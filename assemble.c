@@ -1,8 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "../matrix.io/matrixio_crs.h"
+#include "../matrix.io/matrixio_array.h"
 #include "../matrix.io/utils.h"
 
 typedef float geom_t;
@@ -67,6 +69,13 @@ INLINE real_t dot3(const real_t v1[3], const real_t v2[3]) {
     return ret;
 }
 
+INLINE real_t area3(const real_t left[3], const real_t right[3]) {
+    real_t a = (left[1] * right[2]) - (right[1] * left[2]);
+    real_t b = (left[2] * right[0]) - (right[2] * left[0]);
+    real_t c = (left[0] * right[1]) - (right[0] * left[1]);
+    return sqrt(a * a + b * b + c * c);
+}
+
 int cmpfunc(const void *a, const void *b) { return (*(idx_t *)a - *(idx_t *)b); }
 INLINE void quicksort(idx_t *arr, idx_t size) { qsort(arr, size, sizeof(idx_t), cmpfunc); }
 
@@ -104,8 +113,13 @@ int main(int argc, char *argv[]) {
     }
 
     if (argc < 2) {
-        fprintf(stderr, "usage: %s <folder>", argv[0]);
+        fprintf(stderr, "usage: %s <folder> [output_folder=./]", argv[0]);
         return EXIT_FAILURE;
+    }
+
+    const char *output_folder = "./";
+    if(argc > 2) {
+        output_folder = argv[2];
     }
 
     double tick = MPI_Wtime();
@@ -272,79 +286,175 @@ int main(int argc, char *argv[]) {
     // Operator assembly
     ///////////////////////////////////////////////////////////////////////////////
 
-    real_t jacobian[3 * 3];
-    real_t inverse_jacobian[3 * 3];
-    real_t element_matrix[4 * 4];
+    {
+        real_t jacobian[3 * 3];
+        real_t inverse_jacobian[3 * 3];
+        real_t element_matrix[4 * 4];
 
-    real_t grad_ref[4][3] = {{-1, -1, -1}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
-    real_t grad_test[3];
-    real_t grad_trial[3];
+        real_t grad_ref[4][3] = {{-1, -1, -1}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+        real_t grad_test[3];
+        real_t grad_trial[3];
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
-        // Collect element coordinates
-        for (int d1 = 0; d1 < 3; ++d1) {
-            real_t x0 = (real_t)xyz[d1][elems[0][i]];
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            // Collect element coordinates
+            for (int d1 = 0; d1 < 3; ++d1) {
+                real_t x0 = (real_t)xyz[d1][elems[0][i]];
 
-            for (int d2 = 0; d2 < 3; ++d2) {
-                real_t x1 = (real_t)xyz[d1][elems[d2 + 1][i]];
-                jacobian[d1 * 3 + d2] = x1 - x0;
+                for (int d2 = 0; d2 < 3; ++d2) {
+                    real_t x1 = (real_t)xyz[d1][elems[d2 + 1][i]];
+                    jacobian[d1 * 3 + d2] = x1 - x0;
+                }
             }
-        }
 
-        real_t jacobian_determinant = det3(jacobian);
-        invert3(jacobian, inverse_jacobian, jacobian_determinant);
+            real_t jacobian_determinant = det3(jacobian);
+            invert3(jacobian, inverse_jacobian, jacobian_determinant);
 
-        assert(jacobian_determinant > 0.);
+            assert(jacobian_determinant > 0.);
 
-        for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            mv3(inverse_jacobian, grad_ref[edof_i], grad_test);
+            const real_t dx = jacobian_determinant * 1. / 6.;
 
-            const real_t aii = dot3(grad_test, grad_test) * jacobian_determinant;
+            for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                mv3(inverse_jacobian, grad_ref[edof_i], grad_test);
 
-            element_matrix[edof_i * 4 + edof_i] = aii;
+                const real_t aii = dot3(grad_test, grad_test) * dx;
 
-            for (int edof_j = edof_i + 1; edof_j < 4; ++edof_j) {
-                mv3(inverse_jacobian, grad_ref[edof_j], grad_trial);
+                element_matrix[edof_i * 4 + edof_i] = aii;
 
-                const real_t aij = dot3(grad_test, grad_trial) * jacobian_determinant;
+                for (int edof_j = edof_i + 1; edof_j < 4; ++edof_j) {
+                    mv3(inverse_jacobian, grad_ref[edof_j], grad_trial);
 
-                element_matrix[edof_i * 4 + edof_j] = aij;
-                element_matrix[edof_i + edof_j * 4] = aij;
+                    const real_t aij = dot3(grad_test, grad_trial) * dx;
+
+                    element_matrix[edof_i * 4 + edof_j] = aij;
+                    element_matrix[edof_i + edof_j * 4] = aij;
+                }
             }
-        }
 
 #ifndef NDEBUG
-        real_t sum_matrix = 0.0;
+            real_t sum_matrix = 0.0;
 
-        for (int k = 0; k < 16; ++k) {
-            sum_matrix += element_matrix[k];
-        }
+            for (int k = 0; k < 16; ++k) {
+                sum_matrix += element_matrix[k];
+            }
 
-        assert(sum_matrix < 1e-10);
+            assert(sum_matrix < 1e-10);
 #endif
 
-        // Local to global
-        for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            idx_t dof_i = elems[edof_i][i];
-            idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
+            // Local to global
+            for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                idx_t dof_i = elems[edof_i][i];
+                idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
 
-            idx_t *row = &colidx[rowptr[dof_i]];
-            real_t *rowvalues = &values[rowptr[dof_i]];
+                idx_t *row = &colidx[rowptr[dof_i]];
+                real_t *rowvalues = &values[rowptr[dof_i]];
 
-            for (int edof_j = 0; edof_j < 4; ++edof_j) {
-                idx_t dof_j = elems[edof_j][i];
-                int k = binarysearch(dof_j, row, lenrow);
+                for (int edof_j = 0; edof_j < 4; ++edof_j) {
+                    idx_t dof_j = elems[edof_j][i];
+                    int k = binarysearch(dof_j, row, lenrow);
 
-                rowvalues[k] += element_matrix[edof_i * 4 + edof_j];
+                    rowvalues[k] += element_matrix[edof_i * 4 + edof_j];
+                }
             }
         }
     }
 
     ///////////////////////////////////////////////////////////////////////////////
-    // Write CRS matrix
+    // Boundary conditions
     ///////////////////////////////////////////////////////////////////////////////
 
-    // TODO
+    real_t *rhs = (real_t *)malloc(nnodes * sizeof(real_t));
+    memset(rhs, 0, nnodes * sizeof(real_t));
+
+    {  // Neumann
+        sprintf(path, "%s/on.raw", folder);
+        idx_t *faces_neumann = 0;
+        ptrdiff_t nfacesx3 = read_file(comm, path, (void **)&faces_neumann);
+        idx_t nfaces = (nfacesx3 / 3) / sizeof(idx_t);
+        assert(nfaces * 3 * sizeof(idx_t)== nfacesx3);
+
+        real_t u[3], v[3];
+
+        real_t value = 1.0;
+        for (idx_t f = 0; f < nfaces; ++f) {
+            idx_t i0 = faces_neumann[f * 3];
+            idx_t i1 = faces_neumann[f * 3 + 1];
+            idx_t i2 = faces_neumann[f * 3 + 2];
+
+            for (int d = 0; d < 3; ++d) {
+                u[d] = xyz[d][i1] - xyz[d][i0];
+                v[d] = xyz[d][i2] - xyz[d][i0];
+            }
+
+            real_t dx = area3(u, v);
+            assert(dx > 0.);
+            dx /= 2;
+
+            rhs[i0] += value * dx;
+            rhs[i1] += value * dx;
+            rhs[i2] += value * dx;
+        }
+
+        free(faces_neumann);
+    }
+
+    {
+        // Dirichlet
+        sprintf(path, "%s/zd.raw", folder);
+        idx_t *dirichlet_nodes = 0;
+        ptrdiff_t nn = read_file(comm, path, (void **)&dirichlet_nodes);
+        assert((nn / sizeof(idx_t)) * sizeof(idx_t) == nn);
+        nn /= sizeof(idx_t);
+
+        // Set rhs should not be necessary (but let us do it anyway)
+        for(idx_t node = 0; node < nn; ++node) {
+            idx_t i = dirichlet_nodes[node];
+            rhs[i] = 0;
+        }
+
+        for(idx_t node = 0; node < nn; ++node) {
+            idx_t i = dirichlet_nodes[node];
+
+            idx_t begin = rowptr[i];
+            idx_t end = rowptr[i+1];
+            idx_t lenrow = end - begin;
+            idx_t *cols = &colidx[begin];
+            real_t *row = &values[begin];
+
+            memset(row, 0, sizeof(real_t) * lenrow);
+
+            int k = binarysearch(i, cols, lenrow);
+            assert(k >= 0);
+            row[k] = 1;
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////
+    // Write CRS matrix and rhs vector
+    ///////////////////////////////////////////////////////////////////////////////
+
+    {
+        crs_t crs_out;
+        crs_out.rowptr = (char*)rowptr;
+        crs_out.colidx = (char*)colidx;
+        crs_out.values = (char*)values;
+        crs_out.grows = nnodes;
+        crs_out.lrows = nnodes;
+        crs_out.lnnz = nnz;
+        crs_out.gnnz = nnz;
+        crs_out.start = 0;
+        crs_out.rowoffset = 0;
+
+        // crs_out.rowptr_type_size = sizeof(idx_t);
+        // crs_out.colidx_type_size = sizeof(idx_t);
+        // crs_out.values_type_size = sizeof(real_t);
+
+        crs_write_folder(comm, output_folder, MPI_INT, MPI_INT, MPI_DOUBLE, &crs_out);
+    }
+
+    {
+        sprintf(path, "%s/rhs.raw", output_folder);
+        array_write(comm, path, MPI_DOUBLE, rhs, nnodes, nnodes);
+    }
 
     ///////////////////////////////////////////////////////////////////////////////
     // Free resources
@@ -353,6 +463,7 @@ int main(int argc, char *argv[]) {
     free(rowptr);
     free(colidx);
     free(values);
+    free(rhs);
 
     for (int d = 0; d < 3; ++d) {
         free(xyz[d]);
@@ -368,6 +479,5 @@ int main(int argc, char *argv[]) {
         printf("TTS: %g seconds\n", tock - tick);
     }
 
-    // crs_free(&crs);
     return EXIT_SUCCESS;
 }

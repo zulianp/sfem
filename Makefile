@@ -12,7 +12,7 @@ CC=mpicc
 
 all : $(GOALS)
 
-assemble : assemble.o ../matrix.io/matrixio_crs.o ../matrix.io/utils.o
+assemble : assemble.o ../matrix.io/matrixio_crs.o ../matrix.io/utils.o ../matrix.io/matrixio_array.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
 %.o : %.c
