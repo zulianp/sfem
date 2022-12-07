@@ -1,10 +1,10 @@
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 
-#include "../matrix.io/matrixio_crs.h"
 #include "../matrix.io/matrixio_array.h"
+#include "../matrix.io/matrixio_crs.h"
 #include "../matrix.io/utils.h"
 
 typedef float geom_t;
@@ -118,7 +118,7 @@ int main(int argc, char *argv[]) {
     }
 
     const char *output_folder = "./";
-    if(argc > 2) {
+    if (argc > 2) {
         output_folder = argv[2];
     }
 
@@ -370,7 +370,7 @@ int main(int argc, char *argv[]) {
         idx_t *faces_neumann = 0;
         ptrdiff_t nfacesx3 = read_file(comm, path, (void **)&faces_neumann);
         idx_t nfaces = (nfacesx3 / 3) / sizeof(idx_t);
-        assert(nfaces * 3 * sizeof(idx_t)== nfacesx3);
+        assert(nfaces * 3 * sizeof(idx_t) == nfacesx3);
 
         real_t u[3], v[3];
 
@@ -406,16 +406,16 @@ int main(int argc, char *argv[]) {
         nn /= sizeof(idx_t);
 
         // Set rhs should not be necessary (but let us do it anyway)
-        for(idx_t node = 0; node < nn; ++node) {
+        for (idx_t node = 0; node < nn; ++node) {
             idx_t i = dirichlet_nodes[node];
             rhs[i] = 0;
         }
 
-        for(idx_t node = 0; node < nn; ++node) {
+        for (idx_t node = 0; node < nn; ++node) {
             idx_t i = dirichlet_nodes[node];
 
             idx_t begin = rowptr[i];
-            idx_t end = rowptr[i+1];
+            idx_t end = rowptr[i + 1];
             idx_t lenrow = end - begin;
             idx_t *cols = &colidx[begin];
             real_t *row = &values[begin];
@@ -434,9 +434,9 @@ int main(int argc, char *argv[]) {
 
     {
         crs_t crs_out;
-        crs_out.rowptr = (char*)rowptr;
-        crs_out.colidx = (char*)colidx;
-        crs_out.values = (char*)values;
+        crs_out.rowptr = (char *)rowptr;
+        crs_out.colidx = (char *)colidx;
+        crs_out.values = (char *)values;
         crs_out.grows = nnodes;
         crs_out.lrows = nnodes;
         crs_out.lnnz = nnz;
