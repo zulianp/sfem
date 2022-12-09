@@ -45,8 +45,8 @@ int main(int argc, char *argv[]) {
 
     double tick = MPI_Wtime();
 
-    typedef short indicator_t;
-    MPI_Datatype indicator_mpi_t = MPI_SHORT;
+    typedef float indicator_t;
+    MPI_Datatype indicator_mpi_t = MPI_FLOAT;
 
     indicator_t *indicator = 0;
     ptrdiff_t nnodes = atoll(argv[2]);
