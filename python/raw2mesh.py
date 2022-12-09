@@ -8,11 +8,12 @@ def main(argv):
     directory = "./"
     output_path = "out.vtu"
     field  = None
+    field_dtype = np.float64
 
     try:
         opts, args = getopt.getopt(
             argv[1:], "d:f:h",
-            ["dir=", "field=", "help"])
+            ["dir=", "field=", "field_dtype=", "help"])
 
     except getopt.GetoptError as err:
         print(err)
@@ -28,6 +29,8 @@ def main(argv):
             field = arg
         elif opt in ("-o", "--output"):
             output_path = arg
+        elif opt in ("--field_dtype"):
+            field_dtype = np.dtype(arg)
 
     x = np.fromfile(f'{directory}/x.raw', dtype=np.float32)
     y = np.fromfile(f'{directory}/y.raw', dtype=np.float32)
@@ -47,12 +50,13 @@ def main(argv):
     mesh = meshio.Mesh(points, cells)
 
     if field: 
-        # data = np.fromfile(field, dtype=np.float64)
-        data = np.fromfile(field, dtype=np.float32)
+        data = np.fromfile(field, dtype=field_dtype)
+        # data = np.fromfile(field, dtype=np.float32)
+            
+        print(f'min={np.min(data)}')
+        print(f'max={np.max(data)}')
+        print(f'sum={np.sum(data)}')
         
-        print(np.max(data))
-        print(np.min(data))
-
         mesh.point_data["X"] = data
 
     mesh.write(output_path)

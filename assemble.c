@@ -76,6 +76,35 @@ INLINE real_t area3(const real_t left[3], const real_t right[3]) {
     return sqrt(a * a + b * b + c * c);
 }
 
+INLINE void integrate_neumann(real_t value, real_t area, real_t *element_vector) {
+    element_vector[0] = value * area;
+    element_vector[1] = value * area;
+    element_vector[2] = value * area;
+}
+
+void integrate(const real_t *inverse_jacobian, const real_t volume, real_t *element_matrix) {
+    const real_t grad_ref[4][3] = {{-1, -1, -1}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+    real_t grad_test[3];
+    real_t grad_trial[3];
+
+    for (int edof_i = 0; edof_i < 4; ++edof_i) {
+        mv3(inverse_jacobian, grad_ref[edof_i], grad_test);
+
+        const real_t aii = dot3(grad_test, grad_test) * volume;
+
+        element_matrix[edof_i * 4 + edof_i] = aii;
+
+        for (int edof_j = edof_i + 1; edof_j < 4; ++edof_j) {
+            mv3(inverse_jacobian, grad_ref[edof_j], grad_trial);
+
+            const real_t aij = dot3(grad_test, grad_trial) * volume;
+
+            element_matrix[edof_i * 4 + edof_j] = aij;
+            element_matrix[edof_i + edof_j * 4] = aij;
+        }
+    }
+}
+
 int cmpfunc(const void *a, const void *b) { return (*(idx_t *)a - *(idx_t *)b); }
 INLINE void quicksort(idx_t *arr, idx_t size) { qsort(arr, size, sizeof(idx_t), cmpfunc); }
 
@@ -311,24 +340,8 @@ int main(int argc, char *argv[]) {
 
             assert(jacobian_determinant > 0.);
 
-            const real_t dx = jacobian_determinant * 1. / 6.;
-
-            for (int edof_i = 0; edof_i < 4; ++edof_i) {
-                mv3(inverse_jacobian, grad_ref[edof_i], grad_test);
-
-                const real_t aii = dot3(grad_test, grad_test) * dx;
-
-                element_matrix[edof_i * 4 + edof_i] = aii;
-
-                for (int edof_j = edof_i + 1; edof_j < 4; ++edof_j) {
-                    mv3(inverse_jacobian, grad_ref[edof_j], grad_trial);
-
-                    const real_t aij = dot3(grad_test, grad_trial) * dx;
-
-                    element_matrix[edof_i * 4 + edof_j] = aij;
-                    element_matrix[edof_i + edof_j * 4] = aij;
-                }
-            }
+            const real_t dx = jacobian_determinant / 6.;
+            integrate(inverse_jacobian, dx, element_matrix);
 
 #ifndef NDEBUG
             real_t sum_matrix = 0.0;
@@ -373,6 +386,12 @@ int main(int argc, char *argv[]) {
         assert(nfaces * 3 * sizeof(idx_t) == nfacesx3);
 
         real_t u[3], v[3];
+        real_t element_vector[3];
+
+        real_t jacobian[3 * 3] = {0, 0, 0, 
+                                  0, 0, 0,
+                                  0, 0, 1    
+        };
 
         real_t value = 1.0;
         for (idx_t f = 0; f < nfaces; ++f) {
@@ -380,18 +399,40 @@ int main(int argc, char *argv[]) {
             idx_t i1 = faces_neumann[f * 3 + 1];
             idx_t i2 = faces_neumann[f * 3 + 2];
 
-            for (int d = 0; d < 3; ++d) {
-                u[d] = xyz[d][i1] - xyz[d][i0];
-                v[d] = xyz[d][i2] - xyz[d][i0];
+            real_t dx = 0;
+
+            if(0)
+            {
+                for (int d = 0; d < 3; ++d) {
+                    real_t x0 = (real_t)xyz[d][i0];
+                    real_t x1 = (real_t)xyz[d][i1];
+                    real_t x2 = (real_t)xyz[d][i2];
+
+                    u[d] = x1 - x0;
+                    v[d] = x2 - x0;
+                }
+
+                dx = area3(u, v) / 2;
+            } else {
+                for (int d = 0; d < 3; ++d) {
+                    real_t x0 = (real_t)xyz[d][i0];
+                    real_t x1 = (real_t)xyz[d][i1];
+                    real_t x2 = (real_t)xyz[d][i2];
+
+                    jacobian[d * 3] =  x1 - x0;
+                    jacobian[d * 3 + 1] =  x2 - x0;
+                }
+
+                // Orientation is not proper
+                dx = fabs(det3(jacobian)) / 2;
             }
 
-            real_t dx = area3(u, v);
             assert(dx > 0.);
-            dx /= 2;
+            integrate_neumann(value, dx, element_vector);
 
-            rhs[i0] += value * dx;
-            rhs[i1] += value * dx;
-            rhs[i2] += value * dx;
+            rhs[i0] += element_vector[0];
+            rhs[i1] += element_vector[1];
+            rhs[i2] += element_vector[2];
         }
 
         free(faces_neumann);
@@ -443,10 +484,6 @@ int main(int argc, char *argv[]) {
         crs_out.gnnz = nnz;
         crs_out.start = 0;
         crs_out.rowoffset = 0;
-
-        // crs_out.rowptr_type_size = sizeof(idx_t);
-        // crs_out.colidx_type_size = sizeof(idx_t);
-        // crs_out.values_type_size = sizeof(real_t);
 
         crs_write_folder(comm, output_folder, MPI_INT, MPI_INT, MPI_DOUBLE, &crs_out);
     }
