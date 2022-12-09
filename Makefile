@@ -6,13 +6,19 @@ else
 	CFLAGS += -pedantic -O3 -DNDEBUG
 endif
 
-GOALS = assemble
+GOALS = assemble condense_matrix condense_vector
 
 CC=mpicc
 
 all : $(GOALS)
 
 assemble : assemble.o ../matrix.io/matrixio_crs.o ../matrix.io/utils.o ../matrix.io/matrixio_array.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+
+condense_matrix : condense_matrix.o ../matrix.io/matrixio_crs.o ../matrix.io/utils.o ../matrix.io/matrixio_array.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+
+condense_vector : condense_vector.o ../matrix.io/matrixio_crs.o ../matrix.io/utils.o ../matrix.io/matrixio_array.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
 %.o : %.c
