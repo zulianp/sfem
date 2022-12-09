@@ -30,7 +30,6 @@ def main(argv):
     x = np.fromfile(left, dtype=left_dtype)
     y = np.fromfile(right, dtype=right_dtype)
 
-        
     z = x - factor*y
 
     print(f"len left: {len(x)} right: {len(y)}")

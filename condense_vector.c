@@ -50,9 +50,11 @@ int main(int argc, char *argv[]) {
 
     double tick = MPI_Wtime();
 
+    MPI_Datatype values_mpi_t = MPI_DOUBLE;
+
     real_t *values;
     ptrdiff_t nlocal_, nnodes;
-    array_read(comm, argv[1], MPI_DOUBLE, (void **)&values, &nlocal_, &nnodes);
+    array_read(comm, argv[1], values_mpi_t, (void **)&values, &nlocal_, &nnodes);
 
     idx_t *is_dirichlet = 0;
     ptrdiff_t new_nnodes = 0;
@@ -62,11 +64,11 @@ int main(int argc, char *argv[]) {
 
         idx_t *dirichlet_nodes = 0;
 
-        ptrdiff_t nlocal_, nn;
-        array_read(comm, argv[2], MPI_INT, (void **)&dirichlet_nodes, &nlocal_, &nn);
+        ptrdiff_t nlocal_, ndirichlet;
+        array_read(comm, argv[2], MPI_INT, (void **)&dirichlet_nodes, &nlocal_, &ndirichlet);
 
-        new_nnodes = nnodes - nn;
-        for (ptrdiff_t node = 0; node < nn; ++node) {
+        new_nnodes = nnodes - ndirichlet;
+        for (ptrdiff_t node = 0; node < ndirichlet; ++node) {
             idx_t i = dirichlet_nodes[node];
             is_dirichlet[i] = 1;
         }
@@ -83,9 +85,11 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    array_write(comm, output_path, MPI_DOUBLE, (void*)values, new_nnodes, new_nnodes);
+    array_write(comm, output_path, values_mpi_t, (void*)new_values, new_nnodes, new_nnodes);
 
     free(is_dirichlet);
+    free(values);
+    free(new_values);
 
     double tock = MPI_Wtime();
 

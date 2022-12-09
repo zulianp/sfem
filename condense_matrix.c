@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "../matrix.io/matrixio_array.h"
@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
         output_folder = argv[3];
     }
 
-    if(strcmp(output_folder, argv[1])==0) {
+    if (strcmp(output_folder, argv[1]) == 0) {
         fprintf(stderr, "Input and output folder are the same! Quitting!\n");
         fprintf(stderr, "usage: %s <crs_folder> <dirichlet_nodes.raw> [output_folder=./condensed]", argv[0]);
         return EXIT_FAILURE;
@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
         memset(is_dirichlet, 0, nnodes * sizeof(idx_t));
 
         idx_t *dirichlet_nodes = 0;
-        
+
         ptrdiff_t nlocal_, ndrichlet;
         array_read(comm, argv[2], MPI_INT, (void **)&dirichlet_nodes, &nlocal_, &ndrichlet);
 
@@ -105,68 +105,86 @@ int main(int argc, char *argv[]) {
     const idx_t nrows = crs_in.grows;
     const idx_t nnz = crs_in.gnnz;
 
-    idx_t *new_rowptr = (idx_t*)malloc((new_nnodes + 1) * sizeof(idx_t));
+    idx_t *new_rowptr = (idx_t *)malloc((new_nnodes + 1) * sizeof(idx_t));
     new_rowptr[0] = 0;
+
+    // change name for meaning but reuse memory by overwriting linearly
+    idx_t *mapper = is_dirichlet;
+
+    ptrdiff_t overestimated_new_nnz = 0;
+    for (ptrdiff_t node = 0, new_node_idx = 0; node < nnodes; ++node) {
+        if (!is_dirichlet[node]) {
+            mapper[node] = new_node_idx;
+
+            idx_t range = rowptr[node + 1] - rowptr[node];
+            assert(range > 0);
+            overestimated_new_nnz += range;
+            new_rowptr[++new_node_idx] = range;
+        } else {
+            // nrows is an invalid value
+            mapper[node] = nrows;
+        }
+    }
+
+    // for (ptrdiff_t node = 0; node < new_nnodes; ++node) {
+    //     new_rowptr[node + 1] += new_rowptr[node];
+    // }
+
+    // assert(overestimated_new_nnz == new_rowptr[new_nnodes]);
+
+    // overestimated_new_nnz overestimates the necessary memory
+
+    idx_t *new_colidx = (idx_t *)malloc(overestimated_new_nnz * sizeof(idx_t));
+    real_t *new_values = (real_t *)malloc(overestimated_new_nnz * sizeof(real_t));
 
     ptrdiff_t new_nnz = 0;
     for (ptrdiff_t node = 0, new_node_idx = 0; node < nnodes; ++node) {
-        if (!is_dirichlet[node]) {
-            idx_t range = rowptr[node + 1] - rowptr[node];
-            assert(range > 0);
-            new_nnz += range;
-            new_rowptr[++new_node_idx] = range;
+        if (mapper[node] == nrows) continue;
+        // Only valid rows
+       
+        idx_t start = rowptr[node];
+        idx_t end = rowptr[node + 1];
+
+        idx_t range = end - rowptr[node];
+
+        for (idx_t k = start; k < end; ++k) {
+            idx_t col = colidx[k];
+            if(mapper[col] == nrows) continue;
+            // Only valid columns
+            new_colidx[new_nnz] = mapper[col];
+            new_values[new_nnz] = values[k];
+            new_nnz++;
         }
-    }
 
-    for (ptrdiff_t node = 0; node < new_nnodes; ++node) {
-        new_rowptr[node + 1] += new_rowptr[node];
-    }
-
-    assert(new_nnz == new_rowptr[new_nnodes]);
-
-    idx_t *new_colidx = (idx_t *)malloc(new_nnz * sizeof(idx_t));
-    real_t *new_values = (real_t *)malloc(new_nnz * sizeof(real_t));
-
-    for (ptrdiff_t node = 0, new_node_idx = 0; node < nnodes; ++node) {
-        if (!is_dirichlet[node]) {
-            idx_t start = rowptr[node];
-            idx_t range = rowptr[node + 1] - rowptr[node];
-
-            idx_t new_start = new_rowptr[new_node_idx];
-            idx_t new_range = new_rowptr[new_node_idx + 1] - new_rowptr[new_node_idx];
-
-            assert(new_range == range);
-            assert(new_start <= start);
-
-            memcpy(&new_colidx[new_start], &colidx[start], range * sizeof(idx_t));
-            memcpy(&new_values[new_start], &values[start], range * sizeof(real_t));
-
-            new_node_idx++;
-        }
+        new_rowptr[++new_node_idx] = new_nnz;
     }
 
     // Free input CRS
     crs_free(&crs_in);
 
     {
-       crs_t crs_out;
-       crs_out.rowptr = (char *)new_rowptr;
-       crs_out.colidx = (char *)new_colidx;
-       crs_out.values = (char *)new_values;
-       crs_out.grows = new_nnodes;
-       crs_out.lrows = new_nnodes;
-       crs_out.lnnz = new_nnz;
-       crs_out.gnnz = new_nnz;
-       crs_out.start = 0;
-       crs_out.rowoffset = 0;
+        crs_t crs_out;
+        crs_out.rowptr = (char *)new_rowptr;
+        crs_out.colidx = (char *)new_colidx;
+        crs_out.values = (char *)new_values;
+        crs_out.grows = new_nnodes;
+        crs_out.lrows = new_nnodes;
+        crs_out.lnnz = new_nnz;
+        crs_out.gnnz = new_nnz;
+        crs_out.start = 0;
+        crs_out.rowoffset = 0;
 
-       crs_write_folder(comm, output_folder, MPI_INT, MPI_INT, MPI_DOUBLE, &crs_out);
+        crs_write_folder(comm, output_folder, MPI_INT, MPI_INT, MPI_DOUBLE, &crs_out);
     }
 
     double tock = MPI_Wtime();
 
     if (!rank) {
-        printf("Condensed dofs: from %ld to %ld\n (nnz: %ld to %ld)", (long)nnodes, (long)new_nnodes, (long)nnz, (long)new_nnz);
+        printf("Condensed dofs: from %ld to %ld\n (nnz: %ld to %ld)",
+               (long)nnodes,
+               (long)new_nnodes,
+               (long)nnz,
+               (long)new_nnz);
         printf("TTS: %g seconds\n", tock - tick);
     }
 
