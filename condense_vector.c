@@ -54,11 +54,11 @@ int main(int argc, char *argv[]) {
     ptrdiff_t nlocal_, nnodes;
     array_read(comm, argv[1], MPI_DOUBLE, (void **)&values, &nlocal_, &nnodes);
 
-    idx_t *dof_map = 0;
+    idx_t *is_dirichlet = 0;
     ptrdiff_t new_nnodes = 0;
     {
-        dof_map = (idx_t *)malloc(nnodes * sizeof(idx_t));
-        memset(dof_map, 0, nnodes * sizeof(idx_t));
+        is_dirichlet = (idx_t *)malloc(nnodes * sizeof(idx_t));
+        memset(is_dirichlet, 0, nnodes * sizeof(idx_t));
 
         idx_t *dirichlet_nodes = 0;
 
@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
         new_nnodes = nnodes - nn;
         for (ptrdiff_t node = 0; node < nn; ++node) {
             idx_t i = dirichlet_nodes[node];
-            dof_map[i] = 1;
+            is_dirichlet[i] = 1;
         }
 
         free(dirichlet_nodes);
@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
 
     real_t *new_values = (real_t*)malloc(new_nnodes * sizeof(real_t));
     for (ptrdiff_t node = 0, new_node_idx = 0; node < nnodes; ++node) {
-        if (dof_map[node]) {
+        if (!is_dirichlet[node]) {
             new_values[new_node_idx++] = values[node];
         }
     }

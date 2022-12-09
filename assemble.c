@@ -151,6 +151,8 @@ int main(int argc, char *argv[]) {
         output_folder = argv[2];
     }
 
+    int pure_neumann = 0;
+
     double tick = MPI_Wtime();
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -438,6 +440,7 @@ int main(int argc, char *argv[]) {
         free(faces_neumann);
     }
 
+    if(!pure_neumann)
     {
         // Dirichlet
         sprintf(path, "%s/zd.raw", folder);

@@ -69,47 +69,50 @@ int main(int argc, char *argv[]) {
         mkdir(output_folder, 0700);
     }
 
+    printf("%s %s %s %s\n", argv[0], argv[1], argv[2], output_folder);
+
     double tick = MPI_Wtime();
 
     crs_t crs_in;
     crs_read_folder(comm, argv[1], MPI_INT, MPI_INT, MPI_DOUBLE, &crs_in);
     ptrdiff_t nnodes = crs_in.grows;
 
-    idx_t *dof_map = 0;
+    idx_t *is_dirichlet = 0;
     ptrdiff_t new_nnodes = 0;
     {
-        dof_map = (idx_t *)malloc(nnodes * sizeof(idx_t));
-        memset(dof_map, 0, nnodes * sizeof(idx_t));
+        is_dirichlet = (idx_t *)malloc(nnodes * sizeof(idx_t));
+        memset(is_dirichlet, 0, nnodes * sizeof(idx_t));
 
         idx_t *dirichlet_nodes = 0;
-        ptrdiff_t nn = read_file(comm, argv[2], (void **)&dirichlet_nodes);
-        assert((nn / sizeof(idx_t)) * sizeof(idx_t) == nn);
-        nn /= sizeof(idx_t);
+        
+        ptrdiff_t nlocal_, ndrichlet;
+        array_read(comm, argv[2], MPI_INT, (void **)&dirichlet_nodes, &nlocal_, &ndrichlet);
 
-        new_nnodes = nnodes - nn;
+        new_nnodes = nnodes - ndrichlet;
 
-        for (ptrdiff_t node = 0; node < nn; ++node) {
+        for (ptrdiff_t node = 0; node < ndrichlet; ++node) {
             idx_t i = dirichlet_nodes[node];
-            dof_map[i] = 1;
+            assert(i < nnodes);
+            is_dirichlet[i] = 1;
         }
 
         free(dirichlet_nodes);
     }
 
-    idx_t *rowptr = (idx_t *)crs_in.rowptr;
-    idx_t *colidx = (idx_t *)crs_in.colidx;
-    idx_t *values = (idx_t *)crs_in.values;
-    idx_t nrows = crs_in.grows;
-    idx_t nnz = crs_in.gnnz;
+    const idx_t *rowptr = (const idx_t *)crs_in.rowptr;
+    const idx_t *colidx = (const idx_t *)crs_in.colidx;
+    const idx_t *values = (const idx_t *)crs_in.values;
+    const idx_t nrows = crs_in.grows;
+    const idx_t nnz = crs_in.gnnz;
 
     idx_t *new_rowptr = (idx_t*)malloc((new_nnodes + 1) * sizeof(idx_t));
     new_rowptr[0] = 0;
 
     ptrdiff_t new_nnz = 0;
-
     for (ptrdiff_t node = 0, new_node_idx = 0; node < nnodes; ++node) {
-        if (dof_map[node]) {
+        if (!is_dirichlet[node]) {
             idx_t range = rowptr[node + 1] - rowptr[node];
+            assert(range > 0);
             new_nnz += range;
             new_rowptr[++new_node_idx] = range;
         }
@@ -125,7 +128,7 @@ int main(int argc, char *argv[]) {
     real_t *new_values = (real_t *)malloc(new_nnz * sizeof(real_t));
 
     for (ptrdiff_t node = 0, new_node_idx = 0; node < nnodes; ++node) {
-        if (dof_map[node]) {
+        if (!is_dirichlet[node]) {
             idx_t start = rowptr[node];
             idx_t range = rowptr[node + 1] - rowptr[node];
 
@@ -163,7 +166,7 @@ int main(int argc, char *argv[]) {
     double tock = MPI_Wtime();
 
     if (!rank) {
-        printf("Condensed dofs: from %ld to %ld\n", (long)nnodes, (long)new_nnodes);
+        printf("Condensed dofs: from %ld to %ld\n (nnz: %ld to %ld)", (long)nnodes, (long)new_nnodes, (long)nnz, (long)new_nnz);
         printf("TTS: %g seconds\n", tock - tick);
     }
 
