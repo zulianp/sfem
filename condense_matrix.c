@@ -126,14 +126,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // for (ptrdiff_t node = 0; node < new_nnodes; ++node) {
-    //     new_rowptr[node + 1] += new_rowptr[node];
-    // }
-
-    // assert(overestimated_new_nnz == new_rowptr[new_nnodes]);
-
-    // overestimated_new_nnz overestimates the necessary memory
-
     idx_t *new_colidx = (idx_t *)malloc(overestimated_new_nnz * sizeof(idx_t));
     real_t *new_values = (real_t *)malloc(overestimated_new_nnz * sizeof(real_t));
 
@@ -141,7 +133,7 @@ int main(int argc, char *argv[]) {
     for (ptrdiff_t node = 0, new_node_idx = 0; node < nnodes; ++node) {
         if (mapper[node] == nrows) continue;
         // Only valid rows
-       
+
         idx_t start = rowptr[node];
         idx_t end = rowptr[node + 1];
 
@@ -149,9 +141,12 @@ int main(int argc, char *argv[]) {
 
         for (idx_t k = start; k < end; ++k) {
             idx_t col = colidx[k];
-            if(mapper[col] == nrows) continue;
+            idx_t new_col = mapper[col];
+
+            if (new_col == nrows) continue;
+
             // Only valid columns
-            new_colidx[new_nnz] = mapper[col];
+            new_colidx[new_nnz] = new_col;
             new_values[new_nnz] = values[k];
             new_nnz++;
         }

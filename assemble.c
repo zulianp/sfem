@@ -34,18 +34,25 @@ INLINE real_t det3(const real_t *mat) {
            mat[1] * mat[3] * mat[8] - mat[2] * mat[4] * mat[6];
 }
 
+INLINE void adjugate3(const real_t *mat, real_t *mat_adj) {
+    mat_adj[0] = (mat[4] * mat[8] - mat[5] * mat[7]);
+    mat_adj[1] = (mat[2] * mat[7] - mat[1] * mat[8]);
+    mat_adj[2] = (mat[1] * mat[5] - mat[2] * mat[4]);
+    mat_adj[3] = (mat[5] * mat[6] - mat[3] * mat[8]);
+    mat_adj[4] = (mat[0] * mat[8] - mat[2] * mat[6]);
+    mat_adj[5] = (mat[2] * mat[3] - mat[0] * mat[5]);
+    mat_adj[6] = (mat[3] * mat[7] - mat[4] * mat[6]);
+    mat_adj[7] = (mat[1] * mat[6] - mat[0] * mat[7]);
+    mat_adj[8] = (mat[0] * mat[4] - mat[1] * mat[3]);
+}
+
 INLINE void invert3(const real_t *mat, real_t *mat_inv, const real_t det) {
     assert(det != 0.);
+    adjugate3(mat, mat_inv);
 
-    mat_inv[0] = (mat[4] * mat[8] - mat[5] * mat[7]) / det;
-    mat_inv[1] = (mat[2] * mat[7] - mat[1] * mat[8]) / det;
-    mat_inv[2] = (mat[1] * mat[5] - mat[2] * mat[4]) / det;
-    mat_inv[3] = (mat[5] * mat[6] - mat[3] * mat[8]) / det;
-    mat_inv[4] = (mat[0] * mat[8] - mat[2] * mat[6]) / det;
-    mat_inv[5] = (mat[2] * mat[3] - mat[0] * mat[5]) / det;
-    mat_inv[6] = (mat[3] * mat[7] - mat[4] * mat[6]) / det;
-    mat_inv[7] = (mat[1] * mat[6] - mat[0] * mat[7]) / det;
-    mat_inv[8] = (mat[0] * mat[4] - mat[1] * mat[3]) / det;
+    for (int i = 0; i < 9; ++i) {
+        mat_inv[i] /= det;
+    }
 }
 
 INLINE void mv3(const real_t A[3 * 3], const real_t v[3], real_t *out) {
@@ -337,13 +344,24 @@ int main(int argc, char *argv[]) {
                 }
             }
 
-            real_t jacobian_determinant = det3(jacobian);
-            invert3(jacobian, inverse_jacobian, jacobian_determinant);
+            if (0) {
+                real_t jacobian_determinant = det3(jacobian);
+                invert3(jacobian, inverse_jacobian, jacobian_determinant);
 
-            assert(jacobian_determinant > 0.);
+                assert(jacobian_determinant > 0.);
 
-            const real_t dx = jacobian_determinant / 6.;
-            integrate(inverse_jacobian, dx, element_matrix);
+                const real_t dx = jacobian_determinant / 6.;
+                integrate(inverse_jacobian, dx, element_matrix);
+            } else {
+                // 9 less operations
+                real_t jacobian_determinant = det3(jacobian);
+                adjugate3(jacobian, inverse_jacobian);
+
+                assert(jacobian_determinant > 0.);
+
+                const real_t dx = 1./(jacobian_determinant * 6.);
+                integrate(inverse_jacobian, dx, element_matrix);
+            }
 
 #ifndef NDEBUG
             real_t sum_matrix = 0.0;
@@ -390,10 +408,7 @@ int main(int argc, char *argv[]) {
         real_t u[3], v[3];
         real_t element_vector[3];
 
-        real_t jacobian[3 * 3] = {0, 0, 0, 
-                                  0, 0, 0,
-                                  0, 0, 1    
-        };
+        real_t jacobian[3 * 3] = {0, 0, 0, 0, 0, 0, 0, 0, 1};
 
         real_t value = 1.0;
         for (idx_t f = 0; f < nfaces; ++f) {
@@ -403,8 +418,7 @@ int main(int argc, char *argv[]) {
 
             real_t dx = 0;
 
-            if(0)
-            {
+            if (0) {
                 for (int d = 0; d < 3; ++d) {
                     real_t x0 = (real_t)xyz[d][i0];
                     real_t x1 = (real_t)xyz[d][i1];
@@ -416,16 +430,17 @@ int main(int argc, char *argv[]) {
 
                 dx = area3(u, v) / 2;
             } else {
+                // No square roots in this version
                 for (int d = 0; d < 3; ++d) {
                     real_t x0 = (real_t)xyz[d][i0];
                     real_t x1 = (real_t)xyz[d][i1];
                     real_t x2 = (real_t)xyz[d][i2];
 
-                    jacobian[d * 3] =  x1 - x0;
-                    jacobian[d * 3 + 1] =  x2 - x0;
+                    jacobian[d * 3] = x1 - x0;
+                    jacobian[d * 3 + 1] = x2 - x0;
                 }
 
-                // Orientation is not proper
+                // Orientation of face is not proper
                 dx = fabs(det3(jacobian)) / 2;
             }
 
@@ -440,8 +455,7 @@ int main(int argc, char *argv[]) {
         free(faces_neumann);
     }
 
-    if(!pure_neumann)
-    {
+    if (!pure_neumann) {
         // Dirichlet
         sprintf(path, "%s/zd.raw", folder);
         idx_t *dirichlet_nodes = 0;
