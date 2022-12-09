@@ -75,6 +75,8 @@ int main(int argc, char *argv[]) {
     }
 
     real_t *new_values = (real_t*)malloc(new_nnodes * sizeof(real_t));
+    memset(new_values, 0, new_nnodes * sizeof(real_t));
+
     for (ptrdiff_t node = 0, new_node_idx = 0; node < nnodes; ++node) {
         if (!is_dirichlet[node]) {
             new_values[new_node_idx++] = values[node];
@@ -82,6 +84,8 @@ int main(int argc, char *argv[]) {
     }
 
     array_write(comm, output_path, MPI_DOUBLE, (void*)values, new_nnodes, new_nnodes);
+
+    free(is_dirichlet);
 
     double tock = MPI_Wtime();
 
