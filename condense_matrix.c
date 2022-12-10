@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
 
     const idx_t *rowptr = (const idx_t *)crs_in.rowptr;
     const idx_t *colidx = (const idx_t *)crs_in.colidx;
-    const idx_t *values = (const idx_t *)crs_in.values;
+    const real_t *values = (const real_t *)crs_in.values;
     const idx_t nrows = crs_in.grows;
     const idx_t nnz = crs_in.gnnz;
 
