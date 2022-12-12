@@ -12,8 +12,8 @@ def main(argv):
 
     try:
         opts, args = getopt.getopt(
-            argv[1:], "d:f:h",
-            ["dir=", "field=", "field_dtype=", "help"])
+            argv[1:], "d:f:o:h",
+            ["dir=", "field=", "field_dtype=", "output=", "help"])
 
     except getopt.GetoptError as err:
         print(err)

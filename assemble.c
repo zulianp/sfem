@@ -12,7 +12,7 @@ typedef int idx_t;
 typedef double real_t;
 
 #ifdef NDEBUG
-#define INLINE inline
+#define INLINE
 #else
 #define INLINE
 #endif
@@ -55,17 +55,31 @@ INLINE void invert3(const real_t *mat, real_t *mat_inv, const real_t det) {
     }
 }
 
-INLINE void mv3(const real_t A[3 * 3], const real_t v[3], real_t *out) {
+// INLINE void mv3(const real_t A[3 * 3], const real_t v[3], real_t *out) {
+//     for (int i = 0; i < 3; ++i) {
+//         out[i] = 0;
+//     }
+
+//     for (int i = 0; i < 3; ++i) {
+//         for (int j = 0; j < 3; ++j) {
+//             out[i] += A[i * 3 + j] * v[j];
+//         }
+//     }
+// }
+
+INLINE void mtv3(const real_t A[3 * 3], const real_t v[3], real_t *out) {
     for (int i = 0; i < 3; ++i) {
         out[i] = 0;
     }
 
     for (int i = 0; i < 3; ++i) {
         for (int j = 0; j < 3; ++j) {
-            out[i] += A[i * 3 + j] * v[j];
+            out[i] += A[i  + j * 3] * v[j];
         }
     }
 }
+
+
 
 INLINE real_t dot3(const real_t v1[3], const real_t v2[3]) {
     real_t ret = 0;
@@ -95,14 +109,14 @@ void integrate(const real_t *inverse_jacobian, const real_t dV, real_t *element_
     real_t grad_trial[3];
 
     for (int edof_i = 0; edof_i < 4; ++edof_i) {
-        mv3(inverse_jacobian, grad_ref[edof_i], grad_test);
+        mtv3(inverse_jacobian, grad_ref[edof_i], grad_test);
 
         const real_t aii = dot3(grad_test, grad_test) * dV;
 
         element_matrix[edof_i * 4 + edof_i] = aii;
 
         for (int edof_j = edof_i + 1; edof_j < 4; ++edof_j) {
-            mv3(inverse_jacobian, grad_ref[edof_j], grad_trial);
+            mtv3(inverse_jacobian, grad_ref[edof_j], grad_trial);
 
             const real_t aij = dot3(grad_test, grad_trial) * dV;
 
@@ -110,6 +124,16 @@ void integrate(const real_t *inverse_jacobian, const real_t dV, real_t *element_
             element_matrix[edof_i + edof_j * 4] = aij;
         }
     }
+}
+
+void print_element_matrix(const real_t *element_matrix) {
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            printf("%g ", element_matrix[i * 4 + j]);
+        }
+        printf("\n");
+    }
+    printf("\n");
 }
 
 void integrate_code_gen(real_t x0,
@@ -416,7 +440,7 @@ int main(int argc, char *argv[]) {
         real_t grad_trial[3];
 
         for (ptrdiff_t i = 0; i < nelements; ++i) {
-            if (1) {
+            if (0) {
                 // Use code generated kernel
 
                 // Element indices
@@ -455,7 +479,7 @@ int main(int argc, char *argv[]) {
                     }
                 }
 
-                if (0) {
+                if (1) {
                     real_t jacobian_determinant = det3(jacobian);
                     invert3(jacobian, inverse_jacobian, jacobian_determinant);
 
@@ -474,6 +498,8 @@ int main(int argc, char *argv[]) {
                     integrate(inverse_jacobian, dx, element_matrix);
                 }
             }
+
+            print_element_matrix(element_matrix);
 
 #ifndef NDEBUG
             real_t sum_matrix = 0.0;
@@ -523,6 +549,7 @@ int main(int argc, char *argv[]) {
         real_t jacobian[3 * 3] = {0, 0, 0, 0, 0, 0, 0, 0, 1};
 
         real_t value = 1.0;
+        // real_t value = 2.0;
         for (idx_t f = 0; f < nfaces; ++f) {
             idx_t i0 = faces_neumann[f * 3];
             idx_t i1 = faces_neumann[f * 3 + 1];
