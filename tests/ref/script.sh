@@ -3,6 +3,12 @@
 set -e
 set -x
 
+touch on.raw zd.raw
+
+if [ ! -d "./out/" ]; then
+	mkdir out
+fi
+
 ../../python/create_test_mesh.py . 1.0
 ../../assemble . ./out
 ../../../matrix.io/print_crs out/rowptr.raw out/colidx.raw out/values.raw int int double
