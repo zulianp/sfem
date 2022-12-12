@@ -31,7 +31,7 @@ idx_to_indicator : idx_to_indicator.o ../matrix.io/matrixio_crs.o ../matrix.io/u
 .PRECIOUS :
 
 clean:
-	rm *.o $(GOALS) 
+	rm *.o $(GOALS)
 
 .SUFFIXES:
 

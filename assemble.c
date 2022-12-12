@@ -74,12 +74,10 @@ INLINE void mtv3(const real_t A[3 * 3], const real_t v[3], real_t *out) {
 
     for (int i = 0; i < 3; ++i) {
         for (int j = 0; j < 3; ++j) {
-            out[i] += A[i  + j * 3] * v[j];
+            out[i] += A[i + j * 3] * v[j];
         }
     }
 }
-
-
 
 INLINE real_t dot3(const real_t v1[3], const real_t v2[3]) {
     real_t ret = 0;
