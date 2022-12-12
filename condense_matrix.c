@@ -168,8 +168,11 @@ int main(int argc, char *argv[]) {
         crs_out.gnnz = new_nnz;
         crs_out.start = 0;
         crs_out.rowoffset = 0;
+        crs_out.rowptr_type = MPI_INT;
+        crs_out.colidx_type = MPI_INT;
+        crs_out.values_type = MPI_DOUBLE;
 
-        crs_write_folder(comm, output_folder, MPI_INT, MPI_INT, MPI_DOUBLE, &crs_out);
+        crs_write_folder(comm, output_folder, &crs_out);
     }
 
     double tock = MPI_Wtime();

@@ -55,8 +55,6 @@ A = sp.Matrix(3, 3, [
 	 z1 - z0, z2 - z0, z3 - z0,
 	])
 
-# print(A[0, 1])
-
 Ainv = inv3(A)
 
 b = sp.Matrix(3, 1, [x0, y0, z0])
@@ -80,12 +78,6 @@ def fun(x, y, z):
 	return ref_fun(xref, yref, zref)
 
 f = fun(qx, qy, qz)
-
-
-# print(sp.simplify(sp.diff(f[0], qx)))
-
-# https://tutorial.math.lamar.edu/classes/calciii/changeofvariables.aspx
-# dV = det3(Ainv) / 6
 dV = det3(A) / 6
 
 expr = []

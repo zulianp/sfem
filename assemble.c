@@ -46,7 +46,7 @@ INLINE void adjugate3(const real_t *mat, real_t *mat_adj) {
     mat_adj[8] = (mat[0] * mat[4] - mat[1] * mat[3]);
 }
 
-INLINE void invert3(const real_t *mat, real_t *mat_inv, const real_t det) {
+INLINE void inverse3(const real_t *mat, real_t *mat_inv, const real_t det) {
     assert(det != 0.);
     adjugate3(mat, mat_inv);
 
@@ -134,7 +134,7 @@ void print_element_matrix(const real_t *element_matrix) {
     printf("\n");
 }
 
-void integrate_code_gen(real_t x0,
+INLINE void integrate_code_gen(real_t x0,
                         real_t x1,
                         real_t x2,
                         real_t x3,
@@ -479,7 +479,7 @@ int main(int argc, char *argv[]) {
 
                 if (1) {
                     real_t jacobian_determinant = det3(jacobian);
-                    invert3(jacobian, inverse_jacobian, jacobian_determinant);
+                    inverse3(jacobian, inverse_jacobian, jacobian_determinant);
 
                     assert(jacobian_determinant > 0.);
 
@@ -497,7 +497,7 @@ int main(int argc, char *argv[]) {
                 }
             }
 
-            print_element_matrix(element_matrix);
+            // print_element_matrix(element_matrix);
 
 #ifndef NDEBUG
             real_t sum_matrix = 0.0;
@@ -638,8 +638,10 @@ int main(int argc, char *argv[]) {
         crs_out.gnnz = nnz;
         crs_out.start = 0;
         crs_out.rowoffset = 0;
-
-        crs_write_folder(comm, output_folder, MPI_INT, MPI_INT, MPI_DOUBLE, &crs_out);
+        crs_out.rowptr_type = MPI_INT;
+        crs_out.colidx_type = MPI_INT;
+        crs_out.values_type = MPI_DOUBLE;
+        crs_write_folder(comm, output_folder, &crs_out);
     }
 
     {
