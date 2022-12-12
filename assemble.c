@@ -438,7 +438,7 @@ int main(int argc, char *argv[]) {
         real_t grad_trial[3];
 
         for (ptrdiff_t i = 0; i < nelements; ++i) {
-            if (0) {
+            if (1) {
                 // Use code generated kernel
 
                 // Element indices
