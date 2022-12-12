@@ -2,7 +2,6 @@
 
 import meshio
 import numpy as np
-import pyaml
 import sys
 
 def main(argv):
