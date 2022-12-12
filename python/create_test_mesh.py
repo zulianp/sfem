@@ -6,26 +6,27 @@ import sys
 
 def main(argv):
 	output = "./"
-	xfactor = 1.0
-	yfactor = 1.0
-	zfactor = 1.0
 
 	if(len(argv) > 1):
 		output = argv[1]
-
-	if(len(argv) > 2):
-		xfactor = float(argv[2])
-
-	if(len(argv) > 3):
-		yfactor = float(argv[3])
-
-	if(len(argv) > 4):
-		zfactor = float(argv[4])
 
 	if False:
 	# if True:
 		mesh = meshio.read('./mesh.e')
 	else:
+		xfactor = 1.0
+		yfactor = 1.0
+		zfactor = 1.0
+
+		if(len(argv) > 2):
+			xfactor = float(argv[2])
+
+		if(len(argv) > 3):
+			yfactor = float(argv[3])
+
+		if(len(argv) > 4):
+			zfactor = float(argv[4])
+
 		# two triangles and one quad
 		points = [
 		    [0.0, 0.0, 0],
@@ -44,15 +45,9 @@ def main(argv):
 	)
 
 	n_cells=0
-	n_nodes_x_cell = 0
-	cell_type='Undef'
-
 	for b in mesh.cells:
 		d = b.data
-		cell_type = b.type
 		n_cells += len(d)
-		n_nodes_x_cell = np.max(len(d[0]))
-
 
 	i0 = np.zeros(n_cells, dtype=np.int32)
 	i1 = np.zeros(n_cells, dtype=np.int32)
@@ -69,8 +64,9 @@ def main(argv):
 			assert( elem[0] >= 0)
 			idx += 1
 
-
+	###################################
 	# Export indices
+	###################################
 
 	# First node of each element
 	i0.astype(np.int32).tofile(f'{output}/i0.raw')
@@ -81,11 +77,14 @@ def main(argv):
 	# ...
 	i2.astype(np.int32).tofile(f'{output}/i2.raw')
 
-	# 
+	# ...
 	i3.astype(np.int32).tofile(f'{output}/i3.raw')
 
-	xyz = np.transpose(mesh.points)
+	###################################
+	# Points
+	###################################
 
+	xyz = np.transpose(mesh.points)
 	x = xyz[0, :].astype(np.float32)
 	y = xyz[1, :].astype(np.float32)
 	z = xyz[2, :].astype(np.float32)
@@ -93,15 +92,6 @@ def main(argv):
 	x.tofile(f'{output}/x.raw')
 	y.tofile(f'{output}/y.raw')
 	z.tofile(f'{output}/z.raw')
-
-	print(i0)
-	print(i1)
-	print(i2)
-	print(i3)
-
-	print(x)
-	print(y)
-	print(z)
 
 	print(n_cells)
 

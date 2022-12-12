@@ -48,3 +48,10 @@ Thumbs.db
 *.mov
 *.wmv
 
+# C/C++ artifacts
+*.o
+
+# Output files
+*.raw 
+*.vtu
+

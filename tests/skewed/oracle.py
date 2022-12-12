@@ -7,7 +7,11 @@ xfactor = 2.
 yfactor = 1.
 zfactor = 1.
 
-dx = (xfactor*yfactor*zfactor) / 6.0
+# Patrick
+#dx = (xfactor*yfactor*zfactor) / 6.0
+
+# Diego
+dx = 1/(xfactor*yfactor*zfactor* 6.0)
 
 grad0 = np.array([-1/xfactor, -1/yfactor, -1/zfactor])
 grad1 = np.array([1/xfactor,  0,  0])
