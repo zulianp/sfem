@@ -672,5 +672,6 @@ int main(int argc, char *argv[]) {
         printf("TTS: %g seconds\n", tock - tick);
     }
 
-    return EXIT_SUCCESS;
+
+    return MPI_Finalize();
 }
