@@ -47,8 +47,10 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    const char * help = "usage: %s <crs_folder> <dirichlet_nodes.raw> [output_folder=./condensed]";
+
     if (argc < 3) {
-        fprintf(stderr, "usage: %s <crs_folder> <dirichlet_nodes.raw> [output_folder=./condensed]", argv[0]);
+        fprintf(stderr, help, argv[0]);
         return EXIT_FAILURE;
     }
 
@@ -60,7 +62,7 @@ int main(int argc, char *argv[]) {
 
     if (strcmp(output_folder, argv[1]) == 0) {
         fprintf(stderr, "Input and output folder are the same! Quitting!\n");
-        fprintf(stderr, "usage: %s <crs_folder> <dirichlet_nodes.raw> [output_folder=./condensed]", argv[0]);
+        fprintf(stderr, help, argv[0]);
         return EXIT_FAILURE;
     }
 

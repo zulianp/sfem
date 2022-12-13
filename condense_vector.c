@@ -31,8 +31,10 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    const char * help = "usage: %s <array.raw> <dirichlet_nodes.raw> [out=condensed.raw]";
+    
     if (argc < 3) {
-        fprintf(stderr, "usage: %s <array.raw> <dirichlet_nodes.raw> [out=condensed.raw]", argv[0]);
+        fprintf(stderr, help, argv[0]);
         return EXIT_FAILURE;
     }
 
@@ -44,7 +46,7 @@ int main(int argc, char *argv[]) {
 
     if (strcmp(output_path, argv[1]) == 0) {
         fprintf(stderr, "Input and output are the same! Quitting!\n");
-        fprintf(stderr, "usage: %s <array.raw> <dirichlet_nodes.raw> [output_path=./condensed]", argv[0]);
+        fprintf(stderr, help, argv[0]);
         return EXIT_FAILURE;
     }
 
