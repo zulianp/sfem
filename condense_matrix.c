@@ -156,6 +156,8 @@ int main(int argc, char *argv[]) {
         new_rowptr[++new_node_idx] = new_nnz;
     }
 
+    free(is_dirichlet); // mapper is invalidated here!
+
     // Free input CRS
     crs_free(&crs_in);
 

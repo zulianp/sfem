@@ -6,7 +6,7 @@ else
 	CFLAGS += -pedantic -O3 -DNDEBUG
 endif
 
-GOALS = assemble condense_matrix condense_vector idx_to_indicator
+GOALS = assemble condense_matrix condense_vector idx_to_indicator remap_vector
 
 CC=mpicc
 
@@ -18,10 +18,13 @@ assemble : assemble.o ../matrix.io/matrixio_crs.o ../matrix.io/utils.o ../matrix
 condense_matrix : condense_matrix.o ../matrix.io/matrixio_crs.o ../matrix.io/utils.o ../matrix.io/matrixio_array.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
-condense_vector : condense_vector.o ../matrix.io/matrixio_crs.o ../matrix.io/utils.o ../matrix.io/matrixio_array.o
+condense_vector : condense_vector.o ../matrix.io/utils.o ../matrix.io/matrixio_array.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
-idx_to_indicator : idx_to_indicator.o ../matrix.io/matrixio_crs.o ../matrix.io/utils.o ../matrix.io/matrixio_array.o
+idx_to_indicator : idx_to_indicator.o ../matrix.io/utils.o ../matrix.io/matrixio_array.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+
+remap_vector : remap_vector.o ../matrix.io/utils.o ../matrix.io/matrixio_array.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
 %.o : %.c
