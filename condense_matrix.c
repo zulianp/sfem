@@ -178,7 +178,7 @@ int main(int argc, char *argv[]) {
     double tock = MPI_Wtime();
 
     if (!rank) {
-        printf("Condensed dofs: from %ld to %ld\n (nnz: %ld to %ld)",
+        printf("Condensed dofs: from %ld to %ld\n (nnz: %ld to %ld)\n",
                (long)nnodes,
                (long)new_nnodes,
                (long)nnz,

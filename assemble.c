@@ -262,6 +262,8 @@ int main(int argc, char *argv[]) {
         output_folder = argv[2];
     }
 
+    printf("%s %s %s\n", argv[0], argv[1], output_folder);
+
     int pure_neumann = 0;
 
     double tick = MPI_Wtime();
