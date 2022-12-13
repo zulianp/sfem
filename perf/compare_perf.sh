@@ -36,6 +36,7 @@ fi
 ##############
 # SFEM
 #############
+echo "software: SFEM"
 
 # Assemble operator
 mpirun -np 1 assemble $case_folder ./out
@@ -53,6 +54,7 @@ mpirun utopia_exec -app ls_solve -A ./condensed/rowptr.raw -b ./condensed/rhs.ra
 ##############
 # LAPLSOL
 #############
+echo "software: LAPLSOL"
 
 # Assemble operator
 pre $case_folder
