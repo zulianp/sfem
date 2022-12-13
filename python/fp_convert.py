@@ -21,7 +21,7 @@ def main(argv):
     if(argc > 4):
         dtype_output = argv[4]
 
-    print(f"{argv[0]} {path_input} {path_output} {dtype_input} {dtype_output}")
+    # print(f"{argv[0]} {path_input} {path_output} {dtype_input} {dtype_output}")
 
     x = np.fromfile(path_input, dtype=dtype_input)
     x.astype(dtype_output).tofile(path_output)

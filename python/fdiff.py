@@ -25,7 +25,7 @@ def main(argv):
 
     if len(argv) > 5:
         factor = float(argv[5])
-        print(f"{argv[0]} {argv[1]} {argv[2]} {argv[3]} {argv[4]} {argv[5]}")
+        # print(f"{argv[0]} {argv[1]} {argv[2]} {argv[3]} {argv[4]} {argv[5]}")
 
     if len(argv)> 6:
         figurename = argv[6]
@@ -37,19 +37,17 @@ def main(argv):
     x = np.fromfile(left, dtype=left_dtype)
     y = np.fromfile(right, dtype=right_dtype)
 
+    if(len(x) != len(y)):
+        exit(1)
+
     z = np.abs(x - factor*y.astype(left_dtype))
 
-    print(f"len left: {len(x)} right: {len(y)}")
+    sum_z = np.sum(z)
+    print(f'diff\n - {left}\n - {right}\n > max: {np.max(z)}, sum={sum_z}')
 
-    print('total')
-    print(f'min: {np.min(x)}={np.min(y)}')
-    print(f'max: {np.max(x)}={np.max(y)}')
-    print(f'sum: {np.sum(x)}={np.sum(y)}')
+    if(sum_z == 0):
+        return
 
-    print('element wise')
-    print(f'min={np.min(z)}')
-    print(f'max={np.max(z)}')
-    print(f'sum={np.sum(z)}')
 
     # print(numpy.histogram(z, bins=10, range=None, normed=None, weights=None, density=None))
     _ = plt.hist(z, bins='auto')  # arguments are passed to np.histogram
