@@ -3,7 +3,7 @@
 #SBATCH -J PerfHydroS
 #SBATCH --ntasks=20
 #SBATCH --nodes=1
-#SBATCH --time=00:10:00
+#SBATCH --time=00:40:00
 #SBATCH --exclusive
 #SBATCH --mem=12020
 
@@ -49,7 +49,7 @@ mpirun -np 1 condense_vector ./out/rhs.raw $case_folder/zd.raw condensed/rhs.raw
 mpirun utopia_exec -app ls_solve -A ./condensed/rowptr.raw -b ./condensed/rhs.raw -use_amg false --use_ksp -pc_type hypre -ksp_type cg -atol 1e-18 -rtol 0 -stol 1e-19 -out ./condensed/out.raw
 
 # Missing post processing of vector
-# TODO
+mpirun -np 1 remap_vector ./condensed/out.raw $case_folder/zd.raw ./out.raw
 
 ##############
 # LAPLSOL
@@ -57,13 +57,13 @@ mpirun utopia_exec -app ls_solve -A ./condensed/rowptr.raw -b ./condensed/rhs.ra
 echo "software: LAPLSOL"
 
 # Assemble operator
-pre $case_folder
+laplsol-bc $case_folder
 laplsol-asm $case_folder
 
 # Parallel linear solve
-mpirun spsolve $case_folder $case_folder/rhs.raw $case_folder/sol.raw
+mpirun laplsol-solve $case_folder $case_folder/rhs.raw $case_folder/sol.raw
 
 # Post processing of solution vector
-post $case_folder $case_folder/sol.raw
+laplsol-post $case_folder $case_folder/sol.raw
 
 cd $HERE
