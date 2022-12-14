@@ -52,6 +52,10 @@ def main(argv):
     if field: 
         data = np.fromfile(field, dtype=field_dtype)
         # data = np.fromfile(field, dtype=np.float32)
+
+        if(len(data) != len(x)):
+            print(f"Error: data lenght is different from number of nodes {len(data)} != {len(x)}")
+            exit(1)
             
         print(f'min={np.min(data)}')
         print(f'max={np.max(data)}')
