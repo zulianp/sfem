@@ -42,3 +42,16 @@ fdiff.py pat/values.fp32.raw 	downloads/lhs.value.raw 	float32 float32 1 figures
 fdiff.py pat/rhs.fp32.raw 		downloads/rhs.raw 			float32 float32 1 figures/rhs_pat_vs_diego_rhs.png
 fdiff.py pat/sol.fp32.raw 		diego/sol.fp32.raw  		float32 float32 1 figures/sol_pat_vs_diego_sol.png
 fdiff.py diego/sol.fp32.raw 	downloads/p.raw 			float32 float32 1 figures/sol_diego_vs_diego_sol.png
+
+diffsol.py diego/sol.fp32.raw pat/sol.fp32.raw ./diego/diff.fp32.raw
+
+# Paraview
+
+raw2mesh.py -d $case_folder -f ./diego/diff.fp32.raw --field_dtype=float32
+mv out.vtu diego/diff.vtu
+
+raw2mesh.py -d $case_folder -f diego/sol.fp32.raw --field_dtype=float32
+mv out.vtu diego/sol.vtu
+
+raw2mesh.py -d $case_folder -f pat/sol.fp32.raw --field_dtype=float32
+mv out.vtu pat/sol.vtu
