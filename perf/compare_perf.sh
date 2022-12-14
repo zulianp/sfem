@@ -10,6 +10,12 @@
 set -e
 # set -x
 
+module purge
+module load petsc/3.13.5_gcc-10.1.0
+module load git
+module load cmake
+module load boost
+
 #if ((1 != $#))
 #then
 #	printf "usage: $0 <path/to/mesh>\n" 1>&2
@@ -22,7 +28,8 @@ case_folder=/scratch/zulian/xdns/fe_hydros/sfem/tests/compare/mesh-multi-outlet-
 # Libraries
 laplsoldir=/scratch/diegor/zu/laplsol/
 sfemdir=/scratch/zulian/xdns/fe_hydros/sfem/
-utopiadir=/home/zulian/utopia/utopia/build/
+#utopiadir=/home/zulian/utopia/utopia/build/
+utopiadir=./
 
 # Add executables to path
 PATH=$sfemdir:$PATH
@@ -46,9 +53,9 @@ mpirun -np 1 condense_matrix ./out 	   $case_folder/zd.raw ./condensed
 mpirun -np 1 condense_vector ./out/rhs.raw $case_folder/zd.raw condensed/rhs.raw
 
 # Parallel linear solve
-mpirun utopia_exec -app ls_solve -A ./condensed/rowptr.raw -b ./condensed/rhs.raw -use_amg false --use_ksp -pc_type hypre -ksp_type cg -atol 1e-18 -rtol 0 -stol 1e-19 -out ./condensed/out.raw
+mpirun utopia_exec -app ls_solve -A ./condensed/rowptr.raw -b ./condensed/rhs.raw -use_amg false --use_ksp -pc_type hypre -ksp_type cg -atol 1e-18 -rtol 0 -stol 1e-19 -out ./condensed/out.raw --verbose
 
-# Missing post processing of vector
+# Post processing of vector
 mpirun -np 1 remap_vector ./condensed/out.raw $case_folder/zd.raw ./out.raw
 
 ##############
