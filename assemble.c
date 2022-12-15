@@ -319,6 +319,9 @@ int main(int argc, char *argv[]) {
         nelements = nindex0;
     }
 
+    double tack = MPI_Wtime();
+    printf("assemble.c: read\t%g seconds\n", tack - tick);
+
     ///////////////////////////////////////////////////////////////////////////////
     // Build CRS graph
     ///////////////////////////////////////////////////////////////////////////////
@@ -426,6 +429,10 @@ int main(int argc, char *argv[]) {
         memset(values, 0, nnz * sizeof(real_t));
     }
 
+    double tock = MPI_Wtime();
+    printf("assemble.c: build crs\t%g seconds\n", tock - tack);
+    tack = tock;
+
     ///////////////////////////////////////////////////////////////////////////////
     // Operator assembly
     ///////////////////////////////////////////////////////////////////////////////
@@ -529,6 +536,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    tock = MPI_Wtime();
+    printf("assemble.c: assembly\t%g seconds\n", tock - tack);
+    tack = tock;
+
     ///////////////////////////////////////////////////////////////////////////////
     // Boundary conditions
     ///////////////////////////////////////////////////////////////////////////////
@@ -625,6 +636,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    tock = MPI_Wtime();
+    printf("assemble.c: boundary\t%g seconds\n", tock - tack);
+    tack = tock;
+
     ///////////////////////////////////////////////////////////////////////////////
     // Write CRS matrix and rhs vector
     ///////////////////////////////////////////////////////////////////////////////
@@ -651,6 +666,11 @@ int main(int argc, char *argv[]) {
         array_write(comm, path, MPI_DOUBLE, rhs, nnodes, nnodes);
     }
 
+    tock = MPI_Wtime();
+    printf("assemble.c: write\t%g seconds\n", tock - tack);
+    tack = tock;
+
+
     ///////////////////////////////////////////////////////////////////////////////
     // Free resources
     ///////////////////////////////////////////////////////////////////////////////
@@ -668,10 +688,10 @@ int main(int argc, char *argv[]) {
         free(elems[i]);
     }
 
-    double tock = MPI_Wtime();
+    tock = MPI_Wtime();
 
     if (!rank) {
-        printf("TTS: %g seconds\n", tock - tick);
+        printf("TTS:\t%g seconds\n", tock - tick);
     }
 
 
