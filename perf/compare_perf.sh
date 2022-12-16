@@ -47,7 +47,7 @@ pat32dir=$patdir/fp32
 mkdir $pat32dir
 
 diegodir=`mktemp -d`
-cp -R $case_folder $diegodir
+cp -R $case_folder/*.raw $diegodir/
 
 ##############
 # SFEM
