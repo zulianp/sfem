@@ -81,7 +81,7 @@ fp_convert.py $patdircond/values.raw  $pat32dir/values.fp32.raw  	float64 float3
 if [ "$depth" -eq "1" ]; then
 	fp_convert.py  $pat32dir/rhs.fp32.raw 	 $patdircond/rhs.raw 		float32 float64
 	fp_convert.py  $pat32dir/values.fp32.raw $patdircond/values.raw  	float32 float64
-done
+fi
 
 # Parallel linear solve
 mpirun utopia_exec -app ls_solve -A $patdircond/rowptr.raw -b $patdircond/rhs.raw -use_amg false --use_ksp -pc_type hypre -ksp_type cg -atol 1e-18 -rtol 0 -stol 1e-19 -out $patdircond/sol.raw --verbose
