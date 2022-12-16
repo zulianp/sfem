@@ -3,7 +3,7 @@
 import numpy as np
 import sys, getopt
 import os
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 def main(argv):
     if(len(argv) < 3):
@@ -50,9 +50,9 @@ def main(argv):
 
 
     # print(numpy.histogram(z, bins=10, range=None, normed=None, weights=None, density=None))
-    _ = plt.hist(z, bins='auto')  # arguments are passed to np.histogram
-    plt.title("Histogram | l - r |")
-    plt.savefig(figurename)
+    # _ = plt.hist(z, bins='auto')  # arguments are passed to np.histogram
+    # plt.title("Histogram | l - r |")
+    # plt.savefig(figurename)
         
 if __name__ == '__main__':
     main(sys.argv)

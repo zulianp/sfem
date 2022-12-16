@@ -34,6 +34,8 @@ module load boost
 
 module list
 
+# pip3 install --user matplotlib
+
 # Add executables to path
 PATH=$sfemdir:$PATH
 PATH=$sfemdir/python:$PATH
@@ -99,7 +101,7 @@ fdiff.py $patdircond/colidx.raw $diegodir/lhs.colindex.raw 	int32 int32 1 ./coli
 # FP
 fdiff.py $pat32dir/values.fp32.raw 		$diegodir/lhs.value.raw float32 float32 1 ./lhs_pat_vs_diego_rhs.png
 fdiff.py $pat32dir/rhs.fp32.raw 		$diegodir/rhs.raw 		float32 float32 1 ./rhs_pat_vs_diego_rhs.png
-fdiff.py $pat32dir/full_sol.fp32.raw 	$diegodir/sol.raw 	float32 float32 1 ./sol_pat_vs_diego_sol.png
+fdiff.py $pat32dir/full_sol.fp32.raw 	$diegodir/sol.raw 		float32 float32 1 ./sol_pat_vs_diego_sol.png
 
 diffsol.py $diegodir/sol.raw $pat32dir/full_sol.fp32.raw ./diff.fp32.raw
 
