@@ -24,6 +24,8 @@ module load git
 module load cmake
 module load boost
 
+module list
+
 case_folder=/scratch/zulian/xdns/fe_hydros/sfem/tests/compare/mesh-multi-outlet-better
 
 # Libraries
@@ -43,7 +45,7 @@ mkdir $patdircond
 pat32dir=$patdir/fp32
 mkdir $pat32dir
 
-diegodir=`mkdir -d`
+diegodir=`mktemp -d`
 cp -R $case_folder $diegodir
 
 ##############
@@ -98,12 +100,10 @@ fdiff.py $pat32dir/values.fp32.raw 	$diegodir/lhs.value.raw float32 float32 1 ./
 fdiff.py $pat32dir/rhs.fp32.raw 	$diegodir/rhs.raw 		float32 float32 1 ./rhs_pat_vs_diego_rhs.png
 fdiff.py $pat32dir/sol.fp32.raw 	$diegodir/sol.raw  		float32 float32 1 ./sol_pat_vs_diego_sol.png
 
-diffsol.py $diegodir/sol.raw $patdir/sol.fp32.raw ./diff.fp32.raw
-
+diffsol.py $diegodir/sol.raw $pat32dir/sol.fp32.raw ./diff.fp32.raw
 
 # Remove temporaries
 rm -rf $patdir
 rm -rf $patdircond
 rm -rf $pat32dir
 rm -rf $diegodir
-
