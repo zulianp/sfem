@@ -7,25 +7,28 @@ HERE=$PWD
 
 case_folder=/Users/patrickzulian/Desktop/code/utopia/utopia_fe/data/hydros/mesh-multi-outlet-better
 solver_exec=/Users/patrickzulian/Desktop/code/utopia/utopia/build/utopia_exec
+sfemfp32=0
 
 echo "Assemble system"
 ../assemble  $case_folder ./
 
 ls -la 
 
-echo "Convert rhs to vtu"
-../python/raw2mesh.py -d $case_folder -f rhs.raw  
-mv out.vtu rhs.vtu
+# echo "Convert rhs to vtu"
+# ../python/raw2mesh.py -d $case_folder -f rhs.raw  
+# mv out.vtu rhs.vtu
 
 echo "Condense system"
 ../condense_matrix ./  		 $case_folder/zd.raw ./condensed
 ../condense_vector ./rhs.raw $case_folder/zd.raw condensed/rhs.raw
 
-../python/fp_convert.py condensed/rhs.raw condensed/rhs.raw float64 float32
-../python/fp_convert.py condensed/rhs.raw condensed/rhs.raw float32 float64
+if [ "$sfemfp32" -eq "1" ]; then
+	../python/fp_convert.py condensed/rhs.raw 	 condensed/rhs.raw 	  float64 float32
+	../python/fp_convert.py condensed/values.raw condensed/values.raw float64 float32
 
-../python/fp_convert.py condensed/values.raw condensed/values.raw float64 float32
-../python/fp_convert.py condensed/values.raw condensed/values.raw float32 float64
+	../python/fp_convert.py condensed/values.raw condensed/values.raw float32 float64
+	../python/fp_convert.py condensed/rhs.raw 	 condensed/rhs.raw 	  float32 float64
+fi
 
 ls -la ./condensed
 

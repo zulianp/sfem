@@ -35,10 +35,10 @@ idx_t binarysearch(const idx_t key, const idx_t *arr, idx_t size) {
 int build_n2e(const ptrdiff_t nelements,
               const ptrdiff_t nnodes,
               idx_t *const elems[4],
-              idx_t **out_e2nptr,
+              idx_t **out_n2eptr,
               idx_t **out_elindex) {
-    idx_t *e2nptr = malloc((nnodes + 1) * sizeof(idx_t));
-    memset(e2nptr, 0, nnodes * sizeof(idx_t));
+    idx_t *n2eptr = malloc((nnodes + 1) * sizeof(idx_t));
+    memset(n2eptr, 0, nnodes * sizeof(idx_t));
 
     int *bookkepping = malloc((nnodes) * sizeof(int));
     memset(bookkepping, 0, (nnodes) * sizeof(int));
@@ -48,29 +48,29 @@ int build_n2e(const ptrdiff_t nelements,
             assert(elems[edof_i][i] < nnodes);
             assert(elems[edof_i][i] >= 0);
 
-            ++e2nptr[elems[edof_i][i] + 1];
+            ++n2eptr[elems[edof_i][i] + 1];
         }
     }
 
     for (idx_t i = 0; i < nnodes; ++i) {
-        e2nptr[i + 1] += e2nptr[i];
+        n2eptr[i + 1] += n2eptr[i];
     }
 
-    idx_t *elindex = (idx_t *)malloc(e2nptr[nnodes] * sizeof(idx_t));
+    idx_t *elindex = (idx_t *)malloc(n2eptr[nnodes] * sizeof(idx_t));
 
     for (int edof_i = 0; edof_i < 4; ++edof_i) {
         for (idx_t i = 0; i < nelements; ++i) {
             idx_t node = elems[edof_i][i];
 
-            assert(e2nptr[node] + bookkepping[node] < e2nptr[node + 1]);
+            assert(n2eptr[node] + bookkepping[node] < n2eptr[node + 1]);
 
-            elindex[e2nptr[node] + bookkepping[node]++] = i;
+            elindex[n2eptr[node] + bookkepping[node]++] = i;
         }
     }
 
     free(bookkepping);
 
-    *out_e2nptr = e2nptr;
+    *out_n2eptr = n2eptr;
     *out_elindex = elindex;
     return 0;
 }
@@ -85,16 +85,16 @@ int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
     idx_t *colidx = 0;
 
     {
-        idx_t *e2nptr;
+        idx_t *n2eptr;
         idx_t *elindex;
-        build_n2e(nelements, nnodes, elems, &e2nptr, &elindex);
+        build_n2e(nelements, nnodes, elems, &n2eptr, &elindex);
 
         rowptr[0] = 0;
 
         idx_t n2nbuff[2048];
         for (idx_t node = 0; node < nnodes; ++node) {
-            idx_t ebegin = e2nptr[node];
-            idx_t eend = e2nptr[node + 1];
+            idx_t ebegin = n2eptr[node];
+            idx_t eend = n2eptr[node + 1];
 
             idx_t nneighs = 0;
 
@@ -120,8 +120,8 @@ int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
 
         ptrdiff_t coloffset = 0;
         for (idx_t node = 0; node < nnodes; ++node) {
-            idx_t ebegin = e2nptr[node];
-            idx_t eend = e2nptr[node + 1];
+            idx_t ebegin = n2eptr[node];
+            idx_t eend = n2eptr[node + 1];
 
             idx_t nneighs = 0;
 
@@ -146,7 +146,7 @@ int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
             coloffset += nneighs;
         }
 
-        free(e2nptr);
+        free(n2eptr);
         free(elindex);
     }
 
@@ -165,17 +165,17 @@ int build_crs_graph_faster(const ptrdiff_t nelements,
     idx_t *colidx = 0;
 
     {
-        idx_t *e2nptr;
+        idx_t *n2eptr;
         idx_t *elindex;
-        build_n2e(nelements, nnodes, elems, &e2nptr, &elindex);
+        build_n2e(nelements, nnodes, elems, &n2eptr, &elindex);
 
         rowptr[0] = 0;
 
         ptrdiff_t overestimated_nnz = 0;
         idx_t n2nbuff[2048];
         for (idx_t node = 0; node < nnodes; ++node) {
-            idx_t ebegin = e2nptr[node];
-            idx_t eend = e2nptr[node + 1];
+            idx_t ebegin = n2eptr[node];
+            idx_t eend = n2eptr[node + 1];
 
             idx_t nneighs = 0;
 
@@ -197,8 +197,8 @@ int build_crs_graph_faster(const ptrdiff_t nelements,
 
         ptrdiff_t coloffset = 0;
         for (idx_t node = 0; node < nnodes; ++node) {
-            idx_t ebegin = e2nptr[node];
-            idx_t eend = e2nptr[node + 1];
+            idx_t ebegin = n2eptr[node];
+            idx_t eend = n2eptr[node + 1];
 
             idx_t nneighs = 0;
 
@@ -226,7 +226,7 @@ int build_crs_graph_faster(const ptrdiff_t nelements,
             coloffset += nneighs;
         }
 
-        free(e2nptr);
+        free(n2eptr);
         free(elindex);
     }
 
