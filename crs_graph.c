@@ -9,6 +9,15 @@
 #include "../matrix.io/matrixio_crs.h"
 #include "../matrix.io/utils.h"
 
+#define READ_ENV_VAR(name, conversion)                                         \
+  do {                                                                         \
+    char *var = getenv(#name);                                                 \
+    if (var) {                                                                 \
+      name = conversion(var);                                                  \
+    }                                                                          \
+  } while (0)
+
+
 typedef int idx_t;
 
 #ifdef NDEBUG
@@ -39,7 +48,7 @@ INLINE static idx_t unique(idx_t *arr, idx_t size) {
     return (++result) - arr;
 }
 
-int build_crs_graph(
+int build_crs_graph_mem_conservative(
 	const ptrdiff_t nelements,
 	const ptrdiff_t nnodes,
 	idx_t *const elems[4],
@@ -148,7 +157,135 @@ int build_crs_graph(
 
     *out_rowptr = rowptr;
     *out_colidx = colidx;
-
     return 0;
 }
 
+int build_crs_graph_faster(
+	const ptrdiff_t nelements,
+	const ptrdiff_t nnodes,
+	idx_t *const elems[4],
+	idx_t **out_rowptr,
+	idx_t **out_colidx
+	) {
+
+    ptrdiff_t nnz = 0;
+    idx_t *rowptr = (idx_t *)malloc((nnodes + 1) * sizeof(idx_t));
+    idx_t *colidx = 0;
+
+    {
+        idx_t *e2nptr = malloc((nnodes + 1) * sizeof(idx_t));
+        memset(e2nptr, 0, nnodes * sizeof(idx_t));
+
+        int *bookkepping = malloc((nnodes) * sizeof(int));
+        memset(bookkepping, 0, (nnodes) * sizeof(int));
+
+        for (int edof_i = 0; edof_i < 4; ++edof_i) {
+            for (idx_t i = 0; i < nelements; ++i) {
+                assert(elems[edof_i][i] < nnodes);
+                assert(elems[edof_i][i] >= 0);
+
+                ++e2nptr[elems[edof_i][i] + 1];
+            }
+        }
+
+        for (idx_t i = 0; i < nnodes; ++i) {
+            e2nptr[i + 1] += e2nptr[i];
+        }
+
+        idx_t *elindex = (idx_t *)malloc(e2nptr[nnodes] * sizeof(idx_t));
+
+        for (int edof_i = 0; edof_i < 4; ++edof_i) {
+            for (idx_t i = 0; i < nelements; ++i) {
+                idx_t node = elems[edof_i][i];
+
+                assert(e2nptr[node] + bookkepping[node] < e2nptr[node + 1]);
+
+                elindex[e2nptr[node] + bookkepping[node]++] = i;
+            }
+        }
+
+        free(bookkepping);
+
+        rowptr[0] = 0;
+
+        ptrdiff_t overestimated_nnz = 0;
+        idx_t n2nbuff[2048];
+        for (idx_t node = 0; node < nnodes; ++node) {
+            idx_t ebegin = e2nptr[node];
+            idx_t eend = e2nptr[node + 1];
+
+            idx_t nneighs = 0;
+
+            for (idx_t e = ebegin; e < eend; ++e) {
+                idx_t eidx = elindex[e];
+                assert(eidx < nelements);
+
+                for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                    idx_t neighnode = elems[edof_i][eidx];
+                    assert(nneighs < 2048);
+                    n2nbuff[nneighs++] = neighnode;
+                }
+            }
+
+            overestimated_nnz += nneighs;
+        }
+
+        colidx = (idx_t *)malloc(overestimated_nnz * sizeof(idx_t));
+
+        ptrdiff_t coloffset = 0;
+        for (idx_t node = 0; node < nnodes; ++node) {
+            idx_t ebegin = e2nptr[node];
+            idx_t eend = e2nptr[node + 1];
+
+            idx_t nneighs = 0;
+
+            for (idx_t e = ebegin; e < eend; ++e) {
+                idx_t eidx = elindex[e];
+                assert(eidx < nelements);
+
+                for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                    idx_t neighnode = elems[edof_i][eidx];
+                    assert(nneighs < 2048);
+                    n2nbuff[nneighs++] = neighnode;
+                }
+            }
+
+            quicksort(n2nbuff, nneighs);
+            nneighs = unique(n2nbuff, nneighs);
+
+            nnz += nneighs;
+            rowptr[node + 1] = nnz;
+
+            for (idx_t i = 0; i < nneighs; ++i) {
+                colidx[coloffset + i] = n2nbuff[i];
+            }
+
+            coloffset += nneighs;
+        }
+
+        free(e2nptr);
+        free(elindex);
+    }
+
+    *out_rowptr = rowptr;
+    *out_colidx = colidx;
+    return 0;
+}
+
+int build_crs_graph(
+	const ptrdiff_t nelements,
+	const ptrdiff_t nnodes,
+	idx_t *const elems[4],
+	idx_t **out_rowptr,
+	idx_t **out_colidx
+	) {
+
+	int SFEM_CRS_MEM_CONSERVATIVE=0;
+	READ_ENV_VAR(SFEM_CRS_MEM_CONSERVATIVE, atoi);
+
+	if(SFEM_CRS_MEM_CONSERVATIVE) {
+		return build_crs_graph_mem_conservative(nelements, nnodes, elems, out_rowptr, out_colidx);
+	}  else {
+		return build_crs_graph_faster(nelements, nnodes, elems, out_rowptr, out_colidx);
+	}
+}
