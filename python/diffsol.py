@@ -3,7 +3,6 @@
 import numpy as np
 import sys, getopt
 import os
-import matplotlib.pyplot as plt
 
 def main(argv):
     if(len(argv) < 3):

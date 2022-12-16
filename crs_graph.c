@@ -9,14 +9,13 @@
 #include "../matrix.io/matrixio_crs.h"
 #include "../matrix.io/utils.h"
 
-#define READ_ENV_VAR(name, conversion)                                         \
-  do {                                                                         \
-    char *var = getenv(#name);                                                 \
-    if (var) {                                                                 \
-      name = conversion(var);                                                  \
-    }                                                                          \
-  } while (0)
-
+#define READ_ENV_VAR(name, conversion) \
+    do {                               \
+        char *var = getenv(#name);     \
+        if (var) {                     \
+            name = conversion(var);    \
+        }                              \
+    } while (0)
 
 typedef int idx_t;
 
@@ -48,51 +47,62 @@ INLINE static idx_t unique(idx_t *arr, idx_t size) {
     return (++result) - arr;
 }
 
-int build_crs_graph_mem_conservative(
-	const ptrdiff_t nelements,
-	const ptrdiff_t nnodes,
-	idx_t *const elems[4],
-	idx_t **out_rowptr,
-	idx_t **out_colidx
-	) {
+int build_n2e(const ptrdiff_t nelements,
+              const ptrdiff_t nnodes,
+              idx_t *const elems[4],
+              idx_t **out_e2nptr,
+              idx_t **out_elindex) {
+    idx_t *e2nptr = malloc((nnodes + 1) * sizeof(idx_t));
+    memset(e2nptr, 0, nnodes * sizeof(idx_t));
 
+    int *bookkepping = malloc((nnodes) * sizeof(int));
+    memset(bookkepping, 0, (nnodes) * sizeof(int));
+
+    for (int edof_i = 0; edof_i < 4; ++edof_i) {
+        for (idx_t i = 0; i < nelements; ++i) {
+            assert(elems[edof_i][i] < nnodes);
+            assert(elems[edof_i][i] >= 0);
+
+            ++e2nptr[elems[edof_i][i] + 1];
+        }
+    }
+
+    for (idx_t i = 0; i < nnodes; ++i) {
+        e2nptr[i + 1] += e2nptr[i];
+    }
+
+    idx_t *elindex = (idx_t *)malloc(e2nptr[nnodes] * sizeof(idx_t));
+
+    for (int edof_i = 0; edof_i < 4; ++edof_i) {
+        for (idx_t i = 0; i < nelements; ++i) {
+            idx_t node = elems[edof_i][i];
+
+            assert(e2nptr[node] + bookkepping[node] < e2nptr[node + 1]);
+
+            elindex[e2nptr[node] + bookkepping[node]++] = i;
+        }
+    }
+
+    free(bookkepping);
+
+    *out_e2nptr = e2nptr;
+    *out_elindex = elindex;
+    return 0;
+}
+
+int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
+                                     const ptrdiff_t nnodes,
+                                     idx_t *const elems[4],
+                                     idx_t **out_rowptr,
+                                     idx_t **out_colidx) {
     ptrdiff_t nnz = 0;
     idx_t *rowptr = (idx_t *)malloc((nnodes + 1) * sizeof(idx_t));
     idx_t *colidx = 0;
 
     {
-        idx_t *e2nptr = malloc((nnodes + 1) * sizeof(idx_t));
-        memset(e2nptr, 0, nnodes * sizeof(idx_t));
-
-        int *bookkepping = malloc((nnodes) * sizeof(int));
-        memset(bookkepping, 0, (nnodes) * sizeof(int));
-
-        for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            for (idx_t i = 0; i < nelements; ++i) {
-                assert(elems[edof_i][i] < nnodes);
-                assert(elems[edof_i][i] >= 0);
-
-                ++e2nptr[elems[edof_i][i] + 1];
-            }
-        }
-
-        for (idx_t i = 0; i < nnodes; ++i) {
-            e2nptr[i + 1] += e2nptr[i];
-        }
-
-        idx_t *elindex = (idx_t *)malloc(e2nptr[nnodes] * sizeof(idx_t));
-
-        for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            for (idx_t i = 0; i < nelements; ++i) {
-                idx_t node = elems[edof_i][i];
-
-                assert(e2nptr[node] + bookkepping[node] < e2nptr[node + 1]);
-
-                elindex[e2nptr[node] + bookkepping[node]++] = i;
-            }
-        }
-
-        free(bookkepping);
+        idx_t *e2nptr;
+        idx_t *elindex;
+        build_n2e(nelements, nnodes, elems, &e2nptr, &elindex);
 
         rowptr[0] = 0;
 
@@ -160,51 +170,19 @@ int build_crs_graph_mem_conservative(
     return 0;
 }
 
-int build_crs_graph_faster(
-	const ptrdiff_t nelements,
-	const ptrdiff_t nnodes,
-	idx_t *const elems[4],
-	idx_t **out_rowptr,
-	idx_t **out_colidx
-	) {
-
+int build_crs_graph_faster(const ptrdiff_t nelements,
+                           const ptrdiff_t nnodes,
+                           idx_t *const elems[4],
+                           idx_t **out_rowptr,
+                           idx_t **out_colidx) {
     ptrdiff_t nnz = 0;
     idx_t *rowptr = (idx_t *)malloc((nnodes + 1) * sizeof(idx_t));
     idx_t *colidx = 0;
 
     {
-        idx_t *e2nptr = malloc((nnodes + 1) * sizeof(idx_t));
-        memset(e2nptr, 0, nnodes * sizeof(idx_t));
-
-        int *bookkepping = malloc((nnodes) * sizeof(int));
-        memset(bookkepping, 0, (nnodes) * sizeof(int));
-
-        for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            for (idx_t i = 0; i < nelements; ++i) {
-                assert(elems[edof_i][i] < nnodes);
-                assert(elems[edof_i][i] >= 0);
-
-                ++e2nptr[elems[edof_i][i] + 1];
-            }
-        }
-
-        for (idx_t i = 0; i < nnodes; ++i) {
-            e2nptr[i + 1] += e2nptr[i];
-        }
-
-        idx_t *elindex = (idx_t *)malloc(e2nptr[nnodes] * sizeof(idx_t));
-
-        for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            for (idx_t i = 0; i < nelements; ++i) {
-                idx_t node = elems[edof_i][i];
-
-                assert(e2nptr[node] + bookkepping[node] < e2nptr[node + 1]);
-
-                elindex[e2nptr[node] + bookkepping[node]++] = i;
-            }
-        }
-
-        free(bookkepping);
+        idx_t *e2nptr;
+        idx_t *elindex;
+        build_n2e(nelements, nnodes, elems, &e2nptr, &elindex);
 
         rowptr[0] = 0;
 
@@ -272,20 +250,17 @@ int build_crs_graph_faster(
     return 0;
 }
 
-int build_crs_graph(
-	const ptrdiff_t nelements,
-	const ptrdiff_t nnodes,
-	idx_t *const elems[4],
-	idx_t **out_rowptr,
-	idx_t **out_colidx
-	) {
+int build_crs_graph(const ptrdiff_t nelements,
+                    const ptrdiff_t nnodes,
+                    idx_t *const elems[4],
+                    idx_t **out_rowptr,
+                    idx_t **out_colidx) {
+    int SFEM_CRS_MEM_CONSERVATIVE = 0;
+    READ_ENV_VAR(SFEM_CRS_MEM_CONSERVATIVE, atoi);
 
-	int SFEM_CRS_MEM_CONSERVATIVE=0;
-	READ_ENV_VAR(SFEM_CRS_MEM_CONSERVATIVE, atoi);
-
-	if(SFEM_CRS_MEM_CONSERVATIVE) {
-		return build_crs_graph_mem_conservative(nelements, nnodes, elems, out_rowptr, out_colidx);
-	}  else {
-		return build_crs_graph_faster(nelements, nnodes, elems, out_rowptr, out_colidx);
-	}
+    if (SFEM_CRS_MEM_CONSERVATIVE) {
+        return build_crs_graph_mem_conservative(nelements, nnodes, elems, out_rowptr, out_colidx);
+    } else {
+        return build_crs_graph_faster(nelements, nnodes, elems, out_rowptr, out_colidx);
+    }
 }
