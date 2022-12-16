@@ -86,7 +86,7 @@ laplsol-asm $diegodir
 mpirun laplsol-solve $diegodir $diegodir/rhs.raw $diegodir/sol.raw
 
 # Post processing of solution vector
-laplsol-post $diegodir $diegodir/full_sol.raw
+laplsol-post $diegodir $diegodir/sol.raw
 
 ##############
 # Compare
@@ -99,9 +99,9 @@ fdiff.py $patdircond/colidx.raw $diegodir/lhs.colindex.raw 	int32 int32 1 ./coli
 # FP
 fdiff.py $pat32dir/values.fp32.raw 		$diegodir/lhs.value.raw float32 float32 1 ./lhs_pat_vs_diego_rhs.png
 fdiff.py $pat32dir/rhs.fp32.raw 		$diegodir/rhs.raw 		float32 float32 1 ./rhs_pat_vs_diego_rhs.png
-fdiff.py $pat32dir/full_sol.fp32.raw 	$diegodir/full_sol.raw 	float32 float32 1 ./sol_pat_vs_diego_sol.png
+fdiff.py $pat32dir/full_sol.fp32.raw 	$diegodir/sol.raw 	float32 float32 1 ./sol_pat_vs_diego_sol.png
 
-diffsol.py $diegodir/full_sol.raw $pat32dir/full_sol.fp32.raw ./diff.fp32.raw
+diffsol.py $diegodir/sol.raw $pat32dir/full_sol.fp32.raw ./diff.fp32.raw
 
 # Remove temporaries
 rm -rf $patdir
