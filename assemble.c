@@ -7,6 +7,8 @@
 #include "../matrix.io/matrixio_crs.h"
 #include "../matrix.io/utils.h"
 
+#include "crs_graph.h"
+
 typedef float geom_t;
 typedef int idx_t;
 typedef double real_t;
@@ -331,103 +333,11 @@ int main(int argc, char *argv[]) {
     idx_t *colidx = 0;
     real_t *values = 0;
 
-    {
-        idx_t *e2nptr = malloc((nnodes + 1) * sizeof(idx_t));
-        memset(e2nptr, 0, nnodes * sizeof(idx_t));
+    build_crs_graph(nelements, nnodes, elems, &rowptr, &colidx);
 
-        int *bookkepping = malloc((nnodes) * sizeof(int));
-        memset(bookkepping, 0, (nnodes) * sizeof(int));
-
-        for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            for (idx_t i = 0; i < nelements; ++i) {
-                assert(elems[edof_i][i] < nnodes);
-                assert(elems[edof_i][i] >= 0);
-
-                ++e2nptr[elems[edof_i][i] + 1];
-            }
-        }
-
-        for (idx_t i = 0; i < nnodes; ++i) {
-            e2nptr[i + 1] += e2nptr[i];
-        }
-
-        idx_t *elindex = (idx_t *)malloc(e2nptr[nnodes] * sizeof(idx_t));
-
-        for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            for (idx_t i = 0; i < nelements; ++i) {
-                idx_t node = elems[edof_i][i];
-
-                assert(e2nptr[node] + bookkepping[node] < e2nptr[node + 1]);
-
-                elindex[e2nptr[node] + bookkepping[node]++] = i;
-            }
-        }
-
-        free(bookkepping);
-
-        rowptr[0] = 0;
-
-        idx_t n2nbuff[2048];
-        for (idx_t node = 0; node < nnodes; ++node) {
-            idx_t ebegin = e2nptr[node];
-            idx_t eend = e2nptr[node + 1];
-
-            idx_t nneighs = 0;
-
-            for (idx_t e = ebegin; e < eend; ++e) {
-                idx_t eidx = elindex[e];
-                assert(eidx < nelements);
-
-                for (int edof_i = 0; edof_i < 4; ++edof_i) {
-                    idx_t neighnode = elems[edof_i][eidx];
-                    assert(nneighs < 2048);
-                    n2nbuff[nneighs++] = neighnode;
-                }
-            }
-
-            quicksort(n2nbuff, nneighs);
-            nneighs = unique(n2nbuff, nneighs);
-
-            nnz += nneighs;
-            rowptr[node + 1] = nnz;
-        }
-
-        colidx = (idx_t *)malloc(nnz * sizeof(idx_t));
-
-        ptrdiff_t coloffset = 0;
-        for (idx_t node = 0; node < nnodes; ++node) {
-            idx_t ebegin = e2nptr[node];
-            idx_t eend = e2nptr[node + 1];
-
-            idx_t nneighs = 0;
-
-            for (idx_t e = ebegin; e < eend; ++e) {
-                idx_t eidx = elindex[e];
-                assert(eidx < nelements);
-
-                for (int edof_i = 0; edof_i < 4; ++edof_i) {
-                    idx_t neighnode = elems[edof_i][eidx];
-                    assert(nneighs < 2048);
-                    n2nbuff[nneighs++] = neighnode;
-                }
-            }
-
-            quicksort(n2nbuff, nneighs);
-            nneighs = unique(n2nbuff, nneighs);
-
-            for (idx_t i = 0; i < nneighs; ++i) {
-                colidx[coloffset + i] = n2nbuff[i];
-            }
-
-            coloffset += nneighs;
-        }
-
-        free(e2nptr);
-        free(elindex);
-
-        values = (real_t *)malloc(nnz * sizeof(real_t));
-        memset(values, 0, nnz * sizeof(real_t));
-    }
+    nnz = rowptr[nnodes];
+    values = (real_t *)malloc(nnz * sizeof(real_t));
+    memset(values, 0, nnz * sizeof(real_t));
 
     double tock = MPI_Wtime();
     printf("assemble.c: build crs\t%g seconds\n", tock - tack);

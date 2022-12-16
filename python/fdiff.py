@@ -38,6 +38,7 @@ def main(argv):
     y = np.fromfile(right, dtype=right_dtype)
 
     if(len(x) != len(y)):
+        print(f"Vector lenghts differ {len(x)} != {len(y)}")
         exit(1)
 
     z = np.abs(x - factor*y.astype(left_dtype))
