@@ -12,7 +12,7 @@ set -e
 # Inputs
 #########################################
 
-sfemfp64=0
+sfemfp32=1
 case_folder=/scratch/zulian/xdns/fe_hydros/sfem/tests/compare/mesh-multi-outlet-better
 
 # Libraries
@@ -78,7 +78,7 @@ fp_convert.py $patdircond/rhs.raw 	  $pat32dir/rhs.fp32.raw 		float64 float32
 fp_convert.py $patdircond/values.raw  $pat32dir/values.fp32.raw  	float64 float32
 
 # Convert back to fp64 (for better comparison with fp32 software)
-if [ "$depth" -eq "1" ]; then
+if [ "$sfemfp32" -eq "1" ]; then
 	fp_convert.py  $pat32dir/rhs.fp32.raw 	 $patdircond/rhs.raw 		float32 float64
 	fp_convert.py  $pat32dir/values.fp32.raw $patdircond/values.raw  	float32 float64
 fi
