@@ -84,7 +84,7 @@ if [ "$sfemfp32" -eq "1" ]; then
 fi
 
 # Parallel linear solve
-mpirun utopia_exec -app ls_solve -A $patdircond/rowptr.raw -b $patdircond/rhs.raw -use_amg false --use_ksp -pc_type hypre -ksp_type cg -atol 1e-18 -rtol 0 -stol 1e-19 -out $patdircond/sol.raw --verbose
+usolve.sh $patdircond/rowptr.raw $patdircond/rhs.raw $patdircond/sol.raw
 
 # Post processing of vector
 mpirun -np 1 remap_vector $patdircond/sol.raw $case_folder/zd.raw $patdir/sol.raw
