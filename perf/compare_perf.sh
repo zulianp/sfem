@@ -8,15 +8,11 @@
 #SBATCH --mem=12020
 
 set -e
-# set -x
+#########################################
+# Inputs
+#########################################
 
-#if ((1 != $#))
-#then
-#	printf "usage: $0 <path/to/mesh>\n" 1>&2
-#	exit -1
-#fi
-
-#case_folder=$1
+sfemfp64=0
 case_folder=/scratch/zulian/xdns/fe_hydros/sfem/tests/compare/mesh-multi-outlet-better
 
 # Libraries
@@ -81,10 +77,11 @@ mpirun -np 1 condense_vector $patdir/rhs.raw  $case_folder/zd.raw $patdircond/rh
 fp_convert.py $patdircond/rhs.raw 	  $pat32dir/rhs.fp32.raw 		float64 float32
 fp_convert.py $patdircond/values.raw  $pat32dir/values.fp32.raw  	float64 float32
 
-# Convert back to fp64 (for comparison)
-fp_convert.py  $pat32dir/rhs.fp32.raw 	 $patdircond/rhs.raw 		float32 float64
-fp_convert.py  $pat32dir/values.fp32.raw $patdircond/values.raw  	float32 float64
-
+# Convert back to fp64 (for better comparison with fp32 software)
+if [ "$depth" -eq "1" ]; then
+	fp_convert.py  $pat32dir/rhs.fp32.raw 	 $patdircond/rhs.raw 		float32 float64
+	fp_convert.py  $pat32dir/values.fp32.raw $patdircond/values.raw  	float32 float64
+done
 
 # Parallel linear solve
 mpirun utopia_exec -app ls_solve -A $patdircond/rowptr.raw -b $patdircond/rhs.raw -use_amg false --use_ksp -pc_type hypre -ksp_type cg -atol 1e-18 -rtol 0 -stol 1e-19 -out $patdircond/sol.raw --verbose

@@ -9,6 +9,8 @@
 #include "../matrix.io/matrixio_crs.h"
 #include "../matrix.io/utils.h"
 
+// https://blog.demofox.org/2017/06/20/simd-gpu-friendly-branchless-binary-search/
+
 SFEM_INLINE static int cmpfunc(const void *a, const void *b) { return (*(idx_t *)a - *(idx_t *)b); }
 SFEM_INLINE static void quicksort(idx_t *arr, idx_t size) { qsort(arr, size, sizeof(idx_t), cmpfunc); }
 SFEM_INLINE static idx_t unique(idx_t *arr, idx_t size) {
