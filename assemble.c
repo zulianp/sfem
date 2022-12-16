@@ -7,17 +7,8 @@
 #include "../matrix.io/matrixio_crs.h"
 #include "../matrix.io/utils.h"
 
+#include "sfem_base.h"
 #include "crs_graph.h"
-
-typedef float geom_t;
-typedef int idx_t;
-typedef double real_t;
-
-#ifdef NDEBUG
-#define INLINE
-#else
-#define INLINE
-#endif
 
 ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
     MPI_Status status;
@@ -31,12 +22,12 @@ ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
     return nbytes;
 }
 
-INLINE real_t det3(const real_t *mat) {
+SFEM_INLINE real_t det3(const real_t *mat) {
     return mat[0] * mat[4] * mat[8] + mat[1] * mat[5] * mat[6] + mat[2] * mat[3] * mat[7] - mat[0] * mat[5] * mat[7] -
            mat[1] * mat[3] * mat[8] - mat[2] * mat[4] * mat[6];
 }
 
-INLINE void adjugate3(const real_t *mat, real_t *mat_adj) {
+SFEM_INLINE void adjugate3(const real_t *mat, real_t *mat_adj) {
     mat_adj[0] = (mat[4] * mat[8] - mat[5] * mat[7]);
     mat_adj[1] = (mat[2] * mat[7] - mat[1] * mat[8]);
     mat_adj[2] = (mat[1] * mat[5] - mat[2] * mat[4]);
@@ -48,7 +39,7 @@ INLINE void adjugate3(const real_t *mat, real_t *mat_adj) {
     mat_adj[8] = (mat[0] * mat[4] - mat[1] * mat[3]);
 }
 
-INLINE void inverse3(const real_t *mat, real_t *mat_inv, const real_t det) {
+SFEM_INLINE void inverse3(const real_t *mat, real_t *mat_inv, const real_t det) {
     assert(det != 0.);
     adjugate3(mat, mat_inv);
 
@@ -57,19 +48,7 @@ INLINE void inverse3(const real_t *mat, real_t *mat_inv, const real_t det) {
     }
 }
 
-// INLINE void mv3(const real_t A[3 * 3], const real_t v[3], real_t *out) {
-//     for (int i = 0; i < 3; ++i) {
-//         out[i] = 0;
-//     }
-
-//     for (int i = 0; i < 3; ++i) {
-//         for (int j = 0; j < 3; ++j) {
-//             out[i] += A[i * 3 + j] * v[j];
-//         }
-//     }
-// }
-
-INLINE void mtv3(const real_t A[3 * 3], const real_t v[3], real_t *out) {
+SFEM_INLINE void mtv3(const real_t A[3 * 3], const real_t v[3], real_t *out) {
     for (int i = 0; i < 3; ++i) {
         out[i] = 0;
     }
@@ -81,7 +60,7 @@ INLINE void mtv3(const real_t A[3 * 3], const real_t v[3], real_t *out) {
     }
 }
 
-INLINE real_t dot3(const real_t v1[3], const real_t v2[3]) {
+SFEM_INLINE real_t dot3(const real_t v1[3], const real_t v2[3]) {
     real_t ret = 0;
     for (int i = 0; i < 3; ++i) {
         ret += v1[i] * v2[i];
@@ -90,14 +69,14 @@ INLINE real_t dot3(const real_t v1[3], const real_t v2[3]) {
     return ret;
 }
 
-INLINE real_t area3(const real_t left[3], const real_t right[3]) {
+SFEM_INLINE real_t area3(const real_t left[3], const real_t right[3]) {
     real_t a = (left[1] * right[2]) - (right[1] * left[2]);
     real_t b = (left[2] * right[0]) - (right[2] * left[0]);
     real_t c = (left[0] * right[1]) - (right[0] * left[1]);
     return sqrt(a * a + b * b + c * c);
 }
 
-INLINE void integrate_neumann(real_t value, real_t dA, real_t *element_vector) {
+SFEM_INLINE void integrate_neumann(real_t value, real_t dA, real_t *element_vector) {
     element_vector[0] = value * dA;
     element_vector[1] = value * dA;
     element_vector[2] = value * dA;
@@ -136,7 +115,7 @@ void print_element_matrix(const real_t *element_matrix) {
     printf("\n");
 }
 
-INLINE void integrate_code_gen(real_t x0,
+SFEM_INLINE void integrate_code_gen(real_t x0,
                         real_t x1,
                         real_t x2,
                         real_t x3,
@@ -216,14 +195,6 @@ INLINE void integrate_code_gen(real_t x0,
     element_matrix[13] = x52;
     element_matrix[14] = x53;
     element_matrix[15] = x20 * (-1.0 / 6.0 * pow(x22, 2) - 1.0 / 6.0 * pow(x25, 2) - 1.0 / 6.0 * pow(x33, 2));
-}
-
-// for crs insertion
-int cmpfunc(const void *a, const void *b) { return (*(idx_t *)a - *(idx_t *)b); }
-idx_t binarysearch(const idx_t key, const idx_t *arr, idx_t size) {
-    idx_t *ptr = bsearch(&key, arr, size, sizeof(idx_t), cmpfunc);
-    if (!ptr) return -1;
-    return (idx_t)(ptr - arr);
 }
 
 int main(int argc, char *argv[]) {

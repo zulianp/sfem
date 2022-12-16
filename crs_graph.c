@@ -9,32 +9,9 @@
 #include "../matrix.io/matrixio_crs.h"
 #include "../matrix.io/utils.h"
 
-#define READ_ENV_VAR(name, conversion) \
-    do {                               \
-        char *var = getenv(#name);     \
-        if (var) {                     \
-            name = conversion(var);    \
-        }                              \
-    } while (0)
-
-typedef int idx_t;
-
-#ifdef NDEBUG
-#define INLINE
-#else
-#define INLINE
-#endif
-
-INLINE static int cmpfunc(const void *a, const void *b) { return (*(idx_t *)a - *(idx_t *)b); }
-INLINE static void quicksort(idx_t *arr, idx_t size) { qsort(arr, size, sizeof(idx_t), cmpfunc); }
-
-INLINE static idx_t binarysearch(const idx_t key, const idx_t *arr, idx_t size) {
-    idx_t *ptr = bsearch(&key, arr, size, sizeof(idx_t), cmpfunc);
-    if (!ptr) return -1;
-    return (idx_t)(ptr - arr);
-}
-
-INLINE static idx_t unique(idx_t *arr, idx_t size) {
+SFEM_INLINE static int cmpfunc(const void *a, const void *b) { return (*(idx_t *)a - *(idx_t *)b); }
+SFEM_INLINE static void quicksort(idx_t *arr, idx_t size) { qsort(arr, size, sizeof(idx_t), cmpfunc); }
+SFEM_INLINE static idx_t unique(idx_t *arr, idx_t size) {
     idx_t *first = arr;
     idx_t *last = arr + size;
 
@@ -45,6 +22,12 @@ INLINE static idx_t unique(idx_t *arr, idx_t size) {
         if (*result != *first && ++result != first) *result = *first;
 
     return (++result) - arr;
+}
+
+idx_t binarysearch(const idx_t key, const idx_t *arr, idx_t size) {
+    idx_t *ptr = bsearch(&key, arr, size, sizeof(idx_t), cmpfunc);
+    if (!ptr) return -1;
+    return (idx_t)(ptr - arr);
 }
 
 int build_n2e(const ptrdiff_t nelements,
@@ -256,7 +239,7 @@ int build_crs_graph(const ptrdiff_t nelements,
                     idx_t **out_rowptr,
                     idx_t **out_colidx) {
     int SFEM_CRS_MEM_CONSERVATIVE = 0;
-    READ_ENV_VAR(SFEM_CRS_MEM_CONSERVATIVE, atoi);
+    SFEM_READ_ENV(SFEM_CRS_MEM_CONSERVATIVE, atoi);
 
     if (SFEM_CRS_MEM_CONSERVATIVE) {
         return build_crs_graph_mem_conservative(nelements, nnodes, elems, out_rowptr, out_colidx);
