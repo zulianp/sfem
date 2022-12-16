@@ -218,26 +218,12 @@ INLINE void integrate_code_gen(real_t x0,
     element_matrix[15] = x20 * (-1.0 / 6.0 * pow(x22, 2) - 1.0 / 6.0 * pow(x25, 2) - 1.0 / 6.0 * pow(x33, 2));
 }
 
+// for crs insertion
 int cmpfunc(const void *a, const void *b) { return (*(idx_t *)a - *(idx_t *)b); }
-INLINE void quicksort(idx_t *arr, idx_t size) { qsort(arr, size, sizeof(idx_t), cmpfunc); }
-
 idx_t binarysearch(const idx_t key, const idx_t *arr, idx_t size) {
     idx_t *ptr = bsearch(&key, arr, size, sizeof(idx_t), cmpfunc);
     if (!ptr) return -1;
     return (idx_t)(ptr - arr);
-}
-
-idx_t unique(idx_t *arr, idx_t size) {
-    idx_t *first = arr;
-    idx_t *last = arr + size;
-
-    if (first == last) return 0;
-
-    idx_t *result = first;
-    while (++first != last)
-        if (*result != *first && ++result != first) *result = *first;
-
-    return (++result) - arr;
 }
 
 int main(int argc, char *argv[]) {

@@ -77,15 +77,21 @@ mpirun -np 1 assemble $case_folder $patdir
 mpirun -np 1 condense_matrix $patdir 	      $case_folder/zd.raw $patdircond
 mpirun -np 1 condense_vector $patdir/rhs.raw  $case_folder/zd.raw $patdircond/rhs.raw
 
+# Convert output from fp64 to fp32
+fp_convert.py $patdircond/rhs.raw 	  $pat32dir/rhs.fp32.raw 		float64 float32
+fp_convert.py $patdircond/values.raw  $pat32dir/values.fp32.raw  	float64 float32
+
+# Convert back to fp64 (for comparison)
+fp_convert.py  $pat32dir/rhs.fp32.raw 	 $patdircond/rhs.raw 		float32 float64
+fp_convert.py  $pat32dir/values.fp32.raw $patdircond/values.raw  	float32 float64
+
+
 # Parallel linear solve
 mpirun utopia_exec -app ls_solve -A $patdircond/rowptr.raw -b $patdircond/rhs.raw -use_amg false --use_ksp -pc_type hypre -ksp_type cg -atol 1e-18 -rtol 0 -stol 1e-19 -out $patdircond/sol.raw --verbose
 
 # Post processing of vector
 mpirun -np 1 remap_vector $patdircond/sol.raw $case_folder/zd.raw $patdir/sol.raw
 
-# Convert output from fp64 to fp32
-fp_convert.py $patdircond/rhs.raw 	  $pat32dir/rhs.fp32.raw 		float64 float32
-fp_convert.py $patdircond/values.raw  $pat32dir/values.fp32.raw  	float64 float32
 fp_convert.py $patdircond/sol.raw     $pat32dir/sol.fp32.raw 		float64 float32
 fp_convert.py $patdir/sol.raw     	  $pat32dir/full_sol.fp32.raw 	float64 float32
 
@@ -120,11 +126,12 @@ fdiff.py $patdircond/rowptr.raw $diegodir/lhs.rowindex.raw 	int32 int32 1 ./rowp
 fdiff.py $patdircond/colidx.raw $diegodir/lhs.colindex.raw 	int32 int32 1 ./colidx_pat_vs_diego_rhs.png
 
 # FP
-fdiff.py $pat32dir/values.fp32.raw 	 $diegodir/lhs.value.raw float32 float32 1 ./lhs_pat_vs_diego_rhs.png
-fdiff.py $pat32dir/rhs.fp32.raw 	 $diegodir/rhs.raw 		float32 float32 1 ./rhs_pat_vs_diego_rhs.png
-fdiff.py $pat32dir/sol.fp32.raw 	 $diegodir/sol.raw 		float32 float32 1 ./sol_pat_vs_diego_sol.png
+fdiff.py $pat32dir/values.fp32.raw 	 $diegodir/lhs.value.raw 		float32 float32 1 ./lhs_pat_vs_diego_rhs.png
+fdiff.py $pat32dir/rhs.fp32.raw 	 $diegodir/rhs.raw 				float32 float32 1 ./rhs_pat_vs_diego_rhs.png
+fdiff.py $pat32dir/sol.fp32.raw 	 $diegodir/sol.raw 				float32 float32 1 ./sol_pat_vs_diego_sol.png
+fdiff.py $pat32dir/p.raw 			 $diegodir/full_sol.fp32.raw	float32 float32 1 ./full_sol_pat_vs_diego_sol.png
 
-diffsol.py $diegodir/sol.raw $pat32dir/sol.fp32.raw ./diff.fp32.raw
+diffsol.py $diegodir/p.raw $pat32dir/full_sol.fp32.raw ./diff.fp32.raw
 
 # Remove temporaries
 rm -rf $patdir
