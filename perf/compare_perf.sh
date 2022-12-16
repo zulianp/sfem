@@ -116,8 +116,8 @@ cp $diegodir/lhs.rowindex.raw $diego64dir/rowptr.raw
 cp $diegodir/lhs.colindex.raw $diego64dir/colidx.raw
 
 usolve.sh $diego64dir/rowptr.raw  $diego64dir/rhs.raw $diego64dir/sol.raw
-mpirun -np 1 remap_vector $diego64dir/sol.raw $case_folder/zd.raw $diego64dir/sol.raw
-fp_convert.py $diego64dir/sol.raw  $diegodir/sol.amg.f32.raw float64 float32
+mpirun -np 1 remap_vector $diego64dir/sol.raw $case_folder/zd.raw $diego64dir/sol.full.raw
+fp_convert.py $diego64dir/sol.full.raw $diegodir/sol.amg.f32.raw float64 float32
 
 ##############
 # Compare
