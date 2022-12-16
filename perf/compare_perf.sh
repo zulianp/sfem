@@ -52,18 +52,18 @@ diegodir=`mktemp -d`
 
 # Copy some stuff
 # Coordinates
-cp -$case_folder/x.raw $diegodir/x.raw
-cp -$case_folder/y.raw $diegodir/y.raw
-cp -$case_folder/z.raw $diegodir/z.raw
+cp $case_folder/x.raw $diegodir/x.raw
+cp $case_folder/y.raw $diegodir/y.raw
+cp $case_folder/z.raw $diegodir/z.raw
 # Mesh
-cp -$case_folder/i0.raw $diegodir/i0.raw
-cp -$case_folder/i1.raw $diegodir/i1.raw
-cp -$case_folder/i2.raw $diegodir/i2.raw
-cp -$case_folder/i3.raw $diegodir/i3.raw
+cp $case_folder/i0.raw $diegodir/i0.raw
+cp $case_folder/i1.raw $diegodir/i1.raw
+cp $case_folder/i2.raw $diegodir/i2.raw
+cp $case_folder/i3.raw $diegodir/i3.raw
 
 # Boundary conditions
-cp -$case_folder/on.raw $diegodir/on.raw
-cp -$case_folder/zd.raw $diegodir/zd.raw
+cp $case_folder/on.raw $diegodir/on.raw
+cp $case_folder/zd.raw $diegodir/zd.raw
 
 ##############
 # SFEM
