@@ -45,6 +45,8 @@ pat32dir=$patdir/fp32
 mkdir $pat32dir
 
 diegodir=`mktemp -d`
+diego64dir=$diegodir/fp64
+mkdir $diego64dir
 
 # Copy some stuff
 # Coordinates
@@ -107,6 +109,16 @@ mpirun laplsol-solve $diegodir $diegodir/rhs.raw $diegodir/sol.raw
 # Post processing of solution vector
 laplsol-post $diegodir $diegodir/sol.raw
 
+fp_convert.py $diegodir/lhs.value.raw  $diego64dir/values.raw float32 float64
+fp_convert.py $diegodir/rhs.raw   	   $diego64dir/rhs.raw 	  float32 float64
+
+cp $diegodir/lhs.rowindex.raw $diego64dir/rowptr.raw
+cp $diegodir/lhs.colindex.raw $diego64dir/colidx.raw
+
+usolve.sh $diego64dir/rowptr.raw  $diego64dir/rhs.raw $diego64dir/sol.raw
+mpirun -np 1 remap_vector $diego64dir/sol.raw $case_folder/zd.raw $diego64dir/sol.raw
+fp_convert.py $diego64dir/sol.raw  $diegodir/sol.amg.f32.raw float64 float32
+
 ##############
 # Compare
 #############
@@ -129,6 +141,7 @@ fdiff.py $pat32dir/sol.fp32.raw 	 $diegodir/sol.raw 				float32 float32 1 ./sol_
 fdiff.py $pat32dir/full_sol.fp32.raw $diegodir/p.raw				float32 float32 1 ./full_sol_pat_vs_diego_sol.png
 
 diffsol.py $diegodir/p.raw $pat32dir/full_sol.fp32.raw ./diff.fp32.raw
+diffsol.py $diegodir/p.raw $diegodir/sol.amg.f32.raw   ./diff.amg.fp32.raw
 
 # Remove temporaries
 rm -rf $patdir
