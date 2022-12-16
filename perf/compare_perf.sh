@@ -17,6 +17,14 @@ set -e
 #fi
 
 #case_folder=$1
+case_folder=/scratch/zulian/xdns/fe_hydros/sfem/tests/compare/mesh-multi-outlet-better
+
+# Libraries
+laplsoldir=/scratch/diegor/zu/laplsol/
+sfemdir=/scratch/zulian/xdns/fe_hydros/sfem/
+utopiadir=./
+
+#########################################
 
 module purge
 module load petsc/3.13.5_gcc-10.1.0
@@ -26,19 +34,11 @@ module load boost
 
 module list
 
-case_folder=/scratch/zulian/xdns/fe_hydros/sfem/tests/compare/mesh-multi-outlet-better
-
-# Libraries
-laplsoldir=/scratch/diegor/zu/laplsol/
-sfemdir=/scratch/zulian/xdns/fe_hydros/sfem/
-utopiadir=./
-
 # Add executables to path
 PATH=$sfemdir:$PATH
 PATH=$sfemdir/python:$PATH
 PATH=$laplsoldir:$PATH
 PATH=$utopiadir:$PATH
-
 
 patdir=`mktemp -d`
 patdircond=$patdir/condensed
