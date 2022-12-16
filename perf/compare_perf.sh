@@ -49,7 +49,21 @@ pat32dir=$patdir/fp32
 mkdir $pat32dir
 
 diegodir=`mktemp -d`
-cp -R $case_folder/*.raw $diegodir/
+
+# Copy some stuff
+# Coordinates
+cp -$case_folder/x.raw $diegodir/x.raw
+cp -$case_folder/y.raw $diegodir/y.raw
+cp -$case_folder/z.raw $diegodir/z.raw
+# Mesh
+cp -$case_folder/i0.raw $diegodir/i0.raw
+cp -$case_folder/i1.raw $diegodir/i1.raw
+cp -$case_folder/i2.raw $diegodir/i2.raw
+cp -$case_folder/i3.raw $diegodir/i3.raw
+
+# Boundary conditions
+cp -$case_folder/on.raw $diegodir/on.raw
+cp -$case_folder/zd.raw $diegodir/zd.raw
 
 ##############
 # SFEM
@@ -106,10 +120,9 @@ fdiff.py $patdircond/rowptr.raw $diegodir/lhs.rowindex.raw 	int32 int32 1 ./rowp
 fdiff.py $patdircond/colidx.raw $diegodir/lhs.colindex.raw 	int32 int32 1 ./colidx_pat_vs_diego_rhs.png
 
 # FP
-fdiff.py $pat32dir/values.fp32.raw 		$diegodir/lhs.value.raw float32 float32 1 ./lhs_pat_vs_diego_rhs.png
-fdiff.py $pat32dir/rhs.fp32.raw 		$diegodir/rhs.raw 		float32 float32 1 ./rhs_pat_vs_diego_rhs.png
-fdiff.py $pat32dir/full_sol.fp32.raw 	$diegodir/sol.raw 		float32 float32 1 ./sol_pat_vs_diego_sol.png
-
+fdiff.py $pat32dir/values.fp32.raw 	 $diegodir/lhs.value.raw float32 float32 1 ./lhs_pat_vs_diego_rhs.png
+fdiff.py $pat32dir/rhs.fp32.raw 	 $diegodir/rhs.raw 		float32 float32 1 ./rhs_pat_vs_diego_rhs.png
+fdiff.py $pat32dir/sol.fp32.raw 	 $diegodir/sol.raw 		float32 float32 1 ./sol_pat_vs_diego_sol.png
 
 diffsol.py $diegodir/sol.raw $pat32dir/sol.fp32.raw ./diff.fp32.raw
 
