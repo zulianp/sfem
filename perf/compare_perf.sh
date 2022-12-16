@@ -35,6 +35,7 @@ utopiadir=./
 
 # Add executables to path
 PATH=$sfemdir:$PATH
+PATH=$sfemdir/python:$PATH
 PATH=$laplsoldir:$PATH
 PATH=$utopiadir:$PATH
 
