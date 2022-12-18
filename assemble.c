@@ -7,8 +7,8 @@
 #include "../matrix.io/matrixio_crs.h"
 #include "../matrix.io/utils.h"
 
-#include "sfem_base.h"
 #include "crs_graph.h"
+#include "sfem_base.h"
 
 ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
     MPI_Status status;
@@ -116,18 +116,18 @@ void print_element_matrix(const real_t *element_matrix) {
 }
 
 SFEM_INLINE void integrate_code_gen(real_t x0,
-                        real_t x1,
-                        real_t x2,
-                        real_t x3,
-                        real_t y0,
-                        real_t y1,
-                        real_t y2,
-                        real_t y3,
-                        real_t z0,
-                        real_t z1,
-                        real_t z2,
-                        real_t z3,
-                        real_t *element_matrix) {
+                                    real_t x1,
+                                    real_t x2,
+                                    real_t x3,
+                                    real_t y0,
+                                    real_t y1,
+                                    real_t y2,
+                                    real_t y3,
+                                    real_t z0,
+                                    real_t z1,
+                                    real_t z2,
+                                    real_t z3,
+                                    real_t *element_matrix) {
     real_t x4 = z0 - z3;
     real_t x5 = x0 - x1;
     real_t x6 = y0 - y2;
@@ -395,11 +395,14 @@ int main(int argc, char *argv[]) {
 
                 for (int edof_j = 0; edof_j < 4; ++edof_j) {
                     idx_t dof_j = elems[edof_j][i];
-                    int k = find_idx(dof_j, row, lenrow);
+                    int k = -1;
 
-                    // Use this for larger number of dofs per row
-                    // int k = find_idx_binary_search(dof_j, row, lenrow);
-                    
+                    if (lenrow < 32) {
+                        k = find_idx(dof_j, row, lenrow);
+                    } else {
+                        // Use this for larger number of dofs per row
+                        k = find_idx_binary_search(dof_j, row, lenrow);
+                    }
 
                     rowvalues[k] += element_matrix[edof_i * 4 + edof_j];
                 }
@@ -541,7 +544,6 @@ int main(int argc, char *argv[]) {
     printf("assemble.c: write\t%g seconds\n", tock - tack);
     tack = tock;
 
-
     ///////////////////////////////////////////////////////////////////////////////
     // Free resources
     ///////////////////////////////////////////////////////////////////////////////
@@ -564,7 +566,6 @@ int main(int argc, char *argv[]) {
     if (!rank) {
         printf("TTS:\t%g seconds\n", tock - tick);
     }
-
 
     return MPI_Finalize();
 }
