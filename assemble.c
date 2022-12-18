@@ -395,7 +395,11 @@ int main(int argc, char *argv[]) {
 
                 for (int edof_j = 0; edof_j < 4; ++edof_j) {
                     idx_t dof_j = elems[edof_j][i];
-                    int k = binarysearch(dof_j, row, lenrow);
+                    int k = find_idx(dof_j, row, lenrow);
+
+                    // Use this for larger number of dofs per row
+                    // int k = find_idx_binary_search(dof_j, row, lenrow);
+                    
 
                     rowvalues[k] += element_matrix[edof_i * 4 + edof_j];
                 }
@@ -497,7 +501,7 @@ int main(int argc, char *argv[]) {
 
             memset(row, 0, sizeof(real_t) * lenrow);
 
-            int k = binarysearch(i, cols, lenrow);
+            int k = find_idx(i, cols, lenrow);
             assert(k >= 0);
             row[k] = 1;
         }

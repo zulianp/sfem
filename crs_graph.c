@@ -9,7 +9,13 @@
 #include "../matrix.io/matrixio_crs.h"
 #include "../matrix.io/utils.h"
 
-// https://blog.demofox.org/2017/06/20/simd-gpu-friendly-branchless-binary-search/
+// #include "bitonic.h"
+
+// https://dirtyhandscoding.github.io/posts/vectorizing-small-fixed-size-sort.html
+// https://xhad1234.github.io/Parallel-Sort-Merge-Join-in-Peloton/
+// https://github.com/sid1607/avx2-merge-sort/blob/master/merge_sort.h
+
+SFEM_INLINE int ispow2(idx_t n) { return n && (!(n & (n - 1))); }
 
 SFEM_INLINE static int cmpfunc(const void *a, const void *b) { return (*(idx_t *)a - *(idx_t *)b); }
 SFEM_INLINE static void quicksort(idx_t *arr, idx_t size) { qsort(arr, size, sizeof(idx_t), cmpfunc); }
@@ -26,10 +32,30 @@ SFEM_INLINE static idx_t unique(idx_t *arr, idx_t size) {
     return (++result) - arr;
 }
 
-idx_t binarysearch(const idx_t key, const idx_t *arr, idx_t size) {
-    idx_t *ptr = bsearch(&key, arr, size, sizeof(idx_t), cmpfunc);
-    if (!ptr) return -1;
-    return (idx_t)(ptr - arr);
+static SFEM_INLINE int choose(int condition, int valTrue, int valFalse) {
+    return (condition * valTrue) | (!condition * valFalse);
+}
+
+idx_t find_idx_binary_search(idx_t target, const idx_t *x, idx_t n) {
+    idx_t start = 0;
+    idx_t end = n - 1;
+    while ((end - start) > 1) {
+        const int midPoint = (end + start) / 2;
+        const int c = target < x[midPoint];
+        end = choose(c, midPoint, end);
+        start = choose(!c, midPoint, start);
+    }
+    return choose(target < x[end], start, end);
+}
+
+idx_t find_idx(idx_t target, const idx_t *restrict x, idx_t n) {
+    for (idx_t i = 0; i < n; ++i) {
+        if (target == x[i]) {
+            return i;
+        }
+    }
+
+    return n;
 }
 
 int build_n2e(const ptrdiff_t nelements,
