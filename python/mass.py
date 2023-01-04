@@ -67,19 +67,7 @@ def ref_fun(x, y, z):
 	 z
 	]
 
-def fun(x, y, z):
-	xmb = x - b[0]
-	ymb = y - b[1]
-	zmb = z - b[2]
-
-	xref = Ainv[0, 0] * xmb + Ainv[0, 1] * ymb  + Ainv[0, 2] * zmb
-	yref = Ainv[1, 0] * xmb + Ainv[1, 1] * ymb  + Ainv[1, 2] * zmb
-	zref = Ainv[2, 0] * xmb + Ainv[2, 1] * ymb  + Ainv[2, 2] * zmb
-	return ref_fun(xref, yref, zref)
-
-# f = fun(qx, qy, qz)
 rf = ref_fun(qx, qy, qz)
-# dV = det3(A) / 6
 dV = det3(A)
 
 expr = []
@@ -92,10 +80,8 @@ for i in range(0, 4):
 		bform = sp.symbols(f'element_matrix[{i*4+j}]')
 		expr.append(ast.Assignment(bform, sp.simplify(integr)))
 		sumterms+=integr
-		# expr.append(ast.Assignment(bform, integr))
 
 c_code(expr)
-
 
 print("Test:")
 
@@ -115,5 +101,3 @@ test = test.subs(z2, 0)
 test = test.subs(z3, 1)
 
 print(f'{test} = 1/6')
-
-
