@@ -77,21 +77,43 @@ def fun(x, y, z):
 	zref = Ainv[2, 0] * xmb + Ainv[2, 1] * ymb  + Ainv[2, 2] * zmb
 	return ref_fun(xref, yref, zref)
 
-f = fun(qx, qy, qz)
+# f = fun(qx, qy, qz)
 rf = ref_fun(qx, qy, qz)
-dV = det3(A) / 6
+# dV = det3(A) / 6
+dV = det3(A)
 
 expr = []
-
+sumterms=0
 for i in range(0, 4):
 	for j in range(0, 4):
-		integr = 0
-		for d in range(0, 3):
-			form = rf[i] * rf[j] * dV
-			integr += sp.integrate(form, (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1))
+		form = rf[i] * rf[j] * dV
+		integr = sp.integrate(form, (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1))
  
 		bform = sp.symbols(f'element_matrix[{i*4+j}]')
 		expr.append(ast.Assignment(bform, sp.simplify(integr)))
+		sumterms+=integr
 		# expr.append(ast.Assignment(bform, integr))
 
 c_code(expr)
+
+
+print("Test:")
+
+test = sumterms.subs(x0, 0)
+test = test.subs(x1, 1)
+test = test.subs(x2, 0)
+test = test.subs(x3, 0)
+
+test = test.subs(y0, 0)
+test = test.subs(y1, 0)
+test = test.subs(y2, 1)
+test = test.subs(y3, 0)
+
+test = test.subs(z0, 0)
+test = test.subs(z1, 0)
+test = test.subs(z2, 0)
+test = test.subs(z3, 1)
+
+print(f'{test} = 1/6')
+
+

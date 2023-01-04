@@ -7,24 +7,25 @@ else
 endif
 
 GOALS = assemble condense_matrix condense_vector idx_to_indicator remap_vector
+DEPS = ../matrix.io/matrixio_crs.o ../matrix.io/utils.o ../matrix.io/matrixio_array.o
 
 CC=mpicc
 
 all : $(GOALS)
 
-assemble : assemble.o ../matrix.io/matrixio_crs.o ../matrix.io/utils.o ../matrix.io/matrixio_array.o crs_graph.o
+assemble : assemble.o crs_graph.o laplacian.o mass.o $(DEPS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
-condense_matrix : condense_matrix.o ../matrix.io/matrixio_crs.o ../matrix.io/utils.o ../matrix.io/matrixio_array.o
+condense_matrix : condense_matrix.o ../matrix.io/matrixio_crs.o $(DEPS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
-condense_vector : condense_vector.o ../matrix.io/utils.o ../matrix.io/matrixio_array.o
+condense_vector : condense_vector.o ../matrix.io/utils.o $(DEPS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
-idx_to_indicator : idx_to_indicator.o ../matrix.io/utils.o ../matrix.io/matrixio_array.o
+idx_to_indicator : idx_to_indicator.o ../matrix.io/utils.o $(DEPS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
-remap_vector : remap_vector.o ../matrix.io/utils.o ../matrix.io/matrixio_array.o
+remap_vector : remap_vector.o ../matrix.io/utils.o $(DEPS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
 %.o : %.c

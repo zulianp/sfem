@@ -1,7 +1,7 @@
 #include "laplacian.h"
 
-#include <math.h>
 #include <assert.h>
+#include <math.h>
 #include <stdio.h>
 
 #include <mpi.h>
@@ -170,18 +170,14 @@ SFEM_INLINE void laplacian(const real_t x0,
     element_matrix[15] = x20 * (-1.0 / 6.0 * pow(x22, 2) - 1.0 / 6.0 * pow(x25, 2) - 1.0 / 6.0 * pow(x33, 2));
 }
 
-
-void assemble_laplacian(
-	const ptrdiff_t nelements,
-	const ptrdiff_t nnodes,
-	idx_t *const elems[4],
-	geom_t *const xyz[3],
-	idx_t *const rowptr,
-	idx_t *const colidx,
-	real_t * const values
-	)
-{
-	double tick = MPI_Wtime();
+void assemble_laplacian(const ptrdiff_t nelements,
+                        const ptrdiff_t nnodes,
+                        idx_t *const elems[4],
+                        geom_t *const xyz[3],
+                        idx_t *const rowptr,
+                        idx_t *const colidx,
+                        real_t *const values) {
+    double tick = MPI_Wtime();
 
     real_t jacobian[3 * 3];
     real_t inverse_jacobian[3 * 3];

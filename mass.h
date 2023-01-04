@@ -1,8 +1,8 @@
 #ifndef MASS_H
 #define MASS_H
 
-#include "sfem_base.h"
 #include <stddef.h>
+#include "sfem_base.h"
 
 void assemble_mass(const ptrdiff_t nelements,
                    const ptrdiff_t nnodes,
