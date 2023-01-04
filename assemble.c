@@ -324,6 +324,8 @@ int main(int argc, char *argv[]) {
     tock = MPI_Wtime();
 
     if (!rank) {
+        printf("----------------------------------------\n");
+        printf("#elements %ld #nodes %ld\n", (long)nelements, (long)nnodes);
         printf("TTS:\t%g seconds\n", tock - tick);
     }
 
