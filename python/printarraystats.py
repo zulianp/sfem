@@ -27,10 +27,14 @@ def main(argv):
             dtype = np.dtype(arg)
 
     data = np.fromfile(path, dtype=dtype)
+    fp64data = data.astype(np.float64)
         
-    print(f'min={np.min(data)}')
-    print(f'max={np.max(data)}')
-    print(f'sum={np.sum(data)}')
+    print(f'min={np.min(fp64data)}')
+    print(f'max={np.max(fp64data)}')
+    print(f'min(abs)={np.min(np.abs(fp64data))}')
+    print(f'max(abs)={np.max(np.abs(fp64data))}')
+    print(f'sum={np.sum(fp64data)}')
+    print(f'sum(abs)={np.sum(np.abs(fp64data))}')
         
 
 if __name__ == '__main__':

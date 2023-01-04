@@ -6,6 +6,7 @@
 #include "../matrix.io/matrixio_array.h"
 #include "../matrix.io/matrixio_crs.h"
 #include "../matrix.io/utils.h"
+#include "../matrix.io/array_dtof.h"
 
 #include "crs_graph.h"
 #include "sfem_base.h"
@@ -69,19 +70,22 @@ int main(int argc, char *argv[]) {
 
     printf("%s %s %s\n", argv[0], argv[1], output_folder);
 
-    int LAPLACIAN = 1;
-    int MASS = 0;
-    int HANDLE_DIRICHLET = 1;
+    int SFEM_LAPLACIAN = 1;
+    int SFEM_MASS = 0;
+    int SFEM_HANDLE_DIRICHLET = 1;
+    int SFEM_EXPORT_FP32 = 0;
 
-    SFEM_READ_ENV(LAPLACIAN, atoi);
-    SFEM_READ_ENV(MASS, atoi);
-    SFEM_READ_ENV(HANDLE_DIRICHLET, atoi);
+    SFEM_READ_ENV(SFEM_LAPLACIAN, atoi);
+    SFEM_READ_ENV(SFEM_MASS, atoi);
+    SFEM_READ_ENV(SFEM_HANDLE_DIRICHLET, atoi);
+    SFEM_READ_ENV(SFEM_EXPORT_FP32, atoi);
 
     printf("----------------------------------------\n");
-    printf("Environment variables:\n- LAPLACIAN=%d\n- MASS=%d\n- HANDLE_DIRICHLET=%d\n",
-           LAPLACIAN,
-           MASS,
-           HANDLE_DIRICHLET);
+    printf("Environment variables:\n- SFEM_LAPLACIAN=%d\n- SFEM_MASS=%d\n- SFEM_HANDLE_DIRICHLET=%d\n- SFEM_EXPORT_FP32=%d\n",
+           SFEM_LAPLACIAN,
+           SFEM_MASS,
+           SFEM_HANDLE_DIRICHLET,
+           SFEM_EXPORT_FP32);
     printf("----------------------------------------\n");
 
     double tick = MPI_Wtime();
@@ -162,11 +166,11 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
     // Operator assembly
     ///////////////////////////////////////////////////////////////////////////////
-    if (LAPLACIAN) {
+    if (SFEM_LAPLACIAN) {
         assemble_laplacian(nelements, nnodes, elems, xyz, rowptr, colidx, values);
     }
 
-    if (MASS) {
+    if (SFEM_MASS) {
         assemble_mass(nelements, nnodes, elems, xyz, rowptr, colidx, values);
     }
 
@@ -239,7 +243,7 @@ int main(int argc, char *argv[]) {
         free(faces_neumann);
     }
 
-    if (HANDLE_DIRICHLET) {
+    if (SFEM_HANDLE_DIRICHLET) {
         // Dirichlet
         sprintf(path, "%s/zd.raw", folder);
         idx_t *dirichlet_nodes = 0;
@@ -278,6 +282,13 @@ int main(int argc, char *argv[]) {
     // Write CRS matrix and rhs vector
     ///////////////////////////////////////////////////////////////////////////////
 
+    MPI_Datatype value_type = SFEM_EXPORT_FP32? MPI_FLOAT : MPI_DOUBLE;
+    
+    if(SFEM_EXPORT_FP32) {
+        array_dtof(nnz,    (const double *)values, (float*)values);
+        array_dtof(nnodes, (const double *)rhs, (float*)rhs);
+    }
+
     {
         crs_t crs_out;
         crs_out.rowptr = (char *)rowptr;
@@ -291,13 +302,13 @@ int main(int argc, char *argv[]) {
         crs_out.rowoffset = 0;
         crs_out.rowptr_type = MPI_INT;
         crs_out.colidx_type = MPI_INT;
-        crs_out.values_type = MPI_DOUBLE;
+        crs_out.values_type = value_type;
         crs_write_folder(comm, output_folder, &crs_out);
     }
 
     {
         sprintf(path, "%s/rhs.raw", output_folder);
-        array_write(comm, path, MPI_DOUBLE, rhs, nnodes, nnodes);
+        array_write(comm, path, value_type, rhs, nnodes, nnodes);
     }
 
     tock = MPI_Wtime();
