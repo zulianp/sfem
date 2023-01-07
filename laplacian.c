@@ -88,7 +88,7 @@ void print_element_matrix(const real_t *element_matrix) {
     printf("\n");
 }
 
-SFEM_INLINE void laplacian(const real_t x0,
+static SFEM_INLINE void laplacian(const real_t x0,
                            const real_t x1,
                            const real_t x2,
                            const real_t x3,

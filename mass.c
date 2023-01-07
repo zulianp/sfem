@@ -8,7 +8,7 @@
 
 #include "crs_graph.h"
 
-SFEM_INLINE void mass(const real_t x0,
+static SFEM_INLINE void mass(const real_t x0,
                       const real_t x1,
                       const real_t x2,
                       const real_t x3,

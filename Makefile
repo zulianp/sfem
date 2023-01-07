@@ -11,27 +11,27 @@ DEPS = -L../matrix.io/ -lmatrix.io
 
 LDFLAGS += $(DEPS)
 
-CC=mpicc
+MPICC ?= mpicc
 
 all : $(GOALS)
 
 assemble : assemble.o crs_graph.o laplacian.o mass.o
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
 condense_matrix : condense_matrix.o
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
 condense_vector : condense_vector.o
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
 idx_to_indicator : idx_to_indicator.o
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
 remap_vector : remap_vector.o
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
 %.o : %.c
-	$(CC) $(CFLAGS) -c $<
+	$(MPICC) $(CFLAGS) -c $<
 
 .SUFFIXES :
 .PRECIOUS :
