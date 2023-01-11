@@ -37,11 +37,11 @@ SFEM_INLINE static idx_t unique(idx_t *arr, idx_t size) {
     return (++result) - arr;
 }
 
-idx_t find_idx_binary_search(const idx_t key, const idx_t *arr, idx_t size) {
-    idx_t *ptr = bsearch(&key, arr, size, sizeof(idx_t), cmpfunc);
-    if (!ptr) return -1;
-    return (idx_t)(ptr - arr);
-}
+// idx_t find_idx_binary_search(const idx_t key, const idx_t *arr, idx_t size) {
+//     idx_t *ptr = bsearch(&key, arr, size, sizeof(idx_t), cmpfunc);
+//     if (!ptr) return -1;
+//     return (idx_t)(ptr - arr);
+// }
 
 // SFEM_INLINE static int choose(int condition, int valTrue, int valFalse) {
 //     return (condition * valTrue) | (!condition * valFalse);
