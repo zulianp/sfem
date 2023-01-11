@@ -142,7 +142,7 @@ int main(int argc, char *argv[]) {
     }
 
     double tack = MPI_Wtime();
-    printf("assemble.c: read\t%g seconds\n", tack - tick);
+    printf("assemble.c: read\t\t%g seconds\n", tack - tick);
 
     ///////////////////////////////////////////////////////////////////////////////
     // Build CRS graph
@@ -160,7 +160,7 @@ int main(int argc, char *argv[]) {
     memset(values, 0, nnz * sizeof(real_t));
 
     double tock = MPI_Wtime();
-    printf("assemble.c: build crs\t%g seconds\n", tock - tack);
+    printf("assemble.c: build crs\t\t%g seconds\n", tock - tack);
     tack = tock;
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -175,7 +175,7 @@ int main(int argc, char *argv[]) {
     }
 
     tock = MPI_Wtime();
-    printf("assemble.c: assembly\t%g seconds\n", tock - tack);
+    printf("assemble.c: assembly\t\t%g seconds\n", tock - tack);
     tack = tock;
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -275,7 +275,7 @@ int main(int argc, char *argv[]) {
     }
 
     tock = MPI_Wtime();
-    printf("assemble.c: boundary\t%g seconds\n", tock - tack);
+    printf("assemble.c: boundary\t\t%g seconds\n", tock - tack);
     tack = tock;
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -312,7 +312,7 @@ int main(int argc, char *argv[]) {
     }
 
     tock = MPI_Wtime();
-    printf("assemble.c: write\t%g seconds\n", tock - tack);
+    printf("assemble.c: write\t\t%g seconds\n", tock - tack);
     tack = tock;
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -337,7 +337,7 @@ int main(int argc, char *argv[]) {
     if (!rank) {
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld\n", (long)nelements, (long)nnodes);
-        printf("TTS:\t%g seconds\n", tock - tick);
+        printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
     return MPI_Finalize();

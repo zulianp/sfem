@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <mpi.h>
+
 #include "../matrix.io/matrixio_array.h"
 #include "../matrix.io/matrixio_crs.h"
 #include "../matrix.io/utils.h"
@@ -14,6 +16,7 @@
 // https://dirtyhandscoding.github.io/posts/vectorizing-small-fixed-size-sort.html
 // https://xhad1234.github.io/Parallel-Sort-Merge-Join-in-Peloton/
 // https://github.com/sid1607/avx2-merge-sort/blob/master/merge_sort.h
+// https://onlinelibrary.wiley.com/doi/full/10.1002/spe.2922
 
 SFEM_INLINE int ispow2(idx_t n) { return n && (!(n & (n - 1))); }
 
@@ -69,6 +72,8 @@ int build_n2e(const ptrdiff_t nelements,
               idx_t *const elems[4],
               idx_t **out_n2eptr,
               idx_t **out_elindex) {
+    double tick = MPI_Wtime();
+
     idx_t *n2eptr = malloc((nnodes + 1) * sizeof(idx_t));
     memset(n2eptr, 0, nnodes * sizeof(idx_t));
 
@@ -104,6 +109,9 @@ int build_n2e(const ptrdiff_t nelements,
 
     *out_n2eptr = n2eptr;
     *out_elindex = elindex;
+
+    double tock = MPI_Wtime();
+    printf("crs_graph.c: build_n2e\t\t%g seconds\n", tock - tick);
     return 0;
 }
 
@@ -192,6 +200,8 @@ int build_crs_graph_faster(const ptrdiff_t nelements,
                            idx_t *const elems[4],
                            idx_t **out_rowptr,
                            idx_t **out_colidx) {
+
+
     ptrdiff_t nnz = 0;
     idx_t *rowptr = (idx_t *)malloc((nnodes + 1) * sizeof(idx_t));
     idx_t *colidx = 0;
@@ -201,13 +211,15 @@ int build_crs_graph_faster(const ptrdiff_t nelements,
         idx_t *elindex;
         build_n2e(nelements, nnodes, elems, &n2eptr, &elindex);
 
+        double tick = MPI_Wtime();
+
         rowptr[0] = 0;
 
         ptrdiff_t overestimated_nnz = 0;
         idx_t n2nbuff[2048];
         for (idx_t node = 0; node < nnodes; ++node) {
-            idx_t ebegin = n2eptr[node];
-            idx_t eend = n2eptr[node + 1];
+            const idx_t ebegin = n2eptr[node];
+            const idx_t eend = n2eptr[node + 1];
 
             idx_t nneighs = 0;
 
@@ -216,7 +228,7 @@ int build_crs_graph_faster(const ptrdiff_t nelements,
                 assert(eidx < nelements);
 
                 for (int edof_i = 0; edof_i < 4; ++edof_i) {
-                    idx_t neighnode = elems[edof_i][eidx];
+                    const idx_t neighnode = elems[edof_i][eidx];
                     assert(nneighs < 2048);
                     n2nbuff[nneighs++] = neighnode;
                 }
@@ -227,19 +239,23 @@ int build_crs_graph_faster(const ptrdiff_t nelements,
 
         colidx = (idx_t *)malloc(overestimated_nnz * sizeof(idx_t));
 
+        double tock = MPI_Wtime();
+        printf("crs_graph.c: overestimate nnz\t%g seconds\n", tock - tick);
+        tick = tock;
+
         ptrdiff_t coloffset = 0;
         for (idx_t node = 0; node < nnodes; ++node) {
-            idx_t ebegin = n2eptr[node];
-            idx_t eend = n2eptr[node + 1];
+            const idx_t ebegin = n2eptr[node];
+            const idx_t eend = n2eptr[node + 1];
 
             idx_t nneighs = 0;
 
             for (idx_t e = ebegin; e < eend; ++e) {
-                idx_t eidx = elindex[e];
+                const idx_t eidx = elindex[e];
                 assert(eidx < nelements);
 
                 for (int edof_i = 0; edof_i < 4; ++edof_i) {
-                    idx_t neighnode = elems[edof_i][eidx];
+                    const idx_t neighnode = elems[edof_i][eidx];
                     assert(nneighs < 2048);
                     n2nbuff[nneighs++] = neighnode;
                 }
@@ -260,6 +276,9 @@ int build_crs_graph_faster(const ptrdiff_t nelements,
 
         free(n2eptr);
         free(elindex);
+
+        tock = MPI_Wtime();
+        printf("crs_graph.c: build nz structure\t%g seconds\n", tock - tick);
     }
 
     *out_rowptr = rowptr;
