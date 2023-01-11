@@ -11,6 +11,8 @@
 #include "../matrix.io/matrixio_crs.h"
 #include "../matrix.io/utils.h"
 
+#include "sortreduce.h"
+
 // #include "bitonic.h"
 
 // https://dirtyhandscoding.github.io/posts/vectorizing-small-fixed-size-sort.html
@@ -149,8 +151,10 @@ int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
                 }
             }
 
-            quicksort(n2nbuff, nneighs);
-            nneighs = unique(n2nbuff, nneighs);
+            // quicksort(n2nbuff, nneighs);
+            // nneighs = unique(n2nbuff, nneighs);
+
+            nneighs = sortreduce(n2nbuff, nneighs);
 
             nnz += nneighs;
             rowptr[node + 1] = nnz;
@@ -261,8 +265,9 @@ int build_crs_graph_faster(const ptrdiff_t nelements,
                 }
             }
 
-            quicksort(n2nbuff, nneighs);
-            nneighs = unique(n2nbuff, nneighs);
+            // quicksort(n2nbuff, nneighs);
+            // nneighs = unique(n2nbuff, nneighs);
+            nneighs = sortreduce(n2nbuff, nneighs);
 
             nnz += nneighs;
             rowptr[node + 1] = nnz;

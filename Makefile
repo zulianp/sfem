@@ -1,10 +1,17 @@
 ifeq ($(debug),1)
-	CFLAGS += -pedantic -O0 -g
+	CFLAGS += -O0 -g
 else ifeq ($(prof),1)
-	CFLAGS += -pedantic -O2 -g
+	CFLAGS += -O2 -g
 else
-	CFLAGS += -pedantic -O3 -DNDEBUG
+	CFLAGS += -O3 -DNDEBUG
 endif
+
+CFLAGS += -std=c99 -pedantic 
+
+CXXFLAGS += -std=c++11
+CXXFLAGS += -fno-exceptions -fno-rtti -static
+CXXFLAGS += -fvisibility=hidden
+CXXFLAGS += -fPIC
 
 GOALS = assemble condense_matrix condense_vector idx_to_indicator remap_vector
 DEPS = -L../matrix.io/ -lmatrix.io
@@ -12,10 +19,22 @@ DEPS = -L../matrix.io/ -lmatrix.io
 LDFLAGS += $(DEPS)
 
 MPICC ?= mpicc
+CXX ?= c++
+AR ?= ar
 
 all : $(GOALS)
 
-assemble : assemble.o crs_graph.o laplacian.o mass.o
+OBJS = \
+	sortreduce.o \
+	crs_graph.o \
+	laplacian.o \
+	mass.o \
+	sortreduce.o
+
+libsfem.a : $(OBJS)
+	ar rcs $@ $^
+
+assemble : assemble.o libsfem.a
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
 condense_matrix : condense_matrix.o
@@ -30,6 +49,9 @@ idx_to_indicator : idx_to_indicator.o
 remap_vector : remap_vector.o
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
+sortreduce.o: sortreduce.cpp
+	$(CXX) $(CXXFLAGS) -c $<
+
 %.o : %.c
 	$(MPICC) $(CFLAGS) -c $<
 
@@ -37,7 +59,7 @@ remap_vector : remap_vector.o
 .PRECIOUS :
 
 clean:
-	rm *.o $(GOALS)
+	rm *.o *.a $(GOALS)
 
 .SUFFIXES:
 
