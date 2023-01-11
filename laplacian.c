@@ -7,6 +7,7 @@
 #include <mpi.h>
 
 #include "crs_graph.h"
+#include "sortreduce.h"
 
 static SFEM_INLINE real_t det3(const real_t *mat) {
     return mat[0] * mat[4] * mat[8] + mat[1] * mat[5] * mat[6] + mat[2] * mat[3] * mat[7] - mat[0] * mat[5] * mat[7] -

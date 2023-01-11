@@ -7,6 +7,7 @@
 #include <mpi.h>
 
 #include "crs_graph.h"
+#include "sortreduce.h"
 
 static SFEM_INLINE void mass(const real_t x0,
                       const real_t x1,
