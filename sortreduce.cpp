@@ -1,6 +1,7 @@
 #include "sfem_base.h"
 
 #include <algorithm>
+#include <cassert>
 
 extern "C" idx_t sortreduce(idx_t *arr, idx_t size) {
     idx_t *end = arr + size;
