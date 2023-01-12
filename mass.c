@@ -117,7 +117,7 @@ void assemble_mass(const ptrdiff_t nelements,
                 idx_t dof_j = elems[edof_j][i];
                 int k = -1;
 
-                if (lenrow <= 32) {
+                if (lenrow <= 8) {
                     k = find_idx(dof_j, row, lenrow);
                 } else {
                     // Use this for larger number of dofs per row

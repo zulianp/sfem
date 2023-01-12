@@ -1,9 +1,12 @@
 ifeq ($(debug),1)
 	CFLAGS += -O0 -g
+	CXXFLAGS += -O0 -g
 else ifeq ($(prof),1)
-	CFLAGS += -O2 -g
+	CFLAGS += -O2 -g -DNDEBUG
+	CXXFLAGS += -O2 -g -DNDEBUG
 else
 	CFLAGS += -O3 -DNDEBUG
+	CXXFLAGS += -O3 -DNDEBUG
 endif
 
 CFLAGS += -std=c99 -pedantic 
@@ -14,7 +17,7 @@ CXXFLAGS += -fvisibility=hidden
 CXXFLAGS += -fPIC
 
 GOALS = assemble condense_matrix condense_vector idx_to_indicator remap_vector
-DEPS = -L../matrix.io/ -lmatrix.io
+DEPS = -L../matrix.io/ -lmatrix.io -lstdc++
 
 LDFLAGS += $(DEPS)
 
