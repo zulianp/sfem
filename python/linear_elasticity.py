@@ -2,6 +2,8 @@
 
 from sfem_codegen import *
 
+simplify_expr = False
+
 def n_test_functions():
 	return 4*3
 
@@ -63,7 +65,8 @@ def makeenergy():
 	# integr = sp.integrate(integr * det3(A), (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1)) # No need for this in linear tets
 	integr = integr * dV
 
-	integr = sp.simplify(integr)
+	if simplify_expr:
+		integr = sp.simplify(integr)
 
 	form = sp.symbols(f'element_energy')
 	energy_expr = (ast.Assignment(form, integr))	
@@ -82,17 +85,18 @@ for d1 in range(0, 3):
 grade = [0]*n_test_functions()
 
 for i in range(0, n_test_functions()):
-	integr =  inner(dedu, eps[i])
+	integr =  inner(dedu, shapegrad[i])
 	grade[i] = integr
 
 def makegrad(i, q):
-	integr =  inner(dedu, eps[i])
+	integr =  grade[i]
 	integr = subsmat3x3(integr, gradu, evalgradu)
 
 	# integr = sp.integrate(integr * det3(A), (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1)) # No need for this in linear tets
 	integr = integr * dV
 	
-	integr = sp.simplify(integr)
+	if simplify_expr:
+		integr = sp.simplify(integr)
 
 	lform = sp.symbols(f'element_vector[{i}]')
 	expr = ast.Assignment(lform, integr)
@@ -117,13 +121,14 @@ def makehessian(i, q):
 
 	for j in range(i, n_test_functions()):
 		# Bilinear form
-		integr = inner(He, eps[j]) 
+		integr = inner(He, shapegrad[j]) 
 		integr = subsmat3x3(integr, gradu, evalgradu)
 
 		# integr = sp.integrate(integr * det3(A), (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1)) # No need for this in linear tets
 		integr = integr * dV
 
-		integr = sp.simplify(integr)
+		if simplify_expr:
+			integr = sp.simplify(integr)
 
 		# Store results in array
 		bform1 = sp.symbols(f'element_matrix[{i * n_test_functions() + j}]')
