@@ -57,16 +57,16 @@ if __name__ == '__main__':
 
     material.c_code(hessian_expr)
 
-    print("// --------------------------------")
-    print("// Combined")
-    print("// --------------------------------")
+    # print("// --------------------------------")
+    # print("// Combined")
+    # print("// --------------------------------")
 
-    expr = []
-    expr.append(energy_expr)
-    expr.extend(grad_expr)
-    expr.extend(hessian_expr)
+    # expr = []
+    # expr.append(energy_expr)
+    # expr.extend(grad_expr)
+    # expr.extend(hessian_expr)
 
-    material.c_code(expr)
+    # material.c_code(expr)
 
     tock = time.time()
     print(f'// Code generation took {round(tock - tick, 4)} seconds')

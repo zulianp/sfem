@@ -5,17 +5,21 @@ from sfem_codegen import *
 def n_test_functions():
 	return 4*3
 
-mu, lmbda = sp.symbols('mu lambda')
+mu, lmbda = sp.symbols('mu lambda', real=True)
 
 # Displacement
-u0, u1, u2 = sp.symbols('u0 u1 u2')
 
-u = sp.Matrix(3, 1, [u0, u1, u2])
+listdisp = []
+for i in range(0, n_test_functions()):
+	ui= sp.symbols(f'u[{i}]', real=True)
+	listdisp.append(ui)
+
+disp = sp.Matrix(n_test_functions(), 1, listdisp)
 
 # Displacement gradient
-du0dx, du0dy, du0dz = sp.symbols('du0dx du0dy d0udz')
-du1dx, du1dy, du1dz = sp.symbols('du1dx du1dy d1udz')
-du2dx, du2dy, du2dz = sp.symbols('du2dx du2dy d2udz')
+du0dx, du0dy, du0dz = sp.symbols('du0dx du0dy d0udz', real=True)
+du1dx, du1dy, du1dz = sp.symbols('du1dx du1dy d1udz', real=True)
+du2dx, du2dy, du2dz = sp.symbols('du2dx du2dy d2udz', real=True)
 
 gradu = sp.Matrix(3, 3, [
 	du0dx, du0dy, du0dz, 
@@ -29,18 +33,38 @@ def linear_strain(gradu):
 dV = det3(A) / 6
 eps = symm_grad(qx, qy, qz)
 
+shapegrad = tgrad(qx, qy, qz)
+
 # Elastic energy
 epsu = linear_strain(gradu)
 
 e = lmbda/2 * tr(epsu) * tr(epsu) + mu * inner(epsu, epsu)
 
+evalgradu = sp.Matrix(3, 3, 
+	[0, 0, 0, 
+	 0, 0, 0,
+	 0, 0, 0])
+
+for i in range(0, n_test_functions()):
+	for d1 in range(0, 3):
+		for d2 in range(0, 3):
+			evalgradu[d1, d2] += shapegrad[i][d1, d2] * disp[i]
+
+def subsmat3x3(expr, oldmat, newmat):
+	for d1 in range(0, 3):
+		for d2 in range(0, 3):
+			expr = expr.subs(oldmat[d1, d2], newmat[d1, d2])
+	return expr
+
 def makeenergy():
-	integr = sp.simplify(e * det3(A))
-	integr = sp.integrate(integr, (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1))
-	sintegr = sp.simplify(integr)
+	integr = sp.simplify(e)
+	# integr = sp.integrate(integr * det3(A), (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1))
+	integr = integr * dV
+	integr = subsmat3x3(integr, gradu, evalgradu)
+	integr = sp.simplify(integr)
 
 	form = sp.symbols(f'element_energy')
-	energy_expr = (ast.Assignment(form, sintegr))	
+	energy_expr = (ast.Assignment(form, integr))	
 	return energy_expr
 
 # Gradient
@@ -61,14 +85,16 @@ for i in range(0, 4*3):
 
 def makegrad(i, q):
 	integr =  inner(dedu, eps[i])
-	grade[i] = integr
 
 	# Simplify expressions (switch comment on lines for reducing times)
-	integr = sp.integrate(integr * det3(A), (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1))
-	sintegr = sp.simplify(integr)
-	# sintegr = integr
+	# integr = sp.integrate(integr * det3(A), (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1))
+	
+	integr = integr * dV
+	integr = subsmat3x3(integr, gradu, evalgradu)
+	integr = sp.simplify(integr)
+
 	lform = sp.symbols(f'element_vector[{i}]')
-	expr = ast.Assignment(lform, sintegr)
+	expr = ast.Assignment(lform, integr)
 	q.put(expr)
 
 def print_grads():
@@ -93,17 +119,17 @@ def makehessian(i, q):
 		integr = inner(He, eps[j]) * dV
 		
 		# Simplify expressions (switch comment on lines for reducing times)
-		sintegr = sp.simplify(integr)
+		integr = sp.simplify(integr)
+		integr = subsmat3x3(integr, gradu, evalgradu)
 
 		# Store results in array
 		bform1 = sp.symbols(f'element_matrix[{i*(4*3)+j}]')
 
-		tuples.append((i, j, ast.Assignment(bform1, sintegr)))
+		tuples.append((i, j, ast.Assignment(bform1, integr)))
 
 		# Take advantage of symmetry to reduce code-gen times
 		if i != j:
 			bform2 = sp.symbols(f'element_matrix[{i+(4*3)*j}]')
-			tuples.append((j, i, ast.Assignment(bform2, sintegr)))
+			tuples.append((j, i, ast.Assignment(bform2, integr)))
 
 	q.put(tuples)
-	
