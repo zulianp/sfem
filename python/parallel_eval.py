@@ -1,4 +1,4 @@
-import phasefield as material
+import linear_elasticity as material
 import time
 from multiprocessing import Queue
 from multiprocessing import Process as Worker

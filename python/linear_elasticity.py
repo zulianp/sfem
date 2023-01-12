@@ -5,7 +5,6 @@ from sfem_codegen import *
 def n_test_functions():
 	return 4*3
 
-# if __name__ == '__main__':
 mu, lmbda = sp.symbols('mu lambda')
 
 # Displacement
@@ -107,4 +106,4 @@ def makehessian(i, q):
 			tuples.append((j, i, ast.Assignment(bform2, sintegr)))
 
 	q.put(tuples)
-
+	
