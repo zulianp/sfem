@@ -58,9 +58,11 @@ def subsmat3x3(expr, oldmat, newmat):
 
 def makeenergy():
 	integr = sp.simplify(e)
-	# integr = sp.integrate(integr * det3(A), (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1))
-	integr = integr * dV
 	integr = subsmat3x3(integr, gradu, evalgradu)
+
+	# integr = sp.integrate(integr * det3(A), (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1)) # No need for this in linear tets
+	integr = integr * dV
+
 	integr = sp.simplify(integr)
 
 	form = sp.symbols(f'element_energy')
@@ -77,20 +79,19 @@ for d1 in range(0, 3):
 	for d2 in range(0, 3):
 		dedu[d1, d2] = sp.diff(e, gradu[d1, d2])
 
-grade = [0]*(4*3)
+grade = [0]*n_test_functions()
 
-for i in range(0, 4*3):
+for i in range(0, n_test_functions()):
 	integr =  inner(dedu, eps[i])
 	grade[i] = integr
 
 def makegrad(i, q):
 	integr =  inner(dedu, eps[i])
-
-	# Simplify expressions (switch comment on lines for reducing times)
-	# integr = sp.integrate(integr * det3(A), (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1))
-	
-	integr = integr * dV
 	integr = subsmat3x3(integr, gradu, evalgradu)
+
+	# integr = sp.integrate(integr * det3(A), (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1)) # No need for this in linear tets
+	integr = integr * dV
+	
 	integr = sp.simplify(integr)
 
 	lform = sp.symbols(f'element_vector[{i}]')
@@ -98,7 +99,7 @@ def makegrad(i, q):
 	q.put(expr)
 
 def print_grads():
-	for i in range(0, 4*3):
+	for i in range(0, n_test_functions()):
 		print(f'{i}) {grad_expr[i]}')
 
 # Hessian
@@ -114,22 +115,24 @@ def makehessian(i, q):
 		for d2 in range(0, 3):
 			He[d1, d2] = sp.diff(grade[i], gradu[d1, d2])
 
-	for j in range(i, 4*3):
+	for j in range(i, n_test_functions()):
 		# Bilinear form
-		integr = inner(He, eps[j]) * dV
-		
-		# Simplify expressions (switch comment on lines for reducing times)
-		integr = sp.simplify(integr)
+		integr = inner(He, eps[j]) 
 		integr = subsmat3x3(integr, gradu, evalgradu)
 
+		# integr = sp.integrate(integr * det3(A), (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1)) # No need for this in linear tets
+		integr = integr * dV
+
+		integr = sp.simplify(integr)
+
 		# Store results in array
-		bform1 = sp.symbols(f'element_matrix[{i*(4*3)+j}]')
+		bform1 = sp.symbols(f'element_matrix[{i * n_test_functions() + j}]')
 
 		tuples.append((i, j, ast.Assignment(bform1, integr)))
 
 		# Take advantage of symmetry to reduce code-gen times
 		if i != j:
-			bform2 = sp.symbols(f'element_matrix[{i+(4*3)*j}]')
+			bform2 = sp.symbols(f'element_matrix[{i + n_test_functions() * j}]')
 			tuples.append((j, i, ast.Assignment(bform2, integr)))
 
 	q.put(tuples)
