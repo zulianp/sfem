@@ -28,15 +28,23 @@ if __name__ == '__main__':
     tick = time.time()
     ntf = material.n_test_functions()
 
-    print("--------------------------------")
+    print("// --------------------------------")
+    print("// Energy")
+    print("// --------------------------------")
 
     energy_expr = material.makeenergy()
     material.c_code(energy_expr)
-
-    print("--------------------------------")
+    
+    print("// --------------------------------")
+    print("// Grad")
+    print("// --------------------------------")
 
     grad_expr = parallel_eval(ntf, material.makegrad)
     material.c_code(grad_expr)
+
+    print("// --------------------------------")
+    print("// Hessian")
+    print("// --------------------------------")
 
     hessian_tuples = parallel_eval(ntf, material.makehessian)
 
@@ -49,5 +57,16 @@ if __name__ == '__main__':
 
     material.c_code(hessian_expr)
 
+    print("// --------------------------------")
+    print("// Combined")
+    print("// --------------------------------")
+
+    expr = []
+    expr.append(energy_expr)
+    expr.extend(grad_expr)
+    expr.extend(hessian_expr)
+
+    material.c_code(expr)
+
     tock = time.time()
-    print(f'Code generation took {round(tock - tick, 4)} seconds')
+    print(f'// Code generation took {round(tock - tick, 4)} seconds')
