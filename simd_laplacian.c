@@ -26,56 +26,56 @@ static SFEM_INLINE void laplacian(const vreal_t x0,
                                   const vreal_t z2,
                                   const vreal_t z3,
                                   vreal_t *element_matrix) {
-    vreal_t x4 = z0 - z3;
-    vreal_t x5 = x0 - x1;
-    vreal_t x6 = y0 - y2;
-    vreal_t x7 = x5 * x6;
-    vreal_t x8 = z0 - z1;
-    vreal_t x9 = x0 - x2;
-    vreal_t x10 = y0 - y3;
-    vreal_t x11 = x10 * x9;
-    vreal_t x12 = z0 - z2;
-    vreal_t x13 = x0 - x3;
-    vreal_t x14 = y0 - y1;
-    vreal_t x15 = x13 * x14;
-    vreal_t x16 = x10 * x5;
-    vreal_t x17 = x14 * x9;
-    vreal_t x18 = x13 * x6;
-    vreal_t x19 = x11 * x8 + x12 * x15 - x12 * x16 - x17 * x4 - x18 * x8 + x4 * x7;
-    vreal_t x20 = 1.0 / x19;
-    vreal_t x21 = x11 - x18;
-    vreal_t x22 = -x17 + x7;
-    vreal_t x23 = x15 - x16 + x21 + x22;
-    vreal_t x24 = -x12 * x13 + x4 * x9;
-    vreal_t x25 = x12 * x5 - x8 * x9;
-    vreal_t x26 = x13 * x8;
-    vreal_t x27 = x4 * x5;
-    vreal_t x28 = x26 - x27;
-    vreal_t x29 = -x24 - x25 - x28;
-    vreal_t x30 = x10 * x8;
-    vreal_t x31 = x14 * x4;
-    vreal_t x32 = -x10 * x12 + x4 * x6;
-    vreal_t x33 = x12 * x14 - x6 * x8;
-    vreal_t x34 = x30 - x31 + x32 + x33;
-    vreal_t x35 = -x12;
-    vreal_t x36 = -x9;
-    vreal_t x37 = x19 * (x13 * x35 + x28 - x35 * x5 - x36 * x4 + x36 * x8);
-    vreal_t x38 = -x19;
-    vreal_t x39 = -x23;
-    vreal_t x40 = -x34;
-    vreal_t x41 = (1.0 / 6.0) / (x19 * x19);
-    vreal_t x42 = x41 * (x24 * x37 + x38 * (x21 * x39 + x32 * x40));
-    vreal_t x43 = -x15 + x16;
-    vreal_t x44 = (1.0 / 6.0) * x43;
-    vreal_t x45 = -x26 + x27;
-    vreal_t x46 = -x30 + x31;
-    vreal_t x47 = (1.0 / 6.0) * x46;
-    vreal_t x48 = x20 * (-x23 * x44 + (1.0 / 6.0) * x29 * x45 - x34 * x47);
-    vreal_t x49 = x41 * (x25 * x37 + x38 * (x22 * x39 + x33 * x40));
-    vreal_t x50 = (1.0 / 6.0) * x45;
-    vreal_t x51 = x20 * (x21 * x44 + x24 * x50 + x32 * x47);
-    vreal_t x52 = x20 * (-1.0 / 6.0 * x21 * x22 - 1.0 / 6.0 * x24 * x25 - 1.0 / 6.0 * x32 * x33);
-    vreal_t x53 = x20 * (x22 * x44 + x25 * x50 + x33 * x47);
+    const vreal_t x4 = z0 - z3;
+    const vreal_t x5 = x0 - x1;
+    const vreal_t x6 = y0 - y2;
+    const vreal_t x7 = x5 * x6;
+    const vreal_t x8 = z0 - z1;
+    const vreal_t x9 = x0 - x2;
+    const vreal_t x10 = y0 - y3;
+    const vreal_t x11 = x10 * x9;
+    const vreal_t x12 = z0 - z2;
+    const vreal_t x13 = x0 - x3;
+    const vreal_t x14 = y0 - y1;
+    const vreal_t x15 = x13 * x14;
+    const vreal_t x16 = x10 * x5;
+    const vreal_t x17 = x14 * x9;
+    const vreal_t x18 = x13 * x6;
+    const vreal_t x19 = x11 * x8 + x12 * x15 - x12 * x16 - x17 * x4 - x18 * x8 + x4 * x7;
+    const vreal_t x20 = 1.0 / x19;
+    const vreal_t x21 = x11 - x18;
+    const vreal_t x22 = -x17 + x7;
+    const vreal_t x23 = x15 - x16 + x21 + x22;
+    const vreal_t x24 = -x12 * x13 + x4 * x9;
+    const vreal_t x25 = x12 * x5 - x8 * x9;
+    const vreal_t x26 = x13 * x8;
+    const vreal_t x27 = x4 * x5;
+    const vreal_t x28 = x26 - x27;
+    const vreal_t x29 = -x24 - x25 - x28;
+    const vreal_t x30 = x10 * x8;
+    const vreal_t x31 = x14 * x4;
+    const vreal_t x32 = -x10 * x12 + x4 * x6;
+    const vreal_t x33 = x12 * x14 - x6 * x8;
+    const vreal_t x34 = x30 - x31 + x32 + x33;
+    const vreal_t x35 = -x12;
+    const vreal_t x36 = -x9;
+    const vreal_t x37 = x19 * (x13 * x35 + x28 - x35 * x5 - x36 * x4 + x36 * x8);
+    const vreal_t x38 = -x19;
+    const vreal_t x39 = -x23;
+    const vreal_t x40 = -x34;
+    const vreal_t x41 = (1.0 / 6.0) / (x19 * x19);
+    const vreal_t x42 = x41 * (x24 * x37 + x38 * (x21 * x39 + x32 * x40));
+    const vreal_t x43 = -x15 + x16;
+    const vreal_t x44 = (1.0 / 6.0) * x43;
+    const vreal_t x45 = -x26 + x27;
+    const vreal_t x46 = -x30 + x31;
+    const vreal_t x47 = (1.0 / 6.0) * x46;
+    const vreal_t x48 = x20 * (-x23 * x44 + (1.0 / 6.0) * x29 * x45 - x34 * x47);
+    const vreal_t x49 = x41 * (x25 * x37 + x38 * (x22 * x39 + x33 * x40));
+    const vreal_t x50 = (1.0 / 6.0) * x45;
+    const vreal_t x51 = x20 * (x21 * x44 + x24 * x50 + x32 * x47);
+    const vreal_t x52 = x20 * (-1.0 / 6.0 * x21 * x22 - 1.0 / 6.0 * x24 * x25 - 1.0 / 6.0 * x32 * x33);
+    const vreal_t x53 = x20 * (x22 * x44 + x25 * x50 + x33 * x47);
 
     element_matrix[0] = x20 * (-1.0 / 6.0 * (x23 * x23) - 1.0 / 6.0 * (x29 * x29) - 1.0 / 6.0 * (x34 * x34));
     element_matrix[1] = x42;
@@ -111,12 +111,12 @@ void assemble_laplacian(const ptrdiff_t nelements,
     vreal_t z[4];
 
     for (ptrdiff_t i = 0; i < nelements; i += SFEM_VECTOR_SIZE) {
-        int nvec = MIN(nelements - (i + SFEM_VECTOR_SIZE), SFEM_VECTOR_SIZE);
+        const int nvec = MIN(nelements - (i + SFEM_VECTOR_SIZE), SFEM_VECTOR_SIZE);
 
         for(int vi = 0; vi < nvec; ++vi) {
-            ptrdiff_t offset = i+vi;
+            const ptrdiff_t offset = i+vi;
             for(int d = 0; d < 4; ++d) {
-                ptrdiff_t vidx = elems[d][offset];
+                const ptrdiff_t vidx = elems[d][offset];
                 x[d][vi] = xyz[0][vidx];
                 y[d][vi] = xyz[1][vidx];
                 z[d][vi] = xyz[2][vidx];
@@ -153,12 +153,28 @@ void assemble_laplacian(const ptrdiff_t nelements,
                 idx_t *row = &colidx[rowptr[dof_i]];
                 real_t *rowvalues = &values[rowptr[dof_i]];
 
+                idx_t prev_j = -1;
+                idx_t prev_k = 0;
+
                 for (int edof_j = 0; edof_j < 4; ++edof_j) {
                     idx_t dof_j = elems[edof_j][offset];
                     int k = -1;
 
-                    if (lenrow <= 8) {
-                        k = find_idx(dof_j, row, lenrow);
+                    if (lenrow <= 32) {
+                        if(prev_j > dof_j) {
+                            prev_k = 0;
+                        }
+
+                        for (idx_t c = prev_k; c < lenrow; ++c) {
+                            if(dof_j == row[c]) {
+                                k = c;
+                                break;
+                            }
+                        }
+
+                        prev_k = k + 1;
+                        prev_j = dof_j;
+
                     } else {
                         // Use this for larger number of dofs per row
                         k = find_idx_binary_search(dof_j, row, lenrow);

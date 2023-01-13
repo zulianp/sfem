@@ -39,6 +39,13 @@ OBJS = \
 	mass.o \
 	sortreduce.o
 
+# SIMD experiment
+#simd_laplacian.o
+
+# Scalar
+#laplacian.o
+
+
 libsfem.a : $(OBJS)
 	ar rcs $@ $^
 
