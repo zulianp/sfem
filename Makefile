@@ -35,7 +35,7 @@ all : $(GOALS)
 OBJS = \
 	sortreduce.o \
 	crs_graph.o \
-	laplacian.o \
+	simd_laplacian.o \
 	mass.o \
 	sortreduce.o
 
