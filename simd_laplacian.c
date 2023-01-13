@@ -160,7 +160,8 @@ void assemble_laplacian(const ptrdiff_t nelements,
                     idx_t dof_j = elems[edof_j][offset];
                     int k = -1;
 
-                    if (lenrow <= 32) {
+                    // if (lenrow <= 32) {
+                    if(0) {
                         if(prev_j > dof_j) {
                             prev_k = 0;
                         }
