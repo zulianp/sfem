@@ -9,6 +9,11 @@ else
 	CXXFLAGS += -O3 -DNDEBUG
 endif
 
+ifeq ($(avx2sort), 1)
+	CXXFLAGS += -DSFEM_ENABLE_AVX2_SORT -Iexternal
+
+endif
+
 CFLAGS += -std=c99 -pedantic 
 
 CXXFLAGS += -std=c++11

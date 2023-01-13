@@ -3,9 +3,17 @@
 #include <algorithm>
 #include <cassert>
 
+#ifdef SFEM_ENABLE_AVX2_SORT
+#include "avx2sort.h"
+#endif
+
 extern "C" idx_t sortreduce(idx_t *arr, idx_t size) {
-    idx_t *end = arr + size;
-    std::sort(arr, end);
+
+#ifdef SFEM_ENABLE_AVX2_SORT
+    avx2::quicksort(arr, size);
+#else
+    std::sort(arr,  arr + size);
+#endif
     auto it = std::unique(arr, arr + size);
     return std::distance(arr, it);
 }
