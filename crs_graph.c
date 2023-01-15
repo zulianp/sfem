@@ -59,7 +59,7 @@ SFEM_INLINE static idx_t unique(idx_t *arr, idx_t size) {
 //     return choose(key < arr[end], start, end);
 // }
 
-idx_t find_idx(const idx_t target, const idx_t *restrict x, idx_t n) {
+idx_t find_idx(const idx_t target, const idx_t * x, idx_t n) {
     for (idx_t i = 0; i < n; ++i) {
         if (target == x[i]) {
             return i;
@@ -76,10 +76,10 @@ int build_n2e(const ptrdiff_t nelements,
               idx_t **out_elindex) {
     double tick = MPI_Wtime();
 
-    idx_t *n2eptr = malloc((nnodes + 1) * sizeof(idx_t));
+    idx_t *n2eptr = (idx_t *)malloc((nnodes + 1) * sizeof(idx_t));
     memset(n2eptr, 0, nnodes * sizeof(idx_t));
 
-    int *bookkepping = malloc((nnodes) * sizeof(int));
+    int *bookkepping = (int *)malloc((nnodes) * sizeof(int));
     memset(bookkepping, 0, (nnodes) * sizeof(int));
 
     for (int edof_i = 0; edof_i < 4; ++edof_i) {

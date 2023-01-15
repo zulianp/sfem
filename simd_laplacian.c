@@ -95,6 +95,26 @@ static SFEM_INLINE void laplacian(const vreal_t x0,
     element_matrix[15] = x20 * (-1.0 / 6.0 * (x22 * x22) - 1.0 / 6.0 * (x25 * x25) - 1.0 / 6.0 * (x33 * x33));
 }
 
+static SFEM_INLINE int find_col(const idx_t key, const idx_t *const row, const int lenrow)
+{
+
+    int k = -1;
+    if (lenrow <= 32) 
+    // 
+    {
+        // Using sentinel (potentially dangerous if matrix is buggy and column does not exist)
+        while (key > row[++k]) {
+            // Hi
+        }
+        assert(k < lenrow);
+        assert(key == row[k]);
+    } else {
+        // Use this for larger number of dofs per row
+        k = find_idx_binary_search(key, row, lenrow);
+    }
+    return k;
+}
+
 void assemble_laplacian(const ptrdiff_t nelements,
                         const ptrdiff_t nnodes,
                         idx_t *const elems[4],
@@ -116,7 +136,7 @@ void assemble_laplacian(const ptrdiff_t nelements,
         for (int vi = 0; vi < nvec; ++vi) {
             const ptrdiff_t offset = i + vi;
             for (int d = 0; d < 4; ++d) {
-                const ptrdiff_t vidx = elems[d][offset];
+                const idx_t vidx = elems[d][offset];
                 x[d][vi] = xyz[0][vidx];
                 y[d][vi] = xyz[1][vidx];
                 z[d][vi] = xyz[2][vidx];
@@ -142,39 +162,19 @@ void assemble_laplacian(const ptrdiff_t nelements,
             element_matrix);
 
         // Local to global
-
         for (int vi = 0; vi < nvec; ++vi) {
-            ptrdiff_t offset = i + vi;
+            idx_t offset = i + vi;
 
             for (int edof_i = 0; edof_i < 4; ++edof_i) {
-                idx_t dof_i = elems[edof_i][offset];
-                idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
+                const idx_t dof_i = elems[edof_i][offset];
+                const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
 
-                idx_t *row = &colidx[rowptr[dof_i]];
+                const idx_t *row = &colidx[rowptr[dof_i]];
                 real_t *rowvalues = &values[rowptr[dof_i]];
 
-                idx_t prev_j = -1;
-                idx_t prev_k = 0;
-
                 for (int edof_j = 0; edof_j < 4; ++edof_j) {
-                    idx_t dof_j = elems[edof_j][offset];
-                    int k = -1;
-
-                    // if (!edof_j)
-                    if (lenrow <= 32) 
-                    // 
-                    {
-                        // Using sentinel (potentially dangerous if matrix is buggy and column does not exist)
-                        while (dof_j > row[++k]) {
-                            // Hi
-                        }
-                        assert(k < lenrow);
-                        assert(dof_j == row[k]);
-                    } else {
-                        // Use this for larger number of dofs per row
-                        k = find_idx_binary_search(dof_j, row, lenrow);
-                    }
-
+                    const idx_t dof_j = elems[edof_j][offset];
+                    int k = find_col(dof_j, row, lenrow);
                     rowvalues[k] += element_matrix[edof_i * 4 + edof_j][vi];
                 }
             }

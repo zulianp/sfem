@@ -90,18 +90,18 @@ void print_element_matrix(const real_t *element_matrix) {
 }
 
 static SFEM_INLINE void laplacian(const real_t x0,
-                           const real_t x1,
-                           const real_t x2,
-                           const real_t x3,
-                           const real_t y0,
-                           const real_t y1,
-                           const real_t y2,
-                           const real_t y3,
-                           const real_t z0,
-                           const real_t z1,
-                           const real_t z2,
-                           const real_t z3,
-                           real_t *element_matrix) {
+                                  const real_t x1,
+                                  const real_t x2,
+                                  const real_t x3,
+                                  const real_t y0,
+                                  const real_t y1,
+                                  const real_t y2,
+                                  const real_t y3,
+                                  const real_t z0,
+                                  const real_t z1,
+                                  const real_t z2,
+                                  const real_t z3,
+                                  real_t *element_matrix) {
     real_t x4 = z0 - z3;
     real_t x5 = x0 - x1;
     real_t x6 = y0 - y2;
@@ -169,6 +169,28 @@ static SFEM_INLINE void laplacian(const real_t x0,
     element_matrix[13] = x52;
     element_matrix[14] = x53;
     element_matrix[15] = x20 * (-1.0 / 6.0 * pow(x22, 2) - 1.0 / 6.0 * pow(x25, 2) - 1.0 / 6.0 * pow(x33, 2));
+}
+
+
+static SFEM_INLINE int find_col(const idx_t key, const idx_t *const row, const int lenrow)
+{
+
+    int k = -1;
+    // if(0)
+    if (lenrow <= 32) 
+    // 
+    {
+        // Using sentinel (potentially dangerous if matrix is buggy and column does not exist)
+        while (key > row[++k]) {
+            // Hi
+        }
+        assert(k < lenrow);
+        assert(key == row[k]);
+    } else {
+        // Use this for larger number of dofs per row
+        k = find_idx_binary_search(key, row, lenrow);
+    }
+    return k;
 }
 
 void assemble_laplacian(const ptrdiff_t nelements,
@@ -248,29 +270,40 @@ void assemble_laplacian(const ptrdiff_t nelements,
             }
         }
 
-        // Local to global
-        for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            idx_t dof_i = elems[edof_i][i];
-            idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
+        if (1) {
+            idx_t ks[4];
+            for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                const idx_t dof_i = elems[edof_i][i];
+                const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
 
-            idx_t *row = &colidx[rowptr[dof_i]];
-            real_t *rowvalues = &values[rowptr[dof_i]];
+                const idx_t *row = &colidx[rowptr[dof_i]];
 
-            for (int edof_j = 0; edof_j < 4; ++edof_j) {
-                idx_t dof_j = elems[edof_j][i];
-                int k = -1;
-
-                if (lenrow <= 32) {
-                    // Using sentinel (potentially dangerous if matrix is buggy and column does not exist)
-                    while (dof_j > row[++k]) {
-                        // Hi
-                    }
-                } else {
-                    // Use this for larger number of dofs per row
-                    k = find_idx_binary_search(dof_j, row, lenrow);
+                for(int v = 0; v < 4; ++v) {
+                    ks[v] = find_col(elems[v][i], row, lenrow);
                 }
 
-                rowvalues[k] += element_matrix[edof_i * 4 + edof_j];
+                real_t *rowvalues = &values[rowptr[dof_i]];
+                const real_t *element_row = &element_matrix[edof_i * 4];
+
+                for (int edof_j = 0; edof_j < 4; ++edof_j) {
+                    rowvalues[ks[edof_j]] += element_matrix[edof_j];
+                }
+            }
+
+        } else {
+            // Local to global
+            for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                const idx_t dof_i = elems[edof_i][i];
+                const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
+
+                const idx_t *row = &colidx[rowptr[dof_i]];
+                real_t *rowvalues = &values[rowptr[dof_i]];
+
+                for (int edof_j = 0; edof_j < 4; ++edof_j) {
+                    idx_t dof_j = elems[edof_j][i];
+                    int k = find_col(dof_j, row, lenrow);
+                    rowvalues[k] += element_matrix[edof_i * 4 + edof_j];
+                }
             }
         }
     }

@@ -14,7 +14,8 @@ ifeq ($(avx2sort), 1)
 
 endif
 
-CFLAGS += -std=c99 -pedantic 
+CFLAGS += -pedantic 
+# CFLAGS += -std=c99 
 
 CXXFLAGS += -std=c++11
 CXXFLAGS += -fno-exceptions -fno-rtti -static
