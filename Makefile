@@ -5,8 +5,8 @@ else ifeq ($(prof),1)
 	CFLAGS += -O2 -g -DNDEBUG
 	CXXFLAGS += -O2 -g -DNDEBUG
 else
-	CFLAGS += -O3 -DNDEBUG
-	CXXFLAGS += -O3 -DNDEBUG
+	CFLAGS += -Ofast -DNDEBUG
+	CXXFLAGS += -Ofast -DNDEBUG
 endif
 
 ifeq ($(avx2sort), 1)
@@ -35,7 +35,7 @@ all : $(GOALS)
 OBJS = \
 	sortreduce.o \
 	crs_graph.o \
-	simd_laplacian.o \
+	laplacian.o \
 	mass.o \
 	sortreduce.o
 

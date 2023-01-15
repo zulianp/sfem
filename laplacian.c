@@ -260,8 +260,11 @@ void assemble_laplacian(const ptrdiff_t nelements,
                 idx_t dof_j = elems[edof_j][i];
                 int k = -1;
 
-                if (lenrow <= 8) {
-                    k = find_idx(dof_j, row, lenrow);
+                if (lenrow <= 32) {
+                    // Using sentinel (potentially dangerous if matrix is buggy and column does not exist)
+                    while (dof_j > row[++k]) {
+                        // Hi
+                    }
                 } else {
                     // Use this for larger number of dofs per row
                     k = find_idx_binary_search(dof_j, row, lenrow);

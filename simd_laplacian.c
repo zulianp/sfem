@@ -113,9 +113,9 @@ void assemble_laplacian(const ptrdiff_t nelements,
     for (ptrdiff_t i = 0; i < nelements; i += SFEM_VECTOR_SIZE) {
         const int nvec = MIN(nelements - (i + SFEM_VECTOR_SIZE), SFEM_VECTOR_SIZE);
 
-        for(int vi = 0; vi < nvec; ++vi) {
-            const ptrdiff_t offset = i+vi;
-            for(int d = 0; d < 4; ++d) {
+        for (int vi = 0; vi < nvec; ++vi) {
+            const ptrdiff_t offset = i + vi;
+            for (int d = 0; d < 4; ++d) {
                 const ptrdiff_t vidx = elems[d][offset];
                 x[d][vi] = xyz[0][vidx];
                 y[d][vi] = xyz[1][vidx];
@@ -143,8 +143,8 @@ void assemble_laplacian(const ptrdiff_t nelements,
 
         // Local to global
 
-        for(int vi = 0; vi < nvec; ++vi) {
-            ptrdiff_t offset = i+vi;
+        for (int vi = 0; vi < nvec; ++vi) {
+            ptrdiff_t offset = i + vi;
 
             for (int edof_i = 0; edof_i < 4; ++edof_i) {
                 idx_t dof_i = elems[edof_i][offset];
@@ -160,22 +160,16 @@ void assemble_laplacian(const ptrdiff_t nelements,
                     idx_t dof_j = elems[edof_j][offset];
                     int k = -1;
 
-                    // if (lenrow <= 32) {
-                    if(0) {
-                        if(prev_j > dof_j) {
-                            prev_k = 0;
+                    // if (!edof_j)
+                    if (lenrow <= 32) 
+                    // 
+                    {
+                        // Using sentinel (potentially dangerous if matrix is buggy and column does not exist)
+                        while (dof_j > row[++k]) {
+                            // Hi
                         }
-
-                        for (idx_t c = prev_k; c < lenrow; ++c) {
-                            if(dof_j == row[c]) {
-                                k = c;
-                                break;
-                            }
-                        }
-
-                        prev_k = k + 1;
-                        prev_j = dof_j;
-
+                        assert(k < lenrow);
+                        assert(dof_j == row[k]);
                     } else {
                         // Use this for larger number of dofs per row
                         k = find_idx_binary_search(dof_j, row, lenrow);
