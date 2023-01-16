@@ -9,6 +9,8 @@
 #include "crs_graph.h"
 #include "sortreduce.h"
 
+#include "sfem_vec.h"
+
 static SFEM_INLINE real_t det3(const real_t *mat) {
     return mat[0] * mat[4] * mat[8] + mat[1] * mat[5] * mat[6] + mat[2] * mat[3] * mat[7] - mat[0] * mat[5] * mat[7] -
            mat[1] * mat[3] * mat[8] - mat[2] * mat[4] * mat[6];
@@ -171,9 +173,62 @@ static SFEM_INLINE void laplacian(const real_t x0,
     element_matrix[15] = x20 * (-1.0 / 6.0 * pow(x22, 2) - 1.0 / 6.0 * pow(x25, 2) - 1.0 / 6.0 * pow(x33, 2));
 }
 
+static SFEM_INLINE int ternary_search(const idx_t target, const idx_t* const arr, const int size) {
+    int left = 0;
+    int right = size - 1;
+    while (left <= right) {
+        int mid1 = left + (right - left) / 3;
+        int mid2 = right - (right - left) / 3;
+        if (arr[mid1] == target) return mid1;
+        if (arr[mid2] == target) return mid2;
+        if (target < arr[mid1]) right = mid1 - 1;
+        else if (target > arr[mid2]) left = mid2 + 1;
+        else {
+            left = mid1 + 1;
+            right = mid2 - 1;
+        }
+    }
+    return -1;
+}
+
+
+static SFEM_INLINE int linear_search(const idx_t target, const idx_t* const arr, const int size) {
+    int i;
+    for (i = 0; i < size - SFEM_VECTOR_SIZE; i += SFEM_VECTOR_SIZE) {
+        if (arr[i] == target) return i;
+        if (arr[i + 1] == target) return i + 1;
+        if (arr[i + 2] == target) return i + 2;
+        if (arr[i + 3] == target) return i + 3;
+    }
+    for (; i < size; i++) {
+        if (arr[i] == target) return i;
+    }
+    return -1;
+}
+
+static SFEM_INLINE void find_cols(const idx_t *targets, const idx_t * const row, const int lenrow, int *ks)
+{   
+    for(int d = 0; d < 4; ++d) {
+        ks[d] = 0;
+    }
+
+    for(int i = 0; i < lenrow; ++i) {
+        #pragma unroll(4)
+        for(int d = 0; d < 4; ++d) {
+            ks[d] += row[i] < targets[d];
+        }
+    }
+}
 
 static SFEM_INLINE int find_col(const idx_t key, const idx_t *const row, const int lenrow)
 {
+    // if(1) {
+    //     return ternary_search(key, row, lenrow);
+    // }
+
+    if(1) {
+        return linear_search(key, row, lenrow);
+    }
 
     int k = -1;
     // if(0)
@@ -271,6 +326,7 @@ void assemble_laplacian(const ptrdiff_t nelements,
         }
 
         if (1) {
+            idx_t targets[4];
             idx_t ks[4];
             for (int edof_i = 0; edof_i < 4; ++edof_i) {
                 const idx_t dof_i = elems[edof_i][i];
@@ -279,8 +335,10 @@ void assemble_laplacian(const ptrdiff_t nelements,
                 const idx_t *row = &colidx[rowptr[dof_i]];
 
                 for(int v = 0; v < 4; ++v) {
-                    ks[v] = find_col(elems[v][i], row, lenrow);
+                    targets[v] = elems[v][i];
                 }
+
+                find_cols(targets, row, lenrow, ks);
 
                 real_t *rowvalues = &values[rowptr[dof_i]];
                 const real_t *element_row = &element_matrix[edof_i * 4];
