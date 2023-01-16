@@ -104,73 +104,76 @@ static SFEM_INLINE void laplacian(const real_t x0,
                                   const real_t z2,
                                   const real_t z3,
                                   real_t *element_matrix) {
-    real_t x4 = z0 - z3;
-    real_t x5 = x0 - x1;
-    real_t x6 = y0 - y2;
-    real_t x7 = x5 * x6;
-    real_t x8 = z0 - z1;
-    real_t x9 = x0 - x2;
-    real_t x10 = y0 - y3;
-    real_t x11 = x10 * x9;
-    real_t x12 = z0 - z2;
-    real_t x13 = x0 - x3;
-    real_t x14 = y0 - y1;
-    real_t x15 = x13 * x14;
-    real_t x16 = x10 * x5;
-    real_t x17 = x14 * x9;
-    real_t x18 = x13 * x6;
-    real_t x19 = x11 * x8 + x12 * x15 - x12 * x16 - x17 * x4 - x18 * x8 + x4 * x7;
-    real_t x20 = 1.0 / x19;
-    real_t x21 = x11 - x18;
-    real_t x22 = -x17 + x7;
-    real_t x23 = x15 - x16 + x21 + x22;
-    real_t x24 = -x12 * x13 + x4 * x9;
-    real_t x25 = x12 * x5 - x8 * x9;
-    real_t x26 = x13 * x8;
-    real_t x27 = x4 * x5;
-    real_t x28 = x26 - x27;
-    real_t x29 = -x24 - x25 - x28;
-    real_t x30 = x10 * x8;
-    real_t x31 = x14 * x4;
-    real_t x32 = -x10 * x12 + x4 * x6;
-    real_t x33 = x12 * x14 - x6 * x8;
-    real_t x34 = x30 - x31 + x32 + x33;
-    real_t x35 = -x12;
-    real_t x36 = -x9;
-    real_t x37 = x19 * (x13 * x35 + x28 - x35 * x5 - x36 * x4 + x36 * x8);
-    real_t x38 = -x19;
-    real_t x39 = -x23;
-    real_t x40 = -x34;
-    real_t x41 = (1.0 / 6.0) / pow(x19, 2);
-    real_t x42 = x41 * (x24 * x37 + x38 * (x21 * x39 + x32 * x40));
-    real_t x43 = -x15 + x16;
-    real_t x44 = (1.0 / 6.0) * x43;
-    real_t x45 = -x26 + x27;
-    real_t x46 = -x30 + x31;
-    real_t x47 = (1.0 / 6.0) * x46;
-    real_t x48 = x20 * (-x23 * x44 + (1.0 / 6.0) * x29 * x45 - x34 * x47);
-    real_t x49 = x41 * (x25 * x37 + x38 * (x22 * x39 + x33 * x40));
-    real_t x50 = (1.0 / 6.0) * x45;
-    real_t x51 = x20 * (x21 * x44 + x24 * x50 + x32 * x47);
-    real_t x52 = x20 * (-1.0 / 6.0 * x21 * x22 - 1.0 / 6.0 * x24 * x25 - 1.0 / 6.0 * x32 * x33);
-    real_t x53 = x20 * (x22 * x44 + x25 * x50 + x33 * x47);
-
-    element_matrix[0] = x20 * (-1.0 / 6.0 * pow(x23, 2) - 1.0 / 6.0 * pow(x29, 2) - 1.0 / 6.0 * pow(x34, 2));
-    element_matrix[1] = x42;
-    element_matrix[2] = x48;
-    element_matrix[3] = x49;
-    element_matrix[4] = x42;
-    element_matrix[5] = x20 * (-1.0 / 6.0 * pow(x21, 2) - 1.0 / 6.0 * pow(x24, 2) - 1.0 / 6.0 * pow(x32, 2));
-    element_matrix[6] = x51;
-    element_matrix[7] = x52;
-    element_matrix[8] = x48;
-    element_matrix[9] = x51;
-    element_matrix[10] = x20 * (-1.0 / 6.0 * pow(x43, 2) - 1.0 / 6.0 * pow(x45, 2) - 1.0 / 6.0 * pow(x46, 2));
-    element_matrix[11] = x53;
-    element_matrix[12] = x49;
-    element_matrix[13] = x52;
-    element_matrix[14] = x53;
-    element_matrix[15] = x20 * (-1.0 / 6.0 * pow(x22, 2) - 1.0 / 6.0 * pow(x25, 2) - 1.0 / 6.0 * pow(x33, 2));
+   //FLOATING POINT OPS!
+   //   - Result: 4*ADD + 16*ASSIGNMENT + 16*MUL + 12*POW
+   //   - Subexpressions: 16*ADD + 9*DIV + 56*MUL + 7*NEG + POW + 32*SUB
+   const real_t x4 = z0 - z3;
+   const real_t x5 = x0 - x1;
+   const real_t x6 = y0 - y2;
+   const real_t x7 = x5*x6;
+   const real_t x8 = z0 - z1;
+   const real_t x9 = x0 - x2;
+   const real_t x10 = y0 - y3;
+   const real_t x11 = x10*x9;
+   const real_t x12 = z0 - z2;
+   const real_t x13 = x0 - x3;
+   const real_t x14 = y0 - y1;
+   const real_t x15 = x13*x14;
+   const real_t x16 = x10*x5;
+   const real_t x17 = x14*x9;
+   const real_t x18 = x13*x6;
+   const real_t x19 = x11*x8 + x12*x15 - x12*x16 - x17*x4 - x18*x8 + x4*x7;
+   const real_t x20 = 1.0/x19;
+   const real_t x21 = x11 - x18;
+   const real_t x22 = -x17 + x7;
+   const real_t x23 = x15 - x16 + x21 + x22;
+   const real_t x24 = -x12*x13 + x4*x9;
+   const real_t x25 = x12*x5 - x8*x9;
+   const real_t x26 = x13*x8;
+   const real_t x27 = x4*x5;
+   const real_t x28 = x26 - x27;
+   const real_t x29 = -x24 - x25 - x28;
+   const real_t x30 = x10*x8;
+   const real_t x31 = x14*x4;
+   const real_t x32 = -x10*x12 + x4*x6;
+   const real_t x33 = x12*x14 - x6*x8;
+   const real_t x34 = x30 - x31 + x32 + x33;
+   const real_t x35 = -x12;
+   const real_t x36 = -x9;
+   const real_t x37 = x19*(x13*x35 + x28 - x35*x5 - x36*x4 + x36*x8);
+   const real_t x38 = -x19;
+   const real_t x39 = -x23;
+   const real_t x40 = -x34;
+   const real_t x41 = (1.0/6.0)/pow(x19, 2);
+   const real_t x42 = x41*(x24*x37 + x38*(x21*x39 + x32*x40));
+   const real_t x43 = -x15 + x16;
+   const real_t x44 = (1.0/6.0)*x43;
+   const real_t x45 = -x26 + x27;
+   const real_t x46 = -x30 + x31;
+   const real_t x47 = (1.0/6.0)*x46;
+   const real_t x48 = x20*(-x23*x44 + (1.0/6.0)*x29*x45 - x34*x47);
+   const real_t x49 = x41*(x25*x37 + x38*(x22*x39 + x33*x40));
+   const real_t x50 = (1.0/6.0)*x45;
+   const real_t x51 = x20*(x21*x44 + x24*x50 + x32*x47);
+   const real_t x52 = x20*(-1.0/6.0*x21*x22 - 1.0/6.0*x24*x25 - 1.0/6.0*x32*x33);
+   const real_t x53 = x20*(x22*x44 + x25*x50 + x33*x47);
+   
+   element_matrix[0] = x20*(-1.0/6.0*pow(x23, 2) - 1.0/6.0*pow(x29, 2) - 1.0/6.0*pow(x34, 2));
+   element_matrix[1] = x42;
+   element_matrix[2] = x48;
+   element_matrix[3] = x49;
+   element_matrix[4] = x42;
+   element_matrix[5] = x20*(-1.0/6.0*pow(x21, 2) - 1.0/6.0*pow(x24, 2) - 1.0/6.0*pow(x32, 2));
+   element_matrix[6] = x51;
+   element_matrix[7] = x52;
+   element_matrix[8] = x48;
+   element_matrix[9] = x51;
+   element_matrix[10] = x20*(-1.0/6.0*pow(x43, 2) - 1.0/6.0*pow(x45, 2) - 1.0/6.0*pow(x46, 2));
+   element_matrix[11] = x53;
+   element_matrix[12] = x49;
+   element_matrix[13] = x52;
+   element_matrix[14] = x53;
+   element_matrix[15] = x20*(-1.0/6.0*pow(x22, 2) - 1.0/6.0*pow(x25, 2) - 1.0/6.0*pow(x33, 2));
 }
 
 static SFEM_INLINE int ternary_search(const idx_t target, const idx_t *const arr, const int size) {
@@ -233,7 +236,6 @@ static SFEM_INLINE int find_col(const idx_t key, const idx_t *const row, const i
     }
     return k;
 }
-
 
 static SFEM_INLINE void find_cols(const idx_t *targets, const idx_t *const row, const int lenrow, int *ks) {
     if (lenrow > 32) {

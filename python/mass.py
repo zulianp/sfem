@@ -1,43 +1,11 @@
 #!/usr/bin/env python3
 
-import numpy as np
-import sympy as sp
-from sympy.utilities.codegen import codegen
-import sympy.codegen.ast as ast
+# import numpy as np
+# import sympy as sp
+# from sympy.utilities.codegen import codegen
+# import sympy.codegen.ast as ast
 
-def det3(mat):
-    return mat[0, 0] * mat[1, 1] * mat[2, 2] + mat[0, 1] * mat[1, 2] * mat[2, 0] + mat[0, 2] * mat[1, 0] * mat[2, 1] - mat[0, 0] * mat[1, 2] * mat[2, 1] - mat[0, 1] * mat[1, 0] * mat[2, 2] - mat[0, 2] * mat[1, 1] * mat[2, 0]
-
-def inv3(mat):
-	# Sympy version (same but slower)
-	# return mat.inv()
-    mat_inv = sp.zeros(3, 3)
-    det = det3(mat)
-    mat_inv[0, 0] = (mat[1, 1] * mat[2, 2] - mat[1, 2] * mat[2, 1]) / det
-    mat_inv[0, 1] = (mat[0, 2] * mat[2, 1] - mat[0, 1] * mat[2, 2]) / det
-    mat_inv[0, 2] = (mat[0, 1] * mat[1, 2] - mat[0, 2] * mat[1, 1]) / det
-    mat_inv[1, 0] = (mat[1, 2] * mat[2, 0] - mat[1, 0] * mat[2, 2]) / det
-    mat_inv[1, 1] = (mat[0, 0] * mat[2, 2] - mat[0, 2] * mat[2, 0]) / det
-    mat_inv[1, 2] = (mat[0, 2] * mat[1, 0] - mat[0, 0] * mat[1, 2]) / det
-    mat_inv[2, 0] = (mat[1, 0] * mat[2, 1] - mat[1, 1] * mat[2, 0]) / det
-    mat_inv[2, 1] = (mat[0, 1] * mat[2, 0] - mat[0, 0] * mat[2, 1]) / det
-    mat_inv[2, 2] = (mat[0, 0] * mat[1, 1] - mat[0, 1] * mat[1, 0]) / det
-    return mat_inv
-
-def c_code(expr):
-	sub_expr, simpl_expr = sp.cse(expr)
-	printer = sp.printing.c.C99CodePrinter()
-	lines = []
-
-	for var,expr in sub_expr:
-	    lines.append(f'real_t {var} = {printer.doprint(expr)};')
-
-	for v in simpl_expr:
-	        lines.append(printer.doprint(v))
-
-	code_string=f'\n'.join(lines)
-
-	print(code_string)
+from sfem_codegen import *
 
 # Element coordinates
 x0, x1, x2, x3 = sp.symbols('x0 x1 x2 x3')

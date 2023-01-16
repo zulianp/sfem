@@ -39,13 +39,16 @@ def c_gen(expr, dump=False):
 
     sub_expr, simpl_expr = sp.cse(expr)
 
-    cost = f'FLOATING POINT OPS!\n//\t- Result: {sp.count_ops(simpl_expr, visual=True)}\n//\t- Subexpressions: {sp.count_ops(sub_expr, visual=True)}'
+    sub_ops = sp.count_ops(sub_expr, visual=True)
+    result_ops = sp.count_ops(simpl_expr, visual=True)
+    # total_ops = sub_ops
+    cost = f'FLOATING POINT OPS!\n//\t- Result: {result_ops}\n//\t- Subexpressions: {sub_ops}'
     
     printer = sp.printing.c.C99CodePrinter()
     lines = []
 
     for var,expr in sub_expr:
-        lines.append(f'T {var} = {printer.doprint(expr)};')
+        lines.append(f'const real_t {var} = {printer.doprint(expr)};')
 
     for v in simpl_expr:
             lines.append(printer.doprint(v))

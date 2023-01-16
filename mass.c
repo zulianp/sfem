@@ -10,45 +10,48 @@
 #include "sortreduce.h"
 
 static SFEM_INLINE void mass(const real_t x0,
-                      const real_t x1,
-                      const real_t x2,
-                      const real_t x3,
-                      const real_t y0,
-                      const real_t y1,
-                      const real_t y2,
-                      const real_t y3,
-                      const real_t z0,
-                      const real_t z1,
-                      const real_t z2,
-                      const real_t z3,
-                      real_t *element_matrix) {
-    real_t x4 = (1.0 / 60.0) * x0;
-    real_t x5 = y1 * z2;
-    real_t x6 = (1.0 / 60.0) * x1;
-    real_t x7 = y0 * z3;
-    real_t x8 = y3 * z2;
-    real_t x9 = (1.0 / 60.0) * x2;
-    real_t x10 = y0 * z1;
-    real_t x11 = y3 * z0;
-    real_t x12 = (1.0 / 60.0) * x3;
-    real_t x13 = y0 * z2;
-    real_t x14 = y2 * z1;
-    real_t x15 = (1.0 / 60.0) * x0 * y1 * z3 + (1.0 / 60.0) * x0 * y2 * z1 + (1.0 / 60.0) * x0 * y3 * z2 +
-                 (1.0 / 60.0) * x1 * y0 * z2 + (1.0 / 60.0) * x1 * y2 * z3 + (1.0 / 60.0) * x1 * y3 * z0 - x10 * x9 -
-                 x11 * x9 - x12 * x13 - x12 * x14 - x12 * y1 * z0 + (1.0 / 60.0) * x2 * y0 * z3 +
-                 (1.0 / 60.0) * x2 * y1 * z0 + (1.0 / 60.0) * x2 * y3 * z1 + (1.0 / 60.0) * x3 * y0 * z1 +
-                 (1.0 / 60.0) * x3 * y1 * z2 + (1.0 / 60.0) * x3 * y2 * z0 - x4 * x5 - x4 * y2 * z3 - x4 * y3 * z1 -
-                 x6 * x7 - x6 * x8 - x6 * y2 * z0 - x9 * y1 * z3;
-    real_t x16 = (1.0 / 120.0) * x0;
-    real_t x17 = (1.0 / 120.0) * x1;
-    real_t x18 = (1.0 / 120.0) * x2;
-    real_t x19 = (1.0 / 120.0) * x3;
-    real_t x20 = (1.0 / 120.0) * x0 * y1 * z3 + (1.0 / 120.0) * x0 * y2 * z1 + (1.0 / 120.0) * x0 * y3 * z2 +
-                 (1.0 / 120.0) * x1 * y0 * z2 + (1.0 / 120.0) * x1 * y2 * z3 + (1.0 / 120.0) * x1 * y3 * z0 -
-                 x10 * x18 - x11 * x18 - x13 * x19 - x14 * x19 - x16 * x5 - x16 * y2 * z3 - x16 * y3 * z1 - x17 * x7 -
-                 x17 * x8 - x17 * y2 * z0 - x18 * y1 * z3 - x19 * y1 * z0 + (1.0 / 120.0) * x2 * y0 * z3 +
-                 (1.0 / 120.0) * x2 * y1 * z0 + (1.0 / 120.0) * x2 * y3 * z1 + (1.0 / 120.0) * x3 * y0 * z1 +
-                 (1.0 / 120.0) * x3 * y1 * z2 + (1.0 / 120.0) * x3 * y2 * z0;
+                             const real_t x1,
+                             const real_t x2,
+                             const real_t x3,
+                             const real_t y0,
+                             const real_t y1,
+                             const real_t y2,
+                             const real_t y3,
+                             const real_t z0,
+                             const real_t z1,
+                             const real_t z2,
+                             const real_t z3,
+                             real_t *element_matrix) {
+    // FLOATING POINT OPS!
+    //  - Result: 16*ASSIGNMENT
+    //  - Subexpressions: 22*ADD + 32*DIV + 89*MUL + 24*SUB
+    const real_t x4 = (1.0 / 60.0) * x0;
+    const real_t x5 = y1 * z2;
+    const real_t x6 = (1.0 / 60.0) * x1;
+    const real_t x7 = y0 * z3;
+    const real_t x8 = y3 * z2;
+    const real_t x9 = (1.0 / 60.0) * x2;
+    const real_t x10 = y0 * z1;
+    const real_t x11 = y3 * z0;
+    const real_t x12 = (1.0 / 60.0) * x3;
+    const real_t x13 = y0 * z2;
+    const real_t x14 = y2 * z1;
+    const real_t x15 = (1.0 / 60.0) * x0 * y1 * z3 + (1.0 / 60.0) * x0 * y2 * z1 + (1.0 / 60.0) * x0 * y3 * z2 +
+            (1.0 / 60.0) * x1 * y0 * z2 + (1.0 / 60.0) * x1 * y2 * z3 + (1.0 / 60.0) * x1 * y3 * z0 - x10 * x9 -
+            x11 * x9 - x12 * x13 - x12 * x14 - x12 * y1 * z0 + (1.0 / 60.0) * x2 * y0 * z3 +
+            (1.0 / 60.0) * x2 * y1 * z0 + (1.0 / 60.0) * x2 * y3 * z1 + (1.0 / 60.0) * x3 * y0 * z1 +
+            (1.0 / 60.0) * x3 * y1 * z2 + (1.0 / 60.0) * x3 * y2 * z0 - x4 * x5 - x4 * y2 * z3 - x4 * y3 * z1 -
+            x6 * x7 - x6 * x8 - x6 * y2 * z0 - x9 * y1 * z3;
+    const real_t x16 = (1.0 / 120.0) * x0;
+    const real_t x17 = (1.0 / 120.0) * x1;
+    const real_t x18 = (1.0 / 120.0) * x2;
+    const real_t x19 = (1.0 / 120.0) * x3;
+    const real_t x20 = (1.0 / 120.0) * x0 * y1 * z3 + (1.0 / 120.0) * x0 * y2 * z1 + (1.0 / 120.0) * x0 * y3 * z2 +
+            (1.0 / 120.0) * x1 * y0 * z2 + (1.0 / 120.0) * x1 * y2 * z3 + (1.0 / 120.0) * x1 * y3 * z0 - x10 * x18 -
+            x11 * x18 - x13 * x19 - x14 * x19 - x16 * x5 - x16 * y2 * z3 - x16 * y3 * z1 - x17 * x7 - x17 * x8 -
+            x17 * y2 * z0 - x18 * y1 * z3 - x19 * y1 * z0 + (1.0 / 120.0) * x2 * y0 * z3 +
+            (1.0 / 120.0) * x2 * y1 * z0 + (1.0 / 120.0) * x2 * y3 * z1 + (1.0 / 120.0) * x3 * y0 * z1 +
+            (1.0 / 120.0) * x3 * y1 * z2 + (1.0 / 120.0) * x3 * y2 * z0;
     element_matrix[0] = x15;
     element_matrix[1] = x20;
     element_matrix[2] = x20;
