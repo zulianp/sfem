@@ -5,7 +5,7 @@ from sfem_codegen import *
 mu, lmbda = sp.symbols('mu lambda')
 
 dV = det3(A) / 6
-eps = tgrad(qx, qy, qz)
+eps = symm_grad(qx, qy, qz)
 
 # Preallocate (for preserving write order)
 expr = [0]*(4*3*4*3)
