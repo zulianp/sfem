@@ -37,28 +37,6 @@ SFEM_INLINE static idx_t unique(idx_t *arr, idx_t size) {
     return (++result) - arr;
 }
 
-// idx_t find_idx_binary_search(const idx_t key, const idx_t *arr, idx_t size) {
-//     idx_t *ptr = bsearch(&key, arr, size, sizeof(idx_t), cmpfunc);
-//     if (!ptr) return -1;
-//     return (idx_t)(ptr - arr);
-// }
-
-// SFEM_INLINE static int choose(int condition, int valTrue, int valFalse) {
-//     return (condition * valTrue) | (!condition * valFalse);
-// }
-
-// idx_t find_idx_binary_search(const idx_t key, const idx_t *arr, idx_t n) {
-//     idx_t start = 0;
-//     idx_t end = n - 1;
-//     while ((end - start) > 1) {
-//         const int midPoint = (end + start) / 2;
-//         const int c = key < arr[midPoint];
-//         end = choose(c, midPoint, end);
-//         start = choose(!c, midPoint, start);
-//     }
-//     return choose(key < arr[end], start, end);
-// }
-
 idx_t find_idx(const idx_t target, const idx_t * x, idx_t n) {
     for (idx_t i = 0; i < n; ++i) {
         if (target == x[i]) {
@@ -151,9 +129,6 @@ int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
                 }
             }
 
-            // quicksort(n2nbuff, nneighs);
-            // nneighs = unique(n2nbuff, nneighs);
-
             nneighs = sortreduce(n2nbuff, nneighs);
 
             nnz += nneighs;
@@ -180,8 +155,7 @@ int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
                 }
             }
 
-            quicksort(n2nbuff, nneighs);
-            nneighs = unique(n2nbuff, nneighs);
+            nneighs = sortreduce(n2nbuff, nneighs);
 
             for (idx_t i = 0; i < nneighs; ++i) {
                 colidx[coloffset + i] = n2nbuff[i];
@@ -265,8 +239,6 @@ int build_crs_graph_faster(const ptrdiff_t nelements,
                 }
             }
 
-            // quicksort(n2nbuff, nneighs);
-            // nneighs = unique(n2nbuff, nneighs);
             nneighs = sortreduce(n2nbuff, nneighs);
 
             nnz += nneighs;
