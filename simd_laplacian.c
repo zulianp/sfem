@@ -95,24 +95,56 @@ static SFEM_INLINE void laplacian(const vreal_t x0,
     element_matrix[15] = x20 * (-1.0 / 6.0 * (x22 * x22) - 1.0 / 6.0 * (x25 * x25) - 1.0 / 6.0 * (x33 * x33));
 }
 
-static SFEM_INLINE int find_col(const idx_t key, const idx_t *const row, const int lenrow)
-{
 
-    int k = -1;
-    if (lenrow <= 32) 
-    // 
+static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {
+    int i;
+    for (i = 0; i < size - SFEM_VECTOR_SIZE; i += SFEM_VECTOR_SIZE) {
+        if (arr[i] == target) return i;
+        if (arr[i + 1] == target) return i + 1;
+        if (arr[i + 2] == target) return i + 2;
+        if (arr[i + 3] == target) return i + 3;
+    }
+    for (; i < size; i++) {
+        if (arr[i] == target) return i;
+    }
+    return -1;
+}
+
+static SFEM_INLINE int find_col(const idx_t key, const idx_t *const row, const int lenrow) {
+    if (lenrow <= 32)
     {
+        return linear_search(key, row, lenrow);
+
         // Using sentinel (potentially dangerous if matrix is buggy and column does not exist)
-        while (key > row[++k]) {
-            // Hi
-        }
-        assert(k < lenrow);
-        assert(key == row[k]);
+        // while (key > row[++k]) {
+        //     // Hi
+        // }
+        // assert(k < lenrow);
+        // assert(key == row[k]);
     } else {
         // Use this for larger number of dofs per row
-        k = find_idx_binary_search(key, row, lenrow);
+        return find_idx_binary_search(key, row, lenrow);
     }
-    return k;
+}
+
+static SFEM_INLINE void find_cols4(const idx_t *targets, const idx_t *const row, const int lenrow, int *ks) {
+    if (lenrow > 32) {
+        for (int d = 0; d < 4; ++d) {
+            ks[d] = find_col(targets[d], row, lenrow);
+        }
+    } else {
+#pragma unroll(4)
+        for (int d = 0; d < 4; ++d) {
+            ks[d] = 0;
+        }
+
+        for (int i = 0; i < lenrow; ++i) {
+#pragma unroll(4)
+            for (int d = 0; d < 4; ++d) {
+                ks[d] += row[i] < targets[d];
+            }
+        }
+    }
 }
 
 void assemble_laplacian(const ptrdiff_t nelements,
@@ -129,6 +161,9 @@ void assemble_laplacian(const ptrdiff_t nelements,
     vreal_t x[4];
     vreal_t y[4];
     vreal_t z[4];
+
+    idx_t ev[4];
+    idx_t ks[4];
 
     for (ptrdiff_t i = 0; i < nelements; i += SFEM_VECTOR_SIZE) {
         const int nvec = MIN(nelements - (i + SFEM_VECTOR_SIZE), SFEM_VECTOR_SIZE);
@@ -163,7 +198,12 @@ void assemble_laplacian(const ptrdiff_t nelements,
 
         // Local to global
         for (int vi = 0; vi < nvec; ++vi) {
-            idx_t offset = i + vi;
+            const idx_t offset = i + vi;
+
+            #pragma unroll(4)
+            for (int v = 0; v < 4; ++v) {
+                ev[v] = elems[v][offset];
+            }
 
             for (int edof_i = 0; edof_i < 4; ++edof_i) {
                 const idx_t dof_i = elems[edof_i][offset];
@@ -172,10 +212,16 @@ void assemble_laplacian(const ptrdiff_t nelements,
                 const idx_t *row = &colidx[rowptr[dof_i]];
                 real_t *rowvalues = &values[rowptr[dof_i]];
 
+                find_cols4(ev, row, lenrow, ks);
+                
+                const vreal_t * element_row = &element_matrix[edof_i * 4];
+
+                #pragma unroll(4)
                 for (int edof_j = 0; edof_j < 4; ++edof_j) {
                     const idx_t dof_j = elems[edof_j][offset];
-                    int k = find_col(dof_j, row, lenrow);
-                    rowvalues[k] += element_matrix[edof_i * 4 + edof_j][vi];
+                    const int k = ks[edof_j];
+
+                    rowvalues[k] += element_row[edof_j][vi];
                 }
             }
         }
