@@ -1,21 +1,56 @@
 ifeq ($(debug),1)
-	CFLAGS += -pedantic -O0 -g
+	CFLAGS += -O0 -g
+	CXXFLAGS += -O0 -g
 else ifeq ($(prof),1)
-	CFLAGS += -pedantic -O2 -g
+	CFLAGS += -O2 -g -DNDEBUG
+	CXXFLAGS += -O2 -g -DNDEBUG
 else
-	CFLAGS += -pedantic -O3 -DNDEBUG
+	CFLAGS += -Ofast -DNDEBUG
+	CXXFLAGS += -Ofast -DNDEBUG
 endif
 
+ifeq ($(avx2sort), 1)
+	CXXFLAGS += -DSFEM_ENABLE_AVX2_SORT -Iexternal
+
+endif
+
+CFLAGS += -pedantic 
+# CFLAGS += -std=c99 
+
+CXXFLAGS += -std=c++11
+CXXFLAGS += -fno-exceptions -fno-rtti -static
+CXXFLAGS += -fvisibility=hidden
+CXXFLAGS += -fPIC
+
 GOALS = assemble condense_matrix condense_vector idx_to_indicator remap_vector
-DEPS = -L../matrix.io/ -lmatrix.io
+DEPS = -L../matrix.io/ -lmatrix.io -lstdc++
 
 LDFLAGS += $(DEPS)
 
 MPICC ?= mpicc
+CXX ?= c++
+AR ?= ar
 
 all : $(GOALS)
 
-assemble : assemble.o crs_graph.o laplacian.o mass.o
+OBJS = \
+	sortreduce.o \
+	crs_graph.o \
+	laplacian.o \
+	mass.o \
+	sortreduce.o
+
+# SIMD experiment
+#simd_laplacian.o
+
+# Scalar
+#laplacian.o
+
+
+libsfem.a : $(OBJS)
+	ar rcs $@ $^
+
+assemble : assemble.o libsfem.a
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
 condense_matrix : condense_matrix.o
@@ -30,6 +65,9 @@ idx_to_indicator : idx_to_indicator.o
 remap_vector : remap_vector.o
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
+sortreduce.o: sortreduce.cpp
+	$(CXX) $(CXXFLAGS) -c $<
+
 %.o : %.c
 	$(MPICC) $(CFLAGS) -c $<
 
@@ -37,7 +75,7 @@ remap_vector : remap_vector.o
 .PRECIOUS :
 
 clean:
-	rm *.o $(GOALS)
+	rm *.o *.a $(GOALS)
 
 .SUFFIXES:
 

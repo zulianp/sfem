@@ -14,7 +14,7 @@ int build_crs_graph(
 	);
 
 // for crs insertion
-idx_t find_idx(const idx_t key, const idx_t *restrict arr, idx_t size);
-idx_t find_idx_binary_search(const idx_t key, const idx_t *arr, idx_t size);
+idx_t find_idx(const idx_t key, const idx_t * arr, idx_t size);
+// idx_t find_idx_binary_search(const idx_t key, const idx_t *arr, idx_t size);
 
 #endif
