@@ -14,6 +14,8 @@
 #include "laplacian.h"
 #include "mass.h"
 
+#include "read_mesh.h"
+
 ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
     MPI_Status status;
     MPI_Offset nbytes;
@@ -99,46 +101,11 @@ int main(int argc, char *argv[]) {
     ptrdiff_t nnodes = 0;
     geom_t *xyz[3];
 
-    {
-        sprintf(path, "%s/x.raw", folder);
-        ptrdiff_t x_nnodes = read_file(comm, path, (void **)&xyz[0]);
-
-        sprintf(path, "%s/y.raw", folder);
-        ptrdiff_t y_nnodes = read_file(comm, path, (void **)&xyz[1]);
-
-        sprintf(path, "%s/z.raw", folder);
-        ptrdiff_t z_nnodes = read_file(comm, path, (void **)&xyz[2]);
-
-        assert(x_nnodes == y_nnodes);
-        assert(x_nnodes == z_nnodes);
-
-        x_nnodes /= sizeof(geom_t);
-        assert(x_nnodes * sizeof(geom_t) == y_nnodes);
-        nnodes = x_nnodes;
-    }
-
     ptrdiff_t nelements = 0;
     idx_t *elems[4];
 
-    {
-        sprintf(path, "%s/i0.raw", folder);
-        ptrdiff_t nindex0 = read_file(comm, path, (void **)&elems[0]);
-
-        sprintf(path, "%s/i1.raw", folder);
-        ptrdiff_t nindex1 = read_file(comm, path, (void **)&elems[1]);
-
-        sprintf(path, "%s/i2.raw", folder);
-        ptrdiff_t nindex2 = read_file(comm, path, (void **)&elems[2]);
-
-        sprintf(path, "%s/i3.raw", folder);
-        ptrdiff_t nindex3 = read_file(comm, path, (void **)&elems[3]);
-
-        assert(nindex0 == nindex1);
-        assert(nindex3 == nindex2);
-
-        nindex0 /= sizeof(idx_t);
-        assert(nindex0 * sizeof(idx_t) == nindex1);
-        nelements = nindex0;
+    if(serial_read_tet_mesh(folder, &nelements, elems, &nnodes, xyz)) {
+        return EXIT_FAILURE;
     }
 
     double tack = MPI_Wtime();

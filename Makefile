@@ -38,7 +38,8 @@ OBJS = \
 	crs_graph.o \
 	laplacian.o \
 	mass.o \
-	sortreduce.o
+	sortreduce.o \
+	read_mesh.o
 
 # SIMD experiment
 #simd_laplacian.o
