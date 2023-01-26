@@ -14,6 +14,6 @@ typedef struct {
 	geom_t **points;
 } mesh_t;
 
-int serial_read_tet_mesh(const char *folder, ptrdiff_t *nelements, idx_t *elems[4], ptrdiff_t *nnodes, geom_t *xyz[4]);
+int serial_read_tet_mesh(const char *folder, ptrdiff_t *nelements, idx_t *elems[4], ptrdiff_t *nnodes, geom_t *xyz[3]);
 
 #endif  // SFEM_READ_MESH_H
