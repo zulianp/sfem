@@ -22,7 +22,7 @@ CXXFLAGS += -fno-exceptions -fno-rtti -static
 CXXFLAGS += -fvisibility=hidden
 CXXFLAGS += -fPIC
 
-GOALS = assemble condense_matrix condense_vector idx_to_indicator remap_vector
+GOALS = assemble assemble3 condense_matrix condense_vector idx_to_indicator remap_vector
 DEPS = -L../matrix.io/ -lmatrix.io -lstdc++
 
 LDFLAGS += $(DEPS)
@@ -36,10 +36,11 @@ all : $(GOALS)
 OBJS = \
 	sortreduce.o \
 	crs_graph.o \
+	sortreduce.o \
+	read_mesh.o  \
 	laplacian.o \
 	mass.o \
-	sortreduce.o \
-	read_mesh.o
+	neohookean.o
 
 # SIMD experiment
 #simd_laplacian.o
@@ -52,6 +53,9 @@ libsfem.a : $(OBJS)
 	ar rcs $@ $^
 
 assemble : assemble.o libsfem.a
+	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+
+assemble3 : assemble3.o libsfem.a
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
 condense_matrix : condense_matrix.o

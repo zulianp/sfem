@@ -1,4 +1,5 @@
-import linear_elasticity as material
+# import linear_elasticity as material
+import neohookean as material
 import time
 from multiprocessing import Queue
 from multiprocessing import Process as Worker
@@ -34,6 +35,11 @@ if __name__ == '__main__':
 
     energy_expr = material.makeenergy()
     material.c_code(energy_expr)
+
+    # print(energy_expr)
+
+    # if True:
+    #     exit()
     
     print("// --------------------------------")
     print("// Grad")

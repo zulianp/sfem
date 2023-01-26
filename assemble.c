@@ -116,7 +116,7 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     ptrdiff_t nnz = 0;
-    idx_t *rowptr = (idx_t *)malloc((nnodes + 1) * sizeof(idx_t));
+    idx_t *rowptr = 0;
     idx_t *colidx = 0;
     real_t *values = 0;
 

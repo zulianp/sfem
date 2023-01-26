@@ -106,9 +106,13 @@ def fun(x, y, z):
 qx, qy, qz = sp.symbols('qx qy qz', real=True)
 
 # Element coordinates
-x0, x1, x2, x3 = sp.symbols('x0 x1 x2 x3', real=True)
-y0, y1, y2, y3 = sp.symbols('y0 y1 y2 y3', real=True)
-z0, z1, z2, z3 = sp.symbols('z0 z1 z2 z3', real=True)
+# x0, x1, x2, x3 = sp.symbols('x0 x1 x2 x3', real=True)
+# y0, y1, y2, y3 = sp.symbols('y0 y1 y2 y3', real=True)
+# z0, z1, z2, z3 = sp.symbols('z0 z1 z2 z3', real=True)
+
+x0, x1, x2, x3 = sp.symbols('px0 px1 px2 px3', real=True)
+y0, y1, y2, y3 = sp.symbols('py0 py1 py2 py3', real=True)
+z0, z1, z2, z3 = sp.symbols('pz0 pz1 pz2 pz3', real=True)
 
 # Quadrature points (Physical coordinates)
 q = sp.Matrix(3, 1, [qx, qy, qz])
