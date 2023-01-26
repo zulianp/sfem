@@ -104,7 +104,7 @@ int read_mesh(MPI_Comm comm, const char *folder, mesh_t *mesh) {
         }
     }
 
-
+    return 0;
 }
 
 int serial_read_tet_mesh(const char *folder, ptrdiff_t *nelements, idx_t *elems[4], ptrdiff_t *nnodes, geom_t *xyz[3]) {
