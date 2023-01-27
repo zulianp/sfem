@@ -42,8 +42,9 @@ OBJS = \
 	mass.o \
 	neohookean.o
 
-# SIMD experiment
-#simd_laplacian.o
+# SIMD experiment (worse perf)
+# simd_laplacian.o
+# simd_neohookean.o
 
 # Scalar
 #laplacian.o

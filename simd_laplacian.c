@@ -218,7 +218,6 @@ void assemble_laplacian(const ptrdiff_t nelements,
 
                 #pragma unroll(4)
                 for (int edof_j = 0; edof_j < 4; ++edof_j) {
-                    const idx_t dof_j = elems[edof_j][offset];
                     const int k = ks[edof_j];
 
                     rowvalues[k] += element_row[edof_j][vi];

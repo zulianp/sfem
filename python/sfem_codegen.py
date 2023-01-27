@@ -79,6 +79,13 @@ def inner(l, r):
 
 	return ret
 
+def dot3(l, r):
+	ret = 0
+	for d1 in range(0, 3):
+		ret += l[d1] * r[d1]
+
+	return ret
+
 def tr(mat):
 	ret = 0
 	for d1 in range(0, 3):
@@ -153,7 +160,6 @@ def symm_grad(x, y, z):
 		i += 1
 	return ret
 
-
 def tgrad(x, y, z):
 	ret = []
 	f = fun(x, y, z)
@@ -177,3 +183,14 @@ def tgrad(x, y, z):
 
 		i += 1
 	return ret
+
+def subsmat3x3(expr, oldmat, newmat):
+	for d1 in range(0, 3):
+		for d2 in range(0, 3):
+			expr = expr.subs(oldmat[d1, d2], newmat[d1, d2])
+	return expr
+
+def subsvec3(expr, oldvec, newvec):
+	for d1 in range(0, 3):
+		expr = expr.subs(oldvec[d1], newvec[d1])
+	return expr
