@@ -40,11 +40,14 @@ OBJS = \
 	read_mesh.o  \
 	laplacian.o \
 	mass.o \
-	neohookean.o
+	simd_neohookean.o
+# 	neohookean.o
 
 # SIMD experiment (worse perf)
-# simd_laplacian.o
 # simd_neohookean.o
+
+# SIMD experiment (marginal perf improvment on ARM)
+# simd_laplacian.o
 
 # Scalar
 #laplacian.o

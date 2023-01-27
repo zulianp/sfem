@@ -948,7 +948,7 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
     static const int block_size = 3;
     static const int mat_block_size = block_size * block_size;
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
+    for (ptrdiff_t i = 0; i < nelements; i += SFEM_VECTOR_SIZE) {
         const int nvec = MIN(nelements - (i + SFEM_VECTOR_SIZE), SFEM_VECTOR_SIZE);
 
         for (int vi = 0; vi < nvec; ++vi) {
