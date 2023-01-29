@@ -184,10 +184,9 @@ __global__ void assemble_laplacian_kernel(const ptrdiff_t nelements,
                         idx_t *const rowptr,
                         idx_t *const colidx,
                         real_t *const values) {
-    ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x;
-
-
-    for(; i < nelements; i += blockDim.x * gridDim.x) {
+    
+    for(ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; 
+        i < nelements; i += blockDim.x * gridDim.x) {
         idx_t ev[4];
         idx_t ks[4];
         real_t element_matrix[4 * 4];
@@ -312,11 +311,19 @@ extern "C" void assemble_laplacian(const ptrdiff_t nelements,
         SFEM_CUDA_CHECK(cudaMemcpy(d_values, values, nnz * sizeof(real_t), cudaMemcpyHostToDevice));
     }
 
-    assemble_laplacian_kernel<<<n_blocks, 128>>>(nelements, nnodes, d_elems, d_xyz, d_rowptr, d_colidx, d_values);
-    SFEM_DEBUG_SYNCHRONIZE();
+    {   
+        // double ktick = MPI_Wtime();
 
-    // Copy result to Host memory
-    SFEM_CUDA_CHECK(cudaMemcpy(values, d_values, nnz * sizeof(real_t), cudaMemcpyDeviceToHost));
+        assemble_laplacian_kernel<<<n_blocks, block_size>>>(nelements, nnodes, d_elems, d_xyz, d_rowptr, d_colidx, d_values);
+        SFEM_DEBUG_SYNCHRONIZE();
+        
+        // cudaDeviceSynchronize(); 
+        // double ktock = MPI_Wtime();
+        // printf("cuda_laplacian.c: assemble_laplacian_kernel\t%g seconds\n", ktock - ktick);
+
+        // Copy result to Host memory
+        SFEM_CUDA_CHECK(cudaMemcpy(values, d_values, nnz * sizeof(real_t), cudaMemcpyDeviceToHost));
+    }
 
     { // Free element indices
         for(int d = 0; d < 4; ++d) {
@@ -335,11 +342,9 @@ extern "C" void assemble_laplacian(const ptrdiff_t nelements,
     }
 
     { // Free matrix
-
         SFEM_CUDA_CHECK(cudaFree(d_rowptr));
         SFEM_CUDA_CHECK(cudaFree(d_colidx));
         SFEM_CUDA_CHECK(cudaFree(d_values));
-
     }
 
     double tock = MPI_Wtime();

@@ -1,12 +1,15 @@
 ifeq ($(debug),1)
 	CFLAGS += -O0 -g
 	CXXFLAGS += -O0 -g
+	CUFLAGS += -O0 -g
 else ifeq ($(prof),1)
 	CFLAGS += -O2 -g -DNDEBUG
 	CXXFLAGS += -O2 -g -DNDEBUG
+	CUFLAGS += -O2 -g -DNDEBUG 
 else
 	CFLAGS += -Ofast -DNDEBUG
 	CXXFLAGS += -Ofast -DNDEBUG
+	CUFLAGS += -O3 -DNDEBUG 
 endif
 
 ifeq ($(avx2sort), 1)
@@ -20,7 +23,7 @@ CXXFLAGS += -std=c++11
 CXXFLAGS += -fno-exceptions -fno-rtti -static
 CXXFLAGS += -fvisibility=hidden
 CXXFLAGS += -fPIC
-CUFLAGS += --compiler-options -fPIC -O3 -DNDEBUG -std=c++17
+CUFLAGS += --compiler-options -fPIC -std=c++17
 
 # CUFLAGS += --compiler-options -fPIC -O0 -g -std=c++17
 
