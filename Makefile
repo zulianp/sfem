@@ -11,7 +11,6 @@ endif
 
 ifeq ($(avx2sort), 1)
 	CXXFLAGS += -DSFEM_ENABLE_AVX2_SORT -Iexternal
-
 endif
 
 CFLAGS += -pedantic 
@@ -21,15 +20,21 @@ CXXFLAGS += -std=c++11
 CXXFLAGS += -fno-exceptions -fno-rtti -static
 CXXFLAGS += -fvisibility=hidden
 CXXFLAGS += -fPIC
+CUFLAGS += --compiler-options -fPIC -O3 -DNDEBUG -std=c++17
+
+# CUFLAGS += --compiler-options -fPIC -O0 -g -std=c++17
+
+
 
 GOALS = assemble assemble3 condense_matrix condense_vector idx_to_indicator remap_vector
 DEPS = -L../matrix.io/ -lmatrix.io -lstdc++
 
-LDFLAGS += $(DEPS)
+LDFLAGS += $(DEPS) -lm
 
 MPICC ?= mpicc
 CXX ?= c++
 AR ?= ar
+NVCC ?= nvcc
 
 all : $(GOALS)
 
@@ -38,15 +43,27 @@ OBJS = \
 	crs_graph.o \
 	sortreduce.o \
 	read_mesh.o  \
-	laplacian.o \
-	mass.o \
-	simd_neohookean.o
-# 	neohookean.o
+	mass.o
+
+ifeq ($(cuda), 1)
+	CUDA_OBJS = cuda_laplacian.o
+	DEPS += -L/opt/cuda/lib64 -lcudart
+
+	OBJS += $(CUDA_OBJS)
+else
+	SERIAL_OBJS = laplacian.o # neohookean.o 
+	OBJS += $(SERIAL_OBJS)
+
+endif
+
+SIMD_OBJS = simd_neohookean.o
+
+OBJS += $(SIMD_OBJS)
 
 # SIMD experiment (worse perf)
 # simd_neohookean.o
 
-# SIMD experiment (marginal perf improvment on ARM)
+# SIMD experiment (marginal perf improvment on ARM, almost 2x in assembly with AVX2)
 # simd_laplacian.o
 
 # Scalar
@@ -74,11 +91,16 @@ idx_to_indicator : idx_to_indicator.o
 remap_vector : remap_vector.o
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
+
+
 sortreduce.o: sortreduce.cpp
 	$(CXX) $(CXXFLAGS) -c $<
 
 %.o : %.c
 	$(MPICC) $(CFLAGS) -c $<
+
+%.o : %.cu
+	$(NVCC) $(CUFLAGS) -c $<
 
 .SUFFIXES :
 .PRECIOUS :

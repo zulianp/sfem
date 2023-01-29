@@ -310,8 +310,10 @@ static SFEM_INLINE vreal_t rvpow2(const vreal_t x)
 static SFEM_INLINE vreal_t vlog(const vreal_t x)
 {
     vreal_t ret;
+    #pragma unroll(SFEM_VECTOR_SIZE)
     for(int vi = 0; vi < SFEM_VECTOR_SIZE; ++vi) {
-        ret[vi] = log(x[vi]);
+        const double xi = x[vi];
+        ret[vi] = log(xi);
     }
 
     return ret;

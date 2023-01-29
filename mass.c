@@ -179,7 +179,7 @@ void assemble_mass(const ptrdiff_t nelements,
 
             #pragma unroll(4)
             for (int edof_j = 0; edof_j < 4; ++edof_j) {
-                rowvalues[ks[edof_j]] += element_matrix[edof_j];
+                rowvalues[ks[edof_j]] += element_row[edof_j];
             }
         }
     }

@@ -1,17 +1,47 @@
-#include "laplacian.h"
+// #include "laplacian.h"
 
-#include <assert.h>
-#include <math.h>
-#include <stdio.h>
+#include <cassert>
+#include <cmath>
+// #include <cstdio>
+#include <cstddef>
+#include <algorithm>
 
 #include <mpi.h>
 
+extern "C" {
+#include "sfem_base.h"
+
+
+#include "sfem_base.h"
 #include "crs_graph.h"
 #include "sortreduce.h"
-
 #include "sfem_vec.h"
 
-static SFEM_INLINE void laplacian(const real_t x0,
+}
+
+#include <cuda.h>
+#include <cuda_runtime.h>
+#include <cuda_runtime_api.h>
+
+void sfem_cuda_check(cudaError_t code, const char* file, int line, bool abort = true) {
+        if (code != cudaSuccess) {
+            fprintf(stderr, "cuda_check: %s %s:%d\n", cudaGetErrorString(code), file, line);
+            if (abort) exit(code);
+        }
+    }
+
+#define SFEM_CUDA_CHECK(ans) \
+    { sfem_cuda_check((ans), __FILE__, __LINE__); }
+
+
+#ifndef NDEBUG
+#define SFEM_DEBUG_SYNCHRONIZE() do { cudaDeviceSynchronize(); SFEM_CUDA_CHECK(cudaPeekAtLastError()); } while(0)
+#else
+#define SFEM_DEBUG_SYNCHRONIZE() 
+#endif
+
+
+static inline __device__ void laplacian(const real_t x0,
                                   const real_t x1,
                                   const real_t x2,
                                   const real_t x3,
@@ -96,7 +126,7 @@ static SFEM_INLINE void laplacian(const real_t x0,
     element_matrix[15] = x20 * (-1.0 / 6.0 * pow(x22, 2) - 1.0 / 6.0 * pow(x25, 2) - 1.0 / 6.0 * pow(x33, 2));
 }
 
-static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {
+static inline __device__ int linear_search(const idx_t target, const idx_t *const arr, const int size) {
     int i;
     for (i = 0; i < size - SFEM_VECTOR_SIZE; i += SFEM_VECTOR_SIZE) {
         if (arr[i] == target) return i;
@@ -110,9 +140,9 @@ static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr,
     return -1;
 }
 
-static SFEM_INLINE int find_col(const idx_t key, const idx_t *const row, const int lenrow) {
-    if (lenrow <= 32)
-    {
+static inline __device__ int find_col(const idx_t key, const idx_t *const row, const int lenrow) {
+    // if (lenrow <= 32)
+    // {
         return linear_search(key, row, lenrow);
 
         // Using sentinel (potentially dangerous if matrix is buggy and column does not exist)
@@ -121,13 +151,13 @@ static SFEM_INLINE int find_col(const idx_t key, const idx_t *const row, const i
         // }
         // assert(k < lenrow);
         // assert(key == row[k]);
-    } else {
-        // Use this for larger number of dofs per row
-        return find_idx_binary_search(key, row, lenrow);
-    }
+    // } else {
+    //     // Use this for larger number of dofs per row
+    //     return find_idx_binary_search(key, row, lenrow);
+    // }
 }
 
-static SFEM_INLINE void find_cols4(const idx_t *targets, const idx_t *const row, const int lenrow, int *ks) {
+static inline __device__ void find_cols4(const idx_t *targets, const idx_t *const row, const int lenrow, int *ks) {
     if (lenrow > 32) {
         for (int d = 0; d < 4; ++d) {
             ks[d] = find_col(targets[d], row, lenrow);
@@ -147,22 +177,22 @@ static SFEM_INLINE void find_cols4(const idx_t *targets, const idx_t *const row,
     }
 }
 
-void assemble_laplacian(const ptrdiff_t nelements,
+__global__ void assemble_laplacian_kernel(const ptrdiff_t nelements,
                         const ptrdiff_t nnodes,
-                        idx_t *const elems[4],
-                        geom_t *const xyz[3],
+                        idx_t **const elems,
+                        geom_t **const xyz,
                         idx_t *const rowptr,
                         idx_t *const colidx,
                         real_t *const values) {
-    double tick = MPI_Wtime();
+    ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x;
 
-    idx_t ev[4];
-    idx_t ks[4];
 
-    real_t element_matrix[4 * 4];
+    for(; i < nelements; i += blockDim.x * gridDim.x) {
+        idx_t ev[4];
+        idx_t ks[4];
+        real_t element_matrix[4 * 4];
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
-        #pragma unroll(4)
+        // #pragma unroll(4)
         for (int v = 0; v < 4; ++v) {
             ev[v] = elems[v][i];
         }
@@ -204,11 +234,114 @@ void assemble_laplacian(const ptrdiff_t nelements,
 
             #pragma unroll(4)
             for (int edof_j = 0; edof_j < 4; ++edof_j) {
-                rowvalues[ks[edof_j]] += element_row[edof_j];
+                real_t v = element_row[edof_j];
+                atomicAdd(&rowvalues[ks[edof_j]], v);
             }
         }
     }
+}
+
+__global__ void print_elem_kernel(const ptrdiff_t nelements, 
+                        idx_t **const elems)
+{
+    const int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if(i >= nelements) return;
+
+    printf("%d %d %d %d\n", elems[0][i], elems[1][i], elems[2][i], elems[3][i]);
+}
+
+extern "C" void assemble_laplacian(const ptrdiff_t nelements,
+                        const ptrdiff_t nnodes,
+                        idx_t *const elems[4],
+                        geom_t *const xyz[3],
+                        idx_t *const rowptr,
+                        idx_t *const colidx,
+                        real_t *const values) {
+    double tick = MPI_Wtime();
+
+    const ptrdiff_t nbatch = nelements;
+
+    idx_t *hd_elems[4];
+    idx_t **d_elems = nullptr;
+
+    { // Copy element indices
+        
+        void *ptr;
+        SFEM_CUDA_CHECK(cudaMalloc(&ptr, 4 * sizeof(idx_t *)));
+        d_elems = (idx_t**)ptr;
+
+        for(int d = 0; d < 4; ++d) {
+            SFEM_CUDA_CHECK(cudaMalloc(&hd_elems[d], nbatch * sizeof(idx_t)));
+            SFEM_CUDA_CHECK(cudaMemcpy(hd_elems[d], elems[d], nbatch * sizeof(idx_t), cudaMemcpyHostToDevice));
+        }
+
+        SFEM_CUDA_CHECK(cudaMemcpy(d_elems, hd_elems, 4 * sizeof(idx_t *), cudaMemcpyHostToDevice));
+    }
+
+    static int block_size = 128;
+    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (nbatch + block_size - 1) / block_size);
+    
+    geom_t *hd_xyz[4];
+    geom_t **d_xyz = nullptr;
+    
+    { // Copy coordinates
+        SFEM_CUDA_CHECK(cudaMalloc(&d_xyz, 3 * sizeof(geom_t *)));
+
+        for(int d = 0; d < 3; ++d) {
+            SFEM_CUDA_CHECK(cudaMalloc(&hd_xyz[d], nnodes * sizeof(geom_t)));
+            SFEM_CUDA_CHECK(cudaMemcpy(hd_xyz[d], xyz[d], nnodes * sizeof(geom_t), cudaMemcpyHostToDevice));
+        }
+
+        SFEM_CUDA_CHECK(cudaMemcpy(d_xyz, hd_xyz, 3 * sizeof(geom_t *), cudaMemcpyHostToDevice));
+    }
+
+    idx_t *d_rowptr = nullptr;
+    idx_t *d_colidx = nullptr;
+    real_t *d_values = nullptr;
+    const idx_t nnz = rowptr[nnodes];
+
+    { // Copy matrix
+        SFEM_CUDA_CHECK(cudaMalloc(&d_rowptr, (nnodes + 1) * sizeof(idx_t)));
+        SFEM_CUDA_CHECK(cudaMemcpy(d_rowptr, rowptr, (nnodes + 1) * sizeof(idx_t), cudaMemcpyHostToDevice));
+
+        SFEM_CUDA_CHECK(cudaMalloc(&d_colidx, nnz * sizeof(idx_t)));
+        SFEM_CUDA_CHECK(cudaMemcpy(d_colidx, colidx, nnz * sizeof(idx_t), cudaMemcpyHostToDevice));
+
+        SFEM_CUDA_CHECK(cudaMalloc(&d_values, nnz * sizeof(real_t)));
+        SFEM_CUDA_CHECK(cudaMemcpy(d_values, values, nnz * sizeof(real_t), cudaMemcpyHostToDevice));
+    }
+
+    assemble_laplacian_kernel<<<n_blocks, 128>>>(nelements, nnodes, d_elems, d_xyz, d_rowptr, d_colidx, d_values);
+    SFEM_DEBUG_SYNCHRONIZE();
+
+    // Copy result to Host memory
+    SFEM_CUDA_CHECK(cudaMemcpy(values, d_values, nnz * sizeof(real_t), cudaMemcpyDeviceToHost));
+
+    { // Free element indices
+        for(int d = 0; d < 4; ++d) {
+            SFEM_CUDA_CHECK(cudaFree(hd_elems[d]));
+        }
+
+        SFEM_CUDA_CHECK(cudaFree(d_elems));
+    }
+
+    { // Free element coordinates
+        for(int d = 0; d < 3; ++d) {
+            SFEM_CUDA_CHECK(cudaFree(hd_xyz[d]));
+        }
+
+        SFEM_CUDA_CHECK(cudaFree(d_xyz));
+    }
+
+    { // Free matrix
+
+        SFEM_CUDA_CHECK(cudaFree(d_rowptr));
+        SFEM_CUDA_CHECK(cudaFree(d_colidx));
+        SFEM_CUDA_CHECK(cudaFree(d_values));
+
+    }
 
     double tock = MPI_Wtime();
-    printf("laplacian.c: assemble_laplacian\t%g seconds\n", tock - tick);
+    printf("cuda_laplacian.c: assemble_laplacian\t%g seconds\n", tock - tick);
 }
