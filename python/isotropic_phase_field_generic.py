@@ -60,9 +60,7 @@ ec = (Gc / comega(c)) * omega(c)/ls + ls * dot3(gradc, gradc)
 e = g(c) * eu + ec
 
 def makeenergy():
-	integr = e
-	# integr = sp.integrate(integr * det3(A), (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1))
-	integr = integr * dV
+	integr = e * dV
 
 	if simplify_expr:
 		integr = sp.simplify(integr)
@@ -113,8 +111,7 @@ grade_wrt_c = dot3(dedgradc, test_shapegrad) + dedc * test_shape
 # ####################################
 
 def makegradu(i):
-	integr =  grade_wrt_u[i]
-	integr = integr * dV
+	integr = grade_wrt_u[i] * dV
 	
 	if simplify_expr:
 		integr = sp.simplify(integr)
@@ -124,8 +121,7 @@ def makegradu(i):
 	return expr
 
 def makegradc():
-	integr =  grade_wrt_c
-	integr = integr * dV
+	integr = grade_wrt_c * dV
 	
 	if simplify_expr:
 		integr = sp.simplify(integr)
@@ -222,7 +218,6 @@ def makehessiancc():
 	bform = sp.symbols(f'element_matrix[{3 * 4 + 3}]')
 	return ast.AddAugmentedAssignment(bform, integr)
 
-
 def makehessian():
 	expr = [0] * (4 * 4)
 
@@ -230,10 +225,6 @@ def makehessian():
 		uc = makehessianuc(i)
 		cu = makehessiancu(i)
 
-		print(uc)
-		print(cu)
-
-		
 		expr[i * 4 + 3] = uc
 		expr[3 * 4 + i] = cu
 
@@ -243,17 +234,16 @@ def makehessian():
 	expr[3*4 + 3] = makehessiancc()
 	return expr
 
-
 hessian_expr = makehessian()
 hessian_code = c_gen(hessian_expr)
 
-params="""
+params = """
 	const real_t mu,
 	const real_t lambda,
 	const real_t Gc,
 	const real_t ls,"""
 
-args_eg=params + """
+args_eg = params + """
 	const real_t c, 
 	const real_t *gradc, 
 	const real_t *gradu,
@@ -263,7 +253,7 @@ args_eg=params + """
 	const real_t *trial_grad,
 	const real_t dV,"""
 
-args_H=params+"""
+args_H = params + """
 	const real_t c,  
 	const real_t *gradu,
 	const real_t test,
@@ -274,10 +264,11 @@ args_H=params+"""
 	real_t *element_matrix"""
 
 tpl = """
+// Basic includes
 #include "sfem_base.h"
 #include <math.h>
-// Energy
 
+// Energy
 void {kernel_name}_energy({args_e}) {{
 {energy}
 }}
@@ -294,10 +285,14 @@ void {kernel_name}_hessian({args_H}) {{
 """
 
 output = tpl.format(
-	kernel_name=kernel_name,
-	energy=energy_code, gradient=gradient_code, hessian=hessian_code, 
-	args_e=args_eg + "\n\treal_t *element_scalar", 
-	args_g=args_eg + "\n\treal_t *element_vector",  args_H=args_H)
+	kernel_name = kernel_name,
+	energy = energy_code, 
+	gradient = gradient_code, 
+	hessian = hessian_code, 
+	args_e = args_eg + "\n\treal_t *element_scalar", 
+	args_g = args_eg + "\n\treal_t *element_vector",  
+	args_H = args_H)
+
 console.print(output)
 
 f = open('generated_code_temp.c', 'w')
