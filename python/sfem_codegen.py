@@ -69,7 +69,7 @@ def c_gen(expr, dump=False):
 
 def c_code(expr):
 	code_string = c_gen(expr)
-	print(code_string)
+	console.print(code_string)
 
 def inner(l, r):
 	ret = 0
@@ -110,7 +110,7 @@ def fun(x, y, z):
 	zref = Ainv[2, 0] * xmb + Ainv[2, 1] * ymb  + Ainv[2, 2] * zmb
 	return ref_fun(xref, yref, zref)
 
-qx, qy, qz = sp.symbols('qx qy qz', real=True)
+qx, qy, qz, qw = sp.symbols('qx qy qz qw', real=True)
 
 # Element coordinates
 # x0, x1, x2, x3 = sp.symbols('x0 x1 x2 x3', real=True)
@@ -182,6 +182,43 @@ def tgrad(x, y, z):
 			ret.append(G)
 
 		i += 1
+	return ret
+
+def generic_grad(prefix):
+	gx, gy, gz = sp.symbols(f'{prefix}[0] {prefix}[1] {prefix}[2]')
+	g = sp.Matrix(3, 1, [gx, gy, gz])
+	return g
+
+def tensorize_grad(g):
+	ret = []
+
+	for d1 in range(0, 3):
+		G = sp.Matrix(3, 3, [0, 0, 0, 
+							 0, 0, 0, 
+							 0, 0, 0])
+
+		for d2 in range(0, 3):
+			G[d1, d2] = g[d2]
+
+		ret.append(G)
+	return ret
+
+def generic_symm_grad(prefix):
+	ret = []
+
+	g = generic_grad(prefix)
+
+	for d1 in range(0, 3):
+		G = sp.Matrix(3, 3, [0, 0, 0, 
+							 0, 0, 0, 
+							 0, 0, 0])
+
+		for d2 in range(0, 3):
+			G[d1, d2] = g[d2]
+
+		G = (G + G.T)/2
+
+		ret.append(G)
 	return ret
 
 def subsmat3x3(expr, oldmat, newmat):

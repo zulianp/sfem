@@ -1,5 +1,6 @@
 # import linear_elasticity as material
-import neohookean as material
+# import neohookean as material
+import isotropic_phase_field as material
 import time
 from multiprocessing import Queue
 from multiprocessing import Process as Worker
@@ -8,13 +9,21 @@ def parallel_eval(n, fun):
     tasks = []
     qs = []
 
+    max_cores = 8
+
     for i in range(0, n):
         q = Queue()
         t = Worker(target=fun, args=(i, q))
         tasks.append(t)
         qs.append(q)
         t.start()
-        
+
+        if i != 0 and i % max_cores == 1:
+            print('Joining intermediate results!')
+            for t in tasks:
+                t.join()
+            tasks = []
+
     for t in tasks:
         t.join()
 
