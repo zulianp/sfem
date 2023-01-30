@@ -43,6 +43,7 @@ epsu = linear_strain(gradu)
 eu = lmbda/2 * tr(epsu) * tr(epsu) + mu * inner(epsu, epsu)
 
 ##############################
+kernel_name = "isotropic_phase_field_AT2"
 # AT2
 def g(c):
 	return (1 - c)**2
@@ -277,22 +278,23 @@ tpl = """
 #include <math.h>
 // Energy
 
-void energy({args_e}) {{
+void {kernel_name}_energy({args_e}) {{
 {energy}
 }}
 
 // Gradient
-void gradient({args_g}) {{
+void {kernel_name}_gradient({args_g}) {{
 {gradient}
 }}
 
 // Hessian
-void hessian({args_H}) {{
+void {kernel_name}_hessian({args_H}) {{
 {hessian}
 }}
 """
 
 output = tpl.format(
+	kernel_name=kernel_name,
 	energy=energy_code, gradient=gradient_code, hessian=hessian_code, 
 	args_e=args_eg + "\n\treal_t *element_scalar", 
 	args_g=args_eg + "\n\treal_t *element_vector",  args_H=args_H)
