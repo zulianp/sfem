@@ -15,7 +15,7 @@ du1dx, du1dy, du1dz = sp.symbols('gradu[3] gradu[4] gradu[5]', real=True)
 du2dx, du2dy, du2dz = sp.symbols('gradu[6] gradu[7] gradu[8]', real=True)
 
 c, Gc, ls = sp.symbols('c Gc ls', real=True)
-dcdx, dcdy, dcdz = sp.symbols('gradc[0] gradc[1] gradc[2]')
+dcdx, dcdy, dcdz = sp.symbols('gradc[0] gradc[1] gradc[2]', real=True)
 gradc = sp.Matrix(3, 1, [dcdx, dcdy, dcdz])
 
 gradu = sp.Matrix(3, 3, [
