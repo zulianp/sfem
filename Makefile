@@ -27,10 +27,10 @@ CUFLAGS += --compiler-options -fPIC -std=c++17
 
 # CUFLAGS += --compiler-options -fPIC -O0 -g -std=c++17
 
-
+INCLUDES += -I$(PWD) -I$(PWD)/../matrix.io
 
 GOALS = assemble assemble3 condense_matrix condense_vector idx_to_indicator remap_vector
-DEPS = -L../matrix.io/ -lmatrix.io -lstdc++
+DEPS = -L$(PWD)/../matrix.io/ -lmatrix.io -lstdc++
 
 LDFLAGS += $(DEPS) -lm
 
@@ -72,6 +72,7 @@ OBJS += $(SIMD_OBJS)
 # Scalar
 #laplacian.o
 
+plugins: utopia_sfem.dylib
 
 libsfem.a : $(OBJS)
 	ar rcs $@ $^
@@ -94,16 +95,20 @@ idx_to_indicator : idx_to_indicator.o
 remap_vector : remap_vector.o
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
+utopia_sfem.dylib : utopia_sfem_plugin.o  libsfem.a
+	$(MPICC) -shared -o $@ $^ $(LDFLAGS)  
 
+utopia_sfem_plugin.o : plugin/utopia_sfem_plugin.c
+	$(MPICC) $(CFLAGS) $(INCLUDES) -c $<
 
 sortreduce.o: sortreduce.cpp
 	$(CXX) $(CXXFLAGS) -c $<
 
 %.o : %.c
-	$(MPICC) $(CFLAGS) -c $<
+	$(MPICC) $(CFLAGS) $(INCLUDES) -c $<
 
 %.o : %.cu
-	$(NVCC) $(CUFLAGS) -c $<
+	$(NVCC) $(CUFLAGS) $(INCLUDES) -c $<
 
 .SUFFIXES :
 .PRECIOUS :

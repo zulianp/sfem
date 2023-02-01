@@ -1,8 +1,8 @@
 
 #include "read_mesh.h"
 
-#include "../matrix.io/utils.h"
 #include "../matrix.io/matrixio_array.h"
+#include "../matrix.io/utils.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -23,88 +23,102 @@ static ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
 }
 
 int read_mesh(MPI_Comm comm, const char *folder, mesh_t *mesh) {
-	///////////////////////////////////////////////////////////////
-    // FIXME check from folder
-    int nnodesxelem = 4;
-    int ndims = 3;
-
-    MPI_Datatype mpi_geom_t = MPI_FLOAT;
-    MPI_Datatype mpi_idx_t = MPI_INT;
-
     ///////////////////////////////////////////////////////////////
+    // FIXME check from folder
+    // int nnodesxelem = 4;
+    // int ndims = 3;
 
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
+    // MPI_Datatype mpi_geom_t = MPI_FLOAT;
+    // MPI_Datatype mpi_idx_t = MPI_INT;
 
-    ptrdiff_t n_local_elements = 0, n_elements = 0;
-    ptrdiff_t n_local_nodes = 0, n_nodes = 0;
+    // ///////////////////////////////////////////////////////////////
 
-    char path[1024 * 10];
+    // int rank, size;
+    // MPI_Comm_rank(comm, &rank);
+    // MPI_Comm_size(comm, &size);
 
-    idx_t **elems = (idx_t **)malloc(sizeof(idx_t *) * nnodesxelem);
+    // ptrdiff_t n_local_elements = 0, n_elements = 0;
+    // ptrdiff_t n_local_nodes = 0, n_nodes = 0;
 
-    {
-        idx_t *id = 0;
+    // char path[1024 * 10];
 
-        for (int d = 0; d < nnodesxelem; ++d) {
-            sprintf(path, "%s/i%d.raw", folder, d);
-            array_read(comm, path, mpi_idx_t, (void **)&id, &n_local_elements, &n_elements);
-            elems[d] = id;
-        }
-    }
+    // idx_t **elems = (idx_t **)malloc(sizeof(idx_t *) * nnodesxelem);
 
-    const ptrdiff_t nbytes = sizeof(ptrdiff_t) * (size + 1);
-    ptrdiff_t * pcount = (ptrdiff_t *)malloc(nbytes);
-    memset(pcount, 0, nbytes);
+    // {
+    //     idx_t *id = 0;
 
-    long * distro = (ptrdiff_t *)malloc(sizeof(ptrdiff_t) * (size + 1));
-    memset(pcount, 0, nbytes);
+    //     for (int d = 0; d < nnodesxelem; ++d) {
+    //         sprintf(path, "%s/i%d.raw", folder, d);
+    //         array_read(comm, path, mpi_idx_t, (void **)&id, &n_local_elements, &n_elements);
+    //         elems[d] = id;
+    //     }
+    // }
 
-    MPI_Allreduce(MPI_IN_PLACE, &distro[1], size, MPI_LONG, MPI_SUM, comm);
+    // const ptrdiff_t nbytes = sizeof(ptrdiff_t) * (size + 1);
+    // ptrdiff_t * pcount = (ptrdiff_t *)malloc(nbytes);
+    // memset(pcount, 0, nbytes);
 
-    for(int i = 0; i < size; ++i) {
-    	distro[i+1] += distro[i];
-    }
+    // long * distro = (ptrdiff_t *)malloc(sizeof(ptrdiff_t) * (size + 1));
+    // memset(pcount, 0, nbytes);
 
-    // ALGO 1
+    // MPI_Allreduce(MPI_IN_PLACE, &distro[1], size, MPI_LONG, MPI_SUM, comm);
 
-    // We want
-    // Local nodes
-    // Ghost nodes
-    // (NEXT) What about aura and ghost elements?
+    // for(int i = 0; i < size; ++i) {
+    // 	distro[i+1] += distro[i];
+    // }
 
-    // For all elements e
-    // - For all nodes in e
-    //   - find bucket and increase count
-    // Allocate space for indices (local / remote separate)
-    // Store indices in allocated space
-    // Sort buffers and create unique sorted lists
-    // Count nodes owned by remote processs
-    // Create table from rank to offset
-    // Owned count and ghost count can be computed now
-    // Create local crs and remote crs graphs, crs we have to account for the different offsets
-    // - Local crs 
-    // - Remote crs, remote idx are sorted based on rank
-    // 
+    // // ALGO 1
 
-    // ALGO 2
+    // // We want
+    // // Local nodes
+    // // Ghost nodes
+    // // (NEXT) What about aura and ghost elements?
 
-    // Read xyz
-    geom_t **xyz = (geom_t **)malloc(sizeof(geom_t *) * ndims);
+    // // For all elements e
+    // // - For all nodes in e
+    // //   - find bucket and increase count
+    // // Allocate space for indices (local / remote separate)
+    // // Store indices in allocated space
+    // // Sort buffers and create unique sorted lists
+    // // Count nodes owned by remote processs
+    // // Create table from rank to offset
+    // // Owned count and ghost count can be computed now
+    // // Create local crs and remote crs graphs, crs we have to account for the different offsets
+    // // - Local crs
+    // // - Remote crs, remote idx are sorted based on rank
+    // //
 
-    {
-        geom_t *x = 0;
-        char coord_names[4] = {'x', 'y', 'z', 't'};
+    // // ALGO 2
 
-        for (int d = 0; d < ndims; ++d) {
-            sprintf(path, "%s/%c.raw", folder, coord_names[d]);
-            array_read(comm, path, mpi_geom_t, (void **)&x, &n_local_nodes, &n_nodes);
-            xyz[d] = x;
-        }
-    }
+    // // Read xyz
+    // geom_t **xyz = (geom_t **)malloc(sizeof(geom_t *) * ndims);
 
-    return 0;
+    // {
+    //     geom_t *x = 0;
+    //     char coord_names[4] = {'x', 'y', 'z', 't'};
+
+    //     for (int d = 0; d < ndims; ++d) {
+    //         sprintf(path, "%s/%c.raw", folder, coord_names[d]);
+    //         array_read(comm, path, mpi_geom_t, (void **)&x, &n_local_nodes, &n_nodes);
+    //         xyz[d] = x;
+    //     }
+    // }
+
+    // return 0;
+
+
+    // Serial fallback
+    mesh->comm = comm;
+
+    mesh->mem_space = SFEM_MEM_SPACE_HOST;
+
+    mesh->spatial_dim = 3;
+    mesh->element_type = 4;
+
+    mesh->elements = (idx_t **)malloc(4 * sizeof(idx_t *));
+    mesh->points = (geom_t **)malloc(3 * sizeof(geom_t *));
+
+    return serial_read_tet_mesh(folder, &mesh->nelements, mesh->elements, &mesh->nnodes, mesh->points);
 }
 
 int serial_read_tet_mesh(const char *folder, ptrdiff_t *nelements, idx_t *elems[4], ptrdiff_t *nnodes, geom_t *xyz[3]) {

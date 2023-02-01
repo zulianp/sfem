@@ -111,8 +111,7 @@ static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr,
 }
 
 static SFEM_INLINE int find_col(const idx_t key, const idx_t *const row, const int lenrow) {
-    if (lenrow <= 32)
-    {
+    if (lenrow <= 32) {
         return linear_search(key, row, lenrow);
 
         // Using sentinel (potentially dangerous if matrix is buggy and column does not exist)
@@ -149,10 +148,10 @@ static SFEM_INLINE void find_cols4(const idx_t *targets, const idx_t *const row,
 
 void assemble_laplacian(const ptrdiff_t nelements,
                         const ptrdiff_t nnodes,
-                        idx_t *const elems[4],
-                        geom_t *const xyz[3],
-                        idx_t *const rowptr,
-                        idx_t *const colidx,
+                        idx_t **const elems,
+                        geom_t **const xyz,
+                        const idx_t *const rowptr,
+                        const idx_t *const colidx,
                         real_t *const values) {
     double tick = MPI_Wtime();
 
@@ -162,7 +161,7 @@ void assemble_laplacian(const ptrdiff_t nelements,
     real_t element_matrix[4 * 4];
 
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-        #pragma unroll(4)
+#pragma unroll(4)
         for (int v = 0; v < 4; ++v) {
             ev[v] = elems[v][i];
         }
@@ -202,7 +201,7 @@ void assemble_laplacian(const ptrdiff_t nelements,
             real_t *rowvalues = &values[rowptr[dof_i]];
             const real_t *element_row = &element_matrix[edof_i * 4];
 
-            #pragma unroll(4)
+#pragma unroll(4)
             for (int edof_j = 0; edof_j < 4; ++edof_j) {
                 rowvalues[ks[edof_j]] += element_row[edof_j];
             }

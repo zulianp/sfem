@@ -6,10 +6,10 @@
 
 void assemble_laplacian(const ptrdiff_t nelements,
                         const ptrdiff_t nnodes,
-                        idx_t *const elems[4],
-                        geom_t *const xyz[3],
-                        idx_t *const rowptr,
-                        idx_t *const colidx,
+                        idx_t **const elems,
+                        geom_t **const xyz,
+                        const idx_t *const rowptr,
+                        const idx_t *const colidx,
                         real_t *const values);
 
 #endif  // LAPLACIAN_H
