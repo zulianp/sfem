@@ -55,6 +55,10 @@ def comega(c):
  	return 2
 ##############################
 
+#############################################################
+# Value
+############################################################# 
+
 ec = (Gc / comega(c)) * omega(c)/ls + ls * dot3(gradc, gradc)
 
 e = g(c) * eu + ec
@@ -72,9 +76,9 @@ def makeenergy():
 energy_expr = makeenergy()
 energy_code = c_gen(energy_expr)
 
-# ####################################
-# # Gradient
-# ####################################
+#############################################################
+# Gradient
+############################################################# 
 # 
 # # Displacement variable
 
@@ -138,9 +142,12 @@ def makegrad():
 	expr[3] = makegradc()
 	return expr
 
-
 grad_expr = makegrad()
 gradient_code = c_gen(grad_expr)
+
+#############################################################
+# Hessian
+############################################################# 
 
 # uu
 d2edu2 = sp.Matrix(3, 3, 
@@ -236,6 +243,36 @@ def makehessian():
 
 hessian_expr = makehessian()
 hessian_code = c_gen(hessian_expr)
+
+#############################################################
+# Apply
+############################################################# 
+
+# Displacement gradient increment
+ddelta_u0dx, ddelta_u0dy, ddelta_u0dz = sp.symbols('grad_delta_u[0] grad_delta_u[1] grad_delta_u[2]', real=True)
+ddelta_u1dx, ddelta_u1dy, ddelta_u1dz = sp.symbols('grad_delta_u[3] grad_delta_u[4] grad_delta_u[5]', real=True)
+ddelta_u2dx, ddelta_u2dy, ddelta_u2dz = sp.symbols('grad_delta_u[6] grad_delta_u[7] grad_delta_u[8]', real=True)
+
+delta_c= sp.symbols('delta_c', real=True)
+ddelta_cdx, ddelta_cdy, ddelta_cdz = sp.symbols('grad_delta_c[0] grad_delta_c[1] grad_delta_c[2]', real=True)
+grad_delta_c = sp.Matrix(3, 1, [ddelta_cdx, ddelta_cdy, ddelta_cdz])
+
+grad_delta_u = sp.Matrix(3, 3, 
+	[ ddelta_u0dx, ddelta_u0dy, ddelta_u0dz,  
+	  ddelta_u1dx, ddelta_u1dy, ddelta_u1dz, 
+	  ddelta_u2dx, ddelta_u2dy, ddelta_u2dz ])
+
+
+def makeapply():
+	# Inputs are gradu, gradc, and c
+	expr = None
+	return expr
+
+apply_expr = makeapply()
+apply_code = c_gen(hessian_expr)
+
+
+############################################################# 
 
 params = """
 	const real_t mu,

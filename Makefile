@@ -56,21 +56,12 @@ ifeq ($(cuda), 1)
 else
 	SERIAL_OBJS = laplacian.o # neohookean.o 
 	OBJS += $(SERIAL_OBJS)
-
 endif
 
 SIMD_OBJS = simd_neohookean.o
+# SIMD_OBJS +=  simd_laplacian.o 
 
 OBJS += $(SIMD_OBJS)
-
-# SIMD experiment (worse perf)
-# simd_neohookean.o
-
-# SIMD experiment (marginal perf improvment on ARM, almost 2x in assembly with AVX2)
-# simd_laplacian.o
-
-# Scalar
-#laplacian.o
 
 plugins: utopia_sfem.dylib
 
