@@ -147,7 +147,7 @@ static SFEM_INLINE void find_cols4(const idx_t *targets, const idx_t *const row,
     }
 }
 
-void assemble_laplacian(const ptrdiff_t nelements,
+void laplacian_assemble_hessian(const ptrdiff_t nelements,
                         const ptrdiff_t nnodes,
                         idx_t ** const elems,
                         geom_t ** const xyz,
@@ -227,5 +227,5 @@ void assemble_laplacian(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("simd_laplacian.c: assemble_laplacian\t%g seconds\n", tock - tick);
+    printf("simd_laplacian.c: laplacian_assemble_hessian\t%g seconds\n", tock - tick);
 }

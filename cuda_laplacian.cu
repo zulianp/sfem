@@ -155,7 +155,7 @@ static inline __device__ void find_cols4(const idx_t *targets, const idx_t *cons
     }
 }
 
-__global__ void assemble_laplacian_kernel(const ptrdiff_t nelements,
+__global__ void laplacian_assemble_hessian_kernel(const ptrdiff_t nelements,
                                           const ptrdiff_t nnodes,
                                           idx_t **const elems,
                                           geom_t **const xyz,
@@ -225,7 +225,7 @@ __global__ void print_elem_kernel(const ptrdiff_t nelements, idx_t **const elems
     printf("%d %d %d %d\n", elems[0][i], elems[1][i], elems[2][i], elems[3][i]);
 }
 
-extern "C" void assemble_laplacian(const ptrdiff_t nelements,
+extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
                                    const ptrdiff_t nnodes,
                                    idx_t **const elems,
                                    geom_t **const xyz,
@@ -289,13 +289,13 @@ extern "C" void assemble_laplacian(const ptrdiff_t nelements,
     {
         // double ktick = MPI_Wtime();
 
-        assemble_laplacian_kernel<<<n_blocks, block_size>>>(
+        laplacian_assemble_hessian_kernel<<<n_blocks, block_size>>>(
             nelements, nnodes, d_elems, d_xyz, d_rowptr, d_colidx, d_values);
         SFEM_DEBUG_SYNCHRONIZE();
 
         // cudaDeviceSynchronize();
         // double ktock = MPI_Wtime();
-        // printf("cuda_laplacian.c: assemble_laplacian_kernel\t%g seconds\n", ktock - ktick);
+        // printf("cuda_laplacian.c: laplacian_assemble_hessian_kernel\t%g seconds\n", ktock - ktick);
 
         // Copy result to Host memory
         SFEM_CUDA_CHECK(cudaMemcpy(values, d_values, nnz * sizeof(real_t), cudaMemcpyDeviceToHost));
@@ -324,5 +324,5 @@ extern "C" void assemble_laplacian(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("cuda_laplacian.c: assemble_laplacian\t%g seconds\n", tock - tick);
+    printf("cuda_laplacian.c: laplacian_assemble_hessian\t%g seconds\n", tock - tick);
 }

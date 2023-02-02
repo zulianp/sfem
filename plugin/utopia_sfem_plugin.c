@@ -102,11 +102,13 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_create_vector(const plugin_Funct
     memset(*values, 0, nbytes);
     *nlocal = mesh->nnodes;
     *nglobal = mesh->nnodes;
+
     return UTOPIA_PLUGIN_SUCCESS;
 }
 
 int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_destroy_vector(const plugin_Function_t *info, plugin_scalar_t *values) {
     free(values);
+    
     return UTOPIA_PLUGIN_SUCCESS;
 }
 
@@ -114,14 +116,26 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_destroy_vector(const plugin_Func
 int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_value(const plugin_Function_t *info,
                                                       const plugin_scalar_t *x,
                                                       plugin_scalar_t *const out) {
-    assert(false && "TODO");
+    sfem_problem_t *problem = (sfem_problem_t *)info->user_data;
+    assert(problem);
+    mesh_t *mesh = problem->mesh;
+    assert(mesh);
+
+    laplacian_assemble_value(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
+
     return UTOPIA_PLUGIN_SUCCESS;
 }
 
 int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_gradient(const plugin_Function_t *info,
                                                          const plugin_scalar_t *const x,
                                                          plugin_scalar_t *const out) {
-    assert(false && "TODO");
+    sfem_problem_t *problem = (sfem_problem_t *)info->user_data;
+    assert(problem);
+    mesh_t *mesh = problem->mesh;
+    assert(mesh);
+
+    laplacian_assemble_gradient(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
+
     return UTOPIA_PLUGIN_SUCCESS;
 }
 
@@ -136,7 +150,8 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_hessian_crs(const plugin_Functio
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    assemble_laplacian(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, rowptr, colidx, values);
+    laplacian_assemble_hessian(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, rowptr, colidx, values);
+
     return UTOPIA_PLUGIN_SUCCESS;
 }
 
