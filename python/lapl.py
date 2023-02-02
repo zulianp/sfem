@@ -37,13 +37,16 @@ if False:
 	c_code(expr)
 	print('---------------------------------------------------')
 
-if False:
-# if True:
+# if False:
+if True:
 	expr = []
 	for i in range(0, 4):
 		integr = 0
+
 		for d in range(0, 3):
-			integr += grad_uh[d] * sp.diff(f[j], q[d]) * dV
+			integr += grad_uh[d] * sp.diff(f[i], q[d])
+
+		integr = integr * dV
 
 		lform = sp.symbols(f'element_vector[{i}]')
 
@@ -56,8 +59,8 @@ if False:
 	c_code(expr)
 	print('---------------------------------------------------')
 
-# if False:
-if True:
+if False:
+# if True:
 	expr = []
 	integr = 0
 	for d in range(0, 3):

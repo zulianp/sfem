@@ -111,45 +111,50 @@ static SFEM_INLINE void laplacian_gradient(const real_t px0,
                                            const real_t *u,
                                            real_t *element_vector) {
     // FLOATING POINT OPS!
-    //       - Result: 4*ASSIGNMENT
-    //       - Subexpressions: 10*ADD + DIV + 53*MUL + 3*NEG + 2*POW + 35*SUB
-    const real_t x0 = pz0 - pz3;
-    const real_t x1 = px0 - px1;
-    const real_t x2 = py0 - py2;
+    //      - Result: 4*ADD + 4*ASSIGNMENT + 16*MUL
+    //      - Subexpressions: 13*ADD + 7*DIV + 46*MUL + 3*NEG + 30*SUB
+    const real_t x0 = -pz0 + pz3;
+    const real_t x1 = -px0 + px1;
+    const real_t x2 = -py0 + py2;
     const real_t x3 = x1 * x2;
-    const real_t x4 = pz0 - pz1;
-    const real_t x5 = px0 - px2;
-    const real_t x6 = py0 - py3;
-    const real_t x7 = x5 * x6;
-    const real_t x8 = pz0 - pz2;
-    const real_t x9 = px0 - px3;
-    const real_t x10 = py0 - py1;
+    const real_t x4 = x0 * x3;
+    const real_t x5 = -pz0 + pz2;
+    const real_t x6 = -py0 + py3;
+    const real_t x7 = x1 * x6;
+    const real_t x8 = x5 * x7;
+    const real_t x9 = -px0 + px2;
+    const real_t x10 = -py0 + py1;
     const real_t x11 = x10 * x9;
-    const real_t x12 = -x0 * x10 * x5 + x0 * x3 - x1 * x6 * x8 + x11 * x8 - x2 * x4 * x9 + x4 * x7;
-    const real_t x13 = -x12;
-    const real_t x14 = -x10 * x5 + x3;
-    const real_t x15 = -x2 * x9 + x7;
-    const real_t x16 = x10 * x8 - x2 * x4;
-    const real_t x17 = x0 * x2 - x6 * x8;
-    const real_t x18 = x4 * x6;
-    const real_t x19 = x1 * x8 - x4 * x5;
-    const real_t x20 = -x8;
-    const real_t x21 = -x5;
-    const real_t x22 = x4 * x9;
-    const real_t x23 = x0 * x1;
-    const real_t x24 =
-        (1.0 / 6.0) *
-        (x12 * x19 *
-             (-u[0] * x12 * (-x0 * x21 - x1 * x20 + x20 * x9 + x21 * x4 + x22 - x23) +
-              x13 * (-u[1] * (x0 * x5 - x8 * x9) + u[2] * (-x22 + x23) - u[3] * x19)) +
-         pow(x13, 2) *
-             (x14 * (u[0] * (x1 * x6 - x11 - x14 - x15) + u[1] * x15 - u[2] * (x1 * x6 - x11) + u[3] * x14) +
-              x16 * (u[0] * (x0 * x10 - x16 - x17 - x18) + u[1] * x17 - u[2] * (x0 * x10 - x18) + u[3] * x16))) /
-        pow(x13, 3);
-    element_vector[0] = x24;
-    element_vector[1] = x24;
-    element_vector[2] = x24;
-    element_vector[3] = x24;
+    const real_t x12 = x0 * x11;
+    const real_t x13 = -pz0 + pz1;
+    const real_t x14 = x6 * x9;
+    const real_t x15 = x13 * x14;
+    const real_t x16 = -px0 + px3;
+    const real_t x17 = x10 * x16 * x5;
+    const real_t x18 = x16 * x2;
+    const real_t x19 = x13 * x18;
+    const real_t x20 =
+        -1.0 / 6.0 * x12 + (1.0 / 6.0) * x15 + (1.0 / 6.0) * x17 - 1.0 / 6.0 * x19 + (1.0 / 6.0) * x4 - 1.0 / 6.0 * x8;
+    const real_t x21 = 1.0 / (-x12 + x15 + x17 - x19 + x4 - x8);
+    const real_t x22 = x21 * (-x11 + x3);
+    const real_t x23 = x21 * (x10 * x16 - x7);
+    const real_t x24 = x21 * (x14 - x18);
+    const real_t x25 = -x22 - x23 - x24;
+    const real_t x26 = u[0] * x25 + u[1] * x24 + u[2] * x23 + u[3] * x22;
+    const real_t x27 = x21 * (-x1 * x5 + x13 * x9);
+    const real_t x28 = x21 * (x0 * x1 - x13 * x16);
+    const real_t x29 = x21 * (-x0 * x9 + x16 * x5);
+    const real_t x30 = -x27 - x28 - x29;
+    const real_t x31 = u[0] * x30 + u[1] * x29 + u[2] * x28 + u[3] * x27;
+    const real_t x32 = x21 * (x10 * x5 - x13 * x2);
+    const real_t x33 = x21 * (-x0 * x10 + x13 * x6);
+    const real_t x34 = x21 * (x0 * x2 - x5 * x6);
+    const real_t x35 = -x32 - x33 - x34;
+    const real_t x36 = u[0] * x35 + u[1] * x34 + u[2] * x33 + u[3] * x32;
+    element_vector[0] = x20 * (x25 * x26 + x30 * x31 + x35 * x36);
+    element_vector[1] = x20 * (x24 * x26 + x29 * x31 + x34 * x36);
+    element_vector[2] = x20 * (x23 * x26 + x28 * x31 + x33 * x36);
+    element_vector[3] = x20 * (x22 * x26 + x27 * x31 + x32 * x36);
 }
 
 static SFEM_INLINE void laplacian_value(const real_t px0,
@@ -340,7 +345,7 @@ void laplacian_assemble_gradient(const ptrdiff_t nelements,
             ev[v] = elems[v][i];
         }
 
-        for(int v = 0; v < 4; ++v) {
+        for (int v = 0; v < 4; ++v) {
             element_u[v] = u[ev[v]];
         }
 
@@ -396,7 +401,7 @@ void laplacian_assemble_value(const ptrdiff_t nelements,
             ev[v] = elems[v][i];
         }
 
-        for(int v = 0; v < 4; ++v) {
+        for (int v = 0; v < 4; ++v) {
             element_u[v] = u[ev[v]];
         }
 
