@@ -19,9 +19,22 @@
 #include "read_mesh.h"
 #include "sfem_mesh.h"
 
+#include "dirichlet.h"
+#include "neumann.h"
+
 typedef struct {
     mesh_t *mesh;
+    idx_t *dirichlet_nodes;
+    ptrdiff_t nlocal_dirchlet;
+    ptrdiff_t nglobal_dirchlet;
+
+    ptrdiff_t nlocal_neumann;
+    ptrdiff_t nglobal_neumann;
+    idx_t *faces_neumann;
+
     int block_size;
+
+    const char *output_dir;
 } sfem_problem_t;
 
 int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_destroy_array(const plugin_Function_t *info, void *ptr) {
@@ -31,23 +44,37 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_destroy_array(const plugin_Funct
 
 int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_create_array(const plugin_Function_t *info, size_t size, void **ptr) {
     *ptr = malloc(size);
+    memset(*ptr, 0, size);
     return UTOPIA_PLUGIN_SUCCESS;
 }
 
 int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_init(plugin_Function_t *info) {
     const char *SFEM_MESH_DIR = "[error] undefined";
     const char *SFEM_MATERIAL_MODEL = "[error] undefined";
+    const char *SFEM_DIRICHLET_NODES = "[error] undefined";
+    const char *SFEM_OUTPUT_DIR = "./sfem_output";
+    const char *SFEM_NEUMAN_FACES = "[error] undefined";
 
     SFEM_READ_ENV(SFEM_MESH_DIR, );
     SFEM_READ_ENV(SFEM_MATERIAL_MODEL, );
+    SFEM_READ_ENV(SFEM_DIRICHLET_NODES, );
+    SFEM_READ_ENV(SFEM_OUTPUT_DIR, );
+    SFEM_READ_ENV(SFEM_NEUMAN_FACES, );
 
-    printf("sfem:\n - SFEM_MESH_DIR=%s\n - SFEM_MATERIAL_MODEL%s\n", SFEM_MESH_DIR, SFEM_MATERIAL_MODEL);
+    printf(
+        "sfem:\n"
+        "- SFEM_MESH_DIR=%s\n"
+        "- SFEM_MATERIAL_MODEL%s\n"
+        "- SFEM_DIRICHLET_NODES=%s\n"
+        "- SFEM_OUTPUT_DIR=%s\n"
+        "- SFEM_NEUMAN_FACES=%s\n",
+        SFEM_MESH_DIR,
+        SFEM_MATERIAL_MODEL,
+        SFEM_DIRICHLET_NODES,
+        SFEM_OUTPUT_DIR,
+        SFEM_NEUMAN_FACES);
 
-    // if (!SFEM_MESH_DIR || !SFEM_MATERIAL_MODEL) {
-    //     return UTOPIA_PLUGIN_FAILURE;
-    // }
-
-    if (!SFEM_MESH_DIR) {
+    if (!SFEM_MESH_DIR || !SFEM_DIRICHLET_NODES || !SFEM_NEUMAN_FACES) {
         return UTOPIA_PLUGIN_FAILURE;
     }
 
@@ -58,11 +85,36 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_init(plugin_Function_t *info) {
     }
 
     sfem_problem_t *problem = (sfem_problem_t *)malloc(sizeof(sfem_problem_t));
+
+    if (array_read(info->comm,
+                   SFEM_DIRICHLET_NODES,
+                   SFEM_MPI_IDX_T,
+                   (void **)&problem->dirichlet_nodes,
+                   &problem->nlocal_dirchlet,
+                   &problem->nglobal_dirchlet)) {
+        return UTOPIA_PLUGIN_FAILURE;
+    }
+
+    if (array_read(info->comm,
+                   SFEM_NEUMAN_FACES,
+                   SFEM_MPI_IDX_T,
+                   (void **)&problem->faces_neumann,
+                   &problem->nlocal_neumann,
+                   &problem->nglobal_neumann)) {
+        return UTOPIA_PLUGIN_FAILURE;
+    }
+
+    problem->nlocal_neumann /= 3;
+    problem->nglobal_neumann /= 3;
+
+    // Redistribute Dirichlet nodes
     problem->mesh = mesh;
     problem->block_size = 1;
+    problem->output_dir = SFEM_OUTPUT_DIR;
 
     // Store problem
     info->user_data = (void *)problem;
+
 
     // Eventually initialize info->user_data here
     return UTOPIA_PLUGIN_SUCCESS;
@@ -108,7 +160,6 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_create_vector(const plugin_Funct
 
 int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_destroy_vector(const plugin_Function_t *info, plugin_scalar_t *values) {
     free(values);
-    
     return UTOPIA_PLUGIN_SUCCESS;
 }
 
@@ -122,7 +173,6 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_value(const plugin_Function_t *i
     assert(mesh);
 
     laplacian_assemble_value(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
-
     return UTOPIA_PLUGIN_SUCCESS;
 }
 
@@ -135,6 +185,7 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_gradient(const plugin_Function_t
     assert(mesh);
 
     laplacian_assemble_gradient(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
+    surface_forcing_function(problem->nlocal_neumann, problem->faces_neumann, mesh->points, -1, out);
 
     return UTOPIA_PLUGIN_SUCCESS;
 }
@@ -152,6 +203,7 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_hessian_crs(const plugin_Functio
 
     laplacian_assemble_hessian(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, rowptr, colidx, values);
 
+    crs_constraint_nodes_to_identity(problem->nlocal_dirchlet, problem->dirichlet_nodes, 1.0, rowptr, colidx, values);
     return UTOPIA_PLUGIN_SUCCESS;
 }
 
@@ -159,21 +211,30 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_hessian_crs(const plugin_Functio
 int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_apply(const plugin_Function_t *info,
                                                       const plugin_scalar_t *const x,
                                                       plugin_scalar_t *const out) {
-    assert(false && "TODO");
+    sfem_problem_t *problem = (sfem_problem_t *)info->user_data;
+    assert(problem);
+    mesh_t *mesh = problem->mesh;
+    assert(mesh);
+
+    laplacian_assemble_gradient(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
     return UTOPIA_PLUGIN_SUCCESS;
 }
 
 int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_apply_constraints(const plugin_Function_t *info,
                                                                   plugin_scalar_t *const x) {
-    assert(false && "TODO");
-    // No constraints for this example
+    sfem_problem_t *problem = (sfem_problem_t *)info->user_data;
+    assert(problem);
+
+    constraint_nodes_to_value(problem->nlocal_dirchlet, problem->dirichlet_nodes, 0, x);
     return UTOPIA_PLUGIN_SUCCESS;
 }
 
 int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_apply_zero_constraints(const plugin_Function_t *info,
                                                                        plugin_scalar_t *const x) {
-    assert(false && "TODO");
-    // No constraints for this example
+    sfem_problem_t *problem = (sfem_problem_t *)info->user_data;
+    assert(problem);
+
+    constraint_nodes_to_value(problem->nlocal_dirchlet, problem->dirichlet_nodes, 0, x);
     return UTOPIA_PLUGIN_SUCCESS;
 }
 
@@ -181,18 +242,38 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_copy_constrained_dofs(const plug
                                                                       const plugin_scalar_t *const src,
                                                                       plugin_scalar_t *const dest) {
     assert(false && "TODO");
+    exit(1);
     // No constraints for this example
     return UTOPIA_PLUGIN_SUCCESS;
 }
 
 int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_report_solution(const plugin_Function_t *info,
                                                                 const plugin_scalar_t *const x) {
-    assert(false && "TODO");
+    sfem_problem_t *problem = (sfem_problem_t *)info->user_data;
+    assert(problem);
+    mesh_t *mesh = problem->mesh;
+    assert(mesh);
+
+    char path[2048];
+    sprintf(path, "%s/out.raw", problem->output_dir);
+
+    if(array_write(info->comm,
+                    path,
+                    SFEM_MPI_REAL_T,
+                    x,
+                    mesh->nnodes * problem->block_size,
+                    mesh->nnodes * problem->block_size)) {
+        return UTOPIA_PLUGIN_FAILURE;
+    }
+
     return UTOPIA_PLUGIN_SUCCESS;
 }
 
 int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_destroy(plugin_Function_t *info) {
-    // No user-data for this example
-    assert(false && "TODO");
+    sfem_problem_t *problem = (sfem_problem_t *)info->user_data;
+    free(problem->mesh);
+    free(problem->dirichlet_nodes);
+    free(problem->faces_neumann);
     return UTOPIA_PLUGIN_SUCCESS;
 }
+

@@ -46,7 +46,9 @@ OBJS = \
 	crs_graph.o \
 	sortreduce.o \
 	read_mesh.o  \
-	mass.o
+	mass.o \
+	dirichlet.o \
+	neumann.o
 
 ifeq ($(cuda), 1)
 	CUDA_OBJS = cuda_laplacian.o
