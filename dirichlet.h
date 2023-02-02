@@ -11,6 +11,14 @@ void constraint_nodes_to_value(
     real_t *values
     );
 
+void constraint_nodes_copy(
+    const ptrdiff_t n_dirichlet_nodes,
+    const idx_t * dirichlet_nodes,
+    const real_t *source,
+    real_t *dest
+    );
+
+
 void crs_constraint_nodes_to_identity(
     const ptrdiff_t n_dirichlet_nodes,
     const idx_t * dirichlet_nodes,

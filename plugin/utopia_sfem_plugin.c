@@ -115,7 +115,6 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_init(plugin_Function_t *info) {
     // Store problem
     info->user_data = (void *)problem;
 
-
     // Eventually initialize info->user_data here
     return UTOPIA_PLUGIN_SUCCESS;
 }
@@ -210,13 +209,15 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_hessian_crs(const plugin_Functio
 // Operator
 int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_apply(const plugin_Function_t *info,
                                                       const plugin_scalar_t *const x,
+                                                      const plugin_scalar_t *const h,
                                                       plugin_scalar_t *const out) {
     sfem_problem_t *problem = (sfem_problem_t *)info->user_data;
     assert(problem);
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    laplacian_assemble_gradient(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
+    // Equivalent to operator application due to linearity of the problem
+    laplacian_assemble_gradient(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, h, out);
     return UTOPIA_PLUGIN_SUCCESS;
 }
 
@@ -241,8 +242,13 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_apply_zero_constraints(const plu
 int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_copy_constrained_dofs(const plugin_Function_t *info,
                                                                       const plugin_scalar_t *const src,
                                                                       plugin_scalar_t *const dest) {
-    assert(false && "TODO");
-    exit(1);
+    sfem_problem_t *problem = (sfem_problem_t *)info->user_data;
+    assert(problem);
+    mesh_t *mesh = problem->mesh;
+    assert(mesh);
+
+    constraint_nodes_copy(problem->nlocal_dirchlet, problem->dirichlet_nodes, src, dest);
+
     // No constraints for this example
     return UTOPIA_PLUGIN_SUCCESS;
 }
@@ -257,7 +263,7 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_report_solution(const plugin_Fun
     char path[2048];
     sprintf(path, "%s/out.raw", problem->output_dir);
 
-    if(array_write(info->comm,
+    if (array_write(info->comm,
                     path,
                     SFEM_MPI_REAL_T,
                     x,
@@ -276,4 +282,3 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_destroy(plugin_Function_t *info)
     free(problem->faces_neumann);
     return UTOPIA_PLUGIN_SUCCESS;
 }
-
