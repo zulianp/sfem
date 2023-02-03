@@ -3,10 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../matrix.io/array_dtof.h"
 #include "../matrix.io/matrixio_array.h"
 #include "../matrix.io/matrixio_crs.h"
 #include "../matrix.io/utils.h"
-#include "../matrix.io/array_dtof.h"
 
 #include "crs_graph.h"
 #include "sfem_base.h"
@@ -25,24 +25,6 @@ ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
 
     CATCH_MPI_ERROR(MPI_File_read_at_all(file, 0, *data, nbytes, MPI_CHAR, &status));
     return nbytes;
-}
-
-SFEM_INLINE real_t det3(const real_t *mat) {
-    return mat[0] * mat[4] * mat[8] + mat[1] * mat[5] * mat[6] + mat[2] * mat[3] * mat[7] - mat[0] * mat[5] * mat[7] -
-           mat[1] * mat[3] * mat[8] - mat[2] * mat[4] * mat[6];
-}
-
-SFEM_INLINE real_t area3(const real_t left[3], const real_t right[3]) {
-    real_t a = (left[1] * right[2]) - (right[1] * left[2]);
-    real_t b = (left[2] * right[0]) - (right[2] * left[0]);
-    real_t c = (left[0] * right[1]) - (right[0] * left[1]);
-    return sqrt(a * a + b * b + c * c);
-}
-
-SFEM_INLINE void integrate_neumann(real_t value, real_t dA, real_t *element_vector) {
-    element_vector[0] = value * dA;
-    element_vector[1] = value * dA;
-    element_vector[2] = value * dA;
 }
 
 int main(int argc, char *argv[]) {
@@ -71,17 +53,17 @@ int main(int argc, char *argv[]) {
 
     printf("%s %s %s\n", argv[0], argv[1], output_folder);
 
-    // int SFEM_HANDLE_DIRICHLET = 1;
-    // int SFEM_EXPORT_FP32 = 0;
+    int SFEM_HANDLE_DIRICHLET = 0;
+    int SFEM_EXPORT_FP32 = 0;
 
-    // SFEM_READ_ENV(SFEM_HANDLE_DIRICHLET, atoi);
-    // SFEM_READ_ENV(SFEM_EXPORT_FP32, atoi);
+    SFEM_READ_ENV(SFEM_HANDLE_DIRICHLET, atoi);
+    SFEM_READ_ENV(SFEM_EXPORT_FP32, atoi);
 
-    // printf("----------------------------------------\n");
-    // printf("Environment variables:\n- SFEM_HANDLE_DIRICHLET=%d\n- SFEM_EXPORT_FP32=%d\n",
-    //        SFEM_HANDLE_DIRICHLET,
-    //        SFEM_EXPORT_FP32);
-    // printf("----------------------------------------\n");
+    printf("----------------------------------------\n");
+    printf("Environment variables:\n- SFEM_HANDLE_DIRICHLET=%d\n- SFEM_EXPORT_FP32=%d\n",
+           SFEM_HANDLE_DIRICHLET,
+           SFEM_EXPORT_FP32);
+    printf("----------------------------------------\n");
 
     double tick = MPI_Wtime();
 
@@ -97,20 +79,20 @@ int main(int argc, char *argv[]) {
     ptrdiff_t nelements = 0;
     idx_t *elems[4];
 
-    if(serial_read_tet_mesh(folder, &nelements, elems, &nnodes, xyz)) {
+    if (serial_read_tet_mesh(folder, &nelements, elems, &nnodes, xyz)) {
         return EXIT_FAILURE;
     }
 
     // TODO read displacement from file
-    real_t *displacement = malloc(nnodes * 3 *sizeof(real_t));
-    memset(displacement, 0, nnodes * 3 *sizeof(real_t));
+    real_t *displacement = malloc(nnodes * 3 * sizeof(real_t));
+    memset(displacement, 0, nnodes * 3 * sizeof(real_t));
 
     // TODO read params
     const real_t mu = 1;
     const real_t lambda = 1;
 
     double tack = MPI_Wtime();
-    printf("assemble.c: read\t\t%g seconds\n", tack - tick);
+    printf("assemble3.c: read\t\t%g seconds\n", tack - tick);
 
     ///////////////////////////////////////////////////////////////////////////////
     // Build CRS graph
@@ -124,11 +106,11 @@ int main(int argc, char *argv[]) {
     build_crs_graph(nelements, nnodes, elems, &rowptr, &colidx);
 
     nnz = rowptr[nnodes];
-    values = (real_t *)malloc(nnz  * 9 * sizeof(real_t));
-    memset(values, 0, nnz  * 9 * sizeof(real_t));
+    values = (real_t *)malloc(nnz * 9 * sizeof(real_t));
+    memset(values, 0, nnz * 9 * sizeof(real_t));
 
     double tock = MPI_Wtime();
-    printf("assemble.c: build crs\t\t%g seconds\n", tock - tack);
+    printf("assemble3.c: build crs\t\t%g seconds\n", tock - tack);
     tack = tock;
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -137,14 +119,68 @@ int main(int argc, char *argv[]) {
 
     neohookean_assemble_hessian(
         // Mesh
-        nelements, nnodes, elems, xyz, 
+        nelements,
+        nnodes,
+        elems,
+        xyz,
         // Material
-        mu, lambda, displacement,
+        mu,
+        lambda,
+        displacement,
         // Output
-        rowptr, colidx, values);
+        rowptr,
+        colidx,
+        values);
 
     tock = MPI_Wtime();
-    printf("assemble.c: assembly\t\t%g seconds\n", tock - tack);
+    printf("assemble3.c: assembly\t\t%g seconds\n", tock - tack);
+    tack = tock;
+
+    ///////////////////////////////////////////////////////////////////////////////
+    // Block to scalar operator
+    ///////////////////////////////////////////////////////////////////////////////
+
+    idx_t *new_rowptr = (idx_t *)malloc(((nnodes)*3 + 1)*sizeof(idx_t));
+    idx_t *new_colidx = (idx_t *)malloc(nnz * 9 * sizeof(idx_t));
+    real_t *new_values = (real_t *)malloc(nnz * 9 * sizeof(real_t));
+
+    block_crs_to_crs(nnodes,
+                     3,
+                     // Block matrix
+                     rowptr,
+                     colidx,
+                     values,
+                     // Scalar matrix
+                     new_rowptr,
+                     new_colidx,
+                     new_values);
+
+    // substitute arrays
+    free(rowptr);
+    free(colidx);
+    free(values);
+
+    rowptr = new_rowptr;
+    colidx = new_colidx;
+    values = new_values;
+
+    // for (ptrdiff_t i = 0; i < nnodes * 3; ++i) {
+    //     idx_t begin = rowptr[i];
+    //     idx_t end = rowptr[i + 1];
+
+    //     printf("%d) %d-%d\n", (int)i, begin, end);
+
+    //     for (idx_t k = begin; k < end; ++k) {
+    //         printf("(%d, %g) ", colidx[k], values[k]);
+    //     }
+
+    //     printf("\n---\n");
+    // }
+
+    // printf("bnnz=%d nnz=%d == %d\n-----------------\n", (int)nnz, (int)rowptr[nnodes * 3], (int)(nnz * 9));
+
+    tock = MPI_Wtime();
+    printf("assemble3.c: block to scalar\t\t%g seconds\n", tock - tack);
     tack = tock;
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -161,54 +197,6 @@ int main(int argc, char *argv[]) {
     //     idx_t nfaces = (nfacesx3 / 3) / sizeof(idx_t);
     //     assert(nfaces * 3 * sizeof(idx_t) == nfacesx3);
 
-    //     real_t u[3], v[3];
-    //     real_t element_vector[3];
-
-    //     real_t jacobian[3 * 3] = {0, 0, 0, 0, 0, 0, 0, 0, 1};
-
-    //     real_t value = 1.0;
-    //     // real_t value = 2.0;
-    //     for (idx_t f = 0; f < nfaces; ++f) {
-    //         idx_t i0 = faces_neumann[f * 3];
-    //         idx_t i1 = faces_neumann[f * 3 + 1];
-    //         idx_t i2 = faces_neumann[f * 3 + 2];
-
-    //         real_t dx = 0;
-
-    //         if (0) {
-    //             for (int d = 0; d < 3; ++d) {
-    //                 real_t x0 = (real_t)xyz[d][i0];
-    //                 real_t x1 = (real_t)xyz[d][i1];
-    //                 real_t x2 = (real_t)xyz[d][i2];
-
-    //                 u[d] = x1 - x0;
-    //                 v[d] = x2 - x0;
-    //             }
-
-    //             dx = area3(u, v) / 2;
-    //         } else {
-    //             // No square roots in this version
-    //             for (int d = 0; d < 3; ++d) {
-    //                 real_t x0 = (real_t)xyz[d][i0];
-    //                 real_t x1 = (real_t)xyz[d][i1];
-    //                 real_t x2 = (real_t)xyz[d][i2];
-
-    //                 jacobian[d * 3] = x1 - x0;
-    //                 jacobian[d * 3 + 1] = x2 - x0;
-    //             }
-
-    //             // Orientation of face is not proper
-    //             dx = fabs(det3(jacobian)) / 2;
-    //         }
-
-    //         assert(dx > 0.);
-    //         integrate_neumann(value, dx, element_vector);
-
-    //         rhs[i0] += element_vector[0];
-    //         rhs[i1] += element_vector[1];
-    //         rhs[i2] += element_vector[2];
-    //     }
-
     //     free(faces_neumann);
     // }
 
@@ -220,69 +208,48 @@ int main(int argc, char *argv[]) {
     //     assert((nn / sizeof(idx_t)) * sizeof(idx_t) == nn);
     //     nn /= sizeof(idx_t);
 
-    //     // Set rhs should not be necessary (but let us do it anyway)
-    //     for (idx_t node = 0; node < nn; ++node) {
-    //         idx_t i = dirichlet_nodes[node];
-    //         rhs[i] = 0;
-    //     }
-
-    //     for (idx_t node = 0; node < nn; ++node) {
-    //         idx_t i = dirichlet_nodes[node];
-
-    //         idx_t begin = rowptr[i];
-    //         idx_t end = rowptr[i + 1];
-    //         idx_t lenrow = end - begin;
-    //         idx_t *cols = &colidx[begin];
-    //         real_t *row = &values[begin];
-
-    //         memset(row, 0, sizeof(real_t) * lenrow);
-
-    //         int k = find_idx(i, cols, lenrow);
-    //         assert(k >= 0);
-    //         row[k] = 1;
-    //     }
     // }
 
     // tock = MPI_Wtime();
-    // printf("assemble.c: boundary\t\t%g seconds\n", tock - tack);
+    // printf("assemble3.c: boundary\t\t%g seconds\n", tock - tack);
     // tack = tock;
 
     ///////////////////////////////////////////////////////////////////////////////
     // Write CRS matrix and rhs vector
     ///////////////////////////////////////////////////////////////////////////////
 
-    // MPI_Datatype value_type = SFEM_EXPORT_FP32? MPI_FLOAT : MPI_DOUBLE;
-    
-    // if(SFEM_EXPORT_FP32) {
-    //     array_dtof(nnz,    (const double *)values, (float*)values);
-    //     array_dtof(nnodes, (const double *)rhs, (float*)rhs);
-    // }
+    MPI_Datatype value_type = SFEM_EXPORT_FP32 ? MPI_FLOAT : SFEM_MPI_REAL_T;
 
-    // {
-    //     crs_t crs_out;
-    //     crs_out.rowptr = (char *)rowptr;
-    //     crs_out.colidx = (char *)colidx;
-    //     crs_out.values = (char *)values;
-    //     crs_out.grows = nnodes;
-    //     crs_out.lrows = nnodes;
-    //     crs_out.lnnz = nnz;
-    //     crs_out.gnnz = nnz;
-    //     crs_out.start = 0;
-    //     crs_out.rowoffset = 0;
-    //     crs_out.rowptr_type = MPI_INT;
-    //     crs_out.colidx_type = MPI_INT;
-    //     crs_out.values_type = value_type;
-    //     crs_write_folder(comm, output_folder, &crs_out);
-    // }
+    if (SFEM_EXPORT_FP32) {
+        array_dtof(nnz * 9, (const double *)values, (float *)values);
+        // array_dtof(nnodes, (const double *)rhs, (float*)rhs);
+    }
+
+    {
+        crs_t crs_out;
+        crs_out.rowptr = (char *)rowptr;
+        crs_out.colidx = (char *)colidx;
+        crs_out.values = (char *)values;
+        crs_out.grows = (nnodes * 3);
+        crs_out.lrows = (nnodes * 3);
+        crs_out.lnnz = nnz * 9;
+        crs_out.gnnz = nnz * 9;
+        crs_out.start = 0;
+        crs_out.rowoffset = 0;
+        crs_out.rowptr_type = SFEM_MPI_IDX_T;
+        crs_out.colidx_type = SFEM_MPI_IDX_T;
+        crs_out.values_type = value_type;
+        crs_write_folder(comm, output_folder, &crs_out);
+    }
 
     // {
     //     sprintf(path, "%s/rhs.raw", output_folder);
     //     array_write(comm, path, value_type, rhs, nnodes, nnodes);
     // }
 
-    // tock = MPI_Wtime();
-    // printf("assemble.c: write\t\t%g seconds\n", tock - tack);
-    // tack = tock;
+    tock = MPI_Wtime();
+    printf("assemble3.c: write\t\t%g seconds\n", tock - tack);
+    tack = tock;
 
     ///////////////////////////////////////////////////////////////////////////////
     // Free resources

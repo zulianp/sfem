@@ -12,6 +12,7 @@
 #include "sfem_vec.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 // static SFEM_INLINE void neohookean_energy(const real_t mu,
 //                                           const real_t lambda,
@@ -99,7 +100,8 @@
 //     const real_t x64 = x36 * x44 + x39 * x45 + x40 * x43 + x41 * x46 + 1;
 //     const real_t x65 = x21 * x58 + x28 * x59 + x31 * x57 + x33 * x60 + 1;
 //     const real_t x66 =
-//         vlog(x35 * x56 * x61 - x35 * x62 * x64 + x42 * x47 * x62 - x42 * x56 * x65 - x47 * x61 * x63 + x63 * x64 * x65);
+//         vlog(x35 * x56 * x61 - x35 * x62 * x64 + x42 * x47 * x62 - x42 * x56 * x65 - x47 * x61 * x63 + x63 * x64 *
+//         x65);
 //     *element_energy =
 //         ((1.0 / 2.0) * lambda * pow(x66, 2) - mu * x66 +
 //          (1.0 / 2.0) * mu *
@@ -145,25 +147,13 @@
 //     const real_t x15 = -x14;
 //     const real_t x16 = px0 - px3;
 //     const real_t x17 = -1.0 / 6.0 * x16;
-//     const real_t x18 = -x1 * x11 * x13 + x1 * x3 * x5 + x11 * x17 * x9 + x13 * x15 * x7 - x15 * x17 * x3 - x5 * x7 * x9;
-//     const real_t x19 = x0 * x12 - x16 * x8;
-//     const real_t x20 = x2 * x4;
-//     const real_t x21 = x12 * x6;
-//     const real_t x22 = x10 * x16;
-//     const real_t x23 = x4 * x6;
-//     const real_t x24 = x10 * x12;
-//     const real_t x25 = x16 * x2;
-//     const real_t x26 = 1.0 / (x0 * x20 - x0 * x24 + x14 * x21 - x14 * x25 + x22 * x8 - x23 * x8);
-//     const real_t x27 = u[3] * x26;
-//     const real_t x28 = x0 * x4;
-//     const real_t x29 = x14 * x16;
-//     const real_t x30 = -x28 + x29;
-//     const real_t x31 = u[6] * x26;
-//     const real_t x32 = -x12 * x14 + x4 * x8;
-//     const real_t x33 = u[9] * x26;
-//     const real_t x34 = -x19 + x28 - x29 - x32;
-//     const real_t x35 = u[0] * x26;
-//     const real_t x36 = x19 * x27 + x30 * x31 + x32 * x33 + x34 * x35;
+//     const real_t x18 = -x1 * x11 * x13 + x1 * x3 * x5 + x11 * x17 * x9 + x13 * x15 * x7 - x15 * x17 * x3 - x5 * x7 *
+//     x9; const real_t x19 = x0 * x12 - x16 * x8; const real_t x20 = x2 * x4; const real_t x21 = x12 * x6; const real_t
+//     x22 = x10 * x16; const real_t x23 = x4 * x6; const real_t x24 = x10 * x12; const real_t x25 = x16 * x2; const
+//     real_t x26 = 1.0 / (x0 * x20 - x0 * x24 + x14 * x21 - x14 * x25 + x22 * x8 - x23 * x8); const real_t x27 = u[3] *
+//     x26; const real_t x28 = x0 * x4; const real_t x29 = x14 * x16; const real_t x30 = -x28 + x29; const real_t x31 =
+//     u[6] * x26; const real_t x32 = -x12 * x14 + x4 * x8; const real_t x33 = u[9] * x26; const real_t x34 = -x19 + x28
+//     - x29 - x32; const real_t x35 = u[0] * x26; const real_t x36 = x19 * x27 + x30 * x31 + x32 * x33 + x34 * x35;
 //     const real_t x37 = x20 - x24;
 //     const real_t x38 = -x37;
 //     const real_t x39 = u[10] * x26;
@@ -297,28 +287,20 @@ static SFEM_INLINE void find_cols4(const idx_t *targets, const idx_t *const row,
     }
 }
 
-static SFEM_INLINE vreal_t vpow2(const vreal_t x)
-{
-    return x * x;
-}
+static SFEM_INLINE vreal_t vpow2(const vreal_t x) { return x * x; }
 
-static SFEM_INLINE vreal_t rvpow2(const vreal_t x)
-{
-    return 1./ (x * x);
-}
+static SFEM_INLINE vreal_t rvpow2(const vreal_t x) { return 1. / (x * x); }
 
-static SFEM_INLINE vreal_t vlog(const vreal_t x)
-{
+static SFEM_INLINE vreal_t vlog(const vreal_t x) {
     vreal_t ret;
-    #pragma unroll(SFEM_VECTOR_SIZE)
-    for(int vi = 0; vi < SFEM_VECTOR_SIZE; ++vi) {
+#pragma unroll(SFEM_VECTOR_SIZE)
+    for (int vi = 0; vi < SFEM_VECTOR_SIZE; ++vi) {
         const double xi = x[vi];
         ret[vi] = log(xi);
     }
 
     return ret;
 }
-
 
 static SFEM_INLINE void neohookean_hessian(const vreal_t mu,
                                            const vreal_t lambda,
@@ -932,7 +914,6 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
     vreal_t y[4];
     vreal_t z[4];
 
-
     idx_t ev[4];
     idx_t ks[4];
 
@@ -951,7 +932,7 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
     static const int mat_block_size = block_size * block_size;
 
     for (ptrdiff_t i = 0; i < nelements; i += SFEM_VECTOR_SIZE) {
-        const int nvec = MIN(nelements - (i + SFEM_VECTOR_SIZE), SFEM_VECTOR_SIZE);
+        const int nvec = MAX(1, MIN(nelements - (i + SFEM_VECTOR_SIZE), SFEM_VECTOR_SIZE));
 
         for (int vi = 0; vi < nvec; ++vi) {
             const ptrdiff_t offset = i + vi;
@@ -993,7 +974,7 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
         for (int vi = 0; vi < nvec; ++vi) {
             const idx_t offset = i + vi;
 
-            #pragma unroll(4)
+#pragma unroll(4)
             for (int v = 0; v < 4; ++v) {
                 ev[v] = elems[v][offset];
             }
@@ -1007,8 +988,6 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
                 // Blocks for row
                 real_t *row_blocks = &values[rowptr[dof_i] * mat_block_size];
 
-                const vreal_t *element_row = &element_matrix[edof_i * 4 * block_size];
-
                 for (int edof_j = 0; edof_j < 4; ++edof_j) {
                     // Block for column
                     const idx_t block_k = ks[edof_j] * mat_block_size;
@@ -1019,9 +998,8 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
                         const idx_t offset_j = bj * block_size;
 
                         for (int bi = 0; bi < block_size; ++bi) {
-                            // const idx_t offset_i = bi * block_size;
-                            // block[offset_i + bj] += element_row[edof_j * block_size + bj];
-                            block[offset_j + bi] += element_row[bi * 4 * block_size + edof_j * block_size + bj][vi];
+                            block[offset_j + bi] += element_matrix[(edof_i * block_size + bi) * block_size * 4 +
+                                                                   edof_j * block_size + bj][vi];
                         }
                     }
                 }

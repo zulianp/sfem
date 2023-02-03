@@ -37,7 +37,7 @@ SFEM_INLINE static idx_t unique(idx_t *arr, idx_t size) {
     return (++result) - arr;
 }
 
-idx_t find_idx(const idx_t target, const idx_t * x, idx_t n) {
+idx_t find_idx(const idx_t target, const idx_t *x, idx_t n) {
     for (idx_t i = 0; i < n; ++i) {
         if (target == x[i]) {
             return i;
@@ -55,7 +55,7 @@ int build_n2e(const ptrdiff_t nelements,
     double tick = MPI_Wtime();
 
     idx_t *n2eptr = (idx_t *)malloc((nnodes + 1) * sizeof(idx_t));
-    memset(n2eptr, 0, nnodes * sizeof(idx_t));
+    memset(n2eptr, 0, (nnodes + 1) * sizeof(idx_t));
 
     int *bookkepping = (int *)malloc((nnodes) * sizeof(int));
     memset(bookkepping, 0, (nnodes) * sizeof(int));
@@ -178,8 +178,6 @@ int build_crs_graph_faster(const ptrdiff_t nelements,
                            idx_t *const elems[4],
                            idx_t **out_rowptr,
                            idx_t **out_colidx) {
-
-
     ptrdiff_t nnz = 0;
     idx_t *rowptr = (idx_t *)malloc((nnodes + 1) * sizeof(idx_t));
     idx_t *colidx = 0;
@@ -276,4 +274,53 @@ int build_crs_graph(const ptrdiff_t nelements,
     } else {
         return build_crs_graph_faster(nelements, nnodes, elems, out_rowptr, out_colidx);
     }
+}
+
+int block_crs_to_crs(const ptrdiff_t nnodes,
+                     const int block_size,
+                     const idx_t *const block_rowptr,
+                     const idx_t *const block_colidx,
+                     const real_t *const block_values,
+                     idx_t *const rowptr,
+                     idx_t *const colidx,
+                     real_t *const values) {
+    for (ptrdiff_t i = 0; i < nnodes; ++i) {
+        idx_t k = block_rowptr[i] * (block_size * block_size);
+        idx_t ncols = block_rowptr[i + 1] - block_rowptr[i];
+
+        for (int b = 0; b < block_size; ++b) {
+            rowptr[i * block_size + b] = k + ncols * (b  * block_size);
+        }
+    }
+
+    rowptr[nnodes * block_size] =  2 * rowptr[nnodes * block_size - 1] - rowptr[nnodes * block_size - 2];
+
+    for (ptrdiff_t i = 0; i < nnodes; ++i) {
+        // Block row
+        const idx_t bstart = block_rowptr[i];
+        const idx_t bend = block_rowptr[i + 1];
+
+        for (int brow = 0; brow < block_size; ++brow) {
+            const idx_t row = i * block_size + brow;
+            // Scalar row
+            const idx_t start = rowptr[row];
+            const idx_t end = rowptr[row+1];
+
+            for (idx_t bk = bstart, k = start; bk < bend; ++bk) {
+                // Block column
+                const idx_t bcolidx = block_colidx[bk];
+                // Data block
+                const real_t *block = &block_values[bk * block_size * block_size];
+                
+                for (int bcol = 0; bcol < block_size; ++bcol, ++k) {
+                    assert(k < end);
+
+                    colidx[k] = bcolidx * block_size + bcol;
+                    values[k] = block[bcol * block_size + brow];
+                }
+            }
+        }
+    }
+
+    return 0;
 }

@@ -56,7 +56,8 @@ ifeq ($(cuda), 1)
 
 	OBJS += $(CUDA_OBJS)
 else
-	SERIAL_OBJS = laplacian.o # neohookean.o 
+	SERIAL_OBJS = laplacian.o
+# 	SERIAL_OBJS += neohookean.o 
 	OBJS += $(SERIAL_OBJS)
 endif
 

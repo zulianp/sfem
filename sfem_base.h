@@ -21,7 +21,7 @@ typedef float geom_t;
 typedef int idx_t;
 typedef double real_t;
 
-#define SFEM_MPI_IDX_T MPI_INT
+#define SFEM_MPI_IDX_T  MPI_INT
 #define SFEM_MPI_REAL_T MPI_DOUBLE
 #define SFEM_MPI_GEOM_T MPI_FLOAT
 
