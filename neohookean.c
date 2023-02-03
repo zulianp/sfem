@@ -890,6 +890,36 @@ static SFEM_INLINE void neohookean_hessian(const real_t mu,
                x209 * (x207 * x287 + x208 * x284 + x209 * x281));
 }
 
+static int check_symmetric(int n, const real_t *const element_matrix)
+{
+    for(int i = 0; i < n; ++i) {
+        for(int j = 0; j < n; ++j) {
+            const real_t diff = element_matrix[i*n + j] - element_matrix[i + j*n];
+            assert(diff < 1e-16);
+            if(diff > 1e-16) {
+                return 1;
+            }
+
+            // printf("%g ",  element_matrix[i*n + j] );
+        } 
+
+        // printf("\n");
+    }
+
+    // printf("\n");
+
+    return 0;
+}
+
+static void numerate(int n, real_t *const element_matrix)
+{
+    for(int i = 0; i < n; ++i) {
+        for(int j = 0; j < n; ++j) {
+            element_matrix[i*n + j] = i*n + j;
+        }
+    }
+}
+
 void neohookean_assemble_hessian(const ptrdiff_t nelements,
                          const ptrdiff_t nnodes,
                          idx_t *const elems[4],
@@ -955,6 +985,10 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
                            // output matrix
                            element_matrix);
 
+        assert(!check_symmetric(12, element_matrix));
+
+        // numerate(12, element_matrix);
+
         for (int edof_i = 0; edof_i < 4; ++edof_i) {
             const idx_t dof_i = elems[edof_i][i];
             const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
@@ -963,8 +997,6 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
 
             // Blocks for row
             real_t *row_blocks = &values[rowptr[dof_i] * mat_block_size];
-
-            const real_t *element_row = &element_matrix[edof_i * 4 * block_size];
 
             for (int edof_j = 0; edof_j < 4; ++edof_j) {
                 // Block for column
@@ -976,9 +1008,12 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
                 	const idx_t offset_j = bj * block_size;
                     
                     for (int bi = 0; bi < block_size; ++bi) {
-                        // const idx_t offset_i = bi * block_size;
-                        // block[offset_i + bj] += element_row[edof_j * block_size + bj];
-                        block[offset_j + bi] += element_row[bi * 4 * block_size + edof_j * block_size + bj];
+                        const real_t val = element_matrix[
+                            (edof_i * block_size + bi) * block_size * 4  + edof_j * block_size + bj];
+
+                        assert(val == val);
+                        
+                        block[offset_j + bi] += val;
                     }
                 }
             }

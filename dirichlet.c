@@ -78,3 +78,61 @@ void crs_constraint_nodes_to_identity(const ptrdiff_t n_dirichlet_nodes,
         row[k] = diag_value;
     }
 }
+
+void constraint_nodes_to_value_vec(
+    const ptrdiff_t n_dirichlet_nodes,
+    const idx_t * dirichlet_nodes,
+    const int block_size,
+    const int component,
+    const real_t value,
+    real_t *values
+    )
+{
+    for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
+        idx_t i = dirichlet_nodes[node] * block_size + component;
+        values[i] = value;
+    }
+}
+
+void constraint_nodes_copy_vec(
+    const ptrdiff_t n_dirichlet_nodes,
+    const idx_t * dirichlet_nodes,
+    const int block_size,
+    const int component,
+    const real_t *source,
+    real_t *dest
+    )
+{
+    for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
+        idx_t i = dirichlet_nodes[node] * block_size + component;
+        dest[i] = source[i];
+    }
+}
+
+void crs_constraint_nodes_to_identity_vec(
+    const ptrdiff_t n_dirichlet_nodes,
+    const idx_t * dirichlet_nodes,
+    const int block_size,
+    const int component,
+    const real_t diag_value,
+    const idx_t *rowptr,
+    const idx_t *colidx,
+    real_t *values
+    )
+{
+    for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
+        idx_t i = dirichlet_nodes[node] * block_size + component;
+
+        idx_t begin = rowptr[i];
+        idx_t end = rowptr[i + 1];
+        idx_t lenrow = end - begin;
+        const idx_t *cols = &colidx[begin];
+        real_t *row = &values[begin];
+
+        memset(row, 0, sizeof(real_t) * lenrow);
+
+        int k = find_col(i, cols, lenrow);
+        assert(k >= 0);
+        row[k] = diag_value;
+    }
+}
