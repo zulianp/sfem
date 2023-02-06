@@ -56,13 +56,33 @@ int main(int argc, char *argv[]) {
     int SFEM_HANDLE_DIRICHLET = 0;
     int SFEM_EXPORT_FP32 = 0;
 
+    real_t SFEM_MU = 1.0;
+    real_t SFEM_LAMBDA = 1.0;
+    real_t SFEM_FRACTURE_TOUGHNESS = 1.0;
+    real_t SFEM_LENGTH_SCALE_PARAMETER = 1.0;
+
     SFEM_READ_ENV(SFEM_HANDLE_DIRICHLET, atoi);
     SFEM_READ_ENV(SFEM_EXPORT_FP32, atoi);
 
+    SFEM_READ_ENV(SFEM_MU, atof);
+    SFEM_READ_ENV(SFEM_LAMBDA, atof);
+    SFEM_READ_ENV(SFEM_FRACTURE_TOUGHNESS, atof);
+    SFEM_READ_ENV(SFEM_LENGTH_SCALE_PARAMETER, atof);
+
     printf("----------------------------------------\n");
-    printf("Environment variables:\n- SFEM_HANDLE_DIRICHLET=%d\n- SFEM_EXPORT_FP32=%d\n",
+    printf("Environment variables:\n"
+           "- SFEM_HANDLE_DIRICHLET=%d\n"
+           "- SFEM_EXPORT_FP32=%d\n"
+           "- SFEM_MU=%g\n"
+           "- SFEM_LAMBDA=%g\n"
+           "- SFEM_FRACTURE_TOUGHNESS=%g\n"
+           "- SFEM_LENGTH_SCALE_PARAMETER=%g\n",
            SFEM_HANDLE_DIRICHLET,
-           SFEM_EXPORT_FP32);
+           SFEM_EXPORT_FP32,
+           SFEM_MU,
+           SFEM_LAMBDA,
+           SFEM_FRACTURE_TOUGHNESS,
+           SFEM_LENGTH_SCALE_PARAMETER);
     printf("----------------------------------------\n");
 
     double tick = MPI_Wtime();
@@ -90,11 +110,10 @@ int main(int argc, char *argv[]) {
     real_t *u = malloc(nnodes * block_size * sizeof(real_t));
     memset(u, 0, nnodes * block_size * sizeof(real_t));
 
-    // TODO read params
-    const real_t mu = 1;
-    const real_t lambda = 1;
-    const real_t Gc = 1;
-    const real_t ls = 1;
+    const real_t mu = SFEM_MU;
+    const real_t lambda = SFEM_LAMBDA;
+    const real_t Gc = SFEM_FRACTURE_TOUGHNESS;
+    const real_t ls = SFEM_LENGTH_SCALE_PARAMETER;
 
     double tack = MPI_Wtime();
     printf("assemble4.c: read\t\t%g seconds\n", tack - tick);
