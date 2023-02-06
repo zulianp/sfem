@@ -170,7 +170,7 @@ for i_trial in range(0, 3):
 			d2edu2[d1, d2] = sp.diff(grade_wrt_u[i_trial], gradu[d1, d2])
 
 	for i_test in range(0, 3):
-		Hessian_wrt_uu[i_trial, i_test] = inner(d2edu2, test_shapegrad3[i_trial])
+		Hessian_wrt_uu[i_trial, i_test] = inner(d2edu2, test_shapegrad3[i_test])
 
 # uc / cu
 d2edudc = sp.Matrix(3, 1, 
@@ -184,7 +184,7 @@ for i_trial in range(0, 3):
 	for d1 in range(0, 3):
 		d2edudc[d1] = sp.diff(grade_wrt_u[i_trial], gradc[d1])
 
-	Hessian_wrt_uc[i_trial] = dot3(d2edudc, test_shapegrad) + sp.diff(grade_wrt_u[i_test], c) * test_shape
+	Hessian_wrt_uc[i_trial] = dot3(d2edudc, test_shapegrad) + sp.diff(grade_wrt_u[i_trial], c) * test_shape
 # cc
 grade_wrt_c = dot3(dedgradc, trial_shapegrad) + dedc * trial_shape
 Hessian_wrt_cc = dot3(sp.diff(grade_wrt_c, gradc), test_shapegrad) + sp.diff(grade_wrt_c, c) * test_shape
@@ -238,7 +238,7 @@ def makehessian():
 		for j in range(0, 3):
 			expr[i * 4 + j] = makehessianuu(i, j)
 
-	expr[3*4 + 3] = makehessiancc()
+	expr[3 * 4 + 3] = makehessiancc()
 	return expr
 
 hessian_expr = makehessian()

@@ -340,51 +340,59 @@ static SFEM_INLINE void isotropic_phasefield_AT2_hessian(const real_t mu,
                                                          const real_t *trial_grad,
                                                          const real_t dV,
                                                          real_t *element_matrix) {
-    // FLOATING POINT OPS!
-    //       - Result: 7*ADD + 16*ADDAUGMENTEDASSIGNMENT + 17*MUL + 8*POW
-    //       - Subexpressions: 14*ADD + DIV + 31*MUL + POW + 2*SUB
-    const real_t x0 = pow(1 - c, 2);
-    const real_t x1 = mu * x0;
-    const real_t x2 = test_grad[1] * trial_grad[1];
-    const real_t x3 = x1 * x2;
-    const real_t x4 = test_grad[2] * trial_grad[2];
-    const real_t x5 = x1 * x4;
-    const real_t x6 = 2 * mu;
-    const real_t x7 = x0 * (lambda + x6);
-    const real_t x8 = test_grad[0] * trial_grad[0];
-    const real_t x9 = dV * (x3 + x5 + x7 * x8);
-    const real_t x10 = 2 * c - 2;
-    const real_t x11 = mu * x10;
-    const real_t x12 =
-        dV * test *
-        (trial_grad[0] * x11 * (gradu[2] + gradu[6]) + trial_grad[1] * x11 * (gradu[5] + gradu[7]) +
-         trial_grad[2] * x10 * (gradu[8] * x6 + (1.0 / 2.0) * lambda * (2 * gradu[0] + 2 * gradu[4] + 2 * gradu[8])));
-    const real_t x13 = x1 * x8;
-    const real_t x14 = dV * (x13 + x2 * x7 + x5);
-    const real_t x15 = dV * (x13 + x3 + x4 * x7);
-    const real_t x16 = 2 * ls;
-    element_matrix[0] += x9;
-    element_matrix[1] += x9;
-    element_matrix[2] += x9;
-    element_matrix[3] += x12;
-    element_matrix[4] += x14;
-    element_matrix[5] += x14;
-    element_matrix[6] += x14;
-    element_matrix[7] += x12;
-    element_matrix[8] += x15;
-    element_matrix[9] += x15;
-    element_matrix[10] += x15;
-    element_matrix[11] += x12;
-    element_matrix[12] += x12;
-    element_matrix[13] += x12;
-    element_matrix[14] += x12;
-    element_matrix[15] += dV * (test * trial *
-                                    (Gc / ls + lambda * pow(gradu[0] + gradu[4] + gradu[8], 2) +
-                                     x6 * (pow(gradu[0], 2) + pow(gradu[4], 2) + pow(gradu[8], 2) +
-                                           2 * pow((1.0 / 2.0) * gradu[1] + (1.0 / 2.0) * gradu[3], 2) +
-                                           2 * pow((1.0 / 2.0) * gradu[2] + (1.0 / 2.0) * gradu[6], 2) +
-                                           2 * pow((1.0 / 2.0) * gradu[5] + (1.0 / 2.0) * gradu[7], 2))) +
-                                x16 * x2 + x16 * x4 + x16 * x8);
+    //FLOATING POINT OPS!
+//      - Result: 16*ADD + 16*ADDAUGMENTEDASSIGNMENT + 41*MUL + 8*POW
+//      - Subexpressions: 15*ADD + DIV + 46*MUL + POW + 2*SUB
+const real_t x0 = pow(1 - c, 2);
+const real_t x1 = mu*x0;
+const real_t x2 = test_grad[1]*trial_grad[1];
+const real_t x3 = x1*x2;
+const real_t x4 = trial_grad[2]*x1;
+const real_t x5 = test_grad[2]*x4;
+const real_t x6 = 2*mu;
+const real_t x7 = lambda + x6;
+const real_t x8 = test_grad[0]*x0;
+const real_t x9 = trial_grad[0]*x8;
+const real_t x10 = test_grad[1]*trial_grad[0];
+const real_t x11 = lambda*x0;
+const real_t x12 = mu*x8;
+const real_t x13 = test_grad[2]*x11;
+const real_t x14 = 2*c - 2;
+const real_t x15 = trial_grad[1]*x14;
+const real_t x16 = mu*(gradu[1] + gradu[3]);
+const real_t x17 = gradu[2] + gradu[6];
+const real_t x18 = trial_grad[2]*x14;
+const real_t x19 = mu*x18;
+const real_t x20 = (1.0/2.0)*lambda*(2*gradu[0] + 2*gradu[4] + 2*gradu[8]);
+const real_t x21 = trial_grad[0]*x14;
+const real_t x22 = dV*test;
+const real_t x23 = x22*(x15*x16 + x17*x19 + x21*(gradu[0]*x6 + x20));
+const real_t x24 = lambda*x8;
+const real_t x25 = mu*x9;
+const real_t x26 = x0*x7;
+const real_t x27 = gradu[5] + gradu[7];
+const real_t x28 = x22*(x15*(gradu[4]*x6 + x20) + x16*x21 + x19*x27);
+const real_t x29 = test_grad[2]*x1;
+const real_t x30 = test_grad[2]*trial_grad[2];
+const real_t x31 = x22*(mu*x15*x27 + mu*x17*x21 + x18*(gradu[8]*x6 + x20));
+const real_t x32 = 2*ls;
+element_matrix[0] += dV*(x3 + x5 + x7*x9);
+element_matrix[1] += dV*(trial_grad[1]*x12 + x10*x11);
+element_matrix[2] += dV*(trial_grad[0]*x13 + trial_grad[2]*x12);
+element_matrix[3] += x23;
+element_matrix[4] += dV*(trial_grad[1]*x24 + x1*x10);
+element_matrix[5] += dV*(x2*x26 + x25 + x5);
+element_matrix[6] += dV*(test_grad[1]*x4 + trial_grad[1]*x13);
+element_matrix[7] += x28;
+element_matrix[8] += dV*(trial_grad[0]*x29 + trial_grad[2]*x24);
+element_matrix[9] += dV*(test_grad[1]*trial_grad[2]*x11 + trial_grad[1]*x29);
+element_matrix[10] += dV*(x25 + x26*x30 + x3);
+element_matrix[11] += x31;
+element_matrix[12] += x23;
+element_matrix[13] += x28;
+element_matrix[14] += x31;
+element_matrix[15] += dV*(test*trial*(Gc/ls + lambda*pow(gradu[0] + gradu[4] + gradu[8], 2) + x6*(pow(gradu[0], 2) + pow(gradu[4], 2) + pow(gradu[8], 2) + 2*pow((1.0/2.0)*gradu[1] + (1.0/2.0)*gradu[3], 2) + 
+2*pow((1.0/2.0)*gradu[2] + (1.0/2.0)*gradu[6], 2) + 2*pow((1.0/2.0)*gradu[5] + (1.0/2.0)*gradu[7], 2))) + test_grad[0]*trial_grad[0]*x32 + x2*x32 + x30*x32);
 }
 
 static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {
@@ -497,7 +505,6 @@ void isotropic_phasefield_for_fracture_assemble_hessian(const ptrdiff_t nelement
 
     real_t shape_fun[4];
     real_t shape_grad[4 * 3];
-    // real_t grad_phasefield[3];
     real_t grad_displacement[3 * 3];
 
     const geom_t *const x = xyz[0];
@@ -530,7 +537,23 @@ void isotropic_phasefield_for_fracture_assemble_hessian(const ptrdiff_t nelement
             tet4_measure(x[i0], x[i1], x[i2], x[i3], y[i0], y[i1], y[i2], y[i3], z[i0], z[i1], z[i2], z[i3]);
 
         // Gradient does not depend on qp for tet4
-        tet4_shape_grad(x[i0], x[i1], x[i2], x[i3], y[i0], y[i1], y[i2], y[i3], z[i0], z[i1], z[i2], z[i3], shape_grad);
+        tet4_shape_grad(
+            //
+            x[i0],
+            x[i1],
+            x[i2],
+            x[i3],
+            //
+            y[i0],
+            y[i1],
+            y[i2],
+            y[i3],
+            //
+            z[i0],
+            z[i1],
+            z[i2],
+            z[i3],
+            shape_grad);
 
         tet4_fe_tgrad(x[i0],
                       x[i1],
@@ -579,15 +602,15 @@ void isotropic_phasefield_for_fracture_assemble_hessian(const ptrdiff_t nelement
                                                      element_node_matrix);
                 }
 
-                // printf("%d, %d)\n", edof_i, edof_j);
-                // for (int bj = 0; bj < block_size; ++bj) {
-                //     for (int bi = 0; bi < block_size; ++bi) {
-                //         printf("%g ", element_node_matrix[bi * block_size + bj]);
-                //     }
-                //     printf("\n");
-                // }
+                printf("%d, %d)\n", edof_i, edof_j);
+                for (int bj = 0; bj < block_size; ++bj) {
+                    for (int bi = 0; bi < block_size; ++bi) {
+                        printf("%g ", element_node_matrix[bi * block_size + bj]);
+                    }
+                    printf("\n");
+                }
 
-                // printf("-----------------------\n");
+                printf("-----------------------\n");
 
                 const idx_t block_k = ks[edof_j] * mat_block_size;
                 real_t *block = &row_blocks[block_k];
