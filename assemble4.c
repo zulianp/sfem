@@ -11,7 +11,7 @@
 #include "crs_graph.h"
 #include "sfem_base.h"
 
-#include "neohookean.h"
+#include "isotropic_phasefield_for_fracture.h"
 
 #include "read_mesh.h"
 
@@ -83,16 +83,21 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    static const int block_size = 4;
+    static const int mat_block_size = 4 * 4;
+
     // TODO read displacement from file
-    real_t *displacement = malloc(nnodes * 3 * sizeof(real_t));
-    memset(displacement, 0, nnodes * 3 * sizeof(real_t));
+    real_t *u = malloc(nnodes * block_size * sizeof(real_t));
+    memset(u, 0, nnodes * block_size * sizeof(real_t));
 
     // TODO read params
     const real_t mu = 1;
     const real_t lambda = 1;
+    const real_t Gc = 1;
+    const real_t ls = 1;
 
     double tack = MPI_Wtime();
-    printf("assemble3.c: read\t\t%g seconds\n", tack - tick);
+    printf("assemble4.c: read\t\t%g seconds\n", tack - tick);
 
     ///////////////////////////////////////////////////////////////////////////////
     // Build CRS graph
@@ -106,46 +111,45 @@ int main(int argc, char *argv[]) {
     build_crs_graph(nelements, nnodes, elems, &rowptr, &colidx);
 
     nnz = rowptr[nnodes];
-    values = (real_t *)malloc(nnz * 9 * sizeof(real_t));
-    memset(values, 0, nnz * 9 * sizeof(real_t));
+    values = (real_t *)malloc(nnz * mat_block_size * sizeof(real_t));
+    memset(values, 0, nnz * mat_block_size * sizeof(real_t));
 
     double tock = MPI_Wtime();
-    printf("assemble3.c: build crs\t\t%g seconds\n", tock - tack);
+    printf("assemble4.c: build crs\t\t%g seconds\n", tock - tack);
     tack = tock;
 
     ///////////////////////////////////////////////////////////////////////////////
     // Operator assembly
     ///////////////////////////////////////////////////////////////////////////////
 
-    neohookean_assemble_hessian(
-        // Mesh
-        nelements,
-        nnodes,
-        elems,
-        xyz,
-        // Material
-        mu,
-        lambda,
-        displacement,
-        // Output
-        rowptr,
-        colidx,
-        values);
+    isotropic_phasefield_for_fracture_assemble_hessian(nelements,
+                                                       nnodes,
+                                                       elems,
+                                                       xyz,
+                                                       mu,
+                                                       lambda,
+                                                       Gc,
+                                                       ls,
+                                                       u,
+                                                       // Output
+                                                       rowptr,
+                                                       colidx,
+                                                       values);
 
     tock = MPI_Wtime();
-    printf("assemble3.c: assembly\t\t%g seconds\n", tock - tack);
+    printf("assemble4.c: assembly\t\t%g seconds\n", tock - tack);
     tack = tock;
 
     ///////////////////////////////////////////////////////////////////////////////
     // Block to scalar operator
     ///////////////////////////////////////////////////////////////////////////////
 
-    idx_t *new_rowptr = (idx_t *)malloc(((nnodes)*3 + 1)*sizeof(idx_t));
-    idx_t *new_colidx = (idx_t *)malloc(nnz * 9 * sizeof(idx_t));
-    real_t *new_values = (real_t *)malloc(nnz * 9 * sizeof(real_t));
+    idx_t *new_rowptr = (idx_t *)malloc(((nnodes)*block_size + 1) * sizeof(idx_t));
+    idx_t *new_colidx = (idx_t *)malloc(nnz * mat_block_size * sizeof(idx_t));
+    real_t *new_values = (real_t *)malloc(nnz * mat_block_size * sizeof(real_t));
 
     block_crs_to_crs(nnodes,
-                     3,
+                     block_size,
                      // Block matrix
                      rowptr,
                      colidx,
@@ -180,7 +184,7 @@ int main(int argc, char *argv[]) {
     // printf("bnnz=%d nnz=%d == %d\n-----------------\n", (int)nnz, (int)rowptr[nnodes * 3], (int)(nnz * 9));
 
     tock = MPI_Wtime();
-    printf("assemble3.c: block to scalar\t\t%g seconds\n", tock - tack);
+    printf("assemble4.c: block to scalar\t\t%g seconds\n", tock - tack);
     tack = tock;
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -211,7 +215,7 @@ int main(int argc, char *argv[]) {
     // }
 
     // tock = MPI_Wtime();
-    // printf("assemble3.c: boundary\t\t%g seconds\n", tock - tack);
+    // printf("assemble4.c: boundary\t\t%g seconds\n", tock - tack);
     // tack = tock;
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -221,7 +225,7 @@ int main(int argc, char *argv[]) {
     MPI_Datatype value_type = SFEM_EXPORT_FP32 ? MPI_FLOAT : SFEM_MPI_REAL_T;
 
     if (SFEM_EXPORT_FP32) {
-        array_dtof(nnz * 9, (const double *)values, (float *)values);
+        array_dtof(nnz * mat_block_size, (const double *)values, (float *)values);
         // array_dtof(nnodes, (const double *)rhs, (float*)rhs);
     }
 
@@ -230,10 +234,10 @@ int main(int argc, char *argv[]) {
         crs_out.rowptr = (char *)rowptr;
         crs_out.colidx = (char *)colidx;
         crs_out.values = (char *)values;
-        crs_out.grows = (nnodes * 3);
-        crs_out.lrows = (nnodes * 3);
-        crs_out.lnnz = nnz * 9;
-        crs_out.gnnz = nnz * 9;
+        crs_out.grows = (nnodes * block_size);
+        crs_out.lrows = (nnodes * block_size);
+        crs_out.lnnz = nnz * mat_block_size;
+        crs_out.gnnz = nnz * mat_block_size;
         crs_out.start = 0;
         crs_out.rowoffset = 0;
         crs_out.rowptr_type = SFEM_MPI_IDX_T;
@@ -248,7 +252,7 @@ int main(int argc, char *argv[]) {
     // }
 
     tock = MPI_Wtime();
-    printf("assemble3.c: write\t\t%g seconds\n", tock - tack);
+    printf("assemble4.c: write\t\t%g seconds\n", tock - tack);
     tack = tock;
 
     ///////////////////////////////////////////////////////////////////////////////

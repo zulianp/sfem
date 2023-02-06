@@ -29,7 +29,7 @@ CUFLAGS += --compiler-options -fPIC -std=c++17
 
 INCLUDES += -I$(PWD) -I$(PWD)/../matrix.io
 
-GOALS = assemble assemble3 condense_matrix condense_vector idx_to_indicator remap_vector
+GOALS = assemble assemble3 assemble4 condense_matrix condense_vector idx_to_indicator remap_vector
 DEPS = -L$(PWD)/../matrix.io/ -lmatrix.io -lstdc++
 
 LDFLAGS += $(DEPS) -lm
@@ -76,6 +76,9 @@ assemble : assemble.o libsfem.a
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
 assemble3 : assemble3.o libsfem.a
+	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+
+assemble4 : assemble4.o libsfem.a
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
 condense_matrix : condense_matrix.o

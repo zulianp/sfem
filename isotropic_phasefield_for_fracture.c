@@ -267,7 +267,7 @@ static SFEM_INLINE void tet4_shape_grad(
     g[11] = -x17 * x25;
 }
 
-static SFEM_INLINE void isotropic_phase_field_AT2_energy(const real_t mu,
+static SFEM_INLINE void isotropic_phasefield_AT2_energy(const real_t mu,
                                                          const real_t lambda,
                                                          const real_t Gc,
                                                          const real_t ls,
@@ -288,7 +288,7 @@ static SFEM_INLINE void isotropic_phase_field_AT2_energy(const real_t mu,
                                      2 * pow((1.0 / 2.0) * gradu[5] + (1.0 / 2.0) * gradu[7], 2))));
 }
 
-static SFEM_INLINE void isotropic_phase_field_AT2_gradient(const real_t mu,
+static SFEM_INLINE void isotropic_phasefield_AT2_gradient(const real_t mu,
                                                            const real_t lambda,
                                                            const real_t Gc,
                                                            const real_t ls,
@@ -328,7 +328,7 @@ static SFEM_INLINE void isotropic_phase_field_AT2_gradient(const real_t mu,
                                                    x9 * pow(gradu[0] + gradu[4] + gradu[8], 2))));
 }
 
-static SFEM_INLINE void isotropic_phase_field_AT2_hessian(const real_t mu,
+static SFEM_INLINE void isotropic_phasefield_AT2_hessian(const real_t mu,
                                                           const real_t lambda,
                                                           const real_t Gc,
                                                           const real_t ls,
@@ -471,7 +471,7 @@ static const real_t qy[8] = {0.0, 0.0, 1.0, 0.0, 0.333333333333, 0.0, 0.33333333
 static const real_t qz[8] = {0.0, 0.0, 0.0, 1.0, 0.0, 0.333333333333, 0.333333333333, 0.333333333333};
 static const real_t qw[8] = {0.025, 0.025, 0.025, 0.025, 0.225, 0.225, 0.225, 0.225};
 
-void isotropic_phase_field_for_fracture_assemble_hessian(const ptrdiff_t nelements,
+void isotropic_phasefield_for_fracture_assemble_hessian(const ptrdiff_t nelements,
                                                          const ptrdiff_t nnodes,
                                                          idx_t *const elems[4],
                                                          geom_t *const xyz[3],
@@ -517,14 +517,13 @@ void isotropic_phase_field_for_fracture_assemble_hessian(const ptrdiff_t nelemen
         const idx_t i3 = ev[3];
 
         for (int enode = 0; enode < 4; ++enode) {
-            idx_t edof = enode * block_size;
             idx_t dof = ev[enode] * block_size;
 
             for (int b = 0; b < 3; ++b) {
-                element_displacement[edof + b] = u[dof + b];
+                element_displacement[enode * 3 + b] = u[dof + b];
             }
 
-            element_phasefield[edof + 3] = u[dof + 3];
+            element_phasefield[enode] = u[dof + 3];
         }
 
         const real_t measure =
@@ -566,7 +565,7 @@ void isotropic_phase_field_for_fracture_assemble_hessian(const ptrdiff_t nelemen
                     const real_t c = shape_fun[0] * element_phasefield[0] + shape_fun[1] * element_phasefield[1] +
                                      shape_fun[2] * element_phasefield[2] + shape_fun[3] * element_phasefield[3];
 
-                    isotropic_phase_field_AT2_hessian(mu,
+                    isotropic_phasefield_AT2_hessian(mu,
                                                       lambda,
                                                       Gc,
                                                       ls,
@@ -579,6 +578,16 @@ void isotropic_phase_field_for_fracture_assemble_hessian(const ptrdiff_t nelemen
                                                       dV,
                                                       element_node_matrix);
                 }
+
+                // printf("%d)\n", edof_i);
+                // for (int bj = 0; bj < block_size; ++bj) {
+                //     for (int bi = 0; bi < block_size; ++bi) {
+                //         printf("%g ", element_node_matrix[bi*block_size + bj]);
+                //     }
+                //     printf("\n");
+                // }
+
+                // printf("-----------------------\n");
 
                 const idx_t block_k = ks[edof_j] * mat_block_size;
                 real_t *block = &row_blocks[block_k];
@@ -600,10 +609,10 @@ void isotropic_phase_field_for_fracture_assemble_hessian(const ptrdiff_t nelemen
     }
 
     double tock = MPI_Wtime();
-    printf("isotropic_phase_field_for_fracture.c: assemble_hessian\t%g seconds\n", tock - tick);
+    printf("isotropic_phasefield_for_fracture.c: assemble_hessian\t%g seconds\n", tock - tick);
 }
 
-void isotropic_phase_field_for_fracture_assemble_gradient(const ptrdiff_t nelements,
+void isotropic_phasefield_for_fracture_assemble_gradient(const ptrdiff_t nelements,
                                                           const ptrdiff_t nnodes,
                                                           idx_t *const elems[4],
                                                           geom_t *const xyz[3],
@@ -646,14 +655,13 @@ void isotropic_phase_field_for_fracture_assemble_gradient(const ptrdiff_t neleme
         const idx_t i3 = ev[3];
 
         for (int enode = 0; enode < 4; ++enode) {
-            idx_t edof = enode * block_size;
             idx_t dof = ev[enode] * block_size;
 
             for (int b = 0; b < 3; ++b) {
-                element_displacement[edof + b] = u[dof + b];
+                element_displacement[enode * 3 + b] = u[dof + b];
             }
 
-            element_phasefield[edof + 3] = u[dof + 3];
+            element_phasefield[enode] = u[dof + 3];
         }
 
         const real_t measure =
@@ -704,7 +712,7 @@ void isotropic_phase_field_for_fracture_assemble_gradient(const ptrdiff_t neleme
                 const real_t c = shape_fun[0] * element_phasefield[0] + shape_fun[1] * element_phasefield[1] +
                                  shape_fun[2] * element_phasefield[2] + shape_fun[3] * element_phasefield[3];
 
-                isotropic_phase_field_AT2_gradient(mu,
+                isotropic_phasefield_AT2_gradient(mu,
                                                    lambda,
                                                    Gc,
                                                    ls,
@@ -724,10 +732,10 @@ void isotropic_phase_field_for_fracture_assemble_gradient(const ptrdiff_t neleme
     }
 
     double tock = MPI_Wtime();
-    printf("isotropic_phase_field_for_fracture.c: assemble_gradient\t%g seconds\n", tock - tick);
+    printf("isotropic_phasefield_for_fracture.c: assemble_gradient\t%g seconds\n", tock - tick);
 }
 
-void isotropic_phase_field_for_fracture_assemble_value(const ptrdiff_t nelements,
+void isotropic_phasefield_for_fracture_assemble_value(const ptrdiff_t nelements,
                                                        const ptrdiff_t nnodes,
                                                        idx_t *const elems[4],
                                                        geom_t *const xyz[3],
@@ -769,16 +777,15 @@ void isotropic_phase_field_for_fracture_assemble_value(const ptrdiff_t nelements
         const idx_t i2 = ev[2];
         const idx_t i3 = ev[3];
 
-        for (int enode = 0; enode < 4; ++enode) {
-            idx_t edof = enode * block_size;
-            idx_t dof = ev[enode] * block_size;
+       for (int enode = 0; enode < 4; ++enode) {
+           idx_t dof = ev[enode] * block_size;
 
-            for (int b = 0; b < 3; ++b) {
-                element_displacement[edof + b] = u[dof + b];
-            }
+           for (int b = 0; b < 3; ++b) {
+               element_displacement[enode * 3 + b] = u[dof + b];
+           }
 
-            element_phasefield[edof + 3] = u[dof + 3];
-        }
+           element_phasefield[enode] = u[dof + 3];
+       }
 
         const real_t measure =
             tet4_measure(x[i0], x[i1], x[i2], x[i3], y[i0], y[i1], y[i2], y[i3], z[i0], z[i1], z[i2], z[i3]);
@@ -822,7 +829,7 @@ void isotropic_phase_field_for_fracture_assemble_value(const ptrdiff_t nelements
             const real_t c = shape_fun[0] * element_phasefield[0] + shape_fun[1] * element_phasefield[1] +
                              shape_fun[2] * element_phasefield[2] + shape_fun[3] * element_phasefield[3];
 
-            isotropic_phase_field_AT2_energy(
+            isotropic_phasefield_AT2_energy(
                 mu, lambda, Gc, ls, c, grad_phasefield, grad_displacement, dV, &element_scalar);
         }
 
@@ -830,5 +837,5 @@ void isotropic_phase_field_for_fracture_assemble_value(const ptrdiff_t nelements
     }
 
     double tock = MPI_Wtime();
-    printf("isotropic_phase_field_for_fracture.c: assemble_value\t%g seconds\n", tock - tick);
+    printf("isotropic_phasefield_for_fracture.c: assemble_value\t%g seconds\n", tock - tick);
 }
