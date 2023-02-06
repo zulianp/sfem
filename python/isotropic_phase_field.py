@@ -3,10 +3,13 @@
 from sfem_codegen import *
 
 # simplify_expr = False
-simplify_expr = True
+simplify_expr = False
 
 def n_test_functions():
 	return 4*4
+
+def integral(expr):
+	return sp.integrate(expr, (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1))
 
 mu, lmbda = sp.symbols('mu lambda', real=True)
 
@@ -67,8 +70,7 @@ def comega(c):
  	return 2
 ##############################
 
-ec = (Gc / comega(c)) * omega(c)/ls + ls * dot3(gradc, gradc)
-
+ec = sp.simplify((Gc / comega(c)) * omega(c)/ls) + ls * dot3(gradc, gradc)
 e = g(c) * eu + ec
 
 #############################################
@@ -105,16 +107,34 @@ for i in range(0, 4):
 
 def makeenergy():
 	print(e)
-	print(sp.collect(e, c))
+	# print(sp.collect(e, c))
 
-	integr = e
-	integr = subsmat3x3(integr, gradu, evalgradu)
+	avar, euvar =sp.symbols('avar euvar')
+	avar_val = ls * dot3(gradc, gradc)
+	simpler_ec = sp.simplify((Gc / comega(c)) * omega(c)/ls) + avar
+	simpler_e = g(c) * euvar + simpler_ec
+	integr = simpler_e
+
+	# integr = e
 
 	integr = integr.subs(c, evalc)
+
+	# print("expression")
+	# print(integr)
+
+	integr = integral(integr)
+
+	integr = integr.subs(avar, avar_val)
+	integr = integr.subs(euvar, eu)
+	integr = integr * det3(A)
+
+	print("integral")
+	print(integr)
+
+	integr = subsmat3x3(integr, gradu, evalgradu)
 	integr = subsvec3(integr, gradc, evalgradc)
 	
-	# integr = sp.integrate(integr * det3(A), (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1))
-	integr = integr * dV
+	# integr = integr * dV
 
 	if simplify_expr:
 		integr = sp.simplify(integr)
