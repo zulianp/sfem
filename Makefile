@@ -48,7 +48,8 @@ OBJS = \
 	read_mesh.o  \
 	mass.o \
 	dirichlet.o \
-	neumann.o
+	neumann.o \
+	isotropic_phasefield_for_fracture.o
 
 ifeq ($(cuda), 1)
 	CUDA_OBJS = cuda_laplacian.o

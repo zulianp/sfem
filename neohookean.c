@@ -985,7 +985,7 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
                            // output matrix
                            element_matrix);
 
-        assert(!check_symmetric(12, element_matrix));
+        assert(!check_symmetric(4*block_size, element_matrix));
 
         // numerate(12, element_matrix);
 

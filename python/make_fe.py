@@ -2,6 +2,25 @@
 
 from sfem_codegen import *
 
+def shape_grad(q):
+	d = len(q)
+	assert(d == 3)
+
+	f = fun(q[0], q[1], q[2])
+	ret = [0] * 4
+
+	for i in range(0, 4):
+		fi = f[i]
+
+		gix = sp.simplify(sp.diff(fi, q[0]))
+		giy = sp.simplify(sp.diff(fi, q[1]))
+		giz = sp.simplify(sp.diff(fi, q[2]))
+		
+		g = sp.Matrix(d, 1, [gix, giy, giz])
+		ret[i] = g
+
+	return ret
+
 def fe_tgrad(q, coeff):
 	d = len(q)
 	assert(d == 3)
@@ -77,6 +96,23 @@ for d1 in range(0, 3):
 		vec3_expr.append(ast.Assignment(sp.symbols(f'output[{d1 * 3 + d2}]'), vec3_fg[d1, d2]))
 
 vec3_g_code = c_gen(vec3_expr)
+
+########################################################
+# Shape grad
+########################################################
+
+sg = shape_grad(q)
+sg_list = []
+
+for i in range(0, 4):
+	sgi = sg[i]
+	for d in range(0, 3):
+		gi = sp.symbols(f'g[{i*3 + d}]', real=True)
+		sg_list.append(ast.Assignment(gi, sgi[d]))
+
+
+scalar_g_code = c_gen(sg_list)
+print(scalar_g_code)
 
 ########################################################
 # Scalar grad
@@ -156,3 +192,5 @@ f.write(fe_grad_code)
 f.write(fe_fun_code)
 
 f.close()
+
+c_code(det3(A))
