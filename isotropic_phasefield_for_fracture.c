@@ -268,14 +268,14 @@ static SFEM_INLINE void tet4_shape_grad(
 }
 
 static SFEM_INLINE void isotropic_phasefield_AT2_energy(const real_t mu,
-                                                         const real_t lambda,
-                                                         const real_t Gc,
-                                                         const real_t ls,
-                                                         const real_t c,
-                                                         const real_t *gradc,
-                                                         const real_t *gradu,
-                                                         const real_t dV,
-                                                         real_t *element_scalar) {
+                                                        const real_t lambda,
+                                                        const real_t Gc,
+                                                        const real_t ls,
+                                                        const real_t c,
+                                                        const real_t *gradc,
+                                                        const real_t *gradu,
+                                                        const real_t dV,
+                                                        real_t *element_scalar) {
     // FLOATING POINT OPS!
     //       - Result: 9*ADD + ADDAUGMENTEDASSIGNMENT + 16*MUL + 13*POW
     //       - Subexpressions: 0
@@ -289,16 +289,16 @@ static SFEM_INLINE void isotropic_phasefield_AT2_energy(const real_t mu,
 }
 
 static SFEM_INLINE void isotropic_phasefield_AT2_gradient(const real_t mu,
-                                                           const real_t lambda,
-                                                           const real_t Gc,
-                                                           const real_t ls,
-                                                           const real_t c,
-                                                           const real_t *gradc,
-                                                           const real_t *gradu,
-                                                           const real_t test,
-                                                           const real_t *test_grad,
-                                                           const real_t dV,
-                                                           real_t *element_vector) {
+                                                          const real_t lambda,
+                                                          const real_t Gc,
+                                                          const real_t ls,
+                                                          const real_t c,
+                                                          const real_t *gradc,
+                                                          const real_t *gradu,
+                                                          const real_t test,
+                                                          const real_t *test_grad,
+                                                          const real_t dV,
+                                                          real_t *element_vector) {
     // FLOATING POINT OPS!
     //       - Result: 15*ADD + 4*ADDAUGMENTEDASSIGNMENT + 34*MUL + 8*POW
     //       - Subexpressions: 5*ADD + DIV + 10*MUL + POW + SUB
@@ -329,17 +329,17 @@ static SFEM_INLINE void isotropic_phasefield_AT2_gradient(const real_t mu,
 }
 
 static SFEM_INLINE void isotropic_phasefield_AT2_hessian(const real_t mu,
-                                                          const real_t lambda,
-                                                          const real_t Gc,
-                                                          const real_t ls,
-                                                          const real_t c,
-                                                          const real_t *gradu,
-                                                          const real_t test,
-                                                          const real_t trial,
-                                                          const real_t *test_grad,
-                                                          const real_t *trial_grad,
-                                                          const real_t dV,
-                                                          real_t *element_matrix) {
+                                                         const real_t lambda,
+                                                         const real_t Gc,
+                                                         const real_t ls,
+                                                         const real_t c,
+                                                         const real_t *gradu,
+                                                         const real_t test,
+                                                         const real_t trial,
+                                                         const real_t *test_grad,
+                                                         const real_t *trial_grad,
+                                                         const real_t dV,
+                                                         real_t *element_matrix) {
     // FLOATING POINT OPS!
     //       - Result: 7*ADD + 16*ADDAUGMENTEDASSIGNMENT + 17*MUL + 8*POW
     //       - Subexpressions: 14*ADD + DIV + 31*MUL + POW + 2*SUB
@@ -367,13 +367,13 @@ static SFEM_INLINE void isotropic_phasefield_AT2_hessian(const real_t mu,
     element_matrix[1] += x9;
     element_matrix[2] += x9;
     element_matrix[3] += x12;
-    element_matrix[3] += x14;
     element_matrix[4] += x14;
     element_matrix[5] += x14;
+    element_matrix[6] += x14;
     element_matrix[7] += x12;
-    element_matrix[6] += x15;
-    element_matrix[7] += x15;
     element_matrix[8] += x15;
+    element_matrix[9] += x15;
+    element_matrix[10] += x15;
     element_matrix[11] += x12;
     element_matrix[12] += x12;
     element_matrix[13] += x12;
@@ -472,17 +472,17 @@ static const real_t qz[8] = {0.0, 0.0, 0.0, 1.0, 0.0, 0.333333333333, 0.33333333
 static const real_t qw[8] = {0.025, 0.025, 0.025, 0.025, 0.225, 0.225, 0.225, 0.225};
 
 void isotropic_phasefield_for_fracture_assemble_hessian(const ptrdiff_t nelements,
-                                                         const ptrdiff_t nnodes,
-                                                         idx_t *const elems[4],
-                                                         geom_t *const xyz[3],
-                                                         const real_t mu,
-                                                         const real_t lambda,
-                                                         const real_t Gc,
-                                                         const real_t ls,
-                                                         const real_t *const u,
-                                                         idx_t *const rowptr,
-                                                         idx_t *const colidx,
-                                                         real_t *const values) {
+                                                        const ptrdiff_t nnodes,
+                                                        idx_t *const elems[4],
+                                                        geom_t *const xyz[3],
+                                                        const real_t mu,
+                                                        const real_t lambda,
+                                                        const real_t Gc,
+                                                        const real_t ls,
+                                                        const real_t *const u,
+                                                        idx_t *const rowptr,
+                                                        idx_t *const colidx,
+                                                        real_t *const values) {
     double tick = MPI_Wtime();
 
     static const int block_size = 4;
@@ -566,23 +566,23 @@ void isotropic_phasefield_for_fracture_assemble_hessian(const ptrdiff_t nelement
                                      shape_fun[2] * element_phasefield[2] + shape_fun[3] * element_phasefield[3];
 
                     isotropic_phasefield_AT2_hessian(mu,
-                                                      lambda,
-                                                      Gc,
-                                                      ls,
-                                                      c,
-                                                      grad_displacement,
-                                                      shape_fun[edof_i],
-                                                      shape_fun[edof_j],
-                                                      &shape_grad[edof_i * 3],
-                                                      &shape_grad[edof_j * 3],
-                                                      dV,
-                                                      element_node_matrix);
+                                                     lambda,
+                                                     Gc,
+                                                     ls,
+                                                     c,
+                                                     grad_displacement,
+                                                     shape_fun[edof_i],
+                                                     shape_fun[edof_j],
+                                                     &shape_grad[edof_i * 3],
+                                                     &shape_grad[edof_j * 3],
+                                                     dV,
+                                                     element_node_matrix);
                 }
 
-                // printf("%d)\n", edof_i);
+                // printf("%d, %d)\n", edof_i, edof_j);
                 // for (int bj = 0; bj < block_size; ++bj) {
                 //     for (int bi = 0; bi < block_size; ++bi) {
-                //         printf("%g ", element_node_matrix[bi*block_size + bj]);
+                //         printf("%g ", element_node_matrix[bi * block_size + bj]);
                 //     }
                 //     printf("\n");
                 // }
@@ -613,15 +613,15 @@ void isotropic_phasefield_for_fracture_assemble_hessian(const ptrdiff_t nelement
 }
 
 void isotropic_phasefield_for_fracture_assemble_gradient(const ptrdiff_t nelements,
-                                                          const ptrdiff_t nnodes,
-                                                          idx_t *const elems[4],
-                                                          geom_t *const xyz[3],
-                                                          const real_t mu,
-                                                          const real_t lambda,
-                                                          const real_t Gc,
-                                                          const real_t ls,
-                                                          const real_t *const u,
-                                                          real_t *const values) {
+                                                         const ptrdiff_t nnodes,
+                                                         idx_t *const elems[4],
+                                                         geom_t *const xyz[3],
+                                                         const real_t mu,
+                                                         const real_t lambda,
+                                                         const real_t Gc,
+                                                         const real_t ls,
+                                                         const real_t *const u,
+                                                         real_t *const values) {
     double tick = MPI_Wtime();
 
     static const int block_size = 4;
@@ -713,16 +713,16 @@ void isotropic_phasefield_for_fracture_assemble_gradient(const ptrdiff_t nelemen
                                  shape_fun[2] * element_phasefield[2] + shape_fun[3] * element_phasefield[3];
 
                 isotropic_phasefield_AT2_gradient(mu,
-                                                   lambda,
-                                                   Gc,
-                                                   ls,
-                                                   c,
-                                                   grad_phasefield,
-                                                   grad_displacement,
-                                                   shape_fun[edof_i],
-                                                   &shape_grad[edof_i * 3],
-                                                   dV,
-                                                   element_node_vector);
+                                                  lambda,
+                                                  Gc,
+                                                  ls,
+                                                  c,
+                                                  grad_phasefield,
+                                                  grad_displacement,
+                                                  shape_fun[edof_i],
+                                                  &shape_grad[edof_i * 3],
+                                                  dV,
+                                                  element_node_vector);
             }
 
             for (int bi = 0; bi < block_size; ++bi) {
@@ -736,15 +736,15 @@ void isotropic_phasefield_for_fracture_assemble_gradient(const ptrdiff_t nelemen
 }
 
 void isotropic_phasefield_for_fracture_assemble_value(const ptrdiff_t nelements,
-                                                       const ptrdiff_t nnodes,
-                                                       idx_t *const elems[4],
-                                                       geom_t *const xyz[3],
-                                                       const real_t mu,
-                                                       const real_t lambda,
-                                                       const real_t Gc,
-                                                       const real_t ls,
-                                                       const real_t *const u,
-                                                       real_t *const value) {
+                                                      const ptrdiff_t nnodes,
+                                                      idx_t *const elems[4],
+                                                      geom_t *const xyz[3],
+                                                      const real_t mu,
+                                                      const real_t lambda,
+                                                      const real_t Gc,
+                                                      const real_t ls,
+                                                      const real_t *const u,
+                                                      real_t *const value) {
     double tick = MPI_Wtime();
 
     static const int block_size = 4;
@@ -777,15 +777,15 @@ void isotropic_phasefield_for_fracture_assemble_value(const ptrdiff_t nelements,
         const idx_t i2 = ev[2];
         const idx_t i3 = ev[3];
 
-       for (int enode = 0; enode < 4; ++enode) {
-           idx_t dof = ev[enode] * block_size;
+        for (int enode = 0; enode < 4; ++enode) {
+            idx_t dof = ev[enode] * block_size;
 
-           for (int b = 0; b < 3; ++b) {
-               element_displacement[enode * 3 + b] = u[dof + b];
-           }
+            for (int b = 0; b < 3; ++b) {
+                element_displacement[enode * 3 + b] = u[dof + b];
+            }
 
-           element_phasefield[enode] = u[dof + 3];
-       }
+            element_phasefield[enode] = u[dof + 3];
+        }
 
         const real_t measure =
             tet4_measure(x[i0], x[i1], x[i2], x[i3], y[i0], y[i1], y[i2], y[i3], z[i0], z[i1], z[i2], z[i3]);

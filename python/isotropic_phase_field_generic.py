@@ -195,7 +195,7 @@ def makehessianuu(i, j):
 	if simplify_expr:
 		integr = sp.simplify(integr)
 
-	bform = sp.symbols(f'element_matrix[{i * 3 + j}]')
+	bform = sp.symbols(f'element_matrix[{i * 4 + j}]')
 	return ast.AddAugmentedAssignment(bform, integr)
 
 def makehessianuc(i):
