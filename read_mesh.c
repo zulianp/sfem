@@ -148,89 +148,6 @@ int read_mesh(MPI_Comm comm, const char *folder, mesh_t *mesh) {
                                       SFEM_MPI_IDX_T,
                                       comm));
 
-        // MPI_Barrier(comm);
-        // for (int r = 0; r < size; ++r) {
-        //     if (r == rank) {
-        //         printf("[%d] n_unique=%ld/%ld size_send_list=%ld\n",
-        //                rank,
-        //                (long)n_unique,
-        //                (long)(n_local_elements * nnodesxelem),
-        //                (long)size_send_list);
-
-        //         printf("[%d] input_node_partitions: ", rank);
-        //         for (int i = 0; i < size + 1; ++i) {
-        //             printf("%d ", (int)input_node_partitions[i]);
-        //         }
-
-        //         printf("\n");
-        //         printf("[%d] send_list: ", rank);
-        //         for (int i = 0; i < size_send_list; ++i) {
-        //             printf("%d ", (int)send_list[i]);
-        //         }
-
-        //         printf("\n");
-        //         printf("[%d] unique_idx: ", rank);
-        //         for (int i = 0; i < n_unique; ++i) {
-        //             printf("%d (%d), ", (int)unique_idx[i], owner_rank[i]);
-        //         }
-
-        //         printf("\n");
-        //         printf("[%d] gather_node_count: ", rank);
-        //         for (int i = 0; i < size; ++i) {
-        //             printf("%d ", (int)gather_node_count[i]);
-        //         }
-
-        //         printf("\n");
-
-        //         printf("[%d] gather_node_displs: ", rank);
-        //         for (int i = 0; i < size + 1; ++i) {
-        //             printf("%d ", (int)gather_node_displs[i]);
-        //         }
-
-        //         printf("\n");
-
-        //         printf("[%d] scatter_node_count: ", rank);
-        //         for (int i = 0; i < size; ++i) {
-        //             printf("%d ", (int)scatter_node_count[i]);
-        //         }
-
-        //         printf("\n");
-
-        //         printf("[%d] scatter_node_displs: ", rank);
-        //         for (int i = 0; i < size + 1; ++i) {
-        //             printf("%d ", (int)scatter_node_displs[i]);
-        //         }
-
-        //         printf("\n");
-
-        //         printf("\n-----------------------\n");
-
-        //         fflush(stdout);
-        //     }
-
-        //     sleep(0.1);
-
-        //     MPI_Barrier(comm);
-        // }
-
-        // MPI_Barrier(comm);
-
-        // printf("\n");
-        // fflush(stdout);
-
-        // for (ptrdiff_t i = 0; i < size_send_list; ++i) {
-        //     if (send_list[i] < input_node_partitions[rank] || send_list[i] >= input_node_partitions[rank + 1]) {
-        //         printf("[%d] %ld <= %ld < %ld\n",
-        //                (int)rank,
-        //                (long)input_node_partitions[rank],
-        //                (long)send_list[i],
-        //                (long)input_node_partitions[rank + 1]);
-        //     }
-
-        //     assert(send_list[i] >= input_node_partitions[rank]);
-        //     assert(send_list[i] < input_node_partitions[rank + 1]);
-        // }
-
         ///////////////////////////////////////////////////////////////////////
 
         // Remove offset
@@ -239,7 +156,7 @@ int read_mesh(MPI_Comm comm, const char *folder, mesh_t *mesh) {
         }
 
         ///////////////////////////////////////////////////////////////////////
-        // echange points
+        // Exchange points
 
         geom_t *sendx = (geom_t *)malloc(size_send_list * sizeof(geom_t));
         geom_t **part_xyz = (geom_t **)malloc(sizeof(geom_t *) * ndims);
@@ -268,86 +185,51 @@ int read_mesh(MPI_Comm comm, const char *folder, mesh_t *mesh) {
 
         ///////////////////////////////////////////////////////////////////////
         // Localize element index
-        idx_t *local_offset = (idx_t *)malloc((size + 1) * sizeof(idx_t));
-        memset(local_offset, 0, (size + 1) * sizeof(idx_t));
-
-        for (ptrdiff_t i = 0; i < n_unique; ++i) {
-            const int j = owner_rank[i];
-            assert(j < size);
-            assert(j >= 0);
-
-            local_offset[j + 1] += 1;
+        for (ptrdiff_t d = 0; d < nnodesxelem; ++d) {
+            for (ptrdiff_t e = 0; e < n_local_elements; ++e) {
+                elems[d][e] = find_idx_binary_search(elems[d][e], unique_idx, n_unique);
+            }
         }
 
-        for (ptrdiff_t i = 0; i < size; ++i) {
-            local_offset[i + 1] += local_offset[i];
-        }
+        ///////////////////////////////////////////////////////////////////////
+        // MPI_Barrier(comm);
+        // for (int r = 0; r < size; ++r) {
+        //     if (r == rank) {
+        //         printf("[%d] elements\n", rank);
 
-        // for (ptrdiff_t d = 0; d < nnodesxelem; ++d) {
-        //     idx_t *node_d = elems[d];
-
-        //     for (ptrdiff_t e = 0; e < n_local_elements; ++e) {
-        //         idx_t idx = node_d[e];
-        //         ptrdiff_t owner = MIN(size - 1, idx / n_local_nodes);
-
-        //         if (input_node_partitions[owner] > idx) {
-        //             assert(owner < size);
-        //             while (input_node_partitions[--owner] > idx) {
-        //                 assert(owner < size);
+        //         for (ptrdiff_t e = 0; e < n_local_elements; ++e) {
+        //             for (ptrdiff_t d = 0; d < nnodesxelem; ++d) {
+        //                 printf("%d (%d), ", (int)elems[d][e], (int)unique_idx[elems[d][e]]);
         //             }
-        //         } else if (input_node_partitions[owner + 1] < idx) {
-        //             assert(owner < size);
 
-        //             while (input_node_partitions[(++owner + 1)] < idx) {
-        //                 assert(owner < size);
-        //             }
+        //             printf("\n");
         //         }
+        //         // printf("\noffset\n");
 
-        //         // Remove global offset
-        //         node_d[e] -= input_node_partitions[owner];
-        //         node_d[e] += local_offset[owner];
+        //         // for (ptrdiff_t i = 0; i < size + 1; ++i) {
+        //         //     printf("%d ", (int)local_offset[i]);
+        //         // }
+
+        //         // printf("\nparts\n");
+
+        //         // for (ptrdiff_t i = 0; i < size + 1; ++i) {
+        //         //     printf("(%d), ", (int)input_node_partitions[i]);
+        //         // }
+
+        //         printf("\n");
+        //         printf("------------------\n");
+
+        //         fflush(stdout);
         //     }
+
+        //     sleep(0.1);
+
+        //     MPI_Barrier(comm);
         // }
 
         ///////////////////////////////////////////////////////////////////////
-        MPI_Barrier(comm);
-        for (int r = 0; r < size; ++r) {
-            if (r == rank) {
-                printf("[%d] elements\n", rank);
-
-                for (ptrdiff_t e = 0; e < n_local_elements; ++e) {
-                    for (ptrdiff_t d = 0; d < nnodesxelem; ++d) {
-                        printf("%d ", (int)elems[d][e]);
-                    }
-
-                    printf("\n");
-                }
-                printf("\noffset\n");
-
-                for (ptrdiff_t i = 0; i < size + 1; ++i) {
-                    printf("%d ", (int)local_offset[i]);
-                }
-
-                printf("\nparts\n");
-
-                for (ptrdiff_t i = 0; i < size + 1; ++i) {
-                    printf("(%d), ", (int)input_node_partitions[i]);
-                }
-
-                printf("\n");
-                printf("------------------\n");
-
-                fflush(stdout);
-            }
-
-            sleep(0.1);
-
-            MPI_Barrier(comm);
-        }
-
-        ///////////////////////////////////////////////////////////////////////
         // Free space
-        free(unique_idx);
+        // free(unique_idx);
         free(sendx);
         free(send_list);
         free(input_node_partitions);
@@ -358,11 +240,16 @@ int read_mesh(MPI_Comm comm, const char *folder, mesh_t *mesh) {
         free(scatter_node_displs);
 
         ///////////////////////////////////////////////////////////////////////
-
+        mesh->comm = comm;
+        mesh->mem_space = SFEM_MEM_SPACE_HOST;
+        
         mesh->elements = elems;
         mesh->points = part_xyz;
         mesh->nelements = n_local_elements;
-        mesh->nnodes = n_local_nodes;
+        mesh->nnodes = n_unique;
+
+        // Original indexing
+        mesh->mapping = unique_idx;
 
         double tock = MPI_Wtime();
         return 0;
@@ -377,6 +264,8 @@ int read_mesh(MPI_Comm comm, const char *folder, mesh_t *mesh) {
 
         mesh->elements = (idx_t **)malloc(4 * sizeof(idx_t *));
         mesh->points = (geom_t **)malloc(3 * sizeof(geom_t *));
+
+        mesh->mapping = 0;
 
         return serial_read_tet_mesh(folder, &mesh->nelements, mesh->elements, &mesh->nnodes, mesh->points);
     }

@@ -22,6 +22,8 @@ typedef struct {
 	
 	idx_t **elements;
 	geom_t **points;
+
+	idx_t *mapping;
 } mesh_t;
 
 
