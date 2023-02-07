@@ -15,18 +15,6 @@
 
 #include "read_mesh.h"
 
-// ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
-//     MPI_Status status;
-//     MPI_Offset nbytes;
-//     MPI_File file;
-//     CATCH_MPI_ERROR(MPI_File_open(comm, path, MPI_MODE_RDONLY, MPI_INFO_NULL, &file));
-//     CATCH_MPI_ERROR(MPI_File_get_size(file, &nbytes));
-//     *data = malloc(nbytes);
-
-//     CATCH_MPI_ERROR(MPI_File_read_at_all(file, 0, *data, nbytes, MPI_CHAR, &status));
-//     return nbytes;
-// }
-
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -55,6 +43,7 @@ int main(int argc, char *argv[]) {
 
     int SFEM_HANDLE_DIRICHLET = 0;
     int SFEM_EXPORT_FP32 = 0;
+    char *SFEM_INPUT = 0;
 
     real_t SFEM_MU = 1.0;
     real_t SFEM_LAMBDA = 1.0;
@@ -69,20 +58,25 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_FRACTURE_TOUGHNESS, atof);
     SFEM_READ_ENV(SFEM_LENGTH_SCALE_PARAMETER, atof);
 
+    SFEM_READ_ENV(SFEM_INPUT, );
+
     printf("----------------------------------------\n");
-    printf("Environment variables:\n"
-           "- SFEM_HANDLE_DIRICHLET=%d\n"
-           "- SFEM_EXPORT_FP32=%d\n"
-           "- SFEM_MU=%g\n"
-           "- SFEM_LAMBDA=%g\n"
-           "- SFEM_FRACTURE_TOUGHNESS=%g\n"
-           "- SFEM_LENGTH_SCALE_PARAMETER=%g\n",
-           SFEM_HANDLE_DIRICHLET,
-           SFEM_EXPORT_FP32,
-           SFEM_MU,
-           SFEM_LAMBDA,
-           SFEM_FRACTURE_TOUGHNESS,
-           SFEM_LENGTH_SCALE_PARAMETER);
+    printf(
+        "Environment variables:\n"
+        "- SFEM_HANDLE_DIRICHLET=%d\n"
+        "- SFEM_EXPORT_FP32=%d\n"
+        "- SFEM_MU=%g\n"
+        "- SFEM_LAMBDA=%g\n"
+        "- SFEM_FRACTURE_TOUGHNESS=%g\n"
+        "- SFEM_LENGTH_SCALE_PARAMETER=%g\n"
+        "- SFEM_INPUT=%s\n",
+        SFEM_HANDLE_DIRICHLET,
+        SFEM_EXPORT_FP32,
+        SFEM_MU,
+        SFEM_LAMBDA,
+        SFEM_FRACTURE_TOUGHNESS,
+        SFEM_LENGTH_SCALE_PARAMETER,
+        SFEM_INPUT);
     printf("----------------------------------------\n");
 
     double tick = MPI_Wtime();
@@ -108,7 +102,15 @@ int main(int argc, char *argv[]) {
 
     // TODO read displacement from file
     real_t *u = malloc(nnodes * block_size * sizeof(real_t));
-    memset(u, 0, nnodes * block_size * sizeof(real_t));
+
+    if (SFEM_INPUT) {
+        ptrdiff_t nlocal, nglobal;
+        array_read(comm, SFEM_INPUT, SFEM_MPI_REAL_T, (void **)&u, &nlocal, &nglobal);
+
+        assert(nlocal == nnodes * block_size);
+    } else {
+        memset(u, 0, nnodes * block_size * sizeof(real_t));
+    }
 
     const real_t mu = SFEM_MU;
     const real_t lambda = SFEM_LAMBDA;
@@ -187,31 +189,18 @@ int main(int argc, char *argv[]) {
     colidx = new_colidx;
     values = new_values;
 
-    // for (ptrdiff_t i = 0; i < nnodes * 3; ++i) {
-    //     idx_t begin = rowptr[i];
-    //     idx_t end = rowptr[i + 1];
-
-    //     printf("%d) %d-%d\n", (int)i, begin, end);
-
-    //     for (idx_t k = begin; k < end; ++k) {
-    //         printf("(%d, %g) ", colidx[k], values[k]);
-    //     }
-
-    //     printf("\n---\n");
-    // }
-
-    // printf("bnnz=%d nnz=%d == %d\n-----------------\n", (int)nnz, (int)rowptr[nnodes * 3], (int)(nnz * 9));
-
     tock = MPI_Wtime();
     printf("assemble4.c: block to scalar\t\t%g seconds\n", tock - tack);
     tack = tock;
 
     ///////////////////////////////////////////////////////////////////////////////
-    // Boundary conditions
+    // RHS and Boundary conditions
     ///////////////////////////////////////////////////////////////////////////////
 
-    // real_t *rhs = (real_t *)malloc(nnodes * sizeof(real_t));
-    // memset(rhs, 0, nnodes * sizeof(real_t));
+    real_t *rhs = (real_t *)malloc(nnodes * block_size * sizeof(real_t));
+    memset(rhs, 0, nnodes * block_size * sizeof(real_t));
+
+    isotropic_phasefield_for_fracture_assemble_gradient(nelements, nnodes, elems, xyz, mu, lambda, Gc, ls, u, rhs);
 
     // {  // Neumann
     //     sprintf(path, "%s/on.raw", folder);
@@ -238,6 +227,13 @@ int main(int argc, char *argv[]) {
     // tack = tock;
 
     ///////////////////////////////////////////////////////////////////////////////
+    // Energy
+    ///////////////////////////////////////////////////////////////////////////////
+
+    real_t energy = 0;
+    isotropic_phasefield_for_fracture_assemble_value(nelements, nnodes, elems, xyz, mu, lambda, Gc, ls, u, &energy);
+
+    ///////////////////////////////////////////////////////////////////////////////
     // Write CRS matrix and rhs vector
     ///////////////////////////////////////////////////////////////////////////////
 
@@ -245,7 +241,8 @@ int main(int argc, char *argv[]) {
 
     if (SFEM_EXPORT_FP32) {
         array_dtof(nnz * mat_block_size, (const double *)values, (float *)values);
-        // array_dtof(nnodes, (const double *)rhs, (float*)rhs);
+        array_dtof(nnodes * block_size, (const double *)rhs, (float *)rhs);
+        array_dtof(1, (const double *)&energy, (float *)&energy);
     }
 
     {
@@ -265,10 +262,15 @@ int main(int argc, char *argv[]) {
         crs_write_folder(comm, output_folder, &crs_out);
     }
 
-    // {
-    //     sprintf(path, "%s/rhs.raw", output_folder);
-    //     array_write(comm, path, value_type, rhs, nnodes, nnodes);
-    // }
+    {
+        sprintf(path, "%s/rhs.raw", output_folder);
+        array_write(comm, path, value_type, rhs, nnodes * block_size, nnodes * block_size);
+    }
+
+    sprintf(path, "%s/value.raw", output_folder);
+    if (!rank) {
+        array_write(MPI_COMM_SELF, path, value_type, &energy, 1, 1);
+    }
 
     tock = MPI_Wtime();
     printf("assemble4.c: write\t\t%g seconds\n", tock - tack);
@@ -295,7 +297,7 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)nelements, (long)nnodes);
+        printf("#elements %ld #nodes %ld #nzblocks %ld\n", (long)nelements, (long)nnodes, (long)nnz);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 

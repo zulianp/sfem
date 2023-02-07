@@ -16,7 +16,7 @@ ifeq ($(avx2sort), 1)
 	CXXFLAGS += -DSFEM_ENABLE_AVX2_SORT -Iexternal
 endif
 
-CFLAGS += -pedantic 
+CFLAGS += -pedantic -Wextra
 # CFLAGS += -std=c99 
 
 CXXFLAGS += -std=c++11
@@ -29,7 +29,7 @@ CUFLAGS += --compiler-options -fPIC -std=c++17
 
 INCLUDES += -I$(PWD) -I$(PWD)/../matrix.io
 
-GOALS = assemble assemble3 assemble4 condense_matrix condense_vector idx_to_indicator remap_vector
+GOALS = assemble assemble3 assemble4 condense_matrix condense_vector idx_to_indicator remap_vector partition
 DEPS = -L$(PWD)/../matrix.io/ -lmatrix.io -lstdc++
 
 LDFLAGS += $(DEPS) -lm
@@ -79,6 +79,9 @@ assemble3 : assemble3.o libsfem.a
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
 assemble4 : assemble4.o libsfem.a
+	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+
+partition : partition.o libsfem.a
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
 condense_matrix : condense_matrix.o

@@ -59,7 +59,7 @@ def comega(c):
 # Value
 ############################################################# 
 
-ec = (Gc / comega(c)) * omega(c)/ls + ls * dot3(gradc, gradc)
+ec = (Gc / comega(c)) * (omega(c)/ls + ls * dot3(gradc, gradc))
 
 e = g(c) * eu + ec
 

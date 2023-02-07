@@ -93,7 +93,7 @@ vec3_fg = fe_tgrad(q, vec3)
 vec3_expr = []
 for d1 in range(0, 3):
 	for d2 in range(0, 3):
-		vec3_expr.append(ast.Assignment(sp.symbols(f'output[{d1 * 3 + d2}]'), vec3_fg[d1, d2]))
+		vec3_expr.append(ast.Assignment(sp.symbols(f'vg_output[{d1 * 3 + d2}]'), vec3_fg[d1, d2]))
 
 vec3_g_code = c_gen(vec3_expr)
 
@@ -128,7 +128,7 @@ scalar_fg = fe_grad(q, scalar)
 
 scalar_expr = []
 for d in range(0, 3):
-	scalar_expr.append(ast.Assignment(sp.symbols(f'output[{d}]'), scalar_fg[d]))
+	scalar_expr.append(ast.Assignment(sp.symbols(f'sg_output[{d}]'), scalar_fg[d]))
 
 scalar_g_code = c_gen(scalar_expr)
 
@@ -137,7 +137,7 @@ scalar_g_code = c_gen(scalar_expr)
 ########################################################
 
 scalar_expr = []
-scalar_expr.append(ast.Assignment(sp.symbols(f'output[0]'), fe_fun(q, scalar)))
+scalar_expr.append(ast.Assignment(sp.symbols(f'f_output[0]'), fe_fun(q, scalar)))
 scalar_f_code = c_gen(scalar_expr)
 
 tpl="""
