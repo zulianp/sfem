@@ -59,14 +59,12 @@ int read_mesh(MPI_Comm comm, const char *folder, mesh_t *mesh) {
 
         geom_t **xyz = (geom_t **)malloc(sizeof(geom_t *) * ndims);
 
-        sprintf(path, "%s/x.raw", folder);
-        array_read(comm, path, mpi_geom_t, (void **)&xyz[0], &n_local_nodes, &n_nodes);
+        static const char *str_xyz = "xyzt";
 
-        sprintf(path, "%s/y.raw", folder);
-        array_read(comm, path, mpi_geom_t, (void **)&xyz[1], &n_local_nodes, &n_nodes);
-
-        sprintf(path, "%s/z.raw", folder);
-        array_read(comm, path, mpi_geom_t, (void **)&xyz[2], &n_local_nodes, &n_nodes);
+        for (int d = 0; d < ndims; ++d) {
+            sprintf(path, "%s/%c.raw", folder, str_xyz[d]);
+            array_read(comm, path, mpi_geom_t, (void **)&xyz[d], &n_local_nodes, &n_nodes);
+        }
 
         ////////////////////////////////////////////////////////////////////////////////
 
@@ -242,7 +240,7 @@ int read_mesh(MPI_Comm comm, const char *folder, mesh_t *mesh) {
         ///////////////////////////////////////////////////////////////////////
         mesh->comm = comm;
         mesh->mem_space = SFEM_MEM_SPACE_HOST;
-        
+
         mesh->elements = elems;
         mesh->points = part_xyz;
         mesh->nelements = n_local_elements;
