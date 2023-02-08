@@ -24,6 +24,7 @@ typedef struct {
 	geom_t **points;
 
 	idx_t *mapping;
+	int *node_owner;
 } mesh_t;
 
 

@@ -56,6 +56,7 @@ int read_mesh(MPI_Comm comm, const char *folder, mesh_t *mesh) {
 
         ////////////////////////////////////////////////////////////////////////////////
         // Read coordinates
+        ////////////////////////////////////////////////////////////////////////////////
 
         geom_t **xyz = (geom_t **)malloc(sizeof(geom_t *) * ndims);
 
@@ -182,6 +183,51 @@ int read_mesh(MPI_Comm comm, const char *folder, mesh_t *mesh) {
         }
 
         ///////////////////////////////////////////////////////////////////////
+        // Determine owners
+        int *node_owner = (idx_t *)malloc(n_unique * sizeof(idx_t));
+        
+        {   
+            int *decide_node_owner = (int*)malloc(n_local_nodes * sizeof(int));
+
+            int *send_node_owner = (int *)malloc(size_send_list * sizeof(int));
+
+            for (ptrdiff_t i = 0; i < n_local_nodes; ++i) {
+                decide_node_owner[i] = size;
+            }
+
+            for (int r = 0; r < size; ++r) {
+                idx_t begin = scatter_node_displs[r];
+                idx_t end = scatter_node_displs[r + 1];
+
+                for (idx_t i = begin; i < end; ++i) {
+                    decide_node_owner[send_list[i]] = MIN(decide_node_owner[send_list[i]], r);
+                }
+            }
+
+            for (int r = 0; r < size; ++r) {
+                idx_t begin = scatter_node_displs[r];
+                idx_t end = scatter_node_displs[r + 1];
+
+                for (idx_t i = begin; i < end; ++i) {
+                    send_node_owner[i] = decide_node_owner[send_list[i]];
+                }
+            }
+
+            CATCH_MPI_ERROR(MPI_Alltoallv(send_node_owner,
+                                          scatter_node_count,
+                                          scatter_node_displs,
+                                          MPI_INT,
+                                          node_owner,
+                                          gather_node_count,
+                                          gather_node_displs,
+                                          MPI_INT,
+                                          comm));
+
+            free(decide_node_owner);
+            free(send_node_owner);
+        }
+
+        ///////////////////////////////////////////////////////////////////////
         // Localize element index
         for (ptrdiff_t d = 0; d < nnodesxelem; ++d) {
             for (ptrdiff_t e = 0; e < n_local_elements; ++e) {
@@ -197,22 +243,12 @@ int read_mesh(MPI_Comm comm, const char *folder, mesh_t *mesh) {
 
         //         for (ptrdiff_t e = 0; e < n_local_elements; ++e) {
         //             for (ptrdiff_t d = 0; d < nnodesxelem; ++d) {
-        //                 printf("%d (%d), ", (int)elems[d][e], (int)unique_idx[elems[d][e]]);
+        //                 printf(
+        //                     "%d (%d, %d), ", (int)elems[d][e], (int)unique_idx[elems[d][e]], (int)node_owner[elems[d][e]]);
         //             }
 
         //             printf("\n");
         //         }
-        //         // printf("\noffset\n");
-
-        //         // for (ptrdiff_t i = 0; i < size + 1; ++i) {
-        //         //     printf("%d ", (int)local_offset[i]);
-        //         // }
-
-        //         // printf("\nparts\n");
-
-        //         // for (ptrdiff_t i = 0; i < size + 1; ++i) {
-        //         //     printf("(%d), ", (int)input_node_partitions[i]);
-        //         // }
 
         //         printf("\n");
         //         printf("------------------\n");
@@ -248,6 +284,7 @@ int read_mesh(MPI_Comm comm, const char *folder, mesh_t *mesh) {
 
         // Original indexing
         mesh->mapping = unique_idx;
+        mesh->node_owner = node_owner;
 
         double tock = MPI_Wtime();
         return 0;
@@ -264,6 +301,7 @@ int read_mesh(MPI_Comm comm, const char *folder, mesh_t *mesh) {
         mesh->points = (geom_t **)malloc(3 * sizeof(geom_t *));
 
         mesh->mapping = 0;
+        mesh->node_owner = 0;
 
         return serial_read_tet_mesh(folder, &mesh->nelements, mesh->elements, &mesh->nnodes, mesh->points);
     }
