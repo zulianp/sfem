@@ -4,7 +4,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <stdio.h>
 #include <assert.h>
+
+#include "../matrix.io/matrixio_array.h"
+#include "../matrix.io/utils.h"
 
 int mesh_write(const char *path, const mesh_t *mesh) {
     // TODO

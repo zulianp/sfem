@@ -9,6 +9,7 @@
 #include <mpi.h>
 
 int serial_read_tet_mesh(const char *folder, ptrdiff_t *nelements, idx_t *elems[4], ptrdiff_t *nnodes, geom_t *xyz[3]);
-int mesh_read(MPI_Comm comm, const char *path, mesh_t *mesh);
+int mesh_read(MPI_Comm comm, const char *folder, mesh_t *mesh);
+int mesh_surf_read(MPI_Comm comm, const char *folder, mesh_t *mesh);
 
 #endif  // SFEM_READ_MESH_H

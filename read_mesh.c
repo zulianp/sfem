@@ -13,7 +13,7 @@
 
 #include "sortreduce.h"
 
-int mesh_read(MPI_Comm comm, const char *folder, mesh_t *mesh) {
+int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, const char *folder, mesh_t *mesh) {
     int rank, size;
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
@@ -21,9 +21,6 @@ int mesh_read(MPI_Comm comm, const char *folder, mesh_t *mesh) {
     if (size > 1) {
         double tick = MPI_Wtime();
         ///////////////////////////////////////////////////////////////
-        // FIXME check from folder
-        int nnodesxelem = 4;
-        int ndims = 3;
 
         MPI_Datatype mpi_geom_t = SFEM_MPI_GEOM_T;
         MPI_Datatype mpi_idx_t = SFEM_MPI_IDX_T;
@@ -294,20 +291,60 @@ int mesh_read(MPI_Comm comm, const char *folder, mesh_t *mesh) {
         return 0;
     } else {
         // Serial fallback
+        ///////////////////////////////////////////////////////////////
+
+        MPI_Datatype mpi_geom_t = SFEM_MPI_GEOM_T;
+        MPI_Datatype mpi_idx_t = SFEM_MPI_IDX_T;
+
+        // ///////////////////////////////////////////////////////////////
+
+        ptrdiff_t n_local_elements = 0, n_elements = 0;
+        ptrdiff_t n_local_nodes = 0, n_nodes = 0;
+
+        char path[1024 * 10];
+
+        idx_t **elems = (idx_t **)malloc(sizeof(idx_t *) * nnodesxelem);
+
+        {
+            idx_t *idx = 0;
+
+            for (int d = 0; d < nnodesxelem; ++d) {
+                sprintf(path, "%s/i%d.raw", folder, d);
+                array_read(comm, path, mpi_idx_t, (void **)&idx, &n_local_elements, &n_elements);
+                elems[d] = idx;
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////
+        // Read coordinates
+        ////////////////////////////////////////////////////////////////////////////////
+
+        geom_t **xyz = (geom_t **)malloc(sizeof(geom_t *) * ndims);
+
+        static const char *str_xyz = "xyzt";
+
+        for (int d = 0; d < ndims; ++d) {
+            sprintf(path, "%s/%c.raw", folder, str_xyz[d]);
+            array_read(comm, path, mpi_geom_t, (void **)&xyz[d], &n_local_nodes, &n_nodes);
+        }
+
         mesh->comm = comm;
 
         mesh->mem_space = SFEM_MEM_SPACE_HOST;
 
-        mesh->spatial_dim = 3;
-        mesh->element_type = 4;
+        mesh->spatial_dim = ndims;
+        mesh->element_type = nnodesxelem;
 
-        mesh->elements = (idx_t **)malloc(4 * sizeof(idx_t *));
-        mesh->points = (geom_t **)malloc(3 * sizeof(geom_t *));
+        mesh->nelements = n_local_elements;
+        mesh->nnodes = n_local_nodes;
+
+        mesh->elements = elems;
+        mesh->points = xyz;
 
         mesh->mapping = 0;
         mesh->node_owner = 0;
 
-        return serial_read_tet_mesh(folder, &mesh->nelements, mesh->elements, &mesh->nnodes, mesh->points);
+        return 0;
     }
 }
 
@@ -366,4 +403,17 @@ int serial_read_tet_mesh(const char *folder, ptrdiff_t *nelements, idx_t *elems[
     }
 
     return 0;
+}
+
+int mesh_surf_read(MPI_Comm comm, const char *folder, mesh_t *mesh)
+{
+    int nnodesxelem = 3;
+    int ndims = 3;
+    return mesh_read_generic(comm, nnodesxelem, ndims, folder, mesh);
+}
+
+int mesh_read(MPI_Comm comm, const char *folder, mesh_t *mesh) {
+    int nnodesxelem = 4;
+    int ndims = 3;
+    return mesh_read_generic(comm, nnodesxelem, ndims, folder, mesh);
 }
