@@ -27,5 +27,7 @@ typedef struct {
 	int *node_owner;
 } mesh_t;
 
+void mesh_destroy(mesh_t *mesh);
+
 
 #endif //SFEM_MESH_H

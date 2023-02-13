@@ -9,8 +9,9 @@
 #include "../matrix.io/utils.h"
 
 #include "crs_graph.h"
-#include "sfem_base.h"
 #include "read_mesh.h"
+#include "sfem_base.h"
+#include "sfem_mesh_write.h"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -22,7 +23,7 @@ int main(int argc, char *argv[]) {
     MPI_Comm_size(comm, &size);
 
     if (argc < 2) {
-        if(!rank) {
+        if (!rank) {
             fprintf(stderr, "usage: %s <folder> [output_folder=./]", argv[0]);
         }
 
@@ -34,7 +35,7 @@ int main(int argc, char *argv[]) {
         output_folder = argv[2];
     }
 
-    if(!rank) {
+    if (!rank) {
         printf("%s %s %s\n", argv[0], argv[1], output_folder);
     }
 
@@ -48,16 +49,22 @@ int main(int argc, char *argv[]) {
     char path[1024 * 10];
 
     mesh_t mesh;
-    if (read_mesh(comm, folder, &mesh)) {
+    if (mesh_read(comm, folder, &mesh)) {
         return EXIT_FAILURE;
     }
 
     MPI_Barrier(comm);
 
-    double tock = MPI_Wtime();
+    double tack = MPI_Wtime();
 
-    for(int r = 0;r < size; ++r){
-        if(r == rank) {
+    char output_path[2048];
+    sprintf(output_path, "part_%0.5d", rank);
+    // Everyone independent
+    mesh.comm = MPI_COMM_SELF;
+    mesh_write(output_path, &mesh);
+
+    for (int r = 0; r < size; ++r) {
+        if (r == rank) {
             printf("[%d] #elements %ld #nodes %ld\n", rank, (long)mesh.nelements, (long)mesh.nnodes);
         }
 
@@ -68,11 +75,14 @@ int main(int argc, char *argv[]) {
 
     MPI_Barrier(comm);
 
+    
+    mesh_destroy(&mesh);
+    double tock = MPI_Wtime();
+
     if (!rank) {
         printf("----------------------------------------\n");
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
     return MPI_Finalize();
-
 }

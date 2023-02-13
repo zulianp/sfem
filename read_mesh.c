@@ -13,7 +13,7 @@
 
 #include "sortreduce.h"
 
-int read_mesh(MPI_Comm comm, const char *folder, mesh_t *mesh) {
+int mesh_read(MPI_Comm comm, const char *folder, mesh_t *mesh) {
     int rank, size;
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
@@ -276,6 +276,10 @@ int read_mesh(MPI_Comm comm, const char *folder, mesh_t *mesh) {
         ///////////////////////////////////////////////////////////////////////
         mesh->comm = comm;
         mesh->mem_space = SFEM_MEM_SPACE_HOST;
+
+        
+        mesh->spatial_dim = 3;
+        mesh->element_type = 4;
 
         mesh->elements = elems;
         mesh->points = part_xyz;
