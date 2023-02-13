@@ -72,9 +72,11 @@ def c_code(expr):
 	console.print(code_string)
 
 def inner(l, r):
+	rows, cols = l.shape
+	
 	ret = 0
-	for d1 in range(0, 3):
-		for d2 in range(0, 3):
+	for d1 in range(0, rows):
+		for d2 in range(0, cols):
 			ret += l[d1, d2] * r[d1, d2]
 
 	return ret
@@ -87,8 +89,11 @@ def dot3(l, r):
 	return ret
 
 def tr(mat):
+	rows, cols = mat.shape
+	assert(rows == cols)
+
 	ret = 0
-	for d1 in range(0, 3):
+	for d1 in range(0, rows):
 		ret += mat[d1, d1]
 	return ret
 
