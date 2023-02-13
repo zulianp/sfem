@@ -17,3 +17,4 @@ void {kernel_name}_gradient({args_g}) {{
 // Hessian
 void {kernel_name}_hessian({args_H}) {{
 {hessian}
+}}
