@@ -53,30 +53,17 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    MPI_Barrier(comm);
-
     double tack = MPI_Wtime();
 
-    char output_path[2048];
-    sprintf(output_path, "%s/part_%0.5d", output_folder, rank);
-    // Everyone independent
-    mesh.comm = MPI_COMM_SELF;
-    mesh_write(output_path, &mesh);
+    mesh_t fine_mesh;
 
-    for (int r = 0; r < size; ++r) {
-        if (r == rank) {
-            printf("[%d] #elements %ld #nodes %ld\n", rank, (long)mesh.nelements, (long)mesh.nnodes);
-        }
+    //TODO Refine mesh
 
-        fflush(stdout);
+    mesh_write(output_folder, &fine_mesh);    
 
-        MPI_Barrier(comm);
-    }
-
-    MPI_Barrier(comm);
-
-    
     mesh_destroy(&mesh);
+    mesh_destroy(&fine_mesh);
+
     double tock = MPI_Wtime();
 
     if (!rank) {

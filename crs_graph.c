@@ -47,11 +47,12 @@ idx_t find_idx(const idx_t target, const idx_t *x, idx_t n) {
     return n;
 }
 
-int build_n2e(const ptrdiff_t nelements,
-              const ptrdiff_t nnodes,
-              idx_t *const elems[4],
-              idx_t **out_n2eptr,
-              idx_t **out_elindex) {
+static int build_n2e(const ptrdiff_t nelements,
+                     const ptrdiff_t nnodes,
+                     const int nnodesxelem,
+                     idx_t **const elems,
+                     idx_t **out_n2eptr,
+                     idx_t **out_elindex) {
     double tick = MPI_Wtime();
 
     idx_t *n2eptr = (idx_t *)malloc((nnodes + 1) * sizeof(idx_t));
@@ -60,7 +61,7 @@ int build_n2e(const ptrdiff_t nelements,
     int *bookkepping = (int *)malloc((nnodes) * sizeof(int));
     memset(bookkepping, 0, (nnodes) * sizeof(int));
 
-    for (int edof_i = 0; edof_i < 4; ++edof_i) {
+    for (int edof_i = 0; edof_i < nnodesxelem; ++edof_i) {
         for (idx_t i = 0; i < nelements; ++i) {
             assert(elems[edof_i][i] < nnodes);
             assert(elems[edof_i][i] >= 0);
@@ -75,7 +76,7 @@ int build_n2e(const ptrdiff_t nelements,
 
     idx_t *elindex = (idx_t *)malloc(n2eptr[nnodes] * sizeof(idx_t));
 
-    for (int edof_i = 0; edof_i < 4; ++edof_i) {
+    for (int edof_i = 0; edof_i < nnodesxelem; ++edof_i) {
         for (idx_t i = 0; i < nelements; ++i) {
             idx_t node = elems[edof_i][i];
 
@@ -95,11 +96,12 @@ int build_n2e(const ptrdiff_t nelements,
     return 0;
 }
 
-int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
-                                     const ptrdiff_t nnodes,
-                                     idx_t *const elems[4],
-                                     idx_t **out_rowptr,
-                                     idx_t **out_colidx) {
+static int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
+                                            const ptrdiff_t nnodes,
+                                            const int nnodesxelem,
+                                            idx_t **const elems,
+                                            idx_t **out_rowptr,
+                                            idx_t **out_colidx) {
     ptrdiff_t nnz = 0;
     idx_t *rowptr = (idx_t *)malloc((nnodes + 1) * sizeof(idx_t));
     idx_t *colidx = 0;
@@ -107,7 +109,7 @@ int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
     {
         idx_t *n2eptr;
         idx_t *elindex;
-        build_n2e(nelements, nnodes, elems, &n2eptr, &elindex);
+        build_n2e(nelements, nnodes, nnodesxelem, elems, &n2eptr, &elindex);
 
         rowptr[0] = 0;
 
@@ -122,7 +124,7 @@ int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
                 idx_t eidx = elindex[e];
                 assert(eidx < nelements);
 
-                for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                for (int edof_i = 0; edof_i < nnodesxelem; ++edof_i) {
                     idx_t neighnode = elems[edof_i][eidx];
                     assert(nneighs < 2048);
                     n2nbuff[nneighs++] = neighnode;
@@ -148,7 +150,7 @@ int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
                 idx_t eidx = elindex[e];
                 assert(eidx < nelements);
 
-                for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                for (int edof_i = 0; edof_i < nnodesxelem; ++edof_i) {
                     idx_t neighnode = elems[edof_i][eidx];
                     assert(nneighs < 2048);
                     n2nbuff[nneighs++] = neighnode;
@@ -173,11 +175,12 @@ int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
     return 0;
 }
 
-int build_crs_graph_faster(const ptrdiff_t nelements,
-                           const ptrdiff_t nnodes,
-                           idx_t *const elems[4],
-                           idx_t **out_rowptr,
-                           idx_t **out_colidx) {
+static int build_crs_graph_faster(const ptrdiff_t nelements,
+                                  const ptrdiff_t nnodes,
+                                  const int nnodesxelem,
+                                  idx_t **const elems,
+                                  idx_t **out_rowptr,
+                                  idx_t **out_colidx) {
     ptrdiff_t nnz = 0;
     idx_t *rowptr = (idx_t *)malloc((nnodes + 1) * sizeof(idx_t));
     idx_t *colidx = 0;
@@ -185,7 +188,7 @@ int build_crs_graph_faster(const ptrdiff_t nelements,
     {
         idx_t *n2eptr;
         idx_t *elindex;
-        build_n2e(nelements, nnodes, elems, &n2eptr, &elindex);
+        build_n2e(nelements, nnodes, nnodesxelem, elems, &n2eptr, &elindex);
 
         double tick = MPI_Wtime();
 
@@ -203,7 +206,7 @@ int build_crs_graph_faster(const ptrdiff_t nelements,
                 idx_t eidx = elindex[e];
                 assert(eidx < nelements);
 
-                for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                for (int edof_i = 0; edof_i < nnodesxelem; ++edof_i) {
                     const idx_t neighnode = elems[edof_i][eidx];
                     assert(nneighs < 2048);
                     n2nbuff[nneighs++] = neighnode;
@@ -230,7 +233,7 @@ int build_crs_graph_faster(const ptrdiff_t nelements,
                 const idx_t eidx = elindex[e];
                 assert(eidx < nelements);
 
-                for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                for (int edof_i = 0; edof_i < nnodesxelem; ++edof_i) {
                     const idx_t neighnode = elems[edof_i][eidx];
                     assert(nneighs < 2048);
                     n2nbuff[nneighs++] = neighnode;
@@ -263,16 +266,31 @@ int build_crs_graph_faster(const ptrdiff_t nelements,
 
 int build_crs_graph(const ptrdiff_t nelements,
                     const ptrdiff_t nnodes,
-                    idx_t *const elems[4],
+                    idx_t **const elems,
                     idx_t **out_rowptr,
                     idx_t **out_colidx) {
     int SFEM_CRS_MEM_CONSERVATIVE = 0;
     SFEM_READ_ENV(SFEM_CRS_MEM_CONSERVATIVE, atoi);
 
     if (SFEM_CRS_MEM_CONSERVATIVE) {
-        return build_crs_graph_mem_conservative(nelements, nnodes, elems, out_rowptr, out_colidx);
+        return build_crs_graph_mem_conservative(nelements, nnodes, 4, elems, out_rowptr, out_colidx);
     } else {
-        return build_crs_graph_faster(nelements, nnodes, elems, out_rowptr, out_colidx);
+        return build_crs_graph_faster(nelements, nnodes, 4, elems, out_rowptr, out_colidx);
+    }
+}
+
+int build_crs_graph_3(const ptrdiff_t nelements,
+                      const ptrdiff_t nnodes,
+                      idx_t **const elems,
+                      idx_t **out_rowptr,
+                      idx_t **out_colidx) {
+    int SFEM_CRS_MEM_CONSERVATIVE = 0;
+    SFEM_READ_ENV(SFEM_CRS_MEM_CONSERVATIVE, atoi);
+
+    if (SFEM_CRS_MEM_CONSERVATIVE) {
+        return build_crs_graph_mem_conservative(nelements, nnodes, 3, elems, out_rowptr, out_colidx);
+    } else {
+        return build_crs_graph_faster(nelements, nnodes, 3, elems, out_rowptr, out_colidx);
     }
 }
 
@@ -289,11 +307,11 @@ int block_crs_to_crs(const ptrdiff_t nnodes,
         idx_t ncols = block_rowptr[i + 1] - block_rowptr[i];
 
         for (int b = 0; b < block_size; ++b) {
-            rowptr[i * block_size + b] = k + ncols * (b  * block_size);
+            rowptr[i * block_size + b] = k + ncols * (b * block_size);
         }
     }
 
-    rowptr[nnodes * block_size] =  2 * rowptr[nnodes * block_size - 1] - rowptr[nnodes * block_size - 2];
+    rowptr[nnodes * block_size] = 2 * rowptr[nnodes * block_size - 1] - rowptr[nnodes * block_size - 2];
 
     for (ptrdiff_t i = 0; i < nnodes; ++i) {
         // Block row
@@ -304,14 +322,14 @@ int block_crs_to_crs(const ptrdiff_t nnodes,
             const idx_t row = i * block_size + brow;
             // Scalar row
             const idx_t start = rowptr[row];
-            const idx_t end = rowptr[row+1];
+            const idx_t end = rowptr[row + 1];
 
             for (idx_t bk = bstart, k = start; bk < bend; ++bk) {
                 // Block column
                 const idx_t bcolidx = block_colidx[bk];
                 // Data block
                 const real_t *block = &block_values[bk * block_size * block_size];
-                
+
                 for (int bcol = 0; bcol < block_size; ++bcol, ++k) {
                     assert(k < end);
 

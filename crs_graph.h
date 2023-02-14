@@ -7,7 +7,13 @@
 
 int build_crs_graph(const ptrdiff_t nelements,
                     const ptrdiff_t nnodes,
-                    idx_t *const elems[4],
+                    idx_t **const elems,
+                    idx_t **out_rowptr,
+                    idx_t **out_colidx);
+
+int build_crs_graph_3(const ptrdiff_t nelements,
+                    const ptrdiff_t nnodes,
+                    idx_t **const elems,
                     idx_t **out_rowptr,
                     idx_t **out_colidx);
 

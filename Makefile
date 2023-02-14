@@ -29,7 +29,7 @@ CUFLAGS += --compiler-options -fPIC -std=c++17
 
 INCLUDES += -I$(PWD) -I$(PWD)/../matrix.io
 
-GOALS = assemble assemble3 assemble4 condense_matrix condense_vector idx_to_indicator remap_vector partition select_submesh
+GOALS = assemble assemble3 assemble4 condense_matrix condense_vector idx_to_indicator remap_vector partition select_submesh refine
 DEPS = -L$(PWD)/../matrix.io/ -lmatrix.io -lstdc++
 
 LDFLAGS += $(DEPS) -lm
@@ -45,6 +45,7 @@ OBJS = \
 	sortreduce.o \
 	crs_graph.o \
 	sortreduce.o \
+	argsort.o \
 	read_mesh.o  \
 	mass.o \
 	dirichlet.o \
@@ -90,6 +91,9 @@ partition : partition.o libsfem.a
 select_submesh : select_submesh.o libsfem.a
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
+refine : refine.o libsfem.a
+	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+	
 condense_matrix : condense_matrix.o
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
@@ -109,6 +113,9 @@ utopia_sfem_plugin.o : plugin/utopia_sfem_plugin.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -c $<
 
 sortreduce.o: sortreduce.cpp
+	$(CXX) $(CXXFLAGS) -c $<
+
+argsort.o: argsort.cpp
 	$(CXX) $(CXXFLAGS) -c $<
 
 %.o : %.c
