@@ -101,10 +101,14 @@ int main(int argc, char *argv[]) {
     }
 
     idx_t *selected_nodes = (idx_t *)malloc((mesh.nnodes + 1) * sizeof(idx_t));
+    idx_t *additional_nodes = (idx_t *)malloc((mesh.nnodes + 1) * sizeof(idx_t));
+
     memset(selected_nodes, 0, (mesh.nnodes + 1) * sizeof(idx_t));
+    memset(additional_nodes, 0, (mesh.nnodes + 1) * sizeof(idx_t));
 
     int euclidean = 1;
     if (euclidean) {
+
         idx_t *args = (idx_t *)malloc(mesh.nnodes * sizeof(idx_t));
         argsort_f(mesh.nnodes, sq_dists, args);
 
@@ -112,6 +116,9 @@ int main(int argc, char *argv[]) {
             const idx_t idx = args[i];
             selected_nodes[idx + 1] = 1;
         }
+
+        free(args);
+
     } else {
         idx_t *rowptr;
         idx_t *colidx;
@@ -120,18 +127,35 @@ int main(int argc, char *argv[]) {
         // TODO
     }
 
+    free(sq_dists);
+
     idx_t *selected_elements = (idx_t *)malloc((mesh.nelements + 1) * sizeof(idx_t));
     memset(selected_elements, 0, (mesh.nelements + 1) * sizeof(idx_t));
 
     for (ptrdiff_t i = 0; i < mesh.nelements; ++i) {
         for (int d = 0; d < mesh.element_type; ++d) {
-            idx_t sn = selected_nodes[mesh.elements[d][i] + 1];
-            selected_elements[i + 1] |= sn > 1;
+            idx_t node = mesh.elements[d][i];
+            idx_t sn = selected_nodes[node + 1];
+
+            if(sn != 0) {
+                selected_elements[i + 1] = 1;
+            }
+        }
+
+        if(selected_elements[i + 1]) {
+            for (int d = 0; d < mesh.element_type; ++d) {
+                idx_t node = mesh.elements[d][i];
+                idx_t sn = selected_nodes[node + 1];
+                
+                if(sn == 0) {
+                    additional_nodes[node] = 1;
+                }
+            }
         }
     }
 
     for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {
-        selected_nodes[i + 1] += selected_nodes[i];
+        selected_nodes[i + 1] += selected_nodes[i] + additional_nodes[i];
     }
 
     for (ptrdiff_t i = 0; i < mesh.nelements; ++i) {
@@ -173,6 +197,27 @@ int main(int argc, char *argv[]) {
 
         mapping[offset] = i;
     }
+
+    // for (ptrdiff_t i = 0; i < mesh.nnodes + 1; ++i) {
+    //     const idx_t offset = selected_nodes[i];
+    //     printf("%ld\n", (long)offset);
+    // }
+    // printf("--------------\n");
+
+
+    // for (ptrdiff_t i = 0; i < mesh.nelements + 1; ++i) {
+    //     const idx_t offset = selected_elements[i];
+    //     printf("%ld\n", (long)offset);
+    // }
+
+    if(!rank) {
+        printf("select_submesh.c: nelements=%ld npoints=%ld\n", (long)n_selected_elements, n_selected_nodes);
+    }
+
+    free(selected_nodes);
+    free(additional_nodes);
+    free(selected_elements);
+
 
     mesh_t selection;
     selection.comm = mesh.comm;
