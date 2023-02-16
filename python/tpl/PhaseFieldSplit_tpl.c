@@ -1,6 +1,6 @@
+////////////////////////////////
 // PhaseFieldSplit_tpl.c
-
-
+////////////////////////////////
 
 // Basic includes
 #include "sfem_base.h"
@@ -49,6 +49,7 @@ void {kernel_name}_hessian_cc({args_hessian_cc}) {{
 ///////////////////////////////
 // Apply
 ///////////////////////////////
+
 void {kernel_name}_apply_cc({args_apply_cc}) {{
 {apply_cc}
 }}
