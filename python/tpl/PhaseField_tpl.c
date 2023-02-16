@@ -7,20 +7,28 @@
 ///////////////////////////////
 // Energy
 ///////////////////////////////
-void {kernel_name}_energy({args_e}) {{
+void {kernel_name}_energy({args_energy}) {{
 {energy}
 }}
 
 ///////////////////////////////
 // Gradient
 ///////////////////////////////
-void {kernel_name}_gradient({args_g}) {{
+void {kernel_name}_gradient({args_gradient}) {{
 {gradient}
 }}
 
 ///////////////////////////////
 // Hessian
 ///////////////////////////////
-void {kernel_name}_hessian({args_H}) {{
+void {kernel_name}_hessian({args_hessian}) {{
 {hessian}
+}}
+
+
+///////////////////////////////
+// Apply
+///////////////////////////////
+void {kernel_name}_apply({args_apply}) {{
+{apply}
 }}

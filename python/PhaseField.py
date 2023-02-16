@@ -37,11 +37,11 @@ class IsotropicPhaseField(PhaseFieldBase):
 		
 		self.initialize(energy)
 
-pp2 = IsotropicPhaseField("IsotropicPhaseField_2D_AT2", AT2(), GenericFE('trial', 2), GenericFE('test', 2))
-pp2.generate_code()
+pf2 = IsotropicPhaseField("IsotropicPhaseField_2D_AT2", AT2(), GenericFE('trial', 2), GenericFE('test', 2))
+pf2.generate_code()
 
-pp3 = IsotropicPhaseField("IsotropicPhaseField_3D_AT2", AT2(), GenericFE('trial', 3), GenericFE('test', 3))
-pp3.generate_code()
+pf3 = IsotropicPhaseField("IsotropicPhaseField_3D_AT2", AT2(), GenericFE('trial', 3), GenericFE('test', 3))
+pf3.generate_code()
 
 ############################################################# 
 

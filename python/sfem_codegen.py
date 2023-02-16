@@ -8,6 +8,10 @@ from time import perf_counter
 from rich.syntax import Syntax
 console = rich.get_console()
 
+def c_log(expr):
+	console.print(expr)
+
+
 # from sympy.matrices.dense import eye
 # from sympy.polys.matrices import DomainMatrix
 # from sympy.physics.quantum import TensorProduct

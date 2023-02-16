@@ -38,14 +38,13 @@ class TensorProductFE:
 		self.elem_type = elem_type
 		self.block_size = block_size
 
-
-		temp_grad = []
-
 		if(elem_type.is_generic()):
+			temp_grad = []
+
 			g = elem_type.grad()
 
 			for d1 in range(0, block_size):
-				z = [0]*(block_size * elem_type.dim)
+				z = [0] * (block_size * elem_type.dim)
 				G = sp.Matrix(block_size, elem_type.dim, z)
 
 				for d2 in range(0, elem_type.dim):
@@ -54,6 +53,19 @@ class TensorProductFE:
 				temp_grad.append(G)
 
 			self.grad_ = temp_grad
+
+			# 
+
+			temp_value = []
+			v = elem_type.value()
+
+			for d1 in range(0, block_size):
+				z = [0] * (block_size)
+				V = sp.Matrix(block_size, 1, z)
+
+				temp_value.append(V)
+
+			self.value_ = temp_value
 
 		else:
 			# Implement me
@@ -64,6 +76,9 @@ class TensorProductFE:
 
 	def grad(self):
 		return self.grad_
+
+	def value(self):
+		return self.value_
 
 class Function:
 	def __init__(self, name, elem_type):
@@ -101,7 +116,6 @@ class VectorFunction:
 
 		dim = elem_type.dim
 
-
 		grad_list = []
 		for d1 in range(0, block_size):
 			for d2 in range(0, elem_type.dim):
@@ -110,8 +124,21 @@ class VectorFunction:
 
 		self.grad_ = sp.Matrix(block_size, dim, grad_list)
 
+		# 
+
+		value_list = []
+		for d1 in range(0, block_size):
+			s = sp.symbols(f'{self.name}[{d1}]', real=True)
+			value_list.append(s)
+
+		self.value_ = sp.Matrix(block_size, 1, value_list)
+
+
 	def grad(self):
 		return self.grad_
+
+	def value(self):
+		return self.value_
 
 
 def is_matrix(expr):
@@ -167,6 +194,8 @@ class PhaseFieldBase(Model):
 
 		self.phase = Function('c', elem_trial)
 		self.displacement = VectorFunction('u', elem_trial, dim)
+		self.increment_phase = Function('inc_c', elem_trial) 
+		self.increment_displacement = VectorFunction('inc_u', elem_trial, dim)
 	
 	def initialize(self, energy):
 		self.set_energy(energy)
@@ -251,50 +280,38 @@ class PhaseFieldBase(Model):
 		return expr
 
 	def makehessianuu(self, idx, i, j):
-		n = self.tp_element_test.block_size + 1
-
 		integr = self.hessian_wrt_uu[i, j] * self.dV
 
 		if simplify_expr:
 			integr = sp.simplify(integr)
 
-		# bform = sp.symbols(f'element_matrix[{i * n + j}]')
 		bform = sp.symbols(f'element_matrix[{idx}]')
 		return ast.AddAugmentedAssignment(bform, integr)
 
 	def makehessianuc(self, idx, i, j):
-		n = self.tp_element_test.block_size + 1
-
 		integr = self.hessian_wrt_uc[i] * self.dV
 
 		if simplify_expr:
 			integr = sp.simplify(integr)
 
-		# bform = sp.symbols(f'element_matrix[{i * n + j}]')
 		bform = sp.symbols(f'element_matrix[{idx}]')
 		return ast.AddAugmentedAssignment(bform, integr)
 
 	def makehessiancu(self, idx, j, i):
-		n = self.tp_element_test.block_size + 1
-
 		integr = self.hessian_wrt_uc[i] * self.dV
 
 		if simplify_expr:
 			integr = sp.simplify(integr)
 
-		# bform = sp.symbols(f'element_matrix[{j * n + i}]')
 		bform = sp.symbols(f'element_matrix[{idx}]')
 		return ast.AddAugmentedAssignment(bform, integr)
 
 	def makehessiancc(self, idx):
-		n = self.tp_element_test.block_size + 1
-
 		integr = self.hessian_wrt_cc * self.dV
 
 		if simplify_expr:
 			integr = sp.simplify(integr)
 
-		# bform = sp.symbols(f'element_matrix[{i * n + i}]')
 		bform = sp.symbols(f'element_matrix[{idx}]')
 		return ast.AddAugmentedAssignment(bform, integr)
 
@@ -313,6 +330,102 @@ class PhaseFieldBase(Model):
 
 		expr[ndisp * n + ndisp] = self.makehessiancc(ndisp * n + ndisp)
 		return expr
+
+	def makeapply_blocks(self):
+		ndisp = self.tp_element_test.block_size
+
+		expr_uu = [0] * ndisp
+		expr_uc = [0] * ndisp
+		expr_cu = [0]
+		expr_cc = [0] 
+
+		u_inc = self.increment_displacement.value()
+		c_inc = self.increment_phase.value()
+
+		for i in range(0, ndisp):
+			for j in range(0, ndisp):
+				integr = self.hessian_wrt_uu[i, j] * u_inc[j] * self.dV
+
+				if simplify_expr:
+					integr = sp.simplify(integr)
+
+				expr_uu[i] = integr
+
+		for i in range(0, ndisp):
+			integr = self.hessian_wrt_uc[i] * c_inc * self.dV
+
+			if simplify_expr:
+				integr = sp.simplify(integr)
+
+			expr_uc[i] += integr
+
+		for j in range(0, ndisp):
+			integr = self.hessian_wrt_uc[j] * u_inc[j] * self.dV
+
+			if simplify_expr:
+				integr = sp.simplify(integr)
+				
+			expr_cu[0] += integr
+
+		expr_cc[0] = self.hessian_wrt_cc * c_inc * self.dV
+
+		return expr_uu, expr_uc, expr_cu, expr_cc
+
+	def makeapply(self):
+		ndisp = self.tp_element_test.block_size
+		n = ndisp + 1
+
+		expr_uu, expr_uc, expr_cu, expr_cc = self.makeapply_blocks()
+
+		expr = []
+
+		for i in range(0, ndisp):
+			integr = expr_uu[i] + expr_uc[i]
+
+			if simplify_expr:
+				integr = sp.simplify(integr)
+
+			lform = sp.symbols(f'element_vector[{i}]')
+			expr.append(ast.AddAugmentedAssignment(lform, integr))
+
+		integr = expr_cc[0] + expr_cu[0]
+
+		if simplify_expr:
+			integr = sp.simplify(integr)
+
+		lform = sp.symbols(f'element_vector[{ndisp}]')
+		expr.append(ast.AddAugmentedAssignment(lform, integr))
+
+		return expr
+
+	def split_apply_code(self):
+		ndisp = self.tp_element_test.block_size
+		n = ndisp + 1
+
+		expr_uu, expr_uc, expr_cu, expr_cc = self.makeapply_blocks()
+
+		expr_apply_uu = []
+
+		for i in range(0, ndisp):
+			integr = expr_uu[i] # + expr_uc[i]
+
+			if simplify_expr:
+				integr = sp.simplify(integr)
+
+			lform = sp.symbols(f'element_vector[{i}]')
+			expr_apply_uu.append(ast.AddAugmentedAssignment(lform, integr))
+
+		integr = expr_cc[0] #+ expr_cu[0]
+
+		if simplify_expr:
+			integr = sp.simplify(integr)
+
+		lform = sp.symbols(f'element_vector[{0}]')
+		expr_apply_cc = [ast.AddAugmentedAssignment(lform, integr)]
+
+		code_apply_uu = c_gen(expr_apply_uu)
+		code_apply_cc = c_gen(expr_apply_cc)
+		return code_apply_uu, code_apply_cc
 
 	def make_split_hessian_uu(self):
 		ndisp = self.tp_element_test.block_size
@@ -346,7 +459,7 @@ class PhaseFieldBase(Model):
 
 	def genreate_split_code(self):
 		energy_code = self.energy_code()
-		args_e = self.energy_args()
+		args_energy = self.energy_args()
 
 		# Split operators
 		gradient_c_expr = self.makegradc(0)	
@@ -359,9 +472,6 @@ class PhaseFieldBase(Model):
 			gradient_u_expr.append(self.makegradu(d1, d1))
 
 		gradient_u_code = c_gen(gradient_u_expr)
-
-		# console.print(gradient_c_code)
-		# console.print(gradient_u_code)
 
 		hessian_uu_expr = self.make_split_hessian_uu()
 		hessian_uu_code = c_gen(hessian_uu_expr)
@@ -377,14 +487,14 @@ class PhaseFieldBase(Model):
 
 		params = self.param_string()
 	
-		args_g_u = params + f"""const real_t {self.phase.name}, 
+		args_gradient_u = params + f"""const real_t {self.phase.name}, 
 			const real_t *{self.phase.grad_name}, 
 			const real_t *{self.displacement.grad_name},
 			const real_t *grad_test,
 			const real_t dV,
 			real_t *element_vector
 			"""
-		args_g_c = params + f"""const real_t {self.phase.name}, 
+		args_gradient_c = params + f"""const real_t {self.phase.name}, 
 			const real_t *{self.phase.grad_name}, 
 			const real_t *{self.displacement.grad_name},
 			const real_t test,
@@ -392,22 +502,22 @@ class PhaseFieldBase(Model):
 			const real_t dV,
 			real_t *element_vector
 			"""
-		args_H_uu = params + f"""const real_t {self.phase.name},  
+		args_hessian_uu = params + f"""const real_t {self.phase.name},  
 			const real_t *grad_test,
 			const real_t *grad_trial,
 			const real_t dV,
 			real_t *element_matrix"""
 
-		args_H_uc = params + f"""const real_t {self.phase.name},  
+		args_hessian_uc = params + f"""const real_t {self.phase.name},  
 			const real_t *{self.displacement.grad_name},
 			const real_t test,
 			const real_t *grad_trial,
 			const real_t dV,
 			real_t *element_matrix"""
 
-		args_H_cu = args_H_uc
+		args_hessian_cu = args_hessian_uc
 
-		args_H_cc = params + f"""const real_t *{self.displacement.grad_name},
+		args_hessian_cc = params + f"""const real_t *{self.displacement.grad_name},
 			const real_t test,
 			const real_t trial,
 			const real_t *grad_test,
@@ -416,6 +526,28 @@ class PhaseFieldBase(Model):
 			real_t *element_matrix"""
 
 		tpl = self.read_field_split_tpl()
+
+		code_apply_uu, code_apply_cc = self.split_apply_code()
+		
+		args_apply_uu = params + f"""const real_t {self.phase.name}, 
+			const real_t *{self.increment_displacement.name},
+			const real_t *grad_trial,
+			const real_t *grad_test,
+			const real_t dV,
+			real_t *element_vector
+			"""
+
+		args_apply_cc = params + f"""const real_t {self.phase.name}, 
+			const real_t *{self.phase.grad_name}, 
+			const real_t *{self.displacement.grad_name},
+			const real_t {self.increment_phase.name},
+			const real_t test,
+			const real_t trial,
+			const real_t *grad_trial,
+			const real_t *grad_test,
+			const real_t dV,
+			real_t *element_vector
+			"""
 
 		output = tpl.format(
 			kernel_name = self.kernel_name,
@@ -426,14 +558,20 @@ class PhaseFieldBase(Model):
 			hessian_uc = hessian_uc_code, 
 			hessian_cu = hessian_cu_code, 
 			hessian_cc = hessian_cc_code, 
-			args_e = args_e,
-			args_g_u = args_g_u,
-			args_g_c = args_g_c,
-			args_H_uu = args_H_uu,
-			args_H_uc = args_H_uc,
-			args_H_cu = args_H_cu,
-			args_H_cc = args_H_cc
+			apply_uu = code_apply_uu,
+			apply_cc = code_apply_cc,
+			args_energy = args_energy,
+			args_gradient_u = args_gradient_u,
+			args_gradient_c = args_gradient_c,
+			args_hessian_uu = args_hessian_uu,
+			args_hessian_uc = args_hessian_uc,
+			args_hessian_cu = args_hessian_cu,
+			args_hessian_cc = args_hessian_cc,
+			args_apply_uu = args_apply_uu,
+			args_apply_cc = args_apply_cc
 		)
+
+		
 
 		return output
 
@@ -450,17 +588,17 @@ class PhaseFieldBase(Model):
 
 	def energy_args(self):
 		params = self.param_string()
-		args_e = params + f"""const real_t {self.phase.name}, 
+		args_energy = params + f"""const real_t {self.phase.name}, 
 			const real_t *{self.phase.grad_name}, 
 			const real_t *{self.displacement.grad_name},
 			const real_t dV,
 			real_t *element_scalar
 			"""
-		return args_e
+		return args_energy
 
 	def generate_monolithic_code(self):
 		energy_code = self.energy_code()
-		args_e = self.energy_args()
+		args_energy = self.energy_args()
 
 		gradient_expr = self.makegrad()
 		gradient_code = c_gen(gradient_expr)
@@ -468,8 +606,11 @@ class PhaseFieldBase(Model):
 		hessian_expr = self.makehessian()
 		hessian_code = c_gen(hessian_expr)
 
+		apply_expr = self.makeapply()
+		apply_code = c_gen(apply_expr)
+
 		params = self.param_string()
-		args_g = params + f"""const real_t {self.phase.name}, 
+		args_gradient = params + f"""const real_t {self.phase.name}, 
 			const real_t *{self.phase.grad_name}, 
 			const real_t *{self.displacement.grad_name},
 			const real_t test,
@@ -478,7 +619,7 @@ class PhaseFieldBase(Model):
 			real_t *element_vector
 			"""
 
-		args_H = params + f"""const real_t {self.phase.name},  
+		args_hessian = params + f"""const real_t {self.phase.name},  
 			const real_t *{self.displacement.grad_name},
 			const real_t test,
 			const real_t trial,
@@ -487,6 +628,17 @@ class PhaseFieldBase(Model):
 			const real_t dV,
 			real_t *element_matrix"""
 
+		args_apply = params + f"""const real_t {self.phase.name},  
+			const real_t *{self.displacement.grad_name},
+			const real_t {self.increment_phase.name},
+			const real_t *{self.increment_displacement.name},
+			const real_t test,
+			const real_t trial,
+			const real_t *grad_test,
+			const real_t *grad_trial,
+			const real_t dV,
+			real_t *element_vector"""
+
 		tpl = self.read_tpl()
 
 		output = tpl.format(
@@ -494,9 +646,11 @@ class PhaseFieldBase(Model):
 			energy = energy_code, 
 			gradient = gradient_code, 
 			hessian = hessian_code, 
-			args_e = args_e,
-			args_g = args_g,
-			args_H = args_H)
+			apply = apply_code,
+			args_energy = args_energy,
+			args_gradient = args_gradient,
+			args_hessian = args_hessian,
+			args_apply=args_apply)
 
 		return output
 
