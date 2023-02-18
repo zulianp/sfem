@@ -303,7 +303,7 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)nelements, (long)nnodes);
+        printf("#elements %ld #nodes %ld #nz %ld\n", (long)nelements, (long)nnodes, (long)nnz);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
