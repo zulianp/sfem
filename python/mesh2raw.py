@@ -3,6 +3,7 @@
 import meshio
 import numpy as np
 import sys
+import os
 
 def main(argv):
 	if len(argv) < 3:
@@ -42,7 +43,7 @@ def main(argv):
 
 	for d in range(0, ndims):
 		x = xyz[d, :].astype(np.float32)
-		x.tofile(f'{output}/{str_xyz[d]}.raw')
+		x.tofile(f'{output_folder}/{str_xyz[d]}.raw')
 
 if __name__ == '__main__':
     main(sys.argv)
