@@ -31,7 +31,7 @@ CXXFLAGS += -std=c++11
 CXXFLAGS += -fno-exceptions -fno-rtti -static
 CXXFLAGS += -fvisibility=hidden
 CXXFLAGS += -fPIC
-CUFLAGS += --compiler-options -fPIC -std=c++17
+CUFLAGS += --compiler-options -fPIC -std=c++17 -arch=native 
 
 # CUFLAGS += --compiler-options -fPIC -O0 -g -std=c++17
 

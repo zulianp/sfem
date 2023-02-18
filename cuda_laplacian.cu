@@ -229,7 +229,7 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
                                            const ptrdiff_t nnodes,
                                            idx_t **const elems,
                                            geom_t **const xyz,
-                                           const idx_t *const rowptr,
+                                           const count_t *const rowptr,
                                            const idx_t *const colidx,
                                            real_t *const values) {
     double tick = MPI_Wtime();
@@ -270,14 +270,14 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         SFEM_CUDA_CHECK(cudaMemcpy(d_xyz, hd_xyz, 3 * sizeof(geom_t *), cudaMemcpyHostToDevice));
     }
 
-    idx_t *d_rowptr = nullptr;
+    count_t *d_rowptr = nullptr;
     idx_t *d_colidx = nullptr;
     real_t *d_values = nullptr;
-    const idx_t nnz = rowptr[nnodes];
+    const count_t nnz = rowptr[nnodes];
 
     {  // Copy matrix
-        SFEM_CUDA_CHECK(cudaMalloc(&d_rowptr, (nnodes + 1) * sizeof(idx_t)));
-        SFEM_CUDA_CHECK(cudaMemcpy(d_rowptr, rowptr, (nnodes + 1) * sizeof(idx_t), cudaMemcpyHostToDevice));
+        SFEM_CUDA_CHECK(cudaMalloc(&d_rowptr, (nnodes + 1) * sizeof(count_t)));
+        SFEM_CUDA_CHECK(cudaMemcpy(d_rowptr, rowptr, (nnodes + 1) * sizeof(count_t), cudaMemcpyHostToDevice));
 
         SFEM_CUDA_CHECK(cudaMalloc(&d_colidx, nnz * sizeof(idx_t)));
         SFEM_CUDA_CHECK(cudaMemcpy(d_colidx, colidx, nnz * sizeof(idx_t), cudaMemcpyHostToDevice));
