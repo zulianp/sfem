@@ -12,9 +12,15 @@ else
 	CUFLAGS += -O3 -DNDEBUG 
 endif
 
-ifeq ($(avx2sort), 1)
-	CXXFLAGS += -DSFEM_ENABLE_AVX2_SORT -Iexternal
+ifeq ($(avx512sort), 1)
+	CXXFLAGS += -DSFEM_ENABLE_AVX512_SORT -Iexternal/x86-simd-sort/src -march=native
 endif
+
+ifeq ($(avx2sort), 1)
+	CXXFLAGS += -DSFEM_ENABLE_AVX2_SORT -Iexternal -march=core-avx2
+endif
+
+
 
 CFLAGS += -pedantic -Wextra
 # CFLAGS += -std=c99 

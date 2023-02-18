@@ -3,17 +3,27 @@
 #include <algorithm>
 #include <cassert>
 
+#ifdef SFEM_ENABLE_AVX512_SORT
+#include "avx512-16bit-qsort.hpp"
+#include "avx512-32bit-qsort.hpp"
+#include "avx512-64bit-qsort.hpp"
+#else
 #ifdef SFEM_ENABLE_AVX2_SORT
 #include "avx2sort.h"
+#endif
 #endif
 
 extern "C" idx_t sortreduce(idx_t *arr, idx_t size) {
 
+#ifdef SFEM_ENABLE_AVX512_SORT
+    avx512_qsort<idx_t>(arr, size);
+#else
 #ifdef SFEM_ENABLE_AVX2_SORT
     avx2::quicksort(arr, size);
 #else
     std::sort(arr,  arr + size);
 #endif
+    #endif
     auto it = std::unique(arr, arr + size);
     return std::distance(arr, it);
 }
