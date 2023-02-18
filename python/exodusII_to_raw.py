@@ -23,7 +23,7 @@ connect = nc.variables['connect1']
 nelements, nnodesxelem = connect.shape
 
 for i in range(0, nnodesxelem):
-	ii = np.array(connect[:,0]).astype(np.int32)
+	ii = np.array(connect[:,0]).astype(np.int32) - 1
 	ii.tofile(f'{output_folder}/i{i}.raw')
 
 if 'coord' in nc.variables:
@@ -41,7 +41,6 @@ else:
 		coords.append(coordz)
 
 	coords = np.array(coords)
-	print(coords[0])
 
 dims, nnodes = coords.shape
 
