@@ -265,9 +265,11 @@ void laplacian_assemble_hessian(const ptrdiff_t nelements,
                                 const ptrdiff_t nnodes,
                                 idx_t **const elems,
                                 geom_t **const xyz,
-                                const idx_t *const rowptr,
+                                const count_t *const rowptr,
                                 const idx_t *const colidx,
                                 real_t *const values) {
+    SFEM_UNUSED(nnodes);
+
     double tick = MPI_Wtime();
 
     idx_t ev[4];
@@ -333,6 +335,8 @@ void laplacian_assemble_gradient(const ptrdiff_t nelements,
                                  geom_t **const xyz,
                                  const real_t *const u,
                                  real_t *const values) {
+    SFEM_UNUSED(nnodes);
+
     double tick = MPI_Wtime();
 
     idx_t ev[4];
@@ -390,6 +394,8 @@ void laplacian_assemble_value(const ptrdiff_t nelements,
                               geom_t **const xyz,
                               const real_t *const u,
                               real_t *const value) {
+    SFEM_UNUSED(nnodes);
+    
     double tick = MPI_Wtime();
 
     idx_t ev[4];

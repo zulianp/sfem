@@ -11,9 +11,7 @@
 #include "../matrix.io/matrixio_crs.h"
 #include "../matrix.io/utils.h"
 
-typedef float geom_t;
-typedef int idx_t;
-typedef double real_t;
+#include "sfem_base.h"
 
 #ifdef NDEBUG
 #define INLINE inline
@@ -101,13 +99,13 @@ int main(int argc, char *argv[]) {
         free(dirichlet_nodes);
     }
 
-    const idx_t *rowptr = (const idx_t *)crs_in.rowptr;
+    const count_t *rowptr = (const count_t *)crs_in.rowptr;
     const idx_t *colidx = (const idx_t *)crs_in.colidx;
     const real_t *values = (const real_t *)crs_in.values;
     const idx_t nrows = crs_in.grows;
     const idx_t nnz = crs_in.gnnz;
 
-    idx_t *new_rowptr = (idx_t *)malloc((new_nnodes + 1) * sizeof(idx_t));
+    count_t *new_rowptr = (count_t *)malloc((new_nnodes + 1) * sizeof(count_t));
     new_rowptr[0] = 0;
 
     // change name for meaning but reuse memory by overwriting linearly
@@ -136,12 +134,12 @@ int main(int argc, char *argv[]) {
         if (mapper[node] == nrows) continue;
         // Only valid rows
 
-        idx_t start = rowptr[node];
-        idx_t end = rowptr[node + 1];
+        count_t start = rowptr[node];
+        count_t end = rowptr[node + 1];
 
-        idx_t range = end - rowptr[node];
+        // idx_t range = end - rowptr[node];
 
-        for (idx_t k = start; k < end; ++k) {
+        for (count_t k = start; k < end; ++k) {
             idx_t col = colidx[k];
             idx_t new_col = mapper[col];
 
@@ -172,9 +170,9 @@ int main(int argc, char *argv[]) {
         crs_out.gnnz = new_nnz;
         crs_out.start = 0;
         crs_out.rowoffset = 0;
-        crs_out.rowptr_type = MPI_INT;
-        crs_out.colidx_type = MPI_INT;
-        crs_out.values_type = MPI_DOUBLE;
+        crs_out.rowptr_type = SFEM_MPI_COUNT_T;
+        crs_out.colidx_type = SFEM_MPI_IDX_T;
+        crs_out.values_type = SFEM_MPI_REAL_T;
 
         crs_write_folder(comm, output_folder, &crs_out);
     }

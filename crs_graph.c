@@ -22,20 +22,20 @@
 
 SFEM_INLINE int ispow2(idx_t n) { return n && (!(n & (n - 1))); }
 
-SFEM_INLINE static int cmpfunc(const void *a, const void *b) { return (*(idx_t *)a - *(idx_t *)b); }
-SFEM_INLINE static void quicksort(idx_t *arr, idx_t size) { qsort(arr, size, sizeof(idx_t), cmpfunc); }
-SFEM_INLINE static idx_t unique(idx_t *arr, idx_t size) {
-    idx_t *first = arr;
-    idx_t *last = arr + size;
+// SFEM_INLINE static int cmpfunc(const void *a, const void *b) { return (*(idx_t *)a - *(idx_t *)b); }
+// SFEM_INLINE static void quicksort(idx_t *arr, idx_t size) { qsort(arr, size, sizeof(idx_t), cmpfunc); }
+// SFEM_INLINE static idx_t unique(idx_t *arr, idx_t size) {
+//     idx_t *first = arr;
+//     idx_t *last = arr + size;
 
-    if (first == last) return 0;
+//     if (first == last) return 0;
 
-    idx_t *result = first;
-    while (++first != last)
-        if (*result != *first && ++result != first) *result = *first;
+//     idx_t *result = first;
+//     while (++first != last)
+//         if (*result != *first && ++result != first) *result = *first;
 
-    return (++result) - arr;
-}
+//     return (++result) - arr;
+// }
 
 idx_t find_idx(const idx_t target, const idx_t *x, idx_t n) {
     for (idx_t i = 0; i < n; ++i) {
@@ -51,18 +51,18 @@ static int build_n2e(const ptrdiff_t nelements,
                      const ptrdiff_t nnodes,
                      const int nnodesxelem,
                      idx_t **const elems,
-                     idx_t **out_n2eptr,
+                     count_t **out_n2eptr,
                      idx_t **out_elindex) {
     double tick = MPI_Wtime();
 
-    idx_t *n2eptr = (idx_t *)malloc((nnodes + 1) * sizeof(idx_t));
-    memset(n2eptr, 0, (nnodes + 1) * sizeof(idx_t));
+    count_t *n2eptr = (count_t *)malloc((nnodes + 1) * sizeof(count_t));
+    memset(n2eptr, 0, (nnodes + 1) * sizeof(count_t));
 
     int *bookkepping = (int *)malloc((nnodes) * sizeof(int));
     memset(bookkepping, 0, (nnodes) * sizeof(int));
 
     for (int edof_i = 0; edof_i < nnodesxelem; ++edof_i) {
-        for (idx_t i = 0; i < nelements; ++i) {
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
             assert(elems[edof_i][i] < nnodes);
             assert(elems[edof_i][i] >= 0);
 
@@ -70,7 +70,7 @@ static int build_n2e(const ptrdiff_t nelements,
         }
     }
 
-    for (idx_t i = 0; i < nnodes; ++i) {
+    for (ptrdiff_t i = 0; i < nnodes; ++i) {
         n2eptr[i + 1] += n2eptr[i];
     }
 
@@ -100,27 +100,27 @@ static int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
                                             const ptrdiff_t nnodes,
                                             const int nnodesxelem,
                                             idx_t **const elems,
-                                            idx_t **out_rowptr,
+                                            count_t **out_rowptr,
                                             idx_t **out_colidx) {
     ptrdiff_t nnz = 0;
-    idx_t *rowptr = (idx_t *)malloc((nnodes + 1) * sizeof(idx_t));
+    count_t *rowptr = (count_t *)malloc((nnodes + 1) * sizeof(count_t));
     idx_t *colidx = 0;
 
     {
-        idx_t *n2eptr;
+        count_t *n2eptr;
         idx_t *elindex;
         build_n2e(nelements, nnodes, nnodesxelem, elems, &n2eptr, &elindex);
 
         rowptr[0] = 0;
 
         idx_t n2nbuff[2048];
-        for (idx_t node = 0; node < nnodes; ++node) {
-            idx_t ebegin = n2eptr[node];
-            idx_t eend = n2eptr[node + 1];
+        for (ptrdiff_t node = 0; node < nnodes; ++node) {
+            count_t ebegin = n2eptr[node];
+            count_t eend = n2eptr[node + 1];
 
             idx_t nneighs = 0;
 
-            for (idx_t e = ebegin; e < eend; ++e) {
+            for (count_t e = ebegin; e < eend; ++e) {
                 idx_t eidx = elindex[e];
                 assert(eidx < nelements);
 
@@ -140,13 +140,13 @@ static int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
         colidx = (idx_t *)malloc(nnz * sizeof(idx_t));
 
         ptrdiff_t coloffset = 0;
-        for (idx_t node = 0; node < nnodes; ++node) {
-            idx_t ebegin = n2eptr[node];
-            idx_t eend = n2eptr[node + 1];
+        for (ptrdiff_t node = 0; node < nnodes; ++node) {
+            count_t ebegin = n2eptr[node];
+            count_t eend = n2eptr[node + 1];
 
             idx_t nneighs = 0;
 
-            for (idx_t e = ebegin; e < eend; ++e) {
+            for (count_t e = ebegin; e < eend; ++e) {
                 idx_t eidx = elindex[e];
                 assert(eidx < nelements);
 
@@ -179,14 +179,14 @@ static int build_crs_graph_faster(const ptrdiff_t nelements,
                                   const ptrdiff_t nnodes,
                                   const int nnodesxelem,
                                   idx_t **const elems,
-                                  idx_t **out_rowptr,
+                                  count_t **out_rowptr,
                                   idx_t **out_colidx) {
     ptrdiff_t nnz = 0;
-    idx_t *rowptr = (idx_t *)malloc((nnodes + 1) * sizeof(idx_t));
+    count_t *rowptr = (count_t *)malloc((nnodes + 1) * sizeof(count_t));
     idx_t *colidx = 0;
 
     {
-        idx_t *n2eptr;
+        count_t *n2eptr;
         idx_t *elindex;
         build_n2e(nelements, nnodes, nnodesxelem, elems, &n2eptr, &elindex);
 
@@ -196,13 +196,13 @@ static int build_crs_graph_faster(const ptrdiff_t nelements,
 
         ptrdiff_t overestimated_nnz = 0;
         idx_t n2nbuff[2048];
-        for (idx_t node = 0; node < nnodes; ++node) {
-            const idx_t ebegin = n2eptr[node];
-            const idx_t eend = n2eptr[node + 1];
+        for (ptrdiff_t node = 0; node < nnodes; ++node) {
+            const count_t ebegin = n2eptr[node];
+            const count_t eend = n2eptr[node + 1];
 
             idx_t nneighs = 0;
 
-            for (idx_t e = ebegin; e < eend; ++e) {
+            for (count_t e = ebegin; e < eend; ++e) {
                 idx_t eidx = elindex[e];
                 assert(eidx < nelements);
 
@@ -223,13 +223,13 @@ static int build_crs_graph_faster(const ptrdiff_t nelements,
         tick = tock;
 
         ptrdiff_t coloffset = 0;
-        for (idx_t node = 0; node < nnodes; ++node) {
-            const idx_t ebegin = n2eptr[node];
-            const idx_t eend = n2eptr[node + 1];
+        for (ptrdiff_t node = 0; node < nnodes; ++node) {
+            const count_t ebegin = n2eptr[node];
+            const count_t eend = n2eptr[node + 1];
 
             idx_t nneighs = 0;
 
-            for (idx_t e = ebegin; e < eend; ++e) {
+            for (count_t e = ebegin; e < eend; ++e) {
                 const idx_t eidx = elindex[e];
                 assert(eidx < nelements);
 
@@ -267,7 +267,7 @@ static int build_crs_graph_faster(const ptrdiff_t nelements,
 int build_crs_graph(const ptrdiff_t nelements,
                     const ptrdiff_t nnodes,
                     idx_t **const elems,
-                    idx_t **out_rowptr,
+                    count_t **out_rowptr,
                     idx_t **out_colidx) {
     int SFEM_CRS_MEM_CONSERVATIVE = 0;
     SFEM_READ_ENV(SFEM_CRS_MEM_CONSERVATIVE, atoi);
@@ -282,7 +282,7 @@ int build_crs_graph(const ptrdiff_t nelements,
 int build_crs_graph_3(const ptrdiff_t nelements,
                       const ptrdiff_t nnodes,
                       idx_t **const elems,
-                      idx_t **out_rowptr,
+                      count_t **out_rowptr,
                       idx_t **out_colidx) {
     int SFEM_CRS_MEM_CONSERVATIVE = 0;
     SFEM_READ_ENV(SFEM_CRS_MEM_CONSERVATIVE, atoi);
@@ -296,15 +296,15 @@ int build_crs_graph_3(const ptrdiff_t nelements,
 
 int block_crs_to_crs(const ptrdiff_t nnodes,
                      const int block_size,
-                     const idx_t *const block_rowptr,
+                     const count_t *const block_rowptr,
                      const idx_t *const block_colidx,
                      const real_t *const block_values,
-                     idx_t *const rowptr,
+                     count_t *const rowptr,
                      idx_t *const colidx,
                      real_t *const values) {
     for (ptrdiff_t i = 0; i < nnodes; ++i) {
-        idx_t k = block_rowptr[i] * (block_size * block_size);
-        idx_t ncols = block_rowptr[i + 1] - block_rowptr[i];
+        count_t k = block_rowptr[i] * (block_size * block_size);
+        count_t ncols = block_rowptr[i + 1] - block_rowptr[i];
 
         for (int b = 0; b < block_size; ++b) {
             rowptr[i * block_size + b] = k + ncols * (b * block_size);
@@ -315,16 +315,18 @@ int block_crs_to_crs(const ptrdiff_t nnodes,
 
     for (ptrdiff_t i = 0; i < nnodes; ++i) {
         // Block row
-        const idx_t bstart = block_rowptr[i];
-        const idx_t bend = block_rowptr[i + 1];
+        const count_t bstart = block_rowptr[i];
+        const count_t bend = block_rowptr[i + 1];
 
         for (int brow = 0; brow < block_size; ++brow) {
             const idx_t row = i * block_size + brow;
             // Scalar row
-            const idx_t start = rowptr[row];
-            const idx_t end = rowptr[row + 1];
+            const count_t start = rowptr[row];
+#ifndef NDEBUG
+            const count_t end = rowptr[row + 1];
+#endif
 
-            for (idx_t bk = bstart, k = start; bk < bend; ++bk) {
+            for (count_t bk = bstart, k = start; bk < bend; ++bk) {
                 // Block column
                 const idx_t bcolidx = block_colidx[bk];
                 // Data block

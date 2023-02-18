@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     const char *folder = argv[1];
-    char path[1024 * 10];
+    // char path[1024 * 10];
 
     mesh_t mesh;
     if (mesh_read(comm, folder, &mesh)) {
@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
 
     MPI_Barrier(comm);
 
-    double tack = MPI_Wtime();
+    // double tack = MPI_Wtime();
 
     char output_path[2048];
     sprintf(output_path, "%s/part_%0.5d", output_folder, rank);

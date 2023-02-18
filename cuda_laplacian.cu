@@ -156,18 +156,18 @@ static inline __device__ void find_cols4(const idx_t *targets, const idx_t *cons
 }
 
 __global__ void laplacian_assemble_hessian_kernel(const ptrdiff_t nelements,
-                                          const ptrdiff_t nnodes,
-                                          idx_t **const elems,
-                                          geom_t **const xyz,
-                                          idx_t *const rowptr,
-                                          idx_t *const colidx,
-                                          real_t *const values) {
+                                                  const ptrdiff_t nnodes,
+                                                  idx_t **const elems,
+                                                  geom_t **const xyz,
+                                                  count_t *const rowptr,
+                                                  idx_t *const colidx,
+                                                  real_t *const values) {
     idx_t ev[4];
     idx_t ks[4];
     real_t element_matrix[4 * 4];
 
     for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < nelements; i += blockDim.x * gridDim.x) {
-        #pragma unroll(4)
+#pragma unroll(4)
         for (int v = 0; v < 4; ++v) {
             ev[v] = elems[v][i];
         }
@@ -195,7 +195,7 @@ __global__ void laplacian_assemble_hessian_kernel(const ptrdiff_t nelements,
             xyz[2][i2],
             xyz[2][i3],
             element_matrix);
-        
+
 #pragma unroll(4)
         for (int edof_i = 0; edof_i < 4; ++edof_i) {
             const idx_t dof_i = elems[edof_i][i];
@@ -226,12 +226,12 @@ __global__ void print_elem_kernel(const ptrdiff_t nelements, idx_t **const elems
 }
 
 extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
-                                   const ptrdiff_t nnodes,
-                                   idx_t **const elems,
-                                   geom_t **const xyz,
-                                   const idx_t *const rowptr,
-                                   const idx_t *const colidx,
-                                   real_t *const values) {
+                                           const ptrdiff_t nnodes,
+                                           idx_t **const elems,
+                                           geom_t **const xyz,
+                                           const idx_t *const rowptr,
+                                           const idx_t *const colidx,
+                                           real_t *const values) {
     double tick = MPI_Wtime();
 
     const ptrdiff_t nbatch = nelements;

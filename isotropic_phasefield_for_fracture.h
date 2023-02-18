@@ -14,7 +14,7 @@ void isotropic_phasefield_for_fracture_assemble_hessian(const ptrdiff_t nelement
                                                          const real_t Gc,
                                                          const real_t ls,
                                                          const real_t *const u,
-                                                         idx_t *const rowptr,
+                                                         count_t *const rowptr,
                                                          idx_t *const colidx,
                                                          real_t *const values);
 

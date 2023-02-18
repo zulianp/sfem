@@ -125,7 +125,7 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     ptrdiff_t nnz = 0;
-    idx_t *rowptr = 0;
+    count_t *rowptr = 0;
     idx_t *colidx = 0;
     real_t *values = 0;
 
@@ -165,7 +165,7 @@ int main(int argc, char *argv[]) {
     // Block to scalar operator
     ///////////////////////////////////////////////////////////////////////////////
 
-    idx_t *new_rowptr = (idx_t *)malloc(((nnodes)*block_size + 1) * sizeof(idx_t));
+    count_t *new_rowptr = (count_t *)malloc(((nnodes)*block_size + 1) * sizeof(count_t));
     idx_t *new_colidx = (idx_t *)malloc(nnz * mat_block_size * sizeof(idx_t));
     real_t *new_values = (real_t *)malloc(nnz * mat_block_size * sizeof(real_t));
 
@@ -256,7 +256,7 @@ int main(int argc, char *argv[]) {
         crs_out.gnnz = nnz * mat_block_size;
         crs_out.start = 0;
         crs_out.rowoffset = 0;
-        crs_out.rowptr_type = SFEM_MPI_IDX_T;
+        crs_out.rowptr_type = SFEM_MPI_COUNT_T;
         crs_out.colidx_type = SFEM_MPI_IDX_T;
         crs_out.values_type = value_type;
         crs_write_folder(comm, output_folder, &crs_out);

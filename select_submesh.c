@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     const char *folder = argv[1];
-    char path[1024 * 10];
+    // char path[1024 * 10];
 
     mesh_t mesh;
     if (mesh_surf_read(comm, folder, &mesh)) {
@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
         MPI_Abort(comm, -1);
     }
 
-    double tack = MPI_Wtime();
+    // double tack = MPI_Wtime();
 
     geom_t closest_sq_dist = 1000000;
     ptrdiff_t closest_node = -1;
@@ -120,7 +120,7 @@ int main(int argc, char *argv[]) {
         free(args);
 
     } else {
-        idx_t *rowptr;
+        count_t *rowptr;
         idx_t *colidx;
         build_crs_graph_3(mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
 

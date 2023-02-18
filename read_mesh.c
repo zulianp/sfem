@@ -288,6 +288,10 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
         mesh->node_owner = node_owner;
 
         double tock = MPI_Wtime();
+        if(!rank) {
+            printf("read_mesh.c: read_mesh\t%g seconds\n", tock - tick);
+        }
+
         return 0;
     } else {
         // Serial fallback
@@ -368,10 +372,16 @@ int serial_read_tet_mesh(const char *folder, ptrdiff_t *nelements, idx_t *elems[
         ptrdiff_t x_nnodes = read_file(MPI_COMM_SELF, path, (void **)&xyz[0]);
 
         sprintf(path, "%s/y.raw", folder);
-        ptrdiff_t y_nnodes = read_file(MPI_COMM_SELF, path, (void **)&xyz[1]);
+#ifndef NDEBUG
+        ptrdiff_t y_nnodes = 
+#endif
+        read_file(MPI_COMM_SELF, path, (void **)&xyz[1]);
 
         sprintf(path, "%s/z.raw", folder);
-        ptrdiff_t z_nnodes = read_file(MPI_COMM_SELF, path, (void **)&xyz[2]);
+#ifndef NDEBUG
+        ptrdiff_t z_nnodes = 
+#endif
+        read_file(MPI_COMM_SELF, path, (void **)&xyz[2]);
 
         assert(x_nnodes == y_nnodes);
         assert(x_nnodes == z_nnodes);
@@ -386,13 +396,22 @@ int serial_read_tet_mesh(const char *folder, ptrdiff_t *nelements, idx_t *elems[
         ptrdiff_t nindex0 = read_file(MPI_COMM_SELF, path, (void **)&elems[0]);
 
         sprintf(path, "%s/i1.raw", folder);
-        ptrdiff_t nindex1 = read_file(MPI_COMM_SELF, path, (void **)&elems[1]);
+#ifndef NDEBUG
+        ptrdiff_t nindex1 = 
+#endif
+        read_file(MPI_COMM_SELF, path, (void **)&elems[1]);
 
         sprintf(path, "%s/i2.raw", folder);
-        ptrdiff_t nindex2 = read_file(MPI_COMM_SELF, path, (void **)&elems[2]);
+#ifndef NDEBUG
+        ptrdiff_t nindex2 = 
+#endif
+        read_file(MPI_COMM_SELF, path, (void **)&elems[2]);
 
         sprintf(path, "%s/i3.raw", folder);
-        ptrdiff_t nindex3 = read_file(MPI_COMM_SELF, path, (void **)&elems[3]);
+#ifndef NDEBUG
+        ptrdiff_t nindex3 = 
+#endif
+        read_file(MPI_COMM_SELF, path, (void **)&elems[3]);
 
         assert(nindex0 == nindex1);
         assert(nindex3 == nindex2);

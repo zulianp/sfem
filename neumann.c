@@ -17,8 +17,6 @@ void surface_forcing_function(const ptrdiff_t nfaces,
                               real_t *output) {  // Neumann
     double tick = MPI_Wtime();
 
-    real_t u[3], v[3];
-    real_t element_vector[3];
     real_t jacobian[3 * 3] = {0, 0, 0, 0, 0, 0, 0, 0, 1};
 
     // real_t value = 2.0;
@@ -63,8 +61,6 @@ void surface_forcing_function_vec(const ptrdiff_t nfaces,
 {
     double tick = MPI_Wtime();
 
-    real_t u[3], v[3];
-    real_t element_vector[3];
     real_t jacobian[3 * 3] = {0, 0, 0, 0, 0, 0, 0, 0, 1};
 
     // real_t value = 2.0;

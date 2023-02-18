@@ -116,7 +116,7 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     ptrdiff_t nnz = 0;
-    idx_t *rowptr = 0;
+    count_t *rowptr = 0;
     idx_t *colidx = 0;
     real_t *values = 0;
 
@@ -219,12 +219,12 @@ int main(int argc, char *argv[]) {
         nn /= sizeof(idx_t);
 
         // Set rhs should not be necessary (but let us do it anyway)
-        for (idx_t node = 0; node < nn; ++node) {
+        for (ptrdiff_t node = 0; node < nn; ++node) {
             idx_t i = dirichlet_nodes[node];
             rhs[i] = 0;
         }
 
-        for (idx_t node = 0; node < nn; ++node) {
+        for (ptrdiff_t node = 0; node < nn; ++node) {
             idx_t i = dirichlet_nodes[node];
 
             idx_t begin = rowptr[i];
@@ -252,8 +252,8 @@ int main(int argc, char *argv[]) {
     MPI_Datatype value_type = SFEM_EXPORT_FP32? MPI_FLOAT : MPI_DOUBLE;
     
     if(SFEM_EXPORT_FP32) {
-        array_dtof(nnz,    (const double *)values, (float*)values);
-        array_dtof(nnodes, (const double *)rhs, (float*)rhs);
+        array_dtof(nnz,    (const real_t *)values, (float*)values);
+        array_dtof(nnodes, (const real_t *)rhs, (float*)rhs);
     }
 
     {
@@ -267,8 +267,8 @@ int main(int argc, char *argv[]) {
         crs_out.gnnz = nnz;
         crs_out.start = 0;
         crs_out.rowoffset = 0;
-        crs_out.rowptr_type = MPI_INT;
-        crs_out.colidx_type = MPI_INT;
+        crs_out.rowptr_type = SFEM_MPI_COUNT_T;
+        crs_out.colidx_type = SFEM_MPI_IDX_T;
         crs_out.values_type = value_type;
         crs_write_folder(comm, output_folder, &crs_out);
     }

@@ -186,19 +186,19 @@ static SFEM_INLINE void tet4_fe_grad(
 }
 
 //
-static SFEM_INLINE void tet4_fe_fun(
-    // Coefficients
-    const real_t *c,
-    const real_t qx,
-    const real_t qy,
-    const real_t qz,
-    // Out
-    real_t *output) {
-    // FLOATING POINT OPS!
-    //  - Result: 2*ADD + ASSIGNMENT + 7*MUL
-    //  - Subexpressions: 0
-    output[0] = c[0] * (-qx - qy - qz + 1) + c[1] * qx + c[2] * qy + c[3] * qz;
-}
+// static SFEM_INLINE void tet4_fe_fun(
+//     // Coefficients
+//     const real_t *c,
+//     const real_t qx,
+//     const real_t qy,
+//     const real_t qz,
+//     // Out
+//     real_t *output) {
+//     // FLOATING POINT OPS!
+//     //  - Result: 2*ADD + ASSIGNMENT + 7*MUL
+//     //  - Subexpressions: 0
+//     output[0] = c[0] * (-qx - qy - qz + 1) + c[1] * qx + c[2] * qy + c[3] * qz;
+// }
 
 static SFEM_INLINE void tet4_shape_fun(const real_t qx, const real_t qy, const real_t qz, real_t *f) {
     f[0] = 1 - qx - qy - qz;
@@ -450,6 +450,7 @@ static SFEM_INLINE void find_cols4(const idx_t *targets, const idx_t *const row,
     }
 }
 
+#ifndef NDEBUG
 static int check_symmetric(int n, const real_t *const element_matrix) {
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < n; ++j) {
@@ -469,7 +470,9 @@ static int check_symmetric(int n, const real_t *const element_matrix) {
 
     return 0;
 }
+#endif
 
+#ifndef NDEBUG
 static void numerate(int n, real_t *const element_matrix) {
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < n; ++j) {
@@ -477,6 +480,7 @@ static void numerate(int n, real_t *const element_matrix) {
         }
     }
 }
+#endif
 
 static const int n_qp = 8;
 static const real_t qx[8] = {0.0, 1.0, 0.0, 0.0, 0.333333333333, 0.333333333333, 0.0, 0.333333333333};
@@ -493,9 +497,11 @@ void isotropic_phasefield_for_fracture_assemble_hessian(const ptrdiff_t nelement
                                                         const real_t Gc,
                                                         const real_t ls,
                                                         const real_t *const u,
-                                                        idx_t *const rowptr,
+                                                        count_t *const rowptr,
                                                         idx_t *const colidx,
                                                         real_t *const values) {
+    SFEM_UNUSED(nnodes);
+
     double tick = MPI_Wtime();
 
     static const int block_size = 4;
@@ -650,10 +656,11 @@ void isotropic_phasefield_for_fracture_assemble_gradient(const ptrdiff_t nelemen
                                                          const real_t ls,
                                                          const real_t *const u,
                                                          real_t *const values) {
+    SFEM_UNUSED(nnodes);
+
     double tick = MPI_Wtime();
 
     static const int block_size = 4;
-    static const int mat_block_size = block_size * block_size;
 
     idx_t ev[4];
     real_t element_node_vector[4];
@@ -773,18 +780,20 @@ void isotropic_phasefield_for_fracture_assemble_value(const ptrdiff_t nelements,
                                                       const real_t ls,
                                                       const real_t *const u,
                                                       real_t *const value) {
+    SFEM_UNUSED(nnodes);
+    
     double tick = MPI_Wtime();
 
     static const int block_size = 4;
-    static const int mat_block_size = block_size * block_size;
+    // static const int mat_block_size = block_size * block_size;
 
     idx_t ev[4];
-    real_t element_node_vector[4];
+    // real_t element_node_vector[4];
     real_t element_displacement[4 * 3];
     real_t element_phasefield[4];
 
     real_t shape_fun[4];
-    real_t shape_grad[4 * 3];
+    // real_t shape_grad[4 * 3];
 
     real_t grad_phasefield[3];
     real_t grad_displacement[3 * 3];

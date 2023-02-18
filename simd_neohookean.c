@@ -905,9 +905,11 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
                                  const real_t mu,
                                  const real_t lambda,
                                  const real_t *const displacement,
-                                 idx_t *const rowptr,
+                                 count_t *const rowptr,
                                  idx_t *const colidx,
                                  real_t *const values) {
+    SFEM_UNUSED(nnodes);
+
     double tick = MPI_Wtime();
 
     vreal_t x[4];

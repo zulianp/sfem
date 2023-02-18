@@ -46,14 +46,14 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     const char *folder = argv[1];
-    char path[1024 * 10];
+    // char path[1024 * 10];
 
     mesh_t mesh;
     if (mesh_read(comm, folder, &mesh)) {
         return EXIT_FAILURE;
     }
 
-    double tack = MPI_Wtime();
+    // double tack = MPI_Wtime();
 
     mesh_t fine_mesh;
 
