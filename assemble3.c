@@ -221,8 +221,8 @@ int main(int argc, char *argv[]) {
     MPI_Datatype value_type = SFEM_EXPORT_FP32 ? MPI_FLOAT : SFEM_MPI_REAL_T;
 
     if (SFEM_EXPORT_FP32) {
-        array_dtof(nnz * 9, (const double *)values, (float *)values);
-        // array_dtof(nnodes, (const double *)rhs, (float*)rhs);
+        array_dtof(nnz * 9, (const real_t *)values, (float *)values);
+        // array_dtof(nnodes, (const real_t *)rhs, (float*)rhs);
     }
 
     {
