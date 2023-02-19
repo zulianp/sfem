@@ -13,6 +13,15 @@
 
 #include "sortreduce.h"
 
+#define array_remap(n_, type_, mapping_, array_, temp_)   \
+    do {                                                  \
+        type_ *temp_actual_ = (type_ *)temp_;             \
+        memcpy(temp_actual_, array_, n_ * sizeof(type_)); \
+        for (ptrdiff_t i = 0; i < n_; ++i) {              \
+            array_[mapping_[i]] = temp_actual_[i];        \
+        }                                                 \
+    } while (0)
+
 int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, const char *folder, mesh_t *mesh) {
     int rank, size;
     MPI_Comm_rank(comm, &rank);
@@ -182,9 +191,9 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
         ///////////////////////////////////////////////////////////////////////
         // Determine owners
         int *node_owner = (idx_t *)malloc(n_unique * sizeof(idx_t));
-        
-        {   
-            int *decide_node_owner = (int*)malloc(n_local_nodes * sizeof(int));
+
+        {
+            int *decide_node_owner = (int *)malloc(n_local_nodes * sizeof(int));
 
             int *send_node_owner = (int *)malloc(size_send_list * sizeof(int));
 
@@ -232,35 +241,64 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
             }
         }
 
-        ///////////////////////////////////////////////////////////////////////
-        // MPI_Barrier(comm);
-        // for (int r = 0; r < size; ++r) {
-        //     if (r == rank) {
-        //         printf("[%d] elements\n", rank);
+        // We want owned nodes first
+        // We want remote nodes after in following owner-rank order
 
-        //         for (ptrdiff_t e = 0; e < n_local_elements; ++e) {
-        //             for (ptrdiff_t d = 0; d < nnodesxelem; ++d) {
-        //                 printf(
-        //                     "%d (%d, %d), ", (int)elems[d][e], (int)unique_idx[elems[d][e]], (int)node_owner[elems[d][e]]);
-        //             }
+        if (1) {
+            ////////////////////////////////////////////////////////////
 
-        //             printf("\n");
-        //         }
+            idx_t *proc_ptr = (idx_t *)malloc((size + 1) * sizeof(idx_t));
+            memset(proc_ptr, 0, (size + 1) * sizeof(idx_t));
 
-        //         printf("\n");
-        //         printf("------------------\n");
+            idx_t *offset = (idx_t *)malloc((size) * sizeof(idx_t));
+            memset(offset, 0, size * sizeof(idx_t));
 
-        //         fflush(stdout);
-        //     }
+            for (ptrdiff_t node = 0; node < n_unique; ++node) {
+                proc_ptr[node_owner[node] + 1] += 1;
+            }
 
-        //     sleep(0.1);
+            const ptrdiff_t n_owned = proc_ptr[rank + 1];
+            // Remove offset
+            proc_ptr[rank + 1] = 0;
 
-        //     MPI_Barrier(comm);
-        // }
+            proc_ptr[0] = n_owned;
+            for (int r = 0; r < size; ++r) {
+                proc_ptr[r + 1] += proc_ptr[r];
+            }
+
+            // This rank comes first
+            proc_ptr[rank] = 0;
+
+            // Build local remap index
+            idx_t *local_remap = (idx_t *)malloc((n_unique) * sizeof(idx_t));
+            for (ptrdiff_t node = 0; node < n_unique; ++node) {
+                int owner = node_owner[node];
+                local_remap[node] = proc_ptr[owner] + offset[owner]++;
+            }
+
+            const size_t max_sz = MAX(sizeof(int), MAX(sizeof(idx_t), sizeof(real_t)));
+            void *temp_buff = malloc(n_unique * max_sz);
+
+            for (int d = 0; d < ndims; ++d) {
+                geom_t * x = part_xyz[d];
+                array_remap(n_unique, geom_t, local_remap, x, temp_buff);
+            }
+
+            array_remap(n_unique, int, local_remap, node_owner, temp_buff);
+            array_remap(n_unique, idx_t, local_remap, unique_idx, temp_buff);
+
+            for (int d = 0; d < nnodesxelem; ++d) {
+                for(ptrdiff_t e = 0; e < n_local_elements; ++e) {
+                    elems[d][e] = local_remap[elems[d][e]];
+                }
+            }
+
+            free(local_remap);
+            free(proc_ptr);
+        }
 
         ///////////////////////////////////////////////////////////////////////
         // Free space
-        // free(unique_idx);
         free(sendx);
         free(send_list);
         free(input_node_partitions);
@@ -274,9 +312,8 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
         mesh->comm = comm;
         mesh->mem_space = SFEM_MEM_SPACE_HOST;
 
-        
-        mesh->spatial_dim = 3;
-        mesh->element_type = 4;
+        mesh->spatial_dim = ndims;
+        mesh->element_type = nnodesxelem;
 
         mesh->elements = elems;
         mesh->points = part_xyz;
@@ -288,7 +325,7 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
         mesh->node_owner = node_owner;
 
         double tock = MPI_Wtime();
-        if(!rank) {
+        if (!rank) {
             printf("read_mesh.c: read_mesh\t%g seconds\n", tock - tick);
         }
 
@@ -312,10 +349,27 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
         {
             idx_t *idx = 0;
 
+            ptrdiff_t n_local_elements0 = 0, n_elements0 = 0;
             for (int d = 0; d < nnodesxelem; ++d) {
                 sprintf(path, "%s/i%d.raw", folder, d);
                 array_read(comm, path, mpi_idx_t, (void **)&idx, &n_local_elements, &n_elements);
                 elems[d] = idx;
+
+                if (d == 0) {
+                    n_local_elements0 = n_local_elements;
+                    n_elements0 = n_elements;
+                } else {
+                    assert(n_local_elements0 == n_local_elements);
+                    assert(n_elements0 == n_elements);
+
+                    if (n_elements0 != n_elements) {
+                        fprintf(stderr,
+                                "Inconsistent lenghts in input %ld != %ld\n",
+                                (long)n_local_elements0,
+                                (long)n_local_elements);
+                        MPI_Abort(comm, -1);
+                    }
+                }
             }
         }
 
@@ -372,16 +426,10 @@ int serial_read_tet_mesh(const char *folder, ptrdiff_t *nelements, idx_t *elems[
         ptrdiff_t x_nnodes = read_file(MPI_COMM_SELF, path, (void **)&xyz[0]);
 
         sprintf(path, "%s/y.raw", folder);
-#ifndef NDEBUG
-        ptrdiff_t y_nnodes = 
-#endif
-        read_file(MPI_COMM_SELF, path, (void **)&xyz[1]);
+        ptrdiff_t y_nnodes = read_file(MPI_COMM_SELF, path, (void **)&xyz[1]);
 
         sprintf(path, "%s/z.raw", folder);
-#ifndef NDEBUG
-        ptrdiff_t z_nnodes = 
-#endif
-        read_file(MPI_COMM_SELF, path, (void **)&xyz[2]);
+        ptrdiff_t z_nnodes = read_file(MPI_COMM_SELF, path, (void **)&xyz[2]);
 
         assert(x_nnodes == y_nnodes);
         assert(x_nnodes == z_nnodes);
@@ -389,6 +437,11 @@ int serial_read_tet_mesh(const char *folder, ptrdiff_t *nelements, idx_t *elems[
         x_nnodes /= sizeof(geom_t);
         assert(x_nnodes * sizeof(geom_t) == y_nnodes);
         *nnodes = x_nnodes;
+
+        if (x_nnodes != y_nnodes || x_nnodes != z_nnodes) {
+            fprintf(stderr, "Bad input lengths!\n");
+            return -1;
+        }
     }
 
     {
@@ -396,25 +449,21 @@ int serial_read_tet_mesh(const char *folder, ptrdiff_t *nelements, idx_t *elems[
         ptrdiff_t nindex0 = read_file(MPI_COMM_SELF, path, (void **)&elems[0]);
 
         sprintf(path, "%s/i1.raw", folder);
-#ifndef NDEBUG
-        ptrdiff_t nindex1 = 
-#endif
-        read_file(MPI_COMM_SELF, path, (void **)&elems[1]);
+        ptrdiff_t nindex1 = read_file(MPI_COMM_SELF, path, (void **)&elems[1]);
 
         sprintf(path, "%s/i2.raw", folder);
-#ifndef NDEBUG
-        ptrdiff_t nindex2 = 
-#endif
-        read_file(MPI_COMM_SELF, path, (void **)&elems[2]);
+        ptrdiff_t nindex2 = read_file(MPI_COMM_SELF, path, (void **)&elems[2]);
 
         sprintf(path, "%s/i3.raw", folder);
-#ifndef NDEBUG
-        ptrdiff_t nindex3 = 
-#endif
-        read_file(MPI_COMM_SELF, path, (void **)&elems[3]);
+        ptrdiff_t nindex3 = read_file(MPI_COMM_SELF, path, (void **)&elems[3]);
 
         assert(nindex0 == nindex1);
         assert(nindex3 == nindex2);
+
+        if (nindex0 != nindex1 || nindex0 != nindex2 || nindex0 != nindex3) {
+            fprintf(stderr, "Bad input lengths!\n");
+            return -1;
+        }
 
         nindex0 /= sizeof(idx_t);
         assert(nindex0 * sizeof(idx_t) == nindex1);
@@ -424,8 +473,7 @@ int serial_read_tet_mesh(const char *folder, ptrdiff_t *nelements, idx_t *elems[
     return 0;
 }
 
-int mesh_surf_read(MPI_Comm comm, const char *folder, mesh_t *mesh)
-{
+int mesh_surf_read(MPI_Comm comm, const char *folder, mesh_t *mesh) {
     int nnodesxelem = 3;
     int ndims = 3;
     return mesh_read_generic(comm, nnodesxelem, ndims, folder, mesh);
@@ -436,3 +484,5 @@ int mesh_read(MPI_Comm comm, const char *folder, mesh_t *mesh) {
     int ndims = 3;
     return mesh_read_generic(comm, nnodesxelem, ndims, folder, mesh);
 }
+
+#undef array_remap
