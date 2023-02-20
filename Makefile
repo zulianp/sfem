@@ -35,9 +35,20 @@ CUFLAGS += --compiler-options -fPIC -std=c++17 -arch=native
 
 # CUFLAGS += --compiler-options -fPIC -O0 -g -std=c++17
 
-INCLUDES += -I$(PWD) -I$(PWD)/../matrix.io
+INCLUDES += -I$(PWD) -I$(PWD)/.. -I$(PWD)/../matrix.io 
 
-GOALS = assemble assemble3 assemble4 condense_matrix condense_vector idx_to_indicator remap_vector partition select_submesh refine
+# Assemble systems
+GOALS = assemble assemble3 assemble4 
+
+# Mesh manipulation
+GOALS += partition select_submesh refine
+
+# Algebra post process
+GOALS += condense_matrix condense_vector idx_to_indicator remap_vector 
+
+# Resampling
+GOALS += pizzastack_to_mesh
+
 DEPS = -L$(PWD)/../matrix.io/ -lmatrix.io -lstdc++
 
 LDFLAGS += $(DEPS) -lm
@@ -101,7 +112,10 @@ select_submesh : select_submesh.o libsfem.a
 
 refine : refine.o libsfem.a
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
-	
+
+pizzastack_to_mesh: resampling/pizzastack_to_mesh.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
+
 condense_matrix : condense_matrix.o
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
