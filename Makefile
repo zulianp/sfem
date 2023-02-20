@@ -44,7 +44,7 @@ GOALS = assemble assemble3 assemble4
 GOALS += partition select_submesh refine
 
 # Algebra post process
-GOALS += condense_matrix condense_vector idx_to_indicator remap_vector 
+GOALS += condense_matrix condense_vector idx_to_indicator remap_vector sgather
 
 # Resampling
 GOALS += pizzastack_to_mesh
@@ -128,6 +128,9 @@ idx_to_indicator : idx_to_indicator.o
 remap_vector : remap_vector.o
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
+sgather : sgather.o
+	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+	
 utopia_sfem.dylib : utopia_sfem_plugin.o  libsfem.a
 	$(MPICC) -shared -o $@ $^ $(LDFLAGS)  
 
