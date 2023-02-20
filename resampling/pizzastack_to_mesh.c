@@ -72,13 +72,13 @@ void resample_box_to_tetra_mesh(const count_t n[3],
     free(zbi_max);
 }
 
-void cell_list_1D_create(cell_list_1D *cl, 
-    const ptrdiff_t n, 
-    const geom_t *SFEM_RESTRICT zbi_min,
-    const geom_t *SFEM_RESTRICT zbi_max) {
-    ptrdiff_t *zhisto = malloc(nbins * sizeof(ptrdiff_t));
-    histogram(x, shift, scaling, nbins, zhisto);
-}
+// void cell_list_1D_create(cell_list_1D *cl, 
+//     const ptrdiff_t n, 
+//     const geom_t *SFEM_RESTRICT zbi_min,
+//     const geom_t *SFEM_RESTRICT zbi_max) {
+//     ptrdiff_t *zhisto = malloc(nbins * sizeof(ptrdiff_t));
+//     histogram(x, shift, scaling, nbins, zhisto);
+// }
 
 
 int main(int argc, char *argv[]) {
