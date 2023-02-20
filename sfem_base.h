@@ -34,4 +34,6 @@ typedef long count_t;
 
 #define SFEM_UNUSED(var)(void)var
 
+#define SFEM_RESTRICT __restrict__
+
 #endif //SFEM_BASE_H

@@ -13,12 +13,17 @@
 #include "sfem_base.h"
 #include "sfem_mesh_write.h"
 
+typedef struct {
+    ptrdiff_t *cell_ptr;
+    ptrdiff_t *idx;
+} cell_list_1D;
+
 static void histogram(const ptrdiff_t nnodes,
-                       const geom_t *x,
-                       const geom_t shift,
-                       const geom_t scaling,
-                       const ptrdiff_t nbins,
-                        ptrdiff_t *histo) {
+                      const geom_t *x,
+                      const geom_t shift,
+                      const geom_t scaling,
+                      const ptrdiff_t nbins,
+                      ptrdiff_t *histo) {
     memset(histo, 0, nbins * sizeof(ptrdiff_t));
     for (ptrdiff_t i = 0; i < nnodes; ++i) {
         ptrdiff_t idx = scaling * (x[i] + shift);
@@ -26,45 +31,55 @@ static void histogram(const ptrdiff_t nnodes,
     }
 }
 
-typedef struct {
-    ptrdiff_t *cell_ptr;
-    ptrdiff_t *idx;
-} cell_list_1D;
+static void bounding_intervals(const ptrdiff_t n_elements,
+                               const int n_nodes_per_elem,
+                               idx_t **const elems,
+                               geom_t *const SFEM_RESTRICT x,
+                               geom_t *const SFEM_RESTRICT bi_min,
+                               geom_t *const SFEM_RESTRICT bi_max) {
+    for (ptrdiff_t e = 0; e < n_elements; e++) {
+        const idx_t i = elems[0][e];
+        bi_min[e] = x[i];
+        bi_max[e] = x[i];
+    }
 
-static void bouding_intervals(const ptrdiff_t n_elements,
-                              const int n_nodes_per_elem,
-                              idx_t **const elems,
-                                geom_t **const x,
-                                geom_t *const __restrict__ bi_min,
-                                geom_t *const __restrict__ bi_max)
-{
-    //
-    
-
-    for(int d = 0; d < n_nodes_per_elem; ++d) {
+    for (int d = 1; d < n_nodes_per_elem; ++d) {
         const idx_t *idx = elems[d];
 
-        for(ptrdiff_t i = 0; i < nelements; ++i) {
-            bi_min[i]
+        for (ptrdiff_t e = 1; e < n_elements; e++) {
+            const idx_t i = idx[e];
+            bi_min[e] = MIN(bi_min[e], x[i]);
+            bi_max[e] = MAX(bi_max[e], x[i]);
         }
     }
 }
 
-// void cell_list_1D_create(cell_list_1D *cl, const ptrdiff_t nnodes, const geom_t *x, ) {
-//     ptrdiff_t *zhisto = malloc(nbins * sizeof(ptrdiff_t));
-//     histogram(x, shift, scaling, nbins, zhisto);
-// }
-
 void resample_box_to_tetra_mesh(const count_t n[3],
                                 const count_t ld[3],
-                                const real_t *__restrict__ box_field,
+                                const real_t *SFEM_RESTRICT box_field,
                                 const ptrdiff_t n_elements,
                                 const ptrdiff_t n_nodes,
                                 idx_t **const elems,
                                 geom_t **const xyz,
-                                real_t *const __restrict__ mesh_field) {
-    //
+                                real_t *const SFEM_RESTRICT mesh_field) {
+    geom_t *zbi_min = (geom_t *)malloc(n_elements * sizeof(geom_t));
+    geom_t *zbi_max = (geom_t *)malloc(n_elements * sizeof(geom_t));
+
+    bounding_intervals(n_elements, 4, elems, xyz[2], zbi_min, zbi_max);
+
+    
+    free(zbi_min);
+    free(zbi_max);
 }
+
+void cell_list_1D_create(cell_list_1D *cl, 
+    const ptrdiff_t n, 
+    const geom_t *SFEM_RESTRICT zbi_min,
+    const geom_t *SFEM_RESTRICT zbi_max) {
+    ptrdiff_t *zhisto = malloc(nbins * sizeof(ptrdiff_t));
+    histogram(x, shift, scaling, nbins, zhisto);
+}
+
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
