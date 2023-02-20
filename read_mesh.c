@@ -5,6 +5,8 @@
 #include "../matrix.io/utils.h"
 
 #include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -13,13 +15,22 @@
 
 #include "sortreduce.h"
 
-#define array_remap(n_, type_, mapping_, array_, temp_)   \
-    do {                                                  \
-        type_ *temp_actual_ = (type_ *)temp_;             \
-        memcpy(temp_actual_, array_, n_ * sizeof(type_)); \
-        for (ptrdiff_t i = 0; i < n_; ++i) {              \
-            array_[mapping_[i]] = temp_actual_[i];        \
-        }                                                 \
+#define array_remap_scatter(n_, type_, mapping_, array_, temp_) \
+    do {                                                        \
+        type_ *temp_actual_ = (type_ *)temp_;                   \
+        memcpy(temp_actual_, array_, n_ * sizeof(type_));       \
+        for (ptrdiff_t i = 0; i < n_; ++i) {                    \
+            array_[mapping_[i]] = temp_actual_[i];              \
+        }                                                       \
+    } while (0)
+
+#define array_remap_gather(n_, type_, mapping_, array_, temp_) \
+    do {                                                       \
+        type_ *temp_actual_ = (type_ *)temp_;                  \
+        memcpy(temp_actual_, array_, n_ * sizeof(type_));      \
+        for (ptrdiff_t i = 0; i < n_; ++i) {                   \
+            array_[i] = temp_actual_[mapping_[i]];             \
+        }                                                      \
     } while (0)
 
 int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, const char *folder, mesh_t *mesh) {
@@ -28,7 +39,7 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
     MPI_Comm_size(comm, &size);
 
     static const int remap_nodes = 1;
-    static const int remap_elements = 0;
+    static const int remap_elements = 1;
 
     if (size > 1) {
         double tick = MPI_Wtime();
@@ -247,73 +258,99 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
         ////////////////////////////////////////////////////////////
         // Remap node index
 
-        if (remap_nodes) {
-            idx_t *proc_ptr = (idx_t *)malloc((size + 1) * sizeof(idx_t));
-            memset(proc_ptr, 0, (size + 1) * sizeof(idx_t));
+        idx_t *proc_ptr = (idx_t *)malloc((size + 1) * sizeof(idx_t));
+        memset(proc_ptr, 0, (size + 1) * sizeof(idx_t));
 
-            idx_t *offset = (idx_t *)malloc((size) * sizeof(idx_t));
-            memset(offset, 0, size * sizeof(idx_t));
+        idx_t *offset = (idx_t *)malloc((size) * sizeof(idx_t));
+        memset(offset, 0, size * sizeof(idx_t));
 
-            for (ptrdiff_t node = 0; node < n_unique; ++node) {
-                proc_ptr[node_owner[node] + 1] += 1;
-            }
-
-            const ptrdiff_t n_owned = proc_ptr[rank + 1];
-            // Remove offset
-            proc_ptr[rank + 1] = 0;
-
-            proc_ptr[0] = n_owned;
-            for (int r = 0; r < size; ++r) {
-                proc_ptr[r + 1] += proc_ptr[r];
-            }
-
-            // This rank comes first
-            proc_ptr[rank] = 0;
-
-            // Build local remap index
-            idx_t *local_remap = (idx_t *)malloc((n_unique) * sizeof(idx_t));
-            for (ptrdiff_t node = 0; node < n_unique; ++node) {
-                int owner = node_owner[node];
-                local_remap[node] = proc_ptr[owner] + offset[owner]++;
-            }
-
-            const size_t max_sz = MAX(sizeof(int), MAX(sizeof(idx_t), sizeof(real_t)));
-            void *temp_buff = malloc(n_unique * max_sz);
-
-            for (int d = 0; d < ndims; ++d) {
-                geom_t *x = part_xyz[d];
-                array_remap(n_unique, geom_t, local_remap, x, temp_buff);
-            }
-
-            array_remap(n_unique, int, local_remap, node_owner, temp_buff);
-            array_remap(n_unique, idx_t, local_remap, unique_idx, temp_buff);
-
-            for (int d = 0; d < nnodesxelem; ++d) {
-                for (ptrdiff_t e = 0; e < n_local_elements; ++e) {
-                    elems[d][e] = local_remap[elems[d][e]];
-                }
-            }
-
-            free(local_remap);
-            free(proc_ptr);
+        for (ptrdiff_t node = 0; node < n_unique; ++node) {
+            proc_ptr[node_owner[node] + 1] += 1;
         }
+
+        const ptrdiff_t n_owned_nodes = proc_ptr[rank + 1];
+        // Remove offset
+        proc_ptr[rank + 1] = 0;
+
+        proc_ptr[0] = n_owned_nodes;
+        for (int r = 0; r < size; ++r) {
+            proc_ptr[r + 1] += proc_ptr[r];
+        }
+
+        // This rank comes first
+        proc_ptr[rank] = 0;
+
+        // Build local remap index
+        idx_t *local_remap = (idx_t *)malloc((n_unique) * sizeof(idx_t));
+        for (ptrdiff_t node = 0; node < n_unique; ++node) {
+            int owner = node_owner[node];
+            local_remap[node] = proc_ptr[owner] + offset[owner]++;
+        }
+
+        const size_t max_sz = MAX(sizeof(int), MAX(sizeof(idx_t), sizeof(real_t)));
+        void *temp_buff = malloc(n_unique * max_sz);
+
+        for (int d = 0; d < ndims; ++d) {
+            geom_t *x = part_xyz[d];
+            array_remap_scatter(n_unique, geom_t, local_remap, x, temp_buff);
+        }
+
+        array_remap_scatter(n_unique, int, local_remap, node_owner, temp_buff);
+        array_remap_scatter(n_unique, idx_t, local_remap, unique_idx, temp_buff);
+
+        for (int d = 0; d < nnodesxelem; ++d) {
+            for (ptrdiff_t e = 0; e < n_local_elements; ++e) {
+                elems[d][e] = local_remap[elems[d][e]];
+            }
+        }
+
+        free(local_remap);
+        free(proc_ptr);
+
+        ////////////////////////////////////////////////////////////
+        // Remap element index
 
         if (remap_elements) {
             idx_t *temp_buff = (idx_t *)malloc(n_local_elements * sizeof(idx_t));
-            uint8_t *is_local = (uint8_t*)malloc(n_local_elements * sizeof(idx_t));
-            memset(is_local, 0, n_local_elements*sizeof(uint8_t));
+            char *is_local = (char *)malloc(n_local_elements * sizeof(char));
+            memset(is_local, 0, n_local_elements * sizeof(char));
 
             for (int d = 0; d < nnodesxelem; ++d) {
                 for (ptrdiff_t e = 0; e < n_local_elements; ++e) {
-                    idx_t idx = elems[d][e];
-                    if(node_owner[idx] == rank) {
+                    const idx_t idx = elems[d][e];
+                    if (node_owner[idx] == rank) {
                         is_local[e] = 1;
                     }
                 }
             }
 
+            idx_t *element_mapping = (idx_t *)malloc(n_local_elements * sizeof(idx_t));
+
+            ptrdiff_t counter = 0;
+            for (ptrdiff_t e = 0; e < n_local_elements; ++e) {
+                if (is_local[e]) {
+                    element_mapping[counter++] = e;
+                }
+            }
+
+            mesh->n_shared_elements = n_local_elements-counter;
+            for (ptrdiff_t e = 0; e < n_local_elements; ++e) {
+                if (!is_local[e]) {
+                    element_mapping[counter++] = e;
+                }
+            }
+
+            for (int d = 0; d < nnodesxelem; ++d) {
+                array_remap_gather(n_local_elements, idx_t, element_mapping, elems[d], temp_buff);
+            }
+
+            mesh->element_mapping = element_mapping;
+
             free(temp_buff);
             free(is_local);
+        } else {
+            mesh->element_mapping = 0;
+            mesh->n_shared_elements = 0;
         }
 
         ///////////////////////////////////////////////////////////////////////
@@ -339,8 +376,12 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
         mesh->nelements = n_local_elements;
         mesh->nnodes = n_unique;
 
+        mesh->n_owned_nodes = n_owned_nodes;
+        mesh->n_owned_elements = n_local_elements;
+        
+
         // Original indexing
-        mesh->mapping = unique_idx;
+        mesh->node_mapping = unique_idx;
         mesh->node_owner = node_owner;
 
         double tock = MPI_Wtime();
@@ -418,9 +459,14 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
         mesh->elements = elems;
         mesh->points = xyz;
 
-        mesh->mapping = 0;
+        mesh->n_owned_nodes = n_local_nodes;
+        mesh->n_owned_elements = n_local_elements;
+        mesh->n_shared_elements = 0;
+
+        mesh->node_mapping = 0;
         mesh->node_owner = 0;
 
+        mesh->element_mapping = 0;
         return 0;
     }
 }
@@ -504,4 +550,5 @@ int mesh_read(MPI_Comm comm, const char *folder, mesh_t *mesh) {
     return mesh_read_generic(comm, nnodesxelem, ndims, folder, mesh);
 }
 
-#undef array_remap
+#undef array_remap_scatter
+#undef array_remap_gather

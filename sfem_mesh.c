@@ -11,8 +11,9 @@ void mesh_destroy(mesh_t *mesh) {
         mesh->points[d] = 0;
     }
 
-    free(mesh->mapping);
+    free(mesh->node_mapping);
     free(mesh->node_owner);
+    free(mesh->element_mapping);
 
     mesh->comm = MPI_COMM_NULL;
     mesh->mem_space = SFEM_MEM_SPACE_NONE;

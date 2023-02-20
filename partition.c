@@ -65,7 +65,12 @@ int main(int argc, char *argv[]) {
 
     for (int r = 0; r < size; ++r) {
         if (r == rank) {
-            printf("[%d] #elements %ld #nodes %ld\n", rank, (long)mesh.nelements, (long)mesh.nnodes);
+            printf("[%d] #elements %ld #nodes %ld #owned_nodes %ld #shared_elements %ld\n",
+                   rank,
+                   (long)mesh.nelements,
+                   (long)mesh.nnodes,
+                   (long)mesh.n_owned_nodes,
+                   (long)mesh.n_shared_elements);
         }
 
         fflush(stdout);
@@ -75,7 +80,6 @@ int main(int argc, char *argv[]) {
 
     MPI_Barrier(comm);
 
-    
     mesh_destroy(&mesh);
     double tock = MPI_Wtime();
 

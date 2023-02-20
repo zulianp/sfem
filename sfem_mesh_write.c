@@ -38,9 +38,14 @@ int mesh_write(const char *path, const mesh_t *mesh) {
             array_write(comm, output_path, SFEM_MPI_IDX_T, mesh->elements[d], mesh->nelements, mesh->nelements);
         }
 
-        if(mesh->mapping) {
-            sprintf(output_path, "%s/mapping.raw", path);
-            array_write(comm, output_path, SFEM_MPI_IDX_T, mesh->mapping, mesh->nnodes, mesh->nnodes);
+        if(mesh->node_mapping) {
+            sprintf(output_path, "%s/node_mapping.raw", path);
+            array_write(comm, output_path, SFEM_MPI_IDX_T, mesh->node_mapping, mesh->nnodes, mesh->nnodes);
+        }
+
+        if(mesh->element_mapping) {
+            sprintf(output_path, "%s/element_mapping.raw", path);
+            array_write(comm, output_path, SFEM_MPI_IDX_T, mesh->element_mapping, mesh->nelements, mesh->nelements);
         }
 
         return 0;

@@ -19,12 +19,19 @@ typedef struct {
 
 	ptrdiff_t nelements;
 	ptrdiff_t nnodes;
-	
+
 	idx_t **elements;
 	geom_t **points;
 
-	idx_t *mapping;
+
+	ptrdiff_t n_owned_nodes;
+	ptrdiff_t n_owned_elements;
+	ptrdiff_t n_shared_elements;
+
+	idx_t *node_mapping;
 	int *node_owner;
+
+	idx_t *element_mapping;
 } mesh_t;
 
 void mesh_destroy(mesh_t *mesh);

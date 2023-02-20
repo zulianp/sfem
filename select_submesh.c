@@ -232,7 +232,7 @@ int main(int argc, char *argv[]) {
     selection.elements = elems;
     selection.points = points;
 
-    selection.mapping = mapping;
+    selection.node_mapping = mapping;
     selection.node_owner = 0;
 
     mesh_write(output_folder, &selection);
