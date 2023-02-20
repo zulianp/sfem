@@ -27,6 +27,9 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
 
+    static const int remap_nodes = 1;
+    static const int remap_elements = 0;
+
     if (size > 1) {
         double tick = MPI_Wtime();
         ///////////////////////////////////////////////////////////////
@@ -241,12 +244,10 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
             }
         }
 
-        // We want owned nodes first
-        // We want remote nodes after in following owner-rank order
+        ////////////////////////////////////////////////////////////
+        // Remap node index
 
-        if (1) {
-            ////////////////////////////////////////////////////////////
-
+        if (remap_nodes) {
             idx_t *proc_ptr = (idx_t *)malloc((size + 1) * sizeof(idx_t));
             memset(proc_ptr, 0, (size + 1) * sizeof(idx_t));
 
@@ -280,7 +281,7 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
             void *temp_buff = malloc(n_unique * max_sz);
 
             for (int d = 0; d < ndims; ++d) {
-                geom_t * x = part_xyz[d];
+                geom_t *x = part_xyz[d];
                 array_remap(n_unique, geom_t, local_remap, x, temp_buff);
             }
 
@@ -288,13 +289,31 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
             array_remap(n_unique, idx_t, local_remap, unique_idx, temp_buff);
 
             for (int d = 0; d < nnodesxelem; ++d) {
-                for(ptrdiff_t e = 0; e < n_local_elements; ++e) {
+                for (ptrdiff_t e = 0; e < n_local_elements; ++e) {
                     elems[d][e] = local_remap[elems[d][e]];
                 }
             }
 
             free(local_remap);
             free(proc_ptr);
+        }
+
+        if (remap_elements) {
+            idx_t *temp_buff = (idx_t *)malloc(n_local_elements * sizeof(idx_t));
+            uint8_t *is_local = (uint8_t*)malloc(n_local_elements * sizeof(idx_t));
+            memset(is_local, 0, n_local_elements*sizeof(uint8_t));
+
+            for (int d = 0; d < nnodesxelem; ++d) {
+                for (ptrdiff_t e = 0; e < n_local_elements; ++e) {
+                    idx_t idx = elems[d][e];
+                    if(node_owner[idx] == rank) {
+                        is_local[e] = 1;
+                    }
+                }
+            }
+
+            free(temp_buff);
+            free(is_local);
         }
 
         ///////////////////////////////////////////////////////////////////////
