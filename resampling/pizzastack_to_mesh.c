@@ -31,6 +31,25 @@ typedef struct {
     ptrdiff_t *idx;
 } cell_list_1D;
 
+static void bouding_intervals(const ptrdiff_t n_elements,
+                              const int n_nodes_per_elem,
+                              idx_t **const elems,
+                                geom_t **const x,
+                                geom_t *const __restrict__ bi_min,
+                                geom_t *const __restrict__ bi_max)
+{
+    //
+    
+
+    for(int d = 0; d < n_nodes_per_elem; ++d) {
+        const idx_t *idx = elems[d];
+
+        for(ptrdiff_t i = 0; i < nelements; ++i) {
+            bi_min[i]
+        }
+    }
+}
+
 // void cell_list_1D_create(cell_list_1D *cl, const ptrdiff_t nnodes, const geom_t *x, ) {
 //     ptrdiff_t *zhisto = malloc(nbins * sizeof(ptrdiff_t));
 //     histogram(x, shift, scaling, nbins, zhisto);
