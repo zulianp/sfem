@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
 
     ptrdiff_t n_values = n_bytes / n_bytes_x_entry;
     if((n_values * n_bytes_x_entry) != n_bytes_x_entry) {
-        fprintf(stderr, "Bad input!\n");
+        fprintf(stderr, "Bad input! %ld != %d * %ld\n", (long)n_bytes, n_bytes_x_entry, n_values);
         return EXIT_FAILURE;
     }
 
