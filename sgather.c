@@ -37,36 +37,37 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    const char *gather_idx_path = argv[1];
+    int n_bytes_x_entry = atoi(argv[2]);
+    const char *input_array_path = argv[3];
     const char *output_path = "./sgather_out.raw";
 
     if (argc > 4) {
         output_path = argv[4];
     }
 
-    if (strcmp(output_path, argv[1]) == 0) {
+    if (strcmp(output_path, input_array_path) == 0 || strcmp(output_path, gather_idx_path) == 0) {
         fprintf(stderr, "Input and output are the same! Quitting!\n");
         fprintf(stderr, help, argv[0]);
         return EXIT_FAILURE;
     }
-
-    int n_bytes_x_entry = atoi(argv[2]);
 
     double tick = MPI_Wtime();
 
     MPI_Datatype values_mpi_t = MPI_CHAR;
     char *values;
     ptrdiff_t nlocal_, n_bytes;
-    array_read(comm, argv[1], values_mpi_t, (void **)&values, &nlocal_, &n_bytes);
+    array_read(comm, input_array_path, values_mpi_t, (void **)&values, &nlocal_, &n_bytes);
 
     ptrdiff_t n_values = n_bytes / n_bytes_x_entry;
-    if(n_values * n_bytes_x_entry != n_bytes_x_entry) {
+    if((n_values * n_bytes_x_entry) != n_bytes_x_entry) {
         fprintf(stderr, "Bad input!\n");
         return EXIT_FAILURE;
     }
 
     ptrdiff_t nlocal_gather, n_gather;
     idx_t *gather_idx;
-    array_read(comm, argv[1], MPI_IDX_T, (void **)&gather_idx, &nlocal_gather, &n_gather);
+    array_read(comm, gather_idx_path, MPI_IDX_T, (void **)&gather_idx, &nlocal_gather, &n_gather);
 
     char *selection = (char*)malloc(n_gather * n_bytes_x_entry);
 
