@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
     array_read(comm, input_array_path, values_mpi_t, (void **)&values, &nlocal_, &n_bytes);
 
     ptrdiff_t n_values = n_bytes / n_bytes_x_entry;
-    if((n_values * n_bytes_x_entry) != n_bytes_x_entry) {
+    if((n_values * n_bytes_x_entry) != n_bytes) {
         fprintf(stderr, "Bad input! %ld != %d * %ld\n", (long)n_bytes, n_bytes_x_entry, n_values);
         return EXIT_FAILURE;
     }
