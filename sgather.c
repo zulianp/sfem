@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
         memcpy(&selection[offset], &values[gather_offset], n_bytes_x_entry);
     }
 
-    array_write(comm, output_path, values_mpi_t, (void*)selection, n_gather, n_gather);
+    array_write(comm, output_path, values_mpi_t, (void*)selection, n_gather * n_bytes_x_entry, n_gather * n_bytes_x_entry);
 
     free(values);
     free(gather_idx);
