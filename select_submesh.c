@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "../matrix.io/array_dtof.h"
 #include "../matrix.io/matrixio_array.h"
@@ -38,6 +39,11 @@ int main(int argc, char *argv[]) {
     const char *output_folder = "./";
     if (argc > 6) {
         output_folder = argv[6];
+    }
+
+    struct stat st = {0};
+    if (stat(output_folder, &st) == -1) {
+        mkdir(output_folder, 0700);
     }
 
     if (!rank) {
