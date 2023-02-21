@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
     for(ptrdiff_t i = 0; i < n_gather; ++i) {
         ptrdiff_t offset = i * n_bytes_x_entry;
         ptrdiff_t gather_offset = gather_idx[i] * n_bytes_x_entry;
-        memcpy(&selection[gather_offset], &values[offset], n_bytes_x_entry);
+        memcpy(&selection[offset], &values[gather_offset], n_bytes_x_entry);
     }
 
     array_write(comm, output_path, values_mpi_t, (void*)selection, n_gather, n_gather);
