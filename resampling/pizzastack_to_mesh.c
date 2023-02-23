@@ -44,8 +44,18 @@ void cell_list_1D_print(cell_list_1D *cl)
         printf("\n");
     }
 
+
     printf("---------------------\n");
 
+    printf("cell_ptr:\n");
+    for(ptrdiff_t i = 0; i < cl->n_cells+1; i++) {
+        printf("%ld ", (long)cl->cell_ptr[i]);
+    }
+    printf("\n");
+
+    printf("---------------------\n");
+
+    printf("idx:\n");
     for(ptrdiff_t i = 0; i < cl->n_entries; i++) {
         printf("%ld ", (long)cl->idx[i]);
     }
@@ -165,7 +175,8 @@ void cell_list_1D_create(cell_list_1D *cl,
     // Fill cell-list
     for (ptrdiff_t i = 0; i < n; i++) {
         ptrdiff_t cell = (bi_min[i] + shift) * scaling;
-        idx[zhisto[cell]++] = i;
+        idx[cell_ptr[cell] + zhisto[cell]] = i;
+        zhisto[cell]++;
     }
 
 #ifndef NDEBUG
@@ -182,7 +193,6 @@ void cell_list_1D_create(cell_list_1D *cl,
     cl->n_entries = n_entries;
 
     cell_list_1D_print(cl);
-
     free(zhisto);
 }
 
