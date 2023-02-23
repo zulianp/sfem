@@ -38,7 +38,7 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
 
-    static const int remap_nodes = 1;
+    // static const int remap_nodes = 1;
     static const int remap_elements = 1;
 
     if (size > 1) {

@@ -6,6 +6,9 @@ import sys, getopt
 import os
 import glob
 
+# pip3 install --user h5
+# pip3 install --user meshio
+
 def main(argv):
     directory = "./"
     output_path = "out.xmf"

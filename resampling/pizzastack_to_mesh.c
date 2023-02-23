@@ -14,17 +14,20 @@
 #include "sfem_mesh_write.h"
 
 typedef struct {
+    ptrdiff_t n_cells;
     ptrdiff_t *cell_ptr;
     ptrdiff_t *idx;
+    geom_t shift;
+    geom_t scaling;
 } cell_list_1D;
 
 static void histogram(const ptrdiff_t nnodes,
-                      const geom_t *x,
+                      const geom_t *SFEM_RESTRICT x,
                       const geom_t shift,
                       const geom_t scaling,
-                      const ptrdiff_t nbins,
-                      ptrdiff_t *histo) {
-    memset(histo, 0, nbins * sizeof(ptrdiff_t));
+                      const ptrdiff_t n_cells,
+                      ptrdiff_t *SFEM_RESTRICT histo) {
+    memset(histo, 0, n_cells * sizeof(ptrdiff_t));
     for (ptrdiff_t i = 0; i < nnodes; ++i) {
         ptrdiff_t idx = scaling * (x[i] + shift);
         histo[idx] += 1;
@@ -33,7 +36,7 @@ static void histogram(const ptrdiff_t nnodes,
 
 static void bounding_intervals(const ptrdiff_t n_elements,
                                const int n_nodes_per_elem,
-                               idx_t **const elems,
+                               idx_t **const SFEM_RESTRICT elems,
                                geom_t *const SFEM_RESTRICT x,
                                geom_t *const SFEM_RESTRICT bi_min,
                                geom_t *const SFEM_RESTRICT bi_max) {
@@ -54,32 +57,136 @@ static void bounding_intervals(const ptrdiff_t n_elements,
     }
 }
 
+static SFEM_INLINE geom_t array_min(const ptrdiff_t n, const geom_t *a) {
+    geom_t ret = a[0];
+    for (ptrdiff_t i = 1; i < n; ++i) {
+        ret = MIN(ret, a[i]);
+    }
+
+    return ret;
+}
+
+static SFEM_INLINE geom_t array_max(const ptrdiff_t n, const geom_t *a) {
+    geom_t ret = a[0];
+    for (ptrdiff_t i = 1; i < n; ++i) {
+        ret = MAX(ret, a[i]);
+    }
+
+    return ret;
+}
+
+static SFEM_INLINE geom_t array_max_range(const ptrdiff_t n, const geom_t *start, const geom_t *end) {
+    geom_t ret = end[0] - start[0];
+    for (ptrdiff_t i = 1; i < n; ++i) {
+        const geom_t val = end[i] - start[i];
+        ret = MAX(ret, val);
+    }
+
+    return ret;
+}
+
+typedef struct {
+    ptrdiff_t begin;
+    ptrdiff_t end;
+} cell_list_1D_query_t;
+
+static SFEM_INLINE cell_list_1D_query_t cell_list_1D_query(const cell_list_1D *cl,
+                                                           const geom_t bi_min,
+                                                           const geom_t bi_max) {
+    cell_list_1D_query_t ret;
+    ret.begin = floor(cl->scaling * (bi_min + cl->shift));
+    ret.end = ceil(cl->scaling * (bi_max + cl->shift)) + 1;
+    return ret;
+}
+
+void cell_list_1D_create(cell_list_1D *cl,
+                         const ptrdiff_t n,
+                         const geom_t *SFEM_RESTRICT bi_min,
+                         const geom_t *SFEM_RESTRICT bi_max) {
+    const geom_t x_min = array_min(n, bi_min);
+    const geom_t x_max = array_max(n, bi_max);
+    const geom_t x_range = x_max - x_min;
+    const geom_t max_cell_range = array_max_range(n, bi_min, bi_max);
+
+    // Make sure any interval overlaps with max 2 cells
+    ptrdiff_t n_cells = floor(x_range / max_cell_range) - 1;
+    const geom_t scaling = (n_cells - 1) / x_range;
+    const geom_t shift = -x_min;
+
+    ptrdiff_t *zhisto = malloc(n_cells * sizeof(ptrdiff_t));
+    histogram(n, bi_min, shift, scaling, n_cells, zhisto);
+
+    ptrdiff_t *cell_ptr = malloc((n_cells + 1) * sizeof(ptrdiff_t));
+
+    cell_ptr[0] = 0;
+    for (ptrdiff_t i = 0; i < n_cells; i++) {
+        cell_ptr[i + 1] = cell_ptr[i] + zhisto[i];
+    }
+
+    const ptrdiff_t n_entries = cell_ptr[n_cells];
+    ptrdiff_t *idx = malloc((n_entries) * sizeof(ptrdiff_t));
+    memset(zhisto, 0, n_cells * sizeof(ptrdiff_t));
+
+    // Fill cell-list
+    for (ptrdiff_t i = 0; i < n; i++) {
+        ptrdiff_t cell = (bi_min[i] + shift) * scaling;
+        idx[zhisto[cell]++] = i;
+    }
+
+#ifndef NDEBUG
+    for (ptrdiff_t i = 0; i < n_cells; i++) {
+        assert(cell_ptr[i + 1] == zhisto[i]);
+    }
+#endif
+
+    cl->cell_ptr = cell_ptr;
+    cl->idx = idx;
+    cl->shift = shift;
+    cl->scaling = scaling;
+    cl->n_cells = n_cells;
+
+    free(zhisto);
+}
+
+void cell_list_1D_destroy(cell_list_1D *cl) {
+    free(cl->cell_ptr);
+    free(cl->idx);
+
+    cl->shift = 0;
+    cl->scaling = 0;
+    cl->n_cells = 0;
+}
+
 void resample_box_to_tetra_mesh(const count_t n[3],
                                 const count_t ld[3],
                                 const real_t *SFEM_RESTRICT box_field,
                                 const ptrdiff_t n_elements,
                                 const ptrdiff_t n_nodes,
-                                idx_t **const elems,
-                                geom_t **const xyz,
+                                idx_t **const SFEM_RESTRICT elems,
+                                geom_t **const SFEM_RESTRICT xyz,
                                 real_t *const SFEM_RESTRICT mesh_field) {
     geom_t *zbi_min = (geom_t *)malloc(n_elements * sizeof(geom_t));
     geom_t *zbi_max = (geom_t *)malloc(n_elements * sizeof(geom_t));
+    cell_list_1D cl;
 
     bounding_intervals(n_elements, 4, elems, xyz[2], zbi_min, zbi_max);
+    cell_list_1D_create(&cl, n_elements, zbi_min, zbi_max);
 
-    
+    for (count_t z = 0; z < n[2]; z++) {
+        cell_list_1D_query_t q = cell_list_1D_query(&cl, z - 0.5, z + 0.5);
+
+        printf("query %ld: ", (long)z);
+        for (ptrdiff_t i = q.begin; i < q.end; i++) {
+            printf("%ld ", i);
+        }
+
+        printf("\n");
+    }
+
     free(zbi_min);
     free(zbi_max);
+    cell_list_1D_destroy(&cl);
 }
-
-// void cell_list_1D_create(cell_list_1D *cl, 
-//     const ptrdiff_t n, 
-//     const geom_t *SFEM_RESTRICT zbi_min,
-//     const geom_t *SFEM_RESTRICT zbi_max) {
-//     ptrdiff_t *zhisto = malloc(nbins * sizeof(ptrdiff_t));
-//     histogram(x, shift, scaling, nbins, zhisto);
-// }
-
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -90,21 +197,45 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
 
-    if (argc < 2) {
+    if (argc < 6) {
         if (!rank) {
-            fprintf(stderr, "usage: %s <folder> [output_folder=./]", argv[0]);
+            fprintf(stderr, "usage: %s <nx> <ny> <nz> <field.raw> <mesh_folder> [output_folder=./]", argv[0]);
         }
 
         return EXIT_FAILURE;
     }
 
+    count_t n[3];
+    count_t ld[3];
+
+    n[0] = atol(argv[1]);
+    n[1] = atol(argv[2]);
+    n[2] = atol(argv[3]);
+    const ptrdiff_t size_field = n[0] * n[1] * n[2];
+
+    ld[0] = 0;
+    ld[1] = n[0];
+    ld[2] = n[1] * n[1];
+
+    const char *field_path = argv[4];
+    const char *mesh_folder = argv[5];
+
     const char *output_folder = "./";
-    if (argc > 2) {
-        output_folder = argv[2];
+
+    if (argc > 6) {
+        output_folder = argv[6];
     }
 
     if (!rank) {
-        printf("%s %s %s\n", argv[0], argv[1], output_folder);
+        fprintf(stderr,
+                "usage: %s %ld %ld %ld %s %s %s\n",
+                argv[0],
+                (long)n[0],
+                (long)n[1],
+                (long)n[2],
+                field_path,
+                mesh_folder,
+                output_folder);
     }
 
     double tick = MPI_Wtime();
@@ -113,42 +244,44 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    const char *folder = argv[1];
-    // char path[1024 * 10];
+    real_t *box_field;
+    ptrdiff_t field_n_local, field_n_global;
+
+    if(strcmp(field_path, "demo") == 0) {
+        box_field = (real_t*)malloc(size_field * sizeof(real_t));
+
+        geom_t point[3] = {0, 0, 0};
+        for(ptrdiff_t z = 0; z < n[2]; ++z) {   
+            point[2] = z / (1.0 * n[2]); 
+            for(ptrdiff_t y = 0; y < n[1]; ++y) {
+                point[1] = y / (1.0 * n[1]);
+                for(ptrdiff_t x = 0; x < n[0]; ++x) {
+                    point[0] = x / (1.0 * n[0]);
+                    box_field[z*ld[2] + y*ld[1] + x*ld[0]] = point[2] * point[2];
+                }
+            }
+        }
+
+    } else {
+        array_read(comm, field_path, SFEM_MPI_REAL_T, (void**)&box_field, &field_n_local, &field_n_global);
+        assert(size_field == field_n_global);
+    }
 
     mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
+    if (mesh_read(comm, mesh_folder, &mesh)) {
         return EXIT_FAILURE;
     }
 
-    MPI_Barrier(comm);
+    real_t *mesh_field = (real_t *)malloc(mesh.nnodes * sizeof(real_t));
+    memset(mesh_field, 0, mesh.nnodes * sizeof(real_t));
 
-    // double tack = MPI_Wtime();
+    resample_box_to_tetra_mesh(n, ld, box_field, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mesh_field);
 
-    char output_path[2048];
-    sprintf(output_path, "%s/part_%0.5d", output_folder, rank);
-    // Everyone independent
-    mesh.comm = MPI_COMM_SELF;
-    mesh_write(output_path, &mesh);
-
-    for (int r = 0; r < size; ++r) {
-        if (r == rank) {
-            printf("[%d] #elements %ld #nodes %ld #owned_nodes %ld #shared_elements %ld\n",
-                   rank,
-                   (long)mesh.nelements,
-                   (long)mesh.nnodes,
-                   (long)mesh.n_owned_nodes,
-                   (long)mesh.n_shared_elements);
-        }
-
-        fflush(stdout);
-
-        MPI_Barrier(comm);
-    }
-
-    MPI_Barrier(comm);
-
+    // Free resources
     mesh_destroy(&mesh);
+    free(box_field);
+    free(mesh_field);
+
     double tock = MPI_Wtime();
 
     if (!rank) {
