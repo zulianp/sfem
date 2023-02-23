@@ -426,7 +426,8 @@ void resample_box_to_tetra_mesh(const count_t n[3],
 
                         measure += q_tet.w[k];
                     }
-
+                    
+                    assert(measure > 0);
 
                     for (int d = 0; d < 4; d++) {
                         idx_t node = elems[d][e];
@@ -439,7 +440,9 @@ void resample_box_to_tetra_mesh(const count_t n[3],
     }
 
     for(ptrdiff_t i = 0; i < n_nodes; ++i) {
-        mesh_field[i] /= weight_field[i];
+        real_t w = weight_field[i];
+        assert(w != 0.);
+        mesh_field[i] /= w;
     }
 
     quadrature_destroy(&q_ref);
@@ -521,7 +524,7 @@ int main(int argc, char *argv[]) {
                 point[1] = y / (1.0 * n[1]);
                 for (ptrdiff_t x = 0; x < n[0]; ++x) {
                     point[0] = x / (1.0 * n[0]);
-                    box_field[z * ld[2] + y * ld[1] + x * ld[0]] = point[2] * point[2];
+                    box_field[z * ld[2] + y * ld[1] + x * ld[0]] = point[0] * point[0] + point[1] * point[1] + point[2] * point[2];
                 }
             }
         }
@@ -539,9 +542,10 @@ int main(int argc, char *argv[]) {
     real_t *mesh_field = (real_t *)malloc(mesh.nnodes * sizeof(real_t));
     memset(mesh_field, 0, mesh.nnodes * sizeof(real_t));
 
+    // FIXME! Implement parallel version!
     resample_box_to_tetra_mesh(n, ld, box_field, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mesh_field);
 
-    // FIXME!
+    // FIXME! Implement write field with mesh!
     array_write(comm, output_path, SFEM_MPI_REAL_T, (void *)mesh_field, mesh.nnodes, mesh.nnodes);
 
     // Free resources
