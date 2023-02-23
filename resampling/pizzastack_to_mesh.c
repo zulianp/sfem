@@ -22,33 +22,30 @@ typedef struct {
     geom_t scaling;
 } cell_list_1D;
 
-
-void cell_list_1D_print(cell_list_1D *cl)
-{   
-    printf("shift: %g\n", (double) cl->shift);
-    printf("scaling: %g\n", (double) cl->scaling);
-    printf("n_cells: %ld\n", (long) cl->n_cells);
-    printf("n_entries: %ld\n", (long) cl->n_entries);
+void cell_list_1D_print(cell_list_1D *cl) {
+    printf("shift: %g\n", (double)cl->shift);
+    printf("scaling: %g\n", (double)cl->scaling);
+    printf("n_cells: %ld\n", (long)cl->n_cells);
+    printf("n_entries: %ld\n", (long)cl->n_entries);
 
     printf("---------------------\n");
-    for(ptrdiff_t i = 0; i < cl->n_cells; i++) {
+    for (ptrdiff_t i = 0; i < cl->n_cells; i++) {
         ptrdiff_t begin = cl->cell_ptr[i];
-        ptrdiff_t end = cl->cell_ptr[i+1];
+        ptrdiff_t end = cl->cell_ptr[i + 1];
 
         assert(end <= cl->n_entries);
 
         printf("%ld)\n", (long)i);
-        for(ptrdiff_t k = begin; k < end; k++) {
+        for (ptrdiff_t k = begin; k < end; k++) {
             printf("%ld ", (long)cl->idx[k]);
         }
         printf("\n");
     }
 
-
     printf("---------------------\n");
 
     printf("cell_ptr:\n");
-    for(ptrdiff_t i = 0; i < cl->n_cells+1; i++) {
+    for (ptrdiff_t i = 0; i < cl->n_cells + 1; i++) {
         printf("%ld ", (long)cl->cell_ptr[i]);
     }
     printf("\n");
@@ -56,7 +53,7 @@ void cell_list_1D_print(cell_list_1D *cl)
     printf("---------------------\n");
 
     printf("idx:\n");
-    for(ptrdiff_t i = 0; i < cl->n_entries; i++) {
+    for (ptrdiff_t i = 0; i < cl->n_entries; i++) {
         printf("%ld ", (long)cl->idx[i]);
     }
     printf("\n");
@@ -223,11 +220,18 @@ void resample_box_to_tetra_mesh(const count_t n[3],
     for (count_t z = 0; z < n[2]; z++) {
         cell_list_1D_query_t q = cell_list_1D_query(&cl, z - 0.5, z + 0.5);
         assert(q.begin >= 0);
-        assert(q.end <=  cl.n_entries);
+        assert(q.end <= cl.n_entries);
 
         printf("query %ld: ", (long)z);
         for (ptrdiff_t k = q.begin; k < q.end; k++) {
-            printf("%ld -> %ld, ", k, cl.idx[k]);
+            const ptrdiff_t e = cl.idx[k];
+            printf("%ld -> %ld\n", k, e);
+
+            for (int d = 0; d < 4; d++) {
+                idx_t node = elems[d][e];
+                printf("%f %f %f\n", xyz[0][node], xyz[1][node], xyz[2][node]);
+            }
+            printf("-------------\n");
         }
 
         printf("\n");
@@ -297,23 +301,23 @@ int main(int argc, char *argv[]) {
     real_t *box_field;
     ptrdiff_t field_n_local, field_n_global;
 
-    if(strcmp(field_path, "demo") == 0) {
-        box_field = (real_t*)malloc(size_field * sizeof(real_t));
+    if (strcmp(field_path, "demo") == 0) {
+        box_field = (real_t *)malloc(size_field * sizeof(real_t));
 
         geom_t point[3] = {0, 0, 0};
-        for(ptrdiff_t z = 0; z < n[2]; ++z) {   
-            point[2] = z / (1.0 * n[2]); 
-            for(ptrdiff_t y = 0; y < n[1]; ++y) {
+        for (ptrdiff_t z = 0; z < n[2]; ++z) {
+            point[2] = z / (1.0 * n[2]);
+            for (ptrdiff_t y = 0; y < n[1]; ++y) {
                 point[1] = y / (1.0 * n[1]);
-                for(ptrdiff_t x = 0; x < n[0]; ++x) {
+                for (ptrdiff_t x = 0; x < n[0]; ++x) {
                     point[0] = x / (1.0 * n[0]);
-                    box_field[z*ld[2] + y*ld[1] + x*ld[0]] = point[2] * point[2];
+                    box_field[z * ld[2] + y * ld[1] + x * ld[0]] = point[2] * point[2];
                 }
             }
         }
 
     } else {
-        array_read(comm, field_path, SFEM_MPI_REAL_T, (void**)&box_field, &field_n_local, &field_n_global);
+        array_read(comm, field_path, SFEM_MPI_REAL_T, (void **)&box_field, &field_n_local, &field_n_global);
         assert(size_field == field_n_global);
     }
 
