@@ -10,12 +10,6 @@
 typedef int idx_t;
 #define MPI_IDX_T MPI_INT
 
-#ifdef NDEBUG
-#define INLINE inline
-#else
-#define INLINE
-#endif
-
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 

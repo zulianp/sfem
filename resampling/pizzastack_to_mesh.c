@@ -15,11 +15,46 @@
 
 typedef struct {
     ptrdiff_t n_cells;
+    ptrdiff_t n_entries;
     ptrdiff_t *cell_ptr;
     ptrdiff_t *idx;
     geom_t shift;
     geom_t scaling;
 } cell_list_1D;
+
+
+void cell_list_1D_print(cell_list_1D *cl)
+{   
+    printf("shift: %g\n", (double) cl->shift);
+    printf("scaling: %g\n", (double) cl->scaling);
+    printf("n_cells: %ld\n", (long) cl->n_cells);
+    printf("n_entries: %ld\n", (long) cl->n_entries);
+
+    printf("---------------------\n");
+    for(ptrdiff_t i = 0; i < cl->n_cells; i++) {
+        ptrdiff_t begin = cl->cell_ptr[i];
+        ptrdiff_t end = cl->cell_ptr[i+1];
+
+        assert(end <= cl->n_entries);
+
+        printf("%ld)\n", (long)i);
+        for(ptrdiff_t k = begin; k < end; k++) {
+            printf("%ld ", (long)cl->idx[k]);
+        }
+        printf("\n");
+    }
+
+    printf("---------------------\n");
+
+    for(ptrdiff_t i = 0; i < cl->n_entries; i++) {
+        printf("%ld ", (long)cl->idx[i]);
+    }
+    printf("\n");
+
+    printf("---------------------\n");
+
+    fflush(stdout);
+}
 
 static void histogram(const ptrdiff_t nnodes,
                       const geom_t *SFEM_RESTRICT x,
@@ -49,7 +84,7 @@ static void bounding_intervals(const ptrdiff_t n_elements,
     for (int d = 1; d < n_nodes_per_elem; ++d) {
         const idx_t *idx = elems[d];
 
-        for (ptrdiff_t e = 1; e < n_elements; e++) {
+        for (ptrdiff_t e = 0; e < n_elements; e++) {
             const idx_t i = idx[e];
             bi_min[e] = MIN(bi_min[e], x[i]);
             bi_max[e] = MAX(bi_max[e], x[i]);
@@ -94,8 +129,8 @@ static SFEM_INLINE cell_list_1D_query_t cell_list_1D_query(const cell_list_1D *c
                                                            const geom_t bi_min,
                                                            const geom_t bi_max) {
     cell_list_1D_query_t ret;
-    ret.begin = floor(cl->scaling * (bi_min + cl->shift));
-    ret.end = ceil(cl->scaling * (bi_max + cl->shift)) + 1;
+    ret.begin = MAX(0, floor(cl->scaling * (bi_min + cl->shift)));
+    ret.end = MIN(ceil(cl->scaling * (bi_max + cl->shift)) + 1, cl->n_cells);
     return ret;
 }
 
@@ -109,8 +144,8 @@ void cell_list_1D_create(cell_list_1D *cl,
     const geom_t max_cell_range = array_max_range(n, bi_min, bi_max);
 
     // Make sure any interval overlaps with max 2 cells
-    ptrdiff_t n_cells = floor(x_range / max_cell_range) - 1;
-    const geom_t scaling = (n_cells - 1) / x_range;
+    ptrdiff_t n_cells = floor(x_range / max_cell_range);
+    const geom_t scaling = n_cells / x_range;
     const geom_t shift = -x_min;
 
     ptrdiff_t *zhisto = malloc(n_cells * sizeof(ptrdiff_t));
@@ -135,7 +170,7 @@ void cell_list_1D_create(cell_list_1D *cl,
 
 #ifndef NDEBUG
     for (ptrdiff_t i = 0; i < n_cells; i++) {
-        assert(cell_ptr[i + 1] == zhisto[i]);
+        assert(cell_ptr[i + 1] == cell_ptr[i] + zhisto[i]);
     }
 #endif
 
@@ -144,6 +179,9 @@ void cell_list_1D_create(cell_list_1D *cl,
     cl->shift = shift;
     cl->scaling = scaling;
     cl->n_cells = n_cells;
+    cl->n_entries = n_entries;
+
+    cell_list_1D_print(cl);
 
     free(zhisto);
 }
@@ -174,10 +212,12 @@ void resample_box_to_tetra_mesh(const count_t n[3],
 
     for (count_t z = 0; z < n[2]; z++) {
         cell_list_1D_query_t q = cell_list_1D_query(&cl, z - 0.5, z + 0.5);
+        assert(q.begin >= 0);
+        assert(q.end <=  cl.n_entries);
 
         printf("query %ld: ", (long)z);
-        for (ptrdiff_t i = q.begin; i < q.end; i++) {
-            printf("%ld ", i);
+        for (ptrdiff_t k = q.begin; k < q.end; k++) {
+            printf("%ld -> %ld, ", k, cl.idx[k]);
         }
 
         printf("\n");
