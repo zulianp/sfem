@@ -570,8 +570,8 @@ static SFEM_INLINE void box_gather(const count_t x,
     const count_t yl = y * stride[1];
     const count_t yr = (y + 1) * stride[1];
 
-    const count_t zl = z * stride[0];
-    const count_t zr = (z + 1) * stride[0];
+    const count_t zl = z * stride[2];
+    const count_t zr = (z + 1) * stride[2];
 
     // z-bottom
     box_nodal_values[0] = box_field[xl + yl + zl];
@@ -929,7 +929,7 @@ int main(int argc, char *argv[]) {
                     // box_field[z * stride[2] + y * stride[1] + x * stride[0]] =
                     //     point[0] * point[0] + point[1] * point[1] + point[2] * point[2];
 
-                    box_field[z * stride[2] + y * stride[1] + x * stride[0]] = x;
+                    box_field[z * stride[2] + y * stride[1] + x * stride[0]] = x * (z == 0) * (y == 0);
 
                     // Constant function
                     // box_field[z * stride[2] + y * stride[1] + x * stride[0]] = 1;
