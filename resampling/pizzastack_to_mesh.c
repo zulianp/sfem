@@ -220,6 +220,23 @@ void quadrature_create(quadrature_t *const q, const int size) {
     q->w = (real_t *)malloc(size * sizeof(real_t));
 }
 
+void quadrature_print(const quadrature_t *const q)
+{
+    printf("---------------------\n");
+    for(int k = 0; k < q->size; k++) {
+        printf("%g ", (double) q->x[k]);
+        printf("%g ", (double) q->y[k]);
+        printf("%g ", (double) q->z[k]);
+        printf("\n");
+    }
+
+    for(int k = 0; k < q->size; k++) {
+        printf("%g ", (double) q->w[k]);
+    }
+    printf("\n");
+    printf("---------------------\n");
+}
+
 void quadrature_destroy(quadrature_t *const q) {
     q->size = 0;
     free(q->x);
@@ -529,7 +546,6 @@ static SFEM_INLINE void box_tet_quadrature(const quadrature_t *const q,
 
     // Generate quadrature points and test for containment
     q_box->size = 0;
-    real_t measure = 0;
     for (int k = 0; k < q->size; k++) {
         int discard = 0;
         for (int d = 0; d < 3; ++d) {
@@ -538,8 +554,6 @@ static SFEM_INLINE void box_tet_quadrature(const quadrature_t *const q,
         }
 
         if (discard) continue;
-
-        measure += q->w[k];
 
         const int qidx = q_box->size;
         q_box->x[qidx] = qp[0];
@@ -592,7 +606,10 @@ static SFEM_INLINE void tet4_scatter_add(const idx_t *const SFEM_RESTRICT tet_do
     for (int d = 0; d < 4; d++) {
         const idx_t node = tet_dofs[d];
         field[node] += tet_nodal_values[d];
+        printf("%g ", tet_nodal_values[d]);
     }
+
+    printf("\n");
 }
 
 static SFEM_INLINE void l2_assemble(const quadrature_t *q_box,
@@ -607,13 +624,13 @@ static SFEM_INLINE void l2_assemble(const quadrature_t *q_box,
         const real_t xk = q_box->x[k];
         const real_t yk = q_box->y[k];
         const real_t zk = q_box->z[k];
-        const real_t dV = q_tet->w[k] / 6;
+        const real_t dV = q_tet->w[k] / 6.0;
 
         real_t value = 0;
 
-        const real_t mx = (1 - xk);
-        const real_t my = (1 - yk);
-        const real_t mz = (1 - zk);
+        const real_t mx = (1.0 - xk);
+        const real_t my = (1.0 - yk);
+        const real_t mz = (1.0 - zk);
 
         // z-bottom
         value += mx * my * mz * box_nodal_values[0];
@@ -630,7 +647,7 @@ static SFEM_INLINE void l2_assemble(const quadrature_t *q_box,
         // Scale by quadrature weight
         value *= dV;
 
-        real_t f0k = (1 - q_tet->x[k] - q_tet->y[k] - q_tet->z[k]);
+        real_t f0k = (1.0 - q_tet->x[k] - q_tet->y[k] - q_tet->z[k]);
 #if 1
         real_t df0k = f0k;
         real_t df1k = q_tet->x[k];
@@ -679,6 +696,8 @@ void resample_box_to_tetra_mesh(const count_t n[3],
         quadrature_create(&q_box, q_ref.size);
         quadrature_create(&q_tet, q_ref.size);
     }
+
+    quadrature_print(&q_ref);
 
     geom_t xe[4], ye[4], ze[4];
     real_t box_nodal_values[8];
@@ -731,11 +750,17 @@ void resample_box_to_tetra_mesh(const count_t n[3],
                         continue;
                     }
 
+                    quadrature_print(&q_box);
+                    quadrature_print(&q_tet);
+
                     box_gather(x, y, z, stride, box_field, box_nodal_values);
                     l2_assemble(&q_box, &q_tet, box_nodal_values, tet_nodal_values, tet_nodal_weights);
 
                     tet4_scatter_add(tet_dofs, tet_nodal_values, mesh_field);
                     tet4_scatter_add(tet_dofs, tet_nodal_weights, weight_field);
+
+                    real_t measure = weight_field[0] + weight_field[1] + weight_field[2] + weight_field[3];
+                    printf("measure: %g\n", (double)measure);
                 }
             }
         }
@@ -746,11 +771,7 @@ void resample_box_to_tetra_mesh(const count_t n[3],
         real_t w = weight_field[i];
         printf("%g\n", w);
         assert(w != 0.);
-        if (w == 0) {
-            mesh_field[i] = 0;
-        } else {
-            mesh_field[i] /= w;
-        }
+        mesh_field[i] /= w;
     }
 
     // Clean-up
@@ -888,6 +909,9 @@ int main(int argc, char *argv[]) {
     count_t n[3];
     count_t stride[3];
 
+    geom_t grid_spacing[3] = {1, 1, 1};
+    geom_t grid_shift[3]   = {0., 0., 0.};
+
     n[0] = atol(argv[1]);
     n[1] = atol(argv[2]);
     n[2] = atol(argv[3]);
@@ -940,10 +964,10 @@ int main(int argc, char *argv[]) {
                     // box_field[z * stride[2] + y * stride[1] + x * stride[0]] =
                     //     point[0] * point[0] + point[1] * point[1] + point[2] * point[2];
 
-                    box_field[z * stride[2] + y * stride[1] + x * stride[0]] = x * y * z;
+                    // box_field[z * stride[2] + y * stride[1] + x * stride[0]] = x;
 
                     // Constant function
-                    // box_field[z * stride[2] + y * stride[1] + x * stride[0]] = 1;
+                    box_field[z * stride[2] + y * stride[1] + x * stride[0]] = (1 + x);
                 }
             }
         }
