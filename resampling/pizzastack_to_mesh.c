@@ -79,7 +79,7 @@ static void histogram(const ptrdiff_t nnodes,
 static void bounding_intervals(const ptrdiff_t n_elements,
                                const int n_nodes_per_elem,
                                idx_t **const SFEM_RESTRICT elems,
-                               geom_t *const SFEM_RESTRICT x,
+                               const geom_t *const SFEM_RESTRICT x,
                                geom_t *const SFEM_RESTRICT bi_min,
                                geom_t *const SFEM_RESTRICT bi_max) {
     for (ptrdiff_t e = 0; e < n_elements; e++) {
@@ -108,7 +108,7 @@ static SFEM_INLINE geom_t array_min(const ptrdiff_t n, const geom_t *a) {
     return ret;
 }
 
-static SFEM_INLINE geom_t array_max(const ptrdiff_t n, const geom_t *a) {
+static SFEM_INLINE geom_t array_max(const ptrdiff_t n, const geom_t *const SFEM_RESTRICT a) {
     geom_t ret = a[0];
     for (ptrdiff_t i = 1; i < n; ++i) {
         ret = MAX(ret, a[i]);
@@ -117,7 +117,9 @@ static SFEM_INLINE geom_t array_max(const ptrdiff_t n, const geom_t *a) {
     return ret;
 }
 
-static SFEM_INLINE geom_t array_max_range(const ptrdiff_t n, const geom_t *start, const geom_t *end) {
+static SFEM_INLINE geom_t array_max_range(const ptrdiff_t n,
+                                          const geom_t *const SFEM_RESTRICT start,
+                                          const geom_t *const SFEM_RESTRICT end) {
     geom_t ret = end[0] - start[0];
     for (ptrdiff_t i = 1; i < n; ++i) {
         const geom_t val = end[i] - start[i];
@@ -132,7 +134,7 @@ typedef struct {
     ptrdiff_t end;
 } cell_list_1D_query_t;
 
-static SFEM_INLINE cell_list_1D_query_t cell_list_1D_query(const cell_list_1D_t *cl,
+static SFEM_INLINE cell_list_1D_query_t cell_list_1D_query(const cell_list_1D_t *const cl,
                                                            const geom_t bi_min,
                                                            const geom_t bi_max) {
     cell_list_1D_query_t ret;
@@ -141,10 +143,10 @@ static SFEM_INLINE cell_list_1D_query_t cell_list_1D_query(const cell_list_1D_t 
     return ret;
 }
 
-void cell_list_1D_create(cell_list_1D_t *cl,
+void cell_list_1D_create(cell_list_1D_t *const cl,
                          const ptrdiff_t n,
-                         const geom_t *SFEM_RESTRICT bi_min,
-                         const geom_t *SFEM_RESTRICT bi_max) {
+                         const geom_t *const SFEM_RESTRICT bi_min,
+                         const geom_t *const SFEM_RESTRICT bi_max) {
     const geom_t x_min = array_min(n, bi_min);
     const geom_t x_max = array_max(n, bi_max);
     const geom_t x_range = x_max - x_min;
@@ -193,7 +195,7 @@ void cell_list_1D_create(cell_list_1D_t *cl,
     free(zhisto);
 }
 
-void cell_list_1D_destroy(cell_list_1D_t *cl) {
+void cell_list_1D_destroy(cell_list_1D_t *const cl) {
     free(cl->cell_ptr);
     free(cl->idx);
 
@@ -210,7 +212,7 @@ typedef struct {
     real_t *w;
 } quadrature_t;
 
-void quadrature_create(quadrature_t *q, const int size) {
+void quadrature_create(quadrature_t *const q, const int size) {
     q->size = size;
     q->x = (real_t *)malloc(size * sizeof(real_t));
     q->y = (real_t *)malloc(size * sizeof(real_t));
@@ -218,7 +220,7 @@ void quadrature_create(quadrature_t *q, const int size) {
     q->w = (real_t *)malloc(size * sizeof(real_t));
 }
 
-void quadrature_destroy(quadrature_t *q) {
+void quadrature_destroy(quadrature_t *const q) {
     q->size = 0;
     free(q->x);
     free(q->y);
@@ -226,7 +228,31 @@ void quadrature_destroy(quadrature_t *q) {
     free(q->w);
 }
 
-void quadrature_create_tet_4_order_2(quadrature_t *q) {
+void quadrature_create_tet_4_order_1(quadrature_t *const q) {
+    quadrature_create(q, 4);
+
+    q->x[0] = 0.0;
+    q->x[1] = 1.0;
+    q->x[2] = 0.0;
+    q->x[3] = 0.0;
+
+    q->y[0] = 0.0;
+    q->y[1] = 0.0;
+    q->y[2] = 1.0;
+    q->y[3] = 0.0;
+
+    q->z[0] = 0.0;
+    q->z[1] = 0.0;
+    q->z[2] = 0.0;
+    q->z[3] = 1.0;
+
+    q->w[0] = 0.25;
+    q->w[1] = 0.25;
+    q->w[2] = 0.25;
+    q->w[3] = 0.25;
+}
+
+void quadrature_create_tet_4_order_2(quadrature_t *const q) {
     quadrature_create(q, 8);
 
     q->x[0] = 0.0;
@@ -266,8 +292,7 @@ void quadrature_create_tet_4_order_2(quadrature_t *q) {
     q->w[7] = 0.225;
 }
 
-void quadrature_create_tet_4_order_6(quadrature_t * q)
-{
+void quadrature_create_tet_4_order_6(quadrature_t *const q) {
     quadrature_create(q, 45);
 
     int idx = 0;
@@ -419,7 +444,7 @@ void quadrature_create_tet_4_order_6(quadrature_t * q)
     q->w[idx++] = 0.0244878963560563;
     q->w[idx++] = 0.0039485206398261;
     q->w[idx++] = 0.0039485206398261;
-    q->w[idx++] = 0.0039485206398261; 
+    q->w[idx++] = 0.0039485206398261;
     q->w[idx++] = 0.0039485206398261;
     q->w[idx++] = 0.0263055529507371;
     q->w[idx++] = 0.0263055529507371;
@@ -526,6 +551,7 @@ static SFEM_INLINE void box_tet_quadrature(const quadrature_t *const q,
         q_tet->y[qidx] = q->y[k];
         q_tet->z[qidx] = q->z[k];
         q_tet->w[qidx] = q->w[k];
+
         q_box->size++;
     }
 
@@ -538,17 +564,35 @@ static SFEM_INLINE void box_gather(const count_t x,
                                    const count_t *SFEM_RESTRICT stride,
                                    const real_t *SFEM_RESTRICT box_field,
                                    real_t *SFEM_RESTRICT box_nodal_values) {
+    const count_t xl = x * stride[0];
+    const count_t xr = (x + 1) * stride[0];
+
+    const count_t yl = y * stride[1];
+    const count_t yr = (y + 1) * stride[1];
+
+    const count_t zl = z * stride[0];
+    const count_t zr = (z + 1) * stride[0];
+
     // z-bottom
-    box_nodal_values[0] = box_field[x * stride[0] + y * stride[1] + z * stride[2]];
-    box_nodal_values[1] = box_field[(x + 1) * stride[0] + y * stride[1] + z * stride[2]];
-    box_nodal_values[2] = box_field[x * stride[0] + (y + 1) * stride[1] + z * stride[2]];
-    box_nodal_values[3] = box_field[(x + 1) * stride[0] + (y + 1) * stride[1] + z * stride[2]];
+    box_nodal_values[0] = box_field[xl + yl + zl];
+    box_nodal_values[1] = box_field[xr + yl + zl];
+    box_nodal_values[2] = box_field[xl + yr + zl];
+    box_nodal_values[3] = box_field[xr + yr + zl];
 
     // z-top
-    box_nodal_values[4] = box_field[x * stride[0] + y * stride[1] + (z + 1) * stride[2]];
-    box_nodal_values[5] = box_field[(x + 1) * stride[0] + y * stride[1] + (z + 1) * stride[2]];
-    box_nodal_values[6] = box_field[x * stride[0] + (y + 1) * stride[1] + (z + 1) * stride[2]];
-    box_nodal_values[7] = box_field[(x + 1) * stride[0] + (y + 1) * stride[1] + (z + 1) * stride[2]];
+    box_nodal_values[4] = box_field[xl + yl + zr];
+    box_nodal_values[5] = box_field[xr + yl + zr];
+    box_nodal_values[6] = box_field[xl + yr + zr];
+    box_nodal_values[7] = box_field[xr + yr + zr];
+}
+
+static SFEM_INLINE void tet4_scatter_add(const idx_t *const SFEM_RESTRICT tet_dofs,
+                                         const real_t *const SFEM_RESTRICT tet_nodal_values,
+                                         real_t *const SFEM_RESTRICT field) {
+    for (int d = 0; d < 4; d++) {
+        const idx_t node = tet_dofs[d];
+        field[node] += tet_nodal_values[d];
+    }
 }
 
 static SFEM_INLINE void l2_assemble(const quadrature_t *q_box,
@@ -563,39 +607,46 @@ static SFEM_INLINE void l2_assemble(const quadrature_t *q_box,
         const real_t xk = q_box->x[k];
         const real_t yk = q_box->y[k];
         const real_t zk = q_box->z[k];
+        const real_t dV = q_tet->w[k] / 6;
 
         real_t value = 0;
 
+        const real_t mx = (1 - xk);
+        const real_t my = (1 - yk);
+        const real_t mz = (1 - zk);
+
         // z-bottom
-        value += (1 - xk) * (1 - yk) * (1 - zk) * box_nodal_values[0];
-        value += xk * (1 - yk) * (1 - zk) * box_nodal_values[1];
-        value += (1 - xk) * yk * (1 - zk) * box_nodal_values[2];
-        value += xk * yk * (1 - zk) * box_nodal_values[3];
+        value += mx * my * mz * box_nodal_values[0];
+        value += xk * my * mz * box_nodal_values[1];
+        value += mx * yk * mz * box_nodal_values[2];
+        value += xk * yk * mz * box_nodal_values[3];
 
         // z-top
-        value += (1 - xk) * (1 - yk) * zk * box_nodal_values[4];
-        value += xk * (1 - yk) * zk * box_nodal_values[5];
-        value += (1 - xk) * yk * zk * box_nodal_values[6];
+        value += mx * my * zk * box_nodal_values[4];
+        value += xk * my * zk * box_nodal_values[5];
+        value += mx * yk * zk * box_nodal_values[6];
         value += xk * yk * zk * box_nodal_values[7];
 
         // Scale by quadrature weight
-        value *= q_tet->w[k] / 6;
+        value *= dV;
 
-        tet_nodal_weights[0] += (1 - q_tet->x[k] - q_tet->y[k] - q_tet->z[k]) * q_tet->w[k] / 6;
-        tet_nodal_weights[1] += q_tet->x[k] * q_tet->w[k] / 6;
-        tet_nodal_weights[2] += q_tet->y[k] * q_tet->w[k] / 6;
-        tet_nodal_weights[3] += q_tet->z[k] * q_tet->w[k] / 6;
+        real_t f0k = (1 - q_tet->x[k] - q_tet->y[k] - q_tet->z[k]);
 
-        tet_nodal_values[0] += (1 - q_tet->x[k] - q_tet->y[k] - q_tet->z[k]) * value;
+        tet_nodal_values[0] += f0k * value;
         tet_nodal_values[1] += q_tet->x[k] * value;
         tet_nodal_values[2] += q_tet->y[k] * value;
         tet_nodal_values[3] += q_tet->z[k] * value;
+
+        tet_nodal_weights[0] += f0k * dV;
+        tet_nodal_weights[1] += q_tet->x[k] * dV;
+        tet_nodal_weights[2] += q_tet->y[k] * dV;
+        tet_nodal_weights[3] += q_tet->z[k] * dV;
     }
 }
 
 void resample_box_to_tetra_mesh(const count_t n[3],
                                 const count_t stride[3],
-                                const real_t *SFEM_RESTRICT box_field,
+                                const real_t *const SFEM_RESTRICT box_field,
                                 const ptrdiff_t n_elements,
                                 const ptrdiff_t n_nodes,
                                 idx_t **const SFEM_RESTRICT elems,
@@ -611,8 +662,9 @@ void resample_box_to_tetra_mesh(const count_t n[3],
     quadrature_t q_tet;
 
     {
+        quadrature_create_tet_4_order_1(&q_ref);
         // quadrature_create_tet_4_order_2(&q_ref);
-        quadrature_create_tet_4_order_6(&q_ref);
+        // quadrature_create_tet_4_order_6(&q_ref);
         quadrature_create(&q_box, q_ref.size);
         quadrature_create(&q_tet, q_ref.size);
     }
@@ -621,6 +673,7 @@ void resample_box_to_tetra_mesh(const count_t n[3],
     real_t box_nodal_values[8];
     real_t tet_nodal_values[4];
     real_t tet_nodal_weights[4];
+    idx_t tet_dofs[4];
 
     const geom_t lmargin = 0;
     const geom_t rmargin = 1;
@@ -628,6 +681,7 @@ void resample_box_to_tetra_mesh(const count_t n[3],
     for (ptrdiff_t e = 0; e < n_elements; e++) {
         for (int d = 0; d < 4; d++) {
             const idx_t node = elems[d][e];
+            tet_dofs[d] = node;
             xe[d] = xyz[0][node];
             ye[d] = xyz[1][node];
             ze[d] = xyz[2][node];
@@ -648,9 +702,18 @@ void resample_box_to_tetra_mesh(const count_t n[3],
         for (count_t z = z_min; z < z_max; z++) {
             for (count_t y = y_min; y < y_max; y++) {
                 for (count_t x = x_min; x < x_max; x++) {
-                    box_tet_quadrature(&q_ref, x, y, z, x + 1, y + 1, z + 1, xe, ye, ze, &q_box, &q_tet);
-
-                    printf("q_box.size = %d\n", q_box.size);
+                    box_tet_quadrature(&q_ref,
+                                       x - lmargin,
+                                       y - lmargin,
+                                       z - lmargin,
+                                       x + rmargin,
+                                       y + rmargin,
+                                       z + rmargin,
+                                       xe,
+                                       ye,
+                                       ze,
+                                       &q_box,
+                                       &q_tet);
 
                     if (!q_box.size) {
                         // No intersection
@@ -660,11 +723,8 @@ void resample_box_to_tetra_mesh(const count_t n[3],
                     box_gather(x, y, z, stride, box_field, box_nodal_values);
                     l2_assemble(&q_box, &q_tet, box_nodal_values, tet_nodal_values, tet_nodal_weights);
 
-                    for (int d = 0; d < 4; d++) {
-                        const idx_t node = elems[d][e];
-                        mesh_field[node] += tet_nodal_values[d];
-                        weight_field[node] += tet_nodal_weights[d];
-                    }
+                    tet4_scatter_add(tet_dofs, tet_nodal_values, mesh_field);
+                    tet4_scatter_add(tet_dofs, tet_nodal_weights, weight_field);
                 }
             }
         }
@@ -693,7 +753,7 @@ void resample_box_to_tetra_mesh(const count_t n[3],
 
 void resample_box_to_tetra_mesh_buggy(const count_t n[3],
                                       const count_t stride[3],
-                                      const real_t *SFEM_RESTRICT box_field,
+                                      const real_t *const SFEM_RESTRICT box_field,
                                       const ptrdiff_t n_elements,
                                       const ptrdiff_t n_nodes,
                                       idx_t **const SFEM_RESTRICT elems,
@@ -725,9 +785,7 @@ void resample_box_to_tetra_mesh_buggy(const count_t n[3],
     real_t box_nodal_values[8];
     real_t tet_nodal_values[4];
     real_t tet_nodal_weights[4];
-
-    // const geom_t lmargin = 0.5;
-    // const geom_t rmargin = 0.5;
+    idx_t tet_dofs[4];
 
     const geom_t lmargin = 0;
     const geom_t rmargin = 1;
@@ -742,6 +800,7 @@ void resample_box_to_tetra_mesh_buggy(const count_t n[3],
 
             for (int d = 0; d < 4; d++) {
                 const idx_t node = elems[d][e];
+                tet_dofs[d] = node;
                 xe[d] = xyz[0][node];
                 ye[d] = xyz[1][node];
                 ze[d] = xyz[2][node];
@@ -759,19 +818,14 @@ void resample_box_to_tetra_mesh_buggy(const count_t n[3],
 
                     box_tet_quadrature(&q_ref, x_min, y_min, z_min, x_max, y_max, z_max, xe, ye, ze, &q_box, &q_tet);
 
-                    printf("q_box.size = %d\n", q_box.size);
                     // No intersection
                     if (!q_box.size) continue;
 
                     box_gather(x, y, z, stride, box_field, box_nodal_values);
                     l2_assemble(&q_box, &q_tet, box_nodal_values, tet_nodal_values, tet_nodal_weights);
 
-
-                    for (int d = 0; d < 4; d++) {
-                        const idx_t node = elems[d][e];
-                        mesh_field[node] += tet_nodal_values[d];
-                        weight_field[node] += tet_nodal_weights[d];
-                    }
+                    tet4_scatter_add(tet_dofs, tet_nodal_values, mesh_field);
+                    tet4_scatter_add(tet_dofs, tet_nodal_weights, weight_field);
                 }
             }
         }
@@ -897,7 +951,8 @@ int main(int argc, char *argv[]) {
     memset(mesh_field, 0, mesh.nnodes * sizeof(real_t));
 
     // FIXME! Implement parallel version!
-    resample_box_to_tetra_mesh(n, stride, box_field, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mesh_field);
+    resample_box_to_tetra_mesh(
+        n, stride, box_field, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mesh_field);
 
     // FIXME! Implement write field with mesh!
     array_write(comm, output_path, SFEM_MPI_REAL_T, (void *)mesh_field, mesh.nnodes, mesh.nnodes);
