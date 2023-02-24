@@ -631,16 +631,27 @@ static SFEM_INLINE void l2_assemble(const quadrature_t *q_box,
         value *= dV;
 
         real_t f0k = (1 - q_tet->x[k] - q_tet->y[k] - q_tet->z[k]);
+#if 1
+        real_t df0k = f0k;
+        real_t df1k = q_tet->x[k];
+        real_t df2k = q_tet->y[k];
+        real_t df3k = q_tet->z[k];
+#else
+        real_t df0k = 3 * f0k - q_tet->x[k] - q_tet->y[k] - q_tet->z[k];
+        real_t df1k = -f0k + 3 * q_tet->x[k] - q_tet->y[k] - q_tet->z[k];
+        real_t df2k = -f0k - q_tet->x[k] + 3 * q_tet->y[k] - q_tet->z[k];
+        real_t df3k = -f0k - q_tet->x[k] - q_tet->y[k] + 3 * q_tet->z[k];
+#endif
 
-        tet_nodal_values[0] += f0k * value;
-        tet_nodal_values[1] += q_tet->x[k] * value;
-        tet_nodal_values[2] += q_tet->y[k] * value;
-        tet_nodal_values[3] += q_tet->z[k] * value;
+        tet_nodal_values[0] += df0k * value;
+        tet_nodal_values[1] += df1k * value;
+        tet_nodal_values[2] += df2k * value;
+        tet_nodal_values[3] += df3k * value;
 
-        tet_nodal_weights[0] += f0k * dV;
-        tet_nodal_weights[1] += q_tet->x[k] * dV;
-        tet_nodal_weights[2] += q_tet->y[k] * dV;
-        tet_nodal_weights[3] += q_tet->z[k] * dV;
+        tet_nodal_weights[0] += df0k * dV;
+        tet_nodal_weights[1] += df1k * dV;
+        tet_nodal_weights[2] += df2k * dV;
+        tet_nodal_weights[3] += df3k * dV;
     }
 }
 
@@ -662,8 +673,8 @@ void resample_box_to_tetra_mesh(const count_t n[3],
     quadrature_t q_tet;
 
     {
-        quadrature_create_tet_4_order_1(&q_ref);
-        // quadrature_create_tet_4_order_2(&q_ref);
+        // quadrature_create_tet_4_order_1(&q_ref);
+        quadrature_create_tet_4_order_2(&q_ref);
         // quadrature_create_tet_4_order_6(&q_ref);
         quadrature_create(&q_box, q_ref.size);
         quadrature_create(&q_tet, q_ref.size);
@@ -929,7 +940,7 @@ int main(int argc, char *argv[]) {
                     // box_field[z * stride[2] + y * stride[1] + x * stride[0]] =
                     //     point[0] * point[0] + point[1] * point[1] + point[2] * point[2];
 
-                    box_field[z * stride[2] + y * stride[1] + x * stride[0]] = x * (z == 0) * (y == 0);
+                    box_field[z * stride[2] + y * stride[1] + x * stride[0]] = x * y * z;
 
                     // Constant function
                     // box_field[z * stride[2] + y * stride[1] + x * stride[0]] = 1;
