@@ -14,6 +14,37 @@
 #include "sfem_mesh_write.h"
 
 typedef struct {
+    geom_t shift[3];
+    geom_t scaling[3];
+} affine_transform_t;
+
+void affine_transform_init(affine_transform_t *const trafo) {
+    trafo->shift[0] = 0;
+    trafo->shift[1] = 0;
+    trafo->shift[2] = 0;
+
+    trafo->scaling[0] = 1;
+    trafo->scaling[1] = 1;
+    trafo->scaling[2] = 1;
+}
+
+static SFEM_INLINE void affine_transform_apply(const affine_transform_t *const trafo,
+                                               const geom_t *const in,
+                                               geom_t *out) {
+    for (int d = 0; d < 3; ++d) {
+        out[d] = trafo->shift[d] + trafo->scaling[d] * in[d];
+    }
+}
+
+static SFEM_INLINE void affine_transform_apply_inverse(const affine_transform_t *const trafo,
+                                                       const geom_t *const in,
+                                                       geom_t *out) {
+    for (int d = 0; d < 3; ++d) {
+        out[d] = (in[d] - trafo->shift[d]) / trafo->scaling[d];
+    }
+}
+
+typedef struct {
     ptrdiff_t n_cells;
     ptrdiff_t n_entries;
     ptrdiff_t *cell_ptr;
@@ -129,6 +160,25 @@ static SFEM_INLINE geom_t array_max_range(const ptrdiff_t n,
     return ret;
 }
 
+static SFEM_INLINE real_t array_min_r(const ptrdiff_t n, const real_t *a) {
+    real_t ret = a[0];
+    for (ptrdiff_t i = 1; i < n; ++i) {
+        ret = MIN(ret, a[i]);
+    }
+
+    return ret;
+}
+
+static SFEM_INLINE real_t array_max_r(const ptrdiff_t n, const real_t *const SFEM_RESTRICT a) {
+    real_t ret = a[0];
+    for (ptrdiff_t i = 1; i < n; ++i) {
+        ret = MAX(ret, a[i]);
+    }
+
+    return ret;
+}
+
+
 typedef struct {
     ptrdiff_t begin;
     ptrdiff_t end;
@@ -220,18 +270,17 @@ void quadrature_create(quadrature_t *const q, const int size) {
     q->w = (real_t *)malloc(size * sizeof(real_t));
 }
 
-void quadrature_print(const quadrature_t *const q)
-{
+void quadrature_print(const quadrature_t *const q) {
     printf("---------------------\n");
-    for(int k = 0; k < q->size; k++) {
-        printf("%g ", (double) q->x[k]);
-        printf("%g ", (double) q->y[k]);
-        printf("%g ", (double) q->z[k]);
+    for (int k = 0; k < q->size; k++) {
+        printf("%g ", (double)q->x[k]);
+        printf("%g ", (double)q->y[k]);
+        printf("%g ", (double)q->z[k]);
         printf("\n");
     }
 
-    for(int k = 0; k < q->size; k++) {
-        printf("%g ", (double) q->w[k]);
+    for (int k = 0; k < q->size; k++) {
+        printf("%g ", (double)q->w[k]);
     }
     printf("\n");
     printf("---------------------\n");
@@ -520,6 +569,10 @@ static SFEM_INLINE void box_tet_quadrature(const quadrature_t *const q,
     const real_t y_range = y_max - y_min;
     const real_t z_range = z_max - z_min;
 
+    assert(x_range > 0);
+    assert(y_range > 0);
+    assert(z_range > 0);
+
     // Move to reference cube
     p0[0] = (x[0] - x_min) / x_range;
     p0[1] = (y[0] - y_min) / y_range;
@@ -606,10 +659,10 @@ static SFEM_INLINE void tet4_scatter_add(const idx_t *const SFEM_RESTRICT tet_do
     for (int d = 0; d < 4; d++) {
         const idx_t node = tet_dofs[d];
         field[node] += tet_nodal_values[d];
-        printf("%g ", tet_nodal_values[d]);
+        // printf("%g ", tet_nodal_values[d]);
     }
 
-    printf("\n");
+    // printf("\n");
 }
 
 static SFEM_INLINE void l2_assemble(const quadrature_t *q_box,
@@ -625,6 +678,24 @@ static SFEM_INLINE void l2_assemble(const quadrature_t *q_box,
         const real_t yk = q_box->y[k];
         const real_t zk = q_box->z[k];
         const real_t dV = q_tet->w[k] / 6.0;
+
+        assert(xk >= 0);
+        assert(xk <= 1);
+
+        assert(yk >= 0);
+        assert(yk <= 1);
+
+        assert(zk >= 0);
+        assert(zk <= 1);
+
+        assert(q_tet->x[k] >= 0);
+        assert(q_tet->x[k] <= 1);
+
+        assert(q_tet->y[k] >= 0);
+        assert(q_tet->y[k] <= 1);
+
+        assert(q_tet->z[k] >= 0);
+        assert(q_tet->z[k] <= 1);
 
         real_t value = 0;
 
@@ -674,6 +745,7 @@ static SFEM_INLINE void l2_assemble(const quadrature_t *q_box,
 
 void resample_box_to_tetra_mesh(const count_t n[3],
                                 const count_t stride[3],
+                                const affine_transform_t *const trafo,
                                 const real_t *const SFEM_RESTRICT box_field,
                                 const ptrdiff_t n_elements,
                                 const ptrdiff_t n_nodes,
@@ -697,7 +769,7 @@ void resample_box_to_tetra_mesh(const count_t n[3],
         quadrature_create(&q_tet, q_ref.size);
     }
 
-    quadrature_print(&q_ref);
+    // quadrature_print(&q_ref);
 
     geom_t xe[4], ye[4], ze[4];
     real_t box_nodal_values[8];
@@ -705,8 +777,7 @@ void resample_box_to_tetra_mesh(const count_t n[3],
     real_t tet_nodal_weights[4];
     idx_t tet_dofs[4];
 
-    const geom_t lmargin = 0;
-    const geom_t rmargin = 1;
+    geom_t aabb_min[3], aabb_max[3];
 
     for (ptrdiff_t e = 0; e < n_elements; e++) {
         for (int d = 0; d < 4; d++) {
@@ -717,61 +788,90 @@ void resample_box_to_tetra_mesh(const count_t n[3],
             ze[d] = xyz[2][node];
         }
 
-        const count_t x_min = MAX(0, floor(array_min(4, xe)));
-        const count_t y_min = MAX(0, floor(array_min(4, ye)));
-        const count_t z_min = MAX(0, floor(array_min(4, ze)));
+        aabb_min[0] = array_min(4, xe);
+        aabb_min[1] = array_min(4, ye);
+        aabb_min[2] = array_min(4, ze);
 
-        const count_t x_max = MIN(n[0], ceil(array_max(4, xe)));
-        const count_t y_max = MIN(n[1], ceil(array_max(4, ye)));
-        const count_t z_max = MIN(n[2], ceil(array_max(4, ze)));
+        aabb_max[0] = array_max(4, xe);
+        aabb_max[1] = array_max(4, ye);
+        aabb_max[2] = array_max(4, ze);
 
-        printf("-------------------------\n");
-        printf("min %ld %ld %ld\n", (long)x_min, (long)y_min, (long)z_min);
-        printf("max %ld %ld %ld\n", (long)x_max, (long)y_max, (long)z_max);
+        affine_transform_apply_inverse(trafo, aabb_min, aabb_min);
+        affine_transform_apply_inverse(trafo, aabb_max, aabb_max);
 
+        const count_t x_min = MAX(0, floor(aabb_min[0] * n[0]));
+        const count_t y_min = MAX(0, floor(aabb_min[1] * n[1]));
+        const count_t z_min = MAX(0, floor(aabb_min[2] * n[2]));
+
+        const count_t x_max = MIN(n[0] - 1, ceil(aabb_max[0] * n[0]));
+        const count_t y_max = MIN(n[1] - 1, ceil(aabb_max[1] * n[1]));
+        const count_t z_max = MIN(n[2] - 1, ceil(aabb_max[2] * n[2]));
+
+        // printf("-------------------------\n");
+        // printf("min %ld %ld %ld\n", (long)x_min, (long)y_min, (long)z_min);
+        // printf("max %ld %ld %ld\n", (long)x_max, (long)y_max, (long)z_max);
+
+        ptrdiff_t all_nqp = 0;
         for (count_t z = z_min; z < z_max; z++) {
             for (count_t y = y_min; y < y_max; y++) {
                 for (count_t x = x_min; x < x_max; x++) {
+                    aabb_min[0] = x;
+                    aabb_min[1] = y;
+                    aabb_min[2] = z;
+
+                    aabb_max[0] = (x + 1);
+                    aabb_max[1] = (y + 1);
+                    aabb_max[2] = (z + 1);
+
+                    for (int d = 0; d < 3; ++d) {
+                        aabb_min[d] /= n[d];
+                        aabb_max[d] /= n[d];
+                    }
+
+                    affine_transform_apply(trafo, aabb_min, aabb_min);
+                    affine_transform_apply(trafo, aabb_max, aabb_max);
+
                     box_tet_quadrature(&q_ref,
-                                       x - lmargin,
-                                       y - lmargin,
-                                       z - lmargin,
-                                       x + rmargin,
-                                       y + rmargin,
-                                       z + rmargin,
+                                       aabb_min[0],
+                                       aabb_min[1],
+                                       aabb_min[2],
+                                       aabb_max[0],
+                                       aabb_max[1],
+                                       aabb_max[2],
                                        xe,
                                        ye,
                                        ze,
                                        &q_box,
                                        &q_tet);
 
+                    all_nqp += q_box.size;
                     if (!q_box.size) {
                         // No intersection
                         continue;
                     }
-
-                    quadrature_print(&q_box);
-                    quadrature_print(&q_tet);
 
                     box_gather(x, y, z, stride, box_field, box_nodal_values);
                     l2_assemble(&q_box, &q_tet, box_nodal_values, tet_nodal_values, tet_nodal_weights);
 
                     tet4_scatter_add(tet_dofs, tet_nodal_values, mesh_field);
                     tet4_scatter_add(tet_dofs, tet_nodal_weights, weight_field);
-
-                    real_t measure = weight_field[0] + weight_field[1] + weight_field[2] + weight_field[3];
-                    printf("measure: %g\n", (double)measure);
                 }
             }
         }
+
+        assert(all_nqp > 0);
     }
 
     // Normalize projection
     for (ptrdiff_t i = 0; i < n_nodes; ++i) {
         real_t w = weight_field[i];
-        printf("%g\n", w);
+        // printf("%g\n", w);
         assert(w != 0.);
-        mesh_field[i] /= w;
+        if (w != 0) {
+            mesh_field[i] /= w;
+        } else {
+            mesh_field[i] = 0;
+        }
     }
 
     // Clean-up
@@ -820,7 +920,7 @@ void resample_box_to_tetra_mesh_buggy(const count_t n[3],
     idx_t tet_dofs[4];
 
     const geom_t lmargin = 0;
-    const geom_t rmargin = 1;
+    const geom_t rmargin = 0;
 
     for (count_t z = 0; z < n[2] - 1; z++) {
         cell_list_1D_query_t q = cell_list_1D_query(&cl, z - lmargin, z + rmargin);
@@ -866,7 +966,7 @@ void resample_box_to_tetra_mesh_buggy(const count_t n[3],
     // Normalize projection
     for (ptrdiff_t i = 0; i < n_nodes; ++i) {
         real_t w = weight_field[i];
-        printf("%g\n", w);
+        // printf("%g\n", w);
         assert(w != 0.);
         if (w == 0) {
             mesh_field[i] = 0;
@@ -909,9 +1009,6 @@ int main(int argc, char *argv[]) {
     count_t n[3];
     count_t stride[3];
 
-    geom_t grid_spacing[3] = {1, 1, 1};
-    geom_t grid_shift[3]   = {0., 0., 0.};
-
     n[0] = atol(argv[1]);
     n[1] = atol(argv[2]);
     n[2] = atol(argv[3]);
@@ -951,8 +1048,26 @@ int main(int argc, char *argv[]) {
     real_t *box_field;
     ptrdiff_t field_n_local, field_n_global;
 
+    mesh_t mesh;
+    if (mesh_read(comm, mesh_folder, &mesh)) {
+        return EXIT_FAILURE;
+    }
+
+    affine_transform_t trafo;
+    affine_transform_init(&trafo);
+
     if (strcmp(field_path, "demo") == 0) {
         box_field = (real_t *)malloc(size_field * sizeof(real_t));
+
+        geom_t margin = 0;
+        for (int d = 0; d < 3; ++d) {
+            trafo.shift[d] = array_min(mesh.nnodes, mesh.points[d]) - margin;
+            trafo.scaling[d] = array_max(mesh.nnodes, mesh.points[d]) - trafo.shift[d] + margin;
+        }
+
+        printf("grid %ld %ld %ld\n", (long)n[0], (long)n[1], (long)n[2]);
+        printf("trafo\nshift: %g %g %g\n", (double)trafo.shift[0], (double)trafo.shift[1], (double)trafo.shift[2]);
+        printf("scaling: %g %g %g\n", (double)trafo.scaling[0], (double)trafo.scaling[1], (double)trafo.scaling[2]);
 
         geom_t point[3] = {0, 0, 0};
         for (ptrdiff_t z = 0; z < n[2]; ++z) {
@@ -966,8 +1081,11 @@ int main(int argc, char *argv[]) {
 
                     // box_field[z * stride[2] + y * stride[1] + x * stride[0]] = x;
 
-                    // Constant function
-                    box_field[z * stride[2] + y * stride[1] + x * stride[0]] = (1 + x);
+                    // box_field[z * stride[2] + y * stride[1] + x * stride[0]] =
+                    //     point[0] * point[0] * point[1] * point[1];
+
+                    box_field[z * stride[2] + y * stride[1] + x * stride[0]] = point[0] * point[1] * point[2];
+                    // box_field[z * stride[2] + y * stride[1] + x * stride[0]] = (1 - point[0]) * (1 - point[1]) * (1 - point[2]);
                 }
             }
         }
@@ -977,17 +1095,27 @@ int main(int argc, char *argv[]) {
         assert(size_field == field_n_global);
     }
 
-    mesh_t mesh;
-    if (mesh_read(comm, mesh_folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
-
     real_t *mesh_field = (real_t *)malloc(mesh.nnodes * sizeof(real_t));
     memset(mesh_field, 0, mesh.nnodes * sizeof(real_t));
 
     // FIXME! Implement parallel version!
     resample_box_to_tetra_mesh(
-        n, stride, box_field, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mesh_field);
+        n, stride, &trafo, box_field, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mesh_field);
+
+
+    {
+        real_t min_field = array_min_r(size_field, box_field);
+        real_t max_field = array_max_r(size_field, box_field);
+
+        printf("input field (%g, %g)\n", (double)min_field, (double)max_field);
+    }
+
+    {
+        real_t min_field = array_min_r(mesh.nnodes, mesh_field);
+        real_t max_field = array_max_r(mesh.nnodes, mesh_field);
+
+        printf("output field (%g, %g)\n", (double)min_field, (double)max_field);
+    }
 
     // FIXME! Implement write field with mesh!
     array_write(comm, output_path, SFEM_MPI_REAL_T, (void *)mesh_field, mesh.nnodes, mesh.nnodes);
