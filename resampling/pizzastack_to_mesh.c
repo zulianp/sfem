@@ -759,8 +759,8 @@ void resample_box_to_tetra_mesh(const count_t n[3],
 
     {
         // quadrature_create_tet_4_order_1(&q_ref);
-        // quadrature_create_tet_4_order_2(&q_ref);
-        quadrature_create_tet_4_order_6(&q_ref);
+        quadrature_create_tet_4_order_2(&q_ref);
+        // quadrature_create_tet_4_order_6(&q_ref);
         quadrature_create(&q_box, q_ref.size);
         quadrature_create(&q_tet, q_ref.size);
     }
@@ -793,6 +793,7 @@ void resample_box_to_tetra_mesh(const count_t n[3],
         affine_transform_apply_inverse(trafo, aabb_min, aabb_min);
         affine_transform_apply_inverse(trafo, aabb_max, aabb_max);
 
+        // count_t n_elements = n_nodes - 1
         count_t grid_n[3];
         grid_n[0] = n[0] - 1;
         grid_n[1] = n[1] - 1;
@@ -805,10 +806,6 @@ void resample_box_to_tetra_mesh(const count_t n[3],
         const count_t x_max = MIN(grid_n[0], ceil(aabb_max[0] * grid_n[0]));
         const count_t y_max = MIN(grid_n[1], ceil(aabb_max[1] * grid_n[1]));
         const count_t z_max = MIN(grid_n[2], ceil(aabb_max[2] * grid_n[2]));
-
-        // printf("-------------------------\n");
-        // printf("min %ld %ld %ld\n", (long)x_min, (long)y_min, (long)z_min);
-        // printf("max %ld %ld %ld\n", (long)x_max, (long)y_max, (long)z_max);
 
         ptrdiff_t all_nqp = 0;
         for (count_t z = z_min; z < z_max; z++) {
