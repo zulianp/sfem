@@ -240,7 +240,7 @@ void cell_list_1D_create(cell_list_1D_t *const cl,
     cl->n_cells = n_cells;
     cl->n_entries = n_entries;
 
-    cell_list_1D_print(cl);
+    // cell_list_1D_print(cl);
     free(zhisto);
 }
 
@@ -739,16 +739,15 @@ static SFEM_INLINE void l2_assemble(const quadrature_t *q_box,
     }
 }
 
-
-void resample_box_to_tetra_mesh_faster(const count_t n[3],
-                                const count_t stride[3],
-                                const affine_transform_t *const trafo,
-                                const real_t *const SFEM_RESTRICT box_field,
-                                const ptrdiff_t n_elements,
-                                const ptrdiff_t n_nodes,
-                                idx_t **const SFEM_RESTRICT elems,
-                                geom_t **const SFEM_RESTRICT xyz,
-                                real_t *const SFEM_RESTRICT mesh_field) {
+void resample_box_to_tetra_mesh_unique(const count_t n[3],
+                                       const count_t stride[3],
+                                       const affine_transform_t *const trafo,
+                                       const real_t *const SFEM_RESTRICT box_field,
+                                       const ptrdiff_t n_elements,
+                                       const ptrdiff_t n_nodes,
+                                       idx_t **const SFEM_RESTRICT elems,
+                                       geom_t **const SFEM_RESTRICT xyz,
+                                       real_t *const SFEM_RESTRICT mesh_field) {
     memset(mesh_field, 0, n_nodes * sizeof(real_t));
 
     real_t *weight_field = (real_t *)malloc(n_nodes * sizeof(real_t));
@@ -759,8 +758,8 @@ void resample_box_to_tetra_mesh_faster(const count_t n[3],
 
     {
         // quadrature_create_tet_4_order_1(&q_ref);
-        // quadrature_create_tet_4_order_2(&q_ref);
-        quadrature_create_tet_4_order_6(&q_ref);
+        quadrature_create_tet_4_order_2(&q_ref);
+        // quadrature_create_tet_4_order_6(&q_ref);
         quadrature_create(&q_physical, q_ref.size);
     }
 
@@ -866,8 +865,8 @@ void resample_box_to_tetra_mesh_faster(const count_t n[3],
 
                         const real_t dV = q_physical.w[k] / 6.0;
                         real_t value = 0;
-                        
-                        { //Box
+
+                        {  // Box
                             const real_t xk = qp[0];
                             const real_t yk = qp[1];
                             const real_t zk = qp[2];
@@ -901,12 +900,20 @@ void resample_box_to_tetra_mesh_faster(const count_t n[3],
                             value *= dV;
                         }
 
-                        { // Tet
+                        {  // Tet
                             real_t f0k = (1.0 - q_ref.x[k] - q_ref.y[k] - q_ref.z[k]);
+
+#ifdef SFEM_P1_MULTIPLIER
                             real_t df0k = f0k;
                             real_t df1k = q_ref.x[k];
                             real_t df2k = q_ref.y[k];
                             real_t df3k = q_ref.z[k];
+#else
+                            real_t df0k = 4 * f0k - q_ref.x[k] - q_ref.y[k] - q_ref.z[k];
+                            real_t df1k = -f0k + 4 * q_ref.x[k] - q_ref.y[k] - q_ref.z[k];
+                            real_t df2k = -f0k - q_ref.x[k] + 4 * q_ref.y[k] - q_ref.z[k];
+                            real_t df3k = -f0k - q_ref.x[k] - q_ref.y[k] + 4 * q_ref.z[k];
+#endif
 
                             tet_nodal_values[0] += df0k * value;
                             tet_nodal_values[1] += df1k * value;
@@ -1095,13 +1102,14 @@ void resample_box_to_tetra_mesh(const count_t n[3],
 }
 
 void resample_box_to_tetra_mesh_cell_list(const count_t n[3],
-                                      const count_t stride[3],
-                                      const real_t *const SFEM_RESTRICT box_field,
-                                      const ptrdiff_t n_elements,
-                                      const ptrdiff_t n_nodes,
-                                      idx_t **const SFEM_RESTRICT elems,
-                                      geom_t **const SFEM_RESTRICT xyz,
-                                      real_t *const SFEM_RESTRICT mesh_field) {
+                                          const count_t stride[3],
+                                          const affine_transform_t *const trafo,
+                                          const real_t *const SFEM_RESTRICT box_field,
+                                          const ptrdiff_t n_elements,
+                                          const ptrdiff_t n_nodes,
+                                          idx_t **const SFEM_RESTRICT elems,
+                                          geom_t **const SFEM_RESTRICT xyz,
+                                          real_t *const SFEM_RESTRICT mesh_field) {
     geom_t *zbi_min = (geom_t *)malloc(n_elements * sizeof(geom_t));
     geom_t *zbi_max = (geom_t *)malloc(n_elements * sizeof(geom_t));
     cell_list_1D_t cl;
@@ -1130,16 +1138,20 @@ void resample_box_to_tetra_mesh_cell_list(const count_t n[3],
     real_t tet_nodal_weights[4];
     idx_t tet_dofs[4];
 
-    const geom_t lmargin = 0;
-    const geom_t rmargin = 0;
+    real_t aabb_min[3], aabb_max[3];
 
     for (count_t z = 0; z < n[2] - 1; z++) {
-        cell_list_1D_query_t q = cell_list_1D_query(&cl, z - lmargin, z + rmargin);
+        aabb_min[2] = trafo->shift[2] + trafo->scaling[2] * z;
+        aabb_max[2] = trafo->shift[2] + trafo->scaling[2] * (z + 1);
+
+        cell_list_1D_query_t q = cell_list_1D_query(&cl, aabb_min[2], aabb_max[2]);
         assert(q.begin >= 0);
         assert(q.end <= cl.n_entries);
 
         for (ptrdiff_t k = q.begin; k < q.end; k++) {
             const ptrdiff_t e = cl.idx[k];
+            assert(e < n_elements);
+            assert(e >= 0);
 
             for (int d = 0; d < 4; d++) {
                 const idx_t node = elems[d][e];
@@ -1151,15 +1163,29 @@ void resample_box_to_tetra_mesh_cell_list(const count_t n[3],
 
             for (ptrdiff_t y = 0; y < n[1] - 1; y++) {
                 for (ptrdiff_t x = 0; x < n[0] - 1; x++) {
-                    const geom_t x_min = x - lmargin;
-                    const geom_t y_min = y - lmargin;
-                    const geom_t z_min = z - lmargin;
+                    aabb_min[0] = x;
+                    aabb_min[1] = y;
+                    aabb_min[2] = z;
 
-                    const geom_t x_max = x + rmargin;
-                    const geom_t y_max = y + rmargin;
-                    const geom_t z_max = z + rmargin;
+                    aabb_max[0] = (x + 1);
+                    aabb_max[1] = (y + 1);
+                    aabb_max[2] = (z + 1);
 
-                    box_tet_quadrature(&q_ref, x_min, y_min, z_min, x_max, y_max, z_max, xe, ye, ze, &q_box, &q_tet);
+                    affine_transform_apply(trafo, aabb_min, aabb_min);
+                    affine_transform_apply(trafo, aabb_max, aabb_max);
+
+                    box_tet_quadrature(&q_ref,
+                                       aabb_min[0],
+                                       aabb_min[1],
+                                       aabb_min[2],
+                                       aabb_max[0],
+                                       aabb_max[1],
+                                       aabb_max[2],
+                                       xe,
+                                       ye,
+                                       ze,
+                                       &q_box,
+                                       &q_tet);
 
                     // No intersection
                     if (!q_box.size) continue;
@@ -1298,18 +1324,19 @@ int main(int argc, char *argv[]) {
                     // box_field[z * stride[2] + y * stride[1] + x * stride[0]] = x;
 
                     box_field[z * stride[2] + y * stride[1] + x * stride[0]] = (point[0] * point[1] * point[2]);
-                    // box_field[z * stride[2] + y * stride[1] + x * stride[0]] = (1 - point[0]) * (1 - point[1]) * (1 - point[2]);
+                    // box_field[z * stride[2] + y * stride[1] + x * stride[0]] = (1 - point[0]) * (1 - point[1]) * (1 -
+                    // point[2]);
                 }
             }
         }
 
     } else {
-        if(SFEM_READ_FP32) {
+        if (SFEM_READ_FP32) {
             float *float_box_field = 0;
             array_read(comm, field_path, MPI_FLOAT, (void **)&float_box_field, &field_n_local, &field_n_global);
             box_field = malloc(field_n_local * sizeof(real_t));
 
-            for(ptrdiff_t i = 0; i < field_n_local; ++i) {
+            for (ptrdiff_t i = 0; i < field_n_local; ++i) {
                 box_field[i] = (real_t)float_box_field[i];
             }
 
@@ -1323,17 +1350,33 @@ int main(int argc, char *argv[]) {
             trafo.shift[d] = 0;
             trafo.scaling[d] = (n[d] - 1);
         }
-
     }
 
     real_t *mesh_field = (real_t *)malloc(mesh.nnodes * sizeof(real_t));
     memset(mesh_field, 0, mesh.nnodes * sizeof(real_t));
 
     // FIXME! Implement parallel version!
-    // resample_box_to_tetra_mesh(
-    resample_box_to_tetra_mesh_faster(
-        n, stride, &trafo, box_field, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mesh_field);
 
+    double tack = MPI_Wtime();
+    // resample_box_to_tetra_mesh(
+    resample_box_to_tetra_mesh_unique(
+        // resample_box_to_tetra_mesh_cell_list(
+        n,
+        stride,
+        &trafo,
+        box_field,
+        mesh.nelements,
+        mesh.nnodes,
+        mesh.elements,
+        mesh.points,
+        mesh_field);
+
+    tack = MPI_Wtime() - tack;
+
+    if (!rank) {
+        printf("----------------------------------------\n");
+        printf("resample_box_to_tetra_mesh:\t%g seconds\n", tack);
+    }
 
     {
         real_t min_field = array_min_r(size_field, box_field);
