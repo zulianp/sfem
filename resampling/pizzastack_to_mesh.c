@@ -1234,6 +1234,11 @@ int main(int argc, char *argv[]) {
 
     const char *output_path = "./mesh_field.raw";
 
+    int SFEM_READ_FP32 = 0;
+    SFEM_READ_ENV(SFEM_READ_FP32, atoi);
+
+    printf("Env:\nSFEM_READ_FP32=%d\n", SFEM_READ_FP32);
+
     if (argc > 6) {
         output_path = argv[6];
     }
@@ -1299,8 +1304,26 @@ int main(int argc, char *argv[]) {
         }
 
     } else {
-        array_read(comm, field_path, SFEM_MPI_REAL_T, (void **)&box_field, &field_n_local, &field_n_global);
-        assert(size_field == field_n_global);
+        if(SFEM_READ_FP32) {
+            float *float_box_field = 0;
+            array_read(comm, field_path, MPI_FLOAT, (void **)&float_box_field, &field_n_local, &field_n_global);
+            box_field = malloc(field_n_local * sizeof(real_t));
+
+            for(ptrdiff_t i = 0; i < field_n_local; ++i) {
+                box_field[i] = (real_t)float_box_field[i];
+            }
+
+            free(float_box_field);
+        } else {
+            array_read(comm, field_path, SFEM_MPI_REAL_T, (void **)&box_field, &field_n_local, &field_n_global);
+            assert(size_field == field_n_global);
+        }
+
+        for (int d = 0; d < 3; ++d) {
+            trafo.shift[d] = 0;
+            trafo.scaling[d] = (n[d] - 1);
+        }
+
     }
 
     real_t *mesh_field = (real_t *)malloc(mesh.nnodes * sizeof(real_t));
