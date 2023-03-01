@@ -739,6 +739,221 @@ static SFEM_INLINE void l2_assemble(const quadrature_t *q_box,
     }
 }
 
+
+void resample_box_to_tetra_mesh_faster(const count_t n[3],
+                                const count_t stride[3],
+                                const affine_transform_t *const trafo,
+                                const real_t *const SFEM_RESTRICT box_field,
+                                const ptrdiff_t n_elements,
+                                const ptrdiff_t n_nodes,
+                                idx_t **const SFEM_RESTRICT elems,
+                                geom_t **const SFEM_RESTRICT xyz,
+                                real_t *const SFEM_RESTRICT mesh_field) {
+    memset(mesh_field, 0, n_nodes * sizeof(real_t));
+
+    real_t *weight_field = (real_t *)malloc(n_nodes * sizeof(real_t));
+    memset(weight_field, 0, n_nodes * sizeof(real_t));
+
+    quadrature_t q_ref;
+    quadrature_t q_physical;
+
+    {
+        // quadrature_create_tet_4_order_1(&q_ref);
+        // quadrature_create_tet_4_order_2(&q_ref);
+        quadrature_create_tet_4_order_6(&q_ref);
+        quadrature_create(&q_physical, q_ref.size);
+    }
+
+    uint8_t *found = (uint8_t *)malloc(q_ref.size * sizeof(uint8_t));
+
+    real_t xe[4], ye[4], ze[4];
+    real_t box_nodal_values[8];
+    real_t tet_nodal_values[4];
+    real_t tet_nodal_weights[4];
+    idx_t tet_dofs[4];
+    real_t aabb_min[3], aabb_max[3];
+
+    for (ptrdiff_t e = 0; e < n_elements; e++) {
+        for (int d = 0; d < 4; d++) {
+            const idx_t node = elems[d][e];
+            tet_dofs[d] = node;
+            xe[d] = xyz[0][node];
+            ye[d] = xyz[1][node];
+            ze[d] = xyz[2][node];
+        }
+
+        aabb_min[0] = array_min_r(4, xe);
+        aabb_min[1] = array_min_r(4, ye);
+        aabb_min[2] = array_min_r(4, ze);
+
+        aabb_max[0] = array_max_r(4, xe);
+        aabb_max[1] = array_max_r(4, ye);
+        aabb_max[2] = array_max_r(4, ze);
+
+        affine_transform_apply_inverse(trafo, aabb_min, aabb_min);
+        affine_transform_apply_inverse(trafo, aabb_max, aabb_max);
+
+        count_t grid_n[3];
+        grid_n[0] = n[0] - 1;
+        grid_n[1] = n[1] - 1;
+        grid_n[2] = n[2] - 1;
+
+        const count_t x_min = MAX(0, floor(aabb_min[0] * grid_n[0]));
+        const count_t y_min = MAX(0, floor(aabb_min[1] * grid_n[1]));
+        const count_t z_min = MAX(0, floor(aabb_min[2] * grid_n[2]));
+
+        const count_t x_max = MIN(grid_n[0], ceil(aabb_max[0] * grid_n[0]));
+        const count_t y_max = MIN(grid_n[1], ceil(aabb_max[1] * grid_n[1]));
+        const count_t z_max = MIN(grid_n[2], ceil(aabb_max[2] * grid_n[2]));
+
+        {
+            // Generate quadrature points in physical coordinates
+            for (int k = 0; k < q_ref.size; k++) {
+                const real_t phi0 = (1.0 - q_ref.x[k] - q_ref.y[k] - q_ref.z[k]);
+                const real_t phi1 = q_ref.x[k];
+                const real_t phi2 = q_ref.y[k];
+                const real_t phi3 = q_ref.z[k];
+
+                q_physical.x[k] = phi0 * xe[0] + phi1 * xe[1] + phi2 * xe[2] + phi3 * xe[3];
+                q_physical.y[k] = phi0 * ye[0] + phi1 * ye[1] + phi2 * ye[2] + phi3 * ye[3];
+                q_physical.z[k] = phi0 * ze[0] + phi1 * ze[1] + phi2 * ze[2] + phi3 * ze[3];
+                q_physical.w[k] = q_ref.w[k];
+            }
+        }
+
+        memset(found, 0, q_ref.size * sizeof(uint8_t));
+        memset(tet_nodal_values, 0, 4 * sizeof(real_t));
+        memset(tet_nodal_weights, 0, 4 * sizeof(real_t));
+
+        ptrdiff_t all_nqp = 0;
+        for (count_t z = z_min; z < z_max; z++) {
+            for (count_t y = y_min; y < y_max; y++) {
+                for (count_t x = x_min; x < x_max; x++) {
+                    aabb_min[0] = x;
+                    aabb_min[1] = y;
+                    aabb_min[2] = z;
+
+                    aabb_max[0] = (x + 1);
+                    aabb_max[1] = (y + 1);
+                    aabb_max[2] = (z + 1);
+
+                    for (int d = 0; d < 3; ++d) {
+                        aabb_min[d] /= grid_n[d];
+                        aabb_max[d] /= grid_n[d];
+                    }
+
+                    affine_transform_apply(trafo, aabb_min, aabb_min);
+                    affine_transform_apply(trafo, aabb_max, aabb_max);
+
+                    box_gather(x, y, z, stride, box_field, box_nodal_values);
+
+                    real_t qp[3];
+                    for (int k = 0; k < q_ref.size; ++k) {
+                        if (found[k]) continue;
+
+                        qp[0] = (q_physical.x[k] - aabb_min[0]) / (aabb_max[0] - aabb_min[0]);
+                        qp[1] = (q_physical.y[k] - aabb_min[1]) / (aabb_max[1] - aabb_min[1]);
+                        qp[2] = (q_physical.z[k] - aabb_min[2]) / (aabb_max[2] - aabb_min[2]);
+
+                        int discard = 0;
+                        for (int d = 0; d < 3; ++d) {
+                            discard += qp[d] < -1e-16 || qp[d] > (1 + 1e-16);
+                        }
+
+                        if (discard) continue;
+                        found[k] = 1;
+                        all_nqp++;
+
+                        const real_t dV = q_physical.w[k] / 6.0;
+                        real_t value = 0;
+                        
+                        { //Box
+                            const real_t xk = qp[0];
+                            const real_t yk = qp[1];
+                            const real_t zk = qp[2];
+
+                            assert(xk >= 0);
+                            assert(xk <= 1);
+
+                            assert(yk >= 0);
+                            assert(yk <= 1);
+
+                            assert(zk >= 0);
+                            assert(zk <= 1);
+
+                            const real_t mx = (1.0 - xk);
+                            const real_t my = (1.0 - yk);
+                            const real_t mz = (1.0 - zk);
+
+                            // z-bottom
+                            value += mx * my * mz * box_nodal_values[0];
+                            value += xk * my * mz * box_nodal_values[1];
+                            value += mx * yk * mz * box_nodal_values[2];
+                            value += xk * yk * mz * box_nodal_values[3];
+
+                            // z-top
+                            value += mx * my * zk * box_nodal_values[4];
+                            value += xk * my * zk * box_nodal_values[5];
+                            value += mx * yk * zk * box_nodal_values[6];
+                            value += xk * yk * zk * box_nodal_values[7];
+
+                            // Scale by quadrature weight
+                            value *= dV;
+                        }
+
+                        { // Tet
+                            real_t f0k = (1.0 - q_ref.x[k] - q_ref.y[k] - q_ref.z[k]);
+                            real_t df0k = f0k;
+                            real_t df1k = q_ref.x[k];
+                            real_t df2k = q_ref.y[k];
+                            real_t df3k = q_ref.z[k];
+
+                            tet_nodal_values[0] += df0k * value;
+                            tet_nodal_values[1] += df1k * value;
+                            tet_nodal_values[2] += df2k * value;
+                            tet_nodal_values[3] += df3k * value;
+
+                            tet_nodal_weights[0] += df0k * dV;
+                            tet_nodal_weights[1] += df1k * dV;
+                            tet_nodal_weights[2] += df2k * dV;
+                            tet_nodal_weights[3] += df3k * dV;
+                        }
+                    }
+                }
+            }
+        }
+
+        for (int k = 0; k < q_physical.size; ++k) {
+            assert(found[k]);
+        }
+
+        assert(all_nqp > 0);
+
+        tet4_scatter_add(tet_dofs, tet_nodal_values, mesh_field);
+        tet4_scatter_add(tet_dofs, tet_nodal_weights, weight_field);
+    }
+
+    // Normalize projection
+    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
+        real_t w = weight_field[i];
+        // printf("%g\n", w);
+        assert(w != 0.);
+        if (w != 0) {
+            mesh_field[i] /= w;
+        } else {
+            mesh_field[i] = 0;
+        }
+    }
+
+    // Clean-up
+    {
+        quadrature_destroy(&q_ref);
+        quadrature_destroy(&q_physical);
+        free(weight_field);
+        free(found);
+    }
+}
+
 void resample_box_to_tetra_mesh(const count_t n[3],
                                 const count_t stride[3],
                                 const affine_transform_t *const trafo,
@@ -879,7 +1094,7 @@ void resample_box_to_tetra_mesh(const count_t n[3],
     }
 }
 
-void resample_box_to_tetra_mesh_buggy(const count_t n[3],
+void resample_box_to_tetra_mesh_cell_list(const count_t n[3],
                                       const count_t stride[3],
                                       const real_t *const SFEM_RESTRICT box_field,
                                       const ptrdiff_t n_elements,
@@ -1092,7 +1307,8 @@ int main(int argc, char *argv[]) {
     memset(mesh_field, 0, mesh.nnodes * sizeof(real_t));
 
     // FIXME! Implement parallel version!
-    resample_box_to_tetra_mesh(
+    // resample_box_to_tetra_mesh(
+    resample_box_to_tetra_mesh_faster(
         n, stride, &trafo, box_field, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mesh_field);
 
 
