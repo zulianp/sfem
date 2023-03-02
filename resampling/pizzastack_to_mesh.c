@@ -13,6 +13,8 @@
 #include "sfem_base.h"
 #include "sfem_mesh_write.h"
 
+#include "pizzastack/grid.h"
+
 typedef struct {
     real_t shift[3];
     real_t scaling[3];
@@ -758,8 +760,8 @@ void resample_box_to_tetra_mesh_unique(const count_t n[3],
 
     {
         // quadrature_create_tet_4_order_1(&q_ref);
-        quadrature_create_tet_4_order_2(&q_ref);
-        // quadrature_create_tet_4_order_6(&q_ref);
+        // quadrature_create_tet_4_order_2(&q_ref);
+        quadrature_create_tet_4_order_6(&q_ref);
         quadrature_create(&q_physical, q_ref.size);
     }
 
@@ -1015,7 +1017,6 @@ void resample_box_to_tetra_mesh(const count_t n[3],
         affine_transform_apply_inverse(trafo, aabb_min, aabb_min);
         affine_transform_apply_inverse(trafo, aabb_max, aabb_max);
 
-        // count_t n_elements = n_nodes - 1
         count_t grid_n[3];
         grid_n[0] = n[0] - 1;
         grid_n[1] = n[1] - 1;
@@ -1298,52 +1299,58 @@ int main(int argc, char *argv[]) {
     affine_transform_t trafo;
     affine_transform_init(&trafo);
 
+    gridz_t grid;
+    gridz_create(&grid, comm, n[0], n[1], n[2], 0);
+
     if (strcmp(field_path, "demo") == 0) {
         box_field = (real_t *)malloc(size_field * sizeof(real_t));
 
-        geom_t margin = 0;
         for (int d = 0; d < 3; ++d) {
-            trafo.shift[d] = array_min(mesh.nnodes, mesh.points[d]) - margin;
-            trafo.scaling[d] = array_max(mesh.nnodes, mesh.points[d]) - trafo.shift[d] + margin;
+            trafo.shift[d] = array_min(mesh.nnodes, mesh.points[d]);
+            trafo.scaling[d] = array_max(mesh.nnodes, mesh.points[d]);
         }
 
-        printf("grid %ld %ld %ld\n", (long)n[0], (long)n[1], (long)n[2]);
-        printf("trafo\nshift: %g %g %g\n", (double)trafo.shift[0], (double)trafo.shift[1], (double)trafo.shift[2]);
-        printf("scaling: %g %g %g\n", (double)trafo.scaling[0], (double)trafo.scaling[1], (double)trafo.scaling[2]);
+        CATCH_MPI_ERROR(MPI_Allreduce(MPI_IN_PLACE, trafo.shift, 3, SFEM_MPI_REAL_T, MPI_MIN, comm));
+        CATCH_MPI_ERROR(MPI_Allreduce(MPI_IN_PLACE, trafo.scaling, 3, SFEM_MPI_REAL_T, MPI_MAX, comm));
+
+        for (int d = 0; d < 3; ++d) {
+            trafo.scaling[d] -= trafo.shift[d];
+        }
+
+        if (!rank) {
+            printf("grid %ld %ld %ld\n", (long)n[0], (long)n[1], (long)n[2]);
+            printf("trafo\nshift: %g %g %g\n", (double)trafo.shift[0], (double)trafo.shift[1], (double)trafo.shift[2]);
+            printf("scaling: %g %g %g\n", (double)trafo.scaling[0], (double)trafo.scaling[1], (double)trafo.scaling[2]);
+        }
 
         geom_t point[3] = {0, 0, 0};
-        for (ptrdiff_t z = 0; z < n[2]; ++z) {
-            point[2] = z / (1.0 * n[2]);
-            for (ptrdiff_t y = 0; y < n[1]; ++y) {
-                point[1] = y / (1.0 * n[1]);
-                for (ptrdiff_t x = 0; x < n[0]; ++x) {
-                    point[0] = x / (1.0 * n[0]);
-                    // box_field[z * stride[2] + y * stride[1] + x * stride[0]] =
-                    //     point[0] * point[0] + point[1] * point[1] + point[2] * point[2];
-
-                    // box_field[z * stride[2] + y * stride[1] + x * stride[0]] = x;
-
+        for (ptrdiff_t z = 0; z < grid.extent[2]; ++z) {
+            point[2] = (grid.z_begin + z) / (1.0 * grid.z_global_extent);
+            
+            for (ptrdiff_t y = 0; y < grid.extent[1]; ++y) {
+                point[1] = y / (1.0 * grid.extent[1]);
+                
+                for (ptrdiff_t x = 0; x < grid.extent[0]; ++x) {
+                    point[0] = x / (1.0 * grid.extent[0]);
                     box_field[z * stride[2] + y * stride[1] + x * stride[0]] = (point[0] * point[1] * point[2]);
-                    // box_field[z * stride[2] + y * stride[1] + x * stride[0]] = (1 - point[0]) * (1 - point[1]) * (1 -
-                    // point[2]);
                 }
             }
         }
 
     } else {
-        if (SFEM_READ_FP32) {
-            float *float_box_field = 0;
-            array_read(comm, field_path, MPI_FLOAT, (void **)&float_box_field, &field_n_local, &field_n_global);
-            box_field = malloc(field_n_local * sizeof(real_t));
+        box_field = malloc(field_n_local * sizeof(real_t));
 
-            for (ptrdiff_t i = 0; i < field_n_local; ++i) {
-                box_field[i] = (real_t)float_box_field[i];
+        if (SFEM_READ_FP32) {
+            gridz_read_field(&grid, field_path, MPI_FLOAT, (void *)box_field);
+
+            float * float_field = ((float *)box_field);
+
+            for (ptrdiff_t i = field_n_local-1; i >= 0; --i) {
+                box_field[i] = float_field[i];
             }
 
-            free(float_box_field);
         } else {
-            array_read(comm, field_path, SFEM_MPI_REAL_T, (void **)&box_field, &field_n_local, &field_n_global);
-            assert(size_field == field_n_global);
+            gridz_read_field(&grid, field_path, SFEM_MPI_REAL_T, (void *)box_field);
         }
 
         for (int d = 0; d < 3; ++d) {

@@ -6,6 +6,10 @@ else ifeq ($(prof),1)
 	CFLAGS += -O2 -g -DNDEBUG
 	CXXFLAGS += -O2 -g -DNDEBUG
 	CUFLAGS += -O2 -g -DNDEBUG 
+else ifeq ($(asan), 1)
+	ASAN_FLAGS += -fsanitize=address -fno-optimize-sibling-calls -fsanitize-address-use-after-scope -fno-omit-frame-pointer -g -O0
+	CXXFLAGS += $(ASAN_FLAGS)
+	CFLAGS += $(ASAN_FLAGS)
 else
 	CFLAGS += -Ofast -DNDEBUG
 	CXXFLAGS += -Ofast -DNDEBUG
@@ -21,6 +25,8 @@ ifeq ($(avx2sort), 1)
 	CXXFLAGS += -DSFEM_ENABLE_AVX2_SORT -Iexternal -march=core-avx2
 	CFLAGS += -march=core-avx2
 endif
+
+
 
 
 
@@ -113,7 +119,7 @@ select_submesh : select_submesh.o libsfem.a
 refine : refine.o libsfem.a
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
-pizzastack_to_mesh: resampling/pizzastack_to_mesh.c libsfem.a
+pizzastack_to_mesh: resampling/pizzastack_to_mesh.c pizzastack/grid.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
 condense_matrix : condense_matrix.o
