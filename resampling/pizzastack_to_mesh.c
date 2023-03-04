@@ -1238,7 +1238,7 @@ int main(int argc, char *argv[]) {
     if (argc < 6) {
         if (!rank) {
             fprintf(
-                stderr, "usage: %s <nx> <ny> <nz> <field.raw> <mesh_folder> [output_path=./mesh_field.raw]", argv[0]);
+                stderr, "usage: %s <nx> <ny> <nz> <field.raw> <mesh_folder> [output_path=./mesh_field.raw]\n", argv[0]);
         }
 
         return EXIT_FAILURE;
@@ -1289,7 +1289,7 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     real_t *box_field;
-    ptrdiff_t field_n_local, field_n_global;
+
 
     mesh_t mesh;
     if (mesh_read(comm, mesh_folder, &mesh)) {
@@ -1338,14 +1338,14 @@ int main(int argc, char *argv[]) {
         }
 
     } else {
-        box_field = malloc(field_n_local * sizeof(real_t));
+        box_field = malloc(grid.local_size * sizeof(real_t));
 
         if (SFEM_READ_FP32) {
             gridz_read_field(&grid, field_path, MPI_FLOAT, (void *)box_field);
 
             float * float_field = ((float *)box_field);
 
-            for (ptrdiff_t i = field_n_local-1; i >= 0; --i) {
+            for (ptrdiff_t i = grid.local_size-1; i >= 0; --i) {
                 box_field[i] = float_field[i];
             }
 

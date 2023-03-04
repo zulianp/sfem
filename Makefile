@@ -55,6 +55,9 @@ GOALS += condense_matrix condense_vector idx_to_indicator remap_vector sgather
 # Resampling
 GOALS += pizzastack_to_mesh
 
+# Application of operators
+GOALS += divergence
+
 DEPS = -L$(PWD)/../matrix.io/ -lmatrix.io -lstdc++
 
 LDFLAGS += $(DEPS) -lm
@@ -142,6 +145,12 @@ remap_vector : remap_vector.o
 
 sgather : sgather.o
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+
+divergence : drivers/divergence.c div.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+div.o : operators/div.c
+	$(MPICC) $(CFLAGS) $(INCLUDES) -c $<
 	
 utopia_sfem.dylib : utopia_sfem_plugin.o  libsfem.a
 	$(MPICC) -shared -o $@ $^ $(LDFLAGS)  

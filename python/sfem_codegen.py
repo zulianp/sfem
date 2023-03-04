@@ -240,3 +240,13 @@ def subsvec3(expr, oldvec, newvec):
 	for d1 in range(0, 3):
 		expr = expr.subs(oldvec[d1], newvec[d1])
 	return expr
+
+def coeffs(name, n):
+	list_coeffs = []
+
+	for i in range(0, n):
+		ui= sp.symbols(f'{name}[{i}]', real=True)
+		list_coeffs.append(ui)
+
+	ret = sp.Matrix(n, 1, list_coeffs)
+	return ret
