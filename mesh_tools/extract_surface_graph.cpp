@@ -89,8 +89,8 @@ extern "C" void extract_surface_connectivity(const ptrdiff_t n_elements,
 
         if (same) {
             // Not surface face remove
-            sideidx[l] = -1;
-            sideidx[r] = -1;
+            sideidx[i] = -1;
+            sideidx[i+1] = -1;
             i += 2;
         } else {
             i += 1;
