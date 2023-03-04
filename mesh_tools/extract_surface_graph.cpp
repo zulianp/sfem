@@ -5,9 +5,9 @@
 #include <vector>
 
 extern "C" void extract_surface_connectivity(const ptrdiff_t n_elements,
-                                  idx_t** const elems,
-                                  ptrdiff_t* n_surf_elements,
-                                  idx_t** surf_elems) {
+                                             idx_t** const elems,
+                                             ptrdiff_t* n_surf_elements,
+                                             idx_t** surf_elems) {
     const ptrdiff_t n_sides = 4 * n_elements;
     std::vector<idx_t> buff(n_sides * 3);
 
@@ -90,7 +90,7 @@ extern "C" void extract_surface_connectivity(const ptrdiff_t n_elements,
         if (same) {
             // Not surface face remove
             sideidx[i] = -1;
-            sideidx[i+1] = -1;
+            sideidx[i + 1] = -1;
             i += 2;
         } else {
             i += 1;
@@ -98,8 +98,8 @@ extern "C" void extract_surface_connectivity(const ptrdiff_t n_elements,
         }
     }
 
-    if(sideidx[n_sides - 1] >= 0) {
-    	n_surface += 1;
+    if (sideidx[n_sides - 1] >= 0) {
+        n_surface += 1;
     }
 
     for (int d = 0; d < 3; ++d) {

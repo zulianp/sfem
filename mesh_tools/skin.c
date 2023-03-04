@@ -35,7 +35,6 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-
     const char *output_folder = "./";
     if (argc > 2) {
         output_folder = argv[2];
@@ -47,10 +46,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (!rank) {
-        printf("%s %s %s\n",
-               argv[0],
-               argv[1],
-               output_folder);
+        printf("%s %s %s\n", argv[0], argv[1], output_folder);
     }
 
     double tick = MPI_Wtime();
@@ -67,11 +63,51 @@ int main(int argc, char *argv[]) {
     }
 
     ptrdiff_t n_surf_elements = 0;
-    idx_t** surf_elems = malloc(3 * sizeof(idx_t *));
+    idx_t **surf_elems = (idx_t **)malloc(3 * sizeof(idx_t *));
     extract_surface_connectivity(mesh.nelements, mesh.elements, &n_surf_elements, surf_elems);
-    ptrdiff_t n_surf_nodes = mesh.nnodes;
-    // FIXME
-    geom_t ** points = mesh.points;
+
+    idx_t *vol2surf = (idx_t *)malloc(mesh.nnodes * sizeof(idx_t));
+    for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {
+        vol2surf[i] = -1;
+    }
+
+    ptrdiff_t next_id = 0;
+    for (ptrdiff_t i = 0; i < n_surf_elements; ++i) {
+        for (int d = 0; d < 3; ++d) {
+            idx_t idx = surf_elems[d][i];
+            if (vol2surf[idx] < 0) {
+                vol2surf[idx] = next_id++;
+            }
+        }
+    }
+
+    ptrdiff_t n_surf_nodes = next_id;
+    geom_t **points = (geom_t **)malloc(3 * sizeof(geom_t *));
+
+    idx_t *mapping = (idx_t *)malloc(n_surf_nodes * sizeof(idx_t));
+
+    for (int d = 0; d < 3; ++d) {
+        points[d] = (geom_t *)malloc(n_surf_nodes * sizeof(geom_t));
+    }
+
+    for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {
+        if (vol2surf[i] < 0) continue;
+
+        mapping[vol2surf[i]] = i;
+
+        for (int d = 0; d < 3; ++d) {
+            points[d][vol2surf[i]] = mesh.points[d][i];
+        }
+    }
+
+    // Reindex elements
+    for(ptrdiff_t i = 0; i < n_surf_elements; ++i) {
+        for (int d = 0; d < 3; ++d) {
+            surf_elems[d][i] = vol2surf[surf_elems[d][i]]; 
+        }
+    }
+
+    free(vol2surf);
 
     mesh_t surf;
     surf.comm = mesh.comm;
@@ -86,16 +122,14 @@ int main(int argc, char *argv[]) {
     surf.elements = surf_elems;
     surf.points = points;
 
-    // surf.node_mapping = mapping;
-    surf.node_mapping = 0;
+    surf.node_mapping = mapping;
+    surf.element_mapping = 0;
     surf.node_owner = 0;
 
     mesh_write(output_folder, &surf);
 
     mesh_destroy(&mesh);
-
-    // FIXME
-    // mesh_destroy(&surf);
+    mesh_destroy(&surf);
 
     double tock = MPI_Wtime();
 
