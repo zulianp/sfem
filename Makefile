@@ -47,7 +47,7 @@ INCLUDES += -I$(PWD) -I$(PWD)/.. -I$(PWD)/../matrix.io
 GOALS = assemble assemble3 assemble4 
 
 # Mesh manipulation
-GOALS += partition select_submesh refine
+GOALS += partition select_submesh refine skin
 
 # Algebra post process
 GOALS += condense_matrix condense_vector idx_to_indicator remap_vector sgather
@@ -118,6 +118,12 @@ select_submesh : select_submesh.o libsfem.a
 
 refine : refine.o libsfem.a
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+
+skin : mesh_tools/skin.c extract_surface_graph.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
+
+extract_surface_graph.o : mesh_tools/extract_surface_graph.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $<
 
 pizzastack_to_mesh: resampling/pizzastack_to_mesh.c pizzastack/grid.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
