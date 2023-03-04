@@ -499,14 +499,14 @@ int serial_read_tet_mesh(const char *folder, ptrdiff_t *nelements, idx_t *elems[
         assert(x_nnodes == y_nnodes);
         assert(x_nnodes == z_nnodes);
 
-        x_nnodes /= sizeof(geom_t);
-        assert(x_nnodes * sizeof(geom_t) == y_nnodes);
-        *nnodes = x_nnodes;
-
         if (x_nnodes != y_nnodes || x_nnodes != z_nnodes) {
             fprintf(stderr, "Bad input lengths!\n");
             return -1;
         }
+
+        x_nnodes /= sizeof(geom_t);
+        assert(x_nnodes * sizeof(geom_t) == y_nnodes);
+        *nnodes = x_nnodes;
     }
 
     {

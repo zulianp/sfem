@@ -6,6 +6,7 @@ SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 PATH=$SCRIPTPATH:$PATH
 PATH=$SCRIPTPATH/../..:$PATH
+PATH=$SCRIPTPATH/../../python:$PATH
 
 set -x
 
@@ -28,6 +29,8 @@ griduz=$gridux
 ################################################
 mesh_path=/Users/patrickzulian/Desktop/code/utopia/utopia_fe/data/hydros/mesh-multi-outlet-better 
 
+# >
+
 ################################################
 # Boundary dofs
 ################################################
@@ -38,6 +41,18 @@ mkdir -p $surf_mesh_path
 skin $mesh_path $surf_mesh_path
 nodes_to_zero=$surf_mesh_path/node_mapping.raw
 
+################################################
+# Assemble laplacian
+################################################
+
+# List dirchlet nodes
+python3 -c "import numpy as np; np.array([0]).astype(np.int32).tofile('dn.raw')"
+
+mv dn.raw $workspace/dn.raw
+
+SFEM_HANDLE_DIRICHLET=1 \
+SFEM_DIRICHLET_NODES=$workspace/dn.raw \
+assemble $mesh_path $workspace
 
 # NEXT SHOULD BE A LOOP OVER FILES
 
@@ -49,9 +64,9 @@ ux=$workspace/ux.raw
 uy=$workspace/uy.raw
 uz=$workspace/uz.raw
 
-SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $gridux $mesh_path $ux
-SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $griduy $mesh_path $uy
-SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $griduz $mesh_path $uz
+# SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $gridux $mesh_path $ux
+# SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $griduy $mesh_path $uy
+# SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $griduz $mesh_path $uz
 
 ################################################
 # Compute (div(u), test)_L2
@@ -59,3 +74,7 @@ SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $griduz $mesh_path $uz
 
 divu=$workspace/divu.raw
 divergence $mesh_path $ux $uy $uz $divu
+
+# TODO
+# convert final output
+raw2mesh.py -d $mesh_path --field=$divu --field_dtype=float64 --output=$workspace/out.vtu

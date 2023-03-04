@@ -75,12 +75,14 @@ int main(int argc, char *argv[]) {
     int SFEM_LAPLACIAN = 1;
     int SFEM_MASS = 0;
     int SFEM_HANDLE_DIRICHLET = 1;
+    int SFEM_HANDLE_NEUMANN = 1;
     int SFEM_EXPORT_FP32 = 0;
 
     SFEM_READ_ENV(SFEM_LAPLACIAN, atoi);
     SFEM_READ_ENV(SFEM_MASS, atoi);
     SFEM_READ_ENV(SFEM_HANDLE_DIRICHLET, atoi);
     SFEM_READ_ENV(SFEM_EXPORT_FP32, atoi);
+    SFEM_READ_ENV(SFEM_HANDLE_NEUMANN, atoi);
 
     printf("----------------------------------------\n");
     printf("Environment variables:\n- SFEM_LAPLACIAN=%d\n- SFEM_MASS=%d\n- SFEM_HANDLE_DIRICHLET=%d\n- SFEM_EXPORT_FP32=%d\n",
@@ -152,6 +154,7 @@ int main(int argc, char *argv[]) {
     real_t *rhs = (real_t *)malloc(nnodes * sizeof(real_t));
     memset(rhs, 0, nnodes * sizeof(real_t));
 
+    if(SFEM_HANDLE_NEUMANN)
     {  // Neumann
         sprintf(path, "%s/on.raw", folder);
         idx_t *faces_neumann = 0;
@@ -213,6 +216,15 @@ int main(int argc, char *argv[]) {
     if (SFEM_HANDLE_DIRICHLET) {
         // Dirichlet
         sprintf(path, "%s/zd.raw", folder);
+
+        const char * SFEM_DIRICHLET_NODES = 0;
+        SFEM_READ_ENV(SFEM_DIRICHLET_NODES, );
+
+        if(SFEM_DIRICHLET_NODES) {
+            strcpy(path, SFEM_DIRICHLET_NODES);
+            printf("SFEM_DIRICHLET_NODES=%s\n", path);
+        }
+
         idx_t *dirichlet_nodes = 0;
         ptrdiff_t nn = read_file(comm, path, (void **)&dirichlet_nodes);
         assert((nn / sizeof(idx_t)) * sizeof(idx_t) == nn);
