@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stddef.h>
 
 #include "matrix.io/array_dtof.h"
 #include "matrix.io/matrixio_array.h"
