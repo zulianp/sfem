@@ -68,25 +68,52 @@ int write_mapped_field(MPI_Comm comm,
     MPI_Comm_size(comm, &rank);
     MPI_Comm_size(comm, &size);
 
-    const ptrdiff_t local_file_size = n_global / size;
+    const ptrdiff_t local_output_size_no_remainder = n_global / size;
     const ptrdiff_t begin = (n_global / size) * rank;
 
-    idx_t * send_count = (idx_t * )malloc((size + 1) * sizeof(idx_t));
-    memset(send_count, 0, (size + 1) * sizeof(idx_t));
+    ptrdiff_t local_output_size = local_output_size_no_remainder;
+    if (rank == size - 1) {
+        local_output_size = n_global - begin;
+    }
 
-    for(ptrdiff_t i = 0; i < n_local; ++i) {
+    idx_t *send_count = (idx_t *)malloc((size) * sizeof(idx_t));
+    memset(send_count, 0, (size) * sizeof(idx_t));
+
+    for (ptrdiff_t i = 0; i < n_local; ++i) {
         const idx_t idx = mapping[i];
-        int dest_rank = idx / local_file_size;
+        int dest_rank = idx / local_output_size_no_remainder;
         assert(dest_rank < size);
         send_count[dest_rank]++;
     }
 
-    idx_t * recv_count = (idx_t * )malloc((size + 1) * sizeof(idx_t));
-    // memset(recv_count, 0, (size + 1) * sizeof(idx_t));
+    idx_t *recv_count = (idx_t *)malloc((size) * sizeof(idx_t));
+    CATCH_MPI_ERROR(MPI_Alltoall(send_count, 1, SFEM_MPI_IDX_T, recv_count, 1, SFEM_MPI_IDX_T, comm));
 
-    CATCH_MPI_ERROR(
-                MPI_Alltoall(send_count, 1, SFEM_MPI_IDX_T, recv_count, 1, SFEM_MPI_IDX_T, comm));
+    idx_t *send_list = (idx_t *)malloc(n_local * sizeof(idx_t));
+    idx_t *recv_list = (idx_t *)malloc(local_output_size * sizeof(idx_t));
+
+    // Create data displacements for sending
+    // for (int i = 0; i < size - 1; ++i) {
+    //     send_displs[i + 1] = send_displs[i] + send_count[i];
+    // }
+
+    // Create data displacements for receiving
+    // for (int i = 0; i < size - 1; ++i) {
+    //     recv_displs[i + 1] = recv_displs[i] + recv_count[i];
+    // }
+
+    // CATCH_MPI_ERROR(MPI_Alltoallv(data_out,
+    //                               send_count,
+    //                               send_displs,
+    //                               SFEM_MPI_IDX_T,
+    //                               data_in,
+    //                               recv_count,
+    //                               recv_displs,
+    //                               SFEM_MPI_IDX_T,
+    //                               comm));
 
     free(send_count);
+    free(send_list);
+    free(recv_list);
     return 0;
 }

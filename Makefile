@@ -50,7 +50,7 @@ GOALS = assemble assemble3 assemble4
 GOALS += partition select_submesh refine skin
 
 # Algebra post process
-GOALS += condense_matrix condense_vector idx_to_indicator remap_vector sgather
+GOALS += condense_matrix condense_vector idx_to_indicator remap_vector sgather smask
 
 # Resampling
 GOALS += pizzastack_to_mesh
@@ -147,6 +147,9 @@ sgather : sgather.o
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
 divergence : drivers/divergence.c div.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+smask : drivers/smask.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 div.o : operators/div.c

@@ -69,11 +69,45 @@ uz=$workspace/uz.raw
 # SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $griduz $mesh_path $uz
 
 ################################################
+# Set velocity to zero on surface nodes
+################################################
+
+mux=$workspace/mux.raw
+muy=$workspace/muy.raw
+muz=$workspace/muz.raw
+
+smask $nodes_to_zero $ux $mux 0
+smask $nodes_to_zero $uy $muy 0
+smask $nodes_to_zero $uz $muz 0
+
+################################################
 # Compute (div(u), test)_L2
 ################################################
 
 divu=$workspace/divu.raw
-divergence $mesh_path $ux $uy $uz $divu
+divergence $mesh_path $mux $muy $muz $divu
+
+################################################
+# Solve linear system
+################################################
+
+# TODO
+
+################################################
+# Compute gradients
+################################################
+
+# TODO
+
+################################################
+# Compute WSS
+################################################
+
+# TODO
+
+################################################
+# Visualize WSS
+################################################
 
 # TODO
 # convert final output
