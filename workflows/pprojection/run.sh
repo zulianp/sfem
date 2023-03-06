@@ -8,6 +8,9 @@ PATH=$SCRIPTPATH:$PATH
 PATH=$SCRIPTPATH/../..:$PATH
 PATH=$SCRIPTPATH/../../python:$PATH
 
+# Remove me!
+UTOPIA_EXEC=$CODE_DIR/utopia/utopia/build/utopia_exec
+
 if [[ -z "$UTOPIA_EXEC" ]]
 then
 	echo "Error! Please define UTOPIA_EXEC=<path_to_utopia_exectuable>"
@@ -20,7 +23,7 @@ solve()
 	rhs=$2
 	x=$3
 	# mpirun $UTOPIA_EXEC -app ls_solve -A $mat -b $rhs -out $x -use_amg false --use_ksp -pc_type hypre -ksp_type cg -atol 1e-18 -rtol 0 -stol 1e-19 -out $sol --verbose
-	$UTOPIA_EXEC -app ls_solve -A $mat -b $rhs -out $x -use_amg false --use_ksp -pc_type hypre -ksp_type cg -atol 1e-18 -rtol 0 -stol 1e-19 --verbose
+	mpiexec -np 8 $UTOPIA_EXEC -app ls_solve -A $mat -b $rhs -out $x -use_amg false --use_ksp -pc_type hypre -ksp_type cg -atol 1e-18 -rtol 0 -stol 1e-19 --verbose
 }
 
 set -x
@@ -113,6 +116,17 @@ solve $workspace/rowptr.raw $divu $pressure
 # Compute gradients
 ################################################
 
+# per Cell quantities
+dpdx=$workspace/dpdx.raw
+dpdy=$workspace/dpdy.raw
+dpdz=$workspace/dpdz.raw
+
+cgrad $mesh_path $pressure $dpdx $dpdy $dpdz
+
+################################################
+# P0 to P1 projection
+################################################
+
 # TODO
 
 ################################################
@@ -126,5 +140,6 @@ solve $workspace/rowptr.raw $divu $pressure
 ################################################
 
 # TODO
+
 # convert final output
 raw2mesh.py -d $mesh_path --field=$pressure --field_dtype=float64 --output=$workspace/pressure.vtu
