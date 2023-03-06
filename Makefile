@@ -47,10 +47,10 @@ INCLUDES += -I$(PWD) -I$(PWD)/.. -I$(PWD)/../matrix.io
 GOALS = assemble assemble3 assemble4 
 
 # Mesh manipulation
-GOALS += partition select_submesh refine skin
+GOALS += partition select_submesh refine skin surf_split
 
 # FE post-process
-GOALS += cgrad
+GOALS += cgrad projection_p0_to_p1
 
 # Algebra post process
 GOALS += condense_matrix condense_vector idx_to_indicator remap_vector sgather smask
@@ -128,6 +128,9 @@ refine : refine.o libsfem.a
 skin : mesh_tools/skin.c extract_surface_graph.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
+surf_split : drivers/surf_split.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
+
 extract_surface_graph.o : mesh_tools/extract_surface_graph.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $<
 
@@ -150,6 +153,9 @@ sgather : sgather.o
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
 divergence : drivers/divergence.c div.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+projection_p0_to_p1 : drivers/projection_p0_to_p1.c div.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 smask : drivers/smask.c libsfem.a

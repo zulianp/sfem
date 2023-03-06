@@ -344,3 +344,77 @@ int block_crs_to_crs(const ptrdiff_t nnodes,
 
     return 0;
 }
+
+int create_dual_graph(const ptrdiff_t n_elements,
+                      const ptrdiff_t n_nodes,
+                      const int element_type,
+                      idx_t **const elems,
+                      count_t **out_rowptr,
+                      idx_t **out_colidx) {
+    count_t *n2eptr = 0;
+    idx_t *elindex = 0;
+    build_n2e(n_elements, n_nodes, element_type, elems, &n2eptr, &elindex);
+
+    count_t *e_ptr = (count_t *)malloc((n_elements + 1) * sizeof(count_t));
+    memset(e_ptr, 0, (n_elements + 1) * sizeof(count_t));
+
+    ptrdiff_t n_connections = 0;
+    for (ptrdiff_t node = 0; node < n_nodes; ++node) {
+        const count_t e_begin = n2eptr[node];
+        const count_t e_end = n2eptr[node + 1];
+
+        for (count_t e1 = e_begin; e1 < e_end; ++e1) {
+            const idx_t e_idx_1 = elindex[e1];
+
+            for (count_t e2 = e_begin; e2 < e_end; ++e2) {
+                const idx_t e_idx_2 = elindex[e1];
+                if(e_idx_1 == e_idx_2) continue;
+                n_connections++;
+            }
+        }
+    }
+
+    count_t *bookkepping = (count_t *)malloc((n_elements + 1) * sizeof(count_t));
+    memset(bookkepping, 0, (n_elements + 1) * sizeof(count_t));
+
+    idx_t *elem_1 = (idx_t *)malloc(element_type * sizeof(idx_t));
+    idx_t *elem_2 = (idx_t *)malloc(element_type * sizeof(idx_t));
+
+    idx_t *connections = (idx_t*)malloc(n_connections * sizeof(idx_t));
+    memset(connections, 0, n_connections * sizeof(idx_t));
+
+    for (ptrdiff_t node = 0; node < n_nodes; ++node) {
+        const count_t e_begin = n2eptr[node];
+        const count_t e_end = n2eptr[node + 1];
+
+        for (count_t e1 = e_begin; e1 < e_end; ++e1) {
+            const idx_t e_idx_1 = elindex[e1];
+
+            for(int d = 0; d < element_type; ++d) {
+                elem_1[d] = elems[d][e_idx_1];
+            }
+
+            for (count_t e2 = e_begin; e2 < e_end; ++e2) {
+                const idx_t e_idx_2 = elindex[e2];
+
+                if(e_idx_1 == e_idx_2) continue;
+
+                for(int d = 0; d < element_type; ++d) {
+                    elem_2[d] = elems[d][e_idx_2];
+                }
+
+                // 
+            }
+        }
+    }
+
+    free(elem_1);
+    free(elem_2);
+
+    free(elindex);
+    free(n2eptr);
+
+    free(bookkepping);
+    free(connections);
+    return 0;
+}

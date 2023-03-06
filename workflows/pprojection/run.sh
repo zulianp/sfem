@@ -60,6 +60,12 @@ skin $mesh_path $surf_mesh_path
 nodes_to_zero=$surf_mesh_path/node_mapping.raw
 
 ################################################
+# Split wall from inlet and outlet
+################################################
+
+# TODO
+
+################################################
 # Assemble laplacian
 ################################################
 
@@ -116,18 +122,25 @@ solve $workspace/rowptr.raw $divu $pressure
 # Compute gradients
 ################################################
 
-# per Cell quantities
-dpdx=$workspace/dpdx.raw
-dpdy=$workspace/dpdy.raw
-dpdz=$workspace/dpdz.raw
+# Per Cell quantities
+p0_dpdx=$workspace/p0_dpdx.raw
+p0_dpdy=$workspace/p0_dpdy.raw
+p0_dpdz=$workspace/p0_dpdz.raw
 
-cgrad $mesh_path $pressure $dpdx $dpdy $dpdz
+cgrad $mesh_path $pressure $p0_dpdx $p0_dpdy $p0_dpdz
 
 ################################################
 # P0 to P1 projection
 ################################################
 
-# TODO
+# Per Node quantities
+p1_dpdx=$workspace/p1_dpdx.raw
+p1_dpdy=$workspace/p1_dpdy.raw
+p1_dpdz=$workspace/p1_dpdz.raw
+
+projection_p0_to_p1 $mesh_path $p0_dpdx $p1_dpdx
+projection_p0_to_p1 $mesh_path $p0_dpdy $p1_dpdy
+projection_p0_to_p1 $mesh_path $p0_dpdz $p1_dpdz
 
 ################################################
 # Compute WSS
@@ -141,5 +154,5 @@ cgrad $mesh_path $pressure $dpdx $dpdy $dpdz
 
 # TODO
 
-# convert final output
+# Convert final output
 raw2mesh.py -d $mesh_path --field=$pressure --field_dtype=float64 --output=$workspace/pressure.vtu

@@ -13,6 +13,10 @@
 #endif
 #endif
 
+extern "C" void sort_idx(idx_t *arr, idx_t size) {
+    std::sort(arr,  arr + size);
+}
+
 extern "C" idx_t sortreduce(idx_t *arr, idx_t size) {
 
 #ifdef SFEM_ENABLE_AVX512_SORT
