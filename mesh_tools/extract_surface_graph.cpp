@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <vector>
+#include <cassert>
 
 extern "C" void extract_surface_connectivity(const ptrdiff_t n_elements,
                                              idx_t** const elems,
