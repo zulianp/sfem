@@ -49,6 +49,9 @@ GOALS = assemble assemble3 assemble4
 # Mesh manipulation
 GOALS += partition select_submesh refine skin
 
+# FE post-process
+GOALS += cgrad
+
 # Algebra post process
 GOALS += condense_matrix condense_vector idx_to_indicator remap_vector sgather smask
 
@@ -150,6 +153,9 @@ divergence : drivers/divergence.c div.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 smask : drivers/smask.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+cgrad : drivers/cgrad.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 div.o : operators/div.c
