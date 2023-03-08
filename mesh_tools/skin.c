@@ -131,7 +131,7 @@ int main(int argc, char *argv[]) {
 
     char path[2048];
     sprintf(path, "%s/parent.raw", output_folder);
-    array_write(comm, path, SFEM_MPI_IDX_T, parent, mesh.nelements, mesh.nelements);
+    array_write(comm, path, SFEM_MPI_IDX_T, parent, n_surf_elements, n_surf_elements);
 
     // Clean-up
 

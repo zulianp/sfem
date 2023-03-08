@@ -76,7 +76,7 @@ void wss_mag_3(const ptrdiff_t nelements,
 
     for (ptrdiff_t i = 0; i < nelements; ++i) {
 #pragma unroll(4)
-        for (int v = 0; v < 4; ++v) {
+        for (int v = 0; v < 3; ++v) {
             ev[v] = elems[v][i];
         }
 
@@ -162,7 +162,7 @@ int main(int argc, char *argv[]) {
     char path[2048];
 
     // P0
-    for (int d = 0; d < 3; ++d) {
+    for (int d = 0; d < 6; ++d) {
         sprintf(path, "%s.%d.raw", shear_prefix, d);
         array_read(comm, path, SFEM_MPI_REAL_T, (void **)&shear_6[d], &shear_size_local, &shear_size_global);
     }
