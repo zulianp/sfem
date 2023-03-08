@@ -160,12 +160,12 @@ cshear $mesh_path $p1_dpdx $p1_dpdy $p1_dpdz $vshear_prefix
 
 # Map shear to surface elements
 real_type_size=8
-sgather $parent_elements $real_type_size $vshear_prefix"0.raw" sshear_prefix"0.raw"
-sgather $parent_elements $real_type_size $vshear_prefix"1.raw" sshear_prefix"1.raw"
-sgather $parent_elements $real_type_size $vshear_prefix"2.raw" sshear_prefix"2.raw"
-sgather $parent_elements $real_type_size $vshear_prefix"3.raw" sshear_prefix"3.raw"
-sgather $parent_elements $real_type_size $vshear_prefix"4.raw" sshear_prefix"4.raw"
-sgather $parent_elements $real_type_size $vshear_prefix"5.raw" sshear_prefix"5.raw"
+sgather $parent_elements $real_type_size $vshear_prefix".0.raw" $sshear_prefix".0.raw"
+sgather $parent_elements $real_type_size $vshear_prefix".1.raw" $sshear_prefix".1.raw"
+sgather $parent_elements $real_type_size $vshear_prefix".2.raw" $sshear_prefix".2.raw"
+sgather $parent_elements $real_type_size $vshear_prefix".3.raw" $sshear_prefix".3.raw"
+sgather $parent_elements $real_type_size $vshear_prefix".4.raw" $sshear_prefix".4.raw"
+sgather $parent_elements $real_type_size $vshear_prefix".5.raw" $sshear_prefix".5.raw"
 
 wssmag=$workspace/wssmag.raw
 
