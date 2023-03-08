@@ -112,9 +112,17 @@ int main(int argc, char *argv[]) {
     memset(selected_nodes, 0, (mesh.nnodes + 1) * sizeof(idx_t));
     memset(additional_nodes, 0, (mesh.nnodes + 1) * sizeof(idx_t));
 
-    int euclidean = 1;
-    if (euclidean) {
+    int SFEM_SELECT_EUCLIDEAN = 1;
+    SFEM_READ_ENV(SFEM_SELECT_EUCLIDEAN, atoi);
 
+    int SFEM_SELECT_GEODESIC = 0;
+    SFEM_READ_ENV(SFEM_SELECT_GEODESIC, atoi);
+
+    if(SFEM_SELECT_GEODESIC) {
+        SFEM_SELECT_EUCLIDEAN = 0;
+    }
+
+    if (SFEM_SELECT_EUCLIDEAN) {
         idx_t *args = (idx_t *)malloc(mesh.nnodes * sizeof(idx_t));
         argsort_f(mesh.nnodes, sq_dists, args);
 
@@ -126,11 +134,41 @@ int main(int argc, char *argv[]) {
         free(args);
 
     } else {
-        count_t *rowptr;
-        idx_t *colidx;
-        build_crs_graph_3(mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
+        count_t *adj_ptr;
+        idx_t *adj_idx;
+        build_crs_graph_3(mesh.nelements, mesh.nnodes, mesh.elements, &adj_ptr, &adj_idx);
 
-        // TODO
+        ptrdiff_t size_queue = (mesh.nnodes + 1);
+        ptrdiff_t *node_queue = (ptrdiff_t *)malloc(size_queue * sizeof(ptrdiff_t));
+
+        node_queue[0] = closest_node;
+        for (ptrdiff_t e = 1; e < size_queue; ++e) {
+            node_queue[e] = -1;
+        }
+
+        // Next slot
+        ptrdiff_t next_slot = 1;
+        ptrdiff_t n_selected_nodes = 0;
+        for (ptrdiff_t q = 0; node_queue[q] >= 0 && n_selected_nodes < max_nodes; q = (q + 1) % size_queue) {
+            const ptrdiff_t node = node_queue[q];
+
+            if(selected_nodes[node + 1]) continue;
+
+            const count_t nodes_begin = adj_ptr[node];
+            const count_t nodes_end = adj_ptr[node + 1];
+
+            for (count_t k = nodes_begin; k < nodes_end; ++k) {
+                const idx_t node_adj = adj_idx[k];
+
+                if(!selected_nodes[node_adj + 1]) {
+                    node_queue[next_slot++ % size_queue] = node_adj;
+                    continue;
+                }
+            }
+
+            selected_nodes[node + 1] = 1;
+            n_selected_nodes++;
+        }
     }
 
     free(sq_dists);

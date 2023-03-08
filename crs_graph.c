@@ -58,8 +58,8 @@ static int build_n2e(const ptrdiff_t nelements,
     count_t *n2eptr = (count_t *)malloc((nnodes + 1) * sizeof(count_t));
     memset(n2eptr, 0, (nnodes + 1) * sizeof(count_t));
 
-    int *bookkepping = (int *)malloc((nnodes) * sizeof(int));
-    memset(bookkepping, 0, (nnodes) * sizeof(int));
+    int *book_keeping = (int *)malloc((nnodes) * sizeof(int));
+    memset(book_keeping, 0, (nnodes) * sizeof(int));
 
     for (int edof_i = 0; edof_i < nnodesxelem; ++edof_i) {
         for (ptrdiff_t i = 0; i < nelements; ++i) {
@@ -80,13 +80,13 @@ static int build_n2e(const ptrdiff_t nelements,
         for (idx_t i = 0; i < nelements; ++i) {
             idx_t node = elems[edof_i][i];
 
-            assert(n2eptr[node] + bookkepping[node] < n2eptr[node + 1]);
+            assert(n2eptr[node] + book_keeping[node] < n2eptr[node + 1]);
 
-            elindex[n2eptr[node] + bookkepping[node]++] = i;
+            elindex[n2eptr[node] + book_keeping[node]++] = i;
         }
     }
 
-    free(bookkepping);
+    free(book_keeping);
 
     *out_n2eptr = n2eptr;
     *out_elindex = elindex;
@@ -358,7 +358,7 @@ int create_dual_graph(const ptrdiff_t n_elements,
     count_t *e_ptr = (count_t *)malloc((n_elements + 1) * sizeof(count_t));
     memset(e_ptr, 0, (n_elements + 1) * sizeof(count_t));
 
-    ptrdiff_t n_connections = 0;
+    ptrdiff_t n_overestimated_connections = 0;
     for (ptrdiff_t node = 0; node < n_nodes; ++node) {
         const count_t e_begin = n2eptr[node];
         const count_t e_end = n2eptr[node + 1];
@@ -367,21 +367,27 @@ int create_dual_graph(const ptrdiff_t n_elements,
             const idx_t e_idx_1 = elindex[e1];
 
             for (count_t e2 = e_begin; e2 < e_end; ++e2) {
-                const idx_t e_idx_2 = elindex[e1];
-                if(e_idx_1 == e_idx_2) continue;
-                n_connections++;
+                const idx_t e_idx_2 = elindex[e2];
+                if (e_idx_1 == e_idx_2) continue;
+                
+                n_overestimated_connections++;
+                e_ptr[e_idx_1 + 1]++;
             }
         }
     }
 
-    count_t *bookkepping = (count_t *)malloc((n_elements + 1) * sizeof(count_t));
-    memset(bookkepping, 0, (n_elements + 1) * sizeof(count_t));
+    for (ptrdiff_t e = 0; e < n_elements; ++e) {
+        e_ptr[e + 1] += e_ptr[e];
+    }
+
+    count_t *book_keeping = (count_t *)malloc((n_elements + 1) * sizeof(count_t));
+    memset(book_keeping, 0, (n_elements + 1) * sizeof(count_t));
 
     idx_t *elem_1 = (idx_t *)malloc(element_type * sizeof(idx_t));
     idx_t *elem_2 = (idx_t *)malloc(element_type * sizeof(idx_t));
 
-    idx_t *connections = (idx_t*)malloc(n_connections * sizeof(idx_t));
-    memset(connections, 0, n_connections * sizeof(idx_t));
+    idx_t *connections = (idx_t *)malloc(n_overestimated_connections * sizeof(idx_t));
+    memset(connections, 0, n_overestimated_connections * sizeof(idx_t));
 
     for (ptrdiff_t node = 0; node < n_nodes; ++node) {
         const count_t e_begin = n2eptr[node];
@@ -390,31 +396,94 @@ int create_dual_graph(const ptrdiff_t n_elements,
         for (count_t e1 = e_begin; e1 < e_end; ++e1) {
             const idx_t e_idx_1 = elindex[e1];
 
-            for(int d = 0; d < element_type; ++d) {
-                elem_1[d] = elems[d][e_idx_1];
-            }
-
             for (count_t e2 = e_begin; e2 < e_end; ++e2) {
                 const idx_t e_idx_2 = elindex[e2];
+                if (e_idx_1 == e_idx_2) continue;
 
-                if(e_idx_1 == e_idx_2) continue;
-
-                for(int d = 0; d < element_type; ++d) {
-                    elem_2[d] = elems[d][e_idx_2];
-                }
-
-                // 
+                const count_t idx = e_ptr[e_idx_1] + book_keeping[e_idx_1]++;
+                connections[idx] = e_idx_2;
             }
         }
     }
 
-    free(elem_1);
-    free(elem_2);
+    memset(book_keeping, 0, (n_elements + 1) * sizeof(count_t));
 
-    free(elindex);
-    free(n2eptr);
+    {
+        free(elindex);
+        free(n2eptr);
 
-    free(bookkepping);
-    free(connections);
+        elindex = 0;
+        n2eptr = 0;
+    }
+
+    ptrdiff_t offset = 0;
+    for (ptrdiff_t e = 0; e < n_elements; ++e) {
+        const count_t e_begin = e_ptr[e];
+        const count_t e_end = e_ptr[e + 1];
+        const count_t e_range = e_end - e_begin;
+
+        const count_t n_neighs = sortreduce(&connections[e_begin], e_range);
+
+        // Compress
+        for (count_t k = 0; k < n_neighs; k++) {
+            connections[offset++] = connections[e_begin + k];
+        }
+
+        book_keeping[e + 1] = n_neighs + book_keeping[e];
+    }
+
+    memset(e_ptr, 0, (n_elements + 1) * sizeof(count_t));
+    idx_t *dual_connections = (idx_t *)malloc(book_keeping[n_elements] * sizeof(idx_t));
+    memset(dual_connections, 0, book_keeping[n_elements] * sizeof(idx_t));
+
+    for (ptrdiff_t e = 0; e < n_elements; ++e) {
+        const count_t e_begin = book_keeping[e];
+        const count_t e_end = book_keeping[e + 1];
+        const count_t e_extent = e_end - e_begin;
+
+        e_ptr[e + 1] += e_ptr[e];
+
+        for (int d = 0; d < element_type; ++d) {
+            elem_1[d] = elems[d][e];
+        }
+
+        sort_idx(elem_1, element_type);
+
+        for (count_t k = 0; k < e_extent; ++k) {
+            const count_t ke = connections[e_begin + k];
+            if (e == ke) continue;
+
+            for (int d = 0; d < element_type; ++d) {
+                elem_2[d] = elems[d][ke];
+            }
+
+            sort_idx(elem_2, element_type);
+
+            int count_same = 0;
+            for (int k1 = 0; k1 < element_type; k1++) {
+                for (int k2 = 0; k2 < element_type; k2++) {
+                    count_same += (elem_1[k1] == elem_2[k2]);
+                }
+            }
+
+            assert(count_same < element_type);
+            if (count_same == (element_type - 1)) {
+                dual_connections[e_ptr[e + 1]++] = ke;
+            }
+        }
+
+
+    }
+
+    {
+        free(elem_1);
+        free(elem_2);
+
+        free(book_keeping);
+        free(connections);
+    }
+
+    *out_rowptr = e_ptr;
+    *out_colidx = dual_connections;
     return 0;
 }

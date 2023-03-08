@@ -9,11 +9,13 @@ def main(argv):
     output_path = "out.vtu"
     field  = None
     field_dtype = np.float64
+    cell_data = None
+    cell_data_dtype = np.float64
 
     try:
         opts, args = getopt.getopt(
             argv[1:], "d:f:o:h",
-            ["dir=", "field=", "field_dtype=", "output=", "help"])
+            ["dir=", "field=", "field_dtype=", "cell_data=", "cell_data_dtype=", "output=", "help"])
 
     except getopt.GetoptError as err:
         print(err)
@@ -27,6 +29,10 @@ def main(argv):
             directory = arg
         elif opt in ("-f", "--field"):
             field = arg
+        elif opt in ("-c", "--cell_data"):
+            cell_data = arg
+        elif opt in ("-c", "--cell_data_dtype"):
+            cell_data_dtype = arg
         elif opt in ("-o", "--output"):
             output_path = arg
         elif opt in ("--field_dtype"):
@@ -61,6 +67,20 @@ def main(argv):
         print(f'sum={np.sum(data)}')
         
         mesh.point_data["X"] = data
+
+    if cell_data:
+        data = np.fromfile(cell_data, dtype=cell_data_dtype)
+
+        if(len(data) != len(i0)):
+            print(f"Error: data lenght is different from number of cells {len(data)} != {len(i0)}")
+            exit(1)
+            
+        print(f'min={np.min(data)}')
+        print(f'max={np.max(data)}')
+        print(f'sum={np.sum(data)}')
+        
+        mesh.cell_data["CellD"] = data.astype(np.float64)
+
 
     mesh.write(output_path)
 
