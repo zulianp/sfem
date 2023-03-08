@@ -50,7 +50,7 @@ GOALS = assemble assemble3 assemble4
 GOALS += partition select_submesh refine skin surf_split
 
 # FE post-process
-GOALS += cgrad projection_p0_to_p1
+GOALS += cgrad cshear projection_p0_to_p1 wss 
 
 # Algebra post process
 GOALS += condense_matrix condense_vector idx_to_indicator remap_vector sgather smask set_diff
@@ -158,16 +158,27 @@ sgather : sgather.o
 divergence : drivers/divergence.c div.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
+
+
 projection_p0_to_p1 : drivers/projection_p0_to_p1.c div.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 smask : drivers/smask.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
-cgrad : drivers/cgrad.c libsfem.a
+cgrad : drivers/cgrad.c grad_p1.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+cshear : drivers/cshear.c grad_p1.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+wss : drivers/wss.c grad_p1.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 div.o : operators/div.c
+	$(MPICC) $(CFLAGS) $(INCLUDES) -c $<
+
+grad_p1.o : operators/grad_p1.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -c $<
 	
 utopia_sfem.dylib : utopia_sfem_plugin.o  libsfem.a

@@ -5,10 +5,13 @@
 #include <vector>
 #include <cassert>
 
+#define PARENT_ID(sideidx) (sideidx) / (4)
+
 extern "C" void extract_surface_connectivity(const ptrdiff_t n_elements,
                                              idx_t** const elems,
                                              ptrdiff_t* n_surf_elements,
-                                             idx_t** surf_elems) {
+                                             idx_t** surf_elems,
+                                             idx_t** parent_element) {
     const ptrdiff_t n_sides = 4 * n_elements;
     std::vector<idx_t> buff(n_sides * 3);
 
@@ -107,6 +110,8 @@ extern "C" void extract_surface_connectivity(const ptrdiff_t n_elements,
         surf_elems[d] = (idx_t*)malloc(n_surface * sizeof(idx_t));
     }
 
+    *parent_element = (idx_t*)malloc(n_surface * sizeof(idx_t));
+
     face_idx = 0;
     for (ptrdiff_t i = 0; i < n_sides; i++) {
         if (sideidx[i] < 0) continue;
@@ -115,8 +120,14 @@ extern "C" void extract_surface_connectivity(const ptrdiff_t n_elements,
             surf_elems[d][face_idx] = buff[sideidx[i] * 3 + d];
         }
 
+        idx_t parent_id = PARENT_ID(sideidx[i]);
+        (*parent_element)[face_idx] = parent_id;
+
         face_idx++;
     }
 
     *n_surf_elements = n_surface;
 }
+
+
+#undef PARENT_ID

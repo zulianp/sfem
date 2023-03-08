@@ -83,7 +83,7 @@ void div_apply(const ptrdiff_t nelements,
     double tick = MPI_Wtime();
 
     idx_t ev[4];
-    real_t element_vector[4 * 4];
+    real_t element_vector[4];
     real_t element_ux[4];
     real_t element_uy[4];
     real_t element_uz[4];

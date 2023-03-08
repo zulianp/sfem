@@ -64,7 +64,8 @@ int main(int argc, char *argv[]) {
 
     ptrdiff_t n_surf_elements = 0;
     idx_t **surf_elems = (idx_t **)malloc(3 * sizeof(idx_t *));
-    extract_surface_connectivity(mesh.nelements, mesh.elements, &n_surf_elements, surf_elems);
+    idx_t *parent;
+    extract_surface_connectivity(mesh.nelements, mesh.elements, &n_surf_elements, surf_elems, &parent);
 
     idx_t *vol2surf = (idx_t *)malloc(mesh.nnodes * sizeof(idx_t));
     for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {
@@ -128,8 +129,15 @@ int main(int argc, char *argv[]) {
 
     mesh_write(output_folder, &surf);
 
+    char path[2048];
+    sprintf(path, "%s/parent.raw", output_folder);
+    array_write(comm, path, SFEM_MPI_IDX_T, parent, mesh.nelements, mesh.nelements);
+
+    // Clean-up
+
     mesh_destroy(&mesh);
     mesh_destroy(&surf);
+    free(parent);
 
     double tock = MPI_Wtime();
 

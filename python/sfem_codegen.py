@@ -250,3 +250,22 @@ def coeffs(name, n):
 
 	ret = sp.Matrix(n, 1, list_coeffs)
 	return ret
+
+
+def norm2(v):
+	ret = 0.0;
+
+	rows, cols = v.shape
+
+	for d1 in range(0, rows):
+		for d2 in range(0, cols):
+			ret += v[d1, d2] * v[d1, d2]
+
+	return sp.sqrt(ret)
+
+def cross(a, b):
+	return sp.Matrix(3, 1, [
+		a[1] * b[2] - a[2]*b[1],
+		a[2] * b[0] - a[0]*b[2],
+		a[0] * b[1] - a[1]*b[0]
+	])

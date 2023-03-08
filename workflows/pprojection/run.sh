@@ -58,6 +58,7 @@ mkdir -p $surf_mesh_path
 
 skin $mesh_path $surf_mesh_path
 surface_nodes=$surf_mesh_path/node_mapping.raw
+parent_elements=$surf_mesh_path/parent.raw
 
 ################################################
 # Split wall from inlet and outlet
@@ -130,6 +131,7 @@ p0_dpdx=$workspace/p0_dpdx.raw
 p0_dpdy=$workspace/p0_dpdy.raw
 p0_dpdz=$workspace/p0_dpdz.raw
 
+# coefficients: P1 -> P0
 cgrad $mesh_path $pressure $p0_dpdx $p0_dpdy $p0_dpdz
 
 ################################################
@@ -141,6 +143,7 @@ p1_dpdx=$workspace/p1_dpdx.raw
 p1_dpdy=$workspace/p1_dpdy.raw
 p1_dpdz=$workspace/p1_dpdz.raw
 
+# coefficients: P0 -> P1
 projection_p0_to_p1 $mesh_path $p0_dpdx $p1_dpdx
 projection_p0_to_p1 $mesh_path $p0_dpdy $p1_dpdy
 projection_p0_to_p1 $mesh_path $p0_dpdz $p1_dpdz
@@ -149,13 +152,29 @@ projection_p0_to_p1 $mesh_path $p0_dpdz $p1_dpdz
 # Compute WSS
 ################################################
 
-# TODO
+vshear_prefix=$workspace/volshear
+sshear_prefix=$workspace/surfshear
+
+# coefficients: P1 -> P0
+cshear $mesh_path $p1_dpdx $p1_dpdy $p1_dpdz $vshear_prefix
+
+# Map shear to surface elements
+real_type_size=8
+sgather $parent_elements $real_type_size $vshear_prefix"0.raw" sshear_prefix"0.raw"
+sgather $parent_elements $real_type_size $vshear_prefix"1.raw" sshear_prefix"1.raw"
+sgather $parent_elements $real_type_size $vshear_prefix"2.raw" sshear_prefix"2.raw"
+sgather $parent_elements $real_type_size $vshear_prefix"3.raw" sshear_prefix"3.raw"
+sgather $parent_elements $real_type_size $vshear_prefix"4.raw" sshear_prefix"4.raw"
+sgather $parent_elements $real_type_size $vshear_prefix"5.raw" sshear_prefix"5.raw"
+
+wssmag=$workspace/wssmag.raw
+
+# coefficients: P0 -> P0
+wss $surf_mesh_path $sshear_prefix $wssmag
 
 ################################################
 # Visualize WSS
 ################################################
 
-# TODO
-
-# Convert final output
-raw2mesh.py -d $mesh_path --field=$pressure --field_dtype=float64 --output=$workspace/pressure.vtu
+# Convert final output (P0)
+raw2mesh.py -d $mesh_path --cell_data=$wssmag --cell_data_dtype=float64 --output=$workspace/wssmag.vtk
