@@ -177,23 +177,15 @@ wss $surf_mesh_path $sshear_prefix $wssmag
 ################################################
 
 # Convert final output (P0)
-raw2surfmesh.py 					\ 
-	-d $surf_mesh_path 				\
-	--cell_data=$wssmag 			\ 
-	--cell_data_dtype=float64 		\ 
-	--output=$workspace/wssmag.vtk
+raw2surfmesh.py -d $surf_mesh_path --cell_data=$wssmag --cell_data_dtype=float64 --output=$workspace/wssmag.vtk
 
-################################################
-# Project stress to P1
-################################################
+# ################################################
+# # Project stress to P1
+# ################################################
 
-wssmag_p1=$workspace/wssmag_p1.raw
-projection_p0_to_p1 $surf_mesh_path $wssmag $wssmag_p1
+# wssmag_p1=$workspace/wssmag_p1.raw
+# surf_projection_p0_to_p1 $surf_mesh_path $wssmag $wssmag_p1
 
-# Convert final output (P1)
-raw2surfmesh.py 						\ 
-	-d $surf_mesh_path 					\
-	--field=$wssmag_p1 					\ 
-	--field_dtype=float64 				\ 
-	--output=$workspace/wssmag_p1.vtk
+# # Convert final output (P1)
+# raw2surfmesh.py -d $surf_mesh_path --field=$wssmag_p1 --field_dtype=float64 --output=$workspace/wssmag_p1.vtk
 
