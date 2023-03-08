@@ -50,20 +50,23 @@ mesh_path=/Users/patrickzulian/Desktop/code/utopia/utopia_fe/data/hydros/mesh-mu
 # >
 
 ################################################
-# Boundary dofs
+# Boundary nodes
 ################################################
 surf_mesh_path=$workspace/skinned
 
 mkdir -p $surf_mesh_path
 
 skin $mesh_path $surf_mesh_path
-nodes_to_zero=$surf_mesh_path/node_mapping.raw
+surface_nodes=$surf_mesh_path/node_mapping.raw
 
 ################################################
 # Split wall from inlet and outlet
 ################################################
 
-# TODO
+nodes_to_zero=$workspace/wall_idx.raw
+
+set_diff $surface_nodes $mesh_path/zd.raw $workspace/temp.raw
+set_diff $workspace/temp.raw $mesh_path/on.raw $nodes_to_zero
 
 ################################################
 # Assemble laplacian
