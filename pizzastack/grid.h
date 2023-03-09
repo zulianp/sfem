@@ -22,6 +22,9 @@ typedef struct {
     ptrdiff_t local_size_with_margins;
 } gridz_t;
 
+
+
+
 void gridz_create(gridz_t *const g, MPI_Comm comm, ptrdiff_t nx, ptrdiff_t ny, ptrdiff_t nz, int overlap);
 
 void gridz_read_field(const gridz_t *const g, const char *path, MPI_Datatype data_type, void *const data);
@@ -51,5 +54,7 @@ int write_raw_file(MPI_Comm comm,
                    ptrdiff_t ln,
                    MPI_Datatype datatype,
                    const void *const data);
+
+void gridz_z_ownership_ranges(gridz_t *const g, ptrdiff_t *const ranges);
 
 #endif  // SFEM_GRID_H

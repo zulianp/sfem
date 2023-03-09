@@ -37,3 +37,9 @@ extern "C" idx_t find_idx_binary_search(const idx_t key, const idx_t *arr, idx_t
     assert(key == *low);
     return std::distance(arr, low);
 }
+
+extern "C" ptrdiff_t lower_bound(const ptrdiff_t key, const ptrdiff_t *arr, ptrdiff_t size)
+{
+    auto low = std::lower_bound(arr, arr+size, key); 
+    return std::distance(arr, low);
+}

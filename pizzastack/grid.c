@@ -214,3 +214,20 @@ void gridz_write_field(const gridz_t *const g, const char *path, MPI_Datatype da
                    data_type,
                    &((char *)data)[array_offset]);
 }
+
+
+void gridz_z_ownership_ranges(gridz_t *const g, ptrdiff_t *const ranges)
+{
+    int size;
+    MPI_Comm_size(g->comm, &size);
+
+    ptrdiff_t local_nz = g->z_global_extent / size;
+    ptrdiff_t remainder = (g->z_global_extent - (local_nz * size));
+
+    ranges[0] = 0;
+
+    for(int rank = 0; rank < size; ++rank) {
+        ptrdiff_t z_begin = (g->z_global_extent / size) * rank + MIN(rank, remainder);
+        ranges[rank + 1] = z_begin;
+    }
+}

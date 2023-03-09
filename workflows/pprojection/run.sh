@@ -40,14 +40,15 @@ nz=736
 
 real_type_size=8
 
-gridux=/Users/patrickzulian/Desktop/code/sfem/data/veldata.raw 
-griduy=$gridux
-griduz=$gridux
+velpath=/Users/patrickzulian/Desktop/code/sfem/data/run-hsp-4
+gridux=$velpath/0.24450.raw
+griduy=$velpath/1.24450.raw
+griduz=$velpath/2.24450.raw
 
 ################################################
 # Mesh
 ################################################
-mesh_path=/Users/patrickzulian/Desktop/code/utopia/utopia_fe/data/hydros/mesh-multi-outlet-better 
+mesh_path=/Users/patrickzulian/Desktop/code/utopia/utopia_fe/data/hydros/mesh-multi-outlet-better
 
 # >
 
@@ -97,9 +98,9 @@ ux=$workspace/ux.raw
 uy=$workspace/uy.raw
 uz=$workspace/uz.raw
 
-# SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $gridux $mesh_path $ux
-# SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $griduy $mesh_path $uy
-# SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $griduz $mesh_path $uz
+SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $gridux $mesh_path $ux
+SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $griduy $mesh_path $uy
+SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $griduz $mesh_path $uz
 
 ################################################
 # Set velocity to zero on surface nodes
@@ -181,7 +182,7 @@ projection_p0_to_p1 $mesh_path $p0_dpdx $p1_dpdx
 projection_p0_to_p1 $mesh_path $p0_dpdy $p1_dpdy
 projection_p0_to_p1 $mesh_path $p0_dpdz $p1_dpdz
 
-# 
+#
 raw2mesh.py -d $mesh_path --field=$p1_dpdx --field_dtype=float64 --output=$workspace/velx.vtk
 raw2mesh.py -d $mesh_path --field=$p1_dpdy --field_dtype=float64 --output=$workspace/vely.vtk
 raw2mesh.py -d $mesh_path --field=$p1_dpdz --field_dtype=float64 --output=$workspace/velz.vtk
