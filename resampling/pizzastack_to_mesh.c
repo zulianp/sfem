@@ -1117,6 +1117,7 @@ void resample_box_to_tetra_mesh(const count_t n[3],
     }
 }
 
+// FIXME
 void resample_box_to_tetra_mesh_cell_list(const count_t n[3],
                                           const count_t stride[3],
                                           const affine_transform_t *const trafo,
@@ -1442,6 +1443,7 @@ int main(int argc, char *argv[]) {
             recv_starts[r] = s;
             recv_count[r] = (int)(e - s);
             check_z_extent += recv_count[r];
+            assert(recv_count[r] >= 0);
         }
 
         assert(check_z_extent == z_extent);
