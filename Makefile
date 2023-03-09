@@ -110,6 +110,10 @@ plugins: utopia_sfem.dylib
 libsfem.a : $(OBJS)
 	ar rcs $@ $^
 
+# include $(UTOPIA_DIR)/config/utopia-config.makefile
+# solver_poisson_equation : drivers/solver_poisson_equation.c libsfem.a
+# 	$(MPICC) $(CFLAGS) -I../isolver/interfaces/lsolve $(UTOPIA_LIBRARIES) -o $@ $^ $(LDFLAGS) ; \
+
 assemble : assemble.o libsfem.a
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
