@@ -72,6 +72,39 @@ static SFEM_INLINE void mass(const real_t x0,
     element_matrix[15] = x15;
 }
 
+static SFEM_INLINE void lumped_mass(const real_t px0,
+                                    const real_t px1,
+                                    const real_t px2,
+                                    const real_t px3,
+                                    const real_t py0,
+                                    const real_t py1,
+                                    const real_t py2,
+                                    const real_t py3,
+                                    const real_t pz0,
+                                    const real_t pz1,
+                                    const real_t pz2,
+                                    const real_t pz3,
+                                    real_t *element_vector) {
+    // FLOATING POINT OPS!
+    //       - Result: 4*ASSIGNMENT
+    //       - Subexpressions: 11*ADD + 16*DIV + 48*MUL + 12*SUB
+    const real_t x0 = (1.0 / 24.0) * px0;
+    const real_t x1 = (1.0 / 24.0) * px1;
+    const real_t x2 = (1.0 / 24.0) * px2;
+    const real_t x3 = (1.0 / 24.0) * px3;
+    const real_t x4 = (1.0 / 24.0) * px0 * py1 * pz3 + (1.0 / 24.0) * px0 * py2 * pz1 + (1.0 / 24.0) * px0 * py3 * pz2 +
+                      (1.0 / 24.0) * px1 * py0 * pz2 + (1.0 / 24.0) * px1 * py2 * pz3 + (1.0 / 24.0) * px1 * py3 * pz0 +
+                      (1.0 / 24.0) * px2 * py0 * pz3 + (1.0 / 24.0) * px2 * py1 * pz0 + (1.0 / 24.0) * px2 * py3 * pz1 +
+                      (1.0 / 24.0) * px3 * py0 * pz1 + (1.0 / 24.0) * px3 * py1 * pz2 + (1.0 / 24.0) * px3 * py2 * pz0 -
+                      py0 * pz1 * x2 - py0 * pz2 * x3 - py0 * pz3 * x1 - py1 * pz0 * x3 - py1 * pz2 * x0 -
+                      py1 * pz3 * x2 - py2 * pz0 * x1 - py2 * pz1 * x3 - py2 * pz3 * x0 - py3 * pz0 * x2 -
+                      py3 * pz1 * x0 - py3 * pz2 * x1;
+    element_vector[0] = x4;
+    element_vector[1] = x4;
+    element_vector[2] = x4;
+    element_vector[3] = x4;
+}
+
 static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {
     int i;
     for (i = 0; i < size - SFEM_VECTOR_SIZE; i += SFEM_VECTOR_SIZE) {
@@ -130,7 +163,7 @@ void assemble_mass(const ptrdiff_t nelements,
                    idx_t *const colidx,
                    real_t *const values) {
     SFEM_UNUSED(nnodes);
-    
+
     double tick = MPI_Wtime();
 
     idx_t ev[4];
@@ -139,7 +172,7 @@ void assemble_mass(const ptrdiff_t nelements,
     real_t element_matrix[4 * 4];
 
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-        #pragma unroll(4)
+#pragma unroll(4)
         for (int v = 0; v < 4; ++v) {
             ev[v] = elems[v][i];
         }
@@ -179,7 +212,7 @@ void assemble_mass(const ptrdiff_t nelements,
             real_t *rowvalues = &values[rowptr[dof_i]];
             const real_t *element_row = &element_matrix[edof_i * 4];
 
-            #pragma unroll(4)
+#pragma unroll(4)
             for (int edof_j = 0; edof_j < 4; ++edof_j) {
                 rowvalues[ks[edof_j]] += element_row[edof_j];
             }
@@ -188,4 +221,57 @@ void assemble_mass(const ptrdiff_t nelements,
 
     double tock = MPI_Wtime();
     printf("mass.c: assemble_mass\t%g seconds\n", tock - tick);
+}
+
+void assemble_lumped_mass(const ptrdiff_t nelements,
+                          const ptrdiff_t nnodes,
+                          idx_t *const elems[4],
+                          geom_t *const xyz[3],
+                          real_t *const values) {
+    SFEM_UNUSED(nnodes);
+
+    double tick = MPI_Wtime();
+
+    idx_t ev[4];
+    idx_t ks[4];
+
+    real_t element_vector[4];
+
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma unroll(4)
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        // Element indices
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+        const idx_t i3 = ev[3];
+
+        lumped_mass(
+            // X-coordinates
+            xyz[0][i0],
+            xyz[0][i1],
+            xyz[0][i2],
+            xyz[0][i3],
+            // Y-coordinates
+            xyz[1][i0],
+            xyz[1][i1],
+            xyz[1][i2],
+            xyz[1][i3],
+            // Z-coordinates
+            xyz[2][i0],
+            xyz[2][i1],
+            xyz[2][i2],
+            xyz[2][i3],
+            element_vector);
+
+        for (int edof_i = 0; edof_i < 4; ++edof_i) {
+            values[ev[edof_i]] += element_vector[edof_i];
+        }
+    }
+
+    double tock = MPI_Wtime();
+    printf("mass.c: assemble_lumped_mass\t%g seconds\n", tock - tick);
 }

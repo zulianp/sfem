@@ -50,10 +50,13 @@ GOALS = assemble assemble3 assemble4
 GOALS += partition select_submesh refine skin surf_split
 
 # FE post-process
-GOALS += cgrad cshear projection_p0_to_p1 wss 
+GOALS += cgrad cshear projection_p0_to_p1 wss lumped_mass_inv
+
+# BLAS
+GOALS += axpy
 
 # Algebra post process
-GOALS += condense_matrix condense_vector idx_to_indicator remap_vector sgather smask set_diff
+GOALS += condense_matrix condense_vector idx_to_indicator remap_vector sgather smask set_diff soverride
 
 # Resampling
 GOALS += pizzastack_to_mesh
@@ -137,6 +140,9 @@ extract_surface_graph.o : mesh_tools/extract_surface_graph.cpp
 pizzastack_to_mesh: resampling/pizzastack_to_mesh.c pizzastack/grid.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
+axpy : algebra/axpy.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
 condense_matrix : condense_matrix.o
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
@@ -155,10 +161,14 @@ remap_vector : remap_vector.o
 sgather : sgather.o
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
 
+soverride : drivers/soverride.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
 divergence : drivers/divergence.c div.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
-
+lumped_mass_inv : drivers/lumped_mass_inv.c mass.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 projection_p0_to_p1 : drivers/projection_p0_to_p1.c div.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \

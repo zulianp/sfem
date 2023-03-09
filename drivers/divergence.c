@@ -65,6 +65,15 @@ int main(int argc, char *argv[]) {
 
     div_apply(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, u[0], u[1], u[2], div_u);
 
+    real_t SFEM_SCALE=1;
+    SFEM_READ_ENV(SFEM_SCALE, atof);
+
+    if(SFEM_SCALE != 1) {
+        for(ptrdiff_t i = 0; i < u_n_local; ++i) {
+            div_u[i] *= SFEM_SCALE;
+        }
+    }
+
     array_write(comm, path_output, SFEM_MPI_REAL_T, div_u, u_n_local, u_n_global);
 
     double tock = MPI_Wtime();
