@@ -1,4 +1,4 @@
-#include "utopia_plugin_Function.h"
+#include "isolver_function.h"
 
 #include <assert.h>
 #include <math.h>
@@ -37,18 +37,18 @@ typedef struct {
     const char *output_dir;
 } sfem_problem_t;
 
-int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_destroy_array(const plugin_Function_t *info, void *ptr) {
+int ISOLVER_EXPORT isolver_function_destroy_array(const isolver_function_t *info, void *ptr) {
     free(ptr);
-    return UTOPIA_PLUGIN_SUCCESS;
+    return ISOLVER_FUNCTION_SUCCESS;
 }
 
-int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_create_array(const plugin_Function_t *info, size_t size, void **ptr) {
+int ISOLVER_EXPORT isolver_function_create_array(const isolver_function_t *info, size_t size, void **ptr) {
     *ptr = malloc(size);
     memset(*ptr, 0, size);
-    return UTOPIA_PLUGIN_SUCCESS;
+    return ISOLVER_FUNCTION_SUCCESS;
 }
 
-int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_init(plugin_Function_t *info) {
+int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
     const char *SFEM_MESH_DIR = "[error] undefined";
     const char *SFEM_MATERIAL_MODEL = "[error] undefined";
     const char *SFEM_DIRICHLET_NODES = "[error] undefined";
@@ -75,13 +75,13 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_init(plugin_Function_t *info) {
         SFEM_NEUMAN_FACES);
 
     if (!SFEM_MESH_DIR || !SFEM_DIRICHLET_NODES || !SFEM_NEUMAN_FACES) {
-        return UTOPIA_PLUGIN_FAILURE;
+        return ISOLVER_FUNCTION_FAILURE;
     }
 
     mesh_t *mesh = (mesh_t *)malloc(sizeof(mesh_t));
 
-    if (read_mesh(info->comm, SFEM_MESH_DIR, mesh)) {
-        return UTOPIA_PLUGIN_FAILURE;
+    if (mesh_read(info->comm, SFEM_MESH_DIR, mesh)) {
+        return ISOLVER_FUNCTION_FAILURE;
     }
 
     sfem_problem_t *problem = (sfem_problem_t *)malloc(sizeof(sfem_problem_t));
@@ -92,7 +92,7 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_init(plugin_Function_t *info) {
                    (void **)&problem->dirichlet_nodes,
                    &problem->nlocal_dirchlet,
                    &problem->nglobal_dirchlet)) {
-        return UTOPIA_PLUGIN_FAILURE;
+        return ISOLVER_FUNCTION_FAILURE;
     }
 
     if (array_read(info->comm,
@@ -101,7 +101,7 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_init(plugin_Function_t *info) {
                    (void **)&problem->faces_neumann,
                    &problem->nlocal_neumann,
                    &problem->nglobal_neumann)) {
-        return UTOPIA_PLUGIN_FAILURE;
+        return ISOLVER_FUNCTION_FAILURE;
     }
 
     problem->nlocal_neumann /= 3;
@@ -113,19 +113,19 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_init(plugin_Function_t *info) {
     problem->output_dir = SFEM_OUTPUT_DIR;
 
     // Store problem
-    info->user_data = (void *)problem;
+    info->private_data = (void *)problem;
 
-    // Eventually initialize info->user_data here
-    return UTOPIA_PLUGIN_SUCCESS;
+    // Eventually initialize info->private_data here
+    return ISOLVER_FUNCTION_SUCCESS;
 }
 
-int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_create_crs_graph(const plugin_Function_t *info,
-                                                                 ptrdiff_t *nlocal,
-                                                                 ptrdiff_t *nglobal,
-                                                                 ptrdiff_t *nnz,
-                                                                 plugin_idx_t **rowptr,
-                                                                 plugin_idx_t **colidx) {
-    sfem_problem_t *problem = (sfem_problem_t *)info->user_data;
+int ISOLVER_EXPORT isolver_function_create_crs_graph(const isolver_function_t *info,
+                                                     ptrdiff_t *nlocal,
+                                                     ptrdiff_t *nglobal,
+                                                     ptrdiff_t *nnz,
+                                                     isolver_idx_t **rowptr,
+                                                     isolver_idx_t **colidx) {
+    sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
     assert(problem);
     mesh_t *mesh = problem->mesh;
     assert(mesh);
@@ -135,50 +135,50 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_create_crs_graph(const plugin_Fu
     *nlocal = mesh->nnodes;
     *nglobal = mesh->nnodes;
     *nnz = (*rowptr)[*nlocal] * (problem->block_size * problem->block_size);
-    return UTOPIA_PLUGIN_SUCCESS;
+    return ISOLVER_FUNCTION_SUCCESS;
 }
 
-int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_create_vector(const plugin_Function_t *info,
-                                                              ptrdiff_t *nlocal,
-                                                              ptrdiff_t *nglobal,
-                                                              plugin_scalar_t **values) {
-    sfem_problem_t *problem = (sfem_problem_t *)info->user_data;
+int ISOLVER_EXPORT isolver_function_create_vector(const isolver_function_t *info,
+                                                  ptrdiff_t *nlocal,
+                                                  ptrdiff_t *nglobal,
+                                                  isolver_scalar_t **values) {
+    sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
     assert(problem);
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    const size_t nbytes = mesh->nnodes * sizeof(plugin_scalar_t);
+    const size_t nbytes = mesh->nnodes * sizeof(isolver_scalar_t);
 
-    *values = (plugin_scalar_t *)malloc(nbytes);
+    *values = (isolver_scalar_t *)malloc(nbytes);
     memset(*values, 0, nbytes);
     *nlocal = mesh->nnodes;
     *nglobal = mesh->nnodes;
 
-    return UTOPIA_PLUGIN_SUCCESS;
+    return ISOLVER_FUNCTION_SUCCESS;
 }
 
-int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_destroy_vector(const plugin_Function_t *info, plugin_scalar_t *values) {
+int ISOLVER_EXPORT isolver_function_destroy_vector(const isolver_function_t *info, isolver_scalar_t *values) {
     free(values);
-    return UTOPIA_PLUGIN_SUCCESS;
+    return ISOLVER_FUNCTION_SUCCESS;
 }
 
 // Optimization function
-int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_value(const plugin_Function_t *info,
-                                                      const plugin_scalar_t *x,
-                                                      plugin_scalar_t *const out) {
-    sfem_problem_t *problem = (sfem_problem_t *)info->user_data;
+int ISOLVER_EXPORT isolver_function_value(const isolver_function_t *info,
+                                          const isolver_scalar_t *x,
+                                          isolver_scalar_t *const out) {
+    sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
     assert(problem);
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
     laplacian_assemble_value(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
-    return UTOPIA_PLUGIN_SUCCESS;
+    return ISOLVER_FUNCTION_SUCCESS;
 }
 
-int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_gradient(const plugin_Function_t *info,
-                                                         const plugin_scalar_t *const x,
-                                                         plugin_scalar_t *const out) {
-    sfem_problem_t *problem = (sfem_problem_t *)info->user_data;
+int ISOLVER_EXPORT isolver_function_gradient(const isolver_function_t *info,
+                                             const isolver_scalar_t *const x,
+                                             isolver_scalar_t *const out) {
+    sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
     assert(problem);
     mesh_t *mesh = problem->mesh;
     assert(mesh);
@@ -186,16 +186,16 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_gradient(const plugin_Function_t
     laplacian_assemble_gradient(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
     surface_forcing_function(problem->nlocal_neumann, problem->faces_neumann, mesh->points, -1, out);
 
-    return UTOPIA_PLUGIN_SUCCESS;
+    return ISOLVER_FUNCTION_SUCCESS;
 }
 
 // We might want to have also other formats here
-int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_hessian_crs(const plugin_Function_t *info,
-                                                            const plugin_scalar_t *const x,
-                                                            const plugin_idx_t *const rowptr,
-                                                            const plugin_idx_t *const colidx,
-                                                            plugin_scalar_t *const values) {
-    sfem_problem_t *problem = (sfem_problem_t *)info->user_data;
+int ISOLVER_EXPORT isolver_function_hessian_crs(const isolver_function_t *info,
+                                                const isolver_scalar_t *const x,
+                                                const isolver_idx_t *const rowptr,
+                                                const isolver_idx_t *const colidx,
+                                                isolver_scalar_t *const values) {
+    sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
     assert(problem);
     mesh_t *mesh = problem->mesh;
     assert(mesh);
@@ -203,46 +203,44 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_hessian_crs(const plugin_Functio
     laplacian_assemble_hessian(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, rowptr, colidx, values);
 
     crs_constraint_nodes_to_identity(problem->nlocal_dirchlet, problem->dirichlet_nodes, 1.0, rowptr, colidx, values);
-    return UTOPIA_PLUGIN_SUCCESS;
+    return ISOLVER_FUNCTION_SUCCESS;
 }
 
 // Operator
-int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_apply(const plugin_Function_t *info,
-                                                      const plugin_scalar_t *const x,
-                                                      const plugin_scalar_t *const h,
-                                                      plugin_scalar_t *const out) {
-    sfem_problem_t *problem = (sfem_problem_t *)info->user_data;
+int ISOLVER_EXPORT isolver_function_apply(const isolver_function_t *info,
+                                          const isolver_scalar_t *const x,
+                                          const isolver_scalar_t *const h,
+                                          isolver_scalar_t *const out) {
+    sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
     assert(problem);
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
     // Equivalent to operator application due to linearity of the problem
     laplacian_assemble_gradient(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, h, out);
-    return UTOPIA_PLUGIN_SUCCESS;
+    return ISOLVER_FUNCTION_SUCCESS;
 }
 
-int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_apply_constraints(const plugin_Function_t *info,
-                                                                  plugin_scalar_t *const x) {
-    sfem_problem_t *problem = (sfem_problem_t *)info->user_data;
+int ISOLVER_EXPORT isolver_function_apply_constraints(const isolver_function_t *info, isolver_scalar_t *const x) {
+    sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
     assert(problem);
 
     constraint_nodes_to_value(problem->nlocal_dirchlet, problem->dirichlet_nodes, 0, x);
-    return UTOPIA_PLUGIN_SUCCESS;
+    return ISOLVER_FUNCTION_SUCCESS;
 }
 
-int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_apply_zero_constraints(const plugin_Function_t *info,
-                                                                       plugin_scalar_t *const x) {
-    sfem_problem_t *problem = (sfem_problem_t *)info->user_data;
+int ISOLVER_EXPORT isolver_function_apply_zero_constraints(const isolver_function_t *info, isolver_scalar_t *const x) {
+    sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
     assert(problem);
 
     constraint_nodes_to_value(problem->nlocal_dirchlet, problem->dirichlet_nodes, 0, x);
-    return UTOPIA_PLUGIN_SUCCESS;
+    return ISOLVER_FUNCTION_SUCCESS;
 }
 
-int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_copy_constrained_dofs(const plugin_Function_t *info,
-                                                                      const plugin_scalar_t *const src,
-                                                                      plugin_scalar_t *const dest) {
-    sfem_problem_t *problem = (sfem_problem_t *)info->user_data;
+int ISOLVER_EXPORT isolver_function_copy_constrained_dofs(const isolver_function_t *info,
+                                                          const isolver_scalar_t *const src,
+                                                          isolver_scalar_t *const dest) {
+    sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
     assert(problem);
     mesh_t *mesh = problem->mesh;
     assert(mesh);
@@ -250,12 +248,11 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_copy_constrained_dofs(const plug
     constraint_nodes_copy(problem->nlocal_dirchlet, problem->dirichlet_nodes, src, dest);
 
     // No constraints for this example
-    return UTOPIA_PLUGIN_SUCCESS;
+    return ISOLVER_FUNCTION_SUCCESS;
 }
 
-int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_report_solution(const plugin_Function_t *info,
-                                                                const plugin_scalar_t *const x) {
-    sfem_problem_t *problem = (sfem_problem_t *)info->user_data;
+int ISOLVER_EXPORT isolver_function_report_solution(const isolver_function_t *info, const isolver_scalar_t *const x) {
+    sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
     assert(problem);
     mesh_t *mesh = problem->mesh;
     assert(mesh);
@@ -269,16 +266,16 @@ int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_report_solution(const plugin_Fun
                     x,
                     mesh->nnodes * problem->block_size,
                     mesh->nnodes * problem->block_size)) {
-        return UTOPIA_PLUGIN_FAILURE;
+        return ISOLVER_FUNCTION_FAILURE;
     }
 
-    return UTOPIA_PLUGIN_SUCCESS;
+    return ISOLVER_FUNCTION_SUCCESS;
 }
 
-int UTOPIA_PLUGIN_EXPORT utopia_plugin_Function_destroy(plugin_Function_t *info) {
-    sfem_problem_t *problem = (sfem_problem_t *)info->user_data;
+int ISOLVER_EXPORT isolver_function_destroy(isolver_function_t *info) {
+    sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
     free(problem->mesh);
     free(problem->dirichlet_nodes);
     free(problem->faces_neumann);
-    return UTOPIA_PLUGIN_SUCCESS;
+    return ISOLVER_FUNCTION_SUCCESS;
 }

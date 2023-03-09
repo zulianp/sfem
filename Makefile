@@ -105,7 +105,7 @@ SIMD_OBJS = simd_neohookean.o
 
 OBJS += $(SIMD_OBJS)
 
-plugins: utopia_sfem.dylib
+plugins: isolver_sfem.dylib
 
 libsfem.a : $(OBJS)
 	ar rcs $@ $^
@@ -195,11 +195,11 @@ div.o : operators/div.c
 grad_p1.o : operators/grad_p1.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -c $<
 	
-utopia_sfem.dylib : utopia_sfem_plugin.o  libsfem.a
+isolver_sfem.dylib : isolver_sfem_plugin.o libsfem.a
 	$(MPICC) -shared -o $@ $^ $(LDFLAGS)  
 
-utopia_sfem_plugin.o : plugin/utopia_sfem_plugin.c
-	$(MPICC) $(CFLAGS) $(INCLUDES) -c $<
+isolver_sfem_plugin.o : plugin/isolver_sfem_plugin.c 
+	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
 
 sortreduce.o: sortreduce.cpp
 	$(CXX) $(CXXFLAGS) -c $<
