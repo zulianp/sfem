@@ -34,9 +34,9 @@ CFLAGS += -pedantic -Wextra
 # CFLAGS += -std=c99 
 
 CXXFLAGS += -std=c++11
-CXXFLAGS += -fno-exceptions -fno-rtti -static
 CXXFLAGS += -fvisibility=hidden
 CXXFLAGS += -fPIC
+INTERNAL_CXXFLAGS += -fno-exceptions -fno-rtti 
 CUFLAGS += --compiler-options -fPIC -std=c++17 -arch=native 
 
 # CUFLAGS += --compiler-options -fPIC -O0 -g -std=c++17
@@ -70,6 +70,7 @@ LDFLAGS += $(DEPS) -lm
 
 MPICC ?= mpicc
 CXX ?= c++
+MPICXX ?= mpicxx
 AR ?= ar
 NVCC ?= nvcc
 
@@ -110,9 +111,15 @@ plugins: isolver_sfem.dylib
 libsfem.a : $(OBJS)
 	ar rcs $@ $^
 
-# include $(UTOPIA_DIR)/config/utopia-config.makefile
-# solver_poisson_equation : drivers/solver_poisson_equation.c libsfem.a
-# 	$(MPICC) $(CFLAGS) -I../isolver/interfaces/lsolve $(UTOPIA_LIBRARIES) -o $@ $^ $(LDFLAGS) ; \
+
+YAML_CPP_INCLUDES = -I$(INSTALL_DIR)/yaml-cpp/include/ 
+YAML_CPP_LIBRARIES = $(INSTALL_DIR)/yaml-cpp/lib/libyaml-cpp.a
+ISOLVER_INCLUDES = -I../isolver/interfaces/lsolve -I../isolver/plugin/lsolve -I../isolver/plugin/
+ssolve : drivers/ssolve.cpp isolver_lsolve_frontend.o libsfem.a
+	$(MPICXX) $(CXXFLAGS) $(INCLUDES) $(ISOLVER_INCLUDES) $(YAML_CPP_INCLUDES) $(YAML_CPP_LIBRARIES) -o $@ $^ $(LDFLAGS) ; \
+
+isolver_lsolve_frontend.o : ../isolver/plugin/lsolve/isolver_lsolve_frontend.cpp
+	$(MPICXX) $(CXXFLAGS) $(INTERNAL_CXXFLAGS) $(INCLUDES) $(ISOLVER_INCLUDES) -c $<
 
 assemble : assemble.o libsfem.a
 	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
@@ -139,7 +146,7 @@ surf_split : drivers/surf_split.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
 extract_surface_graph.o : mesh_tools/extract_surface_graph.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $<
+	$(CXX) $(CXXFLAGS) $(INTERNAL_CXXFLAGS) $(INCLUDES) -c $<
 
 pizzastack_to_mesh: resampling/pizzastack_to_mesh.c pizzastack/grid.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
@@ -202,10 +209,10 @@ isolver_sfem_plugin.o : plugin/isolver_sfem_plugin.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
 
 sortreduce.o: sortreduce.cpp
-	$(CXX) $(CXXFLAGS) -c $<
+	$(CXX) $(CXXFLAGS) $(INTERNAL_CXXFLAGS) -c $<
 
 argsort.o: argsort.cpp
-	$(CXX) $(CXXFLAGS) -c $<
+	$(CXX) $(CXXFLAGS) $(INTERNAL_CXXFLAGS) -c $<
 
 %.o : %.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -c $<

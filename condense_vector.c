@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
 
     real_t *values;
     ptrdiff_t nlocal_, nnodes;
-    array_read(comm, argv[1], values_mpi_t, (void **)&values, &nlocal_, &nnodes);
+    array_create_from_file(comm, argv[1], values_mpi_t, (void **)&values, &nlocal_, &nnodes);
 
     idx_t *is_dirichlet = 0;
     ptrdiff_t new_nnodes = 0;
@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
         idx_t *dirichlet_nodes = 0;
 
         ptrdiff_t nlocal_, ndirichlet;
-        array_read(comm, argv[2], MPI_INT, (void **)&dirichlet_nodes, &nlocal_, &ndirichlet);
+        array_create_from_file(comm, argv[2], MPI_INT, (void **)&dirichlet_nodes, &nlocal_, &ndirichlet);
 
         new_nnodes = nnodes - ndirichlet;
         for (ptrdiff_t node = 0; node < ndirichlet; ++node) {

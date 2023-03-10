@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
         idx_t *indices = 0;
 
         ptrdiff_t _nope_, ndirichlet;
-        array_read(comm, argv[1], MPI_INT, (void **)&indices, &_nope_, &ndirichlet);
+        array_create_from_file(comm, argv[1], MPI_INT, (void **)&indices, &_nope_, &ndirichlet);
 
         for (ptrdiff_t node = 0; node < ndirichlet; ++node) {
             idx_t i = indices[node];

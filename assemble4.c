@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
 
     if (SFEM_INPUT) {
         ptrdiff_t nlocal, nglobal;
-        array_read(comm, SFEM_INPUT, SFEM_MPI_REAL_T, (void **)&u, &nlocal, &nglobal);
+        array_create_from_file(comm, SFEM_INPUT, SFEM_MPI_REAL_T, (void **)&u, &nlocal, &nglobal);
 
         assert(nlocal == nnodes * block_size);
     } else {

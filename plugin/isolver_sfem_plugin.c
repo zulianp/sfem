@@ -86,7 +86,7 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
 
     sfem_problem_t *problem = (sfem_problem_t *)malloc(sizeof(sfem_problem_t));
 
-    if (array_read(info->comm,
+    if (array_create_from_file(info->comm,
                    SFEM_DIRICHLET_NODES,
                    SFEM_MPI_IDX_T,
                    (void **)&problem->dirichlet_nodes,
@@ -95,7 +95,7 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
         return ISOLVER_FUNCTION_FAILURE;
     }
 
-    if (array_read(info->comm,
+    if (array_create_from_file(info->comm,
                    SFEM_NEUMAN_FACES,
                    SFEM_MPI_IDX_T,
                    (void **)&problem->faces_neumann,

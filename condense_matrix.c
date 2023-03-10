@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
         idx_t *dirichlet_nodes = 0;
 
         ptrdiff_t nlocal_, ndrichlet;
-        array_read(comm, argv[2], MPI_INT, (void **)&dirichlet_nodes, &nlocal_, &ndrichlet);
+        array_create_from_file(comm, argv[2], MPI_INT, (void **)&dirichlet_nodes, &nlocal_, &ndrichlet);
 
         new_nnodes = nnodes - ndrichlet;
 

@@ -44,11 +44,11 @@ int main(int argc, char *argv[]) {
 
     idx_t *input;
     ptrdiff_t _ignore_, n_entries;
-    array_read(comm, input_path, SFEM_MPI_IDX_T, (void **)&input, &_ignore_, &n_entries);
+    array_create_from_file(comm, input_path, SFEM_MPI_IDX_T, (void **)&input, &_ignore_, &n_entries);
 
     idx_t *toberemoved;
     ptrdiff_t n_to_remove;
-    array_read(comm, toberemoved_path, SFEM_MPI_IDX_T, (void **)&toberemoved, &_ignore_, &n_to_remove);
+    array_create_from_file(comm, toberemoved_path, SFEM_MPI_IDX_T, (void **)&toberemoved, &_ignore_, &n_to_remove);
 
     idx_t *output = (idx_t *)malloc(n_entries * sizeof(idx_t));
 

@@ -65,7 +65,7 @@ int mesh_write_nodal_field(const mesh_t *const mesh, const char *path, MPI_Datat
     if (!mesh->node_mapping) {
 #ifndef NDEBUG
         int size;
-        MPI_Comm_size(comm, &size);
+        MPI_Comm_size(mesh->comm, &size);
         assert(size == 1);
 #endif
         return array_write(mesh->comm, path, data_type, data, mesh->n_owned_nodes, n_global_nodes);

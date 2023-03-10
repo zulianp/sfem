@@ -176,7 +176,7 @@ int main(int argc, char *argv[]) {
 
     real_t *p0;
     ptrdiff_t p0_n_local, p0_n_global;
-    array_read(comm, path_p0, SFEM_MPI_REAL_T, (void **)&p0, &p0_n_local, &p0_n_global);
+    array_create_from_file(comm, path_p0, SFEM_MPI_REAL_T, (void **)&p0, &p0_n_local, &p0_n_global);
 
     ptrdiff_t nelements = mesh.nelements;
     ptrdiff_t nnodes = mesh.nnodes;

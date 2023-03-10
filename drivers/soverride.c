@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
 
     char *override_values;
     ptrdiff_t _ignore_, n_bytes_overrride;
-    array_read(
+    array_create_from_file(
         comm, path_override_values, values_mpi_t, (void **)&override_values, &_ignore_, &n_bytes_overrride);
 
     const ptrdiff_t n_override_values = n_bytes_overrride / n_bytes_x_entry;
@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
 
     ptrdiff_t  n_override;
     idx_t *override_idx;
-    array_read(comm, path_idx, MPI_IDX_T, (void **)&override_idx, &_ignore_, &n_override);
+    array_create_from_file(comm, path_idx, MPI_IDX_T, (void **)&override_idx, &_ignore_, &n_override);
 
     if (n_override != n_override_values) {
         fprintf(stderr,
@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
 
     char *input;
     ptrdiff_t n_bytes_input;
-    array_read(comm, path_input, values_mpi_t, (void **)&input, &_ignore_, &n_bytes_input);
+    array_create_from_file(comm, path_input, values_mpi_t, (void **)&input, &_ignore_, &n_bytes_input);
 
     check_sizes(n_bytes_input, n_bytes_x_entry);
 

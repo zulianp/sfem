@@ -62,7 +62,7 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
 
             for (int d = 0; d < nnodesxelem; ++d) {
                 sprintf(path, "%s/i%d.raw", folder, d);
-                array_read(comm, path, mpi_idx_t, (void **)&idx, &n_local_elements, &n_elements);
+                array_create_from_file(comm, path, mpi_idx_t, (void **)&idx, &n_local_elements, &n_elements);
                 elems[d] = idx;
             }
         }
@@ -84,7 +84,7 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
 
         for (int d = 0; d < ndims; ++d) {
             sprintf(path, "%s/%c.raw", folder, str_xyz[d]);
-            array_read(comm, path, mpi_geom_t, (void **)&xyz[d], &n_local_nodes, &n_nodes);
+            array_create_from_file(comm, path, mpi_geom_t, (void **)&xyz[d], &n_local_nodes, &n_nodes);
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -412,7 +412,7 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
             ptrdiff_t n_local_elements0 = 0, n_elements0 = 0;
             for (int d = 0; d < nnodesxelem; ++d) {
                 sprintf(path, "%s/i%d.raw", folder, d);
-                array_read(comm, path, mpi_idx_t, (void **)&idx, &n_local_elements, &n_elements);
+                array_create_from_file(comm, path, mpi_idx_t, (void **)&idx, &n_local_elements, &n_elements);
                 elems[d] = idx;
 
                 if (d == 0) {
@@ -443,7 +443,7 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
 
         for (int d = 0; d < ndims; ++d) {
             sprintf(path, "%s/%c.raw", folder, str_xyz[d]);
-            array_read(comm, path, mpi_geom_t, (void **)&xyz[d], &n_local_nodes, &n_nodes);
+            array_create_from_file(comm, path, mpi_geom_t, (void **)&xyz[d], &n_local_nodes, &n_nodes);
         }
 
         mesh->comm = comm;

@@ -41,12 +41,12 @@ int main(int argc, char *argv[]) {
 
     ptrdiff_t _nope_, ndofs;
     real_t *input = 0;
-    array_read(comm, input_path, SFEM_MPI_REAL_T, (void **)&input, &_nope_, &ndofs);
+    array_create_from_file(comm, input_path, SFEM_MPI_REAL_T, (void **)&input, &_nope_, &ndofs);
 
     {
         idx_t *indices = 0;
         ptrdiff_t nidx;
-        array_read(comm, idx_path, SFEM_MPI_IDX_T, (void **)&indices, &_nope_, &nidx);
+        array_create_from_file(comm, idx_path, SFEM_MPI_IDX_T, (void **)&indices, &_nope_, &nidx);
 
         for(ptrdiff_t i = 0; i < nidx; ++i) {
             idx_t idx = indices[i];

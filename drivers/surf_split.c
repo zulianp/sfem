@@ -192,7 +192,7 @@ int main(int argc, char *argv[]) {
 
         idx_t *node_mapping = 0;
         ptrdiff_t nlocal, nglobal;
-        array_read(comm, path, SFEM_MPI_IDX_T, (void **)&node_mapping, &nlocal, &nglobal);
+        array_create_from_file(comm, path, SFEM_MPI_IDX_T, (void **)&node_mapping, &nlocal, &nglobal);
 
         // create parts
         // TODO

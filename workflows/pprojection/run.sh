@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+# Methods 
+# - Average pressure 0
+# - Fix 1 point
+# - ?
+
 set -e
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
@@ -218,9 +223,9 @@ wss $surf_mesh_path $sshear_prefix $wssmag
 # Convert final output (P0)
 raw2surfmesh.py -d $surf_mesh_path --cell_data=$wssmag --cell_data_dtype=float64 --output=$workspace/wssmag.vtk
 
-# ################################################
-# # Project stress to P1
-# ################################################
+################################################
+# Project stress to P1
+################################################
 
 # wssmag_p1=$workspace/wssmag_p1.raw
 # surf_projection_p0_to_p1 $surf_mesh_path $wssmag $wssmag_p1

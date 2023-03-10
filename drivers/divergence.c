@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
     ptrdiff_t u_n_local, u_n_global;
 
     for (int d = 0; d < 3; ++d) {
-        array_read(comm, path_u[d], SFEM_MPI_REAL_T, (void **)&u[d], &u_n_local, &u_n_global);
+        array_create_from_file(comm, path_u[d], SFEM_MPI_REAL_T, (void **)&u[d], &u_n_local, &u_n_global);
     }
 
     real_t *div_u = (real_t *)malloc(u_n_local * sizeof(real_t));

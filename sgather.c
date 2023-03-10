@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
     MPI_Datatype values_mpi_t = MPI_CHAR;
     char *values;
     ptrdiff_t nlocal_, n_bytes;
-    array_read(comm, input_array_path, values_mpi_t, (void **)&values, &nlocal_, &n_bytes);
+    array_create_from_file(comm, input_array_path, values_mpi_t, (void **)&values, &nlocal_, &n_bytes);
 
     ptrdiff_t n_values = n_bytes / n_bytes_x_entry;
     if((n_values * n_bytes_x_entry) != n_bytes) {
@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
 
     ptrdiff_t nlocal_gather, n_gather;
     idx_t *gather_idx;
-    array_read(comm, gather_idx_path, MPI_IDX_T, (void **)&gather_idx, &nlocal_gather, &n_gather);
+    array_create_from_file(comm, gather_idx_path, MPI_IDX_T, (void **)&gather_idx, &nlocal_gather, &n_gather);
 
     char *selection = (char*)malloc(n_gather * n_bytes_x_entry);
 

@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
 
     real_t *input;
     ptrdiff_t input_n_local, input_n_global;
-    array_read(comm, path_input, SFEM_MPI_REAL_T, (void **)&input, &input_n_local, &input_n_global);
+    array_create_from_file(comm, path_input, SFEM_MPI_REAL_T, (void **)&input, &input_n_local, &input_n_global);
 
     ptrdiff_t nelements = mesh.nelements;
     ptrdiff_t nnodes = mesh.nnodes;

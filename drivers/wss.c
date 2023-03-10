@@ -164,7 +164,7 @@ int main(int argc, char *argv[]) {
     // P0
     for (int d = 0; d < 6; ++d) {
         sprintf(path, "%s.%d.raw", shear_prefix, d);
-        array_read(comm, path, SFEM_MPI_REAL_T, (void **)&shear_6[d], &shear_size_local, &shear_size_global);
+        array_create_from_file(comm, path, SFEM_MPI_REAL_T, (void **)&shear_6[d], &shear_size_local, &shear_size_global);
     }
 
     // P0
