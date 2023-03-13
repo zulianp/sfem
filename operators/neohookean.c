@@ -1203,3 +1203,69 @@ void neohookean_cauchy_stress(const ptrdiff_t nelements,
         }
     }
 }
+
+void neohookean_cauchy_stress_soa(const ptrdiff_t nelements,
+                                  const ptrdiff_t nnodes,
+                                  idx_t *const SFEM_RESTRICT elems[4],
+                                  geom_t *const SFEM_RESTRICT xyz[3],
+                                  const real_t mu,
+                                  const real_t lambda,
+                                  real_t **const SFEM_RESTRICT u,
+                                  real_t *const SFEM_RESTRICT out[9]) {
+    SFEM_UNUSED(nnodes);
+
+    static const int block_size = 3;
+    static const int mat_block_size = block_size * block_size;
+
+    idx_t ev[4];
+    real_t element_displacement[4 * 3];
+    real_t element_stress[3 * 3];
+
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma unroll(4)
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        for (int enode = 0; enode < 4; ++enode) {
+            idx_t edof = enode * block_size;
+            idx_t dof = ev[enode];
+
+            element_displacement[edof + 0] = u[0][dof];
+            element_displacement[edof + 1] = u[1][dof];
+            element_displacement[edof + 2] = u[2][dof];
+        }
+
+        // Element indices
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+        const idx_t i3 = ev[3];
+
+        cauchy_stress(mu,
+                      lambda,
+                      // X-coordinates
+                      xyz[0][i0],
+                      xyz[0][i1],
+                      xyz[0][i2],
+                      xyz[0][i3],
+                      // Y-coordinates
+                      xyz[1][i0],
+                      xyz[1][i1],
+                      xyz[1][i2],
+                      xyz[1][i3],
+                      // Z-coordinates
+                      xyz[2][i0],
+                      xyz[2][i1],
+                      xyz[2][i2],
+                      xyz[2][i3],
+                      // Data
+                      element_displacement,
+                      // Output
+                      element_stress);
+
+        for (int d = 0; d < 9; d++) {
+            out[d][i] = element_stress[d];
+        }
+    }
+}

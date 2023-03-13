@@ -6,10 +6,13 @@ import sys, getopt
 import os
 import glob
 
+
+# Example usage
+# ./raw_to_db.py raw_db mesh_db.vtk --point_data='raw_db/point_data/*,raw_db/x.raw' --point_data_type='float64,float32'
+
 geom_type = np.float32
 idx_type = np.int32
 max_nodes_x_element = 8
-
 
 def add_fields(field_data, field_data_type, storage, check_len):
     if field_data: 
