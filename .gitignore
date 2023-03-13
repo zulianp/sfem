@@ -52,6 +52,12 @@ Thumbs.db
 *.o
 
 # Output files
-*.raw 
+*.raw
 *.vtu
+*.vtk
+*.h5
+*.o
+*.dSYM
+*.csv
+*.out
 
