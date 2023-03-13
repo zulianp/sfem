@@ -159,11 +159,11 @@ int main(int argc, char *argv[]) {
 
         isolver_lsolve_init(&lsolve);
 
-        isolver_lsolve_set_max_iterations(&lsolve, 1000);
-        isolver_lsolve_set_atol(&lsolve, 1e-16);
-        isolver_lsolve_set_stol(&lsolve, 1e-8);
-        isolver_lsolve_set_rtol(&lsolve, 1e-16);
-        isolver_lsolve_set_verbosity(&lsolve, 1);
+        // isolver_lsolve_set_max_iterations(&lsolve, 1000);
+        // isolver_lsolve_set_atol(&lsolve, 1e-16);
+        // isolver_lsolve_set_stol(&lsolve, 1e-8);
+        // isolver_lsolve_set_rtol(&lsolve, 1e-16);
+        // isolver_lsolve_set_verbosity(&lsolve, 1);
 
         isolver_lsolve_update_crs(&lsolve, mesh.nnodes, mesh.nnodes, matrix.rowptr, matrix.colidx, matrix.values);
         isolver_lsolve_apply(&lsolve, rhs.data(), x.data());
