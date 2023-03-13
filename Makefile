@@ -151,7 +151,7 @@ extract_surface_graph.o : extract_surface_graph.cpp
 pizzastack_to_mesh: resampling/pizzastack_to_mesh.c pizzastack/grid.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
-axpy : algebra/axpy.c libsfem.a
+axpy : axpy.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 condense_matrix : condense_matrix.o
