@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (argc < 4) {
-        fprintf(stderr, "usage: %s <idx.raw> <input.raw> <masked.raw> [mask_value=0]", argv[0]);
+        fprintf(stderr, "usage: %s <idx.raw> <input.raw> <masked.raw> [mask_value=0]\n", argv[0]);
         return EXIT_FAILURE;
     }
 

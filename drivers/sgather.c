@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const char * help = "usage: %s <gather_idx.raw> <n_bytes_x_entry> <input_array.raw> [out=sgather_out.raw]";
+    const char * help = "usage: %s <gather_idx.raw> <n_bytes_x_entry> <input_array.raw> [out=sgather_out.raw]\n";
 
     if (argc < 4) {
         fprintf(stderr, help, argv[0]);
