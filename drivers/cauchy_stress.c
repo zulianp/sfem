@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (argc != 7 || argc != 9) {
+    if (argc != 7 && argc != 9) {
         fprintf(stderr, "usage: (input can be AoS or SoA. output is always SoA)\n");
         fprintf(stderr, " (AoS): %s <material> <mu> <lambda> <folder> <uxyz.raw> <stress_prefix>\n", argv[0]);
         fprintf(stderr,
@@ -46,6 +46,9 @@ int main(int argc, char *argv[]) {
     const char *folder = argv[4];
     const char *path_u[3];
     const char *output_prefix;
+
+    const char * SFEM_OUTPUT_POSTFIX = "";
+    SFEM_READ_ENV(SFEM_OUTPUT_POSTFIX, );
 
     int is_AoS = argc == 7;
 
@@ -114,7 +117,7 @@ int main(int argc, char *argv[]) {
 
     char path[2048];
     for (int d = 0; d < 9; ++d) {
-        sprintf(path, "%s.%d.raw", output_prefix, d);
+        sprintf(path, "%s.%d%s.raw", output_prefix, d, SFEM_OUTPUT_POSTFIX);
         array_write(comm, path, SFEM_MPI_REAL_T, stress[d], mesh.nelements, mesh.nelements);
         free(stress[d]);
     }

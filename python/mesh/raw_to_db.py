@@ -14,6 +14,81 @@ geom_type = np.float32
 idx_type = np.int32
 max_nodes_x_element = 8
 
+
+def write_transient_data(
+    output_path,
+    points, cells, 
+    point_data, point_data_type,
+    cell_data, cell_data_type, n_time_steps, time_step_format):
+
+    with meshio.xdmf.TimeSeriesWriter(output_path) as writer:
+        writer.write_points_cells(points, cells)
+
+        # steps = [None] * n_time_steps 
+        cell_data_steps = [None] * n_time_steps
+
+        if cell_data: 
+            paths = cell_data.split(',')
+            types = cell_data_type.split(',')
+
+            for p in paths:
+                cell_data_files = glob.glob(p, recursive=False)
+                cell_data_files.sort()
+
+                for i in range(0, n_time_steps):
+                    # print(f'{i} -> {os.path.basename(cell_data_files[i])} -> {cell_data_files[i]}')
+
+                    if not cell_data_steps[i]:
+                        cell_data_steps[i] = []
+
+                    cell_data_steps[i].append(cell_data_files[i])
+
+
+        point_data_steps = [None] * n_time_steps
+
+        if point_data: 
+            paths = point_data.split(',')
+            types = point_data_type.split(',')
+
+            for p in paths:
+                point_data_files = glob.glob(p, recursive=False)
+                point_data_files.sort()
+
+                if(len(point_data_files) < n_time_steps):
+                    print(f"Invalid sequence length {len(point_data_files)} for pattern {p}")
+
+                for i in range(0, n_time_steps):
+                    # print(f'{i} -> {os.path.basename(point_data_files[i])} -> {point_data_files[i]}')
+
+                    if not point_data_steps[i]:
+                        point_data_steps[i] = []
+
+                    point_data_steps[i].append(point_data_files[i])
+
+        print(point_data_steps)
+
+        for t in range(0, n_time_steps):
+            name_to_point_data = {}
+
+            cds = point_data_steps[t];
+           
+            if cds:
+                for cd in cds:
+                    data = np.fromfile(cd, dtype=point_data_type)
+                    name = os.path.basename(cd)
+                    name = os.path.splitext(os.path.splitext(name)[0])[0]
+                    name = name.replace('.', '_')
+                    name_to_point_data[name] = data
+
+                    if(len(data) != len(data)):
+                        print(f"Error: data lenght is different from number of nodes {len(data)} != {len(data)}")
+                        exit(1)
+
+                    print(f"field: {name}, path: {cd}, min={round(np.min(data), 3)}, max={round(np.max(data), 3)}, sum={round(np.sum(data), 3)}")
+
+            writer.write_data(t, point_data=name_to_point_data)
+            
+
 def add_fields(field_data, field_data_type, storage, check_len):
     if field_data: 
         paths = field_data.split(',')
@@ -64,10 +139,14 @@ def main(argv):
     cell_data  = None
     cell_data_type = "float64"
 
+    transient = False
+    time_step_format = "%s.%d.%d.raw"
+    n_time_steps = 1
+
     try:
         opts, args = getopt.getopt(
             argv[3:], "p:d:c:t:h",
-            ["point_data=", "point_data_type=", "cell_data=", "cell_data_type=", "help"])
+            ["point_data=", "point_data_type=", "cell_data=", "cell_data_type=", "transient", "time_step_format", "n_time_steps=", "help"])
 
     except getopt.GetoptError as err:
         print(err)
@@ -86,6 +165,12 @@ def main(argv):
             cell_data = arg
         elif opt in ("-t", "--cell_data_type"):
             cell_data_type = arg
+        elif opt in ("--transient"):
+            transient = True
+        elif opt in ("--time_step_format"):
+            time_step_format = arg
+        elif opt in ("--n_time_steps"):
+            n_time_steps = int(arg)
 
     points = []
     for pfn in ['x.raw', 'y.raw', 'z.raw']:
@@ -117,12 +202,21 @@ def main(argv):
         (cell_type, np.array(idx).transpose())
     ]
 
-    mesh = meshio.Mesh(points, cells)
+    if transient:
+        print("Transient mode!")
 
-    add_fields(point_data, point_data_type, mesh.point_data, n_points)
-    add_fields(cell_data, cell_data_type, mesh.cell_data, n_cells)
+        write_transient_data(
+           output_path,
+           points, cells, 
+           point_data, point_data_type,
+           cell_data, cell_data_type, n_time_steps, time_step_format)
+    else:
+        mesh = meshio.Mesh(points, cells)
 
-    mesh.write(output_path)
+        add_fields(point_data, point_data_type, mesh.point_data, n_points)
+        add_fields(cell_data, cell_data_type, mesh.cell_data, n_cells)
+
+        mesh.write(output_path)
 
 if __name__ == '__main__':
     main(sys.argv)
