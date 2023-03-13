@@ -65,7 +65,7 @@ def write_transient_data(
 
                     point_data_steps[i].append(point_data_files[i])
 
-        print(point_data_steps)
+        # print(point_data_steps)
 
         for t in range(0, n_time_steps):
             name_to_point_data = {}
@@ -84,7 +84,7 @@ def write_transient_data(
                         print(f"Error: data lenght is different from number of nodes {len(data)} != {len(data)}")
                         exit(1)
 
-                    print(f"field: {name}, path: {cd}, min={round(np.min(data), 3)}, max={round(np.max(data), 3)}, sum={round(np.sum(data), 3)}")
+                    # print(f"field: {name}, path: {cd}, min={round(np.min(data), 3)}, max={round(np.max(data), 3)}, sum={round(np.sum(data), 3)}")
 
             writer.write_data(t, point_data=name_to_point_data)
             
