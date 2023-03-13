@@ -26,8 +26,9 @@ ifeq ($(avx2sort), 1)
 	CFLAGS += -march=core-avx2
 endif
 
-
-
+# Folder structure
+VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra
+INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra
 
 
 CFLAGS += -pedantic -Wextra
@@ -111,7 +112,6 @@ plugins: isolver_sfem.dylib
 libsfem.a : $(OBJS)
 	ar rcs $@ $^
 
-
 YAML_CPP_INCLUDES = -I$(INSTALL_DIR)/yaml-cpp/include/ 
 YAML_CPP_LIBRARIES = $(INSTALL_DIR)/yaml-cpp/lib/libyaml-cpp.a
 ISOLVER_INCLUDES = -I../isolver/interfaces/lsolve -I../isolver/plugin/lsolve -I../isolver/plugin/
@@ -122,30 +122,30 @@ isolver_lsolve_frontend.o : ../isolver/plugin/lsolve/isolver_lsolve_frontend.cpp
 	$(MPICXX) $(CXXFLAGS) $(INTERNAL_CXXFLAGS) $(INCLUDES) $(ISOLVER_INCLUDES) -c $<
 
 assemble : assemble.o libsfem.a
-	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 assemble3 : assemble3.o libsfem.a
-	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 assemble4 : assemble4.o libsfem.a
-	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 partition : partition.o libsfem.a
-	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 select_submesh : select_submesh.o libsfem.a
-	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 refine : refine.o libsfem.a
-	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
-skin : mesh_tools/skin.c extract_surface_graph.o libsfem.a
+skin : skin.c extract_surface_graph.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
 surf_split : drivers/surf_split.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
-extract_surface_graph.o : mesh_tools/extract_surface_graph.cpp
+extract_surface_graph.o : extract_surface_graph.cpp
 	$(CXX) $(CXXFLAGS) $(INTERNAL_CXXFLAGS) $(INCLUDES) -c $<
 
 pizzastack_to_mesh: resampling/pizzastack_to_mesh.c pizzastack/grid.c libsfem.a
@@ -155,22 +155,22 @@ axpy : algebra/axpy.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 condense_matrix : condense_matrix.o
-	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 condense_vector : condense_vector.o
-	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 idx_to_indicator : idx_to_indicator.o
-	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 set_diff : drivers/set_diff.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 remap_vector : remap_vector.o
-	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 sgather : sgather.o
-	$(MPICC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ; \
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 soverride : drivers/soverride.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
@@ -209,10 +209,10 @@ isolver_sfem_plugin.o : plugin/isolver_sfem_plugin.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
 
 sortreduce.o: sortreduce.cpp
-	$(CXX) $(CXXFLAGS) $(INTERNAL_CXXFLAGS) -c $<
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(INTERNAL_CXXFLAGS) -c $<
 
 argsort.o: argsort.cpp
-	$(CXX) $(CXXFLAGS) $(INTERNAL_CXXFLAGS) -c $<
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(INTERNAL_CXXFLAGS) -c $<
 
 %.o : %.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -c $<
