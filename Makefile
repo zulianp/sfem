@@ -51,7 +51,7 @@ GOALS = assemble assemble3 assemble4
 GOALS += partition select_submesh refine skin surf_split
 
 # FE post-process
-GOALS += cgrad cshear projection_p0_to_p1 wss lumped_mass_inv
+GOALS += cgrad cshear projection_p0_to_p1 wss lumped_mass_inv cauchy_stress
 
 # BLAS
 GOALS += axpy
@@ -98,11 +98,11 @@ ifeq ($(cuda), 1)
 	OBJS += $(CUDA_OBJS)
 else
 	SERIAL_OBJS = laplacian.o
-# 	SERIAL_OBJS += neohookean.o 
+	SERIAL_OBJS += neohookean.o 
 	OBJS += $(SERIAL_OBJS)
 endif
 
-SIMD_OBJS = simd_neohookean.o
+# SIMD_OBJS = simd_neohookean.o
 # SIMD_OBJS +=  simd_laplacian.o 
 
 OBJS += $(SIMD_OBJS)
@@ -115,11 +115,15 @@ libsfem.a : $(OBJS)
 YAML_CPP_INCLUDES = -I$(INSTALL_DIR)/yaml-cpp/include/ 
 YAML_CPP_LIBRARIES = $(INSTALL_DIR)/yaml-cpp/lib/libyaml-cpp.a
 ISOLVER_INCLUDES = -I../isolver/interfaces/lsolve -I../isolver/plugin/lsolve -I../isolver/plugin/
+
 ssolve : drivers/ssolve.cpp isolver_lsolve_frontend.o libsfem.a
 	$(MPICXX) $(CXXFLAGS) $(INCLUDES) $(ISOLVER_INCLUDES) $(YAML_CPP_INCLUDES) $(YAML_CPP_LIBRARIES) -o $@ $^ $(LDFLAGS) ; \
 
 isolver_lsolve_frontend.o : ../isolver/plugin/lsolve/isolver_lsolve_frontend.cpp
 	$(MPICXX) $(CXXFLAGS) $(INTERNAL_CXXFLAGS) $(INCLUDES) $(ISOLVER_INCLUDES) -c $<
+
+cauchy_stress : cauchy_stress.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 assemble : assemble.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
@@ -148,7 +152,7 @@ surf_split : drivers/surf_split.c libsfem.a
 extract_surface_graph.o : extract_surface_graph.cpp
 	$(CXX) $(CXXFLAGS) $(INTERNAL_CXXFLAGS) $(INCLUDES) -c $<
 
-pizzastack_to_mesh: resampling/pizzastack_to_mesh.c pizzastack/grid.c libsfem.a
+pizzastack_to_mesh: pizzastack_to_mesh.c grid.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
 axpy : axpy.c libsfem.a

@@ -94,6 +94,27 @@ for i in range(0, n_test_functions()):
 	integr =  inner(dedF, shapegrad[i])
 	grade[i] = integr
 
+
+def make_cauchy_stress():
+
+	P = dedF 
+	NominalStress = P.T
+	CauchyStress = (F * NominalStress) / J
+
+	CauchyStress = subsmat3x3(CauchyStress, F, evalF)
+
+	expr = []
+
+	for i in range(0, 3):
+		for j in range(0, 3):
+			stress = sp.symbols(f'stress[{i*3+j}]')
+			expr.append(ast.Assignment(stress, CauchyStress[i, j]))
+	return expr
+
+
+c_log("// Cauchy stress")
+c_code(make_cauchy_stress())
+
 def makegrad(i, q):
 	integr =  grade[i]
 	integr = subsmat3x3(integr, F, evalF)

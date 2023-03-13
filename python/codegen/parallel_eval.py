@@ -1,6 +1,6 @@
 # import linear_elasticity as material
-# import neohookean as material
-import isotropic_phase_field as material
+import neohookean as material
+# import isotropic_phase_field as material
 import time
 from multiprocessing import Queue
 from multiprocessing import Process as Worker
