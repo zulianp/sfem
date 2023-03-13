@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const char * help = "usage: %s <array.raw> <dirichlet_nodes.raw> [out=condensed.raw]";
+    const char * help = "usage: %s <array.raw> <dirichlet_nodes.raw> [out=condensed.raw]\n";
     
     if (argc < 3) {
         fprintf(stderr, help, argv[0]);

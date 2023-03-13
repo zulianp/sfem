@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <stdint.h>
 
 #include "array_dtof.h"
 #include "matrixio_array.h"

@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const char * help = "usage: %s <crs_folder> <dirichlet_nodes.raw> [output_folder=./condensed]";
+    const char * help = "usage: %s <crs_folder> <dirichlet_nodes.raw> [output_folder=./condensed]\n";
 
     if (argc < 3) {
         fprintf(stderr, help, argv[0]);
