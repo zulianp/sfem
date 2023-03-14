@@ -46,7 +46,8 @@ divergence_check()
 	uz=$4
 	divu=$workspace/temp_div.raw
 	divergence $mesh_path $ux $uy $uz $divu
-	div_measure=`python3 -c "import numpy as np; print(np.sum(np.abs(np.fromfile(\"$divu\")), dtype=np.float64))"`
+	# div_measure=`python3 -c "import numpy as np; print(np.sum(np.abs(np.fromfile(\"$divu\")), dtype=np.float64))"`
+	div_measure=`python3 -c "import numpy as np; print(np.sum((np.fromfile(\"$divu\")), dtype=np.float64))"`
 	
 	echo "---------------------------"
 	echo "[$stage]: sum(div(u)) = $div_measure"
@@ -136,7 +137,6 @@ set_diff $workspace/temp.raw $mesh_path/on.raw $nodes_to_zero
 
 # List dirchlet nodes
 python3 -c "import numpy as np; np.array([7699704]).astype(np.int32).tofile('dirichlet.raw')"
-# fix_value=12500.4
 fix_value=0
 
 dirichlet_nodes=$workspace/dirichlet.raw
@@ -186,7 +186,7 @@ divergence_check "After clamping" $mux $muy $muz
 ################################################
 
 divu=$workspace/divu.raw
-divergence $mesh_path $mux $muy $muz $divu
+SFEM_SCALE=-1 divergence $mesh_path $mux $muy $muz $divu
 
 ################################################
 # Solve linear system
