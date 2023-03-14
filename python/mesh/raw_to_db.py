@@ -114,7 +114,8 @@ def add_fields(field_data, field_data_type, storage, check_len):
             for f in files:
                 data = np.fromfile(f, dtype=t)
 
-                name = os.path.basename(f).split('.')[0]
+                # name = os.path.basename(f).split('.')[0]
+                name = os.path.splitext(os.path.basename(f))[0]
 
                 if(len(data) != check_len):
                     print(f"Error: data lenght is different from number of nodes {len(data)} != {check_len}")
@@ -188,7 +189,9 @@ def main(argv):
         else:
             # No more indices to read!
             break
-
+    
+    if len(idx) == 3:
+        cell_type = "triangle"
     if len(idx) == 4:
         cell_type = "tetra"
     elif len(idx) == 8:

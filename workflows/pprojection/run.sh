@@ -222,17 +222,17 @@ divergence_check "After correction" $p1_dpdx $p1_dpdy $p1_dpdz
 # Show corrected velocities
 raw_to_db.py $mesh_path $output/corrected_gradient.vtk --point_data="$workspace/vel_*.raw"
 
-# ################################################
-# # Compute WSS
-# ################################################
+################################################
+# Compute WSS
+################################################
 
 vshear_prefix=$workspace/volshear
 sshear_prefix=$workspace/surfshear
 
-# # coefficients: P1 -> P0
+# coefficients: P1 -> P0
 cshear $mesh_path $p1_dpdx $p1_dpdy $p1_dpdz $vshear_prefix
 
-# # Map shear to surface elements
+# Map shear to surface elements
 
 sgather $parent_elements $real_type_size $vshear_prefix".0.raw" $sshear_prefix".0.raw"
 sgather $parent_elements $real_type_size $vshear_prefix".1.raw" $sshear_prefix".1.raw"
@@ -243,7 +243,7 @@ sgather $parent_elements $real_type_size $vshear_prefix".5.raw" $sshear_prefix".
 
 wssmag=$workspace/wssmag.raw
 
-# # coefficients: P0 -> P0
+# coefficients: P0 -> P0
 wss $surf_mesh_path $sshear_prefix $wssmag
 
-raw_to_db.py $mesh_path $output/wssmag.vtk --cell_data=$wssmag
+raw_to_db.py $surf_mesh_path $output/wssmag.vtk --cell_data="$wssmag,$sshear_prefix.*.raw"
