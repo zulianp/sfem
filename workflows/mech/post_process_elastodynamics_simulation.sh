@@ -20,7 +20,7 @@ workspace_folder=$2
 mu=$3
 lambda=$4
 material="neohookean"
-max_steps=40
+
 
 data_folder=$workspace_folder/data
 
@@ -45,6 +45,7 @@ dispy=(`ls $data_folder/point_data/disp_y*.raw`)
 dispz=(`ls $data_folder/point_data/disp_z*.raw`)
 
 ndisps=${#dispx[@]}
+max_steps=$ndisps
 
 echo $ndisps
 
@@ -75,7 +76,7 @@ do
 
 	SFEM_OUTPUT_POSTFIX=$stress_postfix cauchy_stress $material $mu $lambda $mesh_folder $ux $uy $uz $stress_prefix
 
-	for(( d=0; d < 9; d++ ))
+	for(( d=0; d < 6; d++ ))
 	do
 		p0_file=$stress_prefix".$d"$stress_postfix".raw"
 		p1_file=$p1"/stress.$d"$stress_postfix".raw"
@@ -88,11 +89,10 @@ done
 disp_selector="$data_folder/point_data/disp_x*.raw,$data_folder/point_data/disp_y*.raw,$data_folder/point_data/disp_z*.raw"
 stress_selector_0="$p1/stress.0.*.raw,$p1/stress.1.*.raw,$p1/stress.2.*.raw"
 stress_selector_1="$p1/stress.3.*.raw,$p1/stress.4.*.raw,$p1/stress.5.*.raw"
-stress_selector_2="$p1/stress.6.*.raw,$p1/stress.7.*.raw,$p1/stress.8.*.raw"
 
 raw_to_db.py $mesh_folder stress.xmf  \
  --transient --n_time_steps=$nsteps \
- --point_data="$disp_selector,$stress_selector_0,$stress_selector_1,$stress_selector_2"
+ --point_data="$disp_selector,$stress_selector_0,$stress_selector_1"
 
 if [[ -z "$garbage" ]]
 then

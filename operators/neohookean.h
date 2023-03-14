@@ -15,7 +15,7 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
                                  idx_t *const SFEM_RESTRICT colidx,
                                  real_t *const SFEM_RESTRICT values);
 
-void neohookean_cauchy_stress(const ptrdiff_t nelements,
+void neohookean_cauchy_stress_aos(const ptrdiff_t nelements,
                               const ptrdiff_t nnodes,
                               idx_t *const SFEM_RESTRICT elems[4],
                               geom_t *const SFEM_RESTRICT xyz[3],

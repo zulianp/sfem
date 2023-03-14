@@ -115,6 +115,29 @@ def make_cauchy_stress():
 c_log("// Cauchy stress")
 c_code(make_cauchy_stress())
 
+def make_cauchy_stress_symmetric():
+
+	P = dedF 
+	NominalStress = P.T
+	CauchyStress = (F * NominalStress) / J
+
+	CauchyStress = subsmat3x3(CauchyStress, F, evalF)
+
+	expr = []
+
+	idx = 0
+	for i in range(0, 3):
+		for j in range(i, 3):
+			stress = sp.symbols(f'stress[{idx}]')
+			expr.append(ast.Assignment(stress, CauchyStress[i, j]))
+			idx += 1
+	return expr
+
+
+c_log("// Cauchy stress symmetric")
+c_code(make_cauchy_stress_symmetric())
+
+
 def makegrad(i, q):
 	integr =  grade[i]
 	integr = subsmat3x3(integr, F, evalF)

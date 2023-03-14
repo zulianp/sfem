@@ -87,8 +87,8 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    real_t *stress[9];
-    for (int d = 0; d < 9; ++d) {
+    real_t *stress[6];
+    for (int d = 0; d < 6; ++d) {
         stress[d] = (real_t *)malloc(mesh.nelements * sizeof(real_t));
     }
 
@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
         real_t *u;
         ptrdiff_t u_n_local, u_n_global;
         array_create_from_file(comm, path_u[0], SFEM_MPI_REAL_T, (void **)&u, &u_n_local, &u_n_global);
-        neohookean_cauchy_stress(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mu, lambda, u, stress);
+        neohookean_cauchy_stress_aos(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mu, lambda, u, stress);
         free(u);
     } else {
         real_t *u[3];
@@ -116,7 +116,7 @@ int main(int argc, char *argv[]) {
     }
 
     char path[2048];
-    for (int d = 0; d < 9; ++d) {
+    for (int d = 0; d < 6; ++d) {
         sprintf(path, "%s.%d%s.raw", output_prefix, d, SFEM_OUTPUT_POSTFIX);
         array_write(comm, path, SFEM_MPI_REAL_T, stress[d], mesh.nelements, mesh.nelements);
         free(stress[d]);

@@ -1024,22 +1024,22 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
     printf("neohookean.c: neohookean_assemble_hessian\t%g seconds\n", tock - tick);
 }
 
-static SFEM_INLINE void cauchy_stress(const real_t mu,
-                                      const real_t lambda,
-                                      const real_t px0,
-                                      const real_t px1,
-                                      const real_t px2,
-                                      const real_t px3,
-                                      const real_t py0,
-                                      const real_t py1,
-                                      const real_t py2,
-                                      const real_t py3,
-                                      const real_t pz0,
-                                      const real_t pz1,
-                                      const real_t pz2,
-                                      const real_t pz3,
-                                      const real_t *const SFEM_RESTRICT u,
-                                      real_t *const SFEM_RESTRICT stress) {
+static SFEM_INLINE void cauchy_stress_3x3(const real_t mu,
+                                          const real_t lambda,
+                                          const real_t px0,
+                                          const real_t px1,
+                                          const real_t px2,
+                                          const real_t px3,
+                                          const real_t py0,
+                                          const real_t py1,
+                                          const real_t py2,
+                                          const real_t py3,
+                                          const real_t pz0,
+                                          const real_t pz1,
+                                          const real_t pz2,
+                                          const real_t pz3,
+                                          const real_t *const SFEM_RESTRICT u,
+                                          real_t *const SFEM_RESTRICT stress) {
     // FLOATING POINT OPS!
     //       - Result: 9*ADD + 9*ASSIGNMENT + 36*MUL
     //       - Subexpressions: 47*ADD + 2*DIV + LOG + 127*MUL + 4*NEG + 47*SUB
@@ -1138,14 +1138,123 @@ static SFEM_INLINE void cauchy_stress(const real_t mu,
     stress[8] = x63 * (x50 * x79 + x54 * x81 + x58 * x83);
 }
 
-void neohookean_cauchy_stress(const ptrdiff_t nelements,
-                              const ptrdiff_t nnodes,
-                              idx_t *const SFEM_RESTRICT elems[4],
-                              geom_t *const SFEM_RESTRICT xyz[3],
-                              const real_t mu,
-                              const real_t lambda,
-                              const real_t *const SFEM_RESTRICT displacement,
-                              real_t *const SFEM_RESTRICT out[9]) {
+static SFEM_INLINE void cauchy_stress_6(const real_t mu,
+                                        const real_t lambda,
+                                        const real_t px0,
+                                        const real_t px1,
+                                        const real_t px2,
+                                        const real_t px3,
+                                        const real_t py0,
+                                        const real_t py1,
+                                        const real_t py2,
+                                        const real_t py3,
+                                        const real_t pz0,
+                                        const real_t pz1,
+                                        const real_t pz2,
+                                        const real_t pz3,
+                                        const real_t *const SFEM_RESTRICT u,
+                                        real_t *const SFEM_RESTRICT stress) {
+    // FLOATING POINT OPS!
+    //       - Result: 9*ADD + 6*ASSIGNMENT + 33*MUL
+    //       - Subexpressions: 44*ADD + 2*DIV + LOG + 118*MUL + 4*NEG + 44*SUB
+    const real_t x0 = px0 - px2;
+    const real_t x1 = py0 - py3;
+    const real_t x2 = x0 * x1;
+    const real_t x3 = px0 - px3;
+    const real_t x4 = py0 - py2;
+    const real_t x5 = x3 * x4;
+    const real_t x6 = x2 - x5;
+    const real_t x7 = -x6;
+    const real_t x8 = pz0 - pz3;
+    const real_t x9 = px0 - px1;
+    const real_t x10 = x4 * x9;
+    const real_t x11 = pz0 - pz1;
+    const real_t x12 = pz0 - pz2;
+    const real_t x13 = py0 - py1;
+    const real_t x14 = x13 * x3;
+    const real_t x15 = x1 * x9;
+    const real_t x16 = x0 * x13;
+    const real_t x17 = 1.0 / (x10 * x8 + x11 * x2 - x11 * x5 + x12 * x14 - x12 * x15 - x16 * x8);
+    const real_t x18 = u[3] * x17;
+    const real_t x19 = -x14 + x15;
+    const real_t x20 = u[6] * x17;
+    const real_t x21 = x10 - x16;
+    const real_t x22 = -x21;
+    const real_t x23 = u[9] * x17;
+    const real_t x24 = x14 - x15 + x21 + x6;
+    const real_t x25 = u[0] * x17;
+    const real_t x26 = x18 * x7 + x19 * x20 + x22 * x23 + x24 * x25;
+    const real_t x27 = -x11 * x4 + x12 * x13;
+    const real_t x28 = -x27;
+    const real_t x29 = u[10] * x17;
+    const real_t x30 = -x1 * x12 + x4 * x8;
+    const real_t x31 = -x30;
+    const real_t x32 = u[4] * x17;
+    const real_t x33 = x13 * x8;
+    const real_t x34 = x1 * x11;
+    const real_t x35 = x33 - x34;
+    const real_t x36 = u[7] * x17;
+    const real_t x37 = x27 + x30 - x33 + x34;
+    const real_t x38 = u[1] * x17;
+    const real_t x39 = x28 * x29 + x31 * x32 + x35 * x36 + x37 * x38;
+    const real_t x40 = -x0 * x11 + x12 * x9;
+    const real_t x41 = u[11] * x17;
+    const real_t x42 = x0 * x8 - x12 * x3;
+    const real_t x43 = u[5] * x17;
+    const real_t x44 = x8 * x9;
+    const real_t x45 = x11 * x3;
+    const real_t x46 = -x44 + x45;
+    const real_t x47 = u[8] * x17;
+    const real_t x48 = -x40 - x42 + x44 - x45;
+    const real_t x49 = u[2] * x17;
+    const real_t x50 = x40 * x41 + x42 * x43 + x46 * x47 + x48 * x49;
+    const real_t x51 = x39 * x50;
+    const real_t x52 = x18 * x42 + x20 * x46 + x23 * x40 + x25 * x48;
+    const real_t x53 = x19 * x36 + x22 * x29 + x24 * x38 + x32 * x7;
+    const real_t x54 = x28 * x41 + x31 * x43 + x35 * x47 + x37 * x49;
+    const real_t x55 = x53 * x54;
+    const real_t x56 = x29 * x40 + x32 * x42 + x36 * x46 + x38 * x48 + 1;
+    const real_t x57 = x54 * x56;
+    const real_t x58 = x19 * x47 + x22 * x41 + x24 * x49 + x43 * x7 + 1;
+    const real_t x59 = x39 * x58;
+    const real_t x60 = x18 * x31 + x20 * x35 + x23 * x28 + x25 * x37 + 1;
+    const real_t x61 = x50 * x53;
+    const real_t x62 = x26 * x51 - x26 * x57 + x52 * x55 - x52 * x59 + x56 * x58 * x60 - x60 * x61;
+    const real_t x63 = 1.0 / x62;
+    const real_t x64 = x55 - x59;
+    const real_t x65 = mu * x63;
+    const real_t x66 = lambda * x63 * log(x62);
+    const real_t x67 = x51 - x57;
+    const real_t x68 = x56 * x58 - x61;
+    const real_t x69 = -x50 * x60 + x52 * x54;
+    const real_t x70 = mu * x53 - x65 * x69 + x66 * x69;
+    const real_t x71 = x26 * x50 - x52 * x58;
+    const real_t x72 = mu * x39 - x65 * x71 + x66 * x71;
+    const real_t x73 = -x26 * x54 + x58 * x60;
+    const real_t x74 = mu * x56 - x65 * x73 + x66 * x73;
+    const real_t x75 = x26 * x39 - x53 * x60;
+    const real_t x76 = mu * x50 - x65 * x75 + x66 * x75;
+    const real_t x77 = -x26 * x56 + x52 * x53;
+    const real_t x78 = mu * x54 - x65 * x77 + x66 * x77;
+    const real_t x79 = -x39 * x52 + x56 * x60;
+    const real_t x80 = mu * x58 - x65 * x79 + x66 * x79;
+    stress[0] = x63 * (x26 * (mu * x26 - x65 * x67 + x66 * x67) + x52 * (mu * x52 - x64 * x65 + x64 * x66) +
+                       x60 * (mu * x60 - x65 * x68 + x66 * x68));
+    stress[1] = x63 * (x26 * x70 + x52 * x74 + x60 * x72);
+    stress[2] = x63 * (x26 * x80 + x52 * x76 + x60 * x78);
+    stress[3] = x63 * (x39 * x72 + x53 * x70 + x56 * x74);
+    stress[4] = x63 * (x39 * x78 + x53 * x80 + x56 * x76);
+    stress[5] = x63 * (x50 * x76 + x54 * x78 + x58 * x80);
+}
+
+void neohookean_cauchy_stress_aos(const ptrdiff_t nelements,
+                                  const ptrdiff_t nnodes,
+                                  idx_t *const SFEM_RESTRICT elems[4],
+                                  geom_t *const SFEM_RESTRICT xyz[3],
+                                  const real_t mu,
+                                  const real_t lambda,
+                                  const real_t *const SFEM_RESTRICT displacement,
+                                  real_t *const SFEM_RESTRICT out[6]) {
     SFEM_UNUSED(nnodes);
 
     static const int block_size = 3;
@@ -1176,7 +1285,7 @@ void neohookean_cauchy_stress(const ptrdiff_t nelements,
         const idx_t i2 = ev[2];
         const idx_t i3 = ev[3];
 
-        cauchy_stress(mu,
+        cauchy_stress_6(mu,
                       lambda,
                       // X-coordinates
                       xyz[0][i0],
@@ -1198,7 +1307,7 @@ void neohookean_cauchy_stress(const ptrdiff_t nelements,
                       // Output
                       element_stress);
 
-        for (int d = 0; d < 9; d++) {
+        for (int d = 0; d < 6; d++) {
             out[d][i] = element_stress[d];
         }
     }
@@ -1211,7 +1320,7 @@ void neohookean_cauchy_stress_soa(const ptrdiff_t nelements,
                                   const real_t mu,
                                   const real_t lambda,
                                   real_t **const SFEM_RESTRICT u,
-                                  real_t *const SFEM_RESTRICT out[9]) {
+                                  real_t *const SFEM_RESTRICT out[6]) {
     SFEM_UNUSED(nnodes);
 
     static const int block_size = 3;
@@ -1242,7 +1351,7 @@ void neohookean_cauchy_stress_soa(const ptrdiff_t nelements,
         const idx_t i2 = ev[2];
         const idx_t i3 = ev[3];
 
-        cauchy_stress(mu,
+        cauchy_stress_6(mu,
                       lambda,
                       // X-coordinates
                       xyz[0][i0],
@@ -1264,7 +1373,7 @@ void neohookean_cauchy_stress_soa(const ptrdiff_t nelements,
                       // Output
                       element_stress);
 
-        for (int d = 0; d < 9; d++) {
+        for (int d = 0; d < 6; d++) {
             out[d][i] = element_stress[d];
         }
     }
