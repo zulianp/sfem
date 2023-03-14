@@ -12,6 +12,7 @@ SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 PATH=$SCRIPTPATH:$PATH
 PATH=$SCRIPTPATH/../..:$PATH
 PATH=$SCRIPTPATH/../../python:$PATH
+PATH=$SCRIPTPATH/../../python/mesh:$PATH
 
 # Remove me!
 UTOPIA_EXEC=$CODE_DIR/utopia/utopia/build/utopia_exec
@@ -31,10 +32,66 @@ solve()
 	mpiexec -np 8 $UTOPIA_EXEC -app ls_solve -A $mat -b $rhs -out $x -use_amg false --use_ksp -pc_type hypre -ksp_type cg -atol 1e-18 -rtol 0 -stol 1e-19 --verbose
 }
 
+divergence_check()
+{
+	if (($# != 4))
+	then
+		printf "usage: $0 <stage> <velx.raw> <vely.raw> <velz.raw>\n" 1>&2
+		exit -1
+	fi
+
+	stage=$1
+	ux=$2
+	uy=$3
+	uz=$4
+	divu=$workspace/temp_div.raw
+	divergence $mesh_path $ux $uy $uz $divu
+	div_measure=`python3 -c "import numpy as np; print(np.sum(np.abs(np.fromfile(\"$divu\")), dtype=np.float64))"`
+	
+	echo "---------------------------"
+	echo "[$stage]: sum(div(u)) = $div_measure"
+	echo "---------------------------"
+	rm $divu
+}
+
+p1grads()
+{
+	if (($# != 4))
+	then
+		printf "usage: $0 <potential.raw> <outx.raw> <outy.raw> <outz.raw>\n" 1>&2
+		exit -1
+	fi
+
+	potential=$1
+	p1_dpdx=$2
+	p1_dpdy=$3
+	p1_dpdz=$4
+
+	# Per Cell quantities
+	p0_dpdx=$workspace/temp_p0_dpdx.raw
+	p0_dpdy=$workspace/temp_p0_dpdy.raw
+	p0_dpdz=$workspace/temp_p0_dpdz.raw
+
+	# coefficients: P1 -> P0
+	cgrad $mesh_path $potential $p0_dpdx $p0_dpdy $p0_dpdz
+
+	################################################
+	# P0 to P1 projection
+	################################################
+
+	# coefficients: P0 -> P1
+	projection_p0_to_p1 $mesh_path $p0_dpdx $p1_dpdx
+	projection_p0_to_p1 $mesh_path $p0_dpdy $p1_dpdy
+	projection_p0_to_p1 $mesh_path $p0_dpdz $p1_dpdz
+}
+
 set -x
 
 mkdir -p workspace
 workspace="workspace"
+
+mkdir -p output
+output=output
 
 ################################################
 # Grid
@@ -53,13 +110,11 @@ griduz=$velpath/2.24450.raw
 ################################################
 # Mesh
 ################################################
+
 mesh_path=/Users/patrickzulian/Desktop/code/utopia/utopia_fe/data/hydros/mesh-multi-outlet-better
 
-# >
-
-################################################
 # Boundary nodes
-################################################
+
 surf_mesh_path=$workspace/skinned
 
 mkdir -p $surf_mesh_path
@@ -68,9 +123,7 @@ skin $mesh_path $surf_mesh_path
 surface_nodes=$surf_mesh_path/node_mapping.raw
 parent_elements=$surf_mesh_path/parent.raw
 
-################################################
 # Split wall from inlet and outlet
-################################################
 
 nodes_to_zero=$workspace/wall_idx.raw
 
@@ -99,13 +152,20 @@ assemble $mesh_path $workspace
 # Transfer from grid to mesh
 ################################################
 
-ux=$workspace/ux.raw
-uy=$workspace/uy.raw
-uz=$workspace/uz.raw
+mkdir -p $workspace/projected
 
-SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $gridux $mesh_path $ux
-SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $griduy $mesh_path $uy
-SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $griduz $mesh_path $uz
+projected=$workspace/projected/
+ux=$projected/vel_x.raw
+uy=$projected/vel_y.raw
+uz=$projected/vel_z.raw
+
+# SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $gridux $mesh_path $ux
+# SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $griduy $mesh_path $uy
+# SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $griduz $mesh_path $uz
+
+divergence_check "After transfer" $ux $uy $uz
+raw_to_db.py $mesh_path $output/projected_gradient.vtk --point_data="$projected/vel_*.raw"
+
 
 ################################################
 # Set velocity to zero on surface nodes
@@ -119,29 +179,14 @@ smask $nodes_to_zero $ux $mux 0
 smask $nodes_to_zero $uy $muy 0
 smask $nodes_to_zero $uz $muz 0
 
-# CHECK BEGIN
-# check=$workspace/check_mask.raw
-# smask $nodes_to_zero $ux $check 666
-# raw2mesh.py -d $mesh_path --field=$check --field_dtype=float64 --output=$workspace/check_mask.vtk
-# CHECK END
+divergence_check "After clamping" $mux $muy $muz
 
 ################################################
 # Compute (div(u), test)_L2
 ################################################
 
 divu=$workspace/divu.raw
-SFEM_SCALE=-1 divergence $mesh_path $mux $muy $muz $divu
-
-# usage: ./lumped_mass_inv <folder> <in.raw> <out.raw>
-cdivu=$workspace/cdivu.raw
-lumped_mass_inv $mesh_path $divu $cdivu
-
-# CHECK BEGIN
-raw2mesh.py -d $mesh_path --field=$cdivu --field_dtype=float64 --output=$workspace/cdivu.vtk
-# CHECK END
-
-# dirichlet_values=$workspace/dirichlet_values.raw
-# sgather $dirichlet_nodes $real_type_size $cdivu $dirichlet_values
+divergence $mesh_path $mux $muy $muz $divu
 
 ################################################
 # Solve linear system
@@ -151,58 +196,43 @@ raw2mesh.py -d $mesh_path --field=$cdivu --field_dtype=float64 --output=$workspa
 rhs=$workspace/rhs.raw
 smask $workspace/dirichlet.raw $divu $rhs $fix_value
 
-# rhs=$workspace/rhs.raw
-# soverride $dirichlet_nodes $real_type_size $dirichlet_values ? $rhs
-
 potential=$workspace/potential.raw
 solve $workspace/rowptr.raw $rhs $potential
 
-# CHECK BEGIN
-raw2mesh.py -d $mesh_path --field=$potential --field_dtype=float64 --output=$workspace/potential.vtk
-# CHECK END
+raw_to_db.py $mesh_path $output/potential.vtk --point_data=$potential
 
 ################################################
 # Compute gradients
 ################################################
 
-# Per Cell quantities
-p0_dpdx=$workspace/p0_dpdx.raw
-p0_dpdy=$workspace/p0_dpdy.raw
-p0_dpdz=$workspace/p0_dpdz.raw
+p1_dpdx=$workspace/vel_x.raw
+p1_dpdy=$workspace/vel_y.raw
+p1_dpdz=$workspace/vel_z.raw
+p1grads $potential $p1_dpdx $p1_dpdy $p1_dpdz
 
-# coefficients: P1 -> P0
-cgrad $mesh_path $potential $p0_dpdx $p0_dpdy $p0_dpdz
+raw_to_db.py $mesh_path $output/gradient_corrector.vtk --point_data="$workspace/vel_*.raw"
 
-################################################
-# P0 to P1 projection
-################################################
+# Add correction to velocity
+axpy 1 $mux $p1_dpdx 
+axpy 1 $muy $p1_dpdy 
+axpy 1 $muz $p1_dpdz 
 
-# Per Node quantities
-p1_dpdx=$workspace/p1_dpdx.raw
-p1_dpdy=$workspace/p1_dpdy.raw
-p1_dpdz=$workspace/p1_dpdz.raw
+divergence_check "After correction" $p1_dpdx $p1_dpdy $p1_dpdz
 
-# coefficients: P0 -> P1
-projection_p0_to_p1 $mesh_path $p0_dpdx $p1_dpdx
-projection_p0_to_p1 $mesh_path $p0_dpdy $p1_dpdy
-projection_p0_to_p1 $mesh_path $p0_dpdz $p1_dpdz
+# Show corrected velocities
+raw_to_db.py $mesh_path $output/corrected_gradient.vtk --point_data="$workspace/vel_*.raw"
 
-#
-raw2mesh.py -d $mesh_path --field=$p1_dpdx --field_dtype=float64 --output=$workspace/velx.vtk
-raw2mesh.py -d $mesh_path --field=$p1_dpdy --field_dtype=float64 --output=$workspace/vely.vtk
-raw2mesh.py -d $mesh_path --field=$p1_dpdz --field_dtype=float64 --output=$workspace/velz.vtk
-
-################################################
-# Compute WSS
-################################################
+# ################################################
+# # Compute WSS
+# ################################################
 
 vshear_prefix=$workspace/volshear
 sshear_prefix=$workspace/surfshear
 
-# coefficients: P1 -> P0
+# # coefficients: P1 -> P0
 cshear $mesh_path $p1_dpdx $p1_dpdy $p1_dpdz $vshear_prefix
 
-# Map shear to surface elements
+# # Map shear to surface elements
 
 sgather $parent_elements $real_type_size $vshear_prefix".0.raw" $sshear_prefix".0.raw"
 sgather $parent_elements $real_type_size $vshear_prefix".1.raw" $sshear_prefix".1.raw"
@@ -213,23 +243,7 @@ sgather $parent_elements $real_type_size $vshear_prefix".5.raw" $sshear_prefix".
 
 wssmag=$workspace/wssmag.raw
 
-# coefficients: P0 -> P0
+# # coefficients: P0 -> P0
 wss $surf_mesh_path $sshear_prefix $wssmag
 
-################################################
-# Visualize WSS
-################################################
-
-# Convert final output (P0)
-raw2surfmesh.py -d $surf_mesh_path --cell_data=$wssmag --cell_data_dtype=float64 --output=$workspace/wssmag.vtk
-
-################################################
-# Project stress to P1
-################################################
-
-# wssmag_p1=$workspace/wssmag_p1.raw
-# surf_projection_p0_to_p1 $surf_mesh_path $wssmag $wssmag_p1
-
-# # Convert final output (P1)
-# raw2surfmesh.py -d $surf_mesh_path --field=$wssmag_p1 --field_dtype=float64 --output=$workspace/wssmag_p1.vtk
-
+raw_to_db.py $mesh_path $output/wssmag.vtk --cell_data=$wssmag
