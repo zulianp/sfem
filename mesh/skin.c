@@ -169,7 +169,7 @@ int main(int argc, char *argv[]) {
     // Correct normal orientation using elements with orginal indexing
     correct_side_orientation(n_surf_elements, surf_elems, parent, mesh.elements, mesh.points);
 
-    // Reindex elements
+    // Re-index elements
     for (ptrdiff_t i = 0; i < n_surf_elements; ++i) {
         for (int d = 0; d < 3; ++d) {
             surf_elems[d][i] = vol2surf[surf_elems[d][i]];
