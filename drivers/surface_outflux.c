@@ -108,7 +108,7 @@ void surface_outflux(const ptrdiff_t nelements,
                      real_t *const vector_field_x,
                      real_t *const vector_field_y,
                      real_t *const vector_field_z,
-                     real_t *const value) {
+                     real_t *const values) {
     SFEM_UNUSED(nnodes);
 
     double tick = MPI_Wtime();
@@ -117,7 +117,6 @@ void surface_outflux(const ptrdiff_t nelements,
     real_t element_vector_y[3];
     real_t element_vector_z[3];
 
-    *value = 0;
 
     idx_t ev[4];
 
@@ -165,7 +164,7 @@ void surface_outflux(const ptrdiff_t nelements,
             // Output
             &element_value);
 
-        *value += element_value;
+        values[i] += element_value;
     }
 
     double tock = MPI_Wtime();
@@ -237,7 +236,10 @@ int main(int argc, char *argv[]) {
 
     normals(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, normals_xyz);
 
-    real_t value = 0;
+
+    real_t * outflux = (real_t *)malloc(mesh.nelements * sizeof(real_t));
+    memset(outflux, 0, mesh.nelements * sizeof(real_t));
+
     surface_outflux(mesh.nelements,
                     mesh.nnodes,
                     mesh.elements,
@@ -246,13 +248,22 @@ int main(int argc, char *argv[]) {
                     vector_field[0],
                     vector_field[1],
                     vector_field[2],
-                    &value);
+                    outflux);
+
+    real_t value = 0;
+    for(ptrdiff_t i = 0; i < mesh.nelements; i++) {
+        value += outflux[i];
+    }
 
     printf("surface_outflux = %g\n", (double)value);
 
     array_write(comm, "normalx.raw", SFEM_MPI_GEOM_T, normals_xyz[0], mesh.nelements, mesh.nelements);
     array_write(comm, "normaly.raw", SFEM_MPI_GEOM_T, normals_xyz[1], mesh.nelements, mesh.nelements);
     array_write(comm, "normalz.raw", SFEM_MPI_GEOM_T, normals_xyz[2], mesh.nelements, mesh.nelements);
+
+    array_write(comm, path_output, SFEM_MPI_REAL_T, outflux, mesh.nelements, mesh.nelements);
+
+    free(outflux);
 
     for (int d = 0; d < 3; ++d) {
         free(normals_xyz[d]);

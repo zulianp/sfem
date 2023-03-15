@@ -89,8 +89,9 @@ surface_divergence()
 	uy=$3
 	uz=$4
 
-	divu=$workspace/div_vel.raw
-	surface_outflux $surf_mesh_path $ux $uy $uz $divu
+	outflux=$workspace/outflux.raw
+	surface_outflux $surf_mesh_path $ux $uy $uz $outflux
+	raw_to_db.py $surf_mesh_path $output/"$name".vtk --cell_data="$outflux"
 }
 
 volume_divergence "voldiv" $vx $vy $vz
