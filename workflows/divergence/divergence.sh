@@ -78,6 +78,12 @@ volume_divergence()
 
 surface_divergence()
 {
+	if (($# != 4))
+	then
+		printf "usage: $0 <name> <velx.raw> <vely.raw> <velz.raw>\n" 1>&2
+		exit -1
+	fi
+
 	name=$1
 	ux=$2
 	uy=$3
@@ -86,6 +92,8 @@ surface_divergence()
 	divu=$workspace/div_vel.raw
 	surface_outflux $surf_mesh_path $ux $uy $uz $divu
 }
+
+volume_divergence "voldiv" $vx $vy $vz
 
 svx=$workspace/svx.raw
 svy=$workspace/svy.raw
