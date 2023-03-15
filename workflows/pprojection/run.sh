@@ -147,7 +147,7 @@ set_diff $workspace/temp.raw $mesh_path/on.raw $nodes_to_zero
 ################################################
 
 # List dirchlet nodes
-python3 -c "import numpy as np; np.array([7699704]).astype(np.int32).tofile('dirichlet.raw')"
+# python3 -c "import numpy as np; np.array([7699704]).astype(np.int32).tofile('dirichlet.raw')"
 fix_value=0
 
 # dirichlet_nodes=$workspace/dirichlet.raw
@@ -203,7 +203,6 @@ divergence_check "after_clamping" $mux $muy $muz
 ################################################
 
 divu=$workspace/divu.raw
-# SFEM_SCALE=-1 
 divergence $mesh_path $mux $muy $muz $divu
 
 ################################################
@@ -231,9 +230,9 @@ p1grads $potential $p1_dpdx $p1_dpdy $p1_dpdz
 raw_to_db.py $mesh_path $output/gradient_corrector.vtk --point_data="$workspace/vel_*.raw"
 
 # Add correction to velocity
-axpy 1 $mux $p1_dpdx 
-axpy 1 $muy $p1_dpdy 
-axpy 1 $muz $p1_dpdz 
+axpy -1 $mux $p1_dpdx 
+axpy -1 $muy $p1_dpdy 
+axpy -1 $muz $p1_dpdz 
 
 divergence_check "after_correction" $p1_dpdx $p1_dpdy $p1_dpdz
 

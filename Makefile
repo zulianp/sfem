@@ -51,7 +51,7 @@ GOALS = assemble assemble3 assemble4
 GOALS += partition select_submesh refine skin surf_split
 
 # FE post-process
-GOALS += cgrad cshear projection_p0_to_p1 wss lumped_mass_inv cauchy_stress
+GOALS += cgrad cshear projection_p0_to_p1 wss lumped_mass_inv cauchy_stress surface_outflux
 
 # BLAS
 GOALS += axpy
@@ -123,6 +123,9 @@ isolver_lsolve_frontend.o : ../isolver/plugin/lsolve/isolver_lsolve_frontend.cpp
 	$(MPICXX) $(CXXFLAGS) $(INTERNAL_CXXFLAGS) $(INCLUDES) $(ISOLVER_INCLUDES) -c $<
 
 cauchy_stress : cauchy_stress.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+surface_outflux : surface_outflux.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 assemble : assemble.o libsfem.a

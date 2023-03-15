@@ -18,6 +18,71 @@
 
 #include "argsort.h"
 
+
+static SFEM_INLINE void normalize(real_t *const vec3) {
+    const real_t len = sqrt(vec3[0] * vec3[0] + vec3[1] * vec3[1] + vec3[2] * vec3[2]);
+    vec3[0] /= len;
+    vec3[1] /= len;
+    vec3[2] /= len;
+}
+
+void correct_side_orientation(const ptrdiff_t nsides,
+                              idx_t **const SFEM_RESTRICT sides,
+                              const idx_t *const SFEM_RESTRICT parent,
+                              idx_t **const SFEM_RESTRICT elements,
+                              geom_t **const SFEM_RESTRICT xyz) {
+    double tick = MPI_Wtime();
+
+    for (ptrdiff_t i = 0; i < nsides; ++i) {
+        const idx_t i0 = sides[0][i];
+        const idx_t i1 = sides[1][i];
+        const idx_t i2 = sides[2][i];
+
+        real_t u[3] = {xyz[0][i1] - xyz[0][i0], xyz[1][i1] - xyz[1][i0], xyz[2][i1] - xyz[2][i0]};
+        real_t v[3] = {xyz[0][i2] - xyz[0][i0], xyz[1][i2] - xyz[1][i0], xyz[2][i2] - xyz[2][i0]};
+
+        normalize(u);
+        normalize(v);
+
+        real_t n[3] = {u[1] * v[2] - u[2] * v[1],  //
+                             u[2] * v[0] - u[0] * v[2],  //
+                             u[0] * v[1] - u[1] * v[0]};
+
+        normalize(n);
+
+        // Compute element barycenter
+        real_t b[3] = {0, 0, 0};
+        const idx_t p = parent[i];
+
+        for (int d = 0; d < 4; ++d) {
+            b[0] += xyz[0][elements[d][p]];
+            b[1] += xyz[1][elements[d][p]];
+            b[2] += xyz[2][elements[d][p]];
+        }
+
+        b[0] /= 4;
+        b[1] /= 4;
+        b[2] /= 4;
+
+        b[0] -= xyz[0][i0];
+        b[1] -= xyz[1][i0];
+        b[2] -= xyz[2][i0];
+
+        real_t cos_angle = n[0] * b[0] + n[1] * b[1] + n[2] * b[2];
+        assert(cos_angle != 0.);
+
+        if (cos_angle > 0) {
+            // Normal pointing inside
+            // Switch order of nodes
+            sides[1][i] = i2;
+            sides[2][i] = i1;
+        }
+    }
+
+    double tock = MPI_Wtime();
+    printf("skin.c: correct_side_orientation\t%g seconds\n", tock - tick);
+}
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -101,12 +166,17 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // Correct normal orientation using elements with orginal indexing
+    correct_side_orientation(n_surf_elements, surf_elems, parent, mesh.elements, mesh.points);
+
     // Reindex elements
-    for(ptrdiff_t i = 0; i < n_surf_elements; ++i) {
+    for (ptrdiff_t i = 0; i < n_surf_elements; ++i) {
         for (int d = 0; d < 3; ++d) {
-            surf_elems[d][i] = vol2surf[surf_elems[d][i]]; 
+            surf_elems[d][i] = vol2surf[surf_elems[d][i]];
         }
     }
+
+    
 
     free(vol2surf);
 
