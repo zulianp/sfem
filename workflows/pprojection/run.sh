@@ -23,6 +23,18 @@ then
 	exit -1
 fi
 
+# Expensive routine
+resample=0
+
+mkdir -p workspace
+workspace="workspace"
+
+mkdir -p output
+output=output
+
+div_stages_csv=$output/div_stages.csv
+echo "stage,div" > $div_stages_csv
+
 solve()
 {
 	mat=$1
@@ -44,14 +56,19 @@ divergence_check()
 	ux=$2
 	uy=$3
 	uz=$4
-	divu=$workspace/temp_div.raw
+	divu=$workspace/div_vel.raw
 	divergence $mesh_path $ux $uy $uz $divu
 	# div_measure=`python3 -c "import numpy as np; print(np.sum(np.abs(np.fromfile(\"$divu\")), dtype=np.float64))"`
 	div_measure=`python3 -c "import numpy as np; print(np.sum((np.fromfile(\"$divu\")), dtype=np.float64))"`
 	
+	lumped_mass_inv $mesh_path $divu $divu
+	raw_to_db.py $mesh_path $output/"$stage"_divergence.vtk --point_data="$divu"
+
 	echo "---------------------------"
 	echo "[$stage]: sum(div(u)) = $div_measure"
 	echo "---------------------------"
+
+	echo "$stage,$div_measure" >> $div_stages_csv
 	rm $divu
 }
 
@@ -87,12 +104,6 @@ p1grads()
 }
 
 set -x
-
-mkdir -p workspace
-workspace="workspace"
-
-mkdir -p output
-output=output
 
 ################################################
 # Grid
@@ -139,8 +150,11 @@ set_diff $workspace/temp.raw $mesh_path/on.raw $nodes_to_zero
 python3 -c "import numpy as np; np.array([7699704]).astype(np.int32).tofile('dirichlet.raw')"
 fix_value=0
 
-dirichlet_nodes=$workspace/dirichlet.raw
-mv dirichlet.raw $dirichlet_nodes
+# dirichlet_nodes=$workspace/dirichlet.raw
+# mv dirichlet.raw $dirichlet_nodes
+
+# Wall to zero
+dirichlet_nodes=$nodes_to_zero
 
 SFEM_HANDLE_DIRICHLET=1 \
 SFEM_DIRICHLET_NODES=$dirichlet_nodes \
@@ -159,11 +173,14 @@ ux=$projected/vel_x.raw
 uy=$projected/vel_y.raw
 uz=$projected/vel_z.raw
 
-# SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $gridux $mesh_path $ux
-# SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $griduy $mesh_path $uy
-# SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $griduz $mesh_path $uz
+if [[ "$resample" -eq "1" ]]
+then
+	SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $gridux $mesh_path $ux
+	SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $griduy $mesh_path $uy
+	SFEM_READ_FP32=1 pizzastack_to_mesh $nx $ny $nz $griduz $mesh_path $uz
+fi
 
-divergence_check "After transfer" $ux $uy $uz
+divergence_check "after_transfer" $ux $uy $uz
 raw_to_db.py $mesh_path $output/projected_gradient.vtk --point_data="$projected/vel_*.raw"
 
 
@@ -179,14 +196,15 @@ smask $nodes_to_zero $ux $mux 0
 smask $nodes_to_zero $uy $muy 0
 smask $nodes_to_zero $uz $muz 0
 
-divergence_check "After clamping" $mux $muy $muz
+divergence_check "after_clamping" $mux $muy $muz
 
 ################################################
 # Compute (div(u), test)_L2
 ################################################
 
 divu=$workspace/divu.raw
-SFEM_SCALE=-1 divergence $mesh_path $mux $muy $muz $divu
+# SFEM_SCALE=-1 
+divergence $mesh_path $mux $muy $muz $divu
 
 ################################################
 # Solve linear system
@@ -217,7 +235,7 @@ axpy 1 $mux $p1_dpdx
 axpy 1 $muy $p1_dpdy 
 axpy 1 $muz $p1_dpdz 
 
-divergence_check "After correction" $p1_dpdx $p1_dpdy $p1_dpdz
+divergence_check "after_correction" $p1_dpdx $p1_dpdy $p1_dpdz
 
 # Show corrected velocities
 raw_to_db.py $mesh_path $output/corrected_gradient.vtk --point_data="$workspace/vel_*.raw"
