@@ -140,13 +140,7 @@ void surface_outflux(const ptrdiff_t nelements,
         const idx_t i2 = ev[2];
         const idx_t i3 = ev[3];
 
-        real_t vector_field[6];
-        vector_field[0] = vector_field_x[i];
-        vector_field[1] = vector_field_y[i];
-        vector_field[2] = vector_field_z[i];
-
         real_t element_value = 0;
-
         outflux_kernel(
             // X-coordinates
             xyz[0][i0],

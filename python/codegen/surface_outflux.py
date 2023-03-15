@@ -28,6 +28,7 @@ for i in range(0, 3):
 	ty += rf[i] * vy[i]
 	tz += rf[i] * vz[i]
 
+# dot product
 f = tx * nx + ty * ny + tz * nz
 
 # dS outside since it is constant
