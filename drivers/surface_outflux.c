@@ -34,7 +34,20 @@ static SFEM_INLINE void outflux_kernel(const real_t px0,
                                        const real_t *const SFEM_RESTRICT vz,
                                        // Output
                                        real_t *const SFEM_RESTRICT value) {
-    // 
+    // FLOATING POINT OPS!
+    //       - Result: 5*ADD + ASSIGNMENT + 15*MUL + 8*POW
+    //       - Subexpressions: 6*SUB
+    const real_t x0 = -px0 + px1;
+    const real_t x1 = -px0 + px2;
+    const real_t x2 = -py0 + py1;
+    const real_t x3 = -py0 + py2;
+    const real_t x4 = -pz0 + pz1;
+    const real_t x5 = -pz0 + pz2;
+    value[0] = (1.0 / 6.0) *
+               sqrt((pow(x0, 2) + pow(x2, 2) + pow(x4, 2)) * (pow(x1, 2) + pow(x3, 2) + pow(x5, 2)) -
+                    pow(x0 * x1 + x2 * x3 + x4 * x5, 2)) *
+               (nx * vx[0] + nx * vx[1] + nx * vx[2] + ny * vy[0] + ny * vy[1] + ny * vy[2] + nz * vz[0] + nz * vz[1] +
+                nz * vz[2]);
 }
 
 static SFEM_INLINE void normalize(real_t *const vec3) {
@@ -73,8 +86,8 @@ void normals(const ptrdiff_t nelements,
         normalize(v);
 
         real_t n[3] = {u[1] * v[2] - u[2] * v[1],  //
-                             u[2] * v[0] - u[0] * v[2],  //
-                             u[0] * v[1] - u[1] * v[0]};
+                       u[2] * v[0] - u[0] * v[2],  //
+                       u[0] * v[1] - u[1] * v[0]};
 
         normalize(n);
 
