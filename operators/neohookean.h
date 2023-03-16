@@ -22,7 +22,7 @@ void neohookean_cauchy_stress_aos(const ptrdiff_t nelements,
                               const real_t mu,
                               const real_t lambda,
                               const real_t *const SFEM_RESTRICT displacement,
-                              real_t *const SFEM_RESTRICT out[9]);
+                              real_t *const SFEM_RESTRICT out[6]);
 
 void neohookean_cauchy_stress_soa(const ptrdiff_t nelements,
                                   const ptrdiff_t nnodes,
@@ -31,6 +31,6 @@ void neohookean_cauchy_stress_soa(const ptrdiff_t nelements,
                                   const real_t mu,
                                   const real_t lambda,
                                   real_t **const SFEM_RESTRICT u,
-                                  real_t *const SFEM_RESTRICT out[9]);
+                                  real_t *const SFEM_RESTRICT out[6]);
 
 #endif  // LAPLACIAN_H

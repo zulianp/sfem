@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <vector>
 #include <cassert>
+#include <cstddef>
 
 #define PARENT_ID(sideidx) (sideidx) / (4)
 

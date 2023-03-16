@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstddef>
 
 #ifdef SFEM_ENABLE_AVX512_SORT
 #include "avx512-16bit-qsort.hpp"
