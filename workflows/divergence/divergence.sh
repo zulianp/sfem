@@ -42,7 +42,7 @@ mkdir -p $surf_mesh_path
 
 skin $mesh_path $surf_mesh_path
 
-set -x
+# set -x
 
 surface_nodes=$surf_mesh_path/node_mapping.raw
 parent_elements=$surf_mesh_path/parent.raw
