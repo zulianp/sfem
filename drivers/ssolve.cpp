@@ -196,8 +196,8 @@ int main(int argc, char *argv[]) {
         isolver_lsolve_init(&lsolve);
 
         int max_it = 1000;
-        real_t atol = 1e-8;
-        real_t rtol = 1e-10;
+        real_t atol = 1e-14;
+        real_t rtol = 1e-14;
         real_t stol = 1e-19;
 
         if(config["linear_solver"]) {

@@ -5,7 +5,7 @@ mesh:
 dirichlet:
   type: "value"
   idx: mesh/sidesets_aos/sback.raw
-  value: 1
+  value: 0
 
 neumann:
   type: "value"
@@ -14,9 +14,9 @@ neumann:
 
 linear_solver:
   max_it: 10000
-  atol: 1e-14
-  stol: 1e-14
-  rtol: 1e-14
+  atol: 1e-20
+  stol: 1e-20
+  rtol: 1e-20
 
 aux_out:
   rhs: output/rhs.raw  

@@ -19,9 +19,7 @@ set -x
 
 export DYLD_LIBRARY_PATH=$CODE_DIR/external/petsc/lib/:/Users/patrickzulian/Desktop/code/utopia/utopia/build/ui/
 export ISOLVER_LSOLVE_PLUGIN=$INSTALL_DIR/utopia/lib/libutopia.dylib
-# export UTOPIA_LINEAR_SOLVER_CONFIG=$PWD/utopia.yaml
+export UTOPIA_LINEAR_SOLVER_CONFIG=$PWD/utopia.yaml
 
 ssolve config.yaml
-
 raw_to_db.py mesh output/db.vtk --point_data="./output/*.raw"
-
