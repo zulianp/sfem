@@ -5,10 +5,10 @@ extern "C" {
 #include "isolver_lsolve.h"
 #include "laplacian.h"
 #include "matrixio_array.h"
+#include "neumann.h"
 #include "read_mesh.h"
 #include "sfem_mesh.h"
 #include "sfem_mesh_write.h"
-#include "neumann.h"
 }
 
 #include <yaml-cpp/yaml.h>
@@ -16,6 +16,14 @@ extern "C" {
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
+
+template<typename T>
+void get(YAML::Node &node, const std::string &str, T &val)
+{
+    if(node[str]) {
+        val = node[str].as<T>();
+    }
+}
 
 typedef struct {
     ptrdiff_t rows;
@@ -120,10 +128,19 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    crs_matrix_t matrix;
+    p1_create_crs_matrix(&mesh, &matrix, 1);
+
+    laplacian_assemble_hessian(
+        mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, matrix.rowptr, matrix.colidx, matrix.values);
+
+    std::vector<real_t> x(mesh.nnodes, 0);
+
     if (config["dirichlet"]) {
         auto &&node = config["dirichlet"];
         auto dirichlet_path = node["idx"].as<std::string>();
         auto dirichlet_value = node["value"].as<real_t>();
+
 
         const idx_t *dirichlet_nodes = 0;
         ptrdiff_t n_dirichlet_nodes_local, n_dirichlet_nodes;
@@ -134,23 +151,42 @@ int main(int argc, char *argv[]) {
                                &n_dirichlet_nodes_local,
                                &n_dirichlet_nodes);
 
+
+        if(!rank) {
+            printf("[dirichlet] idx: %s\n", dirichlet_path.c_str());
+            printf("[dirichlet] value: %g\n", (double)dirichlet_value);
+            printf("[dirichlet] n_dirichlet_nodes: %ld\n", (long)n_dirichlet_nodes);
+        }
+
         constraint_nodes_to_value(n_dirichlet_nodes, dirichlet_nodes, dirichlet_value, rhs.data());
+        constraint_nodes_to_value(n_dirichlet_nodes, dirichlet_nodes, dirichlet_value, x.data());
+
+        // for(ptrdiff_t i = 0; i < n_dirichlet_nodes; ++i) {
+        //     printf("%ld\n", (long)dirichlet_nodes[i]);
+        // }
+
+        crs_constraint_nodes_to_identity(
+            n_dirichlet_nodes, dirichlet_nodes, 1.0, matrix.rowptr, matrix.colidx, matrix.values);
 
         free((void *)dirichlet_nodes);
     } else {
-        assert(false);
+        if(!rank) {
+            fprintf(stderr, "Dirichlet nodes are required for well-posedness!\n");
+        }
+
+        MPI_Abort(comm, -1);
+    }
+
+    if (config["aux_out"]) {
+        auto &&node = config["aux_out"];
+        if (node["rhs"]) {
+            auto rhs_out_path = node["rhs"].as<std::string>();
+            mesh_write_nodal_field(&mesh, rhs_out_path.c_str(), SFEM_MPI_REAL_T, (void *)rhs.data());
+        }
     }
 
     auto output_path = config["out"].as<std::string>();
-
-    crs_matrix_t matrix;
-    p1_create_crs_matrix(&mesh, &matrix, 1);
-
-    laplacian_assemble_hessian(
-        mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, matrix.rowptr, matrix.colidx, matrix.values);
-
-    std::vector<real_t> x(mesh.nnodes, 0);
-
+    
     {
         double tick = MPI_Wtime();
         // Solve linear system
@@ -159,10 +195,23 @@ int main(int argc, char *argv[]) {
 
         isolver_lsolve_init(&lsolve);
 
-        // isolver_lsolve_set_max_iterations(&lsolve, 1000);
-        // isolver_lsolve_set_atol(&lsolve, 1e-16);
-        // isolver_lsolve_set_stol(&lsolve, 1e-8);
-        // isolver_lsolve_set_rtol(&lsolve, 1e-16);
+        int max_it = 1000;
+        real_t atol = 1e-8;
+        real_t rtol = 1e-10;
+        real_t stol = 1e-19;
+
+        if(config["linear_solver"]) {
+            auto &&node = config["linear_solver"];
+            get(node, "atol", atol);
+            get(node, "rtol", rtol);
+            get(node, "stol", stol);
+            get(node, "max_it", max_it);
+        }
+
+        isolver_lsolve_set_max_iterations(&lsolve, max_it);
+        isolver_lsolve_set_atol(&lsolve, atol);
+        isolver_lsolve_set_rtol(&lsolve, rtol);
+        isolver_lsolve_set_stol(&lsolve, stol);
         // isolver_lsolve_set_verbosity(&lsolve, 1);
 
         isolver_lsolve_update_crs(&lsolve, mesh.nnodes, mesh.nnodes, matrix.rowptr, matrix.colidx, matrix.values);
@@ -172,7 +221,7 @@ int main(int argc, char *argv[]) {
 
         double tock = MPI_Wtime();
 
-        if(!rank) {
+        if (!rank) {
             printf("ssolve.cpp: Linear solver time %g\n", tock - tick);
         }
     }
