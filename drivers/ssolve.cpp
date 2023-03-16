@@ -1,8 +1,10 @@
 
+#include "isolver_lsolve.h"
+
 extern "C" {
 #include "crs_graph.h"
 #include "dirichlet.h"
-#include "isolver_lsolve.h"
+
 #include "laplacian.h"
 #include "matrixio_array.h"
 #include "neumann.h"
@@ -16,6 +18,7 @@ extern "C" {
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
+#include <cassert>
 
 template<typename T>
 void get(YAML::Node &node, const std::string &str, T &val)
