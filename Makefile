@@ -63,7 +63,7 @@ GOALS += condense_matrix condense_vector idx_to_indicator remap_vector sgather s
 GOALS += pizzastack_to_mesh
 
 # Application of operators
-GOALS += divergence
+GOALS += divergence lapl
 
 # Array utilities
 GOALS += soa_to_aos
@@ -190,6 +190,9 @@ soverride : drivers/soverride.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 divergence : drivers/divergence.c div.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+lapl : drivers/lapl.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 lumped_mass_inv : drivers/lumped_mass_inv.c mass.o libsfem.a

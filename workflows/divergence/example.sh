@@ -13,6 +13,6 @@ vz=../pprojection/workspace/projected/vel_z.raw
 # vy=../pprojection/workspace/vel_y.raw
 # vz=../pprojection/workspace/vel_z.raw
 
-./divergence.sh $mesh $vx $vy $vz
+./divergence.sh $mesh $vx $vy $vz output
       
     

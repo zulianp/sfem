@@ -14,9 +14,9 @@ neumann:
 
 linear_solver:
   max_it: 10000
-  atol: 1e-20
-  stol: 1e-20
-  rtol: 1e-20
+  atol: 1e-22
+  stol: 1e-22
+  rtol: 1e-22
 
 aux_out:
   rhs: output/rhs.raw  

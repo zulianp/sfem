@@ -11,8 +11,7 @@
 #include "crs_graph.h"
 #include "sfem_base.h"
 
-
-#include "operators/div.h"
+#include "operators/laplacian.h"
 
 #include "read_mesh.h"
 
@@ -30,16 +29,16 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (argc < 5) {
-        fprintf(stderr, "usage: %s <folder> <ux.raw> <uy.raw> <uz.raw> <output.raw>\n", argv[0]);
+    if (argc != 4) {
+        fprintf(stderr, "usage: %s <folder> <u.raw> <output.raw>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
     const char *folder = argv[1];
-    const char *path_u[3] = {argv[2], argv[3], argv[4]};
-    const char *path_output = argv[5];
+    const char *path_u = argv[2];
+    const char *path_output = argv[3];
 
-    printf("%s %s %s %s %s %s\n", argv[0], folder, path_u[0], path_u[1], path_u[2], path_output);
+    printf("%s %s %s %s\n", argv[0], folder, path_u, path_output);
 
     double tick = MPI_Wtime();
 
@@ -52,35 +51,29 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    real_t *u[3];
+    real_t *u;
 
     ptrdiff_t u_n_local, u_n_global;
+    array_create_from_file(comm, path_u, SFEM_MPI_REAL_T, (void **)&u, &u_n_local, &u_n_global);
 
-    for (int d = 0; d < 3; ++d) {
-        array_create_from_file(comm, path_u[d], SFEM_MPI_REAL_T, (void **)&u[d], &u_n_local, &u_n_global);
-    }
+    real_t *lapl_u = (real_t *)malloc(u_n_local * sizeof(real_t));
+    memset(lapl_u, 0, u_n_local * sizeof(real_t));
 
-    real_t *div_u = (real_t *)malloc(u_n_local * sizeof(real_t));
-    memset(div_u, 0, u_n_local * sizeof(real_t));
+    laplacian_apply(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, u, lapl_u);
 
-    div_apply(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, u[0], u[1], u[2], div_u);
-
-    real_t SFEM_SCALE=1;
+    real_t SFEM_SCALE = 1;
     SFEM_READ_ENV(SFEM_SCALE, atof);
 
-    if(SFEM_SCALE != 1) {
-        for(ptrdiff_t i = 0; i < u_n_local; ++i) {
-            div_u[i] *= SFEM_SCALE;
+    if (SFEM_SCALE != 1) {
+        for (ptrdiff_t i = 0; i < u_n_local; ++i) {
+            lapl_u[i] *= SFEM_SCALE;
         }
     }
 
-    array_write(comm, path_output, SFEM_MPI_REAL_T, div_u, u_n_local, u_n_global);
+    array_write(comm, path_output, SFEM_MPI_REAL_T, lapl_u, u_n_local, u_n_global);
 
-    for (int d = 0; d < 3; ++d) {
-        free(u[d]);
-    }
-    
-    free(div_u);
+    free(u);
+    free(lapl_u);
 
     double tock = MPI_Wtime();
 

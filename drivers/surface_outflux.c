@@ -117,7 +117,6 @@ void surface_outflux(const ptrdiff_t nelements,
     real_t element_vector_y[3];
     real_t element_vector_z[3];
 
-
     idx_t ev[4];
 
     for (ptrdiff_t i = 0; i < nelements; ++i) {
@@ -236,8 +235,7 @@ int main(int argc, char *argv[]) {
 
     normals(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, normals_xyz);
 
-
-    real_t * outflux = (real_t *)malloc(mesh.nelements * sizeof(real_t));
+    real_t *outflux = (real_t *)malloc(mesh.nelements * sizeof(real_t));
     memset(outflux, 0, mesh.nelements * sizeof(real_t));
 
     surface_outflux(mesh.nelements,
@@ -251,16 +249,21 @@ int main(int argc, char *argv[]) {
                     outflux);
 
     real_t value = 0;
-    for(ptrdiff_t i = 0; i < mesh.nelements; i++) {
+    for (ptrdiff_t i = 0; i < mesh.nelements; i++) {
         value += outflux[i];
     }
 
     printf("surface_outflux = %g\n", (double)value);
 
-    array_write(comm, "normalx.raw", SFEM_MPI_GEOM_T, normals_xyz[0], mesh.nelements, mesh.nelements);
-    array_write(comm, "normaly.raw", SFEM_MPI_GEOM_T, normals_xyz[1], mesh.nelements, mesh.nelements);
-    array_write(comm, "normalz.raw", SFEM_MPI_GEOM_T, normals_xyz[2], mesh.nelements, mesh.nelements);
+    int SFEM_EXPORT_NORMALS = 0;
+    SFEM_READ_ENV(SFEM_EXPORT_NORMALS, atoi);
 
+    if (SFEM_EXPORT_NORMALS) {
+        array_write(comm, "normalx.raw", SFEM_MPI_GEOM_T, normals_xyz[0], mesh.nelements, mesh.nelements);
+        array_write(comm, "normaly.raw", SFEM_MPI_GEOM_T, normals_xyz[1], mesh.nelements, mesh.nelements);
+        array_write(comm, "normalz.raw", SFEM_MPI_GEOM_T, normals_xyz[2], mesh.nelements, mesh.nelements);
+    }
+    
     array_write(comm, path_output, SFEM_MPI_REAL_T, outflux, mesh.nelements, mesh.nelements);
 
     free(outflux);

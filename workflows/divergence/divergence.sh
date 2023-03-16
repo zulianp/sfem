@@ -9,9 +9,9 @@ PATH=$SCRIPTPATH/../..:$PATH
 PATH=$SCRIPTPATH/../../python:$PATH
 PATH=$SCRIPTPATH/../../python/mesh:$PATH
 
-if (($# != 4))
+if (($# != 5))
 then
-	printf "usage: $0 <mesh_path> <vx.raw> <vy.raw> <vz.raw>\n" 1>&2
+	printf "usage: $0 <mesh_path> <vx.raw> <vy.raw> <vz.raw> <output>\n" 1>&2
 	exit -1
 fi
 
@@ -22,14 +22,14 @@ mesh_path=$1
 vx=$2
 vy=$3
 vz=$4
+output=$5
 
 real_type_size=8
 
-mkdir -p workspace
-workspace="workspace"
+workspace=`mktemp -d`
 
-mkdir -p output
-output=output
+mkdir -p $output
+
 
 #####################################
 # Surface mesh
@@ -106,4 +106,7 @@ sgather $surface_nodes $real_type_size $vz $svz
 
 surface_divergence "surfdiv" $svx $svy $svz
 
-raw_to_db.py $surf_mesh_path $output/normal.vtk --cell_data="normal*.raw" --cell_data_type="float32"
+# raw_to_db.py $surf_mesh_path $output/normal.vtk --cell_data="normal*.raw" --cell_data_type="float32"
+
+# Clean-up
+rm -r $workspace
