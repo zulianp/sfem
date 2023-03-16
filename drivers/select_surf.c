@@ -1,9 +1,9 @@
 #include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <stdint.h>
 
 #include "array_dtof.h"
 #include "matrixio_array.h"
@@ -46,24 +46,28 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
 
-    if (argc != 3) {
+    if (argc != 7) {
         if (!rank) {
-            fprintf(stderr, "usage: %s <folder> <output_folder>\n", argv[0]);
+            fprintf(stderr, "usage: %s <folder> <x> <y> <z> <angle_threshold> <selection.raw>\n", argv[0]);
         }
 
         return EXIT_FAILURE;
     }
 
     const char *folder = argv[1];
-    const char *output_folder = argv[2];
-
-    struct stat st = {0};
-    if (stat(output_folder, &st) == -1) {
-        mkdir(output_folder, 0700);
-    }
+    const geom_t roi[3] = {atof(argv[2]), atof(argv[3]), atof(argv[4])};
+    const geom_t angle_threshold = atof(argv[5]);
+    const char *path_selection = argv[6];
 
     if (!rank) {
-        printf("%s %s %s\n", argv[0], folder, output_folder);
+        printf("%s %s %g %g %g %g %s\n",
+               argv[0],
+               folder,
+               (double)roi[0],
+               (double)roi[1],
+               (double)roi[2],
+               (double)angle_threshold,
+               path_selection);
     }
 
     double tick = MPI_Wtime();
@@ -77,31 +81,62 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    count_t *adj_ptr = 0;
-    idx_t *adj_idx = 0;
+    ///////////////////////////////////////////////////////////////////////////////
+    // Find approximately closest elemenent
+    ///////////////////////////////////////////////////////////////////////////////
+
+    idx_t closest_element = -1;
+    real_t closest_sq_dist = 1000000;
+
+    for (ptrdiff_t e = 0; e < mesh.nelements; ++e) {
+        geom_t element_sq_dist = 1000000;
+
+        for (int n = 0; n < mesh.element_type; ++n) {
+            const idx_t node = mesh.elements[n][e];
+
+            geom_t sq_dist = 0.;
+            for (int d = 0; d < 3; ++d) {
+                const real_t m_x = mesh.points[d][node];
+                const real_t roi_x = roi[d];
+                const real_t diff = m_x - roi_x;
+                sq_dist += diff * diff;
+            }
+
+            element_sq_dist = MIN(element_sq_dist, sq_dist);
+        }
+
+        if (element_sq_dist < closest_sq_dist) {
+            closest_sq_dist = element_sq_dist;
+            closest_element = e;
+        }
+    }
+
+    if (closest_element < 0) {
+        fprintf(stderr, "Invalid set up!\n");
+        MPI_Abort(comm, -1);
+    }
 
     ///////////////////////////////////////////////////////////////////////////////
     // Create dual-graph for navigating neighboring elements
     ///////////////////////////////////////////////////////////////////////////////
 
+    count_t *adj_ptr = 0;
+    idx_t *adj_idx = 0;
     create_dual_graph(mesh.nelements, mesh.nnodes, mesh.element_type, mesh.elements, &adj_ptr, &adj_idx);
 
-    uint8_t *color = (uint8_t *)malloc(mesh.nelements * sizeof(uint8_t));
-    memset(color, 0, mesh.nelements * sizeof(uint8_t));
-
-    const real_t angle_threshold = 0.99;
+    uint8_t *selected = (uint8_t *)malloc(mesh.nelements * sizeof(uint8_t));
+    memset(selected, 0, mesh.nelements * sizeof(uint8_t));
 
     ptrdiff_t size_queue = (mesh.nelements + 1);
     ptrdiff_t *elem_queue = (ptrdiff_t *)malloc(size_queue * sizeof(ptrdiff_t));
 
-    elem_queue[0] = 0;
+    elem_queue[0] = closest_element;
     for (ptrdiff_t e = 1; e < size_queue; ++e) {
         elem_queue[e] = -1;
     }
 
     // Next slot
     ptrdiff_t next_slot = 1;
-    uint8_t next_color = 1;
 
     ///////////////////////////////////////////////////////////////////////////////
     // Create marker for different faces based on dihedral angles
@@ -110,17 +145,16 @@ int main(int argc, char *argv[]) {
     for (ptrdiff_t q = 0; elem_queue[q] >= 0; q = (q + 1) % size_queue) {
         const ptrdiff_t e = elem_queue[q];
 
-        if(color[e]) continue;
+        if (selected[e]) continue;
 
-        real_t u[3];
-        real_t v[3];
         real_t n[3];
-
         {
             const idx_t idx0 = mesh.elements[0][e];
             const idx_t idx1 = mesh.elements[1][e];
             const idx_t idx2 = mesh.elements[2][e];
 
+            real_t u[3];
+            real_t v[3];
             for (int d = 0; d < 3; ++d) {
                 u[d] = mesh.points[d][idx1] - mesh.points[d][idx0];
                 v[d] = mesh.points[d][idx2] - mesh.points[d][idx0];
@@ -137,19 +171,19 @@ int main(int argc, char *argv[]) {
         for (count_t k = e_begin; k < e_end; ++k) {
             const idx_t e_adj = adj_idx[k];
 
-            if(!color[e_adj]) {
-                elem_queue[next_slot++ % size_queue] = e_adj;
+            if (selected[e_adj]) {
                 continue;
             }
 
-            real_t ua[3];
-            real_t va[3];
-            real_t na[3];
-
+            real_t cos_angle;
             {
                 const idx_t idx0 = mesh.elements[0][e_adj];
                 const idx_t idx1 = mesh.elements[1][e_adj];
                 const idx_t idx2 = mesh.elements[2][e_adj];
+
+                real_t ua[3];
+                real_t va[3];
+                real_t na[3];
 
                 for (int d = 0; d < 3; ++d) {
                     ua[d] = mesh.points[d][idx1] - mesh.points[d][idx0];
@@ -157,51 +191,47 @@ int main(int argc, char *argv[]) {
                 }
 
                 normal(ua, va, na);
+                cos_angle = fabs((n[0] * na[0]) + (n[1] * na[1]) + (n[2] * na[2]));
             }
 
-            const real_t cos_angle = fabs((n[0] * na[0]) + (n[1] * na[1]) + (n[2] * na[2]));
-
-            if (cos_angle > current_thres) {
-                color[e] = color[e_adj];
-                current_thres = cos_angle;
+            if (cos_angle > angle_threshold) {
+                elem_queue[next_slot++ % size_queue] = e_adj;
             }
         }
 
-        if (!color[e]) {
-            color[e] = next_color++;
-        }
-
+        selected[e] = 1;
         elem_queue[q] = -1;
     }
 
-    printf("num_colors = %d, sides touched %ld / %ld\n", (int)next_color, (long)next_slot, (long)mesh.nelements);
+    printf("num_selected = %ld / %ld\n", (long)next_slot, (long)mesh.nelements);
 
-    array_write(comm, "color.raw", MPI_CHAR, color, mesh.nelements, mesh.nelements);
+    int SFEM_EXPORT_COLOR = 0;
+    SFEM_READ_ENV(SFEM_EXPORT_COLOR, atoi);
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Create separate meshes for the different parts
-    ///////////////////////////////////////////////////////////////////////////////
-
-    {
-        // TODO
+    if (SFEM_EXPORT_COLOR) {
+        array_write(comm, "color.raw", MPI_CHAR, selected, mesh.nelements, mesh.nelements);
     }
 
-    if (0) {
-        // handle mapping
-        char path[2048];
-        sprintf(path, "%s/node_mapping.raw", folder);
+    ///////////////////////////////////////////////////////////////////////////////
+    // Create element index
+    ///////////////////////////////////////////////////////////////////////////////
 
-        idx_t *node_mapping = 0;
-        ptrdiff_t nlocal, nglobal;
-        array_create_from_file(comm, path, SFEM_MPI_IDX_T, (void **)&node_mapping, &nlocal, &nglobal);
-
-        // create parts
-        // TODO
-
-        // clean-up
-        free(node_mapping);
+    ptrdiff_t n_selected = 0;
+    for (ptrdiff_t i = 0; i < mesh.nelements; i++) {
+        n_selected += selected[i] == 1;
     }
 
+    idx_t *indices = (idx_t *)malloc(n_selected * sizeof(idx_t));
+    for (ptrdiff_t i = 0, n_inserted = 0; i < mesh.nelements; i++) {
+        if (selected[i]) {
+            indices[n_inserted++] = i;
+        }
+    }
+
+    array_write(comm, path_selection, SFEM_MPI_IDX_T, indices, n_selected, n_selected);
+
+    free(selected);
+    free(indices);
     mesh_destroy(&mesh);
     double tock = MPI_Wtime();
 

@@ -48,7 +48,7 @@ INCLUDES += -I$(PWD) -I$(PWD)/.. -I$(PWD)/../matrix.io
 GOALS = assemble assemble3 assemble4 
 
 # Mesh manipulation
-GOALS += partition select_submesh refine skin surf_split
+GOALS += partition select_submesh refine skin select_surf
 
 # FE post-process
 GOALS += cgrad cshear projection_p0_to_p1 wss lumped_mass_inv cauchy_stress surface_outflux
@@ -149,7 +149,7 @@ refine : refine.o libsfem.a
 skin : skin.c extract_surface_graph.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
-surf_split : drivers/surf_split.c libsfem.a
+select_surf : drivers/select_surf.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
 extract_surface_graph.o : extract_surface_graph.cpp
