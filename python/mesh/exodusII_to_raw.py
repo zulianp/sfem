@@ -8,6 +8,7 @@ import os
 import pdb
 
 geom_type = np.float32
+idx_type = np.int32
 
 def mkdir(path):
 	if not os.path.exists(path):
@@ -24,11 +25,13 @@ mkdir(output_folder)
 
 nc = netCDF4.Dataset(input_mesh)
 connect = nc.variables['connect1']
+elem_type = connect.elem_type
+print(f'elem_type = {elem_type}')
 
 nelements, nnodesxelem = connect.shape
 
 for i in range(0, nnodesxelem):
-	ii = np.array(connect[:,i]).astype(np.int32) - 1
+	ii = np.array(connect[:,i]).astype(idx_type) - 1
 	ii.tofile(f'{output_folder}/i{i}.raw')
 
 if 'coord' in nc.variables:
@@ -96,14 +99,96 @@ if 'name_nod_var' in nc.variables:
 				path = format_string % (var_path_prefix, t)
 				data.tofile(path)
 		
-# pdb.set_trace()
+def s2n_quad4():
+	return [
+		[0, 1],
+		[1, 2],
+		[2, 3],
+		[3, 0],
+	]
 
-# num_sidesets = nc.dimensions['num_side_sets'].size
-# print(num_sidesets)
+def s2n_hex8():
+	return [
+		[0, 1, 5, 4],
+		[1, 2, 6, 5],
+		[2, 3, 7, 6],
+		[3, 0, 4, 7],
+		[0, 1, 2, 3],
+		[4, 5, 6, 7],
+	]
 
-# for i in range(0, num_sidesets):
-# 	ssidx = i + 1
-# 	key = f'side_ss{ssidx}'
-# 	ss = nc.variables[key]
-# 	print(ss[:])
+def s2n_tet4():
+	return [
+		[0, 1, 3],
+		[1, 2, 3],
+		[1, 3, 2],
+		[0, 1, 2],
+	]
+
+def s2n_tri3():
+	return [
+		[0, 1],
+		[1, 2],
+		[2, 0],
+	]
+
+ss_to_nodelist = {}
+ss_to_nodelist['QUAD4'] = s2n_quad4()
+ss_to_nodelist['HEX8'] = s2n_hex8()
+ss_to_nodelist['TET4'] = s2n_tet4()
+ss_to_nodelist['TETRA'] = s2n_tet4()
+ss_to_nodelist['TRI3'] = s2n_tri3()
+
+# 
+
+num_sidesets = nc.dimensions['num_side_sets'].size
+print(f'num_sidesets={num_sidesets}')
+
+s2n_map = ss_to_nodelist[elem_type]
+nnodesxside = len(s2n_map[0])
+
+ss_names = nc.variables['ss_names']
+
+sideset_dir = f'{output_folder}/sidesets'
+if num_sidesets > 0:
+	mkdir(sideset_dir)
+
+for i in range(0, num_sidesets):
+	ssidx = i + 1
+
+	name = netCDF4.chartostring(ss_names[i])
+
+	if name == "":
+		name = f"sideset{ssidx}"
+
+	print(f'sideset = {name}')
+
+	key = f'elem_ss{ssidx}'
+	e_ss = nc.variables[key]
+
+	key = f'side_ss{ssidx}'
+	s_ss = nc.variables[key]
+
+	this_sideset_dir = f'{sideset_dir}/{name}'
+	mkdir(this_sideset_dir)
+
+	idx = [None] * nnodesxside
+	for d in range(0, nnodesxside):
+		idx[d] = []
+
+	for n in range(0, len(e_ss[:])):
+		e = e_ss[n] - 1
+		s = s_ss[n] - 1
+
+		lnodes = s2n_map[s]
+
+		for d in range(0, nnodesxside):
+			ln = lnodes[d]
+			node = connect[e, ln] - 1
+			idx[d].append(node)
+
+	for d in range(0, nnodesxside):
+		path = f'{this_sideset_dir}/{name}.{d}.raw'
+		ii = np.array(idx[d]).astype(idx_type)
+		ii.tofile(path)
 

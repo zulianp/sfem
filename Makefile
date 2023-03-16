@@ -65,6 +65,9 @@ GOALS += pizzastack_to_mesh
 # Application of operators
 GOALS += divergence
 
+# Array utilities
+GOALS += soa_to_aos
+
 DEPS = -L$(PWD)/../matrix.io/ -lmatrix.io -lstdc++
 
 LDFLAGS += $(DEPS) -lm
@@ -177,6 +180,9 @@ remap_vector : remap_vector.o
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 sgather : sgather.o
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+soa_to_aos : soa_to_aos.o
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 soverride : drivers/soverride.c libsfem.a
