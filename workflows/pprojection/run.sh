@@ -24,7 +24,7 @@ then
 fi
 
 # Expensive routine
-resample=0
+resample=1
 
 mkdir -p workspace
 workspace="workspace"
@@ -76,31 +76,34 @@ divergence_check()
 	luy_=$3
 	luz_=$4
 	ldivu_=$workspace/div_vel.raw
+
+	echo "-------------------------------------------"
+	echo "-------------------------------------------"
+	echo "Divergence check: $stage_"
+	echo "-------------------------------------------"
+
 	divergence $mesh_path $lux_ $luy_ $luz_ $ldivu_
-	# div_measure=`python3 -c "import numpy as np; print(np.sum(np.abs(np.fromfile(\"$divu\")), dtype=np.float64))"`
+	SFEM_SCALE=-1 integrate_divergence $mesh_path $lux_ $luy_ $luz_
+
 	div_measure=`python3 -c "import numpy as np; print(np.sum((np.fromfile(\"$ldivu_\")), dtype=np.float64))"`
 	
-	lumped_mass_inv $mesh_path $ldivu_ $ldivu_
+	# lumped_mass_inv $mesh_path $ldivu_ $ldivu_
 	raw_to_db.py $mesh_path $output/"$stage_"_divergence.vtk --point_data="$ldivu_"
-
-	echo "---------------------------"
-	echo "[$stage_]: sum(div(u)) = $div_measure"
-	echo "---------------------------"
 
 	echo "$stage_,$div_measure" >> $div_stages_csv
 	rm $ldivu_
-
-	# 
 
 	svx=$workspace/temp_svx.raw
 	svy=$workspace/temp_svy.raw
 	svz=$workspace/temp_svz.raw
 
-	sgather $surface_nodes $real_type_size $lux $svx
-	sgather $surface_nodes $real_type_size $luy $svy
-	sgather $surface_nodes $real_type_size $luz $svz
+	sgather $surface_nodes $real_type_size $lux_ $svx
+	sgather $surface_nodes $real_type_size $luy_ $svy
+	sgather $surface_nodes $real_type_size $luz_ $svz
 
 	surface_divergence_check $stage_ $svx $svy $svz
+	echo "-------------------------------------------"
+	echo "-------------------------------------------"
 }
 
 p1grads()

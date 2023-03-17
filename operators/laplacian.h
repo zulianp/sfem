@@ -26,14 +26,11 @@ void laplacian_assemble_hessian(const ptrdiff_t nelements,
                                 const idx_t *const colidx,
                                 real_t *const values);
 
-SFEM_INLINE void laplacian_apply(const ptrdiff_t nelements,
+void laplacian_apply(const ptrdiff_t nelements,
                      const ptrdiff_t nnodes,
                      idx_t **const elems,
                      geom_t **const xyz,
                      const real_t *const u,
-                     real_t *const values)
-{
-    laplacian_assemble_gradient(nelements, nnodes, elems, xyz, u, values);
-}
+                     real_t *const values);
 
 #endif  // LAPLACIAN_H

@@ -64,18 +64,18 @@ volume_divergence()
 
 	divu=$workspace/div_vel.raw
 
+	echo "Volume divergence: $name"
+
 	SFEM_SCALE=-1 divergence $mesh_path $ux $uy $uz $divu
-	div_measure=`python3 -c "import numpy as np; print(np.sum((np.fromfile(\"$divu\")), dtype=np.float64))"`
+	# div_measure=`python3 -c "import numpy as np; print(np.sum((np.fromfile(\"$divu\")), dtype=np.float64))"`
+
+	SFEM_SCALE=-1 integrate_divergence $mesh_path $ux $uy $uz
 	
 	# lumped_mass_inv $mesh_path $divu $divu
 	raw_to_db.py $mesh_path $output/"$name".vtk --point_data="$divu"
 
-	echo "---------------------------"
-	echo "[$name]: sum(div(u)) = $div_measure"
-	echo "---------------------------"
-
 	# Remove boundary-bass matrix to show coefficients
-	temp=restricetd_to_boundary.raw
+	temp=$workspace/restr_to_boundary.raw
 	sgather $surface_nodes $real_type_size $divu $temp
 	lumped_boundary_mass_inv $surf_mesh_path $temp $temp
 	raw_to_db.py $surf_mesh_path $output/"$name"_surf.vtk --point_data="$temp"
@@ -93,6 +93,10 @@ surface_divergence()
 	ux=$2
 	uy=$3
 	uz=$4
+
+	echo "-------------------------------"
+	echo "Surface divergence: $name"
+	echo "-------------------------------"
 
 	outflux=$workspace/outflux.raw
 	surface_outflux $surf_mesh_path $ux $uy $uz $outflux

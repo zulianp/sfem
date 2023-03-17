@@ -51,7 +51,7 @@ GOALS = assemble assemble3 assemble4
 GOALS += partition select_submesh refine skin select_surf
 
 # FE post-process
-GOALS += cgrad cshear projection_p0_to_p1 wss cauchy_stress surface_outflux
+GOALS += cgrad cshear projection_p0_to_p1 wss cauchy_stress surface_outflux integrate_divergence
 
 # BLAS
 GOALS += axpy
@@ -89,6 +89,7 @@ OBJS = \
 	mass.o \
 	boundary_mass.o \
 	dirichlet.o \
+	div.o \
 	neumann.o \
 	sfem_mesh.o \
 	sfem_mesh_write.o \
@@ -131,6 +132,9 @@ cauchy_stress : cauchy_stress.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 surface_outflux : surface_outflux.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+integrate_divergence : integrate_divergence.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 assemble : assemble.o libsfem.a
@@ -190,7 +194,7 @@ soa_to_aos : soa_to_aos.o
 soverride : drivers/soverride.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
-divergence : drivers/divergence.c div.o libsfem.a
+divergence : drivers/divergence.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 lapl : drivers/lapl.c libsfem.a
@@ -202,7 +206,7 @@ lumped_mass_inv : drivers/lumped_mass_inv.c mass.o libsfem.a
 lumped_boundary_mass_inv : drivers/lumped_boundary_mass_inv.c mass.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
-projection_p0_to_p1 : drivers/projection_p0_to_p1.c div.o libsfem.a
+projection_p0_to_p1 : drivers/projection_p0_to_p1.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 smask : drivers/smask.c libsfem.a

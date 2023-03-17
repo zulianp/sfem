@@ -444,3 +444,13 @@ void laplacian_assemble_value(const ptrdiff_t nelements,
     double tock = MPI_Wtime();
     printf("laplacian.c: laplacian_assemble_value\t%g seconds\n", tock - tick);
 }
+
+void laplacian_apply(const ptrdiff_t nelements,
+                     const ptrdiff_t nnodes,
+                     idx_t **const elems,
+                     geom_t **const xyz,
+                     const real_t *const u,
+                     real_t *const values)
+{
+    laplacian_assemble_gradient(nelements, nnodes, elems, xyz, u, values);
+}
