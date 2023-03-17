@@ -24,15 +24,7 @@ output_folder = sys.argv[2]
 mkdir(output_folder)
 
 nc = netCDF4.Dataset(input_mesh)
-connect = nc.variables['connect1']
-elem_type = connect.elem_type
-print(f'elem_type = {elem_type}')
 
-nelements, nnodesxelem = connect.shape
-
-for i in range(0, nnodesxelem):
-	ii = np.array(connect[:,i]).astype(idx_type) - 1
-	ii.tofile(f'{output_folder}/i{i}.raw')
 
 if 'coord' in nc.variables:
 	coords = nc.variables['coord']
@@ -140,7 +132,60 @@ ss_to_nodelist['TETRA'] = s2n_tet4()
 ss_to_nodelist['tetra'] = s2n_tet4()
 ss_to_nodelist['TRI3'] = s2n_tri3()
 
-# 
+#########################################
+# Elements
+#########################################
+
+
+num_elem = nc.dimensions['num_elem'].size
+print(f'num_elem = {num_elem}')
+
+num_el_blk = nc.dimensions['num_el_blk'].size
+print(f'num_el_blk = {num_el_blk}')
+
+if num_el_blk == 1:
+	connect = nc.variables['connect1']
+	elem_type = connect.elem_type
+	print(f'elem_type = {elem_type}')
+
+	nelements, nnodesxelem = connect.shape
+
+	for i in range(0, nnodesxelem):
+		ii = np.array(connect[:,i]).astype(idx_type) - 1
+		ii.tofile(f'{output_folder}/i{i}.raw')
+
+else:
+	num_nod_per_el_ref = 0
+	for b in range(0, num_el_blk):
+		var_name = f'num_nod_per_el{b+1}'
+		num_nod_per_el = nc.dimensions[var_name].size
+		print(f'{var_name} = {num_nod_per_el}')
+
+		if num_nod_per_el_ref == 0:
+			num_nod_per_el_ref = num_nod_per_el
+		else:
+			assert num_nod_per_el_ref == num_nod_per_el
+
+	connect = np.zeros((num_elem, num_nod_per_el_ref), dtype=idx_type)
+
+	offset = 0
+	for b in range(0, num_el_blk):
+		connect_b = nc.variables[f'connect{b+1}']
+		elem_type = connect_b.elem_type
+		print(f'elem_type = {elem_type}')
+
+		nelements, nnodesxelem = connect_b.shape
+
+		connect[offset:(offset + nelements),:] = connect_b[:].astype(idx_type)
+		offset += nelements
+
+	for i in range(0, nnodesxelem):
+		ii = np.array(connect[:,i]).astype(idx_type) - 1
+		ii.tofile(f'{output_folder}/i{i}.raw')
+
+#########################################
+# Sidesets
+#########################################
 
 num_sidesets = nc.dimensions['num_side_sets'].size
 print(f'num_sidesets={num_sidesets}')
