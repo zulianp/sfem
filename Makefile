@@ -51,7 +51,7 @@ GOALS = assemble assemble3 assemble4
 GOALS += partition select_submesh refine skin select_surf
 
 # FE post-process
-GOALS += cgrad cshear projection_p0_to_p1 wss lumped_mass_inv cauchy_stress surface_outflux
+GOALS += cgrad cshear projection_p0_to_p1 wss cauchy_stress surface_outflux
 
 # BLAS
 GOALS += axpy
@@ -63,7 +63,7 @@ GOALS += condense_matrix condense_vector idx_to_indicator remap_vector sgather s
 GOALS += pizzastack_to_mesh
 
 # Application of operators
-GOALS += divergence lapl
+GOALS += divergence lapl lumped_mass_inv lumped_boundary_mass_inv
 
 # Array utilities
 GOALS += soa_to_aos
@@ -197,6 +197,9 @@ lapl : drivers/lapl.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 lumped_mass_inv : drivers/lumped_mass_inv.c mass.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+lumped_boundary_mass_inv : drivers/lumped_boundary_mass_inv.c mass.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 projection_p0_to_p1 : drivers/projection_p0_to_p1.c div.o libsfem.a
