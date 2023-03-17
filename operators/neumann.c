@@ -10,7 +10,7 @@ static SFEM_INLINE real_t det3(const real_t *mat) {
            mat[1] * mat[3] * mat[8] - mat[2] * mat[4] * mat[6];
 }
 
-SFEM_INLINE real_t area3(const real_t left[3], const real_t right[3]) {
+static SFEM_INLINE real_t area3(const real_t left[3], const real_t right[3]) {
     real_t a = (left[1] * right[2]) - (right[1] * left[2]);
     real_t b = (left[2] * right[0]) - (right[2] * left[0]);
     real_t c = (left[0] * right[1]) - (right[0] * left[1]);

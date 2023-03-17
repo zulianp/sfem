@@ -15,6 +15,13 @@
 
 #include "operators/grad_p1.h"
 
+static SFEM_INLINE real_t area3(const real_t left[3], const real_t right[3]) {
+    real_t a = (left[1] * right[2]) - (right[1] * left[2]);
+    real_t b = (left[2] * right[0]) - (right[2] * left[0]);
+    real_t c = (left[0] * right[1]) - (right[0] * left[1]);
+    return sqrt(a * a + b * b + c * c);
+}
+
 static SFEM_INLINE void outflux_kernel(const real_t px0,
                                        const real_t px1,
                                        const real_t px2,
@@ -117,10 +124,10 @@ void surface_outflux(const ptrdiff_t nelements,
     real_t element_vector_y[3];
     real_t element_vector_z[3];
 
-    idx_t ev[4];
+    idx_t ev[3];
 
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-#pragma unroll(4)
+#pragma unroll(3)
         for (int v = 0; v < 3; ++v) {
             ev[v] = elems[v][i];
         }
@@ -136,7 +143,6 @@ void surface_outflux(const ptrdiff_t nelements,
         const idx_t i0 = ev[0];
         const idx_t i1 = ev[1];
         const idx_t i2 = ev[2];
-        const idx_t i3 = ev[3];
 
         real_t element_value = 0;
         outflux_kernel(
@@ -168,6 +174,43 @@ void surface_outflux(const ptrdiff_t nelements,
 
     double tock = MPI_Wtime();
     printf("surface_outflux.c: surface_outflux\t%g seconds\n", tock - tick);
+}
+
+void integrate_cell_value(const ptrdiff_t nelements,
+                          const ptrdiff_t nnodes,
+                          idx_t **const SFEM_RESTRICT elems,
+                          geom_t **const SFEM_RESTRICT xyz,
+                          const real_t *const SFEM_RESTRICT cell_values,
+                          real_t *SFEM_RESTRICT value) {
+    SFEM_UNUSED(nnodes);
+
+    double tick = MPI_Wtime();
+
+    real_t element_vector_x[3];
+    real_t element_vector_y[3];
+    real_t element_vector_z[3];
+
+    *value = 0;
+
+    idx_t ev[3];
+
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma unroll(3)
+        for (int v = 0; v < 3; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        // Element indices
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+
+        const real_t u[3] = {xyz[0][i1] - xyz[0][i0], xyz[1][i1] - xyz[1][i0], xyz[2][i1] - xyz[2][i0]};
+        const real_t v[3] = {xyz[0][i2] - xyz[0][i0], xyz[1][i2] - xyz[1][i0], xyz[2][i2] - xyz[2][i0]};
+
+        const real_t area = area3(u, v);
+        *value += cell_values[i] * area;
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -249,9 +292,8 @@ int main(int argc, char *argv[]) {
                     outflux);
 
     real_t value = 0;
-    for (ptrdiff_t i = 0; i < mesh.nelements; i++) {
-        value += outflux[i];
-    }
+
+    integrate_cell_value(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, outflux, &value);
 
     printf("surface_outflux = %g\n", (double)value);
 
@@ -263,7 +305,7 @@ int main(int argc, char *argv[]) {
         array_write(comm, "normaly.raw", SFEM_MPI_GEOM_T, normals_xyz[1], mesh.nelements, mesh.nelements);
         array_write(comm, "normalz.raw", SFEM_MPI_GEOM_T, normals_xyz[2], mesh.nelements, mesh.nelements);
     }
-    
+
     array_write(comm, path_output, SFEM_MPI_REAL_T, outflux, mesh.nelements, mesh.nelements);
 
     free(outflux);

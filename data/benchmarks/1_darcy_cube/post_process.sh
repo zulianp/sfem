@@ -27,7 +27,7 @@ p1lapl()
 	out=$2
 
 	lapl $mesh_path $potential $out
-	lumped_mass_inv $mesh_path $out $out
+	# lumped_mass_inv $mesh_path $out $out
 }
 
 p1grads()

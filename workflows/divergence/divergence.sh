@@ -49,7 +49,6 @@ parent_elements=$surf_mesh_path/parent.raw
 
 #####################################
 
-
 volume_divergence()
 {
 	if (($# != 4))
@@ -68,7 +67,7 @@ volume_divergence()
 	divergence $mesh_path $ux $uy $uz $divu
 	div_measure=`python3 -c "import numpy as np; print(np.sum((np.fromfile(\"$divu\")), dtype=np.float64))"`
 	
-	lumped_mass_inv $mesh_path $divu $divu
+	# lumped_mass_inv $mesh_path $divu $divu
 	raw_to_db.py $mesh_path $output/"$name".vtk --point_data="$divu"
 
 	echo "---------------------------"

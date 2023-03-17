@@ -15,10 +15,6 @@ u = [ux, uy, uz]
 
 f = fun(qx, qy, qz)
 
-
-
-
-
 placeholer_grad_phi = sp.symbols("grad_phi")
 
 expr = []
@@ -31,11 +27,13 @@ for i in range(0, 4):
 
 	lform = 0
 	for j in range(0, 4):
-		form = placeholer_grad_phi * rf[j] * dV
-		integr = sp.integrate(form, (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1))
+		form = placeholer_grad_phi * rf[j] 
+		integr = sp.integrate(form, (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1)) 
 		
 		for d in range(0, 3):
 			lform += integr.subs(placeholer_grad_phi, -g[d] * u[d][j])
+
+	lform *= dV
 	
 	var = sp.symbols(f'element_vector[{i}]')
 	expr.append(ast.Assignment(var, sp.simplify(lform)))

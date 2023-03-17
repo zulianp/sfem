@@ -6,8 +6,9 @@ rf = ref_fun(qx, qy, qz)
 dV = det3(A)
 
 expr = []
-sumterms=0
+
 for i in range(0, 4):
+	
 	acc = 0
 	for j in range(0, 4):
 		form = rf[i] * rf[j] * dV
@@ -16,6 +17,5 @@ for i in range(0, 4):
 
 	form = sp.symbols(f'element_vector[{i}]')
 	expr.append(ast.Assignment(form, sp.simplify(acc)))
-	sumterms+=acc
 
 c_code(expr)
