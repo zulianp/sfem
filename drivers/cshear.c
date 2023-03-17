@@ -202,10 +202,7 @@ int main(int argc, char *argv[]) {
     for (int d = 0; d < 3; ++d) {
         array_create_from_file(comm, path_u[d], SFEM_MPI_REAL_T, (void **)&u[d], &u_n_local, &u_n_global);
     }
-
-    real_t *wss_mag = (real_t *)malloc(u_n_local * sizeof(real_t));
-    memset(wss_mag, 0, u_n_local * sizeof(real_t));
-
+    
     real_t *shear_6[6];
     for (int d = 0; d < 6; ++d) {
         shear_6[d] = (real_t *)malloc(mesh.nelements * sizeof(real_t));

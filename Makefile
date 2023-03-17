@@ -51,7 +51,7 @@ GOALS = assemble assemble3 assemble4
 GOALS += partition select_submesh refine skin select_surf
 
 # FE post-process
-GOALS += cgrad cshear projection_p0_to_p1 wss cauchy_stress surface_outflux integrate_divergence vonmises
+GOALS += cgrad cshear cstrain projection_p0_to_p1 wss cauchy_stress surface_outflux integrate_divergence vonmises
 
 # BLAS
 GOALS += axpy
@@ -90,6 +90,7 @@ OBJS = \
 	boundary_mass.o \
 	dirichlet.o \
 	div.o \
+	strain.o \
 	neumann.o \
 	sfem_mesh.o \
 	sfem_mesh_write.o \
@@ -219,6 +220,9 @@ cgrad : drivers/cgrad.c grad_p1.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 cshear : drivers/cshear.c grad_p1.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+cstrain : drivers/cstrain.c grad_p1.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 wss : drivers/wss.c grad_p1.o libsfem.a
