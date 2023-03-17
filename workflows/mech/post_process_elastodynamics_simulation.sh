@@ -45,7 +45,8 @@ dispy=(`ls $data_folder/point_data/disp_y*.raw`)
 dispz=(`ls $data_folder/point_data/disp_z*.raw`)
 
 ndisps=${#dispx[@]}
-max_steps=$ndisps
+# max_steps=$ndisps
+max_steps=20
 
 echo $ndisps
 
@@ -80,19 +81,24 @@ do
 	do
 		p0_file=$stress_prefix".$d"$stress_postfix".raw"
 		p1_file=$p1"/stress.$d"$stress_postfix".raw"
-
-		echo "projection_p0_to_p1 $mesh_folder $p0_file $p1_file"
 		projection_p0_to_p1 $mesh_folder $p0_file $p1_file
 	done
+
+	p0_out_vonmises=$p0"/vonmises"$stress_postfix".raw"
+	p1_out_vonmises=$p1"/vonmises"$stress_postfix".raw"
+
+	vonmises $material $mu $lambda $mesh_folder $ux $uy $uz $p0_out_vonmises
+	projection_p0_to_p1 $mesh_folder $p0_out_vonmises $p1_out_vonmises	
 done
 
 disp_selector="$data_folder/point_data/disp_x*.raw,$data_folder/point_data/disp_y*.raw,$data_folder/point_data/disp_z*.raw"
 stress_selector_0="$p1/stress.0.*.raw,$p1/stress.1.*.raw,$p1/stress.2.*.raw"
 stress_selector_1="$p1/stress.3.*.raw,$p1/stress.4.*.raw,$p1/stress.5.*.raw"
+stress_selector_2="$p1/vonmises.*.raw"
 
 raw_to_db.py $mesh_folder stress.xmf  \
  --transient --n_time_steps=$nsteps \
- --point_data="$disp_selector,$stress_selector_0,$stress_selector_1"
+ --point_data="$disp_selector,$stress_selector_0,$stress_selector_1,$stress_selector_2"
 
 if [[ -z "$garbage" ]]
 then

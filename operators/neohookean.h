@@ -33,4 +33,14 @@ void neohookean_cauchy_stress_soa(const ptrdiff_t nelements,
                                   real_t **const SFEM_RESTRICT u,
                                   real_t *const SFEM_RESTRICT out[6]);
 
+
+void neohookean_vonmises_soa(const ptrdiff_t nelements,
+                             const ptrdiff_t nnodes,
+                             idx_t *const SFEM_RESTRICT elems[4],
+                             geom_t *const SFEM_RESTRICT xyz[3],
+                             const real_t mu,
+                             const real_t lambda,
+                             real_t **const SFEM_RESTRICT u,
+                             real_t *const SFEM_RESTRICT out);
+
 #endif  // LAPLACIAN_H

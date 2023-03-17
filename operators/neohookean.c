@@ -1247,6 +1247,119 @@ static SFEM_INLINE void cauchy_stress_6(const real_t mu,
     stress[5] = x63 * (x50 * x76 + x54 * x78 + x58 * x80);
 }
 
+static SFEM_INLINE void vonmises(const real_t mu,
+                                 const real_t lambda,
+                                 const real_t px0,
+                                 const real_t px1,
+                                 const real_t px2,
+                                 const real_t px3,
+                                 const real_t py0,
+                                 const real_t py1,
+                                 const real_t py2,
+                                 const real_t py3,
+                                 const real_t pz0,
+                                 const real_t pz1,
+                                 const real_t pz2,
+                                 const real_t pz3,
+                                 const real_t *const SFEM_RESTRICT u,
+                                 real_t *const SFEM_RESTRICT element_scalar) {
+    // FLOATING POINT OPS!
+    //       - Result: 7*ADD + ASSIGNMENT + 18*MUL + 7*POW
+    //       - Subexpressions: 53*ADD + 3*DIV + LOG + 139*MUL + 5*NEG + POW + 47*SUB
+    const real_t x0 = py0 - py1;
+    const real_t x1 = pz0 - pz2;
+    const real_t x2 = py0 - py2;
+    const real_t x3 = pz0 - pz1;
+    const real_t x4 = x0 * x1 - x2 * x3;
+    const real_t x5 = -x4;
+    const real_t x6 = pz0 - pz3;
+    const real_t x7 = px0 - px1;
+    const real_t x8 = x2 * x7;
+    const real_t x9 = px0 - px2;
+    const real_t x10 = py0 - py3;
+    const real_t x11 = x10 * x9;
+    const real_t x12 = px0 - px3;
+    const real_t x13 = x0 * x12;
+    const real_t x14 = x10 * x7;
+    const real_t x15 = x0 * x9;
+    const real_t x16 = x12 * x2;
+    const real_t x17 = 1.0 / (x1 * x13 - x1 * x14 + x11 * x3 - x15 * x6 - x16 * x3 + x6 * x8);
+    const real_t x18 = u[10] * x17;
+    const real_t x19 = -x1 * x10 + x2 * x6;
+    const real_t x20 = -x19;
+    const real_t x21 = u[4] * x17;
+    const real_t x22 = x0 * x6;
+    const real_t x23 = x10 * x3;
+    const real_t x24 = x22 - x23;
+    const real_t x25 = u[7] * x17;
+    const real_t x26 = x19 - x22 + x23 + x4;
+    const real_t x27 = u[1] * x17;
+    const real_t x28 = x18 * x5 + x20 * x21 + x24 * x25 + x26 * x27;
+    const real_t x29 = u[11] * x17;
+    const real_t x30 = u[5] * x17;
+    const real_t x31 = u[8] * x17;
+    const real_t x32 = u[2] * x17;
+    const real_t x33 = x20 * x30 + x24 * x31 + x26 * x32 + x29 * x5;
+    const real_t x34 = x11 - x16;
+    const real_t x35 = -x34;
+    const real_t x36 = u[3] * x17;
+    const real_t x37 = -x13 + x14;
+    const real_t x38 = u[6] * x17;
+    const real_t x39 = -x15 + x8;
+    const real_t x40 = -x39;
+    const real_t x41 = u[9] * x17;
+    const real_t x42 = x13 - x14 + x34 + x39;
+    const real_t x43 = u[0] * x17;
+    const real_t x44 = x35 * x36 + x37 * x38 + x40 * x41 + x42 * x43;
+    const real_t x45 = x1 * x7 - x3 * x9;
+    const real_t x46 = -x1 * x12 + x6 * x9;
+    const real_t x47 = x6 * x7;
+    const real_t x48 = x12 * x3;
+    const real_t x49 = -x47 + x48;
+    const real_t x50 = -x45 - x46 + x47 - x48;
+    const real_t x51 = x18 * x45 + x21 * x46 + x25 * x49 + x27 * x50 + 1;
+    const real_t x52 = x36 * x46 + x38 * x49 + x41 * x45 + x43 * x50;
+    const real_t x53 = x18 * x40 + x21 * x35 + x25 * x37 + x27 * x42;
+    const real_t x54 = -x44 * x51 + x52 * x53;
+    const real_t x55 = x29 * x45 + x30 * x46 + x31 * x49 + x32 * x50;
+    const real_t x56 = x28 * x55;
+    const real_t x57 = x33 * x53;
+    const real_t x58 = x33 * x51;
+    const real_t x59 = x29 * x40 + x30 * x35 + x31 * x37 + x32 * x42 + 1;
+    const real_t x60 = x28 * x59;
+    const real_t x61 = x20 * x36 + x24 * x38 + x26 * x43 + x41 * x5 + 1;
+    const real_t x62 = x53 * x55;
+    const real_t x63 = x44 * x56 - x44 * x58 + x51 * x59 * x61 + x52 * x57 - x52 * x60 - x61 * x62;
+    const real_t x64 = 1.0 / x63;
+    const real_t x65 = mu * x64;
+    const real_t x66 = lambda * x64 * log(x63);
+    const real_t x67 = mu * x33 - x54 * x65 + x54 * x66;
+    const real_t x68 = x28 * x44 - x53 * x61;
+    const real_t x69 = mu * x55 - x65 * x68 + x66 * x68;
+    const real_t x70 = -x28 * x52 + x51 * x61;
+    const real_t x71 = mu * x59 - x65 * x70 + x66 * x70;
+    const real_t x72 = 3 / pow(x63, 2);
+    const real_t x73 = x33 * x52 - x55 * x61;
+    const real_t x74 = mu * x53 - x65 * x73 + x66 * x73;
+    const real_t x75 = x44 * x55 - x52 * x59;
+    const real_t x76 = mu * x28 - x65 * x75 + x66 * x75;
+    const real_t x77 = -x33 * x44 + x59 * x61;
+    const real_t x78 = mu * x51 - x65 * x77 + x66 * x77;
+    const real_t x79 = x57 - x60;
+    const real_t x80 = mu * x52 - x65 * x79 + x66 * x79;
+    const real_t x81 = x56 - x58;
+    const real_t x82 = mu * x44 - x65 * x81 + x66 * x81;
+    const real_t x83 = x51 * x59 - x62;
+    const real_t x84 = mu * x61 - x65 * x83 + x66 * x83;
+    const real_t x85 = x64 * (x33 * x67 + x55 * x69 + x59 * x71);
+    const real_t x86 = x64 * (x28 * x76 + x51 * x78 + x53 * x74);
+    const real_t x87 = -x64 * (x44 * x82 + x52 * x80 + x61 * x84);
+    element_scalar[0] =
+        sqrt(x72 * pow(x28 * x67 + x51 * x69 + x53 * x71, 2) + x72 * pow(x33 * x84 + x55 * x80 + x59 * x82, 2) +
+             x72 * pow(x44 * x74 + x52 * x78 + x61 * x76, 2) + (1.0 / 2.0) * pow(-x85 + x86, 2) +
+             (1.0 / 2.0) * pow(x85 + x87, 2) + (1.0 / 2.0) * pow(-x86 - x87, 2));
+}
+
 void neohookean_cauchy_stress_aos(const ptrdiff_t nelements,
                                   const ptrdiff_t nnodes,
                                   idx_t *const SFEM_RESTRICT elems[4],
@@ -1286,26 +1399,26 @@ void neohookean_cauchy_stress_aos(const ptrdiff_t nelements,
         const idx_t i3 = ev[3];
 
         cauchy_stress_6(mu,
-                      lambda,
-                      // X-coordinates
-                      xyz[0][i0],
-                      xyz[0][i1],
-                      xyz[0][i2],
-                      xyz[0][i3],
-                      // Y-coordinates
-                      xyz[1][i0],
-                      xyz[1][i1],
-                      xyz[1][i2],
-                      xyz[1][i3],
-                      // Z-coordinates
-                      xyz[2][i0],
-                      xyz[2][i1],
-                      xyz[2][i2],
-                      xyz[2][i3],
-                      // Data
-                      element_displacement,
-                      // Output
-                      element_stress);
+                        lambda,
+                        // X-coordinates
+                        xyz[0][i0],
+                        xyz[0][i1],
+                        xyz[0][i2],
+                        xyz[0][i3],
+                        // Y-coordinates
+                        xyz[1][i0],
+                        xyz[1][i1],
+                        xyz[1][i2],
+                        xyz[1][i3],
+                        // Z-coordinates
+                        xyz[2][i0],
+                        xyz[2][i1],
+                        xyz[2][i2],
+                        xyz[2][i3],
+                        // Data
+                        element_displacement,
+                        // Output
+                        element_stress);
 
         for (int d = 0; d < 6; d++) {
             out[d][i] = element_stress[d];
@@ -1352,29 +1465,93 @@ void neohookean_cauchy_stress_soa(const ptrdiff_t nelements,
         const idx_t i3 = ev[3];
 
         cauchy_stress_6(mu,
-                      lambda,
-                      // X-coordinates
-                      xyz[0][i0],
-                      xyz[0][i1],
-                      xyz[0][i2],
-                      xyz[0][i3],
-                      // Y-coordinates
-                      xyz[1][i0],
-                      xyz[1][i1],
-                      xyz[1][i2],
-                      xyz[1][i3],
-                      // Z-coordinates
-                      xyz[2][i0],
-                      xyz[2][i1],
-                      xyz[2][i2],
-                      xyz[2][i3],
-                      // Data
-                      element_displacement,
-                      // Output
-                      element_stress);
+                        lambda,
+                        // X-coordinates
+                        xyz[0][i0],
+                        xyz[0][i1],
+                        xyz[0][i2],
+                        xyz[0][i3],
+                        // Y-coordinates
+                        xyz[1][i0],
+                        xyz[1][i1],
+                        xyz[1][i2],
+                        xyz[1][i3],
+                        // Z-coordinates
+                        xyz[2][i0],
+                        xyz[2][i1],
+                        xyz[2][i2],
+                        xyz[2][i3],
+                        // Data
+                        element_displacement,
+                        // Output
+                        element_stress);
 
         for (int d = 0; d < 6; d++) {
             out[d][i] = element_stress[d];
         }
+    }
+}
+
+void neohookean_vonmises_soa(const ptrdiff_t nelements,
+                             const ptrdiff_t nnodes,
+                             idx_t *const SFEM_RESTRICT elems[4],
+                             geom_t *const SFEM_RESTRICT xyz[3],
+                             const real_t mu,
+                             const real_t lambda,
+                             real_t **const SFEM_RESTRICT u,
+                             real_t *const SFEM_RESTRICT out) {
+    SFEM_UNUSED(nnodes);
+
+    static const int block_size = 3;
+    static const int mat_block_size = block_size * block_size;
+
+    idx_t ev[4];
+    real_t element_displacement[4 * 3];
+
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma unroll(4)
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        for (int enode = 0; enode < 4; ++enode) {
+            idx_t edof = enode * block_size;
+            idx_t dof = ev[enode];
+
+            element_displacement[edof + 0] = u[0][dof];
+            element_displacement[edof + 1] = u[1][dof];
+            element_displacement[edof + 2] = u[2][dof];
+        }
+
+        // Element indices
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+        const idx_t i3 = ev[3];
+
+        real_t element_stress = 0;
+        vonmises(mu,
+                 lambda,
+                 // X-coordinates
+                 xyz[0][i0],
+                 xyz[0][i1],
+                 xyz[0][i2],
+                 xyz[0][i3],
+                 // Y-coordinates
+                 xyz[1][i0],
+                 xyz[1][i1],
+                 xyz[1][i2],
+                 xyz[1][i3],
+                 // Z-coordinates
+                 xyz[2][i0],
+                 xyz[2][i1],
+                 xyz[2][i2],
+                 xyz[2][i3],
+                 // Data
+                 element_displacement,
+                 // Output
+                 &element_stress);
+
+        out[i] = element_stress;
     }
 }

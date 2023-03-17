@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from sfem_codegen import *
+from vonmises import *
 
 simplify_expr = False
 
@@ -95,14 +96,13 @@ for i in range(0, n_test_functions()):
 	grade[i] = integr
 
 
+# Cauchy stress
+P = dedF 
+NominalStress = P.T
+CauchyStress = (F * NominalStress) / J
+CauchyStress = subsmat3x3(CauchyStress, F, evalF)
+
 def make_cauchy_stress():
-
-	P = dedF 
-	NominalStress = P.T
-	CauchyStress = (F * NominalStress) / J
-
-	CauchyStress = subsmat3x3(CauchyStress, F, evalF)
-
 	expr = []
 
 	for i in range(0, 3):
@@ -116,13 +116,6 @@ c_log("// Cauchy stress")
 c_code(make_cauchy_stress())
 
 def make_cauchy_stress_symmetric():
-
-	P = dedF 
-	NominalStress = P.T
-	CauchyStress = (F * NominalStress) / J
-
-	CauchyStress = subsmat3x3(CauchyStress, F, evalF)
-
 	expr = []
 
 	idx = 0
@@ -137,6 +130,15 @@ def make_cauchy_stress_symmetric():
 c_log("// Cauchy stress symmetric")
 c_code(make_cauchy_stress_symmetric())
 
+def make_vonmises():
+	expr = []
+	vm = vonmises(CauchyStress)
+	vm_var = sp.symbols(f'element_scalar[0]')
+	expr.append(ast.Assignment(vm_var, vm))
+	return expr
+
+c_log("// Von Mises")
+c_code(make_vonmises())
 
 def makegrad(i, q):
 	integr =  grade[i]
