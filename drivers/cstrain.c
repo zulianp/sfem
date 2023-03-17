@@ -34,6 +34,9 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    const char * SFEM_OUTPUT_POSTFIX = "";
+    SFEM_READ_ENV(SFEM_OUTPUT_POSTFIX, );
+
     const char *folder = argv[1];
     const char *path_u[3] = {argv[2], argv[3], argv[4]};
     const char *output_prefix = argv[5];
@@ -80,7 +83,7 @@ int main(int argc, char *argv[]) {
 
     char path[2048];
     for (int d = 0; d < 6; ++d) {
-        sprintf(path, "%s.%d.raw", output_prefix, d);
+        sprintf(path, "%s.%d%s.raw", output_prefix, d, SFEM_OUTPUT_POSTFIX);
         array_write(comm, path, SFEM_MPI_REAL_T, strain_6[d], mesh.nelements, mesh.nelements);
         free(strain_6[d]);
     }
