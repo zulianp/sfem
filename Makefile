@@ -87,6 +87,7 @@ OBJS = \
 	argsort.o \
 	read_mesh.o  \
 	mass.o \
+	boundary_mass.o \
 	dirichlet.o \
 	neumann.o \
 	sfem_mesh.o \

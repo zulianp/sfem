@@ -44,6 +44,25 @@ solve()
 	mpiexec -np 8 $UTOPIA_EXEC -app ls_solve -A $mat -b $rhs -out $x -use_amg false --use_ksp -pc_type hypre -ksp_type cg -atol 1e-18 -rtol 0 -stol 1e-19 --verbose
 }
 
+surface_divergence_check()
+{
+	if (($# != 4))
+	then
+		printf "usage: $0 <name> <velx.raw> <vely.raw> <velz.raw>\n" 1>&2
+		exit -1
+	fi
+
+	name_=$1
+	lux_=$2
+	luy_=$3
+	luz_=$4
+
+	outflux_=$workspace/outflux.raw
+	surface_outflux $surf_mesh_path $lux_ $luy_ $luz_ $outflux_
+	raw_to_db.py $surf_mesh_path $output/"$name_".vtk --cell_data="$outflux_"
+}
+
+
 divergence_check()
 {
 	if (($# != 4))
@@ -52,24 +71,36 @@ divergence_check()
 		exit -1
 	fi
 
-	stage=$1
-	ux=$2
-	uy=$3
-	uz=$4
-	divu=$workspace/div_vel.raw
-	divergence $mesh_path $ux $uy $uz $divu
+	stage_=$1
+	lux_=$2
+	luy_=$3
+	luz_=$4
+	ldivu_=$workspace/div_vel.raw
+	divergence $mesh_path $lux_ $luy_ $luz_ $ldivu_
 	# div_measure=`python3 -c "import numpy as np; print(np.sum(np.abs(np.fromfile(\"$divu\")), dtype=np.float64))"`
-	div_measure=`python3 -c "import numpy as np; print(np.sum((np.fromfile(\"$divu\")), dtype=np.float64))"`
+	div_measure=`python3 -c "import numpy as np; print(np.sum((np.fromfile(\"$ldivu_\")), dtype=np.float64))"`
 	
-	lumped_mass_inv $mesh_path $divu $divu
-	raw_to_db.py $mesh_path $output/"$stage"_divergence.vtk --point_data="$divu"
+	lumped_mass_inv $mesh_path $ldivu_ $ldivu_
+	raw_to_db.py $mesh_path $output/"$stage_"_divergence.vtk --point_data="$ldivu_"
 
 	echo "---------------------------"
-	echo "[$stage]: sum(div(u)) = $div_measure"
+	echo "[$stage_]: sum(div(u)) = $div_measure"
 	echo "---------------------------"
 
-	echo "$stage,$div_measure" >> $div_stages_csv
-	rm $divu
+	echo "$stage_,$div_measure" >> $div_stages_csv
+	rm $ldivu_
+
+	# 
+
+	svx=$workspace/temp_svx.raw
+	svy=$workspace/temp_svy.raw
+	svz=$workspace/temp_svz.raw
+
+	sgather $surface_nodes $real_type_size $lux $svx
+	sgather $surface_nodes $real_type_size $luy $svy
+	sgather $surface_nodes $real_type_size $luz $svz
+
+	surface_divergence_check $stage_ $svx $svy $svz
 }
 
 p1grads()
@@ -80,30 +111,30 @@ p1grads()
 		exit -1
 	fi
 
-	potential=$1
-	p1_dpdx=$2
-	p1_dpdy=$3
-	p1_dpdz=$4
+	potential_=$1
+	p1_dpdx_=$2
+	p1_dpdy_=$3
+	p1_dpdz_=$4
 
 	# Per Cell quantities
-	p0_dpdx=$workspace/temp_p0_dpdx.raw
-	p0_dpdy=$workspace/temp_p0_dpdy.raw
-	p0_dpdz=$workspace/temp_p0_dpdz.raw
+	p0_dpdx_=$workspace/temp_p0_dpdx.raw
+	p0_dpdy_=$workspace/temp_p0_dpdy.raw
+	p0_dpdz_=$workspace/temp_p0_dpdz.raw
 
 	# coefficients: P1 -> P0
-	cgrad $mesh_path $potential $p0_dpdx $p0_dpdy $p0_dpdz
+	cgrad $mesh_path $potential_ $p0_dpdx_ $p0_dpdy_ $p0_dpdz_
 
 	################################################
 	# P0 to P1 projection
 	################################################
 
 	# coefficients: P0 -> P1
-	projection_p0_to_p1 $mesh_path $p0_dpdx $p1_dpdx
-	projection_p0_to_p1 $mesh_path $p0_dpdy $p1_dpdy
-	projection_p0_to_p1 $mesh_path $p0_dpdz $p1_dpdz
+	projection_p0_to_p1 $mesh_path $p0_dpdx_ $p1_dpdx_
+	projection_p0_to_p1 $mesh_path $p0_dpdy_ $p1_dpdy_
+	projection_p0_to_p1 $mesh_path $p0_dpdz_ $p1_dpdz_
 }
 
-set -x
+# set -x
 
 ################################################
 # Grid
@@ -230,9 +261,9 @@ p1grads $potential $p1_dpdx $p1_dpdy $p1_dpdz
 raw_to_db.py $mesh_path $output/gradient_corrector.vtk --point_data="$workspace/vel_*.raw"
 
 # Add correction to velocity
-axpy -1 $mux $p1_dpdx 
-axpy -1 $muy $p1_dpdy 
-axpy -1 $muz $p1_dpdz 
+axpy 1 $mux $p1_dpdx 
+axpy 1 $muy $p1_dpdy 
+axpy 1 $muz $p1_dpdz 
 
 divergence_check "after_correction" $p1_dpdx $p1_dpdy $p1_dpdz
 

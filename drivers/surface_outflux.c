@@ -176,7 +176,7 @@ void surface_outflux(const ptrdiff_t nelements,
     printf("surface_outflux.c: surface_outflux\t%g seconds\n", tock - tick);
 }
 
-void integrate_cell_value(const ptrdiff_t nelements,
+void integrate_surf_cell_value(const ptrdiff_t nelements,
                           const ptrdiff_t nnodes,
                           idx_t **const SFEM_RESTRICT elems,
                           geom_t **const SFEM_RESTRICT xyz,
@@ -267,11 +267,7 @@ int main(int argc, char *argv[]) {
                                &vector_field_size_global);
     }
 
-    // integral over surface
-    // TODO
-
     geom_t *normals_xyz[3];
-
     for (int d = 0; d < 3; ++d) {
         normals_xyz[d] = (geom_t *)malloc(mesh.nelements * sizeof(geom_t));
     }
@@ -292,8 +288,11 @@ int main(int argc, char *argv[]) {
                     outflux);
 
     real_t value = 0;
+    for (ptrdiff_t i = 0; i < mesh.nelements; i++) {
+        value += outflux[i];
+    }
 
-    integrate_cell_value(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, outflux, &value);
+    // integrate_surf_cell_value(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, outflux, &value);
 
     printf("surface_outflux = %g\n", (double)value);
 
