@@ -73,7 +73,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    int SFEM_VERBOSE = 1;
+    int SFEM_VERBOSE = 0;
     SFEM_READ_ENV(SFEM_VERBOSE, atoi);
 
     if (SFEM_VERBOSE) {

@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
     int SFEM_VERBOSE = 1;
     SFEM_READ_ENV(SFEM_VERBOSE, atoi);
 
-    if (SFEM_VERBOSE) {
+    // if (SFEM_VERBOSE) {
         real_t integral = 0.;
         for (ptrdiff_t i = 0; i < mesh.nelements; ++i) {
             integral += div_u[i];
@@ -88,7 +88,7 @@ int main(int argc, char *argv[]) {
         if (!rank) {
             printf("integral div(u) = %g\n", (double)integral);
         }
-    }
+    // }
 
     // array_write(comm, path_output, SFEM_MPI_REAL_T, div_u, u_n_local, u_n_global);
 

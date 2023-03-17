@@ -24,7 +24,8 @@ then
 fi
 
 # Expensive routine
-resample=1
+# resample=1
+resample=0
 
 mkdir -p workspace
 workspace="workspace"
@@ -245,7 +246,8 @@ divergence $mesh_path $mux $muy $muz $divu
 
 # Fix degree of freedom for uniqueness of solution
 rhs=$workspace/rhs.raw
-smask $workspace/dirichlet.raw $divu $rhs $fix_value
+# smask $workspace/dirichlet.raw $divu $rhs $fix_value
+smask $surface_nodes $divu $rhs $fix_value
 
 potential=$workspace/potential.raw
 solve $workspace/rowptr.raw $rhs $potential
