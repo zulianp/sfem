@@ -10,9 +10,9 @@
 
 #include "crs_graph.h"
 #include "sfem_base.h"
+#include "boundary_mass.h"
 
 #include "read_mesh.h"
-#include "operators/grad_p1.h"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -28,16 +28,16 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (argc < 6) {
-        fprintf(stderr, "usage: %s <folder> <f.raw> <dfdx.raw> <dfdy.raw> <dfdz.raw>\n", argv[0]);
+    if (argc != 4) {
+        fprintf(stderr, "usage: %s <folder> <in.raw> <out.raw>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
     const char *folder = argv[1];
-    const char *path_f = argv[2];
-    const char *path_outputs[3] = {argv[3], argv[4], argv[5]};
+    const char *path_input = argv[2];
+    const char *path_output = argv[3];
 
-    printf("%s %s %s %s %s %s\n", argv[0], folder, path_f, path_outputs[0], path_outputs[1], path_outputs[2]);
+    printf("%s %s %s %s\n", argv[0], folder, path_input, path_output);
 
     double tick = MPI_Wtime();
 
@@ -46,55 +46,45 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
+    if (mesh_surf_read(comm, folder, &mesh)) {
         return EXIT_FAILURE;
     }
 
-    real_t *f;
-    ptrdiff_t u_n_local, u_n_global;
-    array_create_from_file(comm, path_f, SFEM_MPI_REAL_T, (void **)&f, &u_n_local, &u_n_global);
+    real_t *input;
+    ptrdiff_t input_n_local, input_n_global;
+    array_create_from_file(comm, path_input, SFEM_MPI_REAL_T, (void **)&input, &input_n_local, &input_n_global);
 
     ptrdiff_t nelements = mesh.nelements;
+    ptrdiff_t nnodes = mesh.nnodes;
 
-    real_t *df[3];
-    for (int d = 0; d < 3; ++d) {
-        df[d] = (real_t *)malloc(nelements * sizeof(real_t));
-        memset(df[d], 0, nelements * sizeof(real_t));
-    }
+    assert(input_n_local == nnodes);
+
+    real_t *output = (real_t *)malloc(nnodes * sizeof(real_t));
+    memset(output, 0, nnodes * sizeof(real_t));
 
     ///////////////////////////////////////////////////////////////////////////////
-    // Compute gradient coefficients
+    // Apply lumped mass-matrix inverse
     ///////////////////////////////////////////////////////////////////////////////
 
-    p1_grad3(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, f, df[0], df[1], df[2]);
+    // Store mass-vector into output buffer
+    assemble_lumped_boundary_mass(nelements, nnodes, mesh.elements, mesh.points, output);
 
-    real_t SFEM_SCALE=1;
-    SFEM_READ_ENV(SFEM_SCALE, atof);
-
-    if(SFEM_SCALE != 1.) {
-        for (int d = 0; d < 3; ++d) {
-            for(ptrdiff_t i = 0; i < nelements; i++) {
-                df[d][i] *= SFEM_SCALE;
-            }
-        }
+    for(ptrdiff_t i = 0; i < input_n_local; i++) {
+        output[i] = input[i] / output[i];
     }
 
     ///////////////////////////////////////////////////////////////////////////////
     // Write cell data
     ///////////////////////////////////////////////////////////////////////////////
 
-    for (int d = 0; d < 3; ++d) {
-        array_write(comm, path_outputs[d], SFEM_MPI_REAL_T, df[d], nelements, nelements);
-    }
+    array_write(comm, path_output, SFEM_MPI_REAL_T, output, nnodes, nnodes);
 
     ///////////////////////////////////////////////////////////////////////////////
     // Free resources
     ///////////////////////////////////////////////////////////////////////////////
 
-    free(f);
-    for (int d = 0; d < 3; ++d) {
-        free(df[d]);
-    }
+    free(input);
+    free(output);
 
     double tock = MPI_Wtime();
 

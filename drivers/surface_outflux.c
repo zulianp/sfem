@@ -176,7 +176,7 @@ void surface_outflux(const ptrdiff_t nelements,
     printf("surface_outflux.c: surface_outflux\t%g seconds\n", tock - tick);
 }
 
-void integrate_surf_cell_value(const ptrdiff_t nelements,
+void surf_cell_values_integrate(const ptrdiff_t nelements,
                           const ptrdiff_t nnodes,
                           idx_t **const SFEM_RESTRICT elems,
                           geom_t **const SFEM_RESTRICT xyz,
@@ -208,10 +208,47 @@ void integrate_surf_cell_value(const ptrdiff_t nelements,
         const real_t u[3] = {xyz[0][i1] - xyz[0][i0], xyz[1][i1] - xyz[1][i0], xyz[2][i1] - xyz[2][i0]};
         const real_t v[3] = {xyz[0][i2] - xyz[0][i0], xyz[1][i2] - xyz[1][i0], xyz[2][i2] - xyz[2][i0]};
 
-        const real_t area = area3(u, v);
+        const real_t area = 0.5 * area3(u, v);
         *value += cell_values[i] * area;
     }
 }
+
+
+void surf_cell_values_remove_scaling(const ptrdiff_t nelements,
+                          const ptrdiff_t nnodes,
+                          idx_t **const SFEM_RESTRICT elems,
+                          geom_t **const SFEM_RESTRICT xyz,
+                          real_t *const SFEM_RESTRICT cell_values
+                          ) {
+    SFEM_UNUSED(nnodes);
+
+    double tick = MPI_Wtime();
+
+    real_t element_vector_x[3];
+    real_t element_vector_y[3];
+    real_t element_vector_z[3];
+
+    idx_t ev[3];
+
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma unroll(3)
+        for (int v = 0; v < 3; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        // Element indices
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+
+        const real_t u[3] = {xyz[0][i1] - xyz[0][i0], xyz[1][i1] - xyz[1][i0], xyz[2][i1] - xyz[2][i0]};
+        const real_t v[3] = {xyz[0][i2] - xyz[0][i0], xyz[1][i2] - xyz[1][i0], xyz[2][i2] - xyz[2][i0]};
+
+        const real_t area = 0.5 * area3(u, v);
+        cell_values[i] /= area;
+    }
+}
+
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -292,7 +329,9 @@ int main(int argc, char *argv[]) {
         value += outflux[i];
     }
 
-    // integrate_surf_cell_value(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, outflux, &value);
+    surf_cell_values_remove_scaling(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, outflux);
+
+    // surf_cell_values_integrate(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, outflux, &value);
 
     printf("surface_outflux = %g\n", (double)value);
 

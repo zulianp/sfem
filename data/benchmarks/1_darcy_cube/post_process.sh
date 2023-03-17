@@ -13,7 +13,7 @@ PATH=$SCRIPTPATH/../../../workflows/divergence:$PATH
 
 mesh_path=./mesh
 workspace=`mktemp -d`
-
+real_type_size=8
 
 p1lapl()
 {
@@ -49,7 +49,7 @@ p1grads()
 	p0_dpdz=$workspace/temp_p0_dpdz.raw
 
 	# coefficients: P1 -> P0
-	cgrad $mesh_path $potential $p0_dpdx $p0_dpdy $p0_dpdz
+	SFEM_SCALE=-1 cgrad $mesh_path $potential $p0_dpdx $p0_dpdy $p0_dpdz
 
 	################################################
 	# P0 to P1 projection
