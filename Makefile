@@ -51,7 +51,9 @@ GOALS = assemble assemble3 assemble4
 GOALS += partition select_submesh refine skin select_surf
 
 # FE post-process
-GOALS += cgrad cshear cstrain projection_p0_to_p1 wss cauchy_stress surface_outflux integrate_divergence vonmises
+GOALS += cgrad cshear cstrain cprincipal_strains cauchy_stress vonmises
+GOALS += wss surface_outflux integrate_divergence 
+GOALS += projection_p0_to_p1 
 
 # BLAS
 GOALS += axpy
@@ -91,6 +93,7 @@ OBJS = \
 	dirichlet.o \
 	div.o \
 	strain.o \
+	principal_strains.o \
 	neumann.o \
 	sfem_mesh.o \
 	sfem_mesh_write.o \
@@ -225,6 +228,9 @@ cshear : drivers/cshear.c grad_p1.o libsfem.a
 cstrain : drivers/cstrain.c grad_p1.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
+cprincipal_strains : drivers/cprincipal_strains.c grad_p1.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
 wss : drivers/wss.c grad_p1.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
@@ -240,10 +246,13 @@ isolver_sfem.dylib : isolver_sfem_plugin.o libsfem.a
 isolver_sfem_plugin.o : plugin/isolver_sfem_plugin.c 
 	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
 
-sortreduce.o: sortreduce.cpp
+sortreduce.o : sortreduce.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(INTERNAL_CXXFLAGS) -c $<
 
-argsort.o: argsort.cpp
+argsort.o : argsort.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(INTERNAL_CXXFLAGS) -c $<
+
+principal_strains.o : principal_strains.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(INTERNAL_CXXFLAGS) -c $<
 
 %.o : %.c
