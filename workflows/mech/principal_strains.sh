@@ -45,7 +45,7 @@ dispz=(`ls $data_folder/point_data/disp_z*.raw`)
 
 ndisps=${#dispx[@]}
 max_steps=$ndisps
-max_steps=100
+# max_steps=100
 
 echo $ndisps
 

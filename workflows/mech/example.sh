@@ -14,6 +14,6 @@ workspace=dump
 
 ncdump -h $db
 
-# ./post_process_elastodynamics_simulation.sh $db $workspace $mu $lambda
+./stress.sh $db $workspace $mu $lambda
 # ./strain.sh $db $workspace
 ./principal_strains.sh $db $workspace
