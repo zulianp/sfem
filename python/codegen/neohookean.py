@@ -140,6 +140,18 @@ def make_vonmises():
 c_log("// Von Mises")
 c_code(make_vonmises())
 
+def make_principal_stresses():
+	eigv = eigenvalues(CauchyStress)
+
+	expr = []
+	for d in range(0, 3):
+		eigv_var = sp.symbols(f'element_vector[{d}]')
+		expr.append(ast.Assignment(eigv_var, eigv[d]))
+	return expr
+
+c_log("// Principal stresses")
+c_code(make_principal_stresses())
+
 def makegrad(i, q):
 	integr =  grade[i]
 	integr = subsmat3x3(integr, F, evalF)

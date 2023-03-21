@@ -272,3 +272,26 @@ def cross(a, b):
 		a[2] * b[0] - a[0]*b[2],
 		a[0] * b[1] - a[1]*b[0]
 	])
+
+def eigenvalues(A):
+	s0, s1, s2 = sp.symbols('s0 s1 s2', real=True)
+	s3, s4, s5 = sp.symbols('s3 s4 s5', real=True)
+	s6, s7, s8 = sp.symbols('s6 s7 s8', real=True)
+
+	S = sp.Matrix(3, 3, [s0, s1, s2,
+						 s3, s4, s5,
+						 s6, s7, s8])
+	Se = S.eigenvals()
+	ret = sp.Matrix(3, 1, [0]*3)
+
+	d = 0
+	for e in Se:
+		e_subs = e	
+		for i in range(0, 3):
+			for j in range(0, 3):
+				e_subs = e_subs.subs(S[i, j], A[i, j])
+		ret[d] = e_subs
+		d += 1
+
+	return ret
+

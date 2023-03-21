@@ -250,6 +250,9 @@ void integrate_div(const ptrdiff_t nelements,
 #pragma unroll(4)
         for (int v = 0; v < 4; ++v) {
             ev[v] = elems[v][i];
+
+            assert(ev[v] >= 0);
+            assert(ev[v] < nnodes);
         }
 
         for (int v = 0; v < 4; ++v) {
@@ -269,6 +272,7 @@ void integrate_div(const ptrdiff_t nelements,
         const idx_t i1 = ev[1];
         const idx_t i2 = ev[2];
         const idx_t i3 = ev[3];
+
 
         real_t element_scalar = 0;
 

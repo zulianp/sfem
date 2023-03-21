@@ -1,0 +1,20 @@
+reset
+
+create Cylinder height 2 radius 0.5
+Volume 1  angle 90  about Y include_merged
+
+block 1 add volume 1
+block 1 name "domain_block"
+
+sideset 1 add surface 2 
+sideset 1 name "sinlet"
+
+sideset 2 add surface 3
+sideset 2 name "soutlet"
+
+sideset 3 add surface 1
+sideset 3 name "swall"
+
+volume 1 scheme tetmesh
+mesh volume 1
+
