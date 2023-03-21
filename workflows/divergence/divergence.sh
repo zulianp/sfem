@@ -63,16 +63,21 @@ volume_divergence()
 	uz=$4
 
 	divu=$workspace/div_vel.raw
+	cell_div=$workspace/cell_cdiv.raw
 
 	echo "Volume divergence: $name"
 
-	SFEM_SCALE=-1 divergence $mesh_path $ux $uy $uz $divu
+	SFEM_VERBOSE=1 divergence $mesh_path $ux $uy $uz $divu
 	# div_measure=`python3 -c "import numpy as np; print(np.sum((np.fromfile(\"$divu\")), dtype=np.float64))"`
 
-	SFEM_SCALE=-1 integrate_divergence $mesh_path $ux $uy $uz
-	
-	# lumped_mass_inv $mesh_path $divu $divu
-	raw_to_db.py $mesh_path $output/"$name".vtk --point_data="$divu"
+	integrate_divergence $mesh_path $ux $uy $uz
+
+	cdiv $mesh_path $ux $uy $uz $cell_div
+
+		
+	cdivu=$workspace/cdiv.raw
+	lumped_mass_inv $mesh_path $divu $cdivu
+	raw_to_db.py $mesh_path $output/"$name".vtk --point_data="$cdivu" --cell_data="$cell_div"
 
 	# Remove boundary-bass matrix to show coefficients
 	temp=$workspace/restr_to_boundary.raw

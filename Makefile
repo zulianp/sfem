@@ -52,7 +52,7 @@ GOALS += partition select_submesh refine skin select_surf
 
 # FE post-process
 GOALS += cgrad cshear cstrain cprincipal_strains cauchy_stress vonmises
-GOALS += wss surface_outflux integrate_divergence 
+GOALS += wss surface_outflux integrate_divergence cdiv
 GOALS += projection_p0_to_p1 
 
 # BLAS
@@ -230,6 +230,10 @@ cstrain : drivers/cstrain.c grad_p1.o libsfem.a
 
 cprincipal_strains : drivers/cprincipal_strains.c grad_p1.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+cdiv : drivers/cdiv.c grad_p1.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
 
 wss : drivers/wss.c grad_p1.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \

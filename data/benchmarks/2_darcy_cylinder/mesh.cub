@@ -1,7 +1,7 @@
 reset
 
 create Cylinder height 2 radius 0.5
-Volume 1  angle 90  about Y include_merged
+rotate Volume 1 angle 90  about Y include_merged
 
 block 1 add volume 1
 block 1 name "domain_block"
@@ -16,5 +16,7 @@ sideset 3 add surface 1
 sideset 3 name "swall"
 
 volume 1 scheme tetmesh
+volume 1 size auto factor 4
 mesh volume 1
 
+export mesh "/Users/patrickzulian/Desktop/code/sfem/data/benchmarks/2_darcy_cylinder/mesh.e"  overwrite
