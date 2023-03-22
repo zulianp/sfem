@@ -83,8 +83,8 @@ divergence_check()
 	echo "Divergence check: $stage_"
 	echo "-------------------------------------------"
 
-	divergence $mesh_path $lux_ $luy_ $luz_ $ldivu_
-	SFEM_SCALE=-1 integrate_divergence $mesh_path $lux_ $luy_ $luz_
+	SFEM_VERBOSE=1 divergence $mesh_path $lux_ $luy_ $luz_ $ldivu_
+	integrate_divergence $mesh_path $lux_ $luy_ $luz_
 
 	div_measure=`python3 -c "import numpy as np; print(np.sum((np.fromfile(\"$ldivu_\")), dtype=np.float64))"`
 	
@@ -172,10 +172,10 @@ parent_elements=$surf_mesh_path/parent.raw
 
 # Split wall from inlet and outlet
 
-nodes_to_zero=$workspace/wall_idx.raw
+boundary_wall=$workspace/wall_idx.raw
 
 set_diff $surface_nodes $mesh_path/zd.raw $workspace/temp.raw
-set_diff $workspace/temp.raw $mesh_path/on.raw $nodes_to_zero
+set_diff $workspace/temp.raw $mesh_path/on.raw $boundary_wall
 
 ################################################
 # Assemble laplacian
@@ -189,8 +189,10 @@ fix_value=0
 # mv dirichlet.raw $dirichlet_nodes
 
 # Wall to zero
-dirichlet_nodes=$nodes_to_zero
+dirichlet_nodes=$boundary_wall
 
+SFEM_HANDLE_RHS=0 \
+SFEM_HANDLE_NEUMANN=0 \
 SFEM_HANDLE_DIRICHLET=1 \
 SFEM_DIRICHLET_NODES=$dirichlet_nodes \
 assemble $mesh_path $workspace
@@ -227,9 +229,9 @@ mux=$workspace/mux.raw
 muy=$workspace/muy.raw
 muz=$workspace/muz.raw
 
-smask $nodes_to_zero $ux $mux 0
-smask $nodes_to_zero $uy $muy 0
-smask $nodes_to_zero $uz $muz 0
+smask $boundary_wall $ux $mux 0
+smask $boundary_wall $uy $muy 0
+smask $boundary_wall $uz $muz 0
 
 divergence_check "after_clamping" $mux $muy $muz
 
@@ -246,8 +248,8 @@ divergence $mesh_path $mux $muy $muz $divu
 
 # Fix degree of freedom for uniqueness of solution
 rhs=$workspace/rhs.raw
-# smask $workspace/dirichlet.raw $divu $rhs $fix_value
-smask $surface_nodes $divu $rhs $fix_value
+smask $workspace/dirichlet.raw $divu $rhs $fix_value
+# smask $surface_nodes $divu $rhs $fix_value
 
 potential=$workspace/potential.raw
 solve $workspace/rowptr.raw $rhs $potential

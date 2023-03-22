@@ -3,10 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../matrix.io/array_dtof.h"
 #include "../matrix.io/matrixio_array.h"
 #include "../matrix.io/matrixio_crs.h"
 #include "../matrix.io/utils.h"
-#include "../matrix.io/array_dtof.h"
 
 #include "crs_graph.h"
 #include "sfem_base.h"
@@ -75,7 +75,8 @@ int main(int argc, char *argv[]) {
     int SFEM_LAPLACIAN = 1;
     int SFEM_MASS = 0;
     int SFEM_HANDLE_DIRICHLET = 1;
-    int SFEM_HANDLE_NEUMANN = 1;
+    int SFEM_HANDLE_NEUMANN = 0;
+    int SFEM_HANDLE_RHS = 0;
     int SFEM_EXPORT_FP32 = 0;
 
     SFEM_READ_ENV(SFEM_LAPLACIAN, atoi);
@@ -85,12 +86,18 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_HANDLE_NEUMANN, atoi);
 
     printf("----------------------------------------\n");
-    printf("Environment variables:\n- SFEM_LAPLACIAN=%d\n- SFEM_MASS=%d\n- SFEM_HANDLE_DIRICHLET=%d\n- SFEM_EXPORT_FP32=%d\n",
-           SFEM_LAPLACIAN,
-           SFEM_MASS,
-           SFEM_HANDLE_DIRICHLET,
-           SFEM_EXPORT_FP32);
+    printf(
+        "Environment variables:\n- SFEM_LAPLACIAN=%d\n- SFEM_MASS=%d\n- SFEM_HANDLE_DIRICHLET=%d\n- "
+        "SFEM_HANDLE_NEUMANN=%d\n- SFEM_HANDLE_RHS=%d\n- SFEM_EXPORT_FP32=%d\n",
+        SFEM_LAPLACIAN,
+        SFEM_MASS,
+        SFEM_HANDLE_DIRICHLET,
+        SFEM_HANDLE_NEUMANN,
+        SFEM_HANDLE_RHS,
+        SFEM_EXPORT_FP32);
     printf("----------------------------------------\n");
+
+    MPI_Datatype value_type = SFEM_EXPORT_FP32 ? MPI_FLOAT : MPI_DOUBLE;
 
     double tick = MPI_Wtime();
 
@@ -106,7 +113,7 @@ int main(int argc, char *argv[]) {
     ptrdiff_t nelements = 0;
     idx_t *elems[4];
 
-    if(serial_read_tet_mesh(folder, &nelements, elems, &nnodes, xyz)) {
+    if (serial_read_tet_mesh(folder, &nelements, elems, &nnodes, xyz)) {
         return EXIT_FAILURE;
     }
 
@@ -154,8 +161,7 @@ int main(int argc, char *argv[]) {
     real_t *rhs = (real_t *)malloc(nnodes * sizeof(real_t));
     memset(rhs, 0, nnodes * sizeof(real_t));
 
-    if(SFEM_HANDLE_NEUMANN)
-    {  // Neumann
+    if (SFEM_HANDLE_NEUMANN) {  // Neumann
         sprintf(path, "%s/on.raw", folder);
         idx_t *faces_neumann = 0;
         ptrdiff_t nfacesx3 = read_file(comm, path, (void **)&faces_neumann);
@@ -217,10 +223,10 @@ int main(int argc, char *argv[]) {
         // Dirichlet
         sprintf(path, "%s/zd.raw", folder);
 
-        const char * SFEM_DIRICHLET_NODES = 0;
+        const char *SFEM_DIRICHLET_NODES = 0;
         SFEM_READ_ENV(SFEM_DIRICHLET_NODES, );
 
-        if(SFEM_DIRICHLET_NODES) {
+        if (SFEM_DIRICHLET_NODES) {
             strcpy(path, SFEM_DIRICHLET_NODES);
             printf("SFEM_DIRICHLET_NODES=%s\n", path);
         }
@@ -253,6 +259,19 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    if (SFEM_HANDLE_RHS) {
+        if (SFEM_EXPORT_FP32) {
+            array_dtof(nnodes, (const real_t *)rhs, (float *)rhs);
+        }
+
+        {
+            sprintf(path, "%s/rhs.raw", output_folder);
+            array_write(comm, path, value_type, rhs, nnodes, nnodes);
+        }
+    }
+
+    free(rhs);
+
     tock = MPI_Wtime();
     printf("assemble.c: boundary\t\t%g seconds\n", tock - tack);
     tack = tock;
@@ -261,11 +280,8 @@ int main(int argc, char *argv[]) {
     // Write CRS matrix and rhs vector
     ///////////////////////////////////////////////////////////////////////////////
 
-    MPI_Datatype value_type = SFEM_EXPORT_FP32? MPI_FLOAT : MPI_DOUBLE;
-    
-    if(SFEM_EXPORT_FP32) {
-        array_dtof(nnz,    (const real_t *)values, (float*)values);
-        array_dtof(nnodes, (const real_t *)rhs, (float*)rhs);
+    if (SFEM_EXPORT_FP32) {
+        array_dtof(nnz, (const real_t *)values, (float *)values);
     }
 
     {
@@ -285,11 +301,6 @@ int main(int argc, char *argv[]) {
         crs_write_folder(comm, output_folder, &crs_out);
     }
 
-    {
-        sprintf(path, "%s/rhs.raw", output_folder);
-        array_write(comm, path, value_type, rhs, nnodes, nnodes);
-    }
-
     tock = MPI_Wtime();
     printf("assemble.c: write\t\t%g seconds\n", tock - tack);
     tack = tock;
@@ -301,7 +312,6 @@ int main(int argc, char *argv[]) {
     free(rowptr);
     free(colidx);
     free(values);
-    free(rhs);
 
     for (int d = 0; d < 3; ++d) {
         free(xyz[d]);

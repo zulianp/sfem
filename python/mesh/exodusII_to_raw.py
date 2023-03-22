@@ -113,7 +113,7 @@ def s2n_tet4():
 	return [
 		[0, 1, 3],
 		[1, 2, 3],
-		[1, 3, 2],
+		[0, 3, 2],
 		[0, 1, 2],
 	]
 
@@ -231,6 +231,10 @@ for i in range(0, num_sidesets):
 		for d in range(0, nnodesxside):
 			ln = lnodes[d]
 			node = connect[e, ln] - 1
+
+			# if(node == 162):
+			# 	pdb.set_trace()
+
 			idx[d].append(node)
 
 	for d in range(0, nnodesxside):

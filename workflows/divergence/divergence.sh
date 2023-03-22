@@ -78,12 +78,6 @@ volume_divergence()
 	cdivu=$workspace/cdiv.raw
 	lumped_mass_inv $mesh_path $divu $cdivu
 	raw_to_db.py $mesh_path $output/"$name".vtk --point_data="$cdivu" --cell_data="$cell_div"
-
-	# Remove boundary-bass matrix to show coefficients
-	temp=$workspace/restr_to_boundary.raw
-	sgather $surface_nodes $real_type_size $divu $temp
-	lumped_boundary_mass_inv $surf_mesh_path $temp $temp
-	raw_to_db.py $surf_mesh_path $output/"$name"_surf.vtk --point_data="$temp"
 }
 
 surface_divergence()
