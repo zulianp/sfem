@@ -16,15 +16,13 @@ velx=$workspace/prescribed_vel_x.raw
 vely=$workspace/prescribed_vel_y.raw
 velz=$workspace/prescribed_vel_z.raw
 
-python3 -c "import numpy as np; a=np.fromfile(\"$mesh_path/x.raw\", dtype=np.float32); a.fill(10); a.astype(np.float64).tofile(\"$velx\")"
+python3 -c "import numpy as np; a=np.fromfile(\"$mesh_path/x.raw\", dtype=np.float32); a.fill(1); a.astype(np.float64).tofile(\"$velx\")"
 python3 -c "import numpy as np; a=np.fromfile(\"$mesh_path/y.raw\", dtype=np.float32); a.astype(np.float64).tofile(\"$vely\")"
 python3 -c "import numpy as np; a=np.fromfile(\"$mesh_path/z.raw\", dtype=np.float32); a.astype(np.float64).tofile(\"$velz\")"
 
 ls -la $velx
 ls -la $vely
 ls -la $velz
-
-
 
 post_dir=output/check_0
 mkdir -p $post_dir

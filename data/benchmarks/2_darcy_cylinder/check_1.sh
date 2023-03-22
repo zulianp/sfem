@@ -25,7 +25,7 @@ velz=$workspace/prescribed_vel_z.raw
 volume_cylinder=`python3 -c "import numpy as np; print(f'{np.pi * 0.5 * 0.5 * 2}')"`
 echo "measure(cylinder) = $volume_cylinder"
 
-python3 -c "import numpy as np; a=np.fromfile(\"$mesh_path/x.raw\", dtype=np.float32); a.fill(10); a.astype(np.float64).tofile(\"$velx\")"
+python3 -c "import numpy as np; a=np.fromfile(\"$mesh_path/x.raw\", dtype=np.float32); a.fill(1); a.astype(np.float64).tofile(\"$velx\")"
 python3 -c "import numpy as np; a=np.fromfile(\"$mesh_path/z.raw\", dtype=np.float32); a = -a; a.astype(np.float64).tofile(\"$vely\")"
 python3 -c "import numpy as np; a=np.fromfile(\"$mesh_path/y.raw\", dtype=np.float32); a.astype(np.float64).tofile(\"$velz\")"
 

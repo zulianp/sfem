@@ -59,7 +59,7 @@ GOALS += projection_p0_to_p1
 GOALS += axpy
 
 # Algebra post process
-GOALS += condense_matrix condense_vector idx_to_indicator remap_vector sgather smask set_diff soverride
+GOALS += condense_matrix condense_vector idx_to_indicator remap_vector sgather smask set_diff set_union soverride
 
 # Resampling
 GOALS += pizzastack_to_mesh
@@ -190,6 +190,9 @@ idx_to_indicator : idx_to_indicator.o
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 set_diff : drivers/set_diff.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+set_union : drivers/set_union.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 remap_vector : remap_vector.o

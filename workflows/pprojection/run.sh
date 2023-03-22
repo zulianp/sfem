@@ -229,9 +229,13 @@ mux=$workspace/mux.raw
 muy=$workspace/muy.raw
 muz=$workspace/muz.raw
 
-smask $boundary_wall $ux $mux 0
-smask $boundary_wall $uy $muy 0
-smask $boundary_wall $uz $muz 0
+# smask $boundary_wall $ux $mux 0
+# smask $boundary_wall $uy $muy 0
+# smask $boundary_wall $uz $muz 0
+
+cp $ux $mux
+cp $uy $muy
+cp $uz $muz
 
 divergence_check "after_clamping" $mux $muy $muz
 
