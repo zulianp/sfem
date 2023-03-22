@@ -105,10 +105,6 @@ boundary_wall=$mesh_path/sidesets_aos/swall.raw
 boundary_inlet=$mesh_path/sidesets_aos/sinlet.raw
 boundary_outlet=$mesh_path/sidesets_aos/soutlet.raw
 
-# smask $boundary_wall $velx $velx 0
-# smask $boundary_wall $vely $vely 0
-# smask $boundary_wall $velz $velz 0
-
 divu=$workspace/divu.raw
 SFEM_VERBOSE=1 divergence $mesh_path $velx $vely $velz $divu
 
@@ -177,7 +173,7 @@ axpy 1 $p1_dpdz $new_velz
 integrate_divergence $mesh_path $new_velx $new_vely $new_velz 
 
 raw_to_db.py $mesh_path $post_dir/post_db.vtk \
-	--point_data="$workspace/vel*.raw,$potential,$rhs,$rhs_viz,$node_div,$sides,$workspace/correction*.raw,$workspace/presecibed_vel_*"  \
+	--point_data="$workspace/vel*.raw,$potential,$rhs,$rhs_viz,$node_div,$sides,$workspace/correction*.raw,$velx,$vely,$velz"  \
 	--cell_data="$cell_div,$cell_volume"
 
 # Clean-up

@@ -22,8 +22,11 @@ python3 -c "import numpy as np; a=np.fromfile(\"$mesh_path/x.raw\", dtype=np.flo
 python3 -c "import numpy as np; a=np.fromfile(\"$mesh_path/y.raw\", dtype=np.float32); a.astype(np.float64).tofile(\"$vely\")"
 python3 -c "import numpy as np; a=np.fromfile(\"$mesh_path/z.raw\", dtype=np.float32); a.astype(np.float64).tofile(\"$velz\")"
 
-logfile=output/check_3/log.txt
-divergence.sh mesh $velx $vely $velz output/check_3/div > $logfile
+post_dir=output/check_3
+mkdir -p $post_dir
+
+logfile=$post_dir/log.txt
+divergence.sh mesh $velx $vely $velz $post_dir/div > $logfile
 
 echo "Expected divergence ~ 0"
 grep "integral div" $logfile
@@ -31,7 +34,7 @@ grep "integral div" $logfile
 echo "Expected outflux ~ 0"
 grep "surface_outflux = " $logfile
 
-./projection.sh $velx $vely $velz output/check_3
+./projection.sh $velx $vely $velz $post_dir
 
 # Clean-up
 rm -r $workspace
