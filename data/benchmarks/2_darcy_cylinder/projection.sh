@@ -41,7 +41,8 @@ solve()
 	x_=$3
 
 	echo "rhs=$rhs_"
-	mpiexec -np 8 $UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type hypre -ksp_type cg -atol 1e-18 -rtol 0 -stol 1e-19 --verbose
+	# mpiexec -np 8 
+	$UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type hypre -ksp_type cg -atol 1e-18 -rtol 0 -stol 1e-19 --verbose
 }
 
 norm_fp64()
@@ -128,12 +129,21 @@ cell_volume=$workspace/cell_volume.raw
 volumes $mesh_path $cell_volume
 ######################################
 
-dirichlet_nodes=$boundary_wall
-# dirichlet_nodes=$boundary_inlet
+
+
 
 rhs=$workspace/rhs_divu.raw
-# smask $dirichlet_nodes $divu $rhs 0
-smask $boundary_wall $divu $rhs 0
+
+if [[ -z "$dirichlet_nodes" ]]
+then
+	dirichlet_nodes=$boundary_inlet
+	# dirichlet_nodes=$boundary_wall
+else
+	echo "Using user defined dirichlet_nodes = $dirichlet_nodes"
+fi
+
+smask $dirichlet_nodes $divu $rhs 0
+# smask $boundary_wall $divu $rhs 0
 # smask $boundary_inlet $rhs $rhs 0
 # smask $boundary_outlet $rhs $rhs 0
 
@@ -179,8 +189,13 @@ axpy 1 $p1_dpdz $new_velz
 
 integrate_divergence $mesh_path $new_velx $new_vely $new_velz 
 
+post_divu=$workspace/post_divu.raw
+SFEM_VERBOSE=1 divergence $mesh_path $new_velx $new_vely $new_velz $post_divu
+post_node_div=$workspace/post_node_div.raw
+lumped_mass_inv $mesh_path $post_divu $post_node_div
+
 raw_to_db.py $mesh_path $post_dir/post_db.vtk \
-	--point_data="$workspace/vel*.raw,$potential,$rhs,$rhs_viz,$node_div,$sides,$workspace/correction*.raw,$velx,$vely,$velz"  \
+	--point_data="$workspace/vel*.raw,$potential,$rhs,$rhs_viz,$node_div,$sides,$workspace/correction*.raw,$velx,$vely,$velz,$post_node_div"  \
 	--cell_data="$cell_div,$cell_volume"
 
 # Clean-up
