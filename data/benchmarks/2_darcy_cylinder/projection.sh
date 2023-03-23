@@ -72,12 +72,15 @@ p1grads()
 	p1_dpdz_=$4
 
 	# Per Cell quantities
-	p0_dpdx_=$workspace/temp_p0_dpdx.raw
-	p0_dpdy_=$workspace/temp_p0_dpdy.raw
-	p0_dpdz_=$workspace/temp_p0_dpdz.raw
+	p0_dpdx_=$workspace/p0_grad_x.raw
+	p0_dpdy_=$workspace/p0_grad_y.raw
+	p0_dpdz_=$workspace/p0_grad_z.raw
 
 	# coefficients: P1 -> P0
 	cgrad $mesh_path $potential_ $p0_dpdx_ $p0_dpdy_ $p0_dpdz_
+
+	raw_to_db.py $mesh_path $post_dir/cgrad.vtk \
+		--cell_data="$p0_dpdx_,$p0_dpdy_,$p0_dpdz_"
 
 	################################################
 	# P0 to P1 projection
@@ -109,9 +112,9 @@ boundary_outlet=$mesh_path/sidesets_aos/soutlet.raw
 # boundary_inout=$workspace/sinout.raw
 # set_union $boundary_inlet $boundary_outlet $boundary_inout
 
-# smask $boundary_wall $velx $velx 0
-# smask $boundary_wall $vely $vely 0
-# smask $boundary_wall $velz $velz 0
+smask $boundary_wall $velx $velx 0
+smask $boundary_wall $vely $vely 0
+smask $boundary_wall $velz $velz 0
 
 divu=$workspace/divu.raw
 SFEM_VERBOSE=1 divergence $mesh_path $velx $vely $velz $divu

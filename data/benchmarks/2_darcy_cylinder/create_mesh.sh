@@ -12,6 +12,8 @@ PATH=$SCRIPTPATH/../../../workflows/divergence:$PATH
 
 set -x
 
+nrefs=2
+
 folder=cylinder
 mesh_db=$folder/mesh.vtk
 mesh_raw=./mesh
@@ -24,7 +26,7 @@ mkdir -p $mesh_surface/wall
 mkdir -p $mesh_raw/sidesets_aos
 
 mkdir -p $folder
-nrefs=5
+
 idx_type_size=4
 
 cylinder.py $mesh_db $nrefs
