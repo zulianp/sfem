@@ -37,18 +37,18 @@ def main(argv):
 		com = gmsh.model.occ.getCenterOfMass(s[0], s[1])
 		
 		if(com[1] < 1e-9):
-			print('inlet')
+			# print('inlet')
 			gmsh.model.addPhysicalGroup(s[0], [s[1]], inlet)
 			gmsh.model.setPhysicalName(s[1], inlet, "sinlet")
 		elif(com[1] >= 2-1e-9):
-			print('outlet')
+			# print('outlet')
 			gmsh.model.addPhysicalGroup(s[0], [s[1]], outlet)
 			gmsh.model.setPhysicalName(s[1], outlet, "soutlet")
 		else:
-			print('wall')
+			# print('wall')
 			walls.append(s[1])
 
-		print(gmsh.model.getEntityName(s[0], s[1]))
+		# print(gmsh.model.getEntityName(s[0], s[1]))
 
 
 	gmsh.model.addPhysicalGroup(2, walls, wall)

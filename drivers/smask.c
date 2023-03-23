@@ -51,6 +51,7 @@ int main(int argc, char *argv[]) {
         for(ptrdiff_t i = 0; i < nidx; ++i) {
             idx_t idx = indices[i];
             assert(idx < ndofs);
+            assert(idx >= 0);
             input[idx] = mask_value;
         }
 

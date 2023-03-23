@@ -136,8 +136,8 @@ rhs=$workspace/rhs_divu.raw
 
 if [[ -z "$dirichlet_nodes" ]]
 then
-	dirichlet_nodes=$boundary_inlet
-	# dirichlet_nodes=$boundary_wall
+	# dirichlet_nodes=$boundary_inlet
+	dirichlet_nodes=$boundary_wall
 else
 	echo "Using user defined dirichlet_nodes = $dirichlet_nodes"
 fi
