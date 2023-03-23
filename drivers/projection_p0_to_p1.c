@@ -26,45 +26,33 @@ static SFEM_INLINE void assemble_p0_to_p1(const real_t px0,
                                           const real_t pz2,
                                           const real_t pz3,
                                           // Data
-                                          const real_t * const SFEM_RESTRICT u_p0,
+                                          const real_t *const SFEM_RESTRICT u_p0,
                                           // Output
                                           real_t *const SFEM_RESTRICT u_p1,
                                           real_t *const SFEM_RESTRICT weight) {
     // FLOATING POINT OPS!
     //       - Result: 8*ASSIGNMENT
-    //       - Subexpressions: 22*ADD + 25*DIV + 73*MUL + 24*SUB
-    const real_t x0 = px0 * py1 * pz2;
-    const real_t x1 = px0 * py2 * pz3;
-    const real_t x2 = px0 * py3 * pz1;
-    const real_t x3 = px1 * py0 * pz3;
-    const real_t x4 = px1 * py2 * pz0;
-    const real_t x5 = px1 * py3 * pz2;
-    const real_t x6 = px2 * py0 * pz1;
-    const real_t x7 = px2 * py1 * pz3;
-    const real_t x8 = px2 * py3 * pz0;
-    const real_t x9 = px3 * py0 * pz2;
-    const real_t x10 = px3 * py1 * pz0;
-    const real_t x11 = px3 * py2 * pz1;
-    const real_t x12 =
-        (1.0 / 24.0) * u_p0[0] *
-        (px0 * py1 * pz3 + px0 * py2 * pz1 + px0 * py3 * pz2 + px1 * py0 * pz2 + px1 * py2 * pz3 + px1 * py3 * pz0 +
-         px2 * py0 * pz3 + px2 * py1 * pz0 + px2 * py3 * pz1 + px3 * py0 * pz1 + px3 * py1 * pz2 + px3 * py2 * pz0 -
-         x0 - x1 - x10 - x11 - x2 - x3 - x4 - x5 - x6 - x7 - x8 - x9);
-    const real_t x13 =
-        (1.0 / 24.0) * px0 * py1 * pz3 + (1.0 / 24.0) * px0 * py2 * pz1 + (1.0 / 24.0) * px0 * py3 * pz2 +
-        (1.0 / 24.0) * px1 * py0 * pz2 + (1.0 / 24.0) * px1 * py2 * pz3 + (1.0 / 24.0) * px1 * py3 * pz0 +
-        (1.0 / 24.0) * px2 * py0 * pz3 + (1.0 / 24.0) * px2 * py1 * pz0 + (1.0 / 24.0) * px2 * py3 * pz1 +
-        (1.0 / 24.0) * px3 * py0 * pz1 + (1.0 / 24.0) * px3 * py1 * pz2 + (1.0 / 24.0) * px3 * py2 * pz0 -
-        1.0 / 24.0 * x0 - 1.0 / 24.0 * x1 - 1.0 / 24.0 * x10 - 1.0 / 24.0 * x11 - 1.0 / 24.0 * x2 - 1.0 / 24.0 * x3 -
-        1.0 / 24.0 * x4 - 1.0 / 24.0 * x5 - 1.0 / 24.0 * x6 - 1.0 / 24.0 * x7 - 1.0 / 24.0 * x8 - 1.0 / 24.0 * x9;
-    u_p1[0] = x12;
-    u_p1[1] = x12;
-    u_p1[2] = x12;
-    u_p1[3] = x12;
-    weight[0] = x13;
-    weight[1] = x13;
-    weight[2] = x13;
-    weight[3] = x13;
+    //       - Subexpressions: 2*ADD + 6*DIV + 13*MUL + 12*SUB
+    const real_t x0 = py0 - py2;
+    const real_t x1 = pz0 - pz3;
+    const real_t x2 = px0 - px1;
+    const real_t x3 = py0 - py3;
+    const real_t x4 = pz0 - pz2;
+    const real_t x5 = px0 - px2;
+    const real_t x6 = py0 - py1;
+    const real_t x7 = pz0 - pz1;
+    const real_t x8 = px0 - px3;
+    const real_t x9 = -1.0 / 24.0 * x0 * x1 * x2 + (1.0 / 24.0) * x0 * x7 * x8 + (1.0 / 24.0) * x1 * x5 * x6 +
+                      (1.0 / 24.0) * x2 * x3 * x4 - 1.0 / 24.0 * x3 * x5 * x7 - 1.0 / 24.0 * x4 * x6 * x8;
+    const real_t x10 = u_p0[0] * x9;
+    weight[0] = x9;
+    u_p1[0] = x10;
+    weight[1] = x9;
+    u_p1[1] = x10;
+    weight[2] = x9;
+    u_p1[2] = x10;
+    weight[3] = x9;
+    u_p1[3] = x10;
 }
 
 void projection_p0_to_p1(const ptrdiff_t nelements,
