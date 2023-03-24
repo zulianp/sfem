@@ -34,6 +34,64 @@ ls -la $velx
 ls -la $vely
 ls -la $velz
 
+real_type_size=8
+idx_type_size=4
+real_numpy_type="np.float64"
+
+zero_real()
+{
+	if (($# != 2))
+	then
+		printf "usage: $0 <n> <output.raw>\n" 1>&2
+		exit -1
+	fi
+	n_=$1
+	output_=$2
+	python3 -c "import numpy as np; np.zeros($n_,dtype=$real_numpy_type).tofile(\"$output_\")"
+}
+
+hetero_neumann()
+{
+	if (($# != 5))
+	then
+		printf "usage: $0 <mesh_folder> <vx.raw> <vy.raw> <vz.raw> <output.raw>\n" 1>&2
+		exit -1
+	fi
+
+	mesh_=$1
+	vx_=$2
+	vy_=$3
+	vz_=$4
+	output_=$5
+
+	workspace_=`mktemp -d`
+	surf_mesh_path_=$workspace_/surf
+	mkdir -p $surf_mesh_path_
+
+	svx_=$workspace/svx.raw
+	svy_=$workspace/svy.raw
+	svz_=$workspace/svz.raw
+	p0_outflux_=$workspace/p0_outflux.raw
+	p1_outflux_=$workspace/p1_outflux.raw
+
+	# Create surface mesh
+	skin $mesh_path $surf_mesh_path_
+
+	surface_nodes_=$surf_mesh_path_/node_mapping.raw
+	sgather $surface_nodes_ $real_type_size $vx_ $svx_
+	sgather $surface_nodes_ $real_type_size $vy_ $svy_
+	sgather $surface_nodes_ $real_type_size $vz_ $svz_
+
+	surface_outflux $surf_mesh_path_ $svx_ $svy_ $svz_ $p0_outflux_ 
+	SFEM_COMPUTE_COEFFICIENTS=0 surface_projection_p0_to_p1 $surf_mesh_path_ $p0_outflux_ $p1_outflux_
+
+	n_bytes_nodes_=`ls -la  $mesh_path/x.raw | awk '{print $5}'`
+	n_nodes_=$(( $n_bytes_nodes_ / $idx_type_size ))
+
+	zero_real $n_nodes_ $output_
+	soverride $surface_nodes_ $real_type_size $p1_outflux_ $output_ $output_
+}
+
 solve()
 {
 	mat_=$1
@@ -119,6 +177,9 @@ smask $boundary_wall $velz $velz 0
 divu=$workspace/divu.raw
 SFEM_VERBOSE=1 divergence $mesh_path $velx $vely $velz $divu
 
+neumann_bc=$workspace/neumann_bc.raw
+hetero_neumann  $mesh_path $velx $vely $velz $neumann_bc
+
 ######################################
 # Viz
 ######################################
@@ -132,9 +193,6 @@ cell_volume=$workspace/cell_volume.raw
 volumes $mesh_path $cell_volume
 ######################################
 
-
-
-
 rhs=$workspace/rhs_divu.raw
 
 if [[ -z "$dirichlet_nodes" ]]
@@ -145,6 +203,8 @@ else
 	echo "Using user defined dirichlet_nodes = $dirichlet_nodes"
 fi
 
+# Add surface flux
+axpy 1 $neumann_bc $divu
 smask $dirichlet_nodes $divu $rhs 0
 # smask $boundary_wall $divu $rhs 0
 # smask $boundary_inlet $rhs $rhs 0
