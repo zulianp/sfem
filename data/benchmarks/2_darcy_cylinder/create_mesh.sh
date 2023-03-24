@@ -17,7 +17,7 @@ nrefs=5
 folder=cylinder
 mesh_db=$folder/mesh.vtk
 mesh_raw=./mesh
-mesh_surface=$folder/surface
+mesh_surface=$mesh_raw/surface
 
 mkdir -p $mesh_raw
 mkdir -p $mesh_surface/inlet
@@ -89,16 +89,10 @@ boundary_nodes()
 	sgather $workspace/i1.raw $idx_type_size $mesh_surface/node_mapping.raw $mesh_surface/"$name"/i1.raw 
 	sgather $workspace/i2.raw $idx_type_size $mesh_surface/node_mapping.raw $mesh_surface/"$name"/i2.raw 
 
-	set_union $mesh_surface/"$name"/i0.raw $mesh_surface/"$name"/i1.raw $workspace/temp.raw
-	set_union $workspace/temp.raw		   $mesh_surface/"$name"/i2.raw $sideset_raw
+	# set_union $mesh_surface/"$name"/i0.raw $mesh_surface/"$name"/i1.raw $workspace/temp.raw
+	# set_union $workspace/temp.raw		   $mesh_surface/"$name"/i2.raw $sideset_raw
 
-	# print_array $mesh_surface/"$name"/i0.raw
-	# print_array $mesh_surface/"$name"/i1.raw
-	# print_array $mesh_surface/"$name"/i2.raw
-
-	# print_array $workspace/temp.raw
-	# print_array $sideset_raw
-
+	soa_to_aos "$mesh_surface/"$name"/i*.raw" $idx_type_size $sideset_raw
 	rm -r $workspace
 }
 

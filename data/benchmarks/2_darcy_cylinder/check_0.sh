@@ -37,7 +37,7 @@ echo "Expected outflux ~ 3.14"
 grep "surface_outflux = " $logfile
 
 export dirichlet_nodes=$workspace/dirichlet_nodes.raw
-python3 -c "import numpy as np; a = np.array([504670]); a.astype(np.int32).tofile(\"$dirichlet_nodes\")"
+python3 -c "import numpy as np; b = np.fromfile(\"$mesh_path/surface/wall/i0.raw\",dtype=np.int32); a = np.array(b[0]); a.astype(np.int32).tofile(\"$dirichlet_nodes\"); print(f'fixed node = {a}');"
 
 ./projection.sh $velx $vely $velz $post_dir
 

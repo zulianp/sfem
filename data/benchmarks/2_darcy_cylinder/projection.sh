@@ -167,9 +167,6 @@ boundary_wall=$mesh_path/sidesets_aos/swall.raw
 boundary_inlet=$mesh_path/sidesets_aos/sinlet.raw
 boundary_outlet=$mesh_path/sidesets_aos/soutlet.raw
 
-# boundary_inout=$workspace/sinout.raw
-# set_union $boundary_inlet $boundary_outlet $boundary_inout
-
 smask $boundary_wall $velx $velx 0
 smask $boundary_wall $vely $vely 0
 smask $boundary_wall $velz $velz 0
@@ -177,8 +174,8 @@ smask $boundary_wall $velz $velz 0
 divu=$workspace/divu.raw
 SFEM_VERBOSE=1 divergence $mesh_path $velx $vely $velz $divu
 
-neumann_bc=$workspace/neumann_bc.raw
-hetero_neumann  $mesh_path $velx $vely $velz $neumann_bc
+# neumann_bc=$workspace/neumann_bc.raw
+# hetero_neumann  $mesh_path $velx $vely $velz $neumann_bc
 
 ######################################
 # Viz
@@ -204,12 +201,8 @@ else
 fi
 
 # Add surface flux
-axpy 1 $neumann_bc $divu
+# axpy 1 $neumann_bc $divu
 smask $dirichlet_nodes $divu $rhs 0
-# smask $boundary_wall $divu $rhs 0
-# smask $boundary_inlet $rhs $rhs 0
-# smask $boundary_outlet $rhs $rhs 0
-
 norm_fp64 $rhs
 
 ######################################
