@@ -53,7 +53,7 @@ GOALS += partition select_submesh refine skin select_surf volumes
 # FE post-process
 GOALS += cgrad cshear cstrain cprincipal_strains cauchy_stress vonmises
 GOALS += wss surface_outflux integrate_divergence cdiv
-GOALS += projection_p0_to_p1 
+GOALS += projection_p0_to_p1 surface_projection_p0_to_p1
 
 # BLAS
 GOALS += axpy
@@ -220,6 +220,9 @@ lumped_boundary_mass_inv : drivers/lumped_boundary_mass_inv.c mass.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 projection_p0_to_p1 : drivers/projection_p0_to_p1.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+surface_projection_p0_to_p1 : drivers/surface_projection_p0_to_p1.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 smask : drivers/smask.c libsfem.a

@@ -29,3 +29,15 @@ for i in range(0, 4):
 	expr.append(ast.Assignment(lhs, u[0] * integr))
 
 c_code(expr)
+
+print("-----------------------")
+print("No-weights version")
+print("-----------------------")
+
+expr = []
+for i in range(0, 4):
+	integr =  sp.simplify(sp.integrate(basis[i], (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1)) * dV)
+	lhs = sp.symbols(f'u_p1[{i}]')
+	expr.append(ast.Assignment(lhs, u[0] * integr))
+
+c_code(expr)

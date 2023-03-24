@@ -13,106 +13,92 @@
 
 #include "read_mesh.h"
 
-static SFEM_INLINE void projection_p0_to_p1_kernel(const real_t px0,
-                                          const real_t px1,
-                                          const real_t px2,
-                                          const real_t px3,
-                                          const real_t py0,
-                                          const real_t py1,
-                                          const real_t py2,
-                                          const real_t py3,
-                                          const real_t pz0,
-                                          const real_t pz1,
-                                          const real_t pz2,
-                                          const real_t pz3,
-                                          // Data
-                                          const real_t *const SFEM_RESTRICT u_p0,
-                                          // Output
-                                          real_t *const SFEM_RESTRICT u_p1,
-                                          real_t *const SFEM_RESTRICT weight) {
+static SFEM_INLINE void surface_projection_p0_to_p1_kernel(const real_t px0,
+                                                           const real_t px1,
+                                                           const real_t px2,
+                                                           const real_t py0,
+                                                           const real_t py1,
+                                                           const real_t py2,
+                                                           const real_t pz0,
+                                                           const real_t pz1,
+                                                           const real_t pz2,
+                                                           // Data
+                                                           const real_t *const SFEM_RESTRICT u_p0,
+                                                           // Output
+                                                           real_t *const SFEM_RESTRICT u_p1,
+                                                           real_t *const SFEM_RESTRICT weight) {
     // FLOATING POINT OPS!
-    //       - Result: 8*ASSIGNMENT
-    //       - Subexpressions: 2*ADD + 6*DIV + 13*MUL + 12*SUB
-    const real_t x0 = py0 - py2;
-    const real_t x1 = pz0 - pz3;
-    const real_t x2 = px0 - px1;
-    const real_t x3 = py0 - py3;
-    const real_t x4 = pz0 - pz2;
-    const real_t x5 = px0 - px2;
-    const real_t x6 = py0 - py1;
-    const real_t x7 = pz0 - pz1;
-    const real_t x8 = px0 - px3;
-    const real_t x9 = -1.0 / 24.0 * x0 * x1 * x2 + (1.0 / 24.0) * x0 * x7 * x8 + (1.0 / 24.0) * x1 * x5 * x6 +
-                      (1.0 / 24.0) * x2 * x3 * x4 - 1.0 / 24.0 * x3 * x5 * x7 - 1.0 / 24.0 * x4 * x6 * x8;
-    const real_t x10 = u_p0[0] * x9;
-    weight[0] = x9;
-    u_p1[0] = x10;
-    weight[1] = x9;
-    u_p1[1] = x10;
-    weight[2] = x9;
-    u_p1[2] = x10;
-    weight[3] = x9;
-    u_p1[3] = x10;
+    //       - Result: 6*ASSIGNMENT
+    //       - Subexpressions: 6*ADD + 2*DIV + 5*MUL + 8*POW + 7*SUB
+    const real_t x0 = -px0 + px1;
+    const real_t x1 = -px0 + px2;
+    const real_t x2 = -py0 + py1;
+    const real_t x3 = -py0 + py2;
+    const real_t x4 = -pz0 + pz1;
+    const real_t x5 = -pz0 + pz2;
+    const real_t x6 =
+        (1.0 / 6.0) * sqrt((pow(x0, 2) + pow(x2, 2) + pow(x4, 2)) * (pow(x1, 2) + pow(x3, 2) + pow(x5, 2)) -
+                           pow(x0 * x1 + x2 * x3 + x4 * x5, 2));
+    const real_t x7 = u_p0[0] * x6;
+    weight[0] = x6;
+    u_p1[0] = x7;
+    weight[1] = x6;
+    u_p1[1] = x7;
+    weight[2] = x6;
+    u_p1[2] = x7;
 }
 
 static SFEM_INLINE void integrate_p0_to_p1_kernel(const real_t px0,
                                                   const real_t px1,
                                                   const real_t px2,
-                                                  const real_t px3,
                                                   const real_t py0,
                                                   const real_t py1,
                                                   const real_t py2,
-                                                  const real_t py3,
                                                   const real_t pz0,
                                                   const real_t pz1,
                                                   const real_t pz2,
-                                                  const real_t pz3,
                                                   // Data
                                                   const real_t *const SFEM_RESTRICT u_p0,
                                                   // Output
                                                   real_t *const SFEM_RESTRICT u_p1) {
     // FLOATING POINT OPS!
-    //       - Result: 4*ASSIGNMENT
-    //       - Subexpressions: 2*ADD + 6*DIV + 13*MUL + 12*SUB
-    const real_t x0 = py0 - py2;
-    const real_t x1 = pz0 - pz3;
-    const real_t x2 = px0 - px1;
-    const real_t x3 = py0 - py3;
-    const real_t x4 = pz0 - pz2;
-    const real_t x5 = px0 - px2;
-    const real_t x6 = py0 - py1;
-    const real_t x7 = pz0 - pz1;
-    const real_t x8 = px0 - px3;
-    const real_t x9 =
-        u_p0[0] * (-1.0 / 24.0 * x0 * x1 * x2 + (1.0 / 24.0) * x0 * x7 * x8 + (1.0 / 24.0) * x1 * x5 * x6 +
-                   (1.0 / 24.0) * x2 * x3 * x4 - 1.0 / 24.0 * x3 * x5 * x7 - 1.0 / 24.0 * x4 * x6 * x8);
-    u_p1[0] = x9;
-    u_p1[1] = x9;
-    u_p1[2] = x9;
-    u_p1[3] = x9;
+    //       - Result: 3*ASSIGNMENT
+    //       - Subexpressions: 6*ADD + 2*DIV + 5*MUL + 8*POW + 7*SUB
+    const real_t x0 = -px0 + px1;
+    const real_t x1 = -px0 + px2;
+    const real_t x2 = -py0 + py1;
+    const real_t x3 = -py0 + py2;
+    const real_t x4 = -pz0 + pz1;
+    const real_t x5 = -pz0 + pz2;
+    const real_t x6 = (1.0 / 6.0) * u_p0[0] *
+                      sqrt((pow(x0, 2) + pow(x2, 2) + pow(x4, 2)) * (pow(x1, 2) + pow(x3, 2) + pow(x5, 2)) -
+                           pow(x0 * x1 + x2 * x3 + x4 * x5, 2));
+    u_p1[0] = x6;
+    u_p1[1] = x6;
+    u_p1[2] = x6;
 }
 
-void projection_p0_to_p1(const ptrdiff_t nelements,
-                         const ptrdiff_t nnodes,
-                         idx_t **const SFEM_RESTRICT elems,
-                         geom_t **const SFEM_RESTRICT xyz,
-                         const real_t *const SFEM_RESTRICT p0,
-                         real_t *const SFEM_RESTRICT p1) {
+void surface_projection_p0_to_p1(const ptrdiff_t nelements,
+                                 const ptrdiff_t nnodes,
+                                 idx_t **const SFEM_RESTRICT elems,
+                                 geom_t **const SFEM_RESTRICT xyz,
+                                 const real_t *const SFEM_RESTRICT p0,
+                                 real_t *const SFEM_RESTRICT p1) {
     double tick = MPI_Wtime();
 
-    idx_t ev[4];
+    idx_t ev[3];
 
     real_t element_p0;
-    real_t element_p1[4];
-    real_t element_weights[4];
+    real_t element_p1[3];
+    real_t element_weights[3];
 
     real_t *weights = (real_t *)malloc(nnodes * sizeof(real_t));
     memset(weights, 0, nnodes * sizeof(real_t));
     memset(p1, 0, nnodes * sizeof(real_t));
 
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-#pragma unroll(4)
-        for (int v = 0; v < 4; ++v) {
+#pragma unroll(3)
+        for (int v = 0; v < 3; ++v) {
             ev[v] = elems[v][i];
         }
 
@@ -120,33 +106,29 @@ void projection_p0_to_p1(const ptrdiff_t nelements,
         const idx_t i0 = ev[0];
         const idx_t i1 = ev[1];
         const idx_t i2 = ev[2];
-        const idx_t i3 = ev[3];
 
         element_p0 = p0[i];
 
-        projection_p0_to_p1_kernel(
+        surface_projection_p0_to_p1_kernel(
             // X-coordinates
             xyz[0][i0],
             xyz[0][i1],
             xyz[0][i2],
-            xyz[0][i3],
             // Y-coordinates
             xyz[1][i0],
             xyz[1][i1],
             xyz[1][i2],
-            xyz[1][i3],
             // Z-coordinates
             xyz[2][i0],
             xyz[2][i1],
             xyz[2][i2],
-            xyz[2][i3],
             // Data
             &element_p0,
             // Output
             element_p1,
             element_weights);
 
-        for (int v = 0; v < 4; ++v) {
+        for (int v = 0; v < 3; ++v) {
             const idx_t idx = ev[v];
             p1[idx] += element_p1[v];
             weights[idx] += element_weights[v];
@@ -160,27 +142,27 @@ void projection_p0_to_p1(const ptrdiff_t nelements,
     free(weights);
 
     double tock = MPI_Wtime();
-    printf("projection_p0_to_p1.c: projection_p0_to_p1\t%g seconds\n", tock - tick);
+    printf("surface_projection_p0_to_p1.c: surface_projection_p0_to_p1\t%g seconds\n", tock - tick);
 }
 
-void assemble_p0_to_p1(const ptrdiff_t nelements,
-                       const ptrdiff_t nnodes,
-                       idx_t **const SFEM_RESTRICT elems,
-                       geom_t **const SFEM_RESTRICT xyz,
-                       const real_t *const SFEM_RESTRICT p0,
-                       real_t *const SFEM_RESTRICT p1) {
+void surface_assemble_p0_to_p1(const ptrdiff_t nelements,
+                               const ptrdiff_t nnodes,
+                               idx_t **const SFEM_RESTRICT elems,
+                               geom_t **const SFEM_RESTRICT xyz,
+                               const real_t *const SFEM_RESTRICT p0,
+                               real_t *const SFEM_RESTRICT p1) {
     double tick = MPI_Wtime();
 
-    idx_t ev[4];
+    idx_t ev[3];
 
     real_t element_p0;
-    real_t element_p1[4];
+    real_t element_p1[3];
 
     memset(p1, 0, nnodes * sizeof(real_t));
 
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-#pragma unroll(4)
-        for (int v = 0; v < 4; ++v) {
+#pragma unroll(3)
+        for (int v = 0; v < 3; ++v) {
             ev[v] = elems[v][i];
         }
 
@@ -188,7 +170,6 @@ void assemble_p0_to_p1(const ptrdiff_t nelements,
         const idx_t i0 = ev[0];
         const idx_t i1 = ev[1];
         const idx_t i2 = ev[2];
-        const idx_t i3 = ev[3];
 
         element_p0 = p0[i];
 
@@ -197,30 +178,27 @@ void assemble_p0_to_p1(const ptrdiff_t nelements,
             xyz[0][i0],
             xyz[0][i1],
             xyz[0][i2],
-            xyz[0][i3],
             // Y-coordinates
             xyz[1][i0],
             xyz[1][i1],
             xyz[1][i2],
-            xyz[1][i3],
             // Z-coordinates
             xyz[2][i0],
             xyz[2][i1],
             xyz[2][i2],
-            xyz[2][i3],
             // Data
             &element_p0,
             // Output
             element_p1);
 
-        for (int v = 0; v < 4; ++v) {
+        for (int v = 0; v < 3; ++v) {
             const idx_t idx = ev[v];
             p1[idx] += element_p1[v];
         }
     }
 
     double tock = MPI_Wtime();
-    printf("projection_p0_to_p1.c: assemble_p0_to_p1\t%g seconds\n", tock - tick);
+    printf("surface_projection_p0_to_p1.c: surface_assemble_p0_to_p1\t%g seconds\n", tock - tick);
 }
 
 int main(int argc, char *argv[]) {
@@ -255,7 +233,7 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
+    if (mesh_surf_read(comm, folder, &mesh)) {
         return EXIT_FAILURE;
     }
 
@@ -272,17 +250,17 @@ int main(int argc, char *argv[]) {
     memset(p1, 0, nnodes * sizeof(real_t));
 
     ///////////////////////////////////////////////////////////////////////////////
-    // Compute projection
+    // Compute surface_projection
     ///////////////////////////////////////////////////////////////////////////////
 
-    int SFEM_COMPUTE_COEFFICIENTS=1;
+    int SFEM_COMPUTE_COEFFICIENTS = 1;
 
     SFEM_READ_ENV(SFEM_COMPUTE_COEFFICIENTS, atoi);
 
-    if(SFEM_COMPUTE_COEFFICIENTS) {
-        projection_p0_to_p1(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, p0, p1);
+    if (SFEM_COMPUTE_COEFFICIENTS) {
+        surface_projection_p0_to_p1(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, p0, p1);
     } else {
-        assemble_p0_to_p1(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, p0, p1);
+        surface_assemble_p0_to_p1(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, p0, p1);
     }
 
     ///////////////////////////////////////////////////////////////////////////////
