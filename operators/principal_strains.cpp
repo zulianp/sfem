@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <complex>
+#include <cassert>
 
 static SFEM_INLINE void principal_strain_kernel(const real_t px0,
                                                 const real_t px1,

@@ -17,7 +17,7 @@ set -x
 # export DYLD_LIBRARY_PATH=$INSTALL_DIR/ginkgo/lib:$DYLD_LIBRARY_PATH
 # export ISOLVER_LSOLVE_PLUGIN=$INSTALL_DIR/isolver/lib/libisolver_ginkgo.dylib
 
-export DYLD_LIBRARY_PATH=$CODE_DIR/external/petsc/lib/:/Users/patrickzulian/Desktop/code/utopia/utopia/build/ui/
+export DYLD_LIBRARY_PATH=$CODE_DIR/external/petsc/lib/:$CODE_DIR/utopia/utopia/build/ui/
 export ISOLVER_LSOLVE_PLUGIN=$INSTALL_DIR/utopia/lib/libutopia.dylib
 export UTOPIA_LINEAR_SOLVER_CONFIG=$PWD/utopia.yaml
 
