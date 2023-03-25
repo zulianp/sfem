@@ -29,6 +29,7 @@ velx=$1
 vely=$2
 velz=$3
 output=$4
+clamp_velocity=0
 
 ls -la $velx
 ls -la $vely
@@ -167,9 +168,12 @@ boundary_wall=$mesh_path/sidesets_aos/swall.raw
 boundary_inlet=$mesh_path/sidesets_aos/sinlet.raw
 boundary_outlet=$mesh_path/sidesets_aos/soutlet.raw
 
-smask $boundary_wall $velx $velx 0
-smask $boundary_wall $vely $vely 0
-smask $boundary_wall $velz $velz 0
+if [[ "$clamp_velocity" -eq "1" ]]
+then
+	smask $boundary_wall $velx $velx 0
+	smask $boundary_wall $vely $vely 0
+	smask $boundary_wall $velz $velz 0
+fi
 
 divu=$workspace/divu.raw
 SFEM_VERBOSE=1 divergence $mesh_path $velx $vely $velz $divu
@@ -203,6 +207,7 @@ fi
 # Add surface flux
 # axpy 1 $neumann_bc $divu
 smask $dirichlet_nodes $divu $rhs 0
+# cp $divu $rhs
 norm_fp64 $rhs
 
 ######################################

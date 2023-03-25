@@ -12,7 +12,7 @@ PATH=$SCRIPTPATH/../../../workflows/divergence:$PATH
 
 set -x
 
-nrefs=5
+nrefs=1
 
 folder=cylinder
 mesh_db=$folder/mesh.vtk
@@ -74,23 +74,16 @@ boundary_nodes()
 	sideset_raw=$2
 
 	workspace=`mktemp -d`
-	# workspace=workspace
-	# mkdir -p workspace
-
-
+	
 	# Convert gather surf-mesh indices
 	sgather $mesh_surface/sides_"$name".raw $idx_type_size $mesh_surface/i0.raw $workspace/i0.raw
 	sgather $mesh_surface/sides_"$name".raw $idx_type_size $mesh_surface/i1.raw $workspace/i1.raw
 	sgather $mesh_surface/sides_"$name".raw $idx_type_size $mesh_surface/i2.raw $workspace/i2.raw
 
-
 	# Convert surf-mesh indices to volume mesh indices
 	sgather $workspace/i0.raw $idx_type_size $mesh_surface/node_mapping.raw $mesh_surface/"$name"/i0.raw 
 	sgather $workspace/i1.raw $idx_type_size $mesh_surface/node_mapping.raw $mesh_surface/"$name"/i1.raw 
 	sgather $workspace/i2.raw $idx_type_size $mesh_surface/node_mapping.raw $mesh_surface/"$name"/i2.raw 
-
-	# set_union $mesh_surface/"$name"/i0.raw $mesh_surface/"$name"/i1.raw $workspace/temp.raw
-	# set_union $workspace/temp.raw		   $mesh_surface/"$name"/i2.raw $sideset_raw
 
 	soa_to_aos "$mesh_surface/"$name"/i*.raw" $idx_type_size $sideset_raw
 	rm -r $workspace
