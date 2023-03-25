@@ -227,11 +227,11 @@ __global__ void print_elem_kernel(const ptrdiff_t nelements, idx_t **const elems
 
 extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
                                            const ptrdiff_t nnodes,
-                                           idx_t **const elems,
-                                           geom_t **const xyz,
-                                           const count_t *const rowptr,
-                                           const idx_t *const colidx,
-                                           real_t *const values) {
+                                           idx_t **const SFEM_RESTRICT elems,
+                                           geom_t **const SFEM_RESTRICT xyz,
+                                           const count_t *const SFEM_RESTRICT rowptr,
+                                           const idx_t *const SFEM_RESTRICT colidx,
+                                           real_t *const SFEM_RESTRICT values) {
     double tick = MPI_Wtime();
 
     const ptrdiff_t nbatch = nelements;

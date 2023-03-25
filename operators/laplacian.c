@@ -108,8 +108,8 @@ static SFEM_INLINE void laplacian_gradient(const real_t px0,
                                            const real_t pz1,
                                            const real_t pz2,
                                            const real_t pz3,
-                                           const real_t *u,
-                                           real_t *element_vector) {
+                                           const real_t *SFEM_RESTRICT u,
+                                           real_t *SFEM_RESTRICT element_vector) {
     // FLOATING POINT OPS!
     //      - Result: 4*ADD + 4*ASSIGNMENT + 16*MUL
     //      - Subexpressions: 13*ADD + 7*DIV + 46*MUL + 3*NEG + 30*SUB
@@ -169,8 +169,8 @@ static SFEM_INLINE void laplacian_value(const real_t px0,
                                         const real_t pz1,
                                         const real_t pz2,
                                         const real_t pz3,
-                                        const real_t *u,
-                                        real_t *element_scalar) {
+                                        const real_t *SFEM_RESTRICT u,
+                                        real_t *SFEM_RESTRICT element_scalar) {
     // FLOATING POINT OPS!
     //       - Result: 8*ADD + ASSIGNMENT + 31*MUL + 3*POW
     //       - Subexpressions: 2*ADD + DIV + 34*MUL + 21*SUB
@@ -263,11 +263,11 @@ static SFEM_INLINE void find_cols4(const idx_t *targets, const idx_t *const row,
 
 void laplacian_assemble_hessian(const ptrdiff_t nelements,
                                 const ptrdiff_t nnodes,
-                                idx_t **const elems,
-                                geom_t **const xyz,
-                                const count_t *const rowptr,
-                                const idx_t *const colidx,
-                                real_t *const values) {
+                                idx_t **const SFEM_RESTRICT elems,
+                                geom_t **const SFEM_RESTRICT xyz,
+                                const count_t *const SFEM_RESTRICT rowptr,
+                                const idx_t *const SFEM_RESTRICT colidx,
+                                real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
     double tick = MPI_Wtime();
@@ -331,10 +331,10 @@ void laplacian_assemble_hessian(const ptrdiff_t nelements,
 
 void laplacian_assemble_gradient(const ptrdiff_t nelements,
                                  const ptrdiff_t nnodes,
-                                 idx_t **const elems,
-                                 geom_t **const xyz,
-                                 const real_t *const u,
-                                 real_t *const values) {
+                                 idx_t **const SFEM_RESTRICT elems,
+                                 geom_t **const SFEM_RESTRICT xyz,
+                                 const real_t *const SFEM_RESTRICT u,
+                                 real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
     double tick = MPI_Wtime();
@@ -390,10 +390,10 @@ void laplacian_assemble_gradient(const ptrdiff_t nelements,
 
 void laplacian_assemble_value(const ptrdiff_t nelements,
                               const ptrdiff_t nnodes,
-                              idx_t **const elems,
-                              geom_t **const xyz,
-                              const real_t *const u,
-                              real_t *const value) {
+                              idx_t **const SFEM_RESTRICT elems,
+                              geom_t **const SFEM_RESTRICT xyz,
+                              const real_t *const SFEM_RESTRICT u,
+                              real_t *const SFEM_RESTRICT value) {
     SFEM_UNUSED(nnodes);
     
     double tick = MPI_Wtime();
@@ -447,10 +447,10 @@ void laplacian_assemble_value(const ptrdiff_t nelements,
 
 void laplacian_apply(const ptrdiff_t nelements,
                      const ptrdiff_t nnodes,
-                     idx_t **const elems,
-                     geom_t **const xyz,
-                     const real_t *const u,
-                     real_t *const values)
+                     idx_t **const SFEM_RESTRICT elems,
+                     geom_t **const SFEM_RESTRICT xyz,
+                     const real_t *const SFEM_RESTRICT u,
+                     real_t *const SFEM_RESTRICT values)
 {
     laplacian_assemble_gradient(nelements, nnodes, elems, xyz, u, values);
 }
