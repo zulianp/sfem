@@ -66,17 +66,39 @@ int main(int argc, char *argv[]) {
     idx_t *idx = (idx_t *)malloc(mesh.n_owned_elements * sizeof(idx_t));
     // memset(idx, 0, mesh.n_owned_elements * sizeof(idx_t));
 
-    int coord = mesh.spatial_dim - 1;
+    // int coord = mesh.spatial_dim - 1;
 
+    geom_t box[2][3];
+
+    for (int d = 0; d < mesh.spatial_dim; d++) {
+        box[0][d] = mesh.points[d][0];
+        box[1][d] = mesh.points[d][0];
+
+        for(ptrdiff_t i = 0; i<mesh.n_owned_nodes; i++) {
+            box[0][d] = MIN(box[0][d] ,mesh.points[d][i]); 
+            box[1][d] = MAX(box[0][d] ,mesh.points[d][i]); 
+        }
+    }
+    
     for (int d = 0; d < mesh.element_type; d++) {
         for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
-            val[i] += mesh.points[coord][mesh.elements[d][i]];
+            
+            geom_t scale = 1;
+            for(int coord=0; coord < mesh.spatial_dim; coord++) {
+                geom_t x = mesh.points[coord][mesh.elements[d][i]];            
+                x -= box[0][coord];
+                x /= box[1][coord] - box[0][coord];
+                x *= scale;
+
+                val[i] += x;
+                scale *= 10;
+            }
         }
     }
 
-    for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
-        val[i] /= mesh.element_type;
-    }
+    // for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
+    //     val[i] /= mesh.element_type;
+    // }
 
 #ifdef DSFEM_ENABLE_MPI_SORT
 
@@ -170,6 +192,9 @@ int main(int argc, char *argv[]) {
         free(buff);
         free(x_buff);
     }
+
+    free(val);
+    free(idx);
 
     mesh_write(output_folder, &mesh);
     mesh_destroy(&mesh);
