@@ -65,29 +65,32 @@ int main(int argc, char *argv[]) {
 
     idx_t *idx = (idx_t *)malloc(mesh.n_owned_elements * sizeof(idx_t));
 
-    geom_t box[2][3];
+    geom_t box_min[3], box_max[3];
 
     for (int coord = 0; coord < mesh.spatial_dim; coord++) {
-        box[0][coord] = mesh.points[coord][0];
-        box[1][coord] = mesh.points[coord][0];
+        box_min[coord] = mesh.points[coord][0];
+        box_max[coord] = mesh.points[coord][0];
 
         for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
-            box[0][coord] = MIN(box[0][coord], mesh.points[coord][i]);
-            box[1][coord] = MAX(box[1][coord], mesh.points[coord][i]);
+            const geom_t x = mesh.points[coord][i];
+            box_min[coord] = MIN(box_min[coord], x);
+            box_max[coord] = MAX(box_max[coord], x);
         }
     }
 
     for (int d = 0; d < mesh.element_type; d++) {
         for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
+            const idx_t i0 = mesh.elements[d][i];
+
             geom_t scale = 1;
             for (int coord = 0; coord < mesh.spatial_dim; coord++) {
-                geom_t x = mesh.points[coord][mesh.elements[coord][i]];
-                x -= box[0][coord];
-                x /= box[1][coord] - box[0][coord];
+                geom_t x = mesh.points[coord][i0];
+                x -= box_min[coord];
+                x /= box_max[coord] - box_min[coord];
                 x *= scale;
 
                 val[i] += x;
-                scale *= 10;
+                scale *= 100;
             }
         }
     }
