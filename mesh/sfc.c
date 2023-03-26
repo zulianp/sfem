@@ -102,26 +102,73 @@ int main(int argc, char *argv[]) {
 
         argsort_f(mesh.n_owned_elements, val, idx);
 
-        ptrdiff_t buff_size = MAX(mesh.n_owned_elements, mesh.n_owned_nodes) * MAX(sizeof(geom_t), sizeof(idx_t));
+        ptrdiff_t buff_size = MAX(mesh.n_owned_elements, mesh.n_owned_nodes) * sizeof(idx_t);
         void *buff = malloc(buff_size);
 
         // 1) rearrange elements
-
-        idx_t *elem_buff = (idx_t *)buff;
-        for (int d = 0; d < mesh.element_type; d++) {
-            memcpy(elem_buff, mesh.elements[d], mesh.n_owned_elements * sizeof(idx_t));
-            for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
-                mesh.elements[d][i] = elem_buff[idx[i]];
+        {
+            idx_t *elem_buff = (idx_t *)buff;
+            for (int d = 0; d < mesh.element_type; d++) {
+                memcpy(elem_buff, mesh.elements[d], mesh.n_owned_elements * sizeof(idx_t));
+                for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
+                    mesh.elements[d][i] = elem_buff[idx[i]];
+                }
             }
         }
 
         // 2) rearrange element_mapping (if the case)
+        // TODO
 
         // 3) rearrange nodes
+        idx_t *node_buff = (idx_t *)buff;
+
+        {
+        memset(node_buff, 0, mesh.n_owned_nodes * sizeof(idx_t));
+
+        idx_t next_node = 1;
+        for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
+            for (int d = 0; d < mesh.element_type; d++) {
+                idx_t i0 = mesh.elements[d][i];
+
+                if (!node_buff[i0]) {
+                    node_buff[i0] = next_node++;
+                    assert(next_node - 1 <= mesh.n_owned_nodes);
+                }
+            }
+        }
+
+        assert(next_node - 1 == mesh.n_owned_nodes);
+
+        for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
+            assert(node_buff[i] > 0);
+            node_buff[i] -= 1;
+        }
+
+    }
+
+        // Update e2n
+        for (int d = 0; d < mesh.element_type; d++) {
+            for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
+                idx_t i0 = mesh.elements[d][i];
+                mesh.elements[d][i] = node_buff[i0];
+            }
+        }
+
+        // update coordinates
+        geom_t *x_buff = malloc(mesh.n_owned_nodes * sizeof(geom_t));
+        for (int d = 0; d < mesh.spatial_dim; d++) {
+            memcpy(x_buff, mesh.points[d], mesh.n_owned_nodes * sizeof(geom_t));
+
+            for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
+                mesh.points[d][node_buff[i]] = x_buff[i];
+            }
+        }
 
         // 4) rearrange (or create node_mapping (for relating data))
+        // TODO
 
         free(buff);
+        free(x_buff);
     }
 
     mesh_write(output_folder, &mesh);
