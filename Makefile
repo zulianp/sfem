@@ -26,6 +26,11 @@ ifeq ($(avx2sort), 1)
 	CFLAGS += -march=core-avx2
 endif
 
+ifeq ($(mpisort), 1)
+	INCLUDES += -I../mpi-sort/include
+	CFLAGS += -L../mpi-sort/lib -lmpi-sort -DSFEM_ENABLE_MPI_SORT
+endif
+
 # Folder structure
 VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra
 INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra
@@ -48,7 +53,7 @@ INCLUDES += -I$(PWD) -I$(PWD)/.. -I$(PWD)/../matrix.io
 GOALS = assemble assemble3 assemble4 
 
 # Mesh manipulation
-GOALS += partition select_submesh refine skin select_surf volumes
+GOALS += partition select_submesh refine skin select_surf volumes sfc
 
 # FE post-process
 GOALS += cgrad cshear cstrain cprincipal_strains cauchy_stress vonmises
@@ -155,6 +160,9 @@ assemble4 : assemble4.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 partition : partition.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+sfc : sfc.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 select_submesh : select_submesh.o libsfem.a
