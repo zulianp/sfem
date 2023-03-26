@@ -64,28 +64,24 @@ int main(int argc, char *argv[]) {
     memset(val, 0, mesh.n_owned_elements * sizeof(geom_t));
 
     idx_t *idx = (idx_t *)malloc(mesh.n_owned_elements * sizeof(idx_t));
-    // memset(idx, 0, mesh.n_owned_elements * sizeof(idx_t));
-
-    // int coord = mesh.spatial_dim - 1;
 
     geom_t box[2][3];
 
-    for (int d = 0; d < mesh.spatial_dim; d++) {
-        box[0][d] = mesh.points[d][0];
-        box[1][d] = mesh.points[d][0];
+    for (int coord = 0; coord < mesh.spatial_dim; coord++) {
+        box[0][coord] = mesh.points[coord][0];
+        box[1][coord] = mesh.points[coord][0];
 
-        for(ptrdiff_t i = 0; i<mesh.n_owned_nodes; i++) {
-            box[0][d] = MIN(box[0][d] ,mesh.points[d][i]); 
-            box[1][d] = MAX(box[0][d] ,mesh.points[d][i]); 
+        for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
+            box[0][coord] = MIN(box[0][coord], mesh.points[coord][i]);
+            box[1][coord] = MAX(box[1][coord], mesh.points[coord][i]);
         }
     }
-    
+
     for (int d = 0; d < mesh.element_type; d++) {
         for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
-            
             geom_t scale = 1;
-            for(int coord=0; coord < mesh.spatial_dim; coord++) {
-                geom_t x = mesh.points[coord][mesh.elements[d][i]];            
+            for (int coord = 0; coord < mesh.spatial_dim; coord++) {
+                geom_t x = mesh.points[coord][mesh.elements[coord][i]];
                 x -= box[0][coord];
                 x /= box[1][coord] - box[0][coord];
                 x *= scale;
@@ -95,10 +91,6 @@ int main(int argc, char *argv[]) {
             }
         }
     }
-
-    // for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
-    //     val[i] /= mesh.element_type;
-    // }
 
 #ifdef DSFEM_ENABLE_MPI_SORT
 
@@ -145,28 +137,27 @@ int main(int argc, char *argv[]) {
         idx_t *node_buff = (idx_t *)buff;
 
         {
-        memset(node_buff, 0, mesh.n_owned_nodes * sizeof(idx_t));
+            memset(node_buff, 0, mesh.n_owned_nodes * sizeof(idx_t));
 
-        idx_t next_node = 1;
-        for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
-            for (int d = 0; d < mesh.element_type; d++) {
-                idx_t i0 = mesh.elements[d][i];
+            idx_t next_node = 1;
+            for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
+                for (int d = 0; d < mesh.element_type; d++) {
+                    idx_t i0 = mesh.elements[d][i];
 
-                if (!node_buff[i0]) {
-                    node_buff[i0] = next_node++;
-                    assert(next_node - 1 <= mesh.n_owned_nodes);
+                    if (!node_buff[i0]) {
+                        node_buff[i0] = next_node++;
+                        assert(next_node - 1 <= mesh.n_owned_nodes);
+                    }
                 }
             }
+
+            assert(next_node - 1 == mesh.n_owned_nodes);
+
+            for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
+                assert(node_buff[i] > 0);
+                node_buff[i] -= 1;
+            }
         }
-
-        assert(next_node - 1 == mesh.n_owned_nodes);
-
-        for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
-            assert(node_buff[i] > 0);
-            node_buff[i] -= 1;
-        }
-
-    }
 
         // Update e2n
         for (int d = 0; d < mesh.element_type; d++) {
