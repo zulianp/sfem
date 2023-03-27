@@ -162,68 +162,6 @@ static inline __device__ __host__ void find_cols4(const idx_t *targets,
     }
 }
 
-// __global__ void laplacian_assemble_hessian_kernel(const ptrdiff_t nelements,
-//                                                   const ptrdiff_t nnodes,
-//                                                   idx_t **const elems,
-//                                                   geom_t **const xyz,
-//                                                   count_t *const rowptr,
-//                                                   idx_t *const colidx,
-//                                                   real_t *const values) {
-//     idx_t ev[4];
-//     idx_t ks[4];
-//     real_t element_matrix[4 * 4];
-
-//     for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < nelements; i += blockDim.x * gridDim.x) {
-// #pragma unroll(4)
-//         for (int v = 0; v < 4; ++v) {
-//             ev[v] = elems[v][i];
-//         }
-
-//         // Element indices
-//         const idx_t i0 = ev[0];
-//         const idx_t i1 = ev[1];
-//         const idx_t i2 = ev[2];
-//         const idx_t i3 = ev[3];
-
-//         laplacian(
-//             // X-coordinates
-//             xyz[0][i0],
-//             xyz[0][i1],
-//             xyz[0][i2],
-//             xyz[0][i3],
-//             // Y-coordinates
-//             xyz[1][i0],
-//             xyz[1][i1],
-//             xyz[1][i2],
-//             xyz[1][i3],
-//             // Z-coordinates
-//             xyz[2][i0],
-//             xyz[2][i1],
-//             xyz[2][i2],
-//             xyz[2][i3],
-//             element_matrix);
-
-// #pragma unroll(4)
-//         for (int edof_i = 0; edof_i < 4; ++edof_i) {
-//             const idx_t dof_i = elems[edof_i][i];
-//             const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
-
-//             const idx_t *row = &colidx[rowptr[dof_i]];
-
-//             find_cols4(ev, row, lenrow, ks);
-
-//             real_t *rowvalues = &values[rowptr[dof_i]];
-//             const real_t *element_row = &element_matrix[edof_i * 4];
-
-// #pragma unroll(4)
-//             for (int edof_j = 0; edof_j < 4; ++edof_j) {
-//                 real_t v = element_row[edof_j];
-//                 atomicAdd(&rowvalues[ks[edof_j]], v);
-//             }
-//         }
-//     }
-// }
-
 __global__ void laplacian_assemble_hessian_kernel(const ptrdiff_t nelements,
                                                   const geom_t *const SFEM_RESTRICT xyz,
                                                   real_t *const SFEM_RESTRICT values) {
@@ -421,8 +359,6 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         }
 
         laplacian_assemble_hessian_kernel<<<n_blocks, block_size, 0, cu_stream[0]>>>(n, de_xyz, de_matrix);
-        // cudaEventRecord(cu_event[0], cu_stream[0]);
-        // cuStreamWaitEvent(stream[1], event[0]);
         cudaStreamSynchronize(cu_stream[0]);
         local_to_global_kernel<<<n_blocks, block_size, 0, cu_stream[1]>>>(
             n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
