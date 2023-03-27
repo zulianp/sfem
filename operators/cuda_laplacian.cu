@@ -172,28 +172,22 @@ __global__ void laplacian_assemble_hessian_kernel(const ptrdiff_t nelements,
             ev[v] = elems[v][i];
         }
 
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
-        const idx_t i3 = ev[3];
-
         laplacian(
             // X-coordinates
-            xyz[0][i0],
-            xyz[0][i1],
-            xyz[0][i2],
-            xyz[0][i3],
+            xyz[0][ev[0]],
+            xyz[0][ev[1]],
+            xyz[0][ev[2]],
+            xyz[0][ev[3]],
             // Y-coordinates
-            xyz[1][i0],
-            xyz[1][i1],
-            xyz[1][i2],
-            xyz[1][i3],
+            xyz[1][ev[0]],
+            xyz[1][ev[1]],
+            xyz[1][ev[2]],
+            xyz[1][ev[3]],
             // Z-coordinates
-            xyz[2][i0],
-            xyz[2][i1],
-            xyz[2][i2],
-            xyz[2][i3],
+            xyz[2][ev[0]],
+            xyz[2][ev[1]],
+            xyz[2][ev[2]],
+            xyz[2][ev[3]],
             element_matrix);
 
 #pragma unroll(4)
@@ -286,8 +280,9 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         SFEM_CUDA_CHECK(cudaMemcpy(d_values, values, nnz * sizeof(real_t), cudaMemcpyHostToDevice));
     }
 
+    double ktick = MPI_Wtime();
     {
-        // double ktick = MPI_Wtime();
+        
 
         laplacian_assemble_hessian_kernel<<<n_blocks, block_size>>>(
             nelements, nnodes, d_elems, d_xyz, d_rowptr, d_colidx, d_values);
@@ -300,6 +295,7 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         // Copy result to Host memory
         SFEM_CUDA_CHECK(cudaMemcpy(values, d_values, nnz * sizeof(real_t), cudaMemcpyDeviceToHost));
     }
+    double ktock = MPI_Wtime();
 
     {  // Free element indices
         for (int d = 0; d < 4; ++d) {
@@ -324,5 +320,5 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("cuda_laplacian.c: laplacian_assemble_hessian\t%g seconds\n", tock - tick);
+    printf("cuda_laplacian.c: laplacian_assemble_hessian\t%g seconds (GPU kernel %g seconds)\n", tock - tick, ktock - ktick);
 }

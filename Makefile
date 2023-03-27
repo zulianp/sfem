@@ -32,8 +32,8 @@ ifeq ($(mpisort), 1)
 endif
 
 # Folder structure
-VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra
-INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra
+VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix
+INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix
 
 
 CFLAGS += -pedantic -Wextra
@@ -106,8 +106,10 @@ OBJS = \
 
 
 ifeq ($(cuda), 1)
-	CUDA_OBJS = cuda_laplacian.o
-# 	CUDA_OBJS = cuda_laplacian_2.o
+# 	CUDA_OBJS = cuda_laplacian.o
+
+	CUDA_OBJS = cuda_laplacian_2.o
+	CUDA_OBJS += cuda_crs.o
 	DEPS += -L/opt/cuda/lib64 -lcudart
 
 	OBJS += $(CUDA_OBJS)

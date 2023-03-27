@@ -5,6 +5,8 @@
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
 
+#include <stdio.h>
+
 inline void sfem_cuda_check(cudaError_t code, const char* file, int line, bool abort = true) {
         if (code != cudaSuccess) {
             fprintf(stderr, "cuda_check: %s %s:%d\n", cudaGetErrorString(code), file, line);

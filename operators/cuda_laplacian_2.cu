@@ -12,6 +12,7 @@ extern "C" {
 #include "sfem_base.h"
 
 #include "crs_graph.h"
+#include "cuda_crs.h"
 #include "sfem_base.h"
 #include "sfem_vec.h"
 #include "sortreduce.h"
@@ -89,22 +90,22 @@ static inline __device__ void laplacian(const real_t x0,
     const real_t x52 = x20 * (-1.0 / 6.0 * x21 * x22 - 1.0 / 6.0 * x24 * x25 - 1.0 / 6.0 * x32 * x33);
     const real_t x53 = x20 * (x22 * x44 + x25 * x50 + x33 * x47);
 
-    element_matrix[0*stride] = x20 * (-1.0 / 6.0 * pow(x23, 2) - 1.0 / 6.0 * pow(x29, 2) - 1.0 / 6.0 * pow(x34, 2));
-    element_matrix[1*stride] = x42;
-    element_matrix[2*stride] = x48;
-    element_matrix[3*stride] = x49;
-    element_matrix[4*stride] = x42;
-    element_matrix[5*stride] = x20 * (-1.0 / 6.0 * pow(x21, 2) - 1.0 / 6.0 * pow(x24, 2) - 1.0 / 6.0 * pow(x32, 2));
-    element_matrix[6*stride] = x51;
-    element_matrix[7*stride] = x52;
-    element_matrix[8*stride] = x48;
-    element_matrix[9*stride] = x51;
-    element_matrix[10*stride] = x20 * (-1.0 / 6.0 * pow(x43, 2) - 1.0 / 6.0 * pow(x45, 2) - 1.0 / 6.0 * pow(x46, 2));
-    element_matrix[11*stride] = x53;
-    element_matrix[12*stride] = x49;
-    element_matrix[13*stride] = x52;
-    element_matrix[14*stride] = x53;
-    element_matrix[15*stride] = x20 * (-1.0 / 6.0 * pow(x22, 2) - 1.0 / 6.0 * pow(x25, 2) - 1.0 / 6.0 * pow(x33, 2));
+    element_matrix[0 * stride] = x20 * (-1.0 / 6.0 * pow(x23, 2) - 1.0 / 6.0 * pow(x29, 2) - 1.0 / 6.0 * pow(x34, 2));
+    element_matrix[1 * stride] = x42;
+    element_matrix[2 * stride] = x48;
+    element_matrix[3 * stride] = x49;
+    element_matrix[4 * stride] = x42;
+    element_matrix[5 * stride] = x20 * (-1.0 / 6.0 * pow(x21, 2) - 1.0 / 6.0 * pow(x24, 2) - 1.0 / 6.0 * pow(x32, 2));
+    element_matrix[6 * stride] = x51;
+    element_matrix[7 * stride] = x52;
+    element_matrix[8 * stride] = x48;
+    element_matrix[9 * stride] = x51;
+    element_matrix[10 * stride] = x20 * (-1.0 / 6.0 * pow(x43, 2) - 1.0 / 6.0 * pow(x45, 2) - 1.0 / 6.0 * pow(x46, 2));
+    element_matrix[11 * stride] = x53;
+    element_matrix[12 * stride] = x49;
+    element_matrix[13 * stride] = x52;
+    element_matrix[14 * stride] = x53;
+    element_matrix[15 * stride] = x20 * (-1.0 / 6.0 * pow(x22, 2) - 1.0 / 6.0 * pow(x25, 2) - 1.0 / 6.0 * pow(x33, 2));
 }
 
 static inline __device__ __host__ int linear_search(const idx_t target, const idx_t *const arr, const int size) {
@@ -226,9 +227,6 @@ static inline __device__ __host__ void find_cols4(const idx_t *targets,
 __global__ void laplacian_assemble_hessian_kernel(const ptrdiff_t nelements,
                                                   const geom_t *const SFEM_RESTRICT xyz,
                                                   real_t *const SFEM_RESTRICT values) {
-
-   
-
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
         real_t x[3][4];
 // coalesced read
@@ -258,9 +256,40 @@ __global__ void laplacian_assemble_hessian_kernel(const ptrdiff_t nelements,
             x[2][2],
             x[2][3],
             nelements,
-            &values[e]
-            );
+            &values[e]);
+    }
+}
 
+__global__ void local_to_global_kernel(const ptrdiff_t nelements,
+                                       idx_t **const SFEM_RESTRICT elems,
+                                       const real_t *const SFEM_RESTRICT e_matrix,
+                                       const count_t *const SFEM_RESTRICT rowptr,
+                                       const idx_t *const SFEM_RESTRICT colidx,
+                                       real_t *const SFEM_RESTRICT values) {
+    idx_t ev[4];
+    idx_t ks[4];
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
+#pragma unroll(4)
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elems[v][e];
+        }
+#pragma unroll(4)
+        for (int edof_i = 0; edof_i < 4; ++edof_i) {
+            const idx_t dof_i = elems[edof_i][e];
+            const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
+
+            const idx_t *row = &colidx[rowptr[dof_i]];
+
+            find_cols4(ev, row, lenrow, ks);
+
+            real_t *rowvalues = &values[rowptr[dof_i]];
+
+#pragma unroll(4)
+            for (int edof_j = 0; edof_j < 4; ++edof_j) {
+                real_t v = e_matrix[(edof_i * 4 + edof_j) * nelements];
+                atomicAdd(&rowvalues[ks[edof_j]], v);
+            }
+        }
     }
 }
 
@@ -308,7 +337,7 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
                                            real_t *const SFEM_RESTRICT values) {
     double tick = MPI_Wtime();
 
-    const ptrdiff_t nbatch = 128 * 2000;
+    const ptrdiff_t nbatch = MIN(128 * 2000, nelements);
     static int block_size = 128;
     ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (nbatch + block_size - 1) / block_size);
 
@@ -322,6 +351,35 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
     real_t *de_matrix = nullptr;
     SFEM_CUDA_CHECK(cudaMalloc(&de_matrix, 4 * 4 * nbatch * sizeof(real_t)));
 
+    idx_t **hd_elems[4];
+    idx_t **d_elems = nullptr;
+
+    count_t *d_rowptr = nullptr;
+    idx_t *d_colidx = nullptr;
+    real_t *d_values = nullptr;
+
+    int use_small = 1;
+
+    static const int nstreams = 2;
+    cudaStream_t cu_stream[nstreams];
+    // cudaEvent_t cu_event[nstreams];
+    for (int s = 0; s < nstreams; s++) {
+        cudaStreamCreate(&cu_stream[s]);
+        // cudaEventCreate(&cu_event[s]);
+    }
+
+    // Allocate space for indices
+    for (int d = 0; d < 4; d++) {
+        SFEM_CUDA_CHECK(cudaMalloc(&hd_elems[d], nbatch * sizeof(idx_t)));
+    }
+
+    SFEM_CUDA_CHECK(cudaMalloc(&d_elems, 4 * sizeof(idx_t *)));
+    cudaMemcpy(d_elems, hd_elems, 4 * sizeof(idx_t *), cudaMemcpyHostToDevice);
+
+    // Copy crs-matrix
+    crs_device_create(nnodes, rowptr[nnodes], &d_rowptr, &d_colidx, &d_values);
+    crs_graph_host_to_device(nnodes, rowptr[nnodes], rowptr, colidx, d_rowptr, d_colidx);
+
     double time_setup = MPI_Wtime() - tick;
 
     double time_local_to_global = 0;
@@ -333,55 +391,48 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         n = MIN(nbatch, nelements - element_offset);
         last_element_offset = element_offset;
 
-        double tick = MPI_Wtime();
-        for (int d = 0; d < 3; ++d) {
-            const geom_t *const x = xyz[d];
+        {
+            double tick = MPI_Wtime();
+            for (int d = 0; d < 3; ++d) {
+                const geom_t *const x = xyz[d];
 
-            for (int e_node = 0; e_node < 4; e_node++) {
-                ptrdiff_t offset = (d * 4 + e_node) * nbatch;
-                const idx_t *const nodes = elems[e_node];
+                for (int e_node = 0; e_node < 4; e_node++) {
+                    ptrdiff_t offset = (d * 4 + e_node) * nbatch;
+                    const idx_t *const nodes = elems[e_node];
 
-                geom_t *buff = &he_xyz[offset];
-                for (ptrdiff_t k = 0; k < n; k++) {
-                    buff[k] = x[nodes[k]];
+                    geom_t *buff = &he_xyz[offset];
+                    for (ptrdiff_t k = 0; k < n; k++) {
+                        buff[k] = x[nodes[k]];
+                    }
                 }
             }
-        }
 
-        double tock = MPI_Wtime();
-        time_packing += tock - tick;
-
-        if (element_offset) {
-            // Blocking
-            // Copy result to host!
-            SFEM_CUDA_CHECK(cudaMemcpy(he_matrix, de_matrix, 4 * 4 * n * sizeof(real_t), cudaMemcpyDeviceToHost));
-        }
-
-        SFEM_CUDA_CHECK(cudaMemcpy(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice));
-
-        laplacian_assemble_hessian_kernel<<<n_blocks, block_size>>>(n, de_xyz, de_matrix);
-
-        if (element_offset) {
-            double tick = MPI_Wtime();
-            local_to_global(n, nnodes, element_offset, elems, xyz, he_matrix, rowptr, colidx, values);
             double tock = MPI_Wtime();
-
-            time_local_to_global += tock - tick;
+            time_packing += tock - tick;
         }
 
-        SFEM_DEBUG_SYNCHRONIZE();
-    }
+        SFEM_CUDA_CHECK(
+            cudaMemcpyAsync(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice, cu_stream[0]));
 
-    if (last_element_offset) {
-        SFEM_CUDA_CHECK(cudaMemcpy(he_matrix, de_matrix, 4 * 4 * n * sizeof(real_t), cudaMemcpyDeviceToHost));
+        cudaStreamSynchronize(cu_stream[1]);
+        for (int e_node = 0; e_node < 4; e_node++) {
+            SFEM_CUDA_CHECK(cudaMemcpy(
+                hd_elems[e_node], &elems[e_node][element_offset], n * sizeof(idx_t), cudaMemcpyHostToDevice));
+        }
 
-        double tick = MPI_Wtime();
-        local_to_global(n, nnodes, last_element_offset, elems, xyz, he_matrix, rowptr, colidx, values);
-        double tock = MPI_Wtime();
-        time_local_to_global += tock - tick;
+        laplacian_assemble_hessian_kernel<<<n_blocks, block_size, 0, cu_stream[0]>>>(n, de_xyz, de_matrix);
+        // cudaEventRecord(cu_event[0], cu_stream[0]);
+        // cuStreamWaitEvent(stream[1], event[0]);
+        cudaStreamSynchronize(cu_stream[0]);
+        local_to_global_kernel<<<n_blocks, block_size, 0, cu_stream[1]>>>(
+            n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
+
+        //  SFEM_DEBUG_SYNCHRONIZE();
     }
 
     double tack = MPI_Wtime();
+
+    SFEM_CUDA_CHECK(cudaMemcpy(values, d_values, rowptr[nnodes] * sizeof(real_t), cudaMemcpyDeviceToHost));
 
     {  // Free resources on CPU
         cudaFreeHost(he_xyz);
@@ -391,6 +442,18 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
     {  // Free resources on GPU
         SFEM_CUDA_CHECK(cudaFree(de_xyz));
         SFEM_CUDA_CHECK(cudaFree(de_matrix));
+
+        for (int d = 0; d < 4; d++) {
+            SFEM_CUDA_CHECK(cudaFree(hd_elems[d]));
+        }
+        SFEM_CUDA_CHECK(cudaFree(d_elems));
+
+        crs_device_free(d_rowptr, d_colidx, d_values);
+
+        for (int s = 0; s < nstreams; s++) {
+            cudaStreamDestroy(cu_stream[s]);
+            // cudaEventDestroy(cu_event[s]);
+        }
     }
 
     double tock = MPI_Wtime();
