@@ -7,7 +7,9 @@ else ifeq ($(prof),1)
 	CXXFLAGS += -O2 -g -DNDEBUG
 	CUFLAGS += -O2 -g -DNDEBUG 
 else ifeq ($(asan), 1)
-	ASAN_FLAGS += -fsanitize=address -fno-optimize-sibling-calls -fsanitize-address-use-after-scope -fno-omit-frame-pointer -g -O0
+	ASAN_FLAGS += -fsanitize=address -fno-optimize-sibling-calls -fsanitize-address-use-after-scope -fno-omit-frame-pointer -g 
+	ASAN_FLAGS += -O0
+# 	ASAN_FLAGS += -O1
 	CXXFLAGS += $(ASAN_FLAGS)
 	CFLAGS += $(ASAN_FLAGS)
 else
