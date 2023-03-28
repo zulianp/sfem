@@ -33,6 +33,11 @@ ifeq ($(mpisort), 1)
 	CFLAGS += -L../mpi-sort/lib -lmpi-sort -DSFEM_ENABLE_MPI_SORT
 endif
 
+ifeq ($(openmp), 1)
+	CFLAGS += -fopenmp
+	CXXFLAGS += -fopenmp
+endif
+
 # Folder structure
 VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix
 INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix
@@ -45,7 +50,7 @@ CXXFLAGS += -std=c++11
 CXXFLAGS += -fvisibility=hidden
 CXXFLAGS += -fPIC
 INTERNAL_CXXFLAGS += -fno-exceptions -fno-rtti 
-CUFLAGS += --compiler-options -fPIC -std=c++17 -arch=native 
+CUFLAGS += --compiler-options "-fPIC $(CXXFLAGS)" -std=c++14 -arch=native 
 
 # CUFLAGS += --compiler-options -fPIC -O0 -g -std=c++17
 

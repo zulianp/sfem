@@ -12,7 +12,7 @@ PATH=$SCRIPTPATH/../../../workflows/divergence:$PATH
 
 set -x
 
-nrefs=1
+nrefs=6
 
 folder=cylinder
 mesh_db=$folder/mesh.vtk

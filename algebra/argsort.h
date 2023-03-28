@@ -4,6 +4,7 @@
 #include "sfem_base.h"
 
 #include <stddef.h>
+#include <stdint.h>
 
 void argsort_f(const ptrdiff_t n, const geom_t *key, idx_t *idx);
 void argsort_i(const ptrdiff_t n, const idx_t *key, idx_t *idx);
