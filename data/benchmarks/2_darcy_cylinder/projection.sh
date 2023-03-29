@@ -38,6 +38,8 @@ ls -la $velz
 real_type_size=8
 idx_type_size=4
 real_numpy_type="np.float64"
+# div_function=u_dot_grad_q
+div_function=divergence
 
 zero_real()
 {
@@ -176,10 +178,10 @@ then
 fi
 
 divu=$workspace/divu.raw
-SFEM_VERBOSE=1 divergence $mesh_path $velx $vely $velz $divu
+SFEM_VERBOSE=1 $div_function $mesh_path $velx $vely $velz $divu
 
-# neumann_bc=$workspace/neumann_bc.raw
-# hetero_neumann  $mesh_path $velx $vely $velz $neumann_bc
+neumann_bc=$workspace/neumann_bc.raw
+hetero_neumann  $mesh_path $velx $vely $velz $neumann_bc
 
 ######################################
 # Viz
@@ -198,14 +200,14 @@ rhs=$workspace/rhs_divu.raw
 
 if [[ -z "$dirichlet_nodes" ]]
 then
-	# dirichlet_nodes=$boundary_inlet
-	dirichlet_nodes=$boundary_wall
+	dirichlet_nodes=$boundary_inlet
+	# dirichlet_nodes=$boundary_wall
 else
 	echo "Using user defined dirichlet_nodes = $dirichlet_nodes"
 fi
 
 # Add surface flux
-# axpy 1 $neumann_bc $divu
+# axpy -1 $neumann_bc $divu
 smask $dirichlet_nodes $divu $rhs 0
 # cp $divu $rhs
 norm_fp64 $rhs
@@ -251,7 +253,7 @@ axpy 1 $p1_dpdz $new_velz
 integrate_divergence $mesh_path $new_velx $new_vely $new_velz 
 
 post_divu=$workspace/post_divu.raw
-SFEM_VERBOSE=1 divergence $mesh_path $new_velx $new_vely $new_velz $post_divu
+SFEM_VERBOSE=1 $div_function $mesh_path $new_velx $new_vely $new_velz $post_divu
 post_node_div=$workspace/post_node_div.raw
 lumped_mass_inv $mesh_path $post_divu $post_node_div
 
