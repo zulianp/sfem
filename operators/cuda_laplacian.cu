@@ -19,89 +19,294 @@ extern "C" {
 
 #include "sfem_cuda_base.h"
 
-static inline __device__ void laplacian(const real_t x0,
-                                        const real_t x1,
-                                        const real_t x2,
-                                        const real_t x3,
-                                        const real_t y0,
-                                        const real_t y1,
-                                        const real_t y2,
-                                        const real_t y3,
-                                        const real_t z0,
-                                        const real_t z1,
-                                        const real_t z2,
-                                        const real_t z3,
-                                        real_t *element_matrix) {
-    // FLOATING POINT OPS!
-    //    - Result: 4*ADD + 16*ASSIGNMENT + 16*MUL + 12*POW
-    //    - Subexpressions: 16*ADD + 9*DIV + 56*MUL + 7*NEG + POW + 32*SUB
-    const real_t x4 = z0 - z3;
-    const real_t x5 = x0 - x1;
-    const real_t x6 = y0 - y2;
-    const real_t x7 = x5 * x6;
-    const real_t x8 = z0 - z1;
-    const real_t x9 = x0 - x2;
-    const real_t x10 = y0 - y3;
-    const real_t x11 = x10 * x9;
-    const real_t x12 = z0 - z2;
-    const real_t x13 = x0 - x3;
-    const real_t x14 = y0 - y1;
-    const real_t x15 = x13 * x14;
-    const real_t x16 = x10 * x5;
-    const real_t x17 = x14 * x9;
-    const real_t x18 = x13 * x6;
-    const real_t x19 = x11 * x8 + x12 * x15 - x12 * x16 - x17 * x4 - x18 * x8 + x4 * x7;
-    const real_t x20 = 1.0 / x19;
-    const real_t x21 = x11 - x18;
-    const real_t x22 = -x17 + x7;
-    const real_t x23 = x15 - x16 + x21 + x22;
-    const real_t x24 = -x12 * x13 + x4 * x9;
-    const real_t x25 = x12 * x5 - x8 * x9;
-    const real_t x26 = x13 * x8;
-    const real_t x27 = x4 * x5;
-    const real_t x28 = x26 - x27;
-    const real_t x29 = -x24 - x25 - x28;
-    const real_t x30 = x10 * x8;
-    const real_t x31 = x14 * x4;
-    const real_t x32 = -x10 * x12 + x4 * x6;
-    const real_t x33 = x12 * x14 - x6 * x8;
-    const real_t x34 = x30 - x31 + x32 + x33;
-    const real_t x35 = -x12;
-    const real_t x36 = -x9;
-    const real_t x37 = x19 * (x13 * x35 + x28 - x35 * x5 - x36 * x4 + x36 * x8);
-    const real_t x38 = -x19;
-    const real_t x39 = -x23;
-    const real_t x40 = -x34;
-    const real_t x41 = (1.0 / 6.0) / pow(x19, 2);
-    const real_t x42 = x41 * (x24 * x37 + x38 * (x21 * x39 + x32 * x40));
-    const real_t x43 = -x15 + x16;
-    const real_t x44 = (1.0 / 6.0) * x43;
-    const real_t x45 = -x26 + x27;
-    const real_t x46 = -x30 + x31;
-    const real_t x47 = (1.0 / 6.0) * x46;
-    const real_t x48 = x20 * (-x23 * x44 + (1.0 / 6.0) * x29 * x45 - x34 * x47);
-    const real_t x49 = x41 * (x25 * x37 + x38 * (x22 * x39 + x33 * x40));
-    const real_t x50 = (1.0 / 6.0) * x45;
-    const real_t x51 = x20 * (x21 * x44 + x24 * x50 + x32 * x47);
-    const real_t x52 = x20 * (-1.0 / 6.0 * x21 * x22 - 1.0 / 6.0 * x24 * x25 - 1.0 / 6.0 * x32 * x33);
-    const real_t x53 = x20 * (x22 * x44 + x25 * x50 + x33 * x47);
+// Version 1
+// static inline __device__ void laplacian(const real_t x0,
+//                                         const real_t x1,
+//                                         const real_t x2,
+//                                         const real_t x3,
+//                                         const real_t y0,
+//                                         const real_t y1,
+//                                         const real_t y2,
+//                                         const real_t y3,
+//                                         const real_t z0,
+//                                         const real_t z1,
+//                                         const real_t z2,
+//                                         const real_t z3,
+//                                         real_t *element_matrix) {
+//     // FLOATING POINT OPS!
+//     //    - Result: 4*ADD + 16*ASSIGNMENT + 16*MUL + 12*POW
+//     //    - Subexpressions: 16*ADD + 9*DIV + 56*MUL + 7*NEG + POW + 32*SUB
+//     const real_t x4 = z0 - z3;
+//     const real_t x5 = x0 - x1;
+//     const real_t x6 = y0 - y2;
+//     const real_t x7 = x5 * x6;
+//     const real_t x8 = z0 - z1;
+//     const real_t x9 = x0 - x2;
+//     const real_t x10 = y0 - y3;
+//     const real_t x11 = x10 * x9;
+//     const real_t x12 = z0 - z2;
+//     const real_t x13 = x0 - x3;
+//     const real_t x14 = y0 - y1;
+//     const real_t x15 = x13 * x14;
+//     const real_t x16 = x10 * x5;
+//     const real_t x17 = x14 * x9;
+//     const real_t x18 = x13 * x6;
+//     const real_t x19 = x11 * x8 + x12 * x15 - x12 * x16 - x17 * x4 - x18 * x8 + x4 * x7;
+//     const real_t x20 = 1.0 / x19;
+//     const real_t x21 = x11 - x18;
+//     const real_t x22 = -x17 + x7;
+//     const real_t x23 = x15 - x16 + x21 + x22;
+//     const real_t x24 = -x12 * x13 + x4 * x9;
+//     const real_t x25 = x12 * x5 - x8 * x9;
+//     const real_t x26 = x13 * x8;
+//     const real_t x27 = x4 * x5;
+//     const real_t x28 = x26 - x27;
+//     const real_t x29 = -x24 - x25 - x28;
+//     const real_t x30 = x10 * x8;
+//     const real_t x31 = x14 * x4;
+//     const real_t x32 = -x10 * x12 + x4 * x6;
+//     const real_t x33 = x12 * x14 - x6 * x8;
+//     const real_t x34 = x30 - x31 + x32 + x33;
+//     const real_t x35 = -x12;
+//     const real_t x36 = -x9;
+//     const real_t x37 = x19 * (x13 * x35 + x28 - x35 * x5 - x36 * x4 + x36 * x8);
+//     const real_t x38 = -x19;
+//     const real_t x39 = -x23;
+//     const real_t x40 = -x34;
+//     const real_t x41 = (1.0 / 6.0) / pow(x19, 2);
+//     const real_t x42 = x41 * (x24 * x37 + x38 * (x21 * x39 + x32 * x40));
+//     const real_t x43 = -x15 + x16;
+//     const real_t x44 = (1.0 / 6.0) * x43;
+//     const real_t x45 = -x26 + x27;
+//     const real_t x46 = -x30 + x31;
+//     const real_t x47 = (1.0 / 6.0) * x46;
+//     const real_t x48 = x20 * (-x23 * x44 + (1.0 / 6.0) * x29 * x45 - x34 * x47);
+//     const real_t x49 = x41 * (x25 * x37 + x38 * (x22 * x39 + x33 * x40));
+//     const real_t x50 = (1.0 / 6.0) * x45;
+//     const real_t x51 = x20 * (x21 * x44 + x24 * x50 + x32 * x47);
+//     const real_t x52 = x20 * (-1.0 / 6.0 * x21 * x22 - 1.0 / 6.0 * x24 * x25 - 1.0 / 6.0 * x32 * x33);
+//     const real_t x53 = x20 * (x22 * x44 + x25 * x50 + x33 * x47);
 
-    element_matrix[0] = x20 * (-1.0 / 6.0 * pow(x23, 2) - 1.0 / 6.0 * pow(x29, 2) - 1.0 / 6.0 * pow(x34, 2));
-    element_matrix[1] = x42;
-    element_matrix[2] = x48;
-    element_matrix[3] = x49;
-    element_matrix[4] = x42;
-    element_matrix[5] = x20 * (-1.0 / 6.0 * pow(x21, 2) - 1.0 / 6.0 * pow(x24, 2) - 1.0 / 6.0 * pow(x32, 2));
-    element_matrix[6] = x51;
-    element_matrix[7] = x52;
-    element_matrix[8] = x48;
-    element_matrix[9] = x51;
-    element_matrix[10] = x20 * (-1.0 / 6.0 * pow(x43, 2) - 1.0 / 6.0 * pow(x45, 2) - 1.0 / 6.0 * pow(x46, 2));
-    element_matrix[11] = x53;
-    element_matrix[12] = x49;
-    element_matrix[13] = x52;
-    element_matrix[14] = x53;
-    element_matrix[15] = x20 * (-1.0 / 6.0 * pow(x22, 2) - 1.0 / 6.0 * pow(x25, 2) - 1.0 / 6.0 * pow(x33, 2));
+//     element_matrix[0] = x20 * (-1.0 / 6.0 * pow(x23, 2) - 1.0 / 6.0 * pow(x29, 2) - 1.0 / 6.0 * pow(x34, 2));
+//     element_matrix[1] = x42;
+//     element_matrix[2] = x48;
+//     element_matrix[3] = x49;
+//     element_matrix[4] = x42;
+//     element_matrix[5] = x20 * (-1.0 / 6.0 * pow(x21, 2) - 1.0 / 6.0 * pow(x24, 2) - 1.0 / 6.0 * pow(x32, 2));
+//     element_matrix[6] = x51;
+//     element_matrix[7] = x52;
+//     element_matrix[8] = x48;
+//     element_matrix[9] = x51;
+//     element_matrix[10] = x20 * (-1.0 / 6.0 * pow(x43, 2) - 1.0 / 6.0 * pow(x45, 2) - 1.0 / 6.0 * pow(x46, 2));
+//     element_matrix[11] = x53;
+//     element_matrix[12] = x49;
+//     element_matrix[13] = x52;
+//     element_matrix[14] = x53;
+//     element_matrix[15] = x20 * (-1.0 / 6.0 * pow(x22, 2) - 1.0 / 6.0 * pow(x25, 2) - 1.0 / 6.0 * pow(x33, 2));
+// }
+
+// Version 2
+// static inline __device__ void laplacian(const real_t px0,
+//                                         const real_t px1,
+//                                         const real_t px2,
+//                                         const real_t px3,
+//                                         const real_t py0,
+//                                         const real_t py1,
+//                                         const real_t py2,
+//                                         const real_t py3,
+//                                         const real_t pz0,
+//                                         const real_t pz1,
+//                                         const real_t pz2,
+//                                         const real_t pz3,
+//                                         real_t *element_matrix)
+
+// {
+//     real_t jac_inv[9];
+//     real_t dv;
+//     {
+//         // FLOATING POINT OPS!
+//         //      - Result: 10*ADD + 10*ASSIGNMENT + 31*MUL
+//         //      - Subexpressions: 2*ADD + DIV + 12*MUL + 12*SUB
+//         const real_t x0 = -py0 + py2;
+//         const real_t x1 = -pz0 + pz3;
+//         const real_t x2 = x0 * x1;
+//         const real_t x3 = -py0 + py3;
+//         const real_t x4 = -pz0 + pz2;
+//         const real_t x5 = x3 * x4;
+//         const real_t x6 = -px0 + px1;
+//         const real_t x7 = x2 * x6;
+//         const real_t x8 = -pz0 + pz1;
+//         const real_t x9 = -px0 + px2;
+//         const real_t x10 = x3 * x9;
+//         const real_t x11 = x10 * x8;
+//         const real_t x12 = -py0 + py1;
+//         const real_t x13 = -px0 + px3;
+//         const real_t x14 = x12 * x13 * x4;
+//         const real_t x15 = x5 * x6;
+//         const real_t x16 = x1 * x9;
+//         const real_t x17 = x12 * x16;
+//         const real_t x18 = x0 * x13;
+//         const real_t x19 = x18 * x8;
+//         const real_t x20 = 1.0 / (x11 + x14 - x15 - x17 - x19 + x7);
+//         jac_inv[0] = x20 * (x2 - x5);
+//         jac_inv[1] = x20 * (x13 * x4 - x16);
+//         jac_inv[2] = x20 * (x10 - x18);
+//         jac_inv[3] = x20 * (-x1 * x12 + x3 * x8);
+//         jac_inv[4] = x20 * (x1 * x6 - x13 * x8);
+//         jac_inv[5] = x20 * (x12 * x13 - x3 * x6);
+//         jac_inv[6] = x20 * (-x0 * x8 + x12 * x4);
+//         jac_inv[7] = x20 * (-x4 * x6 + x8 * x9);
+//         jac_inv[8] = x20 * (x0 * x6 - x12 * x9);
+//         dv = (1.0 / 6.0) * x11 + (1.0 / 6.0) * x14 - 1.0 / 6.0 * x15 - 1.0 / 6.0 * x17 - 1.0 / 6.0 * x19 +
+//              (1.0 / 6.0) * x7;
+//     }
+
+//     {
+//         // FLOATING POINT OPS!
+//         //      - Result: 10*ADD + 20*ASSIGNMENT + 30*MUL + 12*POW
+//         //      - Subexpressions: 2*ADD + 6*DIV + 18*MUL + 3*NEG + 18*SUB
+//         const real_t x0 = -jac_inv[0] - jac_inv[3] - jac_inv[6];
+//         const real_t x1 = -pz0 + pz3;
+//         const real_t x2 = -py0 + py2;
+//         const real_t x3 = -1.0 / 6.0 * px0 + (1.0 / 6.0) * px1;
+//         const real_t x4 = -py0 + py3;
+//         const real_t x5 = -pz0 + pz2;
+//         const real_t x6 = -py0 + py1;
+//         const real_t x7 = -1.0 / 6.0 * px0 + (1.0 / 6.0) * px2;
+//         const real_t x8 = -pz0 + pz1;
+//         const real_t x9 = -1.0 / 6.0 * px0 + (1.0 / 6.0) * px3;
+//         const real_t x10 = x1 * x2 * x3 - x1 * x6 * x7 - x2 * x8 * x9 - x3 * x4 * x5 + x4 * x7 * x8 + x5 * x6 * x9;
+//         const real_t x11 = -jac_inv[1] - jac_inv[4] - jac_inv[7];
+//         const real_t x12 = -jac_inv[2] - jac_inv[5] - jac_inv[8];
+//         const real_t x13 = x0 * x10;
+//         const real_t x14 = x10 * x11;
+//         const real_t x15 = x10 * x12;
+//         const real_t x16 = jac_inv[0] * x10;
+//         const real_t x17 = jac_inv[1] * x10;
+//         const real_t x18 = jac_inv[2] * x10;
+//         element_matrix[0] = pow(x0, 2) * x10 + x10 * pow(x11, 2) + x10 * pow(x12, 2);
+//         element_matrix[0] = element_matrix[0];
+//         element_matrix[1] = jac_inv[0] * x13 + jac_inv[1] * x14 + jac_inv[2] * x15;
+//         element_matrix[4] = element_matrix[1];
+//         element_matrix[2] = jac_inv[3] * x13 + jac_inv[4] * x14 + jac_inv[5] * x15;
+//         element_matrix[8] = element_matrix[2];
+//         element_matrix[3] = jac_inv[6] * x13 + jac_inv[7] * x14 + jac_inv[8] * x15;
+//         element_matrix[12] = element_matrix[3];
+//         element_matrix[5] = pow(jac_inv[0], 2) * x10 + pow(jac_inv[1], 2) * x10 + pow(jac_inv[2], 2) * x10;
+//         element_matrix[5] = element_matrix[5];
+//         element_matrix[6] = jac_inv[3] * x16 + jac_inv[4] * x17 + jac_inv[5] * x18;
+//         element_matrix[9] = element_matrix[6];
+//         element_matrix[7] = jac_inv[6] * x16 + jac_inv[7] * x17 + jac_inv[8] * x18;
+//         element_matrix[13] = element_matrix[7];
+//         element_matrix[10] = pow(jac_inv[3], 2) * x10 + pow(jac_inv[4], 2) * x10 + pow(jac_inv[5], 2) * x10;
+//         element_matrix[10] = element_matrix[10];
+//         element_matrix[11] =
+//             jac_inv[3] * jac_inv[6] * x10 + jac_inv[4] * jac_inv[7] * x10 + jac_inv[5] * jac_inv[8] * x10;
+//         element_matrix[14] = element_matrix[11];
+//         element_matrix[15] = pow(jac_inv[6], 2) * x10 + pow(jac_inv[7], 2) * x10 + pow(jac_inv[8], 2) * x10;
+//     }
+// }
+
+// Version 3
+static inline __device__ void laplacian(const real_t px0,
+                                        const real_t px1,
+                                        const real_t px2,
+                                        const real_t px3,
+                                        const real_t py0,
+                                        const real_t py1,
+                                        const real_t py2,
+                                        const real_t py3,
+                                        const real_t pz0,
+                                        const real_t pz1,
+                                        const real_t pz2,
+                                        const real_t pz3,
+                                        real_t *element_matrix) {
+    {
+        real_t jac_inv[9];
+        real_t dv;
+        {
+            // FLOATING POINT OPS!
+            //       - Result: 10*ADD + 10*ASSIGNMENT + 31*MUL
+            //       - Subexpressions: 2*ADD + DIV + 12*MUL + 12*SUB
+            const real_t x0 = -py0 + py2;
+            const real_t x1 = -pz0 + pz3;
+            const real_t x2 = x0 * x1;
+            const real_t x3 = -py0 + py3;
+            const real_t x4 = -pz0 + pz2;
+            const real_t x5 = x3 * x4;
+            const real_t x6 = -px0 + px1;
+            const real_t x7 = x2 * x6;
+            const real_t x8 = -pz0 + pz1;
+            const real_t x9 = -px0 + px2;
+            const real_t x10 = x3 * x9;
+            const real_t x11 = x10 * x8;
+            const real_t x12 = -py0 + py1;
+            const real_t x13 = -px0 + px3;
+            const real_t x14 = x12 * x13 * x4;
+            const real_t x15 = x5 * x6;
+            const real_t x16 = x1 * x9;
+            const real_t x17 = x12 * x16;
+            const real_t x18 = x0 * x13;
+            const real_t x19 = x18 * x8;
+            const real_t x20 = 1.0 / (x11 + x14 - x15 - x17 - x19 + x7);
+            jac_inv[0] = x20 * (x2 - x5);
+            jac_inv[1] = x20 * (x13 * x4 - x16);
+            jac_inv[2] = x20 * (x10 - x18);
+            jac_inv[3] = x20 * (-x1 * x12 + x3 * x8);
+            jac_inv[4] = x20 * (x1 * x6 - x13 * x8);
+            jac_inv[5] = x20 * (x12 * x13 - x3 * x6);
+            jac_inv[6] = x20 * (-x0 * x8 + x12 * x4);
+            jac_inv[7] = x20 * (-x4 * x6 + x8 * x9);
+            jac_inv[8] = x20 * (x0 * x6 - x12 * x9);
+            dv = (1.0 / 6.0) * x11 + (1.0 / 6.0) * x14 - 1.0 / 6.0 * x15 - 1.0 / 6.0 * x17 - 1.0 / 6.0 * x19 +
+                 (1.0 / 6.0) * x7;
+        }
+
+        real_t gx[4], gy[4], gz[4];
+        {
+            //FLOATING POINT OPS!
+            //      - Result: 3*ADD + 12*ASSIGNMENT + 9*MUL
+
+            gx[0] = -jac_inv[0] - jac_inv[3] - jac_inv[6];
+            gy[0] = -jac_inv[1] - jac_inv[4] - jac_inv[7];
+            gz[0] = -jac_inv[2] - jac_inv[5] - jac_inv[8];
+            gx[1] = jac_inv[0];
+            gy[1] = jac_inv[1];
+            gz[1] = jac_inv[2];
+            gx[2] = jac_inv[3];
+            gy[2] = jac_inv[4];
+            gz[2] = jac_inv[5];
+            gx[3] = jac_inv[6];
+            gy[3] = jac_inv[7];
+            gz[3] = jac_inv[8];
+        }
+
+        {
+            // FLOATING POINT OPS!
+            //      - Result: 10*ADD + 20*ASSIGNMENT + 28*MUL + 12*POW
+            //      - Subexpressions: 0
+            element_matrix[0] = dv * (pow(gx[0], 2) + pow(gy[0], 2) + pow(gz[0], 2));
+            element_matrix[0] = element_matrix[0];
+            element_matrix[1] = dv * (gx[0] * gx[1] + gy[0] * gy[1] + gz[0] * gz[1]);
+            element_matrix[4] = element_matrix[1];
+            element_matrix[2] = dv * (gx[0] * gx[2] + gy[0] * gy[2] + gz[0] * gz[2]);
+            element_matrix[8] = element_matrix[2];
+            element_matrix[3] = dv * (gx[0] * gx[3] + gy[0] * gy[3] + gz[0] * gz[3]);
+            element_matrix[12] = element_matrix[3];
+            element_matrix[5] = dv * (pow(gx[1], 2) + pow(gy[1], 2) + pow(gz[1], 2));
+            element_matrix[5] = element_matrix[5];
+            element_matrix[6] = dv * (gx[1] * gx[2] + gy[1] * gy[2] + gz[1] * gz[2]);
+            element_matrix[9] = element_matrix[6];
+            element_matrix[7] = dv * (gx[1] * gx[3] + gy[1] * gy[3] + gz[1] * gz[3]);
+            element_matrix[13] = element_matrix[7];
+            element_matrix[10] = dv * (pow(gx[2], 2) + pow(gy[2], 2) + pow(gz[2], 2));
+            element_matrix[10] = element_matrix[10];
+            element_matrix[11] = dv * (gx[2] * gx[3] + gy[2] * gy[3] + gz[2] * gz[3]);
+            element_matrix[14] = element_matrix[11];
+            element_matrix[15] = dv * (pow(gx[3], 2) + pow(gy[3], 2) + pow(gz[3], 2));
+            element_matrix[15] = element_matrix[15];
+        }
+    }
 }
 
 static inline __device__ int linear_search(const idx_t target, const idx_t *const arr, const int size) {
@@ -282,8 +487,6 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
 
     double ktick = MPI_Wtime();
     {
-        
-
         laplacian_assemble_hessian_kernel<<<n_blocks, block_size>>>(
             nelements, nnodes, d_elems, d_xyz, d_rowptr, d_colidx, d_values);
         SFEM_DEBUG_SYNCHRONIZE();
@@ -320,5 +523,7 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("cuda_laplacian.c: laplacian_assemble_hessian\t%g seconds (GPU kernel %g seconds)\n", tock - tick, ktock - ktick);
+    printf("cuda_laplacian.c: laplacian_assemble_hessian\t%g seconds (GPU kernel %g seconds)\n",
+           tock - tick,
+           ktock - ktick);
 }

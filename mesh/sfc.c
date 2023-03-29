@@ -217,8 +217,8 @@ int main(int argc, char *argv[]) {
 
         // sfc[i] = (sfc_t)(b[2] * (geom_t)urange[2]);
         sfc[i] = fun_sfc((sfc_t)(b[0] * (double)urange[0]),  //
-                          (sfc_t)(b[1] * (double)urange[1]),  //
-                          (sfc_t)(b[2] * (double)urange[2])   //
+                         (sfc_t)(b[1] * (double)urange[1]),  //
+                         (sfc_t)(b[2] * (double)urange[2])   //
         );
 
         // printf("%d -> %g %g %g %d\n", (int)i, (double)b[0], (double)b[1], (double)b[2], (int)sfc[i]);
