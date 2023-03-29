@@ -307,16 +307,6 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
     idx_t *d_colidx = nullptr;
     real_t *d_values = nullptr;
 
-    int use_small = 1;
-
-    static const int nstreams = 2;
-    cudaStream_t cu_stream[nstreams];
-    // cudaEvent_t cu_event[nstreams];
-    for (int s = 0; s < nstreams; s++) {
-        cudaStreamCreate(&cu_stream[s]);
-        // cudaEventCreate(&cu_event[s]);
-    }
-
     // Allocate space for indices
     for (int d = 0; d < 4; d++) {
         SFEM_CUDA_CHECK(cudaMalloc(&hd_elems[d], nbatch * sizeof(idx_t)));
@@ -334,11 +324,9 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
     double time_local_to_global = 0;
     double time_packing = 0;
 
-    ptrdiff_t last_element_offset = 0;
-    ptrdiff_t n = 0;
+    ptrdiff_t last_n = 0;
     for (ptrdiff_t element_offset = 0; element_offset < nelements; element_offset += nbatch) {
-        n = MIN(nbatch, nelements - element_offset);
-        last_element_offset = element_offset;
+        ptrdiff_t n = MIN(nbatch, nelements - element_offset);
 
         {
             double tick = MPI_Wtime();
@@ -354,6 +342,7 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
                         const idx_t *const nodes = elems[e_node];
 
                         geom_t *buff = &he_xyz[offset];
+                        // #pragma omp parallel for
                         for (ptrdiff_t k = 0; k < n; k++) {
                             buff[k] = x[nodes[k]];
                         }
@@ -365,22 +354,28 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
             time_packing += tock - tick;
         }
 
-        SFEM_CUDA_CHECK(
-            cudaMemcpyAsync(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice, cu_stream[0]));
+        if(last_n) {
+            // Do this here to let the main kernel overlap with the packing
+            local_to_global_kernel<<<n_blocks, block_size>>>(
+                n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
+        }
 
-        cudaStreamSynchronize(cu_stream[1]);
+        SFEM_CUDA_CHECK(
+            cudaMemcpy(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice));
+
         for (int e_node = 0; e_node < 4; e_node++) {
             SFEM_CUDA_CHECK(cudaMemcpy(
                 hd_elems[e_node], &elems[e_node][element_offset], n * sizeof(idx_t), cudaMemcpyHostToDevice));
         }
 
-        jacobian_inverse_kernel<<<n_blocks, block_size, 0, cu_stream[0]>>>(n, de_xyz, d_jacobian_inverse);
-        laplacian_assemble_hessian_kernel<<<n_blocks, block_size, 0, cu_stream[0]>>>(n, d_jacobian_inverse, de_matrix);
-        cudaStreamSynchronize(cu_stream[0]);
-        local_to_global_kernel<<<n_blocks, block_size, 0, cu_stream[1]>>>(
-            n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
+        jacobian_inverse_kernel<<<n_blocks, block_size>>>(n, de_xyz, d_jacobian_inverse);
+        laplacian_assemble_hessian_kernel<<<n_blocks, block_size>>>(n, d_jacobian_inverse, de_matrix);
+        last_n = n;
+    }
 
-        SFEM_DEBUG_SYNCHRONIZE();
+    if(last_n) {
+           local_to_global_kernel<<<n_blocks, block_size>>>(
+            last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
     }
 
     double tack = MPI_Wtime();
@@ -403,11 +398,6 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         SFEM_CUDA_CHECK(cudaFree(d_elems));
 
         crs_device_free(d_rowptr, d_colidx, d_values);
-
-        for (int s = 0; s < nstreams; s++) {
-            cudaStreamDestroy(cu_stream[s]);
-            // cudaEventDestroy(cu_event[s]);
-        }
     }
 
     double tock = MPI_Wtime();
