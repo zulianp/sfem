@@ -167,7 +167,6 @@ static inline __device__ __host__ void jacobian_inverse_micro_kernel(const real_
     jac_inv[7 * stride] = x14 * (-x4 * x6 + x7 * x8);
 }
 
-
 __global__ void jacobian_inverse_kernel(const ptrdiff_t nelements,
                                         const geom_t *const SFEM_RESTRICT xyz,
                                         real_t *const SFEM_RESTRICT jacobian_inverse) {
@@ -354,14 +353,12 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
             time_packing += tock - tick;
         }
 
-        if(last_n) {
+        if (last_n) {
             // Do this here to let the main kernel overlap with the packing
-            local_to_global_kernel<<<n_blocks, block_size>>>(
-                n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
+            local_to_global_kernel<<<n_blocks, block_size>>>(n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
         }
 
-        SFEM_CUDA_CHECK(
-            cudaMemcpy(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice));
+        SFEM_CUDA_CHECK(cudaMemcpy(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice));
 
         for (int e_node = 0; e_node < 4; e_node++) {
             SFEM_CUDA_CHECK(cudaMemcpy(
@@ -373,9 +370,8 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         last_n = n;
     }
 
-    if(last_n) {
-           local_to_global_kernel<<<n_blocks, block_size>>>(
-            last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
+    if (last_n) {
+        local_to_global_kernel<<<n_blocks, block_size>>>(last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
     }
 
     double tack = MPI_Wtime();
