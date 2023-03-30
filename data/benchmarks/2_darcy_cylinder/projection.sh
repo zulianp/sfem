@@ -77,7 +77,7 @@ hetero_neumann()
 
 	for (( j=0; j < 3; j++ ))
 	do
-		cat $mesh_path/surface/inlet/i"$j".raw >   $surf_mesh_path_/i"$j".raw
+		cat $mesh_path/surface/inlet/i"$j".raw  >  $surf_mesh_path_/i"$j".raw
 		cat $mesh_path/surface/outlet/i"$j".raw >> $surf_mesh_path_/i"$j".raw
 	done
 
@@ -89,8 +89,10 @@ hetero_neumann()
 
 	surface_outflux $surf_mesh_path_ $vx_ $vy_ $vz_ $p0_outflux_ 
 	SFEM_COMPUTE_COEFFICIENTS=0 surface_projection_p0_to_p1 $surf_mesh_path_ $p0_outflux_ $output_
+	# raw_to_db.py $surf_mesh_path_ hey.vtk --point_data=$output_
 
-	raw_to_db.py $surf_mesh_path_ hey.vtk --point_data=$output_
+	# Clean-up
+	rm $workspace_
 }
 
 
