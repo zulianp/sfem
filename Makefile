@@ -51,7 +51,7 @@ CXXFLAGS += -fvisibility=hidden
 CXXFLAGS += -fPIC
 INTERNAL_CXXFLAGS += -fno-exceptions -fno-rtti
 
-CUFLAGS += --compiler-options "-fPIC $(CXXFLAGS)" -std=c++14 #-arch=native 
+CUFLAGS += --compiler-options "-fPIC $(CXXFLAGS)" -std=c++14 -arch=sm_60  #-arch=native 
 
 # CUFLAGS += --compiler-options -fPIC -O0 -g -std=c++17
 

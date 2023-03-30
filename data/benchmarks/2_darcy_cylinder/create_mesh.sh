@@ -10,6 +10,8 @@ PATH=$SCRIPTPATH/../../../python:$PATH
 PATH=$SCRIPTPATH/../../../python/mesh:$PATH
 PATH=$SCRIPTPATH/../../../workflows/divergence:$PATH
 
+LAUNCH=srun
+
 set -x
 
 nrefs=5
@@ -31,10 +33,10 @@ idx_type_size=4
 
 cylinder.py $mesh_db $nrefs
 db_to_raw.py $mesh_db $mesh_raw
-skin $mesh_raw $mesh_surface
+$LAUNCH skin $mesh_raw $mesh_surface
 
-select_surf $mesh_surface -1 0   0   0.99   $mesh_surface/sides_inlet.raw
-select_surf $mesh_surface  1 0 	 0   0.99 	$mesh_surface/sides_outlet.raw
+$LAUNCH select_surf $mesh_surface -1 0   0   0.99   $mesh_surface/sides_inlet.raw
+$LAUNCH select_surf $mesh_surface  1 0 	 0   0.99 	$mesh_surface/sides_outlet.raw
 
 numbers=`mktemp`
 numbers2=`mktemp`
@@ -44,8 +46,8 @@ ls -la $mesh_surface/i0.raw
 ls -la $numbers
 
 
-set_diff $numbers  $mesh_surface/sides_inlet.raw  $numbers2
-set_diff $numbers2 $mesh_surface/sides_outlet.raw $mesh_surface/sides_wall.raw 
+$LAUNCH set_diff $numbers  $mesh_surface/sides_inlet.raw  $numbers2
+$LAUNCH set_diff $numbers2 $mesh_surface/sides_outlet.raw $mesh_surface/sides_wall.raw 
 
 rm $numbers  $numbers2
 
@@ -76,16 +78,16 @@ boundary_nodes()
 	workspace=`mktemp -d`
 	
 	# Convert gather surf-mesh indices
-	sgather $mesh_surface/sides_"$name".raw $idx_type_size $mesh_surface/i0.raw $workspace/i0.raw
-	sgather $mesh_surface/sides_"$name".raw $idx_type_size $mesh_surface/i1.raw $workspace/i1.raw
-	sgather $mesh_surface/sides_"$name".raw $idx_type_size $mesh_surface/i2.raw $workspace/i2.raw
+	$LAUNCH sgather $mesh_surface/sides_"$name".raw $idx_type_size $mesh_surface/i0.raw $workspace/i0.raw
+	$LAUNCH sgather $mesh_surface/sides_"$name".raw $idx_type_size $mesh_surface/i1.raw $workspace/i1.raw
+	$LAUNCH sgather $mesh_surface/sides_"$name".raw $idx_type_size $mesh_surface/i2.raw $workspace/i2.raw
 
 	# Convert surf-mesh indices to volume mesh indices
-	sgather $workspace/i0.raw $idx_type_size $mesh_surface/node_mapping.raw $mesh_surface/"$name"/i0.raw 
-	sgather $workspace/i1.raw $idx_type_size $mesh_surface/node_mapping.raw $mesh_surface/"$name"/i1.raw 
-	sgather $workspace/i2.raw $idx_type_size $mesh_surface/node_mapping.raw $mesh_surface/"$name"/i2.raw 
+	$LAUNCH sgather $workspace/i0.raw $idx_type_size $mesh_surface/node_mapping.raw $mesh_surface/"$name"/i0.raw 
+	$LAUNCH sgather $workspace/i1.raw $idx_type_size $mesh_surface/node_mapping.raw $mesh_surface/"$name"/i1.raw 
+	$LAUNCH sgather $workspace/i2.raw $idx_type_size $mesh_surface/node_mapping.raw $mesh_surface/"$name"/i2.raw 
 
-	soa_to_aos "$mesh_surface/"$name"/i*.raw" $idx_type_size $sideset_raw
+	$LAUNCH soa_to_aos "$mesh_surface/"$name"/i*.raw" $idx_type_size $sideset_raw
 	rm -r $workspace
 }
 
@@ -96,9 +98,9 @@ boundary_nodes wall   $mesh_raw/sidesets_aos/swall.raw
 sides=$mesh_raw/dirichlet.raw
 python3 -c "import numpy as np; a=np.fromfile(\"$mesh_raw/x.raw\", dtype=np.float32); a.fill(0); a.astype(np.float64).tofile(\"$sides\")"
 
-smask $mesh_raw/sidesets_aos/sinlet.raw  $sides $sides 1
-smask $mesh_raw/sidesets_aos/soutlet.raw $sides $sides 2
-smask $mesh_raw/sidesets_aos/swall.raw   $sides $sides 3
+$LAUNCH smask $mesh_raw/sidesets_aos/sinlet.raw  $sides $sides 1
+$LAUNCH smask $mesh_raw/sidesets_aos/soutlet.raw $sides $sides 2
+$LAUNCH smask $mesh_raw/sidesets_aos/swall.raw   $sides $sides 3
 
 raw_to_db.py $mesh_raw $mesh_raw/dirichlet.vtk --point_data="$sides"
 
