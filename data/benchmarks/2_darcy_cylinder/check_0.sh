@@ -36,11 +36,12 @@ grep "integral div" $logfile
 echo "Expected outflux ~ 3.14"
 grep "surface_outflux = " $logfile
 
-node=`find_closest_point.py -1 0 0 $mesh_path/x.raw $mesh_path/y.raw $mesh_path/z.raw`
+# node=`find_closest_point.py -1 0 0 $mesh_path/x.raw $mesh_path/y.raw $mesh_path/z.raw`
+node=`find_closest_point.py 0 0 0 $mesh_path/x.raw $mesh_path/y.raw $mesh_path/z.raw`
 export dirichlet_nodes=$workspace/dirichlet_nodes.raw
 
-python3 -c "import numpy as np; a = np.array([$node]); a.astype(np.int32).tofile(\"$dirichlet_nodes\"); print(f'fixed node = {a}');"
-# python3 -c "import numpy as np; b = np.fromfile(\"$mesh_path/surface/wall/i0.raw\",dtype=np.int32); a = np.array(b[0]); a.astype(np.int32).tofile(\"$dirichlet_nodes\"); print(f'fixed node = {a}');"
+# python3 -c "import numpy as np; a = np.array([$node]); a.astype(np.int32).tofile(\"$dirichlet_nodes\"); print(f'fixed node = {a}');"
+python3 -c "import numpy as np; b = np.fromfile(\"$mesh_path/surface/wall/i0.raw\",dtype=np.int32); a = np.array(b[0]); a.astype(np.int32).tofile(\"$dirichlet_nodes\"); print(f'fixed node = {a}');"
 
 
 

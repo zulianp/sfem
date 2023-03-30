@@ -23,6 +23,8 @@ typedef uint32_t sfc_t;
 #define SFEM_MPI_SFC_T MPI_UNSIGNED
 #define sort_function argsort_u32
 
+// https://mathworld.wolfram.com/FiedlerVector.html
+
 // typedef uint64_t sfc_t;
 // #define SFEM_MPI_SFC_T MPI_UNSIGNED_LONG
 // #define sort_function argsort_u64

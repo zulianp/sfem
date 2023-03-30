@@ -23,7 +23,7 @@ vx=$2
 vy=$3
 vz=$4
 output=$5
-
+div_function=u_dot_grad_q
 real_type_size=8
 
 workspace=`mktemp -d`
@@ -67,7 +67,7 @@ volume_divergence()
 
 	echo "Volume divergence: $name"
 
-	SFEM_VERBOSE=1 divergence $mesh_path $ux $uy $uz $divu
+	SFEM_VERBOSE=1 $div_function $mesh_path $ux $uy $uz $divu
 	# div_measure=`python3 -c "import numpy as np; print(np.sum((np.fromfile(\"$divu\")), dtype=np.float64))"`
 
 	integrate_divergence $mesh_path $ux $uy $uz

@@ -255,35 +255,6 @@ __global__ void print_elem_kernel(const ptrdiff_t nelements, idx_t **const elems
     printf("%d %d %d %d\n", elems[0][i], elems[1][i], elems[2][i], elems[3][i]);
 }
 
-static void local_to_global(const ptrdiff_t n,
-                            const ptrdiff_t nnodes,
-                            const ptrdiff_t element_offset,
-                            idx_t **const SFEM_RESTRICT elems,
-                            geom_t **const SFEM_RESTRICT xyz,
-                            const real_t *const SFEM_RESTRICT he_matrix,
-                            const count_t *const SFEM_RESTRICT rowptr,
-                            const idx_t *const SFEM_RESTRICT colidx,
-                            real_t *const SFEM_RESTRICT values) {
-    for (int edof_i = 0; edof_i < 4; ++edof_i) {
-        for (int edof_j = 0; edof_j < 4; ++edof_j) {
-            ptrdiff_t offset = (edof_i * 4 + edof_j) * n;
-
-            for (ptrdiff_t k = 0; k < n; k++) {
-                const idx_t ek = element_offset + k;
-                const idx_t node_i = elems[edof_i][ek];
-                const count_t row_begin = rowptr[node_i];
-                const count_t row_end = rowptr[node_i + 1];
-                const count_t row_len = row_end - row_begin;
-
-                ptrdiff_t crs_idx = row_begin + find_col(elems[edof_j][ek], &colidx[row_begin], row_len);
-                values[crs_idx] += he_matrix[offset + k];
-
-                assert(values[crs_idx] == values[crs_idx]);
-            }
-        }
-    }
-}
-
 extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
                                            const ptrdiff_t nnodes,
                                            idx_t **const SFEM_RESTRICT elems,

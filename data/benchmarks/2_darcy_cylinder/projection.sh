@@ -53,6 +53,7 @@ zero_real()
 	python3 -c "import numpy as np; np.zeros($n_,dtype=$real_numpy_type).tofile(\"$output_\")"
 }
 
+
 hetero_neumann()
 {
 	if (($# != 5))
@@ -71,29 +72,69 @@ hetero_neumann()
 	surf_mesh_path_=$workspace_/surf
 	mkdir -p $surf_mesh_path_
 
-	svx_=$workspace/svx.raw
-	svy_=$workspace/svy.raw
-	svz_=$workspace/svz.raw
 	p0_outflux_=$workspace/p0_outflux.raw
 	p1_outflux_=$workspace/p1_outflux.raw
 
-	# Create surface mesh
-	skin $mesh_path $surf_mesh_path_
+	for (( j=0; j < 3; j++ ))
+	do
+		cat $mesh_path/surface/inlet/i"$j".raw >   $surf_mesh_path_/i"$j".raw
+		cat $mesh_path/surface/outlet/i"$j".raw >> $surf_mesh_path_/i"$j".raw
+	done
 
-	surface_nodes_=$surf_mesh_path_/node_mapping.raw
-	sgather $surface_nodes_ $real_type_size $vx_ $svx_
-	sgather $surface_nodes_ $real_type_size $vy_ $svy_
-	sgather $surface_nodes_ $real_type_size $vz_ $svz_
+	cp $mesh_path/x.raw $surf_mesh_path_/x.raw
+	cp $mesh_path/y.raw $surf_mesh_path_/y.raw
+	cp $mesh_path/z.raw $surf_mesh_path_/z.raw
 
-	surface_outflux $surf_mesh_path_ $svx_ $svy_ $svz_ $p0_outflux_ 
-	SFEM_COMPUTE_COEFFICIENTS=0 surface_projection_p0_to_p1 $surf_mesh_path_ $p0_outflux_ $p1_outflux_
+	ls -la  $surf_mesh_path_
 
-	n_bytes_nodes_=`ls -la  $mesh_path/x.raw | awk '{print $5}'`
-	n_nodes_=$(( $n_bytes_nodes_ / $idx_type_size ))
+	surface_outflux $surf_mesh_path_ $vx_ $vy_ $vz_ $p0_outflux_ 
+	SFEM_COMPUTE_COEFFICIENTS=0 surface_projection_p0_to_p1 $surf_mesh_path_ $p0_outflux_ $output_
 
-	zero_real $n_nodes_ $output_
-	soverride $surface_nodes_ $real_type_size $p1_outflux_ $output_ $output_
+	raw_to_db.py $surf_mesh_path_ hey.vtk --point_data=$output_
 }
+
+
+# hetero_neumann()
+# {
+# 	if (($# != 5))
+# 	then
+# 		printf "usage: $0 <mesh_folder> <vx.raw> <vy.raw> <vz.raw> <output.raw>\n" 1>&2
+# 		exit -1
+# 	fi
+
+# 	mesh_=$1
+# 	vx_=$2
+# 	vy_=$3
+# 	vz_=$4
+# 	output_=$5
+
+# 	workspace_=`mktemp -d`
+# 	surf_mesh_path_=$workspace_/surf
+# 	mkdir -p $surf_mesh_path_
+
+# 	svx_=$workspace/svx.raw
+# 	svy_=$workspace/svy.raw
+# 	svz_=$workspace/svz.raw
+# 	p0_outflux_=$workspace/p0_outflux.raw
+# 	p1_outflux_=$workspace/p1_outflux.raw
+
+# 	# Create surface mesh
+# 	skin $mesh_path $surf_mesh_path_
+
+# 	surface_nodes_=$surf_mesh_path_/node_mapping.raw
+# 	sgather $surface_nodes_ $real_type_size $vx_ $svx_
+# 	sgather $surface_nodes_ $real_type_size $vy_ $svy_
+# 	sgather $surface_nodes_ $real_type_size $vz_ $svz_
+
+# 	surface_outflux $surf_mesh_path_ $svx_ $svy_ $svz_ $p0_outflux_ 
+# 	SFEM_COMPUTE_COEFFICIENTS=0 surface_projection_p0_to_p1 $surf_mesh_path_ $p0_outflux_ $p1_outflux_
+
+# 	n_bytes_nodes_=`ls -la  $mesh_path/x.raw | awk '{print $5}'`
+# 	n_nodes_=$(( $n_bytes_nodes_ / $idx_type_size ))
+
+# 	zero_real $n_nodes_ $output_
+# 	soverride $surface_nodes_ $real_type_size $p1_outflux_ $output_ $output_
+# }
 
 solve()
 {
@@ -178,7 +219,8 @@ then
 fi
 
 divu=$workspace/divu.raw
-SFEM_SCALE=-1 SFEM_VERBOSE=1 $div_function $mesh_path $velx $vely $velz $divu
+# SFEM_SCALE=-1 
+SFEM_VERBOSE=1 $div_function $mesh_path $velx $vely $velz $divu
 
 neumann_bc=$workspace/neumann_bc.raw
 hetero_neumann $mesh_path $velx $vely $velz $neumann_bc
@@ -206,8 +248,11 @@ else
 	echo "Using user defined dirichlet_nodes = $dirichlet_nodes"
 fi
 
+# smask $boundary_inlet $divu $divu 0
+# smask $boundary_outlet $divu $divu 0
+
 # Add surface flux
-# axpy 1 $neumann_bc $divu
+axpy -1 $neumann_bc $divu
 smask $dirichlet_nodes $divu $rhs 0
 # cp $divu $rhs
 norm_fp64 $rhs
@@ -230,8 +275,8 @@ assemble $mesh_path $workspace
 potential=$workspace/potential.raw
 
 
-eval_nodal_function.py "(y**2 + z**2)/2" $mesh_path/x.raw $mesh_path/y.raw $mesh_path/z.raw $potential
-# solve $workspace/rowptr.raw $rhs $potential
+# eval_nodal_function.py "(y**2 + z**2)/2" $mesh_path/x.raw $mesh_path/y.raw $mesh_path/z.raw $potential
+solve $workspace/rowptr.raw $rhs $potential
 
 p1_dpdx=$workspace/correction_x.raw
 p1_dpdy=$workspace/correction_y.raw
@@ -261,7 +306,7 @@ post_node_div=$workspace/post_node_div.raw
 lumped_mass_inv $mesh_path $post_divu $post_node_div
 
 raw_to_db.py $mesh_path $post_dir/post_db.vtk \
-	--point_data="$workspace/vel*.raw,$potential,$rhs,$rhs_viz,$node_div,$sides,$workspace/correction*.raw,$velx,$vely,$velz,$post_node_div"  \
+	--point_data="$workspace/vel*.raw,$potential,$rhs,$rhs_viz,$node_div,$sides,$workspace/correction*.raw,$velx,$vely,$velz,$post_node_div,$neumann_bc"  \
 	--cell_data="$cell_div,$cell_volume"
 
 # Clean-up
