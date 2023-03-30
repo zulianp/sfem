@@ -6,8 +6,6 @@
 #include <algorithm>
 #include <cstddef>
 
-
-
 extern "C" {
 #include "sfem_base.h"
 
@@ -60,12 +58,14 @@ static inline __device__ void laplacian(const real_t *SFEM_RESTRICT jac_inv,
         element_matrix[2 * stride] = x4;
         element_matrix[3 * stride] = x5;
         element_matrix[4 * stride] = x3;
-        element_matrix[5 * stride] = dv * (pow(jac_inv[0], 2) + pow(jac_inv[1], 2) + pow(jac_inv[2], 2));
+        element_matrix[5 * stride] =
+            dv * (pow(jac_inv[0 * stride], 2) + pow(jac_inv[1 * stride], 2) + pow(jac_inv[2 * stride], 2));
         element_matrix[6 * stride] = x6;
         element_matrix[7 * stride] = x7;
         element_matrix[8 * stride] = x4;
         element_matrix[9 * stride] = x6;
-        element_matrix[10 * stride] = dv * (pow(jac_inv[3], 2) + pow(jac_inv[4], 2) + pow(jac_inv[5], 2));
+        element_matrix[10 * stride] =
+            dv * (pow(jac_inv[3 * stride], 2) + pow(jac_inv[4 * stride], 2) + pow(jac_inv[5 * stride], 2));
         element_matrix[11 * stride] = x8;
         element_matrix[12 * stride] = x5;
         element_matrix[13 * stride] = x7;
@@ -225,7 +225,7 @@ __global__ void local_to_global_kernel(const ptrdiff_t nelements,
         }
 
         // offsetted array for this element
-        const real_t*const this_matrix = &element_matrix[e];
+        const real_t *const this_matrix = &element_matrix[e];
 
 #pragma unroll(4)
         for (int edof_i = 0; edof_i < 4; ++edof_i) {
@@ -240,7 +240,7 @@ __global__ void local_to_global_kernel(const ptrdiff_t nelements,
 
 #pragma unroll(4)
             for (int edof_j = 0; edof_j < 4; ++edof_j) {
-                real_t v = this_matrix[(edof_i * 4 + edof_j) * nelements];
+                const real_t v = this_matrix[(edof_i * 4 + edof_j) * nelements];
                 atomicAdd(&rowvalues[ks[edof_j]], v);
             }
         }
@@ -262,7 +262,6 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
                                            const count_t *const SFEM_RESTRICT rowptr,
                                            const idx_t *const SFEM_RESTRICT colidx,
                                            real_t *const SFEM_RESTRICT values) {
-
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
@@ -352,7 +351,6 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         local_to_global_kernel<<<n_blocks, block_size>>>(last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
     }
 
-
     SFEM_CUDA_CHECK(cudaMemcpy(values, d_values, rowptr[nnodes] * sizeof(real_t), cudaMemcpyDeviceToHost));
 
     {  // Free resources on CPU
@@ -379,7 +377,7 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
     cudaEventElapsedTime(&milliseconds, start, stop);
 
     printf("cuda_laplacian_2.c: laplacian_assemble_hessian\t%g seconds\nloops %d\n",
-           milliseconds/1000,
+           milliseconds / 1000,
            int(nelements / nbatch));
 }
 
@@ -420,7 +418,6 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
 //     count_t *d_rowptr = nullptr;
 //     idx_t *d_colidx = nullptr;
 //     real_t *d_values = nullptr;
-
 
 //     static const int nstreams = 2;
 //     cudaStream_t stream[nstreams];
@@ -479,12 +476,13 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
 //         if (last_n) {
 //             cudaStreamSynchronize(stream[0]);
 //             // Do this here to let the main kernel overlap with the packing
-//             local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]>>>(last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
+//             local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]>>>(last_n, d_elems, de_matrix, d_rowptr,
+//             d_colidx, d_values);
 //         }
-       
 
-//         // SFEM_CUDA_CHECK(cudaMemcpy(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice));        
-//         SFEM_CUDA_CHECK(cudaMemcpyAsync(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice, stream[0]));
+//         // SFEM_CUDA_CHECK(cudaMemcpy(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice));
+//         SFEM_CUDA_CHECK(cudaMemcpyAsync(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice,
+//         stream[0]));
 
 //         if(last_n) {
 //              for (int e_node = 0; e_node < 4; e_node++) {
@@ -497,7 +495,8 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
 //             //     hd_elems[e_node], &elems[e_node][element_offset], n * sizeof(idx_t), cudaMemcpyHostToDevice));
 
 //              SFEM_CUDA_CHECK(cudaMemcpyAsync(
-//                 hd_elems[e_node], &elems[e_node][element_offset], n * sizeof(idx_t), cudaMemcpyHostToDevice, stream[1]));
+//                 hd_elems[e_node], &elems[e_node][element_offset], n * sizeof(idx_t), cudaMemcpyHostToDevice,
+//                 stream[1]));
 //         }
 
 //         jacobian_inverse_kernel<<<n_blocks, block_size, 0, stream[0]>>>(n, de_xyz, d_jacobian_inverse);
