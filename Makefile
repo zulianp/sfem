@@ -49,8 +49,9 @@ CFLAGS += -pedantic -Wextra
 CXXFLAGS += -std=c++11
 CXXFLAGS += -fvisibility=hidden
 CXXFLAGS += -fPIC
-INTERNAL_CXXFLAGS += -fno-exceptions -fno-rtti 
-CUFLAGS += --compiler-options "-fPIC $(CXXFLAGS)" -std=c++14 -arch=native 
+INTERNAL_CXXFLAGS += -fno-exceptions -fno-rtti
+
+CUFLAGS += --compiler-options "-fPIC $(CXXFLAGS)" -std=c++14 -arch=sm_60  #-arch=native 
 
 # CUFLAGS += --compiler-options -fPIC -O0 -g -std=c++17
 
@@ -273,7 +274,7 @@ div.o : operators/div.c
 
 grad_p1.o : operators/grad_p1.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -c $<
-	
+
 isolver_sfem.dylib : isolver_sfem_plugin.o libsfem.a
 	$(MPICC) -shared -o $@ $^ $(LDFLAGS)  
 
