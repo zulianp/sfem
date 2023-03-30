@@ -356,8 +356,11 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         }
 
         for (int e_node = 0; e_node < 4; e_node++) {
+            unsigned int mem_flag = CU_MEMHOSTREGISTER_PORTABLE;
+            // unsigned int mem_flag = CU_MEMHOSTREGISTER_READ_ONLY;
+
             SFEM_CUDA_CHECK(
-                cudaHostRegister(&elems[e_node][element_offset], n * sizeof(idx_t), CU_MEMHOSTREGISTER_READ_ONLY));
+                cudaHostRegister(&elems[e_node][element_offset], n * sizeof(idx_t), mem_flag));
         }
 
         if (last_n) {
