@@ -92,7 +92,7 @@ hetero_neumann()
 	# raw_to_db.py $surf_mesh_path_ hey.vtk --point_data=$output_
 
 	# Clean-up
-	rm $workspace_
+	rm -r $workspace_
 }
 
 
