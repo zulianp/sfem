@@ -175,7 +175,7 @@ __global__ void jacobian_inverse_kernel(const ptrdiff_t nelements,
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
         // Thy element coordinates and jacobian
         const geom_t *const this_xyz = &xyz[e];
-        real_t *const this_jacobian_inverse[e] = &jacobian_inverse[e];
+        real_t *const this_jacobian_inverse = &jacobian_inverse[e];
 
         ptrdiff_t xi = 0 * 4;
         ptrdiff_t yi = 1 * 4;
