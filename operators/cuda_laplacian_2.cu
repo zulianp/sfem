@@ -339,8 +339,8 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
                     for (int e_node = 0; e_node < 4; e_node++) {
                         // printf("%d %d\n", d, e_node)
                         const geom_t *const x = xyz[d];
-                        ptrdiff_t offset = (d * 4 + e_node) * nbatch;
-                        const idx_t *const nodes = elems[e_node];
+                        ptrdiff_t offset = (d * 4 + e_node) * n;
+                        const idx_t *const nodes = &elems[e_node][element_offset];
 
                         geom_t *buff = &he_xyz[offset];
                         // #pragma omp parallel for
@@ -354,7 +354,7 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
 
         if (last_n) {
             // Do this here to let the main kernel overlap with the packing
-            local_to_global_kernel<<<n_blocks, block_size>>>(n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
+            local_to_global_kernel<<<n_blocks, block_size>>>(last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
         }
 
         SFEM_CUDA_CHECK(cudaMemcpy(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice));
@@ -476,7 +476,7 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
 //                     for (int e_node = 0; e_node < 4; e_node++) {
 //                         // printf("%d %d\n", d, e_node)
 //                         const geom_t *const x = xyz[d];
-//                         ptrdiff_t offset = (d * 4 + e_node) * nbatch;
+//                         ptrdiff_t offset = (d * 4 + e_node) * n;
 //                         const idx_t *const nodes = elems[e_node];
 
 //                         geom_t *buff = &he_xyz[offset];
@@ -500,7 +500,7 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
 //         if (last_n) {
 //             cudaStreamSynchronize(stream[0]);
 //             // Do this here to let the main kernel overlap with the packing
-//             local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]>>>(n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
+//             local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]>>>(last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
 //         }
        
 
