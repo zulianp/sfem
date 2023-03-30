@@ -308,6 +308,15 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
     idx_t *d_colidx = nullptr;
     real_t *d_values = nullptr;
 
+
+    static const int nstreams = 2;
+    cudaStream_t stream[nstreams];
+    // cudaEvent_t cu_event[nstreams];
+    for (int s = 0; s < nstreams; s++) {
+        cudaStreamCreate(&stream[s]);
+        // cudaEventCreate(&cu_event[s]);
+    }
+
     // Allocate space for indices
     for (int d = 0; d < 4; d++) {
         SFEM_CUDA_CHECK(cudaMalloc(&hd_elems[d], nbatch * sizeof(idx_t)));
@@ -346,29 +355,37 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
             }
         }
 
-        if (last_n) {
-            // Do this here to let the main kernel overlap with the packing
-            local_to_global_kernel<<<n_blocks, block_size>>>(n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
-
-            for (int e_node = 0; e_node < 4; e_node++) {
-                SFEM_CUDA_CHECK(cudaHostUnregister(&elems[e_node][last_element_offset]));
-            }
-        }
-
         for (int e_node = 0; e_node < 4; e_node++) {
             SFEM_CUDA_CHECK(
                 cudaHostRegister(&elems[e_node][element_offset], n * sizeof(idx_t), CU_MEMHOSTREGISTER_READ_ONLY));
         }
 
-        SFEM_CUDA_CHECK(cudaMemcpy(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice));
+        if (last_n) {
+            cudaStreamSynchronize(stream[0]);
+            // Do this here to let the main kernel overlap with the packing
+            local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]>>>(n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
+        }
+       
 
-        for (int e_node = 0; e_node < 4; e_node++) {
-            SFEM_CUDA_CHECK(cudaMemcpy(
-                hd_elems[e_node], &elems[e_node][element_offset], n * sizeof(idx_t), cudaMemcpyHostToDevice));
+        // SFEM_CUDA_CHECK(cudaMemcpy(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice));        
+        SFEM_CUDA_CHECK(cudaMemcpyAsync(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice, stream[0]));
+
+        if(last_n) {
+             for (int e_node = 0; e_node < 4; e_node++) {
+                SFEM_CUDA_CHECK(cudaHostUnregister(&elems[e_node][last_element_offset]));
+            }
         }
 
-        jacobian_inverse_kernel<<<n_blocks, block_size>>>(n, de_xyz, d_jacobian_inverse);
-        laplacian_assemble_hessian_kernel<<<n_blocks, block_size>>>(n, d_jacobian_inverse, de_matrix);
+        for (int e_node = 0; e_node < 4; e_node++) {
+            // SFEM_CUDA_CHECK(cudaMemcpy(
+            //     hd_elems[e_node], &elems[e_node][element_offset], n * sizeof(idx_t), cudaMemcpyHostToDevice));
+
+             SFEM_CUDA_CHECK(cudaMemcpyAsync(
+                hd_elems[e_node], &elems[e_node][element_offset], n * sizeof(idx_t), cudaMemcpyHostToDevice, stream[1]));
+        }
+
+        jacobian_inverse_kernel<<<n_blocks, block_size, 0, stream[0]>>>(n, de_xyz, d_jacobian_inverse);
+        laplacian_assemble_hessian_kernel<<<n_blocks, block_size, 0, stream[0]>>>(n, d_jacobian_inverse, de_matrix);
         last_n = n;
         last_element_offset = element_offset;
     }
@@ -399,6 +416,11 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         SFEM_CUDA_CHECK(cudaFree(d_elems));
 
         crs_device_free(d_rowptr, d_colidx, d_values);
+
+        for (int s = 0; s < nstreams; s++) {
+                   cudaStreamDestroy(stream[s]);
+                   // cudaEventDestroy(cu_event[s]);
+               }
     }
 
     cudaEventRecord(stop);
