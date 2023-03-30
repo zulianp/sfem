@@ -173,28 +173,32 @@ __global__ void jacobian_inverse_kernel(const ptrdiff_t nelements,
                                         const geom_t *const SFEM_RESTRICT xyz,
                                         real_t *const SFEM_RESTRICT jacobian_inverse) {
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
+        // Thy element coordinates and jacobian
+        const geom_t *const this_xyz = &xyz[e];
+        real_t *const this_jacobian_inverse[e] = &jacobian_inverse[e];
+
         ptrdiff_t xi = 0 * 4;
         ptrdiff_t yi = 1 * 4;
         ptrdiff_t zi = 2 * 4;
 
         jacobian_inverse_micro_kernel(
             // X-coordinates
-            xyz[(xi + 0) * nelements + e],
-            xyz[(xi + 1) * nelements + e],
-            xyz[(xi + 2) * nelements + e],
-            xyz[(xi + 3) * nelements + e],
+            this_xyz[(xi + 0) * nelements],
+            this_xyz[(xi + 1) * nelements],
+            this_xyz[(xi + 2) * nelements],
+            this_xyz[(xi + 3) * nelements],
             // Y-coordinates
-            xyz[(yi + 0) * nelements + e],
-            xyz[(yi + 1) * nelements + e],
-            xyz[(yi + 2) * nelements + e],
-            xyz[(yi + 3) * nelements + e],
+            this_xyz[(yi + 0) * nelements],
+            this_xyz[(yi + 1) * nelements],
+            this_xyz[(yi + 2) * nelements],
+            this_xyz[(yi + 3) * nelements],
             // Z-coordinates
-            xyz[(zi + 0) * nelements + e],
-            xyz[(zi + 1) * nelements + e],
-            xyz[(zi + 2) * nelements + e],
-            xyz[(zi + 3) * nelements + e],
+            this_xyz[(zi + 0) * nelements],
+            this_xyz[(zi + 1) * nelements],
+            this_xyz[(zi + 2) * nelements],
+            this_xyz[(zi + 3) * nelements],
             nelements,
-            jacobian_inverse);
+            this_jacobian_inverse);
     }
 }
 
@@ -202,13 +206,13 @@ __global__ void laplacian_assemble_hessian_kernel(const ptrdiff_t nelements,
                                                   const real_t *const SFEM_RESTRICT jacobian_inverse,
                                                   real_t *const SFEM_RESTRICT values) {
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
-        laplacian(jacobian_inverse, nelements, &values[e]);
+        laplacian(&jacobian_inverse[e], nelements, &values[e]);
     }
 }
 
 __global__ void local_to_global_kernel(const ptrdiff_t nelements,
                                        idx_t **const SFEM_RESTRICT elems,
-                                       const real_t *const SFEM_RESTRICT e_matrix,
+                                       const real_t *const SFEM_RESTRICT element_matrix,
                                        const count_t *const SFEM_RESTRICT rowptr,
                                        const idx_t *const SFEM_RESTRICT colidx,
                                        real_t *const SFEM_RESTRICT values) {
@@ -219,20 +223,24 @@ __global__ void local_to_global_kernel(const ptrdiff_t nelements,
         for (int v = 0; v < 4; ++v) {
             ev[v] = elems[v][e];
         }
+
+        // offsetted array for this element
+        const real_t*const this_matrix = &element_matrix[e];
+
 #pragma unroll(4)
         for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            const idx_t dof_i = elems[edof_i][e];
+            const idx_t dof_i = ev[edof_i];
             const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
 
-            const idx_t *row = &colidx[rowptr[dof_i]];
+            const idx_t *const row = &colidx[rowptr[dof_i]];
 
             find_cols4(ev, row, lenrow, ks);
 
-            real_t *rowvalues = &values[rowptr[dof_i]];
+            real_t *const rowvalues = &values[rowptr[dof_i]];
 
 #pragma unroll(4)
             for (int edof_j = 0; edof_j < 4; ++edof_j) {
-                real_t v = e_matrix[(edof_i * 4 + edof_j) * nelements];
+                real_t v = this_matrix[(edof_i * 4 + edof_j) * nelements];
                 atomicAdd(&rowvalues[ks[edof_j]], v);
             }
         }
