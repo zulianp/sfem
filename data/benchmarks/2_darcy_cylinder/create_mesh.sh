@@ -10,11 +10,12 @@ PATH=$SCRIPTPATH/../../../python:$PATH
 PATH=$SCRIPTPATH/../../../python/mesh:$PATH
 PATH=$SCRIPTPATH/../../../workflows/divergence:$PATH
 
-LAUNCH=srun
+LAUNCH=""
+# LAUNCH=srun
 
 set -x
 
-nrefs=5
+nrefs=1
 
 folder=cylinder
 mesh_db=$folder/mesh.vtk
