@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <cstddef>
 
-#include <mpi.h>
+
 
 extern "C" {
 #include "sfem_base.h"
@@ -279,7 +279,12 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
                                            const count_t *const SFEM_RESTRICT rowptr,
                                            const idx_t *const SFEM_RESTRICT colidx,
                                            real_t *const SFEM_RESTRICT values) {
-    double tick = MPI_Wtime();
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    cudaEventStart(start);
 
     static int block_size = 128;
     const ptrdiff_t nbatch = MIN(block_size * 1000, nelements);
@@ -318,18 +323,11 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
     crs_device_create(nnodes, rowptr[nnodes], &d_rowptr, &d_colidx, &d_values);
     crs_graph_host_to_device(nnodes, rowptr[nnodes], rowptr, colidx, d_rowptr, d_colidx);
 
-    double time_setup = MPI_Wtime() - tick;
-
-    double time_local_to_global = 0;
-    double time_packing = 0;
-
     ptrdiff_t last_n = 0;
     for (ptrdiff_t element_offset = 0; element_offset < nelements; element_offset += nbatch) {
         ptrdiff_t n = MIN(nbatch, nelements - element_offset);
 
         {
-            double tick = MPI_Wtime();
-
             // #pragma omp parallel
             {
                 // #pragma omp parallel for collapse(2)
@@ -348,9 +346,6 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
                     }
                 }
             }
-
-            double tock = MPI_Wtime();
-            time_packing += tock - tick;
         }
 
         if (last_n) {
@@ -374,7 +369,6 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         local_to_global_kernel<<<n_blocks, block_size>>>(last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
     }
 
-    double tack = MPI_Wtime();
 
     SFEM_CUDA_CHECK(cudaMemcpy(values, d_values, rowptr[nnodes] * sizeof(real_t), cudaMemcpyDeviceToHost));
 
@@ -396,14 +390,12 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         crs_device_free(d_rowptr, d_colidx, d_values);
     }
 
-    double tock = MPI_Wtime();
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
 
-    time_setup += tock - tack;
-
-    printf("cuda_laplacian_2.c: laplacian_assemble_hessian\t%g seconds\nsetup %g\nl2g %g\npack %g\nloops %d\n",
-           tock - tick,
-           time_setup,
-           time_local_to_global,
-           time_packing,
+    printf("cuda_laplacian_2.c: laplacian_assemble_hessian\t%g seconds\nloops %d\n",
+           milliseconds/1000,
            int(nelements / nbatch));
 }

@@ -36,8 +36,18 @@ grep "integral div" $logfile
 echo "Expected outflux ~ 3.14"
 grep "surface_outflux = " $logfile
 
+node=`find_closest_point.py -1 0 0 $mesh_path/x.raw $mesh_path/y.raw $mesh_path/z.raw`
 export dirichlet_nodes=$workspace/dirichlet_nodes.raw
-python3 -c "import numpy as np; b = np.fromfile(\"$mesh_path/surface/wall/i0.raw\",dtype=np.int32); a = np.array(b[0]); a.astype(np.int32).tofile(\"$dirichlet_nodes\"); print(f'fixed node = {a}');"
+
+python3 -c "import numpy as np; a = np.array([$node]); a.astype(np.int32).tofile(\"$dirichlet_nodes\"); print(f'fixed node = {a}');"
+# python3 -c "import numpy as np; b = np.fromfile(\"$mesh_path/surface/wall/i0.raw\",dtype=np.int32); a = np.array(b[0]); a.astype(np.int32).tofile(\"$dirichlet_nodes\"); print(f'fixed node = {a}');"
+
+
+
+# export dirichlet_nodes=temp_dirichlet.raw
+# cat $mesh_path/sidesets_aos/soutlet.raw > $dirichlet_nodes
+# cat $mesh_path/sidesets_aos/sinlet.raw >> $dirichlet_nodes
+# cat $mesh_path/sidesets_aos/swall.raw  >> $dirichlet_nodes
 
 # Chorin projection example they fix the outlet potential to 0
 # export dirichlet_nodes=$mesh_path/sidesets_aos/soutlet.raw 
