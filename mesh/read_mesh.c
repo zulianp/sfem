@@ -405,6 +405,9 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
         char path[1024 * 10];
 
         idx_t **elems = (idx_t **)malloc(sizeof(idx_t *) * nnodesxelem);
+        for(int d = 0; d< nnodesxelem; d++) {
+            elems[d] = 0;
+        }
 
         {
             idx_t *idx = 0;
@@ -438,6 +441,9 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
         ////////////////////////////////////////////////////////////////////////////////
 
         geom_t **xyz = (geom_t **)malloc(sizeof(geom_t *) * ndims);
+        for(int d = 0; d < ndims; d++) {
+            xyz[d] = 0;
+        }
 
         static const char *str_xyz = "xyzt";
 

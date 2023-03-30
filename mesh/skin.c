@@ -129,7 +129,7 @@ int main(int argc, char *argv[]) {
 
     ptrdiff_t n_surf_elements = 0;
     idx_t **surf_elems = (idx_t **)malloc(3 * sizeof(idx_t *));
-    idx_t *parent;
+    idx_t *parent = 0;
     extract_surface_connectivity(mesh.nelements, mesh.elements, &n_surf_elements, surf_elems, &parent);
 
     idx_t *vol2surf = (idx_t *)malloc(mesh.nnodes * sizeof(idx_t));
@@ -149,6 +149,9 @@ int main(int argc, char *argv[]) {
 
     ptrdiff_t n_surf_nodes = next_id;
     geom_t **points = (geom_t **)malloc(3 * sizeof(geom_t *));
+    for(int d = 0; d < 3; d++) {
+        points[d] = 0;
+    }
 
     idx_t *mapping = (idx_t *)malloc(n_surf_nodes * sizeof(idx_t));
 
