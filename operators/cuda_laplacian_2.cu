@@ -284,7 +284,7 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
 
-    cudaEventStart(start);
+    cudaEventRecord(start);
 
     static int block_size = 128;
     const ptrdiff_t nbatch = MIN(block_size * 1000, nelements);

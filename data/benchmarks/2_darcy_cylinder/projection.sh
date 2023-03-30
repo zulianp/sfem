@@ -38,6 +38,8 @@ ls -la $velz
 real_type_size=8
 idx_type_size=4
 real_numpy_type="np.float64"
+div_function=u_dot_grad_q
+# div_function=divergence
 
 zero_real()
 {
@@ -176,10 +178,10 @@ then
 fi
 
 divu=$workspace/divu.raw
-SFEM_VERBOSE=1 divergence $mesh_path $velx $vely $velz $divu
+SFEM_SCALE=-1 SFEM_VERBOSE=1 $div_function $mesh_path $velx $vely $velz $divu
 
-# neumann_bc=$workspace/neumann_bc.raw
-# hetero_neumann  $mesh_path $velx $vely $velz $neumann_bc
+neumann_bc=$workspace/neumann_bc.raw
+hetero_neumann $mesh_path $velx $vely $velz $neumann_bc
 
 ######################################
 # Viz
@@ -198,8 +200,8 @@ rhs=$workspace/rhs_divu.raw
 
 if [[ -z "$dirichlet_nodes" ]]
 then
-	# dirichlet_nodes=$boundary_inlet
-	dirichlet_nodes=$boundary_wall
+	dirichlet_nodes=$boundary_inlet
+	# dirichlet_nodes=$boundary_wall
 else
 	echo "Using user defined dirichlet_nodes = $dirichlet_nodes"
 fi
@@ -226,7 +228,10 @@ SFEM_DIRICHLET_NODES=$dirichlet_nodes \
 assemble $mesh_path $workspace
 
 potential=$workspace/potential.raw
-solve $workspace/rowptr.raw $rhs $potential
+
+
+eval_nodal_function.py "(y**2 + z**2)/2" $mesh_path/x.raw $mesh_path/y.raw $mesh_path/z.raw $potential
+# solve $workspace/rowptr.raw $rhs $potential
 
 p1_dpdx=$workspace/correction_x.raw
 p1_dpdy=$workspace/correction_y.raw
@@ -244,14 +249,14 @@ cp $velx $new_velx
 cp $vely $new_vely
 cp $velz $new_velz
 
-axpy 1 $p1_dpdx $new_velx
-axpy 1 $p1_dpdy $new_vely
-axpy 1 $p1_dpdz $new_velz
+axpy -1 $p1_dpdx $new_velx
+axpy -1 $p1_dpdy $new_vely
+axpy -1 $p1_dpdz $new_velz
 
 integrate_divergence $mesh_path $new_velx $new_vely $new_velz 
 
 post_divu=$workspace/post_divu.raw
-SFEM_VERBOSE=1 divergence $mesh_path $new_velx $new_vely $new_velz $post_divu
+SFEM_VERBOSE=1 $div_function $mesh_path $new_velx $new_vely $new_velz $post_divu
 post_node_div=$workspace/post_node_div.raw
 lumped_mass_inv $mesh_path $post_divu $post_node_div
 

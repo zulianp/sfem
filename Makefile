@@ -78,7 +78,7 @@ GOALS += condense_matrix condense_vector idx_to_indicator remap_vector sgather s
 GOALS += pizzastack_to_mesh
 
 # Application of operators
-GOALS += divergence lapl lumped_mass_inv lumped_boundary_mass_inv
+GOALS += divergence lapl lumped_mass_inv lumped_boundary_mass_inv u_dot_grad_q
 
 # Array utilities
 GOALS += soa_to_aos
@@ -227,6 +227,9 @@ soverride : drivers/soverride.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 divergence : drivers/divergence.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+u_dot_grad_q : drivers/u_dot_grad_q.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 lapl : drivers/lapl.c libsfem.a
