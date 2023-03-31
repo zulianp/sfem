@@ -340,6 +340,9 @@ __global__ void print_elem_kernel(const ptrdiff_t nelements, idx_t **const elems
     printf("%d %d %d %d\n", elems[0][i], elems[1][i], elems[2][i], elems[3][i]);
 }
 
+
+#if 0
+
 extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
                                            const ptrdiff_t nnodes,
                                            idx_t **const SFEM_RESTRICT elems,
@@ -353,14 +356,10 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
 
     cudaEventRecord(start);
 
-    // static int block_size = 128;
-    // const ptrdiff_t nbatch = MIN(block_size * 1000, nelements);
+    static int block_size = 128;
+    const ptrdiff_t nbatch = MIN(block_size * 1000, nelements);
 
-    // ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (nbatch + block_size - 1) / block_size);
-
-    static int block_size = 1;
-    const ptrdiff_t nbatch = 2;
-    ptrdiff_t n_blocks = 1;
+    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (nbatch + block_size - 1) / block_size);
 
     geom_t *he_xyz = nullptr;
     SFEM_CUDA_CHECK(cudaMallocHost(&he_xyz, 3 * 4 * nbatch * sizeof(geom_t)));
@@ -470,169 +469,174 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
            int(nelements / nbatch));
 }
 
-// extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
-//                                            const ptrdiff_t nnodes,
-//                                            idx_t **const SFEM_RESTRICT elems,
-//                                            geom_t **const SFEM_RESTRICT xyz,
-//                                            const count_t *const SFEM_RESTRICT rowptr,
-//                                            const idx_t *const SFEM_RESTRICT colidx,
-//                                            real_t *const SFEM_RESTRICT values) {
-//     cudaEvent_t start, stop;
-//     cudaEventCreate(&start);
-//     cudaEventCreate(&stop);
+#else
 
-//     cudaEventRecord(start);
+extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
+                                           const ptrdiff_t nnodes,
+                                           idx_t **const SFEM_RESTRICT elems,
+                                           geom_t **const SFEM_RESTRICT xyz,
+                                           const count_t *const SFEM_RESTRICT rowptr,
+                                           const idx_t *const SFEM_RESTRICT colidx,
+                                           real_t *const SFEM_RESTRICT values) {
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
 
-//     static int block_size = 128;
-//     const ptrdiff_t nbatch = MIN(block_size * 1000, nelements);
+    cudaEventRecord(start);
 
-//     ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (nbatch + block_size - 1) / block_size);
+    // static int block_size = 256;
+    static int block_size = 128;
+    const ptrdiff_t nbatch = MIN(block_size * 1000, nelements);
 
-//     geom_t *he_xyz = nullptr;
-//     SFEM_CUDA_CHECK(cudaMallocHost(&he_xyz, 3 * 4 * nbatch * sizeof(geom_t)));
-//     geom_t *de_xyz = nullptr;
-//     SFEM_CUDA_CHECK(cudaMalloc(&de_xyz, 3 * 4 * nbatch * sizeof(geom_t)));
+    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (nbatch + block_size - 1) / block_size);
 
-//     real_t *d_jacobian_inverse = nullptr;
-//     SFEM_CUDA_CHECK(cudaMalloc(&d_jacobian_inverse, 3 * 3 * nbatch * sizeof(real_t)));
+    geom_t *he_xyz = nullptr;
+    SFEM_CUDA_CHECK(cudaMallocHost(&he_xyz, 3 * 4 * nbatch * sizeof(geom_t)));
+    geom_t *de_xyz = nullptr;
+    SFEM_CUDA_CHECK(cudaMalloc(&de_xyz, 3 * 4 * nbatch * sizeof(geom_t)));
 
-//     real_t *he_matrix = nullptr;
-//     cudaMallocHost(&he_matrix, 4 * 4 * nbatch * sizeof(real_t));
-//     real_t *de_matrix = nullptr;
-//     SFEM_CUDA_CHECK(cudaMalloc(&de_matrix, 4 * 4 * nbatch * sizeof(real_t)));
+    real_t *d_jacobian_inverse = nullptr;
+    SFEM_CUDA_CHECK(cudaMalloc(&d_jacobian_inverse, 3 * 3 * nbatch * sizeof(real_t)));
 
-//     idx_t **hd_elems[4];
-//     idx_t **d_elems = nullptr;
+    real_t *he_matrix = nullptr;
+    cudaMallocHost(&he_matrix, 4 * 4 * nbatch * sizeof(real_t));
+    real_t *de_matrix = nullptr;
+    SFEM_CUDA_CHECK(cudaMalloc(&de_matrix, 4 * 4 * nbatch * sizeof(real_t)));
 
-//     count_t *d_rowptr = nullptr;
-//     idx_t *d_colidx = nullptr;
-//     real_t *d_values = nullptr;
+    idx_t **hd_elems[4];
+    idx_t **d_elems = nullptr;
 
-//     static const int nstreams = 2;
-//     cudaStream_t stream[nstreams];
-//     // cudaEvent_t cu_event[nstreams];
-//     for (int s = 0; s < nstreams; s++) {
-//         cudaStreamCreate(&stream[s]);
-//         // cudaEventCreate(&cu_event[s]);
-//     }
+    count_t *d_rowptr = nullptr;
+    idx_t *d_colidx = nullptr;
+    real_t *d_values = nullptr;
 
-//     // Allocate space for indices
-//     for (int d = 0; d < 4; d++) {
-//         SFEM_CUDA_CHECK(cudaMalloc(&hd_elems[d], nbatch * sizeof(idx_t)));
-//     }
+    static const int nstreams = 2;
+    cudaStream_t stream[nstreams];
+    // cudaEvent_t cu_event[nstreams];
+    for (int s = 0; s < nstreams; s++) {
+        cudaStreamCreate(&stream[s]);
+        // cudaEventCreate(&cu_event[s]);
+    }
 
-//     SFEM_CUDA_CHECK(cudaMalloc(&d_elems, 4 * sizeof(idx_t *)));
-//     cudaMemcpy(d_elems, hd_elems, 4 * sizeof(idx_t *), cudaMemcpyHostToDevice);
+    // Allocate space for indices
+    for (int d = 0; d < 4; d++) {
+        SFEM_CUDA_CHECK(cudaMalloc(&hd_elems[d], nbatch * sizeof(idx_t)));
+    }
 
-//     // Copy crs-matrix
-//     crs_device_create(nnodes, rowptr[nnodes], &d_rowptr, &d_colidx, &d_values);
-//     crs_graph_host_to_device(nnodes, rowptr[nnodes], rowptr, colidx, d_rowptr, d_colidx);
+    SFEM_CUDA_CHECK(cudaMalloc(&d_elems, 4 * sizeof(idx_t *)));
+    cudaMemcpy(d_elems, hd_elems, 4 * sizeof(idx_t *), cudaMemcpyHostToDevice);
 
-//     ptrdiff_t last_n = 0;
-//     ptrdiff_t last_element_offset = 0;
-//     for (ptrdiff_t element_offset = 0; element_offset < nelements; element_offset += nbatch) {
-//         ptrdiff_t n = MIN(nbatch, nelements - element_offset);
+    // Copy crs-matrix
+    crs_device_create(nnodes, rowptr[nnodes], &d_rowptr, &d_colidx, &d_values);
+    crs_graph_host_to_device(nnodes, rowptr[nnodes], rowptr, colidx, d_rowptr, d_colidx);
 
-//         {
-//             // #pragma omp parallel
-//             {
-//                 // #pragma omp parallel for collapse(2)
-//                 for (int d = 0; d < 3; ++d) {
-//                     for (int e_node = 0; e_node < 4; e_node++) {
-//                         // printf("%d %d\n", d, e_node)
-//                         const geom_t *const x = xyz[d];
-//                         ptrdiff_t offset = (d * 4 + e_node) * n;
-//                         const idx_t *const nodes = elems[e_node];
+    ptrdiff_t last_n = 0;
+    ptrdiff_t last_element_offset = 0;
+    for (ptrdiff_t element_offset = 0; element_offset < nelements; element_offset += nbatch) {
+        ptrdiff_t n = MIN(nbatch, nelements - element_offset);
 
-//                         geom_t *buff = &he_xyz[offset];
-//                         // #pragma omp parallel for
-//                         for (ptrdiff_t k = 0; k < n; k++) {
-//                             buff[k] = x[nodes[k]];
-//                         }
-//                     }
-//                 }
-//             }
-//         }
+        {
+            // #pragma omp parallel
+            {
+                // #pragma omp parallel for collapse(2)
+                for (int d = 0; d < 3; ++d) {
+                    for (int e_node = 0; e_node < 4; e_node++) {
+                        // printf("%d %d\n", d, e_node)
+                        const geom_t *const x = xyz[d];
+                        ptrdiff_t offset = (d * 4 + e_node) * n;
+                        const idx_t *const nodes = &elems[e_node][element_offset];
 
-//         for (int e_node = 0; e_node < 4; e_node++) {
-//             unsigned int mem_flag = CU_MEMHOSTREGISTER_PORTABLE;
-//             // unsigned int mem_flag = CU_MEMHOSTREGISTER_READ_ONLY;
+                        geom_t *buff = &he_xyz[offset];
+                        // #pragma omp parallel for
+                        for (ptrdiff_t k = 0; k < n; k++) {
+                            buff[k] = x[nodes[k]];
+                        }
+                    }
+                }
+            }
+        }
 
-//             SFEM_CUDA_CHECK(
-//                 cudaHostRegister(&elems[e_node][element_offset], n * sizeof(idx_t), mem_flag));
-//         }
+        for (int e_node = 0; e_node < 4; e_node++) {
+            unsigned int mem_flag = CU_MEMHOSTREGISTER_PORTABLE;
+            // unsigned int mem_flag = CU_MEMHOSTREGISTER_READ_ONLY;
 
-//         if (last_n) {
-//             cudaStreamSynchronize(stream[0]);
-//             // Do this here to let the main kernel overlap with the packing
-//             local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]>>>(last_n, d_elems, de_matrix, d_rowptr,
-//             d_colidx, d_values);
-//         }
+            SFEM_CUDA_CHECK(
+                cudaHostRegister(&elems[e_node][element_offset], n * sizeof(idx_t), mem_flag));
+        }
 
-//         // SFEM_CUDA_CHECK(cudaMemcpy(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice));
-//         SFEM_CUDA_CHECK(cudaMemcpyAsync(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice,
-//         stream[0]));
+        if (last_n) {
+            cudaStreamSynchronize(stream[0]);
+            // Do this here to let the main kernel overlap with the packing
+            local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]>>>(last_n, d_elems, de_matrix, d_rowptr,
+            d_colidx, d_values);
+        }
 
-//         if(last_n) {
-//              for (int e_node = 0; e_node < 4; e_node++) {
-//                 SFEM_CUDA_CHECK(cudaHostUnregister(&elems[e_node][last_element_offset]));
-//             }
-//         }
+        // SFEM_CUDA_CHECK(cudaMemcpy(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice));
+        SFEM_CUDA_CHECK(cudaMemcpyAsync(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice,
+        stream[0]));
 
-//         for (int e_node = 0; e_node < 4; e_node++) {
-//             // SFEM_CUDA_CHECK(cudaMemcpy(
-//             //     hd_elems[e_node], &elems[e_node][element_offset], n * sizeof(idx_t), cudaMemcpyHostToDevice));
+        if(last_n) {
+             for (int e_node = 0; e_node < 4; e_node++) {
+                SFEM_CUDA_CHECK(cudaHostUnregister(&elems[e_node][last_element_offset]));
+            }
+        }
 
-//              SFEM_CUDA_CHECK(cudaMemcpyAsync(
-//                 hd_elems[e_node], &elems[e_node][element_offset], n * sizeof(idx_t), cudaMemcpyHostToDevice,
-//                 stream[1]));
-//         }
+        for (int e_node = 0; e_node < 4; e_node++) {
+            // SFEM_CUDA_CHECK(cudaMemcpy(
+            //     hd_elems[e_node], &elems[e_node][element_offset], n * sizeof(idx_t), cudaMemcpyHostToDevice));
 
-//         jacobian_inverse_kernel<<<n_blocks, block_size, 0, stream[0]>>>(n, de_xyz, d_jacobian_inverse);
-//         laplacian_assemble_hessian_kernel<<<n_blocks, block_size, 0, stream[0]>>>(n, d_jacobian_inverse, de_matrix);
-//         last_n = n;
-//         last_element_offset = element_offset;
-//     }
+             SFEM_CUDA_CHECK(cudaMemcpyAsync(
+                hd_elems[e_node], &elems[e_node][element_offset], n * sizeof(idx_t), cudaMemcpyHostToDevice,
+                stream[1]));
+        }
 
-//     if (last_n) {
-//         local_to_global_kernel<<<n_blocks, block_size>>>(last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
+        jacobian_inverse_kernel<<<n_blocks, block_size, 0, stream[0]>>>(n, de_xyz, d_jacobian_inverse);
+        laplacian_assemble_hessian_kernel<<<n_blocks, block_size, 0, stream[0]>>>(n, d_jacobian_inverse, de_matrix);
+        last_n = n;
+        last_element_offset = element_offset;
+    }
 
-//         for (int e_node = 0; e_node < 4; e_node++) {
-//             SFEM_CUDA_CHECK(cudaHostUnregister(&elems[e_node][last_element_offset]));
-//         }
-//     }
+    if (last_n) {
+        local_to_global_kernel<<<n_blocks, block_size>>>(last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
 
-//     SFEM_CUDA_CHECK(cudaMemcpy(values, d_values, rowptr[nnodes] * sizeof(real_t), cudaMemcpyDeviceToHost));
+        for (int e_node = 0; e_node < 4; e_node++) {
+            SFEM_CUDA_CHECK(cudaHostUnregister(&elems[e_node][last_element_offset]));
+        }
+    }
 
-//     {  // Free resources on CPU
-//         cudaFreeHost(he_xyz);
-//         cudaFreeHost(he_matrix);
-//     }
+    SFEM_CUDA_CHECK(cudaMemcpy(values, d_values, rowptr[nnodes] * sizeof(real_t), cudaMemcpyDeviceToHost));
 
-//     {  // Free resources on GPU
-//         SFEM_CUDA_CHECK(cudaFree(de_xyz));
-//         SFEM_CUDA_CHECK(cudaFree(de_matrix));
-//         SFEM_CUDA_CHECK(cudaFree(d_jacobian_inverse));
+    {  // Free resources on CPU
+        cudaFreeHost(he_xyz);
+        cudaFreeHost(he_matrix);
+    }
 
-//         for (int d = 0; d < 4; d++) {
-//             SFEM_CUDA_CHECK(cudaFree(hd_elems[d]));
-//         }
-//         SFEM_CUDA_CHECK(cudaFree(d_elems));
+    {  // Free resources on GPU
+        SFEM_CUDA_CHECK(cudaFree(de_xyz));
+        SFEM_CUDA_CHECK(cudaFree(de_matrix));
+        SFEM_CUDA_CHECK(cudaFree(d_jacobian_inverse));
 
-//         crs_device_free(d_rowptr, d_colidx, d_values);
+        for (int d = 0; d < 4; d++) {
+            SFEM_CUDA_CHECK(cudaFree(hd_elems[d]));
+        }
+        SFEM_CUDA_CHECK(cudaFree(d_elems));
 
-//         for (int s = 0; s < nstreams; s++) {
-//                    cudaStreamDestroy(stream[s]);
-//                    // cudaEventDestroy(cu_event[s]);
-//                }
-//     }
+        crs_device_free(d_rowptr, d_colidx, d_values);
 
-//     cudaEventRecord(stop);
-//     cudaEventSynchronize(stop);
-//     float milliseconds = 0;
-//     cudaEventElapsedTime(&milliseconds, start, stop);
+        for (int s = 0; s < nstreams; s++) {
+                   cudaStreamDestroy(stream[s]);
+                   // cudaEventDestroy(cu_event[s]);
+               }
+    }
 
-//     printf("cuda_laplacian_2.c: laplacian_assemble_hessian\t%g seconds\nloops %d\n",
-//            milliseconds / 1000,
-//            int(nelements / nbatch));
-// }
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+
+    printf("cuda_laplacian_2.c: laplacian_assemble_hessian\t%g seconds\nloops %d\n",
+           milliseconds / 1000,
+           int(nelements / nbatch));
+}
+
+#endif 
