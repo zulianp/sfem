@@ -536,18 +536,14 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         ptrdiff_t n = MIN(nbatch, nelements - element_offset);
 
         {
-            // #pragma omp parallel
             {
-                // #pragma omp parallel for collapse(2)
                 for (int d = 0; d < 3; ++d) {
                     for (int e_node = 0; e_node < 4; e_node++) {
-                        // printf("%d %d\n", d, e_node)
                         const geom_t *const x = xyz[d];
                         ptrdiff_t offset = (d * 4 + e_node) * n;
                         const idx_t *const nodes = &elems[e_node][element_offset];
 
                         geom_t *buff = &he_xyz[offset];
-                        // #pragma omp parallel for
                         for (ptrdiff_t k = 0; k < n; k++) {
                             buff[k] = x[nodes[k]];
                         }
@@ -571,7 +567,6 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
             d_colidx, d_values);
         }
 
-        // SFEM_CUDA_CHECK(cudaMemcpy(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice));
         SFEM_CUDA_CHECK(cudaMemcpyAsync(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice,
         stream[0]));
 
@@ -582,9 +577,6 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         }
 
         for (int e_node = 0; e_node < 4; e_node++) {
-            // SFEM_CUDA_CHECK(cudaMemcpy(
-            //     hd_elems[e_node], &elems[e_node][element_offset], n * sizeof(idx_t), cudaMemcpyHostToDevice));
-
              SFEM_CUDA_CHECK(cudaMemcpyAsync(
                 hd_elems[e_node], &elems[e_node][element_offset], n * sizeof(idx_t), cudaMemcpyHostToDevice,
                 stream[1]));
@@ -597,11 +589,17 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
     }
 
     if (last_n) {
-        local_to_global_kernel<<<n_blocks, block_size>>>(last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
+        cudaStreamSynchronize(stream[0]);
+            // Do this here to let the main kernel overlap with the packing
+            local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]>>>(last_n, d_elems, de_matrix, d_rowptr,
+            d_colidx, d_values);
 
         for (int e_node = 0; e_node < 4; e_node++) {
             SFEM_CUDA_CHECK(cudaHostUnregister(&elems[e_node][last_element_offset]));
         }
+
+
+        cudaStreamSynchronize(stream[1]);
     }
 
     SFEM_CUDA_CHECK(cudaMemcpy(values, d_values, rowptr[nnodes] * sizeof(real_t), cudaMemcpyDeviceToHost));
