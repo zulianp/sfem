@@ -13,6 +13,8 @@ def main(argv):
 		exit(1)
 
 	output = argv[1]
+	radius=0.5
+	height=0.5
 
 	if(len(argv) > 2):
 		nrefs = int(sys.argv[2])
@@ -25,7 +27,7 @@ def main(argv):
 	model = gmsh.model()
 	model.add("Cylinder")
 	model.setCurrent("Cylinder")
-	model.occ.addCylinder(0, 0, 0, 0, 2, 0, 0.5, tag=1)
+	model.occ.addCylinder(0, 0, 0, 0, height, 0, radius, tag=1)
 
 	inlet=1
 	outlet=2
@@ -55,7 +57,7 @@ def main(argv):
 
 	volumes = gmsh.model.occ.getEntities(dim=3)
 	model.occ.rotate(volumes, 0, 0, 0, 0, 0, 1, -np.pi/2)
-	model.occ.translate(volumes, -1, 0, 0)
+	model.occ.translate(volumes, -height/2, 0, 0)
 
 	# Generate mesh
 	model.occ.synchronize()

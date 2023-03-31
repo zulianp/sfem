@@ -8,7 +8,12 @@ f = fun(qx, qy, qz)
 rf = ref_fun(qx, qy, qz)
 dV = det3(A) / 6
 
-cainv = sp.Matrix(3, 3, coeffs("jac_inv", 9))
+cainv = sp.Matrix(3, 3, [0]*9)
+for i in range(0, 3):
+	for j in range(0, 3):
+		cainv[i, j] = sp.symbols(f'jac_inv[{i*3+j}*stride]')
+
+
 cdv = sp.symbols('dv')
 
 
@@ -76,7 +81,7 @@ for i in range(0, 4):
 		
 		integr *= cdv
 
-		bform = sp.symbols(f'element_matrix[{i*4+j}]')
+		bform = sp.symbols(f'element_matrix[{i*4+j}*stride]')
 		# bform_t = sp.symbols(f'element_matrix[{i+j*4}]')
 
 		if simplify_expr:

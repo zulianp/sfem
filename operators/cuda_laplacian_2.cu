@@ -39,8 +39,8 @@ static inline __device__ void laplacian(const real_t *SFEM_RESTRICT jac_inv,
 
     {
         // FLOATING POINT OPS!
-        //       - Result: 4*ADD + 16*ASSIGNMENT + 4*MUL + 12*POW
-        //       - Subexpressions: 12*ADD + 24*MUL + 3*NEG + 6*SUB
+        //      - Result: 4*ADD + 16*ASSIGNMENT + 4*MUL + 12*POW
+        //      - Subexpressions: 12*ADD + 24*MUL + 3*NEG + 6*SUB
         const real_t x0 = -jac_inv[0 * stride] - jac_inv[3 * stride] - jac_inv[6 * stride];
         const real_t x1 = -jac_inv[1 * stride] - jac_inv[4 * stride] - jac_inv[7 * stride];
         const real_t x2 = -jac_inv[2 * stride] - jac_inv[5 * stride] - jac_inv[8 * stride];
@@ -70,7 +70,37 @@ static inline __device__ void laplacian(const real_t *SFEM_RESTRICT jac_inv,
         element_matrix[12 * stride] = x5;
         element_matrix[13 * stride] = x7;
         element_matrix[14 * stride] = x8;
+        element_matrix[15 * stride] = dv * (pow(jac_inv[6*stride], 2) + pow(jac_inv[7*stride], 2) + pow(jac_inv[8*stride], 2));
     }
+
+    // printf("[%g %g %g\n%g %g %g\n%g %g %g]\n",
+    //        jac_inv[0 * stride],
+    //        jac_inv[1 * stride],
+    //        jac_inv[2 * stride],
+    //        jac_inv[3 * stride],
+    //        jac_inv[4 * stride],
+    //        jac_inv[5 * stride],
+    //        jac_inv[6 * stride],
+    //        jac_inv[7 * stride],
+    //        jac_inv[8 * stride]);
+
+    // printf("[%g %g %g %g\n%g %g %g %g\n%g %g %g %g\n%g %g %g %g]\n",
+    //        element_matrix[0 * stride],
+    //        element_matrix[1 * stride],
+    //        element_matrix[2 * stride],
+    //        element_matrix[3 * stride],
+    //        element_matrix[4 * stride],
+    //        element_matrix[5 * stride],
+    //        element_matrix[6 * stride],
+    //        element_matrix[7 * stride],
+    //        element_matrix[8 * stride],
+    //        element_matrix[9 * stride],
+    //        element_matrix[10 * stride],
+    //        element_matrix[11 * stride],
+    //        element_matrix[12 * stride],
+    //        element_matrix[13 * stride],
+    //        element_matrix[14 * stride],
+    //        element_matrix[15 * stride]);
 }
 
 static inline __device__ __host__ int linear_search(const idx_t target, const idx_t *const arr, const int size) {
@@ -141,6 +171,21 @@ static inline __device__ __host__ void jacobian_inverse_micro_kernel(const real_
                                                                      const real_t pz3,
                                                                      const count_t stride,
                                                                      real_t *jac_inv) {
+    // printf("[%g %g %g] [%g %g %g] [%g %g %g] [%g %g %g] %ld\n",
+    //        px0,
+    //        py0,
+    //        pz0,
+    //        px1,
+    //        py1,
+    //        pz1,
+    //        px2,
+    //        py2,
+    //        pz2,
+    //        px3,
+    //        py3,
+    //        pz3,
+    //        (long)stride);
+
     // FLOATING POINT OPS!
     //       - Result: 9*ADD + 9*ASSIGNMENT + 25*MUL
     //       - Subexpressions: 2*ADD + DIV + 12*MUL + 12*SUB
@@ -167,6 +212,18 @@ static inline __device__ __host__ void jacobian_inverse_micro_kernel(const real_
     jac_inv[5 * stride] = x14 * (x10 * x11 - x3 * x6);
     jac_inv[6 * stride] = x14 * (-x0 * x7 + x10 * x4);
     jac_inv[7 * stride] = x14 * (-x4 * x6 + x7 * x8);
+    jac_inv[8 * stride] = x14 * (x0 * x6 - x10 * x8);
+
+    // printf("[%g %g %g\n%g %g %g\n%g %g %g]\n",
+    //        jac_inv[0 * stride],
+    //        jac_inv[1 * stride],
+    //        jac_inv[2 * stride],
+    //        jac_inv[3 * stride],
+    //        jac_inv[4 * stride],
+    //        jac_inv[5 * stride],
+    //        jac_inv[6 * stride],
+    //        jac_inv[7 * stride],
+    //        jac_inv[8 * stride]);
 }
 
 __global__ void jacobian_inverse_kernel(const ptrdiff_t nelements,
@@ -177,9 +234,9 @@ __global__ void jacobian_inverse_kernel(const ptrdiff_t nelements,
         const geom_t *const this_xyz = &xyz[e];
         real_t *const this_jacobian_inverse = &jacobian_inverse[e];
 
-        ptrdiff_t xi = 0 * 4;
-        ptrdiff_t yi = 1 * 4;
-        ptrdiff_t zi = 2 * 4;
+        const ptrdiff_t xi = 0 * 4;
+        const ptrdiff_t yi = 1 * 4;
+        const ptrdiff_t zi = 2 * 4;
 
         jacobian_inverse_micro_kernel(
             // X-coordinates
@@ -227,7 +284,8 @@ __global__ void local_to_global_kernel(const ptrdiff_t nelements,
         // offsetted array for this element
         const real_t *const this_matrix = &element_matrix[e];
 
-#pragma unroll(4)
+        // printf("%d)\n", (int)e);
+
         for (int edof_i = 0; edof_i < 4; ++edof_i) {
             const idx_t dof_i = ev[edof_i];
             const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
@@ -238,12 +296,39 @@ __global__ void local_to_global_kernel(const ptrdiff_t nelements,
 
             real_t *const rowvalues = &values[rowptr[dof_i]];
 
-#pragma unroll(4)
+            // #pragma unroll(4)
             for (int edof_j = 0; edof_j < 4; ++edof_j) {
-                const real_t v = this_matrix[(edof_i * 4 + edof_j) * nelements];
+                ptrdiff_t idx = (edof_i * 4 + edof_j) * nelements;
+                const real_t v = this_matrix[idx];
+
+                // printf("(%d, %d) %g\n", dof_i, ev[edof_j], v);
+
                 atomicAdd(&rowvalues[ks[edof_j]], v);
             }
+
+            // printf("\n");
         }
+
+
+            // printf("\n");
+
+        // printf("[%g %g %g %g\n%g %g %g %g\n%g %g %g %g\n%g %g %g %g]\n",
+        //        this_matrix[0 * nelements],
+        //        this_matrix[1 * nelements],
+        //        this_matrix[2 * nelements],
+        //        this_matrix[3 * nelements],
+        //        this_matrix[4 * nelements],
+        //        this_matrix[5 * nelements],
+        //        this_matrix[6 * nelements],
+        //        this_matrix[7 * nelements],
+        //        this_matrix[8 * nelements],
+        //        this_matrix[9 * nelements],
+        //        this_matrix[10 * nelements],
+        //        this_matrix[11 * nelements],
+        //        this_matrix[12 * nelements],
+        //        this_matrix[13 * nelements],
+        //        this_matrix[14 * nelements],
+        //        this_matrix[15 * nelements]);
     }
 }
 
@@ -268,10 +353,14 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
 
     cudaEventRecord(start);
 
-    static int block_size = 128;
-    const ptrdiff_t nbatch = MIN(block_size * 1000, nelements);
+    // static int block_size = 128;
+    // const ptrdiff_t nbatch = MIN(block_size * 1000, nelements);
 
-    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (nbatch + block_size - 1) / block_size);
+    // ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (nbatch + block_size - 1) / block_size);
+
+    static int block_size = 1;
+    const ptrdiff_t nbatch = 2;
+    ptrdiff_t n_blocks = 1;
 
     geom_t *he_xyz = nullptr;
     SFEM_CUDA_CHECK(cudaMallocHost(&he_xyz, 3 * 4 * nbatch * sizeof(geom_t)));

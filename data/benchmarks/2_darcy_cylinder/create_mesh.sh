@@ -15,7 +15,7 @@ LAUNCH=""
 
 set -x
 
-nrefs=5
+nrefs=6
 
 folder=cylinder
 mesh_db=$folder/mesh.vtk
@@ -36,8 +36,8 @@ cylinder.py $mesh_db $nrefs
 db_to_raw.py $mesh_db $mesh_raw
 $LAUNCH skin $mesh_raw $mesh_surface
 
-$LAUNCH select_surf $mesh_surface -0.2 0   0   0.99   $mesh_surface/sides_inlet.raw
-$LAUNCH select_surf $mesh_surface  0.2 0 	 0   0.99 	$mesh_surface/sides_outlet.raw
+$LAUNCH select_surf $mesh_surface -1 0   0   0.99   $mesh_surface/sides_inlet.raw
+$LAUNCH select_surf $mesh_surface  1 0 	 0   0.99 	$mesh_surface/sides_outlet.raw
 
 numbers=`mktemp`
 numbers2=`mktemp`
