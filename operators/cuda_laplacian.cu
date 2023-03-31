@@ -19,6 +19,9 @@ extern "C" {
 
 #include "sfem_cuda_base.h"
 
+
+#define POW2(a)((a)*(a))
+
 // Version 1
 // static inline __device__ void laplacian(const real_t x0,
 //                                         const real_t x1,
@@ -285,7 +288,7 @@ static inline __device__ void laplacian(const real_t px0,
             // FLOATING POINT OPS!
             //      - Result: 10*ADD + 20*ASSIGNMENT + 28*MUL + 12*POW
             //      - Subexpressions: 0
-            element_matrix[0] = dv * (pow(gx[0], 2) + pow(gy[0], 2) + pow(gz[0], 2));
+            element_matrix[0] = dv * (POW2(gx[0]) + POW2(gy[0]) + POW2(gz[0]));
             element_matrix[0] = element_matrix[0];
             element_matrix[1] = dv * (gx[0] * gx[1] + gy[0] * gy[1] + gz[0] * gz[1]);
             element_matrix[4] = element_matrix[1];
@@ -293,17 +296,17 @@ static inline __device__ void laplacian(const real_t px0,
             element_matrix[8] = element_matrix[2];
             element_matrix[3] = dv * (gx[0] * gx[3] + gy[0] * gy[3] + gz[0] * gz[3]);
             element_matrix[12] = element_matrix[3];
-            element_matrix[5] = dv * (pow(gx[1], 2) + pow(gy[1], 2) + pow(gz[1], 2));
+            element_matrix[5] = dv * (POW2(gx[1]) + POW2(gy[1]) + POW2(gz[1]));
             element_matrix[5] = element_matrix[5];
             element_matrix[6] = dv * (gx[1] * gx[2] + gy[1] * gy[2] + gz[1] * gz[2]);
             element_matrix[9] = element_matrix[6];
             element_matrix[7] = dv * (gx[1] * gx[3] + gy[1] * gy[3] + gz[1] * gz[3]);
             element_matrix[13] = element_matrix[7];
-            element_matrix[10] = dv * (pow(gx[2], 2) + pow(gy[2], 2) + pow(gz[2], 2));
+            element_matrix[10] = dv * (POW2(gx[2]) + POW2(gy[2]) + POW2(gz[2]));
             element_matrix[10] = element_matrix[10];
             element_matrix[11] = dv * (gx[2] * gx[3] + gy[2] * gy[3] + gz[2] * gz[3]);
             element_matrix[14] = element_matrix[11];
-            element_matrix[15] = dv * (pow(gx[3], 2) + pow(gy[3], 2) + pow(gz[3], 2));
+            element_matrix[15] = dv * (POW2(gx[3]) + POW2(gy[3]) + POW2(gz[3]));
             element_matrix[15] = element_matrix[15];
         }
     }

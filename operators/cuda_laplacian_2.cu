@@ -19,6 +19,7 @@ extern "C" {
 #include "sfem_cuda_base.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define POW2(a)((a)*(a))
 
 static inline __device__ void laplacian(const real_t *SFEM_RESTRICT jac_inv,
                                         const count_t stride,
@@ -53,24 +54,24 @@ static inline __device__ void laplacian(const real_t *SFEM_RESTRICT jac_inv,
                                 jac_inv[2 * stride] * jac_inv[8 * stride]);
         const real_t x8 = dv * (jac_inv[3 * stride] * jac_inv[6 * stride] + jac_inv[4 * stride] * jac_inv[7 * stride] +
                                 jac_inv[5 * stride] * jac_inv[8 * stride]);
-        element_matrix[0 * stride] = dv * (pow(x0, 2) + pow(x1, 2) + pow(x2, 2));
+        element_matrix[0 * stride] = dv * (POW2(x0) + POW2(x1) + POW2(x2));
         element_matrix[1 * stride] = x3;
         element_matrix[2 * stride] = x4;
         element_matrix[3 * stride] = x5;
         element_matrix[4 * stride] = x3;
         element_matrix[5 * stride] =
-            dv * (pow(jac_inv[0 * stride], 2) + pow(jac_inv[1 * stride], 2) + pow(jac_inv[2 * stride], 2));
+            dv * (POW2(jac_inv[0 * stride]) + POW2(jac_inv[1 * stride]) + POW2(jac_inv[2 * stride]));
         element_matrix[6 * stride] = x6;
         element_matrix[7 * stride] = x7;
         element_matrix[8 * stride] = x4;
         element_matrix[9 * stride] = x6;
         element_matrix[10 * stride] =
-            dv * (pow(jac_inv[3 * stride], 2) + pow(jac_inv[4 * stride], 2) + pow(jac_inv[5 * stride], 2));
+            dv * (POW2(jac_inv[3 * stride]) + POW2(jac_inv[4 * stride]) + POW2(jac_inv[5 * stride]));
         element_matrix[11 * stride] = x8;
         element_matrix[12 * stride] = x5;
         element_matrix[13 * stride] = x7;
         element_matrix[14 * stride] = x8;
-        element_matrix[15 * stride] = dv * (pow(jac_inv[6*stride], 2) + pow(jac_inv[7*stride], 2) + pow(jac_inv[8*stride], 2));
+        element_matrix[15 * stride] = dv * (POW2(jac_inv[6*stride]) + POW2(jac_inv[7*stride]) + POW2(jac_inv[8*stride]));
     }
 
     // printf("[%g %g %g\n%g %g %g\n%g %g %g]\n",
