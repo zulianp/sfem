@@ -37,23 +37,6 @@ def grad_phi(i):
 
 	return g.T * cainv
 
-# cgx = coeffs("gx", 4) 
-# cgy = coeffs("gy", 4) 
-# cgz = coeffs("gz", 4) 
-
-c_code(expr)
-
-# expr = []
-
-# for i in range(0, 4):
-# 	g = grad_phi(i)
-# 	expr.append(ast.Assignment(cgx[i], g[0]))
-# 	expr.append(ast.Assignment(cgy[i], g[1]))
-# 	expr.append(ast.Assignment(cgz[i], g[2]))
-
-# c_code(expr)
-
-
 c_code(expr)
 
 expr = []

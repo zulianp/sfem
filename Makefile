@@ -100,6 +100,7 @@ OBJS = \
 	crs_graph.o \
 	sortreduce.o \
 	argsort.o \
+	spmv.o \
 	read_mesh.o  \
 	mass.o \
 	boundary_mass.o \
