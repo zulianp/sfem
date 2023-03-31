@@ -10,7 +10,7 @@ CASE=../sorted_mesh
 # CASE=../data/half_tera_cube 
 
 
-SFEM_HANDLE_DIRICHLET=0 ../assemble 	   $CASE test_actual;  
+OMP_NUM_THREADS=16 OMP_PROC_BIND=true SFEM_HANDLE_DIRICHLET=0 ../assemble 	   $CASE test_actual;  
 SFEM_HANDLE_DIRICHLET=0 ../assemble_oracle $CASE test_oracle 
 
 
