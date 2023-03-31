@@ -6,13 +6,18 @@ set -x
 CASE=../../fetest/meshes/case4
 CASE=../../fetest/meshes/case5
 CASE=../data/mesh-multi-outlet-better/
-CASE=../sorted_mesh
+# CASE=../sorted_mesh
 # CASE=../data/half_tera_cube 
 
+export SFEM_HANDLE_DIRICHLET=0
+export OMP_NUM_THREADS=4 
+export OMP_PROC_BIND=true 
 
-OMP_NUM_THREADS=16 OMP_PROC_BIND=true SFEM_HANDLE_DIRICHLET=0 ../assemble 	   $CASE test_actual;  
-SFEM_HANDLE_DIRICHLET=0 ../assemble_oracle $CASE test_oracle 
+# CUDA + OpenMP
+../assemble $CASE test_actual;  
 
+# Serial
+../assemble_oracle $CASE test_oracle 
 
 ../python/fdiff.py test_actual/values.raw test_oracle/values.raw
 
