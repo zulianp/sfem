@@ -592,10 +592,12 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
             cudaStreamSynchronize(stream[1]);
         }
 
+        SFEM_RANGE_PUSH("copy-host-to-host");
         //  Copy elements to host-pinned memory
         for (int e_node = 0; e_node < 4; e_node++) {
             memcpy(hh_elems[e_node], &elems[e_node][element_offset], n * sizeof(idx_t));
         }
+        SFEM_RANGE_POP();
 
         for (int e_node = 0; e_node < 4; e_node++) {
             SFEM_CUDA_CHECK(cudaMemcpyAsync(
