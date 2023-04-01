@@ -492,6 +492,7 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
 
+    SFEM_RANGE_PUSH("lapl-set-up");
     cudaEventRecord(start);
 
     // static int block_size = 256;
@@ -541,9 +542,14 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
     SFEM_CUDA_CHECK(cudaMalloc(&d_elems, 4 * sizeof(idx_t *)));
     cudaMemcpy(d_elems, hd_elems, 4 * sizeof(idx_t *), cudaMemcpyHostToDevice);
 
+    SFEM_RANGE_POP();
+
+    SFEM_RANGE_PUSH("lapl-crs-host-to-device");
     // Copy crs-matrix
     crs_device_create(nnodes, rowptr[nnodes], &d_rowptr, &d_colidx, &d_values);
     crs_graph_host_to_device(nnodes, rowptr[nnodes], rowptr, colidx, d_rowptr, d_colidx);
+
+    SFEM_RANGE_POP();
 
     ptrdiff_t last_n = 0;
     ptrdiff_t last_element_offset = 0;
@@ -551,7 +557,7 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         ptrdiff_t n = MIN(nbatch, nelements - element_offset);
 
         {
-            SFEM_RANGE_PUSH("packing");
+            SFEM_RANGE_PUSH("lapl-packing");
             {
                 for (int d = 0; d < 3; ++d) {
                     for (int e_node = 0; e_node < 4; e_node++) {
@@ -592,7 +598,7 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
             cudaStreamSynchronize(stream[1]);
         }
 
-        SFEM_RANGE_PUSH("copy-host-to-host");
+        SFEM_RANGE_PUSH("lapl-copy-host-to-host");
         //  Copy elements to host-pinned memory
         for (int e_node = 0; e_node < 4; e_node++) {
             memcpy(hh_elems[e_node], &elems[e_node][element_offset], n * sizeof(idx_t));
@@ -627,8 +633,13 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         cudaStreamSynchronize(stream[1]);
     }
 
+    SFEM_RANGE_PUSH("lapl-values-device-to-host");
+
     SFEM_CUDA_CHECK(cudaMemcpy(values, d_values, rowptr[nnodes] * sizeof(real_t), cudaMemcpyDeviceToHost));
 
+    SFEM_RANGE_POP();
+
+    SFEM_RANGE_PUSH("lapl-tear-down");
     {  // Free resources on CPU
         cudaFreeHost(he_xyz);
         cudaFreeHost(he_matrix);
@@ -655,6 +666,8 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
             // cudaEventDestroy(cu_event[s]);
         }
     }
+
+    SFEM_RANGE_POP();
 
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
