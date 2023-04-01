@@ -696,56 +696,13 @@ extern "C" void laplacian_assemble_gradient(const ptrdiff_t nelements,
         SFEM_CUDA_CHECK(cudaMemcpy(d_values, values, nnodes * sizeof(real_t), cudaMemcpyHostToDevice));   
     }
 
-
-//     idx_t ev[4];
-//     real_t element_vector[4 * 4];
-//     real_t element_u[4];
-
-//     for (ptrdiff_t i = 0; i < nelements; ++i) {
-// #pragma unroll(4)
-//         for (int v = 0; v < 4; ++v) {
-//             ev[v] = elems[v][i];
-//         }
-
-//         for (int v = 0; v < 4; ++v) {
-//             element_u[v] = u[ev[v]];
-//         }
-
-//         // Element indices
-//         const idx_t i0 = ev[0];
-//         const idx_t i1 = ev[1];
-//         const idx_t i2 = ev[2];
-//         const idx_t i3 = ev[3];
-
-//         laplacian_gradient(
-//             // X-coordinates
-//             xyz[0][i0],
-//             xyz[0][i1],
-//             xyz[0][i2],
-//             xyz[0][i3],
-//             // Y-coordinates
-//             xyz[1][i0],
-//             xyz[1][i1],
-//             xyz[1][i2],
-//             xyz[1][i3],
-//             // Z-coordinates
-//             xyz[2][i0],
-//             xyz[2][i1],
-//             xyz[2][i2],
-//             xyz[2][i3],
-//             element_u,
-//             element_vector);
-
-//         for (int edof_i = 0; edof_i < 4; ++edof_i) {
-//             const idx_t dof_i = ev[edof_i];
-//             values[dof_i] += element_vector[edof_i];
-//         }
-//     }
-
+    double ktick = MPI_Wtime();
+    laplacian_assemble_gradient_kernel<<<n_blocks, block_size>>>(
+            nelements, nnodes, d_elems, d_xyz, d_u, d_values);
 
 
     SFEM_CUDA_CHECK(cudaMemcpy(values,      d_values,      nnodes * sizeof(real_t), cudaMemcpyDeviceToHost));
-
+    double ktock = MPI_Wtime();
 
 
     {  // Free element indices
@@ -770,7 +727,7 @@ extern "C" void laplacian_assemble_gradient(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("cuda_laplacian.c: laplacian_assemble_gradient\t%g seconds\n", tock - tick);
+    printf("cuda_laplacian.c: laplacian_assemble_gradient\t%g seconds (GPU kernel %g seconds)\n", tock - tick, ktock - ktick);
 }
 
 
