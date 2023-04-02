@@ -160,7 +160,7 @@ static inline __device__ __host__ void fff_micro_kernel(const real_t px0,
     const real_t x20 =
         -1.0 / 6.0 * x12 + (1.0 / 6.0) * x15 + (1.0 / 6.0) * x17 - 1.0 / 6.0 * x19 + (1.0 / 6.0) * x4 - 1.0 / 6.0 * x8;
     const real_t x21 = x14 - x18;
-    const real_t x22 = pow(-x12 + x15 + x17 - x19 + x4 - x8, -2);
+    const real_t x22 = 1./POW2(-x12 + x15 + x17 - x19 + x4 - x8);
     const real_t x23 = -x11 + x16 * x6;
     const real_t x24 = x3 - x7;
     const real_t x25 = -x0 * x5 + x16 * x9;
@@ -172,12 +172,12 @@ static inline __device__ __host__ void fff_micro_kernel(const real_t px0,
     const real_t x31 = x0 * x1 - x10 * x9;
     const real_t x32 = -x0 * x6 + x10 * x13;
     const real_t x33 = -x1 * x13 + x6 * x9;
-    jac_inv[0 * stride] = x20 * (pow(x21, 2) * x22 + x22 * pow(x23, 2) + x22 * pow(x24, 2));
+    jac_inv[0 * stride] = x20 * (POW2(x21) * x22 + x22 * POW2(x23) + x22 * POW2(x24));
     jac_inv[1 * stride] = x20 * (x25 * x26 + x27 * x28 + x29 * x30);
     jac_inv[2 * stride] = x20 * (x26 * x31 + x28 * x32 + x30 * x33);
-    jac_inv[3 * stride] = x20 * (x22 * pow(x25, 2) + x22 * pow(x27, 2) + x22 * pow(x29, 2));
+    jac_inv[3 * stride] = x20 * (x22 * POW2(x25) + x22 * POW2(x27) + x22 * POW2(x29));
     jac_inv[4 * stride] = x20 * (x22 * x25 * x31 + x22 * x27 * x32 + x22 * x29 * x33);
-    jac_inv[5 * stride] = x20 * (x22 * pow(x31, 2) + x22 * pow(x32, 2) + x22 * pow(x33, 2));
+    jac_inv[5 * stride] = x20 * (x22 * POW2(x31) + x22 * POW2(x32) + x22 * POW2(x33));
 }
 
 __global__ void fff_kernel(const ptrdiff_t nelements,
@@ -384,6 +384,8 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
             cudaStreamSynchronize(stream[1]);
         }
 
+        fff_kernel<<<n_blocks, block_size, 0, stream[0]>>>(n, de_xyz, d_fff);
+        
         SFEM_RANGE_PUSH("lapl-copy-host-to-host");
         //  Copy elements to host-pinned memory
         for (int e_node = 0; e_node < 4; e_node++) {
@@ -391,12 +393,14 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         }
         SFEM_RANGE_POP();
 
+
+        
+
         for (int e_node = 0; e_node < 4; e_node++) {
             SFEM_CUDA_CHECK(cudaMemcpyAsync(
                 hd_elems[e_node], hh_elems[e_node], n * sizeof(idx_t), cudaMemcpyHostToDevice, stream[1]));
         }
 
-        fff_kernel<<<n_blocks, block_size, 0, stream[0]>>>(n, de_xyz, d_fff);
 
         SFEM_DEBUG_SYNCHRONIZE();
 
