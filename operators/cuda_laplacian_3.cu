@@ -379,13 +379,15 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
 
         SFEM_CUDA_CHECK(cudaMemcpyAsync(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice, stream[0]));
 
+        
+        fff_kernel<<<n_blocks, block_size, 0, stream[0]>>>(n, de_xyz, d_fff);
+
         if (last_n) {
             // make sure that the previous copy async and kernel from stream 1 is finished!
             cudaStreamSynchronize(stream[1]);
         }
 
-        fff_kernel<<<n_blocks, block_size, 0, stream[0]>>>(n, de_xyz, d_fff);
-        
+
         SFEM_RANGE_PUSH("lapl-copy-host-to-host");
         //  Copy elements to host-pinned memory
         for (int e_node = 0; e_node < 4; e_node++) {
