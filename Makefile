@@ -115,8 +115,10 @@ OBJS = \
 
 
 ifeq ($(cuda), 1)
-	CUDA_OBJS = cuda_laplacian.o
-# 	CUDA_OBJS = cuda_laplacian_2.o
+# 	CUDA_OBJS = cuda_laplacian.o
+	CUDA_OBJS = cuda_laplacian_2.o
+# CUDA_OBJS = cuda_laplacian_3.o
+	
 	CUDA_OBJS += cuda_crs.o
 	DEPS += -L/opt/cuda/lib64 -lcudart
 	DEPS += -lnvToolsExt

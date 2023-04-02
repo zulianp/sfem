@@ -41,27 +41,27 @@ def grad_phi(i):
 
 expr = []
 
-trial_gx = [0] * 4 
-trial_gy = [0] * 4 
-trial_gz = [0] * 4 
+left_gx = [0] * 4 
+left_gy = [0] * 4 
+left_gz = [0] * 4 
 
 
-test_gx = [0] * 4 
-test_gy = [0] * 4 
-test_gz = [0] * 4 
+right_gx = [0] * 4 
+right_gy = [0] * 4 
+right_gz = [0] * 4 
 
 
 
 for i in range(0, 4):
 	g = grad_phi(i)
-	test_gx[i] = g[0]
-	test_gy[i] = g[1]
-	test_gz[i] = g[2]
-	FFFg = cFFF * g
+	right_gx[i] = g[0]
+	right_gy[i] = g[1]
+	right_gz[i] = g[2]
 
-	trial_gx[i] = FFFg[0]
-	trial_gy[i] = FFFg[1]
-	trial_gz[i] = FFFg[2]
+	FFFg = cFFF * g
+	left_gx[i] = FFFg[0]
+	left_gy[i] = FFFg[1]
+	left_gz[i] = FFFg[2]
 
 
 expr = []
@@ -70,9 +70,9 @@ for i in range(0, 4):
 
 		integr = 0
 		
-		integr += trial_gx[i] * test_gx[j]
-		integr += trial_gy[i] * test_gy[j]
-		integr += trial_gz[i] * test_gz[j]
+		integr += left_gx[i] * right_gx[j]
+		integr += left_gy[i] * right_gy[j]
+		integr += left_gz[i] * right_gz[j]
 
 		bform = sp.symbols(f'element_matrix[{i*4+j}*stride]')
 		# bform_t = sp.symbols(f'element_matrix[{i+j*4}]')
