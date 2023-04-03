@@ -526,10 +526,6 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
            int(nelements / nbatch));
 }
 
-
-
-
-
 static inline __device__ void laplacian_gradient(const real_t px0,
                                                  const real_t px1,
                                                  const real_t px2,
@@ -718,6 +714,8 @@ extern "C" void laplacian_assemble_gradient(const ptrdiff_t nelements,
     SFEM_CUDA_CHECK(cudaMemcpy(values, d_values, nnodes * sizeof(real_t), cudaMemcpyDeviceToHost));
     // double ktock = MPI_Wtime();
 
+
+    SFEM_RANGE_PUSH("lapl-tear-down");
     {  // Free element indices
         for (int d = 0; d < 4; ++d) {
             SFEM_CUDA_CHECK(cudaFree(hd_elems[d]));
@@ -738,6 +736,9 @@ extern "C" void laplacian_assemble_gradient(const ptrdiff_t nelements,
         SFEM_CUDA_CHECK(cudaFree(d_u));
         SFEM_CUDA_CHECK(cudaFree(d_values));
     }
+
+     SFEM_RANGE_POP();
+
 
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
