@@ -19,8 +19,7 @@ extern "C" {
 
 #include "sfem_cuda_base.h"
 
-
-#define POW2(a)((a)*(a))
+#define POW2(a) ((a) * (a))
 
 // Version 1
 // static inline __device__ void laplacian(const real_t x0,
@@ -267,8 +266,8 @@ static inline __device__ void laplacian(const real_t px0,
 
         real_t gx[4], gy[4], gz[4];
         {
-            //FLOATING POINT OPS!
-            //      - Result: 3*ADD + 12*ASSIGNMENT + 9*MUL
+            // FLOATING POINT OPS!
+            //       - Result: 3*ADD + 12*ASSIGNMENT + 9*MUL
 
             gx[0] = -jac_inv[0] - jac_inv[3] - jac_inv[6];
             gy[0] = -jac_inv[1] - jac_inv[4] - jac_inv[7];
@@ -312,21 +311,20 @@ static inline __device__ void laplacian(const real_t px0,
     }
 }
 
-
-static inline __device__  void laplacian_gradient(const real_t px0,
-                                           const real_t px1,
-                                           const real_t px2,
-                                           const real_t px3,
-                                           const real_t py0,
-                                           const real_t py1,
-                                           const real_t py2,
-                                           const real_t py3,
-                                           const real_t pz0,
-                                           const real_t pz1,
-                                           const real_t pz2,
-                                           const real_t pz3,
-                                           const real_t *SFEM_RESTRICT u,
-                                           real_t *SFEM_RESTRICT element_vector) {
+static inline __device__ void laplacian_gradient(const real_t px0,
+                                                 const real_t px1,
+                                                 const real_t px2,
+                                                 const real_t px3,
+                                                 const real_t py0,
+                                                 const real_t py1,
+                                                 const real_t py2,
+                                                 const real_t py3,
+                                                 const real_t pz0,
+                                                 const real_t pz1,
+                                                 const real_t pz2,
+                                                 const real_t pz3,
+                                                 const real_t *SFEM_RESTRICT u,
+                                                 real_t *SFEM_RESTRICT element_vector) {
     // FLOATING POINT OPS!
     //      - Result: 4*ADD + 4*ASSIGNMENT + 16*MUL
     //      - Subexpressions: 13*ADD + 7*DIV + 46*MUL + 3*NEG + 30*SUB
@@ -594,11 +592,11 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
 }
 
 __global__ void laplacian_assemble_gradient_kernel(const ptrdiff_t nelements,
-                                                  const ptrdiff_t nnodes,
-                                                  idx_t **const SFEM_RESTRICT elems,
-                                                  geom_t **const SFEM_RESTRICT xyz,
-                                                  const real_t *const SFEM_RESTRICT u,
-                                                  real_t *const SFEM_RESTRICT values) {
+                                                   const ptrdiff_t nnodes,
+                                                   idx_t **const SFEM_RESTRICT elems,
+                                                   geom_t **const SFEM_RESTRICT xyz,
+                                                   const real_t *const SFEM_RESTRICT u,
+                                                   real_t *const SFEM_RESTRICT values) {
     idx_t ev[4];
     real_t element_vector[4];
     real_t element_u[4];
@@ -640,13 +638,11 @@ __global__ void laplacian_assemble_gradient_kernel(const ptrdiff_t nelements,
 }
 
 extern "C" void laplacian_assemble_gradient(const ptrdiff_t nelements,
-                                 const ptrdiff_t nnodes,
-                                 idx_t **const SFEM_RESTRICT elems,
-                                 geom_t **const SFEM_RESTRICT xyz,
-                                 const real_t *const SFEM_RESTRICT u,
-                                 real_t *const SFEM_RESTRICT values) {
-
-
+                                            const ptrdiff_t nnodes,
+                                            idx_t **const SFEM_RESTRICT elems,
+                                            geom_t **const SFEM_RESTRICT xyz,
+                                            const real_t *const SFEM_RESTRICT u,
+                                            real_t *const SFEM_RESTRICT values) {
     double tick = MPI_Wtime();
 
     const ptrdiff_t nbatch = nelements;
@@ -685,25 +681,22 @@ extern "C" void laplacian_assemble_gradient(const ptrdiff_t nelements,
         SFEM_CUDA_CHECK(cudaMemcpy(d_xyz, hd_xyz, 3 * sizeof(geom_t *), cudaMemcpyHostToDevice));
     }
 
-    real_t * d_u = nullptr;
-    real_t * d_values = nullptr;
+    real_t *d_u = nullptr;
+    real_t *d_values = nullptr;
     {
         // Copy input and output to device
-        SFEM_CUDA_CHECK(cudaMalloc(&d_u,  nnodes * sizeof(real_t)));
-        SFEM_CUDA_CHECK(cudaMalloc(&d_values,  nnodes * sizeof(real_t)));
+        SFEM_CUDA_CHECK(cudaMalloc(&d_u, nnodes * sizeof(real_t)));
+        SFEM_CUDA_CHECK(cudaMalloc(&d_values, nnodes * sizeof(real_t)));
 
-        SFEM_CUDA_CHECK(cudaMemcpy(d_u,      u,      nnodes * sizeof(real_t), cudaMemcpyHostToDevice));
-        SFEM_CUDA_CHECK(cudaMemcpy(d_values, values, nnodes * sizeof(real_t), cudaMemcpyHostToDevice));   
+        SFEM_CUDA_CHECK(cudaMemcpy(d_u, u, nnodes * sizeof(real_t), cudaMemcpyHostToDevice));
+        SFEM_CUDA_CHECK(cudaMemcpy(d_values, values, nnodes * sizeof(real_t), cudaMemcpyHostToDevice));
     }
 
     double ktick = MPI_Wtime();
-    laplacian_assemble_gradient_kernel<<<n_blocks, block_size>>>(
-            nelements, nnodes, d_elems, d_xyz, d_u, d_values);
+    laplacian_assemble_gradient_kernel<<<n_blocks, block_size>>>(nelements, nnodes, d_elems, d_xyz, d_u, d_values);
 
-
-    SFEM_CUDA_CHECK(cudaMemcpy(values,      d_values,      nnodes * sizeof(real_t), cudaMemcpyDeviceToHost));
+    SFEM_CUDA_CHECK(cudaMemcpy(values, d_values, nnodes * sizeof(real_t), cudaMemcpyDeviceToHost));
     double ktock = MPI_Wtime();
-
 
     {  // Free element indices
         for (int d = 0; d < 4; ++d) {
@@ -727,16 +720,16 @@ extern "C" void laplacian_assemble_gradient(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("cuda_laplacian.c: laplacian_assemble_gradient\t%g seconds (GPU kernel %g seconds)\n", tock - tick, ktock - ktick);
+    printf("cuda_laplacian.c: laplacian_assemble_gradient\t%g seconds (GPU kernel %g seconds)\n",
+           tock - tick,
+           ktock - ktick);
 }
 
-
 extern "C" void laplacian_apply(const ptrdiff_t nelements,
-                     const ptrdiff_t nnodes,
-                     idx_t **const SFEM_RESTRICT elems,
-                     geom_t **const SFEM_RESTRICT xyz,
-                     const real_t *const SFEM_RESTRICT u,
-                     real_t *const SFEM_RESTRICT values)
-{
+                                const ptrdiff_t nnodes,
+                                idx_t **const SFEM_RESTRICT elems,
+                                geom_t **const SFEM_RESTRICT xyz,
+                                const real_t *const SFEM_RESTRICT u,
+                                real_t *const SFEM_RESTRICT values) {
     laplacian_assemble_gradient(nelements, nnodes, elems, xyz, u, values);
 }

@@ -20,13 +20,18 @@ extern "C" {
 
 #if 1
 #include "nvToolsExt.h"
-#define SFEM_RANGE_PUSH(name_) do { nvtxRangePushA(name_);} while(0)
-#define SFEM_RANGE_POP() do { nvtxRangePop();} while(0)
-#else 
+#define SFEM_RANGE_PUSH(name_) \
+    do {                       \
+        nvtxRangePushA(name_); \
+    } while (0)
+#define SFEM_RANGE_POP() \
+    do {                 \
+        nvtxRangePop();  \
+    } while (0)
+#else
 #define SFEM_RANGE_PUSH(name_)
 #define SFEM_RANGE_POP()
 #endif
-
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define POW2(a) ((a) * (a))
@@ -565,12 +570,11 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
                         ptrdiff_t offset = (d * 4 + e_node) * n;
                         const idx_t *const nodes = &elems[e_node][element_offset];
 
-
                         geom_t *buff = &he_xyz[offset];
 
-                        #pragma omp parallel
+#pragma omp parallel
                         {
-                            #pragma omp for nowait
+#pragma omp for nowait
                             for (ptrdiff_t k = 0; k < n; k++) {
                                 buff[k] = x[nodes[k]];
                             }
@@ -585,16 +589,16 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         if (last_n) {
             cudaStreamSynchronize(stream[0]);
             // Do this here to let the main kernel overlap with the packing
-            local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]>>>(
+            local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]> > >(
                 last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
-        
+
             SFEM_DEBUG_SYNCHRONIZE();
         }
 
         SFEM_CUDA_CHECK(cudaMemcpyAsync(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice, stream[0]));
 
         if (last_n) {
-            // make sure that the previous copy async and kernel from stream 1 is finished! 
+            // make sure that the previous copy async and kernel from stream 1 is finished!
             cudaStreamSynchronize(stream[1]);
         }
 
@@ -610,11 +614,11 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
                 hd_elems[e_node], hh_elems[e_node], n * sizeof(idx_t), cudaMemcpyHostToDevice, stream[1]));
         }
 
-        jacobian_inverse_kernel<<<n_blocks, block_size, 0, stream[0]>>>(n, de_xyz, d_jacobian_inverse);
-        
+        jacobian_inverse_kernel<<<n_blocks, block_size, 0, stream[0]> > >(n, de_xyz, d_jacobian_inverse);
+
         SFEM_DEBUG_SYNCHRONIZE();
 
-        laplacian_assemble_hessian_kernel<<<n_blocks, block_size, 0, stream[0]>>>(n, d_jacobian_inverse, de_matrix);
+        laplacian_assemble_hessian_kernel<<<n_blocks, block_size, 0, stream[0]> > >(n, d_jacobian_inverse, de_matrix);
 
         SFEM_DEBUG_SYNCHRONIZE();
 
@@ -625,7 +629,7 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
     if (last_n) {
         cudaStreamSynchronize(stream[0]);
         // Do this here to let the main kernel overlap with the packing
-        local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]>>>(
+        local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]> > >(
             last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
 
         SFEM_DEBUG_SYNCHRONIZE();
