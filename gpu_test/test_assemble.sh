@@ -23,7 +23,7 @@ mkdir -p test_actual
 mkdir -p test_oracle
 
 export SFEM_HANDLE_DIRICHLET=0
-export OMP_NUM_THREADS=8
+export OMP_NUM_THREADS=16
 export OMP_PROC_BIND=true 
 
 # CUDA + OpenMP

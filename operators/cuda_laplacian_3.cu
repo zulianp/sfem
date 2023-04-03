@@ -313,12 +313,12 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
     idx_t *d_colidx = nullptr;
     real_t *d_values = nullptr;
 
-    static const int nstreams = 2;
+    static const int nstreams = 4;
     cudaStream_t stream[nstreams];
-    // cudaEvent_t cu_event[nstreams];
+    cudaEvent_t event[nstreams];
     for (int s = 0; s < nstreams; s++) {
         cudaStreamCreate(&stream[s]);
-        // cudaEventCreate(&cu_event[s]);
+        cudaEventCreate(&event[s]);
     }
 
     // Allocate space for indices
@@ -338,10 +338,21 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
 
     SFEM_RANGE_POP();
 
+    // TODO CRS HtoD async
+
     ptrdiff_t last_n = 0;
     ptrdiff_t last_element_offset = 0;
     for (ptrdiff_t element_offset = 0; element_offset < nelements; element_offset += nbatch) {
         ptrdiff_t n = MIN(nbatch, nelements - element_offset);
+
+
+        /////////////////////////////////////////////////////////
+        // Packing (stream 0)
+        /////////////////////////////////////////////////////////
+
+        if (last_n) {
+            cudaStreamSynchronize(stream[0]);
+        }
 
         {
             SFEM_RANGE_PUSH("lapl-packing");
@@ -368,62 +379,106 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
             SFEM_RANGE_POP();
         }
 
+
+        /////////////////////////////////////////////////////////
+        // Local to global (stream 3)
+        /////////////////////////////////////////////////////////
+
         if (last_n) {
-            cudaStreamSynchronize(stream[0]);
+            // Make sure we have the elemental matrices and dof indices
+            cudaStreamWaitEvent(stream[3], event[1]);
+            cudaStreamWaitEvent(stream[3], event[2]);
+
             // Do this here to let the main kernel overlap with the packing
-            local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]>>>(
+            local_to_global_kernel<<<n_blocks, block_size, 0, stream[3]>>>(
                 last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
+
+            cudaEventRecord(event[3], stream[3]);
 
             SFEM_DEBUG_SYNCHRONIZE();
         }
 
+        /////////////////////////////////////////////////////////
+        // XYZ HtoD (stream 0)
+        /////////////////////////////////////////////////////////
+
         SFEM_CUDA_CHECK(cudaMemcpyAsync(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice, stream[0]));
+        cudaEventRecord(event[0], stream[0]);
 
-        
-        fff_kernel<<<n_blocks, block_size, 0, stream[0]>>>(n, de_xyz, d_fff);
+        SFEM_DEBUG_SYNCHRONIZE();
+        /////////////////////////////////////////////////////////
+        // Jacobian computations (stream 1)
+        /////////////////////////////////////////////////////////
 
-        if (last_n) {
-            // make sure that the previous copy async and kernel from stream 1 is finished!
-            cudaStreamSynchronize(stream[1]);
-        }
+        // Make sure we have the new XYZ coordinates
+        cudaStreamWaitEvent(stream[1], event[0]);
 
+        fff_kernel<<<n_blocks, block_size, 0, stream[1]>>>(n, de_xyz, d_fff);
+
+        SFEM_DEBUG_SYNCHRONIZE();
+        /////////////////////////////////////////////////////////
+        // DOF indices HtoD (stream 2)
+        /////////////////////////////////////////////////////////
+
+        // Ensure that previous HtoD is completed
+        if(last_n) cudaStreamSynchronize(stream[2]);
 
         SFEM_RANGE_PUSH("lapl-copy-host-to-host");
         //  Copy elements to host-pinned memory
         for (int e_node = 0; e_node < 4; e_node++) {
             memcpy(hh_elems[e_node], &elems[e_node][element_offset], n * sizeof(idx_t));
         }
+
         SFEM_RANGE_POP();
 
-
-        
+        // Make sure local to global has ended
+        cudaStreamWaitEvent(stream[2], event[3]);
 
         for (int e_node = 0; e_node < 4; e_node++) {
             SFEM_CUDA_CHECK(cudaMemcpyAsync(
-                hd_elems[e_node], hh_elems[e_node], n * sizeof(idx_t), cudaMemcpyHostToDevice, stream[1]));
+                hd_elems[e_node], hh_elems[e_node], n * sizeof(idx_t), cudaMemcpyHostToDevice, stream[2]));
         }
 
+        cudaEventRecord(event[2], stream[2]);
 
         SFEM_DEBUG_SYNCHRONIZE();
+        /////////////////////////////////////////////////////////
+        // Assemble elemental matrices (stream 1)
+        /////////////////////////////////////////////////////////
 
-        laplacian_assemble_hessian_kernel<<<n_blocks, block_size, 0, stream[0]>>>(n, d_fff, de_matrix);
+        // Make sure that we have new Jacobians
+        cudaStreamWaitEvent(stream[1], event[3]);
+
+        laplacian_assemble_hessian_kernel<<<n_blocks, block_size, 0, stream[1]>>>(n, d_fff, de_matrix);
+        cudaEventRecord(event[1], stream[1]);
 
         SFEM_DEBUG_SYNCHRONIZE();
+        /////////////////////////////////////////////////////////
 
         last_n = n;
         last_element_offset = element_offset;
     }
 
+    /////////////////////////////////////////////////////////
+    // Local to global (stream 3)
+    /////////////////////////////////////////////////////////
+
     if (last_n) {
-        cudaStreamSynchronize(stream[0]);
+
+        // Make sure we have the elemental matrices and dof indices
+        cudaStreamWaitEvent(stream[3], event[1]);
+        cudaStreamWaitEvent(stream[3], event[2]);
+
         // Do this here to let the main kernel overlap with the packing
-        local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]>>>(
+        local_to_global_kernel<<<n_blocks, block_size, 0, stream[3]>>>(
             last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
 
         SFEM_DEBUG_SYNCHRONIZE();
 
-        cudaStreamSynchronize(stream[1]);
+        cudaStreamSynchronize(stream[3]);
     }
+
+    /////////////////////////////////////////////////////////
 
     SFEM_RANGE_PUSH("lapl-values-device-to-host");
 
@@ -455,7 +510,7 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
 
         for (int s = 0; s < nstreams; s++) {
             cudaStreamDestroy(stream[s]);
-            // cudaEventDestroy(cu_event[s]);
+            cudaEventDestroy(event[s]);
         }
     }
 
