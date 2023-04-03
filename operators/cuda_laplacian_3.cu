@@ -384,8 +384,8 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
 
         if (last_n) {
             // Make sure we have the elemental matrices and dof indices
-            cudaStreamWaitEvent(stream[3], event[1]);
-            cudaStreamWaitEvent(stream[3], event[2]);
+            cudaStreamWaitEvent(stream[3], event[1], 0);
+            cudaStreamWaitEvent(stream[3], event[2], 0);
 
             // Do this here to let the main kernel overlap with the packing
             local_to_global_kernel<<<n_blocks, block_size, 0, stream[3]>>>(
@@ -409,7 +409,7 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         /////////////////////////////////////////////////////////
 
         // Make sure we have the new XYZ coordinates
-        cudaStreamWaitEvent(stream[1], event[0]);
+        cudaStreamWaitEvent(stream[1], event[0], 0);
 
         fff_kernel<<<n_blocks, block_size, 0, stream[1]>>>(n, de_xyz, d_fff);
 
@@ -430,7 +430,7 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         SFEM_RANGE_POP();
 
         // Make sure local to global has ended
-        cudaStreamWaitEvent(stream[2], event[3]);
+        cudaStreamWaitEvent(stream[2], event[3], 0);
 
         for (int e_node = 0; e_node < 4; e_node++) {
             SFEM_CUDA_CHECK(cudaMemcpyAsync(
@@ -445,7 +445,7 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         /////////////////////////////////////////////////////////
 
         // Make sure that we have new Jacobians
-        cudaStreamWaitEvent(stream[1], event[3]);
+        cudaStreamWaitEvent(stream[1], event[3], 0);
 
         laplacian_assemble_hessian_kernel<<<n_blocks, block_size, 0, stream[1]>>>(n, d_fff, de_matrix);
         cudaEventRecord(event[1], stream[1]);
@@ -463,8 +463,8 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
 
     if (last_n) {
         // Make sure we have the elemental matrices and dof indices
-        cudaStreamWaitEvent(stream[3], event[1]);
-        cudaStreamWaitEvent(stream[3], event[2]);
+        cudaStreamWaitEvent(stream[3], event[1], 0);
+        cudaStreamWaitEvent(stream[3], event[2], 0);
 
         // Do this here to let the main kernel overlap with the packing
         local_to_global_kernel<<<n_blocks, block_size, 0, stream[3]>>>(
