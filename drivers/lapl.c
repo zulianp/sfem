@@ -56,6 +56,16 @@ int main(int argc, char *argv[]) {
     ptrdiff_t u_n_local, u_n_global;
     array_create_from_file(comm, path_u, SFEM_MPI_REAL_T, (void **)&u, &u_n_local, &u_n_global);
 
+    assert(u_n_global != 0);
+
+    if (u_n_global != mesh.nnodes) {
+        fprintf(stderr,
+                "Input field does not have correct size. Expected %ld, actual = %ld",
+                (long)mesh.nnodes,
+                (long)u_n_global);
+        return EXIT_FAILURE;
+    }
+
     real_t *lapl_u = (real_t *)malloc(u_n_local * sizeof(real_t));
     memset(lapl_u, 0, u_n_local * sizeof(real_t));
 
