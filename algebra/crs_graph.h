@@ -5,6 +5,13 @@
 
 #include "sfem_base.h"
 
+int build_crs_graph_for_elem_type(const int element_type,
+                                  const ptrdiff_t nelements,
+                                  const ptrdiff_t nnodes,
+                                  idx_t **const elems,
+                                  count_t **out_rowptr,
+                                  idx_t **out_colidx);
+
 int build_crs_graph(const ptrdiff_t nelements,
                     const ptrdiff_t nnodes,
                     idx_t **const elems,

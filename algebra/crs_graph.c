@@ -264,7 +264,9 @@ static int build_crs_graph_faster(const ptrdiff_t nelements,
     return 0;
 }
 
-int build_crs_graph(const ptrdiff_t nelements,
+int build_crs_graph_for_elem_type(
+                    const int element_type,
+                    const ptrdiff_t nelements,
                     const ptrdiff_t nnodes,
                     idx_t **const elems,
                     count_t **out_rowptr,
@@ -273,10 +275,18 @@ int build_crs_graph(const ptrdiff_t nelements,
     SFEM_READ_ENV(SFEM_CRS_MEM_CONSERVATIVE, atoi);
 
     if (SFEM_CRS_MEM_CONSERVATIVE) {
-        return build_crs_graph_mem_conservative(nelements, nnodes, 4, elems, out_rowptr, out_colidx);
+        return build_crs_graph_mem_conservative(nelements, nnodes, element_type, elems, out_rowptr, out_colidx);
     } else {
-        return build_crs_graph_faster(nelements, nnodes, 4, elems, out_rowptr, out_colidx);
+        return build_crs_graph_faster(nelements, nnodes, element_type, elems, out_rowptr, out_colidx);
     }
+}
+
+int build_crs_graph(const ptrdiff_t nelements,
+                    const ptrdiff_t nnodes,
+                    idx_t **const elems,
+                    count_t **out_rowptr,
+                    idx_t **out_colidx) {
+    return build_crs_graph_for_elem_type(4, nelements, nnodes, elems, out_rowptr, out_colidx);
 }
 
 int build_crs_graph_3(const ptrdiff_t nelements,
@@ -284,14 +294,7 @@ int build_crs_graph_3(const ptrdiff_t nelements,
                       idx_t **const elems,
                       count_t **out_rowptr,
                       idx_t **out_colidx) {
-    int SFEM_CRS_MEM_CONSERVATIVE = 0;
-    SFEM_READ_ENV(SFEM_CRS_MEM_CONSERVATIVE, atoi);
-
-    if (SFEM_CRS_MEM_CONSERVATIVE) {
-        return build_crs_graph_mem_conservative(nelements, nnodes, 3, elems, out_rowptr, out_colidx);
-    } else {
-        return build_crs_graph_faster(nelements, nnodes, 3, elems, out_rowptr, out_colidx);
-    }
+    return build_crs_graph_for_elem_type(3, nelements, nnodes, elems, out_rowptr, out_colidx);
 }
 
 int block_crs_to_crs(const ptrdiff_t nnodes,
