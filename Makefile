@@ -39,8 +39,8 @@ ifeq ($(openmp), 1)
 endif
 
 # Folder structure
-VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix
-INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix
+VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix:operators/p2
+INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/p2
 
 
 CFLAGS += -pedantic -Wextra
@@ -112,7 +112,8 @@ OBJS = \
 	neumann.o \
 	sfem_mesh.o \
 	sfem_mesh_write.o \
-	isotropic_phasefield_for_fracture.o
+	isotropic_phasefield_for_fracture.o \
+	p2_laplacian.o
 
 
 ifeq ($(cuda), 1)
