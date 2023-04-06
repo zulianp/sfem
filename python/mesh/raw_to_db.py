@@ -12,7 +12,7 @@ import glob
 
 geom_type = np.float32
 idx_type = np.int32
-max_nodes_x_element = 8
+max_nodes_x_element = 10
 
 
 def write_transient_data(
@@ -196,6 +196,11 @@ def main(argv):
         cell_type = "tetra"
     elif len(idx) == 8:
         cell_type = "hexahedron"
+    elif len(idx) == 10:
+        cell_type = "tetra10"
+
+
+    print(cell_type)
 
     n_points = len(points[0])
     n_cells = len(idx[0])

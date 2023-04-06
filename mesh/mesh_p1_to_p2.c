@@ -139,7 +139,7 @@ int main(int argc, char *argv[]) {
             idx_t row[6];
             row[0] = MIN(p2_mesh.elements[0][e], p2_mesh.elements[1][e]);
             row[1] = MIN(p2_mesh.elements[1][e], p2_mesh.elements[2][e]);
-            row[2] = MIN(p2_mesh.elements[2][e], p2_mesh.elements[0][e]);
+            row[2] = MIN(p2_mesh.elements[0][e], p2_mesh.elements[2][e]);
             row[3] = MIN(p2_mesh.elements[0][e], p2_mesh.elements[3][e]);
             row[4] = MIN(p2_mesh.elements[1][e], p2_mesh.elements[3][e]);
             row[5] = MIN(p2_mesh.elements[2][e], p2_mesh.elements[3][e]);
@@ -147,18 +147,23 @@ int main(int argc, char *argv[]) {
             idx_t key[6];
             key[0] = MAX(p2_mesh.elements[0][e], p2_mesh.elements[1][e]);
             key[1] = MAX(p2_mesh.elements[1][e], p2_mesh.elements[2][e]);
-            key[2] = MAX(p2_mesh.elements[2][e], p2_mesh.elements[0][e]);
+            key[2] = MAX(p2_mesh.elements[0][e], p2_mesh.elements[2][e]);
             key[3] = MAX(p2_mesh.elements[0][e], p2_mesh.elements[3][e]);
             key[4] = MAX(p2_mesh.elements[1][e], p2_mesh.elements[3][e]);
             key[5] = MAX(p2_mesh.elements[2][e], p2_mesh.elements[3][e]);
 
             for (int l = 0; l < 6; l++) {
-                const count_t row_begin = rowptr[row[l]];
-                const count_t len_row = rowptr[row[l] + 1] - row_begin;
+                const idx_t r = row[l];
+                const count_t row_begin = rowptr[r];
+                const count_t len_row = rowptr[r + 1] - row_begin;
                 const idx_t *cols = &colidx[row_begin];
                 const idx_t k = find_idx_binary_search(key[l], cols, len_row);
-                p2_mesh.elements[l + p1_mesh.element_type][e] = p2idx[k];
+                p2_mesh.elements[l + p1_mesh.element_type][e] = p2idx[row_begin + k];
+
+                // printf("%d, %d -> %d\n", r, key[l], p2idx[row_begin + k]);
             }
+
+            // printf("\n");
         }
 
     } else {
@@ -175,7 +180,7 @@ int main(int argc, char *argv[]) {
             const idx_t j = colidx[k];
 
             if (i < j) {
-                idx_t nidx = p2idx[k];
+                const idx_t nidx = p2idx[k];
 
                 for (int d = 0; d < p2_mesh.spatial_dim; d++) {
                     geom_t xi = p2_mesh.points[d][i];
@@ -184,6 +189,8 @@ int main(int argc, char *argv[]) {
                     // Midpoint
                     p2_mesh.points[d][nidx] = (xi + xj) / 2;
                 }
+
+                // printf("%d -> %f %f %f\n", nidx, p2_mesh.points[0][nidx], p2_mesh.points[1][nidx], p2_mesh.points[2][nidx]);
             }
         }
     }
