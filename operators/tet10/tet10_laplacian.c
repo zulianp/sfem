@@ -12,18 +12,18 @@
 #define POW2(a) ((a) * (a))
 
 static SFEM_INLINE void tet10_laplacian_hessian(const real_t px0,
-                                             const real_t px1,
-                                             const real_t px2,
-                                             const real_t px3,
-                                             const real_t py0,
-                                             const real_t py1,
-                                             const real_t py2,
-                                             const real_t py3,
-                                             const real_t pz0,
-                                             const real_t pz1,
-                                             const real_t pz2,
-                                             const real_t pz3,
-                                             real_t *element_matrix) {
+                                                const real_t px1,
+                                                const real_t px2,
+                                                const real_t px3,
+                                                const real_t py0,
+                                                const real_t py1,
+                                                const real_t py2,
+                                                const real_t py3,
+                                                const real_t pz0,
+                                                const real_t pz1,
+                                                const real_t pz2,
+                                                const real_t pz3,
+                                                real_t *element_matrix) {
     static const int stride = 1;
 
     real_t fff[6];
@@ -76,8 +76,8 @@ static SFEM_INLINE void tet10_laplacian_hessian(const real_t px0,
 
     {
         // FLOATING POINT OPS!
-        //      - Result: 5*ADD + 100*ASSIGNMENT + 6*MUL
-        //      - Subexpressions: 34*ADD + 30*DIV + 12*MUL + 19*NEG + 34*SUB
+        //       - Result: 5*ADD + 100*ASSIGNMENT + 6*MUL
+        //       - Subexpressions: 34*ADD + 30*DIV + 12*MUL + 19*NEG + 34*SUB
         const real_t x0 = (1.0 / 10.0) * fff[0 * stride];
         const real_t x1 = (1.0 / 10.0) * fff[3 * stride];
         const real_t x2 = (1.0 / 10.0) * fff[5 * stride];
@@ -261,19 +261,19 @@ static SFEM_INLINE void tet10_laplacian_hessian(const real_t px0,
 }
 
 static SFEM_INLINE void tet10_laplacian_gradient(const real_t px0,
-                                              const real_t px1,
-                                              const real_t px2,
-                                              const real_t px3,
-                                              const real_t py0,
-                                              const real_t py1,
-                                              const real_t py2,
-                                              const real_t py3,
-                                              const real_t pz0,
-                                              const real_t pz1,
-                                              const real_t pz2,
-                                              const real_t pz3,
-                                              const real_t *SFEM_RESTRICT u,
-                                              real_t *SFEM_RESTRICT element_vector) {
+                                                 const real_t px1,
+                                                 const real_t px2,
+                                                 const real_t px3,
+                                                 const real_t py0,
+                                                 const real_t py1,
+                                                 const real_t py2,
+                                                 const real_t py3,
+                                                 const real_t pz0,
+                                                 const real_t pz1,
+                                                 const real_t pz2,
+                                                 const real_t pz3,
+                                                 const real_t *SFEM_RESTRICT u,
+                                                 real_t *SFEM_RESTRICT element_vector) {
     static const int stride = 1;
     real_t fff[6];
 
@@ -325,8 +325,8 @@ static SFEM_INLINE void tet10_laplacian_gradient(const real_t px0,
 
     {
         // FLOATING POINT OPS!
-        //      - Result: 10*ADD + 10*ASSIGNMENT + 78*MUL
-        //      - Subexpressions: 60*ADD + 35*DIV + 130*MUL + 18*NEG + 24*SUB
+        //       - Result: 10*ADD + 10*ASSIGNMENT + 78*MUL
+        //       - Subexpressions: 60*ADD + 35*DIV + 130*MUL + 18*NEG + 24*SUB
         const real_t x0 = (1.0 / 10.0) * u[0];
         const real_t x1 = (1.0 / 30.0) * fff[0 * stride];
         const real_t x2 = u[1] * x1;
@@ -468,282 +468,293 @@ static SFEM_INLINE void tet10_laplacian_gradient(const real_t px0,
 }
 
 static SFEM_INLINE void tet10_laplacian_value(const real_t px0,
-                                           const real_t px1,
-                                           const real_t px2,
-                                           const real_t px3,
-                                           const real_t py0,
-                                           const real_t py1,
-                                           const real_t py2,
-                                           const real_t py3,
-                                           const real_t pz0,
-                                           const real_t pz1,
-                                           const real_t pz2,
-                                           const real_t pz3,
-                                           const real_t *SFEM_RESTRICT u,
-                                           real_t *SFEM_RESTRICT element_scalar) {
+                                              const real_t px1,
+                                              const real_t px2,
+                                              const real_t px3,
+                                              const real_t py0,
+                                              const real_t py1,
+                                              const real_t py2,
+                                              const real_t py3,
+                                              const real_t pz0,
+                                              const real_t pz1,
+                                              const real_t pz2,
+                                              const real_t pz3,
+                                              const real_t *SFEM_RESTRICT u,
+                                              real_t *SFEM_RESTRICT element_scalar) {
     // FLOATING POINT OPS!
     //       - Result: ADD + ASSIGNMENT + 531*MUL
     //       - Subexpressions: 2*ADD + 7*DIV + 178*MUL + NEG + 20*POW + 21*SUB
-    const real_t x0 = -py0 + py1;
-    const real_t x1 = -pz0 + pz2;
+    // FLOATING POINT OPS!
+    //      - Result: 2*ADD + ASSIGNMENT + 538*MUL
+    //      - Subexpressions: 2*ADD + 7*DIV + 178*MUL + NEG + 20*POW + 21*SUB
+    const real_t x0 = -pz0 + pz3;
+    const real_t x1 = -px0 + px1;
     const real_t x2 = -py0 + py2;
-    const real_t x3 = -pz0 + pz1;
-    const real_t x4 = x0 * x1 - x2 * x3;
-    const real_t x5 = pow(x4, 2);
-    const real_t x6 = u[1] * x5;
-    const real_t x7 = -pz0 + pz3;
-    const real_t x8 = -px0 + px1;
-    const real_t x9 = x2 * x8;
-    const real_t x10 = -px0 + px2;
-    const real_t x11 = -py0 + py3;
-    const real_t x12 = x10 * x11;
-    const real_t x13 = -px0 + px3;
-    const real_t x14 = x1 * x8;
-    const real_t x15 = x0 * x10;
-    const real_t x16 = x13 * x3;
-    const real_t x17 = pow(x0 * x1 * x13 - x11 * x14 + x12 * x3 - x15 * x7 - x16 * x2 + x7 * x9, -2);
-    const real_t x18 = (1.0 / 30.0) * x17;
-    const real_t x19 = u[0] * x18;
-    const real_t x20 = -x0 * x7 + x11 * x3;
+    const real_t x3 = x1 * x2;
+    const real_t x4 = x0 * x3;
+    const real_t x5 = -py0 + py3;
+    const real_t x6 = -pz0 + pz2;
+    const real_t x7 = x1 * x6;
+    const real_t x8 = x5 * x7;
+    const real_t x9 = -px0 + px2;
+    const real_t x10 = -py0 + py1;
+    const real_t x11 = x10 * x9;
+    const real_t x12 = x0 * x11;
+    const real_t x13 = -pz0 + pz1;
+    const real_t x14 = x5 * x9;
+    const real_t x15 = x13 * x14;
+    const real_t x16 = -px0 + px3;
+    const real_t x17 = x10 * x16 * x6;
+    const real_t x18 = x13 * x16;
+    const real_t x19 = x18 * x2;
+    const real_t x20 = x10 * x6 - x13 * x2;
     const real_t x21 = pow(x20, 2);
-    const real_t x22 = u[1] * x19;
-    const real_t x23 = -x1 * x11 + x2 * x7;
-    const real_t x24 = pow(x23, 2);
-    const real_t x25 = x10 * x3 - x14;
-    const real_t x26 = pow(x25, 2);
-    const real_t x27 = u[2] * x19;
-    const real_t x28 = -x16 + x7 * x8;
-    const real_t x29 = pow(x28, 2);
-    const real_t x30 = u[2] * x29;
-    const real_t x31 = x1 * x13 - x10 * x7;
+    const real_t x22 = u[1] * x21;
+    const real_t x23 = pow(-x12 + x15 + x17 - x19 + x4 - x8, -2);
+    const real_t x24 = (1.0 / 30.0) * x23;
+    const real_t x25 = u[0] * x24;
+    const real_t x26 = -x0 * x10 + x13 * x5;
+    const real_t x27 = pow(x26, 2);
+    const real_t x28 = u[1] * x25;
+    const real_t x29 = x0 * x2 - x5 * x6;
+    const real_t x30 = pow(x29, 2);
+    const real_t x31 = x13 * x9 - x7;
     const real_t x32 = pow(x31, 2);
-    const real_t x33 = -x15 + x9;
-    const real_t x34 = pow(x33, 2);
-    const real_t x35 = u[3] * x34;
-    const real_t x36 = x0 * x13 - x11 * x8;
-    const real_t x37 = pow(x36, 2);
-    const real_t x38 = u[3] * x19;
-    const real_t x39 = x12 - x13 * x2;
+    const real_t x33 = u[2] * x25;
+    const real_t x34 = x0 * x1 - x18;
+    const real_t x35 = pow(x34, 2);
+    const real_t x36 = u[2] * x35;
+    const real_t x37 = -x0 * x9 + x16 * x6;
+    const real_t x38 = pow(x37, 2);
+    const real_t x39 = -x11 + x3;
     const real_t x40 = pow(x39, 2);
-    const real_t x41 = u[4] * x19;
-    const real_t x42 = u[4] * x29;
-    const real_t x43 = (2.0 / 15.0) * x17;
-    const real_t x44 = u[0] * x43;
-    const real_t x45 = u[4] * x44;
-    const real_t x46 = u[5] * x19;
-    const real_t x47 = u[6] * x19;
-    const real_t x48 = u[6] * x44;
-    const real_t x49 = u[7] * x44;
-    const real_t x50 = u[7] * x19;
-    const real_t x51 = u[8] * x34;
-    const real_t x52 = u[8] * x19;
-    const real_t x53 = u[8] * x5;
-    const real_t x54 = u[9] * x19;
-    const real_t x55 = u[4] * x43;
-    const real_t x56 = u[1] * x55;
-    const real_t x57 = u[5] * x18;
-    const real_t x58 = u[1] * x57;
-    const real_t x59 = x18 * x6;
-    const real_t x60 = u[1] * x18;
-    const real_t x61 = u[6] * x60;
-    const real_t x62 = u[7] * x60;
-    const real_t x63 = u[8] * x60;
-    const real_t x64 = u[2] * x18;
-    const real_t x65 = u[4] * x64;
-    const real_t x66 = u[2] * x57;
-    const real_t x67 = u[2] * u[6];
-    const real_t x68 = x43 * x67;
-    const real_t x69 = x29 * x43;
-    const real_t x70 = u[7] * x64;
-    const real_t x71 = u[9] * x18;
-    const real_t x72 = u[2] * x71;
-    const real_t x73 = u[4] * x18;
-    const real_t x74 = u[3] * x73;
-    const real_t x75 = u[6] * x18;
-    const real_t x76 = u[3] * x75;
-    const real_t x77 = u[7] * x43;
-    const real_t x78 = u[3] * x77;
-    const real_t x79 = u[8] * x18;
+    const real_t x41 = u[3] * x40;
+    const real_t x42 = -x1 * x5 + x10 * x16;
+    const real_t x43 = pow(x42, 2);
+    const real_t x44 = u[3] * x25;
+    const real_t x45 = x14 - x16 * x2;
+    const real_t x46 = pow(x45, 2);
+    const real_t x47 = u[4] * x25;
+    const real_t x48 = u[4] * x35;
+    const real_t x49 = (2.0 / 15.0) * x23;
+    const real_t x50 = u[0] * x49;
+    const real_t x51 = u[4] * x50;
+    const real_t x52 = u[5] * x25;
+    const real_t x53 = u[6] * x25;
+    const real_t x54 = u[6] * x50;
+    const real_t x55 = u[7] * x50;
+    const real_t x56 = u[7] * x25;
+    const real_t x57 = u[8] * x40;
+    const real_t x58 = u[8] * x25;
+    const real_t x59 = u[8] * x21;
+    const real_t x60 = u[9] * x25;
+    const real_t x61 = u[4] * x49;
+    const real_t x62 = u[1] * x61;
+    const real_t x63 = u[5] * x24;
+    const real_t x64 = u[1] * x63;
+    const real_t x65 = x22 * x24;
+    const real_t x66 = u[1] * x24;
+    const real_t x67 = u[6] * x66;
+    const real_t x68 = u[7] * x66;
+    const real_t x69 = u[8] * x66;
+    const real_t x70 = u[2] * x24;
+    const real_t x71 = u[4] * x70;
+    const real_t x72 = u[2] * x63;
+    const real_t x73 = u[2] * u[6];
+    const real_t x74 = x49 * x73;
+    const real_t x75 = x35 * x49;
+    const real_t x76 = u[7] * x70;
+    const real_t x77 = u[9] * x24;
+    const real_t x78 = u[2] * x77;
+    const real_t x79 = u[4] * x24;
     const real_t x80 = u[3] * x79;
-    const real_t x81 = u[3] * x71;
-    const real_t x82 = (4.0 / 15.0) * x17;
-    const real_t x83 = u[5] * x82;
-    const real_t x84 = u[4] * x83;
-    const real_t x85 = u[6] * x55;
-    const real_t x86 = u[7] * x55;
-    const real_t x87 = x34 * x82;
-    const real_t x88 = u[4] * u[8];
-    const real_t x89 = x82 * x88;
-    const real_t x90 = u[9] * x55;
-    const real_t x91 = u[9] * x43;
-    const real_t x92 = u[6] * x83;
-    const real_t x93 = u[5] * x77;
-    const real_t x94 = u[5] * x69;
-    const real_t x95 = u[5] * x43;
-    const real_t x96 = u[8] * x95;
-    const real_t x97 = u[5] * x91;
-    const real_t x98 = u[6] * x77;
-    const real_t x99 = u[6] * x43;
-    const real_t x100 = u[8] * x99;
-    const real_t x101 = u[6] * u[9];
-    const real_t x102 = x101 * x82;
-    const real_t x103 = u[7] * x82;
-    const real_t x104 = u[8] * x103;
-    const real_t x105 = u[9] * x103;
-    const real_t x106 = u[8] * x91;
-    const real_t x107 = pow(u[0], 2);
-    const real_t x108 = (1.0 / 20.0) * x17;
-    const real_t x109 = x107 * x108;
-    const real_t x110 = pow(u[1], 2) * x108;
-    const real_t x111 = pow(u[2], 2) * x108;
-    const real_t x112 = pow(u[3], 2) * x108;
-    const real_t x113 = pow(u[4], 2);
-    const real_t x114 = x113 * x43;
-    const real_t x115 = pow(u[5], 2) * x43;
-    const real_t x116 = pow(u[6], 2);
-    const real_t x117 = x116 * x43;
-    const real_t x118 = pow(u[7], 2);
-    const real_t x119 = x118 * x43;
-    const real_t x120 = pow(u[8], 2) * x43;
-    const real_t x121 = pow(u[9], 2) * x43;
-    const real_t x122 = x33 * x4;
-    const real_t x123 = x20 * x36;
-    const real_t x124 = x25 * x4;
-    const real_t x125 = x20 * x28;
-    const real_t x126 = x23 * x39;
-    const real_t x127 = x23 * x31;
-    const real_t x128 = x25 * x33;
-    const real_t x129 = x28 * x36;
-    const real_t x130 = x31 * x39;
-    const real_t x131 = u[4] * x128;
-    const real_t x132 = u[0] * x17;
-    const real_t x133 = (1.0 / 15.0) * x132;
-    const real_t x134 = u[4] * x122;
-    const real_t x135 = (1.0 / 6.0) * x132;
-    const real_t x136 = u[4] * x133;
-    const real_t x137 = u[4] * x135;
-    const real_t x138 = u[5] * x133;
-    const real_t x139 = u[5] * x125;
-    const real_t x140 = u[6] * x135;
-    const real_t x141 = u[6] * x122;
-    const real_t x142 = u[6] * x133;
-    const real_t x143 = u[7] * x135;
-    const real_t x144 = u[7] * x133;
-    const real_t x145 = u[8] * x122;
-    const real_t x146 = u[8] * x133;
-    const real_t x147 = u[9] * x133;
-    const real_t x148 = u[2] * x60;
-    const real_t x149 = u[3] * x60;
-    const real_t x150 = (1.0 / 10.0) * x17;
-    const real_t x151 = u[1] * x150;
-    const real_t x152 = u[4] * x151;
-    const real_t x153 = u[5] * x151;
-    const real_t x154 = u[8] * x151;
-    const real_t x155 = u[9] * x60;
-    const real_t x156 = u[3] * x128;
-    const real_t x157 = u[3] * x64;
-    const real_t x158 = u[2] * x150;
-    const real_t x159 = u[5] * x158;
-    const real_t x160 = x150 * x67;
-    const real_t x161 = u[2] * x79;
-    const real_t x162 = u[9] * x158;
-    const real_t x163 = u[3] * x57;
-    const real_t x164 = u[7] * x150;
-    const real_t x165 = u[3] * x164;
-    const real_t x166 = u[3] * x150;
-    const real_t x167 = u[8] * x166;
-    const real_t x168 = u[9] * x166;
-    const real_t x169 = u[5] * x55;
-    const real_t x170 = u[4] * u[6] * x82;
-    const real_t x171 = u[4] * x103;
-    const real_t x172 = x43 * x88;
-    const real_t x173 = u[9] * x82;
-    const real_t x174 = u[4] * x173;
-    const real_t x175 = u[5] * x99;
-    const real_t x176 = u[7] * x83;
-    const real_t x177 = u[8] * x83;
-    const real_t x178 = u[9] * x83;
-    const real_t x179 = u[6] * x103;
-    const real_t x180 = u[8] * x82;
-    const real_t x181 = u[6] * x180;
-    const real_t x182 = x101 * x43;
-    const real_t x183 = u[8] * x77;
-    const real_t x184 = u[9] * x77;
-    const real_t x185 = u[8] * x173;
-    const real_t x186 = x107 * x150;
-    const real_t x187 = x186 * x4;
-    const real_t x188 = x186 * x28;
-    const real_t x189 = x186 * x39;
-    const real_t x190 = x113 * x82;
-    const real_t x191 = x114 * x4;
-    const real_t x192 = x116 * x82;
-    const real_t x193 = x118 * x82;
+    const real_t x81 = u[6] * x24;
+    const real_t x82 = u[3] * x81;
+    const real_t x83 = u[7] * x49;
+    const real_t x84 = u[3] * x83;
+    const real_t x85 = u[8] * x24;
+    const real_t x86 = u[3] * x85;
+    const real_t x87 = u[3] * x77;
+    const real_t x88 = (4.0 / 15.0) * x23;
+    const real_t x89 = u[5] * x88;
+    const real_t x90 = u[4] * x89;
+    const real_t x91 = u[6] * x61;
+    const real_t x92 = u[7] * x61;
+    const real_t x93 = x40 * x88;
+    const real_t x94 = u[4] * u[8];
+    const real_t x95 = x88 * x94;
+    const real_t x96 = u[9] * x61;
+    const real_t x97 = u[9] * x49;
+    const real_t x98 = u[6] * x89;
+    const real_t x99 = u[5] * x83;
+    const real_t x100 = u[5] * x75;
+    const real_t x101 = u[5] * x49;
+    const real_t x102 = u[8] * x101;
+    const real_t x103 = u[5] * x97;
+    const real_t x104 = u[6] * x83;
+    const real_t x105 = u[6] * x49;
+    const real_t x106 = u[8] * x105;
+    const real_t x107 = u[6] * u[9];
+    const real_t x108 = x107 * x88;
+    const real_t x109 = u[7] * x88;
+    const real_t x110 = u[8] * x109;
+    const real_t x111 = u[9] * x109;
+    const real_t x112 = u[8] * x97;
+    const real_t x113 = pow(u[0], 2);
+    const real_t x114 = (1.0 / 20.0) * x23;
+    const real_t x115 = x113 * x114;
+    const real_t x116 = pow(u[1], 2) * x114;
+    const real_t x117 = pow(u[2], 2) * x114;
+    const real_t x118 = pow(u[3], 2) * x114;
+    const real_t x119 = pow(u[4], 2);
+    const real_t x120 = x119 * x49;
+    const real_t x121 = pow(u[5], 2) * x49;
+    const real_t x122 = pow(u[6], 2);
+    const real_t x123 = x122 * x49;
+    const real_t x124 = pow(u[7], 2);
+    const real_t x125 = x124 * x49;
+    const real_t x126 = pow(u[8], 2) * x49;
+    const real_t x127 = pow(u[9], 2) * x49;
+    const real_t x128 = x20 * x39;
+    const real_t x129 = x26 * x42;
+    const real_t x130 = x20 * x31;
+    const real_t x131 = x26 * x34;
+    const real_t x132 = x29 * x45;
+    const real_t x133 = x29 * x37;
+    const real_t x134 = x31 * x39;
+    const real_t x135 = x34 * x42;
+    const real_t x136 = x37 * x45;
+    const real_t x137 = u[4] * x134;
+    const real_t x138 = u[0] * x23;
+    const real_t x139 = (1.0 / 15.0) * x138;
+    const real_t x140 = u[4] * x128;
+    const real_t x141 = (1.0 / 6.0) * x138;
+    const real_t x142 = u[4] * x139;
+    const real_t x143 = u[4] * x141;
+    const real_t x144 = u[5] * x139;
+    const real_t x145 = u[5] * x131;
+    const real_t x146 = u[6] * x141;
+    const real_t x147 = u[6] * x128;
+    const real_t x148 = u[6] * x139;
+    const real_t x149 = u[7] * x141;
+    const real_t x150 = u[7] * x139;
+    const real_t x151 = u[8] * x128;
+    const real_t x152 = u[8] * x139;
+    const real_t x153 = u[9] * x139;
+    const real_t x154 = u[2] * x66;
+    const real_t x155 = u[3] * x66;
+    const real_t x156 = (1.0 / 10.0) * x23;
+    const real_t x157 = u[1] * x156;
+    const real_t x158 = u[4] * x157;
+    const real_t x159 = u[5] * x157;
+    const real_t x160 = u[8] * x157;
+    const real_t x161 = u[9] * x66;
+    const real_t x162 = u[3] * x134;
+    const real_t x163 = u[3] * x70;
+    const real_t x164 = u[2] * x156;
+    const real_t x165 = u[5] * x164;
+    const real_t x166 = x156 * x73;
+    const real_t x167 = u[2] * x85;
+    const real_t x168 = u[9] * x164;
+    const real_t x169 = u[3] * x63;
+    const real_t x170 = u[7] * x156;
+    const real_t x171 = u[3] * x170;
+    const real_t x172 = u[3] * x156;
+    const real_t x173 = u[8] * x172;
+    const real_t x174 = u[9] * x172;
+    const real_t x175 = u[5] * x61;
+    const real_t x176 = u[4] * u[6] * x88;
+    const real_t x177 = u[4] * x109;
+    const real_t x178 = x49 * x94;
+    const real_t x179 = u[9] * x88;
+    const real_t x180 = u[4] * x179;
+    const real_t x181 = u[5] * x105;
+    const real_t x182 = u[7] * x89;
+    const real_t x183 = u[8] * x89;
+    const real_t x184 = u[9] * x89;
+    const real_t x185 = u[6] * x109;
+    const real_t x186 = u[8] * x88;
+    const real_t x187 = u[6] * x186;
+    const real_t x188 = x107 * x49;
+    const real_t x189 = u[8] * x83;
+    const real_t x190 = u[9] * x83;
+    const real_t x191 = u[8] * x179;
+    const real_t x192 = x113 * x156;
+    const real_t x193 = x192 * x20;
+    const real_t x194 = x192 * x34;
+    const real_t x195 = x192 * x45;
+    const real_t x196 = x119 * x88;
+    const real_t x197 = x120 * x20;
+    const real_t x198 = x122 * x88;
+    const real_t x199 = x124 * x88;
     element_scalar[0] =
-        u[6] * x59 + u[7] * x18 * x30 + u[7] * x59 - u[7] * x94 + u[9] * x150 * x156 + u[9] * x94 - x100 * x21 -
-        x100 * x24 - x100 * x37 - x100 * x40 - x101 * x87 - x102 * x122 - x102 * x123 - x102 * x126 - x102 * x128 -
-        x102 * x129 - x102 * x130 - x102 * x37 - x102 * x40 + x103 * x134 - x103 * x53 - x104 * x122 - x104 * x123 -
-        x104 * x124 - x104 * x125 - x104 * x126 - x104 * x127 - x104 * x21 - x104 * x24 - x105 * x124 - x105 * x125 -
-        x105 * x127 - x105 * x128 - x105 * x129 - x105 * x130 - x105 * x26 - x105 * x29 - x105 * x32 + x106 * x122 +
-        x106 * x123 + x106 * x126 + x106 * x128 + x106 * x129 + x106 * x130 + x106 * x37 + x106 * x40 + x109 * x21 +
-        x109 * x24 + x109 * x26 + x109 * x29 + x109 * x32 + x109 * x34 + x109 * x37 + x109 * x40 + x109 * x5 +
-        x110 * x21 + x110 * x24 + x110 * x5 + x111 * x26 + x111 * x29 + x111 * x32 + x112 * x34 + x112 * x37 +
-        x112 * x40 + x114 * x123 + x114 * x125 + x114 * x126 + x114 * x127 + x114 * x21 + x114 * x24 + x114 * x26 +
-        x114 * x29 + x114 * x32 + x114 * x34 + x114 * x37 + x114 * x40 + x114 * x5 + x115 * x124 + x115 * x125 +
-        x115 * x127 + x115 * x21 + x115 * x24 + x115 * x26 + x115 * x29 + x115 * x32 + x115 * x5 + x117 * x124 +
-        x117 * x125 + x117 * x127 + x117 * x128 + x117 * x129 + x117 * x130 + x117 * x21 + x117 * x24 + x117 * x26 +
-        x117 * x29 + x117 * x32 + x117 * x34 + x117 * x37 + x117 * x40 + x117 * x5 + x119 * x122 + x119 * x123 +
-        x119 * x126 + x119 * x128 + x119 * x129 + x119 * x130 + x119 * x21 + x119 * x24 + x119 * x26 + x119 * x29 +
-        x119 * x32 + x119 * x34 + x119 * x37 + x119 * x40 + x119 * x5 + x120 * x122 + x120 * x123 + x120 * x126 +
-        x120 * x21 + x120 * x24 + x120 * x34 + x120 * x37 + x120 * x40 + x120 * x5 + x121 * x128 + x121 * x129 +
-        x121 * x130 + x121 * x26 + x121 * x29 + x121 * x32 + x121 * x34 + x121 * x37 + x121 * x40 - x122 * x143 -
-        x122 * x149 + x122 * x154 - x122 * x155 - x122 * x163 - x122 * x165 - x122 * x169 + x122 * x178 - x122 * x184 +
-        x122 * x192 + x122 * x22 + x122 * x38 + x122 * x46 + x122 * x54 + x122 * x61 + x122 * x76 + x122 * x85 -
-        x122 * x89 - x122 * x92 + x122 * x96 + x122 * x98 - x123 * x137 - x123 * x142 - x123 * x143 + x123 * x146 -
-        x123 * x149 - x123 * x152 + x123 * x154 - x123 * x155 - x123 * x163 - x123 * x165 + x123 * x167 - x123 * x169 +
-        x123 * x171 + x123 * x178 - x123 * x181 - x123 * x184 + x123 * x186 + x123 * x192 + x123 * x22 + x123 * x38 +
-        x123 * x46 + x123 * x54 + x123 * x61 + x123 * x76 + x123 * x85 - x123 * x89 - x123 * x92 + x123 * x96 +
-        x123 * x98 - x124 * x137 + x124 * x138 - x124 * x140 - x124 * x144 - x124 * x148 - x124 * x152 + x124 * x153 -
-        x124 * x155 + x124 * x159 - x124 * x160 - x124 * x161 + x124 * x170 - x124 * x172 - x124 * x176 - x124 * x182 +
-        x124 * x185 + x124 * x193 + x124 * x22 + x124 * x27 + x124 * x52 + x124 * x54 + x124 * x62 + x124 * x70 -
-        x124 * x84 + x124 * x86 - x124 * x92 + x124 * x96 + x124 * x97 + x124 * x98 - x125 * x137 - x125 * x140 -
-        x125 * x144 - x125 * x148 - x125 * x152 + x125 * x153 - x125 * x155 - x125 * x160 - x125 * x161 + x125 * x170 -
-        x125 * x172 - x125 * x176 - x125 * x182 + x125 * x185 + x125 * x193 + x125 * x22 + x125 * x27 + x125 * x52 +
-        x125 * x54 + x125 * x62 + x125 * x70 - x125 * x84 + x125 * x86 - x125 * x92 + x125 * x96 + x125 * x97 +
-        x125 * x98 - x126 * x137 - x126 * x142 - x126 * x143 + x126 * x146 - x126 * x149 - x126 * x152 + x126 * x154 -
-        x126 * x155 - x126 * x163 - x126 * x165 + x126 * x167 - x126 * x169 + x126 * x171 + x126 * x178 - x126 * x181 -
-        x126 * x184 + x126 * x192 + x126 * x22 + x126 * x38 + x126 * x46 + x126 * x54 + x126 * x61 + x126 * x76 +
-        x126 * x85 - x126 * x89 - x126 * x92 + x126 * x96 + x126 * x98 - x127 * x137 + x127 * x138 - x127 * x140 -
-        x127 * x144 - x127 * x148 - x127 * x152 + x127 * x153 - x127 * x155 + x127 * x159 - x127 * x160 - x127 * x161 +
-        x127 * x170 - x127 * x172 - x127 * x176 - x127 * x182 + x127 * x185 + x127 * x186 + x127 * x193 + x127 * x22 +
-        x127 * x27 + x127 * x52 + x127 * x54 + x127 * x62 + x127 * x70 - x127 * x84 + x127 * x86 - x127 * x92 +
-        x127 * x96 + x127 * x97 + x127 * x98 - x128 * x140 - x128 * x143 + x128 * x147 - x128 * x160 - x128 * x161 +
-        x128 * x162 - x128 * x175 + x128 * x177 + x128 * x179 - x128 * x183 + x128 * x186 + x128 * x190 + x128 * x27 +
-        x128 * x38 + x128 * x46 + x128 * x52 + x128 * x65 + x128 * x74 - x128 * x84 + x128 * x85 + x128 * x86 -
-        x128 * x89 + x128 * x97 - x129 * x136 - x129 * x140 - x129 * x143 + x129 * x147 - x129 * x157 - x129 * x160 -
-        x129 * x161 + x129 * x162 - x129 * x163 - x129 * x165 + x129 * x168 - x129 * x174 - x129 * x175 + x129 * x177 +
-        x129 * x179 - x129 * x183 + x129 * x190 + x129 * x27 + x129 * x38 + x129 * x46 + x129 * x52 + x129 * x65 +
-        x129 * x74 - x129 * x84 + x129 * x85 + x129 * x86 - x129 * x89 + x129 * x97 - x130 * x136 - x130 * x140 -
-        x130 * x143 + x130 * x147 - x130 * x157 - x130 * x160 - x130 * x161 + x130 * x162 - x130 * x163 - x130 * x165 +
-        x130 * x168 - x130 * x174 - x130 * x175 + x130 * x177 + x130 * x179 - x130 * x183 + x130 * x190 + x130 * x27 +
-        x130 * x38 + x130 * x46 + x130 * x52 + x130 * x65 + x130 * x74 - x130 * x84 + x130 * x85 + x130 * x86 -
-        x130 * x89 + x130 * x97 - x131 * x133 - x131 * x173 + x133 * x139 - x133 * x141 + x133 * x145 - x134 * x135 -
-        x134 * x151 + x139 * x158 - x141 * x180 + x145 * x166 - x156 * x164 - x156 * x57 - x156 * x64 + x187 * x25 +
-        x187 * x33 + x188 * x20 + x188 * x36 + x189 * x23 + x189 * x31 + x19 * x30 + x19 * x35 - x19 * x42 + x19 * x51 +
-        x19 * x53 + x19 * x6 + x191 * x25 + x191 * x33 + x21 * x22 - x21 * x45 + x21 * x46 - x21 * x47 - x21 * x50 +
-        x21 * x52 - x21 * x56 - x21 * x58 + x21 * x61 + x21 * x62 - x21 * x63 - x21 * x92 - x21 * x93 + x21 * x96 +
-        x21 * x98 + x22 * x24 - x24 * x45 + x24 * x46 - x24 * x47 - x24 * x50 + x24 * x52 - x24 * x56 - x24 * x58 +
-        x24 * x61 + x24 * x62 - x24 * x63 - x24 * x92 - x24 * x93 + x24 * x96 + x24 * x98 + x26 * x27 - x26 * x41 +
-        x26 * x46 - x26 * x48 - x26 * x50 + x26 * x54 + x26 * x65 - x26 * x66 - x26 * x68 + x26 * x70 - x26 * x72 -
-        x26 * x84 + x26 * x86 - x26 * x90 - x26 * x93 + x26 * x97 + x27 * x32 + x29 * x46 - x29 * x48 - x29 * x50 +
-        x29 * x54 - x29 * x66 - x30 * x71 - x32 * x41 + x32 * x46 - x32 * x48 - x32 * x50 + x32 * x54 + x32 * x65 -
-        x32 * x66 - x32 * x68 + x32 * x70 - x32 * x72 - x32 * x84 + x32 * x86 - x32 * x90 - x32 * x93 + x32 * x97 -
-        x34 * x41 - x34 * x47 - x34 * x49 + x34 * x54 + x34 * x85 - x34 * x90 - x35 * x71 + x35 * x73 + x35 * x75 -
-        x35 * x77 - x35 * x79 + x37 * x38 - x37 * x41 - x37 * x47 - x37 * x49 + x37 * x52 + x37 * x54 + x37 * x74 +
-        x37 * x76 - x37 * x78 - x37 * x80 - x37 * x81 + x37 * x85 - x37 * x89 - x37 * x90 + x38 * x40 - x40 * x41 -
-        x40 * x47 - x40 * x49 + x40 * x52 + x40 * x54 + x40 * x74 + x40 * x76 - x40 * x78 - x40 * x80 - x40 * x81 +
-        x40 * x85 - x40 * x89 - x40 * x90 + x42 * x64 + x42 * x77 - x42 * x83 - x42 * x91 - x45 * x5 + x46 * x5 -
-        x47 * x5 - x5 * x50 - x5 * x92 - x5 * x93 + x5 * x98 + x51 * x91 - x51 * x99 - x53 * x60 + x53 * x95 -
-        x53 * x99 - x55 * x6 - x57 * x6 - x67 * x69 - x87 * x88;
+        (-1.0 / 6.0 * x12 + (1.0 / 6.0) * x15 + (1.0 / 6.0) * x17 - 1.0 / 6.0 * x19 + (1.0 / 6.0) * x4 -
+         1.0 / 6.0 * x8) *
+        (u[6] * x65 - u[7] * x100 + u[7] * x24 * x36 + u[7] * x65 + u[9] * x100 + u[9] * x156 * x162 + x101 * x59 +
+         x102 * x128 + x102 * x129 + x102 * x130 + x102 * x131 + x102 * x132 + x102 * x133 + x102 * x27 + x102 * x30 +
+         x103 * x130 + x103 * x131 + x103 * x133 + x103 * x134 + x103 * x135 + x103 * x136 + x103 * x32 + x103 * x38 +
+         x104 * x128 + x104 * x129 + x104 * x130 + x104 * x131 + x104 * x132 + x104 * x133 + x104 * x21 + x104 * x27 +
+         x104 * x30 - x105 * x57 - x105 * x59 - x106 * x27 - x106 * x30 - x106 * x43 - x106 * x46 - x107 * x93 -
+         x108 * x128 - x108 * x129 - x108 * x132 - x108 * x134 - x108 * x135 - x108 * x136 - x108 * x43 - x108 * x46 +
+         x109 * x140 - x109 * x59 - x110 * x128 - x110 * x129 - x110 * x130 - x110 * x131 - x110 * x132 - x110 * x133 -
+         x110 * x27 - x110 * x30 - x111 * x130 - x111 * x131 - x111 * x133 - x111 * x134 - x111 * x135 - x111 * x136 -
+         x111 * x32 - x111 * x35 - x111 * x38 + x112 * x128 + x112 * x129 + x112 * x132 + x112 * x134 + x112 * x135 +
+         x112 * x136 + x112 * x43 + x112 * x46 + x115 * x21 + x115 * x27 + x115 * x30 + x115 * x32 + x115 * x35 +
+         x115 * x38 + x115 * x40 + x115 * x43 + x115 * x46 + x116 * x21 + x116 * x27 + x116 * x30 + x117 * x32 +
+         x117 * x35 + x117 * x38 + x118 * x40 + x118 * x43 + x118 * x46 + x120 * x129 + x120 * x131 + x120 * x132 +
+         x120 * x133 + x120 * x21 + x120 * x27 + x120 * x30 + x120 * x32 + x120 * x35 + x120 * x38 + x120 * x40 +
+         x120 * x43 + x120 * x46 + x121 * x130 + x121 * x131 + x121 * x133 + x121 * x21 + x121 * x27 + x121 * x30 +
+         x121 * x32 + x121 * x35 + x121 * x38 + x123 * x130 + x123 * x131 + x123 * x133 + x123 * x134 + x123 * x135 +
+         x123 * x136 + x123 * x21 + x123 * x27 + x123 * x30 + x123 * x32 + x123 * x35 + x123 * x38 + x123 * x40 +
+         x123 * x43 + x123 * x46 + x125 * x128 + x125 * x129 + x125 * x132 + x125 * x134 + x125 * x135 + x125 * x136 +
+         x125 * x21 + x125 * x27 + x125 * x30 + x125 * x32 + x125 * x35 + x125 * x38 + x125 * x40 + x125 * x43 +
+         x125 * x46 + x126 * x128 + x126 * x129 + x126 * x132 + x126 * x21 + x126 * x27 + x126 * x30 + x126 * x40 +
+         x126 * x43 + x126 * x46 + x127 * x134 + x127 * x135 + x127 * x136 + x127 * x32 + x127 * x35 + x127 * x38 +
+         x127 * x40 + x127 * x43 + x127 * x46 - x128 * x149 - x128 * x155 + x128 * x160 - x128 * x161 - x128 * x169 -
+         x128 * x171 - x128 * x175 + x128 * x184 - x128 * x190 + x128 * x198 + x128 * x28 + x128 * x44 + x128 * x52 +
+         x128 * x60 + x128 * x67 + x128 * x82 + x128 * x91 - x128 * x95 - x128 * x98 - x129 * x143 - x129 * x148 -
+         x129 * x149 + x129 * x152 - x129 * x155 - x129 * x158 + x129 * x160 - x129 * x161 - x129 * x169 - x129 * x171 +
+         x129 * x173 - x129 * x175 + x129 * x177 + x129 * x184 - x129 * x187 - x129 * x190 + x129 * x192 + x129 * x198 +
+         x129 * x28 + x129 * x44 + x129 * x52 + x129 * x60 + x129 * x67 + x129 * x82 + x129 * x91 - x129 * x95 -
+         x129 * x98 - x130 * x143 + x130 * x144 - x130 * x146 - x130 * x150 - x130 * x154 - x130 * x158 + x130 * x159 -
+         x130 * x161 + x130 * x165 - x130 * x166 - x130 * x167 + x130 * x176 - x130 * x178 - x130 * x182 - x130 * x188 +
+         x130 * x191 + x130 * x199 + x130 * x28 + x130 * x33 + x130 * x58 + x130 * x60 + x130 * x68 + x130 * x76 -
+         x130 * x90 + x130 * x92 - x130 * x98 - x131 * x143 - x131 * x146 - x131 * x150 - x131 * x154 - x131 * x158 +
+         x131 * x159 - x131 * x161 - x131 * x166 - x131 * x167 + x131 * x176 - x131 * x178 - x131 * x182 - x131 * x188 +
+         x131 * x191 + x131 * x199 + x131 * x28 + x131 * x33 + x131 * x58 + x131 * x60 + x131 * x68 + x131 * x76 -
+         x131 * x90 + x131 * x92 - x131 * x98 - x132 * x143 - x132 * x148 - x132 * x149 + x132 * x152 - x132 * x155 -
+         x132 * x158 + x132 * x160 - x132 * x161 - x132 * x169 - x132 * x171 + x132 * x173 - x132 * x175 + x132 * x177 +
+         x132 * x184 - x132 * x187 - x132 * x190 + x132 * x198 + x132 * x28 + x132 * x44 + x132 * x52 + x132 * x60 +
+         x132 * x67 + x132 * x82 + x132 * x91 - x132 * x95 - x132 * x98 - x133 * x143 + x133 * x144 - x133 * x146 -
+         x133 * x150 - x133 * x154 - x133 * x158 + x133 * x159 - x133 * x161 + x133 * x165 - x133 * x166 - x133 * x167 +
+         x133 * x176 - x133 * x178 - x133 * x182 - x133 * x188 + x133 * x191 + x133 * x192 + x133 * x199 + x133 * x28 +
+         x133 * x33 + x133 * x58 + x133 * x60 + x133 * x68 + x133 * x76 - x133 * x90 + x133 * x92 - x133 * x98 -
+         x134 * x146 - x134 * x149 + x134 * x153 - x134 * x166 - x134 * x167 + x134 * x168 - x134 * x181 + x134 * x183 +
+         x134 * x185 - x134 * x189 + x134 * x192 + x134 * x196 + x134 * x33 + x134 * x44 + x134 * x52 + x134 * x58 +
+         x134 * x71 + x134 * x80 - x134 * x90 + x134 * x91 + x134 * x92 - x134 * x95 - x135 * x142 - x135 * x146 -
+         x135 * x149 + x135 * x153 - x135 * x163 - x135 * x166 - x135 * x167 + x135 * x168 - x135 * x169 - x135 * x171 +
+         x135 * x174 - x135 * x180 - x135 * x181 + x135 * x183 + x135 * x185 - x135 * x189 + x135 * x196 + x135 * x33 +
+         x135 * x44 + x135 * x52 + x135 * x58 + x135 * x71 + x135 * x80 - x135 * x90 + x135 * x91 + x135 * x92 -
+         x135 * x95 - x136 * x142 - x136 * x146 - x136 * x149 + x136 * x153 - x136 * x163 - x136 * x166 - x136 * x167 +
+         x136 * x168 - x136 * x169 - x136 * x171 + x136 * x174 - x136 * x180 - x136 * x181 + x136 * x183 + x136 * x185 -
+         x136 * x189 + x136 * x196 + x136 * x33 + x136 * x44 + x136 * x52 + x136 * x58 + x136 * x71 + x136 * x80 -
+         x136 * x90 + x136 * x91 + x136 * x92 - x136 * x95 - x137 * x139 - x137 * x179 + x139 * x145 - x139 * x147 +
+         x139 * x151 - x140 * x141 - x140 * x157 + x145 * x164 - x147 * x186 + x151 * x172 - x162 * x170 - x162 * x63 -
+         x162 * x70 + x193 * x31 + x193 * x39 + x194 * x26 + x194 * x42 + x195 * x29 + x195 * x37 + x197 * x31 +
+         x197 * x39 - x21 * x51 + x21 * x52 - x21 * x53 - x21 * x56 - x21 * x98 - x21 * x99 + x22 * x25 - x22 * x61 -
+         x22 * x63 + x25 * x36 + x25 * x41 - x25 * x48 + x25 * x57 + x25 * x59 + x27 * x28 - x27 * x51 + x27 * x52 -
+         x27 * x53 - x27 * x56 + x27 * x58 - x27 * x62 - x27 * x64 + x27 * x67 + x27 * x68 - x27 * x69 - x27 * x98 -
+         x27 * x99 + x28 * x30 - x30 * x51 + x30 * x52 - x30 * x53 - x30 * x56 + x30 * x58 - x30 * x62 - x30 * x64 +
+         x30 * x67 + x30 * x68 - x30 * x69 - x30 * x98 - x30 * x99 + x32 * x33 - x32 * x47 + x32 * x52 - x32 * x54 -
+         x32 * x56 + x32 * x60 + x32 * x71 - x32 * x72 - x32 * x74 + x32 * x76 - x32 * x78 - x32 * x90 + x32 * x92 -
+         x32 * x96 - x32 * x99 + x33 * x38 + x35 * x52 - x35 * x54 - x35 * x56 + x35 * x60 - x35 * x72 - x36 * x77 -
+         x38 * x47 + x38 * x52 - x38 * x54 - x38 * x56 + x38 * x60 + x38 * x71 - x38 * x72 - x38 * x74 + x38 * x76 -
+         x38 * x78 - x38 * x90 + x38 * x92 - x38 * x96 - x38 * x99 - x40 * x47 - x40 * x53 - x40 * x55 + x40 * x60 +
+         x40 * x91 - x40 * x96 - x41 * x77 + x41 * x79 + x41 * x81 - x41 * x83 - x41 * x85 + x43 * x44 - x43 * x47 -
+         x43 * x53 - x43 * x55 + x43 * x58 + x43 * x60 + x43 * x80 + x43 * x82 - x43 * x84 - x43 * x86 - x43 * x87 +
+         x43 * x91 - x43 * x95 - x43 * x96 + x44 * x46 - x46 * x47 - x46 * x53 - x46 * x55 + x46 * x58 + x46 * x60 +
+         x46 * x80 + x46 * x82 - x46 * x84 - x46 * x86 - x46 * x87 + x46 * x91 - x46 * x95 - x46 * x96 + x48 * x70 +
+         x48 * x83 - x48 * x89 - x48 * x97 + x57 * x97 - x59 * x66 - x73 * x75 - x93 * x94);
 }
 
 static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {
@@ -797,12 +808,12 @@ static SFEM_INLINE void find_cols10(const idx_t *targets, const idx_t *const row
 }
 
 void tet10_laplacian_assemble_hessian(const ptrdiff_t nelements,
-                                   const ptrdiff_t nnodes,
-                                   idx_t **const SFEM_RESTRICT elems,
-                                   geom_t **const SFEM_RESTRICT xyz,
-                                   const count_t *const SFEM_RESTRICT rowptr,
-                                   const idx_t *const SFEM_RESTRICT colidx,
-                                   real_t *const SFEM_RESTRICT values) {
+                                      const ptrdiff_t nnodes,
+                                      idx_t **const SFEM_RESTRICT elems,
+                                      geom_t **const SFEM_RESTRICT xyz,
+                                      const count_t *const SFEM_RESTRICT rowptr,
+                                      const idx_t *const SFEM_RESTRICT colidx,
+                                      real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
     double tick = MPI_Wtime();
@@ -865,11 +876,11 @@ void tet10_laplacian_assemble_hessian(const ptrdiff_t nelements,
 }
 
 void tet10_laplacian_assemble_gradient(const ptrdiff_t nelements,
-                                    const ptrdiff_t nnodes,
-                                    idx_t **const SFEM_RESTRICT elems,
-                                    geom_t **const SFEM_RESTRICT xyz,
-                                    const real_t *const SFEM_RESTRICT u,
-                                    real_t *const SFEM_RESTRICT values) {
+                                       const ptrdiff_t nnodes,
+                                       idx_t **const SFEM_RESTRICT elems,
+                                       geom_t **const SFEM_RESTRICT xyz,
+                                       const real_t *const SFEM_RESTRICT u,
+                                       real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
     double tick = MPI_Wtime();
@@ -924,11 +935,11 @@ void tet10_laplacian_assemble_gradient(const ptrdiff_t nelements,
 }
 
 void tet10_laplacian_assemble_value(const ptrdiff_t nelements,
-                                 const ptrdiff_t nnodes,
-                                 idx_t **const SFEM_RESTRICT elems,
-                                 geom_t **const SFEM_RESTRICT xyz,
-                                 const real_t *const SFEM_RESTRICT u,
-                                 real_t *const SFEM_RESTRICT value) {
+                                    const ptrdiff_t nnodes,
+                                    idx_t **const SFEM_RESTRICT elems,
+                                    geom_t **const SFEM_RESTRICT xyz,
+                                    const real_t *const SFEM_RESTRICT u,
+                                    real_t *const SFEM_RESTRICT value) {
     SFEM_UNUSED(nnodes);
 
     double tick = MPI_Wtime();
@@ -981,10 +992,10 @@ void tet10_laplacian_assemble_value(const ptrdiff_t nelements,
 }
 
 void tet10_laplacian_apply(const ptrdiff_t nelements,
-                        const ptrdiff_t nnodes,
-                        idx_t **const SFEM_RESTRICT elems,
-                        geom_t **const SFEM_RESTRICT xyz,
-                        const real_t *const SFEM_RESTRICT u,
-                        real_t *const SFEM_RESTRICT values) {
+                           const ptrdiff_t nnodes,
+                           idx_t **const SFEM_RESTRICT elems,
+                           geom_t **const SFEM_RESTRICT xyz,
+                           const real_t *const SFEM_RESTRICT u,
+                           real_t *const SFEM_RESTRICT values) {
     tet10_laplacian_assemble_gradient(nelements, nnodes, elems, xyz, u, values);
 }
