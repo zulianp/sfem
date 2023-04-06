@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include <mpi.h>
+#include <glob.h>
 
 #include "sortreduce.h"
 
@@ -32,6 +33,22 @@
             array_[i] = temp_actual_[mapping_[i]];             \
         }                                                      \
     } while (0)
+
+inline static int count_files(const char*pattern)
+{
+    glob_t gl;
+    glob(pattern, GLOB_MARK, NULL, &gl);
+
+    int n_files = gl.gl_pathc;
+
+    printf("n_files (%d):\n", n_files);
+    for (int np = 0; np < n_files; np++) {
+        printf("%s\n", gl.gl_pathv[np]);
+    }
+
+    globfree(&gl);
+    return n_files;
+}
 
 int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, const char *folder, mesh_t *mesh) {
     int rank, size;
@@ -551,9 +568,38 @@ int mesh_surf_read(MPI_Comm comm, const char *folder, mesh_t *mesh) {
 }
 
 int mesh_read(MPI_Comm comm, const char *folder, mesh_t *mesh) {
-    int nnodesxelem = 4;
-    int ndims = 3;
-    return mesh_read_generic(comm, nnodesxelem, ndims, folder, mesh);
+    int rank;
+    MPI_Comm_rank(comm, &rank);
+
+    int counts[2] = {0, 0};
+
+    if(!rank) {
+        char pattern[1024 * 10];
+        sprintf(pattern, "%s/i*.raw", folder);
+
+        counts[0] = count_files(pattern);
+
+        sprintf(pattern, "%s/x.raw", folder);
+        counts[1] += count_files(pattern);
+
+        sprintf(pattern, "%s/y.raw", folder);
+        counts[1] += count_files(pattern);
+
+        sprintf(pattern, "%s/z.raw", folder);
+        counts[1] += count_files(pattern);
+    }
+
+    MPI_Bcast(counts, 2, MPI_INT, 0, comm);
+
+    if(!counts[0] || !counts[1]) {
+        if(!rank) {
+            fprintf(stderr, "Could not find any mesh files in directory %s\n", folder);
+        }
+
+        MPI_Abort(comm, -1);
+    }
+
+    return mesh_read_generic(comm, counts[0], counts[1], folder, mesh);
 }
 
 #undef array_remap_scatter

@@ -106,14 +106,9 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     const char *folder = argv[1];
-    char path[1024 * 10];
-    ptrdiff_t nnodes = 0;
-    geom_t *xyz[3];
 
-    ptrdiff_t nelements = 0;
-    idx_t *elems[4];
-
-    if (serial_read_tet_mesh(folder, &nelements, elems, &nnodes, xyz)) {
+    mesh_t mesh;
+    if(mesh_read(comm, folder, &mesh)) {
         return EXIT_FAILURE;
     }
 
@@ -129,9 +124,9 @@ int main(int argc, char *argv[]) {
     idx_t *colidx = 0;
     real_t *values = 0;
 
-    build_crs_graph(nelements, nnodes, elems, &rowptr, &colidx);
+    build_crs_graph_for_elem_type(mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
 
-    nnz = rowptr[nnodes];
+    nnz = rowptr[mesh.nnodes];
     values = (real_t *)malloc(nnz * sizeof(real_t));
     memset(values, 0, nnz * sizeof(real_t));
 
@@ -143,11 +138,12 @@ int main(int argc, char *argv[]) {
     // Operator assembly
     ///////////////////////////////////////////////////////////////////////////////
     if (SFEM_LAPLACIAN) {
-        laplacian_assemble_hessian(4, nelements, nnodes, elems, xyz, rowptr, colidx, values);
+        laplacian_assemble_hessian(mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, rowptr, colidx, values);
     }
 
     if (SFEM_MASS) {
-        assemble_mass(nelements, nnodes, elems, xyz, rowptr, colidx, values);
+        assert(false);
+        // assemble_mass(nelements, mesh.nnodes, elems, xyz, rowptr, colidx, values);
     }
 
     tock = MPI_Wtime();
@@ -158,10 +154,12 @@ int main(int argc, char *argv[]) {
     // Boundary conditions
     ///////////////////////////////////////////////////////////////////////////////
 
-    real_t *rhs = (real_t *)malloc(nnodes * sizeof(real_t));
-    memset(rhs, 0, nnodes * sizeof(real_t));
+    real_t *rhs = (real_t *)malloc(mesh.nnodes * sizeof(real_t));
+    memset(rhs, 0, mesh.nnodes * sizeof(real_t));
+
 
     if (SFEM_HANDLE_NEUMANN) {  // Neumann
+        char path[1024 * 10];
         sprintf(path, "%s/on.raw", folder);
         idx_t *faces_neumann = 0;
         ptrdiff_t nfacesx3 = read_file(comm, path, (void **)&faces_neumann);
@@ -184,9 +182,9 @@ int main(int argc, char *argv[]) {
 
             if (0) {
                 for (int d = 0; d < 3; ++d) {
-                    real_t x0 = (real_t)xyz[d][i0];
-                    real_t x1 = (real_t)xyz[d][i1];
-                    real_t x2 = (real_t)xyz[d][i2];
+                    real_t x0 = (real_t)mesh.points[d][i0];
+                    real_t x1 = (real_t)mesh.points[d][i1];
+                    real_t x2 = (real_t)mesh.points[d][i2];
 
                     u[d] = x1 - x0;
                     v[d] = x2 - x0;
@@ -196,9 +194,9 @@ int main(int argc, char *argv[]) {
             } else {
                 // No square roots in this version
                 for (int d = 0; d < 3; ++d) {
-                    real_t x0 = (real_t)xyz[d][i0];
-                    real_t x1 = (real_t)xyz[d][i1];
-                    real_t x2 = (real_t)xyz[d][i2];
+                    real_t x0 = (real_t)mesh.points[d][i0];
+                    real_t x1 = (real_t)mesh.points[d][i1];
+                    real_t x2 = (real_t)mesh.points[d][i2];
 
                     jacobian[d * 3] = x1 - x0;
                     jacobian[d * 3 + 1] = x2 - x0;
@@ -221,6 +219,7 @@ int main(int argc, char *argv[]) {
 
     if (SFEM_HANDLE_DIRICHLET) {
         // Dirichlet
+        char path[1024 * 10];
         sprintf(path, "%s/zd.raw", folder);
 
         const char *SFEM_DIRICHLET_NODES = 0;
@@ -261,12 +260,13 @@ int main(int argc, char *argv[]) {
 
     if (SFEM_HANDLE_RHS) {
         if (SFEM_EXPORT_FP32) {
-            array_dtof(nnodes, (const real_t *)rhs, (float *)rhs);
+            array_dtof(mesh.nnodes, (const real_t *)rhs, (float *)rhs);
         }
 
         {
+            char path[1024 * 10];
             sprintf(path, "%s/rhs.raw", output_folder);
-            array_write(comm, path, value_type, rhs, nnodes, nnodes);
+            array_write(comm, path, value_type, rhs, mesh.nnodes, mesh.nnodes);
         }
     }
 
@@ -289,8 +289,8 @@ int main(int argc, char *argv[]) {
         crs_out.rowptr = (char *)rowptr;
         crs_out.colidx = (char *)colidx;
         crs_out.values = (char *)values;
-        crs_out.grows = nnodes;
-        crs_out.lrows = nnodes;
+        crs_out.grows = mesh.nnodes;
+        crs_out.lrows = mesh.nnodes;
         crs_out.lnnz = nnz;
         crs_out.gnnz = nnz;
         crs_out.start = 0;
@@ -313,13 +313,10 @@ int main(int argc, char *argv[]) {
     free(colidx);
     free(values);
 
-    for (int d = 0; d < 3; ++d) {
-        free(xyz[d]);
-    }
-
-    for (int i = 0; i < 4; ++i) {
-        free(elems[i]);
-    }
+    ptrdiff_t nelements = mesh.nelements;
+    ptrdiff_t nnodes = mesh.nnodes;
+    
+    mesh_destroy(&mesh);
 
     tock = MPI_Wtime();
 
