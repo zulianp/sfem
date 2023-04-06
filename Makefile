@@ -39,8 +39,8 @@ ifeq ($(openmp), 1)
 endif
 
 # Folder structure
-VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix:operators/p2
-INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/p2
+VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix:operators/tet10:operators/tet4
+INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4
 
 
 CFLAGS += -pedantic -Wextra
@@ -113,13 +113,13 @@ OBJS = \
 	sfem_mesh.o \
 	sfem_mesh_write.o \
 	isotropic_phasefield_for_fracture.o \
-	p2_laplacian.o
+	tet10_laplacian.o
 
 
 ifeq ($(cuda), 1)
-# 	CUDA_OBJS = cuda_laplacian.o
-# 	CUDA_OBJS = cuda_laplacian_2.o
-	CUDA_OBJS = cuda_laplacian_3.o
+# 	CUDA_OBJS = tet4_cuda_laplacian.o
+# 	CUDA_OBJS = tet4_cuda_laplacian_2.o
+	CUDA_OBJS = tet4_cuda_laplacian_3.o
 	
 	CUDA_OBJS += cuda_crs.o
 	DEPS += -L/opt/cuda/lib64 -lcudart
@@ -127,7 +127,7 @@ ifeq ($(cuda), 1)
 
 	OBJS += $(CUDA_OBJS)
 else
-	SERIAL_OBJS = laplacian.o
+	SERIAL_OBJS = tet4_laplacian.o
 	OBJS += $(SERIAL_OBJS)
 endif
 

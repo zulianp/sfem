@@ -1,5 +1,3 @@
-#include "p2_laplacian.h"
-
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
@@ -13,7 +11,7 @@
 
 #define POW2(a) ((a) * (a))
 
-static SFEM_INLINE void p2_laplacian_hessian(const real_t px0,
+static SFEM_INLINE void tet10_laplacian_hessian(const real_t px0,
                                              const real_t px1,
                                              const real_t px2,
                                              const real_t px3,
@@ -262,7 +260,7 @@ static SFEM_INLINE void p2_laplacian_hessian(const real_t px0,
     }
 }
 
-static SFEM_INLINE void p2_laplacian_gradient(const real_t px0,
+static SFEM_INLINE void tet10_laplacian_gradient(const real_t px0,
                                               const real_t px1,
                                               const real_t px2,
                                               const real_t px3,
@@ -469,7 +467,7 @@ static SFEM_INLINE void p2_laplacian_gradient(const real_t px0,
     }
 }
 
-static SFEM_INLINE void p2_laplacian_value(const real_t px0,
+static SFEM_INLINE void tet10_laplacian_value(const real_t px0,
                                            const real_t px1,
                                            const real_t px2,
                                            const real_t px3,
@@ -798,7 +796,7 @@ static SFEM_INLINE void find_cols10(const idx_t *targets, const idx_t *const row
     }
 }
 
-void p2_laplacian_assemble_hessian(const ptrdiff_t nelements,
+void tet10_laplacian_assemble_hessian(const ptrdiff_t nelements,
                                    const ptrdiff_t nnodes,
                                    idx_t **const SFEM_RESTRICT elems,
                                    geom_t **const SFEM_RESTRICT xyz,
@@ -826,7 +824,7 @@ void p2_laplacian_assemble_hessian(const ptrdiff_t nelements,
         const idx_t i2 = ev[2];
         const idx_t i3 = ev[3];
 
-        p2_laplacian_hessian(
+        tet10_laplacian_hessian(
             // X-coordinates
             xyz[0][i0],
             xyz[0][i1],
@@ -863,10 +861,10 @@ void p2_laplacian_assemble_hessian(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("p2_laplacian.c: p2_laplacian_assemble_hessian\t%g seconds\n", tock - tick);
+    printf("tet10_laplacian.c: tet10_laplacian_assemble_hessian\t%g seconds\n", tock - tick);
 }
 
-void p2_laplacian_assemble_gradient(const ptrdiff_t nelements,
+void tet10_laplacian_assemble_gradient(const ptrdiff_t nelements,
                                     const ptrdiff_t nnodes,
                                     idx_t **const SFEM_RESTRICT elems,
                                     geom_t **const SFEM_RESTRICT xyz,
@@ -896,7 +894,7 @@ void p2_laplacian_assemble_gradient(const ptrdiff_t nelements,
         const idx_t i2 = ev[2];
         const idx_t i3 = ev[3];
 
-        p2_laplacian_gradient(
+        tet10_laplacian_gradient(
             // X-coordinates
             xyz[0][i0],
             xyz[0][i1],
@@ -922,10 +920,10 @@ void p2_laplacian_assemble_gradient(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("p2_laplacian.c: p2_laplacian_assemble_gradient\t%g seconds\n", tock - tick);
+    printf("tet10_laplacian.c: tet10_laplacian_assemble_gradient\t%g seconds\n", tock - tick);
 }
 
-void p2_laplacian_assemble_value(const ptrdiff_t nelements,
+void tet10_laplacian_assemble_value(const ptrdiff_t nelements,
                                  const ptrdiff_t nnodes,
                                  idx_t **const SFEM_RESTRICT elems,
                                  geom_t **const SFEM_RESTRICT xyz,
@@ -956,7 +954,7 @@ void p2_laplacian_assemble_value(const ptrdiff_t nelements,
 
         real_t element_scalar = 0;
 
-        p2_laplacian_value(
+        tet10_laplacian_value(
             // X-coordinates
             xyz[0][i0],
             xyz[0][i1],
@@ -979,14 +977,14 @@ void p2_laplacian_assemble_value(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("p2_laplacian.c: p2_laplacian_assemble_value\t%g seconds\n", tock - tick);
+    printf("tet10_laplacian.c: tet10_laplacian_assemble_value\t%g seconds\n", tock - tick);
 }
 
-void p2_laplacian_apply(const ptrdiff_t nelements,
+void tet10_laplacian_apply(const ptrdiff_t nelements,
                         const ptrdiff_t nnodes,
                         idx_t **const SFEM_RESTRICT elems,
                         geom_t **const SFEM_RESTRICT xyz,
                         const real_t *const SFEM_RESTRICT u,
                         real_t *const SFEM_RESTRICT values) {
-    p2_laplacian_assemble_gradient(nelements, nnodes, elems, xyz, u, values);
+    tet10_laplacian_assemble_gradient(nelements, nnodes, elems, xyz, u, values);
 }

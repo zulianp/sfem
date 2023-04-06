@@ -143,7 +143,7 @@ int main(int argc, char *argv[]) {
     // Operator assembly
     ///////////////////////////////////////////////////////////////////////////////
     if (SFEM_LAPLACIAN) {
-        laplacian_assemble_hessian(nelements, nnodes, elems, xyz, rowptr, colidx, values);
+        laplacian_assemble_hessian(4, nelements, nnodes, elems, xyz, rowptr, colidx, values);
     }
 
     if (SFEM_MASS) {

@@ -1,4 +1,4 @@
-#include "laplacian.h"
+#include "tet4_laplacian.h"
 
 #include <assert.h>
 #include <math.h>
@@ -13,7 +13,7 @@
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
-static SFEM_INLINE void laplacian(const vreal_t x0,
+static SFEM_INLINE void tet4_laplacian(const vreal_t x0,
                                   const vreal_t x1,
                                   const vreal_t x2,
                                   const vreal_t x3,
@@ -147,7 +147,7 @@ static SFEM_INLINE void find_cols4(const idx_t *targets, const idx_t *const row,
     }
 }
 
-void laplacian_assemble_hessian(const ptrdiff_t nelements,
+void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
                         const ptrdiff_t nnodes,
                         idx_t ** const elems,
                         geom_t ** const xyz,
@@ -178,7 +178,7 @@ void laplacian_assemble_hessian(const ptrdiff_t nelements,
             }
         }
 
-        laplacian(
+        tet4_laplacian(
             // X-coordinates
             x[0],
             x[1],
@@ -227,5 +227,5 @@ void laplacian_assemble_hessian(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("simd_laplacian.c: laplacian_assemble_hessian\t%g seconds\n", tock - tick);
+    printf("simd_tet4_laplacian.c: tet4_laplacian_assemble_hessian\t%g seconds\n", tock - tick);
 }
