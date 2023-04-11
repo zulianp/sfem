@@ -14,6 +14,9 @@
 #include "laplacian.h"
 #include "mass.h"
 
+#include "dirichlet.h"
+#include "neumann.h"
+
 #include "read_mesh.h"
 
 ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
@@ -26,24 +29,6 @@ ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
 
     CATCH_MPI_ERROR(MPI_File_read_at_all(file, 0, *data, nbytes, MPI_CHAR, &status));
     return nbytes;
-}
-
-SFEM_INLINE real_t det3(const real_t *mat) {
-    return mat[0] * mat[4] * mat[8] + mat[1] * mat[5] * mat[6] + mat[2] * mat[3] * mat[7] - mat[0] * mat[5] * mat[7] -
-           mat[1] * mat[3] * mat[8] - mat[2] * mat[4] * mat[6];
-}
-
-SFEM_INLINE real_t area3(const real_t left[3], const real_t right[3]) {
-    real_t a = (left[1] * right[2]) - (right[1] * left[2]);
-    real_t b = (left[2] * right[0]) - (right[2] * left[0]);
-    real_t c = (left[0] * right[1]) - (right[0] * left[1]);
-    return sqrt(a * a + b * b + c * c);
-}
-
-SFEM_INLINE void integrate_neumann(real_t value, real_t dA, real_t *element_vector) {
-    element_vector[0] = value * dA;
-    element_vector[1] = value * dA;
-    element_vector[2] = value * dA;
 }
 
 int main(int argc, char *argv[]) {
@@ -73,24 +58,21 @@ int main(int argc, char *argv[]) {
     printf("%s %s %s\n", argv[0], argv[1], output_folder);
 
     int SFEM_LAPLACIAN = 1;
-    int SFEM_MASS = 0;
     int SFEM_HANDLE_DIRICHLET = 1;
     int SFEM_HANDLE_NEUMANN = 0;
     int SFEM_HANDLE_RHS = 0;
     int SFEM_EXPORT_FP32 = 0;
 
     SFEM_READ_ENV(SFEM_LAPLACIAN, atoi);
-    SFEM_READ_ENV(SFEM_MASS, atoi);
     SFEM_READ_ENV(SFEM_HANDLE_DIRICHLET, atoi);
     SFEM_READ_ENV(SFEM_EXPORT_FP32, atoi);
     SFEM_READ_ENV(SFEM_HANDLE_NEUMANN, atoi);
 
     printf("----------------------------------------\n");
     printf(
-        "Environment variables:\n- SFEM_LAPLACIAN=%d\n- SFEM_MASS=%d\n- SFEM_HANDLE_DIRICHLET=%d\n- "
+        "Environment variables:\n- SFEM_LAPLACIAN=%d\n- SFEM_HANDLE_DIRICHLET=%d\n- "
         "SFEM_HANDLE_NEUMANN=%d\n- SFEM_HANDLE_RHS=%d\n- SFEM_EXPORT_FP32=%d\n",
         SFEM_LAPLACIAN,
-        SFEM_MASS,
         SFEM_HANDLE_DIRICHLET,
         SFEM_HANDLE_NEUMANN,
         SFEM_HANDLE_RHS,
@@ -108,7 +90,7 @@ int main(int argc, char *argv[]) {
     const char *folder = argv[1];
 
     mesh_t mesh;
-    if(mesh_read(comm, folder, &mesh)) {
+    if (mesh_read(comm, folder, &mesh)) {
         return EXIT_FAILURE;
     }
 
@@ -138,12 +120,8 @@ int main(int argc, char *argv[]) {
     // Operator assembly
     ///////////////////////////////////////////////////////////////////////////////
     if (SFEM_LAPLACIAN) {
-        laplacian_assemble_hessian(mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, rowptr, colidx, values);
-    }
-
-    if (SFEM_MASS) {
-        assert(false);
-        // assemble_mass(nelements, mesh.nnodes, elems, xyz, rowptr, colidx, values);
+        laplacian_assemble_hessian(
+            mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, rowptr, colidx, values);
     }
 
     tock = MPI_Wtime();
@@ -157,7 +135,6 @@ int main(int argc, char *argv[]) {
     real_t *rhs = (real_t *)malloc(mesh.nnodes * sizeof(real_t));
     memset(rhs, 0, mesh.nnodes * sizeof(real_t));
 
-
     if (SFEM_HANDLE_NEUMANN) {  // Neumann
         char path[1024 * 10];
         sprintf(path, "%s/on.raw", folder);
@@ -166,54 +143,7 @@ int main(int argc, char *argv[]) {
         idx_t nfaces = (nfacesx3 / 3) / sizeof(idx_t);
         assert(nfaces * 3 * sizeof(idx_t) == nfacesx3);
 
-        real_t u[3], v[3];
-        real_t element_vector[3];
-
-        real_t jacobian[3 * 3] = {0, 0, 0, 0, 0, 0, 0, 0, 1};
-
-        real_t value = 1.0;
-        // real_t value = 2.0;
-        for (idx_t f = 0; f < nfaces; ++f) {
-            idx_t i0 = faces_neumann[f * 3];
-            idx_t i1 = faces_neumann[f * 3 + 1];
-            idx_t i2 = faces_neumann[f * 3 + 2];
-
-            real_t dx = 0;
-
-            if (0) {
-                for (int d = 0; d < 3; ++d) {
-                    real_t x0 = (real_t)mesh.points[d][i0];
-                    real_t x1 = (real_t)mesh.points[d][i1];
-                    real_t x2 = (real_t)mesh.points[d][i2];
-
-                    u[d] = x1 - x0;
-                    v[d] = x2 - x0;
-                }
-
-                dx = area3(u, v) / 2;
-            } else {
-                // No square roots in this version
-                for (int d = 0; d < 3; ++d) {
-                    real_t x0 = (real_t)mesh.points[d][i0];
-                    real_t x1 = (real_t)mesh.points[d][i1];
-                    real_t x2 = (real_t)mesh.points[d][i2];
-
-                    jacobian[d * 3] = x1 - x0;
-                    jacobian[d * 3 + 1] = x2 - x0;
-                }
-
-                // Orientation of face is not proper
-                dx = fabs(det3(jacobian)) / 2;
-            }
-
-            assert(dx > 0.);
-            integrate_neumann(value, dx, element_vector);
-
-            rhs[i0] += element_vector[0];
-            rhs[i1] += element_vector[1];
-            rhs[i2] += element_vector[2];
-        }
-
+        surface_forcing_function(mesh.element_type, nfaces, faces_neumann, mesh.points, 1.0, rhs);
         free(faces_neumann);
     }
 
@@ -235,27 +165,8 @@ int main(int argc, char *argv[]) {
         assert((nn / sizeof(idx_t)) * sizeof(idx_t) == nn);
         nn /= sizeof(idx_t);
 
-        // Set rhs should not be necessary (but let us do it anyway)
-        for (ptrdiff_t node = 0; node < nn; ++node) {
-            idx_t i = dirichlet_nodes[node];
-            rhs[i] = 0;
-        }
-
-        for (ptrdiff_t node = 0; node < nn; ++node) {
-            idx_t i = dirichlet_nodes[node];
-
-            idx_t begin = rowptr[i];
-            idx_t end = rowptr[i + 1];
-            idx_t lenrow = end - begin;
-            idx_t *cols = &colidx[begin];
-            real_t *row = &values[begin];
-
-            memset(row, 0, sizeof(real_t) * lenrow);
-
-            int k = find_idx(i, cols, lenrow);
-            assert(k >= 0);
-            row[k] = 1;
-        }
+        constraint_nodes_to_value(nn, dirichlet_nodes, 0, rhs);
+        crs_constraint_nodes_to_identity(nn, dirichlet_nodes, 1, rowptr, colidx, values);
     }
 
     if (SFEM_HANDLE_RHS) {
@@ -315,7 +226,7 @@ int main(int argc, char *argv[]) {
 
     ptrdiff_t nelements = mesh.nelements;
     ptrdiff_t nnodes = mesh.nnodes;
-    
+
     mesh_destroy(&mesh);
 
     tock = MPI_Wtime();

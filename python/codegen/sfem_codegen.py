@@ -20,6 +20,16 @@ def c_log(expr):
 def det2(mat):
     return mat[0,0] * mat[1,1] - mat[1,0] * mat[0,1];
 
+def inv2(mat):
+	mat_inv = sp.zeros(2, 2)
+	det = det2(mat)
+
+	mat_inv[0] = mat[1,1] / det
+	mat_inv[1] = -mat[0,1] / det
+	mat_inv[2] = -mat[1,0] / det
+	mat_inv[3] = mat[0,0] / det
+	return mat_inv
+
 def det3(mat):
     return mat[0, 0] * mat[1, 1] * mat[2, 2] + mat[0, 1] * mat[1, 2] * mat[2, 0] + mat[0, 2] * mat[1, 0] * mat[2, 1] - mat[0, 0] * mat[1, 2] * mat[2, 1] - mat[0, 1] * mat[1, 0] * mat[2, 2] - mat[0, 2] * mat[1, 1] * mat[2, 0]
 

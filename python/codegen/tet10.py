@@ -5,6 +5,9 @@ class Tet10(FE):
 	def __init__(self):
 		super().__init__()
 
+	def name(self):
+		return "Tet10"
+
 	def f0(self, x, y, z):
 		l0 = 1 - x - y - z
 		return (2 * l0 - 1) * l0
@@ -72,7 +75,10 @@ class Tet10(FE):
 	def n_nodes(self):
 		return 10
 
-	def n_dims(self):
+	def manifold_dim(self):
+		return 3
+
+	def spatial_dim(self):
 		return 3
 
 	def integrate(self, q, expr):

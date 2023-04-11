@@ -7,7 +7,7 @@ import pdb
 class LaplaceOp:
 	def __init__(self, fe, q):
 
-		dims = fe.n_dims()
+		dims = fe.manifold_dim()
 		q = sp.Matrix(dims, 1, q)
 
 		f = fe.fun(q)
@@ -79,7 +79,7 @@ class LaplaceOp:
 
 			for j in range(0, fe.n_nodes()):
 				integr = 0
-				for d in range(0, fe.n_dims()):
+				for d in range(0, fe.manifold_dim()):
 					gdotg = gi[d] * g[j][d]
 					integr += fe.integrate(q, gdotg)
 
@@ -98,7 +98,7 @@ class LaplaceOp:
 		for i in range(0, fe.n_nodes()):
 			integr = 0
 
-			for d in range(0, fe.n_dims()):
+			for d in range(0, fe.manifold_dim()):
 				gdotg = FFF_x_g[d] * g[i][d]
 				integr += fe.integrate(q, gdotg)
 
@@ -118,13 +118,13 @@ class LaplaceOp:
 		dV = self.dV
 
 		expr = []
-		for d in range(0, fe.n_dims()):
+		for d in range(0, fe.manifold_dim()):
 			gsquared = fe.integrate(q, (grad_uh[d] **2)/2)
 			integr += gsquared
 
 
-		for d1 in range(0, fe.n_dims()):
-			for d2 in range(0, fe.n_dims()):
+		for d1 in range(0, fe.manifold_dim()):
+			for d2 in range(0, fe.manifold_dim()):
 				integr = integr.subs(c_jac_inv[d1, d2], jac_inv[d1, d2])
 
 		integr *= dV

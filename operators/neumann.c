@@ -17,11 +17,11 @@ static SFEM_INLINE real_t area3(const real_t left[3], const real_t right[3]) {
     return sqrt(a * a + b * b + c * c);
 }
 
-void surface_forcing_function(const ptrdiff_t nfaces,
-                              const idx_t *faces_neumann,
-                              geom_t **const xyz,
-                              const real_t value,
-                              real_t *output) {  // Neumann
+void tri_shell_3_surface_forcing_function(const ptrdiff_t nfaces,
+                                          const idx_t *SFEM_RESTRICT faces_neumann,
+                                          geom_t **const SFEM_RESTRICT xyz,
+                                          const real_t value,
+                                          real_t *SFEM_RESTRICT output) {  // Neumann
     double tick = MPI_Wtime();
 
     for (idx_t f = 0; f < nfaces; ++f) {
@@ -51,7 +51,7 @@ void surface_forcing_function(const ptrdiff_t nfaces,
     }
 
     double tock = MPI_Wtime();
-    printf("neumann.c: surface_forcing_function\t%g seconds\n", tock - tick);
+    printf("neumann.c: tri_shell_3_surface_forcing_function\t%g seconds\n", tock - tick);
 }
 
 void surface_forcing_function_vec(const ptrdiff_t nfaces,
@@ -95,4 +95,64 @@ void surface_forcing_function_vec(const ptrdiff_t nfaces,
 
     double tock = MPI_Wtime();
     printf("neumann.c: surface_forcing_function_vec\t%g seconds\n", tock - tick);
+}
+
+void tri_shell_6_surface_forcing_function(const ptrdiff_t nfaces,
+                                          const idx_t *SFEM_RESTRICT faces_neumann,
+                                          geom_t **const SFEM_RESTRICT xyz,
+                                          const real_t value,
+                                          real_t *SFEM_RESTRICT output) {
+
+    double tick = MPI_Wtime();
+
+    for (idx_t f = 0; f < nfaces; ++f) {
+        idx_t i0 = faces_neumann[f * 6];
+        idx_t i1 = faces_neumann[f * 6 + 1];
+        idx_t i2 = faces_neumann[f * 6 + 2];
+        idx_t i3 = faces_neumann[f * 6 + 3];
+        idx_t i4 = faces_neumann[f * 6 + 4];
+        idx_t i5 = faces_neumann[f * 6 + 5];
+
+        real_t u[3], v[3];
+
+        for (int d = 0; d < 3; d++) {
+            real_t x0 = (real_t)xyz[d][i0];
+            real_t x1 = (real_t)xyz[d][i1];
+            real_t x2 = (real_t)xyz[d][i2];
+            u[d] = x1 - x0;
+            v[d] = x2 - x0;
+        }
+
+        real_t dx = area3(u, v) / 2;
+
+        assert(dx > 0.);
+
+        real_t integr = value * dx;
+
+        // Only edge dofs
+        output[i3] += integr;
+        output[i4] += integr;
+        output[i5] += integr;
+    }
+
+    double tock = MPI_Wtime();
+    printf("neumann.c: tri_shell_6_surface_forcing_function\t%g seconds\n", tock - tick);
+}
+
+void surface_forcing_function(const int element_type,
+                              const ptrdiff_t nfaces,
+                              const idx_t *SFEM_RESTRICT faces_neumann,
+                              geom_t **const SFEM_RESTRICT xyz,
+                              const real_t value,
+                              real_t *SFEM_RESTRICT output) {
+    switch (element_type) {
+        case 3: {
+            tri_shell_3_surface_forcing_function(nfaces, faces_neumann, xyz, value, output);
+            break;
+        }
+        default: {
+            assert(false && "Implement me!");
+            break;
+        }
+    }
 }

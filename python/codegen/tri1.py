@@ -2,7 +2,7 @@ from fe import FE
 import sympy as sp
 from sfem_codegen import *
 
-class Tri3(FE):
+class Tri1(FE):
 	def __init__(self):
 		super().__init__()
 
@@ -14,29 +14,21 @@ class Tri3(FE):
 		self.Ainv_ = inv2(A)
 
 	def name(self):
-		return "Tri3"
+		return "Tri1"
 
 	def f0(self, x, y):
-		return 1 - x - y
-
-	def f1(self, x, y):
-		return x
-
-	def f2(self, x, y):
-		return y
+		return 1
 
 	def fun(self, p):
 		x = p[0]
 		y = p[1]
 
 		return [
-			self.f0(x, y),
-			self.f1(x, y),
-			self.f2(x, y)
+			self.f0(x, y)
 		]
 
 	def n_nodes(self):
-		return 3
+		return 1
 
 	def manifold_dim(self):
 		return 2
@@ -53,7 +45,7 @@ class Tri3(FE):
 	def measure(self, q):
 		return det2(self.A_) / 2
 
-class TriShell3(Tri3):
+class TriShell1(Tri1):
 	def __init__(self):
 		super().__init__()
 
@@ -66,10 +58,10 @@ class TriShell3(Tri3):
 		StS = self.S.T * self.S
 		self.detS = sp.sqrt(det2(StS))
 		self.Sinv = inv2(StS) * self.S.T
-
+	
 	def name(self):
-		return "TriShell3"
-		
+		return "TriShell1"
+
 	def manifold_dim(self):
 		return 2
 
