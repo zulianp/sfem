@@ -364,9 +364,9 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
 
                         geom_t *buff = &he_xyz[offset];
 
-#pragma omp parallel
+                        #pragma omp parallel
                         {
-#pragma omp for nowait
+                            #pragma omp for nowait
                             for (ptrdiff_t k = 0; k < n; k++) {
                                 buff[k] = x[nodes[k]];
                             }
@@ -520,7 +520,6 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
 
-
     printf("cuda_laplacian_3.c: laplacian_assemble_hessian\t%g seconds\nloops %d\n",
            milliseconds / 1000,
            int(nelements / nbatch));
@@ -587,7 +586,6 @@ static inline __device__ void laplacian_gradient(const real_t px0,
     element_vector[3] = x20 * (x22 * x26 + x27 * x31 + x32 * x36);
 }
 
-
 __global__ void laplacian_assemble_gradient_kernel(const ptrdiff_t nelements,
                                                    const ptrdiff_t nnodes,
                                                    idx_t **const SFEM_RESTRICT elems,
@@ -634,17 +632,16 @@ __global__ void laplacian_assemble_gradient_kernel(const ptrdiff_t nelements,
     }
 }
 
-template<typename T>
+template <typename T>
 __global__ void pack_kernel(const ptrdiff_t nelements,
-                           const idx_t * const SFEM_RESTRICT node_idx,
-                           const T *const SFEM_RESTRICT node_data,
-                           T *const SFEM_RESTRICT per_element_data) {
+                            const idx_t *const SFEM_RESTRICT node_idx,
+                            const T *const SFEM_RESTRICT node_data,
+                            T *const SFEM_RESTRICT per_element_data) {
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
         // coalesced write
-        per_element_data[e*nelements] = node_data[node_idx[e]];
+        per_element_data[e * nelements] = node_data[node_idx[e]];
     }
 }
-
 
 extern "C" void laplacian_assemble_gradient(const ptrdiff_t nelements,
                                             const ptrdiff_t nnodes,
@@ -714,7 +711,6 @@ extern "C" void laplacian_assemble_gradient(const ptrdiff_t nelements,
     SFEM_CUDA_CHECK(cudaMemcpy(values, d_values, nnodes * sizeof(real_t), cudaMemcpyDeviceToHost));
     // double ktock = MPI_Wtime();
 
-
     SFEM_RANGE_PUSH("lapl-tear-down");
     {  // Free element indices
         for (int d = 0; d < 4; ++d) {
@@ -737,8 +733,7 @@ extern "C" void laplacian_assemble_gradient(const ptrdiff_t nelements,
         SFEM_CUDA_CHECK(cudaFree(d_values));
     }
 
-     SFEM_RANGE_POP();
-
+    SFEM_RANGE_POP();
 
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
@@ -748,7 +743,7 @@ extern "C" void laplacian_assemble_gradient(const ptrdiff_t nelements,
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
 
-       printf("cuda_laplacian_3.c: laplacian_assemble_gradient\t%g seconds\nloops %d\n",
+    printf("cuda_laplacian_3.c: laplacian_assemble_gradient\t%g seconds\nloops %d\n",
            milliseconds / 1000,
            int(nelements / nbatch));
 }

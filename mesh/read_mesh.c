@@ -332,13 +332,19 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
             char *is_local = (char *)malloc(n_local_elements * sizeof(char));
             memset(is_local, 0, n_local_elements * sizeof(char));
 
-            for (int d = 0; d < nnodesxelem; ++d) {
-                for (ptrdiff_t e = 0; e < n_local_elements; ++e) {
+            
+            for (ptrdiff_t e = 0; e < n_local_elements; ++e) {
+                int is_local_e = 1;
+
+                for (int d = 0; d < nnodesxelem; ++d) {
                     const idx_t idx = elems[d][e];
-                    if (node_owner[idx] == rank) {
-                        is_local[e] = 1;
+
+                    if (node_owner[idx] != rank) {
+                        is_local_e = 0;
                     }
                 }
+
+                is_local[e] = is_local_e;
             }
 
             idx_t *element_mapping = (idx_t *)malloc(n_local_elements * sizeof(idx_t));

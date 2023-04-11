@@ -51,6 +51,11 @@ int mesh_write(const char *path, const mesh_t *mesh) {
             array_write(comm, output_path, SFEM_MPI_IDX_T, mesh->element_mapping, mesh->nelements, mesh->nelements);
         }
 
+        if (mesh->node_owner) {
+            sprintf(output_path, "%s/node_owner.raw", path);
+            array_write(comm, output_path, SFEM_MPI_IDX_T, mesh->node_owner, mesh->nnodes, mesh->nnodes);
+        }
+
         return 0;
     } else {
         // TODO

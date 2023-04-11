@@ -18,7 +18,6 @@
 
 #include "argsort.h"
 
-
 static SFEM_INLINE void normalize(real_t *const vec3) {
     const real_t len = sqrt(vec3[0] * vec3[0] + vec3[1] * vec3[1] + vec3[2] * vec3[2]);
     vec3[0] /= len;
@@ -45,8 +44,8 @@ void correct_side_orientation(const ptrdiff_t nsides,
         normalize(v);
 
         real_t n[3] = {u[1] * v[2] - u[2] * v[1],  //
-                             u[2] * v[0] - u[0] * v[2],  //
-                             u[0] * v[1] - u[1] * v[0]};
+                       u[2] * v[0] - u[0] * v[2],  //
+                       u[0] * v[1] - u[1] * v[0]};
 
         normalize(n);
 
@@ -149,7 +148,7 @@ int main(int argc, char *argv[]) {
 
     ptrdiff_t n_surf_nodes = next_id;
     geom_t **points = (geom_t **)malloc(3 * sizeof(geom_t *));
-    for(int d = 0; d < 3; d++) {
+    for (int d = 0; d < 3; d++) {
         points[d] = 0;
     }
 
@@ -178,8 +177,6 @@ int main(int argc, char *argv[]) {
             surf_elems[d][i] = vol2surf[surf_elems[d][i]];
         }
     }
-
-    
 
     free(vol2surf);
 

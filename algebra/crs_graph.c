@@ -47,12 +47,12 @@ idx_t find_idx(const idx_t target, const idx_t *x, idx_t n) {
     return n;
 }
 
-static int build_n2e(const ptrdiff_t nelements,
-                     const ptrdiff_t nnodes,
-                     const int nnodesxelem,
-                     idx_t **const elems,
-                     count_t **out_n2eptr,
-                     idx_t **out_elindex) {
+int build_n2e(const ptrdiff_t nelements,
+              const ptrdiff_t nnodes,
+              const int nnodesxelem,
+              idx_t **const elems,
+              count_t **out_n2eptr,
+              idx_t **out_elindex) {
     double tick = MPI_Wtime();
 
     count_t *n2eptr = (count_t *)malloc((nnodes + 1) * sizeof(count_t));
@@ -264,13 +264,12 @@ static int build_crs_graph_faster(const ptrdiff_t nelements,
     return 0;
 }
 
-int build_crs_graph_for_elem_type(
-                    const int element_type,
-                    const ptrdiff_t nelements,
-                    const ptrdiff_t nnodes,
-                    idx_t **const elems,
-                    count_t **out_rowptr,
-                    idx_t **out_colidx) {
+int build_crs_graph_for_elem_type(const int element_type,
+                                  const ptrdiff_t nelements,
+                                  const ptrdiff_t nnodes,
+                                  idx_t **const elems,
+                                  count_t **out_rowptr,
+                                  idx_t **out_colidx) {
     int SFEM_CRS_MEM_CONSERVATIVE = 0;
     SFEM_READ_ENV(SFEM_CRS_MEM_CONSERVATIVE, atoi);
 
@@ -372,7 +371,7 @@ int create_dual_graph(const ptrdiff_t n_elements,
             for (count_t e2 = e_begin; e2 < e_end; ++e2) {
                 const idx_t e_idx_2 = elindex[e2];
                 if (e_idx_1 == e_idx_2) continue;
-                
+
                 n_overestimated_connections++;
                 e_ptr[e_idx_1 + 1]++;
             }
@@ -474,8 +473,6 @@ int create_dual_graph(const ptrdiff_t n_elements,
                 dual_connections[e_ptr[e + 1]++] = ke;
             }
         }
-
-
     }
 
     {
