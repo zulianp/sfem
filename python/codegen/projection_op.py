@@ -54,8 +54,6 @@ class ProjectionOp:
 			expr.append(ast.Assignment(lform, integr))
 		return expr
 
-
-
 def main():
 	shell_fe_from = [TriShell1()]
 	shell_fe_to = [TriShell3(), TriShell6()]

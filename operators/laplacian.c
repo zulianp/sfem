@@ -2,9 +2,11 @@
 #include "tet10_laplacian.h"
 #include "tet4_laplacian.h"
 
+#include "sfem_defs.h"
+
 #include <mpi.h>
 
-enum ElemType { TRI3 = 3, TET4 = 4, HEX8 = 8, TET10 = 10, INVALID = -1 };
+
 
 void laplacian_assemble_value(int element_type,
                               const ptrdiff_t nelements,

@@ -10,6 +10,7 @@
 
 #include "crs_graph.h"
 #include "sfem_base.h"
+#include "sfem_defs.h"
 
 #include "laplacian.h"
 #include "mass.h"
@@ -139,9 +140,11 @@ int main(int argc, char *argv[]) {
         char path[1024 * 10];
         sprintf(path, "%s/on.raw", folder);
         idx_t *faces_neumann = 0;
-        ptrdiff_t nfacesx3 = read_file(comm, path, (void **)&faces_neumann);
-        idx_t nfaces = (nfacesx3 / 3) / sizeof(idx_t);
-        assert(nfaces * 3 * sizeof(idx_t) == nfacesx3);
+
+        int nnodesxface = side_type(mesh.element_type);
+        ptrdiff_t nfacesxnxe = read_file(comm, path, (void **)&faces_neumann);
+        idx_t nfaces = (nfacesxnxe / nnodesxface) / sizeof(idx_t);
+        assert(nfaces * nnodesxface * sizeof(idx_t) == nfacesxnxe);
 
         surface_forcing_function(mesh.element_type, nfaces, faces_neumann, mesh.points, 1.0, rhs);
         free(faces_neumann);

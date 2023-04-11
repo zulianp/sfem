@@ -102,7 +102,6 @@ void tri_shell_6_surface_forcing_function(const ptrdiff_t nfaces,
                                           geom_t **const SFEM_RESTRICT xyz,
                                           const real_t value,
                                           real_t *SFEM_RESTRICT output) {
-
     double tick = MPI_Wtime();
 
     for (idx_t f = 0; f < nfaces; ++f) {
@@ -148,6 +147,10 @@ void surface_forcing_function(const int element_type,
     switch (element_type) {
         case 3: {
             tri_shell_3_surface_forcing_function(nfaces, faces_neumann, xyz, value, output);
+            break;
+        }
+        case 6: {
+            tri_shell_6_surface_forcing_function(nfaces, faces_neumann, xyz, value, output);
             break;
         }
         default: {
