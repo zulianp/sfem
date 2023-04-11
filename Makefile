@@ -128,6 +128,7 @@ ifeq ($(cuda), 1)
 	OBJS += $(CUDA_OBJS)
 else
 	SERIAL_OBJS = tet4_laplacian.o
+	SERIAL_OBJS += laplacian.o
 	OBJS += $(SERIAL_OBJS)
 endif
 
