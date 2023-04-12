@@ -18,20 +18,6 @@ extern "C" {
 
 #include "sfem_cuda_base.h"
 
-#if 1
-#include "nvToolsExt.h"
-#define SFEM_RANGE_PUSH(name_) \
-    do {                       \
-        nvtxRangePushA(name_); \
-    } while (0)
-#define SFEM_RANGE_POP() \
-    do {                 \
-        nvtxRangePop();  \
-    } while (0)
-#else
-#define SFEM_RANGE_PUSH(name_)
-#define SFEM_RANGE_POP()
-#endif
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define POW2(a) ((a) * (a))

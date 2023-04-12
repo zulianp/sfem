@@ -27,6 +27,8 @@ inline void sfem_cuda_check(cudaError_t code, const char* file, int line, bool a
 #define SFEM_DEBUG_SYNCHRONIZE()
 #endif
 
+#define SFEM_ENABLE_NVTX
+
 #ifdef SFEM_ENABLE_NVTX
 #include "nvToolsExt.h"
 namespace sfem {
@@ -40,11 +42,21 @@ namespace sfem {
 }  // namespace sfem
 
 #define SFEM_NVTX_SCOPE(name) sfem::details::Tracer uniq_name_using_macros(name);
+#define SFEM_RANGE_PUSH(name_) \
+    do {                       \
+        nvtxRangePushA(name_); \
+    } while (0)
+#define SFEM_RANGE_POP() \
+    do {                 \
+        nvtxRangePop();  \
+    } while (0)
 
-#else
+#else //SFEM_ENABLE_NVTX
 
 #define SFEM_NVTX_SCOPE(name)
-
-#endif
+#define SFEM_RANGE_PUSH(name_)
+#define SFEM_RANGE_POP()
+ 
+#endif //SFEM_ENABLE_NVTX
 
 #endif  // SFEM_CUDA_BASE_H

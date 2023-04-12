@@ -643,7 +643,12 @@ extern "C" void tet4_laplacian_assemble_gradient(const ptrdiff_t nelements,
                                             geom_t **const SFEM_RESTRICT xyz,
                                             const real_t *const SFEM_RESTRICT u,
                                             real_t *const SFEM_RESTRICT values) {
-    double tick = MPI_Wtime();
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    SFEM_RANGE_PUSH("lapl-set-up");
+    cudaEventRecord(start);
 
     const ptrdiff_t nbatch = nelements;
 
@@ -692,12 +697,15 @@ extern "C" void tet4_laplacian_assemble_gradient(const ptrdiff_t nelements,
         SFEM_CUDA_CHECK(cudaMemcpy(d_values, values, nnodes * sizeof(real_t), cudaMemcpyHostToDevice));
     }
 
-    double ktick = MPI_Wtime();
+    SFEM_RANGE_POP();
+
+    // double ktick = MPI_Wtime();
     laplacian_assemble_gradient_kernel<<<n_blocks, block_size>>>(nelements, nnodes, d_elems, d_xyz, d_u, d_values);
 
     SFEM_CUDA_CHECK(cudaMemcpy(values, d_values, nnodes * sizeof(real_t), cudaMemcpyDeviceToHost));
-    double ktock = MPI_Wtime();
+    // double ktock = MPI_Wtime();
 
+    SFEM_RANGE_PUSH("lapl-tear-down");
     {  // Free element indices
         for (int d = 0; d < 4; ++d) {
             SFEM_CUDA_CHECK(cudaFree(hd_elems[d]));
@@ -719,10 +727,19 @@ extern "C" void tet4_laplacian_assemble_gradient(const ptrdiff_t nelements,
         SFEM_CUDA_CHECK(cudaFree(d_values));
     }
 
-    double tock = MPI_Wtime();
-    printf("cuda_laplacian.c: laplacian_assemble_gradient\t%g seconds (GPU kernel %g seconds)\n",
-           tock - tick,
-           ktock - ktick);
+    SFEM_RANGE_POP();
+
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+
+    printf("cuda_laplacian.c: laplacian_assemble_gradient\t%g seconds\nloops %d\n",
+           milliseconds / 1000,
+           int(nelements / nbatch));
 }
 
 extern "C" void tet4_laplacian_apply(const ptrdiff_t nelements,
