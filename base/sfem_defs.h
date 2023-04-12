@@ -14,7 +14,7 @@ SFEM_INLINE static enum ElemType side_type(const enum ElemType type) {
         case TET10:
             return TRI6;
         default: {
-            assert(false);
+            assert(0);
             return INVALID;
         }
     }
@@ -33,7 +33,7 @@ SFEM_INLINE static enum ElemType elem_num_nodes(const enum ElemType type) {
         case TET10:
             return 10;
         default: {
-            assert(false);
+            assert(0);
             return INVALID;
         }
     }
@@ -52,11 +52,10 @@ SFEM_INLINE static int elem_num_sides(const enum ElemType type) {
         case TET10:
             return 4;
         default: {
-            assert(false);
+            assert(0);
             return INVALID;
         }
     }
 }
-
 
 #endif  // SFEM_DEFS_H

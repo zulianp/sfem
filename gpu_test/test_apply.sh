@@ -25,7 +25,8 @@ set -x
 
 CASE=$1
 # lets just use this for now
-IN=`mktemp`
+# IN=`mktemp`
+IN=debugme.raw
 fp_convert.py $CASE/x.raw $IN float32 float64
 
 mkdir -p test_actual

@@ -154,7 +154,7 @@ void surface_forcing_function(const int element_type,
             break;
         }
         default: {
-            assert(false && "Implement me!");
+            assert(0 && "Implement me!");
             break;
         }
     }

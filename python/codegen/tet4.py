@@ -1,5 +1,5 @@
 from fe import FE
-import sympy as sp
+from sfem_codegen import *
 
 class Tet4(FE):
 	def __init__(self):
@@ -48,4 +48,4 @@ class Tet4(FE):
 		return Ainv
 
 	def measure(self, q):
-		return det(A) / 6
+		return det3(A) / 6

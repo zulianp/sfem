@@ -286,6 +286,35 @@ static void pack_elements(
     SFEM_RANGE_POP();       
 }
 
+
+static void pack_vector(
+    const ptrdiff_t n,
+    const ptrdiff_t element_offset,
+    idx_t **const SFEM_RESTRICT elems,
+    const real_t *const SFEM_RESTRICT vec,
+    real_t * const SFEM_RESTRICT he_vec)
+{
+    SFEM_RANGE_PUSH("lapl-pack-vector");
+    {
+        
+        for (int e_node = 0; e_node < 4; e_node++) {
+            const idx_t *const nodes = &elems[e_node][element_offset];
+
+            real_t *buff = &he_vec[e_node * n];
+
+            #pragma omp parallel
+            {
+                #pragma omp for nowait
+                for (ptrdiff_t k = 0; k < n; k++) {
+                    buff[k] = vec[nodes[k]];
+                }
+            }
+        }
+    }
+
+    SFEM_RANGE_POP();       
+}
+
 extern "C" void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
                                            const ptrdiff_t nnodes,
                                            idx_t **const SFEM_RESTRICT elems,
@@ -314,8 +343,6 @@ extern "C" void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
     real_t *d_fff = nullptr;
     SFEM_CUDA_CHECK(cudaMalloc(&d_fff, 6 * nbatch * sizeof(real_t)));
 
-    real_t *he_matrix = nullptr;
-    cudaMallocHost(&he_matrix, 4 * 4 * nbatch * sizeof(real_t));
     real_t *de_matrix = nullptr;
     SFEM_CUDA_CHECK(cudaMalloc(&de_matrix, 4 * 4 * nbatch * sizeof(real_t)));
 
@@ -481,7 +508,6 @@ extern "C" void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
     SFEM_RANGE_PUSH("lapl-tear-down");
     {  // Free resources on CPU
         cudaFreeHost(he_xyz);
-        cudaFreeHost(he_matrix);
 
         for (int d = 0; d < 4; d++) {
             SFEM_CUDA_CHECK(cudaFreeHost(hh_elems[d]));
@@ -520,110 +546,44 @@ extern "C" void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
            int(nelements / nbatch));
 }
 
-static inline __device__ void laplacian_gradient(const real_t px0,
-                                                 const real_t px1,
-                                                 const real_t px2,
-                                                 const real_t px3,
-                                                 const real_t py0,
-                                                 const real_t py1,
-                                                 const real_t py2,
-                                                 const real_t py3,
-                                                 const real_t pz0,
-                                                 const real_t pz1,
-                                                 const real_t pz2,
-                                                 const real_t pz3,
+static inline __device__ void laplacian_gradient(const real_t *const SFEM_RESTRICT fff,
                                                  const real_t *SFEM_RESTRICT u,
-                                                 real_t *SFEM_RESTRICT element_vector) {
-    // FLOATING POINT OPS!
-    //      - Result: 4*ADD + 4*ASSIGNMENT + 16*MUL
-    //      - Subexpressions: 13*ADD + 7*DIV + 46*MUL + 3*NEG + 30*SUB
-    const real_t x0 = -pz0 + pz3;
-    const real_t x1 = -px0 + px1;
-    const real_t x2 = -py0 + py2;
-    const real_t x3 = x1 * x2;
-    const real_t x4 = x0 * x3;
-    const real_t x5 = -pz0 + pz2;
-    const real_t x6 = -py0 + py3;
-    const real_t x7 = x1 * x6;
-    const real_t x8 = x5 * x7;
-    const real_t x9 = -px0 + px2;
-    const real_t x10 = -py0 + py1;
-    const real_t x11 = x10 * x9;
-    const real_t x12 = x0 * x11;
-    const real_t x13 = -pz0 + pz1;
-    const real_t x14 = x6 * x9;
-    const real_t x15 = x13 * x14;
-    const real_t x16 = -px0 + px3;
-    const real_t x17 = x10 * x16 * x5;
-    const real_t x18 = x16 * x2;
-    const real_t x19 = x13 * x18;
-    const real_t x20 =
-        -1.0 / 6.0 * x12 + (1.0 / 6.0) * x15 + (1.0 / 6.0) * x17 - 1.0 / 6.0 * x19 + (1.0 / 6.0) * x4 - 1.0 / 6.0 * x8;
-    const real_t x21 = 1.0 / (-x12 + x15 + x17 - x19 + x4 - x8);
-    const real_t x22 = x21 * (-x11 + x3);
-    const real_t x23 = x21 * (x10 * x16 - x7);
-    const real_t x24 = x21 * (x14 - x18);
-    const real_t x25 = -x22 - x23 - x24;
-    const real_t x26 = u[0] * x25 + u[1] * x24 + u[2] * x23 + u[3] * x22;
-    const real_t x27 = x21 * (-x1 * x5 + x13 * x9);
-    const real_t x28 = x21 * (x0 * x1 - x13 * x16);
-    const real_t x29 = x21 * (-x0 * x9 + x16 * x5);
-    const real_t x30 = -x27 - x28 - x29;
-    const real_t x31 = u[0] * x30 + u[1] * x29 + u[2] * x28 + u[3] * x27;
-    const real_t x32 = x21 * (x10 * x5 - x13 * x2);
-    const real_t x33 = x21 * (-x0 * x10 + x13 * x6);
-    const real_t x34 = x21 * (x0 * x2 - x5 * x6);
-    const real_t x35 = -x32 - x33 - x34;
-    const real_t x36 = u[0] * x35 + u[1] * x34 + u[2] * x33 + u[3] * x32;
-    element_vector[0] = x20 * (x25 * x26 + x30 * x31 + x35 * x36);
-    element_vector[1] = x20 * (x24 * x26 + x29 * x31 + x34 * x36);
-    element_vector[2] = x20 * (x23 * x26 + x28 * x31 + x33 * x36);
-    element_vector[3] = x20 * (x22 * x26 + x27 * x31 + x32 * x36);
+                                                 const ptrdiff_t stride,
+                                                 real_t * const SFEM_RESTRICT element_vector) {
+    //FLOATING POINT OPS!
+    //      - Result: 4*ADD + 4*ASSIGNMENT + 21*MUL
+    //      - Subexpressions: 4*DIV + 15*MUL
+    const real_t x0 = (1.0/6.0)*u[0];
+    const real_t x1 = fff[0*stride]*x0;
+    const real_t x2 = (1.0/6.0)*u[1];
+    const real_t x3 = fff[0*stride]*x2;
+    const real_t x4 = fff[1*stride]*x2;
+    const real_t x5 = (1.0/6.0)*u[2];
+    const real_t x6 = fff[1*stride]*x5;
+    const real_t x7 = fff[2*stride]*x2;
+    const real_t x8 = (1.0/6.0)*u[3];
+    const real_t x9 = fff[2*stride]*x8;
+    const real_t x10 = fff[3*stride]*x0;
+    const real_t x11 = fff[3*stride]*x5;
+    const real_t x12 = fff[4*stride]*x5;
+    const real_t x13 = fff[4*stride]*x8;
+    const real_t x14 = fff[5*stride]*x0;
+    const real_t x15 = fff[5*stride]*x8;
+    const real_t x16 = fff[1*stride]*x0;
+    const real_t x17 = fff[2*stride]*x0;
+    const real_t x18 = fff[4*stride]*x0;
+    element_vector[0*stride] = (1.0/3.0)*fff[1*stride]*u[0] + (1.0/3.0)*fff[2*stride]*u[0] + (1.0/3.0)*fff[4*stride]*u[0] + x1 + x10 - x11 - x12 - x13 + x14 - x15 - x3 - x4 - x6 - x7 - x9;
+    element_vector[1*stride] = -x1 - x16 - x17 + x3 + x6 + x9;
+    element_vector[2*stride] = -x10 + x11 + x13 - x16 - x18 + x4;
+    element_vector[3*stride] = x12 - x14 + x15 - x17 - x18 + x7;
 }
 
 __global__ void laplacian_assemble_gradient_kernel(const ptrdiff_t nelements,
-                                                   const ptrdiff_t nnodes,
-                                                   idx_t **const SFEM_RESTRICT elems,
-                                                   geom_t **const SFEM_RESTRICT xyz,
-                                                   const real_t *const SFEM_RESTRICT u,
-                                                   real_t *const SFEM_RESTRICT values) {
-    idx_t ev[4];
-    real_t element_vector[4];
-    real_t element_u[4];
-
-    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < nelements; i += blockDim.x * gridDim.x) {
-#pragma unroll(4)
-        for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
-        }
-
-        for (int v = 0; v < 4; ++v) {
-            element_u[v] = u[ev[v]];
-        }
-
-        laplacian_gradient(
-            // X-coordinates
-            xyz[0][ev[0]],
-            xyz[0][ev[1]],
-            xyz[0][ev[2]],
-            xyz[0][ev[3]],
-            // Y-coordinates
-            xyz[1][ev[0]],
-            xyz[1][ev[1]],
-            xyz[1][ev[2]],
-            xyz[1][ev[3]],
-            // Z-coordinates
-            xyz[2][ev[0]],
-            xyz[2][ev[1]],
-            xyz[2][ev[2]],
-            xyz[2][ev[3]],
-            element_u,
-            element_vector);
-
-        for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            const idx_t dof_i = ev[edof_i];
-            atomicAdd(&values[dof_i], element_vector[edof_i]);
-        }
+                                                  const real_t *const SFEM_RESTRICT fff,
+                                                  const real_t *const SFEM_RESTRICT u,
+                                                  real_t *const SFEM_RESTRICT values) {
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
+        laplacian_gradient(&fff[e], &u[e], nelements, &values[e]);
     }
 }
 
@@ -638,94 +598,265 @@ __global__ void pack_kernel(const ptrdiff_t nelements,
     }
 }
 
+__global__ void vector_local_to_global_kernel(const ptrdiff_t nelements,
+                                       idx_t **const SFEM_RESTRICT elems,
+                                       const real_t *const SFEM_RESTRICT element_vector,
+                                       real_t *const SFEM_RESTRICT values) {
+    idx_t ev[4];
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
+#pragma unroll(4)
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elems[v][e];
+        }
+
+        // offsetted array for this element
+        const real_t *const this_vector = &element_vector[e];
+
+#pragma unroll(4)
+        for (int edof_i = 0; edof_i < 4; ++edof_i) {
+            const idx_t dof_i = ev[edof_i];
+            const real_t v = this_vector[edof_i * nelements];
+            atomicAdd(&values[dof_i], v);
+        }
+        
+    }
+}
+
 extern "C" void tet4_laplacian_assemble_gradient(const ptrdiff_t nelements,
                                             const ptrdiff_t nnodes,
                                             idx_t **const SFEM_RESTRICT elems,
                                             geom_t **const SFEM_RESTRICT xyz,
                                             const real_t *const SFEM_RESTRICT u,
                                             real_t *const SFEM_RESTRICT values) {
-    cudaEvent_t start, stop;
+   cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
 
     SFEM_RANGE_PUSH("lapl-set-up");
     cudaEventRecord(start);
 
-    const ptrdiff_t nbatch = nelements;
-
-    idx_t *hd_elems[4];
-    idx_t **d_elems = nullptr;
-
-    {  // Copy element indices
-
-        void *ptr;
-        SFEM_CUDA_CHECK(cudaMalloc(&ptr, 4 * sizeof(idx_t *)));
-        d_elems = (idx_t **)ptr;
-
-        for (int d = 0; d < 4; ++d) {
-            SFEM_CUDA_CHECK(cudaMalloc(&hd_elems[d], nbatch * sizeof(idx_t)));
-            SFEM_CUDA_CHECK(cudaMemcpy(hd_elems[d], elems[d], nbatch * sizeof(idx_t), cudaMemcpyHostToDevice));
-        }
-
-        SFEM_CUDA_CHECK(cudaMemcpy(d_elems, hd_elems, 4 * sizeof(idx_t *), cudaMemcpyHostToDevice));
-    }
-
+    // static int block_size = 256;
     static int block_size = 128;
+    const ptrdiff_t nbatch = MIN(block_size * 500, nelements);
+
     ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (nbatch + block_size - 1) / block_size);
 
-    geom_t *hd_xyz[4];
-    geom_t **d_xyz = nullptr;
+    geom_t *he_xyz = nullptr;
+    SFEM_CUDA_CHECK(cudaMallocHost(&he_xyz, 3 * 4 * nbatch * sizeof(geom_t)));
+    
+    geom_t *de_xyz = nullptr;
+    SFEM_CUDA_CHECK(cudaMalloc(&de_xyz, 3 * 4 * nbatch * sizeof(geom_t)));
 
-    {  // Copy coordinates
-        SFEM_CUDA_CHECK(cudaMalloc(&d_xyz, 3 * sizeof(geom_t *)));
+    real_t *d_fff = nullptr;
+    SFEM_CUDA_CHECK(cudaMalloc(&d_fff, 6 * nbatch * sizeof(real_t)));
 
-        for (int d = 0; d < 3; ++d) {
-            SFEM_CUDA_CHECK(cudaMalloc(&hd_xyz[d], nnodes * sizeof(geom_t)));
-            SFEM_CUDA_CHECK(cudaMemcpy(hd_xyz[d], xyz[d], nnodes * sizeof(geom_t), cudaMemcpyHostToDevice));
-        }
+    real_t *de_vector = nullptr;
+    SFEM_CUDA_CHECK(cudaMalloc(&de_vector, 4 * nbatch * sizeof(real_t)));
 
-        SFEM_CUDA_CHECK(cudaMemcpy(d_xyz, hd_xyz, 3 * sizeof(geom_t *), cudaMemcpyHostToDevice));
+    real_t *he_u = nullptr;
+    SFEM_CUDA_CHECK(cudaMallocHost(&he_u, 4 * nbatch * sizeof(real_t)));
+
+    real_t *de_u = nullptr;
+    SFEM_CUDA_CHECK(cudaMalloc(&de_u, 4 * nbatch * sizeof(real_t)));
+
+    idx_t *hh_elems[4];
+    for (int d = 0; d < 4; d++) {
+        SFEM_CUDA_CHECK(cudaMallocHost(&hh_elems[d], nbatch * sizeof(idx_t)));
     }
 
-    real_t *d_u = nullptr;
+    idx_t **hd_elems[4];
+    idx_t **d_elems = nullptr;
+
+    // real_t *d_u = nullptr;
+    // SFEM_CUDA_CHECK(cudaMalloc(&d_u, nnodes * sizeof(real_t)));
+
     real_t *d_values = nullptr;
-    {
-        // Copy input and output to device
-        SFEM_CUDA_CHECK(cudaMalloc(&d_u, nnodes * sizeof(real_t)));
-        SFEM_CUDA_CHECK(cudaMalloc(&d_values, nnodes * sizeof(real_t)));
+    SFEM_CUDA_CHECK(cudaMalloc(&d_values, nnodes * sizeof(real_t)));
 
-        SFEM_CUDA_CHECK(cudaMemcpy(d_u, u, nnodes * sizeof(real_t), cudaMemcpyHostToDevice));
-        SFEM_CUDA_CHECK(cudaMemcpy(d_values, values, nnodes * sizeof(real_t), cudaMemcpyHostToDevice));
+    static const int nstreams = 4;
+    cudaStream_t stream[nstreams];
+    cudaEvent_t event[nstreams];
+    for (int s = 0; s < nstreams; s++) {
+        cudaStreamCreate(&stream[s]);
+        cudaEventCreate(&event[s]);
     }
+
+    // Allocate space for indices
+    for (int d = 0; d < 4; d++) {
+        SFEM_CUDA_CHECK(cudaMalloc(&hd_elems[d], nbatch * sizeof(idx_t)));
+    }
+
+    SFEM_CUDA_CHECK(cudaMalloc(&d_elems, 4 * sizeof(idx_t *)));
+    cudaMemcpy(d_elems, hd_elems, 4 * sizeof(idx_t *), cudaMemcpyHostToDevice);
 
     SFEM_RANGE_POP();
 
-    // double ktick = MPI_Wtime();
-    laplacian_assemble_gradient_kernel<<<n_blocks, block_size>>>(nelements, nnodes, d_elems, d_xyz, d_u, d_values);
+    SFEM_RANGE_PUSH("lapl-values-host-to-device");
+    // Copy vectors
+    // cudaMemcpy(d_u, u, nnodes * sizeof(real_t), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_values, values, nnodes * sizeof(real_t), cudaMemcpyHostToDevice);
+   
+    SFEM_RANGE_POP();
+
+    ptrdiff_t last_n = 0;
+    ptrdiff_t last_element_offset = 0;
+    for (ptrdiff_t element_offset = 0; element_offset < nelements; element_offset += nbatch) {
+        ptrdiff_t n = MIN(nbatch, nelements - element_offset);
+
+        /////////////////////////////////////////////////////////
+        // Packing (stream 0)
+        /////////////////////////////////////////////////////////
+
+        if (last_n) {
+            cudaStreamSynchronize(stream[0]);
+        }
+
+        pack_elements(n, element_offset, elems, xyz, he_xyz);
+
+        /////////////////////////////////////////////////////////
+        // Local to global (stream 3)
+        /////////////////////////////////////////////////////////
+
+        if (last_n) {
+            // Make sure we have the elemental matrices and dof indices
+            cudaStreamWaitEvent(stream[3], event[1], 0);
+            cudaStreamWaitEvent(stream[3], event[2], 0);
+
+            // Do this here to let the main kernel overlap with the packing
+            vector_local_to_global_kernel<<<n_blocks, block_size, 0, stream[3]>>>(
+                last_n, d_elems, de_vector, d_values);
+
+            cudaEventRecord(event[3], stream[3]);
+
+            SFEM_DEBUG_SYNCHRONIZE();
+        }
+
+        /////////////////////////////////////////////////////////
+        // XYZ HtoD (stream 0)
+        /////////////////////////////////////////////////////////
+
+        SFEM_CUDA_CHECK(cudaMemcpyAsync(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice, stream[0]));
+        cudaEventRecord(event[0], stream[0]);
+
+
+        /////////////////////////////////////////////////////////
+        // Pack and upload solution vector (stream 0)
+        /////////////////////////////////////////////////////////
+        pack_vector(n, element_offset, elems, u, he_u);
+        SFEM_CUDA_CHECK(cudaMemcpyAsync(de_u, he_u, 4 * n * sizeof(real_t), cudaMemcpyHostToDevice, stream[0]));
+
+
+        SFEM_DEBUG_SYNCHRONIZE();
+        /////////////////////////////////////////////////////////
+        // Jacobian computations (stream 1)
+        /////////////////////////////////////////////////////////
+
+        // Make sure we have the new XYZ coordinates
+        cudaStreamWaitEvent(stream[1], event[0], 0);
+
+        fff_kernel<<<n_blocks, block_size, 0, stream[1]>>>(n, de_xyz, d_fff);
+
+        SFEM_DEBUG_SYNCHRONIZE();
+
+        /////////////////////////////////////////////////////////
+        // DOF indices HtoD (stream 2)
+        /////////////////////////////////////////////////////////
+
+        // Ensure that previous HtoD is completed
+        if (last_n) cudaStreamSynchronize(stream[2]);
+
+        SFEM_RANGE_PUSH("lapl-copy-host-to-host");
+        //  Copy elements to host-pinned memory
+        for (int e_node = 0; e_node < 4; e_node++) {
+            memcpy(hh_elems[e_node], &elems[e_node][element_offset], n * sizeof(idx_t));
+        }
+
+        SFEM_RANGE_POP();
+
+        // Make sure local to global has ended
+        cudaStreamWaitEvent(stream[2], event[3], 0);
+
+        for (int e_node = 0; e_node < 4; e_node++) {
+            SFEM_CUDA_CHECK(cudaMemcpyAsync(
+                hd_elems[e_node], hh_elems[e_node], n * sizeof(idx_t), cudaMemcpyHostToDevice, stream[2]));
+        }
+
+        cudaEventRecord(event[2], stream[2]);
+
+        SFEM_DEBUG_SYNCHRONIZE();
+        /////////////////////////////////////////////////////////
+        // Assemble elemental vectors (stream 1)
+        /////////////////////////////////////////////////////////
+
+    
+        // Make sure that we have new residuals
+        cudaStreamWaitEvent(stream[1], event[3], 0);
+
+        // Ensure we have de_u
+        cudaStreamSynchronize(stream[0]);
+
+        laplacian_assemble_gradient_kernel<<<n_blocks, block_size, 0, stream[1]>>>(n, d_fff, de_u, de_vector);
+        cudaEventRecord(event[1], stream[1]);
+
+        SFEM_DEBUG_SYNCHRONIZE();
+        /////////////////////////////////////////////////////////
+
+        last_n = n;
+        last_element_offset = element_offset;
+    }
+
+    /////////////////////////////////////////////////////////
+    // Local to global (stream 3)
+    /////////////////////////////////////////////////////////
+
+    if (last_n) {
+        // Make sure we have the elemental matrices and dof indices
+        cudaStreamWaitEvent(stream[3], event[1], 0);
+        cudaStreamWaitEvent(stream[3], event[2], 0);
+
+        // Do this here to let the main kernel overlap with the packing
+        vector_local_to_global_kernel<<<n_blocks, block_size, 0, stream[3]>>>(
+            last_n, d_elems, de_vector, d_values);
+
+        SFEM_DEBUG_SYNCHRONIZE();
+
+        cudaStreamSynchronize(stream[3]);
+    }
+
+    /////////////////////////////////////////////////////////
+
+    SFEM_RANGE_PUSH("lapl-values-device-to-host");
 
     SFEM_CUDA_CHECK(cudaMemcpy(values, d_values, nnodes * sizeof(real_t), cudaMemcpyDeviceToHost));
-    // double ktock = MPI_Wtime();
+
+    SFEM_RANGE_POP();
 
     SFEM_RANGE_PUSH("lapl-tear-down");
-    {  // Free element indices
-        for (int d = 0; d < 4; ++d) {
+    {  // Free resources on CPU
+        cudaFreeHost(he_xyz);
+
+        for (int d = 0; d < 4; d++) {
+            SFEM_CUDA_CHECK(cudaFreeHost(hh_elems[d]));
+        }
+    }
+
+    {  // Free resources on GPU
+        SFEM_CUDA_CHECK(cudaFree(de_xyz));
+        SFEM_CUDA_CHECK(cudaFree(de_vector));
+        SFEM_CUDA_CHECK(cudaFree(d_fff));
+
+        for (int d = 0; d < 4; d++) {
             SFEM_CUDA_CHECK(cudaFree(hd_elems[d]));
         }
-
         SFEM_CUDA_CHECK(cudaFree(d_elems));
-    }
 
-    {  // Free element coordinates
-        for (int d = 0; d < 3; ++d) {
-            SFEM_CUDA_CHECK(cudaFree(hd_xyz[d]));
-        }
-
-        SFEM_CUDA_CHECK(cudaFree(d_xyz));
-    }
-
-    {
-        SFEM_CUDA_CHECK(cudaFree(d_u));
+        // SFEM_CUDA_CHECK(cudaFree(d_u));
         SFEM_CUDA_CHECK(cudaFree(d_values));
+
+        for (int s = 0; s < nstreams; s++) {
+            cudaStreamDestroy(stream[s]);
+            cudaEventDestroy(event[s]);
+        }
     }
 
     SFEM_RANGE_POP();
@@ -734,7 +865,6 @@ extern "C" void tet4_laplacian_assemble_gradient(const ptrdiff_t nelements,
     cudaEventSynchronize(stop);
     float milliseconds = 0;
     cudaEventElapsedTime(&milliseconds, start, stop);
-
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
 

@@ -34,10 +34,11 @@ class LaplaceOp:
 
 		FFF_x_g = sp.Matrix(dims, 1, [0] * dims)
 		for i in range(0, fe.n_nodes()):
-			gi = cFFF * g[i]
 			for d in range(0, dims):
-				FFF_x_g[d] += gi[d] * u[i]
+				FFF_x_g[d] += g[i][d] * u[i]
 
+
+		FFF_x_g = cFFF * FFF_x_g
 		################################################################### 
 		c_jac_inv = sp.Matrix(dims, dims, coeffs('c_jac_inv', dims*dims))
 
