@@ -51,7 +51,6 @@ right_gy = [0] * 4
 right_gz = [0] * 4 
 
 
-
 for i in range(0, 4):
 	g = grad_phi(i)
 	right_gx[i] = g[0]
@@ -82,8 +81,33 @@ for i in range(0, 4):
 
 		expr.append(ast.Assignment(bform, integr))
 		
-		# if i != j:
-		# 	expr.append(ast.Assignment(bform_t, bform))
+print('---------------------------------------------------')
+print('Hessian')
+print('---------------------------------------------------')
+c_code(expr)
+print('---------------------------------------------------')
+
+u = coeffs('u', 4)
+
+expr = []
+for i in range(0, 4):
+	integr = 0
+
+	for j in range(0, 4):
+		integr += left_gx[i] * right_gx[j] * u[j]
+		integr += left_gy[i] * right_gy[j] * u[j]
+		integr += left_gz[i] * right_gz[j] * u[j]
+
+	lform = sp.symbols(f'element_vector[{i}*stride]')
+
+	if simplify_expr:
+		integr = sp.simplify(integr)
+
+	expr.append(ast.Assignment(lform, integr))
+
+
+print('---------------------------------------------------')
+print('Gradient')
 print('---------------------------------------------------')
 c_code(expr)
 print('---------------------------------------------------')

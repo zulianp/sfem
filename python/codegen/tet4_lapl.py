@@ -14,7 +14,7 @@ print_gradient = False
 print_value = False
 print_fff = False
 
-# print_hessian = True
+print_hessian = True
 print_gradient = True
 # print_value = True
 print_fff = True
