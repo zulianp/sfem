@@ -15,6 +15,12 @@ PATH=$SCRIPTPATH/../python/mesh:$PATH
 LAUNCH=srun
 LAUNCH=""
 
+if (($# != 1))
+then
+	printf "usage: $0 <mesh_path>\n" 1>&2
+	exit -1
+fi
+
 set -x
 
 CASE=$1

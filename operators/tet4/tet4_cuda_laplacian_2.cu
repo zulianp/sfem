@@ -684,3 +684,13 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
 }
 
 #endif
+
+extern "C" void tet4_laplacian_assemble_value(const ptrdiff_t nelements,
+                              const ptrdiff_t nnodes,
+                              idx_t **const SFEM_RESTRICT elems,
+                              geom_t **const SFEM_RESTRICT xyz,
+                              const real_t *const SFEM_RESTRICT u,
+                              real_t *const SFEM_RESTRICT value)
+                              {
+                                assert(false);
+                              }

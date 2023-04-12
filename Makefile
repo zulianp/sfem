@@ -113,7 +113,8 @@ OBJS = \
 	sfem_mesh.o \
 	sfem_mesh_write.o \
 	isotropic_phasefield_for_fracture.o \
-	tet10_laplacian.o
+	tet10_laplacian.o \
+	laplacian.o
 
 
 ifeq ($(cuda), 1)
@@ -128,7 +129,6 @@ ifeq ($(cuda), 1)
 	OBJS += $(CUDA_OBJS)
 else
 	SERIAL_OBJS = tet4_laplacian.o
-	SERIAL_OBJS += laplacian.o
 	OBJS += $(SERIAL_OBJS)
 endif
 

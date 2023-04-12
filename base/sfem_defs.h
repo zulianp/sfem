@@ -7,7 +7,7 @@
 
 enum ElemType { TRI3 = 3, TET4 = 4, TRI6 = 6, HEX8 = 8, TET10 = 10, INVALID = -1 };
 
-SFEM_INLINE static ElemType side_type(const enum ElemType type) {
+SFEM_INLINE static enum ElemType side_type(const enum ElemType type) {
     switch (type) {
         case TET4:
             return TRI3;
@@ -20,7 +20,7 @@ SFEM_INLINE static ElemType side_type(const enum ElemType type) {
     }
 }
 
-SFEM_INLINE static ElemType elem_num_nodes(const enum ElemType type) {
+SFEM_INLINE static enum ElemType elem_num_nodes(const enum ElemType type) {
     switch (type) {
         case TRI3:
             return 3;
@@ -39,7 +39,7 @@ SFEM_INLINE static ElemType elem_num_nodes(const enum ElemType type) {
     }
 }
 
-SFEM_INLINE static ElemType elem_num_sides(const enum ElemType type) {
+SFEM_INLINE static int elem_num_sides(const enum ElemType type) {
     switch (type) {
         case TRI3:
             return 3;

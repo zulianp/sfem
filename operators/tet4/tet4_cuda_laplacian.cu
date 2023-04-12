@@ -487,7 +487,7 @@ __global__ void print_elem_kernel(const ptrdiff_t nelements, idx_t **const elems
     printf("%d %d %d %d\n", elems[0][i], elems[1][i], elems[2][i], elems[3][i]);
 }
 
-extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
+extern "C" void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
                                            const ptrdiff_t nnodes,
                                            idx_t **const SFEM_RESTRICT elems,
                                            geom_t **const SFEM_RESTRICT xyz,
@@ -637,7 +637,7 @@ __global__ void laplacian_assemble_gradient_kernel(const ptrdiff_t nelements,
     }
 }
 
-extern "C" void laplacian_assemble_gradient(const ptrdiff_t nelements,
+extern "C" void tet4_laplacian_assemble_gradient(const ptrdiff_t nelements,
                                             const ptrdiff_t nnodes,
                                             idx_t **const SFEM_RESTRICT elems,
                                             geom_t **const SFEM_RESTRICT xyz,
@@ -725,11 +725,21 @@ extern "C" void laplacian_assemble_gradient(const ptrdiff_t nelements,
            ktock - ktick);
 }
 
-extern "C" void laplacian_apply(const ptrdiff_t nelements,
+extern "C" void tet4_laplacian_apply(const ptrdiff_t nelements,
                                 const ptrdiff_t nnodes,
                                 idx_t **const SFEM_RESTRICT elems,
                                 geom_t **const SFEM_RESTRICT xyz,
                                 const real_t *const SFEM_RESTRICT u,
                                 real_t *const SFEM_RESTRICT values) {
-    laplacian_assemble_gradient(nelements, nnodes, elems, xyz, u, values);
+   tet4_laplacian_assemble_gradient(nelements, nnodes, elems, xyz, u, values);
 }
+
+extern "C" void tet4_laplacian_assemble_value(const ptrdiff_t nelements,
+                              const ptrdiff_t nnodes,
+                              idx_t **const SFEM_RESTRICT elems,
+                              geom_t **const SFEM_RESTRICT xyz,
+                              const real_t *const SFEM_RESTRICT u,
+                              real_t *const SFEM_RESTRICT value)
+                              {
+                                assert(false);
+                              }
