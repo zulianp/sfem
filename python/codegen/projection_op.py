@@ -25,7 +25,7 @@ class ProjectionOp:
 		expr = []
 		for i in range(0, fe_to.n_nodes()):
 			for j in range(0, fe_from.n_nodes()):
-				integr = fe_to.integrate(q, f_from[j] * f_to[i] * fe_to.measure(q))
+				integr = fe_to.integrate(q, f_from[j] * f_to[i] * fe_to.jacobian_determinant(q))
 				var = sp.symbols(f'element_matrix[{i*fe.n_nodes() + j}*stride]')
 				expr.append(ast.Assignment(var, integr))
 
@@ -47,7 +47,7 @@ class ProjectionOp:
 
 		expr = []
 		for i in range(0, fe_to.n_nodes()):
-			integr = fe_to.integrate(q, uh * f_to[i] * fe_to.measure(q))
+			integr = fe_to.integrate(q, uh * f_to[i] * fe_to.jacobian_determinant(q))
 			# integr = sp.simplify(integr)
 
 			lform = sp.symbols(f'element_vector[{i}*stride]')

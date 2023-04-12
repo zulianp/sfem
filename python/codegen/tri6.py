@@ -100,6 +100,9 @@ class TriShell6(Tri6):
 	def jacobian_inverse(self, q):
 		return self.Sinv
 
+	def jacobian_determinant(self, q):
+		return self.detS 
+
 	def measure(self, q):
 		return self.detS / 2
 

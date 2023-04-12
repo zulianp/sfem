@@ -30,8 +30,8 @@ solve()
 	$UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type hypre -ksp_type cg -atol 1e-18 -rtol 0 -stol 1e-19 --verbose
 }
 
-mesh_path=./mesh
-# mesh_path=../2_darcy_cylinder/mesh
+# mesh_path=./mesh
+mesh_path=../2_darcy_cylinder/mesh
 # workspace=`mktemp -d`
 workspace=workspace
 mkdir -p $workspace
