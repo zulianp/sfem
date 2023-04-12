@@ -39,8 +39,14 @@ class Tri1(FE):
 	def integrate(self, q, expr):
 		return sp.integrate(expr, (q[1], 0, 1 - q[0]), (q[0], 0, 1)) 
 
+	def jacobian(self, q):
+		return self.A_
+
 	def jacobian_inverse(self, q):
 		return self.Ainv_
+
+	def jacobian_determinant(self, q):
+		return det2(self.A_)
 
 	def measure(self, q):
 		return det2(self.A_) / 2

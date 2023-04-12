@@ -44,7 +44,8 @@ export SFEM_HANDLE_RHS=1
 export SFEM_NEUMANN_FACES=$mesh_path/sidesets_aos/soutlet.raw
 export SFEM_DIRICHLET_NODES=$mesh_path/sidesets_aos/sinlet.raw
 
-lldb -- assemble $mesh_path $workspace/system
+# lldb -- 
+assemble $mesh_path $workspace/system
 
 solve $workspace/system/rowptr.raw $workspace/system/rhs.raw $workspace/x.raw
 

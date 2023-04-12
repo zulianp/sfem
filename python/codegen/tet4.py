@@ -44,8 +44,14 @@ class Tet4(FE):
 	def integrate(self, q, expr):
 		return sp.integrate(expr, (q[2], 0, 1 - q[0] - q[1]), (q[1], 0, 1 - q[0]), (q[0], 0, 1)) 
 
+	def jacobian(self, q):
+		return A
+
 	def jacobian_inverse(self, q):
 		return Ainv
+
+	def jacobian_determinant(self, q):
+		return det3(A)
 
 	def measure(self, q):
 		return det3(A) / 6

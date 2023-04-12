@@ -16,8 +16,8 @@ class LaplaceOp:
 		u = coeffs('u', fe.n_nodes())
 
 		jac_inv = fe.jacobian_inverse(q)
-		dV = fe.measure(q)
-		FFF = dV * (jac_inv * jac_inv.T)
+		dV = fe.jacobian_determinant(q)
+		FFF = (jac_inv * jac_inv.T) * dV
 
 		###################################################################
 
@@ -65,7 +65,19 @@ class LaplaceOp:
 
 		self.FFF_x_g = FFF_x_g
 		self.cFFF = cFFF
+		self.FFF = FFF
 		self.jac_inv = jac_inv
+
+	def fff(self):
+		expr = []
+
+		for d1 in range(0, 3):
+			for d2 in range(d1, 3):
+				var = self.cFFF[d1, d2]
+				val = self.FFF[d1, d2]
+				expr.append(ast.Assignment(var, val))
+
+		return expr
 
 	def hessian(self):
 		fe = self.fe

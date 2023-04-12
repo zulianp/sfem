@@ -14,7 +14,7 @@ cFFF = sp.Matrix(3, 3, [0]*9)
 varidx = 0
 for i in range(0, 3):
 	for j in range(i, 3):
-		var = sp.symbols(f'jac_inv[{varidx}*stride]')
+		var = sp.symbols(f'fff[{varidx}*stride]')
 		varidx += 1
 
 		cFFF[i, j] = var
