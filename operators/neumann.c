@@ -5,6 +5,8 @@
 #include <mpi.h>
 #include <stdio.h>
 
+#define POW2(a) ((a) * (a))
+
 static SFEM_INLINE real_t det3(const real_t *mat) {
     return mat[0] * mat[4] * mat[8] + mat[1] * mat[5] * mat[6] + mat[2] * mat[3] * mat[7] - mat[0] * mat[5] * mat[7] -
            mat[1] * mat[3] * mat[8] - mat[2] * mat[4] * mat[6];
@@ -49,15 +51,15 @@ static SFEM_INLINE void tri_shell_3_integrate(const real_t px0,
     const real_t x14 = 2*pz0;
     const real_t x15 = pz1*x14;
     const real_t x16 = pz2*x14;
-    const real_t x17 = pow(px0, 2);
-    const real_t x18 = pow(py1, 2);
-    const real_t x19 = pow(py2, 2);
-    const real_t x20 = pow(pz1, 2);
-    const real_t x21 = pow(pz2, 2);
-    const real_t x22 = pow(px1, 2);
-    const real_t x23 = pow(py0, 2);
-    const real_t x24 = pow(pz0, 2);
-    const real_t x25 = pow(px2, 2);
+    const real_t x17 = POW2(px0);
+    const real_t x18 = POW2(py1);
+    const real_t x19 = POW2(py2);
+    const real_t x20 = POW2(pz1);
+    const real_t x21 = POW2(pz2);
+    const real_t x22 = POW2(px1);
+    const real_t x23 = POW2(py0);
+    const real_t x24 = POW2(pz0);
+    const real_t x25 = POW2(px2);
     const real_t x26 = 2*x17;
     const real_t x27 = 2*x23;
     const real_t x28 = 2*x24;
@@ -137,7 +139,7 @@ void surface_forcing_function_vec(const ptrdiff_t nfaces,
 
         assert(dx > 0.);
 
-        real_t integr = value * dx;
+        real_t integr = value * dx / 3;
 
         output[i0 * block_size + component] += integr;
         output[i1 * block_size + component] += integr;
@@ -182,15 +184,15 @@ static SFEM_INLINE void tri_shell_6_integrate(const real_t px0,
    const real_t x14 = 2*pz0;
    const real_t x15 = pz1*x14;
    const real_t x16 = pz2*x14;
-   const real_t x17 = pow(px0, 2);
-   const real_t x18 = pow(py1, 2);
-   const real_t x19 = pow(py2, 2);
-   const real_t x20 = pow(pz1, 2);
-   const real_t x21 = pow(pz2, 2);
-   const real_t x22 = pow(px1, 2);
-   const real_t x23 = pow(py0, 2);
-   const real_t x24 = pow(pz0, 2);
-   const real_t x25 = pow(px2, 2);
+   const real_t x17 = POW2(px0);
+   const real_t x18 = POW2(py1);
+   const real_t x19 = POW2(py2);
+   const real_t x20 = POW2(pz1);
+   const real_t x21 = POW2(pz2);
+   const real_t x22 = POW2(px1);
+   const real_t x23 = POW2(py0);
+   const real_t x24 = POW2(pz0);
+   const real_t x25 = POW2(px2);
    const real_t x26 = 2*x17;
    const real_t x27 = 2*x23;
    const real_t x28 = 2*x24;

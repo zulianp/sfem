@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
 
     ptrdiff_t u_n_local, u_n_global;
 
-    for (int d = 0; d < 3; ++d) {
+    for (int d = 0; d < mesh.spatial_dim; ++d) {
         array_create_from_file(comm, path_u[d], SFEM_MPI_REAL_T, (void **)&u[d], &u_n_local, &u_n_global);
     }
 
@@ -89,7 +89,7 @@ int main(int argc, char *argv[]) {
 
     array_write(comm, path_output, SFEM_MPI_REAL_T, div_u, u_n_local, u_n_global);
 
-    for (int d = 0; d < 3; ++d) {
+    for (int d = 0; d < mesh.spatial_dim; ++d) {
         free(u[d]);
     }
 

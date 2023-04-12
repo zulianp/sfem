@@ -132,7 +132,7 @@ class LaplaceOp:
 
 		expr = []
 		for d in range(0, fe.manifold_dim()):
-			gsquared = fe.integrate(q, (grad_uh[d] **2)/2)
+			gsquared = fe.integrate(q, (grad_uh[d] **2)) / 2
 			integr += gsquared
 
 
