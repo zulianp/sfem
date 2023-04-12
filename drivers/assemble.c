@@ -68,6 +68,7 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_HANDLE_DIRICHLET, atoi);
     SFEM_READ_ENV(SFEM_EXPORT_FP32, atoi);
     SFEM_READ_ENV(SFEM_HANDLE_NEUMANN, atoi);
+    SFEM_READ_ENV(SFEM_HANDLE_RHS, atoi);
 
     printf("----------------------------------------\n");
     printf(
@@ -139,14 +140,24 @@ int main(int argc, char *argv[]) {
     if (SFEM_HANDLE_NEUMANN) {  // Neumann
         char path[1024 * 10];
         sprintf(path, "%s/on.raw", folder);
+
+        const char *SFEM_NEUMANN_FACES = 0;
+        SFEM_READ_ENV(SFEM_NEUMANN_FACES, );
+
+        if (SFEM_NEUMANN_FACES) {
+            strcpy(path, SFEM_NEUMANN_FACES);
+            printf("SFEM_NEUMANN_FACES=%s\n", path);
+        }
+
         idx_t *faces_neumann = 0;
 
-        int nnodesxface = side_type(mesh.element_type);
+        enum ElemType st = side_type(mesh.element_type);
+        int nnodesxface = elem_num_nodes(st);
         ptrdiff_t nfacesxnxe = read_file(comm, path, (void **)&faces_neumann);
         idx_t nfaces = (nfacesxnxe / nnodesxface) / sizeof(idx_t);
         assert(nfaces * nnodesxface * sizeof(idx_t) == nfacesxnxe);
 
-        surface_forcing_function(mesh.element_type, nfaces, faces_neumann, mesh.points, 1.0, rhs);
+        surface_forcing_function(st, nfaces, faces_neumann, mesh.points, 1.0, rhs);
         free(faces_neumann);
     }
 
