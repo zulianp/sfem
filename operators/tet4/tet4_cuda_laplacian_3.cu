@@ -268,6 +268,38 @@ __global__ void print_elem_kernel(const ptrdiff_t nelements, idx_t **const elems
     printf("%d %d %d %d\n", elems[0][i], elems[1][i], elems[2][i], elems[3][i]);
 }
 
+
+static void pack_elements(
+    const ptrdiff_t n,
+    const ptrdiff_t element_offset,
+    idx_t **const SFEM_RESTRICT elems,
+    geom_t **const SFEM_RESTRICT xyz,
+    geom_t * const SFEM_RESTRICT he_xyz)
+{
+    SFEM_RANGE_PUSH("lapl-packing");
+    {
+        for (int d = 0; d < 3; ++d) {
+            for (int e_node = 0; e_node < 4; e_node++) {
+                const geom_t *const x = xyz[d];
+                ptrdiff_t offset = (d * 4 + e_node) * n;
+                const idx_t *const nodes = &elems[e_node][element_offset];
+
+                geom_t *buff = &he_xyz[offset];
+
+                #pragma omp parallel
+                {
+                    #pragma omp for nowait
+                    for (ptrdiff_t k = 0; k < n; k++) {
+                        buff[k] = x[nodes[k]];
+                    }
+                }
+            }
+        }
+    }
+
+    SFEM_RANGE_POP();       
+}
+
 extern "C" void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
                                            const ptrdiff_t nnodes,
                                            idx_t **const SFEM_RESTRICT elems,
@@ -353,30 +385,7 @@ extern "C" void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
             cudaStreamSynchronize(stream[0]);
         }
 
-        {
-            SFEM_RANGE_PUSH("lapl-packing");
-            {
-                for (int d = 0; d < 3; ++d) {
-                    for (int e_node = 0; e_node < 4; e_node++) {
-                        const geom_t *const x = xyz[d];
-                        ptrdiff_t offset = (d * 4 + e_node) * n;
-                        const idx_t *const nodes = &elems[e_node][element_offset];
-
-                        geom_t *buff = &he_xyz[offset];
-
-                        #pragma omp parallel
-                        {
-                            #pragma omp for nowait
-                            for (ptrdiff_t k = 0; k < n; k++) {
-                                buff[k] = x[nodes[k]];
-                            }
-                        }
-                    }
-                }
-            }
-
-            SFEM_RANGE_POP();
-        }
+        pack_elements(n, element_offset, elems, xyz, he_xyz);
 
         /////////////////////////////////////////////////////////
         // Local to global (stream 3)
