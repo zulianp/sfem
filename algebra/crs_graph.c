@@ -13,6 +13,8 @@
 
 #include "sortreduce.h"
 
+#include "sfem_defs.h"
+
 // #include "bitonic.h"
 
 // https://dirtyhandscoding.github.io/posts/vectorizing-small-fixed-size-sort.html

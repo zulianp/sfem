@@ -38,6 +38,19 @@ ifeq ($(openmp), 1)
 	CXXFLAGS += -fopenmp
 endif
 
+ifeq ($(parmetis), 1)
+	metis = 1
+	CFLAGS += -I$(PARMETIS_DIR)/include -DSFEM_ENABLE_PARMETIS
+	CXXFLAGS += -I$(PARMETIS_DIR)/include -DSFEM_ENABLE_PARMETIS
+	DEPS += -L$(PARMETIS_DIR)/lib -lparmetis
+endif
+
+ifeq ($(metis), 1)
+	CFLAGS += -I$(METIS_DIR)/include -DSFEM_ENABLE_METIS
+	CXXFLAGS += -I$(METIS_DIR)/include -DSFEM_ENABLE_METIS
+	DEPS += -L$(METIS_DIR)/lib -lmetis
+endif
+
 # Folder structure
 VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix:operators/tet10:operators/tet4
 INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4
@@ -114,6 +127,7 @@ OBJS = \
 	sfem_mesh_write.o \
 	isotropic_phasefield_for_fracture.o \
 	tet10_laplacian.o \
+	adj_table.o \
 	laplacian.o
 
 

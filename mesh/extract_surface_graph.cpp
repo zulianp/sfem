@@ -130,7 +130,7 @@ extern "C" void extract_surface_connectivity(const ptrdiff_t n_elements,
     for (ptrdiff_t i = 0; i < n_elements; ++i) {
         buff[face_idx + 0] = elems[0][i];
         buff[face_idx + 1] = elems[1][i];
-        buff[face_idx + 2] = elems[2][i];
+        buff[face_idx + 2] = elems[3][i];
 
         std::sort(&buff[face_idx], &buff[face_idx] + 3);
         face_idx += 3;
@@ -151,7 +151,7 @@ extern "C" void extract_surface_connectivity(const ptrdiff_t n_elements,
 
         buff[face_idx + 0] = elems[0][i];
         buff[face_idx + 1] = elems[1][i];
-        buff[face_idx + 2] = elems[3][i];
+        buff[face_idx + 2] = elems[2][i];
 
         std::sort(&buff[face_idx], &buff[face_idx] + 3);
         face_idx += 3;

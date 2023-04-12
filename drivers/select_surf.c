@@ -15,6 +15,8 @@
 #include "sfem_base.h"
 #include "sfem_mesh_write.h"
 
+#include "sfem_defs.h"
+
 #include "argsort.h"
 
 static SFEM_INLINE void normal(real_t u[3], real_t v[3], real_t *n) {
@@ -120,9 +122,14 @@ int main(int argc, char *argv[]) {
     // Create dual-graph for navigating neighboring elements
     ///////////////////////////////////////////////////////////////////////////////
 
+    int element_type_hack = mesh.element_type;
+    if(mesh.element_type == TRI6) {
+        element_type_hack = TRI3;
+    }
+
     count_t *adj_ptr = 0;
     idx_t *adj_idx = 0;
-    create_dual_graph(mesh.nelements, mesh.nnodes, mesh.element_type, mesh.elements, &adj_ptr, &adj_idx);
+    create_dual_graph(mesh.nelements, mesh.nnodes, element_type_hack, mesh.elements, &adj_ptr, &adj_idx);
 
     uint8_t *selected = (uint8_t *)malloc(mesh.nelements * sizeof(uint8_t));
     memset(selected, 0, mesh.nelements * sizeof(uint8_t));

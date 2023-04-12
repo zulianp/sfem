@@ -190,9 +190,12 @@ def main(argv):
             # No more indices to read!
             break
     
+    cell_type = None
     if len(idx) == 3:
         cell_type = "triangle"
-    if len(idx) == 4:
+    elif len(idx) == 6:
+        cell_type = "triangle6"
+    elif len(idx) == 4:
         cell_type = "tetra"
     elif len(idx) == 8:
         cell_type = "hexahedron"
@@ -200,7 +203,7 @@ def main(argv):
         cell_type = "tetra10"
 
 
-    print(cell_type)
+    print(f'numnodes = {len(idx)} -> {cell_type}')
 
     n_points = len(points[0])
     n_cells = len(idx[0])

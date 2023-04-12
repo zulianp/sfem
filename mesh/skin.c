@@ -16,7 +16,11 @@
 
 #include "extract_surface_graph.h"
 
+#include "sfem_defs.h"
+
 #include "argsort.h"
+
+#include "adj_table.h"
 
 static SFEM_INLINE void normalize(real_t *const vec3) {
     const real_t len = sqrt(vec3[0] * vec3[0] + vec3[1] * vec3[1] + vec3[2] * vec3[2]);
@@ -104,9 +108,11 @@ int main(int argc, char *argv[]) {
         output_folder = argv[2];
     }
 
-    struct stat st = {0};
-    if (stat(output_folder, &st) == -1) {
-        mkdir(output_folder, 0700);
+    {
+        struct stat st = {0};
+        if (stat(output_folder, &st) == -1) {
+            mkdir(output_folder, 0700);
+        }
     }
 
     if (!rank) {
@@ -126,10 +132,19 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    enum ElemType st = side_type(mesh.element_type);
+    int nnxs = elem_num_nodes(st);
+
     ptrdiff_t n_surf_elements = 0;
-    idx_t **surf_elems = (idx_t **)malloc(3 * sizeof(idx_t *));
+    idx_t **surf_elems = (idx_t **)malloc(nnxs * sizeof(idx_t *));
     idx_t *parent = 0;
-    extract_surface_connectivity(mesh.nelements, mesh.elements, &n_surf_elements, surf_elems, &parent);
+
+    if (mesh.element_type == TET4) {
+        extract_surface_connectivity(mesh.nelements, mesh.elements, &n_surf_elements, surf_elems, &parent);
+    } else {
+        extract_surface_connectivity_with_adj_table(
+            mesh.nelements, mesh.nnodes, mesh.element_type, mesh.elements, &n_surf_elements, surf_elems, &parent);
+    }
 
     idx_t *vol2surf = (idx_t *)malloc(mesh.nnodes * sizeof(idx_t));
     for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {
@@ -138,7 +153,7 @@ int main(int argc, char *argv[]) {
 
     ptrdiff_t next_id = 0;
     for (ptrdiff_t i = 0; i < n_surf_elements; ++i) {
-        for (int d = 0; d < 3; ++d) {
+        for (int d = 0; d < nnxs; ++d) {
             idx_t idx = surf_elems[d][i];
             if (vol2surf[idx] < 0) {
                 vol2surf[idx] = next_id++;
@@ -147,14 +162,14 @@ int main(int argc, char *argv[]) {
     }
 
     ptrdiff_t n_surf_nodes = next_id;
-    geom_t **points = (geom_t **)malloc(3 * sizeof(geom_t *));
-    for (int d = 0; d < 3; d++) {
+    geom_t **points = (geom_t **)malloc(mesh.spatial_dim * sizeof(geom_t *));
+    for (int d = 0; d < mesh.spatial_dim; d++) {
         points[d] = 0;
     }
 
     idx_t *mapping = (idx_t *)malloc(n_surf_nodes * sizeof(idx_t));
 
-    for (int d = 0; d < 3; ++d) {
+    for (int d = 0; d < mesh.spatial_dim; ++d) {
         points[d] = (geom_t *)malloc(n_surf_nodes * sizeof(geom_t));
     }
 
@@ -163,17 +178,19 @@ int main(int argc, char *argv[]) {
 
         mapping[vol2surf[i]] = i;
 
-        for (int d = 0; d < 3; ++d) {
+        for (int d = 0; d < mesh.spatial_dim; ++d) {
             points[d][vol2surf[i]] = mesh.points[d][i];
         }
     }
 
-    // Correct normal orientation using elements with orginal indexing
-    correct_side_orientation(n_surf_elements, surf_elems, parent, mesh.elements, mesh.points);
+    // Correct normal orientation using elements with orginal indexing (only with P1 for the moment)
+    if (mesh.element_type == TET4) {
+        correct_side_orientation(n_surf_elements, surf_elems, parent, mesh.elements, mesh.points);
+    }
 
     // Re-index elements
     for (ptrdiff_t i = 0; i < n_surf_elements; ++i) {
-        for (int d = 0; d < 3; ++d) {
+        for (int d = 0; d < nnxs; ++d) {
             surf_elems[d][i] = vol2surf[surf_elems[d][i]];
         }
     }
@@ -185,7 +202,7 @@ int main(int argc, char *argv[]) {
     surf.mem_space = mesh.mem_space;
 
     surf.spatial_dim = mesh.spatial_dim;
-    surf.element_type = mesh.element_type - 1;
+    surf.element_type = side_type(mesh.element_type);
 
     surf.nelements = n_surf_elements;
     surf.nnodes = n_surf_nodes;

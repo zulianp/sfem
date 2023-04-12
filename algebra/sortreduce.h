@@ -2,6 +2,7 @@
 #define SFEM_SORT_REDUCE_H
 
 #include "sfem_base.h"
+#include <stddef.h>
 
 void sort_idx(idx_t *arr, idx_t size);
 idx_t sortreduce(idx_t *arr, idx_t size);
