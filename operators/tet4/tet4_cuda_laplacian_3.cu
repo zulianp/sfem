@@ -550,32 +550,19 @@ static inline __device__ void laplacian_gradient(const real_t *const SFEM_RESTRI
                                                  const real_t *SFEM_RESTRICT u,
                                                  const ptrdiff_t stride,
                                                  real_t * const SFEM_RESTRICT element_vector) {
-    //FLOATING POINT OPS!
-    //      - Result: 4*ADD + 4*ASSIGNMENT + 21*MUL
-    //      - Subexpressions: 4*DIV + 15*MUL
-    const real_t x0 = (1.0/6.0)*u[0];
-    const real_t x1 = fff[0*stride]*x0;
-    const real_t x2 = (1.0/6.0)*u[1];
-    const real_t x3 = fff[0*stride]*x2;
-    const real_t x4 = fff[1*stride]*x2;
-    const real_t x5 = (1.0/6.0)*u[2];
-    const real_t x6 = fff[1*stride]*x5;
-    const real_t x7 = fff[2*stride]*x2;
-    const real_t x8 = (1.0/6.0)*u[3];
-    const real_t x9 = fff[2*stride]*x8;
-    const real_t x10 = fff[3*stride]*x0;
-    const real_t x11 = fff[3*stride]*x5;
-    const real_t x12 = fff[4*stride]*x5;
-    const real_t x13 = fff[4*stride]*x8;
-    const real_t x14 = fff[5*stride]*x0;
-    const real_t x15 = fff[5*stride]*x8;
-    const real_t x16 = fff[1*stride]*x0;
-    const real_t x17 = fff[2*stride]*x0;
-    const real_t x18 = fff[4*stride]*x0;
-    element_vector[0*stride] = (1.0/3.0)*fff[1*stride]*u[0] + (1.0/3.0)*fff[2*stride]*u[0] + (1.0/3.0)*fff[4*stride]*u[0] + x1 + x10 - x11 - x12 - x13 + x14 - x15 - x3 - x4 - x6 - x7 - x9;
-    element_vector[1*stride] = -x1 - x16 - x17 + x3 + x6 + x9;
-    element_vector[2*stride] = -x10 + x11 + x13 - x16 - x18 + x4;
-    element_vector[3*stride] = x12 - x14 + x15 - x17 - x18 + x7;
+     //FLOATING POINT OPS!
+    //      - Result: 4*ADD + 4*ASSIGNMENT + 24*MUL
+    //      - Subexpressions: 6*ADD + 3*MUL
+    const real_t x0 = fff[0*stride] + fff[1*stride] + fff[2*stride];
+    const real_t x1 = fff[1*stride] + fff[3*stride] + fff[4*stride];
+    const real_t x2 = fff[2*stride] + fff[4*stride] + fff[5*stride];
+    const real_t x3 = fff[1*stride]*u[0];
+    const real_t x4 = fff[2*stride]*u[0];
+    const real_t x5 = fff[4*stride]*u[0];
+    element_vector[0*stride] = u[0]*x0 + u[0]*x1 + u[0]*x2 - u[1]*x0 - u[2]*x1 - u[3]*x2;
+    element_vector[1*stride] = -fff[0*stride]*u[0] + fff[0*stride]*u[1] + fff[1*stride]*u[2] + fff[2*stride]*u[3] - x3 - x4;
+    element_vector[2*stride] = fff[1*stride]*u[1] - fff[3*stride]*u[0] + fff[3*stride]*u[2] + fff[4*stride]*u[3] - x3 - x5;
+    element_vector[3*stride] = fff[2*stride]*u[1] + fff[4*stride]*u[2] - fff[5*stride]*u[0] + fff[5*stride]*u[3] - x4 - x5;
 }
 
 __global__ void laplacian_assemble_gradient_kernel(const ptrdiff_t nelements,
