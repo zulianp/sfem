@@ -10,59 +10,66 @@ from tri1 import *
 from fields import *
 
 class GradAndProjectOp:
-	def __init__(self, fe_from, fe_to, q):
-		self.q = sp.Matrix(fe_from.manifold_dim(), 1, q)
-		self.u_from = coeffs('u', fe_from.n_nodes())
-		self.fe_from = fe_from
-		self.fe_to = fe_to
+	def __init__(self, field, fe_test, q):
+		self.q = sp.Matrix(fe_test.manifold_dim(), 1, q)
+		self.field = field
+		self.fe_test = fe_test
 
-	def matrix(self):
-		# fe_from = self.fe_from
-		# fe_to = self.fe_to
-		# q = self.q
+	# def matrix(self):
+	# 	field = self.field
+	# 	fe_test = self.fe_test
+	# 	q = self.q
 
-		# f_from = fe_from.fun(q)
-		# f_to   = fe_to.fun(q)
+	# 	J_inv = field.fe.jacobian_inverse(q)
+	# 	grad_field = J_inv * field.grad(q)
 
-		# expr = []
-		# for i in range(0, fe_to.n_nodes()):
-		# 	for j in range(0, fe_from.n_nodes()):
-		# 		integr = fe_to.integrate(q, f_from[j] * f_to[i] * fe_to.jacobian_determinant(q))
-		# 		var = sp.symbols(f'element_matrix[{i*fe.n_nodes() + j}*stride]')
-		# 		expr.append(ast.Assignment(var, integr))
+	# 	f_to   = fe_test.fun(q)
+
+	# 	expr = []
+
+	# 	for i in range(0, fe_test.n_nodes()):
+	# 		for j in range(0, field.n_nodes()):
+	# 			integr = fe_test.integrate(q, grad_field[j] * f_to[i] * fe_test.jacobian_determinant(q))
+	# 			var = sp.symbols(f'element_matrix[{i*fe.n_nodes() + j}*stride]')
+	# 			expr.append(ast.Assignment(var, integr))
 
 		# return expr
 
 	def apply(self):
-		# fe_from = self.fe_from
-		# fe_to = self.fe_to
-		# q = self.q
+		field = self.field
+		fe_test = self.fe_test
+		q = self.q
 
-		# f_from = fe_from.fun(q)
-		# f_to   = fe_to.fun(q)
+		J_inv = field.fe.jacobian_inverse(q)
+		grad_field = J_inv * field.grad(q)
+		f_to   = fe_test.fun(q)
 
-		# u_from = self.u_from
+		expr = []
+		postfix = ['x', 'y', 'z']
 
-		# uh = 0
-		# for i in range(0, fe_from.n_nodes()):
-		# 	uh += u_from[i] * f_from[i]
+		for d in range(0, fe_test.spatial_dim()):
+			for i in range(0, fe_test.n_nodes()):
+				integr = fe_test.integrate(q, grad_field[d] * f_to[i] * fe_test.jacobian_determinant(q))
+				lform = sp.symbols(f'element_vector_{postfix[d]}[{i}*stride]')
+				expr.append(ast.Assignment(lform, integr))
 
-		# expr = []
-		# for i in range(0, fe_to.n_nodes()):
-		# 	integr = fe_to.integrate(q, uh * f_to[i] * fe_to.jacobian_determinant(q))
-		# 	lform = sp.symbols(f'element_vector[{i}*stride]')
-		# 	expr.append(ast.Assignment(lform, integr))
-		# return expr
+		for i in range(0, fe_test.n_nodes()):
+			integr = fe_test.integrate(q, f_to[i] * fe_test.jacobian_determinant(q))
+			lform = sp.symbols(f'element_vector_w[{i}*stride]')
+			expr.append(ast.Assignment(lform, integr))
+
+		return expr
 
 def main():
-	shell_fe_from = [Tet4(), Tet10()]
-	shell_fe_to = [Tet4(), Tet10()]
+	fe_field = [Tet4() ] #, Tet10()]
+	fe_test = [Tet4() ] #, Tet10()]
 
 	q = [qx, qy, qz]
-	for sf_from in shell_fe_from:
-		for sf_to in shell_fe_to:
-			op = GradAndProjectOp(sf_from, sf_to, q)
-			print(f'From {sf_from.name()} to {sf_to.name()}')
+	for fe_f in fe_field:
+		field = Field(fe_f, coeffs('u', fe_f.n_nodes()))
+		for fe_to in fe_test:
+			op = GradAndProjectOp(field, fe_to, q)
+			print(f'From {fe_f.name()} to {fe_to.name()}')
 			c_code(op.apply())
 
 

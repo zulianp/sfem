@@ -128,7 +128,9 @@ OBJS = \
 	isotropic_phasefield_for_fracture.o \
 	tet10_laplacian.o \
 	adj_table.o \
-	laplacian.o
+	laplacian.o \
+	tet4_l2_projection_p0_p1.o \
+	grad_p1.o
 
 
 ifeq ($(cuda), 1)
@@ -279,29 +281,26 @@ surface_projection_p0_to_p1 : drivers/surface_projection_p0_to_p1.c libsfem.a
 smask : drivers/smask.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
-cgrad : drivers/cgrad.c grad_p1.o libsfem.a
+cgrad : drivers/cgrad.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
-cshear : drivers/cshear.c grad_p1.o libsfem.a
+cshear : drivers/cshear.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
-cstrain : drivers/cstrain.c grad_p1.o libsfem.a
+cstrain : drivers/cstrain.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
-cprincipal_strains : drivers/cprincipal_strains.c grad_p1.o libsfem.a
+cprincipal_strains : drivers/cprincipal_strains.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
-cdiv : drivers/cdiv.c grad_p1.o libsfem.a
+cdiv : drivers/cdiv.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 
-wss : drivers/wss.c grad_p1.o libsfem.a
+wss : drivers/wss.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 div.o : operators/div.c
-	$(MPICC) $(CFLAGS) $(INCLUDES) -c $<
-
-grad_p1.o : operators/grad_p1.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -c $<
 
 isolver_sfem.dylib : isolver_sfem_plugin.o libsfem.a

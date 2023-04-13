@@ -14,6 +14,7 @@
 #include "sfem_defs.h"
 
 #include "operators/div.h"
+#include "operators/grad_p1.h"
 
 #include "read_mesh.h"
 
@@ -40,7 +41,18 @@ void tet10_p2_p2_grad_and_project(const ptrdiff_t nelements,
                                   real_t *const SFEM_RESTRICT dudz)
 
 {
-    // TODO
+
+    real_t * p0_dudx = 0;
+    real_t * p0_dudy = 0;
+    real_t * p0_dudz = 0;
+
+
+    // p1_grad3(nelements, nnodes, elems, xyz, u, dudx, dudy, dudz);
+
+
+    free(p0_dudx);
+    free(p0_dudy);
+    free(p0_dudz);
 }
 
 void grad_and_project(const enum ElemType element_type,
