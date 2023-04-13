@@ -1,6 +1,9 @@
 #ifndef SFEM_TET10_GRAD_H
 #define SFEM_TET10_GRAD_H
 
+#include "sfem_base.h"
+#include <stddef.h>
+
 // Returns P1 coefficients per element
 void tet10_grad(const ptrdiff_t nelements,
                 const ptrdiff_t nnodes,

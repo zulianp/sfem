@@ -16,7 +16,7 @@
 #include "operators/div.h"
 #include "operators/grad_p1.h"
 #include "operators/tet4/tet4_l2_projection_p0_p1.h"
-
+#include "operators/tet10/tet10_grad.h"
 #include "read_mesh.h"
 
 void tet4_p1_p1_grad_and_project(const ptrdiff_t nelements,
@@ -59,10 +59,9 @@ void tet10_p2_p2_grad_and_project(const ptrdiff_t nelements,
     real_t * p1_dudy = malloc(nelements * 4 * sizeof(real_t));
     real_t * p1_dudz = malloc(nelements * 4 * sizeof(real_t));
 
+    tet10_grad(nelements, nnodes, elems, xyz, u, p1_dudx, p1_dudy, p1_dudz);
+        
     //TODO
-
-    // tet10_grad(nelements, nnodes, elems, xyz, u, p1_dudx, p1_dudy, p1_dudz);
-    
     // tet10_p1_p2_l2_projection_apply(nelements, nnodes, elems, xyz, p1_dudx, dudx);
     // tet10_p1_p2_l2_projection_apply(nelements, nnodes, elems, xyz, p1_dudy, dudy);
     // tet10_p1_p2_l2_projection_apply(nelements, nnodes, elems, xyz, p1_dudz, dudz);
