@@ -15,6 +15,7 @@
 
 #include "operators/div.h"
 #include "operators/grad_p1.h"
+#include "operators/tet4/tet4_l2_projection_p0_p1.h"
 
 #include "read_mesh.h"
 
@@ -28,9 +29,22 @@ void tet4_p1_p1_grad_and_project(const ptrdiff_t nelements,
                                  real_t *const SFEM_RESTRICT dudz)
 
 {
-    // TODO
+    real_t * p0_dudx = malloc(nelements * sizeof(real_t));
+    real_t * p0_dudy = malloc(nelements * sizeof(real_t));
+    real_t * p0_dudz = malloc(nelements * sizeof(real_t));
+
+    p1_grad3(nelements, nnodes, elems, xyz, u, p0_dudx, p0_dudy, p0_dudz);
+    
+    tet4_p0_p1_l2_projection_apply(nelements, nnodes, elems, xyz, p0_dudx, dudx);
+    tet4_p0_p1_l2_projection_apply(nelements, nnodes, elems, xyz, p0_dudy, dudy);
+    tet4_p0_p1_l2_projection_apply(nelements, nnodes, elems, xyz, p0_dudz, dudz);
+
+    free(p0_dudx);
+    free(p0_dudy);
+    free(p0_dudz);
 }
 
+// Should this routine use "mass-lumping" for the projection?
 void tet10_p2_p2_grad_and_project(const ptrdiff_t nelements,
                                   const ptrdiff_t nnodes,
                                   idx_t **const SFEM_RESTRICT elems,
@@ -41,18 +55,21 @@ void tet10_p2_p2_grad_and_project(const ptrdiff_t nelements,
                                   real_t *const SFEM_RESTRICT dudz)
 
 {
+    real_t * p1_dudx = malloc(nelements * 4 * sizeof(real_t));
+    real_t * p1_dudy = malloc(nelements * 4 * sizeof(real_t));
+    real_t * p1_dudz = malloc(nelements * 4 * sizeof(real_t));
 
-    real_t * p0_dudx = 0;
-    real_t * p0_dudy = 0;
-    real_t * p0_dudz = 0;
+    //TODO
 
+    // tet10_grad(nelements, nnodes, elems, xyz, u, p1_dudx, p1_dudy, p1_dudz);
+    
+    // tet10_p1_p2_l2_projection_apply(nelements, nnodes, elems, xyz, p1_dudx, dudx);
+    // tet10_p1_p2_l2_projection_apply(nelements, nnodes, elems, xyz, p1_dudy, dudy);
+    // tet10_p1_p2_l2_projection_apply(nelements, nnodes, elems, xyz, p1_dudz, dudz);
 
-    // p1_grad3(nelements, nnodes, elems, xyz, u, dudx, dudy, dudz);
-
-
-    free(p0_dudx);
-    free(p0_dudy);
-    free(p0_dudz);
+    free(p1_dudx);
+    free(p1_dudy);
+    free(p1_dudz);
 }
 
 void grad_and_project(const enum ElemType element_type,

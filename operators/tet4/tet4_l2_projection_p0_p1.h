@@ -18,5 +18,4 @@ void tet4_p0_p1_projection_coeffs(const ptrdiff_t nelements,
                          const real_t *const SFEM_RESTRICT p0,
                          real_t *const SFEM_RESTRICT p1);
 
-
 #endif //SFEM_TET4_L2_PROJECTION_P0_P1_H
