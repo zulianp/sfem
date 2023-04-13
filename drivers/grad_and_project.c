@@ -15,8 +15,8 @@
 
 #include "operators/div.h"
 #include "operators/grad_p1.h"
-#include "operators/tet4/tet4_l2_projection_p0_p1.h"
 #include "operators/tet10/tet10_grad.h"
+#include "operators/tet4/tet4_l2_projection_p0_p1.h"
 #include "read_mesh.h"
 
 void tet4_p1_p1_grad_and_project(const ptrdiff_t nelements,
@@ -29,12 +29,12 @@ void tet4_p1_p1_grad_and_project(const ptrdiff_t nelements,
                                  real_t *const SFEM_RESTRICT dudz)
 
 {
-    real_t * p0_dudx = malloc(nelements * sizeof(real_t));
-    real_t * p0_dudy = malloc(nelements * sizeof(real_t));
-    real_t * p0_dudz = malloc(nelements * sizeof(real_t));
+    real_t *p0_dudx = malloc(nelements * sizeof(real_t));
+    real_t *p0_dudy = malloc(nelements * sizeof(real_t));
+    real_t *p0_dudz = malloc(nelements * sizeof(real_t));
 
     p1_grad3(nelements, nnodes, elems, xyz, u, p0_dudx, p0_dudy, p0_dudz);
-    
+
     tet4_p0_p1_l2_projection_apply(nelements, nnodes, elems, xyz, p0_dudx, dudx);
     tet4_p0_p1_l2_projection_apply(nelements, nnodes, elems, xyz, p0_dudy, dudy);
     tet4_p0_p1_l2_projection_apply(nelements, nnodes, elems, xyz, p0_dudz, dudz);
@@ -55,16 +55,16 @@ void tet10_p2_p2_grad_and_project(const ptrdiff_t nelements,
                                   real_t *const SFEM_RESTRICT dudz)
 
 {
-    real_t * p1_dudx = malloc(nelements * 4 * sizeof(real_t));
-    real_t * p1_dudy = malloc(nelements * 4 * sizeof(real_t));
-    real_t * p1_dudz = malloc(nelements * 4 * sizeof(real_t));
+    real_t *p1_dudx = malloc(nelements * 4 * sizeof(real_t));
+    real_t *p1_dudy = malloc(nelements * 4 * sizeof(real_t));
+    real_t *p1_dudz = malloc(nelements * 4 * sizeof(real_t));
 
     tet10_grad(nelements, nnodes, elems, xyz, u, p1_dudx, p1_dudy, p1_dudz);
-        
-    //TODO
-    // tet10_p1_p2_l2_projection_apply(nelements, nnodes, elems, xyz, p1_dudx, dudx);
-    // tet10_p1_p2_l2_projection_apply(nelements, nnodes, elems, xyz, p1_dudy, dudy);
-    // tet10_p1_p2_l2_projection_apply(nelements, nnodes, elems, xyz, p1_dudz, dudz);
+
+    // TODO
+    //  tet10_p1_p2_l2_projection_apply(nelements, nnodes, elems, xyz, p1_dudx, dudx);
+    //  tet10_p1_p2_l2_projection_apply(nelements, nnodes, elems, xyz, p1_dudy, dudy);
+    //  tet10_p1_p2_l2_projection_apply(nelements, nnodes, elems, xyz, p1_dudz, dudz);
 
     free(p1_dudx);
     free(p1_dudy);
@@ -97,6 +97,33 @@ void grad_and_project(const enum ElemType element_type,
         }
     }
 }
+
+// void grad_and_project_coeffs(const enum ElemType element_type,
+//                       const ptrdiff_t nelements,
+//                       const ptrdiff_t nnodes,
+//                       idx_t **const SFEM_RESTRICT elems,
+//                       geom_t **const SFEM_RESTRICT xyz,
+//                       const real_t *const SFEM_RESTRICT u,
+//                       real_t *const SFEM_RESTRICT dudx,
+//                       real_t *const SFEM_RESTRICT dudy,
+//                       real_t *const SFEM_RESTRICT dudz)
+
+// {
+//     switch (element_type) {
+//         case TET4: {
+//             tet4_p1_p1_grad_and_project_coeffs(nelements, nnodes, elems, xyz, u, dudx, dudy, dudz);
+//             break;
+//         }
+//         case TET10: {
+//             tet10_p2_p2_grad_and_project_coeffs(nelements, nnodes, elems, xyz, u, dudx, dudy, dudz);
+//             break;
+//         }
+//         default: {
+//             assert(0);
+//             MPI_Abort(MPI_COMM_WORLD, -1);
+//         }
+//     }
+// }
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -145,8 +172,25 @@ int main(int argc, char *argv[]) {
         memset(grad_u[d], 0, u_n_local * sizeof(real_t));
     }
 
-    grad_and_project(
-        mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, u, grad_u[0], grad_u[1], grad_u[2]);
+    int SFEM_COMPUTE_COEFFICIENTS = 1;
+
+    SFEM_READ_ENV(SFEM_COMPUTE_COEFFICIENTS, atoi);
+
+    if (SFEM_COMPUTE_COEFFICIENTS) {
+        // TODO
+        assert(0);
+        
+    } else {
+        grad_and_project(mesh.element_type,
+                         mesh.nelements,
+                         mesh.nnodes,
+                         mesh.elements,
+                         mesh.points,
+                         u,
+                         grad_u[0],
+                         grad_u[1],
+                         grad_u[2]);
+    }
 
     real_t SFEM_SCALE = 1;
     SFEM_READ_ENV(SFEM_SCALE, atof);
