@@ -29,6 +29,6 @@ void tet10_cdiv(const ptrdiff_t nelements,
                 const real_t *const SFEM_RESTRICT ux,
                 const real_t *const SFEM_RESTRICT uy,
                 const real_t *const SFEM_RESTRICT uz,
-                real_t *const SFEM_RESTRICT div);
+                real_t *const SFEM_RESTRICT element_wise_p1_div);
 
 #endif  // SFEM_TET10_DIV_H

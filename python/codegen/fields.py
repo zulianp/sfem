@@ -36,6 +36,21 @@ class Field:
 
 		return grad_u
 
+	def physical_grad(self, q):
+		fe = self.fe
+		coeff = self.coeff
+
+		rgrad = fe.physical_grad(q)
+		ncoeffs = len(coeff)
+
+		grad_u = sp.Matrix(fe.spatial_dim(), 1, [0]*fe.spatial_dim())
+
+		for i in range(0, fe.n_nodes()):
+			for d in range(0, fe.spatial_dim()):
+				grad_u[d] += rgrad[i][d] * coeff[i]
+
+		return grad_u
+
 class VectorField:
 	def __init__(self, fe, coeff_SoA):
 		self.fe = fe
@@ -55,3 +70,19 @@ class VectorField:
 				vfx[d] += rf[i] * coeff[d][i]
 
 		return vfx
+
+	def physical_div(self, q):
+		fe = self.fe
+		coeff = self.coeff
+
+		ncoeffs = len(self.coeff)
+		g = fe.physical_grad(q)
+		ncoeffs = len(coeff)
+
+		divu = 0.
+		for i in range(0, fe.n_nodes()):
+			for d in range(0, fe.spatial_dim()):
+				divu += g[i][d] * coeff[d][i]
+
+		return divu
+

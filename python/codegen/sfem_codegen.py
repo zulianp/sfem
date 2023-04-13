@@ -243,6 +243,19 @@ def generic_symm_grad(prefix):
 		ret.append(G)
 	return ret
 
+def subsmat(expr, oldmat, newmat):
+	rows, cols = oldmat.shape
+	nrows, ncols = newmat.shape
+
+	assert rows == nrows
+	assert cols == ncols
+
+	for d1 in range(0, rows):
+		for d2 in range(0, cols):
+			expr = expr.subs(oldmat[d1, d2], newmat[d1, d2])
+	
+	return expr
+
 def subsmat3x3(expr, oldmat, newmat):
 	for d1 in range(0, 3):
 		for d2 in range(0, 3):
