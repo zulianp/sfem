@@ -1,24 +1,27 @@
-#include <stddef.h>
 #include <assert.h>
+#include <stddef.h>
+#include <stdio.h>
+
+#include <mpi.h>
 
 #include "sfem_base.h"
 
 static SFEM_INLINE void tet10_div_apply_kernel(const real_t px0,
-                                              const real_t px1,
-                                              const real_t px2,
-                                              const real_t px3,
-                                              const real_t py0,
-                                              const real_t py1,
-                                              const real_t py2,
-                                              const real_t py3,
-                                              const real_t pz0,
-                                              const real_t pz1,
-                                              const real_t pz2,
-                                              const real_t pz3,
-                                              const real_t *ux,
-                                              const real_t *uy,
-                                              const real_t *uz,
-                                              real_t *element_vector) {
+                                               const real_t px1,
+                                               const real_t px2,
+                                               const real_t px3,
+                                               const real_t py0,
+                                               const real_t py1,
+                                               const real_t py2,
+                                               const real_t py3,
+                                               const real_t pz0,
+                                               const real_t pz1,
+                                               const real_t pz2,
+                                               const real_t pz3,
+                                               const real_t *ux,
+                                               const real_t *uy,
+                                               const real_t *uz,
+                                               real_t *element_vector) {
     // FLOATING POINT OPS!
     //       - Result: 10*ADD + 10*ASSIGNMENT + 157*MUL
     //       - Subexpressions: 83*ADD + 24*DIV + 277*MUL + 3*NEG + 108*SUB
@@ -290,8 +293,72 @@ void tet10_div_apply(const ptrdiff_t nelements,
                      const real_t *const uy,
                      const real_t *const uz,
                      real_t *const values) {
-    // TODO
-    assert(0);
+    SFEM_UNUSED(nnodes);
+
+    double tick = MPI_Wtime();
+
+    idx_t ev[10];
+    real_t element_vector[10];
+    real_t element_ux[10];
+    real_t element_uy[10];
+    real_t element_uz[10];
+
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma unroll(10)
+        for (int v = 0; v < 10; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        for (int v = 0; v < 10; ++v) {
+            element_ux[v] = ux[ev[v]];
+        }
+
+        for (int v = 0; v < 10; ++v) {
+            element_uy[v] = uy[ev[v]];
+        }
+
+        for (int v = 0; v < 10; ++v) {
+            element_uz[v] = uz[ev[v]];
+        }
+
+        // Element indices
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+        const idx_t i3 = ev[3];
+
+        tet10_div_apply_kernel(
+            // X-coordinates
+            xyz[0][i0],
+            xyz[0][i1],
+            xyz[0][i2],
+            xyz[0][i3],
+            // Y-coordinates
+            xyz[1][i0],
+            xyz[1][i1],
+            xyz[1][i2],
+            xyz[1][i3],
+            // Z-coordinates
+            xyz[2][i0],
+            xyz[2][i1],
+            xyz[2][i2],
+            xyz[2][i3],
+            // Data
+            element_ux,
+            element_uy,
+            element_uz,
+            // Output
+            element_vector);
+
+#pragma unroll(10)
+        for (int edof_i = 0; edof_i < 10; ++edof_i) {
+            const idx_t dof_i = ev[edof_i];
+            values[dof_i] += element_vector[edof_i];
+        }
+    }
+
+    double tock = MPI_Wtime();
+    printf("tet10_div.c: tet10_div_apply\t%g seconds\n", tock - tick);
 }
 
 void tet10_integrate_div(const ptrdiff_t nelements,

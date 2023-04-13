@@ -2,15 +2,14 @@
 
 from sfem_codegen import *
 from fields import *
+from tet4 import *
 from tet10 import *
-
 
 class DivOp:
 	def __init__(self, vector_field, fe_test, q):
 		self.vector_field = vector_field
 		self.fe_test = fe_test
 		self.q = sp.Matrix(fe_test.manifold_dim(), 1, q)
-
 
 	def apply(self):
 		vector_field = self.vector_field
@@ -34,8 +33,10 @@ class DivOp:
 		return expr
 
 def main():
-	u = [ coeffs('ux', 10), coeffs('uy', 10), coeffs('uz', 10)]
 	fe = Tet10()
+	# fe = Tet4()
+	
+	u = [ coeffs('ux', fe.n_nodes()), coeffs('uy', fe.n_nodes()), coeffs('uz', fe.n_nodes()) ]
 	field = VectorField(fe, u)
 
 	q = vec3(qx, qy, qz)
