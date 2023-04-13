@@ -79,7 +79,7 @@ GOALS += mesh_p1_to_p2
 
 # FE post-process
 GOALS += cgrad cshear cstrain cprincipal_strains cauchy_stress vonmises
-GOALS += wss surface_outflux integrate_divergence cdiv
+GOALS += wss surface_outflux integrate_divergence cdiv lform_surface_outflux
 GOALS += projection_p0_to_p1 surface_projection_p0_to_p1
 
 # BLAS
@@ -175,6 +175,9 @@ vonmises : vonmises.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 surface_outflux : surface_outflux.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+lform_surface_outflux : lform_surface_outflux.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 integrate_divergence : integrate_divergence.c libsfem.a

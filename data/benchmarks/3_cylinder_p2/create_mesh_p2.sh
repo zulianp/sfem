@@ -15,7 +15,7 @@ LAUNCH=""
 
 set -x
 
-nrefs=2
+nrefs=4
 
 folder=cylinder
 mesh_db=$folder/p1_mesh.vtk
