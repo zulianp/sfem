@@ -109,13 +109,13 @@ void normals(const ptrdiff_t nelements,
 
 void surface_outflux(const ptrdiff_t nelements,
                      const ptrdiff_t nnodes,
-                     idx_t **const elems,
-                     geom_t **const xyz,
-                     geom_t **const normals_xyz,
-                     real_t *const vector_field_x,
-                     real_t *const vector_field_y,
-                     real_t *const vector_field_z,
-                     real_t *const values) {
+                     idx_t **const SFEM_RESTRICT elems,
+                     geom_t **const SFEM_RESTRICT xyz,
+                     geom_t **const SFEM_RESTRICT normals_xyz,
+                     real_t *const SFEM_RESTRICT vector_field_x,
+                     real_t *const SFEM_RESTRICT vector_field_y,
+                     real_t *const SFEM_RESTRICT vector_field_z,
+                     real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
     double tick = MPI_Wtime();

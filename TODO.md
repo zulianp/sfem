@@ -4,7 +4,7 @@
 
 The following driver require adaptation for the the pressure projection
 
-- surface_outflux + surface_projection_p0_to_p1 -> (combined driver and p2)
+- surface_outflux + surface_projection_p0_to_p1 -> (combined driver and p2) [UNTESTED]
 - cgrad + projection_p0_to_p1 -> (combined driver and p2)
 - divergence (p2)
 - lumped_mass_inv (p2)

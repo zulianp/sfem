@@ -28,9 +28,9 @@ static SFEM_INLINE void normalize(real_t *const vec3) {
 
 void normals(const ptrdiff_t nelements,
              const ptrdiff_t nnodes,
-             idx_t **const elems,
-             geom_t **const xyz,
-             geom_t **const normals_xyz) {
+             idx_t **const SFEM_RESTRICT elems,
+             geom_t **const SFEM_RESTRICT xyz,
+             geom_t **const SFEM_RESTRICT normals_xyz) {
     SFEM_UNUSED(nnodes);
 
     double tick = MPI_Wtime();
@@ -146,13 +146,13 @@ static SFEM_INLINE void p1_p1_surface_outflux_kernel(const real_t px0,
 
 void tri3_p1_p1_surface_outflux(const ptrdiff_t nelements,
                                 const ptrdiff_t nnodes,
-                                idx_t **const elems,
-                                geom_t **const xyz,
-                                geom_t **const normals_xyz,
-                                real_t *const vector_field_x,
-                                real_t *const vector_field_y,
-                                real_t *const vector_field_z,
-                                real_t *const values) {
+                                idx_t **const SFEM_RESTRICT elems,
+                                geom_t **const SFEM_RESTRICT xyz,
+                                geom_t **const SFEM_RESTRICT normals_xyz,
+                                real_t *const SFEM_RESTRICT vector_field_x,
+                                real_t *const SFEM_RESTRICT vector_field_y,
+                                real_t *const SFEM_RESTRICT vector_field_z,
+                                real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
     double tick = MPI_Wtime();
@@ -234,26 +234,26 @@ static SFEM_INLINE void tri6_p2_p2_surface_outflux_kernel(const real_t px0,
                                                           const real_t *const SFEM_RESTRICT vz,
                                                           // Output
                                                           real_t *const SFEM_RESTRICT element_vector) {
-    //FLOATING POINT OPS!
-    //      - Result: 6*ADD + 6*ASSIGNMENT + 42*MUL
-    //      - Subexpressions: 47*ADD + 5*DIV + 116*MUL + 10*POW + 27*SUB
-    const real_t x0 = 2*px0;
-    const real_t x1 = px1*x0;
-    const real_t x2 = py0*x1;
-    const real_t x3 = py1*py2;
-    const real_t x4 = pz0*pz1;
-    const real_t x5 = pz0*pz2;
-    const real_t x6 = pz1*pz2;
-    const real_t x7 = px2*x0;
-    const real_t x8 = py0*x7;
-    const real_t x9 = px1*px2;
-    const real_t x10 = 2*py0;
-    const real_t x11 = py1*x10;
-    const real_t x12 = py2*x10;
-    const real_t x13 = 2*x9;
-    const real_t x14 = 2*pz0;
-    const real_t x15 = pz1*x14;
-    const real_t x16 = pz2*x14;
+    // FLOATING POINT OPS!
+    //       - Result: 6*ADD + 6*ASSIGNMENT + 42*MUL
+    //       - Subexpressions: 47*ADD + 5*DIV + 116*MUL + 10*POW + 27*SUB
+    const real_t x0 = 2 * px0;
+    const real_t x1 = px1 * x0;
+    const real_t x2 = py0 * x1;
+    const real_t x3 = py1 * py2;
+    const real_t x4 = pz0 * pz1;
+    const real_t x5 = pz0 * pz2;
+    const real_t x6 = pz1 * pz2;
+    const real_t x7 = px2 * x0;
+    const real_t x8 = py0 * x7;
+    const real_t x9 = px1 * px2;
+    const real_t x10 = 2 * py0;
+    const real_t x11 = py1 * x10;
+    const real_t x12 = py2 * x10;
+    const real_t x13 = 2 * x9;
+    const real_t x14 = 2 * pz0;
+    const real_t x15 = pz1 * x14;
+    const real_t x16 = pz2 * x14;
     const real_t x17 = POW2(px0);
     const real_t x18 = POW2(py1);
     const real_t x19 = POW2(py2);
@@ -263,56 +263,59 @@ static SFEM_INLINE void tri6_p2_p2_surface_outflux_kernel(const real_t px0,
     const real_t x23 = POW2(py0);
     const real_t x24 = POW2(pz0);
     const real_t x25 = POW2(px2);
-    const real_t x26 = 2*x17;
-    const real_t x27 = 2*x23;
-    const real_t x28 = 2*x24;
-    const real_t x29 = sqrt(-py1*x2 + py1*x8 + py2*x2 - py2*x8 - x1*x19 - x1*x21 + x1*x3 - x1*x4 + x1*x5 + x1*x6 - x11*x21 - x11*x25 - 
-    x11*x4 + x11*x5 + x11*x6 + x11*x9 - x12*x20 - x12*x22 + x12*x4 - x12*x5 + x12*x6 + x12*x9 - x13*x3 - x13*x6 - x15*x19 - x15*x25 + x15*x3
-    + x15*x9 - x16*x18 - x16*x22 + x16*x3 + x16*x9 + x17*x18 + x17*x19 + x17*x20 + x17*x21 + x18*x21 + x18*x24 + x18*x25 - x18*x7 + x19*x20 
-    + x19*x22 + x19*x24 + x20*x23 + x20*x25 - x20*x7 + x21*x22 + x21*x23 + x22*x23 + x22*x24 + x23*x25 + x24*x25 - x26*x3 - x26*x6 - x27*x6 
-    - x27*x9 - x28*x3 - x28*x9 - 2*x3*x6 + x3*x7 + x4*x7 - x5*x7 + x6*x7);
-    const real_t x30 = (1.0/90.0)*x29;
-    const real_t x31 = nx*x30;
-    const real_t x32 = ny*x30;
-    const real_t x33 = nz*x30;
-    const real_t x34 = (1.0/360.0)*x29;
-    const real_t x35 = nx*x34;
-    const real_t x36 = ny*x34;
-    const real_t x37 = nz*x34;
-    const real_t x38 = vx[2]*x35 + vy[2]*x36 + vz[2]*x37;
-    const real_t x39 = vx[1]*x35 + vy[1]*x36 + vz[1]*x37;
-    const real_t x40 = vx[0]*x35 + vy[0]*x36 + vz[0]*x37;
-    const real_t x41 = (4.0/45.0)*x29;
-    const real_t x42 = nx*x41;
-    const real_t x43 = ny*x41;
-    const real_t x44 = nz*x41;
-    const real_t x45 = (2.0/45.0)*x29;
-    const real_t x46 = nx*x45;
-    const real_t x47 = ny*x45;
-    const real_t x48 = nz*x45;
-    const real_t x49 = vx[5]*x46 + vy[5]*x47 + vz[5]*x48;
-    const real_t x50 = vx[4]*x46 + vy[4]*x47 + vz[4]*x48;
-    const real_t x51 = vx[3]*x46 + vy[3]*x47 + vz[3]*x48;
-    element_vector[0] = (1.0/60.0)*nx*vx[0]*x29 + (1.0/60.0)*ny*vy[0]*x29 + (1.0/60.0)*nz*vz[0]*x29 - vx[4]*x31 - vy[4]*x32 - vz[4]*x33 - 
-    x38 - x39;
-    element_vector[1] = (1.0/60.0)*nx*vx[1]*x29 + (1.0/60.0)*ny*vy[1]*x29 + (1.0/60.0)*nz*vz[1]*x29 - vx[5]*x31 - vy[5]*x32 - vz[5]*x33 - 
-    x38 - x40;
-    element_vector[2] = (1.0/60.0)*nx*vx[2]*x29 + (1.0/60.0)*ny*vy[2]*x29 + (1.0/60.0)*nz*vz[2]*x29 - vx[3]*x31 - vy[3]*x32 - vz[3]*x33 - 
-    x39 - x40;
-    element_vector[3] = -vx[2]*x31 + vx[3]*x42 - vy[2]*x32 + vy[3]*x43 - vz[2]*x33 + vz[3]*x44 + x49 + x50;
-    element_vector[4] = -vx[0]*x31 + vx[4]*x42 - vy[0]*x32 + vy[4]*x43 - vz[0]*x33 + vz[4]*x44 + x49 + x51;
-    element_vector[5] = -vx[1]*x31 + vx[5]*x42 - vy[1]*x32 + vy[5]*x43 - vz[1]*x33 + vz[5]*x44 + x50 + x51;
+    const real_t x26 = 2 * x17;
+    const real_t x27 = 2 * x23;
+    const real_t x28 = 2 * x24;
+    const real_t x29 =
+        sqrt(-py1 * x2 + py1 * x8 + py2 * x2 - py2 * x8 - x1 * x19 - x1 * x21 + x1 * x3 - x1 * x4 + x1 * x5 + x1 * x6 -
+             x11 * x21 - x11 * x25 - x11 * x4 + x11 * x5 + x11 * x6 + x11 * x9 - x12 * x20 - x12 * x22 + x12 * x4 -
+             x12 * x5 + x12 * x6 + x12 * x9 - x13 * x3 - x13 * x6 - x15 * x19 - x15 * x25 + x15 * x3 + x15 * x9 -
+             x16 * x18 - x16 * x22 + x16 * x3 + x16 * x9 + x17 * x18 + x17 * x19 + x17 * x20 + x17 * x21 + x18 * x21 +
+             x18 * x24 + x18 * x25 - x18 * x7 + x19 * x20 + x19 * x22 + x19 * x24 + x20 * x23 + x20 * x25 - x20 * x7 +
+             x21 * x22 + x21 * x23 + x22 * x23 + x22 * x24 + x23 * x25 + x24 * x25 - x26 * x3 - x26 * x6 - x27 * x6 -
+             x27 * x9 - x28 * x3 - x28 * x9 - 2 * x3 * x6 + x3 * x7 + x4 * x7 - x5 * x7 + x6 * x7);
+    const real_t x30 = (1.0 / 90.0) * x29;
+    const real_t x31 = nx * x30;
+    const real_t x32 = ny * x30;
+    const real_t x33 = nz * x30;
+    const real_t x34 = (1.0 / 360.0) * x29;
+    const real_t x35 = nx * x34;
+    const real_t x36 = ny * x34;
+    const real_t x37 = nz * x34;
+    const real_t x38 = vx[2] * x35 + vy[2] * x36 + vz[2] * x37;
+    const real_t x39 = vx[1] * x35 + vy[1] * x36 + vz[1] * x37;
+    const real_t x40 = vx[0] * x35 + vy[0] * x36 + vz[0] * x37;
+    const real_t x41 = (4.0 / 45.0) * x29;
+    const real_t x42 = nx * x41;
+    const real_t x43 = ny * x41;
+    const real_t x44 = nz * x41;
+    const real_t x45 = (2.0 / 45.0) * x29;
+    const real_t x46 = nx * x45;
+    const real_t x47 = ny * x45;
+    const real_t x48 = nz * x45;
+    const real_t x49 = vx[5] * x46 + vy[5] * x47 + vz[5] * x48;
+    const real_t x50 = vx[4] * x46 + vy[4] * x47 + vz[4] * x48;
+    const real_t x51 = vx[3] * x46 + vy[3] * x47 + vz[3] * x48;
+    element_vector[0] = (1.0 / 60.0) * nx * vx[0] * x29 + (1.0 / 60.0) * ny * vy[0] * x29 +
+                        (1.0 / 60.0) * nz * vz[0] * x29 - vx[4] * x31 - vy[4] * x32 - vz[4] * x33 - x38 - x39;
+    element_vector[1] = (1.0 / 60.0) * nx * vx[1] * x29 + (1.0 / 60.0) * ny * vy[1] * x29 +
+                        (1.0 / 60.0) * nz * vz[1] * x29 - vx[5] * x31 - vy[5] * x32 - vz[5] * x33 - x38 - x40;
+    element_vector[2] = (1.0 / 60.0) * nx * vx[2] * x29 + (1.0 / 60.0) * ny * vy[2] * x29 +
+                        (1.0 / 60.0) * nz * vz[2] * x29 - vx[3] * x31 - vy[3] * x32 - vz[3] * x33 - x39 - x40;
+    element_vector[3] = -vx[2] * x31 + vx[3] * x42 - vy[2] * x32 + vy[3] * x43 - vz[2] * x33 + vz[3] * x44 + x49 + x50;
+    element_vector[4] = -vx[0] * x31 + vx[4] * x42 - vy[0] * x32 + vy[4] * x43 - vz[0] * x33 + vz[4] * x44 + x49 + x51;
+    element_vector[5] = -vx[1] * x31 + vx[5] * x42 - vy[1] * x32 + vy[5] * x43 - vz[1] * x33 + vz[5] * x44 + x50 + x51;
 }
 
 void tri6_p2_p2_surface_outflux(const ptrdiff_t nelements,
                                 const ptrdiff_t nnodes,
-                                idx_t **const elems,
-                                geom_t **const xyz,
-                                geom_t **const normals_xyz,
-                                real_t *const vector_field_x,
-                                real_t *const vector_field_y,
-                                real_t *const vector_field_z,
-                                real_t *const values) {
+                                idx_t **const SFEM_RESTRICT elems,
+                                geom_t **const SFEM_RESTRICT xyz,
+                                geom_t **const SFEM_RESTRICT normals_xyz,
+                                real_t *const SFEM_RESTRICT vector_field_x,
+                                real_t *const SFEM_RESTRICT vector_field_y,
+                                real_t *const SFEM_RESTRICT vector_field_z,
+                                real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
     double tick = MPI_Wtime();
@@ -378,13 +381,13 @@ void tri6_p2_p2_surface_outflux(const ptrdiff_t nelements,
 void surface_outflux(const enum ElemType element_type,
                      const ptrdiff_t nelements,
                      const ptrdiff_t nnodes,
-                     idx_t **const elems,
-                     geom_t **const xyz,
-                     geom_t **const normals_xyz,
-                     real_t *const vector_field_x,
-                     real_t *const vector_field_y,
-                     real_t *const vector_field_z,
-                     real_t *const values)
+                     idx_t **const SFEM_RESTRICT elems,
+                     geom_t **const SFEM_RESTRICT xyz,
+                     geom_t **const SFEM_RESTRICT normals_xyz,
+                     real_t *const SFEM_RESTRICT vector_field_x,
+                     real_t *const SFEM_RESTRICT vector_field_y,
+                     real_t *const SFEM_RESTRICT vector_field_z,
+                     real_t *const SFEM_RESTRICT values)
 
 {
     switch (element_type) {
