@@ -1,5 +1,5 @@
-#ifndef SFEM_TET4_L2_PROJECTION_P0_P1_H
-#define SFEM_TET4_L2_PROJECTION_P0_P1_H
+#ifndef SFEM_TET10_L2_PROJECTION_P1_P2_H
+#define SFEM_TET10_L2_PROJECTION_P1_P2_H
 
 #include "sfem_base.h"
 #include <stddef.h>
@@ -18,4 +18,4 @@ void tet10_ep1_p2_projection_coeffs(const ptrdiff_t nelements,
                          const real_t *const SFEM_RESTRICT element_wise_p1,
                          real_t *const SFEM_RESTRICT p2);
 
-#endif //SFEM_TET4_L2_PROJECTION_P0_P1_H
+#endif //SFEM_TET10_L2_PROJECTION_P1_P2_H

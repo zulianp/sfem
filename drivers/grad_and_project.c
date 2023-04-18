@@ -15,8 +15,12 @@
 
 #include "operators/div.h"
 #include "operators/grad_p1.h"
-#include "operators/tet10/tet10_grad.h"
+
 #include "operators/tet4/tet4_l2_projection_p0_p1.h"
+
+#include "operators/tet10/tet10_l2_projection_p1_p2.h"
+#include "operators/tet10/tet10_grad.h"
+
 #include "read_mesh.h"
 
 void tet4_p1_p1_grad_and_project(const ptrdiff_t nelements,
@@ -61,10 +65,9 @@ void tet10_p2_p2_grad_and_project(const ptrdiff_t nelements,
 
     tet10_grad(nelements, nnodes, elems, xyz, u, p1_dudx, p1_dudy, p1_dudz);
 
-    // TODO
-    //  tet10_p1_p2_l2_projection_apply(nelements, nnodes, elems, xyz, p1_dudx, dudx);
-    //  tet10_p1_p2_l2_projection_apply(nelements, nnodes, elems, xyz, p1_dudy, dudy);
-    //  tet10_p1_p2_l2_projection_apply(nelements, nnodes, elems, xyz, p1_dudz, dudz);
+    tet10_ep1_p2_l2_projection_apply(nelements, nnodes, elems, xyz, p1_dudx, dudx);
+    tet10_ep1_p2_l2_projection_apply(nelements, nnodes, elems, xyz, p1_dudy, dudy);
+    tet10_ep1_p2_l2_projection_apply(nelements, nnodes, elems, xyz, p1_dudz, dudz);
 
     free(p1_dudx);
     free(p1_dudy);
@@ -98,32 +101,86 @@ void grad_and_project(const enum ElemType element_type,
     }
 }
 
-// void grad_and_project_coeffs(const enum ElemType element_type,
-//                       const ptrdiff_t nelements,
-//                       const ptrdiff_t nnodes,
-//                       idx_t **const SFEM_RESTRICT elems,
-//                       geom_t **const SFEM_RESTRICT xyz,
-//                       const real_t *const SFEM_RESTRICT u,
-//                       real_t *const SFEM_RESTRICT dudx,
-//                       real_t *const SFEM_RESTRICT dudy,
-//                       real_t *const SFEM_RESTRICT dudz)
+// 
 
-// {
-//     switch (element_type) {
-//         case TET4: {
-//             tet4_p1_p1_grad_and_project_coeffs(nelements, nnodes, elems, xyz, u, dudx, dudy, dudz);
-//             break;
-//         }
-//         case TET10: {
-//             tet10_p2_p2_grad_and_project_coeffs(nelements, nnodes, elems, xyz, u, dudx, dudy, dudz);
-//             break;
-//         }
-//         default: {
-//             assert(0);
-//             MPI_Abort(MPI_COMM_WORLD, -1);
-//         }
-//     }
-// }
+
+void tet4_p1_p1_grad_and_project_coeffs(const ptrdiff_t nelements,
+                                 const ptrdiff_t nnodes,
+                                 idx_t **const SFEM_RESTRICT elems,
+                                 geom_t **const SFEM_RESTRICT xyz,
+                                 const real_t *const SFEM_RESTRICT u,
+                                 real_t *const SFEM_RESTRICT dudx,
+                                 real_t *const SFEM_RESTRICT dudy,
+                                 real_t *const SFEM_RESTRICT dudz)
+
+{
+    real_t *p0_dudx = malloc(nelements * sizeof(real_t));
+    real_t *p0_dudy = malloc(nelements * sizeof(real_t));
+    real_t *p0_dudz = malloc(nelements * sizeof(real_t));
+
+    p1_grad3(nelements, nnodes, elems, xyz, u, p0_dudx, p0_dudy, p0_dudz);
+
+    tet4_p0_p1_projection_coeffs(nelements, nnodes, elems, xyz, p0_dudx, dudx);
+    tet4_p0_p1_projection_coeffs(nelements, nnodes, elems, xyz, p0_dudy, dudy);
+    tet4_p0_p1_projection_coeffs(nelements, nnodes, elems, xyz, p0_dudz, dudz);
+
+    free(p0_dudx);
+    free(p0_dudy);
+    free(p0_dudz);
+}
+
+// Should this routine use "mass-lumping" for the projection?
+void tet10_p2_p2_grad_and_project_coeffs(const ptrdiff_t nelements,
+                                  const ptrdiff_t nnodes,
+                                  idx_t **const SFEM_RESTRICT elems,
+                                  geom_t **const SFEM_RESTRICT xyz,
+                                  const real_t *const SFEM_RESTRICT u,
+                                  real_t *const SFEM_RESTRICT dudx,
+                                  real_t *const SFEM_RESTRICT dudy,
+                                  real_t *const SFEM_RESTRICT dudz)
+
+{
+    real_t *p1_dudx = malloc(nelements * 4 * sizeof(real_t));
+    real_t *p1_dudy = malloc(nelements * 4 * sizeof(real_t));
+    real_t *p1_dudz = malloc(nelements * 4 * sizeof(real_t));
+
+    tet10_grad(nelements, nnodes, elems, xyz, u, p1_dudx, p1_dudy, p1_dudz);
+
+    tet10_ep1_p2_projection_coeffs(nelements, nnodes, elems, xyz, p1_dudx, dudx);
+    tet10_ep1_p2_projection_coeffs(nelements, nnodes, elems, xyz, p1_dudy, dudy);
+    tet10_ep1_p2_projection_coeffs(nelements, nnodes, elems, xyz, p1_dudz, dudz);
+
+    free(p1_dudx);
+    free(p1_dudy);
+    free(p1_dudz);
+}
+
+void grad_and_project_coeffs(const enum ElemType element_type,
+                      const ptrdiff_t nelements,
+                      const ptrdiff_t nnodes,
+                      idx_t **const SFEM_RESTRICT elems,
+                      geom_t **const SFEM_RESTRICT xyz,
+                      const real_t *const SFEM_RESTRICT u,
+                      real_t *const SFEM_RESTRICT dudx,
+                      real_t *const SFEM_RESTRICT dudy,
+                      real_t *const SFEM_RESTRICT dudz)
+
+{
+    switch (element_type) {
+        case TET4: {
+            tet4_p1_p1_grad_and_project_coeffs(nelements, nnodes, elems, xyz, u, dudx, dudy, dudz);
+            break;
+        }
+        case TET10: {
+            tet10_p2_p2_grad_and_project_coeffs(nelements, nnodes, elems, xyz, u, dudx, dudy, dudz);
+            break;
+        }
+        default: {
+            assert(0);
+            MPI_Abort(MPI_COMM_WORLD, -1);
+        }
+    }
+}
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -179,7 +236,7 @@ int main(int argc, char *argv[]) {
     if (SFEM_COMPUTE_COEFFICIENTS) {
         // TODO
         assert(0);
-        
+
     } else {
         grad_and_project(mesh.element_type,
                          mesh.nelements,
