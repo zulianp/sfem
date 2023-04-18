@@ -129,6 +129,7 @@ OBJS = \
 	tet10_laplacian.o \
 	adj_table.o \
 	laplacian.o \
+	tet4_div.o \
 	tet4_l2_projection_p0_p1.o \
 	grad_p1.o \
 	tet10_grad.o \
