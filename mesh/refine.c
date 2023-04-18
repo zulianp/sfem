@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "../matrix.io/array_dtof.h"
 #include "../matrix.io/matrixio_array.h"
@@ -13,31 +14,7 @@
 #include "sfem_base.h"
 #include "sfem_mesh_write.h"
 
-
-// Generic indexing, but maybe lets stick to exodus
-// {
-// template <Integer ManifoldDim>
-// inline Integer midpoint_index(const Integer i, const Integer j) {
-//     const auto ip1 = i + 1;
-//     const auto jp1 = j + 1;
-//     return ((ip1 - 1) * (ManifoldDim - (ip1 / 2.)) + jp1 + ManifoldDim) - 1;
-// }
-//     template <Integer Dim>
-//     inline void fixed_red_refinement(std::array<Simplex<Dim, 3>, 8> &sub_simplices) {
-//         // corner tets
-//         sub_simplices[0].nodes = {0, 4, 5, 6};
-//         sub_simplices[1].nodes = {1, 7, 4, 8};
-//         sub_simplices[2].nodes = {2, 5, 7, 9};
-//         sub_simplices[3].nodes = {6, 8, 9, 3};
-
-//         // octahedron tets
-//         sub_simplices[4].nodes = {4, 8, 7, 5};
-//         sub_simplices[5].nodes = {6, 5, 8, 4};
-//         sub_simplices[6].nodes = {6, 8, 5, 9};
-//         sub_simplices[7].nodes = {8, 7, 5, 9};
-//     }
-
-// }
+#include "sortreduce.h"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -48,24 +25,26 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
 
-    if (argc < 2) {
+    if (argc != 3) {
         if (!rank) {
-            fprintf(stderr, "usage: %s <folder> [output_folder=./]", argv[0]);
+            fprintf(stderr, "usage: %s <folder> <output_folder>", argv[0]);
         }
 
         return EXIT_FAILURE;
     }
 
-    const char *output_folder = "./";
-    if (argc > 2) {
-        output_folder = argv[2];
-    }
+    const char *output_folder = argv[2];
 
     if (!rank) {
         printf("%s %s %s\n", argv[0], argv[1], output_folder);
     }
 
     double tick = MPI_Wtime();
+
+    struct stat st = {0};
+    if (stat(output_folder, &st) == -1) {
+        mkdir(output_folder, 0700);
+    }
 
     ///////////////////////////////////////////////////////////////////////////////
     // Read data
@@ -74,26 +53,175 @@ int main(int argc, char *argv[]) {
     const char *folder = argv[1];
     // char path[1024 * 10];
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
+    mesh_t coarse_mesh;
+    if (mesh_read(comm, folder, &coarse_mesh)) {
         return EXIT_FAILURE;
     }
 
-    // double tack = MPI_Wtime();
+    ///////////////////////////////////////////////////////////////////////////////
+    // Build CRS graph of P1 mesh
+    ///////////////////////////////////////////////////////////////////////////////
 
-    mesh_t fine_mesh;
+    count_t *rowptr = 0;
+    idx_t *colidx = 0;
 
-    //TODO Refine mesh
+    // This only works for TET4 or TRI3
+    build_crs_graph(coarse_mesh.nelements, coarse_mesh.nnodes, coarse_mesh.elements, &rowptr, &colidx);
 
-    mesh_write(output_folder, &fine_mesh);    
+    ///////////////////////////////////////////////////////////////////////////////
 
-    mesh_destroy(&mesh);
-    mesh_destroy(&fine_mesh);
+    mesh_t refined_mesh;
 
-    double tock = MPI_Wtime();
+    const count_t nnz = rowptr[coarse_mesh.nnodes];
+    idx_t *p2idx = (idx_t *)malloc(nnz * sizeof(idx_t));
+    memset(p2idx, 0, nnz * sizeof(idx_t));
+
+    ptrdiff_t fine_nodes = 0;
+    idx_t next_id = coarse_mesh.nnodes;
+    for (ptrdiff_t i = 0; i < coarse_mesh.nnodes; i++) {
+        const count_t begin = rowptr[i];
+        const count_t end = rowptr[i + 1];
+
+        for (count_t k = begin; k < end; k++) {
+            const idx_t j = colidx[k];
+
+            if (i < j) {
+                fine_nodes += 1;
+                p2idx[k] = next_id++;
+            }
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////
+    // Create refined mesh
+    ///////////////////////////////////////////////////////////////////////////////
+
+    refined_mesh.comm = comm;
+    refined_mesh.mem_space = coarse_mesh.mem_space;
+    refined_mesh.nelements = coarse_mesh.nelements * 8;
+    refined_mesh.nnodes = coarse_mesh.nnodes + fine_nodes;
+    refined_mesh.spatial_dim = coarse_mesh.spatial_dim;
+
+    refined_mesh.n_owned_nodes = refined_mesh.nnodes;
+    refined_mesh.n_owned_elements = refined_mesh.nelements;
+    refined_mesh.n_shared_elements = 0;
+
+    refined_mesh.node_mapping = 0;
+    refined_mesh.node_owner = 0;
+    refined_mesh.element_mapping = 0;
+
+    refined_mesh.element_type = coarse_mesh.element_type;
+    refined_mesh.elements = (idx_t **)malloc(refined_mesh.element_type * sizeof(idx_t *));
+    refined_mesh.points = (geom_t **)malloc(refined_mesh.spatial_dim * sizeof(geom_t *));
+
+    // Allocate space for refined nodes
+    for (int d = 0; d < refined_mesh.element_type; d++) {
+        refined_mesh.elements[d] = (idx_t *)malloc(refined_mesh.nelements * sizeof(idx_t));
+
+        // Copy p1 portion
+        memcpy(refined_mesh.elements[d], coarse_mesh.elements[d], coarse_mesh.nelements * sizeof(idx_t));
+    }
+
+    for (int d = 0; d < refined_mesh.spatial_dim; d++) {
+        refined_mesh.points[d] = (geom_t *)malloc(refined_mesh.nnodes * sizeof(geom_t));
+
+        // Copy p1 portion
+        memcpy(refined_mesh.points[d], coarse_mesh.points[d], coarse_mesh.nnodes * sizeof(geom_t));
+    }
+
+    if (coarse_mesh.element_type == 4) {
+        // TODO fill p2 node indices in elements
+        for (ptrdiff_t e = 0; e < coarse_mesh.nelements; e++) {
+            // Ordering of edges compliant to exodusII spec
+            idx_t row[6];
+            row[0] = MIN(coarse_mesh.elements[0][e], coarse_mesh.elements[1][e]);
+            row[1] = MIN(coarse_mesh.elements[1][e], coarse_mesh.elements[2][e]);
+            row[2] = MIN(coarse_mesh.elements[0][e], coarse_mesh.elements[2][e]);
+            row[3] = MIN(coarse_mesh.elements[0][e], coarse_mesh.elements[3][e]);
+            row[4] = MIN(coarse_mesh.elements[1][e], coarse_mesh.elements[3][e]);
+            row[5] = MIN(coarse_mesh.elements[2][e], coarse_mesh.elements[3][e]);
+
+            idx_t key[6];
+            key[0] = MAX(coarse_mesh.elements[0][e], coarse_mesh.elements[1][e]);
+            key[1] = MAX(coarse_mesh.elements[1][e], coarse_mesh.elements[2][e]);
+            key[2] = MAX(coarse_mesh.elements[0][e], coarse_mesh.elements[2][e]);
+            key[3] = MAX(coarse_mesh.elements[0][e], coarse_mesh.elements[3][e]);
+            key[4] = MAX(coarse_mesh.elements[1][e], coarse_mesh.elements[3][e]);
+            key[5] = MAX(coarse_mesh.elements[2][e], coarse_mesh.elements[3][e]);
+
+            idx_t macro_element[10];
+            for(int k = 0; k < 4; k++) {
+                macro_element[k] = coarse_mesh.elements[k][e];
+            }
+
+            for (int l = 0; l < 6; l++) {
+                const idx_t r = row[l];
+                const count_t row_begin = rowptr[r];
+                const count_t len_row = rowptr[r + 1] - row_begin;
+                const idx_t *cols = &colidx[row_begin];
+                const idx_t k = find_idx_binary_search(key[l], cols, len_row);
+                macro_element[l + 4] = p2idx[row_begin + k];
+            }
+
+            // TODO distribute macro_element to fine_mesh
+
+        }
+
+    } else {
+        fprintf(stderr, "Implement for element_type %d\n!", coarse_mesh.element_type);
+        return EXIT_FAILURE;
+    }
+
+    // Generate p2 coordinates
+    for (ptrdiff_t i = 0; i < coarse_mesh.nnodes; i++) {
+        const count_t begin = rowptr[i];
+        const count_t end = rowptr[i + 1];
+
+        for (count_t k = begin; k < end; k++) {
+            const idx_t j = colidx[k];
+
+            if (i < j) {
+                const idx_t nidx = p2idx[k];
+
+                for (int d = 0; d < refined_mesh.spatial_dim; d++) {
+                    geom_t xi = refined_mesh.points[d][i];
+                    geom_t xj = refined_mesh.points[d][j];
+
+                    // Midpoint
+                    refined_mesh.points[d][nidx] = (xi + xj) / 2;
+                }
+
+                // printf("%d -> %f %f %f\n", nidx, refined_mesh.points[0][nidx], refined_mesh.points[1][nidx], refined_mesh.points[2][nidx]);
+            }
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////
+    // Write P2 mesh to disk
+    ///////////////////////////////////////////////////////////////////////////////
+
+    mesh_write(output_folder, &refined_mesh);
+
+    // Make sure we do not delete the same array twice
+    for (int d = 0; d < coarse_mesh.element_type; d++) {
+        coarse_mesh.elements[d] = 0;
+    }
 
     if (!rank) {
         printf("----------------------------------------\n");
+        printf("refine.c: elements #coarse %ld, #fine %ld, nodes #coarse %ld, #fine %ld\n",
+               (long)coarse_mesh.nelements,
+               (long)refined_mesh.nelements,
+               (long)coarse_mesh.nnodes,
+               (long)refined_mesh.nnodes);
+        printf("----------------------------------------\n");
+    }
+
+    mesh_destroy(&coarse_mesh);
+    mesh_destroy(&refined_mesh);
+
+    double tock = MPI_Wtime();
+    if (!rank) {
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 

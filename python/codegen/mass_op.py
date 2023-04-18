@@ -31,7 +31,6 @@ class MassOp:
 
 		return expr
 
-
 	def lumped_matrix(self):
 		fe_trial = self.fe_trial
 		fe_test = self.fe_test
@@ -82,34 +81,34 @@ def main():
 	if False:
 		q = [qx, qy, qz]
 		for i in range(0, n_forms):
-				trial = fields[i]
-				test = test_fes[i]
-				op = MassOp(trial, test, q)
-				expr = op.apply()
+			trial = fields[i]
+			test = test_fes[i]
+			op = MassOp(trial, test, q)
+			expr = op.apply()
 
-				print("----------------------------")
-				print(f"MassOp({trial.fe.name()}, {test.name()})")
-				print("----------------------------")
-				print("Eval")
-				print("----------------------------")
-				c_code(expr)
-				print("----------------------------")
+			print("----------------------------")
+			print(f"MassOp({trial.fe.name()}, {test.name()})")
+			print("----------------------------")
+			print("Eval")
+			print("----------------------------")
+			c_code(expr)
+			print("----------------------------")
 
-				expr = op.lumped_matrix()
+			expr = op.lumped_matrix()
 
-				print("----------------------------")
-				print("lumped Matrix")
-				print("----------------------------")
-				c_code(expr)
-				print("----------------------------")	
+			print("----------------------------")
+			print("lumped Matrix")
+			print("----------------------------")
+			c_code(expr)
+			print("----------------------------")	
 
-				# expr = op.matrix()
+			# expr = op.matrix()
 
-				# print("----------------------------")
-				# print("Matrix")
-				# print("----------------------------")
-				# c_code(expr)
-				# print("----------------------------")	
+			# print("----------------------------")
+			# print("Matrix")
+			# print("----------------------------")
+			# c_code(expr)
+			# print("----------------------------")	
 
 	# print("----------------------------")
 	# print("Transform")
