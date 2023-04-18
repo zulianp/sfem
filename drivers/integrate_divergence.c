@@ -62,6 +62,7 @@ int main(int argc, char *argv[]) {
     memset(div_u, 0, mesh.nelements * sizeof(real_t));
 
     integrate_div(
+        mesh.element_type,
         mesh.nelements, 
         mesh.nnodes, 
         mesh.elements, mesh.points, 

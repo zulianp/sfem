@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
     real_t *div_u = (real_t *)malloc(u_n_local * sizeof(real_t));
     memset(div_u, 0, u_n_local * sizeof(real_t));
 
-    div_apply(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, u[0], u[1], u[2], div_u);
+    div_apply(mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, u[0], u[1], u[2], div_u);
 
     real_t SFEM_SCALE = 1;
     SFEM_READ_ENV(SFEM_SCALE, atof);
