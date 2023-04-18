@@ -13,6 +13,32 @@
 #include "sfem_base.h"
 #include "sfem_mesh_write.h"
 
+
+// Generic indexing, but maybe lets stick to exodus
+// {
+// template <Integer ManifoldDim>
+// inline Integer midpoint_index(const Integer i, const Integer j) {
+//     const auto ip1 = i + 1;
+//     const auto jp1 = j + 1;
+//     return ((ip1 - 1) * (ManifoldDim - (ip1 / 2.)) + jp1 + ManifoldDim) - 1;
+// }
+//     template <Integer Dim>
+//     inline void fixed_red_refinement(std::array<Simplex<Dim, 3>, 8> &sub_simplices) {
+//         // corner tets
+//         sub_simplices[0].nodes = {0, 4, 5, 6};
+//         sub_simplices[1].nodes = {1, 7, 4, 8};
+//         sub_simplices[2].nodes = {2, 5, 7, 9};
+//         sub_simplices[3].nodes = {6, 8, 9, 3};
+
+//         // octahedron tets
+//         sub_simplices[4].nodes = {4, 8, 7, 5};
+//         sub_simplices[5].nodes = {6, 5, 8, 4};
+//         sub_simplices[6].nodes = {6, 8, 5, 9};
+//         sub_simplices[7].nodes = {8, 7, 5, 9};
+//     }
+
+// }
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 

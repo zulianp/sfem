@@ -100,29 +100,69 @@ class Tet10(FE):
 # Dual basis trafo and weights
 #######################################
 
-ls_tet10_trafo_ = [1, 0, 0, 0, 0.2, 0,   0.2, 0.2, 0,   0,   0, 1, 0, 0, 0.2, 0.2, 0, 0,   0.2, 0,
-                      0, 0, 1, 0, 0,   0.2, 0.2, 0,   0,   0.2, 0, 0, 0, 1, 0,   0,   0, 0.2, 0.2, 0.2,
-                      0, 0, 0, 0, 0.6, 0,   0,   0,   0,   0,   0, 0, 0, 0, 0,   0.6, 0, 0,   0,   0,
-                      0, 0, 0, 0, 0,   0,   0.6, 0,   0,   0,   0, 0, 0, 0, 0,   0,   0, 0.6, 0,   0,
-                      0, 0, 0, 0, 0,   0,   0,   0,   0.6, 0,   0, 0, 0, 0, 0,   0,   0, 0,   0,   0.6 ]
+ls_tet10_trafo_ = [1, 0, 0, 0, sp.Rational(1,5), 0,   sp.Rational(1,5), sp.Rational(1,5), 0,   0,   0, 1, 0, 0, sp.Rational(1,5), sp.Rational(1,5), 0, 0,   sp.Rational(1,5), 0,
+                      0, 0, 1, 0, 0,   sp.Rational(1,5), sp.Rational(1,5), 0,   0,   sp.Rational(1,5), 0, 0, 0, 1, 0,   0,   0, sp.Rational(1,5), sp.Rational(1,5), sp.Rational(1,5),
+                      0, 0, 0, 0, sp.Rational(3, 5), 0,   0,   0,   0,   0,   0, 0, 0, 0, 0,   sp.Rational(3, 5), 0, 0,   0,   0,
+                      0, 0, 0, 0, 0,   0,   sp.Rational(3, 5), 0,   0,   0,   0, 0, 0, 0, 0,   0,   0, sp.Rational(3, 5), 0,   0,
+                      0, 0, 0, 0, 0,   0,   0,   0,   sp.Rational(3, 5), 0,   0, 0, 0, 0, 0,   0,   0, 0,   0,   sp.Rational(3, 5) ]
 
 
-ls_tet10_weights_ = [7.0,    0.7,    0.7,    0.7,   0.175,  0.7,    0.175,  0.175,  0.7,    0.7,    0.7,  7.0,    0.7,
-                0.7,    0.175,  0.175,  0.7,   0.7,    0.175,  0.7,    0.7,    0.7,    7.0,    0.7,  0.7,    0.175,
-                0.175,  0.7,    0.7,    0.175, 0.7,    0.7,    0.7,    7.0,    0.7,    0.7,    0.7,  0.175,  0.175,
-                0.175,  -3.9,   -3.9,   1.2,   1.2,    5.55,   -1.875, -1.875, -1.875, -1.875, 1.2,  1.2,    -3.9,
-                -3.9,   1.2,    -1.875, 5.55,  -1.875, 1.2,    -1.875, -1.875, -3.9,   1.2,    -3.9, 1.2,    -1.875,
-                -1.875, 5.55,   -1.875, 1.2,   -1.875, -3.9,   1.2,    1.2,    -3.9,   -1.875, 1.2,  -1.875, 5.55,
-                -1.875, -1.875, 1.2,    -3.9,  1.2,    -3.9,   -1.875, -1.875, 1.2,    -1.875, 5.55, -1.875, 1.2,
-                1.2,    -3.9,   -3.9,   1.2,   -1.875, -1.875, -1.875, -1.875, 5.55 ]
+# ls_tet10_weights_ = [7.0,    0.7,    0.7,    0.7,   0.175,  0.7,    0.175,  0.175,  0.7,    0.7,    0.7,  7.0,    0.7,
+#                 0.7,    0.175,  0.175,  0.7,   0.7,    0.175,  0.7,    0.7,    0.7,    7.0,    0.7,  0.7,    0.175,
+#                 0.175,  0.7,    0.7,    0.175, 0.7,    0.7,    0.7,    7.0,    0.7,    0.7,    0.7,  0.175,  0.175,
+#                 0.175,  -3.9,   -3.9,   1.2,   1.2,    5.55,   -1.875, -1.875, -1.875, -1.875, 1.2,  1.2,    -3.9,
+#                 -3.9,   1.2,    -1.875, 5.55,  -1.875, 1.2,    -1.875, -1.875, -3.9,   1.2,    -3.9, 1.2,    -1.875,
+#                 -1.875, 5.55,   -1.875, 1.2,   -1.875, -3.9,   1.2,    1.2,    -3.9,   -1.875, 1.2,  -1.875, 5.55,
+#                 -1.875, -1.875, 1.2,    -3.9,  1.2,    -3.9,   -1.875, -1.875, 1.2,    -1.875, 5.55, -1.875, 1.2,
+#                 1.2,    -3.9,   -3.9,   1.2,   -1.875, -1.875, -1.875, -1.875, 5.55 ]
+
+r15div8 = sp.Rational(15, 8)
+r7div40 = sp.Rational(7, 40)
+r7div10 = sp.Rational(7, 10)
+r39div10 = sp.Rational(39, 10)
+r6div5 = sp.Rational(6, 5)
+r111div20 = sp.Rational(111,20)
+
+ls_tet10_weights_ = [7,    r7div10,    r7div10,    r7div10,   r7div40,  r7div10,    r7div40,  r7div40,  r7div10,    r7div10,    r7div10,  7,    r7div10,
+                r7div10,    r7div40,  r7div40,  r7div10,   r7div10,    r7div40,  r7div10,    r7div10,    r7div10,    7,    r7div10,  r7div10,    r7div40,
+                r7div40,  r7div10,    r7div10,    r7div40, r7div10,    r7div10,    r7div10,    7,    r7div10,    r7div10,    r7div10,  r7div40,  r7div40,
+                r7div40,  -r39div10,   -r39div10,   r6div5,   r6div5,    r111div20,   -r15div8, -r15div8, -r15div8, -r15div8, r6div5,  r6div5,    -r39div10,
+                -r39div10,   r6div5,    -r15div8, r111div20,  -r15div8, r6div5,    -r15div8, -r15div8, -r39div10,   r6div5,    -r39div10, r6div5,    -r15div8,
+                -r15div8, r111div20,   -r15div8, r6div5,   -r15div8, -r39div10,   r6div5,    r6div5,    -r39div10,   -r15div8, r6div5,  -r15div8, r111div20,
+                -r15div8, -r15div8, r6div5,    -r39div10,  r6div5,    -r39div10,   -r15div8, -r15div8, r6div5,    -r15div8, r111div20, -r15div8, r6div5,
+                r6div5,    -r39div10,   -r39div10,   r6div5,   -r15div8, -r15div8, -r15div8, -r15div8, r111div20 ]
 
 tet10_trafo = sp.Matrix(10, 10, ls_tet10_trafo_)
 tet10_weights = sp.Matrix(10, 10, ls_tet10_weights_)
 
-def WeightedFE(FE):
-	def __init__(self, fe, weights):
+def tet10_basis_transform(x):
+	r, c = tet10_trafo.shape
+
+	ret = sp.Matrix(r, 1, [0]*r)
+
+	for i in range(0, r):
+		for j in range(0, c):
+			 ret[i] = ret[i] + tet10_trafo[i, j] * x[j]
+	return ret
+
+def tet10_basis_transform_expr():
+	tx = tet10_basis_transform(coeffs('x', 10))
+	ttx = coeffs('values', 10)
+	
+	expr = []
+	
+	for i in range(0, 10):
+		print(tx[i])
+		e = ast.Assignment(ttx[i], tx[i])
+		expr.append(e)
+
+	return expr
+
+class WeightedFE(FE):
+	def __init__(self, fe, weights, prefix_ = "WeightedFE"):
 		self.fe = fe
 		self.weights = weights
+		self.prefix_  = prefix_
 
 	def fun(self, p):
 		fe = self.fe
@@ -138,7 +178,7 @@ def WeightedFE(FE):
 		return ret
 
 	def name(self):
-		return f'WeightedFE({self.fe.name()})'
+		return f'{self.prefix_}({self.fe.name()})'
 				
 	def n_nodes(self):
 		return self.fe.n_nodes()
@@ -166,7 +206,10 @@ def WeightedFE(FE):
 
 # Factory functions
 def TransformedTet10():
-	return WeightedFE(Tet10(), tet10_trafo)
+	return WeightedFE(Tet10(), tet10_trafo, "Transformed")
 
 def DualTet10():
-	return WeightedFE(Tet10(), tet10_weights)
+	return WeightedFE(Tet10(), tet10_weights, "Dual")
+
+
+
