@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
     // Apply lumped mass-matrix inverse
     ///////////////////////////////////////////////////////////////////////////////
 
-    // Store mass-vector into output buffer
+    // Apply inverse lumped-mass matrix and store result into output buffer
     apply_inv_lumped_mass(mesh.element_type, nelements, nnodes, mesh.elements, mesh.points, input, output);
 
     ///////////////////////////////////////////////////////////////////////////////
