@@ -25,6 +25,7 @@ mesh_surface=$mesh_raw/surface
 
 mkdir -p $mesh_raw
 mkdir -p $mesh_raw/p1
+mkdir -p $mesh_raw/p1/refined
 mkdir -p $mesh_surface/inlet
 mkdir -p $mesh_surface/outlet
 mkdir -p $mesh_surface/wall
@@ -37,6 +38,7 @@ idx_type_size=4
 ../2_darcy_cylinder/cylinder.py $mesh_db $nrefs
 db_to_raw.py $mesh_db $mesh_raw/p1
 mesh_p1_to_p2 $mesh_raw/p1 $mesh_raw
+refine $mesh_raw/p1 $mesh_raw/p1/refined
 raw_to_db.py $mesh_raw/p1 $mesh_db_p2
 
 $LAUNCH skin $mesh_raw $mesh_surface
@@ -109,4 +111,5 @@ $LAUNCH smask $mesh_raw/sidesets_aos/soutlet.raw $sides $sides 2
 $LAUNCH smask $mesh_raw/sidesets_aos/swall.raw   $sides $sides 3
 
 raw_to_db.py $mesh_raw $mesh_raw/dirichlet.vtk --point_data="$sides"
+raw_to_db.py $mesh_raw/p1/refined $mesh_raw/p1_dirichlet.vtk --point_data="$sides"
 

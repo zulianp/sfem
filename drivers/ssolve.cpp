@@ -44,7 +44,7 @@ void crs_matrix_destroy(crs_matrix_t *const matrix) {
     free(matrix->values);
 }
 
-void p1_create_crs_matrix(const mesh_t *const mesh, crs_matrix_t *const matrix, int block_size) {
+void create_crs_matrix(const mesh_t *const mesh, crs_matrix_t *const matrix, int block_size) {
     ptrdiff_t nnz = 0;
     count_t *rowptr = 0;
     idx_t *colidx = 0;
@@ -127,14 +127,15 @@ int main(int argc, char *argv[]) {
             n_neumann_faces_local /= 3;
             n_neumann_faces /= 3;
 
-            surface_forcing_function(n_neumann_faces_local, neumann_faces, mesh.points, neumann_value, rhs.data());
+            surface_forcing_function(mesh.element_type, n_neumann_faces_local, neumann_faces, mesh.points, neumann_value, rhs.data());
         }
     }
 
     crs_matrix_t matrix;
-    p1_create_crs_matrix(&mesh, &matrix, 1);
+    create_crs_matrix(&mesh, &matrix, 1);
 
     laplacian_assemble_hessian(
+        mesh.element_type,
         mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, matrix.rowptr, matrix.colidx, matrix.values);
 
     std::vector<real_t> x(mesh.nnodes, 0);
@@ -163,10 +164,6 @@ int main(int argc, char *argv[]) {
 
         constraint_nodes_to_value(n_dirichlet_nodes, dirichlet_nodes, dirichlet_value, rhs.data());
         constraint_nodes_to_value(n_dirichlet_nodes, dirichlet_nodes, dirichlet_value, x.data());
-
-        // for(ptrdiff_t i = 0; i < n_dirichlet_nodes; ++i) {
-        //     printf("%ld\n", (long)dirichlet_nodes[i]);
-        // }
 
         crs_constraint_nodes_to_identity(
             n_dirichlet_nodes, dirichlet_nodes, 1.0, matrix.rowptr, matrix.colidx, matrix.values);
@@ -215,7 +212,7 @@ int main(int argc, char *argv[]) {
         isolver_lsolve_set_atol(&lsolve, atol);
         isolver_lsolve_set_rtol(&lsolve, rtol);
         isolver_lsolve_set_stol(&lsolve, stol);
-        // isolver_lsolve_set_verbosity(&lsolve, 1);
+        isolver_lsolve_set_verbosity(&lsolve, 1);
 
         isolver_lsolve_update_crs(&lsolve, mesh.nnodes, mesh.nnodes, matrix.rowptr, matrix.colidx, matrix.values);
         isolver_lsolve_apply(&lsolve, rhs.data(), x.data());
