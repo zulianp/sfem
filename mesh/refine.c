@@ -16,6 +16,18 @@
 
 #include "sortreduce.h"
 
+static const int refine_pattern[8][4] = {
+    // Corner tests
+    {0, 4, 6, 7},
+    {4, 1, 5, 8},
+    {6, 5, 2, 9},
+    {7, 8, 9, 3},
+    // Octahedron tets
+    {4, 5, 6, 8},
+    {7, 4, 6, 8},
+    {6, 5, 9, 8},
+    {7, 6, 9, 8}};
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -132,27 +144,27 @@ int main(int argc, char *argv[]) {
     if (coarse_mesh.element_type == 4) {
         // TODO fill p2 node indices in elements
         for (ptrdiff_t e = 0; e < coarse_mesh.nelements; e++) {
-            // Ordering of edges compliant to exodusII spec
-            idx_t row[6];
-            row[0] = MIN(coarse_mesh.elements[0][e], coarse_mesh.elements[1][e]);
-            row[1] = MIN(coarse_mesh.elements[1][e], coarse_mesh.elements[2][e]);
-            row[2] = MIN(coarse_mesh.elements[0][e], coarse_mesh.elements[2][e]);
-            row[3] = MIN(coarse_mesh.elements[0][e], coarse_mesh.elements[3][e]);
-            row[4] = MIN(coarse_mesh.elements[1][e], coarse_mesh.elements[3][e]);
-            row[5] = MIN(coarse_mesh.elements[2][e], coarse_mesh.elements[3][e]);
-
-            idx_t key[6];
-            key[0] = MAX(coarse_mesh.elements[0][e], coarse_mesh.elements[1][e]);
-            key[1] = MAX(coarse_mesh.elements[1][e], coarse_mesh.elements[2][e]);
-            key[2] = MAX(coarse_mesh.elements[0][e], coarse_mesh.elements[2][e]);
-            key[3] = MAX(coarse_mesh.elements[0][e], coarse_mesh.elements[3][e]);
-            key[4] = MAX(coarse_mesh.elements[1][e], coarse_mesh.elements[3][e]);
-            key[5] = MAX(coarse_mesh.elements[2][e], coarse_mesh.elements[3][e]);
-
             idx_t macro_element[10];
-            for(int k = 0; k < 4; k++) {
+            for (int k = 0; k < 4; k++) {
                 macro_element[k] = coarse_mesh.elements[k][e];
             }
+
+            // Ordering of edges compliant to exodusII spec
+            idx_t row[6];
+            row[0] = MIN(macro_element[0], macro_element[1]);
+            row[1] = MIN(macro_element[1], macro_element[2]);
+            row[2] = MIN(macro_element[0], macro_element[2]);
+            row[3] = MIN(macro_element[0], macro_element[3]);
+            row[4] = MIN(macro_element[1], macro_element[3]);
+            row[5] = MIN(macro_element[2], macro_element[3]);
+
+            idx_t key[6];
+            key[0] = MAX(macro_element[0], macro_element[1]);
+            key[1] = MAX(macro_element[1], macro_element[2]);
+            key[2] = MAX(macro_element[0], macro_element[2]);
+            key[3] = MAX(macro_element[0], macro_element[3]);
+            key[4] = MAX(macro_element[1], macro_element[3]);
+            key[5] = MAX(macro_element[2], macro_element[3]);
 
             for (int l = 0; l < 6; l++) {
                 const idx_t r = row[l];
@@ -163,8 +175,14 @@ int main(int argc, char *argv[]) {
                 macro_element[l + 4] = p2idx[row_begin + k];
             }
 
-            // TODO distribute macro_element to fine_mesh
-
+            // distribute macro_element to fine_mesh
+            ptrdiff_t element_offset = e * 8;
+            for (int k = 0; k < 4; k++) {
+                for (int sub_e = 0; sub_e < 8; sub_e++) {
+                    const idx_t ik = macro_element[refine_pattern[sub_e][k]];
+                    refined_mesh.elements[k][element_offset + sub_e] = ik;
+                }
+            }
         }
 
     } else {
@@ -191,7 +209,8 @@ int main(int argc, char *argv[]) {
                     refined_mesh.points[d][nidx] = (xi + xj) / 2;
                 }
 
-                // printf("%d -> %f %f %f\n", nidx, refined_mesh.points[0][nidx], refined_mesh.points[1][nidx], refined_mesh.points[2][nidx]);
+                // printf("%d -> %f %f %f\n", nidx, refined_mesh.points[0][nidx], refined_mesh.points[1][nidx],
+                // refined_mesh.points[2][nidx]);
             }
         }
     }
