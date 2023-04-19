@@ -347,7 +347,7 @@ static SFEM_INLINE void tet10_transform_kernel(const real_t *const SFEM_RESTRICT
     values[9] = (3.0 / 5.0) * x[9];
 }
 
-void tet_10_apply_inv_lumped_mass(const ptrdiff_t nelements,
+void tet10_apply_inv_lumped_mass(const ptrdiff_t nelements,
                                   const ptrdiff_t nnodes,
                                   idx_t **const SFEM_RESTRICT elems,
                                   geom_t **const SFEM_RESTRICT xyz,
@@ -423,5 +423,5 @@ void tet_10_apply_inv_lumped_mass(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("tet10_mass.c: tet_10_apply_inv_lumped_mass\t%g seconds\n", tock - tick);
+    printf("tet10_mass.c: tet10_apply_inv_lumped_mass\t%g seconds\n", tock - tick);
 }

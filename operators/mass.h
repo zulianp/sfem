@@ -4,18 +4,28 @@
 #include <stddef.h>
 #include "sfem_base.h"
 
-void assemble_mass(const ptrdiff_t nelements,
+void assemble_mass(const int element_type,
+                   const ptrdiff_t nelements,
                    const ptrdiff_t nnodes,
-                   idx_t *const elems[4],
-                   geom_t *const xyz[3],
-                   count_t *const rowptr,
-                   idx_t *const colidx,
-                   real_t *const values);
+                   idx_t **const SFEM_RESTRICT elems,
+                   geom_t **const SFEM_RESTRICT xyz,
+                   count_t *const SFEM_RESTRICT rowptr,
+                   idx_t *const SFEM_RESTRICT colidx,
+                   real_t *const SFEM_RESTRICT values);
 
-void assemble_lumped_mass(const ptrdiff_t nelements,
+void assemble_lumped_mass(const int element_type,
+                          const ptrdiff_t nelements,
                           const ptrdiff_t nnodes,
-                          idx_t *const elems[4],
-                          geom_t *const xyz[3],
-                          real_t *const values);
+                          idx_t **const SFEM_RESTRICT elems,
+                          geom_t **const SFEM_RESTRICT xyz,
+                          real_t *const SFEM_RESTRICT values);
+
+void apply_inv_lumped_mass(const int element_type,
+                           const ptrdiff_t nelements,
+                           const ptrdiff_t nnodes,
+                           idx_t **const SFEM_RESTRICT elems,
+                           geom_t **const SFEM_RESTRICT xyz,
+                           const real_t *const x,
+                           real_t *const values);
 
 #endif  // MASS_H

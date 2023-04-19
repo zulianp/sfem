@@ -13,7 +13,7 @@ void tet10_assemble_mass(const ptrdiff_t nelements,
                    idx_t *const colidx,
                    real_t *const values);
 
-void tet_10_apply_inv_lumped_mass(const ptrdiff_t nelements,
+void tet10_apply_inv_lumped_mass(const ptrdiff_t nelements,
                           const ptrdiff_t nnodes,
                           idx_t **const SFEM_RESTRICT elems,
                           geom_t **const SFEM_RESTRICT xyz,

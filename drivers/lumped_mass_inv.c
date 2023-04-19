@@ -67,11 +67,7 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     // Store mass-vector into output buffer
-    assemble_lumped_mass(nelements, nnodes, mesh.elements, mesh.points, output);
-
-    for(ptrdiff_t i = 0; i < input_n_local; i++) {
-        output[i] = input[i] / output[i];
-    }
+    apply_inv_lumped_mass(mesh.element_type, nelements, nnodes, mesh.elements, mesh.points, input, output);
 
     ///////////////////////////////////////////////////////////////////////////////
     // Write cell data
