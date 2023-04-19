@@ -40,9 +40,20 @@ psolve()
 	x_=$4
 
 	echo "rhs=$rhs_"
-	# mpiexec -np 8 \
-	# lldb -- 
+	mpiexec -np 8 \
 	$UTOPIA_EXEC -app ls_solve -A $mat_ -P $prec_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type hypre -ksp_type cg -atol 1e-18 -rtol 0 -stol 1e-19 --verbose
+}
+
+psolve2()
+{
+	mat_=$1
+	prec_=$2
+	rhs_=$3
+	x_=$4
+
+	echo "rhs=$rhs_"
+	mpiexec -np 8 \
+	$UTOPIA_EXEC -app ls_solve -A $mat_ -P $prec_ -b $rhs_ -out $x_ --use_lor_cg --verbose
 }
 
 
@@ -61,13 +72,16 @@ export SFEM_HANDLE_RHS=1
 export SFEM_NEUMANN_FACES=$mesh_path/sidesets_aos/soutlet.raw
 export SFEM_DIRICHLET_NODES=$mesh_path/sidesets_aos/sinlet.raw
 
+set -x
 # lldb -- 
 assemble $mesh_path $workspace/system
 
 # solve $workspace/system/rowptr.raw $workspace/system/rhs.raw $workspace/x.raw
-set -x
+
 assemble $mesh_path/p1/refined $workspace/lor_system
-psolve  $workspace/system/rowptr.raw $workspace/lor_system/rowptr.raw $workspace/system/rhs.raw $workspace/x.raw
+
+# psolve  $workspace/system/rowptr.raw $workspace/lor_system/rowptr.raw $workspace/system/rhs.raw $workspace/x.raw
+psolve2  $workspace/system/rowptr.raw $workspace/lor_system/rowptr.raw $workspace/system/rhs.raw $workspace/x.raw
 
 raw_to_db.py $mesh_path x.vtk --point_data="$workspace/x.raw,$workspace/system/rhs.raw"
 

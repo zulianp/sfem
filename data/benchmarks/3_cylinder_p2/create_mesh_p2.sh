@@ -38,6 +38,7 @@ idx_type_size=4
 ../2_darcy_cylinder/cylinder.py $mesh_db $nrefs
 db_to_raw.py $mesh_db $mesh_raw/p1
 mesh_p1_to_p2 $mesh_raw/p1 $mesh_raw
+# sfc $mesh_raw $mesh_raw/sorted
 refine $mesh_raw/p1 $mesh_raw/p1/refined
 raw_to_db.py $mesh_raw/p1 $mesh_db_p2
 
