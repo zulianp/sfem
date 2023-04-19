@@ -134,6 +134,7 @@ OBJS = \
 	grad_p1.o \
 	tet10_grad.o \
 	tet10_div.o \
+	tet10_mass.o \
 	tet10_l2_projection_p1_p2.o
 
 

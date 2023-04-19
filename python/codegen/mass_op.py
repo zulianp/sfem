@@ -78,6 +78,13 @@ def main():
 
 	n_forms = len(test_fes)
 
+
+	if True:
+		fe = Tet10()
+		f =  Field(fe, coeffs('u', 10))
+		op = MassOp(f, fe, [qx, qy, qz])
+		c_code(op.matrix())
+
 	if False:
 		q = [qx, qy, qz]
 		for i in range(0, n_forms):
@@ -110,11 +117,12 @@ def main():
 			# c_code(expr)
 			# print("----------------------------")	
 
-	# print("----------------------------")
-	# print("Transform")
-	# print("----------------------------")
-	c_code(tet10_basis_transform_expr())
-	# print("----------------------------")
+	if False:
+		print("----------------------------")
+		print("Transform")
+		print("----------------------------")
+		c_code(tet10_basis_transform_expr())
+		print("----------------------------")
 
 if __name__ == '__main__':
 	main()
