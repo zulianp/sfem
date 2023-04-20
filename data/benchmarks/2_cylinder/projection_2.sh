@@ -75,7 +75,13 @@ hetero_neumann()
 	p0_outflux_=$workspace/p0_outflux.raw
 	p1_outflux_=$workspace/p1_outflux.raw
 
-	for (( j=0; j < 3; j++ ))
+	ls $mesh_path/surface/wall/i*.raw
+	idxs=(`ls $mesh_path/surface/wall/i*.raw`)
+	nidx=${#idxs[@]}
+
+	echo "nidx=$nidx"
+
+	for (( j=0; j < $nidx; j++ ))
 	do
 		cat $mesh_path/surface/wall/i"$j".raw  >  $surf_mesh_path_/i"$j".raw
 		# cat $mesh_path/surface/outlet/i"$j".raw >> $surf_mesh_path_/i"$j".raw

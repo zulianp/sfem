@@ -458,4 +458,5 @@ void tet10_cdiv(const ptrdiff_t nelements,
                 real_t *const SFEM_RESTRICT div) {
     // TODO
     assert(0);
+    MPI_Abort(MPI_COMM_WORLD, -1);
 }
