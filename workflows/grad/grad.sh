@@ -28,5 +28,6 @@ dfdx=$output_folder/gradx.raw
 dfdy=$output_folder/grady.raw
 dfdz=$output_folder/gradz.raw
 
+SFEM_COMPUTE_COEFFICIENTS=1 \
 grad_and_project $mesh_path $f $dfdx $dfdy $dfdz
 raw_to_db.py $mesh_path $output_folder/grad.vtk --point_data="$f,$dfdx,$dfdy,$dfdz" --point_data_type="$py_sfem_real_t,$py_sfem_real_t,$py_sfem_real_t,$py_sfem_real_t"
