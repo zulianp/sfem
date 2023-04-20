@@ -125,6 +125,7 @@ OBJS = \
 	neumann.o \
 	sfem_mesh.o \
 	sfem_mesh_write.o \
+	mesh_aura.o \
 	isotropic_phasefield_for_fracture.o \
 	tet10_laplacian.o \
 	adj_table.o \
