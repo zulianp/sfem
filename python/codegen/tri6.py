@@ -160,5 +160,26 @@ def DualTriShell6():
 	return WeightedFE(TriShell6(), tri6_weights, "Dual")
 
 
+def tri6_basis_transform(x):
+	r, c = tri6_trafo.shape
+
+	ret = sp.Matrix(r, 1, [0]*r)
+
+	for i in range(0, r):
+		for j in range(0, c):
+			 ret[i] = ret[i] + tri6_trafo[i, j] * x[j]
+	return ret
+
+def tri6_basis_transform_expr():
+	tx = tri6_basis_transform(coeffs('x', 6))
+	ttx = coeffs('values', 6)
+	
+	expr = []
+	
+	for i in range(0, 6):
+		e = ast.Assignment(ttx[i], tx[i])
+		expr.append(e)
+
+	return expr
 
 

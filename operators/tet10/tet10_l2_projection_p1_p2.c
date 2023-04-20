@@ -179,7 +179,7 @@ void tet10_ep1_p2_l2_projection_apply(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("tet4_l2_projection_p1_p2.c: tet4_p1_p2_l2_projection_apply\t%g seconds\n", tock - tick);
+    printf("tet10_l2_projection_p1_p2.c: tet10_p1_p2_l2_projection_apply\t%g seconds\n", tock - tick);
 }
 
 void tet10_ep1_p2_projection_coeffs(const ptrdiff_t nelements,
