@@ -47,7 +47,7 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     mesh_t mesh;
-    if (mesh_surf_read(comm, folder, &mesh)) {
+    if (mesh_read(comm, folder, &mesh)) {
         return EXIT_FAILURE;
     }
 
