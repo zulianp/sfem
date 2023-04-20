@@ -1,6 +1,7 @@
 from fe import FE
 import sympy as sp
 from sfem_codegen import *
+from weighted_fe import  *
 
 class Tri6(FE):
 	def __init__(self):
@@ -105,4 +106,59 @@ class TriShell6(Tri6):
 
 	def measure(self, q):
 		return self.detS / 2
+
+# Hard-coded alpha 1./5.
+r24div5 = sp.Rational(24, 5)
+r4div5 = sp.Rational(4, 5)
+r1div5 = sp.Rational(1, 5)
+r33div10 = sp.Rational(33, 10)
+r6div5 = sp.Rational(6, 5)
+r69div20 = sp.Rational(69, 20)
+r57div40 = sp.Rational(57, 40)
+
+ls_tri6_weights_ = [r24div5, r4div5,  r4div5, -r1div5, r4div5, -r1div5, r4div5, r24div5, r4div5, -r1div5, -r1div5, r4div5,
+              r4div5, r4div5,  r24div5,  r4div5, -r1div5, -r1div5,   -r33div10, -r33div10, r6div5,  r69div20,   -r57div40, -r57div40,
+              r6div5, -r33div10, -r33div10, -r57div40, r69div20, -r57div40, -r33div10, r6div5,  -r33div10, -r57div40, -r57div40, r69div20 ]
+
+alpha = sp.Rational(1, 5)
+ls_tri6_trafo_ = [0] * (6*6)
+
+ls_tri6_trafo_[0] = 1
+ls_tri6_trafo_[3] = alpha
+ls_tri6_trafo_[5] = alpha
+
+ls_tri6_trafo_[7] = 1
+ls_tri6_trafo_[9] = alpha
+ls_tri6_trafo_[10] = alpha
+
+ls_tri6_trafo_[14] = 1
+ls_tri6_trafo_[16] = alpha
+ls_tri6_trafo_[17] = alpha
+
+ls_tri6_trafo_[21] = (1 - 2 * alpha)
+ls_tri6_trafo_[28] = (1 - 2 * alpha)
+ls_tri6_trafo_[35] = (1 - 2 * alpha)
+
+tri6_trafo = sp.Matrix(6, 6, ls_tri6_trafo_)
+tri6_weights = sp.Matrix(6, 6, ls_tri6_weights_)
+
+#######################################
+# Dual basis trafo and weights
+#######################################
+
+# Factory functions
+def TransformedTri6():
+	return WeightedFE(Tri6(), tri6_trafo, "Transformed")
+
+def DualTri6():
+	return WeightedFE(Tri6(), tri6_weights, "Dual")
+
+def TransformedTriShell6():
+	return WeightedFE(TriShell6(), tri6_trafo, "Transformed")
+
+def DualTriShell6():
+	return WeightedFE(TriShell6(), tri6_weights, "Dual")
+
+
+
 

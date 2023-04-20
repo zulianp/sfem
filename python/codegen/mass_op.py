@@ -4,6 +4,10 @@ from sfem_codegen import *
 
 from tet4 import *
 from tet10 import *
+
+from tri3 import *
+from tri6 import *
+
 from fields import *
 
 class MassOp:
@@ -73,19 +77,22 @@ class MassOp:
 
 def main():
 
-	fields = [Field(Tet4(), coeffs('u', 4)), Field(TransformedTet10(), coeffs('u', 10))]
-	test_fes  = [TransformedTet10(), DualTet10()]
-
-	n_forms = len(test_fes)
-
-
-	if True:
+	if False:
 		fe = Tet10()
 		f =  Field(fe, coeffs('u', 10))
 		op = MassOp(f, fe, [qx, qy, qz])
 		c_code(op.matrix())
 
-	if False:
+	# if False:
+	if True:
+		# fields = [Field(TriShell3(), coeffs('u', 3)), Field(TransformedTet10(), coeffs('u', 10))]
+		# test_fes  = [TransformedTet10(), DualTet10()]
+
+		fields = [Field(TriShell3(), coeffs('u', 3)), Field(TransformedTriShell6(), coeffs('u', 6))]
+		test_fes  = [TransformedTriShell6(), DualTriShell6()]
+
+		n_forms = len(test_fes)
+
 		q = [qx, qy, qz]
 		for i in range(0, n_forms):
 			trial = fields[i]

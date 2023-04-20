@@ -1,5 +1,6 @@
 from fe import FE
 from sfem_codegen import *
+from weighted_fe import *
 
 class Tet10(FE):
 	def __init__(self):
@@ -106,16 +107,6 @@ ls_tet10_trafo_ = [1, 0, 0, 0, sp.Rational(1,5), 0,   sp.Rational(1,5), sp.Ratio
                       0, 0, 0, 0, 0,   0,   sp.Rational(3, 5), 0,   0,   0,   0, 0, 0, 0, 0,   0,   0, sp.Rational(3, 5), 0,   0,
                       0, 0, 0, 0, 0,   0,   0,   0,   sp.Rational(3, 5), 0,   0, 0, 0, 0, 0,   0,   0, 0,   0,   sp.Rational(3, 5) ]
 
-
-# ls_tet10_weights_ = [7.0,    0.7,    0.7,    0.7,   0.175,  0.7,    0.175,  0.175,  0.7,    0.7,    0.7,  7.0,    0.7,
-#                 0.7,    0.175,  0.175,  0.7,   0.7,    0.175,  0.7,    0.7,    0.7,    7.0,    0.7,  0.7,    0.175,
-#                 0.175,  0.7,    0.7,    0.175, 0.7,    0.7,    0.7,    7.0,    0.7,    0.7,    0.7,  0.175,  0.175,
-#                 0.175,  -3.9,   -3.9,   1.2,   1.2,    5.55,   -1.875, -1.875, -1.875, -1.875, 1.2,  1.2,    -3.9,
-#                 -3.9,   1.2,    -1.875, 5.55,  -1.875, 1.2,    -1.875, -1.875, -3.9,   1.2,    -3.9, 1.2,    -1.875,
-#                 -1.875, 5.55,   -1.875, 1.2,   -1.875, -3.9,   1.2,    1.2,    -3.9,   -1.875, 1.2,  -1.875, 5.55,
-#                 -1.875, -1.875, 1.2,    -3.9,  1.2,    -3.9,   -1.875, -1.875, 1.2,    -1.875, 5.55, -1.875, 1.2,
-#                 1.2,    -3.9,   -3.9,   1.2,   -1.875, -1.875, -1.875, -1.875, 5.55 ]
-
 r15div8 = sp.Rational(15, 8)
 r7div40 = sp.Rational(7, 40)
 r7div10 = sp.Rational(7, 10)
@@ -157,52 +148,6 @@ def tet10_basis_transform_expr():
 		expr.append(e)
 
 	return expr
-
-class WeightedFE(FE):
-	def __init__(self, fe, weights, prefix_ = "WeightedFE"):
-		self.fe = fe
-		self.weights = weights
-		self.prefix_  = prefix_
-
-	def fun(self, p):
-		fe = self.fe
-		weights = self.weights
-
-		nn = fe.n_nodes()
-		f = fe.fun(p)
-		ret = [0] * nn
-
-		for i in range(0, nn):
-			for j in range(0, nn):
-				ret[i] += f[j] * weights[i, j]
-		return ret
-
-	def name(self):
-		return f'{self.prefix_}({self.fe.name()})'
-				
-	def n_nodes(self):
-		return self.fe.n_nodes()
-
-	def manifold_dim(self):
-		return self.fe.manifold_dim()
-
-	def spatial_dim(self):
-		return self.fe.spatial_dim()
-
-	def integrate(self, q, expr):
-		return self.fe.integrate(q, expr)
-	
-	def jacobian(self, q):
-		return self.fe.jacobian(q)
-
-	def jacobian_inverse(self, q):
-		return self.fe.jacobian_inverse(q)
-
-	def jacobian_determinant(self, q):
-		return self.fe.jacobian_determinant(q)
-
-	def measure(self, q):
-		return self.fe.measure(q)
 
 # Factory functions
 def TransformedTet10():
