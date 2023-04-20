@@ -1,6 +1,10 @@
 #ifndef TRISHELL6_L2_PROJECTION_P1_P2_H
 #define TRISHELL6_L2_PROJECTION_P1_P2_H
 
+#include <stddef.h>
+
+#include "sfem_base.h"
+
 void trishell6_ep1_p2_l2_projection_apply(const ptrdiff_t nelements,
                                           const ptrdiff_t nnodes,
                                           idx_t **const SFEM_RESTRICT elems,

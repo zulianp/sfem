@@ -1,4 +1,4 @@
-// #include "trishell6_l2_projection_p1_p2.h"
+#include "trishell6_l2_projection_p1_p2.h"
 
 #include <assert.h>
 #include <math.h>
