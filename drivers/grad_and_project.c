@@ -18,8 +18,8 @@
 
 #include "operators/tet4/tet4_l2_projection_p0_p1.h"
 
-#include "operators/tet10/tet10_l2_projection_p1_p2.h"
 #include "operators/tet10/tet10_grad.h"
+#include "operators/tet10/tet10_l2_projection_p1_p2.h"
 
 #include "read_mesh.h"
 
@@ -101,17 +101,16 @@ void grad_and_project(const enum ElemType element_type,
     }
 }
 
-// 
-
+//
 
 void tet4_p1_p1_grad_and_project_coeffs(const ptrdiff_t nelements,
-                                 const ptrdiff_t nnodes,
-                                 idx_t **const SFEM_RESTRICT elems,
-                                 geom_t **const SFEM_RESTRICT xyz,
-                                 const real_t *const SFEM_RESTRICT u,
-                                 real_t *const SFEM_RESTRICT dudx,
-                                 real_t *const SFEM_RESTRICT dudy,
-                                 real_t *const SFEM_RESTRICT dudz)
+                                        const ptrdiff_t nnodes,
+                                        idx_t **const SFEM_RESTRICT elems,
+                                        geom_t **const SFEM_RESTRICT xyz,
+                                        const real_t *const SFEM_RESTRICT u,
+                                        real_t *const SFEM_RESTRICT dudx,
+                                        real_t *const SFEM_RESTRICT dudy,
+                                        real_t *const SFEM_RESTRICT dudz)
 
 {
     real_t *p0_dudx = malloc(nelements * sizeof(real_t));
@@ -131,13 +130,13 @@ void tet4_p1_p1_grad_and_project_coeffs(const ptrdiff_t nelements,
 
 // Should this routine use "mass-lumping" for the projection?
 void tet10_p2_p2_grad_and_project_coeffs(const ptrdiff_t nelements,
-                                  const ptrdiff_t nnodes,
-                                  idx_t **const SFEM_RESTRICT elems,
-                                  geom_t **const SFEM_RESTRICT xyz,
-                                  const real_t *const SFEM_RESTRICT u,
-                                  real_t *const SFEM_RESTRICT dudx,
-                                  real_t *const SFEM_RESTRICT dudy,
-                                  real_t *const SFEM_RESTRICT dudz)
+                                         const ptrdiff_t nnodes,
+                                         idx_t **const SFEM_RESTRICT elems,
+                                         geom_t **const SFEM_RESTRICT xyz,
+                                         const real_t *const SFEM_RESTRICT u,
+                                         real_t *const SFEM_RESTRICT dudx,
+                                         real_t *const SFEM_RESTRICT dudy,
+                                         real_t *const SFEM_RESTRICT dudz)
 
 {
     real_t *p1_dudx = malloc(nelements * 4 * sizeof(real_t));
@@ -156,14 +155,14 @@ void tet10_p2_p2_grad_and_project_coeffs(const ptrdiff_t nelements,
 }
 
 void grad_and_project_coeffs(const enum ElemType element_type,
-                      const ptrdiff_t nelements,
-                      const ptrdiff_t nnodes,
-                      idx_t **const SFEM_RESTRICT elems,
-                      geom_t **const SFEM_RESTRICT xyz,
-                      const real_t *const SFEM_RESTRICT u,
-                      real_t *const SFEM_RESTRICT dudx,
-                      real_t *const SFEM_RESTRICT dudy,
-                      real_t *const SFEM_RESTRICT dudz)
+                             const ptrdiff_t nelements,
+                             const ptrdiff_t nnodes,
+                             idx_t **const SFEM_RESTRICT elems,
+                             geom_t **const SFEM_RESTRICT xyz,
+                             const real_t *const SFEM_RESTRICT u,
+                             real_t *const SFEM_RESTRICT dudx,
+                             real_t *const SFEM_RESTRICT dudy,
+                             real_t *const SFEM_RESTRICT dudz)
 
 {
     switch (element_type) {
@@ -234,8 +233,15 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_COMPUTE_COEFFICIENTS, atoi);
 
     if (SFEM_COMPUTE_COEFFICIENTS) {
-        // TODO
-        assert(0);
+        grad_and_project_coeffs(mesh.element_type,
+                                mesh.nelements,
+                                mesh.nnodes,
+                                mesh.elements,
+                                mesh.points,
+                                u,
+                                grad_u[0],
+                                grad_u[1],
+                                grad_u[2]);
 
     } else {
         grad_and_project(mesh.element_type,

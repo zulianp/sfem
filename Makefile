@@ -80,7 +80,7 @@ GOALS += mesh_p1_to_p2
 # FE post-process
 GOALS += cgrad cshear cstrain cprincipal_strains cauchy_stress vonmises
 GOALS += wss surface_outflux integrate_divergence cdiv lform_surface_outflux
-GOALS += projection_p0_to_p1 surface_projection_p0_to_p1 grad_and_project
+GOALS += projection_p0_to_p1 surface_projection grad_and_project
 
 # BLAS
 GOALS += axpy
@@ -285,7 +285,7 @@ projection_p0_to_p1 : drivers/projection_p0_to_p1.c libsfem.a
 grad_and_project : drivers/grad_and_project.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
-surface_projection_p0_to_p1 : drivers/surface_projection_p0_to_p1.c libsfem.a
+surface_projection : drivers/surface_projection.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 smask : drivers/smask.c libsfem.a

@@ -88,7 +88,7 @@ hetero_neumann()
 	ls -la  $surf_mesh_path_
 
 	surface_outflux $surf_mesh_path_ $vx_ $vy_ $vz_ $p0_outflux_ 
-	SFEM_COMPUTE_COEFFICIENTS=0 surface_projection_p0_to_p1 $surf_mesh_path_ $p0_outflux_ $output_
+	SFEM_COMPUTE_COEFFICIENTS=0 surface_projection $surf_mesh_path_ $p0_outflux_ $output_
 	# raw_to_db.py $surf_mesh_path_ hey.vtk --point_data=$output_
 
 	# Clean-up
@@ -119,7 +119,7 @@ norm_fp64()
 	echo "norm: $norm_vec  (vec=$vec)"
 }
 
-p1grads()
+compute_grads()
 {
 	if (($# != 4))
 	then
@@ -132,25 +132,29 @@ p1grads()
 	p1_dpdy_=$3
 	p1_dpdz_=$4
 
-	# Per Cell quantities
-	p0_dpdx_=$workspace/p0_grad_x.raw
-	p0_dpdy_=$workspace/p0_grad_y.raw
-	p0_dpdz_=$workspace/p0_grad_z.raw
+	# Old workflow 
+	# # Per Cell quantities
+	# p0_dpdx_=$workspace/p0_grad_x.raw
+	# p0_dpdy_=$workspace/p0_grad_y.raw
+	# p0_dpdz_=$workspace/p0_grad_z.raw
 
-	# coefficients: P1 -> P0
-	cgrad $mesh_path $potential_ $p0_dpdx_ $p0_dpdy_ $p0_dpdz_
+	# # coefficients: P1 -> P0
+	# cgrad $mesh_path $potential_ $p0_dpdx_ $p0_dpdy_ $p0_dpdz_
 
-	raw_to_db.py $mesh_path $post_dir/cgrad.vtk \
-		--cell_data="$p0_dpdx_,$p0_dpdy_,$p0_dpdz_"
+	# raw_to_db.py $mesh_path $post_dir/cgrad.vtk \
+	# 	--cell_data="$p0_dpdx_,$p0_dpdy_,$p0_dpdz_"
 
-	################################################
-	# P0 to P1 projection
-	################################################
+	# ################################################
+	# # P0 to P1 projection
+	# ################################################
 
-	# coefficients: P0 -> P1
-	projection_p0_to_p1 $mesh_path $p0_dpdx_ $p1_dpdx_
-	projection_p0_to_p1 $mesh_path $p0_dpdy_ $p1_dpdy_
-	projection_p0_to_p1 $mesh_path $p0_dpdz_ $p1_dpdz_
+	# # coefficients: P0 -> P1
+	# projection_p0_to_p1 $mesh_path $p0_dpdx_ $p1_dpdx_
+	# projection_p0_to_p1 $mesh_path $p0_dpdy_ $p1_dpdy_
+	# projection_p0_to_p1 $mesh_path $p0_dpdz_ $p1_dpdz_
+
+	# New workflow 
+	grad_and_project $mesh_path $potential_ $p1_dpdx_ $p1_dpdy_ $p1_dpdz_
 }
 
 mesh_path=./mesh
@@ -241,7 +245,7 @@ p1_dpdx=$workspace/correction_x.raw
 p1_dpdy=$workspace/correction_y.raw
 p1_dpdz=$workspace/correction_z.raw
 
-p1grads $potential $p1_dpdx $p1_dpdy $p1_dpdz
+compute_grads $potential $p1_dpdx $p1_dpdy $p1_dpdz
 
 # Add correction to velocity
 

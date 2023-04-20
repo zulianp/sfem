@@ -11,7 +11,8 @@ The following driver require adaptation for the the pressure projection
 - volumes (check that p2 works by piggy-backing) 							[LOOKS good]
 - integrate_divergence (this is used for checks, maybe p2)  				[UNTESTED]
 - surface_projection_p0_to_p1 -> surface_projection_p1_to_p2 				[UNTESTED]
-- Incorporate new components into workflow 									[TODO]
+- Incorporate new components into workflow 									[DONE]
+- Full p2 workflow test 													[TODO]
 
 ## P2 solver performance
 

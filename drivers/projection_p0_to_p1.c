@@ -8,7 +8,6 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-
 #include "crs_graph.h"
 #include "sfem_base.h"
 
@@ -68,11 +67,11 @@ int main(int argc, char *argv[]) {
     // Compute projection
     ///////////////////////////////////////////////////////////////////////////////
 
-    int SFEM_COMPUTE_COEFFICIENTS=1;
+    int SFEM_COMPUTE_COEFFICIENTS = 1;
 
     SFEM_READ_ENV(SFEM_COMPUTE_COEFFICIENTS, atoi);
 
-    if(SFEM_COMPUTE_COEFFICIENTS) {
+    if (SFEM_COMPUTE_COEFFICIENTS) {
         tet4_p0_p1_projection_coeffs(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, p0, p1);
     } else {
         tet4_p0_p1_l2_projection_apply(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, p0, p1);
