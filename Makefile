@@ -52,8 +52,8 @@ ifeq ($(metis), 1)
 endif
 
 # Folder structure
-VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix:operators/tet10:operators/tet4
-INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4
+VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix:operators/tet10:operators/tet4:operators/tri3:operators/tri6
+INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/tri3 -Ioperators/tri6
 
 
 CFLAGS += -pedantic -Wextra
@@ -133,6 +133,7 @@ OBJS = \
 	tet4_div.o \
 	tet4_mass.o \
 	tet4_l2_projection_p0_p1.o \
+	trishell3_l2_projection_p0_p1.o \
 	grad_p1.o \
 	tet10_grad.o \
 	tet10_div.o \
