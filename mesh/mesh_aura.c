@@ -1,4 +1,6 @@
 #include "sfem_mesh.h"
+#include "sortreduce.h"
+#include "sfem_defs.h"
 
 #include <string.h>
 
