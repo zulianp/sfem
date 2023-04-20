@@ -17,4 +17,4 @@ The following driver require adaptation for the the pressure projection
 - LOR operator for preconditioner 
 	- CRS graph from implicit P1 graph from P2 mesh
 	- FE assembly with macro element
-- Matrix free P2 application (first version with matrix) [Done: 2x speed up, and heavily reduced mem footprint]
+- Matrix free P2 application (first version with matrix [Done: 2x speed up, and heavily reduced mem footprint])
