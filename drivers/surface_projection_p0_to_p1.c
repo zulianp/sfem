@@ -13,7 +13,7 @@
 
 #include "read_mesh.h"
 
-#include "trishell3_l2_projection_p0_p1.h"
+#include "surface_l2_projection.h"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -72,9 +72,9 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_COMPUTE_COEFFICIENTS, atoi);
 
     if (SFEM_COMPUTE_COEFFICIENTS) {
-        trishell3_p0_p1_projection_coeffs(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, p0, p1);
+        surface_e_projection_coeffs(mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, p0, p1);
     } else {
-        trishell3_p0_p1_l2_projection_apply(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, p0, p1);
+        surface_e_projection_apply(mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, p0, p1);
     }
 
     ///////////////////////////////////////////////////////////////////////////////

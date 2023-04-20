@@ -135,6 +135,7 @@ OBJS = \
 	tet4_l2_projection_p0_p1.o \
 	trishell3_l2_projection_p0_p1.o \
 	trishell6_l2_projection_p1_p2.o \
+	surface_l2_projection.o \
 	grad_p1.o \
 	tet10_grad.o \
 	tet10_div.o \
