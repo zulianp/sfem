@@ -18,7 +18,6 @@ mesh=mesh
 
 mkdir -p workspace
 
-# set -x
 mesh_evalf.py $mesh/x.raw $mesh/y.raw $mesh/z.raw 'x*x + y*y + z*z' workspace/fx.raw
 
 ls -la $mesh/*.raw
