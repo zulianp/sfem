@@ -91,9 +91,11 @@ hetero_neumann()
 
 	ls -la  $surf_mesh_path_
 
-	surface_outflux $surf_mesh_path_ $vx_ $vy_ $vz_ $p0_outflux_ 
-	SFEM_COMPUTE_COEFFICIENTS=0 surface_projection $surf_mesh_path_ $p0_outflux_ $output_
-	# raw_to_db.py $surf_mesh_path_ hey.vtk --point_data=$output_
+	# surface_outflux $surf_mesh_path_ $vx_ $vy_ $vz_ $p0_outflux_ 
+	# SFEM_COMPUTE_COEFFICIENTS=0 surface_projection $surf_mesh_path_ $p0_outflux_ $output_
+
+	lform_surface_outflux  $surf_mesh_path_ $vx_ $vy_ $vz_ $output_
+
 
 	# Clean-up
 	rm -r $workspace_

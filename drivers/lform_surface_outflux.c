@@ -492,7 +492,7 @@ int main(int argc, char *argv[]) {
         array_write(comm, "normalz.raw", SFEM_MPI_GEOM_T, normals_xyz[2], mesh.nelements, mesh.nelements);
     }
 
-    array_write(comm, path_output, SFEM_MPI_REAL_T, outflux, mesh.nelements, mesh.nelements);
+    array_write(comm, path_output, SFEM_MPI_REAL_T, outflux, mesh.nnodes, mesh.nnodes);
 
     free(outflux);
 
