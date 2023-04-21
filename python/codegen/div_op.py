@@ -11,6 +11,41 @@ class DivOp:
 		self.fe_test = fe_test
 		self.q = sp.Matrix(fe_test.manifold_dim(), 1, q)
 
+	def hessian(self):
+		fe_trial = self.vector_field.fe
+		fe_test = self.fe_test
+		q = self.q
+
+		rf = fe_test.fun(q)
+		J_inv_sym = fe_test.symbol_jacobian_inverse()
+		J_inv = fe_test.jacobian_inverse(q)
+
+		grad_trial = fe_trial.grad(q)
+
+		expr = []
+		for i in range(0, fe_test.n_nodes()):
+			for j in range(0, fe_trial.n_nodes()):
+				# AoS layout
+				offset_ij = (i * fe_trial.n_nodes() + j) * fe_trial.spatial_dim()
+
+				gj = J_inv_sym.T * grad_trial[j]
+
+				for d in range(0, fe_trial.spatial_dim()):
+					blform = rf[i] * gj[d]
+					integr = fe_test.integrate(q, blform) * fe_test.jacobian_determinant(q)
+					
+					# Only for Tet10 it improves
+					if fe_test.n_nodes() == 10:
+						integr = sp.simplify(integr)
+
+					integr = subsmat(integr, J_inv_sym, J_inv)
+
+					var = sp.symbols(f'element_matrix[{offset_ij + d}]')
+					expr.append(ast.Assignment(var, integr))
+
+		return expr
+
+
 	# Code for applying the divergence op (div u, q)_L^2
 	def apply(self):
 		vector_field = self.vector_field
