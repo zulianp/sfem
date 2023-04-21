@@ -124,14 +124,16 @@ def main():
 			# c_code(expr)
 			# print("----------------------------")	
 
-	if True:
+	# if True:
+	if False:
 		print("----------------------------")
 		print("Transform")
 		print("----------------------------")
 		c_code(tet10_basis_transform_expr())
 		print("----------------------------")
 
-	if False:
+	if True:
+	# if False:
 		print("----------------------------")
 		print("Transform")
 		print("----------------------------")

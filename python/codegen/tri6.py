@@ -165,9 +165,11 @@ def tri6_basis_transform(x):
 
 	ret = sp.Matrix(r, 1, [0]*r)
 
+	trafo = tri6_trafo.T
+
 	for i in range(0, r):
 		for j in range(0, c):
-			 ret[i] = ret[i] + tri6_trafo[i, j] * x[j]
+			 ret[i] = ret[i] + trafo[i, j] * x[j]
 	return ret
 
 def tri6_basis_transform_expr():
