@@ -32,19 +32,31 @@ mkdir -p $post_dir
 
 # logfile=$post_dir/log.txt
 # divergence.sh mesh $velx $vely $velz $post_dir/div > $logfile
-divergence.sh mesh $velx $vely $velz $post_dir/div 
+# divergence.sh mesh $velx $vely $velz $post_dir/div 
 
 node=`find_closest_point.py -1 0 0 $mesh_path/x.raw $mesh_path/y.raw $mesh_path/z.raw`
-# node=`find_closest_point.py 0 0 0 $mesh_path/x.raw $mesh_path/y.raw $mesh_path/z.raw`
-export dirichlet_nodes=$workspace/dirichlet_nodes.raw
 
-# python3 -c "import numpy as np; a = np.array([$node]); a.astype(np.int32).tofile(\"$dirichlet_nodes\"); print(f'fixed node = {a}');"
+
+# cat $mesh_path/i4.raw >  p2idx.raw
+# cat $mesh_path/i5.raw >> p2idx.raw
+# cat $mesh_path/i6.raw >> p2idx.raw
+
+# cat $mesh_path/i7.raw >> p2idx.raw
+# cat $mesh_path/i8.raw >> p2idx.raw
+# cat $mesh_path/i9.raw >> p2idx.raw
+
+# node=`sparse_find_closest_point.py -1 0 0 $mesh_path/x.raw $mesh_path/y.raw $mesh_path/z.raw p2idx.raw`
+
+
+export dirichlet_nodes=$workspace/dirichlet_nodes.raw
+python3 -c "import numpy as np; a = np.array([$node]); a.astype(np.int32).tofile(\"$dirichlet_nodes\"); print(f'fixed node = {a}');"
 
 
 # python3 -c "import numpy as np; b = np.fromfile(\"$mesh_path/surface/wall/i0.raw\",dtype=np.int32); a = np.array(b[0]); a.astype(np.int32).tofile(\"$dirichlet_nodes\"); print(f'fixed node = {a}');"
 # ./projection.sh $velx $vely $velz $post_dir
 
-python3 -c "import numpy as np; b = np.fromfile(\"$mesh_path/surface/inlet/i0.raw\",dtype=np.int32); a = np.array(b[0]); a.astype(np.int32).tofile(\"$dirichlet_nodes\"); print(f'fixed node = {a}');"
+# python3 -c "import numpy as np; b = np.fromfile(\"$mesh_path/surface/inlet/i0.raw\",dtype=np.int32); a = np.array(b[0]); a.astype(np.int32).tofile(\"$dirichlet_nodes\"); print(f'fixed node = {a}');"
+
 ./projection_2.sh $velx $vely $velz $post_dir
 
 # Clean-up

@@ -41,7 +41,8 @@ class GradAndProjectOp:
 		q = self.q
 
 		J_inv = field.fe.jacobian_inverse(q)
-		grad_field = J_inv * field.grad(q)
+		# grad_field = J_inv * field.grad(q)
+		grad_field = J_inv.T * field.grad(q) # ATTENTION
 		f_to   = fe_test.fun(q)
 
 		expr = []

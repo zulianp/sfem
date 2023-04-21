@@ -77,10 +77,10 @@ def main():
 	op = DivOp(field, fe, q)
 
 
-	# c_code(op.apply())
+	c_code(op.apply())
 
 
-	c_code(op.value())
+	# c_code(op.value())
 
 if __name__ == '__main__':
 	main()

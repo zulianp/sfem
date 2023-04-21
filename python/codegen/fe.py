@@ -34,7 +34,8 @@ class FE:
 				gi.append(sp.diff(fx[i], p[d]))
 
 			gi = sp.Matrix(dims, 1, gi)
-			gi = J_inv * gi
+			# gi = J_inv * gi
+			gi = J_inv.T * gi # ATTENTION!
 			g[i] = gi
 
 		return g
