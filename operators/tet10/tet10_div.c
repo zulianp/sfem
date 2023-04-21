@@ -457,6 +457,8 @@ void tet10_cdiv(const ptrdiff_t nelements,
                 const real_t *const SFEM_RESTRICT uz,
                 real_t *const SFEM_RESTRICT div) {
     // TODO
+    fprintf(stderr, "tet10_cdiv not implemented!\n");
     assert(0);
     MPI_Abort(MPI_COMM_WORLD, -1);
+    
 }
