@@ -105,25 +105,43 @@ static SFEM_INLINE void lumped_mass_kernel(const real_t px0,
 
 static SFEM_INLINE void tet10_transform_kernel(const real_t *const SFEM_RESTRICT x,
                                                real_t *const SFEM_RESTRICT values) {
-    // FLOATING POINT OPS!
-    //       - Result: 4*ADD + 10*ASSIGNMENT + 6*MUL
-    //       - Subexpressions: 6*DIV
-    const real_t x0 = (1.0 / 5.0) * x[4];
-    const real_t x1 = (1.0 / 5.0) * x[6];
-    const real_t x2 = (1.0 / 5.0) * x[7];
-    const real_t x3 = (1.0 / 5.0) * x[5];
-    const real_t x4 = (1.0 / 5.0) * x[8];
-    const real_t x5 = (1.0 / 5.0) * x[9];
-    values[0] = x0 + x1 + x2 + x[0];
-    values[1] = x0 + x3 + x4 + x[1];
-    values[2] = x1 + x3 + x5 + x[2];
-    values[3] = x2 + x4 + x5 + x[3];
-    values[4] = (3.0 / 5.0) * x[4];
-    values[5] = (3.0 / 5.0) * x[5];
-    values[6] = (3.0 / 5.0) * x[6];
-    values[7] = (3.0 / 5.0) * x[7];
-    values[8] = (3.0 / 5.0) * x[8];
-    values[9] = (3.0 / 5.0) * x[9];
+    // // FLOATING POINT OPS!
+    // //       - Result: 4*ADD + 10*ASSIGNMENT + 6*MUL
+    // //       - Subexpressions: 6*DIV
+    // const real_t x0 = (1.0 / 5.0) * x[4];
+    // const real_t x1 = (1.0 / 5.0) * x[6];
+    // const real_t x2 = (1.0 / 5.0) * x[7];
+    // const real_t x3 = (1.0 / 5.0) * x[5];
+    // const real_t x4 = (1.0 / 5.0) * x[8];
+    // const real_t x5 = (1.0 / 5.0) * x[9];
+    // values[0] = x0 + x1 + x2 + x[0];
+    // values[1] = x0 + x3 + x4 + x[1];
+    // values[2] = x1 + x3 + x5 + x[2];
+    // values[3] = x2 + x4 + x5 + x[3];
+    // values[4] = (3.0 / 5.0) * x[4];
+    // values[5] = (3.0 / 5.0) * x[5];
+    // values[6] = (3.0 / 5.0) * x[6];
+    // values[7] = (3.0 / 5.0) * x[7];
+    // values[8] = (3.0 / 5.0) * x[8];
+    // values[9] = (3.0 / 5.0) * x[9];
+
+    //FLOATING POINT OPS!
+    //      - Result: 6*ADD + 10*ASSIGNMENT + 6*MUL
+    //      - Subexpressions: 4*DIV
+    const real_t x0 = (1.0/5.0)*x[0];
+    const real_t x1 = (1.0/5.0)*x[1];
+    const real_t x2 = (1.0/5.0)*x[2];
+    const real_t x3 = (1.0/5.0)*x[3];
+    values[0] = x[0];
+    values[1] = x[1];
+    values[2] = x[2];
+    values[3] = x[3];
+    values[4] = x0 + x1 + (3.0/5.0)*x[4];
+    values[5] = x1 + x2 + (3.0/5.0)*x[5];
+    values[6] = x0 + x2 + (3.0/5.0)*x[6];
+    values[7] = x0 + x3 + (3.0/5.0)*x[7];
+    values[8] = x1 + x3 + (3.0/5.0)*x[8];
+    values[9] = x2 + x3 + (3.0/5.0)*x[9];
 }
 
 void tet10_ep1_p2_l2_projection_apply(const ptrdiff_t nelements,
@@ -196,8 +214,8 @@ void tet10_ep1_p2_projection_coeffs(const ptrdiff_t nelements,
     real_t element_p2_pre_trafo[10];
     real_t element_weights[10];
 
-    real_t *weights = (real_t *)malloc(nnodes * sizeof(real_t));
-    memset(weights, 0, nnodes * sizeof(real_t));
+    real_t *buff = (real_t *)malloc(nnodes * sizeof(real_t));
+    memset(buff, 0, nnodes * sizeof(real_t));
     memset(p2, 0, nnodes * sizeof(real_t));
 
     for (ptrdiff_t i = 0; i < nelements; ++i) {
@@ -254,20 +272,24 @@ void tet10_ep1_p2_projection_coeffs(const ptrdiff_t nelements,
         for (int v = 0; v < 10; ++v) {
             const idx_t idx = ev[v];
             p2[idx] += element_p2[v];
-            weights[idx] += element_weights[v];
+            buff[idx] += element_weights[v];
         }
     }
 
+    // Reuse buffer for storing rescaled vector
     for (ptrdiff_t i = 0; i < nnodes; i++) {
-        p2[i] /= weights[i];
+        buff[i] = p2[i] / buff[i];
     }
-
-    free(weights);
 
     for (ptrdiff_t i = 0; i < nelements; ++i) {
 #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
-            element_p2_pre_trafo[v] = p2[elems[v][i]];
+            ev[v] = elems[v][i];
+        }
+
+#pragma unroll(10)
+        for (int v = 0; v < 10; ++v) {
+            element_p2_pre_trafo[v] = buff[ev[v]];
         }
 
         tet10_transform_kernel(element_p2_pre_trafo, element_p2);
@@ -277,6 +299,8 @@ void tet10_ep1_p2_projection_coeffs(const ptrdiff_t nelements,
             p2[idx] = element_p2[v];
         }
     }
+
+    free(buff);
 
     double tock = MPI_Wtime();
     printf("tet10_l2_projection_p0_p1.c: tet10_p0_p1_projection_coeffs\t%g seconds\n", tock - tick);

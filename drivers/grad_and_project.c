@@ -128,6 +128,24 @@ void tet4_p1_p1_grad_and_project_coeffs(const ptrdiff_t nelements,
     free(p0_dudz);
 }
 
+void print_if_not_zero(const ptrdiff_t nelements, real_t *p1_dudx)
+{
+    for (ptrdiff_t e = 0; e < nelements; e++) {
+        int printed = 0;
+        for (int i = 0; i < 4; i++) {
+            if (fabs(p1_dudx[e * 4 + i]) > 1e-4) {
+                printf("%3.2lf ", p1_dudx[e * 4 + i]);
+                printed = 1;
+            }
+        }
+
+        if (printed) {
+            printf("\n");
+        }
+    }
+
+}
+
 // Should this routine use "mass-lumping" for the projection?
 void tet10_p2_p2_grad_and_project_coeffs(const ptrdiff_t nelements,
                                          const ptrdiff_t nnodes,
@@ -144,6 +162,10 @@ void tet10_p2_p2_grad_and_project_coeffs(const ptrdiff_t nelements,
     real_t *p1_dudz = malloc(nelements * 4 * sizeof(real_t));
 
     tet10_grad(nelements, nnodes, elems, xyz, u, p1_dudx, p1_dudy, p1_dudz);
+
+    // print_if_not_zero(nelements, p1_dudx);
+    // print_if_not_zero(nelements, p1_dudy);
+    // print_if_not_zero(nelements, p1_dudz);
 
     tet10_ep1_p2_projection_coeffs(nelements, nnodes, elems, xyz, p1_dudx, dudx);
     tet10_ep1_p2_projection_coeffs(nelements, nnodes, elems, xyz, p1_dudy, dudy);
@@ -221,6 +243,8 @@ int main(int argc, char *argv[]) {
 
     ptrdiff_t u_n_local, u_n_global;
     array_create_from_file(comm, path_u, SFEM_MPI_REAL_T, (void **)&u, &u_n_local, &u_n_global);
+
+    assert(u_n_local == mesh.nnodes);
 
     real_t *grad_u[3];
     for (int d = 0; d < mesh.spatial_dim; ++d) {

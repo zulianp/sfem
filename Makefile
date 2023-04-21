@@ -338,7 +338,8 @@ principal_strains.o : principal_strains.cpp
 .PRECIOUS :
 
 clean:
-	rm *.o *.a $(GOALS)
+	rm *.o *.a $(GOALS); rm -r *.dSYM  
+
 
 .SUFFIXES:
 

@@ -21,7 +21,7 @@ class CGradOp:
 		xnames = ['x', 'y', 'z']
 
 		J_inv = fe.jacobian_inverse(q)
-		g = J_inv * field.grad(q)
+		g = J_inv.T * field.grad(q)
 
 		qidx = 0
 		for qeval in q_evals:

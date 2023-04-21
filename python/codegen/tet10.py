@@ -101,11 +101,18 @@ class Tet10(FE):
 # Dual basis trafo and weights
 #######################################
 
+# ls_tet10_trafo_ = [1, 0, 0, 0, 0.2, 0,   0.2, 0.2, 0,   0,   0, 1, 0, 0, 0.2, 0.2, 0, 0,   0.2, 0,
+#               0, 0, 1, 0, 0,   0.2, 0.2, 0,   0,   0.2, 0, 0, 0, 1, 0,   0,   0, 0.2, 0.2, 0.2,
+#               0, 0, 0, 0, 0.6, 0,   0,   0,   0,   0,   0, 0, 0, 0, 0,   0.6, 0, 0,   0,   0,
+#               0, 0, 0, 0, 0,   0,   0.6, 0,   0,   0,   0, 0, 0, 0, 0,   0,   0, 0.6, 0,   0,
+#               0, 0, 0, 0, 0,   0,   0,   0,   0.6, 0,   0, 0, 0, 0, 0,   0,   0, 0,   0,   0.6]
+
 ls_tet10_trafo_ = [1, 0, 0, 0, sp.Rational(1,5), 0,   sp.Rational(1,5), sp.Rational(1,5), 0,   0,   0, 1, 0, 0, sp.Rational(1,5), sp.Rational(1,5), 0, 0,   sp.Rational(1,5), 0,
                       0, 0, 1, 0, 0,   sp.Rational(1,5), sp.Rational(1,5), 0,   0,   sp.Rational(1,5), 0, 0, 0, 1, 0,   0,   0, sp.Rational(1,5), sp.Rational(1,5), sp.Rational(1,5),
                       0, 0, 0, 0, sp.Rational(3, 5), 0,   0,   0,   0,   0,   0, 0, 0, 0, 0,   sp.Rational(3, 5), 0, 0,   0,   0,
                       0, 0, 0, 0, 0,   0,   sp.Rational(3, 5), 0,   0,   0,   0, 0, 0, 0, 0,   0,   0, sp.Rational(3, 5), 0,   0,
                       0, 0, 0, 0, 0,   0,   0,   0,   sp.Rational(3, 5), 0,   0, 0, 0, 0, 0,   0,   0, 0,   0,   sp.Rational(3, 5) ]
+
 
 r15div8 = sp.Rational(15, 8)
 r7div40 = sp.Rational(7, 40)
@@ -126,14 +133,33 @@ ls_tet10_weights_ = [7,    r7div10,    r7div10,    r7div10,   r7div40,  r7div10,
 tet10_trafo = sp.Matrix(10, 10, ls_tet10_trafo_)
 tet10_weights = sp.Matrix(10, 10, ls_tet10_weights_)
 
+
+# for i in range(0, 10):
+# 	s = 0
+# 	for j in range(0, 10):
+# 		s += tet10_trafo[i, j]
+# 	c_log(s)
+	
+# for i in range(0, 10):
+# 	s = 0
+# 	for j in range(0, 10):
+# 		s += tet10_weights[i, j]
+# 	c_log(s)
+
+# c_log(tet10_trafo - tet10_trafo.T)
+	
+
 def tet10_basis_transform(x):
 	r, c = tet10_trafo.shape
 
 	ret = sp.Matrix(r, 1, [0]*r)
 
+	# Use transposed here
+	trafo = tet10_trafo.T
+
 	for i in range(0, r):
 		for j in range(0, c):
-			 ret[i] = ret[i] + tet10_trafo[i, j] * x[j]
+			 ret[i] = ret[i] + trafo[i, j] * x[j]
 	return ret
 
 def tet10_basis_transform_expr():
