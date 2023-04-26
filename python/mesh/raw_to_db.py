@@ -201,6 +201,8 @@ def main(argv):
         cell_type = "hexahedron"
     elif len(idx) == 10:
         cell_type = "tetra10"
+    elif len(idx) == 2:
+        cell_type = "line"
 
 
     print(f'numnodes = {len(idx)} -> {cell_type}')

@@ -39,6 +39,15 @@ static SFEM_INLINE void normal(real_t u[3], real_t v[3], real_t *n) {
     }
 }
 
+static SFEM_INLINE void normal2(real_t p0[2], real_t p1[2], real_t *n) {
+    n[0] = -p1[1] + p0[1];
+    n[1] = p1[0] - p0[0];
+
+    const real_t len_n = sqrt(n[0] * n[0] + n[1] * n[1]);
+    n[0] /= len_n;
+    n[1] /= len_n;
+}
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -79,7 +88,7 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     mesh_t mesh;
-    if (mesh_surf_read(comm, folder, &mesh)) {
+    if (mesh_read(comm, folder, &mesh)) {
         return EXIT_FAILURE;
     }
 
@@ -97,7 +106,7 @@ int main(int argc, char *argv[]) {
             const idx_t node = mesh.elements[n][e];
 
             geom_t sq_dist = 0.;
-            for (int d = 0; d < 3; ++d) {
+            for (int d = 0; d < mesh.spatial_dim; ++d) {
                 const real_t m_x = mesh.points[d][node];
                 const real_t roi_x = roi[d];
                 const real_t diff = m_x - roi_x;
@@ -123,7 +132,7 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     int element_type_hack = mesh.element_type;
-    if(mesh.element_type == TRI6) {
+    if (mesh.element_type == TRI6) {
         element_type_hack = TRI3;
     }
 
@@ -149,65 +158,134 @@ int main(int argc, char *argv[]) {
     // Create marker for different faces based on dihedral angles
     ///////////////////////////////////////////////////////////////////////////////
 
-    for (ptrdiff_t q = 0; elem_queue[q] >= 0; q = (q + 1) % size_queue) {
-        const ptrdiff_t e = elem_queue[q];
+    if (mesh.element_type == EDGE2) {
+        for (ptrdiff_t q = 0; elem_queue[q] >= 0; q = (q + 1) % size_queue) {
+            const ptrdiff_t e = elem_queue[q];
 
-        if (selected[e]) continue;
+            if (selected[e]) continue;
 
-        real_t n[3];
-        {
-            const idx_t idx0 = mesh.elements[0][e];
-            const idx_t idx1 = mesh.elements[1][e];
-            const idx_t idx2 = mesh.elements[2][e];
-
-            real_t u[3];
-            real_t v[3];
-            for (int d = 0; d < 3; ++d) {
-                u[d] = mesh.points[d][idx1] - mesh.points[d][idx0];
-                v[d] = mesh.points[d][idx2] - mesh.points[d][idx0];
-            }
-
-            normal(u, v, n);
-        }
-
-        const count_t e_begin = adj_ptr[e];
-        const count_t e_end = adj_ptr[e + 1];
-
-        real_t current_thres = angle_threshold;
-
-        for (count_t k = e_begin; k < e_end; ++k) {
-            const idx_t e_adj = adj_idx[k];
-
-            if (selected[e_adj]) {
-                continue;
-            }
-
-            real_t cos_angle;
+            real_t n[2];
             {
-                const idx_t idx0 = mesh.elements[0][e_adj];
-                const idx_t idx1 = mesh.elements[1][e_adj];
-                const idx_t idx2 = mesh.elements[2][e_adj];
+                const idx_t idx0 = mesh.elements[0][e];
+                const idx_t idx1 = mesh.elements[1][e];
 
-                real_t ua[3];
-                real_t va[3];
-                real_t na[3];
-
-                for (int d = 0; d < 3; ++d) {
-                    ua[d] = mesh.points[d][idx1] - mesh.points[d][idx0];
-                    va[d] = mesh.points[d][idx2] - mesh.points[d][idx0];
+                real_t p0[2];
+                real_t p1[2];
+                for (int d = 0; d < 2; ++d) {
+                    p0[d] = mesh.points[d][idx0];
+                    p1[d] = mesh.points[d][idx1];
                 }
 
-                normal(ua, va, na);
-                cos_angle = fabs((n[0] * na[0]) + (n[1] * na[1]) + (n[2] * na[2]));
+                normal2(p0, p1, n);
+                printf("------------------\n");
+                printf("%g %g\n", n[0], n[1]);
+
             }
 
-            if (cos_angle > angle_threshold) {
-                elem_queue[next_slot++ % size_queue] = e_adj;
+            const count_t e_begin = adj_ptr[e];
+            const count_t e_end = adj_ptr[e + 1];
+
+            real_t current_thres = angle_threshold;
+
+            for (count_t k = e_begin; k < e_end; ++k) {
+                const idx_t e_adj = adj_idx[k];
+
+                if (selected[e_adj]) {
+                    continue;
+                }
+
+                real_t cos_angle;
+                {
+                    const idx_t idx0 = mesh.elements[0][e_adj];
+                    const idx_t idx1 = mesh.elements[1][e_adj];
+
+                    real_t p0a[2];
+                    real_t p1a[2];
+                    real_t na[2];
+
+
+                    for (int d = 0; d < 2; ++d) {
+                        p0a[d] = mesh.points[d][idx0];
+                        p1a[d] = mesh.points[d][idx1];
+                    }
+
+                    normal2(p0a, p1a, na);
+                    cos_angle = fabs((n[0] * na[0]) + (n[1] * na[1]));
+
+                    printf("%g %g (%g)\n", na[0], na[1], cos_angle);
+                }
+
+                if (cos_angle > angle_threshold) {
+                    elem_queue[next_slot++ % size_queue] = e_adj;
+
+
+                }
             }
+
+            selected[e] = 1;
+            elem_queue[q] = -1;
         }
+    } else {
+        for (ptrdiff_t q = 0; elem_queue[q] >= 0; q = (q + 1) % size_queue) {
+            const ptrdiff_t e = elem_queue[q];
 
-        selected[e] = 1;
-        elem_queue[q] = -1;
+            if (selected[e]) continue;
+
+            real_t n[3];
+            {
+                const idx_t idx0 = mesh.elements[0][e];
+                const idx_t idx1 = mesh.elements[1][e];
+                const idx_t idx2 = mesh.elements[2][e];
+
+                real_t u[3];
+                real_t v[3];
+                for (int d = 0; d < 3; ++d) {
+                    u[d] = mesh.points[d][idx1] - mesh.points[d][idx0];
+                    v[d] = mesh.points[d][idx2] - mesh.points[d][idx0];
+                }
+
+                normal(u, v, n);
+            }
+
+            const count_t e_begin = adj_ptr[e];
+            const count_t e_end = adj_ptr[e + 1];
+
+            real_t current_thres = angle_threshold;
+
+            for (count_t k = e_begin; k < e_end; ++k) {
+                const idx_t e_adj = adj_idx[k];
+
+                if (selected[e_adj]) {
+                    continue;
+                }
+
+                real_t cos_angle;
+                {
+                    const idx_t idx0 = mesh.elements[0][e_adj];
+                    const idx_t idx1 = mesh.elements[1][e_adj];
+                    const idx_t idx2 = mesh.elements[2][e_adj];
+
+                    real_t ua[3];
+                    real_t va[3];
+                    real_t na[3];
+
+                    for (int d = 0; d < 3; ++d) {
+                        ua[d] = mesh.points[d][idx1] - mesh.points[d][idx0];
+                        va[d] = mesh.points[d][idx2] - mesh.points[d][idx0];
+                    }
+
+                    normal(ua, va, na);
+                    cos_angle = fabs((n[0] * na[0]) + (n[1] * na[1]) + (n[2] * na[2]));
+                }
+
+                if (cos_angle > angle_threshold) {
+                    elem_queue[next_slot++ % size_queue] = e_adj;
+                }
+            }
+
+            selected[e] = 1;
+            elem_queue[q] = -1;
+        }
     }
 
     printf("num_selected = %ld / %ld\n", (long)next_slot, (long)mesh.nelements);
