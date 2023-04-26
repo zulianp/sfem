@@ -52,8 +52,8 @@ ifeq ($(metis), 1)
 endif
 
 # Folder structure
-VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix:operators/tet10:operators/tet4:operators/tri3:operators/tri6
-INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/tri3 -Ioperators/tri6
+VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix:operators/tet10:operators/tet4:operators/tri3:operators/tri6:operators/cvfem
+INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/tri3 -Ioperators/tri6 -Ioperators/cvfem
 
 
 CFLAGS += -pedantic -Wextra
@@ -97,6 +97,9 @@ GOALS += divergence lapl lumped_mass_inv lumped_boundary_mass_inv u_dot_grad_q
 # Array utilities
 GOALS += soa_to_aos
 
+# CVFEM
+GOALS += cvfem_assemble
+
 DEPS = -L$(PWD)/../matrix.io/ -lmatrix.io -lstdc++
 
 LDFLAGS += $(DEPS) -lm
@@ -130,17 +133,26 @@ OBJS = \
 	tet10_laplacian.o \
 	adj_table.o \
 	laplacian.o \
-	tet4_div.o \
-	tet4_mass.o \
-	tet4_l2_projection_p0_p1.o \
 	trishell3_l2_projection_p0_p1.o \
 	trishell6_l2_projection_p1_p2.o \
 	surface_l2_projection.o \
-	grad_p1.o \
-	tet10_grad.o \
+	grad_p1.o 
+
+# Tet4
+OBJS += tet4_div.o \
+	tet4_mass.o \
+	tet4_l2_projection_p0_p1.o \
+	trishell3_l2_projection_p0_p1.o
+
+# Tet10
+OBJS += tet10_grad.o \
 	tet10_div.o \
 	tet10_mass.o \
-	tet10_l2_projection_p1_p2.o
+	tet10_l2_projection_p1_p2.o 
+
+
+# CVFEM
+OBJS += cvfem_tri3_diffusion.o 
 
 
 ifeq ($(cuda), 1)
@@ -202,6 +214,10 @@ assemble3 : assemble3.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 assemble4 : assemble4.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+# CVFEM
+cvfem_assemble : cvfem_assemble.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 partition : partition.o libsfem.a

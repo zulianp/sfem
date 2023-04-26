@@ -3,7 +3,12 @@
 from sfem_codegen import *
 
 class UDotGradQOp:
-	def __init__(self, u, q):
+	def __init__(self, u, q, qp):
+		self.u = u
+		self.q = q
+		self.qp = qp
+
+	def gradient(self):
 		rf = ref_fun(qx, qy, qz)
 		dV = det3(A) / 6
 
@@ -33,3 +38,5 @@ class UDotGradQOp:
 
 		c_code(expr)
 
+	def hessian(self):
+		# TODO
