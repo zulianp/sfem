@@ -13,6 +13,7 @@ def main(argv):
 		exit(1)
 
 	output = argv[1]
+	nrefs = int(argv[2])
 	length=2
 	height=1
 
