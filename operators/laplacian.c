@@ -1,6 +1,7 @@
 
 #include "tet10_laplacian.h"
 #include "tet4_laplacian.h"
+#include "tri3_laplacian.h"
 
 #include "sfem_defs.h"
 
@@ -65,6 +66,11 @@ void laplacian_assemble_hessian(int element_type,
                                 const idx_t *const SFEM_RESTRICT colidx,
                                 real_t *const SFEM_RESTRICT values) {
     switch (element_type) {
+        case TRI3: {
+            tri3_laplacian_assemble_hessian(nelements, nnodes, elems, xyz, rowptr, colidx, values);
+            break;
+        }
+
         case TET4: {
             tet4_laplacian_assemble_hessian(nelements, nnodes, elems, xyz, rowptr, colidx, values);
             break;

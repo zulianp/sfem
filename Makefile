@@ -138,6 +138,8 @@ OBJS = \
 	surface_l2_projection.o \
 	grad_p1.o 
 
+OBJS += tri3_laplacian.o
+
 # Tet4
 OBJS += tet4_div.o \
 	tet4_mass.o \

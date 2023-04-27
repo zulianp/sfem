@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
 from sfem_codegen import *
+from tri3 import *
 
-import pdb
+# import pdb
 
 class LaplaceOp:
 	def __init__(self, fe, q):
@@ -71,8 +72,8 @@ class LaplaceOp:
 	def fff(self):
 		expr = []
 
-		for d1 in range(0, 3):
-			for d2 in range(d1, 3):
+		for d1 in range(0, self.fe.spatial_dim()):
+			for d2 in range(d1,  self.fe.spatial_dim()):
 				var = self.cFFF[d1, d2]
 				val = self.FFF[d1, d2]
 				expr.append(ast.Assignment(var, val))
@@ -145,3 +146,16 @@ class LaplaceOp:
 		form = sp.symbols(f'element_scalar[0]')
 		expr.append(ast.Assignment(form, integr))
 		return expr
+
+def main():
+	fe = Tri3()
+	q = sp.Matrix(2, 1, [qx, qy])
+	op = LaplaceOp(fe, q)
+
+	c_code(op.fff())
+
+
+	c_code(op.hessian())
+
+if __name__ == '__main__':
+	main()
