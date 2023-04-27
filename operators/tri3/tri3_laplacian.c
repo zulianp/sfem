@@ -158,5 +158,5 @@ void tri3_laplacian_assemble_hessian(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("tet4_laplacian.c: tet4_laplacian_assemble_hessian\t%g seconds\n", tock - tick);
+    printf("tri3_laplacian.c: tri3_laplacian_assemble_hessian\t%g seconds\n", tock - tick);
 }

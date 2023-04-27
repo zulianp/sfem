@@ -17,13 +17,13 @@ export SFEM_NEUMANN_FACES=./mesh/sidesets_aos/sright.raw
 
 mkdir -p system
 
-# create_box_2D.sh 8 
+create_box_2D.sh 9
 
 export SFEM_HANDLE_RHS=1
 export SFEM_DIRICHLET_NODES=./mesh/sidesets_aos/sleft.raw  
 export SFEM_HANDLE_NEUMANN=1 
-# export SFEM_NEUMANN_FACES=./mesh/sidesets_aos/sright.raw
-export SFEM_NEUMANN_FACES=./mesh/sidesets_aos/stop.raw
+export SFEM_NEUMANN_FACES=./mesh/sidesets_aos/sright.raw
+# export SFEM_NEUMANN_FACES=./mesh/sidesets_aos/stop.raw
 
 cvfem_assemble ./mesh system
 # assemble ./mesh system

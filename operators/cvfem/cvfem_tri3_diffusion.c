@@ -13,6 +13,7 @@ static SFEM_INLINE void cvfem_tri3_diffusion_hessian_kernel(const real_t px0,
                                                             const real_t py1,
                                                             const real_t py2,
                                                             real_t *element_matrix) {
+    static const int stride = 1;
     // FLOATING POINT OPS!
     //       - Result: 9*ADD + 9*ASSIGNMENT + 36*MUL
     //       - Subexpressions: 9*ADD + 13*DIV + 8*MUL + 11*NEG + 10*SUB
@@ -47,15 +48,15 @@ static SFEM_INLINE void cvfem_tri3_diffusion_hessian_kernel(const real_t px0,
     const real_t x28 = -x20;
     const real_t x29 = -x13;
     const real_t x30 = -x27;
-    element_matrix[0] = x11 * x13 + x11 * x3 + x17 * x18 + x18 * x20;
-    element_matrix[1] = x13 * x21 + x17 * x22 + x20 * x22 + x21 * x3;
-    element_matrix[2] = x13 * x23 + x17 * x24 + x20 * x24 + x23 * x3;
-    element_matrix[3] = x11 * x2 + x11 * x26 + x18 * x27 + x18 * x28;
-    element_matrix[4] = x2 * x21 + x21 * x26 + x22 * x27 + x22 * x28;
-    element_matrix[5] = x2 * x23 + x23 * x26 + x24 * x27 + x24 * x28;
-    element_matrix[6] = x11 * x25 + x11 * x29 + x16 * x18 + x18 * x30;
-    element_matrix[7] = x16 * x22 + x21 * x25 + x21 * x29 + x22 * x30;
-    element_matrix[8] = x16 * x24 + x23 * x25 + x23 * x29 + x24 * x30;
+    element_matrix[0 * stride] = x11 * x13 + x11 * x3 + x17 * x18 + x18 * x20;
+    element_matrix[1 * stride] = x13 * x21 + x17 * x22 + x20 * x22 + x21 * x3;
+    element_matrix[2 * stride] = x13 * x23 + x17 * x24 + x20 * x24 + x23 * x3;
+    element_matrix[3 * stride] = x11 * x2 + x11 * x26 + x18 * x27 + x18 * x28;
+    element_matrix[4 * stride] = x2 * x21 + x21 * x26 + x22 * x27 + x22 * x28;
+    element_matrix[5 * stride] = x2 * x23 + x23 * x26 + x24 * x27 + x24 * x28;
+    element_matrix[6 * stride] = x11 * x25 + x11 * x29 + x16 * x18 + x18 * x30;
+    element_matrix[7 * stride] = x16 * x22 + x21 * x25 + x21 * x29 + x22 * x30;
+    element_matrix[8 * stride] = x16 * x24 + x23 * x25 + x23 * x29 + x24 * x30;
 }
 
 static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {

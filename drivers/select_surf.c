@@ -177,8 +177,8 @@ int main(int argc, char *argv[]) {
                 }
 
                 normal2(p0, p1, n);
-                printf("------------------\n");
-                printf("%g %g\n", n[0], n[1]);
+                // printf("------------------\n");
+                // printf("%g %g\n", n[0], n[1]);
 
             }
 
@@ -212,7 +212,7 @@ int main(int argc, char *argv[]) {
                     normal2(p0a, p1a, na);
                     cos_angle = fabs((n[0] * na[0]) + (n[1] * na[1]));
 
-                    printf("%g %g (%g)\n", na[0], na[1], cos_angle);
+                    // printf("%g %g (%g)\n", na[0], na[1], cos_angle);
                 }
 
                 if (cos_angle > angle_threshold) {

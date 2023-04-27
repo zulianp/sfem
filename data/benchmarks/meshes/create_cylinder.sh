@@ -19,7 +19,7 @@ then
 	exit -1
 fi
 
-set -x
+# set -x
 
 nrefs=$1
 
