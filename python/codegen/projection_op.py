@@ -6,10 +6,12 @@ from tet4 import *
 from tri3 import *
 from tri6 import *
 from tri1 import *
+from edge2 import *
+from real1 import *
 
-class ProjectionOp:
+class ProjectionOp:	
 	def __init__(self, fe_from, fe_to, q):
-		self.q = sp.Matrix(fe_from.manifold_dim(), 1, q)
+		self.q = sp.Matrix(fe_to.manifold_dim(), 1, q)
 		self.u_from = coeffs('u', fe_from.n_nodes())
 		self.fe_from = fe_from
 		self.fe_to = fe_to
@@ -55,10 +57,15 @@ class ProjectionOp:
 		return expr
 
 def main():
-	shell_fe_from = [TriShell1()]
-	shell_fe_to = [TriShell3(), TriShell6()]
+	# shell_fe_from = [TriShell1()]
+	# shell_fe_to = [TriShell3(), TriShell6()]
+	# q = [qx, qy]
 
-	q = [qx, qy]
+	shell_fe_from = [Real1()]
+	shell_fe_to = [EdgeShell2()]
+	q = [qx]
+
+	
 	for sf_from in shell_fe_from:
 		for sf_to in shell_fe_to:
 			op = ProjectionOp(sf_from, sf_to, q)

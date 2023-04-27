@@ -48,15 +48,12 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (argc < 2) {
-        fprintf(stderr, "usage: %s <folder> [output_folder=./]\n", argv[0]);
+    if (argc != 3) {
+        fprintf(stderr, "usage: %s <folder> <output_folder>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
-    const char *output_folder = "./";
-    if (argc > 2) {
-        output_folder = argv[2];
-    }
+    const char *output_folder = argv[2];
 
     printf("%s %s %s\n", argv[0], argv[1], output_folder);
 
