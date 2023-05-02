@@ -91,3 +91,12 @@ principal_strain_selector_0="$p1/principal_strain.0.*.raw,$p1/principal_strain.1
 raw_to_db.py $mesh_folder principal_strain.xmf  \
  --transient --n_time_steps=$nsteps \
  --point_data="$disp_selector,$principal_strain_selector_0"
+
+if [[ "$platform" -eq "Darwin" ]]
+then
+	echo "Finished!"
+else
+	# Clean up temps
+	rm -r $garbage
+	echo "Finished!"
+fi
