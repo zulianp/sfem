@@ -16,10 +16,11 @@ mkdir -p $mesh_raw/skin
 
 # mesh_path=/Users/patrickzulian/Desktop/code/utopia/utopia_fe/data/hydros/mesh-multi-outlet-better
 
-cylinder.py cylinder.vtk 6
 mesh_path="$mesh_raw/p1"
-mkdir -p $mesh_path
-db_to_raw.py cylinder.vtk $mesh_path
+
+# mkdir -p $mesh_path
+# cylinder.py cylinder.vtk 6
+# db_to_raw.py cylinder.vtk $mesh_path
 
 
 # 1) Convert p1 mesh to p2 mesh
