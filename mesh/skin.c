@@ -222,6 +222,12 @@ int main(int argc, char *argv[]) {
 
     // Clean-up
 
+    if (!rank) {
+        printf("----------------------------------------\n");
+        printf("Volume: #elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
+        printf("Surface: #elements %ld #nodes %ld\n", (long)surf.nelements, (long)surf.nnodes);
+    }
+
     mesh_destroy(&mesh);
     mesh_destroy(&surf);
     free(parent);

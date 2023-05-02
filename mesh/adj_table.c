@@ -52,8 +52,8 @@ static void fill_local_side_table(enum ElemType element_type, int *local_side_ta
             LST(3, 4) = 6 - 1;
             LST(3, 5) = 5 - 1;
         }
-    }
-    if(element_type == TRI3) {
+
+    } else if(element_type == TRI3) {
         LST(0, 0) = 1 - 1;
         LST(0, 1) = 2 - 1;
 
@@ -62,9 +62,7 @@ static void fill_local_side_table(enum ElemType element_type, int *local_side_ta
 
         LST(2, 0) = 3 - 1;
         LST(2, 1) = 1 - 1;
-    } 
-
-    else {
+    } else {
         assert(0);
     }
 }
