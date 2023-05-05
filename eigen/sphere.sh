@@ -16,10 +16,10 @@ clean_workspace.sh
 
 create_sphere.sh 4
 
-MESH_DIR=surf
+MESH_DIR=mesh/surface
 SYSTEM_DIR=system
 
-skin mesh $MESH_DIR
+# skin mesh $MESH_DIR
 
 
 mkdir -p $SYSTEM_DIR
@@ -27,7 +27,7 @@ assemble_adjaciency_matrix $MESH_DIR $SYSTEM_DIR
 
 rm -rf eigs
 
-N=60
+N=300
 graph_analysis.py $SYSTEM_DIR $N | tee log.txt
 num_vectors=`grep num_vectors log.txt | awk '{print $2}'`
 

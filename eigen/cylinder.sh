@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-
+./clean_workspace.sh
 
 set -e
 
@@ -14,22 +14,17 @@ PATH=$SCRIPTPATH/../data/benchmarks/meshes:$PATH
 
 set -x
 
-./clean_workspace.sh
+create_cylinder.sh 3
 
-create_cylinder.sh 1
-
-MESH_DIR=surf
+MESH_DIR=./mesh/surface
 SYSTEM_DIR=system
-
-skin mesh $MESH_DIR
-
 
 mkdir -p $SYSTEM_DIR
 assemble_adjaciency_matrix $MESH_DIR $SYSTEM_DIR
 
 rm -rf eigs
 
-N=800
+N=300
 graph_analysis.py $SYSTEM_DIR $N | tee log.txt
 num_vectors=`grep num_vectors log.txt | awk '{print $2}'`
 
