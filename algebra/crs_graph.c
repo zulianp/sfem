@@ -388,8 +388,9 @@ int create_dual_graph_mem_conservative(const ptrdiff_t n_elements,
     const ptrdiff_t n_overestimated_connections = n_elements * n_sides;
 
     // +1 more to avoid illegal access when counting self
-    idx_t *dual_eidx = (idx_t *)malloc((n_overestimated_connections + 1) * sizeof(idx_t));
-    memset(dual_eidx, 0, (n_overestimated_connections + 1) * sizeof(idx_t));
+    size_t extra_buffer_space = 1000;
+    idx_t *dual_eidx = (idx_t *)malloc((n_overestimated_connections + extra_buffer_space) * sizeof(idx_t));
+    memset(dual_eidx, 0, (n_overestimated_connections + extra_buffer_space) * sizeof(idx_t));
 
     for (ptrdiff_t e = 0; e < n_elements; e++) {
         count_t offset = dual_e_ptr[e];
@@ -403,6 +404,7 @@ int create_dual_graph_mem_conservative(const ptrdiff_t n_elements,
                 const idx_t e_adj = elindex[eii];
 
                 if (connection_counter[e_adj] == 0) {
+                    assert(offset + count_common < n_overestimated_connections + extra_buffer_space);
                     elist[count_common++] = e_adj;
                 }
 
