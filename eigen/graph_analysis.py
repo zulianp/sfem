@@ -30,7 +30,8 @@ def main(argv):
 
 	print(N)
 
-	A = sp.sparse.csr_matrix((data, colidx, rowptr), shape=(N, N)) - sp.sparse.eye(N, N)
+	A = sp.sparse.csr_matrix((data, colidx, rowptr), shape=(N, N)) 
+	# - sp.sparse.eye(N, N)
 
 	print('-----')
 	print(A.toarray().shape)

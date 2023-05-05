@@ -12,6 +12,8 @@ PATH=$SCRIPTPATH/../data/benchmarks/meshes:$PATH
 
 set -x
 
+clean_workspace.sh
+
 create_box_2D.sh 1
 
 MESH_DIR=mesh

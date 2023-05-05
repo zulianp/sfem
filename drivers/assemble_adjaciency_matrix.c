@@ -20,7 +20,6 @@
 
 #include "read_mesh.h"
 
-
 ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
     MPI_Status status;
     MPI_Offset nbytes;
@@ -60,8 +59,10 @@ int main(int argc, char *argv[]) {
     printf("%s %s %s\n", argv[0], argv[1], output_folder);
 
     int SFEM_EXPORT_FP32 = 0;
+    int SFEM_REMOVE_DIAGONAL = 1;
 
     SFEM_READ_ENV(SFEM_EXPORT_FP32, atoi);
+    SFEM_READ_ENV(SFEM_REMOVE_DIAGONAL, atoi);
 
     MPI_Datatype value_type = SFEM_EXPORT_FP32 ? MPI_FLOAT : MPI_DOUBLE;
 
@@ -95,8 +96,20 @@ int main(int argc, char *argv[]) {
     nnz = rowptr[mesh.nnodes];
     values = (real_t *)malloc(nnz * sizeof(real_t));
 
-    for(count_t i = 0; i < nnz; i++) {
+    for (count_t i = 0; i < nnz; i++) {
         values[i] = 1;
+    }
+
+    if (SFEM_REMOVE_DIAGONAL) {
+        for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+            for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
+                idx_t col = colidx[k];
+
+                if (col == i) {
+                    values[k] = 0;
+                }
+            }
+        }
     }
 
     double tock = MPI_Wtime();
