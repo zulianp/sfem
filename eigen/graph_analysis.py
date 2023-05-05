@@ -28,25 +28,15 @@ def main(argv):
 
 	K = min(N-2, K)
 
-	print(N)
+	print(f'num_vectors {K}')
 
 	A = sp.sparse.csr_matrix((data, colidx, rowptr), shape=(N, N)) 
-	# - sp.sparse.eye(N, N)
-
-	print('-----')
-	print(A.toarray().shape)
-
 	vals, vecs = sp.sparse.linalg.eigs(A, K)
-
-	print(vecs.shape)
 
 	for k in range(0, K):
 		postfix='{num:05d}.raw'.format(num=k)
 		name_real = f'{output_folder}/real.{postfix}'
 		name_imag = f'{output_folder}/imag.{postfix}'
-
-		print(len(vecs[:, k].real))
-
 		vecs[:, k].real.tofile(name_real)
 		vecs[:, k].imag.tofile(name_imag)
 
