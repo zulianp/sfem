@@ -100,6 +100,9 @@ GOALS += soa_to_aos
 # CVFEM
 GOALS += cvfem_assemble
 
+# Graph analysis
+GOALS += assemble_adjaciency_matrix
+
 DEPS = -L$(PWD)/../matrix.io/ -lmatrix.io -lstdc++
 
 LDFLAGS += $(DEPS) -lm
@@ -218,6 +221,9 @@ assemble3 : assemble3.o libsfem.a
 assemble4 : assemble4.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
+assemble_adjaciency_matrix: assemble_adjaciency_matrix.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+	
 # CVFEM
 cvfem_assemble : cvfem_assemble.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
