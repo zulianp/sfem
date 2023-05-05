@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+./clean_workspace.sh
+
 set -e
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
@@ -12,9 +14,8 @@ PATH=$SCRIPTPATH/../data/benchmarks/meshes:$PATH
 
 set -x
 
-clean_workspace.sh
 
-create_box_2D.sh 1
+create_box_2D.sh 0
 
 MESH_DIR=mesh
 SYSTEM_DIR=system

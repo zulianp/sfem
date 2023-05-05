@@ -5,6 +5,7 @@ import scipy as sp
 import sys
 import os
 import math
+import matplotlib.pyplot as plt
 
 
 idx_t = np.int32
@@ -32,6 +33,13 @@ def main(argv):
 
 	A = sp.sparse.csr_matrix((data, colidx, rowptr), shape=(N, N)) 
 	vals, vecs = sp.sparse.linalg.eigs(A, K)
+
+
+	plt.plot(vals)
+	plt.title(f'Eigenvalues')
+	plt.xlabel('Number')
+	plt.ylabel('Value')
+	plt.savefig('eigvals.png')
 
 	for k in range(0, K):
 		postfix='{num:05d}.raw'.format(num=k)

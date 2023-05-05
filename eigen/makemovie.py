@@ -90,10 +90,12 @@ xxmfDisplay.SetScalarBarVisibility(renderView1, True)
 renderView1.Update()
 
 # Rescale transfer function
-realLUT.RescaleTransferFunction(-0.1733855153172917, 0.17338551531729146)
+# realLUT.RescaleTransferFunction(-0.1733855153172917, 0.17338551531729146)
+realLUT.RescaleTransferFunction(-0.01, 0.01)
 
 # Rescale transfer function
-realPWF.RescaleTransferFunction(-0.1733855153172917, 0.17338551531729146)
+# realPWF.RescaleTransferFunction(-0.1733855153172917, 0.17338551531729146)
+realPWF.RescaleTransferFunction(-0.01, 0.01)
 
 # get color legend/bar for realLUT in view renderView1
 realLUTColorBar = GetScalarBar(realLUT, renderView1)
