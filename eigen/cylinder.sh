@@ -16,22 +16,13 @@ set -x
 
 create_cylinder.sh 2
 
-MESH_DIR=./mesh/surface
+MESH_DIR=mesh/surface
 SYSTEM_DIR=system
 
-export SFEM_GRAPH_LAPLACIAN=1
-export EIG_WHICH='SR'
+# export SFEM_GRAPH_LAPLACIAN=1
+# export EIG_WHICH='SR'
 
-# export EIG_WHICH='LR'
+export EIG_WHICH='LR'
 
-mkdir -p $SYSTEM_DIR
-assemble_adjaciency_matrix $MESH_DIR $EIG_WHICH $SYSTEM_DIR
-
-rm -rf eigs
-
-N=60
-graph_analysis.py $SYSTEM_DIR $N | tee log.txt
-num_vectors=`grep num_vectors log.txt | awk '{print $2}'`
-
-# raw_to_db.py $MESH_DIR x.xmf --transient --point_data='eigs/real*.raw,eigs/imag*.raw' --n_time_steps=$num_vectors
-raw_to_db.py $MESH_DIR x.xmf --transient --point_data='eigs/real*.raw' --n_time_steps=$num_vectors
+N=100
+gsp.sh $MESH_DIR $N

@@ -20,22 +20,10 @@ create_sphere.sh 2
 MESH_DIR=mesh/surface
 SYSTEM_DIR=system
 
-# skin mesh $MESH_DIR
-
 # export SFEM_GRAPH_LAPLACIAN=1
 # export EIG_WHICH='SR'
 
 export EIG_WHICH='LR'
 
-mkdir -p $SYSTEM_DIR
-assemble_adjaciency_matrix $MESH_DIR $SYSTEM_DIR
-
-rm -rf eigs
-
 N=100
-graph_analysis.py $SYSTEM_DIR $EIG_WHICH $N | tee log.txt
-num_vectors=`grep num_vectors log.txt | awk '{print $2}'`
-
-raw_to_db.py $MESH_DIR x.xmf --transient --point_data='eigs/real*.raw' --n_time_steps=$num_vectors
-
-raw_to_db.py $MESH_DIR dbg.xmf --point_data='count.raw'
+gsp.sh $MESH_DIR $N
