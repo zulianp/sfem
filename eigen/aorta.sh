@@ -20,9 +20,9 @@ SKIN_DIR=mesh/skin
 MESH_DIR=mesh/surface
 SYSTEM_DIR=system
 
-# mkdir -p $MESH_DIR
-# skin $CASE_DIR $SKIN_DIR
-# select_submesh $SKIN_DIR 306 443 530 15000 $MESH_DIR
+mkdir -p $MESH_DIR
+skin $CASE_DIR $SKIN_DIR
+select_submesh $SKIN_DIR 306 443 530 10000 $MESH_DIR
 
 # export SFEM_GRAPH_LAPLACIAN=1
 # export EIG_WHICH='SR'

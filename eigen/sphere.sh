@@ -21,10 +21,11 @@ MESH_DIR=mesh/surface
 SYSTEM_DIR=system
 
 # export SFEM_GRAPH_LAPLACIAN=1
-# export EIG_WHICH='SR'
+# export EIG_WHICH='SM'
 
 # export EIG_WHICH='LR'
-export EIG_WHICH='LM'
+# export EIG_WHICH='LM'
 
-N=100
+# N=638
+N=200
 gsp.sh $MESH_DIR $N

@@ -43,4 +43,4 @@ max_val=`grep max_val log.txt | awk '{print $2}'`
 raw_to_db.py $MESH_DIR x.xmf --transient --point_data='eigs/real*.raw' --n_time_steps=$num_vectors
 raw_to_db.py $MESH_DIR dbg.xmf --point_data='count.raw'
 
-/Applications/ParaView-5.11.0.app/Contents/bin/pvpython makemovie.py $min_val $max_val movie.avi
+# /Applications/ParaView-5.11.0.app/Contents/bin/pvpython makemovie.py $min_val $max_val movie.avi

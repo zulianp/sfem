@@ -25,5 +25,6 @@ SYSTEM_DIR=system
 # export EIG_WHICH='LR'
 export EIG_WHICH='LM'
 
-N=100
+# N=100
+N=3538
 gsp.sh $MESH_DIR $N
