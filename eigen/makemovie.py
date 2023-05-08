@@ -8,6 +8,18 @@ from paraview.simple import *
 #### disable automatic camera reset on 'Show'
 paraview.simple._DisableFirstRenderCameraReset()
 
+import sys
+
+if len(sys.argv) != 4:
+    print(f'usage: {sys.argv[0]} <min_val> <max_val> output.avi')
+    exit(1)
+
+min_val = float(sys.argv[1])
+max_val = float(sys.argv[2])
+output_movie = sys.argv[3]
+
+print(f'running {sys.argv[0]} {min_val} {max_val} {output_movie}')
+
 # create a new 'Xdmf3ReaderT'
 xxmf = Xdmf3ReaderT(registrationName='x.xmf', FileName=['./x.xmf'])
 xxmf.PointArrays = ['real']
@@ -91,11 +103,11 @@ renderView1.Update()
 
 # Rescale transfer function
 # realLUT.RescaleTransferFunction(-0.1733855153172917, 0.17338551531729146)
-realLUT.RescaleTransferFunction(-0.01, 0.01)
+realLUT.RescaleTransferFunction(min_val, max_val)
 
 # Rescale transfer function
 # realPWF.RescaleTransferFunction(-0.1733855153172917, 0.17338551531729146)
-realPWF.RescaleTransferFunction(-0.01, 0.01)
+realPWF.RescaleTransferFunction(min_val, max_val)
 
 # get color legend/bar for realLUT in view renderView1
 realLUTColorBar = GetScalarBar(realLUT, renderView1)
@@ -126,7 +138,7 @@ renderView1.CameraViewUp = [-0.41703161329094246, 0.7219362062938995, -0.5521709
 renderView1.CameraParallelScale = 0.8660237519752193
 
 # save animation
-SaveAnimation('./movie.avi', renderView1, ImageResolution=[1556, 920],
+SaveAnimation(output_movie, renderView1, ImageResolution=[1556, 920],
     FrameRate=4,
     FrameWindow=[0, 799])
 

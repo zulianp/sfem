@@ -52,12 +52,22 @@ def main(argv):
 	plt.ylabel('Value')
 	plt.savefig('eigvals.png')
 
+	min_val = vecs[0, 0]
+	max_val = vecs[0, 0]
+
 	for k in range(0, K):
 		postfix='{num:05d}.raw'.format(num=k)
 		name_real = f'{output_folder}/real.{postfix}'
 		name_imag = f'{output_folder}/imag.{postfix}'
-		vecs[:, k].real.tofile(name_real)
+		vr = vecs[:, k].real
+		vr.tofile(name_real)
 		vecs[:, k].imag.tofile(name_imag)
+
+		min_val = min(min_val, np.min(vr))
+		max_val = max(max_val, np.max(vr))
+
+	print(f'min_val {min_val}')
+	print(f'max_val {max_val}')
 
 
 if __name__ == '__main__':
