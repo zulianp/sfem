@@ -14,17 +14,22 @@ PATH=$SCRIPTPATH/../data/benchmarks/meshes:$PATH
 
 set -x
 
-create_cylinder.sh 3
+create_cylinder.sh 2
 
 MESH_DIR=./mesh/surface
 SYSTEM_DIR=system
 
+export SFEM_GRAPH_LAPLACIAN=1
+export EIG_WHICH='SR'
+
+# export EIG_WHICH='LR'
+
 mkdir -p $SYSTEM_DIR
-assemble_adjaciency_matrix $MESH_DIR $SYSTEM_DIR
+assemble_adjaciency_matrix $MESH_DIR $EIG_WHICH $SYSTEM_DIR
 
 rm -rf eigs
 
-N=300
+N=60
 graph_analysis.py $SYSTEM_DIR $N | tee log.txt
 num_vectors=`grep num_vectors log.txt | awk '{print $2}'`
 

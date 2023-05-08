@@ -13,18 +13,21 @@ real_t = np.float64
 output_folder='eigs'
 
 def main(argv):
-	if len(argv) != 3:
-		print(f'usage: {argv[0]} <crs_folder> <K>')
+	if len(argv) != 4:
+		print(f'usage: {argv[0]} <crs_folder> <which=LR|SR> <K>')
 		exit(1)
 
 	if not os.path.exists(output_folder):
 		os.mkdir(f'{output_folder}')
 	
 	folder = argv[1]
-	K = np.int32(argv[2])
+	which = argv[2]
+	K = np.int32(argv[3])
 	rowptr = np.fromfile(f'{folder}/rowptr.raw', dtype=idx_t)
 	colidx = np.fromfile(f'{folder}/colidx.raw', dtype=idx_t)
-	data   = np.ones(colidx.shape, dtype=real_t)
+	data   = np.fromfile(f'{folder}/values.raw', dtype=real_t)
+	uno    = np.ones(data.shape, dtype=real_t)
+
 	N = len(rowptr) - 1
 
 	K = min(N-2, K)
@@ -32,10 +35,18 @@ def main(argv):
 	print(f'num_vectors {K}')
 
 	A = sp.sparse.csr_matrix((data, colidx, rowptr), shape=(N, N)) 
-	vals, vecs = sp.sparse.linalg.eigs(A, K)
+	C = sp.sparse.csr_matrix((uno, colidx, rowptr), shape=(N, N)) 
+	vals, vecs = sp.sparse.linalg.eigs(A, K, which=which)
+
+	count = np.ones(N, dtype=real_t)
+	count = C * count
+	count.tofile('count.raw')
+
+	print(f'|A*ones| = {np.sum(np.abs(A * np.ones(N, dtype=real_t)))}')
 
 
-	plt.plot(vals)
+	plt.plot(vals.real)
+	# plt.plot(vals.imag)
 	plt.title(f'Eigenvalues')
 	plt.xlabel('Number')
 	plt.ylabel('Value')

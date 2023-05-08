@@ -60,9 +60,13 @@ int main(int argc, char *argv[]) {
 
     int SFEM_EXPORT_FP32 = 0;
     int SFEM_REMOVE_DIAGONAL = 1;
+    int SFEM_GRAPH_LAPLACIAN = 0;
+    int SFEM_NORMALIZE_ROWS = 0;
 
     SFEM_READ_ENV(SFEM_EXPORT_FP32, atoi);
     SFEM_READ_ENV(SFEM_REMOVE_DIAGONAL, atoi);
+    SFEM_READ_ENV(SFEM_GRAPH_LAPLACIAN, atoi);
+    SFEM_READ_ENV(SFEM_NORMALIZE_ROWS, atoi);
 
     MPI_Datatype value_type = SFEM_EXPORT_FP32 ? MPI_FLOAT : MPI_DOUBLE;
 
@@ -96,21 +100,60 @@ int main(int argc, char *argv[]) {
     nnz = rowptr[mesh.nnodes];
     values = (real_t *)malloc(nnz * sizeof(real_t));
 
-    for (count_t i = 0; i < nnz; i++) {
-        values[i] = 1;
-    }
+    if (SFEM_GRAPH_LAPLACIAN) {
+        for (count_t i = 0; i < nnz; i++) {
+            values[i] = -1;
+        }
 
-    if (SFEM_REMOVE_DIAGONAL) {
         for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+
+            real_t row_sum = 0;
+            for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
+                row_sum += values[k];
+            }
+
+
             for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
                 idx_t col = colidx[k];
-
                 if (col == i) {
-                    values[k] = 0;
+                    values[k] = -1-row_sum;
+                }
+            }
+        }
+
+    } else {
+        for (count_t i = 0; i < nnz; i++) {
+            values[i] = 1;
+        }
+
+        if (SFEM_REMOVE_DIAGONAL) {
+            for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
+                    idx_t col = colidx[k];
+
+                    if (col == i) {
+                        values[k] = 0;
+                    }
+                }
+            }
+        }
+
+        if(SFEM_NORMALIZE_ROWS) {
+            for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                real_t row_sum = 0;
+                for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
+                    row_sum += values[k];
+                }
+
+                for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
+                    values[k] /= row_sum;
                 }
             }
         }
     }
+
+
+
 
     double tock = MPI_Wtime();
     printf("assemble.c: build crs\t\t%g seconds\n", tock - tack);
