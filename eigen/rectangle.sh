@@ -14,10 +14,9 @@ PATH=$SCRIPTPATH/../data/benchmarks/meshes:$PATH
 
 set -x
 
+create_box_2D.sh 3
 
-create_box_2D.sh 0
-
-MESH_DIR=mesh/surface
+MESH_DIR=mesh
 SYSTEM_DIR=system
 
 # export SFEM_GRAPH_LAPLACIAN=1
@@ -27,4 +26,4 @@ SYSTEM_DIR=system
 export EIG_WHICH='LM'
 
 N=100
-gsp.sh $MESH_DIR $N
+USE_DENSE=1 gsp.sh $MESH_DIR $N

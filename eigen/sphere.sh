@@ -22,10 +22,12 @@ SYSTEM_DIR=system
 
 # export SFEM_GRAPH_LAPLACIAN=1
 # export EIG_WHICH='SM'
+# export SFEM_REMOVE_LOWER_TRIANGULAR=1
 
 # export EIG_WHICH='LR'
 # export EIG_WHICH='LM'
 
 # N=638
 N=200
+USE_DENSE=1 \
 gsp.sh $MESH_DIR $N

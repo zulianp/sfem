@@ -34,13 +34,18 @@ assemble_adjaciency_matrix $MESH_DIR $SYSTEM_DIR
 
 rm -rf eigs
 
-graph_analysis.py $SYSTEM_DIR $EIG_WHICH $N | tee log.txt
+if [[ -z "$USE_DENSE" ]]
+then
+	graph_analysis.py $SYSTEM_DIR $EIG_WHICH $N | tee log.txt
+else
+	dense_graph_analysis.py $SYSTEM_DIR $EIG_WHICH $N | tee log.txt
+fi
 num_vectors=`grep num_vectors log.txt | awk '{print $2}'`
 min_val=`grep min_val log.txt | awk '{print $2}'`
 max_val=`grep max_val log.txt | awk '{print $2}'`
 
-# raw_to_db.py $MESH_DIR x.xmf --transient --point_data='eigs/real*.raw,eigs/imag*.raw' --n_time_steps=$num_vectors
-raw_to_db.py $MESH_DIR x.xmf --transient --point_data='eigs/real*.raw' --n_time_steps=$num_vectors
-raw_to_db.py $MESH_DIR dbg.xmf --point_data='count.raw'
+raw_to_db.py $MESH_DIR x.xmf --transient --point_data='eigs/real*.raw,eigs/imag*.raw' --n_time_steps=$num_vectors
+# raw_to_db.py $MESH_DIR x.xmf --transient --point_data='eigs/real*.raw' --n_time_steps=$num_vectors
+# raw_to_db.py $MESH_DIR dbg.xmf --point_data='count.raw'
 
 # /Applications/ParaView-5.11.0.app/Contents/bin/pvpython makemovie.py $min_val $max_val movie.avi
