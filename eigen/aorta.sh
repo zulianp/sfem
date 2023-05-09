@@ -22,7 +22,7 @@ SYSTEM_DIR=system
 
 mkdir -p $MESH_DIR
 skin $CASE_DIR $SKIN_DIR
-select_submesh $SKIN_DIR 306 443 530 10000 $MESH_DIR
+select_submesh $SKIN_DIR 306 443 530 5000 $MESH_DIR
 
 # export SFEM_GRAPH_LAPLACIAN=1
 # export EIG_WHICH='SR'
@@ -30,5 +30,5 @@ select_submesh $SKIN_DIR 306 443 530 10000 $MESH_DIR
 # export EIG_WHICH='LR'
 export EIG_WHICH='LM'
 
-N=200
-gsp.sh $MESH_DIR $N
+N=5278 
+USE_DENSE=1 gsp.sh $MESH_DIR $N

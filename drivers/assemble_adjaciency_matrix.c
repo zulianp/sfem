@@ -62,11 +62,18 @@ int main(int argc, char *argv[]) {
     int SFEM_REMOVE_DIAGONAL = 1;
     int SFEM_GRAPH_LAPLACIAN = 0;
     int SFEM_NORMALIZE_ROWS = 0;
+    int SFEM_REMOVE_LOWER_TRIANGULAR = 0;
+
+    // Ideas
+    // 1) Use the concept of distance and modulo
+    // 2) Construct a breadth-first indexing
+    int SFEM_DIRECTED = 0;
 
     SFEM_READ_ENV(SFEM_EXPORT_FP32, atoi);
     SFEM_READ_ENV(SFEM_REMOVE_DIAGONAL, atoi);
     SFEM_READ_ENV(SFEM_GRAPH_LAPLACIAN, atoi);
     SFEM_READ_ENV(SFEM_NORMALIZE_ROWS, atoi);
+    SFEM_READ_ENV(SFEM_REMOVE_LOWER_TRIANGULAR, atoi);
 
     MPI_Datatype value_type = SFEM_EXPORT_FP32 ? MPI_FLOAT : MPI_DOUBLE;
 
@@ -102,21 +109,19 @@ int main(int argc, char *argv[]) {
 
     if (SFEM_GRAPH_LAPLACIAN) {
         for (count_t i = 0; i < nnz; i++) {
-            values[i] = -1;
+            values[i] = 1;
         }
 
         for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
-
             real_t row_sum = 0;
             for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
                 row_sum += values[k];
             }
 
-
             for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
                 idx_t col = colidx[k];
                 if (col == i) {
-                    values[k] = -1-row_sum;
+                    values[k] = 1 - row_sum;
                 }
             }
         }
@@ -138,7 +143,18 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        if(SFEM_NORMALIZE_ROWS) {
+        if (SFEM_REMOVE_LOWER_TRIANGULAR) {
+            for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
+                    idx_t col = colidx[k];
+                    if (col < i) {
+                        values[k] = 0;
+                    }
+                }
+            }
+        }
+
+        if (SFEM_NORMALIZE_ROWS) {
             for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
                 real_t row_sum = 0;
                 for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
@@ -151,9 +167,6 @@ int main(int argc, char *argv[]) {
             }
         }
     }
-
-
-
 
     double tock = MPI_Wtime();
     printf("assemble.c: build crs\t\t%g seconds\n", tock - tack);

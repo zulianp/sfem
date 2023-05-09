@@ -22,8 +22,8 @@ SYSTEM_DIR=system
 # export SFEM_GRAPH_LAPLACIAN=1
 # export EIG_WHICH='SR'
 
-# export EIG_WHICH='LR'
-export EIG_WHICH='LM'
+export EIG_WHICH='LR'
+# export EIG_WHICH='LM'
 
 # N=100
 N=3538
