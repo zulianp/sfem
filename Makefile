@@ -52,8 +52,8 @@ ifeq ($(metis), 1)
 endif
 
 # Folder structure
-VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix:operators/tet10:operators/tet4:operators/tri3:operators/tri6:operators/cvfem
-INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/tri3 -Ioperators/tri6 -Ioperators/cvfem
+VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix:operators/tet10:operators/tet4:operators/tri3:operators/tri6:operators/cvfem:graphs
+INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/tri3 -Ioperators/tri6 -Ioperators/cvfem -Igraphs
 
 
 CFLAGS += -pedantic -Wextra
@@ -103,7 +103,11 @@ GOALS += cvfem_assemble
 # Graph analysis
 GOALS += assemble_adjaciency_matrix
 
-DEPS = -L$(PWD)/../matrix.io/ -lmatrix.io -lstdc++
+ifeq ($(metis), 1)
+	GOALS += partition_mesh_based_on_operator
+endif
+
+DEPS += -L$(PWD)/../matrix.io/ -lmatrix.io -lstdc++
 
 LDFLAGS += $(DEPS) -lm
 
@@ -159,6 +163,10 @@ OBJS += tet10_grad.o \
 # CVFEM
 OBJS += cvfem_tri3_diffusion.o 
 
+# Graphs
+ifeq ($(metis), 1)
+	OBJS += sfem_metis.o
+endif
 
 ifeq ($(cuda), 1)
 # 	CUDA_OBJS = tet4_cuda_laplacian.o
@@ -229,6 +237,9 @@ cvfem_assemble : cvfem_assemble.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 partition : partition.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+partition_mesh_based_on_operator : partition_mesh_based_on_operator.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 sfc : sfc.o libsfem.a
