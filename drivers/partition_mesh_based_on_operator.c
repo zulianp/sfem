@@ -39,12 +39,12 @@ int main(int argc, char *argv[]) {
     }
 
     const char *folder = argv[1];
-    const char *matrix_file = argv[2];
+    const char *matrix_folder = argv[2];
     const int num_partitions = atoi(argv[3]);
     const char *partition_file = argv[4];
 
     if (!rank) {
-        printf("%s %s %s %d %s\n", argv[0], folder, matrix_file, num_partitions, partition_file);
+        printf("%s %s %s %d %s\n", argv[0], folder, matrix_folder, num_partitions, partition_file);
     }
 
     double tick = MPI_Wtime();
@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
     }
 
     crs_t crs;
-    if (crs_read_folder(comm, folder, SFEM_MPI_COUNT_T, SFEM_MPI_IDX_T, SFEM_MPI_REAL_T, &crs)) {
+    if (crs_read_folder(comm, matrix_folder, SFEM_MPI_COUNT_T, SFEM_MPI_IDX_T, SFEM_MPI_REAL_T, &crs)) {
         return EXIT_FAILURE;
     }
 
