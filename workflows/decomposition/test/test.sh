@@ -33,11 +33,8 @@ SFEM_HANDLE_RHS=0 \
 SFEM_HANDLE_DIRICHLET=0 \
 assemble $mesh $matrix
 
-set -x
 partition_mesh_based_on_operator $mesh $matrix $num_procs $output
-
-
-python3 -c "import numpy as np; a = np.fromfile(\"$output\", dtype=np.int32).astype(np.float32).tofile(\"decomp-float32.raw\")"
-raw_to_db.py $mesh decomp-vis.vtk --cell_data="decomp-float32.raw" --cell_data_type="float32"
+fp_convert.py $output proc-float32.raw int32 float32
+raw_to_db.py $mesh decomp-vis.vtk --cell_data="proc-float32.raw" --cell_data_type="float32"
 
 raw2text.py $output int32 $test_output

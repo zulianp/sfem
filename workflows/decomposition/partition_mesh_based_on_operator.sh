@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
-source ../sfem_config.sh
-
 set -e
+
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
@@ -10,6 +9,10 @@ PATH=$SCRIPTPATH:$PATH
 PATH=$SCRIPTPATH/..:$PATH
 PATH=$SCRIPTPATH/../..:$PATH
 PATH=$SCRIPTPATH/../../python:$PATH
+
+source $SCRIPTPATH/../sfem_config.sh
+
+
 
 if (($# != 4))
 then
@@ -24,4 +27,5 @@ matrix=$2
 num_partitions=$3
 output=$4
 
+export DYLD_LIBRARY_PATH=$METIS_DIR/lib
 partition_mesh_based_on_operator $mesh $matrix $num_partitions $output

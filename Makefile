@@ -49,6 +49,7 @@ ifeq ($(metis), 1)
 	CFLAGS += -I$(METIS_DIR)/include -DSFEM_ENABLE_METIS
 	CXXFLAGS += -I$(METIS_DIR)/include -DSFEM_ENABLE_METIS
 	DEPS += -L$(METIS_DIR)/lib -lmetis
+	DEPS += -L$(GKLIB_DIR)/lib -lGKlib
 endif
 
 # Folder structure

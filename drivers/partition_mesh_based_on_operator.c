@@ -14,6 +14,8 @@
 #include "sfem_base.h"
 #include "sfem_mesh_write.h"
 
+#include "sortreduce.h"
+
 #include "sfem_metis.h"
 
 int main(int argc, char *argv[]) {
@@ -66,22 +68,54 @@ int main(int argc, char *argv[]) {
     idx_t *node_partitions = malloc(crs.lrows * sizeof(idx_t));
     memset(node_partitions, 0, crs.lrows * sizeof(idx_t));
 
-    if (decompose(crs.lrows, (count_t *)crs.rowptr, (idx_t *)crs.colidx, num_partitions, node_partitions)) {
+    if (
+        // decompose
+        decompose_nnz_weighted(crs.lrows, (count_t *)crs.rowptr, (idx_t *)crs.colidx, num_partitions, node_partitions)) {
         return EXIT_FAILURE;
     }
 
+
+
     idx_t *element_partitions = malloc(mesh.nelements * sizeof(idx_t));
 
+
+
     const int nn = elem_num_nodes(mesh.element_type);
+
+    idx_t ranks[nn];
+    idx_t connects[nn];
+    idx_t sranks[nn];
     for (ptrdiff_t e = 0; e < mesh.nelements; e++) {
         element_partitions[e] = mesh.nelements;
 
         int part = element_partitions[e];
         for (int i = 0; i < nn; i++) {
             idx_t ii = mesh.elements[i][e];
-            part = MIN(part, node_partitions[ii]);
+            ranks[i] = node_partitions[ii];
         }
 
+        sort_idx(ranks, nn);
+
+        memset(connects, 0, nn * sizeof(idx_t));
+
+        int offset = 0;
+        sranks[0] = ranks[0];
+        for(int k = 1; k < nn; k++) {
+            if(ranks[k] == ranks[k-1]) {
+                connects[offset]++;
+            } else {
+                sranks[offset++] = ranks[k];
+            }
+        }
+
+        int argmax = 0;
+        for(int k = 1; k < offset; k++) {
+            if(connects[argmax] < connects[k]) {
+                argmax = k;
+            }
+        }
+
+        part = sranks[argmax];
         element_partitions[e] = part;
     }
 
