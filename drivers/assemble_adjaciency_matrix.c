@@ -69,11 +69,18 @@ int main(int argc, char *argv[]) {
     // 2) Construct a breadth-first indexing
     int SFEM_DIRECTED = 0;
 
+
+    // These to options do not work
+    SFEM_READ_ENV(SFEM_DIRECTED, atoi);
+    SFEM_READ_ENV(SFEM_REMOVE_LOWER_TRIANGULAR, atoi);
+
+
+
     SFEM_READ_ENV(SFEM_EXPORT_FP32, atoi);
     SFEM_READ_ENV(SFEM_REMOVE_DIAGONAL, atoi);
     SFEM_READ_ENV(SFEM_GRAPH_LAPLACIAN, atoi);
     SFEM_READ_ENV(SFEM_NORMALIZE_ROWS, atoi);
-    SFEM_READ_ENV(SFEM_REMOVE_LOWER_TRIANGULAR, atoi);
+    
 
     MPI_Datatype value_type = SFEM_EXPORT_FP32 ? MPI_FLOAT : MPI_DOUBLE;
 
@@ -107,54 +114,30 @@ int main(int argc, char *argv[]) {
     nnz = rowptr[mesh.nnodes];
     values = (real_t *)malloc(nnz * sizeof(real_t));
 
-    if (SFEM_GRAPH_LAPLACIAN) {
-        for (count_t i = 0; i < nnz; i++) {
-            values[i] = 1;
-        }
-
+    if (SFEM_DIRECTED) {
+        printf("SFEM_DIRECTED\n");
         for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
-            real_t row_sum = 0;
-            for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
-                row_sum += values[k];
-            }
-
             for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
                 idx_t col = colidx[k];
-                if (col == i) {
-                    values[k] = 1 - row_sum;
+                if (col != i) {
+                    idx_t ii = (i + mesh.nnodes/2) % mesh.nnodes; 
+                    idx_t jj = (col + mesh.nnodes/2) % mesh.nnodes; 
+
+                    if(jj < ii) {
+                        values[k] = 1;
+                    } 
+                    // else {
+                    //     values[k] = -1;
+                    // }
                 }
             }
         }
-
     } else {
-        for (count_t i = 0; i < nnz; i++) {
-            values[i] = 1;
-        }
-
-        if (SFEM_REMOVE_DIAGONAL) {
-            for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
-                for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
-                    idx_t col = colidx[k];
-
-                    if (col == i) {
-                        values[k] = 0;
-                    }
-                }
+        if (SFEM_GRAPH_LAPLACIAN) {
+            for (count_t i = 0; i < nnz; i++) {
+                values[i] = 1;
             }
-        }
 
-        if (SFEM_REMOVE_LOWER_TRIANGULAR) {
-            for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
-                for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
-                    idx_t col = colidx[k];
-                    if (col < i) {
-                        values[k] = 0;
-                    }
-                }
-            }
-        }
-
-        if (SFEM_NORMALIZE_ROWS) {
             for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
                 real_t row_sum = 0;
                 for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
@@ -162,7 +145,51 @@ int main(int argc, char *argv[]) {
                 }
 
                 for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
-                    values[k] /= row_sum;
+                    idx_t col = colidx[k];
+                    if (col == i) {
+                        values[k] = 1 - row_sum;
+                    }
+                }
+            }
+
+        } else {
+            for (count_t i = 0; i < nnz; i++) {
+                values[i] = 1;
+            }
+
+            if (SFEM_REMOVE_DIAGONAL) {
+                for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                    for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
+                        idx_t col = colidx[k];
+
+                        if (col == i) {
+                            values[k] = 0;
+                        }
+                    }
+                }
+            }
+
+            if (SFEM_REMOVE_LOWER_TRIANGULAR) {
+                for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                    for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
+                        idx_t col = colidx[k];
+                        if (col < i) {
+                            values[k] = 0;
+                        }
+                    }
+                }
+            }
+
+            if (SFEM_NORMALIZE_ROWS) {
+                for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                    real_t row_sum = 0;
+                    for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
+                        row_sum += values[k];
+                    }
+
+                    for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
+                        values[k] /= row_sum;
+                    }
                 }
             }
         }

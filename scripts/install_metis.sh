@@ -30,7 +30,7 @@ then
 fi
 
 # DEBUG_OPTIONS='debug=1 assert=1 assert2=1'
-export DEBUG_OPTIONS='debug=1 assert=1'
+# export DEBUG_OPTIONS='debug=1 assert=1'
 
 
 cd $INSTALL_DIR/sources/gklib
