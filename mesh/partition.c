@@ -89,11 +89,8 @@ int main(int argc, char *argv[]) {
 
     mesh_exchange_nodal_master_to_slave(&mesh, &slave_to_master, MPI_FLOAT, frank);
 
-
     mesh_t aura;
     mesh_aura(&mesh, &aura);
-
-
 
     // Everyone independent
     mesh.comm = MPI_COMM_SELF;

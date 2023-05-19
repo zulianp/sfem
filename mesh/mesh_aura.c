@@ -64,20 +64,6 @@ void mesh_exchange_nodal_master_to_slave(const mesh_t *mesh,
     free(send_data);
 }
 
-// void mesh_exchange_nodal_slave_to_master(const mesh_t *mesh,
-//     send_recv_t *const slave_to_master, MPI_Datatype data_type, void *const inout)
-//     {
-//         CATCH_MPI_ERROR(MPI_Alltoallv(send_data,
-//                                       sr->send_count,
-//                                       sr->send_displs,
-//                                       data_type,
-//                                       recv_count,
-//                                       sr->recv_displs,
-//                                       sr->recv_data,
-//                                       data_type,
-//                                       sr->comm));
-//     }
-
 void mesh_create_nodal_send_recv(const mesh_t *mesh, send_recv_t *const slave_to_master) {
     int rank, size;
 
@@ -116,29 +102,6 @@ void mesh_create_nodal_send_recv(const mesh_t *mesh, send_recv_t *const slave_to
     }
 
     idx_t *slave_nodes = (idx_t *)malloc(recv_displs[size] * sizeof(idx_t));
-
-    // for (int r = 0; r < size; ++r) {
-    //     if (r == rank) {
-    //         printf("[%d] ---------------------\n", rank);
-    //         printf("recv\n");
-    //         for (int l = 0; l < size; l++) {
-    //             const int begin = recv_displs[l];
-    //             const int extent = recv_count[l];
-    //             printf("%d -> %d %d\n", l, begin, extent);
-    //         }
-
-    //         printf("send\n");
-    //         for (int l = 0; l < size; l++) {
-    //             const int begin = send_displs[l];
-    //             const int extent = send_count[l];
-    //             printf("%d -> %d %d\n", l, begin, extent);
-    //         }
-    //     }
-
-    //     fflush(stdout);
-
-    //     MPI_Barrier(mesh->comm);
-    // }
 
     // send slave nodes to process with master nodes
     CATCH_MPI_ERROR(MPI_Alltoallv(&mesh->node_mapping[mesh->n_owned_nodes],
@@ -363,7 +326,7 @@ void mesh_aura(const mesh_t *mesh, mesh_t *aura) {
     for (int d = 0; d < nnxe; d++) {
         aura->elements[d] = (idx_t *)malloc(recv_displs[size] * sizeof(idx_t));
 
-        for(ptrdiff_t i = 0; i < size_send_buffer; i++) {
+        for (ptrdiff_t i = 0; i < size_send_buffer; i++) {
             send_buffer[i] = mesh->elements[d][element_send_lists[i]];
         }
 
@@ -381,6 +344,83 @@ void mesh_aura(const mesh_t *mesh, mesh_t *aura) {
     aura->nelements = recv_displs[size];
     aura->n_owned_elements = 0;
     aura->n_shared_elements = aura->nelements;
+
+    {  // Exchange element mapping
+        aura->element_mapping = (idx_t *)malloc(aura->nelements * sizeof(idx_t));
+        for (ptrdiff_t i = 0; i < size_send_buffer; i++) {
+            send_buffer[i] = mesh->element_mapping[element_send_lists[i]];
+        }
+
+        CATCH_MPI_ERROR(MPI_Alltoallv(send_buffer,
+                                      send_count,
+                                      send_displs,
+                                      SFEM_MPI_IDX_T,
+                                      aura->element_mapping,
+                                      recv_count,
+                                      recv_displs,
+                                      SFEM_MPI_IDX_T,
+                                      comm));
+    }
+
+    { // Exchange node_mapping and xyz
+        
+        int max_send_elems = 0;
+        for(int r = 0; r < size; r++) {
+            max_send_elems = MAX(max_send_elems, send_count[r]);
+        }
+
+        idx_t *node_send_lists = (idx_t *)malloc(max_send_elems * nnxe * sizeof(idx_t));
+
+        int * node_send_count = (int *)malloc(size * sizeof(int));
+        int * node_send_displs = (int *)malloc((size+1) * sizeof(int));
+        
+        memset(node_send_count, 0, (size) * sizeof(int));
+        node_send_displs[0] = 0;
+
+        // Count number of nodes to send
+        for(int r = 0; r < size; r++) {
+            const int begin = send_displs[r];
+            const int extent = send_count[r];
+            const idx_t * const elems = &element_send_lists[begin];
+
+            for(int d = 0; d < nnxe; d++) {
+                idx_t * nodes = &node_send_lists[d*extent];
+
+                for(int i = 0; i < extent; i++) {
+                    nodes[i] = mesh->elements[d][elems[i]];
+                }
+            }
+
+            const idx_t n_send_nodes = sortreduce(node_send_lists, extent * nnxe);
+            node_send_displs[r+1] = n_send_nodes + node_send_displs[r];
+        }
+
+        idx_t * node_send_buff = (idx_t*)malloc(node_send_displs[size] * sizeof(idx_t));
+
+        // Pack nodes to send
+        for(int r = 0; r < size; r++) {
+            const int begin = send_displs[r];
+            const int extent = send_count[r];
+            const idx_t * const elems = &element_send_lists[begin];
+
+            for(int d = 0; d < nnxe; d++) {
+                idx_t * nodes = &node_send_lists[d*extent];
+
+                for(int i = 0; i < extent; i++) {
+                    nodes[i] = mesh->elements[d][elems[i]];
+                }
+            }
+
+            const int n_send_nodes = sortreduce(node_send_lists, extent * nnxe);
+            for(int i = 0; i < n_send_nodes; i++) {
+                node_send_buff[node_send_displs[r] + node_send_count[r]++] = node_send_lists[i];
+            }
+        }
+
+        // TODO exchange
+
+        free(node_send_buff);
+    }
 
     {  // Clean-up
         send_recv_destroy(&slave_to_master);
