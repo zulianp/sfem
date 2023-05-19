@@ -36,5 +36,14 @@ typedef struct {
 
 void mesh_destroy(mesh_t *mesh);
 
+typedef struct {
+	ptrdiff_t nelements;
+	idx_t **elements;
+} element_block_t;
+
+
+void mesh_create_shared_elements_block(mesh_t *mesh, element_block_t *block);
+void mesh_destroy_shared_elements_block(mesh_t *mesh, element_block_t *block);
+
 
 #endif //SFEM_MESH_H

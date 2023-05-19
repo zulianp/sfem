@@ -1,8 +1,8 @@
 
 #include "read_mesh.h"
 
-#include "../matrix.io/matrixio_array.h"
-#include "../matrix.io/utils.h"
+#include "matrix.io/matrixio_array.h"
+#include "matrix.io/utils.h"
 
 #include <assert.h>
 #include <stddef.h>
@@ -400,7 +400,7 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
         mesh->nnodes = n_unique;
 
         mesh->n_owned_nodes = n_owned_nodes;
-        mesh->n_owned_elements = n_local_elements;
+        mesh->n_owned_elements = n_local_elements - mesh->n_shared_elements;
         
 
         // Original indexing
