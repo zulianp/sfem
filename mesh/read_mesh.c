@@ -274,6 +274,10 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
 
         ////////////////////////////////////////////////////////////
         // Remap node index
+        // TODO reorder nodes with the following order
+        // 1) locally owned
+        // 2) locally owned by shared by a remote process
+        // 3) Shared and owned by a remote process
 
         idx_t *proc_ptr = (idx_t *)malloc((size + 1) * sizeof(idx_t));
         memset(proc_ptr, 0, (size + 1) * sizeof(idx_t));
@@ -326,6 +330,10 @@ int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, con
 
         ////////////////////////////////////////////////////////////
         // Remap element index
+
+        // TODO reorder elements with the following order
+        // 1) Locally owned element 
+        // 2) Elements that are locally owned but have node shared by a remote process
 
         if (remap_elements) {
             idx_t *temp_buff = (idx_t *)malloc(n_local_elements * sizeof(idx_t));

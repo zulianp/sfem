@@ -28,9 +28,15 @@ void mesh_create_nodal_send_recv(const mesh_t *mesh,
 
 void send_recv_destroy(send_recv_t *const sr);
 
-void mesh_aura(const mesh_t *mesh, mesh_t *aura);
-void mesh_aura_to_complete_mesh(const mesh_t *const mesh, const mesh_t *const aura, mesh_t *const out);
-void mesh_aura_fix_indices(const mesh_t *const mesh, mesh_t *const aura);
+// void mesh_aura(const mesh_t *mesh, mesh_t *aura);
+// void mesh_aura_to_complete_mesh(const mesh_t *const mesh, const mesh_t *const aura, mesh_t *const out);
+// void mesh_aura_fix_indices(const mesh_t *const mesh, mesh_t *const aura);
+
+void mesh_remote_connectivity_graph(const mesh_t *mesh,
+                                    count_t **rowptr,
+                                    idx_t *colidx,
+                                    send_recv_t *const exchange);
+
 
 #ifdef __cplusplus
 }

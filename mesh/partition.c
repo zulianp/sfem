@@ -67,19 +67,21 @@ int main(int argc, char *argv[]) {
     char output_path[2048];
     for (int r = 0; r < size; ++r) {
         if (r == rank) {
-            printf("[%d] #elements %ld #nodes %ld #owned_nodes %ld #owned_elements %ld #shared_elements %ld\n",
-                   rank,
-                   (long)mesh.nelements,
-                   (long)mesh.nnodes,
-                   (long)mesh.n_owned_nodes,
-                   (long)mesh.n_owned_elements,
-                   (long)mesh.n_shared_elements);
+            printf(
+                "[%d] #elements %ld #nodes %ld #owned_nodes %ld "
+                "#owned_elements %ld #shared_elements %ld\n",
+                rank,
+                (long)mesh.nelements,
+                (long)mesh.nnodes,
+                (long)mesh.n_owned_nodes,
+                (long)mesh.n_owned_elements,
+                (long)mesh.n_shared_elements);
         }
 
         fflush(stdout);
         MPI_Barrier(comm);
     }
-    
+
     send_recv_t slave_to_master;
     mesh_create_nodal_send_recv(&mesh, &slave_to_master);
     float *frank = (float *)malloc(mesh.nnodes * sizeof(float));
@@ -87,10 +89,17 @@ int main(int argc, char *argv[]) {
         frank[i] = rank;
     }
 
-    mesh_exchange_nodal_master_to_slave(&mesh, &slave_to_master, MPI_FLOAT, frank);
+    mesh_exchange_nodal_master_to_slave(
+        &mesh, &slave_to_master, MPI_FLOAT, frank);
 
-    mesh_t aura;
-    mesh_aura(&mesh, &aura);
+    // mesh_t aura;
+    // mesh_aura(&mesh, &aura);
+    // mesh_aura_fix_indices(&mesh, &aura);
+
+    count_t *rowptr;
+    idx_t *colidx;
+    send_recv_t exchange;
+    mesh_remote_connectivity_graph(&mesh, &rowptr, &colidx, &exchange);
 
     // Everyone independent
     mesh.comm = MPI_COMM_SELF;
@@ -98,13 +107,14 @@ int main(int argc, char *argv[]) {
     mesh_write(output_path, &mesh);
 
     sprintf(output_path, "%s/part_%0.5d/frank.raw", output_folder, rank);
-    array_write(MPI_COMM_SELF, output_path, MPI_FLOAT, frank, mesh.nnodes, mesh.nnodes);
+    array_write(
+        MPI_COMM_SELF, output_path, MPI_FLOAT, frank, mesh.nnodes, mesh.nnodes);
 
     MPI_Barrier(comm);
 
     send_recv_destroy(&slave_to_master);
     mesh_destroy(&mesh);
-    mesh_destroy(&aura);
+    // mesh_destroy(&aura);
     double tock = MPI_Wtime();
 
     if (!rank) {
