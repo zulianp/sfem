@@ -307,10 +307,7 @@ void mesh_aura(const mesh_t *mesh, mesh_t *aura) {
 #endif
 
     int *recv_count = (int *)malloc((size + 1) * sizeof(int));
-    // memset(recv_count, 0, (size + 1) * sizeof(int));
-
     int *recv_displs = (int *)malloc((size + 1) * sizeof(int));
-    // memset(recv_displs, 0, (size + 1) * sizeof(int));
 
     CATCH_MPI_ERROR(MPI_Alltoall(send_count, 1, MPI_INT, recv_count, 1, MPI_INT, comm));
 
@@ -327,7 +324,8 @@ void mesh_aura(const mesh_t *mesh, mesh_t *aura) {
         aura->elements[d] = (idx_t *)malloc(recv_displs[size] * sizeof(idx_t));
 
         for (ptrdiff_t i = 0; i < size_send_buffer; i++) {
-            send_buffer[i] = mesh->elements[d][element_send_lists[i]];
+            // Global ids
+            send_buffer[i] = mesh->node_mapping[mesh->elements[d][element_send_lists[i]]];
         }
 
         CATCH_MPI_ERROR(MPI_Alltoallv(send_buffer,
@@ -363,7 +361,6 @@ void mesh_aura(const mesh_t *mesh, mesh_t *aura) {
     }
 
     { // Exchange node_mapping and xyz
-        
         int max_send_elems = 0;
         for(int r = 0; r < size; r++) {
             max_send_elems = MAX(max_send_elems, send_count[r]);
@@ -387,7 +384,11 @@ void mesh_aura(const mesh_t *mesh, mesh_t *aura) {
                 idx_t * nodes = &node_send_lists[d*extent];
 
                 for(int i = 0; i < extent; i++) {
-                    nodes[i] = mesh->elements[d][elems[i]];
+                    const idx_t node = mesh->elements[d][elems[i]];
+                    // Send only nodes we own
+                    if(mesh->node_owner[node] == rank) {
+                        nodes[i] = node;
+                    }
                 }
             }
 
@@ -396,6 +397,7 @@ void mesh_aura(const mesh_t *mesh, mesh_t *aura) {
         }
 
         idx_t * node_send_buff = (idx_t*)malloc(node_send_displs[size] * sizeof(idx_t));
+        geom_t * point_send_buff = (geom_t*)malloc(node_send_displs[size] * sizeof(geom_t));
 
         // Pack nodes to send
         for(int r = 0; r < size; r++) {
@@ -407,7 +409,11 @@ void mesh_aura(const mesh_t *mesh, mesh_t *aura) {
                 idx_t * nodes = &node_send_lists[d*extent];
 
                 for(int i = 0; i < extent; i++) {
-                    nodes[i] = mesh->elements[d][elems[i]];
+                    const idx_t node = mesh->elements[d][elems[i]];
+                    // Send only nodes we own
+                    if(mesh->node_owner[node] == rank) {
+                        nodes[i] = node;
+                    }
                 }
             }
 
@@ -417,9 +423,72 @@ void mesh_aura(const mesh_t *mesh, mesh_t *aura) {
             }
         }
 
-        // TODO exchange
+        // exchange
+        int * node_recv_count = (int *)malloc(size * sizeof(int));
+        int * node_recv_displs = (int *)malloc((size+1) * sizeof(int));
+
+        CATCH_MPI_ERROR(MPI_Alltoall(node_send_count, 1, MPI_INT, node_recv_count, 1, MPI_INT, comm));
+
+        node_recv_displs[0] = 0;
+
+        for(int r = 0; r < size; r++) {
+            node_recv_displs[r+1] = node_recv_displs[r] + node_recv_count[r];
+        }
+
+        idx_t * aura_nodes = (idx_t*)malloc(node_recv_displs[size] * sizeof(idx_t));
+        geom_t **aura_points = (geom_t**)malloc(mesh->spatial_dim * sizeof(geom_t *));
+
+
+        for(int d = 0; d < mesh->spatial_dim; d++) {
+            for(int i = 0; i < node_send_displs[size]; i++) {
+                point_send_buff[i] = mesh->points[d][node_send_buff[i]];
+            }
+
+            aura_points[d] = (geom_t*)malloc(node_recv_displs[size] * sizeof(geom_t));
+
+            CATCH_MPI_ERROR(MPI_Alltoallv(point_send_buff,
+                                          node_send_count,
+                                          node_send_displs,
+                                          SFEM_MPI_IDX_T,
+                                          aura_points[d],
+                                          node_recv_count,
+                                          node_recv_displs,
+                                          SFEM_MPI_IDX_T,
+                                          comm));
+        }
+
+        for(int i = 0; i < node_send_displs[size]; i++) {
+            node_send_buff[i] = mesh->node_mapping[node_send_buff[i]];
+        }
+
+        CATCH_MPI_ERROR(MPI_Alltoallv(node_send_buff,
+                                      node_send_count,
+                                      node_send_displs,
+                                      SFEM_MPI_IDX_T,
+                                      aura_nodes,
+                                      node_recv_count,
+                                      node_recv_displs,
+                                      SFEM_MPI_IDX_T,
+                                      comm));
+
+        aura->points = aura_points; 
+        aura->node_mapping = aura_nodes;
+        aura->node_owner = (idx_t*)malloc(node_recv_displs[size] * sizeof(idx_t));
+
+        for(int r = 0; r < size; r++) {
+            int begin = node_recv_displs[r];
+            int extent = node_recv_count[r];
+
+            idx_t * no = &aura->node_owner[begin];
+
+            for(int k = 0; k < extent; k++) {
+                no[k] = r;
+            }
+        }
 
         free(node_send_buff);
+        free(node_send_count);
+        free(node_recv_count);
     }
 
     {  // Clean-up
