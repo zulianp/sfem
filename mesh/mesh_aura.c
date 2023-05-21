@@ -26,7 +26,6 @@ void mesh_exchange_nodal_master_to_slave(const mesh_t *mesh,
     MPI_Comm_rank(slave_to_master->comm, &rank);
     MPI_Comm_size(slave_to_master->comm, &size);
 
-
     double tick = MPI_Wtime();
 
     int n = slave_to_master->recv_displs[size];
@@ -391,7 +390,7 @@ void mesh_aura(const mesh_t *mesh, mesh_t *aura) {
                     const idx_t node = mesh->elements[d][elems[i]];
                     // Send only nodes we own
                     if (mesh->node_owner[node] == rank) {
-                        node_send_lists[nnn++] = node;   
+                        node_send_lists[nnn++] = node;
                     }
                 }
             }
@@ -478,7 +477,7 @@ void mesh_aura(const mesh_t *mesh, mesh_t *aura) {
                                       node_recv_count,
                                       node_recv_displs,
                                       SFEM_MPI_IDX_T,
-                                      comm));   
+                                      comm));
 
         aura->mem_space = mesh->mem_space;
         aura->comm = mesh->comm;
@@ -520,7 +519,27 @@ void mesh_aura(const mesh_t *mesh, mesh_t *aura) {
     }
 
     double tock = MPI_Wtime();
-    if(!rank) {
+    if (!rank) {
         printf("mesh_aura.c: mesh_aura %g seconds\n", tock - tick);
+    }
+}
+
+// void mesh_aura_to_complete_mesh(const mesh_t *const mesh, const mesh_t *const aura)
+
+void mesh_aura_fix_indices(const mesh_t *const mesh, mesh_t *const aura) {
+    int nnxe = elem_num_nodes(mesh->element_type);
+    for (int d = 0; d < nnxe; d++) {
+        idx_t *es = aura->elements[d];
+
+        for (ptrdiff_t i = 0; i < aura->nnodes; i++) {
+            const idx_t gnode = es[i];
+            idx_t lnode = safe_find_idx_binary_search(gnode, aura->node_mapping, aura->nnodes);
+
+            if(lnode == -1) {
+                lnode = find_idx_binary_search(gnode, mesh->node_mapping, mesh->nnodes);
+            }
+
+            es[i] = -lnode;
+        }
     }
 }
