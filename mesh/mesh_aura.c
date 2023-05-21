@@ -26,6 +26,9 @@ void mesh_exchange_nodal_master_to_slave(const mesh_t *mesh,
     MPI_Comm_rank(slave_to_master->comm, &rank);
     MPI_Comm_size(slave_to_master->comm, &size);
 
+
+    double tick = MPI_Wtime();
+
     int n = slave_to_master->recv_displs[size];
 
     int type_size;
@@ -139,6 +142,8 @@ void mesh_create_nodal_send_recv(const mesh_t *mesh, send_recv_t *const slave_to
 }
 
 void mesh_aura(const mesh_t *mesh, mesh_t *aura) {
+    double tick = MPI_Wtime();
+
     MPI_Comm comm = mesh->comm;
 
     int rank, size;
@@ -473,8 +478,12 @@ void mesh_aura(const mesh_t *mesh, mesh_t *aura) {
                                       node_recv_count,
                                       node_recv_displs,
                                       SFEM_MPI_IDX_T,
-                                      comm));
+                                      comm));   
 
+        aura->mem_space = mesh->mem_space;
+        aura->comm = mesh->comm;
+        aura->spatial_dim = mesh->spatial_dim;
+        aura->element_type = mesh->element_type;
         aura->points = aura_points;
         aura->node_mapping = aura_nodes;
         aura->node_owner = (idx_t *)malloc(node_recv_displs[size] * sizeof(idx_t));
@@ -508,5 +517,10 @@ void mesh_aura(const mesh_t *mesh, mesh_t *aura) {
 
         free(recv_count);
         free(recv_displs);
+    }
+
+    double tock = MPI_Wtime();
+    if(!rank) {
+        printf("mesh_aura.c: mesh_aura %g seconds\n", tock - tick);
     }
 }

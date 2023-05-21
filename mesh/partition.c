@@ -104,6 +104,7 @@ int main(int argc, char *argv[]) {
 
     send_recv_destroy(&slave_to_master);
     mesh_destroy(&mesh);
+    mesh_destroy(&aura);
     double tock = MPI_Wtime();
 
     if (!rank) {
