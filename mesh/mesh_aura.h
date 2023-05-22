@@ -34,7 +34,7 @@ void send_recv_destroy(send_recv_t *const sr);
 
 void mesh_remote_connectivity_graph(const mesh_t *mesh,
                                     count_t **rowptr,
-                                    idx_t *colidx,
+                                    idx_t **colidx,
                                     send_recv_t *const exchange);
 
 

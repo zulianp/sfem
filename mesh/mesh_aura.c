@@ -68,8 +68,7 @@ void mesh_exchange_nodal_master_to_slave(const mesh_t *mesh,
     free(send_data);
 }
 
-void mesh_create_nodal_send_recv(const mesh_t *mesh,
-                                 send_recv_t *const slave_to_master) {
+void mesh_create_nodal_send_recv(const mesh_t *mesh, send_recv_t *const slave_to_master) {
     int rank, size;
 
     MPI_Comm_rank(mesh->comm, &rank);
@@ -99,8 +98,7 @@ void mesh_create_nodal_send_recv(const mesh_t *mesh,
     int *recv_displs = (int *)malloc((size + 1) * sizeof(int));
     memset(recv_displs, 0, size * sizeof(int));
 
-    CATCH_MPI_ERROR(MPI_Alltoall(
-        send_count, 1, MPI_INT, recv_count, 1, MPI_INT, mesh->comm));
+    CATCH_MPI_ERROR(MPI_Alltoall(send_count, 1, MPI_INT, recv_count, 1, MPI_INT, mesh->comm));
 
     recv_displs[0] = 0;
     for (int r = 0; r < size; r++) {
@@ -650,12 +648,11 @@ void mesh_create_nodal_send_recv(const mesh_t *mesh,
 //     }
 // }
 
-
 // void mesh_shared_node_contiguous_idx(const mesh_t *mesh, idx_t *share_nodes_contiguou)
 
 void mesh_remote_connectivity_graph(const mesh_t *mesh,
-                                    count_t **rowptr,
-                                    idx_t *colidx,
+                                    count_t **out_rowptr,
+                                    idx_t **out_colidx,
                                     send_recv_t *const exchange) {
     double tick = MPI_Wtime();
 
@@ -665,84 +662,26 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
 
-    send_recv_t slave_to_master;
-    mesh_create_nodal_send_recv(mesh, &slave_to_master);
-    uint8_t *marked_nodes = (uint8_t *)calloc(mesh->nnodes, sizeof(uint8_t));
-
-    for (int r = 0; r < size; r++) {
-        const int begin = slave_to_master.recv_displs[r];
-        const int extent = slave_to_master.recv_count[r];
-
-        idx_t *idx = &slave_to_master.sparse_idx[begin];
-
-        for (int k = 0; k < extent; k++) {
-            idx_t node = idx[k];
-            marked_nodes[node] = 1;
-        }
-    }
-
-    const int nnxe = elem_num_nodes(mesh->element_type);
-
-    uint8_t *marked_elements =
-        (uint8_t *)calloc(mesh->n_owned_elements, sizeof(uint8_t));
-
-    for (int d = 0; d < nnxe; d++) {
-        for (ptrdiff_t i = 0; i < mesh->n_owned_elements; i++) {
-            const idx_t node = mesh->elements[d][i];
-            if (marked_nodes[node]) {
-                marked_elements[i] = 1;
-            }
-        }
-    }
-
-    ptrdiff_t n_marked_elements = 0;
-    for (ptrdiff_t i = 0; i < mesh->n_owned_elements; i++) {
-        n_marked_elements += marked_elements[i];
-    }
-
-    idx_t *marked_element_list =
-        (idx_t *)malloc((n_marked_elements) * sizeof(idx_t));
-
-    for (ptrdiff_t i = 0, ii = 0; i < mesh->n_owned_elements; i++) {
-        if (marked_elements[i]) {
-            marked_element_list[ii++] = i;
-        }
-    }
+    int nnxe = elem_num_nodes(mesh->element_type);
 
     count_t *selection_rowptr = 0;
     idx_t *selection_colidx = 0;
     idx_t **elems = (idx_t **)malloc(nnxe * sizeof(idx_t *));
 
+    ptrdiff_t n_elems = mesh->n_owned_elements_with_ghosts + mesh->n_shared_elements;
+    ptrdiff_t e_begin = mesh->nelements - n_elems;
     for (int d = 0; d < nnxe; d++) {
-        elems[d] = malloc((mesh->n_shared_elements + n_marked_elements) *
-                          sizeof(idx_t));
-
-        for (ptrdiff_t i = mesh->n_owned_elements;
-             i < mesh->n_owned_elements + mesh->n_shared_elements;
-             i++) {
-            elems[d][i] = mesh->elements[d][i];
-        }
-
-        for (ptrdiff_t i = 0; i < n_marked_elements; i++) {
-            elems[d][mesh->n_shared_elements + i] =
-                mesh->elements[d][marked_element_list[i]];
-        }
+        elems[d] = &mesh->elements[d][e_begin];
     }
 
-    build_crs_graph_for_elem_type(mesh->element_type,
-                                  n_marked_elements,
-                                  mesh->nnodes,
-                                  elems,
-                                  &selection_rowptr,
-                                  &selection_colidx);
+    build_crs_graph_for_elem_type(
+        mesh->element_type, n_elems, mesh->nnodes, elems, &selection_rowptr, &selection_colidx);
 
-    count_t *shared_rowptr =
-        (count_t *)calloc(mesh->nnodes + 1, sizeof(count_t));
+    count_t *shared_rowptr = (count_t *)calloc(mesh->nnodes + 1, sizeof(count_t));
 
-    for (ptrdiff_t i = 0; i < mesh->nnodes; i++) {
-        // We do not need to send our row
-        if (mesh->node_owner[i] == rank) continue;
-
+    // Consider only nodes that are shared
+    for (ptrdiff_t i = mesh->n_owned_nodes - mesh->n_owned_nodes_with_ghosts; i < mesh->nnodes;
+         i++) {
         const count_t begin = selection_rowptr[i];
         const count_t extent = selection_rowptr[i + 1] - selection_rowptr[i];
         const idx_t *const cols = &selection_colidx[begin];
@@ -753,32 +692,27 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
         }
     }
 
-    ptrdiff_t nnz = 0;
-    for (ptrdiff_t i = 0; i <= mesh->nnodes; i++) {
-        nnz += shared_rowptr[i];
-    }
-
     // Compute begin/end offsets
     for (ptrdiff_t i = 0; i < mesh->nnodes; i++) {
         shared_rowptr[i + 1] += shared_rowptr[i];
     }
 
-    idx_t *shared_colidx = (idx_t *)malloc(nnz * sizeof(idx_t));
-    for (ptrdiff_t i = 0; i < mesh->nnodes; i++) {
-        // We do not need to send our row
-        if (mesh->node_owner[i] == rank) continue;
+    ptrdiff_t nnz = shared_rowptr[mesh->nnodes];
 
+    idx_t *shared_colidx = (idx_t *)malloc(nnz * sizeof(idx_t));
+    for (ptrdiff_t i = mesh->n_owned_nodes - mesh->n_owned_nodes_with_ghosts; i < mesh->nnodes;
+         i++) {
         const count_t begin = selection_rowptr[i];
         const count_t extent = selection_rowptr[i + 1] - selection_rowptr[i];
         const idx_t *const cols = &selection_colidx[begin];
 
-        idx_t *const colidx = shared_colidx[shared_rowptr[i]];
+        idx_t *const colidx = &shared_colidx[shared_rowptr[i]];
 
         count_t kk = 0;
         for (count_t k = 0; k < extent; k++) {
             const idx_t c = cols[k];
             if (mesh->node_owner[c] == rank) {
-                colidx[kk] = c;
+                colidx[kk++] = c;
             }
         }
 
@@ -788,12 +722,10 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
     int *send_displs = (int *)malloc((size + 1) * sizeof(int));
     int *send_count = (int *)calloc(size, sizeof(int));
 
-    for (ptrdiff_t i = 0; i < mesh->nnodes; i++) {
-        // We do not need to send our row
-        if (mesh->node_owner[i] == rank) continue;
+    for (ptrdiff_t i = mesh->n_owned_nodes; i < mesh->nnodes; i++) {
+        assert(mesh->node_owner[i] != rank);
         const count_t extent = selection_rowptr[i + 1] - selection_rowptr[i];
-        send_count[mesh->node_owner[i]] +=
-            3 + extent;  // 1 for row id and 1 for num cols
+        send_count[mesh->node_owner[i]] += 2 + extent;  // 1 for row id and 1 for num cols
     }
 
     send_displs[0] = 0;
@@ -803,33 +735,26 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
 
     idx_t *send_data = (idx_t *)malloc(send_displs[size] * sizeof(idx_t));
 
-    count_t contiguous_id_begin = 0;
-    count_t lnc = mesh->n_owned_nodes;
-    CATCH_MPI_ERROR(MPI_Exscan(&lnc, &contiguous_id_begin, 1, SFEM_MPI_COUNT_T, MPI_SUM, comm));
-
-    for (ptrdiff_t i = 0; i < mesh->nnodes; i++) {
-        // We do not need to send our row
-        if (mesh->node_owner[i] == rank) continue;
+    for (ptrdiff_t i = mesh->n_owned_nodes; i < mesh->nnodes; i++) {
         const count_t begin = shared_rowptr[i];
         const count_t extent = shared_rowptr[i + 1] - shared_rowptr[i];
         const idx_t *cols = &shared_colidx[begin];
 
         idx_t *sd = &send_data[send_displs[mesh->node_owner[i]]];
-        sd[0] = mesh->node_mapping[i];
-        sd[1] = extent;
-        int offset = 3;
+        assert(mesh->node_owner[i] != rank);
 
+        sd[0] = mesh->ghosts[i - mesh->n_owned_nodes];
+        sd[1] = extent;
+        int offset = 2;
         for (count_t k = 0; k < extent; k++) {
-            sd[offset++] = contiguous_id_begin + cols[k];
+            sd[offset++] = mesh->node_offsets[rank] + cols[k];
         }
     }
 
     int *recv_count = (int *)malloc(size * sizeof(int));
     int *recv_displs = (int *)malloc((size + 1) * sizeof(int));
 
-    CATCH_MPI_ERROR(MPI_Alltoall(
-        send_count, 1, MPI_INT, recv_count, 1, MPI_INT, mesh->comm));
-    // Clean-up
+    CATCH_MPI_ERROR(MPI_Alltoall(send_count, 1, MPI_INT, recv_count, 1, MPI_INT, mesh->comm));
 
     recv_displs[0] = 0;
     for (int r = 0; r < size; r++) {
@@ -848,26 +773,135 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
                                   SFEM_MPI_IDX_T,
                                   mesh->comm));
 
-    for (int d = 0; d < nnxe; d++) {
-        free(elems[d]);
+    count_t *rowptr = calloc(mesh->nnodes + 1, sizeof(count_t));
+    count_t *count = calloc(mesh->nnodes + 1, sizeof(count_t));
+
+
+    for(int r_ = 0; r_ < size; r_++) {
+        if(r_ == rank) {
+
+            printf("[%d] ----------------------------\n", rank);
+            printf("nnz=%d\n", (int)nnz);
+
+            for (int r = 0; r < size; r++) {
+                printf("%d (%d) ", send_displs[r], send_count[r]);
+
+            }
+            printf("\n");
+
+            for (int r = 0; r < size; r++) {
+                printf("%d (%d) ", recv_displs[r], recv_count[r]);
+
+            }
+            printf("\n");
+
+
+            // for (int r = 0; r < size; r++) {
+            //     int begin = recv_displs[r];
+            //     int extent = recv_count[r];
+
+            //     assert(r != rank || extent == 0);
+
+            //     if(extent == 0) continue;
+
+            //     printf("%d)\n", r);
+
+            //     for(int i = 0; i < extent; i++) 
+            //     {
+            //         printf("%d ", recv_data[begin + i]);
+            //     }
+
+            //     printf("\n");
+
+            //     for (idx_t kk = 0; kk < extent;) {
+            //         idx_t row = recv_data[begin + kk] - mesh->node_offsets[rank];
+            //         idx_t ncols = recv_data[begin + kk + 1];
+            //         idx_t *data = &recv_data[begin + kk + 2];
+
+            //         printf("%d (%d) %d\n", row, recv_data[begin + kk], ncols);
+
+            //         for(idx_t c = 0; c < MIN(10, ncols); c++) {
+            //             printf("%d ", data[c]); 
+            //         }
+            //         printf("\n");
+
+            //         kk += 2 + ncols;
+            //     }
+            // }
+        }
+
+        MPI_Barrier(comm);
     }
 
-    send_recv_destroy(&slave_to_master);
-    free(marked_nodes);
-    free(marked_elements);
-    free(marked_element_list);
-    free(elems);
+    for (int r = 0; r < size; r++) {
+        int begin = recv_displs[r];
+        int extent = recv_count[r];
 
-    free(selection_rowptr);
-    free(selection_colidx);
+        assert(r != rank || extent == 0);
 
-    free(shared_rowptr);
-    free(shared_colidx);
+        for (idx_t kk = 0; kk < extent;) {
+            idx_t row = recv_data[begin + kk] - mesh->node_offsets[rank];
 
-    free(send_displs);
-    free(send_count);
-    free(send_data);
+            if(!(row >= 0 && row < mesh->n_owned_nodes)) {
+                printf("[%d] %d %d (%d) < %d o=%d\n", rank, r, row, recv_data[begin + kk], (int)mesh->n_owned_nodes, (int)mesh->node_offsets[rank]);
+            }
 
-    free(recv_count);
-    free(recv_displs) ;free(recv_data);
+            assert(row >= 0);
+            assert(row < mesh->n_owned_nodes);
+            idx_t ncols = recv_data[begin + kk + 1];
+            rowptr[row] += ncols;
+            kk += 2 + ncols;
+        }
+    }
+
+    for (ptrdiff_t i = 0; i < mesh->nnodes; i++) {
+        rowptr[i + 1] += rowptr[i];
+    }
+
+    idx_t *colidx = malloc(rowptr[mesh->nnodes] * sizeof(idx_t));
+
+    for (int r = 0; r < size; r++) {
+        int begin = recv_displs[r];
+        int extent = recv_count[r];
+
+        for (idx_t kk = 0; kk < extent;) {
+            idx_t row = recv_data[begin + kk] - mesh->node_offsets[rank];
+            idx_t ncols = recv_data[begin + kk + 1];
+            idx_t *data = &recv_data[begin + kk + 2];
+
+            for (idx_t k = 0; k < ncols; k++) {
+                colidx[rowptr[row] + count[row]++] = data[k];
+            }
+
+            kk += 2 + ncols;
+        }
+    }
+
+    for (ptrdiff_t i = 0; i < rowptr[mesh->nnodes]; i++) {
+        colidx[i] =
+            find_idx_binary_search(colidx[i], mesh->ghosts, mesh->nnodes - mesh->n_owned_nodes);
+    }
+
+    *out_rowptr = rowptr;
+    *out_colidx = colidx;
+
+    {
+        free(elems);
+
+        free(selection_rowptr);
+        free(selection_colidx);
+
+        free(shared_rowptr);
+        free(shared_colidx);
+
+        free(send_displs);
+        free(send_count);
+        free(send_data);
+
+        free(recv_count);
+        free(recv_displs);
+        free(recv_data);
+
+        free(count);
+    }
 }

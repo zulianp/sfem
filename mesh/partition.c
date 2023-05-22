@@ -107,10 +107,10 @@ int main(int argc, char *argv[]) {
     // mesh_aura(&mesh, &aura);
     // mesh_aura_fix_indices(&mesh, &aura);
 
-    // count_t *rowptr;
-    // idx_t *colidx;
-    // send_recv_t exchange;
-    // mesh_remote_connectivity_graph(&mesh, &rowptr, &colidx, &exchange);
+    count_t *rowptr;
+    idx_t *colidx;
+    send_recv_t exchange;
+    mesh_remote_connectivity_graph(&mesh, &rowptr, &colidx, &exchange);
 
     // Everyone independent
     mesh.comm = MPI_COMM_SELF;
@@ -124,15 +124,16 @@ int main(int argc, char *argv[]) {
     sprintf(output_path, "%s/part_%0.5d/fnodeids.raw", output_folder, rank);
     array_write(MPI_COMM_SELF, output_path, MPI_FLOAT, fnodeids, mesh.nnodes, mesh.nnodes);
 
-    
-
     MPI_Barrier(comm);
 
     send_recv_destroy(&slave_to_master);
     mesh_destroy(&mesh);
     free(nodeids);
     free(fnodeids);
-    // mesh_destroy(&aura);
+
+    free(rowptr);
+    free(colidx);
+    
     double tock = MPI_Wtime();
 
     if (!rank) {
