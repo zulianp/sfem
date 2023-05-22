@@ -71,9 +71,9 @@ def main(argv):
 		order = np.argsort(mag)
 	elif which == 'angle':
 		angles = np.arctan2(vals.imag, vals.real)
-		print(rf(vals.real))
-		print(rf(vals.imag))
-		print(rf(angles))
+		# print(rf(vals.real))
+		# print(rf(vals.imag))
+		# print(rf(angles))
 		order = np.argsort(angles)
 	else:
 		reorder = False
@@ -112,21 +112,19 @@ def main(argv):
 		vecs[:, k].imag.tofile(name_imag)
 
 		vr = vecs[:, k]
-
 		minv = np.min(vr)
 		maxv = np.max(vr)
-		print(f'val({k}) r={rf(vals[k].real)} i={rf(vals[k].imag)}, minv={rf(minv.real)},{rf(minv.imag)} maxv={rf(maxv.real)},{rf(maxv.imag)}')
-		print(rf(vr.real))
-		print(rf(vr.imag))
+		# print(f'val({k}) r={rf(vals[k].real)} i={rf(vals[k].imag)}, minv={rf(minv.real)},{rf(minv.imag)} maxv={rf(maxv.real)},{rf(maxv.imag)}')
+		# print(rf(vr.real))
+		# print(rf(vr.imag))
 
 		min_val = min(min_val, minv)
 		max_val = max(max_val, maxv)
 
+	# print(f'min_val {min_val}')
+	# print(f'max_val {max_val}')
 
-	print(f'min_val {min_val}')
-	print(f'max_val {max_val}')
-
-	check_orthonormal=True
+	check_orthonormal=False
 	if check_orthonormal:
 		for k1 in range(0, N):
 			for k2 in range(0, N):

@@ -57,7 +57,7 @@ def main(argv):
 
 		ampl = np.zeros(N, dtype=complex_t)
 		for i in range(0, N):
-			ampl[i] = np.sum(basis[i] * d)
+			ampl[i] = np.sum(np.conjugate(basis[i]) * d)
 
 		nskip = 0
 		for i in range(0, N):

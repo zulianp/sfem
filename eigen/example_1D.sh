@@ -4,7 +4,7 @@
 set -e
 set -x
 
-n=4
+n=40
 
 real_pattern="real.0000[1-1].raw"
 imag_pattern="imag.0000[1-1].raw"
