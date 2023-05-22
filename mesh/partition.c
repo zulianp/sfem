@@ -68,18 +68,29 @@ int main(int argc, char *argv[]) {
     for (int r = 0; r < size; ++r) {
         if (r == rank) {
             printf(
-                "[%d] #elements %ld #nodes %ld #owned_nodes %ld "
-                "#owned_elements %ld #shared_elements %ld\n",
+                "[%d] #elements %ld #nodes %ld #owned_nodes %ld (with ghosts %ld) "
+                "#owned_elements %ld (with ghosts %ld) #shared_elements %ld\n",
                 rank,
                 (long)mesh.nelements,
                 (long)mesh.nnodes,
                 (long)mesh.n_owned_nodes,
+                (long)mesh.n_owned_nodes_with_ghosts,
                 (long)mesh.n_owned_elements,
+                (long)mesh.n_owned_elements_with_ghosts,
                 (long)mesh.n_shared_elements);
         }
 
         fflush(stdout);
         MPI_Barrier(comm);
+    }
+
+    idx_t *nodeids = (idx_t *)malloc(mesh.nnodes * sizeof(idx_t));
+    mesh_node_ids(&mesh, nodeids);
+
+    float *fnodeids = (float *)malloc(mesh.nnodes * sizeof(float));
+
+    for(ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+        fnodeids[i] = nodeids[i];
     }
 
     send_recv_t slave_to_master;
@@ -96,10 +107,10 @@ int main(int argc, char *argv[]) {
     // mesh_aura(&mesh, &aura);
     // mesh_aura_fix_indices(&mesh, &aura);
 
-    count_t *rowptr;
-    idx_t *colidx;
-    send_recv_t exchange;
-    mesh_remote_connectivity_graph(&mesh, &rowptr, &colidx, &exchange);
+    // count_t *rowptr;
+    // idx_t *colidx;
+    // send_recv_t exchange;
+    // mesh_remote_connectivity_graph(&mesh, &rowptr, &colidx, &exchange);
 
     // Everyone independent
     mesh.comm = MPI_COMM_SELF;
@@ -110,10 +121,17 @@ int main(int argc, char *argv[]) {
     array_write(
         MPI_COMM_SELF, output_path, MPI_FLOAT, frank, mesh.nnodes, mesh.nnodes);
 
+    sprintf(output_path, "%s/part_%0.5d/fnodeids.raw", output_folder, rank);
+    array_write(MPI_COMM_SELF, output_path, MPI_FLOAT, fnodeids, mesh.nnodes, mesh.nnodes);
+
+    
+
     MPI_Barrier(comm);
 
     send_recv_destroy(&slave_to_master);
     mesh_destroy(&mesh);
+    free(nodeids);
+    free(fnodeids);
     // mesh_destroy(&aura);
     double tock = MPI_Wtime();
 

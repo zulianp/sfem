@@ -110,7 +110,7 @@ void mesh_create_nodal_send_recv(const mesh_t *mesh,
     idx_t *slave_nodes = (idx_t *)malloc(recv_displs[size] * sizeof(idx_t));
 
     // send slave nodes to process with master nodes
-    CATCH_MPI_ERROR(MPI_Alltoallv(&mesh->node_mapping[mesh->n_owned_nodes],
+    CATCH_MPI_ERROR(MPI_Alltoallv(mesh->ghosts,
                                   send_count,
                                   send_displs,
                                   SFEM_MPI_IDX_T,
@@ -127,8 +127,7 @@ void mesh_create_nodal_send_recv(const mesh_t *mesh,
         idx_t *nodes = &slave_nodes[begin];
         for (int k = 0; k < extent; k++) {
             idx_t global_idx = nodes[k];
-            idx_t local_idx = find_idx_binary_search(
-                global_idx, mesh->node_mapping, mesh->n_owned_nodes);
+            idx_t local_idx = global_idx - mesh->node_offsets[rank];
             nodes[k] = local_idx;
         }
     }

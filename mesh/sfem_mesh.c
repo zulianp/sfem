@@ -25,24 +25,29 @@ void mesh_destroy(mesh_t *mesh) {
 
     mesh->nelements = 0;
     mesh->nnodes = 0;
+
+    if (mesh->ghosts) {
+        free(mesh->ghosts);
+    }
+
+    if (mesh->node_offsets) {
+        free(mesh->node_offsets);
+    }
 }
 
-
-void mesh_create_shared_elements_block(mesh_t *mesh, element_block_t *block)
-{
-    // 
+void mesh_create_shared_elements_block(mesh_t *mesh, element_block_t *block) {
+    //
     block->nelements = mesh->n_shared_elements;
     const int nn = elem_num_nodes(mesh->element_type);
 
     block->elements = (idx_t *)malloc(nn * sizeof(idx_t *));
 
-    for(int i = 0; i < nn; i++) {
+    for (int i = 0; i < nn; i++) {
         block->elements[i] = &mesh->elements[i][mesh->n_owned_elements];
     }
-}   
+}
 
-void mesh_destroy_shared_elements_block(mesh_t *mesh, element_block_t *block)
-{
+void mesh_destroy_shared_elements_block(mesh_t *mesh, element_block_t *block) {
     free(block->elements);
     block->elements = 0;
     block->elements = 0;
