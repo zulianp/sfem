@@ -59,7 +59,7 @@ def main(argv):
 		for i in range(0, N):
 			ampl[i] = np.sum(basis[i] * d)
 
-		nskip=0
+		nskip = 0
 		for i in range(0, N):
 			if abs(ampl[i]) > thresh:
 				x += ampl[i] * basis[i]

@@ -12,6 +12,8 @@ idx_t = np.int32
 real_t = np.float64
 output_folder='eigs'
 
+
+
 def main(argv):
 	if len(argv) != 4:
 		print(f'usage: {argv[0]} <crs_folder> <which=LR|SR> <K>')
@@ -47,13 +49,20 @@ def main(argv):
 
 	plt.plot(vals.real)
 	# plt.plot(vals.imag)
-	plt.title(f'Eigenvalues')
+	plt.title(f'Eigenvalues {output_folder}')
 	plt.xlabel('Number')
 	plt.ylabel('Value')
 	plt.savefig('eigvals.png')
 
 	min_val = vecs[0, 0]
 	max_val = vecs[0, 0]
+
+	# check_orthonormal=True
+	# if check_orthonormal:
+	# 	for k in range(0, K):
+	# 		v = vecs[:, k]
+	# 		v_mag = np.sum(v*v)
+	# 		print(f'{k}) {v_mag}')
 
 	for k in range(0, K):
 		postfix='{num:05d}.raw'.format(num=k)
@@ -63,8 +72,12 @@ def main(argv):
 		vr.tofile(name_real)
 		vecs[:, k].imag.tofile(name_imag)
 
-		min_val = min(min_val, np.min(vr))
-		max_val = max(max_val, np.max(vr))
+		minv = np.min(vr)
+		maxv = np.max(vr)
+		print(f'minv {minv}')
+		print(f'maxv {maxv}')
+		min_val = min(min_val, minv)
+		max_val = max(max_val, maxv)
 
 	print(f'min_val {min_val}')
 	print(f'max_val {max_val}')
