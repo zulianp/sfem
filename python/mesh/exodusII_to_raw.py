@@ -54,6 +54,8 @@ n_time_steps = 1
 if 'time_whole' in nc.variables:
 	time_whole = nc.variables['time_whole']
 	n_time_steps = time_whole.shape[0]
+	t = np.array(time_whole[:]).astype(np.float32)
+	t.tofile(f'{output_folder}/time_whole.raw')
 
 print(f'n_time_steps = {n_time_steps}')
 

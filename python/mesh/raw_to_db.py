@@ -19,7 +19,7 @@ def write_transient_data(
     output_path,
     points, cells, 
     point_data, point_data_type,
-    cell_data, cell_data_type, n_time_steps, time_step_format):
+    cell_data, cell_data_type, n_time_steps, time_whole, time_step_format):
 
     with meshio.xdmf.TimeSeriesWriter(output_path) as writer:
         writer.write_points_cells(points, cells)
@@ -86,7 +86,7 @@ def write_transient_data(
 
                     # print(f"field: {name}, path: {cd}, min={round(np.min(data), 3)}, max={round(np.max(data), 3)}, sum={round(np.sum(data), 3)}")
 
-            writer.write_data(t, point_data=name_to_point_data)
+            writer.write_data(time_whole[t], point_data=name_to_point_data)
             
 
 def add_fields(field_data, field_data_type, storage, check_len):
@@ -143,11 +143,12 @@ def main(argv):
     transient = False
     time_step_format = "%s.%d.%d.raw"
     n_time_steps = 1
+    time_whole=[]
 
     try:
         opts, args = getopt.getopt(
             argv[3:], "p:d:c:t:h",
-            ["point_data=", "point_data_type=", "cell_data=", "cell_data_type=", "transient", "time_step_format", "n_time_steps=", "help"])
+            ["point_data=", "point_data_type=", "cell_data=", "cell_data_type=", "transient", "time_step_format", "n_time_steps=", "time_whole=", "help"])
 
     except getopt.GetoptError as err:
         print(err)
@@ -168,10 +169,20 @@ def main(argv):
             cell_data_type = arg
         elif opt in ("--transient"):
             transient = True
+        elif opt in ("--time_whole"):
+            time_whole = np.fromfile(arg, dtype=np.float32)
         elif opt in ("--time_step_format"):
             time_step_format = arg
         elif opt in ("--n_time_steps"):
             n_time_steps = int(arg)
+
+    if transient:
+        if len(time_whole) == 0:
+            assert n_time_steps != 0
+            time_whole = np.arange(0, n_time_steps)
+        else:
+            assert n_time_steps == 0 or n_time_steps == len(time_whole)
+            n_time_steps = len(time_whole)
 
     points = []
     for pfn in ['x.raw', 'y.raw', 'z.raw']:
@@ -222,7 +233,7 @@ def main(argv):
            output_path,
            points, cells, 
            point_data, point_data_type,
-           cell_data, cell_data_type, n_time_steps, time_step_format)
+           cell_data, cell_data_type, n_time_steps, time_whole, time_step_format)
     else:
         mesh = meshio.Mesh(points, cells)
 

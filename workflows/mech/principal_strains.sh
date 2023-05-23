@@ -87,10 +87,11 @@ done
 disp_selector="$data_folder/point_data/disp_x*.raw,$data_folder/point_data/disp_y*.raw,$data_folder/point_data/disp_z*.raw"
 principal_strain_selector_0="$p1/principal_strain.0.*.raw,$p1/principal_strain.1.*.raw,$p1/principal_strain.2.*.raw"
 
-
 raw_to_db.py $mesh_folder principal_strain.xmf  \
  --transient --n_time_steps=$nsteps \
- --point_data="$disp_selector,$principal_strain_selector_0"
+ --point_data="$disp_selector,$principal_strain_selector_0" \
+ --time_whole="$mesh_folder/time_whole.raw" 
+
 
 if [[ "$platform" -eq "Darwin" ]]
 then
