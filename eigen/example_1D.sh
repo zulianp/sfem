@@ -4,12 +4,12 @@
 set -e
 set -x
 
-n=40
+n=50
 
 real_pattern="real.0000[1-1].raw"
 imag_pattern="imag.0000[1-1].raw"
 
-max_eigs=10
+max_eigs=$n
 
 [ -d "directed_eigs" ] && rm -rf directed_eigs && rm *data.png
 [ -d "undirected_eigs" ] && rm -rf undirected_eigs

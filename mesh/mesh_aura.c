@@ -670,6 +670,7 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
 
     ptrdiff_t n_elems = mesh->n_owned_elements_with_ghosts + mesh->n_shared_elements;
     ptrdiff_t e_begin = mesh->nelements - n_elems;
+
     for (int d = 0; d < nnxe; d++) {
         elems[d] = &mesh->elements[d][e_begin];
     }
@@ -677,10 +678,38 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
     build_crs_graph_for_elem_type(
         mesh->element_type, n_elems, mesh->nnodes, elems, &selection_rowptr, &selection_colidx);
 
+    // for (int r_ = 0; r_ < size; r_++) {
+    //     if (r_ == rank) {
+    //         printf("[%d] ----------------------------\n", rank);
+    //         printf("n_elems = %d, e_begin=%d\n", (int)n_elems, (int)e_begin);
+    //         printf("node_start = %d, nnodes = %d\n",
+    //                (int)(mesh->n_owned_nodes - mesh->n_owned_nodes_with_ghosts),
+    //                (int)mesh->nnodes);
+
+    //         for (ptrdiff_t i = 0; i < mesh->nnodes; i++) {
+    //             count_t begin = selection_rowptr[i];
+    //             count_t extent = selection_rowptr[i + 1] - begin;
+    //             idx_t *row = &selection_colidx[begin];
+    //             if (extent) {
+    //                 printf("%d) ", (int)i);
+    //                 for (count_t k = 0; k < extent; k++) {
+    //                     printf("%d ", row[k]);
+    //                 }
+    //                 printf("\n");
+    //             }
+    //         }
+    //     }
+
+    //     MPI_Barrier(comm);
+    // }
+
     count_t *shared_rowptr = (count_t *)calloc(mesh->nnodes + 1, sizeof(count_t));
 
+    // ptrdiff_t node_begin = (mesh->n_owned_nodes - mesh->n_owned_nodes_with_ghosts);
+    ptrdiff_t node_begin = mesh->n_owned_nodes ;
+
     // Consider only nodes that are shared
-    for (ptrdiff_t i = mesh->n_owned_nodes - mesh->n_owned_nodes_with_ghosts; i < mesh->nnodes;
+    for (ptrdiff_t i = node_begin; i < mesh->nnodes;
          i++) {
         const count_t begin = selection_rowptr[i];
         const count_t extent = selection_rowptr[i + 1] - selection_rowptr[i];
@@ -688,7 +717,7 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
 
         for (count_t k = 0; k < extent; k++) {
             const idx_t c = cols[k];
-            shared_rowptr[i + 1] += mesh->node_owner[c] == rank;
+            shared_rowptr[i + 1] += (mesh->node_owner[c] == rank);
         }
     }
 
@@ -700,7 +729,7 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
     ptrdiff_t nnz = shared_rowptr[mesh->nnodes];
 
     idx_t *shared_colidx = (idx_t *)malloc(nnz * sizeof(idx_t));
-    for (ptrdiff_t i = mesh->n_owned_nodes - mesh->n_owned_nodes_with_ghosts; i < mesh->nnodes;
+    for (ptrdiff_t i = node_begin; i < mesh->nnodes;
          i++) {
         const count_t begin = selection_rowptr[i];
         const count_t extent = selection_rowptr[i + 1] - selection_rowptr[i];
@@ -719,6 +748,37 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
         assert(kk == shared_rowptr[i + 1] - shared_rowptr[i]);
     }
 
+    for (int r_ = 0; r_ < size; r_++) {
+        if (r_ == rank) {
+            printf("[%d] ----------------------------\n", rank);
+
+            for(int ii = 0; ii < size; ii++) {
+                printf("%d ", mesh->node_offsets[ii]);
+            }
+            printf("\n");
+
+            printf("n_elems = %d, e_begin=%d\n", (int)n_elems, (int)e_begin);
+            printf("node_start = %d, nnodes = %d\n",
+                   (int)(mesh->n_owned_nodes - mesh->n_owned_nodes_with_ghosts),
+                   (int)mesh->nnodes);
+
+            for (ptrdiff_t i = 0; i < mesh->nnodes; i++) {
+                count_t begin = shared_rowptr[i];
+                count_t extent = shared_rowptr[i + 1] - begin;
+                idx_t *row = &shared_colidx[begin];
+                if (extent) {
+                    printf("%d) ", (int)i);
+                    for (count_t k = 0; k < extent; k++) {
+                        printf("%d ", row[k]);
+                    }
+                    printf("\n");
+                }
+            }
+        }
+
+        MPI_Barrier(comm);
+    }
+
     int *send_displs = (int *)malloc((size + 1) * sizeof(int));
     int *send_count = (int *)calloc(size, sizeof(int));
 
@@ -734,10 +794,11 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
     }
 
     idx_t *send_data = (idx_t *)malloc(send_displs[size] * sizeof(idx_t));
+    memset(send_data, 0, send_displs[size] * sizeof(idx_t));
 
     for (ptrdiff_t i = mesh->n_owned_nodes; i < mesh->nnodes; i++) {
         const count_t begin = shared_rowptr[i];
-        const count_t extent = shared_rowptr[i + 1] - shared_rowptr[i];
+        const count_t extent = shared_rowptr[i + 1] - begin;
         const idx_t *cols = &shared_colidx[begin];
 
         idx_t *sd = &send_data[send_displs[mesh->node_owner[i]]];
@@ -776,25 +837,30 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
     count_t *rowptr = calloc(mesh->nnodes + 1, sizeof(count_t));
     count_t *count = calloc(mesh->nnodes + 1, sizeof(count_t));
 
-
-    for(int r_ = 0; r_ < size; r_++) {
-        if(r_ == rank) {
-
+    for (int r_ = 0; r_ < size; r_++) {
+        if (r_ == rank) {
             printf("[%d] ----------------------------\n", rank);
-            printf("nnz=%d\n", (int)nnz);
+            printf("nnz=%d, nnodes=%d, owned=%d, ghosted=%d, ghosts=%d\n",
+                   (int)nnz,
+                   (int)mesh->nnodes,
+                   (int)mesh->n_owned_nodes,
+                   (int)mesh->n_owned_nodes_with_ghosts,
+                   (int)(mesh->nnodes - mesh->n_owned_nodes));
 
             for (int r = 0; r < size; r++) {
                 printf("%d (%d) ", send_displs[r], send_count[r]);
 
+                for (int i = 0; i < send_count[r]; i++) {
+                    printf("%d ", send_data[send_displs[r] + i]);
+                }
+                printf("\n");
             }
             printf("\n");
 
             for (int r = 0; r < size; r++) {
                 printf("%d (%d) ", recv_displs[r], recv_count[r]);
-
             }
             printf("\n");
-
 
             // for (int r = 0; r < size; r++) {
             //     int begin = recv_displs[r];
@@ -806,7 +872,7 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
 
             //     printf("%d)\n", r);
 
-            //     for(int i = 0; i < extent; i++) 
+            //     for(int i = 0; i < extent; i++)
             //     {
             //         printf("%d ", recv_data[begin + i]);
             //     }
@@ -821,7 +887,7 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
             //         printf("%d (%d) %d\n", row, recv_data[begin + kk], ncols);
 
             //         for(idx_t c = 0; c < MIN(10, ncols); c++) {
-            //             printf("%d ", data[c]); 
+            //             printf("%d ", data[c]);
             //         }
             //         printf("\n");
 
@@ -842,8 +908,14 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
         for (idx_t kk = 0; kk < extent;) {
             idx_t row = recv_data[begin + kk] - mesh->node_offsets[rank];
 
-            if(!(row >= 0 && row < mesh->n_owned_nodes)) {
-                printf("[%d] %d %d (%d) < %d o=%d\n", rank, r, row, recv_data[begin + kk], (int)mesh->n_owned_nodes, (int)mesh->node_offsets[rank]);
+            if (!(row >= 0 && row < mesh->n_owned_nodes)) {
+                printf("[%d] from=%d %d (%d) < %d o=%d\n",
+                       rank,
+                       r,
+                       row,
+                       recv_data[begin + kk],
+                       (int)mesh->n_owned_nodes,
+                       (int)mesh->node_offsets[rank]);
             }
 
             assert(row >= 0);
