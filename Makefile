@@ -79,7 +79,7 @@ GOALS += partition select_submesh refine skin select_surf volumes sfc
 GOALS += mesh_p1_to_p2
 
 # FE post-process
-GOALS += cgrad cshear cstrain cprincipal_strains cauchy_stress vonmises
+GOALS += cgrad cshear cstrain cprincipal_strains cprincipal_stresses cauchy_stress vonmises
 GOALS += wss surface_outflux integrate_divergence cdiv lform_surface_outflux
 GOALS += projection_p0_to_p1 surface_projection grad_and_project
 
@@ -133,6 +133,7 @@ OBJS = \
 	div.o \
 	strain.o \
 	principal_strains.o \
+	neohookean_principal_stresses.o \
 	neumann.o \
 	sfem_mesh.o \
 	sfem_mesh_write.o \
@@ -339,6 +340,9 @@ cstrain : drivers/cstrain.c libsfem.a
 cprincipal_strains : drivers/cprincipal_strains.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
+cprincipal_stresses : drivers/cprincipal_stresses.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
 cdiv : drivers/cdiv.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
@@ -362,6 +366,9 @@ argsort.o : argsort.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(INTERNAL_CXXFLAGS) -c $<
 
 principal_strains.o : principal_strains.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(INTERNAL_CXXFLAGS) -c $<
+
+neohookean_principal_stresses.o : neohookean_principal_stresses.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(INTERNAL_CXXFLAGS) -c $<
 
 %.o : %.c

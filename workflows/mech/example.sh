@@ -16,4 +16,5 @@ ncdump -h $db
 
 # ./stress.sh $db $workspace $mu $lambda
 # ./strain.sh $db $workspace
-./principal_strains.sh $db $workspace
+# ./principal_strains.sh $db $workspace
+./principal_stresses.sh $db $workspace $mu $lambda
