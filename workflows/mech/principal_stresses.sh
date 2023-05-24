@@ -70,7 +70,7 @@ do
 	uy=${dispy[$i]}
 	uz=${dispz[$i]}
 
-	stress_prefix=$p0"/stress"
+	stress_prefix=$p0"/principal_stress"
 	stress_postfix=`printf ".%0."$padding"d" $i`
 
 	echo $stress_prefix
@@ -81,14 +81,16 @@ do
 	for(( d=0; d < 3; d++ ))
 	do
 		p0_file=$stress_prefix".$d"$stress_postfix".raw"
-		p1_file=$p1"/stress.$d"$stress_postfix".raw"
+		p1_file=$p1"/principal_stress.$d"$stress_postfix".raw"
 		projection_p0_to_p1 $mesh_folder $p0_file $p1_file
 	done
 done
 
 disp_selector="$data_folder/point_data/disp_x*.raw,$data_folder/point_data/disp_y*.raw,$data_folder/point_data/disp_z*.raw"
-stress_selector_0="$p1/stress.0.*.raw,$p1/stress.1.*.raw,$p1/stress.2.*.raw"
+stress_selector_0="$p1/principal_stress.0.*.raw,$p1/principal_stress.1.*.raw,$p1/principal_stress.2.*.raw"
+# stress_selector_1="$p0/principal_stress.0.*.raw,$p0/principal_stress.1.*.raw,$p0/principal_stress.2.*.raw"
 
+set -x
 raw_to_db.py $mesh_folder principal_stress.xmf  \
  --transient --n_time_steps=$nsteps \
  --point_data="$disp_selector,$stress_selector_0" \

@@ -35,14 +35,14 @@ def write_transient_data(
                 cell_data_files = glob.glob(p, recursive=False)
                 cell_data_files.sort()
 
-                for i in range(0, n_time_steps):
-                    # print(f'{i} -> {os.path.basename(cell_data_files[i])} -> {cell_data_files[i]}')
+                if(len(cell_data_files) < n_time_steps):
+                    print(f"Invalid sequence length {len(cell_data_files)} for pattern {p}")
 
+                for i in range(0, n_time_steps):
                     if not cell_data_steps[i]:
                         cell_data_steps[i] = []
 
                     cell_data_steps[i].append(cell_data_files[i])
-
 
         point_data_steps = [None] * n_time_steps
 
@@ -58,21 +58,22 @@ def write_transient_data(
                     print(f"Invalid sequence length {len(point_data_files)} for pattern {p}")
 
                 for i in range(0, n_time_steps):
-                    # print(f'{i} -> {os.path.basename(point_data_files[i])} -> {point_data_files[i]}')
-
                     if not point_data_steps[i]:
                         point_data_steps[i] = []
 
                     point_data_steps[i].append(point_data_files[i])
 
-        # print(point_data_steps)
-
         for t in range(0, n_time_steps):
             name_to_point_data = {}
+            name_to_cell_data = {}
 
             cds = point_data_steps[t];
+
+            has_point_data = False
+            has_cell_data = False
            
             if cds:
+                has_point_data = True
                 for cd in cds:
                     data = np.fromfile(cd, dtype=point_data_type)
                     name = os.path.basename(cd)
@@ -84,9 +85,28 @@ def write_transient_data(
                         print(f"Error: data lenght is different from number of nodes {len(data)} != {len(data)}")
                         exit(1)
 
-                    # print(f"field: {name}, path: {cd}, min={round(np.min(data), 3)}, max={round(np.max(data), 3)}, sum={round(np.sum(data), 3)}")
+            cds = cell_data_steps[t];
+           
+            if cds:
+                has_cell_data = True
+                for cd in cds:
+                    data = np.fromfile(cd, dtype=cell_data_type)
+                    name = os.path.basename(cd)
+                    name = os.path.splitext(os.path.splitext(name)[0])[0]
+                    name = name.replace('.', '_')
+                    name_to_cell_data[name] = data
 
-            writer.write_data(time_whole[t], point_data=name_to_point_data)
+                    if(len(data) != len(data)):
+                        print(f"Error: data lenght is different from number of nodes {len(data)} != {len(data)}")
+                        exit(1)
+
+            if has_point_data and not has_cell_data:
+                writer.write_data(time_whole[t], point_data=name_to_point_data)
+            elif not has_point_data and has_cell_data:
+                writer.write_data(time_whole[t], cell_data=name_to_cell_data)
+            elif has_point_data and has_cell_data: 
+                writer.write_data(time_whole[t], point_data=name_to_point_data, cell_data=name_to_cell_data)
+
             
 
 def add_fields(field_data, field_data_type, storage, check_len):
@@ -113,8 +133,6 @@ def add_fields(field_data, field_data_type, storage, check_len):
 
             for f in files:
                 data = np.fromfile(f, dtype=t)
-
-                # name = os.path.basename(f).split('.')[0]
                 name = os.path.splitext(os.path.basename(f))[0]
 
                 if(len(data) != check_len):

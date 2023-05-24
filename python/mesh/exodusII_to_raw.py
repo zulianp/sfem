@@ -132,6 +132,7 @@ ss_to_nodelist['HEX8'] = s2n_hex8()
 ss_to_nodelist['TET4'] = s2n_tet4()
 ss_to_nodelist['TETRA'] = s2n_tet4()
 ss_to_nodelist['tetra'] = s2n_tet4()
+ss_to_nodelist['tetra4'] = s2n_tet4()
 ss_to_nodelist['TRI3'] = s2n_tri3()
 
 #########################################

@@ -181,7 +181,7 @@ static SFEM_INLINE void neohookean_principal_stresses_kernel(const real_t mu,
     element_vector[1] = std::real(-x116 * x120 - x117 / x120 + x118);
     element_vector[2] = std::real(-x116 * x121 - x117 / x121 + x118);
 
-    std::sort(element_vector, element_vector + 2);
+    std::sort(element_vector, element_vector + 3);
 
     assert(std::imag(element_vector[0]) < 1e-10);
     assert(std::imag(element_vector[1]) < 1e-10);
@@ -282,7 +282,6 @@ extern "C" void neohookean_principal_stresses_soa(const ptrdiff_t nelements,
                element_displacement[edof + 1] = displacement[1][dof];
                element_displacement[edof + 2] = displacement[2][dof];
            }
-
 
             // Element indices
             const idx_t i0 = ev[0];
