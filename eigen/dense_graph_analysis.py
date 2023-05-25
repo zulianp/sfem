@@ -49,8 +49,15 @@ def main(argv):
 		A[i, cols] = vals
 
 	print(f'num_vectors {N}')
+	diff = np.sum(np.sum(np.abs(A - A.T)))
+	print()
 
-	vals, vecs = la.eig(A)
+	if diff < 1e-16:
+		vals, vecs = la.eigh(A)
+	else:
+		vals, vecs = la.eig(A)
+
+	verbose=False
 
 	# mag = vals * vals
 	# mag = mag.real * np.sign(vals.real)
@@ -73,25 +80,54 @@ def main(argv):
 		angles = np.arctan2(vals.imag, vals.real)
 		# print(rf(vals.real))
 		# print(rf(vals.imag))
+
+		isneg = angles < 0
+		angles[isneg] = np.mod(angles[isneg] + 2*np.pi, 2*np.pi)
 		# print(rf(angles))
 		order = np.argsort(angles)
 	else:
 		reorder = False
+
+	if verbose:
+
+		print(folder)
+
+		print("matrix")
+		print(A)
+		print('values')
+		print(rf(vals.real))
+		print(rf(vals.imag))
+
+		print('vecs')
+		print('real')
+		for k in range(0, N):
+			print(rf(vecs[:,k].real))
+
+		print('imag')
+		for k in range(0, N):
+			print(rf(vecs[:,k].imag))
 
 	if reorder:
 		vals = vals[order]
 		vecs = vecs[:, order]
 
 	plt.figure(figsize=(1000, 1000))
-	fig, axs = plt.subplots(4)
+	fig, axs = plt.subplots(2, 2)
 
-	axs[0].plot(vals.real)
-	axs[0].set_title('Real')
-	axs[1].plot(vals.imag)
-	axs[1].set_title('Imag')
+	axs[0,0].plot(vals.real)
+	axs[0,0].set_title('Real')
+	axs[0, 1].plot(vals.imag)
+	axs[0, 1].set_title('Imag')
 
-	axs[2].plot(np.absolute(vals).real)
-	axs[2].set_title('Mag')
+	axs[1, 0].plot(np.absolute(vals).real)
+	axs[1, 0].set_title('Mag')
+
+	lr = axs[1,1].plot(vals.real)
+	li = axs[1,1].plot(vals.imag)
+	lm = axs[1,1].plot(np.absolute(vals).real)
+	axs[1,1].set_title('Both')
+	axs[1,1].legend(['Real', 'Imag', 'Mag'], loc='center left', bbox_to_anchor=(1, 0.5))
+	
 
 	# plt.plot(vals.imag)
 	fig.suptitle(f'Eigenvalues {which}')
@@ -124,14 +160,17 @@ def main(argv):
 	# print(f'min_val {min_val}')
 	# print(f'max_val {max_val}')
 
-	check_orthonormal=False
+	O = np.zeros((N, N), dtype=real_t)
+	check_orthonormal=True
 	if check_orthonormal:
 		for k1 in range(0, N):
 			for k2 in range(0, N):
 				v1 = vecs[:, k1]
 				v2 = vecs[:, k2]
 				v_mag = np.sum(v1 * np.conjugate(v2))
-				print(f'{k1},{k2}) {rf(v_mag.real)} {rf(v_mag.imag)}')
+				O[k1, k2] = v_mag.real
+	print('Orthonormal:')
+	print(rf(O))
 
 if __name__ == '__main__':
 	main(sys.argv)

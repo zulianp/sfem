@@ -58,13 +58,11 @@ def main(argv):
 		ampl = np.zeros(N, dtype=complex_t)
 		for i in range(0, N):
 			ampl[i] = np.sum(np.conjugate(basis[i]) * d)
-			# ampl[i] = np.sum(basis[i] * d)
 
 		nskip = 0
 		for i in range(0, N):
 			if abs(ampl[i]) > thresh:
 				x += ampl[i] * basis[i]
-				# x += ampl[i] * np.conjugate(basis[i])
 				
 			else:
 				nskip += 1

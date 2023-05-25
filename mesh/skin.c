@@ -198,6 +198,8 @@ int main(int argc, char *argv[]) {
     free(vol2surf);
 
     mesh_t surf;
+    mesh_init(&surf);
+    
     surf.comm = mesh.comm;
     surf.mem_space = mesh.mem_space;
 

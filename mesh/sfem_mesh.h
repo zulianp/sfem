@@ -40,6 +40,8 @@ typedef struct {
 	idx_t *ghosts;
 } mesh_t;
 
+
+void mesh_init(mesh_t *mesh);
 void mesh_destroy(mesh_t *mesh);
 
 typedef struct {

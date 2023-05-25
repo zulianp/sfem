@@ -29,16 +29,23 @@ def main(argv):
 
 	file_eigs = glob.glob(eigen_pattern, recursive=False)
 
+	fig = plt.figure()
+
+	legend = []
 	i=0
 	for f in file_eigs:
 		v = np.fromfile(f, dtype=real_t)
 		plt.plot(np.tile(v, 4))
+		legend.append(os.path.basename(f))
 
 		i += 1
 		if i == n:
-			break
+			break	
 
+
+	plt.legend(legend, loc='center left', bbox_to_anchor=(1, 0.5))
 	plt.title(f'Vectors {eigen_pattern}')
+	fig.tight_layout()
 	plt.savefig(f'{output_path}', dpi=300)
 
 if __name__ == '__main__':
