@@ -30,6 +30,8 @@ def main(argv):
 		nnzxrow = 2
 	elif which == 'laplacian':
 		nnzxrow = 3
+	elif which == 'odd':
+		nnzxrow = 2
 	
 
 	rowptr = np.arange(0, N+1, 1, dtype=idx_t) * nnzxrow
@@ -54,6 +56,14 @@ def main(argv):
 			data[i*3] = 1
 			data[i*3+1] = -2
 			data[i*3+2] = 1
+	elif which == 'odd':
+		for i in range(0, N):
+			ip1 = (i+1) % N
+			im1 = (i - 1 + N ) % N
+			colidx[i*2] = im1
+			colidx[i*2+1] = ip1
+			data[i*2] = -1
+			data[i*2+1] = 1
 	else:
 		for i in range(0, N):
 			colidx[i] = (i+1) % N

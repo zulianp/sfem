@@ -22,8 +22,12 @@ SYSTEM_DIR=system
 # export SFEM_GRAPH_LAPLACIAN=1
 # export EIG_WHICH='SR'
 
+export USE_DENSE=1
 export EIG_WHICH='LR'
 # export EIG_WHICH='LM'
+
+export SFEM_DIRECTED=1
+# export SFEM_NEGATE_LOWER_TRIANGULAR=1
 
 # N=100
 N=3538

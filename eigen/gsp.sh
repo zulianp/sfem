@@ -38,7 +38,7 @@ if [[ -z "$USE_DENSE" ]]
 then
 	graph_analysis.py $SYSTEM_DIR $EIG_WHICH $N | tee log.txt
 else
-	dense_graph_analysis.py $SYSTEM_DIR $EIG_WHICH $N | tee log.txt
+	dense_graph_analysis.py $SYSTEM_DIR $EIG_WHICH eigs | tee log.txt
 fi
 num_vectors=`grep num_vectors log.txt | awk '{print $2}'`
 min_val=`grep min_val log.txt | awk '{print $2}'`

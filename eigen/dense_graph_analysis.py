@@ -57,7 +57,7 @@ def main(argv):
 	else:
 		vals, vecs = la.eig(A)
 
-	verbose=False
+	
 
 	# mag = vals * vals
 	# mag = mag.real * np.sign(vals.real)
@@ -88,6 +88,7 @@ def main(argv):
 	else:
 		reorder = False
 
+	verbose=False
 	if verbose:
 
 		print(folder)

@@ -30,7 +30,7 @@ mesh_evalf.py $MESH_DIR/x.raw $MESH_DIR/y.raw $MESH_DIR/z.raw "2*np.sin(2*np.pi*
 
 
 # mesh_evalf.py $MESH_DIR/x.raw $MESH_DIR/y.raw $MESH_DIR/z.raw "y*y" f.raw
-# project.py "eigs/real*.raw" -1 0.5 f.raw float64
+# project.py "eigs/real*.raw" -1 0.1 f.raw float64
 project.py "eigs/real*.raw" -1 0 f.raw float64
 
 rec_vecs=(`ls reconstructed/*.raw`)

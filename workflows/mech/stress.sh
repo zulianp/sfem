@@ -99,7 +99,8 @@ stress_selector_2="$p1/vonmises.*.raw"
 
 raw_to_db.py $mesh_folder stress.xmf  \
  --transient --n_time_steps=$nsteps \
- --point_data="$disp_selector,$stress_selector_0,$stress_selector_1,$stress_selector_2"
+ --point_data="$disp_selector,$stress_selector_0,$stress_selector_1,$stress_selector_2" \
+ --time_whole="$mesh_folder/time_whole.raw" 
 
 if [[ -z "$garbage" ]]
 then

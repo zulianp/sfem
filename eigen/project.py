@@ -59,9 +59,11 @@ def main(argv):
 		for i in range(0, N):
 			ampl[i] = np.sum(np.conjugate(basis[i]) * d)
 
+		max_amp = np.max(np.absolute(ampl))
+
 		nskip = 0
 		for i in range(0, N):
-			if abs(ampl[i]) > thresh:
+			if np.absolute(ampl[i]/max_amp).real > thresh:
 				x += ampl[i] * basis[i]
 				
 			else:

@@ -80,7 +80,7 @@ if 'name_nod_var' in nc.variables:
 		if(n_time_steps <= 1):
 			path = f'{var_path_prefix}.raw'
 
-			data = var[t, 0]
+			data =  np.array(var[:])
 			data.tofile(path)
 		else:
 			size_padding = int(np.ceil(np.log10(n_time_steps)))

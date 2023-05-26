@@ -181,6 +181,12 @@ static SFEM_INLINE void neohookean_principal_stresses_kernel(const real_t mu,
     element_vector[1] = std::real(-x116 * x120 - x117 / x120 + x118);
     element_vector[2] = std::real(-x116 * x121 - x117 / x121 + x118);
 
+    for(int i = 0; i < 3; i++) {
+        if(element_vector[i] != element_vector[i]) {
+            element_vector[i] = 0;
+        }
+    }
+
     std::sort(element_vector, element_vector + 3);
 
     assert(std::imag(element_vector[0]) < 1e-10);

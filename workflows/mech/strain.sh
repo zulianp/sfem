@@ -90,4 +90,5 @@ strain_selector_1="$p1/strain.3.*.raw,$p1/strain.4.*.raw,$p1/strain.5.*.raw"
 
 raw_to_db.py $mesh_folder strain.xmf  \
  --transient --n_time_steps=$nsteps \
- --point_data="$disp_selector,$strain_selector_0,$strain_selector_1"
+ --point_data="$disp_selector,$strain_selector_0,$strain_selector_1" \
+ --time_whole="$mesh_folder/time_whole.raw" 

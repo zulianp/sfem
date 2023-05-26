@@ -63,6 +63,7 @@ int main(int argc, char *argv[]) {
     int SFEM_GRAPH_LAPLACIAN = 0;
     int SFEM_NORMALIZE_ROWS = 0;
     int SFEM_REMOVE_LOWER_TRIANGULAR = 0;
+    int SFEM_NEGATE_LOWER_TRIANGULAR = 0;
 
     // Ideas
     // 1) Use the concept of distance and modulo
@@ -73,6 +74,7 @@ int main(int argc, char *argv[]) {
     // These to options do not work
     SFEM_READ_ENV(SFEM_DIRECTED, atoi);
     SFEM_READ_ENV(SFEM_REMOVE_LOWER_TRIANGULAR, atoi);
+    SFEM_READ_ENV(SFEM_NEGATE_LOWER_TRIANGULAR, atoi);
 
 
 
@@ -179,6 +181,18 @@ int main(int argc, char *argv[]) {
                     }
                 }
             }
+
+            if (SFEM_NEGATE_LOWER_TRIANGULAR) {
+                for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                    for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
+                        idx_t col = colidx[k];
+                        if (col < i) {
+                            values[k] = -values[k];
+                        }
+                    }
+                }
+            }
+
 
             if (SFEM_NORMALIZE_ROWS) {
                 for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
