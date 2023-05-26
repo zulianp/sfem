@@ -11,6 +11,7 @@
 #include "crs_graph.h"
 #include "read_mesh.h"
 #include "sfem_base.h"
+#include "sfem_defs.h"
 #include "sfem_mesh_write.h"
 
 #include "argsort.h"
@@ -160,7 +161,7 @@ int main(int argc, char *argv[]) {
 
     idx_t *idx = (idx_t *)malloc(mesh.n_owned_elements * sizeof(idx_t));
 
-    geom_t box_min[3], box_max[3];
+    geom_t box_min[3], box_max[3], box_extent[3];
     for (int coord = 0; coord < mesh.spatial_dim; coord++) {
         box_min[coord] = mesh.points[coord][0];
         box_max[coord] = mesh.points[coord][0];
@@ -172,19 +173,21 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    for(int d = 0; d < 3; d++) {
+        box_extent[d] = box_max[d] - box_min[d];
+    }
+
     int normalize_with_max_range = 1;
 
     if (normalize_with_max_range) {
-        geom_t m0 = box_min[0], m1 = box_max[1];
+        geom_t mm = box_extent[0];
 
-        for (int coord = 1; coord < mesh.spatial_dim; coord++) {
-            m0 = MIN(m0, box_min[coord]);
-            m1 = MAX(m1, box_max[coord]);
+        for (int coord = 0; coord < mesh.spatial_dim; coord++) {
+            mm = MAX(mm, box_extent[coord]);
         }
 
         for (int coord = 0; coord < mesh.spatial_dim; coord++) {
-            box_min[coord] = m0;
-            box_max[coord] = m1;
+            box_extent[coord] = mm;
         }
     }
 
@@ -198,7 +201,7 @@ int main(int argc, char *argv[]) {
             for (int coord = 0; coord < mesh.spatial_dim; coord++) {
                 geom_t x = mesh.points[coord][i0];
                 x -= box_min[coord];
-                x /= box_max[coord] - box_min[coord];
+                x /= box_extent[coord];
                 b[coord] = x;
             }
 
@@ -208,7 +211,7 @@ int main(int argc, char *argv[]) {
                 for (int coord = 0; coord < mesh.spatial_dim; coord++) {
                     geom_t x = mesh.points[coord][ii];
                     x -= box_min[coord];
-                    x /= box_max[coord] - box_min[coord];
+                    x /= box_extent[coord];
                     b[coord] = MIN(b[coord], x);
                 }
             }
@@ -221,6 +224,7 @@ int main(int argc, char *argv[]) {
             // (int)sfc[i]);
         }
     } else {
+        const int nnxe = elem_num_nodes(mesh.element_type);
         for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
             geom_t b[3] = {0, 0, 0};
             const idx_t i0 = mesh.elements[0][i];
@@ -228,29 +232,29 @@ int main(int argc, char *argv[]) {
             for (int coord = 0; coord < mesh.spatial_dim; coord++) {
                 geom_t x = mesh.points[coord][i0];
                 x -= box_min[coord];
-                x /= box_max[coord] - box_min[coord];
+                x /= box_extent[coord];
                 b[coord] = x;
             }
 
-            for (int d = 1; d < mesh.element_type; d++) {
+            for (int d = 1; d < nnxe; d++) {
                 const idx_t ii = mesh.elements[d][i];
 
                 for (int coord = 0; coord < mesh.spatial_dim; coord++) {
                     geom_t x = mesh.points[coord][ii];
                     x -= box_min[coord];
-                    x /= box_max[coord] - box_min[coord];
+                    x /= box_extent[coord];
                     b[coord] = MIN(b[coord], x);
                 }
             }
 
-            // assert(b[0] >= 0);
-            // assert(b[0] <= 1);
+            assert(b[0] >= 0);
+            assert(b[0] <= 1);
 
-            // assert(b[1] >= 0);
-            // assert(b[1] <= 1);
+            assert(b[1] >= 0);
+            assert(b[1] <= 1);
 
-            // assert(b[2] >= 0);
-            // assert(b[2] <= 1);
+            assert(b[2] >= 0);
+            assert(b[2] <= 1);
 
             // sfc[i] = (sfc_t)(b[2] * (geom_t)urange[2]);
             sfc[i] = fun_sfc((sfc_t)(b[0] * (double)urange[0]),  //
