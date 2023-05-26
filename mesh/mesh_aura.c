@@ -728,6 +728,10 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
         send_displs[mesh->node_owner[i] + 1] += 2 + extent;
     }
 
+    for(int r = 0; r < size; r++) {
+        send_displs[r+1] += send_displs[r];
+    }
+
     idx_t *send_data = (idx_t *)malloc(MAX(1, send_displs[size]) * sizeof(idx_t));
     memset(send_data, 0, send_displs[size] * sizeof(idx_t));
 
@@ -831,8 +835,23 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
     for (int r_ = 0; r_ < size; r_++) {
         if (r_ == rank) {
             printf("[%d] ----------------------------\n", rank);
+            printf("ghosts:\n");
             for (int i = 0; i < mesh->nnodes - mesh->n_owned_nodes; i++) {
                 printf("%d ", mesh->ghosts[i]);
+            }
+            printf("\n");
+
+            printf("cols:\n");
+            printf("start %d\n", mesh->node_offsets[rank] + mesh->n_owned_nodes - mesh->n_owned_nodes_with_ghosts);
+
+            for(ptrdiff_t i = mesh->n_owned_nodes - mesh->n_owned_nodes_with_ghosts; i < mesh->nnodes; i++) {
+                // if(rowptr[i+1] == rowptr[i]) continue;
+
+                printf("row %d :\n", (int)i);
+                for (ptrdiff_t k = rowptr[i]; k < rowptr[i+1]; k++) {
+                    printf("%d ", colidx[k]);
+                }
+                printf("\n");
             }
 
             printf("\n");
@@ -844,10 +863,13 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
 
     MPI_Barrier(comm);
 
-    for (ptrdiff_t i = 0; i < rowptr[mesh->nnodes]; i++) {
-        colidx[i] =
-            find_idx_binary_search(colidx[i], mesh->ghosts, mesh->nnodes - mesh->n_owned_nodes);
-    }
+    // for (ptrdiff_t i = 0; i < rowptr[mesh->nnodes]; i++) {
+    //     colidx[i] =
+    //         // find_idx_binary_search
+    //         safe_find_idx_binary_search
+    //         (colidx[i], mesh->ghosts, mesh->nnodes - mesh->n_owned_nodes);
+    //     assert(colidx[i] >= 0);
+    // }
 
     *out_rowptr = rowptr;
     *out_colidx = colidx;

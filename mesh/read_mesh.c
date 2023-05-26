@@ -66,7 +66,7 @@ int mesh_node_ids(mesh_t *mesh, idx_t *const ids)
     return 0;
 }
 
-int mesh_build_ghost_ids(mesh_t *mesh) {
+int mesh_build_global_ids(mesh_t *mesh) {
     MPI_Comm comm = mesh->comm;
 
     int rank, size;
@@ -248,7 +248,7 @@ int mesh_build_ghost_ids(mesh_t *mesh) {
             assert(iii < n_lnodes_temp);
             assert(iii >= 0);
             assert(mapping[iii] >= 0);
-            keys[k] = mapping[iii];
+            keys[k] =  mapping[iii];
         }
     }
 
@@ -268,6 +268,28 @@ int mesh_build_ghost_ids(mesh_t *mesh) {
     /////////////////////////////////////////////////
 
     mesh->node_offsets = node_offsets;
+
+
+    for (int r_ = 0; r_ < size; r_++) {
+        if (r_ == rank) {
+            printf("[%d] ----------------------------\n", rank);
+            printf("ghosts (%d):\n", (int)( mesh->nnodes - mesh->n_owned_nodes));
+            for (int i = 0; i < mesh->nnodes - mesh->n_owned_nodes; i++) {
+                printf("%d ", mesh->ghosts[i]);
+            }
+            printf("\n");
+
+            printf("offsets:\n");
+            for (ptrdiff_t i = 0; i < size; i++) {
+                printf("%d ", mesh->node_offsets[i]);
+            }
+
+            printf("\n");
+
+            fflush(stdout);
+        }
+        MPI_Barrier(comm);
+    }
 
     // Clean-up
     free(send_count);
@@ -714,7 +736,7 @@ int mesh_read_generic(MPI_Comm comm,
         mesh->ghosts = 0;
         mesh->node_offsets = 0;
 
-        mesh_build_ghost_ids(mesh);
+        mesh_build_global_ids(mesh);
 
         // MPI_Barrier(comm);
         double tock = MPI_Wtime();
