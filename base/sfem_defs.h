@@ -5,7 +5,7 @@
 
 #include <assert.h>
 
-enum ElemType { EDGE2=2, TRI3 = 3, TET4 = 4, TRI6 = 6, HEX8 = 8, TET10 = 10, INVALID = -1 };
+enum ElemType { EDGE2=2, TRI3 = 3, TET4 = 4, TRI6 = 6, HEX8 = 8, TET10 = 10, NODE1 = 1, INVALID = -1 };
 
 SFEM_INLINE static enum ElemType side_type(const enum ElemType type) {
     switch (type) {
@@ -15,7 +15,8 @@ SFEM_INLINE static enum ElemType side_type(const enum ElemType type) {
             return TRI3;
         case TET10:
             return TRI6;
-
+        case EDGE2:
+            return NODE1;
         default: {
             assert(0);
             return INVALID;
@@ -25,6 +26,8 @@ SFEM_INLINE static enum ElemType side_type(const enum ElemType type) {
 
 SFEM_INLINE static enum ElemType elem_num_nodes(const enum ElemType type) {
     switch (type) {
+        case NODE1:
+            return 1;
         case EDGE2:
             return 2;
         case TRI3:

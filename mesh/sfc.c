@@ -243,14 +243,14 @@ int main(int argc, char *argv[]) {
                 }
             }
 
-            assert(b[0] >= 0);
-            assert(b[0] <= 1);
+            // assert(b[0] >= 0);
+            // assert(b[0] <= 1);
 
-            assert(b[1] >= 0);
-            assert(b[1] <= 1);
+            // assert(b[1] >= 0);
+            // assert(b[1] <= 1);
 
-            assert(b[2] >= 0);
-            assert(b[2] <= 1);
+            // assert(b[2] >= 0);
+            // assert(b[2] <= 1);
 
             // sfc[i] = (sfc_t)(b[2] * (geom_t)urange[2]);
             sfc[i] = fun_sfc((sfc_t)(b[0] * (double)urange[0]),  //

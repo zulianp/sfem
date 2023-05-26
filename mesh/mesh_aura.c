@@ -832,36 +832,36 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
         }
     }
 
-    for (int r_ = 0; r_ < size; r_++) {
-        if (r_ == rank) {
-            printf("[%d] ----------------------------\n", rank);
-            printf("ghosts:\n");
-            for (int i = 0; i < mesh->nnodes - mesh->n_owned_nodes; i++) {
-                printf("%d ", mesh->ghosts[i]);
-            }
-            printf("\n");
+    // for (int r_ = 0; r_ < size; r_++) {
+    //     if (r_ == rank) {
+    //         printf("[%d] ----------------------------\n", rank);
+    //         printf("ghosts:\n");
+    //         for (int i = 0; i < mesh->nnodes - mesh->n_owned_nodes; i++) {
+    //             printf("%d ", mesh->ghosts[i]);
+    //         }
+    //         printf("\n");
 
-            printf("cols:\n");
-            printf("start %d\n", mesh->node_offsets[rank] + mesh->n_owned_nodes - mesh->n_owned_nodes_with_ghosts);
+    //         printf("cols:\n");
+    //         printf("start %d\n", mesh->node_offsets[rank] + mesh->n_owned_nodes - mesh->n_owned_nodes_with_ghosts);
 
-            for(ptrdiff_t i = mesh->n_owned_nodes - mesh->n_owned_nodes_with_ghosts; i < mesh->nnodes; i++) {
-                // if(rowptr[i+1] == rowptr[i]) continue;
+    //         for(ptrdiff_t i = mesh->n_owned_nodes - mesh->n_owned_nodes_with_ghosts; i <  mesh->n_owned_nodes; i++) {
+    //             // if(rowptr[i+1] == rowptr[i]) continue;
 
-                printf("row %d :\n", (int)i);
-                for (ptrdiff_t k = rowptr[i]; k < rowptr[i+1]; k++) {
-                    printf("%d ", colidx[k]);
-                }
-                printf("\n");
-            }
+    //             printf("row %d :\n", (int)i);
+    //             for (ptrdiff_t k = rowptr[i]; k < rowptr[i+1]; k++) {
+    //                 printf("%d ", colidx[k]);
+    //             }
+    //             printf("\n");
+    //         }
 
-            printf("\n");
+    //         printf("\n");
 
-            fflush(stdout);
-        }
-        MPI_Barrier(comm);
-    }
+    //         fflush(stdout);
+    //     }
+    //     MPI_Barrier(comm);
+    // }
 
-    MPI_Barrier(comm);
+    // MPI_Barrier(comm);
 
     // for (ptrdiff_t i = 0; i < rowptr[mesh->nnodes]; i++) {
     //     colidx[i] =

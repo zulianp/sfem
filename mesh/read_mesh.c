@@ -270,26 +270,26 @@ int mesh_build_global_ids(mesh_t *mesh) {
     mesh->node_offsets = node_offsets;
 
 
-    for (int r_ = 0; r_ < size; r_++) {
-        if (r_ == rank) {
-            printf("[%d] ----------------------------\n", rank);
-            printf("ghosts (%d):\n", (int)( mesh->nnodes - mesh->n_owned_nodes));
-            for (int i = 0; i < mesh->nnodes - mesh->n_owned_nodes; i++) {
-                printf("%d ", mesh->ghosts[i]);
-            }
-            printf("\n");
+    // for (int r_ = 0; r_ < size; r_++) {
+    //     if (r_ == rank) {
+    //         printf("[%d] ----------------------------\n", rank);
+    //         printf("ghosts (%d):\n", (int)( mesh->nnodes - mesh->n_owned_nodes));
+    //         for (int i = 0; i < mesh->nnodes - mesh->n_owned_nodes; i++) {
+    //             printf("%d ", mesh->ghosts[i]);
+    //         }
+    //         printf("\n");
 
-            printf("offsets:\n");
-            for (ptrdiff_t i = 0; i < size; i++) {
-                printf("%d ", mesh->node_offsets[i]);
-            }
+    //         printf("offsets:\n");
+    //         for (ptrdiff_t i = 0; i < size; i++) {
+    //             printf("%d ", mesh->node_offsets[i]);
+    //         }
 
-            printf("\n");
+    //         printf("\n");
 
-            fflush(stdout);
-        }
-        MPI_Barrier(comm);
-    }
+    //         fflush(stdout);
+    //     }
+    //     MPI_Barrier(comm);
+    // }
 
     // Clean-up
     free(send_count);
