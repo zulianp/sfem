@@ -140,8 +140,12 @@ int main(int argc, char *argv[]) {
     const char *folder = argv[1];
     const char *output_folder = argv[2];
 
+    int SFEM_ORDER_WITH_COORDINATE = -1;
+    SFEM_READ_ENV(SFEM_ORDER_WITH_COORDINATE, atoi);
+
     if (!rank) {
         printf("%s %s %s\n", argv[0], folder, output_folder);
+        printf("SFEM_ORDER_WITH_COORDINATE=%d\n", SFEM_ORDER_WITH_COORDINATE);
     }
 
     double tick = MPI_Wtime();
@@ -186,44 +190,77 @@ int main(int argc, char *argv[]) {
 
     sfc_t urange[3] = {sfc_urange, sfc_urange, sfc_urange};
 
-    for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
-        geom_t b[3] = {0, 0, 0};
-        const idx_t i0 = mesh.elements[0][i];
-
-        for (int coord = 0; coord < mesh.spatial_dim; coord++) {
-            geom_t x = mesh.points[coord][i0];
-            x -= box_min[coord];
-            x /= box_max[coord] - box_min[coord];
-            b[coord] = x;
-        }
-
-        for (int d = 1; d < mesh.element_type; d++) {
-            const idx_t ii = mesh.elements[d][i];
+    if (SFEM_ORDER_WITH_COORDINATE != -1) {
+        for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
+            geom_t b[3] = {0, 0, 0};
+            const idx_t i0 = mesh.elements[0][i];
 
             for (int coord = 0; coord < mesh.spatial_dim; coord++) {
-                geom_t x = mesh.points[coord][ii];
+                geom_t x = mesh.points[coord][i0];
                 x -= box_min[coord];
                 x /= box_max[coord] - box_min[coord];
-                b[coord] = MIN(b[coord], x);
+                b[coord] = x;
             }
+
+            for (int d = 1; d < mesh.element_type; d++) {
+                const idx_t ii = mesh.elements[d][i];
+
+                for (int coord = 0; coord < mesh.spatial_dim; coord++) {
+                    geom_t x = mesh.points[coord][ii];
+                    x -= box_min[coord];
+                    x /= box_max[coord] - box_min[coord];
+                    b[coord] = MIN(b[coord], x);
+                }
+            }
+
+           
+            // sfc[i] = (sfc_t)(b[2] * (geom_t)urange[2]);
+            sfc[i] = b[SFEM_ORDER_WITH_COORDINATE] * urange[SFEM_ORDER_WITH_COORDINATE];
+
+            // printf("%d -> %g %g %g %d\n", (int)i, (double)b[0], (double)b[1], (double)b[2],
+            // (int)sfc[i]);
         }
+    } else {
+        for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
+            geom_t b[3] = {0, 0, 0};
+            const idx_t i0 = mesh.elements[0][i];
 
-        assert(b[0] >= 0);
-        assert(b[0] <= 1);
+            for (int coord = 0; coord < mesh.spatial_dim; coord++) {
+                geom_t x = mesh.points[coord][i0];
+                x -= box_min[coord];
+                x /= box_max[coord] - box_min[coord];
+                b[coord] = x;
+            }
 
-        assert(b[1] >= 0);
-        assert(b[1] <= 1);
+            for (int d = 1; d < mesh.element_type; d++) {
+                const idx_t ii = mesh.elements[d][i];
 
-        assert(b[2] >= 0);
-        assert(b[2] <= 1);
+                for (int coord = 0; coord < mesh.spatial_dim; coord++) {
+                    geom_t x = mesh.points[coord][ii];
+                    x -= box_min[coord];
+                    x /= box_max[coord] - box_min[coord];
+                    b[coord] = MIN(b[coord], x);
+                }
+            }
 
-        // sfc[i] = (sfc_t)(b[2] * (geom_t)urange[2]);
-        sfc[i] = fun_sfc((sfc_t)(b[0] * (double)urange[0]),  //
-                         (sfc_t)(b[1] * (double)urange[1]),  //
-                         (sfc_t)(b[2] * (double)urange[2])   //
-        );
+            assert(b[0] >= 0);
+            assert(b[0] <= 1);
 
-        // printf("%d -> %g %g %g %d\n", (int)i, (double)b[0], (double)b[1], (double)b[2], (int)sfc[i]);
+            assert(b[1] >= 0);
+            assert(b[1] <= 1);
+
+            assert(b[2] >= 0);
+            assert(b[2] <= 1);
+
+            // sfc[i] = (sfc_t)(b[2] * (geom_t)urange[2]);
+            sfc[i] = fun_sfc((sfc_t)(b[0] * (double)urange[0]),  //
+                             (sfc_t)(b[1] * (double)urange[1]),  //
+                             (sfc_t)(b[2] * (double)urange[2])   //
+            );
+
+            // printf("%d -> %g %g %g %d\n", (int)i, (double)b[0], (double)b[1], (double)b[2],
+            // (int)sfc[i]);
+        }
     }
 
 #ifdef DSFEM_ENABLE_MPI_SORT
@@ -271,7 +308,12 @@ int main(int argc, char *argv[]) {
                     sfc[i] = elem_buff[idx[i]];
                 }
 
-                array_write(comm, SFEM_EXPORT_SFC, SFEM_MPI_SFC_T, sfc, mesh.n_owned_elements, mesh.n_owned_elements);
+                array_write(comm,
+                            SFEM_EXPORT_SFC,
+                            SFEM_MPI_SFC_T,
+                            sfc,
+                            mesh.n_owned_elements,
+                            mesh.n_owned_elements);
             }
         }
 
