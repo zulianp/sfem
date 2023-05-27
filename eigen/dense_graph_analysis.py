@@ -170,8 +170,9 @@ def main(argv):
 				v2 = vecs[:, k2]
 				v_mag = np.sum(v1 * np.conjugate(v2))
 				O[k1, k2] = v_mag.real
+	d = np.diag(O)
 	print('Orthonormal:')
-	print(rf(O))
+	print(rf(d))
 
 if __name__ == '__main__':
 	main(sys.argv)
