@@ -20,7 +20,7 @@ max_eigs=$n
 [ -d "odd_eigs_2D" ]  && rm -rf odd_eigs_2D  && rm -rf odd_matrix_2D
 
 # python3 -c "import numpy as np; (np.cos((10*2 * np.pi /("$n")) * np.arange(0, "$n", dtype=np.float64))).tofile('rdata.raw')"
-python3 -c "import numpy as np; X = np.arange(0, "$nx"); Y = np.arange(0, "$ny"); X, Y = np.meshgrid(X, Y); angles=(2 * np.pi /("$nx") * X); np.cos(angles).tofile('rdata.raw')"
+python3 -c "import numpy as np; X = np.arange(0, "$nx"); Y = np.arange(0, "$ny"); X, Y = np.meshgrid(X, Y); xangles=(2 * np.pi /("$nx") * X); yangles=(2 * np.pi /("$ny") * Y); (np.cos(5*xangles) + np.cos(6*yangles)).tofile('rdata.raw')"
 
 ./plot_surface.py "rdata.raw" $nx $ny 1 "orginal_rdata.png"
 
