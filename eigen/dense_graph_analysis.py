@@ -170,9 +170,24 @@ def main(argv):
 				v2 = vecs[:, k2]
 				v_mag = np.sum(v1 * np.conjugate(v2))
 				O[k1, k2] = v_mag.real
+	
 	d = np.diag(O)
-	print('Orthonormal:')
-	print(rf(d))
+	sd = np.sum(np.abs(d))
+	sm = np.sum(np.sum(np.abs(O)))
+
+	for k in range(0, N):
+			O[k,k] = 0 
+
+	plt.clf()
+
+	ax = plt.imshow(np.abs(O))
+	plt.colorbar()
+	plt.savefig(f'{output_folder}/ortho.png', dpi=300)
+
+
+	print(f'Orthonormal: {sd} - {sm} = {sd - sm}')
+
+
 
 if __name__ == '__main__':
 	main(sys.argv)

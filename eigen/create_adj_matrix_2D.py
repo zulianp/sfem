@@ -25,7 +25,7 @@ def main(argv):
 	if not os.path.exists(output_folder):
 		os.mkdir(f'{output_folder}')
 
-	nnzxrow = 2
+	nnzxrow = 1
 	if which == 'undirected':
 		nnzxrow = 4
 	elif which == 'laplacian':
@@ -82,9 +82,11 @@ def main(argv):
 				yp1 = (y + 1) % ny
 				ym1 = (y - 1 + ny ) % ny
 				i = x * ny + y
-				offset = i * 2
-				colidx[offset] = xp1 * ny + y
-				colidx[offset+1] = x * ny + yp1
+				colidx[i] = xp1 * ny + yp1
+
+				# offset = i * 2
+				# colidx[offset] = xp1 * ny + y
+				# colidx[offset+1] = x * ny + yp1
 
 	rowptr.tofile(f'{output_folder}/rowptr.raw')
 	colidx.tofile(f'{output_folder}/colidx.raw')

@@ -8,9 +8,9 @@ nx=40
 ny=40
 n=$(( nx * ny ))
 
-real_pattern="real.0000[0-0].raw"
-imag_pattern="imag.0000[0-0].raw"
-both_pattern="*.0000[0-0].raw"
+real_pattern="real.0000[0-4].raw"
+imag_pattern="imag.0000[0-4].raw"
+both_pattern="*.0000[0-4].raw"
 
 max_eigs=$n
 
@@ -42,9 +42,8 @@ function analyze()
 	./plot_surface.py "reconstructed/idata.raw" $nx $ny 1 $name"_idata.png"
 }
 
-analyze directed SM
+analyze directed angle
 # analyze undirected LR
-# analyze laplacian SR
 # analyze laplacian SM
 # analyze odd angle
 
