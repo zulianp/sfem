@@ -4,23 +4,27 @@
 set -e
 # set -x
 
-nx=40
-ny=40
+nx=4
+ny=4
 n=$(( nx * ny ))
 
-real_pattern="real.0000[0-4].raw"
-imag_pattern="imag.0000[0-4].raw"
-both_pattern="*.0000[0-4].raw"
+nmax=7
+real_pattern="real.0000[0-$nmax].raw"
+imag_pattern="imag.0000[0-$nmax].raw"
+both_pattern="*.0000[0-$nmax].raw"
+
+# real_pattern="real.*.raw"
+# imag_pattern="imag.*.raw"
+# both_pattern="*.*.raw"
 
 max_eigs=$n
 
-[ -d "directed_eigs_2D" ]   && rm -rf directed_eigs_2D   && rm -rf directed_matrix_2D   && rm *data.png && rm *data.raw
+[ -d "directed_eigs_2D" ]   && rm -rf directed_eigs_2D   && rm -rf directed_matrix_2D   && rm *data.png && rm *data.raw && rm -rf eigs_2D  
 [ -d "undirected_eigs_2D" ] && rm -rf undirected_eigs_2D && rm -rf undirected_matrix_2D && rm -rf reconstructed
 [ -d "laplacian_eigs_2D" ]  && rm -rf laplacian_eigs_2D  && rm -rf laplacian_matrix_2D
 [ -d "odd_eigs_2D" ]  && rm -rf odd_eigs_2D  && rm -rf odd_matrix_2D
 
-# python3 -c "import numpy as np; (np.cos((10*2 * np.pi /("$n")) * np.arange(0, "$n", dtype=np.float64))).tofile('rdata.raw')"
-python3 -c "import numpy as np; X = np.arange(0, "$nx"); Y = np.arange(0, "$ny"); X, Y = np.meshgrid(X, Y); xangles=(2 * np.pi /("$nx") * X); yangles=(2 * np.pi /("$ny") * Y); (np.cos(5*xangles) + np.cos(6*yangles)).tofile('rdata.raw')"
+./example_fun_2D.py $nx $ny "rdata.raw"
 
 ./plot_surface.py "rdata.raw" $nx $ny 1 "orginal_rdata.png"
 
@@ -35,14 +39,21 @@ function analyze()
 	./plot_surface.py $name"_eigs_2D/$imag_pattern" $nx $ny $max_eigs $name"_eigs_2D/imag_dvecs.png"
 	./plot_surface.py $name"_eigs_2D/$both_pattern" $nx $ny $max_eigs $name"_eigs_2D/both_dvecs.png"
 
+	./plot_images.py $name"_eigs_2D/$real_pattern" $nx $ny $max_eigs $name"_eigs_2D/image_real_dvecs.png"
+	./plot_images.py $name"_eigs_2D/$imag_pattern" $nx $ny $max_eigs $name"_eigs_2D/image_imag_dvecs.png"
+	# ./plot_images.py $name"_eigs_2D/$both_pattern" $nx $ny $max_eigs $name"_eigs_2D/image_both_dvecs.png"
+
 	cp rdata.raw data.raw
 	./project.py $name"_eigs_2D/real.*.raw" -1 0 data.raw
 
 	./plot_surface.py "reconstructed/rdata.raw" $nx $ny 1 $name"_rdata.png"
 	./plot_surface.py "reconstructed/idata.raw" $nx $ny 1 $name"_idata.png"
+	./plot_surface.py "reconstructed/mdata.raw" $nx $ny 1 $name"_mdata.png"
 }
 
-analyze directed angle
+analyze yonly angle
+# analyze directed angle
+
 # analyze undirected LR
 # analyze laplacian SM
 # analyze odd angle

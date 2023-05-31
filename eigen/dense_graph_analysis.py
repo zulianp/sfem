@@ -9,7 +9,6 @@ import os
 import math
 import matplotlib.pyplot as plt
 
-
 idx_t = np.int32
 real_t = np.float64
 
@@ -57,12 +56,7 @@ def main(argv):
 	else:
 		vals, vecs = la.eig(A)
 
-	
-
-	# mag = vals * vals
-	# mag = mag.real * np.sign(vals.real)
 	mag = np.absolute(vals).real
-	# print(mag)
 	reorder = True
 	if which == 'SR':
 		order = np.argsort(vals.real)
@@ -78,34 +72,30 @@ def main(argv):
 		order = np.argsort(mag)
 	elif which == 'angle':
 		angles = np.arctan2(vals.imag, vals.real)
-		# print(rf(vals.real))
-		# print(rf(vals.imag))
-
 		isneg = angles < 0
 		angles[isneg] = np.mod(angles[isneg] + 2*np.pi, 2*np.pi)
-		# print(rf(angles))
 		order = np.argsort(angles)
 	else:
 		reorder = False
 
-	verbose=False
+	verbose=True
+	# verbose=False
 	if verbose:
-
 		print(folder)
 
 		print("matrix")
 		print(A)
 		print('values')
-		print(rf(vals.real))
-		print(rf(vals.imag))
+		print(rf(vals.real[order]))
+		print(rf(vals.imag[order]))
 
 		print('vecs')
 		print('real')
-		for k in range(0, N):
+		for k in order:
 			print(rf(vecs[:,k].real))
 
 		print('imag')
-		for k in range(0, N):
+		for k in order:
 			print(rf(vecs[:,k].imag))
 
 	if reorder:
@@ -125,12 +115,14 @@ def main(argv):
 
 	lr = axs[1,1].plot(vals.real)
 	li = axs[1,1].plot(vals.imag)
-	lm = axs[1,1].plot(np.absolute(vals).real)
+
+	if len(vals) <= 16:
+		lm = axs[1,1].plot(np.absolute(vals).real, marker='.')
+	else:
+		lm = axs[1,1].plot(np.absolute(vals).real)
 	axs[1,1].set_title('Both')
 	axs[1,1].legend(['Real', 'Imag', 'Mag'], loc='center left', bbox_to_anchor=(1, 0.5))
 	
-
-	# plt.plot(vals.imag)
 	fig.suptitle(f'Eigenvalues {which}')
 	plt.xlabel('Number')
 	plt.ylabel('Value')
@@ -151,15 +143,8 @@ def main(argv):
 		vr = vecs[:, k]
 		minv = np.min(vr)
 		maxv = np.max(vr)
-		# print(f'val({k}) r={rf(vals[k].real)} i={rf(vals[k].imag)}, minv={rf(minv.real)},{rf(minv.imag)} maxv={rf(maxv.real)},{rf(maxv.imag)}')
-		# print(rf(vr.real))
-		# print(rf(vr.imag))
-
 		min_val = min(min_val, minv)
 		max_val = max(max_val, maxv)
-
-	# print(f'min_val {min_val}')
-	# print(f'max_val {max_val}')
 
 	O = np.zeros((N, N), dtype=real_t)
 	check_orthonormal=True
@@ -179,14 +164,10 @@ def main(argv):
 			O[k,k] = 0 
 
 	plt.clf()
-
 	ax = plt.imshow(np.abs(O))
 	plt.colorbar()
 	plt.savefig(f'{output_folder}/ortho.png', dpi=300)
-
-
 	print(f'Orthonormal: {sd} - {sm} = {sd - sm}')
-
 
 
 if __name__ == '__main__':

@@ -25,13 +25,15 @@ def main(argv):
 	if not os.path.exists(output_folder):
 		os.mkdir(f'{output_folder}')
 
-	nnzxrow = 1
+	nnzxrow = 3
 	if which == 'undirected':
 		nnzxrow = 4
 	elif which == 'laplacian':
 		nnzxrow = 5
 	elif which == 'odd':
 		nnzxrow = 4
+	elif which == 'yonly':
+		nnzxrow = 1
 	
 	N = nx * ny 
 	rowptr = np.arange(0, N+1, 1, dtype=idx_t) * nnzxrow
@@ -73,6 +75,20 @@ def main(argv):
 				data[offset+2] = 1
 				data[offset+3] = 1
 				data[offset+4] = 1
+	elif which == 'yonly':
+		for y in range(0, ny):
+			yp1 = (y + 1) % ny
+			ym1 = (y - 1 + ny ) % ny
+
+			for x in range(0, nx):
+				xp1 = (x + 1) % nx
+				xm1 = (x - 1 + nx) % nx
+				# i = x * ny + y
+				i = x + y * nx
+
+				if nnzxrow == 1:
+					# colidx[i] = x * ny + yp1
+					colidx[i] = yp1 * nx + x
 	else:
 		for x in range(0, nx):
 			xp1 = (x + 1) % nx
@@ -82,11 +98,19 @@ def main(argv):
 				yp1 = (y + 1) % ny
 				ym1 = (y - 1 + ny ) % ny
 				i = x * ny + y
-				colidx[i] = xp1 * ny + yp1
 
-				# offset = i * 2
-				# colidx[offset] = xp1 * ny + y
-				# colidx[offset+1] = x * ny + yp1
+				if nnzxrow == 1:
+					colidx[i] = xp1 * ny + yp1
+				elif nnzxrow == 3:
+					offset = i * 3
+					colidx[offset] = xp1 * ny + y
+					colidx[offset+1] = x * ny + yp1
+					colidx[offset+2] = xp1 * ny + yp1
+				else:
+					assert nnzxrow == 2
+					offset = i * 2
+					colidx[offset] = xp1 * ny + y
+					colidx[offset+1] = x * ny + yp1
 
 	rowptr.tofile(f'{output_folder}/rowptr.raw')
 	colidx.tofile(f'{output_folder}/colidx.raw')

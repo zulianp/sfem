@@ -42,12 +42,15 @@ def main(argv):
 	X = np.arange(0, nx)
 	Y = np.arange(0, ny)
 	X, Y = np.meshgrid(X, Y)
+	X = X.T
+	Y = Y.T
 
 	legend = []
 	i=0
 	for f in file_eigs:
 		v = np.fromfile(f, dtype=real_t)
 		# plt.plot(np.tile(v, 4))
+		# ax.plot_surface(X, Y, np.reshape(v, (nx, ny)), cmap=cm.coolwarm)
 		ax.plot_surface(X, Y, np.reshape(v, (nx, ny)), cmap=cm.coolwarm)
 		legend.append(os.path.basename(f))
 

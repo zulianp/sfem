@@ -73,6 +73,7 @@ def main(argv):
 
 		np.real(x).tofile(f'reconstructed/r{os.path.basename(f)}')
 		np.imag(x).tofile(f'reconstructed/i{os.path.basename(f)}')
+		np.absolute(x).tofile(f'reconstructed/m{os.path.basename(f)}')
 
 if __name__ == '__main__':
 	main(sys.argv)
