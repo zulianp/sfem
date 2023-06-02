@@ -17,6 +17,30 @@ class FE:
 			g[i] = sp.Matrix(dims, 1, gi)
 		return g
 
+	def tgrad(self, p):
+		ret = []
+		g = self.grad(p)
+
+		for gi in g:
+			for d1 in range(0, self.manifold_dim()):
+				G = sp.Matrix(self.manifold_dim(), self.spatial_dim(), [0] * self.manifold_dim() * self.spatial_dim() )
+
+				for d2 in range(0, self.spatial_dim()):
+					G[d1, d2] = gi[d2]
+
+				ret.append(G)
+		return ret
+
+	def physical_tgrad(self, p):
+		ret = []
+		g = self.tgrad(p)
+		J_inv = self.symbol_jacobian_inverse()
+
+		for gi in g:
+			ret.append(J_inv.T * gi)
+
+		return ret
+
 
 	def physical_grad(self, p):
 		fx = self.fun(p)
