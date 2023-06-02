@@ -4,8 +4,8 @@
 set -e
 # set -x
 
-nx=4
-ny=4
+nx=40
+ny=40
 n=$(( nx * ny ))
 
 nmax=7
@@ -51,8 +51,8 @@ function analyze()
 	./plot_surface.py "reconstructed/mdata.raw" $nx $ny 1 $name"_mdata.png"
 }
 
-analyze yonly angle
-# analyze directed angle
+# analyze yonly angle
+analyze directed angle
 
 # analyze undirected LR
 # analyze laplacian SM

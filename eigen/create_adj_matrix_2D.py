@@ -25,7 +25,7 @@ def main(argv):
 	if not os.path.exists(output_folder):
 		os.mkdir(f'{output_folder}')
 
-	nnzxrow = 3
+	nnzxrow = 1
 	if which == 'undirected':
 		nnzxrow = 4
 	elif which == 'laplacian':

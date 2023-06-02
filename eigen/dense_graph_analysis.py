@@ -78,7 +78,7 @@ def main(argv):
 	else:
 		reorder = False
 
-	verbose=True
+	verbose=False
 	# verbose=False
 	if verbose:
 		print(folder)
@@ -146,28 +146,29 @@ def main(argv):
 		min_val = min(min_val, minv)
 		max_val = max(max_val, maxv)
 
-	O = np.zeros((N, N), dtype=real_t)
+	
 	check_orthonormal=True
 	if check_orthonormal:
+		O = np.zeros((N, N), dtype=real_t)
 		for k1 in range(0, N):
 			for k2 in range(0, N):
 				v1 = vecs[:, k1]
 				v2 = vecs[:, k2]
 				v_mag = np.sum(v1 * np.conjugate(v2))
-				O[k1, k2] = v_mag.real
+				O[k1, k2] = np.absolute(v_mag).real
 	
-	d = np.diag(O)
-	sd = np.sum(np.abs(d))
-	sm = np.sum(np.sum(np.abs(O)))
+		d = np.diag(O)
+		sd = np.sum(np.abs(d))
+		sm = np.sum(np.sum(np.abs(O)))
 
-	for k in range(0, N):
-			O[k,k] = 0 
+		# for k in range(0, N):
+		# 		O[k,k] = 0 
 
-	plt.clf()
-	ax = plt.imshow(np.abs(O))
-	plt.colorbar()
-	plt.savefig(f'{output_folder}/ortho.png', dpi=300)
-	print(f'Orthonormal: {sd} - {sm} = {sd - sm}')
+		plt.clf()
+		ax = plt.imshow(np.abs(O))
+		plt.colorbar()
+		plt.savefig(f'{output_folder}/ortho.png', dpi=300)
+		print(f'Orthonormal: {sd} - {sm} = {sd - sm}')
 
 
 if __name__ == '__main__':

@@ -16,6 +16,9 @@ idx_t = np.int32
 real_t = np.float64
 
 
+def rf(val):
+	return np.round(val, 3)
+
 def main(argv):
 	if len(argv) < 4:
 		print(f'usage: {argv[0]} <eigen_pattern> <nx> <ny> [max_eigs] [output_path]')
@@ -45,46 +48,26 @@ def main(argv):
 	X = X.T
 	Y = Y.T
 
+	max_val = -100000000.
+	min_val = 100000000.
+
 	legend = []
 	i=0
 	for f in file_eigs:
 		v = np.fromfile(f, dtype=real_t)
-		# plt.plot(np.tile(v, 4))
-		# ax.plot_surface(X, Y, np.reshape(v, (nx, ny)), cmap=cm.coolwarm)
 		ax.plot_surface(X, Y, np.reshape(v, (nx, ny)), cmap=cm.coolwarm)
 		legend.append(os.path.basename(f))
+
+		max_val = max(max_val, np.max(v))
+		min_val = min(min_val, np.min(v))
 
 		i += 1
 		if i == n:
 			break	
 
-
-	# plt.legend(legend, loc='center left', bbox_to_anchor=(1, 0.5))
-	plt.title(f'Vectors {eigen_pattern}')
+	plt.title(f'Vectors {eigen_pattern} [{rf(min_val)}, {rf(max_val)}]')
 	fig.tight_layout()
 	plt.savefig(f'{output_path}', dpi=300)
 
 if __name__ == '__main__':
 	main(sys.argv)
-
-
-
-# X = np.arange(0, nx)
-# Y = np.arange(0, ny)
-# X, Y = np.meshgrid(X, Y)
-
-# plt.figure(figsize=(1000, 1000))
-# fig, axs = plt.subplots(2, 2, subplot_kw={"projection": "3d"})
-
-# axs[0, 0].plot_surface(X, Y, np.reshape(vals.real, (nx, ny)), cmap=cm.coolwarm)
-# axs[0, 0].set_title('Real')
-# axs[0, 1].plot_surface(X, Y, np.reshape(vals.imag, (nx, ny)))
-# axs[0, 1].set_title('Imag')
-
-# axs[1, 0].plot_surface(X, Y, np.reshape(np.absolute(vals).real, (nx, ny)))
-# axs[1, 0].set_title('Mag')
-
-# lr = axs[1,1].plot_surface(X, Y, np.reshape(vals.real, (nx, ny)))
-# li = axs[1,1].plot_surface(X, Y, np.reshape(vals.imag, (nx, ny)))
-# lm = axs[1,1].plot_surface(X, Y, np.reshape(np.absolute(vals).real, (nx, ny)))
-# axs[1,1].set_title('Both')
