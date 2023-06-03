@@ -2,6 +2,7 @@
 
 from sfem_codegen import *
 from quad4 import *
+from tri3 import *
 
 class LinearElasticityOp:
 	def __init__(self, fe, q):
@@ -29,7 +30,7 @@ class LinearElasticityOp:
 			e_disp_grad += disp[i] * shape_grad[i]
 
 		# strain energy function
-		e = lmbda/2 * tr(epsu) * tr(epsu) + mu * inner(epsu, epsu)
+		e = mu * inner(epsu, epsu) + (lmbda/2) * tr(epsu) * tr(epsu)
 
 		# Gradient
 		de = sp.Matrix(dims, dims, [0]*(dims*dims))
@@ -53,18 +54,22 @@ class LinearElasticityOp:
 				eval_hessian[i, j] = inner(dde, shape_grad[j])
 
 		###################################################################
-		# Integrate and subsitute
+		# Integrate and substitute
 		###################################################################
-
-		integr_grad = sp.Matrix(rows, 1, [0] * rows)
+		integr_value = 0
+		integr_gradient = sp.Matrix(rows, 1, [0] * rows)
 		integr_hessian = sp.Matrix(rows, cols, [0] * (rows * cols))
+
+		integr_value = fe.integrate(q, e)
+		integr_value = subsmat(integr_value, s_disp_grad, e_disp_grad)
+		integr_value = subsmat(integr_value, s_jac_inv, e_jac_inv)
 
 		for i in range(0, rows):
 			integr = fe.integrate(q, eval_grad[i])
 			integr = subsmat(integr, s_disp_grad, e_disp_grad)
 			integr = subsmat(integr, s_jac_inv, e_jac_inv)
 			integr = integr * dV
-			integr_grad[i] = integr
+			integr_gradient[i] = integr
 
 		for i in range(0, rows):
 			for j in range(0, cols):
@@ -84,7 +89,9 @@ class LinearElasticityOp:
 
 		self.eval_grad = eval_grad
 		self.eval_hessian = eval_hessian
-		self.integr_grad = integr_grad
+
+		self.integr_value = integr_value
+		self.integr_gradient = integr_gradient
 		self.integr_hessian = integr_hessian
 
 		###################################################################
@@ -100,23 +107,46 @@ class LinearElasticityOp:
 		for i in range(0, rows):
 			for j in range(0, cols):
 				integr = H[i, j]
-				integr = integr.subs(self.mu, 2)
-				integr = integr.subs(self.lmbda, 2)
+
+				coord = 0.5
+				# integr = integr.subs(self.mu, 2)
+				# integr = integr.subs(self.lmbda, 2)
+
+				coord = 1
+				integr = integr.subs(self.mu, sp.Rational(1, 2))
+				integr = integr.subs(self.lmbda, 1)
 
 				integr = integr.subs(x0, 0)
 				integr = integr.subs(y0, 0)
 				
-				integr = integr.subs(x1, 0.5)
+				integr = integr.subs(x1, coord)
 				integr = integr.subs(y1, 0)
 
-				integr = integr.subs(x2, 0.5)
-				integr = integr.subs(y2, 0.5)
+				if rows == 8:
+					integr = integr.subs(x2, coord)
+					integr = integr.subs(y2, coord)
 
-				integr = integr.subs(x3, 0)
-				integr = integr.subs(y3, 0.5)
+					integr = integr.subs(x3, 0)
+					integr = integr.subs(y3, coord)
+				else:
+					integr = integr.subs(x2, 0)
+					integr = integr.subs(y2, coord)
 				
 				A[i, j] = integr
-		c_log(A)
+
+		S = A.T - A
+		row_sum = sp.Matrix(rows, 1, [0] * rows)
+		for i in range(0, rows):
+			for j in range(0, cols):
+				row_sum[i] += A[i, j]
+
+		for i in range(0, rows):
+			c_log(A[i,i])	
+
+		for i in range(0, rows):
+			c_log(A[i,:])	
+		# c_log(S)
+		# c_log(row_sum)
 
 	def hessian(self):
 		H = self.integr_hessian
@@ -131,46 +161,41 @@ class LinearElasticityOp:
 		return expr
 
 	def gradient(self):
-		fe = self.fe
+		g = self.integr_gradient
+		rows, cols = g.shape
+
 		expr = []
-		# for i in range(0, fe.n_nodes()):
-		# 	integr = 0
+		for i in range(0, rows):
+			var = sp.symbols(f'element_vector[{i}*stride]')
+			expr.append(ast.Assignment(var, g[i]))
 
-		# 	for d in range(0, fe.manifold_dim()):
-		# 		gdotg = FFF_x_g[d] * g[i][d]
-		# 		integr += fe.integrate(q, gdotg)
-
-		# 	lform = sp.symbols(f'element_vector[{i}*stride]')
-		# 	expr.append(ast.Assignment(lform, integr))
-
-		# pdb.set_trace()
 		return expr
 
 	def value(self):
-		fe = self.fe
-		expr = []
-
-		
-		# for d in range(0, fe.manifold_dim()):
-		# 	gsquared = fe.integrate(q, (grad_uh[d] **2)) / 2
-		# 	integr += gsquared
-
-
-		# for d1 in range(0, fe.manifold_dim()):
-		# 	for d2 in range(0, fe.manifold_dim()):
-		# 		integr = integr.subs(s_jac_inv[d1, d2], e_jac_inv[d1, d2])
-
-		# integr *= dV
-
-		# form = sp.symbols(f'element_scalar[0]')
-		# expr.append(ast.Assignment(form, integr))
-		return expr
+		form = sp.symbols(f'element_scalar[0]')
+		return [ast.Assignment(form, self.integr_value)]
 
 def main():
 	fe = AxisAlignedQuad4()
+	fe = Tri3()
 	q = sp.Matrix(2, 1, [qx, qy])
 	op = LinearElasticityOp(fe, q)
 	op.hessian_check()
+
+	# c_log("--------------------------")
+	# c_log("value")
+	# c_log("--------------------------")
+	# c_code(op.value())
+
+	# c_log("--------------------------")
+	# c_log("gradient")
+	# c_log("--------------------------")
+	# c_code(op.gradient())
+
+	# c_log("--------------------------")
+	# c_log("hessian")	
+	# c_log("--------------------------")
+
 	# c_code(op.hessian())
 
 if __name__ == '__main__':
