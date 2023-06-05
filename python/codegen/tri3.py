@@ -11,7 +11,7 @@ class Tri3(FE):
 			 y1 - y0, y2 - y0
 			])
 
-		self.Ainv_ = inv2(A)
+		self.Ainv_ = inv2(self.A_)
 
 	def name(self):
 		return "Tri3"

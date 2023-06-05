@@ -1,6 +1,7 @@
 import sympy as sp
 
 class FE:
+	SoA = True
 	def grad(self, p):
 		fx = self.fun(p)
 		dims, __ = p.shape
@@ -18,17 +19,25 @@ class FE:
 		return g
 
 	def tgrad(self, p):
-		ret = []
 		g = self.grad(p)
+		dim = self.manifold_dim() 
+		tensor_size = self.manifold_dim() * self.spatial_dim() 
+		ndofs = len(g) * dim
+		nnodes = len(g)
 
-		for gi in g:
+		ret = [0] * ndofs
+		for i in range(0, nnodes):
+			gi = g[i]
 			for d1 in range(0, self.manifold_dim()):
-				G = sp.Matrix(self.manifold_dim(), self.spatial_dim(), [0] * self.manifold_dim() * self.spatial_dim() )
-
+				G = sp.Matrix(self.manifold_dim(), self.spatial_dim(), [0] * tensor_size)
 				for d2 in range(0, self.spatial_dim()):
 					G[d1, d2] = gi[d2]
-
-				ret.append(G)
+				
+				if self.SoA:
+					ret[d1 * nnodes + i] = G
+				else:
+					ret[i*dim + d1] = G
+					
 		return ret
 
 	def physical_tgrad(self, p):

@@ -3,6 +3,12 @@
 from sfem_codegen import *
 from quad4 import *
 from tri3 import *
+from tri6 import *
+from tet4 import *
+from tet10 import *
+
+from time import perf_counter
+
 
 class LinearElasticityOp:
 	def __init__(self, fe, q):
@@ -20,6 +26,7 @@ class LinearElasticityOp:
 		###################################################################
 		# Material law
 		###################################################################
+		c_log("Material law")
 
 		mu, lmbda = sp.symbols('mu lambda', real=True)
 		s_disp_grad = sp.Matrix(dims, dims, coeffs('disp_grad', dims * dims))
@@ -30,7 +37,7 @@ class LinearElasticityOp:
 			e_disp_grad += disp[i] * shape_grad[i]
 
 		# strain energy function
-		e = mu * inner(epsu, epsu) + (lmbda/2) * tr(epsu) * tr(epsu)
+		e = mu * inner(epsu, epsu) + (lmbda/2) * (tr(epsu) * tr(epsu))
 
 		# Gradient
 		de = sp.Matrix(dims, dims, [0]*(dims*dims))
@@ -45,17 +52,19 @@ class LinearElasticityOp:
 		dde = sp.Matrix(dims, dims, [0]*(dims*dims))
 		eval_hessian =  sp.Matrix(rows, cols, [0] * (rows * cols))
 
-		for i in range(0, rows):
+		for j in range(0, rows):
 			for d1 in range(0, dims):
 				for d2 in range(0, dims):
-					dde[d1, d2] = sp.diff(eval_grad[i], s_disp_grad[d1, d2])
+					dde[d1, d2] = sp.diff(eval_grad[j], s_disp_grad[d1, d2])
 
-			for j in range(0, cols):
-				eval_hessian[i, j] = inner(dde, shape_grad[j])
+			for i in range(0, cols):
+				eval_hessian[i, j] = inner(dde, shape_grad[i])
 
 		###################################################################
 		# Integrate and substitute
 		###################################################################
+		c_log("Integrate")
+
 		integr_value = 0
 		integr_gradient = sp.Matrix(rows, 1, [0] * rows)
 		integr_hessian = sp.Matrix(rows, cols, [0] * (rows * cols))
@@ -109,12 +118,14 @@ class LinearElasticityOp:
 				integr = H[i, j]
 
 				coord = 0.5
-				# integr = integr.subs(self.mu, 2)
-				# integr = integr.subs(self.lmbda, 2)
+				integr = integr.subs(self.mu, 2)
+				integr = integr.subs(self.lmbda, 2)
 
-				coord = 1
-				integr = integr.subs(self.mu, sp.Rational(1, 2))
-				integr = integr.subs(self.lmbda, 1)
+				# coord = 1.
+				# integr = integr.subs(self.mu, sp.Rational(1, 2))
+				# integr = integr.subs(self.lmbda, 1)
+				# integr = integr.subs(self.mu, 1)
+				# integr = integr.subs(self.lmbda, 0)
 
 				integr = integr.subs(x0, 0)
 				integr = integr.subs(y0, 0)
@@ -140,13 +151,18 @@ class LinearElasticityOp:
 			for j in range(0, cols):
 				row_sum[i] += A[i, j]
 
-		for i in range(0, rows):
-			c_log(A[i,i])	
+		# for i in range(0, rows):
+		# 	c_log("%.3g" % A[i,i])	
 
 		for i in range(0, rows):
-			c_log(A[i,:])	
-		# c_log(S)
-		# c_log(row_sum)
+			line = ""
+			for j in range(0, rows):
+				line += "%.5g " % A[i,j]
+			c_log(line)
+
+			
+		c_log(S)
+		c_log(row_sum)
 
 	def hessian(self):
 		H = self.integr_hessian
@@ -176,27 +192,38 @@ class LinearElasticityOp:
 		return [ast.Assignment(form, self.integr_value)]
 
 def main():
-	fe = AxisAlignedQuad4()
-	fe = Tri3()
+	start = perf_counter()
+
+	# fe = AxisAlignedQuad4()
+	# fe = Tri3()
+	fe = Tri6()
 	q = sp.Matrix(2, 1, [qx, qy])
+
+	# fe = Tet4()
+	# fe = Tet10()
+	# q = sp.Matrix(3, 1, [qx, qy, qz])
+
 	op = LinearElasticityOp(fe, q)
-	op.hessian_check()
+	# op.hessian_check()
 
-	# c_log("--------------------------")
-	# c_log("value")
-	# c_log("--------------------------")
-	# c_code(op.value())
+	c_log("--------------------------")
+	c_log("value")
+	c_log("--------------------------")
+	c_code(op.value())
 
-	# c_log("--------------------------")
-	# c_log("gradient")
-	# c_log("--------------------------")
-	# c_code(op.gradient())
+	c_log("--------------------------")
+	c_log("gradient")
+	c_log("--------------------------")
+	c_code(op.gradient())
 
-	# c_log("--------------------------")
-	# c_log("hessian")	
-	# c_log("--------------------------")
+	c_log("--------------------------")
+	c_log("hessian")	
+	c_log("--------------------------")
+	c_code(op.hessian())
 
-	# c_code(op.hessian())
+	stop = perf_counter()
+	console.print(f'Overall: {stop - start} seconds')
+
 
 if __name__ == '__main__':
 	main()

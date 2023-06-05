@@ -11,7 +11,8 @@ class AxisAlignedQuad4(FE):
 			 0, y2 - y0
 			])
 
-		self.Ainv_ = inv2(A)
+		self.Ainv_ = inv2(self.A_)
+		# print(self.Ainv_)
 
 	def name(self):
 		return "Quad4"
@@ -23,7 +24,7 @@ class AxisAlignedQuad4(FE):
 		return  x * (1 - y)
 
 	def f2(self, x, y):
-		return x  * y
+		return x * y
 
 	def f3(self, x, y):
 		return (1 - x)  * y
