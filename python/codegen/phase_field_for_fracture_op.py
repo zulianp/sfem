@@ -197,9 +197,17 @@ class PhaseFieldForFractureOp:
 			for j in range(0, cols):
 				integr = H[i, j]
 
-				coord = 0.5
-				integr = integr.subs(self.mu, 2)
-				integr = integr.subs(self.lmbda, 2)
+				coord = 1
+				integr = integr.subs(self.mu, 0.5)
+				integr = integr.subs(self.lmbda, 1)
+				integr = integr.subs(self.ls, 1)
+				integr = integr.subs(self.Gc, 1)
+
+				for c in self.c:
+					integr = integr.subs(c, 0)
+
+				for u in self.disp:
+					integr = integr.subs(u, 0)
 
 				# coord = 1.
 				# integr = integr.subs(self.mu, sp.Rational(1, 2))
@@ -300,27 +308,29 @@ def main():
 	# q = sp.Matrix(3, 1, [qx, qy, qz])
 
 	op = PhaseFieldForFractureOp(fe, q)
-	# op.hessian_check()
+	op.hessian_check()
 
-	c_log("--------------------------")
-	c_log("value")
-	c_log("--------------------------")
-	c_code(op.value())
+	if False:
+	# if True:
+		c_log("--------------------------")
+		c_log("value")
+		c_log("--------------------------")
+		c_code(op.value())
 
-	c_log("--------------------------")
-	c_log("gradient")
-	c_log("--------------------------")
-	c_code(op.gradient())
+		c_log("--------------------------")
+		c_log("gradient")
+		c_log("--------------------------")
+		c_code(op.gradient())
 
-	c_log("--------------------------")
-	c_log("hessian")	
-	c_log("--------------------------")
-	c_code(op.hessian())
+		c_log("--------------------------")
+		c_log("hessian")	
+		c_log("--------------------------")
+		c_code(op.hessian())
 
-	c_log("--------------------------")
-	c_log("apply")	
-	c_log("--------------------------")
-	c_code(op.apply())
+		c_log("--------------------------")
+		c_log("apply")	
+		c_log("--------------------------")
+		c_code(op.apply())
 
 	stop = perf_counter()
 	console.print(f'Overall: {stop - start} seconds')
