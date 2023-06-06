@@ -124,23 +124,29 @@ class PhaseFieldForFractureOp:
 		# Integrate and substitute
 		###################################################################
 		c_log("Integrate")
+		full_eval = True
 
 		integr_value = 0
 		integr_gradient = sp.Matrix(rows, 1, [0] * rows)
 		integr_hessian = sp.Matrix(rows, cols, [0] * (rows * cols))
-
 		integr_value = fe.integrate(q, e)
-		integr_value = subsmat(integr_value, s_disp_grad, e_disp_grad)
-		integr_value = subsmat(integr_value, s_jac_inv, e_jac_inv)
-		integr_value = integr_value.subs(s_c, e_c)
-		integr_value = subsmat(integr_value, s_gradc, e_gradc)
+
+		if full_eval:
+			integr_value = subsmat(integr_value, s_disp_grad, e_disp_grad)
+			integr_value = subsmat(integr_value, s_jac_inv, e_jac_inv)
+			integr_value = integr_value.subs(s_c, e_c)
+			integr_value = subsmat(integr_value, s_gradc, e_gradc)
+
+		integr_value = integr_value * dV
 
 		for i in range(0, rows):
 			integr = fe.integrate(q, eval_grad[i])
-			integr = subsmat(integr, s_disp_grad, e_disp_grad)
-			integr = subsmat(integr, s_jac_inv, e_jac_inv)
-			integr = integr.subs(s_c, e_c)
-			integr = subsmat(integr, s_gradc, e_gradc)
+
+			if full_eval:
+				integr = subsmat(integr, s_disp_grad, e_disp_grad)
+				integr = subsmat(integr, s_jac_inv, e_jac_inv)
+				integr = integr.subs(s_c, e_c)
+				integr = subsmat(integr, s_gradc, e_gradc)
 
 			integr = integr * dV
 			integr_gradient[i] = integr
@@ -148,10 +154,12 @@ class PhaseFieldForFractureOp:
 		for i in range(0, rows):
 			for j in range(0, cols):
 				integr = fe.integrate(q, eval_hessian[i, j])
-				integr = subsmat(integr, s_disp_grad, e_disp_grad)
-				integr = subsmat(integr, s_jac_inv, e_jac_inv)
-				integr = integr.subs(s_c, e_c)
-				integr = subsmat(integr, s_gradc, e_gradc)
+
+				if full_eval:
+					integr = subsmat(integr, s_disp_grad, e_disp_grad)
+					integr = subsmat(integr, s_jac_inv, e_jac_inv)
+					integr = integr.subs(s_c, e_c)
+					integr = subsmat(integr, s_gradc, e_gradc)
 
 				integr = integr * dV
 				integr_hessian[i, j] = integr
@@ -172,6 +180,8 @@ class PhaseFieldForFractureOp:
 		self.integr_value = integr_value
 		self.integr_gradient = integr_gradient
 		self.integr_hessian = integr_hessian
+
+		self.increment = coeffs('increment', fe.n_nodes() * n_var)
 
 		###################################################################
 
@@ -257,15 +267,32 @@ class PhaseFieldForFractureOp:
 		return expr
 
 	def value(self):
-		form = sp.symbols(f'element_scalar[0]')
-		return [ast.Assignment(form, self.integr_value)]
+		var = sp.symbols(f'element_scalar[0]')
+		return [ast.Assignment(var, self.integr_value)]
+
+
+	def apply(self):
+		H = self.integr_hessian
+		rows, cols = H.shape
+		inc = self.increment
+
+		expr = []
+		for i in range(0, rows):
+			val = 0
+			for j in range(0, cols):
+				val += H[i, j] * inc[j]
+
+			var = sp.symbols(f'element_vector[{i}*stride]')
+			expr.append(ast.Assignment(var, val))
+		return expr
+
 
 def main():
 	start = perf_counter()
-	# fe = AxisAlignedQuad4()
+	fe = AxisAlignedQuad4()
 
 	# fe = Tri3()
-	fe = Tri6()
+	# fe = Tri6()
 	q = sp.Matrix(2, 1, [qx, qy])
 
 	# fe = Tet4()
@@ -289,6 +316,11 @@ def main():
 	c_log("hessian")	
 	c_log("--------------------------")
 	c_code(op.hessian())
+
+	c_log("--------------------------")
+	c_log("apply")	
+	c_log("--------------------------")
+	c_code(op.apply())
 
 	stop = perf_counter()
 	console.print(f'Overall: {stop - start} seconds')
