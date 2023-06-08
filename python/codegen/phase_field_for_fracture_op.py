@@ -6,6 +6,7 @@ from tri3 import *
 from tri6 import *
 from tet4 import *
 from tet10 import *
+from fe_material import FEMaterial
 
 from time import perf_counter
 
@@ -19,7 +20,7 @@ def omega(c):
 def comega(c):
  	return 2
 
-class PhaseFieldForFractureOp:
+class PhaseFieldForFractureOp(FEMaterial):
 	def __init__(self, fe, q):
 		dims = fe.manifold_dim()
 		q = sp.Matrix(dims, 1, q)
@@ -239,9 +240,6 @@ class PhaseFieldForFractureOp:
 			for j in range(0, cols):
 				row_sum[i] += A[i, j]
 
-		# for i in range(0, rows):
-		# 	c_log("%.3g" % A[i,i])	
-
 		for i in range(0, rows):
 			line = ""
 			for j in range(0, rows):
@@ -251,48 +249,14 @@ class PhaseFieldForFractureOp:
 		c_log(S)
 		c_log(row_sum)
 
-	def hessian(self):
-		H = self.integr_hessian
-		rows, cols = H.shape
+	def get_eval_hessian(self):
+		return self.integr_hessian
 
-		expr = []
-		for i in range(0, rows):
-			for j in range(0, cols):
-				var = sp.symbols(f'element_matrix[{i*cols + j}*stride]')
-				expr.append(ast.Assignment(var, H[i, j]))
+	def get_eval_gradient(self):
+		return self.integr_gradient
 
-		return expr
-
-	def gradient(self):
-		g = self.integr_gradient
-		rows, cols = g.shape
-
-		expr = []
-		for i in range(0, rows):
-			var = sp.symbols(f'element_vector[{i}*stride]')
-			expr.append(ast.Assignment(var, g[i]))
-
-		return expr
-
-	def value(self):
-		var = sp.symbols(f'element_scalar[0]')
-		return [ast.Assignment(var, self.integr_value)]
-
-
-	def apply(self):
-		H = self.integr_hessian
-		rows, cols = H.shape
-		inc = self.increment
-
-		expr = []
-		for i in range(0, rows):
-			val = 0
-			for j in range(0, cols):
-				val += H[i, j] * inc[j]
-
-			var = sp.symbols(f'element_vector[{i}*stride]')
-			expr.append(ast.Assignment(var, val))
-		return expr
+	def get_eval_value(self):
+		return self.integr_value
 
 
 def main():
@@ -310,8 +274,8 @@ def main():
 	op = PhaseFieldForFractureOp(fe, q)
 	op.hessian_check()
 
-	if False:
-	# if True:
+	# if False:
+	if True:
 		c_log("--------------------------")
 		c_log("value")
 		c_log("--------------------------")

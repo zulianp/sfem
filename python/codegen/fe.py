@@ -18,25 +18,52 @@ class FE:
 			g[i] = sp.Matrix(dims, 1, gi)
 		return g
 
-	def tgrad(self, p):
+	def tfun(self, p, ncomp=0):
+		if ncomp == 0:
+			ncomp = self.manifold_dim()
+
+		if ncomp == 1:
+			return self.fun(p)
+
+		f = self.fun(p)
+		nnodes = len(f)
+		ndofs = nnodes * ncomp
+		ret = [0] * ndofs
+
+		for i in range(0, nnodes):
+			for d in range(0, ncomp):
+				F = sp.Matrix(ncomp, 1, [0]*ncomp)
+				F[d] = f[i]
+
+				if self.SoA:
+					ret[d * nnodes + i] = F
+				else:
+					ret[i*ncomp + d] = F
+
+	def tgrad(self, p, ncomp=0):
+		if ncomp == 0:
+			ncomp = self.manifold_dim()
+
+		if ncomp == 1:
+			return self.grad(p)
+
 		g = self.grad(p)
-		dim = self.manifold_dim() 
-		tensor_size = self.manifold_dim() * self.spatial_dim() 
-		ndofs = len(g) * dim
+		tensor_size = ncomp * self.spatial_dim() 
+		ndofs = len(g) * ncomp
 		nnodes = len(g)
 
 		ret = [0] * ndofs
 		for i in range(0, nnodes):
 			gi = g[i]
-			for d1 in range(0, self.manifold_dim()):
-				G = sp.Matrix(self.manifold_dim(), self.spatial_dim(), [0] * tensor_size)
+			for d1 in range(0, ncomp):
+				G = sp.Matrix(ncomp, self.spatial_dim(), [0] * tensor_size)
 				for d2 in range(0, self.spatial_dim()):
 					G[d1, d2] = gi[d2]
 				
 				if self.SoA:
 					ret[d1 * nnodes + i] = G
 				else:
-					ret[i*dim + d1] = G
+					ret[i*ncomp + d1] = G
 					
 		return ret
 
