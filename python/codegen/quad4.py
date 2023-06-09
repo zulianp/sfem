@@ -14,6 +14,13 @@ class AxisAlignedQuad4(FE):
 		self.Ainv_ = inv2(self.A_)
 		# print(self.Ainv_)
 
+	def symbol_jacobian_inverse(self):
+		# Remove off-diags for generator efficiency
+		J = super().symbol_jacobian_inverse()
+		J[0, 1]  = 0
+		J[1, 0] = 0
+		return J
+
 	def coords_sub_parametric(self):
 		return [[x0, x1], [y0, y2]]
 

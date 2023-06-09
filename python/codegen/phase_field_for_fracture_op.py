@@ -6,6 +6,7 @@ from tri3 import *
 from tri6 import *
 from tet4 import *
 from tet10 import *
+from symbolic_fe import *
 from phase_field_for_fracture_op_base import PhaseFieldForFractureOpBase
 
 from time import perf_counter
@@ -109,7 +110,10 @@ class PhaseFieldForFractureOp(PhaseFieldForFractureOpBase):
 
 def main():
 	start = perf_counter()
-	fe = AxisAlignedQuad4()
+	# fe = AxisAlignedQuad4()
+	# fe = SymbolicFE2D()
+	fe = SymbolicFE3D()
+
 	# fe = Tri3()
 	# fe = Tri6()
 	# fe = Tet4()

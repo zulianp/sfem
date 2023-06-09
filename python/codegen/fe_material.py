@@ -2,7 +2,7 @@
 
 from sfem_codegen import *
 
-class Symbol:
+class FESymbol:
 	def __init__(self, var, expansion):
 		self.var_ = var
 		self.expansion_ = expansion
@@ -21,7 +21,10 @@ class FEFunction:
 
 		self.coeffs_ = coeffs(name, fe.n_nodes() * ncomp)
 
-		self.symbols_value_ = coeffs(f's_{name}', ncomp)
+		if ncomp == 1:
+			self.symbols_value_ = sp.symbols(f's_{name}')
+		else:
+			self.symbols_value_ = coeffs(f's_{name}', ncomp)
 		self.symbols_grad_ = sp.Matrix(fe.spatial_dim(), ncomp, coeffs(f's_grad_{name}', fe.spatial_dim()*ncomp))
 		
 		# Basis functions and grads
@@ -58,22 +61,22 @@ class FEFunction:
 		return self.coeffs_
 
 	def value(self):
-		return Symbol(self.symbols_value_, self.eval_value_)
+		return FESymbol(self.symbols_value_, self.eval_value_)
 
 	def grad(self):
-		return Symbol(self.symbols_grad_, self.eval_grad_)
+		return FESymbol(self.symbols_grad_, self.eval_grad_)
 
 	def trial_fun(self):
-		return Symbol(self.symbols_trial_fun_, self.shape_fun_)
+		return FESymbol(self.symbols_trial_fun_, self.shape_fun_)
 
 	def test_fun(self):
-		return Symbol(self.symbols_test_fun_, self.shape_fun_)  
+		return FESymbol(self.symbols_test_fun_, self.shape_fun_)  
 
 	def trial_grad(self):
-		return Symbol(self.symbols_trial_grad_, self.shape_grad_)
+		return FESymbol(self.symbols_trial_grad_, self.shape_grad_)
 
 	def test_grad(self):
-		return Symbol(self.symbols_test_grad_, self.shape_grad_)  
+		return FESymbol(self.symbols_test_grad_, self.shape_grad_)  
 
 	def fe(self):
 		return self.fe_

@@ -24,12 +24,14 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 		self.fe_phase = fe_phase
 
 		s_disp_grad = fe_disp.grad().var()
-		s_c = fe_phase.value().var()[0]
+		s_c = fe_phase.value().var()
 		s_gradc = fe_phase.grad().var()
 
 		e_disp_grad = fe_disp.grad().expansion()
 		e_c = fe_phase.value().expansion()
 		e_gradc = fe_phase.grad().expansion()
+
+		q = fe_disp.quadrature_point()
 
 		###################################################################
 		# Material law
@@ -47,18 +49,53 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 		###################################################################
 		c_log("Compute derivatives")
 
+		if fe.is_symbolic():
+			trial_fun_phase = fe_phase.fe().trial_fun(q)
+			test_fun_phase = fe_phase.fe().test_fun(q)
+			trial_grad_phase = fe_phase.fe().trial_grad(q)
+			test_grad_phase = fe_phase.fe().test_grad(q)
+
+			trial_fun_disp =fe_disp.fe().trial_fun(q, fe.manifold_dim())
+			test_fun_disp =fe_disp.fe().test_fun(q, fe.manifold_dim())
+			trial_grad_disp =fe_disp.fe().trial_grad(q, fe.manifold_dim())
+			test_grad_disp =fe_disp.fe().test_grad(q, fe.manifold_dim())
+		else:
+			trial_fun_phase = fe_phase.trial_fun().expansion()
+			test_fun_phase = fe_phase.test_fun().expansion()
+			trial_grad_phase = fe_phase.trial_grad().expansion()
+			test_grad_phase = fe_phase.test_grad().expansion()
+
+			trial_fun_disp = fe_disp.trial_fun().expansion()
+			test_fun_disp = fe_disp.test_fun().expansion()
+			trial_grad_disp = fe_disp.trial_grad().expansion()
+			test_grad_disp = fe_disp.test_grad().expansion()
+
 		eval_grad = sp.Matrix(ndofs, 1, [0] * ndofs)
 
 		# Phase-field
 		dedc = sp.diff(e, s_c)
 		dedgradc = sp.diff(e, s_gradc)
-		eval_grad_c = self.mult_list(dedc, fe_phase.shape_fun()) 
-		eval_grad_c += self.inner_list(dedgradc, fe_phase.shape_grad())
+		eval_grad_c = self.mult_list(dedc, test_fun_phase) 
+
+		print(test_fun_phase)
+
+		print(eval_grad_c)
+
+		# for i in range(0, len(eval_grad_c)):
+		# 	print("--------------")
+		# 	print(eval_grad_c[i])
+		# 	print("--------------")
+		# 	print(self.inner_list(dedgradc, test_grad_phase)[i])
+		# 	print("--------------")
+
+		# exit(0)
+
+		eval_grad_c += self.inner_list(dedgradc, test_grad_phase)
 		eval_grad[0:nnodes,:] = eval_grad_c[:,:]
 
 		# Displacement
 		dedu = self.derivative(e, s_disp_grad)
-		eval_grad_u = self.inner_list(dedu, fe_disp.shape_grad())
+		eval_grad_u = self.inner_list(dedu, test_grad_disp)
 		eval_grad[nnodes:ndofs,:] = eval_grad_u[:,:]
 
 		###################################################################
@@ -67,12 +104,12 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 		eval_hessian = sp.Matrix(ndofs, ndofs, [0] * (ndofs * ndofs))
 
 		# Phase-field
-		eval_hessian_c = self.vector_diff_scalar_x(eval_grad, s_c, fe_phase.shape_fun()) 
-		eval_hessian_c += self.vector_diff_tensor_x(eval_grad, s_gradc, fe_phase.shape_grad()) 
+		eval_hessian_c = self.vector_diff_scalar_x(eval_grad, s_c, trial_fun_phase) 
+		eval_hessian_c += self.vector_diff_tensor_x(eval_grad, s_gradc, trial_grad_phase) 
 		eval_hessian[0:nnodes,0:ndofs] = eval_hessian_c[:,:]
 
 		# Displacement
-		eval_hessian[nnodes:ndofs,0:ndofs] = self.vector_diff_tensor_x(eval_grad, s_disp_grad, fe_disp.shape_grad()) 
+		eval_hessian[nnodes:ndofs,0:ndofs] = self.vector_diff_tensor_x(eval_grad, s_disp_grad, trial_grad_disp) 
 
 		###################################################################
 		# Integrate and substitute
@@ -80,7 +117,7 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 		c_log("Integrate")
 
 		full_eval = True
-		q = fe_disp.quadrature_point()
+		
 		s_jac_inv = fe.symbol_jacobian_inverse()
 		e_jac_inv = fe.jacobian_inverse(q)
 		# print(e_jac_inv)
@@ -89,14 +126,19 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 		pres_subs = [(s_disp_grad, e_disp_grad), (s_gradc, e_gradc), (stot(s_c), stot(e_c))]
 		post_subs = [(s_jac_inv, e_jac_inv)]
 
-		e = self.subs(pres_subs, e)
-		integr_value = self.subs(post_subs, fe.integrate(q, e))
+		if not fe.is_symbolic():
+			e = self.subs(pres_subs, e)
+			eval_grad = self.subs_tensors(pres_subs, eval_grad)
+			eval_hessian = self.subs_tensors(pres_subs, eval_hessian)
 
-		eval_grad = self.subs_tensors(pres_subs, eval_grad)
-		integr_gradient = self.subs_tensors(post_subs, self.integrate(fe, q, eval_grad))
+		integr_value = fe.integrate(q, e)
+		integr_gradient = self.integrate(fe, q, eval_grad)
+		integr_hessian = self.integrate(fe, q, eval_hessian)
 
-		eval_hessian = self.subs_tensors(pres_subs, eval_hessian)
-		integr_hessian = self.subs_tensors(post_subs, self.integrate(fe, q, eval_hessian))
+		if not fe.is_symbolic():
+			integr_value = self.subs(post_subs, integr_value)
+			integr_gradient = self.subs_tensors(post_subs, integr_gradient)
+			integr_hessian = self.subs_tensors(post_subs, integr_hessian)
 
 		# Assume constant dV for efficiency reasons
 		integr_value *= dV
@@ -222,16 +264,35 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 
 		coord_names = ['x', 'y', 'z', 't']
 		coords = self.fe.coords_sub_parametric()
-		for d in range(0, self.fe.spatial_dim()):
-			param_list += f'// {coord_names[d]} coordinates\n'
-			for c in coords[d]:
-				param_list += f'const {real_t} {c},\n'
 
-		param_list += f'// data arrays \n'
-		param_list += f'const {real_t} * SFEM_RESTRICT {self.fe_phase.name()},\n'
+		if len(coords) > 0:
+			for d in range(0, self.fe.spatial_dim()):
+				param_list += f'// {coord_names[d]} coordinates\n'
+				for c in coords[d]:
+					param_list += f'const {real_t} {c},\n'
 
-		# param_grad_phase = f'const {real_t} * SFEM_RESTRICT grad_{self.fe_phase.name()},\n'
-		param_disp  = f'const {real_t} * SFEM_RESTRICT {self.fe_disp.name()},\n'
+		if self.fe.is_symbolic():
+			# Add quadrature point evaluations
+			param_list += f'const {real_t} ref_vol,\n'
+			param_list += f'const {real_t} det_jac,\n'
+
+			param_trial =  f'const {real_t} trial_fun,\n'
+			param_trial += f'const {real_t} * SFEM_RESTRICT trial_grad,\n'
+
+			param_test =   f'const {real_t} test_fun,\n'
+			param_test +=  f'const {real_t} * SFEM_RESTRICT test_grad,\n'
+			
+			param_arrays =  f'const {real_t} s_phase,\n'
+			param_arrays += f'const {real_t} * SFEM_RESTRICT s_grad_phase,\n'
+			param_arrays += f'const {real_t} * SFEM_RESTRICT s_grad_disp,\n'
+
+		else:
+			param_list += f'// data arrays \n'
+			param_trial = ""
+			param_test = ""
+			param_arrays = f'const {real_t} * SFEM_RESTRICT {self.fe_phase.name()},\n'
+			param_arrays += f'const {real_t} * SFEM_RESTRICT {self.fe_disp.name()},\n'
+		
 		param_inc  = f'const {real_t} * SFEM_RESTRICT increment,\n'
 
 
@@ -247,7 +308,7 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 		if True:
 			output += "\n"
 			# Value kernel
-			value_signature = singature_prefix + f'_value(\n' + param_list + param_disp
+			value_signature = singature_prefix + f'_value(\n' + param_list + param_arrays
 			value_signature += f'{real_t} * SFEM_RESTRICT element_scalar\n' + ')\n'
 
 			value_body = c_gen(self.value())
@@ -257,7 +318,7 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 
 		if True:
 			output += "\n"
-			gradient_signature = singature_prefix + f'_gradient(\n' + param_list + param_disp
+			gradient_signature = singature_prefix + f'_gradient(\n' + param_list + param_test + param_arrays
 			gradient_signature += f'{real_t} * SFEM_RESTRICT element_vector\n' + ')\n'
 
 			gradient_body = c_gen(self.gradient())
@@ -267,7 +328,7 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 
 		if True:
 			output += "\n"
-			hessian_signature = singature_prefix + f'_hessian(\n' + param_list + param_disp
+			hessian_signature = singature_prefix + f'_hessian(\n' + param_list + param_test + param_trial + param_arrays
 			hessian_signature += f'{real_t} * SFEM_RESTRICT element_matrix\n' + ')\n'
 
 			hessian_body = c_gen(self.hessian())
@@ -279,7 +340,7 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 
 		if True:
 			output += "\n"
-			gradient_u_signature = singature_prefix + f'_gradient_u(\n' + param_list + param_disp
+			gradient_u_signature = singature_prefix + f'_gradient_u(\n' + param_list + param_test + param_arrays
 			gradient_u_signature += f'{real_t} * SFEM_RESTRICT element_vector\n' + ')\n'
 
 			gradient_u_body = c_gen(self.gradient_u())
@@ -289,7 +350,7 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 
 		if True:
 			output += "\n"
-			gradient_c_signature = singature_prefix + f'_gradient_c(\n' + param_list + param_disp
+			gradient_c_signature = singature_prefix + f'_gradient_c(\n' + param_list + param_test +param_arrays
 			gradient_c_signature += f'{real_t} * SFEM_RESTRICT element_vector\n' + ')\n'
 
 			gradient_c_body = c_gen(self.gradient_c())
@@ -299,7 +360,7 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 
 		if True:
 			output += "\n"
-			hessian_cc_signature = singature_prefix + f'_hessian_cc(\n' + param_list + param_disp
+			hessian_cc_signature = singature_prefix + f'_hessian_cc(\n' + param_list + param_test + param_trial + param_arrays
 			hessian_cc_signature += f'{real_t} * SFEM_RESTRICT element_matrix\n' + ')\n'
 
 			hessian_cc_body = c_gen(self.hessian_cc())
@@ -309,7 +370,7 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 
 		if True:
 			output += "\n"
-			hessian_uu_signature = singature_prefix + f'_hessian_uu(\n' + param_list + param_disp
+			hessian_uu_signature = singature_prefix + f'_hessian_uu(\n' + param_list + param_test + param_trial + param_arrays
 			hessian_uu_signature += f'{real_t} * SFEM_RESTRICT element_matrix\n' + ')\n'
 
 			hessian_uu_body = c_gen(self.hessian_uu())
@@ -319,7 +380,7 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 
 		if True:
 			output += "\n"
-			hessian_uc_signature = singature_prefix + f'_hessian_uc(\n' + param_list + param_disp
+			hessian_uc_signature = singature_prefix + f'_hessian_uc(\n' + param_list + param_test + param_trial + param_arrays
 			hessian_uc_signature += f'{real_t} * SFEM_RESTRICT element_matrix\n' + ')\n'
 
 			hessian_uc_body = c_gen(self.hessian_uc())
@@ -329,7 +390,7 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 
 		if True:
 			output += "\n"
-			hessian_cu_signature = singature_prefix + f'_hessian_cu(\n' + param_list + param_disp
+			hessian_cu_signature = singature_prefix + f'_hessian_cu(\n' + param_list + param_test + param_trial + param_arrays
 			hessian_cu_signature += f'{real_t} * SFEM_RESTRICT element_matrix\n' + ')\n'
 
 			hessian_cu_body = c_gen(self.hessian_cu())
@@ -339,7 +400,7 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 
 		if True:
 			output += "\n"
-			apply_signature = singature_prefix + f'_apply(\n' + param_list + param_disp + param_inc
+			apply_signature = singature_prefix + f'_apply(\n' + param_list +  param_test + param_trial + param_arrays + param_inc
 			apply_signature += f'{real_t} * SFEM_RESTRICT element_vector\n' + ')\n'
 
 			apply_body = c_gen(self.apply())
@@ -349,7 +410,7 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 
 		if True:
 			output += "\n"
-			apply_uu_signature = singature_prefix + f'_apply_uu(\n' + param_list + param_disp + param_inc
+			apply_uu_signature = singature_prefix + f'_apply_uu(\n' + param_list +  param_test + param_trial + param_arrays + param_inc
 			apply_uu_signature += f'{real_t} * SFEM_RESTRICT element_vector\n' + ')\n'
 
 			apply_uu_body = c_gen(self.apply_uu())
@@ -359,7 +420,7 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 
 		if True:
 			output += "\n"
-			apply_cc_signature = singature_prefix + f'_apply_cc(\n' + param_list + param_disp + param_inc
+			apply_cc_signature = singature_prefix + f'_apply_cc(\n' + param_list +  param_test + param_trial + param_arrays + param_inc
 			apply_cc_signature += f'{real_t} * SFEM_RESTRICT element_vector\n' + ')\n'
 
 			apply_cc_body = c_gen(self.apply_cc())
@@ -369,7 +430,7 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 
 		if True:
 			output += "\n"
-			apply_uc_signature = singature_prefix + f'_apply_uc(\n' + param_list + param_disp + param_inc
+			apply_uc_signature = singature_prefix + f'_apply_uc(\n' + param_list +  param_test + param_trial + param_arrays + param_inc
 			apply_uc_signature += f'{real_t} * SFEM_RESTRICT element_vector\n' + ')\n'
 
 			apply_uc_body = c_gen(self.apply_uc())
@@ -379,7 +440,7 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 
 		if True:
 			output += "\n"
-			apply_cu_signature = singature_prefix + f'_apply_cu(\n' + param_list + param_disp + param_inc
+			apply_cu_signature = singature_prefix + f'_apply_cu(\n' + param_list + param_arrays + param_test + param_trial + param_inc
 			apply_cu_signature += f'{real_t} * SFEM_RESTRICT element_vector\n' + ')\n'
 
 			apply_cu_body = c_gen(self.apply_cu())

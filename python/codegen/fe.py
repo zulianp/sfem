@@ -2,6 +2,10 @@ import sympy as sp
 
 class FE:
 	SoA = True
+
+	def is_symbolic(self):
+		return False
+
 	def grad(self, p):
 		fx = self.fun(p)
 		dims, __ = p.shape
@@ -19,13 +23,15 @@ class FE:
 		return g
 
 	def tfun(self, p, ncomp=0):
+		return self.tensorize(self.fun(p), ncomp)
+
+	def tensorize(self, f, ncomp=0):
 		if ncomp == 0:
 			ncomp = self.manifold_dim()
 
 		if ncomp == 1:
-			return self.fun(p)
+			return f
 
-		f = self.fun(p)
 		nnodes = len(f)
 		ndofs = nnodes * ncomp
 		ret = [0] * ndofs
@@ -41,14 +47,14 @@ class FE:
 					ret[i*ncomp + d] = F
 		return ret
 
-	def tgrad(self, p, ncomp=0):
+
+	def grad_tensorize(self, g, ncomp=0):
 		if ncomp == 0:
 			ncomp = self.manifold_dim()
 
 		if ncomp == 1:
-			return self.grad(p)
+			return g
 
-		g = self.grad(p)
 		tensor_size = ncomp * self.spatial_dim() 
 		ndofs = len(g) * ncomp
 		nnodes = len(g)
@@ -67,6 +73,9 @@ class FE:
 					ret[i*ncomp + d1] = G
 					
 		return ret
+
+	def tgrad(self, p, ncomp=0):
+		return self.grad_tensorize(self.grad(p), ncomp)
 
 	def physical_tgrad(self, p, ncomp=0):
 		ret = []
@@ -88,15 +97,11 @@ class FE:
 
 		J_inv = self.symbol_jacobian_inverse()
 
+		rg = self.grad(p)
+
 		for i in range(0, nn):
-			gi = []
-
-			for d in range(0, dims):
-				gi.append(sp.diff(fx[i], p[d]))
-
-			gi = sp.Matrix(dims, 1, gi)
 			# gi = J_inv * gi
-			gi = J_inv.T * gi # ATTENTION!
+			gi = J_inv.T * rg[i] # ATTENTION!
 			g[i] = gi
 
 		return g
@@ -110,6 +115,19 @@ class FE:
 		for i in range(0, rows):
 			for j in range(0, cols):
 				var = sp.symbols(f'jac_inv[{i*cols + j}*stride]')
+				# var = sp.symbols(f'jac_inv_{i*cols + j}]')
+				sls.append(var)
+		return sp.Matrix(rows, cols, sls)
+
+	def symbol_jacobian(self):
+		rows = self.spatial_dim()
+		cols = self.manifold_dim()
+
+		sls = []
+
+		for i in range(0, rows):
+			for j in range(0, cols):
+				var = sp.symbols(f'jac[{i*cols + j}*stride]')
 				# var = sp.symbols(f'jac_inv_{i*cols + j}]')
 				sls.append(var)
 		return sp.Matrix(rows, cols, sls)
