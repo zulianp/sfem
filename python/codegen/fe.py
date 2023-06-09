@@ -1,3 +1,10 @@
+
+
+import sympy as sp
+from sfem_codegen import c_gen
+from sfem_codegen import c_log
+from sfem_codegen import q as quadrature_point
+import sympy.codegen.ast as ast
 import sympy as sp
 
 class FE:
@@ -114,7 +121,7 @@ class FE:
 
 		for i in range(0, rows):
 			for j in range(0, cols):
-				var = sp.symbols(f'jac_inv[{i*cols + j}*stride]')
+				var = sp.symbols(f'jacobian_inverse[{i*cols + j}*stride_jacobian_inverse]')
 				# var = sp.symbols(f'jac_inv_{i*cols + j}]')
 				sls.append(var)
 		return sp.Matrix(rows, cols, sls)
@@ -127,7 +134,98 @@ class FE:
 
 		for i in range(0, rows):
 			for j in range(0, cols):
-				var = sp.symbols(f'jac[{i*cols + j}*stride]')
+				var = sp.symbols(f'jacobian[{i*cols + j}*stride_jacobian]')
 				# var = sp.symbols(f'jac_inv_{i*cols + j}]')
 				sls.append(var)
 		return sp.Matrix(rows, cols, sls)
+
+
+	def generate_c_code(self):
+		output = ""
+		coordname = ['x', 'y', 'z']
+
+		singature_prefix = f'static void SFEM_INLINE {self.name()}'
+
+		qp = sp.Matrix(self.manifold_dim(), 1, quadrature_point[0:self.manifold_dim()])
+
+		f = self.fun(qp)
+		nfun = len(f)
+
+		fun_expr = []
+		for i in range(0, nfun):
+			fx = ast.Assignment(sp.symbols(f'f[{i}*stride_fun]'), f[i])
+			fun_expr.append(fx)
+
+		fun_body = c_gen(fun_expr)
+		# c_log(fun_body)
+
+		g = self.physical_grad(qp)
+
+		grad_expr = []
+
+		for d in range(0, self.spatial_dim()):
+			gx = []
+			for i in range(0, nfun):
+				fx = ast.Assignment(sp.symbols(f'g{coordname[d]}[{i}*stride_grad]'), g[i][d])
+				gx.append(fx)
+			grad_expr.append(gx)
+
+			grad_body = c_gen(gx)
+			# c_log(grad_body)
+
+		jac = self.jacobian(qp)
+		rows, cols = jac.shape
+		jac_expr = []
+		for r in range(0, rows):
+			for c in range(0, cols):
+				jac_expr.append(ast.Assignment(sp.symbols(f'jacobian[{r*cols+c}*stride_jacobian]'), jac[r, c]))
+		# c_log(c_gen(jac_expr))
+
+		jac_inv = self.jacobian_inverse(qp)
+		rows, cols = jac_inv.shape
+		jac_inv_expr = []
+		for r in range(0, rows):
+			for c in range(0, cols):
+				jac_inv_expr.append(ast.Assignment(sp.symbols(f'jacobian_inverse[{r*cols+c}*stride_jacobian_inverse]'), jac_inv[r, c]))
+		# c_log(c_gen(jac_inv_expr))
+
+
+		jacobian_determinant = self.jacobian_determinant(qp)
+
+		jacobian_determinant_expr = []
+		jacobian_determinant_expr.append(ast.Assignment(sp.symbols(f'jacobian_determinant[0]'), jacobian_determinant))
+		# c_log(c_gen(jacobian_determinant_expr))
+
+		constants  = f'static const int fe_spatial_dim = {self.spatial_dim()};\n'
+		constants += f'static const int fe_manifold_dim = {self.manifold_dim()};\n'
+		constants += f'static const int fe_n_nodes = {self.n_nodes()};\n'
+		constants += f'static const char * fe_name = \"{self.name()}\";\n'
+
+		# c_log(constants)
+
+		def read_file(path):
+			with open(path, 'r') as f:
+			    tpl = f.read()
+			    return tpl
+			assert False
+			return ""
+
+		tpl = read_file('tpl/FE_CUDA_tpl.cu')
+		code = tpl.format(
+			CONSTANTS=constants,
+			COORDINATES="//TODO",
+			QUADRATURE_POINT="//TODO",
+			JACOBIAN=c_gen(jac_expr),
+			JACOBIAN_INVERSE=c_gen(jac_inv_expr),
+			JACOBIAN_DETERMINANT=c_gen(jacobian_determinant_expr),
+			FUN=c_gen(fun_expr),
+			PARTIAL_X=c_gen(grad_expr[0]),
+			PARTIAL_Y=c_gen(grad_expr[1]),
+			PARTIAL_Z=c_gen(grad_expr[2])
+		)
+
+		c_log(code)
+
+		with open(f'{self.name()}_kernels.cu', 'w') as f:
+			f.write(code)
+			f.close()

@@ -53,8 +53,8 @@ ifeq ($(metis), 1)
 endif
 
 # Folder structure
-VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix:operators/tet10:operators/tet4:operators/tri3:operators/tri6:operators/cvfem:graphs:parametrize
-INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/tri3 -Ioperators/tri6 -Ioperators/cvfem -Igraphs -Iparametrize
+VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix:operators/tet10:operators/tet4:operators/tri3:operators/tri6:operators/cvfem:graphs:parametrize:operators/phase_field_for_fracture
+INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/tri3 -Ioperators/tri6 -Ioperators/cvfem -Igraphs -Iparametrize -Ioperators/phase_field_for_fracture
 
 
 CFLAGS += -pedantic -Wextra
@@ -174,6 +174,7 @@ ifeq ($(cuda), 1)
 # 	CUDA_OBJS = tet4_cuda_laplacian.o
 # 	CUDA_OBJS = tet4_cuda_laplacian_2.o
 	CUDA_OBJS = tet4_cuda_laplacian_3.o
+	CUDA_OBJS += tet4_cuda_phase_field_for_fracture.o
 	
 	CUDA_OBJS += cuda_crs.o
 	DEPS += -L/opt/cuda/lib64 -lcudart

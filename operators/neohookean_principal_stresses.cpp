@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cmath>
 #include <complex>
+#include <algorithm>
 
 using complex_t = std::complex<real_t>;
 

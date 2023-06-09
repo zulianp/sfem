@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from fe import FE
 import sympy as sp
 from sfem_codegen import *
@@ -75,3 +77,5 @@ class AxisAlignedQuad4(FE):
 		return det2(self.A_)
 
 
+if __name__ == '__main__':
+	AxisAlignedQuad4().generate_c_code()

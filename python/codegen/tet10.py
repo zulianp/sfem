@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from fe import FE
 from sfem_codegen import *
 from weighted_fe import *
@@ -184,3 +186,6 @@ def DualTet10():
 
 
 
+
+if __name__ == '__main__':
+	Tet10().generate_c_code()

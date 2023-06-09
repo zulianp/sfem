@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from fe import FE
 import sympy as sp
 from sfem_codegen import *
@@ -97,3 +99,5 @@ class TriShell3(Tri3):
 	def measure(self, q):
 		return self.detS / 2
 
+if __name__ == '__main__':
+	TriShell3().generate_c_code()
