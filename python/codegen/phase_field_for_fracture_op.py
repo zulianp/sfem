@@ -36,6 +36,9 @@ class PhaseFieldForFractureOp(PhaseFieldForFractureOpBase):
 		ec = (Gc / comega(c)) * (omega(c)/ls + ls * inner(gradc, gradc))
 		e = g(c) * eu + ec
 
+		self.fracture_energy = ec
+		self.elastic_energy  = g(c) * eu
+
 		self.mu = mu
 		self.lmbda = lmbda
 		self.Gc = Gc
@@ -113,29 +116,62 @@ def main():
 	# fe = Tet10()
 	
 	op = PhaseFieldForFractureOp(fe)
-	op.hessian_check()
+	# op.hessian_check()
 
-	if False:
+	op.generate_c_code()
+
+	# if False:
 	# if True:
-		c_log("--------------------------")
-		c_log("value")
-		c_log("--------------------------")
-		c_code(op.value())
+		# c_log("--------------------------")
+		# c_log("value")
+		# c_log("--------------------------")
+		# c_code(op.value())
 
-		c_log("--------------------------")
-		c_log("gradient")
-		c_log("--------------------------")
-		c_code(op.gradient())
+		# c_log("--------------------------")
+		# c_log("gradient")
+		# c_log("--------------------------")
+		# c_code(op.gradient())
 
-		c_log("--------------------------")
-		c_log("hessian")	
-		c_log("--------------------------")
-		c_code(op.hessian())
+		# c_log("--------------------------")
+		# c_log("hessian")	
+		# c_log("--------------------------")
+		# c_code(op.hessian())
 
-		c_log("--------------------------")
-		c_log("apply")	
-		c_log("--------------------------")
-		c_code(op.apply())
+		# c_log("--------------------------")
+		# c_log("gradient_u")	
+		# c_log("--------------------------")
+		# c_code(op.gradient_u())
+
+		# c_log("--------------------------")
+		# c_log("gradient_c")	
+		# c_log("--------------------------")
+		# c_code(op.gradient_c())
+
+		# c_log("--------------------------")
+		# c_log("hessian_uu")	
+		# c_log("--------------------------")
+		# c_code(op.hessian_uu())
+
+		# c_log("--------------------------")
+		# c_log("hessian_cc")	
+		# c_log("--------------------------")
+		# c_code(op.hessian_cc())
+
+		# c_log("--------------------------")
+		# c_log("hessian_cu")	
+		# c_log("--------------------------")
+		# c_code(op.hessian_cu())
+
+		# c_log("--------------------------")
+		# c_log("hessian_uc")	
+		# c_log("--------------------------")
+		# c_code(op.hessian_uc())
+
+
+		# c_log("--------------------------")
+		# c_log("apply")	
+		# c_log("--------------------------")
+		# c_code(op.apply())
 
 	stop = perf_counter()
 	console.print(f'Overall: {stop - start} seconds')

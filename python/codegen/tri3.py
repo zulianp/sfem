@@ -13,6 +13,9 @@ class Tri3(FE):
 
 		self.Ainv_ = inv2(self.A_)
 
+	def coords_sub_parametric(self):
+		return [[x0, x1, x2], [y0, y1, y2]]
+
 	def name(self):
 		return "Tri3"
 
@@ -72,6 +75,9 @@ class TriShell3(Tri3):
 		StS = self.S.T * self.S
 		self.detS = sp.sqrt(det2(StS))
 		self.Sinv = inv2(StS) * self.S.T
+
+	def coords_sub_parametric(self):
+		return [[x0, x1, x2], [y0, y1, y2], [z0, z1, z2]]
 
 	def name(self):
 		return "TriShell3"

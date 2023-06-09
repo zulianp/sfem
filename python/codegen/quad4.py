@@ -14,6 +14,9 @@ class AxisAlignedQuad4(FE):
 		self.Ainv_ = inv2(self.A_)
 		# print(self.Ainv_)
 
+	def coords_sub_parametric(self):
+		return [[x0, x1], [y0, y2]]
+
 	def name(self):
 		return "Quad4"
 

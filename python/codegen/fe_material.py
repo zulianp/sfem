@@ -51,6 +51,9 @@ class FEFunction:
 
 		self.eval_grad_ = val
 
+	def name(self):
+		return self.name_
+
 	def coeffs(self):
 		return self.coeffs_
 
@@ -229,29 +232,32 @@ class FEMaterial:
 			ret = subsmat(ret, k, v)
 		return ret
 
-
-	def hessian(self):
-		H = self.get_eval_hessian()
-		rows, cols = H.shape
+	def assign_matrix(self, mat):
+		rows, cols = mat.shape
 
 		expr = []
 		for i in range(0, rows):
 			for j in range(0, cols):
 				var = sp.symbols(f'element_matrix[{i*cols + j}*stride]')
-				expr.append(ast.Assignment(var, H[i, j]))
-
+				expr.append(ast.Assignment(var, mat[i, j]))
 		return expr
 
-	def gradient(self):
-		g = self.get_eval_gradient()
-		rows, cols = g.shape
+	def assign_vector(self, vec):
+		rows, cols = vec.shape
 
 		expr = []
 		for i in range(0, rows):
 			var = sp.symbols(f'element_vector[{i}*stride]')
-			expr.append(ast.Assignment(var, g[i]))
-
+			expr.append(ast.Assignment(var, vec[i]))
 		return expr
+
+	def hessian(self):
+		H = self.get_eval_hessian()
+		return self.assign_matrix(H)
+
+	def gradient(self):
+		g = self.get_eval_gradient()
+		return self.assign_vector(g)
 
 	def value(self):
 		var = sp.symbols(f'element_scalar[0]')

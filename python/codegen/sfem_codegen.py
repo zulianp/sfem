@@ -8,6 +8,9 @@ from time import perf_counter
 from rich.syntax import Syntax
 console = rich.get_console()
 
+
+real_t = "real_t"
+
 def c_log(expr):
 	console.print(expr)
 
@@ -64,7 +67,7 @@ def c_gen(expr, dump=False):
     lines = []
 
     for var,expr in sub_expr:
-        lines.append(f'const real_t {var} = {printer.doprint(expr)};')
+        lines.append(f'const {real_t} {var} = {printer.doprint(expr)};')
 
     for v in simpl_expr:
         lines.append(printer.doprint(v))
@@ -142,6 +145,12 @@ qx, qy, qz, qw = sp.symbols('qx qy qz qw', real=True)
 x0, x1, x2, x3 = sp.symbols('px0 px1 px2 px3', real=True)
 y0, y1, y2, y3 = sp.symbols('py0 py1 py2 py3', real=True)
 z0, z1, z2, z3 = sp.symbols('pz0 pz1 pz2 pz3', real=True)
+
+px = [x0, x1, x2, x3]
+py = [y0, y1, y2, y3]
+pz = [z0, z1, z2, z3]
+
+element_points = [px, py, pz]
 
 # Quadrature points (Physical coordinates)
 q = sp.Matrix(3, 1, [qx, qy, qz])
