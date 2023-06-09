@@ -39,6 +39,7 @@ class FE:
 					ret[d * nnodes + i] = F
 				else:
 					ret[i*ncomp + d] = F
+		return ret
 
 	def tgrad(self, p, ncomp=0):
 		if ncomp == 0:
@@ -67,9 +68,9 @@ class FE:
 					
 		return ret
 
-	def physical_tgrad(self, p):
+	def physical_tgrad(self, p, ncomp=0):
 		ret = []
-		g = self.tgrad(p)
+		g = self.tgrad(p, ncomp)
 		J_inv = self.symbol_jacobian_inverse()
 
 		for gi in g:
@@ -109,5 +110,6 @@ class FE:
 		for i in range(0, rows):
 			for j in range(0, cols):
 				var = sp.symbols(f'jac_inv[{i*cols + j}*stride]')
+				# var = sp.symbols(f'jac_inv_{i*cols + j}]')
 				sls.append(var)
 		return sp.Matrix(rows, cols, sls)

@@ -56,10 +56,9 @@ def c_gen(expr, dump=False):
 
     sub_expr, simpl_expr = sp.cse(expr)
 
-    sub_ops = sp.count_ops(sub_expr, visual=True)
-    result_ops = sp.count_ops(simpl_expr, visual=True)
-    # total_ops = sub_ops
-    cost = f'FLOATING POINT OPS!\n//\t- Result: {result_ops}\n//\t- Subexpressions: {sub_ops}'
+    # sub_ops = sp.count_ops(sub_expr, visual=True)
+    # result_ops = sp.count_ops(simpl_expr, visual=True)
+    # cost = f'FLOATING POINT OPS!\n//\t- Result: {result_ops}\n//\t- Subexpressions: {sub_ops}'
     
     printer = sp.printing.c.C99CodePrinter()
     lines = []
@@ -68,7 +67,7 @@ def c_gen(expr, dump=False):
         lines.append(f'const real_t {var} = {printer.doprint(expr)};')
 
     for v in simpl_expr:
-            lines.append(printer.doprint(v))
+        lines.append(printer.doprint(v))
 
     code_string=f'\n'.join(lines)
 
@@ -77,7 +76,8 @@ def c_gen(expr, dump=False):
     console.print("--------------------------")
     console.print(f'generated code')
 
-    code_string = f'//{cost}\n' + code_string
+    # code_string = f'//{cost}\n' + code_string
+    code_string = f'//TODO COST\n' + code_string
 
     if dump:
         console.print(code_string)
@@ -296,6 +296,9 @@ def cross(a, b):
 		a[0] * b[1] - a[1]*b[0]
 	])
 
+
+def stot(x):
+	return sp.Matrix(1, 1, [x])
 
 def vec3(x, y, z):
 	return sp.Matrix(3, 1, [x, y, z])
