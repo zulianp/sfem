@@ -16,7 +16,7 @@ class SymbolicFE2D(FE):
 		return []
 
 	def name(self):
-		return "SymbolicFE2D"
+		return "FE2D"
 
 	def fun(self, p):
 		f = sp.symbols('shape_fun')
@@ -96,7 +96,7 @@ class SymbolicFE3D(FE):
 		return []
 
 	def name(self):
-		return "SymbolicFE3D"
+		return "FE3D"
 
 	def fun(self, p):
 		f = sp.symbols('shape_fun')

@@ -77,19 +77,6 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 		dedgradc = sp.diff(e, s_gradc)
 		eval_grad_c = self.mult_list(dedc, test_fun_phase) 
 
-		print(test_fun_phase)
-
-		print(eval_grad_c)
-
-		# for i in range(0, len(eval_grad_c)):
-		# 	print("--------------")
-		# 	print(eval_grad_c[i])
-		# 	print("--------------")
-		# 	print(self.inner_list(dedgradc, test_grad_phase)[i])
-		# 	print("--------------")
-
-		# exit(0)
-
 		eval_grad_c += self.inner_list(dedgradc, test_grad_phase)
 		eval_grad[0:nnodes,:] = eval_grad_c[:,:]
 
@@ -219,7 +206,7 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 			for j in range(0, cols):
 				val += mat[i, j] * inc[j]
 
-			var = sp.symbols(f'element_vector[{i}*stride]')
+			var = sp.symbols(f'element_vector[{i}]')
 			expr.append(ast.Assignment(var, val))
 		return expr
 
@@ -255,7 +242,7 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 		# tpl_split = self.tpl_split
 
 		material_name = 'phase_field_for_fracture'
-		singature_prefix = f'SFEM_INLINE static void {material_name}'
+		singature_prefix = f'SFEM_INLINE static void {self.fe.name()}_{material_name}'
 
 		param_list = ""
 		param_list += f'// material parameters \n'
@@ -303,7 +290,7 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 		includes += "#include \"math.h\"\n"
 		output += includes
 
-		output += "static const int stride = 1;\n"
+		# output += "static const int stride = 1;\n"
 
 		if True:
 			output += "\n"

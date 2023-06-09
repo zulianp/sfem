@@ -241,7 +241,7 @@ class FEMaterial:
 		expr = []
 		for i in range(0, rows):
 			for j in range(0, cols):
-				var = sp.symbols(f'element_matrix[{i*cols + j}*stride]')
+				var = sp.symbols(f'element_matrix[{i*cols + j}]')
 				expr.append(ast.Assignment(var, mat[i, j]))
 		return expr
 
@@ -250,7 +250,7 @@ class FEMaterial:
 
 		expr = []
 		for i in range(0, rows):
-			var = sp.symbols(f'element_vector[{i}*stride]')
+			var = sp.symbols(f'element_vector[{i}]')
 			expr.append(ast.Assignment(var, vec[i]))
 		return expr
 
@@ -278,7 +278,7 @@ class FEMaterial:
 			for j in range(0, cols):
 				val += H[i, j] * inc[j]
 
-			var = sp.symbols(f'element_vector[{i}*stride]')
+			var = sp.symbols(f'element_vector[{i}]')
 			expr.append(ast.Assignment(var, val))
 		return expr
 

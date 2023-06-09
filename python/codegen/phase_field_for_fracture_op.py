@@ -112,17 +112,21 @@ def main():
 	start = perf_counter()
 	# fe = AxisAlignedQuad4()
 	# fe = SymbolicFE2D()
-	fe = SymbolicFE3D()
+	# fe = SymbolicFE2D()
 
 	# fe = Tri3()
 	# fe = Tri6()
 	# fe = Tet4()
 	# fe = Tet10()
 	
-	op = PhaseFieldForFractureOp(fe)
+	# op = PhaseFieldForFractureOp(fe)
 	# op.hessian_check()
 
-	op.generate_c_code()
+	# op.generate_c_code()
+
+
+	PhaseFieldForFractureOp(SymbolicFE2D()).generate_c_code()
+	PhaseFieldForFractureOp(SymbolicFE3D()).generate_c_code()
 
 	# if False:
 	# if True:
