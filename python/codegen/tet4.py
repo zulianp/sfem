@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from fe import FE
 from sfem_codegen import *
 
@@ -58,3 +60,6 @@ class Tet4(FE):
 
 	def measure(self, q):
 		return det3(A) / 6
+
+if __name__ == '__main__':
+	Tet4().generate_c_code()

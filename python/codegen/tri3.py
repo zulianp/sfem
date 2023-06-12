@@ -90,6 +90,9 @@ class TriShell3(Tri3):
 	def spatial_dim(self):
 		return 3
 
+	def jacobian(self, q):
+		return self.S
+
 	def jacobian_inverse(self, q):
 		return self.Sinv
 
@@ -100,4 +103,5 @@ class TriShell3(Tri3):
 		return self.detS / 2
 
 if __name__ == '__main__':
+	Tri3().generate_c_code()
 	TriShell3().generate_c_code()

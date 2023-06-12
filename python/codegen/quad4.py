@@ -9,7 +9,7 @@ class AxisAlignedQuad4(FE):
 		super().__init__()
 
 		self.A_ = sp.Matrix(2, 2, [
-			 x1 - x0, 0,
+			 x2 - x0, 0,
 			 0, y2 - y0
 			])
 
@@ -24,7 +24,7 @@ class AxisAlignedQuad4(FE):
 		return J
 
 	def coords_sub_parametric(self):
-		return [[x0, x1], [y0, y2]]
+		return [[x0, x2], [y0, y2]]
 
 	def name(self):
 		return "Quad4"

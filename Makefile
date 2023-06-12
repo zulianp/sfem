@@ -53,8 +53,8 @@ ifeq ($(metis), 1)
 endif
 
 # Folder structure
-VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix:operators/tet10:operators/tet4:operators/tri3:operators/tri6:operators/cvfem:graphs:parametrize:operators/phase_field_for_fracture
-INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/tri3 -Ioperators/tri6 -Ioperators/cvfem -Igraphs -Iparametrize -Ioperators/phase_field_for_fracture
+VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix:operators/tet10:operators/tet4:operators/tri3:operators/tri6:operators/cvfem:graphs:parametrize:operators/phase_field_for_fracture:operators/kernels
+INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/tri3 -Ioperators/tri6 -Ioperators/cvfem -Igraphs -Iparametrize -Ioperators/phase_field_for_fracture  -Ioperators/kernels
 
 
 CFLAGS += -pedantic -Wextra

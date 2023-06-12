@@ -8,6 +8,18 @@ from sfem_codegen import real_t
 import sympy.codegen.ast as ast
 import sympy as sp
 
+def read_file(path):
+	with open(path, 'r') as f:
+	    tpl = f.read()
+	    return tpl
+	assert False
+	return ""
+
+def str_to_file(path, mystr):
+	with open(path, 'w') as f:
+		f.write(mystr)
+		f.close()
+
 class FE:
 	SoA = True
 
@@ -141,7 +153,45 @@ class FE:
 		return sp.Matrix(rows, cols, sls)
 
 
+
 	def generate_c_code(self):
+		self.generate_kernels_c_code()
+
+		tpl = read_file('tpl/FE_CUDA_impl_tpl.cu')
+
+		coordname = ['x', 'y', 'z', 't']
+		coordinate_read = ""
+		coordinates = ""
+		csp = self.coords_sub_parametric()
+		for d in range(0, len(csp)):
+			comment = f"// {coordname[d]}-coordinates\n"
+			coordinate_read += comment
+			coordinates += comment
+
+			# coordnum = 0
+			for x in csp[d]:
+				coordnum = f'{x}'.replace(f"p{coordname[d]}","")
+				coordinate_read += f'const {real_t} {x} = this_xyz[({d} * fe_n_nodes_for_jacobian + {coordnum}) * nelements];\n'
+				coordinates += f'{x},\n'
+				# coordnum+=1
+
+		c_log(coordinate_read)
+		c_log(coordinates)
+
+		code = tpl.format(
+			NAME=self.name(),
+			MK_FILE_CU=f'#include \"{self.name()}_kernels.cu\"',
+			COORDINATES_READ=coordinate_read,
+			COORDINATES=coordinates
+		)
+
+		c_log(code)
+		str_to_file(f'{self.name()}_impl.cu', code)
+
+		test = f'#include \"{self.name()}_impl.cu\"'
+		str_to_file(f'{self.name()}_kernels.cpp', code)
+
+	def generate_kernels_c_code(self):
 		output = ""
 		coordname = ['x', 'y', 'z']
 
@@ -201,6 +251,7 @@ class FE:
 		constants += f'static const int fe_manifold_dim = {self.manifold_dim()};\n'
 		constants += f'static const int fe_n_nodes = {self.n_nodes()};\n'
 		constants += f'static const char * fe_name = \"{self.name()}\";\n'
+		constants += f'static const int fe_n_nodes_for_jacobian = {len(self.coords_sub_parametric()[0])};\n'
 
 		# c_log(constants)
 
@@ -216,20 +267,14 @@ class FE:
 			quadrature_point_str += f'const {real_t} {x},\n'
 
 
-		def read_file(path):
-			with open(path, 'r') as f:
-			    tpl = f.read()
-			    return tpl
-			assert False
-			return ""
-
-		def str_to_file(path, mystr):
-			with open(path, 'w') as f:
-				f.write(mystr)
-				f.close()
-
+		if len(grad_expr)>2:
+			partial_z = c_gen(grad_expr[2])
+		else:
+			partial_z = "//TODO\n"
+		
 		tpl = read_file('tpl/FE_CUDA_tpl.cu')
 		code = tpl.format(
+			NAME=self.name(),
 			CONSTANTS=constants,
 			COORDINATES=coordinates,
 			QUADRATURE_POINT=quadrature_point_str,
@@ -239,12 +284,9 @@ class FE:
 			FUN=c_gen(fun_expr),
 			PARTIAL_X=c_gen(grad_expr[0]),
 			PARTIAL_Y=c_gen(grad_expr[1]),
-			PARTIAL_Z=c_gen(grad_expr[2])
+			PARTIAL_Z=partial_z
 		)
 
-		c_log(code)
+		# c_log(code)
 
 		str_to_file(f'{self.name()}_kernels.cu', code)
-
-		test = f'#include \"{self.name()}_kernels.cu\"'
-		str_to_file(f'{self.name()}_kernels.cpp', code)
