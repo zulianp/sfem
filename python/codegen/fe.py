@@ -23,6 +23,9 @@ def str_to_file(path, mystr):
 class FE:
 	SoA = True
 
+	def subparam_n_nodes(self):
+		return self.n_nodes()
+
 	def is_symbolic(self):
 		return False
 
@@ -171,7 +174,7 @@ class FE:
 			# coordnum = 0
 			for x in csp[d]:
 				coordnum = f'{x}'.replace(f"p{coordname[d]}","")
-				coordinate_read += f'const {real_t} {x} = this_xyz[({d} * fe_n_nodes_for_jacobian + {coordnum}) * nelements];\n'
+				coordinate_read += f'const {real_t} {x} = this_xyz[({d} * fe_subparam_n_nodes + {coordnum}) * nelements];\n'
 				coordinates += f'{x},\n'
 				# coordnum+=1
 
@@ -252,6 +255,7 @@ class FE:
 		constants += f'static const int fe_n_nodes = {self.n_nodes()};\n'
 		constants += f'static const char * fe_name = \"{self.name()}\";\n'
 		constants += f'static const int fe_n_nodes_for_jacobian = {len(self.coords_sub_parametric()[0])};\n'
+		constants += f'static const int fe_subparam_n_nodes = {self.subparam_n_nodes()};\n'
 
 		# c_log(constants)
 

@@ -8,6 +8,9 @@ class Tet10(FE):
 	def __init__(self):
 		super().__init__()
 
+	def subparam_n_nodes(self):
+		return 4
+
 	def coords_sub_parametric(self):
 		return [[x0, x1, x2, x3], [y0, y1, y2, y3], [z0, z1, z2, z3]]
 

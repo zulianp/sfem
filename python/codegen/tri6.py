@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from fe import FE
 import sympy as sp
 from sfem_codegen import *
@@ -13,6 +15,9 @@ class Tri6(FE):
 			])
 
 		self.Ainv_ = inv2(self.A_)
+
+	def subparam_n_nodes(self):
+		return 3
 
 	def coords_sub_parametric(self):
 		return [[x0, x1, x2], [y0, y1, y2]]
@@ -190,4 +195,6 @@ def tri6_basis_transform_expr():
 
 	return expr
 
-
+if __name__ == '__main__':
+	Tri6().generate_c_code()
+	TriShell6().generate_c_code()

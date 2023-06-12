@@ -8,17 +8,17 @@
 #define SFEM_DEVICE_KERNEL static __global__
 #else
 #define SFEM_DEVICE_KERNEL static
-#endif 
+#endif
 
 SFEM_DEVICE_KERNEL void {NAME}_jacobian_kernel(
 const ptrdiff_t nelements,
 const geom_t *const SFEM_RESTRICT xyz,
-real_t *const SFEM_RESTRICT jacobian) 
+real_t *const SFEM_RESTRICT jacobian)
 {{
 #ifdef __NVCC__
-for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) 
+for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x)
 #else
-for (ptrdiff_t e = 0; e < nelements; e++) 
+for (ptrdiff_t e = 0; e < nelements; e++)
 #endif
 {{
 // The element coordinates and jacobian
@@ -40,12 +40,12 @@ this_jacobian
 SFEM_DEVICE_KERNEL void {NAME}_jacobian_inverse_kernel(
 const ptrdiff_t nelements,
 const geom_t *const SFEM_RESTRICT xyz,
-real_t *const SFEM_RESTRICT jacobian) 
+real_t *const SFEM_RESTRICT jacobian)
 {{
 #ifdef __NVCC__
-for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) 
+for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x)
 #else
-for (ptrdiff_t e = 0; e < nelements; e++) 
+for (ptrdiff_t e = 0; e < nelements; e++)
 #endif
 {{
 // The element coordinates and jacobian
@@ -64,19 +64,21 @@ this_jacobian
 }}
 }}
 
-static void pack_elements(
+static void {NAME}_pack_elements
+(
     const ptrdiff_t n,
     const ptrdiff_t element_offset,
     idx_t **const SFEM_RESTRICT elems,
     geom_t **const SFEM_RESTRICT xyz,
-    geom_t * const SFEM_RESTRICT he_xyz)
+    geom_t * const SFEM_RESTRICT he_xyz
+)
 {{
-    SFEM_RANGE_PUSH("lapl-packing");
+    SFEM_NVTX_SCOPE("{NAME}_pack_elements");
     {{
         for (int d = 0; d < fe_spatial_dim; ++d) {{
-            for (int e_node = 0; e_node < fe_n_nodes_for_jacobian; e_node++) {{
+            for (int e_node = 0; e_node < fe_subparam_n_nodes; e_node++) {{
                 const geom_t *const x = xyz[d];
-                ptrdiff_t offset = (d * fe_n_nodes_for_jacobian + e_node) * n;
+                ptrdiff_t offset = (d * fe_subparam_n_nodes + e_node) * n;
                 const idx_t *const nodes = &elems[e_node][element_offset];
 
                 geom_t *buff = &he_xyz[offset];
@@ -91,6 +93,4 @@ static void pack_elements(
             }}
         }}
     }}
-
-    SFEM_RANGE_POP();       
 }}
