@@ -4,6 +4,7 @@ import sympy as sp
 from sfem_codegen import c_gen
 from sfem_codegen import c_log
 from sfem_codegen import q as quadrature_point
+from sfem_codegen import real_t
 import sympy.codegen.ast as ast
 import sympy as sp
 
@@ -203,6 +204,18 @@ class FE:
 
 		# c_log(constants)
 
+		coordinates = ""
+		for c in self.coords_sub_parametric():
+			for x in c:
+				coordinates += f'const {real_t} {x},\n'
+
+
+		quadrature_point_str = ""
+
+		for x in qp:
+			quadrature_point_str += f'const {real_t} {x},\n'
+
+
 		def read_file(path):
 			with open(path, 'r') as f:
 			    tpl = f.read()
@@ -210,11 +223,16 @@ class FE:
 			assert False
 			return ""
 
+		def str_to_file(path, mystr):
+			with open(path, 'w') as f:
+				f.write(mystr)
+				f.close()
+
 		tpl = read_file('tpl/FE_CUDA_tpl.cu')
 		code = tpl.format(
 			CONSTANTS=constants,
-			COORDINATES="//TODO",
-			QUADRATURE_POINT="//TODO",
+			COORDINATES=coordinates,
+			QUADRATURE_POINT=quadrature_point_str,
 			JACOBIAN=c_gen(jac_expr),
 			JACOBIAN_INVERSE=c_gen(jac_inv_expr),
 			JACOBIAN_DETERMINANT=c_gen(jacobian_determinant_expr),
@@ -226,6 +244,7 @@ class FE:
 
 		c_log(code)
 
-		with open(f'{self.name()}_kernels.cu', 'w') as f:
-			f.write(code)
-			f.close()
+		str_to_file(f'{self.name()}_kernels.cu', code)
+
+		test = f'#include \"{self.name()}_kernels.cu\"'
+		str_to_file(f'{self.name()}_kernels.cpp', code)

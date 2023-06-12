@@ -1,28 +1,32 @@
+#include "sfem_base.h"
+
+#ifdef __NVCC__
+#include "sfem_cuda_base.h"
+#define SFEM_DEVICE_FUNCTION static SFEM_INLINE __device__ __host__
+#else
+#define SFEM_DEVICE_FUNCTION SFEM_INLINE
+#endif 
+
 {CONSTANTS}
 
-static inline __device__ __host__ void mk_jacobian(
-{COORDINATES}
-{QUADRATURE_POINT}
-const count_t stride_jacobian,
+SFEM_DEVICE_FUNCTION void mk_jacobian(
+{COORDINATES}{QUADRATURE_POINT}const count_t stride_jacobian,
 real_t *jacobian
 )
 {{
 {JACOBIAN}
 }}
 
-static inline __device__ __host__ void mk_jacobian_inverse(
-{COORDINATES}
-{QUADRATURE_POINT}
-const count_t stride_jacobian_inverse,
+SFEM_DEVICE_FUNCTION void mk_jacobian_inverse(
+{COORDINATES}const count_t stride_jacobian_inverse,
 real_t *jacobian_inverse
 )
 {{
 {JACOBIAN_INVERSE}
 }}
 
-static inline __device__ __host__ void mk_jacobian_determinant(
-{COORDINATES}
-{QUADRATURE_POINT}
+SFEM_DEVICE_FUNCTION void mk_jacobian_determinant(
+{COORDINATES} // arrays
 const count_t stride_jacobian_determinant,
 real_t *jacobian_determinant
 )
@@ -30,16 +34,17 @@ real_t *jacobian_determinant
 {JACOBIAN_DETERMINANT}
 }}
 
-static inline __device__ __host__ void mk_fun(
-{QUADRATURE_POINT}
+SFEM_DEVICE_FUNCTION void mk_fun(
+{QUADRATURE_POINT} // arrays
+const int stride_fun,
 real_t * SFEM_RESTRICT f
 )
 {{
 {FUN}
 }}
 
-static inline __device__ __host__ void mk_partial_x(
-{QUADRATURE_POINT}
+SFEM_DEVICE_FUNCTION void mk_partial_x(
+{QUADRATURE_POINT} // arrays
 const count_t stride_jacobian_inverse,
 const real_t * SFEM_RESTRICT jacobian_inverse,
 const count_t stride_grad,
@@ -49,8 +54,8 @@ real_t * SFEM_RESTRICT gx
 {PARTIAL_X}
 }}
 
-static inline __device__ __host__ void mk_partial_y(
-{QUADRATURE_POINT}
+SFEM_DEVICE_FUNCTION void mk_partial_y(
+{QUADRATURE_POINT} // arrays
 const count_t stride_jacobian_inverse,
 const real_t * SFEM_RESTRICT jacobian_inverse,
 const count_t stride_grad,
@@ -60,8 +65,8 @@ real_t * SFEM_RESTRICT gy
 {PARTIAL_Y}
 }}
 
-static inline __device__ __host__ void mk_partial_z(
-{QUADRATURE_POINT}
+SFEM_DEVICE_FUNCTION void mk_partial_z(
+{QUADRATURE_POINT} // arrays
 const count_t stride_jacobian_inverse,
 const real_t * SFEM_RESTRICT jacobian_inverse,
 const count_t stride_grad,

@@ -80,7 +80,7 @@ def c_gen(expr, dump=False):
     console.print(f'generated code')
 
     # code_string = f'//{cost}\n' + code_string
-    code_string = f'//TODO COST\n' + code_string
+    # code_string = f'//TODO COST\n' + code_string
 
     if dump:
         console.print(code_string)
