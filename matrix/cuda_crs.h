@@ -3,9 +3,19 @@
 
 #include "sfem_base.h"
 
-void crs_device_create(const ptrdiff_t nnodes, const ptrdiff_t nnz, count_t** rowptr, idx_t** colidx, real_t** values);
+void crs_device_create(const ptrdiff_t nnodes,
+                       const ptrdiff_t nnz,
+                       count_t** rowptr,
+                       idx_t** colidx,
+                       real_t** values);
+
+void crs_graph_device_create(const ptrdiff_t nnodes,
+                             const ptrdiff_t nnz,
+                             count_t** rowptr,
+                             idx_t** colidx);
 
 void crs_device_free(count_t* rowptr, idx_t* colidx, real_t* values);
+void crs_graph_device_free(count_t* rowptr, idx_t* colidx);
 
 void crs_graph_host_to_device(const ptrdiff_t nnodes,
                               const ptrdiff_t nnz,
