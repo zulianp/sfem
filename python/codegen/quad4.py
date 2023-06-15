@@ -16,6 +16,9 @@ class AxisAlignedQuad4(FE):
 		self.Ainv_ = inv2(self.A_)
 		# print(self.Ainv_)
 
+	def reference_measure(self):
+		return 1
+
 	def symbol_jacobian_inverse(self):
 		# Remove off-diags for generator efficiency
 		J = super().symbol_jacobian_inverse()

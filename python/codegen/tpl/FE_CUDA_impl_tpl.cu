@@ -2,6 +2,8 @@
 {MK_FILE_CU}
 
 #include <stddef.h>
+#include <math.h>
+
 #include "sfem_vec.h"
 
 #ifdef __NVCC__
@@ -135,7 +137,11 @@ const T *const SFEM_RESTRICT node_data,
 T *const SFEM_RESTRICT per_element_data
 ) 
 {{
-    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) 
+#ifdef __NVCC__
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x)
+#else
+    for (ptrdiff_t e = 0; e < nelements; e++)
+#endif 
     {{
         // coalesced write
         per_element_data[e * nelements] = node_data[node_idx[e]];

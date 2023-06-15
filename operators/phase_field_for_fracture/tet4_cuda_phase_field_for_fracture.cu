@@ -47,10 +47,9 @@ public:
         destroy_crs_view();
     }
 
-    void create_sol_buffs()
-    {   
+    void create_sol_buffs() {
         hde_u = (real_t **)malloc(fe_spatial_dim * sizeof(real_t *));
-        for(int d = 0; d < fe_spatial_dim; d++) {
+        for (int d = 0; d < fe_spatial_dim; d++) {
             SFEM_CUDA_CHECK(cudaMalloc(&hde_u[d], fe_n_nodes * nbatch * sizeof(real_t)));
         }
 
@@ -58,9 +57,8 @@ public:
         cudaMemcpy(de_c, hd_elems, fe_n_nodes * sizeof(idx_t *), cudaMemcpyHostToDevice);
     }
 
-    void destroy_sol_buffs()
-    {
-        for(int d =0; d < fe_spatial_dim; d++) {
+    void destroy_sol_buffs() {
+        for (int d = 0; d < fe_spatial_dim; d++) {
             SFEM_CUDA_CHECK(cudaFree(hde_u[d]));
         }
 
@@ -166,6 +164,86 @@ public:
     }
 };
 
+SFEM_DEVICE_KERNEL void Tet4_phase_field_for_fracture_assemble_hessian_kernel(
+    const ptrdiff_t nelements,
+    real_t *const SFEM_RESTRICT jacobian_inverse,
+    const real_t mu,
+    const real_t lambda,
+    const real_t Gc,
+    const real_t ls,
+    const real_t *const SFEM_RESTRICT u,
+    const real_t *const SFEM_RESTRICT c,
+    real_t *const SFEM_RESTRICT de_matrix) {
+    real_t mat[n_vars_squared];
+
+#ifdef __NVCC__
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
+         e += blockDim.x * gridDim.x)
+#else
+    for (ptrdiff_t e = 0; e < nelements; e++)
+#endif
+    {
+        const real_t det_jac = 1. / Tet4_det(nelements, &jacobian[e]);
+        real_t fun[fe_n_nodes];
+        real_t grad[fe_spatial_dim][fe_n_nodes];
+        real_t qp[fe_spatial_dim];
+
+        real_t test_grad[fe_spatial_dim], trial_grad[fe_spatial_dim];
+
+        // TODO
+        real_t s_grad_phase[fe_spatial_dim];
+        real_t s_grad_disp[fe_spatial_dim * fe_spatial_dim];
+
+        // Constant gradient
+        Tet4_mk_partial_x(0, 0, 0, nelements, &jacobian[e], 1 grad[0]);
+        Tet4_mk_partial_y(0, 0, 0, nelements, &jacobian[e], 1 grad[1]);
+        Tet4_mk_partial_z(0, 0, 0, nelements, &jacobian[e], 1 grad[2]);
+
+        for (int i = 0; i < fe_n_nodes; i++) {
+            for (int j = 0; j < fe_n_nodes; j++) {
+                for (int k = 0; k < n_quad_points; k++) {
+                    Tet4_mk_fun(qx[k], qy[k], qz[k], 1, fun);
+
+                    real_t s_phase = 0;
+
+#pragma unroll(fe_spatial_dim)
+                    for (int d = 0; d < fe_spatial_dim; d++) {
+                        test_grad[d] = grad[d][i];
+                        trial_grad[d] = grad[d][j];
+                    }
+
+                    FE2D_phase_field_for_fracture_hessian(mu,
+                                                          lambda,
+                                                          Gc,
+                                                          ls,
+                                                          fe_reference_measure,
+                                                          det_jac,
+                                                          fun[i],
+                                                          test_grad,
+                                                          fun[j],
+                                                          trial_grad,
+                                                          s_phase,
+                                                          s_grad_phase,
+                                                          s_grad_disp,
+                                                          mat);
+                }
+
+                // point mat to element mat
+                const static int nn = fe_n_nodes * fe_n_nodes;
+                for(int d1 = 0; d1 < n_vars; d1++) {
+#pragma unroll(n_vars)
+                    for(int d1 = 0; d1 < n_vars; d1++) {
+                        ptrdiff_t idx = (d1 * n_vars + d2) * nn + i * fe_n_nodes + j;
+                        de_matrix[idx * n_elements] = mat[d1 * n_vars + d2];
+                    }
+                }
+
+            }
+        }
+        //
+    }
+}
+
 extern "C" void phase_field_for_fracture_assemble_hessian(const ptrdiff_t nelements,
                                                           const ptrdiff_t nnodes,
                                                           idx_t **const SFEM_RESTRICT elems,
@@ -249,8 +327,11 @@ extern "C" void phase_field_for_fracture_assemble_hessian(const ptrdiff_t neleme
         // XYZ HtoD (stream 0)
         /////////////////////////////////////////////////////////
 
-        SFEM_CUDA_CHECK(cudaMemcpyAsync(
-            de_xyz, he_xyz, fe_spatial_dim * fe_subparam_n_nodes * n * sizeof(geom_t), cudaMemcpyHostToDevice, w.upload));
+        SFEM_CUDA_CHECK(cudaMemcpyAsync(de_xyz,
+                                        he_xyz,
+                                        fe_spatial_dim * fe_subparam_n_nodes * n * sizeof(geom_t),
+                                        cudaMemcpyHostToDevice,
+                                        w.upload));
         cudaEventRecord(w.upload, uploads[UPLOAD_POINTS]);
 
         SFEM_DEBUG_SYNCHRONIZE();
@@ -303,7 +384,10 @@ extern "C" void phase_field_for_fracture_assemble_hessian(const ptrdiff_t neleme
         // Assemble elemental matrices (stream 1)
         /////////////////////////////////////////////////////////
         {
-            Tet4_phase_field_for_fracture_assemble_hessian_kernel<<<n_blocks, block_size, 0, w.compute>>>(
+            Tet4_phase_field_for_fracture_assemble_hessian_kernel<<<n_blocks,
+                                                                    block_size,
+                                                                    0,
+                                                                    w.compute>>>(
                 n, d_jacobian, mu, lambda, Gc, ls, w.de_u, w.de_c, de_matrix);
             cudaEventRecord(w.compute, computes[COMPUTE_ELEMENTAL_MATRICES]);
         }

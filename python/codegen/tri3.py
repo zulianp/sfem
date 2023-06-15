@@ -15,6 +15,9 @@ class Tri3(FE):
 
 		self.Ainv_ = inv2(self.A_)
 
+	def reference_measure(self):
+		return sp.Rational(1, 2)
+
 	def coords_sub_parametric(self):
 		return [[x0, x1, x2], [y0, y1, y2]]
 

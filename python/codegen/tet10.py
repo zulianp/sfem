@@ -8,6 +8,9 @@ class Tet10(FE):
 	def __init__(self):
 		super().__init__()
 
+	def reference_measure(self):
+		return sp.Rational(1, 6)
+
 	def subparam_n_nodes(self):
 		return 4
 
