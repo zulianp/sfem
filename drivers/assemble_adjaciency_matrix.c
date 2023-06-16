@@ -125,7 +125,7 @@ int main(int argc, char *argv[]) {
                     idx_t ii = (i + mesh.nnodes/2) % mesh.nnodes; 
                     idx_t jj = (col + mesh.nnodes/2) % mesh.nnodes; 
 
-                    if(jj < ii) {
+                    if(col < i) {
                         values[k] = 1;
                     } 
                     // else {

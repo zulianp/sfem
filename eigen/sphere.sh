@@ -27,7 +27,7 @@ SYSTEM_DIR=system
 # export EIG_WHICH='LR'
 # export EIG_WHICH='LM'
 
-export SFEM_DIRECTED=1
+export SFEM_DIRECTED=0
 
 # N=638
 N=200
