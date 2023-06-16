@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from tri3 import *
 from tet4 import *
 
 class BuubbleBase(FE):

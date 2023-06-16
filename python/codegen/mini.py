@@ -21,6 +21,9 @@ class MiniBase(FE):
 	def f0(self, x, y, z):
 		return 27 * (1.0 - x - y) * x * y
 
+	def bubble_dof_idx(self):
+		return 0
+
 	def fun(self, p):
 		ret = self.bubble.fun(q)
 		p1 = self.p1.fun(p)
@@ -67,4 +70,5 @@ class Mini3D(MiniBase):
 		return "Mini3D"
 
 if __name__ == '__main__':
+	Mini2D().generate_c_code()
 	Mini3D().generate_c_code()
