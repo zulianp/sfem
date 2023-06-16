@@ -47,7 +47,7 @@ public:
     real_t **d_values{nullptr};
 
 
-    real_t *d_qx, *d_qy, *d_qz;
+    real_t *d_qx, *d_qy, *d_qz, *d_qw;
 
     cudaStream_t upload, compute, download;
     ptrdiff_t nbatch{0}, n_blocks{0};
@@ -183,6 +183,7 @@ SFEM_DEVICE_KERNEL void Tet4_phase_field_for_fracture_assemble_hessian_kernel(
     const real_t *const SFEM_RESTRICT qx,
     const real_t *const SFEM_RESTRICT qy,
     const real_t *const SFEM_RESTRICT qz,
+    const real_t *const SFEM_RESTRICT qw,
     const real_t mu,
     const real_t lambda,
     const real_t Gc,
@@ -234,7 +235,7 @@ SFEM_DEVICE_KERNEL void Tet4_phase_field_for_fracture_assemble_hessian_kernel(
                                                           lambda,
                                                           Gc,
                                                           ls,
-                                                          fe_reference_measure,
+                                                          fe_reference_measure * qw[k],
                                                           det_jac,
                                                           fun[i],
                                                           test_grad,
@@ -409,6 +410,7 @@ extern "C" void phase_field_for_fracture_assemble_hessian(const ptrdiff_t neleme
                 w.d_qx, 
                 w.d_qy, 
                 w.d_qz, 
+                w.d_qw,
                 mu, lambda, Gc, ls, 
                 w.de_c, 
                 w.de_u[0],
