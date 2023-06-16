@@ -6,6 +6,8 @@ from sfem_codegen import c_log
 from sfem_codegen import q as quadrature_point
 from sfem_codegen import real_t
 from sfem_codegen import coeffs
+from sfem_codegen import det2
+from sfem_codegen import det3
 import sympy.codegen.ast as ast
 import sympy as sp
 
@@ -177,7 +179,33 @@ class FE:
 				sls.append(var)
 		return sp.Matrix(rows, cols, sls)
 
+	def generate_det_code(self):
+		mat = sp.Matrix(self.manifold_dim(), self.manifold_dim(), [0] * (self.manifold_dim() * self.manifold_dim()))
+		
+		for d1 in range(0, self.manifold_dim()):
+			for d2 in range(0, self.manifold_dim()):
+				mat[d1, d2] = sp.symbols(f'a[{d1*self.manifold_dim() + d2}*stride]')
+		
+		expr = []
+		if self.manifold_dim() == 2:
+			expr.append((det2(mat)))
+		elif self.manifold_dim() == 3:
+			expr.append((det3(mat)))
+		else:
+			assert False
 
+		print(expr)
+
+		det_body = c_gen(expr)
+
+
+		det_code = f'static SFEM_CUDA_INLINE real_t {self.name()}_mk_det_{self.manifold_dim()}('
+		det_code += "const count_t stride,\n const real_t *const SFEM_RESTRICT a\n"
+		det_code += ")"
+		det_code += "{\n"
+		det_code += f"return {det_body};\n" 
+		det_code += "}\n"
+		return det_code
 
 	def generate_c_code(self):
 		self.generate_kernels_c_code()
@@ -296,6 +324,11 @@ class FE:
 		for d in range(0, self.spatial_dim()):
 			grad_interp.append(ast.Assignment(sp.symbols(f"grad[{d}*stride_grad]"), g[d]))
 
+		utilities=""
+		utilities += self.generate_det_code()
+
+
+
 		tpl = read_file('tpl/FE_CUDA_tpl.cu')
 		code = tpl.format(
 			NAME=self.name(),
@@ -310,7 +343,8 @@ class FE:
 			PARTIAL_Y=c_gen(grad_expr[1]),
 			PARTIAL_Z=partial_z,
 			INTERPOLATE=c_gen(interp),
-			GRAD_INTERPOLATE=c_gen(grad_interp)
+			GRAD_INTERPOLATE=c_gen(grad_interp),
+			UTILITIES=utilities
 		)
 
 		str_to_file(f'{self.name()}_kernels.cu', code)

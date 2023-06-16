@@ -288,7 +288,7 @@ real_t **const SFEM_RESTRICT values
                 const idx_t dof_i = ev[edof_i];
                 const real_t v = this_vector[(b * fe_n_nodes + edof_i) * stride_element_vector];
 #ifdef __NVCC__
-                atomicAdd(&values[dof_i], v);
+                atomicAdd(&values[b][dof_i], v);
 #else
                 values[b][dof_i] += v;
 #endif

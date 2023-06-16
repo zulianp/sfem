@@ -5,10 +5,19 @@
 #include "FE3D_phase_field_for_fracture_kernels.h"
 #include "Tet4_impl.cu"
 
+#include "cuda_crs.h"
+
+#include <algorithm>
+#include <vector>
+
+
+#define MIN(a, b) ((b) < (a) ? (b) : (a))
+
 static const int block_size = 128;
-static const int n_max_blocks = 500;
+static const ptrdiff_t n_max_blocks = 500;
 static const int n_vars = (fe_spatial_dim + 1);
 static const int n_vars_squared = n_vars * n_vars;
+static const int n_quad_points = 27;
 
 class CudaWorkspace {
 public:
@@ -20,6 +29,7 @@ public:
     // Buffers
     geom_t *he_xyz{nullptr};
     geom_t *de_xyz{nullptr};
+    real_t *d_jacobian_inverse;
 
     real_t *de_matrix{nullptr};
     real_t *de_vector{nullptr};
@@ -35,6 +45,9 @@ public:
     // (c, u) x (c, u)
     real_t **hd_values{nullptr};
     real_t **d_values{nullptr};
+
+
+    real_t *d_qx, *d_qy, *d_qz;
 
     cudaStream_t upload, compute, download;
     ptrdiff_t nbatch{0}, n_blocks{0};
@@ -92,7 +105,7 @@ public:
             cudaMallocHost(&he_xyz, fe_spatial_dim * fe_n_nodes * nbatch * sizeof(geom_t)));
         SFEM_CUDA_CHECK(cudaMalloc(&de_xyz, fe_spatial_dim * fe_n_nodes * nbatch * sizeof(geom_t)));
         SFEM_CUDA_CHECK(
-            cudaMalloc(&d_jacobian, fe_manifold_dim * fe_spatial_dim * nbatch * sizeof(real_t)));
+            cudaMalloc(&d_jacobian_inverse, fe_manifold_dim * fe_spatial_dim * nbatch * sizeof(real_t)));
         SFEM_CUDA_CHECK(cudaMalloc(&de_matrix, fe_n_nodes * fe_n_nodes * nbatch * sizeof(real_t)));
 
         for (int d = 0; d < fe_n_nodes; d++) {
@@ -122,7 +135,7 @@ public:
         {  // Free resources on GPU
             SFEM_CUDA_CHECK(cudaFree(de_xyz));
             SFEM_CUDA_CHECK(cudaFree(de_matrix));
-            SFEM_CUDA_CHECK(cudaFree(d_fff));
+            SFEM_CUDA_CHECK(cudaFree(d_jacobian_inverse));
 
             for (int d = 0; d < fe_n_nodes; d++) {
                 SFEM_CUDA_CHECK(cudaFree(hd_elems[d]));
@@ -167,13 +180,19 @@ public:
 SFEM_DEVICE_KERNEL void Tet4_phase_field_for_fracture_assemble_hessian_kernel(
     const ptrdiff_t nelements,
     real_t *const SFEM_RESTRICT jacobian_inverse,
+    const real_t *const SFEM_RESTRICT qx,
+    const real_t *const SFEM_RESTRICT qy,
+    const real_t *const SFEM_RESTRICT qz,
     const real_t mu,
     const real_t lambda,
     const real_t Gc,
     const real_t ls,
-    const real_t *const SFEM_RESTRICT u,
     const real_t *const SFEM_RESTRICT c,
-    real_t *const SFEM_RESTRICT de_matrix) {
+    const real_t *const SFEM_RESTRICT ux,
+    const real_t *const SFEM_RESTRICT uy,
+    const real_t *const SFEM_RESTRICT uz,
+    real_t *const SFEM_RESTRICT de_matrix) 
+{
     real_t mat[n_vars_squared];
 
 #ifdef __NVCC__
@@ -183,10 +202,9 @@ SFEM_DEVICE_KERNEL void Tet4_phase_field_for_fracture_assemble_hessian_kernel(
     for (ptrdiff_t e = 0; e < nelements; e++)
 #endif
     {
-        const real_t det_jac = 1. / Tet4_det(nelements, &jacobian[e]);
+        const real_t det_jac = 1. / Tet4_mk_det_3(nelements, &jacobian_inverse[e]);
         real_t fun[fe_n_nodes];
         real_t grad[fe_spatial_dim][fe_n_nodes];
-        real_t qp[fe_spatial_dim];
 
         real_t test_grad[fe_spatial_dim], trial_grad[fe_spatial_dim];
 
@@ -195,9 +213,9 @@ SFEM_DEVICE_KERNEL void Tet4_phase_field_for_fracture_assemble_hessian_kernel(
         real_t s_grad_disp[fe_spatial_dim * fe_spatial_dim];
 
         // Constant gradient
-        Tet4_mk_partial_x(0, 0, 0, nelements, &jacobian[e], 1 grad[0]);
-        Tet4_mk_partial_y(0, 0, 0, nelements, &jacobian[e], 1 grad[1]);
-        Tet4_mk_partial_z(0, 0, 0, nelements, &jacobian[e], 1 grad[2]);
+        Tet4_mk_partial_x(0, 0, 0, nelements, &jacobian_inverse[e], 1, grad[0]);
+        Tet4_mk_partial_y(0, 0, 0, nelements, &jacobian_inverse[e], 1, grad[1]);
+        Tet4_mk_partial_z(0, 0, 0, nelements, &jacobian_inverse[e], 1, grad[2]);
 
         for (int i = 0; i < fe_n_nodes; i++) {
             for (int j = 0; j < fe_n_nodes; j++) {
@@ -212,7 +230,7 @@ SFEM_DEVICE_KERNEL void Tet4_phase_field_for_fracture_assemble_hessian_kernel(
                         trial_grad[d] = grad[d][j];
                     }
 
-                    FE2D_phase_field_for_fracture_hessian(mu,
+                    FE3D_phase_field_for_fracture_hessian(mu,
                                                           lambda,
                                                           Gc,
                                                           ls,
@@ -232,15 +250,13 @@ SFEM_DEVICE_KERNEL void Tet4_phase_field_for_fracture_assemble_hessian_kernel(
                 const static int nn = fe_n_nodes * fe_n_nodes;
                 for(int d1 = 0; d1 < n_vars; d1++) {
 #pragma unroll(n_vars)
-                    for(int d1 = 0; d1 < n_vars; d1++) {
+                    for(int d2 = 0; d2 < n_vars; d2++) {
                         ptrdiff_t idx = (d1 * n_vars + d2) * nn + i * fe_n_nodes + j;
-                        de_matrix[idx * n_elements] = mat[d1 * n_vars + d2];
+                        de_matrix[idx * nelements] = mat[d1 * n_vars + d2];
                     }
                 }
-
             }
         }
-        //
     }
 }
 
@@ -292,8 +308,8 @@ extern "C" void phase_field_for_fracture_assemble_hessian(const ptrdiff_t neleme
 
     ptrdiff_t last_n = 0;
     ptrdiff_t last_element_offset = 0;
-    for (ptrdiff_t element_offset = 0; element_offset < nelements; element_offset += nbatch) {
-        ptrdiff_t n = MIN(nbatch, nelements - element_offset);
+    for (ptrdiff_t element_offset = 0; element_offset < nelements; element_offset += w.nbatch) {
+        ptrdiff_t n = MIN(w.nbatch, nelements - element_offset);
 
         /////////////////////////////////////////////////////////
         // Packing (stream 0)
@@ -315,10 +331,10 @@ extern "C" void phase_field_for_fracture_assemble_hessian(const ptrdiff_t neleme
             cudaStreamWaitEvent(w.upload, uploads[UPLOAD_ELEMENTS], 0);
 
             // Do this here to let the main kernel overlap with the packing
-            Tet4_matrix_local_to_global_kernel<<<n_blocks, block_size, 0, w.compute>>>(
-                last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
+            Tet4_block_matrix_local_to_global_kernel<n_vars, n_vars><<<w.n_blocks, block_size, 0, w.compute>>>(
+                last_n, w.d_elems, last_n, w.de_matrix, w.d_rowptr, w.d_colidx, w.d_values);
 
-            cudaEventRecord(w.compute, computes[COMPUTE_JACOBIAN]);
+            cudaEventRecord(computes[COMPUTE_JACOBIAN], w.compute);
 
             SFEM_DEBUG_SYNCHRONIZE();
         }
@@ -327,12 +343,12 @@ extern "C" void phase_field_for_fracture_assemble_hessian(const ptrdiff_t neleme
         // XYZ HtoD (stream 0)
         /////////////////////////////////////////////////////////
 
-        SFEM_CUDA_CHECK(cudaMemcpyAsync(de_xyz,
-                                        he_xyz,
+        SFEM_CUDA_CHECK(cudaMemcpyAsync(w.de_xyz,
+                                        w.he_xyz,
                                         fe_spatial_dim * fe_subparam_n_nodes * n * sizeof(geom_t),
                                         cudaMemcpyHostToDevice,
                                         w.upload));
-        cudaEventRecord(w.upload, uploads[UPLOAD_POINTS]);
+        cudaEventRecord(uploads[UPLOAD_POINTS], w.upload);
 
         SFEM_DEBUG_SYNCHRONIZE();
         /////////////////////////////////////////////////////////
@@ -341,7 +357,7 @@ extern "C" void phase_field_for_fracture_assemble_hessian(const ptrdiff_t neleme
 
         // Make sure we have the new XYZ coordinates
         cudaStreamWaitEvent(w.upload, uploads[UPLOAD_POINTS], 0);
-        Tet4_jacobian_inverse<<<n_blocks, block_size, 0, stream[1]>>>(n, de_xyz, d_fff);
+        Tet4_jacobian_inverse_kernel<<<w.n_blocks, block_size, 0, w.compute>>>(n, w.de_xyz, w.d_jacobian_inverse);
 
         SFEM_DEBUG_SYNCHRONIZE();
         /////////////////////////////////////////////////////////
@@ -357,7 +373,7 @@ extern "C" void phase_field_for_fracture_assemble_hessian(const ptrdiff_t neleme
             SFEM_NVTX_SCOPE("copy-elements-to-pinned-memory");
             //  Copy elements to host-pinned memory
             for (int e_node = 0; e_node < fe_n_nodes; e_node++) {
-                memcpy(hh_elems[e_node], &elems[e_node][element_offset], n * sizeof(idx_t));
+                memcpy(w.hh_elems[e_node], &elems[e_node][element_offset], n * sizeof(idx_t));
             }
         }
 
@@ -369,14 +385,14 @@ extern "C" void phase_field_for_fracture_assemble_hessian(const ptrdiff_t neleme
         {
             SFEM_NVTX_SCOPE("copy-elements-to-device");
             for (int e_node = 0; e_node < fe_subparam_n_nodes; e_node++) {
-                SFEM_CUDA_CHECK(cudaMemcpyAsync(hd_elems[e_node],
-                                                hh_elems[e_node],
+                SFEM_CUDA_CHECK(cudaMemcpyAsync(w.hd_elems[e_node],
+                                                w.hh_elems[e_node],
                                                 n * sizeof(idx_t),
                                                 cudaMemcpyHostToDevice,
                                                 w.upload));
             }
 
-            cudaEventRecord(w.upload, uploads[UPLOAD_ELEMENTS]);
+            cudaEventRecord(uploads[UPLOAD_ELEMENTS], w.upload);
         }
 
         SFEM_DEBUG_SYNCHRONIZE();
@@ -384,12 +400,22 @@ extern "C" void phase_field_for_fracture_assemble_hessian(const ptrdiff_t neleme
         // Assemble elemental matrices (stream 1)
         /////////////////////////////////////////////////////////
         {
-            Tet4_phase_field_for_fracture_assemble_hessian_kernel<<<n_blocks,
+            Tet4_phase_field_for_fracture_assemble_hessian_kernel<<<w.n_blocks,
                                                                     block_size,
                                                                     0,
                                                                     w.compute>>>(
-                n, d_jacobian, mu, lambda, Gc, ls, w.de_u, w.de_c, de_matrix);
-            cudaEventRecord(w.compute, computes[COMPUTE_ELEMENTAL_MATRICES]);
+                n, 
+                w.d_jacobian_inverse, 
+                w.d_qx, 
+                w.d_qy, 
+                w.d_qz, 
+                mu, lambda, Gc, ls, 
+                w.de_c, 
+                w.de_u[0],
+                w.de_u[1],
+                w.de_u[2],
+                w.de_matrix);
+            cudaEventRecord(computes[COMPUTE_ELEMENTAL_MATRICES], w.compute);
         }
 
         SFEM_DEBUG_SYNCHRONIZE();
@@ -408,8 +434,8 @@ extern "C" void phase_field_for_fracture_assemble_hessian(const ptrdiff_t neleme
         cudaStreamWaitEvent(w.upload, uploads[UPLOAD_ELEMENTS], 0);
 
         // Do this here to let the main kernel overlap with the packing
-        Tet4_matrix_local_to_global_kernel<<<n_blocks, block_size, 0, w.compute>>>(
-            last_n, w.d_elems, w.de_matrix, w.d_rowptr, w.d_colidx, w.d_values);
+        Tet4_block_matrix_local_to_global_kernel<n_vars,n_vars><<<w.n_blocks, block_size, 0, w.compute>>>(
+            last_n, w.d_elems, last_n, w.de_matrix, w.d_rowptr, w.d_colidx, w.d_values);
 
         SFEM_DEBUG_SYNCHRONIZE();
         cudaStreamSynchronize(w.compute);
@@ -418,7 +444,7 @@ extern "C" void phase_field_for_fracture_assemble_hessian(const ptrdiff_t neleme
     {
         SFEM_NVTX_SCOPE("downloads");
         SFEM_CUDA_CHECK(
-            cudaMemcpy(values, d_values, rowptr[nnodes] * sizeof(real_t), cudaMemcpyDeviceToHost));
+            cudaMemcpy(values, w.d_values, rowptr[nnodes] * sizeof(real_t), cudaMemcpyDeviceToHost));
     }
 
     for (auto &e : uploads) {
@@ -429,7 +455,7 @@ extern "C" void phase_field_for_fracture_assemble_hessian(const ptrdiff_t neleme
         cudaEventDestroy(e);
     }
 
-    for (auto &e : compute) {
+    for (auto &e : computes) {
         cudaEventDestroy(e);
     }
 

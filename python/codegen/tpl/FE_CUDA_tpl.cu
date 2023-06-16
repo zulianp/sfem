@@ -1,4 +1,6 @@
 #include "sfem_base.h"
+#include "sfem_cuda_base.h"
+
 
 #include <math.h>
 
@@ -10,6 +12,8 @@
 #endif 
 
 {CONSTANTS}
+
+{UTILITIES}
 
 SFEM_DEVICE_FUNCTION void {NAME}_mk_jacobian(
 {COORDINATES}const count_t stride_jacobian,
