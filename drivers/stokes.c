@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "../matrix.io/array_dtof.h"
 #include "../matrix.io/matrixio_array.h"
@@ -558,6 +561,11 @@ int main(int argc, char *argv[]) {
 
     const char *output_folder = argv[2];
 
+    struct stat st = {0};
+    if (stat(output_folder, &st) == -1) {
+        mkdir(output_folder, 0700);
+    }
+
     double tick = MPI_Wtime();
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -574,6 +582,29 @@ int main(int argc, char *argv[]) {
     if (mesh.element_type != TRI3) {
         fprintf(stderr, "element_type must be TRI3\n");
         return EXIT_FAILURE;
+    }
+
+    // Optional params
+    real_t SFEM_MU = 1;
+    int SFEM_PROBLEM_TYPE = 1;
+    const char *SFEM_DIRICHLET_NODES = 0;
+
+    SFEM_READ_ENV(SFEM_PROBLEM_TYPE, atoi);
+    SFEM_READ_ENV(SFEM_MU, atof);
+    SFEM_READ_ENV(SFEM_DIRICHLET_NODES, );
+
+    if (rank == 0) {
+        printf(
+            "----------------------------------------\n"
+            "Options:\n"
+            "----------------------------------------\n"
+            "- SFEM_PROBLEM_TYPE=%d\n"
+            "- SFEM_MU=%g\n"
+            "- SFEM_DIRICHLET_NODES=%s\n"
+            "----------------------------------------\n",
+            SFEM_PROBLEM_TYPE,
+            SFEM_MU,
+            SFEM_DIRICHLET_NODES);
     }
 
     double tack = MPI_Wtime();
@@ -613,8 +644,7 @@ int main(int argc, char *argv[]) {
     // Operator assembly
     ///////////////////////////////////////////////////////////////////////////////
 
-    real_t mu = 1;
-    tri3_stokes_mini_assemble_hessian(mu,
+    tri3_stokes_mini_assemble_hessian(SFEM_MU,
                                       mesh.element_type,
                                       mesh.nelements,
                                       mesh.nnodes,
@@ -624,9 +654,8 @@ int main(int argc, char *argv[]) {
                                       colidx,
                                       values);
 
-    int tp_num = 1;
-    tri3_stokes_mini_assemble_rhs(tp_num,
-                                  mu,
+    tri3_stokes_mini_assemble_rhs(SFEM_PROBLEM_TYPE,
+                                  SFEM_MU,
                                   mesh.element_type,
                                   mesh.nelements,
                                   mesh.nnodes,
@@ -642,30 +671,24 @@ int main(int argc, char *argv[]) {
     // Boundary conditions
     ///////////////////////////////////////////////////////////////////////////////
 
-    char path[1024 * 10];
-    sprintf(path, "%s/zd.raw", folder);
-
-    const char *SFEM_DIRICHLET_NODES = 0;
-    SFEM_READ_ENV(SFEM_DIRICHLET_NODES, );
-
     if (SFEM_DIRICHLET_NODES) {
-        strcpy(path, SFEM_DIRICHLET_NODES);
-        printf("SFEM_DIRICHLET_NODES=%s\n", path);
-    }
+        idx_t *dirichlet_nodes = 0;
+        ptrdiff_t nn = read_file(comm, SFEM_DIRICHLET_NODES, (void **)&dirichlet_nodes);
+        assert((nn / sizeof(idx_t)) * sizeof(idx_t) == nn);
+        nn /= sizeof(idx_t);
 
-    idx_t *dirichlet_nodes = 0;
-    ptrdiff_t nn = read_file(comm, path, (void **)&dirichlet_nodes);
-    assert((nn / sizeof(idx_t)) * sizeof(idx_t) == nn);
-    nn /= sizeof(idx_t);
-
-    for (int d = 0; d < mesh.spatial_dim; d++) {
-        constraint_nodes_to_value(nn, dirichlet_nodes, 0, rhs[d]);
-    }
-
-    for (int d1 = 0; d1 < n_vars; d1++) {
-        for (int d2 = 0; d2 < n_vars; d2++) {
-            crs_constraint_nodes_to_identity(nn, dirichlet_nodes, d1 == d2, rowptr, colidx, values[d1 * n_vars + d2]);
+        for (int d = 0; d < mesh.spatial_dim; d++) {
+            constraint_nodes_to_value(nn, dirichlet_nodes, 0, rhs[d]);
         }
+
+        for (int d1 = 0; d1 < n_vars; d1++) {
+            for (int d2 = 0; d2 < n_vars; d2++) {
+                crs_constraint_nodes_to_identity(
+                    nn, dirichlet_nodes, d1 == d2, rowptr, colidx, values[d1 * n_vars + d2]);
+            }
+        }
+    } else {
+        assert(0);
     }
 
     tock = MPI_Wtime();
@@ -677,6 +700,34 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     // TODO
+
+    {
+        block_crs_t crs_out;
+        crs_out.rowptr = (char *)rowptr;
+        crs_out.colidx = (char *)colidx;
+
+        crs_out.block_size = n_vars * n_vars;
+        crs_out.values = (char **)values;
+        crs_out.grows = mesh.nnodes;
+        crs_out.lrows = mesh.nnodes;
+        crs_out.lnnz = nnz;
+        crs_out.gnnz = nnz;
+        crs_out.start = 0;
+        crs_out.rowoffset = 0;
+        crs_out.rowptr_type = SFEM_MPI_COUNT_T;
+        crs_out.colidx_type = SFEM_MPI_IDX_T;
+        crs_out.values_type = SFEM_MPI_REAL_T;
+
+        char path_rowptr[1024 * 10];
+        sprintf(path_rowptr, "%s/rowptr.raw", output_folder);
+
+        char path_colidx[1024 * 10];
+        sprintf(path_colidx, "%s/colidx.raw", output_folder);
+
+        char format_values[1024 * 10];
+        sprintf(format_values, "%s/values.%%d.raw", output_folder);
+        block_crs_write(comm, path_rowptr, path_colidx, format_values, &crs_out);
+    }
 
     tock = MPI_Wtime();
     printf("stokes.c: write\t\t%g seconds\n", tock - tack);
@@ -708,7 +759,6 @@ int main(int argc, char *argv[]) {
 
     tock = MPI_Wtime();
     if (!rank) {
-   
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld #nz %ld\n", (long)nelements, (long)nnodes, (long)nnz);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
