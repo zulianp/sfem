@@ -17,7 +17,7 @@ export SFEM_NEUMANN_FACES=./mesh/sidesets_aos/sright.raw
 
 mkdir -p system
 
-create_box_2D.sh 5
+create_box_2D.sh 8
 
 export SFEM_HANDLE_RHS=1
 export SFEM_DIRICHLET_NODES=./mesh/sidesets_aos/sleft.raw  

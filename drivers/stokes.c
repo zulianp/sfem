@@ -537,7 +537,7 @@ void tri3_stokes_mini_assemble_rhs(const int tp_num,
     }
 
     double tock = MPI_Wtime();
-    printf("tri3_stokes.c: tri3_stokes_assemble_hessian\t%g seconds\n", tock - tick);
+    printf("tri3_stokes.c: tri3_stokes_mini_assemble_rhs\t%g seconds\n", tock - tick);
 }
 
 int main(int argc, char *argv[]) {
