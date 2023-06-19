@@ -6,3 +6,6 @@ function [rowptr, colidx, values] = read_crs(folder)
 	rowptr = read_array(path_rowptr, 'int');
 	colidx = read_array(path_colidx, 'int');
 	values = read_array(path_values, 'double');
+
+	rowptr += 1
+	colidx += 1
