@@ -16,67 +16,186 @@ class StokesOp:
 		self.fe_pressure = fe_pressure
 		
 		u_shape_grad = fe_velocity.shape_grad()
-		p_shape_grad = fe_pressure.shape_grad()
+		p_shape_fun = fe_pressure.shape_fun()
 
 		nu = len(u_shape_grad)
+		np = len(p_shape_fun)
 
 		mu = sp.symbols('mu')
 		self.params = [mu]
 
 		qp = fe_velocity.quadrature_point()
-		self.a = sp.Matrix(nu, nu, [0]*(nu*nu))
+		# Assume affine
+		dV = fe_u.jacobian_determinant(qp)
 
+		self.a = sp.Matrix(nu, nu, [0]*(nu*nu))
 		for i in range(0,  nu):
 			for j in range(0,  nu):
-				integr = sp.simplify(mu * fe_u.integrate(qp, mu * inner(u_shape_grad[i], u_shape_grad[j]))) * fe_u.jacobian_determinant(qp)
-				self.a[i,j] = integr
+				integr = mu * fe_u.integrate(qp, inner(u_shape_grad[i], u_shape_grad[j])) * dV
+				integr = sp.simplify(integr)
+				self.a[i, j] = integr
 
-		self.mini_condensed_hessian()
+		self.b = sp.Matrix(nu, np, [0] * (nu*np))
+		for i in range(0,  nu):
+			for j in range(0,  np):
+				integr = -fe_u.integrate(qp, tr(u_shape_grad[i]) * p_shape_fun[j]) * dV
+				integr = sp.simplify(integr)
+				self.b[i, j] = integr
 
-	def mini_condensed_hessian(self):
-		fe = self.fe_velocity.fe()
-		a = self.a
-		rows, cols = a.shape
-		d = fe.spatial_dim()
-		nn = fe.n_nodes()
+		self.get_mini_condensed_hessian()
+		# self.hessian_uu()
+		# self.hessian_up()
+		# self.hessian()
+		self.project_bubble_rhs()
+		self.apply()
 
-		C 	= sp.Matrix(d, d, [0]*(d*d))
-		B 	= sp.Matrix(d, cols-d, [0]*(d*(cols-d)))
-		B_t = sp.Matrix(cols-d, d, [0]*(d*(cols-d)))
+	def get_mini_condensed_hessian(self):
+		u_fe = self.fe_velocity.fe()
+		p_fe = self.fe_pressure.fe()
+		qp = self.fe_velocity.quadrature_point()
+		s_dV = u_fe.symbol_jacobian_inverse()
+		dV = u_fe.jacobian_inverse(qp)
+
+		d = u_fe.spatial_dim()
+		nn = u_fe.n_nodes()
+
+		H = self.get_hessian()
+		rows, cols = H.shape
+
+		A = sp.Matrix(cols-d, cols-d, [0]*((cols-d)*(cols-d)))
+		C = sp.Matrix(d, d, [0]*(d*d))
+		B = sp.Matrix(d, cols-d, [0]*(d*(cols-d)))
 
 		for d1 in range(0, d):
-			i1 = d1 * nn + fe.bubble_dof_idx()
+			i1 = d1 * nn + u_fe.bubble_dof_idx()
 			for d2 in range(0, d):
-				i2 = d2 * nn + fe.bubble_dof_idx()
-				C[d1, d2] = a[i1, i2]
+				i2 = d2 * nn + u_fe.bubble_dof_idx()
+				C[d1, d2] = H[i1, i2]
 
-		if d==3:
-			invC = inv3(C)
+		for d1 in range(0, d):
+			i1 = d1 * nn + u_fe.bubble_dof_idx()
+			idx = 0
+			for d2 in range(0, d):
+				for j in range(0, nn):
+					if j == u_fe.bubble_dof_idx():
+						continue
+					j2 = d2 * nn + j
+					B[d1, idx] = H[i1, j2]
+					idx += 1
+
+			for j in range(nn*d, cols):
+				B[d1, idx] = H[i1, j]
+				idx += 1
+
+		bubble_dofs = []
+		for d1 in range(0, d):
+			i1 = d1 * nn + u_fe.bubble_dof_idx()
+			bubble_dofs.append(i1)
+
+		ii = 0
+		for i in range(0, rows):
+			if i in bubble_dofs:
+				continue
+
+			jj = 0
+			for j in range(0, cols):
+				if j in bubble_dofs:
+					continue
+
+				A[ii, jj] = H[i, j]
+				jj += 1
+			ii += 1
+
+		if d == 3:
+			C_inv = inv3(C)
 		else:
 			assert d == 2
-			invC = inv2(C)
+			C_inv = inv2(C)
 
+		# c_code(self.assign_matrix(C_inv))
+		# c_code(self.assign_matrix(B))
+		# c_code(self.assign_matrix(A))
+
+		S = B.T * C_inv * B
+		P = B.T * C_inv
+
+		Hc = A - S
+		c_code(self.assign_matrix(Hc))
+		# c_code(self.assign_matrix(P))
+		return Hc, P
+
+	def assign_tensor(self, name, a):
+		fe = self.fe_velocity.fe()
 		qp = self.fe_velocity.quadrature_point()
+		rows, cols = a.shape
+
 		expr = []
-		for i in range(0,  d):
-			for j in range(0,  d):
-				var = sp.symbols(f'element_matrix[{i*d + j}]')
-				value = invC[i, j]
+		for i in range(0,  rows):
+			for j in range(0,  cols):
+				var = sp.symbols(f'{name}[{i*cols + j}]')
+				value = a[i, j]
 				value = subsmat(value, fe.symbol_jacobian_inverse(), fe.jacobian_inverse(qp))
 				expr.append(ast.Assignment(var, value))
-		c_code(expr)
+		return expr
 
-	def full_hessian(self):
-		expr = []
-		for i in range(0,  nu):
-			for j in range(0,  nu):
-				var = sp.symbols(f'element_matrix[{i*nu + j}]')
-				value = self.a[i, j]
-				value = subsmat(value, fe_u.symbol_jacobian_inverse(), fe_u.jacobian_inverse(qp))
-				expr.append(ast.Assignment(var, value))
+	def assign_matrix(self, a):
+		return self.assign_tensor("element_matrix", a)
+
+	def assign_vector(self, a):
+		return self.assign_tensor("element_vector", a)
+
+	def hessian_uu(self):
+		expr = self.assign_matrix(self.a)
 		c_code(expr)
 		return expr
 
+	def hessian_up(self):
+		expr = self.assign_matrix(self.b)
+		c_code(expr)
+		return expr
+
+	def hessian(self):
+		H = self.get_hessian()
+		expr = self.assign_matrix(H)
+		c_code(expr)
+		return expr
+
+	def get_hessian(self):
+		fe_velocity = self.fe_velocity
+		fe_pressure = self.fe_pressure
+		dims = fe_velocity.fe().manifold_dim()
+		ndofs = fe_velocity.fe().n_nodes() * dims + fe_pressure.fe().n_nodes()
+		H = sp.Matrix(ndofs, ndofs, [0]*(ndofs*ndofs))
+
+		a = self.a
+		b = self.b 
+
+		arows,acols = a.shape
+		brows,bcols = b.shape
+		
+		H[0:arows, 0:arows] = a
+		H[0:arows, arows:ndofs] = b
+		H[arows:ndofs, 0:arows] = b.T
+		return H
+
+	def project_bubble_rhs(self):
+		Hc, P = self.get_mini_condensed_hessian()
+		u_fe = self.fe_velocity.fe()
+
+		fb = coeffs('rhs_bubble', u_fe.manifold_dim())
+
+		Pfb = P * fb
+		c_code(self.assign_vector(Pfb))
+		return Pfb
+
+	def apply(self):
+		Hc, P = self.get_mini_condensed_hessian()
+		rows, cols = Hc.shape
+		x = coeffs('x', cols)
+
+		Hx = Hc * x
+		c_code(self.assign_vector(Hx))
+		return Hx
 
 	def gradient_v(self):
 		print('// StokesOp::gradient_v')
@@ -128,11 +247,13 @@ class StokesOp:
 		return Preconditioner(self.u, self.p, self.qp)
 
 def main():
-	V = Mini3D()
-	Q = Tet4()
-	
-	# V = Mini2D()
-	# Q = Tri3()
+
+	if True:
+		V = Mini3D()
+		Q = Tet4()
+	else:
+		V = Mini2D()
+		Q = Tri3()
 
 	op = StokesOp(V, Q)
 
