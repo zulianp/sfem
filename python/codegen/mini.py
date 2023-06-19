@@ -17,7 +17,6 @@ class MiniBase(FE):
 	def n_nodes(self):
 		return self.bubble.n_nodes() + self.p1.n_nodes()
 
-
 	def f0(self, x, y, z):
 		return 27 * (1.0 - x - y) * x * y
 
@@ -60,7 +59,6 @@ class Mini2D(MiniBase):
 
 	def name(self):
 		return "Mini2D"
-
 
 class Mini3D(MiniBase):
 	def __init__(self):

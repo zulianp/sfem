@@ -8,6 +8,8 @@ from tri6 import *
 from mini import *
 from fe_material import *
 
+import pdb
+
 class StokesOp:
 	def __init__(self, fe_u, fe_p):
 		fe_velocity = FEFunction("u", fe_u, fe_u.manifold_dim())
@@ -16,6 +18,7 @@ class StokesOp:
 		self.fe_pressure = fe_pressure
 		
 		u_shape_grad = fe_velocity.shape_grad()
+		u_shape_fun = fe_velocity.shape_fun()
 		p_shape_fun = fe_pressure.shape_fun()
 
 		nu = len(u_shape_grad)
@@ -42,11 +45,31 @@ class StokesOp:
 				integr = sp.simplify(integr)
 				self.b[i, j] = integr
 
+
+		self.u_mass_mat = sp.Matrix(nu, nu, [0] * (nu * nu))
+		self.p_mass_mat = sp.Matrix(np, np, [0] * (np * np))
+
+		for i in range(0,  nu):
+			for j in range(0,  nu):
+				integr = fe_u.integrate(qp, inner(u_shape_fun[i], u_shape_fun[j])) * dV
+				integr = sp.simplify(integr)
+				self.u_mass_mat[i, j] = integr
+
+		for i in range(0,  np):
+			for j in range(0,  np):
+				integr = fe_u.integrate(qp, (p_shape_fun[i] * p_shape_fun[j])) * dV
+				integr = sp.simplify(integr)
+				self.p_mass_mat[i, j] = integr
+
+		self.u_rhs = self.u_mass_mat * coeffs('u_rhs', len(u_shape_fun))
+		self.p_rhs = self.p_mass_mat * coeffs('p_rhs', len(p_shape_fun))
+		
 		# self.get_mini_condensed_hessian()
 		# self.hessian_uu()
 		# self.hessian_up()
 		# self.hessian()
-		self.project_bubble_rhs()
+		# self.project_bubble_rhs()
+		self.get_mini_condensed_rhs()
 		# self.apply()
 
 	def get_mini_condensed_hessian(self):
@@ -122,7 +145,34 @@ class StokesOp:
 		Hc = A - S
 		c_code(self.assign_matrix(Hc))
 		# c_code(self.assign_matrix(P))
-		return Hc, P
+		return Hc, P, bubble_dofs
+
+	def get_mini_condensed_rhs(self):
+		rhs = self.get_rhs()
+		__, P, bubble_dofs = self.get_mini_condensed_hessian()
+
+		nbubble = len(bubble_dofs)
+		bubble_rhs = sp.Matrix(nbubble, 1, [0] *nbubble)
+
+		for i in range(0, nbubble):
+			bubble_rhs[i] = rhs[bubble_dofs[i]]
+
+		ndofs = len(rhs)
+		cn = ndofs - nbubble
+		crhs = sp.Matrix(cn, 1, [0] * (cn))
+
+		ii = 0
+		for i in range(0, ndofs):
+			if i in bubble_dofs:
+				continue
+			crhs[ii] = rhs[i]
+			ii += 1
+
+		ret = crhs + P * bubble_rhs
+
+		# c_code(self.assign_vector(rhs))
+		c_code(self.assign_vector(ret))
+		return ret
 
 	def assign_tensor(self, name, a):
 		fe = self.fe_velocity.fe()
@@ -177,6 +227,24 @@ class StokesOp:
 		H[0:arows, arows:ndofs] = b
 		H[arows:ndofs, 0:arows] = b.T
 		return H
+
+	def get_rhs(self):
+		fe_velocity = self.fe_velocity
+		fe_pressure = self.fe_pressure
+		dims = fe_velocity.fe().manifold_dim()
+		ndofs = fe_velocity.fe().n_nodes() * dims + fe_pressure.fe().n_nodes()
+		g = sp.Matrix(ndofs, 1, [0]*(ndofs))
+
+		u_rhs = self.u_rhs 
+		p_rhs = self.p_rhs 
+
+		arows,__ = u_rhs.shape
+
+		# pdb.set_trace()
+		g[0:arows,:] = u_rhs[:]
+		g[arows:ndofs,:] = p_rhs[:]
+		return g
+
 
 	def project_bubble_rhs(self):
 		Hc, P = self.get_mini_condensed_hessian()
