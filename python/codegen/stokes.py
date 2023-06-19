@@ -42,12 +42,12 @@ class StokesOp:
 				integr = sp.simplify(integr)
 				self.b[i, j] = integr
 
-		self.get_mini_condensed_hessian()
+		# self.get_mini_condensed_hessian()
 		# self.hessian_uu()
 		# self.hessian_up()
 		# self.hessian()
 		self.project_bubble_rhs()
-		self.apply()
+		# self.apply()
 
 	def get_mini_condensed_hessian(self):
 		u_fe = self.fe_velocity.fe()
@@ -226,29 +226,27 @@ class StokesOp:
 		print('// StokesOp::hessian_pv')
 
 	# Zero block for pq
+	# class Preconditioner:
+	# 	def __init__(self, u, p, qp):
+	# 		self.u = u
+	# 		self.p = p
 
-	class Preconditioner:
-		def __init__(self, u, p, qp):
-			self.u = u
-			self.p = p
+	# 		self.lapl = LaplaceOp(u.fe, qp)
+	# 		self.mass = MassOp(p, p.test, qp)
 
-			self.lapl = LaplaceOp(u.fe, qp)
-			self.mass = MassOp(p, p.test, qp)
+	# 	def hessian_uv(self):
+	# 		print('// Preconditioner::hessian_uv')
+	# 		self.lapl.matrix()
 
-		def hessian_uv(self):
-			print('// Preconditioner::hessian_uv')
-			self.lapl.matrix()
+	# 	def hessian_pq(self):
+	# 		print('// Preconditioner::hessian_pq')
+	# 		return self.mass.matrix()
 
-		def hessian_pq(self):
-			print('// Preconditioner::hessian_pq')
-			return self.mass.matrix()
-
-	def preconditioner(self):
-		return Preconditioner(self.u, self.p, self.qp)
+	# def preconditioner(self):
+	# 	return Preconditioner(self.u, self.p, self.qp)
 
 def main():
-
-	if True:
+	if False:
 		V = Mini3D()
 		Q = Tet4()
 	else:

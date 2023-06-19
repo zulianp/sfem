@@ -72,7 +72,7 @@ CUFLAGS += --compiler-options "-fPIC $(CXXFLAGS)" -std=c++14 -arch=sm_60  #-arch
 INCLUDES += -I$(PWD) -I$(PWD)/.. -I$(PWD)/../matrix.io 
 
 # Assemble systems
-GOALS = assemble assemble3 assemble4 
+GOALS = assemble assemble3 assemble4 stokes
 
 # Mesh manipulation
 GOALS += partition select_submesh refine skin select_surf volumes sfc
@@ -230,6 +230,9 @@ assemble3 : assemble3.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 assemble4 : assemble4.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+stokes : stokes.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 assemble_adjaciency_matrix: assemble_adjaciency_matrix.o libsfem.a
