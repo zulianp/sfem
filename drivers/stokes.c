@@ -702,6 +702,7 @@ int main(int argc, char *argv[]) {
     // TODO
 
     {
+        // Write block CRS matrix
         block_crs_t crs_out;
         crs_out.rowptr = (char *)rowptr;
         crs_out.colidx = (char *)colidx;
@@ -727,6 +728,15 @@ int main(int argc, char *argv[]) {
         char format_values[1024 * 10];
         sprintf(format_values, "%s/values.%%d.raw", output_folder);
         block_crs_write(comm, path_rowptr, path_colidx, format_values, &crs_out);
+    }
+
+    {
+        char path[1024 * 10];
+        // Write rhs vectors
+        for (int d = 0; d < n_vars; d++) {
+            sprintf(path, "%s/rhs.%d.raw", output_folder, d);
+            array_write(comm, path, SFEM_MPI_REAL_T, rhs[d], mesh.nnodes, mesh.nnodes);
+        }
     }
 
     tock = MPI_Wtime();

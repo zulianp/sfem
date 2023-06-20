@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import numpy as np
 import scipy as sp
 import sys
@@ -82,6 +84,15 @@ def read_block_crs(rb, cb, folder, export_folder=None):
 
 	A = sp.sparse.csr_matrix((data, colidx, rowptr), shape=(N*rb, N*cb)) 
 	return A
+
+if __name__ == '__main__':
+	argv = sys.argv
+	if len(argv) != 5:
+		print(f'usage {argv[0]} <br> <bc> <folder> <output>')
+		exit(1)
+
+	read_block_crs(int(argv[1]), int(argv[2]), argv[3], argv[4])
+
 
 # def read_block_crs(rb, cb, folder):
 # 	rowptr = np.fromfile(f'{folder}/rowptr.raw', dtype=idx_t)
