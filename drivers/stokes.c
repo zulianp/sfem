@@ -699,8 +699,6 @@ int main(int argc, char *argv[]) {
     // Write to disk
     ///////////////////////////////////////////////////////////////////////////////
 
-    // TODO
-
     {
         // Write block CRS matrix
         block_crs_t crs_out;
