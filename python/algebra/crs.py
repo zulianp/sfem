@@ -8,7 +8,11 @@ import matplotlib.pyplot as plt
 idx_t = np.int32
 real_t = np.float64
 
-def read_crs(folder)
+def mkdir(path):
+	if not os.path.exists(path):
+		os.makedirs(path)
+
+def read_crs(folder):
 	rowptr = np.fromfile(f'{folder}/rowptr.raw', dtype=idx_t)
 	colidx = np.fromfile(f'{folder}/colidx.raw', dtype=idx_t)
 	data   = np.fromfile(f'{folder}/values.raw', dtype=real_t)
@@ -16,19 +20,89 @@ def read_crs(folder)
 	A = sp.sparse.csr_matrix((data, colidx, rowptr), shape=(N, N)) 
 	return A
 
-def read_block_crs(rb, cb, folder):
-	rowptr = np.fromfile(f'{folder}/rowptr.raw', dtype=idx_t)
-	colidx = np.fromfile(f'{folder}/colidx.raw', dtype=idx_t)
+def read_block_crs(rb, cb, folder, export_folder=None):
+	block_rowptr = np.fromfile(f'{folder}/rowptr.raw', dtype=idx_t)
+	block_colidx = np.fromfile(f'{folder}/colidx.raw', dtype=idx_t)
 
-	nnz = len(colidx)
-	N = len(rowptr) - 1
+	block_nnz = len(block_colidx)
+	N = len(block_rowptr) - 1
 
-	data = np.zeros((rb, rc, nnz))
+	nnz = rb * cb * block_nnz
+	data = np.zeros(nnz, dtype=real_t)
+
+	nrows = rb * N
+	rowptr = np.zeros(rb * N + 1, dtype=idx_t)-1
+	colidx = np.zeros(nnz, dtype=idx_t)-1
+
+	rowptr[0:N] = block_rowptr[0:N] * cb
+	for r in range(1, rb):
+		prev = (r-1) * N
+		s = r * N
+		e = s + N
+		rowptr[s:e]  = rowptr[prev:s]
+		rowptr[s:e] += block_nnz  * cb
+
+	last = block_rowptr[N] - block_rowptr[N - 1]
+	rowptr[nrows] = rowptr[nrows - 1] + (last * cb)
+
+	assert(rowptr[nrows]  == nnz)
+
+	for r in range(0, rb):
+		for i in range(0, N):
+			br_begin  = block_rowptr[i]
+			br_end    = block_rowptr[i + 1]
+			br_extent = br_end - br_begin
+
+			r_offset = r * N + i
+			r_begin = rowptr[r_offset]
+			r_end   = rowptr[r_offset + 1]
+			r_extent = r_end - r_begin
+
+			for c in range(0, cb):
+				offset = r_begin + c
+				rr = range(offset, offset + (br_extent * cb), cb)
+				# print(rr)
+				colidx[rr] = block_colidx[br_begin:br_end] + c * N
+
 	for r in range(0, rb):
 		for c in range(0, cb):
 			path = f'{folder}/values.{r*cb+c}.raw'
+			print(path)
 			d = np.fromfile(path, dtype=real_t)
-			data[r, c, :] = d
-			
-	A = sp.sparse.bsr_matrix((data, colidx, rowptr), shape=(N, N)) 
+			s = (r * cb + c) * block_nnz
+			e = s + block_nnz
+			data[s:e] = d
+
+	if export_folder != None:
+		mkdir(export_folder)
+
+		rowptr.tofile(f'{export_folder}/rowptr.raw')
+		colidx.tofile(f'{export_folder}/colidx.raw')
+		data.tofile(f'{export_folder}/values.raw')
+
+	A = sp.sparse.csr_matrix((data, colidx, rowptr), shape=(N*rb, N*cb)) 
 	return A
+
+# def read_block_crs(rb, cb, folder):
+# 	rowptr = np.fromfile(f'{folder}/rowptr.raw', dtype=idx_t)
+# 	colidx = np.fromfile(f'{folder}/colidx.raw', dtype=idx_t)
+
+# 	nnz = len(colidx)
+# 	N = len(rowptr) - 1
+
+# 	data = np.zeros((rb, cb, nnz))
+# 	for r in range(0, rb):
+# 		for c in range(0, cb):
+# 			path = f'{folder}/values.{r*cb+c}.raw'
+# 			print(path)
+# 			d = np.fromfile(path, dtype=real_t)
+# 			data[r, c, :] = d
+	
+# 	data_t = data.transpose()
+
+# 	print(N)
+# 	print(colidx.shape)
+# 	print(data_t.shape)
+
+# 	A = sp.sparse.bsr_matrix((data_t, colidx, rowptr), blocksize=(rb,cb), shape=(N, N)) 
+# 	return A
