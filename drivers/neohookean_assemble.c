@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
     build_crs_graph(mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
     nnz = rowptr[nnodes];
 
-    real_t **values = (real_t **)malloc(9 * sizeof(real_t *));
+    real_t **values = (real_t **)malloc(dims * dims * sizeof(real_t *));
 
     for (int b = 0; b < dims * dims; b++) {
         values[b] = (real_t *)calloc(nnz, sizeof(real_t));
