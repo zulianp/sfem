@@ -96,16 +96,15 @@ static SFEM_INLINE void neohookean_energy(const real_t mu,
     const real_t x63 = x27 * x51 + x29 * x54 + x32 * x49 + x34 * x55 + 1;
     const real_t x64 = x36 * x44 + x39 * x45 + x40 * x43 + x41 * x46 + 1;
     const real_t x65 = x21 * x58 + x28 * x59 + x31 * x57 + x33 * x60 + 1;
-    const real_t x66 =
-        log(x35 * x56 * x61 - x35 * x62 * x64 + x42 * x47 * x62 - x42 * x56 * x65 - x47 * x61 * x63 + x63 * x64 * x65);
-    *element_energy =
-        ((1.0 / 2.0) * lambda * pow(x66, 2) - mu * x66 +
-         (1.0 / 2.0) * mu *
-             (pow(x35, 2) + pow(x42, 2) + pow(x47, 2) + pow(x56, 2) + pow(x61, 2) + pow(x62, 2) + pow(x63, 2) +
-              pow(x64, 2) + pow(x65, 2) - 3)) *
-        (-x1 * x11 * x13 + x1 * x3 * x5 + x11 * x17 * x9 + x13 * x15 * x7 - x15 * x17 * x3 - x5 * x7 * x9);
+    const real_t x66 = log(x35 * x56 * x61 - x35 * x62 * x64 + x42 * x47 * x62 - x42 * x56 * x65 -
+                           x47 * x61 * x63 + x63 * x64 * x65);
+    *element_energy = ((1.0 / 2.0) * lambda * pow(x66, 2) - mu * x66 +
+                       (1.0 / 2.0) * mu *
+                           (pow(x35, 2) + pow(x42, 2) + pow(x47, 2) + pow(x56, 2) + pow(x61, 2) +
+                            pow(x62, 2) + pow(x63, 2) + pow(x64, 2) + pow(x65, 2) - 3)) *
+                      (-x1 * x11 * x13 + x1 * x3 * x5 + x11 * x17 * x9 + x13 * x15 * x7 -
+                       x15 * x17 * x3 - x5 * x7 * x9);
 }
-
 
 static SFEM_INLINE void neohookean_gradient(const real_t mu,
                                             const real_t lambda,
@@ -144,7 +143,8 @@ static SFEM_INLINE void neohookean_gradient(const real_t mu,
     const real_t x15 = -x14;
     const real_t x16 = px0 - px3;
     const real_t x17 = -1.0 / 6.0 * x16;
-    const real_t x18 = -x1 * x11 * x13 + x1 * x3 * x5 + x11 * x17 * x9 + x13 * x15 * x7 - x15 * x17 * x3 - x5 * x7 * x9;
+    const real_t x18 = -x1 * x11 * x13 + x1 * x3 * x5 + x11 * x17 * x9 + x13 * x15 * x7 -
+                       x15 * x17 * x3 - x5 * x7 * x9;
     const real_t x19 = x0 * x12 - x16 * x8;
     const real_t x20 = x2 * x4;
     const real_t x21 = x12 * x6;
@@ -276,7 +276,10 @@ static SFEM_INLINE int find_col(const idx_t key, const idx_t *const row, const i
     }
 }
 
-static SFEM_INLINE void find_cols4(const idx_t *targets, const idx_t *const row, const int lenrow, int *ks) {
+static SFEM_INLINE void find_cols4(const idx_t *targets,
+                                   const idx_t *const row,
+                                   const int lenrow,
+                                   int *ks) {
     if (lenrow > 32) {
         for (int d = 0; d < 4; ++d) {
             ks[d] = find_col(targets[d], row, lenrow);
@@ -333,7 +336,8 @@ static SFEM_INLINE void neohookean_hessian(const real_t mu,
     const real_t x15 = -x14;
     const real_t x16 = px0 - px3;
     const real_t x17 = -1.0 / 6.0 * x16;
-    const real_t x18 = -x1 * x11 * x13 + x1 * x3 * x5 + x11 * x17 * x9 + x13 * x15 * x7 - x15 * x17 * x3 - x5 * x7 * x9;
+    const real_t x18 = -x1 * x11 * x13 + x1 * x3 * x5 + x11 * x17 * x9 + x13 * x15 * x7 -
+                       x15 * x17 * x3 - x5 * x7 * x9;
     const real_t x19 = x2 * x4;
     const real_t x20 = x10 * x12;
     const real_t x21 = x19 - x20;
@@ -715,30 +719,30 @@ static SFEM_INLINE void neohookean_hessian(const real_t mu,
     const real_t x397 = x201 * x249 + x202 * x243 + x203 * x245;
     const real_t x398 = x201 * x252 + x202 * x256 + x203 * x254;
     const real_t x399 = x18 * (x201 * x398 + x202 * x397 + x203 * x396);
-    const real_t x400 =
-        x18 * (x207 * (x201 * x259 + x202 * x261 + x203 * x260) + x208 * (x201 * x264 + x202 * x263 + x203 * x265) +
-               x209 * (x201 * x268 + x202 * x269 + x203 * x267));
+    const real_t x400 = x18 * (x207 * (x201 * x259 + x202 * x261 + x203 * x260) +
+                               x208 * (x201 * x264 + x202 * x263 + x203 * x265) +
+                               x209 * (x201 * x268 + x202 * x269 + x203 * x267));
     const real_t x401 = x18 * (x207 * x393 + x208 * x395 + x209 * x394);
     const real_t x402 = x18 * (x207 * x398 + x208 * x397 + x209 * x396);
     const real_t x403 = x201 * x292 + x202 * x289 + x203 * x290;
     const real_t x404 = x201 * x287 + x202 * x284 + x203 * x281;
     const real_t x405 = x201 * x294 + x202 * x295 + x203 * x296;
-    const real_t x406 =
-        x18 * (x207 * (x201 * x302 + x202 * x303 + x203 * x304) + x208 * (x201 * x300 + x202 * x298 + x203 * x299) +
-               x209 * (x201 * x308 + x202 * x307 + x203 * x306));
-    const real_t x407 =
-        x18 * (x207 * (x201 * x315 + x202 * x317 + x203 * x316) + x208 * (x201 * x321 + x202 * x319 + x203 * x320) +
-               x209 * (x201 * x313 + x202 * x312 + x203 * x311));
+    const real_t x406 = x18 * (x207 * (x201 * x302 + x202 * x303 + x203 * x304) +
+                               x208 * (x201 * x300 + x202 * x298 + x203 * x299) +
+                               x209 * (x201 * x308 + x202 * x307 + x203 * x306));
+    const real_t x407 = x18 * (x207 * (x201 * x315 + x202 * x317 + x203 * x316) +
+                               x208 * (x201 * x321 + x202 * x319 + x203 * x320) +
+                               x209 * (x201 * x313 + x202 * x312 + x203 * x311));
     const real_t x408 = x18 * (x207 * x405 + x208 * x403 + x209 * x404);
-    const real_t x409 =
-        x18 * (x207 * (x117 * x207 + x124 * x208 + x128 * x209) + x208 * (x148 * x208 + x150 * x207 + x152 * x209) +
-               x209 * (x135 * x209 + x137 * x207 + x141 * x208));
-    const real_t x410 =
-        x18 * (x207 * (x188 * x207 + x190 * x208 + x192 * x209) + x208 * (x160 * x208 + x164 * x207 + x168 * x209) +
-               x209 * (x175 * x209 + x177 * x208 + x181 * x207));
-    const real_t x411 =
-        x18 * (x207 * (x207 * x252 + x208 * x256 + x209 * x254) + x208 * (x207 * x249 + x208 * x243 + x209 * x245) +
-               x209 * (x207 * x236 + x208 * x240 + x209 * x232));
+    const real_t x409 = x18 * (x207 * (x117 * x207 + x124 * x208 + x128 * x209) +
+                               x208 * (x148 * x208 + x150 * x207 + x152 * x209) +
+                               x209 * (x135 * x209 + x137 * x207 + x141 * x208));
+    const real_t x410 = x18 * (x207 * (x188 * x207 + x190 * x208 + x192 * x209) +
+                               x208 * (x160 * x208 + x164 * x207 + x168 * x209) +
+                               x209 * (x175 * x209 + x177 * x208 + x181 * x207));
+    const real_t x411 = x18 * (x207 * (x207 * x252 + x208 * x256 + x209 * x254) +
+                               x208 * (x207 * x249 + x208 * x243 + x209 * x245) +
+                               x209 * (x207 * x236 + x208 * x240 + x209 * x232));
     element_matrix[0] = x18 * (x105 * x88 + x111 * x94 + x83 * x95);
     element_matrix[1] = x154;
     element_matrix[2] = x194;
@@ -856,9 +860,9 @@ static SFEM_INLINE void neohookean_hessian(const real_t mu,
     element_matrix[114] = x390;
     element_matrix[115] = x400;
     element_matrix[116] = x406;
-    element_matrix[117] =
-        x18 * (x207 * (x102 * x208 + x104 * x209 + x207 * x99) + x208 * (x207 * x87 + x208 * x82 + x209 * x93) +
-               x209 * (x108 * x209 + x109 * x208 + x110 * x207));
+    element_matrix[117] = x18 * (x207 * (x102 * x208 + x104 * x209 + x207 * x99) +
+                                 x208 * (x207 * x87 + x208 * x82 + x209 * x93) +
+                                 x209 * (x108 * x209 + x109 * x208 + x110 * x207));
     element_matrix[118] = x409;
     element_matrix[119] = x410;
     element_matrix[120] = x211;
@@ -871,9 +875,9 @@ static SFEM_INLINE void neohookean_hessian(const real_t mu,
     element_matrix[127] = x401;
     element_matrix[128] = x407;
     element_matrix[129] = x409;
-    element_matrix[130] =
-        x18 * (x207 * (x207 * x222 + x208 * x225 + x209 * x223) + x208 * (x207 * x229 + x208 * x227 + x209 * x228) +
-               x209 * (x207 * x217 + x208 * x220 + x209 * x214));
+    element_matrix[130] = x18 * (x207 * (x207 * x222 + x208 * x225 + x209 * x223) +
+                                 x208 * (x207 * x229 + x208 * x227 + x209 * x228) +
+                                 x209 * (x207 * x217 + x208 * x220 + x209 * x214));
     element_matrix[131] = x411;
     element_matrix[132] = x212;
     element_matrix[133] = x279;
@@ -886,9 +890,9 @@ static SFEM_INLINE void neohookean_hessian(const real_t mu,
     element_matrix[140] = x408;
     element_matrix[141] = x410;
     element_matrix[142] = x411;
-    element_matrix[143] =
-        x18 * (x207 * (x207 * x294 + x208 * x295 + x209 * x296) + x208 * (x207 * x292 + x208 * x289 + x209 * x290) +
-               x209 * (x207 * x287 + x208 * x284 + x209 * x281));
+    element_matrix[143] = x18 * (x207 * (x207 * x294 + x208 * x295 + x209 * x296) +
+                                 x208 * (x207 * x292 + x208 * x289 + x209 * x290) +
+                                 x209 * (x207 * x287 + x208 * x284 + x209 * x281));
 }
 
 static int check_symmetric(int n, const real_t *const element_matrix) {
@@ -1010,7 +1014,8 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
 
                     for (int bi = 0; bi < block_size; ++bi) {
                         const real_t val =
-                            element_matrix[(edof_i * block_size + bi) * block_size * 4 + edof_j * block_size + bj];
+                            element_matrix[(edof_i * block_size + bi) * block_size * 4 +
+                                           edof_j * block_size + bj];
 
                         assert(val == val);
 
@@ -1239,8 +1244,9 @@ static SFEM_INLINE void cauchy_stress_6(const real_t mu,
     const real_t x78 = mu * x54 - x65 * x77 + x66 * x77;
     const real_t x79 = -x39 * x52 + x56 * x60;
     const real_t x80 = mu * x58 - x65 * x79 + x66 * x79;
-    stress[0] = x63 * (x26 * (mu * x26 - x65 * x67 + x66 * x67) + x52 * (mu * x52 - x64 * x65 + x64 * x66) +
-                       x60 * (mu * x60 - x65 * x68 + x66 * x68));
+    stress[0] =
+        x63 * (x26 * (mu * x26 - x65 * x67 + x66 * x67) + x52 * (mu * x52 - x64 * x65 + x64 * x66) +
+               x60 * (mu * x60 - x65 * x68 + x66 * x68));
     stress[1] = x63 * (x26 * x70 + x52 * x74 + x60 * x72);
     stress[2] = x63 * (x26 * x80 + x52 * x76 + x60 * x78);
     stress[3] = x63 * (x39 * x72 + x53 * x70 + x56 * x74);
@@ -1356,7 +1362,8 @@ static SFEM_INLINE void vonmises(const real_t mu,
     const real_t x86 = x64 * (x28 * x76 + x51 * x78 + x53 * x74);
     const real_t x87 = -x64 * (x44 * x82 + x52 * x80 + x61 * x84);
     element_scalar[0] =
-        sqrt(x72 * pow(x28 * x67 + x51 * x69 + x53 * x71, 2) + x72 * pow(x33 * x84 + x55 * x80 + x59 * x82, 2) +
+        sqrt(x72 * pow(x28 * x67 + x51 * x69 + x53 * x71, 2) +
+             x72 * pow(x33 * x84 + x55 * x80 + x59 * x82, 2) +
              x72 * pow(x44 * x74 + x52 * x78 + x61 * x76, 2) + (1.0 / 2.0) * pow(-x85 + x86, 2) +
              (1.0 / 2.0) * pow(x85 + x87, 2) + (1.0 / 2.0) * pow(-x86 - x87, 2));
 }
@@ -1555,4 +1562,101 @@ void neohookean_vonmises_soa(const ptrdiff_t nelements,
 
         out[i] = element_stress;
     }
+}
+
+void neohookean_assemble_hessian_soa(const ptrdiff_t nelements,
+                                     const ptrdiff_t nnodes,
+                                     idx_t **const SFEM_RESTRICT elems,
+                                     geom_t **const SFEM_RESTRICT xyz,
+                                     const real_t mu,
+                                     const real_t lambda,
+                                     real_t **const SFEM_RESTRICT displacement,
+                                     idx_t *const SFEM_RESTRICT rowptr,
+                                     idx_t *const SFEM_RESTRICT colidx,
+                                     real_t **const SFEM_RESTRICT values) {
+    SFEM_UNUSED(nnodes);
+
+    const double tick = MPI_Wtime();
+
+    idx_t ev[4];
+    idx_t ks[4];
+
+    real_t element_matrix[(4 * 3) * (4 * 3)];
+    real_t element_displacement[(4 * 3)];
+
+    static const int block_size = 3;
+    static const int mat_block_size = block_size * block_size;
+
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma unroll(4)
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        // Element indices
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+        const idx_t i3 = ev[3];
+
+        for (int enode = 0; enode < 4; ++enode) {
+            const idx_t edof = enode * block_size;
+            const idx_t dof = ev[enode] * block_size;
+
+            for (int b = 0; b < block_size; ++b) {
+                element_displacement[edof + b] = displacement[b][dof];
+            }
+        }
+
+        neohookean_hessian(
+            // Model parameters
+            mu,
+            lambda,
+            // X-coordinates
+            xyz[0][i0],
+            xyz[0][i1],
+            xyz[0][i2],
+            xyz[0][i3],
+            // Y-coordinates
+            xyz[1][i0],
+            xyz[1][i1],
+            xyz[1][i2],
+            xyz[1][i3],
+            // Z-coordinates
+            xyz[2][i0],
+            xyz[2][i1],
+            xyz[2][i2],
+            xyz[2][i3],
+            // element dispalcement
+            element_displacement,
+            // output matrix
+            element_matrix);
+
+        assert(!check_symmetric(4 * block_size, element_matrix));
+
+        for (int edof_i = 0; edof_i < 4; ++edof_i) {
+            const idx_t dof_i = elems[edof_i][i];
+            const idx_t r_begin = rowptr[dof_i];
+            const idx_t lenrow = rowptr[dof_i + 1] - r_begin;
+            const idx_t *row = &colidx[rowptr[dof_i]];
+            find_cols4(ev, row, lenrow, ks);
+
+            for (int bi = 0; bi < block_size; ++bi) {
+                const int offset_bi = (edof_i * block_size + bi) * block_size * 4;
+                for (int bj = 0; bj < block_size; ++bj) {
+                    real_t *const row_values = &values[bi * block_size + bj][r_begin];
+
+                    for (int edof_j = 0; edof_j < 4; ++edof_j) {
+                        const real_t val = element_matrix[offset_bi + (edof_j * block_size + bj)];
+
+                        assert(val == val);
+                        row_values[ks[edof_j]] += val;
+                    }
+                }
+            }
+        }
+    }
+
+    const double tock = MPI_Wtime();
+    printf("neohookean.c: neohookean_assemble_hessian_soa\t%g seconds\n", tock - tick);
 }

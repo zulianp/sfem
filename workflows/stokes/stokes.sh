@@ -12,8 +12,6 @@ PATH=$SCRIPTPATH/../../python/algebra:$PATH
 PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 UTOPIA_EXEC=$CODE_DIR/utopia/utopia/build/utopia_exec
-# UTOPIA_EXEC=$CODE_DIR/utopia/utopia/build_debug/utopia_exec
-
 
 if [[ -z "$UTOPIA_EXEC" ]]
 then
@@ -31,8 +29,6 @@ solve()
 	mpiexec -np 8 \
 	$UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type lu -ksp_type preonly
 }
-
-# mesh=$SCRIPTPATH/../../data/benchmarks/4_rectangle/mesh
 
 mesh=mesh
 create_square.sh 4
@@ -53,4 +49,3 @@ unblocks.py $nvars x.raw
 unblocks.py $nvars stokes_system/rhs.raw
 
 raw_to_db.py $mesh out.vtk --point_data="x.*.raw,stokes_system/rhs.*.raw"
-# split --bytes= --numeric-suffixes  x.raw 

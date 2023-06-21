@@ -72,16 +72,15 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     const char *folder = argv[1];
-    // char path[1024 * 10];
-    ptrdiff_t nnodes = 0;
-    geom_t *xyz[3];
 
-    ptrdiff_t nelements = 0;
-    idx_t *elems[4];
-
-    if (serial_read_tet_mesh(folder, &nelements, elems, &nnodes, xyz)) {
+    mesh_t mesh;
+    if (mesh_read(comm, folder, &mesh)) {
         return EXIT_FAILURE;
     }
+
+    ptrdiff_t nnodes = mesh.nnodes;
+    ptrdiff_t nelements = mesh.nelements;
+
 
     // TODO read displacement from file
     real_t *displacement = malloc(nnodes * 3 * sizeof(real_t));
@@ -103,7 +102,7 @@ int main(int argc, char *argv[]) {
     idx_t *colidx = 0;
     real_t *values = 0;
 
-    build_crs_graph(nelements, nnodes, elems, &rowptr, &colidx);
+    build_crs_graph(mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
 
     nnz = rowptr[nnodes];
     values = (real_t *)malloc(nnz * 9 * sizeof(real_t));
@@ -119,10 +118,10 @@ int main(int argc, char *argv[]) {
 
     neohookean_assemble_hessian(
         // Mesh
-        nelements,
-        nnodes,
-        elems,
-        xyz,
+        mesh.nelements,
+        mesh.nnodes,
+        mesh.elements,
+        mesh.points,
         // Material
         mu,
         lambda,
@@ -258,15 +257,8 @@ int main(int argc, char *argv[]) {
     free(rowptr);
     free(colidx);
     free(values);
-    // free(rhs);
 
-    for (int d = 0; d < 3; ++d) {
-        free(xyz[d]);
-    }
-
-    for (int i = 0; i < 4; ++i) {
-        free(elems[i]);
-    }
+    mesh_destroy(&mesh);
 
     tock = MPI_Wtime();
 
