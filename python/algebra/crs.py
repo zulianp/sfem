@@ -61,10 +61,9 @@ def read_block_crs(rb, cb, folder, export_folder=None):
 			r_extent = r_end - r_begin
 
 			for c in range(0, cb):
-				offset = r_begin + c
-				rr = range(offset, offset + (br_extent * cb), cb)
-				# print(rr)
-				colidx[rr] = block_colidx[br_begin:br_end] + c * N
+				s = r_begin + c * br_extent
+				e = s + br_extent
+				colidx[s:e] = block_colidx[br_begin:br_end] + c * N
 
 	for r in range(0, rb):
 		for c in range(0, cb):

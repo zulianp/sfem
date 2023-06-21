@@ -9,13 +9,19 @@ def main(argv):
 	nrefs = 1
 
 	if(len(argv) < 2):
-		print(f'usage: {argv[0]} <output_db.vtk> [nrefs=1]')
+		print(f'usage: {argv[0]} <output_db.vtk> [nrefs=1] [width] [height]')
 		exit(1)
 
 	output = argv[1]
 	nrefs = int(argv[2])
-	length=2
+	width=2
 	height=1
+
+	if len(argv) > 3:
+		width = float(argv[3])
+
+	if len(argv) > 4:
+		height = float(argv[4])
 
 	gmsh.initialize(argv=["","-bin"])
 	gmsh.option.setNumber("General.Terminal", 0)
@@ -24,7 +30,7 @@ def main(argv):
 	model = gmsh.model()
 	model.add("Rectangle")
 	model.setCurrent("Rectangle")
-	model.occ.addRectangle(.0, 0, 0, length, height)
+	model.occ.addRectangle(.0, 0, 0, width, height)
 
 	# Generate mesh
 	model.occ.synchronize()
