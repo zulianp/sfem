@@ -36,8 +36,8 @@ create_square.sh 4
 nvars=2
 
 dirichlet_nodes=all.raw
-top=$mesh/sidesets_aos/top.raw 
-bottom=$mesh/sidesets_aos/bottom.raw 
+top=$mesh/sidesets_aos/stop.raw 
+bottom=$mesh/sidesets_aos/sbottom.raw 
 
 cat $top 	>  $dirichlet_nodes
 cat $bottom >> $dirichlet_nodes
