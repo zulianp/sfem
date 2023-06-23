@@ -125,6 +125,13 @@ int main(int argc, char *argv[]) {
         values
     );
 
+
+    real_t **rhs = (real_t **)malloc(dims * sizeof(real_t *));
+    for (int b = 0; b < dims; b++) {
+        rhs[b] =  (real_t *)calloc(nnodes, sizeof(real_t));
+    }
+
+
     tock = MPI_Wtime();
     printf("neohookean_assemble.c: assembly\t\t%g seconds\n", tock - tack);
     tack = tock;
@@ -172,13 +179,13 @@ int main(int argc, char *argv[]) {
         block_crs_write(comm, path_rowptr, path_colidx, format_values, &crs_out);
     }
 
-    // {
-    //     char path[1024 * 10];
-    //     for(int b = 0; b < 3; b++) {
-    //         sprintf(path, "%s/rhs.%d.raw", output_folder, b);
-    //         array_write(comm, path, value_type, &rhs[b], nnodes, nnodes);
-    //     }
-    // }
+    {
+        char path[1024 * 10];
+        for(int b = 0; b < dims; b++) {
+            sprintf(path, "%s/rhs.%d.raw", output_folder, b);
+            array_write(comm, path, value_type, &rhs[b], nnodes, nnodes);
+        }
+    }
 
     tock = MPI_Wtime();
     printf("neohookean_assemble.c: write\t\t%g seconds\n", tock - tack);
@@ -196,6 +203,12 @@ int main(int argc, char *argv[]) {
     }
 
     free(values);
+
+    for(int b = 0; b < dims; b++) {
+        free(rhs[b]);
+    }
+
+    free(rhs);
 
     mesh_destroy(&mesh);
 

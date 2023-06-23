@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
         sprintf(values_path, "%s/values.%%d.raw", output_folder);
 
         block_crs_write(comm, rowptr_path, colidx_path, values_path, &crs);
-        // block_crs_free(&crs); //TODO
+        block_crs_free(&crs);
 
     } else {
         sprintf(values_path, "%s/values.raw", crs_folder);
@@ -112,7 +112,6 @@ int main(int argc, char *argv[]) {
                                          (const idx_t *)crs.rowptr,
                                          (const idx_t *)crs.colidx,
                                          (real_t *)crs.values);
-
 
         crs_write_folder(comm, output_folder, &crs);
         crs_free(&crs);
