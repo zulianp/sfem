@@ -3,10 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../matrix.io/array_dtof.h"
-#include "../matrix.io/matrixio_array.h"
-#include "../matrix.io/matrixio_crs.h"
-#include "../matrix.io/utils.h"
+#include "matrix.io/array_dtof.h"
+#include "matrix.io/matrixio_array.h"
+#include "matrix.io/matrixio_crs.h"
+#include "matrix.io/utils.h"
 
 #include "crs_graph.h"
 #include "sfem_base.h"
@@ -67,7 +67,6 @@ int main(int argc, char *argv[]) {
     const int dims = mesh.spatial_dim;
 
     real_t **displacement = (real_t **)malloc(dims * sizeof(real_t *));
-
     for (int b = 0; b < dims * dims; b++) {
         displacement[b] = (real_t *)calloc(nnodes, sizeof(real_t));
     }
@@ -77,12 +76,12 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_MU, atof);
     SFEM_READ_ENV(SFEM_LAMBDA, atof);
 
-    const char * path_pattern_disp = 0;
+    const char *path_pattern_disp = 0;
     SFEM_READ_ENV(path_pattern_disp, );
 
-    if(path_pattern_disp) {
+    // if (path_pattern_disp) {
         // TODO
-    }
+    // }
 
     double tack = MPI_Wtime();
     printf("neohookean_assemble.c: read\t\t%g seconds\n", tack - tick);
@@ -98,7 +97,6 @@ int main(int argc, char *argv[]) {
     nnz = rowptr[nnodes];
 
     real_t **values = (real_t **)malloc(dims * dims * sizeof(real_t *));
-
     for (int b = 0; b < dims * dims; b++) {
         values[b] = (real_t *)calloc(nnz, sizeof(real_t));
     }
@@ -124,7 +122,8 @@ int main(int argc, char *argv[]) {
         // Output
         rowptr,
         colidx,
-        values);
+        values
+    );
 
     tock = MPI_Wtime();
     printf("neohookean_assemble.c: assembly\t\t%g seconds\n", tock - tack);
@@ -155,6 +154,7 @@ int main(int argc, char *argv[]) {
         crs_out.lrows = nnodes;
         crs_out.lnnz = nnz;
         crs_out.gnnz = nnz;
+        crs_out.block_size = dims * dims; 
         crs_out.start = 0;
         crs_out.rowoffset = 0;
         crs_out.rowptr_type = SFEM_MPI_COUNT_T;
@@ -190,6 +190,11 @@ int main(int argc, char *argv[]) {
 
     free(rowptr);
     free(colidx);
+
+    for (int b = 0; b < dims * dims; b++) {
+        free(values[b]);
+    }
+
     free(values);
 
     mesh_destroy(&mesh);

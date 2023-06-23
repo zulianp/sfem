@@ -94,6 +94,7 @@ GOALS += pizzastack_to_mesh
 
 # Application of operators
 GOALS += divergence lapl lumped_mass_inv lumped_boundary_mass_inv u_dot_grad_q
+GOALS += crs_apply_dirichlet
 
 # Array utilities
 GOALS += soa_to_aos roi
@@ -233,6 +234,9 @@ assemble4 : assemble4.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 stokes : stokes.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+crs_apply_dirichlet : crs_apply_dirichlet.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 neohookean_assemble : neohookean_assemble.o libsfem.a
