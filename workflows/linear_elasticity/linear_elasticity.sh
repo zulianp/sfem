@@ -32,7 +32,8 @@ solve()
 }
 
 mesh=mesh
-# create_square.sh 4
+# create_square.sh 0
+# rm $mesh/z.raw
 nvars=2
 
 dirichlet_nodes=all.raw
@@ -46,11 +47,17 @@ neumman_system=neumman_system
 block_system=block_system
 system=system
 
+rm -rf $neumman_system
+rm -rf $block_system
+rm -rf $system
+
 
 export SFEM_MU=1
 export SFEM_LAMBDA=1
-neohookean_assemble $mesh $block_system
-crs_apply_dirichlet $nvars $nvars $neumman_system $dirichlet_nodes 1 $system
+
+set -x
+linear_elasticity_assemble $mesh $neumman_system
+crs_apply_dirichlet $nvars $nvars $neumman_system $dirichlet_nodes 1 $block_system
 
 # for ((i = 0; i < $nvars; i++))
 # do
@@ -58,16 +65,16 @@ crs_apply_dirichlet $nvars $nvars $neumman_system $dirichlet_nodes 1 $system
 # done
 
 smask $top $neumman_system/rhs.1.raw $block_system/rhs.1.raw 0.1
-smask $bottom $system/rhs.1.raw $block_system/rhs.1.raw 0.1
+smask $bottom $block_system/rhs.1.raw $block_system/rhs.1.raw "-0.1"
 cp $neumman_system/rhs.0.raw $block_system/rhs.0.raw 
 
 # stokes $mesh stokes_block_system
 crs.py $nvars $nvars $block_system $system
 blocks.py $block_system'/rhs.*.raw' $system/rhs.raw
 
-solve system/rowptr.raw system/rhs.raw x.raw
+solve $system/rowptr.raw $system/rhs.raw x.raw
 
 unblocks.py $nvars x.raw
-unblocks.py $nvars stokes_system/rhs.raw
+unblocks.py $nvars $system/rhs.raw
 
 raw_to_db.py $mesh out.vtk --point_data="x.*.raw,system/rhs.*.raw"

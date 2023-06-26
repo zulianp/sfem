@@ -13,6 +13,7 @@ real_t = np.float64
 
 def read_block_vector(pattern, export_path=None):
 	paths = glob.glob(pattern, recursive=False)
+	paths.sort()
 
 	rb = len(paths)
 

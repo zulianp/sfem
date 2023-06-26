@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "matrix.io/array_dtof.h"
 #include "matrix.io/matrixio_array.h"
@@ -37,6 +38,12 @@ int main(int argc, char *argv[]) {
     const char *output_folder = argv[2];
     printf("%s %s %s\n", argv[0], argv[1], output_folder);
 
+    struct stat st = {0};
+    if (stat(output_folder, &st) == -1) {
+        mkdir(output_folder, 0700);
+    }
+
+
     int SFEM_HANDLE_DIRICHLET = 0;
     int SFEM_EXPORT_FP32 = 0;
 
@@ -65,6 +72,8 @@ int main(int argc, char *argv[]) {
     ptrdiff_t nnodes = mesh.nnodes;
     ptrdiff_t nelements = mesh.nelements;
     const int dims = mesh.spatial_dim;
+
+    printf("spatial_dim=%d\n",dims);
 
     // real_t **displacement = (real_t **)malloc(dims * sizeof(real_t *));
     // for (int b = 0; b < dims * dims; b++) {
@@ -144,9 +153,9 @@ int main(int argc, char *argv[]) {
             array_dtof(nnz, (const real_t *)&values[b], (float *)&values[b]);
         }
 
-        // for (int b = 0; b < dims; b++) {
-        //     array_dtof(nnodes, (const real_t *)&rhs[b], (float *)&values[b]);
-        // }
+        for (int b = 0; b < dims; b++) {
+            array_dtof(nnodes, (const real_t *)&rhs[b], (float *)&values[b]);
+        }
     }
 
     {
@@ -180,7 +189,7 @@ int main(int argc, char *argv[]) {
         char path[1024 * 10];
         for(int b = 0; b < dims; b++) {
             sprintf(path, "%s/rhs.%d.raw", output_folder, b);
-            array_write(comm, path, value_type, &rhs[b], nnodes, nnodes);
+            array_write(comm, path, value_type, rhs[b], nnodes, nnodes);
         }
     }
 
@@ -201,11 +210,11 @@ int main(int argc, char *argv[]) {
 
     free(values);
 
-    for(int b = 0; b < dims; b++) {
-        free(rhs[b]);
-    }
+    // for(int b = 0; b < dims; b++) {
+    //     free(rhs[b]);
+    // }
 
-    free(rhs);
+    // free(rhs);
 
     mesh_destroy(&mesh);
 

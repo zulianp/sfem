@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "matrixio_array.h"
 #include "matrixio_crs.h"
@@ -41,6 +42,11 @@ int main(int argc, char *argv[]) {
     const real_t diag_value = atof(argv[5]);
     const char *output_folder = argv[6];
 
+    struct stat st = {0};
+    if (stat(output_folder, &st) == -1) {
+        mkdir(output_folder, 0700);
+    }
+
     double tick = MPI_Wtime();
 
     char rowptr_path[1024 * 10];
@@ -76,7 +82,6 @@ int main(int argc, char *argv[]) {
         for (int bi = 0; bi < block_rows; bi++) {
             for (int bj = 0; bj < block_cols; bj++) {
                 real_t *vals = (real_t *)crs.values[bi * block_cols + bj];
-
                 crs_constraint_nodes_to_identity(ndirichlet,
                                                  dirichlet_nodes,
                                                  (bi == bj) * diag_value,
@@ -86,13 +91,39 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        if (1) {
+            const count_t *rowptr = (count_t *)crs.rowptr;
+            const idx_t *colidx = (idx_t *)crs.colidx;
+            real_t **values = (real_t **)crs.values;
+
+            for (ptrdiff_t i = 0; i < crs.lrows; i++) {
+                ptrdiff_t begin = rowptr[i] - rowptr[0];
+                ptrdiff_t extent = rowptr[i + 1] - rowptr[i];
+                const idx_t *row = &colidx[begin];
+
+                for (ptrdiff_t k = 0; k < extent; k++) {
+                    printf("(%d, %d)\n", (int)i, row[k]);
+
+                    for (int bi = 0; bi < block_rows; bi++) {
+                        for (int bj = 0; bj < block_cols; bj++) {
+                            const real_t val = values[bi * block_cols + bj][begin + k];
+                            printf("%g ", val);
+                        }
+
+                        printf("\n");
+                    }
+
+                    printf("\n");
+                }
+            }
+        }
+
         sprintf(rowptr_path, "%s/rowptr.raw", output_folder);
         sprintf(colidx_path, "%s/colidx.raw", output_folder);
         sprintf(values_path, "%s/values.%%d.raw", output_folder);
 
         block_crs_write(comm, rowptr_path, colidx_path, values_path, &crs);
         block_crs_free(&crs);
-
     } else {
         sprintf(values_path, "%s/values.raw", crs_folder);
 

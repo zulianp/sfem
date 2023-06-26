@@ -179,7 +179,7 @@ int main(int argc, char *argv[]) {
         char path[1024 * 10];
         for(int b = 0; b < dims; b++) {
             sprintf(path, "%s/rhs.%d.raw", output_folder, b);
-            array_write(comm, path, value_type, &rhs[b], nnodes, nnodes);
+            array_write(comm, path, value_type, rhs[b], nnodes, nnodes);
         }
     }
 

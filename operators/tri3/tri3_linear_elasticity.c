@@ -9,7 +9,6 @@
 
 #include "sfem_vec.h"
 
-
 static const int stride = 1;
 
 static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {
@@ -63,6 +62,26 @@ static SFEM_INLINE void find_cols3(const idx_t *targets,
             }
         }
     }
+}
+
+static int check_symmetric(int n, const real_t *const element_matrix) {
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            const real_t diff = element_matrix[i * n + j] - element_matrix[i + j * n];
+            assert(diff < 1e-16);
+            if (diff > 1e-16) {
+                return 1;
+            }
+
+            // printf("%g ",  element_matrix[i*n + j] );
+        }
+
+        // printf("\n");
+    }
+
+    // printf("\n");
+
+    return 0;
 }
 
 static SFEM_INLINE void tri3_linear_elasticity_assemble_value_kernel(
@@ -169,16 +188,16 @@ void tri3_linear_elasticity_assemble_gradient_soa(const ptrdiff_t nelements,
     // TODO
 }
 
-static SFEM_INLINE void tri3_linear_elasticity_assemble_hessian_kernel(
-    const real_t mu,
-    const real_t lambda,
-    const real_t px0,
-    const real_t px1,
-    const real_t px2,
-    const real_t py0,
-    const real_t py1,
-    const real_t py2,
-    real_t *const SFEM_RESTRICT element_matrix) {
+static SFEM_INLINE void tri3_linear_elasticity_assemble_hessian_kernel(const real_t mu,
+                                                                       const real_t lambda,
+                                                                       const real_t px0,
+                                                                       const real_t px1,
+                                                                       const real_t px2,
+                                                                       const real_t py0,
+                                                                       const real_t py1,
+                                                                       const real_t py2,
+                                                                       real_t *const SFEM_RESTRICT
+                                                                           element_matrix) {
     const real_t x0 = -px0 + px1;
     const real_t x1 = -py0 + py2;
     const real_t x2 = x0 * x1;
@@ -291,12 +310,12 @@ void tri3_linear_elasticity_assemble_hessian_soa(const ptrdiff_t nelements,
     const double tick = MPI_Wtime();
 
     idx_t ev[3];
-    idx_t ks[3];
+    idx_t ks[3][3];
 
-    real_t element_matrix[(3 * 3) * (3 * 3)];
-    real_t element_displacement[(3 * 3)];
+    real_t element_matrix[(3 * 2) * (3 * 2)];
+    real_t element_displacement[(3 * 2)];
 
-    static const int block_size = 3;
+    static const int block_size = 2;
     static const int mat_block_size = block_size * block_size;
 
     for (ptrdiff_t i = 0; i < nelements; ++i) {
@@ -327,23 +346,32 @@ void tri3_linear_elasticity_assemble_hessian_soa(const ptrdiff_t nelements,
 
         assert(!check_symmetric(3 * block_size, element_matrix));
 
+        // find all indices
         for (int edof_i = 0; edof_i < 3; ++edof_i) {
             const idx_t dof_i = elems[edof_i][i];
             const idx_t r_begin = rowptr[dof_i];
             const idx_t lenrow = rowptr[dof_i + 1] - r_begin;
             const idx_t *row = &colidx[rowptr[dof_i]];
-            find_cols3(ev, row, lenrow, ks);
+            find_cols3(ev, row, lenrow, ks[edof_i]);
+        }
 
-            for (int bi = 0; bi < block_size; ++bi) {
-                const int offset_bi = (edof_i * block_size + bi) * block_size * 3;
-                for (int bj = 0; bj < block_size; ++bj) {
-                    real_t *const row_values = &values[bi * block_size + bj][r_begin];
+        for (int bi = 0; bi < block_size; ++bi) {
+            for (int bj = 0; bj < block_size; ++bj) {
+                for (int edof_i = 0; edof_i < 3; ++edof_i) {
+                	const int ii = bi * 3 + edof_i;
+
+                    const idx_t dof_i = elems[edof_i][i];
+                    const idx_t r_begin = rowptr[dof_i];
+                    const int bb = bi * block_size + bj;
+                    
+                    real_t *const row_values = &values[bb][r_begin];
 
                     for (int edof_j = 0; edof_j < 3; ++edof_j) {
-                        const real_t val = element_matrix[offset_bi + (edof_j * block_size + bj)];
+                    	const int jj = bj * 3 + edof_j;
+                        const real_t val = element_matrix[ii * 6 + jj];
 
                         assert(val == val);
-                        row_values[ks[edof_j]] += val;
+                        row_values[ks[edof_i][edof_j]] += val;
                     }
                 }
             }
@@ -355,18 +383,18 @@ void tri3_linear_elasticity_assemble_hessian_soa(const ptrdiff_t nelements,
            tock - tick);
 }
 
-static SFEM_INLINE void tri3_linear_elasticity_apply_soa_kernel(const real_t mu,
-                                                                const real_t lambda,
-                                                                const real_t px0,
-                                                                const real_t px1,
-                                                                const real_t px2,
-                                                                const real_t py0,
-                                                                const real_t py1,
-                                                                const real_t py2,
-                                                                const real_t *const SFEM_RESTRICT u,
-                                                                const real_t *const SFEM_RESTRICT increment,
-                                                                real_t *const SFEM_RESTRICT
-                                                                    element_vector) {
+static SFEM_INLINE void tri3_linear_elasticity_apply_soa_kernel(
+    const real_t mu,
+    const real_t lambda,
+    const real_t px0,
+    const real_t px1,
+    const real_t px2,
+    const real_t py0,
+    const real_t py1,
+    const real_t py2,
+    const real_t *const SFEM_RESTRICT u,
+    const real_t *const SFEM_RESTRICT increment,
+    real_t *const SFEM_RESTRICT element_vector) {
     const real_t x0 = -px0 + px1;
     const real_t x1 = -py0 + py2;
     const real_t x2 = x0 * x1;
