@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        if (1) {
+        if (0) {
             const count_t *rowptr = (count_t *)crs.rowptr;
             const idx_t *colidx = (idx_t *)crs.colidx;
             real_t **values = (real_t **)crs.values;

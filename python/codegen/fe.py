@@ -125,15 +125,7 @@ class FE:
 		return self.grad_tensorize(self.grad(p), ncomp)
 
 	def physical_tgrad(self, p, ncomp=0):
-		ret = []
-		g = self.tgrad(p, ncomp)
-		J_inv = self.symbol_jacobian_inverse()
-
-		for gi in g:
-			ret.append(J_inv.T * gi)
-
-		return ret
-
+		return self.grad_tensorize(self.physical_grad(p), ncomp)
 
 	def physical_grad(self, p):
 		fx = self.fun(p)
