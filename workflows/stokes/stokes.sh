@@ -26,14 +26,15 @@ solve()
 	x_=$3
 
 	echo "rhs=$rhs_"
-	mpiexec -np 8 \
-	$UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type lu -ksp_type preonly
+	mpiexec -np 8 $UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type lu -ksp_type preonly
+	# mpiexec -np 8 $UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type bjacobi -ksp_type gmres --verbose
 }
 
 mesh=mesh
-create_square.sh 4
+# create_square.sh 5
+# rm $mesh/z.raw
 
-SFEM_DIRICHLET_NODES=all.raw
+export SFEM_DIRICHLET_NODES=all.raw
 cat $mesh/sidesets_aos/*.raw > $SFEM_DIRICHLET_NODES
 
 nvars=3
