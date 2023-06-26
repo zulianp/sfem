@@ -11,7 +11,7 @@
 #include "crs_graph.h"
 #include "sfem_base.h"
 
-#include "neohookean.h"
+#include "linear_elasticity.h"
 
 #include "read_mesh.h"
 
@@ -66,21 +66,21 @@ int main(int argc, char *argv[]) {
     ptrdiff_t nelements = mesh.nelements;
     const int dims = mesh.spatial_dim;
 
-    real_t **displacement = (real_t **)malloc(dims * sizeof(real_t *));
-    for (int b = 0; b < dims * dims; b++) {
-        displacement[b] = (real_t *)calloc(nnodes, sizeof(real_t));
-    }
+    // real_t **displacement = (real_t **)malloc(dims * sizeof(real_t *));
+    // for (int b = 0; b < dims * dims; b++) {
+    //     displacement[b] = (real_t *)calloc(nnodes, sizeof(real_t));
+    // }
 
     real_t SFEM_MU = 1;
     real_t SFEM_LAMBDA = 1;
     SFEM_READ_ENV(SFEM_MU, atof);
     SFEM_READ_ENV(SFEM_LAMBDA, atof);
 
-    const char *path_pattern_disp = 0;
-    SFEM_READ_ENV(path_pattern_disp, );
+    // const char *path_pattern_disp = 0;
+    // SFEM_READ_ENV(path_pattern_disp, );
 
     double tack = MPI_Wtime();
-    printf("neohookean_assemble.c: read\t\t%g seconds\n", tack - tick);
+    printf("linear_elasticity_assemble.c: read\t\t%g seconds\n", tack - tick);
 
     ///////////////////////////////////////////////////////////////////////////////
     // Build CRS graph
@@ -98,15 +98,16 @@ int main(int argc, char *argv[]) {
     }
 
     double tock = MPI_Wtime();
-    printf("neohookean_assemble.c: build crs\t\t%g seconds\n", tock - tack);
+    printf("linear_elasticity_assemble.c: build crs\t\t%g seconds\n", tock - tack);
     tack = tock;
 
     ///////////////////////////////////////////////////////////////////////////////
     // Operator assembly
     ///////////////////////////////////////////////////////////////////////////////
 
-    neohookean_assemble_hessian_soa(
+    linear_elasticity_assemble_hessian_soa(
         // Mesh
+        mesh.element_type,
         mesh.nelements,
         mesh.nnodes,
         mesh.elements,
@@ -114,7 +115,7 @@ int main(int argc, char *argv[]) {
         // Material
         SFEM_MU,
         SFEM_LAMBDA,
-        displacement,
+        // displacement,
         // Output
         rowptr,
         colidx,
@@ -129,7 +130,7 @@ int main(int argc, char *argv[]) {
 
 
     tock = MPI_Wtime();
-    printf("neohookean_assemble.c: assembly\t\t%g seconds\n", tock - tack);
+    printf("linear_elasticity_assemble.c: assembly\t\t%g seconds\n", tock - tack);
     tack = tock;
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -184,7 +185,7 @@ int main(int argc, char *argv[]) {
     }
 
     tock = MPI_Wtime();
-    printf("neohookean_assemble.c: write\t\t%g seconds\n", tock - tack);
+    printf("linear_elasticity_assemble.c: write\t\t%g seconds\n", tock - tack);
     tack = tock;
 
     ///////////////////////////////////////////////////////////////////////////////

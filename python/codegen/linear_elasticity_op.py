@@ -217,13 +217,13 @@ def main():
 	start = perf_counter()
 
 	# fe = AxisAlignedQuad4()
-	# # fe = Tri3()
+	fe = Tri3()
 	# fe = Tri6()
-	# q = sp.Matrix(2, 1, [qx, qy])
+	q = sp.Matrix(2, 1, [qx, qy])
 
 	# fe = Tet4()
-	fe = Tet10()
-	q = sp.Matrix(3, 1, [qx, qy, qz])
+	# fe = Tet10()
+	# q = sp.Matrix(3, 1, [qx, qy, qz])
 
 	op = LinearElasticityOp(fe, q)
 	# op.hessian_check()

@@ -5,9 +5,9 @@ ifeq ($(debug),1)
 else ifeq ($(prof),1)
 	CFLAGS += -O2 -g -DNDEBUG
 	CXXFLAGS += -O2 -g -DNDEBUG
-	CUFLAGS += -O2 -g -DNDEBUG 
+	CUFLAGS += -O2 -g -DNDEBUG
 else ifeq ($(asan), 1)
-	ASAN_FLAGS += -fsanitize=address -fno-optimize-sibling-calls -fsanitize-address-use-after-scope -fno-omit-frame-pointer -g 
+	ASAN_FLAGS += -fsanitize=address -fno-optimize-sibling-calls -fsanitize-address-use-after-scope -fno-omit-frame-pointer -g
 	ASAN_FLAGS += -O0
 # 	ASAN_FLAGS += -O1
 	CXXFLAGS += $(ASAN_FLAGS)
@@ -15,7 +15,7 @@ else ifeq ($(asan), 1)
 else
 	CFLAGS += -Ofast -DNDEBUG
 	CXXFLAGS += -Ofast -DNDEBUG
-	CUFLAGS += -O3 -DNDEBUG 
+	CUFLAGS += -O3 -DNDEBUG
 endif
 
 ifeq ($(avx512sort), 1)
@@ -58,21 +58,21 @@ INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatr
 
 
 CFLAGS += -pedantic -Wextra
-# CFLAGS += -std=c99 
+# CFLAGS += -std=c99
 
 CXXFLAGS += -std=c++11
 CXXFLAGS += -fvisibility=hidden
 CXXFLAGS += -fPIC
 INTERNAL_CXXFLAGS += -fno-exceptions -fno-rtti
 
-CUFLAGS += --compiler-options "-fPIC $(CXXFLAGS)" -std=c++14 -arch=sm_60  #-arch=native 
+CUFLAGS += --compiler-options "-fPIC $(CXXFLAGS)" -std=c++14 -arch=sm_60  #-arch=native
 
 # CUFLAGS += --compiler-options -fPIC -O0 -g -std=c++17
 
-INCLUDES += -I$(PWD) -I$(PWD)/.. -I$(PWD)/../matrix.io 
+INCLUDES += -I$(PWD) -I$(PWD)/.. -I$(PWD)/../matrix.io
 
 # Assemble systems
-GOALS = assemble assemble3 assemble4 neohookean_assemble stokes 
+GOALS = assemble assemble3 assemble4 neohookean_assemble stokes linear_elasticity_assemble
 
 # Mesh manipulation
 GOALS += partition select_submesh refine skin select_surf volumes sfc
@@ -146,7 +146,9 @@ OBJS = \
 	trishell3_l2_projection_p0_p1.o \
 	trishell6_l2_projection_p1_p2.o \
 	surface_l2_projection.o \
-	grad_p1.o 
+	grad_p1.o  \
+	linear_elasticity.o \
+	tri3_linear_elasticity.o
 
 OBJS += tri3_laplacian.o
 
@@ -160,11 +162,11 @@ OBJS += tet4_div.o \
 OBJS += tet10_grad.o \
 	tet10_div.o \
 	tet10_mass.o \
-	tet10_l2_projection_p1_p2.o 
+	tet10_l2_projection_p1_p2.o
 
 
 # CVFEM
-OBJS += cvfem_tri3_diffusion.o 
+OBJS += cvfem_tri3_diffusion.o
 
 # Graphs
 ifeq ($(metis), 1)
@@ -176,7 +178,7 @@ ifeq ($(cuda), 1)
 # 	CUDA_OBJS = tet4_cuda_laplacian_2.o
 	CUDA_OBJS = tet4_cuda_laplacian_3.o
 	CUDA_OBJS += tet4_cuda_phase_field_for_fracture.o
-	
+
 	CUDA_OBJS += cuda_crs.o
 	DEPS += -L/opt/cuda/lib64 -lcudart
 	DEPS += -lnvToolsExt
@@ -190,7 +192,7 @@ endif
 OBJS += neohookean.o
 
 # SIMD_OBJS = simd_neohookean.o
-# SIMD_OBJS +=  simd_laplacian.o 
+# SIMD_OBJS +=  simd_laplacian.o
 
 OBJS += $(SIMD_OBJS)
 
@@ -199,7 +201,7 @@ plugins: isolver_sfem.dylib
 libsfem.a : $(OBJS)
 	ar rcs $@ $^
 
-YAML_CPP_INCLUDES = -I$(INSTALL_DIR)/yaml-cpp/include/ 
+YAML_CPP_INCLUDES = -I$(INSTALL_DIR)/yaml-cpp/include/
 YAML_CPP_LIBRARIES = $(INSTALL_DIR)/yaml-cpp/lib/libyaml-cpp.a
 ISOLVER_INCLUDES = -I../isolver/interfaces/lsolve -I../isolver/plugin/lsolve -I../isolver/plugin/
 
@@ -242,9 +244,12 @@ crs_apply_dirichlet : crs_apply_dirichlet.o libsfem.a
 neohookean_assemble : neohookean_assemble.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
+linear_elasticity_assemble : linear_elasticity_assemble.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
 assemble_adjaciency_matrix: assemble_adjaciency_matrix.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
-	
+
 # CVFEM
 cvfem_assemble : cvfem_assemble.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
@@ -368,9 +373,9 @@ div.o : operators/div.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -c $<
 
 isolver_sfem.dylib : isolver_sfem_plugin.o libsfem.a
-	$(MPICC) -shared -o $@ $^ $(LDFLAGS)  
+	$(MPICC) -shared -o $@ $^ $(LDFLAGS)
 
-isolver_sfem_plugin.o : plugin/isolver_sfem_plugin.c 
+isolver_sfem_plugin.o : plugin/isolver_sfem_plugin.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
 
 sortreduce.o : sortreduce.cpp
@@ -395,7 +400,7 @@ neohookean_principal_stresses.o : neohookean_principal_stresses.cpp
 .PRECIOUS :
 
 clean:
-	rm *.o *.a $(GOALS); rm -r *.dSYM  
+	rm *.o *.a $(GOALS); rm -r *.dSYM
 
 
 .SUFFIXES:

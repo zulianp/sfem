@@ -32,7 +32,7 @@ solve()
 }
 
 mesh=mesh
-create_square.sh 4
+# create_square.sh 4
 nvars=2
 
 dirichlet_nodes=all.raw
