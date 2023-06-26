@@ -664,8 +664,8 @@ int main(int argc, char *argv[]) {
             constraint_nodes_to_value(nn, dirichlet_nodes, 0, rhs[d]);
         }
 
-        for (int d1 = 0; d1 < n_vars; d1++) {
-            for (int d2 = 0; d2 < n_vars; d2++) {
+        for (int d1 = 0; d1 < mesh.spatial_dim; d1++) {
+            for (int d2 = 0; d2 < mesh.spatial_dim; d2++) {
                 crs_constraint_nodes_to_identity(
                     nn, dirichlet_nodes, d1 == d2, rowptr, colidx, values[d1 * n_vars + d2]);
             }

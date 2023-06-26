@@ -27,12 +27,12 @@ solve()
 
 	echo "rhs=$rhs_"
 	mpiexec -np 8 $UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type lu -ksp_type preonly
-	# mpiexec -np 8 $UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type bjacobi -ksp_type gmres --verbose
+	# mpiexec -np 8 $UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type hypre -ksp_type richardson --verbose
 }
 
 mesh=mesh
-# create_square.sh 5
-# rm $mesh/z.raw
+create_square.sh 0
+rm $mesh/z.raw
 
 export SFEM_DIRICHLET_NODES=all.raw
 cat $mesh/sidesets_aos/*.raw > $SFEM_DIRICHLET_NODES
@@ -49,4 +49,7 @@ solve stokes_system/rowptr.raw stokes_system/rhs.raw x.raw
 unblocks.py $nvars x.raw
 unblocks.py $nvars stokes_system/rhs.raw
 
-raw_to_db.py $mesh out.vtk --point_data="x.*.raw,stokes_system/rhs.*.raw"
+# <mesh> <ux.raw> <uy.raw> <uz.raw> <p.raw>
+stokes_check $mesh ref_vel_x.raw ref_vel_y.raw ref_p.raw
+
+raw_to_db.py $mesh out.vtk --point_data="x.*.raw,stokes_system/rhs.*.raw,ref_*"
