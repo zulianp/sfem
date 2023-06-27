@@ -6,6 +6,15 @@ sym d0 real
 sym d1 real
 sym d2 real
 
+% A = [a00, a01, a02; 
+%      a01, a11, a12;
+%      a02, a12, a22 ];
+
+
+% A = [a00, a01, a02; 
+%      a01, 0, 0;
+%      a02, 0, 0 ];
+
 A = [a00, a01, a02; 
      a01, a11, a12;
      a02, a12, a22 ];
@@ -27,3 +36,6 @@ disp(sprintf('D[1]=(%s)', d1));
 
 disp(' ')
 disp(sprintf('D[2]=(%s)', d2));    
+
+
+disp(V)

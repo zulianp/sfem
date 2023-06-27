@@ -24,6 +24,18 @@
 
 #include "read_mesh.h"
 
+// static SFEM_INLINE real_t ux1(const real_t x, const real_t y) {
+//     return x * x * (1 - x) * (1 - x) * 2 * y * (1 - y) * (2 * y - 1);
+// }
+
+// static SFEM_INLINE real_t uy1(const real_t x, const real_t y) {
+//     return y * y * (1 - y) * (1 - y) * 2 * x * (1 - x) * (1 - 2 * x);
+// }
+
+// static SFEM_INLINE real_t p1(const real_t x, const real_t y) {
+//     return x * (1 - x) * (1 - y) - 1. / 12;
+// }
+
 ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
     MPI_Status status;
     MPI_Offset nbytes;
@@ -667,13 +679,25 @@ int main(int argc, char *argv[]) {
         for (int d1 = 0; d1 < mesh.spatial_dim; d1++) {
             for (int d2 = 0; d2 < n_vars; d2++) {
                 crs_constraint_nodes_to_identity(
-                    nn, dirichlet_nodes, (d1 == d2), rowptr, colidx, values[d1 * n_vars + d2]);
+                    nn, dirichlet_nodes, d1 == d2, rowptr, colidx, values[d1 * n_vars + d2]);
             }
         }
 
-        // for (int d = 0; d < mesh.spatial_dim; d++) {
-        //     constraint_nodes_to_value(nn, dirichlet_nodes, 0, rhs[d]);
-        // }
+        if (1) 
+        // if (0) 
+        {
+            // One point to 0
+            for (int d2 = 0; d2 < n_vars; d2++) {
+                crs_constraint_nodes_to_identity(nn,
+                                                 dirichlet_nodes,
+                                                 (n_vars - 1) == d2,
+                                                 rowptr,
+                                                 colidx,
+                                                 values[(n_vars - 1) * n_vars + d2]);
+            }
+
+            constraint_nodes_to_value(nn, dirichlet_nodes, 0, rhs[n_vars - 1]);
+        }
 
     } else {
         assert(0);

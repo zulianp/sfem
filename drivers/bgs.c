@@ -10,32 +10,81 @@
 
 #include "dirichlet.h"
 
+#include "inverse.c"
 #include "sfem_base.h"
+
+int bgs_init(const ptrdiff_t nnodes,
+             const int block_rows,
+             const count_t *const SFEM_RESTRICT rowptr,
+             const idx_t *const SFEM_RESTRICT colidx,
+             real_t **const SFEM_RESTRICT values,
+             real_t **const inv_bdiag) {
+    //
+    switch (block_rows) {
+        case 1: {
+            dinvert1(nnodes, rowptr, colidx, values, inv_bdiag);
+            break;
+        }
+
+        case 2: {
+            dinvert2(nnodes, rowptr, colidx, values, inv_bdiag);
+            break;
+        }
+
+        case 3: {
+            dinvert3(nnodes, rowptr, colidx, values, inv_bdiag);
+            break;
+        }
+        case 4: {
+            dinvert4(nnodes, rowptr, colidx, values, inv_bdiag);
+            break;
+        }
+        default: {
+            assert(0);
+            return -1;
+        }
+    }
+
+    return 0;
+}
 
 int bgs(const ptrdiff_t nnodes,
         const int block_rows,
         const count_t *const SFEM_RESTRICT rowptr,
         const idx_t *const SFEM_RESTRICT colidx,
         real_t **const SFEM_RESTRICT values,
-        real_t **const rhs,
-        real_t **const x,
+        real_t **const SFEM_RESTRICT inv_bdiag,
+        real_t **const SFEM_RESTRICT rhs,
+        real_t **const SFEM_RESTRICT x,
         const int num_sweeps) {
     for (int s = 0; s < num_sweeps; s++) {
         for (ptrdiff_t i = 0; i < nnodes; i++) {
             const count_t r_begin = rowptr[i];
             const count_t r_end = rowptr[i + 1];
             const count_t r_extent = r_end - r_begin;
-            const idx_t *const r_colidx = colidx[r_begin];
+            const idx_t *const r_colidx = &colidx[r_begin];
 
-            count_t diag_idx = -1;
-            for(count_t k = 0; k < r_extent; k++) {
-                // 
+            real_t r[4];
+            for (int d1 = 0; d1 < block_rows; d1++) {
+                r[d1] = rhs[d1][i];
+            }
+
+            for (count_t k = 0; k < r_extent; k++) {
                 const idx_t col = r_colidx[k];
+                if (col == i) continue;
 
-                if(col == i) {
-                    diag_idx = k;
-                } else {
+                for (int d1 = 0; d1 < block_rows; d1++) {
+                    for (int d2 = 0; d2 < block_rows; d2++) {
+                        const int bb = d1 * block_rows + d2;
+                        r[d1] -= values[bb][r_begin + k] * x[d2][col];
+                    }
+                }
+            }
 
+            for (int d1 = 0; d1 < block_rows; d1++) {
+                for (int d2 = 0; d2 < block_rows; d2++) {
+                    const int bb = d1 * block_rows + d2;
+                    x[d1][i] += inv_bdiag[bb][i] * r[d2];
                 }
             }
         }
