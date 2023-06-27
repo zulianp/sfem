@@ -105,6 +105,8 @@ GOALS += cvfem_assemble
 # Graph analysis
 GOALS += assemble_adjaciency_matrix
 
+GOALS += bgs
+
 ifeq ($(metis), 1)
 	GOALS += partition_mesh_based_on_operator
 endif
@@ -207,6 +209,9 @@ ISOLVER_INCLUDES = -I../isolver/interfaces/lsolve -I../isolver/plugin/lsolve -I.
 
 ssolve : drivers/ssolve.cpp isolver_lsolve_frontend.o libsfem.a
 	$(MPICXX) $(CXXFLAGS) $(INCLUDES) $(ISOLVER_INCLUDES) $(YAML_CPP_INCLUDES) $(YAML_CPP_LIBRARIES) -o $@ $^ $(LDFLAGS) ; \
+
+bgs : bgs.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 isolver_lsolve_frontend.o : ../isolver/plugin/lsolve/isolver_lsolve_frontend.cpp
 	$(MPICXX) $(CXXFLAGS) $(INTERNAL_CXXFLAGS) $(INCLUDES) $(ISOLVER_INCLUDES) -c $<
