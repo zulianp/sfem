@@ -26,6 +26,10 @@ def main(argv):
 	gmsh.initialize(argv=["","-bin"])
 	gmsh.option.setNumber("General.Terminal", 0)
 	gmsh.option.setNumber("Mesh.SaveAll", 1)
+	gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
+	gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
+	gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
+
 
 	model = gmsh.model()
 	model.add("Rectangle")
@@ -34,7 +38,8 @@ def main(argv):
 
 	# Generate mesh
 	model.occ.synchronize()
-	model.mesh.generate(3)
+	# model.mesh.generate(3)
+	model.mesh.generate(2)
 
 	for r in range(0, nrefs):
 		model.mesh.refine()

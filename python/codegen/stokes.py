@@ -10,6 +10,16 @@ from fe_material import *
 
 import pdb
 
+# A * u + BT * ub  - f = 0
+# B * u + C * ub - fb = 0
+# ub = Cinv * (fb - B * u)
+# A * u + BT * Cinv * (fb - B * u) - f = 0
+
+# statically condensed system:
+# (A - BT * Cinv * B) * u = f - BT * Cinv * fb
+# (A - S) * u = f - P * fb
+
+
 class StokesOp:
 	def __init__(self, fe_u, fe_p):
 		fe_velocity = FEFunction("u", fe_u, fe_u.manifold_dim())
@@ -35,14 +45,14 @@ class StokesOp:
 		for i in range(0,  nu):
 			for j in range(0,  nu):
 				integr = mu * fe_u.integrate(qp, inner(u_shape_grad[i], u_shape_grad[j])) * dV
-				integr = sp.simplify(integr)
+				# integr = sp.simplify(integr)
 				self.a[i, j] = integr
 
 		self.b = sp.Matrix(nu, np, [0] * (nu*np))
 		for i in range(0,  nu):
 			for j in range(0,  np):
 				integr = -fe_u.integrate(qp, tr(u_shape_grad[i]) * p_shape_fun[j]) * dV
-				integr = sp.simplify(integr)
+				# integr = sp.simplify(integr)
 				self.b[i, j] = integr
 
 
@@ -52,23 +62,31 @@ class StokesOp:
 		for i in range(0,  nu):
 			for j in range(0,  nu):
 				integr = fe_u.integrate(qp, inner(u_shape_fun[i], u_shape_fun[j])) * dV
-				integr = sp.simplify(integr)
+				# integr = sp.simplify(integr)
 				self.u_mass_mat[i, j] = integr
 
 		for i in range(0,  np):
 			for j in range(0,  np):
 				integr = fe_u.integrate(qp, (p_shape_fun[i] * p_shape_fun[j])) * dV
-				integr = sp.simplify(integr)
+				# integr = sp.simplify(integr)
 				self.p_mass_mat[i, j] = integr
 
 		self.u_rhs = self.u_mass_mat * coeffs('u_rhs', len(u_shape_fun))
 		self.p_rhs = self.p_mass_mat * coeffs('p_rhs', len(p_shape_fun))
 		
-		# self.get_mini_condensed_hessian()
+		print('---------------')
+		print('HESSIAN')
+		print('---------------')
+		Hc, P, bubble_dofs = self.get_mini_condensed_hessian()
+		c_code(self.assign_matrix(Hc))
 		# self.hessian_uu()
 		# self.hessian_up()
 		# self.hessian()
 		# self.project_bubble_rhs()
+
+		print('---------------')
+		print('RHS')
+		print('---------------')
 		self.get_mini_condensed_rhs()
 		# self.apply()
 
@@ -76,8 +94,8 @@ class StokesOp:
 		u_fe = self.fe_velocity.fe()
 		p_fe = self.fe_pressure.fe()
 		qp = self.fe_velocity.quadrature_point()
-		s_dV = u_fe.symbol_jacobian_inverse()
-		dV = u_fe.jacobian_inverse(qp)
+		# s_dV = u_fe.symbol_jacobian_inverse()
+		# dV = u_fe.jacobian_inverse(qp)
 
 		d = u_fe.spatial_dim()
 		nn = u_fe.n_nodes()
@@ -143,7 +161,7 @@ class StokesOp:
 		P = B.T * C_inv
 
 		Hc = A - S
-		c_code(self.assign_matrix(Hc))
+		
 		# c_code(self.assign_matrix(P))
 		return Hc, P, bubble_dofs
 
@@ -168,7 +186,7 @@ class StokesOp:
 			crhs[ii] = rhs[i]
 			ii += 1
 
-		ret = crhs + P * bubble_rhs
+		ret = crhs - P * bubble_rhs
 
 		# c_code(self.assign_vector(rhs))
 		c_code(self.assign_vector(ret))

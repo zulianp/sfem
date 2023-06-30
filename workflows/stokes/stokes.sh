@@ -31,8 +31,8 @@ solve()
 }
 
 mesh=mesh
-create_square.sh 0
-rm $mesh/z.raw
+create_square.sh 4
+rm -f $mesh/z.raw
 
 export SFEM_DIRICHLET_NODES=all.raw
 cat $mesh/sidesets_aos/*.raw > $SFEM_DIRICHLET_NODES
