@@ -33,7 +33,7 @@ solve()
 }
 
 mesh=mesh
-# create_square.sh 5
+# create_square.sh 4
 # rm $mesh/z.raw
 nvars=2
 
@@ -67,7 +67,11 @@ crs_apply_dirichlet $nvars $nvars $neumman_system $dirichlet_nodes 1 $block_syst
 
 smask $top $neumman_system/rhs.1.raw $block_system/rhs.1.raw "-0.15"
 smask $bottom $block_system/rhs.1.raw $block_system/rhs.1.raw "0.15"
-cp $neumman_system/rhs.0.raw $block_system/rhs.0.raw 
+
+smask $top $neumman_system/rhs.0.raw $block_system/rhs.0.raw "-0.05"
+smask $bottom $block_system/rhs.0.raw $block_system/rhs.0.raw "0.15"
+
+# cp $neumman_system/rhs.0.raw $block_system/rhs.0.raw 
 
 # crs.py $nvars $nvars $block_system $system
 # blocks.py $block_system'/rhs.*.raw' $system/rhs.raw
@@ -76,5 +80,5 @@ cp $neumman_system/rhs.0.raw $block_system/rhs.0.raw
 # unblocks.py $nvars $system/rhs.raw
 # raw_to_db.py $mesh out.vtk --point_data="x.*.raw,system/rhs.*.raw"
 
-SFEM_LS_MAX_IT=60000 bgs $nvars $block_system $block_system/rhs x
+SFEM_BGS_SYMMETRIC=0 SFEM_LS_MAX_IT=80000 bgs $nvars $block_system $block_system/rhs x
 raw_to_db.py $mesh out.vtk --point_data="x.*.raw,block_system/rhs.*.raw"

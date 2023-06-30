@@ -139,16 +139,15 @@ static int bgs_forward(const ptrdiff_t nnodes,
     return 0;
 }
 
-
 static int bgs_backward(const ptrdiff_t nnodes,
-                       const int block_rows,
-                       const count_t *const SFEM_RESTRICT rowptr,
-                       const idx_t *const SFEM_RESTRICT colidx,
-                       real_t **const SFEM_RESTRICT values,
-                       real_t **const SFEM_RESTRICT inv_bdiag,
-                       real_t **const SFEM_RESTRICT rhs,
-                       real_t **const SFEM_RESTRICT x) {
-    for (ptrdiff_t i = nnodes-1; i >= 0; i--) {
+                        const int block_rows,
+                        const count_t *const SFEM_RESTRICT rowptr,
+                        const idx_t *const SFEM_RESTRICT colidx,
+                        real_t **const SFEM_RESTRICT values,
+                        real_t **const SFEM_RESTRICT inv_bdiag,
+                        real_t **const SFEM_RESTRICT rhs,
+                        real_t **const SFEM_RESTRICT x) {
+    for (ptrdiff_t i = nnodes - 1; i >= 0; i--) {
         const count_t r_begin = rowptr[i];
         const count_t r_end = rowptr[i + 1];
         const count_t r_extent = r_end - r_begin;
@@ -192,10 +191,12 @@ static int bgs(const ptrdiff_t nnodes,
                real_t **const SFEM_RESTRICT inv_bdiag,
                real_t **const SFEM_RESTRICT rhs,
                real_t **const SFEM_RESTRICT x,
-               const int num_sweeps) {
+               const int num_sweeps,
+               int symmetric_variant) {
     for (int s = 0; s < num_sweeps; s++) {
-       bgs_forward(nnodes, block_rows, rowptr, colidx, values, inv_bdiag, rhs, x);
-       bgs_backward(nnodes, block_rows, rowptr, colidx, values, inv_bdiag, rhs, x);
+        bgs_forward(nnodes, block_rows, rowptr, colidx, values, inv_bdiag, rhs, x);
+        if (symmetric_variant)
+            bgs_backward(nnodes, block_rows, rowptr, colidx, values, inv_bdiag, rhs, x);
     }
 
     return 0;
@@ -231,6 +232,9 @@ int main(int argc, char *argv[]) {
 
     int SFEM_BGS_SWEEPS = 2000;
     SFEM_READ_ENV(SFEM_BGS_SWEEPS, atoi);
+
+    int SFEM_BGS_SYMMETRIC = 0;
+    SFEM_READ_ENV(SFEM_BGS_SYMMETRIC, atoi);
 
     // struct stat st = {0};
     // if (stat(output_path, &st) == -1) {
@@ -308,13 +312,14 @@ int main(int argc, char *argv[]) {
                 inv_bdiag,
                 rhs,
                 x,
-                SFEM_BGS_SWEEPS);
+                SFEM_BGS_SWEEPS,
+                SFEM_BGS_SYMMETRIC);
 
             residual(local_ndofs, block_rows, rowptr, colidx, values, rhs, x, res);
 
             int stop = 0;
 
-            printf("%d) ", i);
+            printf("%d) ", i + SFEM_BGS_SWEEPS);
             for (int d = 0; d < block_rows; d++) {
                 printf("%g ", res[d]);
                 stop += res[d] < 1e-8;
