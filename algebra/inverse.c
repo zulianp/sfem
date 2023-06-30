@@ -70,7 +70,7 @@ void dinvert2(const ptrdiff_t nnodes,
         count_t diag_idx = -1;
         for (count_t k = 0; k < r_extent; k++) {
             if (cols[k] == i) {
-                diag_idx = k;
+                diag_idx = r_begin + k;
                 break;
             }
 
@@ -86,6 +86,12 @@ void dinvert2(const ptrdiff_t nnodes,
                  &inv_diag[1][i],
                  &inv_diag[2][i],
                  &inv_diag[3][i]);
+
+        assert(inv_diag[0][i] == inv_diag[0][i]);
+        assert(inv_diag[1][i] == inv_diag[1][i]);
+        assert(inv_diag[2][i] == inv_diag[2][i]);
+        assert(inv_diag[3][i] == inv_diag[3][i]);
+
     }
 }
 

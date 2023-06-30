@@ -27,12 +27,13 @@ solve()
 	x_=$3
 
 	echo "rhs=$rhs_"
-	mpiexec -np 8 $UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type lu -ksp_type preonly
-	# mpiexec -np 8 $UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false -type ksp -pc_type bjacobi -ksp_type cg --verbose
+	# mpiexec -np 8 $UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type lu -ksp_type preonly
+	# mpiexec -np 8 
+	$UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false -type ksp -pc_type hypre -ksp_type cg --verbose
 }
 
 mesh=mesh
-# create_square.sh 2
+# create_square.sh 5
 # rm $mesh/z.raw
 nvars=2
 
@@ -64,17 +65,16 @@ crs_apply_dirichlet $nvars $nvars $neumman_system $dirichlet_nodes 1 $block_syst
 # 	smask $top $neumman_system/rhs."$i".raw 
 # done
 
-smask $top $neumman_system/rhs.1.raw $block_system/rhs.1.raw 0.1
-smask $bottom $block_system/rhs.1.raw $block_system/rhs.1.raw "-0.1"
+smask $top $neumman_system/rhs.1.raw $block_system/rhs.1.raw "-0.15"
+smask $bottom $block_system/rhs.1.raw $block_system/rhs.1.raw "0.15"
 cp $neumman_system/rhs.0.raw $block_system/rhs.0.raw 
 
-# stokes $mesh stokes_block_system
-crs.py $nvars $nvars $block_system $system
-blocks.py $block_system'/rhs.*.raw' $system/rhs.raw
+# crs.py $nvars $nvars $block_system $system
+# blocks.py $block_system'/rhs.*.raw' $system/rhs.raw
+# solve $system/rowptr.raw $system/rhs.raw x.raw
+# unblocks.py $nvars x.raw
+# unblocks.py $nvars $system/rhs.raw
+# raw_to_db.py $mesh out.vtk --point_data="x.*.raw,system/rhs.*.raw"
 
-solve $system/rowptr.raw $system/rhs.raw x.raw
-
-unblocks.py $nvars x.raw
-unblocks.py $nvars $system/rhs.raw
-
-raw_to_db.py $mesh out.vtk --point_data="x.*.raw,system/rhs.*.raw"
+SFEM_LS_MAX_IT=60000 bgs $nvars $block_system $block_system/rhs x
+raw_to_db.py $mesh out.vtk --point_data="x.*.raw,block_system/rhs.*.raw"

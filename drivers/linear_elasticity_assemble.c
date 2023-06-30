@@ -131,6 +131,29 @@ int main(int argc, char *argv[]) {
         values
     );
 
+    if (0) {
+        for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+            ptrdiff_t begin = rowptr[i] - rowptr[0];
+            ptrdiff_t extent = rowptr[i + 1] - rowptr[i];
+            const idx_t *row = &colidx[begin];
+
+            for (ptrdiff_t k = 0; k < extent; k++) {
+                printf("(%d, %d)\n", (int)i, row[k]);
+
+                for (int bi = 0; bi < dims; bi++) {
+                    for (int bj = 0; bj < dims; bj++) {
+                        const real_t val = values[bi * dims + bj][begin + k];
+                        printf("%g ", val);
+                    }
+
+                    printf("\n");
+                }
+
+                printf("\n");
+            }
+        }
+    }
+
 
     real_t **rhs = (real_t **)malloc(dims * sizeof(real_t *));
     for (int b = 0; b < dims; b++) {

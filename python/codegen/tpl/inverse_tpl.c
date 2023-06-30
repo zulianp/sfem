@@ -31,7 +31,7 @@ for(count_t k = 0; k < r_extent; k++)
 
 if(cols[k] == i) 
 {{
-	diag_idx = k;
+	diag_idx = r_begin + k;
 	break;
 }}
 
