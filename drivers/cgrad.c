@@ -68,6 +68,17 @@ int main(int argc, char *argv[]) {
 
     p1_grad3(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, f, df[0], df[1], df[2]);
 
+    real_t SFEM_SCALE=1;
+    SFEM_READ_ENV(SFEM_SCALE, atof);
+
+    if(SFEM_SCALE != 1.) {
+        for (int d = 0; d < 3; ++d) {
+            for(ptrdiff_t i = 0; i < nelements; i++) {
+                df[d][i] *= SFEM_SCALE;
+            }
+        }
+    }
+
     ///////////////////////////////////////////////////////////////////////////////
     // Write cell data
     ///////////////////////////////////////////////////////////////////////////////

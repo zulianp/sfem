@@ -1412,7 +1412,7 @@ int main(int argc, char *argv[]) {
         const count_t y_extent = y_max - y_min;
         const count_t z_extent = z_max - z_min;
 
-        assert(remote_grid_size > 0);
+        // assert(remote_grid_size > 0);
 
         /////////////////////////////////////////////////////////////////////////
         // Prepare grid data exchange

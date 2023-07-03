@@ -25,16 +25,33 @@ typedef struct {
 
 
 	ptrdiff_t n_owned_nodes;
+	ptrdiff_t n_owned_nodes_with_ghosts;
+
 	ptrdiff_t n_owned_elements;
+	ptrdiff_t n_owned_elements_with_ghosts;
 	ptrdiff_t n_shared_elements;
 
 	idx_t *node_mapping;
 	int *node_owner;
 
 	idx_t *element_mapping;
+
+	idx_t *node_offsets;
+	idx_t *ghosts;
 } mesh_t;
 
+
+void mesh_init(mesh_t *mesh);
 void mesh_destroy(mesh_t *mesh);
+
+typedef struct {
+	ptrdiff_t nelements;
+	idx_t **elements;
+} element_block_t;
+
+
+void mesh_create_shared_elements_block(mesh_t *mesh, element_block_t *block);
+void mesh_destroy_shared_elements_block(mesh_t *mesh, element_block_t *block);
 
 
 #endif //SFEM_MESH_H

@@ -1,0 +1,24 @@
+mesh: 
+  type: file
+  path: mesh
+
+dirichlet:
+  type: "value"
+  idx: mesh/sidesets_aos/sback.raw
+  value: 0
+
+neumann:
+  type: "value"
+  idx: mesh/sidesets_aos/sfront.raw
+  value: 1.
+
+linear_solver:
+  max_it: 10000
+  atol: 1e-22
+  stol: 1e-22
+  rtol: 1e-22
+
+aux_out:
+  rhs: output/rhs.raw  
+
+out: output/potential.raw

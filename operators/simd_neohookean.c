@@ -316,8 +316,8 @@ static SFEM_INLINE void neohookean_hessian(const vreal_t mu,
                                            const vreal_t pz1,
                                            const vreal_t pz2,
                                            const vreal_t pz3,
-                                           const vreal_t *u,
-                                           vreal_t *element_matrix) {
+                                           const vreal_t *const  SFEM_RESTRICT u,
+                                           vreal_t * const SFEM_RESTRICT element_matrix) {
     // FLOATING POINT OPS!
     //	- Result: 21*ADD + 144*ASSIGNMENT + 75*MUL
     //	- Subexpressions: 460*ADD + 5*DIV + LOG + 914*MUL + 23*NEG + 10*POW + 140*SUB
@@ -900,14 +900,14 @@ static SFEM_INLINE void neohookean_hessian(const vreal_t mu,
 
 void neohookean_assemble_hessian(const ptrdiff_t nelements,
                                  const ptrdiff_t nnodes,
-                                 idx_t *const elems[4],
-                                 geom_t *const xyz[3],
+                                 idx_t *const  SFEM_RESTRICT elems[4],
+                                 geom_t *const  SFEM_RESTRICT xyz[3],
                                  const real_t mu,
                                  const real_t lambda,
-                                 const real_t *const displacement,
-                                 count_t *const rowptr,
-                                 idx_t *const colidx,
-                                 real_t *const values) {
+                                 const real_t *const  SFEM_RESTRICT displacement,
+                                 count_t *const  SFEM_RESTRICT rowptr,
+                                 idx_t *const  SFEM_RESTRICT colidx,
+                                 real_t *const  SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
     double tick = MPI_Wtime();

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from sfem_codegen import *
+from vonmises import *
 
 simplify_expr = False
 
@@ -93,6 +94,63 @@ grade = [0]*n_test_functions()
 for i in range(0, n_test_functions()):
 	integr =  inner(dedF, shapegrad[i])
 	grade[i] = integr
+
+
+# Cauchy stress
+P = dedF 
+NominalStress = P.T
+CauchyStress = (F * NominalStress) / J
+CauchyStress = subsmat3x3(CauchyStress, F, evalF)
+
+def make_cauchy_stress():
+	expr = []
+
+	for i in range(0, 3):
+		for j in range(0, 3):
+			stress = sp.symbols(f'stress[{i*3+j}]')
+			expr.append(ast.Assignment(stress, CauchyStress[i, j]))
+	return expr
+
+
+c_log("// Cauchy stress")
+c_code(make_cauchy_stress())
+
+def make_cauchy_stress_symmetric():
+	expr = []
+
+	idx = 0
+	for i in range(0, 3):
+		for j in range(i, 3):
+			stress = sp.symbols(f'stress[{idx}]')
+			expr.append(ast.Assignment(stress, CauchyStress[i, j]))
+			idx += 1
+	return expr
+
+
+c_log("// Cauchy stress symmetric")
+c_code(make_cauchy_stress_symmetric())
+
+def make_vonmises():
+	expr = []
+	vm = vonmises(CauchyStress)
+	vm_var = sp.symbols(f'element_scalar[0]')
+	expr.append(ast.Assignment(vm_var, vm))
+	return expr
+
+c_log("// Von Mises")
+c_code(make_vonmises())
+
+def make_principal_stresses():
+	eigv = eigenvalues(CauchyStress)
+
+	expr = []
+	for d in range(0, 3):
+		eigv_var = sp.symbols(f'element_vector[{d}]')
+		expr.append(ast.Assignment(eigv_var, eigv[d]))
+	return expr
+
+c_log("// Principal stresses")
+c_code(make_principal_stresses())
 
 def makegrad(i, q):
 	integr =  grade[i]

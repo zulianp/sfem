@@ -8,6 +8,9 @@ from time import perf_counter
 from rich.syntax import Syntax
 console = rich.get_console()
 
+
+real_t = "real_t"
+
 def c_log(expr):
 	console.print(expr)
 
@@ -16,6 +19,19 @@ def c_log(expr):
 # from sympy.polys.matrices import DomainMatrix
 # from sympy.physics.quantum import TensorProduct
 # from sympy.physics.matrices import msigma
+
+def det2(mat):
+    return mat[0,0] * mat[1,1] - mat[1,0] * mat[0,1];
+
+def inv2(mat):
+	mat_inv = sp.zeros(2, 2)
+	det = det2(mat)
+
+	mat_inv[0] = mat[1,1] / det
+	mat_inv[1] = -mat[0,1] / det
+	mat_inv[2] = -mat[1,0] / det
+	mat_inv[3] = mat[0,0] / det
+	return mat_inv
 
 def det3(mat):
     return mat[0, 0] * mat[1, 1] * mat[2, 2] + mat[0, 1] * mat[1, 2] * mat[2, 0] + mat[0, 2] * mat[1, 0] * mat[2, 1] - mat[0, 0] * mat[1, 2] * mat[2, 1] - mat[0, 1] * mat[1, 0] * mat[2, 2] - mat[0, 2] * mat[1, 1] * mat[2, 0]
@@ -43,19 +59,18 @@ def c_gen(expr, dump=False):
 
     sub_expr, simpl_expr = sp.cse(expr)
 
-    sub_ops = sp.count_ops(sub_expr, visual=True)
-    result_ops = sp.count_ops(simpl_expr, visual=True)
-    # total_ops = sub_ops
-    cost = f'FLOATING POINT OPS!\n//\t- Result: {result_ops}\n//\t- Subexpressions: {sub_ops}'
+    # sub_ops = sp.count_ops(sub_expr, visual=True)
+    # result_ops = sp.count_ops(simpl_expr, visual=True)
+    # cost = f'FLOATING POINT OPS!\n//\t- Result: {result_ops}\n//\t- Subexpressions: {sub_ops}'
     
     printer = sp.printing.c.C99CodePrinter()
     lines = []
 
     for var,expr in sub_expr:
-        lines.append(f'const real_t {var} = {printer.doprint(expr)};')
+        lines.append(f'const {real_t} {var} = {printer.doprint(expr)};')
 
     for v in simpl_expr:
-            lines.append(printer.doprint(v))
+        lines.append(printer.doprint(v))
 
     code_string=f'\n'.join(lines)
 
@@ -64,7 +79,8 @@ def c_gen(expr, dump=False):
     console.print("--------------------------")
     console.print(f'generated code')
 
-    code_string = f'//{cost}\n' + code_string
+    # code_string = f'//{cost}\n' + code_string
+    # code_string = f'//TODO COST\n' + code_string
 
     if dump:
         console.print(code_string)
@@ -129,6 +145,12 @@ qx, qy, qz, qw = sp.symbols('qx qy qz qw', real=True)
 x0, x1, x2, x3 = sp.symbols('px0 px1 px2 px3', real=True)
 y0, y1, y2, y3 = sp.symbols('py0 py1 py2 py3', real=True)
 z0, z1, z2, z3 = sp.symbols('pz0 pz1 pz2 pz3', real=True)
+
+px = [x0, x1, x2, x3]
+py = [y0, y1, y2, y3]
+pz = [z0, z1, z2, z3]
+
+element_points = [px, py, pz]
 
 # Quadrature points (Physical coordinates)
 q = sp.Matrix(3, 1, [qx, qy, qz])
@@ -230,6 +252,19 @@ def generic_symm_grad(prefix):
 		ret.append(G)
 	return ret
 
+def subsmat(expr, oldmat, newmat):
+	rows, cols = oldmat.shape
+	nrows, ncols = newmat.shape
+
+	assert rows == nrows
+	assert cols == ncols
+
+	for d1 in range(0, rows):
+		for d2 in range(0, cols):
+			expr = expr.subs(oldmat[d1, d2], newmat[d1, d2])
+	
+	return expr
+
 def subsmat3x3(expr, oldmat, newmat):
 	for d1 in range(0, 3):
 		for d2 in range(0, 3):
@@ -269,3 +304,33 @@ def cross(a, b):
 		a[2] * b[0] - a[0]*b[2],
 		a[0] * b[1] - a[1]*b[0]
 	])
+
+
+def stot(x):
+	return sp.Matrix(1, 1, [x])
+
+def vec3(x, y, z):
+	return sp.Matrix(3, 1, [x, y, z])
+
+def eigenvalues(A):
+	s0, s1, s2 = sp.symbols('s0 s1 s2', real=True)
+	s3, s4, s5 = sp.symbols('s3 s4 s5', real=True)
+	s6, s7, s8 = sp.symbols('s6 s7 s8', real=True)
+
+	S = sp.Matrix(3, 3, [s0, s1, s2,
+						 s3, s4, s5,
+						 s6, s7, s8])
+	Se = S.eigenvals()
+	ret = sp.Matrix(3, 1, [0]*3)
+
+	d = 0
+	for e in Se:
+		e_subs = e	
+		for i in range(0, 3):
+			for j in range(0, 3):
+				e_subs = e_subs.subs(S[i, j], A[i, j])
+		ret[d] = e_subs
+		d += 1
+
+	return ret
+

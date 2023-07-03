@@ -11,39 +11,31 @@ ux = coeffs('ux', 4)
 uy = coeffs('uy', 4)
 uz = coeffs('uz', 4)
 
+u = [ux, uy, uz]
 f = fun(qx, qy, qz)
 
-
 divu = 0.
-
-# sum_i u_i * div(phi_i)
 for i in range(0, 4):
 	fi = f[i]
 	dfdx = sp.diff(fi, qx)
 	dfdy = sp.diff(fi, qy)
 	dfdz = sp.diff(fi, qz)
-	term = dfdx * ux[i] + dfdy * uy[i] + dfdz * uz[i]
-	# c_log("------------")
-	# c_log(term)
-	divu = divu + term
+	g = [dfdx, dfdy, dfdz]
 
-divu = sp.simplify(divu)
+	for d in range(0, 3):
+		divu += g[d] * u[d][i]
 
-# c_log(divu)
 
-# Since divu is constant we can place it outside the integral
-placeholer_divu = sp.symbols("pdivu")
+var_f = sp.symbols("var_f")
 
 expr = []
 for i in range(0, 4):
-	form = placeholer_divu * rf[i] * dV
-	integr = sp.integrate(form, (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1))
+	lform = rf[i] * var_f
+	integr = sp.integrate(lform, (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1)) * dV 
+	integr = integr.subs(var_f, divu)
 
-	bform = sp.symbols(f'element_vector[{i}]')
-	expr.append(ast.Assignment(bform, sp.simplify(integr)))
-
-for i in range(0, 4):
- 	expr[i] = expr[i].subs(placeholer_divu, divu)
+	var = sp.symbols(f'element_vector[{i}]')
+	expr.append(ast.Assignment(var, integr))
 
 c_code(expr)
 

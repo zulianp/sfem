@@ -4,11 +4,12 @@
 #include <stddef.h>
 #include "sfem_base.h"
 
-void surface_forcing_function(const ptrdiff_t nfaces,
-                              const idx_t *faces_neumann,
-                              geom_t **const xyz,
+void surface_forcing_function(const int element_type,
+                              const ptrdiff_t nfaces,
+                              const idx_t *SFEM_RESTRICT faces_neumann,
+                              geom_t **const SFEM_RESTRICT xyz,
                               const real_t value,
-                              real_t *output);
+                              real_t * SFEM_RESTRICT output);
 
 void surface_forcing_function_vec(const ptrdiff_t nfaces,
                               const idx_t *faces_neumann,

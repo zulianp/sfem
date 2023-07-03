@@ -11,7 +11,6 @@
 #include "crs_graph.h"
 #include "sfem_base.h"
 
-
 #include "operators/div.h"
 
 #include "read_mesh.h"
@@ -56,25 +55,45 @@ int main(int argc, char *argv[]) {
 
     ptrdiff_t u_n_local, u_n_global;
 
-    for (int d = 0; d < 3; ++d) {
+    for (int d = 0; d < mesh.spatial_dim; ++d) {
         array_create_from_file(comm, path_u[d], SFEM_MPI_REAL_T, (void **)&u[d], &u_n_local, &u_n_global);
     }
 
     real_t *div_u = (real_t *)malloc(u_n_local * sizeof(real_t));
     memset(div_u, 0, u_n_local * sizeof(real_t));
 
-    div_apply(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, u[0], u[1], u[2], div_u);
+    div_apply(mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, u[0], u[1], u[2], div_u);
 
-    real_t SFEM_SCALE=1;
+    real_t SFEM_SCALE = 1;
     SFEM_READ_ENV(SFEM_SCALE, atof);
 
-    if(SFEM_SCALE != 1) {
-        for(ptrdiff_t i = 0; i < u_n_local; ++i) {
+    if (SFEM_SCALE != 1) {
+        for (ptrdiff_t i = 0; i < u_n_local; ++i) {
             div_u[i] *= SFEM_SCALE;
         }
     }
 
+    int SFEM_VERBOSE = 0;
+    SFEM_READ_ENV(SFEM_VERBOSE, atoi);
+
+    if (SFEM_VERBOSE) {
+        real_t integral = 0.;
+        for (ptrdiff_t i = 0; i < u_n_local; ++i) {
+            integral += div_u[i];
+        }
+
+        if (!rank) {
+            printf("integral div(u) = %g\n", (double)integral);
+        }
+    }
+
     array_write(comm, path_output, SFEM_MPI_REAL_T, div_u, u_n_local, u_n_global);
+
+    for (int d = 0; d < mesh.spatial_dim; ++d) {
+        free(u[d]);
+    }
+
+    free(div_u);
 
     double tock = MPI_Wtime();
 

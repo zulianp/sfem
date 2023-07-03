@@ -3,16 +3,20 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../matrix.io/array_dtof.h"
 #include "../matrix.io/matrixio_array.h"
 #include "../matrix.io/matrixio_crs.h"
 #include "../matrix.io/utils.h"
-#include "../matrix.io/array_dtof.h"
 
 #include "crs_graph.h"
 #include "sfem_base.h"
+#include "sfem_defs.h"
 
 #include "laplacian.h"
 #include "mass.h"
+
+#include "dirichlet.h"
+#include "neumann.h"
 
 #include "read_mesh.h"
 
@@ -26,24 +30,6 @@ ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
 
     CATCH_MPI_ERROR(MPI_File_read_at_all(file, 0, *data, nbytes, MPI_CHAR, &status));
     return nbytes;
-}
-
-SFEM_INLINE real_t det3(const real_t *mat) {
-    return mat[0] * mat[4] * mat[8] + mat[1] * mat[5] * mat[6] + mat[2] * mat[3] * mat[7] - mat[0] * mat[5] * mat[7] -
-           mat[1] * mat[3] * mat[8] - mat[2] * mat[4] * mat[6];
-}
-
-SFEM_INLINE real_t area3(const real_t left[3], const real_t right[3]) {
-    real_t a = (left[1] * right[2]) - (right[1] * left[2]);
-    real_t b = (left[2] * right[0]) - (right[2] * left[0]);
-    real_t c = (left[0] * right[1]) - (right[0] * left[1]);
-    return sqrt(a * a + b * b + c * c);
-}
-
-SFEM_INLINE void integrate_neumann(real_t value, real_t dA, real_t *element_vector) {
-    element_vector[0] = value * dA;
-    element_vector[1] = value * dA;
-    element_vector[2] = value * dA;
 }
 
 int main(int argc, char *argv[]) {
@@ -73,24 +59,29 @@ int main(int argc, char *argv[]) {
     printf("%s %s %s\n", argv[0], argv[1], output_folder);
 
     int SFEM_LAPLACIAN = 1;
-    int SFEM_MASS = 0;
     int SFEM_HANDLE_DIRICHLET = 1;
-    int SFEM_HANDLE_NEUMANN = 1;
+    int SFEM_HANDLE_NEUMANN = 0;
+    int SFEM_HANDLE_RHS = 0;
     int SFEM_EXPORT_FP32 = 0;
 
     SFEM_READ_ENV(SFEM_LAPLACIAN, atoi);
-    SFEM_READ_ENV(SFEM_MASS, atoi);
     SFEM_READ_ENV(SFEM_HANDLE_DIRICHLET, atoi);
     SFEM_READ_ENV(SFEM_EXPORT_FP32, atoi);
     SFEM_READ_ENV(SFEM_HANDLE_NEUMANN, atoi);
+    SFEM_READ_ENV(SFEM_HANDLE_RHS, atoi);
 
     printf("----------------------------------------\n");
-    printf("Environment variables:\n- SFEM_LAPLACIAN=%d\n- SFEM_MASS=%d\n- SFEM_HANDLE_DIRICHLET=%d\n- SFEM_EXPORT_FP32=%d\n",
-           SFEM_LAPLACIAN,
-           SFEM_MASS,
-           SFEM_HANDLE_DIRICHLET,
-           SFEM_EXPORT_FP32);
+    printf(
+        "Environment variables:\n- SFEM_LAPLACIAN=%d\n- SFEM_HANDLE_DIRICHLET=%d\n- "
+        "SFEM_HANDLE_NEUMANN=%d\n- SFEM_HANDLE_RHS=%d\n- SFEM_EXPORT_FP32=%d\n",
+        SFEM_LAPLACIAN,
+        SFEM_HANDLE_DIRICHLET,
+        SFEM_HANDLE_NEUMANN,
+        SFEM_HANDLE_RHS,
+        SFEM_EXPORT_FP32);
     printf("----------------------------------------\n");
+
+    MPI_Datatype value_type = SFEM_EXPORT_FP32 ? MPI_FLOAT : MPI_DOUBLE;
 
     double tick = MPI_Wtime();
 
@@ -99,14 +90,9 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     const char *folder = argv[1];
-    char path[1024 * 10];
-    ptrdiff_t nnodes = 0;
-    geom_t *xyz[3];
 
-    ptrdiff_t nelements = 0;
-    idx_t *elems[4];
-
-    if(serial_read_tet_mesh(folder, &nelements, elems, &nnodes, xyz)) {
+    mesh_t mesh;
+    if (mesh_read(comm, folder, &mesh)) {
         return EXIT_FAILURE;
     }
 
@@ -122,9 +108,9 @@ int main(int argc, char *argv[]) {
     idx_t *colidx = 0;
     real_t *values = 0;
 
-    build_crs_graph(nelements, nnodes, elems, &rowptr, &colidx);
+    build_crs_graph_for_elem_type(mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
 
-    nnz = rowptr[nnodes];
+    nnz = rowptr[mesh.nnodes];
     values = (real_t *)malloc(nnz * sizeof(real_t));
     memset(values, 0, nnz * sizeof(real_t));
 
@@ -136,11 +122,8 @@ int main(int argc, char *argv[]) {
     // Operator assembly
     ///////////////////////////////////////////////////////////////////////////////
     if (SFEM_LAPLACIAN) {
-        laplacian_assemble_hessian(nelements, nnodes, elems, xyz, rowptr, colidx, values);
-    }
-
-    if (SFEM_MASS) {
-        assemble_mass(nelements, nnodes, elems, xyz, rowptr, colidx, values);
+        laplacian_assemble_hessian(
+            mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, rowptr, colidx, values);
     }
 
     tock = MPI_Wtime();
@@ -151,76 +134,42 @@ int main(int argc, char *argv[]) {
     // Boundary conditions
     ///////////////////////////////////////////////////////////////////////////////
 
-    real_t *rhs = (real_t *)malloc(nnodes * sizeof(real_t));
-    memset(rhs, 0, nnodes * sizeof(real_t));
+    real_t *rhs = (real_t *)malloc(mesh.nnodes * sizeof(real_t));
+    memset(rhs, 0, mesh.nnodes * sizeof(real_t));
 
-    if(SFEM_HANDLE_NEUMANN)
-    {  // Neumann
+    if (SFEM_HANDLE_NEUMANN) {  // Neumann
+        char path[1024 * 10];
         sprintf(path, "%s/on.raw", folder);
-        idx_t *faces_neumann = 0;
-        ptrdiff_t nfacesx3 = read_file(comm, path, (void **)&faces_neumann);
-        idx_t nfaces = (nfacesx3 / 3) / sizeof(idx_t);
-        assert(nfaces * 3 * sizeof(idx_t) == nfacesx3);
 
-        real_t u[3], v[3];
-        real_t element_vector[3];
+        const char *SFEM_NEUMANN_FACES = 0;
+        SFEM_READ_ENV(SFEM_NEUMANN_FACES, );
 
-        real_t jacobian[3 * 3] = {0, 0, 0, 0, 0, 0, 0, 0, 1};
-
-        real_t value = 1.0;
-        // real_t value = 2.0;
-        for (idx_t f = 0; f < nfaces; ++f) {
-            idx_t i0 = faces_neumann[f * 3];
-            idx_t i1 = faces_neumann[f * 3 + 1];
-            idx_t i2 = faces_neumann[f * 3 + 2];
-
-            real_t dx = 0;
-
-            if (0) {
-                for (int d = 0; d < 3; ++d) {
-                    real_t x0 = (real_t)xyz[d][i0];
-                    real_t x1 = (real_t)xyz[d][i1];
-                    real_t x2 = (real_t)xyz[d][i2];
-
-                    u[d] = x1 - x0;
-                    v[d] = x2 - x0;
-                }
-
-                dx = area3(u, v) / 2;
-            } else {
-                // No square roots in this version
-                for (int d = 0; d < 3; ++d) {
-                    real_t x0 = (real_t)xyz[d][i0];
-                    real_t x1 = (real_t)xyz[d][i1];
-                    real_t x2 = (real_t)xyz[d][i2];
-
-                    jacobian[d * 3] = x1 - x0;
-                    jacobian[d * 3 + 1] = x2 - x0;
-                }
-
-                // Orientation of face is not proper
-                dx = fabs(det3(jacobian)) / 2;
-            }
-
-            assert(dx > 0.);
-            integrate_neumann(value, dx, element_vector);
-
-            rhs[i0] += element_vector[0];
-            rhs[i1] += element_vector[1];
-            rhs[i2] += element_vector[2];
+        if (SFEM_NEUMANN_FACES) {
+            strcpy(path, SFEM_NEUMANN_FACES);
+            printf("SFEM_NEUMANN_FACES=%s\n", path);
         }
 
+        idx_t *faces_neumann = 0;
+
+        enum ElemType st = side_type(mesh.element_type);
+        int nnodesxface = elem_num_nodes(st);
+        ptrdiff_t nfacesxnxe = read_file(comm, path, (void **)&faces_neumann);
+        idx_t nfaces = (nfacesxnxe / nnodesxface) / sizeof(idx_t);
+        assert(nfaces * nnodesxface * sizeof(idx_t) == nfacesxnxe);
+
+        surface_forcing_function(st, nfaces, faces_neumann, mesh.points, 1.0, rhs);
         free(faces_neumann);
     }
 
     if (SFEM_HANDLE_DIRICHLET) {
         // Dirichlet
+        char path[1024 * 10];
         sprintf(path, "%s/zd.raw", folder);
 
-        const char * SFEM_DIRICHLET_NODES = 0;
+        const char *SFEM_DIRICHLET_NODES = 0;
         SFEM_READ_ENV(SFEM_DIRICHLET_NODES, );
 
-        if(SFEM_DIRICHLET_NODES) {
+        if (SFEM_DIRICHLET_NODES) {
             strcpy(path, SFEM_DIRICHLET_NODES);
             printf("SFEM_DIRICHLET_NODES=%s\n", path);
         }
@@ -230,28 +179,23 @@ int main(int argc, char *argv[]) {
         assert((nn / sizeof(idx_t)) * sizeof(idx_t) == nn);
         nn /= sizeof(idx_t);
 
-        // Set rhs should not be necessary (but let us do it anyway)
-        for (ptrdiff_t node = 0; node < nn; ++node) {
-            idx_t i = dirichlet_nodes[node];
-            rhs[i] = 0;
+        constraint_nodes_to_value(nn, dirichlet_nodes, 0, rhs);
+        crs_constraint_nodes_to_identity(nn, dirichlet_nodes, 1, rowptr, colidx, values);
+    }
+
+    if (SFEM_HANDLE_RHS) {
+        if (SFEM_EXPORT_FP32) {
+            array_dtof(mesh.nnodes, (const real_t *)rhs, (float *)rhs);
         }
 
-        for (ptrdiff_t node = 0; node < nn; ++node) {
-            idx_t i = dirichlet_nodes[node];
-
-            idx_t begin = rowptr[i];
-            idx_t end = rowptr[i + 1];
-            idx_t lenrow = end - begin;
-            idx_t *cols = &colidx[begin];
-            real_t *row = &values[begin];
-
-            memset(row, 0, sizeof(real_t) * lenrow);
-
-            int k = find_idx(i, cols, lenrow);
-            assert(k >= 0);
-            row[k] = 1;
+        {
+            char path[1024 * 10];
+            sprintf(path, "%s/rhs.raw", output_folder);
+            array_write(comm, path, value_type, rhs, mesh.nnodes, mesh.nnodes);
         }
     }
+
+    free(rhs);
 
     tock = MPI_Wtime();
     printf("assemble.c: boundary\t\t%g seconds\n", tock - tack);
@@ -261,11 +205,8 @@ int main(int argc, char *argv[]) {
     // Write CRS matrix and rhs vector
     ///////////////////////////////////////////////////////////////////////////////
 
-    MPI_Datatype value_type = SFEM_EXPORT_FP32? MPI_FLOAT : MPI_DOUBLE;
-    
-    if(SFEM_EXPORT_FP32) {
-        array_dtof(nnz,    (const real_t *)values, (float*)values);
-        array_dtof(nnodes, (const real_t *)rhs, (float*)rhs);
+    if (SFEM_EXPORT_FP32) {
+        array_dtof(nnz, (const real_t *)values, (float *)values);
     }
 
     {
@@ -273,8 +214,8 @@ int main(int argc, char *argv[]) {
         crs_out.rowptr = (char *)rowptr;
         crs_out.colidx = (char *)colidx;
         crs_out.values = (char *)values;
-        crs_out.grows = nnodes;
-        crs_out.lrows = nnodes;
+        crs_out.grows = mesh.nnodes;
+        crs_out.lrows = mesh.nnodes;
         crs_out.lnnz = nnz;
         crs_out.gnnz = nnz;
         crs_out.start = 0;
@@ -283,11 +224,6 @@ int main(int argc, char *argv[]) {
         crs_out.colidx_type = SFEM_MPI_IDX_T;
         crs_out.values_type = value_type;
         crs_write_folder(comm, output_folder, &crs_out);
-    }
-
-    {
-        sprintf(path, "%s/rhs.raw", output_folder);
-        array_write(comm, path, value_type, rhs, nnodes, nnodes);
     }
 
     tock = MPI_Wtime();
@@ -301,15 +237,11 @@ int main(int argc, char *argv[]) {
     free(rowptr);
     free(colidx);
     free(values);
-    free(rhs);
 
-    for (int d = 0; d < 3; ++d) {
-        free(xyz[d]);
-    }
+    ptrdiff_t nelements = mesh.nelements;
+    ptrdiff_t nnodes = mesh.nnodes;
 
-    for (int i = 0; i < 4; ++i) {
-        free(elems[i]);
-    }
+    mesh_destroy(&mesh);
 
     tock = MPI_Wtime();
 
