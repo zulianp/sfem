@@ -26,7 +26,7 @@ void dinvert1(const ptrdiff_t nnodes,
         count_t diag_idx = -1;
         for (count_t k = 0; k < r_extent; k++) {
             if (cols[k] == i) {
-                diag_idx = k;
+                diag_idx = r_begin + k;
                 break;
             }
 
@@ -148,7 +148,7 @@ void dinvert3(const ptrdiff_t nnodes,
         count_t diag_idx = -1;
         for (count_t k = 0; k < r_extent; k++) {
             if (cols[k] == i) {
-                diag_idx = k;
+                diag_idx = r_begin + k;
                 break;
             }
 
@@ -304,7 +304,7 @@ void dinvert4(const ptrdiff_t nnodes,
         count_t diag_idx = -1;
         for (count_t k = 0; k < r_extent; k++) {
             if (cols[k] == i) {
-                diag_idx = k;
+                diag_idx = r_begin + k;
                 break;
             }
 
