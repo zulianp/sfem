@@ -20,9 +20,9 @@ void phase_field_for_fracture_assemble_hessian_aos(const enum ElemType element_t
                                                    const real_t lambda,
                                                    const real_t Gc,
                                                    const real_t ls,
-                                                   const real_t *const SFEM_RESTRICT displacement,
-                                                   count_t *const SFEM_RESTRICT rowptr,
-                                                   idx_t *const SFEM_RESTRICT colidx,
+                                                   const real_t *const SFEM_RESTRICT solution,
+                                                   const count_t *const SFEM_RESTRICT rowptr,
+                                                   const idx_t *const SFEM_RESTRICT colidx,
                                                    real_t *const SFEM_RESTRICT values);
 
 void phase_field_for_fracture_assemble_gradient_aos(const enum ElemType element_type,
@@ -34,7 +34,7 @@ void phase_field_for_fracture_assemble_gradient_aos(const enum ElemType element_
                                                     const real_t lambda,
                                                     const real_t Gc,
                                                     const real_t ls,
-                                                    const real_t *const SFEM_RESTRICT displacement,
+                                                    const real_t *const SFEM_RESTRICT solution,
                                                     real_t *const SFEM_RESTRICT values);
 
 void phase_field_for_fracture_assemble_value_aos(const enum ElemType element_type,
@@ -46,7 +46,7 @@ void phase_field_for_fracture_assemble_value_aos(const enum ElemType element_typ
                                                  const real_t lambda,
                                                  const real_t Gc,
                                                  const real_t ls,
-                                                 const real_t *const SFEM_RESTRICT displacement,
+                                                 const real_t *const SFEM_RESTRICT solution,
                                                  real_t *const SFEM_RESTRICT values);
 
 #ifdef __cplusplus

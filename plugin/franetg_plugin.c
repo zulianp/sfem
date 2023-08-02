@@ -40,6 +40,9 @@ typedef struct {
 
     const char *output_dir;
 
+    count_t *n2n_rowptr;
+    idx_t *n2n_colidx;
+
     real_t mu, lambda, Gc, ls;
 } sfem_problem_t;
 
@@ -148,7 +151,15 @@ int ISOLVER_EXPORT isolver_function_create_crs_graph(const isolver_function_t *i
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    build_crs_graph(mesh->nelements, mesh->nnodes, mesh->elements, rowptr, colidx);
+    build_crs_graph(
+        mesh->nelements, mesh->nnodes, mesh->elements, &problem->n2n_rowptr, &problem->n2n_colidx);
+
+    crs_graph_block_to_scalar(mesh->nnodes,
+                              problem->block_size,
+                              &problem->n2n_rowptr,
+                              &problem->n2n_colidx,
+                              rowptr,
+                              colidx);
 
     *nlocal = mesh->nnodes;
     *nglobal = mesh->nnodes;
@@ -227,13 +238,13 @@ int ISOLVER_EXPORT isolver_function_gradient(const isolver_function_t *info,
     if (problem->nlocal_neumann) {
         surface_forcing_function_vec(
             // side_type(mesh->element_type), //FIXME
-                                     problem->nlocal_neumann,
-                                     problem->faces_neumann,
-                                     mesh->points,
-                                     -1,
-                                     problem->block_size,
-                                     problem->neumann_component,
-                                     out);
+            problem->nlocal_neumann,
+            problem->faces_neumann,
+            mesh->points,
+            -1,
+            problem->block_size,
+            problem->neumann_component,
+            out);
     }
 
     return ISOLVER_FUNCTION_SUCCESS;
@@ -260,8 +271,8 @@ int ISOLVER_EXPORT isolver_function_hessian_crs(const isolver_function_t *info,
                                                   problem->Gc,
                                                   problem->ls,
                                                   x,
-                                                  rowptr,
-                                                  colidx,
+                                                  problem->n2n_rowptr,
+                                                  problem->n2n_colidx,
                                                   values);
 
     crs_constraint_nodes_to_identity(
@@ -355,5 +366,7 @@ int ISOLVER_EXPORT isolver_function_destroy(isolver_function_t *info) {
     free(problem->mesh);
     free(problem->dirichlet_nodes);
     free(problem->faces_neumann);
+    free(problem->n2n_rowptr);
+    free(problem->n2n_colidx);
     return ISOLVER_FUNCTION_SUCCESS;
 }
