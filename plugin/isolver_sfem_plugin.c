@@ -171,7 +171,7 @@ int ISOLVER_EXPORT isolver_function_value(const isolver_function_t *info,
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    tet4_laplacian_assemble_value(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
+    laplacian_assemble_value(mesh->element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
@@ -183,8 +183,8 @@ int ISOLVER_EXPORT isolver_function_gradient(const isolver_function_t *info,
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    tet4_laplacian_assemble_gradient(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
-    surface_forcing_function(problem->nlocal_neumann, problem->faces_neumann, mesh->points, -1, out);
+    laplacian_assemble_gradient(mesh->element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
+    surface_forcing_function(mesh->element_type, problem->nlocal_neumann, problem->faces_neumann, mesh->points, -1, out);
 
     return ISOLVER_FUNCTION_SUCCESS;
 }
@@ -200,7 +200,7 @@ int ISOLVER_EXPORT isolver_function_hessian_crs(const isolver_function_t *info,
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    tet4_laplacian_assemble_hessian(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, rowptr, colidx, values);
+    laplacian_assemble_hessian(mesh->element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, rowptr, colidx, values);
 
     crs_constraint_nodes_to_identity(problem->nlocal_dirchlet, problem->dirichlet_nodes, 1.0, rowptr, colidx, values);
     return ISOLVER_FUNCTION_SUCCESS;
@@ -217,7 +217,7 @@ int ISOLVER_EXPORT isolver_function_apply(const isolver_function_t *info,
     assert(mesh);
 
     // Equivalent to operator application due to linearity of the problem
-    tet4_laplacian_assemble_gradient(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, h, out);
+    laplacian_assemble_gradient(mesh->element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, h, out);
     return ISOLVER_FUNCTION_SUCCESS;
 }
 

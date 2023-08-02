@@ -33,8 +33,8 @@ solve()
 }
 
 mesh=mesh
-# create_square.sh 4
-# rm $mesh/z.raw
+create_square.sh 8
+rm $mesh/z.raw
 nvars=2
 
 dirichlet_nodes=all.raw
