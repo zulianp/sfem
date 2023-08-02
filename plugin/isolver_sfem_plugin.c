@@ -18,6 +18,7 @@
 
 #include "read_mesh.h"
 #include "sfem_mesh.h"
+#include "sfem_defs.h"
 
 #include "dirichlet.h"
 #include "neumann.h"
@@ -184,7 +185,7 @@ int ISOLVER_EXPORT isolver_function_gradient(const isolver_function_t *info,
     assert(mesh);
 
     laplacian_assemble_gradient(mesh->element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
-    surface_forcing_function(mesh->element_type, problem->nlocal_neumann, problem->faces_neumann, mesh->points, -1, out);
+    surface_forcing_function(side_type(mesh->element_type), problem->nlocal_neumann, problem->faces_neumann, mesh->points, -1, out);
 
     return ISOLVER_FUNCTION_SUCCESS;
 }
