@@ -8,7 +8,6 @@
 
 #include "crs_graph.h"
 #include "sortreduce.h"
-
 #include "sfem_vec.h"
 
 static SFEM_INLINE void neohookean_energy(const real_t mu,
