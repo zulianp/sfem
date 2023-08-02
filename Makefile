@@ -198,7 +198,7 @@ OBJS += neohookean.o
 
 OBJS += $(SIMD_OBJS)
 
-plugins: isolver_sfem.dylib
+plugins: isolver_sfem.dylib franetg_plugin.dylib
 
 libsfem.a : $(OBJS)
 	ar rcs $@ $^
@@ -384,6 +384,12 @@ isolver_sfem.dylib : isolver_sfem_plugin.o libsfem.a
 	$(MPICC) -shared -o $@ $^ $(LDFLAGS)
 
 isolver_sfem_plugin.o : plugin/isolver_sfem_plugin.c
+	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
+
+franetg_plugin.dylib : franetg_plugin.o libsfem.a
+	$(MPICC) -shared -o $@ $^ $(LDFLAGS)
+
+franetg_plugin.o : plugin/franetg_plugin.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
 
 sortreduce.o : sortreduce.cpp

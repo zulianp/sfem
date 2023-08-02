@@ -15,7 +15,7 @@
 #include "crs_graph.h"
 #include "sfem_base.h"
 
-#include "laplacian.h"
+#include "phase_field_for_fracture.h"
 
 #include "read_mesh.h"
 #include "sfem_defs.h"
@@ -33,10 +33,14 @@ typedef struct {
     ptrdiff_t nlocal_neumann;
     ptrdiff_t nglobal_neumann;
     idx_t *faces_neumann;
+    int neumann_component;
+    int dirichlet_component;
 
     int block_size;
 
     const char *output_dir;
+
+    real_t mu, lambda, Gc, ls;
 } sfem_problem_t;
 
 int ISOLVER_EXPORT isolver_function_destroy_array(const isolver_function_t *info, void *ptr) {
@@ -83,7 +87,6 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
         mkdir(SFEM_OUTPUT_DIR, 0700);
     }
 
-
     mesh_t *mesh = (mesh_t *)malloc(sizeof(mesh_t));
 
     if (mesh_read(info->comm, SFEM_MESH_DIR, mesh)) {
@@ -124,7 +127,7 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
 
     // Redistribute Dirichlet nodes
     problem->mesh = mesh;
-    problem->block_size = 1;
+    problem->block_size = mesh->spatial_dim + 1;
     problem->output_dir = SFEM_OUTPUT_DIR;
 
     // Store problem
@@ -187,8 +190,17 @@ int ISOLVER_EXPORT isolver_function_value(const isolver_function_t *info,
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    laplacian_assemble_value(
-        mesh->element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
+    phase_field_for_fracture_assemble_value_aos(mesh->element_type,
+                                                mesh->nelements,
+                                                mesh->nnodes,
+                                                mesh->elements,
+                                                mesh->points,
+                                                problem->mu,
+                                                problem->lambda,
+                                                problem->Gc,
+                                                problem->ls,
+                                                x,
+                                                out);
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
@@ -200,16 +212,28 @@ int ISOLVER_EXPORT isolver_function_gradient(const isolver_function_t *info,
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    laplacian_assemble_gradient(
-        mesh->element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
+    phase_field_for_fracture_assemble_gradient_aos(mesh->element_type,
+                                                   mesh->nelements,
+                                                   mesh->nnodes,
+                                                   mesh->elements,
+                                                   mesh->points,
+                                                   problem->mu,
+                                                   problem->lambda,
+                                                   problem->Gc,
+                                                   problem->ls,
+                                                   x,
+                                                   out);
 
     if (problem->nlocal_neumann) {
-        surface_forcing_function(side_type(mesh->element_type),
-                                 problem->nlocal_neumann,
-                                 problem->faces_neumann,
-                                 mesh->points,
-                                 -1,
-                                 out);
+        surface_forcing_function_vec(
+            // side_type(mesh->element_type), //FIXME
+                                     problem->nlocal_neumann,
+                                     problem->faces_neumann,
+                                     mesh->points,
+                                     -1,
+                                     problem->block_size,
+                                     problem->neumann_component,
+                                     out);
     }
 
     return ISOLVER_FUNCTION_SUCCESS;
@@ -226,14 +250,19 @@ int ISOLVER_EXPORT isolver_function_hessian_crs(const isolver_function_t *info,
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    laplacian_assemble_hessian(mesh->element_type,
-                               mesh->nelements,
-                               mesh->nnodes,
-                               mesh->elements,
-                               mesh->points,
-                               rowptr,
-                               colidx,
-                               values);
+    phase_field_for_fracture_assemble_hessian_aos(mesh->element_type,
+                                                  mesh->nelements,
+                                                  mesh->nnodes,
+                                                  mesh->elements,
+                                                  mesh->points,
+                                                  problem->mu,
+                                                  problem->lambda,
+                                                  problem->Gc,
+                                                  problem->ls,
+                                                  x,
+                                                  rowptr,
+                                                  colidx,
+                                                  values);
 
     crs_constraint_nodes_to_identity(
         problem->nlocal_dirchlet, problem->dirichlet_nodes, 1.0, rowptr, colidx, values);
@@ -251,8 +280,14 @@ int ISOLVER_EXPORT isolver_function_apply(const isolver_function_t *info,
     assert(mesh);
 
     // Equivalent to operator application due to linearity of the problem
-    laplacian_assemble_gradient(
-        mesh->element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, h, out);
+    // phase_field_for_fracture_assemble_gradient_aos(mesh->element_type,
+    //                                                mesh->nelements,
+    //                                                mesh->nnodes,
+    //                                                mesh->elements,
+    //                                                mesh->points,
+    //                                                h,
+    //                                                out);
+    assert(0);
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
@@ -282,7 +317,12 @@ int ISOLVER_EXPORT isolver_function_copy_constrained_dofs(const isolver_function
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    constraint_nodes_copy(problem->nlocal_dirchlet, problem->dirichlet_nodes, src, dest);
+    constraint_nodes_copy_vec(problem->nlocal_dirchlet,
+                              problem->dirichlet_nodes,
+                              problem->block_size,
+                              problem->dirichlet_component,
+                              src,
+                              dest);
 
     // No constraints for this example
     return ISOLVER_FUNCTION_SUCCESS;
