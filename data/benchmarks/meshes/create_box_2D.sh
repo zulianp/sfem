@@ -54,7 +54,7 @@ db_to_raw.py $mesh_db $mesh_raw
 $LAUNCH skin $mesh_raw $mesh_surface
 raw_to_db.py $mesh_surface $mesh_surface/surf.vtk
 
-# 									x 				y 				z 		cos(angle)
+# 									x 				y 					z 	cos(angle)
 $LAUNCH select_surf $mesh_surface  0  			 	$(( height/2 )) 	0  	0.99 $mesh_surface/sides_left.raw
 $LAUNCH select_surf $mesh_surface  $width  		 	$(( height/2 ))  	0  	0.99 $mesh_surface/sides_right.raw
 $LAUNCH select_surf $mesh_surface  $(( width/2 ))  	0  					0  	0.99 $mesh_surface/sides_bottom.raw
