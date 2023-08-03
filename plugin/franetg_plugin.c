@@ -25,28 +25,109 @@
 #include "neumann.h"
 
 typedef struct {
+    ptrdiff_t local_size, global_size;
+    idx_t *idx;
+    int component;
+    real_t value;
+} boundary_condition_t;
+
+typedef struct {
     mesh_t *mesh;
-    idx_t *dirichlet_nodes;
-    ptrdiff_t nlocal_dirchlet;
-    ptrdiff_t nglobal_dirchlet;
-
-    ptrdiff_t nlocal_neumann;
-    ptrdiff_t nglobal_neumann;
-    idx_t *faces_neumann;
-    int neumann_component;
-    int dirichlet_component;
-
-    int block_size;
-
-    const char *output_dir;
 
     count_t *n2n_rowptr;
     idx_t *n2n_colidx;
+    int block_size;
+
+    int n_neumann_conditions;
+    boundary_condition_t *neumann_conditions;
+
+    int n_dirichlet_conditions;
+    boundary_condition_t *dirichlet_conditions;
 
     real_t mu, lambda, Gc, ls;
+
+    const char *output_dir;
 } sfem_problem_t;
 
+void read_boundary_conditions(MPI_Comm comm,
+                              char *sets,
+                              char *values,
+                              char *components,
+                              boundary_condition_t **bcs,
+                              int *nbc) {
+    if (!sets) {
+        *bcs = NULL;
+        *nbc = 0;
+        return;
+    }
+
+    const char *splitters = " ,;| ";
+    char *pch;
+    pch = strtok(sets, splitters);
+
+    int count = 1;
+    while (pch != NULL) {
+        pch = strtok(NULL, splitters);
+        count++;
+    }
+
+    boundary_condition_t *conds = malloc(count * sizeof(boundary_condition_t));
+
+    // NODESET/SIDESET
+    {
+        pch = strtok(sets, splitters);
+        int i = 0;
+        while (pch != NULL) {
+            printf("Reading %s\n", pch);
+            pch = strtok(NULL, splitters);
+
+            if (array_create_from_file(comm,
+                                       pch,
+                                       SFEM_MPI_IDX_T,
+                                       (void **)&conds[i].idx,
+                                       &conds[i].local_size,
+                                       &conds[i].global_size)) {
+                fprintf(stderr, "Failed to read file %s\n", pch);
+                return;
+            }
+
+            // Some default values
+            conds[i].value = 0;
+            conds[i].component = 0;
+            i++;
+        }
+    }
+
+    if (values) {
+        pch = strtok(values, splitters);
+        int i = 0;
+        while (pch != NULL) {
+            printf("Reading %s\n", pch);
+            pch = strtok(NULL, splitters);
+
+            conds[i].value = atof(pch);
+            i++;
+        }
+    }
+
+    if (components) {
+        pch = strtok(components, splitters);
+        int i = 0;
+        while (pch != NULL) {
+            printf("Reading %s\n", pch);
+            pch = strtok(NULL, splitters);
+
+            conds[i].component = atoi(pch);
+            i++;
+        }
+    }
+
+    *bcs = conds;
+    *nbc = count;
+}
+
 int ISOLVER_EXPORT isolver_function_destroy_array(const isolver_function_t *info, void *ptr) {
+    SFEM_UNUSED(info);
     free(ptr);
     return ISOLVER_FUNCTION_SUCCESS;
 }
@@ -54,6 +135,8 @@ int ISOLVER_EXPORT isolver_function_destroy_array(const isolver_function_t *info
 int ISOLVER_EXPORT isolver_function_create_array(const isolver_function_t *info,
                                                  size_t size,
                                                  void **ptr) {
+    SFEM_UNUSED(info);
+
     *ptr = malloc(size);
     memset(*ptr, 0, size);
     return ISOLVER_FUNCTION_SUCCESS;
@@ -61,27 +144,46 @@ int ISOLVER_EXPORT isolver_function_create_array(const isolver_function_t *info,
 
 int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
     const char *SFEM_MESH_DIR = "[error] undefined";
-    const char *SFEM_DIRICHLET_NODES = 0;
-    const char *SFEM_OUTPUT_DIR = "./sfem_output";
-    const char *SFEM_NEUMAN_FACES = 0;
-
     SFEM_READ_ENV(SFEM_MESH_DIR, );
-    SFEM_READ_ENV(SFEM_DIRICHLET_NODES, );
+
+    char *SFEM_DIRICHLET_NODESET = 0;
+    char *SFEM_DIRICHLET_VALUE = 0;
+    char *SFEM_DIRICHLET_COMPONENT = 0;
+    SFEM_READ_ENV(SFEM_DIRICHLET_NODESET, );
+    SFEM_READ_ENV(SFEM_DIRICHLET_VALUE, );
+    SFEM_READ_ENV(SFEM_DIRICHLET_COMPONENT, );
+
+    char *SFEM_NEUMANN_SIDESET = 0;
+    char *SFEM_NEUMANN_VALUE = 0;
+    char *SFEM_NEUMANN_COMPONENT = 0;
+    SFEM_READ_ENV(SFEM_NEUMANN_SIDESET, );
+    SFEM_READ_ENV(SFEM_NEUMANN_VALUE, );
+    SFEM_READ_ENV(SFEM_NEUMANN_COMPONENT, );
+
+    const char *SFEM_OUTPUT_DIR = "./sfem_output";
     SFEM_READ_ENV(SFEM_OUTPUT_DIR, );
-    SFEM_READ_ENV(SFEM_NEUMAN_FACES, );
+
+    // const char *SFEM_INITIAL_GUESS = 0;
+    // SFEM_READ_ENV(SFEM_INITIAL_GUESS, );
 
     printf(
         "sfem:\n"
-        "- SFEM_MESH_DIR=%s\n"
-        "- SFEM_DIRICHLET_NODES=%s\n"
-        "- SFEM_OUTPUT_DIR=%s\n"
-        "- SFEM_NEUMAN_FACES=%s\n",
-        SFEM_MESH_DIR,
-        SFEM_DIRICHLET_NODES,
-        SFEM_OUTPUT_DIR,
-        SFEM_NEUMAN_FACES);
+        "- SFEM_DIRICHLET_NODESET=%s\n"
+        "- SFEM_DIRICHLET_VALUE=%s\n"
+        "- SFEM_DIRICHLET_COMPONENT=%s\n"
+        "- SFEM_NEUMANN_SIDESET=%s\n"
+        "- SFEM_NEUMANN_VALUE=%s\n"
+        "- SFEM_NEUMANN_COMPONENT=%s\n"
+        "- SFEM_OUTPUT_DIR=%s\n",
+        SFEM_DIRICHLET_NODESET,
+        SFEM_DIRICHLET_VALUE,
+        SFEM_DIRICHLET_COMPONENT,
+        SFEM_NEUMANN_SIDESET,
+        SFEM_NEUMANN_VALUE,
+        SFEM_NEUMANN_COMPONENT,
+        SFEM_OUTPUT_DIR);
 
-    if (!SFEM_MESH_DIR || !SFEM_DIRICHLET_NODES) {
+    if (!SFEM_MESH_DIR || !SFEM_DIRICHLET_NODESET) {
         return ISOLVER_FUNCTION_FAILURE;
     }
 
@@ -98,34 +200,27 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
 
     sfem_problem_t *problem = (sfem_problem_t *)malloc(sizeof(sfem_problem_t));
 
-    if (array_create_from_file(info->comm,
-                               SFEM_DIRICHLET_NODES,
-                               SFEM_MPI_IDX_T,
-                               (void **)&problem->dirichlet_nodes,
-                               &problem->nlocal_dirchlet,
-                               &problem->nglobal_dirchlet)) {
-        return ISOLVER_FUNCTION_FAILURE;
-    }
+    read_boundary_conditions(info->comm,
+                             SFEM_DIRICHLET_NODESET,
+                             SFEM_DIRICHLET_VALUE,
+                             SFEM_DIRICHLET_COMPONENT,
+                             &problem->dirichlet_conditions,
+                             &problem->n_dirichlet_conditions);
 
-    if (SFEM_NEUMAN_FACES) {
-        if (array_create_from_file(info->comm,
-                                   SFEM_NEUMAN_FACES,
-                                   SFEM_MPI_IDX_T,
-                                   (void **)&problem->faces_neumann,
-                                   &problem->nlocal_neumann,
-                                   &problem->nglobal_neumann)) {
-            return ISOLVER_FUNCTION_FAILURE;
-        }
+    read_boundary_conditions(info->comm,
+                             SFEM_NEUMANN_SIDESET,
+                             SFEM_NEUMANN_VALUE,
+                             SFEM_NEUMANN_COMPONENT,
+                             &problem->neumann_conditions,
+                             &problem->n_neumann_conditions);
 
-        enum ElemType stype = side_type(mesh->element_type);
-        int nns = elem_num_sides(stype);
+    // Count faces not nodes
+    enum ElemType stype = side_type(mesh->element_type);
+    int nns = elem_num_sides(stype);
 
-        problem->nlocal_neumann /= nns;
-        problem->nglobal_neumann /= nns;
-
-    } else {
-        problem->nlocal_neumann = 0;
-        problem->nglobal_neumann = 0;
+    for (int i = 0; i < problem->n_neumann_conditions; i++) {
+        problem->neumann_conditions[i].global_size /= nns;
+        problem->neumann_conditions[i].local_size /= nns;
     }
 
     // Redistribute Dirichlet nodes
@@ -154,16 +249,20 @@ int ISOLVER_EXPORT isolver_function_create_crs_graph(const isolver_function_t *i
     build_crs_graph(
         mesh->nelements, mesh->nnodes, mesh->elements, &problem->n2n_rowptr, &problem->n2n_colidx);
 
+    *rowptr = (count_t *)malloc((mesh->nnodes + 1) * problem->block_size * sizeof(count_t));
+    *colidx = (idx_t *)malloc(problem->n2n_rowptr[mesh->nnodes] * problem->block_size *
+                              problem->block_size * sizeof(idx_t));
+
     crs_graph_block_to_scalar(mesh->nnodes,
                               problem->block_size,
-                              &problem->n2n_rowptr,
-                              &problem->n2n_colidx,
-                              rowptr,
-                              colidx);
+                              problem->n2n_rowptr,
+                              problem->n2n_colidx,
+                              *rowptr,
+                              *colidx);
 
     *nlocal = mesh->nnodes;
     *nglobal = mesh->nnodes;
-    *nnz = (*rowptr)[*nlocal] * (problem->block_size * problem->block_size);
+    *nnz = problem->n2n_rowptr[mesh->nnodes] * (problem->block_size * problem->block_size);
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
@@ -188,6 +287,8 @@ int ISOLVER_EXPORT isolver_function_create_vector(const isolver_function_t *info
 
 int ISOLVER_EXPORT isolver_function_destroy_vector(const isolver_function_t *info,
                                                    isolver_scalar_t *values) {
+    SFEM_UNUSED(info);
+
     free(values);
     return ISOLVER_FUNCTION_SUCCESS;
 }
@@ -235,15 +336,15 @@ int ISOLVER_EXPORT isolver_function_gradient(const isolver_function_t *info,
                                                    x,
                                                    out);
 
-    if (problem->nlocal_neumann) {
+    for (int i = 0; i < problem->n_neumann_conditions; i++) {
         surface_forcing_function_vec(
             // side_type(mesh->element_type), //FIXME
-            problem->nlocal_neumann,
-            problem->faces_neumann,
+            problem->neumann_conditions[i].local_size,
+            problem->neumann_conditions[i].idx,
             mesh->points,
-            -1,
+            problem->neumann_conditions[i].value,
             problem->block_size,
-            problem->neumann_component,
+            problem->neumann_conditions[i].component,
             out);
     }
 
@@ -275,39 +376,55 @@ int ISOLVER_EXPORT isolver_function_hessian_crs(const isolver_function_t *info,
                                                   problem->n2n_colidx,
                                                   values);
 
-    crs_constraint_nodes_to_identity(
-        problem->nlocal_dirchlet, problem->dirichlet_nodes, 1.0, rowptr, colidx, values);
+    for (int i = 0; i < problem->n_dirichlet_conditions; i++) {
+        crs_constraint_nodes_to_identity_vec(problem->dirichlet_conditions[i].local_size,
+                                             problem->dirichlet_conditions[i].idx,
+                                             problem->block_size,
+                                             problem->dirichlet_conditions[i].component,
+                                             problem->dirichlet_conditions[i].value,
+                                             rowptr,
+                                             colidx,
+                                             values);
+    }
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
 // Operator
-int ISOLVER_EXPORT isolver_function_apply(const isolver_function_t *info,
-                                          const isolver_scalar_t *const x,
-                                          const isolver_scalar_t *const h,
-                                          isolver_scalar_t *const out) {
-    sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
-    assert(problem);
-    mesh_t *mesh = problem->mesh;
-    assert(mesh);
+// int ISOLVER_EXPORT isolver_function_apply(const isolver_function_t *info,
+//                                           const isolver_scalar_t *const x,
+//                                           const isolver_scalar_t *const h,
+//                                           isolver_scalar_t *const out) {
+//     sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
+//     assert(problem);
+//     mesh_t *mesh = problem->mesh;
+//     assert(mesh);
 
-    // Equivalent to operator application due to linearity of the problem
-    // phase_field_for_fracture_assemble_gradient_aos(mesh->element_type,
-    //                                                mesh->nelements,
-    //                                                mesh->nnodes,
-    //                                                mesh->elements,
-    //                                                mesh->points,
-    //                                                h,
-    //                                                out);
-    assert(0);
-    return ISOLVER_FUNCTION_SUCCESS;
-}
+//     // Equivalent to operator application due to linearity of the problem
+//     // phase_field_for_fracture_assemble_gradient_aos(mesh->element_type,
+//     //                                                mesh->nelements,
+//     //                                                mesh->nnodes,
+//     //                                                mesh->elements,
+//     //                                                mesh->points,
+//     //                                                h,
+//     //                                                out);
+//     assert(0);
+//     return ISOLVER_FUNCTION_SUCCESS;
+// }
 
 int ISOLVER_EXPORT isolver_function_apply_constraints(const isolver_function_t *info,
                                                       isolver_scalar_t *const x) {
     sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
     assert(problem);
 
-    constraint_nodes_to_value(problem->nlocal_dirchlet, problem->dirichlet_nodes, 0, x);
+    for (int i = 0; i < problem->n_dirichlet_conditions; i++) {
+        constraint_nodes_to_value_vec(problem->dirichlet_conditions[i].local_size,
+                                      problem->dirichlet_conditions[i].idx,
+                                      problem->dirichlet_conditions[i].value,
+                                      problem->block_size,
+                                      problem->dirichlet_conditions[i].component,
+                                      x);
+    }
+
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
@@ -316,7 +433,14 @@ int ISOLVER_EXPORT isolver_function_apply_zero_constraints(const isolver_functio
     sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
     assert(problem);
 
-    constraint_nodes_to_value(problem->nlocal_dirchlet, problem->dirichlet_nodes, 0, x);
+    for (int i = 0; i < problem->n_dirichlet_conditions; i++) {
+        constraint_nodes_to_value_vec(problem->dirichlet_conditions[i].local_size,
+                                      problem->dirichlet_conditions[i].idx,
+                                      problem->block_size,
+                                      problem->dirichlet_conditions[i].component,
+                                      0,
+                                      x);
+    }
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
@@ -328,12 +452,14 @@ int ISOLVER_EXPORT isolver_function_copy_constrained_dofs(const isolver_function
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    constraint_nodes_copy_vec(problem->nlocal_dirchlet,
-                              problem->dirichlet_nodes,
-                              problem->block_size,
-                              problem->dirichlet_component,
-                              src,
-                              dest);
+    for (int i = 0; i < problem->n_dirichlet_conditions; i++) {
+        constraint_nodes_copy_vec(problem->dirichlet_conditions[i].local_size,
+                                  problem->dirichlet_conditions[i].idx,
+                                  problem->block_size,
+                                  problem->dirichlet_conditions[i].component,
+                                  src,
+                                  dest);
+    }
 
     // No constraints for this example
     return ISOLVER_FUNCTION_SUCCESS;
@@ -364,9 +490,14 @@ int ISOLVER_EXPORT isolver_function_report_solution(const isolver_function_t *in
 int ISOLVER_EXPORT isolver_function_destroy(isolver_function_t *info) {
     sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
     free(problem->mesh);
-    free(problem->dirichlet_nodes);
-    free(problem->faces_neumann);
     free(problem->n2n_rowptr);
     free(problem->n2n_colidx);
+
+    free(problem->dirichlet_conditions);
+
+    if (problem->neumann_conditions) {
+        free(problem->neumann_conditions);
+    }
+
     return ISOLVER_FUNCTION_SUCCESS;
 }
