@@ -230,8 +230,33 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
 
     // Store problem
     info->private_data = (void *)problem;
+    return ISOLVER_FUNCTION_SUCCESS;
+}
 
-    // Eventually initialize info->private_data here
+int ISOLVER_EXPORT isolver_function_initial_guess(isolver_function_t *info,
+                                                  isolver_scalar_t *const x) {
+    sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
+    assert(problem);
+    mesh_t *mesh = problem->mesh;
+    assert(mesh);
+
+    const char *SFEM_INITIAL_GUESS = 0;
+    SFEM_READ_ENV(SFEM_INITIAL_GUESS, );
+
+    if (SFEM_INITIAL_GUESS) {
+        // FIXME
+        if (array_read(info->comm,
+                       SFEM_INITIAL_GUESS,
+                       SFEM_MPI_REAL_T,
+                       (void *)x,
+                       mesh->nnodes,
+                       mesh->nnodes)) {
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+    } else {
+        memset(x, 0, mesh->nnodes * problem->block_size * sizeof(isolver_scalar_t));
+    }
+
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
@@ -338,7 +363,7 @@ int ISOLVER_EXPORT isolver_function_gradient(const isolver_function_t *info,
 
     for (int i = 0; i < problem->n_neumann_conditions; i++) {
         surface_forcing_function_vec(
-            // side_type(mesh->element_type), //FIXME
+            side_type(mesh->element_type),
             problem->neumann_conditions[i].local_size,
             problem->neumann_conditions[i].idx,
             mesh->points,
@@ -386,6 +411,7 @@ int ISOLVER_EXPORT isolver_function_hessian_crs(const isolver_function_t *info,
                                              colidx,
                                              values);
     }
+
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
@@ -441,6 +467,7 @@ int ISOLVER_EXPORT isolver_function_apply_zero_constraints(const isolver_functio
                                       0,
                                       x);
     }
+
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
@@ -461,7 +488,6 @@ int ISOLVER_EXPORT isolver_function_copy_constrained_dofs(const isolver_function
                                   dest);
     }
 
-    // No constraints for this example
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
