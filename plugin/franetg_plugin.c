@@ -49,9 +49,7 @@ typedef struct {
     const char *output_dir;
 } sfem_problem_t;
 
-
-static int SFEM_DEBUG_DUMP=0;
-
+static int SFEM_DEBUG_DUMP = 0;
 
 void read_boundary_conditions(MPI_Comm comm,
                               char *sets,
@@ -409,12 +407,16 @@ int ISOLVER_EXPORT isolver_function_gradient(const isolver_function_t *info,
                                      out);
     }
 
-
-    if(SFEM_DEBUG_DUMP) {
+    if (SFEM_DEBUG_DUMP) {
         static int gradient_counter = 0;
         char path[1024 * 10];
         sprintf(path, "%s/g_debug_%d.raw", problem->output_dir, gradient_counter++);
-        array_write(info->comm, path, SFEM_MPI_REAL_T, out, mesh->nnodes * problem->block_size, mesh->nnodes * problem->block_size);
+        array_write(info->comm,
+                    path,
+                    SFEM_MPI_REAL_T,
+                    out,
+                    mesh->nnodes * problem->block_size,
+                    mesh->nnodes * problem->block_size);
     }
 
     return ISOLVER_FUNCTION_SUCCESS;
@@ -456,7 +458,7 @@ int ISOLVER_EXPORT isolver_function_hessian_crs(const isolver_function_t *info,
                                              values);
     }
 
-    if(SFEM_DEBUG_DUMP) {
+    if (SFEM_DEBUG_DUMP) {
         static int hessian_counter = 0;
 
         crs_t crs_out;
@@ -484,11 +486,11 @@ int ISOLVER_EXPORT isolver_function_hessian_crs(const isolver_function_t *info,
         crs_write_folder(info->comm, path, &crs_out);
     }
 
-    if(0) {
-        for(ptrdiff_t i = 0; i < (mesh->nnodes * problem->block_size); i++) {
+    if (0) {
+        for (ptrdiff_t i = 0; i < (mesh->nnodes * problem->block_size); i++) {
             printf("%ld\t", i);
 
-            for(count_t k=rowptr[i]; k < rowptr[i+1]; k++) {
+            for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
                 idx_t col = colidx[k];
                 real_t val = values[k];
 
