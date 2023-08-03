@@ -49,6 +49,10 @@ typedef struct {
     const char *output_dir;
 } sfem_problem_t;
 
+
+static int SFEM_DEBUG_DUMP=0;
+
+
 void read_boundary_conditions(MPI_Comm comm,
                               char *sets,
                               char *values,
@@ -61,26 +65,27 @@ void read_boundary_conditions(MPI_Comm comm,
         return;
     }
 
-    const char *splitters = " ,;| ";
-    char *pch;
-    pch = strtok(sets, splitters);
+    const char *splitter = ",";
 
     int count = 1;
-    while (pch != NULL) {
-        pch = strtok(NULL, splitters);
-        count++;
+    {
+        int i = 0;
+        while (sets[i]) {
+            count += (sets[i++] == splitter[0]);
+            assert(i <= strlen(sets));
+        }
     }
+
+    printf("conds = %d, splitter=%c\n", count, splitter[0]);
 
     boundary_condition_t *conds = malloc(count * sizeof(boundary_condition_t));
 
     // NODESET/SIDESET
     {
-        pch = strtok(sets, splitters);
+        char *pch = strtok(sets, splitter);
         int i = 0;
         while (pch != NULL) {
-            printf("Reading %s\n", pch);
-            pch = strtok(NULL, splitters);
-
+            printf("Reading file (%d/%d): %s\n", i + 1, count, pch);
             if (array_create_from_file(comm,
                                        pch,
                                        SFEM_MPI_IDX_T,
@@ -95,30 +100,31 @@ void read_boundary_conditions(MPI_Comm comm,
             conds[i].value = 0;
             conds[i].component = 0;
             i++;
+            pch = strtok(NULL, splitter);
         }
     }
 
     if (values) {
-        pch = strtok(values, splitters);
+        char *pch = strtok(values, splitter);
         int i = 0;
         while (pch != NULL) {
-            printf("Reading %s\n", pch);
-            pch = strtok(NULL, splitters);
-
+            printf("Parsing %s\n", pch);
             conds[i].value = atof(pch);
             i++;
+
+            pch = strtok(NULL, splitter);
         }
     }
 
     if (components) {
-        pch = strtok(components, splitters);
+        char *pch = strtok(components, splitter);
         int i = 0;
         while (pch != NULL) {
-            printf("Reading %s\n", pch);
-            pch = strtok(NULL, splitters);
-
+            printf("Parsing %s\n", pch);
             conds[i].component = atoi(pch);
             i++;
+
+            pch = strtok(NULL, splitter);
         }
     }
 
@@ -163,8 +169,20 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
     const char *SFEM_OUTPUT_DIR = "./sfem_output";
     SFEM_READ_ENV(SFEM_OUTPUT_DIR, );
 
+    real_t SFEM_SHEAR_MODULUS = 2.23;
+    real_t SFEM_FIRST_LAME_PARAMETER = 3.35;
+    real_t SFEM_FRACTURE_TOUGHNESS = 0.27;
+    real_t SFEM_LENGTH_SCALE = 1.;
+
+    SFEM_READ_ENV(SFEM_SHEAR_MODULUS, atof);
+    SFEM_READ_ENV(SFEM_FIRST_LAME_PARAMETER, atof);
+    SFEM_READ_ENV(SFEM_FRACTURE_TOUGHNESS, atof);
+    SFEM_READ_ENV(SFEM_LENGTH_SCALE, atof);
+
     // const char *SFEM_INITIAL_GUESS = 0;
     // SFEM_READ_ENV(SFEM_INITIAL_GUESS, );
+
+    SFEM_READ_ENV(SFEM_DEBUG_DUMP, atoi);
 
     printf(
         "sfem:\n"
@@ -174,14 +192,24 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
         "- SFEM_NEUMANN_SIDESET=%s\n"
         "- SFEM_NEUMANN_VALUE=%s\n"
         "- SFEM_NEUMANN_COMPONENT=%s\n"
-        "- SFEM_OUTPUT_DIR=%s\n",
+        "- SFEM_SHEAR_MODULUS=%g\n"
+        "- SFEM_FIRST_LAME_PARAMETER=%g\n"
+        "- SFEM_FRACTURE_TOUGHNESS=%g\n"
+        "- SFEM_LENGTH_SCALE=%g\n"
+        "- SFEM_OUTPUT_DIR=%s\n"
+        "- SFEM_DEBUG_DUMP=%d\n",
         SFEM_DIRICHLET_NODESET,
         SFEM_DIRICHLET_VALUE,
         SFEM_DIRICHLET_COMPONENT,
         SFEM_NEUMANN_SIDESET,
         SFEM_NEUMANN_VALUE,
         SFEM_NEUMANN_COMPONENT,
-        SFEM_OUTPUT_DIR);
+        SFEM_SHEAR_MODULUS,
+        SFEM_FIRST_LAME_PARAMETER,
+        SFEM_FRACTURE_TOUGHNESS,
+        SFEM_LENGTH_SCALE,
+        SFEM_OUTPUT_DIR,
+        SFEM_DEBUG_DUMP);
 
     if (!SFEM_MESH_DIR || !SFEM_DIRICHLET_NODESET) {
         return ISOLVER_FUNCTION_FAILURE;
@@ -225,8 +253,13 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
 
     // Redistribute Dirichlet nodes
     problem->mesh = mesh;
-    problem->block_size = mesh->spatial_dim + 1;
+    problem->block_size = elem_manifold_dim(mesh->element_type) + 1;
     problem->output_dir = SFEM_OUTPUT_DIR;
+
+    problem->lambda = SFEM_FIRST_LAME_PARAMETER;
+    problem->mu = SFEM_SHEAR_MODULUS;
+    problem->Gc = SFEM_FRACTURE_TOUGHNESS;
+    problem->ls = SFEM_LENGTH_SCALE;
 
     // Store problem
     info->private_data = (void *)problem;
@@ -271,8 +304,12 @@ int ISOLVER_EXPORT isolver_function_create_crs_graph(const isolver_function_t *i
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    build_crs_graph(
-        mesh->nelements, mesh->nnodes, mesh->elements, &problem->n2n_rowptr, &problem->n2n_colidx);
+    build_crs_graph_for_elem_type(mesh->element_type,
+                                  mesh->nelements,
+                                  mesh->nnodes,
+                                  mesh->elements,
+                                  &problem->n2n_rowptr,
+                                  &problem->n2n_colidx);
 
     *rowptr = (count_t *)malloc((mesh->nnodes + 1) * problem->block_size * sizeof(count_t));
     *colidx = (idx_t *)malloc(problem->n2n_rowptr[mesh->nnodes] * problem->block_size *
@@ -285,8 +322,8 @@ int ISOLVER_EXPORT isolver_function_create_crs_graph(const isolver_function_t *i
                               *rowptr,
                               *colidx);
 
-    *nlocal = mesh->nnodes;
-    *nglobal = mesh->nnodes;
+    *nlocal = mesh->nnodes * problem->block_size;
+    *nglobal = mesh->nnodes * problem->block_size;
     *nnz = problem->n2n_rowptr[mesh->nnodes] * (problem->block_size * problem->block_size);
     return ISOLVER_FUNCTION_SUCCESS;
 }
@@ -362,15 +399,22 @@ int ISOLVER_EXPORT isolver_function_gradient(const isolver_function_t *info,
                                                    out);
 
     for (int i = 0; i < problem->n_neumann_conditions; i++) {
-        surface_forcing_function_vec(
-            side_type(mesh->element_type),
-            problem->neumann_conditions[i].local_size,
-            problem->neumann_conditions[i].idx,
-            mesh->points,
-            problem->neumann_conditions[i].value,
-            problem->block_size,
-            problem->neumann_conditions[i].component,
-            out);
+        surface_forcing_function_vec(side_type(mesh->element_type),
+                                     problem->neumann_conditions[i].local_size,
+                                     problem->neumann_conditions[i].idx,
+                                     mesh->points,
+                                     problem->neumann_conditions[i].value,
+                                     problem->block_size,
+                                     problem->neumann_conditions[i].component,
+                                     out);
+    }
+
+
+    if(SFEM_DEBUG_DUMP) {
+        static int gradient_counter = 0;
+        char path[1024 * 10];
+        sprintf(path, "%s/g_debug_%d.raw", problem->output_dir, gradient_counter++);
+        array_write(info->comm, path, SFEM_MPI_REAL_T, out, mesh->nnodes * problem->block_size, mesh->nnodes * problem->block_size);
     }
 
     return ISOLVER_FUNCTION_SUCCESS;
@@ -406,36 +450,71 @@ int ISOLVER_EXPORT isolver_function_hessian_crs(const isolver_function_t *info,
                                              problem->dirichlet_conditions[i].idx,
                                              problem->block_size,
                                              problem->dirichlet_conditions[i].component,
-                                             problem->dirichlet_conditions[i].value,
+                                             1,
                                              rowptr,
                                              colidx,
                                              values);
+    }
+
+    if(SFEM_DEBUG_DUMP) {
+        static int hessian_counter = 0;
+
+        crs_t crs_out;
+        crs_out.rowptr = (char *)rowptr;
+        crs_out.colidx = (char *)colidx;
+        crs_out.values = (char *)values;
+        crs_out.grows = mesh->nnodes * problem->block_size;
+        crs_out.lrows = mesh->nnodes * problem->block_size;
+        crs_out.lnnz = rowptr[mesh->nnodes * problem->block_size];
+        crs_out.gnnz = rowptr[mesh->nnodes * problem->block_size];
+        crs_out.start = 0;
+        crs_out.rowoffset = 0;
+        crs_out.rowptr_type = SFEM_MPI_COUNT_T;
+        crs_out.colidx_type = SFEM_MPI_IDX_T;
+        crs_out.values_type = SFEM_MPI_REAL_T;
+
+        char path[1024 * 10];
+        sprintf(path, "%s/H_debug_%d.raw", problem->output_dir, hessian_counter++);
+
+        struct stat st = {0};
+        if (stat(path, &st) == -1) {
+            mkdir(path, 0700);
+        }
+
+        crs_write_folder(info->comm, path, &crs_out);
+    }
+
+    if(0) {
+        for(ptrdiff_t i = 0; i < (mesh->nnodes * problem->block_size); i++) {
+            printf("%ld\t", i);
+
+            for(count_t k=rowptr[i]; k < rowptr[i+1]; k++) {
+                idx_t col = colidx[k];
+                real_t val = values[k];
+
+                printf("(%d, %g) ", col, val);
+                assert(col < mesh->nnodes * problem->block_size);
+            }
+            printf("\n");
+        }
     }
 
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
 // Operator
-// int ISOLVER_EXPORT isolver_function_apply(const isolver_function_t *info,
-//                                           const isolver_scalar_t *const x,
-//                                           const isolver_scalar_t *const h,
-//                                           isolver_scalar_t *const out) {
-//     sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
-//     assert(problem);
-//     mesh_t *mesh = problem->mesh;
-//     assert(mesh);
-
-//     // Equivalent to operator application due to linearity of the problem
-//     // phase_field_for_fracture_assemble_gradient_aos(mesh->element_type,
-//     //                                                mesh->nelements,
-//     //                                                mesh->nnodes,
-//     //                                                mesh->elements,
-//     //                                                mesh->points,
-//     //                                                h,
-//     //                                                out);
-//     assert(0);
-//     return ISOLVER_FUNCTION_SUCCESS;
-// }
+int ISOLVER_EXPORT isolver_function_apply(const isolver_function_t *info,
+                                          const isolver_scalar_t *const x,
+                                          const isolver_scalar_t *const h,
+                                          isolver_scalar_t *const out) {
+    sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
+    assert(problem);
+    mesh_t *mesh = problem->mesh;
+    assert(mesh);
+    // TODO
+    assert(0);
+    return ISOLVER_FUNCTION_SUCCESS;
+}
 
 int ISOLVER_EXPORT isolver_function_apply_constraints(const isolver_function_t *info,
                                                       isolver_scalar_t *const x) {

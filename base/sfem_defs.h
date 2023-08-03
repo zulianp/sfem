@@ -68,4 +68,26 @@ SFEM_INLINE static int elem_num_sides(const enum ElemType type) {
     }
 }
 
+SFEM_INLINE static int elem_manifold_dim(const enum ElemType type) {
+    switch (type) {
+        case EDGE2:
+            return 1;
+        case TRI3:
+            return 2;
+        case TET4:
+            return 3;
+        case TRI6:
+            return 2;
+        case HEX8:
+            return 3;
+        case TET10:
+            return 3;
+        default: {
+            assert(0);
+            return INVALID;
+        }
+    }
+}
+
+
 #endif  // SFEM_DEFS_H

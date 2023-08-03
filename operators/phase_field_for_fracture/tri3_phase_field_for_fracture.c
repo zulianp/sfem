@@ -15,6 +15,14 @@
 #include "FE2D_phase_field_for_fracture_kernels.h"
 #include "Tri3_kernels.cu"
 
+#define var_disp 1
+#define var_phase 0
+#define sdim 2
+#define tdim 4
+#define block_size 3
+#define n_funs 3
+#define n_qp 6
+
 static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {
     int i;
     for (i = 0; i < size - SFEM_VECTOR_SIZE; i += SFEM_VECTOR_SIZE) {
@@ -45,36 +53,33 @@ static SFEM_INLINE int find_col(const idx_t key, const idx_t *const row, const i
     }
 }
 
-static SFEM_INLINE void find_cols3(const idx_t *targets,
-                                   const idx_t *const row,
-                                   const int lenrow,
-                                   int *ks) {
+static SFEM_INLINE void find_cols_x(const idx_t *targets,
+                                    const idx_t *const row,
+                                    const int lenrow,
+                                    int *ks) {
     if (lenrow > 32) {
-        for (int d = 0; d < 3; ++d) {
+        for (int d = 0; d < n_funs; ++d) {
             ks[d] = find_col(targets[d], row, lenrow);
         }
     } else {
-#pragma unroll(3)
-        for (int d = 0; d < 3; ++d) {
+#pragma unroll(n_funs)
+        for (int d = 0; d < n_funs; ++d) {
             ks[d] = 0;
         }
 
         for (int i = 0; i < lenrow; ++i) {
-#pragma unroll(3)
-            for (int d = 0; d < 3; ++d) {
+#pragma unroll(n_funs)
+            for (int d = 0; d < n_funs; ++d) {
                 ks[d] += row[i] < targets[d];
             }
         }
     }
 }
 
-static const int n_qp = 6;
-static const real_t qx[6] = {0.5, 0.5, 0.0, 1.0 / 6.0, 1.0 / 6.0, 2.0 / 3.0};
-static const real_t qy[6] = {0.5, 0.0, 0.5, 1.0 / 6.0, 2.0 / 3.0, 1.0 / 6.0};
-static const real_t qw[6] = {1.0 / 30.0, 1.0 / 30.0, 1.0 / 30.0, 0.3, 0.3, 0.3};
-
-static const int var_disp = 0;
-static const int var_phase = 2;
+static const real_t qx[n_qp] = {0.5, 0.5, 0.0, 1.0 / 6.0, 1.0 / 6.0, 2.0 / 3.0};
+static const real_t qy[n_qp] = {0.5, 0.0, 0.5, 1.0 / 6.0, 2.0 / 3.0, 1.0 / 6.0};
+static const real_t qw[n_qp] = {1.0 / 30.0, 1.0 / 30.0, 1.0 / 30.0, 0.3, 0.3, 0.3};
+static const real_t ref_vol = 1. / 2;
 
 SFEM_INLINE static void element_init(const geom_t x0,
                                      const geom_t x1,
@@ -90,11 +95,6 @@ SFEM_INLINE static void element_init(const geom_t x0,
                                      real_t *phase,
                                      real_t *grad_phase,
                                      real_t *grad_disp) {
-    static const int block_size = 3;
-    static const int n_funs = 3;
-    static const int sdim = 2;
-    static const int tdim = 4;
-
     Tri3_mk_jacobian_determinant_and_inverse(
         x0, x1, x2, y0, y1, y2, 1, jacobian_determinant, 1, jacobian_inverse);
     // Compute physical gradients
@@ -116,10 +116,11 @@ SFEM_INLINE static void element_init(const geom_t x0,
 
     // Compute phase-field gradient
     for (int k = 0; k < n_qp; k++) {
-        real_t grad[sdim] = {0, 0, 0};
+        real_t grad[sdim] = {0, 0};
 
         for (int ii = 0; ii < n_funs; ii++) {
             const real_t c = element_solution[ii * block_size + var_phase];
+            assert(c == c);
 
             for (int d = 0; d < sdim; d++) {
                 grad[d] += grad[k * n_funs * sdim + ii * sdim + d] * c;
@@ -138,6 +139,7 @@ SFEM_INLINE static void element_init(const geom_t x0,
         for (int ii = 0; ii < n_funs; ii++) {
             for (int d1 = 0; d1 < sdim; d1++) {
                 const real_t c = element_solution[ii * block_size + var_disp + d1];
+                assert(c == c);
 
                 for (int d2 = 0; d2 < sdim; d2++) {
                     grad[d1 * sdim + d2] += grad[k * n_funs * sdim + ii * sdim + d2] * c;
@@ -169,39 +171,32 @@ void tri3_phase_field_for_fracture_assemble_hessian_aos(const ptrdiff_t nelement
 
     double tick = MPI_Wtime();
 
-    static const int block_size = 4;
-    static const int mat_block_size = block_size * block_size;
-    static const int sdim = 3;
-    static const int n_funs = 3;
+    idx_t ev[n_funs];
+    idx_t ks[n_funs];
 
-    idx_t ev[3];
-    idx_t ks[3];
+    real_t element_matrix[block_size * block_size];
+    real_t element_solution[n_funs * block_size];
 
-    real_t element_matrix[3 * 3];
-    real_t element_solution[3 * 3];
+    real_t fun[n_qp * sdim];
+    real_t grad[n_qp * n_funs * sdim];
 
-    real_t fun[n_qp * 3];
-    real_t grad[n_qp * 3 * 2];
-
-    real_t jacobian_inverse[2 * 2];
+    real_t jacobian_inverse[sdim * sdim];
     real_t jacobian_determinant;
 
     real_t phase[n_qp];
-    real_t grad_phase[n_qp * 2];
-    real_t grad_disp[n_qp * 2 * 2];
-    real_t ref_vol = 1. / 2;
+    real_t grad_phase[n_qp * sdim];
+    real_t grad_disp[n_qp * sdim * sdim];
 
     const geom_t *const x = xyz[0];
     const geom_t *const y = xyz[1];
-    const geom_t *const z = xyz[2];
 
     for (int k = 0; k < n_qp; k++) {
         Tri3_mk_fun(qx[k], qy[k], 1, &fun[k * n_funs]);
     }
 
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-#pragma unroll(3)
-        for (int v = 0; v < 3; ++v) {
+#pragma unroll(n_funs)
+        for (int v = 0; v < n_funs; ++v) {
             ev[v] = elems[v][i];
         }
 
@@ -210,12 +205,13 @@ void tri3_phase_field_for_fracture_assemble_hessian_aos(const ptrdiff_t nelement
         const idx_t i1 = ev[1];
         const idx_t i2 = ev[2];
 
-        for (int enode = 0; enode < 3; ++enode) {
+        for (int enode = 0; enode < n_funs; ++enode) {
             idx_t edof = enode * block_size;
             idx_t dof = ev[enode] * block_size;
 
             for (int b = 0; b < block_size; ++b) {
                 element_solution[edof + b] = solution[dof + b];
+                assert(element_solution[edof + b] == element_solution[edof + b]);
             }
         }
 
@@ -238,10 +234,10 @@ void tri3_phase_field_for_fracture_assemble_hessian_aos(const ptrdiff_t nelement
             const idx_t dof_i = elems[edof_i][i];
             const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
             const idx_t *row = &colidx[rowptr[dof_i]];
-            find_cols3(ev, row, lenrow, ks);
+            find_cols_x(ev, row, lenrow, ks);
 
             // Blocks for row
-            real_t *block_start = &values[rowptr[dof_i] * mat_block_size];
+            real_t *block_start = &values[rowptr[dof_i] * block_size * block_size];
 
             for (int edof_j = 0; edof_j < n_funs; ++edof_j) {
                 memset(element_matrix, 0, block_size * block_size * sizeof(real_t));
@@ -263,6 +259,17 @@ void tri3_phase_field_for_fracture_assemble_hessian_aos(const ptrdiff_t nelement
                                                           element_matrix);
                 }
 
+                if (0) {
+                    printf("(%d, %d)\n", dof_i, ks[edof_j]);
+
+                    for (int d1 = 0; d1 < block_size; d1++) {
+                        for (int d2 = 0; d2 < block_size; d2++) {
+                            printf("%g ", element_matrix[d1 * block_size + d2]);
+                        }
+                        printf("\n");
+                    }
+                }
+
                 const idx_t offset_j = ks[edof_j] * block_size;
 
                 for (int bi = 0; bi < block_size; ++bi) {
@@ -271,6 +278,7 @@ void tri3_phase_field_for_fracture_assemble_hessian_aos(const ptrdiff_t nelement
 
                     for (int bj = 0; bj < block_size; ++bj) {
                         const real_t val = element_matrix[bi * block_size + bj];
+                        assert(val == val);
                         row[offset_j + bj] += val;
                     }
                 }
@@ -279,58 +287,51 @@ void tri3_phase_field_for_fracture_assemble_hessian_aos(const ptrdiff_t nelement
     }
 
     double tock = MPI_Wtime();
-    printf("tri3_phase_field_for_fracture.c: phase_field_for_fracture_assemble_hessian\t%g seconds\n",
-           tock - tick);
+    printf(
+        "tri3_phase_field_for_fracture.c: phase_field_for_fracture_assemble_hessian\t%g seconds\n",
+        tock - tick);
 }
 
 void tri3_phase_field_for_fracture_assemble_gradient_aos(const ptrdiff_t nelements,
-                                                    const ptrdiff_t nnodes,
-                                                    idx_t **const SFEM_RESTRICT elems,
-                                                    geom_t **const SFEM_RESTRICT xyz,
-                                                    const real_t mu,
-                                                    const real_t lambda,
-                                                    const real_t Gc,
-                                                    const real_t ls,
-                                                    const real_t *const SFEM_RESTRICT solution,
-                                                    real_t *const SFEM_RESTRICT values) {
+                                                         const ptrdiff_t nnodes,
+                                                         idx_t **const SFEM_RESTRICT elems,
+                                                         geom_t **const SFEM_RESTRICT xyz,
+                                                         const real_t mu,
+                                                         const real_t lambda,
+                                                         const real_t Gc,
+                                                         const real_t ls,
+                                                         const real_t *const SFEM_RESTRICT solution,
+                                                         real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
     double tick = MPI_Wtime();
 
-    static const int block_size = 3;
-    static const int mat_block_size = block_size * block_size;
-    static const int sdim = 3;
-    static const int n_funs = 3;
-
     idx_t ev[n_funs];
     idx_t ks[n_funs];
 
-    real_t element_vector[n_funs];
-    real_t element_solution[3 * 3];
+    real_t element_vector[block_size];
+    real_t element_solution[n_funs * block_size];
 
-    real_t fun[n_qp * 3];
-    real_t grad[n_qp * 3 * 2];
+    real_t fun[n_qp * n_funs];
+    real_t grad[n_qp * n_funs * sdim];
 
-    real_t jacobian_inverse[2 * 2];
+    real_t jacobian_inverse[sdim * sdim];
     real_t jacobian_determinant;
 
     real_t phase[n_qp];
-    real_t grad_phase[n_qp * 2];
-    real_t grad_disp[n_qp * 2 * 2];
-    real_t ref_vol = 1. / 2;
+    real_t grad_phase[n_qp * sdim];
+    real_t grad_disp[n_qp * sdim * sdim];
 
     const geom_t *const x = xyz[0];
     const geom_t *const y = xyz[1];
-    const geom_t *const z = xyz[2];
 
     for (int k = 0; k < n_qp; k++) {
         Tri3_mk_fun(qx[k], qy[k], 1, &fun[k * n_funs]);
     }
 
-
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-#pragma unroll(3)
-        for (int v = 0; v < 3; ++v) {
+#pragma unroll(n_funs)
+        for (int v = 0; v < n_funs; ++v) {
             ev[v] = elems[v][i];
         }
 
@@ -339,13 +340,13 @@ void tri3_phase_field_for_fracture_assemble_gradient_aos(const ptrdiff_t nelemen
         const idx_t i1 = ev[1];
         const idx_t i2 = ev[2];
 
-
         for (int enode = 0; enode < n_funs; ++enode) {
             idx_t edof = enode * block_size;
             idx_t dof = ev[enode] * block_size;
 
             for (int b = 0; b < block_size; ++b) {
                 element_solution[edof + b] = solution[dof + b];
+                assert(element_solution[edof + b] == element_solution[edof + b]);
             }
         }
 
@@ -384,62 +385,57 @@ void tri3_phase_field_for_fracture_assemble_gradient_aos(const ptrdiff_t nelemen
             }
 
             for (int b = 0; b < block_size; b++) {
+                assert(element_vector[b] == element_vector[b]);
                 values[dof_i * block_size + b] += element_vector[b];
             }
         }
     }
 
     double tock = MPI_Wtime();
-    printf("tri3_phase_field_for_fracture.c: phase_field_for_fracture_assemble_gradient\t%g seconds\n",
-           tock - tick);
+    printf(
+        "tri3_phase_field_for_fracture.c: phase_field_for_fracture_assemble_gradient\t%g seconds\n",
+        tock - tick);
 }
 
 void tri3_phase_field_for_fracture_assemble_value_aos(const ptrdiff_t nelements,
-                                                 const ptrdiff_t nnodes,
-                                                 idx_t **const SFEM_RESTRICT elems,
-                                                 geom_t **const SFEM_RESTRICT xyz,
-                                                 const real_t mu,
-                                                 const real_t lambda,
-                                                 const real_t Gc,
-                                                 const real_t ls,
-                                                 const real_t *const SFEM_RESTRICT solution,
-                                                 real_t *const SFEM_RESTRICT values) {
+                                                      const ptrdiff_t nnodes,
+                                                      idx_t **const SFEM_RESTRICT elems,
+                                                      geom_t **const SFEM_RESTRICT xyz,
+                                                      const real_t mu,
+                                                      const real_t lambda,
+                                                      const real_t Gc,
+                                                      const real_t ls,
+                                                      const real_t *const SFEM_RESTRICT solution,
+                                                      real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
     double tick = MPI_Wtime();
 
-    static const int block_size = 3;
-    static const int mat_block_size = block_size * block_size;
-    static const int sdim = 3;
-    static const int n_funs = 3;
-
     idx_t ev[n_funs];
     idx_t ks[n_funs];
 
-    real_t element_vector[n_funs];
-    real_t element_solution[3 * 3];
+    real_t element_vector[block_size];
+    real_t element_solution[n_funs * block_size];
 
-    real_t fun[n_qp * 3];
-    real_t grad[n_qp * 3 * 2];
+    real_t fun[n_qp * n_funs];
+    real_t grad[n_qp * n_funs * sdim];
 
-    real_t jacobian_inverse[2 * 2];
+    real_t jacobian_inverse[sdim * sdim];
     real_t jacobian_determinant;
 
     real_t phase[n_qp];
-    real_t grad_phase[n_qp * 2];
-    real_t grad_disp[n_qp * 2 * 2];
-    real_t ref_vol = 1. / 2;
+    real_t grad_phase[n_qp * sdim];
+    real_t grad_disp[n_qp * sdim * sdim];
 
     const geom_t *const x = xyz[0];
     const geom_t *const y = xyz[1];
-    const geom_t *const z = xyz[2];
 
     for (int k = 0; k < n_qp; k++) {
         Tri3_mk_fun(qx[k], qy[k], 1, &fun[k * n_funs]);
     }
 
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-#pragma unroll(3)
+#pragma unroll(n_funs)
         for (int v = 0; v < n_funs; ++v) {
             ev[v] = elems[v][i];
         }
@@ -455,6 +451,7 @@ void tri3_phase_field_for_fracture_assemble_value_aos(const ptrdiff_t nelements,
 
             for (int b = 0; b < block_size; ++b) {
                 element_solution[edof + b] = solution[dof + b];
+                assert(element_solution[edof + b] == element_solution[edof + b]);
             }
         }
 
@@ -488,6 +485,7 @@ void tri3_phase_field_for_fracture_assemble_value_aos(const ptrdiff_t nelements,
                                                 &element_scalar);
         }
 
+        assert(element_scalar == element_scalar);
         values[0] += element_scalar;
     }
 
@@ -495,3 +493,12 @@ void tri3_phase_field_for_fracture_assemble_value_aos(const ptrdiff_t nelements,
     printf("tri3_phase_field_for_fracture.c: phase_field_for_fracture_assemble_value\t%g seconds\n",
            tock - tick);
 }
+
+// Clean-up
+#undef var_disp
+#undef var_phase
+#undef sdim
+#undef tdim
+#undef block_size
+#undef n_funs
+#undef n_qp

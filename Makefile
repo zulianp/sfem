@@ -12,6 +12,8 @@ else ifeq ($(asan), 1)
 # 	ASAN_FLAGS += -O1
 	CXXFLAGS += $(ASAN_FLAGS)
 	CFLAGS += $(ASAN_FLAGS)
+# 	DEPS += -static-libsan
+# 	DEPS += -static
 else
 	CFLAGS += -Ofast -DNDEBUG
 	CXXFLAGS += -Ofast -DNDEBUG
@@ -97,7 +99,7 @@ GOALS += divergence lapl lumped_mass_inv lumped_boundary_mass_inv u_dot_grad_q
 GOALS += crs_apply_dirichlet
 
 # Array utilities
-GOALS += soa_to_aos roi
+GOALS += soa_to_aos aos_to_soa roi
 
 # CVFEM
 GOALS += cvfem_assemble
@@ -323,6 +325,9 @@ sgather : sgather.o
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 soa_to_aos : soa_to_aos.o
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+aos_to_soa : aos_to_soa.o
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 soverride : drivers/soverride.c libsfem.a
