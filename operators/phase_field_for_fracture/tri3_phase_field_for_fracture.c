@@ -108,7 +108,11 @@ SFEM_INLINE static void element_init(const geom_t x0,
     for (int k = 0; k < n_qp; k++) {
         real_t val = 0;
         for (int ii = 0; ii < n_funs; ii++) {
-            val += fun[k * n_funs + ii] * element_solution[ii * block_size + var_phase];
+            const real_t c = element_solution[ii * block_size + var_phase];
+            // assert(fabs(c) < 1e-6);
+            assert(c == c);
+
+            val += fun[k * n_funs + ii] * c;
         }
 
         phase[k] = val;
@@ -120,6 +124,7 @@ SFEM_INLINE static void element_init(const geom_t x0,
 
         for (int ii = 0; ii < n_funs; ii++) {
             const real_t c = element_solution[ii * block_size + var_phase];
+            // assert(fabs(c) < 1e-6);
             assert(c == c);
 
             for (int d = 0; d < sdim; d++) {
@@ -382,6 +387,13 @@ void tri3_phase_field_for_fracture_assemble_gradient_aos(const ptrdiff_t nelemen
                                                        &grad_phase[k * sdim],
                                                        &grad_disp[k * sdim * sdim],
                                                        element_vector);
+            }
+
+            if (0) {
+                printf("%d)\n", dof_i);
+                for (int d1 = 0; d1 < block_size; d1++) {
+                    printf("%g\n", element_vector[d1]);
+                }
             }
 
             for (int b = 0; b < block_size; b++) {

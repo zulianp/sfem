@@ -524,9 +524,9 @@ int ISOLVER_EXPORT isolver_function_apply_constraints(const isolver_function_t *
     for (int i = 0; i < problem->n_dirichlet_conditions; i++) {
         constraint_nodes_to_value_vec(problem->dirichlet_conditions[i].local_size,
                                       problem->dirichlet_conditions[i].idx,
-                                      problem->dirichlet_conditions[i].value,
                                       problem->block_size,
                                       problem->dirichlet_conditions[i].component,
+                                      problem->dirichlet_conditions[i].value,
                                       x);
     }
 

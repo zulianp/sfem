@@ -11,7 +11,7 @@ PATH=$SCRIPTPATH/../../python/mesh:$PATH
 PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 PATH=$SCRIPTPATH/../../../matrix.io:$PATH
 
-# create_box_2D.sh 3 40 20
+# create_box_2D.sh 6 40 20
 # rm mesh/z.raw
 
 export SFEM_MESH_DIR=mesh
@@ -30,20 +30,21 @@ export BLOCK_SIZE=3
 
 export SFEM_DIRICHLET_NODESET="$sleft,$sleft,$sright"
 # export SFEM_DIRICHLET_VALUE="0,0,3"
-export SFEM_DIRICHLET_VALUE="0,0,0"
+# export SFEM_DIRICHLET_VALUE="0,0,0"
+export SFEM_DIRICHLET_VALUE="0,0,0.00000001"
 export SFEM_DIRICHLET_COMPONENT="$VAR_UC,$VAR_UX,$VAR_UX"
 
 export SFEM_SHEAR_MODULUS="2.23"
 export SFEM_FIRST_LAME_PARAMETER="3.35"
 export SFEM_FRACTURE_TOUGHNESS="0.27"
-export SFEM_LENGTH_SCALE="1."
+export SFEM_LENGTH_SCALE="1"
 
 
 export SFEM_OUTPUT_DIR=sfem_output
 
 # export SFEM_DEBUG_DUMP=1
-# lldb -- 
-utopia_exec -app nlsolve -path $CODE_DIR/sfem/franetg_plugin.dylib -solver_type Newton --verbose -max_it 2
+lldb -- utopia_exec -app nlsolve -path $CODE_DIR/sfem/franetg_plugin.dylib -solver_type Newton --verbose -max_it 3	
+
 aos_to_soa $SFEM_OUTPUT_DIR/out.raw 8 $BLOCK_SIZE $SFEM_OUTPUT_DIR/out
 raw_to_db.py $SFEM_MESH_DIR $SFEM_OUTPUT_DIR/x.vtk -p "$SFEM_OUTPUT_DIR/out.*.raw"
 
