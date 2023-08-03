@@ -318,7 +318,7 @@ void tet4_phase_field_for_fracture_assemble_hessian_aos(const ptrdiff_t nelement
            tock - tick);
 }
 
-void phase_field_for_fracture_assemble_gradient_aos(const ptrdiff_t nelements,
+void tet4_phase_field_for_fracture_assemble_gradient_aos(const ptrdiff_t nelements,
                                                     const ptrdiff_t nnodes,
                                                     idx_t **const SFEM_RESTRICT elems,
                                                     geom_t **const SFEM_RESTRICT xyz,
@@ -434,7 +434,7 @@ void phase_field_for_fracture_assemble_gradient_aos(const ptrdiff_t nelements,
            tock - tick);
 }
 
-void phase_field_for_fracture_assemble_value_aos(const ptrdiff_t nelements,
+void tet4_phase_field_for_fracture_assemble_value_aos(const ptrdiff_t nelements,
                                                  const ptrdiff_t nnodes,
                                                  idx_t **const SFEM_RESTRICT elems,
                                                  geom_t **const SFEM_RESTRICT xyz,
