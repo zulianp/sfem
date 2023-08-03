@@ -152,6 +152,7 @@ OBJS = \
 	linear_elasticity.o \
 	tri3_linear_elasticity.o \
 	tet4_phase_field_for_fracture.o \
+	tri3_phase_field_for_fracture.o \
 	phase_field_for_fracture.o 
 
 OBJS += tri3_laplacian.o

@@ -2,6 +2,7 @@
 
 #include "sfem_defs.h"
 #include "tet4_phase_field_for_fracture.h"
+#include "tri3_phase_field_for_fracture.h"
 
 #include <assert.h>
 #include <mpi.h>
@@ -20,6 +21,21 @@ void phase_field_for_fracture_assemble_hessian_aos(const enum ElemType element_t
                                                    const idx_t *const SFEM_RESTRICT colidx,
                                                    real_t *const SFEM_RESTRICT values) {
     switch (element_type) {
+        case TRI3: {
+            tri3_phase_field_for_fracture_assemble_hessian_aos(nelements,
+                                                               nnodes,
+                                                               elems,
+                                                               xyz,
+                                                               mu,
+                                                               lambda,
+                                                               Gc,
+                                                               ls,
+                                                               solution,
+                                                               rowptr,
+                                                               colidx,
+                                                               values);
+            break;
+        }
         case TET4: {
             tet4_phase_field_for_fracture_assemble_hessian_aos(nelements,
                                                                nnodes,
@@ -55,6 +71,11 @@ void phase_field_for_fracture_assemble_gradient_aos(const enum ElemType element_
                                                     const real_t *const SFEM_RESTRICT solution,
                                                     real_t *const SFEM_RESTRICT values) {
     switch (element_type) {
+        case TRI3: {
+            tri3_phase_field_for_fracture_assemble_gradient_aos(
+                nelements, nnodes, elems, xyz, mu, lambda, Gc, ls, solution, values);
+            break;
+        }
         case TET4: {
             tet4_phase_field_for_fracture_assemble_gradient_aos(
                 nelements, nnodes, elems, xyz, mu, lambda, Gc, ls, solution, values);
@@ -80,6 +101,11 @@ void phase_field_for_fracture_assemble_value_aos(const enum ElemType element_typ
                                                  const real_t *const SFEM_RESTRICT solution,
                                                  real_t *const SFEM_RESTRICT values) {
     switch (element_type) {
+        case TRI3: {
+            tri3_phase_field_for_fracture_assemble_value_aos(
+                nelements, nnodes, elems, xyz, mu, lambda, Gc, ls, solution, values);
+            break;
+        }
         case TET4: {
             tet4_phase_field_for_fracture_assemble_value_aos(
                 nelements, nnodes, elems, xyz, mu, lambda, Gc, ls, solution, values);
