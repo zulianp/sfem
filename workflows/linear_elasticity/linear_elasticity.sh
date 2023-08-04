@@ -33,7 +33,7 @@ solve()
 }
 
 mesh=mesh
-create_square.sh 8
+create_square.sh 3
 rm $mesh/z.raw
 nvars=2
 

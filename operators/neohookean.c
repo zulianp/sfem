@@ -991,8 +991,6 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
 
         assert(!check_symmetric(4 * block_size, element_matrix));
 
-        // numerate(12, element_matrix);
-
         for (int edof_i = 0; edof_i < 4; ++edof_i) {
             const idx_t dof_i = elems[edof_i][i];
             const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
@@ -1000,25 +998,18 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
             find_cols4(ev, row, lenrow, ks);
 
             // Blocks for row
-            real_t *row_blocks = &values[rowptr[dof_i] * mat_block_size];
+            real_t *block_start = &values[rowptr[dof_i] * mat_block_size];
 
             for (int edof_j = 0; edof_j < 4; ++edof_j) {
-                // Block for column
-                const idx_t block_k = ks[edof_j] * mat_block_size;
-                real_t *block = &row_blocks[block_k];
+                const idx_t offset_j = ks[edof_j] * block_size;
 
-                // Iterate over dimensions
-                for (int bj = 0; bj < block_size; ++bj) {
-                    const idx_t offset_j = bj * block_size;
+                for (int bi = 0; bi < block_size; ++bi) {
+                    // Jump rows (including the block-size for the columns)
+                    real_t *row = &block_start[bi * lenrow * block_size];
 
-                    for (int bi = 0; bi < block_size; ++bi) {
-                        const real_t val =
-                            element_matrix[(edof_i * block_size + bi) * block_size * 4 +
-                                           edof_j * block_size + bj];
-
-                        assert(val == val);
-
-                        block[offset_j + bi] += val;
+                    for (int bj = 0; bj < block_size; ++bj) {
+                        const real_t val = element_matrix[(edof_i * block_size + bi) * 4 * block_size + edof_j * block_size + bj];
+                        row[offset_j + bj] += val;
                     }
                 }
             }

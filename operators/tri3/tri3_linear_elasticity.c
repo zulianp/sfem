@@ -147,33 +147,33 @@ static SFEM_INLINE void tri3_linear_elasticity_assemble_gradient_kernel(
     const real_t x5 = 1.0 / x4;
     const real_t x6 = x1 * x5;
     const real_t x7 = x3 * x5;
-    const real_t x8 = u[0] * x6 + u[3] * x7;
-    const real_t x9 = u[1] * x1 * x5 + u[4] * x3 * x5 - x8;
+    const real_t x8 = -x6 - x7;
+    const real_t x9 = u[0] * x8 + u[1] * x6 + u[2] * x7;
     const real_t x10 = mu * x9;
-    const real_t x11 = x2 * x5;
-    const real_t x12 = x0 * x5;
-    const real_t x13 = u[0] * x11 + u[3] * x12;
-    const real_t x14 = u[2] * x2 * x5 + u[5] * x0 * x5 - x13;
-    const real_t x15 = (1.0 / 2.0) * lambda;
-    const real_t x16 = x15 * x6;
-    const real_t x17 = u[1] * x2 * x5 + u[4] * x0 * x5 - x13;
+    const real_t x11 = (1.0 / 2.0) * lambda;
+    const real_t x12 = x11 * x6;
+    const real_t x13 = x2 * x5;
+    const real_t x14 = x0 * x5;
+    const real_t x15 = -x13 - x14;
+    const real_t x16 = u[3] * x15 + u[4] * x13 + u[5] * x14;
+    const real_t x17 = u[0] * x15 + u[1] * x13 + u[2] * x14;
     const real_t x18 = (1.0 / 2.0) * mu;
-    const real_t x19 = x11 * x18;
-    const real_t x20 = u[2] * x1 * x5 + u[5] * x3 * x5 - x8;
-    const real_t x21 = x10 * x6 + x14 * x16 + x16 * x9 + x17 * x19 + x19 * x20;
-    const real_t x22 = mu * x14;
-    const real_t x23 = x11 * x15;
-    const real_t x24 = x18 * x6;
-    const real_t x25 = x11 * x22 + x14 * x23 + x17 * x24 + x20 * x24 + x23 * x9;
-    const real_t x26 = x15 * x7;
-    const real_t x27 = x12 * x18;
-    const real_t x28 = x10 * x7 + x14 * x26 + x17 * x27 + x20 * x27 + x26 * x9;
-    const real_t x29 = x12 * x15;
+    const real_t x19 = x13 * x18;
+    const real_t x20 = u[3] * x8 + u[4] * x6 + u[5] * x7;
+    const real_t x21 = x10 * x6 + x12 * x16 + x12 * x9 + x17 * x19 + x19 * x20;
+    const real_t x22 = x11 * x7;
+    const real_t x23 = x14 * x18;
+    const real_t x24 = x10 * x7 + x16 * x22 + x17 * x23 + x20 * x23 + x22 * x9;
+    const real_t x25 = mu * x16;
+    const real_t x26 = x11 * x13;
+    const real_t x27 = x18 * x6;
+    const real_t x28 = x13 * x25 + x16 * x26 + x17 * x27 + x20 * x27 + x26 * x9;
+    const real_t x29 = x11 * x14;
     const real_t x30 = x18 * x7;
-    const real_t x31 = x12 * x22 + x14 * x29 + x17 * x30 + x20 * x30 + x29 * x9;
-    element_vector[0 * stride] = x4 * (-x21 - x25);
+    const real_t x31 = x14 * x25 + x16 * x29 + x17 * x30 + x20 * x30 + x29 * x9;
+    element_vector[0 * stride] = x4 * (-x21 - x24);
     element_vector[1 * stride] = x21 * x4;
-    element_vector[2 * stride] = x25 * x4;
+    element_vector[2 * stride] = x24 * x4;
     element_vector[3 * stride] = x4 * (-x28 - x31);
     element_vector[4 * stride] = x28 * x4;
     element_vector[5 * stride] = x31 * x4;
@@ -376,7 +376,7 @@ void tri3_linear_elasticity_assemble_hessian_soa(const ptrdiff_t nelements,
            tock - tick);
 }
 
-static SFEM_INLINE void tri3_linear_elasticity_apply_soa_kernel(
+static SFEM_INLINE void tri3_linear_elasticity_apply_kernel(
     const real_t mu,
     const real_t lambda,
     const real_t px0,
@@ -385,81 +385,73 @@ static SFEM_INLINE void tri3_linear_elasticity_apply_soa_kernel(
     const real_t py0,
     const real_t py1,
     const real_t py2,
-    const real_t *const SFEM_RESTRICT u,
     const real_t *const SFEM_RESTRICT increment,
     real_t *const SFEM_RESTRICT element_vector) {
-    const real_t x0 = -px0 + px1;
-    const real_t x1 = -py0 + py2;
-    const real_t x2 = x0 * x1;
-    const real_t x3 = px0 - px2;
+    const real_t x0 = -py0 + py2;
+    const real_t x1 = px0 - px2;
+    const real_t x2 = -px0 + px1;
+    const real_t x3 = x0 * x2;
     const real_t x4 = py0 - py1;
-    const real_t x5 = x2 - x3 * x4;
+    const real_t x5 = -x1 * x4 + x3;
     const real_t x6 = pow(x5, -2);
     const real_t x7 = lambda * x6;
     const real_t x8 = (1.0 / 2.0) * x7;
-    const real_t x9 = x1 * x3;
+    const real_t x9 = x1 * x8;
     const real_t x10 = mu * x6;
-    const real_t x11 = x10 * x9;
-    const real_t x12 = (1.0 / 2.0) * x11 + x8 * x9;
-    const real_t x13 = pow(x1, 2);
-    const real_t x14 = x10 * x13;
-    const real_t x15 = x13 * x8;
-    const real_t x16 = pow(x3, 2);
-    const real_t x17 = x10 * x16;
-    const real_t x18 = x14 + x15 + (1.0 / 2.0) * x17;
-    const real_t x19 = -x12 - x18;
-    const real_t x20 = increment[1] * x5;
-    const real_t x21 = x16 * x8;
-    const real_t x22 = (1.0 / 2.0) * x14 + x17 + x21;
-    const real_t x23 = -x12 - x22;
-    const real_t x24 = increment[2] * x5;
-    const real_t x25 = x4 * x8;
-    const real_t x26 = (1.0 / 2.0) * x10 * x2 + x25 * x3;
-    const real_t x27 = x10 * x4;
-    const real_t x28 = x1 * x27;
-    const real_t x29 = x1 * x25;
-    const real_t x30 = x0 * x3;
-    const real_t x31 = x10 * x30;
-    const real_t x32 = x28 + x29 + (1.0 / 2.0) * x31;
-    const real_t x33 = -x26 - x32;
-    const real_t x34 = increment[4] * x5;
-    const real_t x35 = x2 * x8 + (1.0 / 2.0) * x27 * x3;
-    const real_t x36 = x30 * x8;
-    const real_t x37 = (1.0 / 2.0) * x28 + x31 + x36;
-    const real_t x38 = -x35 - x37;
-    const real_t x39 = increment[5] * x5;
-    const real_t x40 = increment[0] * x5;
-    const real_t x41 = x26 + (3.0 / 2.0) * x28 + x29 + (3.0 / 2.0) * x31 + x35 + x36;
-    const real_t x42 = increment[3] * x5;
-    const real_t x43 = -x32 - x35;
-    const real_t x44 = -x26 - x37;
-    const real_t x45 = x0 * x4;
-    const real_t x46 = x0 * x27;
-    const real_t x47 = x45 * x8 + (1.0 / 2.0) * x46;
-    const real_t x48 = pow(x4, 2);
-    const real_t x49 = x10 * x48;
-    const real_t x50 = x48 * x8;
-    const real_t x51 = pow(x0, 2);
-    const real_t x52 = x10 * x51;
-    const real_t x53 = x49 + x50 + (1.0 / 2.0) * x52;
-    const real_t x54 = -x47 - x53;
-    const real_t x55 = x51 * x8;
-    const real_t x56 = (1.0 / 2.0) * x49 + x52 + x55;
-    const real_t x57 = -x47 - x56;
-    element_vector[0 * stride] =
-        x19 * x20 + x23 * x24 + x33 * x34 + x38 * x39 +
-        x40 * (x11 + (3.0 / 2.0) * x14 + x15 + (3.0 / 2.0) * x17 + x21 + x7 * x9) + x41 * x42;
+    const real_t x11 = (1.0 / 2.0) * x10;
+    const real_t x12 = x1 * x11;
+    const real_t x13 = x0 * x12 + x0 * x9;
+    const real_t x14 = x11 * x3 + x4 * x9;
+    const real_t x15 = x13 + x14;
+    const real_t x16 = -x15;
+    const real_t x17 = increment[4] * x5;
+    const real_t x18 = x12 * x4 + x3 * x8;
+    const real_t x19 = x2 * x4;
+    const real_t x20 = x11 * x19 + x19 * x8;
+    const real_t x21 = x18 + x20;
+    const real_t x22 = -x21;
+    const real_t x23 = increment[5] * x5;
+    const real_t x24 = pow(x0, 2);
+    const real_t x25 = x10 * x24;
+    const real_t x26 = pow(x1, 2);
+    const real_t x27 = x10 * x26;
+    const real_t x28 = x24 * x8 + x25 + (1.0 / 2.0) * x27;
+    const real_t x29 = x0 * x4;
+    const real_t x30 = x10 * x29;
+    const real_t x31 = x1 * x2;
+    const real_t x32 = x10 * x31;
+    const real_t x33 = x29 * x8 + x30 + (1.0 / 2.0) * x32;
+    const real_t x34 = -x28 - x33;
+    const real_t x35 = increment[1] * x5;
+    const real_t x36 = pow(x4, 2);
+    const real_t x37 = x10 * x36;
+    const real_t x38 = pow(x2, 2);
+    const real_t x39 = x10 * x38;
+    const real_t x40 = x36 * x8 + x37 + (1.0 / 2.0) * x39;
+    const real_t x41 = -x33 - x40;
+    const real_t x42 = increment[2] * x5;
+    const real_t x43 = x15 + x21;
+    const real_t x44 = increment[3] * x5;
+    const real_t x45 = increment[0] * x5;
+    const real_t x46 = -x13 - x18;
+    const real_t x47 = -x14 - x20;
+    const real_t x48 = (1.0 / 2.0) * x25 + x26 * x8 + x27;
+    const real_t x49 = (1.0 / 2.0) * x30 + x31 * x8 + x32;
+    const real_t x50 = -x48 - x49;
+    const real_t x51 = (1.0 / 2.0) * x37 + x38 * x8 + x39;
+    const real_t x52 = -x49 - x51;
+    element_vector[0 * stride] = x16 * x17 + x22 * x23 + x34 * x35 + x41 * x42 + x43 * x44 +
+                                 x45 * (x28 + x29 * x7 + 2 * x30 + x32 + x40);
     element_vector[1 * stride] =
-        x12 * x24 + x18 * x20 + x19 * x40 + x32 * x34 + x35 * x39 + x42 * x43;
+        x13 * x17 + x18 * x23 + x28 * x35 + x33 * x42 + x34 * x45 + x44 * x46;
     element_vector[2 * stride] =
-        x12 * x20 + x22 * x24 + x23 * x40 + x26 * x34 + x37 * x39 + x42 * x44;
-    element_vector[3 * stride] =
-        x20 * x43 + x24 * x44 + x34 * x54 + x39 * x57 + x40 * x41 +
-        x42 * (x45 * x7 + x46 + (3.0 / 2.0) * x49 + x50 + (3.0 / 2.0) * x52 + x55);
+        x14 * x17 + x20 * x23 + x33 * x35 + x40 * x42 + x41 * x45 + x44 * x47;
+    element_vector[3 * stride] = x17 * x50 + x23 * x52 + x35 * x46 + x42 * x47 + x43 * x45 +
+                                 x44 * (x30 + x31 * x7 + 2 * x32 + x48 + x51);
     element_vector[4 * stride] =
-        x20 * x32 + x24 * x26 + x33 * x40 + x34 * x53 + x39 * x47 + x42 * x54;
+        x13 * x35 + x14 * x42 + x16 * x45 + x17 * x48 + x23 * x49 + x44 * x50;
     element_vector[5 * stride] =
-        x20 * x35 + x24 * x37 + x34 * x47 + x38 * x40 + x39 * x56 + x42 * x57;
+        x17 * x49 + x18 * x35 + x20 * x42 + x22 * x45 + x23 * x51 + x44 * x52;
 }
 
 void tri3_linear_elasticity_apply_soa(const ptrdiff_t nelements,
@@ -471,4 +463,236 @@ void tri3_linear_elasticity_apply_soa(const ptrdiff_t nelements,
                                       const real_t **const SFEM_RESTRICT u,
                                       real_t **const SFEM_RESTRICT values) {
     // TODO
+}
+
+void tri3_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
+                                               const ptrdiff_t nnodes,
+                                               idx_t **const SFEM_RESTRICT elems,
+                                               geom_t **const SFEM_RESTRICT xyz,
+                                               const real_t mu,
+                                               const real_t lambda,
+                                               const real_t *const SFEM_RESTRICT u,
+                                               real_t *const SFEM_RESTRICT value) {
+    assert(0);
+    // TODO
+}
+
+void tri3_linear_elasticity_assemble_gradient_aos(const ptrdiff_t nelements,
+                                                  const ptrdiff_t nnodes,
+                                                  idx_t **const SFEM_RESTRICT elems,
+                                                  geom_t **const SFEM_RESTRICT xyz,
+                                                  const real_t mu,
+                                                  const real_t lambda,
+                                                  const real_t *const SFEM_RESTRICT displacement,
+                                                  real_t *const SFEM_RESTRICT values) {
+    SFEM_UNUSED(nnodes);
+
+    double tick = MPI_Wtime();
+
+    idx_t ev[3];
+    idx_t ks[3];
+
+    real_t element_vector[(3 * 2)];
+    real_t element_displacement[(3 * 2)];
+
+    static const int block_size = 2;
+
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma unroll(4)
+        for (int v = 0; v < 3; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        // Element indices
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+
+        for (int enode = 0; enode < 3; ++enode) {
+            idx_t dof = ev[enode] * block_size;
+
+            for (int b = 0; b < block_size; ++b) {
+                element_displacement[b * 3 + enode] = displacement[dof + b];
+            }
+        }
+
+        tri3_linear_elasticity_assemble_gradient_kernel(  // Model parameters
+            mu,
+            lambda,
+            // X-coordinates
+            xyz[0][i0],
+            xyz[0][i1],
+            xyz[0][i2],
+            // Y-coordinates
+            xyz[1][i0],
+            xyz[1][i1],
+            xyz[1][i2],
+            element_displacement,
+            // output vector
+            element_vector);
+
+        for (int edof_i = 0; edof_i < 3; ++edof_i) {
+            const idx_t dof_i = elems[edof_i][i];
+
+            for (int b = 0; b < block_size; b++) {
+                values[dof_i * block_size + b] = element_vector[b * 3 + edof_i];
+            }
+        }
+    }
+
+    double tock = MPI_Wtime();
+    printf("tri3_linear_elasticity.c: tri3_laplacian_assemble_gradient\t%g seconds\n", tock - tick);
+}
+
+void tri3_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
+                                                 const ptrdiff_t nnodes,
+                                                 idx_t **const SFEM_RESTRICT elems,
+                                                 geom_t **const SFEM_RESTRICT xyz,
+                                                 const real_t mu,
+                                                 const real_t lambda,
+                                                 const count_t *const SFEM_RESTRICT rowptr,
+                                                 const idx_t *const SFEM_RESTRICT colidx,
+                                                 real_t *const SFEM_RESTRICT values) {
+    SFEM_UNUSED(nnodes);
+
+    const double tick = MPI_Wtime();
+
+    idx_t ev[3];
+    idx_t ks[3];
+
+    real_t element_matrix[(3 * 2) * (3 * 2)];
+
+    static const int block_size = 2;
+    static const int mat_block_size = block_size * block_size;
+
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma unroll(3)
+        for (int v = 0; v < 3; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        // Element indices
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+
+        for (int enode = 0; enode < 3; ++enode) {
+            idx_t edof = enode * block_size;
+            idx_t dof = ev[enode] * block_size;
+        }
+
+        tri3_linear_elasticity_assemble_hessian_kernel(  // Model parameters
+            mu,
+            lambda,
+            // X-coordinates
+            xyz[0][i0],
+            xyz[0][i1],
+            xyz[0][i2],
+            // Y-coordinates
+            xyz[1][i0],
+            xyz[1][i1],
+            xyz[1][i2],
+            // output matrix
+            element_matrix);
+
+        assert(!check_symmetric(3 * block_size, element_matrix));
+
+        for (int edof_i = 0; edof_i < 3; ++edof_i) {
+            const idx_t dof_i = elems[edof_i][i];
+            const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
+            const idx_t *row = &colidx[rowptr[dof_i]];
+            find_cols3(ev, row, lenrow, ks);
+
+            // Blocks for row
+            real_t *block_start = &values[rowptr[dof_i] * mat_block_size];
+
+            for (int edof_j = 0; edof_j < 3; ++edof_j) {
+                const idx_t offset_j = ks[edof_j] * block_size;
+
+                for (int bi = 0; bi < block_size; ++bi) {
+                    // Jump rows (including the block-size for the columns)
+                    real_t *row = &block_start[bi * lenrow * block_size];
+
+                    for (int bj = 0; bj < block_size; ++bj) {
+                        const real_t val =
+                            // element_matrix[(edof_i * block_size + bi) * 3 * block_size +
+                            //                edof_j * block_size + bj];
+                            element_matrix[(bi * 3 * 2 + bj * 3) + edof_i * 3 + edof_j];
+
+                        row[offset_j + bj] += val;
+                    }
+                }
+            }
+        }
+    }
+    const double tock = MPI_Wtime();
+    printf("tri3_linear_elasticity.c: tri3_linear_elasticity_assemble_hessian_aos\t%g seconds\n",
+           tock - tick);
+}
+
+void tri3_linear_elasticity_apply_aos(const ptrdiff_t nelements,
+                                      const ptrdiff_t nnodes,
+                                      idx_t **const SFEM_RESTRICT elems,
+                                      geom_t **const SFEM_RESTRICT xyz,
+                                      const real_t mu,
+                                      const real_t lambda,
+                                      const real_t *const SFEM_RESTRICT displacement,
+                                      real_t *const SFEM_RESTRICT values) {
+    SFEM_UNUSED(nnodes);
+
+    double tick = MPI_Wtime();
+
+    idx_t ev[3];
+    idx_t ks[3];
+
+    real_t element_vector[(3 * 2)];
+    real_t element_displacement[(3 * 2)];
+
+    static const int block_size = 2;
+
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma unroll(4)
+        for (int v = 0; v < 3; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        // Element indices
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+
+        for (int enode = 0; enode < 3; ++enode) {
+            idx_t dof = ev[enode] * block_size;
+
+            for (int b = 0; b < block_size; ++b) {
+                element_displacement[b * 3 + enode] = displacement[dof + b];
+            }
+        }
+
+        tri3_linear_elasticity_apply_kernel(  // Model parameters
+            mu,
+            lambda,
+            // X-coordinates
+            xyz[0][i0],
+            xyz[0][i1],
+            xyz[0][i2],
+            // Y-coordinates
+            xyz[1][i0],
+            xyz[1][i1],
+            xyz[1][i2],
+            element_displacement,
+            // output vector
+            element_vector);
+
+        for (int edof_i = 0; edof_i < 3; ++edof_i) {
+            const idx_t dof = ev[edof_i] * block_size;
+
+            for (int b = 0; b < block_size; b++) {
+                values[dof + b] = element_vector[b * 3 + edof_i];
+            }
+        }
+    }
+
+    double tock = MPI_Wtime();
+    printf("tri3_linear_elasticity.c: tri3_laplacian_assemble_apply\t%g seconds\n", tock - tick);
 }

@@ -16,6 +16,7 @@
 #include "sfem_base.h"
 
 #include "neohookean.h"
+#include "linear_elasticity.h"
 
 #include "read_mesh.h"
 #include "sfem_defs.h"
@@ -47,6 +48,8 @@ typedef struct {
     real_t mu, lambda;
 
     const char *output_dir;
+
+    const char *material;
 } sfem_problem_t;
 
 static int SFEM_DEBUG_DUMP = 0;
@@ -175,6 +178,9 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
     SFEM_READ_ENV(SFEM_SHEAR_MODULUS, atof);
     SFEM_READ_ENV(SFEM_FIRST_LAME_PARAMETER, atof);
 
+    const char *SFEM_MATERIAL = 0;
+    SFEM_READ_ENV(SFEM_MATERIAL, );
+
     // const char *SFEM_INITIAL_GUESS = 0;
     // SFEM_READ_ENV(SFEM_INITIAL_GUESS, );
 
@@ -188,6 +194,7 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
         "- SFEM_NEUMANN_SIDESET=%s\n"
         "- SFEM_NEUMANN_VALUE=%s\n"
         "- SFEM_NEUMANN_COMPONENT=%s\n"
+        "- SFEM_MATERIAL=%s\n"
         "- SFEM_SHEAR_MODULUS=%g\n"
         "- SFEM_FIRST_LAME_PARAMETER=%g\n"
         "- SFEM_OUTPUT_DIR=%s\n"
@@ -198,6 +205,7 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
         SFEM_NEUMANN_SIDESET,
         SFEM_NEUMANN_VALUE,
         SFEM_NEUMANN_COMPONENT,
+        SFEM_MATERIAL,
         SFEM_SHEAR_MODULUS,
         SFEM_FIRST_LAME_PARAMETER,
         SFEM_OUTPUT_DIR,
@@ -250,6 +258,9 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
 
     problem->lambda = SFEM_FIRST_LAME_PARAMETER;
     problem->mu = SFEM_SHEAR_MODULUS;
+    problem->material = SFEM_MATERIAL;
+    problem->n2n_rowptr = NULL;
+    problem->n2n_colidx = NULL;
 
     // Store problem
     info->private_data = (void *)problem;
@@ -354,15 +365,28 @@ int ISOLVER_EXPORT isolver_function_value(const isolver_function_t *info,
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    neohookean_assemble_value(//mesh->element_type,
-                              mesh->nelements,
-                              mesh->nnodes,
-                              mesh->elements,
-                              mesh->points,
-                              problem->mu,
-                              problem->lambda,
-                              x,
-                              out);
+    if (strcmp(problem->material, "linear") == 0) {
+        linear_elasticity_assemble_value_aos(
+            mesh->element_type,
+            mesh->nelements,
+            mesh->nnodes,
+            mesh->elements,
+            mesh->points,
+            problem->mu,
+            problem->lambda,
+            x,
+            out);
+    } else {
+        neohookean_assemble_value(  // mesh->element_type,
+            mesh->nelements,
+            mesh->nnodes,
+            mesh->elements,
+            mesh->points,
+            problem->mu,
+            problem->lambda,
+            x,
+            out);
+    }
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
@@ -374,15 +398,28 @@ int ISOLVER_EXPORT isolver_function_gradient(const isolver_function_t *info,
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    neohookean_assemble_gradient(//mesh->element_type,
-                                 mesh->nelements,
-                                 mesh->nnodes,
-                                 mesh->elements,
-                                 mesh->points,
-                                 problem->mu,
-                                 problem->lambda,
-                                 x,
-                                 out);
+    if (strcmp(problem->material, "linear") == 0) {
+        linear_elasticity_assemble_gradient_aos(
+            mesh->element_type,
+            mesh->nelements,
+            mesh->nnodes,
+            mesh->elements,
+            mesh->points,
+            problem->mu,
+            problem->lambda,
+            x,
+            out);
+    } else {
+        neohookean_assemble_gradient(  // mesh->element_type,
+            mesh->nelements,
+            mesh->nnodes,
+            mesh->elements,
+            mesh->points,
+            problem->mu,
+            problem->lambda,
+            x,
+            out);
+    }
 
     for (int i = 0; i < problem->n_neumann_conditions; i++) {
         surface_forcing_function_vec(side_type(mesh->element_type),
@@ -421,17 +458,31 @@ int ISOLVER_EXPORT isolver_function_hessian_crs(const isolver_function_t *info,
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    neohookean_assemble_hessian(//mesh->element_type,
-                                mesh->nelements,
-                                mesh->nnodes,
-                                mesh->elements,
-                                mesh->points,
-                                problem->mu,
-                                problem->lambda,
-                                x,
-                                problem->n2n_rowptr,
-                                problem->n2n_colidx,
-                                values);
+    if (strcmp(problem->material, "linear") == 0) {
+        linear_elasticity_assemble_hessian_aos(
+            mesh->element_type,
+            mesh->nelements,
+            mesh->nnodes,
+            mesh->elements,
+            mesh->points,
+            problem->mu,
+            problem->lambda,
+            problem->n2n_rowptr,
+            problem->n2n_colidx,
+            values);
+    } else {
+        neohookean_assemble_hessian(  // mesh->element_type,
+            mesh->nelements,
+            mesh->nnodes,
+            mesh->elements,
+            mesh->points,
+            problem->mu,
+            problem->lambda,
+            x,
+            problem->n2n_rowptr,
+            problem->n2n_colidx,
+            values);
+    }
 
     for (int i = 0; i < problem->n_dirichlet_conditions; i++) {
         crs_constraint_nodes_to_identity_vec(problem->dirichlet_conditions[i].local_size,
@@ -499,8 +550,24 @@ int ISOLVER_EXPORT isolver_function_apply(const isolver_function_t *info,
     assert(problem);
     mesh_t *mesh = problem->mesh;
     assert(mesh);
-    // TODO
-    assert(0);
+
+    if (strcmp(problem->material, "linear") == 0) {
+        linear_elasticity_apply_aos(
+            mesh->element_type,
+            mesh->nelements,
+            mesh->nnodes,
+            mesh->elements,
+            mesh->points,
+            problem->mu,
+            problem->lambda,
+            h,
+            out);
+    } else {
+        // TODO
+        assert(0);
+    }
+
+    
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
