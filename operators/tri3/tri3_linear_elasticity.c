@@ -125,7 +125,57 @@ void tri3_linear_elasticity_assemble_value_soa(const ptrdiff_t nelements,
                                                const real_t lambda,
                                                const real_t **const SFEM_RESTRICT u,
                                                real_t *const SFEM_RESTRICT value) {
-    // TODO
+        SFEM_UNUSED(nnodes);
+
+        const double tick = MPI_Wtime();
+
+        idx_t ev[3];
+        idx_t ks[3][3];
+
+        real_t element_displacement[(3 * 2)];
+
+        static const int block_size = 2;
+
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+    #pragma unroll(3)
+            for (int v = 0; v < 3; ++v) {
+                ev[v] = elems[v][i];
+            }
+
+            for(int b = 0; b < block_size; b++) {
+                for (int v = 0; v < 3; ++v) {
+                    element_displacement[b * 3 + v] = u[b][ev[v]];
+                }
+            }
+
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+
+            real_t element_scalar = 0;
+            tri3_linear_elasticity_assemble_value_kernel(
+                // Model parameters
+                mu,
+                lambda,
+                // X-coordinates
+                xyz[0][i0],
+                xyz[0][i1],
+                xyz[0][i2],
+                // Y-coordinates
+                xyz[1][i0],
+                xyz[1][i1],
+                xyz[1][i2],
+                element_displacement,
+                // output matrix
+                &element_scalar);
+
+            *value += element_scalar;
+        }
+
+        const double tock = MPI_Wtime();
+        printf("tri3_linear_elasticity.c: tri3_linear_elasticity_assemble_gradient_soa\t%g seconds\n",
+               tock - tick);
 }
 
 static SFEM_INLINE void tri3_linear_elasticity_assemble_gradient_kernel(
@@ -183,9 +233,65 @@ void tri3_linear_elasticity_assemble_gradient_soa(const ptrdiff_t nelements,
                                                   const ptrdiff_t nnodes,
                                                   idx_t **const SFEM_RESTRICT elems,
                                                   geom_t **const SFEM_RESTRICT xyz,
+                                                  const real_t mu,
+                                                  const real_t lambda,
                                                   const real_t **const SFEM_RESTRICT u,
                                                   real_t **const SFEM_RESTRICT values) {
-    // TODO
+    SFEM_UNUSED(nnodes);
+
+    const double tick = MPI_Wtime();
+
+    idx_t ev[3];
+    idx_t ks[3][3];
+
+    real_t element_vector[(3 * 2)];
+    real_t element_displacement[(3 * 2)];
+
+    static const int block_size = 2;
+
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma unroll(3)
+        for (int v = 0; v < 3; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        for(int b = 0; b < block_size; b++) {
+            for (int v = 0; v < 3; ++v) {
+                element_displacement[b * 3 + v] = u[b][ev[v]];
+            }
+        }
+
+        // Element indices
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+
+        tri3_linear_elasticity_assemble_gradient_kernel(
+            // Model parameters
+            mu,
+            lambda,
+            // X-coordinates
+            xyz[0][i0],
+            xyz[0][i1],
+            xyz[0][i2],
+            // Y-coordinates
+            xyz[1][i0],
+            xyz[1][i1],
+            xyz[1][i2],
+            element_displacement,
+            // output matrix
+            element_vector);
+
+        for (int bi = 0; bi < block_size; ++bi) {
+            for (int edof_i = 0; edof_i < 3; edof_i++) {
+                values[bi][ev[edof_i]] += element_vector[bi * 3 + edof_i];
+            }
+        }
+    }
+
+    const double tock = MPI_Wtime();
+    printf("tri3_linear_elasticity.c: tri3_linear_elasticity_assemble_gradient_soa\t%g seconds\n",
+           tock - tick);
 }
 
 static SFEM_INLINE void tri3_linear_elasticity_assemble_hessian_kernel(const real_t mu,
@@ -306,7 +412,6 @@ void tri3_linear_elasticity_assemble_hessian_soa(const ptrdiff_t nelements,
     idx_t ks[3][3];
 
     real_t element_matrix[(3 * 2) * (3 * 2)];
-    real_t element_displacement[(3 * 2)];
 
     static const int block_size = 2;
     static const int mat_block_size = block_size * block_size;
@@ -462,7 +567,61 @@ void tri3_linear_elasticity_apply_soa(const ptrdiff_t nelements,
                                       const real_t lambda,
                                       const real_t **const SFEM_RESTRICT u,
                                       real_t **const SFEM_RESTRICT values) {
-    // TODO
+        SFEM_UNUSED(nnodes);
+
+        const double tick = MPI_Wtime();
+
+        idx_t ev[3];
+        idx_t ks[3][3];
+
+        real_t element_vector[(3 * 2)];
+        real_t element_displacement[(3 * 2)];
+
+        static const int block_size = 2;
+
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+    #pragma unroll(3)
+            for (int v = 0; v < 3; ++v) {
+                ev[v] = elems[v][i];
+            }
+
+            for(int b = 0; b < block_size; b++) {
+                for (int v = 0; v < 3; ++v) {
+                    element_displacement[b * 3 + v] = u[b][ev[v]];
+                }
+            }
+
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+
+            tri3_linear_elasticity_apply_kernel(
+                // Model parameters
+                mu,
+                lambda,
+                // X-coordinates
+                xyz[0][i0],
+                xyz[0][i1],
+                xyz[0][i2],
+                // Y-coordinates
+                xyz[1][i0],
+                xyz[1][i1],
+                xyz[1][i2],
+                element_displacement,
+                // output matrix
+                element_vector);
+
+            for (int bi = 0; bi < block_size; ++bi) {
+                for (int edof_i = 0; edof_i < 3; edof_i++) {
+                    values[bi][ev[edof_i]] += element_vector[bi * 3 + edof_i];
+                }
+            }
+        }
+
+        const double tock = MPI_Wtime();
+        printf("tri3_linear_elasticity.c: tri3_linear_elasticity_assemble_apply_soa\t%g seconds\n",
+               tock - tick);
 }
 
 void tri3_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
@@ -471,10 +630,59 @@ void tri3_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
                                                geom_t **const SFEM_RESTRICT xyz,
                                                const real_t mu,
                                                const real_t lambda,
-                                               const real_t *const SFEM_RESTRICT u,
+                                               const real_t *const SFEM_RESTRICT displacement,
                                                real_t *const SFEM_RESTRICT value) {
-    assert(0);
-    // TODO
+    SFEM_UNUSED(nnodes);
+
+    double tick = MPI_Wtime();
+
+    idx_t ev[3];
+    idx_t ks[3];
+
+    real_t element_displacement[(3 * 2)];
+
+    static const int block_size = 2;
+
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma unroll(4)
+        for (int v = 0; v < 3; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        // Element indices
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+
+        for (int enode = 0; enode < 3; ++enode) {
+            idx_t dof = ev[enode] * block_size;
+
+            for (int b = 0; b < block_size; ++b) {
+                element_displacement[b * 3 + enode] = displacement[dof + b];
+            }
+        }
+
+        real_t element_scalar = 0;
+        tri3_linear_elasticity_assemble_value_kernel(  // Model parameters
+            mu,
+            lambda,
+            // X-coordinates
+            xyz[0][i0],
+            xyz[0][i1],
+            xyz[0][i2],
+            // Y-coordinates
+            xyz[1][i0],
+            xyz[1][i1],
+            xyz[1][i2],
+            element_displacement,
+            // output vector
+            &element_scalar);
+
+        *value += element_scalar;
+    }
+
+    double tock = MPI_Wtime();
+    printf("tri3_linear_elasticity.c: tri3_laplacian_assemble_value\t%g seconds\n", tock - tick);
 }
 
 void tri3_linear_elasticity_assemble_gradient_aos(const ptrdiff_t nelements,

@@ -904,7 +904,7 @@ int serial_read_tet_mesh(const char *folder,
         }
 
         nindex0 /= sizeof(idx_t);
-        assert(nindex0 * sizeof(idx_t) == nindex1);
+        assert((ptrdiff_t)(nindex0 * sizeof(idx_t)) == nindex1);
         *nelements = nindex0;
     }
 
