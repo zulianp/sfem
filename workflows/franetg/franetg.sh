@@ -20,6 +20,7 @@ sleft=$SFEM_MESH_DIR/sidesets_aos/sleft.raw
 sright=$SFEM_MESH_DIR/sidesets_aos/sright.raw
 
 export PATH=$CODE_DIR/utopia/utopia/build_debug:$PATH
+# export PATH=$CODE_DIR/utopia/utopia/build:$PATH
 
 set -x
 

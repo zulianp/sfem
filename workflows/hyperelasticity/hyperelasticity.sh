@@ -18,8 +18,8 @@ export SFEM_MESH_DIR=mesh
 sleft=$SFEM_MESH_DIR/sidesets_aos/sinlet.raw
 sright=$SFEM_MESH_DIR/sidesets_aos/soutlet.raw
 
-export PATH=$CODE_DIR/utopia/utopia/build_debug:$PATH
-# export PATH=$CODE_DIR/utopia/utopia/build:$PATH
+# export PATH=$CODE_DIR/utopia/utopia/build_debug:$PATH
+export PATH=$CODE_DIR/utopia/utopia/build:$PATH
 
 set -x
 
