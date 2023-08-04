@@ -682,7 +682,7 @@ void tri3_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("tri3_linear_elasticity.c: tri3_laplacian_assemble_value\t%g seconds\n", tock - tick);
+    printf("tri3_linear_elasticity.c: tri3_linear_elasticity_assemble_value\t%g seconds\n", tock - tick);
 }
 
 void tri3_linear_elasticity_assemble_gradient_aos(const ptrdiff_t nelements,
@@ -743,13 +743,13 @@ void tri3_linear_elasticity_assemble_gradient_aos(const ptrdiff_t nelements,
             const idx_t dof_i = elems[edof_i][i];
 
             for (int b = 0; b < block_size; b++) {
-                values[dof_i * block_size + b] = element_vector[b * 3 + edof_i];
+                values[dof_i * block_size + b] += element_vector[b * 3 + edof_i];
             }
         }
     }
 
     double tock = MPI_Wtime();
-    printf("tri3_linear_elasticity.c: tri3_laplacian_assemble_gradient\t%g seconds\n", tock - tick);
+    printf("tri3_linear_elasticity.c: tri3_linear_elasticity_assemble_gradient\t%g seconds\n", tock - tick);
 }
 
 void tri3_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
@@ -784,12 +784,8 @@ void tri3_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
         const idx_t i1 = ev[1];
         const idx_t i2 = ev[2];
 
-        for (int enode = 0; enode < 3; ++enode) {
-            idx_t edof = enode * block_size;
-            idx_t dof = ev[enode] * block_size;
-        }
-
-        tri3_linear_elasticity_assemble_hessian_kernel(  // Model parameters
+        tri3_linear_elasticity_assemble_hessian_kernel( 
+            // Model parameters
             mu,
             lambda,
             // X-coordinates
@@ -825,7 +821,7 @@ void tri3_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
                         const real_t val =
                             // element_matrix[(edof_i * block_size + bi) * 3 * block_size +
                             //                edof_j * block_size + bj];
-                            element_matrix[(bi * 3 * 2 + bj * 3) + edof_i * 3 + edof_j];
+                            element_matrix[(bi * 6 + bj * 3) + edof_i * 3 + edof_j];
 
                         row[offset_j + bj] += val;
                     }
@@ -896,11 +892,11 @@ void tri3_linear_elasticity_apply_aos(const ptrdiff_t nelements,
             const idx_t dof = ev[edof_i] * block_size;
 
             for (int b = 0; b < block_size; b++) {
-                values[dof + b] = element_vector[b * 3 + edof_i];
+                values[dof + b] += element_vector[b * 3 + edof_i];
             }
         }
     }
 
     double tock = MPI_Wtime();
-    printf("tri3_linear_elasticity.c: tri3_laplacian_assemble_apply\t%g seconds\n", tock - tick);
+    printf("tri3_linear_elasticity.c: tri3_linear_elasticity_assemble_apply\t%g seconds\n", tock - tick);
 }
