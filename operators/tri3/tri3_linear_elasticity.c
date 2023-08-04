@@ -644,7 +644,7 @@ void tri3_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
     static const int block_size = 2;
 
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-#pragma unroll(4)
+#pragma unroll(3)
         for (int v = 0; v < 3; ++v) {
             ev[v] = elems[v][i];
         }
@@ -706,7 +706,7 @@ void tri3_linear_elasticity_assemble_gradient_aos(const ptrdiff_t nelements,
     static const int block_size = 2;
 
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-#pragma unroll(4)
+#pragma unroll(3)
         for (int v = 0; v < 3; ++v) {
             ev[v] = elems[v][i];
         }
@@ -804,8 +804,11 @@ void tri3_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
         for (int edof_i = 0; edof_i < 3; ++edof_i) {
             const idx_t dof_i = elems[edof_i][i];
             const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
-            const idx_t *row = &colidx[rowptr[dof_i]];
-            find_cols3(ev, row, lenrow, ks);
+            
+            {
+                const idx_t *row = &colidx[rowptr[dof_i]];
+                find_cols3(ev, row, lenrow, ks);
+            }
 
             // Blocks for row
             real_t *block_start = &values[rowptr[dof_i] * mat_block_size];
@@ -814,15 +817,14 @@ void tri3_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
                 const idx_t offset_j = ks[edof_j] * block_size;
 
                 for (int bi = 0; bi < block_size; ++bi) {
+                    const int ii = bi * 3 + edof_i;
+
                     // Jump rows (including the block-size for the columns)
                     real_t *row = &block_start[bi * lenrow * block_size];
 
                     for (int bj = 0; bj < block_size; ++bj) {
-                        const real_t val =
-                            // element_matrix[(edof_i * block_size + bi) * 3 * block_size +
-                            //                edof_j * block_size + bj];
-                            element_matrix[(bi * 6 + bj * 3) + edof_i * 3 + edof_j];
-
+                        const int jj = bj * 3 + edof_j;
+                        const real_t val = element_matrix[ii * 6 + jj];
                         row[offset_j + bj] += val;
                     }
                 }
@@ -844,7 +846,7 @@ void tri3_linear_elasticity_apply_aos(const ptrdiff_t nelements,
                                       real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    // double tick = MPI_Wtime();
 
     idx_t ev[3];
     idx_t ks[3];
@@ -855,7 +857,7 @@ void tri3_linear_elasticity_apply_aos(const ptrdiff_t nelements,
     static const int block_size = 2;
 
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-#pragma unroll(4)
+#pragma unroll(3)
         for (int v = 0; v < 3; ++v) {
             ev[v] = elems[v][i];
         }
@@ -897,6 +899,6 @@ void tri3_linear_elasticity_apply_aos(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
-    printf("tri3_linear_elasticity.c: tri3_linear_elasticity_assemble_apply\t%g seconds\n", tock - tick);
+    // double tock = MPI_Wtime();
+    // printf("tri3_linear_elasticity.c: tri3_linear_elasticity_assemble_apply\t%g seconds\n", tock - tick);
 }
