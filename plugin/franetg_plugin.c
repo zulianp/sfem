@@ -259,6 +259,9 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
     problem->Gc = SFEM_FRACTURE_TOUGHNESS;
     problem->ls = SFEM_LENGTH_SCALE;
 
+    problem->n2n_rowptr = NULL;
+    problem->n2n_colidx = NULL;
+
     // Store problem
     info->private_data = (void *)problem;
     return ISOLVER_FUNCTION_SUCCESS;
