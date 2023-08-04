@@ -957,12 +957,12 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
         const idx_t i2 = ev[2];
         const idx_t i3 = ev[3];
 
-        for (int enode = 0; enode < 4; ++enode) {
-            idx_t edof = enode * block_size;
-            idx_t dof = ev[enode] * block_size;
+        for (int edof_i = 0; edof_i < 4; ++edof_i) {
+            idx_t dof = ev[edof_i] * block_size;
 
             for (int b = 0; b < block_size; ++b) {
-                element_displacement[edof + b] = displacement[dof + b];
+                // element_displacement[b * 4 + edof_i] = displacement[dof + b];
+                element_displacement[b + edof_i * block_size] = displacement[dof + b]; //OLD Layout
             }
         }
 
@@ -994,8 +994,11 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
         for (int edof_i = 0; edof_i < 4; ++edof_i) {
             const idx_t dof_i = elems[edof_i][i];
             const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
-            const idx_t *row = &colidx[rowptr[dof_i]];
-            find_cols4(ev, row, lenrow, ks);
+            
+            {
+                const idx_t *row = &colidx[rowptr[dof_i]];
+                find_cols4(ev, row, lenrow, ks);
+            }
 
             // Blocks for row
             real_t *block_start = &values[rowptr[dof_i] * mat_block_size];
@@ -1004,11 +1007,17 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
                 const idx_t offset_j = ks[edof_j] * block_size;
 
                 for (int bi = 0; bi < block_size; ++bi) {
+                    // const int ii = bi * 4 + edof_i;
+                    const int ii = edof_i * block_size + bi;
+
                     // Jump rows (including the block-size for the columns)
                     real_t *row = &block_start[bi * lenrow * block_size];
 
                     for (int bj = 0; bj < block_size; ++bj) {
-                        const real_t val = element_matrix[(edof_i * block_size + bi) * 4 * block_size + edof_j * block_size + bj];
+                        // const int jj = bj * 4 + edof_j;
+                        const int jj = edof_j * block_size + bj;
+
+                        const real_t val = element_matrix[ii * 12 + jj];
                         row[offset_j + bj] += val;
                     }
                 }
@@ -1052,12 +1061,12 @@ void neohookean_assemble_gradient(const ptrdiff_t nelements,
         const idx_t i2 = ev[2];
         const idx_t i3 = ev[3];
 
-        for (int enode = 0; enode < 4; ++enode) {
-            idx_t edof = enode * block_size;
-            idx_t dof = ev[enode] * block_size;
+        for (int edof_i = 0; edof_i < 4; ++edof_i) {
+            idx_t dof = ev[edof_i] * block_size;
 
             for (int b = 0; b < block_size; ++b) {
-                element_displacement[edof + b] = displacement[dof + b];
+                // element_displacement[b * 4 + edof_i] = displacement[dof + b];
+                element_displacement[b + edof_i * block_size] = displacement[dof + b]; //OLD Layout
             }
         }
 
@@ -1085,10 +1094,11 @@ void neohookean_assemble_gradient(const ptrdiff_t nelements,
             element_vector);
 
         for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            const idx_t dof_i = elems[edof_i][i];
+            const idx_t dof = elems[edof_i][i] * block_size;
 
             for (int b = 0; b < block_size; b++) {
-                values[dof_i * block_size + b] = element_vector[edof_i * block_size + b];
+                // values[dof + b] += element_vector[b * 4 + edof_i];
+                values[dof + b] += element_vector[edof_i * block_size + b];
             }
         }
     }
@@ -1128,12 +1138,12 @@ void neohookean_assemble_value(const ptrdiff_t nelements,
         const idx_t i2 = ev[2];
         const idx_t i3 = ev[3];
 
-        for (int enode = 0; enode < 4; ++enode) {
-            idx_t edof = enode * block_size;
-            idx_t dof = ev[enode] * block_size;
+        for (int edof_i = 0; edof_i < 4; ++edof_i) {
+            idx_t dof = ev[edof_i] * block_size;
 
             for (int b = 0; b < block_size; ++b) {
-                element_displacement[edof + b] = displacement[dof + b];
+                // element_displacement[b * 4 + edof_i] = displacement[dof + b];
+                element_displacement[b + edof_i * block_size] = displacement[dof + b]; //OLD Layout
             }
         }
 

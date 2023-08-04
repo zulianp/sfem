@@ -178,7 +178,7 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
     SFEM_READ_ENV(SFEM_SHEAR_MODULUS, atof);
     SFEM_READ_ENV(SFEM_FIRST_LAME_PARAMETER, atof);
 
-    const char *SFEM_MATERIAL = 0;
+    const char *SFEM_MATERIAL = "";
     SFEM_READ_ENV(SFEM_MATERIAL, );
 
     // const char *SFEM_INITIAL_GUESS = 0;
