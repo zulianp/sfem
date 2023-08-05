@@ -9,7 +9,7 @@
 
 #include "sfem_vec.h"
 
-// #define USE_EXPLICIT_VECTORIZATION
+#define SFEM_ENABLE_EXPLICIT_VECTORIZATION
 
 #define POW2(l) ((l) * (l))
 #define RPOW2(l) (1. / ((l) * (l)))
@@ -659,7 +659,7 @@ static SFEM_INLINE void tet4_linear_elasticity_assemble_hessian_kernel(const rea
     element_matrix[143 * stride] = x14 * x213;
 }
 
-#ifdef USE_EXPLICIT_VECTORIZATION
+#ifdef SFEM_ENABLE_EXPLICIT_VECTORIZATION
 
 static SFEM_INLINE void tet4_linear_elasticity_apply_kernel(
     const vreal_t mu,
@@ -1426,7 +1426,7 @@ void tet4_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
            tock - tick);
 }
 
-#ifdef USE_EXPLICIT_VECTORIZATION
+#ifdef SFEM_ENABLE_EXPLICIT_VECTORIZATION
 
 void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
                                       const ptrdiff_t nnodes,
@@ -1440,16 +1440,6 @@ void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
 
     // double tick = MPI_Wtime();
 
-    idx_t ev[4];
-    idx_t ks[4];
-
-    vreal_t x[4];
-    vreal_t y[4];
-    vreal_t z[4];
-
-    vreal_t element_vector[(4 * 3)];
-    vreal_t element_displacement[(4 * 3)];
-
     vreal_t vmu;
     vreal_t vlambda;
 
@@ -1460,67 +1450,82 @@ void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
 
     static const int block_size = 3;
 
-    for (ptrdiff_t i = 0; i < nelements; i += SFEM_VECTOR_SIZE) {
-        const int nvec = MAX(1, MIN(nelements - (i + SFEM_VECTOR_SIZE), SFEM_VECTOR_SIZE));
+#pragma omp parallel
+    {
+#pragma omp for nowait
+        for (ptrdiff_t i = 0; i < nelements; i += SFEM_VECTOR_SIZE) {
+            const int nvec = MAX(1, MIN(nelements - (i + SFEM_VECTOR_SIZE), SFEM_VECTOR_SIZE));
 
-        for (int vi = 0; vi < nvec; ++vi) {
-            const ptrdiff_t offset = i + vi;
+            idx_t ev[4];
+            idx_t ks[4];
+
+            vreal_t x[4];
+            vreal_t y[4];
+            vreal_t z[4];
+
+            vreal_t element_vector[(4 * 3)];
+            vreal_t element_displacement[(4 * 3)];
+
+            for (int vi = 0; vi < nvec; ++vi) {
+                const ptrdiff_t offset = i + vi;
 #pragma unroll(4)
-            for (int v = 0; v < 4; ++v) {
-                ev[v] = elems[v][offset];
-            }
+                for (int v = 0; v < 4; ++v) {
+                    ev[v] = elems[v][offset];
+                }
 
 #pragma unroll(4)
-            for (int v = 0; v < 4; ++v) {
-                x[v][vi] = xyz[0][ev[v]];
-                y[v][vi] = xyz[1][ev[v]];
-                z[v][vi] = xyz[2][ev[v]];
-            }
+                for (int v = 0; v < 4; ++v) {
+                    x[v][vi] = xyz[0][ev[v]];
+                    y[v][vi] = xyz[1][ev[v]];
+                    z[v][vi] = xyz[2][ev[v]];
+                }
 
-            for (int enode = 0; enode < 4; ++enode) {
-                idx_t dof = ev[enode] * block_size;
+                for (int enode = 0; enode < 4; ++enode) {
+                    idx_t dof = ev[enode] * block_size;
 
-                for (int b = 0; b < block_size; ++b) {
-                    element_displacement[b * 4 + enode][vi] = displacement[dof + b];
+                    for (int b = 0; b < block_size; ++b) {
+                        element_displacement[b * 4 + enode][vi] = displacement[dof + b];
+                    }
                 }
             }
-        }
 
-        tet4_linear_elasticity_apply_kernel(  // Model parameters
-            vmu,
-            vlambda,
-            // X-coordinates
-            x[0],
-            x[1],
-            x[2],
-            x[3],
-            // Y-coordinates
-            y[0],
-            y[1],
-            y[2],
-            y[3],
-            // Z-coordinates
-            z[0],
-            z[1],
-            z[2],
-            z[3],
-            element_displacement,
-            // output vector
-            element_vector);
+            tet4_linear_elasticity_apply_kernel(  // Model parameters
+                vmu,
+                vlambda,
+                // X-coordinates
+                x[0],
+                x[1],
+                x[2],
+                x[3],
+                // Y-coordinates
+                y[0],
+                y[1],
+                y[2],
+                y[3],
+                // Z-coordinates
+                z[0],
+                z[1],
+                z[2],
+                z[3],
+                element_displacement,
+                // output vector
+                element_vector);
 
-        for (int vi = 0; vi < nvec; ++vi) {
-            const ptrdiff_t offset = i + vi;
+            for (int vi = 0; vi < nvec; ++vi) {
+                const ptrdiff_t offset = i + vi;
 
 #pragma unroll(4)
-            for (int v = 0; v < 4; ++v) {
-                ev[v] = elems[v][offset];
-            }
+                for (int v = 0; v < 4; ++v) {
+                    ev[v] = elems[v][offset];
+                }
 
-            for (int edof_i = 0; edof_i < 4; ++edof_i) {
-                const idx_t dof = ev[edof_i] * block_size;
+                for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                    const idx_t dof = ev[edof_i] * block_size;
 
-                for (int b = 0; b < block_size; b++) {
-                    values[dof + b] += element_vector[b * 4 + edof_i][vi];
+                    for (int b = 0; b < block_size; b++) {
+#pragma omp atomic update
+                        values[dof + b] += element_vector[b * 4 + edof_i][vi];
+                    }
                 }
             }
         }
@@ -1545,62 +1550,65 @@ void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
 
     // double tick = MPI_Wtime();
 
-    idx_t ev[4];
-    idx_t ks[4];
-
-    real_t element_vector[(4 * 3)];
-    real_t element_displacement[(4 * 3)];
-
     static const int block_size = 3;
+#pragma omp parallel
+    {
+#pragma omp for nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[4];
+            idx_t ks[4];
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
+            real_t element_vector[(4 * 3)];
+            real_t element_displacement[(4 * 3)];
 #pragma unroll(4)
-        for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
-        }
-
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
-        const idx_t i3 = ev[3];
-
-        for (int enode = 0; enode < 4; ++enode) {
-            idx_t dof = ev[enode] * block_size;
-
-            for (int b = 0; b < block_size; ++b) {
-                element_displacement[b * 4 + enode] = displacement[dof + b];
+            for (int v = 0; v < 4; ++v) {
+                ev[v] = elems[v][i];
             }
-        }
 
-        tet4_linear_elasticity_apply_kernel(  // Model parameters
-            mu,
-            lambda,
-            // X-coordinates
-            xyz[0][i0],
-            xyz[0][i1],
-            xyz[0][i2],
-            xyz[0][i3],
-            // Y-coordinates
-            xyz[1][i0],
-            xyz[1][i1],
-            xyz[1][i2],
-            xyz[1][i3],
-            // Z-coordinates
-            xyz[2][i0],
-            xyz[2][i1],
-            xyz[2][i2],
-            xyz[2][i3],
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+            const idx_t i3 = ev[3];
 
-            element_displacement,
-            // output vector
-            element_vector);
+            for (int enode = 0; enode < 4; ++enode) {
+                idx_t dof = ev[enode] * block_size;
 
-        for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            const idx_t dof = ev[edof_i] * block_size;
+                for (int b = 0; b < block_size; ++b) {
+                    element_displacement[b * 4 + enode] = displacement[dof + b];
+                }
+            }
 
-            for (int b = 0; b < block_size; b++) {
-                values[dof + b] += element_vector[b * 4 + edof_i];
+            tet4_linear_elasticity_apply_kernel(  // Model parameters
+                mu,
+                lambda,
+                // X-coordinates
+                xyz[0][i0],
+                xyz[0][i1],
+                xyz[0][i2],
+                xyz[0][i3],
+                // Y-coordinates
+                xyz[1][i0],
+                xyz[1][i1],
+                xyz[1][i2],
+                xyz[1][i3],
+                // Z-coordinates
+                xyz[2][i0],
+                xyz[2][i1],
+                xyz[2][i2],
+                xyz[2][i3],
+
+                element_displacement,
+                // output vector
+                element_vector);
+
+            for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                const idx_t dof = ev[edof_i] * block_size;
+
+                for (int b = 0; b < block_size; b++) {
+#pragma omp atomic update
+                    values[dof + b] += element_vector[b * 4 + edof_i];
+                }
             }
         }
     }

@@ -60,6 +60,7 @@ INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatr
 
 
 CFLAGS += -pedantic -Wextra
+CFLAGS += -fPIC
 # CFLAGS += -std=c99
 
 CXXFLAGS += -std=c++11
