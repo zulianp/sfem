@@ -404,6 +404,7 @@ int ISOLVER_EXPORT isolver_function_gradient(const isolver_function_t *info,
                                      problem->neumann_conditions[i].local_size,
                                      problem->neumann_conditions[i].idx,
                                      mesh->points,
+                                     - // Use negative sign since we are on LHS
                                      problem->neumann_conditions[i].value,
                                      problem->block_size,
                                      problem->neumann_conditions[i].component,
@@ -603,9 +604,19 @@ int ISOLVER_EXPORT isolver_function_destroy(isolver_function_t *info) {
     free(problem->n2n_rowptr);
     free(problem->n2n_colidx);
 
+    
+
+    for(int i = 0; i < problem->n_dirichlet_conditions; i++) {
+        free(problem->dirichlet_conditions[i].idx);
+    }
+
     free(problem->dirichlet_conditions);
 
     if (problem->neumann_conditions) {
+        for(int i = 0; i < problem->n_neumann_conditions; i++) {
+            free(problem->neumann_conditions[i].idx);
+        }
+        
         free(problem->neumann_conditions);
     }
 

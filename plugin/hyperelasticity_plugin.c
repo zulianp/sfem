@@ -15,8 +15,8 @@
 #include "crs_graph.h"
 #include "sfem_base.h"
 
-#include "neohookean.h"
 #include "linear_elasticity.h"
+#include "neohookean.h"
 
 #include "read_mesh.h"
 #include "sfem_defs.h"
@@ -366,16 +366,15 @@ int ISOLVER_EXPORT isolver_function_value(const isolver_function_t *info,
     assert(mesh);
 
     if (strcmp(problem->material, "linear") == 0) {
-        linear_elasticity_assemble_value_aos(
-            mesh->element_type,
-            mesh->nelements,
-            mesh->nnodes,
-            mesh->elements,
-            mesh->points,
-            problem->mu,
-            problem->lambda,
-            x,
-            out);
+        linear_elasticity_assemble_value_aos(mesh->element_type,
+                                             mesh->nelements,
+                                             mesh->nnodes,
+                                             mesh->elements,
+                                             mesh->points,
+                                             problem->mu,
+                                             problem->lambda,
+                                             x,
+                                             out);
     } else {
         neohookean_assemble_value(  // mesh->element_type,
             mesh->nelements,
@@ -399,16 +398,15 @@ int ISOLVER_EXPORT isolver_function_gradient(const isolver_function_t *info,
     assert(mesh);
 
     if (strcmp(problem->material, "linear") == 0) {
-        linear_elasticity_assemble_gradient_aos(
-            mesh->element_type,
-            mesh->nelements,
-            mesh->nnodes,
-            mesh->elements,
-            mesh->points,
-            problem->mu,
-            problem->lambda,
-            x,
-            out);
+        linear_elasticity_assemble_gradient_aos(mesh->element_type,
+                                                mesh->nelements,
+                                                mesh->nnodes,
+                                                mesh->elements,
+                                                mesh->points,
+                                                problem->mu,
+                                                problem->lambda,
+                                                x,
+                                                out);
     } else {
         neohookean_assemble_gradient(  // mesh->element_type,
             mesh->nelements,
@@ -426,6 +424,7 @@ int ISOLVER_EXPORT isolver_function_gradient(const isolver_function_t *info,
                                      problem->neumann_conditions[i].local_size,
                                      problem->neumann_conditions[i].idx,
                                      mesh->points,
+                                     -  // Use negative sign since we are on LHS
                                      problem->neumann_conditions[i].value,
                                      problem->block_size,
                                      problem->neumann_conditions[i].component,
@@ -459,17 +458,16 @@ int ISOLVER_EXPORT isolver_function_hessian_crs(const isolver_function_t *info,
     assert(mesh);
 
     if (strcmp(problem->material, "linear") == 0) {
-        linear_elasticity_assemble_hessian_aos(
-            mesh->element_type,
-            mesh->nelements,
-            mesh->nnodes,
-            mesh->elements,
-            mesh->points,
-            problem->mu,
-            problem->lambda,
-            problem->n2n_rowptr,
-            problem->n2n_colidx,
-            values);
+        linear_elasticity_assemble_hessian_aos(mesh->element_type,
+                                               mesh->nelements,
+                                               mesh->nnodes,
+                                               mesh->elements,
+                                               mesh->points,
+                                               problem->mu,
+                                               problem->lambda,
+                                               problem->n2n_rowptr,
+                                               problem->n2n_colidx,
+                                               values);
     } else {
         neohookean_assemble_hessian(  // mesh->element_type,
             mesh->nelements,
@@ -552,22 +550,20 @@ int ISOLVER_EXPORT isolver_function_apply(const isolver_function_t *info,
     assert(mesh);
 
     if (strcmp(problem->material, "linear") == 0) {
-        linear_elasticity_apply_aos(
-            mesh->element_type,
-            mesh->nelements,
-            mesh->nnodes,
-            mesh->elements,
-            mesh->points,
-            problem->mu,
-            problem->lambda,
-            h,
-            out);
+        linear_elasticity_apply_aos(mesh->element_type,
+                                    mesh->nelements,
+                                    mesh->nnodes,
+                                    mesh->elements,
+                                    mesh->points,
+                                    problem->mu,
+                                    problem->lambda,
+                                    h,
+                                    out);
     } else {
         // TODO
         assert(0);
     }
 
-    
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
@@ -653,9 +649,17 @@ int ISOLVER_EXPORT isolver_function_destroy(isolver_function_t *info) {
     free(problem->n2n_rowptr);
     free(problem->n2n_colidx);
 
+    for (int i = 0; i < problem->n_dirichlet_conditions; i++) {
+        free(problem->dirichlet_conditions[i].idx);
+    }
+
     free(problem->dirichlet_conditions);
 
     if (problem->neumann_conditions) {
+        for (int i = 0; i < problem->n_neumann_conditions; i++) {
+            free(problem->neumann_conditions[i].idx);
+        }
+
         free(problem->neumann_conditions);
     }
 
