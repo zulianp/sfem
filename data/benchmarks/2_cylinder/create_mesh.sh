@@ -11,6 +11,6 @@ PATH=$SCRIPTPATH/../../../python/mesh:$PATH
 PATH=$SCRIPTPATH/../../../workflows/divergence:$PATH
 PATH=$SCRIPTPATH/../meshes:$PATH
 
-rm -r mesh
-create_cylinder.sh 5
+rm -rf mesh
+create_cylinder.sh 3
 # create_cylinder_p2.sh 3
