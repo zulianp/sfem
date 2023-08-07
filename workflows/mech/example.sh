@@ -22,7 +22,10 @@ workspace=dump
 
 ncdump -h $db
 
-# ./stress.sh $db $workspace $mu $lambda
+export OMP_NUM_THREADS=8
+export OMP_PROC_BIND=true
+
+./stress.sh $db $workspace $mu $lambda
 # ./strain.sh $db $workspace
-./principal_strains.sh $db $workspace
-./principal_stresses.sh $db $workspace $mu $lambda
+# ./principal_strains.sh $db $workspace
+# ./principal_stresses.sh $db $workspace $mu $lambda

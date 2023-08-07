@@ -9,7 +9,7 @@
 
 #include "sfem_vec.h"
 
-// Does not lead to improvements on Apple M1, 2x on x86 ma
+// Does not lead to improvements on Apple M1, however 2x on x86 with avx2
 // #define SFEM_ENABLE_EXPLICIT_VECTORIZATION
 
 #define POW2(l) ((l) * (l))
@@ -1198,58 +1198,62 @@ void tet4_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
 
     double tick = MPI_Wtime();
 
-    idx_t ev[4];
-    idx_t ks[4];
-
-    real_t element_displacement[(4 * 3)];
-
     static const int block_size = 3;
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma omp parallel
+    {
+#pragma omp for nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[4];
+            idx_t ks[4];
+
+            real_t element_displacement[(4 * 3)];
 #pragma unroll(4)
-        for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
-        }
-
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
-        const idx_t i3 = ev[3];
-
-        for (int enode = 0; enode < 4; ++enode) {
-            idx_t dof = ev[enode] * block_size;
-
-            for (int b = 0; b < block_size; ++b) {
-                element_displacement[b * 4 + enode] = displacement[dof + b];
+            for (int v = 0; v < 4; ++v) {
+                ev[v] = elems[v][i];
             }
+
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+            const idx_t i3 = ev[3];
+
+            for (int enode = 0; enode < 4; ++enode) {
+                idx_t dof = ev[enode] * block_size;
+
+                for (int b = 0; b < block_size; ++b) {
+                    element_displacement[b * 4 + enode] = displacement[dof + b];
+                }
+            }
+
+            real_t element_scalar = 0;
+            tet4_linear_elasticity_assemble_value_kernel(  // Model parameters
+                mu,
+                lambda,
+                // X-coordinates
+                xyz[0][i0],
+                xyz[0][i1],
+                xyz[0][i2],
+                xyz[0][i3],
+                // Y-coordinates
+                xyz[1][i0],
+                xyz[1][i1],
+                xyz[1][i2],
+                xyz[1][i3],
+                // Z-coordinates
+                xyz[2][i0],
+                xyz[2][i1],
+                xyz[2][i2],
+                xyz[2][i3],
+
+                element_displacement,
+                // output vector
+                &element_scalar);
+
+#pragma omp atomic update
+            *value += element_scalar;
         }
-
-        real_t element_scalar = 0;
-        tet4_linear_elasticity_assemble_value_kernel(  // Model parameters
-            mu,
-            lambda,
-            // X-coordinates
-            xyz[0][i0],
-            xyz[0][i1],
-            xyz[0][i2],
-            xyz[0][i3],
-            // Y-coordinates
-            xyz[1][i0],
-            xyz[1][i1],
-            xyz[1][i2],
-            xyz[1][i3],
-            // Z-coordinates
-            xyz[2][i0],
-            xyz[2][i1],
-            xyz[2][i2],
-            xyz[2][i3],
-
-            element_displacement,
-            // output vector
-            &element_scalar);
-
-        *value += element_scalar;
     }
 
     double tock = MPI_Wtime();

@@ -71,6 +71,7 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     mesh_t p2_mesh;
+    mesh_init(&p2_mesh);
 
     const count_t nnz = rowptr[p1_mesh.nnodes];
     idx_t *p2idx = (idx_t *)malloc(nnz * sizeof(idx_t));

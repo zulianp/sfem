@@ -11,21 +11,21 @@
 #include "sortreduce.h"
 
 static SFEM_INLINE void neohookean_value(const real_t mu,
-                                          const real_t lambda,
-                                          const real_t px0,
-                                          const real_t px1,
-                                          const real_t px2,
-                                          const real_t px3,
-                                          const real_t py0,
-                                          const real_t py1,
-                                          const real_t py2,
-                                          const real_t py3,
-                                          const real_t pz0,
-                                          const real_t pz1,
-                                          const real_t pz2,
-                                          const real_t pz3,
-                                          const real_t *const SFEM_RESTRICT u,
-                                          real_t *const SFEM_RESTRICT element_energy) {
+                                         const real_t lambda,
+                                         const real_t px0,
+                                         const real_t px1,
+                                         const real_t px2,
+                                         const real_t px3,
+                                         const real_t py0,
+                                         const real_t py1,
+                                         const real_t py2,
+                                         const real_t py3,
+                                         const real_t pz0,
+                                         const real_t pz1,
+                                         const real_t pz2,
+                                         const real_t pz3,
+                                         const real_t *const SFEM_RESTRICT u,
+                                         real_t *const SFEM_RESTRICT element_energy) {
     // FLOATING POINT OPS!
     //	- Result: 3*ADD + ASSIGNMENT + 10*MUL + 10*POW
     //	- Subexpressions: 38*ADD + 4*DIV + LOG + 84*MUL + 13*NEG + 29*SUB
@@ -936,89 +936,96 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
 
     double tick = MPI_Wtime();
 
-    idx_t ev[4];
-    idx_t ks[4];
-
-    real_t element_matrix[(4 * 3) * (4 * 3)];
-    real_t element_displacement[(4 * 3)];
-
     static const int block_size = 3;
     static const int mat_block_size = block_size * block_size;
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma omp parallel
+    {
+#pragma omp for nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[4];
+            idx_t ks[4];
+
+            real_t element_matrix[(4 * 3) * (4 * 3)];
+            real_t element_displacement[(4 * 3)];
 #pragma unroll(4)
-        for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
-        }
-
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
-        const idx_t i3 = ev[3];
-
-        for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            idx_t dof = ev[edof_i] * block_size;
-
-            for (int b = 0; b < block_size; ++b) {
-                // element_displacement[b * 4 + edof_i] = displacement[dof + b];
-                element_displacement[b + edof_i * block_size] = displacement[dof + b]; //OLD Layout
-            }
-        }
-
-        neohookean_hessian(  // Model parameters
-            mu,
-            lambda,
-            // X-coordinates
-            xyz[0][i0],
-            xyz[0][i1],
-            xyz[0][i2],
-            xyz[0][i3],
-            // Y-coordinates
-            xyz[1][i0],
-            xyz[1][i1],
-            xyz[1][i2],
-            xyz[1][i3],
-            // Z-coordinates
-            xyz[2][i0],
-            xyz[2][i1],
-            xyz[2][i2],
-            xyz[2][i3],
-            // element dispalcement
-            element_displacement,
-            // output matrix
-            element_matrix);
-
-        assert(!check_symmetric(4 * block_size, element_matrix));
-
-        for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            const idx_t dof_i = elems[edof_i][i];
-            const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
-            
-            {
-                const idx_t *row = &colidx[rowptr[dof_i]];
-                find_cols4(ev, row, lenrow, ks);
+            for (int v = 0; v < 4; ++v) {
+                ev[v] = elems[v][i];
             }
 
-            // Blocks for row
-            real_t *block_start = &values[rowptr[dof_i] * mat_block_size];
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+            const idx_t i3 = ev[3];
 
-            for (int edof_j = 0; edof_j < 4; ++edof_j) {
-                const idx_t offset_j = ks[edof_j] * block_size;
+            for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                idx_t dof = ev[edof_i] * block_size;
 
-                for (int bi = 0; bi < block_size; ++bi) {
-                    // const int ii = bi * 4 + edof_i;
-                    const int ii = edof_i * block_size + bi;
+                for (int b = 0; b < block_size; ++b) {
+                    // element_displacement[b * 4 + edof_i] = displacement[dof + b];
+                    element_displacement[b + edof_i * block_size] =
+                        displacement[dof + b];  // OLD
+                                                // Layout
+                }
+            }
 
-                    // Jump rows (including the block-size for the columns)
-                    real_t *row = &block_start[bi * lenrow * block_size];
+            neohookean_hessian(  // Model parameters
+                mu,
+                lambda,
+                // X-coordinates
+                xyz[0][i0],
+                xyz[0][i1],
+                xyz[0][i2],
+                xyz[0][i3],
+                // Y-coordinates
+                xyz[1][i0],
+                xyz[1][i1],
+                xyz[1][i2],
+                xyz[1][i3],
+                // Z-coordinates
+                xyz[2][i0],
+                xyz[2][i1],
+                xyz[2][i2],
+                xyz[2][i3],
+                // element dispalcement
+                element_displacement,
+                // output matrix
+                element_matrix);
 
-                    for (int bj = 0; bj < block_size; ++bj) {
-                        // const int jj = bj * 4 + edof_j;
-                        const int jj = edof_j * block_size + bj;
+            assert(!check_symmetric(4 * block_size, element_matrix));
 
-                        const real_t val = element_matrix[ii * 12 + jj];
-                        row[offset_j + bj] += val;
+            for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                const idx_t dof_i = elems[edof_i][i];
+                const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
+
+                {
+                    const idx_t *row = &colidx[rowptr[dof_i]];
+                    find_cols4(ev, row, lenrow, ks);
+                }
+
+                // Blocks for row
+                real_t *block_start = &values[rowptr[dof_i] * mat_block_size];
+
+                for (int edof_j = 0; edof_j < 4; ++edof_j) {
+                    const idx_t offset_j = ks[edof_j] * block_size;
+
+                    for (int bi = 0; bi < block_size; ++bi) {
+                        // const int ii = bi * 4 + edof_i;
+                        const int ii = edof_i * block_size + bi;
+
+                        // Jump rows (including the block-size for the columns)
+                        real_t *row = &block_start[bi * lenrow * block_size];
+
+                        for (int bj = 0; bj < block_size; ++bj) {
+                            // const int jj = bj * 4 + edof_j;
+                            const int jj = edof_j * block_size + bj;
+
+                            const real_t val = element_matrix[ii * 12 + jj];
+
+#pragma omp atomic update
+                            row[offset_j + bj] += val;
+                        }
                     }
                 }
             }
@@ -1041,64 +1048,71 @@ void neohookean_assemble_gradient(const ptrdiff_t nelements,
 
     double tick = MPI_Wtime();
 
-    idx_t ev[4];
-    idx_t ks[4];
-
-    real_t element_vector[(4 * 3)];
-    real_t element_displacement[(4 * 3)];
-
     static const int block_size = 3;
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma omp parallel
+    {
+#pragma omp for nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[4];
+            idx_t ks[4];
+
+            real_t element_vector[(4 * 3)];
+            real_t element_displacement[(4 * 3)];
+
 #pragma unroll(4)
-        for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
-        }
-
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
-        const idx_t i3 = ev[3];
-
-        for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            idx_t dof = ev[edof_i] * block_size;
-
-            for (int b = 0; b < block_size; ++b) {
-                // element_displacement[b * 4 + edof_i] = displacement[dof + b];
-                element_displacement[b + edof_i * block_size] = displacement[dof + b]; //OLD Layout
+            for (int v = 0; v < 4; ++v) {
+                ev[v] = elems[v][i];
             }
-        }
 
-        neohookean_gradient(  // Model parameters
-            mu,
-            lambda,
-            // X-coordinates
-            xyz[0][i0],
-            xyz[0][i1],
-            xyz[0][i2],
-            xyz[0][i3],
-            // Y-coordinates
-            xyz[1][i0],
-            xyz[1][i1],
-            xyz[1][i2],
-            xyz[1][i3],
-            // Z-coordinates
-            xyz[2][i0],
-            xyz[2][i1],
-            xyz[2][i2],
-            xyz[2][i3],
-            // element dispalcement
-            element_displacement,
-            // output matrix
-            element_vector);
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+            const idx_t i3 = ev[3];
 
-        for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            const idx_t dof = elems[edof_i][i] * block_size;
+            for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                idx_t dof = ev[edof_i] * block_size;
 
-            for (int b = 0; b < block_size; b++) {
-                // values[dof + b] += element_vector[b * 4 + edof_i];
-                values[dof + b] += element_vector[edof_i * block_size + b];
+                for (int b = 0; b < block_size; ++b) {
+                    // element_displacement[b * 4 + edof_i] = displacement[dof + b];
+                    element_displacement[b + edof_i * block_size] =
+                        displacement[dof + b];  // OLD
+                                                // Layout
+                }
+            }
+
+            neohookean_gradient(  // Model parameters
+                mu,
+                lambda,
+                // X-coordinates
+                xyz[0][i0],
+                xyz[0][i1],
+                xyz[0][i2],
+                xyz[0][i3],
+                // Y-coordinates
+                xyz[1][i0],
+                xyz[1][i1],
+                xyz[1][i2],
+                xyz[1][i3],
+                // Z-coordinates
+                xyz[2][i0],
+                xyz[2][i1],
+                xyz[2][i2],
+                xyz[2][i3],
+                // element dispalcement
+                element_displacement,
+                // output matrix
+                element_vector);
+
+            for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                const idx_t dof = elems[edof_i][i] * block_size;
+
+                for (int b = 0; b < block_size; b++) {
+                    // values[dof + b] += element_vector[b * 4 + edof_i];
+#pragma omp atomic update
+                    values[dof + b] += element_vector[edof_i * block_size + b];
+                }
             }
         }
     }
@@ -1118,60 +1132,65 @@ void neohookean_assemble_value(const ptrdiff_t nelements,
     SFEM_UNUSED(nnodes);
 
     double tick = MPI_Wtime();
-
-    idx_t ev[4];
-    idx_t ks[4];
-
-    real_t element_displacement[(4 * 3)];
-
     static const int block_size = 3;
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma omp parallel
+    {
+#pragma omp for nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[4];
+            idx_t ks[4];
+
+            real_t element_displacement[(4 * 3)];
+
 #pragma unroll(4)
-        for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
-        }
-
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
-        const idx_t i3 = ev[3];
-
-        for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            idx_t dof = ev[edof_i] * block_size;
-
-            for (int b = 0; b < block_size; ++b) {
-                // element_displacement[b * 4 + edof_i] = displacement[dof + b];
-                element_displacement[b + edof_i * block_size] = displacement[dof + b]; //OLD Layout
+            for (int v = 0; v < 4; ++v) {
+                ev[v] = elems[v][i];
             }
+
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+            const idx_t i3 = ev[3];
+
+            for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                idx_t dof = ev[edof_i] * block_size;
+
+                for (int b = 0; b < block_size; ++b) {
+                    // element_displacement[b * 4 + edof_i] = displacement[dof + b];
+                    element_displacement[b + edof_i * block_size] =
+                        displacement[dof + b];  // OLD
+                                                // Layout
+                }
+            }
+
+            real_t element_scalar = 0;
+            neohookean_value(  // Model parameters
+                mu,
+                lambda,
+                // X-coordinates
+                xyz[0][i0],
+                xyz[0][i1],
+                xyz[0][i2],
+                xyz[0][i3],
+                // Y-coordinates
+                xyz[1][i0],
+                xyz[1][i1],
+                xyz[1][i2],
+                xyz[1][i3],
+                // Z-coordinates
+                xyz[2][i0],
+                xyz[2][i1],
+                xyz[2][i2],
+                xyz[2][i3],
+                // element dispalcement
+                element_displacement,
+                // output matrix
+                &element_scalar);
+#pragma omp atomic update
+            (*value) += element_scalar;
         }
-
-        real_t element_scalar = 0;
-        neohookean_value(  // Model parameters
-            mu,
-            lambda,
-            // X-coordinates
-            xyz[0][i0],
-            xyz[0][i1],
-            xyz[0][i2],
-            xyz[0][i3],
-            // Y-coordinates
-            xyz[1][i0],
-            xyz[1][i1],
-            xyz[1][i2],
-            xyz[1][i3],
-            // Z-coordinates
-            xyz[2][i0],
-            xyz[2][i1],
-            xyz[2][i2],
-            xyz[2][i3],
-            // element dispalcement
-            element_displacement,
-            // output matrix
-            &element_scalar);
-
-        (*value) += element_scalar;
     }
 
     double tock = MPI_Wtime();
@@ -1529,55 +1548,59 @@ void neohookean_cauchy_stress_aos(const ptrdiff_t nelements,
     static const int block_size = 3;
     static const int mat_block_size = block_size * block_size;
 
-    idx_t ev[4];
-    real_t element_displacement[4 * 3];
-    real_t element_stress[3 * 3];
+#pragma omp parallel
+    {
+#pragma omp for nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[4];
+            real_t element_displacement[4 * 3];
+            real_t element_stress[3 * 3];
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
 #pragma unroll(4)
-        for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
-        }
-
-        for (int enode = 0; enode < 4; ++enode) {
-            idx_t edof = enode * block_size;
-            idx_t dof = ev[enode] * block_size;
-
-            for (int b = 0; b < block_size; ++b) {
-                element_displacement[edof + b] = displacement[dof + b];
+            for (int v = 0; v < 4; ++v) {
+                ev[v] = elems[v][i];
             }
-        }
 
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
-        const idx_t i3 = ev[3];
+            for (int enode = 0; enode < 4; ++enode) {
+                idx_t edof = enode * block_size;
+                idx_t dof = ev[enode] * block_size;
 
-        cauchy_stress_6(mu,
-                        lambda,
-                        // X-coordinates
-                        xyz[0][i0],
-                        xyz[0][i1],
-                        xyz[0][i2],
-                        xyz[0][i3],
-                        // Y-coordinates
-                        xyz[1][i0],
-                        xyz[1][i1],
-                        xyz[1][i2],
-                        xyz[1][i3],
-                        // Z-coordinates
-                        xyz[2][i0],
-                        xyz[2][i1],
-                        xyz[2][i2],
-                        xyz[2][i3],
-                        // Data
-                        element_displacement,
-                        // Output
-                        element_stress);
+                for (int b = 0; b < block_size; ++b) {
+                    element_displacement[edof + b] = displacement[dof + b];
+                }
+            }
 
-        for (int d = 0; d < 6; d++) {
-            out[d][i] = element_stress[d];
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+            const idx_t i3 = ev[3];
+
+            cauchy_stress_6(mu,
+                            lambda,
+                            // X-coordinates
+                            xyz[0][i0],
+                            xyz[0][i1],
+                            xyz[0][i2],
+                            xyz[0][i3],
+                            // Y-coordinates
+                            xyz[1][i0],
+                            xyz[1][i1],
+                            xyz[1][i2],
+                            xyz[1][i3],
+                            // Z-coordinates
+                            xyz[2][i0],
+                            xyz[2][i1],
+                            xyz[2][i2],
+                            xyz[2][i3],
+                            // Data
+                            element_displacement,
+                            // Output
+                            element_stress);
+
+            for (int d = 0; d < 6; d++) {
+                out[d][i] = element_stress[d];
+            }
         }
     }
 }
@@ -1595,55 +1618,59 @@ void neohookean_cauchy_stress_soa(const ptrdiff_t nelements,
     static const int block_size = 3;
     static const int mat_block_size = block_size * block_size;
 
-    idx_t ev[4];
-    real_t element_displacement[4 * 3];
-    real_t element_stress[3 * 3];
+#pragma omp parallel
+    {
+#pragma omp for nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[4];
+            real_t element_displacement[4 * 3];
+            real_t element_stress[3 * 3];
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
 #pragma unroll(4)
-        for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
-        }
+            for (int v = 0; v < 4; ++v) {
+                ev[v] = elems[v][i];
+            }
 
-        for (int enode = 0; enode < 4; ++enode) {
-            idx_t edof = enode * block_size;
-            idx_t dof = ev[enode];
+            for (int enode = 0; enode < 4; ++enode) {
+                idx_t edof = enode * block_size;
+                idx_t dof = ev[enode];
 
-            element_displacement[edof + 0] = u[0][dof];
-            element_displacement[edof + 1] = u[1][dof];
-            element_displacement[edof + 2] = u[2][dof];
-        }
+                element_displacement[edof + 0] = u[0][dof];
+                element_displacement[edof + 1] = u[1][dof];
+                element_displacement[edof + 2] = u[2][dof];
+            }
 
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
-        const idx_t i3 = ev[3];
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+            const idx_t i3 = ev[3];
 
-        cauchy_stress_6(mu,
-                        lambda,
-                        // X-coordinates
-                        xyz[0][i0],
-                        xyz[0][i1],
-                        xyz[0][i2],
-                        xyz[0][i3],
-                        // Y-coordinates
-                        xyz[1][i0],
-                        xyz[1][i1],
-                        xyz[1][i2],
-                        xyz[1][i3],
-                        // Z-coordinates
-                        xyz[2][i0],
-                        xyz[2][i1],
-                        xyz[2][i2],
-                        xyz[2][i3],
-                        // Data
-                        element_displacement,
-                        // Output
-                        element_stress);
+            cauchy_stress_6(mu,
+                            lambda,
+                            // X-coordinates
+                            xyz[0][i0],
+                            xyz[0][i1],
+                            xyz[0][i2],
+                            xyz[0][i3],
+                            // Y-coordinates
+                            xyz[1][i0],
+                            xyz[1][i1],
+                            xyz[1][i2],
+                            xyz[1][i3],
+                            // Z-coordinates
+                            xyz[2][i0],
+                            xyz[2][i1],
+                            xyz[2][i2],
+                            xyz[2][i3],
+                            // Data
+                            element_displacement,
+                            // Output
+                            element_stress);
 
-        for (int d = 0; d < 6; d++) {
-            out[d][i] = element_stress[d];
+            for (int d = 0; d < 6; d++) {
+                out[d][i] = element_stress[d];
+            }
         }
     }
 }
@@ -1661,54 +1688,58 @@ void neohookean_vonmises_soa(const ptrdiff_t nelements,
     static const int block_size = 3;
     static const int mat_block_size = block_size * block_size;
 
-    idx_t ev[4];
-    real_t element_displacement[4 * 3];
+#pragma omp parallel
+    {
+#pragma omp for nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[4];
+            real_t element_displacement[4 * 3];
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
 #pragma unroll(4)
-        for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
+            for (int v = 0; v < 4; ++v) {
+                ev[v] = elems[v][i];
+            }
+
+            for (int enode = 0; enode < 4; ++enode) {
+                idx_t edof = enode * block_size;
+                idx_t dof = ev[enode];
+
+                element_displacement[edof + 0] = u[0][dof];
+                element_displacement[edof + 1] = u[1][dof];
+                element_displacement[edof + 2] = u[2][dof];
+            }
+
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+            const idx_t i3 = ev[3];
+
+            real_t element_stress = 0;
+            vonmises(mu,
+                     lambda,
+                     // X-coordinates
+                     xyz[0][i0],
+                     xyz[0][i1],
+                     xyz[0][i2],
+                     xyz[0][i3],
+                     // Y-coordinates
+                     xyz[1][i0],
+                     xyz[1][i1],
+                     xyz[1][i2],
+                     xyz[1][i3],
+                     // Z-coordinates
+                     xyz[2][i0],
+                     xyz[2][i1],
+                     xyz[2][i2],
+                     xyz[2][i3],
+                     // Data
+                     element_displacement,
+                     // Output
+                     &element_stress);
+
+            out[i] = element_stress;
         }
-
-        for (int enode = 0; enode < 4; ++enode) {
-            idx_t edof = enode * block_size;
-            idx_t dof = ev[enode];
-
-            element_displacement[edof + 0] = u[0][dof];
-            element_displacement[edof + 1] = u[1][dof];
-            element_displacement[edof + 2] = u[2][dof];
-        }
-
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
-        const idx_t i3 = ev[3];
-
-        real_t element_stress = 0;
-        vonmises(mu,
-                 lambda,
-                 // X-coordinates
-                 xyz[0][i0],
-                 xyz[0][i1],
-                 xyz[0][i2],
-                 xyz[0][i3],
-                 // Y-coordinates
-                 xyz[1][i0],
-                 xyz[1][i1],
-                 xyz[1][i2],
-                 xyz[1][i3],
-                 // Z-coordinates
-                 xyz[2][i0],
-                 xyz[2][i1],
-                 xyz[2][i2],
-                 xyz[2][i3],
-                 // Data
-                 element_displacement,
-                 // Output
-                 &element_stress);
-
-        out[i] = element_stress;
     }
 }
 
@@ -1726,85 +1757,90 @@ void neohookean_assemble_hessian_soa(const ptrdiff_t nelements,
 
     const double tick = MPI_Wtime();
 
-    idx_t ev[4];
-    idx_t ks[4];
-
-    real_t element_matrix[(4 * 3) * (4 * 3)];
-    real_t element_displacement[(4 * 3)];
-
     static const int block_size = 3;
     static const int mat_block_size = block_size * block_size;
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma omp parallel
+    {
+#pragma omp for nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[4];
+            idx_t ks[4];
+
+            real_t element_matrix[(4 * 3) * (4 * 3)];
+            real_t element_displacement[(4 * 3)];
+
 #pragma unroll(4)
-        for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
-        }
-
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
-        const idx_t i3 = ev[3];
-
-        for (int enode = 0; enode < 4; ++enode) {
-            const idx_t edof = enode * block_size;
-            const idx_t dof = ev[enode] * block_size;
-
-            for (int b = 0; b < block_size; ++b) {
-                element_displacement[edof + b] = displacement[b][dof];
+            for (int v = 0; v < 4; ++v) {
+                ev[v] = elems[v][i];
             }
-        }
 
-        neohookean_hessian(
-            // Model parameters
-            mu,
-            lambda,
-            // X-coordinates
-            xyz[0][i0],
-            xyz[0][i1],
-            xyz[0][i2],
-            xyz[0][i3],
-            // Y-coordinates
-            xyz[1][i0],
-            xyz[1][i1],
-            xyz[1][i2],
-            xyz[1][i3],
-            // Z-coordinates
-            xyz[2][i0],
-            xyz[2][i1],
-            xyz[2][i2],
-            xyz[2][i3],
-            // element dispalcement
-            element_displacement,
-            // output matrix
-            element_matrix);
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+            const idx_t i3 = ev[3];
 
-        assert(!check_symmetric(4 * block_size, element_matrix));
+            for (int enode = 0; enode < 4; ++enode) {
+                const idx_t edof = enode * block_size;
+                const idx_t dof = ev[enode] * block_size;
 
-        for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            const idx_t dof_i = elems[edof_i][i];
-            const idx_t r_begin = rowptr[dof_i];
-            const idx_t lenrow = rowptr[dof_i + 1] - r_begin;
-            const idx_t *row = &colidx[rowptr[dof_i]];
-            find_cols4(ev, row, lenrow, ks);
+                for (int b = 0; b < block_size; ++b) {
+                    element_displacement[edof + b] = displacement[b][dof];
+                }
+            }
 
-            for (int bi = 0; bi < block_size; ++bi) {
-                const int offset_bi = (edof_i * block_size + bi) * block_size * 4;
-                for (int bj = 0; bj < block_size; ++bj) {
-                    real_t *const row_values = &values[bi * block_size + bj][r_begin];
+            neohookean_hessian(
+                // Model parameters
+                mu,
+                lambda,
+                // X-coordinates
+                xyz[0][i0],
+                xyz[0][i1],
+                xyz[0][i2],
+                xyz[0][i3],
+                // Y-coordinates
+                xyz[1][i0],
+                xyz[1][i1],
+                xyz[1][i2],
+                xyz[1][i3],
+                // Z-coordinates
+                xyz[2][i0],
+                xyz[2][i1],
+                xyz[2][i2],
+                xyz[2][i3],
+                // element dispalcement
+                element_displacement,
+                // output matrix
+                element_matrix);
 
-                    for (int edof_j = 0; edof_j < 4; ++edof_j) {
-                        const real_t val = element_matrix[offset_bi + (edof_j * block_size + bj)];
+            assert(!check_symmetric(4 * block_size, element_matrix));
 
-                        assert(val == val);
-                        row_values[ks[edof_j]] += val;
+            for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                const idx_t dof_i = elems[edof_i][i];
+                const idx_t r_begin = rowptr[dof_i];
+                const idx_t lenrow = rowptr[dof_i + 1] - r_begin;
+                const idx_t *row = &colidx[rowptr[dof_i]];
+                find_cols4(ev, row, lenrow, ks);
+
+                for (int bi = 0; bi < block_size; ++bi) {
+                    const int offset_bi = (edof_i * block_size + bi) * block_size * 4;
+                    for (int bj = 0; bj < block_size; ++bj) {
+                        real_t *const row_values = &values[bi * block_size + bj][r_begin];
+
+                        for (int edof_j = 0; edof_j < 4; ++edof_j) {
+                            const real_t val =
+                                element_matrix[offset_bi + (edof_j * block_size + bj)];
+
+                            assert(val == val);
+#pragma omp atomic update
+                            row_values[ks[edof_j]] += val;
+                        }
                     }
                 }
             }
         }
     }
-
     const double tock = MPI_Wtime();
     printf("neohookean.c: neohookean_assemble_hessian_soa\t%g seconds\n", tock - tick);
 }

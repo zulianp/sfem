@@ -14,6 +14,9 @@ PATH=$SCRIPTPATH/../../../workflows/divergence:$PATH
 UTOPIA_EXEC=$CODE_DIR/utopia/utopia/build/utopia_exec
 # UTOPIA_EXEC=$CODE_DIR/utopia/utopia/build_debug/utopia_exec
 
+export OMP_NUM_THREADS=8
+export OMP_PROC_BIND=true
+
 
 if [[ -z "$UTOPIA_EXEC" ]]
 then

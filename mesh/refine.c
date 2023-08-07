@@ -83,6 +83,7 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     mesh_t refined_mesh;
+    mesh_init(&refined_mesh);
 
     const count_t nnz = rowptr[coarse_mesh.nnodes];
     idx_t *p2idx = (idx_t *)malloc(nnz * sizeof(idx_t));
