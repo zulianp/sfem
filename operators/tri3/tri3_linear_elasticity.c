@@ -125,57 +125,57 @@ void tri3_linear_elasticity_assemble_value_soa(const ptrdiff_t nelements,
                                                const real_t lambda,
                                                const real_t **const SFEM_RESTRICT u,
                                                real_t *const SFEM_RESTRICT value) {
-        SFEM_UNUSED(nnodes);
+    SFEM_UNUSED(nnodes);
 
-        const double tick = MPI_Wtime();
+    const double tick = MPI_Wtime();
 
-        idx_t ev[3];
-        idx_t ks[3][3];
+    idx_t ev[3];
+    idx_t ks[3][3];
 
-        real_t element_displacement[(3 * 2)];
+    real_t element_displacement[(3 * 2)];
 
-        static const int block_size = 2;
+    static const int block_size = 2;
 
-        for (ptrdiff_t i = 0; i < nelements; ++i) {
-    #pragma unroll(3)
-            for (int v = 0; v < 3; ++v) {
-                ev[v] = elems[v][i];
-            }
-
-            for(int b = 0; b < block_size; b++) {
-                for (int v = 0; v < 3; ++v) {
-                    element_displacement[b * 3 + v] = u[b][ev[v]];
-                }
-            }
-
-            // Element indices
-            const idx_t i0 = ev[0];
-            const idx_t i1 = ev[1];
-            const idx_t i2 = ev[2];
-
-            real_t element_scalar = 0;
-            tri3_linear_elasticity_assemble_value_kernel(
-                // Model parameters
-                mu,
-                lambda,
-                // X-coordinates
-                xyz[0][i0],
-                xyz[0][i1],
-                xyz[0][i2],
-                // Y-coordinates
-                xyz[1][i0],
-                xyz[1][i1],
-                xyz[1][i2],
-                element_displacement,
-                // output matrix
-                &element_scalar);
-
-            *value += element_scalar;
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma unroll(3)
+        for (int v = 0; v < 3; ++v) {
+            ev[v] = elems[v][i];
         }
 
-        const double tock = MPI_Wtime();
-        printf("tri3_linear_elasticity.c: tri3_linear_elasticity_assemble_gradient_soa\t%g seconds\n",
-               tock - tick);
+        for (int b = 0; b < block_size; b++) {
+            for (int v = 0; v < 3; ++v) {
+                element_displacement[b * 3 + v] = u[b][ev[v]];
+            }
+        }
+
+        // Element indices
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+
+        real_t element_scalar = 0;
+        tri3_linear_elasticity_assemble_value_kernel(
+            // Model parameters
+            mu,
+            lambda,
+            // X-coordinates
+            xyz[0][i0],
+            xyz[0][i1],
+            xyz[0][i2],
+            // Y-coordinates
+            xyz[1][i0],
+            xyz[1][i1],
+            xyz[1][i2],
+            element_displacement,
+            // output matrix
+            &element_scalar);
+
+        *value += element_scalar;
+    }
+
+    const double tock = MPI_Wtime();
+    printf("tri3_linear_elasticity.c: tri3_linear_elasticity_assemble_gradient_soa\t%g seconds\n",
+           tock - tick);
 }
 
 static SFEM_INLINE void tri3_linear_elasticity_assemble_gradient_kernel(
@@ -255,7 +255,7 @@ void tri3_linear_elasticity_assemble_gradient_soa(const ptrdiff_t nelements,
             ev[v] = elems[v][i];
         }
 
-        for(int b = 0; b < block_size; b++) {
+        for (int b = 0; b < block_size; b++) {
             for (int v = 0; v < 3; ++v) {
                 element_displacement[b * 3 + v] = u[b][ev[v]];
             }
@@ -567,61 +567,61 @@ void tri3_linear_elasticity_apply_soa(const ptrdiff_t nelements,
                                       const real_t lambda,
                                       const real_t **const SFEM_RESTRICT u,
                                       real_t **const SFEM_RESTRICT values) {
-        SFEM_UNUSED(nnodes);
+    SFEM_UNUSED(nnodes);
 
-        const double tick = MPI_Wtime();
+    const double tick = MPI_Wtime();
 
-        idx_t ev[3];
-        idx_t ks[3][3];
+    idx_t ev[3];
+    idx_t ks[3][3];
 
-        real_t element_vector[(3 * 2)];
-        real_t element_displacement[(3 * 2)];
+    real_t element_vector[(3 * 2)];
+    real_t element_displacement[(3 * 2)];
 
-        static const int block_size = 2;
+    static const int block_size = 2;
 
-        for (ptrdiff_t i = 0; i < nelements; ++i) {
-    #pragma unroll(3)
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma unroll(3)
+        for (int v = 0; v < 3; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        for (int b = 0; b < block_size; b++) {
             for (int v = 0; v < 3; ++v) {
-                ev[v] = elems[v][i];
-            }
-
-            for(int b = 0; b < block_size; b++) {
-                for (int v = 0; v < 3; ++v) {
-                    element_displacement[b * 3 + v] = u[b][ev[v]];
-                }
-            }
-
-            // Element indices
-            const idx_t i0 = ev[0];
-            const idx_t i1 = ev[1];
-            const idx_t i2 = ev[2];
-
-            tri3_linear_elasticity_apply_kernel(
-                // Model parameters
-                mu,
-                lambda,
-                // X-coordinates
-                xyz[0][i0],
-                xyz[0][i1],
-                xyz[0][i2],
-                // Y-coordinates
-                xyz[1][i0],
-                xyz[1][i1],
-                xyz[1][i2],
-                element_displacement,
-                // output matrix
-                element_vector);
-
-            for (int bi = 0; bi < block_size; ++bi) {
-                for (int edof_i = 0; edof_i < 3; edof_i++) {
-                    values[bi][ev[edof_i]] += element_vector[bi * 3 + edof_i];
-                }
+                element_displacement[b * 3 + v] = u[b][ev[v]];
             }
         }
 
-        const double tock = MPI_Wtime();
-        printf("tri3_linear_elasticity.c: tri3_linear_elasticity_assemble_apply_soa\t%g seconds\n",
-               tock - tick);
+        // Element indices
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+
+        tri3_linear_elasticity_apply_kernel(
+            // Model parameters
+            mu,
+            lambda,
+            // X-coordinates
+            xyz[0][i0],
+            xyz[0][i1],
+            xyz[0][i2],
+            // Y-coordinates
+            xyz[1][i0],
+            xyz[1][i1],
+            xyz[1][i2],
+            element_displacement,
+            // output matrix
+            element_vector);
+
+        for (int bi = 0; bi < block_size; ++bi) {
+            for (int edof_i = 0; edof_i < 3; edof_i++) {
+                values[bi][ev[edof_i]] += element_vector[bi * 3 + edof_i];
+            }
+        }
+    }
+
+    const double tock = MPI_Wtime();
+    printf("tri3_linear_elasticity.c: tri3_linear_elasticity_assemble_apply_soa\t%g seconds\n",
+           tock - tick);
 }
 
 void tri3_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
@@ -636,53 +636,59 @@ void tri3_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
 
     double tick = MPI_Wtime();
 
-    idx_t ev[3];
-    idx_t ks[3];
-
-    real_t element_displacement[(3 * 2)];
-
     static const int block_size = 2;
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma omp parallel
+    {
+#pragma omp for nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[3];
+            idx_t ks[3];
+
+            real_t element_displacement[(3 * 2)];
+
 #pragma unroll(3)
-        for (int v = 0; v < 3; ++v) {
-            ev[v] = elems[v][i];
-        }
-
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
-
-        for (int enode = 0; enode < 3; ++enode) {
-            idx_t dof = ev[enode] * block_size;
-
-            for (int b = 0; b < block_size; ++b) {
-                element_displacement[b * 3 + enode] = displacement[dof + b];
+            for (int v = 0; v < 3; ++v) {
+                ev[v] = elems[v][i];
             }
+
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+
+            for (int enode = 0; enode < 3; ++enode) {
+                idx_t dof = ev[enode] * block_size;
+
+                for (int b = 0; b < block_size; ++b) {
+                    element_displacement[b * 3 + enode] = displacement[dof + b];
+                }
+            }
+
+            real_t element_scalar = 0;
+            tri3_linear_elasticity_assemble_value_kernel(  // Model parameters
+                mu,
+                lambda,
+                // X-coordinates
+                xyz[0][i0],
+                xyz[0][i1],
+                xyz[0][i2],
+                // Y-coordinates
+                xyz[1][i0],
+                xyz[1][i1],
+                xyz[1][i2],
+                element_displacement,
+                // output vector
+                &element_scalar);
+
+#pragma omp atomic update
+            *value += element_scalar;
         }
-
-        real_t element_scalar = 0;
-        tri3_linear_elasticity_assemble_value_kernel(  // Model parameters
-            mu,
-            lambda,
-            // X-coordinates
-            xyz[0][i0],
-            xyz[0][i1],
-            xyz[0][i2],
-            // Y-coordinates
-            xyz[1][i0],
-            xyz[1][i1],
-            xyz[1][i2],
-            element_displacement,
-            // output vector
-            &element_scalar);
-
-        *value += element_scalar;
     }
 
     double tock = MPI_Wtime();
-    printf("tri3_linear_elasticity.c: tri3_linear_elasticity_assemble_value\t%g seconds\n", tock - tick);
+    printf("tri3_linear_elasticity.c: tri3_linear_elasticity_assemble_value\t%g seconds\n",
+           tock - tick);
 }
 
 void tri3_linear_elasticity_assemble_gradient_aos(const ptrdiff_t nelements,
@@ -705,51 +711,63 @@ void tri3_linear_elasticity_assemble_gradient_aos(const ptrdiff_t nelements,
 
     static const int block_size = 2;
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma omp parallel
+    {
+#pragma omp for nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[3];
+            idx_t ks[3];
+
+            real_t element_vector[(3 * 2)];
+            real_t element_displacement[(3 * 2)];
+
 #pragma unroll(3)
-        for (int v = 0; v < 3; ++v) {
-            ev[v] = elems[v][i];
-        }
-
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
-
-        for (int enode = 0; enode < 3; ++enode) {
-            idx_t dof = ev[enode] * block_size;
-
-            for (int b = 0; b < block_size; ++b) {
-                element_displacement[b * 3 + enode] = displacement[dof + b];
+            for (int v = 0; v < 3; ++v) {
+                ev[v] = elems[v][i];
             }
-        }
 
-        tri3_linear_elasticity_assemble_gradient_kernel(  // Model parameters
-            mu,
-            lambda,
-            // X-coordinates
-            xyz[0][i0],
-            xyz[0][i1],
-            xyz[0][i2],
-            // Y-coordinates
-            xyz[1][i0],
-            xyz[1][i1],
-            xyz[1][i2],
-            element_displacement,
-            // output vector
-            element_vector);
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
 
-        for (int edof_i = 0; edof_i < 3; ++edof_i) {
-            const idx_t dof_i = elems[edof_i][i];
+            for (int enode = 0; enode < 3; ++enode) {
+                idx_t dof = ev[enode] * block_size;
 
-            for (int b = 0; b < block_size; b++) {
-                values[dof_i * block_size + b] += element_vector[b * 3 + edof_i];
+                for (int b = 0; b < block_size; ++b) {
+                    element_displacement[b * 3 + enode] = displacement[dof + b];
+                }
+            }
+
+            tri3_linear_elasticity_assemble_gradient_kernel(  // Model parameters
+                mu,
+                lambda,
+                // X-coordinates
+                xyz[0][i0],
+                xyz[0][i1],
+                xyz[0][i2],
+                // Y-coordinates
+                xyz[1][i0],
+                xyz[1][i1],
+                xyz[1][i2],
+                element_displacement,
+                // output vector
+                element_vector);
+
+            for (int edof_i = 0; edof_i < 3; ++edof_i) {
+                const idx_t dof_i = elems[edof_i][i];
+
+                for (int b = 0; b < block_size; b++) {
+#pragma omp atomic update
+                    values[dof_i * block_size + b] += element_vector[b * 3 + edof_i];
+                }
             }
         }
     }
 
     double tock = MPI_Wtime();
-    printf("tri3_linear_elasticity.c: tri3_linear_elasticity_assemble_gradient\t%g seconds\n", tock - tick);
+    printf("tri3_linear_elasticity.c: tri3_linear_elasticity_assemble_gradient\t%g seconds\n",
+           tock - tick);
 }
 
 void tri3_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
@@ -765,67 +783,72 @@ void tri3_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
 
     const double tick = MPI_Wtime();
 
-    idx_t ev[3];
-    idx_t ks[3];
-
-    real_t element_matrix[(3 * 2) * (3 * 2)];
-
     static const int block_size = 2;
     static const int mat_block_size = block_size * block_size;
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma omp parallel
+    {
+#pragma omp for nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[3];
+            idx_t ks[3];
+
+            real_t element_matrix[(3 * 2) * (3 * 2)];
+
 #pragma unroll(3)
-        for (int v = 0; v < 3; ++v) {
-            ev[v] = elems[v][i];
-        }
-
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
-
-        tri3_linear_elasticity_assemble_hessian_kernel( 
-            // Model parameters
-            mu,
-            lambda,
-            // X-coordinates
-            xyz[0][i0],
-            xyz[0][i1],
-            xyz[0][i2],
-            // Y-coordinates
-            xyz[1][i0],
-            xyz[1][i1],
-            xyz[1][i2],
-            // output matrix
-            element_matrix);
-
-        assert(!check_symmetric(3 * block_size, element_matrix));
-
-        for (int edof_i = 0; edof_i < 3; ++edof_i) {
-            const idx_t dof_i = elems[edof_i][i];
-            const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
-            
-            {
-                const idx_t *row = &colidx[rowptr[dof_i]];
-                find_cols3(ev, row, lenrow, ks);
+            for (int v = 0; v < 3; ++v) {
+                ev[v] = elems[v][i];
             }
 
-            // Blocks for row
-            real_t *block_start = &values[rowptr[dof_i] * mat_block_size];
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
 
-            for (int edof_j = 0; edof_j < 3; ++edof_j) {
-                const idx_t offset_j = ks[edof_j] * block_size;
+            tri3_linear_elasticity_assemble_hessian_kernel(
+                // Model parameters
+                mu,
+                lambda,
+                // X-coordinates
+                xyz[0][i0],
+                xyz[0][i1],
+                xyz[0][i2],
+                // Y-coordinates
+                xyz[1][i0],
+                xyz[1][i1],
+                xyz[1][i2],
+                // output matrix
+                element_matrix);
 
-                for (int bi = 0; bi < block_size; ++bi) {
-                    const int ii = bi * 3 + edof_i;
+            assert(!check_symmetric(3 * block_size, element_matrix));
 
-                    // Jump rows (including the block-size for the columns)
-                    real_t *row = &block_start[bi * lenrow * block_size];
+            for (int edof_i = 0; edof_i < 3; ++edof_i) {
+                const idx_t dof_i = elems[edof_i][i];
+                const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
 
-                    for (int bj = 0; bj < block_size; ++bj) {
-                        const int jj = bj * 3 + edof_j;
-                        const real_t val = element_matrix[ii * 6 + jj];
-                        row[offset_j + bj] += val;
+                {
+                    const idx_t *row = &colidx[rowptr[dof_i]];
+                    find_cols3(ev, row, lenrow, ks);
+                }
+
+                // Blocks for row
+                real_t *block_start = &values[rowptr[dof_i] * mat_block_size];
+
+                for (int edof_j = 0; edof_j < 3; ++edof_j) {
+                    const idx_t offset_j = ks[edof_j] * block_size;
+
+                    for (int bi = 0; bi < block_size; ++bi) {
+                        const int ii = bi * 3 + edof_i;
+
+                        // Jump rows (including the block-size for the columns)
+                        real_t *row = &block_start[bi * lenrow * block_size];
+
+                        for (int bj = 0; bj < block_size; ++bj) {
+                            const int jj = bj * 3 + edof_j;
+                            const real_t val = element_matrix[ii * 6 + jj];
+#pragma omp atomic update
+                            row[offset_j + bj] += val;
+                        }
                     }
                 }
             }
@@ -847,58 +870,63 @@ void tri3_linear_elasticity_apply_aos(const ptrdiff_t nelements,
     SFEM_UNUSED(nnodes);
 
     // double tick = MPI_Wtime();
-
-    idx_t ev[3];
-    idx_t ks[3];
-
-    real_t element_vector[(3 * 2)];
-    real_t element_displacement[(3 * 2)];
-
     static const int block_size = 2;
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma omp parallel
+    {
+#pragma omp for nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[3];
+            idx_t ks[3];
+
+            real_t element_vector[(3 * 2)];
+            real_t element_displacement[(3 * 2)];
+
 #pragma unroll(3)
-        for (int v = 0; v < 3; ++v) {
-            ev[v] = elems[v][i];
-        }
-
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
-
-        for (int enode = 0; enode < 3; ++enode) {
-            idx_t dof = ev[enode] * block_size;
-
-            for (int b = 0; b < block_size; ++b) {
-                element_displacement[b * 3 + enode] = displacement[dof + b];
+            for (int v = 0; v < 3; ++v) {
+                ev[v] = elems[v][i];
             }
-        }
 
-        tri3_linear_elasticity_apply_kernel(  // Model parameters
-            mu,
-            lambda,
-            // X-coordinates
-            xyz[0][i0],
-            xyz[0][i1],
-            xyz[0][i2],
-            // Y-coordinates
-            xyz[1][i0],
-            xyz[1][i1],
-            xyz[1][i2],
-            element_displacement,
-            // output vector
-            element_vector);
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
 
-        for (int edof_i = 0; edof_i < 3; ++edof_i) {
-            const idx_t dof = ev[edof_i] * block_size;
+            for (int enode = 0; enode < 3; ++enode) {
+                idx_t dof = ev[enode] * block_size;
 
-            for (int b = 0; b < block_size; b++) {
-                values[dof + b] += element_vector[b * 3 + edof_i];
+                for (int b = 0; b < block_size; ++b) {
+                    element_displacement[b * 3 + enode] = displacement[dof + b];
+                }
+            }
+
+            tri3_linear_elasticity_apply_kernel(  // Model parameters
+                mu,
+                lambda,
+                // X-coordinates
+                xyz[0][i0],
+                xyz[0][i1],
+                xyz[0][i2],
+                // Y-coordinates
+                xyz[1][i0],
+                xyz[1][i1],
+                xyz[1][i2],
+                element_displacement,
+                // output vector
+                element_vector);
+
+            for (int edof_i = 0; edof_i < 3; ++edof_i) {
+                const idx_t dof = ev[edof_i] * block_size;
+
+                for (int b = 0; b < block_size; b++) {
+#pragma omp atomic update
+                    values[dof + b] += element_vector[b * 3 + edof_i];
+                }
             }
         }
     }
 
     // double tock = MPI_Wtime();
-    // printf("tri3_linear_elasticity.c: tri3_linear_elasticity_assemble_apply\t%g seconds\n", tock - tick);
+    // printf("tri3_linear_elasticity.c: tri3_linear_elasticity_assemble_apply\t%g seconds\n", tock
+    // - tick);
 }
