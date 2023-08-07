@@ -164,6 +164,8 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    const int nxe = elem_num_nodes(mesh.element_type);
+
     sfc_t *sfc = (sfc_t *)malloc(mesh.n_owned_elements * sizeof(sfc_t));
     memset(sfc, 0, mesh.n_owned_elements * sizeof(sfc_t));
 
@@ -232,7 +234,7 @@ int main(int argc, char *argv[]) {
             // (int)sfc[i]);
         }
     } else {
-        const int nnxe = elem_num_nodes(mesh.element_type);
+        
         for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
             geom_t b[3] = {0, 0, 0};
             const idx_t i0 = mesh.elements[0][i];
@@ -244,7 +246,7 @@ int main(int argc, char *argv[]) {
                 b[coord] = x;
             }
 
-            for (int d = 1; d < nnxe; d++) {
+            for (int d = 1; d < nxe; d++) {
                 const idx_t ii = mesh.elements[d][i];
 
                 for (int coord = 0; coord < mesh.spatial_dim; coord++) {
@@ -305,7 +307,8 @@ int main(int argc, char *argv[]) {
         // 1) rearrange elements
         {
             idx_t *elem_buff = (idx_t *)buff;
-            for (int d = 0; d < mesh.element_type; d++) {
+
+            for (int d = 0; d < nxe; d++) {
                 memcpy(elem_buff, mesh.elements[d], mesh.n_owned_elements * sizeof(idx_t));
                 for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
                     mesh.elements[d][i] = elem_buff[idx[i]];
@@ -340,7 +343,7 @@ int main(int argc, char *argv[]) {
 
             idx_t next_node = 1;
             for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
-                for (int d = 0; d < mesh.element_type; d++) {
+                for (int d = 0; d < nxe; d++) {
                     idx_t i0 = mesh.elements[d][i];
 
                     if (!node_buff[i0]) {
@@ -359,7 +362,7 @@ int main(int argc, char *argv[]) {
         }
 
         // Update e2n
-        for (int d = 0; d < mesh.element_type; d++) {
+        for (int d = 0; d < nxe; d++) {
             for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
                 idx_t i0 = mesh.elements[d][i];
                 mesh.elements[d][i] = node_buff[i0];
