@@ -349,6 +349,53 @@ int block_crs_to_crs(const ptrdiff_t nnodes,
     return 0;
 }
 
+int crs_graph_block_to_scalar(const ptrdiff_t nnodes,
+                     const int block_size,
+                     const count_t *const block_rowptr,
+                     const idx_t *const block_colidx,
+                     count_t *const rowptr,
+                     idx_t *const colidx) {
+    for (ptrdiff_t i = 0; i < nnodes; ++i) {
+        count_t k = block_rowptr[i] * (block_size * block_size);
+        count_t ncols = block_rowptr[i + 1] - block_rowptr[i];
+
+        for (int b = 0; b < block_size; ++b) {
+            rowptr[i * block_size + b] = k + ncols * (b * block_size);
+        }
+    }
+
+    rowptr[nnodes * block_size] = 2 * rowptr[nnodes * block_size - 1] - rowptr[nnodes * block_size - 2];
+
+    for (ptrdiff_t i = 0; i < nnodes; ++i) {
+        // Block row
+        const count_t bstart = block_rowptr[i];
+        const count_t bend = block_rowptr[i + 1];
+
+        for (int brow = 0; brow < block_size; ++brow) {
+            const idx_t row = i * block_size + brow;
+            // Scalar row
+            const count_t start = rowptr[row];
+#ifndef NDEBUG
+            const count_t end = rowptr[row + 1];
+#endif
+
+            for (count_t bk = bstart, k = start; bk < bend; ++bk) {
+                // Block column
+                const idx_t bcolidx = block_colidx[bk];
+                // Data block
+                for (int bcol = 0; bcol < block_size; ++bcol, ++k) {
+                    assert(k < end);
+
+                    colidx[k] = bcolidx * block_size + bcol;
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
+
 int create_dual_graph_mem_conservative(const ptrdiff_t n_elements,
                                        const ptrdiff_t n_nodes,
                                        const int element_type,

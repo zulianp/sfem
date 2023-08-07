@@ -12,6 +12,8 @@ else ifeq ($(asan), 1)
 # 	ASAN_FLAGS += -O1
 	CXXFLAGS += $(ASAN_FLAGS)
 	CFLAGS += $(ASAN_FLAGS)
+# 	DEPS += -static-libsan
+# 	DEPS += -static
 else
 	CFLAGS += -Ofast -DNDEBUG
 	CXXFLAGS += -Ofast -DNDEBUG
@@ -58,6 +60,7 @@ INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatr
 
 
 CFLAGS += -pedantic -Wextra
+CFLAGS += -fPIC
 # CFLAGS += -std=c99
 
 CXXFLAGS += -std=c++11
@@ -97,7 +100,7 @@ GOALS += divergence lapl lumped_mass_inv lumped_boundary_mass_inv u_dot_grad_q
 GOALS += crs_apply_dirichlet
 
 # Array utilities
-GOALS += soa_to_aos roi
+GOALS += soa_to_aos aos_to_soa roi
 
 # CVFEM
 GOALS += cvfem_assemble
@@ -150,7 +153,11 @@ OBJS = \
 	surface_l2_projection.o \
 	grad_p1.o  \
 	linear_elasticity.o \
-	tri3_linear_elasticity.o
+	tri3_linear_elasticity.o \
+	tet4_linear_elasticity.o \
+	tet4_phase_field_for_fracture.o \
+	tri3_phase_field_for_fracture.o \
+	phase_field_for_fracture.o 
 
 OBJS += tri3_laplacian.o
 
@@ -198,7 +205,7 @@ OBJS += neohookean.o
 
 OBJS += $(SIMD_OBJS)
 
-plugins: isolver_sfem.dylib
+plugins: isolver_sfem.dylib franetg_plugin.dylib hyperelasticity_plugin.dylib
 
 libsfem.a : $(OBJS)
 	ar rcs $@ $^
@@ -322,6 +329,9 @@ sgather : sgather.o
 soa_to_aos : soa_to_aos.o
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
+aos_to_soa : aos_to_soa.o
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
 soverride : drivers/soverride.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
@@ -384,6 +394,19 @@ isolver_sfem.dylib : isolver_sfem_plugin.o libsfem.a
 	$(MPICC) -shared -o $@ $^ $(LDFLAGS)
 
 isolver_sfem_plugin.o : plugin/isolver_sfem_plugin.c
+	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
+
+franetg_plugin.dylib : franetg_plugin.o libsfem.a
+	$(MPICC) -shared -o $@ $^ $(LDFLAGS)
+
+franetg_plugin.o : plugin/franetg_plugin.c
+	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
+
+
+hyperelasticity_plugin.dylib : hyperelasticity_plugin.o libsfem.a
+	$(MPICC) -shared -o $@ $^ $(LDFLAGS)
+
+hyperelasticity_plugin.o : plugin/hyperelasticity_plugin.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
 
 sortreduce.o : sortreduce.cpp

@@ -10,6 +10,7 @@ from sfem_codegen import det2
 from sfem_codegen import det3
 import sympy.codegen.ast as ast
 import sympy as sp
+import numpy as np
 
 def read_file(path):
 	with open(path, 'r') as f:
@@ -281,6 +282,9 @@ class FE:
 		jacobian_determinant_expr = []
 		jacobian_determinant_expr.append(ast.Assignment(sp.symbols(f'jacobian_determinant[0]'), jacobian_determinant))
 
+
+		jacobian_determinant_and_inverse_expr = np.append(jacobian_determinant_expr, jac_inv_expr)
+
 		constants  = f'static const int fe_spatial_dim = {self.spatial_dim()};\n'
 		constants += f'static const int fe_manifold_dim = {self.manifold_dim()};\n'
 		constants += f'static const int fe_n_nodes = {self.n_nodes()};\n'
@@ -330,6 +334,7 @@ class FE:
 			JACOBIAN=c_gen(jac_expr),
 			JACOBIAN_INVERSE=c_gen(jac_inv_expr),
 			JACOBIAN_DETERMINANT=c_gen(jacobian_determinant_expr),
+			JACOBIAN_DETERMINANT_AND_INVERSE=c_gen(jacobian_determinant_and_inverse_expr),
 			FUN=c_gen(fun_expr),
 			PARTIAL_X=c_gen(grad_expr[0]),
 			PARTIAL_Y=c_gen(grad_expr[1]),

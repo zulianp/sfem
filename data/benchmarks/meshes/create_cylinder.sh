@@ -25,9 +25,11 @@ nrefs=$1
 
 folder=cylinder
 mesh_db=$folder/mesh.vtk
+mesh_original=./unsorted
 mesh_raw=./mesh
 mesh_surface=$mesh_raw/surface
 
+mkdir -p $mesh_original
 mkdir -p $mesh_raw
 mkdir -p $mesh_surface/inlet
 mkdir -p $mesh_surface/outlet
@@ -39,7 +41,8 @@ mkdir -p $folder
 idx_type_size=4
 
 cylinder.py $mesh_db $nrefs
-db_to_raw.py $mesh_db $mesh_raw
+db_to_raw.py $mesh_db $mesh_original
+sfc $mesh_original $mesh_raw
 $LAUNCH skin $mesh_raw $mesh_surface
 
 $LAUNCH select_surf $mesh_surface -1 0   0   0.99   $mesh_surface/sides_inlet.raw

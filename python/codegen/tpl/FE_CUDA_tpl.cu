@@ -1,5 +1,4 @@
 #include "sfem_base.h"
-#include "sfem_cuda_base.h"
 
 
 #include <math.h>
@@ -29,6 +28,17 @@ real_t *const SFEM_RESTRICT jacobian_inverse
 )
 {{
 {JACOBIAN_INVERSE}
+}}
+
+SFEM_DEVICE_FUNCTION void {NAME}_mk_jacobian_determinant_and_inverse(
+{COORDINATES} //arrays
+const count_t stride_jacobian_determinant,
+real_t * const SFEM_RESTRICT jacobian_determinant,
+const count_t stride_jacobian_inverse,
+real_t *const SFEM_RESTRICT jacobian_inverse
+)
+{{
+{JACOBIAN_DETERMINANT_AND_INVERSE}
 }}
 
 SFEM_DEVICE_FUNCTION void {NAME}_mk_jacobian_determinant(

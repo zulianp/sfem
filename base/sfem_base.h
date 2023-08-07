@@ -36,4 +36,6 @@ typedef int count_t;
 
 #define SFEM_RESTRICT __restrict__
 
+#define SFEM_MAX_PATH_LENGTH 2056
+
 #endif //SFEM_BASE_H

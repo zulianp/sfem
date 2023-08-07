@@ -12,7 +12,7 @@ PATH=$SCRIPTPATH/../../../python/mesh:$PATH
 LAUNCH=""
 # LAUNCH=srun
 
-if (($# != 1))
+if [[ $# -lt 1 ]]
 then
 	printf "usage: $0 <n_refinements>\n" 1>&2
 	exit -1
@@ -21,6 +21,14 @@ fi
 set -x
 
 nrefs=$1
+width=2
+height=1
+
+if [[ $# -eq 3 ]]
+then
+	width=$2
+	height=$3
+fi
 
 folder=box_2D
 mesh_db=$folder/mesh.vtk
@@ -38,7 +46,7 @@ mkdir -p $folder
 
 idx_type_size=4
 
-box_2D.py $mesh_db $nrefs
+box_2D.py $mesh_db $nrefs $width $height
 db_to_raw.py $mesh_db $mesh_raw
 
 # set -x
@@ -46,10 +54,11 @@ db_to_raw.py $mesh_db $mesh_raw
 $LAUNCH skin $mesh_raw $mesh_surface
 raw_to_db.py $mesh_surface $mesh_surface/surf.vtk
 
-$LAUNCH select_surf $mesh_surface -2  0.5  0  0.99 $mesh_surface/sides_left.raw
-$LAUNCH select_surf $mesh_surface  2  0.5  0  0.99 $mesh_surface/sides_right.raw
-$LAUNCH select_surf $mesh_surface  0 -1  0  0.99 $mesh_surface/sides_bottom.raw
-$LAUNCH select_surf $mesh_surface  0  1  0  0.99 $mesh_surface/sides_top.raw
+# 									x 				y 					z 	cos(angle)
+$LAUNCH select_surf $mesh_surface  0  			 	$(( height/2 )) 	0  	0.99 $mesh_surface/sides_left.raw
+$LAUNCH select_surf $mesh_surface  $width  		 	$(( height/2 ))  	0  	0.99 $mesh_surface/sides_right.raw
+$LAUNCH select_surf $mesh_surface  $(( width/2 ))  	0  					0  	0.99 $mesh_surface/sides_bottom.raw
+$LAUNCH select_surf $mesh_surface  $(( width/2 ))   $height  			0  	0.99 $mesh_surface/sides_top.raw
 
 print_array()
 {

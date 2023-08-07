@@ -124,10 +124,9 @@ int main(int argc, char *argv[]) {
         // Material
         SFEM_MU,
         SFEM_LAMBDA,
-        // displacement,
-        // Output
         rowptr,
         colidx,
+        // Output
         values
     );
 

@@ -3,7 +3,9 @@
 #include "sfem_base.h"
 #include "sfem_vec.h"
 
+#ifndef SFEM_CUDA_INLINE
 #define SFEM_CUDA_INLINE SFEM_INLINE __device__ __host__ 
+#endif 
 
 SFEM_CUDA_INLINE static void FE3D_phase_field_for_fracture_value(
     // material parameters

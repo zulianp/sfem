@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stddef.h>
 
 #include "../matrix.io/array_dtof.h"
 #include "../matrix.io/matrixio_array.h"
@@ -20,9 +21,16 @@
 #include "mpi-sort.h"
 #endif
 
-typedef uint32_t sfc_t;
+
 #define SFEM_MPI_SFC_T MPI_UNSIGNED
-#define sort_function argsort_u32
+
+typedef uint32_t sfc_t;
+
+// #define sort_function argsort_u32
+// typedef idx_t element_idx_t;
+
+#define sort_function argsort_u32_ptrdiff_t
+typedef ptrdiff_t element_idx_t;
 
 // https://mathworld.wolfram.com/FiedlerVector.html
 
@@ -159,7 +167,7 @@ int main(int argc, char *argv[]) {
     sfc_t *sfc = (sfc_t *)malloc(mesh.n_owned_elements * sizeof(sfc_t));
     memset(sfc, 0, mesh.n_owned_elements * sizeof(sfc_t));
 
-    idx_t *idx = (idx_t *)malloc(mesh.n_owned_elements * sizeof(idx_t));
+    element_idx_t *idx = (element_idx_t *)malloc(mesh.n_owned_elements * sizeof(element_idx_t));
 
     geom_t box_min[3], box_max[3], box_extent[3];
     for (int coord = 0; coord < mesh.spatial_dim; coord++) {

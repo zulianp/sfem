@@ -7,11 +7,10 @@
 #include <mpi.h>
 
 #include "crs_graph.h"
+#include "sfem_vec.h"
 #include "sortreduce.h"
 
-#include "sfem_vec.h"
-
-static SFEM_INLINE void neohookean_energy(const real_t mu,
+static SFEM_INLINE void neohookean_value(const real_t mu,
                                           const real_t lambda,
                                           const real_t px0,
                                           const real_t px1,
@@ -958,12 +957,12 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
         const idx_t i2 = ev[2];
         const idx_t i3 = ev[3];
 
-        for (int enode = 0; enode < 4; ++enode) {
-            idx_t edof = enode * block_size;
-            idx_t dof = ev[enode] * block_size;
+        for (int edof_i = 0; edof_i < 4; ++edof_i) {
+            idx_t dof = ev[edof_i] * block_size;
 
             for (int b = 0; b < block_size; ++b) {
-                element_displacement[edof + b] = displacement[dof + b];
+                // element_displacement[b * 4 + edof_i] = displacement[dof + b];
+                element_displacement[b + edof_i * block_size] = displacement[dof + b]; //OLD Layout
             }
         }
 
@@ -992,34 +991,34 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
 
         assert(!check_symmetric(4 * block_size, element_matrix));
 
-        // numerate(12, element_matrix);
-
         for (int edof_i = 0; edof_i < 4; ++edof_i) {
             const idx_t dof_i = elems[edof_i][i];
             const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
-            const idx_t *row = &colidx[rowptr[dof_i]];
-            find_cols4(ev, row, lenrow, ks);
+            
+            {
+                const idx_t *row = &colidx[rowptr[dof_i]];
+                find_cols4(ev, row, lenrow, ks);
+            }
 
             // Blocks for row
-            real_t *row_blocks = &values[rowptr[dof_i] * mat_block_size];
+            real_t *block_start = &values[rowptr[dof_i] * mat_block_size];
 
             for (int edof_j = 0; edof_j < 4; ++edof_j) {
-                // Block for column
-                const idx_t block_k = ks[edof_j] * mat_block_size;
-                real_t *block = &row_blocks[block_k];
+                const idx_t offset_j = ks[edof_j] * block_size;
 
-                // Iterate over dimensions
-                for (int bj = 0; bj < block_size; ++bj) {
-                    const idx_t offset_j = bj * block_size;
+                for (int bi = 0; bi < block_size; ++bi) {
+                    // const int ii = bi * 4 + edof_i;
+                    const int ii = edof_i * block_size + bi;
 
-                    for (int bi = 0; bi < block_size; ++bi) {
-                        const real_t val =
-                            element_matrix[(edof_i * block_size + bi) * block_size * 4 +
-                                           edof_j * block_size + bj];
+                    // Jump rows (including the block-size for the columns)
+                    real_t *row = &block_start[bi * lenrow * block_size];
 
-                        assert(val == val);
+                    for (int bj = 0; bj < block_size; ++bj) {
+                        // const int jj = bj * 4 + edof_j;
+                        const int jj = edof_j * block_size + bj;
 
-                        block[offset_j + bi] += val;
+                        const real_t val = element_matrix[ii * 12 + jj];
+                        row[offset_j + bj] += val;
                     }
                 }
             }
@@ -1028,6 +1027,155 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
 
     double tock = MPI_Wtime();
     printf("neohookean.c: neohookean_assemble_hessian\t%g seconds\n", tock - tick);
+}
+
+void neohookean_assemble_gradient(const ptrdiff_t nelements,
+                                  const ptrdiff_t nnodes,
+                                  idx_t *const SFEM_RESTRICT elems[4],
+                                  geom_t *const SFEM_RESTRICT xyz[3],
+                                  const real_t mu,
+                                  const real_t lambda,
+                                  const real_t *const SFEM_RESTRICT displacement,
+                                  real_t *const SFEM_RESTRICT values) {
+    SFEM_UNUSED(nnodes);
+
+    double tick = MPI_Wtime();
+
+    idx_t ev[4];
+    idx_t ks[4];
+
+    real_t element_vector[(4 * 3)];
+    real_t element_displacement[(4 * 3)];
+
+    static const int block_size = 3;
+
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma unroll(4)
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        // Element indices
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+        const idx_t i3 = ev[3];
+
+        for (int edof_i = 0; edof_i < 4; ++edof_i) {
+            idx_t dof = ev[edof_i] * block_size;
+
+            for (int b = 0; b < block_size; ++b) {
+                // element_displacement[b * 4 + edof_i] = displacement[dof + b];
+                element_displacement[b + edof_i * block_size] = displacement[dof + b]; //OLD Layout
+            }
+        }
+
+        neohookean_gradient(  // Model parameters
+            mu,
+            lambda,
+            // X-coordinates
+            xyz[0][i0],
+            xyz[0][i1],
+            xyz[0][i2],
+            xyz[0][i3],
+            // Y-coordinates
+            xyz[1][i0],
+            xyz[1][i1],
+            xyz[1][i2],
+            xyz[1][i3],
+            // Z-coordinates
+            xyz[2][i0],
+            xyz[2][i1],
+            xyz[2][i2],
+            xyz[2][i3],
+            // element dispalcement
+            element_displacement,
+            // output matrix
+            element_vector);
+
+        for (int edof_i = 0; edof_i < 4; ++edof_i) {
+            const idx_t dof = elems[edof_i][i] * block_size;
+
+            for (int b = 0; b < block_size; b++) {
+                // values[dof + b] += element_vector[b * 4 + edof_i];
+                values[dof + b] += element_vector[edof_i * block_size + b];
+            }
+        }
+    }
+
+    double tock = MPI_Wtime();
+    printf("neohookean.c: neohookean_assemble_gradient\t%g seconds\n", tock - tick);
+}
+
+void neohookean_assemble_value(const ptrdiff_t nelements,
+                               const ptrdiff_t nnodes,
+                               idx_t *const SFEM_RESTRICT elems[4],
+                               geom_t *const SFEM_RESTRICT xyz[3],
+                               const real_t mu,
+                               const real_t lambda,
+                               const real_t *const SFEM_RESTRICT displacement,
+                               real_t *const SFEM_RESTRICT value) {
+    SFEM_UNUSED(nnodes);
+
+    double tick = MPI_Wtime();
+
+    idx_t ev[4];
+    idx_t ks[4];
+
+    real_t element_displacement[(4 * 3)];
+
+    static const int block_size = 3;
+
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma unroll(4)
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        // Element indices
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+        const idx_t i3 = ev[3];
+
+        for (int edof_i = 0; edof_i < 4; ++edof_i) {
+            idx_t dof = ev[edof_i] * block_size;
+
+            for (int b = 0; b < block_size; ++b) {
+                // element_displacement[b * 4 + edof_i] = displacement[dof + b];
+                element_displacement[b + edof_i * block_size] = displacement[dof + b]; //OLD Layout
+            }
+        }
+
+        real_t element_scalar = 0;
+        neohookean_value(  // Model parameters
+            mu,
+            lambda,
+            // X-coordinates
+            xyz[0][i0],
+            xyz[0][i1],
+            xyz[0][i2],
+            xyz[0][i3],
+            // Y-coordinates
+            xyz[1][i0],
+            xyz[1][i1],
+            xyz[1][i2],
+            xyz[1][i3],
+            // Z-coordinates
+            xyz[2][i0],
+            xyz[2][i1],
+            xyz[2][i2],
+            xyz[2][i3],
+            // element dispalcement
+            element_displacement,
+            // output matrix
+            &element_scalar);
+
+        (*value) += element_scalar;
+    }
+
+    double tock = MPI_Wtime();
+    printf("neohookean.c: neohookean_assemble_value\t%g seconds\n", tock - tick);
 }
 
 static SFEM_INLINE void cauchy_stress_3x3(const real_t mu,

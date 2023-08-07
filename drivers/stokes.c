@@ -351,7 +351,7 @@ void tri3_stokes_mini_assemble_hessian(const real_t mu,
 
     static const int n_vars = 3;
     static const int ndofs = 3;
-    static const int rows = 9;
+    // static const int rows = 9;
     static const int cols = 9;
 
     idx_t ev[3];

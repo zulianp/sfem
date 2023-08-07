@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "matrix.io/array_dtof.h"
 #include "matrix.io/matrixio_array.h"
@@ -17,6 +18,7 @@
 #include "laplacian.h"
 
 #include "read_mesh.h"
+#include "sfem_defs.h"
 #include "sfem_mesh.h"
 
 #include "dirichlet.h"
@@ -42,7 +44,9 @@ int ISOLVER_EXPORT isolver_function_destroy_array(const isolver_function_t *info
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
-int ISOLVER_EXPORT isolver_function_create_array(const isolver_function_t *info, size_t size, void **ptr) {
+int ISOLVER_EXPORT isolver_function_create_array(const isolver_function_t *info,
+                                                 size_t size,
+                                                 void **ptr) {
     *ptr = malloc(size);
     memset(*ptr, 0, size);
     return ISOLVER_FUNCTION_SUCCESS;
@@ -50,13 +54,11 @@ int ISOLVER_EXPORT isolver_function_create_array(const isolver_function_t *info,
 
 int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
     const char *SFEM_MESH_DIR = "[error] undefined";
-    const char *SFEM_MATERIAL_MODEL = "[error] undefined";
-    const char *SFEM_DIRICHLET_NODES = "[error] undefined";
+    const char *SFEM_DIRICHLET_NODES = 0;
     const char *SFEM_OUTPUT_DIR = "./sfem_output";
-    const char *SFEM_NEUMAN_FACES = "[error] undefined";
+    const char *SFEM_NEUMAN_FACES = 0;
 
     SFEM_READ_ENV(SFEM_MESH_DIR, );
-    SFEM_READ_ENV(SFEM_MATERIAL_MODEL, );
     SFEM_READ_ENV(SFEM_DIRICHLET_NODES, );
     SFEM_READ_ENV(SFEM_OUTPUT_DIR, );
     SFEM_READ_ENV(SFEM_NEUMAN_FACES, );
@@ -64,19 +66,23 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
     printf(
         "sfem:\n"
         "- SFEM_MESH_DIR=%s\n"
-        "- SFEM_MATERIAL_MODEL%s\n"
         "- SFEM_DIRICHLET_NODES=%s\n"
         "- SFEM_OUTPUT_DIR=%s\n"
         "- SFEM_NEUMAN_FACES=%s\n",
         SFEM_MESH_DIR,
-        SFEM_MATERIAL_MODEL,
         SFEM_DIRICHLET_NODES,
         SFEM_OUTPUT_DIR,
         SFEM_NEUMAN_FACES);
 
-    if (!SFEM_MESH_DIR || !SFEM_DIRICHLET_NODES || !SFEM_NEUMAN_FACES) {
+    if (!SFEM_MESH_DIR || !SFEM_DIRICHLET_NODES) {
         return ISOLVER_FUNCTION_FAILURE;
     }
+
+    struct stat st = {0};
+    if (stat(SFEM_OUTPUT_DIR, &st) == -1) {
+        mkdir(SFEM_OUTPUT_DIR, 0700);
+    }
+
 
     mesh_t *mesh = (mesh_t *)malloc(sizeof(mesh_t));
 
@@ -87,25 +93,34 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
     sfem_problem_t *problem = (sfem_problem_t *)malloc(sizeof(sfem_problem_t));
 
     if (array_create_from_file(info->comm,
-                   SFEM_DIRICHLET_NODES,
-                   SFEM_MPI_IDX_T,
-                   (void **)&problem->dirichlet_nodes,
-                   &problem->nlocal_dirchlet,
-                   &problem->nglobal_dirchlet)) {
+                               SFEM_DIRICHLET_NODES,
+                               SFEM_MPI_IDX_T,
+                               (void **)&problem->dirichlet_nodes,
+                               &problem->nlocal_dirchlet,
+                               &problem->nglobal_dirchlet)) {
         return ISOLVER_FUNCTION_FAILURE;
     }
 
-    if (array_create_from_file(info->comm,
-                   SFEM_NEUMAN_FACES,
-                   SFEM_MPI_IDX_T,
-                   (void **)&problem->faces_neumann,
-                   &problem->nlocal_neumann,
-                   &problem->nglobal_neumann)) {
-        return ISOLVER_FUNCTION_FAILURE;
-    }
+    if (SFEM_NEUMAN_FACES) {
+        if (array_create_from_file(info->comm,
+                                   SFEM_NEUMAN_FACES,
+                                   SFEM_MPI_IDX_T,
+                                   (void **)&problem->faces_neumann,
+                                   &problem->nlocal_neumann,
+                                   &problem->nglobal_neumann)) {
+            return ISOLVER_FUNCTION_FAILURE;
+        }
 
-    problem->nlocal_neumann /= 3;
-    problem->nglobal_neumann /= 3;
+        enum ElemType stype = side_type(mesh->element_type);
+        int nns = elem_num_sides(stype);
+
+        problem->nlocal_neumann /= nns;
+        problem->nglobal_neumann /= nns;
+
+    } else {
+        problem->nlocal_neumann = 0;
+        problem->nglobal_neumann = 0;
+    }
 
     // Redistribute Dirichlet nodes
     problem->mesh = mesh;
@@ -147,17 +162,18 @@ int ISOLVER_EXPORT isolver_function_create_vector(const isolver_function_t *info
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    const size_t nbytes = mesh->nnodes * sizeof(isolver_scalar_t);
+    const size_t nbytes = mesh->nnodes * problem->block_size * sizeof(isolver_scalar_t);
 
     *values = (isolver_scalar_t *)malloc(nbytes);
     memset(*values, 0, nbytes);
-    *nlocal = mesh->nnodes;
-    *nglobal = mesh->nnodes;
+    *nlocal = mesh->nnodes * problem->block_size;
+    *nglobal = mesh->nnodes * problem->block_size;
 
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
-int ISOLVER_EXPORT isolver_function_destroy_vector(const isolver_function_t *info, isolver_scalar_t *values) {
+int ISOLVER_EXPORT isolver_function_destroy_vector(const isolver_function_t *info,
+                                                   isolver_scalar_t *values) {
     free(values);
     return ISOLVER_FUNCTION_SUCCESS;
 }
@@ -171,7 +187,8 @@ int ISOLVER_EXPORT isolver_function_value(const isolver_function_t *info,
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    tet4_laplacian_assemble_value(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
+    laplacian_assemble_value(
+        mesh->element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
@@ -183,8 +200,17 @@ int ISOLVER_EXPORT isolver_function_gradient(const isolver_function_t *info,
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    tet4_laplacian_assemble_gradient(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
-    surface_forcing_function(problem->nlocal_neumann, problem->faces_neumann, mesh->points, -1, out);
+    laplacian_assemble_gradient(
+        mesh->element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
+
+    if (problem->nlocal_neumann) {
+        surface_forcing_function(side_type(mesh->element_type),
+                                 problem->nlocal_neumann,
+                                 problem->faces_neumann,
+                                 mesh->points,
+                                 -1,
+                                 out);
+    }
 
     return ISOLVER_FUNCTION_SUCCESS;
 }
@@ -200,9 +226,17 @@ int ISOLVER_EXPORT isolver_function_hessian_crs(const isolver_function_t *info,
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    tet4_laplacian_assemble_hessian(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, rowptr, colidx, values);
+    laplacian_assemble_hessian(mesh->element_type,
+                               mesh->nelements,
+                               mesh->nnodes,
+                               mesh->elements,
+                               mesh->points,
+                               rowptr,
+                               colidx,
+                               values);
 
-    crs_constraint_nodes_to_identity(problem->nlocal_dirchlet, problem->dirichlet_nodes, 1.0, rowptr, colidx, values);
+    crs_constraint_nodes_to_identity(
+        problem->nlocal_dirchlet, problem->dirichlet_nodes, 1.0, rowptr, colidx, values);
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
@@ -217,11 +251,13 @@ int ISOLVER_EXPORT isolver_function_apply(const isolver_function_t *info,
     assert(mesh);
 
     // Equivalent to operator application due to linearity of the problem
-    tet4_laplacian_assemble_gradient(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, h, out);
+    laplacian_assemble_gradient(
+        mesh->element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, h, out);
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
-int ISOLVER_EXPORT isolver_function_apply_constraints(const isolver_function_t *info, isolver_scalar_t *const x) {
+int ISOLVER_EXPORT isolver_function_apply_constraints(const isolver_function_t *info,
+                                                      isolver_scalar_t *const x) {
     sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
     assert(problem);
 
@@ -229,7 +265,8 @@ int ISOLVER_EXPORT isolver_function_apply_constraints(const isolver_function_t *
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
-int ISOLVER_EXPORT isolver_function_apply_zero_constraints(const isolver_function_t *info, isolver_scalar_t *const x) {
+int ISOLVER_EXPORT isolver_function_apply_zero_constraints(const isolver_function_t *info,
+                                                           isolver_scalar_t *const x) {
     sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
     assert(problem);
 
@@ -251,7 +288,8 @@ int ISOLVER_EXPORT isolver_function_copy_constrained_dofs(const isolver_function
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
-int ISOLVER_EXPORT isolver_function_report_solution(const isolver_function_t *info, const isolver_scalar_t *const x) {
+int ISOLVER_EXPORT isolver_function_report_solution(const isolver_function_t *info,
+                                                    const isolver_scalar_t *const x) {
     sfem_problem_t *problem = (sfem_problem_t *)info->private_data;
     assert(problem);
     mesh_t *mesh = problem->mesh;

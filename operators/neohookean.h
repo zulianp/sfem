@@ -19,6 +19,25 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
                                  idx_t *const SFEM_RESTRICT colidx,
                                  real_t *const SFEM_RESTRICT values);
 
+void neohookean_assemble_gradient(const ptrdiff_t nelements,
+                                  const ptrdiff_t nnodes,
+                                  idx_t *const SFEM_RESTRICT elems[4],
+                                  geom_t *const SFEM_RESTRICT xyz[3],
+                                  const real_t mu,
+                                  const real_t lambda,
+                                  const real_t *const SFEM_RESTRICT displacement,
+                                  real_t *const SFEM_RESTRICT values);
+
+
+void neohookean_assemble_value(const ptrdiff_t nelements,
+                               const ptrdiff_t nnodes,
+                               idx_t *const SFEM_RESTRICT elems[4],
+                               geom_t *const SFEM_RESTRICT xyz[3],
+                               const real_t mu,
+                               const real_t lambda,
+                               const real_t *const SFEM_RESTRICT displacement,
+                               real_t *const SFEM_RESTRICT value);
+
 void neohookean_cauchy_stress_aos(const ptrdiff_t nelements,
                                   const ptrdiff_t nnodes,
                                   idx_t *const SFEM_RESTRICT elems[4],
