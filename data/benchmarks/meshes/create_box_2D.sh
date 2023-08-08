@@ -32,6 +32,7 @@ fi
 
 folder=box_2D
 mesh_db=$folder/mesh.vtk
+mesh_original=./original
 mesh_raw=./mesh
 mesh_surface=$mesh_raw/surface
 
@@ -47,7 +48,8 @@ mkdir -p $folder
 idx_type_size=4
 
 box_2D.py $mesh_db $nrefs $width $height
-db_to_raw.py $mesh_db $mesh_raw
+db_to_raw.py $mesh_db $mesh_original
+refine $mesh_original $mesh_raw
 
 # set -x
 

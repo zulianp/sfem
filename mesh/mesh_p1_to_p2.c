@@ -4,14 +4,15 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "../matrix.io/array_dtof.h"
-#include "../matrix.io/matrixio_array.h"
-#include "../matrix.io/matrixio_crs.h"
-#include "../matrix.io/utils.h"
+#include "matrix.io/array_dtof.h"
+#include "matrix.io/matrixio_array.h"
+#include "matrix.io/matrixio_crs.h"
+#include "matrix.io/utils.h"
 
 #include "crs_graph.h"
 #include "read_mesh.h"
 #include "sfem_base.h"
+#include "sfem_defs.h"
 #include "sfem_mesh_write.h"
 
 #include "sortreduce.h"
@@ -97,7 +98,7 @@ int main(int argc, char *argv[]) {
     // Create P2 mesh
     ///////////////////////////////////////////////////////////////////////////////
 
-    const int n_p2_node_x_element = (p1_mesh.element_type == 4 ? 6 : 3);
+    const int n_p2_node_x_element = (p1_mesh.element_type == TET4 ? 6 : 3);
 
     p2_mesh.comm = comm;
     p2_mesh.mem_space = p1_mesh.mem_space;
@@ -117,12 +118,15 @@ int main(int argc, char *argv[]) {
     p2_mesh.elements = (idx_t **)malloc(p2_mesh.element_type * sizeof(idx_t *));
     p2_mesh.points = (geom_t **)malloc(p2_mesh.spatial_dim * sizeof(geom_t *));
 
-    for (int d = 0; d < p1_mesh.element_type; d++) {
+    const int p1_nxe = elem_num_nodes(p1_mesh.element_type);
+    const int p2_nxe = elem_num_nodes(p2_mesh.element_type);
+
+    for (int d = 0; d < p1_nxe; d++) {
         p2_mesh.elements[d] = p1_mesh.elements[d];
     }
 
     // Allocate space for p2 nodes
-    for (int d = p1_mesh.element_type; d < p2_mesh.element_type; d++) {
+    for (int d = p1_nxe; d < p2_nxe; d++) {
         p2_mesh.elements[d] = (idx_t *)malloc(p2_mesh.nelements * sizeof(idx_t));
     }
 
@@ -133,7 +137,7 @@ int main(int argc, char *argv[]) {
         memcpy(p2_mesh.points[d], p1_mesh.points[d], p1_mesh.nnodes * sizeof(geom_t));
     }
 
-    if (p1_mesh.element_type == 4) {
+    if (p1_mesh.element_type == TET4) {
         // TODO fill p2 node indices in elements
         for (ptrdiff_t e = 0; e < p2_mesh.nelements; e++) {
             // Ordering of edges compliant to exodusII spec
@@ -160,13 +164,31 @@ int main(int argc, char *argv[]) {
                 const idx_t *cols = &colidx[row_begin];
                 const idx_t k = find_idx_binary_search(key[l], cols, len_row);
                 p2_mesh.elements[l + p1_mesh.element_type][e] = p2idx[row_begin + k];
-
-                // printf("%d, %d -> %d\n", r, key[l], p2idx[row_begin + k]);
             }
-
-            // printf("\n");
         }
 
+    } else if (p1_mesh.element_type == TRI3) {
+        for (ptrdiff_t e = 0; e < p2_mesh.nelements; e++) {
+            // Ordering of edges compliant to exodusII spec
+            idx_t row[3];
+            row[0] = MIN(p2_mesh.elements[0][e], p2_mesh.elements[1][e]);
+            row[1] = MIN(p2_mesh.elements[1][e], p2_mesh.elements[2][e]);
+            row[2] = MIN(p2_mesh.elements[0][e], p2_mesh.elements[2][e]);
+
+            idx_t key[3];
+            key[0] = MAX(p2_mesh.elements[0][e], p2_mesh.elements[1][e]);
+            key[1] = MAX(p2_mesh.elements[1][e], p2_mesh.elements[2][e]);
+            key[2] = MAX(p2_mesh.elements[0][e], p2_mesh.elements[2][e]);
+
+            for (int l = 0; l < 3; l++) {
+                const idx_t r = row[l];
+                const count_t row_begin = rowptr[r];
+                const count_t len_row = rowptr[r + 1] - row_begin;
+                const idx_t *cols = &colidx[row_begin];
+                const idx_t k = find_idx_binary_search(key[l], cols, len_row);
+                p2_mesh.elements[l + p1_mesh.element_type][e] = p2idx[row_begin + k];
+            }
+        }
     } else {
         fprintf(stderr, "Implement for element_type %d\n!", p1_mesh.element_type);
         return EXIT_FAILURE;
@@ -190,8 +212,6 @@ int main(int argc, char *argv[]) {
                     // Midpoint
                     p2_mesh.points[d][nidx] = (xi + xj) / 2;
                 }
-
-                // printf("%d -> %f %f %f\n", nidx, p2_mesh.points[0][nidx], p2_mesh.points[1][nidx], p2_mesh.points[2][nidx]);
             }
         }
     }
@@ -203,7 +223,7 @@ int main(int argc, char *argv[]) {
     mesh_write(output_folder, &p2_mesh);
 
     // Make sure we do not delete the same array twice
-    for (int d = 0; d < p1_mesh.element_type; d++) {
+    for (int d = 0; d < p1_nxe; d++) {
         p1_mesh.elements[d] = 0;
     }
 
