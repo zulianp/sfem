@@ -36,16 +36,8 @@
 //     return x * (1 - x) * (1 - y) - 1. / 12;
 // }
 
-ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
-    MPI_Status status;
-    MPI_Offset nbytes;
-    MPI_File file;
-    CATCH_MPI_ERROR(MPI_File_open(comm, path, MPI_MODE_RDONLY, MPI_INFO_NULL, &file));
-    CATCH_MPI_ERROR(MPI_File_get_size(file, &nbytes));
-    *data = malloc(nbytes);
-
-    CATCH_MPI_ERROR(MPI_File_read_at_all(file, 0, *data, nbytes, MPI_CHAR, &status));
-    return nbytes;
+static SFEM_INLINE real_t ref_p1(const real_t x, const real_t y) {
+    return x * (1 - x) * (1 - y) - 1. / 12;
 }
 
 static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {
@@ -110,178 +102,135 @@ SFEM_INLINE void tri3_stokes_assemble_hessian_kernel(const real_t mu,
                                                      const real_t py2,
                                                      real_t *const SFEM_RESTRICT element_matrix) {
     const real_t x0 = px0 - px1;
-    const real_t x1 = -x0;
-    const real_t x2 = px0 - px2;
-    const real_t x3 = py0 - py2;
-    const real_t x4 = -x3;
-    const real_t x5 = py0 - py1;
-    const real_t x6 = x1 * x4 - x2 * x5;
-    const real_t x7 = pow(x6, -2);
-    const real_t x8 = x1 * x2 * x7;
-    const real_t x9 = x4 * x5 * x7;
-    const real_t x10 = pow(x2, 2) * x7;
-    const real_t x11 = pow(x4, 2) * x7;
-    const real_t x12 = x10 + x11;
-    const real_t x13 = pow(x1, 2) * x7;
-    const real_t x14 = pow(x5, 2) * x7;
-    const real_t x15 = x13 + x14;
-    const real_t x16 = x0 * x3 - x2 * x5;
-    const real_t x17 = (1.0 / 2.0) * mu * x16;
-    const real_t x18 = x17 * (x12 + x15 + 2 * x8 + 2 * x9);
-    const real_t x19 = x8 + x9;
-    const real_t x20 = x12 + x19;
-    const real_t x21 = -x17 * x20;
-    const real_t x22 = -x17 * (x15 + x19);
-    const real_t x23 = 1.0 / x6;
-    const real_t x24 = x23 * x4;
-    const real_t x25 = x23 * x5;
-    const real_t x26 = x24 + x25;
-    const real_t x27 = (1.0 / 6.0) * x16;
-    const real_t x28 = x26 * x27;
-    const real_t x29 = x12 * x17;
-    const real_t x30 = x17 * x19;
-    const real_t x31 = -x24 * x27;
-    const real_t x32 = x15 * x17;
-    const real_t x33 = -x25 * x27;
-    const real_t x34 = x1 * x23;
-    const real_t x35 = x2 * x23;
-    const real_t x36 = x34 + x35;
-    const real_t x37 = x27 * x36;
-    const real_t x38 = -x27 * x35;
-    const real_t x39 = -x27 * x34;
-    const real_t x40 = (1.0 / 80.0) * x16 / (mu * (x15 + x20));
-    const real_t x41 = x36 * x40;
-    const real_t x42 = x26 * x40;
-    const real_t x43 = x24 * x42 + x35 * x41;
-    const real_t x44 = x25 * x42 + x34 * x41;
-    const real_t x45 = -x40 * x8 - x40 * x9;
-    element_matrix[0] = x18;
-    element_matrix[1] = x21;
-    element_matrix[2] = x22;
+    const real_t x1 = -px2;
+    const real_t x2 = px0 + x1;
+    const real_t x3 = x0 * x2;
+    const real_t x4 = py0 - py1;
+    const real_t x5 = -py2;
+    const real_t x6 = py0 + x5;
+    const real_t x7 = x4 * x6;
+    const real_t x8 = pow(x2, 2);
+    const real_t x9 = pow(x6, 2);
+    const real_t x10 = x8 + x9;
+    const real_t x11 = pow(x0, 2) + pow(x4, 2);
+    const real_t x12 = x0 * x6;
+    const real_t x13 = x2 * x4;
+    const real_t x14 = x12 - x13;
+    const real_t x15 = (1.0 / 2.0) * mu / x14;
+    const real_t x16 = x15 * (x10 + x11 - 2 * x3 - 2 * x7);
+    const real_t x17 = x3 + x7;
+    const real_t x18 = mu / (2 * x12 - 2 * x13);
+    const real_t x19 = x18 * (x17 - x8 - x9);
+    const real_t x20 = x11 - x3 - x7;
+    const real_t x21 = -x18 * x20;
+    const real_t x22 = (1.0 / 6.0) * py1;
+    const real_t x23 = -1.0 / 6.0 * py2;
+    const real_t x24 = -x22 - x23;
+    const real_t x25 = x10 * x15;
+    const real_t x26 = -x17 * x18;
+    const real_t x27 = (1.0 / 6.0) * py0;
+    const real_t x28 = x23 + x27;
+    const real_t x29 = x11 * x15;
+    const real_t x30 = x22 - x27;
+    const real_t x31 = (1.0 / 6.0) * px1;
+    const real_t x32 = -1.0 / 6.0 * px2;
+    const real_t x33 = x31 + x32;
+    const real_t x34 = (1.0 / 6.0) * px0;
+    const real_t x35 = -x32 - x34;
+    const real_t x36 = -x31 + x34;
+    const real_t x37 = -px1 - x1;
+    const real_t x38 = -py1 - x5;
+    const real_t x39 = (1.0 / 80.0) / (mu * (x10 + x20));
+    const real_t x40 = x14 * x39;
+    const real_t x41 = x40 * (-x2 * x37 - x38 * x6);
+    const real_t x42 = x40 * (x0 * x37 + x38 * x4);
+    const real_t x43 = -x14 * x39;
+    const real_t x44 = x17 * x40;
+    element_matrix[0] = x16;
+    element_matrix[1] = x19;
+    element_matrix[2] = x21;
     element_matrix[3] = 0;
     element_matrix[4] = 0;
     element_matrix[5] = 0;
-    element_matrix[6] = x28;
-    element_matrix[7] = x28;
-    element_matrix[8] = x28;
-    element_matrix[9] = x21;
-    element_matrix[10] = x29;
-    element_matrix[11] = x30;
+    element_matrix[6] = x24;
+    element_matrix[7] = x24;
+    element_matrix[8] = x24;
+    element_matrix[9] = x19;
+    element_matrix[10] = x25;
+    element_matrix[11] = x26;
     element_matrix[12] = 0;
     element_matrix[13] = 0;
     element_matrix[14] = 0;
-    element_matrix[15] = x31;
-    element_matrix[16] = x31;
-    element_matrix[17] = x31;
-    element_matrix[18] = x22;
-    element_matrix[19] = x30;
-    element_matrix[20] = x32;
+    element_matrix[15] = x28;
+    element_matrix[16] = x28;
+    element_matrix[17] = x28;
+    element_matrix[18] = x21;
+    element_matrix[19] = x26;
+    element_matrix[20] = x29;
     element_matrix[21] = 0;
     element_matrix[22] = 0;
     element_matrix[23] = 0;
-    element_matrix[24] = x33;
-    element_matrix[25] = x33;
-    element_matrix[26] = x33;
+    element_matrix[24] = x30;
+    element_matrix[25] = x30;
+    element_matrix[26] = x30;
     element_matrix[27] = 0;
     element_matrix[28] = 0;
     element_matrix[29] = 0;
-    element_matrix[30] = x18;
-    element_matrix[31] = x21;
-    element_matrix[32] = x22;
-    element_matrix[33] = x37;
-    element_matrix[34] = x37;
-    element_matrix[35] = x37;
+    element_matrix[30] = x16;
+    element_matrix[31] = x19;
+    element_matrix[32] = x21;
+    element_matrix[33] = x33;
+    element_matrix[34] = x33;
+    element_matrix[35] = x33;
     element_matrix[36] = 0;
     element_matrix[37] = 0;
     element_matrix[38] = 0;
-    element_matrix[39] = x21;
-    element_matrix[40] = x29;
-    element_matrix[41] = x30;
-    element_matrix[42] = x38;
-    element_matrix[43] = x38;
-    element_matrix[44] = x38;
+    element_matrix[39] = x19;
+    element_matrix[40] = x25;
+    element_matrix[41] = x26;
+    element_matrix[42] = x35;
+    element_matrix[43] = x35;
+    element_matrix[44] = x35;
     element_matrix[45] = 0;
     element_matrix[46] = 0;
     element_matrix[47] = 0;
-    element_matrix[48] = x22;
-    element_matrix[49] = x30;
-    element_matrix[50] = x32;
-    element_matrix[51] = x39;
-    element_matrix[52] = x39;
-    element_matrix[53] = x39;
-    element_matrix[54] = x28;
-    element_matrix[55] = x31;
-    element_matrix[56] = x33;
-    element_matrix[57] = x37;
-    element_matrix[58] = x38;
-    element_matrix[59] = x39;
-    element_matrix[60] = -pow(x26, 2) * x40 - pow(x36, 2) * x40;
-    element_matrix[61] = x43;
-    element_matrix[62] = x44;
-    element_matrix[63] = x28;
-    element_matrix[64] = x31;
-    element_matrix[65] = x33;
-    element_matrix[66] = x37;
-    element_matrix[67] = x38;
-    element_matrix[68] = x39;
-    element_matrix[69] = x43;
-    element_matrix[70] = -x10 * x40 - x11 * x40;
-    element_matrix[71] = x45;
-    element_matrix[72] = x28;
-    element_matrix[73] = x31;
-    element_matrix[74] = x33;
-    element_matrix[75] = x37;
-    element_matrix[76] = x38;
-    element_matrix[77] = x39;
-    element_matrix[78] = x44;
-    element_matrix[79] = x45;
-    element_matrix[80] = -x13 * x40 - x14 * x40;
-}
-
-SFEM_INLINE void tri3_stokes_mini_condense_rhs_kernel(const real_t mu,
-                                                      const real_t px0,
-                                                      const real_t px1,
-                                                      const real_t px2,
-                                                      const real_t py0,
-                                                      const real_t py1,
-                                                      const real_t py2,
-                                                      const real_t *const SFEM_RESTRICT rhs_bubble,
-                                                      real_t *const SFEM_RESTRICT element_vector) {
-    const real_t x0 = px0 - px1;
-    const real_t x1 = -x0;
-    const real_t x2 = py0 - py2;
-    const real_t x3 = -x2;
-    const real_t x4 = px0 - px2;
-    const real_t x5 = py0 - py1;
-    const real_t x6 = x1 * x3 - x4 * x5;
-    const real_t x7 = pow(x6, -2);
-    const real_t x8 = pow(x1, 2) * x7 + pow(x5, 2) * x7;
-    const real_t x9 = 1.0 / x6;
-    const real_t x10 = x4 * x9;
-    const real_t x11 = x3 * x9;
-    const real_t x12 = x10 + x11;
-    const real_t x13 = pow(x0 * x2 - x4 * x5, 2);
-    const real_t x14 = x1 * x4 * x7 + x3 * x5 * x7;
-    const real_t x15 = (6561.0 / 100.0) * pow(mu, 2) * x13;
-    const real_t x16 = pow(x3, 2) * x7 + pow(x4, 2) * x7;
-    const real_t x17 = 1.0 / (-pow(x14, 2) * x15 + x15 * x16 * x8);
-    const real_t x18 = (729.0 / 400.0) * mu * x13 * x17;
-    const real_t x19 = x1 * x9;
-    const real_t x20 = x5 * x9;
-    const real_t x21 = x18 * (x19 + x20);
-    const real_t x22 = x14 * x18;
-
-    element_vector[6] += rhs_bubble[0] * (-x12 * x18 * x8 + x14 * x21) +
-                         rhs_bubble[1] * ((729.0 / 400.0) * mu * x12 * x13 * x14 * x17 - x16 * x21);
-    element_vector[7] +=
-        rhs_bubble[0] * (x11 * x18 * x8 - x20 * x22) +
-        rhs_bubble[1] * ((729.0 / 400.0) * mu * x13 * x16 * x17 * x5 * x9 - x11 * x22);
-    element_vector[8] +=
-        rhs_bubble[0] * ((729.0 / 400.0) * mu * x13 * x17 * x4 * x8 * x9 - x19 * x22) +
-        rhs_bubble[1] * (-x10 * x22 + x16 * x18 * x19);
+    element_matrix[48] = x21;
+    element_matrix[49] = x26;
+    element_matrix[50] = x29;
+    element_matrix[51] = x36;
+    element_matrix[52] = x36;
+    element_matrix[53] = x36;
+    element_matrix[54] = x24;
+    element_matrix[55] = x28;
+    element_matrix[56] = x30;
+    element_matrix[57] = x33;
+    element_matrix[58] = x35;
+    element_matrix[59] = x36;
+    element_matrix[60] = x40 * (-pow(x37, 2) - pow(x38, 2));
+    element_matrix[61] = x41;
+    element_matrix[62] = x42;
+    element_matrix[63] = x24;
+    element_matrix[64] = x28;
+    element_matrix[65] = x30;
+    element_matrix[66] = x33;
+    element_matrix[67] = x35;
+    element_matrix[68] = x36;
+    element_matrix[69] = x41;
+    element_matrix[70] = x10 * x43;
+    element_matrix[71] = x44;
+    element_matrix[72] = x24;
+    element_matrix[73] = x28;
+    element_matrix[74] = x30;
+    element_matrix[75] = x33;
+    element_matrix[76] = x35;
+    element_matrix[77] = x36;
+    element_matrix[78] = x42;
+    element_matrix[79] = x44;
+    element_matrix[80] = x11 * x43;
 }
 
 SFEM_INLINE void tri3_stokes_mini_assemble_rhs_kernel(const real_t mu,
+                                                      const real_t rho,
                                                       const real_t px0,
                                                       const real_t px1,
                                                       const real_t px2,
@@ -291,47 +240,38 @@ SFEM_INLINE void tri3_stokes_mini_assemble_rhs_kernel(const real_t mu,
                                                       const real_t *const SFEM_RESTRICT u_rhs,
                                                       const real_t *const SFEM_RESTRICT p_rhs,
                                                       real_t *const SFEM_RESTRICT element_vector) {
-    const real_t x0 = -px0 + px1;
-    const real_t x1 = -py0 + py2;
-    const real_t x2 = x0 * x1;
-    const real_t x3 = px0 - px2;
-    const real_t x4 = py0 - py1;
-    const real_t x5 = x3 * x4;
-    const real_t x6 = (1.0 / 12.0) * x2 - 1.0 / 12.0 * x5;
-    const real_t x7 = (1.0 / 24.0) * x2 - 1.0 / 24.0 * x5;
-    const real_t x8 = u_rhs[2] * x7;
-    const real_t x9 = (3.0 / 40.0) * x2 - 3.0 / 40.0 * x5;
-    const real_t x10 = u_rhs[0] * x9;
-    const real_t x11 = u_rhs[3] * x7 + x10;
-    const real_t x12 = u_rhs[1] * x7;
-    const real_t x13 = u_rhs[6] * x7;
-    const real_t x14 = u_rhs[4] * x9;
-    const real_t x15 = u_rhs[7] * x7 + x14;
-    const real_t x16 = u_rhs[5] * x7;
-    const real_t x17 = p_rhs[1] * x7;
-    const real_t x18 = p_rhs[2] * x7;
-    const real_t x19 = x2 - x5;
-    const real_t x20 = (9.0 / 40.0) / x19;
-    const real_t x21 = x0 * x20;
-    const real_t x22 = x20 * x3;
-    const real_t x23 = (81.0 / 560.0) * x2 - 81.0 / 560.0 * x5;
-    const real_t x24 = (81.0 / 20.0) / pow(x19, 2);
-    const real_t x25 = 1 / (mu * (pow(x0, 2) * x24 + x0 * x24 * x3 + pow(x1, 2) * x24 +
-                                  x1 * x24 * x4 + x24 * pow(x3, 2) + x24 * pow(x4, 2)));
-    const real_t x26 = x25 * (u_rhs[4] * x23 + u_rhs[5] * x9 + u_rhs[6] * x9 + u_rhs[7] * x9);
-    const real_t x27 = x1 * x20;
-    const real_t x28 = x20 * x4;
-    const real_t x29 = x25 * (u_rhs[0] * x23 + u_rhs[1] * x9 + u_rhs[2] * x9 + u_rhs[3] * x9);
-    const real_t x30 = p_rhs[0] * x7;
-    element_vector[0] = u_rhs[1] * x6 + x11 + x8;
-    element_vector[1] = u_rhs[2] * x6 + x11 + x12;
-    element_vector[2] = u_rhs[3] * x6 + x10 + x12 + x8;
-    element_vector[3] = u_rhs[5] * x6 + x13 + x15;
-    element_vector[4] = u_rhs[6] * x6 + x15 + x16;
-    element_vector[5] = u_rhs[7] * x6 + x13 + x14 + x16;
-    element_vector[6] = p_rhs[0] * x6 + x17 + x18 - x26 * (-x21 - x22) - x29 * (-x27 - x28);
-    element_vector[7] = p_rhs[1] * x6 + x18 - x22 * x26 - x27 * x29 + x30;
-    element_vector[8] = p_rhs[2] * x6 + x17 - x21 * x26 - x28 * x29 + x30;
+    const real_t x0 = 5 * u_rhs[2];
+    const real_t x1 = 9 * u_rhs[0];
+    const real_t x2 = 5 * u_rhs[3] + x1;
+    const real_t x3 = px0 - px1;
+    const real_t x4 = -py2;
+    const real_t x5 = py0 + x4;
+    const real_t x6 = -px2;
+    const real_t x7 = px0 + x6;
+    const real_t x8 = py0 - py1;
+    const real_t x9 = x3 * x5 - x7 * x8;
+    const real_t x10 = rho * x9;
+    const real_t x11 = (1.0 / 120.0) * x10;
+    const real_t x12 = 5 * u_rhs[1];
+    const real_t x13 = 5 * u_rhs[6];
+    const real_t x14 = 9 * u_rhs[4];
+    const real_t x15 = 5 * u_rhs[7] + x14;
+    const real_t x16 = 5 * u_rhs[5];
+    const real_t x17 = x9 * (27 * u_rhs[0] + 14 * u_rhs[1] + 14 * u_rhs[2] + 14 * u_rhs[3]);
+    const real_t x18 = x9 * (27 * u_rhs[4] + 14 * u_rhs[5] + 14 * u_rhs[6] + 14 * u_rhs[7]);
+    const real_t x19 = pow(x3, 2) - x3 * x7 + pow(x5, 2) - x5 * x8 + pow(x7, 2) + pow(x8, 2);
+    const real_t x20 = 140 * mu * x19;
+    const real_t x21 = (1.0 / 3360.0) * x10 / (mu * x19);
+    element_vector[0] = x11 * (10 * u_rhs[1] + x0 + x2);
+    element_vector[1] = x11 * (10 * u_rhs[2] + x12 + x2);
+    element_vector[2] = x11 * (10 * u_rhs[3] + x0 + x1 + x12);
+    element_vector[3] = x11 * (10 * u_rhs[5] + x13 + x15);
+    element_vector[4] = x11 * (10 * u_rhs[6] + x15 + x16);
+    element_vector[5] = x11 * (10 * u_rhs[7] + x13 + x14 + x16);
+    element_vector[6] =
+        x21 * (x17 * (-py1 - x4) - x18 * (-px1 - x6) + x20 * (2 * p_rhs[0] + p_rhs[1] + p_rhs[2]));
+    element_vector[7] = x21 * (x17 * x5 - x18 * x7 + x20 * (p_rhs[0] + 2 * p_rhs[1] + p_rhs[2]));
+    element_vector[8] = x21 * (-x17 * x8 + x18 * x3 + x20 * (p_rhs[0] + p_rhs[1] + 2 * p_rhs[2]));
 }
 
 void tri3_stokes_mini_assemble_hessian(const real_t mu,
@@ -350,7 +290,7 @@ void tri3_stokes_mini_assemble_hessian(const real_t mu,
     double tick = MPI_Wtime();
 
     static const int n_vars = 3;
-    static const int ndofs = 3;
+    static const int nxe = 3;
     // static const int rows = 9;
     static const int cols = 9;
 
@@ -389,7 +329,7 @@ void tri3_stokes_mini_assemble_hessian(const real_t mu,
                                             element_matrix);
 
         // find all indices
-        for (int edof_i = 0; edof_i < ndofs; ++edof_i) {
+        for (int edof_i = 0; edof_i < nxe; ++edof_i) {
             const idx_t dof_i = elems[edof_i][i];
             const idx_t r_begin = rowptr[dof_i];
             const idx_t lenrow = rowptr[dof_i + 1] - r_begin;
@@ -399,8 +339,8 @@ void tri3_stokes_mini_assemble_hessian(const real_t mu,
 
         for (int bi = 0; bi < n_vars; ++bi) {
             for (int bj = 0; bj < n_vars; ++bj) {
-                for (int edof_i = 0; edof_i < ndofs; ++edof_i) {
-                    const int ii = bi * ndofs + edof_i;
+                for (int edof_i = 0; edof_i < nxe; ++edof_i) {
+                    const int ii = bi * nxe + edof_i;
 
                     const idx_t dof_i = elems[edof_i][i];
                     const idx_t r_begin = rowptr[dof_i];
@@ -408,8 +348,8 @@ void tri3_stokes_mini_assemble_hessian(const real_t mu,
 
                     real_t *const row_values = &values[bb][r_begin];
 
-                    for (int edof_j = 0; edof_j < ndofs; ++edof_j) {
-                        const int jj = bj * ndofs + edof_j;
+                    for (int edof_j = 0; edof_j < nxe; ++edof_j) {
+                        const int jj = bj * nxe + edof_j;
                         const real_t val = element_matrix[ii * cols + jj];
 
                         assert(val == val);
@@ -431,13 +371,31 @@ static SFEM_INLINE void rhs1(const real_t mu, const real_t x, const real_t y, re
                   12 * x * x * (1 - x) * (1 - x) * (1 - 2 * y)) +
            (1 - 2 * x) * (1 - y);
 
-    f[1] = -mu * (4 * x * (1 - x) * ((1 - 2 * x) * ((1 - 2 * y) * (1 - 2 * y) - 2 * y * 1 - y)) +
+    f[1] = -mu * (4 * x * (1 - x) * (1 - 2 * x) * ((1 - 2 * y) * (1 - 2 * y) - 2 * y * (1 - y)) +
                   12 * y * y * (1 - y) * (1 - y) * (2 * x - 1)) -
            x * (1 - x);
 }
 
+static SFEM_INLINE void rhs2(const real_t mu, const real_t x, const real_t y, real_t *const f) {
+    f[0] = -mu * ((2 - 12 * x + 12 * x * x) * (2 * y - 6 * y * y + 4 * y * y * y) +
+                  (x * x - 2 * x * x * x + x * x * x * x) * (-12 + 24 * y)) +
+           1. / 24;
+
+    f[1] = mu * ((2 - 12 * y + 12 * y * y) * (2 * x - 6 * x * x + 4 * x * x * x) +
+                 (y * y - 2 * y * y * y + y * y * y * y) * (-12 + 24 * x)) +
+           1. / 24;
+}
+
+static SFEM_INLINE void rhs3(const real_t mu, const real_t x, const real_t y, real_t *const f) {
+    const real_t pis4 = 4 * M_PI * M_PI;
+    const real_t pi2 = 2 * M_PI;
+    f[0] = pis4 * mu * sin(pi2 * y) * (2 * cos(pi2 * x) - 1) + pis4 * sin(pi2 * x);
+    f[1] = pis4 * mu * sin(pi2 * x) * (2 * cos(pi2 * y) - 1) + pis4 * sin(pi2 * y);
+}
+
 void tri3_stokes_mini_assemble_rhs(const int tp_num,
                                    const real_t mu,
+                                   const real_t rho,
                                    enum ElemType element_type,
                                    const ptrdiff_t nelements,
                                    const ptrdiff_t nnodes,
@@ -505,18 +463,43 @@ void tri3_stokes_mini_assemble_rhs(const int tp_num,
                     rhs1(mu, xx[ii], yy[ii], fb);
                     break;
                 }
+                case 2: {
+                    rhs2(mu, xx[ii], yy[ii], fb);
+                    break;
+                }
+                case 3: {
+                    rhs3(mu, xx[ii], yy[ii], fb);
+                    break;
+                }
                 default: {
                     assert(0);
                     break;
                 }
             }
 
+            if (ii == 0) {
+                fb[0] = 0;
+                fb[1] = 0;
+            }
+
             u_rhs[0 * 3 + ii] = fb[0];
             u_rhs[1 * 3 + ii] = fb[1];
         }
 
-        tri3_stokes_mini_assemble_rhs_kernel(
-            mu, x0, x1, x2, y0, y1, y2, u_rhs, p_rhs, element_vector);
+        tri3_stokes_mini_assemble_rhs_kernel(mu,
+                                             rho,
+                                             // X coords
+                                             x0,
+                                             x1,
+                                             x2,
+                                             // Y coords
+                                             y0,
+                                             y1,
+                                             y2,
+                                             //  buffers
+                                             u_rhs,
+                                             p_rhs,
+                                             element_vector);
 
         for (int edof_i = 0; edof_i < 3; ++edof_i) {
             const idx_t dof_i = elems[edof_i][i];
@@ -578,11 +561,13 @@ int main(int argc, char *argv[]) {
 
     // Optional params
     real_t SFEM_MU = 1;
+    real_t SFEM_RHO = 1;
     int SFEM_PROBLEM_TYPE = 1;
     const char *SFEM_DIRICHLET_NODES = 0;
 
     SFEM_READ_ENV(SFEM_PROBLEM_TYPE, atoi);
     SFEM_READ_ENV(SFEM_MU, atof);
+    SFEM_READ_ENV(SFEM_RHO, atof);
     SFEM_READ_ENV(SFEM_DIRICHLET_NODES, );
 
     if (rank == 0) {
@@ -592,10 +577,12 @@ int main(int argc, char *argv[]) {
             "----------------------------------------\n"
             "- SFEM_PROBLEM_TYPE=%d\n"
             "- SFEM_MU=%g\n"
+            "- SFEM_RHO=%g\n"
             "- SFEM_DIRICHLET_NODES=%s\n"
             "----------------------------------------\n",
             SFEM_PROBLEM_TYPE,
             SFEM_MU,
+            SFEM_RHO,
             SFEM_DIRICHLET_NODES);
     }
 
@@ -616,7 +603,9 @@ int main(int argc, char *argv[]) {
 
     nnz = rowptr[mesh.nnodes];
 
-    static const int n_vars = 3;
+    const int sdim = elem_manifold_dim(mesh.element_type);
+    const int n_vars = sdim + 1;
+
     values = (real_t **)malloc((n_vars * n_vars) * sizeof(real_t *));
     for (int d = 0; d < (n_vars * n_vars); d++) {
         values[d] = calloc(nnz, sizeof(real_t));
@@ -648,6 +637,7 @@ int main(int argc, char *argv[]) {
 
     tri3_stokes_mini_assemble_rhs(SFEM_PROBLEM_TYPE,
                                   SFEM_MU,
+                                  SFEM_RHO,
                                   mesh.element_type,
                                   mesh.nelements,
                                   mesh.nnodes,
@@ -665,15 +655,15 @@ int main(int argc, char *argv[]) {
 
     if (SFEM_DIRICHLET_NODES) {
         idx_t *dirichlet_nodes = 0;
-        ptrdiff_t nn = read_file(comm, SFEM_DIRICHLET_NODES, (void **)&dirichlet_nodes);
-        assert((nn / sizeof(idx_t)) * sizeof(idx_t) == nn);
-        nn /= sizeof(idx_t);
+        ptrdiff_t _nope_, nn;
+        array_create_from_file(
+            comm, SFEM_DIRICHLET_NODES, SFEM_MPI_IDX_T, (void **)&dirichlet_nodes, &_nope_, &nn);
 
-        for (int d = 0; d < mesh.spatial_dim; d++) {
+        for (int d = 0; d < sdim; d++) {
             constraint_nodes_to_value(nn, dirichlet_nodes, 0, rhs[d]);
         }
 
-        for (int d1 = 0; d1 < mesh.spatial_dim; d1++) {
+        for (int d1 = 0; d1 < sdim; d1++) {
             for (int d2 = 0; d2 < n_vars; d2++) {
                 crs_constraint_nodes_to_identity(
                     nn, dirichlet_nodes, d1 == d2, rowptr, colidx, values[d1 * n_vars + d2]);
@@ -683,17 +673,21 @@ int main(int argc, char *argv[]) {
         if (1)
         // if (0)
         {
-            // One point to 0
+            // One point to 0 to fix pressure degree of freedom
+            // ptrdiff_t node = nn - 1;
+            ptrdiff_t node = 0;
             for (int d2 = 0; d2 < n_vars; d2++) {
-                crs_constraint_nodes_to_identity(nn,
-                                                 dirichlet_nodes,
+                crs_constraint_nodes_to_identity(1,
+                                                 &dirichlet_nodes[node],
                                                  (n_vars - 1) == d2,
                                                  rowptr,
                                                  colidx,
                                                  values[(n_vars - 1) * n_vars + d2]);
             }
 
-            constraint_nodes_to_value(nn, dirichlet_nodes, 0, rhs[n_vars - 1]);
+            constraint_nodes_to_value(1, &dirichlet_nodes[node], 0, rhs[n_vars - 1]);
+
+            printf("constrained node %ld\n", (long)dirichlet_nodes[0]);
         }
 
     } else {

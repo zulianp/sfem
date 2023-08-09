@@ -94,18 +94,17 @@ class StokesOp:
 		u_fe = self.fe_velocity.fe()
 		p_fe = self.fe_pressure.fe()
 		qp = self.fe_velocity.quadrature_point()
-		# s_dV = u_fe.symbol_jacobian_inverse()
-		# dV = u_fe.jacobian_inverse(qp)
-
 		d = u_fe.spatial_dim()
 		nn = u_fe.n_nodes()
 
 		H = self.get_hessian()
 		rows, cols = H.shape
 
-		A = sp.Matrix(cols-d, cols-d, [0]*((cols-d)*(cols-d)))
+		p1_rows = cols-d
+
+		A = sp.Matrix(p1_rows, p1_rows, [0]*((p1_rows)*(p1_rows)))
 		C = sp.Matrix(d, d, [0]*(d*d))
-		B = sp.Matrix(d, cols-d, [0]*(d*(cols-d)))
+		B = sp.Matrix(d, p1_rows, [0]*(d*(p1_rows)))
 
 		for d1 in range(0, d):
 			i1 = d1 * nn + u_fe.bubble_dof_idx()
@@ -161,6 +160,10 @@ class StokesOp:
 		P = B.T * C_inv
 
 		Hc = A - S
+
+		print(S.shape)
+		print(C_inv.shape)
+		print(B.shape)
 		
 		# c_code(self.assign_matrix(P))
 		return Hc, P, bubble_dofs

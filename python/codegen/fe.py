@@ -44,7 +44,9 @@ class FE:
 			gi = []
 
 			for d in range(0, dims):
-				gi.append(sp.diff(fx[i], p[d]))
+				gg = sp.diff(fx[i], p[d])
+				gg = sp.simplify(gg)
+				gi.append(gg)
 
 			g[i] = sp.Matrix(dims, 1, gi)
 		return g
