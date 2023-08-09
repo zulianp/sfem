@@ -36,6 +36,26 @@
 //     return x * (1 - x) * (1 - y) - 1. / 12;
 // }
 
+static int check_symmetric(int n, const real_t *const element_matrix) {
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            const real_t diff = element_matrix[i * n + j] - element_matrix[i + j * n];
+            assert(diff < 1e-16);
+            if (diff > 1e-16) {
+                return 1;
+            }
+
+            printf("%g ", element_matrix[i * n + j]);
+        }
+
+        printf("\n");
+    }
+
+    printf("\n");
+
+    return 0;
+}
+
 static SFEM_INLINE real_t ref_p1(const real_t x, const real_t y) {
     return x * (1 - x) * (1 - y) - 1. / 12;
 }
@@ -477,13 +497,8 @@ void tri3_stokes_mini_assemble_rhs_soa(const int tp_num,
                 }
             }
 
-            if (ii == 0) {
-                fb[0] = 0;
-                fb[1] = 0;
-            }
-
-            u_rhs[0 * 3 + ii] = fb[0];
-            u_rhs[1 * 3 + ii] = fb[1];
+            u_rhs[0 * 4 + ii] = fb[0];
+            u_rhs[1 * 4 + ii] = fb[1];
         }
 
         tri3_stokes_mini_assemble_rhs_kernel(mu,
@@ -565,6 +580,8 @@ void tri3_stokes_mini_assemble_hessian_aos(const real_t mu,
                 points[1][i2],
                 // output matrix
                 element_matrix);
+
+            assert(!check_symmetric(9, element_matrix));
 
             for (int edof_i = 0; edof_i < 3; ++edof_i) {
                 const idx_t dof_i = elems[edof_i][i];
@@ -665,7 +682,7 @@ void tri3_stokes_mini_assemble_rhs_aos(const int tp_num,
         xx[3] = x2;
         yy[3] = y2;
 
-        for (int ii = 0; ii < 4; ii++) {
+        for (int ii = 0; ii < (ndofs + 1); ii++) {
             switch (tp_num) {
                 case 1: {
                     rhs1(mu, xx[ii], yy[ii], fb);
@@ -685,13 +702,8 @@ void tri3_stokes_mini_assemble_rhs_aos(const int tp_num,
                 }
             }
 
-            if (ii == 0) {
-                fb[0] = 0;
-                fb[1] = 0;
-            }
-
-            u_rhs[0 * 3 + ii] = fb[0];
-            u_rhs[1 * 3 + ii] = fb[1];
+            u_rhs[0 * (ndofs + 1) + ii] = fb[0];
+            u_rhs[1 * (ndofs + 1) + ii] = fb[1];
         }
 
         tri3_stokes_mini_assemble_rhs_kernel(mu,

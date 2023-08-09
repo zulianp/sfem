@@ -27,11 +27,11 @@ solve()
 
 	echo "rhs=$rhs_"
 	mpiexec -np 8 $UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type lu -ksp_type preonly
-	# mpiexec -np 8 $UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type hypre -ksp_type richardson --verbose
+	# mpiexec -np 8 $UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type bjacobi -ksp_type bicg --verbose
 }
 
 mesh=mesh
-# create_square.sh 4
+# create_square.sh 6
 # rm -f $mesh/z.raw
 
 export SFEM_DIRICHLET_NODES=all.raw
@@ -40,8 +40,8 @@ cat $mesh/sidesets_aos/*.raw > $SFEM_DIRICHLET_NODES
 nvars=3
 
 
-export SFEM_PROBLEM_TYPE=1
-export SFEM_AOS=1
+export SFEM_PROBLEM_TYPE=2
+# export SFEM_AOS=1
 
 if [[ -z "$SFEM_AOS" ]]
 then
@@ -64,6 +64,7 @@ else
 	mkdir -p out
 	set -x
 	
+	# lldb -- 
 	stokes $mesh stokes_system_aos
 
 	solve stokes_system_aos/rowptr.raw stokes_system_aos/rhs.raw out/x.raw
