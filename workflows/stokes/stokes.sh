@@ -13,6 +13,9 @@ PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 UTOPIA_EXEC=$CODE_DIR/utopia/utopia/build/utopia_exec
 
+export OMP_NUM_THREADS=8
+export OMP_PROC_BIND=true
+
 if [[ -z "$UTOPIA_EXEC" ]]
 then
 	echo "Error! Please define UTOPIA_EXEC=<path_to_utopia_exectuable>"
@@ -31,8 +34,8 @@ solve()
 }
 
 mesh=mesh
-# create_square.sh 8
-# rm -f $mesh/z.raw
+create_square.sh 10
+rm -f $mesh/z.raw
 
 export SFEM_DIRICHLET_NODES=all.raw
 cat $mesh/sidesets_aos/*.raw > $SFEM_DIRICHLET_NODES
@@ -41,7 +44,7 @@ nvars=3
 
 
 export SFEM_PROBLEM_TYPE=3
-# export SFEM_AOS=1
+export SFEM_AOS=1
 
 if [[ -z "$SFEM_AOS" ]]
 then

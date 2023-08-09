@@ -314,66 +314,70 @@ void tri3_stokes_mini_assemble_hessian_soa(const real_t mu,
     // static const int rows = 9;
     static const int cols = 9;
 
-    idx_t ev[3];
-    idx_t ks[3][3];
-    real_t element_matrix[3 * 3 * 3 * 3];
-
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma omp parallel
+    {
+#pragma omp for nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[3];
+            idx_t ks[3][3];
+            real_t element_matrix[3 * 3 * 3 * 3];
 #pragma unroll(3)
-        for (int v = 0; v < 3; ++v) {
-            ev[v] = elems[v][i];
-        }
+            for (int v = 0; v < 3; ++v) {
+                ev[v] = elems[v][i];
+            }
 
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
 
-        const real_t x0 = points[0][i0];
-        const real_t x1 = points[0][i1];
-        const real_t x2 = points[0][i2];
+            const real_t x0 = points[0][i0];
+            const real_t x1 = points[0][i1];
+            const real_t x2 = points[0][i2];
 
-        const real_t y0 = points[1][i0];
-        const real_t y1 = points[1][i1];
-        const real_t y2 = points[1][i2];
+            const real_t y0 = points[1][i0];
+            const real_t y1 = points[1][i1];
+            const real_t y2 = points[1][i2];
 
-        tri3_stokes_assemble_hessian_kernel(mu,
-                                            // X-coordinates
-                                            x0,
-                                            x1,
-                                            x2,
-                                            // Y-coordinates
-                                            y0,
-                                            y1,
-                                            y2,
-                                            element_matrix);
+            tri3_stokes_assemble_hessian_kernel(mu,
+                                                // X-coordinates
+                                                x0,
+                                                x1,
+                                                x2,
+                                                // Y-coordinates
+                                                y0,
+                                                y1,
+                                                y2,
+                                                element_matrix);
 
-        // find all indices
-        for (int edof_i = 0; edof_i < nxe; ++edof_i) {
-            const idx_t dof_i = elems[edof_i][i];
-            const idx_t r_begin = rowptr[dof_i];
-            const idx_t lenrow = rowptr[dof_i + 1] - r_begin;
-            const idx_t *row = &colidx[rowptr[dof_i]];
-            find_cols3(ev, row, lenrow, ks[edof_i]);
-        }
+            // find all indices
+            for (int edof_i = 0; edof_i < nxe; ++edof_i) {
+                const idx_t dof_i = elems[edof_i][i];
+                const idx_t r_begin = rowptr[dof_i];
+                const idx_t lenrow = rowptr[dof_i + 1] - r_begin;
+                const idx_t *row = &colidx[rowptr[dof_i]];
+                find_cols3(ev, row, lenrow, ks[edof_i]);
+            }
 
-        for (int bi = 0; bi < n_vars; ++bi) {
-            for (int bj = 0; bj < n_vars; ++bj) {
-                for (int edof_i = 0; edof_i < nxe; ++edof_i) {
-                    const int ii = bi * nxe + edof_i;
+            for (int bi = 0; bi < n_vars; ++bi) {
+                for (int bj = 0; bj < n_vars; ++bj) {
+                    for (int edof_i = 0; edof_i < nxe; ++edof_i) {
+                        const int ii = bi * nxe + edof_i;
 
-                    const idx_t dof_i = elems[edof_i][i];
-                    const idx_t r_begin = rowptr[dof_i];
-                    const int bb = bi * n_vars + bj;
+                        const idx_t dof_i = elems[edof_i][i];
+                        const idx_t r_begin = rowptr[dof_i];
+                        const int bb = bi * n_vars + bj;
 
-                    real_t *const row_values = &values[bb][r_begin];
+                        real_t *const row_values = &values[bb][r_begin];
 
-                    for (int edof_j = 0; edof_j < nxe; ++edof_j) {
-                        const int jj = bj * nxe + edof_j;
-                        const real_t val = element_matrix[ii * cols + jj];
+                        for (int edof_j = 0; edof_j < nxe; ++edof_j) {
+                            const int jj = bj * nxe + edof_j;
+                            const real_t val = element_matrix[ii * cols + jj];
 
-                        assert(val == val);
-                        row_values[ks[edof_i][edof_j]] += val;
+                            assert(val == val);
+#pragma omp atomic update
+                            row_values[ks[edof_i][edof_j]] += val;
+                        }
                     }
                 }
             }
@@ -434,99 +438,104 @@ void tri3_stokes_mini_assemble_rhs_soa(const int tp_num,
     static const int rows = 9;
     static const int cols = 9;
 
-    idx_t ev[3];
-    idx_t ks[3];
-    real_t element_vector[3 * 3];
-    real_t fb[2] = {0, 0};
-    real_t xx[4];
-    real_t yy[4];
+#pragma omp parallel
+    {
+#pragma omp for nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[3];
+            idx_t ks[3];
+            real_t element_vector[3 * 3];
+            real_t fb[2] = {0, 0};
+            real_t xx[4];
+            real_t yy[4];
 
-    real_t u_rhs[4 * 2];
-    real_t p_rhs[3] = {0., 0., 0.};
+            real_t u_rhs[4 * 2];
+            real_t p_rhs[3] = {0., 0., 0.};
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
 #pragma unroll(3)
-        for (int v = 0; v < 3; ++v) {
-            ev[v] = elems[v][i];
-        }
-
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
-
-        const real_t x0 = points[0][i0];
-        const real_t x1 = points[0][i1];
-        const real_t x2 = points[0][i2];
-
-        const real_t y0 = points[1][i0];
-        const real_t y1 = points[1][i1];
-        const real_t y2 = points[1][i2];
-
-        const real_t bx = (x0 + x1 + x2) / 3;
-        const real_t by = (y0 + y1 + y2) / 3;
-
-        xx[0] = bx;
-        yy[0] = by;
-
-        xx[1] = x0;
-        yy[1] = y0;
-
-        xx[2] = x1;
-        yy[2] = y1;
-
-        xx[3] = x2;
-        yy[3] = y2;
-
-        memset(u_rhs, 0, 4*2*sizeof(real_t));
-
-        // Not in the bubble dof??
-        for (int ii = 1; ii < 4; ii++) {
-        // for (int ii = 0; ii < 4; ii++) {
-            switch (tp_num) {
-                case 1: {
-                    rhs1(mu, xx[ii], yy[ii], fb);
-                    break;
-                }
-                case 2: {
-                    rhs2(mu, xx[ii], yy[ii], fb);
-                    break;
-                }
-                case 3: {
-                    rhs3(mu, xx[ii], yy[ii], fb);
-                    break;
-                }
-                default: {
-                    assert(0);
-                    break;
-                }
+            for (int v = 0; v < 3; ++v) {
+                ev[v] = elems[v][i];
             }
 
-            u_rhs[0 * 4 + ii] = fb[0];
-            u_rhs[1 * 4 + ii] = fb[1];
-        }
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
 
-        tri3_stokes_mini_assemble_rhs_kernel(mu,
-                                             rho,
-                                             // X coords
-                                             x0,
-                                             x1,
-                                             x2,
-                                             // Y coords
-                                             y0,
-                                             y1,
-                                             y2,
-                                             //  buffers
-                                             u_rhs,
-                                             p_rhs,
-                                             element_vector);
+            const real_t x0 = points[0][i0];
+            const real_t x1 = points[0][i1];
+            const real_t x2 = points[0][i2];
 
-        for (int edof_i = 0; edof_i < 3; ++edof_i) {
-            const idx_t dof_i = elems[edof_i][i];
+            const real_t y0 = points[1][i0];
+            const real_t y1 = points[1][i1];
+            const real_t y2 = points[1][i2];
 
-            // Add block
-            for (int d1 = 0; d1 < n_vars; d1++) {
-                rhs[d1][dof_i] += element_vector[d1 * 3 + edof_i];
+            const real_t bx = (x0 + x1 + x2) / 3;
+            const real_t by = (y0 + y1 + y2) / 3;
+
+            xx[0] = bx;
+            yy[0] = by;
+
+            xx[1] = x0;
+            yy[1] = y0;
+
+            xx[2] = x1;
+            yy[2] = y1;
+
+            xx[3] = x2;
+            yy[3] = y2;
+
+            memset(u_rhs, 0, 4 * 2 * sizeof(real_t));
+
+            // Not in the bubble dof??
+            for (int ii = 1; ii < 4; ii++) {
+                // for (int ii = 0; ii < 4; ii++) {
+                switch (tp_num) {
+                    case 1: {
+                        rhs1(mu, xx[ii], yy[ii], fb);
+                        break;
+                    }
+                    case 2: {
+                        rhs2(mu, xx[ii], yy[ii], fb);
+                        break;
+                    }
+                    case 3: {
+                        rhs3(mu, xx[ii], yy[ii], fb);
+                        break;
+                    }
+                    default: {
+                        assert(0);
+                        break;
+                    }
+                }
+
+                u_rhs[0 * 4 + ii] = fb[0];
+                u_rhs[1 * 4 + ii] = fb[1];
+            }
+
+            tri3_stokes_mini_assemble_rhs_kernel(mu,
+                                                 rho,
+                                                 // X coords
+                                                 x0,
+                                                 x1,
+                                                 x2,
+                                                 // Y coords
+                                                 y0,
+                                                 y1,
+                                                 y2,
+                                                 //  buffers
+                                                 u_rhs,
+                                                 p_rhs,
+                                                 element_vector);
+
+            for (int edof_i = 0; edof_i < 3; ++edof_i) {
+                const idx_t dof_i = elems[edof_i][i];
+
+                // Add block
+                for (int d1 = 0; d1 < n_vars; d1++) {
+#pragma omp atomic update
+                    rhs[d1][dof_i] += element_vector[d1 * 3 + edof_i];
+                }
             }
         }
     }
@@ -553,9 +562,9 @@ void tri3_stokes_mini_assemble_hessian_aos(const real_t mu,
     static const int block_size = 3;
     static const int mat_block_size = block_size * block_size;
 
-    // #pragma omp parallel
+#pragma omp parallel
     {
-        // #pragma omp for nowait
+#pragma omp for nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[3];
             idx_t ks[3];
@@ -612,7 +621,7 @@ void tri3_stokes_mini_assemble_hessian_aos(const real_t mu,
                         for (int bj = 0; bj < block_size; ++bj) {
                             const int jj = bj * 3 + edof_j;
                             const real_t val = element_matrix[ii * 9 + jj];
-                            // #pragma omp atomic update
+#pragma omp atomic update
                             row[offset_j + bj] += val;
                         }
                     }
@@ -643,99 +652,105 @@ void tri3_stokes_mini_assemble_rhs_aos(const int tp_num,
     static const int ndofs = 3;
     static const int rows = 9;
 
-    idx_t ev[3];
-    idx_t ks[3];
-    real_t element_vector[rows];
-    real_t fb[2] = {0, 0};
-    real_t xx[4];
-    real_t yy[4];
+#pragma omp parallel
+    {
+#pragma omp for nowait
 
-    real_t u_rhs[4 * 2];
-    real_t p_rhs[3] = {0., 0., 0.};
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[3];
+            idx_t ks[3];
+            real_t element_vector[9];
+            real_t fb[2] = {0, 0};
+            real_t xx[4];
+            real_t yy[4];
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
+            real_t u_rhs[4 * 2];
+            real_t p_rhs[3] = {0., 0., 0.};
+
 #pragma unroll(3)
-        for (int v = 0; v < 3; ++v) {
-            ev[v] = elems[v][i];
-        }
-
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
-
-        const real_t x0 = points[0][i0];
-        const real_t x1 = points[0][i1];
-        const real_t x2 = points[0][i2];
-
-        const real_t y0 = points[1][i0];
-        const real_t y1 = points[1][i1];
-        const real_t y2 = points[1][i2];
-
-        const real_t bx = (x0 + x1 + x2) / 3;
-        const real_t by = (y0 + y1 + y2) / 3;
-
-        xx[0] = bx;
-        yy[0] = by;
-
-        xx[1] = x0;
-        yy[1] = y0;
-
-        xx[2] = x1;
-        yy[2] = y1;
-
-        xx[3] = x2;
-        yy[3] = y2;
-
-        memset(u_rhs, 0, 4*2*sizeof(real_t));
-
-        // Not in the bubble dof??
-        for (int ii = 1; ii < 4; ii++) {
-        // for (int ii = 0; ii < (ndofs + 1); ii++) {
-            switch (tp_num) {
-                case 1: {
-                    rhs1(mu, xx[ii], yy[ii], fb);
-                    break;
-                }
-                case 2: {
-                    rhs2(mu, xx[ii], yy[ii], fb);
-                    break;
-                }
-                case 3: {
-                    rhs3(mu, xx[ii], yy[ii], fb);
-                    break;
-                }
-                default: {
-                    assert(0);
-                    break;
-                }
+            for (int v = 0; v < 3; ++v) {
+                ev[v] = elems[v][i];
             }
 
-            u_rhs[0 * (ndofs + 1) + ii] = fb[0];
-            u_rhs[1 * (ndofs + 1) + ii] = fb[1];
-        }
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
 
-        tri3_stokes_mini_assemble_rhs_kernel(mu,
-                                             rho,
-                                             // X coords
-                                             x0,
-                                             x1,
-                                             x2,
-                                             // Y coords
-                                             y0,
-                                             y1,
-                                             y2,
-                                             //  buffers
-                                             u_rhs,
-                                             p_rhs,
-                                             element_vector);
+            const real_t x0 = points[0][i0];
+            const real_t x1 = points[0][i1];
+            const real_t x2 = points[0][i2];
 
-        for (int edof_i = 0; edof_i < 3; ++edof_i) {
-            const idx_t dof_i = elems[edof_i][i];
+            const real_t y0 = points[1][i0];
+            const real_t y1 = points[1][i1];
+            const real_t y2 = points[1][i2];
 
-            // Add block
-            for (int d1 = 0; d1 < n_vars; d1++) {
-                rhs[dof_i * n_vars + d1] += element_vector[d1 * 3 + edof_i];
+            const real_t bx = (x0 + x1 + x2) / 3;
+            const real_t by = (y0 + y1 + y2) / 3;
+
+            xx[0] = bx;
+            yy[0] = by;
+
+            xx[1] = x0;
+            yy[1] = y0;
+
+            xx[2] = x1;
+            yy[2] = y1;
+
+            xx[3] = x2;
+            yy[3] = y2;
+
+            memset(u_rhs, 0, 4 * 2 * sizeof(real_t));
+
+            // Not in the bubble dof??
+            for (int ii = 1; ii < 4; ii++) {
+                // for (int ii = 0; ii < (ndofs + 1); ii++) {
+                switch (tp_num) {
+                    case 1: {
+                        rhs1(mu, xx[ii], yy[ii], fb);
+                        break;
+                    }
+                    case 2: {
+                        rhs2(mu, xx[ii], yy[ii], fb);
+                        break;
+                    }
+                    case 3: {
+                        rhs3(mu, xx[ii], yy[ii], fb);
+                        break;
+                    }
+                    default: {
+                        assert(0);
+                        break;
+                    }
+                }
+
+                u_rhs[0 * (ndofs + 1) + ii] = fb[0];
+                u_rhs[1 * (ndofs + 1) + ii] = fb[1];
+            }
+
+            tri3_stokes_mini_assemble_rhs_kernel(mu,
+                                                 rho,
+                                                 // X coords
+                                                 x0,
+                                                 x1,
+                                                 x2,
+                                                 // Y coords
+                                                 y0,
+                                                 y1,
+                                                 y2,
+                                                 //  buffers
+                                                 u_rhs,
+                                                 p_rhs,
+                                                 element_vector);
+
+            for (int edof_i = 0; edof_i < 3; ++edof_i) {
+                const idx_t dof_i = elems[edof_i][i];
+
+                // Add block
+                for (int d1 = 0; d1 < n_vars; d1++) {
+#pragma omp atomic update
+                    rhs[dof_i * n_vars + d1] += element_vector[d1 * 3 + edof_i];
+                }
             }
         }
     }

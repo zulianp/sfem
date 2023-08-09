@@ -10,6 +10,8 @@ from fe_material import *
 
 import pdb
 
+simplify_expr = False
+
 class StokesMiniOp:
 	def __init__(self, fe_mini):
 		self.fe_mini = fe_mini
@@ -243,7 +245,10 @@ class StokesMiniOp:
 				value = a[i, j]
 
 				value = subsmat(value, fe.symbol_jacobian_inverse(), fe.jacobian_inverse(qp))
-				value = sp.simplify(value)
+
+				if simplify_expr:
+					value = sp.simplify(value)
+					
 				expr.append(ast.Assignment(var, value))
 		return expr
 
@@ -254,7 +259,8 @@ class StokesMiniOp:
 		return self.assign_tensor("element_vector", a)
 
 def main():
-	op = StokesMiniOp(Mini2D())
+	# op = StokesMiniOp(Mini2D())
+	op = StokesMiniOp(Mini3D())
 
 if __name__ == "__main__":
 	main()
