@@ -182,6 +182,11 @@ class StokesMiniOp:
 		A, B, C = self.form_vv_matrix()
 		D, E = self.form_vp_matrix()
 
+		# print(B)
+		# print(E)
+		# print(C)
+
+
 		d = self.fe_mini.spatial_dim()
 
 		if d == 3:

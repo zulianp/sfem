@@ -45,13 +45,13 @@ static int check_symmetric(int n, const real_t *const element_matrix) {
                 return 1;
             }
 
-            printf("%g ", element_matrix[i * n + j]);
+            // printf("%g ", element_matrix[i * n + j]);
         }
 
-        printf("\n");
+        // printf("\n");
     }
 
-    printf("\n");
+    // printf("\n");
 
     return 0;
 }
@@ -409,8 +409,9 @@ static SFEM_INLINE void rhs2(const real_t mu, const real_t x, const real_t y, re
 static SFEM_INLINE void rhs3(const real_t mu, const real_t x, const real_t y, real_t *const f) {
     const real_t pis4 = 4 * M_PI * M_PI;
     const real_t pi2 = 2 * M_PI;
-    f[0] = pis4 * mu * sin(pi2 * y) * (2 * cos(pi2 * x) - 1) + pis4 * sin(pi2 * x);
-    f[1] = pis4 * mu * sin(pi2 * x) * (2 * cos(pi2 * y) - 1) + pis4 * sin(pi2 * y);
+
+    f[0] = -pis4 * mu * sin(pi2 * y) * (2 * cos(pi2 * x) - 1) + pis4 * sin(pi2 * x);
+    f[1] = pis4 * mu * sin(pi2 * x) * (2 * cos(pi2 * y) - 1) - pis4 * sin(pi2 * y);
 }
 
 void tri3_stokes_mini_assemble_rhs_soa(const int tp_num,
@@ -477,7 +478,11 @@ void tri3_stokes_mini_assemble_rhs_soa(const int tp_num,
         xx[3] = x2;
         yy[3] = y2;
 
-        for (int ii = 0; ii < 4; ii++) {
+        memset(u_rhs, 0, 4*2*sizeof(real_t));
+
+        // Not in the bubble dof??
+        for (int ii = 1; ii < 4; ii++) {
+        // for (int ii = 0; ii < 4; ii++) {
             switch (tp_num) {
                 case 1: {
                     rhs1(mu, xx[ii], yy[ii], fb);
@@ -682,7 +687,11 @@ void tri3_stokes_mini_assemble_rhs_aos(const int tp_num,
         xx[3] = x2;
         yy[3] = y2;
 
-        for (int ii = 0; ii < (ndofs + 1); ii++) {
+        memset(u_rhs, 0, 4*2*sizeof(real_t));
+
+        // Not in the bubble dof??
+        for (int ii = 1; ii < 4; ii++) {
+        // for (int ii = 0; ii < (ndofs + 1); ii++) {
             switch (tp_num) {
                 case 1: {
                     rhs1(mu, xx[ii], yy[ii], fb);
