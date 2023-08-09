@@ -274,15 +274,15 @@ SFEM_INLINE void tri3_stokes_mini_assemble_rhs_kernel(const real_t mu,
     element_vector[8] = x21 * (-x17 * x8 + x18 * x3 + x20 * (p_rhs[0] + p_rhs[1] + 2 * p_rhs[2]));
 }
 
-void tri3_stokes_mini_assemble_hessian(const real_t mu,
-                                       enum ElemType element_type,
-                                       const ptrdiff_t nelements,
-                                       const ptrdiff_t nnodes,
-                                       idx_t **const elems,
-                                       geom_t **const points,
-                                       const count_t *const rowptr,
-                                       const idx_t *const colidx,
-                                       real_t **const values) {
+void tri3_stokes_mini_assemble_hessian_soa(const real_t mu,
+                                           enum ElemType element_type,
+                                           const ptrdiff_t nelements,
+                                           const ptrdiff_t nnodes,
+                                           idx_t **const elems,
+                                           geom_t **const points,
+                                           const count_t *const rowptr,
+                                           const idx_t *const colidx,
+                                           real_t **const values) {
     assert(element_type == TRI3);
     SFEM_UNUSED(nnodes);
     SFEM_UNUSED(element_type);
@@ -393,15 +393,15 @@ static SFEM_INLINE void rhs3(const real_t mu, const real_t x, const real_t y, re
     f[1] = pis4 * mu * sin(pi2 * x) * (2 * cos(pi2 * y) - 1) + pis4 * sin(pi2 * y);
 }
 
-void tri3_stokes_mini_assemble_rhs(const int tp_num,
-                                   const real_t mu,
-                                   const real_t rho,
-                                   enum ElemType element_type,
-                                   const ptrdiff_t nelements,
-                                   const ptrdiff_t nnodes,
-                                   idx_t **const elems,
-                                   geom_t **const points,
-                                   real_t **const rhs) {
+void tri3_stokes_mini_assemble_rhs_soa(const int tp_num,
+                                       const real_t mu,
+                                       const real_t rho,
+                                       enum ElemType element_type,
+                                       const ptrdiff_t nelements,
+                                       const ptrdiff_t nnodes,
+                                       idx_t **const elems,
+                                       geom_t **const points,
+                                       real_t **const rhs) {
     assert(element_type == TRI3);
     SFEM_UNUSED(nnodes);
     SFEM_UNUSED(element_type);
@@ -515,6 +515,216 @@ void tri3_stokes_mini_assemble_rhs(const int tp_num,
     printf("tri3_stokes.c: tri3_stokes_mini_assemble_rhs\t%g seconds\n", tock - tick);
 }
 
+//////////////////////////////////////////////
+
+void tri3_stokes_mini_assemble_hessian_aos(const real_t mu,
+                                           enum ElemType element_type,
+                                           const ptrdiff_t nelements,
+                                           const ptrdiff_t nnodes,
+                                           idx_t **const elems,
+                                           geom_t **const points,
+                                           const count_t *const rowptr,
+                                           const idx_t *const colidx,
+                                           real_t *const values) {
+    SFEM_UNUSED(nnodes);
+
+    const double tick = MPI_Wtime();
+
+    static const int block_size = 3;
+    static const int mat_block_size = block_size * block_size;
+
+    // #pragma omp parallel
+    {
+        // #pragma omp for nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[3];
+            idx_t ks[3];
+
+            real_t element_matrix[(3 * 3) * (3 * 3)];
+
+#pragma unroll(3)
+            for (int v = 0; v < 3; ++v) {
+                ev[v] = elems[v][i];
+            }
+
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+
+            tri3_stokes_assemble_hessian_kernel(
+                // Model parameters
+                mu,
+                // X-coordinates
+                points[0][i0],
+                points[0][i1],
+                points[0][i2],
+                // Y-coordinates
+                points[1][i0],
+                points[1][i1],
+                points[1][i2],
+                // output matrix
+                element_matrix);
+
+            for (int edof_i = 0; edof_i < 3; ++edof_i) {
+                const idx_t dof_i = elems[edof_i][i];
+                const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
+
+                {
+                    const idx_t *row = &colidx[rowptr[dof_i]];
+                    find_cols3(ev, row, lenrow, ks);
+                }
+
+                // Blocks for row
+                real_t *block_start = &values[rowptr[dof_i] * mat_block_size];
+
+                for (int edof_j = 0; edof_j < 3; ++edof_j) {
+                    const idx_t offset_j = ks[edof_j] * block_size;
+
+                    for (int bi = 0; bi < block_size; ++bi) {
+                        const int ii = bi * 3 + edof_i;
+
+                        // Jump rows (including the block-size for the columns)
+                        real_t *row = &block_start[bi * lenrow * block_size];
+
+                        for (int bj = 0; bj < block_size; ++bj) {
+                            const int jj = bj * 3 + edof_j;
+                            const real_t val = element_matrix[ii * 9 + jj];
+                            // #pragma omp atomic update
+                            row[offset_j + bj] += val;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    const double tock = MPI_Wtime();
+    printf("stokes.c: stokes_assemble_hessian_aos\t%g seconds\n", tock - tick);
+}
+
+void tri3_stokes_mini_assemble_rhs_aos(const int tp_num,
+                                       const real_t mu,
+                                       const real_t rho,
+                                       enum ElemType element_type,
+                                       const ptrdiff_t nelements,
+                                       const ptrdiff_t nnodes,
+                                       idx_t **const elems,
+                                       geom_t **const points,
+                                       real_t *const rhs) {
+    assert(element_type == TRI3);
+    SFEM_UNUSED(nnodes);
+    SFEM_UNUSED(element_type);
+
+    double tick = MPI_Wtime();
+
+    static const int n_vars = 3;
+    static const int ndofs = 3;
+    static const int rows = 9;
+
+    idx_t ev[3];
+    idx_t ks[3];
+    real_t element_vector[rows];
+    real_t fb[2] = {0, 0};
+    real_t xx[4];
+    real_t yy[4];
+
+    real_t u_rhs[4 * 2];
+    real_t p_rhs[3] = {0., 0., 0.};
+
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma unroll(3)
+        for (int v = 0; v < 3; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        // Element indices
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+
+        const real_t x0 = points[0][i0];
+        const real_t x1 = points[0][i1];
+        const real_t x2 = points[0][i2];
+
+        const real_t y0 = points[1][i0];
+        const real_t y1 = points[1][i1];
+        const real_t y2 = points[1][i2];
+
+        const real_t bx = (x0 + x1 + x2) / 3;
+        const real_t by = (y0 + y1 + y2) / 3;
+
+        xx[0] = bx;
+        yy[0] = by;
+
+        xx[1] = x0;
+        yy[1] = y0;
+
+        xx[2] = x1;
+        yy[2] = y1;
+
+        xx[3] = x2;
+        yy[3] = y2;
+
+        for (int ii = 0; ii < 4; ii++) {
+            switch (tp_num) {
+                case 1: {
+                    rhs1(mu, xx[ii], yy[ii], fb);
+                    break;
+                }
+                case 2: {
+                    rhs2(mu, xx[ii], yy[ii], fb);
+                    break;
+                }
+                case 3: {
+                    rhs3(mu, xx[ii], yy[ii], fb);
+                    break;
+                }
+                default: {
+                    assert(0);
+                    break;
+                }
+            }
+
+            if (ii == 0) {
+                fb[0] = 0;
+                fb[1] = 0;
+            }
+
+            u_rhs[0 * 3 + ii] = fb[0];
+            u_rhs[1 * 3 + ii] = fb[1];
+        }
+
+        tri3_stokes_mini_assemble_rhs_kernel(mu,
+                                             rho,
+                                             // X coords
+                                             x0,
+                                             x1,
+                                             x2,
+                                             // Y coords
+                                             y0,
+                                             y1,
+                                             y2,
+                                             //  buffers
+                                             u_rhs,
+                                             p_rhs,
+                                             element_vector);
+
+        for (int edof_i = 0; edof_i < 3; ++edof_i) {
+            const idx_t dof_i = elems[edof_i][i];
+
+            // Add block
+            for (int d1 = 0; d1 < n_vars; d1++) {
+                rhs[dof_i * n_vars + d1] += element_vector[d1 * 3 + edof_i];
+            }
+        }
+    }
+
+    double tock = MPI_Wtime();
+    printf("tri3_stokes.c: tri3_stokes_mini_assemble_rhs\t%g seconds\n", tock - tick);
+}
+
+//////////////////////////////////////////////
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -563,6 +773,7 @@ int main(int argc, char *argv[]) {
     real_t SFEM_MU = 1;
     real_t SFEM_RHO = 1;
     int SFEM_PROBLEM_TYPE = 1;
+    int SFEM_AOS = 0;
     const char *SFEM_DIRICHLET_NODES = 0;
 
     SFEM_READ_ENV(SFEM_PROBLEM_TYPE, atoi);
@@ -596,172 +807,274 @@ int main(int argc, char *argv[]) {
     ptrdiff_t nnz = 0;
     count_t *rowptr = 0;
     idx_t *colidx = 0;
-    real_t **values = 0;
 
     build_crs_graph_for_elem_type(
         mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
-
     nnz = rowptr[mesh.nnodes];
+
+    double tock = MPI_Wtime();
+    printf("stokes.c: build crs graph\t\t%g seconds\n", tock - tack);
+    tack = tock;
 
     const int sdim = elem_manifold_dim(mesh.element_type);
     const int n_vars = sdim + 1;
 
-    values = (real_t **)malloc((n_vars * n_vars) * sizeof(real_t *));
-    for (int d = 0; d < (n_vars * n_vars); d++) {
-        values[d] = calloc(nnz, sizeof(real_t));
-    }
+    if (SFEM_AOS) {
+        real_t *values = calloc(n_vars * n_vars * nnz, sizeof(real_t));
+        real_t *rhs = calloc(n_vars * mesh.nnodes, sizeof(real_t));
 
-    real_t **rhs = 0;
-    rhs = (real_t **)malloc((n_vars) * sizeof(real_t *));
-    for (int d = 0; d < n_vars; d++) {
-        rhs[d] = calloc(mesh.nnodes, sizeof(real_t));
-    }
+        ///////////////////////////////////////////////////////////////////////////////
+        // Operator assembly
+        ///////////////////////////////////////////////////////////////////////////////
 
-    double tock = MPI_Wtime();
-    printf("stokes.c: build crs\t\t%g seconds\n", tock - tack);
-    tack = tock;
+        tri3_stokes_mini_assemble_hessian_aos(SFEM_MU,
+                                              mesh.element_type,
+                                              mesh.nelements,
+                                              mesh.nnodes,
+                                              mesh.elements,
+                                              mesh.points,
+                                              rowptr,
+                                              colidx,
+                                              values);
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Operator assembly
-    ///////////////////////////////////////////////////////////////////////////////
+        tri3_stokes_mini_assemble_rhs_aos(SFEM_PROBLEM_TYPE,
+                                          SFEM_MU,
+                                          SFEM_RHO,
+                                          mesh.element_type,
+                                          mesh.nelements,
+                                          mesh.nnodes,
+                                          mesh.elements,
+                                          mesh.points,
+                                          rhs);
 
-    tri3_stokes_mini_assemble_hessian(SFEM_MU,
-                                      mesh.element_type,
-                                      mesh.nelements,
-                                      mesh.nnodes,
-                                      mesh.elements,
-                                      mesh.points,
-                                      rowptr,
-                                      colidx,
-                                      values);
+        count_t *b_rowptr = (count_t *)malloc((mesh.nnodes + 1) * n_vars * sizeof(count_t));
+        idx_t *b_colidx = (idx_t *)malloc(rowptr[mesh.nnodes] * n_vars * n_vars * sizeof(idx_t));
+        crs_graph_block_to_scalar(mesh.nnodes, n_vars, rowptr, colidx, b_rowptr, b_colidx);
 
-    tri3_stokes_mini_assemble_rhs(SFEM_PROBLEM_TYPE,
-                                  SFEM_MU,
-                                  SFEM_RHO,
-                                  mesh.element_type,
-                                  mesh.nelements,
-                                  mesh.nnodes,
-                                  mesh.elements,
-                                  mesh.points,
-                                  rhs);
+        if (SFEM_DIRICHLET_NODES) {
+            idx_t *dirichlet_nodes = 0;
+            ptrdiff_t _nope_, nn;
+            array_create_from_file(comm,
+                                   SFEM_DIRICHLET_NODES,
+                                   SFEM_MPI_IDX_T,
+                                   (void **)&dirichlet_nodes,
+                                   &_nope_,
+                                   &nn);
 
-    tock = MPI_Wtime();
-    printf("stokes.c: assembly\t\t%g seconds\n", tock - tack);
-    tack = tock;
-
-    ///////////////////////////////////////////////////////////////////////////////
-    // Boundary conditions
-    ///////////////////////////////////////////////////////////////////////////////
-
-    if (SFEM_DIRICHLET_NODES) {
-        idx_t *dirichlet_nodes = 0;
-        ptrdiff_t _nope_, nn;
-        array_create_from_file(
-            comm, SFEM_DIRICHLET_NODES, SFEM_MPI_IDX_T, (void **)&dirichlet_nodes, &_nope_, &nn);
-
-        for (int d = 0; d < sdim; d++) {
-            constraint_nodes_to_value(nn, dirichlet_nodes, 0, rhs[d]);
-        }
-
-        for (int d1 = 0; d1 < sdim; d1++) {
-            for (int d2 = 0; d2 < n_vars; d2++) {
-                crs_constraint_nodes_to_identity(
-                    nn, dirichlet_nodes, d1 == d2, rowptr, colidx, values[d1 * n_vars + d2]);
+            for (int d = 0; d < sdim; d++) {
+                constraint_nodes_to_value_vec(nn, dirichlet_nodes, n_vars, d, 0, rhs);
             }
+
+            for (int d1 = 0; d1 < sdim; d1++) {
+                crs_constraint_nodes_to_identity_vec(
+                    nn, dirichlet_nodes, n_vars, d1, 1, b_rowptr, b_colidx, values);
+            }
+
+            if (1)
+            // if (0)
+            {
+                // One point to 0 to fix pressure degree of freedom
+                // ptrdiff_t node = nn - 1;
+                ptrdiff_t node = 0;
+                crs_constraint_nodes_to_identity_vec(
+                    1, &dirichlet_nodes[node], n_vars, (n_vars - 1), 1, b_rowptr, b_colidx, values);
+
+                constraint_nodes_to_value_vec(
+                    1, &dirichlet_nodes[node], n_vars, n_vars - 1, 0, rhs);
+            }
+
+        } else {
+            assert(0);
         }
 
-        if (1)
-        // if (0)
         {
-            // One point to 0 to fix pressure degree of freedom
-            // ptrdiff_t node = nn - 1;
-            ptrdiff_t node = 0;
-            for (int d2 = 0; d2 < n_vars; d2++) {
-                crs_constraint_nodes_to_identity(1,
-                                                 &dirichlet_nodes[node],
-                                                 (n_vars - 1) == d2,
-                                                 rowptr,
-                                                 colidx,
-                                                 values[(n_vars - 1) * n_vars + d2]);
+            crs_t crs_out;
+            crs_out.rowptr = (char *)b_rowptr;
+            crs_out.colidx = (char *)b_colidx;
+            crs_out.values = (char *)values;
+            crs_out.grows = mesh.nnodes * n_vars;
+            crs_out.lrows = mesh.nnodes * n_vars;
+            crs_out.lnnz = b_rowptr[mesh.nnodes * n_vars];
+            crs_out.gnnz = b_rowptr[mesh.nnodes * n_vars];
+            crs_out.start = 0;
+            crs_out.rowoffset = 0;
+            crs_out.rowptr_type = SFEM_MPI_COUNT_T;
+            crs_out.colidx_type = SFEM_MPI_IDX_T;
+            crs_out.values_type = SFEM_MPI_REAL_T;
+
+            crs_write_folder(comm, output_folder, &crs_out);
+        }
+
+        {
+            char path[1024 * 10];
+            // Write rhs vectors
+            sprintf(path, "%s/rhs.raw", output_folder);
+            array_write(
+                comm, path, SFEM_MPI_REAL_T, rhs, mesh.nnodes * n_vars, mesh.nnodes * n_vars);
+        }
+
+        free(b_rowptr);
+        free(b_colidx);
+        free(values);
+        free(rhs);
+    } else {
+        real_t **values = 0;
+        values = (real_t **)malloc((n_vars * n_vars) * sizeof(real_t *));
+        for (int d = 0; d < (n_vars * n_vars); d++) {
+            values[d] = calloc(nnz, sizeof(real_t));
+        }
+
+        real_t **rhs = 0;
+        rhs = (real_t **)malloc((n_vars) * sizeof(real_t *));
+        for (int d = 0; d < n_vars; d++) {
+            rhs[d] = calloc(mesh.nnodes, sizeof(real_t));
+        }
+
+        ///////////////////////////////////////////////////////////////////////////////
+        // Operator assembly
+        ///////////////////////////////////////////////////////////////////////////////
+
+        tri3_stokes_mini_assemble_hessian_soa(SFEM_MU,
+                                              mesh.element_type,
+                                              mesh.nelements,
+                                              mesh.nnodes,
+                                              mesh.elements,
+                                              mesh.points,
+                                              rowptr,
+                                              colidx,
+                                              values);
+
+        tri3_stokes_mini_assemble_rhs_soa(SFEM_PROBLEM_TYPE,
+                                          SFEM_MU,
+                                          SFEM_RHO,
+                                          mesh.element_type,
+                                          mesh.nelements,
+                                          mesh.nnodes,
+                                          mesh.elements,
+                                          mesh.points,
+                                          rhs);
+
+        tock = MPI_Wtime();
+        printf("stokes.c: assembly\t\t%g seconds\n", tock - tack);
+        tack = tock;
+
+        ///////////////////////////////////////////////////////////////////////////////
+        // Boundary conditions
+        ///////////////////////////////////////////////////////////////////////////////
+
+        if (SFEM_DIRICHLET_NODES) {
+            idx_t *dirichlet_nodes = 0;
+            ptrdiff_t _nope_, nn;
+            array_create_from_file(comm,
+                                   SFEM_DIRICHLET_NODES,
+                                   SFEM_MPI_IDX_T,
+                                   (void **)&dirichlet_nodes,
+                                   &_nope_,
+                                   &nn);
+
+            for (int d = 0; d < sdim; d++) {
+                constraint_nodes_to_value(nn, dirichlet_nodes, 0, rhs[d]);
             }
 
-            constraint_nodes_to_value(1, &dirichlet_nodes[node], 0, rhs[n_vars - 1]);
+            for (int d1 = 0; d1 < sdim; d1++) {
+                for (int d2 = 0; d2 < n_vars; d2++) {
+                    crs_constraint_nodes_to_identity(
+                        nn, dirichlet_nodes, d1 == d2, rowptr, colidx, values[d1 * n_vars + d2]);
+                }
+            }
 
-            printf("constrained node %ld\n", (long)dirichlet_nodes[0]);
+            if (1)
+            // if (0)
+            {
+                // One point to 0 to fix pressure degree of freedom
+                // ptrdiff_t node = nn - 1;
+                ptrdiff_t node = 0;
+                for (int d2 = 0; d2 < n_vars; d2++) {
+                    crs_constraint_nodes_to_identity(1,
+                                                     &dirichlet_nodes[node],
+                                                     (n_vars - 1) == d2,
+                                                     rowptr,
+                                                     colidx,
+                                                     values[(n_vars - 1) * n_vars + d2]);
+                }
+
+                constraint_nodes_to_value(1, &dirichlet_nodes[node], 0, rhs[n_vars - 1]);
+            }
+
+        } else {
+            assert(0);
         }
 
-    } else {
-        assert(0);
-    }
+        tock = MPI_Wtime();
+        printf("stokes.c: boundary\t\t%g seconds\n", tock - tack);
+        tack = tock;
 
-    tock = MPI_Wtime();
-    printf("stokes.c: boundary\t\t%g seconds\n", tock - tack);
-    tack = tock;
+        ///////////////////////////////////////////////////////////////////////////////
+        // Write to disk
+        ///////////////////////////////////////////////////////////////////////////////
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Write to disk
-    ///////////////////////////////////////////////////////////////////////////////
+        {
+            // Write block CRS matrix
+            block_crs_t crs_out;
+            crs_out.rowptr = (char *)rowptr;
+            crs_out.colidx = (char *)colidx;
 
-    {
-        // Write block CRS matrix
-        block_crs_t crs_out;
-        crs_out.rowptr = (char *)rowptr;
-        crs_out.colidx = (char *)colidx;
+            crs_out.block_size = n_vars * n_vars;
+            crs_out.values = (char **)values;
+            crs_out.grows = mesh.nnodes;
+            crs_out.lrows = mesh.nnodes;
+            crs_out.lnnz = nnz;
+            crs_out.gnnz = nnz;
+            crs_out.start = 0;
+            crs_out.rowoffset = 0;
+            crs_out.rowptr_type = SFEM_MPI_COUNT_T;
+            crs_out.colidx_type = SFEM_MPI_IDX_T;
+            crs_out.values_type = SFEM_MPI_REAL_T;
 
-        crs_out.block_size = n_vars * n_vars;
-        crs_out.values = (char **)values;
-        crs_out.grows = mesh.nnodes;
-        crs_out.lrows = mesh.nnodes;
-        crs_out.lnnz = nnz;
-        crs_out.gnnz = nnz;
-        crs_out.start = 0;
-        crs_out.rowoffset = 0;
-        crs_out.rowptr_type = SFEM_MPI_COUNT_T;
-        crs_out.colidx_type = SFEM_MPI_IDX_T;
-        crs_out.values_type = SFEM_MPI_REAL_T;
+            char path_rowptr[1024 * 10];
+            sprintf(path_rowptr, "%s/rowptr.raw", output_folder);
 
-        char path_rowptr[1024 * 10];
-        sprintf(path_rowptr, "%s/rowptr.raw", output_folder);
+            char path_colidx[1024 * 10];
+            sprintf(path_colidx, "%s/colidx.raw", output_folder);
 
-        char path_colidx[1024 * 10];
-        sprintf(path_colidx, "%s/colidx.raw", output_folder);
+            char format_values[1024 * 10];
+            sprintf(format_values, "%s/values.%%d.raw", output_folder);
+            block_crs_write(comm, path_rowptr, path_colidx, format_values, &crs_out);
+        }
 
-        char format_values[1024 * 10];
-        sprintf(format_values, "%s/values.%%d.raw", output_folder);
-        block_crs_write(comm, path_rowptr, path_colidx, format_values, &crs_out);
-    }
+        {
+            char path[1024 * 10];
+            // Write rhs vectors
+            for (int d = 0; d < n_vars; d++) {
+                sprintf(path, "%s/rhs.%d.raw", output_folder, d);
+                array_write(comm, path, SFEM_MPI_REAL_T, rhs[d], mesh.nnodes, mesh.nnodes);
+            }
+        }
 
-    {
-        char path[1024 * 10];
-        // Write rhs vectors
+        tock = MPI_Wtime();
+        printf("stokes.c: write\t\t%g seconds\n", tock - tack);
+        tack = tock;
+
+        ///////////////////////////////////////////////////////////////////////////////
+        // Free resources
+        ///////////////////////////////////////////////////////////////////////////////
+
+        for (int d = 0; d < (n_vars * n_vars); d++) {
+            free(values[d]);
+        }
+
+        free(values);
+
         for (int d = 0; d < n_vars; d++) {
-            sprintf(path, "%s/rhs.%d.raw", output_folder, d);
-            array_write(comm, path, SFEM_MPI_REAL_T, rhs[d], mesh.nnodes, mesh.nnodes);
+            free(rhs[d]);
         }
+
+        free(rhs);
     }
 
-    tock = MPI_Wtime();
-    printf("stokes.c: write\t\t%g seconds\n", tock - tack);
-    tack = tock;
-
-    ///////////////////////////////////////////////////////////////////////////////
-    // Free resources
-    ///////////////////////////////////////////////////////////////////////////////
-
+    // Mesh n2n graph
     free(rowptr);
     free(colidx);
-
-    for (int d = 0; d < (n_vars * n_vars); d++) {
-        free(values[d]);
-    }
-
-    free(values);
-
-    for (int d = 0; d < n_vars; d++) {
-        free(rhs[d]);
-    }
-
-    free(rhs);
 
     ptrdiff_t nelements = mesh.nelements;
     ptrdiff_t nnodes = mesh.nnodes;

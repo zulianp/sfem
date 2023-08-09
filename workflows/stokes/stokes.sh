@@ -31,8 +31,8 @@ solve()
 }
 
 mesh=mesh
-# create_square.sh 8
-# rm -f $mesh/z.raw
+create_square.sh 6
+rm -f $mesh/z.raw
 
 export SFEM_DIRICHLET_NODES=all.raw
 cat $mesh/sidesets_aos/*.raw > $SFEM_DIRICHLET_NODES
@@ -40,19 +40,33 @@ cat $mesh/sidesets_aos/*.raw > $SFEM_DIRICHLET_NODES
 nvars=3
 
 
-export SFEM_PROBLEM_TYPE=3
+export SFEM_PROBLEM_TYPE=1
+# export SFEM_AOS=1
 
-stokes $mesh stokes_block_system
-crs.py $nvars $nvars stokes_block_system stokes_system
+if [[ -z "$SFEM_AOS" ]]
+then
+	stokes $mesh stokes_block_system
+	crs.py $nvars $nvars stokes_block_system stokes_system
 
-blocks.py 'stokes_block_system/rhs.*.raw' stokes_system/rhs.raw
+	blocks.py 'stokes_block_system/rhs.*.raw' stokes_system/rhs.raw
 
-solve stokes_system/rowptr.raw stokes_system/rhs.raw x.raw
+	solve stokes_system/rowptr.raw stokes_system/rhs.raw x.raw
 
-unblocks.py $nvars x.raw
-unblocks.py $nvars stokes_system/rhs.raw
+	unblocks.py $nvars x.raw
+	unblocks.py $nvars stokes_system/rhs.raw
 
-# <mesh> <ux.raw> <uy.raw> <uz.raw> <p.raw>
-stokes_check $mesh ref_vel_x.raw ref_vel_y.raw ref_p.raw
+	# <mesh> <ux.raw> <uy.raw> <uz.raw> <p.raw>
+	stokes_check $mesh ref_vel_x.raw ref_vel_y.raw ref_p.raw
 
-raw_to_db.py $mesh out.vtk --point_data="x.*.raw,stokes_system/rhs.*.raw,ref_*"
+	raw_to_db.py $mesh out.vtk --point_data="x.*.raw,stokes_system/rhs.*.raw,ref_*"
+else
+	mkdir -p stokes_system
+	mkdir -p out
+	set -x
+	
+	stokes $mesh stokes_system
+
+	solve stokes_system/rowptr.raw stokes_system/rhs.raw out/x.raw
+	aos_to_soa out/x.raw 8 $nvars ./out/x
+	raw_to_db.py $mesh out.vtk --point_data="out/x.*.raw"
+fi
