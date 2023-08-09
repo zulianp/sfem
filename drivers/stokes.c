@@ -779,6 +779,7 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_PROBLEM_TYPE, atoi);
     SFEM_READ_ENV(SFEM_MU, atof);
     SFEM_READ_ENV(SFEM_RHO, atof);
+    SFEM_READ_ENV(SFEM_AOS, atoi);
     SFEM_READ_ENV(SFEM_DIRICHLET_NODES, );
 
     if (rank == 0) {

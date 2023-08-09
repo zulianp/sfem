@@ -31,8 +31,8 @@ solve()
 }
 
 mesh=mesh
-create_square.sh 6
-rm -f $mesh/z.raw
+# create_square.sh 4
+# rm -f $mesh/z.raw
 
 export SFEM_DIRICHLET_NODES=all.raw
 cat $mesh/sidesets_aos/*.raw > $SFEM_DIRICHLET_NODES
@@ -41,7 +41,7 @@ nvars=3
 
 
 export SFEM_PROBLEM_TYPE=1
-# export SFEM_AOS=1
+export SFEM_AOS=1
 
 if [[ -z "$SFEM_AOS" ]]
 then
@@ -60,13 +60,13 @@ then
 
 	raw_to_db.py $mesh out.vtk --point_data="x.*.raw,stokes_system/rhs.*.raw,ref_*"
 else
-	mkdir -p stokes_system
+	mkdir -p stokes_system_aos
 	mkdir -p out
 	set -x
 	
-	stokes $mesh stokes_system
+	stokes $mesh stokes_system_aos
 
-	solve stokes_system/rowptr.raw stokes_system/rhs.raw out/x.raw
+	solve stokes_system_aos/rowptr.raw stokes_system_aos/rhs.raw out/x.raw
 	aos_to_soa out/x.raw 8 $nvars ./out/x
 	raw_to_db.py $mesh out.vtk --point_data="out/x.*.raw"
 fi
