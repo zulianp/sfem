@@ -65,8 +65,8 @@ class StokesMiniOp:
 				self.mass_p1[i, j] = integr
 
 		c_u_rhs = coeffs('u_rhs', len(fun_mini))
-		for b in self.get_bubble_dofs():
-			c_u_rhs[b] = 0
+		# for b in self.get_bubble_dofs():
+		# 	c_u_rhs[b] = 0
 
 		self.u_rhs = rho * self.mass_mini * c_u_rhs
 		self.p_rhs = rho * self.mass_p1 * coeffs('p_rhs', len(fun_p1))
@@ -263,8 +263,8 @@ class StokesMiniOp:
 		return self.assign_tensor("element_vector", a)
 
 def main():
-	# op = StokesMiniOp(Mini2D())
-	op = StokesMiniOp(Mini3D())
+	op = StokesMiniOp(Mini2D())
+	# op = StokesMiniOp(Mini3D())
 
 if __name__ == "__main__":
 	main()

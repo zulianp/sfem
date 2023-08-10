@@ -5,11 +5,11 @@ set -e
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 PATH=$SCRIPTPATH:$PATH
-PATH=$SCRIPTPATH/../..:$PATH
-PATH=$SCRIPTPATH/../../python:$PATH
-PATH=$SCRIPTPATH/../../python/mesh:$PATH
-PATH=$SCRIPTPATH/../../python/algebra:$PATH
-PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
+PATH=$SCRIPTPATH/../../..:$PATH
+PATH=$SCRIPTPATH/../../../python:$PATH
+PATH=$SCRIPTPATH/../../../python/mesh:$PATH
+PATH=$SCRIPTPATH/../../../python/algebra:$PATH
+PATH=$SCRIPTPATH/../../../data/benchmarks/meshes:$PATH
 
 UTOPIA_EXEC=$CODE_DIR/utopia/utopia/build/utopia_exec
 
@@ -29,20 +29,26 @@ solve()
 	x_=$3
 
 	echo "rhs=$rhs_"
-	mpiexec -np 8 $UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type lu -ksp_type preonly
-	# mpiexec -np 8 $UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type bjacobi -ksp_type bicg --verbose
+	# mpiexec -np 8 $UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type lu -ksp_type preonly
+	# mpiexec -np 8 
+	$UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type ilu -ksp_type fgmres --verbose -rtol 1e-8 -max_it 20000
 }
 
+
+db=/Users/patrickzulian/Desktop/cloud/owncloud_HSLU/Patrick/2023/Cases/FP1100/fluid.e
 mesh=mesh
-# create_square.sh 3
-# rm -f $mesh/z.raw
-nvars=3
+
+# db_to_raw.py $db $mesh
+# 
+# create_cylinder.sh 4
+# mesh=/Users/patrickzulian/Desktop/code/sfem/data/benchmarks/1_darcy_cube/mesh
+nvars=4
 
 export SFEM_DIRICHLET_NODES=all.raw
 cat $mesh/sidesets_aos/*.raw > $SFEM_DIRICHLET_NODES
 
 
-export SFEM_PROBLEM_TYPE=3
+export SFEM_PROBLEM_TYPE=5
 # export SFEM_AOS=1
 
 if [[ -z "$SFEM_AOS" ]]
@@ -58,7 +64,7 @@ then
 	unblocks.py $nvars stokes_system/rhs.raw
 
 	# <mesh> <ux.raw> <uy.raw> <uz.raw> <p.raw>
-	stokes_check $mesh ref_vel_x.raw ref_vel_y.raw ref_p.raw
+	# stokes_check $mesh ref_vel_x.raw ref_vel_y.raw ref_p.raw
 
 	raw_to_db.py $mesh out.vtk --point_data="x.*.raw,stokes_system/rhs.*.raw,ref_*"
 else
@@ -66,7 +72,6 @@ else
 	mkdir -p out
 	set -x
 	
-	# lldb -- 
 	stokes $mesh stokes_system_aos
 
 	solve stokes_system_aos/rowptr.raw stokes_system_aos/rhs.raw out/x.raw

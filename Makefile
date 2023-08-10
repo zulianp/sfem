@@ -145,7 +145,6 @@ OBJS = \
 	sfem_mesh_write.o \
 	mesh_aura.o \
 	isotropic_phasefield_for_fracture.o \
-	tet10_laplacian.o \
 	adj_table.o \
 	laplacian.o \
 	trishell3_l2_projection_p0_p1.o \
@@ -153,27 +152,30 @@ OBJS = \
 	surface_l2_projection.o \
 	grad_p1.o  \
 	linear_elasticity.o \
-	tri3_linear_elasticity.o \
-	tet4_linear_elasticity.o \
-	tet4_phase_field_for_fracture.o \
-	tri3_phase_field_for_fracture.o \
-	tet4_stokes_mini.o \
-	tri3_stokes_mini.o \
 	stokes_mini.o \
 	phase_field_for_fracture.o 
 
-OBJS += tri3_laplacian.o
+# Tri3
+OBJS += tri3_stokes_mini.o \
+		tri3_mass.o \
+		tri3_phase_field_for_fracture.o \
+		tri3_linear_elasticity.o \
+		tri3_laplacian.o
 
 # Tet4
 OBJS += tet4_div.o \
 	tet4_mass.o \
 	tet4_l2_projection_p0_p1.o \
+	tet4_linear_elasticity.o \
+	tet4_phase_field_for_fracture.o \
+	tet4_stokes_mini.o \
 	trishell3_l2_projection_p0_p1.o
 
 # Tet10
 OBJS += tet10_grad.o \
 	tet10_div.o \
 	tet10_mass.o \
+	tet10_laplacian.o \
 	tet10_l2_projection_p1_p2.o
 
 

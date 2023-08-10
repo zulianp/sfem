@@ -77,6 +77,12 @@ class MassOp:
 
 def main():
 
+	if True:
+		fe = Tri3()
+		f =  Field(fe, coeffs('u', 3))
+		op = MassOp(f, fe, [qx, qy])
+		c_code(op.apply())
+
 	if False:
 		fe = Tet10()
 		f =  Field(fe, coeffs('u', 10))
@@ -132,8 +138,8 @@ def main():
 		c_code(tet10_basis_transform_expr())
 		print("----------------------------")
 
-	if True:
-	# if False:
+	# if True:
+	if False:
 		print("----------------------------")
 		print("Transform")
 		print("----------------------------")

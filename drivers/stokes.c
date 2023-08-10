@@ -23,81 +23,7 @@
 #include "neumann.h"
 
 #include "read_mesh.h"
-
 #include "stokes_mini.h"
-
-SFEM_INLINE void tri3_stokes_mini_assemble_rhs_kernel(const real_t mu,
-                                                      const real_t rho,
-                                                      const real_t px0,
-                                                      const real_t px1,
-                                                      const real_t px2,
-                                                      const real_t py0,
-                                                      const real_t py1,
-                                                      const real_t py2,
-                                                      const real_t *const SFEM_RESTRICT u_rhs,
-                                                      const real_t *const SFEM_RESTRICT p_rhs,
-                                                      real_t *const SFEM_RESTRICT element_vector) {
-    // const real_t x0 = 5 * u_rhs[2];
-    // const real_t x1 = 9 * u_rhs[0];
-    // const real_t x2 = 5 * u_rhs[3] + x1;
-    // const real_t x3 = px0 - px1;
-    // const real_t x4 = -py2;
-    // const real_t x5 = py0 + x4;
-    // const real_t x6 = -px2;
-    // const real_t x7 = px0 + x6;
-    // const real_t x8 = py0 - py1;
-    // const real_t x9 = x3 * x5 - x7 * x8;
-    // const real_t x10 = rho * x9;
-    // const real_t x11 = (1.0 / 120.0) * x10;
-    // const real_t x12 = 5 * u_rhs[1];
-    // const real_t x13 = 5 * u_rhs[6];
-    // const real_t x14 = 9 * u_rhs[4];
-    // const real_t x15 = 5 * u_rhs[7] + x14;
-    // const real_t x16 = 5 * u_rhs[5];
-    // const real_t x17 = x9 * (27 * u_rhs[0] + 14 * u_rhs[1] + 14 * u_rhs[2] + 14 * u_rhs[3]);
-    // const real_t x18 = x9 * (27 * u_rhs[4] + 14 * u_rhs[5] + 14 * u_rhs[6] + 14 * u_rhs[7]);
-    // const real_t x19 = pow(x3, 2) - x3 * x7 + pow(x5, 2) - x5 * x8 + pow(x7, 2) + pow(x8, 2);
-    // const real_t x20 = 140 * mu * x19;
-    // const real_t x21 = (1.0 / 3360.0) * x10 / (mu * x19);
-    // element_vector[0] = x11 * (10 * u_rhs[1] + x0 + x2);
-    // element_vector[1] = x11 * (10 * u_rhs[2] + x12 + x2);
-    // element_vector[2] = x11 * (10 * u_rhs[3] + x0 + x1 + x12);
-    // element_vector[3] = x11 * (10 * u_rhs[5] + x13 + x15);
-    // element_vector[4] = x11 * (10 * u_rhs[6] + x15 + x16);
-    // element_vector[5] = x11 * (10 * u_rhs[7] + x13 + x14 + x16);
-    // element_vector[6] =
-    //     x21 * (x17 * (-py1 - x4) - x18 * (-px1 - x6) + x20 * (2 * p_rhs[0] + p_rhs[1] +
-    //     p_rhs[2]));
-    // element_vector[7] = x21 * (x17 * x5 - x18 * x7 + x20 * (p_rhs[0] + 2 * p_rhs[1] + p_rhs[2]));
-    // element_vector[8] = x21 * (-x17 * x8 + x18 * x3 + x20 * (p_rhs[0] + p_rhs[1] + 2 *
-    // p_rhs[2]));
-    const real_t x0 = u_rhs[2] + u_rhs[3];
-    const real_t x1 = px0 - px1;
-    const real_t x2 = -py2;
-    const real_t x3 = py0 + x2;
-    const real_t x4 = -px2;
-    const real_t x5 = px0 + x4;
-    const real_t x6 = py0 - py1;
-    const real_t x7 = x1 * x3 - x5 * x6;
-    const real_t x8 = rho * x7;
-    const real_t x9 = (1.0 / 24.0) * x8;
-    const real_t x10 = u_rhs[6] + u_rhs[7];
-    const real_t x11 = x7 * (u_rhs[1] + x0);
-    const real_t x12 = x7 * (u_rhs[5] + x10);
-    const real_t x13 = pow(x1, 2) - x1 * x5 + pow(x3, 2) - x3 * x6 + pow(x5, 2) + pow(x6, 2);
-    const real_t x14 = 10 * mu * x13;
-    const real_t x15 = (1.0 / 240.0) * x8 / (mu * x13);
-    element_vector[0] = x9 * (2 * u_rhs[1] + x0);
-    element_vector[1] = x9 * (u_rhs[1] + 2 * u_rhs[2] + u_rhs[3]);
-    element_vector[2] = x9 * (u_rhs[1] + u_rhs[2] + 2 * u_rhs[3]);
-    element_vector[3] = x9 * (2 * u_rhs[5] + x10);
-    element_vector[4] = x9 * (u_rhs[5] + 2 * u_rhs[6] + u_rhs[7]);
-    element_vector[5] = x9 * (u_rhs[5] + u_rhs[6] + 2 * u_rhs[7]);
-    element_vector[6] =
-        x15 * (x11 * (-py1 - x2) - x12 * (-px1 - x4) + x14 * (2 * p_rhs[0] + p_rhs[1] + p_rhs[2]));
-    element_vector[7] = x15 * (x11 * x3 - x12 * x5 + x14 * (p_rhs[0] + 2 * p_rhs[1] + p_rhs[2]));
-    element_vector[8] = x15 * (x1 * x12 - x11 * x6 + x14 * (p_rhs[0] + p_rhs[1] + 2 * p_rhs[2]));
-}
 
 ////////////////////////////////////////////////////////////////////////////////////
 // The MINI mixed finite element for the Stokes problem: An experimental
@@ -138,7 +64,6 @@ static SFEM_INLINE real_t rhs3_y(const real_t mu, const real_t x, const real_t y
     return pis4 * mu * sin(pi2 * x) * (2 * cos(pi2 * y) - 1) - pis4 * sin(pi2 * y);
 }
 
-
 static SFEM_INLINE real_t rhs4_x(const real_t mu, const real_t x, const real_t y, const real_t z) {
     const real_t pis4 = 4 * M_PI * M_PI;
     const real_t pi2 = 2 * M_PI;
@@ -155,6 +80,10 @@ static SFEM_INLINE real_t rhs4_z(const real_t mu, const real_t x, const real_t y
     const real_t pis4 = 4 * M_PI * M_PI;
     const real_t pi2 = 2 * M_PI;
     return pis4 * mu * sin(pi2 * z) * (2 * cos(pi2 * x) - 1) - pis4 * sin(pi2 * y);
+}
+
+static SFEM_INLINE real_t rhs5_x(const real_t mu, const real_t x, const real_t y, const real_t z) {
+    return 10000 * (x * x + y * y + z * z);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -252,7 +181,6 @@ int main(int argc, char *argv[]) {
     double tack = MPI_Wtime();
     printf("stokes.c: read\t\t%g seconds\n", tack - tick);
 
-
     ptrdiff_t nnz = 0;
     count_t *rowptr = 0;
     idx_t *colidx = 0;
@@ -290,7 +218,7 @@ int main(int argc, char *argv[]) {
             node_eval_f2D(mesh.nnodes, mesh.points, SFEM_MU, &rhs3_y, rhs_values[1]);
             break;
         }
-    case 4: {
+        case 4: {
             rhs_values[0] = calloc(mesh.nnodes, sizeof(real_t));
             rhs_values[1] = calloc(mesh.nnodes, sizeof(real_t));
             rhs_values[2] = calloc(mesh.nnodes, sizeof(real_t));
@@ -299,8 +227,14 @@ int main(int argc, char *argv[]) {
             node_eval_f3D(mesh.nnodes, mesh.points, SFEM_MU, &rhs4_z, rhs_values[2]);
             break;
         }
-        default:
+        case 5: {
+            rhs_values[0] = calloc(mesh.nnodes, sizeof(real_t));
+            node_eval_f3D(mesh.nnodes, mesh.points, SFEM_MU, &rhs5_x, rhs_values[0]);
             break;
+        }
+        default: {
+            break;
+        }
     }
 
     if (SFEM_AOS) {
@@ -426,15 +360,30 @@ int main(int argc, char *argv[]) {
                                          colidx,
                                          values);
 
-        stokes_mini_assemble_rhs_soa(mesh.element_type,
-                                     mesh.nelements,
-                                     mesh.nnodes,
-                                     mesh.elements,
-                                     mesh.points,
-                                     SFEM_MU,
-                                     SFEM_RHO,
-                                     rhs_values,
-                                     rhs);
+        if (0) {
+            // No static condensation contribution on RHS
+            for (int i = 0; i < n_vars; i++) {
+                if (rhs_values[i]) {
+                    apply_mass(mesh.element_type,
+                               mesh.nelements,
+                               mesh.nnodes,
+                               mesh.elements,
+                               mesh.points,
+                               rhs_values[i],
+                               rhs[i]);
+                }
+            }
+        } else {
+            stokes_mini_assemble_rhs_soa(mesh.element_type,
+                                         mesh.nelements,
+                                         mesh.nnodes,
+                                         mesh.elements,
+                                         mesh.points,
+                                         SFEM_MU,
+                                         SFEM_RHO,
+                                         rhs_values,
+                                         rhs);
+        }
 
         tock = MPI_Wtime();
         printf("stokes.c: assembly\t\t%g seconds\n", tock - tack);
