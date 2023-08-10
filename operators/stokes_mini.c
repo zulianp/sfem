@@ -72,11 +72,11 @@ void stokes_mini_assemble_hessian_soa(const enum ElemType element_type,
                 nelements, nnodes, elems, xyz, mu, rowptr, colidx, values);
             break;
         }
-        // case TET4: {
-        //     tet4_stokes_mini_assemble_hessian_soa(
-        //         nelements, nnodes, elems, xyz, mu, rowptr, colidx, values);
-        //     break;
-        // }
+        case TET4: {
+            tet4_stokes_mini_assemble_hessian_soa(
+                nelements, nnodes, elems, xyz, mu, rowptr, colidx, values);
+            break;
+        }
         default: {
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
@@ -224,10 +224,10 @@ void stokes_mini_assemble_rhs_soa(enum ElemType element_type,
                 tri3_stokes_mini_assemble_rhs_soa(nelements, nnodes, elems, points, mu, rho, forcing, rhs);
                 break;
             }
-            // case TET4: {
-            //     tet4_stokes_mini_assemble_rhs_soa(nelements, nnodes, elems, points, mu, rho, forcing, rhs);
-            //     break;
-            // }
+            case TET4: {
+                tet4_stokes_mini_assemble_rhs_soa(nelements, nnodes, elems, points, mu, rho, forcing, rhs);
+                break;
+            }
             default: {
                 MPI_Abort(MPI_COMM_WORLD, -1);
             }
@@ -251,10 +251,10 @@ void stokes_mini_assemble_rhs_aos(enum ElemType element_type,
             tri3_stokes_mini_assemble_rhs_aos(nelements, nnodes, elems, points, mu, rho, forcing, rhs);
             break;
         }
-        // case TET4: {
-        //     tet4_stokes_mini_assemble_rhs_aos(nelements, nnodes, elems, points, mu, rho, forcing, rhs);
-        //     break;
-        // }
+        case TET4: {
+            tet4_stokes_mini_assemble_rhs_aos(nelements, nnodes, elems, points, mu, rho, forcing, rhs);
+            break;
+        }
         default: {
             MPI_Abort(MPI_COMM_WORLD, -1);
         }

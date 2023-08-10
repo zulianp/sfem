@@ -138,6 +138,25 @@ static SFEM_INLINE real_t rhs3_y(const real_t mu, const real_t x, const real_t y
     return pis4 * mu * sin(pi2 * x) * (2 * cos(pi2 * y) - 1) - pis4 * sin(pi2 * y);
 }
 
+
+static SFEM_INLINE real_t rhs4_x(const real_t mu, const real_t x, const real_t y, const real_t z) {
+    const real_t pis4 = 4 * M_PI * M_PI;
+    const real_t pi2 = 2 * M_PI;
+    return -pis4 * mu * sin(pi2 * y) * (2 * cos(pi2 * x) - 1) + pis4 * sin(pi2 * x);
+}
+
+static SFEM_INLINE real_t rhs4_y(const real_t mu, const real_t x, const real_t y, const real_t z) {
+    const real_t pis4 = 4 * M_PI * M_PI;
+    const real_t pi2 = 2 * M_PI;
+    return pis4 * mu * sin(pi2 * x) * (2 * cos(pi2 * y) - 1) - pis4 * sin(pi2 * y);
+}
+
+static SFEM_INLINE real_t rhs4_z(const real_t mu, const real_t x, const real_t y, const real_t z) {
+    const real_t pis4 = 4 * M_PI * M_PI;
+    const real_t pi2 = 2 * M_PI;
+    return pis4 * mu * sin(pi2 * z) * (2 * cos(pi2 * x) - 1) - pis4 * sin(pi2 * y);
+}
+
 ////////////////////////////////////////////////////////////////////////////////////
 
 static void node_eval_f2D(const ptrdiff_t nnodes,
@@ -269,6 +288,15 @@ int main(int argc, char *argv[]) {
             rhs_values[1] = calloc(mesh.nnodes, sizeof(real_t));
             node_eval_f2D(mesh.nnodes, mesh.points, SFEM_MU, &rhs3_x, rhs_values[0]);
             node_eval_f2D(mesh.nnodes, mesh.points, SFEM_MU, &rhs3_y, rhs_values[1]);
+            break;
+        }
+    case 4: {
+            rhs_values[0] = calloc(mesh.nnodes, sizeof(real_t));
+            rhs_values[1] = calloc(mesh.nnodes, sizeof(real_t));
+            rhs_values[2] = calloc(mesh.nnodes, sizeof(real_t));
+            node_eval_f3D(mesh.nnodes, mesh.points, SFEM_MU, &rhs4_x, rhs_values[0]);
+            node_eval_f3D(mesh.nnodes, mesh.points, SFEM_MU, &rhs4_y, rhs_values[1]);
+            node_eval_f3D(mesh.nnodes, mesh.points, SFEM_MU, &rhs4_z, rhs_values[2]);
             break;
         }
         default:

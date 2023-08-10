@@ -605,7 +605,7 @@ void tet4_stokes_mini_assemble_hessian_soa(const ptrdiff_t nelements,
             const idx_t i0 = ev[0];
             const idx_t i1 = ev[1];
             const idx_t i2 = ev[2];
-            const idx_t i3 = ev[2];
+            const idx_t i3 = ev[3];
 
             const real_t x0 = points[0][i0];
             const real_t x1 = points[0][i1];
@@ -820,9 +820,9 @@ void tet4_stokes_mini_assemble_rhs_soa(const ptrdiff_t nelements,
                 }
             }
 
-            if (forcing[4]) {
+            if (forcing[3]) {
                 for (int ii = 0; ii < 4; ii++) {
-                    p_rhs[ii] = forcing[4][ev[ii]];
+                    p_rhs[ii] = forcing[3][ev[ii]];
                 }
             }
 
@@ -912,9 +912,9 @@ void tet4_stokes_mini_assemble_rhs_aos(const ptrdiff_t nelements,
                 }
             }
 
-            if (forcing[4]) {
+            if (forcing[3]) {
                 for (int ii = 0; ii < 4; ii++) {
-                    p_rhs[ii] = forcing[4][ev[ii]];
+                    p_rhs[ii] = forcing[3][ev[ii]];
                 }
             }
 

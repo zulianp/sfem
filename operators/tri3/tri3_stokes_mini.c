@@ -493,9 +493,9 @@ void tri3_stokes_mini_assemble_rhs_soa(const ptrdiff_t nelements,
                 }
             }
 
-            if (forcing[3]) {
+            if (forcing[2]) {
                 for (int ii = 0; ii < 3; ii++) {
-                    p_rhs[ii] = forcing[3][ev[ii]];
+                    p_rhs[ii] = forcing[2][ev[ii]];
                 }
             }
 
@@ -585,9 +585,9 @@ void tri3_stokes_mini_assemble_rhs_aos(const ptrdiff_t nelements,
                 }
             }
 
-            if (forcing[3]) {
+            if (forcing[2]) {
                 for (int ii = 0; ii < 3; ii++) {
-                    p_rhs[ii] = forcing[3][ev[ii]];
+                    p_rhs[ii] = forcing[2][ev[ii]];
                 }
             }
 
