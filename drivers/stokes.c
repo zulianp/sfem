@@ -99,8 +99,10 @@ SFEM_INLINE void tri3_stokes_mini_assemble_rhs_kernel(const real_t mu,
     element_vector[8] = x15 * (x1 * x12 - x11 * x6 + x14 * (p_rhs[0] + p_rhs[1] + 2 * p_rhs[2]));
 }
 
+////////////////////////////////////////////////////////////////////////////////////
 // The MINI mixed finite element for the Stokes problem: An experimental
 // investigation
+////////////////////////////////////////////////////////////////////////////////////
 static SFEM_INLINE real_t rhs1_x(const real_t mu, const real_t x, const real_t y) {
     return -mu * (4 * y * (1 - y) * (2 * y - 1) * ((1 - 2 * x) * (1 - 2 * x) - 2 * x * (1 - x)) +
                   12 * x * x * (1 - x) * (1 - x) * (1 - 2 * y)) +
@@ -136,14 +138,25 @@ static SFEM_INLINE real_t rhs3_y(const real_t mu, const real_t x, const real_t y
     return pis4 * mu * sin(pi2 * x) * (2 * cos(pi2 * y) - 1) - pis4 * sin(pi2 * y);
 }
 
-void node_eval_f2D(const ptrdiff_t nnodes,
-                   geom_t **const points,
-                   const real_t mu,
-                   real_t (*f)(const real_t, const real_t, const real_t),
-                   real_t *values) {
+////////////////////////////////////////////////////////////////////////////////////
+
+static void node_eval_f2D(const ptrdiff_t nnodes,
+                          geom_t **const points,
+                          const real_t mu,
+                          real_t (*f)(const real_t, const real_t, const real_t),
+                          real_t *values) {
     for (ptrdiff_t i = 0; i < nnodes; i++) {
         values[i] = f(mu, points[0][i], points[1][i]);
-        // printf
+    }
+}
+
+static void node_eval_f3D(const ptrdiff_t nnodes,
+                          geom_t **const points,
+                          const real_t mu,
+                          real_t (*f)(const real_t, const real_t, const real_t, const real_t),
+                          real_t *values) {
+    for (ptrdiff_t i = 0; i < nnodes; i++) {
+        values[i] = f(mu, points[0][i], points[1][i], points[2][i]);
     }
 }
 
@@ -188,11 +201,6 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (mesh.element_type != TRI3) {
-        fprintf(stderr, "element_type must be TRI3\n");
-        return EXIT_FAILURE;
-    }
-
     // Optional params
     real_t SFEM_MU = 1;
     real_t SFEM_RHO = 1;
@@ -225,14 +233,10 @@ int main(int argc, char *argv[]) {
     double tack = MPI_Wtime();
     printf("stokes.c: read\t\t%g seconds\n", tack - tick);
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Build CRS graph
-    ///////////////////////////////////////////////////////////////////////////////
 
     ptrdiff_t nnz = 0;
     count_t *rowptr = 0;
     idx_t *colidx = 0;
-
     build_crs_graph_for_elem_type(
         mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
     nnz = rowptr[mesh.nnodes];
@@ -322,8 +326,6 @@ int main(int argc, char *argv[]) {
                     nn, dirichlet_nodes, n_vars, d1, 1, b_rowptr, b_colidx, values);
             }
 
-            if (1)
-            // if (0)
             {
                 // One point to 0 to fix pressure degree of freedom
                 // ptrdiff_t node = nn - 1;
@@ -435,8 +437,6 @@ int main(int argc, char *argv[]) {
                 }
             }
 
-            if (1)
-            // if (0)
             {
                 // One point to 0 to fix pressure degree of freedom
                 // ptrdiff_t node = nn - 1;

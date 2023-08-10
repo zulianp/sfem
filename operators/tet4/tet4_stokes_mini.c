@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 static int check_symmetric(int n, const real_t *const element_matrix) {
     for (int i = 0; i < n; ++i) {
@@ -495,7 +496,82 @@ SFEM_INLINE void tet4_stokes_mini_assemble_rhs_kernel(const real_t mu,
                                                       const real_t pz3,
                                                       const real_t *const SFEM_RESTRICT u_rhs,
                                                       const real_t *const SFEM_RESTRICT p_rhs,
-                                                      real_t *const SFEM_RESTRICT element_vector) {}
+                                                      real_t *const SFEM_RESTRICT element_vector) {
+    const real_t x0 = u_rhs[3] + u_rhs[4];
+    const real_t x1 = u_rhs[2] + x0;
+    const real_t x2 = pz0 - pz3;
+    const real_t x3 = px0 - px1;
+    const real_t x4 = py0 - py2;
+    const real_t x5 = x3 * x4;
+    const real_t x6 = py0 - py3;
+    const real_t x7 = px0 - px2;
+    const real_t x8 = pz0 - pz1;
+    const real_t x9 = x7 * x8;
+    const real_t x10 = pz0 - pz2;
+    const real_t x11 = px0 - px3;
+    const real_t x12 = py0 - py1;
+    const real_t x13 = x11 * x12;
+    const real_t x14 = x3 * x6;
+    const real_t x15 = x12 * x7;
+    const real_t x16 = x11 * x8;
+    const real_t x17 = x10 * x13 - x10 * x14 - x15 * x2 - x16 * x4 + x2 * x5 + x6 * x9;
+    const real_t x18 = rho * x17;
+    const real_t x19 = (1.0 / 120.0) * x18;
+    const real_t x20 = u_rhs[1] + u_rhs[2];
+    const real_t x21 = u_rhs[8] + u_rhs[9];
+    const real_t x22 = u_rhs[7] + x21;
+    const real_t x23 = u_rhs[6] + u_rhs[7];
+    const real_t x24 = u_rhs[13] + u_rhs[14];
+    const real_t x25 = u_rhs[12] + x24;
+    const real_t x26 = u_rhs[11] + u_rhs[12];
+    const real_t x27 = -x15 + x5;
+    const real_t x28 = -x11 * x4 + x6 * x7;
+    const real_t x29 = u_rhs[11] + x25;
+    const real_t x30 = 3 * x17;
+    const real_t x31 = x29 * x30;
+    const real_t x32 = x6 * x8;
+    const real_t x33 = x12 * x2;
+    const real_t x34 = x10 * x12 - x4 * x8;
+    const real_t x35 = -x10 * x6 + x2 * x4;
+    const real_t x36 = u_rhs[1] + x1;
+    const real_t x37 = x30 * x36;
+    const real_t x38 = x10 * x3 - x9;
+    const real_t x39 = -x10 * x11 + x2 * x7;
+    const real_t x40 = u_rhs[6] + x22;
+    const real_t x41 = x30 * x40;
+    const real_t x42 = p_rhs[2] + p_rhs[3];
+    const real_t x43 = -x13 + x14;
+    const real_t x44 = -x16 + x2 * x3;
+    const real_t x45 = -x32 + x33;
+    const real_t x46 = pow(x27, 2) + x27 * x28 - x27 * x43 + pow(x28, 2) - x28 * x43 + pow(x34, 2) +
+                       x34 * x35 - x34 * x45 + pow(x35, 2) - x35 * x45 + pow(x38, 2) + x38 * x39 -
+                       x38 * x44 + pow(x39, 2) - x39 * x44 + pow(x43, 2) + pow(x44, 2) +
+                       pow(x45, 2);
+    const real_t x47 = 56 * mu * x46;
+    const real_t x48 = (1.0 / 6720.0) * x18 / (mu * x46);
+    const real_t x49 = p_rhs[0] + p_rhs[1];
+    element_vector[0] = x19 * (-2 * u_rhs[1] - x1);
+    element_vector[1] = x19 * (-u_rhs[1] - 2 * u_rhs[2] - x0);
+    element_vector[2] = x19 * (-2 * u_rhs[3] - u_rhs[4] - x20);
+    element_vector[3] = x19 * (-u_rhs[3] - 2 * u_rhs[4] - x20);
+    element_vector[4] = x19 * (-2 * u_rhs[6] - x22);
+    element_vector[5] = x19 * (-u_rhs[6] - 2 * u_rhs[7] - x21);
+    element_vector[6] = x19 * (-2 * u_rhs[8] - u_rhs[9] - x23);
+    element_vector[7] = x19 * (-u_rhs[8] - 2 * u_rhs[9] - x23);
+    element_vector[8] = x19 * (-2 * u_rhs[11] - x25);
+    element_vector[9] = x19 * (-u_rhs[11] - 2 * u_rhs[12] - x24);
+    element_vector[10] = x19 * (-2 * u_rhs[13] - u_rhs[14] - x26);
+    element_vector[11] = x19 * (-u_rhs[13] - 2 * u_rhs[14] - x26);
+    element_vector[12] =
+        x48 * (x31 * (x13 - x14 + x27 + x28) + x37 * (x32 - x33 + x34 + x35) +
+               x41 * (-x16 + x2 * x3 - x38 - x39) - x47 * (2 * p_rhs[0] + p_rhs[1] + x42));
+    element_vector[13] =
+        x48 * (3 * x17 * x39 * x40 - x28 * x31 - x35 * x37 - x47 * (p_rhs[0] + 2 * p_rhs[1] + x42));
+    element_vector[14] = x48 * (3 * x17 * x29 * x43 + 3 * x17 * x36 * x45 - x41 * x44 -
+                                x47 * (2 * p_rhs[2] + p_rhs[3] + x49));
+    element_vector[15] =
+        x48 * (3 * x17 * x38 * x40 - x27 * x31 - x34 * x37 - x47 * (p_rhs[2] + 2 * p_rhs[3] + x49));
+}
 
 void tet4_stokes_mini_assemble_hessian_soa(const ptrdiff_t nelements,
                                            const ptrdiff_t nnodes,
@@ -694,4 +770,188 @@ void tet4_stokes_mini_assemble_hessian_aos(const ptrdiff_t nelements,
     }
     const double tock = MPI_Wtime();
     printf("stokes.c: stokes_assemble_hessian_aos\t%g seconds\n", tock - tick);
+}
+
+void tet4_stokes_mini_assemble_rhs_soa(const ptrdiff_t nelements,
+                                       const ptrdiff_t nnodes,
+                                       idx_t **const elems,
+                                       geom_t **const points,
+                                       const real_t mu,
+                                       const real_t rho,
+                                       real_t **SFEM_RESTRICT forcing,
+                                       real_t **const SFEM_RESTRICT rhs) {
+    SFEM_UNUSED(nnodes);
+    double tick = MPI_Wtime();
+
+    static const int n_vars = 4;
+    static const int ndofs = 4;
+    static const int rows = 16;
+    static const int cols = 16;
+
+#pragma omp parallel
+    {
+#pragma omp for nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[4];
+            idx_t ks[4];
+            real_t element_vector[4 * 4];
+            real_t u_rhs[5 * 4];
+            real_t p_rhs[4] = {0., 0., 0., 0.};
+
+#pragma unroll(4)
+            for (int v = 0; v < 4; ++v) {
+                ev[v] = elems[v][i];
+            }
+
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+            const idx_t i3 = ev[3];
+
+            memset(u_rhs, 0, 5 * 3 * sizeof(real_t));
+
+            for (int v = 0; v < 3; v++) {
+                for (int ii = 0; ii < 4; ii++) {
+                    if (forcing[v]) {
+                        // Skip bubble dof
+                        u_rhs[v * 5 + ii + 1] = forcing[v][ev[ii]];
+                    }
+                }
+            }
+
+            if (forcing[4]) {
+                for (int ii = 0; ii < 4; ii++) {
+                    p_rhs[ii] = forcing[4][ev[ii]];
+                }
+            }
+
+            tet4_stokes_mini_assemble_rhs_kernel(mu,
+                                                 rho,
+                                                 // X coords
+                                                 points[0][i0],
+                                                 points[0][i1],
+                                                 points[0][i2],
+                                                 points[0][i3],
+                                                 // Y coords
+                                                 points[1][i0],
+                                                 points[1][i1],
+                                                 points[1][i2],
+                                                 points[1][i3],
+                                                 // Z coords
+                                                 points[2][i0],
+                                                 points[2][i1],
+                                                 points[2][i2],
+                                                 points[2][i3],
+                                                 //  buffers
+                                                 u_rhs,
+                                                 p_rhs,
+                                                 element_vector);
+
+            for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                const idx_t dof_i = elems[edof_i][i];
+
+                // Add block
+                for (int d1 = 0; d1 < n_vars; d1++) {
+#pragma omp atomic update
+                    rhs[d1][dof_i] += element_vector[d1 * 4 + edof_i];
+                }
+            }
+        }
+    }
+
+    double tock = MPI_Wtime();
+    printf("tet4_stokes.c: tet4_stokes_mini_assemble_rhs\t%g seconds\n", tock - tick);
+}
+
+void tet4_stokes_mini_assemble_rhs_aos(const ptrdiff_t nelements,
+                                       const ptrdiff_t nnodes,
+                                       idx_t **const elems,
+                                       geom_t **const points,
+                                       const real_t mu,
+                                       const real_t rho,
+                                       real_t **SFEM_RESTRICT forcing,
+                                       real_t *const SFEM_RESTRICT rhs) {
+    SFEM_UNUSED(nnodes);
+    double tick = MPI_Wtime();
+
+    static const int n_vars = 4;
+    static const int ndofs = 4;
+    static const int rows = 16;
+    static const int cols = 16;
+
+#pragma omp parallel
+    {
+#pragma omp for nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[4];
+            idx_t ks[4];
+            real_t element_vector[4 * 4];
+            real_t u_rhs[5 * 4];
+            real_t p_rhs[4] = {0., 0., 0., 0.};
+
+#pragma unroll(4)
+            for (int v = 0; v < 4; ++v) {
+                ev[v] = elems[v][i];
+            }
+
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+            const idx_t i3 = ev[3];
+
+            memset(u_rhs, 0, 5 * 3 * sizeof(real_t));
+
+            for (int v = 0; v < 3; v++) {
+                for (int ii = 0; ii < 4; ii++) {
+                    if (forcing[v]) {
+                        // Skip bubble dof
+                        u_rhs[v * 5 + ii + 1] = forcing[v][ev[ii]];
+                    }
+                }
+            }
+
+            if (forcing[4]) {
+                for (int ii = 0; ii < 4; ii++) {
+                    p_rhs[ii] = forcing[4][ev[ii]];
+                }
+            }
+
+            tet4_stokes_mini_assemble_rhs_kernel(mu,
+                                                 rho,
+                                                 // X coords
+                                                 points[0][i0],
+                                                 points[0][i1],
+                                                 points[0][i2],
+                                                 points[0][i3],
+                                                 // Y coords
+                                                 points[1][i0],
+                                                 points[1][i1],
+                                                 points[1][i2],
+                                                 points[1][i3],
+                                                 // Z coords
+                                                 points[2][i0],
+                                                 points[2][i1],
+                                                 points[2][i2],
+                                                 points[2][i3],
+                                                 //  buffers
+                                                 u_rhs,
+                                                 p_rhs,
+                                                 element_vector);
+
+            for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                const idx_t dof_i = elems[edof_i][i];
+
+                // Add block
+                for (int d1 = 0; d1 < n_vars; d1++) {
+#pragma omp atomic update
+                    rhs[dof_i * n_vars + d1] += element_vector[d1 * 4 + edof_i];
+                }
+            }
+        }
+    }
+
+    double tock = MPI_Wtime();
+    printf("tet4_stokes.c: tet4_stokes_mini_assemble_rhs\t%g seconds\n", tock - tick);
 }
