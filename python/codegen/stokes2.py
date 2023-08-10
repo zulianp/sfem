@@ -10,7 +10,7 @@ from fe_material import *
 
 import pdb
 
-simplify_expr = False
+simplify_expr = True
 
 class StokesMiniOp:
 	def __init__(self, fe_mini):
@@ -64,7 +64,11 @@ class StokesMiniOp:
 				integr = fe_p1.integrate(qp, (fun_p1[i] * fun_p1[j])) * dV
 				self.mass_p1[i, j] = integr
 
-		self.u_rhs = rho * self.mass_mini * coeffs('u_rhs', len(fun_mini))
+		c_u_rhs = coeffs('u_rhs', len(fun_mini))
+		for b in self.get_bubble_dofs():
+			c_u_rhs[b] = 0
+
+		self.u_rhs = rho * self.mass_mini * c_u_rhs
 		self.p_rhs = rho * self.mass_p1 * coeffs('p_rhs', len(fun_p1))
 
 		M_vv, M_vp, M_pv, M_pp, P_v, P_p = self.get_mini_condensed_hessian()

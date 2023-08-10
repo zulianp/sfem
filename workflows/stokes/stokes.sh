@@ -34,17 +34,16 @@ solve()
 }
 
 mesh=mesh
-create_square.sh 10
-rm -f $mesh/z.raw
+# create_square.sh 5
+# rm -f $mesh/z.raw
+nvars=3
 
 export SFEM_DIRICHLET_NODES=all.raw
 cat $mesh/sidesets_aos/*.raw > $SFEM_DIRICHLET_NODES
 
-nvars=3
-
 
 export SFEM_PROBLEM_TYPE=3
-export SFEM_AOS=1
+# export SFEM_AOS=1
 
 if [[ -z "$SFEM_AOS" ]]
 then
