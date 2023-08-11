@@ -969,6 +969,7 @@ void tet4_stokes_mini_assemble_hessian_aos(const ptrdiff_t nelements,
                         for (int bj = 0; bj < block_size; ++bj) {
                             const int jj = bj * 4 + edof_j;
                             const real_t val = element_matrix[ii * mat_block_size + jj];
+                            assert(val == val);
 #pragma omp atomic update
                             row[offset_j + bj] += val;
                         }
@@ -1062,8 +1063,10 @@ void tet4_stokes_mini_assemble_rhs_soa(const ptrdiff_t nelements,
 
                 // Add block
                 for (int d1 = 0; d1 < n_vars; d1++) {
+                    real_t val = element_vector[d1 * 4 + edof_i];
+                    assert(val == val);
 #pragma omp atomic update
-                    rhs[d1][dof_i] += element_vector[d1 * 4 + edof_i];
+                    rhs[d1][dof_i] += val;
                 }
             }
         }
@@ -1154,8 +1157,10 @@ void tet4_stokes_mini_assemble_rhs_aos(const ptrdiff_t nelements,
 
                 // Add block
                 for (int d1 = 0; d1 < n_vars; d1++) {
+                    real_t val = element_vector[d1 * 4 + edof_i];
+                    assert(val == val);
 #pragma omp atomic update
-                    rhs[dof_i * n_vars + d1] += element_vector[d1 * 4 + edof_i];
+                    rhs[dof_i * n_vars + d1] += val;
                 }
             }
         }
@@ -1235,8 +1240,10 @@ void tet4_stokes_mini_apply_aos(const ptrdiff_t nelements,
 
                 // Add block
                 for (int d1 = 0; d1 < n_vars; d1++) {
+                    real_t val = element_vector[d1 * 4 + edof_i];
+                    assert(val == val);
 #pragma omp atomic update
-                    rhs[dof_i * n_vars + d1] += element_vector[d1 * 4 + edof_i];
+                    rhs[dof_i * n_vars + d1] += val;
                 }
             }
         }
