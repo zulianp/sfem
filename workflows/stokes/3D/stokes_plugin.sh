@@ -36,7 +36,7 @@ export VAR_UY=1
 export VAR_UZ=2
 export VAR_P=3
 
-export BLOCK_SIZE=3
+export BLOCK_SIZE=4
 
 export SFEM_DIRICHLET_NODESET="$sinlet,$sinlet,$sinlet,$soutlet,$soutlet,$soutlet,$swall,$swall,$swall"
 export SFEM_DIRICHLET_VALUE="1,0,0,1,0,0,0,0,0"
@@ -52,5 +52,5 @@ export SFEM_MATERIAL=linear
 # utopia_exec -app nlsolve -path $CODE_DIR/sfem/stokes_plugin.dylib -solver_type ConjugateGradient --verbose -max_it 10000 -matrix_free false -apply_gradient_descent_step true
 utopia_exec -app nlsolve -path $CODE_DIR/sfem/stokes_plugin.dylib -solver_type Newton --verbose --max_it 1 -ksp_type preonly -pc_type lu
 
-aos_to_soa $SFEM_OUTPUT_DIR/out.raw 8 $BLOCK_SIZE $SFEM_OUTPUT_DIR/out
-raw_to_db.py $SFEM_MESH_DIR $SFEM_OUTPUT_DIR/x.vtk -p "$SFEM_OUTPUT_DIR/out.*.raw"
+aos_to_soa $SFEM_OUTPUT_DIR/out.raw 8 $BLOCK_SIZE $SFEM_OUTPUT_DIR/x
+raw_to_db.py $SFEM_MESH_DIR $SFEM_OUTPUT_DIR/x.vtk -p "$SFEM_OUTPUT_DIR/x.*.raw"

@@ -10,8 +10,8 @@ from fe_material import *
 
 import pdb
 
-# simplify_expr = False
-simplify_expr = True
+simplify_expr = False
+# simplify_expr = True
 
 class StokesMiniOp:
 	def __init__(self, fe_mini):
@@ -294,8 +294,8 @@ class StokesMiniOp:
 		return self.assign_tensor("element_vector", a)
 
 def main():
-	op = StokesMiniOp(Mini2D())
-	# op = StokesMiniOp(Mini3D())
+	# op = StokesMiniOp(Mini2D())
+	op = StokesMiniOp(Mini3D())
 
 if __name__ == "__main__":
 	main()

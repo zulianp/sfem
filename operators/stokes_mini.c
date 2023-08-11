@@ -147,11 +147,11 @@ void stokes_mini_assemble_gradient_aos(const enum ElemType element_type,
                 nelements, nnodes, elems, xyz, mu, u, values);
             break;
         }
-        // case TET4: {
-        //     tet4_stokes_mini_assemble_gradient_aos(
-        //         nelements, nnodes, elems, xyz, mu, u, values);
-        //     break;
-        // }
+        case TET4: {
+            tet4_stokes_mini_assemble_gradient_aos(
+                nelements, nnodes, elems, xyz, mu, u, values);
+            break;
+        }
         default: {
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
@@ -197,10 +197,10 @@ void stokes_mini_apply_aos(const enum ElemType element_type,
             tri3_stokes_mini_apply_aos(nelements, nnodes, elems, xyz, mu, u, values);
             break;
         }
-        // case TET4: {
-        //     tet4_stokes_mini_apply_aos(nelements, nnodes, elems, xyz, mu, u, values);
-        //     break;
-        // }
+        case TET4: {
+            tet4_stokes_mini_apply_aos(nelements, nnodes, elems, xyz, mu, u, values);
+            break;
+        }
         default: {
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
