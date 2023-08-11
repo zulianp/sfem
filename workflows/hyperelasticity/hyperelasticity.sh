@@ -11,7 +11,7 @@ PATH=$SCRIPTPATH/../../python/mesh:$PATH
 PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 PATH=$SCRIPTPATH/../../../matrix.io:$PATH
 
-create_cylinder.sh 1
+create_cylinder.sh 6
 
 export SFEM_MESH_DIR=mesh
 
@@ -42,9 +42,9 @@ export SFEM_FIRST_LAME_PARAMETER="1"
 export SFEM_OUTPUT_DIR=sfem_output
 export SFEM_MATERIAL=linear
 
-# export OMP_NUM_THREADS=32
+export OMP_NUM_THREADS=32
 # export OMP_NUM_THREADS=16
-export OMP_NUM_THREADS=8
+# export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true
 
 utopia_exec -app nlsolve -path $CODE_DIR/sfem/hyperelasticity_plugin.dylib -solver_type ConjugateGradient --verbose -max_it 10000 -matrix_free true -apply_gradient_descent_step true -atol 1e-4

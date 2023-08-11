@@ -10,7 +10,7 @@ int build_n2e(const ptrdiff_t nelements,
               const int nnodesxelem,
               idx_t **const elems,
               count_t **out_n2eptr,
-              idx_t **out_elindex);
+              element_idx_t **out_elindex);
 
 int build_crs_graph_for_elem_type(const int element_type,
                                   const ptrdiff_t nelements,
@@ -49,7 +49,7 @@ int create_dual_graph(const ptrdiff_t n_elements,
                       const int element_type,
                       idx_t **const elems,
                       count_t **out_rowptr,
-                      idx_t **out_colidx);
+                      element_idx_t **out_colidx);
 
 
 int crs_graph_block_to_scalar(const ptrdiff_t nnodes,

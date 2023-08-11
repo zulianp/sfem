@@ -929,7 +929,7 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
                                  const real_t mu,
                                  const real_t lambda,
                                  const real_t *const SFEM_RESTRICT displacement,
-                                 idx_t *const SFEM_RESTRICT rowptr,
+                                 count_t *const SFEM_RESTRICT rowptr,
                                  idx_t *const SFEM_RESTRICT colidx,
                                  real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);

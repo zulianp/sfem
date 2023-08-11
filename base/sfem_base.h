@@ -26,11 +26,18 @@ typedef int idx_t;
 typedef double real_t;
 #define SFEM_MPI_REAL_T MPI_DOUBLE
 
-// typedef long count_t;
-// #define SFEM_MPI_COUNT_T MPI_LONG
+typedef long count_t;
+#define SFEM_MPI_COUNT_T MPI_LONG
 
-typedef int count_t;
-#define SFEM_MPI_COUNT_T MPI_INT
+// typedef int count_t;
+// #define SFEM_MPI_COUNT_T MPI_INT
+
+typedef count_t element_idx_t;
+#define SFEM_MPI_ELEMENT_IDX_T SFEM_MPI_COUNT_T
+
+// typedef long element_idx_t;
+// #define SFEM_MPI_ELEMENT_IDX_T MPI_LONG
+
 
 #define SFEM_UNUSED(var)(void)var
 
