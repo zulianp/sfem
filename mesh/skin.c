@@ -136,8 +136,8 @@ int main(int argc, char *argv[]) {
     const int nnxs = elem_num_nodes(st);
 
     ptrdiff_t n_surf_elements = 0;
-    idx_t **surf_elems = (idx_t **)malloc(nnxs * sizeof(idx_t *));
-    idx_t *parent = 0;
+    element_idx_t **surf_elems = (idx_t **)malloc(nnxs * sizeof(idx_t *));
+    element_idx_t *parent = 0;
 
     // if (mesh.element_type == TET4) {
     //     extract_surface_connectivity(mesh.nelements, mesh.elements, &n_surf_elements, surf_elems, &parent);
@@ -220,7 +220,7 @@ int main(int argc, char *argv[]) {
 
     char path[2048];
     sprintf(path, "%s/parent.raw", output_folder);
-    array_write(comm, path, SFEM_MPI_IDX_T, parent, n_surf_elements, n_surf_elements);
+    array_write(comm, path, SFEM_MPI_ELEMENT_IDX_T, parent, n_surf_elements, n_surf_elements);
 
     // Clean-up
 

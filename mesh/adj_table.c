@@ -80,7 +80,7 @@ void fill_element_adj_table(const ptrdiff_t n_elements,
     }
 
     count_t *adj_ptr = 0;
-    idx_t *adj_idx = 0;
+    element_idx_t *adj_idx = 0;
     create_dual_graph(n_elements, n_nodes, element_type_for_algo, elems, &adj_ptr, &adj_idx);
 
     int local_side_table[SFEM_MAX_NUM_SIDES * SFEM_MAX_NUM_NODES_PER_SIDE];
@@ -112,7 +112,7 @@ void fill_element_adj_table(const ptrdiff_t n_elements,
 
             for (count_t k = 0; k < range; k++) {
                 if (assigned[k]) continue;
-                const idx_t e_adj = adj_idx[begin + k];
+                const element_idx_t e_adj = adj_idx[begin + k];
 
                 for (int s2 = 0; s2 < ns; s2++) {
                     for (int j = 0; j < nn; j++) {
@@ -146,8 +146,8 @@ void extract_surface_connectivity_with_adj_table(const ptrdiff_t n_elements,
                                                  const int element_type,
                                                  idx_t **const SFEM_RESTRICT elems,
                                                  ptrdiff_t *n_surf_elements,
-                                                 idx_t **surf_elems,
-                                                 idx_t **parent_element)
+                                                 element_idx_t **surf_elems,
+                                                 element_idx_t **parent_element)
 
 {
     const int ns = elem_num_sides(element_type);
@@ -170,23 +170,23 @@ void extract_surface_connectivity_with_adj_table(const ptrdiff_t n_elements,
     for (ptrdiff_t e = 0; e < n_elements; e++) {
         for (int s = 0; s < ns; s++) {
             // Array of structures
-            const idx_t e_adj = table[e * ns + s];
+            const ptrdiff_t e_adj = table[e * ns + s];
             if (e_adj == SFEM_INVALID_IDX) {
                 (*n_surf_elements)++;
             }
         }
     }
 
-    *parent_element = malloc((*n_surf_elements) * sizeof(idx_t));
+    *parent_element = malloc((*n_surf_elements) * sizeof(element_idx_t));
     for (int s = 0; s < nn; s++) {
-        surf_elems[s] = malloc((*n_surf_elements) * sizeof(idx_t));
+        surf_elems[s] = malloc((*n_surf_elements) * sizeof(element_idx_t));
     }
 
     ptrdiff_t side_offset = 0;
     for (ptrdiff_t e = 0; e < n_elements; e++) {
         for (int s = 0; s < ns; s++) {
             // Array of structures
-            const idx_t e_adj = table[e * ns + s];
+            const ptrdiff_t e_adj = table[e * ns + s];
             if (e_adj == SFEM_INVALID_IDX) {
                 for (int n = 0; n < nn; n++) {
                     idx_t node = elems[LST(s, n)][e];

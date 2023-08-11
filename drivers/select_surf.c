@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
     }
 
     count_t *adj_ptr = 0;
-    idx_t *adj_idx = 0;
+    element_idx_t *adj_idx = 0;
     create_dual_graph(mesh.nelements, mesh.nnodes, element_type_hack, mesh.elements, &adj_ptr, &adj_idx);
 
     uint8_t *selected = (uint8_t *)malloc(mesh.nelements * sizeof(uint8_t));

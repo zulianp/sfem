@@ -85,7 +85,7 @@ int main(int argc, char *argv[]) {
                 crs_constraint_nodes_to_identity(ndirichlet,
                                                  dirichlet_nodes,
                                                  (bi == bj) * diag_value,
-                                                 (const idx_t *)crs.rowptr,
+                                                 (const count_t *)crs.rowptr,
                                                  (const idx_t *)crs.colidx,
                                                  vals);
             }
@@ -140,7 +140,7 @@ int main(int argc, char *argv[]) {
         crs_constraint_nodes_to_identity(ndirichlet,
                                          dirichlet_nodes,
                                          diag_value,
-                                         (const idx_t *)crs.rowptr,
+                                         (const count_t *)crs.rowptr,
                                          (const idx_t *)crs.colidx,
                                          (real_t *)crs.values);
 
