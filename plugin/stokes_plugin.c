@@ -207,12 +207,15 @@ int ISOLVER_EXPORT isolver_function_create_crs_graph(const isolver_function_t *i
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    build_crs_graph_for_elem_type(mesh->element_type,
-                                  mesh->nelements,
-                                  mesh->nnodes,
-                                  mesh->elements,
-                                  &problem->n2n_rowptr,
-                                  &problem->n2n_colidx);
+    if (!problem->n2n_rowptr) {
+        // We create it only the first time
+        build_crs_graph_for_elem_type(mesh->element_type,
+                                      mesh->nelements,
+                                      mesh->nnodes,
+                                      mesh->elements,
+                                      &problem->n2n_rowptr,
+                                      &problem->n2n_colidx);
+    }
 
     *rowptr = (count_t *)malloc((mesh->nnodes + 1) * problem->block_size * sizeof(count_t));
     *colidx = (idx_t *)malloc(problem->n2n_rowptr[mesh->nnodes] * problem->block_size *
@@ -228,6 +231,7 @@ int ISOLVER_EXPORT isolver_function_create_crs_graph(const isolver_function_t *i
     *nlocal = mesh->nnodes * problem->block_size;
     *nglobal = mesh->nnodes * problem->block_size;
     *nnz = problem->n2n_rowptr[mesh->nnodes] * (problem->block_size * problem->block_size);
+
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
@@ -459,11 +463,11 @@ int ISOLVER_EXPORT isolver_function_copy_constrained_dofs(const isolver_function
     assert(mesh);
 
     copy_at_dirichlet_nodes_vec(problem->n_dirichlet_conditions,
-                                 problem->dirichlet_conditions,
-                                 mesh,
-                                 problem->block_size,
-                                 src,
-                                 dest);
+                                problem->dirichlet_conditions,
+                                mesh,
+                                problem->block_size,
+                                src,
+                                dest);
 
     return ISOLVER_FUNCTION_SUCCESS;
 }

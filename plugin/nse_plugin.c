@@ -140,7 +140,8 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
 
     sfem_problem_t *problem = (sfem_problem_t *)malloc(sizeof(sfem_problem_t));
 
-    read_dirichlet_conditions(mesh, SFEM_DIRICHLET_NODESET,
+    read_dirichlet_conditions(mesh,
+                              SFEM_DIRICHLET_NODESET,
                               SFEM_DIRICHLET_VALUE,
                               SFEM_DIRICHLET_COMPONENT,
                               &problem->dirichlet_conditions,
@@ -207,12 +208,14 @@ int ISOLVER_EXPORT isolver_function_create_crs_graph(const isolver_function_t *i
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    build_crs_graph_for_elem_type(mesh->element_type,
-                                  mesh->nelements,
-                                  mesh->nnodes,
-                                  mesh->elements,
-                                  &problem->n2n_rowptr,
-                                  &problem->n2n_colidx);
+    if (!problem->n2n_rowptr) {
+        build_crs_graph_for_elem_type(mesh->element_type,
+                                      mesh->nelements,
+                                      mesh->nnodes,
+                                      mesh->elements,
+                                      &problem->n2n_rowptr,
+                                      &problem->n2n_colidx);
+    }
 
     *rowptr = (count_t *)malloc((mesh->nnodes + 1) * problem->block_size * sizeof(count_t));
     *colidx = (idx_t *)malloc(problem->n2n_rowptr[mesh->nnodes] * problem->block_size *

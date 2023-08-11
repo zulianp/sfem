@@ -21,11 +21,9 @@
 #include "sfem_defs.h"
 #include "sfem_mesh.h"
 
+#include "boundary_condition.h"
 #include "dirichlet.h"
 #include "neumann.h"
-#include "boundary_condition.h"
-
-
 
 typedef struct {
     mesh_t *mesh;
@@ -143,7 +141,8 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
 
     sfem_problem_t *problem = (sfem_problem_t *)malloc(sizeof(sfem_problem_t));
 
-    read_dirichlet_conditions(mesh, SFEM_DIRICHLET_NODESET,
+    read_dirichlet_conditions(mesh,
+                              SFEM_DIRICHLET_NODESET,
                               SFEM_DIRICHLET_VALUE,
                               SFEM_DIRICHLET_COMPONENT,
                               &problem->dirichlet_conditions,
@@ -212,12 +211,14 @@ int ISOLVER_EXPORT isolver_function_create_crs_graph(const isolver_function_t *i
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    build_crs_graph_for_elem_type(mesh->element_type,
-                                  mesh->nelements,
-                                  mesh->nnodes,
-                                  mesh->elements,
-                                  &problem->n2n_rowptr,
-                                  &problem->n2n_colidx);
+    if (!problem->n2n_rowptr) {
+        build_crs_graph_for_elem_type(mesh->element_type,
+                                      mesh->nelements,
+                                      mesh->nnodes,
+                                      mesh->elements,
+                                      &problem->n2n_rowptr,
+                                      &problem->n2n_colidx);
+    }
 
     *rowptr = (count_t *)malloc((mesh->nnodes + 1) * problem->block_size * sizeof(count_t));
     *colidx = (idx_t *)malloc(problem->n2n_rowptr[mesh->nnodes] * problem->block_size *
@@ -311,7 +312,7 @@ int ISOLVER_EXPORT isolver_function_gradient(const isolver_function_t *info,
                                      problem->neumann_conditions[i].local_size,
                                      problem->neumann_conditions[i].idx,
                                      mesh->points,
-                                     - // Use negative sign since we are on LHS
+                                     -  // Use negative sign since we are on LHS
                                      problem->neumann_conditions[i].value,
                                      problem->block_size,
                                      problem->neumann_conditions[i].component,
@@ -511,17 +512,17 @@ int ISOLVER_EXPORT isolver_function_destroy(isolver_function_t *info) {
     free(problem->n2n_rowptr);
     free(problem->n2n_colidx);
 
-    for(int i = 0; i < problem->n_dirichlet_conditions; i++) {
+    for (int i = 0; i < problem->n_dirichlet_conditions; i++) {
         free(problem->dirichlet_conditions[i].idx);
     }
 
     free(problem->dirichlet_conditions);
 
     if (problem->neumann_conditions) {
-        for(int i = 0; i < problem->n_neumann_conditions; i++) {
+        for (int i = 0; i < problem->n_neumann_conditions; i++) {
             free(problem->neumann_conditions[i].idx);
         }
-        
+
         free(problem->neumann_conditions);
     }
 

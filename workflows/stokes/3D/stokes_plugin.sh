@@ -17,7 +17,7 @@ export SFEM_MESH_DIR=mesh
 
 # db_to_raw.py $db $SFEM_MESH_DIR
 # 
-# create_cylinder.sh 1
+# create_cylinder.sh 3
 # SFEM_MESH_DIR=/Users/patrickzulian/Desktop/code/sfem/data/benchmarks/1_darcy_cube/mesh
 nvars=4
 
@@ -50,7 +50,7 @@ export SFEM_MATERIAL=linear
 
 # lldb --  
 # utopia_exec -app nlsolve -path $CODE_DIR/sfem/stokes_plugin.dylib -solver_type ConjugateGradient --verbose -max_it 10000 -matrix_free false -apply_gradient_descent_step true
-utopia_exec -app nlsolve -path $CODE_DIR/sfem/stokes_plugin.dylib -solver_type Newton --verbose --max_it 1 -ksp_type preonly -pc_type lu
+utopia_exec --verbose  -app nlsolve -path $CODE_DIR/sfem/stokes_plugin.dylib -solver_type Newton -max_it 40
 
 aos_to_soa $SFEM_OUTPUT_DIR/out.raw 8 $BLOCK_SIZE $SFEM_OUTPUT_DIR/x
 raw_to_db.py $SFEM_MESH_DIR $SFEM_OUTPUT_DIR/x.vtk -p "$SFEM_OUTPUT_DIR/x.*.raw"

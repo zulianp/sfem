@@ -211,12 +211,14 @@ int ISOLVER_EXPORT isolver_function_create_crs_graph(const isolver_function_t *i
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    build_crs_graph_for_elem_type(mesh->element_type,
-                                  mesh->nelements,
-                                  mesh->nnodes,
-                                  mesh->elements,
-                                  &problem->n2n_rowptr,
-                                  &problem->n2n_colidx);
+    if (!problem->n2n_rowptr) {
+        build_crs_graph_for_elem_type(mesh->element_type,
+                                      mesh->nelements,
+                                      mesh->nnodes,
+                                      mesh->elements,
+                                      &problem->n2n_rowptr,
+                                      &problem->n2n_colidx);
+    }
 
     *rowptr = (count_t *)malloc((mesh->nnodes + 1) * problem->block_size * sizeof(count_t));
     *colidx = (idx_t *)malloc(problem->n2n_rowptr[mesh->nnodes] * problem->block_size *
