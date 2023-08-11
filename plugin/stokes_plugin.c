@@ -458,7 +458,6 @@ int ISOLVER_EXPORT isolver_function_copy_constrained_dofs(const isolver_function
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-
     copy_at_dirichlet_nodes_vec(problem->n_dirichlet_conditions,
                                  problem->dirichlet_conditions,
                                  mesh,
@@ -499,6 +498,6 @@ int ISOLVER_EXPORT isolver_function_destroy(isolver_function_t *info) {
 
     destroy_conditions(problem->n_dirichlet_conditions, problem->dirichlet_conditions);
     destroy_conditions(problem->n_neumann_conditions, problem->neumann_conditions);
-    
+
     return ISOLVER_FUNCTION_SUCCESS;
 }

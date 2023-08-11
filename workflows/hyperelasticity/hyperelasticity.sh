@@ -11,7 +11,7 @@ PATH=$SCRIPTPATH/../../python/mesh:$PATH
 PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 PATH=$SCRIPTPATH/../../../matrix.io:$PATH
 
-create_cylinder.sh 2
+create_cylinder.sh 1
 
 export SFEM_MESH_DIR=mesh
 
