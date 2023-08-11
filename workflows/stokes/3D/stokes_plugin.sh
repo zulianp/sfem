@@ -14,6 +14,9 @@ PATH=$SCRIPTPATH/../../convert_exodus_to_raw:$PATH
 
 # export PATH=$CODE_DIR/utopia/utopia/build_debug:$PATH
 export PATH=$CODE_DIR/utopia/utopia/build:$PATH
+export OMP_NUM_THREADS=8
+export OMP_PROC_BIND=true
+
 
 export VAR_UX=0
 export VAR_UY=1
