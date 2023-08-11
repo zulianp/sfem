@@ -288,6 +288,7 @@ int main(int argc, char *argv[]) {
                     nn, dirichlet_nodes, n_vars, d1, 1, b_rowptr, b_colidx, values);
             }
 
+            if(0)
             {
                 // One point to 0 to fix pressure degree of freedom
                 // ptrdiff_t node = nn - 1;
@@ -414,6 +415,7 @@ int main(int argc, char *argv[]) {
                 }
             }
 
+            if(0)
             {
                 // One point to 0 to fix pressure degree of freedom
                 // ptrdiff_t node = nn - 1;

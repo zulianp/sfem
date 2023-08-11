@@ -55,8 +55,8 @@ ifeq ($(metis), 1)
 endif
 
 # Folder structure
-VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix:operators/tet10:operators/tet4:operators/tri3:operators/tri6:operators/cvfem:graphs:parametrize:operators/phase_field_for_fracture:operators/kernels
-INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/tri3 -Ioperators/tri6 -Ioperators/cvfem -Igraphs -Iparametrize -Ioperators/phase_field_for_fracture  -Ioperators/kernels
+VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix:operators/tet10:operators/tet4:operators/tri3:operators/tri6:operators/cvfem:graphs:parametrize:operators/phase_field_for_fracture:operators/kernels:operators/navier_stokes
+INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/tri3 -Ioperators/tri6 -Ioperators/cvfem -Igraphs -Iparametrize -Ioperators/phase_field_for_fracture  -Ioperators/kernels -Ioperators/navier_stokes
 
 
 CFLAGS += -pedantic -Wextra
@@ -153,7 +153,9 @@ OBJS = \
 	grad_p1.o  \
 	linear_elasticity.o \
 	stokes_mini.o \
-	phase_field_for_fracture.o 
+	phase_field_for_fracture.o  \
+	navier_stokes.o \
+	boundary_condition.o
 
 # Tri3
 OBJS += tri3_stokes_mini.o \
@@ -210,7 +212,7 @@ OBJS += neohookean.o
 
 OBJS += $(SIMD_OBJS)
 
-plugins: isolver_sfem.dylib franetg_plugin.dylib hyperelasticity_plugin.dylib
+plugins: isolver_sfem.dylib franetg_plugin.dylib hyperelasticity_plugin.dylib nse_plugin.dylib stokes_plugin.dylib
 
 libsfem.a : $(OBJS)
 	ar rcs $@ $^
@@ -407,6 +409,17 @@ franetg_plugin.dylib : franetg_plugin.o libsfem.a
 franetg_plugin.o : plugin/franetg_plugin.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
 
+nse_plugin.dylib : nse_plugin.o libsfem.a
+	$(MPICC) -shared -o $@ $^ $(LDFLAGS)
+
+nse_plugin.o : plugin/nse_plugin.c
+	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
+
+stokes_plugin.dylib : stokes_plugin.o libsfem.a
+	$(MPICC) -shared -o $@ $^ $(LDFLAGS)
+
+stokes_plugin.o : plugin/stokes_plugin.c
+	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
 
 hyperelasticity_plugin.dylib : hyperelasticity_plugin.o libsfem.a
 	$(MPICC) -shared -o $@ $^ $(LDFLAGS)

@@ -31,7 +31,7 @@ solve()
 	echo "rhs=$rhs_"
 	# mpiexec -np 8 $UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type lu -ksp_type preonly
 	# mpiexec -np 8 
-	$UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type ilu -ksp_type fgmres --verbose -rtol 1e-8 -max_it 20000
+	$UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type ilu -ksp_type fgmres --verbose -rtol 1e-6 -max_it 20000
 }
 
 
@@ -40,7 +40,7 @@ mesh=mesh
 
 # db_to_raw.py $db $mesh
 # 
-# create_cylinder.sh 4
+# create_cylinder.sh 3
 # mesh=/Users/patrickzulian/Desktop/code/sfem/data/benchmarks/1_darcy_cube/mesh
 nvars=4
 
@@ -48,7 +48,7 @@ export SFEM_DIRICHLET_NODES=all.raw
 cat $mesh/sidesets_aos/*.raw > $SFEM_DIRICHLET_NODES
 
 
-export SFEM_PROBLEM_TYPE=5
+export SFEM_PROBLEM_TYPE=4
 # export SFEM_AOS=1
 
 if [[ -z "$SFEM_AOS" ]]

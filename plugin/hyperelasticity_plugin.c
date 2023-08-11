@@ -22,15 +22,9 @@
 #include "sfem_defs.h"
 #include "sfem_mesh.h"
 
+#include "boundary_condition.h"
 #include "dirichlet.h"
 #include "neumann.h"
-
-typedef struct {
-    ptrdiff_t local_size, global_size;
-    idx_t *idx;
-    int component;
-    real_t value;
-} boundary_condition_t;
 
 typedef struct {
     mesh_t *mesh;
@@ -53,85 +47,6 @@ typedef struct {
 } sfem_problem_t;
 
 static int SFEM_DEBUG_DUMP = 0;
-
-void read_boundary_conditions(MPI_Comm comm,
-                              char *sets,
-                              char *values,
-                              char *components,
-                              boundary_condition_t **bcs,
-                              int *nbc) {
-    if (!sets) {
-        *bcs = NULL;
-        *nbc = 0;
-        return;
-    }
-
-    const char *splitter = ",";
-
-    int count = 1;
-    {
-        int i = 0;
-        while (sets[i]) {
-            count += (sets[i++] == splitter[0]);
-            assert(i <= strlen(sets));
-        }
-    }
-
-    printf("conds = %d, splitter=%c\n", count, splitter[0]);
-
-    boundary_condition_t *conds = malloc(count * sizeof(boundary_condition_t));
-
-    // NODESET/SIDESET
-    {
-        char *pch = strtok(sets, splitter);
-        int i = 0;
-        while (pch != NULL) {
-            printf("Reading file (%d/%d): %s\n", i + 1, count, pch);
-            if (array_create_from_file(comm,
-                                       pch,
-                                       SFEM_MPI_IDX_T,
-                                       (void **)&conds[i].idx,
-                                       &conds[i].local_size,
-                                       &conds[i].global_size)) {
-                fprintf(stderr, "Failed to read file %s\n", pch);
-                return;
-            }
-
-            // Some default values
-            conds[i].value = 0;
-            conds[i].component = 0;
-            i++;
-            pch = strtok(NULL, splitter);
-        }
-    }
-
-    if (values) {
-        char *pch = strtok(values, splitter);
-        int i = 0;
-        while (pch != NULL) {
-            printf("Parsing %s\n", pch);
-            conds[i].value = atof(pch);
-            i++;
-
-            pch = strtok(NULL, splitter);
-        }
-    }
-
-    if (components) {
-        char *pch = strtok(components, splitter);
-        int i = 0;
-        while (pch != NULL) {
-            printf("Parsing %s\n", pch);
-            conds[i].component = atoi(pch);
-            i++;
-
-            pch = strtok(NULL, splitter);
-        }
-    }
-
-    *bcs = conds;
-    *nbc = count;
-}
 
 int ISOLVER_EXPORT isolver_function_destroy_array(const isolver_function_t *info, void *ptr) {
     SFEM_UNUSED(info);
@@ -228,28 +143,19 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
 
     sfem_problem_t *problem = (sfem_problem_t *)malloc(sizeof(sfem_problem_t));
 
-    read_boundary_conditions(info->comm,
-                             SFEM_DIRICHLET_NODESET,
-                             SFEM_DIRICHLET_VALUE,
-                             SFEM_DIRICHLET_COMPONENT,
-                             &problem->dirichlet_conditions,
-                             &problem->n_dirichlet_conditions);
+    read_dirichlet_conditions(mesh,
+                              SFEM_DIRICHLET_NODESET,
+                              SFEM_DIRICHLET_VALUE,
+                              SFEM_DIRICHLET_COMPONENT,
+                              &problem->dirichlet_conditions,
+                              &problem->n_dirichlet_conditions);
 
-    read_boundary_conditions(info->comm,
-                             SFEM_NEUMANN_SIDESET,
-                             SFEM_NEUMANN_VALUE,
-                             SFEM_NEUMANN_COMPONENT,
-                             &problem->neumann_conditions,
-                             &problem->n_neumann_conditions);
-
-    // Count faces not nodes
-    enum ElemType stype = side_type(mesh->element_type);
-    int nns = elem_num_sides(stype);
-
-    for (int i = 0; i < problem->n_neumann_conditions; i++) {
-        problem->neumann_conditions[i].global_size /= nns;
-        problem->neumann_conditions[i].local_size /= nns;
-    }
+    read_neumann_conditions(mesh,
+                            SFEM_NEUMANN_SIDESET,
+                            SFEM_NEUMANN_VALUE,
+                            SFEM_NEUMANN_COMPONENT,
+                            &problem->neumann_conditions,
+                            &problem->n_neumann_conditions);
 
     // Redistribute Dirichlet nodes
     problem->mesh = mesh;

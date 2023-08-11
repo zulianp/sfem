@@ -34,7 +34,7 @@ solve()
 }
 
 mesh=mesh
-# create_square.sh 3
+# create_square.sh 4
 # rm -f $mesh/z.raw
 nvars=3
 

@@ -10,6 +10,7 @@ from fe_material import *
 
 import pdb
 
+# simplify_expr = False
 simplify_expr = True
 
 class StokesMiniOp:
@@ -54,8 +55,15 @@ class StokesMiniOp:
 		self.mass_mini = sp.zeros(n_vel, n_vel)
 		self.mass_p1 = sp.zeros(n_pressure, n_pressure)
 
+		bubble_dofs = self.get_bubble_dofs()
+
 		for i in range(0,  n_vel):
+			# if i in bubble_dofs:
+			# 	continue
 			for j in range(0,  n_vel):
+				# if j in bubble_dofs:
+				# 	continue
+
 				integr = fe_mini.integrate(qp, inner(fun_mini[i], fun_mini[j])) * dV
 				self.mass_mini[i, j] = integr
 
@@ -65,8 +73,10 @@ class StokesMiniOp:
 				self.mass_p1[i, j] = integr
 
 		c_u_rhs = coeffs('u_rhs', len(fun_mini))
-		# for b in self.get_bubble_dofs():
-		# 	c_u_rhs[b] = 0
+
+		# Eliminate bubble coeffcients
+		for b in bubble_dofs:
+			c_u_rhs[b] = 0
 
 		self.u_rhs = rho * self.mass_mini * c_u_rhs
 		self.p_rhs = rho * self.mass_p1 * coeffs('p_rhs', len(fun_p1))
@@ -97,6 +107,27 @@ class StokesMiniOp:
 		rhs[0:v_rows,:] = rhs_v[:,:]
 		rhs[v_rows:(v_rows+p_rows),:] = rhs_p[:,:]
 		c_code(self.assign_vector(rhs))
+
+		self.hessian = M
+		self.increment = coeffs('increment', v_rows+p_rows)
+
+		print('---------------')
+		print('Apply')
+		print('---------------')
+		c_code(self.apply())
+
+
+	# def hessian(self):
+	def apply(self):
+		H = self.hessian
+		rows, cols = H.shape
+		x = self.increment
+
+		Hx = H * x
+		return self.assign_vector(Hx)
+
+	def gradient(self):
+		return self.apply()
 
 	def get_bubble_dofs(self):
 		fe_mini = self.fe_mini

@@ -15,17 +15,15 @@
 #include "crs_graph.h"
 #include "sfem_base.h"
 
-#include "phase_field_for_fracture.h"
+#include "navier_stokes.h"
 
 #include "read_mesh.h"
 #include "sfem_defs.h"
 #include "sfem_mesh.h"
 
+#include "boundary_condition.h"
 #include "dirichlet.h"
 #include "neumann.h"
-#include "boundary_condition.h"
-
-
 
 typedef struct {
     mesh_t *mesh;
@@ -40,9 +38,11 @@ typedef struct {
     int n_dirichlet_conditions;
     boundary_condition_t *dirichlet_conditions;
 
-    real_t mu, lambda, Gc, ls;
+    real_t nu, rho;
 
     const char *output_dir;
+
+    const char *material;
 } sfem_problem_t;
 
 static int SFEM_DEBUG_DUMP = 0;
@@ -84,15 +84,14 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
     const char *SFEM_OUTPUT_DIR = "./sfem_output";
     SFEM_READ_ENV(SFEM_OUTPUT_DIR, );
 
-    real_t SFEM_SHEAR_MODULUS = 2.23;
-    real_t SFEM_FIRST_LAME_PARAMETER = 3.35;
-    real_t SFEM_FRACTURE_TOUGHNESS = 0.27;
-    real_t SFEM_LENGTH_SCALE = 1.;
+    real_t SFEM_KINEMATIC_VISCOSITY = 2.23;
+    real_t SFEM_MASS_DENSITY = 3.35;
 
-    SFEM_READ_ENV(SFEM_SHEAR_MODULUS, atof);
-    SFEM_READ_ENV(SFEM_FIRST_LAME_PARAMETER, atof);
-    SFEM_READ_ENV(SFEM_FRACTURE_TOUGHNESS, atof);
-    SFEM_READ_ENV(SFEM_LENGTH_SCALE, atof);
+    SFEM_READ_ENV(SFEM_KINEMATIC_VISCOSITY, atof);
+    SFEM_READ_ENV(SFEM_MASS_DENSITY, atof);
+
+    const char *SFEM_MATERIAL = "";
+    SFEM_READ_ENV(SFEM_MATERIAL, );
 
     // const char *SFEM_INITIAL_GUESS = 0;
     // SFEM_READ_ENV(SFEM_INITIAL_GUESS, );
@@ -107,10 +106,9 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
         "- SFEM_NEUMANN_SIDESET=%s\n"
         "- SFEM_NEUMANN_VALUE=%s\n"
         "- SFEM_NEUMANN_COMPONENT=%s\n"
-        "- SFEM_SHEAR_MODULUS=%g\n"
-        "- SFEM_FIRST_LAME_PARAMETER=%g\n"
-        "- SFEM_FRACTURE_TOUGHNESS=%g\n"
-        "- SFEM_LENGTH_SCALE=%g\n"
+        "- SFEM_MATERIAL=%s\n"
+        "- SFEM_KINEMATIC_VISCOSITY=%g\n"
+        "- SFEM_MASS_DENSITY=%g\n"
         "- SFEM_OUTPUT_DIR=%s\n"
         "- SFEM_DEBUG_DUMP=%d\n",
         SFEM_DIRICHLET_NODESET,
@@ -119,10 +117,9 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
         SFEM_NEUMANN_SIDESET,
         SFEM_NEUMANN_VALUE,
         SFEM_NEUMANN_COMPONENT,
-        SFEM_SHEAR_MODULUS,
-        SFEM_FIRST_LAME_PARAMETER,
-        SFEM_FRACTURE_TOUGHNESS,
-        SFEM_LENGTH_SCALE,
+        SFEM_MATERIAL,
+        SFEM_KINEMATIC_VISCOSITY,
+        SFEM_MASS_DENSITY,
         SFEM_OUTPUT_DIR,
         SFEM_DEBUG_DUMP);
 
@@ -161,11 +158,9 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
     problem->block_size = elem_manifold_dim(mesh->element_type) + 1;
     problem->output_dir = SFEM_OUTPUT_DIR;
 
-    problem->lambda = SFEM_FIRST_LAME_PARAMETER;
-    problem->mu = SFEM_SHEAR_MODULUS;
-    problem->Gc = SFEM_FRACTURE_TOUGHNESS;
-    problem->ls = SFEM_LENGTH_SCALE;
-
+    problem->rho = SFEM_MASS_DENSITY;
+    problem->nu = SFEM_KINEMATIC_VISCOSITY;
+    problem->material = SFEM_MATERIAL;
     problem->n2n_rowptr = NULL;
     problem->n2n_colidx = NULL;
 
@@ -272,17 +267,16 @@ int ISOLVER_EXPORT isolver_function_value(const isolver_function_t *info,
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    phase_field_for_fracture_assemble_value_aos(mesh->element_type,
-                                                mesh->nelements,
-                                                mesh->nnodes,
-                                                mesh->elements,
-                                                mesh->points,
-                                                problem->mu,
-                                                problem->lambda,
-                                                problem->Gc,
-                                                problem->ls,
-                                                x,
-                                                out);
+    navier_stokes_assemble_value_aos(mesh->element_type,
+                                     mesh->nelements,
+                                     mesh->nnodes,
+                                     mesh->elements,
+                                     mesh->points,
+                                     problem->nu,
+                                     problem->rho,
+                                     x,
+                                     out);
+
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
@@ -294,24 +288,22 @@ int ISOLVER_EXPORT isolver_function_gradient(const isolver_function_t *info,
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    phase_field_for_fracture_assemble_gradient_aos(mesh->element_type,
-                                                   mesh->nelements,
-                                                   mesh->nnodes,
-                                                   mesh->elements,
-                                                   mesh->points,
-                                                   problem->mu,
-                                                   problem->lambda,
-                                                   problem->Gc,
-                                                   problem->ls,
-                                                   x,
-                                                   out);
+    navier_stokes_assemble_gradient_aos(mesh->element_type,
+                                        mesh->nelements,
+                                        mesh->nnodes,
+                                        mesh->elements,
+                                        mesh->points,
+                                        problem->nu,
+                                        problem->rho,
+                                        x,
+                                        out);
 
     for (int i = 0; i < problem->n_neumann_conditions; i++) {
         surface_forcing_function_vec(side_type(mesh->element_type),
                                      problem->neumann_conditions[i].local_size,
                                      problem->neumann_conditions[i].idx,
                                      mesh->points,
-                                     - // Use negative sign since we are on LHS
+                                     -  // Use negative sign since we are on LHS
                                      problem->neumann_conditions[i].value,
                                      problem->block_size,
                                      problem->neumann_conditions[i].component,
@@ -344,19 +336,16 @@ int ISOLVER_EXPORT isolver_function_hessian_crs(const isolver_function_t *info,
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    phase_field_for_fracture_assemble_hessian_aos(mesh->element_type,
-                                                  mesh->nelements,
-                                                  mesh->nnodes,
-                                                  mesh->elements,
-                                                  mesh->points,
-                                                  problem->mu,
-                                                  problem->lambda,
-                                                  problem->Gc,
-                                                  problem->ls,
-                                                  x,
-                                                  problem->n2n_rowptr,
-                                                  problem->n2n_colidx,
-                                                  values);
+    navier_stokes_assemble_hessian_aos(mesh->element_type,
+                                       mesh->nelements,
+                                       mesh->nnodes,
+                                       mesh->elements,
+                                       mesh->points,
+                                       problem->nu,
+                                       problem->rho,
+                                       problem->n2n_rowptr,
+                                       problem->n2n_colidx,
+                                       values);
 
     for (int i = 0; i < problem->n_dirichlet_conditions; i++) {
         crs_constraint_nodes_to_identity_vec(problem->dirichlet_conditions[i].local_size,
@@ -424,8 +413,17 @@ int ISOLVER_EXPORT isolver_function_apply(const isolver_function_t *info,
     assert(problem);
     mesh_t *mesh = problem->mesh;
     assert(mesh);
-    // TODO
-    assert(0);
+
+    navier_stokes_apply_aos(mesh->element_type,
+                            mesh->nelements,
+                            mesh->nnodes,
+                            mesh->elements,
+                            mesh->points,
+                            problem->nu,
+                            problem->rho,
+                            h,
+                            out);
+
     return ISOLVER_FUNCTION_SUCCESS;
 }
 
@@ -511,17 +509,17 @@ int ISOLVER_EXPORT isolver_function_destroy(isolver_function_t *info) {
     free(problem->n2n_rowptr);
     free(problem->n2n_colidx);
 
-    for(int i = 0; i < problem->n_dirichlet_conditions; i++) {
+    for (int i = 0; i < problem->n_dirichlet_conditions; i++) {
         free(problem->dirichlet_conditions[i].idx);
     }
 
     free(problem->dirichlet_conditions);
 
     if (problem->neumann_conditions) {
-        for(int i = 0; i < problem->n_neumann_conditions; i++) {
+        for (int i = 0; i < problem->n_neumann_conditions; i++) {
             free(problem->neumann_conditions[i].idx);
         }
-        
+
         free(problem->neumann_conditions);
     }
 

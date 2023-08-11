@@ -44,6 +44,22 @@ void tri3_stokes_mini_assemble_rhs_aos(const ptrdiff_t nelements,
                                        real_t **SFEM_RESTRICT forcing,
                                        real_t *const SFEM_RESTRICT rhs);
 
+void tri3_stokes_mini_apply_aos(const ptrdiff_t nelements,
+                                const ptrdiff_t nnodes,
+                                idx_t **const elems,
+                                geom_t **const points,
+                                const real_t mu,
+                                const real_t *const SFEM_RESTRICT x,
+                                real_t *const SFEM_RESTRICT rhs);
+
+void tri3_stokes_mini_assemble_gradient_aos(const ptrdiff_t nelements,
+                                const ptrdiff_t nnodes,
+                                idx_t **const elems,
+                                geom_t **const points,
+                                const real_t mu,
+                                const real_t *const SFEM_RESTRICT x,
+                                real_t *const SFEM_RESTRICT g);
+
 #ifdef __cplusplus
 }
 #endif

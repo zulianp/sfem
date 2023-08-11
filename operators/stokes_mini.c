@@ -133,31 +133,30 @@ void stokes_mini_assemble_hessian_soa(const enum ElemType element_type,
 //     }
 // }
 
-// void stokes_mini_assemble_gradient_aos(const enum ElemType element_type,
-//                                              const ptrdiff_t nelements,
-//                                              const ptrdiff_t nnodes,
-//                                              idx_t **const SFEM_RESTRICT elems,
-//                                              geom_t **const SFEM_RESTRICT xyz,
-//                                              const real_t mu,
-//                                              const real_t lambda,
-//                                              const real_t *const SFEM_RESTRICT u,
-//                                              real_t *const SFEM_RESTRICT values) {
-//     switch (element_type) {
-//         case TRI3: {
-//             tri3_stokes_mini_assemble_gradient_aos(
-//                 nelements, nnodes, elems, xyz, mu, u, values);
-//             break;
-//         }
-//         case TET4: {
-//             tet4_stokes_mini_assemble_gradient_aos(
-//                 nelements, nnodes, elems, xyz, mu, u, values);
-//             break;
-//         }
-//         default: {
-//             MPI_Abort(MPI_COMM_WORLD, -1);
-//         }
-//     }
-// }
+void stokes_mini_assemble_gradient_aos(const enum ElemType element_type,
+                                             const ptrdiff_t nelements,
+                                             const ptrdiff_t nnodes,
+                                             idx_t **const SFEM_RESTRICT elems,
+                                             geom_t **const SFEM_RESTRICT xyz,
+                                             const real_t mu,
+                                             const real_t *const SFEM_RESTRICT u,
+                                             real_t *const SFEM_RESTRICT values) {
+    switch (element_type) {
+        case TRI3: {
+            tri3_stokes_mini_assemble_gradient_aos(
+                nelements, nnodes, elems, xyz, mu, u, values);
+            break;
+        }
+        // case TET4: {
+        //     tet4_stokes_mini_assemble_gradient_aos(
+        //         nelements, nnodes, elems, xyz, mu, u, values);
+        //     break;
+        // }
+        default: {
+            MPI_Abort(MPI_COMM_WORLD, -1);
+        }
+    }
+}
 
 void stokes_mini_assemble_hessian_aos(const enum ElemType element_type,
                                       const ptrdiff_t nelements,
@@ -185,29 +184,28 @@ void stokes_mini_assemble_hessian_aos(const enum ElemType element_type,
     }
 }
 
-// void stokes_mini_apply_aos(const enum ElemType element_type,
-//                                  const ptrdiff_t nelements,
-//                                  const ptrdiff_t nnodes,
-//                                  idx_t **const SFEM_RESTRICT elems,
-//                                  geom_t **const SFEM_RESTRICT xyz,
-//                                  const real_t mu,
-//                                  const real_t lambda,
-//                                  const real_t *const SFEM_RESTRICT u,
-//                                  real_t *const SFEM_RESTRICT values) {
-//     switch (element_type) {
-//         case TRI3: {
-//             tri3_stokes_mini_apply_aos(nelements, nnodes, elems, xyz, mu, u, values);
-//             break;
-//         }
-//         case TET4: {
-//             tet4_stokes_mini_apply_aos(nelements, nnodes, elems, xyz, mu, u, values);
-//             break;
-//         }
-//         default: {
-//             MPI_Abort(MPI_COMM_WORLD, -1);
-//         }
-//     }
-// }
+void stokes_mini_apply_aos(const enum ElemType element_type,
+                                 const ptrdiff_t nelements,
+                                 const ptrdiff_t nnodes,
+                                 idx_t **const SFEM_RESTRICT elems,
+                                 geom_t **const SFEM_RESTRICT xyz,
+                                 const real_t mu,
+                                 const real_t *const SFEM_RESTRICT u,
+                                 real_t *const SFEM_RESTRICT values) {
+    switch (element_type) {
+        case TRI3: {
+            tri3_stokes_mini_apply_aos(nelements, nnodes, elems, xyz, mu, u, values);
+            break;
+        }
+        // case TET4: {
+        //     tet4_stokes_mini_apply_aos(nelements, nnodes, elems, xyz, mu, u, values);
+        //     break;
+        // }
+        default: {
+            MPI_Abort(MPI_COMM_WORLD, -1);
+        }
+    }
+}
 
 void stokes_mini_assemble_rhs_soa(enum ElemType element_type,
                                        const ptrdiff_t nelements,
