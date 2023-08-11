@@ -53,7 +53,7 @@ static void fill_local_side_table(enum ElemType element_type, int *local_side_ta
             LST(3, 5) = 5 - 1;
         }
 
-    } else if(element_type == TRI3) {
+    } else if (element_type == TRI3) {
         LST(0, 0) = 1 - 1;
         LST(0, 1) = 2 - 1;
 
@@ -146,10 +146,12 @@ void extract_surface_connectivity_with_adj_table(const ptrdiff_t n_elements,
                                                  const int element_type,
                                                  idx_t **const SFEM_RESTRICT elems,
                                                  ptrdiff_t *n_surf_elements,
-                                                 element_idx_t **surf_elems,
+                                                 idx_t **surf_elems,
                                                  element_idx_t **parent_element)
 
 {
+    double tick = MPI_Wtime();
+
     const int ns = elem_num_sides(element_type);
     ptrdiff_t *table = (ptrdiff_t *)malloc(n_elements * ns * sizeof(ptrdiff_t));
     fill_element_adj_table(n_elements, n_nodes, element_type, elems, table);
@@ -179,7 +181,7 @@ void extract_surface_connectivity_with_adj_table(const ptrdiff_t n_elements,
 
     *parent_element = malloc((*n_surf_elements) * sizeof(element_idx_t));
     for (int s = 0; s < nn; s++) {
-        surf_elems[s] = malloc((*n_surf_elements) * sizeof(element_idx_t));
+        surf_elems[s] = malloc((*n_surf_elements) * sizeof(idx_t));
     }
 
     ptrdiff_t side_offset = 0;
@@ -200,6 +202,9 @@ void extract_surface_connectivity_with_adj_table(const ptrdiff_t n_elements,
     }
 
     free(table);
+
+    double tock = MPI_Wtime();
+    printf("adj_table.c: extract_surface_connectivity_with_adj_table\t%g seconds\n", tock - tick);
 }
 
 #undef LST

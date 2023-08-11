@@ -31,7 +31,7 @@ static SFEM_INLINE void normalize(real_t *const vec3) {
 
 void correct_side_orientation(const ptrdiff_t nsides,
                               idx_t **const SFEM_RESTRICT sides,
-                              const idx_t *const SFEM_RESTRICT parent,
+                              const element_idx_t *const SFEM_RESTRICT parent,
                               idx_t **const SFEM_RESTRICT elements,
                               geom_t **const SFEM_RESTRICT xyz) {
     double tick = MPI_Wtime();
@@ -55,7 +55,7 @@ void correct_side_orientation(const ptrdiff_t nsides,
 
         // Compute element barycenter
         real_t b[3] = {0, 0, 0};
-        const idx_t p = parent[i];
+        const element_idx_t p = parent[i];
 
         for (int d = 0; d < 4; ++d) {
             b[0] += xyz[0][elements[d][p]];
@@ -136,7 +136,7 @@ int main(int argc, char *argv[]) {
     const int nnxs = elem_num_nodes(st);
 
     ptrdiff_t n_surf_elements = 0;
-    element_idx_t **surf_elems = (idx_t **)malloc(nnxs * sizeof(idx_t *));
+    idx_t **surf_elems = (idx_t **)malloc(nnxs * sizeof(idx_t *));
     element_idx_t *parent = 0;
 
     // if (mesh.element_type == TET4) {
