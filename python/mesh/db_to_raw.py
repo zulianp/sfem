@@ -4,6 +4,7 @@ import meshio
 import numpy as np
 import sys
 import os
+# import pdb
 
 def main(argv):
 	if len(argv) < 3:
@@ -75,8 +76,12 @@ def main(argv):
 	for key in mesh.cell_data:
 		print(f"\t- {key}")
 		data = mesh.cell_data[key]
-		d = data[:].astype(np.float64)
-		d.tofile(f'{cell_data}/{key}.raw')
+		# pdb.set_trace()
+		try:
+			d = data[:].astype(np.float64)
+			d.tofile(f'{cell_data}/{key}.raw')
+		except:
+			print(f'Unable to convert {key}')
 
 if __name__ == '__main__':
     main(sys.argv)
