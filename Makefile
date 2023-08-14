@@ -167,6 +167,9 @@ OBJS += tri3_stokes_mini.o \
 		tri3_linear_elasticity.o \
 		tri3_laplacian.o
 
+# Tri6
+OBJS += tri6_mass.o
+
 # Tet4
 OBJS += tet4_div.o \
 	tet4_mass.o \

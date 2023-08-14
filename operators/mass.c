@@ -16,6 +16,7 @@
 #include "tet10_mass.h"
 #include "tet4_mass.h"
 #include "tri3_mass.h"
+#include "tri6_mass.h"
 
 void assemble_mass(const int element_type,
                    const ptrdiff_t nelements,
@@ -74,6 +75,10 @@ void apply_inv_lumped_mass(const int element_type,
                            const real_t *const x,
                            real_t *const values) {
     switch (element_type) {
+        case TRI6: {
+            tri6_apply_inv_lumped_mass(nelements, nnodes, elems, xyz, x, values);
+            break;
+        }
         case TET4: {
             tet4_apply_inv_lumped_mass(nelements, nnodes, elems, xyz, x, values);
             break;
@@ -102,11 +107,15 @@ void apply_mass(const int element_type,
             tri3_apply_mass(nelements, nnodes, elems, xyz, x, values);
             break;
         }
+            // case TRI6: {
+            //         tri6_apply_mass(nelements, nnodes, elems, xyz, x, values);
+            //         break;
+            //     }
 
-        // case TET4: {
-        //     tet4_apply_mass(nelements, nnodes, elems, xyz, x, values);
-        //     break;
-        // }
+            // case TET4: {
+            //     tet4_apply_mass(nelements, nnodes, elems, xyz, x, values);
+            //     break;
+            // }
 
             // case TET10: {
             //     tet10_apply_mass(nelements, nnodes, elems, xyz, x, values);
