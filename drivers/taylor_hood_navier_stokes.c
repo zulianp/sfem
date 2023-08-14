@@ -32,7 +32,7 @@
 //////////////////////////////////////////////
 
 // TODOs 
-// 1) Handle P2 - P1 for boundary conditions
+// 1) Handle P2 - P1 mesh queries
 // 2) Implement missing kernels for Tri6
 
 int main(int argc, char *argv[]) {
@@ -83,18 +83,19 @@ int main(int argc, char *argv[]) {
     real_t SFEM_MASS_DENSITY = 1;
     int SFEM_PROBLEM_TYPE = 1;
     int SFEM_AOS = 0;
-    const char *SFEM_DIRICHLET_NODES = 0;
 
     SFEM_READ_ENV(SFEM_PROBLEM_TYPE, atoi);
     SFEM_READ_ENV(SFEM_DYNAMIC_VISCOSITY, atof);
     SFEM_READ_ENV(SFEM_MASS_DENSITY, atof);
 
-    char *SFEM_DIRICHLET_NODESET = 0;
-    char *SFEM_DIRICHLET_VALUE = 0;
-    char *SFEM_DIRICHLET_COMPONENT = 0;
-    SFEM_READ_ENV(SFEM_DIRICHLET_NODESET, );
-    SFEM_READ_ENV(SFEM_DIRICHLET_VALUE, );
-    SFEM_READ_ENV(SFEM_DIRICHLET_COMPONENT, );
+    char *SFEM_VELOCITY_DIRICHLET_NODESET = 0;
+    char *SFEM_VELOCITY_DIRICHLET_VALUE = 0;
+    char *SFEM_VELOCITY_DIRICHLET_COMPONENT = 0;
+    SFEM_READ_ENV(SFEM_VELOCITY_DIRICHLET_NODESET, );
+    SFEM_READ_ENV(SFEM_VELOCITY_DIRICHLET_VALUE, );
+    SFEM_READ_ENV(SFEM_VELOCITY_DIRICHLET_COMPONENT, );
+
+    char * SFEM_PRESSURE_DIRICHLET_NODESET=0;
 
     char *SFEM_NEUMANN_SIDESET = 0;
     char *SFEM_NEUMANN_VALUE = 0;
@@ -116,33 +117,43 @@ int main(int argc, char *argv[]) {
             "- SFEM_PROBLEM_TYPE=%d\n"
             "- SFEM_DYNAMIC_VISCOSITY=%g\n"
             "- SFEM_MASS_DENSITY=%g\n"
-            "- SFEM_DIRICHLET_NODES=%s\n"
+            "- SFEM_VELOCITY_DIRICHLET_NODESET=%s\n"
             "----------------------------------------\n",
             SFEM_PROBLEM_TYPE,
             SFEM_DYNAMIC_VISCOSITY,
             SFEM_MASS_DENSITY,
-            SFEM_DIRICHLET_NODES);
+            SFEM_VELOCITY_DIRICHLET_NODESET);
     }
 
-    int n_neumann_conditions;
-    boundary_condition_t *neumann_conditions;
+    // int n_neumann_conditions;
+    // boundary_condition_t *neumann_conditions;
 
-    int n_dirichlet_conditions;
-    boundary_condition_t *dirichlet_conditions;
+    int n_velocity_dirichlet_conditions;
+    boundary_condition_t *velocity_dirichlet_conditions;
+
+    int n_pressure_dirichlet_conditions;
+    boundary_condition_t *pressure_dirichlet_conditions;
 
     read_dirichlet_conditions(&mesh,
-                              SFEM_DIRICHLET_NODESET,
-                              SFEM_DIRICHLET_VALUE,
-                              SFEM_DIRICHLET_COMPONENT,
-                              &dirichlet_conditions,
-                              &n_dirichlet_conditions);
+                              SFEM_VELOCITY_DIRICHLET_NODESET,
+                              SFEM_VELOCITY_DIRICHLET_VALUE,
+                              SFEM_VELOCITY_DIRICHLET_COMPONENT,
+                              &velocity_dirichlet_conditions,
+                              &n_velocity_dirichlet_conditions);
 
-    read_neumann_conditions(&mesh,
-                            SFEM_NEUMANN_SIDESET,
-                            SFEM_NEUMANN_VALUE,
-                            SFEM_NEUMANN_COMPONENT,
-                            &neumann_conditions,
-                            &n_neumann_conditions);
+    read_dirichlet_conditions(&mesh,
+                              SFEM_PRESSURE_DIRICHLET_NODESET,
+                              "",
+                              "",
+                              &velocity_dirichlet_conditions,
+                              &n_velocity_dirichlet_conditions);
+
+    // read_neumann_conditions(&mesh,
+    //                         SFEM_NEUMANN_SIDESET,
+    //                         SFEM_NEUMANN_VALUE,
+    //                         SFEM_NEUMANN_COMPONENT,
+    //                         &neumann_conditions,
+    //                         &n_neumann_conditions);
 
     enum ElemType p1_type = elem_lower_order(mesh.element_type);
     const int sdim = elem_manifold_dim(mesh.element_type);
@@ -165,12 +176,9 @@ int main(int argc, char *argv[]) {
                                p1_colidx,
                                values);
 
-    apply_dirichlet_condition_to_hessian_crs_vec(
-        n_dirichlet_conditions, dirichlet_conditions, &mesh, 1, p1_rowptr, p1_colidx, values);
-
-    for (int i = 0; i < n_dirichlet_conditions; i++) {
-        crs_constraint_nodes_to_identity(dirichlet_conditions[i].local_size,
-                                         dirichlet_conditions[i].idx,
+    for (int i = 0; i < n_pressure_dirichlet_conditions; i++) {
+        crs_constraint_nodes_to_identity(pressure_dirichlet_conditions[i].local_size,
+                                         pressure_dirichlet_conditions[i].idx,
                                          1,
                                          p1_rowptr,
                                          p1_colidx,
@@ -227,10 +235,10 @@ int main(int argc, char *argv[]) {
                                   tentative_vel[d]);
         }
 
-        // TODO Boundary conditions on tentative_vel ?
-        for (int d = 0; d < sdim; d++) {
-            apply_dirichlet_condition_vec(
-                n_dirichlet_conditions, dirichlet_conditions, &mesh, 1, tentative_vel[d]);
+        for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
+            boundary_condition_t cond = velocity_dirichlet_conditions[i];
+            constraint_nodes_to_value(
+                cond.local_size, cond.idx, cond.value, tentative_vel[cond.component]);
         }
 
         //////////////////////////////////////////////////////////////
@@ -251,7 +259,14 @@ int main(int argc, char *argv[]) {
         isolver_lsolve_t lsolve;
         lsolve.comm = comm;
 
-        // TODO Boundary conditions on buff
+        for (int i = 0; i < n_pressure_dirichlet_conditions; i++) {
+            boundary_condition_t cond = pressure_dirichlet_conditions[i];
+            assert(cond.component == 0);
+
+            constraint_nodes_to_value(
+                cond.local_size, cond.idx, cond.value, buff);
+        }
+
         isolver_lsolve_apply(&lsolve, buff, p);
 
         //////////////////////////////////////////////////////////////
@@ -276,10 +291,10 @@ int main(int argc, char *argv[]) {
                                   vel[d]);
         }
 
-        // TODO Boundary conditions on vel ?
-        for (int d = 0; d < sdim; d++) {
-            apply_dirichlet_condition_vec(
-                n_dirichlet_conditions, dirichlet_conditions, &mesh, 1, vel[d]);
+        for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
+            boundary_condition_t cond = velocity_dirichlet_conditions[i];
+            constraint_nodes_to_value(
+                cond.local_size, cond.idx, cond.value, vel[cond.component]);
         }
     }
 
@@ -311,8 +326,9 @@ int main(int argc, char *argv[]) {
 
     mesh_destroy(&mesh);
 
-    destroy_conditions(n_dirichlet_conditions, dirichlet_conditions);
-    destroy_conditions(n_neumann_conditions, neumann_conditions);
+    destroy_conditions(n_velocity_dirichlet_conditions, velocity_dirichlet_conditions);
+    destroy_conditions(n_pressure_dirichlet_conditions, pressure_dirichlet_conditions);
+    // destroy_conditions(n_neumann_conditions, neumann_conditions);
 
     double tock = MPI_Wtime();
     if (!rank) {
