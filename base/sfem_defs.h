@@ -24,7 +24,22 @@ SFEM_INLINE static enum ElemType side_type(const enum ElemType type) {
     }
 }
 
-SFEM_INLINE static enum ElemType elem_num_nodes(const enum ElemType type) {
+SFEM_INLINE static enum ElemType elem_lower_order(const enum ElemType type) {
+    switch (type) {
+        case TRI6:
+            return TRI3;
+        case TET10:
+            return TET4;
+        // case EDGE3:
+            // return EDGE2;
+        default: {
+            assert(0);
+            return INVALID;
+        }
+    }
+}
+
+SFEM_INLINE static int elem_num_nodes(const enum ElemType type) {
     switch (type) {
         case NODE1:
             return 1;

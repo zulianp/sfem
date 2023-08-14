@@ -110,6 +110,9 @@ GOALS += assemble_adjaciency_matrix
 
 GOALS += bgs
 
+
+GOALS += taylor_hood_navier_stokes
+
 ifeq ($(metis), 1)
 	GOALS += partition_mesh_based_on_operator
 endif
@@ -223,6 +226,9 @@ ISOLVER_INCLUDES = -I../isolver/interfaces/lsolve -I../isolver/plugin/lsolve -I.
 
 ssolve : drivers/ssolve.cpp isolver_lsolve_frontend.o libsfem.a
 	$(MPICXX) $(CXXFLAGS) $(INCLUDES) $(ISOLVER_INCLUDES) $(YAML_CPP_INCLUDES) $(YAML_CPP_LIBRARIES) -o $@ $^ $(LDFLAGS) ; \
+
+taylor_hood_navier_stokes: drivers/taylor_hood_navier_stokes.c isolver_lsolve_frontend.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) $(ISOLVER_INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 bgs : bgs.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \

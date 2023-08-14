@@ -14,14 +14,15 @@ import pdb
 simplify_expr = True
 subs_jacobian = True
 
-# Implicit Euler
-# Chorin's projection method
 # 1) temptative momentum step
-# 	`1/dt * <u, v> + nu * <grad(u), grad(v)> = <u_old, v> - <(u_old . div) * u_old, v>`
+# - Implicit Euler
+# `<u, v> + dt * nu * <grad(u), grad(v)> = <u_old, v> - dt * <(u_old . div) * u_old, v>`
+# - Explicit Euler
+# `<u, v> = <u_old, v> - dt * ( <(u_old . div) * u_old, v> + nu * <grad(u), grad(v)> )`
 # 2) Potential eqaution
-#  	`<grad(p), grad(q)> = - 1/dt * <div(u), q>`
+# `<grad(p), grad(q)> = - 1/dt * <div(u), q>`
 # 3) Projection/Correction
-#  	`<u_new, v> = <u, v> - dt * <grad(p), v>`
+# `<u_new, v> = <u, v> - dt * <grad(p), v>`
 
 class NavierStokesOp:
 	def __init__(self, fe_vel, fe_pressure):
@@ -104,6 +105,7 @@ class NavierStokesOp:
 			conv[d] = val
 		#########################################################
 
+		self.form1_diffusion = sp.zeros(n_vel, 1)
 		self.form1_convection = sp.zeros(n_vel, 1)
 		self.form1_divergence = sp.zeros(n_pressure, 1)
 		self.form1_correction = sp.zeros(n_vel, 1)
@@ -112,11 +114,15 @@ class NavierStokesOp:
 		#########################################################
 
 		for i in range(0, n_vel):
-			integr = fe_vel.integrate(qp, inner(conv, fun_vel[i])) * fe_vel.jacobian_determinant(qp)
+			integr = -nu * fe_vel.integrate(qp, inner(grad_uh, grad_vel[i])) * fe_vel.jacobian_determinant(qp)
+			self.form1_diffusion[i] = integr
+
+		for i in range(0, n_vel):
+			integr = -fe_vel.integrate(qp, inner(conv, fun_vel[i])) * fe_vel.jacobian_determinant(qp)
 			self.form1_convection[i] = integr
 
 		for i in range(0, n_vel):
-			integr = fe_vel.integrate(qp, inner(uh, fun_vel[i])) * fe_vel.jacobian_determinant(qp)
+			integr = (1/dt) * fe_vel.integrate(qp, inner(uh, fun_vel[i])) * fe_vel.jacobian_determinant(qp)
 			self.form1_utm1[i] = integr
 
 		for i in range(0,  n_pressure):
@@ -140,7 +146,7 @@ class NavierStokesOp:
 		print('------------------------------')
 		print('RHS (temptative momentum)')
 		print('------------------------------')
-		c_code(self.assign_vector(self.form1_utm1 - self.form1_convection))
+		c_code(self.assign_vector(self.form1_utm1 + self.form1_convection))
 
 		print('------------------------------')
 		print('RHS (potential equation)')
@@ -151,6 +157,11 @@ class NavierStokesOp:
 		print('RHS (correction equation)')
 		print('------------------------------')
 		c_code(self.assign_vector(self.form1_correction))
+
+		print('------------------------------')
+		print('RHS (explicit momentum)')
+		print('------------------------------')
+		c_code(self.assign_vector(dt * (self.form1_utm1 + self.form1_diffusion + self.form1_convection)))
 
 	# def apply(self):
 	# 	H = self.hessian
