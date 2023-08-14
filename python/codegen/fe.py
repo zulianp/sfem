@@ -174,6 +174,9 @@ class FE:
 				sls.append(var)
 		return sp.Matrix(rows, cols, sls)
 
+	def symbol_jacobian_determinant(self):
+		return sp.symbols('jacobian_determinant')
+
 	def generate_det_code(self):
 		mat = sp.Matrix(self.manifold_dim(), self.manifold_dim(), [0] * (self.manifold_dim() * self.manifold_dim()))
 		

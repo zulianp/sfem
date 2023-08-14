@@ -10,8 +10,9 @@ from fe_material import *
 
 import pdb
 
-simplify_expr = False
-# simplify_expr = True
+# simplify_expr = False
+simplify_expr = True
+subs_jacobian = True
 
 # Implicit Euler
 # Chorin's projection method
@@ -39,13 +40,13 @@ class NavierStokesOp:
 		grad_vel = fe_vel.physical_tgrad(qp)
 		fun_vel = fe_vel.tfun(qp)
 		fun_pressure = fe_pressure.fun(qp)
-		grad_pressure = fe_pressure.grad(qp)
+		grad_pressure = fe_pressure.physical_grad(qp)
 
 		n_vel = len(grad_vel) 
 		n_pressure = len(fun_pressure)
 
-		mu, rho, dt = sp.symbols('mu rho dt')
-		self.params = [mu, rho, dt]
+		nu, rho, dt = sp.symbols('nu rho dt')
+		self.params = [nu, rho, dt]
 
 		self.form2_diffusion = sp.zeros(n_vel, n_vel)
 		self.form2_mass = sp.zeros(n_vel, n_vel)
@@ -57,22 +58,22 @@ class NavierStokesOp:
 
 		for i in range(0,  n_vel):
 			for j in range(0,  n_vel):
-				integr = mu * fe_vel.integrate(qp, inner(grad_vel[i], grad_vel[j])) *  fe_vel.jacobian_determinant(qp)
+				integr = nu * fe_vel.integrate(qp, inner(grad_vel[i], grad_vel[j])) *  fe_vel.symbol_jacobian_determinant()
 				self.form2_diffusion[i, j] = integr
 
 		for i in range(0,  n_vel):
 			for j in range(0,  n_vel):
-				integr = (1/dt) * fe_vel.integrate(qp, inner(fun_vel[i], fun_vel[j])) *  fe_vel.jacobian_determinant(qp)
+				integr = (1/dt) * fe_vel.integrate(qp, inner(fun_vel[i], fun_vel[j])) *  fe_vel.symbol_jacobian_determinant()
 				self.form2_mass[i, j] = integr
 
 		# for i in range(0,  n_vel):
 		# 	for j in range(0,  n_pressure):
-		# 		integr = -(1/dt)*fe_pressure.integrate(qp, tr(grad_vel[i]) * fun_pressure[j]) * fe_pressure.jacobian_determinant(qp)
+		# 		integr = -(1/dt)*fe_pressure.integrate(qp, tr(grad_vel[i]) * fun_pressure[j]) * fe_pressure.symbol_jacobian_determinant()
 		# 		self.form2_divergence[i, j] = integr
 
 		for i in range(0,  n_pressure):
 			for j in range(0,  n_pressure):
-				integr = fe_pressure.integrate(qp, inner(grad_pressure[i], grad_pressure[j])) * fe_pressure.jacobian_determinant(qp)
+				integr = fe_pressure.integrate(qp, inner(grad_pressure[i], grad_pressure[j])) * fe_pressure.symbol_jacobian_determinant()
 				self.form2_laplacian[i, j] = integr
 
 
@@ -139,17 +140,17 @@ class NavierStokesOp:
 		print('------------------------------')
 		print('RHS (temptative momentum)')
 		print('------------------------------')
-		c_code(self.assign_matrix(self.form1_utm1 - self.form1_convection))
+		c_code(self.assign_vector(self.form1_utm1 - self.form1_convection))
 
 		print('------------------------------')
 		print('RHS (potential equation)')
 		print('------------------------------')
-		c_code(self.assign_matrix(self.form1_divergence))
+		c_code(self.assign_vector(self.form1_divergence))
 
 		print('------------------------------')
 		print('RHS (correction equation)')
 		print('------------------------------')
-		c_code(self.assign_matrix(self.form1_correction))
+		c_code(self.assign_vector(self.form1_correction))
 
 	# def apply(self):
 	# 	H = self.hessian
@@ -173,7 +174,9 @@ class NavierStokesOp:
 				var = sp.symbols(f'{name}[{i*cols + j}]')
 				value = a[i, j]
 
-				value = subsmat(value, fe.symbol_jacobian_inverse(), fe.jacobian_inverse(qp))
+				if subs_jacobian:
+					value = subsmat(value, fe.symbol_jacobian_inverse(), fe.jacobian_inverse(qp))
+					value = value.subs(fe.symbol_jacobian_determinant(), fe.jacobian_determinant(qp))
 
 				if simplify_expr:
 					value = sp.simplify(value)

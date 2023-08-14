@@ -60,811 +60,137 @@ void navier_stokes_apply_aos(const enum ElemType element_type,
     // TODO
 }
 
+// Implicit Euler
+// Chorin's projection method
+// 1) temptative momentum step
+//   `1/dt * <u, v> + nu * <grad(u), grad(v)> = <u_old, v> - <(u_old . div) * u_old, v>`
+// 2) Potential eqaution
+//   `<grad(p), grad(q)> = - 1/dt * <div(u), q>`
+// 3) Projection/Correction
+//   `<u_new, v> = <u, v> - dt * <grad(p), v>`
+
 // Taylor hood Triangle P2/P1
+// 1) Temptative momentum step
 
-static SFEM_INLINE void tri6_nse_taylor_hood_correction_rhs_kernel(
-    const real_t px0,
-    const real_t px1,
-    const real_t px2,
-    const real_t py0,
-    const real_t py1,
-    const real_t py2,
-    const real_t dt,
-    const real_t *const SFEM_RESTRICT u,
-    const real_t *const SFEM_RESTRICT p,
-    real_t *const SFEM_RESTRICT element_vector) {
-    const real_t x0 = (1.0 / 360.0) * u[1];
-    const real_t x1 = (1.0 / 360.0) * u[2];
-    const real_t x2 = (-px0 + px1) * (-py0 + py2) - (-px0 + px2) * (-py0 + py1);
-    const real_t x3 = (1.0 / 360.0) * u[0];
-    const real_t x4 = (2.0 / 45.0) * u[4];
-    const real_t x5 = (1.0 / 6.0) * p[0];
-    const real_t x6 = -dt * ((1.0 / 6.0) * p[1] - x5);
-    const real_t x7 = (2.0 / 45.0) * u[5] + x6;
-    const real_t x8 = (2.0 / 45.0) * u[3];
-    const real_t x9 = (1.0 / 360.0) * u[7];
-    const real_t x10 = (1.0 / 360.0) * u[8];
-    const real_t x11 = (1.0 / 360.0) * u[6];
-    const real_t x12 = (2.0 / 45.0) * u[10];
-    const real_t x13 = -dt * ((1.0 / 6.0) * p[2] - x5);
-    const real_t x14 = (2.0 / 45.0) * u[11] + x13;
-    const real_t x15 = (2.0 / 45.0) * u[9];
-    element_vector[0] = x2 * ((1.0 / 60.0) * u[0] - 1.0 / 90.0 * u[4] - x0 - x1);
-    element_vector[1] = x2 * ((1.0 / 60.0) * u[1] - 1.0 / 90.0 * u[5] - x1 - x3);
-    element_vector[2] = x2 * ((1.0 / 60.0) * u[2] - 1.0 / 90.0 * u[3] - x0 - x3);
-    element_vector[3] = x2 * (-1.0 / 90.0 * u[2] + (4.0 / 45.0) * u[3] + x4 + x7);
-    element_vector[4] = x2 * (-1.0 / 90.0 * u[0] + (4.0 / 45.0) * u[4] + x7 + x8);
-    element_vector[5] = x2 * (-1.0 / 90.0 * u[1] + (4.0 / 45.0) * u[5] + x4 + x6 + x8);
-    element_vector[6] = x2 * (-1.0 / 90.0 * u[10] + (1.0 / 60.0) * u[6] - x10 - x9);
-    element_vector[7] = x2 * (-1.0 / 90.0 * u[11] + (1.0 / 60.0) * u[7] - x10 - x11);
-    element_vector[8] = x2 * ((1.0 / 60.0) * u[8] - 1.0 / 90.0 * u[9] - x11 - x9);
-    element_vector[9] = x2 * (-1.0 / 90.0 * u[8] + (4.0 / 45.0) * u[9] + x12 + x14);
-    element_vector[10] = x2 * ((4.0 / 45.0) * u[10] - 1.0 / 90.0 * u[6] + x14 + x15);
-    element_vector[11] = x2 * ((4.0 / 45.0) * u[11] - 1.0 / 90.0 * u[7] + x12 + x13 + x15);
-}
-
-static SFEM_INLINE void tri3_laplacian_kernel(const real_t px0,
+static SFEM_INLINE void tri6_momentum_lhs_kernel(const real_t px0,
                                                  const real_t px1,
                                                  const real_t px2,
                                                  const real_t py0,
                                                  const real_t py1,
                                                  const real_t py2,
+                                                 const real_t dt,
+                                                 const real_t nu,
                                                  real_t *const SFEM_RESTRICT element_matrix) {
-    const real_t x0 = (-px0 + px1) * (-py0 + py2);
-    const real_t x1 = -px0 + px2;
-    const real_t x2 = -py0 + py1;
-    const real_t x3 = (1.0 / 2.0) * x0 - 1.0 / 2.0 * x1 * x2;
-    const real_t x4 = -x3;
-    element_matrix[0] = x0 - x1 * x2;
-    element_matrix[1] = x4;
-    element_matrix[2] = x4;
-    element_matrix[3] = x4;
-    element_matrix[4] = x3;
-    element_matrix[5] = 0;
-    element_matrix[6] = x4;
-    element_matrix[7] = 0;
-    element_matrix[8] = x3;
-}
-
-static SFEM_INLINE void tri6_momentum_rhs_kernel(const real_t px0,
-                                                const real_t px1,
-                                                const real_t px2,
-                                                const real_t py0,
-                                                const real_t py1,
-                                                const real_t py2,
-                                                real_t *const SFEM_RESTRICT u,
-                                                real_t *const SFEM_RESTRICT element_vector) {
-    const real_t x0 = (1.0 / 360.0) * u[1];
-    const real_t x1 = (1.0 / 360.0) * u[2];
-    const real_t x2 = -px0 + px1;
-    const real_t x3 = -py0 + py2;
-    const real_t x4 = px0 - px2;
-    const real_t x5 = py0 - py1;
-    const real_t x6 = x2 * x3 - x4 * x5;
-    const real_t x7 = pow(u[3], 2);
-    const real_t x8 = 1.0 / x6;
-    const real_t x9 = pow(u[5], 2);
-    const real_t x10 = pow(u[1], 2);
-    const real_t x11 = x3 * x8;
-    const real_t x12 = (1.0 / 280.0) * x11;
-    const real_t x13 = x10 * x12;
-    const real_t x14 = pow(u[2], 2);
-    const real_t x15 = x5 * x8;
-    const real_t x16 = (1.0 / 280.0) * x15;
-    const real_t x17 = x14 * x16;
-    const real_t x18 = pow(u[0], 2);
-    const real_t x19 = (13.0 / 420.0) * x18;
-    const real_t x20 = (1.0 / 35.0) * u[0];
-    const real_t x21 = u[3] * x15;
-    const real_t x22 = u[5] * x11;
-    const real_t x23 = (1.0 / 105.0) * u[6];
-    const real_t x24 = x2 * x8;
-    const real_t x25 = u[3] * x24;
-    const real_t x26 = x4 * x8;
-    const real_t x27 = u[5] * x26;
-    const real_t x28 = (1.0 / 126.0) * u[10];
-    const real_t x29 = u[1] * x26;
-    const real_t x30 = u[2] * x24;
-    const real_t x31 = (1.0 / 126.0) * u[1];
-    const real_t x32 = (1.0 / 126.0) * u[2];
-    const real_t x33 = (1.0 / 140.0) * u[6];
-    const real_t x34 = u[0] * x26;
-    const real_t x35 = (1.0 / 210.0) * u[10];
-    const real_t x36 = u[0] * x24;
-    const real_t x37 = (1.0 / 280.0) * x26;
-    const real_t x38 = u[7] * x37;
-    const real_t x39 = u[1] * x38;
-    const real_t x40 = (1.0 / 280.0) * x24;
-    const real_t x41 = u[8] * x40;
-    const real_t x42 = u[2] * x41;
-    const real_t x43 = (1.0 / 630.0) * u[8];
-    const real_t x44 = (1.0 / 630.0) * u[7];
-    const real_t x45 = (2.0 / 105.0) * u[11];
-    const real_t x46 = (2.0 / 105.0) * u[9];
-    const real_t x47 = u[11] * x24;
-    const real_t x48 = (2.0 / 315.0) * u[4];
-    const real_t x49 = x47 * x48;
-    const real_t x50 = (2.0 / 315.0) * u[1];
-    const real_t x51 = u[4] * x50;
-    const real_t x52 = u[2] * x48;
-    const real_t x53 = u[4] * x26;
-    const real_t x54 = (2.0 / 315.0) * u[9];
-    const real_t x55 = x53 * x54;
-    const real_t x56 = (4.0 / 315.0) * u[2];
-    const real_t x57 = (4.0 / 315.0) * x26;
-    const real_t x58 = u[11] * x57;
-    const real_t x59 = (4.0 / 315.0) * x11;
-    const real_t x60 = u[1] * u[3];
-    const real_t x61 = u[1] * u[9];
-    const real_t x62 = u[5] * x15;
-    const real_t x63 = u[4] * x24;
-    const real_t x64 = (4.0 / 315.0) * u[9];
-    const real_t x65 = (13.0 / 420.0) * u[6];
-    const real_t x66 = x11 * x7;
-    const real_t x67 = pow(u[4], 2);
-    const real_t x68 = (2.0 / 105.0) * x67;
-    const real_t x69 = u[3] * x26;
-    const real_t x70 = (2.0 / 63.0) * x69;
-    const real_t x71 = (2.0 / 105.0) * u[10];
-    const real_t x72 = u[3] * x11;
-    const real_t x73 = (1.0 / 126.0) * u[8];
-    const real_t x74 = u[0] * u[1];
-    const real_t x75 = -u[9] * x70 + x12 * x74 + x15 * x68 - x22 * x48 - x25 * x71 + x32 * x72 +
-                       x63 * x71 - 2.0 / 63.0 * x66 + x69 * x73;
-    const real_t x76 = x15 * x9;
-    const real_t x77 = u[5] * x47;
-    const real_t x78 = u[5] * x24;
-    const real_t x79 = (1.0 / 126.0) * u[7];
-    const real_t x80 = u[0] * u[2];
-    const real_t x81 = x11 * x68 + x16 * x80 - x21 * x48 - x27 * x71 + x31 * x62 + x53 * x71 -
-                       2.0 / 63.0 * x76 - 2.0 / 63.0 * x77 + x78 * x79;
-    const real_t x82 = x11 * x52;
-    const real_t x83 = (2.0 / 315.0) * u[8];
-    const real_t x84 = x53 * x83;
-    const real_t x85 = -8.0 / 315.0 * u[11] * u[3] * x4 * x8 - 2.0 / 315.0 * u[2] * u[5] * x3 * x8 -
-                       2.0 / 315.0 * u[5] * u[8] * x4 * x8 + x82 + x84;
-    const real_t x86 = x15 * x51;
-    const real_t x87 = (2.0 / 315.0) * u[7];
-    const real_t x88 = x63 * x87;
-    const real_t x89 = -2.0 / 315.0 * u[1] * u[3] * x5 * x8 - 2.0 / 315.0 * u[3] * u[7] * x2 * x8 -
-                       8.0 / 315.0 * u[5] * u[9] * x2 * x8 + x86 + x88;
-    const real_t x90 = u[11] * x26;
-    const real_t x91 = x50 * x90;
-    const real_t x92 = x30 * x54;
-    const real_t x93 = x91 + x92;
-    const real_t x94 = (1.0 / 360.0) * u[0];
-    const real_t x95 = x15 * x7;
-    const real_t x96 = (2.0 / 105.0) * x95;
-    const real_t x97 = x11 * x9;
-    const real_t x98 = (2.0 / 105.0) * x97;
-    const real_t x99 = x10 * x11;
-    const real_t x100 = (11.0 / 2520.0) * x11;
-    const real_t x101 = (11.0 / 2520.0) * u[8];
-    const real_t x102 = u[10] * x69;
-    const real_t x103 = (8.0 / 315.0) * x102;
-    const real_t x104 = u[7] * x69;
-    const real_t x105 = x24 * x56;
-    const real_t x106 = u[10] * x57;
-    const real_t x107 = (2.0 / 63.0) * u[4];
-    const real_t x108 = x45 * x53;
-    const real_t x109 = x11 * x60;
-    const real_t x110 = u[4] * x15;
-    const real_t x111 = (2.0 / 105.0) * u[2];
-    const real_t x112 = x25 * x46;
-    const real_t x113 = (2.0 / 315.0) * u[3];
-    const real_t x114 = (2.0 / 315.0) * u[6];
-    const real_t x115 = x114 * x63;
-    const real_t x116 = x63 * x83;
-    const real_t x117 = x15 * x60;
-    const real_t x118 = (1.0 / 21.0) * u[7];
-    const real_t x119 = (1.0 / 105.0) * u[7];
-    const real_t x120 = (1.0 / 126.0) * u[6];
-    const real_t x121 = u[1] * u[2];
-    const real_t x122 = (1.0 / 140.0) * x15;
-    const real_t x123 = (1.0 / 210.0) * u[1];
-    const real_t x124 = u[6] * x37;
-    const real_t x125 = (1.0 / 630.0) * u[6];
-    const real_t x126 = u[1] * x110;
-    const real_t x127 = u[4] * x11;
-    const real_t x128 = u[1] * x127;
-    const real_t x129 = (1.0 / 126.0) * u[11];
-    const real_t x130 = (1.0 / 126.0) * u[0];
-    const real_t x131 = (1.0 / 140.0) * u[7];
-    const real_t x132 = (2.0 / 105.0) * u[0];
-    const real_t x133 = x27 * x45;
-    const real_t x134 = x26 * x61;
-    const real_t x135 = x46 * x63;
-    const real_t x136 = (2.0 / 315.0) * x22;
-    const real_t x137 = u[10] * x78;
-    const real_t x138 = u[0] * x59;
-    const real_t x139 = (11.0 / 2520.0) * u[6];
-    const real_t x140 = u[7] * x29;
-    const real_t x141 = (2.0 / 315.0) * u[10];
-    const real_t x142 = x141 * x34 + x141 * x36;
-    const real_t x143 = x142 - x92;
-    const real_t x144 = u[0] * u[6] * x40 + u[0] * x124 + x113 * x47 + x12 * x18 + x16 * x18 +
-                        x27 * x54 - x49 - x55;
-    const real_t x145 = x15 * x67;
-    const real_t x146 = x14 * x15;
-    const real_t x147 = (11.0 / 2520.0) * x15;
-    const real_t x148 = (11.0 / 2520.0) * u[7];
-    const real_t x149 = (8.0 / 315.0) * x137;
-    const real_t x150 = u[8] * x78;
-    const real_t x151 = (4.0 / 315.0) * u[10];
-    const real_t x152 = x114 * x53;
-    const real_t x153 = x53 * x87;
-    const real_t x154 = (1.0 / 21.0) * u[2];
-    const real_t x155 = (1.0 / 21.0) * u[8];
-    const real_t x156 = (1.0 / 105.0) * u[8];
-    const real_t x157 = (1.0 / 140.0) * x11;
-    const real_t x158 = (1.0 / 140.0) * u[8];
-    const real_t x159 = (1.0 / 210.0) * x21;
-    const real_t x160 = u[2] * x40;
-    const real_t x161 = u[2] * x110;
-    const real_t x162 = (1.0 / 126.0) * u[9];
-    const real_t x163 = u[9] * x30;
-    const real_t x164 = u[0] * x21;
-    const real_t x165 = u[11] * x36;
-    const real_t x166 = u[0] * x62;
-    const real_t x167 = u[8] * x30;
-    const real_t x168 = x142 - x91;
-    const real_t x169 = (2.0 / 45.0) * u[4];
-    const real_t x170 = (2.0 / 45.0) * u[5];
-    const real_t x171 = u[2] * x11;
-    const real_t x172 = u[11] * x34;
-    const real_t x173 = u[0] * x72;
-    const real_t x174 = (2.0 / 105.0) * x117;
-    const real_t x175 = (2.0 / 105.0) * u[7] * x25;
-    const real_t x176 = (2.0 / 105.0) * x63;
-    const real_t x177 = x15 * x50;
-    const real_t x178 = (4.0 / 63.0) * u[9];
-    const real_t x179 = u[1] * x57;
-    const real_t x180 = (4.0 / 315.0) * u[6];
-    const real_t x181 = (8.0 / 105.0) * u[10];
-    const real_t x182 = u[0] * x22;
-    const real_t x183 = (8.0 / 315.0) * u[3];
-    const real_t x184 = (16.0 / 105.0) * u[9];
-    const real_t x185 = (16.0 / 315.0) * x27;
-    const real_t x186 = u[5] * x90;
-    const real_t x187 = (2.0 / 105.0) * x18;
-    const real_t x188 = (2.0 / 105.0) * u[6];
-    const real_t x189 = (16.0 / 315.0) * x47;
-    const real_t x190 = u[3] * x189;
-    const real_t x191 = u[9] * x185;
-    const real_t x192 = -16.0 / 315.0 * u[11] * u[4] * x2 * x8 -
-                        16.0 / 315.0 * u[4] * u[9] * x4 * x8 + x11 * x187 + x15 * x187 +
-                        x188 * x34 + x188 * x36 + x190 + x191;
-    const real_t x193 = (16.0 / 315.0) * x62;
-    const real_t x194 = (8.0 / 105.0) * u[4];
-    const real_t x195 = (1.0 / 630.0) * x15;
-    const real_t x196 = (2.0 / 315.0) * u[2];
-    const real_t x197 = -u[3] * x193 - u[4] * x193 + x110 * x132 + x111 * x21 +
-                        (2.0 / 315.0) * x166 - x194 * x21 - x195 * x80 + x196 * x62 + x50 * x62 -
-                        8.0 / 315.0 * x76 - 8.0 / 315.0 * x77 + x78 * x87;
-    const real_t x198 = (2.0 / 45.0) * u[3];
-    const real_t x199 = (1.0 / 210.0) * x18;
-    const real_t x200 = (16.0 / 105.0) * u[10];
-    const real_t x201 = (8.0 / 105.0) * u[9];
-    const real_t x202 = u[1] * x15;
-    const real_t x203 = u[7] * x57;
-    const real_t x204 = (4.0 / 315.0) * u[8];
-    const real_t x205 = x111 * x22;
-    const real_t x206 = (2.0 / 105.0) * u[8];
-    const real_t x207 = x206 * x27;
-    const real_t x208 = (1.0 / 210.0) * u[6];
-    const real_t x209 = (2.0 / 63.0) * u[2];
-    const real_t x210 = (4.0 / 105.0) * u[10];
-    const real_t x211 = u[6] * x57;
-    const real_t x212 = (16.0 / 315.0) * x22;
-    const real_t x213 = (1.0 / 630.0) * x11;
-    const real_t x214 = (2.0 / 105.0) * u[1];
-    const real_t x215 = -u[3] * x212 - 16.0 / 315.0 * u[4] * x72 - 8.0 / 315.0 * u[9] * x69 +
-                        (2.0 / 315.0) * x109 + x127 * x132 + (2.0 / 315.0) * x173 - x194 * x22 +
-                        x196 * x72 - x213 * x74 + x214 * x22 - 8.0 / 315.0 * x66 + x69 * x83;
-    const real_t x216 = x15 * x31;
-    const real_t x217 = (2.0 / 63.0) * u[9];
-    const real_t x218 = (2.0 / 105.0) * u[7];
-    const real_t x219 = x26 * x50;
-    const real_t x220 = u[1] * x59;
-    const real_t x221 = (16.0 / 315.0) * x25;
-    const real_t x222 = (1.0 / 360.0) * u[7];
-    const real_t x223 = (1.0 / 360.0) * u[8];
-    const real_t x224 = pow(u[11], 2);
-    const real_t x225 = pow(u[9], 2);
-    const real_t x226 = pow(u[7], 2);
-    const real_t x227 = x226 * x37;
-    const real_t x228 = pow(u[8], 2);
-    const real_t x229 = x228 * x40;
-    const real_t x230 = pow(u[6], 2);
-    const real_t x231 = (13.0 / 420.0) * x230;
-    const real_t x232 = (1.0 / 35.0) * u[6];
-    const real_t x233 = u[9] * x24;
-    const real_t x234 = u[0] * x11;
-    const real_t x235 = u[0] * x15;
-    const real_t x236 = u[8] * x122;
-    const real_t x237 = u[1] * u[7] * x12;
-    const real_t x238 = u[2] * u[8] * x16;
-    const real_t x239 = x141 * x72;
-    const real_t x240 = x141 * x62;
-    const real_t x241 = u[10] * x87;
-    const real_t x242 = u[10] * x83;
-    const real_t x243 = u[5] * x59;
-    const real_t x244 = u[3] * x59;
-    const real_t x245 = x225 * x26;
-    const real_t x246 = pow(u[10], 2);
-    const real_t x247 = (2.0 / 105.0) * x246;
-    const real_t x248 = u[9] * x11;
-    const real_t x249 = x26 * x73;
-    const real_t x250 = u[6] * x38 + u[9] * x249 - x110 * x46 + x110 * x71 - x141 * x90 -
-                        x217 * x72 + x24 * x247 - 2.0 / 63.0 * x245 + x248 * x32;
-    const real_t x251 = x224 * x24;
-    const real_t x252 = (2.0 / 63.0) * x62;
-    const real_t x253 = -u[10] * x24 * x54 + u[11] * x216 - u[11] * x252 + u[6] * x41 - x127 * x45 +
-                        x127 * x71 + x247 * x26 - 2.0 / 63.0 * x251 + x47 * x79;
-    const real_t x254 = x141 * x171;
-    const real_t x255 = x242 * x26;
-    const real_t x256 = -2.0 / 315.0 * u[11] * u[2] * x3 * x8 -
-                        2.0 / 315.0 * u[11] * u[8] * x4 * x8 - 8.0 / 315.0 * u[5] * u[9] * x3 * x8 +
-                        x254 + x255;
-    const real_t x257 = u[10] * x177;
-    const real_t x258 = x24 * x241;
-    const real_t x259 = -8.0 / 315.0 * u[11] * u[3] * x5 * x8 -
-                        2.0 / 315.0 * u[1] * u[9] * x5 * x8 - 2.0 / 315.0 * u[7] * u[9] * x2 * x8 +
-                        x257 + x258;
-    const real_t x260 = x21 * x83;
-    const real_t x261 = x22 * x87;
-    const real_t x262 = x260 + x261;
-    const real_t x263 = (1.0 / 360.0) * u[6];
-    const real_t x264 = x225 * x24;
-    const real_t x265 = (2.0 / 105.0) * x264;
-    const real_t x266 = x224 * x26;
-    const real_t x267 = (2.0 / 105.0) * x266;
-    const real_t x268 = x226 * x26;
-    const real_t x269 = u[2] * u[6];
-    const real_t x270 = u[6] * x26;
-    const real_t x271 = (8.0 / 315.0) * u[9];
-    const real_t x272 = x127 * x271;
-    const real_t x273 = x11 * x61;
-    const real_t x274 = u[4] * x59;
-    const real_t x275 = u[10] * x26;
-    const real_t x276 = x22 * x71;
-    const real_t x277 = u[8] * x24;
-    const real_t x278 = x21 * x46;
-    const real_t x279 = u[7] * x26;
-    const real_t x280 = x141 * x235;
-    const real_t x281 = u[2] * x15;
-    const real_t x282 = x141 * x281;
-    const real_t x283 = (2.0 / 315.0) * u[11];
-    const real_t x284 = x15 * x61;
-    const real_t x285 = u[11] * x11;
-    const real_t x286 = (1.0 / 105.0) * u[1];
-    const real_t x287 = (1.0 / 210.0) * u[7];
-    const real_t x288 = u[0] * x12;
-    const real_t x289 = u[2] * u[7];
-    const real_t x290 = (1.0 / 630.0) * x234;
-    const real_t x291 = (1.0 / 35.0) * u[10];
-    const real_t x292 = u[10] * x11;
-    const real_t x293 = u[11] * x15;
-    const real_t x294 = u[1] * x11;
-    const real_t x295 = u[7] * x24;
-    const real_t x296 = x21 * x71;
-    const real_t x297 = x22 * x45;
-    const real_t x298 = u[6] * x24;
-    const real_t x299 = u[6] * x48;
-    const real_t x300 = x11 * x299 + x15 * x299;
-    const real_t x301 = -x260 + x300;
-    const real_t x302 = u[0] * u[6] * x16 + u[6] * x288 + x230 * x37 + x230 * x40 - x239 - x240 +
-                        x283 * x72 + x54 * x62;
-    const real_t x303 = x24 * x246;
-    const real_t x304 = x228 * x24;
-    const real_t x305 = u[1] * u[6];
-    const real_t x306 = (8.0 / 315.0) * u[11];
-    const real_t x307 = x110 * x306;
-    const real_t x308 = x141 * x234;
-    const real_t x309 = x292 * x50;
-    const real_t x310 = (1.0 / 105.0) * x281;
-    const real_t x311 = u[8] * x26;
-    const real_t x312 = u[8] * x16;
-    const real_t x313 = u[0] * x195;
-    const real_t x314 = -x261 + x300;
-    const real_t x315 = (2.0 / 45.0) * u[10];
-    const real_t x316 = (2.0 / 45.0) * u[11];
-    const real_t x317 = (2.0 / 63.0) * u[6];
-    const real_t x318 = (2.0 / 105.0) * x284;
-    const real_t x319 = x295 * x46;
-    const real_t x320 = (4.0 / 63.0) * u[6];
-    const real_t x321 = (8.0 / 315.0) * u[6];
-    const real_t x322 = (16.0 / 315.0) * u[11];
-    const real_t x323 = (16.0 / 315.0) * u[6];
-    const real_t x324 = (2.0 / 105.0) * x230;
-    const real_t x325 = u[6] * x132;
-    const real_t x326 = x322 * x72;
-    const real_t x327 = u[9] * x193;
-    const real_t x328 = -16.0 / 315.0 * u[10] * u[3] * x3 * x8 -
-                        16.0 / 315.0 * u[10] * u[5] * x5 * x8 + x11 * x325 + x15 * x325 +
-                        x24 * x324 + x26 * x324 + x326 + x327;
-    const real_t x329 = -u[10] * x189 + u[11] * x177 - 8.0 / 315.0 * u[11] * x62 - u[9] * x189 +
-                        x114 * x47 - x181 * x233 - 8.0 / 315.0 * x251 + x277 * x46 - x298 * x43 +
-                        x298 * x71 + x47 * x83 + x47 * x87;
-    const real_t x330 = (2.0 / 45.0) * u[9];
-    const real_t x331 = (1.0 / 210.0) * x230;
-    const real_t x332 = (16.0 / 105.0) * u[11];
-    const real_t x333 = (8.0 / 105.0) * u[11];
-    const real_t x334 = x15 * x56;
-    const real_t x335 = (4.0 / 315.0) * x15;
-    const real_t x336 = u[8] * x335;
-    const real_t x337 = x171 * x45;
-    const real_t x338 = x311 * x45;
-    const real_t x339 = (1.0 / 210.0) * u[0];
-    const real_t x340 = u[6] * x11;
-    const real_t x341 = (4.0 / 105.0) * u[6];
-    const real_t x342 = (16.0 / 315.0) * u[10];
-    const real_t x343 = (16.0 / 315.0) * u[9];
-    const real_t x344 = x171 * x54 - x181 * x90 - 8.0 / 315.0 * x245 - x270 * x44 + x270 * x54 +
-                        x270 * x71 - x271 * x72 - x275 * x343 + x279 * x45 + x279 * x54 +
-                        x311 * x54 - x343 * x90;
-    element_vector[0] =
-        x6 * ((1.0 / 60.0) * u[0] - 1.0 / 90.0 * u[4] - x0 - x1) -
-        x6 * ((1.0 / 280.0) * u[0] * u[1] * x5 * x8 + (1.0 / 280.0) * u[0] * u[2] * x3 * x8 +
-              (2.0 / 105.0) * u[0] * u[3] * x3 * x8 + (1.0 / 210.0) * u[0] * u[4] * x3 * x8 +
-              (1.0 / 210.0) * u[0] * u[4] * x5 * x8 + (2.0 / 105.0) * u[0] * u[5] * x5 * x8 +
-              (1.0 / 280.0) * u[0] * u[7] * x2 * x8 + (1.0 / 280.0) * u[0] * u[7] * x4 * x8 +
-              (1.0 / 280.0) * u[0] * u[8] * x2 * x8 + (1.0 / 280.0) * u[0] * u[8] * x4 * x8 +
-              (4.0 / 315.0) * u[10] * u[3] * x4 * x8 + (4.0 / 315.0) * u[10] * u[5] * x2 * x8 +
-              (2.0 / 315.0) * u[11] * u[3] * x2 * x8 + (4.0 / 315.0) * u[11] * u[5] * x4 * x8 +
-              (11.0 / 2520.0) * u[1] * u[2] * x3 * x8 + (11.0 / 2520.0) * u[1] * u[2] * x5 * x8 +
-              (11.0 / 2520.0) * u[1] * u[8] * x4 * x8 + (11.0 / 2520.0) * u[2] * u[7] * x2 * x8 +
-              (2.0 / 315.0) * u[3] * u[4] * x3 * x8 + (2.0 / 63.0) * u[3] * u[5] * x3 * x8 +
-              (2.0 / 63.0) * u[3] * u[5] * x5 * x8 + (4.0 / 105.0) * u[3] * u[6] * x4 * x8 +
-              (4.0 / 315.0) * u[3] * u[9] * x2 * x8 + (2.0 / 315.0) * u[4] * u[5] * x5 * x8 +
-              (1.0 / 105.0) * u[4] * u[6] * x2 * x8 + (1.0 / 105.0) * u[4] * u[6] * x4 * x8 +
-              (1.0 / 630.0) * u[4] * u[7] * x4 * x8 + (1.0 / 630.0) * u[4] * u[8] * x2 * x8 -
-              u[4] * x58 + (4.0 / 105.0) * u[5] * u[6] * x2 * x8 +
-              (2.0 / 315.0) * u[5] * u[9] * x4 * x8 - x11 * x19 - x11 * x51 - x13 - x15 * x19 -
-              x15 * x52 - x17 - x20 * x21 - x20 * x22 - x21 * x32 - x22 * x31 - x23 * x25 -
-              x23 * x27 - x25 * x43 - x27 * x44 - x28 * x29 - x28 * x30 - x29 * x33 +
-              (4.0 / 315.0) * x3 * x8 * x9 - x30 * x33 - x34 * x35 - x34 * x45 - x34 * x46 -
-              x34 * x65 - x35 * x36 - x36 * x45 - x36 * x46 - x36 * x65 - x39 - x42 - x47 * x56 -
-              x49 + (4.0 / 315.0) * x5 * x7 * x8 - x55 - x56 * x62 - x57 * x61 - x59 * x60 -
-              x63 * x64 - x75 - x81 - x85 - x89 - x93);
-    element_vector[1] =
-        x6 * ((1.0 / 60.0) * u[1] - 1.0 / 90.0 * u[5] - x1 - x94) -
-        x6 * (u[0] * u[9] * x57 + u[0] * x136 - u[10] * x105 - u[1] * u[8] * x37 - u[1] * x124 +
-              u[2] * x136 + u[3] * x138 - u[3] * x58 - u[4] * x106 + u[5] * x106 -
-              1.0 / 140.0 * u[7] * x30 - x100 * x80 - x101 * x34 - x101 * x36 - x103 -
-              4.0 / 105.0 * x104 - x107 * x72 - x108 - 2.0 / 105.0 * x109 - x110 * x111 - x112 -
-              x113 * x22 + x114 * x25 - x115 - x116 - 1.0 / 21.0 * x117 - x118 * x25 + x118 * x63 -
-              x119 * x27 + x119 * x53 - x12 * x121 - x120 * x78 - x121 * x122 + x122 * x74 -
-              x123 * x22 + x123 * x90 - x125 * x27 + x125 * x53 + (1.0 / 21.0) * x126 +
-              x127 * x130 + (1.0 / 35.0) * x128 + x129 * x34 + x129 * x36 + x131 * x34 +
-              x131 * x36 + x132 * x21 + x133 + (2.0 / 105.0) * x134 + x135 + (2.0 / 315.0) * x137 +
-              x139 * x30 + (13.0 / 420.0) * x140 + x143 + x144 - x17 + x25 * x83 + x27 * x83 +
-              x29 * x71 - x32 * x47 + x36 * x64 - x42 - x54 * x78 - x59 * x67 + x73 * x78 + x75 -
-              x82 - x84 - x96 + x98 + (13.0 / 420.0) * x99);
-    element_vector[2] =
-        x6 * ((1.0 / 60.0) * u[2] - 1.0 / 90.0 * u[3] - x0 - x94) -
-        x6 * (u[0] * x58 - u[1] * x106 - u[2] * x159 - u[6] * x160 - u[7] * x160 +
-              (2.0 / 315.0) * x102 - x107 * x62 + x108 + x110 * x130 + x111 * x47 - x111 * x62 +
-              x112 - x113 * x62 - x113 * x90 + x114 * x27 + (2.0 / 315.0) * x117 - x120 * x69 -
-              x121 * x157 - x121 * x16 - x125 * x25 + x125 * x63 + x127 * x154 -
-              2.0 / 105.0 * x128 - x13 + x132 * x22 - x133 - 1.0 / 126.0 * x134 - x135 +
-              x139 * x29 + x144 - 4.0 / 315.0 * x145 + (13.0 / 420.0) * x146 - x147 * x74 -
-              x148 * x34 - x148 * x36 - x149 - 4.0 / 105.0 * x150 + x151 * x25 - x151 * x63 - x152 -
-              x153 - x154 * x22 - x155 * x27 + x155 * x53 - x156 * x25 + x156 * x63 + x157 * x80 -
-              x158 * x29 + x158 * x34 + x158 * x36 + (1.0 / 35.0) * x161 + x162 * x34 + x162 * x36 +
-              (1.0 / 210.0) * x163 + (2.0 / 315.0) * x164 + (4.0 / 315.0) * x165 +
-              (4.0 / 315.0) * x166 + (13.0 / 420.0) * x167 + x168 + x25 * x87 + x27 * x87 +
-              x30 * x71 - x39 - x64 * x78 + x69 * x79 + x81 - x86 - x88 + x96 - x98);
-    element_vector[3] =
-        x6 * (-1.0 / 90.0 * u[2] + (4.0 / 45.0) * u[3] + x169 + x170) -
-        x6 * ((4.0 / 315.0) * u[0] * u[1] * x5 * x8 + (1.0 / 126.0) * u[0] * u[2] * x3 * x8 +
-              (4.0 / 315.0) * u[0] * u[7] * x2 * x8 + (4.0 / 315.0) * u[0] * u[7] * x4 * x8 +
-              (1.0 / 126.0) * u[0] * u[8] * x2 * x8 + (1.0 / 126.0) * u[0] * u[8] * x4 * x8 +
-              (2.0 / 63.0) * u[10] * u[1] * x4 * x8 + (2.0 / 315.0) * u[10] * u[2] * x2 * x8 +
-              (8.0 / 105.0) * u[10] * u[4] * x2 * x8 + (16.0 / 315.0) * u[10] * u[4] * x4 * x8 -
-              u[10] * x185 + (2.0 / 315.0) * u[11] * u[2] * x2 * x8 +
-              (16.0 / 315.0) * u[11] * u[4] * x4 * x8 + (2.0 / 63.0) * u[1] * u[3] * x3 * x8 +
-              (8.0 / 315.0) * u[1] * u[4] * x3 * x8 + (2.0 / 105.0) * u[1] * u[4] * x5 * x8 +
-              (4.0 / 315.0) * u[1] * u[5] * x3 * x8 + (2.0 / 105.0) * u[1] * u[7] * x4 * x8 +
-              (4.0 / 63.0) * u[1] * u[9] * x4 * x8 + (1.0 / 210.0) * u[2] * u[8] * x2 * x8 -
-              u[2] * x177 + (8.0 / 315.0) * u[3] * u[4] * x3 * x8 +
-              (4.0 / 315.0) * u[3] * u[6] * x2 * x8 + (2.0 / 63.0) * u[3] * u[6] * x4 * x8 +
-              (2.0 / 105.0) * u[3] * u[8] * x2 * x8 + (2.0 / 105.0) * u[4] * u[7] * x2 * x8 +
-              (16.0 / 105.0) * u[4] * u[9] * x2 * x8 - u[4] * x138 +
-              (8.0 / 315.0) * u[5] * u[6] * x2 * x8 + (2.0 / 315.0) * u[5] * u[6] * x4 * x8 +
-              (2.0 / 315.0) * u[5] * u[7] * x4 * x8 + (32.0 / 315.0) * u[5] * u[9] * x2 * x8 -
-              u[6] * x179 - u[7] * x70 - u[8] * x176 + (2.0 / 105.0) * x10 * x3 * x8 - x103 -
-              x110 * x56 - x114 * x30 + (1.0 / 210.0) * x14 * x5 * x8 - 4.0 / 315.0 * x150 - x152 -
-              x153 - 4.0 / 105.0 * x163 - 16.0 / 315.0 * x164 - 2.0 / 63.0 * x165 - x168 -
-              x171 * x31 - 2.0 / 63.0 * x172 - 2.0 / 63.0 * x173 - x174 - x175 - x178 * x34 -
-              x178 * x36 - x180 * x63 - x181 * x25 - 8.0 / 315.0 * x182 - x183 * x22 - x184 * x25 -
-              16.0 / 315.0 * x186 - x192 - x197 - x29 * x73 + (16.0 / 315.0) * x3 * x67 * x8 -
-              x30 * x87 + (8.0 / 105.0) * x5 * x67 * x8 - x85 - 16.0 / 105.0 * x95 -
-              16.0 / 315.0 * x97);
-    element_vector[4] =
-        x6 * (-1.0 / 90.0 * u[0] + (4.0 / 45.0) * u[4] + x170 + x198) -
-        x6 *
-            (u[0] * x177 + (4.0 / 63.0) * u[10] * x29 + (4.0 / 63.0) * u[10] * x30 +
-             (8.0 / 105.0) * u[11] * x53 + u[3] * x211 + u[4] * x189 - u[4] * x203 + u[5] * x138 +
-             u[5] * x203 - u[7] * x105 + u[7] * x176 - u[8] * x179 - 8.0 / 315.0 * u[8] * x78 +
-             (16.0 / 315.0) * u[9] * x53 - 32.0 / 315.0 * x102 - 8.0 / 315.0 * x104 - x11 * x199 +
-             (16.0 / 105.0) * x11 * x67 + (2.0 / 315.0) * x11 * x80 + x111 * x127 - x120 * x29 -
-             x120 * x30 - x121 * x59 + (2.0 / 105.0) * x126 + (16.0 / 315.0) * x128 +
-             (2.0 / 63.0) * x134 - 32.0 / 315.0 * x137 + (2.0 / 105.0) * x140 +
-             (16.0 / 105.0) * x145 + (2.0 / 105.0) * x146 - x15 * x199 + (16.0 / 315.0) * x161 +
-             (4.0 / 315.0) * x164 - 2.0 / 315.0 * x165 + (2.0 / 105.0) * x167 - 2.0 / 315.0 * x172 -
-             x174 - x175 + x180 * x78 - 8.0 / 105.0 * x186 + x188 * x25 + x188 * x27 - x188 * x53 -
-             x188 * x63 - x190 - x191 + x197 - x200 * x25 - x200 * x27 + x200 * x53 + x200 * x63 -
-             x201 * x25 + x201 * x63 - x202 * x56 + x204 * x25 - x204 * x63 - x205 + x206 * x53 -
-             x207 - x208 * x34 - x208 * x36 + x209 * x47 + x210 * x34 + x210 * x36 + x215 -
-             x34 * x54 + x34 * x83 + x34 * x87 - x36 * x54 + x36 * x83 + x36 * x87 + x93 -
-             8.0 / 105.0 * x95 - 8.0 / 105.0 * x97 + (2.0 / 105.0) * x99);
-    element_vector[5] =
-        x6 * (-1.0 / 90.0 * u[1] + (4.0 / 45.0) * u[5] + x169 + x198) -
-        x6 * ((1.0 / 126.0) * u[0] * u[1] * x5 * x8 + (4.0 / 315.0) * u[0] * u[2] * x3 * x8 +
-              (1.0 / 126.0) * u[0] * u[7] * x2 * x8 + (1.0 / 126.0) * u[0] * u[7] * x4 * x8 +
-              (4.0 / 315.0) * u[0] * u[8] * x2 * x8 + (4.0 / 315.0) * u[0] * u[8] * x4 * x8 -
-              4.0 / 315.0 * u[0] * x110 + (2.0 / 315.0) * u[10] * u[1] * x4 * x8 +
-              (2.0 / 63.0) * u[10] * u[2] * x2 * x8 + (16.0 / 315.0) * u[10] * u[4] * x2 * x8 +
-              (8.0 / 105.0) * u[10] * u[4] * x4 * x8 - u[10] * x221 +
-              (4.0 / 63.0) * u[11] * u[2] * x2 * x8 + (32.0 / 315.0) * u[11] * u[3] * x4 * x8 +
-              (16.0 / 105.0) * u[11] * u[4] * x4 * x8 + (1.0 / 210.0) * u[1] * u[7] * x4 * x8 +
-              (2.0 / 315.0) * u[1] * u[9] * x4 * x8 - 4.0 / 105.0 * u[1] * x90 +
-              (4.0 / 315.0) * u[2] * u[3] * x5 * x8 + (2.0 / 105.0) * u[2] * u[4] * x3 * x8 +
-              (8.0 / 315.0) * u[2] * u[4] * x5 * x8 + (2.0 / 63.0) * u[2] * u[5] * x5 * x8 +
-              (2.0 / 105.0) * u[2] * u[8] * x2 * x8 - u[2] * x216 +
-              (2.0 / 315.0) * u[3] * u[6] * x2 * x8 + (8.0 / 315.0) * u[3] * u[6] * x4 * x8 +
-              (2.0 / 315.0) * u[3] * u[8] * x2 * x8 - u[3] * x203 +
-              (8.0 / 315.0) * u[4] * u[5] * x5 * x8 + (2.0 / 105.0) * u[4] * u[8] * x4 * x8 +
-              (16.0 / 315.0) * u[4] * u[9] * x2 * x8 - u[4] * x211 - u[4] * x220 +
-              (2.0 / 63.0) * u[5] * u[6] * x2 * x8 + (4.0 / 315.0) * u[5] * u[6] * x4 * x8 +
-              (2.0 / 105.0) * u[5] * u[7] * x4 * x8 - u[6] * x105 - u[6] * x219 - u[8] * x219 -
-              u[9] * x221 + (1.0 / 210.0) * x10 * x3 * x8 - x115 - x116 +
-              (2.0 / 105.0) * x14 * x5 * x8 - x143 - x149 - 2.0 / 63.0 * x150 - 8.0 / 315.0 * x164 -
-              4.0 / 63.0 * x165 - 2.0 / 63.0 * x166 - x171 * x50 - 4.0 / 63.0 * x172 - x181 * x27 -
-              16.0 / 315.0 * x182 - x183 * x62 - 16.0 / 105.0 * x186 - x192 - x205 - x207 - x215 -
-              x217 * x34 - x217 * x36 - x218 * x53 + (8.0 / 105.0) * x3 * x67 * x8 - x30 * x79 +
-              (16.0 / 315.0) * x5 * x67 * x8 - x89 - 16.0 / 315.0 * x95 - 16.0 / 105.0 * x97);
-    element_vector[6] =
-        x6 * (-1.0 / 90.0 * u[10] + (1.0 / 60.0) * u[6] - x222 - x223) -
-        x6 * ((1.0 / 105.0) * u[0] * u[10] * x3 * x8 + (1.0 / 105.0) * u[0] * u[10] * x5 * x8 +
-              (4.0 / 105.0) * u[0] * u[11] * x5 * x8 + (4.0 / 105.0) * u[0] * u[9] * x3 * x8 -
-              u[0] * x236 + (2.0 / 315.0) * u[10] * u[11] * x2 * x8 +
-              (1.0 / 630.0) * u[10] * u[1] * x3 * x8 + (1.0 / 630.0) * u[10] * u[2] * x5 * x8 +
-              (1.0 / 210.0) * u[10] * u[6] * x2 * x8 + (1.0 / 210.0) * u[10] * u[6] * x4 * x8 +
-              (2.0 / 315.0) * u[10] * u[9] * x4 * x8 - u[10] * x243 - u[11] * u[1] * x213 +
-              (2.0 / 315.0) * u[11] * u[3] * x3 * x8 + (4.0 / 315.0) * u[11] * u[4] * x5 * x8 +
-              (4.0 / 315.0) * u[11] * u[5] * x3 * x8 + (2.0 / 105.0) * u[11] * u[6] * x2 * x8 +
-              (2.0 / 63.0) * u[11] * u[9] * x2 * x8 + (2.0 / 63.0) * u[11] * u[9] * x4 * x8 -
-              1.0 / 105.0 * u[11] * x234 + (1.0 / 280.0) * u[1] * u[6] * x3 * x8 +
-              (1.0 / 280.0) * u[1] * u[6] * x5 * x8 + (11.0 / 2520.0) * u[1] * u[8] * x5 * x8 +
-              (1.0 / 280.0) * u[2] * u[6] * x3 * x8 + (1.0 / 280.0) * u[2] * u[6] * x5 * x8 +
-              (11.0 / 2520.0) * u[2] * u[7] * x3 * x8 - u[2] * u[9] * x195 +
-              (4.0 / 315.0) * u[3] * u[9] * x5 * x8 + (4.0 / 315.0) * u[4] * u[9] * x3 * x8 +
-              (2.0 / 315.0) * u[5] * u[9] * x5 * x8 + (1.0 / 280.0) * u[6] * u[7] * x2 * x8 +
-              (1.0 / 280.0) * u[6] * u[8] * x4 * x8 + (2.0 / 105.0) * u[6] * u[9] * x4 * x8 +
-              (11.0 / 2520.0) * u[7] * u[8] * x2 * x8 + (11.0 / 2520.0) * u[7] * u[8] * x4 * x8 -
-              u[7] * x244 - u[9] * x203 - 1.0 / 105.0 * u[9] * x235 - x110 * x208 - x110 * x73 -
-              x127 * x208 - x127 * x79 - x131 * x234 - x151 * x21 - x188 * x21 - x188 * x22 -
-              x188 * x62 - x188 * x72 + (4.0 / 315.0) * x2 * x225 * x8 - x204 * x47 - x204 * x62 +
-              (4.0 / 315.0) * x224 * x4 * x8 - x227 - x229 - x231 * x24 - x231 * x26 - x232 * x233 -
-              x232 * x90 - x233 * x73 - x234 * x65 - x235 * x65 - x237 - x238 - x239 - x24 * x242 -
-              x240 - x241 * x26 - x250 - x253 - x256 - x259 - x262 - x79 * x90);
-    element_vector[7] =
-        x6 * (-1.0 / 90.0 * u[11] + (1.0 / 60.0) * u[7] - x223 - x263) -
-        x6 * (u[0] * u[8] * x147 + u[10] * x118 * x24 + (1.0 / 21.0) * u[10] * x202 - u[10] * x274 +
-              u[10] * x290 + u[11] * x274 - u[11] * x290 - u[1] * x236 + u[6] * x244 - u[7] * x288 +
-              (13.0 / 420.0) * u[7] * x294 - u[8] * x38 + u[9] * x211 - u[9] * x243 - x100 * x269 -
-              x101 * x270 - x110 * x204 + x114 * x90 - x118 * x233 - x12 * x289 + x120 * x22 +
-              x120 * x62 + x127 * x218 - x129 * x235 - x131 * x277 - x147 * x269 + x180 * x21 +
-              x196 * x285 + x202 * x33 - x21 * x283 - x217 * x275 + x218 * x72 + x22 * x287 - x229 +
-              x235 * x54 - x238 - x246 * x57 + x250 - x254 - x255 - x265 + x267 +
-              (13.0 / 420.0) * x268 + x270 * x28 - x272 - 4.0 / 105.0 * x273 - x276 - x277 * x71 -
-              x278 + x279 * x291 - x279 * x46 - x280 + x281 * x54 - x282 - 1.0 / 21.0 * x284 -
-              x285 * x286 + x286 * x292 - x287 * x90 + x293 * x32 + x293 * x48 + x294 * x33 +
-              x295 * x33 + x296 + x297 + x298 * x46 + x301 + x302 - x54 * x90 - x62 * x73 +
-              x83 * x90);
-    element_vector[8] =
-        x6 * ((1.0 / 60.0) * u[8] - 1.0 / 90.0 * u[9] - x222 - x263) -
-        x6 * (u[0] * u[7] * x100 - u[0] * x312 + u[10] * x310 + u[10] * x313 -
-              2.0 / 63.0 * u[10] * x47 - 4.0 / 315.0 * u[11] * x21 - 4.0 / 105.0 * u[11] * x281 -
-              u[1] * x312 + u[6] * x243 - u[7] * x274 - u[7] * x41 + u[8] * x159 -
-              1.0 / 210.0 * u[8] * x233 + (13.0 / 420.0) * u[8] * x281 - u[9] * x310 - u[9] * x313 -
-              x100 * x305 - x110 * x151 + x110 * x206 + x110 * x64 + x120 * x21 + x120 * x72 -
-              x130 * x248 - x131 * x171 - x131 * x311 - x139 * x295 - x147 * x305 - x154 * x285 +
-              x154 * x292 + x155 * x275 - x155 * x90 + x171 * x33 + x180 * x47 + x180 * x62 -
-              x206 * x47 + x206 * x62 - x22 * x54 - x227 + x234 * x283 - x237 + x248 * x48 + x253 -
-              x257 - x258 + x265 - x267 + x270 * x45 + (1.0 / 126.0) * x273 + x276 + x277 * x291 +
-              x278 - x279 * x71 + x28 * x298 + x281 * x33 + (2.0 / 315.0) * x284 + x285 * x50 +
-              x295 * x54 - x296 - x297 + x298 * x54 + x302 - 4.0 / 315.0 * x303 +
-              (13.0 / 420.0) * x304 - x307 - x308 - x309 + x311 * x33 + x314 - x47 * x54 -
-              x72 * x79);
-    element_vector[9] =
-        x6 * (-1.0 / 90.0 * u[8] + (4.0 / 45.0) * u[9] + x315 + x316) -
-        x6 * ((2.0 / 315.0) * u[0] * u[11] * x3 * x8 + (8.0 / 315.0) * u[0] * u[11] * x5 * x8 +
-              (2.0 / 63.0) * u[0] * u[9] * x3 * x8 + (4.0 / 315.0) * u[0] * u[9] * x5 * x8 +
-              (2.0 / 105.0) * u[10] * u[1] * x5 * x8 + (16.0 / 105.0) * u[10] * u[3] * x5 * x8 +
-              (16.0 / 315.0) * u[10] * u[4] * x3 * x8 + (8.0 / 105.0) * u[10] * u[4] * x5 * x8 +
-              (16.0 / 315.0) * u[10] * u[5] * x3 * x8 + (2.0 / 105.0) * u[10] * u[7] * x2 * x8 +
-              (8.0 / 315.0) * u[10] * u[7] * x4 * x8 + (8.0 / 315.0) * u[10] * u[9] * x4 * x8 +
-              (2.0 / 315.0) * u[11] * u[1] * x3 * x8 + (32.0 / 315.0) * u[11] * u[3] * x5 * x8 +
-              (4.0 / 315.0) * u[11] * u[7] * x4 * x8 - u[11] * x212 +
-              (4.0 / 315.0) * u[1] * u[6] * x3 * x8 + (4.0 / 315.0) * u[1] * u[6] * x5 * x8 +
-              (2.0 / 105.0) * u[1] * u[7] * x3 * x8 + (1.0 / 126.0) * u[2] * u[6] * x3 * x8 +
-              (1.0 / 126.0) * u[2] * u[6] * x5 * x8 + (1.0 / 210.0) * u[2] * u[8] * x5 * x8 +
-              (2.0 / 105.0) * u[2] * u[9] * x5 * x8 + (4.0 / 63.0) * u[3] * u[7] * x3 * x8 +
-              (2.0 / 63.0) * u[4] * u[7] * x3 * x8 + (2.0 / 315.0) * u[4] * u[8] * x5 * x8 +
-              (2.0 / 315.0) * u[5] * u[8] * x5 * x8 + (4.0 / 315.0) * u[6] * u[7] * x2 * x8 +
-              (1.0 / 126.0) * u[6] * u[8] * x4 * x8 - u[6] * x106 +
-              (2.0 / 63.0) * u[7] * u[9] * x4 * x8 - u[7] * x11 * x32 - u[7] * x138 - u[7] * x249 -
-              u[8] * x177 - 4.0 / 105.0 * u[8] * x21 - x110 * x201 - x127 * x322 - x151 * x235 -
-              x151 * x277 - x184 * x21 + (1.0 / 210.0) * x2 * x228 * x8 +
-              (8.0 / 105.0) * x2 * x246 * x8 - x21 * x320 - x217 * x270 - x22 * x317 +
-              (2.0 / 105.0) * x226 * x4 * x8 - x233 * x323 - x235 * x83 +
-              (16.0 / 315.0) * x246 * x4 * x8 - x256 - 16.0 / 105.0 * x264 - 16.0 / 315.0 * x266 -
-              x271 * x90 - x272 - 2.0 / 63.0 * x273 - x277 * x87 - x281 * x71 - x293 * x56 - x308 -
-              x309 - x314 - x317 * x62 - x318 - x319 - x320 * x72 - x321 * x90 - x328 - x329);
-    element_vector[10] =
-        x6 * ((4.0 / 45.0) * u[10] - 1.0 / 90.0 * u[6] + x316 + x330) -
-        x6 *
-            (u[0] * u[11] * x335 + u[10] * x193 - u[10] * x220 + (16.0 / 315.0) * u[10] * x279 -
-             u[10] * x334 - 32.0 / 315.0 * u[11] * x110 + u[11] * x220 - u[1] * x336 - u[6] * x136 -
-             u[6] * x15 * x339 + u[6] * x177 + u[6] * x58 + u[7] * x11 * x214 +
-             (4.0 / 63.0) * u[7] * x127 + (2.0 / 63.0) * u[7] * x72 + (4.0 / 63.0) * u[8] * x110 +
-             u[8] * x111 * x15 - u[8] * x203 + u[8] * x252 - 32.0 / 315.0 * u[9] * x127 +
-             u[9] * x138 + u[9] * x334 - x110 * x184 + x110 * x200 + x110 * x341 + x114 * x171 -
-             x114 * x21 + x114 * x281 - x114 * x62 - x114 * x72 + x127 * x200 - x127 * x332 +
-             x127 * x341 + x171 * x71 + x181 * x21 + x181 * x22 - x201 * x21 + x202 * x71 -
-             x204 * x295 - x22 * x333 + x234 * x45 - x234 * x71 - x234 * x79 + x235 * x46 -
-             x235 * x71 - x235 * x73 - x24 * x331 + (16.0 / 105.0) * x246 * x26 - x26 * x331 +
-             x262 - 8.0 / 105.0 * x264 - 8.0 / 105.0 * x266 + (2.0 / 105.0) * x268 + x270 * x83 -
-             8.0 / 315.0 * x273 + x277 * x342 - x281 * x306 - x289 * x59 + x295 * x71 + x298 * x64 +
-             x298 * x87 + (16.0 / 105.0) * x303 + (2.0 / 105.0) * x304 + x311 * x71 - x318 - x319 -
-             x326 - x327 + x329 - x337 - x338 - x339 * x340 + x340 * x50 + x342 * x72 + x344);
-    element_vector[11] =
-        x6 * ((4.0 / 45.0) * u[11] - 1.0 / 90.0 * u[7] + x315 + x330) -
-        x6 * ((4.0 / 315.0) * u[0] * u[11] * x3 * x8 + (2.0 / 63.0) * u[0] * u[11] * x5 * x8 +
-              (8.0 / 315.0) * u[0] * u[9] * x3 * x8 + (2.0 / 315.0) * u[0] * u[9] * x5 * x8 -
-              u[0] * x336 + (8.0 / 315.0) * u[10] * u[11] * x2 * x8 +
-              (2.0 / 105.0) * u[10] * u[2] * x3 * x8 + (16.0 / 315.0) * u[10] * u[3] * x5 * x8 +
-              (8.0 / 105.0) * u[10] * u[4] * x3 * x8 + (16.0 / 315.0) * u[10] * u[4] * x5 * x8 +
-              (16.0 / 105.0) * u[10] * u[5] * x3 * x8 + (8.0 / 315.0) * u[10] * u[8] * x2 * x8 +
-              (2.0 / 105.0) * u[10] * u[8] * x4 * x8 - u[10] * x138 +
-              (2.0 / 105.0) * u[11] * u[1] * x3 * x8 + (2.0 / 63.0) * u[11] * u[8] * x2 * x8 +
-              (1.0 / 126.0) * u[1] * u[6] * x3 * x8 + (1.0 / 126.0) * u[1] * u[6] * x5 * x8 +
-              (1.0 / 210.0) * u[1] * u[7] * x3 * x8 + (4.0 / 315.0) * u[2] * u[6] * x3 * x8 +
-              (4.0 / 315.0) * u[2] * u[6] * x5 * x8 + (2.0 / 105.0) * u[2] * u[8] * x5 * x8 +
-              (2.0 / 315.0) * u[2] * u[9] * x5 * x8 + (2.0 / 315.0) * u[3] * u[7] * x3 * x8 +
-              (2.0 / 315.0) * u[4] * u[7] * x3 * x8 + (2.0 / 63.0) * u[4] * u[8] * x5 * x8 +
-              (4.0 / 63.0) * u[5] * u[8] * x5 * x8 + (32.0 / 315.0) * u[5] * u[9] * x3 * x8 +
-              (1.0 / 126.0) * u[6] * u[7] * x2 * x8 + (4.0 / 315.0) * u[6] * u[8] * x4 * x8 -
-              u[7] * x106 - 4.0 / 105.0 * u[7] * x22 + (4.0 / 315.0) * u[8] * u[9] * x2 * x8 -
-              u[8] * x216 - x110 * x343 - x127 * x333 - x151 * x298 - x171 * x87 +
-              (2.0 / 105.0) * x2 * x228 * x8 + (16.0 / 315.0) * x2 * x246 * x8 - x209 * x293 -
-              x21 * x317 - x21 * x343 - x22 * x320 - x22 * x332 + (1.0 / 210.0) * x226 * x4 * x8 -
-              x233 * x321 - x234 * x87 + (8.0 / 105.0) * x246 * x4 * x8 - x259 -
-              16.0 / 315.0 * x264 - 16.0 / 105.0 * x266 - x271 * x47 - x280 - x282 - x294 * x71 -
-              x295 * x73 - x301 - x307 - x311 * x87 - x317 * x47 - x317 * x72 - x320 * x62 -
-              x323 * x90 - x328 - x337 - x338 - x344 - x59 * x61);
-}
-
-static SFEM_INLINE void tr6_momentum_kernel(const real_t px0,
-                                            const real_t px1,
-                                            const real_t px2,
-                                            const real_t py0,
-                                            const real_t py1,
-                                            const real_t py2,
-                                            const real_t dt,
-                                            const real_t nu,
-                                            real_t *const SFEM_RESTRICT element_matrix) {
-    const real_t x0 = -px0 + px1;
-    const real_t x1 = -py0 + py2;
-    const real_t x2 = px0 - px2;
-    const real_t x3 = py0 - py1;
-    const real_t x4 = x0 * x1 - x2 * x3;
-    const real_t x5 = x4 / dt;
-    const real_t x6 = (1.0 / 60.0) * x5;
-    const real_t x7 = pow(x4, -2);
-    const real_t x8 = x0 * x2 * x7;
-    const real_t x9 = x1 * x3 * x7;
-    const real_t x10 = pow(x2, 2);
-    const real_t x11 = (1.0 / 2.0) * x7;
-    const real_t x12 = pow(x1, 2);
-    const real_t x13 = x10 * x11 + x11 * x12;
-    const real_t x14 = pow(x0, 2);
-    const real_t x15 = pow(x3, 2);
-    const real_t x16 = x11 * x14 + x11 * x15;
-    const real_t x17 = nu * x4;
-    const real_t x18 = x17 * (x13 + x16 + x8 + x9) + x6;
-    const real_t x19 = -1.0 / 360.0 * x5;
-    const real_t x20 = (1.0 / 6.0) * x7;
-    const real_t x21 = (1.0 / 6.0) * x8 + (1.0 / 6.0) * x9;
-    const real_t x22 = x17 * (x10 * x20 + x12 * x20 + x21) + x19;
-    const real_t x23 = x17 * (x14 * x20 + x15 * x20 + x21) + x19;
-    const real_t x24 = (2.0 / 3.0) * x7;
-    const real_t x25 = (2.0 / 3.0) * x8 + (2.0 / 3.0) * x9;
-    const real_t x26 = x17 * (-x10 * x24 - x12 * x24 - x25);
-    const real_t x27 = -1.0 / 90.0 * x5;
-    const real_t x28 = x17 * (-x14 * x24 - x15 * x24 - x25);
-    const real_t x29 = x13 * x17 + x6;
-    const real_t x30 = -x17 * x21 + x19;
-    const real_t x31 = x17 * x25;
-    const real_t x32 = x16 * x17 + x6;
-    const real_t x33 = (4.0 / 3.0) * x7;
-    const real_t x34 = (4.0 / 3.0) * x8 + (4.0 / 3.0) * x9;
-    const real_t x35 = x14 * x33 + x15 * x33 + x34;
-    const real_t x36 = x10 * x33 + x12 * x33;
-    const real_t x37 = x17 * (x35 + x36) + (4.0 / 45.0) * x5;
-    const real_t x38 = (2.0 / 45.0) * x5;
-    const real_t x39 = -x17 * x35 + x38;
-    const real_t x40 = x17 * x34 + x38;
-    const real_t x41 = x17 * (-x34 - x36) + x38;
-    element_matrix[0] = x18;
-    element_matrix[1] = x22;
-    element_matrix[2] = x23;
-    element_matrix[3] = x26;
-    element_matrix[4] = x27;
-    element_matrix[5] = x28;
+    const real_t x0 = px0 - px1;
+    const real_t x1 = py0 - py2;
+    const real_t x2 = x0 * x1;
+    const real_t x3 = px0 - px2;
+    const real_t x4 = py0 - py1;
+    const real_t x5 = x3 * x4;
+    const real_t x6 = x2 - x5;
+    const real_t x7 = pow(x6, 2);
+    const real_t x8 = x0 * x3;
+    const real_t x9 = x1 * x4;
+    const real_t x10 = pow(x3, 2);
+    const real_t x11 = pow(x1, 2);
+    const real_t x12 = x10 + x11;
+    const real_t x13 = pow(x0, 2) + pow(x4, 2);
+    const real_t x14 = dt * nu;
+    const real_t x15 = 30 * x14;
+    const real_t x16 = 1.0 / dt;
+    const real_t x17 = x16 / x6;
+    const real_t x18 = (1.0 / 60.0) * x17;
+    const real_t x19 = x18 * (x15 * (x12 + x13 - 2 * x8 - 2 * x9) + x7);
+    const real_t x20 = -x6;
+    const real_t x21 = pow(x20, 2);
+    const real_t x22 = x8 + x9;
+    const real_t x23 = -x10 - x11 + x22;
+    const real_t x24 = 60 * x14;
+    const real_t x25 = (1.0 / 360.0) * x17;
+    const real_t x26 = x25 * (-x21 - x23 * x24);
+    const real_t x27 = -x21;
+    const real_t x28 = x13 - x8 - x9;
+    const real_t x29 = x25 * (x24 * x28 + x27);
+    const real_t x30 = 2 * nu / (3 * x2 - 3 * x5);
+    const real_t x31 = x23 * x30;
+    const real_t x32 = (1.0 / 90.0) * x16 * x20;
+    const real_t x33 = -x28 * x30;
+    const real_t x34 = x18 * (x12 * x15 + x7);
+    const real_t x35 = x25 * (x22 * x24 + x27);
+    const real_t x36 = -x22 * x30;
+    const real_t x37 = x18 * (x13 * x15 + x7);
+    const real_t x38 = (4.0 / 45.0) * x17 * (15 * x14 * (x12 + x28) + x7);
+    const real_t x39 = -x7;
+    const real_t x40 = (2.0 / 45.0) * x17;
+    const real_t x41 = x40 * (-x15 * x28 - x39);
+    const real_t x42 = x40 * (-x15 * x22 - x39);
+    const real_t x43 = x40 * (x15 * x23 + x7);
+    element_matrix[0] = x19;
+    element_matrix[1] = x26;
+    element_matrix[2] = x29;
+    element_matrix[3] = x31;
+    element_matrix[4] = x32;
+    element_matrix[5] = x33;
     element_matrix[6] = 0;
     element_matrix[7] = 0;
     element_matrix[8] = 0;
     element_matrix[9] = 0;
     element_matrix[10] = 0;
     element_matrix[11] = 0;
-    element_matrix[12] = x22;
-    element_matrix[13] = x29;
-    element_matrix[14] = x30;
-    element_matrix[15] = x26;
-    element_matrix[16] = x31;
-    element_matrix[17] = x27;
+    element_matrix[12] = x26;
+    element_matrix[13] = x34;
+    element_matrix[14] = x35;
+    element_matrix[15] = x31;
+    element_matrix[16] = x36;
+    element_matrix[17] = x32;
     element_matrix[18] = 0;
     element_matrix[19] = 0;
     element_matrix[20] = 0;
     element_matrix[21] = 0;
     element_matrix[22] = 0;
     element_matrix[23] = 0;
-    element_matrix[24] = x23;
-    element_matrix[25] = x30;
-    element_matrix[26] = x32;
-    element_matrix[27] = x27;
-    element_matrix[28] = x31;
-    element_matrix[29] = x28;
+    element_matrix[24] = x29;
+    element_matrix[25] = x35;
+    element_matrix[26] = x37;
+    element_matrix[27] = x32;
+    element_matrix[28] = x36;
+    element_matrix[29] = x33;
     element_matrix[30] = 0;
     element_matrix[31] = 0;
     element_matrix[32] = 0;
     element_matrix[33] = 0;
     element_matrix[34] = 0;
     element_matrix[35] = 0;
-    element_matrix[36] = x26;
-    element_matrix[37] = x26;
-    element_matrix[38] = x27;
-    element_matrix[39] = x37;
-    element_matrix[40] = x39;
-    element_matrix[41] = x40;
+    element_matrix[36] = x31;
+    element_matrix[37] = x31;
+    element_matrix[38] = x32;
+    element_matrix[39] = x38;
+    element_matrix[40] = x41;
+    element_matrix[41] = x42;
     element_matrix[42] = 0;
     element_matrix[43] = 0;
     element_matrix[44] = 0;
     element_matrix[45] = 0;
     element_matrix[46] = 0;
     element_matrix[47] = 0;
-    element_matrix[48] = x27;
-    element_matrix[49] = x31;
-    element_matrix[50] = x31;
-    element_matrix[51] = x39;
-    element_matrix[52] = x37;
-    element_matrix[53] = x41;
+    element_matrix[48] = x32;
+    element_matrix[49] = x36;
+    element_matrix[50] = x36;
+    element_matrix[51] = x41;
+    element_matrix[52] = x38;
+    element_matrix[53] = x43;
     element_matrix[54] = 0;
     element_matrix[55] = 0;
     element_matrix[56] = 0;
     element_matrix[57] = 0;
     element_matrix[58] = 0;
     element_matrix[59] = 0;
-    element_matrix[60] = x28;
-    element_matrix[61] = x27;
-    element_matrix[62] = x28;
-    element_matrix[63] = x40;
-    element_matrix[64] = x41;
-    element_matrix[65] = x37;
+    element_matrix[60] = x33;
+    element_matrix[61] = x32;
+    element_matrix[62] = x33;
+    element_matrix[63] = x42;
+    element_matrix[64] = x43;
+    element_matrix[65] = x38;
     element_matrix[66] = 0;
     element_matrix[67] = 0;
     element_matrix[68] = 0;
@@ -877,70 +203,759 @@ static SFEM_INLINE void tr6_momentum_kernel(const real_t px0,
     element_matrix[75] = 0;
     element_matrix[76] = 0;
     element_matrix[77] = 0;
-    element_matrix[78] = x18;
-    element_matrix[79] = x22;
-    element_matrix[80] = x23;
-    element_matrix[81] = x26;
-    element_matrix[82] = x27;
-    element_matrix[83] = x28;
+    element_matrix[78] = x19;
+    element_matrix[79] = x26;
+    element_matrix[80] = x29;
+    element_matrix[81] = x31;
+    element_matrix[82] = x32;
+    element_matrix[83] = x33;
     element_matrix[84] = 0;
     element_matrix[85] = 0;
     element_matrix[86] = 0;
     element_matrix[87] = 0;
     element_matrix[88] = 0;
     element_matrix[89] = 0;
-    element_matrix[90] = x22;
-    element_matrix[91] = x29;
-    element_matrix[92] = x30;
-    element_matrix[93] = x26;
-    element_matrix[94] = x31;
-    element_matrix[95] = x27;
+    element_matrix[90] = x26;
+    element_matrix[91] = x34;
+    element_matrix[92] = x35;
+    element_matrix[93] = x31;
+    element_matrix[94] = x36;
+    element_matrix[95] = x32;
     element_matrix[96] = 0;
     element_matrix[97] = 0;
     element_matrix[98] = 0;
     element_matrix[99] = 0;
     element_matrix[100] = 0;
     element_matrix[101] = 0;
-    element_matrix[102] = x23;
-    element_matrix[103] = x30;
-    element_matrix[104] = x32;
-    element_matrix[105] = x27;
-    element_matrix[106] = x31;
-    element_matrix[107] = x28;
+    element_matrix[102] = x29;
+    element_matrix[103] = x35;
+    element_matrix[104] = x37;
+    element_matrix[105] = x32;
+    element_matrix[106] = x36;
+    element_matrix[107] = x33;
     element_matrix[108] = 0;
     element_matrix[109] = 0;
     element_matrix[110] = 0;
     element_matrix[111] = 0;
     element_matrix[112] = 0;
     element_matrix[113] = 0;
-    element_matrix[114] = x26;
-    element_matrix[115] = x26;
-    element_matrix[116] = x27;
-    element_matrix[117] = x37;
-    element_matrix[118] = x39;
-    element_matrix[119] = x40;
+    element_matrix[114] = x31;
+    element_matrix[115] = x31;
+    element_matrix[116] = x32;
+    element_matrix[117] = x38;
+    element_matrix[118] = x41;
+    element_matrix[119] = x42;
     element_matrix[120] = 0;
     element_matrix[121] = 0;
     element_matrix[122] = 0;
     element_matrix[123] = 0;
     element_matrix[124] = 0;
     element_matrix[125] = 0;
-    element_matrix[126] = x27;
-    element_matrix[127] = x31;
-    element_matrix[128] = x31;
-    element_matrix[129] = x39;
-    element_matrix[130] = x37;
-    element_matrix[131] = x41;
+    element_matrix[126] = x32;
+    element_matrix[127] = x36;
+    element_matrix[128] = x36;
+    element_matrix[129] = x41;
+    element_matrix[130] = x38;
+    element_matrix[131] = x43;
     element_matrix[132] = 0;
     element_matrix[133] = 0;
     element_matrix[134] = 0;
     element_matrix[135] = 0;
     element_matrix[136] = 0;
     element_matrix[137] = 0;
-    element_matrix[138] = x28;
-    element_matrix[139] = x27;
-    element_matrix[140] = x28;
-    element_matrix[141] = x40;
-    element_matrix[142] = x41;
-    element_matrix[143] = x37;
+    element_matrix[138] = x33;
+    element_matrix[139] = x32;
+    element_matrix[140] = x33;
+    element_matrix[141] = x42;
+    element_matrix[142] = x43;
+    element_matrix[143] = x38;
+}
+
+static SFEM_INLINE void tri6_momentum_rhs_kernel(const real_t px0,
+                                                 const real_t px1,
+                                                 const real_t px2,
+                                                 const real_t py0,
+                                                 const real_t py1,
+                                                 const real_t py2,
+                                                 real_t *const SFEM_RESTRICT u,
+                                                 real_t *const SFEM_RESTRICT element_vector) {
+    const real_t x0 = py0 - py1;
+    const real_t x1 = u[3] * x0;
+    const real_t x2 = (2.0 / 315.0) * u[1];
+    const real_t x3 = -x1 * x2;
+    const real_t x4 = (2.0 / 315.0) * u[4];
+    const real_t x5 = px0 - px1;
+    const real_t x6 = u[7] * x5;
+    const real_t x7 = -x4 * x6;
+    const real_t x8 = u[4] * x0;
+    const real_t x9 = x2 * x8;
+    const real_t x10 = (2.0 / 315.0) * u[3];
+    const real_t x11 = x10 * x6;
+    const real_t x12 = 4 * u[4];
+    const real_t x13 = py0 - py2;
+    const real_t x14 = px0 - px2;
+    const real_t x15 = -x0 * x14 + x13 * x5;
+    const real_t x16 = (1.0 / 360.0) * x15;
+    const real_t x17 = u[5] * x13;
+    const real_t x18 = u[1] * x14;
+    const real_t x19 = u[2] * x5;
+    const real_t x20 = u[6] * (x18 - x19);
+    const real_t x21 = u[10] * x5;
+    const real_t x22 = -u[10] * x14 - u[4] * x13 + x21 + x8;
+    const real_t x23 = (1.0 / 210.0) * u[0];
+    const real_t x24 = pow(u[2], 2);
+    const real_t x25 = (1.0 / 280.0) * x0;
+    const real_t x26 = pow(u[3], 2);
+    const real_t x27 = x13 * x26;
+    const real_t x28 = -x0;
+    const real_t x29 = pow(u[5], 2);
+    const real_t x30 = x28 * x29;
+    const real_t x31 = -x13;
+    const real_t x32 = pow(u[4], 2);
+    const real_t x33 = (2.0 / 105.0) * x32;
+    const real_t x34 = x26 * x28;
+    const real_t x35 = (4.0 / 315.0) * x13;
+    const real_t x36 = u[6] * x5;
+    const real_t x37 = u[0] * x0;
+    const real_t x38 = u[6] * x14;
+    const real_t x39 = x37 + x38;
+    const real_t x40 = -x36 + x39;
+    const real_t x41 = u[0] * x31 + x40;
+    const real_t x42 = u[2] * x0;
+    const real_t x43 = u[1] * x42;
+    const real_t x44 = u[8] * x18;
+    const real_t x45 = u[10] * x14;
+    const real_t x46 = (4.0 / 315.0) * u[3];
+    const real_t x47 = (4.0 / 315.0) * x19;
+    const real_t x48 = u[11] * x14;
+    const real_t x49 = (4.0 / 315.0) * u[5];
+    const real_t x50 = u[3] * x13;
+    const real_t x51 = u[1] * x50;
+    const real_t x52 = u[9] * x5;
+    const real_t x53 = (4.0 / 315.0) * u[4];
+    const real_t x54 = (2.0 / 63.0) * u[5];
+    const real_t x55 = u[9] * x14;
+    const real_t x56 = (2.0 / 63.0) * u[3];
+    const real_t x57 = u[11] * x5;
+    const real_t x58 = (2.0 / 105.0) * u[0];
+    const real_t x59 = (2.0 / 105.0) * u[5];
+    const real_t x60 = x45 * x59;
+    const real_t x61 = u[4] * x13;
+    const real_t x62 = u[9] * x19;
+    const real_t x63 = (2.0 / 315.0) * x62;
+    const real_t x64 = x1 * x4;
+    const real_t x65 = (2.0 / 315.0) * u[5];
+    const real_t x66 = (1.0 / 105.0) * x36;
+    const real_t x67 = (1.0 / 105.0) * x38;
+    const real_t x68 = (1.0 / 126.0) * u[10];
+    const real_t x69 = (1.0 / 126.0) * u[1];
+    const real_t x70 = (1.0 / 126.0) * u[5];
+    const real_t x71 = x6 * x70;
+    const real_t x72 = (1.0 / 280.0) * x37;
+    const real_t x73 = u[7] * x14;
+    const real_t x74 = (1.0 / 280.0) * u[0];
+    const real_t x75 = (1.0 / 280.0) * x14;
+    const real_t x76 = u[0] * u[8];
+    const real_t x77 = (1.0 / 280.0) * x19;
+    const real_t x78 = u[8] * x77;
+    const real_t x79 = u[8] * x5;
+    const real_t x80 = (1.0 / 630.0) * x79;
+    const real_t x81 = (1.0 / 630.0) * x73;
+    const real_t x82 = u[5] * x0;
+    const real_t x83 = x69 * x82;
+    const real_t x84 = (1.0 / 126.0) * u[2];
+    const real_t x85 = u[2] * x72;
+    const real_t x86 = u[0] * x13;
+    const real_t x87 = u[2] * x86;
+    const real_t x88 = (1.0 / 280.0) * x5;
+    const real_t x89 = u[0] * u[7];
+    const real_t x90 = (2.0 / 105.0) * u[4];
+    const real_t x91 = x45 * x90;
+    const real_t x92 = (2.0 / 315.0) * u[2];
+    const real_t x93 = (4.0 / 105.0) * u[5];
+    const real_t x94 = u[9] * x18;
+    const real_t x95 = u[2] * x82;
+    const real_t x96 = (8.0 / 315.0) * u[5];
+    const real_t x97 = x52 * x96;
+    const real_t x98 = u[1] * x13;
+    const real_t x99 = u[2] * x98;
+    const real_t x100 = u[7] * x19;
+    const real_t x101 = (2.0 / 105.0) * x21;
+    const real_t x102 = u[8] * x14;
+    const real_t x103 = (1.0 / 126.0) * u[3];
+    const real_t x104 =
+        u[3] * x101 - u[4] * x101 + x0 * x33 + x102 * x103 + x17 * x4 - x50 * x84 - x74 * x98;
+    const real_t x105 = pow(u[1], 2);
+    const real_t x106 = x4 * x57;
+    const real_t x107 = x55 * x65;
+    const real_t x108 = (2.0 / 315.0) * u[11];
+    const real_t x109 = x108 * x18;
+    const real_t x110 = (1.0 / 280.0) * u[7] * x18 + x10 * x57 + (1.0 / 280.0) * x105 * x31 - x106 -
+                        x107 + x109 + x4 * x55;
+    const real_t x111 = u[3] * x48;
+    const real_t x112 = x61 * x92;
+    const real_t x113 = x102 * x65;
+    const real_t x114 = x102 * x4 - 8.0 / 315.0 * x111 - x112 - x113 + x17 * x92;
+    const real_t x115 = -x73 + x98;
+    const real_t x116 = pow(u[0], 2);
+    const real_t x117 = x17 + x48;
+    const real_t x118 = (1.0 / 210.0) * u[1];
+    const real_t x119 = 4 * u[5];
+    const real_t x120 = (1.0 / 21.0) * u[1];
+    const real_t x121 = (1.0 / 126.0) * u[0];
+    const real_t x122 = u[11] * x19;
+    const real_t x123 = u[1] * x37;
+    const real_t x124 = (1.0 / 140.0) * u[0];
+    const real_t x125 = x38 * x74;
+    const real_t x126 = (1.0 / 630.0) * x38;
+    const real_t x127 = (2.0 / 105.0) * u[10];
+    const real_t x128 = x36 * x4;
+    const real_t x129 = x4 * x79;
+    const real_t x130 = (4.0 / 315.0) * u[0];
+    const real_t x131 = (11.0 / 2520.0) * u[0];
+    const real_t x132 = (2.0 / 315.0) * u[0];
+    const real_t x133 = x132 * x21;
+    const real_t x134 = x132 * x45;
+    const real_t x135 = -x133 + x134;
+    const real_t x136 = x135 + x63;
+    const real_t x137 = u[3] * x52;
+    const real_t x138 = (2.0 / 105.0) * x137 + x48 * x59 - x48 * x90 - x52 * x90;
+    const real_t x139 = 4 * u[3];
+    const real_t x140 = x1 + x52;
+    const real_t x141 = (1.0 / 210.0) * u[2];
+    const real_t x142 = (1.0 / 280.0) * x116;
+    const real_t x143 = x0 * x32;
+    const real_t x144 = u[2] * x28 + x79;
+    const real_t x145 = (11.0 / 2520.0) * u[6];
+    const real_t x146 = u[1] * x61;
+    const real_t x147 = (1.0 / 21.0) * u[2];
+    const real_t x148 = (1.0 / 21.0) * x102;
+    const real_t x149 = u[2] * x8;
+    const real_t x150 = (1.0 / 105.0) * x79;
+    const real_t x151 = u[10] * x18;
+    const real_t x152 = x38 * x4 - x38 * x65 + x4 * x73 - x65 * x73;
+    const real_t x153 = x11 - x21 * x96 + x3 + x7 + x9;
+    const real_t x154 = (1.0 / 90.0) * x15;
+    const real_t x155 = (2.0 / 105.0) * x116;
+    const real_t x156 = x28 * x32;
+    const real_t x157 = x0 * x26;
+    const real_t x158 = x13 * x32;
+    const real_t x159 = x29 * x31;
+    const real_t x160 = (16.0 / 315.0) * u[4];
+    const real_t x161 = (16.0 / 315.0) * u[5];
+    const real_t x162 = x1 * x161;
+    const real_t x163 = x161 * x8;
+    const real_t x164 = (8.0 / 105.0) * x21;
+    const real_t x165 = (8.0 / 105.0) * u[4];
+    const real_t x166 = x1 * x165;
+    const real_t x167 = u[0] * x17;
+    const real_t x168 = (8.0 / 315.0) * u[3];
+    const real_t x169 = (4.0 / 63.0) * u[0];
+    const real_t x170 = (2.0 / 63.0) * u[0];
+    const real_t x171 = (2.0 / 315.0) * x19;
+    const real_t x172 = x6 * x65;
+    const real_t x173 = (1.0 / 630.0) * x37;
+    const real_t x174 = x58 * x8;
+    const real_t x175 = (2.0 / 105.0) * u[2];
+    const real_t x176 = x1 * x175;
+    const real_t x177 = (2.0 / 105.0) * u[3];
+    const real_t x178 = x37 * x65;
+    const real_t x179 = x2 * x82;
+    const real_t x180 = x82 * x92;
+    const real_t x181 = (4.0 / 315.0) * x5;
+    const real_t x182 = (4.0 / 315.0) * x17;
+    const real_t x183 = u[6] * x18;
+    const real_t x184 = x57 * x96;
+    const real_t x185 = (16.0 / 105.0) * u[4];
+    const real_t x186 = u[0] * x1;
+    const real_t x187 = (32.0 / 315.0) * u[5];
+    const real_t x188 = (2.0 / 105.0) * x0;
+    const real_t x189 = (16.0 / 315.0) * u[3];
+    const real_t x190 = -x189 * x57;
+    const real_t x191 = -x160 * x55;
+    const real_t x192 = x160 * x57;
+    const real_t x193 = x161 * x55;
+    const real_t x194 = x116 * x188 + x190 + x191 + x192 + x193 - x36 * x58 + x38 * x58;
+    const real_t x195 = (2.0 / 105.0) * x13;
+    const real_t x196 = (2.0 / 105.0) * u[1];
+    const real_t x197 = (2.0 / 105.0) * u[7];
+    const real_t x198 = (2.0 / 105.0) * x5;
+    const real_t x199 = u[7] * x198;
+    const real_t x200 =
+        -u[3] * x199 + u[4] * x199 + x1 * x196 + x105 * x195 - x109 - x18 * x197 - x196 * x8;
+    const real_t x201 = (1.0 / 630.0) * u[0];
+    const real_t x202 = x189 * x61;
+    const real_t x203 = x17 * x189;
+    const real_t x204 = x165 * x17;
+    const real_t x205 = (4.0 / 105.0) * u[0];
+    const real_t x206 = (2.0 / 63.0) * u[9];
+    const real_t x207 = x10 * x102;
+    const real_t x208 = (2.0 / 63.0) * u[11];
+    const real_t x209 = x58 * x61;
+    const real_t x210 = x17 * x196;
+    const real_t x211 = x132 * x50;
+    const real_t x212 = (2.0 / 315.0) * x51;
+    const real_t x213 = x50 * x92;
+    const real_t x214 = u[10] * x19;
+    const real_t x215 = (8.0 / 105.0) * u[5];
+    const real_t x216 = x168 * x55;
+    const real_t x217 = (16.0 / 105.0) * u[5];
+    const real_t x218 = (2.0 / 105.0) * u[8];
+    const real_t x219 = x102 * x59 - x102 * x90 - x17 * x175 + x175 * x61 + x19 * x218;
+    const real_t x220 = (4.0 / 315.0) * x14;
+    const real_t x221 = (4.0 / 315.0) * x1;
+    const real_t x222 = (4.0 / 105.0) * u[11];
+    const real_t x223 = pow(u[11], 2);
+    const real_t x224 = pow(u[9], 2);
+    const real_t x225 = x14 * x224;
+    const real_t x226 = pow(u[10], 2);
+    const real_t x227 = (2.0 / 105.0) * x226;
+    const real_t x228 = x227 * x5;
+    const real_t x229 = u[7] * x13;
+    const real_t x230 = u[8] * x0;
+    const real_t x231 = x229 - x230;
+    const real_t x232 = pow(u[8], 2);
+    const real_t x233 = 4 * u[10];
+    const real_t x234 = (1.0 / 210.0) * u[6];
+    const real_t x235 = pow(u[7], 2);
+    const real_t x236 = -x86;
+    const real_t x237 = u[1] * x230;
+    const real_t x238 = (11.0 / 2520.0) * u[8];
+    const real_t x239 = (4.0 / 315.0) * u[11];
+    const real_t x240 = (4.0 / 315.0) * u[8];
+    const real_t x241 = (4.0 / 315.0) * u[7];
+    const real_t x242 = (2.0 / 105.0) * u[6];
+    const real_t x243 = (2.0 / 105.0) * u[9];
+    const real_t x244 = x243 * x8;
+    const real_t x245 = x108 * x45;
+    const real_t x246 = (2.0 / 315.0) * x21;
+    const real_t x247 = (2.0 / 315.0) * u[9];
+    const real_t x248 = (2.0 / 315.0) * u[7];
+    const real_t x249 = x17 * x248;
+    const real_t x250 = -x249;
+    const real_t x251 = (1.0 / 105.0) * u[10];
+    const real_t x252 = (1.0 / 105.0) * u[11];
+    const real_t x253 = u[9] * x13 * x84;
+    const real_t x254 = (1.0 / 126.0) * u[7];
+    const real_t x255 = (1.0 / 126.0) * u[8];
+    const real_t x256 = u[1] * u[6];
+    const real_t x257 = (1.0 / 280.0) * x98;
+    const real_t x258 = u[7] * x257;
+    const real_t x259 = (1.0 / 280.0) * u[6];
+    const real_t x260 = (1.0 / 280.0) * u[8];
+    const real_t x261 = (1.0 / 630.0) * u[10];
+    const real_t x262 = u[11] * x98;
+    const real_t x263 = x255 * x55;
+    const real_t x264 = u[2] * x13;
+    const real_t x265 = (1.0 / 280.0) * u[7];
+    const real_t x266 = x265 * x38;
+    const real_t x267 = u[9] * x42;
+    const real_t x268 = x127 * x8;
+    const real_t x269 = (2.0 / 105.0) * u[11];
+    const real_t x270 = (4.0 / 105.0) * u[9];
+    const real_t x271 = u[9] * x61;
+    const real_t x272 = (8.0 / 315.0) * u[9];
+    const real_t x273 = u[2] * x229;
+    const real_t x274 = u[7] * x79;
+    const real_t x275 = x13 * x92;
+    const real_t x276 = u[10] * x275;
+    const real_t x277 = (2.0 / 315.0) * u[10];
+    const real_t x278 = x277 * x50;
+    const real_t x279 = (2.0 / 315.0) * u[8];
+    const real_t x280 = x279 * x48;
+    const real_t x281 = x247 * x82;
+    const real_t x282 = x1 * x279;
+    const real_t x283 = u[11] * x275 + x108 * x50 + x260 * x42 - x276 + x277 * x82 - x278 +
+                        x279 * x45 - x280 - x281 + x282;
+    const real_t x284 = x0 * x69;
+    const real_t x285 =
+        u[11] * x284 + u[9] * x246 - x127 * x61 + x14 * x227 - x254 * x57 - x260 * x36 + x269 * x61;
+    const real_t x286 = (8.0 / 315.0) * u[11];
+    const real_t x287 = u[7] * x246;
+    const real_t x288 = x0 * x2;
+    const real_t x289 = u[9] * x288;
+    const real_t x290 = u[10] * x288 - x1 * x286 + x248 * x52 - x287 - x289;
+    const real_t x291 = 4 * u[11];
+    const real_t x292 = (1.0 / 210.0) * u[7];
+    const real_t x293 = pow(u[6], 2);
+    const real_t x294 = -x14;
+    const real_t x295 = -x5;
+    const real_t x296 = u[7] * x294 + x98;
+    const real_t x297 = (8.0 / 315.0) * x271;
+    const real_t x298 = (4.0 / 315.0) * u[10];
+    const real_t x299 = (4.0 / 315.0) * u[9];
+    const real_t x300 = x0 * x120;
+    const real_t x301 = (1.0 / 21.0) * u[7];
+    const real_t x302 = u[7] * x45;
+    const real_t x303 = (1.0 / 126.0) * u[6];
+    const real_t x304 = (1.0 / 126.0) * u[11];
+    const real_t x305 = x0 * x256;
+    const real_t x306 = u[6] * x72;
+    const real_t x307 = (1.0 / 140.0) * u[6];
+    const real_t x308 = u[7] * x36;
+    const real_t x309 = (4.0 / 315.0) * u[6];
+    const real_t x310 = (2.0 / 315.0) * u[6];
+    const real_t x311 = x310 * x8;
+    const real_t x312 = x310 * x61;
+    const real_t x313 = -x311 + x312;
+    const real_t x314 = -x1 * x127 + x1 * x243 - x127 * x17 + x17 * x269;
+    const real_t x315 = -x247 * x37 - x247 * x42 + x277 * x37 + x277 * x42;
+    const real_t x316 = 4 * u[9];
+    const real_t x317 = -x79;
+    const real_t x318 = u[8] * (x317 + x42);
+    const real_t x319 = x311 - x312;
+    const real_t x320 = -2.0 / 315.0 * u[0] * u[11] * x13 - 2.0 / 315.0 * u[11] * u[1] * x13 +
+                        x277 * x86 + x277 * x98;
+    const real_t x321 = (2.0 / 105.0) * x293;
+    const real_t x322 = (2.0 / 105.0) * x235;
+    const real_t x323 = (16.0 / 105.0) * x5;
+    const real_t x324 = (2.0 / 63.0) * u[6];
+    const real_t x325 = (2.0 / 63.0) * u[7];
+    const real_t x326 = x242 * x86;
+    const real_t x327 = u[1] * x188;
+    const real_t x328 = u[10] * x327;
+    const real_t x329 = x197 * x52;
+    const real_t x330 = (4.0 / 63.0) * u[6];
+    const real_t x331 = (16.0 / 315.0) * u[10];
+    const real_t x332 = x331 * x82;
+    const real_t x333 = (16.0 / 315.0) * u[11];
+    const real_t x334 = x333 * x50;
+    const real_t x335 = (16.0 / 315.0) * u[9];
+    const real_t x336 = (32.0 / 315.0) * u[11];
+    const real_t x337 = -u[11] * x288 + u[6] * x101 - u[9] * x164 + x108 * x36 - x21 * x333 +
+                        x218 * x52 + x248 * x57 + x279 * x57 + x286 * x82 - x333 * x52;
+    const real_t x338 = x14 * x223;
+    const real_t x339 = x224 * x295;
+    const real_t x340 = (16.0 / 105.0) * u[10];
+    const real_t x341 = (16.0 / 105.0) * u[11];
+    const real_t x342 = (8.0 / 105.0) * u[10];
+    const real_t x343 = (8.0 / 105.0) * u[11];
+    const real_t x344 = x272 * x50;
+    const real_t x345 = (4.0 / 63.0) * u[8];
+    const real_t x346 = (4.0 / 105.0) * u[6];
+    const real_t x347 = (2.0 / 63.0) * u[8];
+    const real_t x348 = x242 * x45;
+    const real_t x349 = x197 * x48;
+    const real_t x350 = x247 * x38;
+    const real_t x351 = x248 * x55;
+    const real_t x352 = x279 * x55;
+    const real_t x353 = u[9] * x275;
+    const real_t x354 = x343 * x45;
+    const real_t x355 = u[8] * x21;
+    const real_t x356 = x335 * x45;
+    const real_t x357 = x333 * x55;
+    const real_t x358 = u[2] * x195;
+    const real_t x359 = u[10] * x358 - u[11] * x358 + x198 * x232 - x218 * x42 - x218 * x45 +
+                        x218 * x48 - x282 + x331 * x50 - x332 - x334 + x335 * x82;
+    element_vector[0] =
+        (13.0 / 420.0) * u[0] * x41 + (1.0 / 35.0) * u[0] * (x1 - x17) - u[11] * x47 - u[1] * x72 -
+        4.0 / 105.0 * u[3] * x38 - u[3] * x66 - u[3] * x80 + u[4] * x66 - u[4] * x67 + u[4] * x80 -
+        u[4] * x81 + u[5] * x67 + u[5] * x81 - x1 * x54 + x1 * x84 + x10 * x61 +
+        (11.0 / 2520.0) * x100 + x104 + x11 + x110 + x114 - x16 * (-6 * u[0] + u[1] + u[2] + x12) +
+        x17 * x56 - x17 * x69 + x18 * x68 - x19 * x68 - x2 * x61 + (1.0 / 140.0) * x20 + x21 * x49 -
+        x22 * x23 + x24 * x25 + (2.0 / 63.0) * x27 + x29 * x35 + x3 + (2.0 / 63.0) * x30 +
+        x31 * x33 + (4.0 / 315.0) * x34 + x36 * x93 - x37 * x59 - 11.0 / 2520.0 * x43 -
+        11.0 / 2520.0 * x44 - x45 * x46 + x46 * x52 - x48 * x49 + x48 * x53 + x48 * x58 +
+        x50 * x58 - 4.0 / 315.0 * x51 - x52 * x53 - x52 * x58 + x54 * x57 - x55 * x56 + x55 * x58 -
+        x57 * x58 - x60 - x63 - x64 - x65 * x8 + x7 - x71 - x73 * x74 + x74 * x79 - x75 * x76 -
+        x78 + x8 * x92 + x83 + x85 + (1.0 / 280.0) * x87 + x88 * x89 + x9 + x91 +
+        (4.0 / 315.0) * x94 + (4.0 / 315.0) * x95 + x97 + (11.0 / 2520.0) * x99;
+    element_vector[1] = (1.0 / 126.0) * u[0] * u[11] * x5 + (4.0 / 315.0) * u[0] * u[3] * x13 +
+                        (1.0 / 126.0) * u[0] * u[4] * x13 + (2.0 / 315.0) * u[0] * u[5] * x13 +
+                        (1.0 / 280.0) * u[0] * u[6] * x5 + (1.0 / 140.0) * u[0] * u[7] * x5 +
+                        (11.0 / 2520.0) * u[0] * u[8] * x14 + (4.0 / 315.0) * u[0] * u[9] * x5 +
+                        (8.0 / 315.0) * u[10] * u[3] * x14 + (4.0 / 315.0) * u[10] * u[4] * x14 +
+                        (2.0 / 315.0) * u[10] * u[5] * x5 - u[10] * x47 +
+                        (4.0 / 315.0) * u[11] * u[3] * x14 + (2.0 / 315.0) * u[11] * u[3] * x5 +
+                        (1.0 / 140.0) * u[1] * u[2] * x0 + (1.0 / 21.0) * u[1] * u[3] * x0 +
+                        (1.0 / 35.0) * u[1] * u[4] * x13 + (1.0 / 280.0) * u[1] * u[6] * x14 +
+                        (1.0 / 280.0) * u[1] * u[8] * x14 + (13.0 / 420.0) * u[1] * x115 +
+                        (2.0 / 105.0) * u[2] * u[4] * x0 + (2.0 / 315.0) * u[2] * u[5] * x13 +
+                        (11.0 / 2520.0) * u[2] * u[6] * x5 + (2.0 / 315.0) * u[3] * u[6] * x5 +
+                        (4.0 / 105.0) * u[3] * u[7] * x14 + (2.0 / 315.0) * u[3] * u[8] * x5 -
+                        1.0 / 21.0 * u[3] * x6 + (1.0 / 21.0) * u[4] * u[7] * x5 +
+                        (2.0 / 315.0) * u[4] * u[8] * x14 + (2.0 / 315.0) * u[4] * u[9] * x14 -
+                        1.0 / 105.0 * u[4] * x73 + (1.0 / 105.0) * u[5] * u[7] * x14 +
+                        (1.0 / 126.0) * u[5] * u[8] * x5 + (1.0 / 280.0) * x0 * x24 +
+                        (2.0 / 105.0) * x0 * x26 - x1 * x58 - x10 * x17 - 1.0 / 140.0 * x100 -
+                        x104 - x106 - x107 - x112 - x113 + (1.0 / 280.0) * x116 * x13 - x116 * x25 -
+                        x117 * x118 - x120 * x8 - x121 * x48 - 1.0 / 126.0 * x122 -
+                        1.0 / 140.0 * x123 - x124 * x73 - x125 - x126 * (u[4] - u[5]) - x127 * x18 -
+                        x128 - x129 + (2.0 / 105.0) * x13 * x29 - x130 * x55 - x131 * x79 - x136 -
+                        x138 - x16 * (u[0] - 6 * u[1] + u[2] + x119) - x32 * x35 - x36 * x70 -
+                        x45 * x49 - 2.0 / 105.0 * x51 - x52 * x65 - x56 * (x50 - x55 + x61) - x78 -
+                        11.0 / 2520.0 * x87 - 2.0 / 105.0 * x94 - 1.0 / 280.0 * x99;
+    element_vector[2] =
+        (13.0 / 420.0) * u[2] * x144 - u[3] * x150 - u[4] * x148 + u[4] * x150 + u[5] * x148 -
+        u[6] * x77 - u[7] * x77 - x1 * x132 + x1 * x65 - x10 * x45 - x102 * x124 + x103 * x38 -
+        x103 * x73 + x110 + (2.0 / 315.0) * x111 + x121 * x52 - x121 * x55 - x121 * x8 +
+        (2.0 / 105.0) * x122 + (11.0 / 2520.0) * x123 + x124 * x79 - x125 + x127 * x19 +
+        x13 * x142 + x13 * x33 - x130 * x48 + x130 * x57 - x131 * x6 + x131 * x73 + x133 - x134 +
+        x138 + x140 * x141 + x142 * x28 + (4.0 / 315.0) * x143 - x145 * x18 - 2.0 / 105.0 * x146 -
+        x147 * x17 + x147 * x61 - 1.0 / 35.0 * x149 + (4.0 / 315.0) * x151 + x152 + x153 -
+        x16 * (u[0] + u[1] - 6 * u[2] + x139) + x17 * x58 + x21 * x46 - x21 * x53 +
+        (2.0 / 105.0) * x29 * x31 + (2.0 / 105.0) * x34 + x36 * x74 +
+        (1.0 / 630.0) * x36 * (-u[3] + u[4]) - x37 * x49 + (1.0 / 280.0) * x43 +
+        (1.0 / 140.0) * x44 - x49 * x52 + x54 * (-x57 + x8 + x82) + x60 + x64 + x71 - x79 * x93 -
+        x83 - x85 + (1.0 / 140.0) * x87 - x91 + (1.0 / 126.0) * x94 + (2.0 / 105.0) * x95 -
+        1.0 / 140.0 * x99;
+    element_vector[3] =
+        u[10] * x171 + u[1] * x182 - u[2] * x173 - u[3] * x164 + u[4] * x164 - u[6] * x171 -
+        2.0 / 315.0 * x100 - x102 * x121 + x108 * x19 + x114 + x121 * x79 - 4.0 / 315.0 * x123 -
+        x130 * x61 - x130 * x73 + x135 - 16.0 / 105.0 * x137 + x141 * x144 + (8.0 / 315.0) * x146 +
+        (4.0 / 315.0) * x149 - 2.0 / 63.0 * x151 + x152 + x154 * (-u[2] + 8 * u[3] + x119 + x12) +
+        x155 * x31 + (8.0 / 105.0) * x156 + (16.0 / 105.0) * x157 + (16.0 / 315.0) * x158 +
+        (16.0 / 315.0) * x159 - x160 * x45 - x160 * x48 + x161 * x45 + x161 * x48 - x162 - x163 -
+        x166 - 8.0 / 315.0 * x167 - x168 * x17 + x168 * x45 + x168 * x61 - x169 * x52 + x169 * x55 +
+        x170 * x48 - x170 * x50 - x170 * x57 - x172 + x174 + x176 + x177 * x79 + x178 + x179 +
+        x180 + x181 * x89 + (4.0 / 315.0) * x183 + x184 + x185 * x52 + (16.0 / 315.0) * x186 +
+        x187 * x52 + x194 + x200 + (8.0 / 315.0) * x30 + x36 * x46 - x36 * x53 + x36 * x96 -
+        x38 * x56 + (2.0 / 315.0) * x43 + (1.0 / 126.0) * x44 - x49 * x79 + (2.0 / 63.0) * x51 +
+        x56 * x73 - 4.0 / 105.0 * x62 - x79 * x90 + x84 * x86 - x84 * x98 - 4.0 / 63.0 * x94;
+    element_vector[4] =
+        -16.0 / 105.0 * u[3] * x21 + (32.0 / 315.0) * u[3] * x45 - u[7] * x47 +
+        (8.0 / 315.0) * x0 * x29 - x1 * x130 - x102 * x132 + x130 * x17 + x132 * x48 - x132 * x52 +
+        x132 * x55 - x132 * x57 + x132 * x6 - x132 * x73 + x132 * x79 - 8.0 / 105.0 * x137 +
+        (16.0 / 315.0) * x146 - 16.0 / 315.0 * x149 - 4.0 / 63.0 * x151 +
+        x154 * (-u[0] + 8 * u[4] + x119 + x139) + (16.0 / 105.0) * x156 + (8.0 / 105.0) * x157 +
+        (16.0 / 105.0) * x158 + (8.0 / 105.0) * x159 + x162 + x163 - x165 * x48 + x165 * x52 +
+        x166 + x168 * x73 + x172 - x174 - x176 + x177 * x36 - x178 - x179 - x18 * x206 - x180 -
+        x184 + x185 * x21 - x185 * x45 - x187 * x21 + x19 * x208 + x190 + x191 + x192 + x193 -
+        x2 * x37 + (1.0 / 126.0) * x20 + x200 + x201 * (u[2] * x0 - x98) - x202 - x203 - x204 +
+        x205 * x21 - x205 * x45 - x207 + x209 + x210 + x211 + x212 + x213 + (4.0 / 63.0) * x214 +
+        x215 * x48 + x216 + x217 * x45 + x219 + x23 * x41 + (2.0 / 105.0) * x24 * x28 +
+        (8.0 / 315.0) * x26 * x31 + x36 * x49 - x36 * x90 - x38 * x46 - x38 * x59 + x38 * x90 +
+        (4.0 / 315.0) * x43 + (4.0 / 315.0) * x44 + x46 * x79 - x49 * x73 + x53 * x73 - x53 * x79 +
+        x63 - x79 * x96 + x86 * x92 - 4.0 / 315.0 * x99;
+    element_vector[5] =
+        -u[2] * x221 - u[6] * x47 + x1 * x96 + x10 * x36 + x10 * x79 - 1.0 / 126.0 * x100 -
+        32.0 / 315.0 * x111 + x115 * x118 + x121 * x6 - x121 * x73 + (4.0 / 63.0) * x122 - x128 -
+        x129 - x13 * x155 - 16.0 / 105.0 * x13 * x29 + x130 * x79 + x130 * x8 + x136 -
+        16.0 / 315.0 * x137 - 16.0 / 315.0 * x143 - 4.0 / 315.0 * x146 - 8.0 / 315.0 * x149 -
+        2.0 / 315.0 * x151 + x153 + x154 * (-u[1] + 8 * u[5] + x12 + x139) + (16.0 / 315.0) * x157 +
+        (8.0 / 105.0) * x158 + x160 * x21 + x160 * x52 - x165 * x45 - 16.0 / 315.0 * x167 -
+        x168 * x38 + x169 * x48 - x169 * x57 - x170 * x52 + x170 * x55 + x18 * x222 +
+        (2.0 / 315.0) * x183 - x185 * x48 + (8.0 / 315.0) * x186 - x188 * x24 - x189 * x21 + x194 +
+        x201 * x98 + x202 + x203 + x204 + x207 - x209 - x210 - x211 - x212 - x213 +
+        (2.0 / 63.0) * x214 + x215 * x45 - x216 + x217 * x48 + x219 - x220 * x76 +
+        (8.0 / 315.0) * x27 + x36 * x54 + x37 * x54 - x37 * x69 - x38 * x49 + x38 * x53 +
+        (1.0 / 126.0) * x43 + (2.0 / 315.0) * x44 + x46 * x73 - x54 * x79 - x59 * x73 + x73 * x90 -
+        x8 * x96 + (4.0 / 315.0) * x87 - x92 * x98 - 2.0 / 315.0 * x94 - 2.0 / 63.0 * x95 + x97;
+    element_vector[6] =
+        -u[10] * x182 + u[10] * x221 + u[11] * x182 + u[6] * x257 +
+        (13.0 / 420.0) * u[6] * (x236 + x40) + (1.0 / 35.0) * u[6] * (x48 - x52) - u[8] * x246 -
+        u[9] * x221 + (1.0 / 105.0) * u[9] * x37 + x1 * x242 + x108 * x21 - x124 * x231 -
+        x16 * (-6 * u[6] + u[7] + u[8] + x233) - x17 * x242 + x17 * x272 + x181 * x224 +
+        x206 * x50 + x208 * x52 - x208 * x55 - x208 * x82 + x22 * x234 - x220 * x223 - x222 * x37 +
+        (2.0 / 63.0) * x223 * x5 - 2.0 / 63.0 * x225 - x228 - x232 * x88 + x235 * x75 -
+        11.0 / 2520.0 * x237 - x238 * x73 - x239 * x8 - x240 * x57 + x240 * x82 - x241 * x50 +
+        x241 * x55 - x242 * x50 + x242 * x82 - x243 * x38 - x244 - x245 - x247 * x45 + x248 * x45 -
+        x25 * x256 + x250 - x251 * x37 + x251 * x86 - x252 * x86 - x253 + x254 * x48 - x254 * x61 -
+        x255 * x52 + x255 * x8 - x258 + x259 * x264 - x259 * x42 - x260 * x38 - x261 * x42 +
+        x261 * x98 - 1.0 / 630.0 * x262 + x263 + x265 * x36 + x266 + (1.0 / 630.0) * x267 + x268 +
+        x269 * x36 + x270 * x86 + (4.0 / 315.0) * x271 + (11.0 / 2520.0) * x273 +
+        (11.0 / 2520.0) * x274 + x283 + x285 + x290;
+    element_vector[7] =
+        -u[10] * x300 - u[6] * x221 + (13.0 / 420.0) * u[7] * x296 - u[8] * x101 - u[9] * x182 +
+        u[9] * x300 + x1 * x108 - x108 * x38 + x108 * x55 - x108 * x8 + x117 * x292 - x145 * x264 +
+        x145 * x42 - x16 * (u[6] - 6 * u[7] + u[8] + x291) + x17 * x303 + x197 * x50 + x197 * x55 +
+        x197 * x61 + x206 * (x45 - x50 + x55) + x21 * x301 + x220 * x226 +
+        (2.0 / 105.0) * x223 * x294 + (2.0 / 105.0) * x224 * x295 + x228 - x229 * x74 +
+        (1.0 / 280.0) * x232 * x295 + (1.0 / 140.0) * x237 - x238 * x37 + x238 * x38 + x239 * x61 +
+        x240 * x8 + x243 * x36 + x244 + x245 + x251 * x98 - x252 * x98 + x253 + x255 * x82 +
+        x259 * x86 + x260 * x73 - x263 - x266 - x268 - x270 * x98 - 1.0 / 280.0 * x273 -
+        1.0 / 140.0 * x274 + x283 + (1.0 / 280.0) * x293 * x294 + x293 * x88 - x297 - x298 * x61 -
+        x299 * x38 - x301 * x52 - 1.0 / 35.0 * x302 - x303 * x45 - x303 * x82 + x304 * x37 -
+        x304 * x42 - 1.0 / 140.0 * x305 - x306 + x307 * x98 + (1.0 / 140.0) * x308 + x309 * x50 +
+        x313 + x314 + x315 + (1.0 / 630.0) * x86 * (u[10] - u[11]);
+    element_vector[8] =
+        (1.0 / 280.0) * u[0] * u[6] * x13 + (11.0 / 2520.0) * u[0] * u[7] * x13 +
+        (1.0 / 280.0) * u[0] * u[8] * x0 + (2.0 / 315.0) * u[10] * u[1] * x0 +
+        (1.0 / 21.0) * u[10] * u[2] * x13 + (4.0 / 315.0) * u[10] * u[4] * x0 +
+        (2.0 / 315.0) * u[10] * u[5] * x0 + (1.0 / 126.0) * u[10] * u[6] * x5 +
+        (2.0 / 105.0) * u[10] * u[7] * x14 + (1.0 / 35.0) * u[10] * u[8] * x5 +
+        (4.0 / 105.0) * u[11] * u[2] * x0 + (4.0 / 315.0) * u[11] * u[3] * x0 +
+        (2.0 / 315.0) * u[11] * u[3] * x13 + (8.0 / 315.0) * u[11] * u[4] * x0 +
+        (4.0 / 315.0) * u[11] * u[6] * x5 + (1.0 / 21.0) * u[11] * u[8] * x14 - u[11] * x13 * x147 +
+        (11.0 / 2520.0) * u[1] * u[6] * x0 + (1.0 / 280.0) * u[1] * u[8] * x0 +
+        (1.0 / 126.0) * u[1] * u[9] * x13 + (1.0 / 140.0) * u[2] * u[6] * x13 +
+        (1.0 / 105.0) * u[2] * u[9] * x0 + (1.0 / 126.0) * u[3] * u[6] * x13 +
+        (2.0 / 315.0) * u[4] * u[9] * x13 + (4.0 / 315.0) * u[5] * u[6] * x13 +
+        (2.0 / 315.0) * u[6] * u[9] * x5 + (1.0 / 140.0) * u[7] * u[8] * x14 +
+        (2.0 / 315.0) * u[7] * u[9] * x5 - 1.0 / 210.0 * u[8] * x140 - 1.0 / 140.0 * u[8] * x38 -
+        1.0 / 21.0 * u[8] * x45 - 1.0 / 126.0 * u[9] * x86 - x1 * x303 - x108 * x52 +
+        (2.0 / 105.0) * x14 * x223 + (1.0 / 280.0) * x14 * x235 - x145 * x98 -
+        x16 * (u[6] + u[7] - 6 * u[8] + x316) - x17 * x247 - x173 * (u[10] - u[9]) - x181 * x226 -
+        x208 * (x21 + x57 - x82) - x218 * x57 - x218 * x8 - x218 * x82 + (2.0 / 105.0) * x224 * x5 -
+        x241 * x61 - x249 - x251 * x42 - x254 * x50 - x258 - x265 * x79 - x269 * x38 -
+        1.0 / 140.0 * x273 - x278 - x281 - x285 - x287 - x289 + (1.0 / 280.0) * x293 * x5 -
+        x293 * x75 - x299 * x8 - x306 - x307 * x42 - 11.0 / 2520.0 * x308 - x309 * x82 - x314 -
+        13.0 / 420.0 * x318 - x319 - x320;
+    element_vector[9] =
+        (4.0 / 315.0) * u[0] * u[10] * x0 + (2.0 / 105.0) * u[0] * u[6] * x0 +
+        (2.0 / 315.0) * u[0] * u[8] * x0 + (2.0 / 63.0) * u[0] * u[9] * x13 +
+        (2.0 / 105.0) * u[10] * u[2] * x0 + (16.0 / 315.0) * u[10] * u[3] * x13 +
+        (16.0 / 315.0) * u[10] * u[4] * x13 + (16.0 / 315.0) * u[10] * u[5] * x13 +
+        (4.0 / 315.0) * u[10] * u[6] * x14 + (2.0 / 105.0) * u[10] * u[7] * x5 +
+        (2.0 / 315.0) * u[10] * u[8] * x14 - 16.0 / 105.0 * u[10] * x1 - 8.0 / 105.0 * u[10] * x8 +
+        (4.0 / 315.0) * u[11] * u[2] * x0 + (2.0 / 315.0) * u[11] * u[2] * x13 +
+        (8.0 / 315.0) * u[11] * u[6] * x14 + (8.0 / 315.0) * u[11] * u[9] * x14 +
+        (4.0 / 315.0) * u[1] * u[6] * x13 + (2.0 / 105.0) * u[1] * u[7] * x13 +
+        (2.0 / 315.0) * u[1] * u[8] * x0 + (2.0 / 105.0) * u[1] * u[9] * x0 +
+        (1.0 / 126.0) * u[2] * u[6] * x13 + (4.0 / 63.0) * u[3] * u[6] * x0 +
+        (4.0 / 63.0) * u[3] * u[7] * x13 + (4.0 / 105.0) * u[3] * u[8] * x0 +
+        (16.0 / 105.0) * u[3] * u[9] * x0 + (2.0 / 63.0) * u[4] * u[7] * x13 +
+        (8.0 / 105.0) * u[4] * u[9] * x0 + (2.0 / 63.0) * u[5] * u[6] * x0 +
+        (16.0 / 315.0) * u[5] * u[9] * x0 + (8.0 / 315.0) * u[5] * u[9] * x13 +
+        (4.0 / 315.0) * u[6] * u[7] * x5 + (1.0 / 630.0) * u[6] * u[8] * x5 +
+        (2.0 / 63.0) * u[6] * u[9] * x14 + (1.0 / 126.0) * u[7] * u[8] * x14 - x1 * x336 -
+        x130 * x229 + (16.0 / 315.0) * x14 * x223 - 16.0 / 315.0 * x14 * x226 +
+        (2.0 / 105.0) * x14 * x293 - x14 * x322 +
+        (1.0 / 90.0) * x15 * (-u[8] + 8 * u[9] + x233 + x291) - x17 * x324 - x17 * x333 -
+        x206 * x98 - x21 * x240 + (8.0 / 315.0) * x223 * x5 - x224 * x323 +
+        (8.0 / 105.0) * x226 * x5 - x229 * x84 - x241 * x48 - x243 * x42 - x248 * x79 - x250 -
+        x255 * x38 - x272 * x45 - x276 - x279 * x8 - x279 * x82 - x280 - x286 * x37 - x297 -
+        x299 * x37 - 8.0 / 315.0 * x302 - x303 * x42 - 4.0 / 315.0 * x305 - x313 -
+        1.0 / 210.0 * x318 - x320 - x321 * x5 - x325 * x55 - x326 - x328 - x329 - x330 * x50 -
+        x332 - x333 * x61 - x334 - x335 * x36 - x337;
+    element_vector[10] =
+        u[6] * x275 - u[6] * x288 + (1.0 / 630.0) * u[6] * (x317 + x73) + u[7] * x101 +
+        (4.0 / 63.0) * u[7] * x61 + (8.0 / 105.0) * u[9] * x1 + u[9] * x327 +
+        (16.0 / 105.0) * u[9] * x8 + x1 * x310 - x1 * x342 - x121 * x231 + x127 * x37 - x127 * x86 +
+        x154 * (8 * u[10] - u[6] + x291 + x316) - x17 * x310 + x17 * x342 - x17 * x343 +
+        x197 * x98 + (8.0 / 315.0) * x223 * x295 + (8.0 / 315.0) * x225 +
+        (16.0 / 105.0) * x226 * x294 + x226 * x323 + x234 * (u[6] * x295 + x236 + x39) +
+        (4.0 / 315.0) * x237 - x239 * x37 - x239 * x38 + x239 * x98 + x240 * x73 - x241 * x79 -
+        x243 * x37 + x248 * x36 + x249 - 4.0 / 315.0 * x267 + x269 * x86 - 32.0 / 315.0 * x271 -
+        x272 * x98 - 4.0 / 315.0 * x273 - x279 * x38 + x286 * x42 + x294 * x322 + x298 * x42 -
+        x298 * x98 + x299 * x36 + x299 * x86 - 16.0 / 315.0 * x302 - x310 * x42 - x310 * x50 +
+        x310 * x82 + x310 * x98 + x325 * x50 - x328 - x329 + x336 * x8 + x337 +
+        (8.0 / 105.0) * x338 + (8.0 / 105.0) * x339 + x340 * x61 - x340 * x8 - x341 * x61 - x344 -
+        x345 * x8 + x346 * x61 - x346 * x8 - x347 * x82 - x348 - x349 - x350 - x351 - x352 + x353 +
+        x354 + (16.0 / 315.0) * x355 + x356 + x357 + x359;
+    element_vector[11] =
+        u[2] * u[6] * x35 - u[6] * x284 - u[7] * x126 - 4.0 / 105.0 * u[7] * x17 +
+        (32.0 / 315.0) * u[9] * x17 + x1 * x324 - x1 * x331 + x1 * x335 - x127 * x98 - x132 * x229 +
+        x14 * x321 + x154 * (8 * u[11] - u[7] + x233 + x316) - x17 * x330 + x17 * x340 -
+        x17 * x341 - x208 * x36 - x208 * x37 + x208 * x42 + x21 * x286 - x21 * x309 +
+        (8.0 / 315.0) * x224 * x294 + (8.0 / 105.0) * x226 * x294 + (16.0 / 315.0) * x226 * x5 -
+        x229 * x92 + x230 * x69 + x239 * x86 + x240 * x37 - x240 * x38 + x240 * x52 + x241 * x45 +
+        x242 * x37 + x248 * x50 + x248 * x61 + x254 * x36 - x254 * x79 + (2.0 / 105.0) * x262 -
+        x272 * x36 + x272 * x86 + x279 * x73 - x286 * x52 + x286 * x8 + x290 + x292 * x296 +
+        x295 * x321 - x298 * x86 - x299 * x98 + x303 * x98 - x309 * x42 + x315 + x319 - x324 * x50 -
+        x326 + x330 * x82 - x331 * x8 + x333 * x38 + x335 * x8 + (16.0 / 105.0) * x338 +
+        (16.0 / 315.0) * x339 + x342 * x61 - x343 * x61 + x344 - x345 * x82 + x347 * x57 -
+        x347 * x8 + x348 + x349 + x350 + x351 + x352 - x353 - x354 + (8.0 / 315.0) * x355 - x356 -
+        x357 + x359;
+}
+
+// 2) Potential equation
+static SFEM_INLINE void tri3_laplacian_lhs_kernel(const real_t px0,
+                                                  const real_t px1,
+                                                  const real_t px2,
+                                                  const real_t py0,
+                                                  const real_t py1,
+                                                  const real_t py2,
+                                                  real_t *const SFEM_RESTRICT element_matrix) {
+    const real_t x0 = px0 - px1;
+    const real_t x1 = px0 - px2;
+    const real_t x2 = x0 * x1;
+    const real_t x3 = py0 - py1;
+    const real_t x4 = py0 - py2;
+    const real_t x5 = x3 * x4;
+    const real_t x6 = pow(x1, 2);
+    const real_t x7 = pow(x4, 2);
+    const real_t x8 = x6 + x7;
+    const real_t x9 = pow(x0, 2) + pow(x3, 2);
+    const real_t x10 = (1.0 / 2.0) / (x0 * x4 - x1 * x3);
+    const real_t x11 = x2 + x5;
+    const real_t x12 = x10 * (x11 - x6 - x7);
+    const real_t x13 = x10 * (x2 + x5 - x9);
+    const real_t x14 = -x10 * x11;
+    element_matrix[0] = x10 * (-2 * x2 - 2 * x5 + x8 + x9);
+    element_matrix[1] = x12;
+    element_matrix[2] = x13;
+    element_matrix[3] = x12;
+    element_matrix[4] = x10 * x8;
+    element_matrix[5] = x14;
+    element_matrix[6] = x13;
+    element_matrix[7] = x14;
+    element_matrix[8] = x10 * x9;
+}
+
+static SFEM_INLINE void tri3_tri6_divergence_rhs_kernel(const real_t px0,
+                                                        const real_t px1,
+                                                        const real_t px2,
+                                                        const real_t py0,
+                                                        const real_t py1,
+                                                        const real_t py2,
+                                                        const real_t dt,
+                                                        const real_t *const SFEM_RESTRICT u,
+                                                        real_t *const SFEM_RESTRICT
+                                                            element_vector) {
+    const real_t x0 = 2 * px0;
+    const real_t x1 = 2 * py0;
+    const real_t x2 = (1.0 / 6.0) / dt;
+    const real_t x3 = px0 - px2;
+    const real_t x4 = u[11] * x3;
+    const real_t x5 = py0 - py2;
+    const real_t x6 = u[4] * x5;
+    const real_t x7 = px0 - px1;
+    const real_t x8 = u[10] * x7;
+    const real_t x9 = u[10] * x3;
+    const real_t x10 = py0 - py1;
+    const real_t x11 = u[3] * x10;
+    const real_t x12 = u[4] * x10;
+    const real_t x13 = u[5] * x5;
+    const real_t x14 = u[9] * x7;
+    element_vector[0] = x2 * (-px1 * u[10] - px1 * u[11] + px1 * u[6] + px1 * u[9] + px2 * u[10] -
+                              px2 * u[11] - px2 * u[6] + px2 * u[9] - py1 * u[0] - py1 * u[3] +
+                              py1 * u[4] + py1 * u[5] + py2 * u[0] - py2 * u[3] - py2 * u[4] +
+                              py2 * u[5] + u[11] * x0 + u[3] * x1 - u[5] * x1 - u[9] * x0);
+    element_vector[1] = x2 * (u[1] * x5 - u[3] * x5 - u[7] * x3 + u[9] * x3 + 2 * x11 - 2 * x12 -
+                              x13 - 2 * x14 + x4 + x6 + 2 * x8 - x9);
+    element_vector[2] = x2 * (-u[11] * x7 - u[2] * x10 + u[5] * x10 + u[8] * x7 + x11 - x12 -
+                              2 * x13 - x14 + 2 * x4 + 2 * x6 + x8 - 2 * x9);
+}
+
+// 2) Correction/Projection
+static SFEM_INLINE void tri6_tri3_rhs_correction_kernel(const real_t px0,
+                                                        const real_t px1,
+                                                        const real_t px2,
+                                                        const real_t py0,
+                                                        const real_t py1,
+                                                        const real_t py2,
+                                                        const real_t dt,
+                                                        const real_t *const SFEM_RESTRICT u,
+                                                        const real_t *const SFEM_RESTRICT p,
+                                                        real_t *const SFEM_RESTRICT
+                                                            element_vector) {
+    const real_t x0 = 4 * u[4];
+    const real_t x1 = px0 - px1;
+    const real_t x2 = py0 - py2;
+    const real_t x3 = px0 - px2;
+    const real_t x4 = py0 - py1;
+    const real_t x5 = x1 * x2 - x3 * x4;
+    const real_t x6 = (1.0 / 360.0) * x5;
+    const real_t x7 = 4 * u[5];
+    const real_t x8 = 4 * u[3];
+    const real_t x9 = (1.0 / 6.0) * dt;
+    const real_t x10 = x9 * (-p[0] * x2 + p[0] * x4 + p[1] * x2 - p[2] * x4);
+    const real_t x11 = (1.0 / 90.0) * x5;
+    const real_t x12 = 4 * u[10];
+    const real_t x13 = 4 * u[11];
+    const real_t x14 = 4 * u[9];
+    const real_t x15 = x9 * (-p[0] * x1 + p[0] * x3 - p[1] * x3 + p[2] * x1);
+    element_vector[0] = -x6 * (-6 * u[0] + u[1] + u[2] + x0);
+    element_vector[1] = -x6 * (u[0] - 6 * u[1] + u[2] + x7);
+    element_vector[2] = -x6 * (u[0] + u[1] - 6 * u[2] + x8);
+    element_vector[3] = x10 + x11 * (-u[2] + 8 * u[3] + x0 + x7);
+    element_vector[4] = x10 + x11 * (-u[0] + 8 * u[4] + x7 + x8);
+    element_vector[5] = x10 + x11 * (-u[1] + 8 * u[5] + x0 + x8);
+    element_vector[6] = -x6 * (-6 * u[6] + u[7] + u[8] + x12);
+    element_vector[7] = -x6 * (u[6] - 6 * u[7] + u[8] + x13);
+    element_vector[8] = -x6 * (u[6] + u[7] - 6 * u[8] + x14);
+    element_vector[9] = x11 * (-u[8] + 8 * u[9] + x12 + x13) + x15;
+    element_vector[10] = x11 * (8 * u[10] - u[6] + x13 + x14) + x15;
+    element_vector[11] = x11 * (8 * u[11] - u[7] + x12 + x14) + x15;
 }
