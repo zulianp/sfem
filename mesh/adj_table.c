@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <mpi.h>
+
 #define SFEM_MAX_NUM_SIDES 8
 #define SFEM_MAX_NUM_NODES_PER_SIDE 6
 #define SFEM_INVALID_IDX (-1)

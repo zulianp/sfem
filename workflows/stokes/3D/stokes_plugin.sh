@@ -83,10 +83,14 @@ export SFEM_DIRICHLET_COMPONENT="$VAR_UX,$VAR_UY,$VAR_UZ,$VAR_UX,$VAR_UY,$VAR_UZ
 
 set -x
 
-# lldb --  
-utopia_exec -app nlsolve -path $CODE_DIR/sfem/stokes_plugin.dylib -solver_type ConjugateGradient --verbose -max_it 10000 -matrix_free false -apply_gradient_descent_step true
+# utopia_exec -app nlsolve -path $CODE_DIR/sfem/stokes_plugin.dylib -solver_type ConjugateGradient --verbose -max_it 10000 -matrix_free false -apply_gradient_descent_step true
+
 # lldb -- 
-# utopia_exec --verbose  -app nlsolve -path $CODE_DIR/sfem/stokes_plugin.dylib -solver_type Newton -max_it 40 -ksp_monitor -pc_monitor
+utopia_exec --verbose  -app nlsolve -path $CODE_DIR/sfem/stokes_plugin.dylib -solver_type Newton -max_it 40 -ksp_monitor -pc_monitor
 
 aos_to_soa $SFEM_OUTPUT_DIR/out.raw 8 $BLOCK_SIZE $SFEM_OUTPUT_DIR/x
-raw_to_db.py $SFEM_MESH_DIR $SFEM_OUTPUT_DIR/x.vtk -p "$SFEM_OUTPUT_DIR/x.*.raw"
+
+cdiv $SFEM_MESH_DIR $SFEM_OUTPUT_DIR/x.0.raw $SFEM_OUTPUT_DIR/x.1.raw $SFEM_OUTPUT_DIR/x.2.raw $SFEM_OUTPUT_DIR/div.raw
+
+raw_to_db.py $SFEM_MESH_DIR $SFEM_OUTPUT_DIR/x.vtk -p "$SFEM_OUTPUT_DIR/x.*.raw" -c "$SFEM_OUTPUT_DIR/div.raw"
+
