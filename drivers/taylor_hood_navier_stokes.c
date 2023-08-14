@@ -79,14 +79,14 @@ int main(int argc, char *argv[]) {
     }
 
     // Optional params
-    real_t SFEM_KINEMATIC_VISCOSITY = 1;
+    real_t SFEM_DYNAMIC_VISCOSITY = 1;
     real_t SFEM_MASS_DENSITY = 1;
     int SFEM_PROBLEM_TYPE = 1;
     int SFEM_AOS = 0;
     const char *SFEM_DIRICHLET_NODES = 0;
 
     SFEM_READ_ENV(SFEM_PROBLEM_TYPE, atoi);
-    SFEM_READ_ENV(SFEM_KINEMATIC_VISCOSITY, atof);
+    SFEM_READ_ENV(SFEM_DYNAMIC_VISCOSITY, atof);
     SFEM_READ_ENV(SFEM_MASS_DENSITY, atof);
 
     char *SFEM_DIRICHLET_NODESET = 0;
@@ -114,12 +114,12 @@ int main(int argc, char *argv[]) {
             "Options:\n"
             "----------------------------------------\n"
             "- SFEM_PROBLEM_TYPE=%d\n"
-            "- SFEM_KINEMATIC_VISCOSITY=%g\n"
+            "- SFEM_DYNAMIC_VISCOSITY=%g\n"
             "- SFEM_MASS_DENSITY=%g\n"
             "- SFEM_DIRICHLET_NODES=%s\n"
             "----------------------------------------\n",
             SFEM_PROBLEM_TYPE,
-            SFEM_KINEMATIC_VISCOSITY,
+            SFEM_DYNAMIC_VISCOSITY,
             SFEM_MASS_DENSITY,
             SFEM_DIRICHLET_NODES);
     }
@@ -212,7 +212,7 @@ int main(int argc, char *argv[]) {
                                         mesh.elements,
                                         mesh.points,
                                         dt,
-                                        SFEM_KINEMATIC_VISCOSITY,
+                                        SFEM_DYNAMIC_VISCOSITY,
                                         vel,
                                         tentative_vel);
 
@@ -242,7 +242,7 @@ int main(int argc, char *argv[]) {
                              mesh.elements,
                              mesh.points,
                              dt,
-                             SFEM_KINEMATIC_VISCOSITY,
+                             SFEM_DYNAMIC_VISCOSITY,
                              tentative_vel,
                              buff);
 
