@@ -87,13 +87,8 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    // Optional params
     real_t SFEM_DYNAMIC_VISCOSITY = 1;
     real_t SFEM_MASS_DENSITY = 1;
-    int SFEM_PROBLEM_TYPE = 1;
-    int SFEM_AOS = 0;
-
-    SFEM_READ_ENV(SFEM_PROBLEM_TYPE, atoi);
     SFEM_READ_ENV(SFEM_DYNAMIC_VISCOSITY, atof);
     SFEM_READ_ENV(SFEM_MASS_DENSITY, atof);
 
@@ -105,6 +100,7 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_VELOCITY_DIRICHLET_COMPONENT, );
 
     char * SFEM_PRESSURE_DIRICHLET_NODESET=0;
+    SFEM_READ_ENV(SFEM_PRESSURE_DIRICHLET_NODESET, );
 
     char *SFEM_NEUMANN_SIDESET = 0;
     char *SFEM_NEUMANN_VALUE = 0;
@@ -117,22 +113,38 @@ int main(int argc, char *argv[]) {
     real_t SFEM_ATOL = 1e-8;
     real_t SFEM_RTOL = 1e-8;
     real_t SFEM_STOL = 1e-8;
+    SFEM_READ_ENV(SFEM_MAX_IT, atoi);
+    SFEM_READ_ENV(SFEM_ATOL, atof);
+    SFEM_READ_ENV(SFEM_RTOL, atof);
+    SFEM_READ_ENV(SFEM_STOL, atof);
+
+
+    real_t SFEM_DT = 0.001;
+    real_t SFEM_MAX_TIME = 1;
+    SFEM_READ_ENV(SFEM_DT, atof);
+    SFEM_READ_ENV(SFEM_MAX_TIME, atof);
 
     if (rank == 0) {
         printf(
             "----------------------------------------\n"
             "Options:\n"
             "----------------------------------------\n"
-            "- SFEM_PROBLEM_TYPE=%d\n"
             "- SFEM_DYNAMIC_VISCOSITY=%g\n"
             "- SFEM_MASS_DENSITY=%g\n"
             "- SFEM_VELOCITY_DIRICHLET_NODESET=%s\n"
             "----------------------------------------\n",
-            SFEM_PROBLEM_TYPE,
             SFEM_DYNAMIC_VISCOSITY,
             SFEM_MASS_DENSITY,
             SFEM_VELOCITY_DIRICHLET_NODESET);
     }
+
+
+    isolver_lsolve_set_max_iterations(&lsolve, SFEM_MAX_IT);
+    isolver_lsolve_set_atol(&lsolve, SFEM_ATOL);
+    isolver_lsolve_set_rtol(&lsolve, SFEM_RTOL);
+    isolver_lsolve_set_stol(&lsolve, SFEM_STOL);
+    isolver_lsolve_set_verbosity(&lsolve, 1);
+
 
     // int n_neumann_conditions;
     // boundary_condition_t *neumann_conditions;
@@ -201,12 +213,6 @@ int main(int argc, char *argv[]) {
                                          values);
     }
 
-
-    isolver_lsolve_set_max_iterations(&lsolve, SFEM_MAX_IT);
-    isolver_lsolve_set_atol(&lsolve, SFEM_ATOL);
-    isolver_lsolve_set_rtol(&lsolve, SFEM_RTOL);
-    isolver_lsolve_set_stol(&lsolve, SFEM_STOL);
-    isolver_lsolve_set_verbosity(&lsolve, 1);
     isolver_lsolve_update_crs(&lsolve, p1_nnodes, p1_nnodes, p1_rowptr, p1_colidx, values);
 
     real_t *vel[3];
@@ -220,9 +226,7 @@ int main(int argc, char *argv[]) {
 
     real_t *p = calloc(p1_nnodes, sizeof(real_t));
 
-    real_t T = 1;
-    real_t dt = 0.1;
-    for (real_t t = 0; t < T; t += dt) {
+    for (real_t t = 0; t < SFEM_MAX_TIME; t += SFEM_DT) {
         //////////////////////////////////////////////////////////////
         // Tentative momentum step
         //////////////////////////////////////////////////////////////
@@ -235,7 +239,7 @@ int main(int argc, char *argv[]) {
                                         mesh.nnodes,
                                         mesh.elements,
                                         mesh.points,
-                                        dt,
+                                        SFEM_DT,
                                         SFEM_DYNAMIC_VISCOSITY,
                                         vel,
                                         tentative_vel);
@@ -258,14 +262,14 @@ int main(int argc, char *argv[]) {
         }
 
         //////////////////////////////////////////////////////////////
-        // Poisson problem solve
+        // Poisson problem + solve
         //////////////////////////////////////////////////////////////
 
         tri3_tri6_divergence(mesh.nelements,
                              mesh.nnodes,
                              mesh.elements,
                              mesh.points,
-                             dt,
+                             SFEM_DT,
                              SFEM_DYNAMIC_VISCOSITY,
                              tentative_vel,
                              buff);
@@ -294,7 +298,7 @@ int main(int argc, char *argv[]) {
         }
 
         tri6_tri3_correction(
-            mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, dt, tentative_vel, p, vel);
+            mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, SFEM_DT, tentative_vel, p, vel);
 
         for (int d = 0; d < sdim; d++) {
             // Write in place!!!
