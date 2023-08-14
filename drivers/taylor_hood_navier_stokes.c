@@ -29,11 +29,20 @@
 
 #include "isolver_lsolve.h"
 
+idx_t max_idx(const ptrdiff_t n, const idx_t *idx) {
+    idx_t ret = idx[0];
+
+    for(ptrdiff_t i = 1; i < n; i++) {
+        ret = MAX(ret, idx[i]);
+    }
+
+    return ret;
+}
+
 //////////////////////////////////////////////
 
 // TODOs 
-// 1) Handle P2 - P1 mesh queries
-// 2) Implement missing kernels for Tri6
+// - Implement missing kernels for Tri6
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -156,8 +165,15 @@ int main(int argc, char *argv[]) {
     //                         &n_neumann_conditions);
 
     enum ElemType p1_type = elem_lower_order(mesh.element_type);
+    const int p1_nxe = elem_num_nodes(p1_type);
     const int sdim = elem_manifold_dim(mesh.element_type);
-    const ptrdiff_t p1_nnodes = mesh.nnodes;  // TODO
+    ptrdiff_t p1_nnodes = 0;
+
+    for(int d = 0; d < p1_nxe; d++) {
+        p1_nnodes = MAX(p1_nnodes, max_idx(mesh.nelements, mesh.elements[d]));
+    }
+
+    p1_nnodes += 1;
 
     ptrdiff_t p1_nnz = 0;
     count_t *p1_rowptr = 0;
@@ -308,7 +324,6 @@ int main(int argc, char *argv[]) {
     array_write(comm, path, SFEM_MPI_REAL_T, p, p1_nnodes, p1_nnodes);
 
     // Free resources
-
     free(p1_rowptr);
     free(p1_colidx);
     free(values);
