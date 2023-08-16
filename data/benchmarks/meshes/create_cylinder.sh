@@ -41,9 +41,9 @@ mkdir -p $folder
 
 idx_type_size=4
 
-# cylinder.py $mesh_db $nrefs
-# db_to_raw.py $mesh_db $mesh_original
-# refine $mesh_original $mesh_raw
+cylinder.py $mesh_db $nrefs
+db_to_raw.py $mesh_db $mesh_original
+refine $mesh_original $mesh_raw
 $LAUNCH skin $mesh_raw $mesh_surface
 
 $LAUNCH select_surf $mesh_surface -1 0   0   0.99   $mesh_surface/sides_inlet.raw

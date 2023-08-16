@@ -110,9 +110,9 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_NEUMANN_COMPONENT, );
 
     int SFEM_MAX_IT = 1000;
-    real_t SFEM_ATOL = 1e-8;
-    real_t SFEM_RTOL = 1e-8;
-    real_t SFEM_STOL = 1e-8;
+    real_t SFEM_ATOL = 1e-10;
+    real_t SFEM_RTOL = 1e-12;
+    real_t SFEM_STOL = 1e-10;
     SFEM_READ_ENV(SFEM_MAX_IT, atoi);
     SFEM_READ_ENV(SFEM_ATOL, atof);
     SFEM_READ_ENV(SFEM_RTOL, atof);

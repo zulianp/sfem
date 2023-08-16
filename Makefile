@@ -1,3 +1,7 @@
+SHELL := /bin/bash
+
+# LDFLAGS=`mpic++ -showme:link`
+
 ifeq ($(debug),1)
 	CFLAGS += -O0 -g
 	CXXFLAGS += -O0 -g
@@ -21,13 +25,13 @@ else
 endif
 
 ifeq ($(avx512sort), 1)
-	CXXFLAGS += -DSFEM_ENABLE_AVX512_SORT -Iexternal/x86-simd-sort/src -march=native
-	CFLAGS += -march=native
+	CXXFLAGS += -DSFEM_ENABLE_AVX512_SORT -Iexternal/x86-simd-sort/src -march=native -DSFEM_ENABLE_EXPLICIT_VECTORIZATION
+	CFLAGS += -march=native -DSFEM_ENABLE_EXPLICIT_VECTORIZATION
 endif
 
 ifeq ($(avx2sort), 1)
-	CXXFLAGS += -DSFEM_ENABLE_AVX2_SORT -Iexternal -march=core-avx2
-	CFLAGS += -march=core-avx2
+	CXXFLAGS += -DSFEM_ENABLE_AVX2_SORT -Iexternal -march=core-avx2 -DSFEM_ENABLE_EXPLICIT_VECTORIZATION
+	CFLAGS += -march=core-avx2 -DSFEM_ENABLE_EXPLICIT_VECTORIZATION
 endif
 
 ifeq ($(mpisort), 1)

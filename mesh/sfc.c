@@ -1,8 +1,8 @@
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stddef.h>
 
 #include "../matrix.io/array_dtof.h"
 #include "../matrix.io/matrixio_array.h"
@@ -20,7 +20,6 @@
 #ifdef DSFEM_ENABLE_MPI_SORT
 #include "mpi-sort.h"
 #endif
-
 
 #define SFEM_MPI_SFC_T MPI_UNSIGNED
 
@@ -171,7 +170,7 @@ int main(int argc, char *argv[]) {
 
     element_idx_t *idx = (element_idx_t *)malloc(mesh.n_owned_elements * sizeof(element_idx_t));
 
-    geom_t box_min[3], box_max[3], box_extent[3];
+    geom_t box_min[3] = {0, 0, 0}, box_max[3] = {0, 0, 0}, box_extent[3] = {0, 0, 0};
     for (int coord = 0; coord < mesh.spatial_dim; coord++) {
         box_min[coord] = mesh.points[coord][0];
         box_max[coord] = mesh.points[coord][0];
@@ -183,7 +182,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    for(int d = 0; d < 3; d++) {
+    for (int d = 0; d < 3; d++) {
         box_extent[d] = box_max[d] - box_min[d];
     }
 
@@ -226,7 +225,6 @@ int main(int argc, char *argv[]) {
                 }
             }
 
-           
             // sfc[i] = (sfc_t)(b[2] * (geom_t)urange[2]);
             sfc[i] = b[SFEM_ORDER_WITH_COORDINATE] * urange[SFEM_ORDER_WITH_COORDINATE];
 
@@ -234,7 +232,6 @@ int main(int argc, char *argv[]) {
             // (int)sfc[i]);
         }
     } else {
-        
         for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
             geom_t b[3] = {0, 0, 0};
             const idx_t i0 = mesh.elements[0][i];

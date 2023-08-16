@@ -1257,7 +1257,7 @@ void tet4_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("tet4_linear_elasticity.c: tet4_linear_elasticity_assemble_value\t%g seconds\n",
+    printf("tet4_linear_elasticity.c: tet4_linear_elasticity_assemble_value_aos\t%g seconds\n",
            tock - tick);
 }
 
@@ -1339,7 +1339,7 @@ void tet4_linear_elasticity_assemble_gradient_aos(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("tet4_linear_elasticity.c: tet4_linear_elasticity_assemble_gradient\t%g seconds\n",
+    printf("tet4_linear_elasticity.c: tet4_linear_elasticity_assemble_gradient_aos\t%g seconds\n",
            tock - tick);
 }
 
@@ -1454,7 +1454,7 @@ void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
                                       real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    // double tick = MPI_Wtime();
+    double tick = MPI_Wtime();
 
     vreal_t vmu;
     vreal_t vlambda;
@@ -1547,9 +1547,8 @@ void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
         }
     }
 
-    // double tock = MPI_Wtime();
-    // printf("tet4_linear_elasticity.c: tet4_linear_elasticity_assemble_apply\t%g seconds\n", tock
-    // - tick);
+    double tock = MPI_Wtime();
+    printf("tet4_linear_elasticity.c: tet4_linear_elasticity_apply_aos\t%g seconds\n", tock - tick);
 }
 
 #else
@@ -1564,7 +1563,7 @@ void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
                                       real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    // double tick = MPI_Wtime();
+    double tick = MPI_Wtime();
 
     static const int block_size = 3;
 #pragma omp parallel
@@ -1629,9 +1628,8 @@ void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
         }
     }
 
-    // double tock = MPI_Wtime();
-    // printf("tet4_linear_elasticity.c: tet4_linear_elasticity_assemble_apply\t%g seconds\n", tock
-    // - tick);
+    double tock = MPI_Wtime();
+    printf("tet4_linear_elasticity.c: tet4_linear_elasticity_apply_aos\t%g seconds\n", tock - tick);
 }
 
 #endif

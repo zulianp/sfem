@@ -11,7 +11,8 @@ PATH=$SCRIPTPATH/../../python/mesh:$PATH
 PATH=$SCRIPTPATH/../../python/algebra:$PATH
 PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
-export ISOLVER_LSOLVE_PLUGIN=$CODE_DIR/utopia/utopia/build_shared/libutopia.dylib
+# export ISOLVER_LSOLVE_PLUGIN=$CODE_DIR/utopia/utopia/build_shared/libutopia.dylib
+export ISOLVER_LSOLVE_PLUGIN=$CODE_DIR/utopia/utopia/build_shared/libutopia.so
 
 export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true
@@ -33,11 +34,12 @@ sbottom=$SFEM_MESH_DIR/sidesets_aos/sbottom.raw
 stop=$SFEM_MESH_DIR/sidesets_aos/stop.raw
 
 export SFEM_VELOCITY_DIRICHLET_NODESET="$sleft,$sleft,$sright,$sright,$sbottom,$sbottom,$stop,$stop"
-export SFEM_VELOCITY_DIRICHLET_VALUE="0,0,0,0,0,0,10,0,"
+export SFEM_VELOCITY_DIRICHLET_VALUE="0,0,0,0,0,0,1,0,"
 export SFEM_VELOCITY_DIRICHLET_COMPONENT="0,1,0,1,0,1,0,1"
 
 export SFEM_DT=0.000001
 export SFEM_MAX_TIME=0.000005
+export SFEM_RTOL=1e-14
 
 export SFEM_DYNAMIC_VISCOSITY=1
 export SFEM_MASS_DENSITY=1
