@@ -1057,7 +1057,7 @@ void tri6_tri3_correction(const ptrdiff_t nelements,
             idx_t ev[6];
             real_t element_vector[6 * 2];
             real_t element_vel[6 * 2];
-            real_t element_p[6];
+            real_t element_p[3];
 
 #pragma unroll(6)
             for (int v = 0; v < element_nnodes; ++v) {
@@ -1109,7 +1109,7 @@ void tri6_tri3_correction(const ptrdiff_t nelements,
             for (int b = 0; b < n_vars; ++b) {
 #pragma unroll(6)
                 for (int edof_i = 0; edof_i < element_nnodes; ++edof_i) {
-                    const idx_t dof_i = elems[edof_i][ev[edof_i]];
+                    const idx_t dof_i = ev[edof_i];
 #pragma omp atomic update
                     values[b][dof_i] += element_vector[b * element_nnodes + edof_i];
                 }
@@ -1848,7 +1848,7 @@ void tri6_explict_momentum_tentative(const ptrdiff_t nelements,
             }
 
             for (int enode = 0; enode < element_nnodes; ++enode) {
-                idx_t dof = ev[enode] * n_vars;
+                idx_t dof = ev[enode];
 
                 for (int b = 0; b < n_vars; ++b) {
                     element_x[b * element_nnodes + enode] = vel[b][dof];

@@ -68,7 +68,7 @@ void read_boundary_conditions(MPI_Comm comm,
         char *pch = strtok(values, splitter);
         int i = 0;
         while (pch != NULL) {
-            printf("Parsing %s\n", pch);
+            printf("Parsing  values (%d/%d): %s\n", i + 1, count, pch);
             conds[i].value = atof(pch);
             i++;
 
@@ -80,7 +80,7 @@ void read_boundary_conditions(MPI_Comm comm,
         char *pch = strtok(components, splitter);
         int i = 0;
         while (pch != NULL) {
-            printf("Parsing %s\n", pch);
+            printf("Parsing comps (%d/%d): %s\n", i + 1, count, pch);
             conds[i].component = atoi(pch);
             i++;
 

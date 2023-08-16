@@ -32,7 +32,7 @@
 idx_t max_idx(const ptrdiff_t n, const idx_t *idx) {
     idx_t ret = idx[0];
 
-    for(ptrdiff_t i = 1; i < n; i++) {
+    for (ptrdiff_t i = 1; i < n; i++) {
         ret = MAX(ret, idx[i]);
     }
 
@@ -41,7 +41,7 @@ idx_t max_idx(const ptrdiff_t n, const idx_t *idx) {
 
 //////////////////////////////////////////////
 
-// TODOs 
+// TODOs
 // - Implement missing kernels for Tri6
 
 int main(int argc, char *argv[]) {
@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_VELOCITY_DIRICHLET_VALUE, );
     SFEM_READ_ENV(SFEM_VELOCITY_DIRICHLET_COMPONENT, );
 
-    char * SFEM_PRESSURE_DIRICHLET_NODESET=0;
+    char *SFEM_PRESSURE_DIRICHLET_NODESET = 0;
     SFEM_READ_ENV(SFEM_PRESSURE_DIRICHLET_NODESET, );
 
     char *SFEM_NEUMANN_SIDESET = 0;
@@ -117,7 +117,6 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_ATOL, atof);
     SFEM_READ_ENV(SFEM_RTOL, atof);
     SFEM_READ_ENV(SFEM_STOL, atof);
-
 
     real_t SFEM_DT = 0.001;
     real_t SFEM_MAX_TIME = 1;
@@ -138,13 +137,11 @@ int main(int argc, char *argv[]) {
             SFEM_VELOCITY_DIRICHLET_NODESET);
     }
 
-
     isolver_lsolve_set_max_iterations(&lsolve, SFEM_MAX_IT);
     isolver_lsolve_set_atol(&lsolve, SFEM_ATOL);
     isolver_lsolve_set_rtol(&lsolve, SFEM_RTOL);
     isolver_lsolve_set_stol(&lsolve, SFEM_STOL);
     isolver_lsolve_set_verbosity(&lsolve, 1);
-
 
     // int n_neumann_conditions;
     // boundary_condition_t *neumann_conditions;
@@ -166,8 +163,8 @@ int main(int argc, char *argv[]) {
                               SFEM_PRESSURE_DIRICHLET_NODESET,
                               "",
                               "",
-                              &velocity_dirichlet_conditions,
-                              &n_velocity_dirichlet_conditions);
+                              &pressure_dirichlet_conditions,
+                              &n_pressure_dirichlet_conditions);
 
     // read_neumann_conditions(&mesh,
     //                         SFEM_NEUMANN_SIDESET,
@@ -181,7 +178,7 @@ int main(int argc, char *argv[]) {
     const int sdim = elem_manifold_dim(mesh.element_type);
     ptrdiff_t p1_nnodes = 0;
 
-    for(int d = 0; d < p1_nxe; d++) {
+    for (int d = 0; d < p1_nxe; d++) {
         p1_nnodes = MAX(p1_nnodes, max_idx(mesh.nelements, mesh.elements[d]));
     }
 
@@ -192,7 +189,7 @@ int main(int argc, char *argv[]) {
     idx_t *p1_colidx = 0;
     build_crs_graph_for_elem_type(
         p1_type, mesh.nelements, p1_nnodes, mesh.elements, &p1_rowptr, &p1_colidx);
-    p1_nnz = p1_rowptr[mesh.nnodes];
+    p1_nnz = p1_rowptr[p1_nnodes];
     real_t *values = calloc(p1_nnz, sizeof(real_t));
 
     laplacian_assemble_hessian(p1_type,
@@ -276,15 +273,11 @@ int main(int argc, char *argv[]) {
 
         memset(p, 0, p1_nnodes * sizeof(real_t));
 
-        isolver_lsolve_t lsolve;
-        lsolve.comm = comm;
-
         for (int i = 0; i < n_pressure_dirichlet_conditions; i++) {
             boundary_condition_t cond = pressure_dirichlet_conditions[i];
             assert(cond.component == 0);
 
-            constraint_nodes_to_value(
-                cond.local_size, cond.idx, cond.value, buff);
+            constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, buff);
         }
 
         isolver_lsolve_apply(&lsolve, buff, p);
@@ -297,8 +290,14 @@ int main(int argc, char *argv[]) {
             memset(vel[d], 0, mesh.nnodes * sizeof(real_t));
         }
 
-        tri6_tri3_correction(
-            mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, SFEM_DT, tentative_vel, p, vel);
+        tri6_tri3_correction(mesh.nelements,
+                             mesh.nnodes,
+                             mesh.elements,
+                             mesh.points,
+                             SFEM_DT,
+                             tentative_vel,
+                             p,
+                             vel);
 
         for (int d = 0; d < sdim; d++) {
             // Write in place!!!
@@ -313,8 +312,7 @@ int main(int argc, char *argv[]) {
 
         for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
             boundary_condition_t cond = velocity_dirichlet_conditions[i];
-            constraint_nodes_to_value(
-                cond.local_size, cond.idx, cond.value, vel[cond.component]);
+            constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, vel[cond.component]);
         }
     }
 
@@ -335,7 +333,7 @@ int main(int argc, char *argv[]) {
     free(p);
     free(buff);
 
-    for (int d = 0; d < mesh.spatial_dim; d++) {
+    for (int d = 0; d < sdim; d++) {
         free(vel[d]);
         free(tentative_vel[d]);
     }
