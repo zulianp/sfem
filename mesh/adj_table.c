@@ -64,7 +64,20 @@ static void fill_local_side_table(enum ElemType element_type, int *local_side_ta
 
         LST(2, 0) = 3 - 1;
         LST(2, 1) = 1 - 1;
-    } else {
+    } 
+    else if (element_type == TRI6) {
+        LST(0, 0) = 1 - 1;
+        LST(0, 1) = 2 - 1;
+        LST(0, 2) = 4 - 1;
+
+        LST(1, 0) = 2 - 1;
+        LST(1, 1) = 3 - 1;
+        LST(1, 2) = 5 - 1;
+
+        LST(2, 0) = 3 - 1;
+        LST(2, 1) = 1 - 1;
+        LST(2, 2) = 6 - 1;
+    }  else {
         assert(0);
     }
 }
@@ -79,6 +92,8 @@ void fill_element_adj_table(const ptrdiff_t n_elements,
     if (element_type == TET10) {
         // This is enough for many operations
         element_type_for_algo = TET4;
+    } else if(element_type == TRI6) {
+        element_type_for_algo = TRI3;
     }
 
     count_t *adj_ptr = 0;

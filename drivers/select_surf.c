@@ -59,7 +59,9 @@ int main(int argc, char *argv[]) {
 
     if (argc != 7) {
         if (!rank) {
-            fprintf(stderr, "usage: %s <folder> <x> <y> <z> <angle_threshold> <selection.raw>\n", argv[0]);
+            fprintf(stderr,
+                    "usage: %s <folder> <x> <y> <z> <angle_threshold> <selection.raw>\n",
+                    argv[0]);
         }
 
         return EXIT_FAILURE;
@@ -92,6 +94,12 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    int SFEM_ELEMENT_TYPE = mesh.element_type;
+    SFEM_READ_ENV(SFEM_ELEMENT_TYPE, atoi);
+    mesh.element_type = SFEM_ELEMENT_TYPE;
+
+    int nxe = elem_num_nodes(mesh.element_type);
+
     ///////////////////////////////////////////////////////////////////////////////
     // Find approximately closest elemenent
     ///////////////////////////////////////////////////////////////////////////////
@@ -102,7 +110,7 @@ int main(int argc, char *argv[]) {
     for (ptrdiff_t e = 0; e < mesh.nelements; ++e) {
         geom_t element_sq_dist = 1000000;
 
-        for (int n = 0; n < mesh.element_type; ++n) {
+        for (int n = 0; n < nxe; ++n) {
             const idx_t node = mesh.elements[n][e];
 
             geom_t sq_dist = 0.;
@@ -136,9 +144,14 @@ int main(int argc, char *argv[]) {
         element_type_hack = TRI3;
     }
 
+    if (mesh.element_type == EDGE3) {
+        element_type_hack = EDGE2;
+    }
+
     count_t *adj_ptr = 0;
     element_idx_t *adj_idx = 0;
-    create_dual_graph(mesh.nelements, mesh.nnodes, element_type_hack, mesh.elements, &adj_ptr, &adj_idx);
+    create_dual_graph(
+        mesh.nelements, mesh.nnodes, element_type_hack, mesh.elements, &adj_ptr, &adj_idx);
 
     uint8_t *selected = (uint8_t *)malloc(mesh.nelements * sizeof(uint8_t));
     memset(selected, 0, mesh.nelements * sizeof(uint8_t));
@@ -158,7 +171,7 @@ int main(int argc, char *argv[]) {
     // Create marker for different faces based on dihedral angles
     ///////////////////////////////////////////////////////////////////////////////
 
-    if (mesh.element_type == EDGE2) {
+    if (element_type_hack == EDGE2) {
         for (ptrdiff_t q = 0; elem_queue[q] >= 0; q = (q + 1) % size_queue) {
             const ptrdiff_t e = elem_queue[q];
 
@@ -179,7 +192,6 @@ int main(int argc, char *argv[]) {
                 normal2(p0, p1, n);
                 // printf("------------------\n");
                 // printf("%g %g\n", n[0], n[1]);
-
             }
 
             const count_t e_begin = adj_ptr[e];
@@ -203,7 +215,6 @@ int main(int argc, char *argv[]) {
                     real_t p1a[2];
                     real_t na[2];
 
-
                     for (int d = 0; d < 2; ++d) {
                         p0a[d] = mesh.points[d][idx0];
                         p1a[d] = mesh.points[d][idx1];
@@ -217,8 +228,6 @@ int main(int argc, char *argv[]) {
 
                 if (cos_angle > angle_threshold) {
                     elem_queue[next_slot++ % size_queue] = e_adj;
-
-
                 }
             }
 

@@ -33,7 +33,8 @@ void mesh_init(mesh_t *mesh)
 }
 
 void mesh_destroy(mesh_t *mesh) {
-    for (int d = 0; d < mesh->element_type; ++d) {
+    const int nxe = elem_num_nodes(mesh->element_type);
+    for (int d = 0; d < nxe; ++d) {
         free(mesh->elements[d]);
         mesh->elements[d] = 0;
     }
