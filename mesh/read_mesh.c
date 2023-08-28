@@ -322,6 +322,11 @@ int mesh_read_elements(MPI_Comm comm,
         }
     }
 
+#ifdef SFEM_MEM_DIAGNOSTICS
+    printf("mesh_read_elements: allocated %g GB\n",
+           nnodesxelem * *n_elements * sizeof(idx_t) * 1e-9);
+#endif
+
     return ret;
 }
 
