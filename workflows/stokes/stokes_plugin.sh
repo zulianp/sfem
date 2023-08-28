@@ -11,8 +11,8 @@ PATH=$SCRIPTPATH/../../python/mesh:$PATH
 PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 PATH=$SCRIPTPATH/../../../matrix.io:$PATH
 
-# create_box_2D.sh 7 2 1
-# rm mesh/z.raw
+create_box_2D.sh 6 2 1
+rm mesh/z.raw
 
 
 export SFEM_MESH_DIR=mesh

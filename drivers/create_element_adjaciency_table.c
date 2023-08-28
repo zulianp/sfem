@@ -15,7 +15,7 @@
 #include "sfem_base.h"
 #include "sfem_mesh_write.h"
 
-#include "extract_surface_graph.h"
+#include "adj_table.h"
 
 #include "sfem_defs.h"
 
@@ -81,6 +81,19 @@ int main(int argc, char *argv[]) {
     char path[SFEM_MAX_PATH_LENGTH];
     sprintf(path, "%s/i*.raw", folder);
     int nnxe = count_files(path);
+    
+
+    // FIXME
+    int element_type = nnxe;
+    int element_type_for_algo = element_type;
+    if (element_type == TET10) {
+        element_type_for_algo = TET4;
+    } else if (element_type == TRI6) {
+        element_type_for_algo = TRI3;
+    }
+
+    nnxe = elem_num_nodes(element_type_for_algo);
+    // Read only the data we need
     idx_t **elems = (idx_t **)malloc(sizeof(idx_t *) * nnxe);
 
     ptrdiff_t n_local_elements, n_elements;
@@ -100,15 +113,40 @@ int main(int argc, char *argv[]) {
 
     sprintf(path, "%s/adj_ptr.raw", output_folder);
     ptrdiff_t adj_ptr_size_local, adj_ptr_size;
-    array_create_from_file(comm, path, SFEM_MPI_COUNT_T, (void**)&adj_ptr, &adj_ptr_size_local, &adj_ptr_size);
+    array_create_from_file(
+        comm, path, SFEM_MPI_COUNT_T, (void **)&adj_ptr, &adj_ptr_size_local, &adj_ptr_size);
 
     sprintf(path, "%s/adj_idx.raw", output_folder);
     ptrdiff_t ennz_local, ennz;
-    array_create_from_file(comm, path, SFEM_MPI_ELEMENT_IDX_T, (void**)&adj_idx, &ennz_local, &ennz);
+    array_create_from_file(
+        comm, path, SFEM_MPI_ELEMENT_IDX_T, (void **)&adj_idx, &ennz_local, &ennz);
+
+    int ns = elem_num_sides(element_type);
+    ptrdiff_t **table = (ptrdiff_t **) malloc(ns * sizeof(ptrdiff_t *));
+
+    for(int s = 0; s < ns; s++) {
+        table[s] = (ptrdiff_t *)malloc(n_elements * sizeof(ptrdiff_t));
+    }
+
+    create_element_adj_table_from_dual_graph_soa(
+        n_elements, n_nodes, element_type, elems, adj_ptr, adj_idx, table);
+
+    for(int s = 0; s < ns; s++) {
+        sprintf(path, "%s/a.%d.raw", output_folder, s);
+        array_write(comm, path, SFEM_MPI_COUNT_T, table[s], n_elements, n_elements);
+    }
+
+    // Free resources
 
     for (int d = 0; d < nnxe; d++) {
         free(elems[d]);
     }
+
+    for(int s = 0; s < ns; s++) {
+        free(table[s]);
+    }
+
+    free(table);
 
     free(adj_ptr);
     free(adj_idx);
