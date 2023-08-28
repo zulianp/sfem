@@ -82,11 +82,14 @@ static void fill_local_side_table(enum ElemType element_type, int *local_side_ta
     }
 }
 
-void fill_element_adj_table(const ptrdiff_t n_elements,
+void create_element_adj_table_from_dual_graph(const ptrdiff_t n_elements,
                             const ptrdiff_t n_nodes,
                             enum ElemType element_type,
                             idx_t **const SFEM_RESTRICT elems,
-                            ptrdiff_t *const SFEM_RESTRICT table) {
+                            const count_t *const adj_ptr,
+                            const element_idx_t *const adj_idx,
+                            ptrdiff_t **const SFEM_RESTRICT table_out)
+{
     int element_type_for_algo = element_type;
 
     if (element_type == TET10) {
@@ -95,10 +98,6 @@ void fill_element_adj_table(const ptrdiff_t n_elements,
     } else if(element_type == TRI6) {
         element_type_for_algo = TRI3;
     }
-
-    count_t *adj_ptr = 0;
-    element_idx_t *adj_idx = 0;
-    create_dual_graph(n_elements, n_nodes, element_type_for_algo, elems, &adj_ptr, &adj_idx);
 
     int local_side_table[SFEM_MAX_NUM_SIDES * SFEM_MAX_NUM_NODES_PER_SIDE];
     fill_local_side_table(element_type_for_algo, local_side_table);
@@ -110,6 +109,8 @@ void fill_element_adj_table(const ptrdiff_t n_elements,
     enum ElemType st = side_type(element_type_for_algo);
     const int nn = elem_num_nodes(st);
     const int ns = elem_num_sides(element_type_for_algo);
+
+    ptrdiff_t *table = (ptrdiff_t *)malloc(n_elements * ns * sizeof(ptrdiff_t));
 
     for (ptrdiff_t e = 0; e < n_elements; e++) {
         const count_t begin = adj_ptr[e];
@@ -154,6 +155,27 @@ void fill_element_adj_table(const ptrdiff_t n_elements,
         }
     }
 
+    *table_out = table;
+}
+
+void create_element_adj_table(const ptrdiff_t n_elements,
+                            const ptrdiff_t n_nodes,
+                            enum ElemType element_type,
+                            idx_t **const SFEM_RESTRICT elems,
+                            ptrdiff_t **const SFEM_RESTRICT table_out) {
+    int element_type_for_algo = element_type;
+
+    if (element_type == TET10) {
+        // This is enough for many operations
+        element_type_for_algo = TET4;
+    } else if(element_type == TRI6) {
+        element_type_for_algo = TRI3;
+    }
+
+    count_t *adj_ptr = 0;
+    element_idx_t *adj_idx = 0;
+    create_dual_graph(n_elements, n_nodes, element_type_for_algo, elems, &adj_ptr, &adj_idx);
+    create_element_adj_table_from_dual_graph(n_elements, n_nodes, element_type, elems, adj_ptr, adj_idx, table_out);
     free(adj_ptr);
     free(adj_idx);
 }
@@ -170,8 +192,8 @@ void extract_surface_connectivity_with_adj_table(const ptrdiff_t n_elements,
     double tick = MPI_Wtime();
 
     const int ns = elem_num_sides(element_type);
-    ptrdiff_t *table = (ptrdiff_t *)malloc(n_elements * ns * sizeof(ptrdiff_t));
-    fill_element_adj_table(n_elements, n_nodes, element_type, elems, table);
+    ptrdiff_t *table = 0;
+    create_element_adj_table(n_elements, n_nodes, element_type, elems, &table);
 
     int local_side_table[SFEM_MAX_NUM_SIDES * SFEM_MAX_NUM_NODES_PER_SIDE];
     fill_local_side_table(element_type, local_side_table);

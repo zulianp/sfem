@@ -49,17 +49,16 @@ inline static int count_files(const char *pattern) {
     return n_files;
 }
 
-int mesh_node_ids(mesh_t *mesh, idx_t *const ids)
-{
+int mesh_node_ids(mesh_t *mesh, idx_t *const ids) {
     int rank, size;
     MPI_Comm_rank(mesh->comm, &rank);
     MPI_Comm_size(mesh->comm, &size);
 
-    for(ptrdiff_t i = 0; i < mesh->n_owned_nodes; i++) {
+    for (ptrdiff_t i = 0; i < mesh->n_owned_nodes; i++) {
         ids[i] = mesh->node_offsets[rank] + i;
     }
 
-    for(ptrdiff_t i = mesh->n_owned_nodes; i <mesh->nnodes; i++) {
+    for (ptrdiff_t i = mesh->n_owned_nodes; i < mesh->nnodes; i++) {
         ids[i] = mesh->ghosts[i - mesh->n_owned_nodes];
     }
 
@@ -75,7 +74,7 @@ int mesh_build_global_ids(mesh_t *mesh) {
 
     long n_gnodes = mesh->n_owned_nodes;
     long global_node_offset = 0;
-    MPI_Exscan(&n_gnodes, &global_node_offset, 1, MPI_LONG ,MPI_SUM, comm);
+    MPI_Exscan(&n_gnodes, &global_node_offset, 1, MPI_LONG, MPI_SUM, comm);
 
     n_gnodes = global_node_offset + mesh->n_owned_nodes;
     MPI_Bcast(&n_gnodes, 1, MPI_LONG, size - 1, comm);
@@ -175,7 +174,6 @@ int mesh_build_global_ids(mesh_t *mesh) {
         }
     }
 
-
     // MPI_Barrier(comm);
     // for(int r_ = 0; r_ < size; r_++) {
     //     if(r_ == rank) {
@@ -248,7 +246,7 @@ int mesh_build_global_ids(mesh_t *mesh) {
             assert(iii < n_lnodes_temp);
             assert(iii >= 0);
             assert(mapping[iii] >= 0);
-            keys[k] =  mapping[iii];
+            keys[k] = mapping[iii];
         }
     }
 
@@ -268,7 +266,6 @@ int mesh_build_global_ids(mesh_t *mesh) {
     /////////////////////////////////////////////////
 
     mesh->node_offsets = node_offsets;
-
 
     // for (int r_ = 0; r_ < size; r_++) {
     //     if (r_ == rank) {
@@ -302,6 +299,32 @@ int mesh_build_global_ids(mesh_t *mesh) {
     return 0;
 }
 
+int mesh_read_elements(MPI_Comm comm,
+                       const int nnodesxelem,
+                       const char *folder,
+                       idx_t **const elems,
+                       ptrdiff_t *const n_local_elements,
+                       ptrdiff_t *const n_elements) {
+    char path[1024 * 10];
+    MPI_Datatype mpi_idx_t = SFEM_MPI_IDX_T;
+
+    // DO this outside
+    // idx_t **elems = (idx_t **)malloc(sizeof(idx_t *) * nnodesxelem);
+
+    int ret = 0;
+    {
+        idx_t *idx = 0;
+        for (int d = 0; d < nnodesxelem; ++d) {
+            sprintf(path, "%s/i%d.raw", folder, d);
+            ret |= array_create_from_file(
+                comm, path, mpi_idx_t, (void **)&idx, n_local_elements, n_elements);
+            elems[d] = idx;
+        }
+    }
+
+    return ret;
+}
+
 int mesh_read_generic(MPI_Comm comm,
                       const int nnodesxelem,
                       const int ndims,
@@ -330,16 +353,18 @@ int mesh_read_generic(MPI_Comm comm,
 
         idx_t **elems = (idx_t **)malloc(sizeof(idx_t *) * nnodesxelem);
 
-        {
-            idx_t *idx = 0;
+        // {
+        //     idx_t *idx = 0;
 
-            for (int d = 0; d < nnodesxelem; ++d) {
-                sprintf(path, "%s/i%d.raw", folder, d);
-                array_create_from_file(
-                    comm, path, mpi_idx_t, (void **)&idx, &n_local_elements, &n_elements);
-                elems[d] = idx;
-            }
-        }
+        //     for (int d = 0; d < nnodesxelem; ++d) {
+        //         sprintf(path, "%s/i%d.raw", folder, d);
+        //         array_create_from_file(
+        //             comm, path, mpi_idx_t, (void **)&idx, &n_local_elements, &n_elements);
+        //         elems[d] = idx;
+        //     }
+        // }
+
+        mesh_read_elements(comm, nnodesxelem, folder, elems, &n_local_elements, &n_elements);
 
         idx_t *unique_idx = (idx_t *)malloc(sizeof(idx_t) * n_local_elements * nnodesxelem);
         for (int d = 0; d < nnodesxelem; ++d) {
@@ -628,7 +653,6 @@ int mesh_read_generic(MPI_Comm comm,
             }
         }
 
-        
         free(local_remap);
         free(proc_ptr);
 
