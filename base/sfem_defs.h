@@ -61,7 +61,7 @@ SFEM_INLINE static int elem_num_nodes(const enum ElemType type) {
             return 10;
         default: {
             assert(0);
-            return INVALID;
+            return 0;
         }
     }
 }
@@ -82,7 +82,7 @@ SFEM_INLINE static int elem_num_sides(const enum ElemType type) {
             return 4;
         default: {
             assert(0);
-            return INVALID;
+            return 0;
         }
     }
 }

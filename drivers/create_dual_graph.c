@@ -90,10 +90,11 @@ int main(int argc, char *argv[]) {
         element_type_for_algo = TRI3;
     }
 
+
     // Read only the data we need
     nnxe = elem_num_nodes(element_type_for_algo);
 
-    idx_t **elems = (idx_t **)malloc(sizeof(idx_t *) * nnxe);
+    idx_t **elems = (idx_t **)malloc(nnxe * sizeof(idx_t *));
 
     ptrdiff_t n_local_elements, n_elements;
     mesh_read_elements(comm, nnxe, folder, elems, &n_local_elements, &n_elements);
@@ -110,6 +111,10 @@ int main(int argc, char *argv[]) {
     count_t *adj_ptr = 0;
     element_idx_t *adj_idx = 0;
     create_dual_graph(n_elements, n_nodes, element_type_for_algo, elems, &adj_ptr, &adj_idx);
+
+    if(!rank) {
+        printf("Dual graph %ld elements, %ld nnz\n", (long)n_elements, (long)adj_ptr[n_elements]);
+    }
 
     sprintf(path, "%s/adj_ptr.raw", output_folder);
     array_write(comm, path, SFEM_MPI_COUNT_T, adj_ptr, n_elements + 1, n_elements + 1);
