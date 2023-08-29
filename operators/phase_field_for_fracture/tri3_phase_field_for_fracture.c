@@ -111,6 +111,7 @@ SFEM_INLINE static void element_init(const geom_t x0,
             const real_t c = element_solution[ii * block_size + var_phase];
             // assert(fabs(c) < 1e-6);
             assert(c == c);
+            assert(fun[k * n_funs + ii] ==  fun[k * n_funs + ii]);
 
             val += fun[k * n_funs + ii] * c;
         }
@@ -120,7 +121,7 @@ SFEM_INLINE static void element_init(const geom_t x0,
 
     // Compute phase-field gradient
     for (int k = 0; k < n_qp; k++) {
-        real_t grad[sdim] = {0, 0};
+        real_t grad2[sdim] = {0, 0};
 
         for (int ii = 0; ii < n_funs; ii++) {
             const real_t c = element_solution[ii * block_size + var_phase];
@@ -128,18 +129,19 @@ SFEM_INLINE static void element_init(const geom_t x0,
             assert(c == c);
 
             for (int d = 0; d < sdim; d++) {
-                grad[d] += grad[k * n_funs * sdim + ii * sdim + d] * c;
+                assert(grad[k * n_funs * sdim + ii * sdim + d]  == grad[k * n_funs * sdim + ii * sdim + d] );
+                grad2[d] += grad[k * n_funs * sdim + ii * sdim + d] * c;
             }
         }
 
         for (int d = 0; d < sdim; d++) {
-            grad_phase[k * sdim + d] = grad[d];
+            grad_phase[k * sdim + d] = grad2[d];
         }
     }
 
     // Compute displacement-gradient
     for (int k = 0; k < n_qp; k++) {
-        real_t grad[tdim] = {0, 0, 0, 0};
+        real_t grad2[tdim] = {0, 0, 0, 0};
 
         for (int ii = 0; ii < n_funs; ii++) {
             for (int d1 = 0; d1 < sdim; d1++) {
@@ -147,14 +149,14 @@ SFEM_INLINE static void element_init(const geom_t x0,
                 assert(c == c);
 
                 for (int d2 = 0; d2 < sdim; d2++) {
-                    grad[d1 * sdim + d2] += grad[k * n_funs * sdim + ii * sdim + d2] * c;
+                    grad2[d1 * sdim + d2] += grad[k * n_funs * sdim + ii * sdim + d2] * c;
                 }
             }
         }
 
         for (int d1 = 0; d1 < sdim; d1++) {
             for (int d2 = 0; d2 < sdim; d2++) {
-                grad_disp[k * sdim * sdim + d1 * sdim + d2] = grad[d1 * sdim + d2];
+                grad_disp[k * sdim * sdim + d1 * sdim + d2] = grad2[d1 * sdim + d2];
             }
         }
     }

@@ -22,6 +22,9 @@ real_t *const SFEM_RESTRICT jacobian)
 #ifdef __NVCC__
 for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x)
 #else
+#pragma omp parallel
+{{
+#pragma omp for
 for (ptrdiff_t e = 0; e < nelements; e++)
 #endif
 {{
@@ -39,6 +42,9 @@ this_jacobian
 );
 
 }}
+#ifndef __NVCC__
+}}
+#endif
 }}
 
 SFEM_DEVICE_KERNEL void {NAME}_jacobian_inverse_kernel(
