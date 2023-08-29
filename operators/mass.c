@@ -31,9 +31,12 @@ void assemble_mass(const int element_type,
             tet4_assemble_mass(nelements, nnodes, elems, xyz, rowptr, colidx, values);
             break;
         }
-
         case TET10: {
             tet10_assemble_mass(nelements, nnodes, elems, xyz, rowptr, colidx, values);
+            break;
+        }
+        case TRI6: {
+            tri6_assemble_mass(nelements, nnodes, elems, xyz, rowptr, colidx, values);
             break;
         }
 

@@ -103,8 +103,11 @@ def main():
 		# fields = [Field(TriShell3(), coeffs('u', 3)), Field(TransformedTriShell6(), coeffs('u', 6))]
 		# test_fes  = [TransformedTriShell6(), DualTriShell6()]
 
-		fields = [Field(Tri6(), coeffs('u', 6)), Field(TransformedTri6(), coeffs('u', 6))]
-		test_fes  = [TransformedTri6(), DualTri6()]
+		# fields = [Field(Tri6(), coeffs('u', 6)), Field(TransformedTri6(), coeffs('u', 6))]
+		# test_fes  = [TransformedTri6(), DualTri6()]
+
+		fields = [Field(Tri6(), coeffs('u', 6))]
+		test_fes  = [Tri6()]
 
 		n_forms = len(test_fes)
 
@@ -128,6 +131,14 @@ def main():
 			print("----------------------------")
 			print("lumped Matrix")
 			print("----------------------------")
+			c_code(expr)
+			print("----------------------------")	
+
+
+			print("----------------------------")
+			print("Matrix")
+			print("----------------------------")
+			expr = op.matrix()
 			c_code(expr)
 			print("----------------------------")	
 

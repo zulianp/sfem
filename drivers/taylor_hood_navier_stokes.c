@@ -29,6 +29,8 @@
 
 #include "isolver_lsolve.h"
 
+// https://fenicsproject.org/olddocs/dolfin/1.6.0/python/demo/documented/navier-stokes/python/documentation.html
+
 idx_t max_idx(const ptrdiff_t n, const idx_t *idx) {
     idx_t ret = idx[0];
 
@@ -41,17 +43,17 @@ idx_t max_idx(const ptrdiff_t n, const idx_t *idx) {
 
 //////////////////////////////////////////////
 
-// TODOs
-// - Implement missing kernels for Tri6
-
+#define N_SYSTEMS 3
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
     MPI_Comm comm = MPI_COMM_WORLD;
+    isolver_lsolve_t lsolve[N_SYSTEMS];
 
-    isolver_lsolve_t lsolve;
-    lsolve.comm = comm;
-    isolver_lsolve_init(&lsolve);
+    for (int s = 0; s < N_SYSTEMS; s++) {
+        lsolve[s].comm = comm;
+        isolver_lsolve_init(&lsolve[s]);
+    }
 
     int rank, size;
     MPI_Comm_rank(comm, &rank);
@@ -137,11 +139,13 @@ int main(int argc, char *argv[]) {
             SFEM_VELOCITY_DIRICHLET_NODESET);
     }
 
-    isolver_lsolve_set_max_iterations(&lsolve, SFEM_MAX_IT);
-    isolver_lsolve_set_atol(&lsolve, SFEM_ATOL);
-    isolver_lsolve_set_rtol(&lsolve, SFEM_RTOL);
-    isolver_lsolve_set_stol(&lsolve, SFEM_STOL);
-    isolver_lsolve_set_verbosity(&lsolve, 1);
+    for (int s = 0; s < 2; s++) {
+        isolver_lsolve_set_max_iterations(&lsolve[s], SFEM_MAX_IT);
+        isolver_lsolve_set_atol(&lsolve[s], SFEM_ATOL);
+        isolver_lsolve_set_rtol(&lsolve[s], SFEM_RTOL);
+        isolver_lsolve_set_stol(&lsolve[s], SFEM_STOL);
+        isolver_lsolve_set_verbosity(&lsolve[s], 1);
+    }
 
     // int n_neumann_conditions;
     // boundary_condition_t *neumann_conditions;
@@ -190,7 +194,7 @@ int main(int argc, char *argv[]) {
     build_crs_graph_for_elem_type(
         p1_type, mesh.nelements, p1_nnodes, mesh.elements, &p1_rowptr, &p1_colidx);
     p1_nnz = p1_rowptr[p1_nnodes];
-    real_t *values = calloc(p1_nnz, sizeof(real_t));
+    real_t *p1_values = calloc(p1_nnz, sizeof(real_t));
 
     laplacian_assemble_hessian(p1_type,
                                mesh.nelements,
@@ -199,7 +203,7 @@ int main(int argc, char *argv[]) {
                                mesh.points,
                                p1_rowptr,
                                p1_colidx,
-                               values);
+                               p1_values);
 
     for (int i = 0; i < n_pressure_dirichlet_conditions; i++) {
         crs_constraint_nodes_to_identity(pressure_dirichlet_conditions[i].local_size,
@@ -207,18 +211,78 @@ int main(int argc, char *argv[]) {
                                          1,
                                          p1_rowptr,
                                          p1_colidx,
-                                         values);
+                                         p1_values);
     }
 
-    isolver_lsolve_update_crs(&lsolve, p1_nnodes, p1_nnodes, p1_rowptr, p1_colidx, values);
+    isolver_lsolve_update_crs(&lsolve[0], p1_nnodes, p1_nnodes, p1_rowptr, p1_colidx, p1_values);
+
+    ptrdiff_t p2_nnz = 0;
+    count_t *p2_rowptr = 0;
+    idx_t *p2_colidx = 0;
+    build_crs_graph_for_elem_type(
+        mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &p2_rowptr, &p2_colidx);
+    p2_nnz = p2_rowptr[mesh.nnodes];
+    real_t *p2_momentum = calloc(p2_nnz, sizeof(real_t));
+    real_t *p2_projection = calloc(p2_nnz, sizeof(real_t));
+
+    { // Tentative Momentum Step
+        // FIXME compute actual LHS
+        // assemble_mass(mesh.element_type,
+        //               mesh.nelements,
+        //               mesh.nnodes,
+        //               mesh.elements,
+        //               mesh.points,
+        //               p2_rowptr,
+        //               p2_colidx,
+        //               p2_momentum);
+
+        // for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
+        //     crs_constraint_nodes_to_identity(velocity_dirichlet_conditions[i].local_size,
+        //                                      velocity_dirichlet_conditions[i].idx,
+        //                                      1,
+        //                                      p2_rowptr,
+        //                                      p2_colidx,
+        //                                      p2_momentum);
+        // }
+
+        // isolver_lsolve_update_crs(
+        //     &lsolve[1], mesh.nnodes, mesh.nnodes, p2_rowptr, p2_colidx, p2_momentum);
+    }
+
+    {
+        // Projection Step
+        // FIXME compute actual LHS
+        // assemble_mass(mesh.element_type,
+        //               mesh.nelements,
+        //               mesh.nnodes,
+        //               mesh.elements,
+        //               mesh.points,
+        //               p2_rowptr,
+        //               p2_colidx,
+        //               p2_momentum);
+
+        // for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
+        //     crs_constraint_nodes_to_identity(velocity_dirichlet_conditions[i].local_size,
+        //                                      velocity_dirichlet_conditions[i].idx,
+        //                                      1,
+        //                                      p2_rowptr,
+        //                                      p2_colidx,
+        //                                      p2_momentum);
+        // }
+
+        // isolver_lsolve_update_crs(
+        //     &lsolve[1], mesh.nnodes, mesh.nnodes, p2_rowptr, p2_colidx, p2_momentum);
+    }
 
     real_t *vel[3];
+    real_t *correction[3];
     real_t *tentative_vel[3];
-    real_t *buff = calloc(mesh.nnodes, sizeof(real_t));
+    real_t *buff = calloc(p1_nnodes, sizeof(real_t));
 
     for (int d = 0; d < sdim; d++) {
         vel[d] = calloc(mesh.nnodes, sizeof(real_t));
         tentative_vel[d] = calloc(mesh.nnodes, sizeof(real_t));
+        correction[d] = calloc(mesh.nnodes, sizeof(real_t));
     }
 
     real_t *p = calloc(p1_nnodes, sizeof(real_t));
@@ -232,6 +296,7 @@ int main(int argc, char *argv[]) {
             memset(tentative_vel[d], 0, mesh.nnodes * sizeof(real_t));
         }
 
+        // FIXME compute actual RHS
         tri6_explict_momentum_tentative(mesh.nelements,
                                         mesh.nnodes,
                                         mesh.elements,
@@ -241,15 +306,16 @@ int main(int argc, char *argv[]) {
                                         vel,
                                         tentative_vel);
 
+        for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
+            boundary_condition_t cond = velocity_dirichlet_conditions[i];
+            constraint_nodes_to_value(
+                cond.local_size, cond.idx, cond.value, tentative_vel[cond.component]);
+        }
+
         for (int d = 0; d < sdim; d++) {
-            // Write in place!!!
-            apply_inv_lumped_mass(mesh.element_type,
-                                  mesh.nelements,
-                                  mesh.nnodes,
-                                  mesh.elements,
-                                  mesh.points,
-                                  tentative_vel[d],
-                                  tentative_vel[d]);
+            memset(correction[d], 0, mesh.nnodes * sizeof(real_t));
+            isolver_lsolve_apply(&lsolve[1], tentative_vel[d], correction[d]);
+            memcpy(tentative_vel[d], correction[d], mesh.nnodes * sizeof(real_t));
         }
 
         for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
@@ -267,6 +333,7 @@ int main(int argc, char *argv[]) {
                              mesh.elements,
                              mesh.points,
                              SFEM_DT,
+                             SFEM_MASS_DENSITY,
                              SFEM_DYNAMIC_VISCOSITY,
                              tentative_vel,
                              buff);
@@ -280,34 +347,41 @@ int main(int argc, char *argv[]) {
             constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, buff);
         }
 
-        isolver_lsolve_apply(&lsolve, buff, p);
+        isolver_lsolve_apply(&lsolve[0], buff, p);
 
         //////////////////////////////////////////////////////////////
         // Correction/Projection step
         //////////////////////////////////////////////////////////////
 
-        for (int d = 0; d < sdim; d++) {
-            memset(vel[d], 0, mesh.nnodes * sizeof(real_t));
-        }
+        // for (int d = 0; d < sdim; d++) {
+        //     memset(vel[d], 0, mesh.nnodes * sizeof(real_t));
+        // }
 
         tri6_tri3_correction(mesh.nelements,
                              mesh.nnodes,
                              mesh.elements,
                              mesh.points,
                              SFEM_DT,
+                             SFEM_MASS_DENSITY,
                              tentative_vel,
                              p,
-                             vel);
+                             correction);
+
+        for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
+            boundary_condition_t cond = velocity_dirichlet_conditions[i];
+            constraint_nodes_to_value(
+                cond.local_size, cond.idx, cond.value, correction[cond.component]);
+        }
 
         for (int d = 0; d < sdim; d++) {
-            // Write in place!!!
-            apply_inv_lumped_mass(mesh.element_type,
-                                  mesh.nelements,
-                                  mesh.nnodes,
-                                  mesh.elements,
-                                  mesh.points,
-                                  vel[d],
-                                  vel[d]);
+            memset(tentative_vel[d], 0, mesh.nnodes * sizeof(real_t));
+            isolver_lsolve_apply(&lsolve[1], correction[d], tentative_vel[d]);
+        }
+
+        for (int d = 0; d < sdim; d++) {
+            for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                vel[d][i] += tentative_vel[d][i];
+            }
         }
 
         for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
@@ -322,13 +396,31 @@ int main(int argc, char *argv[]) {
         array_write(comm, path, SFEM_MPI_REAL_T, vel[d], mesh.nnodes, mesh.nnodes);
     }
 
+    for (int d = 0; d < sdim; d++) {
+        sprintf(path, "%s/c.%d.raw", output_folder, d);
+        array_write(comm, path, SFEM_MPI_REAL_T, tentative_vel[d], mesh.nnodes, mesh.nnodes);
+    }
+
+    // for (int d = 0; d < sdim; d++) {
+    //     sprintf(path, "%s/c.%d.raw", output_folder, d);
+    //     array_write(comm, path, SFEM_MPI_REAL_T, correction[d], mesh.nnodes, mesh.nnodes);
+    // }
+
     sprintf(path, "%s/p.raw", output_folder);
     array_write(comm, path, SFEM_MPI_REAL_T, p, p1_nnodes, p1_nnodes);
+
+    sprintf(path, "%s/tp.raw", output_folder);
+    array_write(comm, path, SFEM_MPI_REAL_T, buff, p1_nnodes, p1_nnodes);
 
     // Free resources
     free(p1_rowptr);
     free(p1_colidx);
-    free(values);
+    free(p1_values);
+
+    free(p2_rowptr);
+    free(p2_colidx);
+    free(p2_momentum);
+    free(p2_projection);
 
     free(p);
     free(buff);
@@ -336,6 +428,7 @@ int main(int argc, char *argv[]) {
     for (int d = 0; d < sdim; d++) {
         free(vel[d]);
         free(tentative_vel[d]);
+        free(correction[d]);
     }
 
     ptrdiff_t nelements = mesh.nelements;
@@ -354,6 +447,8 @@ int main(int argc, char *argv[]) {
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
-    isolver_lsolve_destroy(&lsolve);
+    // FIXME One is enough for now, but it is not clean
+    isolver_lsolve_destroy(&lsolve[0]);
+    // isolver_lsolve_destroy(&lsolve[1]);
     return MPI_Finalize();
 }
