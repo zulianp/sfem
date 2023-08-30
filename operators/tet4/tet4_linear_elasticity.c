@@ -1539,8 +1539,9 @@ void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
                     const idx_t dof = ev[edof_i] * block_size;
 
                     for (int b = 0; b < block_size; b++) {
+                        const int evdof_i = b * 4 + edof_i;
 #pragma omp atomic update
-                        values[dof + b] += element_vector[b * 4 + edof_i][vi];
+                        values[dof + b] += element_vector[evdof_i][vi];
                     }
                 }
             }
@@ -1548,7 +1549,7 @@ void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("tet4_linear_elasticity.c: tet4_linear_elasticity_apply_aos\t%g seconds\n", tock - tick);
+    printf("tet4_linear_elasticity.c: tet4_linear_elasticity_apply_aos (explicit vectorization)\t%g seconds\n", tock - tick);
 }
 
 #else
