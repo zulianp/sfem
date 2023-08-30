@@ -225,7 +225,8 @@ int main(int argc, char *argv[]) {
     real_t *p2_momentum = calloc(p2_nnz, sizeof(real_t));
     real_t *p2_projection = calloc(p2_nnz, sizeof(real_t));
 
-    { // Tentative Momentum Step
+    {
+        // Tentative Momentum Step
         // FIXME compute actual LHS
         // assemble_mass(mesh.element_type,
         //               mesh.nelements,
@@ -291,102 +292,104 @@ int main(int argc, char *argv[]) {
         //////////////////////////////////////////////////////////////
         // Tentative momentum step
         //////////////////////////////////////////////////////////////
+        {
+            for (int d = 0; d < sdim; d++) {
+                memset(tentative_vel[d], 0, mesh.nnodes * sizeof(real_t));
+            }
 
-        for (int d = 0; d < sdim; d++) {
-            memset(tentative_vel[d], 0, mesh.nnodes * sizeof(real_t));
+            // FIXME compute actual RHS
+            tri6_explict_momentum_tentative(mesh.nelements,
+                                            mesh.nnodes,
+                                            mesh.elements,
+                                            mesh.points,
+                                            SFEM_DT,
+                                            SFEM_DYNAMIC_VISCOSITY,
+                                            vel,
+                                            tentative_vel);
+
+            for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
+                boundary_condition_t cond = velocity_dirichlet_conditions[i];
+                constraint_nodes_to_value(
+                    cond.local_size, cond.idx, cond.value, tentative_vel[cond.component]);
+            }
+
+            for (int d = 0; d < sdim; d++) {
+                memset(correction[d], 0, mesh.nnodes * sizeof(real_t));
+                isolver_lsolve_apply(&lsolve[1], tentative_vel[d], correction[d]);
+                memcpy(tentative_vel[d], correction[d], mesh.nnodes * sizeof(real_t));
+            }
+
+            for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
+                boundary_condition_t cond = velocity_dirichlet_conditions[i];
+                constraint_nodes_to_value(
+                    cond.local_size, cond.idx, cond.value, tentative_vel[cond.component]);
+            }
         }
-
-        // FIXME compute actual RHS
-        tri6_explict_momentum_tentative(mesh.nelements,
-                                        mesh.nnodes,
-                                        mesh.elements,
-                                        mesh.points,
-                                        SFEM_DT,
-                                        SFEM_DYNAMIC_VISCOSITY,
-                                        vel,
-                                        tentative_vel);
-
-        for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
-            boundary_condition_t cond = velocity_dirichlet_conditions[i];
-            constraint_nodes_to_value(
-                cond.local_size, cond.idx, cond.value, tentative_vel[cond.component]);
-        }
-
-        for (int d = 0; d < sdim; d++) {
-            memset(correction[d], 0, mesh.nnodes * sizeof(real_t));
-            isolver_lsolve_apply(&lsolve[1], tentative_vel[d], correction[d]);
-            memcpy(tentative_vel[d], correction[d], mesh.nnodes * sizeof(real_t));
-        }
-
-        for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
-            boundary_condition_t cond = velocity_dirichlet_conditions[i];
-            constraint_nodes_to_value(
-                cond.local_size, cond.idx, cond.value, tentative_vel[cond.component]);
-        }
-
         //////////////////////////////////////////////////////////////
         // Poisson problem + solve
         //////////////////////////////////////////////////////////////
+        {
+            tri3_tri6_divergence(mesh.nelements,
+                                 mesh.nnodes,
+                                 mesh.elements,
+                                 mesh.points,
+                                 SFEM_DT,
+                                 SFEM_MASS_DENSITY,
+                                 SFEM_DYNAMIC_VISCOSITY,
+                                 tentative_vel,
+                                 buff);
 
-        tri3_tri6_divergence(mesh.nelements,
-                             mesh.nnodes,
-                             mesh.elements,
-                             mesh.points,
-                             SFEM_DT,
-                             SFEM_MASS_DENSITY,
-                             SFEM_DYNAMIC_VISCOSITY,
-                             tentative_vel,
-                             buff);
+            memset(p, 0, p1_nnodes * sizeof(real_t));
 
-        memset(p, 0, p1_nnodes * sizeof(real_t));
+            for (int i = 0; i < n_pressure_dirichlet_conditions; i++) {
+                boundary_condition_t cond = pressure_dirichlet_conditions[i];
+                assert(cond.component == 0);
 
-        for (int i = 0; i < n_pressure_dirichlet_conditions; i++) {
-            boundary_condition_t cond = pressure_dirichlet_conditions[i];
-            assert(cond.component == 0);
+                constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, buff);
+            }
 
-            constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, buff);
+            isolver_lsolve_apply(&lsolve[0], buff, p);
         }
-
-        isolver_lsolve_apply(&lsolve[0], buff, p);
-
         //////////////////////////////////////////////////////////////
         // Correction/Projection step
         //////////////////////////////////////////////////////////////
+        {
+            // for (int d = 0; d < sdim; d++) {
+            //     memset(vel[d], 0, mesh.nnodes * sizeof(real_t));
+            // }
 
-        // for (int d = 0; d < sdim; d++) {
-        //     memset(vel[d], 0, mesh.nnodes * sizeof(real_t));
-        // }
+            tri6_tri3_correction(mesh.nelements,
+                                 mesh.nnodes,
+                                 mesh.elements,
+                                 mesh.points,
+                                 SFEM_DT,
+                                 SFEM_MASS_DENSITY,
+                                 tentative_vel,
+                                 p,
+                                 correction);
 
-        tri6_tri3_correction(mesh.nelements,
-                             mesh.nnodes,
-                             mesh.elements,
-                             mesh.points,
-                             SFEM_DT,
-                             SFEM_MASS_DENSITY,
-                             tentative_vel,
-                             p,
-                             correction);
-
-        for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
-            boundary_condition_t cond = velocity_dirichlet_conditions[i];
-            constraint_nodes_to_value(
-                cond.local_size, cond.idx, cond.value, correction[cond.component]);
-        }
-
-        for (int d = 0; d < sdim; d++) {
-            memset(tentative_vel[d], 0, mesh.nnodes * sizeof(real_t));
-            isolver_lsolve_apply(&lsolve[1], correction[d], tentative_vel[d]);
-        }
-
-        for (int d = 0; d < sdim; d++) {
-            for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
-                vel[d][i] += tentative_vel[d][i];
+            for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
+                boundary_condition_t cond = velocity_dirichlet_conditions[i];
+                constraint_nodes_to_value(
+                    cond.local_size, cond.idx, cond.value, correction[cond.component]);
             }
-        }
 
-        for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
-            boundary_condition_t cond = velocity_dirichlet_conditions[i];
-            constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, vel[cond.component]);
+            for (int d = 0; d < sdim; d++) {
+                memset(tentative_vel[d], 0, mesh.nnodes * sizeof(real_t));
+                isolver_lsolve_apply(&lsolve[1], correction[d], tentative_vel[d]);
+            }
+
+            for (int d = 0; d < sdim; d++) {
+                for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                    vel[d][i] += tentative_vel[d][i];
+                }
+            }
+
+            for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
+                boundary_condition_t cond = velocity_dirichlet_conditions[i];
+                constraint_nodes_to_value(
+                    cond.local_size, cond.idx, cond.value, vel[cond.component]);
+            }
         }
     }
 

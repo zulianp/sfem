@@ -16,7 +16,7 @@
 
 #define LST(i, j) local_side_table[(i)*nn + (j)]
 
-static void fill_local_side_table(enum ElemType element_type, int *local_side_table) {
+void fill_local_side_table(enum ElemType element_type, int *local_side_table) {
     enum ElemType st = side_type(element_type);
     const int nn = elem_num_nodes(st);
 
@@ -88,7 +88,7 @@ void create_element_adj_table_from_dual_graph(const ptrdiff_t n_elements,
                             idx_t **const SFEM_RESTRICT elems,
                             const count_t *const adj_ptr,
                             const element_idx_t *const adj_idx,
-                            ptrdiff_t *const SFEM_RESTRICT table)
+                            element_idx_t *const SFEM_RESTRICT table)
 {
     int element_type_for_algo = element_type;
 
@@ -160,7 +160,7 @@ void create_element_adj_table_from_dual_graph_soa(const ptrdiff_t n_elements,
                             idx_t **const SFEM_RESTRICT elems,
                             const count_t *const adj_ptr,
                             const element_idx_t *const adj_idx,
-                            ptrdiff_t **const SFEM_RESTRICT table)
+                            element_idx_t **const SFEM_RESTRICT table)
 {
     int element_type_for_algo = element_type;
 
@@ -190,7 +190,7 @@ void create_element_adj_table_from_dual_graph_soa(const ptrdiff_t n_elements,
         memset(assigned, 0, range * sizeof(int));
 
         for (int s1 = 0; s1 < ns; s1++) {
-            table[e * ns + s1] = SFEM_INVALID_IDX;
+            table[s1][e] = SFEM_INVALID_IDX;
 
             for (int j = 0; j < nn; j++) {
                 nodes1[j] = elems[LST(s1, j)][e];
@@ -230,7 +230,7 @@ void create_element_adj_table(const ptrdiff_t n_elements,
                             const ptrdiff_t n_nodes,
                             enum ElemType element_type,
                             idx_t **const SFEM_RESTRICT elems,
-                            ptrdiff_t **const SFEM_RESTRICT table_out) {
+                            element_idx_t **const SFEM_RESTRICT table_out) {
     int element_type_for_algo = element_type;
 
     if (element_type == TET10) {
@@ -245,7 +245,7 @@ void create_element_adj_table(const ptrdiff_t n_elements,
     create_dual_graph(n_elements, n_nodes, element_type_for_algo, elems, &adj_ptr, &adj_idx);
 
     const int ns = elem_num_sides(element_type);
-    ptrdiff_t *table = (ptrdiff_t *)malloc(n_elements * ns * sizeof(ptrdiff_t));
+    element_idx_t *table = (element_idx_t *)malloc(n_elements * ns * sizeof(element_idx_t));
     create_element_adj_table_from_dual_graph(n_elements, n_nodes, element_type, elems, adj_ptr, adj_idx, table);
 
     free(adj_ptr);
@@ -266,7 +266,7 @@ void extract_surface_connectivity_with_adj_table(const ptrdiff_t n_elements,
     double tick = MPI_Wtime();
 
     const int ns = elem_num_sides(element_type);
-    ptrdiff_t *table = 0;
+    element_idx_t *table = 0;
     create_element_adj_table(n_elements, n_nodes, element_type, elems, &table);
 
     int local_side_table[SFEM_MAX_NUM_SIDES * SFEM_MAX_NUM_NODES_PER_SIDE];
@@ -285,7 +285,7 @@ void extract_surface_connectivity_with_adj_table(const ptrdiff_t n_elements,
     for (ptrdiff_t e = 0; e < n_elements; e++) {
         for (int s = 0; s < ns; s++) {
             // Array of structures
-            const ptrdiff_t e_adj = table[e * ns + s];
+            const element_idx_t e_adj = table[e * ns + s];
             if (e_adj == SFEM_INVALID_IDX) {
                 (*n_surf_elements)++;
             }
@@ -301,7 +301,7 @@ void extract_surface_connectivity_with_adj_table(const ptrdiff_t n_elements,
     for (ptrdiff_t e = 0; e < n_elements; e++) {
         for (int s = 0; s < ns; s++) {
             // Array of structures
-            const ptrdiff_t e_adj = table[e * ns + s];
+            const element_idx_t e_adj = table[e * ns + s];
             if (e_adj == SFEM_INVALID_IDX) {
                 for (int n = 0; n < nn; n++) {
                     idx_t node = elems[LST(s, n)][e];

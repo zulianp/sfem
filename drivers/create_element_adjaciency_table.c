@@ -122,10 +122,10 @@ int main(int argc, char *argv[]) {
         comm, path, SFEM_MPI_ELEMENT_IDX_T, (void **)&adj_idx, &ennz_local, &ennz);
 
     int ns = elem_num_sides(element_type);
-    ptrdiff_t **table = (ptrdiff_t **) malloc(ns * sizeof(ptrdiff_t *));
+    element_idx_t **table = (element_idx_t **) malloc(ns * sizeof(element_idx_t *));
 
     for(int s = 0; s < ns; s++) {
-        table[s] = (ptrdiff_t *)malloc(n_elements * sizeof(ptrdiff_t));
+        table[s] = (element_idx_t *)malloc(n_elements * sizeof(element_idx_t));
     }
 
     create_element_adj_table_from_dual_graph_soa(
@@ -133,7 +133,7 @@ int main(int argc, char *argv[]) {
 
     for(int s = 0; s < ns; s++) {
         sprintf(path, "%s/a.%d.raw", output_folder, s);
-        array_write(comm, path, SFEM_MPI_COUNT_T, table[s], n_elements, n_elements);
+        array_write(comm, path, SFEM_MPI_ELEMENT_IDX_T, table[s], n_elements, n_elements);
     }
 
     // Free resources

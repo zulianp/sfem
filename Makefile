@@ -85,7 +85,7 @@ GOALS = assemble assemble3 assemble4 neohookean_assemble stokes stokes_check lin
 
 # Mesh manipulation
 GOALS += partition select_submesh refine skin select_surf volumes sfc
-GOALS += mesh_p1_to_p2 create_dual_graph create_element_adjaciency_table
+GOALS += mesh_p1_to_p2 create_dual_graph create_element_adjaciency_table create_surface_from_element_adjaciency_table
 
 # FE post-process
 GOALS += cgrad cshear cstrain cprincipal_strains cprincipal_stresses cauchy_stress vonmises
@@ -308,6 +308,11 @@ refine : refine.o libsfem.a
 
 skin : skin.c extract_surface_graph.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
+
+create_surface_from_element_adjaciency_table : create_surface_from_element_adjaciency_table.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
+
+
 
 mesh_p1_to_p2 : mesh_p1_to_p2.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
