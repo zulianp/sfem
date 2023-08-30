@@ -126,7 +126,6 @@ void tri6_tri3_correction(const ptrdiff_t nelements,
                           geom_t **const points,
                           const real_t dt,
                           const real_t rho,
-                          real_t **const SFEM_RESTRICT vel,
                           real_t *const SFEM_RESTRICT p,
                           real_t **const SFEM_RESTRICT values);
 

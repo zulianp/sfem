@@ -909,7 +909,6 @@ static SFEM_INLINE void tri6_tri3_rhs_correction_kernel(const real_t px0,
                                                         const real_t py2,
                                                         const real_t dt,
                                                         const real_t rho,
-                                                        const real_t *const SFEM_RESTRICT u,
                                                         const real_t *const SFEM_RESTRICT p,
                                                         real_t *const SFEM_RESTRICT
                                                             element_vector) {
@@ -1673,9 +1672,9 @@ void tri3_tri6_divergence(const ptrdiff_t nelements,
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[6];
             real_t element_vector[3];
-            real_t element_x[6 * 2];
+            real_t element_vel[6 * 2];
 
-#pragma unroll(3)
+#pragma unroll(6)
             for (int v = 0; v < element_nnodes; ++v) {
                 ev[v] = elems[v][i];
             }
@@ -1684,7 +1683,7 @@ void tri3_tri6_divergence(const ptrdiff_t nelements,
                 idx_t dof = ev[enode];
 
                 for (int b = 0; b < n_vars; ++b) {
-                    element_x[b * element_nnodes + enode] = vel[b][dof];
+                    element_vel[b * element_nnodes + enode] = vel[b][dof];
                 }
             }
 
@@ -1713,11 +1712,11 @@ void tri3_tri6_divergence(const ptrdiff_t nelements,
                 dt,
                 rho,
                 //  buffers
-                element_x,
+                element_vel,
                 element_vector);
 
             for (int edof_i = 0; edof_i < 3; ++edof_i) {
-                const idx_t dof_i = elems[edof_i][i];
+                const idx_t dof_i = ev[edof_i];
 #pragma omp atomic update
                 f[dof_i] += element_vector[edof_i];
             }
@@ -1734,7 +1733,6 @@ void tri6_tri3_correction(const ptrdiff_t nelements,
                           geom_t **const points,
                           const real_t dt,
                           const real_t rho,
-                          real_t **const SFEM_RESTRICT vel,
                           real_t *const SFEM_RESTRICT p,
                           real_t **const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
@@ -1749,26 +1747,17 @@ void tri6_tri3_correction(const ptrdiff_t nelements,
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[6];
             real_t element_vector[6 * 2];
-            real_t element_vel[6 * 2];
-            real_t element_p[3];
+            real_t element_pressure[3];
 
 #pragma unroll(6)
             for (int v = 0; v < element_nnodes; ++v) {
                 ev[v] = elems[v][i];
             }
 
-            for (int enode = 0; enode < element_nnodes; ++enode) {
-                idx_t dof = ev[enode];
-
-                for (int b = 0; b < n_vars; ++b) {
-                    element_vel[b * element_nnodes + enode] = vel[b][dof];
-                }
-            }
-
 #pragma unroll(3)
             for (int enode = 0; enode < 3; ++enode) {
                 idx_t dof = ev[enode];
-                element_p[enode] = p[dof];
+                element_pressure[enode] = p[dof];
             }
 
             // Element indices
@@ -1796,8 +1785,7 @@ void tri6_tri3_correction(const ptrdiff_t nelements,
                 dt,
                 rho,
                 //  buffers
-                element_vel,
-                element_p,
+                element_pressure,
                 element_vector);
 
             for (int b = 0; b < n_vars; ++b) {
@@ -1957,9 +1945,9 @@ void tri6_explict_momentum_tentative(const ptrdiff_t nelements,
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[6];
             real_t element_vector[6 * 2];
-            real_t element_x[6 * 2];
+            real_t element_vel[6 * 2];
 
-#pragma unroll(3)
+#pragma unroll(6)
             for (int v = 0; v < element_nnodes; ++v) {
                 ev[v] = elems[v][i];
             }
@@ -1968,7 +1956,7 @@ void tri6_explict_momentum_tentative(const ptrdiff_t nelements,
                 idx_t dof = ev[enode];
 
                 for (int b = 0; b < n_vars; ++b) {
-                    element_x[b * element_nnodes + enode] = vel[b][dof];
+                    element_vel[b * element_nnodes + enode] = vel[b][dof];
                 }
             }
 
@@ -1998,12 +1986,12 @@ void tri6_explict_momentum_tentative(const ptrdiff_t nelements,
                 nu,
                 convonoff,
                 //  buffers
-                element_x,
+                element_vel,
                 element_vector);
 
             for (int d1 = 0; d1 < n_vars; d1++) {
                 for (int edof_i = 0; edof_i < element_nnodes; ++edof_i) {
-                    const idx_t dof_i = elems[edof_i][i];
+                    const idx_t dof_i = ev[edof_i];
 
 #pragma omp atomic update
                     f[d1][dof_i] += element_vector[d1 * element_nnodes + edof_i];

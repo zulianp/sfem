@@ -355,7 +355,7 @@ int main(int argc, char *argv[]) {
                                                 mesh.points,
                                                 SFEM_DT,
                                                 SFEM_DYNAMIC_VISCOSITY,
-                                                0, //Turn-off convective term for debugging
+                                                1, //Turn-off convective term for debugging with 0
                                                 vel,
                                                 tentative_vel);
 
@@ -431,14 +431,13 @@ int main(int argc, char *argv[]) {
                                  mesh.points,
                                  SFEM_DT,
                                  SFEM_MASS_DENSITY,
-                                 tentative_vel,
                                  p,
                                  correction);
 
             for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
                 boundary_condition_t cond = velocity_dirichlet_conditions[i];
                 constraint_nodes_to_value(
-                    cond.local_size, cond.idx, cond.value, correction[cond.component]);
+                    cond.local_size, cond.idx, 0, correction[cond.component]);
             }
 
             for (int d = 0; d < sdim; d++) {
