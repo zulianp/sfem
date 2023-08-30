@@ -392,6 +392,7 @@ int main(int argc, char *argv[]) {
         // Poisson problem + solve
         //////////////////////////////////////////////////////////////
         {
+            memset(buff, 0, p1_nnodes * sizeof(real_t));
             tri3_tri6_divergence(mesh.nelements,
                                  mesh.nnodes,
                                  mesh.elements,
@@ -402,7 +403,7 @@ int main(int argc, char *argv[]) {
                                  tentative_vel,
                                  buff);
 
-            memset(p, 0, p1_nnodes * sizeof(real_t));
+            
 
             for (int i = 0; i < n_pressure_dirichlet_conditions; i++) {
                 boundary_condition_t cond = pressure_dirichlet_conditions[i];
@@ -413,12 +414,17 @@ int main(int argc, char *argv[]) {
             sprintf(path, "%s/div.raw", output_folder);
             array_write(comm, path, SFEM_MPI_REAL_T, buff, p1_nnodes, p1_nnodes);
 
+            memset(p, 0, p1_nnodes * sizeof(real_t));
             isolver_lsolve_apply(&lsolve[0], buff, p);
         }
         //////////////////////////////////////////////////////////////
         // Correction/Projection step
         //////////////////////////////////////////////////////////////
         {
+            for (int d = 0; d < sdim; d++) {
+                memset(correction[d], 0, mesh.nnodes * sizeof(real_t));
+            }
+
             tri6_tri3_correction(mesh.nelements,
                                  mesh.nnodes,
                                  mesh.elements,
