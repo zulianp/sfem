@@ -46,7 +46,7 @@ class NavierStokesOp:
 		n_vel = len(grad_vel) 
 		n_pressure = len(fun_pressure)
 
-		nu, rho, dt = sp.symbols('nu rho dt')
+		nu, rho, dt, convonoff = sp.symbols('nu rho dt convonoff')
 		self.params = [nu, rho, dt]
 
 		self.form2_diffusion = sp.zeros(n_vel, n_vel)
@@ -124,14 +124,14 @@ class NavierStokesOp:
 			# Convection
 			# - dt * < (u^n * div) u^n, v>
 			integr = -dt * fe_vel.integrate(qp, inner(conv, fun_vel[i])) * fe_vel.jacobian_determinant(qp)
-			self.form1_convection[i] = integr
+			self.form1_convection[i] = convonoff * integr
 
 		for i in range(0, n_vel):
 			integr = fe_vel.integrate(qp, inner(uh, fun_vel[i])) * fe_vel.jacobian_determinant(qp)
 			self.form1_utm1[i] = integr
 
 		for i in range(0,  n_pressure):
-			integr = (rho/dt) * fe_pressure.integrate(qp, div_uh * fun_pressure[i]) * fe_pressure.jacobian_determinant(qp)
+			integr = -(rho/dt) * fe_pressure.integrate(qp, div_uh * fun_pressure[i]) * fe_pressure.jacobian_determinant(qp)
 			self.form1_divergence[i] = integr
 
 		for i in range(0, n_vel):
@@ -142,12 +142,29 @@ class NavierStokesOp:
 		print('------------------------------')
 		print('LHS (diffusion, temptative momentum)')
 		print('------------------------------')
-		c_code(self.assign_matrix(self.form2_mass + self.form2_diffusion))
+
+		tent_mom = self.form2_mass + self.form2_diffusion
+		c_code(self.assign_matrix(tent_mom))
+
+		print('------------------------------')
+		print('LHS (diffusion, temptative momentum) X')
+		print('------------------------------')
+
+		tent_mom_x = tent_mom[0:fe_vel.n_nodes(),0:fe_vel.n_nodes()]
+		c_code(self.assign_matrix(tent_mom_x))
+
+		print('------------------------------')
+		print('LHS (diffusion, temptative momentum) Y')
+		print('------------------------------')
+
+		tent_mom_y = tent_mom[fe_vel.n_nodes():2*fe_vel.n_nodes(),fe_vel.n_nodes():2*fe_vel.n_nodes()]
+		c_code(self.assign_matrix(tent_mom_y))
 
 		print('------------------------------')
 		print('LHS (potential equation)')
 		print('------------------------------')
 		c_code(self.assign_matrix(self.form2_laplacian))
+
 
 		print('------------------------------')
 		print('RHS (temptative momentum)')
@@ -167,7 +184,7 @@ class NavierStokesOp:
 		print('------------------------------')
 		print('RHS (explicit momentum)')
 		print('------------------------------')
-		c_code(self.assign_vector(dt * (self.form1_utm1 + self.form1_diffusion + self.form1_convection)))
+		c_code(self.assign_vector(self.form1_utm1 + self.form1_diffusion + self.form1_convection))
 
 	# def apply(self):
 	# 	H = self.hessian
