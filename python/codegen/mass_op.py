@@ -106,8 +106,11 @@ def main():
 		# fields = [Field(Tri6(), coeffs('u', 6)), Field(TransformedTri6(), coeffs('u', 6))]
 		# test_fes  = [TransformedTri6(), DualTri6()]
 
-		fields = [Field(Tri6(), coeffs('u', 6))]
-		test_fes  = [Tri6()]
+		# fields = [Field(Tri6(), coeffs('u', 6))]
+		# test_fes  = [Tri6()]
+
+		fields = [Field(Tri3(), coeffs('u', 3))]
+		test_fes  = [Tri3()]
 
 		n_forms = len(test_fes)
 

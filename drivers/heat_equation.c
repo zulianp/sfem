@@ -226,8 +226,7 @@ int main(int argc, char *argv[]) {
 
     real_t *u = calloc(mesh.nnodes, sizeof(real_t));
     real_t *u_old = calloc(mesh.nnodes, sizeof(real_t));
-    // real_t *buff = calloc(mesh.nnodes, sizeof(real_t));
-
+    
     if (SFEM_IMPLICIT) {
         int step_count = 0;
         for (real_t t = 0; t < SFEM_MAX_TIME; t += SFEM_DT, step_count++) {
@@ -258,14 +257,14 @@ int main(int argc, char *argv[]) {
                 constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, u);
             }
 
-            isolver_lsolve_apply(&lsolve[INVERSE_MASS_MATRIX], u, u_old);
-            // apply_inv_lumped_mass(mesh.element_type,
-            //                       mesh.nelements,
-            //                       mesh.nnodes,
-            //                       mesh.elements,
-            //                       mesh.points,
-            //                       u,
-            //                       u_old);
+            // isolver_lsolve_apply(&lsolve[INVERSE_MASS_MATRIX], u, u_old);
+            apply_inv_lumped_mass(mesh.element_type,
+                                  mesh.nelements,
+                                  mesh.nnodes,
+                                  mesh.elements,
+                                  mesh.points,
+                                  u,
+                                  u_old);
 
             printf("%g/%g\n", t, SFEM_MAX_TIME);
             sprintf(path, "%s/u.%05d.raw", output_folder, step_count);

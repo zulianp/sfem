@@ -35,6 +35,10 @@ void assemble_mass(const int element_type,
             tet10_assemble_mass(nelements, nnodes, elems, xyz, rowptr, colidx, values);
             break;
         }
+    case TRI3: {
+            tri3_assemble_mass(nelements, nnodes, elems, xyz, rowptr, colidx, values);
+            break;
+        }
         case TRI6: {
             tri6_assemble_mass(nelements, nnodes, elems, xyz, rowptr, colidx, values);
             break;
