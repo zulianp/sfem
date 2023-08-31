@@ -113,6 +113,9 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_DT, atof);
     SFEM_READ_ENV(SFEM_MAX_TIME, atof);
 
+    int SFEM_IMPLICIT = 1;
+    SFEM_READ_ENV(SFEM_IMPLICIT, atoi);
+
     if (rank == 0) {
         printf(
             "----------------------------------------\n"
@@ -121,10 +124,12 @@ int main(int argc, char *argv[]) {
             "- SFEM_DT=%g\n"
             "- SFEM_DIFFUSIVITY=%g\n"
             "- SFEM_DIRICHLET_NODESET=%s\n"
+            "- SFEM_IMPLICIT=%d\n"
             "----------------------------------------\n",
             SFEM_DT,
             SFEM_DIFFUSIVITY,
-            SFEM_DIRICHLET_NODESET);
+            SFEM_DIRICHLET_NODESET,
+            SFEM_IMPLICIT);
     }
 
     for (int s = 0; s < N_SYSTEMS; s++) {
@@ -132,7 +137,7 @@ int main(int argc, char *argv[]) {
         isolver_lsolve_set_atol(&lsolve[s], SFEM_ATOL);
         isolver_lsolve_set_rtol(&lsolve[s], SFEM_RTOL);
         isolver_lsolve_set_stol(&lsolve[s], SFEM_STOL);
-        isolver_lsolve_set_verbosity(&lsolve[s], 0);
+        isolver_lsolve_set_verbosity(&lsolve[s], 1);
     }
 
     int n_dirichlet_conditions;
@@ -187,7 +192,12 @@ int main(int argc, char *argv[]) {
 
     for (ptrdiff_t i = 0; i < nnz; i++) {
         system_matrix[i] *= SFEM_DT;
-        system_matrix[i] += mass_matrix[i];
+
+        if(SFEM_IMPLICIT) {
+            system_matrix[i] += mass_matrix[i];
+        } else {
+            system_matrix[i] = mass_matrix[i] - system_matrix[i];
+        }
     }
 
     for (int i = 0; i < n_dirichlet_conditions; i++) {
@@ -218,20 +228,49 @@ int main(int argc, char *argv[]) {
     real_t *u_old = calloc(mesh.nnodes, sizeof(real_t));
     // real_t *buff = calloc(mesh.nnodes, sizeof(real_t));
 
-    int step_count = 0;
-    for (real_t t = 0; t < SFEM_MAX_TIME; t += SFEM_DT, step_count++) {
-        spmv_crs(mesh.nnodes, rowptr, colidx, mass_matrix, u, u_old);
+    if (SFEM_IMPLICIT) {
+        int step_count = 0;
+        for (real_t t = 0; t < SFEM_MAX_TIME; t += SFEM_DT, step_count++) {
+            spmv_crs(mesh.nnodes, rowptr, colidx, mass_matrix, u, u_old);
 
-        for (int i = 0; i < n_dirichlet_conditions; i++) {
-            boundary_condition_t cond = dirichlet_conditions[i];
-            constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, u_old);
+            for (int i = 0; i < n_dirichlet_conditions; i++) {
+                boundary_condition_t cond = dirichlet_conditions[i];
+                constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, u_old);
+            }
+
+            isolver_lsolve_apply(&lsolve[INVERSE_SYSTEM], u_old, u);
+
+            printf("%g/%g\n", t, SFEM_MAX_TIME);
+            sprintf(path, "%s/u.%05d.raw", output_folder, step_count);
+            array_write(comm, path, SFEM_MPI_REAL_T, u, mesh.nnodes, mesh.nnodes);
         }
 
-        isolver_lsolve_apply(&lsolve[INVERSE_SYSTEM], u_old, u);
+    } else {
+        int step_count = 0;
+        for (real_t t = 0; t < SFEM_MAX_TIME; t += SFEM_DT, step_count++) {
+            const int i = step_count % 2;
+            const int ip1 = (step_count + 1) % 2;
 
-        printf("%g/%g\n", t, SFEM_MAX_TIME);
-        sprintf(path, "%s/u.%05d.raw", output_folder, step_count);
-        array_write(comm, path, SFEM_MPI_REAL_T, u, mesh.nnodes, mesh.nnodes);
+            spmv_crs(mesh.nnodes, rowptr, colidx, system_matrix, u_old, u);
+
+            for (int i = 0; i < n_dirichlet_conditions; i++) {
+                boundary_condition_t cond = dirichlet_conditions[i];
+                constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, u);
+            }
+
+            isolver_lsolve_apply(&lsolve[INVERSE_MASS_MATRIX], u, u_old);
+            // apply_inv_lumped_mass(mesh.element_type,
+            //                       mesh.nelements,
+            //                       mesh.nnodes,
+            //                       mesh.elements,
+            //                       mesh.points,
+            //                       u,
+            //                       u_old);
+
+            printf("%g/%g\n", t, SFEM_MAX_TIME);
+            sprintf(path, "%s/u.%05d.raw", output_folder, step_count);
+            array_write(comm, path, SFEM_MPI_REAL_T, u_old, mesh.nnodes, mesh.nnodes);
+        }
     }
 
     free(rowptr);
