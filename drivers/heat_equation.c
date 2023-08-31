@@ -116,6 +116,12 @@ int main(int argc, char *argv[]) {
     int SFEM_IMPLICIT = 1;
     SFEM_READ_ENV(SFEM_IMPLICIT, atoi);
 
+    int SFEM_LUMPED_MASS = 0;
+    SFEM_READ_ENV(SFEM_LUMPED_MASS, atoi);
+
+    int SFEM_EXPORT_FREQUENCY = 10;
+    SFEM_READ_ENV(SFEM_EXPORT_FREQUENCY, atoi);
+
     if (rank == 0) {
         printf(
             "----------------------------------------\n"
@@ -193,7 +199,7 @@ int main(int argc, char *argv[]) {
     for (ptrdiff_t i = 0; i < nnz; i++) {
         system_matrix[i] *= SFEM_DT;
 
-        if(SFEM_IMPLICIT) {
+        if (SFEM_IMPLICIT) {
             system_matrix[i] += mass_matrix[i];
         } else {
             system_matrix[i] = mass_matrix[i] - system_matrix[i];
@@ -226,7 +232,11 @@ int main(int argc, char *argv[]) {
 
     real_t *u = calloc(mesh.nnodes, sizeof(real_t));
     real_t *u_old = calloc(mesh.nnodes, sizeof(real_t));
-    
+
+    printf("%g/%g\n", 0., SFEM_MAX_TIME);
+    sprintf(path, "%s/u.%05d.raw", output_folder, 0);
+    array_write(comm, path, SFEM_MPI_REAL_T, u_old, mesh.nnodes, mesh.nnodes);
+
     if (SFEM_IMPLICIT) {
         int step_count = 0;
         for (real_t t = 0; t < SFEM_MAX_TIME; t += SFEM_DT, step_count++) {
@@ -239,9 +249,11 @@ int main(int argc, char *argv[]) {
 
             isolver_lsolve_apply(&lsolve[INVERSE_SYSTEM], u_old, u);
 
-            printf("%g/%g\n", t, SFEM_MAX_TIME);
-            sprintf(path, "%s/u.%05d.raw", output_folder, step_count);
-            array_write(comm, path, SFEM_MPI_REAL_T, u, mesh.nnodes, mesh.nnodes);
+            if((step_count + 1) % SFEM_EXPORT_FREQUENCY == 0) {
+                printf("%g/%g\n", t, SFEM_MAX_TIME);
+                sprintf(path, "%s/u.%05d.raw", output_folder, step_count);
+                array_write(comm, path, SFEM_MPI_REAL_T, u, mesh.nnodes, mesh.nnodes);
+            }
         }
 
     } else {
@@ -252,23 +264,34 @@ int main(int argc, char *argv[]) {
 
             spmv_crs(mesh.nnodes, rowptr, colidx, system_matrix, u_old, u);
 
-            for (int i = 0; i < n_dirichlet_conditions; i++) {
-                boundary_condition_t cond = dirichlet_conditions[i];
-                constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, u);
+            if (SFEM_LUMPED_MASS) {
+                apply_inv_lumped_mass(mesh.element_type,
+                                      mesh.nelements,
+                                      mesh.nnodes,
+                                      mesh.elements,
+                                      mesh.points,
+                                      u,
+                                      u_old);
+
+                for (int i = 0; i < n_dirichlet_conditions; i++) {
+                    boundary_condition_t cond = dirichlet_conditions[i];
+                    constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, u_old);
+                }
+
+            } else {
+                for (int i = 0; i < n_dirichlet_conditions; i++) {
+                    boundary_condition_t cond = dirichlet_conditions[i];
+                    constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, u);
+                }
+
+                isolver_lsolve_apply(&lsolve[INVERSE_MASS_MATRIX], u, u_old);
             }
 
-            // isolver_lsolve_apply(&lsolve[INVERSE_MASS_MATRIX], u, u_old);
-            apply_inv_lumped_mass(mesh.element_type,
-                                  mesh.nelements,
-                                  mesh.nnodes,
-                                  mesh.elements,
-                                  mesh.points,
-                                  u,
-                                  u_old);
-
-            printf("%g/%g\n", t, SFEM_MAX_TIME);
-            sprintf(path, "%s/u.%05d.raw", output_folder, step_count);
-            array_write(comm, path, SFEM_MPI_REAL_T, u_old, mesh.nnodes, mesh.nnodes);
+            if((step_count + 1) % SFEM_EXPORT_FREQUENCY == 0) {
+                printf("%g/%g\n", t, SFEM_MAX_TIME);
+                sprintf(path, "%s/u.%05d.raw", output_folder, step_count);
+                array_write(comm, path, SFEM_MPI_REAL_T, u_old, mesh.nnodes, mesh.nnodes);
+            }
         }
     }
 

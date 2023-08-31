@@ -35,7 +35,7 @@ void assemble_mass(const int element_type,
             tet10_assemble_mass(nelements, nnodes, elems, xyz, rowptr, colidx, values);
             break;
         }
-    case TRI3: {
+        case TRI3: {
             tri3_assemble_mass(nelements, nnodes, elems, xyz, rowptr, colidx, values);
             break;
         }
@@ -61,7 +61,6 @@ void assemble_lumped_mass(const int element_type,
             tet4_assemble_lumped_mass(nelements, nnodes, elems, xyz, values);
             break;
         }
-
         case TET10: {
             fprintf(stderr, "The lumbed mass vector does not exists for P2!\n");
             MPI_Abort(MPI_COMM_WORLD, -1);
@@ -82,6 +81,10 @@ void apply_inv_lumped_mass(const int element_type,
                            const real_t *const x,
                            real_t *const values) {
     switch (element_type) {
+        case TRI3: {
+            tri3_apply_inv_lumped_mass(nelements, nnodes, elems, xyz, x, values);
+            break;
+        }
         case TRI6: {
             tri6_apply_inv_lumped_mass(nelements, nnodes, elems, xyz, x, values);
             break;

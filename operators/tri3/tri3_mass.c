@@ -2,6 +2,7 @@
 
 #include <mpi.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "crs_graph.h"
 #include "sortreduce.h"
@@ -96,6 +97,20 @@ static SFEM_INLINE void tri3_apply_mass_kernel(const real_t px0,
     element_vector[0] = x0 * (2 * u[0] + u[1] + u[2]);
     element_vector[1] = x0 * (u[0] + 2 * u[1] + u[2]);
     element_vector[2] = x0 * (u[0] + u[1] + 2 * u[2]);
+}
+
+static SFEM_INLINE void lumped_mass(const real_t px0,
+                                    const real_t px1,
+                                    const real_t px2,
+                                    const real_t py0,
+                                    const real_t py1,
+                                    const real_t py2,
+                                    real_t *element_matrix_diag) {
+    const real_t x0 =
+        (1.0 / 6.0) * (px0 - px1) * (py0 - py2) - 1.0 / 6.0 * (px0 - px2) * (py0 - py1);
+    element_matrix_diag[0] = x0;
+    element_matrix_diag[1] = x0;
+    element_matrix_diag[2] = x0;
 }
 
 void tri3_apply_mass(const ptrdiff_t nelements,
@@ -218,4 +233,76 @@ void tri3_assemble_mass(const ptrdiff_t nelements,
 
     double tock = MPI_Wtime();
     printf("tri3_mass.c: assemble_mass\t%g seconds\n", tock - tick);
+}
+
+void tri3_assemble_lumped_mass(const ptrdiff_t nelements,
+                               const ptrdiff_t nnodes,
+                               idx_t **const SFEM_RESTRICT elems,
+                               geom_t **const SFEM_RESTRICT xyz,
+                               real_t *const SFEM_RESTRICT values) {
+    SFEM_UNUSED(nnodes);
+
+    // double tick = MPI_Wtime();
+
+    idx_t ev[3];
+    idx_t ks[3];
+
+    real_t element_vector[3];
+
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma unroll(3)
+        for (int v = 0; v < 3; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        // Element indices
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+
+        lumped_mass(
+            // X-coordinates
+            xyz[0][i0],
+            xyz[0][i1],
+            xyz[0][i2],
+
+            // Y-coordinates
+            xyz[1][i0],
+            xyz[1][i1],
+            xyz[1][i2],
+
+            element_vector);
+
+        for (int edof_i = 0; edof_i < 3; ++edof_i) {
+            values[ev[edof_i]] += element_vector[edof_i];
+        }
+    }
+
+    // double tock = MPI_Wtime();
+    // printf("tri3_mass.c: tri3_assemble_lumped_mass\t%g seconds\n", tock - tick);
+}
+
+void tri3_apply_inv_lumped_mass(const ptrdiff_t nelements,
+                                const ptrdiff_t nnodes,
+                                idx_t **const SFEM_RESTRICT elems,
+                                geom_t **const SFEM_RESTRICT xyz,
+                                const real_t *const x,
+                                real_t *const values) {
+    real_t *buff = 0;
+    if (x == values) {
+        buff = (real_t *)calloc(nnodes, sizeof(real_t));
+    } else {
+        buff = values;
+        memset(buff, 0, nnodes * sizeof(real_t));
+    }
+
+    tri3_assemble_lumped_mass(nelements, nnodes, elems, xyz, values);
+
+    for (ptrdiff_t i = 0; i < nnodes; i++) {
+        values[i] = x[i] / values[i];
+    }
+
+    if (x == values) {
+        free(buff);
+    }
 }
