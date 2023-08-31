@@ -24,7 +24,7 @@ then
 fi
 
 SFEM_MESH_DIR=mesh
-# create_box_2D_p2.sh 5
+# create_box_2D_p2.sh 3
 # rm -f $mesh/z.raw
 nvars=3
 
@@ -44,22 +44,19 @@ export SFEM_PRESSURE_DIRICHLET_NODESET="$sright"
 export SFEM_PRESSURE_DIRICHLET_VALUE="0"
 export SFEM_PRESSURE_DIRICHLET_COMPONENT="0"
 
-export SFEM_DT=0.1
-export SFEM_MAX_TIME=0.1
+export SFEM_DT=0.0000001
+export SFEM_MAX_TIME=0.0000001
 export SFEM_RTOL=1e-14
 export SFEM_MAX_IT=4000
 
-export SFEM_DYNAMIC_VISCOSITY=100
+export SFEM_DYNAMIC_VISCOSITY=1
 export SFEM_MASS_DENSITY=1
 
 mkdir -p out
 set -x
 
-# lldb -- 
+# lldb -- taylor_hood_navier_stokes $SFEM_MESH_DIR out
 taylor_hood_navier_stokes $SFEM_MESH_DIR out
 
-raw_to_db.py $SFEM_MESH_DIR out.vtk --point_data="out/v.*.raw"
-raw_to_db.py $SFEM_MESH_DIR debug.vtk --point_data="out/c.*.raw"
-
-raw_to_db.py $SFEM_MESH_DIR/p1 out_pressure.vtk  --point_data="out/p.raw,out/div.raw"
-raw_to_db.py $SFEM_MESH_DIR/p1 p_debug.vtk --point_data="out/tp.raw"
+raw_to_db.py $SFEM_MESH_DIR out.vtk --point_data="out/v.*.raw,out/c.*.raw,out/tv.*.raw"
+raw_to_db.py $SFEM_MESH_DIR/p1 out_pressure.vtk  --point_data="out/p.raw"

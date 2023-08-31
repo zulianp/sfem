@@ -116,8 +116,7 @@ GOALS += assemble_adjaciency_matrix
 
 GOALS += bgs
 
-
-GOALS += taylor_hood_navier_stokes
+GOALS += taylor_hood_navier_stokes heat_equation
 
 ifeq ($(metis), 1)
 	GOALS += partition_mesh_based_on_operator
@@ -174,7 +173,7 @@ OBJS += tri3_stokes_mini.o \
 		tri3_laplacian.o
 
 # Tri6
-OBJS += tri6_mass.o
+OBJS += tri6_mass.o tri6_laplacian.o
 
 # Tet4
 OBJS += tet4_div.o \
@@ -237,6 +236,9 @@ ssolve : drivers/ssolve.cpp isolver_lsolve_frontend.o libsfem.a
 	$(MPICXX) $(CXXFLAGS) $(INCLUDES) $(ISOLVER_INCLUDES) $(YAML_CPP_INCLUDES) $(YAML_CPP_LIBRARIES) -o $@ $^ $(LDFLAGS) ; \
 
 taylor_hood_navier_stokes: drivers/taylor_hood_navier_stokes.c isolver_lsolve_frontend.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) $(ISOLVER_INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+heat_equation: drivers/heat_equation.c isolver_lsolve_frontend.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) $(ISOLVER_INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 bgs : bgs.c libsfem.a

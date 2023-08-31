@@ -12,7 +12,7 @@ PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 PATH=$SCRIPTPATH/../../../matrix.io:$PATH
 
 # create_cylinder.sh 6
-create_cylinder.sh 1
+create_cylinder.sh 4
 
 export SFEM_MESH_DIR=mesh
 

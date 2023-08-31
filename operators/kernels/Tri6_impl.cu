@@ -103,7 +103,7 @@ static void Tri6_pack_elements(const ptrdiff_t n,
 
 #pragma omp parallel
                 {
-#pragma omp for nowait
+#pragma omp for //nowait
                     for (ptrdiff_t k = 0; k < n; k++) {
                         buff[k] = x[nodes[k]];
                     }

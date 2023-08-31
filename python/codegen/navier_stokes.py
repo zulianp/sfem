@@ -46,7 +46,7 @@ class NavierStokesOp:
 		n_vel = len(grad_vel) 
 		n_pressure = len(fun_pressure)
 
-		nu, rho, dt, convonoff = sp.symbols('nu rho dt convonoff')
+		nu, rho, dt = sp.symbols('nu rho dt')
 		self.params = [nu, rho, dt]
 
 		self.form2_diffusion = sp.zeros(n_vel, n_vel)
@@ -124,7 +124,7 @@ class NavierStokesOp:
 			# Convection
 			# - dt * < (u^n * div) u^n, v>
 			integr = -dt * fe_vel.integrate(qp, inner(conv, fun_vel[i])) * fe_vel.jacobian_determinant(qp)
-			self.form1_convection[i] = convonoff * integr
+			self.form1_convection[i] = integr
 
 		for i in range(0, n_vel):
 			integr = fe_vel.integrate(qp, inner(uh, fun_vel[i])) * fe_vel.jacobian_determinant(qp)
@@ -146,19 +146,19 @@ class NavierStokesOp:
 		tent_mom = self.form2_mass + self.form2_diffusion
 		c_code(self.assign_matrix(tent_mom))
 
-		print('------------------------------')
-		print('LHS (diffusion, temptative momentum) X')
-		print('------------------------------')
+		# print('------------------------------')
+		# print('LHS (diffusion, temptative momentum) X')
+		# print('------------------------------')
 
-		tent_mom_x = tent_mom[0:fe_vel.n_nodes(),0:fe_vel.n_nodes()]
-		c_code(self.assign_matrix(tent_mom_x))
+		# tent_mom_x = tent_mom[0:fe_vel.n_nodes(),0:fe_vel.n_nodes()]
+		# c_code(self.assign_matrix(tent_mom_x))
 
-		print('------------------------------')
-		print('LHS (diffusion, temptative momentum) Y')
-		print('------------------------------')
+		# print('------------------------------')
+		# print('LHS (diffusion, temptative momentum) Y')
+		# print('------------------------------')
 
-		tent_mom_y = tent_mom[fe_vel.n_nodes():2*fe_vel.n_nodes(),fe_vel.n_nodes():2*fe_vel.n_nodes()]
-		c_code(self.assign_matrix(tent_mom_y))
+		# tent_mom_y = tent_mom[fe_vel.n_nodes():2*fe_vel.n_nodes(),fe_vel.n_nodes():2*fe_vel.n_nodes()]
+		# c_code(self.assign_matrix(tent_mom_y))
 
 		print('------------------------------')
 		print('LHS (potential equation)')
@@ -169,7 +169,12 @@ class NavierStokesOp:
 		print('------------------------------')
 		print('RHS (temptative momentum)')
 		print('------------------------------')
-		c_code(self.assign_vector(self.form1_utm1 + self.form1_convection))
+		# c_code(self.assign_vector(self.form1_utm1 + self.form1_convection))
+		print('Mom')
+		c_code(self.assign_vector(self.form1_utm1))
+		print('Conv')
+		c_code(self.in_place_add_vector(self.form1_convection))
+
 
 		print('------------------------------')
 		print('RHS (potential equation)')
@@ -184,7 +189,14 @@ class NavierStokesOp:
 		print('------------------------------')
 		print('RHS (explicit momentum)')
 		print('------------------------------')
-		c_code(self.assign_vector(self.form1_utm1 + self.form1_diffusion + self.form1_convection))
+		# c_code(self.assign_vector(self.form1_utm1 + self.form1_diffusion + self.form1_convection))
+
+		print('Mom')
+		c_code(self.assign_vector(self.form1_utm1))
+		print('Diff')
+		c_code(self.in_place_add_vector(self.form1_diffusion))
+		print('Conv')
+		c_code(self.in_place_add_vector(self.form1_convection))
 
 	# def apply(self):
 	# 	H = self.hessian
@@ -198,6 +210,37 @@ class NavierStokesOp:
 	# 	return self.apply()
 
 	def assign_tensor(self, name, a):
+		# fe = self.fe_vel
+		# qp = self.qp
+		# rows, cols = a.shape
+
+		# expr = []
+		# for i in range(0,  rows):
+		# 	for j in range(0,  cols):
+		# 		var = sp.symbols(f'{name}[{i*cols + j}]')
+		# 		value = a[i, j]
+
+		# 		if subs_jacobian:
+		# 			value = subsmat(value, fe.symbol_jacobian_inverse(), fe.jacobian_inverse(qp))
+		# 			value = value.subs(fe.symbol_jacobian_determinant(), fe.jacobian_determinant(qp))
+
+		# 		if simplify_expr:
+		# 			value = sp.simplify(value)
+					
+		# 		expr.append(ast.Assignment(var, value))
+		# return expr
+		return self.op_tensor(name, a, ast.Assignment)
+
+	def in_place_add(self, name, a):
+		return self.op_tensor(name, a, ast.AddAugmentedAssignment)
+
+	def in_place_add_vector(self, a):
+		return self.op_tensor("element_vector", a, ast.AddAugmentedAssignment)		
+
+	def in_place_add_matrix(self, name, a):
+		return self.op_tensor("element_matrix", a, ast.AddAugmentedAssignment)
+
+	def op_tensor(self, name, a, op):
 		fe = self.fe_vel
 		qp = self.qp
 		rows, cols = a.shape
@@ -215,7 +258,7 @@ class NavierStokesOp:
 				if simplify_expr:
 					value = sp.simplify(value)
 					
-				expr.append(ast.Assignment(var, value))
+				expr.append(op(var, value))
 		return expr
 
 	def assign_matrix(self, a):

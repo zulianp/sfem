@@ -2,6 +2,8 @@
 
 from sfem_codegen import *
 from tri3 import *
+from tri6 import *
+
 
 # import pdb
 
@@ -148,7 +150,7 @@ class LaplaceOp:
 		return expr
 
 def main():
-	fe = Tri3()
+	fe = Tri6()
 	q = sp.Matrix(2, 1, [qx, qy])
 	op = LaplaceOp(fe, q)
 

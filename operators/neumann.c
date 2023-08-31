@@ -91,7 +91,7 @@ static void tri_shell_3_surface_forcing_function(const ptrdiff_t nfaces,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
 
         for (idx_t f = 0; f < nfaces; ++f) {
             real_t element_vector[3];
@@ -197,7 +197,7 @@ static void tri_shell_6_surface_forcing_function(const ptrdiff_t nfaces,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
 
         for (idx_t f = 0; f < nfaces; ++f) {
             real_t element_vector[3];

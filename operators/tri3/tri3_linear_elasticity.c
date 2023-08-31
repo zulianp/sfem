@@ -640,7 +640,7 @@ void tri3_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[3];
             idx_t ks[3];
@@ -713,7 +713,7 @@ void tri3_linear_elasticity_assemble_gradient_aos(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[3];
             idx_t ks[3];
@@ -788,7 +788,7 @@ void tri3_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[3];
             idx_t ks[3];
@@ -874,7 +874,7 @@ void tri3_linear_elasticity_apply_aos(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[3];
             idx_t ks[3];

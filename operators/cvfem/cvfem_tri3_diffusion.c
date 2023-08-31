@@ -125,7 +125,7 @@ void cvfem_tri3_diffusion_assemble_hessian(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
 
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[3];

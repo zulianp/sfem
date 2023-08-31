@@ -1202,7 +1202,7 @@ void tet4_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             idx_t ks[4];
@@ -1277,7 +1277,7 @@ void tet4_linear_elasticity_assemble_gradient_aos(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             idx_t ks[4];
@@ -1361,7 +1361,7 @@ void tet4_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             idx_t ks[4];
@@ -1468,7 +1468,7 @@ void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; i += SFEM_VECTOR_SIZE) {
             const int nvec = MAX(1, MIN(nelements - (i + SFEM_VECTOR_SIZE), SFEM_VECTOR_SIZE));
 
@@ -1569,7 +1569,7 @@ void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
     static const int block_size = 3;
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             idx_t ks[4];

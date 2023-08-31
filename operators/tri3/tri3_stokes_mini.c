@@ -399,7 +399,7 @@ void tri3_stokes_mini_assemble_hessian_soa(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[3];
             idx_t ks[3][3];
@@ -488,7 +488,7 @@ void tri3_stokes_mini_assemble_hessian_aos(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[3];
             idx_t ks[3];
@@ -575,7 +575,7 @@ void tri3_stokes_mini_assemble_rhs_soa(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[3];
             idx_t ks[3];
@@ -672,7 +672,7 @@ void tri3_stokes_mini_assemble_rhs_aos(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[3];
             idx_t ks[3];
@@ -764,7 +764,7 @@ void tri3_stokes_mini_apply_aos(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[3];
             idx_t ks[3];

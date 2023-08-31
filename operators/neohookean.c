@@ -941,7 +941,7 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             idx_t ks[4];
@@ -1052,7 +1052,7 @@ void neohookean_assemble_gradient(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             idx_t ks[4];
@@ -1136,7 +1136,7 @@ void neohookean_assemble_value(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             idx_t ks[4];
@@ -1550,7 +1550,7 @@ void neohookean_cauchy_stress_aos(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             real_t element_displacement[4 * 3];
@@ -1620,7 +1620,7 @@ void neohookean_cauchy_stress_soa(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             real_t element_displacement[4 * 3];
@@ -1690,7 +1690,7 @@ void neohookean_vonmises_soa(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             real_t element_displacement[4 * 3];
@@ -1762,7 +1762,7 @@ void neohookean_assemble_hessian_soa(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             idx_t ks[4];

@@ -133,7 +133,7 @@ static void TriShell6_pack_elements
 
                 #pragma omp parallel
                 {
-                    #pragma omp for nowait
+                    #pragma omp for //nowait
                     for (ptrdiff_t k = 0; k < n; k++) {
                         buff[k] = x[nodes[k]];
                     }

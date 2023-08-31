@@ -129,15 +129,15 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_NEUMANN_COMPONENT, );
 
     int SFEM_MAX_IT = 1000;
-    real_t SFEM_ATOL = 1e-10;
-    real_t SFEM_RTOL = 1e-12;
-    real_t SFEM_STOL = 1e-10;
+    real_t SFEM_ATOL = 1e-15;
+    real_t SFEM_RTOL = 1e-14;
+    real_t SFEM_STOL = 1e-12;
     SFEM_READ_ENV(SFEM_MAX_IT, atoi);
     SFEM_READ_ENV(SFEM_ATOL, atof);
     SFEM_READ_ENV(SFEM_RTOL, atof);
     SFEM_READ_ENV(SFEM_STOL, atof);
 
-    real_t SFEM_DT = 0.001;
+    real_t SFEM_DT = 1;
     real_t SFEM_MAX_TIME = 1;
     SFEM_READ_ENV(SFEM_DT, atof);
     SFEM_READ_ENV(SFEM_MAX_TIME, atof);
@@ -147,10 +147,12 @@ int main(int argc, char *argv[]) {
             "----------------------------------------\n"
             "Options:\n"
             "----------------------------------------\n"
+            "- SFEM_DT=%g\n"
             "- SFEM_DYNAMIC_VISCOSITY=%g\n"
             "- SFEM_MASS_DENSITY=%g\n"
             "- SFEM_VELOCITY_DIRICHLET_NODESET=%s\n"
             "----------------------------------------\n",
+            SFEM_DT,
             SFEM_DYNAMIC_VISCOSITY,
             SFEM_MASS_DENSITY,
             SFEM_VELOCITY_DIRICHLET_NODESET);
@@ -161,7 +163,7 @@ int main(int argc, char *argv[]) {
         isolver_lsolve_set_atol(&lsolve[s], SFEM_ATOL);
         isolver_lsolve_set_rtol(&lsolve[s], SFEM_RTOL);
         isolver_lsolve_set_stol(&lsolve[s], SFEM_STOL);
-        isolver_lsolve_set_verbosity(&lsolve[s], 0);
+        isolver_lsolve_set_verbosity(&lsolve[s], 1);
     }
 
     // int n_neumann_conditions;
@@ -316,7 +318,7 @@ int main(int argc, char *argv[]) {
     real_t *vel[3];
     real_t *correction[3];
     real_t *tentative_vel[3];
-    real_t *buff = calloc(p1_nnodes, sizeof(real_t));
+    real_t *buff = calloc(mesh.nnodes, sizeof(real_t));
 
     for (int d = 0; d < sdim; d++) {
         vel[d] = calloc(mesh.nnodes, sizeof(real_t));
@@ -337,17 +339,6 @@ int main(int argc, char *argv[]) {
 
             if (implicit_momentum) {
                 // TODO
-                // for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
-                //     boundary_condition_t cond = velocity_dirichlet_conditions[i];
-                //     constraint_nodes_to_value(
-                //         cond.local_size, cond.idx, cond.value, tentative_vel[cond.component]);
-
-                //     for (int d = 0; d < sdim; d++) {
-                //         memset(correction[d], 0, mesh.nnodes * sizeof(real_t));
-                //         isolver_lsolve_apply(&lsolve[1], tentative_vel[d], correction[d]);
-                //         memcpy(tentative_vel[d], correction[d], mesh.nnodes * sizeof(real_t));
-                //     }
-                // }
             } else {
                 tri6_explict_momentum_tentative(mesh.nelements,
                                                 mesh.nnodes,
@@ -355,7 +346,7 @@ int main(int argc, char *argv[]) {
                                                 mesh.points,
                                                 SFEM_DT,
                                                 SFEM_DYNAMIC_VISCOSITY,
-                                                1, //Turn-off convective term for debugging with 0
+                                                0, //Turn-off convective term for debugging with 0
                                                 vel,
                                                 tentative_vel);
 
@@ -382,11 +373,11 @@ int main(int argc, char *argv[]) {
                 }
             }
 
-            for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
-                boundary_condition_t cond = velocity_dirichlet_conditions[i];
-                constraint_nodes_to_value(
-                    cond.local_size, cond.idx, cond.value, tentative_vel[cond.component]);
-            }
+            // for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
+            //     boundary_condition_t cond = velocity_dirichlet_conditions[i];
+            //     constraint_nodes_to_value(
+            //         cond.local_size, cond.idx, cond.value, tentative_vel[cond.component]);
+            // }
         }
         //////////////////////////////////////////////////////////////
         // Poisson problem + solve
@@ -397,13 +388,11 @@ int main(int argc, char *argv[]) {
                                  mesh.nnodes,
                                  mesh.elements,
                                  mesh.points,
-                                 SFEM_DT,
+                                 1,
                                  SFEM_MASS_DENSITY,
                                  SFEM_DYNAMIC_VISCOSITY,
                                  tentative_vel,
                                  buff);
-
-            
 
             for (int i = 0; i < n_pressure_dirichlet_conditions; i++) {
                 boundary_condition_t cond = pressure_dirichlet_conditions[i];
@@ -411,8 +400,8 @@ int main(int argc, char *argv[]) {
                 constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, buff);
             }
 
-            sprintf(path, "%s/div.raw", output_folder);
-            array_write(comm, path, SFEM_MPI_REAL_T, buff, p1_nnodes, p1_nnodes);
+            // sprintf(path, "%s/div.raw", output_folder);
+            // array_write(comm, path, SFEM_MPI_REAL_T, buff, p1_nnodes, p1_nnodes);
 
             memset(p, 0, p1_nnodes * sizeof(real_t));
             isolver_lsolve_apply(&lsolve[0], buff, p);
@@ -429,7 +418,7 @@ int main(int argc, char *argv[]) {
                                  mesh.nnodes,
                                  mesh.elements,
                                  mesh.points,
-                                 SFEM_DT,
+                                 1,
                                  SFEM_MASS_DENSITY,
                                  p,
                                  correction);
@@ -451,21 +440,22 @@ int main(int argc, char *argv[]) {
                                           tentative_vel[d]);
 
                 } else {
-                    memset(tentative_vel[d], 0, mesh.nnodes * sizeof(real_t));
-                    isolver_lsolve_apply(&lsolve[2], correction[d], tentative_vel[d]);
-                }
-            }
-
-            for (int d = 0; d < sdim; d++) {
-                for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
-                    vel[d][i] += tentative_vel[d][i];
+                    memset(buff, 0, mesh.nnodes * sizeof(real_t));
+                    isolver_lsolve_apply(&lsolve[2], correction[d], buff);
+                    memcpy(correction[d], buff, mesh.nnodes * sizeof(real_t));
                 }
             }
 
             for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
                 boundary_condition_t cond = velocity_dirichlet_conditions[i];
                 constraint_nodes_to_value(
-                    cond.local_size, cond.idx, cond.value, vel[cond.component]);
+                    cond.local_size, cond.idx, 0, correction[cond.component]);
+            }
+
+            for (int d = 0; d < sdim; d++) {
+                for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                    vel[d][i] = tentative_vel[d][i] + correction[d][i];
+                }
             }
         }
     }
@@ -477,14 +467,14 @@ int main(int argc, char *argv[]) {
     }
 
     for (int d = 0; d < sdim; d++) {
-        sprintf(path, "%s/c.%d.raw", output_folder, d);
+        sprintf(path, "%s/tv.%d.raw", output_folder, d);
         array_write(comm, path, SFEM_MPI_REAL_T, tentative_vel[d], mesh.nnodes, mesh.nnodes);
     }
 
-    // for (int d = 0; d < sdim; d++) {
-    //     sprintf(path, "%s/c.%d.raw", output_folder, d);
-    //     array_write(comm, path, SFEM_MPI_REAL_T, correction[d], mesh.nnodes, mesh.nnodes);
-    // }
+    for (int d = 0; d < sdim; d++) {
+        sprintf(path, "%s/c.%d.raw", output_folder, d);
+        array_write(comm, path, SFEM_MPI_REAL_T, correction[d], mesh.nnodes, mesh.nnodes);
+    }
 
     sprintf(path, "%s/p.raw", output_folder);
     array_write(comm, path, SFEM_MPI_REAL_T, p, p1_nnodes, p1_nnodes);

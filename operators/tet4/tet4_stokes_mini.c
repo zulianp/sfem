@@ -800,7 +800,7 @@ void tet4_stokes_mini_assemble_hessian_soa(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             idx_t ks[4][4];
@@ -904,7 +904,7 @@ void tet4_stokes_mini_assemble_hessian_aos(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             idx_t ks[4];
@@ -1000,7 +1000,7 @@ void tet4_stokes_mini_assemble_rhs_soa(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             idx_t ks[4];
@@ -1094,7 +1094,7 @@ void tet4_stokes_mini_assemble_rhs_aos(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             idx_t ks[4];
@@ -1188,7 +1188,7 @@ void tet4_stokes_mini_apply_aos(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for nowait
+#pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             idx_t ks[4];
