@@ -148,20 +148,21 @@ int main(int argc, char *argv[]) {
 
     int n_dirichlet_conditions;
     boundary_condition_t *dirichlet_conditions;
+    {  // B.C.s
+        read_dirichlet_conditions(&mesh,
+                                  SFEM_DIRICHLET_NODESET,
+                                  SFEM_DIRICHLET_VALUE,
+                                  SFEM_DIRICHLET_COMPONENT,
+                                  &dirichlet_conditions,
+                                  &n_dirichlet_conditions);
 
-    read_dirichlet_conditions(&mesh,
-                              SFEM_DIRICHLET_NODESET,
-                              SFEM_DIRICHLET_VALUE,
-                              SFEM_DIRICHLET_COMPONENT,
-                              &dirichlet_conditions,
-                              &n_dirichlet_conditions);
-
-    // read_neumann_conditions(&mesh,
-    //                         SFEM_NEUMANN_SIDESET,
-    //                         SFEM_NEUMANN_VALUE,
-    //                         SFEM_NEUMANN_COMPONENT,
-    //                         &neumann_conditions,
-    //                         &n_neumann_conditions);
+        // read_neumann_conditions(&mesh,
+        //                         SFEM_NEUMANN_SIDESET,
+        //                         SFEM_NEUMANN_VALUE,
+        //                         SFEM_NEUMANN_COMPONENT,
+        //                         &neumann_conditions,
+        //                         &n_neumann_conditions);
+    }
 
     const int sdim = elem_manifold_dim(mesh.element_type);
 
@@ -174,8 +175,12 @@ int main(int argc, char *argv[]) {
     build_crs_graph_for_elem_type(
         mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
 
+
+    {
+        // CFL
+    }
+
     ptrdiff_t nnz = rowptr[mesh.nnodes];
-    mass_matrix = calloc(nnz, sizeof(real_t));
     system_matrix = calloc(nnz, sizeof(real_t));
 
     laplacian_assemble_hessian(mesh.element_type,
@@ -187,60 +192,120 @@ int main(int argc, char *argv[]) {
                                colidx,
                                system_matrix);
 
-    assemble_mass(mesh.element_type,
-                  mesh.nelements,
-                  mesh.nnodes,
-                  mesh.elements,
-                  mesh.points,
-                  rowptr,
-                  colidx,
-                  mass_matrix);
+    {  // Mass matrix
+        if (SFEM_LUMPED_MASS) {
+            mass_matrix = calloc(mesh.nnodes, sizeof(real_t));
 
-    for (ptrdiff_t i = 0; i < nnz; i++) {
-        system_matrix[i] *= SFEM_DT;
-
-        if (SFEM_IMPLICIT) {
-            system_matrix[i] += mass_matrix[i];
+            assemble_lumped_mass(mesh.element_type,
+                                 mesh.nelements,
+                                 mesh.nnodes,
+                                 mesh.elements,
+                                 mesh.points,
+                                 mass_matrix);
         } else {
-            system_matrix[i] = mass_matrix[i] - system_matrix[i];
+            mass_matrix = calloc(nnz, sizeof(real_t));
+
+            assemble_mass(mesh.element_type,
+                          mesh.nelements,
+                          mesh.nnodes,
+                          mesh.elements,
+                          mesh.points,
+                          rowptr,
+                          colidx,
+                          mass_matrix);
         }
     }
 
-    for (int i = 0; i < n_dirichlet_conditions; i++) {
-        crs_constraint_nodes_to_identity(dirichlet_conditions[i].local_size,
-                                         dirichlet_conditions[i].idx,
-                                         1,
-                                         rowptr,
-                                         colidx,
-                                         mass_matrix);
+    {  // Assemble M * dt * A
+        if (SFEM_LUMPED_MASS) {
+            for (ptrdiff_t i = 0; i < nnz; i++) {
+                if (SFEM_IMPLICIT) {
+                    system_matrix[i] *= SFEM_DT;
+                } else {
+                    system_matrix[i] *= -SFEM_DT;
+                }
+            }
+
+            for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                const idx_t *const cols = &colidx[rowptr[i]];
+                real_t *const vals = &system_matrix[rowptr[i]];
+                const count_t extent = rowptr[i + 1] - rowptr[i];
+
+                for (count_t k = 0; k < extent; k++) {
+                    if (cols[k] == i) {
+                        vals[k] += mass_matrix[i];
+                        assert(vals[k] == vals[k]);
+                        break;
+                    }
+                }
+            }
+        } else {
+            for (ptrdiff_t i = 0; i < nnz; i++) {
+                if (SFEM_IMPLICIT) {
+                    system_matrix[i] *= SFEM_DT;
+                } else {
+                    system_matrix[i] -= SFEM_DT;
+                }
+            }
+        }
     }
 
-    for (int i = 0; i < n_dirichlet_conditions; i++) {
-        crs_constraint_nodes_to_identity(dirichlet_conditions[i].local_size,
-                                         dirichlet_conditions[i].idx,
-                                         1,
-                                         rowptr,
-                                         colidx,
-                                         system_matrix);
+    {  // Apply B.C.s to matrices
+        if (SFEM_LUMPED_MASS) {
+            for (int i = 0; i < n_dirichlet_conditions; i++) {
+                boundary_condition_t cond = dirichlet_conditions[i];
+                constraint_nodes_to_value(cond.local_size, cond.idx, 1, mass_matrix);
+            }
+        } else {
+            for (int i = 0; i < n_dirichlet_conditions; i++) {
+                crs_constraint_nodes_to_identity(dirichlet_conditions[i].local_size,
+                                                 dirichlet_conditions[i].idx,
+                                                 1,
+                                                 rowptr,
+                                                 colidx,
+                                                 mass_matrix);
+            }
+
+            isolver_lsolve_update_crs(&lsolve[INVERSE_MASS_MATRIX],
+                                      mesh.nnodes,
+                                      mesh.nnodes,
+                                      rowptr,
+                                      colidx,
+                                      mass_matrix);
+        }
+
+        for (int i = 0; i < n_dirichlet_conditions; i++) {
+            crs_constraint_nodes_to_identity(dirichlet_conditions[i].local_size,
+                                             dirichlet_conditions[i].idx,
+                                             1,
+                                             rowptr,
+                                             colidx,
+                                             system_matrix);
+        }
     }
 
     isolver_lsolve_update_crs(
         &lsolve[INVERSE_SYSTEM], mesh.nnodes, mesh.nnodes, rowptr, colidx, system_matrix);
 
-    isolver_lsolve_update_crs(
-        &lsolve[INVERSE_MASS_MATRIX], mesh.nnodes, mesh.nnodes, rowptr, colidx, mass_matrix);
-
     real_t *u = calloc(mesh.nnodes, sizeof(real_t));
     real_t *u_old = calloc(mesh.nnodes, sizeof(real_t));
 
     printf("%g/%g\n", 0., SFEM_MAX_TIME);
-    sprintf(path, "%s/u.%05d.raw", output_folder, 0);
+    sprintf(path, "%s/u.%09d.raw", output_folder, 0);
     array_write(comm, path, SFEM_MPI_REAL_T, u_old, mesh.nnodes, mesh.nnodes);
 
     if (SFEM_IMPLICIT) {
         int step_count = 0;
         for (real_t t = 0; t < SFEM_MAX_TIME; t += SFEM_DT, step_count++) {
-            spmv_crs(mesh.nnodes, rowptr, colidx, mass_matrix, u, u_old);
+            if (SFEM_LUMPED_MASS) {
+                for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                    u_old[i] = u[i] * mass_matrix[i];
+                    assert(u_old[i] == u_old[i]);
+                }
+
+            } else {
+                spmv_crs(mesh.nnodes, rowptr, colidx, mass_matrix, u, u_old);
+            }
 
             for (int i = 0; i < n_dirichlet_conditions; i++) {
                 boundary_condition_t cond = dirichlet_conditions[i];
@@ -249,9 +314,9 @@ int main(int argc, char *argv[]) {
 
             isolver_lsolve_apply(&lsolve[INVERSE_SYSTEM], u_old, u);
 
-            if((step_count + 1) % SFEM_EXPORT_FREQUENCY == 0) {
+            if ((step_count + 1) % SFEM_EXPORT_FREQUENCY == 0) {
                 printf("%g/%g\n", t, SFEM_MAX_TIME);
-                sprintf(path, "%s/u.%05d.raw", output_folder, step_count);
+                sprintf(path, "%s/u.%09d.raw", output_folder, step_count);
                 array_write(comm, path, SFEM_MPI_REAL_T, u, mesh.nnodes, mesh.nnodes);
             }
         }
@@ -265,13 +330,14 @@ int main(int argc, char *argv[]) {
             spmv_crs(mesh.nnodes, rowptr, colidx, system_matrix, u_old, u);
 
             if (SFEM_LUMPED_MASS) {
-                apply_inv_lumped_mass(mesh.element_type,
-                                      mesh.nelements,
-                                      mesh.nnodes,
-                                      mesh.elements,
-                                      mesh.points,
-                                      u,
-                                      u_old);
+#pragma omp parallel
+                {
+#pragma omp for
+                    for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                        u_old[i] = u[i] / mass_matrix[i];
+                        assert(u_old[i] == u_old[i]);
+                    }
+                }
 
                 for (int i = 0; i < n_dirichlet_conditions; i++) {
                     boundary_condition_t cond = dirichlet_conditions[i];
@@ -287,9 +353,9 @@ int main(int argc, char *argv[]) {
                 isolver_lsolve_apply(&lsolve[INVERSE_MASS_MATRIX], u, u_old);
             }
 
-            if((step_count + 1) % SFEM_EXPORT_FREQUENCY == 0) {
+            if ((step_count + 1) % SFEM_EXPORT_FREQUENCY == 0) {
                 printf("%g/%g\n", t, SFEM_MAX_TIME);
-                sprintf(path, "%s/u.%05d.raw", output_folder, step_count);
+                sprintf(path, "%s/u.%09d.raw", output_folder, step_count);
                 array_write(comm, path, SFEM_MPI_REAL_T, u_old, mesh.nnodes, mesh.nnodes);
             }
         }

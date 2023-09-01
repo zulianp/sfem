@@ -57,6 +57,14 @@ void assemble_lumped_mass(const int element_type,
                           geom_t **const SFEM_RESTRICT xyz,
                           real_t *const SFEM_RESTRICT values) {
     switch (element_type) {
+        case TRI3: {
+            tri3_assemble_lumped_mass(nelements, nnodes, elems, xyz, values);
+            break;
+        }
+        // case TRI6: {
+        //     tri6_assemble_lumped_mass(nelements, nnodes, elems, xyz, values);
+        //     break;
+        // }
         case TET4: {
             tet4_assemble_lumped_mass(nelements, nnodes, elems, xyz, values);
             break;
