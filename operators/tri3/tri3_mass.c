@@ -212,7 +212,7 @@ void tri3_assemble_mass(const ptrdiff_t nelements,
                 element_matrix);
 
             for (int edof_i = 0; edof_i < 3; ++edof_i) {
-                const idx_t dof_i = elems[edof_i][i];
+                const idx_t dof_i = ev[edof_i];
                 const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
 
                 const idx_t *row = &colidx[rowptr[dof_i]];

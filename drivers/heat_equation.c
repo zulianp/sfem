@@ -122,6 +122,9 @@ int main(int argc, char *argv[]) {
     int SFEM_EXPORT_FREQUENCY = 10;
     SFEM_READ_ENV(SFEM_EXPORT_FREQUENCY, atoi);
 
+    int SFEM_VERBOSE = 0;
+    SFEM_READ_ENV(SFEM_VERBOSE, atoi);
+
     if (rank == 0) {
         printf(
             "----------------------------------------\n"
@@ -143,7 +146,7 @@ int main(int argc, char *argv[]) {
         isolver_lsolve_set_atol(&lsolve[s], SFEM_ATOL);
         isolver_lsolve_set_rtol(&lsolve[s], SFEM_RTOL);
         isolver_lsolve_set_stol(&lsolve[s], SFEM_STOL);
-        isolver_lsolve_set_verbosity(&lsolve[s], 1);
+        isolver_lsolve_set_verbosity(&lsolve[s], SFEM_VERBOSE);
     }
 
     int n_dirichlet_conditions;
@@ -175,7 +178,6 @@ int main(int argc, char *argv[]) {
     build_crs_graph_for_elem_type(
         mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
 
-
     {
         // CFL
     }
@@ -191,6 +193,15 @@ int main(int argc, char *argv[]) {
                                rowptr,
                                colidx,
                                system_matrix);
+
+    {
+        real_t sum_lapl = 0;
+        for (ptrdiff_t i = 0; i < nnz; i++) {
+            sum_lapl += system_matrix[i];
+        }
+
+        printf("sum(Lapl) %g\n", sum_lapl);
+    }
 
     {  // Mass matrix
         if (SFEM_LUMPED_MASS) {
@@ -213,6 +224,13 @@ int main(int argc, char *argv[]) {
                           rowptr,
                           colidx,
                           mass_matrix);
+
+            real_t measure = 0;
+            for (ptrdiff_t i = 0; i < nnz; i++) {
+                measure += mass_matrix[i];
+            }
+
+            printf("Measure %g\n", measure);
         }
     }
 
@@ -246,6 +264,8 @@ int main(int argc, char *argv[]) {
                 } else {
                     system_matrix[i] -= SFEM_DT;
                 }
+
+                system_matrix[i] += mass_matrix[i];
             }
         }
     }
