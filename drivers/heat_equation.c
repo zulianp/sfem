@@ -234,7 +234,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    {  // Assemble M * dt * A
+    {  // Assemble M +/- dt * A
         if (SFEM_LUMPED_MASS) {
             for (ptrdiff_t i = 0; i < nnz; i++) {
                 if (SFEM_IMPLICIT) {
