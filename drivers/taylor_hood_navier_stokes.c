@@ -31,6 +31,10 @@
 
 // https://fenicsproject.org/olddocs/dolfin/1.6.0/python/demo/documented/navier-stokes/python/documentation.html
 
+// Explicit euler
+// #elements 65536 #nodes 131585 #nz 0 #steps 10001
+// 583.669 / 10001 = 0.0583669 (seconds) per time-step
+
 ptrdiff_t remove_p2_nodes(const ptrdiff_t n, const idx_t bound_p1, idx_t *idx) {
     ptrdiff_t nret = sortreduce(idx, n);
 
@@ -135,9 +139,7 @@ int main(int argc, char *argv[]) {
     real_t SFEM_RTOL = 1e-14;
     real_t SFEM_STOL = 1e-12;
     int SFEM_VERBOSE = 0;
-    
 
-    
     SFEM_READ_ENV(SFEM_MAX_IT, atoi);
     SFEM_READ_ENV(SFEM_ATOL, atof);
     SFEM_READ_ENV(SFEM_RTOL, atof);
@@ -277,7 +279,7 @@ int main(int argc, char *argv[]) {
 
         p2_nnz = p2_rowptr[mesh.nnodes];
         p2_mass_matrix = calloc(p2_nnz, sizeof(real_t));
-    } 
+    }
 
     if (implicit_momentum) {
         p2_diffusion = calloc(p2_nnz, sizeof(real_t));
@@ -346,7 +348,8 @@ int main(int argc, char *argv[]) {
                              mesh.nelements,
                              mesh.nnodes,
                              mesh.elements,
-                             mesh.points, p2_mass_matrix);
+                             mesh.points,
+                             p2_mass_matrix);
     }
 
     real_t *vel[3];
@@ -411,8 +414,12 @@ int main(int argc, char *argv[]) {
 
                 for (int d = 0; d < sdim; d++) {
                     if (SFEM_LUMPED_MASS) {
-                        for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
-                            tentative_vel[d][i] = correction[d][i] / p2_mass_matrix[i];
+#pragma omp parallel
+                        {
+#pragma omp for
+                            for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                                tentative_vel[d][i] = correction[d][i] / p2_mass_matrix[i];
+                            }
                         }
 
                     } else {
@@ -465,19 +472,12 @@ int main(int argc, char *argv[]) {
 
             for (int d = 0; d < sdim; d++) {
                 if (SFEM_LUMPED_MASS) {
-                    // apply_inv_lumped_mass(mesh.element_type,
-                    //                       mesh.nelements,
-                    //                       mesh.nnodes,
-                    //                       mesh.elements,
-                    //                       mesh.points,
-                    //                       correction[d],
-                    //                       buff);
-
-                    // memcpy(correction[d], buff, mesh.nnodes * sizeof(real_t));
-
-
-                    for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
-                        correction[d][i] = correction[d][i] / p2_mass_matrix[i];
+#pragma omp parallel
+                    {
+#pragma omp for
+                        for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                            correction[d][i] = correction[d][i] / p2_mass_matrix[i];
+                        }
                     }
 
                 } else {
