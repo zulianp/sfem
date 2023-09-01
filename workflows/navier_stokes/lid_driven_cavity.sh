@@ -24,7 +24,7 @@ then
 fi
 
 SFEM_MESH_DIR=mesh
-create_box_2D_p2.sh 6
+create_box_2D_p2.sh 5
 rm -f $mesh/z.raw
 nvars=3
 
@@ -43,13 +43,14 @@ export SFEM_PRESSURE_DIRICHLET_NODESET="pbc.int32.raw"
 export SFEM_PRESSURE_DIRICHLET_VALUE="0"
 export SFEM_PRESSURE_DIRICHLET_COMPONENT="0"
 
-export SFEM_DT=0.00001
+export SFEM_DT=0.000001
 export SFEM_MAX_TIME=0.1
 export SFEM_EXPORT_FREQUENCY=0.001
 export SFEM_RTOL=1e-14
 export SFEM_MAX_IT=2000
 export SFEM_CFL=0.05
 export SFEM_LUMPED_MASS=1
+export SFEM_VERBOSE=1
 
 export SFEM_DYNAMIC_VISCOSITY=1
 export SFEM_MASS_DENSITY=1
