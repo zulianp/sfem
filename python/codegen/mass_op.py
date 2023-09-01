@@ -35,6 +35,38 @@ class MassOp:
 
 		return expr
 
+	def hrz_diagonal_scaling_lumped_matrix(self):
+		fe_trial = self.fe_trial
+		fe_test = self.fe_test
+		q = self.q
+
+		fun_trial = fe_trial.fun(q)
+		fun_test  = fe_test.fun(q)
+		dV = fe_test.jacobian_determinant(q)
+
+		expr = []
+
+		d = sp.zeros(fe_test.n_nodes(), 1)
+
+		approx_measure = 0
+		for i in range(0, fe_test.n_nodes()):
+			integr = fe_test.integrate(q, fun_test[i] * fun_trial[i]) * dV
+			integr = sp.simplify(integr)
+			d[i] = integr
+			approx_measure += integr
+
+			
+
+		measure = fe_test.measure(q)
+		rescale = measure / approx_measure
+		d = d * rescale
+		
+		for i in range(0, fe_test.n_nodes()):
+			var = sp.symbols(f'element_matrix_diag[{i}]')
+			expr.append(ast.Assignment(var, d[i]))
+		return expr
+
+
 	def lumped_matrix(self):
 		fe_trial = self.fe_trial
 		fe_test = self.fe_test
@@ -93,7 +125,8 @@ def main():
 		fe = Tri6()
 		f =  Field(fe, coeffs('u', 6))
 		op = MassOp(f, fe, [qx, qy, qz])
-		c_code(op.matrix())
+		# c_code(op.matrix())
+		c_code(op.hrz_diagonal_scaling_lumped_matrix())
 
 	if False:
 	# if True:

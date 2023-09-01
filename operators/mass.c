@@ -61,10 +61,10 @@ void assemble_lumped_mass(const int element_type,
             tri3_assemble_lumped_mass(nelements, nnodes, elems, xyz, values);
             break;
         }
-        // case TRI6: {
-        //     tri6_assemble_lumped_mass(nelements, nnodes, elems, xyz, values);
-        //     break;
-        // }
+        case TRI6: {
+            tri6_assemble_lumped_mass(nelements, nnodes, elems, xyz, values);
+            break;
+        }
         case TET4: {
             tet4_assemble_lumped_mass(nelements, nnodes, elems, xyz, values);
             break;

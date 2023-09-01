@@ -135,6 +135,9 @@ int main(int argc, char *argv[]) {
     real_t SFEM_RTOL = 1e-14;
     real_t SFEM_STOL = 1e-12;
     int SFEM_VERBOSE = 0;
+    
+
+    
     SFEM_READ_ENV(SFEM_MAX_IT, atoi);
     SFEM_READ_ENV(SFEM_ATOL, atof);
     SFEM_READ_ENV(SFEM_RTOL, atof);
@@ -145,11 +148,13 @@ int main(int argc, char *argv[]) {
     real_t SFEM_MAX_TIME = 1;
     real_t SFEM_CFL = 0.1;
     real_t SFEM_EXPORT_FREQUENCY = 0.1;
+    int SFEM_LUMPED_MASS = 0;
 
     SFEM_READ_ENV(SFEM_DT, atof);
     SFEM_READ_ENV(SFEM_MAX_TIME, atof);
     SFEM_READ_ENV(SFEM_CFL, atof);
     SFEM_READ_ENV(SFEM_EXPORT_FREQUENCY, atof);
+    SFEM_READ_ENV(SFEM_LUMPED_MASS, atoi);
 
     if (rank == 0) {
         printf(
@@ -158,12 +163,14 @@ int main(int argc, char *argv[]) {
             "----------------------------------------\n"
             "- SFEM_DT=%g\n"
             "- SFEM_CFL=%g\n"
+            "- SFEM_LUMPED_MASS=%d\n"
             "- SFEM_DYNAMIC_VISCOSITY=%g\n"
             "- SFEM_MASS_DENSITY=%g\n"
             "- SFEM_VELOCITY_DIRICHLET_NODESET=%s\n"
             "----------------------------------------\n",
             SFEM_DT,
             SFEM_CFL,
+            SFEM_LUMPED_MASS,
             SFEM_DYNAMIC_VISCOSITY,
             SFEM_MASS_DENSITY,
             SFEM_VELOCITY_DIRICHLET_NODESET);
@@ -263,15 +270,14 @@ int main(int argc, char *argv[]) {
     real_t *p2_mass_matrix = 0;
 
     int implicit_momentum = 0;
-    int lumped_mass_matrix = 0;
 
-    if (!lumped_mass_matrix || implicit_momentum) {
+    if (!SFEM_LUMPED_MASS || implicit_momentum) {
         build_crs_graph_for_elem_type(
             mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &p2_rowptr, &p2_colidx);
 
         p2_nnz = p2_rowptr[mesh.nnodes];
         p2_mass_matrix = calloc(p2_nnz, sizeof(real_t));
-    }
+    } 
 
     if (implicit_momentum) {
         p2_diffusion = calloc(p2_nnz, sizeof(real_t));
@@ -304,7 +310,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Only works if B.C. are set on al three vector components
-    if (!lumped_mass_matrix) {
+    if (!SFEM_LUMPED_MASS) {
         p2_nnz = p2_rowptr[mesh.nnodes];
         p2_mass_matrix = calloc(p2_nnz, sizeof(real_t));
 
@@ -334,6 +340,13 @@ int main(int argc, char *argv[]) {
                                   p2_rowptr,
                                   p2_colidx,
                                   p2_mass_matrix);
+    } else {
+        p2_mass_matrix = calloc(mesh.nnodes, sizeof(real_t));
+        assemble_lumped_mass(mesh.element_type,
+                             mesh.nelements,
+                             mesh.nnodes,
+                             mesh.elements,
+                             mesh.points, p2_mass_matrix);
     }
 
     real_t *vel[3];
@@ -357,7 +370,7 @@ int main(int argc, char *argv[]) {
     int export_counter = 0;
     real_t next_check_point = SFEM_EXPORT_FREQUENCY;
 
-    { // Write to disk
+    {  // Write to disk
         printf("%g/%g\n", 0., SFEM_MAX_TIME);
         for (int d = 0; d < sdim; d++) {
             sprintf(path, "%s/u%d.%09d.raw", output_folder, d, export_counter);
@@ -397,14 +410,11 @@ int main(int argc, char *argv[]) {
                 }
 
                 for (int d = 0; d < sdim; d++) {
-                    if (lumped_mass_matrix) {
-                        apply_inv_lumped_mass(mesh.element_type,
-                                              mesh.nelements,
-                                              mesh.nnodes,
-                                              mesh.elements,
-                                              mesh.points,
-                                              correction[d],
-                                              tentative_vel[d]);
+                    if (SFEM_LUMPED_MASS) {
+                        for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                            tentative_vel[d][i] = correction[d][i] / p2_mass_matrix[i];
+                        }
+
                     } else {
                         memset(tentative_vel[d], 0, mesh.nnodes * sizeof(real_t));
                         isolver_lsolve_apply(
@@ -454,16 +464,21 @@ int main(int argc, char *argv[]) {
                 mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, 1, 1, p, correction);
 
             for (int d = 0; d < sdim; d++) {
-                if (lumped_mass_matrix) {
-                    apply_inv_lumped_mass(mesh.element_type,
-                                          mesh.nelements,
-                                          mesh.nnodes,
-                                          mesh.elements,
-                                          mesh.points,
-                                          correction[d],
-                                          buff);
+                if (SFEM_LUMPED_MASS) {
+                    // apply_inv_lumped_mass(mesh.element_type,
+                    //                       mesh.nelements,
+                    //                       mesh.nnodes,
+                    //                       mesh.elements,
+                    //                       mesh.points,
+                    //                       correction[d],
+                    //                       buff);
 
-                    memcpy(correction[d], buff, mesh.nnodes * sizeof(real_t));
+                    // memcpy(correction[d], buff, mesh.nnodes * sizeof(real_t));
+
+
+                    for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                        correction[d][i] = correction[d][i] / p2_mass_matrix[i];
+                    }
 
                 } else {
                     memset(buff, 0, mesh.nnodes * sizeof(real_t));
@@ -485,8 +500,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        if (t >= next_check_point)
-        { // Write to disk
+        if (t >= next_check_point) {  // Write to disk
             next_check_point += SFEM_EXPORT_FREQUENCY;
             printf("%g/%g\n", t, SFEM_MAX_TIME);
             for (int d = 0; d < sdim; d++) {
@@ -529,7 +543,11 @@ int main(int argc, char *argv[]) {
     double tock = MPI_Wtime();
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld #nz %ld #steps %ld\n", (long)nelements, (long)nnodes, (long)p2_nnz, step_count);
+        printf("#elements %ld #nodes %ld #nz %ld #steps %ld\n",
+               (long)nelements,
+               (long)nnodes,
+               (long)p2_nnz,
+               step_count);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
