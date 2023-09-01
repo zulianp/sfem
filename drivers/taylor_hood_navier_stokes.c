@@ -31,7 +31,7 @@
 
 // https://fenicsproject.org/olddocs/dolfin/1.6.0/python/demo/documented/navier-stokes/python/documentation.html
 
-ptrdiff_t remove_p2_nodes(const ptrdiff_t n, const idx_t bound_p1,  idx_t *idx) {
+ptrdiff_t remove_p2_nodes(const ptrdiff_t n, const idx_t bound_p1, idx_t *idx) {
     ptrdiff_t nret = sortreduce(idx, n);
 
     for (ptrdiff_t i = 0; i < n; i++) {
@@ -144,10 +144,12 @@ int main(int argc, char *argv[]) {
     real_t SFEM_DT = 1;
     real_t SFEM_MAX_TIME = 1;
     real_t SFEM_CFL = 0.1;
+    real_t SFEM_EXPORT_FREQUENCY = 0.1;
 
     SFEM_READ_ENV(SFEM_DT, atof);
     SFEM_READ_ENV(SFEM_MAX_TIME, atof);
     SFEM_READ_ENV(SFEM_CFL, atof);
+    SFEM_READ_ENV(SFEM_EXPORT_FREQUENCY, atof);
 
     if (rank == 0) {
         printf(
@@ -169,7 +171,7 @@ int main(int argc, char *argv[]) {
 
     real_t emin, emax;
     mesh_minmax_edge_length(&mesh, &emin, &emax);
-    
+
     for (int s = 0; s < N_SYSTEMS; s++) {
         isolver_lsolve_set_max_iterations(&lsolve[s], SFEM_MAX_IT);
         isolver_lsolve_set_atol(&lsolve[s], SFEM_ATOL);
@@ -220,8 +222,10 @@ int main(int argc, char *argv[]) {
     p1_nnodes += 1;
 
     for (int c = 0; c < n_pressure_dirichlet_conditions; c++) {
-        pressure_dirichlet_conditions[c].local_size = remove_p2_nodes(
-            pressure_dirichlet_conditions[c].local_size, p1_nnodes, pressure_dirichlet_conditions[c].idx);
+        pressure_dirichlet_conditions[c].local_size =
+            remove_p2_nodes(pressure_dirichlet_conditions[c].local_size,
+                            p1_nnodes,
+                            pressure_dirichlet_conditions[c].idx);
     }
 
     ptrdiff_t p1_nnz = 0;
@@ -314,6 +318,7 @@ int main(int argc, char *argv[]) {
                       p2_colidx,
                       p2_mass_matrix);
 
+        // Seems that it works best when no B.C. are used here!
         // for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
         //     crs_constraint_nodes_to_identity(velocity_dirichlet_conditions[i].local_size,
         //                                      velocity_dirichlet_conditions[i].idx,
@@ -323,8 +328,12 @@ int main(int argc, char *argv[]) {
         //                                      p2_mass_matrix);
         // }
 
-        isolver_lsolve_update_crs(
-            &lsolve[INVERSE_MASS_MATRIX], mesh.nnodes, mesh.nnodes, p2_rowptr, p2_colidx, p2_mass_matrix);
+        isolver_lsolve_update_crs(&lsolve[INVERSE_MASS_MATRIX],
+                                  mesh.nnodes,
+                                  mesh.nnodes,
+                                  p2_rowptr,
+                                  p2_colidx,
+                                  p2_mass_matrix);
     }
 
     real_t *vel[3];
@@ -342,11 +351,24 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
         boundary_condition_t cond = velocity_dirichlet_conditions[i];
-        constraint_nodes_to_value(
-            cond.local_size, cond.idx, cond.value, vel[cond.component]);
+        constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, vel[cond.component]);
     }
 
-    for (real_t t = 0; t < SFEM_MAX_TIME; t += SFEM_DT) {
+    int export_counter = 0;
+    real_t next_check_point = SFEM_EXPORT_FREQUENCY;
+
+    { // Write to disk
+        printf("%g/%g\n", 0., SFEM_MAX_TIME);
+        for (int d = 0; d < sdim; d++) {
+            sprintf(path, "%s/u%d.%09d.raw", output_folder, d, export_counter);
+            array_write(comm, path, SFEM_MPI_REAL_T, vel[d], mesh.nnodes, mesh.nnodes);
+        }
+
+        export_counter++;
+    }
+
+    ptrdiff_t step_count = 0;
+    for (real_t t = 0; t < SFEM_MAX_TIME; t += SFEM_DT, step_count++) {
         //////////////////////////////////////////////////////////////
         // Tentative momentum step
         //////////////////////////////////////////////////////////////
@@ -364,7 +386,7 @@ int main(int argc, char *argv[]) {
                                                 mesh.points,
                                                 SFEM_DT,
                                                 SFEM_DYNAMIC_VISCOSITY,
-                                                1, //Turn-off convective term for debugging with 0
+                                                1,  // Turn-off convective term for debugging with 0
                                                 vel,
                                                 correction);
 
@@ -385,10 +407,11 @@ int main(int argc, char *argv[]) {
                                               tentative_vel[d]);
                     } else {
                         memset(tentative_vel[d], 0, mesh.nnodes * sizeof(real_t));
-                        isolver_lsolve_apply(&lsolve[INVERSE_MASS_MATRIX], correction[d], tentative_vel[d]);
+                        isolver_lsolve_apply(
+                            &lsolve[INVERSE_MASS_MATRIX], correction[d], tentative_vel[d]);
                     }
 
-                    for(ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                    for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
                         tentative_vel[d][i] += vel[d][i];
                     }
                 }
@@ -427,20 +450,8 @@ int main(int argc, char *argv[]) {
                 memset(correction[d], 0, mesh.nnodes * sizeof(real_t));
             }
 
-            tri6_tri3_correction(mesh.nelements,
-                                 mesh.nnodes,
-                                 mesh.elements,
-                                 mesh.points,
-                                 1,
-                                 1,
-                                 p,
-                                 correction);
-
-            // for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
-            //     boundary_condition_t cond = velocity_dirichlet_conditions[i];
-            //     constraint_nodes_to_value(
-            //         cond.local_size, cond.idx, 0, correction[cond.component]);
-            // }
+            tri6_tri3_correction(
+                mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, 1, 1, p, correction);
 
             for (int d = 0; d < sdim; d++) {
                 if (lumped_mass_matrix) {
@@ -473,29 +484,19 @@ int main(int argc, char *argv[]) {
                     cond.local_size, cond.idx, cond.value, vel[cond.component]);
             }
         }
+
+        if (t >= next_check_point)
+        { // Write to disk
+            next_check_point += SFEM_EXPORT_FREQUENCY;
+            printf("%g/%g\n", t, SFEM_MAX_TIME);
+            for (int d = 0; d < sdim; d++) {
+                sprintf(path, "%s/u%d.%09d.raw", output_folder, d, export_counter);
+                array_write(comm, path, SFEM_MPI_REAL_T, vel[d], mesh.nnodes, mesh.nnodes);
+            }
+
+            export_counter++;
+        }
     }
-
-    
-    for (int d = 0; d < sdim; d++) {
-        sprintf(path, "%s/v.%d.raw", output_folder, d);
-        array_write(comm, path, SFEM_MPI_REAL_T, vel[d], mesh.nnodes, mesh.nnodes);
-    }
-
-    for (int d = 0; d < sdim; d++) {
-        sprintf(path, "%s/tv.%d.raw", output_folder, d);
-        array_write(comm, path, SFEM_MPI_REAL_T, tentative_vel[d], mesh.nnodes, mesh.nnodes);
-    }
-
-    for (int d = 0; d < sdim; d++) {
-        sprintf(path, "%s/c.%d.raw", output_folder, d);
-        array_write(comm, path, SFEM_MPI_REAL_T, correction[d], mesh.nnodes, mesh.nnodes);
-    }
-
-    sprintf(path, "%s/p.raw", output_folder);
-    array_write(comm, path, SFEM_MPI_REAL_T, p, p1_nnodes, p1_nnodes);
-
-    sprintf(path, "%s/tp.raw", output_folder);
-    array_write(comm, path, SFEM_MPI_REAL_T, buff, p1_nnodes, p1_nnodes);
 
     // Free resources
     free(p1_rowptr);
@@ -528,7 +529,7 @@ int main(int argc, char *argv[]) {
     double tock = MPI_Wtime();
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld #nz %ld\n", (long)nelements, (long)nnodes, (long)p1_nnz);
+        printf("#elements %ld #nodes %ld #nz %ld #steps %ld\n", (long)nelements, (long)nnodes, (long)p2_nnz, step_count);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 

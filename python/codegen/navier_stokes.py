@@ -140,8 +140,8 @@ class NavierStokesOp:
 
 		for i in range(0, n_vel):
 			# integr = (fe_vel.integrate(qp, inner(uh, fun_vel[i])) - (dt/rho) * fe_vel.integrate(qp, inner(grad_ph, fun_vel[i]))) * fe_vel.jacobian_determinant(qp)
-			# integr = (-(dt/rho) * fe_vel.integrate(qp, inner(grad_ph, fun_vel[i]))) * fe_vel.jacobian_determinant(qp)
-			integr = (-(dt/rho) * fe_vel.integrate(qp, -ph * tr(grad_vel[i]))) * fe_vel.jacobian_determinant(qp)
+			integr = (-(dt/rho) * fe_vel.integrate(qp, inner(grad_ph, fun_vel[i]))) * fe_vel.jacobian_determinant(qp)
+			# integr = (-(dt/rho) * fe_vel.integrate(qp, -ph * tr(grad_vel[i]))) * fe_vel.jacobian_determinant(qp)
 			self.form1_correction[i] = integr
 
 		print('------------------------------')
