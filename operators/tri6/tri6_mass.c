@@ -89,35 +89,30 @@ static SFEM_INLINE void tri6_mass_kernel(const real_t px0,
     element_matrix[3] = 0;
     element_matrix[4] = x6;
     element_matrix[5] = 0;
-
     element_matrix[6] = x5;
     element_matrix[7] = x4;
     element_matrix[8] = x5;
     element_matrix[9] = 0;
     element_matrix[10] = 0;
     element_matrix[11] = x6;
-
     element_matrix[12] = x5;
     element_matrix[13] = x5;
     element_matrix[14] = x4;
     element_matrix[15] = x6;
     element_matrix[16] = 0;
     element_matrix[17] = 0;
-
     element_matrix[18] = 0;
     element_matrix[19] = 0;
     element_matrix[20] = x6;
     element_matrix[21] = x7;
     element_matrix[22] = x8;
     element_matrix[23] = x8;
-
     element_matrix[24] = x6;
     element_matrix[25] = 0;
     element_matrix[26] = 0;
     element_matrix[27] = x8;
     element_matrix[28] = x7;
     element_matrix[29] = x8;
-    
     element_matrix[30] = 0;
     element_matrix[31] = x6;
     element_matrix[32] = 0;
@@ -242,7 +237,7 @@ void tri6_assemble_mass(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for //nowait
+#pragma omp for  // nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[6];
             idx_t ks[6];

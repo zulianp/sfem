@@ -936,6 +936,36 @@ static SFEM_INLINE void tri6_tri3_rhs_correction_kernel(const real_t px0,
     element_vector[9] = x6;
     element_vector[10] = x6;
     element_vector[11] = x6;
+
+    // Weak derivative on the pressure
+    // const real_t x0 = -py2;
+    // const real_t x1 = (1.0/6.0)*dt/rho;
+    // const real_t x2 = p[0]*x1;
+    // const real_t x3 = py0 + x0;
+    // const real_t x4 = py0 - py1;
+    // const real_t x5 = p[2]*x4;
+    // const real_t x6 = p[1]*x3;
+    // const real_t x7 = 2*p[1];
+    // const real_t x8 = p[0]*x3 + p[0]*x4;
+    // const real_t x9 = 2*p[2];
+    // const real_t x10 = -px2;
+    // const real_t x11 = px0 + x10;
+    // const real_t x12 = p[1]*x11;
+    // const real_t x13 = px0 - px1;
+    // const real_t x14 = p[2]*x13;
+    // const real_t x15 = p[0]*x11 + p[0]*x13;
+    // element_vector[0] = x2*(py1 + x0);
+    // element_vector[1] = -p[1]*x1*x3;
+    // element_vector[2] = x1*x5;
+    // element_vector[3] = -x1*(x4*x7 + x5 - x6 + x8);
+    // element_vector[4] = x1*(-p[0]*py1 + p[0]*py2 + p[1]*py0 + p[1]*py2 - p[2]*py0 - p[2]*py1 + 2*p[2]*py2 - py1*x7);
+    // element_vector[5] = x1*(x3*x9 - x5 + x6 + x8);
+    // element_vector[6] = x2*(-px1 - x10);
+    // element_vector[7] = x1*x12;
+    // element_vector[8] = -p[2]*x1*x13;
+    // element_vector[9] = x1*(-x12 + x13*x7 + x14 + x15);
+    // element_vector[10] = x1*(p[0]*px1 - p[0]*px2 - p[1]*px0 - p[1]*px2 + p[2]*px0 + p[2]*px1 + px1*x7 - px2*x9);
+    // element_vector[11] = -x1*(x11*x9 + x12 - x14 + x15);
 }
 
 static SFEM_INLINE void tri6_explict_momentum_rhs_kernel(const real_t px0,
@@ -2374,7 +2404,7 @@ void tri3_tri6_divergence(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("tri6_naviers_stokes.c: tri6_explict_momentum_tentative\t%g seconds\n", tock - tick);
+    // printf("tri6_naviers_stokes.c: tri6_explict_momentum_tentative\t%g seconds\n", tock - tick);
 }
 
 void tri6_tri3_correction(const ptrdiff_t nelements,
@@ -2450,7 +2480,7 @@ void tri6_tri3_correction(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("tri6_naviers_stokes.c: tri6_explict_momentum_tentative\t%g seconds\n", tock - tick);
+    // printf("tri6_naviers_stokes.c: tri6_explict_momentum_tentative\t%g seconds\n", tock - tick);
 }
 
 static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {
@@ -2641,16 +2671,16 @@ void tri6_explict_momentum_tentative(const ptrdiff_t nelements,
 
             memset(element_vector, 0, 6 * 2 * sizeof(real_t));
 
-            tri6_add_momentum_rhs_kernel(points[0][i0],
-                                         points[0][i1],
-                                         points[0][i2],
-                                         // Y coords
-                                         points[1][i0],
-                                         points[1][i1],
-                                         points[1][i2],
-                                         //  buffers
-                                         element_vel,
-                                         element_vector);
+            // tri6_add_momentum_rhs_kernel(points[0][i0],
+            //                              points[0][i1],
+            //                              points[0][i2],
+            //                              // Y coords
+            //                              points[1][i0],
+            //                              points[1][i1],
+            //                              points[1][i2],
+            //                              //  buffers
+            //                              element_vel,
+            //                              element_vector);
 
             tri6_add_diffusion_rhs_kernel(points[0][i0],
                                           points[0][i1],
@@ -2692,5 +2722,5 @@ void tri6_explict_momentum_tentative(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("tri6_naviers_stokes.c: tri6_explict_momentum_tentative\t%g seconds\n", tock - tick);
+    // printf("tri6_naviers_stokes.c: tri6_explict_momentum_tentative\t%g seconds\n", tock - tick);
 }

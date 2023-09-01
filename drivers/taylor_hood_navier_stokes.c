@@ -56,6 +56,8 @@ idx_t max_idx(const ptrdiff_t n, const idx_t *idx) {
 //////////////////////////////////////////////
 
 #define N_SYSTEMS 3
+#define INVERSE_MASS_MATRIX 2
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -132,15 +134,20 @@ int main(int argc, char *argv[]) {
     real_t SFEM_ATOL = 1e-15;
     real_t SFEM_RTOL = 1e-14;
     real_t SFEM_STOL = 1e-12;
+    int SFEM_VERBOSE = 0;
     SFEM_READ_ENV(SFEM_MAX_IT, atoi);
     SFEM_READ_ENV(SFEM_ATOL, atof);
     SFEM_READ_ENV(SFEM_RTOL, atof);
     SFEM_READ_ENV(SFEM_STOL, atof);
+    SFEM_READ_ENV(SFEM_VERBOSE, atoi);
 
     real_t SFEM_DT = 1;
     real_t SFEM_MAX_TIME = 1;
+    real_t SFEM_CFL = 0.1;
+
     SFEM_READ_ENV(SFEM_DT, atof);
     SFEM_READ_ENV(SFEM_MAX_TIME, atof);
+    SFEM_READ_ENV(SFEM_CFL, atof);
 
     if (rank == 0) {
         printf(
@@ -148,22 +155,27 @@ int main(int argc, char *argv[]) {
             "Options:\n"
             "----------------------------------------\n"
             "- SFEM_DT=%g\n"
+            "- SFEM_CFL=%g\n"
             "- SFEM_DYNAMIC_VISCOSITY=%g\n"
             "- SFEM_MASS_DENSITY=%g\n"
             "- SFEM_VELOCITY_DIRICHLET_NODESET=%s\n"
             "----------------------------------------\n",
             SFEM_DT,
+            SFEM_CFL,
             SFEM_DYNAMIC_VISCOSITY,
             SFEM_MASS_DENSITY,
             SFEM_VELOCITY_DIRICHLET_NODESET);
     }
 
+    real_t emin, emax;
+    mesh_minmax_edge_length(&mesh, &emin, &emax);
+    
     for (int s = 0; s < N_SYSTEMS; s++) {
         isolver_lsolve_set_max_iterations(&lsolve[s], SFEM_MAX_IT);
         isolver_lsolve_set_atol(&lsolve[s], SFEM_ATOL);
         isolver_lsolve_set_rtol(&lsolve[s], SFEM_RTOL);
         isolver_lsolve_set_stol(&lsolve[s], SFEM_STOL);
-        isolver_lsolve_set_verbosity(&lsolve[s], 1);
+        isolver_lsolve_set_verbosity(&lsolve[s], SFEM_VERBOSE);
     }
 
     // int n_neumann_conditions;
@@ -302,17 +314,17 @@ int main(int argc, char *argv[]) {
                       p2_colidx,
                       p2_mass_matrix);
 
-        for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
-            crs_constraint_nodes_to_identity(velocity_dirichlet_conditions[i].local_size,
-                                             velocity_dirichlet_conditions[i].idx,
-                                             1,
-                                             p2_rowptr,
-                                             p2_colidx,
-                                             p2_mass_matrix);
-        }
+        // for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
+        //     crs_constraint_nodes_to_identity(velocity_dirichlet_conditions[i].local_size,
+        //                                      velocity_dirichlet_conditions[i].idx,
+        //                                      1,
+        //                                      p2_rowptr,
+        //                                      p2_colidx,
+        //                                      p2_mass_matrix);
+        // }
 
         isolver_lsolve_update_crs(
-            &lsolve[2], mesh.nnodes, mesh.nnodes, p2_rowptr, p2_colidx, p2_mass_matrix);
+            &lsolve[INVERSE_MASS_MATRIX], mesh.nnodes, mesh.nnodes, p2_rowptr, p2_colidx, p2_mass_matrix);
     }
 
     real_t *vel[3];
@@ -328,13 +340,19 @@ int main(int argc, char *argv[]) {
 
     real_t *p = calloc(p1_nnodes, sizeof(real_t));
 
+    for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
+        boundary_condition_t cond = velocity_dirichlet_conditions[i];
+        constraint_nodes_to_value(
+            cond.local_size, cond.idx, cond.value, vel[cond.component]);
+    }
+
     for (real_t t = 0; t < SFEM_MAX_TIME; t += SFEM_DT) {
         //////////////////////////////////////////////////////////////
         // Tentative momentum step
         //////////////////////////////////////////////////////////////
         {
             for (int d = 0; d < sdim; d++) {
-                memset(tentative_vel[d], 0, mesh.nnodes * sizeof(real_t));
+                memset(correction[d], 0, mesh.nnodes * sizeof(real_t));
             }
 
             if (implicit_momentum) {
@@ -346,14 +364,14 @@ int main(int argc, char *argv[]) {
                                                 mesh.points,
                                                 SFEM_DT,
                                                 SFEM_DYNAMIC_VISCOSITY,
-                                                0, //Turn-off convective term for debugging with 0
+                                                1, //Turn-off convective term for debugging with 0
                                                 vel,
-                                                tentative_vel);
+                                                correction);
 
                 for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
                     boundary_condition_t cond = velocity_dirichlet_conditions[i];
                     constraint_nodes_to_value(
-                        cond.local_size, cond.idx, cond.value, tentative_vel[cond.component]);
+                        cond.local_size, cond.idx, 0, correction[cond.component]);
                 }
 
                 for (int d = 0; d < sdim; d++) {
@@ -363,22 +381,20 @@ int main(int argc, char *argv[]) {
                                               mesh.nnodes,
                                               mesh.elements,
                                               mesh.points,
-                                              tentative_vel[d],
+                                              correction[d],
                                               tentative_vel[d]);
                     } else {
-                        memset(correction[d], 0, mesh.nnodes * sizeof(real_t));
-                        isolver_lsolve_apply(&lsolve[2], tentative_vel[d], correction[d]);
-                        memcpy(tentative_vel[d], correction[d], mesh.nnodes * sizeof(real_t));
+                        memset(tentative_vel[d], 0, mesh.nnodes * sizeof(real_t));
+                        isolver_lsolve_apply(&lsolve[INVERSE_MASS_MATRIX], correction[d], tentative_vel[d]);
+                    }
+
+                    for(ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                        tentative_vel[d][i] += vel[d][i];
                     }
                 }
             }
-
-            // for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
-            //     boundary_condition_t cond = velocity_dirichlet_conditions[i];
-            //     constraint_nodes_to_value(
-            //         cond.local_size, cond.idx, cond.value, tentative_vel[cond.component]);
-            // }
         }
+
         //////////////////////////////////////////////////////////////
         // Poisson problem + solve
         //////////////////////////////////////////////////////////////
@@ -389,7 +405,7 @@ int main(int argc, char *argv[]) {
                                  mesh.elements,
                                  mesh.points,
                                  1,
-                                 SFEM_MASS_DENSITY,
+                                 1,
                                  SFEM_DYNAMIC_VISCOSITY,
                                  tentative_vel,
                                  buff);
@@ -399,9 +415,6 @@ int main(int argc, char *argv[]) {
                 assert(cond.component == 0);
                 constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, buff);
             }
-
-            // sprintf(path, "%s/div.raw", output_folder);
-            // array_write(comm, path, SFEM_MPI_REAL_T, buff, p1_nnodes, p1_nnodes);
 
             memset(p, 0, p1_nnodes * sizeof(real_t));
             isolver_lsolve_apply(&lsolve[0], buff, p);
@@ -419,15 +432,15 @@ int main(int argc, char *argv[]) {
                                  mesh.elements,
                                  mesh.points,
                                  1,
-                                 SFEM_MASS_DENSITY,
+                                 1,
                                  p,
                                  correction);
 
-            for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
-                boundary_condition_t cond = velocity_dirichlet_conditions[i];
-                constraint_nodes_to_value(
-                    cond.local_size, cond.idx, 0, correction[cond.component]);
-            }
+            // for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
+            //     boundary_condition_t cond = velocity_dirichlet_conditions[i];
+            //     constraint_nodes_to_value(
+            //         cond.local_size, cond.idx, 0, correction[cond.component]);
+            // }
 
             for (int d = 0; d < sdim; d++) {
                 if (lumped_mass_matrix) {
@@ -437,25 +450,27 @@ int main(int argc, char *argv[]) {
                                           mesh.elements,
                                           mesh.points,
                                           correction[d],
-                                          tentative_vel[d]);
+                                          buff);
+
+                    memcpy(correction[d], buff, mesh.nnodes * sizeof(real_t));
 
                 } else {
                     memset(buff, 0, mesh.nnodes * sizeof(real_t));
-                    isolver_lsolve_apply(&lsolve[2], correction[d], buff);
+                    isolver_lsolve_apply(&lsolve[INVERSE_MASS_MATRIX], correction[d], buff);
                     memcpy(correction[d], buff, mesh.nnodes * sizeof(real_t));
                 }
-            }
-
-            for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
-                boundary_condition_t cond = velocity_dirichlet_conditions[i];
-                constraint_nodes_to_value(
-                    cond.local_size, cond.idx, 0, correction[cond.component]);
             }
 
             for (int d = 0; d < sdim; d++) {
                 for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
                     vel[d][i] = tentative_vel[d][i] + correction[d][i];
                 }
+            }
+
+            for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
+                boundary_condition_t cond = velocity_dirichlet_conditions[i];
+                constraint_nodes_to_value(
+                    cond.local_size, cond.idx, cond.value, vel[cond.component]);
             }
         }
     }

@@ -110,6 +110,9 @@ int main(int argc, char *argv[]) {
 
     real_t SFEM_DT = 1;
     real_t SFEM_MAX_TIME = 1;
+    real_t SFEM_CFL = 0.1;
+
+    SFEM_READ_ENV(SFEM_CFL, atof);
     SFEM_READ_ENV(SFEM_DT, atof);
     SFEM_READ_ENV(SFEM_MAX_TIME, atof);
 
@@ -119,8 +122,8 @@ int main(int argc, char *argv[]) {
     int SFEM_LUMPED_MASS = 0;
     SFEM_READ_ENV(SFEM_LUMPED_MASS, atoi);
 
-    int SFEM_EXPORT_FREQUENCY = 10;
-    SFEM_READ_ENV(SFEM_EXPORT_FREQUENCY, atoi);
+    real_t SFEM_EXPORT_FREQUENCY = 0.1;
+    SFEM_READ_ENV(SFEM_EXPORT_FREQUENCY, atof);
 
     int SFEM_VERBOSE = 0;
     SFEM_READ_ENV(SFEM_VERBOSE, atoi);
@@ -178,8 +181,37 @@ int main(int argc, char *argv[]) {
     build_crs_graph_for_elem_type(
         mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
 
-    {
-        // CFL
+    if (!SFEM_IMPLICIT) {
+        // SFEM_CFL
+        // real_t h = 10000000;
+        // for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+        //     const count_t extent = rowptr[i + 1] - rowptr[i];
+        //     const idx_t *adj = &colidx[rowptr[i]];
+
+        //     for (count_t k = 0; k < extent; k++) {
+        //         if(adj[k] == i) continue;
+
+        //         real_t len = 0;
+
+        //         for (int d = 0; d < sdim; d++) {
+        //             const real_t a = mesh.points[d][i];
+        //             const real_t b = mesh.points[d][adj[k]];
+        //             const real_t d = a - b;
+        //             len += (d * d);
+        //         }
+
+        //         len = sqrt(len);
+        //         h = MIN(len, h);
+        //     }
+        // }
+
+        real_t h, _ignore;
+        mesh_minmax_edge_length(&mesh, &h, &_ignore);
+        SFEM_DT = MIN(SFEM_DT, (SFEM_CFL * h * h) / (2 * SFEM_DIFFUSIVITY));
+
+        if(!rank) {
+            printf("Adjusted SFEM_DT = %g\n", (double)SFEM_DT);
+        }
     }
 
     ptrdiff_t nnz = rowptr[mesh.nnodes];
@@ -238,9 +270,9 @@ int main(int argc, char *argv[]) {
         if (SFEM_LUMPED_MASS) {
             for (ptrdiff_t i = 0; i < nnz; i++) {
                 if (SFEM_IMPLICIT) {
-                    system_matrix[i] *= SFEM_DT;
+                    system_matrix[i] *= SFEM_DT * SFEM_DIFFUSIVITY;
                 } else {
-                    system_matrix[i] *= -SFEM_DT;
+                    system_matrix[i] *= -SFEM_DT * SFEM_DIFFUSIVITY;
                 }
             }
 
@@ -260,9 +292,9 @@ int main(int argc, char *argv[]) {
         } else {
             for (ptrdiff_t i = 0; i < nnz; i++) {
                 if (SFEM_IMPLICIT) {
-                    system_matrix[i] *= SFEM_DT;
+                    system_matrix[i] *= SFEM_DT * SFEM_DIFFUSIVITY;
                 } else {
-                    system_matrix[i] -= SFEM_DT;
+                    system_matrix[i] *= -SFEM_DT * SFEM_DIFFUSIVITY;
                 }
 
                 system_matrix[i] += mass_matrix[i];
@@ -310,12 +342,23 @@ int main(int argc, char *argv[]) {
     real_t *u = calloc(mesh.nnodes, sizeof(real_t));
     real_t *u_old = calloc(mesh.nnodes, sizeof(real_t));
 
+    for (int i = 0; i < n_dirichlet_conditions; i++) {
+        boundary_condition_t cond = dirichlet_conditions[i];
+        constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, u_old);
+    }
+
+    int export_counter = 0;
+
     printf("%g/%g\n", 0., SFEM_MAX_TIME);
-    sprintf(path, "%s/u.%09d.raw", output_folder, 0);
+    sprintf(path, "%s/u.%09d.raw", output_folder, export_counter++);
     array_write(comm, path, SFEM_MPI_REAL_T, u_old, mesh.nnodes, mesh.nnodes);
 
+
+    real_t next_check_point = SFEM_EXPORT_FREQUENCY;
+
+    ptrdiff_t step_count = 0;
+
     if (SFEM_IMPLICIT) {
-        int step_count = 0;
         for (real_t t = 0; t < SFEM_MAX_TIME; t += SFEM_DT, step_count++) {
             if (SFEM_LUMPED_MASS) {
                 for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
@@ -334,15 +377,16 @@ int main(int argc, char *argv[]) {
 
             isolver_lsolve_apply(&lsolve[INVERSE_SYSTEM], u_old, u);
 
-            if ((step_count + 1) % SFEM_EXPORT_FREQUENCY == 0) {
+            if (t >= next_check_point) {
+                next_check_point += SFEM_EXPORT_FREQUENCY;
+
                 printf("%g/%g\n", t, SFEM_MAX_TIME);
-                sprintf(path, "%s/u.%09d.raw", output_folder, step_count);
+                sprintf(path, "%s/u.%09d.raw", output_folder, export_counter++);
                 array_write(comm, path, SFEM_MPI_REAL_T, u, mesh.nnodes, mesh.nnodes);
             }
         }
 
     } else {
-        int step_count = 0;
         for (real_t t = 0; t < SFEM_MAX_TIME; t += SFEM_DT, step_count++) {
             const int i = step_count % 2;
             const int ip1 = (step_count + 1) % 2;
@@ -373,9 +417,11 @@ int main(int argc, char *argv[]) {
                 isolver_lsolve_apply(&lsolve[INVERSE_MASS_MATRIX], u, u_old);
             }
 
-            if ((step_count + 1) % SFEM_EXPORT_FREQUENCY == 0) {
+            if (t >= next_check_point) {
+                next_check_point += SFEM_EXPORT_FREQUENCY;
+
                 printf("%g/%g\n", t, SFEM_MAX_TIME);
-                sprintf(path, "%s/u.%09d.raw", output_folder, step_count);
+                sprintf(path, "%s/u.%09d.raw", output_folder, export_counter++);
                 array_write(comm, path, SFEM_MPI_REAL_T, u_old, mesh.nnodes, mesh.nnodes);
             }
         }
@@ -399,7 +445,7 @@ int main(int argc, char *argv[]) {
     double tock = MPI_Wtime();
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)nelements, (long)nnodes);
+        printf("#elements %ld #nodes %ld time-steps %ld\n", (long)nelements, (long)nnodes, (long)step_count);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 

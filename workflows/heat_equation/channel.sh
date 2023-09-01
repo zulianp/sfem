@@ -24,8 +24,8 @@ then
 fi
 
 SFEM_MESH_DIR=mesh
-# create_box_2D_p2.sh 8
-# create_box_2D.sh 4
+create_box_2D_p2.sh 7
+# create_box_2D.sh 2
 # rm -f $mesh/z.raw
 nvars=3
 
@@ -34,21 +34,26 @@ sright=$SFEM_MESH_DIR/sidesets_aos/sright.raw
 sbottom=$SFEM_MESH_DIR/sidesets_aos/sbottom.raw
 stop=$SFEM_MESH_DIR/sidesets_aos/stop.raw
 
-export SFEM_DIRICHLET_NODESET="$sleft"
-export SFEM_DIRICHLET_VALUE="1"
-export SFEM_DIRICHLET_COMPONENT="0"
+export SFEM_DIRICHLET_NODESET="$sleft,$stop,$sbottom"
+export SFEM_DIRICHLET_VALUE="1,0,0"
+export SFEM_DIRICHLET_COMPONENT="0,0,0"
 
 export SFEM_DT=0.1
-export SFEM_MAX_TIME=6
+export SFEM_MAX_TIME=0.6
 export SFEM_RTOL=1e-14
 export SFEM_MAX_IT=4000
-export SFEM_EXPORT_FREQUENCY=1
+export SFEM_EXPORT_FREQUENCY=0.01
+export SFEM_VERBOSE=0
+export SFEM_DIFFUSIVITY=1
+
+# Used for explicit integration
+export SFEM_CFL=0.05;
 
 mkdir -p out
 set -x
 
 
-export SFEM_IMPLICIT=1
+export SFEM_IMPLICIT=0
 export SFEM_LUMPED_MASS=0
 
 rm -rf out

@@ -89,13 +89,13 @@ def main():
 		op = MassOp(f, fe, [qx, qy, qz])
 		c_code(op.matrix())
 
-	if False:
+	if True:
 		fe = Tri6()
-		f =  Field(fe, coeffs('u', 10))
+		f =  Field(fe, coeffs('u', 6))
 		op = MassOp(f, fe, [qx, qy, qz])
 		c_code(op.matrix())
 
-	if True:
+	if False:
 	# if True:
 		# fields = [Field(TriShell3(), coeffs('u', 3)), Field(TransformedTet10(), coeffs('u', 10))]
 		# test_fes  = [TransformedTet10(), DualTet10()]
@@ -161,7 +161,7 @@ def main():
 		c_code(tet10_basis_transform_expr())
 		print("----------------------------")
 
-	if True:
+	if False:
 	# if False:
 		print("----------------------------")
 		print("Transform")
