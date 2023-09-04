@@ -352,7 +352,7 @@ int main(int argc, char *argv[]) {
                              mesh.points,
                              p2_mass_matrix);
 
-        array_write(comm, "out/mass.raw", SFEM_MPI_REAL_T, p2_mass_matrix, mesh.nnodes, mesh.nnodes);
+        // array_write(comm, "out/mass.raw", SFEM_MPI_REAL_T, p2_mass_matrix, mesh.nnodes, mesh.nnodes);
     }
 
     real_t *vel[3];
