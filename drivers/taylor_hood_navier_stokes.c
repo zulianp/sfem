@@ -57,6 +57,14 @@ idx_t max_idx(const ptrdiff_t n, const idx_t *idx) {
     return ret;
 }
 
+static ptrdiff_t count_nan(const ptrdiff_t n, const real_t *const v) {
+    ptrdiff_t ret = 0;
+    for (ptrdiff_t i = 0; i < n; i++) {
+        ret += !(v[i] == v[i]);
+    }
+    return ret;
+}
+
 //////////////////////////////////////////////
 
 #define N_SYSTEMS 3
@@ -352,7 +360,8 @@ int main(int argc, char *argv[]) {
                              mesh.points,
                              p2_mass_matrix);
 
-        // array_write(comm, "out/mass.raw", SFEM_MPI_REAL_T, p2_mass_matrix, mesh.nnodes, mesh.nnodes);
+        // array_write(comm, "out/mass.raw", SFEM_MPI_REAL_T, p2_mass_matrix, mesh.nnodes,
+        // mesh.nnodes);
     }
 
     real_t *vel[3];
@@ -382,15 +391,16 @@ int main(int argc, char *argv[]) {
             sprintf(path, "%s/u%d.%09d.raw", output_folder, d, export_counter);
             array_write(comm, path, SFEM_MPI_REAL_T, vel[d], mesh.nnodes, mesh.nnodes);
         }
-        
+
         sprintf(path, "%s/p.%09d.raw", output_folder, export_counter);
         array_write(comm, path, SFEM_MPI_REAL_T, p, p1_nnodes, p1_nnodes);
 
         export_counter++;
     }
 
+    real_t dt = SFEM_DT;
     ptrdiff_t step_count = 0;
-    for (real_t t = 0; t < SFEM_MAX_TIME; t += SFEM_DT, step_count++) {
+    for (real_t t = 0; t < SFEM_MAX_TIME; t += dt, step_count++) {
         //////////////////////////////////////////////////////////////
         // Tentative momentum step
         //////////////////////////////////////////////////////////////
@@ -402,17 +412,41 @@ int main(int argc, char *argv[]) {
             if (implicit_momentum) {
                 // TODO
             } else {
+                // Ensure CFL condition
+                real_t max_velocity = 0;
+                for (int d = 0; d < sdim; d++) {
+                    for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                        max_velocity = MAX(max_velocity, vel[d][i]);
+                    }
+                }
+
+                // Maybe not the right place
+                dt = MAX(1e-12, MIN(SFEM_DT, SFEM_CFL / ((2 * max_velocity * emin * emin))));
+
                 navier_stokes_mixed_explict_momentum_tentative(
                     mesh.element_type,
                     mesh.nelements,
                     mesh.nnodes,
                     mesh.elements,
                     mesh.points,
-                    SFEM_DT,
+                    dt,
                     SFEM_DYNAMIC_VISCOSITY,
                     1,  // Turn-off convective term for debugging with 0
                     vel,
                     correction);
+
+                { //CHECK NaN
+                    ptrdiff_t stop = 0;
+                    for (int d = 0; d < sdim; d++) {
+                        stop += count_nan(mesh.nnodes, correction[d]);
+                    }
+
+                    if (stop) {
+                        fprintf(stderr, "Encountered %ld NaN value! Stopping...\n", stop);
+                        MPI_Abort(comm, -1);
+                        break;
+                    }
+                }
 
                 for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
                     boundary_condition_t cond = velocity_dirichlet_conditions[i];
@@ -523,7 +557,7 @@ int main(int argc, char *argv[]) {
 
         if (t >= next_check_point) {  // Write to disk
             next_check_point += SFEM_EXPORT_FREQUENCY;
-            printf("%g/%g\n", t, SFEM_MAX_TIME);
+            printf("%g/%g dt=%g\n", t, SFEM_MAX_TIME, dt);
             for (int d = 0; d < sdim; d++) {
                 sprintf(path, "%s/u%d.%09d.raw", output_folder, d, export_counter);
                 array_write(comm, path, SFEM_MPI_REAL_T, vel[d], mesh.nnodes, mesh.nnodes);
