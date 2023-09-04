@@ -15,18 +15,18 @@
 #include "sfem_vec.h"
 
 static SFEM_INLINE void tet10_mass_kernel(const real_t px0,
-                                    const real_t px1,
-                                    const real_t px2,
-                                    const real_t px3,
-                                    const real_t py0,
-                                    const real_t py1,
-                                    const real_t py2,
-                                    const real_t py3,
-                                    const real_t pz0,
-                                    const real_t pz1,
-                                    const real_t pz2,
-                                    const real_t pz3,
-                                    real_t *const SFEM_RESTRICT element_matrix) {
+                                          const real_t px1,
+                                          const real_t px2,
+                                          const real_t px3,
+                                          const real_t py0,
+                                          const real_t py1,
+                                          const real_t py2,
+                                          const real_t py3,
+                                          const real_t pz0,
+                                          const real_t pz1,
+                                          const real_t pz2,
+                                          const real_t pz3,
+                                          real_t *const SFEM_RESTRICT element_matrix) {
     // FLOATING POINT OPS!
     //       - Result: 100*ASSIGNMENT
     //       - Subexpressions: 12*ADD + 33*DIV + 69*MUL + NEG + 27*SUB
@@ -42,21 +42,27 @@ static SFEM_INLINE void tet10_mass_kernel(const real_t px0,
     const real_t x9 = x4 * x8;
     const real_t x10 = px0 - px3;
     const real_t x11 = x5 * x7;
-    const real_t x12 = (1.0 / 420.0) * x0 * x3 - 1.0 / 420.0 * x0 * x4 * x5 - 1.0 / 420.0 * x1 * x10 * x8 +
-                       (1.0 / 420.0) * x10 * x11 - 1.0 / 420.0 * x2 * x6 * x7 + (1.0 / 420.0) * x6 * x9;
+    const real_t x12 = (1.0 / 420.0) * x0 * x3 - 1.0 / 420.0 * x0 * x4 * x5 -
+                       1.0 / 420.0 * x1 * x10 * x8 + (1.0 / 420.0) * x10 * x11 -
+                       1.0 / 420.0 * x2 * x6 * x7 + (1.0 / 420.0) * x6 * x9;
     const real_t x13 = -x12;
-    const real_t x14 = -1.0 / 2520.0 * x0 * x3 + (1.0 / 2520.0) * x0 * x4 * x5 + (1.0 / 2520.0) * x1 * x10 * x8 -
-                       1.0 / 2520.0 * x10 * x11 + (1.0 / 2520.0) * x2 * x6 * x7 - 1.0 / 2520.0 * x6 * x9;
+    const real_t x14 = -1.0 / 2520.0 * x0 * x3 + (1.0 / 2520.0) * x0 * x4 * x5 +
+                       (1.0 / 2520.0) * x1 * x10 * x8 - 1.0 / 2520.0 * x10 * x11 +
+                       (1.0 / 2520.0) * x2 * x6 * x7 - 1.0 / 2520.0 * x6 * x9;
     const real_t x15 = (1.0 / 630.0) * x0;
     const real_t x16 = (1.0 / 630.0) * x6;
     const real_t x17 = (1.0 / 630.0) * x10;
-    const real_t x18 = -x1 * x17 * x8 + x11 * x17 + x15 * x3 - x15 * x4 * x5 - x16 * x2 * x7 + x16 * x9;
-    const real_t x19 = -4.0 / 315.0 * x0 * x3 + (4.0 / 315.0) * x0 * x4 * x5 + (4.0 / 315.0) * x1 * x10 * x8 -
-                       4.0 / 315.0 * x10 * x11 + (4.0 / 315.0) * x2 * x6 * x7 - 4.0 / 315.0 * x6 * x9;
-    const real_t x20 = -2.0 / 315.0 * x0 * x3 + (2.0 / 315.0) * x0 * x4 * x5 + (2.0 / 315.0) * x1 * x10 * x8 -
-                       2.0 / 315.0 * x10 * x11 + (2.0 / 315.0) * x2 * x6 * x7 - 2.0 / 315.0 * x6 * x9;
-    const real_t x21 = -1.0 / 315.0 * x0 * x3 + (1.0 / 315.0) * x0 * x4 * x5 + (1.0 / 315.0) * x1 * x10 * x8 -
-                       1.0 / 315.0 * x10 * x11 + (1.0 / 315.0) * x2 * x6 * x7 - 1.0 / 315.0 * x6 * x9;
+    const real_t x18 =
+        -x1 * x17 * x8 + x11 * x17 + x15 * x3 - x15 * x4 * x5 - x16 * x2 * x7 + x16 * x9;
+    const real_t x19 = -4.0 / 315.0 * x0 * x3 + (4.0 / 315.0) * x0 * x4 * x5 +
+                       (4.0 / 315.0) * x1 * x10 * x8 - 4.0 / 315.0 * x10 * x11 +
+                       (4.0 / 315.0) * x2 * x6 * x7 - 4.0 / 315.0 * x6 * x9;
+    const real_t x20 = -2.0 / 315.0 * x0 * x3 + (2.0 / 315.0) * x0 * x4 * x5 +
+                       (2.0 / 315.0) * x1 * x10 * x8 - 2.0 / 315.0 * x10 * x11 +
+                       (2.0 / 315.0) * x2 * x6 * x7 - 2.0 / 315.0 * x6 * x9;
+    const real_t x21 = -1.0 / 315.0 * x0 * x3 + (1.0 / 315.0) * x0 * x4 * x5 +
+                       (1.0 / 315.0) * x1 * x10 * x8 - 1.0 / 315.0 * x10 * x11 +
+                       (1.0 / 315.0) * x2 * x6 * x7 - 1.0 / 315.0 * x6 * x9;
     element_matrix[0] = x13;
     element_matrix[1] = x14;
     element_matrix[2] = x14;
@@ -189,7 +195,10 @@ static SFEM_INLINE int find_col(const idx_t key, const idx_t *const row, const i
     }
 }
 
-static SFEM_INLINE void find_cols10(const idx_t *targets, const idx_t *const row, const int lenrow, int *ks) {
+static SFEM_INLINE void find_cols10(const idx_t *targets,
+                                    const idx_t *const row,
+                                    const int lenrow,
+                                    int *ks) {
     if (lenrow > 32) {
         for (int d = 0; d < 10; ++d) {
             ks[d] = find_col(targets[d], row, lenrow);
@@ -209,74 +218,72 @@ static SFEM_INLINE void find_cols10(const idx_t *targets, const idx_t *const row
     }
 }
 
-
 void tet10_assemble_mass(const ptrdiff_t nelements,
                          const ptrdiff_t nnodes,
                          idx_t **const elems,
                          geom_t **const xyz,
                          count_t *const rowptr,
                          idx_t *const colidx,
-                         real_t *const values)
-{
-        SFEM_UNUSED(nnodes);
+                         real_t *const values) {
+    SFEM_UNUSED(nnodes);
 
-        double tick = MPI_Wtime();
+    double tick = MPI_Wtime();
 
-        idx_t ev[10];
-        idx_t ks[10];
+    idx_t ev[10];
+    idx_t ks[10];
 
-        real_t element_matrix[10 * 10];
+    real_t element_matrix[10 * 10];
 
-        for (ptrdiff_t i = 0; i < nelements; ++i) {
-    #pragma unroll(10)
-            for (int v = 0; v < 10; ++v) {
-                ev[v] = elems[v][i];
-            }
-
-            // Element indices for affine coordinates
-            const idx_t i0 = ev[0];
-            const idx_t i1 = ev[1];
-            const idx_t i2 = ev[2];
-            const idx_t i3 = ev[3];
-
-            tet10_mass_kernel(
-                // X-coordinates
-                xyz[0][i0],
-                xyz[0][i1],
-                xyz[0][i2],
-                xyz[0][i3],
-                // Y-coordinates
-                xyz[1][i0],
-                xyz[1][i1],
-                xyz[1][i2],
-                xyz[1][i3],
-                // Z-coordinates
-                xyz[2][i0],
-                xyz[2][i1],
-                xyz[2][i2],
-                xyz[2][i3],
-                element_matrix);
-
-            for (int edof_i = 0; edof_i < 10; ++edof_i) {
-                const idx_t dof_i = elems[edof_i][i];
-                const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
-
-                const idx_t *row = &colidx[rowptr[dof_i]];
-
-                find_cols10(ev, row, lenrow, ks);
-
-                real_t *rowvalues = &values[rowptr[dof_i]];
-                const real_t *element_row = &element_matrix[edof_i * 10];
-
-    #pragma unroll(10)
-                for (int edof_j = 0; edof_j < 10; ++edof_j) {
-                    rowvalues[ks[edof_j]] += element_row[edof_j];
-                }
-            }
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma unroll(10)
+        for (int v = 0; v < 10; ++v) {
+            ev[v] = elems[v][i];
         }
 
-        double tock = MPI_Wtime();
-        printf("tet10_mass.c: tet10_assemble_mass\t%g seconds\n", tock - tick);
+        // Element indices for affine coordinates
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+        const idx_t i3 = ev[3];
+
+        tet10_mass_kernel(
+            // X-coordinates
+            xyz[0][i0],
+            xyz[0][i1],
+            xyz[0][i2],
+            xyz[0][i3],
+            // Y-coordinates
+            xyz[1][i0],
+            xyz[1][i1],
+            xyz[1][i2],
+            xyz[1][i3],
+            // Z-coordinates
+            xyz[2][i0],
+            xyz[2][i1],
+            xyz[2][i2],
+            xyz[2][i3],
+            element_matrix);
+
+        for (int edof_i = 0; edof_i < 10; ++edof_i) {
+            const idx_t dof_i = elems[edof_i][i];
+            const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
+
+            const idx_t *row = &colidx[rowptr[dof_i]];
+
+            find_cols10(ev, row, lenrow, ks);
+
+            real_t *rowvalues = &values[rowptr[dof_i]];
+            const real_t *element_row = &element_matrix[edof_i * 10];
+
+#pragma unroll(10)
+            for (int edof_j = 0; edof_j < 10; ++edof_j) {
+                rowvalues[ks[edof_j]] += element_row[edof_j];
+            }
+        }
+    }
+
+    double tock = MPI_Wtime();
+    printf("tet10_mass.c: tet10_assemble_mass\t%g seconds\n", tock - tick);
 }
 
 static SFEM_INLINE void lumped_mass_kernel(const real_t px0,
@@ -308,10 +315,12 @@ static SFEM_INLINE void lumped_mass_kernel(const real_t px0,
     const real_t x9 = x4 * x8;
     const real_t x10 = px0 - px3;
     const real_t x11 = x5 * x7;
-    const real_t x12 = -7.0 / 600.0 * x0 * x3 + (7.0 / 600.0) * x0 * x4 * x5 + (7.0 / 600.0) * x1 * x10 * x8 -
-                       7.0 / 600.0 * x10 * x11 + (7.0 / 600.0) * x2 * x6 * x7 - 7.0 / 600.0 * x6 * x9;
-    const real_t x13 = -1.0 / 50.0 * x0 * x3 + (1.0 / 50.0) * x0 * x4 * x5 + (1.0 / 50.0) * x1 * x10 * x8 -
-                       1.0 / 50.0 * x10 * x11 + (1.0 / 50.0) * x2 * x6 * x7 - 1.0 / 50.0 * x6 * x9;
+    const real_t x12 = -7.0 / 600.0 * x0 * x3 + (7.0 / 600.0) * x0 * x4 * x5 +
+                       (7.0 / 600.0) * x1 * x10 * x8 - 7.0 / 600.0 * x10 * x11 +
+                       (7.0 / 600.0) * x2 * x6 * x7 - 7.0 / 600.0 * x6 * x9;
+    const real_t x13 = -1.0 / 50.0 * x0 * x3 + (1.0 / 50.0) * x0 * x4 * x5 +
+                       (1.0 / 50.0) * x1 * x10 * x8 - 1.0 / 50.0 * x10 * x11 +
+                       (1.0 / 50.0) * x2 * x6 * x7 - 1.0 / 50.0 * x6 * x9;
     element_matrix_diag[0] = x12;
     element_matrix_diag[1] = x12;
     element_matrix_diag[2] = x12;
@@ -348,11 +357,11 @@ static SFEM_INLINE void tet10_transform_kernel(const real_t *const SFEM_RESTRICT
 }
 
 void tet10_apply_inv_lumped_mass(const ptrdiff_t nelements,
-                                  const ptrdiff_t nnodes,
-                                  idx_t **const SFEM_RESTRICT elems,
-                                  geom_t **const SFEM_RESTRICT xyz,
-                                  const real_t *const x,
-                                  real_t *const values) {
+                                 const ptrdiff_t nnodes,
+                                 idx_t **const SFEM_RESTRICT elems,
+                                 geom_t **const SFEM_RESTRICT xyz,
+                                 const real_t *const x,
+                                 real_t *const values) {
     double tick = MPI_Wtime();
 
     idx_t ev[10];
@@ -424,4 +433,120 @@ void tet10_apply_inv_lumped_mass(const ptrdiff_t nelements,
 
     double tock = MPI_Wtime();
     printf("tet10_mass.c: tet10_apply_inv_lumped_mass\t%g seconds\n", tock - tick);
+}
+
+static SFEM_INLINE void tet10_hrz_lumped_mass_kernel(const real_t px0,
+                                                     const real_t px1,
+                                                     const real_t px2,
+                                                     const real_t px3,
+                                                     const real_t py0,
+                                                     const real_t py1,
+                                                     const real_t py2,
+                                                     const real_t py3,
+                                                     const real_t pz0,
+                                                     const real_t pz1,
+                                                     const real_t pz2,
+                                                     const real_t pz3,
+                                                     real_t *const SFEM_RESTRICT
+                                                         element_matrix_diag) {
+    const real_t x0 = py0 - py2;
+    const real_t x1 = pz0 - pz3;
+    const real_t x2 = x0 * x1;
+    const real_t x3 = px0 - px1;
+    const real_t x4 = py0 - py3;
+    const real_t x5 = pz0 - pz2;
+    const real_t x6 = px0 - px2;
+    const real_t x7 = py0 - py1;
+    const real_t x8 = pz0 - pz1;
+    const real_t x9 = x4 * x8;
+    const real_t x10 = x5 * x7;
+    const real_t x11 = px0 - px3;
+    const real_t x12 = -x1;
+    const real_t x13 = -x0;
+    const real_t x14 = -1.0 / 6.0 * x3;
+    const real_t x15 = -x4;
+    const real_t x16 = -x5;
+    const real_t x17 = -x7;
+    const real_t x18 = -1.0 / 6.0 * x6;
+    const real_t x19 = -x8;
+    const real_t x20 = -1.0 / 6.0 * x11;
+    const real_t x21 =
+        (x12 * x13 * x14 - x12 * x17 * x18 - x13 * x19 * x20 - x14 * x15 * x16 + x15 * x18 * x19 +
+         x16 * x17 * x20) /
+        ((3.0 / 35.0) * x0 * x11 * x8 + (3.0 / 35.0) * x1 * x6 * x7 - 3.0 / 35.0 * x10 * x11 -
+         3.0 / 35.0 * x2 * x3 + (3.0 / 35.0) * x3 * x4 * x5 - 3.0 / 35.0 * x6 * x9);
+    const real_t x22 = x21 * ((1.0 / 420.0) * x0 * x11 * x8 + (1.0 / 420.0) * x1 * x6 * x7 -
+                              1.0 / 420.0 * x10 * x11 - 1.0 / 420.0 * x2 * x3 +
+                              (1.0 / 420.0) * x3 * x4 * x5 - 1.0 / 420.0 * x6 * x9);
+    const real_t x23 = x21 * ((4.0 / 315.0) * x0 * x11 * x8 + (4.0 / 315.0) * x1 * x6 * x7 -
+                              4.0 / 315.0 * x10 * x11 - 4.0 / 315.0 * x2 * x3 +
+                              (4.0 / 315.0) * x3 * x4 * x5 - 4.0 / 315.0 * x6 * x9);
+    element_matrix_diag[0] = x22;
+    element_matrix_diag[1] = x22;
+    element_matrix_diag[2] = x22;
+    element_matrix_diag[3] = x22;
+    element_matrix_diag[4] = x23;
+    element_matrix_diag[5] = x23;
+    element_matrix_diag[6] = x23;
+    element_matrix_diag[7] = x23;
+    element_matrix_diag[8] = x23;
+    element_matrix_diag[9] = x23;
+}
+
+void tet10_assemble_lumped_mass(const ptrdiff_t nelements,
+                                const ptrdiff_t nnodes,
+                                idx_t **const SFEM_RESTRICT elems,
+                                geom_t **const SFEM_RESTRICT xyz,
+                                real_t *const SFEM_RESTRICT values) {
+    SFEM_UNUSED(nnodes);
+
+    double tick = MPI_Wtime();
+
+#pragma omp parallel
+    {
+#pragma omp for  // nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[10];
+            idx_t ks[10];
+
+            real_t element_vector[10];
+#pragma unroll(10)
+            for (int v = 0; v < 10; ++v) {
+                ev[v] = elems[v][i];
+            }
+
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+            const idx_t i3 = ev[3];
+
+            tet10_hrz_lumped_mass_kernel(
+                // X-coordinates
+                xyz[0][i0],
+                xyz[0][i1],
+                xyz[0][i2],
+                xyz[0][i3],
+                // Y-coordinates
+                xyz[1][i0],
+                xyz[1][i1],
+                xyz[1][i2],
+                xyz[1][i3],
+                // Z-coordinates
+                xyz[2][i0],
+                xyz[2][i1],
+                xyz[2][i2],
+                xyz[2][i3],
+                element_vector);
+
+#pragma unroll(10)
+            for (int edof_i = 0; edof_i < 10; ++edof_i) {
+#pragma omp atomic update
+                values[ev[edof_i]] += element_vector[edof_i];
+            }
+        }
+    }
+
+    double tock = MPI_Wtime();
+    printf("tet10_mass.c: tet10_assemble_lumped_mass\t%g seconds\n", tock - tick);
 }

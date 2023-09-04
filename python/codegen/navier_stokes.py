@@ -11,7 +11,7 @@ from fe_material import *
 import pdb
 
 # simplify_expr = False
-simplify_expr = True
+simplify_expr = False
 subs_jacobian = True
 
 # 1) temptative momentum step
@@ -274,7 +274,8 @@ class NavierStokesOp:
 
 def main():
 	# op = NavierStokesOp(Mini2D())
-	op = NavierStokesOp(Tri6(), Tri3())
+	# op = NavierStokesOp(Tri6(), Tri3())
+	op = NavierStokesOp(Tet10(), Tet4())
 
 if __name__ == "__main__":
 	main()

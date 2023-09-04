@@ -287,15 +287,16 @@ int main(int argc, char *argv[]) {
         // Only works if B.C. are set on al three vector components
         {
             // Momentum step (implicit)
-            tri6_momentum_lhs_scalar_crs(mesh.nelements,
-                                         mesh.nnodes,
-                                         mesh.elements,
-                                         mesh.points,
-                                         SFEM_DT,
-                                         SFEM_DYNAMIC_VISCOSITY,
-                                         p2_rowptr,
-                                         p2_colidx,
-                                         p2_diffusion);
+            navier_stokes_momentum_lhs_scalar_crs(mesh.element_type,
+                                                  mesh.nelements,
+                                                  mesh.nnodes,
+                                                  mesh.elements,
+                                                  mesh.points,
+                                                  SFEM_DT,
+                                                  SFEM_DYNAMIC_VISCOSITY,
+                                                  p2_rowptr,
+                                                  p2_colidx,
+                                                  p2_diffusion);
 
             for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
                 crs_constraint_nodes_to_identity(velocity_dirichlet_conditions[i].local_size,
@@ -396,15 +397,17 @@ int main(int argc, char *argv[]) {
             if (implicit_momentum) {
                 // TODO
             } else {
-                tri6_explict_momentum_tentative(mesh.nelements,
-                                                mesh.nnodes,
-                                                mesh.elements,
-                                                mesh.points,
-                                                SFEM_DT,
-                                                SFEM_DYNAMIC_VISCOSITY,
-                                                1,  // Turn-off convective term for debugging with 0
-                                                vel,
-                                                correction);
+                navier_stokes_mixed_explict_momentum_tentative(
+                    mesh.element_type,
+                    mesh.nelements,
+                    mesh.nnodes,
+                    mesh.elements,
+                    mesh.points,
+                    SFEM_DT,
+                    SFEM_DYNAMIC_VISCOSITY,
+                    1,  // Turn-off convective term for debugging with 0
+                    vel,
+                    correction);
 
                 for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
                     boundary_condition_t cond = velocity_dirichlet_conditions[i];
@@ -440,15 +443,17 @@ int main(int argc, char *argv[]) {
         //////////////////////////////////////////////////////////////
         {
             memset(buff, 0, p1_nnodes * sizeof(real_t));
-            tri3_tri6_divergence(mesh.nelements,
-                                 mesh.nnodes,
-                                 mesh.elements,
-                                 mesh.points,
-                                 1,
-                                 1,
-                                 SFEM_DYNAMIC_VISCOSITY,
-                                 tentative_vel,
-                                 buff);
+            navier_stokes_mixed_divergence(mesh.element_type,
+                                           p1_type,
+                                           mesh.nelements,
+                                           mesh.nnodes,
+                                           mesh.elements,
+                                           mesh.points,
+                                           1,
+                                           1,
+                                           SFEM_DYNAMIC_VISCOSITY,
+                                           tentative_vel,
+                                           buff);
 
             for (int i = 0; i < n_pressure_dirichlet_conditions; i++) {
                 boundary_condition_t cond = pressure_dirichlet_conditions[i];
@@ -467,8 +472,16 @@ int main(int argc, char *argv[]) {
                 memset(correction[d], 0, mesh.nnodes * sizeof(real_t));
             }
 
-            tri6_tri3_correction(
-                mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, 1, 1, p, correction);
+            navier_stokes_mixed_correction(mesh.element_type,
+                                           p1_type,
+                                           mesh.nelements,
+                                           mesh.nnodes,
+                                           mesh.elements,
+                                           mesh.points,
+                                           1,
+                                           1,
+                                           p,
+                                           correction);
 
             for (int d = 0; d < sdim; d++) {
                 if (SFEM_LUMPED_MASS) {

@@ -70,8 +70,7 @@ void assemble_lumped_mass(const int element_type,
             break;
         }
         case TET10: {
-            fprintf(stderr, "The lumbed mass vector does not exists for P2!\n");
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            tet10_assemble_lumped_mass(nelements, nnodes, elems, xyz, values);
             break;
         }
 
@@ -101,7 +100,6 @@ void apply_inv_lumped_mass(const int element_type,
             tet4_apply_inv_lumped_mass(nelements, nnodes, elems, xyz, x, values);
             break;
         }
-
         case TET10: {
             tet10_apply_inv_lumped_mass(nelements, nnodes, elems, xyz, x, values);
             break;

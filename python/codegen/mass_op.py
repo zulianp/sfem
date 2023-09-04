@@ -115,13 +115,14 @@ def main():
 		op = MassOp(f, fe, [qx, qy])
 		c_code(op.apply())
 
-	if False:
+	if True:
 		fe = Tet10()
 		f =  Field(fe, coeffs('u', 10))
 		op = MassOp(f, fe, [qx, qy, qz])
-		c_code(op.matrix())
+		# c_code(op.matrix())
+		c_code(op.hrz_diagonal_scaling_lumped_matrix())
 
-	if True:
+	if False:
 		fe = Tri6()
 		f =  Field(fe, coeffs('u', 6))
 		op = MassOp(f, fe, [qx, qy, qz])

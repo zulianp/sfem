@@ -173,7 +173,7 @@ OBJS += tri3_stokes_mini.o \
 		tri3_laplacian.o
 
 # Tri6
-OBJS += tri6_mass.o tri6_laplacian.o
+OBJS += tri6_mass.o tri6_laplacian.o tri6_navier_stokes.o
 
 # Tet4
 OBJS += tet4_div.o \
@@ -189,7 +189,8 @@ OBJS += tet10_grad.o \
 	tet10_div.o \
 	tet10_mass.o \
 	tet10_laplacian.o \
-	tet10_l2_projection_p1_p2.o
+	tet10_l2_projection_p1_p2.o \
+	tet10_navier_stokes.o
 
 
 # CVFEM
