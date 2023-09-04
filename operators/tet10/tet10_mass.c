@@ -449,48 +449,75 @@ static SFEM_INLINE void tet10_hrz_lumped_mass_kernel(const real_t px0,
                                                      const real_t pz3,
                                                      real_t *const SFEM_RESTRICT
                                                          element_matrix_diag) {
-    const real_t x0 = py0 - py2;
-    const real_t x1 = pz0 - pz3;
-    const real_t x2 = x0 * x1;
-    const real_t x3 = px0 - px1;
-    const real_t x4 = py0 - py3;
-    const real_t x5 = pz0 - pz2;
-    const real_t x6 = px0 - px2;
-    const real_t x7 = py0 - py1;
-    const real_t x8 = pz0 - pz1;
-    const real_t x9 = x4 * x8;
-    const real_t x10 = x5 * x7;
-    const real_t x11 = px0 - px3;
-    const real_t x12 = -x1;
-    const real_t x13 = -x0;
-    const real_t x14 = -1.0 / 6.0 * x3;
-    const real_t x15 = -x4;
-    const real_t x16 = -x5;
-    const real_t x17 = -x7;
-    const real_t x18 = -1.0 / 6.0 * x6;
-    const real_t x19 = -x8;
-    const real_t x20 = -1.0 / 6.0 * x11;
-    const real_t x21 =
-        (x12 * x13 * x14 - x12 * x17 * x18 - x13 * x19 * x20 - x14 * x15 * x16 + x15 * x18 * x19 +
-         x16 * x17 * x20) /
-        ((3.0 / 35.0) * x0 * x11 * x8 + (3.0 / 35.0) * x1 * x6 * x7 - 3.0 / 35.0 * x10 * x11 -
-         3.0 / 35.0 * x2 * x3 + (3.0 / 35.0) * x3 * x4 * x5 - 3.0 / 35.0 * x6 * x9);
-    const real_t x22 = x21 * ((1.0 / 420.0) * x0 * x11 * x8 + (1.0 / 420.0) * x1 * x6 * x7 -
-                              1.0 / 420.0 * x10 * x11 - 1.0 / 420.0 * x2 * x3 +
-                              (1.0 / 420.0) * x3 * x4 * x5 - 1.0 / 420.0 * x6 * x9);
-    const real_t x23 = x21 * ((4.0 / 315.0) * x0 * x11 * x8 + (4.0 / 315.0) * x1 * x6 * x7 -
-                              4.0 / 315.0 * x10 * x11 - 4.0 / 315.0 * x2 * x3 +
-                              (4.0 / 315.0) * x3 * x4 * x5 - 4.0 / 315.0 * x6 * x9);
-    element_matrix_diag[0] = x22;
-    element_matrix_diag[1] = x22;
-    element_matrix_diag[2] = x22;
-    element_matrix_diag[3] = x22;
-    element_matrix_diag[4] = x23;
-    element_matrix_diag[5] = x23;
-    element_matrix_diag[6] = x23;
-    element_matrix_diag[7] = x23;
-    element_matrix_diag[8] = x23;
-    element_matrix_diag[9] = x23;
+    // const real_t x0 = py0 - py2;
+    // const real_t x1 = pz0 - pz3;
+    // const real_t x2 = x0 * x1;
+    // const real_t x3 = px0 - px1;
+    // const real_t x4 = py0 - py3;
+    // const real_t x5 = pz0 - pz2;
+    // const real_t x6 = px0 - px2;
+    // const real_t x7 = py0 - py1;
+    // const real_t x8 = pz0 - pz1;
+    // const real_t x9 = x4 * x8;
+    // const real_t x10 = x5 * x7;
+    // const real_t x11 = px0 - px3;
+    // const real_t x12 = -x1;
+    // const real_t x13 = -x0;
+    // const real_t x14 = -1.0 / 6.0 * x3;
+    // const real_t x15 = -x4;
+    // const real_t x16 = -x5;
+    // const real_t x17 = -x7;
+    // const real_t x18 = -1.0 / 6.0 * x6;
+    // const real_t x19 = -x8;
+    // const real_t x20 = -1.0 / 6.0 * x11;
+    // const real_t x21 =
+    //     (x12 * x13 * x14 - x12 * x17 * x18 - x13 * x19 * x20 - x14 * x15 * x16 + x15 * x18 * x19 +
+    //      x16 * x17 * x20) /
+    //     ((3.0 / 35.0) * x0 * x11 * x8 + (3.0 / 35.0) * x1 * x6 * x7 - 3.0 / 35.0 * x10 * x11 -
+    //      3.0 / 35.0 * x2 * x3 + (3.0 / 35.0) * x3 * x4 * x5 - 3.0 / 35.0 * x6 * x9);
+    // const real_t x22 = x21 * ((1.0 / 420.0) * x0 * x11 * x8 + (1.0 / 420.0) * x1 * x6 * x7 -
+    //                           1.0 / 420.0 * x10 * x11 - 1.0 / 420.0 * x2 * x3 +
+    //                           (1.0 / 420.0) * x3 * x4 * x5 - 1.0 / 420.0 * x6 * x9);
+    // const real_t x23 = x21 * ((4.0 / 315.0) * x0 * x11 * x8 + (4.0 / 315.0) * x1 * x6 * x7 -
+    //                           4.0 / 315.0 * x10 * x11 - 4.0 / 315.0 * x2 * x3 +
+    //                           (4.0 / 315.0) * x3 * x4 * x5 - 4.0 / 315.0 * x6 * x9);
+    // element_matrix_diag[0] = x22;
+    // element_matrix_diag[1] = x22;
+    // element_matrix_diag[2] = x22;
+    // element_matrix_diag[3] = x22;
+    // element_matrix_diag[4] = x23;
+    // element_matrix_diag[5] = x23;
+    // element_matrix_diag[6] = x23;
+    // element_matrix_diag[7] = x23;
+    // element_matrix_diag[8] = x23;
+    // element_matrix_diag[9] = x23;
+    const real_t x0 = px0 - px1;
+    const real_t x1 = (1.0/120.0)*x0;
+    const real_t x2 = pz0 - pz3;
+    const real_t x3 = py0 - py2;
+    const real_t x4 = x2*x3;
+    const real_t x5 = py0 - py3;
+    const real_t x6 = pz0 - pz2;
+    const real_t x7 = px0 - px2;
+    const real_t x8 = (1.0/120.0)*x7;
+    const real_t x9 = py0 - py1;
+    const real_t x10 = pz0 - pz1;
+    const real_t x11 = x10*x5;
+    const real_t x12 = px0 - px3;
+    const real_t x13 = (1.0/120.0)*x12;
+    const real_t x14 = x6*x9;
+    const real_t x15 = x1*x4 - x1*x5*x6 - x10*x13*x3 + x11*x8 + x13*x14 - x2*x8*x9;
+    const real_t x16 = -1.0/30.0*x0*x4 + (1.0/30.0)*x0*x5*x6 + (1.0/30.0)*x10*x12*x3 - 1.0/30.0*x11*x7 - 1.0/30.0*x12*x14 + (1.0/30.0)*x2*x7*x9;
+    element_matrix_diag[0] = x15;
+    element_matrix_diag[1] = x15;
+    element_matrix_diag[2] = x15;
+    element_matrix_diag[3] = x15;
+    element_matrix_diag[4] = x16;
+    element_matrix_diag[5] = x16;
+    element_matrix_diag[6] = x16;
+    element_matrix_diag[7] = x16;
+    element_matrix_diag[8] = x16;
+    element_matrix_diag[9] = x16;
 }
 
 void tet10_assemble_lumped_mass(const ptrdiff_t nelements,
@@ -508,7 +535,7 @@ void tet10_assemble_lumped_mass(const ptrdiff_t nelements,
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[10];
             real_t element_vector[10];
-            
+
 #pragma unroll(10)
             for (int v = 0; v < 10; ++v) {
                 ev[v] = elems[v][i];

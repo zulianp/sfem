@@ -351,6 +351,8 @@ int main(int argc, char *argv[]) {
                              mesh.elements,
                              mesh.points,
                              p2_mass_matrix);
+
+        array_write(comm, "out/mass.raw", SFEM_MPI_REAL_T, p2_mass_matrix, mesh.nnodes, mesh.nnodes);
     }
 
     real_t *vel[3];
@@ -380,6 +382,9 @@ int main(int argc, char *argv[]) {
             sprintf(path, "%s/u%d.%09d.raw", output_folder, d, export_counter);
             array_write(comm, path, SFEM_MPI_REAL_T, vel[d], mesh.nnodes, mesh.nnodes);
         }
+        
+        sprintf(path, "%s/p.%09d.raw", output_folder, export_counter);
+        array_write(comm, path, SFEM_MPI_REAL_T, p, p1_nnodes, p1_nnodes);
 
         export_counter++;
     }
@@ -523,6 +528,9 @@ int main(int argc, char *argv[]) {
                 sprintf(path, "%s/u%d.%09d.raw", output_folder, d, export_counter);
                 array_write(comm, path, SFEM_MPI_REAL_T, vel[d], mesh.nnodes, mesh.nnodes);
             }
+
+            sprintf(path, "%s/p.%09d.raw", output_folder, export_counter);
+            array_write(comm, path, SFEM_MPI_REAL_T, p, p1_nnodes, p1_nnodes);
 
             export_counter++;
         }

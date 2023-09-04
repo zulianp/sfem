@@ -1,4 +1,5 @@
-static SFEM_INLINE void tet10_add_convection_rhs_kernel(const real_t px0,
+// Standard numerical quadrature should be better than this
+static /*SFEM_INLINE*/ void tet10_add_convection_rhs_kernel(const real_t px0,
                                                         const real_t px1,
                                                         const real_t px2,
                                                         const real_t px3,
@@ -15,6 +16,8 @@ static SFEM_INLINE void tet10_add_convection_rhs_kernel(const real_t px0,
                                                         real_t *const SFEM_RESTRICT u,
                                                         real_t *const SFEM_RESTRICT
                                                             element_vector) {
+
+	// printf("tet10_add_convection_rhs_kernel\n");
     const real_t x0 = -py0 + py1;
     const real_t x1 = -pz0 + pz2;
     const real_t x2 = x0 * x1;

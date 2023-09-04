@@ -64,6 +64,10 @@ class MassOp:
 			expr.append(ast.Assignment(var, d[i]))
 		return expr
 
+	# def biorthogonal_weights(self):
+	# 	mmat = self.matrix()
+	# 	mvec = self.hrz_diagonal_scaling_lumped_matrix()
+
 
 	def lumped_matrix(self):
 		fe_trial = self.fe_trial
@@ -118,7 +122,9 @@ def main():
 		f =  Field(fe, coeffs('u', 10))
 		op = MassOp(f, fe, [qx, qy, qz])
 		# c_code(op.matrix())
-		c_code(op.hrz_diagonal_scaling_lumped_matrix())
+		# c_code(op.hrz_diagonal_scaling_lumped_matrix())
+		c_code(op.lumped_matrix())
+
 
 	if False:
 		fe = Tri6()

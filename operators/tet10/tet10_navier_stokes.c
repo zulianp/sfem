@@ -1952,27 +1952,27 @@ void tet10_explict_momentum_tentative(const ptrdiff_t nelements,
                                            element_vel,
                                            element_vector);
 
-            // if (convonoff != 0) {
-            //     tet10_add_convection_rhs_kernel(x0,
-            //                                     x1,
-            //                                     x2,
-            //                                     x3,
-            //                                     // Y coords
-            //                                     y0,
-            //                                     y1,
-            //                                     y2,
-            //                                     y3,
-            //                                     // Z coords
-            //                                     z0,
-            //                                     z1,
-            //                                     z2,
-            //                                     z3,
-            //                                     dt,
-            //                                     nu,
-            //                                     //  buffers
-            //                                     element_vel,
-            //                                     element_vector);
-            // }
+            if (convonoff != 0) {
+                tet10_add_convection_rhs_kernel(x0,
+                                                x1,
+                                                x2,
+                                                x3,
+                                                // Y coords
+                                                y0,
+                                                y1,
+                                                y2,
+                                                y3,
+                                                // Z coords
+                                                z0,
+                                                z1,
+                                                z2,
+                                                z3,
+                                                dt,
+                                                nu,
+                                                //  buffers
+                                                element_vel,
+                                                element_vector);
+            }
 
             for (int d1 = 0; d1 < n_vars; d1++) {
                 for (int edof_i = 0; edof_i < element_nnodes; ++edof_i) {

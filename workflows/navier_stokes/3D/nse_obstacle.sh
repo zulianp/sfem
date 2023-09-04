@@ -52,12 +52,13 @@ export SFEM_PRESSURE_DIRICHLET_VALUE="0"
 export SFEM_PRESSURE_DIRICHLET_COMPONENT="0"
 
 export SFEM_DT=0.00000001
-export SFEM_MAX_TIME=0.000001
-export SFEM_EXPORT_FREQUENCY=0.00000001
+# export SFEM_MAX_TIME=0.00000002
+export SFEM_MAX_TIME=0.00000005
+export SFEM_EXPORT_FREQUENCY=$SFEM_DT
 export SFEM_RTOL=1e-14
 export SFEM_MAX_IT=2000
 export SFEM_CFL=0.05
-export SFEM_LUMPED_MASS=0
+export SFEM_LUMPED_MASS=1
 export SFEM_VERBOSE=1
 
 export SFEM_DYNAMIC_VISCOSITY=1
@@ -75,3 +76,7 @@ nsteps=`ls out/u0.*.raw | wc -l | awk '{print $1}'`
 raw_to_db.py $SFEM_MESH_DIR u.xmf  \
  --transient --n_time_steps=$nsteps \
  --point_data="out/u0.*.raw,out/u1.*.raw,out/u2.*.raw" 
+
+raw_to_db.py $SFEM_MESH_DIR/p1 p.xmf \
+ --transient --n_time_steps=$nsteps \
+ --point_data="out/p.*.raw" 
