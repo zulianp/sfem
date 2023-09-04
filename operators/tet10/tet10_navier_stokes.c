@@ -9,6 +9,8 @@
 
 #include "sfem_vec.h"
 
+#include "tet10_convection.h"
+
 static SFEM_INLINE void tet10_momentum_lhs_scalar_kernel(const real_t px0,
                                                          const real_t px1,
                                                          const real_t px2,
@@ -1515,55 +1517,7 @@ static SFEM_INLINE void tet10_add_diffusion_rhs_kernel(const real_t px0,
                           x89 * (x785 + x872 + x894 + x897 + x898 + x899 + x915 + x922 + x925);
 }
 
-static SFEM_INLINE void tet10_add_convection_rhs_kernel(const real_t px0,
-                                                        const real_t px1,
-                                                        const real_t px2,
-                                                        const real_t px3,
-                                                        const real_t py0,
-                                                        const real_t py1,
-                                                        const real_t py2,
-                                                        const real_t py3,
-                                                        const real_t pz0,
-                                                        const real_t pz1,
-                                                        const real_t pz2,
-                                                        const real_t pz3,
-                                                        const real_t dt,
-                                                        const real_t nu,
-                                                        real_t *const SFEM_RESTRICT u,
-                                                        real_t *const SFEM_RESTRICT
-                                                            element_vector) {
-    // TODO
-    element_vector[0] += 0;
-    element_vector[1] += 0;
-    element_vector[2] += 0;
-    element_vector[3] += 0;
-    element_vector[4] += 0;
-    element_vector[5] += 0;
-    element_vector[6] += 0;
-    element_vector[7] += 0;
-    element_vector[8] += 0;
-    element_vector[9] += 0;
-    element_vector[10] += 0;
-    element_vector[11] += 0;
-    element_vector[12] += 0;
-    element_vector[13] += 0;
-    element_vector[14] += 0;
-    element_vector[15] += 0;
-    element_vector[16] += 0;
-    element_vector[17] += 0;
-    element_vector[18] += 0;
-    element_vector[19] += 0;
-    element_vector[20] += 0;
-    element_vector[21] += 0;
-    element_vector[22] += 0;
-    element_vector[23] += 0;
-    element_vector[24] += 0;
-    element_vector[25] += 0;
-    element_vector[26] += 0;
-    element_vector[27] += 0;
-    element_vector[28] += 0;
-    element_vector[29] += 0;
-}
+
 
 // static SFEM_INLINE void tet10_explict_momentum_rhs_kernel(const real_t px0,
 //                                                          const real_t px1,
