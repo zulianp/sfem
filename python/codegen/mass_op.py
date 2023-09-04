@@ -55,8 +55,6 @@ class MassOp:
 			d[i] = integr
 			approx_measure += integr
 
-			
-
 		measure = fe_test.measure(q)
 		rescale = measure / approx_measure
 		d = d * rescale

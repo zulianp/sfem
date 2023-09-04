@@ -507,9 +507,8 @@ void tet10_assemble_lumped_mass(const ptrdiff_t nelements,
 #pragma omp for  // nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[10];
-            idx_t ks[10];
-
             real_t element_vector[10];
+            
 #pragma unroll(10)
             for (int v = 0; v < 10; ++v) {
                 ev[v] = elems[v][i];

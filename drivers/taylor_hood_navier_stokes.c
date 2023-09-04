@@ -421,7 +421,9 @@ int main(int argc, char *argv[]) {
                         {
 #pragma omp for
                             for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                                assert(correction[d][i] == correction[d][i]);
                                 tentative_vel[d][i] = correction[d][i] / p2_mass_matrix[i];
+                                assert(tentative_vel[d][i] == tentative_vel[d][i]);
                             }
                         }
 
@@ -490,6 +492,7 @@ int main(int argc, char *argv[]) {
 #pragma omp for
                         for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
                             correction[d][i] = correction[d][i] / p2_mass_matrix[i];
+                            assert(correction[d][i] == correction[d][i]);
                         }
                     }
 
