@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include "sfem_base.h"
 #include "sfem_defs.h"
+#include "crs_graph.h"
+#include "sortreduce.h"
 
 #ifdef __cplusplus
 extern "C" {
