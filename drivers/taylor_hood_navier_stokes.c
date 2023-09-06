@@ -379,7 +379,11 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
         boundary_condition_t cond = velocity_dirichlet_conditions[i];
-        constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, vel[cond.component]);
+        if (cond.values) {
+            constraint_nodes_to_values(cond.local_size, cond.idx, cond.values, vel[cond.component]);
+        } else {
+            constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, vel[cond.component]);
+        }
     }
 
     int export_counter = 0;
@@ -419,7 +423,7 @@ int main(int argc, char *argv[]) {
                         max_velocity = MAX(max_velocity, vel[d][i]);
                     }
                 }
-                
+
                 dt = MAX(1e-12, MIN(SFEM_DT, SFEM_CFL / ((2 * max_velocity * emin * emin))));
 
                 navier_stokes_mixed_explict_momentum_tentative(
@@ -434,7 +438,7 @@ int main(int argc, char *argv[]) {
                     vel,
                     correction);
 
-                { //CHECK NaN
+                {  // CHECK NaN
                     ptrdiff_t stop = 0;
                     for (int d = 0; d < sdim; d++) {
                         stop += count_nan(mesh.nnodes, correction[d]);
@@ -549,8 +553,13 @@ int main(int argc, char *argv[]) {
 
             for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
                 boundary_condition_t cond = velocity_dirichlet_conditions[i];
-                constraint_nodes_to_value(
-                    cond.local_size, cond.idx, cond.value, vel[cond.component]);
+                if (cond.values) {
+                    constraint_nodes_to_values(
+                        cond.local_size, cond.idx, cond.values, vel[cond.component]);
+                } else {
+                    constraint_nodes_to_value(
+                        cond.local_size, cond.idx, cond.value, vel[cond.component]);
+                }
             }
         }
 

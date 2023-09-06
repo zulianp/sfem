@@ -50,6 +50,20 @@ void constraint_nodes_to_value(const ptrdiff_t n_dirichlet_nodes,
     }
 }
 
+void constraint_nodes_to_values(const ptrdiff_t n_dirichlet_nodes,
+                                const idx_t *dirichlet_nodes,
+                                const real_t *SFEM_RESTRICT dirichlet_values,
+                                real_t *SFEM_RESTRICT values) {
+#pragma omp parallel
+    {
+#pragma omp for
+        for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
+            idx_t i = dirichlet_nodes[node];
+            values[i] = dirichlet_values[node];
+        }
+    }
+}
+
 void constraint_nodes_copy(const ptrdiff_t n_dirichlet_nodes,
                            const idx_t *dirichlet_nodes,
                            const real_t *source,

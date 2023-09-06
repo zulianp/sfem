@@ -94,6 +94,7 @@ boundary_nodes()
 	done	
 
 	$LAUNCH soa_to_aos "$mesh_surface/"$name"/i*.raw" $idx_type_size $sideset_raw
+	$LAUNCH unique $sideset_raw $sideset_raw
 	# rm -r $workspace
 }
 
