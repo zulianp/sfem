@@ -14,6 +14,7 @@ PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 idx_type_size=4
 folder=channel_hole
 mesh_db=$folder/mesh.vtk
+# mesh_db=$folder/mesh_fine.vtk
 mesh_db_p2=$folder/mesh_p2.vtk
 mesh_raw=./mesh
 # mesh_original=./unsorted
@@ -37,10 +38,11 @@ db_to_raw.py $mesh_db $mesh_raw/p1
 mesh_p1_to_p2 $mesh_raw/p1 $mesh_raw
 raw_to_db.py $mesh_raw $mesh_db_p2
 
+export SFEM_ELEMENT_TYPE=11 #EDGE3
 $LAUNCH skin $mesh_raw $mesh_surface
 
-$LAUNCH select_surf $mesh_surface -0.1 0.5   0.2   0.99  	$mesh_surface/sides_inlet.raw
-$LAUNCH select_surf $mesh_surface  3.1 0.5   0.2   0.99 	$mesh_surface/sides_outlet.raw
+$LAUNCH select_surf $mesh_surface -0.1  0.2   0.2   0.99  	$mesh_surface/sides_inlet.raw
+$LAUNCH select_surf $mesh_surface  2.3  0.2   0.2   0.99   	$mesh_surface/sides_outlet.raw
 
 numbers=`mktemp`
 numbers2=`mktemp`

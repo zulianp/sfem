@@ -15,7 +15,11 @@ typedef struct {
     ptrdiff_t local_size, global_size;
     idx_t *idx;
     int component;
+    // Set for uniform
     real_t value;
+
+    // Set for varying
+    real_t * values;
 } boundary_condition_t;
 
 void read_boundary_conditions(MPI_Comm comm,

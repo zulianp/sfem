@@ -412,15 +412,14 @@ int main(int argc, char *argv[]) {
             if (implicit_momentum) {
                 // TODO
             } else {
-                // Ensure CFL condition
+                // Ensure CFL condition (Maybe not the right place)
                 real_t max_velocity = 0;
                 for (int d = 0; d < sdim; d++) {
                     for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
                         max_velocity = MAX(max_velocity, vel[d][i]);
                     }
                 }
-
-                // Maybe not the right place
+                
                 dt = MAX(1e-12, MIN(SFEM_DT, SFEM_CFL / ((2 * max_velocity * emin * emin))));
 
                 navier_stokes_mixed_explict_momentum_tentative(
