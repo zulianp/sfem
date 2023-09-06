@@ -49,14 +49,18 @@ sinlet=$SFEM_MESH_DIR/sidesets_aos/sinlet.raw
 swall=$SFEM_MESH_DIR/sidesets_aos/swall.raw
 soutlet=$SFEM_MESH_DIR/sidesets_aos/soutlet.raw
 
-python3 -c 'import numpy as np; idx=np.fromfile("'$sinlet'", dtype="'$py_sfem_idx_t'"); y=np.fromfile("'$SFEM_MESH_DIR'/y.raw",dtype="'$py_sfem_geom_t'"); y=y[idx]; U=0.3; fy=4*U*y*(0.41 - y)/(0.41*0.41); fy.astype("'$py_sfem_real_t'").tofile("bcvalues.raw")'
+# Laminar case
+# U=0.3
+# Shedding
+U=1.5
+python3 -c 'import numpy as np; idx=np.fromfile("'$sinlet'", dtype="'$py_sfem_idx_t'"); y=np.fromfile("'$SFEM_MESH_DIR'/y.raw",dtype="'$py_sfem_geom_t'"); y=y[idx]; U='$U'; fy=4*U*y*(0.41 - y)/(0.41*0.41); fy.astype("'$py_sfem_real_t'").tofile("bcvalues.raw")'
 
 # export SFEM_VELOCITY_DIRICHLET_NODESET="$sbottom,$sbottom,$stop,$stop,$sleft,$sleft"
 export SFEM_VELOCITY_DIRICHLET_NODESET="$swall,$swall,$sinlet,$sinlet"
 export SFEM_VELOCITY_DIRICHLET_VALUE="0,0,path:bcvalues.raw,0"
 export SFEM_VELOCITY_DIRICHLET_COMPONENT="0,1,0,1"
 
-python3 -c "import numpy as np; np.array([120]).astype(np.int32).tofile('pbc.int32.raw')"
+python3 -c "import numpy as np; np.array([210]).astype(np.int32).tofile('pbc.int32.raw')"
 export SFEM_PRESSURE_DIRICHLET_NODESET="pbc.int32.raw"
 
 # export SFEM_PRESSURE_DIRICHLET_NODESET="$sright"
@@ -64,8 +68,8 @@ export SFEM_PRESSURE_DIRICHLET_NODESET="pbc.int32.raw"
 export SFEM_PRESSURE_DIRICHLET_VALUE="0"
 export SFEM_PRESSURE_DIRICHLET_COMPONENT="0"
 
-export SFEM_DT=0.0001
-export SFEM_MAX_TIME=1
+export SFEM_DT=0.00001
+export SFEM_MAX_TIME=10
 export SFEM_EXPORT_FREQUENCY=0.001
 export SFEM_RTOL=1e-14
 export SFEM_MAX_IT=2000
