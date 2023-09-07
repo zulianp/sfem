@@ -13,8 +13,8 @@ PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 idx_type_size=4
 folder=channel_hole
-mesh_db=$folder/mesh.vtk
-# mesh_db=$folder/mesh_fine.vtk
+# mesh_db=$folder/mesh.vtk
+mesh_db=$folder/mesh_fine.vtk
 mesh_db_p2=$folder/mesh_p2.vtk
 mesh_raw=./mesh
 # mesh_original=./unsorted

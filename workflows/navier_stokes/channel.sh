@@ -70,11 +70,11 @@ python3 -c "import numpy as np; np.array([210]).astype(np.int32).tofile('pbc.int
 # export SFEM_PRESSURE_DIRICHLET_VALUE="0"
 # export SFEM_PRESSURE_DIRICHLET_COMPONENT="0"
 
-export SFEM_DT=0.001
-export SFEM_MAX_TIME=10
-export SFEM_EXPORT_FREQUENCY=$SFEM_DT
+export SFEM_DT=0.0001
+export SFEM_MAX_TIME=20
+export SFEM_EXPORT_FREQUENCY=0.01
 export SFEM_RTOL=1e-14
-export SFEM_MAX_IT=2000
+export SFEM_MAX_IT=60
 export SFEM_CFL=0.005
 export SFEM_LUMPED_MASS=0
 export SFEM_VERBOSE=0

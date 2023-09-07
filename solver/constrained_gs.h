@@ -33,6 +33,9 @@ int constrained_gs_residual(const ptrdiff_t nnodes,
              real_t *const SFEM_RESTRICT values,
              real_t *const SFEM_RESTRICT rhs,
              real_t *const SFEM_RESTRICT x,
+             const real_t *const SFEM_RESTRICT weights,
+             const real_t sum_weights,
+             const real_t lagrange_multiplier,
              real_t *res);
 
 #ifdef __cplusplus

@@ -145,7 +145,7 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_NEUMANN_VALUE, );
     SFEM_READ_ENV(SFEM_NEUMANN_COMPONENT, );
 
-    int SFEM_MAX_IT = 1000;
+    int SFEM_MAX_IT = 100;
     real_t SFEM_ATOL = 1e-15;
     real_t SFEM_RTOL = 1e-14;
     real_t SFEM_STOL = 1e-12;
@@ -283,7 +283,8 @@ int main(int argc, char *argv[]) {
             sum_mass += p1_mass_vector[i];
         }
 
-        constrained_gs_init(p1_nnodes, p1_rowptr, p1_colidx, p1_values, p1_mass_vector, p1_inv_diag);
+        constrained_gs_init(
+            p1_nnodes, p1_rowptr, p1_colidx, p1_values, p1_mass_vector, p1_inv_diag);
 
     } else {
         for (int i = 0; i < n_pressure_dirichlet_conditions; i++) {
@@ -533,7 +534,9 @@ int main(int argc, char *argv[]) {
 
             if (SFEM_AVG_PRESSURE_CONSTRAINT) {
                 real_t lagrange_multiplier = 0;
-                for (int i = 0; i < 10; i++) {
+
+                int check_each = 1000;
+                for (long i = 0; i * check_each < SFEM_MAX_IT; i++) {
                     constrained_gs(p1_nnodes,
                                    p1_rowptr,
                                    p1_colidx,
@@ -544,14 +547,26 @@ int main(int argc, char *argv[]) {
                                    p1_mass_vector,
                                    sum_mass,
                                    &lagrange_multiplier,
-                                   100);
+                                   check_each);
 
                     real_t res = 0;
-                    constrained_gs_residual(p1_nnodes, p1_rowptr, p1_colidx, p1_values, buff, p, &res);
+                    constrained_gs_residual(p1_nnodes,
+                                            p1_rowptr,
+                                            p1_colidx,
+                                            p1_values,
+                                            buff,
+                                            p,
+                                            p1_mass_vector,
+                                            sum_mass,
+                                            lagrange_multiplier,
+                                            &res);
 
-                    printf("poisson residual: %g, lagrange_multiplier: %g\n",
+                    printf("(%ld) poisson residual: %g, lagrange_multiplier: %g\n",
+                        (i+1) * check_each,
                            res,
                            lagrange_multiplier);
+
+                    if (res < SFEM_ATOL) break;
                 }
             } else {
                 isolver_lsolve_apply(&lsolve[INVERSE_POISSON_MATRIX], buff, p);

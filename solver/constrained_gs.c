@@ -83,8 +83,8 @@ int constrained_gs_init(const ptrdiff_t nnodes,
                         real_t *const SFEM_RESTRICT values,
                         real_t *const SFEM_RESTRICT off,
                         real_t *const inv_diag) {
-    // dinvert(nnodes, rowptr, colidx, values, inv_diag);
-    l1_dinvert(nnodes, rowptr, colidx, values, off, inv_diag);
+    dinvert(nnodes, rowptr, colidx, values, inv_diag);
+    // l1_dinvert(nnodes, rowptr, colidx, values, off, inv_diag);
     return 0;
 }
 
@@ -94,8 +94,18 @@ int constrained_gs_residual(const ptrdiff_t nnodes,
                             real_t *const SFEM_RESTRICT values,
                             real_t *const SFEM_RESTRICT rhs,
                             real_t *const SFEM_RESTRICT x,
+                            const real_t *const SFEM_RESTRICT weights,
+                            const real_t sum_weights,
+                            const real_t lagrange_multiplier,
                             real_t *res) {
     *res = 0;
+
+    real_t sum_values = 0;
+    for (ptrdiff_t i = 0; i < nnodes; i++) {
+        const real_t v = x[i] * weights[i];
+        *res += v * v;
+    }
+
 #pragma omp parallel
     {
 #pragma omp for
@@ -105,7 +115,7 @@ int constrained_gs_residual(const ptrdiff_t nnodes,
             const count_t r_extent = r_end - r_begin;
             const idx_t *const r_colidx = &colidx[r_begin];
 
-            real_t r = rhs[i];
+            real_t r = rhs[i] - lagrange_multiplier * weights[i];
             for (count_t k = 0; k < r_extent; k++) {
                 const idx_t col = r_colidx[k];
                 r -= values[r_begin + k] * x[col];
@@ -134,30 +144,53 @@ static int constrained_gs_forward(const ptrdiff_t nnodes,
         sum_values += x[i] * weights[i];
     }
 
-    *lagrange_multiplier = sum_values / sum_weights;
+    real_t avg = sum_values / sum_weights;
+    for (ptrdiff_t i = 0; i < nnodes; i++) {
+        x[i] -= avg;
+    }
 
-    for (int ii = 0; ii < 10; ii++) {
+    *lagrange_multiplier = 0;
+
 #pragma omp parallel
-        {
+    {
 #pragma omp for
-            for (ptrdiff_t i = 0; i < nnodes; i++) {
-                const count_t r_begin = rowptr[i];
-                const count_t r_end = rowptr[i + 1];
-                const count_t r_extent = r_end - r_begin;
-                const idx_t *const r_colidx = &colidx[r_begin];
+        for (ptrdiff_t i = 0; i < nnodes; i++) {
+            const count_t r_begin = rowptr[i];
+            const count_t r_end = rowptr[i + 1];
+            const count_t r_extent = r_end - r_begin;
+            const idx_t *const r_colidx = &colidx[r_begin];
 
-                real_t r = rhs[i] - weights[i] * (*lagrange_multiplier);
-                for (count_t k = 0; k < r_extent; k++) {
-                    const idx_t col = r_colidx[k];
-                    if (col == i) continue;
-                    r -= values[r_begin + k] * atomic_read(&x[col]);
-                }
-
-                const real_t val = inv_diag[i] * r;
-                atomic_write(&x[i], val);
+            real_t r = rhs[i];
+            for (count_t k = 0; k < r_extent; k++) {
+                const idx_t col = r_colidx[k];
+                r -= values[r_begin + k] * atomic_read(&x[col]);
             }
+
+            const real_t val = r / weights[i];
+            atomic_write(lagrange_multiplier, val);
+        }
+
+#pragma omp for
+        for (ptrdiff_t i = 0; i < nnodes; i++) {
+            const count_t r_begin = rowptr[i];
+            const count_t r_end = rowptr[i + 1];
+            const count_t r_extent = r_end - r_begin;
+            const idx_t *const r_colidx = &colidx[r_begin];
+
+            real_t r = rhs[i] - weights[i] * (*lagrange_multiplier);
+            // real_t r = rhs[i];
+            for (count_t k = 0; k < r_extent; k++) {
+                const idx_t col = r_colidx[k];
+                if (col == i) continue;
+                r -= values[r_begin + k] * atomic_read(&x[col]);
+            }
+
+            const real_t val = inv_diag[i] * r;
+            atomic_write(&x[i], val);
         }
     }
+
+    // *lagrange_multiplier = 0;
 
     return 0;
 }
