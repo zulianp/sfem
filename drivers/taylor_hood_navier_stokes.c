@@ -69,6 +69,7 @@ static ptrdiff_t count_nan(const ptrdiff_t n, const real_t *const v) {
 
 #define N_SYSTEMS 3
 #define INVERSE_MASS_MATRIX 2
+#define INVERSE_POISSON_MATRIX 0
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -271,7 +272,7 @@ int main(int argc, char *argv[]) {
                                          p1_values);
     }
 
-    isolver_lsolve_update_crs(&lsolve[0], p1_nnodes, p1_nnodes, p1_rowptr, p1_colidx, p1_values);
+    isolver_lsolve_update_crs(&lsolve[INVERSE_POISSON_MATRIX], p1_nnodes, p1_nnodes, p1_rowptr, p1_colidx, p1_values);
 
     ptrdiff_t p2_nnz = 0;
     count_t *p2_rowptr = 0;
@@ -506,7 +507,7 @@ int main(int argc, char *argv[]) {
             }
 
             memset(p, 0, p1_nnodes * sizeof(real_t));
-            isolver_lsolve_apply(&lsolve[0], buff, p);
+            isolver_lsolve_apply(&lsolve[INVERSE_POISSON_MATRIX], buff, p);
         }
         //////////////////////////////////////////////////////////////
         // Correction/Projection step
@@ -618,7 +619,7 @@ int main(int argc, char *argv[]) {
     }
 
     // FIXME One is enough for now, but it is not clean
-    isolver_lsolve_destroy(&lsolve[0]);
+    isolver_lsolve_destroy(&lsolve[INVERSE_POISSON_MATRIX]);
     // isolver_lsolve_destroy(&lsolve[1]);
     return MPI_Finalize();
 }
