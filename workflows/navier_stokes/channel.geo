@@ -12,7 +12,6 @@ Point(5) = {0.2, 0.15, 0, 1.0};
 Point(6) = {0.2, 0.2, 0, 1.0};
 //+
 Point(7) = {0.2, 0.25, 0, 1.0};
-
 //+
 Line(1) = {1, 2};
 //+
@@ -30,4 +29,5 @@ Curve Loop(1) = {2, 4, 1, 3};
 //+
 Curve Loop(2) = {5, 6};
 //+
-Plane Surface(1) = {1, 2};
+Plane Surface(1) = {1, 2};//+
+Physical Surface("domain", 7) = {1};

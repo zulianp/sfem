@@ -29,6 +29,8 @@
 
 #include "isolver_lsolve.h"
 
+#include "constrained_gs.h"
+
 // https://fenicsproject.org/olddocs/dolfin/1.6.0/python/demo/documented/navier-stokes/python/documentation.html
 
 // Explicit euler
@@ -167,6 +169,9 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_EXPORT_FREQUENCY, atof);
     SFEM_READ_ENV(SFEM_LUMPED_MASS, atoi);
 
+    int SFEM_AVG_PRESSURE_CONSTRAINT = 1;
+    SFEM_READ_ENV(SFEM_AVG_PRESSURE_CONSTRAINT, atoi);
+
     if (rank == 0) {
         printf(
             "----------------------------------------\n"
@@ -263,16 +268,36 @@ int main(int argc, char *argv[]) {
                                p1_colidx,
                                p1_values);
 
-    for (int i = 0; i < n_pressure_dirichlet_conditions; i++) {
-        crs_constraint_nodes_to_identity(pressure_dirichlet_conditions[i].local_size,
-                                         pressure_dirichlet_conditions[i].idx,
-                                         1,
-                                         p1_rowptr,
-                                         p1_colidx,
-                                         p1_values);
-    }
+    real_t *p1_mass_vector = 0;
+    real_t sum_mass = 0;
+    real_t *p1_inv_diag = 0;
 
-    isolver_lsolve_update_crs(&lsolve[INVERSE_POISSON_MATRIX], p1_nnodes, p1_nnodes, p1_rowptr, p1_colidx, p1_values);
+    if (SFEM_AVG_PRESSURE_CONSTRAINT) {
+        p1_mass_vector = calloc(p1_nnodes, sizeof(real_t));
+        p1_inv_diag = calloc(p1_nnodes, sizeof(real_t));
+
+        assemble_lumped_mass(
+            p1_type, mesh.nelements, p1_nnodes, mesh.elements, mesh.points, p1_mass_vector);
+
+        for (ptrdiff_t i = 0; i < p1_nnodes; i++) {
+            sum_mass += p1_mass_vector[i];
+        }
+
+        constrained_gs_init(p1_nnodes, p1_rowptr, p1_colidx, p1_values, p1_mass_vector, p1_inv_diag);
+
+    } else {
+        for (int i = 0; i < n_pressure_dirichlet_conditions; i++) {
+            crs_constraint_nodes_to_identity(pressure_dirichlet_conditions[i].local_size,
+                                             pressure_dirichlet_conditions[i].idx,
+                                             1,
+                                             p1_rowptr,
+                                             p1_colidx,
+                                             p1_values);
+        }
+
+        isolver_lsolve_update_crs(
+            &lsolve[INVERSE_POISSON_MATRIX], p1_nnodes, p1_nnodes, p1_rowptr, p1_colidx, p1_values);
+    }
 
     ptrdiff_t p2_nnz = 0;
     count_t *p2_rowptr = 0;
@@ -377,7 +402,6 @@ int main(int argc, char *argv[]) {
     }
 
     real_t *p = calloc(p1_nnodes, sizeof(real_t));
-
     for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
         boundary_condition_t cond = velocity_dirichlet_conditions[i];
         if (cond.values) {
@@ -399,7 +423,6 @@ int main(int argc, char *argv[]) {
 
         sprintf(path, "%s/p.%09d.raw", output_folder, export_counter);
         array_write(comm, path, SFEM_MPI_REAL_T, p, p1_nnodes, p1_nnodes);
-
         export_counter++;
     }
 
@@ -507,7 +530,32 @@ int main(int argc, char *argv[]) {
             }
 
             memset(p, 0, p1_nnodes * sizeof(real_t));
-            isolver_lsolve_apply(&lsolve[INVERSE_POISSON_MATRIX], buff, p);
+
+            if (SFEM_AVG_PRESSURE_CONSTRAINT) {
+                real_t lagrange_multiplier = 0;
+                for (int i = 0; i < 10; i++) {
+                    constrained_gs(p1_nnodes,
+                                   p1_rowptr,
+                                   p1_colidx,
+                                   p1_values,
+                                   p1_inv_diag,
+                                   buff,
+                                   p,
+                                   p1_mass_vector,
+                                   sum_mass,
+                                   &lagrange_multiplier,
+                                   100);
+
+                    real_t res = 0;
+                    constrained_gs_residual(p1_nnodes, p1_rowptr, p1_colidx, p1_values, buff, p, &res);
+
+                    printf("poisson residual: %g, lagrange_multiplier: %g\n",
+                           res,
+                           lagrange_multiplier);
+                }
+            } else {
+                isolver_lsolve_apply(&lsolve[INVERSE_POISSON_MATRIX], buff, p);
+            }
         }
         //////////////////////////////////////////////////////////////
         // Correction/Projection step
@@ -596,6 +644,10 @@ int main(int argc, char *argv[]) {
         free(vel[d]);
         free(tentative_vel[d]);
         free(correction[d]);
+    }
+
+    if (p1_mass_vector) {
+        free(p1_mass_vector);
     }
 
     ptrdiff_t nelements = mesh.nelements;

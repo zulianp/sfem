@@ -63,16 +63,16 @@ export SFEM_VELOCITY_DIRICHLET_VALUE="0,0,path:bcvalues.raw,0"
 export SFEM_VELOCITY_DIRICHLET_COMPONENT="0,1,0,1"
 
 python3 -c "import numpy as np; np.array([210]).astype(np.int32).tofile('pbc.int32.raw')"
-export SFEM_PRESSURE_DIRICHLET_NODESET="pbc.int32.raw"
+# export SFEM_PRESSURE_DIRICHLET_NODESET="pbc.int32.raw"
 
 # export SFEM_PRESSURE_DIRICHLET_NODESET="$sright"
 # export SFEM_PRESSURE_DIRICHLET_NODESET="$soutlet"
-export SFEM_PRESSURE_DIRICHLET_VALUE="0"
-export SFEM_PRESSURE_DIRICHLET_COMPONENT="0"
+# export SFEM_PRESSURE_DIRICHLET_VALUE="0"
+# export SFEM_PRESSURE_DIRICHLET_COMPONENT="0"
 
-export SFEM_DT=0.00001
-export SFEM_MAX_TIME=1
-export SFEM_EXPORT_FREQUENCY=0.01
+export SFEM_DT=0.001
+export SFEM_MAX_TIME=10
+export SFEM_EXPORT_FREQUENCY=$SFEM_DT
 export SFEM_RTOL=1e-14
 export SFEM_MAX_IT=2000
 export SFEM_CFL=0.005
@@ -86,9 +86,8 @@ rm -rf out
 mkdir -p out
 set -x
 
-# lldb -- 
+# lldb -- taylor_hood_navier_stokes $SFEM_MESH_DIR out
 taylor_hood_navier_stokes $SFEM_MESH_DIR out
-# taylor_hood_navier_stokes $SFEM_MESH_DIR out
 
 nsteps=`ls out/u0.*.raw | wc -l | awk '{print $1}'`
 raw_to_db.py $SFEM_MESH_DIR u.xmf  \
