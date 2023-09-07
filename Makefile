@@ -208,7 +208,7 @@ ifeq ($(cuda), 1)
 	CUDA_OBJS += tet4_cuda_phase_field_for_fracture.o
 
 	CUDA_OBJS += cuda_crs.o
-	DEPS += -L/opt/cuda/lib64 -lcudart
+	DEPS += -L/opt/cuda/lib64 -lcudart -lcusparse -lcusolver
 	DEPS += -lnvToolsExt
 
 	OBJS += $(CUDA_OBJS)
