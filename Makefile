@@ -106,7 +106,7 @@ GOALS += divergence lapl lumped_mass_inv lumped_boundary_mass_inv u_dot_grad_q
 GOALS += crs_apply_dirichlet
 
 # Array utilities
-GOALS += soa_to_aos aos_to_soa roi
+GOALS += soa_to_aos aos_to_soa roi unique
 
 # CVFEM
 GOALS += cvfem_assemble
@@ -421,6 +421,9 @@ wss : drivers/wss.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 roi : drivers/roi.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+unique:  drivers/unique.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 div.o : operators/div.c

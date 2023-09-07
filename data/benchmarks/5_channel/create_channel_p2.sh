@@ -5,25 +5,31 @@ set -e
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 PATH=$SCRIPTPATH:$PATH
-PATH=$SCRIPTPATH/../..:$PATH
-PATH=$SCRIPTPATH/../../python:$PATH
-PATH=$SCRIPTPATH/../../python/mesh:$PATH
-PATH=$SCRIPTPATH/../../python/algebra:$PATH
-PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
+PATH=$SCRIPTPATH/../../..:$PATH
+PATH=$SCRIPTPATH/../../../python:$PATH
+PATH=$SCRIPTPATH/../../../python/mesh:$PATH
+PATH=$SCRIPTPATH/../../../workflows/divergence:$PATH
 
-idx_type_size=4
-folder=channel_hole
+LAUNCH=""
+# LAUNCH=srun
+
+if (($# != 1))
+then
+	printf "usage: $0 <n_refinements>\n" 1>&2
+	exit -1
+fi
+
+# set -x
+
+nrefs=$1
+
+folder=channel
 mesh_db=$folder/mesh.vtk
-# mesh_db=$folder/mesh_fine.vtk
 mesh_db_p2=$folder/mesh_p2.vtk
 mesh_raw=./mesh
 # mesh_original=./unsorted
 mesh_original=$mesh_raw
 mesh_surface=$mesh_raw/surface
-
-workspace=workspace
-mkdir -p $workspace
-
 
 mkdir -p $mesh_original
 mkdir -p $mesh_raw
@@ -32,17 +38,19 @@ mkdir -p $mesh_surface/outlet
 mkdir -p $mesh_surface/wall
 mkdir -p $mesh_raw/sidesets_aos
 
-set -x
+mkdir -p $folder
 
+idx_type_size=4
+
+channel.py $nrefs
 db_to_raw.py $mesh_db $mesh_raw/p1
 mesh_p1_to_p2 $mesh_raw/p1 $mesh_raw
 raw_to_db.py $mesh_raw $mesh_db_p2
 
-export SFEM_ELEMENT_TYPE=11 #EDGE3
 $LAUNCH skin $mesh_raw $mesh_surface
 
-$LAUNCH select_surf $mesh_surface -0.1  0.2   0.2   0.99  	$mesh_surface/sides_inlet.raw
-$LAUNCH select_surf $mesh_surface  2.3  0.2   0.2   0.99   	$mesh_surface/sides_outlet.raw
+$LAUNCH select_surf $mesh_surface -0.1 0.2   0.2   0.99  	$mesh_surface/sides_inlet.raw
+$LAUNCH select_surf $mesh_surface  2.6 0.2   0.2   0.99 	$mesh_surface/sides_outlet.raw
 
 numbers=`mktemp`
 numbers2=`mktemp`
@@ -81,9 +89,9 @@ boundary_nodes()
 	name=$1
 	sideset_raw=$2
 
-	# workspace=`mktemp -d`
+	workspace=`mktemp -d`
 
-	for(( i=0; i < 3; i++ ))
+	for(( i=0; i < 6; i++ ))
 	do
 		fname=i"$i".raw
 		# Convert gather surf-mesh indices
@@ -94,8 +102,7 @@ boundary_nodes()
 	done	
 
 	$LAUNCH soa_to_aos "$mesh_surface/"$name"/i*.raw" $idx_type_size $sideset_raw
-	$LAUNCH unique $sideset_raw $sideset_raw
-	# rm -r $workspace
+	rm -r $workspace
 }
 
 boundary_nodes inlet  $mesh_raw/sidesets_aos/sinlet.raw

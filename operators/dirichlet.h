@@ -11,6 +11,13 @@ void constraint_nodes_to_value(
     real_t *values
     );
 
+void constraint_nodes_to_values(
+    const ptrdiff_t n_dirichlet_nodes,
+    const idx_t * dirichlet_nodes,
+    const real_t * SFEM_RESTRICT dirichlet_values,
+    real_t * SFEM_RESTRICT values
+    );
+
 void constraint_nodes_copy(
     const ptrdiff_t n_dirichlet_nodes,
     const idx_t * dirichlet_nodes,
@@ -36,6 +43,15 @@ void constraint_nodes_to_value_vec(
     const int block_size,
     const int component,
     const real_t value,
+    real_t *values
+    );
+
+void constraint_nodes_to_values_vec(
+    const ptrdiff_t n_dirichlet_nodes,
+    const idx_t * dirichlet_nodes,
+    const int block_size,
+    const int component,
+    const real_t *dirichlet_values,
     real_t *values
     );
 

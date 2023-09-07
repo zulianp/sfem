@@ -50,6 +50,20 @@ void constraint_nodes_to_value(const ptrdiff_t n_dirichlet_nodes,
     }
 }
 
+void constraint_nodes_to_values(const ptrdiff_t n_dirichlet_nodes,
+                                const idx_t *dirichlet_nodes,
+                                const real_t *SFEM_RESTRICT dirichlet_values,
+                                real_t *SFEM_RESTRICT values) {
+#pragma omp parallel
+    {
+#pragma omp for
+        for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
+            idx_t i = dirichlet_nodes[node];
+            values[i] = dirichlet_values[node];
+        }
+    }
+}
+
 void constraint_nodes_copy(const ptrdiff_t n_dirichlet_nodes,
                            const idx_t *dirichlet_nodes,
                            const real_t *source,
@@ -103,6 +117,22 @@ void constraint_nodes_to_value_vec(const ptrdiff_t n_dirichlet_nodes,
         for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
             idx_t i = dirichlet_nodes[node] * block_size + component;
             values[i] = value;
+        }
+    }
+}
+
+void constraint_nodes_to_values_vec(const ptrdiff_t n_dirichlet_nodes,
+                                    const idx_t *dirichlet_nodes,
+                                    const int block_size,
+                                    const int component,
+                                    const real_t *dirichlet_values,
+                                    real_t *values) {
+#pragma omp parallel
+    {
+#pragma omp for
+        for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
+            idx_t i = dirichlet_nodes[node] * block_size + component;
+            values[i] = dirichlet_values[node];
         }
     }
 }
