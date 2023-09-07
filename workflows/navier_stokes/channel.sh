@@ -9,6 +9,8 @@
 # https://wwwold.mathematik.tu-dortmund.de/~featflow/en/benchmarks/cfdbenchmarking/flow/dfg_benchmark1_re20.html
 # https://www.featool.com/tutorial/2015/08/13/Accurate-Computational-Fluid-Dynamics-CFD-Simulations-with-FEATool
 # https://www.youtube.com/watch?v=7Y6iSPPHwvU&t=3s
+# https://drive.google.com/file/d/1iWXkEYfBGwlYKth_Cl9JdD2Z18TGCyDs/view?usp=sharing
+# https://drive.google.com/file/d/1NOt8M3IpCNYu8mfT6VGBBrh6hYZ8G3FZ/view?usp=sharing
 
 set -e
 
@@ -69,8 +71,8 @@ export SFEM_PRESSURE_DIRICHLET_VALUE="0"
 export SFEM_PRESSURE_DIRICHLET_COMPONENT="0"
 
 export SFEM_DT=0.00001
-export SFEM_MAX_TIME=10
-export SFEM_EXPORT_FREQUENCY=0.001
+export SFEM_MAX_TIME=1
+export SFEM_EXPORT_FREQUENCY=0.01
 export SFEM_RTOL=1e-14
 export SFEM_MAX_IT=2000
 export SFEM_CFL=0.005
