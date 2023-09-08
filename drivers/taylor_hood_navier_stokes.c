@@ -535,7 +535,7 @@ int main(int argc, char *argv[]) {
             if (SFEM_AVG_PRESSURE_CONSTRAINT) {
                 real_t lagrange_multiplier = 0;
 
-                int check_each = 1000;
+                int check_each = 100;
                 for (long i = 0; i * check_each < SFEM_MAX_IT; i++) {
                     constrained_gs(p1_nnodes,
                                    p1_rowptr,
