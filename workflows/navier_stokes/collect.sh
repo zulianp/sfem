@@ -12,4 +12,4 @@ raw_to_db.py ./mesh u.xmf  \
 
 raw_to_db.py ./mesh/p1 p.xmf \
  --transient --n_time_steps=$nsteps \
- --point_data="out/p.*.raw" 
+ --point_data="out/p.*.raw,out/div.*.raw,out/div_pre.*.raw" 

@@ -93,8 +93,7 @@ static void shift_diag(const ptrdiff_t n,
                        const count_t *const SFEM_RESTRICT rowptr,
                        const idx_t *const SFEM_RESTRICT colidx,
                        real_t *const SFEM_RESTRICT values) {
-    for (ptrdiff_t i = 0; i < n; ++i) 
-    {
+    for (ptrdiff_t i = 0; i < n; ++i) {
         // ptrdiff_t i = n - 1;
         count_t rstart = rowptr[i];
         count_t rextent = rowptr[i + 1] - rstart;
@@ -109,7 +108,6 @@ static void shift_diag(const ptrdiff_t n,
         }
     }
 }
-
 
 //////////////////////////////////////////////
 
@@ -213,7 +211,8 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_EXPORT_FREQUENCY, atof);
     SFEM_READ_ENV(SFEM_LUMPED_MASS, atoi);
 
-    int SFEM_AVG_PRESSURE_CONSTRAINT = 1;
+    // int SFEM_AVG_PRESSURE_CONSTRAINT = 1;
+    int SFEM_AVG_PRESSURE_CONSTRAINT = 0;
     SFEM_READ_ENV(SFEM_AVG_PRESSURE_CONSTRAINT, atoi);
 
     real_t SFEM_REGULARIZATION_FACTOR = 1e-8;
@@ -230,13 +229,15 @@ int main(int argc, char *argv[]) {
             "- SFEM_DYNAMIC_VISCOSITY=%g\n"
             "- SFEM_MASS_DENSITY=%g\n"
             "- SFEM_VELOCITY_DIRICHLET_NODESET=%s\n"
+            "- SFEM_AVG_PRESSURE_CONSTRAINT=%d\n"
             "----------------------------------------\n",
             SFEM_DT,
             SFEM_CFL,
             SFEM_LUMPED_MASS,
             SFEM_DYNAMIC_VISCOSITY,
             SFEM_MASS_DENSITY,
-            SFEM_VELOCITY_DIRICHLET_NODESET);
+            SFEM_VELOCITY_DIRICHLET_NODESET,
+            SFEM_AVG_PRESSURE_CONSTRAINT);
     }
 
     real_t emin, emax;
@@ -343,24 +344,25 @@ int main(int argc, char *argv[]) {
                                              p1_values);
         }
 
-        if (n_pressure_dirichlet_conditions == 0) {
-            // make_matrix_nonsingular(
-            //     SFEM_REGULARIZATION_FACTOR, p1_nnodes, p1_rowptr, p1_colidx, p1_values);
+        // if (n_pressure_dirichlet_conditions == 0) {
+        //     // make_matrix_nonsingular(
+        //     //     SFEM_REGULARIZATION_FACTOR, p1_nnodes, p1_rowptr, p1_colidx, p1_values);
 
-            p1_mass_vector = calloc(p1_nnodes, sizeof(real_t));
+        //     p1_mass_vector = calloc(p1_nnodes, sizeof(real_t));
 
-            assemble_lumped_mass(
-                p1_type, mesh.nelements, p1_nnodes, mesh.elements, mesh.points, p1_mass_vector);
+        //     assemble_lumped_mass(
+        //         p1_type, mesh.nelements, p1_nnodes, mesh.elements, mesh.points, p1_mass_vector);
 
-            shift_diag(p1_nnodes,
-                       SFEM_REGULARIZATION_FACTOR,
-                       p1_mass_vector,
-                       p1_rowptr,
-                       p1_colidx,
-                       p1_values);
+        //     shift_diag(p1_nnodes,
+        //                SFEM_REGULARIZATION_FACTOR,
+        //                p1_mass_vector,
+        //                p1_rowptr,
+        //                p1_colidx,
+        //                p1_values);
 
-            free(p1_mass_vector);
-        }
+        //     free(p1_mass_vector);
+        // }
+
         isolver_lsolve_update_crs(
             &lsolve[INVERSE_POISSON_MATRIX], p1_nnodes, p1_nnodes, p1_rowptr, p1_colidx, p1_values);
     }
@@ -392,7 +394,7 @@ int main(int argc, char *argv[]) {
                                                   mesh.nnodes,
                                                   mesh.elements,
                                                   mesh.points,
-                                                  SFEM_DT,
+                                                  1,
                                                   SFEM_DYNAMIC_VISCOSITY,
                                                   p2_rowptr,
                                                   p2_colidx,
@@ -489,6 +491,12 @@ int main(int argc, char *argv[]) {
 
         sprintf(path, "%s/p.%09d.raw", output_folder, export_counter);
         array_write(comm, path, SFEM_MPI_REAL_T, p, p1_nnodes, p1_nnodes);
+
+        sprintf(path, "%s/div.%09d.raw", output_folder, export_counter);
+        array_write(comm, path, SFEM_MPI_REAL_T, p, p1_nnodes, p1_nnodes);
+
+        sprintf(path, "%s/div_pre.%09d.raw", output_folder, export_counter);
+        array_write(comm, path, SFEM_MPI_REAL_T, p, p1_nnodes, p1_nnodes);
         export_counter++;
     }
 
@@ -583,8 +591,7 @@ int main(int argc, char *argv[]) {
                                            mesh.nnodes,
                                            mesh.elements,
                                            mesh.points,
-                                           1,
-                                           1,
+                                           1,1,
                                            SFEM_DYNAMIC_VISCOSITY,
                                            tentative_vel,
                                            buff);
@@ -593,6 +600,16 @@ int main(int argc, char *argv[]) {
                 boundary_condition_t cond = pressure_dirichlet_conditions[i];
                 assert(cond.component == 0);
                 constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, buff);
+            }
+
+            if (t >= next_check_point) {  // Write to disk
+                memset(p, 0, p1_nnodes * sizeof(real_t));
+
+                apply_inv_lumped_mass(
+                    p1_type, mesh.nelements, p1_nnodes, mesh.elements, mesh.points, buff, p);
+
+                sprintf(path, "%s/div_pre.%09d.raw", output_folder, export_counter);
+                array_write(comm, path, SFEM_MPI_REAL_T, p, p1_nnodes, p1_nnodes);
             }
 
             memset(p, 0, p1_nnodes * sizeof(real_t));
@@ -651,8 +668,7 @@ int main(int argc, char *argv[]) {
                                            mesh.nnodes,
                                            mesh.elements,
                                            mesh.points,
-                                           1,
-                                           1,
+                                           1,1,
                                            p,
                                            correction);
 
@@ -693,7 +709,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (t >= next_check_point) {  // Write to disk
-            next_check_point += SFEM_EXPORT_FREQUENCY;
+
             printf("%g/%g dt=%g\n", t, SFEM_MAX_TIME, dt);
             for (int d = 0; d < sdim; d++) {
                 sprintf(path, "%s/u%d.%09d.raw", output_folder, d, export_counter);
@@ -703,6 +719,30 @@ int main(int argc, char *argv[]) {
             sprintf(path, "%s/p.%09d.raw", output_folder, export_counter);
             array_write(comm, path, SFEM_MPI_REAL_T, p, p1_nnodes, p1_nnodes);
 
+
+            {  // Compute divergence for analysis
+                memset(buff, 0, p1_nnodes * sizeof(real_t));
+                navier_stokes_mixed_divergence(mesh.element_type,
+                                               p1_type,
+                                               mesh.nelements,
+                                               mesh.nnodes,
+                                               mesh.elements,
+                                               mesh.points,
+                                               1,
+                                               1,
+                                               SFEM_DYNAMIC_VISCOSITY,
+                                               vel,
+                                               buff);
+
+                memset(p, 0, p1_nnodes * sizeof(real_t));
+                apply_inv_lumped_mass(
+                    p1_type, mesh.nelements, p1_nnodes, mesh.elements, mesh.points, buff, p);
+
+                sprintf(path, "%s/div.%09d.raw", output_folder, export_counter);
+                array_write(comm, path, SFEM_MPI_REAL_T, p, p1_nnodes, p1_nnodes);
+            }
+
+            next_check_point += SFEM_EXPORT_FREQUENCY;
             export_counter++;
         }
     }
