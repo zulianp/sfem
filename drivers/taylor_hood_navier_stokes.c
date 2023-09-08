@@ -67,6 +67,50 @@ static ptrdiff_t count_nan(const ptrdiff_t n, const real_t *const v) {
     return ret;
 }
 
+static void make_matrix_nonsingular(const real_t factor,
+                                    const ptrdiff_t n,
+                                    const count_t *const SFEM_RESTRICT rowptr,
+                                    const idx_t *const SFEM_RESTRICT colidx,
+                                    real_t *const SFEM_RESTRICT values) {
+    count_t rstart = rowptr[n - 1];
+    count_t rextent = rowptr[n] - rstart;
+    const idx_t *const cols = &colidx[rstart];
+    real_t *const vals = &values[rstart];
+
+    for (count_t i = 0; i < rextent; ++i) {
+        if (cols[i] == n - 1) {
+            vals[i] *= (1 + factor);
+
+            // vals[i] += factor;
+            break;
+        }
+    }
+}
+
+static void shift_diag(const ptrdiff_t n,
+                       const real_t factor,
+                       const real_t *const SFEM_RESTRICT vector,
+                       const count_t *const SFEM_RESTRICT rowptr,
+                       const idx_t *const SFEM_RESTRICT colidx,
+                       real_t *const SFEM_RESTRICT values) {
+    for (ptrdiff_t i = 0; i < n; ++i) 
+    {
+        // ptrdiff_t i = n - 1;
+        count_t rstart = rowptr[i];
+        count_t rextent = rowptr[i + 1] - rstart;
+        const idx_t *const cols = &colidx[rstart];
+        real_t *const vals = &values[rstart];
+
+        for (count_t k = 0; k < rextent; ++k) {
+            if (cols[k] == i) {
+                vals[k] += factor * vector[i];
+                break;
+            }
+        }
+    }
+}
+
+
 //////////////////////////////////////////////
 
 #define N_SYSTEMS 3
@@ -171,6 +215,9 @@ int main(int argc, char *argv[]) {
 
     int SFEM_AVG_PRESSURE_CONSTRAINT = 1;
     SFEM_READ_ENV(SFEM_AVG_PRESSURE_CONSTRAINT, atoi);
+
+    real_t SFEM_REGULARIZATION_FACTOR = 1e-8;
+    SFEM_READ_ENV(SFEM_REGULARIZATION_FACTOR, atof);
 
     if (rank == 0) {
         printf(
@@ -296,6 +343,24 @@ int main(int argc, char *argv[]) {
                                              p1_values);
         }
 
+        if (n_pressure_dirichlet_conditions == 0) {
+            // make_matrix_nonsingular(
+            //     SFEM_REGULARIZATION_FACTOR, p1_nnodes, p1_rowptr, p1_colidx, p1_values);
+
+            p1_mass_vector = calloc(p1_nnodes, sizeof(real_t));
+
+            assemble_lumped_mass(
+                p1_type, mesh.nelements, p1_nnodes, mesh.elements, mesh.points, p1_mass_vector);
+
+            shift_diag(p1_nnodes,
+                       SFEM_REGULARIZATION_FACTOR,
+                       p1_mass_vector,
+                       p1_rowptr,
+                       p1_colidx,
+                       p1_values);
+
+            free(p1_mass_vector);
+        }
         isolver_lsolve_update_crs(
             &lsolve[INVERSE_POISSON_MATRIX], p1_nnodes, p1_nnodes, p1_rowptr, p1_colidx, p1_values);
     }
@@ -562,7 +627,7 @@ int main(int argc, char *argv[]) {
                                             &res);
 
                     printf("(%ld) poisson residual: %g, lagrange_multiplier: %g\n",
-                        (i+1) * check_each,
+                           (i + 1) * check_each,
                            res,
                            lagrange_multiplier);
 
