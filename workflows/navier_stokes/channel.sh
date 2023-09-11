@@ -54,8 +54,8 @@ soutlet=$SFEM_MESH_DIR/sidesets_aos/soutlet.raw
 # Laminar case
 # U=0.3
 # Shedding
-# U=1.5
-U=10
+U=1.5
+# U=10
 python3 -c 'import numpy as np; idx=np.fromfile("'$sinlet'", dtype="'$py_sfem_idx_t'"); y=np.fromfile("'$SFEM_MESH_DIR'/y.raw",dtype="'$py_sfem_geom_t'"); y=y[idx]; U='$U'; fy=4*U*y*(0.41 - y)/(0.41*0.41); fy.astype("'$py_sfem_real_t'").tofile("bcvalues.raw")'
 
 # export SFEM_VELOCITY_DIRICHLET_NODESET="$sbottom,$sbottom,$stop,$stop,$sleft,$sleft"
@@ -71,8 +71,8 @@ python3 -c "import numpy as np; np.array([210]).astype(np.int32).tofile('pbc.int
 # export SFEM_PRESSURE_DIRICHLET_VALUE="0"
 # export SFEM_PRESSURE_DIRICHLET_COMPONENT="0"
 
-export SFEM_DT=0.000001
-export SFEM_MAX_TIME=4
+export SFEM_DT=0.0001
+export SFEM_MAX_TIME=0.001
 export SFEM_EXPORT_FREQUENCY=0.0001
 export SFEM_RTOL=1e-14
 export SFEM_MAX_IT=60
@@ -84,8 +84,8 @@ export SFEM_AVG_PRESSURE_CONSTRAINT=0
 export SFEM_DYNAMIC_VISCOSITY=0.001
 export SFEM_MASS_DENSITY=1
 
-export SFEM_RESTART_FOLDER=batch1
-export SFEM_RESTART_ID=772
+# export SFEM_RESTART_FOLDER=batch1
+# export SFEM_RESTART_ID=772
 
 rm -rf out
 mkdir -p out
@@ -96,5 +96,5 @@ taylor_hood_navier_stokes $SFEM_MESH_DIR out
 
 nsteps=`ls out/u0.*.raw | wc -l | awk '{print $1}'`
 raw_to_db.py $SFEM_MESH_DIR u.xmf  \
- --transient --n_time_steps=$nsteps \
+ --transient --time_whole_txt="out/time.txt" \
  --point_data="out/u0.*.raw,out/u1.*.raw" 

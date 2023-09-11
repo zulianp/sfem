@@ -536,7 +536,8 @@ int main(int argc, char *argv[]) {
         sprintf(path, "%s/div_pre.%09d.raw", output_folder, export_counter);
         array_write(comm, path, SFEM_MPI_REAL_T, p, p1_nnodes, p1_nnodes);
 
-        log_create_file(&time_logger, "time.txt", "w");
+        sprintf(path, "%s/time.txt", output_folder);
+        log_create_file(&time_logger, path, "w");
         log_write_double(&time_logger, 0);
         export_counter++;
     }
