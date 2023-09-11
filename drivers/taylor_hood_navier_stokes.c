@@ -31,6 +31,8 @@
 
 #include "constrained_gs.h"
 
+#include "sfem_logger.h"
+
 // https://fenicsproject.org/olddocs/dolfin/1.6.0/python/demo/documented/navier-stokes/python/documentation.html
 
 // Explicit euler
@@ -218,6 +220,14 @@ int main(int argc, char *argv[]) {
     real_t SFEM_REGULARIZATION_FACTOR = 1e-8;
     SFEM_READ_ENV(SFEM_REGULARIZATION_FACTOR, atof);
 
+    const char *SFEM_RESTART_FOLDER = 0;
+    SFEM_READ_ENV(SFEM_RESTART_FOLDER, );
+
+    int SFEM_RESTART_ID = 0;
+    SFEM_READ_ENV(SFEM_RESTART_ID, atoi);
+
+    
+
     if (rank == 0) {
         printf(
             "----------------------------------------\n"
@@ -230,6 +240,8 @@ int main(int argc, char *argv[]) {
             "- SFEM_MASS_DENSITY=%g\n"
             "- SFEM_VELOCITY_DIRICHLET_NODESET=%s\n"
             "- SFEM_AVG_PRESSURE_CONSTRAINT=%d\n"
+            "- SFEM_RESTART_FOLDER=%s\n"
+            "- SFEM_RESTART_ID=%d\n"
             "----------------------------------------\n",
             SFEM_DT,
             SFEM_CFL,
@@ -237,8 +249,17 @@ int main(int argc, char *argv[]) {
             SFEM_DYNAMIC_VISCOSITY,
             SFEM_MASS_DENSITY,
             SFEM_VELOCITY_DIRICHLET_NODESET,
-            SFEM_AVG_PRESSURE_CONSTRAINT);
+            SFEM_AVG_PRESSURE_CONSTRAINT,
+            SFEM_RESTART_FOLDER,
+            SFEM_RESTART_ID);
     }
+
+    if (SFEM_RESTART_FOLDER && !SFEM_RESTART_ID) {
+        fprintf(stderr, "Defined SFEM_RESTART_FOLDER but not SFEM_RESTART_ID\n");
+        return EXIT_FAILURE;
+    }
+
+    
 
     real_t emin, emax;
     mesh_minmax_edge_length(&mesh, &emin, &emax);
@@ -481,8 +502,25 @@ int main(int argc, char *argv[]) {
 
     int export_counter = 0;
     real_t next_check_point = SFEM_EXPORT_FREQUENCY;
+    logger_t time_logger;
 
-    {  // Write to disk
+    if (SFEM_RESTART_FOLDER) {
+        for (int d = 0; d < sdim; d++) {
+            sprintf(path, "%s/u%d.%09d.raw", SFEM_RESTART_FOLDER, d, SFEM_RESTART_ID);
+
+            if (array_read(
+                    comm, path, SFEM_MPI_REAL_T, (void *)vel[d], mesh.nnodes, mesh.nnodes)) {
+                fprintf(stderr, "Error reading restart file: %s\n", SFEM_RESTART_FOLDER);
+                return EXIT_FAILURE;
+            }
+        }
+
+        // Read current time file and start from offset
+        // log_write_double()
+
+        export_counter = SFEM_RESTART_ID + 1;
+
+    } else {  // Write to disk
         printf("%g/%g\n", 0., SFEM_MAX_TIME);
         for (int d = 0; d < sdim; d++) {
             sprintf(path, "%s/u%d.%09d.raw", output_folder, d, export_counter);
@@ -497,6 +535,9 @@ int main(int argc, char *argv[]) {
 
         sprintf(path, "%s/div_pre.%09d.raw", output_folder, export_counter);
         array_write(comm, path, SFEM_MPI_REAL_T, p, p1_nnodes, p1_nnodes);
+
+        log_create_file(&time_logger, "time.txt", "w");
+        log_write_double(&time_logger, 0);
         export_counter++;
     }
 
@@ -591,7 +632,8 @@ int main(int argc, char *argv[]) {
                                            mesh.nnodes,
                                            mesh.elements,
                                            mesh.points,
-                                           1,1,
+                                           1,
+                                           1,
                                            SFEM_DYNAMIC_VISCOSITY,
                                            tentative_vel,
                                            buff);
@@ -668,7 +710,8 @@ int main(int argc, char *argv[]) {
                                            mesh.nnodes,
                                            mesh.elements,
                                            mesh.points,
-                                           1,1,
+                                           1,
+                                           1,
                                            p,
                                            correction);
 
@@ -709,7 +752,6 @@ int main(int argc, char *argv[]) {
         }
 
         if (t >= next_check_point) {  // Write to disk
-
             printf("%g/%g dt=%g\n", t, SFEM_MAX_TIME, dt);
             for (int d = 0; d < sdim; d++) {
                 sprintf(path, "%s/u%d.%09d.raw", output_folder, d, export_counter);
@@ -718,7 +760,6 @@ int main(int argc, char *argv[]) {
 
             sprintf(path, "%s/p.%09d.raw", output_folder, export_counter);
             array_write(comm, path, SFEM_MPI_REAL_T, p, p1_nnodes, p1_nnodes);
-
 
             {  // Compute divergence for analysis
                 memset(buff, 0, p1_nnodes * sizeof(real_t));
@@ -740,6 +781,8 @@ int main(int argc, char *argv[]) {
 
                 sprintf(path, "%s/div.%09d.raw", output_folder, export_counter);
                 array_write(comm, path, SFEM_MPI_REAL_T, p, p1_nnodes, p1_nnodes);
+
+                log_write_double(&time_logger, t);
             }
 
             next_check_point += SFEM_EXPORT_FREQUENCY;
@@ -778,6 +821,8 @@ int main(int argc, char *argv[]) {
     destroy_conditions(n_velocity_dirichlet_conditions, velocity_dirichlet_conditions);
     destroy_conditions(n_pressure_dirichlet_conditions, pressure_dirichlet_conditions);
     // destroy_conditions(n_neumann_conditions, neumann_conditions);
+
+    log_destroy(&time_logger);
 
     double tock = MPI_Wtime();
     if (!rank) {

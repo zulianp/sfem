@@ -164,7 +164,8 @@ OBJS = \
 	phase_field_for_fracture.o  \
 	navier_stokes.o \
 	boundary_condition.o \
-	constrained_gs.o
+	constrained_gs.o \
+	sfem_logger.o
 
 # Tri3
 OBJS += tri3_stokes_mini.o \

@@ -84,6 +84,9 @@ export SFEM_AVG_PRESSURE_CONSTRAINT=0
 export SFEM_DYNAMIC_VISCOSITY=0.001
 export SFEM_MASS_DENSITY=1
 
+export SFEM_RESTART_FOLDER=batch1
+export SFEM_RESTART_ID=772
+
 rm -rf out
 mkdir -p out
 set -x
