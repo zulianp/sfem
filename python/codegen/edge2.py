@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from fe import FE
 import sympy as sp
 from sfem_codegen import *
@@ -66,6 +68,9 @@ class EdgeShell2(Edge2):
 		self.detS = sp.sqrt(StS[0])
 		self.Sinv = StS * self.S.T
 
+	def inverse_transform(self, p):
+		return self.Sinv * (p - sp.Matrix(2, 1, [x0, y0]))
+
 	def name(self):
 		return "Edge2hell2"
 		
@@ -84,3 +89,9 @@ class EdgeShell2(Edge2):
 	def measure(self, q):
 		return self.detS
 
+
+if __name__ == '__main__':
+	# Tri3().generate_c_code()
+	# TriShell3().generate_c_code()
+
+	EdgeShell2().generate_qp_based_code()

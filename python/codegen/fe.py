@@ -205,6 +205,16 @@ class FE:
 		det_code += "}\n"
 		return det_code
 
+	def generate_qp_based_code(self):
+		qp = sp.Matrix(self.spatial_dim(), 1, quadrature_point[0:self.spatial_dim()])
+		expr = []
+		tqp = self.inverse_transform(qp)
+
+		for i in range(0, len(tqp)):
+			expr.append(ast.Assignment(sp.symbols(f'res[{i}]'), tqp[i]))
+		c_log(c_gen(expr))
+
+
 	def generate_c_code(self):
 		self.generate_kernels_c_code()
 
