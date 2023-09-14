@@ -31,7 +31,7 @@ export VAR_UY=1
 export VAR_UZ=2
 
 
-export SFEM_DYNAMIC_VISCOSITY=""
+export SFEM_VISCOSITY=""
 export SFEM_MASS_DENSITY="1"
 export SFEM_OUTPUT_DIR=sfem_output
 
@@ -61,7 +61,7 @@ export SFEM_CFL=0.5
 export SFEM_LUMPED_MASS=1
 export SFEM_VERBOSE=1
 
-export SFEM_DYNAMIC_VISCOSITY=1
+export SFEM_VISCOSITY=1
 export SFEM_MASS_DENSITY=1
 
 rm -rf out

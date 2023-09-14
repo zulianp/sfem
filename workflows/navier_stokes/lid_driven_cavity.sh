@@ -52,7 +52,7 @@ export SFEM_CFL=0.005
 export SFEM_LUMPED_MASS=0
 export SFEM_VERBOSE=0
 
-export SFEM_DYNAMIC_VISCOSITY=0.01
+export SFEM_VISCOSITY=0.01
 export SFEM_MASS_DENSITY=1
 
 rm -rf out

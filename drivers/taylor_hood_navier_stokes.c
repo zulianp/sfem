@@ -163,9 +163,9 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    real_t SFEM_DYNAMIC_VISCOSITY = 1;
+    real_t SFEM_VISCOSITY = 1;
     real_t SFEM_MASS_DENSITY = 1;
-    SFEM_READ_ENV(SFEM_DYNAMIC_VISCOSITY, atof);
+    SFEM_READ_ENV(SFEM_VISCOSITY, atof);
     SFEM_READ_ENV(SFEM_MASS_DENSITY, atof);
 
     char *SFEM_VELOCITY_DIRICHLET_NODESET = 0;
@@ -236,7 +236,7 @@ int main(int argc, char *argv[]) {
             "- SFEM_DT=%g\n"
             "- SFEM_CFL=%g\n"
             "- SFEM_LUMPED_MASS=%d\n"
-            "- SFEM_DYNAMIC_VISCOSITY=%g\n"
+            "- SFEM_VISCOSITY=%g\n"
             "- SFEM_MASS_DENSITY=%g\n"
             "- SFEM_VELOCITY_DIRICHLET_NODESET=%s\n"
             "- SFEM_AVG_PRESSURE_CONSTRAINT=%d\n"
@@ -246,7 +246,7 @@ int main(int argc, char *argv[]) {
             SFEM_DT,
             SFEM_CFL,
             SFEM_LUMPED_MASS,
-            SFEM_DYNAMIC_VISCOSITY,
+            SFEM_VISCOSITY,
             SFEM_MASS_DENSITY,
             SFEM_VELOCITY_DIRICHLET_NODESET,
             SFEM_AVG_PRESSURE_CONSTRAINT,
@@ -416,7 +416,7 @@ int main(int argc, char *argv[]) {
                                                   mesh.elements,
                                                   mesh.points,
                                                   1,
-                                                  SFEM_DYNAMIC_VISCOSITY,
+                                                  SFEM_VISCOSITY,
                                                   p2_rowptr,
                                                   p2_colidx,
                                                   p2_diffusion);
@@ -573,7 +573,7 @@ int main(int argc, char *argv[]) {
                     mesh.elements,
                     mesh.points,
                     dt,
-                    SFEM_DYNAMIC_VISCOSITY,
+                    SFEM_VISCOSITY,
                     1,  // Turn-off convective term for debugging with 0
                     vel,
                     correction);
@@ -635,7 +635,7 @@ int main(int argc, char *argv[]) {
                                            mesh.points,
                                            1,
                                            1,
-                                           SFEM_DYNAMIC_VISCOSITY,
+                                           SFEM_VISCOSITY,
                                            tentative_vel,
                                            buff);
 
@@ -772,7 +772,7 @@ int main(int argc, char *argv[]) {
                                                mesh.points,
                                                1,
                                                1,
-                                               SFEM_DYNAMIC_VISCOSITY,
+                                               SFEM_VISCOSITY,
                                                vel,
                                                buff);
 
