@@ -14,7 +14,7 @@ ti.init(arch=ti.gpu)
 real_t = np.float32
 idx_t = np.int32
 
-mesh = meshio.read("teapot.obj")
+mesh = meshio.read("chair.obj")
 
 x =  mesh.points[:,0]
 y =  mesh.points[:,1]
