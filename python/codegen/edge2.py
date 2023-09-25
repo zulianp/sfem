@@ -66,7 +66,7 @@ class EdgeShell2(Edge2):
 
 		StS = self.S.T * self.S
 		self.detS = sp.sqrt(StS[0])
-		self.Sinv = StS * self.S.T
+		self.Sinv = (1/StS[0])* self.S.T
 
 	def inverse_transform(self, p):
 		return self.Sinv * (p - sp.Matrix(2, 1, [x0, y0]))
