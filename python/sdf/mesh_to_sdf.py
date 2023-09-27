@@ -4,6 +4,7 @@ import numpy as np
 import meshio
 import taichi as ti
 import sdf2
+import sys
 
 from time import perf_counter
 vec3 = ti.math.vec3
@@ -32,6 +33,8 @@ def sdt(mesh, hmax, margin):
 
 
 
+
+
 	x_range = xmax - xmin
 	y_range = ymax - ymin
 	z_range = zmax - zmin
@@ -39,6 +42,9 @@ def sdt(mesh, hmax, margin):
 	nx = np.int64(np.ceil((x_range)/hmax)) + 1
 	ny = np.int64(np.ceil((y_range)/hmax)) + 1
 	nz = np.int64(np.ceil((z_range)/hmax)) + 1
+
+	print(f'hmax={hmax} margin={margin}')
+	print(f'hmax={x_range} y_range={y_range} z_range={z_range}')
 
 	num_points = len(x)
 
@@ -112,13 +118,14 @@ def sdt(mesh, hmax, margin):
 
 					if d < e_min:
 						e_min = d
-						# n = ti.math.cross(ti.math.normalize(p1 - p0),  ti.math.normalize(p2 - p0))
-						# if d == 0:
-						# 	e_sign = 0
-						# elif ti.math.dot(q - p0, n) > 0:
-						# 	e_sign = -1
-						# else:
-						# 	e_sign = 1
+						n = ti.math.cross(ti.math.normalize(p1 - p0),  ti.math.normalize(p2 - p0))
+						# n = ti.math.normalize(p0)
+						if d == 0:
+							e_sign = 1
+						elif ti.math.dot(p - q, n) < 0:
+							e_sign = -1
+						else:
+							e_sign = 1
 
 					if(ti.math.isnan(d)):
 						print(f'Error = {tix[i0]} {tiy[i0]} {tiz[i0]}')
@@ -126,8 +133,8 @@ def sdt(mesh, hmax, margin):
 						# print(f"Error NaN p={p}, t={t}, q={q}, d={d}")
 						continue
 
-				# edt[k, j, i] = e_sign * e_min
-				edt[k, j, i] = e_min
+				edt[k, j, i] = e_sign * e_min
+				# edt[k, j, i] = e_min
 
 	compute()
 	ti.sync()
@@ -139,9 +146,18 @@ def sdt(mesh, hmax, margin):
 	print(f'd in [{np.min(nedt[:])}, {np.max(nedt[:])}]')
 	return nedt
 
-hmax = 0.005
-input_path = "teapot.obj"
-output_path = 'edt.float32.raw'
-mesh = meshio.read(input_path)
-nedt = sdt(mesh, hmax, 4*hmax)
-nedt.tofile(output_path)
+if __name__ == '__main__':
+
+	input_path = sys.argv[1]
+	hmax = float(sys.argv[2])
+	margin = float(sys.argv[3])
+	output_path = sys.argv[4]
+
+	# hmax = 0.005
+	# margin = 4*hmax
+	# input_path = "teapot.obj"
+	# output_path = 'edt.float32.raw'
+
+	mesh = meshio.read(input_path)
+	nedt = sdt(mesh, hmax, margin)
+	nedt.tofile(output_path)
