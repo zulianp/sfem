@@ -9,6 +9,8 @@ import sys
 from time import perf_counter
 vec3 = ti.math.vec3
 
+
+
 def sdt(mesh, hmax, margin):
 	t1_start = perf_counter()
 
@@ -68,6 +70,11 @@ def sdt(mesh, hmax, margin):
 	hy = y_range/(ny - 1)
 	hz = z_range/(nz - 1)
 
+	tinx = ti.field(ti.f32, shape=x.shape)
+	tiny = ti.field(ti.f32, shape=y.shape)
+	tinz = ti.field(ti.f32, shape=z.shape)
+	# area = ti.field(ti.f32, shape=x.shape)
+
 	for b in mesh.cells:
 		ncells, nnodesxelem = b.data.shape
 		print(f'{ncells} x {nnodesxelem}')
@@ -86,7 +93,79 @@ def sdt(mesh, hmax, margin):
 		idx2.from_numpy(ii2.astype(idx_t))
 
 		@ti.kernel
-		def compute():
+		def compute_vertex_normals():
+			for e in range(0, ncells):
+				i0 = idx0[e]
+				i1 = idx1[e]
+				i2 = idx2[e]
+
+				p0 = vec3(tix[i0], tiy[i0], tiz[i0])
+				p1 = vec3(tix[i1], tiy[i1], tiz[i1])
+				p2 = vec3(tix[i2], tiy[i2], tiz[i2])
+
+				n = ti.math.cross(p1 - p0,  p2 - p0)
+				a = ti.math.sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2])
+
+				ti.atomic_add(tinx[i0], n[0])
+				ti.atomic_add(tiny[i0], n[1])
+				ti.atomic_add(tinz[i0], n[2])
+
+				ti.atomic_add(tinx[i1], n[0])
+				ti.atomic_add(tiny[i1], n[1])
+				ti.atomic_add(tinz[i1], n[2])
+
+				ti.atomic_add(tinx[i2], n[0])
+				ti.atomic_add(tiny[i2], n[1])
+				ti.atomic_add(tinz[i2], n[2])
+
+				# area[i0] += a
+				# area[i1] += a
+				# area[i2] += a
+
+		compute_vertex_normals()
+
+	# @ti.kernel
+	# def in_place_e_div(n, num, denum):
+	# 	for e in range(0, n):
+	# 		num[e] /= denum[e]
+
+	@ti.kernel
+	def normalize():
+		for e in range(0, num_points):
+			v = ti.math.normalize(vec3(tinx[e], tiny[e], tinz[e]))
+
+			tinx[e] = v[0]
+			tiny[e] = v[1]
+			tinz[e] = v[2]
+
+		
+	normalize()
+
+	for b in mesh.cells:
+		ncells, nnodesxelem = b.data.shape
+		print(f'{ncells} x {nnodesxelem}')
+
+		ii0 = b.data[:, 0]
+		ii1 = b.data[:, 1]
+		ii2 = b.data[:, 2]
+
+		idx0 = ti.field(ti.i32, shape=ii0.shape)
+		idx0.from_numpy(ii0.astype(idx_t))
+
+		idx1 = ti.field(ti.i32, shape=ii1.shape)
+		idx1.from_numpy(ii1.astype(idx_t))
+
+		idx2 = ti.field(ti.i32, shape=ii2.shape)
+		idx2.from_numpy(ii2.astype(idx_t))
+
+		@ti.func
+		def approxeq(a, b, tol):
+			v = a - b
+			v *= ti.math.sign(v)
+			return v < tol
+
+		@ti.kernel
+		def compute_sdf():
 			for k, j, i, in ti.ndrange(nz, ny, nx):
 				e_min = infty
 				e_sign = 1
@@ -109,34 +188,58 @@ def sdt(mesh, hmax, margin):
 
 					p = [ gpx, gpy, gpz ]
 					t = [ p0, p1, p2 ]
-					q = sdf2.point_to_triangle(p, t)
+					q, phi1, phi2 = sdf2.point_to_triangle(p, t)
 					d = ti.math.distance(p, q)
 
 					if d < e_min:
 						e_min = d
 
-					# 	n = ti.math.cross(ti.math.normalize(p1 - p0),  ti.math.normalize(p2 - p0))
-					# 	if d == 0:
-					# 		e_sign = 1
-					# 	elif ti.math.dot(p - q, n) < 0:
-					# 		e_sign = -1
-					# 	else:
-					# 		e_sign = 1
+						phi0 = 1 - phi1 - phi2
+						
+						# Interior
+						n = ti.math.cross(p1 - p0,  p2 - p0)
+						a = ti.math.sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2])
+						n /= a
 
-					# if(ti.math.isnan(d)):
-					# 	print(f'Error = {tix[i0]} {tiy[i0]} {tiz[i0]}')
+						tol = 1e-16
+						isvertex = approxeq(phi0, 1, tol) or approxeq(phi1, 1, tol) or approxeq(phi2, 1, tol)
+						# isedge   = approxeq(phi0, 0, tol) or approxeq(phi1, 0, tol) or approxeq(phi2, 0, tol)
+
+						if isvertex:
+						# if isvertex or isedge:
+							# Corners	
+							n0 = vec3(tinx[i0], tinx[i0], tinx[i0])
+							n1 = vec3(tinx[i1], tinx[i1], tinx[i1])
+							n2 = vec3(tinx[i2], tinx[i2], tinx[i2])
+							n = ti.math.normalize(phi0 * n0 + phi1 * n1 + phi2 * n2)
+						# else:
+						# 	# Edge
+
+						if d == 0:
+							e_sign = 1
+						elif ti.math.dot(p - q, n) < 0:
+							e_sign = -1
+						else:
+							e_sign = 1
+
+					if(ti.math.isnan(d)):
+						print(f'Error = {tix[i0]} {tiy[i0]} {tiz[i0]}')
 					# 	print('\n')
 					# 	# print(f"Error NaN p={p}, t={t}, q={q}, d={d}")
 					# 	continue
 
-				# edt[k, j, i] = e_sign * e_min
-				edt[k, j, i] = e_min
+				edt[k, j, i] = e_sign * e_min
+				# edt[k, j, i] = e_min
 
-	compute()
+		compute_sdf()
 	ti.sync()
 
 	t1_stop = perf_counter()
 	print("TTS:", t1_stop - t1_start)
+
+	tinx.to_numpy().astype(real_t).tofile('nx.float32.raw')
+	tiny.to_numpy().astype(real_t).tofile('ny.float32.raw')
+	tinz.to_numpy().astype(real_t).tofile('nz.float32.raw')
 
 	nedt = edt.to_numpy().astype(real_t)
 	print(f'd in [{np.min(nedt[:])}, {np.max(nedt[:])}]')

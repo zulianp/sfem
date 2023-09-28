@@ -109,7 +109,7 @@ def sdt(mesh, hmax, margin):
 
 					p = [ gpx, gpy, gpz ]
 					t = [ p0, p1, p2 ]
-					q = sdf2.point_to_triangle(p, t)
+					q, __, __ = sdf2.point_to_triangle(p, t)
 					d = ti.math.distance(p, q)
 
 					if d < e_min:

@@ -34,7 +34,10 @@ mkdir -p $mesh_raw
 
 db_to_raw.py $db_in $mesh_raw
 skin $mesh_raw $skinned
-raw_to_db.py $skinned $surf
+
 
 mesh_to_sdf.py $surf $hmax $margin $db_out
+# raw_to_db.py $skinned $surf --point_data="nx.float32.raw,ny.float32.raw,nz.float32.raw" --point_data_type="float32,float32,float32"
 
+
+mesh_to_udf.py $surf $hmax $margin $db_out
