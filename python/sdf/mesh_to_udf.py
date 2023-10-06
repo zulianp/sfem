@@ -9,7 +9,26 @@ import sys
 from time import perf_counter
 vec3 = ti.math.vec3
 
-def sdt(mesh, hmax, margin):
+
+class Grid:
+	def __init__(self, 
+		nx, ny, nz, 
+		xmin, ymin, zmin,
+		xmax, ymax, zmax):
+
+		self.nx = np.int64(nx)
+		self.ny = np.int64(ny)
+		self.nz = np.int64(nz)
+
+		self.xrange = np.float32(xmax - xmin)
+		self.yrange = np.float32(ymax - ymin)
+		self.zrange = np.float32(zmax - zmin)
+
+		self.hx = np.float32(self.xrange / (nx - 1))
+		self.hy = np.float32(self.yrange / (ny - 1))
+		self.hz = np.float32(self.zrange / (nz - 1))
+
+def udf(mesh, hmax, margin):
 	t1_start = perf_counter()
 
 	# ti.init(arch=ti.arm64)
@@ -109,7 +128,7 @@ def sdt(mesh, hmax, margin):
 
 					p = [ gpx, gpy, gpz ]
 					t = [ p0, p1, p2 ]
-					q, __, __ = sdf2.point_to_triangle(p, t)
+					q, __, __, __ = sdf2.point_to_triangle(p, t)
 					d = ti.math.distance(p, q)
 
 					if d < e_min:
@@ -135,12 +154,14 @@ def sdt(mesh, hmax, margin):
 	compute()
 	ti.sync()
 
+	grid = Grid(nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax)
+
 	t1_stop = perf_counter()
 	print("TTS:", t1_stop - t1_start)
 
 	nedt = edt.to_numpy().astype(real_t)
 	print(f'd in [{np.min(nedt[:])}, {np.max(nedt[:])}]')
-	return nedt
+	return grid, nedt
 
 if __name__ == '__main__':
 
@@ -155,5 +176,5 @@ if __name__ == '__main__':
 	# output_path = 'edt.float32.raw'
 
 	mesh = meshio.read(input_path)
-	nedt = sdt(mesh, hmax, margin)
+	grid, nedt = udf(mesh, hmax, margin)
 	nedt.tofile(output_path)

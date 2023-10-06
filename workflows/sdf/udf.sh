@@ -34,8 +34,5 @@ mkdir -p $mesh_raw
 
 db_to_raw.py $db_in $mesh_raw
 skin $mesh_raw $skinned
-create_dual_graph $skinned $skinned/dual
-mesh_to_sdf.py $skinned $skinned/dual $hmax $margin $db_out
-
-raw_to_db.py $skinned $surf --point_data="nx.float32.raw,ny.float32.raw,nz.float32.raw" --point_data_type="float32,float32,float32"
-
+raw_to_db.py $skinned $surf
+mesh_to_udf.py $surf $hmax $margin $db_out
