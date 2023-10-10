@@ -27,7 +27,6 @@ class Mesh:
 		print(self.cells[0].data)
 		print(self.points)
 
-
 	def read(self, path):
 		self.cells = []
 
@@ -67,6 +66,10 @@ class Mesh:
 			d += 1
 
 		self.points = coords
+
+	def add_cells(self, cells)
+		block = Block(cells)
+		self.cells.append(block)
 
 def read(input_path):
 	mesh = Mesh()

@@ -14,16 +14,23 @@ PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 LAUNCH=""
 
-if (($# != 4))
+if (($# -le "4"))
 then
-	printf "usage: $0 <db.e> <hmax> <margin> <sdt.float32.raw>\n" 1>&2
+	printf "usage: $0 <db.e> <hmax> <margin> <sdt.float32.raw> [aux_mesh]\n" 1>&2
 	exit -1
 fi
+
+set -x
 
 db_in=$1
 hmax=$2
 margin=$3
 db_out=$4
+
+if !((-z $5))
+then
+	opts='--scale_box=1.1 --box_from_mesh='$5
+fi
 
 mesh_raw=mesh_raw
 skinned=skinned
@@ -34,8 +41,8 @@ mkdir -p $mesh_raw
 
 db_to_raw.py $db_in $mesh_raw
 skin $mesh_raw $skinned
-create_dual_graph $skinned $skinned/dual
-mesh_to_sdf.py $skinned $skinned/dual $hmax $margin $db_out
+# create_dual_graph $skinned $skinned/dual
+mesh_to_sdf.py $skinned $db_out --hmax=$hmax --margin=$margin $opts
 
 raw_to_db.py $skinned $surf --point_data="nx.float32.raw,ny.float32.raw,nz.float32.raw" --point_data_type="float32,float32,float32"
 
