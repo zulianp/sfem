@@ -21,6 +21,7 @@ class ElementDualGraph:
 class Block:
 	def __init__(self, data):
 		self.data = data
+		self.cell_type = 'triangle'
 
 class Mesh:
 	def __init__(self):
@@ -69,6 +70,18 @@ class Mesh:
 			d += 1
 
 		self.points = coords
+
+	def to_meshio(self):
+		import meshio
+		cells = []
+
+		for b in self.cells:
+			cells.append((b.cell_type, b.data))
+		return meshio.Mesh(self.points, cells)
+
+	def write(self, path):
+		m = self.to_meshio()
+		m.write(path)
 
 	def add_cells(self, cells):
 		block = Block(cells)
