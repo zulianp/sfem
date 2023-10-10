@@ -35,26 +35,27 @@ def select_submesh(mesh, pmin, pmax):
     y =  mesh.points[:,1].astype(real_t)
     z =  mesh.points[:,2].astype(real_t)
 
-    is_node_inside_min = x > pmin[0] and y > pmin[1] and z > pmin[2] 
-    is_node_inside_max = x < pmax[0] and y < pmax[1] and z < pmax[2] 
-    is_node_inside = is_node_inside_min and is_node_inside_max
+    is_node_inside_min = np.logical_and(np.logical_and(x > pmin[0], y > pmin[1]), z > pmin[2])
+    is_node_inside_max = np.logical_and(np.logical_and(x < pmax[0], y < pmax[1]), z < pmax[2])
+    is_node_inside = np.logical_and(is_node_inside_min, is_node_inside_max)
 
+    submesh = smesh.Mesh()
+    submesh.points = mesh.points
     selected_cells = None
     for b in mesh.cells:
         ncells, nnodesxelem = b.data.shape
         print(f'{ncells} x {nnodesxelem}')
 
-        i0 = b.data[:, 0]
-        i1 = b.data[:, 1]
-        i2 = b.data[:, 2]
+        i0 = b.data[:, 0].astype(np.int32)
+        i1 = b.data[:, 1].astype(np.int32)
+        i2 = b.data[:, 2].astype(np.int32)
 
-        keep_cells = is_node_inside[ii0] or is_node_inside[ii1] or is_node_inside[ii2]
+        keep_cells = np.logical_or(np.logical_or(is_node_inside[i0], is_node_inside[i1]), is_node_inside[i2])
 
         selected_cells = b.data[keep_cells, :]
-
-    submesh = smesh.Mesh()
-    submesh.add_cells(selected_cells)
-    submesh.points = mesh.points
+        submesh.add_cells(selected_cells)
+        print(f'cells {selected_cells.shape[0]}/{ncells}')
+    return submesh
 
 
 def compute_aabb(mesh, margin=0):
@@ -380,5 +381,6 @@ if __name__ == '__main__':
         pmin = ppmin + pmean
         pmax = ppmax + pmean
 
-    nedt = sdt(mesh, pmin, pmax, hmax)
+    submesh = select_submesh(mesh, pmin, pmax)
+    nedt = sdt(submesh, pmin, pmax, hmax)
     nedt.tofile(output_path)

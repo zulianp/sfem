@@ -23,10 +23,13 @@ class Block:
 		self.data = data
 
 class Mesh:
+	def __init__(self):
+		self.cells = []
+
 	def describe(self):
 		print(self.cells[0].data)
 		print(self.points)
-
+		
 	def read(self, path):
 		self.cells = []
 
@@ -67,7 +70,7 @@ class Mesh:
 
 		self.points = coords
 
-	def add_cells(self, cells)
+	def add_cells(self, cells):
 		block = Block(cells)
 		self.cells.append(block)
 
