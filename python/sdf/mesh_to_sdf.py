@@ -57,7 +57,6 @@ def select_submesh(mesh, pmin, pmax):
         print(f'cells {selected_cells.shape[0]}/{ncells}')
     return submesh
 
-
 def compute_aabb(mesh, margin=0):
     x =  mesh.points[:,0].astype(real_t)
     y =  mesh.points[:,1].astype(real_t)
@@ -285,7 +284,7 @@ def sdt(mesh, pmin, pmax, hmax):
 
     nedt = edt.to_numpy().astype(real_t)
     print(f'd in [{np.min(nedt[:])}, {np.max(nedt[:])}]')
-    return nedt
+    return nedt, [nx, ny, nz]
 
 if __name__ == '__main__':
     import sys, getopt
@@ -383,5 +382,19 @@ if __name__ == '__main__':
 
     submesh = select_submesh(mesh, pmin, pmax)
     submesh.write('submesh.vtk')
-    nedt = sdt(submesh, pmin, pmax, hmax)
+    nedt, dims = sdt(submesh, pmin, pmax, hmax)
     nedt.tofile(output_path)
+
+    header =    f'nx: {dims[0]}\n'
+    header +=   f'ny: {dims[1]}\n'
+    header +=   f'nz: {dims[2]}\n'
+    header +=   f'block_size: 1\n'
+    header +=   f'type: float\n'
+
+    fname, fextension = os.path.splitext(output_path)
+    pdir = os.path.dirname(fname)
+    fname = os.path.basename(fname)
+    
+    with open(f'{pdir}/metadata_{fname}.yml', 'w') as f:
+        f.write(header)
+
