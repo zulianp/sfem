@@ -27,12 +27,34 @@ def main(argv):
 	if nblocks > 1:
 		print(f'nblocks={nblocks}')
 
-	for b in mesh.cells:
-		ncells, nnodesxelem = b.data.shape
+		ncells = 0
+		nnodesxelem = 0
+
+		for b in mesh.cells:
+			bncells, bnnodesxelem = b.data.shape
+			ncells += bncells
+
+			assert(nnodesxelem == 0 or bnnodesxelem == nnodesxelem)
+			nnodesxelem = bnnodesxelem
+
+
+		idx = np.zeros(ncells, dtype=np.int32)
 
 		for d in range(0, nnodesxelem):
-			i0 = b.data[:, d]
-			i0.astype(np.int32).tofile(f'{output_folder}/i{d}.raw')
+			offset = 0		
+			for b in mesh.cells:
+				bncells, bnnodesxelem = b.data.shape
+				idx[offset:(offset + bncells)] = b.data[:, d]
+				offset += bncells
+			idx.astype(np.int32).tofile(f'{output_folder}/i{d}.raw')
+
+	else:
+		for b in mesh.cells:
+			ncells, nnodesxelem = b.data.shape
+
+			for d in range(0, nnodesxelem):
+				i0 = b.data[:, d]
+				i0.astype(np.int32).tofile(f'{output_folder}/i{d}.raw')
 
 	###################################
 	# Points

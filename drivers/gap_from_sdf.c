@@ -242,6 +242,8 @@ int resample_gap(MPI_Comm comm,
     memset(ynormal, 0, nnodes * sizeof(real_t));
     memset(znormal, 0, nnodes * sizeof(real_t));
 
+    real_t *wg = calloc(nnodes, sizeof(real_t));
+
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[3];
         geom_t x[3], y[3], z[3];
@@ -276,6 +278,7 @@ int resample_gap(MPI_Comm comm,
 
         const real_t measure =
             tri_shell_3_measure(x[0], x[1], x[2], y[0], y[1], y[2], z[0], z[1], z[2]);
+
         for (int q = 0; q < 12; q++) {
             real_t g_qx, g_qy, g_qz;
             tri_shell_3_transform(x[0],
@@ -297,26 +300,37 @@ int resample_gap(MPI_Comm comm,
             tri3_f[1] = qx[q];
             tri3_f[2] = qy[q];
 
-            // TODO
-            real_t det_jac = 0;
-            real_t dV = measure * qw[q];
+            const real_t dV = measure * qw[q];
 
-            const ptrdiff_t i = (g_qx - origin[0]) / delta[0];
-            const ptrdiff_t j = (g_qy - origin[1]) / delta[1];
-            const ptrdiff_t k = (g_qz - origin[2]) / delta[2];
+            const ptrdiff_t grid_x = (g_qx - origin[0]) / (real_t)delta[0];
+            const ptrdiff_t grid_y = (g_qy - origin[1]) / (real_t)delta[1];
+            const ptrdiff_t grid_z = (g_qz - origin[2]) / (real_t)delta[2];
 
-            const real_t xmin = origin[0] + i * delta[0];
-            const real_t xmax = origin[0] + (i + 1) * delta[0];
+            const ptrdiff_t i = floor(grid_x);
+            const ptrdiff_t j = floor(grid_y);
+            const ptrdiff_t k = floor(grid_z);
 
-            const real_t ymin = origin[1] + j * delta[1];
-            const real_t ymax = origin[1] + (j + 1) * delta[1];
+            // If outside
+            if (i < 0 || j < 0 || k < 0 || 
+                (i + 1 >= nglobal[0]) || 
+                (j + 1 >= nglobal[1]) ||
+                (k + 1 >= nglobal[2])) {
+                fprintf(stderr, "warning (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n", i, j, k, nglobal[0], nglobal[1], nglobal[2]);
+                continue;
+            }
 
-            const real_t zmin = origin[2] + k * delta[2];
-            const real_t zmax = origin[2] + (k + 1) * delta[2];
+            // Get the reminder [0, 1]
+            const real_t l_x = (grid_x - i);
+            const real_t l_y = (grid_y - j);
+            const real_t l_z = (grid_z - k);
 
-            const real_t l_x = (g_qx - xmin) / (xmax - xmin);
-            const real_t l_y = (g_qy - ymin) / (ymax - ymin);
-            const real_t l_z = (g_qz - zmin) / (zmax - zmin);
+            assert(l_x >= -1e-8);
+            assert(l_y >= -1e-8);
+            assert(l_z >= -1e-8);
+
+            assert(l_x <= 1 + 1e-8);
+            assert(l_y <= 1 + 1e-8);
+            assert(l_z <= 1 + 1e-8);
 
             hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
             hex_aa_8_eval_grad(l_x, l_y, l_z, hex8_grad_x, hex8_grad_y, hex8_grad_z);
@@ -358,8 +372,8 @@ int resample_gap(MPI_Comm comm,
                     eval_znormal /= denom;
                 }
 
-#pragma unroll(8)
-                for (int edof_i = 0; edof_i < 8; edof_i++) {
+#pragma unroll(3)
+                for (int edof_i = 0; edof_i < 3; edof_i++) {
                     element_xnormal[edof_i] += eval_xnormal * tri3_f[edof_i] * dV;
                     element_ynormal[edof_i] += eval_ynormal * tri3_f[edof_i] * dV;
                     element_znormal[edof_i] += eval_znormal * tri3_f[edof_i] * dV;
@@ -369,14 +383,15 @@ int resample_gap(MPI_Comm comm,
 
 #pragma unroll(3)
         for (int v = 0; v < 3; ++v) {
-            g[ev[v]] += element_gap[v];
+            // Invert sign since distance field is negative insdide and positive outside
+            wg[ev[v]] -= element_gap[v];
             xnormal[ev[v]] += element_xnormal[v];
             ynormal[ev[v]] += element_ynormal[v];
             znormal[ev[v]] += element_znormal[v];
         }
     }
 
-    apply_inv_lumped_mass(TRISHELL3, nelements, nnodes, elems, xyz, g, g);
+    apply_inv_lumped_mass(TRISHELL3, nelements, nnodes, elems, xyz, wg, g);
 
     // Normalize!
     for (ptrdiff_t i = 0; i < nnodes; i++) {
@@ -386,6 +401,8 @@ int resample_gap(MPI_Comm comm,
         ynormal[i] /= denom;
         znormal[i] /= denom;
     }
+
+    free(wg);
 
     return 0;
 }
@@ -438,7 +455,7 @@ int main(int argc, char *argv[]) {
     }
 
     // X is contiguous
-    ptrdiff_t stride[3] = {1, nlocal[0], nlocal[0] * nlocal[1]};
+    ptrdiff_t stride[3] = {1, nglobal[0], nglobal[0] * nglobal[1]};
 
     real_t *g = malloc(mesh.nnodes * sizeof(real_t));
     real_t *xnormal = malloc(mesh.nnodes * sizeof(real_t));

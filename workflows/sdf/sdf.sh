@@ -15,7 +15,7 @@ PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 LAUNCH=""
 
-if (($# -le "4"))
+if [[ $# -le "4" ]]
 then
 	printf "usage: $0 <db.e> <hmax> <margin> <sdt.float32.raw> [aux_mesh]\n" 1>&2
 	exit -1
@@ -27,10 +27,14 @@ db_in=$1
 hmax=$2
 margin=$3
 db_out=$4
+boxed_mesh_raw=boxed_mesh
 
-if !((-z $5))
+if [[ -n "$5" ]]
 then
+	# echo "using $5 to defined bounding-box"
 	opts='--scale_box=1.1 --box_from_mesh='$5
+	db_to_raw.py $5 $boxed_mesh_raw
+	skin $boxed_mesh_raw $boxed_mesh_raw/skinned
 fi
 
 mesh_raw=mesh_raw
@@ -48,5 +52,13 @@ raw_to_xdmf.py $db_out
 
 raw_to_db.py $skinned $surf --point_data="nx.float32.raw,ny.float32.raw,nz.float32.raw" --point_data_type="float32,float32,float32"
 
+
+if [[ -n "$5" ]]
+then
+	cat metadata_sdf.float32.yml | tr ':' ' ' | awk '{print $1,$2}' | tr ' ' '=' > vars.sh
+	source vars.sh
+	gap_from_sdf $boxed_mesh_raw/skinned $nx $ny $nz $ox $oy $oz $dx $dy $dz $db_out sdf_on_mesh
+	raw_to_db.py $boxed_mesh_raw/skinned gap.vtk --point_data="sdf_on_mesh/*float64.raw"
+fi
 
 
