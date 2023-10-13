@@ -312,6 +312,9 @@ def stot(x):
 def vec3(x, y, z):
 	return sp.Matrix(3, 1, [x, y, z])
 
+def vec2(x, y):
+	return sp.Matrix(2, 1, [x, y])
+
 def eigenvalues(A):
 	s0, s1, s2 = sp.symbols('s0 s1 s2', real=True)
 	s3, s4, s5 = sp.symbols('s3 s4 s5', real=True)

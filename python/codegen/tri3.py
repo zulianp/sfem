@@ -115,4 +115,5 @@ if __name__ == '__main__':
 	# Tri3().generate_c_code()
 	# TriShell3().generate_c_code()
 
-	Tri3().generate_qp_based_code()
+	# Tri3().generate_qp_based_code()
+	c_code(TriShell3().measure(vec2(qx, qy)))

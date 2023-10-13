@@ -5,7 +5,7 @@
 
 #include <assert.h>
 
-enum ElemType { NODE1 = 1, EDGE2=2, TRI3 = 3, TET4 = 4, TRI6 = 6, HEX8 = 8, TET10 = 10, EDGE3=11, INVALID = -1 };
+enum ElemType { NODE1 = 1, EDGE2=2, TRI3 = 3, TET4 = 4, TRI6 = 6, HEX8 = 8, TET10 = 10, EDGE3=11, TRISHELL3 = 103, INVALID = -1 };
 
 SFEM_INLINE static enum ElemType side_type(const enum ElemType type) {
     switch (type) {

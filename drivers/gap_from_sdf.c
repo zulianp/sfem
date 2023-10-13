@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include "matrix.io/matrixio_array.h"
 #include "matrix.io/matrixio_ndarray.h"
 
 #include "crs_graph.h"
@@ -11,6 +12,7 @@
 
 #include "isotropic_phasefield_for_fracture.h"
 
+#include "mass.h"
 #include "read_mesh.h"
 #include "sfem_defs.h"
 
@@ -72,6 +74,30 @@ SFEM_INLINE static int hex_aa_8_contains(
     const real_t z) {
     int outside = (x < xmin) | (x > xmax) | (y < ymin) | (y > ymax) | (z < zmin) | (x > zmax);
     return !outside;
+}
+
+SFEM_INLINE static real_t tri_shell_3_measure(
+    // X-coordinates
+    const real_t px0,
+    const real_t px1,
+    const real_t px2,
+    // Y-coordinates
+    const real_t py0,
+    const real_t py1,
+    const real_t py2,
+    // Z-coordinates
+    const real_t pz0,
+    const real_t pz1,
+    const real_t pz2) {
+    const real_t x0 = -px0 + px1;
+    const real_t x1 = -px0 + px2;
+    const real_t x2 = -py0 + py1;
+    const real_t x3 = -py0 + py2;
+    const real_t x4 = -pz0 + pz1;
+    const real_t x5 = -pz0 + pz2;
+    return (1.0 / 2.0) *
+           sqrt((pow(x0, 2) + pow(x2, 2) + pow(x4, 2)) * (pow(x1, 2) + pow(x3, 2) + pow(x5, 2)) -
+                pow(x0 * x1 + x2 * x3 + x4 * x5, 2));
 }
 
 SFEM_INLINE static void tri_shell_3_transform(
@@ -209,7 +235,7 @@ int resample_gap(MPI_Comm comm,
                  real_t *const SFEM_RESTRICT xnormal,
                  real_t *const SFEM_RESTRICT ynormal,
                  real_t *const SFEM_RESTRICT znormal) {
-    assert(element_type == TRI3);  // only triangles supported for now
+    assert(element_type == TRI3 || element_type == TRISHELL3);  // only triangles supported for now
 
     memset(g, 0, nnodes * sizeof(real_t));
     memset(xnormal, 0, nnodes * sizeof(real_t));
@@ -248,6 +274,8 @@ int resample_gap(MPI_Comm comm,
         memset(element_ynormal, 0, 3 * sizeof(real_t));
         memset(element_znormal, 0, 3 * sizeof(real_t));
 
+        const real_t measure =
+            tri_shell_3_measure(x[0], x[1], x[2], y[0], y[1], y[2], z[0], z[1], z[2]);
         for (int q = 0; q < 12; q++) {
             real_t g_qx, g_qy, g_qz;
             tri_shell_3_transform(x[0],
@@ -271,7 +299,7 @@ int resample_gap(MPI_Comm comm,
 
             // TODO
             real_t det_jac = 0;
-            real_t dV = det_jac * qw[q] / 2;
+            real_t dV = measure * qw[q];
 
             const ptrdiff_t i = (g_qx - origin[0]) / delta[0];
             const ptrdiff_t j = (g_qy - origin[1]) / delta[1];
@@ -348,8 +376,17 @@ int resample_gap(MPI_Comm comm,
         }
     }
 
-    // TODO for Shell elements!
-    // apply_inv_lumped_mass(element_type, nelements, nnodes, elems, xyz, g, g);    
+    apply_inv_lumped_mass(TRISHELL3, nelements, nnodes, elems, xyz, g, g);
+
+    // Normalize!
+    for (ptrdiff_t i = 0; i < nnodes; i++) {
+        real_t denom =
+            sqrt(xnormal[i] * xnormal[i] + ynormal[i] * ynormal[i] + znormal[i] * znormal[i]);
+        xnormal[i] /= denom;
+        ynormal[i] /= denom;
+        znormal[i] /= denom;
+    }
+
     return 0;
 }
 
@@ -427,6 +464,22 @@ int main(int argc, char *argv[]) {
                  xnormal,
                  ynormal,
                  znormal);
+
+    // Write result to disk
+    {
+        char path[1024 * 10];
+        sprintf(path, "%s/gap.float64.raw", output_folder);
+        array_write(comm, path, SFEM_MPI_REAL_T, g, mesh.nnodes, mesh.nnodes);
+
+        sprintf(path, "%s/xnormal.float64.raw", output_folder);
+        array_write(comm, path, SFEM_MPI_REAL_T, xnormal, mesh.nnodes, mesh.nnodes);
+
+        sprintf(path, "%s/ynormal.float64.raw", output_folder);
+        array_write(comm, path, SFEM_MPI_REAL_T, ynormal, mesh.nnodes, mesh.nnodes);
+
+        sprintf(path, "%s/znormal.float64.raw", output_folder);
+        array_write(comm, path, SFEM_MPI_REAL_T, znormal, mesh.nnodes, mesh.nnodes);
+    }
 
     // Free resources
     free(sdf);
