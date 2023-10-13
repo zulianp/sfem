@@ -114,6 +114,9 @@ GOALS += cvfem_assemble
 # Graph analysis
 GOALS += assemble_adjaciency_matrix
 
+# Contact
+GOALS += gap_from_sdf
+
 GOALS += bgs
 
 GOALS += taylor_hood_navier_stokes heat_equation
@@ -317,7 +320,8 @@ skin : skin.c extract_surface_graph.o libsfem.a
 create_surface_from_element_adjaciency_table : create_surface_from_element_adjaciency_table.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
-
+gap_from_sdf : gap_from_sdf.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
 mesh_p1_to_p2 : mesh_p1_to_p2.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
@@ -472,6 +476,8 @@ principal_strains.o : principal_strains.cpp
 
 neohookean_principal_stresses.o : neohookean_principal_stresses.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(INTERNAL_CXXFLAGS) -c $<
+
+
 
 %.o : %.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -c $<
