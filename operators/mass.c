@@ -17,6 +17,7 @@
 #include "tet4_mass.h"
 #include "tri3_mass.h"
 #include "tri6_mass.h"
+#include "trishell3_mass.h"
 
 void assemble_mass(const int element_type,
                    const ptrdiff_t nelements,
@@ -39,6 +40,10 @@ void assemble_mass(const int element_type,
             tri3_assemble_mass(nelements, nnodes, elems, xyz, rowptr, colidx, values);
             break;
         }
+        case TRISHELL3: {
+            trishell3_assemble_mass(nelements, nnodes, elems, xyz, rowptr, colidx, values);
+            break;
+        }
         case TRI6: {
             tri6_assemble_mass(nelements, nnodes, elems, xyz, rowptr, colidx, values);
             break;
@@ -59,6 +64,10 @@ void assemble_lumped_mass(const int element_type,
     switch (element_type) {
         case TRI3: {
             tri3_assemble_lumped_mass(nelements, nnodes, elems, xyz, values);
+            break;
+        }
+        case TRISHELL3: {
+            trishell3_assemble_lumped_mass(nelements, nnodes, elems, xyz, values);
             break;
         }
         case TRI6: {
@@ -92,6 +101,10 @@ void apply_inv_lumped_mass(const int element_type,
             tri3_apply_inv_lumped_mass(nelements, nnodes, elems, xyz, x, values);
             break;
         }
+        case TRISHELL3: {
+            trishell3_apply_inv_lumped_mass(nelements, nnodes, elems, xyz, x, values);
+            break;
+        }
         case TRI6: {
             tri6_apply_inv_lumped_mass(nelements, nnodes, elems, xyz, x, values);
             break;
@@ -121,6 +134,10 @@ void apply_mass(const int element_type,
     switch (element_type) {
         case TRI3: {
             tri3_apply_mass(nelements, nnodes, elems, xyz, x, values);
+            break;
+        }
+        case TRISHELL3: {
+            trishell3_apply_mass(nelements, nnodes, elems, xyz, x, values);
             break;
         }
             // case TRI6: {

@@ -3,11 +3,14 @@
 #include <mpi.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 #include "crs_graph.h"
 #include "sortreduce.h"
 
 #include "sfem_vec.h"
+
+#define POW2(x) ((x) * (x))
 
 static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {
     int i;
@@ -72,8 +75,25 @@ static SFEM_INLINE void trishell3_mass_kernel(const real_t px0,
                                               const real_t pz1,
                                               const real_t pz2,
                                               real_t *const SFEM_RESTRICT element_matrix) {
-    assert(0);
-    // TODO
+    const real_t x0 = -px0 + px1;
+    const real_t x1 = -px0 + px2;
+    const real_t x2 = -py0 + py1;
+    const real_t x3 = -py0 + py2;
+    const real_t x4 = -pz0 + pz1;
+    const real_t x5 = -pz0 + pz2;
+    const real_t x6 = sqrt((POW2(x0) + POW2(x2) + POW2(x4)) * (POW2(x1) + POW2(x3) + POW2(x5)) -
+                           POW2(x0 * x1 + x2 * x3 + x4 * x5));
+    const real_t x7 = (1.0 / 12.0) * x6;
+    const real_t x8 = (1.0 / 24.0) * x6;
+    element_matrix[0] = x7;
+    element_matrix[1] = x8;
+    element_matrix[2] = x8;
+    element_matrix[3] = x8;
+    element_matrix[4] = x7;
+    element_matrix[5] = x8;
+    element_matrix[6] = x8;
+    element_matrix[7] = x8;
+    element_matrix[8] = x7;
 }
 
 static SFEM_INLINE void trishell3_apply_mass_kernel(const real_t px0,
@@ -87,8 +107,18 @@ static SFEM_INLINE void trishell3_apply_mass_kernel(const real_t px0,
                                                     const real_t pz2,
                                                     const real_t *const SFEM_RESTRICT u,
                                                     real_t *const SFEM_RESTRICT element_vector) {
-    assert(0);
-    // TODO
+    const real_t x0 = -px0 + px1;
+    const real_t x1 = -px0 + px2;
+    const real_t x2 = -py0 + py1;
+    const real_t x3 = -py0 + py2;
+    const real_t x4 = -pz0 + pz1;
+    const real_t x5 = -pz0 + pz2;
+    const real_t x6 =
+        (1.0 / 24.0) * sqrt((POW2(x0) + POW2(x2) + POW2(x4)) * (POW2(x1) + POW2(x3) + POW2(x5)) -
+                            POW2(x0 * x1 + x2 * x3 + x4 * x5));
+    element_vector[0] = x6 * (2 * u[0] + u[1] + u[2]);
+    element_vector[1] = x6 * (u[0] + 2 * u[1] + u[2]);
+    element_vector[2] = x6 * (u[0] + u[1] + 2 * u[2]);
 }
 
 static SFEM_INLINE void lumped_mass(const real_t px0,
@@ -101,8 +131,18 @@ static SFEM_INLINE void lumped_mass(const real_t px0,
                                     const real_t pz1,
                                     const real_t pz2,
                                     real_t *element_matrix_diag) {
-    assert(0);
-    // TODO
+    const real_t x0 = -px0 + px1;
+    const real_t x1 = -px0 + px2;
+    const real_t x2 = -py0 + py1;
+    const real_t x3 = -py0 + py2;
+    const real_t x4 = -pz0 + pz1;
+    const real_t x5 = -pz0 + pz2;
+    const real_t x6 =
+        (1.0 / 6.0) * sqrt((POW2(x0) + POW2(x2) + POW2(x4)) * (POW2(x1) + POW2(x3) + POW2(x5)) -
+                           POW2(x0 * x1 + x2 * x3 + x4 * x5));
+    element_matrix_diag[0] = x6;
+    element_matrix_diag[1] = x6;
+    element_matrix_diag[2] = x6;
 }
 
 void trishell3_apply_mass(const ptrdiff_t nelements,
