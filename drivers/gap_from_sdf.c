@@ -311,11 +311,16 @@ int resample_gap(MPI_Comm comm,
             const ptrdiff_t k = floor(grid_z);
 
             // If outside
-            if (i < 0 || j < 0 || k < 0 || 
-                (i + 1 >= nglobal[0]) || 
-                (j + 1 >= nglobal[1]) ||
+            if (i < 0 || j < 0 || k < 0 || (i + 1 >= nglobal[0]) || (j + 1 >= nglobal[1]) ||
                 (k + 1 >= nglobal[2])) {
-                fprintf(stderr, "warning (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n", i, j, k, nglobal[0], nglobal[1], nglobal[2]);
+                fprintf(stderr,
+                        "warning (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n",
+                        i,
+                        j,
+                        k,
+                        nglobal[0],
+                        nglobal[1],
+                        nglobal[2]);
                 continue;
             }
 
@@ -429,6 +434,8 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    double tick = MPI_Wtime();
+
     const char *folder = argv[1];
     ptrdiff_t nglobal[3] = {atol(argv[2]), atol(argv[3]), atol(argv[4])};
     geom_t origin[3] = {atof(argv[5]), atof(argv[6]), atof(argv[7])};
@@ -498,12 +505,31 @@ int main(int argc, char *argv[]) {
         array_write(comm, path, SFEM_MPI_REAL_T, znormal, mesh.nnodes, mesh.nnodes);
     }
 
+    ptrdiff_t nelements = mesh.nelements;
+    ptrdiff_t nnodes = mesh.nnodes;
+
     // Free resources
-    free(sdf);
-    free(g);
-    free(xnormal);
-    free(ynormal);
-    free(znormal);
-    mesh_destroy(&mesh);
+    {
+        free(sdf);
+        free(g);
+        free(xnormal);
+        free(ynormal);
+        free(znormal);
+        mesh_destroy(&mesh);
+    }
+
+    double tock = MPI_Wtime();
+
+    if (!rank) {
+        printf("----------------------------------------\n");
+        printf("#elements %ld #nodes %ld #grid (%ld x %ld x %ld)\n",
+               (long)nelements,
+               (long)nnodes,
+               nglobal[0],
+               nglobal[1],
+               nglobal[2]);
+        printf("TTS:\t\t\t%g seconds\n", tock - tick);
+    }
+
     return MPI_Finalize();
 }
