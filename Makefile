@@ -200,6 +200,8 @@ OBJS += tet10_grad.o \
 	tet10_l2_projection_p1_p2.o \
 	tet10_navier_stokes.o
 
+# Resampling
+OBJS += sfem_resample_gap.o
 
 # CVFEM
 OBJS += cvfem_tri3_diffusion.o
