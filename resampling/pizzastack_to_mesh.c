@@ -17,7 +17,7 @@
 #include "sfem_base.h"
 #include "sfem_mesh_write.h"
 
-#include "pizzastack/grid.h"
+#include "grid.h"
 
 typedef struct {
     real_t shift[3];

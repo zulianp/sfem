@@ -1,4 +1,6 @@
 
+#ifdef __NVCC__
+
 extern "C" {
 #include "sfem_cuda_mesh.h"
 #include "sfem_base.h"
@@ -28,10 +30,12 @@ extern "C" void cuda_mesh_create_from_host(const mesh_t *const host_mesh, mesh_t
 
         for (int d = 0; d < element_type; ++d) {
             SFEM_CUDA_CHECK(cudaMalloc(&hd_elems[d], nbatch * sizeof(idx_t)));
-            SFEM_CUDA_CHECK(cudaMemcpy(hd_elems[d], elems[d], nbatch * sizeof(idx_t), cudaMemcpyHostToDevice));
+            SFEM_CUDA_CHECK(
+                cudaMemcpy(hd_elems[d], elems[d], nbatch * sizeof(idx_t), cudaMemcpyHostToDevice));
         }
 
-        SFEM_CUDA_CHECK(cudaMemcpy(d_elems, hd_elems, element_type * sizeof(idx_t *), cudaMemcpyHostToDevice));
+        SFEM_CUDA_CHECK(
+            cudaMemcpy(d_elems, hd_elems, element_type * sizeof(idx_t *), cudaMemcpyHostToDevice));
     }
 
     geom_t *hd_xyz[element_type];
@@ -42,10 +46,12 @@ extern "C" void cuda_mesh_create_from_host(const mesh_t *const host_mesh, mesh_t
 
         for (int d = 0; d < spatial_dim; ++d) {
             SFEM_CUDA_CHECK(cudaMalloc(&hd_xyz[d], nnodes * sizeof(geom_t)));
-            SFEM_CUDA_CHECK(cudaMemcpy(hd_xyz[d], xyz[d], nnodes * sizeof(geom_t), cudaMemcpyHostToDevice));
+            SFEM_CUDA_CHECK(
+                cudaMemcpy(hd_xyz[d], xyz[d], nnodes * sizeof(geom_t), cudaMemcpyHostToDevice));
         }
 
-        SFEM_CUDA_CHECK(cudaMemcpy(d_xyz, hd_xyz, spatial_dim * sizeof(geom_t *), cudaMemcpyHostToDevice));
+        SFEM_CUDA_CHECK(
+            cudaMemcpy(d_xyz, hd_xyz, spatial_dim * sizeof(geom_t *), cudaMemcpyHostToDevice));
     }
 
     device_mesh->comm = host_mesh->comm;
@@ -69,7 +75,8 @@ extern "C" void cuda_mesh_free(mesh_t *device_mesh) {
     geom_t **d_xyz = device_mesh->points;
 
     idx_t *hd_elems[element_type];
-    SFEM_CUDA_CHECK(cudaMemcpy(hd_elems, d_elems, element_type * sizeof(idx_t *), cudaMemcpyDeviceToHost));
+    SFEM_CUDA_CHECK(
+        cudaMemcpy(hd_elems, d_elems, element_type * sizeof(idx_t *), cudaMemcpyDeviceToHost));
 
     {  // Free element indices
         for (int d = 0; d < element_type; ++d) {
@@ -80,7 +87,8 @@ extern "C" void cuda_mesh_free(mesh_t *device_mesh) {
     }
 
     geom_t *hd_xyz[element_type];
-    SFEM_CUDA_CHECK(cudaMemcpy(hd_xyz, d_xyz, spatial_dim * sizeof(geom_t *), cudaMemcpyDeviceToHost));
+    SFEM_CUDA_CHECK(
+        cudaMemcpy(hd_xyz, d_xyz, spatial_dim * sizeof(geom_t *), cudaMemcpyDeviceToHost));
 
     {  // Free element coordinates
         for (int d = 0; d < spatial_dim; ++d) {
@@ -101,3 +109,5 @@ extern "C" void cuda_mesh_free(mesh_t *device_mesh) {
     device_mesh->elems = nullptr;
     device_mesh->points = nullptr;
 }
+
+#endif  // __NVCC__
