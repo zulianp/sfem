@@ -6,6 +6,7 @@ import sys, getopt
 import os
 import glob
 
+import pdb
 
 # Example usage
 # ./raw_to_db.py raw_db mesh_db.vtk --point_data='raw_db/point_data/*,raw_db/x.raw' --point_data_type='float64,float32'
@@ -166,7 +167,7 @@ def main(argv):
     try:
         opts, args = getopt.getopt(
             argv[3:], "p:d:c:t:h",
-            ["point_data=", "point_data_type=", "cell_data=", "cell_data_type=", "transient", "time_step_format", "n_time_steps=", "time_whole=", "help"])
+            ["point_data=", "point_data_type=", "cell_data=", "cell_data_type=", "transient", "time_step_format", "n_time_steps=", "time_whole=", "time_whole_txt=", "help"])
 
     except getopt.GetoptError as err:
         print(err)
@@ -189,6 +190,8 @@ def main(argv):
             transient = True
         elif opt in ("--time_whole"):
             time_whole = np.fromfile(arg, dtype=np.float32)
+        elif opt in ("--time_whole_txt"):
+            time_whole = np.loadtxt(arg, dtype=np.float32)
         elif opt in ("--time_step_format"):
             time_step_format = arg
         elif opt in ("--n_time_steps"):
@@ -199,7 +202,6 @@ def main(argv):
             assert n_time_steps != 0
             time_whole = np.arange(0, n_time_steps)
         else:
-            assert n_time_steps == 0 or n_time_steps == len(time_whole)
             n_time_steps = len(time_whole)
 
     points = []

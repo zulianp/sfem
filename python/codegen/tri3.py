@@ -18,6 +18,12 @@ class Tri3(FE):
 	def reference_measure(self):
 		return sp.Rational(1, 2)
 
+	def transform(self, p):
+		return self.A_ * p + sp.Matrix(2, 1, [x0, y0])
+
+	def inverse_transform(self, p):
+		return self.Ainv_ * (p - sp.Matrix(2, 1, [x0, y0]))
+
 	def coords_sub_parametric(self):
 		return [[x0, x1, x2], [y0, y1, y2]]
 
@@ -106,5 +112,8 @@ class TriShell3(Tri3):
 		return self.detS / 2
 
 if __name__ == '__main__':
-	Tri3().generate_c_code()
-	TriShell3().generate_c_code()
+	# Tri3().generate_c_code()
+	# TriShell3().generate_c_code()
+
+	# Tri3().generate_qp_based_code()
+	c_code(TriShell3().measure(vec2(qx, qy)))

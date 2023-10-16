@@ -28,4 +28,12 @@ void apply_inv_lumped_mass(const int element_type,
                            const real_t *const x,
                            real_t *const values);
 
+void apply_mass(const int element_type,
+                const ptrdiff_t nelements,
+                const ptrdiff_t nnodes,
+                idx_t **const SFEM_RESTRICT elems,
+                geom_t **const SFEM_RESTRICT xyz,
+                const real_t *const x,
+                real_t *const values);
+
 #endif  // MASS_H

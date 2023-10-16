@@ -44,7 +44,9 @@ class FE:
 			gi = []
 
 			for d in range(0, dims):
-				gi.append(sp.diff(fx[i], p[d]))
+				gg = sp.diff(fx[i], p[d])
+				gg = sp.simplify(gg)
+				gi.append(gg)
 
 			g[i] = sp.Matrix(dims, 1, gi)
 		return g
@@ -172,6 +174,9 @@ class FE:
 				sls.append(var)
 		return sp.Matrix(rows, cols, sls)
 
+	def symbol_jacobian_determinant(self):
+		return sp.symbols('jacobian_determinant')
+
 	def generate_det_code(self):
 		mat = sp.Matrix(self.manifold_dim(), self.manifold_dim(), [0] * (self.manifold_dim() * self.manifold_dim()))
 		
@@ -199,6 +204,16 @@ class FE:
 		det_code += f"return {det_body};\n" 
 		det_code += "}\n"
 		return det_code
+
+	def generate_qp_based_code(self):
+		qp = sp.Matrix(self.spatial_dim(), 1, quadrature_point[0:self.spatial_dim()])
+		expr = []
+		tqp = self.inverse_transform(qp)
+
+		for i in range(0, len(tqp)):
+			expr.append(ast.Assignment(sp.symbols(f'res[{i}]'), tqp[i]))
+		c_log(c_gen(expr))
+
 
 	def generate_c_code(self):
 		self.generate_kernels_c_code()

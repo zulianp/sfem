@@ -58,38 +58,177 @@ static int residual(const ptrdiff_t nnodes,
                     real_t **const SFEM_RESTRICT rhs,
                     real_t **const SFEM_RESTRICT x,
                     real_t *res) {
-    for (int d1 = 0; d1 < block_rows; d1++) {
-        res[d1] = 0;
-    }
-
-    for (ptrdiff_t i = 0; i < nnodes; i++) {
-        const count_t r_begin = rowptr[i];
-        const count_t r_end = rowptr[i + 1];
-        const count_t r_extent = r_end - r_begin;
-        const idx_t *const r_colidx = &colidx[r_begin];
-
-        real_t r[MAX_BLOCK_SIZE];
+#pragma omp parallel
+    {
+#pragma omp for
         for (int d1 = 0; d1 < block_rows; d1++) {
-            r[d1] = rhs[d1][i];
+            res[d1] = 0;
         }
 
-        for (count_t k = 0; k < r_extent; k++) {
-            const idx_t col = r_colidx[k];
+#pragma omp for
+        for (ptrdiff_t i = 0; i < nnodes; i++) {
+            const count_t r_begin = rowptr[i];
+            const count_t r_end = rowptr[i + 1];
+            const count_t r_extent = r_end - r_begin;
+            const idx_t *const r_colidx = &colidx[r_begin];
+
+            real_t r[MAX_BLOCK_SIZE];
             for (int d1 = 0; d1 < block_rows; d1++) {
-                for (int d2 = 0; d2 < block_rows; d2++) {
-                    const int bb = d1 * block_rows + d2;
-                    r[d1] -= values[bb][r_begin + k] * x[d2][col];
+                r[d1] = rhs[d1][i];
+            }
+
+            for (count_t k = 0; k < r_extent; k++) {
+                const idx_t col = r_colidx[k];
+                for (int d1 = 0; d1 < block_rows; d1++) {
+                    for (int d2 = 0; d2 < block_rows; d2++) {
+                        const int bb = d1 * block_rows + d2;
+                        r[d1] -= values[bb][r_begin + k] * x[d2][col];
+                    }
                 }
             }
-        }
 
-        for (int d1 = 0; d1 < block_rows; d1++) {
-            res[d1] += r[d1] * r[d1];
+            for (int d1 = 0; d1 < block_rows; d1++) {
+#pragma omp atomic update
+                res[d1] += r[d1] * r[d1];
+            }
         }
     }
 
     for (int d1 = 0; d1 < block_rows; d1++) {
         res[d1] = sqrt(res[d1]);
+    }
+
+    return 0;
+}
+
+static SFEM_INLINE real_t atomic_read(const real_t *p) {
+    real_t value;
+#pragma omp atomic read
+    value = *p;
+    return value;
+}
+
+static SFEM_INLINE void atomic_write(real_t *p, const real_t value) {
+#pragma omp atomic write
+    *p = value;
+}
+
+static int bgs2_forward(const ptrdiff_t nnodes,
+                        const count_t *const SFEM_RESTRICT rowptr,
+                        const idx_t *const SFEM_RESTRICT colidx,
+                        real_t **const SFEM_RESTRICT values,
+                        real_t **const SFEM_RESTRICT inv_bdiag,
+                        real_t **const SFEM_RESTRICT rhs,
+                        real_t **const SFEM_RESTRICT x) {
+#pragma omp parallel
+    {
+#pragma omp for
+        for (ptrdiff_t i = 0; i < nnodes; i++) {
+            const count_t r_begin = rowptr[i];
+            const count_t r_end = rowptr[i + 1];
+            const count_t r_extent = r_end - r_begin;
+            const idx_t *const r_colidx = &colidx[r_begin];
+
+            real_t r[2];
+#pragma unroll(2)
+            for (int d1 = 0; d1 < 2; d1++) {
+                r[d1] = rhs[d1][i];
+            }
+
+            for (count_t k = 0; k < r_extent; k++) {
+                const idx_t col = r_colidx[k];
+                if (col == i) continue;
+
+#pragma unroll(2)
+                for (int d1 = 0; d1 < 2; d1++) {
+#pragma unroll(2)
+                    for (int d2 = 0; d2 < 2; d2++) {
+                        const int bb = d1 * 2 + d2;
+                        r[d1] -= values[bb][r_begin + k] * atomic_read(&x[d2][col]);
+                    }
+                }
+            }
+
+            real_t acc[2];
+
+#pragma unroll(2)
+            for (int d1 = 0; d1 < 2; d1++) {
+                acc[d1] = 0;
+
+#pragma unroll(2)
+                for (int d2 = 0; d2 < 2; d2++) {
+                    const int bb = d1 * 2 + d2;
+                    assert(inv_bdiag[bb][i] == inv_bdiag[bb][i]);
+                    const real_t val = inv_bdiag[bb][i] * r[d2];
+                    acc[d1] += val;
+                }
+            }
+
+#pragma unroll(2)
+            for (int d1 = 0; d1 < 2; d1++) {
+                atomic_write(&x[d1][i], acc[d1]);
+            }
+        }
+    }
+
+    return 0;
+}
+
+static int bgs3_forward(const ptrdiff_t nnodes,
+                        const count_t *const SFEM_RESTRICT rowptr,
+                        const idx_t *const SFEM_RESTRICT colidx,
+                        real_t **const SFEM_RESTRICT values,
+                        real_t **const SFEM_RESTRICT inv_bdiag,
+                        real_t **const SFEM_RESTRICT rhs,
+                        real_t **const SFEM_RESTRICT x) {
+#pragma omp parallel
+    {
+#pragma omp for
+        for (ptrdiff_t i = 0; i < nnodes; i++) {
+            const count_t r_begin = rowptr[i];
+            const count_t r_end = rowptr[i + 1];
+            const count_t r_extent = r_end - r_begin;
+            const idx_t *const r_colidx = &colidx[r_begin];
+
+            real_t r[3];
+#pragma unroll(3)
+            for (int d1 = 0; d1 < 3; d1++) {
+                r[d1] = rhs[d1][i];
+            }
+
+            for (count_t k = 0; k < r_extent; k++) {
+                const idx_t col = r_colidx[k];
+                if (col == i) continue;
+
+#pragma unroll(3)
+                for (int d1 = 0; d1 < 3; d1++) {
+#pragma unroll(3)
+                    for (int d2 = 0; d2 < 3; d2++) {
+                        const int bb = d1 * 3 + d2;
+                        r[d1] -= values[bb][r_begin + k] * atomic_read(&x[d2][col]);
+                    }
+                }
+            }
+
+            real_t acc[3];
+#pragma unroll(3)
+            for (int d1 = 0; d1 < 3; d1++) {
+                acc[d1] = 0;
+
+#pragma unroll(3)
+                for (int d2 = 0; d2 < 3; d2++) {
+                    const int bb = d1 * 3 + d2;
+                    assert(inv_bdiag[bb][i] == inv_bdiag[bb][i]);
+                    const real_t val = inv_bdiag[bb][i] * r[d2];
+                    acc[d1] += val;
+                }
+            }
+
+#pragma unroll(3)
+            for (int d1 = 0; d1 < 3; d1++) {
+                atomic_write(&x[d1][i], acc[d1]);
+            }
+        }
     }
 
     return 0;
@@ -103,35 +242,51 @@ static int bgs_forward(const ptrdiff_t nnodes,
                        real_t **const SFEM_RESTRICT inv_bdiag,
                        real_t **const SFEM_RESTRICT rhs,
                        real_t **const SFEM_RESTRICT x) {
-    for (ptrdiff_t i = 0; i < nnodes; i++) {
-        const count_t r_begin = rowptr[i];
-        const count_t r_end = rowptr[i + 1];
-        const count_t r_extent = r_end - r_begin;
-        const idx_t *const r_colidx = &colidx[r_begin];
+    if (block_rows == 2) {
+        return bgs2_forward(nnodes, rowptr, colidx, values, inv_bdiag, rhs, x);
+    } else if (block_rows == 3) {
+        return bgs3_forward(nnodes, rowptr, colidx, values, inv_bdiag, rhs, x);
+    }
 
-        real_t r[MAX_BLOCK_SIZE];
-        for (int d1 = 0; d1 < block_rows; d1++) {
-            r[d1] = rhs[d1][i];
-        }
+#pragma omp parallel
+    {
+#pragma omp for
+        for (ptrdiff_t i = 0; i < nnodes; i++) {
+            const count_t r_begin = rowptr[i];
+            const count_t r_end = rowptr[i + 1];
+            const count_t r_extent = r_end - r_begin;
+            const idx_t *const r_colidx = &colidx[r_begin];
 
-        for (count_t k = 0; k < r_extent; k++) {
-            const idx_t col = r_colidx[k];
-            if (col == i) continue;
-
+            real_t r[MAX_BLOCK_SIZE];
             for (int d1 = 0; d1 < block_rows; d1++) {
-                for (int d2 = 0; d2 < block_rows; d2++) {
-                    const int bb = d1 * block_rows + d2;
-                    r[d1] -= values[bb][r_begin + k] * x[d2][col];
+                r[d1] = rhs[d1][i];
+            }
+
+            for (count_t k = 0; k < r_extent; k++) {
+                const idx_t col = r_colidx[k];
+                if (col == i) continue;
+
+                for (int d1 = 0; d1 < block_rows; d1++) {
+                    for (int d2 = 0; d2 < block_rows; d2++) {
+                        const int bb = d1 * block_rows + d2;
+                        r[d1] -= values[bb][r_begin + k] * atomic_read(&x[d2][col]);
+                    }
                 }
             }
-        }
 
-        for (int d1 = 0; d1 < block_rows; d1++) {
-            x[d1][i] = 0;
-            for (int d2 = 0; d2 < block_rows; d2++) {
-                const int bb = d1 * block_rows + d2;
-                assert(inv_bdiag[bb][i] == inv_bdiag[bb][i]);
-                x[d1][i] += inv_bdiag[bb][i] * r[d2];
+            real_t acc[MAX_BLOCK_SIZE];
+            for (int d1 = 0; d1 < block_rows; d1++) {
+                acc[d1] = 0;
+                for (int d2 = 0; d2 < block_rows; d2++) {
+                    const int bb = d1 * block_rows + d2;
+                    assert(inv_bdiag[bb][i] == inv_bdiag[bb][i]);
+                    const real_t val = inv_bdiag[bb][i] * r[d2];
+                    acc[d1] += val;
+                }
+            }
+
+            for (int d1 = 0; d1 < block_rows; d1++) {
+                atomic_write(&x[d1][i], acc[d1]);
             }
         }
     }
@@ -147,35 +302,45 @@ static int bgs_backward(const ptrdiff_t nnodes,
                         real_t **const SFEM_RESTRICT inv_bdiag,
                         real_t **const SFEM_RESTRICT rhs,
                         real_t **const SFEM_RESTRICT x) {
-    for (ptrdiff_t i = nnodes - 1; i >= 0; i--) {
-        const count_t r_begin = rowptr[i];
-        const count_t r_end = rowptr[i + 1];
-        const count_t r_extent = r_end - r_begin;
-        const idx_t *const r_colidx = &colidx[r_begin];
+#pragma omp parallel
+    {
+#pragma omp for
+        for (ptrdiff_t i = nnodes - 1; i >= 0; i--) {
+            const count_t r_begin = rowptr[i];
+            const count_t r_end = rowptr[i + 1];
+            const count_t r_extent = r_end - r_begin;
+            const idx_t *const r_colidx = &colidx[r_begin];
 
-        real_t r[MAX_BLOCK_SIZE];
-        for (int d1 = 0; d1 < block_rows; d1++) {
-            r[d1] = rhs[d1][i];
-        }
-
-        for (count_t k = 0; k < r_extent; k++) {
-            const idx_t col = r_colidx[k];
-            if (col == i) continue;
-
+            real_t r[MAX_BLOCK_SIZE];
             for (int d1 = 0; d1 < block_rows; d1++) {
-                for (int d2 = 0; d2 < block_rows; d2++) {
-                    const int bb = d1 * block_rows + d2;
-                    r[d1] -= values[bb][r_begin + k] * x[d2][col];
+                r[d1] = rhs[d1][i];
+            }
+
+            for (count_t k = 0; k < r_extent; k++) {
+                const idx_t col = r_colidx[k];
+                if (col == i) continue;
+
+                for (int d1 = 0; d1 < block_rows; d1++) {
+                    for (int d2 = 0; d2 < block_rows; d2++) {
+                        const int bb = d1 * block_rows + d2;
+                        r[d1] -= values[bb][r_begin + k] * atomic_read(&x[d2][col]);
+                    }
                 }
             }
-        }
 
-        for (int d1 = 0; d1 < block_rows; d1++) {
-            x[d1][i] = 0;
-            for (int d2 = 0; d2 < block_rows; d2++) {
-                const int bb = d1 * block_rows + d2;
-                assert(inv_bdiag[bb][i] == inv_bdiag[bb][i]);
-                x[d1][i] += inv_bdiag[bb][i] * r[d2];
+            real_t acc[MAX_BLOCK_SIZE];
+            for (int d1 = 0; d1 < block_rows; d1++) {
+                acc[d1] = 0;
+                for (int d2 = 0; d2 < block_rows; d2++) {
+                    const int bb = d1 * block_rows + d2;
+                    assert(inv_bdiag[bb][i] == inv_bdiag[bb][i]);
+                    const real_t val = inv_bdiag[bb][i] * r[d2];
+                    acc[d1] += val;
+                }
+            }
+
+            for (int d1 = 0; d1 < block_rows; d1++) {
+                atomic_write(&x[d1][i], acc[d1]);
             }
         }
     }

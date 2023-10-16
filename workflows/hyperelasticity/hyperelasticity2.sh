@@ -11,8 +11,8 @@ PATH=$SCRIPTPATH/../../python/mesh:$PATH
 PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 PATH=$SCRIPTPATH/../../../matrix.io:$PATH
 
-# create_box_2D.sh 8 2 1
-# rm mesh/z.raw
+create_box_2D.sh 5 2 1
+rm mesh/z.raw
 
 export SFEM_MESH_DIR=mesh
 
@@ -39,8 +39,8 @@ export SFEM_OUTPUT_DIR=sfem_output
 export SFEM_MATERIAL=linear
 
 # lldb --  
-# utopia_exec -app nlsolve -path $CODE_DIR/sfem/hyperelasticity_plugin.dylib -solver_type ConjugateGradient --verbose -max_it 10000 -matrix_free true -apply_gradient_descent_step true
-utopia_exec -app nlsolve -path $CODE_DIR/sfem/hyperelasticity_plugin.dylib -solver_type Newton --verbose --max_it 10
+utopia_exec -app nlsolve -path $CODE_DIR/sfem/hyperelasticity_plugin.dylib -solver_type ConjugateGradient --verbose -max_it 10000 -matrix_free true -apply_gradient_descent_step true
+# utopia_exec -app nlsolve -path $CODE_DIR/sfem/hyperelasticity_plugin.dylib -solver_type Newton --verbose --max_it 10
 
 aos_to_soa $SFEM_OUTPUT_DIR/out.raw 8 $BLOCK_SIZE $SFEM_OUTPUT_DIR/out
 raw_to_db.py $SFEM_MESH_DIR $SFEM_OUTPUT_DIR/x.vtk -p "$SFEM_OUTPUT_DIR/out.*.raw"

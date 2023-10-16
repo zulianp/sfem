@@ -44,6 +44,8 @@ typedef struct {
 void mesh_init(mesh_t *mesh);
 void mesh_destroy(mesh_t *mesh);
 
+void mesh_minmax_edge_length(const mesh_t *const mesh, real_t*emin, real_t*emax);
+
 typedef struct {
 	ptrdiff_t nelements;
 	idx_t **elements;

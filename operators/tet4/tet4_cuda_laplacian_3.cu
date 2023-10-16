@@ -274,7 +274,7 @@ static void pack_elements(
 
                 #pragma omp parallel
                 {
-                    #pragma omp for nowait
+                    #pragma omp for //nowait
                     for (ptrdiff_t k = 0; k < n; k++) {
                         buff[k] = x[nodes[k]];
                     }
@@ -304,7 +304,7 @@ static void pack_vector(
 
             #pragma omp parallel
             {
-                #pragma omp for nowait
+                #pragma omp for //nowait
                 for (ptrdiff_t k = 0; k < n; k++) {
                     buff[k] = vec[nodes[k]];
                 }

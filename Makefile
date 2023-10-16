@@ -1,3 +1,7 @@
+SHELL := /bin/bash
+
+# LDFLAGS=`mpic++ -showme:link`
+
 ifeq ($(debug),1)
 	CFLAGS += -O0 -g
 	CXXFLAGS += -O0 -g
@@ -21,13 +25,13 @@ else
 endif
 
 ifeq ($(avx512sort), 1)
-	CXXFLAGS += -DSFEM_ENABLE_AVX512_SORT -Iexternal/x86-simd-sort/src -march=native
-	CFLAGS += -march=native
+	CXXFLAGS += -DSFEM_ENABLE_AVX512_SORT -Iexternal/x86-simd-sort/src -march=native -DSFEM_ENABLE_EXPLICIT_VECTORIZATION
+	CFLAGS += -march=native -DSFEM_ENABLE_EXPLICIT_VECTORIZATION
 endif
 
 ifeq ($(avx2sort), 1)
-	CXXFLAGS += -DSFEM_ENABLE_AVX2_SORT -Iexternal -march=core-avx2
-	CFLAGS += -march=core-avx2
+	CXXFLAGS += -DSFEM_ENABLE_AVX2_SORT -Iexternal -march=core-avx2 -DSFEM_ENABLE_EXPLICIT_VECTORIZATION
+	CFLAGS += -march=core-avx2 -DSFEM_ENABLE_EXPLICIT_VECTORIZATION
 endif
 
 ifeq ($(mpisort), 1)
@@ -54,9 +58,11 @@ ifeq ($(metis), 1)
 	DEPS += -L$(GKLIB_DIR)/lib -lGKlib
 endif
 
+CFLAGS += -DSFEM_MEM_DIAGNOSTICS
+
 # Folder structure
-VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix:operators/tet10:operators/tet4:operators/tri3:operators/tri6:operators/cvfem:graphs:parametrize:operators/phase_field_for_fracture:operators/kernels
-INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/tri3 -Ioperators/tri6 -Ioperators/cvfem -Igraphs -Iparametrize -Ioperators/phase_field_for_fracture  -Ioperators/kernels
+VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix:operators/tet10:operators/tet4:operators/tri3:operators/trishell3:operators/tri6:operators/cvfem:graphs:parametrize:operators/phase_field_for_fracture:operators/kernels:operators/navier_stokes:solver
+INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/tri3 -Ioperators/trishell3 -Ioperators/tri6 -Ioperators/cvfem -Igraphs -Iparametrize -Ioperators/phase_field_for_fracture  -Ioperators/kernels -Ioperators/navier_stokes -Isolver
 
 
 CFLAGS += -pedantic -Wextra
@@ -79,7 +85,7 @@ GOALS = assemble assemble3 assemble4 neohookean_assemble stokes stokes_check lin
 
 # Mesh manipulation
 GOALS += partition select_submesh refine skin select_surf volumes sfc
-GOALS += mesh_p1_to_p2
+GOALS += mesh_p1_to_p2 create_dual_graph create_element_adjaciency_table create_surface_from_element_adjaciency_table
 
 # FE post-process
 GOALS += cgrad cshear cstrain cprincipal_strains cprincipal_stresses cauchy_stress vonmises
@@ -100,7 +106,7 @@ GOALS += divergence lapl lumped_mass_inv lumped_boundary_mass_inv u_dot_grad_q
 GOALS += crs_apply_dirichlet
 
 # Array utilities
-GOALS += soa_to_aos aos_to_soa roi
+GOALS += soa_to_aos aos_to_soa roi unique
 
 # CVFEM
 GOALS += cvfem_assemble
@@ -108,7 +114,12 @@ GOALS += cvfem_assemble
 # Graph analysis
 GOALS += assemble_adjaciency_matrix
 
+# Contact
+GOALS += gap_from_sdf
+
 GOALS += bgs
+
+GOALS += taylor_hood_navier_stokes heat_equation
 
 ifeq ($(metis), 1)
 	GOALS += partition_mesh_based_on_operator
@@ -145,7 +156,6 @@ OBJS = \
 	sfem_mesh_write.o \
 	mesh_aura.o \
 	isotropic_phasefield_for_fracture.o \
-	tet10_laplacian.o \
 	adj_table.o \
 	laplacian.o \
 	trishell3_l2_projection_p0_p1.o \
@@ -153,26 +163,45 @@ OBJS = \
 	surface_l2_projection.o \
 	grad_p1.o  \
 	linear_elasticity.o \
-	tri3_linear_elasticity.o \
-	tet4_linear_elasticity.o \
-	tet4_phase_field_for_fracture.o \
-	tri3_phase_field_for_fracture.o \
-	phase_field_for_fracture.o 
+	stokes_mini.o \
+	phase_field_for_fracture.o  \
+	navier_stokes.o \
+	boundary_condition.o \
+	constrained_gs.o \
+	sfem_logger.o
 
-OBJS += tri3_laplacian.o
+# Tri3
+OBJS += tri3_stokes_mini.o \
+		tri3_mass.o \
+		tri3_phase_field_for_fracture.o \
+		tri3_linear_elasticity.o \
+		tri3_laplacian.o
+
+# TriShell3
+OBJS += trishell3_mass.o
+
+# Tri6
+OBJS += tri6_mass.o tri6_laplacian.o tri6_navier_stokes.o
 
 # Tet4
 OBJS += tet4_div.o \
 	tet4_mass.o \
 	tet4_l2_projection_p0_p1.o \
+	tet4_linear_elasticity.o \
+	tet4_phase_field_for_fracture.o \
+	tet4_stokes_mini.o \
 	trishell3_l2_projection_p0_p1.o
 
 # Tet10
 OBJS += tet10_grad.o \
 	tet10_div.o \
 	tet10_mass.o \
-	tet10_l2_projection_p1_p2.o
+	tet10_laplacian.o \
+	tet10_l2_projection_p1_p2.o \
+	tet10_navier_stokes.o
 
+# Resampling
+OBJS += sfem_resample_gap.o
 
 # CVFEM
 OBJS += cvfem_tri3_diffusion.o
@@ -189,7 +218,7 @@ ifeq ($(cuda), 1)
 	CUDA_OBJS += tet4_cuda_phase_field_for_fracture.o
 
 	CUDA_OBJS += cuda_crs.o
-	DEPS += -L/opt/cuda/lib64 -lcudart
+	DEPS += -L/opt/cuda/lib64 -lcudart -lcusparse -lcusolver -lcublas
 	DEPS += -lnvToolsExt
 
 	OBJS += $(CUDA_OBJS)
@@ -205,7 +234,7 @@ OBJS += neohookean.o
 
 OBJS += $(SIMD_OBJS)
 
-plugins: isolver_sfem.dylib franetg_plugin.dylib hyperelasticity_plugin.dylib
+plugins: isolver_sfem.dylib franetg_plugin.dylib hyperelasticity_plugin.dylib nse_plugin.dylib stokes_plugin.dylib
 
 libsfem.a : $(OBJS)
 	ar rcs $@ $^
@@ -216,6 +245,12 @@ ISOLVER_INCLUDES = -I../isolver/interfaces/lsolve -I../isolver/plugin/lsolve -I.
 
 ssolve : drivers/ssolve.cpp isolver_lsolve_frontend.o libsfem.a
 	$(MPICXX) $(CXXFLAGS) $(INCLUDES) $(ISOLVER_INCLUDES) $(YAML_CPP_INCLUDES) $(YAML_CPP_LIBRARIES) -o $@ $^ $(LDFLAGS) ; \
+
+taylor_hood_navier_stokes: drivers/taylor_hood_navier_stokes.c isolver_lsolve_frontend.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) $(ISOLVER_INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+heat_equation: drivers/heat_equation.c isolver_lsolve_frontend.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) $(ISOLVER_INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 bgs : bgs.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
@@ -287,6 +322,12 @@ refine : refine.o libsfem.a
 skin : skin.c extract_surface_graph.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
+create_surface_from_element_adjaciency_table : create_surface_from_element_adjaciency_table.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
+
+gap_from_sdf : gap_from_sdf.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
+
 mesh_p1_to_p2 : mesh_p1_to_p2.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
@@ -294,6 +335,12 @@ volumes : drivers/volumes.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
 select_surf : drivers/select_surf.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
+
+create_dual_graph : drivers/create_dual_graph.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
+
+create_element_adjaciency_table : drivers/create_element_adjaciency_table.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
 extract_surface_graph.o : extract_surface_graph.cpp
@@ -387,6 +434,9 @@ wss : drivers/wss.c libsfem.a
 roi : drivers/roi.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
+unique:  drivers/unique.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
 div.o : operators/div.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -c $<
 
@@ -402,6 +452,17 @@ franetg_plugin.dylib : franetg_plugin.o libsfem.a
 franetg_plugin.o : plugin/franetg_plugin.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
 
+nse_plugin.dylib : nse_plugin.o libsfem.a
+	$(MPICC) -shared -o $@ $^ $(LDFLAGS)
+
+nse_plugin.o : plugin/nse_plugin.c
+	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
+
+stokes_plugin.dylib : stokes_plugin.o libsfem.a
+	$(MPICC) -shared -o $@ $^ $(LDFLAGS)
+
+stokes_plugin.o : plugin/stokes_plugin.c
+	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
 
 hyperelasticity_plugin.dylib : hyperelasticity_plugin.o libsfem.a
 	$(MPICC) -shared -o $@ $^ $(LDFLAGS)
@@ -420,6 +481,8 @@ principal_strains.o : principal_strains.cpp
 
 neohookean_principal_stresses.o : neohookean_principal_stresses.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(INTERNAL_CXXFLAGS) -c $<
+
+
 
 %.o : %.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -c $<

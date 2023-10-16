@@ -1,8 +1,8 @@
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stddef.h>
 
 #include "../matrix.io/array_dtof.h"
 #include "../matrix.io/matrixio_array.h"
@@ -21,16 +21,15 @@
 #include "mpi-sort.h"
 #endif
 
-
 #define SFEM_MPI_SFC_T MPI_UNSIGNED
 
 typedef uint32_t sfc_t;
 
-// #define sort_function argsort_u32
-// typedef idx_t element_idx_t;
+#define sort_function argsort_u32
+typedef idx_t element_idx_t;
 
-#define sort_function argsort_u32_ptrdiff_t
-typedef ptrdiff_t element_idx_t;
+// #define sort_function argsort_u32_ptrdiff_t
+// typedef ptrdiff_t element_idx_t;
 
 // https://mathworld.wolfram.com/FiedlerVector.html
 
@@ -164,12 +163,14 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    const int nxe = elem_num_nodes(mesh.element_type);
+
     sfc_t *sfc = (sfc_t *)malloc(mesh.n_owned_elements * sizeof(sfc_t));
     memset(sfc, 0, mesh.n_owned_elements * sizeof(sfc_t));
 
     element_idx_t *idx = (element_idx_t *)malloc(mesh.n_owned_elements * sizeof(element_idx_t));
 
-    geom_t box_min[3], box_max[3], box_extent[3];
+    geom_t box_min[3] = {0, 0, 0}, box_max[3] = {0, 0, 0}, box_extent[3] = {0, 0, 0};
     for (int coord = 0; coord < mesh.spatial_dim; coord++) {
         box_min[coord] = mesh.points[coord][0];
         box_max[coord] = mesh.points[coord][0];
@@ -181,7 +182,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    for(int d = 0; d < 3; d++) {
+    for (int d = 0; d < 3; d++) {
         box_extent[d] = box_max[d] - box_min[d];
     }
 
@@ -224,7 +225,6 @@ int main(int argc, char *argv[]) {
                 }
             }
 
-           
             // sfc[i] = (sfc_t)(b[2] * (geom_t)urange[2]);
             sfc[i] = b[SFEM_ORDER_WITH_COORDINATE] * urange[SFEM_ORDER_WITH_COORDINATE];
 
@@ -232,7 +232,6 @@ int main(int argc, char *argv[]) {
             // (int)sfc[i]);
         }
     } else {
-        const int nnxe = elem_num_nodes(mesh.element_type);
         for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
             geom_t b[3] = {0, 0, 0};
             const idx_t i0 = mesh.elements[0][i];
@@ -244,7 +243,7 @@ int main(int argc, char *argv[]) {
                 b[coord] = x;
             }
 
-            for (int d = 1; d < nnxe; d++) {
+            for (int d = 1; d < nxe; d++) {
                 const idx_t ii = mesh.elements[d][i];
 
                 for (int coord = 0; coord < mesh.spatial_dim; coord++) {
@@ -305,7 +304,8 @@ int main(int argc, char *argv[]) {
         // 1) rearrange elements
         {
             idx_t *elem_buff = (idx_t *)buff;
-            for (int d = 0; d < mesh.element_type; d++) {
+
+            for (int d = 0; d < nxe; d++) {
                 memcpy(elem_buff, mesh.elements[d], mesh.n_owned_elements * sizeof(idx_t));
                 for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
                     mesh.elements[d][i] = elem_buff[idx[i]];
@@ -340,7 +340,7 @@ int main(int argc, char *argv[]) {
 
             idx_t next_node = 1;
             for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
-                for (int d = 0; d < mesh.element_type; d++) {
+                for (int d = 0; d < nxe; d++) {
                     idx_t i0 = mesh.elements[d][i];
 
                     if (!node_buff[i0]) {
@@ -359,7 +359,7 @@ int main(int argc, char *argv[]) {
         }
 
         // Update e2n
-        for (int d = 0; d < mesh.element_type; d++) {
+        for (int d = 0; d < nxe; d++) {
             for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
                 idx_t i0 = mesh.elements[d][i];
                 mesh.elements[d][i] = node_buff[i0];

@@ -12,11 +12,12 @@
 #include "crs_graph.h"
 #include "read_mesh.h"
 #include "sfem_base.h"
+#include "sfem_defs.h"
 #include "sfem_mesh_write.h"
 
 #include "sortreduce.h"
 
-static const int refine_pattern[8][4] = {
+static const int tet4_refine_pattern[8][4] = {
     // Corner tests
     {0, 4, 6, 7},
     {4, 1, 5, 8},
@@ -27,6 +28,14 @@ static const int refine_pattern[8][4] = {
     {7, 4, 6, 8},
     {6, 5, 9, 8},
     {7, 6, 9, 8}};
+
+static const int tri3_refine_pattern[4][3] = {
+    // Corner triangles
+    {0, 3, 5},
+    {3, 1, 4},
+    {5, 4, 2},
+    // Center triangle
+    {3, 4, 5}};
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -78,11 +87,14 @@ int main(int argc, char *argv[]) {
     idx_t *colidx = 0;
 
     // This only works for TET4 or TRI3
-    build_crs_graph(coarse_mesh.nelements, coarse_mesh.nnodes, coarse_mesh.elements, &rowptr, &colidx);
+    build_crs_graph_for_elem_type(
+        coarse_mesh.element_type,
+        coarse_mesh.nelements, coarse_mesh.nnodes, coarse_mesh.elements, &rowptr, &colidx);
 
     ///////////////////////////////////////////////////////////////////////////////
 
     mesh_t refined_mesh;
+    mesh_init(&refined_mesh);
 
     const count_t nnz = rowptr[coarse_mesh.nnodes];
     idx_t *p2idx = (idx_t *)malloc(nnz * sizeof(idx_t));
@@ -110,7 +122,7 @@ int main(int argc, char *argv[]) {
 
     refined_mesh.comm = comm;
     refined_mesh.mem_space = coarse_mesh.mem_space;
-    refined_mesh.nelements = coarse_mesh.nelements * 8;
+    refined_mesh.nelements = coarse_mesh.nelements * (coarse_mesh.element_type == TET4? 8 : 4);
     refined_mesh.nnodes = coarse_mesh.nnodes + fine_nodes;
     refined_mesh.spatial_dim = coarse_mesh.spatial_dim;
 
@@ -126,12 +138,17 @@ int main(int argc, char *argv[]) {
     refined_mesh.elements = (idx_t **)malloc(refined_mesh.element_type * sizeof(idx_t *));
     refined_mesh.points = (geom_t **)malloc(refined_mesh.spatial_dim * sizeof(geom_t *));
 
+    const int coarse_nxe = elem_num_nodes(coarse_mesh.element_type);
+    const int fine_nxe = elem_num_nodes(refined_mesh.element_type);
+
     // Allocate space for refined nodes
-    for (int d = 0; d < refined_mesh.element_type; d++) {
+    for (int d = 0; d < fine_nxe; d++) {
         refined_mesh.elements[d] = (idx_t *)malloc(refined_mesh.nelements * sizeof(idx_t));
 
         // Copy p1 portion
-        memcpy(refined_mesh.elements[d], coarse_mesh.elements[d], coarse_mesh.nelements * sizeof(idx_t));
+        memcpy(refined_mesh.elements[d],
+               coarse_mesh.elements[d],
+               coarse_mesh.nelements * sizeof(idx_t));
     }
 
     for (int d = 0; d < refined_mesh.spatial_dim; d++) {
@@ -141,7 +158,7 @@ int main(int argc, char *argv[]) {
         memcpy(refined_mesh.points[d], coarse_mesh.points[d], coarse_mesh.nnodes * sizeof(geom_t));
     }
 
-    if (coarse_mesh.element_type == 4) {
+    if (coarse_mesh.element_type == TET4) {
         // TODO fill p2 node indices in elements
         for (ptrdiff_t e = 0; e < coarse_mesh.nelements; e++) {
             idx_t macro_element[10];
@@ -179,12 +196,49 @@ int main(int argc, char *argv[]) {
             ptrdiff_t element_offset = e * 8;
             for (int k = 0; k < 4; k++) {
                 for (int sub_e = 0; sub_e < 8; sub_e++) {
-                    const idx_t ik = macro_element[refine_pattern[sub_e][k]];
+                    const idx_t ik = macro_element[tet4_refine_pattern[sub_e][k]];
                     refined_mesh.elements[k][element_offset + sub_e] = ik;
                 }
             }
         }
 
+    } else if (coarse_mesh.element_type == TRI3) {
+        // TODO fill p2 node indices in elements
+        for (ptrdiff_t e = 0; e < coarse_mesh.nelements; e++) {
+            idx_t macro_element[6];
+            for (int k = 0; k < 3; k++) {
+                macro_element[k] = coarse_mesh.elements[k][e];
+            }
+
+            // Ordering of edges compliant to exodusII spec
+            idx_t row[3];
+            row[0] = MIN(macro_element[0], macro_element[1]);
+            row[1] = MIN(macro_element[1], macro_element[2]);
+            row[2] = MIN(macro_element[0], macro_element[2]);
+
+            idx_t key[3];
+            key[0] = MAX(macro_element[0], macro_element[1]);
+            key[1] = MAX(macro_element[1], macro_element[2]);
+            key[2] = MAX(macro_element[0], macro_element[2]);
+
+            for (int l = 0; l < 3; l++) {
+                const idx_t r = row[l];
+                const count_t row_begin = rowptr[r];
+                const count_t len_row = rowptr[r + 1] - row_begin;
+                const idx_t *cols = &colidx[row_begin];
+                const idx_t k = find_idx_binary_search(key[l], cols, len_row);
+                macro_element[l + 3] = p2idx[row_begin + k];
+            }
+
+            // distribute macro_element to fine_mesh
+            ptrdiff_t element_offset = e * 4;
+            for (int k = 0; k < 3; k++) {
+                for (int sub_e = 0; sub_e < 4; sub_e++) {
+                    const idx_t ik = macro_element[tri3_refine_pattern[sub_e][k]];
+                    refined_mesh.elements[k][element_offset + sub_e] = ik;
+                }
+            }
+        }
     } else {
         fprintf(stderr, "Implement for element_type %d\n!", coarse_mesh.element_type);
         return EXIT_FAILURE;
@@ -208,9 +262,6 @@ int main(int argc, char *argv[]) {
                     // Midpoint
                     refined_mesh.points[d][nidx] = (xi + xj) / 2;
                 }
-
-                // printf("%d -> %f %f %f\n", nidx, refined_mesh.points[0][nidx], refined_mesh.points[1][nidx],
-                // refined_mesh.points[2][nidx]);
             }
         }
     }
@@ -222,7 +273,7 @@ int main(int argc, char *argv[]) {
     mesh_write(output_folder, &refined_mesh);
 
     // Make sure we do not delete the same array twice
-    for (int d = 0; d < coarse_mesh.element_type; d++) {
+    for (int d = 0; d < coarse_nxe; d++) {
         coarse_mesh.elements[d] = 0;
     }
 

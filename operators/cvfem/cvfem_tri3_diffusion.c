@@ -89,7 +89,10 @@ static SFEM_INLINE int find_col(const idx_t key, const idx_t *const row, const i
     }
 }
 
-static SFEM_INLINE void find_cols3(const idx_t *targets, const idx_t *const row, const int lenrow, int *ks) {
+static SFEM_INLINE void find_cols3(const idx_t *targets,
+                                   const idx_t *const row,
+                                   const int lenrow,
+                                   int *ks) {
     if (lenrow > 32) {
         for (int d = 0; d < 3; ++d) {
             ks[d] = find_col(targets[d], row, lenrow);
@@ -120,51 +123,58 @@ void cvfem_tri3_diffusion_assemble_hessian(const ptrdiff_t nelements,
 
     double tick = MPI_Wtime();
 
-    idx_t ev[3];
-    idx_t ks[3];
+#pragma omp parallel
+    {
+#pragma omp for //nowait
 
-    real_t element_matrix[3 * 3];
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[3];
+            idx_t ks[3];
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
-#pragma unroll(3)
-        for (int v = 0; v < 3; ++v) {
-            ev[v] = elems[v][i];
-        }
-
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
-
-        cvfem_tri3_diffusion_hessian_kernel(
-            // X-coordinates
-            xyz[0][i0],
-            xyz[0][i1],
-            xyz[0][i2],
-            // Y-coordinates
-            xyz[1][i0],
-            xyz[1][i1],
-            xyz[1][i2],
-            element_matrix);
-
-        for (int edof_i = 0; edof_i < 3; ++edof_i) {
-            const idx_t dof_i = elems[edof_i][i];
-            const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
-
-            const idx_t *row = &colidx[rowptr[dof_i]];
-
-            find_cols3(ev, row, lenrow, ks);
-
-            real_t *rowvalues = &values[rowptr[dof_i]];
-            const real_t *element_row = &element_matrix[edof_i * 3];
+            real_t element_matrix[3 * 3];
 
 #pragma unroll(3)
-            for (int edof_j = 0; edof_j < 3; ++edof_j) {
-                rowvalues[ks[edof_j]] += element_row[edof_j];
+            for (int v = 0; v < 3; ++v) {
+                ev[v] = elems[v][i];
+            }
+
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+
+            cvfem_tri3_diffusion_hessian_kernel(
+                // X-coordinates
+                xyz[0][i0],
+                xyz[0][i1],
+                xyz[0][i2],
+                // Y-coordinates
+                xyz[1][i0],
+                xyz[1][i1],
+                xyz[1][i2],
+                element_matrix);
+
+            for (int edof_i = 0; edof_i < 3; ++edof_i) {
+                const idx_t dof_i = elems[edof_i][i];
+                const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
+
+                const idx_t *row = &colidx[rowptr[dof_i]];
+
+                find_cols3(ev, row, lenrow, ks);
+
+                real_t *rowvalues = &values[rowptr[dof_i]];
+                const real_t *element_row = &element_matrix[edof_i * 3];
+
+#pragma unroll(3)
+                for (int edof_j = 0; edof_j < 3; ++edof_j) {
+#pragma omp atomic update
+                    rowvalues[ks[edof_j]] += element_row[edof_j];
+                }
             }
         }
     }
 
     double tock = MPI_Wtime();
-    printf("cvfem_tri3_diffusion.c: cvfem_tri3_diffusion_assemble_hessian\t%g seconds\n", tock - tick);
+    printf("cvfem_tri3_diffusion.c: cvfem_tri3_diffusion_assemble_hessian\t%g seconds\n",
+           tock - tick);
 }

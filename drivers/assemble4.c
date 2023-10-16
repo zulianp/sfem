@@ -3,10 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../matrix.io/array_dtof.h"
-#include "../matrix.io/matrixio_array.h"
-#include "../matrix.io/matrixio_crs.h"
-#include "../matrix.io/utils.h"
+#include "matrix.io/array_dtof.h"
+#include "matrix.io/matrixio_array.h"
+#include "matrix.io/matrixio_crs.h"
+#include "matrix.io/utils.h"
 
 #include "crs_graph.h"
 #include "sfem_base.h"

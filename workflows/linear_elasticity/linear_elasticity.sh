@@ -14,6 +14,9 @@ PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 UTOPIA_EXEC=$CODE_DIR/utopia/utopia/build/utopia_exec
 # UTOPIA_EXEC=$CODE_DIR/utopia/utopia/build_debug/utopia_exec
 
+export OMP_NUM_THREADS=8
+export OMP_PROC_BIND=true
+
 if [[ -z "$UTOPIA_EXEC" ]]
 then
 	echo "Error! Please define UTOPIA_EXEC=<path_to_utopia_exectuable>"
@@ -33,8 +36,8 @@ solve()
 }
 
 mesh=mesh
-create_square.sh 3
-rm $mesh/z.raw
+# create_square.sh 7
+# rm $mesh/z.raw
 nvars=2
 
 dirichlet_nodes=all.raw

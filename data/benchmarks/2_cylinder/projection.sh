@@ -10,6 +10,8 @@ PATH=$SCRIPTPATH/../../../python:$PATH
 PATH=$SCRIPTPATH/../../../python/mesh:$PATH
 PATH=$SCRIPTPATH/../../../workflows/divergence:$PATH
 
+export OMP_NUM_THREADS=8
+export OMP_PROC_BIND=true
 
 UTOPIA_EXEC=$CODE_DIR/utopia/utopia/build/utopia_exec
 

@@ -149,7 +149,7 @@ geom_t * const SFEM_RESTRICT he_xyz
 
                 #pragma omp parallel
                 {
-                    #pragma omp for nowait
+                    #pragma omp for //nowait
                     for (ptrdiff_t k = 0; k < n; k++) {
                         buff[k] = x[nodes[k]];
                     }
@@ -179,7 +179,7 @@ real_t * const SFEM_RESTRICT he_vec
 
             #pragma omp parallel
             {
-                #pragma omp for nowait
+                #pragma omp for //nowait
                 for (ptrdiff_t k = 0; k < n; k++) 
                 {
                     buff[k] = vec[nodes[k]];

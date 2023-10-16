@@ -14,6 +14,9 @@ PATH=$SCRIPTPATH/../..:$PATH
 PATH=$SCRIPTPATH/../../python:$PATH
 PATH=$SCRIPTPATH/../../python/mesh:$PATH
 
+export OMP_NUM_THREADS=8
+export OMP_PROC_BIND=true
+
 # Remove me!
 UTOPIA_EXEC=$CODE_DIR/utopia/utopia/build/utopia_exec
 
@@ -252,7 +255,7 @@ divergence $mesh_path $mux $muy $muz $divu
 
 # Fix degree of freedom for uniqueness of solution
 rhs=$workspace/rhs.raw
-smask $workspace/dirichlet.raw $divu $rhs $fix_value
+smask $dirichlet_nodes $divu $rhs $fix_value
 # smask $surface_nodes $divu $rhs $fix_value
 
 potential=$workspace/potential.raw

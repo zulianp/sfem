@@ -1,9 +1,12 @@
 #include "sfem_mesh.h"
-
 #include "sfem_defs.h"
 
-void mesh_init(mesh_t *mesh)
-{
+#include <math.h>
+
+#define MAX(a, b) ((a) > (b)? (a) : (b))
+#define MIN(a, b) ((a) < (b)? (a) : (b))
+
+void mesh_init(mesh_t *mesh) {
     mesh->comm = MPI_COMM_NULL;
     mesh->mem_space = 0;
 
@@ -32,8 +35,59 @@ void mesh_init(mesh_t *mesh)
     mesh->ghosts = 0;
 }
 
+void mesh_minmax_edge_length(const mesh_t *const mesh, real_t *emin, real_t *emax) {
+    const int nnxe = elem_num_nodes(mesh->element_type);
+    *emin = 1e10;
+    *emax = 0;
+
+    const int sdim = mesh->spatial_dim;
+
+#pragma omp parallel
+    {
+#pragma omp for
+        for (ptrdiff_t e = 0; e < mesh->nelements; e++) {
+            real_t len_min = 1e10;
+            real_t len_max = 0;
+            for (int i = 0; i < nnxe; i++) {
+                idx_t node_i = mesh->elements[i][e];
+
+                for (int j = i+1; j < nnxe; j++) {
+                    idx_t node_j = mesh->elements[j][e];
+
+                    real_t len = 0;
+                    for(int d = 0; d < sdim; d++) {
+                        real_t diff = mesh->points[d][node_i] - mesh->points[d][node_j];
+                        len += diff*diff;
+                    }
+
+                    len = sqrt(len);
+
+                    len_min = MIN(len_min, len);
+                    len_max = MAX(len_max, len);
+                }
+            }
+
+            #pragma omp critical
+            {
+                *emin = MIN(*emin, len_min);
+                *emax = MAX(*emax, len_max);
+            }
+        }
+    }
+
+    int size;
+    MPI_Comm_size(mesh->comm, &size);
+
+    if(size > 1) {
+        // IMPLEMENT ME
+        assert(0);
+        MPI_Abort(mesh->comm, -1);
+    }
+}
+
 void mesh_destroy(mesh_t *mesh) {
-    for (int d = 0; d < mesh->element_type; ++d) {
+    const int nxe = elem_num_nodes(mesh->element_type);
+    for (int d = 0; d < nxe; ++d) {
         free(mesh->elements[d]);
         mesh->elements[d] = 0;
     }

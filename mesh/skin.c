@@ -31,7 +31,7 @@ static SFEM_INLINE void normalize(real_t *const vec3) {
 
 void correct_side_orientation(const ptrdiff_t nsides,
                               idx_t **const SFEM_RESTRICT sides,
-                              const idx_t *const SFEM_RESTRICT parent,
+                              const element_idx_t *const SFEM_RESTRICT parent,
                               idx_t **const SFEM_RESTRICT elements,
                               geom_t **const SFEM_RESTRICT xyz) {
     double tick = MPI_Wtime();
@@ -55,7 +55,7 @@ void correct_side_orientation(const ptrdiff_t nsides,
 
         // Compute element barycenter
         real_t b[3] = {0, 0, 0};
-        const idx_t p = parent[i];
+        const element_idx_t p = parent[i];
 
         for (int d = 0; d < 4; ++d) {
             b[0] += xyz[0][elements[d][p]];
@@ -133,18 +133,18 @@ int main(int argc, char *argv[]) {
     }
 
     enum ElemType st = side_type(mesh.element_type);
-    int nnxs = elem_num_nodes(st);
+    const int nnxs = elem_num_nodes(st);
 
     ptrdiff_t n_surf_elements = 0;
     idx_t **surf_elems = (idx_t **)malloc(nnxs * sizeof(idx_t *));
-    idx_t *parent = 0;
+    element_idx_t *parent = 0;
 
-    if (mesh.element_type == TET4) {
-        extract_surface_connectivity(mesh.nelements, mesh.elements, &n_surf_elements, surf_elems, &parent);
-    } else {
+    // if (mesh.element_type == TET4) {
+    //     extract_surface_connectivity(mesh.nelements, mesh.elements, &n_surf_elements, surf_elems, &parent);
+    // } else {
         extract_surface_connectivity_with_adj_table(
             mesh.nelements, mesh.nnodes, mesh.element_type, mesh.elements, &n_surf_elements, surf_elems, &parent);
-    }
+    // }
 
     idx_t *vol2surf = (idx_t *)malloc(mesh.nnodes * sizeof(idx_t));
     for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {
@@ -220,7 +220,7 @@ int main(int argc, char *argv[]) {
 
     char path[2048];
     sprintf(path, "%s/parent.raw", output_folder);
-    array_write(comm, path, SFEM_MPI_IDX_T, parent, n_surf_elements, n_surf_elements);
+    array_write(comm, path, SFEM_MPI_ELEMENT_IDX_T, parent, n_surf_elements, n_surf_elements);
 
     // Clean-up
 

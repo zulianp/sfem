@@ -82,34 +82,45 @@ static SFEM_INLINE void tri_shell_3_integrate(const real_t px0,
 }
 
 static void tri_shell_3_surface_forcing_function(const ptrdiff_t nfaces,
-                                          const idx_t *SFEM_RESTRICT faces_neumann,
-                                          geom_t **const SFEM_RESTRICT xyz,
-                                          const real_t value,
-                                          const int stride,
-                                          real_t *SFEM_RESTRICT output) {  // Neumann
+                                                 const idx_t *SFEM_RESTRICT faces_neumann,
+                                                 geom_t **const SFEM_RESTRICT xyz,
+                                                 const real_t value,
+                                                 const int stride,
+                                                 real_t *SFEM_RESTRICT output) {  // Neumann
     double tick = MPI_Wtime();
 
-    real_t element_vector[3];
-    for (idx_t f = 0; f < nfaces; ++f) {
-        idx_t i0 = faces_neumann[f * 3];
-        idx_t i1 = faces_neumann[f * 3 + 1];
-        idx_t i2 = faces_neumann[f * 3 + 2];
+#pragma omp parallel
+    {
+#pragma omp for //nowait
 
-        tri_shell_3_integrate(xyz[0][i0],
-                              xyz[0][i1],
-                              xyz[0][i2],
-                              xyz[1][i0],
-                              xyz[1][i1],
-                              xyz[1][i2],
-                              xyz[2][i0],
-                              xyz[2][i1],
-                              xyz[2][i2],
-                              &value,
-                              element_vector);
+        for (idx_t f = 0; f < nfaces; ++f) {
+            real_t element_vector[3];
 
-        output[i0 * stride] += element_vector[0];
-        output[i1 * stride] += element_vector[1];
-        output[i2 * stride] += element_vector[2];
+            idx_t i0 = faces_neumann[f * 3];
+            idx_t i1 = faces_neumann[f * 3 + 1];
+            idx_t i2 = faces_neumann[f * 3 + 2];
+
+            tri_shell_3_integrate(xyz[0][i0],
+                                  xyz[0][i1],
+                                  xyz[0][i2],
+                                  xyz[1][i0],
+                                  xyz[1][i1],
+                                  xyz[1][i2],
+                                  xyz[2][i0],
+                                  xyz[2][i1],
+                                  xyz[2][i2],
+                                  &value,
+                                  element_vector);
+
+#pragma omp atomic update
+            output[i0 * stride] += element_vector[0];
+
+#pragma omp atomic update
+            output[i1 * stride] += element_vector[1];
+
+#pragma omp atomic update
+            output[i2 * stride] += element_vector[2];
+        }
     }
 
     double tock = MPI_Wtime();
@@ -177,39 +188,49 @@ static SFEM_INLINE void tri_shell_6_integrate(const real_t px0,
 }
 
 static void tri_shell_6_surface_forcing_function(const ptrdiff_t nfaces,
-                                          const idx_t *SFEM_RESTRICT faces_neumann,
-                                          geom_t **const SFEM_RESTRICT xyz,
-                                          const real_t value,
-                                          const int stride,
-                                          real_t *SFEM_RESTRICT output) {
+                                                 const idx_t *SFEM_RESTRICT faces_neumann,
+                                                 geom_t **const SFEM_RESTRICT xyz,
+                                                 const real_t value,
+                                                 const int stride,
+                                                 real_t *SFEM_RESTRICT output) {
     double tick = MPI_Wtime();
 
-    real_t element_vector[3];
+#pragma omp parallel
+    {
+#pragma omp for //nowait
 
-    for (idx_t f = 0; f < nfaces; ++f) {
-        idx_t i0 = faces_neumann[f * 6];
-        idx_t i1 = faces_neumann[f * 6 + 1];
-        idx_t i2 = faces_neumann[f * 6 + 2];
-        idx_t i3 = faces_neumann[f * 6 + 3];
-        idx_t i4 = faces_neumann[f * 6 + 4];
-        idx_t i5 = faces_neumann[f * 6 + 5];
+        for (idx_t f = 0; f < nfaces; ++f) {
+            real_t element_vector[3];
 
-        tri_shell_6_integrate(xyz[0][i0],
-                              xyz[0][i1],
-                              xyz[0][i2],
-                              xyz[1][i0],
-                              xyz[1][i1],
-                              xyz[1][i2],
-                              xyz[2][i0],
-                              xyz[2][i1],
-                              xyz[2][i2],
-                              &value,
-                              element_vector);
+            idx_t i0 = faces_neumann[f * 6];
+            idx_t i1 = faces_neumann[f * 6 + 1];
+            idx_t i2 = faces_neumann[f * 6 + 2];
+            idx_t i3 = faces_neumann[f * 6 + 3];
+            idx_t i4 = faces_neumann[f * 6 + 4];
+            idx_t i5 = faces_neumann[f * 6 + 5];
 
-        // Only edge dofs
-        output[i3 * stride] += element_vector[0];
-        output[i4 * stride] += element_vector[1];
-        output[i5 * stride] += element_vector[2];
+            tri_shell_6_integrate(xyz[0][i0],
+                                  xyz[0][i1],
+                                  xyz[0][i2],
+                                  xyz[1][i0],
+                                  xyz[1][i1],
+                                  xyz[1][i2],
+                                  xyz[2][i0],
+                                  xyz[2][i1],
+                                  xyz[2][i2],
+                                  &value,
+                                  element_vector);
+
+// Only edge dofs
+#pragma omp atomic update
+            output[i3 * stride] += element_vector[0];
+
+#pragma omp atomic update
+            output[i4 * stride] += element_vector[1];
+
+#pragma omp atomic update
+            output[i5 * stride] += element_vector[2];
+        }
     }
 
     double tock = MPI_Wtime();
@@ -235,25 +256,30 @@ static SFEM_INLINE void edge_shell_2_surface_forcing_function_kernel(
 }
 
 static void edge_shell_2_surface_forcing_function(const ptrdiff_t nfaces,
-                                           const idx_t *SFEM_RESTRICT faces_neumann,
-                                           geom_t **const SFEM_RESTRICT xyz,
-                                           const real_t value,
-                                           const int stride,
-                                           real_t *SFEM_RESTRICT output) {
+                                                  const idx_t *SFEM_RESTRICT faces_neumann,
+                                                  geom_t **const SFEM_RESTRICT xyz,
+                                                  const real_t value,
+                                                  const int stride,
+                                                  real_t *SFEM_RESTRICT output) {
     double tick = MPI_Wtime();
 
-    real_t element_vector[2];
+#pragma omp parallel
+    {
+        for (idx_t f = 0; f < nfaces; ++f) {
+            real_t element_vector[2];
+            idx_t i0 = faces_neumann[f * 2];
+            idx_t i1 = faces_neumann[f * 2 + 1];
 
-    for (idx_t f = 0; f < nfaces; ++f) {
-        idx_t i0 = faces_neumann[f * 2];
-        idx_t i1 = faces_neumann[f * 2 + 1];
+            edge_shell_2_surface_forcing_function_kernel(
+                xyz[0][i0], xyz[0][i1], xyz[1][i0], xyz[1][i1], &value, element_vector);
 
-        edge_shell_2_surface_forcing_function_kernel(
-            xyz[0][i0], xyz[0][i1], xyz[1][i0], xyz[1][i1], &value, element_vector);
+// Only edge dofs
+#pragma omp atomic update
+            output[i0 * stride] += element_vector[0];
 
-        // Only edge dofs
-        output[i0 * stride] += element_vector[0];
-        output[i1 * stride] += element_vector[1];
+#pragma omp atomic update
+            output[i1 * stride] += element_vector[1];
+        }
     }
 
     double tock = MPI_Wtime();

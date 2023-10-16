@@ -5,12 +5,14 @@
 
 #include <assert.h>
 
-enum ElemType { EDGE2=2, TRI3 = 3, TET4 = 4, TRI6 = 6, HEX8 = 8, TET10 = 10, NODE1 = 1, INVALID = -1 };
+enum ElemType { NODE1 = 1, EDGE2=2, TRI3 = 3, TET4 = 4, TRI6 = 6, HEX8 = 8, TET10 = 10, EDGE3=11, TRISHELL3 = 103, INVALID = -1 };
 
 SFEM_INLINE static enum ElemType side_type(const enum ElemType type) {
     switch (type) {
         case TRI3:
             return EDGE2;
+        case TRI6:
+            return EDGE3;
         case TET4:
             return TRI3;
         case TET10:
@@ -24,12 +26,29 @@ SFEM_INLINE static enum ElemType side_type(const enum ElemType type) {
     }
 }
 
-SFEM_INLINE static enum ElemType elem_num_nodes(const enum ElemType type) {
+SFEM_INLINE static enum ElemType elem_lower_order(const enum ElemType type) {
+    switch (type) {
+        case TRI6:
+            return TRI3;
+        case TET10:
+            return TET4;
+        case EDGE3:
+            return EDGE2;
+        default: {
+            assert(0);
+            return INVALID;
+        }
+    }
+}
+
+SFEM_INLINE static int elem_num_nodes(const enum ElemType type) {
     switch (type) {
         case NODE1:
             return 1;
         case EDGE2:
             return 2;
+        case EDGE3:
+            return 3;
         case TRI3:
             return 3;
         case TET4:
@@ -42,7 +61,7 @@ SFEM_INLINE static enum ElemType elem_num_nodes(const enum ElemType type) {
             return 10;
         default: {
             assert(0);
-            return INVALID;
+            return 0;
         }
     }
 }
@@ -63,7 +82,7 @@ SFEM_INLINE static int elem_num_sides(const enum ElemType type) {
             return 4;
         default: {
             assert(0);
-            return INVALID;
+            return 0;
         }
     }
 }

@@ -10,18 +10,18 @@
 #include "sfem_vec.h"
 
 static SFEM_INLINE void tet4_laplacian_hessian(const real_t x0,
-                                          const real_t x1,
-                                          const real_t x2,
-                                          const real_t x3,
-                                          const real_t y0,
-                                          const real_t y1,
-                                          const real_t y2,
-                                          const real_t y3,
-                                          const real_t z0,
-                                          const real_t z1,
-                                          const real_t z2,
-                                          const real_t z3,
-                                          real_t *element_matrix) {
+                                               const real_t x1,
+                                               const real_t x2,
+                                               const real_t x3,
+                                               const real_t y0,
+                                               const real_t y1,
+                                               const real_t y2,
+                                               const real_t y3,
+                                               const real_t z0,
+                                               const real_t z1,
+                                               const real_t z2,
+                                               const real_t z3,
+                                               real_t *element_matrix) {
     // FLOATING POINT OPS!
     //    - Result: 4*ADD + 16*ASSIGNMENT + 16*MUL + 12*POW
     //    - Subexpressions: 16*ADD + 9*DIV + 56*MUL + 7*NEG + POW + 32*SUB
@@ -73,41 +73,46 @@ static SFEM_INLINE void tet4_laplacian_hessian(const real_t x0,
     const real_t x49 = x41 * (x25 * x37 + x38 * (x22 * x39 + x33 * x40));
     const real_t x50 = (1.0 / 6.0) * x45;
     const real_t x51 = x20 * (x21 * x44 + x24 * x50 + x32 * x47);
-    const real_t x52 = x20 * (-1.0 / 6.0 * x21 * x22 - 1.0 / 6.0 * x24 * x25 - 1.0 / 6.0 * x32 * x33);
+    const real_t x52 =
+        x20 * (-1.0 / 6.0 * x21 * x22 - 1.0 / 6.0 * x24 * x25 - 1.0 / 6.0 * x32 * x33);
     const real_t x53 = x20 * (x22 * x44 + x25 * x50 + x33 * x47);
 
-    element_matrix[0] = x20 * (-1.0 / 6.0 * pow(x23, 2) - 1.0 / 6.0 * pow(x29, 2) - 1.0 / 6.0 * pow(x34, 2));
+    element_matrix[0] =
+        x20 * (-1.0 / 6.0 * pow(x23, 2) - 1.0 / 6.0 * pow(x29, 2) - 1.0 / 6.0 * pow(x34, 2));
     element_matrix[1] = x42;
     element_matrix[2] = x48;
     element_matrix[3] = x49;
     element_matrix[4] = x42;
-    element_matrix[5] = x20 * (-1.0 / 6.0 * pow(x21, 2) - 1.0 / 6.0 * pow(x24, 2) - 1.0 / 6.0 * pow(x32, 2));
+    element_matrix[5] =
+        x20 * (-1.0 / 6.0 * pow(x21, 2) - 1.0 / 6.0 * pow(x24, 2) - 1.0 / 6.0 * pow(x32, 2));
     element_matrix[6] = x51;
     element_matrix[7] = x52;
     element_matrix[8] = x48;
     element_matrix[9] = x51;
-    element_matrix[10] = x20 * (-1.0 / 6.0 * pow(x43, 2) - 1.0 / 6.0 * pow(x45, 2) - 1.0 / 6.0 * pow(x46, 2));
+    element_matrix[10] =
+        x20 * (-1.0 / 6.0 * pow(x43, 2) - 1.0 / 6.0 * pow(x45, 2) - 1.0 / 6.0 * pow(x46, 2));
     element_matrix[11] = x53;
     element_matrix[12] = x49;
     element_matrix[13] = x52;
     element_matrix[14] = x53;
-    element_matrix[15] = x20 * (-1.0 / 6.0 * pow(x22, 2) - 1.0 / 6.0 * pow(x25, 2) - 1.0 / 6.0 * pow(x33, 2));
+    element_matrix[15] =
+        x20 * (-1.0 / 6.0 * pow(x22, 2) - 1.0 / 6.0 * pow(x25, 2) - 1.0 / 6.0 * pow(x33, 2));
 }
 
 static SFEM_INLINE void tet4_laplacian_gradient(const real_t px0,
-                                           const real_t px1,
-                                           const real_t px2,
-                                           const real_t px3,
-                                           const real_t py0,
-                                           const real_t py1,
-                                           const real_t py2,
-                                           const real_t py3,
-                                           const real_t pz0,
-                                           const real_t pz1,
-                                           const real_t pz2,
-                                           const real_t pz3,
-                                           const real_t *SFEM_RESTRICT u,
-                                           real_t *SFEM_RESTRICT element_vector) {
+                                                const real_t px1,
+                                                const real_t px2,
+                                                const real_t px3,
+                                                const real_t py0,
+                                                const real_t py1,
+                                                const real_t py2,
+                                                const real_t py3,
+                                                const real_t pz0,
+                                                const real_t pz1,
+                                                const real_t pz2,
+                                                const real_t pz3,
+                                                const real_t *SFEM_RESTRICT u,
+                                                real_t *SFEM_RESTRICT element_vector) {
     // FLOATING POINT OPS!
     //      - Result: 4*ADD + 4*ASSIGNMENT + 16*MUL
     //      - Subexpressions: 13*ADD + 7*DIV + 46*MUL + 3*NEG + 30*SUB
@@ -131,8 +136,8 @@ static SFEM_INLINE void tet4_laplacian_gradient(const real_t px0,
     const real_t x17 = x10 * x16 * x5;
     const real_t x18 = x16 * x2;
     const real_t x19 = x13 * x18;
-    const real_t x20 =
-        -1.0 / 6.0 * x12 + (1.0 / 6.0) * x15 + (1.0 / 6.0) * x17 - 1.0 / 6.0 * x19 + (1.0 / 6.0) * x4 - 1.0 / 6.0 * x8;
+    const real_t x20 = -1.0 / 6.0 * x12 + (1.0 / 6.0) * x15 + (1.0 / 6.0) * x17 - 1.0 / 6.0 * x19 +
+                       (1.0 / 6.0) * x4 - 1.0 / 6.0 * x8;
     const real_t x21 = 1.0 / (-x12 + x15 + x17 - x19 + x4 - x8);
     const real_t x22 = x21 * (-x11 + x3);
     const real_t x23 = x21 * (x10 * x16 - x7);
@@ -156,19 +161,19 @@ static SFEM_INLINE void tet4_laplacian_gradient(const real_t px0,
 }
 
 static SFEM_INLINE void tet4_laplacian_value(const real_t px0,
-                                        const real_t px1,
-                                        const real_t px2,
-                                        const real_t px3,
-                                        const real_t py0,
-                                        const real_t py1,
-                                        const real_t py2,
-                                        const real_t py3,
-                                        const real_t pz0,
-                                        const real_t pz1,
-                                        const real_t pz2,
-                                        const real_t pz3,
-                                        const real_t *SFEM_RESTRICT u,
-                                        real_t *SFEM_RESTRICT element_scalar) {
+                                             const real_t px1,
+                                             const real_t px2,
+                                             const real_t px3,
+                                             const real_t py0,
+                                             const real_t py1,
+                                             const real_t py2,
+                                             const real_t py3,
+                                             const real_t pz0,
+                                             const real_t pz1,
+                                             const real_t pz2,
+                                             const real_t pz3,
+                                             const real_t *SFEM_RESTRICT u,
+                                             real_t *SFEM_RESTRICT element_scalar) {
     // FLOATING POINT OPS!
     //       - Result: 8*ADD + ASSIGNMENT + 31*MUL + 3*POW
     //       - Subexpressions: 2*ADD + DIV + 34*MUL + 21*SUB
@@ -202,11 +207,12 @@ static SFEM_INLINE void tet4_laplacian_value(const real_t px0,
     const real_t x27 = x20 * (x0 * x2 - x5 * x6);
     const real_t x28 = x20 * (-x0 * x10 + x13 * x6);
     const real_t x29 = x20 * (x10 * x5 - x13 * x2);
-    element_scalar[0] = ((1.0 / 2.0) * pow(u[0] * (-x21 - x22 - x23) + u[1] * x21 + u[2] * x22 + u[3] * x23, 2) +
-                         (1.0 / 2.0) * pow(u[0] * (-x24 - x25 - x26) + u[1] * x24 + u[2] * x25 + u[3] * x26, 2) +
-                         (1.0 / 2.0) * pow(u[0] * (-x27 - x28 - x29) + u[1] * x27 + u[2] * x28 + u[3] * x29, 2)) *
-                        (-1.0 / 6.0 * x12 + (1.0 / 6.0) * x15 + (1.0 / 6.0) * x17 - 1.0 / 6.0 * x19 + (1.0 / 6.0) * x4 -
-                         1.0 / 6.0 * x8);
+    element_scalar[0] =
+        ((1.0 / 2.0) * pow(u[0] * (-x21 - x22 - x23) + u[1] * x21 + u[2] * x22 + u[3] * x23, 2) +
+         (1.0 / 2.0) * pow(u[0] * (-x24 - x25 - x26) + u[1] * x24 + u[2] * x25 + u[3] * x26, 2) +
+         (1.0 / 2.0) * pow(u[0] * (-x27 - x28 - x29) + u[1] * x27 + u[2] * x28 + u[3] * x29, 2)) *
+        (-1.0 / 6.0 * x12 + (1.0 / 6.0) * x15 + (1.0 / 6.0) * x17 - 1.0 / 6.0 * x19 +
+         (1.0 / 6.0) * x4 - 1.0 / 6.0 * x8);
 }
 
 static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {
@@ -239,7 +245,10 @@ static SFEM_INLINE int find_col(const idx_t key, const idx_t *const row, const i
     }
 }
 
-static SFEM_INLINE void find_cols4(const idx_t *targets, const idx_t *const row, const int lenrow, int *ks) {
+static SFEM_INLINE void find_cols4(const idx_t *targets,
+                                   const idx_t *const row,
+                                   const int lenrow,
+                                   int *ks) {
     if (lenrow > 32) {
         for (int d = 0; d < 4; ++d) {
             ks[d] = find_col(targets[d], row, lenrow);
@@ -260,65 +269,71 @@ static SFEM_INLINE void find_cols4(const idx_t *targets, const idx_t *const row,
 }
 
 void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
-                                const ptrdiff_t nnodes,
-                                idx_t **const SFEM_RESTRICT elems,
-                                geom_t **const SFEM_RESTRICT xyz,
-                                const count_t *const SFEM_RESTRICT rowptr,
-                                const idx_t *const SFEM_RESTRICT colidx,
-                                real_t *const SFEM_RESTRICT values) {
+                                     const ptrdiff_t nnodes,
+                                     idx_t **const SFEM_RESTRICT elems,
+                                     geom_t **const SFEM_RESTRICT xyz,
+                                     const count_t *const SFEM_RESTRICT rowptr,
+                                     const idx_t *const SFEM_RESTRICT colidx,
+                                     real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
     double tick = MPI_Wtime();
 
-    idx_t ev[4];
-    idx_t ks[4];
+#pragma omp parallel
+    {
+#pragma omp for //nowait
 
-    real_t element_matrix[4 * 4];
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[4];
+            idx_t ks[4];
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
-#pragma unroll(4)
-        for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
-        }
-
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
-        const idx_t i3 = ev[3];
-
-        tet4_laplacian_hessian(
-            // X-coordinates
-            xyz[0][i0],
-            xyz[0][i1],
-            xyz[0][i2],
-            xyz[0][i3],
-            // Y-coordinates
-            xyz[1][i0],
-            xyz[1][i1],
-            xyz[1][i2],
-            xyz[1][i3],
-            // Z-coordinates
-            xyz[2][i0],
-            xyz[2][i1],
-            xyz[2][i2],
-            xyz[2][i3],
-            element_matrix);
-
-        for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            const idx_t dof_i = elems[edof_i][i];
-            const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
-
-            const idx_t *row = &colidx[rowptr[dof_i]];
-
-            find_cols4(ev, row, lenrow, ks);
-
-            real_t *rowvalues = &values[rowptr[dof_i]];
-            const real_t *element_row = &element_matrix[edof_i * 4];
+            real_t element_matrix[4 * 4];
 
 #pragma unroll(4)
-            for (int edof_j = 0; edof_j < 4; ++edof_j) {
-                rowvalues[ks[edof_j]] += element_row[edof_j];
+            for (int v = 0; v < 4; ++v) {
+                ev[v] = elems[v][i];
+            }
+
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+            const idx_t i3 = ev[3];
+
+            tet4_laplacian_hessian(
+                // X-coordinates
+                xyz[0][i0],
+                xyz[0][i1],
+                xyz[0][i2],
+                xyz[0][i3],
+                // Y-coordinates
+                xyz[1][i0],
+                xyz[1][i1],
+                xyz[1][i2],
+                xyz[1][i3],
+                // Z-coordinates
+                xyz[2][i0],
+                xyz[2][i1],
+                xyz[2][i2],
+                xyz[2][i3],
+                element_matrix);
+
+            for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                const idx_t dof_i = elems[edof_i][i];
+                const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
+
+                const idx_t *row = &colidx[rowptr[dof_i]];
+
+                find_cols4(ev, row, lenrow, ks);
+
+                real_t *rowvalues = &values[rowptr[dof_i]];
+                const real_t *element_row = &element_matrix[edof_i * 4];
+
+#pragma unroll(4)
+                for (int edof_j = 0; edof_j < 4; ++edof_j) {
+#pragma omp atomic update
+                    rowvalues[ks[edof_j]] += element_row[edof_j];
+                }
             }
         }
     }
@@ -328,57 +343,64 @@ void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
 }
 
 void tet4_laplacian_assemble_gradient(const ptrdiff_t nelements,
-                                 const ptrdiff_t nnodes,
-                                 idx_t **const SFEM_RESTRICT elems,
-                                 geom_t **const SFEM_RESTRICT xyz,
-                                 const real_t *const SFEM_RESTRICT u,
-                                 real_t *const SFEM_RESTRICT values) {
+                                      const ptrdiff_t nnodes,
+                                      idx_t **const SFEM_RESTRICT elems,
+                                      geom_t **const SFEM_RESTRICT xyz,
+                                      const real_t *const SFEM_RESTRICT u,
+                                      real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
     double tick = MPI_Wtime();
 
-    idx_t ev[4];
-    real_t element_vector[4 * 4];
-    real_t element_u[4];
+#pragma omp parallel
+    {
+#pragma omp for //nowait
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[4];
+            real_t element_vector[4 * 4];
+            real_t element_u[4];
+
 #pragma unroll(4)
-        for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
-        }
+            for (int v = 0; v < 4; ++v) {
+                ev[v] = elems[v][i];
+            }
 
-        for (int v = 0; v < 4; ++v) {
-            element_u[v] = u[ev[v]];
-        }
+            for (int v = 0; v < 4; ++v) {
+                element_u[v] = u[ev[v]];
+            }
 
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
-        const idx_t i3 = ev[3];
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+            const idx_t i3 = ev[3];
 
-        tet4_laplacian_gradient(
-            // X-coordinates
-            xyz[0][i0],
-            xyz[0][i1],
-            xyz[0][i2],
-            xyz[0][i3],
-            // Y-coordinates
-            xyz[1][i0],
-            xyz[1][i1],
-            xyz[1][i2],
-            xyz[1][i3],
-            // Z-coordinates
-            xyz[2][i0],
-            xyz[2][i1],
-            xyz[2][i2],
-            xyz[2][i3],
-            element_u,
-            element_vector);
+            tet4_laplacian_gradient(
+                // X-coordinates
+                xyz[0][i0],
+                xyz[0][i1],
+                xyz[0][i2],
+                xyz[0][i3],
+                // Y-coordinates
+                xyz[1][i0],
+                xyz[1][i1],
+                xyz[1][i2],
+                xyz[1][i3],
+                // Z-coordinates
+                xyz[2][i0],
+                xyz[2][i1],
+                xyz[2][i2],
+                xyz[2][i3],
+                element_u,
+                element_vector);
 
-        for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            const idx_t dof_i = ev[edof_i];
-            values[dof_i] += element_vector[edof_i];
+            for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                const idx_t dof_i = ev[edof_i];
+
+#pragma omp atomic update
+                values[dof_i] += element_vector[edof_i];
+            }
         }
     }
 
@@ -387,56 +409,62 @@ void tet4_laplacian_assemble_gradient(const ptrdiff_t nelements,
 }
 
 void tet4_laplacian_assemble_value(const ptrdiff_t nelements,
-                              const ptrdiff_t nnodes,
-                              idx_t **const SFEM_RESTRICT elems,
-                              geom_t **const SFEM_RESTRICT xyz,
-                              const real_t *const SFEM_RESTRICT u,
-                              real_t *const SFEM_RESTRICT value) {
+                                   const ptrdiff_t nnodes,
+                                   idx_t **const SFEM_RESTRICT elems,
+                                   geom_t **const SFEM_RESTRICT xyz,
+                                   const real_t *const SFEM_RESTRICT u,
+                                   real_t *const SFEM_RESTRICT value) {
     SFEM_UNUSED(nnodes);
-    
+
     double tick = MPI_Wtime();
 
-    idx_t ev[4];
-    real_t element_u[4];
+#pragma omp parallel
+    {
+#pragma omp for //nowait
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[4];
+            real_t element_u[4];
+
 #pragma unroll(4)
-        for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
+            for (int v = 0; v < 4; ++v) {
+                ev[v] = elems[v][i];
+            }
+
+            for (int v = 0; v < 4; ++v) {
+                element_u[v] = u[ev[v]];
+            }
+
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+            const idx_t i3 = ev[3];
+
+            real_t element_scalar = 0;
+
+            tet4_laplacian_value(
+                // X-coordinates
+                xyz[0][i0],
+                xyz[0][i1],
+                xyz[0][i2],
+                xyz[0][i3],
+                // Y-coordinates
+                xyz[1][i0],
+                xyz[1][i1],
+                xyz[1][i2],
+                xyz[1][i3],
+                // Z-coordinates
+                xyz[2][i0],
+                xyz[2][i1],
+                xyz[2][i2],
+                xyz[2][i3],
+                element_u,
+                &element_scalar);
+
+#pragma omp atomic update
+            *value += element_scalar;
         }
-
-        for (int v = 0; v < 4; ++v) {
-            element_u[v] = u[ev[v]];
-        }
-
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
-        const idx_t i3 = ev[3];
-
-        real_t element_scalar = 0;
-
-        tet4_laplacian_value(
-            // X-coordinates
-            xyz[0][i0],
-            xyz[0][i1],
-            xyz[0][i2],
-            xyz[0][i3],
-            // Y-coordinates
-            xyz[1][i0],
-            xyz[1][i1],
-            xyz[1][i2],
-            xyz[1][i3],
-            // Z-coordinates
-            xyz[2][i0],
-            xyz[2][i1],
-            xyz[2][i2],
-            xyz[2][i3],
-            element_u,
-            &element_scalar);
-
-        *value += element_scalar;
     }
 
     double tock = MPI_Wtime();
@@ -444,11 +472,10 @@ void tet4_laplacian_assemble_value(const ptrdiff_t nelements,
 }
 
 void tet4_laplacian_apply(const ptrdiff_t nelements,
-                     const ptrdiff_t nnodes,
-                     idx_t **const SFEM_RESTRICT elems,
-                     geom_t **const SFEM_RESTRICT xyz,
-                     const real_t *const SFEM_RESTRICT u,
-                     real_t *const SFEM_RESTRICT values)
-{
+                          const ptrdiff_t nnodes,
+                          idx_t **const SFEM_RESTRICT elems,
+                          geom_t **const SFEM_RESTRICT xyz,
+                          const real_t *const SFEM_RESTRICT u,
+                          real_t *const SFEM_RESTRICT values) {
     tet4_laplacian_assemble_gradient(nelements, nnodes, elems, xyz, u, values);
 }

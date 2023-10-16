@@ -13,6 +13,8 @@
 #include "matrixio_array.h"
 #include "utils.h"
 
+#include "sfem_defs.h"
+
 int mesh_write(const char *path, const mesh_t *mesh) {
     // TODO
     MPI_Comm comm = mesh->comm;
@@ -36,7 +38,8 @@ int mesh_write(const char *path, const mesh_t *mesh) {
             array_write(comm, output_path, SFEM_MPI_GEOM_T, mesh->points[d], mesh->nnodes, mesh->nnodes);
         }
 
-        for (int d = 0; d < mesh->element_type; ++d) {
+        const int nxe = elem_num_nodes(mesh->element_type);
+        for (int d = 0; d < nxe; ++d) {
             sprintf(output_path, "%s/i%d.raw", path, d);
             array_write(comm, output_path, SFEM_MPI_IDX_T, mesh->elements[d], mesh->nelements, mesh->nelements);
         }
