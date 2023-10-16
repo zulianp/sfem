@@ -1,8 +1,8 @@
 
 #include "read_mesh.h"
 
-#include "matrix.io/matrixio_array.h"
-#include "matrix.io/utils.h"
+#include "matrixio_array.h"
+#include "utils.h"
 
 #include <assert.h>
 #include <stddef.h>

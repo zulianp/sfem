@@ -5,10 +5,10 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "../matrix.io/array_dtof.h"
-#include "../matrix.io/matrixio_array.h"
-#include "../matrix.io/matrixio_crs.h"
-#include "../matrix.io/utils.h"
+#include "array_dtof.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "crs_graph.h"
 #include "read_mesh.h"
@@ -81,7 +81,6 @@ int main(int argc, char *argv[]) {
     char path[SFEM_MAX_PATH_LENGTH];
     sprintf(path, "%s/i*.raw", folder);
     int nnxe = count_files(path);
-    
 
     // FIXME
     int element_type = nnxe;
@@ -122,16 +121,16 @@ int main(int argc, char *argv[]) {
         comm, path, SFEM_MPI_ELEMENT_IDX_T, (void **)&adj_idx, &ennz_local, &ennz);
 
     int ns = elem_num_sides(element_type);
-    element_idx_t **table = (element_idx_t **) malloc(ns * sizeof(element_idx_t *));
+    element_idx_t **table = (element_idx_t **)malloc(ns * sizeof(element_idx_t *));
 
-    for(int s = 0; s < ns; s++) {
+    for (int s = 0; s < ns; s++) {
         table[s] = (element_idx_t *)malloc(n_elements * sizeof(element_idx_t));
     }
 
     create_element_adj_table_from_dual_graph_soa(
         n_elements, n_nodes, element_type, elems, adj_ptr, adj_idx, table);
 
-    for(int s = 0; s < ns; s++) {
+    for (int s = 0; s < ns; s++) {
         sprintf(path, "%s/a.%d.raw", output_folder, s);
         array_write(comm, path, SFEM_MPI_ELEMENT_IDX_T, table[s], n_elements, n_elements);
     }
@@ -142,7 +141,7 @@ int main(int argc, char *argv[]) {
         free(elems[d]);
     }
 
-    for(int s = 0; s < ns; s++) {
+    for (int s = 0; s < ns; s++) {
         free(table[s]);
     }
 

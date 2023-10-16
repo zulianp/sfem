@@ -5,10 +5,10 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "matrix.io/array_dtof.h"
-#include "matrix.io/matrixio_array.h"
-#include "matrix.io/matrixio_crs.h"
-#include "matrix.io/utils.h"
+#include "array_dtof.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "crs_graph.h"
 #include "read_mesh.h"
@@ -90,7 +90,6 @@ int main(int argc, char *argv[]) {
         element_type_for_algo = TRI3;
     }
 
-
     // Read only the data we need
     nnxe = elem_num_nodes(element_type_for_algo);
 
@@ -112,7 +111,7 @@ int main(int argc, char *argv[]) {
     element_idx_t *adj_idx = 0;
     create_dual_graph(n_elements, n_nodes, element_type_for_algo, elems, &adj_ptr, &adj_idx);
 
-    if(!rank) {
+    if (!rank) {
         printf("Dual graph %ld elements, %ld nnz\n", (long)n_elements, (long)adj_ptr[n_elements]);
     }
 
@@ -120,7 +119,8 @@ int main(int argc, char *argv[]) {
     array_write(comm, path, SFEM_MPI_COUNT_T, adj_ptr, n_elements + 1, n_elements + 1);
 
     sprintf(path, "%s/adj_idx.raw", output_folder);
-    array_write(comm, path, SFEM_MPI_ELEMENT_IDX_T, adj_idx, adj_ptr[n_elements], adj_ptr[n_elements]);
+    array_write(
+        comm, path, SFEM_MPI_ELEMENT_IDX_T, adj_idx, adj_ptr[n_elements], adj_ptr[n_elements]);
 
     for (int d = 0; d < nnxe; d++) {
         free(elems[d]);

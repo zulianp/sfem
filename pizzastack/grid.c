@@ -2,11 +2,16 @@
 
 #include "sfem_base.h"
 
-#include "../matrix.io/utils.h"
+#include "utils.h"
 
 #include <stdio.h>
 
-void gridz_create(gridz_t *const g, MPI_Comm comm, ptrdiff_t nx, ptrdiff_t ny, ptrdiff_t nz, int overlap) {
+void gridz_create(gridz_t *const g,
+                  MPI_Comm comm,
+                  ptrdiff_t nx,
+                  ptrdiff_t ny,
+                  ptrdiff_t nz,
+                  int overlap) {
     int rank, size;
 
     MPI_Comm_rank(comm, &rank);
@@ -50,8 +55,13 @@ void gridz_create(gridz_t *const g, MPI_Comm comm, ptrdiff_t nx, ptrdiff_t ny, p
 void gridz_synchronize_field(const gridz_t *const g, MPI_Datatype data_type, char *const data) {
     int type_size;
     CATCH_MPI_ERROR(MPI_Type_size(data_type, &type_size));
-    grid1_synchronize(
-        g->comm, g->extent[2], g->stride[2] * type_size, g->z_margin_left, g->z_margin_right, data_type, data);
+    grid1_synchronize(g->comm,
+                      g->extent[2],
+                      g->stride[2] * type_size,
+                      g->z_margin_left,
+                      g->z_margin_right,
+                      data_type,
+                      data);
 }
 
 void grid1_synchronize(MPI_Comm comm,
@@ -167,7 +177,8 @@ int write_raw_file(MPI_Comm comm,
     MPI_Offset offset = z_begin;
     MPI_Status status;
 
-    if (MPI_File_open(comm, path, MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &handle) != MPI_SUCCESS) {
+    if (MPI_File_open(comm, path, MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &handle) !=
+        MPI_SUCCESS) {
         int rank;
         MPI_Comm_rank(comm, &rank);
 
@@ -186,38 +197,33 @@ int write_raw_file(MPI_Comm comm,
     return 0;
 }
 
-void gridz_read_field(const gridz_t *const g, const char *path, MPI_Datatype data_type, void *const data) {
+void gridz_read_field(const gridz_t *const g,
+                      const char *path,
+                      MPI_Datatype data_type,
+                      void *const data) {
     int type_size;
     CATCH_MPI_ERROR(MPI_Type_size(data_type, &type_size));
 
     ptrdiff_t array_offset = g->z_margin_left * g->stride[2] * type_size;
 
-    read_raw_file(g->comm,
-                  path,
-                  g->offset,
-                  g->local_size,
-                  data_type,
-                  &((char *)data)[array_offset]);
+    read_raw_file(
+        g->comm, path, g->offset, g->local_size, data_type, &((char *)data)[array_offset]);
 }
 
-void gridz_write_field(const gridz_t *const g, const char *path, MPI_Datatype data_type, const void *const data) {
+void gridz_write_field(const gridz_t *const g,
+                       const char *path,
+                       MPI_Datatype data_type,
+                       const void *const data) {
     int type_size;
     CATCH_MPI_ERROR(MPI_Type_size(data_type, &type_size));
 
     ptrdiff_t array_offset = g->z_margin_left * g->stride[2] * type_size;
-    
-    write_raw_file(g->comm,
-                   path,
-                   g->size,
-                   g->offset,
-                   g->local_size,
-                   data_type,
-                   &((char *)data)[array_offset]);
+
+    write_raw_file(
+        g->comm, path, g->size, g->offset, g->local_size, data_type, &((char *)data)[array_offset]);
 }
 
-
-void gridz_z_ownership_ranges(gridz_t *const g, ptrdiff_t *const ranges)
-{
+void gridz_z_ownership_ranges(gridz_t *const g, ptrdiff_t *const ranges) {
     int size;
     MPI_Comm_size(g->comm, &size);
 
@@ -226,7 +232,7 @@ void gridz_z_ownership_ranges(gridz_t *const g, ptrdiff_t *const ranges)
 
     ranges[0] = 0;
 
-    for(int rank = 0; rank < size; ++rank) {
+    for (int rank = 0; rank < size; ++rank) {
         ptrdiff_t z_begin = (g->z_global_extent / size) * rank + MIN(rank, remainder);
         ranges[rank + 1] = z_begin;
     }

@@ -4,10 +4,10 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "../matrix.io/array_dtof.h"
-#include "../matrix.io/matrixio_array.h"
-#include "../matrix.io/matrixio_crs.h"
-#include "../matrix.io/utils.h"
+#include "array_dtof.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "crs_graph.h"
 #include "read_mesh.h"
@@ -87,9 +87,12 @@ int main(int argc, char *argv[]) {
     idx_t *colidx = 0;
 
     // This only works for TET4 or TRI3
-    build_crs_graph_for_elem_type(
-        coarse_mesh.element_type,
-        coarse_mesh.nelements, coarse_mesh.nnodes, coarse_mesh.elements, &rowptr, &colidx);
+    build_crs_graph_for_elem_type(coarse_mesh.element_type,
+                                  coarse_mesh.nelements,
+                                  coarse_mesh.nnodes,
+                                  coarse_mesh.elements,
+                                  &rowptr,
+                                  &colidx);
 
     ///////////////////////////////////////////////////////////////////////////////
 
@@ -122,7 +125,7 @@ int main(int argc, char *argv[]) {
 
     refined_mesh.comm = comm;
     refined_mesh.mem_space = coarse_mesh.mem_space;
-    refined_mesh.nelements = coarse_mesh.nelements * (coarse_mesh.element_type == TET4? 8 : 4);
+    refined_mesh.nelements = coarse_mesh.nelements * (coarse_mesh.element_type == TET4 ? 8 : 4);
     refined_mesh.nnodes = coarse_mesh.nnodes + fine_nodes;
     refined_mesh.spatial_dim = coarse_mesh.spatial_dim;
 

@@ -6,10 +6,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "matrix.io/array_dtof.h"
-#include "matrix.io/matrixio_array.h"
-#include "matrix.io/matrixio_crs.h"
-#include "matrix.io/utils.h"
+#include "array_dtof.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "crs_graph.h"
 #include "sfem_base.h"
@@ -288,8 +288,7 @@ int main(int argc, char *argv[]) {
                     nn, dirichlet_nodes, n_vars, d1, 1, b_rowptr, b_colidx, values);
             }
 
-            if(0)
-            {
+            if (0) {
                 // One point to 0 to fix pressure degree of freedom
                 // ptrdiff_t node = nn - 1;
                 ptrdiff_t node = 0;
@@ -415,8 +414,7 @@ int main(int argc, char *argv[]) {
                 }
             }
 
-            if(0)
-            {
+            if (0) {
                 // One point to 0 to fix pressure degree of freedom
                 // ptrdiff_t node = nn - 1;
                 ptrdiff_t node = 0;

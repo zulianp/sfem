@@ -4,10 +4,10 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "matrix.io/array_dtof.h"
-#include "matrix.io/matrixio_array.h"
-#include "matrix.io/matrixio_crs.h"
-#include "matrix.io/utils.h"
+#include "array_dtof.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "crs_graph.h"
 #include "read_mesh.h"
@@ -67,7 +67,12 @@ int main(int argc, char *argv[]) {
     idx_t *colidx = 0;
 
     // This only works for TET4 or TRI3
-    build_crs_graph_for_elem_type(p1_mesh.element_type, p1_mesh.nelements, p1_mesh.nnodes, p1_mesh.elements, &rowptr, &colidx);
+    build_crs_graph_for_elem_type(p1_mesh.element_type,
+                                  p1_mesh.nelements,
+                                  p1_mesh.nnodes,
+                                  p1_mesh.elements,
+                                  &rowptr,
+                                  &colidx);
 
     ///////////////////////////////////////////////////////////////////////////////
 

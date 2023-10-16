@@ -3,9 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../matrix.io/matrixio_array.h"
-#include "../matrix.io/matrixio_crs.h"
-#include "../matrix.io/utils.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 typedef float geom_t;
 typedef int idx_t;
@@ -42,7 +42,6 @@ int main(int argc, char *argv[]) {
         output_path = argv[3];
     }
 
-
     double tick = MPI_Wtime();
 
     typedef float indicator_t;
@@ -70,7 +69,7 @@ int main(int argc, char *argv[]) {
         free(indices);
     }
 
-    array_write(comm, output_path, indicator_mpi_t, (void*)indicator, nnodes, nnodes);
+    array_write(comm, output_path, indicator_mpi_t, (void *)indicator, nnodes, nnodes);
 
     free(indicator);
 

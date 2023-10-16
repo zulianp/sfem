@@ -3,9 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../matrix.io/matrixio_array.h"
-#include "../matrix.io/matrixio_crs.h"
-#include "../matrix.io/utils.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 typedef int idx_t;
 #define MPI_IDX_T MPI_INT
@@ -24,7 +24,8 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const char *help = "usage: %s <gather_idx.raw> <n_bytes_x_entry> <input_array.raw> [out=sgather_out.raw]\n";
+    const char *help =
+        "usage: %s <gather_idx.raw> <n_bytes_x_entry> <input_array.raw> [out=sgather_out.raw]\n";
 
     if (argc < 4) {
         fprintf(stderr, help, argv[0]);
@@ -51,7 +52,8 @@ int main(int argc, char *argv[]) {
     MPI_Datatype values_mpi_t = MPI_CHAR;
     char *values;
     ptrdiff_t nlocal_, n_bytes;
-    array_create_from_file(comm, input_array_path, values_mpi_t, (void **)&values, &nlocal_, &n_bytes);
+    array_create_from_file(
+        comm, input_array_path, values_mpi_t, (void **)&values, &nlocal_, &n_bytes);
 
     ptrdiff_t n_values = n_bytes / n_bytes_x_entry;
     if ((n_values * n_bytes_x_entry) != n_bytes) {
@@ -61,7 +63,8 @@ int main(int argc, char *argv[]) {
 
     ptrdiff_t nlocal_gather, n_gather;
     idx_t *gather_idx;
-    array_create_from_file(comm, gather_idx_path, MPI_IDX_T, (void **)&gather_idx, &nlocal_gather, &n_gather);
+    array_create_from_file(
+        comm, gather_idx_path, MPI_IDX_T, (void **)&gather_idx, &nlocal_gather, &n_gather);
 
     // assert(n_values >= n_gather);
 
@@ -74,8 +77,12 @@ int main(int argc, char *argv[]) {
         memcpy(&selection[offset], &values[gather_offset], n_bytes_x_entry);
     }
 
-    array_write(
-        comm, output_path, values_mpi_t, (void *)selection, n_gather * n_bytes_x_entry, n_gather * n_bytes_x_entry);
+    array_write(comm,
+                output_path,
+                values_mpi_t,
+                (void *)selection,
+                n_gather * n_bytes_x_entry,
+                n_gather * n_bytes_x_entry);
 
     free(values);
     free(gather_idx);

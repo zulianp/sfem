@@ -6,7 +6,7 @@
 
 #include "crs_graph.h"
 
-#include "matrix.io/utils.h"
+#include "utils.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -728,8 +728,8 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
         send_displs[mesh->node_owner[i] + 1] += 2 + extent;
     }
 
-    for(int r = 0; r < size; r++) {
-        send_displs[r+1] += send_displs[r];
+    for (int r = 0; r < size; r++) {
+        send_displs[r + 1] += send_displs[r];
     }
 
     idx_t *send_data = (idx_t *)malloc(MAX(1, send_displs[size]) * sizeof(idx_t));
@@ -842,9 +842,11 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
     //         printf("\n");
 
     //         printf("cols:\n");
-    //         printf("start %d\n", mesh->node_offsets[rank] + mesh->n_owned_nodes - mesh->n_owned_nodes_with_ghosts);
+    //         printf("start %d\n", mesh->node_offsets[rank] + mesh->n_owned_nodes -
+    //         mesh->n_owned_nodes_with_ghosts);
 
-    //         for(ptrdiff_t i = mesh->n_owned_nodes - mesh->n_owned_nodes_with_ghosts; i <  mesh->n_owned_nodes; i++) {
+    //         for(ptrdiff_t i = mesh->n_owned_nodes - mesh->n_owned_nodes_with_ghosts; i <
+    //         mesh->n_owned_nodes; i++) {
     //             // if(rowptr[i+1] == rowptr[i]) continue;
 
     //             printf("row %d :\n", (int)i);

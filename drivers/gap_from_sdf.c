@@ -4,8 +4,8 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "matrix.io/matrixio_array.h"
-#include "matrix.io/matrixio_ndarray.h"
+#include "matrixio_array.h"
+#include "matrixio_ndarray.h"
 
 #include "read_mesh.h"
 #include "sfem_resample_gap.h"

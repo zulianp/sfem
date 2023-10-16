@@ -7,10 +7,10 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "matrix.io/array_dtof.h"
-#include "matrix.io/matrixio_array.h"
-#include "matrix.io/matrixio_crs.h"
-#include "matrix.io/utils.h"
+#include "array_dtof.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "crs_graph.h"
 #include "sfem_base.h"
@@ -82,7 +82,6 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
     if (stat(SFEM_OUTPUT_DIR, &st) == -1) {
         mkdir(SFEM_OUTPUT_DIR, 0700);
     }
-
 
     mesh_t *mesh = (mesh_t *)malloc(sizeof(mesh_t));
 

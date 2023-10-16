@@ -4,10 +4,10 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "matrix.io/array_dtof.h"
-#include "matrix.io/matrixio_array.h"
-#include "matrix.io/matrixio_crs.h"
-#include "matrix.io/utils.h"
+#include "array_dtof.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "crs_graph.h"
 #include "read_mesh.h"
@@ -89,7 +89,7 @@ int main(int argc, char *argv[]) {
 
     float *fnodeids = (float *)malloc(mesh.nnodes * sizeof(float));
 
-    for(ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+    for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
         fnodeids[i] = nodeids[i];
     }
 
@@ -100,8 +100,7 @@ int main(int argc, char *argv[]) {
         frank[i] = rank;
     }
 
-    mesh_exchange_nodal_master_to_slave(
-        &mesh, &slave_to_master, MPI_FLOAT, frank);
+    mesh_exchange_nodal_master_to_slave(&mesh, &slave_to_master, MPI_FLOAT, frank);
 
     // mesh_t aura;
     // mesh_aura(&mesh, &aura);
@@ -118,8 +117,7 @@ int main(int argc, char *argv[]) {
     mesh_write(output_path, &mesh);
 
     sprintf(output_path, "%s/part_%0.5d/frank.raw", output_folder, rank);
-    array_write(
-        MPI_COMM_SELF, output_path, MPI_FLOAT, frank, mesh.nnodes, mesh.nnodes);
+    array_write(MPI_COMM_SELF, output_path, MPI_FLOAT, frank, mesh.nnodes, mesh.nnodes);
 
     sprintf(output_path, "%s/part_%0.5d/fnodeids.raw", output_folder, rank);
     array_write(MPI_COMM_SELF, output_path, MPI_FLOAT, fnodeids, mesh.nnodes, mesh.nnodes);
@@ -133,7 +131,7 @@ int main(int argc, char *argv[]) {
 
     free(rowptr);
     free(colidx);
-    
+
     double tock = MPI_Wtime();
 
     if (!rank) {

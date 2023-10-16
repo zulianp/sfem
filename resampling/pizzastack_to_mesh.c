@@ -5,10 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "matrix.io/array_dtof.h"
-#include "matrix.io/matrixio_array.h"
-#include "matrix.io/matrixio_crs.h"
-#include "matrix.io/utils.h"
+#include "array_dtof.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "sortreduce.h"
 
@@ -34,7 +34,6 @@ void affine_transform_init(affine_transform_t *const trafo) {
     trafo->scaling[2] = 1;
 }
 
-
 void affine_transform_copy(const affine_transform_t *const src, affine_transform_t *const dest) {
     dest->shift[0] = src->shift[0];
     dest->shift[1] = src->shift[1];
@@ -43,7 +42,6 @@ void affine_transform_copy(const affine_transform_t *const src, affine_transform
     dest->scaling[1] = src->scaling[1];
     dest->scaling[2] = src->scaling[2];
 }
-
 
 static SFEM_INLINE void affine_transform_apply(const affine_transform_t *const trafo,
                                                const real_t *const in,
@@ -1085,7 +1083,8 @@ void resample_box_to_tetra_mesh(const count_t n[3],
                     }
 
                     box_gather(x, y, z, stride, box_field, box_nodal_values);
-                    l2_assemble(&q_box, &q_tet, box_nodal_values, tet_nodal_values, tet_nodal_weights);
+                    l2_assemble(
+                        &q_box, &q_tet, box_nodal_values, tet_nodal_values, tet_nodal_weights);
 
                     tet4_scatter_add(tet_dofs, tet_nodal_values, mesh_field);
                     tet4_scatter_add(tet_dofs, tet_nodal_weights, weight_field);
@@ -1208,7 +1207,8 @@ void resample_box_to_tetra_mesh_cell_list(const count_t n[3],
                     if (!q_box.size) continue;
 
                     box_gather(x, y, z, stride, box_field, box_nodal_values);
-                    l2_assemble(&q_box, &q_tet, box_nodal_values, tet_nodal_values, tet_nodal_weights);
+                    l2_assemble(
+                        &q_box, &q_tet, box_nodal_values, tet_nodal_values, tet_nodal_weights);
 
                     tet4_scatter_add(tet_dofs, tet_nodal_values, mesh_field);
                     tet4_scatter_add(tet_dofs, tet_nodal_weights, weight_field);
@@ -1253,8 +1253,10 @@ int main(int argc, char *argv[]) {
 
     if (argc < 6) {
         if (!rank) {
-            fprintf(
-                stderr, "usage: %s <nx> <ny> <nz> <field.raw> <mesh_folder> [output_path=./mesh_field.raw]\n", argv[0]);
+            fprintf(stderr,
+                    "usage: %s <nx> <ny> <nz> <field.raw> <mesh_folder> "
+                    "[output_path=./mesh_field.raw]\n",
+                    argv[0]);
         }
 
         return EXIT_FAILURE;
@@ -1325,8 +1327,10 @@ int main(int argc, char *argv[]) {
             trafo.scaling[d] = array_max(mesh.nnodes, mesh.points[d]);
         }
 
-        CATCH_MPI_ERROR(MPI_Allreduce(MPI_IN_PLACE, trafo.shift, 3, SFEM_MPI_REAL_T, MPI_MIN, comm));
-        CATCH_MPI_ERROR(MPI_Allreduce(MPI_IN_PLACE, trafo.scaling, 3, SFEM_MPI_REAL_T, MPI_MAX, comm));
+        CATCH_MPI_ERROR(
+            MPI_Allreduce(MPI_IN_PLACE, trafo.shift, 3, SFEM_MPI_REAL_T, MPI_MIN, comm));
+        CATCH_MPI_ERROR(
+            MPI_Allreduce(MPI_IN_PLACE, trafo.scaling, 3, SFEM_MPI_REAL_T, MPI_MAX, comm));
 
         for (int d = 0; d < 3; ++d) {
             trafo.scaling[d] -= trafo.shift[d];
@@ -1334,8 +1338,14 @@ int main(int argc, char *argv[]) {
 
         if (!rank) {
             printf("grid %ld %ld %ld\n", (long)n[0], (long)n[1], (long)n[2]);
-            printf("trafo\nshift: %g %g %g\n", (double)trafo.shift[0], (double)trafo.shift[1], (double)trafo.shift[2]);
-            printf("scaling: %g %g %g\n", (double)trafo.scaling[0], (double)trafo.scaling[1], (double)trafo.scaling[2]);
+            printf("trafo\nshift: %g %g %g\n",
+                   (double)trafo.shift[0],
+                   (double)trafo.shift[1],
+                   (double)trafo.shift[2]);
+            printf("scaling: %g %g %g\n",
+                   (double)trafo.scaling[0],
+                   (double)trafo.scaling[1],
+                   (double)trafo.scaling[2]);
         }
 
         geom_t point[3] = {0, 0, 0};
@@ -1347,7 +1357,8 @@ int main(int argc, char *argv[]) {
 
                 for (ptrdiff_t x = 0; x < grid.extent[0]; ++x) {
                     point[0] = x / (1.0 * grid.extent[0]);
-                    box_field[z * stride[2] + y * stride[1] + x * stride[0]] = (point[0] * point[1] * point[2]);
+                    box_field[z * stride[2] + y * stride[1] + x * stride[0]] =
+                        (point[0] * point[1] * point[2]);
                 }
             }
         }
@@ -1489,16 +1500,15 @@ int main(int argc, char *argv[]) {
         // Transfer data
         /////////////////////////////////////////////////////////////////////////
 
-        resample_box_to_tetra_mesh_unique(
-            subregion_n,
-            stride,
-            &subregion_trafo,
-            remote_grid_field,
-            mesh.nelements,
-            mesh.nnodes,
-            mesh.elements,
-            mesh.points,
-            mesh_field);
+        resample_box_to_tetra_mesh_unique(subregion_n,
+                                          stride,
+                                          &subregion_trafo,
+                                          remote_grid_field,
+                                          mesh.nelements,
+                                          mesh.nnodes,
+                                          mesh.elements,
+                                          mesh.points,
+                                          mesh_field);
 
         /////////////////////////////////////////////////////////////////////////
         // Clean-up

@@ -4,7 +4,7 @@
 #include "neumann.h"
 #include "sfem_defs.h"
 
-#include "matrix.io/matrixio_array.h"
+#include "matrixio_array.h"
 
 #include <assert.h>
 #include <math.h>

@@ -4,10 +4,10 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "../matrix.io/array_dtof.h"
-#include "../matrix.io/matrixio_array.h"
-#include "../matrix.io/matrixio_crs.h"
-#include "../matrix.io/utils.h"
+#include "array_dtof.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "crs_graph.h"
 #include "read_mesh.h"
@@ -29,7 +29,9 @@ int main(int argc, char *argv[]) {
 
     if (argc != 5) {
         if (!rank) {
-            fprintf(stderr, "usage: %s <folder> <crs_matrix_folder> <num_partitions> <partition_file>\n", argv[0]);
+            fprintf(stderr,
+                    "usage: %s <folder> <crs_matrix_folder> <num_partitions> <partition_file>\n",
+                    argv[0]);
         }
 
         return EXIT_FAILURE;
@@ -61,7 +63,8 @@ int main(int argc, char *argv[]) {
     }
 
     crs_t crs;
-    if (crs_read_folder(comm, matrix_folder, SFEM_MPI_COUNT_T, SFEM_MPI_IDX_T, SFEM_MPI_REAL_T, &crs)) {
+    if (crs_read_folder(
+            comm, matrix_folder, SFEM_MPI_COUNT_T, SFEM_MPI_IDX_T, SFEM_MPI_REAL_T, &crs)) {
         return EXIT_FAILURE;
     }
 
@@ -70,15 +73,15 @@ int main(int argc, char *argv[]) {
 
     if (
         // decompose
-        decompose_nnz_weighted(crs.lrows, (count_t *)crs.rowptr, (idx_t *)crs.colidx, num_partitions, node_partitions)) {
+        decompose_nnz_weighted(crs.lrows,
+                               (count_t *)crs.rowptr,
+                               (idx_t *)crs.colidx,
+                               num_partitions,
+                               node_partitions)) {
         return EXIT_FAILURE;
     }
 
-
-
     idx_t *element_partitions = malloc(mesh.nelements * sizeof(idx_t));
-
-
 
     const int nn = elem_num_nodes(mesh.element_type);
 
@@ -100,8 +103,8 @@ int main(int argc, char *argv[]) {
 
         int offset = 0;
         sranks[0] = ranks[0];
-        for(int k = 1; k < nn; k++) {
-            if(ranks[k] == ranks[k-1]) {
+        for (int k = 1; k < nn; k++) {
+            if (ranks[k] == ranks[k - 1]) {
                 connects[offset]++;
             } else {
                 sranks[offset++] = ranks[k];
@@ -109,8 +112,8 @@ int main(int argc, char *argv[]) {
         }
 
         int argmax = 0;
-        for(int k = 1; k < offset; k++) {
-            if(connects[argmax] < connects[k]) {
+        for (int k = 1; k < offset; k++) {
+            if (connects[argmax] < connects[k]) {
                 argmax = k;
             }
         }
@@ -119,7 +122,8 @@ int main(int argc, char *argv[]) {
         element_partitions[e] = part;
     }
 
-    array_write(comm, partition_file, SFEM_MPI_IDX_T, element_partitions, mesh.nelements, mesh.nelements);
+    array_write(
+        comm, partition_file, SFEM_MPI_IDX_T, element_partitions, mesh.nelements, mesh.nelements);
 
     mesh_destroy(&mesh);
     free(node_partitions);

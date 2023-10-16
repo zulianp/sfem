@@ -3,10 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../matrix.io/array_dtof.h"
-#include "../matrix.io/matrixio_array.h"
-#include "../matrix.io/matrixio_crs.h"
-#include "../matrix.io/utils.h"
+#include "array_dtof.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "crs_graph.h"
 #include "sfem_base.h"
@@ -108,7 +108,8 @@ int main(int argc, char *argv[]) {
     idx_t *colidx = 0;
     real_t *values = 0;
 
-    build_crs_graph_for_elem_type(mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
+    build_crs_graph_for_elem_type(
+        mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
 
     nnz = rowptr[mesh.nnodes];
     values = (real_t *)malloc(nnz * sizeof(real_t));
@@ -122,8 +123,14 @@ int main(int argc, char *argv[]) {
     // Operator assembly
     ///////////////////////////////////////////////////////////////////////////////
     if (SFEM_LAPLACIAN) {
-        laplacian_assemble_hessian(
-            mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, rowptr, colidx, values);
+        laplacian_assemble_hessian(mesh.element_type,
+                                   mesh.nelements,
+                                   mesh.nnodes,
+                                   mesh.elements,
+                                   mesh.points,
+                                   rowptr,
+                                   colidx,
+                                   values);
     }
 
     tock = MPI_Wtime();

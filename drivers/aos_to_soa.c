@@ -6,9 +6,9 @@
 
 #include "sfem_base.h"
 
-#include "../matrix.io/matrixio_array.h"
-#include "../matrix.io/matrixio_crs.h"
-#include "../matrix.io/utils.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 typedef int idx_t;
 #define MPI_IDX_T MPI_INT

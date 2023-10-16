@@ -4,10 +4,10 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "matrix.io/array_dtof.h"
-#include "matrix.io/matrixio_array.h"
-#include "matrix.io/matrixio_crs.h"
-#include "matrix.io/utils.h"
+#include "array_dtof.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "crs_graph.h"
 #include "sfem_base.h"
@@ -43,7 +43,6 @@ int main(int argc, char *argv[]) {
         mkdir(output_folder, 0700);
     }
 
-
     int SFEM_HANDLE_DIRICHLET = 0;
     int SFEM_EXPORT_FP32 = 0;
 
@@ -73,7 +72,7 @@ int main(int argc, char *argv[]) {
     ptrdiff_t nelements = mesh.nelements;
     const int dims = mesh.spatial_dim;
 
-    printf("spatial_dim=%d\n",dims);
+    printf("spatial_dim=%d\n", dims);
 
     // real_t **displacement = (real_t **)malloc(dims * sizeof(real_t *));
     // for (int b = 0; b < dims * dims; b++) {
@@ -98,7 +97,8 @@ int main(int argc, char *argv[]) {
     ptrdiff_t nnz = 0;
     count_t *rowptr = 0;
     idx_t *colidx = 0;
-    build_crs_graph_for_elem_type(mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
+    build_crs_graph_for_elem_type(
+        mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
     nnz = rowptr[nnodes];
 
     real_t **values = (real_t **)malloc(dims * dims * sizeof(real_t *));
@@ -127,8 +127,7 @@ int main(int argc, char *argv[]) {
         rowptr,
         colidx,
         // Output
-        values
-    );
+        values);
 
     if (0) {
         for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
@@ -153,12 +152,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
-
     real_t **rhs = (real_t **)malloc(dims * sizeof(real_t *));
     for (int b = 0; b < dims; b++) {
-        rhs[b] =  (real_t *)calloc(nnodes, sizeof(real_t));
+        rhs[b] = (real_t *)calloc(nnodes, sizeof(real_t));
     }
-
 
     tock = MPI_Wtime();
     printf("linear_elasticity_assemble.c: assembly\t\t%g seconds\n", tock - tack);
@@ -189,7 +186,7 @@ int main(int argc, char *argv[]) {
         crs_out.lrows = nnodes;
         crs_out.lnnz = nnz;
         crs_out.gnnz = nnz;
-        crs_out.block_size = dims * dims; 
+        crs_out.block_size = dims * dims;
         crs_out.start = 0;
         crs_out.rowoffset = 0;
         crs_out.rowptr_type = SFEM_MPI_COUNT_T;
@@ -209,7 +206,7 @@ int main(int argc, char *argv[]) {
 
     {
         char path[1024 * 10];
-        for(int b = 0; b < dims; b++) {
+        for (int b = 0; b < dims; b++) {
             sprintf(path, "%s/rhs.%d.raw", output_folder, b);
             array_write(comm, path, value_type, rhs[b], nnodes, nnodes);
         }

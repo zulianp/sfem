@@ -6,10 +6,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "matrix.io/array_dtof.h"
-#include "matrix.io/matrixio_array.h"
-#include "matrix.io/matrixio_crs.h"
-#include "matrix.io/utils.h"
+#include "array_dtof.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "crs_graph.h"
 #include "sfem_base.h"
@@ -209,7 +209,7 @@ int main(int argc, char *argv[]) {
         mesh_minmax_edge_length(&mesh, &h, &_ignore);
         SFEM_DT = MIN(SFEM_DT, (SFEM_CFL * h * h) / (2 * SFEM_DIFFUSIVITY));
 
-        if(!rank) {
+        if (!rank) {
             printf("Adjusted SFEM_DT = %g\n", (double)SFEM_DT);
         }
     }
@@ -353,7 +353,6 @@ int main(int argc, char *argv[]) {
     sprintf(path, "%s/u.%09d.raw", output_folder, export_counter++);
     array_write(comm, path, SFEM_MPI_REAL_T, u_old, mesh.nnodes, mesh.nnodes);
 
-
     real_t next_check_point = SFEM_EXPORT_FREQUENCY;
 
     ptrdiff_t step_count = 0;
@@ -445,7 +444,10 @@ int main(int argc, char *argv[]) {
     double tock = MPI_Wtime();
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld time-steps %ld\n", (long)nelements, (long)nnodes, (long)step_count);
+        printf("#elements %ld #nodes %ld time-steps %ld\n",
+               (long)nelements,
+               (long)nnodes,
+               (long)step_count);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
