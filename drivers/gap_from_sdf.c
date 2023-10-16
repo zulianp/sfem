@@ -412,6 +412,123 @@ int resample_gap(MPI_Comm comm,
     return 0;
 }
 
+int interpolate_gap(MPI_Comm comm,
+                    // Mesh
+                    const enum ElemType element_type,
+                    const ptrdiff_t nelements,
+                    const ptrdiff_t nnodes,
+                    idx_t **const SFEM_RESTRICT elems,
+                    geom_t **const SFEM_RESTRICT xyz,
+                    // SDF
+                    const ptrdiff_t *const SFEM_RESTRICT nlocal,
+                    const ptrdiff_t *const SFEM_RESTRICT nglobal,
+                    const ptrdiff_t *const SFEM_RESTRICT stride,
+                    const geom_t *const SFEM_RESTRICT origin,
+                    const geom_t *const SFEM_RESTRICT delta,
+                    const geom_t *const SFEM_RESTRICT data,
+                    // Output
+                    real_t *const SFEM_RESTRICT g,
+                    real_t *const SFEM_RESTRICT xnormal,
+                    real_t *const SFEM_RESTRICT ynormal,
+                    real_t *const SFEM_RESTRICT znormal) {
+    SFEM_UNUSED(element_type);
+    SFEM_UNUSED(nelements);
+    SFEM_UNUSED(elems);
+
+    for (ptrdiff_t node = 0; node < nnodes; ++node) {
+        real_t hex8_f[8];
+        real_t hex8_grad_x[8];
+        real_t hex8_grad_y[8];
+        real_t hex8_grad_z[8];
+        real_t coeffs[8];
+
+        const real_t x = xyz[0][node];
+        const real_t y = xyz[1][node];
+        const real_t z = xyz[2][node];
+
+        const ptrdiff_t grid_x = (x - origin[0]) / (real_t)delta[0];
+        const ptrdiff_t grid_y = (y - origin[1]) / (real_t)delta[1];
+        const ptrdiff_t grid_z = (z - origin[2]) / (real_t)delta[2];
+
+        const ptrdiff_t i = floor(grid_x);
+        const ptrdiff_t j = floor(grid_y);
+        const ptrdiff_t k = floor(grid_z);
+
+        // If outside
+        if (i < 0 || j < 0 || k < 0 || (i + 1 >= nglobal[0]) || (j + 1 >= nglobal[1]) ||
+            (k + 1 >= nglobal[2])) {
+            fprintf(stderr,
+                    "warning (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n",
+                    i,
+                    j,
+                    k,
+                    nglobal[0],
+                    nglobal[1],
+                    nglobal[2]);
+            continue;
+        }
+
+        // Get the reminder [0, 1]
+        const real_t l_x = (grid_x - i);
+        const real_t l_y = (grid_y - j);
+        const real_t l_z = (grid_z - k);
+
+        assert(l_x >= -1e-8);
+        assert(l_y >= -1e-8);
+        assert(l_z >= -1e-8);
+
+        assert(l_x <= 1 + 1e-8);
+        assert(l_y <= 1 + 1e-8);
+        assert(l_z <= 1 + 1e-8);
+
+        hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
+        hex_aa_8_eval_grad(l_x, l_y, l_z, hex8_grad_x, hex8_grad_y, hex8_grad_z);
+        hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
+
+        // Interpolate gap function
+        {
+            real_t eval_gap = 0;
+
+#pragma unroll(8)
+            for (int edof_j = 0; edof_j < 8; edof_j++) {
+                eval_gap += hex8_f[edof_j] * coeffs[edof_j];
+            }
+
+            g[node] = -eval_gap;
+
+        }
+
+        // Interpolate gap function
+        {
+            real_t eval_xnormal = 0;
+            real_t eval_ynormal = 0;
+            real_t eval_znormal = 0;
+
+#pragma unroll(8)
+            for (int edof_j = 0; edof_j < 8; edof_j++) {
+                eval_xnormal += hex8_grad_x[edof_j] * coeffs[edof_j];
+                eval_ynormal += hex8_grad_y[edof_j] * coeffs[edof_j];
+                eval_znormal += hex8_grad_z[edof_j] * coeffs[edof_j];
+            }
+
+            {
+                // Normalize
+                real_t denom = sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal +
+                                    eval_znormal * eval_znormal);
+                eval_xnormal /= denom;
+                eval_ynormal /= denom;
+                eval_znormal /= denom;
+            }
+
+            xnormal[node] = eval_xnormal;
+            ynormal[node] = eval_ynormal;
+            znormal[node] = eval_znormal;
+        }
+    }
+
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -433,6 +550,9 @@ int main(int argc, char *argv[]) {
                 argv[0]);
         return EXIT_FAILURE;
     }
+
+    int SFEM_INTERPOLATE = 1;
+    SFEM_READ_ENV(SFEM_INTERPOLATE, atoi);
 
     double tick = MPI_Wtime();
 
@@ -469,25 +589,47 @@ int main(int argc, char *argv[]) {
     real_t *ynormal = malloc(mesh.nnodes * sizeof(real_t));
     real_t *znormal = malloc(mesh.nnodes * sizeof(real_t));
 
-    resample_gap(comm,
-                 // Mesh
-                 mesh.element_type,
-                 mesh.nelements,
-                 mesh.nnodes,
-                 mesh.elements,
-                 mesh.points,
-                 // SDF
-                 nlocal,
-                 nglobal,
-                 stride,
-                 origin,
-                 delta,
-                 sdf,
-                 // Output
-                 g,
-                 xnormal,
-                 ynormal,
-                 znormal);
+    if (SFEM_INTERPOLATE) {
+        interpolate_gap(comm,
+                        // Mesh
+                        mesh.element_type,
+                        mesh.nelements,
+                        mesh.nnodes,
+                        mesh.elements,
+                        mesh.points,
+                        // SDF
+                        nlocal,
+                        nglobal,
+                        stride,
+                        origin,
+                        delta,
+                        sdf,
+                        // Output
+                        g,
+                        xnormal,
+                        ynormal,
+                        znormal);
+    } else {
+        resample_gap(comm,
+                     // Mesh
+                     mesh.element_type,
+                     mesh.nelements,
+                     mesh.nnodes,
+                     mesh.elements,
+                     mesh.points,
+                     // SDF
+                     nlocal,
+                     nglobal,
+                     stride,
+                     origin,
+                     delta,
+                     sdf,
+                     // Output
+                     g,
+                     xnormal,
+                     ynormal,
+                     znormal);
+    }
 
     // Write result to disk
     {

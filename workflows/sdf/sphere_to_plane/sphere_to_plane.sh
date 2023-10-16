@@ -27,7 +27,7 @@ margin=0.1
 sdf=sdf.float32.raw
 
 
-opts='--scale_box=1.1 --box_from_mesh='$boxed_mesh_raw
+opts='--scale_box=1 --box_from_mesh='$boxed_mesh_raw
 mesh_to_sdf.py $mesh_raw/surface $sdf --hmax=$hmax --margin=$margin $opts
 raw_to_xdmf.py $sdf
 
