@@ -8,11 +8,14 @@ import os
 
 def main(argv):
 	if len(argv) < 3:
-		print(f'usage: {argv[0]} <input_mesh> <output_folder>')
+		print(f'usage: {argv[0]} <input_mesh> <output_folder> [elem_type_filter]')
 		exit()
 
 	input_mesh = argv[1]
 	output_folder = argv[2]
+	elem_type_filter = None
+	if(len(argv) > 3):
+		elem_type_filter = argv[3]
 
 	if not os.path.exists(output_folder):
 		os.makedirs(output_folder)
@@ -27,13 +30,20 @@ def main(argv):
 	if nblocks > 1:
 		print(f'nblocks={nblocks}')
 
+		for b in mesh.cells:
+			bncells, bnnodesxelem = b.data.shape
+			print(f'{b}')
+
 		ncells = 0
 		nnodesxelem = 0
 
 		for b in mesh.cells:
 			bncells, bnnodesxelem = b.data.shape
-			ncells += bncells
 
+			if elem_type_filter != None and b.type != elem_type_filter:
+				continue
+
+			ncells += bncells
 			assert(nnodesxelem == 0 or bnnodesxelem == nnodesxelem)
 			nnodesxelem = bnnodesxelem
 
@@ -43,6 +53,9 @@ def main(argv):
 		for d in range(0, nnodesxelem):
 			offset = 0		
 			for b in mesh.cells:
+				if elem_type_filter != None and b.type != elem_type_filter:
+					continue
+					
 				bncells, bnnodesxelem = b.data.shape
 				idx[offset:(offset + bncells)] = b.data[:, d]
 				offset += bncells

@@ -298,6 +298,7 @@ if __name__ == '__main__':
     hmax = 1
     margin = 0
     scale_box=1
+    box_from_mesh = None
 
     if(len(sys.argv) < 3):
         print(usage)
