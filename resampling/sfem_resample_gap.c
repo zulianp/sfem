@@ -128,13 +128,13 @@ SFEM_INLINE static void hex_aa_8_eval_fun(
     // Output
     real_t *const SFEM_RESTRICT f) {
     f[0] = (1.0 - x) * (1.0 - y) * (1.0 - z);
-    f[1] = x * (1.0 - y) * (1.0 - z);
-    f[2] = x * y * (1.0 - z);
-    f[3] = (1.0 - x) * y * (1.0 - z);
+    f[1] = x         * (1.0 - y) * (1.0 - z);
+    f[2] = x         * y         * (1.0 - z);
+    f[3] = (1.0 - x) * y         * (1.0 - z);
     f[4] = (1.0 - x) * (1.0 - y) * z;
-    f[5] = x * (1.0 - y) * z;
-    f[6] = x * y * z;
-    f[7] = (1.0 - x) * y * z;
+    f[5] = x         * (1.0 - y) * z;
+    f[6] = x         * y         * z;
+    f[7] = (1.0 - x) * y         * z;
 }
 
 SFEM_INLINE static void hex_aa_8_collect_coeffs(
@@ -174,37 +174,37 @@ SFEM_INLINE static void hex_aa_8_eval_grad(
     real_t *const SFEM_RESTRICT gy,
     real_t *const SFEM_RESTRICT gz) {
     // Transformation to ref element
-    gx[0] = -(1.0 - y) * (1.0 - z);
-    gy[0] = -(1.0 - x) * (1.0 - z);
-    gz[0] = -(1.0 - x) * (1.0 - y);
+    gx[0] = -(1.0 - y)  * (1.0 - z);
+    gy[0] = -(1.0 - x)  * (1.0 - z);
+    gz[0] = -(1.0 - x)  * (1.0 - y);
 
-    gx[1] = (1.0 - y) * (1.0 - z);
-    gy[1] = -x * (1.0 - z);
-    gz[1] = -x * (1.0 - y);
+    gx[1] = (1.0 - y)   * (1.0 - z);
+    gy[1] = -x          * (1.0 - z);
+    gz[1] = -x          * (1.0 - y);
 
-    gx[2] = y * (1.0 - z);
-    gy[2] = x * (1.0 - z);
-    gz[2] = -x * y;
+    gx[2] = y           * (1.0 - z);
+    gy[2] = x           * (1.0 - z);
+    gz[2] = -x          * y;
 
-    gx[3] = -y * (1.0 - z);
-    gy[3] = (1.0 - x) * (1.0 - z);
-    gz[3] = -(1.0 - x) * y;
+    gx[3] = -y          * (1.0 - z);
+    gy[3] = (1.0 - x)   * (1.0 - z);
+    gz[3] = -(1.0 - x)  * y;
 
-    gx[4] = -(1.0 - y) * z;
-    gy[4] = -(1.0 - x) * z;
-    gz[4] = (1.0 - x) * (1.0 - y);
+    gx[4] = -(1.0 - y)  * z;
+    gy[4] = -(1.0 - x)  * z;
+    gz[4] =  (1.0 - x)  * (1.0 - y);
 
-    gx[5] = (1.0 - y) * z;
-    gy[5] = -x * z;
-    gz[5] = x * (1.0 - y);
+    gx[5] = (1.0 - y)   * z;
+    gy[5] = -x          * z;
+    gz[5] = x           * (1.0 - y);
 
-    gx[6] = y * z;
-    gy[6] = x * z;
-    gz[6] = x * y;
+    gx[6] = y           * z;
+    gy[6] = x           * z;
+    gz[6] = x           * y;
 
-    gx[7] = -y * z;
-    gy[7] = (1.0 - x) * z;
-    gz[7] = (1.0 - x) * y;
+    gx[7] = -y          * z;
+    gy[7] = (1.0 - x)   * z;
+    gz[7] = (1.0 - x)   * y;
 }
 
 int resample_gap(MPI_Comm comm,
@@ -363,6 +363,9 @@ int resample_gap(MPI_Comm comm,
                     // Normalize
                     real_t denom = sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal +
                                         eval_znormal * eval_znormal);
+
+                    assert(denom != 0);
+
                     eval_xnormal /= denom;
                     eval_ynormal /= denom;
                     eval_znormal /= denom;
@@ -506,6 +509,9 @@ int interpolate_gap(MPI_Comm comm,
                 // Normalize
                 real_t denom = sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal +
                                     eval_znormal * eval_znormal);
+
+                assert(denom != 0);
+
                 eval_xnormal /= denom;
                 eval_ynormal /= denom;
                 eval_znormal /= denom;
