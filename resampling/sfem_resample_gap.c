@@ -10,6 +10,10 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+static SFEM_INLINE real_t put_inside(const real_t v) {
+    return MIN(MAX(1e-7, v), 1-1e-7);
+}
+
 // TRI3 6th order quadrature rule
 static real_t qw[12] = {0.050844906370206816920936809106869,
                         0.050844906370206816920936809106869,
@@ -145,14 +149,14 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs(
     // Attention this is geometric data transformed to solver data!
     const geom_t *const SFEM_RESTRICT data,
     real_t *const SFEM_RESTRICT out) {
-    const ptrdiff_t i0 = i * stride[0] + j * stride[1] + k * stride[2];
-    const ptrdiff_t i1 = (i + 1) * stride[0] + j * stride[1] + k * stride[2];
-    const ptrdiff_t i2 = (i + 1) * stride[0] + (j + 1) * stride[1] + k * stride[2];
-    const ptrdiff_t i3 = i * stride[0] + (j + 1) * stride[1] + k * stride[2];
-    const ptrdiff_t i4 = i * stride[0] + j * stride[1] + (k + 1) * stride[2];
-    const ptrdiff_t i5 = (i + 1) * stride[0] + j * stride[1] + (k + 1) * stride[2];
-    const ptrdiff_t i6 = (i + 1) * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
-    const ptrdiff_t i7 = i * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
+    const ptrdiff_t i0 = i       * stride[0] + j       * stride[1]  + k       * stride[2];
+    const ptrdiff_t i1 = (i + 1) * stride[0] + j       * stride[1]  + k       * stride[2];
+    const ptrdiff_t i2 = (i + 1) * stride[0] + (j + 1) * stride[1]  + k       * stride[2];
+    const ptrdiff_t i3 = i       * stride[0] + (j + 1) * stride[1]  + k       * stride[2];
+    const ptrdiff_t i4 = i       * stride[0] + j       * stride[1]  + (k + 1) * stride[2];
+    const ptrdiff_t i5 = (i + 1) * stride[0] + j       * stride[1]  + (k + 1) * stride[2];
+    const ptrdiff_t i6 = (i + 1) * stride[0] + (j + 1) * stride[1]  + (k + 1) * stride[2];
+    const ptrdiff_t i7 = i       * stride[0] + (j + 1) * stride[1]  + (k + 1) * stride[2];
 
     out[0] = data[i0];
     out[1] = data[i1];
@@ -316,9 +320,9 @@ int resample_gap(MPI_Comm comm,
             }
 
             // Get the reminder [0, 1]
-            const real_t l_x = (grid_x - i);
-            const real_t l_y = (grid_y - j);
-            const real_t l_z = (grid_z - k);
+            real_t l_x = (grid_x - i);
+            real_t l_y = (grid_y - j);
+            real_t l_z = (grid_z - k);
 
             assert(l_x >= -1e-8);
             assert(l_y >= -1e-8);
@@ -329,7 +333,7 @@ int resample_gap(MPI_Comm comm,
             assert(l_z <= 1 + 1e-8);
 
             hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
-            hex_aa_8_eval_grad(l_x, l_y, l_z, hex8_grad_x, hex8_grad_y, hex8_grad_z);
+            hex_aa_8_eval_grad(put_inside(l_x), put_inside(l_y), put_inside(l_z), hex8_grad_x, hex8_grad_y, hex8_grad_z);
             hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
 
             // Integrate gap function
@@ -406,6 +410,7 @@ int resample_gap(MPI_Comm comm,
     return 0;
 }
 
+
 int interpolate_gap(MPI_Comm comm,
                     // Mesh
                     const enum ElemType element_type,
@@ -463,9 +468,9 @@ int interpolate_gap(MPI_Comm comm,
         }
 
         // Get the reminder [0, 1]
-        const real_t l_x = (grid_x - i);
-        const real_t l_y = (grid_y - j);
-        const real_t l_z = (grid_z - k);
+        real_t l_x = (grid_x - i);
+        real_t l_y = (grid_y - j);
+        real_t l_z = (grid_z - k);
 
         assert(l_x >= -1e-8);
         assert(l_y >= -1e-8);
@@ -476,7 +481,7 @@ int interpolate_gap(MPI_Comm comm,
         assert(l_z <= 1 + 1e-8);
 
         hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
-        hex_aa_8_eval_grad(l_x, l_y, l_z, hex8_grad_x, hex8_grad_y, hex8_grad_z);
+        hex_aa_8_eval_grad(put_inside(l_x), put_inside(l_y), put_inside(l_z), hex8_grad_x, hex8_grad_y, hex8_grad_z);
         hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
 
         // Interpolate gap function

@@ -18,7 +18,10 @@ LAUNCH=""
 set -x
 
 mkdir -p vtk_meshes
-box.py vtk_meshes/small_cube.vtk 0.2 0.2 0.2 0.6 0.6 0.6
+
+o=0.1
+d=0.8
+box.py vtk_meshes/small_cube.vtk $o $o $o $d $d $d
 box.py vtk_meshes/cube.vtk 0 0 0 1 1 1
 
 small_cube_raw=small_cube_raw
@@ -39,5 +42,5 @@ raw_to_xdmf.py $sdf
 
 cat metadata_sdf.float32.yml | tr ':' ' ' | awk '{print $1,$2}' | tr ' ' '=' > vars.sh
 source vars.sh
-SFEM_INTERPOLATE=1 gap_from_sdf $small_cube_raw/surface $nx $ny $nz $ox $oy $oz $dx $dy $dz $sdf sdf_on_mesh
+SFEM_INTERPOLATE=0 gap_from_sdf $small_cube_raw/surface $nx $ny $nz $ox $oy $oz $dx $dy $dz $sdf sdf_on_mesh
 raw_to_db.py $small_cube_raw/surface gap.vtk --point_data="sdf_on_mesh/*.float64.raw"
