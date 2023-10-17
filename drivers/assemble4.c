@@ -3,10 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "matrix.io/array_dtof.h"
-#include "matrix.io/matrixio_array.h"
-#include "matrix.io/matrixio_crs.h"
-#include "matrix.io/utils.h"
+#include "array_dtof.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "crs_graph.h"
 #include "sfem_base.h"
@@ -200,7 +200,8 @@ int main(int argc, char *argv[]) {
     real_t *rhs = (real_t *)malloc(nnodes * block_size * sizeof(real_t));
     memset(rhs, 0, nnodes * block_size * sizeof(real_t));
 
-    isotropic_phasefield_for_fracture_assemble_gradient(nelements, nnodes, elems, xyz, mu, lambda, Gc, ls, u, rhs);
+    isotropic_phasefield_for_fracture_assemble_gradient(
+        nelements, nnodes, elems, xyz, mu, lambda, Gc, ls, u, rhs);
 
     // {  // Neumann
     //     sprintf(path, "%s/on.raw", folder);
@@ -231,7 +232,8 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     real_t energy = 0;
-    isotropic_phasefield_for_fracture_assemble_value(nelements, nnodes, elems, xyz, mu, lambda, Gc, ls, u, &energy);
+    isotropic_phasefield_for_fracture_assemble_value(
+        nelements, nnodes, elems, xyz, mu, lambda, Gc, ls, u, &energy);
 
     ///////////////////////////////////////////////////////////////////////////////
     // Write CRS matrix and rhs vector
@@ -297,7 +299,8 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld #nzblocks %ld\n", (long)nelements, (long)nnodes, (long)nnz);
+        printf(
+            "#elements %ld #nodes %ld #nzblocks %ld\n", (long)nelements, (long)nnodes, (long)nnz);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 

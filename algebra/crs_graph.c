@@ -7,9 +7,9 @@
 
 #include <mpi.h>
 
-#include "../matrix.io/matrixio_array.h"
-#include "../matrix.io/matrixio_crs.h"
-#include "../matrix.io/utils.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "sortreduce.h"
 
@@ -57,16 +57,12 @@ int build_n2e(const ptrdiff_t nelements,
               element_idx_t **out_elindex) {
     double tick = MPI_Wtime();
 
-
 #ifdef SFEM_MEM_DIAGNOSTICS
     printf("build_n2e: allocating %g GB\n", (nnodes + 1) * sizeof(count_t) * 1e-9);
 #endif
 
     count_t *n2eptr = (count_t *)malloc((nnodes + 1) * sizeof(count_t));
     memset(n2eptr, 0, (nnodes + 1) * sizeof(count_t));
-
-
-
 
     int *book_keeping = (int *)malloc((nnodes) * sizeof(int));
     memset(book_keeping, 0, (nnodes) * sizeof(int));
@@ -83,7 +79,6 @@ int build_n2e(const ptrdiff_t nelements,
     for (ptrdiff_t i = 0; i < nnodes; ++i) {
         n2eptr[i + 1] += n2eptr[i];
     }
-
 
 #ifdef SFEM_MEM_DIAGNOSTICS
     printf("build_n2e: allocating %g GB\n", n2eptr[nnodes] * sizeof(element_idx_t) * 1e-9);
@@ -116,7 +111,6 @@ static int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
                                             idx_t **const elems,
                                             count_t **out_rowptr,
                                             idx_t **out_colidx) {
-
     ptrdiff_t nnz = 0;
     count_t *rowptr = (count_t *)malloc((nnodes + 1) * sizeof(count_t));
     idx_t *colidx = 0;
@@ -428,7 +422,8 @@ int create_dual_graph_mem_conservative(const ptrdiff_t n_elements,
     }
 
 #ifdef SFEM_MEM_DIAGNOSTICS
-    printf("create_dual_graph_mem_conservative: allocating %g GB\n", n_elements * sizeof(int) * 1e-9);
+    printf("create_dual_graph_mem_conservative: allocating %g GB\n",
+           n_elements * sizeof(int) * 1e-9);
 #endif
 
     int *connection_counter = (int *)malloc(n_elements * sizeof(int));
@@ -449,14 +444,14 @@ int create_dual_graph_mem_conservative(const ptrdiff_t n_elements,
         n_nodes_per_side = 3;
     }
 
-
 #ifdef SFEM_MEM_DIAGNOSTICS
-    printf("create_dual_graph_mem_conservative: allocating %g GB\n", (n_elements + 1) * sizeof(count_t) * 1e-9);
+    printf("create_dual_graph_mem_conservative: allocating %g GB\n",
+           (n_elements + 1) * sizeof(count_t) * 1e-9);
 #endif
     count_t *dual_e_ptr = (count_t *)calloc((n_elements + 1), sizeof(count_t));
 
     const ptrdiff_t n_overestimated_connections = n_elements * n_sides;
-       // +1 more to avoid illegal access when counting self
+    // +1 more to avoid illegal access when counting self
     size_t extra_buffer_space = 1000;
 
 #ifdef SFEM_MEM_DIAGNOSTICS
@@ -464,7 +459,6 @@ int create_dual_graph_mem_conservative(const ptrdiff_t n_elements,
            (n_overestimated_connections + extra_buffer_space) * sizeof(element_idx_t) * 1e-9);
 #endif
 
- 
     element_idx_t *dual_eidx = (element_idx_t *)calloc(
         n_overestimated_connections + extra_buffer_space, sizeof(element_idx_t));
 

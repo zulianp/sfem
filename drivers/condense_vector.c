@@ -3,9 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../matrix.io/matrixio_array.h"
-#include "../matrix.io/matrixio_crs.h"
-#include "../matrix.io/utils.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 typedef float geom_t;
 typedef int idx_t;
@@ -31,8 +31,8 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const char * help = "usage: %s <array.raw> <dirichlet_nodes.raw> [out=condensed.raw]\n";
-    
+    const char *help = "usage: %s <array.raw> <dirichlet_nodes.raw> [out=condensed.raw]\n";
+
     if (argc < 3) {
         fprintf(stderr, help, argv[0]);
         return EXIT_FAILURE;
@@ -67,7 +67,8 @@ int main(int argc, char *argv[]) {
         idx_t *dirichlet_nodes = 0;
 
         ptrdiff_t nlocal_, ndirichlet;
-        array_create_from_file(comm, argv[2], MPI_INT, (void **)&dirichlet_nodes, &nlocal_, &ndirichlet);
+        array_create_from_file(
+            comm, argv[2], MPI_INT, (void **)&dirichlet_nodes, &nlocal_, &ndirichlet);
 
         new_nnodes = nnodes - ndirichlet;
         for (ptrdiff_t node = 0; node < ndirichlet; ++node) {
@@ -78,7 +79,7 @@ int main(int argc, char *argv[]) {
         free(dirichlet_nodes);
     }
 
-    real_t *new_values = (real_t*)malloc(new_nnodes * sizeof(real_t));
+    real_t *new_values = (real_t *)malloc(new_nnodes * sizeof(real_t));
     memset(new_values, 0, new_nnodes * sizeof(real_t));
 
     for (ptrdiff_t node = 0, new_node_idx = 0; node < nnodes; ++node) {
@@ -87,7 +88,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    array_write(comm, output_path, values_mpi_t, (void*)new_values, new_nnodes, new_nnodes);
+    array_write(comm, output_path, values_mpi_t, (void *)new_values, new_nnodes, new_nnodes);
 
     free(is_dirichlet);
     free(values);

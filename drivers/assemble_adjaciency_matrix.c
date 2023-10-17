@@ -3,10 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../matrix.io/array_dtof.h"
-#include "../matrix.io/matrixio_array.h"
-#include "../matrix.io/matrixio_crs.h"
-#include "../matrix.io/utils.h"
+#include "array_dtof.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "crs_graph.h"
 #include "sfem_base.h"
@@ -70,19 +70,15 @@ int main(int argc, char *argv[]) {
     // 2) Construct a breadth-first indexing
     int SFEM_DIRECTED = 0;
 
-
     // These to options do not work
     SFEM_READ_ENV(SFEM_DIRECTED, atoi);
     SFEM_READ_ENV(SFEM_REMOVE_LOWER_TRIANGULAR, atoi);
     SFEM_READ_ENV(SFEM_NEGATE_LOWER_TRIANGULAR, atoi);
 
-
-
     SFEM_READ_ENV(SFEM_EXPORT_FP32, atoi);
     SFEM_READ_ENV(SFEM_REMOVE_DIAGONAL, atoi);
     SFEM_READ_ENV(SFEM_GRAPH_LAPLACIAN, atoi);
     SFEM_READ_ENV(SFEM_NORMALIZE_ROWS, atoi);
-    
 
     MPI_Datatype value_type = SFEM_EXPORT_FP32 ? MPI_FLOAT : MPI_DOUBLE;
 
@@ -111,7 +107,8 @@ int main(int argc, char *argv[]) {
     idx_t *colidx = 0;
     real_t *values = 0;
 
-    build_crs_graph_for_elem_type(mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
+    build_crs_graph_for_elem_type(
+        mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
 
     nnz = rowptr[mesh.nnodes];
     values = (real_t *)malloc(nnz * sizeof(real_t));
@@ -122,12 +119,12 @@ int main(int argc, char *argv[]) {
             for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
                 idx_t col = colidx[k];
                 if (col != i) {
-                    idx_t ii = (i + mesh.nnodes/2) % mesh.nnodes; 
-                    idx_t jj = (col + mesh.nnodes/2) % mesh.nnodes; 
+                    idx_t ii = (i + mesh.nnodes / 2) % mesh.nnodes;
+                    idx_t jj = (col + mesh.nnodes / 2) % mesh.nnodes;
 
-                    if(col < i) {
+                    if (col < i) {
                         values[k] = 1;
-                    } 
+                    }
                     // else {
                     //     values[k] = -1;
                     // }
@@ -192,7 +189,6 @@ int main(int argc, char *argv[]) {
                     }
                 }
             }
-
 
             if (SFEM_NORMALIZE_ROWS) {
                 for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {

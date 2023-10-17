@@ -8,6 +8,10 @@
 
 #include <mpi.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int serial_read_tet_mesh(const char *folder,
                          ptrdiff_t *nelements,
                          idx_t *elems[4],
@@ -22,5 +26,9 @@ int mesh_read_elements(MPI_Comm comm,
                        idx_t **const elems,
                        ptrdiff_t *const n_local_elements,
                        ptrdiff_t *const n_elements);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  // SFEM_READ_MESH_H

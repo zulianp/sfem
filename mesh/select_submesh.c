@@ -4,10 +4,10 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "../matrix.io/array_dtof.h"
-#include "../matrix.io/matrixio_array.h"
-#include "../matrix.io/matrixio_crs.h"
-#include "../matrix.io/utils.h"
+#include "array_dtof.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "crs_graph.h"
 #include "read_mesh.h"
@@ -27,7 +27,8 @@ int main(int argc, char *argv[]) {
 
     if (argc < 6) {
         if (!rank) {
-            fprintf(stderr, "usage: %s <folder> <x> <y> <z> <max_nodes> [output_folder=./]", argv[0]);
+            fprintf(
+                stderr, "usage: %s <folder> <x> <y> <z> <max_nodes> [output_folder=./]", argv[0]);
         }
 
         return EXIT_FAILURE;
@@ -118,7 +119,7 @@ int main(int argc, char *argv[]) {
     int SFEM_SELECT_GEODESIC = 0;
     SFEM_READ_ENV(SFEM_SELECT_GEODESIC, atoi);
 
-    if(SFEM_SELECT_GEODESIC) {
+    if (SFEM_SELECT_GEODESIC) {
         SFEM_SELECT_EUCLIDEAN = 0;
     }
 
@@ -149,10 +150,11 @@ int main(int argc, char *argv[]) {
         // Next slot
         ptrdiff_t next_slot = 1;
         ptrdiff_t n_selected_nodes = 0;
-        for (ptrdiff_t q = 0; node_queue[q] >= 0 && n_selected_nodes < max_nodes; q = (q + 1) % size_queue) {
+        for (ptrdiff_t q = 0; node_queue[q] >= 0 && n_selected_nodes < max_nodes;
+             q = (q + 1) % size_queue) {
             const ptrdiff_t node = node_queue[q];
 
-            if(selected_nodes[node + 1]) continue;
+            if (selected_nodes[node + 1]) continue;
 
             const count_t nodes_begin = adj_ptr[node];
             const count_t nodes_end = adj_ptr[node + 1];
@@ -160,7 +162,7 @@ int main(int argc, char *argv[]) {
             for (count_t k = nodes_begin; k < nodes_end; ++k) {
                 const idx_t node_adj = adj_idx[k];
 
-                if(!selected_nodes[node_adj + 1]) {
+                if (!selected_nodes[node_adj + 1]) {
                     node_queue[next_slot++ % size_queue] = node_adj;
                     continue;
                 }
@@ -181,17 +183,17 @@ int main(int argc, char *argv[]) {
             idx_t node = mesh.elements[d][i];
             idx_t sn = selected_nodes[node + 1];
 
-            if(sn != 0) {
+            if (sn != 0) {
                 selected_elements[i + 1] = 1;
             }
         }
 
-        if(selected_elements[i + 1]) {
+        if (selected_elements[i + 1]) {
             for (int d = 0; d < mesh.element_type; ++d) {
                 idx_t node = mesh.elements[d][i];
                 idx_t sn = selected_nodes[node + 1];
-                
-                if(sn == 0) {
+
+                if (sn == 0) {
                     additional_nodes[node] = 1;
                 }
             }
@@ -233,7 +235,7 @@ int main(int argc, char *argv[]) {
 
     for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {
         const idx_t offset = selected_nodes[i];
-        if(offset == selected_nodes[i+1]) continue;
+        if (offset == selected_nodes[i + 1]) continue;
 
         for (int d = 0; d < mesh.spatial_dim; ++d) {
             points[d][offset] = mesh.points[d][i];
@@ -248,20 +250,20 @@ int main(int argc, char *argv[]) {
     // }
     // printf("--------------\n");
 
-
     // for (ptrdiff_t i = 0; i < mesh.nelements + 1; ++i) {
     //     const idx_t offset = selected_elements[i];
     //     printf("%ld\n", (long)offset);
     // }
 
-    if(!rank) {
-        printf("select_submesh.c: nelements=%ld npoints=%ld\n", (long)n_selected_elements, n_selected_nodes);
+    if (!rank) {
+        printf("select_submesh.c: nelements=%ld npoints=%ld\n",
+               (long)n_selected_elements,
+               n_selected_nodes);
     }
 
     free(selected_nodes);
     free(additional_nodes);
     free(selected_elements);
-
 
     mesh_t selection;
     selection.comm = mesh.comm;

@@ -4,10 +4,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../matrix.io/array_dtof.h"
-#include "../matrix.io/matrixio_array.h"
-#include "../matrix.io/matrixio_crs.h"
-#include "../matrix.io/utils.h"
+#include "array_dtof.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "crs_graph.h"
 #include "read_mesh.h"

@@ -4,10 +4,10 @@
 // #include <string.h>
 // #include <sys/stat.h>
 
-// #include "../matrix.io/array_dtof.h"
-// #include "../matrix.io/matrixio_array.h"
-// #include "../matrix.io/matrixio_crs.h"
-// #include "../matrix.io/utils.h"
+// #include "array_dtof.h"
+// #include "matrixio_array.h"
+// #include "matrixio_crs.h"
+// #include "utils.h"
 
 // #include "crs_graph.h"
 // #include "read_mesh.h"
@@ -16,7 +16,8 @@
 
 // #include "sortreduce.h"
 
-// void mesh_promote_p1_to_p2(const mesh_t *const p1_mesh, mesh_t *const p2_mesh, const int steal_p1_nodes) {
+// void mesh_promote_p1_to_p2(const mesh_t *const p1_mesh, mesh_t *const p2_mesh, const int
+// steal_p1_nodes) {
 //     ///////////////////////////////////////////////////////////////////////////////
 //     // Build CRS graph of P1 mesh
 //     ///////////////////////////////////////////////////////////////////////////////
@@ -82,7 +83,8 @@
 //     } else {
 //         for (int d = 0; d < p1_mesh->element_type; d++) {
 //             p2_mesh->elements[d] =  (idx_t *)malloc(p2_mesh->nelements * sizeof(idx_t));
-//             memcpy(p2_mesh->elements[d],  p1_mesh->elements[d], p2_mesh->nelements * sizeof(idx_t));
+//             memcpy(p2_mesh->elements[d],  p1_mesh->elements[d], p2_mesh->nelements *
+//             sizeof(idx_t));
 //         }
 //     }
 
@@ -156,7 +158,8 @@
 //                     p2_mesh->points[d][nidx] = (xi + xj) / 2;
 //                 }
 
-//                 // printf("%d -> %f %f %f\n", nidx, p2_mesh->points[0][nidx], p2_mesh->points[1][nidx],
+//                 // printf("%d -> %f %f %f\n", nidx, p2_mesh->points[0][nidx],
+//                 p2_mesh->points[1][nidx],
 //                 // p2_mesh->points[2][nidx]);
 //             }
 //         }

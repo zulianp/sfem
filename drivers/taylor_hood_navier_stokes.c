@@ -6,10 +6,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "matrix.io/array_dtof.h"
-#include "matrix.io/matrixio_array.h"
-#include "matrix.io/matrixio_crs.h"
-#include "matrix.io/utils.h"
+#include "array_dtof.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "crs_graph.h"
 #include "sfem_base.h"
@@ -226,8 +226,6 @@ int main(int argc, char *argv[]) {
     int SFEM_RESTART_ID = 0;
     SFEM_READ_ENV(SFEM_RESTART_ID, atoi);
 
-    
-
     if (rank == 0) {
         printf(
             "----------------------------------------\n"
@@ -258,8 +256,6 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Defined SFEM_RESTART_FOLDER but not SFEM_RESTART_ID\n");
         return EXIT_FAILURE;
     }
-
-    
 
     real_t emin, emax;
     mesh_minmax_edge_length(&mesh, &emin, &emax);
@@ -508,8 +504,7 @@ int main(int argc, char *argv[]) {
         for (int d = 0; d < sdim; d++) {
             sprintf(path, "%s/u%d.%09d.raw", SFEM_RESTART_FOLDER, d, SFEM_RESTART_ID);
 
-            if (array_read(
-                    comm, path, SFEM_MPI_REAL_T, (void *)vel[d], mesh.nnodes, mesh.nnodes)) {
+            if (array_read(comm, path, SFEM_MPI_REAL_T, (void *)vel[d], mesh.nnodes, mesh.nnodes)) {
                 fprintf(stderr, "Error reading restart file: %s\n", SFEM_RESTART_FOLDER);
                 return EXIT_FAILURE;
             }

@@ -4,9 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../matrix.io/matrixio_array.h"
-#include "../matrix.io/matrixio_crs.h"
-#include "../matrix.io/utils.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 typedef int idx_t;
 #define MPI_IDX_T MPI_INT
@@ -50,17 +50,21 @@ int main(int argc, char *argv[]) {
 
     MPI_Datatype values_mpi_t = MPI_CHAR;
     char **arrays;
-    arrays = (char **)malloc(n_arrays * sizeof(char*));
+    arrays = (char **)malloc(n_arrays * sizeof(char *));
 
     ptrdiff_t check_bytes = 0;
     ptrdiff_t _nope_, n_bytes = 0;
     for (int np = 0; np < n_arrays; np++) {
-        array_create_from_file(comm, gl.gl_pathv[np], values_mpi_t, (void **)&arrays[np], &_nope_, &n_bytes);
-        if(!check_bytes) {
+        array_create_from_file(
+            comm, gl.gl_pathv[np], values_mpi_t, (void **)&arrays[np], &_nope_, &n_bytes);
+        if (!check_bytes) {
             check_bytes = n_bytes;
         } else {
-            if(check_bytes != n_bytes) {
-                fprintf(stderr, "Bad input! arrays do not have same length %ld != %ld\n", (long)check_bytes, (long)n_bytes);
+            if (check_bytes != n_bytes) {
+                fprintf(stderr,
+                        "Bad input! arrays do not have same length %ld != %ld\n",
+                        (long)check_bytes,
+                        (long)n_bytes);
             }
         }
     }
@@ -76,11 +80,13 @@ int main(int argc, char *argv[]) {
 
     for (int np = 0; np < n_arrays; np++) {
         for (ptrdiff_t i = 0; i < n_values; i++) {
-            memcpy(&aos[(i * n_arrays + np) * n_bytes_x_entry], &arrays[np][i * n_bytes_x_entry], n_bytes_x_entry);
+            memcpy(&aos[(i * n_arrays + np) * n_bytes_x_entry],
+                   &arrays[np][i * n_bytes_x_entry],
+                   n_bytes_x_entry);
         }
     }
 
-    array_write(comm, path_output_aos, values_mpi_t, (void*)aos, n_bytes_aos, n_bytes_aos);
+    array_write(comm, path_output_aos, values_mpi_t, (void *)aos, n_bytes_aos, n_bytes_aos);
 
     for (int np = 0; np < n_arrays; np++) {
         free(arrays[np]);

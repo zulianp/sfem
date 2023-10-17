@@ -3,10 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "matrix.io/array_dtof.h"
-#include "matrix.io/matrixio_array.h"
-#include "matrix.io/matrixio_crs.h"
-#include "matrix.io/utils.h"
+#include "array_dtof.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "crs_graph.h"
 #include "sfem_base.h"
@@ -89,7 +89,8 @@ int main(int argc, char *argv[]) {
     ptrdiff_t nnz = 0;
     count_t *rowptr = 0;
     idx_t *colidx = 0;
-    build_crs_graph_for_elem_type(mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
+    build_crs_graph_for_elem_type(
+        mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
     nnz = rowptr[nnodes];
 
     real_t **values = (real_t **)malloc(dims * dims * sizeof(real_t *));
@@ -118,15 +119,12 @@ int main(int argc, char *argv[]) {
         // Output
         rowptr,
         colidx,
-        values
-    );
-
+        values);
 
     real_t **rhs = (real_t **)malloc(dims * sizeof(real_t *));
     for (int b = 0; b < dims; b++) {
-        rhs[b] =  (real_t *)calloc(nnodes, sizeof(real_t));
+        rhs[b] = (real_t *)calloc(nnodes, sizeof(real_t));
     }
-
 
     tock = MPI_Wtime();
     printf("neohookean_assemble.c: assembly\t\t%g seconds\n", tock - tack);
@@ -157,7 +155,7 @@ int main(int argc, char *argv[]) {
         crs_out.lrows = nnodes;
         crs_out.lnnz = nnz;
         crs_out.gnnz = nnz;
-        crs_out.block_size = dims * dims; 
+        crs_out.block_size = dims * dims;
         crs_out.start = 0;
         crs_out.rowoffset = 0;
         crs_out.rowptr_type = SFEM_MPI_COUNT_T;
@@ -177,7 +175,7 @@ int main(int argc, char *argv[]) {
 
     {
         char path[1024 * 10];
-        for(int b = 0; b < dims; b++) {
+        for (int b = 0; b < dims; b++) {
             sprintf(path, "%s/rhs.%d.raw", output_folder, b);
             array_write(comm, path, value_type, rhs[b], nnodes, nnodes);
         }
@@ -200,7 +198,7 @@ int main(int argc, char *argv[]) {
 
     free(values);
 
-    for(int b = 0; b < dims; b++) {
+    for (int b = 0; b < dims; b++) {
         free(rhs[b]);
     }
 

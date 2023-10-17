@@ -3,10 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../matrix.io/array_dtof.h"
-#include "../matrix.io/matrixio_array.h"
-#include "../matrix.io/matrixio_crs.h"
-#include "../matrix.io/utils.h"
+#include "array_dtof.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "crs_graph.h"
 #include "sfem_base.h"
@@ -81,7 +81,6 @@ int main(int argc, char *argv[]) {
     ptrdiff_t nnodes = mesh.nnodes;
     ptrdiff_t nelements = mesh.nelements;
 
-
     // TODO read displacement from file
     real_t *displacement = malloc(nnodes * 3 * sizeof(real_t));
     memset(displacement, 0, nnodes * 3 * sizeof(real_t));
@@ -139,7 +138,7 @@ int main(int argc, char *argv[]) {
     // Block to scalar operator
     ///////////////////////////////////////////////////////////////////////////////
 
-    count_t *new_rowptr = (count_t *)malloc(((nnodes)*3 + 1)*sizeof(count_t));
+    count_t *new_rowptr = (count_t *)malloc(((nnodes)*3 + 1) * sizeof(count_t));
     idx_t *new_colidx = (idx_t *)malloc(nnz * 9 * sizeof(idx_t));
     real_t *new_values = (real_t *)malloc(nnz * 9 * sizeof(real_t));
 
@@ -176,7 +175,8 @@ int main(int argc, char *argv[]) {
     //     printf("\n---\n");
     // }
 
-    // printf("bnnz=%d nnz=%d == %d\n-----------------\n", (int)nnz, (int)rowptr[nnodes * 3], (int)(nnz * 9));
+    // printf("bnnz=%d nnz=%d == %d\n-----------------\n", (int)nnz, (int)rowptr[nnodes * 3],
+    // (int)(nnz * 9));
 
     tock = MPI_Wtime();
     printf("assemble3.c: block to scalar\t\t%g seconds\n", tock - tack);

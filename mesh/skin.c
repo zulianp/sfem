@@ -4,10 +4,10 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "../matrix.io/array_dtof.h"
-#include "../matrix.io/matrixio_array.h"
-#include "../matrix.io/matrixio_crs.h"
-#include "../matrix.io/utils.h"
+#include "array_dtof.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "crs_graph.h"
 #include "read_mesh.h"
@@ -140,10 +140,16 @@ int main(int argc, char *argv[]) {
     element_idx_t *parent = 0;
 
     // if (mesh.element_type == TET4) {
-    //     extract_surface_connectivity(mesh.nelements, mesh.elements, &n_surf_elements, surf_elems, &parent);
+    //     extract_surface_connectivity(mesh.nelements, mesh.elements, &n_surf_elements, surf_elems,
+    //     &parent);
     // } else {
-        extract_surface_connectivity_with_adj_table(
-            mesh.nelements, mesh.nnodes, mesh.element_type, mesh.elements, &n_surf_elements, surf_elems, &parent);
+    extract_surface_connectivity_with_adj_table(mesh.nelements,
+                                                mesh.nnodes,
+                                                mesh.element_type,
+                                                mesh.elements,
+                                                &n_surf_elements,
+                                                surf_elems,
+                                                &parent);
     // }
 
     idx_t *vol2surf = (idx_t *)malloc(mesh.nnodes * sizeof(idx_t));
@@ -199,7 +205,7 @@ int main(int argc, char *argv[]) {
 
     mesh_t surf;
     mesh_init(&surf);
-    
+
     surf.comm = mesh.comm;
     surf.mem_space = mesh.mem_space;
 

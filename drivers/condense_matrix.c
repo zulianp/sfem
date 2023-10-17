@@ -7,9 +7,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "../matrix.io/matrixio_array.h"
-#include "../matrix.io/matrixio_crs.h"
-#include "../matrix.io/utils.h"
+#include "matrixio_array.h"
+#include "matrixio_crs.h"
+#include "utils.h"
 
 #include "sfem_base.h"
 
@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const char * help = "usage: %s <crs_folder> <dirichlet_nodes.raw> [output_folder=./condensed]\n";
+    const char *help = "usage: %s <crs_folder> <dirichlet_nodes.raw> [output_folder=./condensed]\n";
 
     if (argc < 3) {
         fprintf(stderr, help, argv[0]);
@@ -86,7 +86,8 @@ int main(int argc, char *argv[]) {
         idx_t *dirichlet_nodes = 0;
 
         ptrdiff_t nlocal_, ndrichlet;
-        array_create_from_file(comm, argv[2], MPI_INT, (void **)&dirichlet_nodes, &nlocal_, &ndrichlet);
+        array_create_from_file(
+            comm, argv[2], MPI_INT, (void **)&dirichlet_nodes, &nlocal_, &ndrichlet);
 
         new_nnodes = nnodes - ndrichlet;
 
@@ -154,7 +155,7 @@ int main(int argc, char *argv[]) {
         new_rowptr[++new_node_idx] = new_nnz;
     }
 
-    free(is_dirichlet); // mapper is invalidated here!
+    free(is_dirichlet);  // mapper is invalidated here!
 
     // Free input CRS
     crs_free(&crs_in);
