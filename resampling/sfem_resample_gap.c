@@ -245,163 +245,172 @@ int resample_gap(MPI_Comm comm,
     const real_t dy = (real_t)delta[1];
     const real_t dz = (real_t)delta[2];
 
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
-        idx_t ev[3];
-        geom_t x[3], y[3], z[3];
+#pragma omp parallel
+    {
+#pragma omp for  // nowait
 
-        real_t hex8_f[8];
-        real_t hex8_grad_x[8];
-        real_t hex8_grad_y[8];
-        real_t hex8_grad_z[8];
-        real_t coeffs[8];
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[3];
+            geom_t x[3], y[3], z[3];
 
-        real_t tri3_f[3];
-        real_t element_gap[3];
-        real_t element_xnormal[3];
-        real_t element_ynormal[3];
-        real_t element_znormal[3];
+            real_t hex8_f[8];
+            real_t hex8_grad_x[8];
+            real_t hex8_grad_y[8];
+            real_t hex8_grad_z[8];
+            real_t coeffs[8];
 
-#pragma unroll(3)
-        for (int v = 0; v < 3; ++v) {
-            ev[v] = elems[v][i];
-        }
-
-        for (int v = 0; v < 3; ++v) {
-            x[v] = xyz[0][ev[v]];
-            y[v] = xyz[1][ev[v]];
-            z[v] = xyz[2][ev[v]];
-        }
-
-        memset(element_gap, 0, 3 * sizeof(real_t));
-        memset(element_xnormal, 0, 3 * sizeof(real_t));
-        memset(element_ynormal, 0, 3 * sizeof(real_t));
-        memset(element_znormal, 0, 3 * sizeof(real_t));
-
-        const real_t measure =
-            tri_shell_3_measure(x[0], x[1], x[2], y[0], y[1], y[2], z[0], z[1], z[2]);
-
-        for (int q = 0; q < 12; q++) {
-            real_t g_qx, g_qy, g_qz;
-            tri_shell_3_transform(x[0],
-                                  x[1],
-                                  x[2],
-                                  y[0],
-                                  y[1],
-                                  y[2],
-                                  z[0],
-                                  z[1],
-                                  z[2],
-                                  qx[q],
-                                  qy[q],
-                                  &g_qx,
-                                  &g_qy,
-                                  &g_qz);
-
-            tri3_f[0] = 1 - qx[q] - qy[q];
-            tri3_f[1] = qx[q];
-            tri3_f[2] = qy[q];
-
-            const real_t dV = measure * qw[q];
-
-            const real_t grid_x = (g_qx - ox) / dx;
-            const real_t grid_y = (g_qy - oy) / dy;
-            const real_t grid_z = (g_qz - oz) / dz;
-
-            const ptrdiff_t i = floor(grid_x);
-            const ptrdiff_t j = floor(grid_y);
-            const ptrdiff_t k = floor(grid_z);
-
-            // If outside
-            if (i < 0 || j < 0 || k < 0 || (i + 1 >= nglobal[0]) || (j + 1 >= nglobal[1]) ||
-                (k + 1 >= nglobal[2])) {
-                fprintf(stderr,
-                        "warning (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n",
-                        i,
-                        j,
-                        k,
-                        nglobal[0],
-                        nglobal[1],
-                        nglobal[2]);
-                continue;
-            }
-
-            // Get the reminder [0, 1]
-            real_t l_x = (grid_x - i);
-            real_t l_y = (grid_y - j);
-            real_t l_z = (grid_z - k);
-
-            assert(l_x >= -1e-8);
-            assert(l_y >= -1e-8);
-            assert(l_z >= -1e-8);
-
-            assert(l_x <= 1 + 1e-8);
-            assert(l_y <= 1 + 1e-8);
-            assert(l_z <= 1 + 1e-8);
-
-            hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
-            hex_aa_8_eval_grad(put_inside(l_x),
-                               put_inside(l_y),
-                               put_inside(l_z),
-                               hex8_grad_x,
-                               hex8_grad_y,
-                               hex8_grad_z);
-            hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
-
-            // Integrate gap function
-            {
-                real_t eval_gap = 0;
-
-#pragma unroll(8)
-                for (int edof_j = 0; edof_j < 8; edof_j++) {
-                    eval_gap += hex8_f[edof_j] * coeffs[edof_j];
-                }
+            real_t tri3_f[3];
+            real_t element_gap[3];
+            real_t element_xnormal[3];
+            real_t element_ynormal[3];
+            real_t element_znormal[3];
 
 #pragma unroll(3)
-                for (int edof_i = 0; edof_i < 3; edof_i++) {
-                    element_gap[edof_i] += eval_gap * tri3_f[edof_i] * dV;
-                }
+            for (int v = 0; v < 3; ++v) {
+                ev[v] = elems[v][i];
             }
 
-            {
-                real_t eval_xnormal = 0;
-                real_t eval_ynormal = 0;
-                real_t eval_znormal = 0;
+            for (int v = 0; v < 3; ++v) {
+                x[v] = xyz[0][ev[v]];
+                y[v] = xyz[1][ev[v]];
+                z[v] = xyz[2][ev[v]];
+            }
+
+            memset(element_gap, 0, 3 * sizeof(real_t));
+            memset(element_xnormal, 0, 3 * sizeof(real_t));
+            memset(element_ynormal, 0, 3 * sizeof(real_t));
+            memset(element_znormal, 0, 3 * sizeof(real_t));
+
+            const real_t measure =
+                tri_shell_3_measure(x[0], x[1], x[2], y[0], y[1], y[2], z[0], z[1], z[2]);
+
+            for (int q = 0; q < 12; q++) {
+                real_t g_qx, g_qy, g_qz;
+                tri_shell_3_transform(x[0],
+                                      x[1],
+                                      x[2],
+                                      y[0],
+                                      y[1],
+                                      y[2],
+                                      z[0],
+                                      z[1],
+                                      z[2],
+                                      qx[q],
+                                      qy[q],
+                                      &g_qx,
+                                      &g_qy,
+                                      &g_qz);
+
+                tri3_f[0] = 1 - qx[q] - qy[q];
+                tri3_f[1] = qx[q];
+                tri3_f[2] = qy[q];
+
+                const real_t dV = measure * qw[q];
+
+                const real_t grid_x = (g_qx - ox) / dx;
+                const real_t grid_y = (g_qy - oy) / dy;
+                const real_t grid_z = (g_qz - oz) / dz;
+
+                const ptrdiff_t i = floor(grid_x);
+                const ptrdiff_t j = floor(grid_y);
+                const ptrdiff_t k = floor(grid_z);
+
+                // If outside
+                if (i < 0 || j < 0 || k < 0 || (i + 1 >= nglobal[0]) || (j + 1 >= nglobal[1]) ||
+                    (k + 1 >= nglobal[2])) {
+                    fprintf(stderr,
+                            "warning (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n",
+                            i,
+                            j,
+                            k,
+                            nglobal[0],
+                            nglobal[1],
+                            nglobal[2]);
+                    continue;
+                }
+
+                // Get the reminder [0, 1]
+                real_t l_x = (grid_x - i);
+                real_t l_y = (grid_y - j);
+                real_t l_z = (grid_z - k);
+
+                assert(l_x >= -1e-8);
+                assert(l_y >= -1e-8);
+                assert(l_z >= -1e-8);
+
+                assert(l_x <= 1 + 1e-8);
+                assert(l_y <= 1 + 1e-8);
+                assert(l_z <= 1 + 1e-8);
+
+                hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
+                hex_aa_8_eval_grad(put_inside(l_x),
+                                   put_inside(l_y),
+                                   put_inside(l_z),
+                                   hex8_grad_x,
+                                   hex8_grad_y,
+                                   hex8_grad_z);
+                hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
+
+                // Integrate gap function
+                {
+                    real_t eval_gap = 0;
 
 #pragma unroll(8)
-                for (int edof_j = 0; edof_j < 8; edof_j++) {
-                    eval_xnormal += hex8_grad_x[edof_j] * coeffs[edof_j];
-                    eval_ynormal += hex8_grad_y[edof_j] * coeffs[edof_j];
-                    eval_znormal += hex8_grad_z[edof_j] * coeffs[edof_j];
+                    for (int edof_j = 0; edof_j < 8; edof_j++) {
+                        eval_gap += hex8_f[edof_j] * coeffs[edof_j];
+                    }
+
+#pragma unroll(3)
+                    for (int edof_i = 0; edof_i < 3; edof_i++) {
+                        element_gap[edof_i] += eval_gap * tri3_f[edof_i] * dV;
+                    }
                 }
 
                 {
-                    // Normalize
-                    real_t denom = sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal +
-                                        eval_znormal * eval_znormal);
+                    real_t eval_xnormal = 0;
+                    real_t eval_ynormal = 0;
+                    real_t eval_znormal = 0;
 
-                    assert(denom != 0);
+#pragma unroll(8)
+                    for (int edof_j = 0; edof_j < 8; edof_j++) {
+                        eval_xnormal += hex8_grad_x[edof_j] * coeffs[edof_j];
+                        eval_ynormal += hex8_grad_y[edof_j] * coeffs[edof_j];
+                        eval_znormal += hex8_grad_z[edof_j] * coeffs[edof_j];
+                    }
 
-                    eval_xnormal /= denom;
-                    eval_ynormal /= denom;
-                    eval_znormal /= denom;
-                }
+                    {
+                        // Normalize
+                        real_t denom =
+                            sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal +
+                                 eval_znormal * eval_znormal);
+
+                        assert(denom != 0);
+
+                        eval_xnormal /= denom;
+                        eval_ynormal /= denom;
+                        eval_znormal /= denom;
+                    }
 
 #pragma unroll(3)
-                for (int edof_i = 0; edof_i < 3; edof_i++) {
-                    element_xnormal[edof_i] += eval_xnormal * tri3_f[edof_i] * dV;
-                    element_ynormal[edof_i] += eval_ynormal * tri3_f[edof_i] * dV;
-                    element_znormal[edof_i] += eval_znormal * tri3_f[edof_i] * dV;
+                    for (int edof_i = 0; edof_i < 3; edof_i++) {
+                        element_xnormal[edof_i] += eval_xnormal * tri3_f[edof_i] * dV;
+                        element_ynormal[edof_i] += eval_ynormal * tri3_f[edof_i] * dV;
+                        element_znormal[edof_i] += eval_znormal * tri3_f[edof_i] * dV;
+                    }
                 }
             }
-        }
 
 #pragma unroll(3)
-        for (int v = 0; v < 3; ++v) {
-            // Invert sign since distance field is negative insdide and positive outside
-            wg[ev[v]] -= element_gap[v];
-            xnormal[ev[v]] += element_xnormal[v];
-            ynormal[ev[v]] += element_ynormal[v];
-            znormal[ev[v]] += element_znormal[v];
+            for (int v = 0; v < 3; ++v) {
+                // Invert sign since distance field is negative insdide and positive outside
+#pragma omp critical
+                {
+                    wg[ev[v]] -= element_gap[v];
+                    xnormal[ev[v]] += element_xnormal[v];
+                    ynormal[ev[v]] += element_ynormal[v];
+                    znormal[ev[v]] += element_znormal[v];
+                }
+            }
         }
     }
 
@@ -452,107 +461,105 @@ int interpolate_gap(MPI_Comm comm,
     const real_t dy = (real_t)delta[1];
     const real_t dz = (real_t)delta[2];
 
-    for (ptrdiff_t node = 0; node < nnodes; ++node) {
-        real_t hex8_f[8];
-        real_t hex8_grad_x[8];
-        real_t hex8_grad_y[8];
-        real_t hex8_grad_z[8];
-        real_t coeffs[8];
+#pragma omp parallel
+    {
+#pragma omp for  // nowait
+        for (ptrdiff_t node = 0; node < nnodes; ++node) {
+            real_t hex8_f[8];
+            real_t hex8_grad_x[8];
+            real_t hex8_grad_y[8];
+            real_t hex8_grad_z[8];
+            real_t coeffs[8];
 
-        const real_t x = xyz[0][node];
-        const real_t y = xyz[1][node];
-        const real_t z = xyz[2][node];
+            const real_t x = xyz[0][node];
+            const real_t y = xyz[1][node];
+            const real_t z = xyz[2][node];
 
-        const real_t grid_x = (x - ox) / dx;
-        const real_t grid_y = (y - oy) / dy;
-        const real_t grid_z = (z - oz) / dz;
+            const real_t grid_x = (x - ox) / dx;
+            const real_t grid_y = (y - oy) / dy;
+            const real_t grid_z = (z - oz) / dz;
 
-        const ptrdiff_t i = floor(grid_x);
-        const ptrdiff_t j = floor(grid_y);
-        const ptrdiff_t k = floor(grid_z);
+            const ptrdiff_t i = floor(grid_x);
+            const ptrdiff_t j = floor(grid_y);
+            const ptrdiff_t k = floor(grid_z);
 
-        // dx = (max - min) / (n - 1)
-        // x  = min + i * dx
-        // ii = (x - min) / dx
-
-        // printf("ijk: %ld %ld %ld\n", i, j, k);
-
-        // If outside
-        if (i < 0 || j < 0 || k < 0 || (i + 1 >= nglobal[0]) || (j + 1 >= nglobal[1]) ||
-            (k + 1 >= nglobal[2])) {
-            fprintf(stderr,
-                    "warning (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n",
-                    i,
-                    j,
-                    k,
-                    nglobal[0],
-                    nglobal[1],
-                    nglobal[2]);
-            continue;
-        }
-
-        // Get the reminder [0, 1]
-        real_t l_x = (grid_x - i);
-        real_t l_y = (grid_y - j);
-        real_t l_z = (grid_z - k);
-
-        assert(l_x >= -1e-8);
-        assert(l_y >= -1e-8);
-        assert(l_z >= -1e-8);
-
-        assert(l_x <= 1 + 1e-8);
-        assert(l_y <= 1 + 1e-8);
-        assert(l_z <= 1 + 1e-8);
-
-        hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
-        hex_aa_8_eval_grad(put_inside(l_x),
-                           put_inside(l_y),
-                           put_inside(l_z),
-                           hex8_grad_x,
-                           hex8_grad_y,
-                           hex8_grad_z);
-        hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
-
-        // Interpolate gap function
-        {
-            real_t eval_gap = 0;
-
-#pragma unroll(8)
-            for (int edof_j = 0; edof_j < 8; edof_j++) {
-                eval_gap += hex8_f[edof_j] * coeffs[edof_j];
+            // If outside
+            if (i < 0 || j < 0 || k < 0 || (i + 1 >= nglobal[0]) || (j + 1 >= nglobal[1]) ||
+                (k + 1 >= nglobal[2])) {
+                fprintf(stderr,
+                        "warning (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n",
+                        i,
+                        j,
+                        k,
+                        nglobal[0],
+                        nglobal[1],
+                        nglobal[2]);
+                continue;
             }
 
-            g[node] = -eval_gap;
-        }
+            // Get the reminder [0, 1]
+            real_t l_x = (grid_x - i);
+            real_t l_y = (grid_y - j);
+            real_t l_z = (grid_z - k);
 
-        // Interpolate gap function
-        {
-            real_t eval_xnormal = 0;
-            real_t eval_ynormal = 0;
-            real_t eval_znormal = 0;
+            assert(l_x >= -1e-8);
+            assert(l_y >= -1e-8);
+            assert(l_z >= -1e-8);
 
-#pragma unroll(8)
-            for (int edof_j = 0; edof_j < 8; edof_j++) {
-                eval_xnormal += hex8_grad_x[edof_j] * coeffs[edof_j];
-                eval_ynormal += hex8_grad_y[edof_j] * coeffs[edof_j];
-                eval_znormal += hex8_grad_z[edof_j] * coeffs[edof_j];
-            }
+            assert(l_x <= 1 + 1e-8);
+            assert(l_y <= 1 + 1e-8);
+            assert(l_z <= 1 + 1e-8);
 
+            hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
+            hex_aa_8_eval_grad(put_inside(l_x),
+                               put_inside(l_y),
+                               put_inside(l_z),
+                               hex8_grad_x,
+                               hex8_grad_y,
+                               hex8_grad_z);
+            hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
+
+            // Interpolate gap function
             {
-                // Normalize
-                real_t denom = sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal +
-                                    eval_znormal * eval_znormal);
+                real_t eval_gap = 0;
 
-                assert(denom != 0);
+#pragma unroll(8)
+                for (int edof_j = 0; edof_j < 8; edof_j++) {
+                    eval_gap += hex8_f[edof_j] * coeffs[edof_j];
+                }
 
-                eval_xnormal /= denom;
-                eval_ynormal /= denom;
-                eval_znormal /= denom;
+                g[node] = -eval_gap;
             }
 
-            xnormal[node] = eval_xnormal;
-            ynormal[node] = eval_ynormal;
-            znormal[node] = eval_znormal;
+            // Interpolate gap function
+            {
+                real_t eval_xnormal = 0;
+                real_t eval_ynormal = 0;
+                real_t eval_znormal = 0;
+
+#pragma unroll(8)
+                for (int edof_j = 0; edof_j < 8; edof_j++) {
+                    eval_xnormal += hex8_grad_x[edof_j] * coeffs[edof_j];
+                    eval_ynormal += hex8_grad_y[edof_j] * coeffs[edof_j];
+                    eval_znormal += hex8_grad_z[edof_j] * coeffs[edof_j];
+                }
+
+                {
+                    // Normalize
+                    real_t denom = sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal +
+                                        eval_znormal * eval_znormal);
+
+                    assert(denom != 0);
+
+                    eval_xnormal /= denom;
+                    eval_ynormal /= denom;
+                    eval_znormal /= denom;
+                }
+
+                xnormal[node] = eval_xnormal;
+                ynormal[node] = eval_ynormal;
+                znormal[node] = eval_znormal;
+            }
         }
     }
 
