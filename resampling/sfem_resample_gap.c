@@ -3,16 +3,14 @@
 #include "mass.h"
 #include "read_mesh.h"
 
-#include <stdio.h>
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-static SFEM_INLINE real_t put_inside(const real_t v) {
-    return MIN(MAX(1e-7, v), 1-1e-7);
-}
+static SFEM_INLINE real_t put_inside(const real_t v) { return MIN(MAX(1e-7, v), 1 - 1e-7); }
 
 // TRI3 6th order quadrature rule
 static real_t qw[12] = {0.050844906370206816920936809106869,
@@ -132,13 +130,13 @@ SFEM_INLINE static void hex_aa_8_eval_fun(
     // Output
     real_t *const SFEM_RESTRICT f) {
     f[0] = (1.0 - x) * (1.0 - y) * (1.0 - z);
-    f[1] = x         * (1.0 - y) * (1.0 - z);
-    f[2] = x         * y         * (1.0 - z);
-    f[3] = (1.0 - x) * y         * (1.0 - z);
+    f[1] = x * (1.0 - y) * (1.0 - z);
+    f[2] = x * y * (1.0 - z);
+    f[3] = (1.0 - x) * y * (1.0 - z);
     f[4] = (1.0 - x) * (1.0 - y) * z;
-    f[5] = x         * (1.0 - y) * z;
-    f[6] = x         * y         * z;
-    f[7] = (1.0 - x) * y         * z;
+    f[5] = x * (1.0 - y) * z;
+    f[6] = x * y * z;
+    f[7] = (1.0 - x) * y * z;
 }
 
 SFEM_INLINE static void hex_aa_8_collect_coeffs(
@@ -149,14 +147,14 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs(
     // Attention this is geometric data transformed to solver data!
     const geom_t *const SFEM_RESTRICT data,
     real_t *const SFEM_RESTRICT out) {
-    const ptrdiff_t i0 = i       * stride[0] + j       * stride[1]  + k       * stride[2];
-    const ptrdiff_t i1 = (i + 1) * stride[0] + j       * stride[1]  + k       * stride[2];
-    const ptrdiff_t i2 = (i + 1) * stride[0] + (j + 1) * stride[1]  + k       * stride[2];
-    const ptrdiff_t i3 = i       * stride[0] + (j + 1) * stride[1]  + k       * stride[2];
-    const ptrdiff_t i4 = i       * stride[0] + j       * stride[1]  + (k + 1) * stride[2];
-    const ptrdiff_t i5 = (i + 1) * stride[0] + j       * stride[1]  + (k + 1) * stride[2];
-    const ptrdiff_t i6 = (i + 1) * stride[0] + (j + 1) * stride[1]  + (k + 1) * stride[2];
-    const ptrdiff_t i7 = i       * stride[0] + (j + 1) * stride[1]  + (k + 1) * stride[2];
+    const ptrdiff_t i0 = i * stride[0] + j * stride[1] + k * stride[2];
+    const ptrdiff_t i1 = (i + 1) * stride[0] + j * stride[1] + k * stride[2];
+    const ptrdiff_t i2 = (i + 1) * stride[0] + (j + 1) * stride[1] + k * stride[2];
+    const ptrdiff_t i3 = i * stride[0] + (j + 1) * stride[1] + k * stride[2];
+    const ptrdiff_t i4 = i * stride[0] + j * stride[1] + (k + 1) * stride[2];
+    const ptrdiff_t i5 = (i + 1) * stride[0] + j * stride[1] + (k + 1) * stride[2];
+    const ptrdiff_t i6 = (i + 1) * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
+    const ptrdiff_t i7 = i * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
 
     out[0] = data[i0];
     out[1] = data[i1];
@@ -178,37 +176,37 @@ SFEM_INLINE static void hex_aa_8_eval_grad(
     real_t *const SFEM_RESTRICT gy,
     real_t *const SFEM_RESTRICT gz) {
     // Transformation to ref element
-    gx[0] = -(1.0 - y)  * (1.0 - z);
-    gy[0] = -(1.0 - x)  * (1.0 - z);
-    gz[0] = -(1.0 - x)  * (1.0 - y);
+    gx[0] = -(1.0 - y) * (1.0 - z);
+    gy[0] = -(1.0 - x) * (1.0 - z);
+    gz[0] = -(1.0 - x) * (1.0 - y);
 
-    gx[1] = (1.0 - y)   * (1.0 - z);
-    gy[1] = -x          * (1.0 - z);
-    gz[1] = -x          * (1.0 - y);
+    gx[1] = (1.0 - y) * (1.0 - z);
+    gy[1] = -x * (1.0 - z);
+    gz[1] = -x * (1.0 - y);
 
-    gx[2] = y           * (1.0 - z);
-    gy[2] = x           * (1.0 - z);
-    gz[2] = -x          * y;
+    gx[2] = y * (1.0 - z);
+    gy[2] = x * (1.0 - z);
+    gz[2] = -x * y;
 
-    gx[3] = -y          * (1.0 - z);
-    gy[3] = (1.0 - x)   * (1.0 - z);
-    gz[3] = -(1.0 - x)  * y;
+    gx[3] = -y * (1.0 - z);
+    gy[3] = (1.0 - x) * (1.0 - z);
+    gz[3] = -(1.0 - x) * y;
 
-    gx[4] = -(1.0 - y)  * z;
-    gy[4] = -(1.0 - x)  * z;
-    gz[4] =  (1.0 - x)  * (1.0 - y);
+    gx[4] = -(1.0 - y) * z;
+    gy[4] = -(1.0 - x) * z;
+    gz[4] = (1.0 - x) * (1.0 - y);
 
-    gx[5] = (1.0 - y)   * z;
-    gy[5] = -x          * z;
-    gz[5] = x           * (1.0 - y);
+    gx[5] = (1.0 - y) * z;
+    gy[5] = -x * z;
+    gz[5] = x * (1.0 - y);
 
-    gx[6] = y           * z;
-    gy[6] = x           * z;
-    gz[6] = x           * y;
+    gx[6] = y * z;
+    gy[6] = x * z;
+    gz[6] = x * y;
 
-    gx[7] = -y          * z;
-    gy[7] = (1.0 - x)   * z;
-    gz[7] = (1.0 - x)   * y;
+    gx[7] = -y * z;
+    gy[7] = (1.0 - x) * z;
+    gz[7] = (1.0 - x) * y;
 }
 
 int resample_gap(MPI_Comm comm,
@@ -297,9 +295,9 @@ int resample_gap(MPI_Comm comm,
 
             const real_t dV = measure * qw[q];
 
-            const ptrdiff_t grid_x = (g_qx - origin[0]) / (real_t)delta[0];
-            const ptrdiff_t grid_y = (g_qy - origin[1]) / (real_t)delta[1];
-            const ptrdiff_t grid_z = (g_qz - origin[2]) / (real_t)delta[2];
+            const real_t grid_x = (g_qx - origin[0]) / (real_t)delta[0];
+            const real_t grid_y = (g_qy - origin[1]) / (real_t)delta[1];
+            const real_t grid_z = (g_qz - origin[2]) / (real_t)delta[2];
 
             const ptrdiff_t i = floor(grid_x);
             const ptrdiff_t j = floor(grid_y);
@@ -333,7 +331,12 @@ int resample_gap(MPI_Comm comm,
             assert(l_z <= 1 + 1e-8);
 
             hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
-            hex_aa_8_eval_grad(put_inside(l_x), put_inside(l_y), put_inside(l_z), hex8_grad_x, hex8_grad_y, hex8_grad_z);
+            hex_aa_8_eval_grad(put_inside(l_x),
+                               put_inside(l_y),
+                               put_inside(l_z),
+                               hex8_grad_x,
+                               hex8_grad_y,
+                               hex8_grad_z);
             hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
 
             // Integrate gap function
@@ -410,7 +413,6 @@ int resample_gap(MPI_Comm comm,
     return 0;
 }
 
-
 int interpolate_gap(MPI_Comm comm,
                     // Mesh
                     const enum ElemType element_type,
@@ -434,6 +436,14 @@ int interpolate_gap(MPI_Comm comm,
     SFEM_UNUSED(nelements);
     SFEM_UNUSED(elems);
 
+    const real_t ox = (real_t)origin[0];
+    const real_t oy = (real_t)origin[1];
+    const real_t oz = (real_t)origin[2];
+
+    const real_t dx = (real_t)delta[0];
+    const real_t dy = (real_t)delta[1];
+    const real_t dz = (real_t)delta[2];
+
     for (ptrdiff_t node = 0; node < nnodes; ++node) {
         real_t hex8_f[8];
         real_t hex8_grad_x[8];
@@ -445,13 +455,19 @@ int interpolate_gap(MPI_Comm comm,
         const real_t y = xyz[1][node];
         const real_t z = xyz[2][node];
 
-        const ptrdiff_t grid_x = (x - origin[0]) / (real_t)delta[0];
-        const ptrdiff_t grid_y = (y - origin[1]) / (real_t)delta[1];
-        const ptrdiff_t grid_z = (z - origin[2]) / (real_t)delta[2];
+        const real_t grid_x = (x - ox) / dx;
+        const real_t grid_y = (y - oy) / dy;
+        const real_t grid_z = (z - ox) / dz;
 
         const ptrdiff_t i = floor(grid_x);
         const ptrdiff_t j = floor(grid_y);
         const ptrdiff_t k = floor(grid_z);
+
+        // dx = (max - min) / (n - 1)
+        // x  = min + i * dx
+        // ii = (x - min) / dx
+
+        // printf("ijk: %ld %ld %ld\n", i, j, k);
 
         // If outside
         if (i < 0 || j < 0 || k < 0 || (i + 1 >= nglobal[0]) || (j + 1 >= nglobal[1]) ||
@@ -481,7 +497,12 @@ int interpolate_gap(MPI_Comm comm,
         assert(l_z <= 1 + 1e-8);
 
         hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
-        hex_aa_8_eval_grad(put_inside(l_x), put_inside(l_y), put_inside(l_z), hex8_grad_x, hex8_grad_y, hex8_grad_z);
+        hex_aa_8_eval_grad(put_inside(l_x),
+                           put_inside(l_y),
+                           put_inside(l_z),
+                           hex8_grad_x,
+                           hex8_grad_y,
+                           hex8_grad_z);
         hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
 
         // Interpolate gap function
@@ -494,7 +515,6 @@ int interpolate_gap(MPI_Comm comm,
             }
 
             g[node] = -eval_gap;
-
         }
 
         // Interpolate gap function
