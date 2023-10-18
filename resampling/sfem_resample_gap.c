@@ -237,6 +237,14 @@ int resample_gap(MPI_Comm comm,
 
     real_t *wg = calloc(nnodes, sizeof(real_t));
 
+    const real_t ox = (real_t)origin[0];
+    const real_t oy = (real_t)origin[1];
+    const real_t oz = (real_t)origin[2];
+
+    const real_t dx = (real_t)delta[0];
+    const real_t dy = (real_t)delta[1];
+    const real_t dz = (real_t)delta[2];
+
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[3];
         geom_t x[3], y[3], z[3];
@@ -295,9 +303,9 @@ int resample_gap(MPI_Comm comm,
 
             const real_t dV = measure * qw[q];
 
-            const real_t grid_x = (g_qx - origin[0]) / (real_t)delta[0];
-            const real_t grid_y = (g_qy - origin[1]) / (real_t)delta[1];
-            const real_t grid_z = (g_qz - origin[2]) / (real_t)delta[2];
+            const real_t grid_x = (g_qx - ox) / dx;
+            const real_t grid_y = (g_qy - oy) / dy;
+            const real_t grid_z = (g_qz - oz) / dz;
 
             const ptrdiff_t i = floor(grid_x);
             const ptrdiff_t j = floor(grid_y);
@@ -457,7 +465,7 @@ int interpolate_gap(MPI_Comm comm,
 
         const real_t grid_x = (x - ox) / dx;
         const real_t grid_y = (y - oy) / dy;
-        const real_t grid_z = (z - ox) / dz;
+        const real_t grid_z = (z - oz) / dz;
 
         const ptrdiff_t i = floor(grid_x);
         const ptrdiff_t j = floor(grid_y);
