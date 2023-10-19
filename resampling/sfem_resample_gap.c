@@ -209,7 +209,7 @@ SFEM_INLINE static void hex_aa_8_eval_grad(
     gz[7] = (1.0 - x) * y;
 }
 
-int resample_gap(MPI_Comm comm,
+int resample_gap(
                  // Mesh
                  const enum ElemType element_type,
                  const ptrdiff_t nelements,
@@ -217,8 +217,7 @@ int resample_gap(MPI_Comm comm,
                  idx_t **const SFEM_RESTRICT elems,
                  geom_t **const SFEM_RESTRICT xyz,
                  // SDF
-                 const ptrdiff_t *const SFEM_RESTRICT nlocal,
-                 const ptrdiff_t *const SFEM_RESTRICT nglobal,
+                 const ptrdiff_t *const SFEM_RESTRICT n,
                  const ptrdiff_t *const SFEM_RESTRICT stride,
                  const geom_t *const SFEM_RESTRICT origin,
                  const geom_t *const SFEM_RESTRICT delta,
@@ -248,7 +247,6 @@ int resample_gap(MPI_Comm comm,
 #pragma omp parallel
     {
 #pragma omp for  // nowait
-
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[3];
             geom_t x[3], y[3], z[3];
@@ -316,16 +314,16 @@ int resample_gap(MPI_Comm comm,
                 const ptrdiff_t k = floor(grid_z);
 
                 // If outside
-                if (i < 0 || j < 0 || k < 0 || (i + 1 >= nglobal[0]) || (j + 1 >= nglobal[1]) ||
-                    (k + 1 >= nglobal[2])) {
+                if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) ||
+                    (k + 1 >= n[2])) {
                     fprintf(stderr,
                             "warning (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n",
                             i,
                             j,
                             k,
-                            nglobal[0],
-                            nglobal[1],
-                            nglobal[2]);
+                            n[0],
+                            n[1],
+                            n[2]);
                     continue;
                 }
 
@@ -430,16 +428,10 @@ int resample_gap(MPI_Comm comm,
     return 0;
 }
 
-int interpolate_gap(MPI_Comm comm,
-                    // Mesh
-                    const enum ElemType element_type,
-                    const ptrdiff_t nelements,
-                    const ptrdiff_t nnodes,
-                    idx_t **const SFEM_RESTRICT elems,
+int interpolate_gap(const ptrdiff_t nnodes,
                     geom_t **const SFEM_RESTRICT xyz,
                     // SDF
-                    const ptrdiff_t *const SFEM_RESTRICT nlocal,
-                    const ptrdiff_t *const SFEM_RESTRICT nglobal,
+                    const ptrdiff_t *const SFEM_RESTRICT n,
                     const ptrdiff_t *const SFEM_RESTRICT stride,
                     const geom_t *const SFEM_RESTRICT origin,
                     const geom_t *const SFEM_RESTRICT delta,
@@ -449,9 +441,7 @@ int interpolate_gap(MPI_Comm comm,
                     real_t *const SFEM_RESTRICT xnormal,
                     real_t *const SFEM_RESTRICT ynormal,
                     real_t *const SFEM_RESTRICT znormal) {
-    SFEM_UNUSED(element_type);
-    SFEM_UNUSED(nelements);
-    SFEM_UNUSED(elems);
+
 
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];
@@ -484,16 +474,16 @@ int interpolate_gap(MPI_Comm comm,
             const ptrdiff_t k = floor(grid_z);
 
             // If outside
-            if (i < 0 || j < 0 || k < 0 || (i + 1 >= nglobal[0]) || (j + 1 >= nglobal[1]) ||
-                (k + 1 >= nglobal[2])) {
+            if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) ||
+                (k + 1 >= n[2])) {
                 fprintf(stderr,
                         "warning (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n",
                         i,
                         j,
                         k,
-                        nglobal[0],
-                        nglobal[1],
-                        nglobal[2]);
+                        n[0],
+                        n[1],
+                        n[2]);
                 continue;
             }
 

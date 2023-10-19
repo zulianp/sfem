@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-int resample_gap(MPI_Comm comm,
+int resample_gap(
                  // Mesh
                  const enum ElemType element_type,
                  const ptrdiff_t nelements,
@@ -19,8 +19,7 @@ int resample_gap(MPI_Comm comm,
                  idx_t **const SFEM_RESTRICT elems,
                  geom_t **const SFEM_RESTRICT xyz,
                  // SDF
-                 const ptrdiff_t *const SFEM_RESTRICT nlocal,
-                 const ptrdiff_t *const SFEM_RESTRICT nglobal,
+                 const ptrdiff_t *const SFEM_RESTRICT n,
                  const ptrdiff_t *const SFEM_RESTRICT stride,
                  const geom_t *const SFEM_RESTRICT origin,
                  const geom_t *const SFEM_RESTRICT delta,
@@ -31,16 +30,10 @@ int resample_gap(MPI_Comm comm,
                  real_t *const SFEM_RESTRICT ynormal,
                  real_t *const SFEM_RESTRICT znormal);
 
-int interpolate_gap(MPI_Comm comm,
-                    // Mesh
-                    const enum ElemType element_type,
-                    const ptrdiff_t nelements,
-                    const ptrdiff_t nnodes,
-                    idx_t **const SFEM_RESTRICT elems,
+int interpolate_gap(const ptrdiff_t nnodes,
                     geom_t **const SFEM_RESTRICT xyz,
                     // SDF
-                    const ptrdiff_t *const SFEM_RESTRICT nlocal,
-                    const ptrdiff_t *const SFEM_RESTRICT nglobal,
+                    const ptrdiff_t *const SFEM_RESTRICT n,
                     const ptrdiff_t *const SFEM_RESTRICT stride,
                     const geom_t *const SFEM_RESTRICT origin,
                     const geom_t *const SFEM_RESTRICT delta,

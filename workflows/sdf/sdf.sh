@@ -13,6 +13,7 @@ PATH=$SCRIPTPATH/../../python/algebra:$PATH
 PATH=$SCRIPTPATH/../../python/sdf:$PATH
 PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
+# LAUNCH="mpiexec -np 2"
 LAUNCH=""
 
 if [[ $# -le "4" ]]
@@ -28,6 +29,8 @@ hmax=$2
 margin=$3
 db_out=$4
 boxed_mesh_raw=boxed_mesh
+
+
 
 if [[ -n "$5" ]]
 then
@@ -57,7 +60,7 @@ if [[ -n "$5" ]]
 then
 	cat metadata_sdf.float32.yml | tr ':' ' ' | awk '{print $1,$2}' | tr ' ' '=' > vars.sh
 	source vars.sh
-	SFEM_INTERPOLATE=1 gap_from_sdf $boxed_mesh_raw/skinned $nx $ny $nz $ox $oy $oz $dx $dy $dz $db_out sdf_on_mesh
+	SFEM_INTERPOLATE=1 $LAUNCH gap_from_sdf $boxed_mesh_raw/skinned $nx $ny $nz $ox $oy $oz $dx $dy $dz $db_out sdf_on_mesh
 	raw_to_db.py $boxed_mesh_raw/skinned gap.vtk --point_data="sdf_on_mesh/*float64.raw"
 fi
 

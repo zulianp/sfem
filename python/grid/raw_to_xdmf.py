@@ -7,6 +7,7 @@ import os
 def main(path):
     # Initial variable definition.
     path = os.path.abspath(path) 
+    binary_path = path
     pdir = os.path.dirname(path)
     fname, fextension = os.path.splitext(path)
     fname = os.path.basename(fname)
@@ -167,7 +168,7 @@ def main(path):
             <Geometry Reference="/Xdmf/Domain/Geometry[1]"/>
             <Attribute Name="U" Center="Node" AttributeType="{attribute_type}">
                 <DataItem Format="Binary" Dimensions="{dim} {block_size}" Endian="{endianess}" Precision="{precision}" NumberType="{number_type}">
-                    {file_name}.raw
+                    {binary_path}
                 </DataItem>
             </Attribute>
         </Grid>
@@ -181,7 +182,7 @@ def main(path):
         dy=dy,
         dz=dz,
         endianess=endianess,
-        file_name=file_name,
+        binary_path=binary_path,
         block_size=block_size,
         precision=precision,
         number_type=number_type,
