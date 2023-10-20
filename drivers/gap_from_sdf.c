@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-// #include <unistd.h>
 
 #include "matrixio_array.h"
 #include "matrixio_ndarray.h"
@@ -37,11 +36,6 @@ int main(int argc, char* argv[])
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
 
-    // if (size != 1) {
-    //     fprintf(stderr, "Parallel execution not supported!\n");
-    //     return EXIT_FAILURE;
-    // }
-
     if (argc != 13) {
         fprintf(stderr,
             "usage: %s <folder> <nx> <ny> <nz> <ox> <oy> <oz> <dx> <dy> <dz> "
@@ -67,8 +61,6 @@ int main(int argc, char* argv[])
         mkdir(output_folder, 0700);
     }
 
-    // sleep(3);
-
     mesh_t mesh;
     if (mesh_read(comm, folder, &mesh)) {
         return EXIT_FAILURE;
@@ -87,9 +79,9 @@ int main(int argc, char* argv[])
 
         double ndarray_read_tock = MPI_Wtime();
 
-        // if (!rank) {
-        printf("[%d] ndarray_read %g (seconds)\n", rank, ndarray_read_tock - ndarray_read_tick);
-        // }
+        if (!rank) {
+            printf("[%d] ndarray_read %g (seconds)\n", rank, ndarray_read_tock - ndarray_read_tick);
+        }
     }
 
     // X is contiguous
@@ -101,53 +93,23 @@ int main(int argc, char* argv[])
     real_t* znormal = malloc(mesh.nnodes * sizeof(real_t));
 
     if (size > 1) {
-        double redist_tick = MPI_Wtime();
-
-        geom_t zmin, zmax;
-        minmax(mesh.nnodes, mesh.points[2], &zmin, &zmax);
-
-        // Z is distributed
-        ptrdiff_t zoffset = 0;
-        MPI_Exscan(&nlocal[2], &zoffset, 1, MPI_LONG, MPI_SUM, comm);
-
-        // // Compute Local z-tile
-        ptrdiff_t sdf_start = (zmin - origin[2]) / delta[2];
-        ptrdiff_t sdf_end = (zmax - origin[2]) / delta[2];
-
-        // Make sure we are inside the grid
-        sdf_start = MAX(0, sdf_start);
-        sdf_end = MIN(nglobal[2], sdf_end + 1 + 1); // 1 for the rightside of the cell 1 for the exclusive range
-
-        ptrdiff_t pnlocal_z = (sdf_end - sdf_start);
-        geom_t* psdf = malloc(pnlocal_z * stride[2] * sizeof(geom_t));
-
-        array_range_select(comm, SFEM_MPI_GEOM_T, sdf, psdf,
-            // Size of z-slice
-            nlocal[2] * stride[2],
-            // starting offset
-            sdf_start * stride[2],
-            // ending offset
-            sdf_end * stride[2]);
-
-        // printf("%ld x %ld x %ld\n", nglobal[0], nglobal[1], nglobal[2]);
-        // printf("[%d] [%ld, %ld) %ld %f >= %f\n",
-        //     rank, sdf_start, sdf_end,
-        //     pnlocal_z, origin[2],
-        //     origin[2] + sdf_start * delta[2]);
-
-        origin[2] += sdf_start * delta[2];
-        nlocal[2] = pnlocal_z;
-
-        // printf("[%d] %ld x %ld x %ld\n", rank, nlocal[0], nlocal[1], nlocal[2]);
+        geom_t* psdf;
+        sdf_view(
+            comm,
+            mesh.nnodes,
+            mesh.points[2],
+            nlocal,
+            nglobal,
+            stride,
+            origin,
+            delta,
+            sdf,
+            &psdf,
+            &nlocal[2],
+            &origin[2]);
 
         free(sdf);
         sdf = psdf;
-
-        double redist_tock = MPI_Wtime();
-
-        // if (!rank) {
-        printf("[%d] redist %g (seconds)\n", rank, redist_tock - redist_tick);
-        // }
     }
 
     {
@@ -192,9 +154,9 @@ int main(int argc, char* argv[])
 
         double resample_tock = MPI_Wtime();
 
-        // if (!rank) {
-        printf("[%d] resample %g (seconds)\n", rank, resample_tock - resample_tick);
-        // }
+        if (!rank) {
+            printf("[%d] resample %g (seconds)\n", rank, resample_tock - resample_tick);
+        }
     }
 
     // Write result to disk
@@ -216,9 +178,9 @@ int main(int argc, char* argv[])
 
         double io_tock = MPI_Wtime();
 
-        // if (!rank) {
-        printf("[%d] write %g (seconds)\n", rank, io_tock - io_tick);
-        // }
+        if (!rank) {
+            printf("[%d] write %g (seconds)\n", rank, io_tock - io_tick);
+        }
     }
 
     ptrdiff_t nelements = mesh.nelements;

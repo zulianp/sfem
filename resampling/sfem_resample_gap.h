@@ -44,6 +44,20 @@ int interpolate_gap(const ptrdiff_t nnodes,
                     real_t *const SFEM_RESTRICT ynormal,
                     real_t *const SFEM_RESTRICT znormal);
 
+int sdf_view(
+    MPI_Comm comm,
+    const ptrdiff_t nnodes,
+    const geom_t* SFEM_RESTRICT z_coordinate,
+    const ptrdiff_t* const SFEM_RESTRICT nlocal,
+    const ptrdiff_t* const SFEM_RESTRICT nglobal,
+    const ptrdiff_t* const SFEM_RESTRICT stride,
+    const geom_t* const SFEM_RESTRICT origin,
+    const geom_t* const SFEM_RESTRICT delta,
+    const geom_t* const sdf,
+    geom_t** sdf_out,
+    ptrdiff_t* z_nlocal_out,
+    geom_t* const SFEM_RESTRICT z_origin_out);
+
 #ifdef __cplusplus
 }
 #endif
