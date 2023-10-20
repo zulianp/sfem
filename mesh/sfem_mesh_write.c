@@ -93,7 +93,7 @@ int write_mapped_field(MPI_Comm comm,
                        MPI_Datatype data_type,
                        const void *const data_in) {
     int rank, size;
-    MPI_Comm_size(comm, &rank);
+    MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
 
     const uint8_t *const data = (const uint8_t *const)data_in;
@@ -114,8 +114,7 @@ int write_mapped_field(MPI_Comm comm,
 
     for (ptrdiff_t i = 0; i < n_local; ++i) {
         const idx_t idx = mapping[i];
-        int dest_rank = idx / local_output_size_no_remainder;
-        assert(dest_rank < size);
+        int dest_rank = MIN(size - 1, idx / local_output_size_no_remainder);
         send_count[dest_rank]++;
     }
 
@@ -124,8 +123,7 @@ int write_mapped_field(MPI_Comm comm,
 
     int *send_displs = (int *)malloc(size * sizeof(int));
     int *recv_displs = (int *)malloc(size * sizeof(int));
-    count_t *book_keeping = (count_t *)malloc(size * sizeof(count_t));
-    memset(book_keeping, 0, size * sizeof(count_t));
+    count_t *book_keeping = (count_t *)calloc(size, sizeof(count_t));
 
     send_displs[0] = 0;
     recv_displs[0] = 0;
@@ -140,6 +138,8 @@ int write_mapped_field(MPI_Comm comm,
         recv_displs[i + 1] = recv_displs[i] + recv_count[i];
     }
 
+    const ptrdiff_t total_recv = recv_displs[size-1] + recv_count[size-1];
+
     idx_t *send_list = (idx_t *)malloc(n_local * sizeof(idx_t));
 
     ptrdiff_t n_buff = MAX(n_local, local_output_size);
@@ -148,13 +148,16 @@ int write_mapped_field(MPI_Comm comm,
     // Pack data and indices
     for (ptrdiff_t i = 0; i < n_local; ++i) {
         const idx_t idx = mapping[i];
-        int dest_rank = idx / local_output_size_no_remainder;
+        int dest_rank = MIN(size - 1, idx / local_output_size_no_remainder);
         assert(dest_rank < size);
 
         // Put index and data into buffers
-        const ptrdiff_t offset = book_keeping[dest_rank];
+        const ptrdiff_t offset = send_displs[dest_rank] + book_keeping[dest_rank];
         send_list[offset] = idx;
-        memcpy((void *)&send_data_and_final_storage[offset * type_size], (void *)&data[i * type_size], type_size);
+        memcpy(
+            (void *)&send_data_and_final_storage[offset * type_size], 
+            (void *)&data[i * type_size], 
+            type_size);
 
         book_keeping[dest_rank]++;
     }
@@ -167,21 +170,83 @@ int write_mapped_field(MPI_Comm comm,
     ///////////////////////////////////
 
     CATCH_MPI_ERROR(MPI_Alltoallv(
-        send_list, send_count, send_displs, SFEM_MPI_IDX_T, recv_list, recv_count, recv_displs, SFEM_MPI_IDX_T, comm));
+        send_list, send_count, send_displs, SFEM_MPI_IDX_T, 
+        recv_list, recv_count, recv_displs, SFEM_MPI_IDX_T, comm));
 
     ///////////////////////////////////
     // Send data
     ///////////////////////////////////
 
-    CATCH_MPI_ERROR(MPI_Alltoallv(send_data_and_final_storage,
-                                  send_count,
-                                  send_displs,
-                                  data_type,
-                                  recv_data,
-                                  recv_count,
-                                  recv_displs,
-                                  data_type,
-                                  comm));
+    CATCH_MPI_ERROR(MPI_Alltoallv(
+        send_data_and_final_storage, send_count, send_displs, data_type,
+        recv_data,                   recv_count, recv_displs, data_type, comm));
+
+
+    if(0)
+    {
+        for(int r = 0; r < size; r++) {
+            MPI_Barrier(comm);
+
+            if(r == rank) {
+                printf("[%d]\n", rank);
+                printf("\nsend_count\n");
+                for(int i = 0; i < size; i++) {
+                    printf("%d ", send_count[i]);
+                }
+
+                printf("\nsend_displs\n");
+                for(int i = 0; i < size; i++) {
+                    printf("%d ", send_displs[i]);
+                }
+
+                printf("\nrecv_count\n");
+                for(int i = 0; i < size; i++) {
+                    printf("%d ", recv_count[i]);
+                }
+
+                printf("\nrecv_displs\n");
+                for(int i = 0; i < size; i++) {
+                    printf("%d ", recv_displs[i]);
+                }
+
+                printf("\n");
+
+                idx_t min_idx = mapping[0];
+                idx_t max_idx = mapping[0];
+                for (ptrdiff_t i = 0; i < n_local; ++i) {
+                    const idx_t idx = mapping[i];
+                    min_idx = MIN(min_idx, idx);
+                    max_idx = MAX(max_idx, idx);
+                }
+
+                printf("[%d, %d]\n", min_idx, max_idx);
+                printf("%ld == %ld\n", total_recv, local_output_size);
+
+                for (ptrdiff_t recv_rank = 0; recv_rank < size; ++recv_rank) {
+                    if(recv_rank != rank) {
+                        for(int i = 0; i < send_count[recv_rank]; i++) {
+                            printf("%d ", (int)send_list[send_displs[recv_rank] + i]);
+                        }
+                    }
+                }
+
+                printf("\n");
+
+                for (ptrdiff_t i = 0; i < local_output_size; ++i) {
+                    ptrdiff_t dest = recv_list[i] - begin;
+
+                    if(dest < 0 || dest >= local_output_size) {
+                        printf("%d not in [%ld, %ld)\n", recv_list[i], begin, begin + local_output_size);
+                    }
+                }
+
+
+                fflush(stdout);
+            }
+
+            MPI_Barrier(comm);
+        }
+    }
 
     ///////////////////////////////////
     // Unpack indexed data
@@ -189,7 +254,6 @@ int write_mapped_field(MPI_Comm comm,
 
     for (ptrdiff_t i = 0; i < local_output_size; ++i) {
         ptrdiff_t dest = recv_list[i] - begin;
-
         assert(dest >= 0);
         assert(dest < local_output_size);
         memcpy((void *)&send_data_and_final_storage[dest * type_size], (void *)&recv_data[i * type_size], type_size);

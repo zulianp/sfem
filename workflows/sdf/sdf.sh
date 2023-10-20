@@ -13,8 +13,8 @@ PATH=$SCRIPTPATH/../../python/algebra:$PATH
 PATH=$SCRIPTPATH/../../python/sdf:$PATH
 PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
-# LAUNCH="mpiexec -np 2"
-LAUNCH=""
+LAUNCH="mpiexec -np 8"
+# LAUNCH=""
 
 if [[ $# -le "4" ]]
 then

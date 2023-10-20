@@ -476,8 +476,12 @@ int interpolate_gap(const ptrdiff_t nnodes,
             // If outside
             if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) ||
                 (k + 1 >= n[2])) {
+
+                int rank;
+                MPI_Comm_rank(MPI_COMM_WORLD, &rank);
                 fprintf(stderr,
-                        "warning (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n",
+                        "[%d] warning (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n",
+                        rank,
                         i,
                         j,
                         k,
