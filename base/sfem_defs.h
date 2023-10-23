@@ -12,6 +12,7 @@ enum ElemType {
     TRI3 = 3,
     QUAD4 = 40,
     TET4 = 4,
+    WEDGE6,
     TRI6 = 6,
     HEX8 = 8,
     TET10 = 10,
@@ -69,6 +70,8 @@ SFEM_INLINE static int elem_num_nodes(const enum ElemType type) {
             return 3;
         case TRI3:
             return 3;
+        case WEDGE6:
+            return 6;
         case QUAD4:
             return 4;
         case TET4:
@@ -98,6 +101,8 @@ SFEM_INLINE static int elem_num_sides(const enum ElemType type) {
             return 4;
         case TET4:
             return 4;
+        case WEDGE6:
+            return 5;
         case TRI6:
             return 3;
         case HEX8:
@@ -122,6 +127,8 @@ SFEM_INLINE static int elem_manifold_dim(const enum ElemType type) {
         case QUAD4:
             return 3;
         case TET4:
+            return 3;
+        case WEDGE6:
             return 3;
         case TRI6:
             return 2;

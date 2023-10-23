@@ -164,10 +164,12 @@ def main(argv):
     n_time_steps = 1
     time_whole=[]
 
+    cell_type = None
+
     try:
         opts, args = getopt.getopt(
             argv[3:], "p:d:c:t:h",
-            ["point_data=", "point_data_type=", "cell_data=", "cell_data_type=", "transient", "time_step_format", "n_time_steps=", "time_whole=", "time_whole_txt=", "help"])
+            ["point_data=", "point_data_type=", "cell_type=", "cell_data=", "cell_data_type=", "transient", "time_step_format", "n_time_steps=", "time_whole=", "time_whole_txt=", "help"])
 
     except getopt.GetoptError as err:
         print(err)
@@ -196,6 +198,8 @@ def main(argv):
             time_step_format = arg
         elif opt in ("--n_time_steps"):
             n_time_steps = int(arg)
+        elif opt in ("--cell_type"):
+            cell_type = arg
 
     if transient:
         if len(time_whole) == 0:
@@ -221,19 +225,20 @@ def main(argv):
             # No more indices to read!
             break
     
-    cell_type = None
-    if len(idx) == 3:
-        cell_type = "triangle"
-    elif len(idx) == 6:
-        cell_type = "triangle6"
-    elif len(idx) == 4:
-        cell_type = "tetra"
-    elif len(idx) == 8:
-        cell_type = "hexahedron"
-    elif len(idx) == 10:
-        cell_type = "tetra10"
-    elif len(idx) == 2:
-        cell_type = "line"
+
+    if cell_type == None:
+        if len(idx) == 3:
+            cell_type = "triangle"
+        elif len(idx) == 6:
+            cell_type = "triangle6"
+        elif len(idx) == 4:
+            cell_type = "tetra"
+        elif len(idx) == 8:
+            cell_type = "hexahedron"
+        elif len(idx) == 10:
+            cell_type = "tetra10"
+        elif len(idx) == 2:
+            cell_type = "line"
 
 
     print(f'numnodes = {len(idx)} -> {cell_type}')
