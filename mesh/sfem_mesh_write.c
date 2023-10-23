@@ -1,8 +1,8 @@
 #include "sfem_mesh_write.h"
 
+#include <stdint.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <stdint.h>
 #include <unistd.h>
 
 #include <assert.h>
@@ -17,59 +17,93 @@
 
 int mesh_write(const char *path, const mesh_t *mesh) {
     // TODO
-    MPI_Comm comm = mesh->comm;
+    // MPI_Comm comm = mesh->comm;
+    MPI_Comm comm = MPI_COMM_SELF;
 
     int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
+    MPI_Comm_rank(mesh->comm, &rank);
+    MPI_Comm_size(mesh->comm, &size);
 
     static const char *str_xyz = "xyzt";
 
+    char folder[2048];
     char output_path[2048];
 
-    struct stat st = {0};
-    if (stat(path, &st) == -1) {
-        mkdir(path, 0700);
+    {
+        struct stat st = {0};
+        if (stat(path, &st) == -1) {
+            mkdir(path, 0700);
+        }
     }
 
-    if (size == 1) {
-        for (int d = 0; d < mesh->spatial_dim; ++d) {
-            sprintf(output_path, "%s/%c.raw", path, str_xyz[d]);
-            array_write(comm, output_path, SFEM_MPI_GEOM_T, mesh->points[d], mesh->nnodes, mesh->nnodes);
-        }
+    sprintf(folder, "%s/%d", path, rank);
 
-        const int nxe = elem_num_nodes(mesh->element_type);
-        for (int d = 0; d < nxe; ++d) {
-            sprintf(output_path, "%s/i%d.raw", path, d);
-            array_write(comm, output_path, SFEM_MPI_IDX_T, mesh->elements[d], mesh->nelements, mesh->nelements);
+    {
+        struct stat st = {0};
+        if (stat(folder, &st) == -1) {
+            mkdir(folder, 0700);
         }
-
-        if (mesh->node_mapping) {
-            sprintf(output_path, "%s/node_mapping.raw", path);
-            array_write(comm, output_path, SFEM_MPI_IDX_T, mesh->node_mapping, mesh->nnodes, mesh->nnodes);
-        }
-
-        if (mesh->element_mapping) {
-            sprintf(output_path, "%s/element_mapping.raw", path);
-            array_write(comm, output_path, SFEM_MPI_IDX_T, mesh->element_mapping, mesh->nelements, mesh->nelements);
-        }
-
-        if (mesh->node_owner) {
-            sprintf(output_path, "%s/node_owner.raw", path);
-            array_write(comm, output_path, SFEM_MPI_IDX_T, mesh->node_owner, mesh->nnodes, mesh->nnodes);
-        }
-
-        return 0;
-    } else {
-        // TODO
-        assert(0);
-        return 1;
     }
+
+    if (!rank) {
+        printf("Writing mesh in %s\n", folder);
+    }
+
+    // if (size == 1) {
+    for (int d = 0; d < mesh->spatial_dim; ++d) {
+        sprintf(output_path, "%s/%c.raw", folder, str_xyz[d]);
+        array_write(
+            comm, output_path, SFEM_MPI_GEOM_T, mesh->points[d], mesh->nnodes, mesh->nnodes);
+    }
+
+    const int nxe = elem_num_nodes(mesh->element_type);
+    for (int d = 0; d < nxe; ++d) {
+        sprintf(output_path, "%s/i%d.raw", folder, d);
+        array_write(comm,
+                    output_path,
+                    SFEM_MPI_IDX_T,
+                    mesh->elements[d],
+                    mesh->n_owned_elements,
+                    mesh->n_owned_elements);
+    }
+
+    if (mesh->node_mapping) {
+        sprintf(output_path, "%s/node_mapping.raw", folder);
+        array_write(
+            comm, output_path, SFEM_MPI_IDX_T, mesh->node_mapping, mesh->nnodes, mesh->nnodes);
+    }
+
+    if (mesh->element_mapping) {
+        sprintf(output_path, "%s/element_mapping.raw", folder);
+        array_write(comm,
+                    output_path,
+                    SFEM_MPI_IDX_T,
+                    mesh->element_mapping,
+                    mesh->n_owned_elements,
+                    mesh->n_owned_elements);
+    }
+
+    if (mesh->node_owner) {
+        sprintf(output_path, "%s/node_owner.raw", folder);
+        array_write(
+            comm, output_path, SFEM_MPI_IDX_T, mesh->node_owner, mesh->nnodes, mesh->nnodes);
+    }
+
+    return 0;
+    // } else {
+    //     // TODO
+    //     assert(0);
+    //     return 1;
+    // }
 }
 
-int mesh_write_nodal_field(const mesh_t *const mesh, const char *path, MPI_Datatype data_type, const void *const data) {
+int mesh_write_nodal_field(const mesh_t *const mesh,
+                           const char *path,
+                           MPI_Datatype data_type,
+                           const void *const data) {
     count_t n_global_nodes = mesh->n_owned_nodes;
-    CATCH_MPI_ERROR(MPI_Allreduce(MPI_IN_PLACE, &n_global_nodes, 1, SFEM_MPI_COUNT_T, MPI_SUM, mesh->comm));
+    CATCH_MPI_ERROR(
+        MPI_Allreduce(MPI_IN_PLACE, &n_global_nodes, 1, SFEM_MPI_COUNT_T, MPI_SUM, mesh->comm));
 
     if (!mesh->node_mapping) {
 #ifndef NDEBUG
@@ -80,8 +114,13 @@ int mesh_write_nodal_field(const mesh_t *const mesh, const char *path, MPI_Datat
         return array_write(mesh->comm, path, data_type, data, mesh->n_owned_nodes, n_global_nodes);
 
     } else {
-        return write_mapped_field(
-            mesh->comm, path, mesh->n_owned_nodes, n_global_nodes, mesh->node_mapping, data_type, data);
+        return write_mapped_field(mesh->comm,
+                                  path,
+                                  mesh->n_owned_nodes,
+                                  n_global_nodes,
+                                  mesh->node_mapping,
+                                  data_type,
+                                  data);
     }
 }
 
@@ -119,7 +158,8 @@ int write_mapped_field(MPI_Comm comm,
     }
 
     idx_t *recv_count = (idx_t *)malloc((size) * sizeof(idx_t));
-    CATCH_MPI_ERROR(MPI_Alltoall(send_count, 1, SFEM_MPI_IDX_T, recv_count, 1, SFEM_MPI_IDX_T, comm));
+    CATCH_MPI_ERROR(
+        MPI_Alltoall(send_count, 1, SFEM_MPI_IDX_T, recv_count, 1, SFEM_MPI_IDX_T, comm));
 
     int *send_displs = (int *)malloc(size * sizeof(int));
     int *recv_displs = (int *)malloc(size * sizeof(int));
@@ -138,7 +178,7 @@ int write_mapped_field(MPI_Comm comm,
         recv_displs[i + 1] = recv_displs[i] + recv_count[i];
     }
 
-    const ptrdiff_t total_recv = recv_displs[size-1] + recv_count[size-1];
+    const ptrdiff_t total_recv = recv_displs[size - 1] + recv_count[size - 1];
 
     idx_t *send_list = (idx_t *)malloc(n_local * sizeof(idx_t));
 
@@ -154,10 +194,9 @@ int write_mapped_field(MPI_Comm comm,
         // Put index and data into buffers
         const ptrdiff_t offset = send_displs[dest_rank] + book_keeping[dest_rank];
         send_list[offset] = idx;
-        memcpy(
-            (void *)&send_data_and_final_storage[offset * type_size], 
-            (void *)&data[i * type_size], 
-            type_size);
+        memcpy((void *)&send_data_and_final_storage[offset * type_size],
+               (void *)&data[i * type_size],
+               type_size);
 
         book_keeping[dest_rank]++;
     }
@@ -169,43 +208,53 @@ int write_mapped_field(MPI_Comm comm,
     // Send indices
     ///////////////////////////////////
 
-    CATCH_MPI_ERROR(MPI_Alltoallv(
-        send_list, send_count, send_displs, SFEM_MPI_IDX_T, 
-        recv_list, recv_count, recv_displs, SFEM_MPI_IDX_T, comm));
+    CATCH_MPI_ERROR(MPI_Alltoallv(send_list,
+                                  send_count,
+                                  send_displs,
+                                  SFEM_MPI_IDX_T,
+                                  recv_list,
+                                  recv_count,
+                                  recv_displs,
+                                  SFEM_MPI_IDX_T,
+                                  comm));
 
     ///////////////////////////////////
     // Send data
     ///////////////////////////////////
 
-    CATCH_MPI_ERROR(MPI_Alltoallv(
-        send_data_and_final_storage, send_count, send_displs, data_type,
-        recv_data,                   recv_count, recv_displs, data_type, comm));
+    CATCH_MPI_ERROR(MPI_Alltoallv(send_data_and_final_storage,
+                                  send_count,
+                                  send_displs,
+                                  data_type,
+                                  recv_data,
+                                  recv_count,
+                                  recv_displs,
+                                  data_type,
+                                  comm));
 
-
-    if(0)
-    {
-        for(int r = 0; r < size; r++) {
+    if (0) {
+        for (int r = 0; r < size; r++) {
             MPI_Barrier(comm);
 
-            if(r == rank) {
+            if (r == rank) {
                 printf("[%d]\n", rank);
                 printf("\nsend_count\n");
-                for(int i = 0; i < size; i++) {
+                for (int i = 0; i < size; i++) {
                     printf("%d ", send_count[i]);
                 }
 
                 printf("\nsend_displs\n");
-                for(int i = 0; i < size; i++) {
+                for (int i = 0; i < size; i++) {
                     printf("%d ", send_displs[i]);
                 }
 
                 printf("\nrecv_count\n");
-                for(int i = 0; i < size; i++) {
+                for (int i = 0; i < size; i++) {
                     printf("%d ", recv_count[i]);
                 }
 
                 printf("\nrecv_displs\n");
-                for(int i = 0; i < size; i++) {
+                for (int i = 0; i < size; i++) {
                     printf("%d ", recv_displs[i]);
                 }
 
@@ -223,8 +272,8 @@ int write_mapped_field(MPI_Comm comm,
                 printf("%ld == %ld\n", total_recv, local_output_size);
 
                 for (ptrdiff_t recv_rank = 0; recv_rank < size; ++recv_rank) {
-                    if(recv_rank != rank) {
-                        for(int i = 0; i < send_count[recv_rank]; i++) {
+                    if (recv_rank != rank) {
+                        for (int i = 0; i < send_count[recv_rank]; i++) {
                             printf("%d ", (int)send_list[send_displs[recv_rank] + i]);
                         }
                     }
@@ -235,11 +284,13 @@ int write_mapped_field(MPI_Comm comm,
                 for (ptrdiff_t i = 0; i < local_output_size; ++i) {
                     ptrdiff_t dest = recv_list[i] - begin;
 
-                    if(dest < 0 || dest >= local_output_size) {
-                        printf("%d not in [%ld, %ld)\n", recv_list[i], begin, begin + local_output_size);
+                    if (dest < 0 || dest >= local_output_size) {
+                        printf("%d not in [%ld, %ld)\n",
+                               recv_list[i],
+                               begin,
+                               begin + local_output_size);
                     }
                 }
-
 
                 fflush(stdout);
             }
@@ -256,10 +307,17 @@ int write_mapped_field(MPI_Comm comm,
         ptrdiff_t dest = recv_list[i] - begin;
         assert(dest >= 0);
         assert(dest < local_output_size);
-        memcpy((void *)&send_data_and_final_storage[dest * type_size], (void *)&recv_data[i * type_size], type_size);
+        memcpy((void *)&send_data_and_final_storage[dest * type_size],
+               (void *)&recv_data[i * type_size],
+               type_size);
     }
 
-    array_write(comm, output_path, data_type, (void *)send_data_and_final_storage, local_output_size, n_global);
+    array_write(comm,
+                output_path,
+                data_type,
+                (void *)send_data_and_final_storage,
+                local_output_size,
+                n_global);
 
     ///////////////////////////////////
     // Clean-up
