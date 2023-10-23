@@ -47,7 +47,6 @@ void extrude(
     }
 
     for (ptrdiff_t i = 0; i < nsides; ++i) {
-
         const idx_t i0 = sides[0][i];
         const idx_t i1 = sides[1][i];
         const idx_t i2 = sides[2][i];
@@ -100,7 +99,6 @@ void extrude(
             extruded_elements[3 + d][i] = extruded_node;
         }
     }
-
 
     for (ptrdiff_t i = 0; i < nnodes; ++i) {
         for (int dd = 0; dd < 3; dd++) {
@@ -157,6 +155,11 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
+    if(mesh.element_type != TRI3) {
+        fprintf(stderr, "This code only supports mesh with element type TRI3\n");
+        return EXIT_FAILURE;
+    }
+
     mesh_t extruded;
     mesh_init(&extruded);
 
@@ -168,6 +171,7 @@ int main(int argc, char* argv[])
 
     extruded.nelements = mesh.nelements;
     extruded.nnodes = mesh.nnodes * 2;
+    extruded.n_owned_elements = extruded.nelements;
 
     extruded.node_mapping = 0;
     extruded.element_mapping = 0;
