@@ -3,8 +3,8 @@
 
 #include <math.h>
 
-#define MAX(a, b) ((a) > (b)? (a) : (b))
-#define MIN(a, b) ((a) < (b)? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 void mesh_init(mesh_t *mesh) {
     mesh->comm = MPI_COMM_NULL;
@@ -51,13 +51,13 @@ void mesh_minmax_edge_length(const mesh_t *const mesh, real_t *emin, real_t *ema
             for (int i = 0; i < nnxe; i++) {
                 idx_t node_i = mesh->elements[i][e];
 
-                for (int j = i+1; j < nnxe; j++) {
+                for (int j = i + 1; j < nnxe; j++) {
                     idx_t node_j = mesh->elements[j][e];
 
                     real_t len = 0;
-                    for(int d = 0; d < sdim; d++) {
+                    for (int d = 0; d < sdim; d++) {
                         real_t diff = mesh->points[d][node_i] - mesh->points[d][node_j];
-                        len += diff*diff;
+                        len += diff * diff;
                     }
 
                     len = sqrt(len);
@@ -67,7 +67,7 @@ void mesh_minmax_edge_length(const mesh_t *const mesh, real_t *emin, real_t *ema
                 }
             }
 
-            #pragma omp critical
+#pragma omp critical
             {
                 *emin = MIN(*emin, len_min);
                 *emax = MAX(*emax, len_max);
@@ -78,7 +78,7 @@ void mesh_minmax_edge_length(const mesh_t *const mesh, real_t *emin, real_t *ema
     int size;
     MPI_Comm_size(mesh->comm, &size);
 
-    if(size > 1) {
+    if (size > 1) {
         // IMPLEMENT ME
         assert(0);
         MPI_Abort(mesh->comm, -1);
@@ -92,9 +92,11 @@ void mesh_destroy(mesh_t *mesh) {
         mesh->elements[d] = 0;
     }
 
-    for (int d = 0; d < mesh->spatial_dim; ++d) {
-        free(mesh->points[d]);
-        mesh->points[d] = 0;
+    if (mesh->points) {
+        for (int d = 0; d < mesh->spatial_dim; ++d) {
+            free(mesh->points[d]);
+            mesh->points[d] = 0;
+        }
     }
 
     free(mesh->node_mapping);
