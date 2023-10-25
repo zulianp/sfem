@@ -84,7 +84,7 @@ INCLUDES += -I$(PWD) -I$(PWD)/.. -I$(PWD)/../matrix.io
 GOALS = assemble assemble3 assemble4 neohookean_assemble stokes stokes_check linear_elasticity_assemble
 
 # Mesh manipulation
-GOALS += partition select_submesh refine skin extrude select_surf volumes sfc
+GOALS += partition select_submesh refine skin extrude mesh_self_intersect select_surf volumes sfc
 GOALS += mesh_p1_to_p2 create_dual_graph create_element_adjaciency_table create_surface_from_element_adjaciency_table
 
 # FE post-process
@@ -320,6 +320,9 @@ refine : refine.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 skin : skin.c extract_surface_graph.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
+
+mesh_self_intersect : mesh_self_intersect.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
 extrude : extrude.c libsfem.a

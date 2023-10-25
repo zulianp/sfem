@@ -12,7 +12,7 @@ enum ElemType {
     TRI3 = 3,
     QUAD4 = 40,
     TET4 = 4,
-    WEDGE6,
+    WEDGE6 = 1006,
     TRI6 = 6,
     HEX8 = 8,
     TET10 = 10,
