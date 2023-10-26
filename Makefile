@@ -256,7 +256,7 @@ bgs : bgs.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 isolver_lsolve_frontend.o : ../isolver/plugin/lsolve/isolver_lsolve_frontend.cpp
-	$(MPICXX) $(CXXFLAGS) $(INTERNAL_CXXFLAGS) $(INCLUDES) $(ISOLVER_INCLUDES) -c $<
+	$(MPICXX) $(CXXFLAGS) $(INCLUDES) $(ISOLVER_INCLUDES) -c $<
 
 cauchy_stress : cauchy_stress.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
