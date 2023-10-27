@@ -83,42 +83,55 @@ static void compute_vertex_pseudo_normals_3(const ptrdiff_t nelements,
         memset(normals[d], 0, nnodes * sizeof(geom_t));
     }
 
-    for (ptrdiff_t e = 0; e < nelements; e++) {
-        const idx_t i0 = elements[0][e];
-        const idx_t i1 = elements[1][e];
-        const idx_t i2 = elements[2][e];
+#pragma omp parallel
+    {
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; e++) {
+            const idx_t i0 = elements[0][e];
+            const idx_t i1 = elements[1][e];
+            const idx_t i2 = elements[2][e];
 
-        const geom_t p0[3] = {points[0][i0], points[1][i0], points[2][i0]};
+            const geom_t p0[3] = {points[0][i0], points[1][i0], points[2][i0]};
 
-        const geom_t u[3] = {points[0][i1] - points[0][i0],
-                             points[1][i1] - points[1][i0],
-                             points[2][i1] - points[2][i0]};
+            const geom_t u[3] = {points[0][i1] - points[0][i0],
+                                 points[1][i1] - points[1][i0],
+                                 points[2][i1] - points[2][i0]};
 
-        const geom_t v[3] = {points[0][i2] - points[0][i0],
-                             points[1][i2] - points[1][i0],
-                             points[2][i2] - points[2][i0]};
-        geom_t n[3];
-        cross3(u, v, n);
-        normalize(n);
+            const geom_t v[3] = {points[0][i2] - points[0][i0],
+                                 points[1][i2] - points[1][i0],
+                                 points[2][i2] - points[2][i0]};
+            geom_t n[3];
+            cross3(u, v, n);
+            normalize(n);
 
-        for (int d = 0; d < 3; d++) {
-            normals[d][i0] += n[d];
-            normals[d][i1] += n[d];
-            normals[d][i2] += n[d];
+            for (int d = 0; d < 3; d++) {
+#pragma omp atomic update
+                normals[d][i0] += n[d];
+
+#pragma omp atomic update
+                normals[d][i1] += n[d];
+
+#pragma omp atomic update
+                normals[d][i2] += n[d];
+            }
         }
     }
 
-    for (ptrdiff_t i = 0; i < nnodes; i++) {
-        geom_t n[3] = {
-            normals[0][i],
-            normals[1][i],
-            normals[2][i],
-        };
+#pragma omp parallel
+    {
+#pragma omp for
+        for (ptrdiff_t i = 0; i < nnodes; i++) {
+            geom_t n[3] = {
+                normals[0][i],
+                normals[1][i],
+                normals[2][i],
+            };
 
-        normalize(n);
-        normals[0][i] = n[0];
-        normals[1][i] = n[1];
-        normals[2][i] = n[2];
+            normalize(n);
+            normals[0][i] = n[0];
+            normals[1][i] = n[1];
+            normals[2][i] = n[2];
+        }
     }
 }
 
@@ -133,65 +146,69 @@ void compute_sdf(const ptrdiff_t nelements,
                  geom_t* const SFEM_RESTRICT sdf) {
     static const geom_t infty = 1e8;
 
-    for (ptrdiff_t k = 0; k < size[2]; k++) {
-        for (ptrdiff_t j = 0; j < size[1]; j++) {
-            for (ptrdiff_t i = 0; i < size[0]; i++) {
-                geom_t e_min = infty;
-                geom_t e_sign = 1;
+#pragma omp parallel
+    {
+#pragma omp for
+        for (ptrdiff_t k = 0; k < size[2]; k++) {
+            for (ptrdiff_t j = 0; j < size[1]; j++) {
+                for (ptrdiff_t i = 0; i < size[0]; i++) {
+                    geom_t e_min = infty;
+                    geom_t e_sign = 1;
 
-                for (ptrdiff_t e = 0; e < nelements; e++) {
-                    geom_t temp = infty;
+                    for (ptrdiff_t e = 0; e < nelements; e++) {
+                        geom_t temp = infty;
 
-                    const idx_t i0 = elements[0][e];
-                    const idx_t i1 = elements[1][e];
-                    const idx_t i2 = elements[2][e];
+                        const idx_t i0 = elements[0][e];
+                        const idx_t i1 = elements[1][e];
+                        const idx_t i2 = elements[2][e];
 
-                    const geom_t gpx = origin[0] + i * delta[0];
-                    const geom_t gpy = origin[1] + j * delta[1];
-                    const geom_t gpz = origin[2] + k * delta[2];
-                    const geom_t p[3] = {gpx, gpy, gpz};
+                        const geom_t gpx = origin[0] + i * delta[0];
+                        const geom_t gpy = origin[1] + j * delta[1];
+                        const geom_t gpz = origin[2] + k * delta[2];
+                        const geom_t p[3] = {gpx, gpy, gpz};
 
-                    const geom_t x[3] = {points[0][i0], points[0][i1], points[0][i2]};
-                    const geom_t y[3] = {points[1][i0], points[1][i1], points[1][i2]};
-                    const geom_t z[3] = {points[2][i0], points[2][i1], points[2][i2]};
-                    geom_t n[3] = {0., 0., 0.};
+                        const geom_t x[3] = {points[0][i0], points[0][i1], points[0][i2]};
+                        const geom_t y[3] = {points[1][i0], points[1][i1], points[1][i2]};
+                        const geom_t z[3] = {points[2][i0], points[2][i1], points[2][i2]};
+                        geom_t n[3] = {0., 0., 0.};
 
-                    point_triangle_distance_result_t result;
-                    point_triangle_distance(p, x, y, z, &result);
+                        point_triangle_distance_result_t result;
+                        point_triangle_distance(p, x, y, z, &result);
 
-                    geom_t diff[3];
-                    distance3(p, result.point, diff);
-                    const geom_t d =
-                        sqrt(diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]);
+                        geom_t diff[3];
+                        distance3(p, result.point, diff);
+                        const geom_t d =
+                            sqrt(diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]);
 
-                    if (d < e_min) {
-                        e_min = d;
+                        if (d < e_min) {
+                            e_min = d;
 
-                        if (d == 0) {
-                            e_sign = 1;
-                        } else {
-                            const geom_t phi1 = result.s;
-                            const geom_t phi2 = result.t;
-                            const geom_t phi0 = 1 - phi1 - phi2;
-
-                            n[0] = phi0 * normals[0][i0] + phi1 * normals[0][i1] +
-                                   phi2 * normals[0][i2];
-                            n[1] = phi0 * normals[1][i0] + phi1 * normals[1][i1] +
-                                   phi2 * normals[1][i2];
-                            n[2] = phi0 * normals[2][i0] + phi1 * normals[2][i1] +
-                                   phi2 * normals[2][i2];
-
-                            normalize(n);
-                            if (dot3(diff, n) < 0) {
-                                e_sign = -1;
-                            } else {
+                            if (d == 0) {
                                 e_sign = 1;
+                            } else {
+                                const geom_t phi1 = result.s;
+                                const geom_t phi2 = result.t;
+                                const geom_t phi0 = 1 - phi1 - phi2;
+
+                                n[0] = phi0 * normals[0][i0] + phi1 * normals[0][i1] +
+                                       phi2 * normals[0][i2];
+                                n[1] = phi0 * normals[1][i0] + phi1 * normals[1][i1] +
+                                       phi2 * normals[1][i2];
+                                n[2] = phi0 * normals[2][i0] + phi1 * normals[2][i1] +
+                                       phi2 * normals[2][i2];
+
+                                normalize(n);
+                                if (dot3(diff, n) < 0) {
+                                    e_sign = -1;
+                                } else {
+                                    e_sign = 1;
+                                }
                             }
                         }
                     }
-                }
 
-                sdf[k * stride[2] + j * stride[1] + i * stride[0]] = e_sign * e_min;
+                    sdf[k * stride[2] + j * stride[1] + i * stride[0]] = e_sign * e_min;
+                }
             }
         }
     }
@@ -231,7 +248,7 @@ int main(int argc, char* argv[]) {
 
     geom_t origin[3], box_max[3];
 
-    { // AABB
+    {  // AABB
         if (SFEM_BOXED_MESH) {
             // FIXME we do not actually need to read the mesh!
             mesh_t boxed_mesh;
@@ -287,8 +304,8 @@ int main(int argc, char* argv[]) {
     compute_sdf(
         mesh.nelements, mesh.elements, mesh.points, normals, nglobal, stride, origin, delta, sdf);
 
-    ptrdiff_t nelements = mesh.nelements;
-    ptrdiff_t nnodes = mesh.nnodes;
+    const ptrdiff_t nelements = mesh.nelements;
+    const ptrdiff_t nnodes = mesh.nnodes;
 
     char data_path[2048];
     sprintf(data_path, "%s/sdf.float32.raw", output_folder);
