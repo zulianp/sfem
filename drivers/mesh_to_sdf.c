@@ -15,6 +15,7 @@
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define GEOM_SQRT sqrtf
 
 int write_metadata(const char* meta_data_path,
                    const char* data_path,
@@ -68,7 +69,7 @@ static SFEM_INLINE void distance3(const geom_t* const SFEM_RESTRICT p,
 }
 
 static SFEM_INLINE void normalize(geom_t* const vec3) {
-    const geom_t len = sqrt(vec3[0] * vec3[0] + vec3[1] * vec3[1] + vec3[2] * vec3[2]);
+    const geom_t len = GEOM_SQRT(vec3[0] * vec3[0] + vec3[1] * vec3[1] + vec3[2] * vec3[2]);
     vec3[0] /= len;
     vec3[1] /= len;
     vec3[2] /= len;
@@ -90,8 +91,6 @@ static void compute_vertex_pseudo_normals_3(const ptrdiff_t nelements,
             const idx_t i0 = elements[0][e];
             const idx_t i1 = elements[1][e];
             const idx_t i2 = elements[2][e];
-
-            const geom_t p0[3] = {points[0][i0], points[1][i0], points[2][i0]};
 
             const geom_t u[3] = {points[0][i1] - points[0][i0],
                                  points[1][i1] - points[1][i0],
@@ -146,6 +145,8 @@ void compute_sdf(const ptrdiff_t nelements,
                  geom_t* const SFEM_RESTRICT sdf) {
     static const geom_t infty = 1e8;
 
+    const double tick = MPI_Wtime();
+
 #pragma omp parallel
     {
 #pragma omp for
@@ -155,6 +156,7 @@ void compute_sdf(const ptrdiff_t nelements,
                     geom_t e_min = infty;
                     geom_t e_sign = 1;
 
+                    // Brute force
                     for (ptrdiff_t e = 0; e < nelements; e++) {
                         geom_t temp = infty;
 
@@ -178,7 +180,7 @@ void compute_sdf(const ptrdiff_t nelements,
                         geom_t diff[3];
                         distance3(p, result.point, diff);
                         const geom_t d =
-                            sqrt(diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]);
+                            GEOM_SQRT(diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]);
 
                         if (d < e_min) {
                             e_min = d;
@@ -188,12 +190,14 @@ void compute_sdf(const ptrdiff_t nelements,
                             } else {
                                 const geom_t phi1 = result.s;
                                 const geom_t phi2 = result.t;
-                                const geom_t phi0 = 1 - phi1 - phi2;
+                                const geom_t phi0 = 1.0 - phi1 - phi2;
 
                                 n[0] = phi0 * normals[0][i0] + phi1 * normals[0][i1] +
                                        phi2 * normals[0][i2];
+
                                 n[1] = phi0 * normals[1][i0] + phi1 * normals[1][i1] +
                                        phi2 * normals[1][i2];
+
                                 n[2] = phi0 * normals[2][i0] + phi1 * normals[2][i1] +
                                        phi2 * normals[2][i2];
 
@@ -212,6 +216,9 @@ void compute_sdf(const ptrdiff_t nelements,
             }
         }
     }
+
+    const double tock = MPI_Wtime();
+    printf("mesh_to_sdf.c: compute_sdf:\t\t\t%g seconds\n", tock - tick);
 }
 
 int main(int argc, char* argv[]) {
@@ -234,12 +241,27 @@ int main(int argc, char* argv[]) {
     geom_t SFEM_SCALE_BOX = 1;
     SFEM_READ_ENV(SFEM_SCALE_BOX, atof);
 
+    if (!rank) {
+        printf(
+            "SFEM_BOXED_MESH=%s\n"
+            "SFEM_SCALE_BOX=%f\n",
+            SFEM_BOXED_MESH,
+            SFEM_SCALE_BOX);
+    }
+
     double tick = MPI_Wtime();
 
     const char* folder = argv[1];
     const geom_t hmax = atof(argv[2]);
     const geom_t margin = atof(argv[3]);
     const char* output_folder = argv[4];
+
+    {
+        struct stat st = {0};
+        if (stat(output_folder, &st) == -1) {
+            mkdir(output_folder, 0700);
+        }
+    }
 
     mesh_t mesh;
     if (mesh_read(comm, folder, &mesh)) {
@@ -250,7 +272,7 @@ int main(int argc, char* argv[]) {
 
     {  // AABB
         if (SFEM_BOXED_MESH) {
-            // FIXME we do not actually need to read the mesh!
+            // FIXME we do not actually need to read the mesh! only the points!
             mesh_t boxed_mesh;
             if (mesh_read(comm, SFEM_BOXED_MESH, &boxed_mesh)) {
                 return EXIT_FAILURE;
@@ -264,6 +286,13 @@ int main(int argc, char* argv[]) {
         } else {
             for (int d = 0; d < mesh.spatial_dim; d++) {
                 minmax(mesh.nnodes, mesh.points[d], &origin[d], &box_max[d]);
+            }
+        }
+
+        if (margin != 0) {
+            for (int d = 0; d < mesh.spatial_dim; d++) {
+                origin[d] -= margin;
+                box_max[d] += margin;
             }
         }
 
@@ -299,7 +328,9 @@ int main(int argc, char* argv[]) {
     ptrdiff_t nglobal[3] = {nx, ny, nz};
     ptrdiff_t stride[3] = {1, nx, nx * ny};
     geom_t delta[3] = {x_range / (nx - 1), y_range / (ny - 1), z_range / (nz - 1)};
-    geom_t* sdf = malloc(nglobal[0] * nglobal[1] * nglobal[2] * sizeof(geom_t));
+
+    ptrdiff_t sdf_size = nglobal[0] * nglobal[1] * nglobal[2];
+    geom_t* sdf = malloc(sdf_size * sizeof(geom_t));
 
     compute_sdf(
         mesh.nelements, mesh.elements, mesh.points, normals, nglobal, stride, origin, delta, sdf);
@@ -309,12 +340,12 @@ int main(int argc, char* argv[]) {
 
     char data_path[2048];
     sprintf(data_path, "%s/sdf.float32.raw", output_folder);
-    ptrdiff_t sdf_size = nglobal[0] * nglobal[1] * nglobal[2];
+
     array_write(comm, data_path, SFEM_MPI_GEOM_T, sdf, sdf_size, sdf_size);
 
     if (!rank) {
         char meta_data_path[2048];
-        sprintf(meta_data_path, "%s/metadata_sdf.float32.raw", output_folder);
+        sprintf(meta_data_path, "%s/metadata_sdf.float32.yml", output_folder);
         write_metadata(meta_data_path, data_path, nglobal, origin, delta);
     }
 
@@ -328,7 +359,7 @@ int main(int argc, char* argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld #grid (%ld x %ld x %ld)\n",
+        printf("mesh_to_sdf.c: #elements %ld #nodes %ld #grid (%ld x %ld x %ld)\n",
                (long)nelements,
                (long)nnodes,
                nglobal[0],

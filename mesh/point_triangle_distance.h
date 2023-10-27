@@ -38,8 +38,9 @@ static SFEM_INLINE void point_triangle_distance(
     const geom_t *const SFEM_RESTRICT y_triangle,
     const geom_t *const SFEM_RESTRICT z_triangle,
     point_triangle_distance_result_t *const SFEM_RESTRICT result) {
-    const geom_t diff[3] = {
-        x_triangle[0] - point[0], y_triangle[0] - point[0], z_triangle[0] - point[0]};
+    const geom_t diff[3] = {x_triangle[0] - point[0],  //
+                            y_triangle[0] - point[1],  //
+                            z_triangle[0] - point[2]};
 
     const geom_t edge0[3] = {x_triangle[1] - x_triangle[0],
                              y_triangle[1] - y_triangle[0],
