@@ -15,7 +15,8 @@
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
-#define GEOM_SQRT sqrtf
+#define SDF_SQRT sqrt
+#define SDF_CEIL ceil
 
 int write_metadata(const char* meta_data_path,
                    const char* data_path,
@@ -29,12 +30,12 @@ int write_metadata(const char* meta_data_path,
     fprintf(file, "nz: %ld\n", size[2]);
     fprintf(file, "block_size: 1\n");
     fprintf(file, "type: float\n");
-    fprintf(file, "ox: %f\n", origin[0]);
-    fprintf(file, "oy: %f\n", origin[1]);
-    fprintf(file, "oz: %f\n", origin[2]);
-    fprintf(file, "dx: %f\n", delta[0]);
-    fprintf(file, "dy: %f\n", delta[1]);
-    fprintf(file, "dz: %f\n", delta[2]);
+    fprintf(file, "ox: %.15f\n", origin[0]);
+    fprintf(file, "oy: %.15f\n", origin[1]);
+    fprintf(file, "oz: %.15f\n", origin[2]);
+    fprintf(file, "dx: %.15f\n", delta[0]);
+    fprintf(file, "dy: %.15f\n", delta[1]);
+    fprintf(file, "dz: %.15f\n", delta[2]);
     fprintf(file, "path: %s\n", data_path);
     fclose(file);
     return EXIT_SUCCESS;
@@ -60,7 +61,7 @@ static SFEM_INLINE void cross3(const geom_t* const SFEM_RESTRICT u,
     n[2] = u[0] * v[1] - u[1] * v[0];
 }
 
-static SFEM_INLINE void distance3(const geom_t* const SFEM_RESTRICT p,
+static SFEM_INLINE void diff3(const geom_t* const SFEM_RESTRICT p,
                                   const geom_t* const SFEM_RESTRICT q,
                                   geom_t* const SFEM_RESTRICT diff) {
     diff[0] = p[0] - q[0];
@@ -69,7 +70,7 @@ static SFEM_INLINE void distance3(const geom_t* const SFEM_RESTRICT p,
 }
 
 static SFEM_INLINE void normalize(geom_t* const vec3) {
-    const geom_t len = GEOM_SQRT(vec3[0] * vec3[0] + vec3[1] * vec3[1] + vec3[2] * vec3[2]);
+    const geom_t len = SDF_SQRT(vec3[0] * vec3[0] + vec3[1] * vec3[1] + vec3[2] * vec3[2]);
     vec3[0] /= len;
     vec3[1] /= len;
     vec3[2] /= len;
@@ -178,9 +179,9 @@ void compute_sdf(const ptrdiff_t nelements,
                         point_triangle_distance(p, x, y, z, &result);
 
                         geom_t diff[3];
-                        distance3(p, result.point, diff);
+                        diff3(p, result.point, diff);
                         const geom_t d =
-                            GEOM_SQRT(diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]);
+                            SDF_SQRT(diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]);
 
                         if (d < e_min) {
                             e_min = d;
@@ -321,13 +322,18 @@ int main(int argc, char* argv[]) {
     const geom_t y_range = box_max[1] - origin[1];
     const geom_t z_range = box_max[2] - origin[2];
 
-    ptrdiff_t nx = ceil((x_range) / hmax) + 1;
-    ptrdiff_t ny = ceil((y_range) / hmax) + 1;
-    ptrdiff_t nz = ceil((z_range) / hmax) + 1;
+    ptrdiff_t nx = SDF_CEIL((x_range) / hmax) + 1;
+    ptrdiff_t ny = SDF_CEIL((y_range) / hmax) + 1;
+    ptrdiff_t nz = SDF_CEIL((z_range) / hmax) + 1;
 
     ptrdiff_t nglobal[3] = {nx, ny, nz};
     ptrdiff_t stride[3] = {1, nx, nx * ny};
-    geom_t delta[3] = {x_range / (nx - 1), y_range / (ny - 1), z_range / (nz - 1)};
+
+    geom_t delta[3] = {
+        x_range / (nx - 1.), 
+        y_range / (ny - 1.), 
+        z_range / (nz - 1.)
+    };
 
     ptrdiff_t sdf_size = nglobal[0] * nglobal[1] * nglobal[2];
     geom_t* sdf = malloc(sdf_size * sizeof(geom_t));
