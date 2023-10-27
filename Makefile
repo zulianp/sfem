@@ -115,7 +115,7 @@ GOALS += cvfem_assemble
 GOALS += assemble_adjaciency_matrix
 
 # Contact
-GOALS += gap_from_sdf
+GOALS += gap_from_sdf mesh_to_sdf
 
 GOALS += bgs
 
@@ -335,6 +335,9 @@ create_surface_from_element_adjaciency_table : create_surface_from_element_adjac
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
 gap_from_sdf : gap_from_sdf.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
+
+mesh_to_sdf : mesh_to_sdf.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
 mesh_p1_to_p2 : mesh_p1_to_p2.c libsfem.a
