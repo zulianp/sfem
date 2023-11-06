@@ -11,6 +11,7 @@ import smesh
 from time import perf_counter
 
 ti.init(arch=ti.gpu)
+# ti.init(arch=ti.cpu)
 vec3 = ti.math.vec3
 real_t = np.float32
 idx_t = np.int32
