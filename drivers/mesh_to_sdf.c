@@ -755,8 +755,8 @@ int main(int argc, char* argv[]) {
     ptrdiff_t sdf_size = nglobal[0] * nglobal[1] * nglobal[2];
     geom_t* sdf = malloc(sdf_size * sizeof(geom_t));
 
-    compute_sdf
-        // compute_sdf_brute_force
+    // compute_sdf
+        compute_sdf_brute_force
         //
         (mesh.nelements, mesh.elements, mesh.points, normals, nglobal, stride, origin, delta, sdf);
 
