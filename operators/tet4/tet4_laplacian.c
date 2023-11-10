@@ -358,7 +358,7 @@ void tet4_laplacian_assemble_gradient(const ptrdiff_t nelements,
 
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
-            real_t element_vector[4 * 4];
+            real_t element_vector[4];
             real_t element_u[4];
 
 #pragma unroll(4)

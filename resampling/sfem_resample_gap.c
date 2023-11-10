@@ -235,7 +235,7 @@ int resample_gap(
     real_t* const SFEM_RESTRICT znormal)
 {
     assert(element_type == TRI3 || element_type == TRISHELL3); // only triangles supported for now
-    if(element_type != TRI3 || element_type != TRISHELL3) {
+    if(element_type != TRI3 && element_type != TRISHELL3) {
         MPI_Abort(MPI_COMM_WORLD, -1);
     }
 
