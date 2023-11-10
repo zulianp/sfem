@@ -215,7 +215,7 @@ SFEM_INLINE static void hex_aa_8_eval_grad(
     gz[7] = (1.0 - x) * y;
 }
 
-int resample_gap(
+int resample_gap_local(
     // Mesh
     const enum ElemType element_type,
     const ptrdiff_t nelements,
@@ -229,7 +229,7 @@ int resample_gap(
     const geom_t* const SFEM_RESTRICT delta,
     const geom_t* const SFEM_RESTRICT data,
     // Output
-    real_t* const SFEM_RESTRICT g,
+    real_t* const SFEM_RESTRICT wg,
     real_t* const SFEM_RESTRICT xnormal,
     real_t* const SFEM_RESTRICT ynormal,
     real_t* const SFEM_RESTRICT znormal)
@@ -239,12 +239,10 @@ int resample_gap(
         MPI_Abort(MPI_COMM_WORLD, -1);
     }
 
-    memset(g, 0, nnodes * sizeof(real_t));
+    memset(wg, 0, nnodes * sizeof(real_t));
     memset(xnormal, 0, nnodes * sizeof(real_t));
     memset(ynormal, 0, nnodes * sizeof(real_t));
     memset(znormal, 0, nnodes * sizeof(real_t));
-
-    real_t* wg = calloc(nnodes, sizeof(real_t));
 
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];
@@ -418,6 +416,39 @@ int resample_gap(
         }
     }
 
+    return 0;
+}
+
+
+int resample_gap(
+    // Mesh
+    const enum ElemType element_type,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t** const SFEM_RESTRICT elems,
+    geom_t** const SFEM_RESTRICT xyz,
+    // SDF
+    const ptrdiff_t* const SFEM_RESTRICT n,
+    const ptrdiff_t* const SFEM_RESTRICT stride,
+    const geom_t* const SFEM_RESTRICT origin,
+    const geom_t* const SFEM_RESTRICT delta,
+    const geom_t* const SFEM_RESTRICT data,
+    // Output
+    real_t* const SFEM_RESTRICT g,
+    real_t* const SFEM_RESTRICT xnormal,
+    real_t* const SFEM_RESTRICT ynormal,
+    real_t* const SFEM_RESTRICT znormal)
+{
+    assert(element_type == TRI3 || element_type == TRISHELL3); // only triangles supported for now
+    if(element_type != TRI3 && element_type != TRISHELL3) {
+        MPI_Abort(MPI_COMM_WORLD, -1);
+    }
+
+    real_t* wg = calloc(nnodes, sizeof(real_t));
+
+    resample_gap_local(element_type, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, wg, xnormal, ynormal, znormal);
+
+    // Removing the mass-contributions from the weighted gap function "wg"
     apply_inv_lumped_mass(TRISHELL3, nelements, nnodes, elems, xyz, wg, g);
 
     // Normalize!
@@ -429,7 +460,6 @@ int resample_gap(
     }
 
     free(wg);
-
     return 0;
 }
 
