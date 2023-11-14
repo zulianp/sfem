@@ -12,7 +12,7 @@
     } while (0)
 
 #ifdef NDEBUG
-#define SFEM_INLINE
+#define SFEM_INLINE inline
 #else
 #define SFEM_INLINE
 #endif

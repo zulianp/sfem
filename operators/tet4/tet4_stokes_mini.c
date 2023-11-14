@@ -84,7 +84,7 @@ static SFEM_INLINE void find_cols4(const idx_t *targets,
     }
 }
 
-SFEM_INLINE void tet4_stokes_assemble_hessian_kernel(const real_t mu,
+static SFEM_INLINE void tet4_stokes_assemble_hessian_kernel(const real_t mu,
                                                      const real_t px0,
                                                      const real_t px1,
                                                      const real_t px2,
@@ -643,7 +643,7 @@ SFEM_INLINE void tet4_stokes_mini_assemble_rhs_kernel(const real_t mu,
     element_vector[15] = p_rhs[3] * x30 + x45 + x49;
 }
 
-SFEM_INLINE void tet4_stokes_mini_apply_kernel(const real_t mu,
+static SFEM_INLINE void tet4_stokes_mini_apply_kernel(const real_t mu,
                                                const real_t px0,
                                                const real_t px1,
                                                const real_t px2,
