@@ -15,44 +15,44 @@
 static SFEM_INLINE real_t put_inside(const real_t v) { return MIN(MAX(1e-7, v), 1 - 1e-7); }
 
 // TRI3 6th order quadrature rule
-static real_t qw[12] = { 0.050844906370206816920936809106869,
-    0.050844906370206816920936809106869,
-    0.050844906370206816920936809106869,
-    0.11678627572637936602528961138558,
-    0.11678627572637936602528961138558,
-    0.11678627572637936602528961138558,
-    0.082851075618373575193553456420442,
-    0.082851075618373575193553456420442,
-    0.082851075618373575193553456420442,
-    0.082851075618373575193553456420442,
-    0.082851075618373575193553456420442,
-    0.082851075618373575193553456420442 };
+static real_t qw[12] = {0.050844906370206816920936809106869,
+                        0.050844906370206816920936809106869,
+                        0.050844906370206816920936809106869,
+                        0.11678627572637936602528961138558,
+                        0.11678627572637936602528961138558,
+                        0.11678627572637936602528961138558,
+                        0.082851075618373575193553456420442,
+                        0.082851075618373575193553456420442,
+                        0.082851075618373575193553456420442,
+                        0.082851075618373575193553456420442,
+                        0.082851075618373575193553456420442,
+                        0.082851075618373575193553456420442};
 
-static real_t qx[12] = { 0.063089014491502228340331602870819,
-    0.063089014491502228340331602870819,
-    0.87382197101699554331933679425836,
-    0.24928674517091042129163855310702,
-    0.24928674517091042129163855310702,
-    0.50142650965817915741672289378596,
-    0.053145049844816947353249671631398,
-    0.053145049844816947353249671631398,
-    0.31035245103378440541660773395655,
-    0.31035245103378440541660773395655,
-    0.63650249912139864723014259441205,
-    0.63650249912139864723014259441205 };
+static real_t qx[12] = {0.063089014491502228340331602870819,
+                        0.063089014491502228340331602870819,
+                        0.87382197101699554331933679425836,
+                        0.24928674517091042129163855310702,
+                        0.24928674517091042129163855310702,
+                        0.50142650965817915741672289378596,
+                        0.053145049844816947353249671631398,
+                        0.053145049844816947353249671631398,
+                        0.31035245103378440541660773395655,
+                        0.31035245103378440541660773395655,
+                        0.63650249912139864723014259441205,
+                        0.63650249912139864723014259441205};
 
-static real_t qy[12] = { 0.063089014491502228340331602870819,
-    0.87382197101699554331933679425836,
-    0.063089014491502228340331602870819,
-    0.24928674517091042129163855310702,
-    0.50142650965817915741672289378596,
-    0.24928674517091042129163855310702,
-    0.31035245103378440541660773395655,
-    0.63650249912139864723014259441205,
-    0.053145049844816947353249671631398,
-    0.63650249912139864723014259441205,
-    0.053145049844816947353249671631398,
-    0.31035245103378440541660773395655 };
+static real_t qy[12] = {0.063089014491502228340331602870819,
+                        0.87382197101699554331933679425836,
+                        0.063089014491502228340331602870819,
+                        0.24928674517091042129163855310702,
+                        0.50142650965817915741672289378596,
+                        0.24928674517091042129163855310702,
+                        0.31035245103378440541660773395655,
+                        0.63650249912139864723014259441205,
+                        0.053145049844816947353249671631398,
+                        0.63650249912139864723014259441205,
+                        0.053145049844816947353249671631398,
+                        0.31035245103378440541660773395655};
 
 SFEM_INLINE static int hex_aa_8_contains(
     // X-coordinates
@@ -66,8 +66,7 @@ SFEM_INLINE static int hex_aa_8_contains(
     const real_t zmax,
     const real_t x,
     const real_t y,
-    const real_t z)
-{
+    const real_t z) {
     int outside = (x < xmin) | (x > xmax) | (y < ymin) | (y > ymax) | (z < zmin) | (x > zmax);
     return !outside;
 }
@@ -84,15 +83,16 @@ SFEM_INLINE static real_t tri_shell_3_measure(
     // Z-coordinates
     const real_t pz0,
     const real_t pz1,
-    const real_t pz2)
-{
+    const real_t pz2) {
     const real_t x0 = -px0 + px1;
     const real_t x1 = -px0 + px2;
     const real_t x2 = -py0 + py1;
     const real_t x3 = -py0 + py2;
     const real_t x4 = -pz0 + pz1;
     const real_t x5 = -pz0 + pz2;
-    return (1.0 / 2.0) * sqrt((pow(x0, 2) + pow(x2, 2) + pow(x4, 2)) * (pow(x1, 2) + pow(x3, 2) + pow(x5, 2)) - pow(x0 * x1 + x2 * x3 + x4 * x5, 2));
+    return (1.0 / 2.0) *
+           sqrt((pow(x0, 2) + pow(x2, 2) + pow(x4, 2)) * (pow(x1, 2) + pow(x3, 2) + pow(x5, 2)) -
+                pow(x0 * x1 + x2 * x3 + x4 * x5, 2));
 }
 
 SFEM_INLINE static void tri_shell_3_transform(
@@ -114,8 +114,7 @@ SFEM_INLINE static void tri_shell_3_transform(
     // Output
     real_t* const SFEM_RESTRICT out_x,
     real_t* const SFEM_RESTRICT out_y,
-    real_t* const SFEM_RESTRICT out_z)
-{
+    real_t* const SFEM_RESTRICT out_z) {
     const real_t phi0 = 1 - x - y;
     const real_t phi1 = x;
     const real_t phi2 = y;
@@ -131,8 +130,7 @@ SFEM_INLINE static void hex_aa_8_eval_fun(
     const real_t y,
     const real_t z,
     // Output
-    real_t* const SFEM_RESTRICT f)
-{
+    real_t* const SFEM_RESTRICT f) {
     f[0] = (1.0 - x) * (1.0 - y) * (1.0 - z);
     f[1] = x * (1.0 - y) * (1.0 - z);
     f[2] = x * y * (1.0 - z);
@@ -150,8 +148,7 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs(
     const ptrdiff_t k,
     // Attention this is geometric data transformed to solver data!
     const geom_t* const SFEM_RESTRICT data,
-    real_t* const SFEM_RESTRICT out)
-{
+    real_t* const SFEM_RESTRICT out) {
     const ptrdiff_t i0 = i * stride[0] + j * stride[1] + k * stride[2];
     const ptrdiff_t i1 = (i + 1) * stride[0] + j * stride[1] + k * stride[2];
     const ptrdiff_t i2 = (i + 1) * stride[0] + (j + 1) * stride[1] + k * stride[2];
@@ -179,8 +176,7 @@ SFEM_INLINE static void hex_aa_8_eval_grad(
     // Output
     real_t* const SFEM_RESTRICT gx,
     real_t* const SFEM_RESTRICT gy,
-    real_t* const SFEM_RESTRICT gz)
-{
+    real_t* const SFEM_RESTRICT gz) {
     // Transformation to ref element
     gx[0] = -(1.0 - y) * (1.0 - z);
     gy[0] = -(1.0 - x) * (1.0 - z);
@@ -232,10 +228,9 @@ int resample_gap_local(
     real_t* const SFEM_RESTRICT wg,
     real_t* const SFEM_RESTRICT xnormal,
     real_t* const SFEM_RESTRICT ynormal,
-    real_t* const SFEM_RESTRICT znormal)
-{
-    assert(element_type == TRI3 || element_type == TRISHELL3); // only triangles supported for now
-    if(element_type != TRI3 && element_type != TRISHELL3) {
+    real_t* const SFEM_RESTRICT znormal) {
+    assert(element_type == TRI3 || element_type == TRISHELL3);  // only triangles supported for now
+    if (element_type != TRI3 && element_type != TRISHELL3) {
         MPI_Abort(MPI_COMM_WORLD, -1);
     }
 
@@ -254,7 +249,7 @@ int resample_gap_local(
 
 #pragma omp parallel
     {
-#pragma omp for // nowait
+#pragma omp for  // nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[3];
             geom_t x[3], y[3], z[3];
@@ -287,24 +282,25 @@ int resample_gap_local(
             memset(element_ynormal, 0, 3 * sizeof(real_t));
             memset(element_znormal, 0, 3 * sizeof(real_t));
 
-            const real_t measure = tri_shell_3_measure(x[0], x[1], x[2], y[0], y[1], y[2], z[0], z[1], z[2]);
+            const real_t measure =
+                tri_shell_3_measure(x[0], x[1], x[2], y[0], y[1], y[2], z[0], z[1], z[2]);
 
             for (int q = 0; q < 12; q++) {
                 real_t g_qx, g_qy, g_qz;
                 tri_shell_3_transform(x[0],
-                    x[1],
-                    x[2],
-                    y[0],
-                    y[1],
-                    y[2],
-                    z[0],
-                    z[1],
-                    z[2],
-                    qx[q],
-                    qy[q],
-                    &g_qx,
-                    &g_qy,
-                    &g_qz);
+                                      x[1],
+                                      x[2],
+                                      y[0],
+                                      y[1],
+                                      y[2],
+                                      z[0],
+                                      z[1],
+                                      z[2],
+                                      qx[q],
+                                      qy[q],
+                                      &g_qx,
+                                      &g_qy,
+                                      &g_qz);
 
                 tri3_f[0] = 1 - qx[q] - qy[q];
                 tri3_f[1] = qx[q];
@@ -321,10 +317,15 @@ int resample_gap_local(
                 const ptrdiff_t k = floor(grid_z);
 
                 // If outside
-                if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
-                    fprintf(stderr,
+                if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) ||
+                    (k + 1 >= n[2])) {
+                    fprintf(
+                        stderr,
                         "warning (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n",
-                        x,y,z,i,
+                        g_qx,
+                        g_qy,
+                        g_qz,
+                        i,
                         j,
                         k,
                         n[0],
@@ -348,11 +349,11 @@ int resample_gap_local(
 
                 hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
                 hex_aa_8_eval_grad(put_inside(l_x),
-                    put_inside(l_y),
-                    put_inside(l_z),
-                    hex8_grad_x,
-                    hex8_grad_y,
-                    hex8_grad_z);
+                                   put_inside(l_y),
+                                   put_inside(l_z),
+                                   hex8_grad_x,
+                                   hex8_grad_y,
+                                   hex8_grad_z);
                 hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
 
                 // Integrate gap function
@@ -384,7 +385,9 @@ int resample_gap_local(
 
                     {
                         // Normalize
-                        real_t denom = sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal + eval_znormal * eval_znormal);
+                        real_t denom =
+                            sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal +
+                                 eval_znormal * eval_znormal);
 
                         assert(denom != 0);
 
@@ -419,7 +422,6 @@ int resample_gap_local(
     return 0;
 }
 
-
 int resample_gap(
     // Mesh
     const enum ElemType element_type,
@@ -437,23 +439,36 @@ int resample_gap(
     real_t* const SFEM_RESTRICT g,
     real_t* const SFEM_RESTRICT xnormal,
     real_t* const SFEM_RESTRICT ynormal,
-    real_t* const SFEM_RESTRICT znormal)
-{
-    assert(element_type == TRI3 || element_type == TRISHELL3); // only triangles supported for now
-    if(element_type != TRI3 && element_type != TRISHELL3) {
+    real_t* const SFEM_RESTRICT znormal) {
+    assert(element_type == TRI3 || element_type == TRISHELL3);  // only triangles supported for now
+    if (element_type != TRI3 && element_type != TRISHELL3) {
         MPI_Abort(MPI_COMM_WORLD, -1);
     }
 
     real_t* wg = calloc(nnodes, sizeof(real_t));
 
-    resample_gap_local(element_type, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, wg, xnormal, ynormal, znormal);
+    resample_gap_local(element_type,
+                       nelements,
+                       nnodes,
+                       elems,
+                       xyz,
+                       n,
+                       stride,
+                       origin,
+                       delta,
+                       data,
+                       wg,
+                       xnormal,
+                       ynormal,
+                       znormal);
 
     // Removing the mass-contributions from the weighted gap function "wg"
     apply_inv_lumped_mass(TRISHELL3, nelements, nnodes, elems, xyz, wg, g);
 
     // Normalize!
     for (ptrdiff_t i = 0; i < nnodes; i++) {
-        real_t denom = sqrt(xnormal[i] * xnormal[i] + ynormal[i] * ynormal[i] + znormal[i] * znormal[i]);
+        real_t denom =
+            sqrt(xnormal[i] * xnormal[i] + ynormal[i] * ynormal[i] + znormal[i] * znormal[i]);
         xnormal[i] /= denom;
         ynormal[i] /= denom;
         znormal[i] /= denom;
@@ -464,20 +479,18 @@ int resample_gap(
 }
 
 int interpolate_gap(const ptrdiff_t nnodes,
-    geom_t** const SFEM_RESTRICT xyz,
-    // SDF
-    const ptrdiff_t* const SFEM_RESTRICT n,
-    const ptrdiff_t* const SFEM_RESTRICT stride,
-    const geom_t* const SFEM_RESTRICT origin,
-    const geom_t* const SFEM_RESTRICT delta,
-    const geom_t* const SFEM_RESTRICT data,
-    // Output
-    real_t* const SFEM_RESTRICT g,
-    real_t* const SFEM_RESTRICT xnormal,
-    real_t* const SFEM_RESTRICT ynormal,
-    real_t* const SFEM_RESTRICT znormal)
-{
-
+                    geom_t** const SFEM_RESTRICT xyz,
+                    // SDF
+                    const ptrdiff_t* const SFEM_RESTRICT n,
+                    const ptrdiff_t* const SFEM_RESTRICT stride,
+                    const geom_t* const SFEM_RESTRICT origin,
+                    const geom_t* const SFEM_RESTRICT delta,
+                    const geom_t* const SFEM_RESTRICT data,
+                    // Output
+                    real_t* const SFEM_RESTRICT g,
+                    real_t* const SFEM_RESTRICT xnormal,
+                    real_t* const SFEM_RESTRICT ynormal,
+                    real_t* const SFEM_RESTRICT znormal) {
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];
     const real_t oz = (real_t)origin[2];
@@ -488,7 +501,7 @@ int interpolate_gap(const ptrdiff_t nnodes,
 
 #pragma omp parallel
     {
-#pragma omp for // nowait
+#pragma omp for  // nowait
         for (ptrdiff_t node = 0; node < nnodes; ++node) {
             real_t hex8_f[8];
             real_t hex8_grad_x[8];
@@ -510,13 +523,15 @@ int interpolate_gap(const ptrdiff_t nnodes,
 
             // If outside
             if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
-
                 int rank;
                 MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-                fprintf(stderr,
+                fprintf(
+                    stderr,
                     "[%d] warning (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n",
                     rank,
-                    x, y, z,
+                    x,
+                    y,
+                    z,
                     i,
                     j,
                     k,
@@ -541,11 +556,11 @@ int interpolate_gap(const ptrdiff_t nnodes,
 
             hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
             hex_aa_8_eval_grad(put_inside(l_x),
-                put_inside(l_y),
-                put_inside(l_z),
-                hex8_grad_x,
-                hex8_grad_y,
-                hex8_grad_z);
+                               put_inside(l_y),
+                               put_inside(l_z),
+                               hex8_grad_x,
+                               hex8_grad_y,
+                               hex8_grad_z);
             hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
 
             // Interpolate gap function
@@ -575,7 +590,8 @@ int interpolate_gap(const ptrdiff_t nnodes,
 
                 {
                     // Normalize
-                    real_t denom = sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal + eval_znormal * eval_znormal);
+                    real_t denom = sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal +
+                                        eval_znormal * eval_znormal);
 
                     assert(denom != 0);
 
@@ -594,10 +610,10 @@ int interpolate_gap(const ptrdiff_t nnodes,
     return 0;
 }
 
-SFEM_INLINE static void minmax(
-    const ptrdiff_t n,
-    const geom_t* const SFEM_RESTRICT x, geom_t* xmin, geom_t* xmax)
-{
+SFEM_INLINE static void minmax(const ptrdiff_t n,
+                               const geom_t* const SFEM_RESTRICT x,
+                               geom_t* xmin,
+                               geom_t* xmax) {
     *xmin = x[0];
     *xmax = x[0];
     for (ptrdiff_t i = 1; i < n; i++) {
@@ -606,20 +622,18 @@ SFEM_INLINE static void minmax(
     }
 }
 
-int sdf_view(
-    MPI_Comm comm,
-    const ptrdiff_t nnodes,
-    const geom_t* SFEM_RESTRICT z_coordinate,
-    const ptrdiff_t* const nlocal,
-    const ptrdiff_t* const SFEM_RESTRICT nglobal,
-    const ptrdiff_t* const SFEM_RESTRICT stride,
-    const geom_t* const origin,
-    const geom_t* const SFEM_RESTRICT delta,
-    const geom_t* const sdf,
-    geom_t** sdf_out,
-    ptrdiff_t* z_nlocal_out,
-    geom_t* const SFEM_RESTRICT z_origin_out)
-{
+int sdf_view(MPI_Comm comm,
+             const ptrdiff_t nnodes,
+             const geom_t* SFEM_RESTRICT z_coordinate,
+             const ptrdiff_t* const nlocal,
+             const ptrdiff_t* const SFEM_RESTRICT nglobal,
+             const ptrdiff_t* const SFEM_RESTRICT stride,
+             const geom_t* const origin,
+             const geom_t* const SFEM_RESTRICT delta,
+             const geom_t* const sdf,
+             geom_t** sdf_out,
+             ptrdiff_t* z_nlocal_out,
+             geom_t* const SFEM_RESTRICT z_origin_out) {
     int rank, size;
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
@@ -648,20 +662,22 @@ int sdf_view(
 
     // Make sure we are inside the grid
     sdf_start = MAX(0, sdf_start);
-    sdf_end = MIN(nglobal[2], sdf_end + 1 + 1); // 1 for the rightside of the cell 1 for the exclusive range
+    sdf_end = MIN(nglobal[2],
+                  sdf_end + 1 + 1);  // 1 for the rightside of the cell 1 for the exclusive range
 
     ptrdiff_t pnlocal_z = (sdf_end - sdf_start);
     geom_t* psdf = malloc(pnlocal_z * stride[2] * sizeof(geom_t));
 
-    array_range_select(comm, SFEM_MPI_GEOM_T, 
-        (void*)sdf, 
-        (void*)psdf,
-        // Size of z-slice
-        nlocal[2] * stride[2],
-        // starting offset
-        sdf_start * stride[2],
-        // ending offset
-        sdf_end * stride[2]);
+    array_range_select(comm,
+                       SFEM_MPI_GEOM_T,
+                       (void*)sdf,
+                       (void*)psdf,
+                       // Size of z-slice
+                       nlocal[2] * stride[2],
+                       // starting offset
+                       sdf_start * stride[2],
+                       // ending offset
+                       sdf_end * stride[2]);
 
     *sdf_out = psdf;
     *z_nlocal_out = pnlocal_z;
