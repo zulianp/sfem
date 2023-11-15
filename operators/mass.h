@@ -4,6 +4,10 @@
 #include <stddef.h>
 #include "sfem_base.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void assemble_mass(const int element_type,
                    const ptrdiff_t nelements,
                    const ptrdiff_t nnodes,
@@ -35,5 +39,9 @@ void apply_mass(const int element_type,
                 geom_t **const SFEM_RESTRICT xyz,
                 const real_t *const x,
                 real_t *const values);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  // MASS_H
