@@ -11,13 +11,15 @@
 #include "sfem_mesh_write.h"
 #include "sfem_resample_gap.h"
 
+#include "mass.h"
+
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-static void minmax(
-    const ptrdiff_t n,
-    const geom_t* const SFEM_RESTRICT x, geom_t* xmin, geom_t* xmax)
-{
+static void minmax(const ptrdiff_t n,
+                   const geom_t* const SFEM_RESTRICT x,
+                   geom_t* xmin,
+                   geom_t* xmax) {
     *xmin = x[0];
     *xmax = x[0];
     for (ptrdiff_t i = 1; i < n; i++) {
@@ -26,8 +28,7 @@ static void minmax(
     }
 }
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
     MPI_Init(&argc, &argv);
 
     MPI_Comm comm = MPI_COMM_WORLD;
@@ -38,9 +39,9 @@ int main(int argc, char* argv[])
 
     if (argc != 13) {
         fprintf(stderr,
-            "usage: %s <folder> <nx> <ny> <nz> <ox> <oy> <oz> <dx> <dy> <dz> "
-            "<data.float32.raw> <output_folder>\n",
-            argv[0]);
+                "usage: %s <folder> <nx> <ny> <nz> <ox> <oy> <oz> <dx> <dy> <dz> "
+                "<data.float32.raw> <output_folder>\n",
+                argv[0]);
         return EXIT_FAILURE;
     }
 
@@ -50,13 +51,13 @@ int main(int argc, char* argv[])
     double tick = MPI_Wtime();
 
     const char* folder = argv[1];
-    ptrdiff_t nglobal[3] = { atol(argv[2]), atol(argv[3]), atol(argv[4]) };
-    geom_t origin[3] = { atof(argv[5]), atof(argv[6]), atof(argv[7]) };
-    geom_t delta[3] = { atof(argv[8]), atof(argv[9]), atof(argv[10]) };
+    ptrdiff_t nglobal[3] = {atol(argv[2]), atol(argv[3]), atol(argv[4])};
+    geom_t origin[3] = {atof(argv[5]), atof(argv[6]), atof(argv[7])};
+    geom_t delta[3] = {atof(argv[8]), atof(argv[9]), atof(argv[10])};
     const char* data_path = argv[11];
     const char* output_folder = argv[12];
 
-    struct stat st = { 0 };
+    struct stat st = {0};
     if (stat(output_folder, &st) == -1) {
         mkdir(output_folder, 0700);
     }
@@ -85,7 +86,7 @@ int main(int argc, char* argv[])
     }
 
     // X is contiguous
-    ptrdiff_t stride[3] = { 1, nlocal[0], nlocal[0] * nlocal[1] };
+    ptrdiff_t stride[3] = {1, nlocal[0], nlocal[0] * nlocal[1]};
 
     real_t* g = malloc(mesh.nnodes * sizeof(real_t));
     real_t* xnormal = malloc(mesh.nnodes * sizeof(real_t));
@@ -94,19 +95,18 @@ int main(int argc, char* argv[])
 
     if (size > 1) {
         geom_t* psdf;
-        sdf_view(
-            comm,
-            mesh.nnodes,
-            mesh.points[2],
-            nlocal,
-            nglobal,
-            stride,
-            origin,
-            delta,
-            sdf,
-            &psdf,
-            &nlocal[2],
-            &origin[2]);
+        sdf_view(comm,
+                 mesh.nnodes,
+                 mesh.points[2],
+                 nlocal,
+                 nglobal,
+                 stride,
+                 origin,
+                 delta,
+                 sdf,
+                 &psdf,
+                 &nlocal[2],
+                 &origin[2]);
 
         free(sdf);
         sdf = psdf;
@@ -132,24 +132,81 @@ int main(int argc, char* argv[])
                 ynormal,
                 znormal);
         } else {
-            resample_gap(
-                // Mesh
-                mesh.element_type,
-                mesh.nelements,
-                mesh.n_owned_nodes,
-                mesh.elements,
-                mesh.points,
-                // SDF
-                nlocal,
-                stride,
-                origin,
-                delta,
-                sdf,
-                // Output
-                g,
-                xnormal,
-                ynormal,
-                znormal);
+            if (size == 1) {
+                resample_gap(
+                    // Mesh
+                    mesh.element_type,
+                    mesh.nelements,
+                    mesh.n_owned_nodes,
+                    mesh.elements,
+                    mesh.points,
+                    // SDF
+                    nlocal,
+                    stride,
+                    origin,
+                    delta,
+                    sdf,
+                    // Output
+                    g,
+                    xnormal,
+                    ynormal,
+                    znormal);
+            } else {
+                resample_gap_local(
+                    // Mesh
+                    mesh.element_type,
+                    mesh.nelements,
+                    mesh.nnodes,
+                    mesh.elements,
+                    mesh.points,
+                    // SDF
+                    nlocal,
+                    stride,
+                    origin,
+                    delta,
+                    sdf,
+                    // Output
+                    g,
+                    xnormal,
+                    ynormal,
+                    znormal);
+
+                real_t* mass_vector = malloc(mesh.nnodes * sizeof(real_t));
+                
+                assemble_lumped_mass(mesh.element_type,
+                                     mesh.nelements,
+                                     mesh.nnodes,
+                                     mesh.elements,
+                                     mesh.points,
+                                     mass_vector);
+
+
+
+                // exchange ghost nodes and add contribution
+                // TODO gap, xnormal, ..., mass_vector
+                // node_mapping
+                // idx_t *const ids = malloc(mesh.nnodes * sizeof(idx_t));
+                // mesh_node_ids(&mesh, ids);
+                
+
+                // divide by the mass vector
+                for(ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                    g[i] /= mass_vector[i];
+                }
+
+                for(ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                    const real_t xn = xnormal[i];
+                    const real_t yn = ynormal[i];
+                    const real_t zn = znormal[i];
+                    const real_t ln = sqrt(xn * xn + yn * yn + zn * zn);
+
+                    xnormal[i] /= ln;
+                    ynormal[i] /= ln;
+                    znormal[i] /= ln;
+                }
+
+                free(mass_vector);
+            }
         }
 
         double resample_tock = MPI_Wtime();
@@ -201,11 +258,11 @@ int main(int argc, char* argv[])
     if (!rank) {
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld #grid (%ld x %ld x %ld)\n",
-            (long)nelements,
-            (long)nnodes,
-            nglobal[0],
-            nglobal[1],
-            nglobal[2]);
+               (long)nelements,
+               (long)nnodes,
+               nglobal[0],
+               nglobal[1],
+               nglobal[2]);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
