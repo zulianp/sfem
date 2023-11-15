@@ -60,7 +60,7 @@ if [[ -n "$5" ]]
 then
 	cat metadata_sdf.float32.yml | tr ':' ' ' | awk '{print $1,$2}' | tr ' ' '=' > vars.sh
 	source vars.sh
-	SFEM_INTERPOLATE=1 $LAUNCH gap_from_sdf $boxed_mesh_raw/skinned $nx $ny $nz $ox $oy $oz $dx $dy $dz $db_out sdf_on_mesh
+	SFEM_INTERPOLATE=0 $LAUNCH gap_from_sdf $boxed_mesh_raw/skinned $nx $ny $nz $ox $oy $oz $dx $dy $dz $db_out sdf_on_mesh
 	raw_to_db.py $boxed_mesh_raw/skinned gap.vtk --point_data="sdf_on_mesh/*float64.raw"
 fi
 

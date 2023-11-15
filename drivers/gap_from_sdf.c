@@ -68,20 +68,20 @@ int main(int argc, char* argv[]) {
     }
 
     ptrdiff_t n = nglobal[0] * nglobal[1] * nglobal[2];
-    geom_t* sdf = (geom_t*)malloc(n * sizeof(geom_t));
+    geom_t* sdf = 0;
     ptrdiff_t nlocal[3];
 
     {
         double ndarray_read_tick = MPI_Wtime();
 
-        if (ndarray_read(comm, data_path, SFEM_MPI_GEOM_T, 3, sdf, nlocal, nglobal)) {
+        if (ndarray_create_from_file(comm, data_path, SFEM_MPI_GEOM_T, 3, (void**)&sdf, nlocal, nglobal)) {
             return EXIT_FAILURE;
         }
 
         double ndarray_read_tock = MPI_Wtime();
 
         if (!rank) {
-            printf("[%d] ndarray_read %g (seconds)\n", rank, ndarray_read_tock - ndarray_read_tick);
+            printf("[%d] ndarray_create_from_file %g (seconds)\n", rank, ndarray_read_tock - ndarray_read_tick);
         }
     }
 
@@ -187,7 +187,7 @@ int main(int argc, char* argv[]) {
                 // node_mapping
                 // idx_t *const ids = malloc(mesh.nnodes * sizeof(idx_t));
                 // mesh_node_ids(&mesh, ids);
-                
+
 
                 // divide by the mass vector
                 for(ptrdiff_t i = 0; i < mesh.nnodes; i++) {

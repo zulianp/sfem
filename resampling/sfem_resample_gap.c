@@ -514,8 +514,9 @@ int interpolate_gap(const ptrdiff_t nnodes,
                 int rank;
                 MPI_Comm_rank(MPI_COMM_WORLD, &rank);
                 fprintf(stderr,
-                    "[%d] warning (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n",
+                    "[%d] warning (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n",
                     rank,
+                    x, y, z,
                     i,
                     j,
                     k,
