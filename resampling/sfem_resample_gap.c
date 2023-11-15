@@ -323,8 +323,8 @@ int resample_gap_local(
                 // If outside
                 if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
                     fprintf(stderr,
-                        "warning (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n",
-                        i,
+                        "warning (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n",
+                        x,y,z,i,
                         j,
                         k,
                         n[0],
