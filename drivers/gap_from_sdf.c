@@ -7,6 +7,7 @@
 #include "matrixio_array.h"
 #include "matrixio_ndarray.h"
 
+#include "mesh_aura.h"
 #include "read_mesh.h"
 #include "sfem_mesh_write.h"
 #include "sfem_resample_gap.h"
@@ -25,6 +26,23 @@ static void minmax(const ptrdiff_t n,
     for (ptrdiff_t i = 1; i < n; i++) {
         *xmin = MIN(*xmin, x[i]);
         *xmax = MAX(*xmax, x[i]);
+    }
+}
+
+static void exchange_add(mesh_t* mesh,
+                         send_recv_t* slave_to_master,
+                         real_t* const SFEM_RESTRICT inout,
+                         real_t* const SFEM_RESTRICT real_buffer) {
+    ptrdiff_t n_ghosts = (mesh->nnodes - mesh->n_owned_nodes);
+    ptrdiff_t count = mesh_exchange_master_buffer_count(slave_to_master);
+
+    // Exchange mass_vector ghosts
+    mesh_exchange_nodal_slave_to_master(
+        mesh, slave_to_master, SFEM_MPI_REAL_T, &inout[mesh->n_owned_nodes], real_buffer);
+
+    for (ptrdiff_t i = 0; i < count; i++) {
+        assert(real_buffer[i] == real_buffer[i]);
+        inout[slave_to_master->sparse_idx[i]] += real_buffer[i];
     }
 }
 
@@ -74,14 +92,17 @@ int main(int argc, char* argv[]) {
     {
         double ndarray_read_tick = MPI_Wtime();
 
-        if (ndarray_create_from_file(comm, data_path, SFEM_MPI_GEOM_T, 3, (void**)&sdf, nlocal, nglobal)) {
+        if (ndarray_create_from_file(
+                comm, data_path, SFEM_MPI_GEOM_T, 3, (void**)&sdf, nlocal, nglobal)) {
             return EXIT_FAILURE;
         }
 
         double ndarray_read_tock = MPI_Wtime();
 
         if (!rank) {
-            printf("[%d] ndarray_create_from_file %g (seconds)\n", rank, ndarray_read_tock - ndarray_read_tick);
+            printf("[%d] ndarray_create_from_file %g (seconds)\n",
+                   rank,
+                   ndarray_read_tock - ndarray_read_tick);
         }
     }
 
@@ -171,30 +192,43 @@ int main(int argc, char* argv[]) {
                     ynormal,
                     znormal);
 
-                real_t* mass_vector = malloc(mesh.nnodes * sizeof(real_t));
-                
-                assemble_lumped_mass(mesh.element_type,
+                real_t* mass_vector = calloc(mesh.nnodes, sizeof(real_t));
+
+                assemble_lumped_mass(shell_type(mesh.element_type),
                                      mesh.nelements,
                                      mesh.nnodes,
                                      mesh.elements,
                                      mesh.points,
                                      mass_vector);
 
-
-
                 // exchange ghost nodes and add contribution
-                // TODO gap, xnormal, ..., mass_vector
-                // node_mapping
-                // idx_t *const ids = malloc(mesh.nnodes * sizeof(idx_t));
-                // mesh_node_ids(&mesh, ids);
+                send_recv_t slave_to_master;
+                mesh_create_nodal_send_recv(&mesh, &slave_to_master);
 
+                ptrdiff_t count = mesh_exchange_master_buffer_count(&slave_to_master);
+                real_t* real_buffer = malloc(count * sizeof(real_t));
+
+                exchange_add(&mesh, &slave_to_master, mass_vector, real_buffer);
+                exchange_add(&mesh, &slave_to_master, g, real_buffer);
+                exchange_add(&mesh, &slave_to_master, xnormal, real_buffer);
+                exchange_add(&mesh, &slave_to_master, ynormal, real_buffer);
+                exchange_add(&mesh, &slave_to_master, znormal, real_buffer);
 
                 // divide by the mass vector
-                for(ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                    if (mass_vector[i] == 0) {
+                        fprintf(stderr,
+                                "Found 0 mass at %ld, info (%ld, %ld)\n",
+                                i,
+                                mesh.n_owned_nodes,
+                                mesh.nnodes);
+                    }
+
+                    assert(mass_vector[i] != 0);
                     g[i] /= mass_vector[i];
                 }
 
-                for(ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
                     const real_t xn = xnormal[i];
                     const real_t yn = ynormal[i];
                     const real_t zn = znormal[i];
@@ -232,6 +266,15 @@ int main(int argc, char* argv[]) {
 
         sprintf(path, "%s/znormal.float64.raw", output_folder);
         mesh_write_nodal_field(&mesh, path, SFEM_MPI_REAL_T, znormal);
+
+        if (1) {
+            for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                g[i] = rank;
+            }
+
+            sprintf(path, "%s/rank.float64.raw", output_folder);
+            mesh_write_nodal_field(&mesh, path, SFEM_MPI_REAL_T, g);
+        }
 
         double io_tock = MPI_Wtime();
 

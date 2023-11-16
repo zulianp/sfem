@@ -20,6 +20,29 @@ void send_recv_destroy(send_recv_t *const sr) {
     free(sr->sparse_idx);
 }
 
+ptrdiff_t mesh_exchange_master_buffer_count(const send_recv_t *const slave_to_master) {
+    int size;
+    MPI_Comm_size(slave_to_master->comm, &size);
+    return slave_to_master->recv_count[size - 1] + slave_to_master->recv_displs[size - 1];
+}
+
+void mesh_exchange_nodal_slave_to_master(const mesh_t *mesh,
+                                         send_recv_t *const slave_to_master,
+                                         MPI_Datatype data_type,
+                                         void *const SFEM_RESTRICT ghost_data,
+                                         void *const SFEM_RESTRICT buffer) {
+    // send slave nodes to process with master nodes
+    CATCH_MPI_ERROR(MPI_Alltoallv(ghost_data,
+                                  slave_to_master->send_count,
+                                  slave_to_master->send_displs,
+                                  data_type,
+                                  buffer,
+                                  slave_to_master->recv_count,
+                                  slave_to_master->recv_displs,
+                                  data_type,
+                                  mesh->comm));
+}
+
 void mesh_exchange_nodal_master_to_slave(const mesh_t *mesh,
                                          send_recv_t *const slave_to_master,
                                          MPI_Datatype data_type,

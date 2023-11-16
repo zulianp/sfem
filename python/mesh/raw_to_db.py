@@ -140,7 +140,7 @@ def add_fields(field_data, field_data_type, storage, check_len):
                     print(f"Error: data lenght is different from number of nodes {len(data)} != {check_len}")
                     sys.exit(1)
 
-                print(f"field: {name}, min={np.min(data)}, max={np.max(data)}, sum={np.sum(data)}")
+                print(f"field: {name}, min={np.min(data)}, max={np.max(data)}, sum={np.sum(data)} type={t}")
                 storage[name] = data
 
 def main(argv):

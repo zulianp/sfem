@@ -84,6 +84,9 @@ int main(int argc, char *argv[]) {
         MPI_Barrier(comm);
     }
 
+    // float for visualization
+    float *neigh_count = calloc(mesh.nnodes, sizeof(float));
+
     idx_t *nodeids = (idx_t *)malloc(mesh.nnodes * sizeof(idx_t));
     mesh_node_ids(&mesh, nodeids);
 
@@ -102,6 +105,32 @@ int main(int argc, char *argv[]) {
 
     mesh_exchange_nodal_master_to_slave(&mesh, &slave_to_master, MPI_FLOAT, frank);
 
+    { // Count how many neighboring processes a master node is connected to
+        ptrdiff_t count = mesh_exchange_master_buffer_count(&slave_to_master);
+        int *int_buffer = malloc(count * sizeof(int));
+
+        ptrdiff_t n_ghosts = (mesh.nnodes - mesh.n_owned_nodes);
+        int *ones = malloc(n_ghosts * sizeof(int));
+
+        for (ptrdiff_t i = 0; i < n_ghosts; i++) {
+            ones[i] = 1;
+        }
+
+        mesh_exchange_nodal_slave_to_master(&mesh, &slave_to_master, MPI_INT, ones, int_buffer);
+
+        for (ptrdiff_t i = 0; i < n_ghosts; i++) {
+            neigh_count[mesh.n_owned_nodes + i] = -1;
+        }
+
+        for (ptrdiff_t i = 0; i < count; i++) {
+            assert(neigh_count[slave_to_master.sparse_idx[i]] >= 0);
+            neigh_count[slave_to_master.sparse_idx[i]] += int_buffer[i];
+        }
+
+        free(int_buffer);
+        free(ones);
+    }
+
     // mesh_t aura;
     // mesh_aura(&mesh, &aura);
     // mesh_aura_fix_indices(&mesh, &aura);
@@ -119,6 +148,9 @@ int main(int argc, char *argv[]) {
     sprintf(output_path, "%s/part_%0.5d/frank.raw", output_folder, rank);
     array_write(MPI_COMM_SELF, output_path, MPI_FLOAT, frank, mesh.nnodes, mesh.nnodes);
 
+    sprintf(output_path, "%s/part_%0.5d/neigh_count.raw", output_folder, rank);
+    array_write(MPI_COMM_SELF, output_path, MPI_FLOAT, neigh_count, mesh.nnodes, mesh.nnodes);
+
     sprintf(output_path, "%s/part_%0.5d/fnodeids.raw", output_folder, rank);
     array_write(MPI_COMM_SELF, output_path, MPI_FLOAT, fnodeids, mesh.nnodes, mesh.nnodes);
 
@@ -126,6 +158,8 @@ int main(int argc, char *argv[]) {
 
     send_recv_destroy(&slave_to_master);
     mesh_destroy(&mesh);
+
+    free(neigh_count);
     free(nodeids);
     free(fnodeids);
 

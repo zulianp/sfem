@@ -285,6 +285,8 @@ int resample_gap_local(
             const real_t measure =
                 tri_shell_3_measure(x[0], x[1], x[2], y[0], y[1], y[2], z[0], z[1], z[2]);
 
+            assert(measure > 0);
+
             for (int q = 0; q < 12; q++) {
                 real_t g_qx, g_qy, g_qz;
                 tri_shell_3_transform(x[0],

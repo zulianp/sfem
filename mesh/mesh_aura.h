@@ -37,6 +37,13 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
                                     idx_t **colidx,
                                     send_recv_t *const exchange);
 
+void mesh_exchange_nodal_slave_to_master(const mesh_t *mesh,
+                                         send_recv_t *const slave_to_master,
+                                         MPI_Datatype data_type,
+                                         void *const SFEM_RESTRICT ghost_data,
+                                         void *const SFEM_RESTRICT buffer);
+
+ptrdiff_t mesh_exchange_master_buffer_count(const send_recv_t *const slave_to_master);
 
 #ifdef __cplusplus
 }

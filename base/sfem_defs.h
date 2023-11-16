@@ -41,6 +41,19 @@ SFEM_INLINE static enum ElemType side_type(const enum ElemType type) {
     }
 }
 
+SFEM_INLINE static enum ElemType shell_type(const enum ElemType type) {
+    switch (type) {
+        case TRI3:
+            return TRISHELL3;
+            // case TRI6:
+            //     return TRISHELL6;
+        default: {
+            assert(0);
+            return INVALID;
+        }
+    }
+}
+
 SFEM_INLINE static enum ElemType elem_lower_order(const enum ElemType type) {
     switch (type) {
         case NIL:

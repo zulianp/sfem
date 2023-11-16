@@ -52,8 +52,7 @@ skin $mesh_raw $skinned
 # create_dual_graph $skinned $skinned/dual
 mesh_to_sdf.py $skinned $db_out --hmax=$hmax --margin=$margin $opts
 raw_to_xdmf.py $db_out
-
-raw_to_db.py $skinned $surf --point_data="nx.float32.raw,ny.float32.raw,nz.float32.raw" --point_data_type="float32,float32,float32"
+raw_to_db.py $skinned $surf
 
 
 if [[ -n "$5" ]]
