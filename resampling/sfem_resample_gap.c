@@ -465,7 +465,7 @@ int resample_gap(
                        znormal);
 
     // Removing the mass-contributions from the weighted gap function "wg"
-    apply_inv_lumped_mass(TRISHELL3, nelements, nnodes, elems, xyz, wg, g);
+    apply_inv_lumped_mass(shell_type(element_type), nelements, nnodes, elems, xyz, wg, g);
 
     // Normalize!
     for (ptrdiff_t i = 0; i < nnodes; i++) {

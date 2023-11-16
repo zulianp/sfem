@@ -215,7 +215,7 @@ int main(int argc, char* argv[]) {
                 exchange_add(&mesh, &slave_to_master, znormal, real_buffer);
 
                 // divide by the mass vector
-                for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
                     if (mass_vector[i] == 0) {
                         fprintf(stderr,
                                 "Found 0 mass at %ld, info (%ld, %ld)\n",
@@ -228,7 +228,7 @@ int main(int argc, char* argv[]) {
                     g[i] /= mass_vector[i];
                 }
 
-                for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
                     const real_t xn = xnormal[i];
                     const real_t yn = ynormal[i];
                     const real_t zn = znormal[i];
