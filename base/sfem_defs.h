@@ -45,8 +45,8 @@ SFEM_INLINE static enum ElemType shell_type(const enum ElemType type) {
     switch (type) {
         case TRI3:
             return TRISHELL3;
-            // case TRI6:
-            //     return TRISHELL6;
+        case TRISHELL3:
+            return TRISHELL3;
         default: {
             assert(0);
             return INVALID;
