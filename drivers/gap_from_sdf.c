@@ -267,7 +267,7 @@ int main(int argc, char* argv[]) {
         sprintf(path, "%s/znormal.float64.raw", output_folder);
         mesh_write_nodal_field(&mesh, path, SFEM_MPI_REAL_T, znormal);
 
-        if (1) {
+        if (0) {
             for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
                 g[i] = rank;
             }
