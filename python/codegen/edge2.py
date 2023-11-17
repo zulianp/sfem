@@ -90,8 +90,58 @@ class EdgeShell2(Edge2):
 		return self.detS
 
 
+class Beam2(Edge2):
+	def __init__(self):
+		super().__init__()
+
+		self.S = sp.Matrix(3, 1, [
+			 x1 - x0,
+			 y1 - y0,
+			 z1 - z0,
+			])
+
+		StS = self.S.T * self.S
+		self.detS = sp.sqrt(StS[0])
+		self.Sinv = self.S.T * (1/StS[0])
+
+	def coords_sub_parametric(self):
+		return [[x0, x1], [y0, y1], [z0, z1]]
+
+	def name(self):
+		return "Beam2"
+		
+	def manifold_dim(self):
+		return 1
+
+	def spatial_dim(self):
+		return 3
+
+	def jacobian(self, q):
+		return self.S
+
+	def jacobian_inverse(self, q):
+		return self.Sinv
+
+	def jacobian_determinant(self, q):
+		return self.detS 
+
+	def transform(self, p):
+		return self.S * p + sp.Matrix(3, 1, [x0, y0, z0])
+
+	def inverse_transform(self, p):
+		diff = (p - sp.Matrix(3, 1, [x0, y0, z0]))
+		return self.Sinv * diff
+
+	def measure(self, q):
+		return self.detS
+
+	def reference_measure(self):
+		return 1
+
+
 if __name__ == '__main__':
 	# Tri3().generate_c_code()
 	# TriShell3().generate_c_code()
 
-	EdgeShell2().generate_qp_based_code()
+	# EdgeShell2().generate_qp_based_code()
+	Beam2().generate_qp_based_code()

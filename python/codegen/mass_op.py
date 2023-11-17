@@ -8,6 +8,8 @@ from tet10 import *
 from tri3 import *
 from tri6 import *
 
+from edge2 import *
+
 from fields import *
 
 class MassOp:
@@ -111,13 +113,21 @@ class MassOp:
 
 def main():
 
+	if True:
+		fe = Beam2()
+		f =  Field(fe, coeffs('u', 2))
+		op = MassOp(f, fe, [qx])
+		c_code(op.apply())
+		# c_code(op.lumped_matrix())
+		# c_code(op.matrix())
+
 	if False:
 		fe = Tri3()
 		f =  Field(fe, coeffs('u', 3))
 		op = MassOp(f, fe, [qx, qy])
 		c_code(op.apply())
 
-	if True:
+	if False:
 		fe = TriShell3()
 		f =  Field(fe, coeffs('u', 3))
 		op = MassOp(f, fe, [qx, qy])

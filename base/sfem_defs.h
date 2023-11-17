@@ -18,6 +18,7 @@ enum ElemType {
     TET10 = 10,
     EDGE3 = 11,
     TRISHELL3 = 103,
+    BEAM2 = 100002,
     INVALID = -1
 };
 
@@ -34,6 +35,8 @@ SFEM_INLINE static enum ElemType side_type(const enum ElemType type) {
             return TRI6;
         case EDGE2:
             return NODE1;
+        case TRISHELL3:
+            return BEAM2;
         default: {
             assert(0);
             return INVALID;
@@ -47,6 +50,10 @@ SFEM_INLINE static enum ElemType shell_type(const enum ElemType type) {
             return TRISHELL3;
         case TRISHELL3:
             return TRISHELL3;
+        case EDGE2:
+            return BEAM2;
+        case BEAM2:
+            return BEAM2;
         default: {
             assert(0);
             return INVALID;

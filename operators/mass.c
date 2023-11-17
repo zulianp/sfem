@@ -18,6 +18,7 @@
 #include "tri3_mass.h"
 #include "tri6_mass.h"
 #include "trishell3_mass.h"
+#include "beam2_mass.h"
 
 void assemble_mass(const int element_type,
                    const ptrdiff_t nelements,
@@ -82,6 +83,10 @@ void assemble_lumped_mass(const int element_type,
             tet10_assemble_lumped_mass(nelements, nnodes, elems, xyz, values);
             break;
         }
+        case BEAM2: {
+            beam2_assemble_lumped_mass(nelements, nnodes, elems, xyz, values);
+            break;
+        }
 
         default: {
             MPI_Abort(MPI_COMM_WORLD, -1);
@@ -115,6 +120,10 @@ void apply_inv_lumped_mass(const int element_type,
         }
         case TET10: {
             tet10_apply_inv_lumped_mass(nelements, nnodes, elems, xyz, x, values);
+            break;
+        }
+        case BEAM2: {
+            beam2_apply_inv_lumped_mass(nelements, nnodes, elems, xyz, x, values);
             break;
         }
 

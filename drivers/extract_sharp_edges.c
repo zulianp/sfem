@@ -91,7 +91,6 @@ int main(int argc, char *argv[]) {
         normal[d] = calloc(nedges, sizeof(geom_t));
     }
 
-    short *checked = calloc(nedges, sizeof(short));
     const int nxe = elem_num_nodes(mesh.element_type);
 
     count_t *opposite = malloc(nedges * sizeof(count_t));
@@ -162,7 +161,6 @@ int main(int argc, char *argv[]) {
                 }
 
                 assert(edge_id >= 0);
-                assert(checked[edge_id] == 0);
                 for (int d = 0; d < 3; d++) {
                     normal[d][edge_id] = n[d];
                 }
@@ -173,7 +171,6 @@ int main(int argc, char *argv[]) {
     geom_t *dihedral_angle = calloc(nedges, sizeof(geom_t));
     count_t *e0 = malloc(nedges * sizeof(count_t));
     count_t *e1 = malloc(nedges * sizeof(count_t));
-
 
     ptrdiff_t edge_count = 0;
     {
@@ -204,40 +201,76 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // TODO
-    // 1) export all edges and dihedral angles for visual inspection
-    // 2) select sharp edges create edge selection index
-    // 3) create face islands index (for contact integral separation)
-    // 4) export edge and face selection
-    // Future work: detect sharp corners
+    // 1) select sharp edges create edge selection index
+    // 2) create face islands index (for contact integral separation)
+    // 3) export edge and face selection
+    // TODO Future work: detect sharp corners
 
     ptrdiff_t n_sharp_edges = 0;
     {
+        // Select edges
         for (ptrdiff_t i = 0; i < edge_count; i++) {
             if (dihedral_angle[i] <= angle_threshold) {
                 e0[n_sharp_edges] = e0[i];
                 e1[n_sharp_edges] = e1[i];
                 dihedral_angle[n_sharp_edges] = dihedral_angle[i];
-                
-                // printf("%" d_COUNT_T ", %" d_COUNT_T ": %" d_GEOM_T "\n",
-                //        e0[n_sharp_edges],
-                //        e1[n_sharp_edges],
-                //        dihedral_angle[n_sharp_edges]);
-
                 n_sharp_edges++;
             }
         }
     }
 
+    ptrdiff_t n_disconnected_elements = 0;
+    element_idx_t *disconnected_elements = 0;
+    {
+        // Select unconnected faces
+        short *checked = calloc(mesh.nnodes, sizeof(short));
+
+        for (ptrdiff_t i = 0; i < n_sharp_edges; i++) {
+            checked[e0[i]] = 1;
+            checked[e1[i]] = 1;
+        }
+
+        for (ptrdiff_t e = 0; e < mesh.nelements; e++) {
+            short connected_to_sharp_edge = 0;
+            for (int ln = 0; ln < nxe; ln++) {
+                connected_to_sharp_edge += checked[mesh.elements[ln][e]];
+            }
+
+            n_disconnected_elements += connected_to_sharp_edge == 0;
+        }
+
+        disconnected_elements = malloc(n_disconnected_elements * sizeof(element_idx_t));
+
+        ptrdiff_t eidx = 0;
+        for (ptrdiff_t e = 0; e < mesh.nelements; e++) {
+            short connected_to_sharp_edge = 0;
+            for (int ln = 0; ln < nxe; ln++) {
+                connected_to_sharp_edge += checked[mesh.elements[ln][e]];
+            }
+
+            if (connected_to_sharp_edge == 0) {
+                disconnected_elements[eidx++] = e;
+            }
+        }
+
+        free(checked);
+    }
+
     {
         char path[1024 * 10];
         sprintf(path, "%s/i0.raw", output_folder);
-        // sprintf(path, "%s/i0." dtype_COUNT_T ".raw", output_folder);
         array_write(comm, path, SFEM_MPI_COUNT_T, e0, n_sharp_edges, n_sharp_edges);
 
         sprintf(path, "%s/i1.raw", output_folder);
-        // sprintf(path, "%s/i1." dtype_COUNT_T ".raw", output_folder);
         array_write(comm, path, SFEM_MPI_COUNT_T, e1, n_sharp_edges, n_sharp_edges);
+
+        sprintf(path, "%s/e." dtype_ELEMENT_IDX_T ".raw", output_folder);
+        array_write(comm,
+                    path,
+                    SFEM_MPI_ELEMENT_IDX_T,
+                    disconnected_elements,
+                    n_disconnected_elements,
+                    n_disconnected_elements);
     }
 
     if (!rank) {
@@ -257,8 +290,8 @@ int main(int argc, char *argv[]) {
 
     free(rowptr);
     free(colidx);
-    free(checked);
     free(dihedral_angle);
+    free(disconnected_elements);
 
     for (int d = 0; d < 3; d++) {
         free(normal[d]);

@@ -212,7 +212,31 @@ class FE:
 
 		for i in range(0, len(tqp)):
 			expr.append(ast.Assignment(sp.symbols(f'res[{i}]'), tqp[i]))
+
+		print("------ inverse transform -------")
 		c_log(c_gen(expr))
+
+
+		qp = sp.Matrix(self.manifold_dim(), 1, quadrature_point[0:self.manifold_dim()])
+		expr = []
+		tqp = self.transform(qp)
+
+		for i in range(0, len(tqp)):
+			expr.append(ast.Assignment(sp.symbols(f'res[{i}]'), tqp[i]))
+
+		print("------ transform -------")
+		c_log(c_gen(expr))
+
+
+		qp = sp.Matrix(self.manifold_dim(), 1, quadrature_point[0:self.manifold_dim()])
+		expr = []
+		tqp = self.measure(qp)
+		expr.append(ast.Assignment(sp.symbols(f'res[{0}]'), tqp))
+
+		print("------ measure -------")
+		c_log(c_gen(expr))
+
+
 
 
 	def generate_c_code(self):
