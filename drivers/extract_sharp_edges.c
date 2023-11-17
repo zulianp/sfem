@@ -37,18 +37,19 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
 
-    if (argc != 3) {
+    if (argc != 4) {
         if (!rank) {
-            fprintf(stderr, "usage: %s <folder> <output_folder>", argv[0]);
+            fprintf(stderr, "usage: %s <folder> <angle_threshold> <output_folder>", argv[0]);
         }
 
         return EXIT_FAILURE;
     }
 
-    const char *output_folder = argv[2];
+    const geom_t angle_threshold = atof(argv[2]);
+    const char *output_folder = argv[3];
 
     if (!rank) {
-        printf("%s %s %s\n", argv[0], argv[1], output_folder);
+        printf("%s %s %s %s\n", argv[0], argv[1], argv[2], output_folder);
     }
 
     double tick = MPI_Wtime();
@@ -169,13 +170,12 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    ptrdiff_t n_undirected_edges = (nedges - mesh.nnodes) / 2;
-    assert(n_undirected_edges * 2 + mesh.nnodes == nedges);
+    geom_t *dihedral_angle = calloc(nedges, sizeof(geom_t));
+    count_t *e0 = malloc(nedges * sizeof(count_t));
+    count_t *e1 = malloc(nedges * sizeof(count_t));
 
-    geom_t *dihedral_angle = calloc(n_undirected_edges, sizeof(geom_t));
-    count_t *e1 = malloc(n_undirected_edges * sizeof(count_t));
-    count_t *e2 = malloc(n_undirected_edges * sizeof(count_t));
 
+    ptrdiff_t edge_count = 0;
     {
         for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
             const count_t begin = rowptr[i];
@@ -188,27 +188,64 @@ int main(int argc, char *argv[]) {
                 ptrdiff_t edge_id = begin + k;
                 ptrdiff_t o_edge_id = opposite[edge_id];
 
+                assert(edge_id != o_edge_id);
+
                 // Higher precision computation
                 real_t n[3] = {normal[0][edge_id], normal[1][edge_id], normal[2][edge_id]};
                 real_t on[3] = {normal[0][o_edge_id], normal[1][o_edge_id], normal[2][o_edge_id]};
                 real_t da = dot3(n, on);
 
                 // Store for minimum edge for exporting data
-                ptrdiff_t min_edge_id = MIN(edge_id, o_edge_id);
-                
-                dihedral_angle[min_edge_id] = (geom_t)da;
-                
-                e1[min_edge_id] = i;
-                e2[min_edge_id] = cols[k];
+                dihedral_angle[edge_count] = (geom_t)da;
+                e0[edge_count] = i;
+                e1[edge_count] = cols[k];
+                edge_count++;
             }
         }
     }
 
+    // TODO
+    // 1) export all edges and dihedral angles for visual inspection
+    // 2) select sharp edges create edge selection index
+    // 3) create face islands index (for contact integral separation)
+    // 4) export edge and face selection
+    // Future work: detect sharp corners
+
+    ptrdiff_t n_sharp_edges = 0;
+    {
+        for (ptrdiff_t i = 0; i < edge_count; i++) {
+            if (dihedral_angle[i] <= angle_threshold) {
+                e0[n_sharp_edges] = e0[i];
+                e1[n_sharp_edges] = e1[i];
+                dihedral_angle[n_sharp_edges] = dihedral_angle[i];
+                
+                // printf("%" d_COUNT_T ", %" d_COUNT_T ": %" d_GEOM_T "\n",
+                //        e0[n_sharp_edges],
+                //        e1[n_sharp_edges],
+                //        dihedral_angle[n_sharp_edges]);
+
+                n_sharp_edges++;
+            }
+        }
+    }
+
+    {
+        char path[1024 * 10];
+        sprintf(path, "%s/i0.raw", output_folder);
+        // sprintf(path, "%s/i0." dtype_COUNT_T ".raw", output_folder);
+        array_write(comm, path, SFEM_MPI_COUNT_T, e0, n_sharp_edges, n_sharp_edges);
+
+        sprintf(path, "%s/i1.raw", output_folder);
+        // sprintf(path, "%s/i1." dtype_COUNT_T ".raw", output_folder);
+        array_write(comm, path, SFEM_MPI_COUNT_T, e1, n_sharp_edges, n_sharp_edges);
+    }
+
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("extract_sharp_edges.c: #elements %ld, #nodes %ldn",
+        printf("extract_sharp_edges.c: #elements %ld, #nodes %ld, #n_sharp_edges %ld\n",
                (long)mesh.nelements,
-               (long)mesh.nnodes);
+               (long)mesh.nnodes,
+               (long)n_sharp_edges);
         printf("----------------------------------------\n");
     }
 
