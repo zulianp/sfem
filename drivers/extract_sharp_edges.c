@@ -243,6 +243,8 @@ int main(int argc, char *argv[]) {
                 n_corners++;
             }
         }
+
+        free(incidence_count);
     }
 
     ptrdiff_t n_disconnected_elements = 0;
