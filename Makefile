@@ -168,7 +168,8 @@ OBJS = \
 	navier_stokes.o \
 	boundary_condition.o \
 	constrained_gs.o \
-	sfem_logger.o
+	sfem_logger.o \
+	extract_sharp_features.o
 
 # Tri3
 OBJS += tri3_stokes_mini.o \
