@@ -169,7 +169,8 @@ OBJS = \
 	boundary_condition.o \
 	constrained_gs.o \
 	sfem_logger.o \
-	extract_sharp_features.o
+	extract_sharp_features.o \
+	mesh_utils.o
 
 # Tri3
 OBJS += tri3_stokes_mini.o \

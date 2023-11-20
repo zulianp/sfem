@@ -298,11 +298,6 @@ int trishell3_resample_gap_local(
         MPI_Abort(MPI_COMM_WORLD, -1);
     }
 
-    memset(wg, 0, nnodes * sizeof(real_t));
-    memset(xnormal, 0, nnodes * sizeof(real_t));
-    memset(ynormal, 0, nnodes * sizeof(real_t));
-    memset(znormal, 0, nnodes * sizeof(real_t));
-
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];
     const real_t oz = (real_t)origin[2];
@@ -512,12 +507,6 @@ int beam2_resample_gap_local(
     }
 
     printf("beam2_resample_gap_local!\n");
-
-    
-    memset(wg, 0, nnodes * sizeof(real_t));
-    memset(xnormal, 0, nnodes * sizeof(real_t));
-    memset(ynormal, 0, nnodes * sizeof(real_t));
-    memset(znormal, 0, nnodes * sizeof(real_t));
 
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];

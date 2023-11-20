@@ -12,39 +12,9 @@
 #include "sfem_mesh_write.h"
 #include "sfem_resample_gap.h"
 
+#include "mesh_utils.h"
+
 #include "mass.h"
-
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-
-static void minmax(const ptrdiff_t n,
-                   const geom_t* const SFEM_RESTRICT x,
-                   geom_t* xmin,
-                   geom_t* xmax) {
-    *xmin = x[0];
-    *xmax = x[0];
-    for (ptrdiff_t i = 1; i < n; i++) {
-        *xmin = MIN(*xmin, x[i]);
-        *xmax = MAX(*xmax, x[i]);
-    }
-}
-
-static void exchange_add(mesh_t* mesh,
-                         send_recv_t* slave_to_master,
-                         real_t* const SFEM_RESTRICT inout,
-                         real_t* const SFEM_RESTRICT real_buffer) {
-    ptrdiff_t n_ghosts = (mesh->nnodes - mesh->n_owned_nodes);
-    ptrdiff_t count = mesh_exchange_master_buffer_count(slave_to_master);
-
-    // Exchange mass_vector ghosts
-    mesh_exchange_nodal_slave_to_master(
-        mesh, slave_to_master, SFEM_MPI_REAL_T, &inout[mesh->n_owned_nodes], real_buffer);
-
-    for (ptrdiff_t i = 0; i < count; i++) {
-        assert(real_buffer[i] == real_buffer[i]);
-        inout[slave_to_master->sparse_idx[i]] += real_buffer[i];
-    }
-}
 
 int main(int argc, char* argv[]) {
     MPI_Init(&argc, &argv);
@@ -109,11 +79,6 @@ int main(int argc, char* argv[]) {
     // X is contiguous
     ptrdiff_t stride[3] = {1, nlocal[0], nlocal[0] * nlocal[1]};
 
-    real_t* g = malloc(mesh.nnodes * sizeof(real_t));
-    real_t* xnormal = malloc(mesh.nnodes * sizeof(real_t));
-    real_t* ynormal = malloc(mesh.nnodes * sizeof(real_t));
-    real_t* znormal = malloc(mesh.nnodes * sizeof(real_t));
-
     if (size > 1) {
         geom_t* psdf;
         sdf_view(comm,
@@ -133,6 +98,11 @@ int main(int argc, char* argv[]) {
         sdf = psdf;
     }
 
+
+    real_t* g = calloc(mesh.nnodes, sizeof(real_t));
+    real_t* xnormal = calloc(mesh.nnodes, sizeof(real_t));
+    real_t* ynormal = calloc(mesh.nnodes, sizeof(real_t));
+    real_t* znormal = calloc(mesh.nnodes, sizeof(real_t));
     {
         double resample_tick = MPI_Wtime();
 

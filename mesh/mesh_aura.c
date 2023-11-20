@@ -919,3 +919,20 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
         free(count);
     }
 }
+
+void exchange_add(mesh_t *mesh,
+                  send_recv_t *slave_to_master,
+                  real_t *const SFEM_RESTRICT inout,
+                  real_t *const SFEM_RESTRICT real_buffer) {
+    ptrdiff_t n_ghosts = (mesh->nnodes - mesh->n_owned_nodes);
+    ptrdiff_t count = mesh_exchange_master_buffer_count(slave_to_master);
+
+    // Exchange mass_vector ghosts
+    mesh_exchange_nodal_slave_to_master(
+        mesh, slave_to_master, SFEM_MPI_REAL_T, &inout[mesh->n_owned_nodes], real_buffer);
+
+    for (ptrdiff_t i = 0; i < count; i++) {
+        assert(real_buffer[i] == real_buffer[i]);
+        inout[slave_to_master->sparse_idx[i]] += real_buffer[i];
+    }
+}
