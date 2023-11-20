@@ -38,7 +38,7 @@ mkdir -p $mesh_raw
 db_to_raw.py $db_in $mesh_raw
 skin $mesh_raw $skinned
 
-extract_sharp_edges $skinned 0.1 sharp_features
+extract_sharp_edges $skinned 0.15 sharp_features
 cp $skinned/{x,y,z}.raw sharp_features
 raw_to_db.py sharp_features sharp_edges.vtk
 

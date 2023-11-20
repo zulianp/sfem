@@ -236,7 +236,6 @@ int main(int argc, char *argv[]) {
         }
 
         corners = malloc(n_corners * sizeof(idx_t));
-
         for (ptrdiff_t i = 0, n_corners = 0; i < mesh.nnodes; i++) {
             if (incidence_count[i] >= 3) {
                 corners[n_corners] = i;

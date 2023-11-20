@@ -244,9 +244,12 @@ def main(argv):
 
 
     print(f'numnodes = {len(idx)} -> {cell_type}')
-
     n_points = len(points[0])
     n_cells = len(idx[0])
+
+    if n_points == 0 or n_cells == 0:
+        print(f"Warning empty database at {raw_mesh_folder}")
+        return
 
     points = np.array(points).transpose()
     cells = [
