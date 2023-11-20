@@ -97,10 +97,6 @@ int main(int argc, char *argv[]) {
         free(colidx);
     }
 
-    ptrdiff_t n_corners = 0;
-    idx_t *corners = 0;
-    extract_sharp_corners(mesh.nnodes, n_sharp_edges, e0, e1, &n_corners, &corners);
-
     ptrdiff_t n_disconnected_elements = 0;
     element_idx_t *disconnected_elements = 0;
 
@@ -113,6 +109,11 @@ int main(int argc, char *argv[]) {
                                e1,
                                &n_disconnected_elements,
                                &disconnected_elements);
+
+    ptrdiff_t n_corners = 0;
+    idx_t *corners = 0;
+    n_sharp_edges =
+        extract_sharp_corners(mesh.nnodes, n_sharp_edges, e0, e1, &n_corners, &corners, 1);
 
     {
         char path[1024 * 10];

@@ -179,13 +179,15 @@ int extract_sharp_edges(const enum ElemType element_type,
 
 int extract_sharp_corners(const ptrdiff_t nnodes,
                           const ptrdiff_t n_sharp_edges,
-                          const count_t *const SFEM_RESTRICT e0,
-                          const count_t *const SFEM_RESTRICT e1,
+                           count_t *const SFEM_RESTRICT e0,
+                           count_t *const SFEM_RESTRICT e1,
                           ptrdiff_t *out_ncorners,
-                          idx_t **out_corners) {
+                          idx_t **out_corners,
+                          int edge_clean_up) {
     ptrdiff_t n_corners = 0;
     idx_t *corners = 0;
 
+    ptrdiff_t out_n_sharp_edges = n_sharp_edges;
     {
         int *incidence_count = calloc(nnodes, sizeof(int));
 
@@ -208,13 +210,26 @@ int extract_sharp_corners(const ptrdiff_t nnodes,
             }
         }
 
+        if(edge_clean_up) {
+        	out_n_sharp_edges = 0;
+        	for (ptrdiff_t i = 0; i < n_sharp_edges; i++) {
+        	    if(incidence_count[e0[i]] < 3 &&
+        	       incidence_count[e1[i]] < 3) {
+        	    	e0[out_n_sharp_edges] = e0[i];
+        	    	e1[out_n_sharp_edges] = e1[i];
+
+        	    	out_n_sharp_edges++;
+        	    }
+        	}
+        }
+
         free(incidence_count);
     }
 
     *out_ncorners = n_corners;
     *out_corners = corners;
 
-    return 0;
+    return out_n_sharp_edges;
 }
 
 int extract_disconnected_faces(const enum ElemType element_type,

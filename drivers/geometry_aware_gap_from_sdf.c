@@ -112,11 +112,6 @@ int main(int argc, char* argv[]) {
     // X is contiguous
     ptrdiff_t stride[3] = {1, nlocal[0], nlocal[0] * nlocal[1]};
 
-    real_t* g = malloc(mesh.nnodes * sizeof(real_t));
-    real_t* xnormal = malloc(mesh.nnodes * sizeof(real_t));
-    real_t* ynormal = malloc(mesh.nnodes * sizeof(real_t));
-    real_t* znormal = malloc(mesh.nnodes * sizeof(real_t));
-
     if (size > 1) {
         geom_t* psdf;
         sdf_view(comm,
@@ -136,18 +131,21 @@ int main(int argc, char* argv[]) {
         sdf = psdf;
     }
 
-    //
-
+    // edge graph for resampling on sharp edges
     ptrdiff_t n_sharp_edges = 0;
     count_t* e0 = 0;
     count_t* e1 = 0;
+
+    // Indices for interpolating on corner nodes
     ptrdiff_t n_corners = 0;
     idx_t* corners = 0;
+
+    // selector for resampling on faces
     ptrdiff_t n_disconnected_elements = 0;
     element_idx_t* disconnected_elements = 0;
 
-    { // Extract sharp features!
-        {  
+    {  // Extract sharp features!
+        {
             count_t* rowptr = 0;
             idx_t* colidx = 0;
             build_crs_graph_for_elem_type(
@@ -170,8 +168,6 @@ int main(int argc, char* argv[]) {
             free(colidx);
         }
 
-        extract_sharp_corners(mesh.nnodes, n_sharp_edges, e0, e1, &n_corners, &corners);
-
         extract_disconnected_faces(mesh.element_type,
                                    mesh.nelements,
                                    mesh.nnodes,
@@ -181,8 +177,17 @@ int main(int argc, char* argv[]) {
                                    e1,
                                    &n_disconnected_elements,
                                    &disconnected_elements);
+
+        n_sharp_edges =
+            extract_sharp_corners(mesh.nnodes, n_sharp_edges, e0, e1, &n_corners, &corners, 1);
     }
 
+    // Quantities of interest
+    real_t* g = malloc(mesh.nnodes * sizeof(real_t));
+    real_t* xnormal = malloc(mesh.nnodes * sizeof(real_t));
+    real_t* ynormal = malloc(mesh.nnodes * sizeof(real_t));
+    real_t* znormal = malloc(mesh.nnodes * sizeof(real_t));
+    real_t* mass_vector = calloc(mesh.nnodes, sizeof(real_t));
     {
         // double resample_tick = MPI_Wtime();
 
@@ -204,8 +209,6 @@ int main(int argc, char* argv[]) {
         //     xnormal,
         //     ynormal,
         //     znormal);
-
-        // real_t* mass_vector = calloc(mesh.nnodes, sizeof(real_t));
 
         // assemble_lumped_mass(shell_type(mesh.element_type),
         //                      mesh.nelements,
