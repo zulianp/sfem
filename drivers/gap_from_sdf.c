@@ -202,17 +202,21 @@ int main(int argc, char* argv[]) {
                                      mass_vector);
 
                 // exchange ghost nodes and add contribution
-                send_recv_t slave_to_master;
-                mesh_create_nodal_send_recv(&mesh, &slave_to_master);
+                if(size > 1)
+                {
+                    send_recv_t slave_to_master;
+                    mesh_create_nodal_send_recv(&mesh, &slave_to_master);
 
-                ptrdiff_t count = mesh_exchange_master_buffer_count(&slave_to_master);
-                real_t* real_buffer = malloc(count * sizeof(real_t));
+                    ptrdiff_t count = mesh_exchange_master_buffer_count(&slave_to_master);
+                    real_t* real_buffer = malloc(count * sizeof(real_t));
 
-                exchange_add(&mesh, &slave_to_master, mass_vector, real_buffer);
-                exchange_add(&mesh, &slave_to_master, g, real_buffer);
-                exchange_add(&mesh, &slave_to_master, xnormal, real_buffer);
-                exchange_add(&mesh, &slave_to_master, ynormal, real_buffer);
-                exchange_add(&mesh, &slave_to_master, znormal, real_buffer);
+                    exchange_add(&mesh, &slave_to_master, mass_vector, real_buffer);
+                    exchange_add(&mesh, &slave_to_master, g, real_buffer);
+                    exchange_add(&mesh, &slave_to_master, xnormal, real_buffer);
+                    exchange_add(&mesh, &slave_to_master, ynormal, real_buffer);
+                    exchange_add(&mesh, &slave_to_master, znormal, real_buffer);
+                    free(real_buffer);
+                }
 
                 // divide by the mass vector
                 for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {

@@ -49,6 +49,64 @@ static void exchange_add(mesh_t* mesh,
     }
 }
 
+idx_t** allocate_elements(const int nxe, const ptrdiff_t n_elements) {
+    idx_t** elements = malloc(nxe * sizeof(idx_t*));
+    for (int d = 0; d < nxe; d++) {
+        elements[d] = malloc(n_elements * sizeof(idx_t));
+    }
+
+    return elements;
+}
+
+void free_elements(const int nxe, idx_t** elements) {
+    for (int d = 0; d < nxe; d++) {
+        free(elements[d]);
+    }
+
+    free(elements);
+}
+
+void select_elements(const int nxe,
+                     const ptrdiff_t nselected,
+                     const element_idx_t* const idx,
+                     idx_t** const SFEM_RESTRICT elements,
+                     idx_t** const SFEM_RESTRICT selection) {
+    for (int d = 0; d < nxe; d++) {
+        for (ptrdiff_t i = 0; i < nselected; i++) {
+            selection[d][i] = elements[d][idx[i]];
+        }
+    }
+}
+
+geom_t** allocate_points(const int dim, const ptrdiff_t n_points) {
+    geom_t** points = malloc(dim * sizeof(geom_t*));
+    for (int d = 0; d < dim; d++) {
+        points[d] = malloc(n_points * sizeof(geom_t));
+    }
+
+    return points;
+}
+
+void free_points(const int dim, geom_t** points) {
+    for (int d = 0; d < dim; d++) {
+        free(points[d]);
+    }
+
+    free(points);
+}
+
+void select_points(const int dim,
+                   const ptrdiff_t n_points,
+                   const idx_t* idx,
+                   geom_t** const points,
+                   geom_t** const selection) {
+    for (int d = 0; d < dim; d++) {
+        for (ptrdiff_t i = 0; i < n_points; i++) {
+            selection[d][i] = points[d][idx[i]];
+        }
+    }
+}
+
 int main(int argc, char* argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -183,85 +241,166 @@ int main(int argc, char* argv[]) {
     }
 
     // Quantities of interest
-    real_t* g = malloc(mesh.nnodes * sizeof(real_t));
-    real_t* xnormal = malloc(mesh.nnodes * sizeof(real_t));
-    real_t* ynormal = malloc(mesh.nnodes * sizeof(real_t));
-    real_t* znormal = malloc(mesh.nnodes * sizeof(real_t));
+    real_t* g = calloc(mesh.nnodes, sizeof(real_t));
+    real_t* xnormal = calloc(mesh.nnodes, sizeof(real_t));
+    real_t* ynormal = calloc(mesh.nnodes, sizeof(real_t));
+    real_t* znormal = calloc(mesh.nnodes, sizeof(real_t));
     real_t* mass_vector = calloc(mesh.nnodes, sizeof(real_t));
     {
-        // double resample_tick = MPI_Wtime();
+        double resample_tick = MPI_Wtime();
 
-        // resample_gap_local(
-        //     // Mesh
-        //     mesh.element_type,
-        //     mesh.nelements,
-        //     mesh.nnodes,
-        //     mesh.elements,
-        //     mesh.points,
-        //     // SDF
-        //     nlocal,
-        //     stride,
-        //     origin,
-        //     delta,
-        //     sdf,
-        //     // Output
-        //     g,
-        //     xnormal,
-        //     ynormal,
-        //     znormal);
+        {  // BEAM2 integral
+            idx_t* edges[2] = {e0, e1};
+            resample_gap_local(
+                // Mesh
+                BEAM2,
+                n_sharp_edges,
+                mesh.nnodes,
+                edges,
+                mesh.points,
+                // SDF
+                nlocal,
+                stride,
+                origin,
+                delta,
+                sdf,
+                // Output
+                g,
+                xnormal,
+                ynormal,
+                znormal);
 
-        // assemble_lumped_mass(shell_type(mesh.element_type),
-        //                      mesh.nelements,
-        //                      mesh.nnodes,
-        //                      mesh.elements,
-        //                      mesh.points,
-        //                      mass_vector);
+            assemble_lumped_mass(
+                BEAM2, n_sharp_edges, mesh.nnodes, edges, mesh.points, mass_vector);
+        }
 
-        // // exchange ghost nodes and add contribution
-        // send_recv_t slave_to_master;
-        // mesh_create_nodal_send_recv(&mesh, &slave_to_master);
+        {  // Faces
+            int nxe = elem_num_nodes(mesh.element_type);
+            idx_t** selected_elements = allocate_elements(nxe, n_disconnected_elements);
+            select_elements(nxe,
+                            n_disconnected_elements,
+                            disconnected_elements,
+                            mesh.elements,
+                            selected_elements);
 
-        // ptrdiff_t count = mesh_exchange_master_buffer_count(&slave_to_master);
-        // real_t* real_buffer = malloc(count * sizeof(real_t));
+            resample_gap_local(
+                // Mesh
+                shell_type(mesh.element_type),
+                n_disconnected_elements,
+                mesh.nnodes,
+                selected_elements,
+                mesh.points,
+                // SDF
+                nlocal,
+                stride,
+                origin,
+                delta,
+                sdf,
+                // Output
+                g,
+                xnormal,
+                ynormal,
+                znormal);
 
-        // exchange_add(&mesh, &slave_to_master, mass_vector, real_buffer);
-        // exchange_add(&mesh, &slave_to_master, g, real_buffer);
-        // exchange_add(&mesh, &slave_to_master, xnormal, real_buffer);
-        // exchange_add(&mesh, &slave_to_master, ynormal, real_buffer);
-        // exchange_add(&mesh, &slave_to_master, znormal, real_buffer);
+            assemble_lumped_mass(shell_type(mesh.element_type),
+                                 n_disconnected_elements,
+                                 mesh.nnodes,
+                                 selected_elements,
+                                 mesh.points,
+                                 mass_vector);
 
-        // // divide by the mass vector
-        // for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
-        //     if (mass_vector[i] == 0) {
-        //         fprintf(stderr,
-        //                 "Found 0 mass at %ld, info (%ld, %ld)\n",
-        //                 i,
-        //                 mesh.n_owned_nodes,
-        //                 mesh.nnodes);
-        //     }
+            free_elements(nxe, selected_elements);
+        }
 
-        //     assert(mass_vector[i] != 0);
-        //     g[i] /= mass_vector[i];
-        // }
+        if (n_corners) {  // Nodes
+            geom_t** corner_points = allocate_points(mesh.spatial_dim, n_corners);
+            select_points(mesh.spatial_dim, n_corners, corners, mesh.points, corner_points);
 
-        // for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
-        //     const real_t xn = xnormal[i];
-        //     const real_t yn = ynormal[i];
-        //     const real_t zn = znormal[i];
-        //     const real_t ln = sqrt(xn * xn + yn * yn + zn * zn);
+            real_t* p_g = calloc(n_corners, sizeof(real_t));
+            real_t* p_xnormal = calloc(n_corners, sizeof(real_t));
+            real_t* p_ynormal = calloc(n_corners, sizeof(real_t));
+            real_t* p_znormal = calloc(n_corners, sizeof(real_t));
 
-        //     xnormal[i] /= ln;
-        //     ynormal[i] /= ln;
-        //     znormal[i] /= ln;
-        // }
+            interpolate_gap(
+                // Mesh
+                n_corners,
+                corner_points,
+                // SDF
+                nlocal,
+                stride,
+                origin,
+                delta,
+                sdf,
+                // Output
+                p_g,
+                p_xnormal,
+                p_ynormal,
+                p_znormal);
 
-        // free(mass_vector);
+            // Add to complete array
+            for (ptrdiff_t i = 0; i < n_corners; i++) {
+                g[corners[i]] += p_g[i];
+                xnormal[corners[i]] += p_xnormal[i];
+                ynormal[corners[i]] += p_ynormal[i];
+                znormal[corners[i]] += p_znormal[i];
+                mass_vector[corners[i]] += 1;
+            }
 
-        // double resample_tock = MPI_Wtime();
+            free_points(mesh.spatial_dim, corner_points);
+            free(p_g);
+            free(p_xnormal);
+            free(p_ynormal);
+            free(p_znormal);
+        }
 
-        // if (!rank) {
-        //     printf("[%d] resample %g (seconds)\n", rank, resample_tock - resample_tick);
-        // }
+        if (size > 1) {
+            // // exchange ghost nodes and add contribution
+            send_recv_t slave_to_master;
+            mesh_create_nodal_send_recv(&mesh, &slave_to_master);
+
+            ptrdiff_t count = mesh_exchange_master_buffer_count(&slave_to_master);
+            real_t* real_buffer = malloc(count * sizeof(real_t));
+
+            exchange_add(&mesh, &slave_to_master, mass_vector, real_buffer);
+            exchange_add(&mesh, &slave_to_master, g, real_buffer);
+            exchange_add(&mesh, &slave_to_master, xnormal, real_buffer);
+            exchange_add(&mesh, &slave_to_master, ynormal, real_buffer);
+            exchange_add(&mesh, &slave_to_master, znormal, real_buffer);
+            free(real_buffer);
+        }
+
+        // divide by the mass vector
+        for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
+            if (mass_vector[i] == 0) {
+                fprintf(stderr,
+                        "Found 0 mass at %ld, info (%ld, %ld)\n",
+                        i,
+                        mesh.n_owned_nodes,
+                        mesh.nnodes);
+            }
+
+            assert(mass_vector[i] != 0);
+            g[i] /= mass_vector[i];
+        }
+
+        for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
+            const real_t xn = xnormal[i];
+            const real_t yn = ynormal[i];
+            const real_t zn = znormal[i];
+            const real_t ln = sqrt(xn * xn + yn * yn + zn * zn);
+
+            xnormal[i] /= ln;
+            ynormal[i] /= ln;
+            znormal[i] /= ln;
+        }
+
+        free(mass_vector);
+
+        double resample_tock = MPI_Wtime();
+
+        if (!rank) {
+            printf("[%d] resample %g (seconds)\n", rank, resample_tock - resample_tick);
+        }
     }
 
     // Write result to disk
