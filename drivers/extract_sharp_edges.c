@@ -18,6 +18,7 @@
 #include "sortreduce.h"
 
 #include "extract_sharp_features.h"
+#include "mesh_utils.h"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -131,7 +132,6 @@ int main(int argc, char *argv[]) {
         }
 
         sprintf(path, "%s/corners/i0.raw", output_folder);
-
         array_write(comm, path, SFEM_MPI_COUNT_T, corners, n_corners, n_corners);
 
         sprintf(path, "%s/e." dtype_ELEMENT_IDX_T ".raw", output_folder);
@@ -141,6 +141,32 @@ int main(int argc, char *argv[]) {
                     disconnected_elements,
                     n_disconnected_elements,
                     n_disconnected_elements);
+
+        {
+            const int nxe = elem_num_nodes(mesh.element_type);
+            idx_t **delems = allocate_elements(nxe, n_disconnected_elements);
+            select_elements(
+                nxe, n_disconnected_elements, disconnected_elements, mesh.elements, delems);
+
+            sprintf(path, "%s/disconnected", output_folder);
+
+            struct stat st = {0};
+            if (stat(path, &st) == -1) {
+                mkdir(path, 0700);
+            }
+
+            for (int d = 0; d < nxe; d++) {
+                sprintf(path, "%s/disconnected/i%d.raw", output_folder, d);
+                array_write(comm,
+                            path,
+                            SFEM_MPI_IDX_T,
+                            delems[d],
+                            n_disconnected_elements,
+                            n_disconnected_elements);
+            }
+
+            free_elements(nxe, delems);
+        }
     }
 
     if (!rank) {

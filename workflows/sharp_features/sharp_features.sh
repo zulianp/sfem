@@ -44,3 +44,6 @@ raw_to_db.py sharp_features sharp_edges.vtk
 
 cp $skinned/{x,y,z}.raw sharp_features/corners
 raw_to_db.py sharp_features/corners corners.vtk
+
+cp $skinned/{x,y,z}.raw sharp_features/disconnected
+raw_to_db.py sharp_features/disconnected disconnected.vtk
