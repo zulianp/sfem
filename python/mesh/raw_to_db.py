@@ -225,7 +225,6 @@ def main(argv):
             # No more indices to read!
             break
     
-
     if cell_type == None:
         if len(idx) == 3:
             cell_type = "triangle"
@@ -241,7 +240,6 @@ def main(argv):
             cell_type = "line"
         elif len(idx) == 1:
             cell_type = "vertex"
-
 
     print(f'numnodes = {len(idx)} -> {cell_type}')
     n_points = len(points[0])
