@@ -61,6 +61,9 @@ then
 	source vars.sh
 	SFEM_INTERPOLATE=0 $LAUNCH gap_from_sdf $boxed_mesh_raw/skinned $nx $ny $nz $ox $oy $oz $dx $dy $dz $db_out sdf_on_mesh
 	raw_to_db.py $boxed_mesh_raw/skinned gap.vtk --point_data="sdf_on_mesh/*float64.raw"
+
+	geometry_aware_gap_from_sdf $boxed_mesh_raw/skinned $nx $ny $nz $ox $oy $oz $dx $dy $dz $db_out ga_sdf_on_mesh
+	raw_to_db.py $boxed_mesh_raw/skinned ga_gap.vtk --point_data="ga_sdf_on_mesh/*float64.raw"
 fi
 
 extract_sharp_edges $boxed_mesh_raw/skinned 0.1 sharp_features
@@ -68,5 +71,6 @@ cp $boxed_mesh_raw/skinned/{x,y,z}.raw sharp_features
 
 # Serial since the sharp features connectivity are an auxiliry graph of the actual mesh
 SFEM_INTERPOLATE=0 gap_from_sdf sharp_features $nx $ny $nz $ox $oy $oz $dx $dy $dz $db_out sdf_on_sharp
-raw_to_db.py sharp_features gap_sharp.vtk --point_data="sdf_on_sharp/*float64.raw"  
+raw_to_db.py sharp_features gap_sharp.vtk --point_data="sdf_on_sharp/*float64.raw" 
+
 

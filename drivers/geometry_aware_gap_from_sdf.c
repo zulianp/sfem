@@ -249,6 +249,7 @@ int main(int argc, char* argv[]) {
     {
         double resample_tick = MPI_Wtime();
 
+        if(n_sharp_edges)
         {  // BEAM2 integral
             idx_t* edges[2] = {e0, e1};
             resample_gap_local(
@@ -274,6 +275,7 @@ int main(int argc, char* argv[]) {
                 BEAM2, n_sharp_edges, mesh.nnodes, edges, mesh.points, mass_vector);
         }
 
+        if(n_disconnected_elements)
         {  // Faces
             int nxe = elem_num_nodes(mesh.element_type);
             idx_t** selected_elements = allocate_elements(nxe, n_disconnected_elements);
@@ -366,6 +368,7 @@ int main(int argc, char* argv[]) {
             exchange_add(&mesh, &slave_to_master, xnormal, real_buffer);
             exchange_add(&mesh, &slave_to_master, ynormal, real_buffer);
             exchange_add(&mesh, &slave_to_master, znormal, real_buffer);
+            
             free(real_buffer);
         }
 
