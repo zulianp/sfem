@@ -219,6 +219,32 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    ptrdiff_t n_corners = 0;
+    idx_t *corners = 0;
+    {
+        int *incidence_count = calloc(mesh.nnodes, sizeof(int));
+
+        for (ptrdiff_t i = 0; i < n_sharp_edges; i++) {
+            incidence_count[e0[i]]++;
+            incidence_count[e1[i]]++;
+        }
+
+        for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+            if (incidence_count[i] >= 3) {
+                n_corners++;
+            }
+        }
+
+        corners = malloc(n_corners * sizeof(idx_t));
+
+        for (ptrdiff_t i = 0, n_corners = 0; i < mesh.nnodes; i++) {
+            if (incidence_count[i] >= 3) {
+                corners[n_corners] = i;
+                n_corners++;
+            }
+        }
+    }
+
     ptrdiff_t n_disconnected_elements = 0;
     element_idx_t *disconnected_elements = 0;
     {
@@ -264,6 +290,17 @@ int main(int argc, char *argv[]) {
         sprintf(path, "%s/i1.raw", output_folder);
         array_write(comm, path, SFEM_MPI_COUNT_T, e1, n_sharp_edges, n_sharp_edges);
 
+        sprintf(path, "%s/corners", output_folder);
+
+        struct stat st = {0};
+        if (stat(path, &st) == -1) {
+            mkdir(path, 0700);
+        }
+
+        sprintf(path, "%s/corners/i0.raw", output_folder);
+
+        array_write(comm, path, SFEM_MPI_COUNT_T, corners, n_corners, n_corners);
+
         sprintf(path, "%s/e." dtype_ELEMENT_IDX_T ".raw", output_folder);
         array_write(comm,
                     path,
@@ -292,6 +329,7 @@ int main(int argc, char *argv[]) {
     free(colidx);
     free(dihedral_angle);
     free(disconnected_elements);
+    free(corners);
 
     for (int d = 0; d < 3; d++) {
         free(normal[d]);
