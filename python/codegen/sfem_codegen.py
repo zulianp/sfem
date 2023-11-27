@@ -286,6 +286,17 @@ def coeffs(name, n):
 	ret = sp.Matrix(n, 1, list_coeffs)
 	return ret
 
+def matrix_coeff(name, rows, cols):
+	list_coeffs = []
+
+	for i in range(0, rows):
+		for j in range(0, cols):
+			ui = sp.symbols(f'{name}[{i * rows + j}]', real=True)
+			list_coeffs.append(ui)
+
+	ret = sp.Matrix(rows, cols, list_coeffs)
+	return ret
+
 
 def norm2(v):
 	ret = 0.0;

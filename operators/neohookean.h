@@ -1,5 +1,5 @@
-#ifndef LAPLACIAN_H
-#define LAPLACIAN_H
+#ifndef SFEM_NEOHOOKEAN_H
+#define SFEM_NEOHOOKEAN_H
 
 #include <stddef.h>
 #include "sfem_base.h"
@@ -97,4 +97,4 @@ void neohookean_assemble_hessian_soa(const ptrdiff_t nelements,
 #ifdef __cplusplus
 }
 #endif
-#endif  // LAPLACIAN_H
+#endif  // SFEM_NEOHOOKEAN_H
