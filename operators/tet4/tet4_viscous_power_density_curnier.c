@@ -1,4 +1,4 @@
-#include "viscous_power_density_curnier.h"
+#include "tet4_viscous_power_density_curnier.h"
 
 #include <assert.h>
 #include <math.h>
