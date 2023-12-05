@@ -16,7 +16,7 @@ PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 LAUNCH="mpiexec -np 8"
 # LAUNCH=""
 
-if [[ $# -le "4" ]]
+if [[ $# -le "3" ]]
 then
 	printf "usage: $0 <db.e> <hmax> <margin> <sdt.float32.raw> [aux_mesh]\n" 1>&2
 	exit -1
@@ -50,7 +50,7 @@ mkdir -p $mesh_raw
 db_to_raw.py $db_in $mesh_raw
 skin $mesh_raw $skinned
 # create_dual_graph $skinned $skinned/dual
-# mesh_to_sdf.py $skinned $db_out --hmax=$hmax --margin=$margin $opts
+mesh_to_sdf.py $skinned $db_out --hmax=$hmax --margin=$margin $opts
 raw_to_xdmf.py $db_out
 raw_to_db.py $skinned $surf
 
@@ -64,13 +64,12 @@ then
 
 	geometry_aware_gap_from_sdf $boxed_mesh_raw/skinned $nx $ny $nz $ox $oy $oz $dx $dy $dz $db_out ga_sdf_on_mesh
 	raw_to_db.py $boxed_mesh_raw/skinned ga_gap.vtk --point_data="ga_sdf_on_mesh/*float64.raw"
+
+	extract_sharp_edges $boxed_mesh_raw/skinned 0.1 sharp_features
+	cp $boxed_mesh_raw/skinned/{x,y,z}.raw sharp_features
+
+	# Serial since the sharp features connectivity are an auxiliry graph of the actual mesh
+	SFEM_INTERPOLATE=0 gap_from_sdf sharp_features $nx $ny $nz $ox $oy $oz $dx $dy $dz $db_out sdf_on_sharp
+	raw_to_db.py sharp_features gap_sharp.vtk --point_data="sdf_on_sharp/*float64.raw" 
 fi
-
-extract_sharp_edges $boxed_mesh_raw/skinned 0.1 sharp_features
-cp $boxed_mesh_raw/skinned/{x,y,z}.raw sharp_features
-
-# Serial since the sharp features connectivity are an auxiliry graph of the actual mesh
-SFEM_INTERPOLATE=0 gap_from_sdf sharp_features $nx $ny $nz $ox $oy $oz $dx $dy $dz $db_out sdf_on_sharp
-raw_to_db.py sharp_features gap_sharp.vtk --point_data="sdf_on_sharp/*float64.raw" 
-
 

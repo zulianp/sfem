@@ -12,6 +12,9 @@ def main(path):
     fname, fextension = os.path.splitext(path)
     fname = os.path.basename(fname)
 
+    if pdir == "":
+        pdir = "./"
+
     path = pdir
     xdmf_path = fname + '.xdmf'
     file_name = fname
@@ -24,6 +27,9 @@ def main(path):
     endianess = tp = precision = number_type = ''
     attribute_type = 'Vector'
     final_path = pdir + '/' + 'metadata_' + file_name + '.yml'
+
+    if not os.path.exists(pdir):
+        os.mkdir(f'{pdir}')
 
     # print(f'reading {final_path} ...')
     with open(final_path, 'r'

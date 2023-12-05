@@ -974,7 +974,7 @@ int sdf_view(MPI_Comm comm,
     ptrdiff_t sdf_end = (zmax - origin[2]) / delta[2];
 
     // Make sure we are inside the grid
-    sdf_start = MAX(0, sdf_start);
+    sdf_start = MAX(0, sdf_start - 1);
     sdf_end = MIN(nglobal[2],
                   sdf_end + 1 + 1);  // 1 for the rightside of the cell 1 for the exclusive range
 

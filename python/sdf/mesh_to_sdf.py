@@ -402,6 +402,10 @@ if __name__ == '__main__':
 
     fname, fextension = os.path.splitext(output_path)
     pdir = os.path.dirname(fname)
+
+    if pdir == "":
+        pdir = "./"
+
     fname = os.path.basename(fname)
 
     with open(f'{pdir}/metadata_{fname}.yml', 'w') as f:
