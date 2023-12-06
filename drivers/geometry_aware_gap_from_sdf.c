@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
 
     if (argc != 13) {
         fprintf(stderr,
-                "usage: %s <folder> <nx> <ny> <nz> <ox> <oy> <oz> <dx> <dy> <dz> "
+                "usage: %s <mesh_folder> <nx> <ny> <nz> <ox> <oy> <oz> <dx> <dy> <dz> "
                 "<data.float32.raw> <output_folder>\n",
                 argv[0]);
         return EXIT_FAILURE;
@@ -103,8 +103,8 @@ int main(int argc, char* argv[]) {
 
     // Edge graph for resampling on sharp edges
     ptrdiff_t n_sharp_edges = 0;
-    count_t* e0 = 0;
-    count_t* e1 = 0;
+    idx_t* e0 = 0;
+    idx_t* e1 = 0;
 
     // Indices for interpolating on corner nodes
     ptrdiff_t n_corners = 0;

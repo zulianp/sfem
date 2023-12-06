@@ -23,8 +23,8 @@ int extract_sharp_edges(const enum ElemType element_type,
                         const idx_t *const SFEM_RESTRICT colidx,
                         const geom_t angle_threshold,
                         ptrdiff_t *out_n_sharp_edges,
-                        count_t **out_e0,
-                        count_t **out_e1) {
+                        idx_t **out_e0,
+                        idx_t **out_e1) {
     const count_t nedges = rowptr[nnodes];
 
     geom_t *normal[3];
@@ -110,8 +110,8 @@ int extract_sharp_edges(const enum ElemType element_type,
     }
 
     ptrdiff_t n_sharp_edges = 0;
-    count_t *e0 = malloc(nedges * sizeof(count_t));
-    count_t *e1 = malloc(nedges * sizeof(count_t));
+    idx_t *e0 = malloc(nedges * sizeof(idx_t));
+    idx_t *e1 = malloc(nedges * sizeof(idx_t));
 
     {
         geom_t *dihedral_angle = calloc(nedges, sizeof(geom_t));

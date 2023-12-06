@@ -5,6 +5,10 @@
 
 #include "sfem_base.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int build_n2e(const ptrdiff_t nelements,
               const ptrdiff_t nnodes,
               const int nnodesxelem,
@@ -58,4 +62,8 @@ int crs_graph_block_to_scalar(const ptrdiff_t nnodes,
                      const idx_t *const block_colidx,
                      count_t *const rowptr,
                      idx_t *const colidx);
+
+#ifdef __cplusplus
+}
+#endif
 #endif
