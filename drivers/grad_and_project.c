@@ -37,7 +37,7 @@ void tet4_p1_p1_grad_and_project(const ptrdiff_t nelements,
     real_t *p0_dudy = malloc(nelements * sizeof(real_t));
     real_t *p0_dudz = malloc(nelements * sizeof(real_t));
 
-    p1_grad3(nelements, nnodes, elems, xyz, u, p0_dudx, p0_dudy, p0_dudz);
+    tet4_grad(nelements, nnodes, elems, xyz, u, p0_dudx, p0_dudy, p0_dudz);
 
     tet4_p0_p1_l2_projection_apply(nelements, nnodes, elems, xyz, p0_dudx, dudx);
     tet4_p0_p1_l2_projection_apply(nelements, nnodes, elems, xyz, p0_dudy, dudy);
@@ -117,7 +117,7 @@ void tet4_p1_p1_grad_and_project_coeffs(const ptrdiff_t nelements,
     real_t *p0_dudy = malloc(nelements * sizeof(real_t));
     real_t *p0_dudz = malloc(nelements * sizeof(real_t));
 
-    p1_grad3(nelements, nnodes, elems, xyz, u, p0_dudx, p0_dudy, p0_dudz);
+    tet4_grad(nelements, nnodes, elems, xyz, u, p0_dudx, p0_dudy, p0_dudz);
 
     tet4_p0_p1_projection_coeffs(nelements, nnodes, elems, xyz, p0_dudx, dudx);
     tet4_p0_p1_projection_coeffs(nelements, nnodes, elems, xyz, p0_dudy, dudy);

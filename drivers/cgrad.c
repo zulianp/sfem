@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
     // Compute gradient coefficients
     ///////////////////////////////////////////////////////////////////////////////
 
-    p1_grad3(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, f, df[0], df[1], df[2]);
+    tet4_grad(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, f, df[0], df[1], df[2]);
 
     real_t SFEM_SCALE=1;
     SFEM_READ_ENV(SFEM_SCALE, atof);

@@ -62,7 +62,7 @@ static SFEM_INLINE void cgradient(const real_t px0,
     dfdz[0] = f[0] * (-x21 - x22 - x23) + f[1] * x21 + f[2] * x22 + f[3] * x23;
 }
 
-void p1_grad3(const ptrdiff_t nelements,
+void tet4_grad(const ptrdiff_t nelements,
               const ptrdiff_t nnodes,
               idx_t **const SFEM_RESTRICT elems,
               geom_t **SFEM_RESTRICT xyz,
