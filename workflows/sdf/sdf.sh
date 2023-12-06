@@ -50,10 +50,13 @@ mkdir -p $mesh_raw
 db_to_raw.py $db_in $mesh_raw
 skin $mesh_raw $skinned
 # create_dual_graph $skinned $skinned/dual
-mesh_to_sdf.py $skinned $db_out --hmax=$hmax --margin=$margin $opts
-raw_to_xdmf.py $db_out
-raw_to_db.py $skinned $surf
 
+if [[ -z $REUSE_SDF ]]
+then
+	mesh_to_sdf.py $skinned $db_out --hmax=$hmax --margin=$margin $opts
+	raw_to_xdmf.py $db_out
+	raw_to_db.py $skinned $surf
+fi
 
 if [[ -n "$5" ]]
 then

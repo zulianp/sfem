@@ -39,6 +39,9 @@ int main(int argc, char* argv[]) {
     geom_t SFEM_ANGLE_THRESHOLD = 0.15;
     SFEM_READ_ENV(SFEM_ANGLE_THRESHOLD, atof);
 
+    int SFEM_SUPERIMPOSE = 0;
+    SFEM_READ_ENV(SFEM_SUPERIMPOSE, atoi);
+
     double tick = MPI_Wtime();
 
     const char* folder = argv[1];
@@ -148,8 +151,8 @@ int main(int argc, char* argv[]) {
                                    &n_disconnected_elements,
                                    &disconnected_elements);
 
-        n_sharp_edges =
-            extract_sharp_corners(mesh.nnodes, n_sharp_edges, e0, e1, &n_corners, &corners, 1);
+        n_sharp_edges = extract_sharp_corners(
+            mesh.nnodes, n_sharp_edges, e0, e1, &n_corners, &corners, !SFEM_SUPERIMPOSE);
     }
 
     // Quantities of interest
@@ -161,8 +164,7 @@ int main(int argc, char* argv[]) {
     {
         double resample_tick = MPI_Wtime();
 
-        if(n_sharp_edges)
-        {  // BEAM2 integral
+        if (n_sharp_edges) {  // BEAM2 integral
             idx_t* edges[2] = {e0, e1};
             resample_gap_local(
                 // Mesh
@@ -187,22 +189,13 @@ int main(int argc, char* argv[]) {
                 BEAM2, n_sharp_edges, mesh.nnodes, edges, mesh.points, mass_vector);
         }
 
-        if(n_disconnected_elements)
-        {  // Faces
-            int nxe = elem_num_nodes(mesh.element_type);
-            idx_t** selected_elements = allocate_elements(nxe, n_disconnected_elements);
-            select_elements(nxe,
-                            n_disconnected_elements,
-                            disconnected_elements,
-                            mesh.elements,
-                            selected_elements);
-
+        if (SFEM_SUPERIMPOSE) {
             resample_gap_local(
                 // Mesh
                 shell_type(mesh.element_type),
-                n_disconnected_elements,
+                mesh.nelements,
                 mesh.nnodes,
-                selected_elements,
+                mesh.elements,
                 mesh.points,
                 // SDF
                 nlocal,
@@ -217,13 +210,50 @@ int main(int argc, char* argv[]) {
                 znormal);
 
             assemble_lumped_mass(shell_type(mesh.element_type),
-                                 n_disconnected_elements,
+                                 mesh.nelements,
                                  mesh.nnodes,
-                                 selected_elements,
+                                 mesh.elements,
                                  mesh.points,
                                  mass_vector);
 
-            free_elements(nxe, selected_elements);
+        } else {
+            if (n_disconnected_elements) {  // Faces
+                int nxe = elem_num_nodes(mesh.element_type);
+                idx_t** selected_elements = allocate_elements(nxe, n_disconnected_elements);
+                select_elements(nxe,
+                                n_disconnected_elements,
+                                disconnected_elements,
+                                mesh.elements,
+                                selected_elements);
+
+                resample_gap_local(
+                    // Mesh
+                    shell_type(mesh.element_type),
+                    n_disconnected_elements,
+                    mesh.nnodes,
+                    selected_elements,
+                    mesh.points,
+                    // SDF
+                    nlocal,
+                    stride,
+                    origin,
+                    delta,
+                    sdf,
+                    // Output
+                    g,
+                    xnormal,
+                    ynormal,
+                    znormal);
+
+                assemble_lumped_mass(shell_type(mesh.element_type),
+                                     n_disconnected_elements,
+                                     mesh.nnodes,
+                                     selected_elements,
+                                     mesh.points,
+                                     mass_vector);
+
+                free_elements(nxe, selected_elements);
+            }
         }
 
         if (n_corners) {  // Nodes
@@ -280,7 +310,7 @@ int main(int argc, char* argv[]) {
             exchange_add(&mesh, &slave_to_master, xnormal, real_buffer);
             exchange_add(&mesh, &slave_to_master, ynormal, real_buffer);
             exchange_add(&mesh, &slave_to_master, znormal, real_buffer);
-            
+
             free(real_buffer);
         }
 
