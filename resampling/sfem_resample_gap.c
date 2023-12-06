@@ -12,6 +12,8 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+#define SFEM_RESAMPLE_GAP_DUAL
+
 static SFEM_INLINE real_t put_inside(const real_t v) { return MIN(MAX(1e-7, v), 1 - 1e-7); }
 
 // TRI3 6th order quadrature rule
@@ -363,9 +365,25 @@ int trishell3_resample_gap_local(
                                       &g_qy,
                                       &g_qz);
 
-                tri3_f[0] = 1 - tri3_qx[q] - tri3_qy[q];
-                tri3_f[1] = tri3_qx[q];
-                tri3_f[2] = tri3_qy[q];
+#ifndef SFEM_RESAMPLE_GAP_DUAL
+                // Standard basis function
+                {
+                    tri3_f[0] = 1 - tri3_qx[q] - tri3_qy[q];
+                    tri3_f[1] = tri3_qx[q];
+                    tri3_f[2] = tri3_qy[q];
+                }
+#else
+                // DUAL basis function
+                {
+                    const real_t f0 = 1 - tri3_qx[q] - tri3_qy[q];
+                    const real_t f1 = tri3_qx[q];
+                    const real_t f2 = tri3_qy[q];
+
+                    tri3_f[0] = 3 * f0 - f1 - f2;
+                    tri3_f[1] = -f0 + 3 * f1 - f2;
+                    tri3_f[2] = -f0 - f1 + 3 * f2;
+                }
+#endif
 
                 const real_t dV = measure * tri3_qw[q];
 
@@ -560,8 +578,21 @@ int beam2_resample_gap_local(
                 beam2_transform(
                     x[0], x[1], y[0], y[1], z[0], z[1], edge2_qx[q], &g_qx, &g_qy, &g_qz);
 
-                beam2_f[0] = 1 - edge2_qx[q];
-                beam2_f[1] = edge2_qx[q];
+#ifndef SFEM_RESAMPLE_GAP_DUAL
+                // Standard basis function
+                {
+                    beam2_f[0] = 1 - edge2_qx[q];
+                    beam2_f[1] = edge2_qx[q];
+                }
+#else
+                // DUAL basis function
+                {
+                    const real_t f0 = 1 - edge2_qx[q];
+                    const real_t f1 = edge2_qx[q];
+                    beam2_f[0] = 2 * f0 - f1;
+                    beam2_f[1] = -f0 + 2 * f1;
+                }
+#endif
 
                 const real_t dV = measure * edge2_qw[q];
 
