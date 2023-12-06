@@ -14,7 +14,7 @@
 #include "sfem_defs.h"
 
 #include "operators/div.h"
-#include "operators/grad_p1.h"
+#include "tet4_grad.h"
 
 #include "operators/tet4/tet4_l2_projection_p0_p1.h"
 

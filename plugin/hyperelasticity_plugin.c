@@ -16,7 +16,7 @@
 #include "sfem_base.h"
 
 #include "linear_elasticity.h"
-#include "neohookean.h"
+#include "tet4_neohookean.h"
 
 #include "read_mesh.h"
 #include "sfem_defs.h"

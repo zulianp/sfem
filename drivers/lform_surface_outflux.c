@@ -13,7 +13,7 @@
 
 #include "read_mesh.h"
 
-#include "operators/grad_p1.h"
+#include "tet4_grad.h"
 
 #include "sfem_defs.h"
 

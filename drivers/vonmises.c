@@ -13,7 +13,7 @@
 
 #include "read_mesh.h"
 
-#include "neohookean.h"
+#include "tet4_neohookean.h"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);

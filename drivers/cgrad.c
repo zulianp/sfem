@@ -12,7 +12,7 @@
 #include "sfem_base.h"
 
 #include "read_mesh.h"
-#include "operators/grad_p1.h"
+#include "tet4_grad.h"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);

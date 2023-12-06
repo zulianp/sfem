@@ -11,7 +11,7 @@
 #include "crs_graph.h"
 #include "sfem_base.h"
 
-#include "neohookean.h"
+#include "tet4_neohookean.h"
 
 #include "read_mesh.h"
 

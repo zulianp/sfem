@@ -148,20 +148,15 @@ OBJS = \
 	boundary_mass.o \
 	dirichlet.o \
 	div.o \
-	strain.o \
-	principal_strains.o \
-	neohookean_principal_stresses.o \
 	neumann.o \
 	sfem_mesh.o \
 	sfem_mesh_write.o \
 	mesh_aura.o \
-	isotropic_phasefield_for_fracture.o \
 	adj_table.o \
 	laplacian.o \
 	trishell3_l2_projection_p0_p1.o \
 	trishell6_l2_projection_p1_p2.o \
 	surface_l2_projection.o \
-	grad_p1.o  \
 	linear_elasticity.o \
 	stokes_mini.o \
 	phase_field_for_fracture.o  \
@@ -177,7 +172,8 @@ OBJS += tri3_stokes_mini.o \
 		tri3_mass.o \
 		tri3_phase_field_for_fracture.o \
 		tri3_linear_elasticity.o \
-		tri3_laplacian.o
+		tri3_laplacian.o 
+
 
 # TriShell3
 OBJS += trishell3_mass.o
@@ -192,7 +188,13 @@ OBJS += tet4_div.o \
 	tet4_linear_elasticity.o \
 	tet4_phase_field_for_fracture.o \
 	tet4_stokes_mini.o \
-	trishell3_l2_projection_p0_p1.o
+	trishell3_l2_projection_p0_p1.o \
+	tet4_grad.o \
+	tet4_isotropic_phasefield_for_fracture.o \
+	tet4_strain.o \
+	tet4_principal_strains.o \
+	tet4_neohookean_principal_stresses.o \
+	tet4_neohookean.o
 
 # Beam2
 OBJS += beam2_mass.o
@@ -231,11 +233,6 @@ else
 	SERIAL_OBJS = tet4_laplacian.o
 	OBJS += $(SERIAL_OBJS)
 endif
-
-OBJS += neohookean.o
-
-# SIMD_OBJS = simd_neohookean.o
-# SIMD_OBJS +=  simd_laplacian.o
 
 OBJS += $(SIMD_OBJS)
 
@@ -499,10 +496,10 @@ sortreduce.o : sortreduce.cpp
 argsort.o : argsort.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(INTERNAL_CXXFLAGS) -c $<
 
-principal_strains.o : principal_strains.cpp
+tet4_principal_strains.o : tet4_principal_strains.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(INTERNAL_CXXFLAGS) -c $<
 
-neohookean_principal_stresses.o : neohookean_principal_stresses.cpp
+tet4_neohookean_principal_stresses.o : tet4_neohookean_principal_stresses.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(INTERNAL_CXXFLAGS) -c $<
 
 

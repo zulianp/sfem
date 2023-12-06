@@ -13,7 +13,7 @@
 
 #include "read_mesh.h"
 
-#include "operators/grad_p1.h"
+#include "tet4_grad.h"
 
 static SFEM_INLINE void shear_kernel(const real_t px0,
                                      const real_t px1,

@@ -13,7 +13,7 @@
 
 #include "read_mesh.h"
 
-#include "operators/grad_p1.h"
+#include "tet4_grad.h"
 
 static SFEM_INLINE real_t area3(const real_t left[3], const real_t right[3]) {
     real_t a = (left[1] * right[2]) - (right[1] * left[2]);

@@ -1,4 +1,4 @@
-#include "neohookean.h"
+#include "tet4_neohookean.h"
 
 #include <assert.h>
 #include <math.h>

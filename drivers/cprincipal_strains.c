@@ -13,7 +13,7 @@
 
 #include "read_mesh.h"
 
-#include "operators/strain.h"
+#include "tet4_strain.h"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
