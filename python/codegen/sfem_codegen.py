@@ -146,6 +146,10 @@ x0, x1, x2, x3 = sp.symbols('px0 px1 px2 px3', real=True)
 y0, y1, y2, y3 = sp.symbols('py0 py1 py2 py3', real=True)
 z0, z1, z2, z3 = sp.symbols('pz0 pz1 pz2 pz3', real=True)
 
+x4, x5, x6, x7 = sp.symbols('px4 px5 px6 px7', real=True)
+y4, y5, y6, y7 = sp.symbols('py4 py5 py6 py7', real=True)
+z4, z5, z6, z7 = sp.symbols('pz4 pz5 pz6 pz7', real=True)
+
 px = [x0, x1, x2, x3]
 py = [y0, y1, y2, y3]
 pz = [z0, z1, z2, z3]

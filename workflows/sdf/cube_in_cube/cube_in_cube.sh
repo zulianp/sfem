@@ -27,8 +27,8 @@ box.py vtk_meshes/cube.vtk 0 0 0 1 1 1
 small_cube_raw=small_cube_raw
 cube_raw=cube_raw
 
-db_to_raw.py vtk_meshes/small_cube.vtk 	$small_cube_raw tetra
-db_to_raw.py vtk_meshes/cube.vtk 		$cube_raw 		tetra
+db_to_raw.py vtk_meshes/small_cube.vtk 	$small_cube_raw -e tetra
+db_to_raw.py vtk_meshes/cube.vtk 		$cube_raw 		-e tetra
 
 skin $small_cube_raw  	$small_cube_raw/surface
 skin $cube_raw  		$cube_raw/surface

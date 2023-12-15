@@ -6,6 +6,7 @@
 #include "matrixio_array.h"
 
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -978,6 +979,34 @@ int sdf_view(MPI_Comm comm,
              geom_t** sdf_out,
              ptrdiff_t* z_nlocal_out,
              geom_t* const SFEM_RESTRICT z_origin_out) {
+    return sdf_view_ensure_margin(comm,
+                                  nnodes,
+                                  z_coordinate,
+                                  nlocal,
+                                  nglobal,
+                                  stride,
+                                  origin,
+                                  delta,
+                                  sdf,
+                                  0,
+                                  sdf_out,
+                                  z_nlocal_out,
+                                  z_origin_out);
+}
+
+int sdf_view_ensure_margin(MPI_Comm comm,
+                           const ptrdiff_t nnodes,
+                           const geom_t* SFEM_RESTRICT z_coordinate,
+                           const ptrdiff_t* const nlocal,
+                           const ptrdiff_t* const SFEM_RESTRICT nglobal,
+                           const ptrdiff_t* const SFEM_RESTRICT stride,
+                           const geom_t* const origin,
+                           const geom_t* const SFEM_RESTRICT delta,
+                           const geom_t* const sdf,
+                           const ptrdiff_t z_margin,
+                           geom_t** sdf_out,
+                           ptrdiff_t* z_nlocal_out,
+                           geom_t* const SFEM_RESTRICT z_origin_out) {
     int rank, size;
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
@@ -1004,10 +1033,10 @@ int sdf_view(MPI_Comm comm,
     ptrdiff_t sdf_start = (zmin - origin[2]) / delta[2];
     ptrdiff_t sdf_end = (zmax - origin[2]) / delta[2];
 
-    // Make sure we are inside the grid
-    sdf_start = MAX(0, sdf_start - 1);
+    // Make sure we are inside the grid and get also the required margin for resampling
+    sdf_start = MAX(0, sdf_start - 1 - z_margin);
     sdf_end = MIN(nglobal[2],
-                  sdf_end + 1 + 1);  // 1 for the rightside of the cell 1 for the exclusive range
+                  sdf_end + 2 + z_margin);  // 1 for the rightside of the cell 1 for the exclusive range
 
     ptrdiff_t pnlocal_z = (sdf_end - sdf_start);
     geom_t* psdf = malloc(pnlocal_z * stride[2] * sizeof(geom_t));

@@ -98,7 +98,6 @@ int main(int argc, char* argv[]) {
         sdf = psdf;
     }
 
-
     real_t* g = calloc(mesh.nnodes, sizeof(real_t));
     real_t* xnormal = calloc(mesh.nnodes, sizeof(real_t));
     real_t* ynormal = calloc(mesh.nnodes, sizeof(real_t));
@@ -172,8 +171,7 @@ int main(int argc, char* argv[]) {
                                      mass_vector);
 
                 // exchange ghost nodes and add contribution
-                if(size > 1)
-                {
+                if (size > 1) {
                     send_recv_t slave_to_master;
                     mesh_create_nodal_send_recv(&mesh, &slave_to_master);
 
@@ -207,6 +205,8 @@ int main(int argc, char* argv[]) {
                     const real_t yn = ynormal[i];
                     const real_t zn = znormal[i];
                     const real_t ln = sqrt(xn * xn + yn * yn + zn * zn);
+
+                    assert(ln != 0.);
 
                     xnormal[i] /= ln;
                     ynormal[i] /= ln;

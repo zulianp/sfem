@@ -4,6 +4,7 @@ import netCDF4
 import numpy as np
 import sys
 import os
+import getopt
 
 import pdb
 
@@ -14,14 +15,37 @@ def mkdir(path):
 	if not os.path.exists(path):
 		os.makedirs(path)
 
+usage = f'usage: {sys.argv[0]} <input_mesh> <output_folder>'
+
 if len(sys.argv) < 3:
-	print(f'usage: {sys.argv[0]} <input_mesh> <output_folder>')
+	print(usage)
 	exit()
 
 input_mesh = sys.argv[1]
 output_folder = sys.argv[2]
 
+try:
+    opts, args = getopt.getopt(
+        sys.argv[3:], "h", ["help"])
+
+except getopt.GetoptError as err:
+    print(err)
+    print(usage)
+    sys.exit(1)
+
+for opt, arg in opts:
+    if opt in ('-h', '--help'):
+        print(usage)
+        sys.exit()
+    # elif opt in ("--exclude"):
+    # 	 temp = arg.split(',')
+    # 	 for t in temp:
+    # 	 	exclude.append(t.lower())
+    # 	 print(f'Excluding {exclude}')
+
+
 mkdir(output_folder)
+mkdir(f'{output_folder}/blocks')
 
 nc = netCDF4.Dataset(input_mesh)
 
@@ -177,9 +201,27 @@ else:
 		elem_type = connect_b.elem_type
 		print(f'elem_type = {elem_type}')
 
+		name = None
+		eb_prop_b = nc.variables[f'eb_prop{b+2}']
+		if eb_prop_b != None:
+			name = eb_prop_b.__dict__['name']
+			name = name.lower()
+		
+		# if name != None:
+			# if name in exclude:
+			# 	print(f'Skipping block: {name}')
+			# 	continue
+			# print(f'name = {name}')
+
 		nelements, nnodesxelem = connect_b.shape
 
-		connect[offset:(offset + nelements),:] = connect_b[:].astype(idx_type)
+		block_begin = offset
+		block_end = (offset + nelements)
+
+		if name != None:
+			np.array([block_begin, block_end], dtype=np.int64).tofile(f'{output_folder}/blocks/{name}.int64.raw')
+
+		connect[block_begin:block_end,:] = connect_b[:].astype(idx_type)
 		offset += nelements
 
 	for i in range(0, nnodesxelem):
