@@ -17,7 +17,7 @@ blocks=`ls $mesh/blocks/*.int64.raw`
 for b in ${blocks[@]}
 do
 	name=`basename $b | tr '.' ' ' | awk '{print $1}'`
-	echo $name
+	echo "Extracting block: $name"
 
 	mkdir -p $mesh/blocks/$name
 
@@ -26,7 +26,7 @@ do
 	for i in ${idx[@]}
 	do
 		idx_name=`basename $i`
-		echo "rgather.py $range $idx_t $i "$mesh/blocks/$name/$idx_name".raw"
+		echo "	- ($range) "$mesh/blocks/$name/$idx_name".raw"
 		rgather.py $range $idx_t $i "$mesh/blocks/$name/$idx_name".raw
 	done
 done
