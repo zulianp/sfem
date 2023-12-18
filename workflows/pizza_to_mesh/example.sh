@@ -14,7 +14,7 @@ PATH=$SCRIPTPATH/../../python/sdf:$PATH
 PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 
-create_sphere.sh 2
+create_sphere.sh 0
 
 field=field.raw
 mesh=mesh
@@ -37,5 +37,7 @@ echo $origins
 echo $scaling
 
 # SFEM_INTERPOLATE=1 
-SFEM_READ_FP32=1 pizzastack_to_mesh $sizes $origins $scaling $sdf $mesh $field
+
+set -x
+SFEM_READ_FP32=1 mpiexec -np 4 pizzastack_to_mesh $sizes $origins $scaling $sdf $mesh $field
 raw_to_db.py $mesh out.vtk --point_data=$field

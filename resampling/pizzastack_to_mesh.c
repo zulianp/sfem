@@ -1432,7 +1432,7 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         fprintf(stderr,
-                "usage: %s (%ld %ld %ld) (%f %f %f) (%f %f %f) %s %s %s\n",
+                "%s (%ld %ld %ld) (%f %f %f) (%f %f %f) %s %s %s\n",
                 argv[0],
                 (long)n[0],
                 (long)n[1],

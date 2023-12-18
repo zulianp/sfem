@@ -65,6 +65,32 @@ int mesh_node_ids(mesh_t *mesh, idx_t *const ids) {
     return 0;
 }
 
+static SFEM_INLINE int find_owner_rank(const idx_t idx,
+                                       const ptrdiff_t n_local_nodes,
+                                       const int size,
+                                       const idx_t *SFEM_RESTRICT input_node_partitions) {
+    int owner = MIN(size - 1, idx / n_local_nodes);
+    int guess = owner;
+    assert(owner >= 0);
+    assert(owner < size);
+
+    if (idx == input_node_partitions[owner]) {
+        // Do nothing
+    } else if (input_node_partitions[owner + 1] <= idx) {
+        while (input_node_partitions[owner + 1] <= idx) {
+            owner++;
+            assert(owner < size);
+        }
+    } else if (input_node_partitions[owner] > idx) {
+        while (input_node_partitions[owner] > idx) {
+            --owner;
+            assert(owner >= 0);
+        }
+    }
+
+    return owner;
+}
+
 int mesh_build_global_ids(mesh_t *mesh) {
     MPI_Comm comm = mesh->comm;
 
@@ -83,8 +109,10 @@ int mesh_build_global_ids(mesh_t *mesh) {
     CATCH_MPI_ERROR(MPI_Allgather(
         &global_node_offset, 1, SFEM_MPI_IDX_T, node_offsets, 1, SFEM_MPI_IDX_T, comm));
 
+    node_offsets[size] = n_gnodes;
+
     const ptrdiff_t n_lnodes_no_reminder = n_gnodes / size;
-    const ptrdiff_t begin = (n_gnodes / size) * rank;
+    const ptrdiff_t begin = n_lnodes_no_reminder * rank;
 
     ptrdiff_t n_lnodes_temp = n_lnodes_no_reminder;
     if (rank == size - 1) {
@@ -105,11 +133,15 @@ int mesh_build_global_ids(mesh_t *mesh) {
 
     for (ptrdiff_t i = 0; i < extent_owned_with_ghosts; i++) {
         ghost_ids[i] = global_node_offset + begin_owned_with_ghosts + i;
+        assert(ghost_ids[i] < n_gnodes);
     }
 
     for (ptrdiff_t i = 0; i < extent_owned_with_ghosts; i++) {
         const idx_t idx = ghost_keys[i];
-        int dest_rank = idx / n_lnodes_no_reminder;
+        int dest_rank = MIN(idx / n_lnodes_no_reminder, size - 1);
+        assert(dest_rank < size);
+        assert(dest_rank >= 0);
+
         send_count[dest_rank]++;
     }
 
@@ -167,16 +199,18 @@ int mesh_build_global_ids(mesh_t *mesh) {
 
         for (int k = 0; k < proc_extent; k++) {
             idx_t iii = keys[k] - begin;
-            assert(iii < n_lnodes_temp);
+
             assert(iii >= 0);
+            assert(iii < n_lnodes_temp);
 
             mapping[iii] = ids[k];
         }
     }
 
     // MPI_Barrier(comm);
-    // for(int r_ = 0; r_ < size; r_++) {
-    //     if(r_ == rank) {
+    // for (int r_ = 0; r_ < size; r_++) {
+    //     if (r_ == rank) {
+    //         printf("\n");
     //         printf("[%d] ------------------------------------\n", rank);
     //         for (int r = 0; r < size; r++) {
     //             int proc_begin = recv_displs[r];
@@ -187,11 +221,10 @@ int mesh_build_global_ids(mesh_t *mesh) {
 
     //             printf("%d)\n", r);
     //             for (int k = 0; k < proc_extent; k++) {
-    //                 printf("(%d %d)",  keys[k], ids[k]);
+    //                 printf("(%d %d)", keys[k], ids[k]);
     //             }
     //             printf("\n");
     //         }
-
     //     }
 
     //     MPI_Barrier(comm);
@@ -204,18 +237,40 @@ int mesh_build_global_ids(mesh_t *mesh) {
     // Get the query nodes
     ghost_keys = &mesh->node_mapping[mesh->n_owned_nodes];
 
-    for (ptrdiff_t i = 0; i < n_ghost_nodes; i++) {
-        const idx_t idx = ghost_keys[i];
-        int dest_rank = idx / n_lnodes_no_reminder;
-        send_count[dest_rank]++;
+    idx_t *recv_idx = (idx_t *)malloc(n_ghost_nodes * sizeof(idx_t));
+    idx_t *exchange_buff = (idx_t *)malloc(n_ghost_nodes * sizeof(idx_t));
+    {
+        for (ptrdiff_t i = 0; i < n_ghost_nodes; i++) {
+            const idx_t idx = ghost_keys[i];
+            int dest_rank = MIN(idx / n_lnodes_no_reminder, size - 1);
+
+            assert(dest_rank < size);
+            assert(dest_rank >= 0);
+
+            send_count[dest_rank]++;
+        }
+
+        send_displs[0] = 0;
+        for (int r = 0; r < size; r++) {
+            send_displs[r + 1] = send_displs[r] + send_count[r];
+        }
+
+        memset(send_count, 0, sizeof(int) * size);
+
+        for (ptrdiff_t i = 0; i < n_ghost_nodes; i++) {
+            const idx_t idx = ghost_keys[i];
+            int dest_rank = MIN(idx / n_lnodes_no_reminder, size - 1);
+
+            assert(dest_rank < size);
+            assert(dest_rank >= 0);
+
+            const idx_t offset = send_displs[dest_rank] + send_count[dest_rank]++;
+            exchange_buff[offset] = idx;
+            recv_idx[offset] = i;
+        }
     }
 
     CATCH_MPI_ERROR(MPI_Alltoall(send_count, 1, MPI_INT, recv_count, 1, MPI_INT, comm));
-
-    send_displs[0] = 0;
-    for (int r = 0; r < size; r++) {
-        send_displs[r + 1] = send_displs[r] + send_count[r];
-    }
 
     recv_displs[0] = 0;
     for (int r = 0; r < size; r++) {
@@ -224,7 +279,7 @@ int mesh_build_global_ids(mesh_t *mesh) {
 
     recv_key_buff = realloc(recv_key_buff, recv_displs[size] * sizeof(idx_t));
 
-    CATCH_MPI_ERROR(MPI_Alltoallv(ghost_keys,
+    CATCH_MPI_ERROR(MPI_Alltoallv(exchange_buff,
                                   send_count,
                                   send_displs,
                                   SFEM_MPI_IDX_T,
@@ -243,6 +298,11 @@ int mesh_build_global_ids(mesh_t *mesh) {
 
         for (int k = 0; k < proc_extent; k++) {
             idx_t iii = keys[k] - begin;
+
+            if (iii >= n_lnodes_temp) {
+                printf("[%d] %d < %d < %d\n", rank, begin, keys[k], begin + n_lnodes_temp);
+            }
+
             assert(iii < n_lnodes_temp);
             assert(iii >= 0);
             assert(mapping[iii] >= 0);
@@ -257,11 +317,18 @@ int mesh_build_global_ids(mesh_t *mesh) {
                                   recv_count,
                                   recv_displs,
                                   SFEM_MPI_IDX_T,
-                                  mesh->ghosts,
+                                  exchange_buff,
                                   send_count,
                                   send_displs,
                                   SFEM_MPI_IDX_T,
                                   mesh->comm));
+
+    for (ptrdiff_t i = 0; i < n_ghost_nodes; i++) {
+        mesh->ghosts[recv_idx[i]] = exchange_buff[i];
+    }
+
+    free(recv_idx);
+    free(exchange_buff);
 
     /////////////////////////////////////////////////
 
@@ -413,26 +480,13 @@ int mesh_read_generic(MPI_Comm comm,
 
         for (ptrdiff_t i = 0; i < n_unique; ++i) {
             idx_t idx = unique_idx[i];
-            ptrdiff_t owner = MIN(size - 1, idx / n_local_nodes);
-
-            if (input_node_partitions[owner] > idx) {
-                assert(owner < size);
-                while (input_node_partitions[--owner] > idx) {
-                    assert(owner < size);
-                }
-            } else if (input_node_partitions[owner + 1] < idx) {
-                assert(owner < size);
-
-                while (input_node_partitions[(++owner + 1)] < idx) {
-                    assert(owner < size);
-                }
-            }
+            const int owner = find_owner_rank(idx, n_local_nodes, size, input_node_partitions);
 
             assert(owner < size);
             assert(owner >= 0);
 
-            assert(input_node_partitions[owner] <= idx);
-            assert(input_node_partitions[owner + 1] > idx);
+            assert(idx >= input_node_partitions[owner]);
+            assert(idx < input_node_partitions[owner + 1]);
 
             gather_node_count[owner]++;
             owner_rank[i] = owner;
