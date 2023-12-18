@@ -13,16 +13,6 @@ PATH=$SCRIPTPATH/../../python/algebra:$PATH
 PATH=$SCRIPTPATH/../../python/sdf:$PATH
 PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
-# LAUNCH="mpiexec -np 8"
-# LAUNCH=""
-
-# if [[ $# -le "3" ]]
-# then
-# 	printf "usage: $0 <db.e> <hmax> <margin> <sdt.float32.raw> [aux_mesh]\n" 1>&2
-# 	exit -1
-# fi
-
-# set -x
 
 create_sphere.sh 3
 
@@ -30,12 +20,16 @@ field=field.raw
 mesh=mesh
 out=resampled
 skinned=skinned
+# sdf=sdf.float32.raw
+sdf=demo
+sizes="50 53 57"
 
 mkdir -p $skinned
 skin $mesh $skinned
 
-mesh_to_sdf.py $skinned $db_out --hmax=0.01 --margin=0.5
+# mesh_to_sdf.py $skinned $sdf --hmax=0.01 --margin=0.5
+# raw_to_xdmf.py $sdf
+# sizes=`head -3 metadata_sdf.float32.yml | awk '{print $2}' | tr '\n' ' '`
 
-# pizzastack_to_mesh <nx> <ny> <nz> <field.raw> <mesh_folder> [output_path=./mesh_field.raw]
-# pizzastack_to_mesh $nx $ny $nz $field $mesh $out
-# raw_to_db.py $mesh out.vtk --point_data=$out
+SFEM_READ_FP32=1 pizzastack_to_mesh $sizes demo $mesh $field
+raw_to_db.py $mesh out.vtk --point_data=$field
