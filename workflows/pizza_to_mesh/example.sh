@@ -21,6 +21,8 @@ mesh=mesh
 out=resampled
 skinned=skinned
 sdf=sdf.float32.raw
+mesh_sorted=sorted
+sfc $mesh $mesh_sorted
 
 mkdir -p $skinned
 skin $mesh $skinned
@@ -39,5 +41,5 @@ echo $scaling
 # SFEM_INTERPOLATE=1 
 
 set -x
-SFEM_READ_FP32=1 mpiexec -np 4 pizzastack_to_mesh $sizes $origins $scaling $sdf $mesh $field
-raw_to_db.py $mesh out.vtk --point_data=$field
+SFEM_READ_FP32=1 mpiexec -np 4 pizzastack_to_mesh $sizes $origins $scaling $sdf $mesh_sorted $field
+raw_to_db.py $mesh_sorted out.vtk --point_data=$field

@@ -310,8 +310,6 @@ int mesh_build_global_ids(mesh_t *mesh) {
         }
     }
 
-    mesh->ghosts = malloc(n_ghost_nodes * sizeof(idx_t));
-
     // Send back
     CATCH_MPI_ERROR(MPI_Alltoallv(recv_key_buff,
                                   recv_count,
@@ -323,6 +321,7 @@ int mesh_build_global_ids(mesh_t *mesh) {
                                   SFEM_MPI_IDX_T,
                                   mesh->comm));
 
+    mesh->ghosts = malloc(n_ghost_nodes * sizeof(idx_t));
     for (ptrdiff_t i = 0; i < n_ghost_nodes; i++) {
         mesh->ghosts[recv_idx[i]] = exchange_buff[i];
     }

@@ -839,21 +839,19 @@ int interpolate_field(const ptrdiff_t nnodes,
             if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
                 int rank;
                 MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-                fprintf(
-                    stderr,
-                    "[%d] warning (%g, %g, %g) (%ld, %ld, %ld) outside domain (%" 
-                    dtype_COUNT_T ", %" dtype_COUNT_T ", %" dtype_COUNT_T 
-                    ")!\n",
-                    rank,
-                    x,
-                    y,
-                    z,
-                    i,
-                    j,
-                    k,
-                    n[0],
-                    n[1],
-                    n[2]);
+                fprintf(stderr,
+                        "[%d] warning (%g, %g, %g) (%ld, %ld, %ld) outside domain (%" dtype_COUNT_T
+                        ", %" dtype_COUNT_T ", %" dtype_COUNT_T ")!\n",
+                        rank,
+                        x,
+                        y,
+                        z,
+                        i,
+                        j,
+                        k,
+                        n[0],
+                        n[1],
+                        n[2]);
                 continue;
             }
 
@@ -1581,17 +1579,28 @@ int main(int argc, char *argv[]) {
         ptrdiff_t *ownership_ranges = malloc((size + 1) * sizeof(ptrdiff_t));
         gridz_z_ownership_ranges(&grid, ownership_ranges);
 
-        const int start_rank = lower_bound(z_min, ownership_ranges, size + 1);
+        for (int r = 0; r < size; r++) {
+            if (r == rank) {
+                printf("[%d] ", rank);
+                for (int i = 0; i < size + 1; i++) {
+                    printf("%ld ", ownership_ranges[i]);
+                }
+                printf("\n");
+            }
+
+            MPI_Barrier(comm);
+        }
+
+        const int start_rank = lower_bound(z_min, ownership_ranges, size + 1) - 1;
         const int end_rank = lower_bound(z_max - 1, ownership_ranges, size + 1);
+
+        printf("[%d] %ld %ld : %d %d\n", rank, z_min, z_max, start_rank, end_rank);
 
         assert(start_rank < size);
         assert(end_rank < size);
 
-        int *recv_starts = (int *)malloc(size * sizeof(int));
-        int *recv_count = (int *)malloc(size * sizeof(int));
-
-        memset(recv_starts, 0, size * sizeof(int));
-        memset(recv_count, 0, size * sizeof(int));
+        int *recv_starts = (int *)calloc(size, sizeof(int));
+        int *recv_count = (int *)calloc(size, sizeof(int));
 
         int *send_starts = (int *)malloc(size * sizeof(int));
         int *send_count = (int *)malloc(size * sizeof(int));
@@ -1599,9 +1608,13 @@ int main(int argc, char *argv[]) {
         ptrdiff_t check_z_extent = 0;
         for (int r = start_rank; r <= end_rank; r++) {
             const int s = (int)MAX(ownership_ranges[r], z_min) - ownership_ranges[r];
-            const ptrdiff_t e = MIN(ownership_ranges[r + 1], z_max) - ownership_ranges[r];
+            int e = (int)MIN(ownership_ranges[r + 1], z_max) - ownership_ranges[r];
+            e = MAX(s, e);
+
+            // printf("[%d] %d (%d %d) beg: %ld\n", rank, z_min, s, e, ownership_ranges[r]);
+
             recv_starts[r] = s;
-            recv_count[r] = (int)(e - s);
+            recv_count[r] = e - s;
             check_z_extent += recv_count[r];
             assert(recv_count[r] >= 0);
         }
@@ -1640,24 +1653,44 @@ int main(int argc, char *argv[]) {
         subregion_trafo.shift[2] = trafo.shift[2] + (trafo.scaling[2] * z_min);
 
         count_t subregion_n[3];
+        count_t subregion_stride[3];
 
         subregion_n[0] = grid.extent[0];
         subregion_n[1] = grid.extent[1];
         subregion_n[2] = z_extent;
 
+        subregion_stride[0] = 1;
+        subregion_stride[1] = subregion_n[0];
+        subregion_stride[2] = subregion_n[0] * subregion_n[1];
+
         /////////////////////////////////////////////////////////////////////////
         // Transfer data
         /////////////////////////////////////////////////////////////////////////
 
-        resample_box_to_tetra_mesh_unique(subregion_n,
-                                          stride,
-                                          &subregion_trafo,
-                                          remote_grid_field,
-                                          mesh.nelements,
-                                          mesh.nnodes,
-                                          mesh.elements,
-                                          mesh.points,
-                                          mesh_field);
+        // if (SFEM_INTERPOLATE) {
+        //     printf("interpolate_field\n");
+        //     // TODO Sub-region trafo!
+        //     interpolate_field(mesh.nnodes,
+        //                       mesh.points,
+        //                       // SDF
+        //                       n,
+        //                       stride,
+        //                       ox,
+        //                       dx,
+        //                       box_field,
+        //                       // Output
+        //                       mesh_field);
+        // } else {
+            resample_box_to_tetra_mesh_unique(subregion_n,
+                                              subregion_stride,
+                                              &subregion_trafo,
+                                              remote_grid_field,
+                                              mesh.nelements,
+                                              mesh.nnodes,
+                                              mesh.elements,
+                                              mesh.points,
+                                              mesh_field);
+        // }
 
         /////////////////////////////////////////////////////////////////////////
         // Clean-up
