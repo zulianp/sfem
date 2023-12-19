@@ -184,6 +184,7 @@ int main(int argc, char* argv[]) {
                     exchange_add(&mesh, &slave_to_master, ynormal, real_buffer);
                     exchange_add(&mesh, &slave_to_master, znormal, real_buffer);
                     free(real_buffer);
+                    send_recv_destroy(&slave_to_master);
                 }
 
                 // divide by the mass vector
