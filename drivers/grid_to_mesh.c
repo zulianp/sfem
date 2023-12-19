@@ -39,7 +39,6 @@ int main(int argc, char* argv[]) {
 
     double tick = MPI_Wtime();
 
-    
     ptrdiff_t nglobal[3] = {atol(argv[1]), atol(argv[2]), atol(argv[3])};
     geom_t origin[3] = {atof(argv[4]), atof(argv[5]), atof(argv[6])};
     geom_t delta[3] = {atof(argv[7]), atof(argv[8]), atof(argv[9])};
@@ -63,7 +62,6 @@ int main(int argc, char* argv[]) {
         double ndarray_read_tick = MPI_Wtime();
 
         if (SFEM_READ_FP32) {
-
             geom_t* temp = 0;
             if (ndarray_create_from_file(
                     comm, data_path, SFEM_MPI_GEOM_T, 3, (void**)&temp, nlocal, nglobal)) {
@@ -71,8 +69,8 @@ int main(int argc, char* argv[]) {
             }
 
             ptrdiff_t n_zyx = nlocal[0] * nlocal[1] * nlocal[2];
-            field =  malloc(n_zyx * sizeof(real_t));
-            for(ptrdiff_t i = 0; i < n_zyx; i++) {
+            field = malloc(n_zyx * sizeof(real_t));
+            for (ptrdiff_t i = 0; i < n_zyx; i++) {
                 field[i] = temp[i];
             }
 
@@ -100,17 +98,17 @@ int main(int argc, char* argv[]) {
     if (size > 1) {
         real_t* pfield;
         field_view(comm,
-                 mesh.nnodes,
-                 mesh.points[2],
-                 nlocal,
-                 nglobal,
-                 stride,
-                 origin,
-                 delta,
-                 field,
-                 &pfield,
-                 &nlocal[2],
-                 &origin[2]);
+                   mesh.nnodes,
+                   mesh.points[2],
+                   nlocal,
+                   nglobal,
+                   stride,
+                   origin,
+                   delta,
+                   field,
+                   &pfield,
+                   &nlocal[2],
+                   &origin[2]);
 
         free(field);
         field = pfield;
@@ -170,12 +168,20 @@ int main(int argc, char* argv[]) {
 
                 real_t* mass_vector = calloc(mesh.nnodes, sizeof(real_t));
 
-                assemble_lumped_mass(shell_type(mesh.element_type),
-                                     mesh.nelements,
-                                     mesh.nnodes,
-                                     mesh.elements,
-                                     mesh.points,
-                                     mass_vector);
+                enum ElemType st = shell_type(mesh.element_type);
+
+                if (st == INVALID) {
+                    assemble_lumped_mass(
+                        mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mass_vector);
+
+                } else {
+                    assemble_lumped_mass(st,
+                                         mesh.nelements,
+                                         mesh.nnodes,
+                                         mesh.elements,
+                                         mesh.points,
+                                         mass_vector);
+                }
 
                 // exchange ghost nodes and add contribution
                 if (size > 1) {

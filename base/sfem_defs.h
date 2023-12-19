@@ -55,7 +55,7 @@ SFEM_INLINE static enum ElemType shell_type(const enum ElemType type) {
         case BEAM2:
             return BEAM2;
         default: {
-            assert(0);
+            // assert(0);
             return INVALID;
         }
     }

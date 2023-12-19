@@ -87,6 +87,63 @@ static real_t edge2_qw[EDGE2_NQP] = {
     0.053469662997658998215833037193078780546784400939941406250000,
     0.023587668193255501014604647025407757610082626342773437500000};
 
+#define TET4_NQP 45
+static real_t tet4_qx[TET4_NQP] = {
+    0.2500000000000000, 0.6175871903000830, 0.1274709365666390, 0.1274709365666390,
+    0.1274709365666390, 0.9037635088221031, 0.0320788303926323, 0.0320788303926323,
+    0.0320788303926323, 0.4502229043567190, 0.0497770956432810, 0.0497770956432810,
+    0.0497770956432810, 0.4502229043567190, 0.4502229043567190, 0.3162695526014501,
+    0.1837304473985499, 0.1837304473985499, 0.1837304473985499, 0.3162695526014501,
+    0.3162695526014501, 0.0229177878448171, 0.2319010893971509, 0.2319010893971509,
+    0.5132800333608811, 0.2319010893971509, 0.2319010893971509, 0.2319010893971509,
+    0.0229177878448171, 0.5132800333608811, 0.2319010893971509, 0.0229177878448171,
+    0.5132800333608811, 0.7303134278075384, 0.0379700484718286, 0.0379700484718286,
+    0.1937464752488044, 0.0379700484718286, 0.0379700484718286, 0.0379700484718286,
+    0.7303134278075384, 0.1937464752488044, 0.0379700484718286, 0.7303134278075384,
+    0.1937464752488044};
+
+static real_t tet4_qy[TET4_NQP] = {
+    0.2500000000000000, 0.1274709365666390, 0.1274709365666390, 0.1274709365666390,
+    0.6175871903000830, 0.0320788303926323, 0.0320788303926323, 0.0320788303926323,
+    0.9037635088221031, 0.0497770956432810, 0.4502229043567190, 0.0497770956432810,
+    0.4502229043567190, 0.0497770956432810, 0.4502229043567190, 0.1837304473985499,
+    0.3162695526014501, 0.1837304473985499, 0.3162695526014501, 0.1837304473985499,
+    0.3162695526014501, 0.2319010893971509, 0.0229177878448171, 0.2319010893971509,
+    0.2319010893971509, 0.5132800333608811, 0.2319010893971509, 0.0229177878448171,
+    0.5132800333608811, 0.2319010893971509, 0.5132800333608811, 0.2319010893971509,
+    0.0229177878448171, 0.0379700484718286, 0.7303134278075384, 0.0379700484718286,
+    0.0379700484718286, 0.1937464752488044, 0.0379700484718286, 0.7303134278075384,
+    0.1937464752488044, 0.0379700484718286, 0.1937464752488044, 0.0379700484718286,
+    0.7303134278075384};
+
+static real_t tet4_qz[TET4_NQP] = {
+    0.2500000000000000, 0.1274709365666390, 0.1274709365666390, 0.6175871903000830,
+    0.1274709365666390, 0.0320788303926323, 0.0320788303926323, 0.9037635088221031,
+    0.0320788303926323, 0.0497770956432810, 0.0497770956432810, 0.4502229043567190,
+    0.4502229043567190, 0.4502229043567190, 0.0497770956432810, 0.1837304473985499,
+    0.1837304473985499, 0.3162695526014501, 0.3162695526014501, 0.3162695526014501,
+    0.1837304473985499, 0.2319010893971509, 0.2319010893971509, 0.0229177878448171,
+    0.2319010893971509, 0.2319010893971509, 0.5132800333608811, 0.5132800333608811,
+    0.2319010893971509, 0.0229177878448171, 0.0229177878448171, 0.5132800333608811,
+    0.2319010893971509, 0.0379700484718286, 0.0379700484718286, 0.7303134278075384,
+    0.0379700484718286, 0.0379700484718286, 0.1937464752488044, 0.1937464752488044,
+    0.0379700484718286, 0.7303134278075384, 0.7303134278075384, 0.1937464752488044,
+    0.0379700484718286};
+
+static real_t tet4_qw[TET4_NQP] = {
+    -0.2359620398477559, 0.0244878963560563, 0.0244878963560563, 0.0244878963560563,
+    0.0244878963560563,  0.0039485206398261, 0.0039485206398261, 0.0039485206398261,
+    0.0039485206398261,  0.0263055529507371, 0.0263055529507371, 0.0263055529507371,
+    0.0263055529507371,  0.0263055529507371, 0.0263055529507371, 0.0829803830550590,
+    0.0829803830550590,  0.0829803830550590, 0.0829803830550590, 0.0829803830550590,
+    0.0829803830550590,  0.0254426245481024, 0.0254426245481024, 0.0254426245481024,
+    0.0254426245481024,  0.0254426245481024, 0.0254426245481024, 0.0254426245481024,
+    0.0254426245481024,  0.0254426245481024, 0.0254426245481024, 0.0254426245481024,
+    0.0254426245481024,  0.0134324384376852, 0.0134324384376852, 0.0134324384376852,
+    0.0134324384376852,  0.0134324384376852, 0.0134324384376852, 0.0134324384376852,
+    0.0134324384376852,  0.0134324384376852, 0.0134324384376852, 0.0134324384376852,
+    0.0134324384376852};
+
 SFEM_INLINE static int hex_aa_8_contains(
     // X-coordinates
     const real_t xmin,
@@ -191,6 +248,63 @@ SFEM_INLINE static void beam2_transform(
     *out_z = pz0 + x * (-pz0 + pz1);
 }
 
+SFEM_INLINE static real_t tet4_measure(
+    // X-coordinates
+    const real_t px0,
+    const real_t px1,
+    const real_t px2,
+    const real_t px3,
+    // Y-coordinates
+    const real_t py0,
+    const real_t py1,
+    const real_t py2,
+    const real_t py3,
+    // Z-coordinates
+    const real_t pz0,
+    const real_t pz1,
+    const real_t pz2,
+    const real_t pz3) {
+    const real_t x0 = -pz0 + pz3;
+    const real_t x1 = -py0 + py2;
+    const real_t x2 = -1.0 / 6.0 * px0 + (1.0 / 6.0) * px1;
+    const real_t x3 = -py0 + py3;
+    const real_t x4 = -pz0 + pz2;
+    const real_t x5 = -py0 + py1;
+    const real_t x6 = -1.0 / 6.0 * px0 + (1.0 / 6.0) * px2;
+    const real_t x7 = -pz0 + pz1;
+    const real_t x8 = -1.0 / 6.0 * px0 + (1.0 / 6.0) * px3;
+    return x0 * x1 * x2 - x0 * x5 * x6 - x1 * x7 * x8 - x2 * x3 * x4 + x3 * x6 * x7 + x4 * x5 * x8;
+}
+
+SFEM_INLINE static void tet4_transform(
+    // X-coordinates
+    const real_t px0,
+    const real_t px1,
+    const real_t px2,
+    const real_t px3,
+    // Y-coordinates
+    const real_t py0,
+    const real_t py1,
+    const real_t py2,
+    const real_t py3,
+    // Z-coordinates
+    const real_t pz0,
+    const real_t pz1,
+    const real_t pz2,
+    const real_t pz3,
+    // Quadrature point
+    const real_t qx,
+    const real_t qy,
+    const real_t qz,
+    // Output
+    real_t* const SFEM_RESTRICT out_x,
+    real_t* const SFEM_RESTRICT out_y,
+    real_t* const SFEM_RESTRICT out_z) {
+    *out_x = px0 + qx * (-px0 + px1) + qy * (-px0 + px2) + qz * (-px0 + px3);
+    *out_y = py0 + qx * (-py0 + py1) + qy * (-py0 + py2) + qz * (-py0 + py3);
+    *out_z = pz0 + qx * (-pz0 + pz1) + qy * (-pz0 + pz2) + qz * (-pz0 + pz3);
+}
+
 SFEM_INLINE static void hex_aa_8_eval_fun(
     // Quadrature point (local coordinates)
     const real_t x,
@@ -278,9 +392,8 @@ SFEM_INLINE static void hex_aa_8_eval_grad(
     gz[7] = (1.0 - x) * y;
 }
 
-int trishell3_resample_field_local(
+int tet4_resample_field_local(
     // Mesh
-    const enum ElemType element_type,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t** const SFEM_RESTRICT elems,
@@ -293,11 +406,188 @@ int trishell3_resample_field_local(
     const real_t* const SFEM_RESTRICT data,
     // Output
     real_t* const SFEM_RESTRICT weighted_field) {
-    assert(element_type == TRI3 || element_type == TRISHELL3);  // only triangles supported for now
-    if (element_type != TRI3 && element_type != TRISHELL3) {
-        MPI_Abort(MPI_COMM_WORLD, -1);
+    const real_t ox = (real_t)origin[0];
+    const real_t oy = (real_t)origin[1];
+    const real_t oz = (real_t)origin[2];
+
+    const real_t dx = (real_t)delta[0];
+    const real_t dy = (real_t)delta[1];
+    const real_t dz = (real_t)delta[2];
+
+#pragma omp parallel
+    {
+#pragma omp for  // nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[4];
+            geom_t x[4], y[4], z[4];
+
+            real_t hex8_f[8];
+            real_t coeffs[8];
+
+            real_t tet4_f[4];
+            real_t element_field[4];
+
+#pragma unroll(4)
+            for (int v = 0; v < 4; ++v) {
+                ev[v] = elems[v][i];
+            }
+
+            for (int v = 0; v < 4; ++v) {
+                x[v] = xyz[0][ev[v]];
+                y[v] = xyz[1][ev[v]];
+                z[v] = xyz[2][ev[v]];
+            }
+
+            memset(element_field, 0, 4 * sizeof(real_t));
+
+            const real_t measure = tet4_measure(x[0],
+                                                x[1],
+                                                x[2],
+                                                x[3],
+                                                //
+                                                y[0],
+                                                y[1],
+                                                y[2],
+                                                y[3],
+                                                //
+                                                z[0],
+                                                z[1],
+                                                z[2],
+                                                z[3]);
+
+            assert(measure > 0);
+
+            for (int q = 0; q < TET4_NQP; q++) {
+                real_t g_qx, g_qy, g_qz;
+                tet4_transform(x[0],
+                               x[1],
+                               x[2],
+                               x[3],
+                               //
+                               y[0],
+                               y[1],
+                               y[2],
+                               y[3],
+                               //
+                               z[0],
+                               z[1],
+                               z[2],
+                               z[3],
+                               //
+                               tet4_qx[q],
+                               tet4_qy[q],
+                               tet4_qz[q],
+                               &g_qx,
+                               &g_qy,
+                               &g_qz);
+
+#ifndef SFEM_RESAMPLE_GAP_DUAL
+                // Standard basis function
+                {
+                    tet4_f[0] = 1 - tet4_qx[q] - tet4_qy[q] - tet4_qz[q];
+                    tet4_f[1] = tet4_qx[q];
+                    tet4_f[2] = tet4_qy[q];
+                    tet4_f[2] = tet4_qz[q];
+                }
+#else
+                // DUAL basis function
+                {
+                    const real_t f0 = 1 - tet4_qx[q] - tet4_qy[q] - tet4_qz[q];
+                    const real_t f1 = tet4_qx[q];
+                    const real_t f2 = tet4_qy[q];
+                    const real_t f3 = tet4_qz[q];
+
+                    tet4_f[0] = 4 * f0 - f1 - f2 - f3;
+                    tet4_f[1] = -f0 + 4 * f1 - f2 - f3;
+                    tet4_f[2] = -f0 - f1 + 4 * f2 - f3;
+                    tet4_f[3] = -f0 - f1 - f2 + 4 * f3;
+                }
+#endif
+                const real_t dV = measure * tet4_qw[q];
+
+                const real_t grid_x = (g_qx - ox) / dx;
+                const real_t grid_y = (g_qy - oy) / dy;
+                const real_t grid_z = (g_qz - oz) / dz;
+
+                const ptrdiff_t i = floor(grid_x);
+                const ptrdiff_t j = floor(grid_y);
+                const ptrdiff_t k = floor(grid_z);
+
+                // If outside
+                if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) ||
+                    (k + 1 >= n[2])) {
+                    fprintf(
+                        stderr,
+                        "warning (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n",
+                        g_qx,
+                        g_qy,
+                        g_qz,
+                        i,
+                        j,
+                        k,
+                        n[0],
+                        n[1],
+                        n[2]);
+                    continue;
+                }
+
+                // Get the reminder [0, 1]
+                real_t l_x = (grid_x - i);
+                real_t l_y = (grid_y - j);
+                real_t l_z = (grid_z - k);
+
+                assert(l_x >= -1e-8);
+                assert(l_y >= -1e-8);
+                assert(l_z >= -1e-8);
+
+                assert(l_x <= 1 + 1e-8);
+                assert(l_y <= 1 + 1e-8);
+                assert(l_z <= 1 + 1e-8);
+
+                hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
+                hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
+
+                // Integrate gap function
+                {
+                    real_t eval_field = 0;
+#pragma unroll(8)
+                    for (int edof_j = 0; edof_j < 8; edof_j++) {
+                        eval_field += hex8_f[edof_j] * coeffs[edof_j];
+                    }
+
+#pragma unroll(4)
+                    for (int edof_i = 0; edof_i < 4; edof_i++) {
+                        element_field[edof_i] += eval_field * tet4_f[edof_i] * dV;
+                    }
+                }
+            }
+
+#pragma unroll(4)
+            for (int v = 0; v < 4; ++v) {
+                // Invert sign since distance field is negative insdide and positive outside
+#pragma omp critical
+                { weighted_field[ev[v]] += element_field[v]; }
+            }
+        }
     }
 
+    return 0;
+}
+
+int trishell3_resample_field_local(
+    // Mesh
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t** const SFEM_RESTRICT elems,
+    geom_t** const SFEM_RESTRICT xyz,
+    // SDF
+    const ptrdiff_t* const SFEM_RESTRICT n,
+    const ptrdiff_t* const SFEM_RESTRICT stride,
+    const geom_t* const SFEM_RESTRICT origin,
+    const geom_t* const SFEM_RESTRICT delta,
+    const real_t* const SFEM_RESTRICT data,
+    // Output
+    real_t* const SFEM_RESTRICT weighted_field) {
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];
     const real_t oz = (real_t)origin[2];
@@ -446,26 +736,18 @@ int trishell3_resample_field_local(
     return 0;
 }
 
-int beam2_resample_field_local(
-    // Mesh
-    const enum ElemType element_type,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t** const SFEM_RESTRICT elems,
-    geom_t** const SFEM_RESTRICT xyz,
-    // SDF
-    const ptrdiff_t* const SFEM_RESTRICT n,
-    const ptrdiff_t* const SFEM_RESTRICT stride,
-    const geom_t* const SFEM_RESTRICT origin,
-    const geom_t* const SFEM_RESTRICT delta,
-    const real_t* const SFEM_RESTRICT data,
-    // Output
-    real_t* const SFEM_RESTRICT weighted_field) {
-    assert(element_type == EDGE2 || element_type == BEAM2);  // only triangles supported for now
-    if (element_type != EDGE2 && element_type != BEAM2) {
-        MPI_Abort(MPI_COMM_WORLD, -1);
-    }
-
+int beam2_resample_field_local(const ptrdiff_t nelements,
+                               const ptrdiff_t nnodes,
+                               idx_t** const SFEM_RESTRICT elems,
+                               geom_t** const SFEM_RESTRICT xyz,
+                               // SDF
+                               const ptrdiff_t* const SFEM_RESTRICT n,
+                               const ptrdiff_t* const SFEM_RESTRICT stride,
+                               const geom_t* const SFEM_RESTRICT origin,
+                               const geom_t* const SFEM_RESTRICT delta,
+                               const real_t* const SFEM_RESTRICT data,
+                               // Output
+                               real_t* const SFEM_RESTRICT weighted_field) {
     printf("beam2_resample_field_local!\n");
 
     const real_t ox = (real_t)origin[0];
@@ -614,18 +896,26 @@ int resample_field_local(
     const real_t* const SFEM_RESTRICT data,
     // Output
     real_t* const SFEM_RESTRICT weighted_field) {
+    switch (element_type) {
+        case TET4: {
+            return tet4_resample_field_local(
+                nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+        }
+    }
+
     enum ElemType st = shell_type(element_type);
 
     switch (st) {
         case TRISHELL3:
             return trishell3_resample_field_local(
-                st, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+                nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
         case BEAM2:
             return beam2_resample_field_local(
-                st, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+                nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
 
         default: {
             assert(0);
+            fprintf(stderr, "Unknown element type %d\n", st);
             MPI_Abort(MPI_COMM_WORLD, -1);
             return EXIT_FAILURE;
         }
@@ -661,9 +951,14 @@ int resample_field(
                          data,
                          weighted_field);
 
-    // Removing the mass-contributions from the weighted gap function "weighted_field"
-    apply_inv_lumped_mass(
-        shell_type(element_type), nelements, nnodes, elems, xyz, weighted_field, g);
+    enum ElemType st = shell_type(element_type);
+
+    if (INVALID == st) {
+        // Removing the mass-contributions from the weighted gap function "weighted_field"
+        apply_inv_lumped_mass(element_type, nelements, nnodes, elems, xyz, weighted_field, g);
+    } else {
+        apply_inv_lumped_mass(st, nelements, nnodes, elems, xyz, weighted_field, g);
+    }
 
     free(weighted_field);
     return 0;

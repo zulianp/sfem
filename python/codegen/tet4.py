@@ -64,5 +64,15 @@ class Tet4(FE):
 	def measure(self, q):
 		return det3(A) / 6
 
+	def transform(self, q):
+		return self.jacobian(q) * q + sp.Matrix(3, 1, [x0, y0, z0])
+
+	def inverse_transform(self, p):
+		diff = (p - sp.Matrix(3, 1, [x0, y0, z0]))
+		return self.jacobian_inverse(p) * diff
+
 if __name__ == '__main__':
-	Tet4().generate_c_code()
+	# Tet4().generate_c_code()
+
+	# c_code(Tet4().measure(vec3(qx, qy, qz)))
+	Tet4().generate_qp_based_code()
