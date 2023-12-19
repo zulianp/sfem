@@ -840,8 +840,8 @@ int interpolate_field(const ptrdiff_t nnodes,
                 int rank;
                 MPI_Comm_rank(MPI_COMM_WORLD, &rank);
                 fprintf(stderr,
-                        "[%d] warning (%g, %g, %g) (%ld, %ld, %ld) outside domain (%" dtype_COUNT_T
-                        ", %" dtype_COUNT_T ", %" dtype_COUNT_T ")!\n",
+                        "[%d] warning (%g, %g, %g) (%ld, %ld, %ld) outside domain (%" d_COUNT_T
+                        ", %" d_COUNT_T ", %" d_COUNT_T ")!\n",
                         rank,
                         x,
                         y,
@@ -869,6 +869,17 @@ int interpolate_field(const ptrdiff_t nnodes,
             assert(l_z <= 1 + 1e-8);
 
             hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
+           
+            assert(i + 1 < n[0]);
+            assert(j + 1 < n[1]);
+            assert(k + 1 < n[2]);
+
+
+            assert(i >= 0);
+            assert(j >= 0);
+            assert(k >= 0);
+
+
             hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
 
             // Interpolate gap function
@@ -1558,19 +1569,19 @@ int main(int argc, char *argv[]) {
         grid_n[1] = grid.extent[1] - 1;
         grid_n[2] = grid.z_global_extent - 1;
 
-        const count_t x_min = MAX(0, floor(aabb_min[0] * grid_n[0]));
-        const count_t y_min = MAX(0, floor(aabb_min[1] * grid_n[1]));
-        const count_t z_min = MAX(0, floor(aabb_min[2] * grid_n[2]));
+        const count_t margin = 2;
+        const count_t x_min = MAX(0, (floor(aabb_min[0] * grid_n[0]) - margin));
+        const count_t y_min = MAX(0, (floor(aabb_min[1] * grid_n[1]) - margin));
+        const count_t z_min = MAX(0, (floor(aabb_min[2] * grid_n[2]) - margin));
 
-        const count_t x_max = MIN(grid_n[0], ceil(aabb_max[0] * grid_n[0]));
-        const count_t y_max = MIN(grid_n[1], ceil(aabb_max[1] * grid_n[1]));
-        const count_t z_max = MIN(grid_n[2], ceil(aabb_max[2] * grid_n[2]));
+        const count_t x_max = MIN(grid_n[0], (ceil(aabb_max[0] * grid_n[0]) + margin));
+        const count_t y_max = MIN(grid_n[1], (ceil(aabb_max[1] * grid_n[1]) + margin));
+        const count_t z_max = MIN(grid_n[2], (ceil(aabb_max[2] * grid_n[2]) + margin));
 
         const count_t x_extent = x_max - x_min;
         const count_t y_extent = y_max - y_min;
         const count_t z_extent = z_max - z_min;
-
-        // assert(remote_grid_size > 0);
+        assert(z_extent > 0);
 
         /////////////////////////////////////////////////////////////////////////
         // Prepare grid data exchange
@@ -1588,16 +1599,18 @@ int main(int argc, char *argv[]) {
                 printf("\n");
             }
 
+            printf("---------------------------\n");
+
             MPI_Barrier(comm);
         }
 
         const int start_rank = lower_bound(z_min, ownership_ranges, size + 1) - 1;
         const int end_rank = lower_bound(z_max - 1, ownership_ranges, size + 1);
 
-        printf("[%d] %ld %ld : %d %d\n", rank, z_min, z_max, start_rank, end_rank);
+        // printf("[%d] %d %d : %d %d\n", rank, z_min, z_max, start_rank, end_rank);
 
         assert(start_rank < size);
-        assert(end_rank < size);
+        assert(end_rank <= size);
 
         int *recv_starts = (int *)calloc(size, sizeof(int));
         int *recv_count = (int *)calloc(size, sizeof(int));
@@ -1606,12 +1619,13 @@ int main(int argc, char *argv[]) {
         int *send_count = (int *)malloc(size * sizeof(int));
 
         ptrdiff_t check_z_extent = 0;
-        for (int r = start_rank; r <= end_rank; r++) {
+        for (int r = start_rank; r < end_rank; r++) {
             const int s = (int)MAX(ownership_ranges[r], z_min) - ownership_ranges[r];
             int e = (int)MIN(ownership_ranges[r + 1], z_max) - ownership_ranges[r];
             e = MAX(s, e);
 
-            // printf("[%d] %d (%d %d) beg: %ld\n", rank, z_min, s, e, ownership_ranges[r]);
+            // printf("[%d] z_min=%d (%d %d) beg: %ld\n", rank, z_min, s, e, ownership_ranges[r]);
+            // printf("[%d] z_max=%d (%d %d) beg: %ld\n", rank, z_max, s, e, ownership_ranges[r]);
 
             recv_starts[r] = s;
             recv_count[r] = e - s;
@@ -1644,13 +1658,21 @@ int main(int argc, char *argv[]) {
                       SFEM_MPI_REAL_T,
                       comm);
 
+        {
+            real_t min_field = array_min_r(remote_grid_size, remote_grid_field);
+            real_t max_field = array_max_r(remote_grid_size, remote_grid_field);
+            printf("input field (%g, %g)\n", (double)min_field, (double)max_field);
+            MPI_Barrier(comm);
+        }
+
+
         /////////////////////////////////////////////////////////////////////////
         // Shift affine transform for sub-region of grid data
         /////////////////////////////////////////////////////////////////////////
 
         affine_transform_t subregion_trafo;
         affine_transform_copy(&trafo, &subregion_trafo);
-        subregion_trafo.shift[2] = trafo.shift[2] + (trafo.scaling[2] * z_min);
+        subregion_trafo.shift[2] = trafo.shift[2] + (dx[2] * z_min);
 
         count_t subregion_n[3];
         count_t subregion_stride[3];
@@ -1664,23 +1686,22 @@ int main(int argc, char *argv[]) {
         subregion_stride[2] = subregion_n[0] * subregion_n[1];
 
         /////////////////////////////////////////////////////////////////////////
-        // Transfer data
+        // Resample data
         /////////////////////////////////////////////////////////////////////////
 
-        // if (SFEM_INTERPOLATE) {
-        //     printf("interpolate_field\n");
-        //     // TODO Sub-region trafo!
-        //     interpolate_field(mesh.nnodes,
-        //                       mesh.points,
-        //                       // SDF
-        //                       n,
-        //                       stride,
-        //                       ox,
-        //                       dx,
-        //                       box_field,
-        //                       // Output
-        //                       mesh_field);
-        // } else {
+        if (SFEM_INTERPOLATE) {
+            printf("interpolate_field\n");
+            interpolate_field(mesh.nnodes,
+                              mesh.points,
+                              // SDF
+                              subregion_n,
+                              subregion_stride,
+                              subregion_trafo.shift,
+                              dx,
+                              remote_grid_field,
+                              // Output
+                              mesh_field);
+        } else {
             resample_box_to_tetra_mesh_unique(subregion_n,
                                               subregion_stride,
                                               &subregion_trafo,
@@ -1690,7 +1711,7 @@ int main(int argc, char *argv[]) {
                                               mesh.elements,
                                               mesh.points,
                                               mesh_field);
-        // }
+        }
 
         /////////////////////////////////////////////////////////////////////////
         // Clean-up
@@ -1735,21 +1756,21 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("resample_box_to_tetra_mesh:\t%g seconds\n", tack);
+        printf("resampling:\t%g seconds\n", tack);
     }
 
-    {
-        real_t min_field = array_min_r(size_field, box_field);
-        real_t max_field = array_max_r(size_field, box_field);
+    // {
+    //     real_t min_field = array_min_r(size_field, box_field);
+    //     real_t max_field = array_max_r(size_field, box_field);
 
-        printf("input field (%g, %g)\n", (double)min_field, (double)max_field);
-    }
+    //     printf("input field (%g, %g)\n", (double)min_field, (double)max_field);
+    // }
 
     {
         real_t min_field = array_min_r(mesh.nnodes, mesh_field);
         real_t max_field = array_max_r(mesh.nnodes, mesh_field);
 
-        printf("output field (%g, %g)\n", (double)min_field, (double)max_field);
+        printf("[%d] output field (%g, %g)\n", rank, (double)min_field, (double)max_field);
     }
 
     mesh_write_nodal_field(&mesh, output_path, SFEM_MPI_REAL_T, (void *)mesh_field);

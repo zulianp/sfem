@@ -115,7 +115,7 @@ GOALS += cvfem_assemble
 GOALS += assemble_adjaciency_matrix
 
 # Contact
-GOALS += gap_from_sdf geometry_aware_gap_from_sdf mesh_to_sdf
+GOALS += gap_from_sdf geometry_aware_gap_from_sdf mesh_to_sdf grid_to_mesh
 
 GOALS += bgs
 
@@ -208,7 +208,7 @@ OBJS += tet10_grad.o \
 	tet10_navier_stokes.o
 
 # Resampling
-OBJS += sfem_resample_gap.o
+OBJS += sfem_resample_gap.o sfem_resample_field.o
 
 # CVFEM
 OBJS += cvfem_tri3_diffusion.o
@@ -340,6 +340,9 @@ create_surface_from_element_adjaciency_table : create_surface_from_element_adjac
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
 gap_from_sdf : gap_from_sdf.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
+
+grid_to_mesh : grid_to_mesh.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
 geometry_aware_gap_from_sdf : geometry_aware_gap_from_sdf.c libsfem.a
