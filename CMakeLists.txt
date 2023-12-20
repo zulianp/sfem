@@ -22,10 +22,10 @@ include(cmake/SFEMBuildTypes.cmake)
 include(cmake/SFEMCMakeFunctions.cmake)
 include(cmake/SFEMDependencies.cmake)
 
-# ##############################################################################
-# ##############################################################################
+# ######################################################
+# ######################################################
 # Library
-# ##############################################################################
+# ######################################################
 
 find_package(MatrixIO)
 
@@ -59,7 +59,7 @@ endforeach(MODULE)
 
 add_library(sfem ${SFEM_SOURCES} ${SFEM_HEADERS})
 
-# ##############################################################################
+# ######################################################
 # include
 
 foreach(include ${SFEM_BUILD_INCLUDES})
@@ -75,12 +75,12 @@ target_include_directories(
 
 target_include_directories(sfem PUBLIC ${SFEM_DEP_INCLUDES})
 
-# ##############################################################################
+# ######################################################
 # link
 
 target_link_libraries(sfem PUBLIC ${SFEM_DEP_LIBRARIES})
 
-# ##############################################################################
+# ######################################################
 # properties
 
 set_compiler_features(sfem)
@@ -88,8 +88,8 @@ set_target_properties(
     sfem PROPERTIES VERSION ${SFEM_VERSION}
                              SOVERSION ${SFEM_VERSION_MAJOR})
 
-# ##############################################################################
-# ##############################################################################
+# ######################################################
+# ######################################################
 # Executables
 
 file(GLOB C_DRIVERS CONFIGURE_DEPENDS "drivers/*.c")
@@ -118,11 +118,11 @@ endforeach()
 #     include(benchmarks/benchmarks.cmake)
 # endif()
 
-# ##############################################################################
-# ##############################################################################
-# ##############################################################################
+# ######################################################
+# ######################################################
+# ######################################################
 # Installation
-# ##############################################################################
+# ######################################################
 
 install(
     TARGETS sfem
@@ -144,7 +144,29 @@ install(
     NAMESPACE SFEM::
     DESTINATION lib/cmake)
 
-# ##############################################################################
+######################################################
+# Python scripts
+######################################################
+
+file(GLOB PYTHON_SCRIPTS CONFIGURE_DEPENDS
+     "${CMAKE_SOURCE_DIR}/python/mesh/*.py")
+install(FILES ${PYTHON_SCRIPTS} DESTINATION scripts/mesh)
+
+file(GLOB PYTHON_SCRIPTS CONFIGURE_DEPENDS
+     "${CMAKE_SOURCE_DIR}/python/sdf/*.py")
+install(FILES ${PYTHON_SCRIPTS} DESTINATION scripts/sdf)
+
+file(GLOB PYTHON_SCRIPTS CONFIGURE_DEPENDS
+     "${CMAKE_SOURCE_DIR}/python/grid/*.py")
+install(FILES ${PYTHON_SCRIPTS} DESTINATION scripts/grid)
+
+file(GLOB PYTHON_SCRIPTS CONFIGURE_DEPENDS
+     "${CMAKE_SOURCE_DIR}/python/algebra/*.py")
+install(FILES ${PYTHON_SCRIPTS} DESTINATION scripts/algebra)
+
+######################################################
+
+# ######################################################
 
 # generate the config file that is includes the exports
 configure_package_config_file(
@@ -165,9 +187,9 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/SFEMConfig.cmake
 
 include(cmake/PostInstall.cmake)
 
-# ##############################################################################
-# ##############################################################################
+# ######################################################
+# ######################################################
 # Extra targets
-# ##############################################################################
+# ######################################################
 
-# ##############################################################################
+# ######################################################
