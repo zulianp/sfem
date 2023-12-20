@@ -27,8 +27,10 @@ include(cmake/SFEMDependencies.cmake)
 # Library
 # ##############################################################################
 
+find_package(MatrixIO)
+
 set(SFEM_MODULES
-    algebra base graphs matrix resampling solver
+    algebra base matrix mesh pizzastack resampling solver
     operators 
         operators/beam2 
         operators/cvfem 
@@ -42,14 +44,18 @@ set(SFEM_MODULES
         operators/trishell3
             )
 
+if(SFEM_ENABLE_METIS)
+    list(APPEND SFEM_MODULES graphs)
+endif()
+
 foreach(MODULE ${SFEM_MODULES})
     scan_directories(${CMAKE_SOURCE_DIR}/${MODULE} "." SFEM_BUILD_INCLUDES
                      SFEM_HEADERS SFEM_SOURCES)
 endforeach(MODULE)
 
-message(STATUS "SFEM_BUILD_INCLUDES: ${SFEM_BUILD_INCLUDES}")
-message(STATUS "SFEM_HEADERS: ${SFEM_HEADERS}") 
-message(STATUS "SFEM_SOURCES: ${SFEM_SOURCES}")
+# message(STATUS "SFEM_BUILD_INCLUDES: ${SFEM_BUILD_INCLUDES}")
+# message(STATUS "SFEM_HEADERS: ${SFEM_HEADERS}") 
+# message(STATUS "SFEM_SOURCES: ${SFEM_SOURCES}")
 
 add_library(sfem ${SFEM_SOURCES} ${SFEM_HEADERS})
 
@@ -85,15 +91,32 @@ set_target_properties(
 # ##############################################################################
 # ##############################################################################
 # Executables
-# add_subdirectory(examples)
 
-if(SFEM_ENABLE_TESTING)
-    include(tests/tests.cmake)
-endif()
+file(GLOB C_DRIVERS CONFIGURE_DEPENDS "drivers/*.c")
+file(GLOB CPP_DRIVERS CONFIGURE_DEPENDS "drivers/*.cpp")
 
-if(SFEM_ENABLE_BENCHMARK)
-    include(benchmarks/benchmarks.cmake)
-endif()
+set(DRIVERS "${C_DRIVERS};${CPP_DRIVERS}")
+
+list(APPEND SFEM_EXCLUDED_EXEC "grad_and_project;heat_equation;integrate_divergence;partition_mesh_based_on_operator;taylor_hood_navier_stokes;ssolve")
+
+foreach(DRIVER ${DRIVERS})
+    get_filename_component(DRIVER_NAME ${DRIVER} NAME_WE)
+    list(FIND SFEM_EXCLUDED_EXEC "${DRIVER_NAME}" LIST_INDEX)
+    
+    if (${LIST_INDEX} GREATER -1)
+    else()
+        add_executable(${DRIVER_NAME} ${DRIVER})
+        target_link_libraries(${DRIVER_NAME} PRIVATE sfem)
+    endif()
+endforeach()
+
+# if(SFEM_ENABLE_TESTING)
+#     include(tests/tests.cmake)
+# endif()
+
+# if(SFEM_ENABLE_BENCHMARK)
+#     include(benchmarks/benchmarks.cmake)
+# endif()
 
 # ##############################################################################
 # ##############################################################################
