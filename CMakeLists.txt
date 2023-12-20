@@ -88,6 +88,8 @@ set_target_properties(
     sfem PROPERTIES VERSION ${SFEM_VERSION}
                              SOVERSION ${SFEM_VERSION_MAJOR})
 
+set(SFEM_TARGETS sfem)
+
 # ######################################################
 # ######################################################
 # Executables
@@ -107,6 +109,7 @@ foreach(DRIVER ${DRIVERS})
     else()
         add_executable(${DRIVER_NAME} ${DRIVER})
         target_link_libraries(${DRIVER_NAME} PRIVATE sfem)
+        list(APPEND SFEM_TARGETS ${DRIVER_NAME})
     endif()
 endforeach()
 
@@ -125,7 +128,7 @@ endforeach()
 # ######################################################
 
 install(
-    TARGETS sfem
+    TARGETS ${SFEM_TARGETS}
     EXPORT SFEMTargets
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
