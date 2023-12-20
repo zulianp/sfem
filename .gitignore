@@ -61,3 +61,5 @@ Thumbs.db
 *.csv
 *.out
 
+build/
+

@@ -27,8 +27,8 @@ resample_target=$mesh_sorted
 # mkdir -p $skinned
 # skin $mesh $skinned
 
-# mesh_to_sdf.py $skinned $sdf --hmax=0.02 --margin=0.2
-# raw_to_xdmf.py $sdf
+mesh_to_sdf.py $skinned $sdf --hmax=0.01 --margin=0.2
+raw_to_xdmf.py $sdf
 
 sizes=`head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' '`
 origins=`head -8 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' '`
@@ -38,9 +38,9 @@ echo $sizes
 echo $origins
 echo $scaling
 
-n_procs=1
+# n_procs=1
 # n_procs=2
-# n_procs=8
+n_procs=8
 LAUNCH="mpiexec -np $n_procs"
 # LAUNCH="lldb --"
 

@@ -24,5 +24,5 @@ set -x
 for f in ${files[@]}
 do
 	echo $f
-	raw_to_db.py $f "$f".vtk --point_data="$f"/frank.raw --point_data_type=float32
+	raw_to_db.py $f "$f".vtk --point_data="$f/frank.raw,$f/neigh_count.raw" --point_data_type="float32,float32"
 done
