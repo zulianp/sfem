@@ -43,15 +43,8 @@ set(SFEM_MODULES
             )
 
 foreach(MODULE ${SFEM_MODULES})
-    # add_subdirectory("${MODULE}")
-
-    # find_project_files(${CMAKE_SOURCE_DIR}/$MODULE "." SFEM_C_HEADERS
-    #                              SFEM_C_SOURCES)
-
     scan_directories(${CMAKE_SOURCE_DIR}/${MODULE} "." SFEM_BUILD_INCLUDES
                      SFEM_HEADERS SFEM_SOURCES)
-
-
 endforeach(MODULE)
 
 message(STATUS "SFEM_BUILD_INCLUDES: ${SFEM_BUILD_INCLUDES}")
