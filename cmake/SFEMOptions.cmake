@@ -11,6 +11,8 @@ option(SFEM_ENABLE_PROFILER "Allows producing profiles of the runs" OFF)
 option(SFEM_ENABLE_DEV_MODE
        "Add additional flags for more strict compilation" OFF)
 
+option(SFEM_ENABLE_CUDA "Enable CUDA support" OFF)
+
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)
 if(HAS_PARENT)
     option(SFEM_ENABLE_TESTING "Build the tests" OFF)

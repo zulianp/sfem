@@ -1,5 +1,15 @@
 # SFEMDependencies.cmake
 
+if(SFEM_ENABLE_CUDA)
+    enable_language(CUDA)
+
+    if(NOT DEFINED CMAKE_CUDA_STANDARD)
+        set(CMAKE_CUDA_STANDARD 17)
+        set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+    endif()
+
+endif()
+
 # ##############################################################################
 
 if(SFEM_ENABLE_LAPACK OR TPL_ENABLE_LAPACK)
@@ -13,7 +23,6 @@ if(SFEM_ENABLE_LAPACK OR TPL_ENABLE_LAPACK)
             list(APPEND SFEM_DEP_LIBRARIES ${LAPACK_LIBRARIES})
         endif()
     endif()
-
 endif()
 
 # ##############################################################################
