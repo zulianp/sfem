@@ -143,9 +143,9 @@ install(FILES ${CMAKE_BINARY_DIR}/sfem_config.hpp DESTINATION include)
 
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/configuration/sfem_config.py.in
-    ${CMAKE_CURRENT_SOURCE_DIR}/python/sfem_config.py)
+    ${CMAKE_CURRENT_SOURCE_DIR}/python/sfem/sfem_config.py)
 
-install(FILES ${CMAKE_BINARY_DIR}/python/sfem_config.py DESTINATION scripts/sfem)
+install(FILES ${CMAKE_BINARY_DIR}/python/sfem/sfem_config.py DESTINATION scripts/sfem)
 
 install(FILES ${SFEM_HEADERS} DESTINATION include)
 

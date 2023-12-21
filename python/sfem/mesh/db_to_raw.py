@@ -7,7 +7,7 @@ import os
 import glob
 import pdb
 
-def main(argv):
+def db_to_raw(argv):
 	if len(argv) < 3:
 		print(f'usage: {argv[0]} <input_mesh> <output_folder>')
 		exit()
@@ -137,4 +137,4 @@ def main(argv):
 			print(f'Unable to convert {key}')
 
 if __name__ == '__main__':
-    main(sys.argv)
+    db_to_raw(sys.argv)

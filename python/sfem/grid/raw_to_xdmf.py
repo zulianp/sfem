@@ -4,7 +4,7 @@
 import sys
 import os
 
-def main(path):
+def raw_to_xdmf(path):
     # Initial variable definition.
     path = os.path.abspath(path) 
     binary_path = path
@@ -209,4 +209,4 @@ def main(path):
 
 
 if __name__ == '__main__':
-    main(sys.argv[1])
+    raw_to_xdmf(sys.argv[1])

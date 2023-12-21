@@ -143,7 +143,7 @@ def add_fields(field_data, field_data_type, storage, check_len):
                 print(f"field: {name}, min={np.min(data)}, max={np.max(data)}, sum={np.sum(data)} type={t}")
                 storage[name] = data
 
-def main(argv):
+def raw_to_db(argv):
     usage = f'usage: {argv[0]} <input_folder> <output_mesh>'
 
     if(len(argv) < 3):
@@ -271,5 +271,5 @@ def main(argv):
         mesh.write(output_path)
 
 if __name__ == '__main__':
-    main(sys.argv)
+    raw_to_db(sys.argv)
 

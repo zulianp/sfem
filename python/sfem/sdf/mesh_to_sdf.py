@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 
+import sys
+import os
+# import smesh
+from time import perf_counter
+
 import numpy as np
 import meshio
 import taichi as ti
-import sdf2
-import sys
-import os
-import smesh
 
-from time import perf_counter
+# from distance_point_to_triangle import point_to_triangle
 
 ti.init(arch=ti.gpu)
 # ti.init(arch=ti.cpu)
@@ -76,7 +77,7 @@ def compute_aabb(mesh, margin=0):
     pmax[2] = np.max(z).astype(real_t) + margin
     return np.array(pmin), np.array(pmax)
 
-def sdt(mesh, pmin, pmax, hmax):
+def mesh_to_sdf(mesh, pmin, pmax, hmax):
     t1_start = perf_counter()
 
     x =  mesh.points[:,0].astype(real_t)
@@ -253,7 +254,7 @@ def sdt(mesh, pmin, pmax, hmax):
 
                     p = [ gpx, gpy, gpz ]
                     t = [ p0, p1, p2 ]
-                    q, phi1, phi2, entity = sdf2.point_to_triangle(p, t)
+                    q, phi1, phi2, entity = point_to_triangle(p, t)
                     d = ti.math.distance(p, q)
 
                     if d < e_min:
@@ -384,7 +385,7 @@ if __name__ == '__main__':
 
     submesh = select_submesh(mesh, pmin, pmax)
     submesh.write('submesh.vtk')
-    nedt, dims = sdt(submesh, pmin, pmax, hmax)
+    nedt, dims = mesh_to_sdf(submesh, pmin, pmax, hmax)
     nedt.tofile(output_path)
 
     header =    f'nx: {dims[0]}\n'
