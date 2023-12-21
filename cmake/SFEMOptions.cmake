@@ -2,7 +2,7 @@
 
 # ##############################################################################
 option(BUILD_SHARED_LIBS "build shared libraries" OFF)
-option(USE_XSDK_DEFAULTS "XSDK mode" OFF)
+# option(USE_XSDK_DEFAULTS "XSDK mode" OFF)
 
 # option(SFEM_ENABLE_SANITIZER "check for memory access problems" OFF)
 option(SFEM_ENABLE_GLIBCXX_DEBUG
@@ -13,7 +13,9 @@ option(SFEM_ENABLE_DEV_MODE
 
 option(SFEM_ENABLE_CUDA "Enable CUDA support" OFF)
 
+
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)
+
 if(HAS_PARENT)
     option(SFEM_ENABLE_TESTING "Build the tests" OFF)
     option(SFEM_ENABLE_BENCHMARK "enable benchmark suite" OFF)
@@ -26,37 +28,47 @@ endif()
 # XSDK_PRECISION
 # ##############################################################################
 
-if(NOT XSDK_PRECISION OR USE_XSDK_DEFAULTS)
-    set(XSDK_PRECISION "DOUBLE")
+# if(NOT XSDK_PRECISION OR USE_XSDK_DEFAULTS)
+#     set(XSDK_PRECISION "DOUBLE")
+# endif()
+
+# string(COMPARE EQUAL ${XSDK_PRECISION} "DOUBLE" SFEM_HAVE_DOUBLE_PRECISION)
+# string(COMPARE EQUAL ${XSDK_PRECISION} "SINGLE" SFEM_HAVE_SINGLE_PRECISION)
+# string(COMPARE EQUAL ${XSDK_PRECISION} "QUAD" SFEM_HAVE_QUAD_PRECISION)
+
+# # ##############################################################################
+# # XSDK_INDEX_SIZE
+# # ##############################################################################
+
+
+if(NOT SFEM_INDEX_SIZE)
+    set(SFEM_INDEX_SIZE 32 CACHE STRING "Choice of idx_t size between 32 or 64 bits" FORCE)
 endif()
 
-string(COMPARE EQUAL ${XSDK_PRECISION} "DOUBLE" SFEM_HAVE_DOUBLE_PRECISION)
-string(COMPARE EQUAL ${XSDK_PRECISION} "SINGLE" SFEM_HAVE_SINGLE_PRECISION)
-string(COMPARE EQUAL ${XSDK_PRECISION} "QUAD" SFEM_HAVE_QUAD_PRECISION)
-
-# ##############################################################################
-# XSDK_INDEX_SIZE
-# ##############################################################################
-
-if(USE_XSDK_DEFAULTS)
-    set(XSDK_INDEX_SIZE 32)
-    set(SFEM_INDEX_SIZE 32)
-else()
-    if(XSDK_INDEX_SIZE)
-        set(SFEM_INDEX_SIZE ${XSDK_INDEX_SIZE})
-    elseif(NOT SFEM_INDEX_SIZE)
-        set(XSDK_INDEX_SIZE 64)
-        set(SFEM_INDEX_SIZE 64)
-    endif()
+if(NOT SFEM_COUNT_SIZE)
+    set(SFEM_COUNT_SIZE 32 CACHE STRING "Choice of count_t size between 32 or 64 bits" FORCE)
 endif()
+
+
+# if(USE_XSDK_DEFAULTS)
+#     set(XSDK_INDEX_SIZE 32)
+#     set(SFEM_INDEX_SIZE 32)
+# else()
+#     if(XSDK_INDEX_SIZE)
+#         set(SFEM_INDEX_SIZE ${XSDK_INDEX_SIZE})
+#     elseif(NOT SFEM_INDEX_SIZE)
+#         set(XSDK_INDEX_SIZE 64)
+#         set(SFEM_INDEX_SIZE 64)
+#     endif()
+# endif()
 
 # ##############################################################################
 # Handle xSDK defaults
 # ##############################################################################
 
 include(CMakeDependentOption)
-cmake_dependent_option(BUILD_SHARED_LIBS "Build shared libraries" OFF
-                       "NOT USE_XSDK_DEFAULTS" ON)
+# cmake_dependent_option(BUILD_SHARED_LIBS "Build shared libraries" OFF
+#                        "NOT USE_XSDK_DEFAULTS" ON)
 
 # FIXME: LAPACK supporting long double?
 cmake_dependent_option(SFEM_ENABLE_LAPACK "Enable
@@ -66,18 +78,18 @@ Lapack for dense matrix operations" ON "NOT SFEM_HAVE_QUAD_PRECISION" OFF)
 # support" ON "NOT TPL_ENABLE_MPI" OFF)
 
 if(NOT CMAKE_BUILD_TYPE)
-    if(USE_XSDK_DEFAULTS)
-        set(CMAKE_BUILD_TYPE
-            "Debug"
-            CACHE STRING "Choose the type of build, options are: Debug Release
-        RelWithDebInfo MinSizeRel." FORCE)
+    # if(USE_XSDK_DEFAULTS)
+    #     set(CMAKE_BUILD_TYPE
+    #         "Debug"
+    #         CACHE STRING "Choose the type of build, options are: Debug Release
+    #     RelWithDebInfo MinSizeRel." FORCE)
 
-        message(
-            STATUS
-                "[Status] Since USE_XSDK_DEFAULTS=ON then CMAKE_BUILD_TYPE=Debug"
-        )
+    #     message(
+    #         STATUS
+    #             "[Status] Since USE_XSDK_DEFAULTS=ON then CMAKE_BUILD_TYPE=Debug"
+    #     )
 
-    else()
+    # else()
         set(CMAKE_BUILD_TYPE
             "Release"
             CACHE STRING "Choose the type of build, options are: Debug Release
@@ -85,7 +97,7 @@ RelWithDebInfo MinSizeRel." FORCE)
 
         message(STATUS "[Status] CMAKE_BUILD_TYPE=Release")
 
-    endif()
+    # endif()
 endif(NOT CMAKE_BUILD_TYPE)
 
 # ##############################################################################
