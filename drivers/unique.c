@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const char *help = "usage: %s <input.idx_t.raw> <output.idx_t.raw>";
+    const char *help = "usage: %s <input.idx_t.raw> <output.idx_t.raw>\n";
 
     if (argc < 3) {
         fprintf(stderr, help, argv[0]);

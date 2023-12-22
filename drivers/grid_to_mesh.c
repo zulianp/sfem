@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,7 +11,7 @@
 #include "mesh_aura.h"
 #include "read_mesh.h"
 #include "sfem_mesh_write.h"
-#include "sfem_resample_gap.h"
+#include "sfem_resample_field.h"
 
 #include "mesh_utils.h"
 
@@ -27,8 +28,8 @@ int main(int argc, char* argv[]) {
 
     if (argc != 13) {
         fprintf(stderr,
-                "usage: %s <folder> <nx> <ny> <nz> <ox> <oy> <oz> <dx> <dy> <dz> "
-                "<data.float32.raw> <output_folder>\n",
+                "usage: %s <nx> <ny> <nz> <ox> <oy> <oz> <dx> <dy> <dz> "
+                "<data.float32.raw> <folder> <output_path>\n",
                 argv[0]);
         return EXIT_FAILURE;
     }
@@ -38,17 +39,12 @@ int main(int argc, char* argv[]) {
 
     double tick = MPI_Wtime();
 
-    const char* folder = argv[1];
-    ptrdiff_t nglobal[3] = {atol(argv[2]), atol(argv[3]), atol(argv[4])};
-    geom_t origin[3] = {atof(argv[5]), atof(argv[6]), atof(argv[7])};
-    geom_t delta[3] = {atof(argv[8]), atof(argv[9]), atof(argv[10])};
-    const char* data_path = argv[11];
-    const char* output_folder = argv[12];
-
-    struct stat st = {0};
-    if (stat(output_folder, &st) == -1) {
-        mkdir(output_folder, 0700);
-    }
+    ptrdiff_t nglobal[3] = {atol(argv[1]), atol(argv[2]), atol(argv[3])};
+    geom_t origin[3] = {atof(argv[4]), atof(argv[5]), atof(argv[6])};
+    geom_t delta[3] = {atof(argv[7]), atof(argv[8]), atof(argv[9])};
+    const char* data_path = argv[10];
+    const char* folder = argv[11];
+    const char* output_path = argv[12];
 
     mesh_t mesh;
     if (mesh_read(comm, folder, &mesh)) {
@@ -56,15 +52,35 @@ int main(int argc, char* argv[]) {
     }
 
     ptrdiff_t n = nglobal[0] * nglobal[1] * nglobal[2];
-    geom_t* sdf = 0;
+    real_t* field = 0;
     ptrdiff_t nlocal[3];
+
+    int SFEM_READ_FP32 = 0;
+    SFEM_READ_ENV(SFEM_READ_FP32, atoi);
 
     {
         double ndarray_read_tick = MPI_Wtime();
 
-        if (ndarray_create_from_file(
-                comm, data_path, SFEM_MPI_GEOM_T, 3, (void**)&sdf, nlocal, nglobal)) {
-            return EXIT_FAILURE;
+        if (SFEM_READ_FP32) {
+            geom_t* temp = 0;
+            if (ndarray_create_from_file(
+                    comm, data_path, SFEM_MPI_GEOM_T, 3, (void**)&temp, nlocal, nglobal)) {
+                return EXIT_FAILURE;
+            }
+
+            ptrdiff_t n_zyx = nlocal[0] * nlocal[1] * nlocal[2];
+            field = malloc(n_zyx * sizeof(real_t));
+            for (ptrdiff_t i = 0; i < n_zyx; i++) {
+                field[i] = temp[i];
+            }
+
+            free(temp);
+
+        } else {
+            if (ndarray_create_from_file(
+                    comm, data_path, SFEM_MPI_REAL_T, 3, (void**)&field, nlocal, nglobal)) {
+                return EXIT_FAILURE;
+            }
         }
 
         double ndarray_read_tock = MPI_Wtime();
@@ -80,33 +96,31 @@ int main(int argc, char* argv[]) {
     ptrdiff_t stride[3] = {1, nlocal[0], nlocal[0] * nlocal[1]};
 
     if (size > 1) {
-        geom_t* psdf;
-        sdf_view(comm,
-                 mesh.nnodes,
-                 mesh.points[2],
-                 nlocal,
-                 nglobal,
-                 stride,
-                 origin,
-                 delta,
-                 sdf,
-                 &psdf,
-                 &nlocal[2],
-                 &origin[2]);
+        real_t* pfield;
+        field_view(comm,
+                   mesh.nnodes,
+                   mesh.points[2],
+                   nlocal,
+                   nglobal,
+                   stride,
+                   origin,
+                   delta,
+                   field,
+                   &pfield,
+                   &nlocal[2],
+                   &origin[2]);
 
-        free(sdf);
-        sdf = psdf;
+        free(field);
+        field = pfield;
     }
 
     real_t* g = calloc(mesh.nnodes, sizeof(real_t));
-    real_t* xnormal = calloc(mesh.nnodes, sizeof(real_t));
-    real_t* ynormal = calloc(mesh.nnodes, sizeof(real_t));
-    real_t* znormal = calloc(mesh.nnodes, sizeof(real_t));
+
     {
         double resample_tick = MPI_Wtime();
 
         if (SFEM_INTERPOLATE) {
-            interpolate_gap(
+            interpolate_field(
                 // Mesh
                 mesh.n_owned_nodes,
                 mesh.points,
@@ -115,15 +129,12 @@ int main(int argc, char* argv[]) {
                 stride,
                 origin,
                 delta,
-                sdf,
+                field,
                 // Output
-                g,
-                xnormal,
-                ynormal,
-                znormal);
+                g);
         } else {
             if (size == 1) {
-                resample_gap(
+                resample_field(
                     // Mesh
                     mesh.element_type,
                     mesh.nelements,
@@ -135,14 +146,11 @@ int main(int argc, char* argv[]) {
                     stride,
                     origin,
                     delta,
-                    sdf,
+                    field,
                     // Output
-                    g,
-                    xnormal,
-                    ynormal,
-                    znormal);
+                    g);
             } else {
-                resample_gap_local(
+                resample_field_local(
                     // Mesh
                     mesh.element_type,
                     mesh.nelements,
@@ -154,21 +162,26 @@ int main(int argc, char* argv[]) {
                     stride,
                     origin,
                     delta,
-                    sdf,
+                    field,
                     // Output
-                    g,
-                    xnormal,
-                    ynormal,
-                    znormal);
+                    g);
 
                 real_t* mass_vector = calloc(mesh.nnodes, sizeof(real_t));
 
-                assemble_lumped_mass(shell_type(mesh.element_type),
-                                     mesh.nelements,
-                                     mesh.nnodes,
-                                     mesh.elements,
-                                     mesh.points,
-                                     mass_vector);
+                enum ElemType st = shell_type(mesh.element_type);
+
+                if (st == INVALID) {
+                    assemble_lumped_mass(
+                        mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mass_vector);
+
+                } else {
+                    assemble_lumped_mass(st,
+                                         mesh.nelements,
+                                         mesh.nnodes,
+                                         mesh.elements,
+                                         mesh.points,
+                                         mass_vector);
+                }
 
                 // exchange ghost nodes and add contribution
                 if (size > 1) {
@@ -180,9 +193,6 @@ int main(int argc, char* argv[]) {
 
                     exchange_add(&mesh, &slave_to_master, mass_vector, real_buffer);
                     exchange_add(&mesh, &slave_to_master, g, real_buffer);
-                    exchange_add(&mesh, &slave_to_master, xnormal, real_buffer);
-                    exchange_add(&mesh, &slave_to_master, ynormal, real_buffer);
-                    exchange_add(&mesh, &slave_to_master, znormal, real_buffer);
                     free(real_buffer);
                     send_recv_destroy(&slave_to_master);
                 }
@@ -201,19 +211,6 @@ int main(int argc, char* argv[]) {
                     g[i] /= mass_vector[i];
                 }
 
-                for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
-                    const real_t xn = xnormal[i];
-                    const real_t yn = ynormal[i];
-                    const real_t zn = znormal[i];
-                    const real_t ln = sqrt(xn * xn + yn * yn + zn * zn);
-
-                    assert(ln != 0.);
-
-                    xnormal[i] /= ln;
-                    ynormal[i] /= ln;
-                    znormal[i] /= ln;
-                }
-
                 free(mass_vector);
             }
         }
@@ -229,27 +226,7 @@ int main(int argc, char* argv[]) {
     {
         double io_tick = MPI_Wtime();
 
-        char path[1024 * 10];
-        sprintf(path, "%s/gap.float64.raw", output_folder);
-        mesh_write_nodal_field(&mesh, path, SFEM_MPI_REAL_T, g);
-
-        sprintf(path, "%s/xnormal.float64.raw", output_folder);
-        mesh_write_nodal_field(&mesh, path, SFEM_MPI_REAL_T, xnormal);
-
-        sprintf(path, "%s/ynormal.float64.raw", output_folder);
-        mesh_write_nodal_field(&mesh, path, SFEM_MPI_REAL_T, ynormal);
-
-        sprintf(path, "%s/znormal.float64.raw", output_folder);
-        mesh_write_nodal_field(&mesh, path, SFEM_MPI_REAL_T, znormal);
-
-        if (0) {
-            for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
-                g[i] = rank;
-            }
-
-            sprintf(path, "%s/rank.float64.raw", output_folder);
-            mesh_write_nodal_field(&mesh, path, SFEM_MPI_REAL_T, g);
-        }
+        mesh_write_nodal_field(&mesh, output_path, SFEM_MPI_REAL_T, g);
 
         double io_tock = MPI_Wtime();
 
@@ -263,11 +240,8 @@ int main(int argc, char* argv[]) {
 
     // Free resources
     {
-        free(sdf);
+        free(field);
         free(g);
-        free(xnormal);
-        free(ynormal);
-        free(znormal);
         mesh_destroy(&mesh);
     }
 

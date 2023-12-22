@@ -2,20 +2,36 @@
 
 import meshio
 import numpy as np
-import sys
+import sys, getopt
 import os
-# import pdb
+import glob
+import pdb
 
 def main(argv):
 	if len(argv) < 3:
-		print(f'usage: {argv[0]} <input_mesh> <output_folder> [elem_type_filter]')
+		print(f'usage: {argv[0]} <input_mesh> <output_folder>')
 		exit()
 
 	input_mesh = argv[1]
 	output_folder = argv[2]
 	elem_type_filter = None
-	if(len(argv) > 3):
-		elem_type_filter = argv[3]
+
+	try:
+	    opts, args = getopt.getopt(
+	        argv[3:], "e:h",
+	        ["select_elem_type=", "help"])
+
+	except getopt.GetoptError as err:
+	    print(err)
+	    print(usage)
+	    sys.exit(1)
+
+	for opt, arg in opts:
+	    if opt in ('-h', '--help'):
+	        print(usage)
+	        sys.exit()
+	    elif opt in ("-e", "--select_elem_type"):
+	    	elem_type_filter = arg
 
 	if not os.path.exists(output_folder):
 		os.makedirs(output_folder)
@@ -55,6 +71,8 @@ def main(argv):
 			for b in mesh.cells:
 				if elem_type_filter != None and b.type != elem_type_filter:
 					continue
+
+				# pdb.set_trace()
 					
 				bncells, bnnodesxelem = b.data.shape
 				idx[offset:(offset + bncells)] = b.data[:, d]

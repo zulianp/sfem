@@ -77,6 +77,21 @@ int sdf_view(
     ptrdiff_t* z_nlocal_out,
     geom_t* const SFEM_RESTRICT z_origin_out);
 
+int sdf_view_ensure_margin(
+    MPI_Comm comm,
+    const ptrdiff_t nnodes,
+    const geom_t* SFEM_RESTRICT z_coordinate,
+    const ptrdiff_t* const nlocal,
+    const ptrdiff_t* const SFEM_RESTRICT nglobal,
+    const ptrdiff_t* const SFEM_RESTRICT stride,
+    const geom_t* const origin,
+    const geom_t* const SFEM_RESTRICT delta,
+    const geom_t* const sdf,
+    const ptrdiff_t z_margin,
+    geom_t** sdf_out,
+    ptrdiff_t* z_nlocal_out,
+    geom_t* const SFEM_RESTRICT z_origin_out);
+
 #ifdef __cplusplus
 }
 #endif

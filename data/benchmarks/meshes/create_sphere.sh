@@ -32,5 +32,5 @@ mkdir -p $folder
 idx_type_size=4
 
 sphere.py $mesh_db $nrefs
-db_to_raw.py $mesh_db $mesh_raw
+db_to_raw.py $mesh_db $mesh_raw -e tetra
 $LAUNCH skin $mesh_raw $mesh_surface

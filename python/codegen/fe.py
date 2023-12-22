@@ -45,7 +45,7 @@ class FE:
 
 			for d in range(0, dims):
 				gg = sp.diff(fx[i], p[d])
-				gg = sp.simplify(gg)
+				# gg = sp.simplify(gg)
 				gi.append(gg)
 
 			g[i] = sp.Matrix(dims, 1, gi)
@@ -68,7 +68,7 @@ class FE:
 		for i in range(0, self.n_nodes()):
 			gi = g[i]
 			for d in range(0, self.spatial_dim()):
-				print(gi)
+				# print(gi)
 				ret[d] += gi[d] * c[i]
 		return ret
 

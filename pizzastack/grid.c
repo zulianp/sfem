@@ -233,7 +233,7 @@ void gridz_z_ownership_ranges(gridz_t *const g, ptrdiff_t *const ranges) {
     ranges[0] = 0;
 
     for (int rank = 0; rank < size; ++rank) {
-        ptrdiff_t z_begin = (g->z_global_extent / size) * rank + MIN(rank, remainder);
-        ranges[rank + 1] = z_begin;
+        ptrdiff_t z_extent = (g->z_global_extent / size) * (rank + 1) + MIN(rank, remainder);
+        ranges[rank + 1] = z_extent;
     }
 }

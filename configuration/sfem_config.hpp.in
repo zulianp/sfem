@@ -1,0 +1,10 @@
+#ifndef SFEM_CONFIG_HPP
+
+#cmakedefine SFEM_ENABLE_CUDA
+#cmakedefine SFEM_ENABLE_OPENMP
+#cmakedefine SFEM_ENABLE_AVX2
+#cmakedefine SFEM_ENABLE_AVX512
+#cmakedefine SFEM_INDEX_SIZE @SFEM_INDEX_SIZE@
+#cmakedefine SFEM_COUNT_SIZE @SFEM_COUNT_SIZE@
+
+#endif //SFEM_CONFIG_HPP

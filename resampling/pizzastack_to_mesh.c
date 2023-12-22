@@ -754,6 +754,151 @@ static SFEM_INLINE void l2_assemble(const quadrature_t *q_box,
     }
 }
 
+SFEM_INLINE static void hex_aa_8_eval_fun(
+    // Quadrature point (local coordinates)
+    const real_t x,
+    const real_t y,
+    const real_t z,
+    // Output
+    real_t *const SFEM_RESTRICT f) {
+    f[0] = (1.0 - x) * (1.0 - y) * (1.0 - z);
+    f[1] = x * (1.0 - y) * (1.0 - z);
+    f[2] = x * y * (1.0 - z);
+    f[3] = (1.0 - x) * y * (1.0 - z);
+    f[4] = (1.0 - x) * (1.0 - y) * z;
+    f[5] = x * (1.0 - y) * z;
+    f[6] = x * y * z;
+    f[7] = (1.0 - x) * y * z;
+}
+
+SFEM_INLINE static void hex_aa_8_collect_coeffs(
+    const count_t *const SFEM_RESTRICT stride,
+    const ptrdiff_t i,
+    const ptrdiff_t j,
+    const ptrdiff_t k,
+    // Attention this is geometric data transformed to solver data!
+    const real_t *const SFEM_RESTRICT data,
+    real_t *const SFEM_RESTRICT out) {
+    const ptrdiff_t i0 = i * stride[0] + j * stride[1] + k * stride[2];
+    const ptrdiff_t i1 = (i + 1) * stride[0] + j * stride[1] + k * stride[2];
+    const ptrdiff_t i2 = (i + 1) * stride[0] + (j + 1) * stride[1] + k * stride[2];
+    const ptrdiff_t i3 = i * stride[0] + (j + 1) * stride[1] + k * stride[2];
+    const ptrdiff_t i4 = i * stride[0] + j * stride[1] + (k + 1) * stride[2];
+    const ptrdiff_t i5 = (i + 1) * stride[0] + j * stride[1] + (k + 1) * stride[2];
+    const ptrdiff_t i6 = (i + 1) * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
+    const ptrdiff_t i7 = i * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
+
+    out[0] = data[i0];
+    out[1] = data[i1];
+    out[2] = data[i2];
+    out[3] = data[i3];
+    out[4] = data[i4];
+    out[5] = data[i5];
+    out[6] = data[i6];
+    out[7] = data[i7];
+}
+
+int interpolate_field(const ptrdiff_t nnodes,
+                      geom_t **const SFEM_RESTRICT xyz,
+                      // SDF
+                      const count_t *const SFEM_RESTRICT n,
+                      const count_t *const SFEM_RESTRICT stride,
+                      const real_t *const SFEM_RESTRICT origin,
+                      const real_t *const SFEM_RESTRICT delta,
+                      const real_t *const SFEM_RESTRICT data,
+                      // Output
+                      real_t *const SFEM_RESTRICT out) {
+    const real_t ox = (real_t)origin[0];
+    const real_t oy = (real_t)origin[1];
+    const real_t oz = (real_t)origin[2];
+
+    const real_t dx = (real_t)delta[0];
+    const real_t dy = (real_t)delta[1];
+    const real_t dz = (real_t)delta[2];
+
+#pragma omp parallel
+    {
+#pragma omp for  // nowait
+        for (ptrdiff_t node = 0; node < nnodes; ++node) {
+            real_t hex8_f[8];
+            real_t coeffs[8];
+
+            const real_t x = xyz[0][node];
+            const real_t y = xyz[1][node];
+            const real_t z = xyz[2][node];
+
+            const real_t grid_x = (x - ox) / dx;
+            const real_t grid_y = (y - oy) / dy;
+            const real_t grid_z = (z - oz) / dz;
+
+            const ptrdiff_t i = floor(grid_x);
+            const ptrdiff_t j = floor(grid_y);
+            const ptrdiff_t k = floor(grid_z);
+
+            // If outside
+            if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
+                int rank;
+                MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+                fprintf(stderr,
+                        "[%d] warning (%g, %g, %g) (%ld, %ld, %ld) outside domain (%" d_COUNT_T
+                        ", %" d_COUNT_T ", %" d_COUNT_T ")!\n",
+                        rank,
+                        x,
+                        y,
+                        z,
+                        i,
+                        j,
+                        k,
+                        n[0],
+                        n[1],
+                        n[2]);
+                continue;
+            }
+
+            // Get the reminder [0, 1]
+            real_t l_x = (grid_x - i);
+            real_t l_y = (grid_y - j);
+            real_t l_z = (grid_z - k);
+
+            assert(l_x >= -1e-8);
+            assert(l_y >= -1e-8);
+            assert(l_z >= -1e-8);
+
+            assert(l_x <= 1 + 1e-8);
+            assert(l_y <= 1 + 1e-8);
+            assert(l_z <= 1 + 1e-8);
+
+            hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
+           
+            assert(i + 1 < n[0]);
+            assert(j + 1 < n[1]);
+            assert(k + 1 < n[2]);
+
+
+            assert(i >= 0);
+            assert(j >= 0);
+            assert(k >= 0);
+
+
+            hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
+
+            // Interpolate gap function
+            {
+                real_t eval_field = 0;
+
+#pragma unroll(8)
+                for (int edof_j = 0; edof_j < 8; edof_j++) {
+                    eval_field += hex8_f[edof_j] * coeffs[edof_j];
+                }
+
+                out[node] = eval_field;
+            }
+        }
+    }
+
+    return 0;
+}
+
 void resample_box_to_tetra_mesh_unique(const count_t n[3],
                                        const count_t stride[3],
                                        const affine_transform_t *const trafo,
@@ -958,7 +1103,6 @@ void resample_box_to_tetra_mesh_unique(const count_t n[3],
     // Normalize projection
     for (ptrdiff_t i = 0; i < n_nodes; ++i) {
         real_t w = weight_field[i];
-        // printf("%g\n", w);
         assert(w != 0.);
         if (w != 0) {
             mesh_field[i] /= w;
@@ -1251,12 +1395,13 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
 
-    if (argc < 6) {
+    if (argc < 12) {
         if (!rank) {
-            fprintf(stderr,
-                    "usage: %s <nx> <ny> <nz> <field.raw> <mesh_folder> "
-                    "[output_path=./mesh_field.raw]\n",
-                    argv[0]);
+            fprintf(
+                stderr,
+                "usage: %s <nx> <ny> <nz> <ox> <oy> <oz> <dx> <dy> <dz> <field.raw> <mesh_folder> "
+                "[output_path=./mesh_field.raw]\n",
+                argv[0]);
         }
 
         return EXIT_FAILURE;
@@ -1270,12 +1415,15 @@ int main(int argc, char *argv[]) {
     n[2] = atol(argv[3]);
     const ptrdiff_t size_field = n[0] * n[1] * n[2];
 
+    real_t ox[3] = {atof(argv[4]), atof(argv[5]), atof(argv[6])};
+    real_t dx[3] = {atof(argv[7]), atof(argv[8]), atof(argv[9])};
+
     stride[0] = 1;
     stride[1] = n[0];
     stride[2] = n[0] * n[1];
 
-    const char *field_path = argv[4];
-    const char *mesh_folder = argv[5];
+    const char *field_path = argv[10];
+    const char *mesh_folder = argv[11];
 
     const char *output_path = "./mesh_field.raw";
 
@@ -1284,17 +1432,26 @@ int main(int argc, char *argv[]) {
 
     printf("Env:\nSFEM_READ_FP32=%d\n", SFEM_READ_FP32);
 
-    if (argc > 6) {
-        output_path = argv[6];
+    int SFEM_INTERPOLATE = 0;
+    SFEM_READ_ENV(SFEM_INTERPOLATE, atoi);
+
+    if (argc > 12) {
+        output_path = argv[12];
     }
 
     if (!rank) {
         fprintf(stderr,
-                "usage: %s %ld %ld %ld %s %s %s\n",
+                "%s (%ld %ld %ld) (%f %f %f) (%f %f %f) %s %s %s\n",
                 argv[0],
                 (long)n[0],
                 (long)n[1],
                 (long)n[2],
+                ox[0],
+                ox[1],
+                ox[2],
+                dx[0],
+                dx[1],
+                dx[2],
                 field_path,
                 mesh_folder,
                 output_path);
@@ -1316,6 +1473,11 @@ int main(int argc, char *argv[]) {
     affine_transform_t trafo;
     affine_transform_init(&trafo);
 
+    for (int d = 0; d < 3; d++) {
+        trafo.shift[d] = ox[d];
+        trafo.scaling[d] = dx[d] * (n[d] - 1);
+    }
+
     gridz_t grid;
     gridz_create(&grid, comm, n[0], n[1], n[2], 0);
 
@@ -1329,6 +1491,7 @@ int main(int argc, char *argv[]) {
 
         CATCH_MPI_ERROR(
             MPI_Allreduce(MPI_IN_PLACE, trafo.shift, 3, SFEM_MPI_REAL_T, MPI_MIN, comm));
+
         CATCH_MPI_ERROR(
             MPI_Allreduce(MPI_IN_PLACE, trafo.scaling, 3, SFEM_MPI_REAL_T, MPI_MAX, comm));
 
@@ -1378,11 +1541,6 @@ int main(int argc, char *argv[]) {
         } else {
             gridz_read_field(&grid, field_path, SFEM_MPI_REAL_T, (void *)box_field);
         }
-
-        for (int d = 0; d < 3; ++d) {
-            trafo.shift[d] = 0;
-            trafo.scaling[d] = (n[d] - 1);
-        }
     }
 
     real_t *mesh_field = (real_t *)malloc(mesh.nnodes * sizeof(real_t));
@@ -1411,19 +1569,19 @@ int main(int argc, char *argv[]) {
         grid_n[1] = grid.extent[1] - 1;
         grid_n[2] = grid.z_global_extent - 1;
 
-        const count_t x_min = MAX(0, floor(aabb_min[0] * grid_n[0]));
-        const count_t y_min = MAX(0, floor(aabb_min[1] * grid_n[1]));
-        const count_t z_min = MAX(0, floor(aabb_min[2] * grid_n[2]));
+        const count_t margin = 2;
+        const count_t x_min = MAX(0, (floor(aabb_min[0] * grid_n[0]) - margin));
+        const count_t y_min = MAX(0, (floor(aabb_min[1] * grid_n[1]) - margin));
+        const count_t z_min = MAX(0, (floor(aabb_min[2] * grid_n[2]) - margin));
 
-        const count_t x_max = MIN(grid_n[0], ceil(aabb_max[0] * grid_n[0]));
-        const count_t y_max = MIN(grid_n[1], ceil(aabb_max[1] * grid_n[1]));
-        const count_t z_max = MIN(grid_n[2], ceil(aabb_max[2] * grid_n[2]));
+        const count_t x_max = MIN(grid_n[0], (ceil(aabb_max[0] * grid_n[0]) + margin));
+        const count_t y_max = MIN(grid_n[1], (ceil(aabb_max[1] * grid_n[1]) + margin));
+        const count_t z_max = MIN(grid_n[2], (ceil(aabb_max[2] * grid_n[2]) + margin));
 
         const count_t x_extent = x_max - x_min;
         const count_t y_extent = y_max - y_min;
         const count_t z_extent = z_max - z_min;
-
-        // assert(remote_grid_size > 0);
+        assert(z_extent > 0);
 
         /////////////////////////////////////////////////////////////////////////
         // Prepare grid data exchange
@@ -1432,27 +1590,45 @@ int main(int argc, char *argv[]) {
         ptrdiff_t *ownership_ranges = malloc((size + 1) * sizeof(ptrdiff_t));
         gridz_z_ownership_ranges(&grid, ownership_ranges);
 
-        const int start_rank = lower_bound(z_min, ownership_ranges, size + 1);
+        for (int r = 0; r < size; r++) {
+            if (r == rank) {
+                printf("[%d] ", rank);
+                for (int i = 0; i < size + 1; i++) {
+                    printf("%ld ", ownership_ranges[i]);
+                }
+                printf("\n");
+            }
+
+            printf("---------------------------\n");
+
+            MPI_Barrier(comm);
+        }
+
+        const int start_rank = lower_bound(z_min, ownership_ranges, size + 1) - 1;
         const int end_rank = lower_bound(z_max - 1, ownership_ranges, size + 1);
 
+        // printf("[%d] %d %d : %d %d\n", rank, z_min, z_max, start_rank, end_rank);
+
         assert(start_rank < size);
-        assert(end_rank < size);
+        assert(end_rank <= size);
 
-        int *recv_starts = (int *)malloc(size * sizeof(int));
-        int *recv_count = (int *)malloc(size * sizeof(int));
-
-        memset(recv_starts, 0, size * sizeof(int));
-        memset(recv_count, 0, size * sizeof(int));
+        int *recv_starts = (int *)calloc(size, sizeof(int));
+        int *recv_count = (int *)calloc(size, sizeof(int));
 
         int *send_starts = (int *)malloc(size * sizeof(int));
         int *send_count = (int *)malloc(size * sizeof(int));
 
         ptrdiff_t check_z_extent = 0;
-        for (int r = start_rank; r <= end_rank; r++) {
+        for (int r = start_rank; r < end_rank; r++) {
             const int s = (int)MAX(ownership_ranges[r], z_min) - ownership_ranges[r];
-            const ptrdiff_t e = MIN(ownership_ranges[r + 1], z_max) - ownership_ranges[r];
+            int e = (int)MIN(ownership_ranges[r + 1], z_max) - ownership_ranges[r];
+            e = MAX(s, e);
+
+            // printf("[%d] z_min=%d (%d %d) beg: %ld\n", rank, z_min, s, e, ownership_ranges[r]);
+            // printf("[%d] z_max=%d (%d %d) beg: %ld\n", rank, z_max, s, e, ownership_ranges[r]);
+
             recv_starts[r] = s;
-            recv_count[r] = (int)(e - s);
+            recv_count[r] = e - s;
             check_z_extent += recv_count[r];
             assert(recv_count[r] >= 0);
         }
@@ -1482,33 +1658,60 @@ int main(int argc, char *argv[]) {
                       SFEM_MPI_REAL_T,
                       comm);
 
+        {
+            real_t min_field = array_min_r(remote_grid_size, remote_grid_field);
+            real_t max_field = array_max_r(remote_grid_size, remote_grid_field);
+            printf("input field (%g, %g)\n", (double)min_field, (double)max_field);
+            MPI_Barrier(comm);
+        }
+
+
         /////////////////////////////////////////////////////////////////////////
         // Shift affine transform for sub-region of grid data
         /////////////////////////////////////////////////////////////////////////
 
         affine_transform_t subregion_trafo;
         affine_transform_copy(&trafo, &subregion_trafo);
-        subregion_trafo.shift[2] = trafo.shift[2] + (trafo.scaling[2] * z_min);
+        subregion_trafo.shift[2] = trafo.shift[2] + (dx[2] * z_min);
 
         count_t subregion_n[3];
+        count_t subregion_stride[3];
 
         subregion_n[0] = grid.extent[0];
         subregion_n[1] = grid.extent[1];
         subregion_n[2] = z_extent;
 
+        subregion_stride[0] = 1;
+        subregion_stride[1] = subregion_n[0];
+        subregion_stride[2] = subregion_n[0] * subregion_n[1];
+
         /////////////////////////////////////////////////////////////////////////
-        // Transfer data
+        // Resample data
         /////////////////////////////////////////////////////////////////////////
 
-        resample_box_to_tetra_mesh_unique(subregion_n,
-                                          stride,
-                                          &subregion_trafo,
-                                          remote_grid_field,
-                                          mesh.nelements,
-                                          mesh.nnodes,
-                                          mesh.elements,
-                                          mesh.points,
-                                          mesh_field);
+        if (SFEM_INTERPOLATE) {
+            printf("interpolate_field\n");
+            interpolate_field(mesh.nnodes,
+                              mesh.points,
+                              // SDF
+                              subregion_n,
+                              subregion_stride,
+                              subregion_trafo.shift,
+                              dx,
+                              remote_grid_field,
+                              // Output
+                              mesh_field);
+        } else {
+            resample_box_to_tetra_mesh_unique(subregion_n,
+                                              subregion_stride,
+                                              &subregion_trafo,
+                                              remote_grid_field,
+                                              mesh.nelements,
+                                              mesh.nnodes,
+                                              mesh.elements,
+                                              mesh.points,
+                                              mesh_field);
+        }
 
         /////////////////////////////////////////////////////////////////////////
         // Clean-up
@@ -1521,41 +1724,53 @@ int main(int argc, char *argv[]) {
         free(send_count);
         free(remote_grid_field);
     } else {
-        // Serial transfer
+        if (SFEM_INTERPOLATE) {
+            printf("interpolate_field\n");
+            interpolate_field(mesh.nnodes,
+                              mesh.points,
+                              // SDF
+                              n,
+                              stride,
+                              ox,
+                              dx,
+                              box_field,
+                              // Output
+                              mesh_field);
 
-        // resample_box_to_tetra_mesh(
-        resample_box_to_tetra_mesh_unique(
-            // resample_box_to_tetra_mesh_cell_list(
-            n,
-            stride,
-            &trafo,
-            box_field,
-            mesh.nelements,
-            mesh.nnodes,
-            mesh.elements,
-            mesh.points,
-            mesh_field);
+        } else {
+            printf("resample_box_to_tetra_mesh_unique\n");
+            // Serial transfer
+            resample_box_to_tetra_mesh_unique(n,
+                                              stride,
+                                              &trafo,
+                                              box_field,
+                                              mesh.nelements,
+                                              mesh.nnodes,
+                                              mesh.elements,
+                                              mesh.points,
+                                              mesh_field);
+        }
     }
 
     tack = MPI_Wtime() - tack;
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("resample_box_to_tetra_mesh:\t%g seconds\n", tack);
+        printf("resampling:\t%g seconds\n", tack);
     }
 
-    {
-        real_t min_field = array_min_r(size_field, box_field);
-        real_t max_field = array_max_r(size_field, box_field);
+    // {
+    //     real_t min_field = array_min_r(size_field, box_field);
+    //     real_t max_field = array_max_r(size_field, box_field);
 
-        printf("input field (%g, %g)\n", (double)min_field, (double)max_field);
-    }
+    //     printf("input field (%g, %g)\n", (double)min_field, (double)max_field);
+    // }
 
     {
         real_t min_field = array_min_r(mesh.nnodes, mesh_field);
         real_t max_field = array_max_r(mesh.nnodes, mesh_field);
 
-        printf("output field (%g, %g)\n", (double)min_field, (double)max_field);
+        printf("[%d] output field (%g, %g)\n", rank, (double)min_field, (double)max_field);
     }
 
     mesh_write_nodal_field(&mesh, output_path, SFEM_MPI_REAL_T, (void *)mesh_field);
