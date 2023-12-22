@@ -13,7 +13,8 @@ ti.init(arch=ti.gpu)
 # ti.init(arch=ti.cpu)
 vec3 = ti.math.vec3
 
-try: geom_t
+try: 
+    from sfem_config import *
 except NameError: 
     print('mesh_to_sdf: self contained mode')
     from distance_point_to_triangle import *

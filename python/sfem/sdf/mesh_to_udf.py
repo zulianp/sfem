@@ -8,13 +8,13 @@ import sys
 from time import perf_counter
 vec3 = ti.math.vec3
 
-try: geom_t
+try: 
+    from sfem_config import *
 except NameError: 
-    print('mesh_to_udf: self contained mode')
-    import smesh
+    print('mesh_to_sdf: self contained mode')
     from distance_point_to_triangle import *
+    import smesh
     geom_t = np.float32
-    idx_t = np.int32
 
 sdf_t = geom_t
 

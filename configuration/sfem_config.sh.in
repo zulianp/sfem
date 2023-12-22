@@ -1,7 +1,7 @@
-export SFEM_INDEX_SIZE=@SFEM_INDEX_SIZE@
-export SFEM_COUNT_SIZE=@SFEM_COUNT_SIZE@
+export SFEM_INDEX_BITSIZE=@SFEM_INDEX_BITSIZE@
+export SFEM_COUNT_BITSIZE=@SFEM_COUNT_BITSIZE@
 
-if [[ $SFEM_COUNT_SIZE -eq 64 ]]
+if [[ $SFEM_COUNT_BITSIZE -eq 64 ]]
 then
 	export py_sfem_count_t="int64"
 	export sfem_count_size=8
@@ -10,7 +10,7 @@ else
 	export sfem_count_size=4
 fi
 
-if [[ $SFEM_INDEX_SIZE -eq 64 ]]
+if [[ $SFEM_INDEX_BITSIZE -eq 64 ]]
 then
 	export py_sfem_idx_t="int64"
 	export sfem_idx_size=8
