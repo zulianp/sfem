@@ -5,16 +5,15 @@ import numpy as np
 import sys, getopt
 import os
 import glob
-
 import pdb
 
-# Example usage
-# ./raw_to_db.py raw_db mesh_db.vtk --point_data='raw_db/point_data/*,raw_db/x.raw' --point_data_type='float64,float32'
+try: geom_t
+except NameError: 
+    print('raw_to_db: self contained mode')
+    geom_t = np.float32
+    idx_t = np.int32
 
-geom_type = np.float32
-idx_type = np.int32
 max_nodes_x_element = 10
-
 
 def write_transient_data(
     output_path,
@@ -212,14 +211,14 @@ def raw_to_db(argv):
     for pfn in ['x.raw', 'y.raw', 'z.raw']:
         path = f'{raw_mesh_folder}/{pfn}'
         if os.path.exists(path):
-            x = np.fromfile(path, dtype=geom_type)
+            x = np.fromfile(path, dtype=geom_t)
             points.append(x)
             
     idx = []
     for i in range(0, max_nodes_x_element):
         path = f'{raw_mesh_folder}/i{i}.raw'
         if os.path.exists(path):
-            ii = np.fromfile(path, dtype=idx_type)
+            ii = np.fromfile(path, dtype=idx_t)
             idx.append(ii)
         else:
             # No more indices to read!
@@ -270,6 +269,8 @@ def raw_to_db(argv):
 
         mesh.write(output_path)
 
+# Example usage
+# ./raw_to_db.py raw_db mesh_db.vtk --point_data='raw_db/point_data/*,raw_db/x.raw' --point_data_type='float64,float32'
 if __name__ == '__main__':
     raw_to_db(sys.argv)
 

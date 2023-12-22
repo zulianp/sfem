@@ -140,12 +140,16 @@ configure_file(
 
 install(FILES ${CMAKE_BINARY_DIR}/sfem_config.hpp DESTINATION include)
 
-
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/configuration/sfem_config.py.in
     ${CMAKE_CURRENT_SOURCE_DIR}/python/sfem/sfem_config.py)
 
-install(FILES ${CMAKE_BINARY_DIR}/python/sfem/sfem_config.py DESTINATION scripts/sfem)
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/configuration/sfem_config.sh.in
+    ${CMAKE_CURRENT_SOURCE_DIR}/workflows/sfem_config.sh)
+
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/python/sfem/sfem_config.py DESTINATION scripts/sfem)
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/workflows/sfem_config.sh DESTINATION workflows)
 
 install(FILES ${SFEM_HEADERS} DESTINATION include)
 
@@ -159,21 +163,8 @@ install(
 # Python scripts
 ######################################################
 
-file(GLOB PYTHON_SCRIPTS CONFIGURE_DEPENDS
-     "${CMAKE_SOURCE_DIR}/python/mesh/*.py")
-install(FILES ${PYTHON_SCRIPTS} DESTINATION scripts/sfem/mesh)
-
-file(GLOB PYTHON_SCRIPTS CONFIGURE_DEPENDS
-     "${CMAKE_SOURCE_DIR}/python/sdf/*.py")
-install(FILES ${PYTHON_SCRIPTS} DESTINATION scripts/sfem/sdf)
-
-file(GLOB PYTHON_SCRIPTS CONFIGURE_DEPENDS
-     "${CMAKE_SOURCE_DIR}/python/grid/*.py")
-install(FILES ${PYTHON_SCRIPTS} DESTINATION scripts/sfem/grid)
-
-file(GLOB PYTHON_SCRIPTS CONFIGURE_DEPENDS
-     "${CMAKE_SOURCE_DIR}/python/algebra/*.py")
-install(FILES ${PYTHON_SCRIPTS} DESTINATION scripts/sfem/algebra)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/python/sfem DESTINATION scripts)
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/python/requirements.txt DESTINATION scripts)
 
 ######################################################
 

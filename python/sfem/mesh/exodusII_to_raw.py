@@ -5,11 +5,13 @@ import numpy as np
 import sys
 import os
 import getopt
+# import pdb
 
-import pdb
-
-geom_type = np.float32
-idx_type = np.int32
+try: geom_t
+except NameError: 
+    print('exodusII_to_raw: self contained mode')
+    geom_t = np.float32
+    idx_t = np.int32
 
 def exodusII_to_raw(input_mesh, output_folder):
 	def mkdir(path):
@@ -20,7 +22,6 @@ def exodusII_to_raw(input_mesh, output_folder):
 	mkdir(f'{output_folder}/blocks')
 
 	nc = netCDF4.Dataset(input_mesh)
-
 
 	if 'coord' in nc.variables:
 		coords = nc.variables['coord']
@@ -43,7 +44,7 @@ def exodusII_to_raw(input_mesh, output_folder):
 	coordnames = ['x', 'y', 'z', 't' ]
 
 	for i in range(0, dims):
-		x = np.array(coords[i, :]).astype(geom_type)
+		x = np.array(coords[i, :]).astype(geom_t)
 		x.tofile(f'{output_folder}/{coordnames[i]}.raw')
 
 	n_time_steps = 1
@@ -150,7 +151,7 @@ def exodusII_to_raw(input_mesh, output_folder):
 		nelements, nnodesxelem = connect.shape
 
 		for i in range(0, nnodesxelem):
-			ii = np.array(connect[:,i]).astype(idx_type) - 1
+			ii = np.array(connect[:,i]).astype(idx_t) - 1
 			ii.tofile(f'{output_folder}/i{i}.raw')
 
 	else:
@@ -165,7 +166,7 @@ def exodusII_to_raw(input_mesh, output_folder):
 			else:
 				assert num_nod_per_el_ref == num_nod_per_el
 
-		connect = np.zeros((num_elem, num_nod_per_el_ref), dtype=idx_type)
+		connect = np.zeros((num_elem, num_nod_per_el_ref), dtype=idx_t)
 
 		offset = 0
 		for b in range(0, num_el_blk):
@@ -193,11 +194,11 @@ def exodusII_to_raw(input_mesh, output_folder):
 			if name != None:
 				np.array([block_begin, block_end], dtype=np.int64).tofile(f'{output_folder}/blocks/{name}.int64.raw')
 
-			connect[block_begin:block_end,:] = connect_b[:].astype(idx_type)
+			connect[block_begin:block_end,:] = connect_b[:].astype(idx_t)
 			offset += nelements
 
 		for i in range(0, nnodesxelem):
-			ii = np.array(connect[:,i]).astype(idx_type) - 1
+			ii = np.array(connect[:,i]).astype(idx_t) - 1
 			ii.tofile(f'{output_folder}/i{i}.raw')
 
 	#########################################
@@ -256,7 +257,7 @@ def exodusII_to_raw(input_mesh, output_folder):
 
 		for d in range(0, nnodesxside):
 			path = f'{this_sideset_dir}/{name}.{d}.raw'
-			ii = np.array(idx[d]).astype(idx_type)
+			ii = np.array(idx[d]).astype(idx_t)
 			ii.tofile(path)
 
 if __name__ == '__main__':

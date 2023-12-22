@@ -4,6 +4,13 @@ import meshio
 import numpy as np
 import sys
 
+try: idx_t
+except NameError: 
+    print('create_test_mesh.py: self contained mode')    
+    idx_t = np.int32
+    real_t = np.float64
+    geom_t = np.float32
+
 def main(argv):
 	output = "./"
 
@@ -49,10 +56,10 @@ def main(argv):
 		d = b.data
 		n_cells += len(d)
 
-	i0 = np.zeros(n_cells, dtype=np.int32)
-	i1 = np.zeros(n_cells, dtype=np.int32)
-	i2 = np.zeros(n_cells, dtype=np.int32)
-	i3 = np.zeros(n_cells, dtype=np.int32)
+	i0 = np.zeros(n_cells, dtype=idx_t)
+	i1 = np.zeros(n_cells, dtype=idx_t)
+	i2 = np.zeros(n_cells, dtype=idx_t)
+	i3 = np.zeros(n_cells, dtype=idx_t)
 
 	idx=0
 	for b in mesh.cells:
@@ -85,9 +92,9 @@ def main(argv):
 	###################################
 
 	xyz = np.transpose(mesh.points)
-	x = xyz[0, :].astype(np.float32)
-	y = xyz[1, :].astype(np.float32)
-	z = xyz[2, :].astype(np.float32)
+	x = xyz[0, :].astype(geom_t)
+	y = xyz[1, :].astype(geom_t)
+	z = xyz[2, :].astype(geom_t)
 
 	x.tofile(f'{output}/x.raw')
 	y.tofile(f'{output}/y.raw')

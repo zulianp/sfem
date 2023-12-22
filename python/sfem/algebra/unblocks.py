@@ -8,8 +8,11 @@ import math
 import matplotlib.pyplot as plt
 import glob
 
-idx_t = np.int32
-real_t = np.float64
+try: idx_t
+except NameError: 
+    print('unblocks.py: self contained mode')    
+    idx_t = np.int32
+    real_t = np.float64
 
 def split_block_vector(rb, path):
 	bvec = np.fromfile(path, dtype=real_t)

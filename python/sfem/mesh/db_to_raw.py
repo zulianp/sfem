@@ -7,6 +7,13 @@ import os
 import glob
 import pdb
 
+try: geom_t
+except NameError: 
+    print('db_to_raw: self contained mode')
+    geom_t = np.float32
+    idx_t = np.int32
+    real_t = np.float64
+
 def db_to_raw(argv):
 	if len(argv) < 3:
 		print(f'usage: {argv[0]} <input_mesh> <output_folder>')
@@ -113,7 +120,7 @@ def db_to_raw(argv):
 	for key in mesh.point_data:
 		print(f"\t- {key}")
 		data = mesh.point_data[key]
-		d = data[:].astype(np.float64)
+		d = data[:].astype(real_t)
 		d.tofile(f'{point_data_dir}/{key}.raw')
 
 	###################################
@@ -131,7 +138,7 @@ def db_to_raw(argv):
 		data = mesh.cell_data[key]
 		# pdb.set_trace()
 		try:
-			d = data[:].astype(np.float64)
+			d = data[:].astype(real_t)
 			d.tofile(f'{cell_data}/{key}.raw')
 		except:
 			print(f'Unable to convert {key}')

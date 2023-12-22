@@ -9,13 +9,19 @@ import numpy as np
 import meshio
 import taichi as ti
 
-# from distance_point_to_triangle import point_to_triangle
-
 ti.init(arch=ti.gpu)
 # ti.init(arch=ti.cpu)
 vec3 = ti.math.vec3
-real_t = np.float32
-idx_t = np.int32
+
+try: geom_t
+except NameError: 
+    print('mesh_to_sdf: self contained mode')
+    from distance_point_to_triangle import *
+    import smesh
+    geom_t = np.float32
+    idx_t = np.int32
+
+sdf_t = geom_t
 
 @ti.func
 def cross(u, v):
@@ -33,9 +39,9 @@ def read_mesh(input_path):
     return mesh
 
 def select_submesh(mesh, pmin, pmax):
-    x =  mesh.points[:,0].astype(real_t)
-    y =  mesh.points[:,1].astype(real_t)
-    z =  mesh.points[:,2].astype(real_t)
+    x =  mesh.points[:,0].astype(geom_t)
+    y =  mesh.points[:,1].astype(geom_t)
+    z =  mesh.points[:,2].astype(geom_t)
 
     is_node_inside_min = np.logical_and(np.logical_and(x > pmin[0], y > pmin[1]), z > pmin[2])
     is_node_inside_max = np.logical_and(np.logical_and(x < pmax[0], y < pmax[1]), z < pmax[2])
@@ -60,29 +66,29 @@ def select_submesh(mesh, pmin, pmax):
     return submesh
 
 def compute_aabb(mesh, margin=0):
-    x =  mesh.points[:,0].astype(real_t)
-    y =  mesh.points[:,1].astype(real_t)
-    z =  mesh.points[:,2].astype(real_t)
+    x =  mesh.points[:,0].astype(geom_t)
+    y =  mesh.points[:,1].astype(geom_t)
+    z =  mesh.points[:,2].astype(geom_t)
 
     pmin = [0, 0, 0]
     pmax = [0, 0, 0]
 
-    pmin[0] = np.min(x).astype(real_t) - margin
-    pmax[0] = np.max(x).astype(real_t) + margin
+    pmin[0] = np.min(x).astype(geom_t) - margin
+    pmax[0] = np.max(x).astype(geom_t) + margin
 
-    pmin[1] = np.min(y).astype(real_t) - margin
-    pmax[1] = np.max(y).astype(real_t) + margin
+    pmin[1] = np.min(y).astype(geom_t) - margin
+    pmax[1] = np.max(y).astype(geom_t) + margin
 
-    pmin[2] = np.min(z).astype(real_t) - margin
-    pmax[2] = np.max(z).astype(real_t) + margin
+    pmin[2] = np.min(z).astype(geom_t) - margin
+    pmax[2] = np.max(z).astype(geom_t) + margin
     return np.array(pmin), np.array(pmax)
 
 def mesh_to_sdf(mesh, pmin, pmax, hmax):
     t1_start = perf_counter()
 
-    x =  mesh.points[:,0].astype(real_t)
-    y =  mesh.points[:,1].astype(real_t)
-    z =  mesh.points[:,2].astype(real_t)
+    x =  mesh.points[:,0].astype(geom_t)
+    y =  mesh.points[:,1].astype(geom_t)
+    z =  mesh.points[:,2].astype(geom_t)
 
     xmin = pmin[0]
     xmax = pmax[0]
@@ -110,8 +116,8 @@ def mesh_to_sdf(mesh, pmin, pmax, hmax):
     print(f'grid    [{xmin}, {xmax}] x [{ymin}, {ymax}] x [{zmin}, {zmax}] ')
     print(f'points  {num_points}')
 
-    infty = real_t(np.max([x_range, y_range, z_range]) * 1000)
-    edt = np.zeros((nz, ny, nx)).astype(real_t)
+    infty = sdf_t(np.max([x_range, y_range, z_range]) * 1000)
+    edt = np.zeros((nz, ny, nx)).astype(sdf_t)
 
     print(f'shape {edt.shape}')
 
@@ -280,11 +286,11 @@ def mesh_to_sdf(mesh, pmin, pmax, hmax):
     t1_stop = perf_counter()
     print("TTS:", t1_stop - t1_start)
 
-    # tinx.to_numpy().astype(real_t).tofile('nx.float32.raw')
-    # tiny.to_numpy().astype(real_t).tofile('ny.float32.raw')
-    # tinz.to_numpy().astype(real_t).tofile('nz.float32.raw')
+    # tinx.to_numpy().astype(geom_t).tofile('nx.float32.raw')
+    # tiny.to_numpy().astype(geom_t).tofile('ny.float32.raw')
+    # tinz.to_numpy().astype(geom_t).tofile('nz.float32.raw')
 
-    nedt = edt.to_numpy().astype(real_t)
+    nedt = edt.to_numpy().astype(sdf_t)
     print(f'd in [{np.min(nedt[:])}, {np.max(nedt[:])}]')
     return nedt, [nx, ny, nz]
 

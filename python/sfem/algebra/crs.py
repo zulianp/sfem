@@ -8,8 +8,11 @@ import math
 import matplotlib.pyplot as plt
 import pdb
 
-idx_t = np.int32
-real_t = np.float64
+try: idx_t
+except NameError: 
+    print('crs.py: self contained mode')    
+    idx_t = np.int32
+    real_t = np.float64
 
 def mkdir(path):
 	if not os.path.exists(path):

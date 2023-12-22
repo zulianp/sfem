@@ -3,12 +3,20 @@
 import numpy as np
 import meshio
 import taichi as ti
-import sdf2
 import sys
 
 from time import perf_counter
 vec3 = ti.math.vec3
 
+try: geom_t
+except NameError: 
+    print('mesh_to_udf: self contained mode')
+    import smesh
+    from distance_point_to_triangle import *
+    geom_t = np.float32
+    idx_t = np.int32
+
+sdf_t = geom_t
 
 class Grid:
 	def __init__(self, 
@@ -34,21 +42,18 @@ def udf(mesh, hmax, margin):
 	# ti.init(arch=ti.arm64)
 	ti.init(arch=ti.gpu)
 
-	real_t = np.float32
-	idx_t = np.int32
+	x =  mesh.points[:,0].astype(geom_t)
+	y =  mesh.points[:,1].astype(geom_t)
+	z =  mesh.points[:,2].astype(geom_t)
 
-	x =  mesh.points[:,0].astype(real_t)
-	y =  mesh.points[:,1].astype(real_t)
-	z =  mesh.points[:,2].astype(real_t)
+	xmin = np.min(x).astype(geom_t) - margin
+	xmax = np.max(x).astype(geom_t) + margin
 
-	xmin = np.min(x).astype(real_t) - margin
-	xmax = np.max(x).astype(real_t) + margin
+	ymin = np.min(y).astype(geom_t) - margin
+	ymax = np.max(y).astype(geom_t) + margin
 
-	ymin = np.min(y).astype(real_t) - margin
-	ymax = np.max(y).astype(real_t) + margin
-
-	zmin = np.min(z).astype(real_t) - margin
-	zmax = np.max(z).astype(real_t) + margin
+	zmin = np.min(z).astype(geom_t) - margin
+	zmax = np.max(z).astype(geom_t) + margin
 
 	x_range = xmax - xmin
 	y_range = ymax - ymin
@@ -67,8 +72,8 @@ def udf(mesh, hmax, margin):
 	print(f'grid 	[{xmin}, {xmax}] x [{ymin}, {ymax}] x [{zmin}, {zmax}] ')
 	print(f'points 	{num_points}')
 
-	infty = real_t(np.max([x_range, y_range, z_range]) * 1000)
-	edt = np.zeros((nz, ny, nx)).astype(real_t)
+	infty = sdf_t(np.max([x_range, y_range, z_range]) * 1000)
+	edt = np.zeros((nz, ny, nx)).astype(sdf_t)
 
 	print(f'shape {edt.shape}')
 
@@ -128,7 +133,7 @@ def udf(mesh, hmax, margin):
 
 					p = [ gpx, gpy, gpz ]
 					t = [ p0, p1, p2 ]
-					q, __, __, __ = sdf2.point_to_triangle(p, t)
+					q, __, __, __ = point_to_triangle(p, t)
 					d = ti.math.distance(p, q)
 
 					if d < e_min:
@@ -159,7 +164,7 @@ def udf(mesh, hmax, margin):
 	t1_stop = perf_counter()
 	print("TTS:", t1_stop - t1_start)
 
-	nedt = edt.to_numpy().astype(real_t)
+	nedt = edt.to_numpy().astype(sdf_t)
 	print(f'd in [{np.min(nedt[:])}, {np.max(nedt[:])}]')
 	return grid, nedt
 

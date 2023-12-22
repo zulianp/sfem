@@ -3,11 +3,14 @@
 import glob
 import numpy as np
 
-geom_t = np.float32
-idx_t  = np.int32
-real_t = np.float64
-count_t = np.int32
-elem_idx_t = np.int32
+try: geom_t
+except NameError: 
+    print('smesh: self contained mode')
+    geom_t = np.float32
+    idx_t  = np.int32
+    real_t = np.float64
+    count_t = np.int32
+    elem_idx_t = np.int32
 
 class ElementDualGraph:
 	def read(self, rowptr_path, idx_path):

@@ -1,0 +1,22 @@
+reset
+brick x 1 y 2 z 3
+
+block 1 add volume 1 
+block 1 name "vdomain"
+
+sideset 1 add surface 4  
+sideset 1 name "sleft"
+
+sideset 2 add surface 6  
+sideset 2 name "sright"
+
+sideset 3 add surface 1  
+sideset 3 name "sfront"
+
+sideset 4 add surface 2  
+sideset 4 name "sback"
+
+volume 1 scheme tetmesh
+mesh volume 1
+
+export mesh "/Users/patrickzulian/Desktop/code/sfem/workflows/convert_exodus_to_raw/tet4_example.e"  overwrite 
