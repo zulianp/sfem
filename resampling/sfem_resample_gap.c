@@ -295,6 +295,8 @@ int trishell3_resample_gap_local(
     real_t* const SFEM_RESTRICT xnormal,
     real_t* const SFEM_RESTRICT ynormal,
     real_t* const SFEM_RESTRICT znormal) {
+    if (!nelements) return 0;
+
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];
     const real_t oz = (real_t)origin[2];
@@ -717,6 +719,8 @@ int resample_gap_local(
     real_t* const SFEM_RESTRICT xnormal,
     real_t* const SFEM_RESTRICT ynormal,
     real_t* const SFEM_RESTRICT znormal) {
+    if (!nelements) return 0;
+
     enum ElemType st = shell_type(element_type);
 
     switch (st) {
@@ -750,7 +754,10 @@ int resample_gap_local(
                                             znormal);
 
         default: {
-            fprintf(stderr, "Invalid element_type: %d\n", st);
+            fprintf(stderr,
+                    "Invalid shell_element_type: %d from  element_type: %d\n",
+                    st,
+                    element_type);
             assert(0);
             MPI_Abort(MPI_COMM_WORLD, -1);
             return EXIT_FAILURE;
@@ -776,6 +783,8 @@ int resample_gap(
     real_t* const SFEM_RESTRICT xnormal,
     real_t* const SFEM_RESTRICT ynormal,
     real_t* const SFEM_RESTRICT znormal) {
+    if (!nelements) return 0;
+
     real_t* wg = calloc(nnodes, sizeof(real_t));
 
     resample_gap_local(element_type,
@@ -822,6 +831,8 @@ int interpolate_gap(const ptrdiff_t nnodes,
                     real_t* const SFEM_RESTRICT xnormal,
                     real_t* const SFEM_RESTRICT ynormal,
                     real_t* const SFEM_RESTRICT znormal) {
+    if (!nnodes) return 0;
+
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];
     const real_t oz = (real_t)origin[2];
@@ -946,6 +957,8 @@ SFEM_INLINE static void minmax(const ptrdiff_t n,
                                const geom_t* const SFEM_RESTRICT x,
                                geom_t* xmin,
                                geom_t* xmax) {
+    if (!n) return;
+
     *xmin = x[0];
     *xmax = x[0];
     for (ptrdiff_t i = 1; i < n; i++) {
@@ -1003,13 +1016,14 @@ int sdf_view_ensure_margin(MPI_Comm comm,
             fprintf(stderr, "[%d] resample_grid_view cannot be used in serial runs!\n", rank);
         }
 
+        assert(0);
         MPI_Abort(comm, -1);
         return 1;
     }
 
     double sdf_view_tick = MPI_Wtime();
 
-    geom_t zmin, zmax;
+    geom_t zmin = origin[2], zmax = origin[2];
     minmax(nnodes, z_coordinate, &zmin, &zmax);
 
     // Z is distributed
