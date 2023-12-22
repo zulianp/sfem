@@ -175,11 +175,15 @@ def exodusII_to_raw(input_mesh, output_folder):
 			print(f'elem_type = {elem_type}')
 
 			name = None
-			eb_prop_b = nc.variables[f'eb_prop{b+2}']
-			if eb_prop_b != None:
-				name = eb_prop_b.__dict__['name']
-				name = name.lower()
-			
+
+			try:
+				eb_prop_b = nc.variables[f'eb_prop{b+2}']
+				if eb_prop_b != None:
+					name = eb_prop_b.__dict__['name']
+					name = name.lower()
+			except:
+				eb_prop_b = None
+
 			# if name != None:
 				# if name in exclude:
 				# 	print(f'Skipping block: {name}')
