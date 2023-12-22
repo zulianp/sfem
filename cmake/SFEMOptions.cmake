@@ -12,6 +12,7 @@ option(SFEM_ENABLE_DEV_MODE
        "Add additional flags for more strict compilation" OFF)
 
 option(SFEM_ENABLE_CUDA "Enable CUDA support" OFF)
+option(SFEM_ENABLE_OPENMP "Enable OpenMP support" OFF)
 
 
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)

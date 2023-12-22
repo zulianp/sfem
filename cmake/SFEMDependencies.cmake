@@ -2,12 +2,24 @@
 
 if(SFEM_ENABLE_CUDA)
     enable_language(CUDA)
-
     if(NOT DEFINED CMAKE_CUDA_STANDARD)
         set(CMAKE_CUDA_STANDARD 17)
         set(CMAKE_CUDA_STANDARD_REQUIRED ON)
     endif()
+endif()
 
+if(SFEM_ENABLE_OPENMP)
+    if(OPENMP_DIR)
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Xpreprocessor -fopenmp")
+        list(APPEND SFEM_DEP_INCLUDES "${OPENMP_DIR}/include")
+        list(APPEND SFEM_DEP_LIBRARIES "-L${OPENMP_DIR}/lib -lomp" )
+    else()
+        find_package(OpenMP REQUIRED)
+        if(OpenMP_FOUND)
+            message(STATUS "OpenMP: ${OpenMP_INCLUDES}")
+            set(SFEM_DEP_LIBRARIES "${SFEM_DEP_LIBRARIES};OpenMP::OpenMP_C;OpenMP::OpenMP_CXX")
+        endif()
+    endif()
 endif()
 
 # ##############################################################################
