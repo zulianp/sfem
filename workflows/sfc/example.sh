@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# run with ./viz_decomposition.sh
 
 set -e
 
@@ -15,19 +14,10 @@ export PATH=$SFEM_DIR:$PATH
 export PATH=$SFEM_DIR/python/sfem:$PATH
 export PATH=$SFEM_DIR/python/sfem/mesh:$PATH
 
-if (($# != 1))
-then
-	printf "usage: $0 <folder>\n" 1>&2
-	exit -1
-fi
+mesh=/Users/patrickzulian/Desktop/cloud/owncloud_HSLU/Patrick/2023/Cases/FP70/solid.exo
 
-folder=$1
-files=(`ls -d $folder/part_*`)
+db_to_raw.py $mesh db_raw
 
+./sfc.sh db_raw db_raw_sfc
 
-set -x
-for f in ${files[@]}
-do
-	echo $f
-	raw_to_db.py $f "$f".vtk --point_data="$f/frank.raw,$f/neigh_count.raw" --point_data_type="float32,float32"
-done
+raw_to_db.py db_raw_sfc sfc.vtk

@@ -4,11 +4,16 @@ set -e
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
+source $SCRIPTPATH/../sfem_config.sh
+export PATH=$SCRIPTPATH/../../:$PATH
+export PATH=$SCRIPTPATH/../../build/:$PATH
+export PATH=$SCRIPTPATH/../../bin/:$PATH
+
 PATH=$SCRIPTPATH:$PATH
 PATH=$SCRIPTPATH/../..:$PATH
-PATH=$SCRIPTPATH/../../python:$PATH
-PATH=$SCRIPTPATH/../../python/mesh:$PATH
-PATH=$SCRIPTPATH/../../python/algebra:$PATH
+PATH=$SCRIPTPATH/../../python/sfem:$PATH
+PATH=$SCRIPTPATH/../../python/sfem/mesh:$PATH
+PATH=$SCRIPTPATH/../../python/sfem/algebra:$PATH
 PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 UTOPIA_EXEC=$CODE_DIR/utopia/utopia/build/utopia_exec
