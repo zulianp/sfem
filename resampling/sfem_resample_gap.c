@@ -280,7 +280,6 @@ SFEM_INLINE static void hex_aa_8_eval_grad(
 
 int trishell3_resample_gap_local(
     // Mesh
-    const enum ElemType element_type,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t** const SFEM_RESTRICT elems,
@@ -296,10 +295,7 @@ int trishell3_resample_gap_local(
     real_t* const SFEM_RESTRICT xnormal,
     real_t* const SFEM_RESTRICT ynormal,
     real_t* const SFEM_RESTRICT znormal) {
-    assert(element_type == TRI3 || element_type == TRISHELL3);  // only triangles supported for now
-    if (element_type != TRI3 && element_type != TRISHELL3) {
-        MPI_Abort(MPI_COMM_WORLD, -1);
-    }
+    if (!nelements) return 0;
 
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];
@@ -504,7 +500,6 @@ int trishell3_resample_gap_local(
 
 int beam2_resample_gap_local(
     // Mesh
-    const enum ElemType element_type,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t** const SFEM_RESTRICT elems,
@@ -520,11 +515,6 @@ int beam2_resample_gap_local(
     real_t* const SFEM_RESTRICT xnormal,
     real_t* const SFEM_RESTRICT ynormal,
     real_t* const SFEM_RESTRICT znormal) {
-    assert(element_type == EDGE2 || element_type == BEAM2);  // only triangles supported for now
-    if (element_type != EDGE2 && element_type != BEAM2) {
-        MPI_Abort(MPI_COMM_WORLD, -1);
-    }
-
     printf("beam2_resample_gap_local!\n");
 
     const real_t ox = (real_t)origin[0];
@@ -729,12 +719,13 @@ int resample_gap_local(
     real_t* const SFEM_RESTRICT xnormal,
     real_t* const SFEM_RESTRICT ynormal,
     real_t* const SFEM_RESTRICT znormal) {
+    if (!nelements) return 0;
+
     enum ElemType st = shell_type(element_type);
 
     switch (st) {
         case TRISHELL3:
-            return trishell3_resample_gap_local(st,
-                                                nelements,
+            return trishell3_resample_gap_local(nelements,
                                                 nnodes,
                                                 elems,
                                                 xyz,
@@ -748,8 +739,7 @@ int resample_gap_local(
                                                 ynormal,
                                                 znormal);
         case BEAM2:
-            return beam2_resample_gap_local(st,
-                                            nelements,
+            return beam2_resample_gap_local(nelements,
                                             nnodes,
                                             elems,
                                             xyz,
@@ -764,6 +754,10 @@ int resample_gap_local(
                                             znormal);
 
         default: {
+            fprintf(stderr,
+                    "Invalid shell_element_type: %d from  element_type: %d\n",
+                    st,
+                    element_type);
             assert(0);
             MPI_Abort(MPI_COMM_WORLD, -1);
             return EXIT_FAILURE;
@@ -789,6 +783,8 @@ int resample_gap(
     real_t* const SFEM_RESTRICT xnormal,
     real_t* const SFEM_RESTRICT ynormal,
     real_t* const SFEM_RESTRICT znormal) {
+    if (!nelements) return 0;
+
     real_t* wg = calloc(nnodes, sizeof(real_t));
 
     resample_gap_local(element_type,
@@ -835,6 +831,8 @@ int interpolate_gap(const ptrdiff_t nnodes,
                     real_t* const SFEM_RESTRICT xnormal,
                     real_t* const SFEM_RESTRICT ynormal,
                     real_t* const SFEM_RESTRICT znormal) {
+    if (!nnodes) return 0;
+
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];
     const real_t oz = (real_t)origin[2];
@@ -959,6 +957,8 @@ SFEM_INLINE static void minmax(const ptrdiff_t n,
                                const geom_t* const SFEM_RESTRICT x,
                                geom_t* xmin,
                                geom_t* xmax) {
+    if (!n) return;
+
     *xmin = x[0];
     *xmax = x[0];
     for (ptrdiff_t i = 1; i < n; i++) {
@@ -1016,13 +1016,14 @@ int sdf_view_ensure_margin(MPI_Comm comm,
             fprintf(stderr, "[%d] resample_grid_view cannot be used in serial runs!\n", rank);
         }
 
+        assert(0);
         MPI_Abort(comm, -1);
         return 1;
     }
 
     double sdf_view_tick = MPI_Wtime();
 
-    geom_t zmin, zmax;
+    geom_t zmin = origin[2], zmax = origin[2];
     minmax(nnodes, z_coordinate, &zmin, &zmax);
 
     // Z is distributed
@@ -1035,8 +1036,9 @@ int sdf_view_ensure_margin(MPI_Comm comm,
 
     // Make sure we are inside the grid and get also the required margin for resampling
     sdf_start = MAX(0, sdf_start - 1 - z_margin);
-    sdf_end = MIN(nglobal[2],
-                  sdf_end + 2 + z_margin);  // 1 for the rightside of the cell 1 for the exclusive range
+    sdf_end =
+        MIN(nglobal[2],
+            sdf_end + 2 + z_margin);  // 1 for the rightside of the cell 1 for the exclusive range
 
     ptrdiff_t pnlocal_z = (sdf_end - sdf_start);
     geom_t* psdf = malloc(pnlocal_z * stride[2] * sizeof(geom_t));

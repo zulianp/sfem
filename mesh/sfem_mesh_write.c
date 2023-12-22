@@ -37,7 +37,7 @@ int mesh_write(const char *path, const mesh_t *mesh) {
     }
 
     ptrdiff_t nelements;
-    if(size > 1) {
+    if (size > 1) {
         sprintf(folder, "%s/%d", path, rank);
         nelements = mesh->n_owned_elements;
     } else {
@@ -66,12 +66,7 @@ int mesh_write(const char *path, const mesh_t *mesh) {
     const int nxe = elem_num_nodes(mesh->element_type);
     for (int d = 0; d < nxe; ++d) {
         sprintf(output_path, "%s/i%d.raw", folder, d);
-        array_write(comm,
-                    output_path,
-                    SFEM_MPI_IDX_T,
-                    mesh->elements[d],
-                    mesh->nelements,
-                    mesh->nelements);
+        array_write(comm, output_path, SFEM_MPI_IDX_T, mesh->elements[d], nelements, nelements);
     }
 
     if (mesh->node_mapping) {
@@ -82,12 +77,7 @@ int mesh_write(const char *path, const mesh_t *mesh) {
 
     if (mesh->element_mapping) {
         sprintf(output_path, "%s/element_mapping.raw", folder);
-        array_write(comm,
-                    output_path,
-                    SFEM_MPI_IDX_T,
-                    mesh->element_mapping,
-                    mesh->nelements,
-                    mesh->nelements);
+        array_write(comm, output_path, SFEM_MPI_IDX_T, mesh->element_mapping, nelements, nelements);
     }
 
     if (mesh->node_owner) {

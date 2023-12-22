@@ -901,6 +901,8 @@ int resample_field_local(
             return tet4_resample_field_local(
                 nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
         }
+        default:
+            break;
     }
 
     enum ElemType st = shell_type(element_type);

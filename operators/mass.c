@@ -13,12 +13,12 @@
 
 #include "sfem_defs.h"
 
+#include "beam2_mass.h"
 #include "tet10_mass.h"
 #include "tet4_mass.h"
 #include "tri3_mass.h"
 #include "tri6_mass.h"
 #include "trishell3_mass.h"
-#include "beam2_mass.h"
 
 void assemble_mass(const int element_type,
                    const ptrdiff_t nelements,
@@ -28,6 +28,8 @@ void assemble_mass(const int element_type,
                    count_t *const SFEM_RESTRICT rowptr,
                    idx_t *const SFEM_RESTRICT colidx,
                    real_t *const SFEM_RESTRICT values) {
+    if (!nelements) return;
+
     switch (element_type) {
         case TET4: {
             tet4_assemble_mass(nelements, nnodes, elems, xyz, rowptr, colidx, values);
@@ -62,6 +64,8 @@ void assemble_lumped_mass(const int element_type,
                           idx_t **const SFEM_RESTRICT elems,
                           geom_t **const SFEM_RESTRICT xyz,
                           real_t *const SFEM_RESTRICT values) {
+    if (!nelements) return;
+
     switch (element_type) {
         case TRI3: {
             tri3_assemble_lumped_mass(nelements, nnodes, elems, xyz, values);
@@ -101,6 +105,8 @@ void apply_inv_lumped_mass(const int element_type,
                            geom_t **const SFEM_RESTRICT xyz,
                            const real_t *const x,
                            real_t *const values) {
+    if (!nelements) return;
+
     switch (element_type) {
         case TRI3: {
             tri3_apply_inv_lumped_mass(nelements, nnodes, elems, xyz, x, values);
@@ -140,6 +146,8 @@ void apply_mass(const int element_type,
                 geom_t **const SFEM_RESTRICT xyz,
                 const real_t *const x,
                 real_t *const values) {
+    if (!nelements) return;
+
     switch (element_type) {
         case TRI3: {
             tri3_apply_mass(nelements, nnodes, elems, xyz, x, values);
