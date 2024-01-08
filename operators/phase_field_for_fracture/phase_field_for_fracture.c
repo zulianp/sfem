@@ -36,21 +36,21 @@ void phase_field_for_fracture_assemble_hessian_aos(const enum ElemType element_t
                                                                values);
             break;
         }
-        case TET4: {
-            tet4_phase_field_for_fracture_assemble_hessian_aos(nelements,
-                                                               nnodes,
-                                                               elems,
-                                                               xyz,
-                                                               mu,
-                                                               lambda,
-                                                               Gc,
-                                                               ls,
-                                                               solution,
-                                                               rowptr,
-                                                               colidx,
-                                                               values);
-            break;
-        }
+        // case TET4: {
+        //     tet4_phase_field_for_fracture_assemble_hessian_aos(nelements,
+        //                                                        nnodes,
+        //                                                        elems,
+        //                                                        xyz,
+        //                                                        mu,
+        //                                                        lambda,
+        //                                                        Gc,
+        //                                                        ls,
+        //                                                        solution,
+        //                                                        rowptr,
+        //                                                        colidx,
+        //                                                        values);
+        //     break;
+        // }
         default: {
             assert(0);
             MPI_Abort(MPI_COMM_WORLD, -1);
@@ -76,11 +76,11 @@ void phase_field_for_fracture_assemble_gradient_aos(const enum ElemType element_
                 nelements, nnodes, elems, xyz, mu, lambda, Gc, ls, solution, values);
             break;
         }
-        case TET4: {
-            tet4_phase_field_for_fracture_assemble_gradient_aos(
-                nelements, nnodes, elems, xyz, mu, lambda, Gc, ls, solution, values);
-            break;
-        }
+        // case TET4: {
+        //     tet4_phase_field_for_fracture_assemble_gradient_aos(
+        //         nelements, nnodes, elems, xyz, mu, lambda, Gc, ls, solution, values);
+        //     break;
+        // }
         default: {
             assert(0);
             MPI_Abort(MPI_COMM_WORLD, -1);
@@ -106,11 +106,11 @@ void phase_field_for_fracture_assemble_value_aos(const enum ElemType element_typ
                 nelements, nnodes, elems, xyz, mu, lambda, Gc, ls, solution, values);
             break;
         }
-        case TET4: {
-            tet4_phase_field_for_fracture_assemble_value_aos(
-                nelements, nnodes, elems, xyz, mu, lambda, Gc, ls, solution, values);
-            break;
-        }
+        // case TET4: {
+        //     tet4_phase_field_for_fracture_assemble_value_aos(
+        //         nelements, nnodes, elems, xyz, mu, lambda, Gc, ls, solution, values);
+        //     break;
+        // }
         default: {
             assert(0);
             MPI_Abort(MPI_COMM_WORLD, -1);
