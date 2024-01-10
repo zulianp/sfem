@@ -36,6 +36,13 @@ def inv2(mat):
 def det3(mat):
     return mat[0, 0] * mat[1, 1] * mat[2, 2] + mat[0, 1] * mat[1, 2] * mat[2, 0] + mat[0, 2] * mat[1, 0] * mat[2, 1] - mat[0, 0] * mat[1, 2] * mat[2, 1] - mat[0, 1] * mat[1, 0] * mat[2, 2] - mat[0, 2] * mat[1, 1] * mat[2, 0]
 
+def determinant(mat):
+	rows, cols = mat.shape
+	if rows == 2:
+		return det2(mat)
+	else:
+		return det3(mat)
+
 def inv3(mat):
 	# Sympy version (same but slower)
 	# return mat.inv()
@@ -51,6 +58,13 @@ def inv3(mat):
     mat_inv[2, 1] = (mat[0, 1] * mat[2, 0] - mat[0, 0] * mat[2, 1]) / det
     mat_inv[2, 2] = (mat[0, 0] * mat[1, 1] - mat[0, 1] * mat[1, 0]) / det
     return mat_inv
+
+def inverse(mat):
+	rows, cols = mat.shape
+	if rows == 2:
+		return inv2(mat)
+	else:
+		return inv3(mat)
 
 def c_gen(expr, dump=False):
     console.print("--------------------------")
