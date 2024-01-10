@@ -51,6 +51,7 @@ int main() {
     cusparseIndexType_t csrColIndType = CUSPARSE_INDEX_32I;
     cusparseIndexBase_t idxBase = CUSPARSE_INDEX_BASE_ZERO;
     cudaDataType valueType = CUDA_R_64F;
+    cusparseOperation_t op_type = CUSPARSE_OPERATION_NON_TRANSPOSE;
 
     CHECK_CUSPARSE(cusparseCreateCsr(&d_matrix,
                                      rows,
@@ -70,7 +71,7 @@ int main() {
 
     size_t bufferSize = 0;
     CHECK_CUSPARSE(cusparseSpMV_bufferSize(handle,
-                                           CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                           op_type,
                                            &alpha,
                                            d_matrix,
                                            vecX,
@@ -84,7 +85,7 @@ int main() {
     CHECK_CUDA(cudaMalloc(&dBuffer, bufferSize));
 
     CHECK_CUSPARSE(cusparseSpMV(handle,
-                                CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                op_type,
                                 &alpha,
                                 d_matrix,
                                 vecX,
