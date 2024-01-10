@@ -1,17 +1,11 @@
 #include <math.h>
 #include <stddef.h>
 
-#ifndef SFEM_RESTRICT
-typedef double real_t;
-#define SFEM_INLINE inline
-#define SFEM_RESTRICT restrict
-#endif
+#include "sfem_base.h"
 
-#ifndef SFEM_STATIC
-#define SFEM_STATIC static
-#endif
+#define SFEM_DEVICE_MK static SFEM_INLINE __device__
 
-SFEM_STATIC SFEM_INLINE void micro_kernel_energy(
+SFEM_DEVICE_MK void micro_kernel_energy(
 	const real_t mu,
 	const real_t lambda,
 	const real_t Gc,
@@ -27,7 +21,7 @@ SFEM_STATIC SFEM_INLINE void micro_kernel_energy(
 	{MICRO_KERNEL_ENERGY}
 }}
 
-SFEM_STATIC SFEM_INLINE void micro_kernel_form1_u(
+SFEM_DEVICE_MK void micro_kernel_form1_u(
 	const real_t mu,
 	const real_t lambda,
 	// const real_t Gc,
@@ -45,7 +39,7 @@ SFEM_STATIC SFEM_INLINE void micro_kernel_form1_u(
 	{MICRO_KERNEL_FORM1_U}
 }}
 
-SFEM_STATIC SFEM_INLINE void micro_kernel_form1_c(
+SFEM_DEVICE_MK void micro_kernel_form1_c(
 	const real_t mu,
 	const real_t lambda,
 	const real_t Gc,
@@ -64,7 +58,7 @@ SFEM_STATIC SFEM_INLINE void micro_kernel_form1_c(
 	{MICRO_KERNEL_FORM1_C}
 }}
 
-SFEM_STATIC SFEM_INLINE void micro_kernel_form2_uu(
+SFEM_DEVICE_MK void micro_kernel_form2_uu(
 	const real_t mu,
 	const real_t lambda,
 	// const real_t Gc,
@@ -81,7 +75,7 @@ SFEM_STATIC SFEM_INLINE void micro_kernel_form2_uu(
 	{MICRO_KERNEL_FORM2_UU}
 }}
 
-SFEM_STATIC SFEM_INLINE void micro_kernel_form2_uc(
+SFEM_DEVICE_MK void micro_kernel_form2_uc(
 	const real_t mu,
 	const real_t lambda,
 	// const real_t Gc,
@@ -100,7 +94,7 @@ SFEM_STATIC SFEM_INLINE void micro_kernel_form2_uc(
 	{MICRO_KERNEL_FORM2_UC}
 }}
 
-SFEM_STATIC SFEM_INLINE void micro_kernel_form2_cu(
+SFEM_DEVICE_MK void micro_kernel_form2_cu(
 	const real_t mu,
 	const real_t lambda,
 	// const real_t Gc,
@@ -119,7 +113,7 @@ SFEM_STATIC SFEM_INLINE void micro_kernel_form2_cu(
 	{MICRO_KERNEL_FORM2_CU}
 }}
 
-SFEM_STATIC SFEM_INLINE void micro_kernel_form2_cc(
+SFEM_DEVICE_MK void micro_kernel_form2_cc(
 	const real_t mu,
 	const real_t lambda,
 	const real_t Gc,

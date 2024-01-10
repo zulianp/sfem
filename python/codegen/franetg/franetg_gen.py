@@ -97,7 +97,7 @@ def generate_micro_kernel(dim):
 		MICRO_KERNEL_FORM2_CU=c_gen(form2_assign('element_matrix', form_2_cu)),
 		MICRO_KERNEL_FORM2_CC=c_gen(form2_assign('element_matrix', form_2_cc)))
 
-	str_to_file(f'micro_kernel_isotropic_phase_field_{dim}.c', code)
+	str_to_file(f'micro_kernel_isotropic_phase_field_{dim}.h', code)
 
 # def generate_kernel_code(dim):
 

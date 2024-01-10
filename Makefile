@@ -61,7 +61,7 @@ endif
 CFLAGS += -DSFEM_MEM_DIAGNOSTICS
 
 # Folder structure
-VPATH = pizzastack:resampling:mesh:operators:drivers:base:algebra:matrix:operators/tet10:operators/tet4:operators/tri3:operators/trishell3:operators/tri6:operators/beam2:operators/cvfem:graphs:parametrize:operators/phase_field_for_fracture:operators/kernels:operators/navier_stokes:solver
+VPATH = pizzastack:resampling:mesh:operators:drivers:drivers/cuda:base:algebra:matrix:operators/tet10:operators/tet4:operators/tri3:operators/trishell3:operators/tri6:operators/beam2:operators/cvfem:graphs:parametrize:operators/phase_field_for_fracture:operators/kernels:operators/navier_stokes:solver
 INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/tri3 -Ioperators/trishell3 -Ioperators/tri6 -Ioperators/beam2 -Ioperators/cvfem -Igraphs -Iparametrize -Ioperators/phase_field_for_fracture  -Ioperators/kernels -Ioperators/navier_stokes -Isolver
 
 
@@ -505,7 +505,8 @@ tet4_principal_strains.o : tet4_principal_strains.cpp
 tet4_neohookean_principal_stresses.o : tet4_neohookean_principal_stresses.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(INTERNAL_CXXFLAGS) -c $<
 
-
+spmv : drivers/cuda/spmv.cu libsfem.a
+	$(NVCC) $(CUFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 %.o : %.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -c $<
