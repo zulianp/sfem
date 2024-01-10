@@ -366,7 +366,7 @@ int main(int argc, char *argv[]) {
                 }
 
             } else {
-                spmv_crs(mesh.nnodes, rowptr, colidx, mass_matrix, u, u_old);
+                crs_spmv(mesh.nnodes, rowptr, colidx, mass_matrix, u, u_old);
             }
 
             for (int i = 0; i < n_dirichlet_conditions; i++) {
@@ -390,7 +390,7 @@ int main(int argc, char *argv[]) {
             const int i = step_count % 2;
             const int ip1 = (step_count + 1) % 2;
 
-            spmv_crs(mesh.nnodes, rowptr, colidx, system_matrix, u_old, u);
+            crs_spmv(mesh.nnodes, rowptr, colidx, system_matrix, u_old, u);
 
             if (SFEM_LUMPED_MASS) {
 #pragma omp parallel
