@@ -15,7 +15,7 @@ vec3 = ti.math.vec3
 
 try: 
     from sfem_config import *
-except NameError: 
+except ModuleNotFoundError: 
     print('mesh_to_sdf: self contained mode')
     from distance_point_to_triangle import *
     import smesh
