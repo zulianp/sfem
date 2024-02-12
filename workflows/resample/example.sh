@@ -27,6 +27,12 @@ mesh_sorted=sorted
 resample_target=$mesh_sorted
 # resample_target=$skinned
 
+if [[ -d "refined" ]]
+then
+	resample_target=refined
+	echo "resample_target=$resample_target"
+fi
+
 if [[ -d "$skinned" ]] 
 then
 	echo "Reusing existing mesh $skinned and SDF!"
