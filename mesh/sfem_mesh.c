@@ -91,12 +91,17 @@ void mesh_destroy(mesh_t *mesh) {
         free(mesh->elements[d]);
         mesh->elements[d] = 0;
     }
+    if(nxe) {
+        free(mesh->elements);
+    }
 
     if (mesh->points) {
         for (int d = 0; d < mesh->spatial_dim; ++d) {
             free(mesh->points[d]);
             mesh->points[d] = 0;
         }
+
+        free(mesh->points);
     }
 
     free(mesh->node_mapping);

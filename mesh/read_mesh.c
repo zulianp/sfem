@@ -367,6 +367,8 @@ int mesh_build_global_ids(mesh_t *mesh) {
     free(recv_displs);
     free(recv_key_buff);
     free(recv_ids_buff);
+    free(mapping);
+    free(ghost_ids);
 
     return 0;
 }
@@ -480,8 +482,8 @@ int mesh_read_generic(MPI_Comm comm,
         idx_t *gather_node_count = malloc(size * sizeof(idx_t));
         memset(gather_node_count, 0, size * sizeof(idx_t));
 
-        int *owner_rank = malloc(n_unique * sizeof(int));
-        memset(owner_rank, 0, n_unique * sizeof(int));
+        // int *owner_rank = malloc(n_unique * sizeof(int));
+        // memset(owner_rank, 0, n_unique * sizeof(int));
 
         for (ptrdiff_t i = 0; i < n_unique; ++i) {
             idx_t idx = unique_idx[i];
@@ -494,7 +496,7 @@ int mesh_read_generic(MPI_Comm comm,
             assert(idx < input_node_partitions[owner + 1]);
 
             gather_node_count[owner]++;
-            owner_rank[i] = owner;
+            // owner_rank[i] = owner;
         }
 
         idx_t *scatter_node_count = malloc(size * sizeof(idx_t));
@@ -597,6 +599,8 @@ int mesh_read_generic(MPI_Comm comm,
             // Free space
             free(xyz[d]);
         }
+
+        free(xyz);
 
         ///////////////////////////////////////////////////////////////////////
         // Determine owners
@@ -750,6 +754,8 @@ int mesh_read_generic(MPI_Comm comm,
 
         free(local_remap);
         free(proc_ptr);
+        free(temp_buff);
+        free(offset);
 
         ////////////////////////////////////////////////////////////
         // Remap element index

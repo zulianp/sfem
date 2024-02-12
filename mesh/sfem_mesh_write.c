@@ -321,6 +321,7 @@ int write_mapped_field(MPI_Comm comm,
     ///////////////////////////////////
     free(send_count);
     free(send_displs);
+    free(recv_count);
     free(recv_displs);
     free(book_keeping);
     free(send_list);
