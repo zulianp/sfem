@@ -391,6 +391,7 @@ if __name__ == '__main__':
         pmax = ppmax + pmean
 
     submesh = select_submesh(mesh, pmin, pmax)
+    print(submesh)
     submesh.write('submesh.vtk')
     nedt, dims = mesh_to_sdf(submesh, pmin, pmax, hmax)
     nedt.tofile(output_path)
