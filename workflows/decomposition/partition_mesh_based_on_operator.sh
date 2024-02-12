@@ -5,13 +5,15 @@ set -e
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
+source $SCRIPTPATH/../sfem_config.sh
+export PATH=$SCRIPTPATH/../../:$PATH
+export PATH=$SCRIPTPATH/../../build/:$PATH
+export PATH=$SCRIPTPATH/../../bin/:$PATH
+
 PATH=$SCRIPTPATH:$PATH
 PATH=$SCRIPTPATH/..:$PATH
 PATH=$SCRIPTPATH/../..:$PATH
-PATH=$SCRIPTPATH/../../python:$PATH
-
-source $SCRIPTPATH/../sfem_config.sh
-
+PATH=$SCRIPTPATH/../../python/sfem:$PATH
 
 
 if (($# != 4))

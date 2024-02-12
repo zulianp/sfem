@@ -4,13 +4,18 @@ set -e
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
+source $SCRIPTPATH/../sfem_config.sh
+export PATH=$SCRIPTPATH/../../:$PATH
+export PATH=$SCRIPTPATH/../../build/:$PATH
+export PATH=$SCRIPTPATH/../../bin/:$PATH
+
 PATH=$SCRIPTPATH:$PATH
 PATH=$SCRIPTPATH/../..:$PATH
-PATH=$SCRIPTPATH/../../python:$PATH
-PATH=$SCRIPTPATH/../../python/mesh:$PATH
-PATH=$SCRIPTPATH/../../python/grid:$PATH
-PATH=$SCRIPTPATH/../../python/algebra:$PATH
-PATH=$SCRIPTPATH/../../python/sdf:$PATH
+PATH=$SCRIPTPATH/../../python/sfem:$PATH
+PATH=$SCRIPTPATH/../../python/sfem/mesh:$PATH
+PATH=$SCRIPTPATH/../../python/sfem/grid:$PATH
+PATH=$SCRIPTPATH/../../python/sfem/algebra:$PATH
+PATH=$SCRIPTPATH/../../python/sfem/sdf:$PATH
 PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 LAUNCH="mpiexec -np 8"

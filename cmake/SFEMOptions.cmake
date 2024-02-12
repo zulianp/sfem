@@ -12,6 +12,7 @@ option(SFEM_ENABLE_DEV_MODE
        "Add additional flags for more strict compilation" OFF)
 
 option(SFEM_ENABLE_CUDA "Enable CUDA support" OFF)
+option(SFEM_ENABLE_OPENMP "Enable OpenMP support" OFF)
 
 
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)
@@ -41,24 +42,24 @@ endif()
 # # ##############################################################################
 
 
-if(NOT SFEM_INDEX_SIZE)
-    set(SFEM_INDEX_SIZE 32 CACHE STRING "Choice of idx_t size between 32 or 64 bits" FORCE)
+if(NOT SFEM_INDEX_BITSIZE)
+    set(SFEM_INDEX_BITSIZE 32 CACHE STRING "Choice of idx_t size between 32 or 64 bits" FORCE)
 endif()
 
-if(NOT SFEM_COUNT_SIZE)
-    set(SFEM_COUNT_SIZE 32 CACHE STRING "Choice of count_t size between 32 or 64 bits" FORCE)
+if(NOT SFEM_COUNT_BITSIZE)
+    set(SFEM_COUNT_BITSIZE 32 CACHE STRING "Choice of count_t size between 32 or 64 bits" FORCE)
 endif()
 
 
 # if(USE_XSDK_DEFAULTS)
 #     set(XSDK_INDEX_SIZE 32)
-#     set(SFEM_INDEX_SIZE 32)
+#     set(SFEM_INDEX_BITSIZE 32)
 # else()
 #     if(XSDK_INDEX_SIZE)
-#         set(SFEM_INDEX_SIZE ${XSDK_INDEX_SIZE})
-#     elseif(NOT SFEM_INDEX_SIZE)
+#         set(SFEM_INDEX_BITSIZE ${XSDK_INDEX_SIZE})
+#     elseif(NOT SFEM_INDEX_BITSIZE)
 #         set(XSDK_INDEX_SIZE 64)
-#         set(SFEM_INDEX_SIZE 64)
+#         set(SFEM_INDEX_BITSIZE 64)
 #     endif()
 # endif()
 

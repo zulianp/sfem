@@ -3,7 +3,7 @@
 set -e
 set -x
 
-export PATH=$CODE_DIR/sfem/python/mesh:$PATH
+export PATH=$CODE_DIR/sfem/python/sfem/mesh:$PATH
 export PATH=$CODE_DIR/utopia/utopia/build:$PATH
 
 export SFEM_MESH_DIR=$CODE_DIR/sfem/data/benchmarks/1_darcy_cube/mesh 

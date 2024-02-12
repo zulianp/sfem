@@ -1,18 +1,23 @@
 #!/usr/bin/env bash
 
-# set -e
+set -e
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
+source $SCRIPTPATH/../sfem_config.sh
+export PATH=$SCRIPTPATH/../../:$PATH
+export PATH=$SCRIPTPATH/../../build/:$PATH
+export PATH=$SCRIPTPATH/../../bin/:$PATH
+
 PATH=$SCRIPTPATH:$PATH
 PATH=$SCRIPTPATH/../..:$PATH
-PATH=$SCRIPTPATH/../../python:$PATH
-PATH=$SCRIPTPATH/../../python/mesh:$PATH
+PATH=$SCRIPTPATH/../../python/sfem:$PATH
+PATH=$SCRIPTPATH/../../python/sfem/mesh:$PATH
 PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 PATH=$SCRIPTPATH/../../../matrix.io:$PATH
 
-# create_box_2D.sh 4 40 20
-# rm mesh/z.raw
+create_box_2D.sh 4 40 20
+rm mesh/z.raw
 
 export SFEM_MESH_DIR=mesh
 
@@ -46,7 +51,7 @@ export SFEM_OUTPUT_DIR=sfem_output
 
 export SFEM_DEBUG_DUMP=1
 # lldb -- 
-utopia_exec -app nlsolve -path $CODE_DIR/sfem/franetg_plugin.dylib -solver_type Newton --verbose -max_it 9 --linear_start -damping 0.1
+utopia_exec -app nlsolve -path $CODE_DIR/sfem/franetg_plugin.dylib -solver_type Newton --verbose -max_it 40 --linear_start -damping 0.8
 
 aos_to_soa $SFEM_OUTPUT_DIR/out.raw 8 $BLOCK_SIZE $SFEM_OUTPUT_DIR/out
 raw_to_db.py $SFEM_MESH_DIR $SFEM_OUTPUT_DIR/x.vtk -p "$SFEM_OUTPUT_DIR/out.*.raw"

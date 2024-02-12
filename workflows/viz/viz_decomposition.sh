@@ -5,10 +5,15 @@ set -e
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
+source $SCRIPTPATH/../sfem_config.sh
+export PATH=$SCRIPTPATH/../../:$PATH
+export PATH=$SCRIPTPATH/../../build/:$PATH
+export PATH=$SCRIPTPATH/../../bin/:$PATH
+
 SFEM_DIR=$SCRIPTPATH/../..
 export PATH=$SFEM_DIR:$PATH
-export PATH=$SFEM_DIR/python:$PATH
-export PATH=$SFEM_DIR/python/mesh:$PATH
+export PATH=$SFEM_DIR/python/sfem:$PATH
+export PATH=$SFEM_DIR/python/sfem/mesh:$PATH
 
 if (($# != 1))
 then

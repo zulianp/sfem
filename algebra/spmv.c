@@ -2,7 +2,18 @@
 #include <stddef.h>
 #include "sfem_base.h"
 
-int spmv_crs(const ptrdiff_t nnodes,
+int scal(const ptrdiff_t nnodes, const real_t scale_factor, real_t *x) {
+#pragma omp parallel
+    {
+#pragma omp for  // nowait
+        for (ptrdiff_t i = 0; i < nnodes; i++) {
+            x[i] *= scale_factor;
+        }
+    }
+    return 0;
+}
+
+int crs_spmv(const ptrdiff_t nnodes,
              const count_t *const SFEM_RESTRICT rowptr,
              const idx_t *const SFEM_RESTRICT colidx,
              const real_t *const SFEM_RESTRICT values,

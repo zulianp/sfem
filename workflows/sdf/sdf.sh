@@ -4,14 +4,19 @@ set -e
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
-PATH=$SCRIPTPATH:$PATH
-PATH=$SCRIPTPATH/../..:$PATH
-PATH=$SCRIPTPATH/../../python:$PATH
-PATH=$SCRIPTPATH/../../python/mesh:$PATH
-PATH=$SCRIPTPATH/../../python/grid:$PATH
-PATH=$SCRIPTPATH/../../python/algebra:$PATH
-PATH=$SCRIPTPATH/../../python/sdf:$PATH
-PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
+source $SCRIPTPATH/../sfem_config.sh
+export PATH=$SCRIPTPATH/../../:$PATH
+export PATH=$SCRIPTPATH/../../build/:$PATH
+export PATH=$SCRIPTPATH/../../bin/:$PATH
+
+export PATH=$SCRIPTPATH:$PATH
+export PATH=$SCRIPTPATH/../..:$PATH
+export PATH=$SCRIPTPATH/../../python/sfem:$PATH
+export PATH=$SCRIPTPATH/../../python/sfem/mesh:$PATH
+export PATH=$SCRIPTPATH/../../python/sfem/grid:$PATH
+export PATH=$SCRIPTPATH/../../python/sfem/algebra:$PATH
+export PATH=$SCRIPTPATH/../../python/sfem/sdf:$PATH
+export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 LAUNCH="mpiexec -np 8"
 # LAUNCH=""
