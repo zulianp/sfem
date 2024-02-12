@@ -27,13 +27,17 @@ mesh_sorted=sorted
 resample_target=$mesh_sorted
 # resample_target=$skinned
 
-# create_sphere.sh 5
-# sfc $mesh $mesh_sorted
-# mkdir -p $skinned
-# skin $mesh $skinned
-
-mesh_to_sdf.py $skinned $sdf --hmax=0.01 --margin=0.2
-raw_to_xdmf.py $sdf
+if [[ -d "$skinned" ]] 
+then
+	echo "Reusing existing mesh $skinned and SDF!"
+else
+	create_sphere.sh 3
+	sfc $mesh $mesh_sorted
+	mkdir -p $skinned
+	skin $mesh $skinned
+	mesh_to_sdf.py $skinned $sdf --hmax=0.01 --margin=0.2
+	raw_to_xdmf.py $sdf
+fi
 
 sizes=`head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' '`
 origins=`head -8 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' '`
