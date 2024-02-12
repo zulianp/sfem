@@ -16,6 +16,12 @@
 
 #include "sortreduce.h"
 
+#define BARRIER_MSG(msg_)                \
+    do {                                 \
+        printf("[%d] %s\n", rank, msg_); \
+        MPI_Barrier(MPI_COMM_WORLD);     \
+    } while (0);
+
 #define array_remap_scatter(n_, type_, mapping_, array_, temp_) \
     do {                                                        \
         type_ *temp_actual_ = (type_ *)temp_;                   \
@@ -515,6 +521,37 @@ int mesh_read_generic(MPI_Comm comm,
 
         idx_t *send_list = malloc(sizeof(idx_t) * size_send_list);
         memset(send_list, 0, sizeof(idx_t) * size_send_list);
+
+        if(0)
+        {
+            for (int r = 0; r < size; r++) {
+                if (r == rank) {
+                    printf("------------------------\n");
+                    printf("[%d]\n", rank);
+
+                    for (int i = 0; i < size; i++) {
+                        printf("%d ", gather_node_count[i]);
+                    }
+                    printf("\n");
+                    for (int i = 0; i < size; i++) {
+                        printf("%d ", gather_node_displs[i]);
+                    }
+                    printf("\n");
+                    for (int i = 0; i < size; i++) {
+                        printf("%d ", scatter_node_count[i]);
+                    }
+                       printf("\n");
+                    for (int i = 0; i < size; i++) {
+                        printf("%d ", scatter_node_displs[i]);
+                    }
+                    printf("\n");
+                    printf("------------------------\n");
+                    fflush(stdout);
+                }
+
+                MPI_Barrier(comm);
+            }
+        }
 
         CATCH_MPI_ERROR(MPI_Alltoallv(unique_idx,
                                       gather_node_count,
