@@ -507,7 +507,10 @@ tet4_principal_strains.o : tet4_principal_strains.cpp
 tet4_neohookean_principal_stresses.o : tet4_neohookean_principal_stresses.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(INTERNAL_CXXFLAGS) -c $<
 
-spmv : drivers/cuda/cuda_do_spmv.c libsfem.a
+cuspmv : drivers/cuda/cuda_do_spmv.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+spmv : drivers/cuda/do_spmv.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 %.o : %.c

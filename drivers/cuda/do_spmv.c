@@ -81,6 +81,7 @@ int main(int argc, char *argv[]) {
 
     double tock = MPI_Wtime();
     if (!rank) {
+        printf("do_spmv.c\n");
         printf("TTS: %g seconds\n", tock - tick);
     }
 

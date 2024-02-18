@@ -25,12 +25,12 @@ source venv/bin/activate
 
 mesh=mesh
 mesh_sorted=mesh_sorted
-create_sphere.sh 4
-sfc $mesh $mesh_sorted
+# create_sphere.sh 4
+# sfc $mesh $mesh_sorted
 
 
-touch $mesh_sorted/zd.raw
-touch $mesh_sorted/on.raw
+# touch $mesh_sorted/zd.raw
+# touch $mesh_sorted/on.raw
 
 
 mkdir -p linear_system
@@ -41,8 +41,8 @@ eval_nodal_function.py "x*x + y*y" $mesh_sorted/x.raw $mesh_sorted/y.raw  $mesh_
 
  # ../../spmv <alpha> <transpose> <crs_folder> <x.raw> <output.raw> <output_folder>
 
-
-spmv 1 0 linear_system linear_system/rhs.raw test.raw
+cuspmv 1 0 linear_system linear_system/rhs.raw test.raw
+# spmv 1 0 linear_system linear_system/rhs.raw test.raw
 
 # usage: ../../lumped_mass_inv <folder> <in.raw> <out.raw>
 lumped_mass_inv $mesh_sorted test.raw out.raw
