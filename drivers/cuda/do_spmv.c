@@ -29,8 +29,7 @@ int main(int argc, char *argv[]) {
 
     if (argc != 6) {
         fprintf(stderr,
-                "usage: %s <alpha> <transpose> <crs_folder> <x.raw> <output.raw> "
-                "<output_folder>\n",
+                "usage: %s <alpha> <transpose> <crs_folder> <x.raw> <output.raw>\n",
                 argv[0]);
         return EXIT_FAILURE;
     }
