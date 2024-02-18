@@ -223,11 +223,12 @@ ifeq ($(cuda), 1)
 # 	CUDA_OBJS = tet4_cuda_laplacian_2.o
 	CUDA_OBJS = tet4_cuda_laplacian_3.o
 	CUDA_OBJS += tet4_cuda_phase_field_for_fracture.o
-	CUDA_OBJS += spmv.o
+	
 
 	CUDA_OBJS += cuda_crs.o
 	DEPS += -L/opt/cuda/lib64 -lcudart -lcusparse -lcusolver -lcublas
 	DEPS += -lnvToolsExt
+	CFLAGS += -I/opt/cuda/include
 
 	OBJS += $(CUDA_OBJS)
 else
@@ -506,7 +507,7 @@ tet4_principal_strains.o : tet4_principal_strains.cpp
 tet4_neohookean_principal_stresses.o : tet4_neohookean_principal_stresses.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(INTERNAL_CXXFLAGS) -c $<
 
-spmv : drivers/cuda/do_spmv.c libsfem.a
+spmv : drivers/cuda/cuda_do_spmv.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 %.o : %.c

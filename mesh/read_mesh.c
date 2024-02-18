@@ -524,25 +524,28 @@ int mesh_read_generic(MPI_Comm comm,
         idx_t *send_list = malloc(sizeof(idx_t) * size_send_list);
         memset(send_list, 0, sizeof(idx_t) * size_send_list);
 
-        if(0)
+        if(0) //
         {
             for (int r = 0; r < size; r++) {
                 if (r == rank) {
                     printf("------------------------\n");
-                    printf("[%d]\n", rank);
+                    printf("[%d] gnc: ", rank);
 
                     for (int i = 0; i < size; i++) {
                         printf("%d ", gather_node_count[i]);
                     }
                     printf("\n");
+                     printf("[%d] gnd: ", rank);
                     for (int i = 0; i < size; i++) {
                         printf("%d ", gather_node_displs[i]);
                     }
                     printf("\n");
+                     printf("[%d] snc: ", rank);
                     for (int i = 0; i < size; i++) {
                         printf("%d ", scatter_node_count[i]);
                     }
                        printf("\n");
+                        printf("[%d] snd: ", rank);
                     for (int i = 0; i < size; i++) {
                         printf("%d ", scatter_node_displs[i]);
                     }
