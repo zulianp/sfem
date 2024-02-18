@@ -25,7 +25,7 @@ source venv/bin/activate
 
 mesh=mesh
 mesh_sorted=mesh_sorted
-create_sphere.sh 1
+create_sphere.sh 4
 sfc $mesh $mesh_sorted
 
 
@@ -37,7 +37,7 @@ mkdir -p linear_system
 assemble $mesh_sorted linear_system
 
 
-eval_nodal_function.py "x" $mesh_sorted/x.raw $mesh_sorted/y.raw  $mesh_sorted/z.raw linear_system/rhs.raw
+eval_nodal_function.py "x*x + y*y" $mesh_sorted/x.raw $mesh_sorted/y.raw  $mesh_sorted/z.raw linear_system/rhs.raw
 
  # ../../spmv <alpha> <transpose> <crs_folder> <x.raw> <output.raw> <output_folder>
 
