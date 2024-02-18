@@ -40,6 +40,8 @@ assemble $mesh_sorted linear_system
 eval_nodal_function.py "x" $mesh_sorted/x.raw $mesh_sorted/y.raw  $mesh_sorted/z.raw linear_system/rhs.raw
 
  # ../../spmv <alpha> <transpose> <crs_folder> <x.raw> <output.raw> <output_folder>
+
+ set -x
 spmv 1 0 linear_system linear_system/rhs.raw test.raw
 
 

@@ -54,9 +54,8 @@ int main(int argc, char *argv[]) {
     }
 
     if (argc != 6) {
-        fprintf(stderr,
-                "usage: %s <alpha> <transpose> <crs_folder> <x.raw> <output.raw>\n",
-                argv[0]);
+        fprintf(
+            stderr, "usage: %s <alpha> <transpose> <crs_folder> <x.raw> <output.raw>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
@@ -101,6 +100,20 @@ int main(int argc, char *argv[]) {
         cusparseDnVecDescr_t vecX, vecY;
         void *dX, *dY;
 
+        count_t *csrRowOffsets;
+        idx_t *csrColInd;
+        real_t *csrValues;
+
+        CHECK_CUDA(cudaMalloc((void **)&csrRowOffsets, (crs.lrows + 1) * sizeof(count_t)));
+        CHECK_CUDA(cudaMalloc((void **)&csrColInd, crs.lnnz * sizeof(idx_t)));
+        CHECK_CUDA(cudaMalloc((void **)&csrValues, crs.lnnz * sizeof(real_t)));
+
+        CHECK_CUDA(cudaMemcpy(
+            csrRowOffsets, (count_t *)crs.rowptr, (crs.lrows + 1) * sizeof(count_t), cudaMemcpyHostToDevice));
+        CHECK_CUDA(cudaMemcpy(csrColInd, (idx_t *)crs.colidx, crs.lnnz * sizeof(idx_t), cudaMemcpyHostToDevice));
+        CHECK_CUDA(cudaMemcpy(csrValues, (real_t *)crs.values, crs.lnnz * sizeof(real_t), cudaMemcpyHostToDevice));
+
+
         cusparseSpMatDescr_t d_matrix;
 
         cusparseIndexType_t csrRowOffsetsType = CUSPARSE_INDEX_32I;
@@ -114,9 +127,9 @@ int main(int argc, char *argv[]) {
                                          crs.lrows,
                                          crs.lrows,
                                          crs.lnnz,
-                                         (count_t *)crs.rowptr,
-                                         (idx_t *)crs.colidx,
-                                         (real_t *)crs.values,
+                                         csrRowOffsets,
+                                         csrColInd,
+                                         csrValues,
                                          csrRowOffsetsType,
                                          csrColIndType,
                                          idxBase,
@@ -147,6 +160,9 @@ int main(int argc, char *argv[]) {
         void *dBuffer = NULL;
         CHECK_CUDA(cudaMalloc(&dBuffer, bufferSize));
 
+        cudaDeviceSynchronize();
+        CHECK_CUDA(cudaPeekAtLastError());
+
         CHECK_CUSPARSE(cusparseSpMV(handle,
                                     op_type,
                                     &alpha,
@@ -159,6 +175,7 @@ int main(int argc, char *argv[]) {
                                     dBuffer));
 
         cudaDeviceSynchronize();
+        CHECK_CUDA(cudaPeekAtLastError());
         CHECK_CUDA(cudaMemcpy(y, dY, crs.lrows * sizeof(real_t), cudaMemcpyDeviceToHost));
 
         CHECK_CUSPARSE(cusparseDestroySpMat(d_matrix));
@@ -167,9 +184,9 @@ int main(int argc, char *argv[]) {
         CHECK_CUSPARSE(cusparseDestroy(handle));
 
         CHECK_CUDA(cudaFree(dBuffer));
-        // CHECK_CUDA(cudaFree(csrRowOffsets));
-        // CHECK_CUDA(cudaFree(csrColInd));
-        // CHECK_CUDA(cudaFree(csrValues));
+        CHECK_CUDA(cudaFree(csrRowOffsets));
+        CHECK_CUDA(cudaFree(csrColInd));
+        CHECK_CUDA(cudaFree(csrValues));
         CHECK_CUDA(cudaFree(dX));
         CHECK_CUDA(cudaFree(dY));
     }
