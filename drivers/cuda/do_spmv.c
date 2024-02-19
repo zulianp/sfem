@@ -28,10 +28,8 @@ int main(int argc, char *argv[]) {
     }
 
     if (argc != 6) {
-        fprintf(stderr,
-                "usage: %s <alpha> <transpose> <crs_folder> <x.raw> <output.raw> "
-                "<output_folder>\n",
-                argv[0]);
+        fprintf(
+            stderr, "usage: %s <alpha> <transpose> <crs_folder> <x.raw> <output.raw>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
@@ -67,6 +65,8 @@ int main(int argc, char *argv[]) {
 
     real_t *y = calloc(crs.grows, sizeof(real_t));
 
+    double spmv_tick = MPI_Wtime();
+
     scal(x_n, alpha, x);
     crs_spmv(crs.grows,
              (const count_t *const)crs.rowptr,
@@ -75,6 +75,9 @@ int main(int argc, char *argv[]) {
              x,
              y);
 
+    double spmv_tock = MPI_Wtime();
+    printf("spmv: %g (seconds)\n", spmv_tock - spmv_tick);
+
     array_write(comm, output_path, SFEM_MPI_REAL_T, y, crs.grows, crs.grows);
     crs_free(&crs);
     free(x);
@@ -82,6 +85,7 @@ int main(int argc, char *argv[]) {
 
     double tock = MPI_Wtime();
     if (!rank) {
+        printf("do_spmv.c\n");
         printf("TTS: %g seconds\n", tock - tick);
     }
 
