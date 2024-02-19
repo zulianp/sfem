@@ -77,9 +77,77 @@ static inline __device__ __host__ void fff_micro_kernel(const geom_t px0,
     fff[5 * stride] = x20 * (x22 * POW2(x31) + x22 * POW2(x32) + x22 * POW2(x33));
 }
 
-int tet4_cuda_incore_laplacian_init(cuda_incore_laplacian_t *ctx, mesh_t mesh) {
+static inline __device__ __host__ void lapl_apply_mk(const geom_t *const SFEM_RESTRICT fff,
+                                                     const ptrdiff_t stride,
+                                                     const real_t *const SFEM_RESTRICT x,
+                                                     real_t *const SFEM_RESTRICT y) {
+    const real_t x0 = (1.0 / 6.0) * x[0];
+    const real_t x1 = fff[0 * stride] * x0;
+    const real_t x2 = (1.0 / 6.0) * x[1];
+    const real_t x3 = fff[0 * stride] * x2;
+    const real_t x4 = fff[1 * stride] * x2;
+    const real_t x5 = (1.0 / 6.0) * x[2];
+    const real_t x6 = fff[1 * stride] * x5;
+    const real_t x7 = fff[2 * stride] * x2;
+    const real_t x8 = (1.0 / 6.0) * x[3];
+    const real_t x9 = fff[2 * stride] * x8;
+    const real_t x10 = fff[3 * stride] * x0;
+    const real_t x11 = fff[3 * stride] * x5;
+    const real_t x12 = fff[4 * stride] * x5;
+    const real_t x13 = fff[4 * stride] * x8;
+    const real_t x14 = fff[5 * stride] * x0;
+    const real_t x15 = fff[5 * stride] * x8;
+    const real_t x16 = fff[1 * stride] * x0;
+    const real_t x17 = fff[2 * stride] * x0;
+    const real_t x18 = fff[4 * stride] * x0;
+    y[0] = (1.0 / 3.0) * fff[1 * stride] * x[0] + (1.0 / 3.0) * fff[2 * stride] * x[0] +
+           (1.0 / 3.0) * fff[4 * stride] * x[0] + x1 + x10 - x11 - x12 - x13 + x14 - x15 - x3 - x4 -
+           x6 - x7 - x9;
+    y[1] = -x1 - x16 - x17 + x3 + x6 + x9;
+    y[2] = -x10 + x11 + x13 - x16 - x18 + x4;
+    y[3] = x12 - x14 + x15 - x17 - x18 + x7;
+}
 
-    { // Create FFF and store it on device
+__global__ void tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t nelements,
+                                                        idx_t *const SFEM_RESTRICT elems,
+                                                        const geom_t *const SFEM_RESTRICT fff,
+                                                        const real_t *const SFEM_RESTRICT x,
+                                                        real_t *const SFEM_RESTRICT y) {
+    real_t ex[4];
+    real_t ey[4];
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
+         e += blockDim.x * gridDim.x) {
+        // collect coeffs
+#pragma unroll(4)
+        for (int v = 0; v < 4; ++v) {
+            ex[v] = x[elems[v * nelements + e]];
+        }
+
+        // apply operator
+        lapl_apply_mk(&fff[e], nelements, ex, ey);
+
+        // redistribute coeffs
+#pragma unroll(4)
+        for (int v = 0; v < 4; ++v) {
+            idx_t idx = elems[v * nelements + e];
+            atomicAdd(&y[idx], ey[v]);
+        }
+    }
+}
+
+extern int tet4_cuda_incore_laplacian_apply(cuda_incore_laplacian_t *ctx,
+                                     const real_t *const d_x,
+                                     real_t *const d_y) {
+    static int block_size = 128;
+    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (ctx->nelements + block_size - 1) / block_size);
+    tet4_cuda_incore_laplacian_apply_kernel<<<n_blocks, block_size, 0>>>(
+        ctx->nelements, ctx->d_elems, ctx->d_fff, d_x, d_y);
+    return 0;
+}
+
+
+extern int tet4_cuda_incore_laplacian_init(cuda_incore_laplacian_t *ctx, mesh_t mesh) {
+    {  // Create FFF and store it on device
         geom_t *h_fff = (geom_t *)calloc(6 * mesh.nelements, sizeof(geom_t));
 
 #pragma omp parallel
@@ -110,17 +178,28 @@ int tet4_cuda_incore_laplacian_init(cuda_incore_laplacian_t *ctx, mesh_t mesh) {
     }
 
     {
-    	 // Store elem indices on device
+        // Store elem indices on device
+        SFEM_CUDA_CHECK(cudaMalloc(&ctx->d_elems, 4 * mesh.nelements * sizeof(geom_t)));
+
+        for (int d = 0; d < 4; d++) {
+            SFEM_CUDA_CHECK(cudaMemcpy(ctx->d_elems + d * mesh.nelements,
+                                       mesh.elements[d],
+                                       mesh.nelements * sizeof(idx_t),
+                                       cudaMemcpyHostToDevice));
+        }
     }
-//
+
+    ctx->nelements = mesh.nelements;
     return 0;
 }
 
-int tet4_cuda_incore_laplacian_apply(cuda_incore_laplacian_t *ctx,
-                                     const real_t *const d_x,
-                                     real_t *const d_y) {
-    // collect coeffs
-    // apply operator
-    // redistribute coeffs
-    return 0;
+extern int tet4_cuda_incore_laplacian_destroy(cuda_incore_laplacian_t *ctx)
+{
+	cudaFree(ctx->d_elems);
+	cudaFree(ctx->d_fff);
+
+	ctx->nelements = 0;
+	ctx->d_elems = nullptr;
+	ctx->d_fff = nullptr;
+	return 0;
 }

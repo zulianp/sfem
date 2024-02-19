@@ -11,9 +11,11 @@
 #include <cuda_runtime_api.h>  // cudaMalloc, cudaMemcpy, etc.
 #include <cusparse.h>
 
+#include "read_mesh.h"
 #include "sfem_base.h"
 #include "sfem_mesh.h"
-#include "read_mesh.h"
+
+#include "tet4_cuda_incore_laplacian.h"
 
 #define CHECK_CUDA(func)                                               \
     do {                                                               \
@@ -55,8 +57,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (argc != 5) {
-        fprintf(
-            stderr, "usage: %s <mesh> <alpha> <x.raw> <output.raw>\n", argv[0]);
+        fprintf(stderr, "usage: %s <mesh> <alpha> <x.raw> <output.raw>\n", argv[0]);
         return EXIT_FAILURE;
     }
     const char *mesh_folder = argv[1];
@@ -64,10 +65,10 @@ int main(int argc, char *argv[]) {
     const char *x_path = argv[3];
     const char *output_path = argv[4];
 
-    mesh_t hmesh;
-    mesh_read(comm, mesh_folder, &hmesh);
+    mesh_t mesh;
+    mesh_read(comm, mesh_folder, &mesh);
 
-    ptrdiff_t nnodes = hmesh.nnodes;
+    ptrdiff_t nnodes = mesh.nnodes;
 
     double tick = MPI_Wtime();
 
@@ -78,20 +79,23 @@ int main(int argc, char *argv[]) {
     real_t *y = calloc(nnodes, sizeof(real_t));
 
     {  // CUDA begin
-        void *dX, *dY;
+        void *d_x, *d_y;
 
         // Create dense vectors
-        CHECK_CUDA(cudaMalloc((void **)&dX, nnodes * sizeof(real_t)));
-        CHECK_CUDA(cudaMalloc((void **)&dY, nnodes * sizeof(real_t)));
-        CHECK_CUDA(cudaMemcpy(dY, y, nnodes * sizeof(real_t), cudaMemcpyHostToDevice));
-        CHECK_CUDA(cudaMemcpy(dX, x, nnodes * sizeof(real_t), cudaMemcpyHostToDevice));
+        CHECK_CUDA(cudaMalloc((void **)&d_x, nnodes * sizeof(real_t)));
+        CHECK_CUDA(cudaMalloc((void **)&d_y, nnodes * sizeof(real_t)));
+        CHECK_CUDA(cudaMemcpy(d_y, y, nnodes * sizeof(real_t), cudaMemcpyHostToDevice));
+        CHECK_CUDA(cudaMemcpy(d_x, x, nnodes * sizeof(real_t), cudaMemcpyHostToDevice));
 
         cudaDeviceSynchronize();
         CHECK_CUDA(cudaPeekAtLastError());
 
+        cuda_incore_laplacian_t ctx;
+        tet4_cuda_incore_laplacian_init(&ctx, mesh);
+
         double spmv_tick = MPI_Wtime();
 
-        // TODO MF kernel  
+        tet4_cuda_incore_laplacian_apply(&ctx, d_x, d_y);
 
         cudaDeviceSynchronize();
 
@@ -99,9 +103,11 @@ int main(int argc, char *argv[]) {
         printf("mf: %g (seconds)\n", spmv_tock - spmv_tick);
 
         CHECK_CUDA(cudaPeekAtLastError());
-        CHECK_CUDA(cudaMemcpy(y, dY, nnodes * sizeof(real_t), cudaMemcpyDeviceToHost));
-        CHECK_CUDA(cudaFree(dX));
-        CHECK_CUDA(cudaFree(dY));
+        CHECK_CUDA(cudaMemcpy(y, d_y, nnodes * sizeof(real_t), cudaMemcpyDeviceToHost));
+        CHECK_CUDA(cudaFree(d_x));
+        CHECK_CUDA(cudaFree(d_y));
+
+        tet4_cuda_incore_laplacian_destroy(&ctx);
     }
 
     array_write(comm, output_path, SFEM_MPI_REAL_T, y, nnodes, nnodes);
