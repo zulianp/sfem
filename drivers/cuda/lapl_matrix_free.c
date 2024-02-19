@@ -92,6 +92,7 @@ int main(int argc, char *argv[]) {
 
         cuda_incore_laplacian_t ctx;
         tet4_cuda_incore_laplacian_init(&ctx, mesh);
+        cudaDeviceSynchronize();
 
         double spmv_tick = MPI_Wtime();
 

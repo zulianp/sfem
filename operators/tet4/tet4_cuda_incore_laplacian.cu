@@ -77,7 +77,7 @@ static inline __device__ __host__ void fff_micro_kernel(const geom_t px0,
     fff[5 * stride] = x20 * (x22 * POW2(x31) + x22 * POW2(x32) + x22 * POW2(x33));
 }
 
-static inline __device__ __host__ void lapl_apply_mk(const geom_t *const SFEM_RESTRICT fff,
+static inline __device__ __host__ void lapl_apply_micro_kernel(const geom_t *const SFEM_RESTRICT fff,
                                                      const ptrdiff_t stride,
                                                      const real_t *const SFEM_RESTRICT x,
                                                      real_t *const SFEM_RESTRICT y) {
@@ -127,7 +127,7 @@ __global__ void tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t nelement
         }
 
         // apply operator
-        lapl_apply_mk(&fff[e], nelements, ex, ey);
+        lapl_apply_micro_kernel(&fff[e], nelements, ex, ey);
 
         // redistribute coeffs
 #pragma unroll(4)

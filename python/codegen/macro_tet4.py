@@ -27,7 +27,8 @@ def subJ(micro_ref):
 	Am = sp.Matrix(3, 3, [
 		um[0], vm[0], wm[0], 
 		um[1], vm[1], wm[1],
-		um[2], vm[2], wm[2] ])
+		um[2], vm[2], wm[2]
+	])
 
 	Aminv = inv3(Am)
 	Rm = Am
