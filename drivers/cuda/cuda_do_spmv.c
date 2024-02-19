@@ -108,11 +108,14 @@ int main(int argc, char *argv[]) {
         CHECK_CUDA(cudaMalloc((void **)&csrColInd, crs.lnnz * sizeof(idx_t)));
         CHECK_CUDA(cudaMalloc((void **)&csrValues, crs.lnnz * sizeof(real_t)));
 
+        CHECK_CUDA(cudaMemcpy(csrRowOffsets,
+                              (count_t *)crs.rowptr,
+                              (crs.lrows + 1) * sizeof(count_t),
+                              cudaMemcpyHostToDevice));
         CHECK_CUDA(cudaMemcpy(
-            csrRowOffsets, (count_t *)crs.rowptr, (crs.lrows + 1) * sizeof(count_t), cudaMemcpyHostToDevice));
-        CHECK_CUDA(cudaMemcpy(csrColInd, (idx_t *)crs.colidx, crs.lnnz * sizeof(idx_t), cudaMemcpyHostToDevice));
-        CHECK_CUDA(cudaMemcpy(csrValues, (real_t *)crs.values, crs.lnnz * sizeof(real_t), cudaMemcpyHostToDevice));
-
+            csrColInd, (idx_t *)crs.colidx, crs.lnnz * sizeof(idx_t), cudaMemcpyHostToDevice));
+        CHECK_CUDA(cudaMemcpy(
+            csrValues, (real_t *)crs.values, crs.lnnz * sizeof(real_t), cudaMemcpyHostToDevice));
 
         cusparseSpMatDescr_t d_matrix;
 
@@ -163,6 +166,8 @@ int main(int argc, char *argv[]) {
         cudaDeviceSynchronize();
         CHECK_CUDA(cudaPeekAtLastError());
 
+        double spmv_tick = MPI_Wtime();
+
         CHECK_CUSPARSE(cusparseSpMV(handle,
                                     op_type,
                                     &alpha,
@@ -175,6 +180,10 @@ int main(int argc, char *argv[]) {
                                     dBuffer));
 
         cudaDeviceSynchronize();
+
+        double spmv_tock = MPI_Wtime();
+        printf("spmv: %g (seconds)\n", spmv_tock - spmv_tick);
+
         CHECK_CUDA(cudaPeekAtLastError());
         CHECK_CUDA(cudaMemcpy(y, dY, crs.lrows * sizeof(real_t), cudaMemcpyDeviceToHost));
 
@@ -198,7 +207,6 @@ int main(int argc, char *argv[]) {
 
     double tock = MPI_Wtime();
     if (!rank) {
-
         printf("cuda_do_spmv.c\n");
         printf("TTS: %g seconds\n", tock - tick);
     }

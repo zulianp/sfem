@@ -39,12 +39,9 @@ assemble $mesh_sorted linear_system
 
 eval_nodal_function.py "x*x + y*y" $mesh_sorted/x.raw $mesh_sorted/y.raw  $mesh_sorted/z.raw linear_system/rhs.raw
 
- # ../../spmv <alpha> <transpose> <crs_folder> <x.raw> <output.raw> <output_folder>
+# cuspmv 1 0 linear_system linear_system/rhs.raw test.raw
+spmv 1 0 linear_system linear_system/rhs.raw test.raw
 
-cuspmv 1 0 linear_system linear_system/rhs.raw test.raw
-# spmv 1 0 linear_system linear_system/rhs.raw test.raw
-
-# usage: ../../lumped_mass_inv <folder> <in.raw> <out.raw>
 lumped_mass_inv $mesh_sorted test.raw out.raw
 raw_to_db.py $mesh_sorted out.vtk --point_data="out.raw,linear_system/rhs.raw,test.raw"
 
