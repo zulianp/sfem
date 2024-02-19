@@ -59,6 +59,9 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    int SFEM_REPEAT = 1;
+    SFEM_READ_ENV(SFEM_REPEAT, atoi);
+
     const real_t alpha = atof(argv[1]);
     const int transpose = atoi(argv[2]);
     const char *crs_folder = argv[3];
@@ -168,21 +171,23 @@ int main(int argc, char *argv[]) {
 
         double spmv_tick = MPI_Wtime();
 
-        CHECK_CUSPARSE(cusparseSpMV(handle,
-                                    op_type,
-                                    &alpha,
+        for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
+            CHECK_CUSPARSE(cusparseSpMV(handle,
+                                        op_type,
+                                        &alpha,
                                     d_matrix,
                                     vecX,
                                     &beta,
                                     vecY,
-                                    valueType,
-                                    CUSPARSE_SPMV_ALG_DEFAULT,
-                                    dBuffer));
+                                        valueType,
+                                        CUSPARSE_SPMV_ALG_DEFAULT,
+                                        dBuffer));
+        }
 
         cudaDeviceSynchronize();
 
         double spmv_tock = MPI_Wtime();
-        printf("spmv: %g (seconds)\n", spmv_tock - spmv_tick);
+        printf("spmv: %g (seconds)\n", (spmv_tock - spmv_tick) / SFEM_REPEAT);
 
         CHECK_CUDA(cudaPeekAtLastError());
         CHECK_CUDA(cudaMemcpy(y, dY, crs.lrows * sizeof(real_t), cudaMemcpyDeviceToHost));

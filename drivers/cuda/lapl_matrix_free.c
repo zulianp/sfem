@@ -65,6 +65,9 @@ int main(int argc, char *argv[]) {
     const char *x_path = argv[3];
     const char *output_path = argv[4];
 
+    int SFEM_REPEAT = 1;
+    SFEM_READ_ENV(SFEM_REPEAT, atoi);
+
     mesh_t mesh;
     mesh_read(comm, mesh_folder, &mesh);
 
@@ -96,12 +99,14 @@ int main(int argc, char *argv[]) {
 
         double spmv_tick = MPI_Wtime();
 
-        tet4_cuda_incore_laplacian_apply(&ctx, d_x, d_y);
+        for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
+            tet4_cuda_incore_laplacian_apply(&ctx, d_x, d_y);
+        }
 
         cudaDeviceSynchronize();
 
         double spmv_tock = MPI_Wtime();
-        printf("mf: %g (seconds)\n", spmv_tock - spmv_tick);
+        printf("mf: %g (seconds)\n", (spmv_tock - spmv_tick) / SFEM_REPEAT);
 
         CHECK_CUDA(cudaPeekAtLastError());
         CHECK_CUDA(cudaMemcpy(y, d_y, nnodes * sizeof(real_t), cudaMemcpyDeviceToHost));

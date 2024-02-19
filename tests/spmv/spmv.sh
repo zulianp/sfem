@@ -22,6 +22,8 @@ LAUNCH="mpiexec -np 8"
 export OMP_NUM_THREADS=16
 export OMP_PROC_BIND=true 
 
+export SFEM_REPEAT=40
+
 # LAUNCH=""
 
 source venv/bin/activate
