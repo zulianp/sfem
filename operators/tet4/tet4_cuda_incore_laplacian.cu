@@ -113,14 +113,17 @@ __global__ void tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t nelement
                                                         const geom_t *const SFEM_RESTRICT fff,
                                                         const real_t *const SFEM_RESTRICT x,
                                                         real_t *const SFEM_RESTRICT y) {
-    real_t ex[4];
-    real_t ey[4];
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
          e += blockDim.x * gridDim.x) {
+        real_t ex[4];
+        real_t ey[4];
+        idx_t vidx[4];
+
         // collect coeffs
 #pragma unroll(4)
         for (int v = 0; v < 4; ++v) {
-            ex[v] = x[elems[v * nelements + e]];
+        	vidx[v] = elems[v * nelements + e];
+            ex[v] = x[vidx[v]];
         }
 
         // apply operator
@@ -129,22 +132,20 @@ __global__ void tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t nelement
         // redistribute coeffs
 #pragma unroll(4)
         for (int v = 0; v < 4; ++v) {
-            idx_t idx = elems[v * nelements + e];
-            atomicAdd(&y[idx], ey[v]);
+            atomicAdd(&y[vidx[v]], ey[v]);
         }
     }
 }
 
 extern int tet4_cuda_incore_laplacian_apply(cuda_incore_laplacian_t *ctx,
-                                     const real_t *const d_x,
-                                     real_t *const d_y) {
+                                            const real_t *const d_x,
+                                            real_t *const d_y) {
     static int block_size = 128;
     ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (ctx->nelements + block_size - 1) / block_size);
     tet4_cuda_incore_laplacian_apply_kernel<<<n_blocks, block_size, 0>>>(
         ctx->nelements, ctx->d_elems, ctx->d_fff, d_x, d_y);
     return 0;
 }
-
 
 extern int tet4_cuda_incore_laplacian_init(cuda_incore_laplacian_t *ctx, mesh_t mesh) {
     {  // Create FFF and store it on device
@@ -193,13 +194,12 @@ extern int tet4_cuda_incore_laplacian_init(cuda_incore_laplacian_t *ctx, mesh_t 
     return 0;
 }
 
-extern int tet4_cuda_incore_laplacian_destroy(cuda_incore_laplacian_t *ctx)
-{
-	cudaFree(ctx->d_elems);
-	cudaFree(ctx->d_fff);
+extern int tet4_cuda_incore_laplacian_destroy(cuda_incore_laplacian_t *ctx) {
+    cudaFree(ctx->d_elems);
+    cudaFree(ctx->d_fff);
 
-	ctx->nelements = 0;
-	ctx->d_elems = nullptr;
-	ctx->d_fff = nullptr;
-	return 0;
+    ctx->nelements = 0;
+    ctx->d_elems = nullptr;
+    ctx->d_fff = nullptr;
+    return 0;
 }

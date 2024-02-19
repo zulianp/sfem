@@ -116,7 +116,7 @@ int main(int argc, char *argv[]) {
 
     double tock = MPI_Wtime();
     if (!rank) {
-        printf("cuda_do_spmv.c\n");
+        printf("lapl_matrix_free.c\n");
         printf("TTS: %g seconds\n", tock - tick);
     }
 
