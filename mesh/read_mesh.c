@@ -20,7 +20,7 @@
     do {                                 \
         printf("[%d] %s\n", rank, msg_); \
         MPI_Barrier(MPI_COMM_WORLD);     \
-    } while (0);
+    } while (0)
 
 #define array_remap_scatter(n_, type_, mapping_, array_, temp_) \
     do {                                                        \
@@ -398,7 +398,7 @@ int mesh_read_elements(MPI_Comm comm,
 
 #ifdef SFEM_MEM_DIAGNOSTICS
     printf("mesh_read_elements: allocated %g GB\n",
-           nnodesxelem * *n_elements * sizeof(idx_t) * 1e-9);
+           nnodesxelem * *n_local_elements * sizeof(idx_t) * 1e-9);
 #endif
 
     return ret;
