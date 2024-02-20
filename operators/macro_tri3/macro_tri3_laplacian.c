@@ -20,23 +20,11 @@ static SFEM_INLINE void fff_micro_kernel(const geom_t px0,
     fff[2] = x4 * (POW2(x0) * x5 + POW2(x3) * x5);
 }
 
-static SFEM_INLINE void sub_fff_0(const geom_t *const SFEM_RESTRICT fff,
-                                  geom_t *const SFEM_RESTRICT sub_fff) {
-    const real_t x0 = (1.0 / 4.0) * fff[1];
-    sub_fff[0] = (1.0 / 4.0) * fff[0];
-    sub_fff[1] = x0;
-    sub_fff[2] = x0;
-    sub_fff[3] = (1.0 / 4.0) * fff[3];
-}
-
 static SFEM_INLINE void sub_fff_1(const geom_t *const SFEM_RESTRICT fff,
                                   geom_t *const SFEM_RESTRICT sub_fff) {
-    const real_t x0 = (1.0 / 4.0) * fff[3];
-    const real_t x1 = -1.0 / 4.0 * fff[1] + (1.0 / 4.0) * fff[3];
-    sub_fff[0] = x0;
-    sub_fff[1] = x1;
-    sub_fff[2] = x1;
-    sub_fff[3] = (1.0 / 4.0) * fff[0] - 1.0 / 2.0 * fff[1] + x0;
+    sub_fff[0] = fff[0] + 2 * fff[1] + fff[2];
+    sub_fff[1] = -fff[0] - fff[1];
+    sub_fff[2] = fff[0];
 }
 
 static SFEM_INLINE void lapl_apply_micro_kernel(const geom_t *const SFEM_RESTRICT fff,
@@ -95,10 +83,8 @@ void macro_tri3_laplacian_apply(const ptrdiff_t nelements,
                 xyz[0][i0], xyz[0][i1], xyz[0][i2], xyz[1][i0], xyz[1][i1], xyz[1][i2], fff);
 
             {
-                // Corner FFFs (Same fff)
-                sub_fff_0(fff, sub_fff);
-
-                lapl_apply_micro_kernel(sub_fff,
+                // Corner FFFs (Same as fff)
+                lapl_apply_micro_kernel(fff,
                                         element_u[0],
                                         element_u[3],
                                         element_u[5],
@@ -106,7 +92,7 @@ void macro_tri3_laplacian_apply(const ptrdiff_t nelements,
                                         &element_vector[3],
                                         &element_vector[5]);
 
-                lapl_apply_micro_kernel(sub_fff,
+                lapl_apply_micro_kernel(fff,
                                         element_u[3],
                                         element_u[1],
                                         element_u[4],
@@ -114,7 +100,7 @@ void macro_tri3_laplacian_apply(const ptrdiff_t nelements,
                                         &element_vector[1],
                                         &element_vector[4]);
 
-                lapl_apply_micro_kernel(sub_fff,
+                lapl_apply_micro_kernel(fff,
                                         element_u[5],
                                         element_u[4],
                                         element_u[2],

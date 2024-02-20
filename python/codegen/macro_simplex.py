@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 
 import numpy as np
-import pdb
+# import pdb
+from fe import FE
+import sympy as sp
+from sfem_codegen import *
 
 dim = 2
 
@@ -20,6 +23,12 @@ if dim == 2:
 	]
 
 	unique = [0, 3]
+
+	c = coeffs("fff", 3)
+	FFFs = sp.Matrix(dim, dim, [
+		c[0], c[1],
+		c[1], c[2]
+	])
 
 else:
 	sub_simplices = [
@@ -43,6 +52,13 @@ else:
 
 	unique = [0, 4, 5, 6, 7]
 
+	c = coeffs("fff", 6)
+	FFFs = sp.Matrix(dim, dim, [
+		c[0], c[1], c[2], 
+		c[1], c[3], c[4],
+		c[2], c[4], c[5]
+	])
+
 def read_file(path):
 	with open(path, 'r') as f:
 	    tpl = f.read()
@@ -55,35 +71,40 @@ def str_to_file(path, mystr):
 		f.write(mystr)
 		f.close()
 
-def assign_matrix(name, mat):
+def assign_fff(name, mat):
 	rows, cols = mat.shape
 
 	expr = []
+	idx = 0
 	for i in range(0, rows):
-		for j in range(0, cols):
-			var = sp.symbols(f'{name}[{i*cols + j}]')
+		for j in range(i, cols):
+			var = sp.symbols(f'{name}[{idx}]')
 			expr.append(ast.Assignment(var, mat[i, j]))
+			idx += 1
 	return expr
-
-from fe import FE
-import sympy as sp
-from sfem_codegen import *
 
 def subJ_generic(micro_ref, FFFs):
 	Am = sp.zeros(dim, dim)
 
 	for d1 in range(0, dim):
 		for d2 in range(0, dim):
-			Am[d1, d2] = micro_ref[d1+1, d2] - micro_ref[0, d2]
+			Am[d2, d1] = micro_ref[d1+1][d2] - micro_ref[0][d2]
 	
-	Aminv = inv2(Am)
-	Rm = Am
-	Rminv = inv2(Rm)
-	FFAms = Rm * FFFs * Rm.T
+	detAm = determinant(Am)
+	Aminv = inverse(Am)
+
+	# inv(J * A) = (inv(A) * inv(J))
+	# inv(J * A)^T = (inv(J)^T * inv(A)^T)
+	# <(inv(J)^T * inv(A)^T) gi, (inv(J)^T * inv(A)^T) gj> 
+	# <(inv(J)^T * inv(A)*T)^T * inv(J)^T * inv(A)^T gi, gj>
+	# <inv(A) * inv(J) * inv(J)^T * inv(A)^T gi, gj>
+	# <inv(A) * FFF * inv(A)^T gi, gj>
+
+
+	FFAms = Aminv * FFFs * Aminv.T * detAm
 	return FFAms
 
 def subJ(micro_ref):
-	FFFs = matrix_coeff("fff", dim, dim)
 	for d1 in range(0, dim):
 		for d2 in range(d1+1, dim):
 			FFFs[d2, d1] = FFFs[d1, d2] 
@@ -95,12 +116,12 @@ def fff_code_basic(FFF):
 	tpl = read_file('tpl/macro_sub_jacobian_tpl.c')
 	code0to2 = tpl.format(
 		NUM="0to2",
-		CODE=c_gen(assign_matrix("sub_fff", FFF[0]))
+		CODE=c_gen(assign_fff("sub_fff", FFF[0]))
 	)
 
 	code3 = tpl.format(
 		NUM="3",
-		CODE=c_gen(assign_matrix("sub_fff", FFF[3]))
+		CODE=c_gen(assign_fff("sub_fff", FFF[3]))
 	)
 
 	funs = [code0to2, code3]
@@ -111,7 +132,7 @@ def fff_code(name, FFF):
 	tpl = read_file('tpl/macro_sub_jacobian_tpl.c')
 	code = tpl.format(
 		NUM=name,
-		CODE=c_gen(assign_matrix("sub_fff", FFF))
+		CODE=c_gen(assign_fff("sub_fff", FFF))
 	)
 
 	return code
@@ -158,7 +179,8 @@ fffl = MacroSimplex().fff_level_n(nl)
 for l in range(0, nl):
 	num = 0
 	print(f'level {l} #fff {len(fffl[l])}')
-	for i in unique:
+	# for i in unique:
+	for i in range(0, len(fffl[l])):
 		f = fffl[l][i]
 		print(fff_code(f'{l}_{num}',f))
 		num += 1

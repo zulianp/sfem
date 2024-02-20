@@ -82,6 +82,7 @@ INCLUDES += -I$(PWD) -I$(PWD)/.. -I$(PWD)/../matrix.io
 
 # Assemble systems
 GOALS = assemble assemble3 assemble4 neohookean_assemble stokes stokes_check linear_elasticity_assemble
+GOALS += macro_element_apply
 
 # Mesh manipulation
 GOALS += partition select_submesh refine skin extract_sharp_edges extrude wedge6_to_tet4 mesh_self_intersect select_surf volumes sfc
@@ -288,6 +289,9 @@ assemble3 : assemble3.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 assemble4 : assemble4.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+macro_element_apply : macro_element_apply.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 stokes : stokes.o libsfem.a

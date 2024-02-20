@@ -39,7 +39,7 @@ mkdir -p $folder
 idx_type_size=4
 
 box_2D.py $mesh_db $nrefs 1 1
-db_to_raw.py $mesh_db $mesh_raw
+db_to_raw.py $mesh_db $mesh_raw --select_elem_type=triangle
 
 # set -x
 
