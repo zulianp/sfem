@@ -19,7 +19,7 @@ export PATH=$SCRIPTPATH/../../python/sfem/utils:$PATH
 export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 LAUNCH="mpiexec -np 8"
-export OMP_NUM_THREADS=16
+export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 
 export SFEM_REPEAT=40
@@ -37,9 +37,12 @@ if [[ -d "$simulation_mesh" ]]
 then
 	echo "Reusing $simulation_mesh"
 else
-	create_square.sh 2
-	mesh_p1_to_p2 $mesh $simulation_mesh
-	refine $mesh $refined_mesh
+	# create_square.sh 6
+	create_sphere.sh 1
+	refine $mesh temp1
+	refine temp1 temp2
+	mesh_p1_to_p2 temp2 $simulation_mesh
+	refine temp2 $refined_mesh
 
 	mkdir -p linear_system
 	eval_nodal_function.py "x*x" $simulation_mesh/x.raw $simulation_mesh/y.raw  $simulation_mesh/z.raw linear_system/rhs.raw

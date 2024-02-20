@@ -3,6 +3,8 @@
 from sfem_codegen import *
 from tri3 import *
 from tri6 import *
+from tet4 import *
+
 
 
 # import pdb
@@ -151,9 +153,13 @@ class LaplaceOp:
 
 def main():
 	# fe = Tri6()
-	fe = Tri3()
+	# fe = Tri3()
+	# q = sp.Matrix(2, 1, [qx, qy])
+	# op = LaplaceOp(fe, q)
 
-	q = sp.Matrix(2, 1, [qx, qy])
+	fe = Tet4()
+
+	q = sp.Matrix(3, 1, [qx, qy, qz])
 	op = LaplaceOp(fe, q)
 
 	print("FFF")

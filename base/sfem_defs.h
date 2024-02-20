@@ -21,6 +21,7 @@ enum ElemType {
     BEAM2 = 100002,
     MACRO = 100,
     MACRO_TRI3 = (MACRO + TRI3),
+    MACRO_TET4 = (MACRO + TET4),
     INVALID = -1
 };
 
@@ -102,6 +103,8 @@ SFEM_INLINE static int elem_num_nodes(const enum ElemType type) {
             return 6;
         case MACRO_TRI3:
             return 6;
+        case MACRO_TET4:
+            return 10;
         case HEX8:
             return 8;
         case TET10:
@@ -123,6 +126,8 @@ SFEM_INLINE static int elem_num_sides(const enum ElemType type) {
             return 3;
         case MACRO_TRI3:
             return 3; // Really?
+        case MACRO_TET4:
+            return 4;
         case QUAD4:
             return 4;
         case TET4:
@@ -160,6 +165,8 @@ SFEM_INLINE static int elem_manifold_dim(const enum ElemType type) {
             return 2;
         case MACRO_TRI3:
             return 2;
+        case MACRO_TET4:
+            return 3;
         case HEX8:
             return 3;
         case TET10:

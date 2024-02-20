@@ -6,7 +6,7 @@ from fe import FE
 import sympy as sp
 from sfem_codegen import *
 
-dim = 2
+dim = 3
 
 if dim == 2:
 	sub_simplices = np.array([

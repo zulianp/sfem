@@ -1,5 +1,8 @@
 #include "macro_tri3_laplacian.h"
 
+#include <stdio.h>
+#include <mpi.h>
+
 #define POW2(a) ((a) * (a))
 
 static SFEM_INLINE void fff_micro_kernel(const geom_t px0,
@@ -55,6 +58,8 @@ void macro_tri3_laplacian_apply(const ptrdiff_t nelements,
                                 geom_t **const SFEM_RESTRICT xyz,
                                 const real_t *const SFEM_RESTRICT u,
                                 real_t *const SFEM_RESTRICT values) {
+    double tick = MPI_Wtime();
+
 #pragma omp parallel
     {
 #pragma omp for  // nowait
@@ -127,4 +132,7 @@ void macro_tri3_laplacian_apply(const ptrdiff_t nelements,
             }
         }
     }
+
+    double tock = MPI_Wtime();
+    printf("macro_tri3_laplacian_apply %g (seconds)\n", tock - tick);
 }
