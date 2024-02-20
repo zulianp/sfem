@@ -201,12 +201,12 @@ void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
                 xyz[2][i3],
                 //
                 fff);
-
+            
             {  // Corner tests
                 sub_fff_0(fff, sub_fff);
 
                 // [0, 4, 6, 7],
-                lapl_apply_micro_kernel(fff,
+                lapl_apply_micro_kernel(sub_fff,
                                         element_u[0],
                                         element_u[4],
                                         element_u[6],
@@ -217,7 +217,7 @@ void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
                                         &element_vector[7]);
 
                 // [4, 1, 5, 8],
-                lapl_apply_micro_kernel(fff,
+                lapl_apply_micro_kernel(sub_fff,
                                         element_u[4],
                                         element_u[1],
                                         element_u[5],
@@ -228,7 +228,7 @@ void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
                                         &element_vector[8]);
 
                 // [6, 5, 2, 9],
-                lapl_apply_micro_kernel(fff,
+                lapl_apply_micro_kernel(sub_fff,
                                         element_u[6],
                                         element_u[5],
                                         element_u[2],
@@ -239,7 +239,7 @@ void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
                                         &element_vector[9]);
 
                 // [7, 8, 9, 3],
-                lapl_apply_micro_kernel(fff,
+                lapl_apply_micro_kernel(sub_fff,
                                         element_u[7],
                                         element_u[8],
                                         element_u[9],
@@ -254,7 +254,7 @@ void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
 
                 // [4, 5, 6, 8],
                 sub_fff_4(fff, sub_fff);
-                lapl_apply_micro_kernel(fff,
+                lapl_apply_micro_kernel(sub_fff,
                                         element_u[4],
                                         element_u[5],
                                         element_u[6],
@@ -266,7 +266,7 @@ void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
 
                 // [7, 4, 6, 8],
                 sub_fff_5(fff, sub_fff);
-                lapl_apply_micro_kernel(fff,
+                lapl_apply_micro_kernel(sub_fff,
                                         element_u[7],
                                         element_u[4],
                                         element_u[6],
@@ -278,7 +278,7 @@ void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
 
                 // [6, 5, 9, 8],
                 sub_fff_6(fff, sub_fff);
-                lapl_apply_micro_kernel(fff,
+                lapl_apply_micro_kernel(sub_fff,
                                         element_u[6],
                                         element_u[5],
                                         element_u[9],
@@ -290,7 +290,7 @@ void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
 
                 // [7, 6, 9, 8]]
                 sub_fff_7(fff, sub_fff);
-                lapl_apply_micro_kernel(fff,
+                lapl_apply_micro_kernel(sub_fff,
                                         element_u[7],
                                         element_u[6],
                                         element_u[9],
