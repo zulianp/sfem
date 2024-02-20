@@ -1,7 +1,47 @@
 #!/usr/bin/env python3
 
+import numpy as np
 import pdb
-# from sfem_codegen import *
+
+dim = 2
+
+if dim == 2:
+	sub_simplices = np.array([
+		[0, 3, 5],
+		[3, 1, 4],
+		[5, 4, 2],
+		[3, 4, 5]
+	])
+
+	edges = [
+		[0, 1],
+		[1, 2],
+		[2, 0],
+	]
+
+	unique = [0, 3]
+
+else:
+	sub_simplices = [
+	[0, 4, 6, 7],
+	[4, 1, 5, 8],
+	[6, 5, 2, 9],
+	[7, 8, 9, 3],
+	[4, 5, 6, 8],
+	[7, 4, 6, 8],
+	[6, 5, 9, 8],
+	[7, 6, 9, 8]]
+
+	edges = [
+		[0, 1],
+		[1, 2],
+		[0, 2],
+		[0, 3],
+		[1, 3],
+		[2, 3]
+	]
+
+	unique = [0, 4, 5, 6, 7]
 
 def read_file(path):
 	with open(path, 'r') as f:
@@ -29,15 +69,13 @@ from fe import FE
 import sympy as sp
 from sfem_codegen import *
 
-
 def subJ_generic(micro_ref, FFFs):
-	x0m = micro_ref[0]
-	x1m = micro_ref[1]
-	x2m = micro_ref[2]
+	Am = sp.zeros(dim, dim)
 
-	um = x1m - x0m
-	vm = x2m - x0m
-	Am = sp.Matrix(2, 2, [um[0], vm[0], um[1], vm[1]])
+	for d1 in range(0, dim):
+		for d2 in range(0, dim):
+			Am[d1, d2] = micro_ref[d1+1, d2] - micro_ref[0, d2]
+	
 	Aminv = inv2(Am)
 	Rm = Am
 	Rminv = inv2(Rm)
@@ -45,8 +83,11 @@ def subJ_generic(micro_ref, FFFs):
 	return FFAms
 
 def subJ(micro_ref):
-	FFFs = matrix_coeff("fff", 2, 2)
-	FFFs[1, 0] = FFFs[0, 1] 
+	FFFs = matrix_coeff("fff", dim, dim)
+	for d1 in range(0, dim):
+		for d2 in range(d1+1, dim):
+			FFFs[d2, d1] = FFFs[d1, d2] 
+
 	return subJ_generic(micro_ref, FFFs)
 
 def fff_code_basic(FFF):
@@ -75,75 +116,49 @@ def fff_code(name, FFF):
 
 	return code
 
-class MacroTri3:
+class MacroSimplex:
 	def __init__(self):
-		self.x0 = vec2(0., 0.)
-		self.x1 = vec2(1., 0.)
-		self.x2 = vec2(0., 1.)
-		self.x3 = (self.x0 + self.x1)/2
-		self.x4 = (self.x1 + self.x2)/2
-		self.x5 = (self.x2 + self.x0)/2
+		points = []
+		points.append(sp.zeros(dim, 1))
+		for d1 in range(0, dim):
+			p = sp.zeros(dim, 1)
+			p[d1] = 1
+			points.append(p)
 
-	def fff_level_1(self):
-		x0 = self.x0 
-		x1 = self.x1 
-		x2 = self.x2 
-		x3 = self.x3 
-		x4 = self.x4 
-		x5 = self.x5 
+		for e in edges:
+			p = (points[e[0]] + points[e[1]])/2
+			points.append(p)
 
-		FFFA0toA2 = subJ([x0, x3, x5])
-		FFF = [
-			FFFA0toA2,
-			FFFA0toA2,
-			FFFA0toA2,
-			subJ([x3, x4, x5])
-		]
+		self.points = np.array(points)
 
-		return fff_code_basic(FFF)
-	
 	def fff_level_n(self, n_levels):
-		x0 = self.x0 
-		x1 = self.x1 
-		x2 = self.x2 
-		x3 = self.x3 
-		x4 = self.x4 
-		x5 = self.x5 
-
 		levels = [[]] * n_levels
-		FFFA0toA2 = subJ([x0, x3, x5])
-		FFFA3 = subJ([x3, x4, x5])
-		levels[0].append(FFFA0toA2)
-		levels[0].append(FFFA3)
+		x = self.points
+
+		for ss in sub_simplices:
+			refpattern = x[ss]
+			fff = subJ(refpattern)
+			levels[0].append(fff)
 
 		for l in range(1, n_levels):
 			n_ffs = len(levels[l-1])
-			print(n_ffs)
-
 			levels[l] = [0]*(n_ffs * 2)
 
 			for i in range(0, n_ffs):
 				fff = levels[l-1][i]
-				fffa = subJ_generic([x0, x3, x5], fff)
-				fffb = subJ_generic([x3, x4, x5], fff)
-				levels[l][i*2]= fffa
-				levels[l][i*2+1] = fffb
+				for ss in sub_simplices:
+					refpattern = x[ss]
+					sub_fff = subJ_generic(refpattern, fff)
+					levels[l].append(sub_fff)
 		return levels
 
-
-
-
-# fff = MacroTri3().fff_level_1()
-# for f in fff:
-# 	print(f)
-
 nl = 1
-fffl = MacroTri3().fff_level_n(nl)
+fffl = MacroSimplex().fff_level_n(nl)
 
 for l in range(0, nl):
 	num = 0
 	print(f'level {l} #fff {len(fffl[l])}')
-	for f in fffl[l]:
+	for i in unique:
+		f = fffl[l][i]
 		print(fff_code(f'{l}_{num}',f))
 		num += 1
-

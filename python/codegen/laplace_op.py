@@ -150,14 +150,20 @@ class LaplaceOp:
 		return expr
 
 def main():
-	fe = Tri6()
+	# fe = Tri6()
+	fe = Tri3()
+
 	q = sp.Matrix(2, 1, [qx, qy])
 	op = LaplaceOp(fe, q)
 
+	print("FFF")
 	c_code(op.fff())
 
-
+	print("Hessian")
 	c_code(op.hessian())
+
+	print("Gradient")
+	c_code(op.gradient())
 
 if __name__ == '__main__':
 	main()
