@@ -38,7 +38,7 @@ then
 	echo "Reusing $simulation_mesh"
 else
 	# create_square.sh 6
-	create_sphere.sh 1
+	create_sphere.sh 2
 	refine $mesh temp1
 	refine temp1 temp2
 	mesh_p1_to_p2 temp2 $simulation_mesh
