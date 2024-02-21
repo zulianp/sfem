@@ -15,6 +15,7 @@
 #include "sfem_base.h"
 #include "sfem_mesh.h"
 
+#include "macro_tet4_cuda_incore_laplacian.h"
 #include "tet4_cuda_incore_laplacian.h"
 
 #define CHECK_CUDA(func)                                               \
@@ -94,13 +95,24 @@ int main(int argc, char *argv[]) {
         CHECK_CUDA(cudaPeekAtLastError());
 
         cuda_incore_laplacian_t ctx;
-        tet4_cuda_incore_laplacian_init(&ctx, mesh);
+
+        if (mesh.element_type == TET4) {
+            tet4_cuda_incore_laplacian_init(&ctx, mesh);
+        } else if (mesh.element_type == TET10) {
+            // Go for macro just for testing
+            macro_tet4_cuda_incore_laplacian_init(&ctx, mesh);
+        }
+
         cudaDeviceSynchronize();
 
         double spmv_tick = MPI_Wtime();
 
         for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
-            tet4_cuda_incore_laplacian_apply(&ctx, d_x, d_y);
+            if (mesh.element_type == TET4) {
+                tet4_cuda_incore_laplacian_apply(&ctx, d_x, d_y);
+            } else if (mesh.element_type == TET10) {
+                macro_tet4_cuda_incore_laplacian_apply(&ctx, mesh);
+            }
         }
 
         cudaDeviceSynchronize();
@@ -113,7 +125,11 @@ int main(int argc, char *argv[]) {
         CHECK_CUDA(cudaFree(d_x));
         CHECK_CUDA(cudaFree(d_y));
 
-        tet4_cuda_incore_laplacian_destroy(&ctx);
+        if (mesh.element_type == TET4) {
+            tet4_cuda_incore_laplacian_destroy(&ctx);
+        } else if (mesh.element_type == TET10) {
+            macro_tet4_cuda_incore_laplacian_destroy(&ctx);
+        }
     }
 
     array_write(comm, output_path, SFEM_MPI_REAL_T, y, nnodes, nnodes);

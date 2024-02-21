@@ -13,7 +13,7 @@ extern "C" {
 #include "sfem_cuda_base.h"
 #include "sfem_mesh.h"
 
-#include "tet4_cuda_incore_laplacian.h"
+#include "tet4_laplacian_incore_cuda.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define POW2(a) ((a) * (a))

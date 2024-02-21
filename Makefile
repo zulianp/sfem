@@ -231,7 +231,8 @@ ifeq ($(cuda), 1)
 # 	CUDA_OBJS = tet4_cuda_laplacian_2.o
 	CUDA_OBJS = tet4_cuda_laplacian_3.o
 	CUDA_OBJS += tet4_cuda_phase_field_for_fracture.o
-	CUDA_OBJS += tet4_cuda_incore_laplacian.o
+	CUDA_OBJS += tet4_laplacian_incore_cuda.o
+	CUDA_OBJS += macro_tet4_laplacian_incore_cuda.o
 	
 
 	CUDA_OBJS += cuda_crs.o

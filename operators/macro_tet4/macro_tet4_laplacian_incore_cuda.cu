@@ -13,7 +13,7 @@ extern "C" {
 #include "sfem_cuda_base.h"
 #include "sfem_mesh.h"
 
-#include "tet4_cuda_incore_laplacian.h"
+#include "macro_tet4_cuda_incore_laplacian.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define POW2(a) ((a) * (a))
@@ -32,8 +32,6 @@ static inline __device__ __host__ void fff_micro_kernel(const geom_t px0,
                                                         const geom_t pz3,
                                                         const count_t stride,
                                                         geom_t *fff) {
-    //      - Result: 6*ADD + 6*ASSIGNMENT + 24*MUL + 9*POW
-    //      - Subexpressions: 4*ADD + 6*DIV + 28*MUL + NEG + POW + 24*SUB
     const geom_t x0 = -px0 + px1;
     const geom_t x1 = -py0 + py2;
     const geom_t x2 = -pz0 + pz3;
@@ -77,35 +75,101 @@ static inline __device__ __host__ void fff_micro_kernel(const geom_t px0,
     fff[5 * stride] = x20 * (x22 * POW2(x31) + x22 * POW2(x32) + x22 * POW2(x33));
 }
 
-static inline __device__ __host__ void lapl_apply_micro_kernel(const geom_t *const SFEM_RESTRICT fff,
-                                                     const ptrdiff_t stride,
-                                                     const real_t *const SFEM_RESTRICT x,
-                                                     real_t *const SFEM_RESTRICT y) {
-    const real_t x0 = (1.0 / 6.0) * x[0];
-    const real_t x1 = fff[0 * stride] * x0;
-    const real_t x2 = (1.0 / 6.0) * x[1];
-    const real_t x3 = fff[0 * stride] * x2;
-    const real_t x4 = fff[1 * stride] * x2;
-    const real_t x5 = (1.0 / 6.0) * x[2];
-    const real_t x6 = fff[1 * stride] * x5;
-    const real_t x7 = fff[2 * stride] * x2;
-    const real_t x8 = (1.0 / 6.0) * x[3];
-    const real_t x9 = fff[2 * stride] * x8;
-    const real_t x10 = fff[3 * stride] * x0;
-    const real_t x11 = fff[3 * stride] * x5;
-    const real_t x12 = fff[4 * stride] * x5;
-    const real_t x13 = fff[4 * stride] * x8;
-    const real_t x14 = fff[5 * stride] * x0;
-    const real_t x15 = fff[5 * stride] * x8;
-    const real_t x16 = fff[1 * stride] * x0;
-    const real_t x17 = fff[2 * stride] * x0;
-    const real_t x18 = fff[4 * stride] * x0;
-    y[0] = (1.0 / 3.0) * fff[1 * stride] * x[0] + (1.0 / 3.0) * fff[2 * stride] * x[0] +
-           (1.0 / 3.0) * fff[4 * stride] * x[0] + x1 + x10 - x11 - x12 - x13 + x14 - x15 - x3 - x4 -
-           x6 - x7 - x9;
-    y[1] = -x1 - x16 - x17 + x3 + x6 + x9;
-    y[2] = -x10 + x11 + x13 - x16 - x18 + x4;
-    y[3] = x12 - x14 + x15 - x17 - x18 + x7;
+static inline __device__ __host__ void sub_fff_0(const geom_t *const SFEM_RESTRICT fff,
+                                                 geom_t *const SFEM_RESTRICT sub_fff) {
+    sub_fff[0] = (1.0 / 2.0) * fff[0];
+    sub_fff[1] = (1.0 / 2.0) * fff[1];
+    sub_fff[2] = (1.0 / 2.0) * fff[2];
+    sub_fff[3] = (1.0 / 2.0) * fff[3];
+    sub_fff[4] = (1.0 / 2.0) * fff[4];
+    sub_fff[5] = (1.0 / 2.0) * fff[5];
+}
+
+static inline __device__ __host__ void sub_fff_4(const geom_t *const SFEM_RESTRICT fff,
+                                                 geom_t *const SFEM_RESTRICT sub_fff) {
+    const geom_t x0 = (1.0 / 2.0) * fff[0];
+    const geom_t x1 = (1.0 / 2.0) * fff[2];
+    sub_fff[0] = fff[1] + (1.0 / 2.0) * fff[3] + x0;
+    sub_fff[1] = -1.0 / 2.0 * fff[1] - x0;
+    sub_fff[2] = (1.0 / 2.0) * fff[4] + x1;
+    sub_fff[3] = x0;
+    sub_fff[4] = -x1;
+    sub_fff[5] = (1.0 / 2.0) * fff[5];
+}
+
+static inline __device__ __host__ void sub_fff_5(const geom_t *const SFEM_RESTRICT fff,
+                                                 geom_t *const SFEM_RESTRICT sub_fff) {
+    const geom_t x0 = (1.0 / 2.0) * fff[3];
+    const geom_t x1 = fff[4] + (1.0 / 2.0) * fff[5] + x0;
+    const geom_t x2 = (1.0 / 2.0) * fff[4] + x0;
+    const geom_t x3 = (1.0 / 2.0) * fff[1];
+    sub_fff[0] = x1;
+    sub_fff[1] = -x2;
+    sub_fff[2] = -1.0 / 2.0 * fff[2] - x1 - x3;
+    sub_fff[3] = x0;
+    sub_fff[4] = x2 + x3;
+    sub_fff[5] = (1.0 / 2.0) * fff[0] + fff[1] + fff[2] + x1;
+}
+
+static inline __device__ __host__ void sub_fff_6(const geom_t *const SFEM_RESTRICT fff,
+                                                 geom_t *const SFEM_RESTRICT sub_fff) {
+    const geom_t x0 = (1.0 / 2.0) * fff[3];
+    const geom_t x1 = (1.0 / 2.0) * fff[4];
+    const geom_t x2 = (1.0 / 2.0) * fff[1] + x0;
+    sub_fff[0] = (1.0 / 2.0) * fff[0] + fff[1] + x0;
+    sub_fff[1] = (1.0 / 2.0) * fff[2] + x1 + x2;
+    sub_fff[2] = -x2;
+    sub_fff[3] = fff[4] + (1.0 / 2.0) * fff[5] + x0;
+    sub_fff[4] = -x0 - x1;
+    sub_fff[5] = x0;
+}
+
+static inline __device__ __host__ void sub_fff_7(const geom_t *const SFEM_RESTRICT fff,
+                                                 geom_t *const SFEM_RESTRICT sub_fff) {
+    const geom_t x0 = (1.0 / 2.0) * fff[5];
+    const geom_t x1 = (1.0 / 2.0) * fff[2];
+    sub_fff[0] = x0;
+    sub_fff[1] = -1.0 / 2.0 * fff[4] - x0;
+    sub_fff[2] = -x1;
+    sub_fff[3] = (1.0 / 2.0) * fff[3] + fff[4] + x0;
+    sub_fff[4] = (1.0 / 2.0) * fff[1] + x1;
+    sub_fff[5] = (1.0 / 2.0) * fff[0];
+}
+
+static inline __device__ __host__ void lapl_apply_micro_kernel(const geom_t *const SFEM_RESTRICT
+                                                                   fff,
+                                                               const real_t u0,
+                                                               const real_t u1,
+                                                               const real_t u2,
+                                                               const real_t u3,
+                                                               real_t *const SFEM_RESTRICT e0,
+                                                               real_t *const SFEM_RESTRICT e1,
+                                                               real_t *const SFEM_RESTRICT e2,
+                                                               real_t *const SFEM_RESTRICT e3) {
+    const real_t x0 = (1.0 / 6.0) * u0;
+    const real_t x1 = fff[0] * x0;
+    const real_t x2 = (1.0 / 6.0) * u1;
+    const real_t x3 = fff[0] * x2;
+    const real_t x4 = fff[1] * x2;
+    const real_t x5 = (1.0 / 6.0) * u2;
+    const real_t x6 = fff[1] * x5;
+    const real_t x7 = fff[2] * x2;
+    const real_t x8 = (1.0 / 6.0) * u3;
+    const real_t x9 = fff[2] * x8;
+    const real_t x10 = fff[3] * x0;
+    const real_t x11 = fff[3] * x5;
+    const real_t x12 = fff[4] * x5;
+    const real_t x13 = fff[4] * x8;
+    const real_t x14 = fff[5] * x0;
+    const real_t x15 = fff[5] * x8;
+    const real_t x16 = fff[1] * x0;
+    const real_t x17 = fff[2] * x0;
+    const real_t x18 = fff[4] * x0;
+    *e0 += (1.0 / 3.0) * fff[1] * u0 + (1.0 / 3.0) * fff[2] * u0 + (1.0 / 3.0) * fff[4] * u0 + x1 +
+           x10 - x11 - x12 - x13 + x14 - x15 - x3 - x4 - x6 - x7 - x9;
+    *e1 += -x1 - x16 - x17 + x3 + x6 + x9;
+    *e2 += -x10 + x11 + x13 - x16 - x18 + x4;
+    *e3 += x12 - x14 + x15 - x17 - x18 + x7;
 }
 
 __global__ void macro_tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t nelements,
@@ -115,23 +179,65 @@ __global__ void macro_tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t ne
                                                         real_t *const SFEM_RESTRICT y) {
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
          e += blockDim.x * gridDim.x) {
-        real_t ex[4];
-        real_t ey[4];
-        idx_t vidx[4];
+        real_t ex[10];
+        real_t ey[10];
+        idx_t vidx[10];
 
         // collect coeffs
-#pragma unroll(4)
-        for (int v = 0; v < 4; ++v) {
-        	vidx[v] = elems[v * nelements + e];
+#pragma unroll(10)
+        for (int v = 0; v < 10; ++v) {
+            vidx[v] = elems[v * nelements + e];
             ex[v] = x[vidx[v]];
         }
 
         // apply operator
-        lapl_apply_micro_kernel(&fff[e], nelements, ex, ey);
+
+        {  // Corner tests
+            sub_fff_0(fff, sub_fff);
+
+            // [0, 4, 6, 7],
+            lapl_apply_micro_kernel(
+                sub_fff, ex[0], ex[4], ex[6], ex[7], &ey[0], &ey[4], &ey[6], &ey[7]);
+
+            // [4, 1, 5, 8],
+            lapl_apply_micro_kernel(
+                sub_fff, ex[4], ex[1], ex[5], ex[8], &ey[4], &ey[1], &ey[5], &ey[8]);
+
+            // [6, 5, 2, 9],
+            lapl_apply_micro_kernel(
+                sub_fff, ex[6], ex[5], ex[2], ex[9], &ey[6], &ey[5], &ey[2], &ey[9]);
+
+            // [7, 8, 9, 3],
+            lapl_apply_micro_kernel(
+                sub_fff, ex[7], ex[8], ex[9], ex[3], &ey[7], &ey[8], &ey[9], &ey[3]);
+        }
+
+        {  // Octahedron tets
+
+            // [4, 5, 6, 8],
+            sub_fff_4(fff, sub_fff);
+            lapl_apply_micro_kernel(
+                sub_fff, ex[4], ex[5], ex[6], ex[8], &ey[4], &ey[5], &ey[6], &ey[8]);
+
+            // [7, 4, 6, 8],
+            sub_fff_5(fff, sub_fff);
+            lapl_apply_micro_kernel(
+                sub_fff, ex[7], ex[4], ex[6], ex[8], &ey[7], &ey[4], &ey[6], &ey[8]);
+
+            // [6, 5, 9, 8],
+            sub_fff_6(fff, sub_fff);
+            lapl_apply_micro_kernel(
+                sub_fff, ex[6], ex[5], ex[9], ex[8], &ey[6], &ey[5], &ey[9], &ey[8]);
+
+            // [7, 6, 9, 8]]
+            sub_fff_7(fff, sub_fff);
+            lapl_apply_micro_kernel(
+                sub_fff, ex[7], ex[6], ex[9], ex[8], &ey[7], &ey[6], &ey[9], &ey[8]);
+        }
 
         // redistribute coeffs
-#pragma unroll(4)
-        for (int v = 0; v < 4; ++v) {
+#pragma unroll(10)
+        for (int v = 0; v < 10; ++v) {
             atomicAdd(&y[vidx[v]], ey[v]);
         }
     }
@@ -180,9 +286,9 @@ extern int macro_tet4_cuda_incore_laplacian_init(cuda_incore_laplacian_t *ctx, m
 
     {
         // Store elem indices on device
-        SFEM_CUDA_CHECK(cudaMalloc(&ctx->d_elems, 4 * mesh.nelements * sizeof(geom_t)));
+        SFEM_CUDA_CHECK(cudaMalloc(&ctx->d_elems, 10 * mesh.nelements * sizeof(geom_t)));
 
-        for (int d = 0; d < 4; d++) {
+        for (int d = 0; d < 10; d++) {
             SFEM_CUDA_CHECK(cudaMemcpy(ctx->d_elems + d * mesh.nelements,
                                        mesh.elements[d],
                                        mesh.nelements * sizeof(idx_t),

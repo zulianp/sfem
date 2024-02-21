@@ -493,6 +493,8 @@ void macro_tet4_laplacian_apply_opt(const macro_tet4_laplacian_t *const ctx,
 #else
             for (int d = 0; d < 6; d++) {
                 const geom_t *const fffi = &ctx->fff[i * 6];
+
+                // Should be a vectorized load
                 for (int vi = 0; vi < nvec; ++vi) {
                     fff[d][vi] = fffi[vi * 6 + d];
                 }

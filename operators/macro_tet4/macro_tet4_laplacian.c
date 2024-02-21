@@ -375,12 +375,6 @@ void macro_tet4_laplacian_apply_opt(const macro_tet4_laplacian_t *const ctx,
                 element_u[v] = u[ev[v]];
             }
 
-            // Element indices
-            const idx_t i0 = ev[0];
-            const idx_t i1 = ev[1];
-            const idx_t i2 = ev[2];
-            const idx_t i3 = ev[3];
-
             {  // Corner tests
                 sub_fff_0(fff, sub_fff);
 
