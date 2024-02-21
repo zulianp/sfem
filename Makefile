@@ -94,7 +94,7 @@ GOALS += wss surface_outflux integrate_divergence cdiv lform_surface_outflux
 GOALS += projection_p0_to_p1 surface_projection grad_and_project
 
 # BLAS
-GOALS += axpy
+GOALS += axpy spmv
 
 # Algebra post process
 GOALS += condense_matrix condense_vector idx_to_indicator remap_vector sgather smask set_diff set_union soverride
@@ -180,7 +180,8 @@ OBJS += tri3_stokes_mini.o \
 OBJS += macro_tri3_laplacian.o 
 
 # Macro Tet4
-OBJS += macro_tet4_laplacian.o 
+# OBJS += macro_tet4_laplacian.o 
+OBJS += macro_tet4_laplacian_simd.o 
 
 # TriShell3
 OBJS += trishell3_mass.o

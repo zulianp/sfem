@@ -18,8 +18,7 @@ export PATH=$SCRIPTPATH/../../python/sfem/algebra:$PATH
 export PATH=$SCRIPTPATH/../../python/sfem/utils:$PATH
 export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
-LAUNCH="mpiexec -np 8"
-export OMP_NUM_THREADS=8
+export OMP_NUM_THREADS=16
 export OMP_PROC_BIND=true 
 
 export SFEM_REPEAT=40

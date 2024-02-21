@@ -18,34 +18,34 @@ static void fff_micro_kernel(const geom_t px0,
                              const geom_t pz2,
                              const geom_t pz3,
                              geom_t *fff) {
-    const real_t x0 = -px0 + px1;
-    const real_t x1 = -py0 + py2;
-    const real_t x2 = -pz0 + pz3;
-    const real_t x3 = x1 * x2;
-    const real_t x4 = -pz0 + pz1;
-    const real_t x5 = -px0 + px2;
-    const real_t x6 = -py0 + py3;
-    const real_t x7 = x5 * x6;
-    const real_t x8 = -py0 + py1;
-    const real_t x9 = -px0 + px3;
-    const real_t x10 = -pz0 + pz2;
-    const real_t x11 = x10 * x6;
-    const real_t x12 = x2 * x5;
-    const real_t x13 = x1 * x9;
-    const real_t x14 = -x0 * x11 + x0 * x3 + x10 * x8 * x9 - x12 * x8 - x13 * x4 + x4 * x7;
-    const real_t x15 = -x13 + x7;
-    const real_t x16 = 1./POW2(x14);
-    const real_t x17 = x10 * x9 - x12;
-    const real_t x18 = -x11 + x3;
-    const real_t x19 = -x0 * x6 + x8 * x9;
-    const real_t x20 = x15 * x16;
-    const real_t x21 = x0 * x2 - x4 * x9;
-    const real_t x22 = x16 * x17;
-    const real_t x23 = -x2 * x8 + x4 * x6;
-    const real_t x24 = x16 * x18;
-    const real_t x25 = x0 * x1 - x5 * x8;
-    const real_t x26 = -x0 * x10 + x4 * x5;
-    const real_t x27 = -x1 * x4 + x10 * x8;
+    const geom_t x0 = -px0 + px1;
+    const geom_t x1 = -py0 + py2;
+    const geom_t x2 = -pz0 + pz3;
+    const geom_t x3 = x1 * x2;
+    const geom_t x4 = -pz0 + pz1;
+    const geom_t x5 = -px0 + px2;
+    const geom_t x6 = -py0 + py3;
+    const geom_t x7 = x5 * x6;
+    const geom_t x8 = -py0 + py1;
+    const geom_t x9 = -px0 + px3;
+    const geom_t x10 = -pz0 + pz2;
+    const geom_t x11 = x10 * x6;
+    const geom_t x12 = x2 * x5;
+    const geom_t x13 = x1 * x9;
+    const geom_t x14 = -x0 * x11 + x0 * x3 + x10 * x8 * x9 - x12 * x8 - x13 * x4 + x4 * x7;
+    const geom_t x15 = -x13 + x7;
+    const geom_t x16 = 1./POW2(x14);
+    const geom_t x17 = x10 * x9 - x12;
+    const geom_t x18 = -x11 + x3;
+    const geom_t x19 = -x0 * x6 + x8 * x9;
+    const geom_t x20 = x15 * x16;
+    const geom_t x21 = x0 * x2 - x4 * x9;
+    const geom_t x22 = x16 * x17;
+    const geom_t x23 = -x2 * x8 + x4 * x6;
+    const geom_t x24 = x16 * x18;
+    const geom_t x25 = x0 * x1 - x5 * x8;
+    const geom_t x26 = -x0 * x10 + x4 * x5;
+    const geom_t x27 = -x1 * x4 + x10 * x8;
     fff[0] = x14 * (POW2(x15) * x16 + x16 * POW2(x17) + x16 * POW2(x18));
     fff[1] = x14 * (x19 * x20 + x21 * x22 + x23 * x24);
     fff[2] = x14 * (x20 * x25 + x22 * x26 + x24 * x27);
@@ -66,8 +66,8 @@ static SFEM_INLINE void sub_fff_0(const geom_t *const SFEM_RESTRICT fff,
 
 static SFEM_INLINE void sub_fff_4(const geom_t *const SFEM_RESTRICT fff,
                                   geom_t *const SFEM_RESTRICT sub_fff) {
-    const real_t x0 = (1.0 / 2.0) * fff[0];
-    const real_t x1 = (1.0 / 2.0) * fff[2];
+    const geom_t x0 = (1.0 / 2.0) * fff[0];
+    const geom_t x1 = (1.0 / 2.0) * fff[2];
     sub_fff[0] = fff[1] + (1.0 / 2.0) * fff[3] + x0;
     sub_fff[1] = -1.0 / 2.0 * fff[1] - x0;
     sub_fff[2] = (1.0 / 2.0) * fff[4] + x1;
@@ -78,10 +78,10 @@ static SFEM_INLINE void sub_fff_4(const geom_t *const SFEM_RESTRICT fff,
 
 static SFEM_INLINE void sub_fff_5(const geom_t *const SFEM_RESTRICT fff,
                                   geom_t *const SFEM_RESTRICT sub_fff) {
-    const real_t x0 = (1.0 / 2.0) * fff[3];
-    const real_t x1 = fff[4] + (1.0 / 2.0) * fff[5] + x0;
-    const real_t x2 = (1.0 / 2.0) * fff[4] + x0;
-    const real_t x3 = (1.0 / 2.0) * fff[1];
+    const geom_t x0 = (1.0 / 2.0) * fff[3];
+    const geom_t x1 = fff[4] + (1.0 / 2.0) * fff[5] + x0;
+    const geom_t x2 = (1.0 / 2.0) * fff[4] + x0;
+    const geom_t x3 = (1.0 / 2.0) * fff[1];
     sub_fff[0] = x1;
     sub_fff[1] = -x2;
     sub_fff[2] = -1.0 / 2.0 * fff[2] - x1 - x3;
@@ -92,9 +92,9 @@ static SFEM_INLINE void sub_fff_5(const geom_t *const SFEM_RESTRICT fff,
 
 static SFEM_INLINE void sub_fff_6(const geom_t *const SFEM_RESTRICT fff,
                                   geom_t *const SFEM_RESTRICT sub_fff) {
-    const real_t x0 = (1.0 / 2.0) * fff[3];
-    const real_t x1 = (1.0 / 2.0) * fff[4];
-    const real_t x2 = (1.0 / 2.0) * fff[1] + x0;
+    const geom_t x0 = (1.0 / 2.0) * fff[3];
+    const geom_t x1 = (1.0 / 2.0) * fff[4];
+    const geom_t x2 = (1.0 / 2.0) * fff[1] + x0;
     sub_fff[0] = (1.0 / 2.0) * fff[0] + fff[1] + x0;
     sub_fff[1] = (1.0 / 2.0) * fff[2] + x1 + x2;
     sub_fff[2] = -x2;
@@ -105,8 +105,8 @@ static SFEM_INLINE void sub_fff_6(const geom_t *const SFEM_RESTRICT fff,
 
 static SFEM_INLINE void sub_fff_7(const geom_t *const SFEM_RESTRICT fff,
                                     geom_t *const SFEM_RESTRICT sub_fff) {
-    const real_t x0 = (1.0 / 2.0) * fff[5];
-    const real_t x1 = (1.0 / 2.0) * fff[2];
+    const geom_t x0 = (1.0 / 2.0) * fff[5];
+    const geom_t x1 = (1.0 / 2.0) * fff[2];
     sub_fff[0] = x0;
     sub_fff[1] = -1.0 / 2.0 * fff[4] - x0;
     sub_fff[2] = -x1;

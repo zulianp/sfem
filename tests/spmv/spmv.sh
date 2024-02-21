@@ -37,17 +37,18 @@ mesh_sorted=mesh_sorted
 # refine $mesh refined
 # refine refined refined2
 # refine refined2 refined3
-sfc refined $mesh_sorted
+# sfc refined2 $mesh_sorted
 # touch $mesh_sorted/zd.raw
 # touch $mesh_sorted/on.raw
 # mkdir -p linear_system
-assemble $mesh_sorted linear_system
+# assemble $mesh_sorted linear_system
 
 
 eval_nodal_function.py "x*x + y*y" $mesh_sorted/x.raw $mesh_sorted/y.raw  $mesh_sorted/z.raw linear_system/rhs.raw
 
+spmv 1 0 linear_system linear_system/rhs.raw test.raw
 cuspmv 1 0 linear_system linear_system/rhs.raw test.raw
-# spmv 1 0 linear_system linear_system/rhs.raw test.raw
+
 
 lumped_mass_inv $mesh_sorted test.raw out.raw
 raw_to_db.py $mesh_sorted out.vtk --point_data="out.raw,linear_system/rhs.raw,test.raw"
