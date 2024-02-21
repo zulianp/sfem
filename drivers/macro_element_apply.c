@@ -17,6 +17,11 @@
 #include "macro_tet4_laplacian.h"
 #include "macro_tri3_laplacian.h"
 
+// Tet4 on Arm (MF Slower than naive SPMV), 8 cores
+// Serial  MF: 0.131053,          SPMV: 0.0386919 (3.38x)
+// OpenMP  MF: 0.031211 (0.03891), SPMV: 0.0115319 (2.7x)
+// SpeedUp MF: 4.198x,            SPMV: 3.355x
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -38,6 +43,9 @@ int main(int argc, char *argv[]) {
 
     int SFEM_REPEAT = 1;
     SFEM_READ_ENV(SFEM_REPEAT, atoi);
+
+    int SFEM_USE_OPT = 1;
+    SFEM_READ_ENV(SFEM_USE_OPT, atoi);
 
     const char *folder = argv[1];
     const char *path_f = argv[2];
@@ -62,7 +70,12 @@ int main(int argc, char *argv[]) {
 
     real_t *y = calloc(u_n_local, sizeof(real_t));
 
-       double spmv_tick = MPI_Wtime();
+    macro_tet4_laplacian_t tet4_ctx;
+    if (mesh.element_type == TET10) {
+        macro_tet4_laplacian_init(&tet4_ctx, mesh.nelements, mesh.elements, mesh.points);
+    }
+
+    double spmv_tick = MPI_Wtime();
 
     for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
         if (mesh.element_type == TRI6) {
@@ -70,18 +83,25 @@ int main(int argc, char *argv[]) {
             macro_tri3_laplacian_apply(
                 mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, x, y);
         } else if (mesh.element_type == TET10) {
-            // mesh.element_type = MACRO_TET4;
-            macro_tet4_laplacian_apply(
+
+            if(SFEM_USE_OPT) {
+                macro_tet4_laplacian_apply_opt(
+                   &tet4_ctx, x, y);
+            } else {
+                macro_tet4_laplacian_apply(
                 mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, x, y);
+            }
         } else {
             return EXIT_FAILURE;
         }
     }
 
-
     double spmv_tock = MPI_Wtime();
-    printf("macro_element_apply: %g (seconds)\n", (spmv_tock - spmv_tick)/SFEM_REPEAT);
+    printf("macro_element_apply: %g (seconds)\n", (spmv_tock - spmv_tick) / SFEM_REPEAT);
 
+    if (mesh.element_type == TET10) {
+        macro_tet4_laplacian_destroy(&tet4_ctx);
+    }
 
     array_write(comm, path_output, SFEM_MPI_REAL_T, y, u_n_local, u_n_global);
 

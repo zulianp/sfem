@@ -18,10 +18,12 @@ export PATH=$SCRIPTPATH/../../python/sfem/algebra:$PATH
 export PATH=$SCRIPTPATH/../../python/sfem/utils:$PATH
 export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
-export OMP_NUM_THREADS=16
+# export OMP_NUM_THREADS=16
+export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 
-export SFEM_REPEAT=40
+# export SFEM_REPEAT=40
+export SFEM_REPEAT=1
 
 # LAUNCH=""
 
@@ -37,7 +39,7 @@ then
 	echo "Reusing $simulation_mesh"
 else
 	# create_square.sh 6
-	create_sphere.sh 2
+	create_sphere.sh 3
 	refine $mesh temp1
 	refine temp1 temp2
 	mesh_p1_to_p2 temp2 $simulation_mesh
@@ -51,7 +53,7 @@ fi
 spmv 1 0 linear_system linear_system/rhs.raw test.raw
 lumped_mass_inv $refined_mesh test.raw test_out.raw
 
-macro_element_apply $simulation_mesh linear_system/rhs.raw mea_test.raw
+SFEM_USE_OPT=1 macro_element_apply $simulation_mesh linear_system/rhs.raw mea_test.raw
 lumped_mass_inv $refined_mesh mea_test.raw mf_out.raw
 raw_to_db.py $refined_mesh mf_out.vtk --point_data="linear_system/rhs.raw,mea_test.raw,mf_out.raw,test.raw,test_out.raw"
 

@@ -2,6 +2,7 @@
 
 #include <mpi.h>
 #include <stdio.h>
+#include "sfem_base.h"
 
 #define POW2(a) ((a) * (a))
 
@@ -34,7 +35,7 @@ static void fff_micro_kernel(const geom_t px0,
     const geom_t x13 = x1 * x9;
     const geom_t x14 = -x0 * x11 + x0 * x3 + x10 * x8 * x9 - x12 * x8 - x13 * x4 + x4 * x7;
     const geom_t x15 = -x13 + x7;
-    const geom_t x16 = 1./POW2(x14);
+    const geom_t x16 = 1. / POW2(x14);
     const geom_t x17 = x10 * x9 - x12;
     const geom_t x18 = -x11 + x3;
     const geom_t x19 = -x0 * x6 + x8 * x9;
@@ -104,7 +105,7 @@ static SFEM_INLINE void sub_fff_6(const geom_t *const SFEM_RESTRICT fff,
 }
 
 static SFEM_INLINE void sub_fff_7(const geom_t *const SFEM_RESTRICT fff,
-                                    geom_t *const SFEM_RESTRICT sub_fff) {
+                                  geom_t *const SFEM_RESTRICT sub_fff) {
     const geom_t x0 = (1.0 / 2.0) * fff[5];
     const geom_t x1 = (1.0 / 2.0) * fff[2];
     sub_fff[0] = x0;
@@ -143,8 +144,8 @@ static void lapl_apply_micro_kernel(const geom_t *const SFEM_RESTRICT fff,
     const real_t x16 = fff[1] * x0;
     const real_t x17 = fff[2] * x0;
     const real_t x18 = fff[4] * x0;
-    *e0 += (1.0 / 3.0) * fff[1] * u0 + (1.0 / 3.0) * fff[2] * u0 + (1.0 / 3.0) * fff[4] * u0 +
-           x1 + x10 - x11 - x12 - x13 + x14 - x15 - x3 - x4 - x6 - x7 - x9;
+    *e0 += (1.0 / 3.0) * fff[1] * u0 + (1.0 / 3.0) * fff[2] * u0 + (1.0 / 3.0) * fff[4] * u0 + x1 +
+           x10 - x11 - x12 - x13 + x14 - x15 - x3 - x4 - x6 - x7 - x9;
     *e1 += -x1 - x16 - x17 + x3 + x6 + x9;
     *e2 += -x10 + x11 + x13 - x16 - x18 + x4;
     *e3 += x12 - x14 + x15 - x17 - x18 + x7;
@@ -156,7 +157,7 @@ void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
                                 geom_t **const SFEM_RESTRICT xyz,
                                 const real_t *const SFEM_RESTRICT u,
                                 real_t *const SFEM_RESTRICT values) {
-    double tick = MPI_Wtime();
+    // double tick = MPI_Wtime();
 
 #pragma omp parallel
     {
@@ -201,7 +202,7 @@ void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
                 xyz[2][i3],
                 //
                 fff);
-            
+
             {  // Corner tests
                 sub_fff_0(fff, sub_fff);
 
@@ -309,6 +310,181 @@ void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
-    printf("macro_tet4_laplacian_apply %g (seconds)\n", tock - tick);
+    // double tock = MPI_Wtime();
+    // printf("macro_tet4_laplacian_apply %g (seconds)\n", tock - tick);
+}
+
+void macro_tet4_laplacian_init(macro_tet4_laplacian_t *const ctx,
+                               const ptrdiff_t nelements,
+                               idx_t **const SFEM_RESTRICT elements,
+                               geom_t **const SFEM_RESTRICT
+                                   points) {  // Create FFF and store it on device
+    geom_t *h_fff = (geom_t *)calloc(6 * nelements, sizeof(geom_t));
+
+#pragma omp parallel
+    {
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; e++) {
+            fff_micro_kernel(points[0][elements[0][e]],
+                             points[0][elements[1][e]],
+                             points[0][elements[2][e]],
+                             points[0][elements[3][e]],
+                             points[1][elements[0][e]],
+                             points[1][elements[1][e]],
+                             points[1][elements[2][e]],
+                             points[1][elements[3][e]],
+                             points[2][elements[0][e]],
+                             points[2][elements[1][e]],
+                             points[2][elements[2][e]],
+                             points[2][elements[3][e]],
+                             &h_fff[e * 6]);
+        }
+    }
+
+    ctx->fff = h_fff;
+    ctx->elements = elements;
+    ctx->nelements = nelements;
+}
+
+void macro_tet4_laplacian_destroy(macro_tet4_laplacian_t *const ctx) {
+    free(ctx->fff);
+    ctx->fff = 0;
+    ctx->nelements = 0;
+    ctx->elements = 0;
+}
+
+void macro_tet4_laplacian_apply_opt(const macro_tet4_laplacian_t *const ctx,
+                                    const real_t *const SFEM_RESTRICT u,
+                                    real_t *const SFEM_RESTRICT values) {
+#pragma omp parallel
+    {
+#pragma omp for  // nowait
+        for (ptrdiff_t i = 0; i < ctx->nelements; ++i) {
+            idx_t ev[10];
+            geom_t sub_fff[6];
+            real_t element_u[10];
+            real_t element_vector[10] = {0};
+            const geom_t *const fff = &ctx->fff[i*6];
+
+#pragma unroll(10)
+            for (int v = 0; v < 10; ++v) {
+                ev[v] = ctx->elements[v][i];
+            }
+
+            for (int v = 0; v < 10; ++v) {
+                element_u[v] = u[ev[v]];
+            }
+
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+            const idx_t i3 = ev[3];
+
+            {  // Corner tests
+                sub_fff_0(fff, sub_fff);
+
+                // [0, 4, 6, 7],
+                lapl_apply_micro_kernel(sub_fff,
+                                        element_u[0],
+                                        element_u[4],
+                                        element_u[6],
+                                        element_u[7],
+                                        &element_vector[0],
+                                        &element_vector[4],
+                                        &element_vector[6],
+                                        &element_vector[7]);
+
+                // [4, 1, 5, 8],
+                lapl_apply_micro_kernel(sub_fff,
+                                        element_u[4],
+                                        element_u[1],
+                                        element_u[5],
+                                        element_u[8],
+                                        &element_vector[4],
+                                        &element_vector[1],
+                                        &element_vector[5],
+                                        &element_vector[8]);
+
+                // [6, 5, 2, 9],
+                lapl_apply_micro_kernel(sub_fff,
+                                        element_u[6],
+                                        element_u[5],
+                                        element_u[2],
+                                        element_u[9],
+                                        &element_vector[6],
+                                        &element_vector[5],
+                                        &element_vector[2],
+                                        &element_vector[9]);
+
+                // [7, 8, 9, 3],
+                lapl_apply_micro_kernel(sub_fff,
+                                        element_u[7],
+                                        element_u[8],
+                                        element_u[9],
+                                        element_u[3],
+                                        &element_vector[7],
+                                        &element_vector[8],
+                                        &element_vector[9],
+                                        &element_vector[3]);
+            }
+
+            {  // Octahedron tets
+
+                // [4, 5, 6, 8],
+                sub_fff_4(fff, sub_fff);
+                lapl_apply_micro_kernel(sub_fff,
+                                        element_u[4],
+                                        element_u[5],
+                                        element_u[6],
+                                        element_u[8],
+                                        &element_vector[4],
+                                        &element_vector[5],
+                                        &element_vector[6],
+                                        &element_vector[8]);
+
+                // [7, 4, 6, 8],
+                sub_fff_5(fff, sub_fff);
+                lapl_apply_micro_kernel(sub_fff,
+                                        element_u[7],
+                                        element_u[4],
+                                        element_u[6],
+                                        element_u[8],
+                                        &element_vector[7],
+                                        &element_vector[4],
+                                        &element_vector[6],
+                                        &element_vector[8]);
+
+                // [6, 5, 9, 8],
+                sub_fff_6(fff, sub_fff);
+                lapl_apply_micro_kernel(sub_fff,
+                                        element_u[6],
+                                        element_u[5],
+                                        element_u[9],
+                                        element_u[8],
+                                        &element_vector[6],
+                                        &element_vector[5],
+                                        &element_vector[9],
+                                        &element_vector[8]);
+
+                // [7, 6, 9, 8]]
+                sub_fff_7(fff, sub_fff);
+                lapl_apply_micro_kernel(sub_fff,
+                                        element_u[7],
+                                        element_u[6],
+                                        element_u[9],
+                                        element_u[8],
+                                        &element_vector[7],
+                                        &element_vector[6],
+                                        &element_vector[9],
+                                        &element_vector[8]);
+            }
+
+#pragma unroll(10)
+            for (int v = 0; v < 10; v++) {
+#pragma omp atomic update
+                values[ev[v]] += element_vector[v];
+            }
+        }
+    }
 }
