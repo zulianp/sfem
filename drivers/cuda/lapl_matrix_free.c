@@ -14,9 +14,10 @@
 #include "read_mesh.h"
 #include "sfem_base.h"
 #include "sfem_mesh.h"
+#include "sfem_defs.h"
 
-#include "macro_tet4_cuda_incore_laplacian.h"
-#include "tet4_cuda_incore_laplacian.h"
+#include "macro_tet4_laplacian_incore_cuda.h"
+#include "tet4_laplacian_incore_cuda.h"
 
 #define CHECK_CUDA(func)                                               \
     do {                                                               \
@@ -111,7 +112,7 @@ int main(int argc, char *argv[]) {
             if (mesh.element_type == TET4) {
                 tet4_cuda_incore_laplacian_apply(&ctx, d_x, d_y);
             } else if (mesh.element_type == TET10) {
-                macro_tet4_cuda_incore_laplacian_apply(&ctx, mesh);
+                macro_tet4_cuda_incore_laplacian_apply(&ctx, d_x, d_y);
             }
         }
 
