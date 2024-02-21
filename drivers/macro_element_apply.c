@@ -18,9 +18,13 @@
 #include "macro_tri3_laplacian.h"
 
 // Tet4 on Arm (MF Slower than naive SPMV), 8 cores
-// Serial  MF: 0.131053,          SPMV: 0.0386919 (3.38x)
-// OpenMP  MF: 0.031211 (0.03891), SPMV: 0.0115319 (2.7x)
-// SpeedUp MF: 4.198x,            SPMV: 3.355x
+// Serial    MF: 0.131053,          SPMV: 0.0386919 (3.38x)
+// OpenMP    MF: 0.031211 (0.03891), SPMV: 0.0115319 (2.7x)
+// SpeedUp   MF: 4.198x,            SPMV: 3.355x
+// Tet4 on Zen4 (MF-AVX2 faster with 16 cores, SPMV does not scale with TLP)
+// Serial    MF: 0.106794           SPMV: 0.0571115 
+// OpenMP(8) MF: 0.0287701          SPMV: 0.0268007
+// OpenMP(16)MF: 0.0163542          SPMV: 0.0292629 
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
