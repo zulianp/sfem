@@ -33,6 +33,9 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    int SFEM_REPEAT = 1;
+    SFEM_READ_ENV(SFEM_REPEAT, atoi);
+
     const real_t alpha = atof(argv[1]);
     const int transpose = atoi(argv[2]);
     const char *crs_folder = argv[3];
@@ -68,15 +71,18 @@ int main(int argc, char *argv[]) {
     double spmv_tick = MPI_Wtime();
 
     scal(x_n, alpha, x);
-    crs_spmv(crs.grows,
-             (const count_t *const)crs.rowptr,
-             (const idx_t *const)crs.colidx,
-             (const real_t *const)crs.values,
-             x,
-             y);
+
+    for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
+        crs_spmv(crs.grows,
+                 (const count_t *const)crs.rowptr,
+                 (const idx_t *const)crs.colidx,
+                 (const real_t *const)crs.values,
+                 x,
+                 y);
+    }
 
     double spmv_tock = MPI_Wtime();
-    printf("spmv: %g (seconds)\n", spmv_tock - spmv_tick);
+    printf("spmv: %g (seconds)\n", (spmv_tock - spmv_tick)/SFEM_REPEAT);
 
     array_write(comm, output_path, SFEM_MPI_REAL_T, y, crs.grows, crs.grows);
     crs_free(&crs);

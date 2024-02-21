@@ -14,8 +14,8 @@
 
 #include "read_mesh.h"
 
-#include "macro_tri3_laplacian.h"
 #include "macro_tet4_laplacian.h"
+#include "macro_tri3_laplacian.h"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -35,6 +35,9 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "usage: %s <folder> <x.raw> <y.raw>\n", argv[0]);
         return EXIT_FAILURE;
     }
+
+    int SFEM_REPEAT = 1;
+    SFEM_READ_ENV(SFEM_REPEAT, atoi);
 
     const char *folder = argv[1];
     const char *path_f = argv[2];
@@ -59,17 +62,26 @@ int main(int argc, char *argv[]) {
 
     real_t *y = calloc(u_n_local, sizeof(real_t));
 
-    if (mesh.element_type == TRI6) {
-        mesh.element_type = MACRO_TRI3;
-        macro_tri3_laplacian_apply(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, x, y);
+       double spmv_tick = MPI_Wtime();
+
+    for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
+        if (mesh.element_type == TRI6) {
+            // mesh.element_type = MACRO_TRI3;
+            macro_tri3_laplacian_apply(
+                mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, x, y);
+        } else if (mesh.element_type == TET10) {
+            // mesh.element_type = MACRO_TET4;
+            macro_tet4_laplacian_apply(
+                mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, x, y);
+        } else {
+            return EXIT_FAILURE;
+        }
     }
-    else if(mesh.element_type == TET10) {
-        mesh.element_type = MACRO_TET4;
-        macro_tet4_laplacian_apply(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, x, y);
-    }
-    else {
-        return EXIT_FAILURE;
-    }
+
+
+    double spmv_tock = MPI_Wtime();
+    printf("macro_element_apply: %g (seconds)\n", (spmv_tock - spmv_tick)/SFEM_REPEAT);
+
 
     array_write(comm, path_output, SFEM_MPI_REAL_T, y, u_n_local, u_n_global);
 
