@@ -75,82 +75,82 @@ static inline __device__ __host__ void fff_micro_kernel(const geom_t px0,
     fff[5 * stride] = x20 * (x22 * POW2(x31) + x22 * POW2(x32) + x22 * POW2(x33));
 }
 
-static inline __device__ __host__ void sub_fff_0(const geom_t *const SFEM_RESTRICT fff,
-                                                 const ptrdiff_t stride,
-                                                 geom_t *const SFEM_RESTRICT sub_fff) {
-    sub_fff[0] = (1.0 / 2.0) * fff[0 * stride];
-    sub_fff[1] = (1.0 / 2.0) * fff[1 * stride];
-    sub_fff[2] = (1.0 / 2.0) * fff[2 * stride];
-    sub_fff[3] = (1.0 / 2.0) * fff[3 * stride];
-    sub_fff[4] = (1.0 / 2.0) * fff[4 * stride];
-    sub_fff[5] = (1.0 / 2.0) * fff[5 * stride];
+static /*inline*/ __device__ __host__ void sub_fff_0(const geom_t *const SFEM_RESTRICT fff,
+                                                     const ptrdiff_t stride,
+                                                     geom_t *const SFEM_RESTRICT sub_fff) {
+    sub_fff[0] = (geom_t)(1.0 / 2.0) * fff[0 * stride];
+    sub_fff[1] = (geom_t)(1.0 / 2.0) * fff[1 * stride];
+    sub_fff[2] = (geom_t)(1.0 / 2.0) * fff[2 * stride];
+    sub_fff[3] = (geom_t)(1.0 / 2.0) * fff[3 * stride];
+    sub_fff[4] = (geom_t)(1.0 / 2.0) * fff[4 * stride];
+    sub_fff[5] = (geom_t)(1.0 / 2.0) * fff[5 * stride];
 }
 
-static inline __device__ __host__ void sub_fff_4(const geom_t *const SFEM_RESTRICT fff,
-                                                 const ptrdiff_t stride,
-                                                 geom_t *const SFEM_RESTRICT sub_fff) {
-    const geom_t x0 = (1.0 / 2.0) * fff[0 * stride];
-    const geom_t x1 = (1.0 / 2.0) * fff[2 * stride];
+static /*inline*/ __device__ __host__ void sub_fff_4(const geom_t *const SFEM_RESTRICT fff,
+                                                     const ptrdiff_t stride,
+                                                     geom_t *const SFEM_RESTRICT sub_fff) {
+    const geom_t x0 = (geom_t)(1.0 / 2.0) * fff[0 * stride];
+    const geom_t x1 = (geom_t)(1.0 / 2.0) * fff[2 * stride];
     sub_fff[0] = fff[1 * stride] + (1.0 / 2.0) * fff[3 * stride] + x0;
-    sub_fff[1] = -1.0 / 2.0 * fff[1 * stride] - x0;
-    sub_fff[2] = (1.0 / 2.0) * fff[4 * stride] + x1;
+    sub_fff[1] = (geom_t)(-1.0 / 2.0) * fff[1 * stride] - x0;
+    sub_fff[2] = (geom_t)(1.0 / 2.0) * fff[4 * stride] + x1;
     sub_fff[3] = x0;
     sub_fff[4] = -x1;
-    sub_fff[5] = (1.0 / 2.0) * fff[5 * stride];
+    sub_fff[5] = (geom_t)(1.0 / 2.0) * fff[5 * stride];
 }
 
-static inline __device__ __host__ void sub_fff_5(const geom_t *const SFEM_RESTRICT fff,
-                                                 const ptrdiff_t stride,
-                                                 geom_t *const SFEM_RESTRICT sub_fff) {
-    const geom_t x0 = (1.0 / 2.0) * fff[3 * stride];
-    const geom_t x1 = fff[4 * stride] + (1.0 / 2.0) * fff[5 * stride] + x0;
-    const geom_t x2 = (1.0 / 2.0) * fff[4 * stride] + x0;
-    const geom_t x3 = (1.0 / 2.0) * fff[1 * stride];
+static /*inline*/ __device__ __host__ void sub_fff_5(const geom_t *const SFEM_RESTRICT fff,
+                                                     const ptrdiff_t stride,
+                                                     geom_t *const SFEM_RESTRICT sub_fff) {
+    const geom_t x0 = (geom_t)(1.0 / 2.0) * fff[3 * stride];
+    const geom_t x1 = fff[4 * stride] + (geom_t)(1.0 / 2.0) * fff[5 * stride] + x0;
+    const geom_t x2 = (geom_t)(1.0 / 2.0) * fff[4 * stride] + x0;
+    const geom_t x3 = (geom_t)(1.0 / 2.0) * fff[1 * stride];
     sub_fff[0] = x1;
     sub_fff[1] = -x2;
-    sub_fff[2] = -1.0 / 2.0 * fff[2 * stride] - x1 - x3;
+    sub_fff[2] = (geom_t)(-1.0 / 2.0) * fff[2 * stride] - x1 - x3;
     sub_fff[3] = x0;
     sub_fff[4] = x2 + x3;
-    sub_fff[5] = (1.0 / 2.0) * fff[0 * stride] + fff[1 * stride] + fff[2 * stride] + x1;
+    sub_fff[5] = (geom_t)(1.0 / 2.0) * fff[0 * stride] + fff[1 * stride] + fff[2 * stride] + x1;
 }
 
-static inline __device__ __host__ void sub_fff_6(const geom_t *const SFEM_RESTRICT fff,
-                                                 const ptrdiff_t stride,
-                                                 geom_t *const SFEM_RESTRICT sub_fff) {
-    const geom_t x0 = (1.0 / 2.0) * fff[3 * stride];
-    const geom_t x1 = (1.0 / 2.0) * fff[4 * stride];
-    const geom_t x2 = (1.0 / 2.0) * fff[1 * stride] + x0;
-    sub_fff[0] = (1.0 / 2.0) * fff[0 * stride] + fff[1 * stride] + x0;
-    sub_fff[1] = (1.0 / 2.0) * fff[2 * stride] + x1 + x2;
+static /*inline*/ __device__ __host__ void sub_fff_6(const geom_t *const SFEM_RESTRICT fff,
+                                                     const ptrdiff_t stride,
+                                                     geom_t *const SFEM_RESTRICT sub_fff) {
+    const geom_t x0 = (geom_t)(1.0 / 2.0) * fff[3 * stride];
+    const geom_t x1 = (geom_t)(1.0 / 2.0) * fff[4 * stride];
+    const geom_t x2 = (geom_t)(1.0 / 2.0) * fff[1 * stride] + x0;
+    sub_fff[0] = (geom_t)(1.0 / 2.0) * fff[0 * stride] + fff[1 * stride] + x0;
+    sub_fff[1] = (geom_t)(1.0 / 2.0) * fff[2 * stride] + x1 + x2;
     sub_fff[2] = -x2;
-    sub_fff[3] = fff[4 * stride] + (1.0 / 2.0) * fff[5 * stride] + x0;
+    sub_fff[3] = fff[4 * stride] + (geom_t)(1.0 / 2.0) * fff[5 * stride] + x0;
     sub_fff[4] = -x0 - x1;
     sub_fff[5] = x0;
 }
 
-static inline __device__ __host__ void sub_fff_7(const geom_t *const SFEM_RESTRICT fff,
-                                                 const ptrdiff_t stride,
-                                                 geom_t *const SFEM_RESTRICT sub_fff) {
-    const geom_t x0 = (1.0 / 2.0) * fff[5 * stride];
-    const geom_t x1 = (1.0 / 2.0) * fff[2 * stride];
+static /*inline*/ __device__ __host__ void sub_fff_7(const geom_t *const SFEM_RESTRICT fff,
+                                                     const ptrdiff_t stride,
+                                                     geom_t *const SFEM_RESTRICT sub_fff) {
+    const geom_t x0 = (geom_t)(1.0 / 2.0) * fff[5 * stride];
+    const geom_t x1 = (geom_t)(1.0 / 2.0) * fff[2 * stride];
     sub_fff[0] = x0;
-    sub_fff[1] = -1.0 / 2.0 * fff[4 * stride] - x0;
+    sub_fff[1] = (geom_t)(-1.0 / 2.0) * fff[4 * stride] - x0;
     sub_fff[2] = -x1;
-    sub_fff[3] = (1.0 / 2.0) * fff[3 * stride] + fff[4 * stride] + x0;
-    sub_fff[4] = (1.0 / 2.0) * fff[1 * stride] + x1;
-    sub_fff[5] = (1.0 / 2.0) * fff[0 * stride];
+    sub_fff[3] = (geom_t)(1.0 / 2.0) * fff[3 * stride] + fff[4 * stride] + x0;
+    sub_fff[4] = (geom_t)(1.0 / 2.0) * fff[1 * stride] + x1;
+    sub_fff[5] = (geom_t)(1.0 / 2.0) * fff[0 * stride];
 }
 
-static inline __device__ __host__ void lapl_apply_micro_kernel(const geom_t *const SFEM_RESTRICT
-                                                                   fff,
-                                                               const real_t u0,
-                                                               const real_t u1,
-                                                               const real_t u2,
-                                                               const real_t u3,
-                                                               real_t *const SFEM_RESTRICT e0,
-                                                               real_t *const SFEM_RESTRICT e1,
-                                                               real_t *const SFEM_RESTRICT e2,
-                                                               real_t *const SFEM_RESTRICT e3) {
+static /*inline*/ __device__ __host__ void lapl_apply_micro_kernel(const geom_t *const SFEM_RESTRICT
+                                                                       fff,
+                                                                   const real_t u0,
+                                                                   const real_t u1,
+                                                                   const real_t u2,
+                                                                   const real_t u3,
+                                                                   real_t *const SFEM_RESTRICT e0,
+                                                                   real_t *const SFEM_RESTRICT e1,
+                                                                   real_t *const SFEM_RESTRICT e2,
+                                                                   real_t *const SFEM_RESTRICT e3) {
     const real_t x0 = (1.0 / 6.0) * u0;
     const real_t x1 = fff[0] * x0;
     const real_t x2 = (1.0 / 6.0) * u1;
@@ -182,69 +182,127 @@ __global__ void macro_tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t ne
                                                               const geom_t *const SFEM_RESTRICT fff,
                                                               const real_t *const SFEM_RESTRICT x,
                                                               real_t *const SFEM_RESTRICT y) {
+    real_t ex[10];
+    real_t ey[10];
+    geom_t sub_fff[6];
+
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
          e += blockDim.x * gridDim.x) {
-        real_t ex[10];
-        real_t ey[10];
-        idx_t vidx[10];
-        geom_t sub_fff[6];
-
+#pragma unroll(10)
+        for (int v = 0; v < 10; ++v) {
+            ey[v] = 0;
+        }
         // collect coeffs
 #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
-            vidx[v] = elems[v * nelements + e];
-            ex[v] = x[vidx[v]];
+            ex[v] = x[elems[v * nelements + e]];
         }
 
         // apply operator
 
         {  // Corner tests
-            sub_fff_0(fff, nelements, sub_fff);
+            sub_fff_0(&fff[e], nelements, sub_fff);
 
             // [0, 4, 6, 7],
-            lapl_apply_micro_kernel(
-                sub_fff, ex[0], ex[4], ex[6], ex[7], &ey[0], &ey[4], &ey[6], &ey[7]);
+            lapl_apply_micro_kernel(sub_fff,
+                                    ex[0],
+                                    ex[4],
+                                    ex[6],
+                                    ex[7],  //
+                                    &ey[0],
+                                    &ey[4],
+                                    &ey[6],
+                                    &ey[7]);
 
             // [4, 1, 5, 8],
-            lapl_apply_micro_kernel(
-                sub_fff, ex[4], ex[1], ex[5], ex[8], &ey[4], &ey[1], &ey[5], &ey[8]);
+            lapl_apply_micro_kernel(sub_fff,
+                                    ex[4],
+                                    ex[1],
+                                    ex[5],
+                                    ex[8],  //
+                                    &ey[4],
+                                    &ey[1],
+                                    &ey[5],
+                                    &ey[8]);
 
             // [6, 5, 2, 9],
-            lapl_apply_micro_kernel(
-                sub_fff, ex[6], ex[5], ex[2], ex[9], &ey[6], &ey[5], &ey[2], &ey[9]);
+            lapl_apply_micro_kernel(sub_fff,
+                                    ex[6],
+                                    ex[5],
+                                    ex[2],
+                                    ex[9],  //
+                                    &ey[6],
+                                    &ey[5],
+                                    &ey[2],
+                                    &ey[9]);
 
             // [7, 8, 9, 3],
-            lapl_apply_micro_kernel(
-                sub_fff, ex[7], ex[8], ex[9], ex[3], &ey[7], &ey[8], &ey[9], &ey[3]);
+            lapl_apply_micro_kernel(sub_fff,
+                                    ex[7],
+                                    ex[8],
+                                    ex[9],
+                                    ex[3],  //
+                                    &ey[7],
+                                    &ey[8],
+                                    &ey[9],
+                                    &ey[3]);
         }
 
         {  // Octahedron tets
 
             // [4, 5, 6, 8],
-            sub_fff_4(fff, nelements, sub_fff);
-            lapl_apply_micro_kernel(
-                sub_fff, ex[4], ex[5], ex[6], ex[8], &ey[4], &ey[5], &ey[6], &ey[8]);
+            sub_fff_4(&fff[e], nelements, sub_fff);
+            lapl_apply_micro_kernel(sub_fff,
+                                    ex[4],
+                                    ex[5],
+                                    ex[6],
+                                    ex[8],  //
+                                    &ey[4],
+                                    &ey[5],
+                                    &ey[6],
+                                    &ey[8]);
 
             // [7, 4, 6, 8],
-            sub_fff_5(fff, nelements, sub_fff);
-            lapl_apply_micro_kernel(
-                sub_fff, ex[7], ex[4], ex[6], ex[8], &ey[7], &ey[4], &ey[6], &ey[8]);
+            sub_fff_5(&fff[e], nelements, sub_fff);
+            lapl_apply_micro_kernel(sub_fff,
+                                    ex[7],
+                                    ex[4],
+                                    ex[6],
+                                    ex[8],  //
+                                    &ey[7],
+                                    &ey[4],
+                                    &ey[6],
+                                    &ey[8]);
 
             // [6, 5, 9, 8],
-            sub_fff_6(fff, nelements, sub_fff);
-            lapl_apply_micro_kernel(
-                sub_fff, ex[6], ex[5], ex[9], ex[8], &ey[6], &ey[5], &ey[9], &ey[8]);
+            sub_fff_6(&fff[e], nelements, sub_fff);
+            lapl_apply_micro_kernel(sub_fff,
+                                    ex[6],
+                                    ex[5],
+                                    ex[9],
+                                    ex[8],  //
+                                    &ey[6],
+                                    &ey[5],
+                                    &ey[9],
+                                    &ey[8]);
 
             // [7, 6, 9, 8]]
-            sub_fff_7(fff, nelements, sub_fff);
-            lapl_apply_micro_kernel(
-                sub_fff, ex[7], ex[6], ex[9], ex[8], &ey[7], &ey[6], &ey[9], &ey[8]);
+            sub_fff_7(&fff[e], nelements, sub_fff);
+            lapl_apply_micro_kernel(sub_fff,
+                                    ex[7],
+                                    ex[6],
+                                    ex[9],
+                                    ex[8],  //
+                                    &ey[7],
+                                    &ey[6],
+                                    &ey[9],
+                                    &ey[8]);
         }
 
         // redistribute coeffs
 #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
-            atomicAdd(&y[vidx[v]], ey[v]);
+            atomicAdd(&y[elems[v * nelements + e]], ey[v]);
         }
     }
 }

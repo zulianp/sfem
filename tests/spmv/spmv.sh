@@ -22,7 +22,7 @@ LAUNCH="mpiexec -np 8"
 export OMP_NUM_THREADS=16
 export OMP_PROC_BIND=true 
 
-export SFEM_REPEAT=40
+export SFEM_REPEAT=1
 
 # LAUNCH=""
 
@@ -42,7 +42,7 @@ mesh_sorted=mesh_sorted
 # touch $mesh_sorted/on.raw
 # mkdir -p linear_system
 # assemble $mesh_sorted linear_system
-
+# mesh_p1_to_p2 refined p2
 
 eval_nodal_function.py "x*x + y*y" $mesh_sorted/x.raw $mesh_sorted/y.raw  $mesh_sorted/z.raw linear_system/rhs.raw
 
@@ -50,14 +50,18 @@ spmv 1 0 linear_system linear_system/rhs.raw test.raw
 cuspmv 1 0 linear_system linear_system/rhs.raw test.raw
 
 
-lumped_mass_inv $mesh_sorted test.raw out.raw
-raw_to_db.py $mesh_sorted out.vtk --point_data="out.raw,linear_system/rhs.raw,test.raw"
+# lumped_mass_inv $mesh_sorted test.raw out.raw
+# raw_to_db.py $mesh_sorted out.vtk --point_data="out.raw,linear_system/rhs.raw,test.raw"
 
 
 # set -x
 # usage: ../../lapl_matrix_free <mesh> <alpha> <x.raw> <output.raw>
 lapl_matrix_free $mesh_sorted 1 linear_system/rhs.raw mf_test.raw
-lumped_mass_inv $mesh_sorted mf_test.raw mf_out.raw
-raw_to_db.py $mesh_sorted mf_out.vtk --point_data="mf_out.raw,linear_system/rhs.raw,mf_test.raw"
+# lumped_mass_inv $mesh_sorted mf_test.raw mf_out.raw
+
+
+lapl_matrix_free p2 1 linear_system/rhs.raw macro_test.raw
+
+raw_to_db.py $mesh_sorted mf_out.vtk --point_data="linear_system/rhs.raw,mf_test.raw,macro_test.raw,test.raw"
 
 deactivate
