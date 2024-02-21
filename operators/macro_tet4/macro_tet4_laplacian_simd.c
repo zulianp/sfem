@@ -189,7 +189,7 @@ void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
 
             for (int vi = 0; vi < nvec; ++vi) {
                 const ptrdiff_t offset = i + vi;
-                #pragma omp unroll full
+                // #pragma omp unroll full
                 for (int d = 0; d < 4; ++d) {
                     const idx_t vidx = elems[d][offset];
                     x[d][vi] = xyz[0][vidx];
