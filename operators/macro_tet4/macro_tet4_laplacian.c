@@ -157,8 +157,6 @@ void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
                                 geom_t **const SFEM_RESTRICT xyz,
                                 const real_t *const SFEM_RESTRICT u,
                                 real_t *const SFEM_RESTRICT values) {
-    // double tick = MPI_Wtime();
-
 #pragma omp parallel
     {
 #pragma omp for  // nowait
@@ -309,9 +307,6 @@ void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
             }
         }
     }
-
-    // double tock = MPI_Wtime();
-    // printf("macro_tet4_laplacian_apply %g (seconds)\n", tock - tick);
 }
 
 void macro_tet4_laplacian_init(macro_tet4_laplacian_t *const ctx,
