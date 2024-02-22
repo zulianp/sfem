@@ -35,40 +35,47 @@ static inline __device__ __host__ void fff_micro_kernel(const geom_t px0,
                                                         const geom_t pz3,
                                                         const count_t stride,
                                                         geom_t *fff) {
-    const geom_t x0 = -px0 + px1;
-    const geom_t x1 = -py0 + py2;
-    const geom_t x2 = -pz0 + pz3;
-    const geom_t x3 = x1 * x2;
-    const geom_t x4 = -pz0 + pz1;
-    const geom_t x5 = -px0 + px2;
-    const geom_t x6 = -py0 + py3;
-    const geom_t x7 = x5 * x6;
-    const geom_t x8 = -py0 + py1;
-    const geom_t x9 = -px0 + px3;
-    const geom_t x10 = -pz0 + pz2;
-    const geom_t x11 = x10 * x6;
-    const geom_t x12 = x2 * x5;
-    const geom_t x13 = x1 * x9;
-    const geom_t x14 = -x0 * x11 + x0 * x3 + x10 * x8 * x9 - x12 * x8 - x13 * x4 + x4 * x7;
-    const geom_t x15 = -x13 + x7;
-    const geom_t x16 = 1 / POW2(x14);
-    const geom_t x17 = x10 * x9 - x12;
-    const geom_t x18 = -x11 + x3;
-    const geom_t x19 = -x0 * x6 + x8 * x9;
-    const geom_t x20 = x15 * x16;
-    const geom_t x21 = x0 * x2 - x4 * x9;
-    const geom_t x22 = x16 * x17;
-    const geom_t x23 = -x2 * x8 + x4 * x6;
-    const geom_t x24 = x16 * x18;
-    const geom_t x25 = x0 * x1 - x5 * x8;
-    const geom_t x26 = -x0 * x10 + x4 * x5;
-    const geom_t x27 = -x1 * x4 + x10 * x8;
-    fff[0 * stride] = x14 * (POW2(x15) * x16 + x16 * POW2(x17) + x16 * POW2(x18));
-    fff[1 * stride] = x14 * (x19 * x20 + x21 * x22 + x23 * x24);
-    fff[2 * stride] = x14 * (x20 * x25 + x22 * x26 + x24 * x27);
-    fff[3 * stride] = x14 * (x16 * POW2(x19) + x16 * POW2(x21) + x16 * POW2(x23));
-    fff[4 * stride] = x14 * (x16 * x19 * x25 + x16 * x21 * x26 + x16 * x23 * x27);
-    fff[5 * stride] = x14 * (x16 * POW2(x25) + x16 * POW2(x26) + x16 * POW2(x27));
+    const real_t x0 = -px0 + px1;
+    const real_t x1 = -py0 + py2;
+    const real_t x2 = -pz0 + pz3;
+    const real_t x3 = x1 * x2;
+    const real_t x4 = x0 * x3;
+    const real_t x5 = -py0 + py3;
+    const real_t x6 = -pz0 + pz2;
+    const real_t x7 = x5 * x6;
+    const real_t x8 = x0 * x7;
+    const real_t x9 = -py0 + py1;
+    const real_t x10 = -px0 + px2;
+    const real_t x11 = x10 * x2;
+    const real_t x12 = x11 * x9;
+    const real_t x13 = -pz0 + pz1;
+    const real_t x14 = x10 * x5;
+    const real_t x15 = x13 * x14;
+    const real_t x16 = -px0 + px3;
+    const real_t x17 = x16 * x6 * x9;
+    const real_t x18 = x1 * x16;
+    const real_t x19 = x13 * x18;
+    const real_t x20 = -1.0 / 6.0 * x12 + (1.0 / 6.0) * x15 + (1.0 / 6.0) * x17 - 1.0 / 6.0 * x19 +
+                       (1.0 / 6.0) * x4 - 1.0 / 6.0 * x8;
+    const real_t x21 = x14 - x18;
+    const real_t x22 = 1. / POW2(-x12 + x15 + x17 - x19 + x4 - x8);
+    const real_t x23 = -x11 + x16 * x6;
+    const real_t x24 = x3 - x7;
+    const real_t x25 = -x0 * x5 + x16 * x9;
+    const real_t x26 = x21 * x22;
+    const real_t x27 = x0 * x2 - x13 * x16;
+    const real_t x28 = x22 * x23;
+    const real_t x29 = x13 * x5 - x2 * x9;
+    const real_t x30 = x22 * x24;
+    const real_t x31 = x0 * x1 - x10 * x9;
+    const real_t x32 = -x0 * x6 + x10 * x13;
+    const real_t x33 = -x1 * x13 + x6 * x9;
+    fff[0 * stride] = x20 * (POW2(x21) * x22 + x22 * POW2(x23) + x22 * POW2(x24));
+    fff[1 * stride] = x20 * (x25 * x26 + x27 * x28 + x29 * x30);
+    fff[2 * stride] = x20 * (x26 * x31 + x28 * x32 + x30 * x33);
+    fff[3 * stride] = x20 * (x22 * POW2(x25) + x22 * POW2(x27) + x22 * POW2(x29));
+    fff[4 * stride] = x20 * (x22 * x25 * x31 + x22 * x27 * x32 + x22 * x29 * x33);
+    fff[5 * stride] = x20 * (x22 * POW2(x31) + x22 * POW2(x32) + x22 * POW2(x33));
 }
 
 static /*inline*/ __device__ __host__ void sub_fff_0(const geom_t *const SFEM_RESTRICT fff,
@@ -147,35 +154,20 @@ static /*inline*/ __device__ __host__ void lapl_apply_micro_kernel(const geom_t 
                                                                    real_t *const SFEM_RESTRICT e1,
                                                                    real_t *const SFEM_RESTRICT e2,
                                                                    real_t *const SFEM_RESTRICT e3) {
-    const real_t x0 = (1.0 / 6.0) * u0;
-    const real_t x1 = fff[0] * x0;
-    const real_t x2 = (1.0 / 6.0) * u1;
-    const real_t x3 = fff[0] * x2;
-    const real_t x4 = fff[1] * x2;
-    const real_t x5 = (1.0 / 6.0) * u2;
-    const real_t x6 = fff[1] * x5;
-    const real_t x7 = fff[2] * x2;
-    const real_t x8 = (1.0 / 6.0) * u3;
-    const real_t x9 = fff[2] * x8;
-    const real_t x10 = fff[3] * x0;
-    const real_t x11 = fff[3] * x5;
-    const real_t x12 = fff[4] * x5;
-    const real_t x13 = fff[4] * x8;
-    const real_t x14 = fff[5] * x0;
-    const real_t x15 = fff[5] * x8;
-    const real_t x16 = fff[1] * x0;
-    const real_t x17 = fff[2] * x0;
-    const real_t x18 = fff[4] * x0;
-    *e0 += (1.0 / 3.0) * fff[1] * u0 + (1.0 / 3.0) * fff[2] * u0 + (1.0 / 3.0) * fff[4] * u0 + x1 +
-           x10 - x11 - x12 - x13 + x14 - x15 - x3 - x4 - x6 - x7 - x9;
-    *e1 += -x1 - x16 - x17 + x3 + x6 + x9;
-    *e2 += -x10 + x11 + x13 - x16 - x18 + x4;
-    *e3 += x12 - x14 + x15 - x17 - x18 + x7;
+    const real_t x0 = fff[0] + fff[1] + fff[2];
+    const real_t x1 = fff[1] + fff[3] + fff[4];
+    const real_t x2 = fff[2] + fff[4] + fff[5];
+    const real_t x3 = fff[1] * u0;
+    const real_t x4 = fff[2] * u0;
+    const real_t x5 = fff[4] * u0;
+    *e0 += u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+    *e1 += -fff[0] * u0 + fff[0] * u1 + fff[1] * u2 + fff[2] * u3 - x3 - x4;
+    *e2 += fff[1] * u1 - fff[3] * u0 + fff[3] * u2 + fff[4] * u3 - x3 - x5;
+    *e3 += fff[2] * u1 + fff[4] * u2 - fff[5] * u0 + fff[5] * u3 - x4 - x5;
 }
 
 // Worse
 // #define MACRO_TET4_USE_SHARED
-
 
 __global__ void macro_tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t nelements,
                                                               idx_t *const SFEM_RESTRICT elems,
@@ -203,10 +195,9 @@ __global__ void macro_tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t ne
         }
 
 #ifdef MACRO_TET4_USE_SHARED
-        for(int d = 0; d < 6; d++) {
-            sfff[d * block_size + threadIdx.x] = fff[d*nelements + e];
+        for (int d = 0; d < 6; d++) {
+            sfff[d * block_size + threadIdx.x] = fff[d * nelements + e];
         }
-
 
         const ptrdiff_t stride = block_size;
         const geom_t *const offf = &sfff[threadIdx.x];
@@ -328,7 +319,6 @@ __global__ void macro_tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t ne
 extern int macro_tet4_cuda_incore_laplacian_apply(cuda_incore_laplacian_t *ctx,
                                                   const real_t *const d_x,
                                                   real_t *const d_y) {
-    
     ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (ctx->nelements + block_size - 1) / block_size);
     macro_tet4_cuda_incore_laplacian_apply_kernel<<<n_blocks, block_size, 0>>>(
         ctx->nelements, ctx->d_elems, ctx->d_fff, d_x, d_y);
