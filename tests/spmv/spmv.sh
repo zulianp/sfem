@@ -29,24 +29,29 @@ export SFEM_REPEAT=1
 source venv/bin/activate
 
 mesh=mesh
-# mesh_sorted=mesh_sorted
+mesh_sorted=ref2
 
 
 
-create_sphere.sh 4
-# sfc refined2 $mesh_sorted
-refine $mesh refined
-mesh_sorted=refined
-# refine refined refined2
-# refine refined2 refined3
-# sfc refined $mesh_sorted
-touch $mesh_sorted/zd.raw
-touch $mesh_sorted/on.raw
-mkdir -p linear_system
-assemble $mesh_sorted linear_system
-mesh_p1_to_p2 $mesh p2
+if [[ -d "$mesh_sorted" ]]
+then
+	echo "Reusing mesh: $mesh_sorted"
+else
+	create_sphere.sh 4
+	refine mesh ref1
+	sfc ref1 sfc1
+	refine sfc1 ref2
+	mesh_p1_to_p2 sfc1 p2
 
-eval_nodal_function.py "x*x + y*y" $mesh_sorted/x.raw $mesh_sorted/y.raw  $mesh_sorted/z.raw linear_system/rhs.raw
+
+	touch $mesh_sorted/zd.raw
+	touch $mesh_sorted/on.raw
+
+	mkdir -p linear_system
+	assemble $mesh_sorted linear_system
+
+	eval_nodal_function.py "x*x + y*y" $mesh_sorted/x.raw $mesh_sorted/y.raw  $mesh_sorted/z.raw linear_system/rhs.raw
+fi
 
 spmv 	1 0 linear_system linear_system/rhs.raw test.raw
 cuspmv 	1 0 linear_system linear_system/rhs.raw test.raw

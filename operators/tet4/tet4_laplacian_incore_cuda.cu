@@ -65,14 +65,14 @@ static inline __device__ __host__ void fff_micro_kernel(const geom_t px0,
     fff[2 * stride] = x14 * (x20 * x25 + x22 * x26 + x24 * x27);
     fff[3 * stride] = x14 * (x16 * POW2(x19) + x16 * POW2(x21) + x16 * POW2(x23));
     fff[4 * stride] = x14 * (x16 * x19 * x25 + x16 * x21 * x26 + x16 * x23 * x27);
-   fff[5 * stride] = x14 * (x16 * POW2(x25) + x16 * POW2(x26) + x16 * POW2(x27));
+    fff[5 * stride] = x14 * (x16 * POW2(x25) + x16 * POW2(x26) + x16 * POW2(x27));
 }
 
-
-static inline __device__ __host__ void lapl_apply_micro_kernel(const geom_t *const SFEM_RESTRICT fff,
-                                                     const ptrdiff_t stride,
-                                                     const real_t *const SFEM_RESTRICT x,
-                                                     real_t *const SFEM_RESTRICT y) {
+static inline __device__ __host__ void lapl_apply_micro_kernel(const geom_t *const SFEM_RESTRICT
+                                                                   fff,
+                                                               const ptrdiff_t stride,
+                                                               const real_t *const SFEM_RESTRICT x,
+                                                               real_t *const SFEM_RESTRICT y) {
     const real_t x0 = (1.0 / 6.0) * x[0];
     const real_t x1 = fff[0 * stride] * x0;
     const real_t x2 = (1.0 / 6.0) * x[1];
@@ -114,7 +114,7 @@ __global__ void tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t nelement
         // collect coeffs
 #pragma unroll(4)
         for (int v = 0; v < 4; ++v) {
-        	vidx[v] = elems[v * nelements + e];
+            vidx[v] = elems[v * nelements + e];
             ex[v] = x[vidx[v]];
         }
 
