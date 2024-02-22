@@ -19,6 +19,47 @@
 #include "macro_tet4_laplacian_incore_cuda.h"
 #include "tet4_laplacian_incore_cuda.h"
 
+/*
+Architecture:            x86_64
+  CPU op-mode(s):        32-bit, 64-bit
+  Address sizes:         48 bits physical, 48 bits virtual
+  Byte Order:            Little Endian
+CPU(s):                  32
+  On-line CPU(s) list:   0-31
+Vendor ID:               AuthenticAMD
+  Model name:            AMD Ryzen 9 7950X 16-Core Processor
+    CPU family:          25
+    Model:               97
+    Thread(s) per core:  2
+    Core(s) per socket:  16
+    Socket(s):           1
+    Stepping:            2
+    CPU(s) scaling MHz:  28%
+    CPU max MHz:         5881.0000
+    CPU min MHz:         400.0000
+    BogoMIPS:            8986.18
+
+    and
+
+    NVIDIA GeForce RTX 3060
+*/
+
+
+// Comparisons with Vanilla MF code (seconds)
+// 20,971,520 elements, 3,578,097 nodes
+// OpenMP(16)           Cuda
+// SPMV: 0.0301502  0.00534357 (cusparse) 5.64x speed up
+// MF:   __         0.0111022             2.71x speed up wrt OpenMP spmv
+//                  2.0x slower than cusparse
+// 167,772,160 elements, 28,292,577  nodes
+// OpenMP(16)           Cuda (CRS matrix assembly time 1.05465)
+// SPMV: 0.184149       0.02335 (cusparse) 7.88x speed up
+// MF:   __             0.0718077          2.56x speed up wrt OpenMP spmv
+//                      3.0x slower than cusparse 
+// Clearly there is room for improvements wrt Vanilla version
+// Even  20 MF evaluations are time neutral if we consider assembly and 20 SpmV evaluations
+
+
 #define CHECK_CUDA(func)                                               \
     do {                                                               \
         cudaError_t status = (func);                                   \

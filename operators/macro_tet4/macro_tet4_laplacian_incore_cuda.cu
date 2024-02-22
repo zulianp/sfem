@@ -18,6 +18,9 @@ extern "C" {
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define POW2(a) ((a) * (a))
 
+// static int block_size = 128;
+#define block_size 128
+
 static inline __device__ __host__ void fff_micro_kernel(const geom_t px0,
                                                         const geom_t px1,
                                                         const geom_t px2,
@@ -170,6 +173,10 @@ static /*inline*/ __device__ __host__ void lapl_apply_micro_kernel(const geom_t 
     *e3 += x12 - x14 + x15 - x17 - x18 + x7;
 }
 
+// Worse
+// #define MACRO_TET4_USE_SHARED
+
+
 __global__ void macro_tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t nelements,
                                                               idx_t *const SFEM_RESTRICT elems,
                                                               const geom_t *const SFEM_RESTRICT fff,
@@ -178,6 +185,10 @@ __global__ void macro_tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t ne
     real_t ex[10];
     real_t ey[10];
     geom_t sub_fff[6];
+
+#ifdef MACRO_TET4_USE_SHARED
+    __shared__ geom_t sfff[6 * block_size];
+#endif
 
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
          e += blockDim.x * gridDim.x) {
@@ -191,10 +202,24 @@ __global__ void macro_tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t ne
             ex[v] = x[elems[v * nelements + e]];
         }
 
+#ifdef MACRO_TET4_USE_SHARED
+        for(int d = 0; d < 6; d++) {
+            sfff[d * block_size + threadIdx.x] = fff[d*nelements + e];
+        }
+
+
+        const ptrdiff_t stride = block_size;
+        const geom_t *const offf = &sfff[threadIdx.x];
+
+#else
+        const ptrdiff_t stride = nelements;
+        const geom_t *const offf = &fff[e];
+#endif
+
         // apply operator
 
         {  // Corner tests
-            sub_fff_0(&fff[e], nelements, sub_fff);
+            sub_fff_0(offf, stride, sub_fff);
 
             // [0, 4, 6, 7],
             lapl_apply_micro_kernel(sub_fff,
@@ -244,7 +269,7 @@ __global__ void macro_tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t ne
         {  // Octahedron tets
 
             // [4, 5, 6, 8],
-            sub_fff_4(&fff[e], nelements, sub_fff);
+            sub_fff_4(offf, stride, sub_fff);
             lapl_apply_micro_kernel(sub_fff,
                                     ex[4],
                                     ex[5],
@@ -256,7 +281,7 @@ __global__ void macro_tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t ne
                                     &ey[8]);
 
             // [7, 4, 6, 8],
-            sub_fff_5(&fff[e], nelements, sub_fff);
+            sub_fff_5(offf, stride, sub_fff);
             lapl_apply_micro_kernel(sub_fff,
                                     ex[7],
                                     ex[4],
@@ -268,7 +293,7 @@ __global__ void macro_tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t ne
                                     &ey[8]);
 
             // [6, 5, 9, 8],
-            sub_fff_6(&fff[e], nelements, sub_fff);
+            sub_fff_6(offf, stride, sub_fff);
             lapl_apply_micro_kernel(sub_fff,
                                     ex[6],
                                     ex[5],
@@ -280,7 +305,7 @@ __global__ void macro_tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t ne
                                     &ey[8]);
 
             // [7, 6, 9, 8]]
-            sub_fff_7(&fff[e], nelements, sub_fff);
+            sub_fff_7(offf, stride, sub_fff);
             lapl_apply_micro_kernel(sub_fff,
                                     ex[7],
                                     ex[6],
@@ -303,7 +328,7 @@ __global__ void macro_tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t ne
 extern int macro_tet4_cuda_incore_laplacian_apply(cuda_incore_laplacian_t *ctx,
                                                   const real_t *const d_x,
                                                   real_t *const d_y) {
-    static int block_size = 128;
+    
     ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (ctx->nelements + block_size - 1) / block_size);
     macro_tet4_cuda_incore_laplacian_apply_kernel<<<n_blocks, block_size, 0>>>(
         ctx->nelements, ctx->d_elems, ctx->d_fff, d_x, d_y);

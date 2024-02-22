@@ -391,13 +391,13 @@ void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
 // Optimized
 
 // On ARM is better with this off
-// #define PACKED
+#define PACKED
 
 void macro_tet4_laplacian_init(macro_tet4_laplacian_t *const ctx,
                                const ptrdiff_t nelements,
                                idx_t **const SFEM_RESTRICT elements,
-                               geom_t **const SFEM_RESTRICT
-                                   points) {  // Create FFF and store it on device
+                               geom_t **const SFEM_RESTRICT points) {
+    // Create FFF and store it on device
 
     ptrdiff_t alloc_size = (nelements / VEC_SIZE) * VEC_SIZE;
     alloc_size += (alloc_size < nelements) ? VEC_SIZE : 0;
