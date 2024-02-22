@@ -60,6 +60,7 @@ Vendor ID:               AuthenticAMD
 //                      2.4 slower than cusparse 
 // Clearly there is room for improvements wrt Vanilla version
 // Even  20 MF evaluations are time neutral if we consider assembly and 20 SpmV evaluations
+// with fp32 types in kernel 4x speed up (still not near peak)
 
 
 #define CHECK_CUDA(func)                                               \
