@@ -56,6 +56,8 @@ Vendor ID:               AuthenticAMD
 // SPMV: 0.184149       0.02335 (cusparse) 7.88x speed up
 // MF:   __             0.0718077          2.56x speed up wrt OpenMP spmv
 //                      3.0x slower than cusparse 
+// MF(opt1): ___        0.0553568          3.326x speed up wrt OpenMP spmv
+//                      2.4 slower than cusparse 
 // Clearly there is room for improvements wrt Vanilla version
 // Even  20 MF evaluations are time neutral if we consider assembly and 20 SpmV evaluations
 
