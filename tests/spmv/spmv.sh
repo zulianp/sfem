@@ -29,37 +29,29 @@ export SFEM_REPEAT=1
 source venv/bin/activate
 
 mesh=mesh
-mesh_sorted=mesh_sorted
+# mesh_sorted=mesh_sorted
 
 
 
-# create_sphere.sh 4
-# refine $mesh refined
+create_sphere.sh 4
+# sfc refined2 $mesh_sorted
+refine $mesh refined
+mesh_sorted=refined
 # refine refined refined2
 # refine refined2 refined3
-# sfc refined2 $mesh_sorted
-# touch $mesh_sorted/zd.raw
-# touch $mesh_sorted/on.raw
-# mkdir -p linear_system
-# assemble $mesh_sorted linear_system
-# mesh_p1_to_p2 refined p2
+# sfc refined $mesh_sorted
+touch $mesh_sorted/zd.raw
+touch $mesh_sorted/on.raw
+mkdir -p linear_system
+assemble $mesh_sorted linear_system
+mesh_p1_to_p2 $mesh p2
 
 eval_nodal_function.py "x*x + y*y" $mesh_sorted/x.raw $mesh_sorted/y.raw  $mesh_sorted/z.raw linear_system/rhs.raw
 
-spmv 1 0 linear_system linear_system/rhs.raw test.raw
-cuspmv 1 0 linear_system linear_system/rhs.raw test.raw
+spmv 	1 0 linear_system linear_system/rhs.raw test.raw
+cuspmv 	1 0 linear_system linear_system/rhs.raw test.raw
 
-
-# lumped_mass_inv $mesh_sorted test.raw out.raw
-# raw_to_db.py $mesh_sorted out.vtk --point_data="out.raw,linear_system/rhs.raw,test.raw"
-
-
-# set -x
-# usage: ../../lapl_matrix_free <mesh> <alpha> <x.raw> <output.raw>
 lapl_matrix_free $mesh_sorted 1 linear_system/rhs.raw mf_test.raw
-# lumped_mass_inv $mesh_sorted mf_test.raw mf_out.raw
-
-
 lapl_matrix_free p2 1 linear_system/rhs.raw macro_test.raw
 
 raw_to_db.py $mesh_sorted mf_out.vtk --point_data="linear_system/rhs.raw,mf_test.raw,macro_test.raw,test.raw"

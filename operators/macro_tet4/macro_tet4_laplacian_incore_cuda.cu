@@ -36,43 +36,36 @@ static inline __device__ __host__ void fff_micro_kernel(const geom_t px0,
     const geom_t x1 = -py0 + py2;
     const geom_t x2 = -pz0 + pz3;
     const geom_t x3 = x1 * x2;
-    const geom_t x4 = x0 * x3;
-    const geom_t x5 = -py0 + py3;
-    const geom_t x6 = -pz0 + pz2;
+    const geom_t x4 = -pz0 + pz1;
+    const geom_t x5 = -px0 + px2;
+    const geom_t x6 = -py0 + py3;
     const geom_t x7 = x5 * x6;
-    const geom_t x8 = x0 * x7;
-    const geom_t x9 = -py0 + py1;
-    const geom_t x10 = -px0 + px2;
-    const geom_t x11 = x10 * x2;
-    const geom_t x12 = x11 * x9;
-    const geom_t x13 = -pz0 + pz1;
-    const geom_t x14 = x10 * x5;
-    const geom_t x15 = x13 * x14;
-    const geom_t x16 = -px0 + px3;
-    const geom_t x17 = x16 * x6 * x9;
-    const geom_t x18 = x1 * x16;
-    const geom_t x19 = x13 * x18;
-    const geom_t x20 = -1.0 / 6.0 * x12 + (1.0 / 6.0) * x15 + (1.0 / 6.0) * x17 - 1.0 / 6.0 * x19 +
-                       (1.0 / 6.0) * x4 - 1.0 / 6.0 * x8;
-    const geom_t x21 = x14 - x18;
-    const geom_t x22 = 1. / POW2(-x12 + x15 + x17 - x19 + x4 - x8);
-    const geom_t x23 = -x11 + x16 * x6;
-    const geom_t x24 = x3 - x7;
-    const geom_t x25 = -x0 * x5 + x16 * x9;
-    const geom_t x26 = x21 * x22;
-    const geom_t x27 = x0 * x2 - x13 * x16;
-    const geom_t x28 = x22 * x23;
-    const geom_t x29 = x13 * x5 - x2 * x9;
-    const geom_t x30 = x22 * x24;
-    const geom_t x31 = x0 * x1 - x10 * x9;
-    const geom_t x32 = -x0 * x6 + x10 * x13;
-    const geom_t x33 = -x1 * x13 + x6 * x9;
-    fff[0 * stride] = x20 * (POW2(x21) * x22 + x22 * POW2(x23) + x22 * POW2(x24));
-    fff[1 * stride] = x20 * (x25 * x26 + x27 * x28 + x29 * x30);
-    fff[2 * stride] = x20 * (x26 * x31 + x28 * x32 + x30 * x33);
-    fff[3 * stride] = x20 * (x22 * POW2(x25) + x22 * POW2(x27) + x22 * POW2(x29));
-    fff[4 * stride] = x20 * (x22 * x25 * x31 + x22 * x27 * x32 + x22 * x29 * x33);
-    fff[5 * stride] = x20 * (x22 * POW2(x31) + x22 * POW2(x32) + x22 * POW2(x33));
+    const geom_t x8 = -py0 + py1;
+    const geom_t x9 = -px0 + px3;
+    const geom_t x10 = -pz0 + pz2;
+    const geom_t x11 = x10 * x6;
+    const geom_t x12 = x2 * x5;
+    const geom_t x13 = x1 * x9;
+    const geom_t x14 = -x0 * x11 + x0 * x3 + x10 * x8 * x9 - x12 * x8 - x13 * x4 + x4 * x7;
+    const geom_t x15 = -x13 + x7;
+    const geom_t x16 = 1 / POW2(x14);
+    const geom_t x17 = x10 * x9 - x12;
+    const geom_t x18 = -x11 + x3;
+    const geom_t x19 = -x0 * x6 + x8 * x9;
+    const geom_t x20 = x15 * x16;
+    const geom_t x21 = x0 * x2 - x4 * x9;
+    const geom_t x22 = x16 * x17;
+    const geom_t x23 = -x2 * x8 + x4 * x6;
+    const geom_t x24 = x16 * x18;
+    const geom_t x25 = x0 * x1 - x5 * x8;
+    const geom_t x26 = -x0 * x10 + x4 * x5;
+    const geom_t x27 = -x1 * x4 + x10 * x8;
+    fff[0 * stride] = x14 * (POW2(x15) * x16 + x16 * POW2(x17) + x16 * POW2(x18));
+    fff[1 * stride] = x14 * (x19 * x20 + x21 * x22 + x23 * x24);
+    fff[2 * stride] = x14 * (x20 * x25 + x22 * x26 + x24 * x27);
+    fff[3 * stride] = x14 * (x16 * POW2(x19) + x16 * POW2(x21) + x16 * POW2(x23));
+    fff[4 * stride] = x14 * (x16 * x19 * x25 + x16 * x21 * x26 + x16 * x23 * x27);
+    fff[5 * stride] = x14 * (x16 * POW2(x25) + x16 * POW2(x26) + x16 * POW2(x27));
 }
 
 static /*inline*/ __device__ __host__ void sub_fff_0(const geom_t *const SFEM_RESTRICT fff,
@@ -350,7 +343,7 @@ extern int macro_tet4_cuda_incore_laplacian_init(cuda_incore_laplacian_t *ctx, m
 
     {
         // Store elem indices on device
-        SFEM_CUDA_CHECK(cudaMalloc(&ctx->d_elems, 10 * mesh.nelements * sizeof(geom_t)));
+        SFEM_CUDA_CHECK(cudaMalloc(&ctx->d_elems, 10 * mesh.nelements * sizeof(idx_t)));
 
         for (int d = 0; d < 10; d++) {
             SFEM_CUDA_CHECK(cudaMemcpy(ctx->d_elems + d * mesh.nelements,
