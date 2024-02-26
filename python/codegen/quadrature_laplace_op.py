@@ -76,26 +76,35 @@ class QuadratureLaplaceOp:
 				FFF_x_g[d] += g[i][d] * u[i]
 
 
-		FFF_x_g = cFFF * FFF_x_g
+		qw = sp.symbols('qw')
+		FFF_x_g = cFFF * FFF_x_g * qw
 		################################################################### 
 		c_jac_inv = sp.Matrix(dims, dims, coeffs('c_jac_inv', dims*dims))
 
 		grad_uh = sp.Matrix(dims, 1, [0] * dims)
 		for i in range(0, fe.n_nodes()):
 			gi = g[i]
+
 			for d in range(0, dims):
 				grad_uh[d] += gi[d] * u[i]
 
 		grad_uh = c_jac_inv * grad_uh
 
 
-		gref = [sp.zeros(fe.n_nodes(), 1)]*dims
-
-		for i in range(0, fe.n_nodes()):
-			for d in range(0, dims):
+		gref = [0]*dims
+		for d in range(0, dims):
+			gref[d] = sp.zeros(fe.n_nodes(), 1)
+			for i in range(0, fe.n_nodes()):
 				gref[d][i] = g[i][d]
-				print(gref)
+			
+		print(gref[0])
 
+
+		print(gref[1])
+		
+
+		print(gref[2])
+		
 		tpl = read_file('tpl/quadrature_laplace_op_tpl.c')
 		code = tpl.format(
 			TRIAL_OPERAND_CODE=c_gen(assign_matrix("out", FFF_x_g)),

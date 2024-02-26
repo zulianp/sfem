@@ -22,7 +22,7 @@ LAUNCH="mpiexec -np 8"
 export OMP_NUM_THREADS=16
 export OMP_PROC_BIND=true 
 
-export SFEM_REPEAT=1
+# export SFEM_REPEAT=20
 
 # LAUNCH=""
 
@@ -51,14 +51,16 @@ else
 	assemble $mesh_sorted linear_system
 
 	eval_nodal_function.py "x*x + y*y" $mesh_sorted/x.raw $mesh_sorted/y.raw  $mesh_sorted/z.raw linear_system/rhs.raw
+	# eval_nodal_function.py "x*0 + 1" $mesh_sorted/x.raw $mesh_sorted/y.raw  $mesh_sorted/z.raw linear_system/rhs.raw
 fi
 
 spmv 	1 0 linear_system linear_system/rhs.raw test.raw
 cuspmv 	1 0 linear_system linear_system/rhs.raw test.raw
 
 lapl_matrix_free $mesh_sorted 1 linear_system/rhs.raw mf_test.raw
-lapl_matrix_free p2 1 linear_system/rhs.raw macro_test.raw
+SFEM_USE_MACRO=1 lapl_matrix_free p2 1 linear_system/rhs.raw macro_test.raw
+SFEM_USE_MACRO=0 lapl_matrix_free p2 1 linear_system/rhs.raw p2_test.raw
 
-raw_to_db.py $mesh_sorted mf_out.vtk --point_data="linear_system/rhs.raw,mf_test.raw,macro_test.raw,test.raw"
+raw_to_db.py $mesh_sorted mf_out.vtk --point_data="linear_system/rhs.raw,mf_test.raw,macro_test.raw,test.raw,p2_test.raw"
 
 deactivate

@@ -17,6 +17,7 @@
 #include "sfem_mesh.h"
 
 #include "macro_tet4_laplacian_incore_cuda.h"
+#include "tet10_laplacian_incore_cuda.h"
 #include "tet4_laplacian_incore_cuda.h"
 
 /*
@@ -66,12 +67,12 @@ Vendor ID:               AuthenticAMD
 
 // Small experiment
 // #elements 20,971,520 #nodes 3,578,097 #nz 53,007,057
-// run 1) MF std: 0.00424194, macro: 0.00138402  SpMV (cusparse): 0.00242305 
+// run 1) MF std: 0.00424194, macro: 0.00138402  SpMV (cusparse): 0.00242305
 
 // Larger experiment (Naive OpenMP SpMV:  0.127337 seconds)
 // #elements 167,772,160 #nodes 28,292,577 #nz 421,740,961
 // run 1) MF std: 0.033685, macro: 0.010668, SpMV (cusparse): 0.0184639
-// run 2) MF std: 0.033650, macro: 0.010675, SpMV (cusparse): 0.0184841 
+// run 2) MF std: 0.033650, macro: 0.010675, SpMV (cusparse): 0.0184841
 
 #define CHECK_CUDA(func)                                               \
     do {                                                               \
@@ -124,6 +125,9 @@ int main(int argc, char *argv[]) {
     int SFEM_REPEAT = 1;
     SFEM_READ_ENV(SFEM_REPEAT, atoi);
 
+    int SFEM_USE_MACRO = 1;
+    SFEM_READ_ENV(SFEM_USE_MACRO, atoi);
+
     mesh_t mesh;
     mesh_read(comm, mesh_folder, &mesh);
 
@@ -155,7 +159,12 @@ int main(int argc, char *argv[]) {
             tet4_cuda_incore_laplacian_init(&ctx, mesh.nelements, mesh.elements, mesh.points);
         } else if (mesh.element_type == TET10) {
             // Go for macro just for testing
-            macro_tet4_cuda_incore_laplacian_init(&ctx, mesh.nelements, mesh.elements, mesh.points);
+            if (SFEM_USE_MACRO) {
+                macro_tet4_cuda_incore_laplacian_init(
+                    &ctx, mesh.nelements, mesh.elements, mesh.points);
+            } else {
+                tet10_cuda_incore_laplacian_init(&ctx, mesh.nelements, mesh.elements, mesh.points);
+            }
         }
 
         cudaDeviceSynchronize();
@@ -166,7 +175,11 @@ int main(int argc, char *argv[]) {
             if (mesh.element_type == TET4) {
                 tet4_cuda_incore_laplacian_apply(&ctx, d_x, d_y);
             } else if (mesh.element_type == TET10) {
-                macro_tet4_cuda_incore_laplacian_apply(&ctx, d_x, d_y);
+                if (SFEM_USE_MACRO) {
+                    macro_tet4_cuda_incore_laplacian_apply(&ctx, d_x, d_y);
+                } else {
+                    tet10_cuda_incore_laplacian_apply(&ctx, d_x, d_y);
+                }
             }
         }
 
@@ -183,7 +196,11 @@ int main(int argc, char *argv[]) {
         if (mesh.element_type == TET4) {
             tet4_cuda_incore_laplacian_destroy(&ctx);
         } else if (mesh.element_type == TET10) {
-            macro_tet4_cuda_incore_laplacian_destroy(&ctx);
+            if (SFEM_USE_MACRO) {
+                macro_tet4_cuda_incore_laplacian_destroy(&ctx);
+            } else {
+                tet10_cuda_incore_laplacian_destroy(&ctx);
+            }
         }
     }
 
