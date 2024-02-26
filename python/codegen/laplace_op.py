@@ -4,6 +4,7 @@ from sfem_codegen import *
 from tri3 import *
 from tri6 import *
 from tet4 import *
+from tet10 import *
 
 
 
@@ -157,7 +158,8 @@ def main():
 	# q = sp.Matrix(2, 1, [qx, qy])
 	# op = LaplaceOp(fe, q)
 
-	fe = Tet4()
+	# fe = Tet4()
+	fe = Tet10()
 
 	q = sp.Matrix(3, 1, [qx, qy, qz])
 	op = LaplaceOp(fe, q)

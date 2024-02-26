@@ -11,8 +11,6 @@ extern "C" {
 }
 
 #include "sfem_cuda_base.h"
-#include "sfem_mesh.h"
-
 #include "tet4_laplacian_incore_cuda.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -86,14 +84,13 @@ static inline __device__ __host__ void lapl_apply_micro_kernel(
     const real_t x3 = fff[1 * stride] * u[0];
     const real_t x4 = fff[2 * stride] * u[0];
     const real_t x5 = fff[4 * stride] * u[0];
-    element_vector[0] =
-        u[0] * x0 + u[0] * x1 + u[0] * x2 - u[1] * x0 - u[2] * x1 - u[3] * x2;
-    element_vector[1] = -fff[0 * stride] * u[0] + fff[0 * stride] * u[1] +
-                                 fff[1 * stride] * u[2] + fff[2 * stride] * u[3] - x3 - x4;
-    element_vector[2] = fff[1 * stride] * u[1] - fff[3 * stride] * u[0] +
-                                 fff[3 * stride] * u[2] + fff[4 * stride] * u[3] - x3 - x5;
-    element_vector[3] = fff[2 * stride] * u[1] + fff[4 * stride] * u[2] -
-                                 fff[5 * stride] * u[0] + fff[5 * stride] * u[3] - x4 - x5;
+    element_vector[0] = u[0] * x0 + u[0] * x1 + u[0] * x2 - u[1] * x0 - u[2] * x1 - u[3] * x2;
+    element_vector[1] = -fff[0 * stride] * u[0] + fff[0 * stride] * u[1] + fff[1 * stride] * u[2] +
+                        fff[2 * stride] * u[3] - x3 - x4;
+    element_vector[2] = fff[1 * stride] * u[1] - fff[3 * stride] * u[0] + fff[3 * stride] * u[2] +
+                        fff[4 * stride] * u[3] - x3 - x5;
+    element_vector[3] = fff[2 * stride] * u[1] + fff[4 * stride] * u[2] - fff[5 * stride] * u[0] +
+                        fff[5 * stride] * u[3] - x4 - x5;
 }
 
 __global__ void tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t nelements,
@@ -135,50 +132,53 @@ extern int tet4_cuda_incore_laplacian_apply(cuda_incore_laplacian_t *ctx,
     return 0;
 }
 
-extern int tet4_cuda_incore_laplacian_init(cuda_incore_laplacian_t *ctx, mesh_t mesh) {
+extern int tet4_cuda_incore_laplacian_init(cuda_incore_laplacian_t *ctx,
+                                           const ptrdiff_t nelements,
+                                           idx_t **const SFEM_RESTRICT elements,
+                                           geom_t **const SFEM_RESTRICT points) {
     {  // Create FFF and store it on device
-        geom_t *h_fff = (geom_t *)calloc(6 * mesh.nelements, sizeof(geom_t));
+        geom_t *h_fff = (geom_t *)calloc(6 * nelements, sizeof(geom_t));
 
 #pragma omp parallel
         {
 #pragma omp for
-            for (ptrdiff_t e = 0; e < mesh.nelements; e++) {
-                fff_micro_kernel(mesh.points[0][mesh.elements[0][e]],
-                                 mesh.points[0][mesh.elements[1][e]],
-                                 mesh.points[0][mesh.elements[2][e]],
-                                 mesh.points[0][mesh.elements[3][e]],
-                                 mesh.points[1][mesh.elements[0][e]],
-                                 mesh.points[1][mesh.elements[1][e]],
-                                 mesh.points[1][mesh.elements[2][e]],
-                                 mesh.points[1][mesh.elements[3][e]],
-                                 mesh.points[2][mesh.elements[0][e]],
-                                 mesh.points[2][mesh.elements[1][e]],
-                                 mesh.points[2][mesh.elements[2][e]],
-                                 mesh.points[2][mesh.elements[3][e]],
-                                 mesh.nelements,
+            for (ptrdiff_t e = 0; e < nelements; e++) {
+                fff_micro_kernel(points[0][elements[0][e]],
+                                 points[0][elements[1][e]],
+                                 points[0][elements[2][e]],
+                                 points[0][elements[3][e]],
+                                 points[1][elements[0][e]],
+                                 points[1][elements[1][e]],
+                                 points[1][elements[2][e]],
+                                 points[1][elements[3][e]],
+                                 points[2][elements[0][e]],
+                                 points[2][elements[1][e]],
+                                 points[2][elements[2][e]],
+                                 points[2][elements[3][e]],
+                                 nelements,
                                  &h_fff[e]);
             }
         }
 
-        SFEM_CUDA_CHECK(cudaMalloc(&ctx->d_fff, 6 * mesh.nelements * sizeof(geom_t)));
-        SFEM_CUDA_CHECK(cudaMemcpy(
-            ctx->d_fff, h_fff, 6 * mesh.nelements * sizeof(geom_t), cudaMemcpyHostToDevice));
+        SFEM_CUDA_CHECK(cudaMalloc(&ctx->d_fff, 6 * nelements * sizeof(geom_t)));
+        SFEM_CUDA_CHECK(
+            cudaMemcpy(ctx->d_fff, h_fff, 6 * nelements * sizeof(geom_t), cudaMemcpyHostToDevice));
         free(h_fff);
     }
 
     {
         // Store elem indices on device
-        SFEM_CUDA_CHECK(cudaMalloc(&ctx->d_elems, 4 * mesh.nelements * sizeof(idx_t)));
+        SFEM_CUDA_CHECK(cudaMalloc(&ctx->d_elems, 4 * nelements * sizeof(idx_t)));
 
         for (int d = 0; d < 4; d++) {
-            SFEM_CUDA_CHECK(cudaMemcpy(ctx->d_elems + d * mesh.nelements,
-                                       mesh.elements[d],
-                                       mesh.nelements * sizeof(idx_t),
+            SFEM_CUDA_CHECK(cudaMemcpy(ctx->d_elems + d * nelements,
+                                       elements[d],
+                                       nelements * sizeof(idx_t),
                                        cudaMemcpyHostToDevice));
         }
     }
 
-    ctx->nelements = mesh.nelements;
+    ctx->nelements = nelements;
     return 0;
 }
 

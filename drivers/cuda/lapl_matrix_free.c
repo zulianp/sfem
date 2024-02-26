@@ -13,8 +13,8 @@
 
 #include "read_mesh.h"
 #include "sfem_base.h"
-#include "sfem_mesh.h"
 #include "sfem_defs.h"
+#include "sfem_mesh.h"
 
 #include "macro_tet4_laplacian_incore_cuda.h"
 #include "tet4_laplacian_incore_cuda.h"
@@ -44,7 +44,6 @@ Vendor ID:               AuthenticAMD
     NVIDIA GeForce RTX 3060
 */
 
-
 // Comparisons with Vanilla MF code (seconds)
 // 20,971,520 elements, 3,578,097 nodes
 // OpenMP(16)           Cuda
@@ -55,13 +54,12 @@ Vendor ID:               AuthenticAMD
 // OpenMP(16)           Cuda (CRS matrix assembly time 1.05465)
 // SPMV: 0.184149       0.02335 (cusparse) 7.88x speed up
 // MF:   __             0.0718077          2.56x speed up wrt OpenMP spmv
-//                      3.0x slower than cusparse 
+//                      3.0x slower than cusparse
 // MF(opt1): ___        0.0553568          3.326x speed up wrt OpenMP spmv
-//                      2.4 slower than cusparse 
+//                      2.4 slower than cusparse
 // Clearly there is room for improvements wrt Vanilla version
 // Even  20 MF evaluations are time neutral if we consider assembly and 20 SpmV evaluations
 // with fp32 types in kernel 4x speed up (still not near peak)
-
 
 #define CHECK_CUDA(func)                                               \
     do {                                                               \
@@ -142,10 +140,10 @@ int main(int argc, char *argv[]) {
         cuda_incore_laplacian_t ctx;
 
         if (mesh.element_type == TET4) {
-            tet4_cuda_incore_laplacian_init(&ctx, mesh);
+            tet4_cuda_incore_laplacian_init(&ctx, mesh.nelements, mesh.elements, mesh.points);
         } else if (mesh.element_type == TET10) {
             // Go for macro just for testing
-            macro_tet4_cuda_incore_laplacian_init(&ctx, mesh);
+            macro_tet4_cuda_incore_laplacian_init(&ctx, mesh.nelements, mesh.elements, mesh.points);
         }
 
         cudaDeviceSynchronize();

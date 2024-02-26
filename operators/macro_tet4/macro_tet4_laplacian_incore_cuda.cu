@@ -11,8 +11,6 @@ extern "C" {
 }
 
 #include "sfem_cuda_base.h"
-#include "sfem_mesh.h"
-
 #include "macro_tet4_laplacian_incore_cuda.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -150,16 +148,16 @@ static /*inline*/ __device__ __host__ void sub_fff_7(const geom_t *const SFEM_RE
     sub_fff[5] = (geom_t)(1.0 / 2.0) * fff[0 * stride];
 }
 
-static /*inline*/ __device__ __host__ void lapl_apply_micro_kernel(const geom_t *const SFEM_RESTRICT
-                                                                       fff,
-                                                                   const scalar_t u0,
-                                                                   const scalar_t u1,
-                                                                   const scalar_t u2,
-                                                                   const scalar_t u3,
-                                                                   scalar_t *const SFEM_RESTRICT e0,
-                                                                   scalar_t *const SFEM_RESTRICT e1,
-                                                                   scalar_t *const SFEM_RESTRICT e2,
-                                                                   scalar_t *const SFEM_RESTRICT e3) {
+static /*inline*/ __device__ __host__ void lapl_apply_micro_kernel(
+    const geom_t *const SFEM_RESTRICT fff,
+    const scalar_t u0,
+    const scalar_t u1,
+    const scalar_t u2,
+    const scalar_t u3,
+    scalar_t *const SFEM_RESTRICT e0,
+    scalar_t *const SFEM_RESTRICT e1,
+    scalar_t *const SFEM_RESTRICT e2,
+    scalar_t *const SFEM_RESTRICT e3) {
     const scalar_t x0 = fff[0] + fff[1] + fff[2];
     const scalar_t x1 = fff[1] + fff[3] + fff[4];
     const scalar_t x2 = fff[2] + fff[4] + fff[5];
@@ -195,7 +193,7 @@ __global__ void macro_tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t ne
             ey[v] = 0;
         }
         // collect coeffs
-// #pragma unroll(10)
+        // #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
             ex[v] = x[elems[v * nelements + e]];
         }
@@ -315,7 +313,7 @@ __global__ void macro_tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t ne
         }
 
         // redistribute coeffs
-// #pragma unroll(10)
+        // #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
             atomicAdd(&y[elems[v * nelements + e]], ey[v]);
         }
@@ -331,50 +329,53 @@ extern int macro_tet4_cuda_incore_laplacian_apply(cuda_incore_laplacian_t *ctx,
     return 0;
 }
 
-extern int macro_tet4_cuda_incore_laplacian_init(cuda_incore_laplacian_t *ctx, mesh_t mesh) {
+extern int macro_tet4_cuda_incore_laplacian_init(cuda_incore_laplacian_t *ctx,
+                                                 const ptrdiff_t nelements,
+                                                 idx_t **const SFEM_RESTRICT elements,
+                                                 geom_t **const SFEM_RESTRICT points) {
     {  // Create FFF and store it on device
-        geom_t *h_fff = (geom_t *)calloc(6 * mesh.nelements, sizeof(geom_t));
+        geom_t *h_fff = (geom_t *)calloc(6 * nelements, sizeof(geom_t));
 
 #pragma omp parallel
         {
 #pragma omp for
-            for (ptrdiff_t e = 0; e < mesh.nelements; e++) {
-                fff_micro_kernel(mesh.points[0][mesh.elements[0][e]],
-                                 mesh.points[0][mesh.elements[1][e]],
-                                 mesh.points[0][mesh.elements[2][e]],
-                                 mesh.points[0][mesh.elements[3][e]],
-                                 mesh.points[1][mesh.elements[0][e]],
-                                 mesh.points[1][mesh.elements[1][e]],
-                                 mesh.points[1][mesh.elements[2][e]],
-                                 mesh.points[1][mesh.elements[3][e]],
-                                 mesh.points[2][mesh.elements[0][e]],
-                                 mesh.points[2][mesh.elements[1][e]],
-                                 mesh.points[2][mesh.elements[2][e]],
-                                 mesh.points[2][mesh.elements[3][e]],
-                                 mesh.nelements,
+            for (ptrdiff_t e = 0; e < nelements; e++) {
+                fff_micro_kernel(points[0][elements[0][e]],
+                                 points[0][elements[1][e]],
+                                 points[0][elements[2][e]],
+                                 points[0][elements[3][e]],
+                                 points[1][elements[0][e]],
+                                 points[1][elements[1][e]],
+                                 points[1][elements[2][e]],
+                                 points[1][elements[3][e]],
+                                 points[2][elements[0][e]],
+                                 points[2][elements[1][e]],
+                                 points[2][elements[2][e]],
+                                 points[2][elements[3][e]],
+                                 nelements,
                                  &h_fff[e]);
             }
         }
 
-        SFEM_CUDA_CHECK(cudaMalloc(&ctx->d_fff, 6 * mesh.nelements * sizeof(geom_t)));
-        SFEM_CUDA_CHECK(cudaMemcpy(
-            ctx->d_fff, h_fff, 6 * mesh.nelements * sizeof(geom_t), cudaMemcpyHostToDevice));
+        SFEM_CUDA_CHECK(cudaMalloc(&ctx->d_fff, 6 * nelements * sizeof(geom_t)));
+        SFEM_CUDA_CHECK(
+            cudaMemcpy(ctx->d_fff, h_fff, 6 * nelements * sizeof(geom_t), cudaMemcpyHostToDevice));
         free(h_fff);
     }
 
     {
         // Store elem indices on device
-        SFEM_CUDA_CHECK(cudaMalloc(&ctx->d_elems, 10 * mesh.nelements * sizeof(idx_t)));
+        SFEM_CUDA_CHECK(cudaMalloc(&ctx->d_elems, 10 * nelements * sizeof(idx_t)));
 
         for (int d = 0; d < 10; d++) {
-            SFEM_CUDA_CHECK(cudaMemcpy(ctx->d_elems + d * mesh.nelements,
-                                       mesh.elements[d],
-                                       mesh.nelements * sizeof(idx_t),
+            SFEM_CUDA_CHECK(cudaMemcpy(ctx->d_elems + d * nelements,
+                                       elements[d],
+                                       nelements * sizeof(idx_t),
                                        cudaMemcpyHostToDevice));
         }
     }
 
-    ctx->nelements = mesh.nelements;
+    ctx->nelements = nelements;
     return 0;
 }
 
