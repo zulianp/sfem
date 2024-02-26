@@ -61,6 +61,18 @@ Vendor ID:               AuthenticAMD
 // Even  20 MF evaluations are time neutral if we consider assembly and 20 SpmV evaluations
 // with fp32 types in kernel 4x speed up (still not near peak)
 
+// On CSCS Piz Daint P100 (cuda 11) matrix free with macro element is 1.7 times faster
+// than SpMV and 3.1 times faster than standard matrix free
+
+// Small experiment
+// #elements 20,971,520 #nodes 3,578,097 #nz 53,007,057
+// run 1) MF std: 0.00424194, macro: 0.00138402  SpMV (cusparse): 0.00242305 
+
+// Larger experiment (Naive OpenMP SpMV:  0.127337 seconds)
+// #elements 167,772,160 #nodes 28,292,577 #nz 421,740,961
+// run 1) MF std: 0.033685, macro: 0.010668, SpMV (cusparse): 0.0184639
+// run 2) MF std: 0.033650, macro: 0.010675, SpMV (cusparse): 0.0184841 
+
 #define CHECK_CUDA(func)                                               \
     do {                                                               \
         cudaError_t status = (func);                                   \

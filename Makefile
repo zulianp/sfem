@@ -174,15 +174,15 @@ OBJS += tri3_stokes_mini.o \
 		tri3_mass.o \
 		tri3_phase_field_for_fracture.o \
 		tri3_linear_elasticity.o \
-		tri3_laplacian.o 
+		tri3_laplacian.o
 
 
 # Macro Tri3
-OBJS += macro_tri3_laplacian.o 
+OBJS += macro_tri3_laplacian.o
 
 # Macro Tet4
-# OBJS += macro_tet4_laplacian.o 
-OBJS += macro_tet4_laplacian_simd.o 
+# OBJS += macro_tet4_laplacian.o
+OBJS += macro_tet4_laplacian_simd.o
 
 # TriShell3
 OBJS += trishell3_mass.o
@@ -234,7 +234,7 @@ ifeq ($(cuda), 1)
 	CUDA_OBJS += tet4_cuda_phase_field_for_fracture.o
 	CUDA_OBJS += tet4_laplacian_incore_cuda.o
 	CUDA_OBJS += macro_tet4_laplacian_incore_cuda.o
-	
+
 
 	CUDA_OBJS += cuda_crs.o
 	DEPS += -L/opt/cuda/lib64 -lcudart -lcusparse -lcusolver -lcublas

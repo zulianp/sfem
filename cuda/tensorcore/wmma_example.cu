@@ -4,6 +4,8 @@
 #include <mma.h>
 #include <stdio.h>
 
+// https://forums.developer.nvidia.com/t/how-to-use-wmma-efficiently/157619/2
+
 // #include <helper_cuda.h>
 // #include <helper_functions.h>
 
