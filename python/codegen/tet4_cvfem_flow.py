@@ -11,6 +11,59 @@ def cross(a, b):
 		])
 	return s
 
+def subspoints(ss):
+	ss = ss.subs(x0, 0)
+	ss = ss.subs(y0, 0)
+	ss = ss.subs(z0, 0)
+
+	ss = ss.subs(x1, 1)
+	ss = ss.subs(y1, 0)
+	ss = ss.subs(z1, 0)
+
+	ss = ss.subs(x2, 0)
+	ss = ss.subs(y2, 1)
+	ss = ss.subs(z2, 0)
+
+	ss = ss.subs(x3, 0)
+	ss = ss.subs(y3, 0)
+	ss = ss.subs(z3, 1)
+	return ss
+
+def plot_normals(b, dS):
+	import matplotlib.pyplot as plt
+	import numpy as np
+
+	# Define data points
+	X = np.zeros(len(dS))
+	Y = np.zeros(len(dS))
+	Z = np.zeros(len(dS))
+
+	# Define vector components (modify these for different directions)
+	U = np.zeros(len(dS))
+	V = np.zeros(len(dS))
+	W = np.zeros(len(dS))
+
+	for i in range(0, len(dS)):
+		d = subspoints(dS[i])
+		U[i] = d[0] * 10
+		V[i] = d[1] * 10
+		W[i] = d[2] * 10
+
+	# Create the plot
+	fig = plt.figure()
+	ax = fig.add_subplot(projection='3d')
+
+	# Plot the quiver with options
+	ax.quiver(X, Y, Z, U, V, W, normalize=True, color='red')  # Normalize for consistent size
+
+	# Set labels and title
+	ax.set_xlabel('X')
+	ax.set_ylabel('Y')
+	ax.set_zlabel('Z')
+	ax.set_title('3D Quiver Plot')
+
+	plt.show()
+
 A = sp.Matrix(3, 3, [0] * 9)
 
 K = sp.symbols('K')
@@ -37,17 +90,47 @@ def p(x, y, z):
 half = sp.Rational(1, 2)
 centroid = p(half, half, half)
 
-print(f'{centroid[0]}\n{centroid[1]}\n{centroid[2]}')
+# print(f'{centroid[0]}\n{centroid[1]}\n{centroid[2]}')
 
 dS = [0] * 6
 
+# A -> B
 dS[0] = sp.Rational(1, 24) * (    cross(a, c) +     cross(a, d) + 	  cross(b, c) -     cross(b, d) + 2 * cross(c, d))
+
+# A -> C
 dS[1] = sp.Rational(1, 24) * (-   cross(a, b) +     cross(a, d) + 	  cross(b, c) - 2 * cross(b, d) +     cross(c, d)) 
+
+# A -> D
 dS[2] = sp.Rational(1, 24) * (    cross(a, b) -     cross(a, c) + 2 * cross(b, c) - 	cross(b, d) +     cross(c, d))
+
+# B -> C
 dS[3] = sp.Rational(1, 24) * (-   cross(a, b) -     cross(a, c) + 2 * cross(a, d) -  	cross(b, d) -	  cross(c, d))
+
+# B -> D
 dS[4] = sp.Rational(1, 24) * (	  cross(a, b) - 2 * cross(a, c) +     cross(a, d) + 	cross(b, c) - 	  cross(c, d))
+
+# C -> D
 dS[5] = sp.Rational(1, 24) * (2 * cross(a, b) -     cross(a, c) - 	  cross(a, d) + 	cross(b, c) + 	  cross(b, d))
 
+# plot_normals(centroid, dS)
+
+# for k in range(0, len(dS)):
+# 	dd = dS[k]
+# 	print(f'{k}) {subspoints(dd)}')
+
+subs = [
+	[0, 1, 2],
+	[0, 3, 4],
+	[1, 3, 5],
+	[2, 4, 5]
+]
+
+signs = [
+	[-1, -1, -1],
+	[1,  -1, -1],
+	[1,   1, -1],
+	[1,   1,  1]
+]
 
 # V_ABCD = sp.Rational(1, 6) * dot3((d - a), (cross(b - a, c - a)))
 # print(V_ABCD)
@@ -71,34 +154,24 @@ for i in range(0, 4):
 		integr = 0
 
 		# Integrate over CV surface integration points
-		for k in range(0, 6):
+		for l in range(0, 3):
+			k = subs[i][l]
+			s = signs[i][l]
 			dGdS = 0
 			for d in range(0, 3): 
-				dGdS += dS[k][d] * g[j][d]
+				dGdS += dS[k][d] * g[j][d] * s
 			integr += dGdS
 
-		if True:
-			ss = integr
-			ss = ss.subs(x0, 0)
-			ss = ss.subs(y0, 0)
-			ss = ss.subs(z0, 0)
+		# if True:
+		if False:
+			ss = subspoints(integr)
 
-			ss = ss.subs(x1, 1)
-			ss = ss.subs(y1, 0)
-			ss = ss.subs(z1, 0)
-
-			ss = ss.subs(x2, 0)
-			ss = ss.subs(y2, 1)
-			ss = ss.subs(z2, 0)
-
-			ss = ss.subs(x3, 0)
-			ss = ss.subs(y3, 0)
-			ss = ss.subs(z3, 1)
-
-			print(f'{i}, {j}) {ss}')
+			if j == 0:
+				print("\n")
+			print(ss, end=" ")
 
 		# integr = sp.simplify(integr)
 		var = sp.symbols(f'element_matrix[{i*4+j}]')
 		expr.append(ast.Assignment(var, integr))
-
+print("\n")
 c_code(expr)
