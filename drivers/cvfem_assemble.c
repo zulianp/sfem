@@ -175,7 +175,7 @@ int main(int argc, char *argv[]) {
 
         idx_t *faces_neumann = 0;
 
-        enum ElemType st = side_type(mesh.element_type);
+        enum ElemType st = shell_type(side_type(mesh.element_type));
         int nnodesxface = elem_num_nodes(st);
         ptrdiff_t nfacesxnxe = read_file(comm, path, (void **)&faces_neumann);
         idx_t nfaces = (nfacesxnxe / nnodesxface) / sizeof(idx_t);

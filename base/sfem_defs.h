@@ -18,6 +18,7 @@ enum ElemType {
     TET10 = 10,
     EDGE3 = 11,
     TRISHELL3 = 103,
+    TRISHELL6 = 106,
     BEAM2 = 100002,
     MACRO = 100,
     MACRO_TRI3 = (MACRO + TRI3),
@@ -51,8 +52,12 @@ SFEM_INLINE static enum ElemType shell_type(const enum ElemType type) {
     switch (type) {
         case TRI3:
             return TRISHELL3;
+        case TRI6:
+            return TRISHELL6;
         case TRISHELL3:
             return TRISHELL3;
+        case TRISHELL6:
+            return TRISHELL6;
         case EDGE2:
             return BEAM2;
         case BEAM2:

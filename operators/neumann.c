@@ -91,7 +91,7 @@ static void tri_shell_3_surface_forcing_function(const ptrdiff_t nfaces,
 
 #pragma omp parallel
     {
-#pragma omp for //nowait
+#pragma omp for  // nowait
 
         for (idx_t f = 0; f < nfaces; ++f) {
             real_t element_vector[3];
@@ -197,7 +197,7 @@ static void tri_shell_6_surface_forcing_function(const ptrdiff_t nfaces,
 
 #pragma omp parallel
     {
-#pragma omp for //nowait
+#pragma omp for  // nowait
 
         for (idx_t f = 0; f < nfaces; ++f) {
             real_t element_vector[3];
@@ -305,7 +305,20 @@ void surface_forcing_function(const int element_type,
             tri_shell_6_surface_forcing_function(nfaces, faces_neumann, xyz, value, 1, output);
             break;
         }
+        case BEAM2: {
+            edge_shell_2_surface_forcing_function(nfaces, faces_neumann, xyz, value, 1, output);
+            break;
+        }
+        case TRISHELL3: {
+            tri_shell_3_surface_forcing_function(nfaces, faces_neumann, xyz, value, 1, output);
+            break;
+        }
+        case TRISHELL6: {
+            tri_shell_6_surface_forcing_function(nfaces, faces_neumann, xyz, value, 1, output);
+            break;
+        }
         default: {
+            MPI_Abort(MPI_COMM_WORLD, -1);
             assert(0 && "Implement me!");
             break;
         }

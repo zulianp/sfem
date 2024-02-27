@@ -22,9 +22,8 @@ export SFEM_HANDLE_RHS=1
 export SFEM_DIRICHLET_NODES=./mesh/sidesets_aos/sinlet.raw  
 export SFEM_HANDLE_NEUMANN=1 
 export SFEM_NEUMANN_FACES=./mesh/sidesets_aos/soutlet.raw
-# export SFEM_NEUMANN_FACES=./mesh/sidesets_aos/stop.raw
 
-SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 cvfem_assemble ./mesh system
+cvfem_assemble ./mesh system
 # assemble ./mesh system
 
 # UTOPIA_EXEC=$CODE_DIR/utopia/utopia/build/utopia_exec
@@ -45,10 +44,10 @@ solve()
 
 	echo "rhs=$rhs_"
 	# mpiexec -np 8 \
-	# $UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type hypre -ksp_type bcgs -atol 1e-18 -rtol 0 -stol 1e-19 --verbose
+	$UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type hypre -ksp_type bcgs -atol 1e-18 -rtol 0 -stol 1e-19 --verbose
 
 
-	$UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type lu -ksp_type preonly --verbose
+	# $UTOPIA_EXEC -app ls_solve -A $mat_ -b $rhs_ -out $x_ -use_amg false --use_ksp -pc_type lu -ksp_type preonly --verbose
 }
 
 
