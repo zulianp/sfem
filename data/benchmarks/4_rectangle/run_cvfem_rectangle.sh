@@ -6,8 +6,8 @@ SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 PATH=$SCRIPTPATH:$PATH
 PATH=$SCRIPTPATH/../../..:$PATH
-PATH=$SCRIPTPATH/../../../python:$PATH
-PATH=$SCRIPTPATH/../../../python/mesh:$PATH
+PATH=$SCRIPTPATH/../../../python/sfem:$PATH
+PATH=$SCRIPTPATH/../../../python/sfem/mesh:$PATH
 PATH=$SCRIPTPATH/../../../workflows/divergence:$PATH
 PATH=$SCRIPTPATH/../../benchmarks/meshes:$PATH
 
@@ -17,7 +17,7 @@ export SFEM_NEUMANN_FACES=./mesh/sidesets_aos/sright.raw
 
 mkdir -p system
 
-create_box_2D.sh 11
+# create_box_2D.sh 4
 
 export SFEM_HANDLE_RHS=1
 export SFEM_DIRICHLET_NODES=./mesh/sidesets_aos/sleft.raw  
@@ -28,8 +28,8 @@ export SFEM_NEUMANN_FACES=./mesh/sidesets_aos/sright.raw
 cvfem_assemble ./mesh system
 # assemble ./mesh system
 
-UTOPIA_EXEC=$CODE_DIR/utopia/utopia/build/utopia_exec
-# UTOPIA_EXEC=$CODE_DIR/utopia/utopia/build_debug/utopia_exec
+# UTOPIA_EXEC=$CODE_DIR/utopia/utopia/build/utopia_exec
+UTOPIA_EXEC=$CODE_DIR/utopia/utopia/build_debug/utopia_exec
 
 
 if [[ -z "$UTOPIA_EXEC" ]]

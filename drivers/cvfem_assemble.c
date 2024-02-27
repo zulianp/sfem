@@ -20,6 +20,7 @@
 
 #include "read_mesh.h"
 
+#include "cvfem_tet4_laplacian.h"
 #include "cvfem_tri3_diffusion.h"
 
 ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
@@ -122,15 +123,31 @@ int main(int argc, char *argv[]) {
     // Operator assembly
     ///////////////////////////////////////////////////////////////////////////////
     if (SFEM_LAPLACIAN) {
-        cvfem_tri3_diffusion_assemble_hessian(
-            // mesh.element_type,
-            mesh.nelements,
-            mesh.nnodes,
-            mesh.elements,
-            mesh.points,
-            rowptr,
-            colidx,
-            values);
+        switch (mesh.element_type) {
+            case TRI3: {
+                cvfem_tri3_diffusion_assemble_hessian(mesh.nelements,
+                                                      mesh.nnodes,
+                                                      mesh.elements,
+                                                      mesh.points,
+                                                      rowptr,
+                                                      colidx,
+                                                      values);
+                break;
+            }
+            case TET4: {
+                cvfem_tet4_laplacian_assemble_hessian(mesh.nelements,
+                                                      mesh.nnodes,
+                                                      mesh.elements,
+                                                      mesh.points,
+                                                      rowptr,
+                                                      colidx,
+                                                      values);
+                break;
+            }
+            default:
+                MPI_Finalize();
+                return EXIT_FAILURE;
+        }
     }
 
     tock = MPI_Wtime();

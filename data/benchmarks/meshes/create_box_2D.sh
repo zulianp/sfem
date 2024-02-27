@@ -48,7 +48,7 @@ mkdir -p $folder
 idx_type_size=4
 
 box_2D.py $mesh_db $nrefs $width $height
-db_to_raw.py $mesh_db $mesh_original
+db_to_raw.py $mesh_db $mesh_original --select_elem_type=triangle
 refine $mesh_original $mesh_raw
 
 # set -x

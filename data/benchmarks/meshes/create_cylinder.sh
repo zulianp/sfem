@@ -6,8 +6,8 @@ SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 PATH=$SCRIPTPATH:$PATH
 PATH=$SCRIPTPATH/../../..:$PATH
-PATH=$SCRIPTPATH/../../../python:$PATH
-PATH=$SCRIPTPATH/../../../python/mesh:$PATH
+PATH=$SCRIPTPATH/../../../python/sfem:$PATH
+PATH=$SCRIPTPATH/../../../python/sfem/mesh:$PATH
 PATH=$SCRIPTPATH/../../../workflows/divergence:$PATH
 
 LAUNCH=""
@@ -42,7 +42,7 @@ mkdir -p $folder
 idx_type_size=4
 
 cylinder.py $mesh_db $nrefs
-db_to_raw.py $mesh_db $mesh_original
+db_to_raw.py $mesh_db $mesh_original --select_elem_type=tetra
 refine $mesh_original $mesh_raw
 $LAUNCH skin $mesh_raw $mesh_surface
 
