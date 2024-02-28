@@ -20,8 +20,8 @@ export SFEM_DIRICHLET_NODES=./mesh/sidesets_aos/sinlet.raw
 export SFEM_HANDLE_NEUMANN=1
 export SFEM_NEUMANN_FACES=./mesh/sidesets_aos/soutlet.raw
 
-# cvfem_assemble ./mesh system
-assemble ./mesh system
+cvfem_assemble ./mesh system
+# assemble ./mesh system
 
 # UTOPIA_EXEC=$CODE_DIR/utopia/utopia/build/utopia_exec
 UTOPIA_EXEC=$CODE_DIR/utopia/utopia/build_debug/utopia_exec

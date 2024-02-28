@@ -20,7 +20,7 @@ enum ElemType {
     TRISHELL3 = 103,
     TRISHELL6 = 106,
     BEAM2 = 100002,
-    MACRO = 100,
+    MACRO = 200,
     MACRO_TRI3 = (MACRO + TRI3),
     MACRO_TET4 = (MACRO + TET4),
     INVALID = -1
@@ -98,6 +98,8 @@ SFEM_INLINE static int elem_num_nodes(const enum ElemType type) {
             return 3;
         case TRI3:
             return 3;
+        case TRISHELL3:
+            return 3;
         case WEDGE6:
             return 6;
         case QUAD4:
@@ -128,6 +130,8 @@ SFEM_INLINE static int elem_num_sides(const enum ElemType type) {
         case EDGE2:
             return 2;
         case TRI3:
+            return 3;
+        case TRISHELL3:
             return 3;
         case MACRO_TRI3:
             return 3; // Really?
