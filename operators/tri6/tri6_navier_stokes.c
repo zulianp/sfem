@@ -2418,7 +2418,7 @@ void tri6_tri3_correction(const ptrdiff_t nelements,
 
 static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {
     int i;
-    for (i = 0; i < size - SFEM_VECTOR_SIZE; i += SFEM_VECTOR_SIZE) {
+    for (i = 0; i < size - 4; i += 4) {
         if (arr[i] == target) return i;
         if (arr[i + 1] == target) return i + 1;
         if (arr[i + 2] == target) return i + 2;

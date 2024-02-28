@@ -12,21 +12,22 @@ def cross(a, b):
 	return s
 
 def subspoints(ss):
+	scaling = 3;
 	ss = ss.subs(x0, 0)
 	ss = ss.subs(y0, 0)
 	ss = ss.subs(z0, 0)
 
-	ss = ss.subs(x1, 1)
+	ss = ss.subs(x1, scaling)
 	ss = ss.subs(y1, 0)
 	ss = ss.subs(z1, 0)
 
 	ss = ss.subs(x2, 0)
-	ss = ss.subs(y2, 1)
+	ss = ss.subs(y2, scaling)
 	ss = ss.subs(z2, 0)
 
 	ss = ss.subs(x3, 0)
 	ss = ss.subs(y3, 0)
-	ss = ss.subs(z3, 1)
+	ss = ss.subs(z3, scaling)
 	return ss
 
 def plot_normals(b, dS):

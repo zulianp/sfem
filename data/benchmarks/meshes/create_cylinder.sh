@@ -26,8 +26,8 @@ nrefs=$1
 folder=cylinder
 mesh_db=$folder/mesh.vtk
 mesh_raw=./mesh
-mesh_original=./original
-# mesh_original=$mesh_raw
+# mesh_original=./original
+mesh_original=$mesh_raw
 mesh_surface=$mesh_raw/surface
 
 mkdir -p $mesh_original
@@ -44,7 +44,7 @@ idx_type_size=4
 cylinder.py $mesh_db $nrefs
 db_to_raw.py $mesh_db $mesh_original --select_elem_type=tetra
 # refine $mesh_original $mesh_raw
-sfc $mesh_original $mesh_raw
+# sfc $mesh_original $mesh_raw
 $LAUNCH skin $mesh_raw $mesh_surface
 
 $LAUNCH select_surf $mesh_surface -1 0   0   0.99   $mesh_surface/sides_inlet.raw
