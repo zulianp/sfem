@@ -95,7 +95,7 @@ centroid = p(half, half, half)
 dS = [0] * 6
 
 # A -> B
-dS[0] = sp.Rational(1, 24) * (    cross(a, c) +     cross(a, d) + 	  cross(b, c) -     cross(b, d) + 2 * cross(c, d))
+dS[0] = sp.Rational(1, 24) * (    cross(a, c) -     cross(a, d) + 	  cross(b, c) -     cross(b, d) + 2 * cross(c, d))
 
 # A -> C
 dS[1] = sp.Rational(1, 24) * (-   cross(a, b) +     cross(a, d) + 	  cross(b, c) - 2 * cross(b, d) +     cross(c, d)) 
@@ -135,11 +135,12 @@ signs = [
 # V_ABCD = sp.Rational(1, 6) * dot3((d - a), (cross(b - a, c - a)))
 # print(V_ABCD)
 
-V_ABCD = det3(Jac)
-
+V_ABCD = dot3(sp.Rational(1, 6) * (d - a), cross(b - a, c - a))
+print(subspoints(V_ABCD))
+# V_ABCD = det3(Jac)
 # Divide by reference volume 1/6
 # and number of sub-volumes (4)
-dV = V_ABCD / (6 * 4)
+# dV = V_ABCD / (6 * 4)
 
 g = [0, 0, 0, 0]
 
@@ -147,6 +148,12 @@ for i in range(0, 4):
 	gi = sp.Matrix(3, 1, [ sp.diff(rf[i], qx), sp.diff(rf[i], qy), sp.diff(rf[i], qz)])
 	gi = JacInv.T * gi
 	g[i] = sp.simplify(gi)
+
+# Following the paper
+# g[0] = sp.Rational(1, 6) / V_ABCD * cross(d - b, c - b)
+# g[1] = sp.Rational(1, 6) / V_ABCD * cross(c - a, d - a)
+# g[2] = sp.Rational(1, 6) / V_ABCD * cross(d - a, b - a)
+# g[3] = sp.Rational(1, 6) / V_ABCD * cross(b - a, c - a)
 
 expr = []
 for i in range(0, 4):
@@ -157,13 +164,10 @@ for i in range(0, 4):
 		for l in range(0, 3):
 			k = subs[i][l]
 			s = signs[i][l]
-			dGdS = 0
-			for d in range(0, 3): 
-				dGdS += dS[k][d] * g[j][d] * s
-			integr += dGdS
+			integr += dot3(dS[k] * s, g[j])
 
-		# if True:
-		if False:
+		if True:
+		# if False:
 			ss = subspoints(integr)
 
 			if j == 0:

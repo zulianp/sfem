@@ -16,7 +16,7 @@ export SFEM_NEUMANN_FACES=./mesh/sidesets_aos/sright.raw
 
 mkdir -p system
 
-# create_cylinder.sh 1
+create_cylinder.sh 0
 
 export SFEM_HANDLE_RHS=1
 export SFEM_DIRICHLET_NODES=./mesh/sidesets_aos/sinlet.raw  
