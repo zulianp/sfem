@@ -178,8 +178,8 @@ for i in range(0, 4):
 
 			if j == 0:
 				print("\n")
-				print(ssdA)
-			# print(ss, end=" ")
+				# print(ssdA)
+			print(ss, end=" ")
 
 
 		# integr = sp.simplify(integr)
