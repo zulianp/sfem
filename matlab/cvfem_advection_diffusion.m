@@ -12,8 +12,7 @@ function cvfem_advection_diffusion()
 
 % Cylinder example
 
-
-if 0
+if 1
 mesh = '/Users/patrickzulian/Desktop/code/sfem/tests/cvfem3/mesh';
 lsystem = '/Users/patrickzulian/Desktop/code/sfem/tests/cvfem3/system';
 
@@ -154,8 +153,13 @@ mat_e = lap_e + adv_e;
 
 values = elemental_to_crs(problem.elems, mat_e, rowptr, colidx);
 
-D = crs_to_dense(rowptr, colidx, values);
-disp(D)
+D = sparse(crs_to_dense(rowptr, colidx, values));
+% disp(D)
+
+
+% Without BCs this should sum to zero
+disp(sum(D(:)))
+
 return
 
 function values = elemental_to_crs(elems, mat_e, rowptr, colidx)
@@ -236,14 +240,14 @@ for e=1:p.nelements
     Ae(e, 1, 3) = dot(grads(3, :), gtest1);
     Ae(e, 1, 4) = dot(grads(4, :), gtest1);
 
-    gtest2 =  dn1(:, e) - dn4(:, e) - dn5(:, e);
+    gtest2 = dn1(:, e) - dn4(:, e) - dn5(:, e);
     
     Ae(e, 2, 1) = dot(grads(1, :), gtest2);
     Ae(e, 2, 2) = dot(grads(2, :), gtest2);
     Ae(e, 2, 3) = dot(grads(3, :), gtest2);
     Ae(e, 2, 4) = dot(grads(4, :), gtest2);
     
-    gtest3 =  dn2(:, e) + dn4(:, e) - dn6(:, e);
+    gtest3 = dn2(:, e) + dn4(:, e) - dn6(:, e);
     
     Ae(e, 3, 1) = dot(grads(1, :), gtest3);
     Ae(e, 3, 2) = dot(grads(2, :), gtest3);
@@ -274,22 +278,22 @@ Ae(:, 1, 3) =  max(-q(2, :), 0);
 Ae(:, 1, 4) =  max(-q(3, :), 0);
 
 % Node b
-Ae(:, 2, 2) = -max( q(1, :), 0) - max(q(4, :), 0) - max(q(5, :), 0);
-Ae(:, 2, 1) =  max(-q(1, :), 0);
+Ae(:, 2, 2) = -max(-q(1, :), 0) - max(q(4, :), 0) - max(q(5, :), 0);
+Ae(:, 2, 1) =  max( q(1, :), 0);
 Ae(:, 2, 3) =  max(-q(4, :), 0);
 Ae(:, 2, 4) =  max(-q(5, :), 0);
 
 % Node c
-Ae(:, 3, 3) = -max( q(2, :), 0) - max(q(4, :), 0) - max(q(6, :), 0);
-Ae(:, 3, 1) =  max(-q(2, :), 0);
-Ae(:, 3, 2) =  max(-q(4, :), 0);
+Ae(:, 3, 3) = -max(-q(2, :), 0) - max(-q(4, :), 0) - max(q(6, :), 0);
+Ae(:, 3, 1) =  max( q(2, :), 0);
+Ae(:, 3, 2) =  max( q(4, :), 0);
 Ae(:, 3, 4) =  max(-q(6, :), 0);
 
 % Node d
-Ae(:, 4, 4) = -max( q(3, :), 0) - max(q(5, :), 0) - max(q(6, :), 0);
-Ae(:, 4, 1) =  max(-q(3, :), 0);
-Ae(:, 4, 2) =  max(-q(5, :), 0);
-Ae(:, 4, 3) =  max(-q(6, :), 0);
+Ae(:, 4, 4) = -max(-q(3, :), 0) - max(-q(5, :), 0) - max(-q(6, :), 0);
+Ae(:, 4, 1) =  max(q(3, :), 0);
+Ae(:, 4, 2) =  max(q(5, :), 0);
+Ae(:, 4, 3) =  max(q(6, :), 0);
 return
 
 
@@ -316,7 +320,7 @@ q2 = vxc(2, :) .* dn2(1, :) + vyc(2, :) .* dn2(2, :) + vzc(2, :) .* dn2(2, :);
 q3 = vxc(3, :) .* dn3(1, :) + vyc(3, :) .* dn3(2, :) + vzc(3, :) .* dn3(2, :);
 q4 = vxc(4, :) .* dn4(1, :) + vyc(4, :) .* dn4(2, :) + vzc(4, :) .* dn4(2, :);
 q5 = vxc(5, :) .* dn5(1, :) + vyc(5, :) .* dn5(2, :) + vzc(5, :) .* dn5(2, :);
-q6 = vxc(6, :) .* dn6(1, :) + vyc(6, :) .* dn6(2, :) + vzc(6, :) * dn6(2, :);
+q6 = vxc(6, :) .* dn6(1, :) + vyc(6, :) .* dn6(2, :) + vzc(6, :) .* dn6(2, :);
 q = [q1; q2; q3; q4; q5; q6];
 return
 
