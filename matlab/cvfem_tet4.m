@@ -166,10 +166,7 @@ for i=1:4
 
     gtest = G_inv * gtest;
 
-    
-
     for j=1:4        
-%         A(i, j) = dot(gtest, g(:, j));
           A(i, j) = dot(gtest, g_ref(:, j));
     end
 end
