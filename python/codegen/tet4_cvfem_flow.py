@@ -12,7 +12,7 @@ def cross(a, b):
 	return s
 
 def subspoints(ss):
-	scaling = 3;
+	scaling = 1;
 	ss = ss.subs(x0, 0)
 	ss = ss.subs(y0, 0)
 	ss = ss.subs(z0, 0)
@@ -159,21 +159,28 @@ for i in range(0, 4):
 expr = []
 for i in range(0, 4):
 	for j in range(0, 4):
-		integr = 0
+		
 
 		# Integrate over CV surface integration points
+		dA = sp.zeros(3, 1);
 		for l in range(0, 3):
 			k = subs[i][l]
 			s = signs[i][l]
-			integr += dot3(dS[k] * s, g[j])
+			dA = dA + dS[k] * s
+		
+
+		integr = dot3(dA, g[j])
 
 		if True:
 		# if False:
 			ss = subspoints(integr)
+			ssdA = subspoints(dA)
 
 			if j == 0:
 				print("\n")
-			print(ss, end=" ")
+				print(ssdA)
+			# print(ss, end=" ")
+
 
 		# integr = sp.simplify(integr)
 		var = sp.symbols(f'element_matrix[{i*4+j}]')

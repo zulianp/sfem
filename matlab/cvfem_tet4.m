@@ -1,5 +1,5 @@
 % In this script we show that the laplace operator in CVFEM is nothing else
-% than alpha * FEM
+% than FEM
 
 t = [
     0, 0, 0;
@@ -15,8 +15,8 @@ t_physical = [
     0, 0, 6
 ]';
 
-t_physical = 3*t;
-% t_physical = 7*t;
+% t_physical = 3*t;
+t_physical = 1*t;
 % t_physical = t;
 
 g_ref = [
@@ -31,6 +31,7 @@ G = [
     t_physical(:, 3) - t_physical(:, 1), ... 
     t_physical(:, 4) - t_physical(:, 1)    
 ];
+
 
 G_inv = inv(G);
 J = det(G);
@@ -76,7 +77,7 @@ for i=1:4
     area_tet = area_tet + a;
 end
 
-disp(area_tet)
+% disp(area_tet)
 
 % Volume centroid
 c = sum(t, 2)/4;
@@ -96,12 +97,12 @@ xlabel('x')
 ylabel('y')
 zlabel('z')
 
-eps = 0.1;
+eps = 0.2;
 amin = min(t');
 amax = max(t');
 
 axis([amin(1) - eps, amax(1) + eps, amin(2) - eps, amax(2) + eps, amin(3) - eps, amax(3) + eps]);
-pbaspect([1 1 1]);
+% pbaspect([1 1 1]);
 
 figure(2);
 
@@ -111,6 +112,7 @@ for i=1:4
     subplot(2, 2, i);
     hold on;
     trisurf(ptri, 'FaceAlpha', 0.1);
+    view([67.866 41.5017964071856]);
     xlabel('x')
     ylabel('y')
     zlabel('z')
@@ -158,16 +160,29 @@ for i=1:4
 
     legend('', ['f1 (' num2str(area1) ')'],  ['f2 (' num2str(area2) ')'],  ['f3 (' num2str(area3) ')'], 'n1', 'n2', 'n3')
 
+    gtest = a1 + a2 + a3;
+    disp(['Normal ' num2str(i)]);
+    disp(gtest);
+
+    gtest = G_inv * gtest;
+
+    
+
     for j=1:4        
-        A(i, j) = dot(a1, g(:, j)) + dot(a2, g(:, j)) + dot(a3, g(:, j));
+%         A(i, j) = dot(gtest, g(:, j));
+          A(i, j) = dot(gtest, g_ref(:, j));
     end
 end
+disp('---------------');
 
 A_fem = zeros(4, 4);
 
 for i=1:4   
-    for j=1:4   
-        A_fem(i, j) = dot(FFF_fem * g_ref(:, i), g_ref(:, j));
+    gtest = FFF_fem * g_ref(:, i);
+    disp(gtest)
+    for j=1:4 
+        
+        A_fem(i, j) = dot(gtest, g_ref(:, j));
     end
 end
 
@@ -194,18 +209,15 @@ function [a, area] = poly_surf_area_normal(poly)
     a = 0;
     area = 0;
     n = size(poly, 2);
-    for i=1:n-1
+
+    p0 = poly(:, 1);
+
+    for i=2:n-1
         ip1 = i+1;
 
-        if ip1 == n
-            ip2 = 1;
-        else
-            ip2 = ip1 + 1;
-        end
-
-        p0 = poly(:, i);
-        p1 = poly(:, ip1);
-        p2 = poly(:, ip2);
+        
+        p1 = poly(:, i);
+        p2 = poly(:, ip1);
 
         J = [p1 - p0, p2 - p0];
         J2 = J'*J;
