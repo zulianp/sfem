@@ -143,6 +143,12 @@ colidx = problem.colidx;
 lap_e = e_assemble_laplacian(problem);
 adv_e = e_assemble_advection(problem);
 
+% lap_e_test = e_assemble_laplacian_loop(problem);
+% diff = lap_e - lap_e_test;
+% disp("diff")
+% disp(reshape(diff(1, :, :), 4, 4))
+% norm(diff(:), 2)
+
 % disp(reshape(lap_e(1, :, :), 4, 4))
 % disp(reshape(adv_e(1, :, :), 4, 4))
 % 
@@ -198,6 +204,7 @@ end
    
 return
 
+
 function Ae = e_assemble_laplacian(p)
 Ae = zeros(p.nelements, 4, 4);
 elems = p.elems;
@@ -211,59 +218,113 @@ dn5 = p.dn5;
 dn6 = p.dn6;
 evol = p.evol;
 
-for e=1:p.nelements
-    enodes = elems(:, e);
-    x = points(1, enodes);
-    y = points(2, enodes);
-    z = points(3, enodes);
-    p = [x; y; z];
+a = points(:, elems(1, :));
+b = points(:, elems(2, :));
+c = points(:, elems(3, :));
+d = points(:, elems(4, :));
 
-    a = p(:, 1);
-    b = p(:, 2);
-    c = p(:, 3);
-    d = p(:, 4);
+dmb = d - b;
+cmb = c - b;
+cma = c - a;
+dma = d - a;
+bma = b - a;
 
-    agrad = 1./6 * cross(d - b, c - b) / evol(e);
-    bgrad = 1./6 * cross(c - a, d - a) / evol(e);
-    cgrad = 1./6 * cross(d - a, b - a) / evol(e);
-    dgrad = 1./6 * cross(b - a, c - a) / evol(e);
+agrad = 1./6 .* p_cross(dmb(1, :), dmb(2, :), dmb(3, :), cmb(1, :), cmb(2, :), cmb(3, :)) ./ evol';
+bgrad = 1./6 .* p_cross(cma(1, :), cma(2, :), cma(3, :), dma(1, :), dma(2, :), dma(3, :)) ./ evol';
+cgrad = 1./6 .* p_cross(dma(1, :), dma(2, :), dma(3, :), bma(1, :), bma(2, :), bma(3, :)) ./ evol';
+dgrad = 1./6 .* p_cross(bma(1, :), bma(2, :), bma(3, :), cma(1, :), cma(2, :), cma(3, :)) ./ evol';
 
-    grads = [agrad, bgrad, cgrad, dgrad]';
-    
-    assert(size(grads,1) == 4);
-    assert(size(grads,2) == 3);
+gtest1 = -dn1 - dn2 - dn3;
+gtest2 =  dn1 - dn4 - dn5;
+gtest3 =  dn2 + dn4 - dn6;
+gtest4 =  dn3 + dn5 + dn6;
 
-    gtest1 = -dn1(:, e) - dn2(:, e) - dn3(:, e);
-    
-    Ae(e, 1, 1) = dot(grads(1, :), gtest1);
-    Ae(e, 1, 2) = dot(grads(2, :), gtest1);
-    Ae(e, 1, 3) = dot(grads(3, :), gtest1);
-    Ae(e, 1, 4) = dot(grads(4, :), gtest1);
+Ae(:, 1, 1) = sum(agrad .* gtest1, 1);
+Ae(:, 1, 2) = sum(bgrad .* gtest1, 1);
+Ae(:, 1, 3) = sum(cgrad .* gtest1, 1);
+Ae(:, 1, 4) = sum(dgrad .* gtest1, 1);
 
-    gtest2 = dn1(:, e) - dn4(:, e) - dn5(:, e);
-    
-    Ae(e, 2, 1) = dot(grads(1, :), gtest2);
-    Ae(e, 2, 2) = dot(grads(2, :), gtest2);
-    Ae(e, 2, 3) = dot(grads(3, :), gtest2);
-    Ae(e, 2, 4) = dot(grads(4, :), gtest2);
-    
-    gtest3 = dn2(:, e) + dn4(:, e) - dn6(:, e);
-    
-    Ae(e, 3, 1) = dot(grads(1, :), gtest3);
-    Ae(e, 3, 2) = dot(grads(2, :), gtest3);
-    Ae(e, 3, 3) = dot(grads(3, :), gtest3);
-    Ae(e, 3, 4) = dot(grads(4, :), gtest3);
-    
-    gtest4 = dn3(:, e) + dn5(:, e) + dn6(:, e);
-    
-    Ae(e, 4, 1) = dot(grads(1, :), gtest4);
-    Ae(e, 4, 2) = dot(grads(2, :), gtest4);
-    Ae(e, 4, 3) = dot(grads(3, :), gtest4);
-    Ae(e, 4, 4) = dot(grads(4, :), gtest4);    
-end
+Ae(:, 2, 1) = sum(agrad .* gtest2, 1);
+Ae(:, 2, 2) = sum(bgrad .* gtest2, 1);
+Ae(:, 2, 3) = sum(cgrad .* gtest2, 1);
+Ae(:, 2, 4) = sum(dgrad .* gtest2, 1);
 
+Ae(:, 3, 1) = sum(agrad .* gtest3, 1);
+Ae(:, 3, 2) = sum(bgrad .* gtest3, 1);
+Ae(:, 3, 3) = sum(cgrad .* gtest3, 1);
+Ae(:, 3, 4) = sum(dgrad .* gtest3, 1);
+
+Ae(:, 4, 1) = sum(agrad .* gtest4, 1);
+Ae(:, 4, 2) = sum(bgrad .* gtest4, 1);
+Ae(:, 4, 3) = sum(cgrad .* gtest4, 1);
+Ae(:, 4, 4) = sum(dgrad .* gtest4, 1);
 
 return
+% 
+% function Ae = e_assemble_laplacian_loop(p)
+% Ae = zeros(p.nelements, 4, 4);
+% elems = p.elems;
+% points = p.points;
+% 
+% dn1 = p.dn1;
+% dn2 = p.dn2;
+% dn3 = p.dn3;
+% dn4 = p.dn4;
+% dn5 = p.dn5;
+% dn6 = p.dn6;
+% evol = p.evol;
+% 
+% for e=1:p.nelements
+%     enodes = elems(:, e);
+%     x = points(1, enodes);
+%     y = points(2, enodes);
+%     z = points(3, enodes);
+%     p = [x; y; z];
+% 
+%     a = p(:, 1);
+%     b = p(:, 2);
+%     c = p(:, 3);
+%     d = p(:, 4);
+% 
+%     agrad = 1./6 * cross(d - b, c - b) / evol(e);
+%     bgrad = 1./6 * cross(c - a, d - a) / evol(e);
+%     cgrad = 1./6 * cross(d - a, b - a) / evol(e);
+%     dgrad = 1./6 * cross(b - a, c - a) / evol(e);
+% 
+%     grads = [agrad, bgrad, cgrad, dgrad]';
+%     
+%     assert(size(grads,1) == 4);
+%     assert(size(grads,2) == 3);
+% 
+%     gtest1 = -dn1(:, e) - dn2(:, e) - dn3(:, e);
+%     
+%     Ae(e, 1, 1) = dot(grads(1, :), gtest1);
+%     Ae(e, 1, 2) = dot(grads(2, :), gtest1);
+%     Ae(e, 1, 3) = dot(grads(3, :), gtest1);
+%     Ae(e, 1, 4) = dot(grads(4, :), gtest1);
+% 
+%     gtest2 = dn1(:, e) - dn4(:, e) - dn5(:, e);
+%     
+%     Ae(e, 2, 1) = dot(grads(1, :), gtest2);
+%     Ae(e, 2, 2) = dot(grads(2, :), gtest2);
+%     Ae(e, 2, 3) = dot(grads(3, :), gtest2);
+%     Ae(e, 2, 4) = dot(grads(4, :), gtest2);
+%     
+%     gtest3 = dn2(:, e) + dn4(:, e) - dn6(:, e);
+%     
+%     Ae(e, 3, 1) = dot(grads(1, :), gtest3);
+%     Ae(e, 3, 2) = dot(grads(2, :), gtest3);
+%     Ae(e, 3, 3) = dot(grads(3, :), gtest3);
+%     Ae(e, 3, 4) = dot(grads(4, :), gtest3);
+%     
+%     gtest4 = dn3(:, e) + dn5(:, e) + dn6(:, e);
+%     
+%     Ae(e, 4, 1) = dot(grads(1, :), gtest4);
+%     Ae(e, 4, 2) = dot(grads(2, :), gtest4);
+%     Ae(e, 4, 3) = dot(grads(3, :), gtest4);
+%     Ae(e, 4, 4) = dot(grads(4, :), gtest4);    
+% end
+% return
 
 function Ae = e_assemble_advection(p)
 Ae = zeros(p.nelements, 4, 4);
