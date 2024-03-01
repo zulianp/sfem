@@ -55,7 +55,7 @@ echo $scaling
 
 # n_procs=1
 # n_procs=2
-n_procs=15
+n_procs=8
 LAUNCH="mpiexec -np $n_procs"
 # LAUNCH="lldb --"
 
