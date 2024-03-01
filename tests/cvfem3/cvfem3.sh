@@ -12,7 +12,7 @@ PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 mkdir -p system
 
-# create_cylinder.sh 0
+create_cylinder.sh 2
 
 export SFEM_HANDLE_RHS=1
 export SFEM_HANDLE_DIRICHLET=1

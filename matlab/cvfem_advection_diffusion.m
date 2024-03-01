@@ -13,8 +13,12 @@ function cvfem_advection_diffusion()
 % Cylinder example
 
 if 1
-mesh = '/Users/patrickzulian/Desktop/code/sfem/tests/cvfem3/mesh';
-lsystem = '/Users/patrickzulian/Desktop/code/sfem/tests/cvfem3/system';
+% mesh = '/Users/patrickzulian/Desktop/code/sfem/tests/cvfem3/mesh';
+% lsystem = '/Users/patrickzulian/Desktop/code/sfem/tests/cvfem3/system';
+mesh = './annulus/mesh';
+lsystem = './annulus/crs';
+
+% ../python/sfem/mesh/raw_to_db.py /Users/patrickzulian/Desktop/code/sfem/tests/cvfem3/mesh out.vtk --point_data=solution.raw
 
 rowptr = read_array([lsystem  '/rowptr.raw'], 'int32') + 1;
 colidx = read_array([lsystem  '/colidx.raw'], 'int32') + 1;
@@ -53,17 +57,17 @@ i1 = [2,4]';
 i2 = [3,3]';
 i3 = [4,2]';
 
-x = [0.0, 1.0, 0.0, 0.,  1.0]';
-y = [0.0, 0.0, 1.0, 0.,  1.0]';
+x = [0.0, 1.0, 0.0, 0., 1.0]';
+y = [0.0, 0.0, 1.0, 0., 1.0]';
 z = [0.0, 0.0, 0.0, 1., 1.0]';
 
 dirichlet = [1];
 neumann = [5, 3, 4];
 end
 
-
-phi = zeros(length(x), 1);
-phi(dirichlet) = 1;
+% 
+% phi = zeros(length(x), 1);
+% phi(dirichlet) = 1;
 
 elems = [i0'; i1'; i2'; i3'];
 points = [x'; y'; z'];
@@ -79,30 +83,23 @@ disp(sum(cv_vol)./sum(evol))
 
 [dn1, dn2, dn3, dn4, dn5, dn6] = CV_normals(elems, points);
 
-% disp(size(dn1));
-
-vx0 = ones(size(x));
-zzz = zeros(size(x));
-vx1 = zeros(size(x));
-vx2 = zeros(size(x));
-vx3 = zeros(size(x));
+vx = ones(size(x));
+vy = zeros(size(x));
+vz = zeros(size(x));
 
 % Compute velocties at the centroids
-vxc = p_CV_face_centroids_interp(vx0, vx1, vx2, vx3);
-
-% FIXME now velocities are zero
-vyc = p_CV_face_centroids_interp(zzz, zzz, zzz, zzz);
-vzc = p_CV_face_centroids_interp(zzz, zzz, zzz, zzz);
+vxc = p_nodal_to_CV_centroids(elems, vx);
+vyc = p_nodal_to_CV_centroids(elems, vy);
+vzc = p_nodal_to_CV_centroids(elems, vz);
 
 q = advective_fluxes(vxc, vyc, vzc, dn1, dn2, dn3, dn4, dn5, dn6);
-% size(q)
 
-qphi = upwind_scheme(elems, phi, q);
-% size(qphi)
+% qphi = upwind_scheme(elems, phi, q);
+
 
 problem = {};
 problem.q = q;
-problem.qphi = qphi;
+% problem.qphi = qphi;
 problem.vxc = vxc;
 problem.vyc = vyc;
 problem.vzc = vzc;
@@ -118,9 +115,12 @@ problem.evol = evol;
 problem.cv_vol = cv_vol;
 problem.neumann = neumann;
 
+problem.BC_penalization = 1e16;
+problem.diffusivity = 10;
+
 problem.dirichlet_nodes = unique(sort(dirichlet(:)));
 problem.dirichlet = dirichlet;
-problem.dirichlet_fun = @(x, y, z) 1;
+problem.dirichlet_fun = @(x, y, z) 1.;
 
 problem.rowptr = rowptr;
 problem.colidx = colidx;
@@ -143,6 +143,9 @@ end
 trisurf(ptri, 'FaceAlpha', 0.1);
 hold on;
 plot3(x(dirichlet), y(dirichlet), z(dirichlet), '*');
+xlabel('x');
+ylabel('y');
+zlabel('z');
 return
 
 %% Algebraic system
@@ -212,7 +215,7 @@ function [ad, vd] = assemble_dirichlet(p)
     ad = zeros(p.nnodes, 1);
 
 %   Not a big fan of this
-    h = 1e14;
+    h = p.BC_penalization;
 
     d = p.dirichlet;
     points = p.points;
@@ -236,11 +239,11 @@ function [ad, vd] = assemble_dirichlet(p)
         dd = d(1, :);
         for kk=1:length(dd)
             k = dd(kk);
-            a = h * areas(kk) / 3;
+            a = h * (areas(kk) / 3);
             x = points(1, k);
             y = points(2, k);
             z = points(3, k);
-            vd(k) = vd(k) + p.dirichlet_fun(x, y, z) * a;
+            vd(k) = vd(k) + a * p.dirichlet_fun(x, y, z);
             ad(k) = ad(k) + a;
         end
     end
@@ -250,6 +253,8 @@ function Ae = e_assemble_laplacian(p)
 Ae = zeros(p.nelements, 4, 4);
 elems = p.elems;
 points = p.points;
+
+diffusivity = p.diffusivity;
 
 dn1 = p.dn1;
 dn2 = p.dn2;
@@ -300,6 +305,7 @@ Ae(:, 4, 2) = sum(bgrad .* gtest4, 1);
 Ae(:, 4, 3) = sum(cgrad .* gtest4, 1);
 Ae(:, 4, 4) = sum(dgrad .* gtest4, 1);
 
+Ae = Ae * diffusivity;
 return
 
 function Ae = e_assemble_advection(p)
@@ -469,4 +475,12 @@ return
 function [vc] = p_CV_face_centroids_interp(v0, v1, v2, v3)
 [vc1, vc2, vc3, vc4, vc5, vc6] = CV_face_centroids_interp(v0, v1, v2, v3);
 vc =  [vc1; vc2; vc3; vc4; vc5; vc6];
+return
+
+function [vc] = p_nodal_to_CV_centroids(elems, v)
+v0 = v(elems(1, :));
+v1 = v(elems(2, :));
+v2 = v(elems(3, :));
+v3 = v(elems(4, :));
+vc = p_CV_face_centroids_interp(v0, v1, v2, v3);
 return
