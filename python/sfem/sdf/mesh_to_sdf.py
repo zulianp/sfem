@@ -84,7 +84,7 @@ def compute_aabb(mesh, margin=0):
     pmax[2] = np.max(z).astype(geom_t) + margin
     return np.array(pmin), np.array(pmax)
 
-def mesh_to_sdf(mesh, pmin, pmax, hmax):
+def mesh_to_sdf(mesh, pmin, pmax, hmax, /, export_normals=False):
     t1_start = perf_counter()
 
     x =  mesh.points[:,0].astype(geom_t)
@@ -287,9 +287,10 @@ def mesh_to_sdf(mesh, pmin, pmax, hmax):
     t1_stop = perf_counter()
     print("TTS:", t1_stop - t1_start)
 
-    # tinx.to_numpy().astype(geom_t).tofile('nx.float32.raw')
-    # tiny.to_numpy().astype(geom_t).tofile('ny.float32.raw')
-    # tinz.to_numpy().astype(geom_t).tofile('nz.float32.raw')
+    if export_normals:
+        tinx.to_numpy().astype(geom_t).tofile('nx.float32.raw')
+        tiny.to_numpy().astype(geom_t).tofile('ny.float32.raw')
+        tinz.to_numpy().astype(geom_t).tofile('nz.float32.raw')
 
     nedt = edt.to_numpy().astype(sdf_t)
     print(f'd in [{np.min(nedt[:])}, {np.max(nedt[:])}]')
@@ -308,12 +309,14 @@ if __name__ == '__main__':
     margin = 0
     scale_box=1
     box_from_mesh = None
+    export_normals = False
 
     if(len(sys.argv) < 3):
         print(usage)
     try:
         opts, args = getopt.getopt(
-            sys.argv[3:len(sys.argv)], "h",["help",  "xmin=", "ymin=", "zmin=", "xmax=", "ymax=", "zmax=", "hmax=", "margin=", "box_from_mesh=", "scale_box="])
+            sys.argv[3:len(sys.argv)], "h",
+            ["help",  "xmin=", "ymin=", "zmin=", "xmax=", "ymax=", "zmax=", "hmax=", "margin=", "box_from_mesh=", "scale_box=", "export_normals"])
 
     except getopt.GetoptError as err:
         print(err)
@@ -351,6 +354,8 @@ if __name__ == '__main__':
             box_from_mesh = arg
         elif opt in ("--scale_box"):
             scale_box = float(arg)
+        elif opt in ("--export_normals"):
+            export_normals = True
 
     if box_from_mesh != None:
         aux_mesh = read_mesh(arg)
@@ -393,7 +398,7 @@ if __name__ == '__main__':
     submesh = select_submesh(mesh, pmin, pmax)
     print(submesh)
     submesh.write('submesh.vtk')
-    nedt, dims = mesh_to_sdf(submesh, pmin, pmax, hmax)
+    nedt, dims = mesh_to_sdf(submesh, pmin, pmax, hmax, export_normals=export_normals)
     nedt.tofile(output_path)
 
     header =    f'nx: {dims[0]}\n'

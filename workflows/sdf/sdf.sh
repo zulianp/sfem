@@ -52,15 +52,15 @@ surf=surf.vtk
 mkdir -p $skinned
 mkdir -p $mesh_raw
 
-db_to_raw.py $db_in $mesh_raw
+db_to_raw.py $db_in $mesh_raw  --select_elem_type=tetra
 skin $mesh_raw $skinned
 # create_dual_graph $skinned $skinned/dual
 
 if [[ -z $REUSE_SDF ]]
 then
-	mesh_to_sdf.py $skinned $db_out --hmax=$hmax --margin=$margin $opts
+	mesh_to_sdf.py $skinned $db_out --hmax=$hmax --margin=$margin $opts --export_normals
 	raw_to_xdmf.py $db_out
-	raw_to_db.py $skinned $surf
+	raw_to_db.py $skinned $surf --point_data="nx.float32.raw,ny.float32.raw,nz.float32.raw" --point_data_type="float32,float32,float32"
 fi
 
 if [[ -n "$5" ]]
