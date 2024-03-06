@@ -10,6 +10,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "quadratures_rule.h"
+
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
@@ -17,163 +19,36 @@
 
 static SFEM_INLINE real_t put_inside(const real_t v) { return MIN(MAX(1e-7, v), 1 - 1e-7); }
 
-// TRI3 6th order quadrature rule
-#define TRI3_NQP 12
-static real_t tri3_qw[TRI3_NQP] = {0.050844906370206816920936809106869,
-                                   0.050844906370206816920936809106869,
-                                   0.050844906370206816920936809106869,
-                                   0.11678627572637936602528961138558,
-                                   0.11678627572637936602528961138558,
-                                   0.11678627572637936602528961138558,
-                                   0.082851075618373575193553456420442,
-                                   0.082851075618373575193553456420442,
-                                   0.082851075618373575193553456420442,
-                                   0.082851075618373575193553456420442,
-                                   0.082851075618373575193553456420442,
-                                   0.082851075618373575193553456420442};
-
-static real_t tri3_qx[TRI3_NQP] = {0.063089014491502228340331602870819,
-                                   0.063089014491502228340331602870819,
-                                   0.87382197101699554331933679425836,
-                                   0.24928674517091042129163855310702,
-                                   0.24928674517091042129163855310702,
-                                   0.50142650965817915741672289378596,
-                                   0.053145049844816947353249671631398,
-                                   0.053145049844816947353249671631398,
-                                   0.31035245103378440541660773395655,
-                                   0.31035245103378440541660773395655,
-                                   0.63650249912139864723014259441205,
-                                   0.63650249912139864723014259441205};
-
-static real_t tri3_qy[TRI3_NQP] = {0.063089014491502228340331602870819,
-                                   0.87382197101699554331933679425836,
-                                   0.063089014491502228340331602870819,
-                                   0.24928674517091042129163855310702,
-                                   0.50142650965817915741672289378596,
-                                   0.24928674517091042129163855310702,
-                                   0.31035245103378440541660773395655,
-                                   0.63650249912139864723014259441205,
-                                   0.053145049844816947353249671631398,
-                                   0.63650249912139864723014259441205,
-                                   0.053145049844816947353249671631398,
-                                   0.31035245103378440541660773395655};
-
-#define EDGE2_NQP 12
-static real_t edge2_qx[EDGE2_NQP] = {
-    0.009219682876640489244124410106451250612735748291015625000000,
-    0.047941371814762490100036984586040489375591278076171875000000,
-    0.115048662902847487199409215463674627244472503662109375000000,
-    0.206341022856691480580337838546256534755229949951171875000000,
-    0.316084250500909991199449677878874354064464569091796875000000,
-    0.437383295744265487847712847724324092268943786621093750000000,
-    0.562616704255734512152287152275675907731056213378906250000000,
-    0.683915749499089953289399090863298624753952026367187500000000,
-    0.793658977143308463908510930195916444063186645507812500000000,
-    0.884951337097152457289439553278498351573944091796875000000000,
-    0.952058628185237454388811784156132489442825317382812500000000,
-    0.990780317123359566267026821151375770568847656250000000000000};
-
-static real_t edge2_qw[EDGE2_NQP] = {
-    0.023587668193255501014604647025407757610082626342773437500000,
-    0.053469662997658998215833037193078780546784400939941406250000,
-    0.080039164271672999517726054818922420963644981384277343750000,
-    0.101583713361533004015946346498822094872593879699707031250000,
-    0.116746268269177499998789926394238136708736419677734375000000,
-    0.124573522906701497636738906749087618663907051086425781250000,
-    0.124573522906701497636738906749087618663907051086425781250000,
-    0.116746268269177499998789926394238136708736419677734375000000,
-    0.101583713361533004015946346498822094872593879699707031250000,
-    0.080039164271672999517726054818922420963644981384277343750000,
-    0.053469662997658998215833037193078780546784400939941406250000,
-    0.023587668193255501014604647025407757610082626342773437500000};
-
-#define TET4_NQP 45
-static real_t tet4_qx[TET4_NQP] = {
-    0.2500000000000000, 0.6175871903000830, 0.1274709365666390, 0.1274709365666390,
-    0.1274709365666390, 0.9037635088221031, 0.0320788303926323, 0.0320788303926323,
-    0.0320788303926323, 0.4502229043567190, 0.0497770956432810, 0.0497770956432810,
-    0.0497770956432810, 0.4502229043567190, 0.4502229043567190, 0.3162695526014501,
-    0.1837304473985499, 0.1837304473985499, 0.1837304473985499, 0.3162695526014501,
-    0.3162695526014501, 0.0229177878448171, 0.2319010893971509, 0.2319010893971509,
-    0.5132800333608811, 0.2319010893971509, 0.2319010893971509, 0.2319010893971509,
-    0.0229177878448171, 0.5132800333608811, 0.2319010893971509, 0.0229177878448171,
-    0.5132800333608811, 0.7303134278075384, 0.0379700484718286, 0.0379700484718286,
-    0.1937464752488044, 0.0379700484718286, 0.0379700484718286, 0.0379700484718286,
-    0.7303134278075384, 0.1937464752488044, 0.0379700484718286, 0.7303134278075384,
-    0.1937464752488044};
-
-static real_t tet4_qy[TET4_NQP] = {
-    0.2500000000000000, 0.1274709365666390, 0.1274709365666390, 0.1274709365666390,
-    0.6175871903000830, 0.0320788303926323, 0.0320788303926323, 0.0320788303926323,
-    0.9037635088221031, 0.0497770956432810, 0.4502229043567190, 0.0497770956432810,
-    0.4502229043567190, 0.0497770956432810, 0.4502229043567190, 0.1837304473985499,
-    0.3162695526014501, 0.1837304473985499, 0.3162695526014501, 0.1837304473985499,
-    0.3162695526014501, 0.2319010893971509, 0.0229177878448171, 0.2319010893971509,
-    0.2319010893971509, 0.5132800333608811, 0.2319010893971509, 0.0229177878448171,
-    0.5132800333608811, 0.2319010893971509, 0.5132800333608811, 0.2319010893971509,
-    0.0229177878448171, 0.0379700484718286, 0.7303134278075384, 0.0379700484718286,
-    0.0379700484718286, 0.1937464752488044, 0.0379700484718286, 0.7303134278075384,
-    0.1937464752488044, 0.0379700484718286, 0.1937464752488044, 0.0379700484718286,
-    0.7303134278075384};
-
-static real_t tet4_qz[TET4_NQP] = {
-    0.2500000000000000, 0.1274709365666390, 0.1274709365666390, 0.6175871903000830,
-    0.1274709365666390, 0.0320788303926323, 0.0320788303926323, 0.9037635088221031,
-    0.0320788303926323, 0.0497770956432810, 0.0497770956432810, 0.4502229043567190,
-    0.4502229043567190, 0.4502229043567190, 0.0497770956432810, 0.1837304473985499,
-    0.1837304473985499, 0.3162695526014501, 0.3162695526014501, 0.3162695526014501,
-    0.1837304473985499, 0.2319010893971509, 0.2319010893971509, 0.0229177878448171,
-    0.2319010893971509, 0.2319010893971509, 0.5132800333608811, 0.5132800333608811,
-    0.2319010893971509, 0.0229177878448171, 0.0229177878448171, 0.5132800333608811,
-    0.2319010893971509, 0.0379700484718286, 0.0379700484718286, 0.7303134278075384,
-    0.0379700484718286, 0.0379700484718286, 0.1937464752488044, 0.1937464752488044,
-    0.0379700484718286, 0.7303134278075384, 0.7303134278075384, 0.1937464752488044,
-    0.0379700484718286};
-
-static real_t tet4_qw[TET4_NQP] = {
-    -0.2359620398477559, 0.0244878963560563, 0.0244878963560563, 0.0244878963560563,
-    0.0244878963560563,  0.0039485206398261, 0.0039485206398261, 0.0039485206398261,
-    0.0039485206398261,  0.0263055529507371, 0.0263055529507371, 0.0263055529507371,
-    0.0263055529507371,  0.0263055529507371, 0.0263055529507371, 0.0829803830550590,
-    0.0829803830550590,  0.0829803830550590, 0.0829803830550590, 0.0829803830550590,
-    0.0829803830550590,  0.0254426245481024, 0.0254426245481024, 0.0254426245481024,
-    0.0254426245481024,  0.0254426245481024, 0.0254426245481024, 0.0254426245481024,
-    0.0254426245481024,  0.0254426245481024, 0.0254426245481024, 0.0254426245481024,
-    0.0254426245481024,  0.0134324384376852, 0.0134324384376852, 0.0134324384376852,
-    0.0134324384376852,  0.0134324384376852, 0.0134324384376852, 0.0134324384376852,
-    0.0134324384376852,  0.0134324384376852, 0.0134324384376852, 0.0134324384376852,
-    0.0134324384376852};
-
 SFEM_INLINE static int hex_aa_8_contains(
-    // X-coordinates
-    const real_t xmin,
-    const real_t xmax,
-    // Y-coordinates
-    const real_t ymin,
-    const real_t ymax,
-    // Z-coordinates
-    const real_t zmin,
-    const real_t zmax,
-    const real_t x,
-    const real_t y,
-    const real_t z) {
+        // X-coordinates
+        const real_t xmin,
+        const real_t xmax,
+        // Y-coordinates
+        const real_t ymin,
+        const real_t ymax,
+        // Z-coordinates
+        const real_t zmin,
+        const real_t zmax,
+        const real_t x,
+        const real_t y,
+        const real_t z) {
     int outside = (x < xmin) | (x > xmax) | (y < ymin) | (y > ymax) | (z < zmin) | (x > zmax);
     return !outside;
 }
 
 SFEM_INLINE static real_t tri_shell_3_measure(
-    // X-coordinates
-    const real_t px0,
-    const real_t px1,
-    const real_t px2,
-    // Y-coordinates
-    const real_t py0,
-    const real_t py1,
-    const real_t py2,
-    // Z-coordinates
-    const real_t pz0,
-    const real_t pz1,
-    const real_t pz2) {
+        // X-coordinates
+        const real_t px0,
+        const real_t px1,
+        const real_t px2,
+        // Y-coordinates
+        const real_t py0,
+        const real_t py1,
+        const real_t py2,
+        // Z-coordinates
+        const real_t pz0,
+        const real_t pz1,
+        const real_t pz2) {
     const real_t x0 = -px0 + px1;
     const real_t x1 = -px0 + px2;
     const real_t x2 = -py0 + py1;
@@ -186,25 +61,25 @@ SFEM_INLINE static real_t tri_shell_3_measure(
 }
 
 SFEM_INLINE static void tri_shell_3_transform(
-    // X-coordinates
-    const real_t x0,
-    const real_t x1,
-    const real_t x2,
-    // Y-coordinates
-    const real_t y0,
-    const real_t y1,
-    const real_t y2,
-    // Z-coordinates
-    const real_t z0,
-    const real_t z1,
-    const real_t z2,
-    // Quadrature point
-    const real_t x,
-    const real_t y,
-    // Output
-    real_t* const SFEM_RESTRICT out_x,
-    real_t* const SFEM_RESTRICT out_y,
-    real_t* const SFEM_RESTRICT out_z) {
+        // X-coordinates
+        const real_t x0,
+        const real_t x1,
+        const real_t x2,
+        // Y-coordinates
+        const real_t y0,
+        const real_t y1,
+        const real_t y2,
+        // Z-coordinates
+        const real_t z0,
+        const real_t z1,
+        const real_t z2,
+        // Quadrature point
+        const real_t x,
+        const real_t y,
+        // Output
+        real_t* const SFEM_RESTRICT out_x,
+        real_t* const SFEM_RESTRICT out_y,
+        real_t* const SFEM_RESTRICT out_z) {
     const real_t phi0 = 1 - x - y;
     const real_t phi1 = x;
     const real_t phi2 = y;
@@ -215,55 +90,64 @@ SFEM_INLINE static void tri_shell_3_transform(
 }
 
 SFEM_INLINE static real_t beam2_measure(
-    // X-coordinates
-    const real_t px0,
-    const real_t px1,
-    // Y-coordinates
-    const real_t py0,
-    const real_t py1,
-    // Z-coordinates
-    const real_t pz0,
-    const real_t pz1) {
+        // X-coordinates
+        const real_t px0,
+        const real_t px1,
+        // Y-coordinates
+        const real_t py0,
+        const real_t py1,
+        // Z-coordinates
+        const real_t pz0,
+        const real_t pz1) {
     return sqrt(pow(-px0 + px1, 2) + pow(-py0 + py1, 2) + pow(-pz0 + pz1, 2));
 }
 
 SFEM_INLINE static void beam2_transform(
-    // X-coordinates
-    const real_t px0,
-    const real_t px1,
-    // Y-coordinates
-    const real_t py0,
-    const real_t py1,
-    // Z-coordinates
-    const real_t pz0,
-    const real_t pz1,
-    // Quadrature point
-    const real_t x,
-    // Output
-    real_t* const SFEM_RESTRICT out_x,
-    real_t* const SFEM_RESTRICT out_y,
-    real_t* const SFEM_RESTRICT out_z) {
+        // X-coordinates
+        const real_t px0,
+        const real_t px1,
+        // Y-coordinates
+        const real_t py0,
+        const real_t py1,
+        // Z-coordinates
+        const real_t pz0,
+        const real_t pz1,
+        // Quadrature point
+        const real_t x,
+        // Output
+        real_t* const SFEM_RESTRICT out_x,
+        real_t* const SFEM_RESTRICT out_y,
+        real_t* const SFEM_RESTRICT out_z) {
     *out_x = px0 + x * (-px0 + px1);
     *out_y = py0 + x * (-py0 + py1);
     *out_z = pz0 + x * (-pz0 + pz1);
 }
 
 SFEM_INLINE static real_t tet4_measure(
-    // X-coordinates
-    const real_t px0,
-    const real_t px1,
-    const real_t px2,
-    const real_t px3,
-    // Y-coordinates
-    const real_t py0,
-    const real_t py1,
-    const real_t py2,
-    const real_t py3,
-    // Z-coordinates
-    const real_t pz0,
-    const real_t pz1,
-    const real_t pz2,
-    const real_t pz3) {
+        // X-coordinates
+        const real_t px0,
+        const real_t px1,
+        const real_t px2,
+        const real_t px3,
+        // Y-coordinates
+        const real_t py0,
+        const real_t py1,
+        const real_t py2,
+        const real_t py3,
+        // Z-coordinates
+        const real_t pz0,
+        const real_t pz1,
+        const real_t pz2,
+        const real_t pz3) {
+    //
+    // determinant of the Jacobian
+    // M = [px0, py0, pz0, 1]
+    //     [px1, py1, pz1, 1]
+    //     [px2, py2, pz2, 1]
+    //     [px3, py3, pz3, 1]
+    //
+    // V = (1/6) * det(M)
+
     const real_t x0 = -pz0 + pz3;
     const real_t x1 = -py0 + py2;
     const real_t x2 = -1.0 / 6.0 * px0 + (1.0 / 6.0) * px1;
@@ -273,45 +157,79 @@ SFEM_INLINE static real_t tet4_measure(
     const real_t x6 = -1.0 / 6.0 * px0 + (1.0 / 6.0) * px2;
     const real_t x7 = -pz0 + pz1;
     const real_t x8 = -1.0 / 6.0 * px0 + (1.0 / 6.0) * px3;
+
     return x0 * x1 * x2 - x0 * x5 * x6 - x1 * x7 * x8 - x2 * x3 * x4 + x3 * x6 * x7 + x4 * x5 * x8;
 }
 
 SFEM_INLINE static void tet4_transform(
-    // X-coordinates
-    const real_t px0,
-    const real_t px1,
-    const real_t px2,
-    const real_t px3,
-    // Y-coordinates
-    const real_t py0,
-    const real_t py1,
-    const real_t py2,
-    const real_t py3,
-    // Z-coordinates
-    const real_t pz0,
-    const real_t pz1,
-    const real_t pz2,
-    const real_t pz3,
-    // Quadrature point
-    const real_t qx,
-    const real_t qy,
-    const real_t qz,
-    // Output
-    real_t* const SFEM_RESTRICT out_x,
-    real_t* const SFEM_RESTRICT out_y,
-    real_t* const SFEM_RESTRICT out_z) {
+        /**
+         ****************************************************************************************
+        \begin{bmatrix}
+        out_x \\
+        out_y \\
+        out_z
+        \end{bmatrix}
+        =
+        \begin{bmatrix}
+        px_0 \\
+        py_0 \\
+        pz_0
+        \end{bmatrix}
+        +
+        \begin{bmatrix}
+        px_1 - px_0 & px_2 - px_0 & px_3 - px_0 \\
+        py_1 - py_0 & py_2 - py_0 & py_3 - py_0 \\
+        pz_1 - pz_0 & pz_2 - pz_0 & pz_3 - pz_0
+        \end{bmatrix}
+        \cdot
+        \begin{bmatrix}
+        qx \\
+        qy \\
+        qz
+        \end{bmatrix}
+        *************************************************************************************************
+      */
+
+        // X-coordinates
+        const real_t px0,
+        const real_t px1,
+        const real_t px2,
+        const real_t px3,
+        // Y-coordinates
+        const real_t py0,
+        const real_t py1,
+        const real_t py2,
+        const real_t py3,
+        // Z-coordinates
+        const real_t pz0,
+        const real_t pz1,
+        const real_t pz2,
+        const real_t pz3,
+        // Quadrature point
+        const real_t qx,
+        const real_t qy,
+        const real_t qz,
+        // Output
+        real_t* const SFEM_RESTRICT out_x,
+        real_t* const SFEM_RESTRICT out_y,
+        real_t* const SFEM_RESTRICT out_z) {
+    //
+    //
     *out_x = px0 + qx * (-px0 + px1) + qy * (-px0 + px2) + qz * (-px0 + px3);
     *out_y = py0 + qx * (-py0 + py1) + qy * (-py0 + py2) + qz * (-py0 + py3);
     *out_z = pz0 + qx * (-pz0 + pz1) + qy * (-pz0 + pz2) + qz * (-pz0 + pz3);
 }
 
 SFEM_INLINE static void hex_aa_8_eval_fun(
-    // Quadrature point (local coordinates)
-    const real_t x,
-    const real_t y,
-    const real_t z,
-    // Output
-    real_t* const SFEM_RESTRICT f) {
+        // Quadrature point (local coordinates)
+        // With respect to the hat functions of a cube element
+        // In a local coordinate system
+        const real_t x,
+        const real_t y,
+        const real_t z,
+        // Output
+        real_t* const SFEM_RESTRICT f) {
+    //
     f[0] = (1.0 - x) * (1.0 - y) * (1.0 - z);
     f[1] = x * (1.0 - y) * (1.0 - z);
     f[2] = x * y * (1.0 - z);
@@ -323,13 +241,13 @@ SFEM_INLINE static void hex_aa_8_eval_fun(
 }
 
 SFEM_INLINE static void hex_aa_8_collect_coeffs(
-    const ptrdiff_t* const SFEM_RESTRICT stride,
-    const ptrdiff_t i,
-    const ptrdiff_t j,
-    const ptrdiff_t k,
-    // Attention this is geometric data transformed to solver data!
-    const real_t* const SFEM_RESTRICT data,
-    real_t* const SFEM_RESTRICT out) {
+        const ptrdiff_t* const SFEM_RESTRICT stride,
+        const ptrdiff_t i,
+        const ptrdiff_t j,
+        const ptrdiff_t k,
+        // Attention this is geometric data transformed to solver data!
+        const real_t* const SFEM_RESTRICT data,
+        real_t* const SFEM_RESTRICT out) {
     const ptrdiff_t i0 = i * stride[0] + j * stride[1] + k * stride[2];
     const ptrdiff_t i1 = (i + 1) * stride[0] + j * stride[1] + k * stride[2];
     const ptrdiff_t i2 = (i + 1) * stride[0] + (j + 1) * stride[1] + k * stride[2];
@@ -350,14 +268,15 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs(
 }
 
 SFEM_INLINE static void hex_aa_8_eval_grad(
-    // Quadrature point (local coordinates)
-    const real_t x,
-    const real_t y,
-    const real_t z,
-    // Output
-    real_t* const SFEM_RESTRICT gx,
-    real_t* const SFEM_RESTRICT gy,
-    real_t* const SFEM_RESTRICT gz) {
+        // Quadrature point (local coordinates)
+        const real_t x,
+        const real_t y,
+        const real_t z,
+        // Output
+        real_t* const SFEM_RESTRICT gx,
+        real_t* const SFEM_RESTRICT gy,
+        real_t* const SFEM_RESTRICT gz) {
+    //
     // Transformation to ref element
     gx[0] = -(1.0 - y) * (1.0 - z);
     gy[0] = -(1.0 - x) * (1.0 - z);
@@ -392,20 +311,32 @@ SFEM_INLINE static void hex_aa_8_eval_grad(
     gz[7] = (1.0 - x) * y;
 }
 
+#define UNROLL_ZERO _Pragma("GCC unroll(0)")
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_resample_field_local /////////////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
 int tet4_resample_field_local(
-    // Mesh
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t** const SFEM_RESTRICT elems,
-    geom_t** const SFEM_RESTRICT xyz,
-    // SDF
-    const ptrdiff_t* const SFEM_RESTRICT n,
-    const ptrdiff_t* const SFEM_RESTRICT stride,
-    const geom_t* const SFEM_RESTRICT origin,
-    const geom_t* const SFEM_RESTRICT delta,
-    const real_t* const SFEM_RESTRICT data,
-    // Output
-    real_t* const SFEM_RESTRICT weighted_field) {
+        // Mesh
+        const ptrdiff_t nelements,          // number of elements
+        const ptrdiff_t nnodes,             // number of nodes
+        idx_t** const SFEM_RESTRICT elems,  // connectivity
+        geom_t** const SFEM_RESTRICT xyz,   // coordinates
+        // SDF
+        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
+        const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
+        const geom_t* const SFEM_RESTRICT origin,     // origin of the domain
+        const geom_t* const SFEM_RESTRICT delta,      // delta of the domain
+        const real_t* const SFEM_RESTRICT data,       // SDF
+        // Output
+        real_t* const SFEM_RESTRICT weighted_field) {
+    //
+    printf("============================================================\n");
+    printf("Start: tet4_resample_field_local\n");
+    printf("============================================================\n");
+    //
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];
     const real_t oz = (real_t)origin[2];
@@ -414,9 +345,13 @@ int tet4_resample_field_local(
     const real_t dy = (real_t)delta[1];
     const real_t dz = (real_t)delta[2];
 
+    // printf("\nnumber of elements %ld  +++++++++++++++++++++++++++++++++++ \n", nelements);
+
 #pragma omp parallel
     {
 #pragma omp for  // nowait
+
+        /// Loop over the elements of the mesh
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             geom_t x[4], y[4], z[4];
@@ -427,19 +362,23 @@ int tet4_resample_field_local(
             real_t tet4_f[4];
             real_t element_field[4];
 
-#pragma unroll(4)
+            // loop over the 4 vertices of the tetrahedron
+            UNROLL_ZERO
             for (int v = 0; v < 4; ++v) {
                 ev[v] = elems[v][i];
             }
 
+            // copy the coordinates of the vertices
             for (int v = 0; v < 4; ++v) {
-                x[v] = xyz[0][ev[v]];
-                y[v] = xyz[1][ev[v]];
-                z[v] = xyz[2][ev[v]];
+                x[v] = xyz[0][ev[v]];  // x-coordinates
+                y[v] = xyz[1][ev[v]];  // y-coordinates
+                z[v] = xyz[2][ev[v]];  // z-coordinates
             }
 
-            memset(element_field, 0, 4 * sizeof(real_t));
+            memset(element_field, 0,
+                   4 * sizeof(real_t));  // set to zero the element field
 
+            // Area of the tetrahedron
             const real_t measure = tet4_measure(x[0],
                                                 x[1],
                                                 x[2],
@@ -457,8 +396,12 @@ int tet4_resample_field_local(
 
             assert(measure > 0);
 
-            for (int q = 0; q < TET4_NQP; q++) {
+            for (int q = 0; q < TET4_NQP; q++) {  // loop over the quadrature points
+
                 real_t g_qx, g_qy, g_qz;
+                // Transform quadrature point to physical space
+                // g_qx, g_qy, g_qz are the coordinates of the quadrature point in the physical
+                // space
                 tet4_transform(x[0],
                                x[1],
                                x[2],
@@ -477,6 +420,7 @@ int tet4_resample_field_local(
                                tet4_qx[q],
                                tet4_qy[q],
                                tet4_qz[q],
+                               //
                                &g_qx,
                                &g_qy,
                                &g_qz);
@@ -492,7 +436,7 @@ int tet4_resample_field_local(
 #else
                 // DUAL basis function
                 {
-                    const real_t f0 = 1 - tet4_qx[q] - tet4_qy[q] - tet4_qz[q];
+                    const real_t f0 = 1.0 - tet4_qx[q] - tet4_qy[q] - tet4_qz[q];
                     const real_t f1 = tet4_qx[q];
                     const real_t f2 = tet4_qy[q];
                     const real_t f3 = tet4_qz[q];
@@ -516,18 +460,18 @@ int tet4_resample_field_local(
                 // If outside
                 if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) ||
                     (k + 1 >= n[2])) {
-                    fprintf(
-                        stderr,
-                        "warning (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n",
-                        g_qx,
-                        g_qy,
-                        g_qz,
-                        i,
-                        j,
-                        k,
-                        n[0],
-                        n[1],
-                        n[2]);
+                    fprintf(stderr,
+                            "warning (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
+                            "%ld)!\n",
+                            g_qx,
+                            g_qy,
+                            g_qz,
+                            i,
+                            j,
+                            k,
+                            n[0],
+                            n[1],
+                            n[2]);
                     continue;
                 }
 
@@ -550,44 +494,46 @@ int tet4_resample_field_local(
                 // Integrate gap function
                 {
                     real_t eval_field = 0;
-#pragma unroll(8)
+                    UNROLL_ZERO
                     for (int edof_j = 0; edof_j < 8; edof_j++) {
                         eval_field += hex8_f[edof_j] * coeffs[edof_j];
                     }
 
-#pragma unroll(4)
+                    UNROLL_ZERO
                     for (int edof_i = 0; edof_i < 4; edof_i++) {
                         element_field[edof_i] += eval_field * tet4_f[edof_i] * dV;
-                    }
+                    }  // end edof_i loop
                 }
-            }
+            }  // end quadrature loop
 
-#pragma unroll(4)
+            UNROLL_ZERO
             for (int v = 0; v < 4; ++v) {
                 // Invert sign since distance field is negative insdide and positive outside
 #pragma omp critical
                 { weighted_field[ev[v]] += element_field[v]; }
-            }
-        }
-    }
+
+            }  // end vertex loop
+        }      // end element loop
+    }          // end parallel region
 
     return 0;
 }
 
 int trishell3_resample_field_local(
-    // Mesh
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t** const SFEM_RESTRICT elems,
-    geom_t** const SFEM_RESTRICT xyz,
-    // SDF
-    const ptrdiff_t* const SFEM_RESTRICT n,
-    const ptrdiff_t* const SFEM_RESTRICT stride,
-    const geom_t* const SFEM_RESTRICT origin,
-    const geom_t* const SFEM_RESTRICT delta,
-    const real_t* const SFEM_RESTRICT data,
-    // Output
-    real_t* const SFEM_RESTRICT weighted_field) {
+        // Mesh
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t** const SFEM_RESTRICT elems,
+        geom_t** const SFEM_RESTRICT xyz,
+        // SDF
+        const ptrdiff_t* const SFEM_RESTRICT n,
+        const ptrdiff_t* const SFEM_RESTRICT stride,
+        const geom_t* const SFEM_RESTRICT origin,
+        const geom_t* const SFEM_RESTRICT delta,
+        const real_t* const SFEM_RESTRICT data,
+        // Output
+        real_t* const SFEM_RESTRICT weighted_field) {
+    //
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];
     const real_t oz = (real_t)origin[2];
@@ -609,7 +555,7 @@ int trishell3_resample_field_local(
             real_t tri3_f[3];
             real_t element_field[3];
 
-#pragma unroll(3)
+            UNROLL_ZERO
             for (int v = 0; v < 3; ++v) {
                 ev[v] = elems[v][i];
             }
@@ -623,7 +569,7 @@ int trishell3_resample_field_local(
             memset(element_field, 0, 3 * sizeof(real_t));
 
             const real_t measure =
-                tri_shell_3_measure(x[0], x[1], x[2], y[0], y[1], y[2], z[0], z[1], z[2]);
+                    tri_shell_3_measure(x[0], x[1], x[2], y[0], y[1], y[2], z[0], z[1], z[2]);
 
             assert(measure > 0);
 
@@ -658,9 +604,9 @@ int trishell3_resample_field_local(
                     const real_t f1 = tri3_qx[q];
                     const real_t f2 = tri3_qy[q];
 
-                    tri3_f[0] = 3 * f0 - f1 - f2;
-                    tri3_f[1] = -f0 + 3 * f1 - f2;
-                    tri3_f[2] = -f0 - f1 + 3 * f2;
+                    tri3_f[0] = 3.0 * f0 - f1 - f2;
+                    tri3_f[1] = -f0 + 3.0 * f1 - f2;
+                    tri3_f[2] = -f0 - f1 + 3.0 * f2;
                 }
 #endif
 
@@ -677,18 +623,18 @@ int trishell3_resample_field_local(
                 // If outside
                 if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) ||
                     (k + 1 >= n[2])) {
-                    fprintf(
-                        stderr,
-                        "warning (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n",
-                        g_qx,
-                        g_qy,
-                        g_qz,
-                        i,
-                        j,
-                        k,
-                        n[0],
-                        n[1],
-                        n[2]);
+                    fprintf(stderr,
+                            "warning (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
+                            "%ld)!\n",
+                            g_qx,
+                            g_qy,
+                            g_qz,
+                            i,
+                            j,
+                            k,
+                            n[0],
+                            n[1],
+                            n[2]);
                     continue;
                 }
 
@@ -712,29 +658,30 @@ int trishell3_resample_field_local(
                 {
                     real_t eval_field = 0;
 
-#pragma unroll(8)
-                    for (int edof_j = 0; edof_j < 8; edof_j++) {
+                    UNROLL_ZERO
+                    for (int edof_j = 0; edof_j < 8; edof_j++) {  // loop over the 8 vertices
                         eval_field += hex8_f[edof_j] * coeffs[edof_j];
                     }
 
-#pragma unroll(3)
-                    for (int edof_i = 0; edof_i < 3; edof_i++) {
+                    UNROLL_ZERO
+                    for (int edof_i = 0; edof_i < 3; edof_i++) {  // loop over the 3 vertices
                         element_field[edof_i] += eval_field * tri3_f[edof_i] * dV;
                     }
                 }
             }
 
-#pragma unroll(3)
+            UNROLL_ZERO
             for (int v = 0; v < 3; ++v) {
                 // Invert sign since distance field is negative insdide and positive outside
 #pragma omp critical
                 { weighted_field[ev[v]] += element_field[v]; }
-            }
-        }
-    }
+
+            }  // end vertex loop
+        }      // end element loop
+    }          // end parallel region
 
     return 0;
-}
+}  // end trishell3_resample_field_local
 
 int beam2_resample_field_local(const ptrdiff_t nelements,
                                const ptrdiff_t nnodes,
@@ -771,7 +718,7 @@ int beam2_resample_field_local(const ptrdiff_t nelements,
             real_t beam2_f[2];
             real_t element_field[2];
 
-#pragma unroll(2)
+            UNROLL_ZERO
             for (int v = 0; v < 2; ++v) {
                 ev[v] = elems[v][i];
             }
@@ -791,7 +738,7 @@ int beam2_resample_field_local(const ptrdiff_t nelements,
             for (int q = 0; q < EDGE2_NQP; q++) {
                 real_t g_qx, g_qy, g_qz;
                 beam2_transform(
-                    x[0], x[1], y[0], y[1], z[0], z[1], edge2_qx[q], &g_qx, &g_qy, &g_qz);
+                        x[0], x[1], y[0], y[1], z[0], z[1], edge2_qx[q], &g_qx, &g_qy, &g_qz);
 
 #ifndef SFEM_RESAMPLE_GAP_DUAL
                 // Standard basis function
@@ -822,18 +769,18 @@ int beam2_resample_field_local(const ptrdiff_t nelements,
                 // If outside
                 if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) ||
                     (k + 1 >= n[2])) {
-                    fprintf(
-                        stderr,
-                        "warning (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n",
-                        g_qx,
-                        g_qy,
-                        g_qz,
-                        i,
-                        j,
-                        k,
-                        n[0],
-                        n[1],
-                        n[2]);
+                    fprintf(stderr,
+                            "warning (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
+                            "%ld)!\n",
+                            g_qx,
+                            g_qy,
+                            g_qz,
+                            i,
+                            j,
+                            k,
+                            n[0],
+                            n[1],
+                            n[2]);
                     continue;
                 }
 
@@ -857,49 +804,63 @@ int beam2_resample_field_local(const ptrdiff_t nelements,
                 {
                     real_t eval_field = 0;
 
-#pragma unroll(8)
+                    UNROLL_ZERO
                     for (int edof_j = 0; edof_j < 8; edof_j++) {
                         eval_field += hex8_f[edof_j] * coeffs[edof_j];
                     }
 
-#pragma unroll(2)
+                    UNROLL_ZERO
                     for (int edof_i = 0; edof_i < 2; edof_i++) {
                         element_field[edof_i] += eval_field * beam2_f[edof_i] * dV;
                     }
-                }
-            }
+                }  // end integrate gap function
+            }      // end quadrature loop
 
-#pragma unroll(2)
+            UNROLL_ZERO
             for (int v = 0; v < 2; ++v) {
                 // Invert sign since distance field is negative insdide and positive outside
 #pragma omp critical
                 { weighted_field[ev[v]] += element_field[v]; }
-            }
-        }
-    }
+
+            }  // end vertex loop
+
+        }  // end element loop
+    }      // end parallel region
 
     return 0;
-}
+}  // end beam2_resample_field_local
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
 
 int resample_field_local(
-    // Mesh
-    const enum ElemType element_type,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t** const SFEM_RESTRICT elems,
-    geom_t** const SFEM_RESTRICT xyz,
-    // SDF
-    const ptrdiff_t* const SFEM_RESTRICT n,
-    const ptrdiff_t* const SFEM_RESTRICT stride,
-    const geom_t* const SFEM_RESTRICT origin,
-    const geom_t* const SFEM_RESTRICT delta,
-    const real_t* const SFEM_RESTRICT data,
-    // Output
-    real_t* const SFEM_RESTRICT weighted_field) {
+        // Mesh
+        const enum ElemType element_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t** const SFEM_RESTRICT elems,
+        geom_t** const SFEM_RESTRICT xyz,
+        // SDF
+        const ptrdiff_t* const SFEM_RESTRICT n,
+        const ptrdiff_t* const SFEM_RESTRICT stride,
+        const geom_t* const SFEM_RESTRICT origin,
+        const geom_t* const SFEM_RESTRICT delta,
+        const real_t* const SFEM_RESTRICT data,
+        // Output
+        real_t* const SFEM_RESTRICT weighted_field) {
     switch (element_type) {
         case TET4: {
-            return tet4_resample_field_local(
-                nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+            return tet4_resample_field_local_V8(  ////// v2 test V8
+                                                  //   0,
+                    nelements,
+                    nnodes,
+                    elems,
+                    xyz,
+                    n,
+                    stride,
+                    origin,
+                    delta,
+                    data,
+                    weighted_field);
         }
         default:
             break;
@@ -910,10 +871,10 @@ int resample_field_local(
     switch (st) {
         case TRISHELL3:
             return trishell3_resample_field_local(
-                nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+                    nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
         case BEAM2:
             return beam2_resample_field_local(
-                nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+                    nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
 
         default: {
             assert(0);
@@ -925,20 +886,20 @@ int resample_field_local(
 }
 
 int resample_field(
-    // Mesh
-    const enum ElemType element_type,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t** const SFEM_RESTRICT elems,
-    geom_t** const SFEM_RESTRICT xyz,
-    // SDF
-    const ptrdiff_t* const SFEM_RESTRICT n,
-    const ptrdiff_t* const SFEM_RESTRICT stride,
-    const geom_t* const SFEM_RESTRICT origin,
-    const geom_t* const SFEM_RESTRICT delta,
-    const real_t* const SFEM_RESTRICT data,
-    // Output
-    real_t* const SFEM_RESTRICT g) {
+        // Mesh
+        const enum ElemType element_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t** const SFEM_RESTRICT elems,
+        geom_t** const SFEM_RESTRICT xyz,
+        // SDF
+        const ptrdiff_t* const SFEM_RESTRICT n,
+        const ptrdiff_t* const SFEM_RESTRICT stride,
+        const geom_t* const SFEM_RESTRICT origin,
+        const geom_t* const SFEM_RESTRICT delta,
+        const real_t* const SFEM_RESTRICT data,
+        // Output
+        real_t* const SFEM_RESTRICT g) {
     real_t* weighted_field = calloc(nnodes, sizeof(real_t));
 
     resample_field_local(element_type,
@@ -1010,19 +971,19 @@ int interpolate_field(const ptrdiff_t nnodes,
             if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
                 int rank;
                 MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-                fprintf(
-                    stderr,
-                    "[%d] warning (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n",
-                    rank,
-                    x,
-                    y,
-                    z,
-                    i,
-                    j,
-                    k,
-                    n[0],
-                    n[1],
-                    n[2]);
+                fprintf(stderr,
+                        "[%d] warning (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
+                        "%ld)!\n",
+                        rank,
+                        x,
+                        y,
+                        z,
+                        i,
+                        j,
+                        k,
+                        n[0],
+                        n[1],
+                        n[2]);
                 continue;
             }
 
@@ -1046,7 +1007,7 @@ int interpolate_field(const ptrdiff_t nnodes,
             {
                 real_t eval_field = 0;
 
-#pragma unroll(8)
+                UNROLL_ZERO
                 for (int edof_j = 0; edof_j < 8; edof_j++) {
                     eval_field += hex8_f[edof_j] * coeffs[edof_j];
                 }
@@ -1139,8 +1100,8 @@ int field_view_ensure_margin(MPI_Comm comm,
 
     // Make sure we are inside the grid and get also the required margin for resampling
     field_start = MAX(0, field_start - 1 - z_margin);
-    field_end =
-        MIN(nglobal[2],
+    field_end = MIN(
+            nglobal[2],
             field_end + 2 + z_margin);  // 1 for the rightside of the cell 1 for the exclusive range
 
     ptrdiff_t pnlocal_z = (field_end - field_start);

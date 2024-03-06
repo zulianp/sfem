@@ -2,6 +2,9 @@ SHELL := /bin/bash
 
 # LDFLAGS=`mpic++ -showme:link`
 
+MARCH ?= native
+VECTOR_SIZE ?= 512
+
 ifeq ($(debug),1)
 	CFLAGS += -O0 -g
 	CXXFLAGS += -O0 -g
@@ -19,8 +22,8 @@ else ifeq ($(asan), 1)
 # 	DEPS += -static-libsan
 # 	DEPS += -static
 else
-	CFLAGS += -Ofast -DNDEBUG
-	CXXFLAGS += -Ofast -DNDEBUG
+	CFLAGS += -Ofast -DNDEBUG -march=${MARCH} -fno-signed-zeros -fno-trapping-math -fassociative-math -mprefer-vector-width=${VECTOR_SIZE}  -fPIC
+	CXXFLAGS += -Ofast -DNDEBUG -march=${MARCH} -fno-signed-zeros -fno-trapping-math -fassociative-math -mprefer-vector-width=${VECTOR_SIZE} -fPIC
 	CUFLAGS += -O3 -DNDEBUG
 endif
 
@@ -83,7 +86,6 @@ INCLUDES += -I$(PWD) -I$(PWD)/.. -I$(PWD)/../matrix.io
 
 # Assemble systems
 GOALS = assemble assemble3 assemble4 neohookean_assemble stokes stokes_check linear_elasticity_assemble
-GOALS += macro_element_apply
 
 # Mesh manipulation
 GOALS += partition select_submesh refine skin extract_sharp_edges extrude wedge6_to_tet4 mesh_self_intersect select_surf volumes sfc
@@ -129,15 +131,28 @@ endif
 
 DEPS += -L$(PWD)/../matrix.io/ -lmatrix.io -lstdc++
 
-LDFLAGS += $(DEPS) -lm
+LDFLAGS += $(DEPS) -lm -fPIC
 
 MPICC ?= mpicc
 CXX ?= c++
+CC ?= cc
 MPICXX ?= mpicxx
 AR ?= ar
 NVCC ?= nvcc
 
-all : $(GOALS)
+export MPICH_CXX=${CXX}
+export OMPI_CXX=${CXX}
+
+export MPICH_CC=${CC}
+export OMPI_CC=${CC}
+
+
+all :    $(GOALS)
+
+pre-build:
+	mpicc --version
+
+
 
 OBJS = \
 	sortreduce.o \
@@ -177,13 +192,6 @@ OBJS += tri3_stokes_mini.o \
 		tri3_laplacian.o
 
 
-# Macro Tri3
-OBJS += macro_tri3_laplacian.o
-
-# Macro Tet4
-# OBJS += macro_tet4_laplacian.o
-OBJS += macro_tet4_laplacian_simd.o
-
 # TriShell3
 OBJS += trishell3_mass.o
 
@@ -217,7 +225,7 @@ OBJS += tet10_grad.o \
 	tet10_navier_stokes.o
 
 # Resampling
-OBJS += sfem_resample_gap.o sfem_resample_field.o
+OBJS += sfem_resample_gap.o sfem_resample_field.o sfem_resample_field_v2.o sfem_resample_field_V8.o
 
 # CVFEM
 OBJS += cvfem_tri3_diffusion.o cvfem_tet4_laplacian.o

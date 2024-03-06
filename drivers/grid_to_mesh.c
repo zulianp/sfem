@@ -18,6 +18,10 @@
 #include "mass.h"
 
 int main(int argc, char* argv[]) {
+    printf("========================================\n");
+    printf("Starting grid_to_mesh\n");
+    printf("========================================\n\n");
+
     MPI_Init(&argc, &argv);
 
     MPI_Comm comm = MPI_COMM_WORLD;
@@ -26,7 +30,17 @@ int main(int argc, char* argv[]) {
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
 
+    // print argv
+    printf("argc: %d\n", argc);
+    printf("argv: \n");
+    for (int i = 0; i < argc; i++) {
+        printf(" %s", argv[i]);
+    }
+    printf("\n");
+
     if (argc != 13) {
+        fprintf(stderr, "Error: Invalid number of arguments\n\n");
+
         fprintf(stderr,
                 "usage: %s <nx> <ny> <nz> <ox> <oy> <oz> <dx> <dy> <dz> "
                 "<data.float32.raw> <folder> <output_path>\n",
@@ -64,7 +78,7 @@ int main(int argc, char* argv[]) {
         if (SFEM_READ_FP32) {
             geom_t* temp = 0;
             if (ndarray_create_from_file(
-                    comm, data_path, SFEM_MPI_GEOM_T, 3, (void**)&temp, nlocal, nglobal)) {
+                        comm, data_path, SFEM_MPI_GEOM_T, 3, (void**)&temp, nlocal, nglobal)) {
                 return EXIT_FAILURE;
             }
 
@@ -78,7 +92,7 @@ int main(int argc, char* argv[]) {
 
         } else {
             if (ndarray_create_from_file(
-                    comm, data_path, SFEM_MPI_REAL_T, 3, (void**)&field, nlocal, nglobal)) {
+                        comm, data_path, SFEM_MPI_REAL_T, 3, (void**)&field, nlocal, nglobal)) {
                 return EXIT_FAILURE;
             }
         }
@@ -121,58 +135,62 @@ int main(int argc, char* argv[]) {
 
         if (SFEM_INTERPOLATE) {
             interpolate_field(
-                // Mesh
-                mesh.n_owned_nodes,
-                mesh.points,
-                // SDF
-                nlocal,
-                stride,
-                origin,
-                delta,
-                field,
-                // Output
-                g);
+                    // Mesh
+                    mesh.n_owned_nodes,
+                    mesh.points,
+                    // SDF
+                    nlocal,
+                    stride,
+                    origin,
+                    delta,
+                    field,
+                    // Output
+                    g);
         } else {
             if (size == 1) {
                 resample_field(
-                    // Mesh
-                    mesh.element_type,
-                    mesh.nelements,
-                    mesh.n_owned_nodes,
-                    mesh.elements,
-                    mesh.points,
-                    // SDF
-                    nlocal,
-                    stride,
-                    origin,
-                    delta,
-                    field,
-                    // Output
-                    g);
+                        // Mesh
+                        mesh.element_type,
+                        mesh.nelements,
+                        mesh.n_owned_nodes,
+                        mesh.elements,
+                        mesh.points,
+                        // SDF
+                        nlocal,
+                        stride,
+                        origin,
+                        delta,
+                        field,
+                        // Output
+                        g);
             } else {
                 resample_field_local(
-                    // Mesh
-                    mesh.element_type,
-                    mesh.nelements,
-                    mesh.nnodes,
-                    mesh.elements,
-                    mesh.points,
-                    // SDF
-                    nlocal,
-                    stride,
-                    origin,
-                    delta,
-                    field,
-                    // Output
-                    g);
+                        // Mesh
+                        mesh.element_type,
+                        mesh.nelements,
+                        mesh.nnodes,
+                        mesh.elements,
+                        mesh.points,
+                        // SDF
+                        nlocal,
+                        stride,
+                        origin,
+                        delta,
+                        field,
+                        // Output
+                        g);
 
                 real_t* mass_vector = calloc(mesh.nnodes, sizeof(real_t));
 
                 enum ElemType st = shell_type(mesh.element_type);
 
                 if (st == INVALID) {
-                    assemble_lumped_mass(
-                        mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mass_vector);
+                    assemble_lumped_mass(mesh.element_type,
+                                         mesh.nelements,
+                                         mesh.nnodes,
+                                         mesh.elements,
+                                         mesh.points,
+                                         mass_vector);
 
                 } else {
                     assemble_lumped_mass(st,
@@ -217,13 +235,53 @@ int main(int argc, char* argv[]) {
 
         double resample_tock = MPI_Wtime();
 
+        // get MPI world size
+        int mpi_size;
+        MPI_Comm_size(comm, &mpi_size);
+
+        int* elements_v = malloc(mpi_size * sizeof(int));
+
+        MPI_Gather(&mesh.nelements, 1, MPI_INT, elements_v, 1, MPI_INT, 0, comm);
+
+        int tot_nelements = 0;
         if (!rank) {
-            printf("[%d] resample %g (seconds)\n", rank, resample_tock - resample_tick);
+            for (int i = 0; i < mpi_size; i++) {
+                tot_nelements += elements_v[i];
+            }
+        }
+
+        free(elements_v);
+
+        if (!rank) {
+            const int nelements = mesh.nelements;
+            const double elements_second =
+                    (double)tot_nelements / (double)(resample_tock - resample_tick);
+
+            printf("\n");
+
+            printf("Rank: [%d]  Nr of elements  %d\n",                    //
+                   rank,                                                  //
+                   nelements * mpi_size);                                 //
+            printf("Rank: [%d]  Resample        %g (seconds)\n",          //
+                   rank,                                                  //
+                   resample_tock - resample_tick);                        //
+            printf("Rank: [%d]  Throughput      %e (elements/second)\n",  //
+                   rank,                                                  //
+                   elements_second);                                      //
+
+            printf("\n");
         }
     }
 
     // Write result to disk
     {
+        if (rank == 0) {
+            printf("-------------------------------------------\n");
+            printf("Writing result to disk\n");
+            printf("Output path: %s\n", output_path);
+            printf("-------------------------------------------\n");
+        }
+
         double io_tick = MPI_Wtime();
 
         mesh_write_nodal_field(&mesh, output_path, SFEM_MPI_REAL_T, g);
