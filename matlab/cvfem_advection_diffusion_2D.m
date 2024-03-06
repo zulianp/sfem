@@ -113,7 +113,7 @@ problem.neumann_fun = @(x, y) zeros(size(x));
 
 problem.BC_penalization = 1e16; %1e16;
 problem.diffusivity = 0.001;
-problem.diffusivity = 0.0;
+% problem.diffusivity = 0.0;
 
 problem.dirichlet_nodes = unique(sort(dirichlet(:)));
 problem.dirichlet = dirichlet;
