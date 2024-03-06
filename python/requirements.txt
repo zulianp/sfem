@@ -1,0 +1,14 @@
+gmsh==4.11.1
+gmsh-interop==2021.1.1
+h5==0.6.0
+h5py==3.8.0
+matplotlib==3.7.1
+matplotlib-inline==0.1.6
+meshio==5.3.4
+netCDF4==1.6.3
+numba==0.57.1
+numpy==1.24.2
+rich==13.3.2
+scipy==1.10.1
+sympy==1.11.1
+taichi==1.6.0
