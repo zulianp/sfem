@@ -14,49 +14,49 @@ function cvfem_advection_diffusion_2D()
 
 if 1
 
-mesh = './square/mesh';
-lsystem = './square/crs';
+    mesh = './square/mesh';
+    lsystem = './square/crs';
 
-% ../python/sfem/mesh/raw_to_db.py /Users/patrickzulian/Desktop/code/sfem/tests/cvfem3/mesh out.vtk --point_data=solution.raw
+    % ../python/sfem/mesh/raw_to_db.py /Users/patrickzulian/Desktop/code/sfem/tests/cvfem3/mesh out.vtk --point_data=solution.raw
 
-rowptr = read_array([lsystem  '/rowptr.raw'], 'int32') + 1;
-colidx = read_array([lsystem  '/colidx.raw'], 'int32') + 1;
-
-
-i0 = read_array([mesh '/i0.raw'], 'int32') + 1;
-i1 = read_array([mesh '/i1.raw'], 'int32') + 1;
-i2 = read_array([mesh '/i2.raw'], 'int32') + 1;
-
-x = read_array([mesh '/x.raw'], 'float');
-y = read_array([mesh '/y.raw'], 'float');
+    rowptr = read_array([lsystem  '/rowptr.raw'], 'int32') + 1;
+    colidx = read_array([lsystem  '/colidx.raw'], 'int32') + 1;
 
 
-% dirichlet = unique(sort(read_array([mesh '/sidesets_aos/sinlet.raw'], 'int32') + 1));
-dirichlet = read_array([mesh '/sidesets_aos/sleft.raw'], 'int32') + 1;
-dirichlet = reshape(dirichlet, 2, length(dirichlet)/ 2);
+    i0 = read_array([mesh '/i0.raw'], 'int32') + 1;
+    i1 = read_array([mesh '/i1.raw'], 'int32') + 1;
+    i2 = read_array([mesh '/i2.raw'], 'int32') + 1;
+
+    x = read_array([mesh '/x.raw'], 'float');
+    y = read_array([mesh '/y.raw'], 'float');
 
 
-neumann   = read_array([mesh '/sidesets_aos/sright.raw'], 'int32') + 1;
-neumann   = reshape(neumann, 2, length(neumann)/ 2);
+    % dirichlet = unique(sort(read_array([mesh '/sidesets_aos/sinlet.raw'], 'int32') + 1));
+    dirichlet = read_array([mesh '/sidesets_aos/sleft.raw'], 'int32') + 1;
+    dirichlet = reshape(dirichlet, 2, length(dirichlet)/ 2);
+
+
+    neumann   = read_array([mesh '/sidesets_aos/sright.raw'], 'int32') + 1;
+    neumann   = reshape(neumann, 2, length(neumann)/ 2);
 
 else
 
-rowptr = [1, 5, 9, 13, 17];
-colidx = [
-    1, 2, 3, 4, ...
-    1, 2, 3, 4, ...
-    1, 2, 3, 4, ... 
-    1, 2, 3, 4 ];
+    rowptr = [1, 5, 9, 13, 17];
+    colidx = [
+        1, 2, 3, 4, ...
+        1, 2, 3, 4, ...
+        1, 2, 3, 4, ...
+        1, 2, 3, 4 ];
 
-i0 = [1,2]';
-i1 = [2,4]';
-i2 = [3,3]';
+    i0 = [1,2]';
+    i1 = [2,4]';
+    i2 = [3,3]';
 
-x = [0.0, 1.0, 0.0, 1.0]';
-y = [0.0, 0.0, 1.0, 1.0]';
+    x = [0.0, 1.0, 0.0, 1.0]';
+    y = [0.0, 0.0, 1.0, 1.0]';
 
-dirichlet = [2; 1];
-neumann = [2, 4];
+    dirichlet = [2; 1];
+    neumann = [2, 4];
 
 end
 
@@ -84,6 +84,7 @@ yip = p_nodal_to_CV_centroids(elems, y');
 
 vx = ones(size(x));
 vy = zeros(size(x));
+% vy = 0.1 .* ones(size(x));
 
 % Compute velocties at the centroids
 vxc = p_nodal_to_CV_centroids(elems, vx');
@@ -107,13 +108,17 @@ problem.points = points;
 problem.evol = evol;
 problem.cv_vol = cv_vol;
 problem.neumann = neumann;
+% problem.neumann_fun = @(x, y) -10 * ones(size(x));
+problem.neumann_fun = @(x, y) zeros(size(x));
 
 problem.BC_penalization = 1e16; %1e16;
-problem.diffusivity = 0.5;
+problem.diffusivity = 0.001;
+problem.diffusivity = 0.0;
 
 problem.dirichlet_nodes = unique(sort(dirichlet(:)));
 problem.dirichlet = dirichlet;
-problem.dirichlet_fun = @(x, y) (1-y).*(y).*(1-y).*(y);
+% problem.dirichlet_fun = @(x, y) (1-y).*(y).*(1-y).*(y)./0.25 + 1 + sin(4*pi*y);
+problem.dirichlet_fun = @(x, y) ones(size(x));
 
 problem.rowptr = rowptr;
 problem.colidx = colidx;
@@ -121,7 +126,7 @@ problem.colidx = colidx;
 problem.nelements = size(elems, 2);
 problem.nnodes = length(x);
 
-[A, b] = assemble(problem);
+[A, b] = assemble(problem, 1);
 sol = A\b;
 % sol = ones(size(b));
 
@@ -132,49 +137,127 @@ write_array('solution.raw', sol, 'double');
 
 %% Plot stuff
 close all;
-figure(1);
 
+if 0
+    figure;
 
-trimesh(elems', x, y, zeros(size(x)), 'FaceAlpha', 0.1);
-hold on;
+    trimesh(elems', x, y, zeros(size(x)), 'FaceAlpha', 0.1);
+    hold on;
 
-% plot(x(elems(1, :)), y(elems(1, :)), 'rx');
-% plot(x(elems(2, :)), y(elems(2, :)), 'go');
-% plot(x(elems(3, :)), y(elems(3, :)), 'b.');
+    for n = 1:numel(x)
+        text(x(n),y(n),num2str(n))
+    end
 
-for n = 1:numel(x)
-    text(x(n),y(n),num2str(n))
+    plot(xip(1, :), yip(1, :),'r.');
+    quiver(xip(1, :), yip(1, :), dn1(1, :), dn1(2, :), 'off', 'r');
+
+    plot(xip(2, :), yip(2, :), 'g.');
+    quiver(xip(2, :), yip(2, :), dn2(1, :), dn2(2, :), 'off', 'g');
+
+    plot(xip(3, :), yip(3, :), 'b.');
+    quiver(xip(3, :), yip(3, :), dn3(1, :), dn3(2, :), 'off', 'b');
 end
 
-plot(xip(1, :), yip(1, :),'r.');
-quiver(xip(1, :), yip(1, :), dn1(1, :), dn1(2, :), 'off', 'r');
-
-plot(xip(2, :), yip(2, :), 'g.');
-quiver(xip(2, :), yip(2, :), dn2(1, :), dn2(2, :), 'off', 'g');
-
-plot(xip(3, :), yip(3, :), 'b.');
-quiver(xip(3, :), yip(3, :), dn3(1, :), dn3(2, :), 'off', 'b');
-
-
-figure(2);
+% Steady state plot
+figure(1);
 ptri = triangulation(elems', x, y);
-
 trimesh(elems', x, y, sol, 'FaceAlpha', 0.1);
 xlabel('x');
 ylabel('y');
 zlabel('u');
+title('Steady state solution')
+
+
+% Transient movie
+figure(2);
+
+[A, b] = assemble(problem, 0);
+
+
+% Initial condition
+IVP_nodes = problem.dirichlet_nodes;
+u0 = zeros(size(b));
+df = problem.dirichlet_fun(problem.points(1, :), problem.points(2, :));
+u0(IVP_nodes) = df(IVP_nodes);
+
+uold = u0;
+mass = sum(uold .* cv_vol);
+
+M = [mass];
+
+trisurf(elems', x, y, u0);
+xlabel('x');
+ylabel('y');
+zlabel('u');
+
+
+xmin = min(x);
+xmax = max(x);
+
+ymin = min(y);
+ymax = max(y);
+
+zmin = min(u0);
+zmax = max(u0);
+
+aa = [xmin, xmax, ymin, ymax, zmin, zmax];
+
+axis(aa);
+
+
+% dt = 0.01;
+% nts = 150;
+
+dt = 0.0001;
+nts = 40000;
+for ts=1:nts
+
+    unext = uold + dt .* ((A * uold)./cv_vol + b);
+    uold = unext;
+
+    if mod(ts, 100) == 1
+        M = [M; plot_sol(ts, nts, elems, x, y, cv_vol, uold, aa)];
+        pause(0.00001);
+    end
+
+end
+
+zmin = min(uold);
+zmax = max(uold);
+
+aa = [xmin, xmax, ymin, ymax, zmin, zmax];
+
+plot_sol(ts, nts, elems, x, y, cv_vol, uold, aa)
+
+figure(3);
+plot(M);
+title(['mesh vol = ' num2str(sum(cv_vol)) ' min = ' num2str(min(M)) ' max = ' num2str(max(M)) ', relative mass diff = ' num2str((max(M) - min(M))/min(M))]);
+% axis tight;
 return
 
+function mass = plot_sol(ts, nts, elems, x, y, cv_vol, u, aa)
+
+s = trisurf(elems', x, y, u);
+s.EdgeColor = 'none';
+xlabel('x');
+ylabel('y');
+zlabel('u');
+axis(aa);
+mass = sum(u .* cv_vol);
+
+title(['Transient ' num2str(ts) '/' num2str(nts) ' mass = ' num2str(mass)]);
+return
+
+
 %% Algebraic system
-function [A, b] = assemble(problem)
+function [A, b] = assemble(problem, steady)
 rowptr = problem.rowptr;
 colidx = problem.colidx;
 nodal_dirichlet = problem.dirichlet_nodes;
 
 lap_e = e_assemble_laplacian(problem);
 adv_e = e_assemble_advection(problem);
-mat_e = lap_e - adv_e;
-% mat_e = lap_e;
+mat_e = lap_e + adv_e;
 
 disp('lap')
 disp(reshape(lap_e(1, :, :), 3, 3));
@@ -189,26 +272,32 @@ values = elemental_to_crs(problem.elems, mat_e, rowptr, colidx);
 A = sparse(crs_to_dense(rowptr, colidx, values));
 disp(sum(A(:)))
 
+sa = sum(A, 2);
+disp('minmax row sum A')
+disp(min(sa))
+disp(max(sa))
+
+
+sa = sum(A, 1);
+disp('minmax col sum A')
+disp(min(sa))
+disp(max(sa))
+
+
 b = zeros(size(A, 1), 1);
-dd = zeros(size(b));
-dd(nodal_dirichlet) = 1;
-A(nodal_dirichlet, :) = 0;
-A = A + diag(dd);
-
-
-df = problem.dirichlet_fun(problem.points(1, :), problem.points(2, :));
-b(nodal_dirichlet) = df(nodal_dirichlet);
-
-% [ad, bd] = assemble_dirichlet(problem);
 vs = assemble_source_term(problem);
+b = b + vs;
 
-format short;
-% disp(full(A))
-% disp(b)
-% A = A + diag(ad);
-% b = b + bd + vs;
-% Without BCs this should sum to zero
+% Handle dirichlet
+if steady
+    dd = zeros(size(b));
+    dd(nodal_dirichlet) = 1;
+    A(nodal_dirichlet, :) = 0;
+    A = A + diag(dd);
 
+    df = problem.dirichlet_fun(problem.points(1, :), problem.points(2, :));
+    b(nodal_dirichlet) = df(nodal_dirichlet);
+end
 return
 
 function values = elemental_to_crs(elems, mat_e, rowptr, colidx)
@@ -222,10 +311,10 @@ for e=1:size(elems, 2)
     for ii=1:3
         i = idx(ii);
         row = colidx(rowptr(i):(rowptr(i+1)-1));
-       
+
         for jj=1:3
             j=idx(jj);
-    
+
             found = 0;
             for kk=1:length(row)
                 if j == row(kk)
@@ -244,44 +333,73 @@ for e=1:size(elems, 2)
         end
     end
 end
-   
+
+return
+
+function vs = assemble_neumann(p)
+points = p.points;
+vs = zeros(p.nnodes, 1);
+neumann = p.neumann;
+
+x = points(1, :);
+y = points(2, :);
+
+ux = x(neumann(2, :)) - x(neumann(1, :));
+uy = y(neumann(2, :)) - y(neumann(1, :));
+
+
+areas = sqrt(ux.*ux + uy.*uy);
+
+for i=1:2
+    dd = neumann(1, :);
+    for kk=1:length(dd)
+        k = dd(kk);
+        a = (areas(kk) / 2);
+        x = points(1, k);
+        y = points(2, k);
+
+        vs(k) = vs(k) + a * p.neumann_fun(x, y); %outflow        
+    end
+end
+
 return
 
 function vs = assemble_source_term(p)
-     vs = zeros(p.nnodes, 1);
+vs = zeros(p.nnodes, 1);
+vs = vs + assemble_neumann(p);
 return
 
 function [ad, vd] = assemble_dirichlet(p)
-    vd = zeros(p.nnodes, 1);
-    ad = zeros(p.nnodes, 1);
+vd = zeros(p.nnodes, 1);
+ad = zeros(p.nnodes, 1);
 
 %   Not a big fan of this
-    h = p.BC_penalization;
+h = p.BC_penalization;
 
-    d = p.dirichlet;
-    points = p.points;
-    
-    x = points(1, :);
-    y = points(2, :);
-   
-    ux = x(d(2, :)) - x(d(1, :));
-    uy = y(d(2, :)) - y(d(1, :));
-   
-    
-    areas = sqrt(ux.*ux + uy.*uy);
-    
-    for i=1:2
-        dd = d(1, :);
-        for kk=1:length(dd)
-            k = dd(kk);
-            a = h * (areas(kk) / 3);
-            x = points(1, k);
-            y = points(2, k);
-            
-            vd(k) = vd(k) + a * p.dirichlet_fun(x, y);
-            ad(k) = ad(k) + a;
-        end
+d = p.dirichlet;
+points = p.points;
+
+x = points(1, :);
+y = points(2, :);
+
+ux = x(d(2, :)) - x(d(1, :));
+uy = y(d(2, :)) - y(d(1, :));
+
+
+areas = sqrt(ux.*ux + uy.*uy);
+
+for i=1:2
+    dd = d(1, :);
+    for kk=1:length(dd)
+        k = dd(kk);
+        a = h * (areas(kk) / 3);
+        x = points(1, k);
+        y = points(2, k);
+
+        vd(k) = vd(k) + a * p.dirichlet_fun(x, y);
+        ad(k) = ad(k) + a;
     end
+end
 return
 
 function Jinv = inv2(u, v)
@@ -292,7 +410,7 @@ Jinv = [
     -v(1, :);
     -u(2, :);
     u(1, :)
-] ./det;
+    ] ./det;
 
 return
 
@@ -309,7 +427,7 @@ p1 = points(:, elems(1, :));
 p2 = points(:, elems(2, :));
 p3 = points(:, elems(3, :));
 
-u = p2 - p1; 
+u = p2 - p1;
 v = p3 - p1;
 
 Jinv = inv2(u, v);
@@ -345,7 +463,7 @@ Ae(:, 3, 1) = sum(agrad .* cgrad, 1) .* evol;
 Ae(:, 3, 2) = sum(bgrad .* cgrad, 1) .* evol;
 Ae(:, 3, 3) = sum(cgrad .* cgrad, 1) .* evol;
 
-Ae = Ae * diffusivity;
+Ae = -Ae * diffusivity;
 return
 
 function Ae = e_assemble_advection(p)
@@ -357,21 +475,43 @@ q = p.q;
 % disp('q')
 % disp(q)
 
-% Node a
-Ae(:, 1, 1) = -max( q(1, :), 0) - max(-q(3, :), 0);
-Ae(:, 1, 2) = max(-q(1, :), 0);
-Ae(:, 1, 3) = max(q(3, :), 0);
+use_transpose = 0;
 
-% Node b
-Ae(:, 2, 2) = -max(-q(1, :), 0) - max(q(2, :), 0);
-Ae(:, 2, 1) = max(q(1, :), 0);
-Ae(:, 2, 3) = max(-q(2, :), 0);
+if ~use_transpose
 
+    % Node a
+    Ae(:, 1, 1) = -max( q(1, :), 0) - max(-q(3, :), 0);
+    Ae(:, 1, 2) = max(-q(1, :), 0);
+    Ae(:, 1, 3) = max(q(3, :), 0);
 
-% Node c
-Ae(:, 3, 3) = -max(-q(2, :), 0) - max(q(3, :), 0);
-Ae(:, 3, 1) = max(-q(3, :), 0);
-Ae(:, 3, 2) = max(q(2, :), 0);
+    % Node b
+    Ae(:, 2, 2) = -max(-q(1, :), 0) - max(q(2, :), 0);
+    Ae(:, 2, 1) = max(q(1, :), 0);
+    Ae(:, 2, 3) = max(-q(2, :), 0);
+
+    % Node c
+    Ae(:, 3, 3) = -max(-q(2, :), 0) - max(q(3, :), 0);
+    Ae(:, 3, 1) = max(-q(3, :), 0);
+    Ae(:, 3, 2) = max(q(2, :), 0);
+
+else
+    % Transpose
+    %     Node a
+    Ae(:, 1, 1) = -max( q(1, :), 0) - max(-q(3, :), 0);
+    Ae(:, 2, 1) = max(-q(1, :), 0);
+    Ae(:, 3, 1) = max(q(3, :), 0);
+
+    % Node b
+    Ae(:, 2, 2) = -max(-q(1, :), 0) - max(q(2, :), 0);
+    Ae(:, 1, 2) = max(q(1, :), 0);
+    Ae(:, 3, 2) = max(-q(2, :), 0);
+
+    % Node c
+    Ae(:, 3, 3) = -max(-q(2, :), 0) - max(q(3, :), 0);
+    Ae(:, 1, 3) = max(-q(3, :), 0);
+    Ae(:, 2, 3) = max(q(2, :), 0);
+
+end
 
 return
 
@@ -415,10 +555,10 @@ vol = (u0 .* v1 - u1 .* v0) ./ 2;
 return
 
 function ret = perp(v)
-    ret = [
-        -v(2, :);
-        v(1, :)
-        ];
+ret = [
+    -v(2, :);
+    v(1, :)
+    ];
 return
 
 function [dn1, dn2, dn3] = CV_normals(elems, points)
