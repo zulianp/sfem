@@ -33,7 +33,8 @@ y = read_array([mesh '/y.raw'], 'float');
 
 % dirichlet = unique(sort(read_array([mesh '/sidesets_aos/sinlet.raw'], 'int32') + 1));
 dirichlet = read_array([mesh '/sidesets_aos/sleft.raw'], 'int32') + 1;
-dirichlet   = reshape(dirichlet, 2, length(dirichlet)/ 2);
+dirichlet = reshape(dirichlet, 2, length(dirichlet)/ 2);
+
 
 neumann   = read_array([mesh '/sidesets_aos/sright.raw'], 'int32') + 1;
 neumann   = reshape(neumann, 2, length(neumann)/ 2);
@@ -73,6 +74,9 @@ disp(sum(cv_vol)./sum(evol))
 
 [dn1, dn2, dn3] = CV_normals(elems, points);
 
+xip = p_nodal_to_CV_centroids(elems, x');
+yip = p_nodal_to_CV_centroids(elems, y');
+
 % disp('dn')
 % disp(dn1);
 % disp(dn2);
@@ -82,8 +86,8 @@ vx = ones(size(x));
 vy = zeros(size(x));
 
 % Compute velocties at the centroids
-vxc = p_nodal_to_CV_centroids(elems, vx);
-vyc = p_nodal_to_CV_centroids(elems, vy);
+vxc = p_nodal_to_CV_centroids(elems, vx');
+vyc = p_nodal_to_CV_centroids(elems, vy');
 
 q = advective_fluxes(vxc, vyc, dn1, dn2, dn3);
 % qphi = upwind_scheme(elems, phi, q);
@@ -104,12 +108,12 @@ problem.evol = evol;
 problem.cv_vol = cv_vol;
 problem.neumann = neumann;
 
-problem.BC_penalization = 1e16;
-problem.diffusivity = 1;
+problem.BC_penalization = 1e16; %1e16;
+problem.diffusivity = 0.5;
 
 problem.dirichlet_nodes = unique(sort(dirichlet(:)));
 problem.dirichlet = dirichlet;
-problem.dirichlet_fun = @(x, y) 1.;
+problem.dirichlet_fun = @(x, y) (1-y).*(y).*(1-y).*(y);
 
 problem.rowptr = rowptr;
 problem.colidx = colidx;
@@ -121,52 +125,88 @@ problem.nnodes = length(x);
 sol = A\b;
 % sol = ones(size(b));
 
+min(sol)
+max(sol)
+
 write_array('solution.raw', sol, 'double');
 
 %% Plot stuff
-% close all;
-% if(size(neumann, 1) == 1)
-%     ptri = triangulation(neumann, x, y);
-% else
+close all;
+figure(1);
+
+
+trimesh(elems', x, y, zeros(size(x)), 'FaceAlpha', 0.1);
+hold on;
+
+% plot(x(elems(1, :)), y(elems(1, :)), 'rx');
+% plot(x(elems(2, :)), y(elems(2, :)), 'go');
+% plot(x(elems(3, :)), y(elems(3, :)), 'b.');
+
+for n = 1:numel(x)
+    text(x(n),y(n),num2str(n))
+end
+
+plot(xip(1, :), yip(1, :),'r.');
+quiver(xip(1, :), yip(1, :), dn1(1, :), dn1(2, :), 'off', 'r');
+
+plot(xip(2, :), yip(2, :), 'g.');
+quiver(xip(2, :), yip(2, :), dn2(1, :), dn2(2, :), 'off', 'g');
+
+plot(xip(3, :), yip(3, :), 'b.');
+quiver(xip(3, :), yip(3, :), dn3(1, :), dn3(2, :), 'off', 'b');
+
+
+figure(2);
 ptri = triangulation(elems', x, y);
-% end
+
 trimesh(elems', x, y, sol, 'FaceAlpha', 0.1);
-% hold on;
-% plot3(x(dirichlet), y(dirichlet), z(dirichlet), '*');
-% xlabel('x');
-% ylabel('y');
-% zlabel('z');
+xlabel('x');
+ylabel('y');
+zlabel('u');
 return
 
 %% Algebraic system
 function [A, b] = assemble(problem)
 rowptr = problem.rowptr;
 colidx = problem.colidx;
+nodal_dirichlet = problem.dirichlet_nodes;
 
 lap_e = e_assemble_laplacian(problem);
 adv_e = e_assemble_advection(problem);
-% mat_e = lap_e + adv_e;
-mat_e = lap_e;
+mat_e = lap_e - adv_e;
+% mat_e = lap_e;
 
-% disp('adv')
-% disp(reshape(lap_e(1, :, :), 3, 3));
-% disp(reshape(adv_e(1, :, :), 3, 3));
-% disp(reshape(adv_e(2, :, :), 3, 3));
+disp('lap')
+disp(reshape(lap_e(1, :, :), 3, 3));
+disp(reshape(lap_e(2, :, :), 3, 3));
+disp('adv')
+disp(reshape(adv_e(1, :, :), 3, 3));
+disp(reshape(adv_e(2, :, :), 3, 3));
 
 % values = elemental_to_crs(problem.elems, adv_e, rowptr, colidx);
 values = elemental_to_crs(problem.elems, mat_e, rowptr, colidx);
 
 A = sparse(crs_to_dense(rowptr, colidx, values));
-[ad, b] = assemble_dirichlet(problem);
+disp(sum(A(:)))
+
+b = zeros(size(A, 1), 1);
+dd = zeros(size(b));
+dd(nodal_dirichlet) = 1;
+A(nodal_dirichlet, :) = 0;
+A = A + diag(dd);
+
+
+df = problem.dirichlet_fun(problem.points(1, :), problem.points(2, :));
+b(nodal_dirichlet) = df(nodal_dirichlet);
+
+% [ad, bd] = assemble_dirichlet(problem);
 vs = assemble_source_term(problem);
 
 format short;
 % disp(full(A))
-disp(sum(A(:)))
-
-A = A + diag(ad);
-b = b + vs;
-
+% disp(b)
+% A = A + diag(ad);
+% b = b + bd + vs;
 % Without BCs this should sum to zero
 
 return
@@ -263,10 +303,6 @@ points = p.points;
 
 diffusivity = p.diffusivity;
 
-dn1 = p.dn1;
-dn2 = p.dn2;
-dn3 = p.dn3;
-
 evol = p.evol;
 
 p1 = points(:, elems(1, :));
@@ -290,30 +326,26 @@ agrady = -J21 - J22;
 bgradx = J11;
 bgrady = J21;
 
-cgradx = J21;
+cgradx = J12;
 cgrady = J22;
 
-agrad = 1./2 .* [agradx; agrady] ./ evol;
-bgrad = 1./2 .* [bgradx; bgrady] ./ evol;
-cgrad = 1./2 .* [cgradx; cgrady] ./ evol;
+agrad = [agradx; agrady];
+bgrad = [bgradx; bgrady];
+cgrad = [cgradx; cgrady];
 
-gtest1 =  dn1 - dn3;
-gtest2 = -dn1 + dn2;
-gtest3 = -dn2 + dn3;
+Ae(:, 1, 1) = sum(agrad .* agrad, 1) .* evol;
+Ae(:, 1, 2) = sum(bgrad .* agrad, 1) .* evol;
+Ae(:, 1, 3) = sum(cgrad .* agrad, 1) .* evol;
 
-Ae(:, 1, 1) = sum(agrad .* gtest1, 1);
-Ae(:, 1, 2) = sum(bgrad .* gtest1, 1);
-Ae(:, 1, 3) = sum(cgrad .* gtest1, 1);
+Ae(:, 2, 1) = sum(agrad .* bgrad, 1) .* evol;
+Ae(:, 2, 2) = sum(bgrad .* bgrad, 1) .* evol;
+Ae(:, 2, 3) = sum(cgrad .* bgrad, 1) .* evol;
 
-Ae(:, 2, 1) = sum(agrad .* gtest2, 1);
-Ae(:, 2, 2) = sum(bgrad .* gtest2, 1);
-Ae(:, 2, 3) = sum(cgrad .* gtest2, 1);
+Ae(:, 3, 1) = sum(agrad .* cgrad, 1) .* evol;
+Ae(:, 3, 2) = sum(bgrad .* cgrad, 1) .* evol;
+Ae(:, 3, 3) = sum(cgrad .* cgrad, 1) .* evol;
 
-Ae(:, 3, 1) = sum(agrad .* gtest3, 1);
-Ae(:, 3, 2) = sum(bgrad .* gtest3, 1);
-Ae(:, 3, 3) = sum(cgrad .* gtest3, 1);
-
-Ae = -Ae * diffusivity;
+Ae = Ae * diffusivity;
 return
 
 function Ae = e_assemble_advection(p)
@@ -327,7 +359,7 @@ q = p.q;
 
 % Node a
 Ae(:, 1, 1) = -max( q(1, :), 0) - max(-q(3, :), 0);
-Ae(:, 1, 2) = -max(-q(1, :), 0);
+Ae(:, 1, 2) = max(-q(1, :), 0);
 Ae(:, 1, 3) = max(q(3, :), 0);
 
 % Node b
@@ -399,14 +431,9 @@ e1 = (a + b) / 2;
 e2 = (b + c) / 2;
 e3 = (c + a) / 2;
 
-% s1 = bary - e1;
-% s2 = bary - e2;
-% s3 = e3 - bary;
-
 s1 = e1 - bary;
 s2 = e2 - bary;
 s3 = e3 - bary;
-
 
 dn1 = perp(s1);
 dn2 = perp(s2);
