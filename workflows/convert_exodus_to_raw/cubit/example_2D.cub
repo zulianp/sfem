@@ -1,0 +1,23 @@
+reset 
+
+create surface rectangle width 1 zplane 
+
+sideset 1 add curve 2 
+sideset 1 name "sleft"
+
+sideset 2 add curve 4 
+sideset 2 name "sright"
+
+block 1 add surface 1 
+surface 1 size auto factor 10
+
+#surface 1  scheme auto 
+#block 1 element type QUAD4
+#mesh surface 1 
+#export mesh "/Users/patrickzulian/Desktop/code/sfem/workflows/convert_exodus_to_raw/quad4_example.e"  overwrite 
+
+
+surface 1  scheme trimesh
+block 1 element type TRI3
+mesh surface 1 
+export mesh "/Users/patrickzulian/Desktop/code/sfem/workflows/convert_exodus_to_raw/tri3_example.e"  overwrite 
