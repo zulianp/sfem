@@ -7,7 +7,7 @@ SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 PATH=$SCRIPTPATH:$PATH
 PATH=$SCRIPTPATH/../../..:$PATH
 PATH=$SCRIPTPATH/../../../python:$PATH
-PATH=$SCRIPTPATH/../../../python/mesh:$PATH
+PATH=$SCRIPTPATH/../../../python/sfem/mesh:$PATH
 
 LAUNCH=""
 # LAUNCH=srun
