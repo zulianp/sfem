@@ -16,6 +16,7 @@ extern "C" {
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define POW2(a) ((a) * (a))
 
+// #define SFEM_ENABLE_FP32_KERNELS
 
 #ifdef SFEM_ENABLE_FP32_KERNELS
 typedef float scalar_t;

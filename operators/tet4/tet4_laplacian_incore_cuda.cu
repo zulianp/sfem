@@ -122,15 +122,7 @@ __global__ void tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t nelement
     }
 }
 
-extern int tet4_cuda_incore_laplacian_apply(cuda_incore_laplacian_t *ctx,
-                                            const real_t *const d_x,
-                                            real_t *const d_y) {
-    static int block_size = 128;
-    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (ctx->nelements + block_size - 1) / block_size);
-    tet4_cuda_incore_laplacian_apply_kernel<<<n_blocks, block_size, 0>>>(
-        ctx->nelements, ctx->d_elems, ctx->d_fff, d_x, d_y);
-    return 0;
-}
+
 
 extern int tet4_cuda_incore_laplacian_init(cuda_incore_laplacian_t *ctx,
                                            const ptrdiff_t nelements,
@@ -190,4 +182,110 @@ extern int tet4_cuda_incore_laplacian_destroy(cuda_incore_laplacian_t *ctx) {
     ctx->d_elems = nullptr;
     ctx->d_fff = nullptr;
     return 0;
+}
+
+
+// Version 2
+
+__global__ void tet4_cuda_incore_laplacian_apply_kernel_V2(const ptrdiff_t nelements,
+                                                        idx_t *const SFEM_RESTRICT elems,
+                                                        const geom_t *const SFEM_RESTRICT fff,
+                                                        const real_t *const SFEM_RESTRICT x,
+                                                        real_t *const SFEM_RESTRICT y) {
+    int v = threadIdx.y;
+    real_t ref_grad[3] = {0., 0., 0.};
+
+    switch(v) {
+        case 0:
+        {
+            ref_grad[0] = -1;
+            ref_grad[1] = -1;
+            ref_grad[2] = -1;
+            break;
+        }
+        case 1:
+        {
+            ref_grad[0] = 1;
+            break;
+        }
+         case 2:
+        {
+            ref_grad[1] = 1;
+            break;
+        }
+        case 3:
+        {
+            ref_grad[2] = 1;
+            break;
+        }
+        default: {
+            assert(false);
+        }
+    }
+
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
+         e += blockDim.x * gridDim.x) {
+    
+
+        const idx_t vidx = elems[v * nelements + e];
+        const real_t ex = x[vidx];
+        
+        // apply operator
+        real_t gradu[3] = {0., 0., 0};
+
+        // Compute gradient of quantity
+        #pragma unroll
+        for (int i = (4) / 2; i >= 1; i /= 2) {
+            gradu[0] += __shfl_xor_sync(0xffffffff, ex * ref_grad[0], i, 32);
+            gradu[1] += __shfl_xor_sync(0xffffffff, ex * ref_grad[1], i, 32);
+            gradu[2] += __shfl_xor_sync(0xffffffff, ex * ref_grad[2], i, 32);
+        }
+
+        const geom_t *const fffe = &fff[e];
+        real_t JinvTgradu[3] = {
+            fffe[0] * gradu[0] + fffe[1] * gradu[1] + fffe[2] * gradu[2],
+            fffe[1] * gradu[0] + fffe[3] * gradu[1] + fffe[4] * gradu[2],
+            fffe[2] * gradu[0] + fffe[4] * gradu[1] + fffe[5] * gradu[2]   
+        };
+
+        //  dot product
+        real_t ey = ref_grad[0] * JinvTgradu[0] + ref_grad[1] * JinvTgradu[1] + ref_grad[2] * JinvTgradu[2];
+
+        // redistribute coeffs
+        atomicAdd(&y[vidx], ey);        
+    } 
+}
+
+extern int tet4_cuda_incore_laplacian_apply_V2(cuda_incore_laplacian_t *ctx,
+                                            const real_t *const d_x,
+                                            real_t *const d_y) {
+    static int block_size = 128;
+    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (ctx->nelements + block_size - 1) / block_size);
+
+    dim3 n_blocks_2(n_blocks, 1);
+    dim3 block_size_2(block_size, 4);
+
+    tet4_cuda_incore_laplacian_apply_kernel_V2<<<n_blocks_2, block_size_2, 0>>>(
+        ctx->nelements, ctx->d_elems, ctx->d_fff, d_x, d_y);
+    printf("tet4_cuda_incore_laplacian_apply_V2\n");
+    return 0;
+}
+
+
+extern int tet4_cuda_incore_laplacian_apply(cuda_incore_laplacian_t *ctx,
+                                            const real_t *const d_x,
+                                            real_t *const d_y) {
+    if(0) {
+        // This implementation is slower on the NVIDIA GeForce RTX 3060
+        return tet4_cuda_incore_laplacian_apply_V2(ctx, d_x, d_y);
+    }
+
+    static int block_size = 128;
+    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (ctx->nelements + block_size - 1) / block_size);
+    tet4_cuda_incore_laplacian_apply_kernel<<<n_blocks, block_size, 0>>>(
+        ctx->nelements, ctx->d_elems, ctx->d_fff, d_x, d_y);
+
+    printf("tet4_cuda_incore_laplacian_apply_V1\n");
+    return 0;
+
 }
