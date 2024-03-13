@@ -6,7 +6,7 @@
 
 typedef struct {
     ptrdiff_t nelements;
-    geom_t *fff;
+    jacobian_t *fff;
     idx_t **elements;
 } macro_tet4_laplacian_t;
 

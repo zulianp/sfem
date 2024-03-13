@@ -10,13 +10,6 @@
 typedef real_t scalar_t;
 typedef vreal_t vec_t;
 
-// typedef float scalar_t;
-// typedef float8_t vec_t;
-// #define VEC_SIZE 8
-
-// typedef double scalar_t;
-// typedef double4_t vec_t;
-// #define VEC_SIZE 4
 
 #define POW2(a) ((a) * (a))
 #define MIN(a, b) ((a) < (b) ? a : b)
@@ -54,8 +47,8 @@ static void fff_micro_kernel(const vec_t px0,
     const vec_t x17 = x16 * x6 * x9;
     const vec_t x18 = x1 * x16;
     const vec_t x19 = x13 * x18;
-    const vec_t x20 = -1.0 / 6.0 * x12 + (1.0 / 6.0) * x15 + (1.0 / 6.0) * x17 - 1.0 / 6.0 * x19 +
-                      (1.0 / 6.0) * x4 - 1.0 / 6.0 * x8;
+    const vec_t x20 = (scalar_t)(-1.0 / 6.0) * x12 + (scalar_t)(1.0 / 6.0) * x15 + (scalar_t)(1.0 / 6.0) * x17 - (scalar_t)(1.0 / 6.0) * x19 +
+                      (scalar_t)(1.0 / 6.0) * x4 - (scalar_t)(1.0 / 6.0) * x8;
     const vec_t x21 = x14 - x18;
     const vec_t x22 = 1. / POW2(-x12 + x15 + x17 - x19 + x4 - x8);
     const vec_t x23 = -x11 + x16 * x6;
@@ -90,7 +83,7 @@ static void fff_micro_kernel_scalar(const geom_t px0,
                                     const geom_t pz2,
                                     const geom_t pz3,
                                     const ptrdiff_t stride,
-                                    geom_t *fff) {
+                                    jacobian_t *fff) {
     const geom_t x0 = -px0 + px1;
     const geom_t x1 = -py0 + py2;
     const geom_t x2 = -pz0 + pz3;
@@ -400,7 +393,7 @@ void macro_tet4_laplacian_init(macro_tet4_laplacian_t *const ctx,
 
     ptrdiff_t alloc_size = (nelements / VEC_SIZE) * VEC_SIZE;
     alloc_size += (alloc_size < nelements) ? VEC_SIZE : 0;
-    geom_t *h_fff = (geom_t *)calloc(6 * alloc_size, sizeof(geom_t));
+    jacobian_t *h_fff = (jacobian_t *)calloc(6 * alloc_size, sizeof(jacobian_t));
 
 #pragma omp parallel
     {
@@ -408,7 +401,7 @@ void macro_tet4_laplacian_init(macro_tet4_laplacian_t *const ctx,
 #pragma omp for
         for (ptrdiff_t e = 0; e < nelements; e += VEC_SIZE) {
             const int nvec = MIN(nelements - (e + VEC_SIZE), VEC_SIZE);
-            geom_t *const fffi = &h_fff[e * 6];
+            jacobian_t *const fffi = &h_fff[e * 6];
             for (int vi = 0; vi < nvec; vi++) {
                 const ptrdiff_t eoffset = e + vi;
                 fff_micro_kernel_scalar(points[0][elements[0][eoffset]],
@@ -484,7 +477,7 @@ void macro_tet4_laplacian_apply_opt(const macro_tet4_laplacian_t *const ctx,
 
 #ifdef PACKED
             for (int d = 0; d < 6; d++) {
-                const geom_t *const fffi = &ctx->fff[i * 6 + d * VEC_SIZE];
+                const jacobian_t *const fffi = &ctx->fff[i * 6 + d * VEC_SIZE];
 
                 // Should be a vectorized load
 #pragma unroll(VEC_SIZE)

@@ -13,7 +13,6 @@ function cvfem_advection_diffusion_2D()
 % Cylinder example
 
 if 1
-
     mesh = './square/mesh';
     lsystem = './square/crs';
 
@@ -22,7 +21,6 @@ if 1
     rowptr = read_array([lsystem  '/rowptr.raw'], 'int32') + 1;
     colidx = read_array([lsystem  '/colidx.raw'], 'int32') + 1;
 
-
     i0 = read_array([mesh '/i0.raw'], 'int32') + 1;
     i1 = read_array([mesh '/i1.raw'], 'int32') + 1;
     i2 = read_array([mesh '/i2.raw'], 'int32') + 1;
@@ -30,17 +28,13 @@ if 1
     x = read_array([mesh '/x.raw'], 'float');
     y = read_array([mesh '/y.raw'], 'float');
 
-
     % dirichlet = unique(sort(read_array([mesh '/sidesets_aos/sinlet.raw'], 'int32') + 1));
     dirichlet = read_array([mesh '/sidesets_aos/sleft.raw'], 'int32') + 1;
     dirichlet = reshape(dirichlet, 2, length(dirichlet)/ 2);
 
-
     neumann   = read_array([mesh '/sidesets_aos/sright.raw'], 'int32') + 1;
     neumann   = reshape(neumann, 2, length(neumann)/ 2);
-
 else
-
     rowptr = [1, 5, 9, 13, 17];
     colidx = [
         1, 2, 3, 4, ...
@@ -57,7 +51,6 @@ else
 
     dirichlet = [2; 1];
     neumann = [2, 4];
-
 end
 
 elems = [i0'; i1'; i2'];
@@ -112,13 +105,13 @@ problem.neumann = neumann;
 problem.neumann_fun = @(x, y) zeros(size(x));
 
 problem.BC_penalization = 1e16; %1e16;
-problem.diffusivity = 0.001;
+problem.diffusivity = 0.00001;
 % problem.diffusivity = 0.0;
 
 problem.dirichlet_nodes = unique(sort(dirichlet(:)));
 problem.dirichlet = dirichlet;
-% problem.dirichlet_fun = @(x, y) (1-y).*(y).*(1-y).*(y)./0.25 + 1 + sin(4*pi*y);
-problem.dirichlet_fun = @(x, y) ones(size(x));
+problem.dirichlet_fun = @(x, y) (1-y).*(y).*(1-y).*(y)./0.25 + 1 + sin(0.5 * pi + 4*pi*y);
+% problem.dirichlet_fun = @(x, y) ones(size(x));
 
 problem.rowptr = rowptr;
 problem.colidx = colidx;

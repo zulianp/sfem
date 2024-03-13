@@ -58,4 +58,7 @@ typedef int element_idx_t;
 #define SFEM_MAX_PATH_LENGTH 2056
 #define SFEM_OK 0
 
+// typedef __fp16 jacobian_t;
+typedef geom_t jacobian_t;
+
 #endif  // SFEM_BASE_H
