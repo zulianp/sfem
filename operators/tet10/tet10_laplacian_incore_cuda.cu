@@ -24,9 +24,12 @@ typedef float scalar_t;
 typedef real_t scalar_t;
 #endif
 
-
+#ifdef SFEM_ENABLE_FP16_JACOBIANS
 #include <cuda_fp16.h>
+typedef half cu_jacobian_t;
+#else
 typedef geom_t cu_jacobian_t;
+#endif
 
 
 static inline __device__ __host__ void fff_micro_kernel(const geom_t px0,
@@ -234,7 +237,7 @@ __global__ void tet10_cuda_incore_laplacian_apply_kernel(const ptrdiff_t nelemen
         geom_t fffe[6];
 #pragma unroll(6)
         for(int d = 0; d < 6; d++) {
-            fffe[d] = fff[d*nelements];
+            fffe[d] = fff[d*nelements+e];
         }
 
         {  // Numerical quadrature

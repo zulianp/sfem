@@ -16,8 +16,11 @@ extern "C" {
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define POW2(a) ((a) * (a))
 
-// static int block_size = 128;
+
 #define block_size 128
+
+// #define SFEM_ENABLE_FP32_KERNELS
+// #define SFEM_ENABLE_FP16_JACOBIANS
 
 #ifdef SFEM_ENABLE_FP32_KERNELS
 typedef float scalar_t;
@@ -25,9 +28,12 @@ typedef float scalar_t;
 typedef real_t scalar_t;
 #endif
 
-
+#ifdef SFEM_ENABLE_FP16_JACOBIANS
 #include <cuda_fp16.h>
+typedef half cu_jacobian_t;
+#else
 typedef geom_t cu_jacobian_t;
+#endif
 
 static inline __device__ __host__ void fff_micro_kernel(const geom_t px0,
                                                         const geom_t px1,
@@ -218,7 +224,7 @@ __global__ void macro_tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t ne
         geom_t offf[6];
         #pragma unroll(6)
         for(int d = 0; d < 6; d++) {
-            offf[d] = fff[d*nelements];
+            offf[d] = fff[d*nelements + e];
         }
 #endif
 
