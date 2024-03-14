@@ -16,12 +16,20 @@ extern "C" {
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define POW2(a) ((a) * (a))
 
+
+#ifdef SFEM_ENABLE_FP32_KERNELS
+typedef float scalar_t;
+#else
+typedef real_t scalar_t;
+#endif
+
 #ifdef SFEM_ENABLE_FP16_JACOBIANS
 #include <cuda_fp16.h>
 typedef half cu_jacobian_t;
 #else
 typedef geom_t cu_jacobian_t;
 #endif
+
 
 static inline __device__ __host__ void fff_micro_kernel(const geom_t px0,
                                                         const geom_t px1,
@@ -57,10 +65,10 @@ static inline __device__ __host__ void fff_micro_kernel(const geom_t px0,
     const geom_t x17 = x16 * x6 * x9;
     const geom_t x18 = x1 * x16;
     const geom_t x19 = x13 * x18;
-    const geom_t x20 = -1.0 / 6.0 * x12 + (1.0 / 6.0) * x15 + (1.0 / 6.0) * x17 - 1.0 / 6.0 * x19 +
-                       (1.0 / 6.0) * x4 - 1.0 / 6.0 * x8;
+    const geom_t x20 = (geom_t)(-1.0 / 6.0) * x12 + (geom_t)(1.0 / 6.0) * x15 + (geom_t)(1.0 / 6.0) * x17 - (geom_t)(1.0 / 6.0) * x19 +
+                       (geom_t)(1.0 / 6.0) * x4 - (geom_t)(1.0 / 6.0) * x8;
     const geom_t x21 = x14 - x18;
-    const geom_t x22 = 1. / POW2(-x12 + x15 + x17 - x19 + x4 - x8);
+    const geom_t x22 = 1 / POW2(-x12 + x15 + x17 - x19 + x4 - x8);
     const geom_t x23 = -x11 + x16 * x6;
     const geom_t x24 = x3 - x7;
     const geom_t x25 = -x0 * x5 + x16 * x9;
@@ -83,14 +91,14 @@ static inline __device__ __host__ void fff_micro_kernel(const geom_t px0,
 static inline __device__ __host__ void lapl_apply_micro_kernel(
     const geom_t *const SFEM_RESTRICT fff,
     const ptrdiff_t stride,
-    const real_t *const SFEM_RESTRICT u,
-    real_t *const SFEM_RESTRICT element_vector) {
-    const real_t x0 = fff[0 * stride] + fff[1 * stride] + fff[2 * stride];
-    const real_t x1 = fff[1 * stride] + fff[3 * stride] + fff[4 * stride];
-    const real_t x2 = fff[2 * stride] + fff[4 * stride] + fff[5 * stride];
-    const real_t x3 = fff[1 * stride] * u[0];
-    const real_t x4 = fff[2 * stride] * u[0];
-    const real_t x5 = fff[4 * stride] * u[0];
+    const scalar_t *const SFEM_RESTRICT u,
+    scalar_t *const SFEM_RESTRICT element_vector) {
+    const scalar_t x0 = fff[0 * stride] + fff[1 * stride] + fff[2 * stride];
+    const scalar_t x1 = fff[1 * stride] + fff[3 * stride] + fff[4 * stride];
+    const scalar_t x2 = fff[2 * stride] + fff[4 * stride] + fff[5 * stride];
+    const scalar_t x3 = fff[1 * stride] * u[0];
+    const scalar_t x4 = fff[2 * stride] * u[0];
+    const scalar_t x5 = fff[4 * stride] * u[0];
     element_vector[0] = u[0] * x0 + u[0] * x1 + u[0] * x2 - u[1] * x0 - u[2] * x1 - u[3] * x2;
     element_vector[1] = -fff[0 * stride] * u[0] + fff[0 * stride] * u[1] + fff[1 * stride] * u[2] +
                         fff[2 * stride] * u[3] - x3 - x4;
@@ -107,8 +115,8 @@ __global__ void tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t nelement
                                                         real_t *const SFEM_RESTRICT y) {
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
          e += blockDim.x * gridDim.x) {
-        real_t ex[4];
-        real_t ey[4];
+        scalar_t ex[4];
+        scalar_t ey[4];
         idx_t vidx[4];
 
         // collect coeffs
@@ -208,7 +216,7 @@ __global__ void tet4_cuda_incore_laplacian_apply_kernel_V2(const ptrdiff_t nelem
                                                         const real_t *const SFEM_RESTRICT x,
                                                         real_t *const SFEM_RESTRICT y) {
     int v = threadIdx.y;
-    real_t ref_grad[3] = {0., 0., 0.};
+    scalar_t ref_grad[3] = {0., 0., 0.};
 
     switch(v) {
         case 0:
@@ -243,10 +251,10 @@ __global__ void tet4_cuda_incore_laplacian_apply_kernel_V2(const ptrdiff_t nelem
     
 
         const idx_t vidx = elems[v * nelements + e];
-        const real_t ex = x[vidx];
+        const scalar_t ex = x[vidx];
         
         // apply operator
-        real_t gradu[3] = {0., 0., 0};
+        scalar_t gradu[3] = {0., 0., 0};
 
         // Compute gradient of quantity
         #pragma unroll
@@ -262,14 +270,14 @@ __global__ void tet4_cuda_incore_laplacian_apply_kernel_V2(const ptrdiff_t nelem
             fffe[d] = fff[d*nelements + e];
         }
 
-        real_t JinvTgradu[3] = {
+        scalar_t JinvTgradu[3] = {
             fffe[0] * gradu[0] + fffe[1] * gradu[1] + fffe[2] * gradu[2],
             fffe[1] * gradu[0] + fffe[3] * gradu[1] + fffe[4] * gradu[2],
             fffe[2] * gradu[0] + fffe[4] * gradu[1] + fffe[5] * gradu[2]   
         };
 
         //  dot product
-        real_t ey = ref_grad[0] * JinvTgradu[0] + ref_grad[1] * JinvTgradu[1] + ref_grad[2] * JinvTgradu[2];
+        scalar_t ey = ref_grad[0] * JinvTgradu[0] + ref_grad[1] * JinvTgradu[1] + ref_grad[2] * JinvTgradu[2];
 
         // redistribute coeffs
         atomicAdd(&y[vidx], ey);        
