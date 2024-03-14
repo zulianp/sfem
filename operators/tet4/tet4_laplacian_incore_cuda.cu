@@ -16,6 +16,10 @@ extern "C" {
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define POW2(a) ((a) * (a))
 
+
+#include <cuda_fp16.h>
+typedef geom_t cu_jacobian_t;
+
 static inline __device__ __host__ void fff_micro_kernel(const geom_t px0,
                                                         const geom_t px1,
                                                         const geom_t px2,
@@ -29,7 +33,7 @@ static inline __device__ __host__ void fff_micro_kernel(const geom_t px0,
                                                         const geom_t pz2,
                                                         const geom_t pz3,
                                                         const count_t stride,
-                                                        geom_t *fff) {
+                                                        cu_jacobian_t *fff) {
     const geom_t x0 = -px0 + px1;
     const geom_t x1 = -py0 + py2;
     const geom_t x2 = -pz0 + pz3;
@@ -95,7 +99,7 @@ static inline __device__ __host__ void lapl_apply_micro_kernel(
 
 __global__ void tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t nelements,
                                                         idx_t *const SFEM_RESTRICT elems,
-                                                        const geom_t *const SFEM_RESTRICT fff,
+                                                        const cu_jacobian_t *const SFEM_RESTRICT fff,
                                                         const real_t *const SFEM_RESTRICT x,
                                                         real_t *const SFEM_RESTRICT y) {
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
@@ -111,8 +115,16 @@ __global__ void tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t nelement
             ex[v] = x[vidx[v]];
         }
 
-        // apply operator
-        lapl_apply_micro_kernel(&fff[e], nelements, ex, ey);
+        geom_t fffe[6];
+#pragma unroll(6)
+        for(int d = 0; d < 6; d++) {
+            fffe[d] = fff[d*nelements];
+        }
+
+        // // apply operator
+        // lapl_apply_micro_kernel(&fff[e], nelements, ex, ey);
+
+        lapl_apply_micro_kernel(fffe, 1, ex, ey);
 
         // redistribute coeffs
 #pragma unroll(4)
@@ -129,7 +141,7 @@ extern int tet4_cuda_incore_laplacian_init(cuda_incore_laplacian_t *ctx,
                                            idx_t **const SFEM_RESTRICT elements,
                                            geom_t **const SFEM_RESTRICT points) {
     {  // Create FFF and store it on device
-        geom_t *h_fff = (geom_t *)calloc(6 * nelements, sizeof(geom_t));
+        cu_jacobian_t *h_fff = (cu_jacobian_t *)calloc(6 * nelements, sizeof(cu_jacobian_t));
 
 #pragma omp parallel
         {
@@ -152,9 +164,9 @@ extern int tet4_cuda_incore_laplacian_init(cuda_incore_laplacian_t *ctx,
             }
         }
 
-        SFEM_CUDA_CHECK(cudaMalloc(&ctx->d_fff, 6 * nelements * sizeof(geom_t)));
+        SFEM_CUDA_CHECK(cudaMalloc(&ctx->d_fff, 6 * nelements * sizeof(cu_jacobian_t)));
         SFEM_CUDA_CHECK(
-            cudaMemcpy(ctx->d_fff, h_fff, 6 * nelements * sizeof(geom_t), cudaMemcpyHostToDevice));
+            cudaMemcpy(ctx->d_fff, h_fff, 6 * nelements * sizeof(cu_jacobian_t), cudaMemcpyHostToDevice));
         free(h_fff);
     }
 
@@ -189,7 +201,7 @@ extern int tet4_cuda_incore_laplacian_destroy(cuda_incore_laplacian_t *ctx) {
 
 __global__ void tet4_cuda_incore_laplacian_apply_kernel_V2(const ptrdiff_t nelements,
                                                         idx_t *const SFEM_RESTRICT elems,
-                                                        const geom_t *const SFEM_RESTRICT fff,
+                                                        const cu_jacobian_t *const SFEM_RESTRICT fff,
                                                         const real_t *const SFEM_RESTRICT x,
                                                         real_t *const SFEM_RESTRICT y) {
     int v = threadIdx.y;
@@ -241,7 +253,12 @@ __global__ void tet4_cuda_incore_laplacian_apply_kernel_V2(const ptrdiff_t nelem
             gradu[2] += __shfl_xor_sync(0xffffffff, ex * ref_grad[2], i, 32);
         }
 
-        const geom_t *const fffe = &fff[e];
+        geom_t fffe[6];
+#pragma unroll(6)
+        for(int d = 0; d < 6; d++) {
+            fffe[d] = fff[d*nelements];
+        }
+
         real_t JinvTgradu[3] = {
             fffe[0] * gradu[0] + fffe[1] * gradu[1] + fffe[2] * gradu[2],
             fffe[1] * gradu[0] + fffe[3] * gradu[1] + fffe[4] * gradu[2],
@@ -266,7 +283,7 @@ extern int tet4_cuda_incore_laplacian_apply_V2(cuda_incore_laplacian_t *ctx,
     dim3 block_size_2(block_size, 4);
 
     tet4_cuda_incore_laplacian_apply_kernel_V2<<<n_blocks_2, block_size_2, 0>>>(
-        ctx->nelements, ctx->d_elems, ctx->d_fff, d_x, d_y);
+        ctx->nelements, ctx->d_elems, (cu_jacobian_t*)ctx->d_fff, d_x, d_y);
     printf("tet4_cuda_incore_laplacian_apply_V2\n");
     return 0;
 }
@@ -283,7 +300,7 @@ extern int tet4_cuda_incore_laplacian_apply(cuda_incore_laplacian_t *ctx,
     static int block_size = 128;
     ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (ctx->nelements + block_size - 1) / block_size);
     tet4_cuda_incore_laplacian_apply_kernel<<<n_blocks, block_size, 0>>>(
-        ctx->nelements, ctx->d_elems, ctx->d_fff, d_x, d_y);
+        ctx->nelements, ctx->d_elems, (cu_jacobian_t*)ctx->d_fff, d_x, d_y);
 
     printf("tet4_cuda_incore_laplacian_apply_V1\n");
     return 0;

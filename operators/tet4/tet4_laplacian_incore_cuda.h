@@ -10,7 +10,7 @@ extern "C" {
 
 typedef struct {
     ptrdiff_t nelements;
-    geom_t *d_fff;
+    jacobian_t *d_fff;
     idx_t *d_elems;
 } cuda_incore_laplacian_t;
 
