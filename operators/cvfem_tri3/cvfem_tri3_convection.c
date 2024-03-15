@@ -18,8 +18,8 @@ static SFEM_INLINE void cvfem_tri3_convection_assemble_hessian_kernel(
     const real_t *const SFEM_RESTRICT vx,
     const real_t *const SFEM_RESTRICT vy,
     real_t *const SFEM_RESTRICT element_matrix) {
+    
     real_t J[4];
-
     J[0] = -px0 + px1;
     J[1] = -px0 + px2;
     J[2] = -py0 + py1;

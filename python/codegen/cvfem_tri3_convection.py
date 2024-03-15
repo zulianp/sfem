@@ -101,7 +101,6 @@ dn0, dn1, dn2 = cv_normals(J)
 q0, q1, q2 = advective_fluxes(vcx, vcy, dn0, dn1, dn2)
 q = [q0, q1, q2]
 
-
 print('----------------------------')
 print('Jacobian')
 print('----------------------------')
