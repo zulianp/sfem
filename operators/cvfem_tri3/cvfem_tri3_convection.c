@@ -18,7 +18,6 @@ static SFEM_INLINE void cvfem_tri3_convection_assemble_hessian_kernel(
     const real_t *const SFEM_RESTRICT vx,
     const real_t *const SFEM_RESTRICT vy,
     real_t *const SFEM_RESTRICT element_matrix) {
-    
     real_t J[4];
     J[0] = -px0 + px1;
     J[1] = -px0 + px2;
@@ -63,7 +62,6 @@ static SFEM_INLINE void cvfem_tri3_convection_assemble_apply_kernel(
     const real_t *const SFEM_RESTRICT vy,
     const real_t *const SFEM_RESTRICT x,
     real_t *const SFEM_RESTRICT element_vector) {
-    
     real_t J[4];
     J[0] = -px0 + px1;
     J[1] = -px0 + px2;
@@ -222,4 +220,78 @@ void cvfem_tri3_convection_assemble_hessian(const ptrdiff_t nelements,
     double tock = MPI_Wtime();
     printf("cvfem_tri3_convection.c: cvfem_tri3_convection_assemble_hessian\t%g seconds\n",
            tock - tick);
+}
+
+void cvfem_tri3_convection_apply(const ptrdiff_t nelements,
+                                 const ptrdiff_t nnodes,
+                                 idx_t **const SFEM_RESTRICT elems,
+                                 geom_t **const SFEM_RESTRICT xyz,
+                                 real_t **const SFEM_RESTRICT velocity,
+                                 const real_t *const SFEM_RESTRICT u,
+                                 real_t *const SFEM_RESTRICT values) {
+    SFEM_UNUSED(nnodes);
+
+    double tick = MPI_Wtime();
+
+#pragma omp parallel
+    {
+#pragma omp for  // nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[3];
+
+            real_t vx[3];
+            real_t vy[3];
+            real_t element_u[3];
+            real_t element_vector[3];
+       
+#pragma unroll(3)
+            for (int v = 0; v < 3; ++v) {
+                ev[v] = elems[v][i];
+            }
+
+#pragma unroll(3)
+            for (int v = 0; v < 3; ++v) {
+                vx[v] = velocity[0][ev[v]];
+            }
+
+#pragma unroll(3)
+            for (int v = 0; v < 3; ++v) {
+                vy[v] = velocity[1][ev[v]];
+            }
+
+#pragma unroll(3)
+            for (int v = 0; v < 3; ++v) {
+                element_u[v] = u[ev[v]];
+            }
+
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+
+            cvfem_tri3_convection_assemble_apply_kernel(
+                // X-coordinates
+                xyz[0][i0],
+                xyz[0][i1],
+                xyz[0][i2],
+                // Y-coordinates
+                xyz[1][i0],
+                xyz[1][i1],
+                xyz[1][i2],
+                vx,
+                vy,
+                element_u,
+                element_vector);
+
+            for (int edof_i = 0; edof_i < 3; ++edof_i) {
+                const idx_t dof_i = ev[edof_i];
+
+#pragma omp atomic update
+                values[dof_i] += element_vector[edof_i];
+            }
+        }
+    }
+
+    double tock = MPI_Wtime();
+    printf("cvfem_tri3_convection.c: cvfem_tri3_convection_apply\t%g seconds\n", tock - tick);
 }

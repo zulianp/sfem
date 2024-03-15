@@ -115,7 +115,6 @@ int main(int argc, char *argv[]) {
 
     int n_dirichlet_conditions;
     boundary_condition_t *dirichlet_conditions;
-
     read_dirichlet_conditions(&mesh,
                               SFEM_DIRICHLET_NODESET,
                               SFEM_DIRICHLET_VALUE,
@@ -162,6 +161,10 @@ int main(int argc, char *argv[]) {
     ptrdiff_t step_count = 0;
     for (real_t t = 0; t < SFEM_MAX_TIME; t += dt, step_count++) {
         // Integrate
+        memset(buff, 0, mesh.nnodes * sizeof(real_t));
+        
+        cvfem_tri3_convection_apply(
+            mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, vel, c, buff);
 
         for (int i = 0; i < n_dirichlet_conditions; i++) {
             boundary_condition_t cond = dirichlet_conditions[i];
