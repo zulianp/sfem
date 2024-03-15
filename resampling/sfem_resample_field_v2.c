@@ -303,7 +303,8 @@ int tet4_resample_field_local_v2(
                                                        z2,
                                                        z3);
 
-        ///////////////////////
+        /////////////////////////////////////////////  
+        // loop over the quadrature points
         for (int quad_i = 0; quad_i < TET4_NQP; quad_i++) {  // loop over the quadrature points
 
             real_type g_qx, g_qy, g_qz;

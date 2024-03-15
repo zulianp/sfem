@@ -225,7 +225,7 @@ OBJS += tet10_grad.o \
 	tet10_navier_stokes.o
 
 # Resampling
-OBJS += sfem_resample_gap.o sfem_resample_field.o sfem_resample_field_v2.o sfem_resample_field_V8.o
+OBJS += sfem_resample_gap.o sfem_resample_field.o sfem_resample_field_v2.o sfem_resample_field_V8.o sfem_resample_field_V4.o
 
 # CVFEM
 OBJS += cvfem_tri3_diffusion.o cvfem_tet4_laplacian.o

@@ -341,7 +341,7 @@ int tet4_resample_field_local_V8_aligned(
     // Loop over the elements
     for (ptrdiff_t element_i = start_nelement; element_i < end_nelement; element_i += 8) {
         //
-        vec8_int64 ev0 = {elems[0][element_i],
+        vec8_int64 ev0 = {elems[0][element_i + 0],
                           elems[0][element_i + 1],
                           elems[0][element_i + 2],
                           elems[0][element_i + 3],
@@ -350,7 +350,7 @@ int tet4_resample_field_local_V8_aligned(
                           elems[0][element_i + 6],
                           elems[0][element_i + 7]};
 
-        vec8_int64 ev1 = {elems[1][element_i],
+        vec8_int64 ev1 = {elems[1][element_i + 0],
                           elems[1][element_i + 1],
                           elems[1][element_i + 2],
                           elems[1][element_i + 3],
@@ -359,7 +359,7 @@ int tet4_resample_field_local_V8_aligned(
                           elems[1][element_i + 6],
                           elems[1][element_i + 7]};
 
-        vec8_int64 ev2 = {elems[2][element_i],
+        vec8_int64 ev2 = {elems[2][element_i + 0],
                           elems[2][element_i + 1],
                           elems[2][element_i + 2],
                           elems[2][element_i + 3],
@@ -368,7 +368,7 @@ int tet4_resample_field_local_V8_aligned(
                           elems[2][element_i + 6],
                           elems[2][element_i + 7]};
 
-        vec8_int64 ev3 = {elems[3][element_i],
+        vec8_int64 ev3 = {elems[3][element_i + 0],
                           elems[3][element_i + 1],
                           elems[3][element_i + 2],
                           elems[3][element_i + 3],
