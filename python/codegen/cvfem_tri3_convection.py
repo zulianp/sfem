@@ -107,7 +107,7 @@ print('Jacobian')
 print('----------------------------')
 
 JJ = create_jacobian()
-JJexpr = assign_matrix('jacobian', JJ)
+JJexpr = assign_matrix('J', JJ)
 c_code(JJexpr)
 
 print('----------------------------')
@@ -116,4 +116,13 @@ print('----------------------------')
 
 A = advection_op(q)
 expr = assign_matrix('element_matrix', A)
+c_code(expr)
+
+print('----------------------------')
+print('Apply')
+print('----------------------------')
+
+x = coeffs('x', 3)
+y = A * x
+expr = assign_matrix('element_vector', y)
 c_code(expr)
