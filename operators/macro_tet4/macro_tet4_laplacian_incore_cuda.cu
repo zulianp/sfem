@@ -10,12 +10,11 @@ extern "C" {
 #include "sortreduce.h"
 }
 
-#include "sfem_cuda_base.h"
 #include "macro_tet4_laplacian_incore_cuda.h"
+#include "sfem_cuda_base.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define POW2(a) ((a) * (a))
-
 
 #define block_size 128
 
@@ -183,11 +182,12 @@ static /*inline*/ __device__ __host__ void lapl_apply_micro_kernel(
 // Worse
 // #define MACRO_TET4_USE_SHARED
 
-__global__ void macro_tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t nelements,
-                                                              idx_t *const SFEM_RESTRICT elems,
-                                                              const cu_jacobian_t *const SFEM_RESTRICT fff,
-                                                              const real_t *const SFEM_RESTRICT x,
-                                                              real_t *const SFEM_RESTRICT y) {
+__global__ void macro_tet4_cuda_incore_laplacian_apply_kernel(
+    const ptrdiff_t nelements,
+    idx_t *const SFEM_RESTRICT elems,
+    const cu_jacobian_t *const SFEM_RESTRICT fff,
+    const real_t *const SFEM_RESTRICT x,
+    real_t *const SFEM_RESTRICT y) {
     scalar_t ex[10];
     scalar_t ey[10];
     geom_t sub_fff[6];
@@ -202,8 +202,8 @@ __global__ void macro_tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t ne
         for (int v = 0; v < 10; ++v) {
             ey[v] = 0;
         }
+
         // collect coeffs
-        // #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
             ex[v] = x[elems[v * nelements + e]];
         }
@@ -217,20 +217,16 @@ __global__ void macro_tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t ne
         const geom_t *const offf = &sfff[threadIdx.x];
 
 #else
-        // const ptrdiff_t stride = nelements;
-        // const cu_jacobian_t *const offf = &fff[e];
-
-         const ptrdiff_t stride = 1;
+        const ptrdiff_t stride = 1;
         geom_t offf[6];
-        #pragma unroll(6)
-        for(int d = 0; d < 6; d++) {
-            offf[d] = fff[d*nelements + e];
+#pragma unroll(6)
+        for (int d = 0; d < 6; d++) {
+            offf[d] = fff[d * nelements + e];
         }
 #endif
 
-        // apply operator
-
-        {  // Corner tests
+        // Apply operator
+        {  // Corner tets
             sub_fff_0(offf, stride, sub_fff);
 
             // [0, 4, 6, 7],
@@ -342,7 +338,7 @@ extern int macro_tet4_cuda_incore_laplacian_apply(cuda_incore_laplacian_t *ctx,
                                                   real_t *const d_y) {
     ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (ctx->nelements + block_size - 1) / block_size);
     macro_tet4_cuda_incore_laplacian_apply_kernel<<<n_blocks, block_size, 0>>>(
-        ctx->nelements, ctx->d_elems, (cu_jacobian_t*)ctx->d_fff, d_x, d_y);
+        ctx->nelements, ctx->d_elems, (cu_jacobian_t *)ctx->d_fff, d_x, d_y);
     return 0;
 }
 
@@ -375,13 +371,12 @@ extern int macro_tet4_cuda_incore_laplacian_init(cuda_incore_laplacian_t *ctx,
         }
 
         SFEM_CUDA_CHECK(cudaMalloc(&ctx->d_fff, 6 * nelements * sizeof(cu_jacobian_t)));
-        SFEM_CUDA_CHECK(
-            cudaMemcpy(ctx->d_fff, h_fff, 6 * nelements * sizeof(cu_jacobian_t), cudaMemcpyHostToDevice));
+        SFEM_CUDA_CHECK(cudaMemcpy(
+            ctx->d_fff, h_fff, 6 * nelements * sizeof(cu_jacobian_t), cudaMemcpyHostToDevice));
         free(h_fff);
     }
 
-    {
-        // Store elem indices on device
+    {   // Store elem indices on device
         SFEM_CUDA_CHECK(cudaMalloc(&ctx->d_elems, 10 * nelements * sizeof(idx_t)));
 
         for (int d = 0; d < 10; d++) {

@@ -61,8 +61,8 @@ endif
 CFLAGS += -DSFEM_MEM_DIAGNOSTICS
 
 # Folder structure
-VPATH = pizzastack:resampling:mesh:operators:drivers:drivers/cuda:base:algebra:matrix:operators/tet10:operators/tet4:operators/macro_tet4:operators/tri3:operators/macro_tri3:operators/trishell3:operators/tri6:operators/beam2:operators/cvfem:graphs:parametrize:operators/phase_field_for_fracture:operators/kernels:operators/navier_stokes:solver:operators/cvfem_tet4
-INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/macro_tet4 -Ioperators/tri3 -Ioperators/macro_tri3 -Ioperators/trishell3 -Ioperators/tri6 -Ioperators/beam2 -Ioperators/cvfem -Igraphs -Iparametrize -Ioperators/phase_field_for_fracture  -Ioperators/kernels -Ioperators/navier_stokes -Isolver -Ioperators/cvfem_tet4
+VPATH = pizzastack:resampling:mesh:operators:drivers:drivers/cuda:base:algebra:matrix:operators/tet10:operators/tet4:operators/macro_tet4:operators/tri3:operators/macro_tri3:operators/trishell3:operators/tri6:operators/beam2:operators/cvfem:graphs:parametrize:operators/phase_field_for_fracture:operators/kernels:operators/navier_stokes:solver:operators/cvfem_tet4:operators/cvfem_tri3:examples
+INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/macro_tet4 -Ioperators/tri3 -Ioperators/macro_tri3 -Ioperators/trishell3 -Ioperators/tri6 -Ioperators/beam2 -Ioperators/cvfem -Igraphs -Iparametrize -Ioperators/phase_field_for_fracture  -Ioperators/kernels -Ioperators/navier_stokes -Isolver -Ioperators/cvfem_tet4 -Ioperators/cvfem_tri3
 
 
 CFLAGS += -pedantic -Wextra
@@ -111,7 +111,7 @@ GOALS += crs_apply_dirichlet
 GOALS += soa_to_aos aos_to_soa roi unique
 
 # CVFEM
-GOALS += cvfem_assemble
+GOALS += cvfem_assemble run_convection_diffusion
 
 # Graph analysis
 GOALS += assemble_adjaciency_matrix
@@ -220,7 +220,7 @@ OBJS += tet10_grad.o \
 OBJS += sfem_resample_gap.o sfem_resample_field.o
 
 # CVFEM
-OBJS += cvfem_tri3_diffusion.o cvfem_tet4_laplacian.o
+OBJS += cvfem_tri3_diffusion.o cvfem_tet4_laplacian.o cvfem_tri3_convection.o
 
 # Graphs
 ifeq ($(metis), 1)
@@ -321,6 +321,9 @@ assemble_adjaciency_matrix: assemble_adjaciency_matrix.o libsfem.a
 
 # CVFEM
 cvfem_assemble : cvfem_assemble.o libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+run_convection_diffusion : run_convection_diffusion.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 partition : partition.o libsfem.a
