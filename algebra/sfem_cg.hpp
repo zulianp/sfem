@@ -8,9 +8,14 @@ namespace sfem {
     template <typename T>
     class ConjugateGradient {
     public:
+    	// Operator
         std::function<void(const T* const, T* const)> apply;
+        
+        // Mem management
         std::function<T*(const std::size_t)> allocate;
         std::function<void(const T*)> destroy;
+        
+        // blas
         std::function<T(const T* const, const T* const)> dot;
         std::function<void(const T, const T* const, const T, T* const)> axpby;
         T tol{1e-10};
@@ -43,14 +48,13 @@ namespace sfem {
                 axpby(-alpha, Ap, 1, r);
 
                 T rtr_new = dot(r, r);
-                T beta = rtr_new / rtr;
-                rtr = rtr_new;
-
-                if (rtr < tol) {
+                if (rtr_new < tol) {
                     info = 0;
                     break;
                 }
 
+                T beta = rtr_new / rtr;
+                rtr = rtr_new;
                 axpby(1, r, beta, p);
             }
 
