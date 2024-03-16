@@ -19,6 +19,8 @@ namespace sfem {
         // blas
         std::function<T(const T* const, const T* const)> dot;
         std::function<void(const T, const T* const, const T, T* const)> axpby;
+
+        // Solver parameters
         T tol{1e-10};
 
         int apply(const size_t n, const T* const b, T* const x) {
