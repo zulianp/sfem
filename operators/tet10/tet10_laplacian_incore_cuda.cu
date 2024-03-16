@@ -66,8 +66,8 @@ static inline __device__ __host__ void fff_micro_kernel(const geom_t px0,
     const geom_t x17 = x16 * x6 * x9;
     const geom_t x18 = x1 * x16;
     const geom_t x19 = x13 * x18;
-    const geom_t x20 = -1.0 / 6.0 * x12 + (1.0 / 6.0) * x15 + (1.0 / 6.0) * x17 - 1.0 / 6.0 * x19 +
-                       (1.0 / 6.0) * x4 - 1.0 / 6.0 * x8;
+    const geom_t x20 = (geom_t)(-1.0 / 6.0) * x12 + (geom_t)(1.0 / 6.0) * x15 + (geom_t)(1.0 / 6.0) * x17 - (geom_t)(1.0 / 6.0) * x19 +
+                       (geom_t)(1.0 / 6.0) * x4 - (geom_t)(1.0 / 6.0) * x8;
     const geom_t x21 = x14 - x18;
     const geom_t x22 = 1. / POW2(-x12 + x15 + x17 - x19 + x4 - x8);
     const geom_t x23 = -x11 + x16 * x6;
