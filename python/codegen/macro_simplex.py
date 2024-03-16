@@ -102,6 +102,11 @@ def subJ_generic(micro_ref, FFFs):
 
 
 	FFAms = Aminv * FFFs * Aminv.T * detAm
+
+	print("------------------")
+	print(Aminv)
+	print(detAm)
+	print(FFAms)
 	return FFAms
 
 def subJ(micro_ref):

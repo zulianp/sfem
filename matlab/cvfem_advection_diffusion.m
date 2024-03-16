@@ -305,7 +305,7 @@ Ae(:, 4, 2) = sum(bgrad .* gtest4, 1);
 Ae(:, 4, 3) = sum(cgrad .* gtest4, 1);
 Ae(:, 4, 4) = sum(dgrad .* gtest4, 1);
 
-Ae = Ae * diffusivity;
+Ae = -Ae * diffusivity;
 return
 
 function Ae = e_assemble_advection(p)
