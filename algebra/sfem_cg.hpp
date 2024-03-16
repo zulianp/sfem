@@ -2,6 +2,7 @@
 #define SFEM_CG_HPP
 
 #include <function>
+#include <cmath>
 
 // https://en.wikipedia.org/wiki/Conjugate_gradient_method
 namespace sfem {
@@ -28,32 +29,32 @@ namespace sfem {
 
             T rtr = dot(r, r);
 
-            if (rtr < tol) {
+            if (sqrt(rtr) < tol) {
                 destroy(r);
                 return 0;
             }
 
             T* p = allocate(n);
-            T* ptAp = allocate(n);
+            T* Ap = allocate(n);
 
             int info = -1;
             for (int k = 0; k < max_it; k++) {
-                apply(p, ptAp);
+                apply(p, Ap);
 
-                T ptAp = dot(p, Ap);
-                T alpha = rtr / ptAp;
+                const T ptAp = dot(p, Ap);
+                const T alpha = rtr / ptAp;
 
                 // Opt use 2 cuda streams?
                 axpby(alpha, p, 1, x);
                 axpby(-alpha, Ap, 1, r);
 
-                T rtr_new = dot(r, r);
-                if (rtr_new < tol) {
+                const T rtr_new = dot(r, r);
+                if (sqrt(rtr_new) < tol) {
                     info = 0;
                     break;
                 }
 
-                T beta = rtr_new / rtr;
+                const T beta = rtr_new / rtr;
                 rtr = rtr_new;
                 axpby(1, r, beta, p);
             }
@@ -61,7 +62,7 @@ namespace sfem {
             // clean-up
             destroy(r);
             destroy(p);
-            destroy(ptAp);
+            destroy(Ap);
             return info;
         }
     };
