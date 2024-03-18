@@ -14,9 +14,13 @@
 #include "dirichlet.h"
 #include "neumann.h"
 
+#include "matrixio_array.h"
+
 #include "laplacian.h"
 #include "read_mesh.h"
 #include "sfem_cg.hpp"
+
+#include <vector>
 
 
 int main(int argc, char *argv[]) {
@@ -38,12 +42,12 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const char *output_folder = argv[2];
+    const char *output_path = argv[2];
 
-    struct stat st = {0};
-    if (stat(output_folder, &st) == -1) {
-        mkdir(output_folder, 0700);
-    }
+    // struct stat st = {0};
+    // if (stat(output_folder, &st) == -1) {
+    //     mkdir(output_folder, 0700);
+    // }
 
     char path[SFEM_MAX_PATH_LENGTH];
     double tick = MPI_Wtime();
@@ -60,8 +64,10 @@ int main(int argc, char *argv[]) {
     }
     char *SFEM_DIRICHLET_NODESET = 0;
     char *SFEM_DIRICHLET_VALUE = 0;
+    char *SFEM_DIRICHLET_COMPONENT = 0;
     SFEM_READ_ENV(SFEM_DIRICHLET_NODESET, );
     SFEM_READ_ENV(SFEM_DIRICHLET_VALUE, );
+    SFEM_READ_ENV(SFEM_DIRICHLET_COMPONENT, );
 
     char *SFEM_NEUMANN_SIDESET = 0;
     char *SFEM_NEUMANN_VALUE = 0;
@@ -75,9 +81,11 @@ int main(int argc, char *argv[]) {
             "----------------------------------------\n"
             "- SFEM_DIRICHLET_NODESET=%s\n"
             "- SFEM_DIRICHLET_VALUE=%s\n"
+            "- SFEM_DIRICHLET_COMPONENT=%s\n"
             "----------------------------------------\n",
             SFEM_DIRICHLET_NODESET,
-            SFEM_DIRICHLET_VALUE);
+            SFEM_DIRICHLET_VALUE,
+            SFEM_DIRICHLET_COMPONENT);
     }
 
     int n_dirichlet_conditions;
@@ -85,15 +93,17 @@ int main(int argc, char *argv[]) {
     read_dirichlet_conditions(&mesh,
                               SFEM_DIRICHLET_NODESET,
                               SFEM_DIRICHLET_VALUE,
-                              "0",
+                              SFEM_DIRICHLET_COMPONENT,
                               &dirichlet_conditions,
                               &n_dirichlet_conditions);
 
     const int sdim = elem_manifold_dim((ElemType)mesh.element_type);
 
     sfem::ConjugateGradient<real_t> cg;
+    cg.max_it = 1000;
     cg.default_init();
     cg.apply_op = [&](const real_t *const x, real_t *const y) {
+        memset(y, 0, mesh.nnodes * sizeof(real_t));
         laplacian_apply((ElemType)mesh.element_type,
                         mesh.nelements,
                         mesh.nnodes,
@@ -104,6 +114,15 @@ int main(int argc, char *argv[]) {
 
         copy_at_dirichlet_nodes_vec(n_dirichlet_conditions, dirichlet_conditions, &mesh, 1, x, y);
     };
+
+    std::vector<real_t> x(mesh.nnodes, 0), b(mesh.nnodes, 0);
+
+    apply_dirichlet_condition_vec(n_dirichlet_conditions, dirichlet_conditions, &mesh, 1, x.data());
+    apply_dirichlet_condition_vec(n_dirichlet_conditions, dirichlet_conditions, &mesh, 1, b.data());
+
+    cg.apply(mesh.nnodes, b.data(), x.data());
+
+    array_write(comm, output_path, SFEM_MPI_REAL_T, x.data(), mesh.nnodes, mesh.nnodes);
 
     ptrdiff_t nelements = mesh.nelements;
     ptrdiff_t nnodes = mesh.nnodes;

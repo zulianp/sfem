@@ -2,6 +2,7 @@
 #define SFEM_CG_HPP
 
 #include <cmath>
+#include <cstring>
 #include <functional>
 #include <cstdlib>
 #include <iostream>
@@ -18,6 +19,8 @@ namespace sfem {
         std::function<T*(const std::size_t)> allocate;
         std::function<void(T*)> destroy;
 
+        std::function<void(const std::size_t, const T* const, T* const)> copy;
+
         // blas
         std::function<T(const std::size_t, const T* const, const T* const)> dot;
         std::function<void(const std::size_t, const T, const T* const, const T, T* const)> axpby;
@@ -30,6 +33,10 @@ namespace sfem {
             allocate = [](const std::size_t n) -> T* { return (T*)calloc(n, sizeof(T)); };
 
             destroy = [](T* a) { free(a); };
+
+            copy = [](const std::size_t n, const T* const src, T* const dest) {
+                std::memcpy(dest, src, n*sizeof(T));
+            };
 
             dot = [](const std::size_t n, const T* const l, const T* const r) -> T {
                 T ret = 0;
@@ -51,15 +58,19 @@ namespace sfem {
         bool good() const {
             assert(allocate);
             assert(destroy);
+            assert(copy);
             assert(dot);
             assert(axpby);
             assert(apply_op);
 
-            return allocate && destroy && dot && axpby && apply_op;
+
+            return allocate && destroy && copy && dot && axpby && apply_op;
         }
 
         void monitor(const int iter, const T residual) {
-            std::cout << iter << ": " << residual << "\n";
+            if(iter == max_it || iter % 100 == 0) {
+                std::cout << iter << ": " << residual << "\n";
+            }
         }
 
         int apply(const size_t n, const T* const b, T* const x) {
@@ -69,10 +80,10 @@ namespace sfem {
 
             T* r = allocate(n);
 
-            apply(x, r);
-            axpby(1, b, -1, r);
+            apply_op(x, r);
+            axpby(n, 1, b, -1, r);
 
-            T rtr = dot(r, r);
+            T rtr = dot(n, r, r);
 
             if (sqrt(rtr) < tol) {
                 destroy(r);
@@ -82,9 +93,11 @@ namespace sfem {
             T* p = allocate(n);
             T* Ap = allocate(n);
 
+            copy(n, r, p);
+
             int info = -1;
             for (int k = 0; k < max_it; k++) {
-                apply(p, Ap);
+                apply_op(p, Ap);
 
                 const T ptAp = dot(n, p, Ap);
                 const T alpha = rtr / ptAp;
@@ -93,10 +106,10 @@ namespace sfem {
                 axpby(n, alpha, p, 1, x);
                 axpby(n, -alpha, Ap, 1, r);
 
-                const T rtr_new = dot(r, r);
+                const T rtr_new = dot(n, r, r);
 
                 monitor(k, sqrt(rtr_new));
-                
+
                 if (sqrt(rtr_new) < tol) {
                     info = 0;
                     break;

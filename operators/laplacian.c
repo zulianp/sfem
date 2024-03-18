@@ -111,6 +111,7 @@ void laplacian_apply(int element_type,
         }
 
         default: {
+            assert(0);
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
     }
