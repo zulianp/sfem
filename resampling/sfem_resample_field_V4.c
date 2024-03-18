@@ -226,7 +226,7 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_V4(
 // tet4_resample_field_local_v4 //////////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-int tet4_resample_field_local_V8_aligned(
+int tet4_resample_field_local_V4_aligned(
         // Mesh
         const ptrdiff_t start_nelement,
         const ptrdiff_t end_nelement,

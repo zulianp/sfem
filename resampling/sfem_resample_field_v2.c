@@ -192,15 +192,6 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_V(
     *out5 = data[i5];
     *out6 = data[i6];
     *out7 = data[i7];
-
-    // *out0 = 1.0;
-    // *out1 = 2.0;
-    // *out2 = 3.0;
-    // *out3 = 4.0;
-    // *out4 = 5.0;
-    // *out5 = 6.0;
-    // *out6 = 7.0;
-    // *out7 = 8.0;
 }
 
 //////////////////////////////////////////////////////////
