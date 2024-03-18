@@ -5,6 +5,11 @@
 
 #include <assert.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 enum ElemType {
     NIL = 0,
     NODE1 = 1,
@@ -186,5 +191,9 @@ SFEM_INLINE static int elem_manifold_dim(const enum ElemType type) {
         }
     }
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  // SFEM_DEFS_H

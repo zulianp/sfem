@@ -23,23 +23,23 @@ typedef struct {
 } boundary_condition_t;
 
 void read_boundary_conditions(MPI_Comm comm,
-                              char *sets,
-                              char *values,
-                              char *components,
+                              const char *sets,
+                              const char *values,
+                              const char *components,
                               boundary_condition_t **bcs,
                               int *nbc);
 
 void read_dirichlet_conditions(const mesh_t *const mesh,
-                               char *sets,
-                               char *values,
-                               char *components,
+                               const char *sets,
+                               const char *values,
+                               const char *components,
                                boundary_condition_t **bcs,
                                int *nbc);
 
 void read_neumann_conditions(const mesh_t *const mesh,
-                             char *sets,
-                             char *values,
-                             char *components,
+                             const char *sets,
+                             const char *values,
+                             const char *components,
                              boundary_condition_t **bcs,
                              int *nbc);
 

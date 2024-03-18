@@ -14,9 +14,9 @@
 #include <sys/stat.h>
 
 void read_boundary_conditions(MPI_Comm comm,
-                              char *sets,
-                              char *values,
-                              char *components,
+                              const char *sets,
+                              const char *values,
+                              const char *components,
                               boundary_condition_t **bcs,
                               int *nbc) {
     if (!sets) {
@@ -28,7 +28,7 @@ void read_boundary_conditions(MPI_Comm comm,
     int rank;
     MPI_Comm_rank(comm, &rank);
 
-    const char *splitter = ",";
+    const const char *splitter = ",";
 
     int count = 1;
     {
@@ -45,7 +45,7 @@ void read_boundary_conditions(MPI_Comm comm,
 
     // NODESET/SIDESET
     {
-        char *pch = strtok(sets, splitter);
+        const char *pch = strtok(sets, splitter);
         int i = 0;
         while (pch != NULL) {
             printf("Reading file (%d/%d): %s\n", i + 1, count, pch);
@@ -68,10 +68,10 @@ void read_boundary_conditions(MPI_Comm comm,
     }
 
     if (values) {
-        static const char *path_key = "path:";
+        static const const char *path_key = "path:";
         const int path_key_len = strlen(path_key);
 
-        char *pch = strtok(values, splitter);
+        const char *pch = strtok(values, splitter);
         int i = 0;
         while (pch != NULL) {
             printf("Parsing  values (%d/%d): %s\n", i + 1, count, pch);
@@ -109,7 +109,7 @@ void read_boundary_conditions(MPI_Comm comm,
     }
 
     if (components) {
-        char *pch = strtok(components, splitter);
+        const char *pch = strtok(components, splitter);
         int i = 0;
         while (pch != NULL) {
             printf("Parsing comps (%d/%d): %s\n", i + 1, count, pch);
@@ -125,18 +125,18 @@ void read_boundary_conditions(MPI_Comm comm,
 }
 
 void read_dirichlet_conditions(const mesh_t *const mesh,
-                               char *sets,
-                               char *values,
-                               char *components,
+                               const char *sets,
+                               const char *values,
+                               const char *components,
                                boundary_condition_t **bcs,
                                int *nbc) {
     read_boundary_conditions(mesh->comm, sets, values, components, bcs, nbc);
 }
 
 void read_neumann_conditions(const mesh_t *const mesh,
-                             char *sets,
-                             char *values,
-                             char *components,
+                             const char *sets,
+                             const char *values,
+                             const char *components,
                              boundary_condition_t **bcs,
                              int *nbc) {
     read_boundary_conditions(mesh->comm, sets, values, components, bcs, nbc);
