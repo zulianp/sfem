@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
         elem_type = macro_type_variant(elem_type);
     }
 
-    const int sdim = elem_manifold_dim(elem_type);
+    // const int sdim = elem_manifold_dim(elem_type);
 
     macro_tet4_laplacian_t mtet4;
     if (elem_type == MACRO_TET4) {
@@ -116,7 +116,6 @@ int main(int argc, char *argv[]) {
 
         if (elem_type == MACRO_TET4) {
             macro_tet4_laplacian_apply_opt(&mtet4, x, y);
-
         } else {
             laplacian_apply(
                 elem_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, x, y);
@@ -140,6 +139,10 @@ int main(int argc, char *argv[]) {
     mesh_destroy(&mesh);
     destroy_conditions(n_dirichlet_conditions, dirichlet_conditions);
     // destroy_conditions(n_neumann_conditions, neumann_conditions);
+
+    if (elem_type == MACRO_TET4) {
+        macro_tet4_laplacian_destroy(&mtet4);
+    }
 
     double tock = MPI_Wtime();
     if (!rank) {
