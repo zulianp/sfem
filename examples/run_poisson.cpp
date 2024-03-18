@@ -44,12 +44,6 @@ int main(int argc, char *argv[]) {
 
     const char *output_path = argv[2];
 
-    // struct stat st = {0};
-    // if (stat(output_folder, &st) == -1) {
-    //     mkdir(output_folder, 0700);
-    // }
-
-    char path[SFEM_MAX_PATH_LENGTH];
     double tick = MPI_Wtime();
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -62,6 +56,7 @@ int main(int argc, char *argv[]) {
     if (mesh_read(comm, folder, &mesh)) {
         return EXIT_FAILURE;
     }
+    
     char *SFEM_DIRICHLET_NODESET = 0;
     char *SFEM_DIRICHLET_VALUE = 0;
     char *SFEM_DIRICHLET_COMPONENT = 0;
