@@ -9,7 +9,6 @@
 #include "sfem_base.h"
 #include "sfem_defs.h"
 
-
 #include "boundary_condition.h"
 #include "dirichlet.h"
 #include "neumann.h"
@@ -17,11 +16,13 @@
 #include "matrixio_array.h"
 
 #include "laplacian.h"
+
+#include "macro_tet4_laplacian.h"
+
 #include "read_mesh.h"
 #include "sfem_cg.hpp"
 
 #include <vector>
-
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -56,7 +57,7 @@ int main(int argc, char *argv[]) {
     if (mesh_read(comm, folder, &mesh)) {
         return EXIT_FAILURE;
     }
-    
+
     char *SFEM_DIRICHLET_NODESET = 0;
     char *SFEM_DIRICHLET_VALUE = 0;
     char *SFEM_DIRICHLET_COMPONENT = 0;
@@ -92,20 +93,34 @@ int main(int argc, char *argv[]) {
                               &dirichlet_conditions,
                               &n_dirichlet_conditions);
 
-    const int sdim = elem_manifold_dim((ElemType)mesh.element_type);
+    enum ElemType elem_type = (ElemType)mesh.element_type;
+
+    int SFEM_USE_MACRO = 0;
+    SFEM_READ_ENV(SFEM_USE_MACRO, atoi);
+    if (SFEM_USE_MACRO) {
+        elem_type = macro_type_variant(elem_type);
+    }
+
+    const int sdim = elem_manifold_dim(elem_type);
+
+    macro_tet4_laplacian_t mtet4;
+    if (elem_type == MACRO_TET4) {
+        macro_tet4_laplacian_init(&mtet4, mesh.nelements, mesh.elements, mesh.points);
+    }
 
     sfem::ConjugateGradient<real_t> cg;
     cg.max_it = 9000;
     cg.default_init();
     cg.apply_op = [&](const real_t *const x, real_t *const y) {
         memset(y, 0, mesh.nnodes * sizeof(real_t));
-        laplacian_apply((ElemType)mesh.element_type,
-                        mesh.nelements,
-                        mesh.nnodes,
-                        mesh.elements,
-                        mesh.points,
-                        x,
-                        y);
+
+        if (elem_type == MACRO_TET4) {
+            macro_tet4_laplacian_apply_opt(&mtet4, x, y);
+
+        } else {
+            laplacian_apply(
+                elem_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, x, y);
+        }
 
         copy_at_dirichlet_nodes_vec(n_dirichlet_conditions, dirichlet_conditions, &mesh, 1, x, y);
     };

@@ -29,6 +29,6 @@ export SFEM_DIRICHLET_NODESET="$sleft,$sright"
 export SFEM_DIRICHLET_VALUE="0,0.5"
 export SFEM_DIRICHLET_COMPONENT="0,0"
 
-run_poisson $SFEM_MESH_DIR out.raw
+SFEM_USE_MACRO=1 run_poisson $SFEM_MESH_DIR out.raw
 
 raw_to_db.py $SFEM_MESH_DIR x.vtk -p "out.raw"

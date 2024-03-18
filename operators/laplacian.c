@@ -4,11 +4,11 @@
 #include "tri3_laplacian.h"
 #include "tri6_laplacian.h"
 
+#include "macro_tet4_laplacian.h"
+
 #include "sfem_defs.h"
 
 #include <mpi.h>
-
-
 
 void laplacian_assemble_value(int element_type,
                               const ptrdiff_t nelements,
@@ -71,7 +71,7 @@ void laplacian_assemble_hessian(int element_type,
             tri3_laplacian_assemble_hessian(nelements, nnodes, elems, xyz, rowptr, colidx, values);
             break;
         }
-    case TRI6: {
+        case TRI6: {
             tri6_laplacian_assemble_hessian(nelements, nnodes, elems, xyz, rowptr, colidx, values);
             break;
         }
@@ -82,7 +82,7 @@ void laplacian_assemble_hessian(int element_type,
         }
 
         case TET10: {
-        	tet10_laplacian_assemble_hessian(nelements, nnodes, elems, xyz, rowptr, colidx, values);
+            tet10_laplacian_assemble_hessian(nelements, nnodes, elems, xyz, rowptr, colidx, values);
             break;
         }
 
@@ -107,6 +107,10 @@ void laplacian_apply(int element_type,
 
         case TET10: {
             tet10_laplacian_apply(nelements, nnodes, elems, xyz, u, values);
+            break;
+        }
+        case MACRO_TET4: {
+            macro_tet4_laplacian_apply(nelements, nnodes, elems, xyz, u, values);
             break;
         }
 
