@@ -40,6 +40,8 @@ namespace sfem {
 
             dot = [](const std::size_t n, const T* const l, const T* const r) -> T {
                 T ret = 0;
+
+                #pragma omp parallel for reduction(+ : ret)
                 for (std::size_t i = 0; i < n; i++) {
                     ret += l[i] * r[i];
                 }
@@ -49,6 +51,7 @@ namespace sfem {
 
             axpby =
                 [](const std::size_t n, const T alpha, const T* const x, const T beta, T* const y) {
+                    #pragma omp parallel for
                     for (std::size_t i = 0; i < n; i++) {
                         y[i] = alpha * x[i] + beta * y[i];
                     }

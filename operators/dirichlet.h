@@ -4,6 +4,10 @@
 #include <stddef.h>
 #include "sfem_base.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void constraint_nodes_to_value(
     const ptrdiff_t n_dirichlet_nodes,
     const idx_t * dirichlet_nodes,
@@ -76,4 +80,7 @@ void crs_constraint_nodes_to_identity_vec(
     real_t *values
     );
 
+#ifdef __cplusplus
+}
+#endif
 #endif //SFEM_DIRICHLET_H
