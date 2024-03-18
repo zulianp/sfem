@@ -100,7 +100,7 @@ int main(int argc, char *argv[]) {
     const int sdim = elem_manifold_dim((ElemType)mesh.element_type);
 
     sfem::ConjugateGradient<real_t> cg;
-    cg.max_it = 1000;
+    cg.max_it = 9000;
     cg.default_init();
     cg.apply_op = [&](const real_t *const x, real_t *const y) {
         memset(y, 0, mesh.nnodes * sizeof(real_t));

@@ -68,7 +68,7 @@ namespace sfem {
         }
 
         void monitor(const int iter, const T residual) {
-            if(iter == max_it || iter % 100 == 0) {
+            if(iter == max_it || iter % 100 == 0 || residual < tol) {
                 std::cout << iter << ": " << residual << "\n";
             }
         }

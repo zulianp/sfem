@@ -20,7 +20,7 @@ export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true
 
 SFEM_MESH_DIR=mesh
-create_cylinder.sh 5
+# create_cylinder.sh 5
 
 sleft=$SFEM_MESH_DIR/sidesets_aos/sinlet.raw
 sright=$SFEM_MESH_DIR/sidesets_aos/soutlet.raw
