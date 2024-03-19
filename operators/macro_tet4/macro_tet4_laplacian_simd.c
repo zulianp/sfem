@@ -221,7 +221,6 @@ void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
         for (ptrdiff_t i = 0; i < nelements; i += VEC_SIZE) {
             const int nvec = MIN(nelements - (i + VEC_SIZE), VEC_SIZE);
 
-            idx_t ev[10];
             vec_t x[4], y[4], z[4];
             vec_t fff[6];
             vec_t sub_fff[6];
@@ -243,12 +242,6 @@ void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
                     element_u[d][vi] = u[vidx];
                 }
             }
-
-            // Element indices
-            const idx_t i0 = ev[0];
-            const idx_t i1 = ev[1];
-            const idx_t i2 = ev[2];
-            const idx_t i3 = ev[3];
 
             fff_micro_kernel(
                 // X
@@ -383,7 +376,7 @@ void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
 // Optimized
 
 // On ARM is better with this off
-#define PACKED
+// #define PACKED
 
 void macro_tet4_laplacian_init(macro_tet4_laplacian_t *const ctx,
                                const ptrdiff_t nelements,
@@ -467,6 +460,12 @@ void macro_tet4_laplacian_apply_opt(const macro_tet4_laplacian_t *const ctx,
             vec_t element_u[10];
             vec_t element_vector[10] = {0};
 
+            // for(int d = 0; d < 10; d++) {
+            //     for(int vi = 0; vi < VEC_SIZE; ++vi) {
+            //         element_vector[d][vi] = 0;
+            //     }
+            // }
+
             for (int vi = 0; vi < nvec; ++vi) {
                 const ptrdiff_t offset = i + vi;
                 for (int d = 0; d < 10; ++d) {
@@ -489,7 +488,6 @@ void macro_tet4_laplacian_apply_opt(const macro_tet4_laplacian_t *const ctx,
             for (int d = 0; d < 6; d++) {
                 const geom_t *const fffi = &ctx->fff[i * 6];
 
-                
                 for (int vi = 0; vi < nvec; ++vi) {
                     fff[d][vi] = fffi[vi * 6 + d];
                 }

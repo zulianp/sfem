@@ -181,8 +181,9 @@ OBJS += tri3_stokes_mini.o \
 OBJS += macro_tri3_laplacian.o
 
 # Macro Tet4
-# OBJS += macro_tet4_laplacian.o
-OBJS += macro_tet4_laplacian_simd.o
+OBJS += macro_tet4_laplacian.o
+# This is bugged
+# OBJS += macro_tet4_laplacian_simd.o
 
 # TriShell3
 OBJS += trishell3_mass.o

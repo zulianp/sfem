@@ -108,6 +108,7 @@ int main(int argc, char *argv[]) {
 
     sfem::ConjugateGradient<real_t> cg;
     cg.max_it = 9000;
+    cg.tol = 1e-16;
     cg.default_init();
     cg.apply_op = [&](const real_t *const x, real_t *const y) {
         memset(y, 0, mesh.nnodes * sizeof(real_t));
