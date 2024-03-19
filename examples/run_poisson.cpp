@@ -101,8 +101,6 @@ int main(int argc, char *argv[]) {
         elem_type = macro_type_variant(elem_type);
     }
 
-    // const int sdim = elem_manifold_dim(elem_type);
-
     macro_tet4_laplacian_t mtet4;
     if (elem_type == MACRO_TET4) {
         macro_tet4_laplacian_init(&mtet4, mesh.nelements, mesh.elements, mesh.points);
