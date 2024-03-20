@@ -1,5 +1,5 @@
-#ifndef SFEM_CG_HPP
-#define SFEM_CG_HPP
+#ifndef SFEM_BCGS_HPP
+#define SFEM_BCGS_HPP
 
 #include <cmath>
 #include <cstdlib>
@@ -7,14 +7,15 @@
 #include <functional>
 #include <iostream>
 
-// https://en.wikipedia.org/wiki/Conjugate_gradient_method
+// https://en.wikipedia.org/wiki/Biconjugate_gradient_stabilized_method
 namespace sfem {
     template <typename T>
-    class ConjugateGradient {
+    class BiCGStab {
     public:
         // Operator
         std::function<void(const T* const, T* const)> apply_op;
         std::function<void(const T* const, T* const)> left_preconditioner_op;
+        std::function<void(const T* const, T* const)> apply_right_preconditioner;
 
         // Mem management
         std::function<T*(const std::size_t)> allocate;
@@ -25,6 +26,14 @@ namespace sfem {
         // blas
         std::function<T(const std::size_t, const T* const, const T* const)> dot;
         std::function<void(const std::size_t, const T, const T* const, const T, T* const)> axpby;
+        std::function<
+            void(const std::size_t, 
+                const T, 
+                const T* const, 
+                const T, 
+                const T* const, 
+                T* const)>
+            zaxpby;
 
         // Solver parameters
         T tol{1e-10};
@@ -57,6 +66,18 @@ namespace sfem {
                         y[i] = alpha * x[i] + beta * y[i];
                     }
                 };
+
+            zaxpby = [](const std::size_t n,
+                        const T alpha,
+                        const T* const x,
+                        const T beta,
+                        const T* const y,
+                        T* const z) {
+#pragma omp parallel for
+                for (std::size_t i = 0; i < n; i++) {
+                    z[i] = alpha * x[i] + beta * y[i];
+                }
+            };
         }
 
         bool good() const {
@@ -65,9 +86,10 @@ namespace sfem {
             assert(copy);
             assert(dot);
             assert(axpby);
+            assert(zaxpby);
             assert(apply_op);
 
-            return allocate && destroy && copy && dot && axpby && apply_op;
+            return allocate && destroy && copy && dot && axpby && zaxpby && apply_op;
         }
 
         void monitor(const int iter, const T residual) {
@@ -77,11 +99,11 @@ namespace sfem {
         }
 
         int apply(const size_t n, const T* const b, T* const x) {
-            if (left_preconditioner_op) {
-                return aux_apply_precond(n, b, x);
-            } else {
+            // if (left_preconditioner_op) {
+                // return aux_apply_precond(n, b, x);
+            // } else {
                 return aux_apply_basic(n, b, x);
-            }
+            // }
         }
 
     private:
@@ -90,125 +112,88 @@ namespace sfem {
                 return -1;
             }
 
-            T* r = allocate(n);
+            T* r0 = allocate(n);
 
-            apply_op(x, r);
-            axpby(n, 1, b, -1, r);
+            // Residual
+            apply_op(x, r0);
+            axpby(n, 1, b, -1, r0);
 
-            T rtr = dot(n, r, r);
+            T rho = dot(n, r0, r0);
 
-            if (sqrt(rtr) < tol) {
-                destroy(r);
+            if (sqrt(rho) < tol) {
+                destroy(r0);
                 return 0;
             }
 
+            T* r = allocate(n);
             T* p = allocate(n);
-            T* Ap = allocate(n);
+            T* v = allocate(n);
+            T* h = allocate(n);
+            T* s = allocate(n);
+            T* t = allocate(n);
 
-            copy(n, r, p);
+            copy(n, r0, r);
+            copy(n, r0, p);
 
             int info = -1;
             for (int k = 0; k < max_it; k++) {
-                apply_op(p, Ap);
+                apply_op(p, v);
 
-                const T ptAp = dot(n, p, Ap);
-                const T alpha = rtr / ptAp;
+                const T ptv = dot(n, r0, v);
+                const T alpha = rho / ptv;
 
-                axpby(n, alpha, p, 1, x);
-                axpby(n, -alpha, Ap, 1, r);
+                zaxpby(n, 1, x, alpha, p, h);
+                zaxpby(n, 1, r, -alpha, v, s);
 
-                const T rtr_new = dot(n, r, r);
+                const T sts = dot(n, s, s);
 
-                monitor(k, sqrt(rtr_new));
-
-                if (sqrt(rtr_new) < tol) {
+                if (sqrt(sts) < tol) {
+                    monitor(k, sqrt(sts));
+                    copy(n, h, x);
                     info = 0;
                     break;
                 }
 
-                const T beta = rtr_new / rtr;
-                rtr = rtr_new;
+                apply_op(s, t);
+
+                const T tts = dot(n, t, s);
+                const T ttt = dot(n, t, t);
+                const T omega = tts / ttt;
+
+                zaxpby(n, 1, h, omega, s, x);
+                zaxpby(n, 1, s, -omega, t, r);
+
+                const T rtr = dot(n, r, r);
+
+                monitor(k, sqrt(rtr));
+                if (sqrt(rtr) < tol) {
+                    info = 0;
+                    break;
+                }
+
+                const T rho_new = dot(n, r0, r);
+                const T beta  = (rho_new/rho) * (alpha/omega);
+                rho = rho_new;
+
                 axpby(n, 1, r, beta, p);
+                axpby(n, -omega*beta, v, 1, p);
             }
 
             // clean-up
+            destroy(r0);
             destroy(r);
             destroy(p);
-            destroy(Ap);
+            destroy(v);
+            destroy(h);
+            destroy(s);
+            destroy(t);
             return info;
         }
 
         int aux_apply_precond(const size_t n, const T* const b, T* const x) {
-            if (!good()) {
-                return -1;
-            }
-
-            T* r = allocate(n);
-
-            apply_op(x, r);
-            axpby(n, 1, b, -1, r);
-
-            T rtr = dot(n, r, r);
-
-            if (sqrt(rtr) < tol) {
-                destroy(r);
-                return 0;
-            }
-
-            T* z = allocate(n);
-            T* Mz = allocate(n);
-            T* p = allocate(n);
-            T* Ap = allocate(n);
-
-            left_preconditioner_op(r, z);
-            copy(n, z, p);
-            apply_op(p, Ap);
-
-            T rtz = dot(n, r, z);
-            {
-                const T ptAp = dot(n, p, Ap);
-                const T alpha = rtr / ptAp;
-
-                axpby(n, alpha, p, 1, x);
-                axpby(n, -alpha, Ap, 1, r);
-            }
-
-            int info = -1;
-            for (int k = 0; k < max_it; k++) {
-                left_preconditioner_op(r, z);
-
-                const T rtz_new = dot(n, r, z);
-                const T beta = rtz_new / rtz;
-                rtz = rtz_new;
-
-                axpby(n, 1, z, beta, p);
-
-                apply_op(p, Ap);
-
-                const T ptAp = dot(n, p, Ap);
-                const T alpha = rtz / ptAp;
-
-                axpby(n, alpha, p, 1, x);
-                axpby(n, -alpha, Ap, 1, r);
-
-                monitor(k, sqrt(rtz));
-
-                if (sqrt(rtz) < tol) {
-                    info = 0;
-                    break;
-                }
-            }
-
-            // clean-up
-            destroy(r);
-            destroy(p);
-            destroy(Ap);
-
-            destroy(z);
-            destroy(Mz);
-            return info;
+           
         }
     };
 }  // namespace sfem
 
-#endif  // SFEM_CG_HPP
+#endif  // SFEM_BCGS_HPP

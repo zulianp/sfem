@@ -21,6 +21,7 @@
 #include "macro_tet4_laplacian.h"
 
 #include "read_mesh.h"
+#include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 
 #include <vector>
@@ -105,23 +106,26 @@ int main(int argc, char *argv[]) {
         elem_type = macro_type_variant(elem_type);
     }
 
-    sfem::ConjugateGradient<real_t> cg;
-    cg.max_it = 9000;
-    cg.tol = 1e-16;
-    cg.default_init();
+    using Solver_t = sfem::ConjugateGradient<real_t>;
+    // using Solver_t = sfem::BiCGStab<real_t>;
+
+    Solver_t solver;
+
+    solver.max_it = 9000;
+    solver.tol = 1e-16;
+    solver.default_init();
 
     std::vector<real_t> diag;
 
     macro_tet4_laplacian_t mtet4;
     if (elem_type == MACRO_TET4) {
         macro_tet4_laplacian_init(&mtet4, mesh.nelements, mesh.elements, mesh.points);
-
         if (SFEM_USE_PRECONDITIONER) {
             diag.resize(mesh.nnodes, 0);
 
             macro_tet4_laplacian_diag(&mtet4, diag.data());
 
-            cg.apply_preconditioner = [&](const real_t *const x, real_t *const y) {
+            solver.left_preconditioner_op = [&](const real_t *const x, real_t *const y) {
 
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
@@ -134,7 +138,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    cg.apply_op = [&](const real_t *const x, real_t *const y) {
+    solver.apply_op = [&](const real_t *const x, real_t *const y) {
         memset(y, 0, mesh.nnodes * sizeof(real_t));
 
         if (elem_type == MACRO_TET4) {
@@ -152,7 +156,7 @@ int main(int argc, char *argv[]) {
     apply_dirichlet_condition_vec(n_dirichlet_conditions, dirichlet_conditions, &mesh, 1, x.data());
     apply_dirichlet_condition_vec(n_dirichlet_conditions, dirichlet_conditions, &mesh, 1, b.data());
 
-    cg.apply(mesh.nnodes, b.data(), x.data());
+    solver.apply(mesh.nnodes, b.data(), x.data());
 
     array_write(comm, output_path, SFEM_MPI_REAL_T, x.data(), mesh.nnodes, mesh.nnodes);
 
