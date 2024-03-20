@@ -26,6 +26,9 @@ void macro_tet4_laplacian_apply_opt(const macro_tet4_laplacian_t *const ctx,
                                     const real_t *const SFEM_RESTRICT u,
                                     real_t *const SFEM_RESTRICT values);
 
+void macro_tet4_laplacian_diag(const macro_tet4_laplacian_t *const ctx,
+                               real_t *const SFEM_RESTRICT diag);
+
 void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
                                 const ptrdiff_t nnodes,
                                 idx_t **const SFEM_RESTRICT elems,

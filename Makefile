@@ -327,10 +327,10 @@ cvfem_assemble : cvfem_assemble.o libsfem.a
 run_convection_diffusion : run_convection_diffusion.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
-run_poisson : run_poisson.o libsfem.a
+run_poisson : run_poisson.o libsfem.a 
 	$(MPICXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
-run_poisson.o : run_poisson.cpp
+run_poisson.o : run_poisson.cpp sfem_cg.hpp
 	$(MPICXX) examples/run_poisson.cpp -c $(CXXFLAGS) $(INCLUDES) 
 
 partition : partition.o libsfem.a

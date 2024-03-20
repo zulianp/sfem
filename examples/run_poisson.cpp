@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -70,6 +71,9 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_NEUMANN_SIDESET, );
     SFEM_READ_ENV(SFEM_NEUMANN_VALUE, );
 
+    int SFEM_USE_PRECONDITIONER = 0;
+    SFEM_READ_ENV(SFEM_USE_PRECONDITIONER, atoi);
+
     if (rank == 0) {
         printf(
             "----------------------------------------\n"
@@ -101,15 +105,35 @@ int main(int argc, char *argv[]) {
         elem_type = macro_type_variant(elem_type);
     }
 
-    macro_tet4_laplacian_t mtet4;
-    if (elem_type == MACRO_TET4) {
-        macro_tet4_laplacian_init(&mtet4, mesh.nelements, mesh.elements, mesh.points);
-    }
-
     sfem::ConjugateGradient<real_t> cg;
     cg.max_it = 9000;
     cg.tol = 1e-16;
     cg.default_init();
+
+    std::vector<real_t> diag;
+
+    macro_tet4_laplacian_t mtet4;
+    if (elem_type == MACRO_TET4) {
+        macro_tet4_laplacian_init(&mtet4, mesh.nelements, mesh.elements, mesh.points);
+
+        if (SFEM_USE_PRECONDITIONER) {
+            diag.resize(mesh.nnodes, 0);
+
+            macro_tet4_laplacian_diag(&mtet4, diag.data());
+
+            cg.apply_preconditioner = [&](const real_t *const x, real_t *const y) {
+
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                    y[i] = x[i] / diag[i];
+                }
+
+                copy_at_dirichlet_nodes_vec(
+                    n_dirichlet_conditions, dirichlet_conditions, &mesh, 1, x, y);
+            };
+        }
+    }
+
     cg.apply_op = [&](const real_t *const x, real_t *const y) {
         memset(y, 0, mesh.nnodes * sizeof(real_t));
 
