@@ -34,19 +34,13 @@ SFEM_MESH_DIR=mesh
 sleft=$SFEM_MESH_DIR/sidesets_aos/sleft.raw
 sright=$SFEM_MESH_DIR/sidesets_aos/sright.raw
 
-set -x
-
-# export SFEM_DIRICHLET_NODESET="$sleft,$sright"
-# export SFEM_DIRICHLET_VALUE="1,0"
-# export SFEM_DIRICHLET_COMPONENT="0,0"
-
 export SFEM_DIRICHLET_NODESET="$sleft"
 export SFEM_DIRICHLET_VALUE="1"
 export SFEM_DIRICHLET_COMPONENT="0"
 
 export SFEM_MAX_TIME=100
 export SFEM_DT=0.0005
-export SFEM_EXPORT_FREQUENCY=0.1
+export SFEM_EXPORT_FREQUENCY=0.5
 export SFEM_DIFFUSIVITY=0.01
 
 # lldb -- 
