@@ -154,15 +154,14 @@ class LaplaceOp:
 
 def main():
 	# fe = Tri6()
-	# fe = Tri3()
-	# q = sp.Matrix(2, 1, [qx, qy])
-	# op = LaplaceOp(fe, q)
+	fe = Tri3()
+	q = sp.Matrix(2, 1, [qx, qy])
+	op = LaplaceOp(fe, q)
 
 	# fe = Tet4()
-	fe = Tet10()
-
-	q = sp.Matrix(3, 1, [qx, qy, qz])
-	op = LaplaceOp(fe, q)
+	# fe = Tet10()
+	# q = sp.Matrix(3, 1, [qx, qy, qz])
+	# op = LaplaceOp(fe, q)
 
 	print("FFF")
 	c_code(op.fff())

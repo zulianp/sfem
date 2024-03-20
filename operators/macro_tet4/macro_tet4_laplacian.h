@@ -8,7 +8,6 @@
 extern "C" {
 #endif
 
-
 typedef struct {
     ptrdiff_t nelements;
     jacobian_t *fff;

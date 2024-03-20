@@ -29,6 +29,7 @@
 #include "read_mesh.h"
 // #include "constrained_gs.h"
 #include "cvfem_tri3_convection.h"
+#include "tri3_laplacian.h"
 
 #include "sfem_logger.h"
 
@@ -38,6 +39,15 @@ void axpy(const ptrdiff_t n, const real_t alpha, const real_t *const x, real_t *
         y[i] += alpha * x[i];
     }
 }
+
+
+void scal(const ptrdiff_t n, const real_t alpha, real_t *const x) {
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n; i++) {
+        x[i] *= alpha;
+    }
+}
+
 
 real_t dot(const ptrdiff_t n, const real_t *const x, const real_t *const y) {
 
@@ -112,10 +122,12 @@ int main(int argc, char *argv[]) {
     float SFEM_DT = 0.1;
     float SFEM_MAX_TIME = 1;
     float SFEM_EXPORT_FREQUENCY = 1;
+    float SFEM_DIFFUSIVITY = 1;
 
     SFEM_READ_ENV(SFEM_DT, atof);
     SFEM_READ_ENV(SFEM_MAX_TIME, atof);
     SFEM_READ_ENV(SFEM_EXPORT_FREQUENCY, atof);
+    SFEM_READ_ENV(SFEM_DIFFUSIVITY, atof);
 
     const char *SFEM_RESTART_FOLDER = 0;
     SFEM_READ_ENV(SFEM_RESTART_FOLDER, );
@@ -164,7 +176,8 @@ int main(int argc, char *argv[]) {
     }
 
     for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
-        vel[0][i] = 0.5;
+        vel[0][i] = 1;
+        // vel[1][i] = 0.01;
     }
 
     update = calloc(mesh.nnodes, sizeof(real_t));
@@ -206,8 +219,14 @@ int main(int argc, char *argv[]) {
         // Integrate
         memset(buff, 0, mesh.nnodes * sizeof(real_t));
 
+        if(SFEM_DIFFUSIVITY != 0.) {
+            tri3_laplacian_apply(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, c, buff);
+            scal(mesh.nnodes, -SFEM_DIFFUSIVITY, buff);
+        }
+
         cvfem_tri3_convection_apply(
             mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, vel, c, buff);
+
 
         ediv(mesh.nnodes, buff, cv_volumes, update);
         axpy(mesh.nnodes, SFEM_DT, update, c);
@@ -219,7 +238,7 @@ int main(int argc, char *argv[]) {
         //     constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, c);
         // }
 
-        if (t >= next_check_point) {  // Write to disk
+        if (t >= (next_check_point - SFEM_DT/2)) {  // Write to disk
             printf("%g/%g dt=%g mc=%g\n", t, SFEM_MAX_TIME, dt, integr_concentration);
 
             sprintf(path, "%s/c.%09d.raw", output_folder, export_counter);

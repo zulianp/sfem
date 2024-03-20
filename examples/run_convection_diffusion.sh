@@ -19,6 +19,8 @@ PATH=$SCRIPTPATH/../data/benchmarks/meshes:$PATH
 HERE=$PWD
 
 mkdir -p convection_diffusion
+rm -rf convection_diffusion/out
+
 cd convection_diffusion
 
 # export OMP_NUM_THREADS=16
@@ -26,7 +28,7 @@ export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true
 
 SFEM_MESH_DIR=mesh
-# create_square.sh 6
+# create_box_2D.sh 4 2 1
 # rm $SFEM_MESH_DIR/z.raw
 
 sleft=$SFEM_MESH_DIR/sidesets_aos/sleft.raw
@@ -42,9 +44,10 @@ export SFEM_DIRICHLET_NODESET="$sleft"
 export SFEM_DIRICHLET_VALUE="1"
 export SFEM_DIRICHLET_COMPONENT="0"
 
-export SFEM_MAX_TIME=300
-export SFEM_DT=0.005
-export SFEM_EXPORT_FREQUENCY=0.5
+export SFEM_MAX_TIME=100
+export SFEM_DT=0.0005
+export SFEM_EXPORT_FREQUENCY=0.1
+export SFEM_DIFFUSIVITY=0.01
 
 # lldb -- 
 run_convection_diffusion $SFEM_MESH_DIR out
