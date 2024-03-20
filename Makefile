@@ -368,7 +368,7 @@ gap_from_sdf : gap_from_sdf.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
 grid_to_mesh : grid_to_mesh.c libsfem.a
-	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) -L/home/sriva/git/sfem/resampling/cuda -lsfem_resample_field_cuda -L/usr/local/cuda-12.3/targets/x86_64-linux/lib -lcudart ; \
 
 geometry_aware_gap_from_sdf : geometry_aware_gap_from_sdf.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \

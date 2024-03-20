@@ -832,6 +832,23 @@ int beam2_resample_field_local(const ptrdiff_t nelements,
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 
+#define MY_RESTRICT __restrict__
+#define real_type double
+
+int tet4_resample_field_local_CUDA(  // Mesh
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        int** const MY_RESTRICT elems,
+        float** const MY_RESTRICT xyz,
+        // SDF
+        const ptrdiff_t* const MY_RESTRICT n,
+        const ptrdiff_t* const MY_RESTRICT stride,
+        const float* const MY_RESTRICT origin,
+        const float* const MY_RESTRICT delta,
+        const real_type* const MY_RESTRICT data,
+        // Output
+        real_type* const MY_RESTRICT weighted_field);
+
 int resample_field_local(
         // Mesh
         const enum ElemType element_type,
@@ -849,8 +866,8 @@ int resample_field_local(
         real_t* const SFEM_RESTRICT weighted_field) {
     switch (element_type) {
         case TET4: {
-            return tet4_resample_field_local_V8(  ////// v2 test V8
-                                                  //   0,
+            return tet4_resample_field_local_CUDA(  ////// v2 test V8 CUDA
+                                                    //   0,
                     nelements,
                     nnodes,
                     elems,
@@ -902,7 +919,7 @@ int resample_field(
         real_t* const SFEM_RESTRICT g) {
     real_t* weighted_field = calloc(nnodes, sizeof(real_t));
 
-    resample_field_local(element_type,
+    resample_field_local(element_type, 
                          nelements,
                          nnodes,
                          elems,
