@@ -83,10 +83,12 @@ int main(int argc, char *argv[]) {
             "- SFEM_DIRICHLET_NODESET=%s\n"
             "- SFEM_DIRICHLET_VALUE=%s\n"
             "- SFEM_DIRICHLET_COMPONENT=%s\n"
+            "- SFEM_USE_PRECONDITIONER=%d\n"
             "----------------------------------------\n",
             SFEM_DIRICHLET_NODESET,
             SFEM_DIRICHLET_VALUE,
-            SFEM_DIRICHLET_COMPONENT);
+            SFEM_DIRICHLET_COMPONENT,
+            SFEM_USE_PRECONDITIONER);
     }
 
     int n_dirichlet_conditions;
@@ -106,8 +108,8 @@ int main(int argc, char *argv[]) {
         elem_type = macro_type_variant(elem_type);
     }
 
-    using Solver_t = sfem::ConjugateGradient<real_t>;
-    // using Solver_t = sfem::BiCGStab<real_t>;
+    // using Solver_t = sfem::ConjugateGradient<real_t>;
+    using Solver_t = sfem::BiCGStab<real_t>;
 
     Solver_t solver;
 
@@ -125,7 +127,7 @@ int main(int argc, char *argv[]) {
 
             macro_tet4_laplacian_diag(&mtet4, diag.data());
 
-            solver.left_preconditioner_op = [&](const real_t *const x, real_t *const y) {
+            solver.set_preconditioner([&](const real_t *const x, real_t *const y) {
 
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
@@ -134,7 +136,7 @@ int main(int argc, char *argv[]) {
 
                 copy_at_dirichlet_nodes_vec(
                     n_dirichlet_conditions, dirichlet_conditions, &mesh, 1, x, y);
-            };
+            });
         }
     }
 

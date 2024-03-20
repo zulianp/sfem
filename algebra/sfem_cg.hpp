@@ -14,7 +14,7 @@ namespace sfem {
     public:
         // Operator
         std::function<void(const T* const, T* const)> apply_op;
-        std::function<void(const T* const, T* const)> left_preconditioner_op;
+        std::function<void(const T* const, T* const)> preconditioner_op;
 
         // Mem management
         std::function<T*(const std::size_t)> allocate;
@@ -29,6 +29,11 @@ namespace sfem {
         // Solver parameters
         T tol{1e-10};
         int max_it{10000};
+
+        void set_preconditioner(std::function<void(const T* const, T* const)> &&in)
+        {
+            preconditioner_op = in;
+        }
 
         void default_init() {
             allocate = [](const std::size_t n) -> T* { return (T*)calloc(n, sizeof(T)); };
@@ -77,7 +82,7 @@ namespace sfem {
         }
 
         int apply(const size_t n, const T* const b, T* const x) {
-            if (left_preconditioner_op) {
+            if (preconditioner_op) {
                 return aux_apply_precond(n, b, x);
             } else {
                 return aux_apply_basic(n, b, x);
@@ -160,7 +165,7 @@ namespace sfem {
             T* p = allocate(n);
             T* Ap = allocate(n);
 
-            left_preconditioner_op(r, z);
+            preconditioner_op(r, z);
             copy(n, z, p);
             apply_op(p, Ap);
 
@@ -175,7 +180,7 @@ namespace sfem {
 
             int info = -1;
             for (int k = 0; k < max_it; k++) {
-                left_preconditioner_op(r, z);
+                preconditioner_op(r, z);
 
                 const T rtz_new = dot(n, r, z);
                 const T beta = rtz_new / rtz;
