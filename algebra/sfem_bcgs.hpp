@@ -217,8 +217,6 @@ namespace sfem {
             T* s = allocate(n);
             T* t = allocate(n);
 
-            // T* y = allocate(n);
-
             copy(n, r0, r);
             copy(n, r0, p);
 
@@ -278,8 +276,6 @@ namespace sfem {
             destroy(h);
             destroy(s);
             destroy(t);
-
-            // destroy(y);
             return info;
         }
     };

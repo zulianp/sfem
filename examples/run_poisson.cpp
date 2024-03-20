@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
     Solver_t solver;
 
     solver.max_it = 9000;
-    solver.tol = 1e-16;
+    solver.tol = 1e-10;
     solver.default_init();
 
     std::vector<real_t> diag;
