@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,6 +31,34 @@
 #include "cvfem_tri3_convection.h"
 
 #include "sfem_logger.h"
+
+void axpy(const ptrdiff_t n, const real_t alpha, const real_t *const x, real_t *const y) {
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n; i++) {
+        y[i] += alpha * x[i];
+    }
+}
+
+real_t dot(const ptrdiff_t n, const real_t *const x, const real_t *const y) {
+
+    real_t ret = 0;
+#pragma omp parallel for reduction(+ : ret)
+    for (ptrdiff_t i = 0; i < n; i++) {
+        ret += y[i] * x[i];
+    }
+
+    return ret;
+}
+
+void ediv(const ptrdiff_t n,
+          const real_t *const nom,
+          const real_t *const denom,
+          real_t *const result) {
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n; i++) {
+        result[i] = nom[i] / denom[i];
+    }
+}
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -80,7 +109,7 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_NEUMANN_SIDESET, );
     SFEM_READ_ENV(SFEM_NEUMANN_VALUE, );
 
-    float SFEM_DT = 1;
+    float SFEM_DT = 0.1;
     float SFEM_MAX_TIME = 1;
     float SFEM_EXPORT_FREQUENCY = 1;
 
@@ -128,11 +157,22 @@ int main(int argc, char *argv[]) {
     real_t *c = calloc(mesh.nnodes, sizeof(real_t));
 
     real_t *vel[3];
-    real_t *correction[3];
+    real_t *update;
 
     for (int d = 0; d < sdim; d++) {
         vel[d] = calloc(mesh.nnodes, sizeof(real_t));
-        correction[d] = calloc(mesh.nnodes, sizeof(real_t));
+    }
+
+    for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+        vel[0][i] = 0.5;
+    }
+
+    update = calloc(mesh.nnodes, sizeof(real_t));
+
+    // FIXME these are initial conditions (rename)
+    for (int i = 0; i < n_dirichlet_conditions; i++) {
+        boundary_condition_t cond = dirichlet_conditions[i];
+        constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, c);
     }
 
     int export_counter = 0;
@@ -157,26 +197,35 @@ int main(int argc, char *argv[]) {
         export_counter++;
     }
 
+    real_t *cv_volumes = calloc(mesh.nnodes, sizeof(real_t));
+    cvfem_tri3_cv_volumes(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, cv_volumes);
+
     real_t dt = SFEM_DT;
     ptrdiff_t step_count = 0;
     for (real_t t = 0; t < SFEM_MAX_TIME; t += dt, step_count++) {
         // Integrate
         memset(buff, 0, mesh.nnodes * sizeof(real_t));
-        
+
         cvfem_tri3_convection_apply(
             mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, vel, c, buff);
 
-        for (int i = 0; i < n_dirichlet_conditions; i++) {
-            boundary_condition_t cond = dirichlet_conditions[i];
-            assert(cond.component == 0);
-            constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, buff);
-        }
+        ediv(mesh.nnodes, buff, cv_volumes, update);
+        axpy(mesh.nnodes, SFEM_DT, update, c);
+
+        real_t integr_concentration = dot(mesh.nnodes, c, cv_volumes);
+
+        // for (int i = 0; i < n_dirichlet_conditions; i++) {
+        //     boundary_condition_t cond = dirichlet_conditions[i];
+        //     constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, c);
+        // }
 
         if (t >= next_check_point) {  // Write to disk
-            printf("%g/%g dt=%g\n", t, SFEM_MAX_TIME, dt);
+            printf("%g/%g dt=%g mc=%g\n", t, SFEM_MAX_TIME, dt, integr_concentration);
 
             sprintf(path, "%s/c.%09d.raw", output_folder, export_counter);
             array_write(comm, path, SFEM_MPI_REAL_T, c, mesh.nnodes, mesh.nnodes);
+
+            log_write_double(&time_logger, t);
 
             next_check_point += SFEM_EXPORT_FREQUENCY;
             export_counter++;
@@ -191,6 +240,14 @@ int main(int argc, char *argv[]) {
     // destroy_conditions(n_neumann_conditions, neumann_conditions);
 
     log_destroy(&time_logger);
+
+    free(update);
+    free(buff);
+    free(c);
+
+    for (int d = 0; d < sdim; d++) {
+        free(vel[d]);
+    }
 
     double tock = MPI_Wtime();
     if (!rank) {

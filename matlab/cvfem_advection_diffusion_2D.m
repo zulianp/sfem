@@ -110,8 +110,8 @@ problem.diffusivity = 0.00001;
 
 problem.dirichlet_nodes = unique(sort(dirichlet(:)));
 problem.dirichlet = dirichlet;
-problem.dirichlet_fun = @(x, y) (1-y).*(y).*(1-y).*(y)./0.25 + 1 + sin(0.5 * pi + 4*pi*y);
-% problem.dirichlet_fun = @(x, y) ones(size(x));
+% problem.dirichlet_fun = @(x, y) (1-y).*(y).*(1-y).*(y)./0.25 + 1 + sin(0.5 * pi + 4*pi*y);
+problem.dirichlet_fun = @(x, y) ones(size(x));
 
 problem.rowptr = rowptr;
 problem.colidx = colidx;
