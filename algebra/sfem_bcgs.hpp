@@ -27,12 +27,7 @@ namespace sfem {
         std::function<T(const std::size_t, const T* const, const T* const)> dot;
         std::function<void(const std::size_t, const T, const T* const, const T, T* const)> axpby;
         std::function<
-            void(const std::size_t, 
-                const T, 
-                const T* const, 
-                const T, 
-                const T* const, 
-                T* const)>
+            void(const std::size_t, const T, const T* const, const T, const T* const, T* const)>
             zaxpby;
 
         // Solver parameters
@@ -100,9 +95,9 @@ namespace sfem {
 
         int apply(const size_t n, const T* const b, T* const x) {
             // if (left_preconditioner_op) {
-                // return aux_apply_precond(n, b, x);
+            // return aux_apply_precond(n, b, x);
             // } else {
-                return aux_apply_basic(n, b, x);
+            return aux_apply_basic(n, b, x);
             // }
         }
 
@@ -172,11 +167,11 @@ namespace sfem {
                 }
 
                 const T rho_new = dot(n, r0, r);
-                const T beta  = (rho_new/rho) * (alpha/omega);
+                const T beta = (rho_new / rho) * (alpha / omega);
                 rho = rho_new;
 
                 axpby(n, 1, r, beta, p);
-                axpby(n, -omega*beta, v, 1, p);
+                axpby(n, -omega * beta, v, 1, p);
             }
 
             // clean-up
@@ -190,9 +185,7 @@ namespace sfem {
             return info;
         }
 
-        int aux_apply_precond(const size_t n, const T* const b, T* const x) {
-           
-        }
+        int aux_apply_precond(const size_t n, const T* const b, T* const x) {}
     };
 }  // namespace sfem
 
