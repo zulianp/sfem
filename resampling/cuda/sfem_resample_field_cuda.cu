@@ -478,22 +478,16 @@ __global__ void tet4_resample_field_local_kernel(
 
 __global__ void mykernel() { printf("hello fron kernel\n"); }
 
+double calculate_flops(const ptrdiff_t nelements, const ptrdiff_t quad_nodes, double time_sec) {
+    const double flops = (nelements * (35 + 166 * quad_nodes)) / time_sec;
+    return flops;
+}
+
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 // tet4_resample_field_local_v2 //////////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-/*
-nvcc --gpu-architecture=sm_75 --device-c sfem_resample_field_cuda.cu -o sfem_resample_field_cuda.o
-nvcc -O3 --gpu-architecture=sm_75 --shared --compiler-options -fPIC -shared
-sfem_resample_field_cuda.cu -o sfem_resample_field_cuda.so
-
-
-nvcc -O3  --gpu-architecture=sm_75 --compiler-options -fPIC -shared sfem_resample_field_cuda.cu -o
-sfem_resample_field_cuda.o ar -r sfem_resample_field_cuda.a sfem_resample_field_cuda.o
-
-*/
-
 extern "C" int tet4_resample_field_local_CUDA(
         // Mesh
         const ptrdiff_t nelements,
@@ -570,7 +564,7 @@ extern "C" int tet4_resample_field_local_CUDA(
                                                                      nelements,     //
                                                                      nnodes,        //
                                                                      elems_device,  //
-                                                                     xyz_device,
+                                                                     xyz_device,    //
                                                                      //  NULL,
 
                                                                      stride[0],
@@ -606,11 +600,14 @@ extern "C" int tet4_resample_field_local_CUDA(
 
     double time = milliseconds / 1000.0;
 
+    const double flops = calculate_flops(nelements, TET4_NQP, time);
+
     const double elements_second = (double)nelements / time;
 
     printf("============================================================================\n");
-    printf("GPU:    Elapsed time: %e s\n", time);
-    printf("GPU:    Throughput:   %e elements/second\n", elements_second);
+    printf("GPU:    Elapsed time:  %e s\n", time);
+    printf("GPU:    Throughput:    %e elements/second\n", elements_second);
+    printf("GPU:    FLOPS:         %e FLOP/S \n", flops);
     printf("============================================================================\n");
 
     // Wait for GPU to finish before accessing on host

@@ -849,6 +849,11 @@ int tet4_resample_field_local_CUDA(  // Mesh
         // Output
         real_type* const MY_RESTRICT weighted_field);
 
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+// resample_field_local ////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
 int resample_field_local(
         // Mesh
         const enum ElemType element_type,
@@ -861,11 +866,15 @@ int resample_field_local(
         const ptrdiff_t* const SFEM_RESTRICT stride,
         const geom_t* const SFEM_RESTRICT origin,
         const geom_t* const SFEM_RESTRICT delta,
-        const real_t* const SFEM_RESTRICT data, 
+        const real_t* const SFEM_RESTRICT data,
         // Output
-        real_t* const SFEM_RESTRICT weighted_field) {
+        real_t* const SFEM_RESTRICT weighted_field,
+        sfem_resample_field_info* info) {
     switch (element_type) {
         case TET4: {
+            info->quad_nodes_cnt = TET4_NQP;
+            info->nelements = nelements;
+
             return tet4_resample_field_local_CUDA(  ////// v2 test V8 CUDA
                                                     //   0,
                     nelements,
@@ -919,7 +928,9 @@ int resample_field(
         real_t* const SFEM_RESTRICT g) {
     real_t* weighted_field = calloc(nnodes, sizeof(real_t));
 
-    resample_field_local(element_type, 
+    sfem_resample_field_info info;
+
+    resample_field_local(element_type,
                          nelements,
                          nnodes,
                          elems,
@@ -929,7 +940,8 @@ int resample_field(
                          origin,
                          delta,
                          data,
-                         weighted_field);
+                         weighted_field,
+                         &info);
 
     enum ElemType st = shell_type(element_type);
 
@@ -954,6 +966,7 @@ int interpolate_field(const ptrdiff_t nnodes,
                       const real_t* const SFEM_RESTRICT data,
                       // Output
                       real_t* const SFEM_RESTRICT g) {
+    //
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];
     const real_t oz = (real_t)origin[2];

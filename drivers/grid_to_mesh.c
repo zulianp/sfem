@@ -17,6 +17,11 @@
 
 #include "mass.h"
 
+double calculate_flops(const ptrdiff_t nelements, const ptrdiff_t quad_nodes, double time_sec) {
+    const double flops = (nelements * (35 + 166 * quad_nodes)) / time_sec;
+    return flops;
+}
+
 int main(int argc, char* argv[]) {
     printf("========================================\n");
     printf("Starting grid_to_mesh\n");
@@ -129,6 +134,7 @@ int main(int argc, char* argv[]) {
     }
 
     real_t* g = calloc(mesh.nnodes, sizeof(real_t));
+    sfem_resample_field_info info;
 
     {
         double resample_tick = MPI_Wtime();
@@ -178,7 +184,8 @@ int main(int argc, char* argv[]) {
                         delta,
                         field,
                         // Output
-                        g);
+                        g,
+                        &info);
 
                 real_t* mass_vector = calloc(mesh.nnodes, sizeof(real_t));
 
@@ -252,6 +259,14 @@ int main(int argc, char* argv[]) {
 
         free(elements_v);
 
+        const double flops = calculate_flops(mesh.nelements,       //
+                                             info.quad_nodes_cnt,  //
+                                             (resample_tock - resample_tick)) *
+                             (double)mpi_size;  //
+
+        printf("Info quad_nodes_cnt: %ld\n", info.quad_nodes_cnt);
+        printf("Info nelements: %ld\n", info.nelements);
+
         if (!rank) {
             const int nelements = mesh.nelements;
             const double elements_second =
@@ -268,6 +283,9 @@ int main(int argc, char* argv[]) {
             printf("Rank: [%d]  Throughput      %e (elements/second)\n",  //
                    rank,                                                  //
                    elements_second);                                      //
+            printf("Rank: [%d]  FLOPS           %e (flops [circa])\n",    //
+                   rank,                                                  //
+                   flops);                                                //
 
             printf("\n");
         }
