@@ -4,6 +4,10 @@
 #include <stddef.h>
 #include "sfem_base.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
     ptrdiff_t nelements;
     jacobian_t *fff;
@@ -21,6 +25,9 @@ void macro_tet4_laplacian_apply_opt(const macro_tet4_laplacian_t *const ctx,
                                     const real_t *const SFEM_RESTRICT u,
                                     real_t *const SFEM_RESTRICT values);
 
+void macro_tet4_laplacian_diag(const macro_tet4_laplacian_t *const ctx,
+                               real_t *const SFEM_RESTRICT diag);
+
 void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
                                 const ptrdiff_t nnodes,
                                 idx_t **const SFEM_RESTRICT elems,
@@ -28,4 +35,7 @@ void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
                                 const real_t *const SFEM_RESTRICT u,
                                 real_t *const SFEM_RESTRICT values);
 
+#ifdef __cplusplus
+}
+#endif
 #endif  // MACRO_TET4_LAPLACIAN_H

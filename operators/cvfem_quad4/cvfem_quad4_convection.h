@@ -1,5 +1,5 @@
-#ifndef CVFEM_TRI3_CONVECTION_H
-#define CVFEM_TRI3_CONVECTION_H
+#ifndef CVFEM_QUAD4_CONVECTION_H
+#define CVFEM_QUAD4_CONVECTION_H
 
 #include <stddef.h>
 #include "sfem_base.h"
@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-void cvfem_tri3_convection_assemble_hessian(const ptrdiff_t nelements,
+void cvfem_quad4_convection_assemble_hessian(const ptrdiff_t nelements,
                                             const ptrdiff_t nnodes,
                                             idx_t **const SFEM_RESTRICT elems,
                                             geom_t **const SFEM_RESTRICT xyz,
@@ -17,7 +17,7 @@ void cvfem_tri3_convection_assemble_hessian(const ptrdiff_t nelements,
                                             const idx_t *const SFEM_RESTRICT colidx,
                                             real_t *const SFEM_RESTRICT values);
 
-void cvfem_tri3_convection_apply(const ptrdiff_t nelements,
+void cvfem_quad4_convection_apply(const ptrdiff_t nelements,
                                  const ptrdiff_t nnodes,
                                  idx_t **const SFEM_RESTRICT elems,
                                  geom_t **const SFEM_RESTRICT xyz,
@@ -25,7 +25,7 @@ void cvfem_tri3_convection_apply(const ptrdiff_t nelements,
                                  const real_t *const SFEM_RESTRICT u,
                                  real_t *const SFEM_RESTRICT values);
 
-void cvfem_tri3_cv_volumes(const ptrdiff_t nelements,
+void cvfem_quad4_cv_volumes(const ptrdiff_t nelements,
                            const ptrdiff_t nnodes,
                            idx_t **const SFEM_RESTRICT elems,
                            geom_t **const SFEM_RESTRICT xyz,
@@ -35,4 +35,4 @@ void cvfem_tri3_cv_volumes(const ptrdiff_t nelements,
 }
 #endif
 
-#endif  // CVFEM_TRI3_CONVECTION_H
+#endif  // CVFEM_QUAD4_CONVECTION_H

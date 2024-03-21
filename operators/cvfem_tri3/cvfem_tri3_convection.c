@@ -1,10 +1,12 @@
 #include "cvfem_tri3_convection.h"
 
+#include "sfem_base.h"
 #include "sfem_vec.h"
 #include "sortreduce.h"
 
 #include <mpi.h>
 #include <stdio.h>
+#include <assert.h>
 
 #define POW2(a) ((a) * (a))
 
@@ -231,7 +233,7 @@ void cvfem_tri3_convection_apply(const ptrdiff_t nelements,
                                  real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    // double tick = MPI_Wtime();
 
 #pragma omp parallel
     {
@@ -243,7 +245,7 @@ void cvfem_tri3_convection_apply(const ptrdiff_t nelements,
             real_t vy[3];
             real_t element_u[3];
             real_t element_vector[3];
-       
+
 #pragma unroll(3)
             for (int v = 0; v < 3; ++v) {
                 ev[v] = elems[v][i];
@@ -292,6 +294,46 @@ void cvfem_tri3_convection_apply(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
-    printf("cvfem_tri3_convection.c: cvfem_tri3_convection_apply\t%g seconds\n", tock - tick);
+    // double tock = MPI_Wtime();
+    // printf("cvfem_tri3_convection.c: cvfem_tri3_convection_apply\t%g seconds\n", tock - tick);
+}
+
+void cvfem_tri3_cv_volumes(const ptrdiff_t nelements,
+                           const ptrdiff_t nnodes,
+                           idx_t **const SFEM_RESTRICT elems,
+                           geom_t **const SFEM_RESTRICT xyz,
+                           real_t *const SFEM_RESTRICT values) {
+    SFEM_UNUSED(nnodes);
+
+    const geom_t *const x = xyz[0];
+    const geom_t *const y = xyz[1]; 
+
+#pragma omp parallel
+    {
+#pragma omp for  // nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[3];
+
+#pragma unroll(3)
+            for (int v = 0; v < 3; ++v) {
+                ev[v] = elems[v][i];
+            }
+
+            real_t J[4];
+            J[0] = -x[ev[0]] + x[ev[1]];
+            J[1] = -x[ev[0]] + x[ev[2]];
+            J[2] = -y[ev[0]] + y[ev[1]];
+            J[3] = -y[ev[0]] + y[ev[2]];
+
+            const real_t measure = ((J[0] * J[3] - J[1] * J[2]) / 2) / 3;
+
+            assert(measure > 0);
+            for (int edof_i = 0; edof_i < 3; ++edof_i) {
+                const idx_t dof_i = ev[edof_i];
+
+#pragma omp atomic update
+                values[dof_i] += measure;
+            }
+        }
+    }
 }

@@ -5,6 +5,11 @@
 
 #include <assert.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 enum ElemType {
     NIL = 0,
     NODE1 = 1,
@@ -186,5 +191,20 @@ SFEM_INLINE static int elem_manifold_dim(const enum ElemType type) {
         }
     }
 }
+
+SFEM_INLINE static enum ElemType macro_type_variant(const enum ElemType type) {
+    switch (type) {
+        case TET10: return MACRO_TET4;
+        case TRI6: return MACRO_TRI3;
+        default: {
+            assert(0);
+            return INVALID;
+        }
+    }
+}
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  // SFEM_DEFS_H

@@ -87,6 +87,27 @@ print('---------------------------------------------------')
 c_code(expr)
 print('---------------------------------------------------')
 
+expr = []
+for i in range(0, 4):
+	integr = 0
+	
+	integr += left_gx[i] * right_gx[i]
+	integr += left_gy[i] * right_gy[i]
+	integr += left_gz[i] * right_gz[i]
+
+	bform = sp.symbols(f'element_vector[{i}*stride]')
+
+	if simplify_expr:
+		integr = sp.simplify(integr)
+
+	expr.append(ast.Assignment(bform, integr))
+		
+print('---------------------------------------------------')
+print('diag(Hessian)')
+print('---------------------------------------------------')
+c_code(expr)
+print('---------------------------------------------------')
+
 u = coeffs('u', 4)
 
 expr = []
