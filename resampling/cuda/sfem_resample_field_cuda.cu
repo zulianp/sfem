@@ -211,7 +211,7 @@ __device__ void hex_aa_8_eval_fun_cu(
 }
 
 ////////////////////////////////////////////////////////
-// hex_aa_8_collect_coeffs_V
+// hex_aa_8_collect_coeffs_cu
 ////////////////////////////////////////////////////////
 __device__ void hex_aa_8_collect_coeffs_cu(
         //
@@ -239,6 +239,49 @@ __device__ void hex_aa_8_collect_coeffs_cu(
     const ptrdiff_t i5 = (i + 1) * stride[0] + j * stride[1] + (k + 1) * stride[2];
     const ptrdiff_t i6 = (i + 1) * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
     const ptrdiff_t i7 = i * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
+
+    *out0 = data[i0];
+    *out1 = data[i1];
+    *out2 = data[i2];
+    *out3 = data[i3];
+    *out4 = data[i4];
+    *out5 = data[i5];
+    *out6 = data[i6];
+    *out7 = data[i7];
+}
+
+////////////////////////////////////////////////////////
+// hex_aa_8_collect_coeffs_cu
+////////////////////////////////////////////////////////
+__device__ void hex_aa_8_collect_coeffs_cu_v2(
+        //
+        const ptrdiff_t MY_RESTRICT stride0,
+        const ptrdiff_t MY_RESTRICT stride1,
+        const ptrdiff_t MY_RESTRICT stride2,
+
+        const ptrdiff_t i,
+        const ptrdiff_t j,
+        const ptrdiff_t k,
+        // Attention this is geometric data transformed to solver data!
+        const real_t* const MY_RESTRICT data,
+        //
+        real_t* MY_RESTRICT out0,
+        real_t* MY_RESTRICT out1,
+        real_t* MY_RESTRICT out2,
+        real_t* MY_RESTRICT out3,
+        real_t* MY_RESTRICT out4,
+        real_t* MY_RESTRICT out5,
+        real_t* MY_RESTRICT out6,
+        real_t* MY_RESTRICT out7) {
+    //
+    const ptrdiff_t i0 = i * stride0 + j * stride1 + k * stride2;
+    const ptrdiff_t i1 = (i + 1) * stride0 + j * stride1 + k * stride2;
+    const ptrdiff_t i2 = (i + 1) * stride0 + (j + 1) * stride1 + k * stride2;
+    const ptrdiff_t i3 = i * stride0 + (j + 1) * stride1 + k * stride2;
+    const ptrdiff_t i4 = i * stride0 + j * stride1 + (k + 1) * stride2;
+    const ptrdiff_t i5 = (i + 1) * stride0 + j * stride1 + (k + 1) * stride2;
+    const ptrdiff_t i6 = (i + 1) * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
+    const ptrdiff_t i7 = i * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
 
     *out0 = data[i0];
     *out1 = data[i1];
@@ -307,7 +350,10 @@ __global__ void tet4_resample_field_local_kernel(
         const xyz_tet4_device MY_RESTRICT xyz,
         // SDF
         // const ptrdiff_t* const MY_RESTRICT n,
-        const ptrdiff_t* const MY_RESTRICT stride,
+        const ptrdiff_t MY_RESTRICT stride0,
+        const ptrdiff_t MY_RESTRICT stride1,
+        const ptrdiff_t MY_RESTRICT stride2,
+
         const float* const MY_RESTRICT origin,
         const float* const MY_RESTRICT delta,
         const real_type* const MY_RESTRICT data,
@@ -499,19 +545,21 @@ __global__ void tet4_resample_field_local_kernel(
                              &hex8_f6,
                              &hex8_f7);
 
-        hex_aa_8_collect_coeffs_cu(stride,
-                                   i,
-                                   j,
-                                   k,
-                                   data,
-                                   &coeffs0,
-                                   &coeffs1,
-                                   &coeffs2,
-                                   &coeffs3,
-                                   &coeffs4,
-                                   &coeffs5,
-                                   &coeffs6,
-                                   &coeffs7);
+        hex_aa_8_collect_coeffs_cu_v2(stride0,
+                                      stride1,
+                                      stride2,
+                                      i,
+                                      j,
+                                      k,
+                                      data,
+                                      &coeffs0,
+                                      &coeffs1,
+                                      &coeffs2,
+                                      &coeffs3,
+                                      &coeffs4,
+                                      &coeffs5,
+                                      &coeffs6,
+                                      &coeffs7);
 
         // Integrate gap function
         {
@@ -593,6 +641,11 @@ extern "C" int tet4_resample_field_local_CUDA(
 
     // Allocate memory on the device
 
+    // Allocate weighted_field on the device
+    double* weighted_field_device;
+    cudaMalloc((void**)&weighted_field_device, nnodes * sizeof(double));
+    cudaMemset(weighted_field_device, 0, sizeof(double) * nnodes);
+
     // copy the elements to the device
     elems_tet4_device elems_device;
     cuda_allocate_elems_tet4_device(&elems_device, nelements);
@@ -602,11 +655,6 @@ extern "C" int tet4_resample_field_local_CUDA(
     cudaMemcpy(elems_device.elems_v2, elems[2], nelements * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(elems_device.elems_v3, elems[3], nelements * sizeof(int), cudaMemcpyHostToDevice);
 
-    // Allocate weighted_field on the device
-    double* weighted_field_device;
-    cudaMalloc((void**)&weighted_field_device, nnodes * sizeof(double));
-    cudaMemset(weighted_field_device, 0, sizeof(double) * nnodes);
-
     // Allocate xyz on the device
     xyz_tet4_device xyz_device;
     cudaMalloc((void**)&xyz_device, 3 * sizeof(float*));
@@ -615,9 +663,9 @@ extern "C" int tet4_resample_field_local_CUDA(
     cudaMemcpy(xyz_device.y, xyz[1], nnodes * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(xyz_device.z, xyz[2], nnodes * sizeof(float), cudaMemcpyHostToDevice);
 
-    ptrdiff_t* stride_device;
-    cudaMalloc((void**)&stride_device, 3 * sizeof(ptrdiff_t));
-    cudaMemcpy(stride_device, stride, 3 * sizeof(ptrdiff_t), cudaMemcpyHostToDevice);
+    // ptrdiff_t* stride_device;
+    // cudaMalloc((void**)&stride_device, 3 * sizeof(ptrdiff_t));
+    // cudaMemcpy(stride_device, stride, 3 * sizeof(ptrdiff_t), cudaMemcpyHostToDevice);
 
     float* origin_device;
     cudaMalloc((void**)&origin_device, 3 * sizeof(float));
@@ -632,12 +680,13 @@ extern "C" int tet4_resample_field_local_CUDA(
     cudaMalloc((void**)&data_device, size_data * sizeof(double));
     cudaMemcpy(data_device, data, size_data * sizeof(double), cudaMemcpyHostToDevice);
 
+    cudaDeviceSynchronize();
     ///////////////////////////////////////////////////////////////////////////////
     // Call the kernel
     cudaEvent_t start, stop;
 
     // Number of threads
-    const ptrdiff_t threadsPerBlock = 256;
+    const ptrdiff_t threadsPerBlock = 128;
 
     // Number of blocks
     const ptrdiff_t numBlocks = (nelements + threadsPerBlock - 1) / threadsPerBlock;
@@ -660,7 +709,9 @@ extern "C" int tet4_resample_field_local_CUDA(
                                                                      elems_device,  //
                                                                      xyz_device,
                                                                      //  NULL,
-                                                                     stride_device,
+                                                                     stride[0],
+                                                                     stride[1],
+                                                                     stride[2],
                                                                      origin_device,
                                                                      delta_device,
                                                                      data_device,
@@ -699,7 +750,7 @@ extern "C" int tet4_resample_field_local_CUDA(
 
     free_xyz_tet4_device(&xyz_device);
 
-    cudaFree(stride_device);
+    // cudaFree(stride_device);
     cudaFree(origin_device);
     cudaFree(delta_device);
 

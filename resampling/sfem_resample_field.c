@@ -866,7 +866,7 @@ int resample_field_local(
         real_t* const SFEM_RESTRICT weighted_field) {
     switch (element_type) {
         case TET4: {
-            return tet4_resample_field_local_CUDA(  ////// v2 test V8 CUDA
+            return tet4_resample_field_local_CUDA(  ////// v2 test V8 CUDA 
                                                     //   0,
                     nelements,
                     nnodes,
