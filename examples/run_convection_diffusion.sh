@@ -41,7 +41,7 @@ export SFEM_DIRICHLET_COMPONENT="0"
 export SFEM_MAX_TIME=100
 export SFEM_DT=0.0005
 export SFEM_EXPORT_FREQUENCY=0.5
-export SFEM_DIFFUSIVITY=0.01
+export SFEM_DIFFUSIVITY=0.001
 
 # lldb -- 
 run_convection_diffusion $SFEM_MESH_DIR out
