@@ -861,12 +861,12 @@ int resample_field_local(
         const ptrdiff_t* const SFEM_RESTRICT stride,
         const geom_t* const SFEM_RESTRICT origin,
         const geom_t* const SFEM_RESTRICT delta,
-        const real_t* const SFEM_RESTRICT data,
+        const real_t* const SFEM_RESTRICT data, 
         // Output
         real_t* const SFEM_RESTRICT weighted_field) {
     switch (element_type) {
         case TET4: {
-            return tet4_resample_field_local_CUDA(  ////// v2 test V8 CUDA 
+            return tet4_resample_field_local_CUDA(  ////// v2 test V8 CUDA
                                                     //   0,
                     nelements,
                     nnodes,

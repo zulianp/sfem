@@ -7,74 +7,7 @@
 
 #define MY_RESTRICT __restrict__
 
-#define SFEM_USE_RULE56
-#ifdef SFEM_USE_RULE56
-#define TET4_NQP 56
-static __device__ real_t tet4_qw[TET4_NQP] = {
-        0.0010373112336140, 0.0010373112336140, 0.0010373112336140, 0.0010373112336140,
-        0.0096016645399480, 0.0096016645399480, 0.0096016645399480, 0.0096016645399480,
-        0.0096016645399480, 0.0096016645399480, 0.0096016645399480, 0.0096016645399480,
-        0.0096016645399480, 0.0096016645399480, 0.0096016645399480, 0.0096016645399480,
-        0.0164493976798232, 0.0164493976798232, 0.0164493976798232, 0.0164493976798232,
-        0.0164493976798232, 0.0164493976798232, 0.0164493976798232, 0.0164493976798232,
-        0.0164493976798232, 0.0164493976798232, 0.0164493976798232, 0.0164493976798232,
-        0.0153747766513310, 0.0153747766513310, 0.0153747766513310, 0.0153747766513310,
-        0.0153747766513310, 0.0153747766513310, 0.0153747766513310, 0.0153747766513310,
-        0.0153747766513310, 0.0153747766513310, 0.0153747766513310, 0.0153747766513310,
-        0.0293520118375230, 0.0293520118375230, 0.0293520118375230, 0.0293520118375230,
-        0.0293520118375230, 0.0293520118375230, 0.0293520118375230, 0.0293520118375230,
-        0.0293520118375230, 0.0293520118375230, 0.0293520118375230, 0.0293520118375230,
-        0.0366291366405108, 0.0366291366405108, 0.0366291366405108, 0.0366291366405108};
-
-static __device__ real_t tet4_qx[TET4_NQP] = {
-        0.0149520651530592, 0.9551438045408220, 0.0149520651530592, 0.0149520651530592,
-        0.1518319491659370, 0.7799760084415400, 0.0340960211962615, 0.0340960211962615,
-        0.0340960211962615, 0.0340960211962615, 0.7799760084415400, 0.1518319491659370,
-        0.7799760084415400, 0.1518319491659370, 0.0340960211962615, 0.0340960211962615,
-        0.5526556431060171, 0.3549340560639790, 0.0462051504150017, 0.0462051504150017,
-        0.0462051504150017, 0.0462051504150017, 0.3549340560639790, 0.5526556431060171,
-        0.3549340560639790, 0.5526556431060171, 0.0462051504150017, 0.0462051504150017,
-        0.2281904610687610, 0.5381043228880020, 0.2281904610687610, 0.2281904610687610,
-        0.5381043228880020, 0.2281904610687610, 0.0055147549744775, 0.0055147549744775,
-        0.0055147549744775, 0.5381043228880020, 0.2281904610687610, 0.2281904610687610,
-        0.3523052600879940, 0.1961837595745600, 0.3523052600879940, 0.3523052600879940,
-        0.1961837595745600, 0.3523052600879940, 0.0992057202494530, 0.0992057202494530,
-        0.0992057202494530, 0.1961837595745600, 0.3523052600879940, 0.3523052600879940,
-        0.1344783347929940, 0.5965649956210171, 0.1344783347929940, 0.1344783347929940};
-
-static __device__ real_t tet4_qy[TET4_NQP] = {
-        0.0149520651530592, 0.0149520651530592, 0.9551438045408220, 0.0149520651530592,
-        0.0340960211962615, 0.0340960211962615, 0.1518319491659370, 0.7799760084415400,
-        0.0340960211962615, 0.0340960211962615, 0.1518319491659370, 0.7799760084415400,
-        0.0340960211962615, 0.0340960211962615, 0.7799760084415400, 0.1518319491659370,
-        0.0462051504150017, 0.0462051504150017, 0.5526556431060171, 0.3549340560639790,
-        0.0462051504150017, 0.0462051504150017, 0.5526556431060171, 0.3549340560639790,
-        0.0462051504150017, 0.0462051504150017, 0.3549340560639790, 0.5526556431060171,
-        0.2281904610687610, 0.2281904610687610, 0.5381043228880020, 0.0055147549744775,
-        0.0055147549744775, 0.0055147549744775, 0.2281904610687610, 0.5381043228880020,
-        0.2281904610687610, 0.2281904610687610, 0.5381043228880020, 0.2281904610687610,
-        0.3523052600879940, 0.3523052600879940, 0.1961837595745600, 0.0992057202494530,
-        0.0992057202494530, 0.0992057202494530, 0.3523052600879940, 0.1961837595745600,
-        0.3523052600879940, 0.3523052600879940, 0.1961837595745600, 0.3523052600879940,
-        0.1344783347929940, 0.1344783347929940, 0.5965649956210171, 0.1344783347929940};
-
-static __device__ real_t tet4_qz[TET4_NQP] = {
-        0.0149520651530592, 0.0149520651530592, 0.0149520651530592, 0.9551438045408220,
-        0.0340960211962615, 0.0340960211962615, 0.0340960211962615, 0.0340960211962615,
-        0.1518319491659370, 0.7799760084415400, 0.0340960211962615, 0.0340960211962615,
-        0.1518319491659370, 0.7799760084415400, 0.1518319491659370, 0.7799760084415400,
-        0.0462051504150017, 0.0462051504150017, 0.0462051504150017, 0.0462051504150017,
-        0.5526556431060171, 0.3549340560639790, 0.0462051504150017, 0.0462051504150017,
-        0.5526556431060171, 0.3549340560639790, 0.5526556431060171, 0.3549340560639790,
-        0.0055147549744775, 0.0055147549744775, 0.0055147549744775, 0.2281904610687610,
-        0.2281904610687610, 0.5381043228880020, 0.2281904610687610, 0.2281904610687610,
-        0.5381043228880020, 0.2281904610687610, 0.2281904610687610, 0.5381043228880020,
-        0.0992057202494530, 0.0992057202494530, 0.0992057202494530, 0.3523052600879940,
-        0.3523052600879940, 0.1961837595745600, 0.3523052600879940, 0.3523052600879940,
-        0.1961837595745600, 0.3523052600879940, 0.3523052600879940, 0.1961837595745600,
-        0.1344783347929940, 0.1344783347929940, 0.1344783347929940, 0.5965649956210171};
-
-#endif  // SFEM_USE_RULE56
+#include "quadratures_rule_cuda.h"
 
 ////////////////////////////////////////////////////////
 // tet4_transform_v2
@@ -215,46 +148,6 @@ __device__ void hex_aa_8_eval_fun_cu(
 ////////////////////////////////////////////////////////
 __device__ void hex_aa_8_collect_coeffs_cu(
         //
-        const ptrdiff_t* const MY_RESTRICT stride,
-        const ptrdiff_t i,
-        const ptrdiff_t j,
-        const ptrdiff_t k,
-        // Attention this is geometric data transformed to solver data!
-        const real_t* const MY_RESTRICT data,
-        //
-        real_t* MY_RESTRICT out0,
-        real_t* MY_RESTRICT out1,
-        real_t* MY_RESTRICT out2,
-        real_t* MY_RESTRICT out3,
-        real_t* MY_RESTRICT out4,
-        real_t* MY_RESTRICT out5,
-        real_t* MY_RESTRICT out6,
-        real_t* MY_RESTRICT out7) {
-    //
-    const ptrdiff_t i0 = i * stride[0] + j * stride[1] + k * stride[2];
-    const ptrdiff_t i1 = (i + 1) * stride[0] + j * stride[1] + k * stride[2];
-    const ptrdiff_t i2 = (i + 1) * stride[0] + (j + 1) * stride[1] + k * stride[2];
-    const ptrdiff_t i3 = i * stride[0] + (j + 1) * stride[1] + k * stride[2];
-    const ptrdiff_t i4 = i * stride[0] + j * stride[1] + (k + 1) * stride[2];
-    const ptrdiff_t i5 = (i + 1) * stride[0] + j * stride[1] + (k + 1) * stride[2];
-    const ptrdiff_t i6 = (i + 1) * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
-    const ptrdiff_t i7 = i * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
-
-    *out0 = data[i0];
-    *out1 = data[i1];
-    *out2 = data[i2];
-    *out3 = data[i3];
-    *out4 = data[i4];
-    *out5 = data[i5];
-    *out6 = data[i6];
-    *out7 = data[i7];
-}
-
-////////////////////////////////////////////////////////
-// hex_aa_8_collect_coeffs_cu
-////////////////////////////////////////////////////////
-__device__ void hex_aa_8_collect_coeffs_cu_v2(
-        //
         const ptrdiff_t MY_RESTRICT stride0,
         const ptrdiff_t MY_RESTRICT stride1,
         const ptrdiff_t MY_RESTRICT stride2,
@@ -354,8 +247,14 @@ __global__ void tet4_resample_field_local_kernel(
         const ptrdiff_t MY_RESTRICT stride1,
         const ptrdiff_t MY_RESTRICT stride2,
 
-        const float* const MY_RESTRICT origin,
-        const float* const MY_RESTRICT delta,
+        const float origin_x,
+        const float origin_y,
+        const float origin_z,
+
+        const float delta_x,
+        const float delta_y,
+        const float delta_z,
+
         const real_type* const MY_RESTRICT data,
         // Output
         real_type* const MY_RESTRICT weighted_field) {
@@ -373,13 +272,13 @@ __global__ void tet4_resample_field_local_kernel(
 
     ////////////////////////////////////////////////////
 
-    const real_type ox = (real_type)origin[0];
-    const real_type oy = (real_type)origin[1];
-    const real_type oz = (real_type)origin[2];
+    const real_type ox = (real_type)origin_x;
+    const real_type oy = (real_type)origin_y;
+    const real_type oz = (real_type)origin_z;
 
-    const real_type dx = (real_type)delta[0];
-    const real_type dy = (real_type)delta[1];
-    const real_type dz = (real_type)delta[2];
+    const real_type dx = (real_type)delta_x;
+    const real_type dy = (real_type)delta_y;
+    const real_type dz = (real_type)delta_z;
 
     ////////////////////////////////////////////////////
 
@@ -409,32 +308,7 @@ __global__ void tet4_resample_field_local_kernel(
     ev[2] = elems.elems_v2[element_i];
     ev[3] = elems.elems_v3[element_i];
 
-    // for (int v = 0; v < 4; ++v) {
-    //     ev[v] = elems[v][element_i];
-    // }
-
-    // copy the coordinates of the vertices
-    // for (int v = 0; v < 4; ++v) {
-    //     x[v] = xyz[0][ev[v]];  // x-coordinates
-    //     y[v] = xyz[1][ev[v]];  // y-coordinates
-    //     z[v] = xyz[2][ev[v]];  // z-coordinates
-    // }
     {
-        // x0 = xyz[0][ev[0]];
-        // x1 = xyz[0][ev[1]];
-        // x2 = xyz[0][ev[2]];
-        // x3 = xyz[0][ev[3]];
-
-        // y0 = xyz[1][ev[0]];
-        // y1 = xyz[1][ev[1]];
-        // y2 = xyz[1][ev[2]];
-        // y3 = xyz[1][ev[3]];
-
-        // z0 = xyz[2][ev[0]];
-        // z1 = xyz[2][ev[1]];
-        // z2 = xyz[2][ev[2]];
-        // z3 = xyz[2][ev[3]];
-
         x0 = xyz.x[ev[0]];
         x1 = xyz.x[ev[1]];
         x2 = xyz.x[ev[2]];
@@ -545,25 +419,26 @@ __global__ void tet4_resample_field_local_kernel(
                              &hex8_f6,
                              &hex8_f7);
 
-        hex_aa_8_collect_coeffs_cu_v2(stride0,
-                                      stride1,
-                                      stride2,
-                                      i,
-                                      j,
-                                      k,
-                                      data,
-                                      &coeffs0,
-                                      &coeffs1,
-                                      &coeffs2,
-                                      &coeffs3,
-                                      &coeffs4,
-                                      &coeffs5,
-                                      &coeffs6,
-                                      &coeffs7);
+        hex_aa_8_collect_coeffs_cu(stride0,
+                                   stride1,
+                                   stride2,
+                                   i,
+                                   j,
+                                   k,
+                                   data,
+                                   &coeffs0,
+                                   &coeffs1,
+                                   &coeffs2,
+                                   &coeffs3,
+                                   &coeffs4,
+                                   &coeffs5,
+                                   &coeffs6,
+                                   &coeffs7);
 
         // Integrate gap function
         {
             real_type eval_field = 0.0;
+
             // UNROLL_ZERO
             // for (int edof_j = 0; edof_j < 8; edof_j++) {
             //     eval_field += hex8_f[edof_j] * coeffs[edof_j];
@@ -582,7 +457,7 @@ __global__ void tet4_resample_field_local_kernel(
             //     element_field[edof_i] += eval_field * tet4_f[edof_i] * dV;
             // }  // end edof_i loop
 
-            real_type dV = theta_volume * tet4_qw[quad_i];
+            const real_type dV = theta_volume * tet4_qw[quad_i];
             // dV = 1.0;
 
             element_field0 += eval_field * tet4_f0 * dV;
@@ -663,18 +538,6 @@ extern "C" int tet4_resample_field_local_CUDA(
     cudaMemcpy(xyz_device.y, xyz[1], nnodes * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(xyz_device.z, xyz[2], nnodes * sizeof(float), cudaMemcpyHostToDevice);
 
-    // ptrdiff_t* stride_device;
-    // cudaMalloc((void**)&stride_device, 3 * sizeof(ptrdiff_t));
-    // cudaMemcpy(stride_device, stride, 3 * sizeof(ptrdiff_t), cudaMemcpyHostToDevice);
-
-    float* origin_device;
-    cudaMalloc((void**)&origin_device, 3 * sizeof(float));
-    cudaMemcpy(origin_device, origin, 3 * sizeof(float), cudaMemcpyHostToDevice);
-
-    float* delta_device;
-    cudaMalloc((void**)&delta_device, 3 * sizeof(float));
-    cudaMemcpy(delta_device, delta, 3 * sizeof(float), cudaMemcpyHostToDevice);
-
     double* data_device;
     const ptrdiff_t size_data = n[0] * n[1] * n[2];
     cudaMalloc((void**)&data_device, size_data * sizeof(double));
@@ -709,11 +572,19 @@ extern "C" int tet4_resample_field_local_CUDA(
                                                                      elems_device,  //
                                                                      xyz_device,
                                                                      //  NULL,
+
                                                                      stride[0],
                                                                      stride[1],
                                                                      stride[2],
-                                                                     origin_device,
-                                                                     delta_device,
+
+                                                                     origin[0],
+                                                                     origin[1],
+                                                                     origin[2],
+
+                                                                     delta[0],
+                                                                     delta[1],
+                                                                     delta[2],
+
                                                                      data_device,
                                                                      weighted_field_device);
 
@@ -747,12 +618,7 @@ extern "C" int tet4_resample_field_local_CUDA(
 
     // Free memory on the device
     free_elems_tet4_device(&elems_device);
-
     free_xyz_tet4_device(&xyz_device);
-
-    // cudaFree(stride_device);
-    cudaFree(origin_device);
-    cudaFree(delta_device);
 
     // Copy the result back to the host
     cudaMemcpy(weighted_field,           //
