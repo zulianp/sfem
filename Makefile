@@ -367,8 +367,16 @@ create_surface_from_element_adjaciency_table : create_surface_from_element_adjac
 gap_from_sdf : gap_from_sdf.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
-grid_to_mesh : grid_to_mesh.c libsfem.a
-	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) -L/home/sriva/git/sfem/resampling/cuda -lsfem_resample_field_cuda -L/usr/local/cuda-12.3/targets/x86_64-linux/lib -lcudart ; \
+
+
+CUDA_LIBS_PATH = /usr/local/cuda-12.3/targets/x86_64-linux/lib
+grid_to_mesh: grid_to_mesh.c libsfem.a ${PWD}/resampling/cuda/libsfem_resample_field_cuda.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) -L${PWD}/resampling/cuda -lsfem_resample_field_cuda -L${CUDA_LIBS_PATH} -lcudart ; \
+
+${PWD}/resampling/cuda/libsfem_resample_field_cuda.a: ${PWD}/resampling/cuda/sfem_resample_field_cuda.cu ${PWD}/resampling/cuda/quadratures_rule_cuda.h
+	cd ${PWD}/resampling/cuda ; \
+	make ; \
+	cd ${PWD} ; 
 
 geometry_aware_gap_from_sdf : geometry_aware_gap_from_sdf.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
