@@ -47,7 +47,8 @@ int resample_field(
         const geom_t* const SFEM_RESTRICT delta,
         const real_t* const SFEM_RESTRICT data,
         // Output
-        real_t* const SFEM_RESTRICT field);
+        real_t* const SFEM_RESTRICT field,
+        sfem_resample_field_info* info);
 
 int interpolate_field(const ptrdiff_t nnodes,
                       geom_t** const SFEM_RESTRICT xyz,
