@@ -875,8 +875,8 @@ int resample_field_local(
             info->quad_nodes_cnt = TET4_NQP;
             info->nelements = nelements;
 
-            return tet4_resample_field_local_CUDA(  ////// v2 test V8 CUDA
-                                                    //   0,
+            return tet4_resample_field_local_CUDA(  ////// v2 test V4 V8 CUDA
+                                                  //   0,
                     nelements,
                     nnodes,
                     elems,
@@ -925,10 +925,10 @@ int resample_field(
         const geom_t* const SFEM_RESTRICT delta,
         const real_t* const SFEM_RESTRICT data,
         // Output
-        real_t* const SFEM_RESTRICT g) {
+        real_t* const SFEM_RESTRICT g,
+        sfem_resample_field_info* info) {
+    //
     real_t* weighted_field = calloc(nnodes, sizeof(real_t));
-
-    sfem_resample_field_info info;
 
     resample_field_local(element_type,
                          nelements,
@@ -941,7 +941,7 @@ int resample_field(
                          delta,
                          data,
                          weighted_field,
-                         &info);
+                         info);
 
     enum ElemType st = shell_type(element_type);
 

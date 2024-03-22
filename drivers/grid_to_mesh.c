@@ -27,6 +27,8 @@ int main(int argc, char* argv[]) {
     printf("Starting grid_to_mesh\n");
     printf("========================================\n\n");
 
+    sfem_resample_field_info info;
+
     MPI_Init(&argc, &argv);
 
     MPI_Comm comm = MPI_COMM_WORLD;
@@ -134,7 +136,6 @@ int main(int argc, char* argv[]) {
     }
 
     real_t* g = calloc(mesh.nnodes, sizeof(real_t));
-    sfem_resample_field_info info;
 
     {
         double resample_tick = MPI_Wtime();
@@ -168,7 +169,9 @@ int main(int argc, char* argv[]) {
                         delta,
                         field,
                         // Output
-                        g);
+                        g,
+                        &info);
+
             } else {
                 resample_field_local(
                         // Mesh
@@ -259,13 +262,23 @@ int main(int argc, char* argv[]) {
 
         free(elements_v);
 
-        const double flops = calculate_flops(mesh.nelements,       //
-                                             info.quad_nodes_cnt,  //
-                                             (resample_tock - resample_tick)) *
-                             (double)mpi_size;  //
+        double* flops_v = NULL;
+        flops_v = malloc(mpi_size * sizeof(double));
 
-        printf("Info quad_nodes_cnt: %ld\n", info.quad_nodes_cnt);
-        printf("Info nelements: %ld\n", info.nelements);
+        const double flops = calculate_flops(mesh.nelements,                    //
+                                             info.quad_nodes_cnt,               //
+                                             (resample_tock - resample_tick));  //
+
+        MPI_Gather(&flops, 1, MPI_DOUBLE, flops_v, 1, MPI_DOUBLE, 0, comm);
+
+        double tot_flops = 0.0;
+        if (!rank) {
+            for (int i = 0; i < mpi_size; i++) {
+                tot_flops += flops_v[i];
+            }
+        }
+
+        free(flops_v);
 
         if (!rank) {
             const int nelements = mesh.nelements;
@@ -273,6 +286,7 @@ int main(int argc, char* argv[]) {
                     (double)tot_nelements / (double)(resample_tock - resample_tick);
 
             printf("\n");
+            printf("===========================================\n");
 
             printf("Rank: [%d]  Nr of elements  %d\n",                    //
                    rank,                                                  //
@@ -283,9 +297,10 @@ int main(int argc, char* argv[]) {
             printf("Rank: [%d]  Throughput      %e (elements/second)\n",  //
                    rank,                                                  //
                    elements_second);                                      //
-            printf("Rank: [%d]  FLOPS           %e (flops [circa])\n",    //
+            printf("Rank: [%d]  FLOPS           %e (FLOP/S)\n",           //
                    rank,                                                  //
-                   flops);                                                //
+                   tot_flops);                                            //
+            printf("===========================================\n");
 
             printf("\n");
         }
