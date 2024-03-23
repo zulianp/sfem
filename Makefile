@@ -61,8 +61,8 @@ endif
 CFLAGS += -DSFEM_MEM_DIAGNOSTICS
 
 # Folder structure
-VPATH = pizzastack:resampling:mesh:operators:drivers:drivers/cuda:base:algebra:matrix:operators/tet10:operators/tet4:operators/macro_tet4:operators/tri3:operators/macro_tri3:operators/trishell3:operators/tri6:operators/beam2:operators/cvfem:graphs:parametrize:operators/phase_field_for_fracture:operators/kernels:operators/navier_stokes:solver:operators/cvfem_tet4:operators/cvfem_tri3:operators/cvfem_quad4:examples
-INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/macro_tet4 -Ioperators/tri3 -Ioperators/macro_tri3 -Ioperators/trishell3 -Ioperators/tri6 -Ioperators/beam2 -Ioperators/cvfem -Igraphs -Iparametrize -Ioperators/phase_field_for_fracture  -Ioperators/kernels -Ioperators/navier_stokes -Isolver -Ioperators/cvfem_tet4 -Ioperators/cvfem_tri3
+VPATH = pizzastack:resampling:mesh:operators:drivers:drivers/cuda:base:algebra:matrix:operators/tet10:operators/tet4:operators/macro_tet4:operators/tri3:operators/macro_tri3:operators/trishell3:operators/tri6:operators/beam2:operators/cvfem:graphs:parametrize:operators/phase_field_for_fracture:operators/kernels:operators/navier_stokes:solver:operators/cvfem_tet4:operators/cvfem_tri3:operators/cvfem_quad4:examples:algebra/cuda
+INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/macro_tet4 -Ioperators/tri3 -Ioperators/macro_tri3 -Ioperators/trishell3 -Ioperators/tri6 -Ioperators/beam2 -Ioperators/cvfem -Igraphs -Iparametrize -Ioperators/phase_field_for_fracture  -Ioperators/kernels -Ioperators/navier_stokes -Isolver -Ioperators/cvfem_tet4 -Ioperators/cvfem_tri3 -Ialgebra/cuda
 
 
 CFLAGS += -pedantic -Wextra
@@ -236,6 +236,7 @@ ifeq ($(cuda), 1)
 	CUDA_OBJS += tet4_laplacian_incore_cuda.o
 	CUDA_OBJS += tet10_laplacian_incore_cuda.o
 	CUDA_OBJS += macro_tet4_laplacian_incore_cuda.o
+	CUDA_OBJS += sfem_cuda_blas.o
 
 
 	CUDA_OBJS += cuda_crs.o
@@ -539,6 +540,8 @@ cuspmv : drivers/cuda/cuda_do_spmv.c libsfem.a
 lapl_matrix_free : drivers/cuda/lapl_matrix_free.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
+run_poisson_cuda : examples/run_poisson_cuda.cpp libsfem.a
+	$(MPICXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 spmv : drivers/cuda/do_spmv.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
