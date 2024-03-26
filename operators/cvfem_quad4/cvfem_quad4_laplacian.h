@@ -1,5 +1,5 @@
-#ifndef CVFEM_QUAD4_CONVECTION_H
-#define CVFEM_QUAD4_CONVECTION_H
+#ifndef CVFEM_QUAD4_LAPLACIAN_H
+#define CVFEM_QUAD4_LAPLACIAN_H
 
 #include <stddef.h>
 #include "sfem_base.h"
@@ -28,4 +28,4 @@ void cvfem_quad4_laplacian_apply(const ptrdiff_t nelements,
 }
 #endif
 
-#endif  // CVFEM_QUAD4_CONVECTION_H
+#endif  // CVFEM_QUAD4_LAPLACIAN_H

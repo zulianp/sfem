@@ -27,9 +27,7 @@
 #include "laplacian.h"
 #include "navier_stokes.h"
 #include "read_mesh.h"
-// #include "constrained_gs.h"
-#include "cvfem_tri3_convection.h"
-#include "tri3_laplacian.h"
+#include "cvfem_operators.h"
 
 #include "sfem_logger.h"
 
@@ -40,7 +38,6 @@ void axpy(const ptrdiff_t n, const real_t alpha, const real_t *const x, real_t *
     }
 }
 
-
 void scal(const ptrdiff_t n, const real_t alpha, real_t *const x) {
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < n; i++) {
@@ -48,9 +45,7 @@ void scal(const ptrdiff_t n, const real_t alpha, real_t *const x) {
     }
 }
 
-
 real_t dot(const ptrdiff_t n, const real_t *const x, const real_t *const y) {
-
     real_t ret = 0;
 #pragma omp parallel for reduction(+ : ret)
     for (ptrdiff_t i = 0; i < n; i++) {
@@ -211,7 +206,8 @@ int main(int argc, char *argv[]) {
     }
 
     real_t *cv_volumes = calloc(mesh.nnodes, sizeof(real_t));
-    cvfem_tri3_cv_volumes(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, cv_volumes);
+    cvfem_cv_volumes(
+        mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, cv_volumes);
 
     real_t dt = SFEM_DT;
     ptrdiff_t step_count = 0;
@@ -219,14 +215,25 @@ int main(int argc, char *argv[]) {
         // Integrate
         memset(buff, 0, mesh.nnodes * sizeof(real_t));
 
-        if(SFEM_DIFFUSIVITY != 0.) {
-            tri3_laplacian_apply(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, c, buff);
+        if (SFEM_DIFFUSIVITY != 0.) {
+            cvfem_laplacian_apply(mesh.element_type,
+                                  mesh.nelements,
+                                  mesh.nnodes,
+                                  mesh.elements,
+                                  mesh.points,
+                                  c,
+                                  buff);
             scal(mesh.nnodes, -SFEM_DIFFUSIVITY, buff);
         }
 
-        cvfem_tri3_convection_apply(
-            mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, vel, c, buff);
-
+        cvfem_convection_apply(mesh.element_type,
+                               mesh.nelements,
+                               mesh.nnodes,
+                               mesh.elements,
+                               mesh.points,
+                               vel,
+                               c,
+                               buff);
 
         ediv(mesh.nnodes, buff, cv_volumes, update);
         axpy(mesh.nnodes, SFEM_DT, update, c);
@@ -238,7 +245,7 @@ int main(int argc, char *argv[]) {
         //     constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, c);
         // }
 
-        if (t >= (next_check_point - SFEM_DT/2)) {  // Write to disk
+        if (t >= (next_check_point - SFEM_DT / 2)) {  // Write to disk
             printf("%g/%g dt=%g mc=%g\n", t, SFEM_MAX_TIME, dt, integr_concentration);
 
             sprintf(path, "%s/c.%09d.raw", output_folder, export_counter);

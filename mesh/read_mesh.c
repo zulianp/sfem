@@ -2,6 +2,7 @@
 #include "read_mesh.h"
 
 #include "matrixio_array.h"
+#include "sfem_defs.h"
 #include "utils.h"
 
 #include <assert.h>
@@ -848,6 +849,10 @@ int mesh_read_generic(MPI_Comm comm,
 
         mesh->spatial_dim = ndims;
         mesh->element_type = nnodesxelem;
+
+        if(nnodesxelem == 4 && ndims == 2) {
+            mesh->element_type = QUAD4;
+        }
 
         mesh->elements = elems;
         mesh->points = part_xyz;
