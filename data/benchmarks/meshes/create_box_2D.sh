@@ -61,12 +61,19 @@ then
 	box_2D.py $mesh_db $nrefs $width $height
 else
 	box_2D_quad.py $mesh_db $nrefs $width $height
+	mesh_original=$mesh_raw
 fi
 
 db_to_raw.py $mesh_db $mesh_original --select_elem_type=$elem_type
 
 rm -rf  $mesh_original/z.raw
-refine $mesh_original $mesh_raw
+
+if [[ "$elem_type" = "triangle" ]]
+then
+	refine $mesh_original $mesh_raw
+else
+	echo "skipping refinement"
+fi
 
 # set -x
 

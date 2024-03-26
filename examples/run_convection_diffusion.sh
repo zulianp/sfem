@@ -29,8 +29,7 @@ export OMP_PROC_BIND=true
 
 SFEM_MESH_DIR=mesh
 
-SFEM_ELEM_TYPE=quad create_box_2D.sh 1 2 1
-rm $SFEM_MESH_DIR/z.raw
+# SFEM_ELEM_TYPE=quad create_box_2D.sh 1 2 1
 
 sleft=$SFEM_MESH_DIR/sidesets_aos/sleft.raw
 sright=$SFEM_MESH_DIR/sidesets_aos/sright.raw
@@ -40,7 +39,7 @@ export SFEM_DIRICHLET_VALUE="1"
 export SFEM_DIRICHLET_COMPONENT="0"
 
 export SFEM_MAX_TIME=100
-export SFEM_DT=0.0005
+export SFEM_DT=0.00001
 export SFEM_EXPORT_FREQUENCY=0.5
 export SFEM_DIFFUSIVITY=0
 

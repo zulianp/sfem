@@ -341,10 +341,10 @@ void cvfem_quad4_cv_volumes(const ptrdiff_t nelements,
     {
 #pragma omp for  // nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
-            idx_t ev[3];
+            idx_t ev[4];
 
-#pragma unroll(3)
-            for (int v = 0; v < 3; ++v) {
+#pragma unroll(4)
+            for (int v = 0; v < 4; ++v) {
                 ev[v] = elems[v][i];
             }
 
@@ -358,7 +358,7 @@ void cvfem_quad4_cv_volumes(const ptrdiff_t nelements,
             const real_t measure = ((J[0] * J[3] - J[1] * J[2]) / 2) / 4;
 
             assert(measure > 0);
-            for (int edof_i = 0; edof_i < 3; ++edof_i) {
+            for (int edof_i = 0; edof_i < 4; ++edof_i) {
                 const idx_t dof_i = ev[edof_i];
 
 #pragma omp atomic update
