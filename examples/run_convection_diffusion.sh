@@ -28,7 +28,7 @@ export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true
 
 SFEM_MESH_DIR=mesh
-# create_box_2D.sh 4 2 1
+# create_box_2D.sh 6 2 1
 # rm $SFEM_MESH_DIR/z.raw
 
 sleft=$SFEM_MESH_DIR/sidesets_aos/sleft.raw
@@ -41,7 +41,7 @@ export SFEM_DIRICHLET_COMPONENT="0"
 export SFEM_MAX_TIME=100
 export SFEM_DT=0.0005
 export SFEM_EXPORT_FREQUENCY=0.5
-export SFEM_DIFFUSIVITY=0.001
+export SFEM_DIFFUSIVITY=0
 
 # lldb -- 
 run_convection_diffusion $SFEM_MESH_DIR out
