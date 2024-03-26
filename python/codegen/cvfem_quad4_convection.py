@@ -67,29 +67,29 @@ def pw_max(a, b):
 def advection_op(q):
 	A = sp.zeros(4, 4)
 
-	# Node 1
+	# Node 0
 	A[0, 0] = -pw_max( q[0], 0) - pw_max(-q[3], 0)
 	A[0, 1] =  pw_max(-q[0], 0)
 	A[0, 2] =  0
 	A[0, 3] =  pw_max(q[3], 0)
 
-	# Node 2
+	# Node 1
 	A[1, 1] = -pw_max(-q[0], 0) - pw_max(q[1], 0)
 	A[1, 0] =  pw_max(q[0], 0)
 	A[1, 2] =  pw_max(-q[1], 0)
 	A[1, 3] =  0
 
-	# Node 3
+	# Node 2
 	A[2, 2] = -pw_max(-q[1], 0) - pw_max(q[2], 0)
 	A[2, 0] = 0
 	A[2, 1] = pw_max(q[1], 0)
 	A[2, 3] = pw_max(-q[2], 0)
 
-	# Node 4
-	A[3, 3] = -pw_max(q[3], 0) - pw_max(q[2], 0)
+	# Node 3
+	A[3, 3] = -pw_max(q[3], 0) - pw_max(-q[2], 0)
 	A[3, 0] = pw_max(-q[3], 0)
 	A[3, 1] = 0
-	A[3, 2] = pw_max(-q[2], 0)
+	A[3, 2] = pw_max(q[2], 0)
 
 	return A
 
@@ -141,3 +141,23 @@ x = coeffs('x', 4)
 y = A * x
 expr = assign_matrix('element_vector', y)
 c_code(expr)
+
+# Check on ref element
+if False:
+	for i in range(0, 4):
+
+		line = ""
+
+		for j in range(0, 4):
+			su = ref_subs(A[i, j])
+
+			for v in vx:
+				su = su.subs(v, 0)
+
+			for v in vy:
+				su = su.subs(v, 1)
+
+			line += f"{round(su, 1)} "
+
+		print(line)
+		print('\n')

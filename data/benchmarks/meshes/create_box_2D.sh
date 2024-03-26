@@ -80,11 +80,15 @@ fi
 $LAUNCH skin $mesh_raw $mesh_surface
 raw_to_db.py $mesh_surface $mesh_surface/surf.vtk
 
+x_middle=`python3 -c 'print('$width'/2)'`
+y_middle=`python3 -c 'print('$height'/2)'`
+echo $x_middle
+
 # 									x 				y 					z 	cos(angle)
-$LAUNCH select_surf $mesh_surface  0  			 	$(( height/2 )) 	0  	0.99 $mesh_surface/sides_left.raw
-$LAUNCH select_surf $mesh_surface  $width  		 	$(( height/2 ))  	0  	0.99 $mesh_surface/sides_right.raw
-$LAUNCH select_surf $mesh_surface  $(( width/2 ))  	0  					0  	0.99 $mesh_surface/sides_bottom.raw
-$LAUNCH select_surf $mesh_surface  $(( width/2 ))   $height  			0  	0.99 $mesh_surface/sides_top.raw
+$LAUNCH select_surf $mesh_surface  0  			$y_middle 	0  	0.99 $mesh_surface/sides_left.raw
+$LAUNCH select_surf $mesh_surface  $width  		$y_middle  	0  	0.99 $mesh_surface/sides_right.raw
+$LAUNCH select_surf $mesh_surface  $x_middle  	0  					0  	0.99 $mesh_surface/sides_bottom.raw
+$LAUNCH select_surf $mesh_surface  $x_middle   	$height  			0  	0.99 $mesh_surface/sides_top.raw
 
 print_array()
 {
@@ -134,8 +138,8 @@ python3 -c "import numpy as np; a=np.fromfile(\"$mesh_raw/x.raw\", dtype=np.floa
 
 $LAUNCH smask $mesh_raw/sidesets_aos/sleft.raw    $sides $sides 1
 $LAUNCH smask $mesh_raw/sidesets_aos/sright.raw   $sides $sides 2
-$LAUNCH smask $mesh_raw/sidesets_aos/sbottom.raw  $sides $sides 3
-$LAUNCH smask $mesh_raw/sidesets_aos/stop.raw  	  $sides $sides 4
+# $LAUNCH smask $mesh_raw/sidesets_aos/sbottom.raw  $sides $sides 3
+# $LAUNCH smask $mesh_raw/sidesets_aos/stop.raw  	  $sides $sides 4
 
 raw_to_db.py $mesh_raw $mesh_raw/dirichlet.vtk --point_data="$sides" --cell_type=$elem_type
  

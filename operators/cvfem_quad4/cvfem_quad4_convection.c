@@ -66,8 +66,8 @@ static SFEM_INLINE void cvfem_quad4_convection_assemble_hessian_kernel(
     element_matrix[11] = x29;
     element_matrix[12] = x19;
     element_matrix[13] = 0;
-    element_matrix[14] = x29;
-    element_matrix[15] = -x21 - x28;
+    element_matrix[14] = x28;
+    element_matrix[15] = -x21 - x29;
 }
 
 static SFEM_INLINE void cvfem_quad4_convection_assemble_apply_kernel(
@@ -116,7 +116,7 @@ static SFEM_INLINE void cvfem_quad4_convection_assemble_apply_kernel(
     element_vector[0] = x13 * x[3] + x19 * x[1] + x[0] * (-x20 - x21);
     element_vector[1] = x20 * x[0] + x25 * x[2] + x[1] * (-x19 - x26);
     element_vector[2] = x26 * x[1] + x28 * x[3] + x[2] * (-x25 - x29);
-    element_vector[3] = x21 * x[0] + x28 * x[2] + x[3] * (-x13 - x29);
+    element_vector[3] = x21 * x[0] + x29 * x[2] + x[3] * (-x13 - x28);
 }
 
 static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {
