@@ -949,6 +949,10 @@ int mesh_read_generic(MPI_Comm comm,
         mesh->spatial_dim = ndims;
         mesh->element_type = nnodesxelem;
 
+        if(nnodesxelem == 4 && ndims == 2) {
+            mesh->element_type = QUAD4;
+        }
+
         mesh->nelements = n_local_elements;
         mesh->nnodes = n_local_nodes;
 

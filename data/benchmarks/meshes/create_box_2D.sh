@@ -35,6 +35,15 @@ mesh_db=$folder/mesh.vtk
 mesh_original=./original
 mesh_raw=./mesh
 mesh_surface=$mesh_raw/surface
+elem_type=triangle
+
+if [[ -z $SFEM_ELEM_TYPE ]]
+then
+	echo "Using default elem_type=$elem_type"
+else
+	elem_type=$SFEM_ELEM_TYPE
+	echo "Using elem_type=$elem_type"
+fi
 
 mkdir -p $mesh_raw
 mkdir -p $mesh_surface/left
@@ -47,8 +56,16 @@ mkdir -p $folder
 
 idx_type_size=4
 
-box_2D.py $mesh_db $nrefs $width $height
-db_to_raw.py $mesh_db $mesh_original --select_elem_type=triangle
+if [[ "$elem_type" = "triangle" ]]
+then
+	box_2D.py $mesh_db $nrefs $width $height
+else
+	box_2D_quad.py $mesh_db $nrefs $width $height
+fi
+
+db_to_raw.py $mesh_db $mesh_original --select_elem_type=$elem_type
+
+rm -rf  $mesh_original/z.raw
 refine $mesh_original $mesh_raw
 
 # set -x
@@ -113,5 +130,5 @@ $LAUNCH smask $mesh_raw/sidesets_aos/sright.raw   $sides $sides 2
 $LAUNCH smask $mesh_raw/sidesets_aos/sbottom.raw  $sides $sides 3
 $LAUNCH smask $mesh_raw/sidesets_aos/stop.raw  	  $sides $sides 4
 
-raw_to_db.py $mesh_raw $mesh_raw/dirichlet.vtk --point_data="$sides"
-
+raw_to_db.py $mesh_raw $mesh_raw/dirichlet.vtk --point_data="$sides" --cell_type=$elem_type
+ 

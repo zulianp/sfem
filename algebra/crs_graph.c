@@ -284,10 +284,10 @@ int build_crs_graph_for_elem_type(const int element_type,
 
     if (SFEM_CRS_MEM_CONSERVATIVE) {
         return build_crs_graph_mem_conservative(
-            nelements, nnodes, element_type, elems, out_rowptr, out_colidx);
+            nelements, nnodes, elem_num_nodes(element_type), elems, out_rowptr, out_colidx);
     } else {
         return build_crs_graph_faster(
-            nelements, nnodes, element_type, elems, out_rowptr, out_colidx);
+            nelements, nnodes, elem_num_nodes(element_type), elems, out_rowptr, out_colidx);
     }
 }
 

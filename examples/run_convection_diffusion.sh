@@ -28,8 +28,9 @@ export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true
 
 SFEM_MESH_DIR=mesh
-# create_box_2D.sh 6 2 1
-# rm $SFEM_MESH_DIR/z.raw
+
+SFEM_ELEM_TYPE=quad create_box_2D.sh 1 2 1
+rm $SFEM_MESH_DIR/z.raw
 
 sleft=$SFEM_MESH_DIR/sidesets_aos/sleft.raw
 sright=$SFEM_MESH_DIR/sidesets_aos/sright.raw
