@@ -29,13 +29,13 @@ export OMP_PROC_BIND=true
 source venv/bin/activate
 
 mesh=mesh
-mesh_sorted=ref2
+ref2=ref2
 
 
 
-if [[ -d "$mesh_sorted" ]]
+if [[ -d "$ref2" ]]
 then
-	echo "Reusing mesh: $mesh_sorted"
+	echo "Reusing mesh: $ref2"
 else
 	create_sphere.sh 4
 	refine mesh ref1
@@ -44,23 +44,23 @@ else
 	mesh_p1_to_p2 sfc1 p2
 
 
-	touch $mesh_sorted/zd.raw
-	touch $mesh_sorted/on.raw
+	touch $ref2/zd.raw
+	touch $ref2/on.raw
 
 	mkdir -p linear_system
-	assemble $mesh_sorted linear_system
+	assemble $ref2 linear_system
 
-	eval_nodal_function.py "x*x + y*y" $mesh_sorted/x.raw $mesh_sorted/y.raw  $mesh_sorted/z.raw linear_system/rhs.raw
-	# eval_nodal_function.py "x*0 + 1" $mesh_sorted/x.raw $mesh_sorted/y.raw  $mesh_sorted/z.raw linear_system/rhs.raw
+	eval_nodal_function.py "x*x + y*y" $ref2/x.raw $ref2/y.raw  $ref2/z.raw linear_system/rhs.raw
+	# eval_nodal_function.py "x*0 + 1" $ref2/x.raw $ref2/y.raw  $ref2/z.raw linear_system/rhs.raw
 fi
 
 spmv 	1 0 linear_system linear_system/rhs.raw test.raw
 cuspmv 	1 0 linear_system linear_system/rhs.raw test.raw
 
-lapl_matrix_free $mesh_sorted 1 linear_system/rhs.raw mf_test.raw
+lapl_matrix_free $ref2 1 linear_system/rhs.raw mf_test.raw
 SFEM_USE_MACRO=1 lapl_matrix_free p2 1 linear_system/rhs.raw macro_test.raw
 SFEM_USE_MACRO=0 lapl_matrix_free p2 1 linear_system/rhs.raw p2_test.raw
 
-raw_to_db.py $mesh_sorted mf_out.vtk --point_data="linear_system/rhs.raw,mf_test.raw,macro_test.raw,test.raw,p2_test.raw"
+raw_to_db.py $ref2 mf_out.vtk --point_data="linear_system/rhs.raw,mf_test.raw,macro_test.raw,test.raw,p2_test.raw"
 
 deactivate

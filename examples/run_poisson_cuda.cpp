@@ -7,10 +7,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "boundary_condition.h"
 #include "sfem_base.h"
 #include "sfem_defs.h"
 
-#include "boundary_condition.h"
+#include "boundary_condition_incore_cuda.h"
 #include "dirichlet.h"
 #include "neumann.h"
 
@@ -29,82 +30,6 @@
 #include <vector>
 
 #include "sfem_cuda_blas.h"
-
-//TODO port the following functions to GPU
-void d_constraint_nodes_copy_vec(const ptrdiff_t n_dirichlet_nodes,
-                               const idx_t *dirichlet_nodes,
-                               const int block_size,
-                               const int component,
-                               const real_t *source,
-                               real_t *dest) {
-#pragma omp parallel
-    {
-#pragma omp for
-        for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
-            idx_t i = dirichlet_nodes[node] * block_size + component;
-            dest[i] = source[i];
-        }
-    }
-}
-
-void d_copy_at_dirichlet_nodes_vec(const int n_conditions,
-                                   const boundary_condition_t *const cond,
-                                   const int block_size,
-                                   const real_t *const in,
-                                   real_t *const out)
-{
-      for (int i = 0; i < n_conditions; i++) {
-        d_constraint_nodes_copy_vec(
-            cond[i].local_size, cond[i].idx, block_size, cond[i].component, in, out);
-    }
-}
-
-void d_constraint_nodes_to_value_vec(const ptrdiff_t n_dirichlet_nodes,
-                                   const idx_t *dirichlet_nodes,
-                                   const int block_size,
-                                   const int component,
-                                   const real_t value,
-                                   real_t *values) {
-#pragma omp parallel
-    {
-#pragma omp for
-        for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
-            idx_t i = dirichlet_nodes[node] * block_size + component;
-            values[i] = value;
-        }
-    }
-}
-
-void d_constraint_nodes_to_values_vec(const ptrdiff_t n_dirichlet_nodes,
-                                    const idx_t *dirichlet_nodes,
-                                    const int block_size,
-                                    const int component,
-                                    const real_t *dirichlet_values,
-                                    real_t *values) {
-#pragma omp parallel
-    {
-#pragma omp for
-        for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
-            idx_t i = dirichlet_nodes[node] * block_size + component;
-            values[i] = dirichlet_values[node];
-        }
-    }
-}
-
-void d_apply_dirichlet_condition_vec(const int n_conditions,
-                                   const boundary_condition_t *const cond,
-                                   const int block_size,
-                                   real_t *const x) {
-    for (int i = 0; i < n_conditions; i++) {
-        if (cond[i].values) {
-            d_constraint_nodes_to_values_vec(
-                cond[i].local_size, cond[i].idx, block_size, cond[i].component, cond[i].values, x);
-        } else {
-            d_constraint_nodes_to_value_vec(
-                cond[i].local_size, cond[i].idx, block_size, cond[i].component, cond[i].value, x);
-        }
-    }
-}
 
 template <typename T>
 void cg_init_cuda(sfem::ConjugateGradient<T> &cg) {
@@ -185,13 +110,28 @@ int main(int argc, char *argv[]) {
     }
 
     int n_dirichlet_conditions;
-    boundary_condition_t *dirichlet_conditions;
-    read_dirichlet_conditions(&mesh,
-                              SFEM_DIRICHLET_NODESET,
-                              SFEM_DIRICHLET_VALUE,
-                              SFEM_DIRICHLET_COMPONENT,
-                              &dirichlet_conditions,
-                              &n_dirichlet_conditions);
+    boundary_condition_t *d_dirichlet_conditions = 0;
+
+    {   
+        // 
+        boundary_condition_t *h_dirichlet_conditions;
+        read_dirichlet_conditions(&mesh,
+                                  SFEM_DIRICHLET_NODESET,
+                                  SFEM_DIRICHLET_VALUE,
+                                  SFEM_DIRICHLET_COMPONENT,
+                                  &h_dirichlet_conditions,
+                                  &n_dirichlet_conditions);
+
+        d_dirichlet_conditions =
+            (boundary_condition_t *)malloc(n_dirichlet_conditions * sizeof(boundary_condition_t));
+
+        for (int d = 0; d < n_dirichlet_conditions; d++) {
+            boundary_conditions_host_to_device(&h_dirichlet_conditions[d],
+                                               &d_dirichlet_conditions[d]);
+        }
+
+        destroy_conditions(n_dirichlet_conditions, h_dirichlet_conditions);
+    }
 
     enum ElemType elem_type = (ElemType)mesh.element_type;
 
@@ -209,8 +149,8 @@ int main(int argc, char *argv[]) {
     // solver.default_init();
     cg_init_cuda(solver);
 
-    real_t * d_x = d_allocate(mesh.nnodes);
-    real_t * d_b = d_allocate(mesh.nnodes);
+    real_t *d_x = d_allocate(mesh.nnodes);
+    real_t *d_b = d_allocate(mesh.nnodes);
 
     cuda_incore_laplacian_t ctx;
 
@@ -238,15 +178,15 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        d_copy_at_dirichlet_nodes_vec(n_dirichlet_conditions, dirichlet_conditions, 1, x, y);
+        d_copy_at_dirichlet_nodes_vec(n_dirichlet_conditions, d_dirichlet_conditions, 1, x, y);
     };
 
     // std::vector<real_t> x(mesh.nnodes, 0), b(mesh.nnodes, 0);
 
-    d_apply_dirichlet_condition_vec(n_dirichlet_conditions, dirichlet_conditions, 1, d_x);
-    d_apply_dirichlet_condition_vec(n_dirichlet_conditions, dirichlet_conditions, 1, d_b);
+    d_apply_dirichlet_condition_vec(n_dirichlet_conditions, d_dirichlet_conditions, 1, d_x);
+    d_apply_dirichlet_condition_vec(n_dirichlet_conditions, d_dirichlet_conditions, 1, d_b);
 
-    solver.apply(mesh.nnodes,d_b, d_x);
+    solver.apply(mesh.nnodes, d_b, d_x);
 
     // array_write(comm, output_path, SFEM_MPI_REAL_T, x.data(), mesh.nnodes, mesh.nnodes);
 
@@ -254,7 +194,7 @@ int main(int argc, char *argv[]) {
     ptrdiff_t nnodes = mesh.nnodes;
 
     mesh_destroy(&mesh);
-    destroy_conditions(n_dirichlet_conditions, dirichlet_conditions);
+    d_destroy_conditions(n_dirichlet_conditions, d_dirichlet_conditions);
     // destroy_conditions(n_neumann_conditions, neumann_conditions);
 
     if (mesh.element_type == TET4) {
