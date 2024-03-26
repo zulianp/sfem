@@ -221,7 +221,7 @@ OBJS += tet10_grad.o \
 OBJS += sfem_resample_gap.o sfem_resample_field.o
 
 # CVFEM
-OBJS += cvfem_tri3_diffusion.o cvfem_tet4_laplacian.o cvfem_tri3_convection.o cvfem_quad4_convection.o
+OBJS += cvfem_tri3_diffusion.o cvfem_tet4_laplacian.o cvfem_tri3_convection.o cvfem_quad4_convection.o cvfem_quad4_laplacian.o
 
 # Graphs
 ifeq ($(metis), 1)

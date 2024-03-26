@@ -264,8 +264,6 @@ void cvfem_quad4_convection_apply(const ptrdiff_t nelements,
                                   real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    // double tick = MPI_Wtime();
-
 #pragma omp parallel
     {
 #pragma omp for  // nowait
@@ -327,9 +325,6 @@ void cvfem_quad4_convection_apply(const ptrdiff_t nelements,
             }
         }
     }
-
-    // double tock = MPI_Wtime();
-    // printf("cvfem_quad4_convection.c: cvfem_quad4_convection_apply\t%g seconds\n", tock - tick);
 }
 
 void cvfem_quad4_cv_volumes(const ptrdiff_t nelements,
