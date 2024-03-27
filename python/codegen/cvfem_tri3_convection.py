@@ -125,3 +125,41 @@ x = coeffs('x', 3)
 y = A * x
 expr = assign_matrix('element_vector', y)
 c_code(expr)
+
+# if False:
+if True:
+	print("Ref element subs")
+	def ref_subs(expr):
+
+		for i in range(0, 2):
+			for j in range(0, 2):
+				expr = expr.subs(J[i, j], JJ[i, j])
+
+		expr = expr.subs(x0, 0)
+		expr = expr.subs(y0, 0)
+
+		expr = expr.subs(x1, 1)
+		expr = expr.subs(y1, 0)
+		
+		expr = expr.subs(x2, 0)
+		expr = expr.subs(y2, 1)
+
+		return expr
+
+	for i in range(0, 3):
+
+		line = ""
+
+		for j in range(0, 3):
+			su = ref_subs(A[i, j])
+
+			for v in vx:
+				su = su.subs(v, 0)
+
+			for v in vy:
+				su = su.subs(v, 1)
+
+			line += f"{round(su, 4)} "
+
+		print(line)
+		print('\n')

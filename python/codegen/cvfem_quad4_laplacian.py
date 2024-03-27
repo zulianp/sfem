@@ -92,7 +92,7 @@ def laplace_op(dn):
 				gx = grad_shape[j][0].subs(qx, num_qx[k]).subs(qy, num_qy[k])
 				gy = grad_shape[j][1].subs(qx, num_qx[k]).subs(qy, num_qy[k])
 				A[i, j] += dn_l[0] * gx + dn_l[1] * gy
-
+	# A = -A
 	return A
 
 def ref_subs(expr):
@@ -130,7 +130,14 @@ c_code(expr)
 
 
 # # Check on ref element
-# for i in range(0, 4):
-# 	for j in range(0, 4):
-# 		print(ref_subs(A[i, j]))
-# 	print('\n')
+if True:
+	for i in range(0, 4):
+
+		line = ""
+
+		for j in range(0, 4):
+			su = ref_subs(A[i, j])
+			line += f"{round(su, 1)} "
+
+		print(line)
+		print('\n')

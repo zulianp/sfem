@@ -23,7 +23,7 @@ def fun(x, y):
 
 def p(x, y):
 	f = fun(x, y)
-	px = f[0] * p0[0] + f[1] * p1[0] + f[2] * p2[0] + f[3] * p3[0];
+	px = f[0] * p0[0] + f[1] * p1[0] + f[2] * p2[0] + f[3] * p3[0]
 	py = f[0] * p0[1] + f[1] * p1[1] + f[2] * p2[1] + f[3] * p3[1]
 	return [px, py]
 
@@ -143,7 +143,8 @@ expr = assign_matrix('element_vector', y)
 c_code(expr)
 
 # Check on ref element
-if False:
+# if False:
+if True:
 	for i in range(0, 4):
 
 		line = ""

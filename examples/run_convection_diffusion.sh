@@ -32,6 +32,7 @@ SFEM_MESH_DIR=mesh
 export SFEM_ELEM_TYPE=quad 
 # export SFEM_ELEM_TYPE=triangle
 
+rm -rf $SFEM_MESH_DIR
 create_box_2D.sh 3 2 1
 
 sleft=$SFEM_MESH_DIR/sidesets_aos/sleft.raw
@@ -41,9 +42,9 @@ export SFEM_DIRICHLET_NODESET="$sleft"
 export SFEM_DIRICHLET_VALUE="1"
 export SFEM_DIRICHLET_COMPONENT="0"
 
-export SFEM_MAX_TIME=1
-export SFEM_DT=0.0005
-export SFEM_EXPORT_FREQUENCY=0.001
+export SFEM_MAX_TIME=10
+export SFEM_DT=0.0001
+export SFEM_EXPORT_FREQUENCY=0.1
 export SFEM_DIFFUSIVITY=0
 
 # lldb -- 
