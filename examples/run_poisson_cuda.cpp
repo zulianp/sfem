@@ -32,13 +32,22 @@
 #include "sfem_cuda_blas.h"
 
 template <typename T>
-void cg_init_cuda(sfem::ConjugateGradient<T> &cg) {
+void sfem_cuda_init_solver(sfem::ConjugateGradient<T> &cg) {
     cg.allocate = d_allocate;
     cg.destroy = d_destroy;
     cg.copy = d_copy;
     cg.dot = d_dot;
     cg.axpby = d_axpby;
-    // cg.zaxpby =
+}
+
+template <typename T>
+void sfem_cuda_init_solver(sfem::BiCGStab<T> &cg) {
+    cg.allocate = d_allocate;
+    cg.destroy = d_destroy;
+    cg.copy = d_copy;
+    cg.dot = d_dot;
+    cg.axpby = d_axpby;
+    cg.zaxpby = d_zaxpby;
 }
 
 int main(int argc, char *argv[]) {
@@ -139,15 +148,15 @@ int main(int argc, char *argv[]) {
         elem_type = macro_type_variant(elem_type);
     }
 
-    using Solver_t = sfem::ConjugateGradient<real_t>;
-    // using Solver_t = sfem::BiCGStab<real_t>;
+    // using Solver_t = sfem::ConjugateGradient<real_t>;
+    using Solver_t = sfem::BiCGStab<real_t>;
 
     Solver_t solver;
 
     solver.max_it = 9000;
     solver.tol = 1e-10;
     // solver.default_init();
-    cg_init_cuda(solver);
+    sfem_cuda_init_solver(solver);
 
     real_t *d_x = d_allocate(mesh.nnodes);
     real_t *d_b = d_allocate(mesh.nnodes);

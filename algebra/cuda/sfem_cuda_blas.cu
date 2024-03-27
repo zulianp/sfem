@@ -74,7 +74,7 @@ static bool sfem_blas_initialized = false;
 static cublasHandle_t cublas_handle;
 void __attribute__((destructor)) sfem_blas_destroy() {
     if (sfem_blas_initialized) {
-        printf("Destroy CuBLAS\n");
+        // printf("Destroy CuBLAS\n");
         cublasDestroy(cublas_handle);
     }
 }
@@ -256,6 +256,60 @@ namespace sfem {
 #endif
         }
 
+        void zaxpby(const ptrdiff_t n,
+                    const double alpha,
+                    const double *const x,
+                    const double beta,
+                    const double *const y,
+                    double *const z) {
+            sfem_blas_init();
+
+#ifdef SFEM_ENABLE_CUBLAS
+
+            if (x == z) {
+                CHECK_CUBLAS(cublasDscal(cublas_handle, n, &alpha, z, 1));
+                CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &beta, y, 1, z, 1));
+
+            } else if (y == z) {
+                CHECK_CUBLAS(cublasDscal(cublas_handle, n, &beta, z, 1));
+                CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &alpha, x, 1, z, 1));
+            } else {
+                cudaMemset(z, 0, n * sizeof(double));
+                CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &alpha, x, 1, z, 1));
+                CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &beta, y, 1, z, 1));
+            }
+#else
+#error "IMPLEMENT ME!"
+#endif
+        }
+
+        void zaxpby(const ptrdiff_t n,
+                    const float alpha,
+                    const float *const x,
+                    const float beta,
+                    const float *const y,
+                    float *const z) {
+            sfem_blas_init();
+
+#ifdef SFEM_ENABLE_CUBLAS
+
+            if (x == z) {
+                CHECK_CUBLAS(cublasSscal(cublas_handle, n, &alpha, z, 1));
+                CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &beta, y, 1, z, 1));
+
+            } else if (y == z) {
+                CHECK_CUBLAS(cublasSscal(cublas_handle, n, &beta, z, 1));
+                CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &alpha, x, 1, z, 1));
+            } else {
+                cudaMemset(z, 0, n * sizeof(float));
+                CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &alpha, x, 1, z, 1));
+                CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &beta, y, 1, z, 1));
+            }
+#else
+#error "IMPLEMENT ME!"
+#endif
+        }
+
     }  // namespace device
 }  // namespace sfem
 
@@ -281,7 +335,7 @@ void d_ediv(const ptrdiff_t n, const real_t *const l, const real_t *const r, rea
     int kernel_block_size = 128;
     ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-   sfem::device::tdiv<<<n_blocks, kernel_block_size>>>(n, l, r, result);
+    sfem::device::tdiv<<<n_blocks, kernel_block_size>>>(n, l, r, result);
 
     SFEM_DEBUG_SYNCHRONIZE();
 }
@@ -292,6 +346,15 @@ void d_axpby(const ptrdiff_t n,
              const real_t beta,
              real_t *const y) {
     sfem::device::axpby(n, alpha, x, beta, y);
+}
+
+void d_zaxpby(const ptrdiff_t n,
+              const real_t alpha,
+              const real_t *const x,
+              const real_t beta,
+              const real_t *const y,
+              real_t *const z) {
+    sfem::device::zaxpby(n, alpha, x, beta, y, z);
 }
 
 void d_memset(void *ptr, int value, const std::size_t n) { cudaMemset(ptr, value, n); }

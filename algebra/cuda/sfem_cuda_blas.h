@@ -25,6 +25,9 @@ void d_axpby(const ptrdiff_t n,
              const real_t beta,
              real_t *const y);
 
+
+void d_zaxpby(const ptrdiff_t, const real_t alpha, const real_t* const x, const real_t beta, const real_t* const y, real_t* const z);
+
 #ifdef __cplusplus
 }
 #endif
