@@ -107,6 +107,17 @@ static inline __device__ __host__ void lapl_apply_micro_kernel(
                         fff[5 * stride] * u[3] - x4 - x5;
 }
 
+static inline __device__ __host__ void lapl_diag_micro_kernel(const geom_t *const SFEM_RESTRICT fff,
+                                                              const ptrdiff_t stride,
+                                                              scalar_t *const SFEM_RESTRICT
+                                                                  element_vector) {
+    element_vector[0] = fff[0 * stride] + 2 * fff[1 * stride] + 2 * fff[2 * stride] +
+                        fff[3 * stride] + 2 * fff[4 * stride] + fff[5 * stride];
+    element_vector[1] = fff[0 * stride];
+    element_vector[2] = fff[3 * stride];
+    element_vector[3] = fff[5 * stride];
+}
+
 __global__ void tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t nelements,
                                                         idx_t *const SFEM_RESTRICT elems,
                                                         const cu_jacobian_t *const SFEM_RESTRICT
@@ -141,6 +152,39 @@ __global__ void tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t nelement
 #pragma unroll(4)
         for (int v = 0; v < 4; ++v) {
             atomicAdd(&y[vidx[v]], ey[v]);
+        }
+    }
+}
+
+__global__ void tet4_cuda_incore_laplacian_diag_kernel(
+    const ptrdiff_t nelements,
+    idx_t *const SFEM_RESTRICT elems,
+    const cu_jacobian_t *const SFEM_RESTRICT fff,
+    real_t *const SFEM_RESTRICT diag) {
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
+         e += blockDim.x * gridDim.x) {
+        scalar_t ed[4];
+        idx_t vidx[4];
+
+        // collect coeffs
+#pragma unroll(4)
+        for (int v = 0; v < 4; ++v) {
+            vidx[v] = elems[v * nelements + e];
+        }
+
+        geom_t fffe[6];
+#pragma unroll(6)
+        for (int d = 0; d < 6; d++) {
+            fffe[d] = fff[d * nelements + e];
+        }
+
+        // Assembler operator diagonal
+        lapl_diag_micro_kernel(fffe, 1, ed);
+
+        // redistribute coeffs
+#pragma unroll(4)
+        for (int v = 0; v < 4; ++v) {
+            atomicAdd(&diag[vidx[v]], ed[v]);
         }
     }
 }
@@ -306,12 +350,27 @@ extern int tet4_cuda_incore_laplacian_apply(cuda_incore_laplacian_t *ctx,
         cuOccupancyMaxPotentialBlockSize(
             &min_grid_size, &block_size, tet4_cuda_incore_laplacian_apply_kernel, 0, 0);
     }
-#endif //SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+#endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
     ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (ctx->nelements + block_size - 1) / block_size);
     tet4_cuda_incore_laplacian_apply_kernel<<<n_blocks, block_size, 0>>>(
         ctx->nelements, ctx->d_elems, (cu_jacobian_t *)ctx->d_fff, d_x, d_y);
+    return 0;
+}
 
-    printf("tet4_cuda_incore_laplacian_apply_V1\n");
+extern int tet4_cuda_incore_laplacian_diag(cuda_incore_laplacian_t *ctx, real_t *const d_d) {
+        // Hand tuned
+    int block_size = 128;
+#ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+    {
+        int min_grid_size;
+        cuOccupancyMaxPotentialBlockSize(
+            &min_grid_size, &block_size, tet4_cuda_incore_laplacian_apply_kernel, 0, 0);
+    }
+#endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+
+    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (ctx->nelements + block_size - 1) / block_size);
+    tet4_cuda_incore_laplacian_diag_kernel<<<n_blocks, block_size, 0>>>(
+        ctx->nelements, ctx->d_elems, (cu_jacobian_t *)ctx->d_fff, d_d);
     return 0;
 }

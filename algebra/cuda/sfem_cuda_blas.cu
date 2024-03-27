@@ -125,6 +125,17 @@ namespace sfem {
         }
 
         template <typename T>
+        __global__ void tdiv(const ptrdiff_t n,
+                             const T *const l,
+                             const T *const r,
+                             T *const result) {
+            for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n;
+                 i += blockDim.x * gridDim.x) {
+                result[i] = l[i] / r[i];
+            }
+        }
+
+        template <typename T>
         T *allocate(const std::size_t n) {
             T *ptr = nullptr;
             cudaMalloc((void **)&ptr, n * sizeof(T));
@@ -264,6 +275,15 @@ void d_copy(const ptrdiff_t n, const real_t *const src, real_t *const dest) {
 
 real_t d_dot(const ptrdiff_t n, const real_t *const l, const real_t *const r) {
     return sfem::device::dot(n, l, r);
+}
+
+void d_ediv(const ptrdiff_t n, const real_t *const l, const real_t *const r, real_t *const result) {
+    int kernel_block_size = 128;
+    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
+
+   sfem::device::tdiv<<<n_blocks, kernel_block_size>>>(n, l, r, result);
+
+    SFEM_DEBUG_SYNCHRONIZE();
 }
 
 void d_axpby(const ptrdiff_t n,

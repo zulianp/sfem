@@ -44,7 +44,6 @@ void cg_init_cuda(sfem::ConjugateGradient<T> &cg) {
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
-
     MPI_Comm comm = MPI_COMM_WORLD;
 
     int rank, size;
@@ -113,8 +112,8 @@ int main(int argc, char *argv[]) {
     int n_dirichlet_conditions;
     boundary_condition_t *d_dirichlet_conditions = 0;
 
-    {   
-        // 
+    {
+        //
         boundary_condition_t *h_dirichlet_conditions;
         read_dirichlet_conditions(&mesh,
                                   SFEM_DIRICHLET_NODESET,
@@ -152,15 +151,27 @@ int main(int argc, char *argv[]) {
 
     real_t *d_x = d_allocate(mesh.nnodes);
     real_t *d_b = d_allocate(mesh.nnodes);
+    real_t *d_d = nullptr;
 
     cuda_incore_laplacian_t ctx;
 
     if (mesh.element_type == TET4) {
         tet4_cuda_incore_laplacian_init(&ctx, mesh.nelements, mesh.elements, mesh.points);
+
     } else if (mesh.element_type == TET10) {
         // Go for macro just for testing
         if (SFEM_USE_MACRO) {
             macro_tet4_cuda_incore_laplacian_init(&ctx, mesh.nelements, mesh.elements, mesh.points);
+
+            if (SFEM_USE_PRECONDITIONER) {
+                d_d = d_allocate(mesh.nnodes);
+                macro_tet4_cuda_incore_laplacian_diag(&ctx, d_d);
+                solver.set_preconditioner([&](const real_t *const x, real_t *const y) {
+                    d_ediv(mesh.nnodes, x, d_d, y);
+                    d_copy_at_dirichlet_nodes_vec(
+                        n_dirichlet_conditions, d_dirichlet_conditions, 1, x, y);
+                });
+            }
         } else {
             tet10_cuda_incore_laplacian_init(&ctx, mesh.nelements, mesh.elements, mesh.points);
         }
@@ -212,6 +223,10 @@ int main(int argc, char *argv[]) {
 
     d_destroy(d_b);
     d_destroy(d_x);
+
+    if (d_d) {
+        d_destroy(d_d);
+    }
 
     double tock = MPI_Wtime();
     if (!rank) {
