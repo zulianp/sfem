@@ -6,9 +6,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+// void sfem_blas_init();
 real_t *d_allocate(const std::size_t n);
 void d_memset(void *ptr, int value, const std::size_t n);
+void device_to_host(const std::size_t n, const real_t *const d, real_t * h);
 
 void d_destroy(real_t *a);
 

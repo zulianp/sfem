@@ -98,6 +98,7 @@ namespace sfem {
             T* r = allocate(n);
 
             apply_op(x, r);
+            
             axpby(n, 1, b, -1, r);
 
             T rtr = dot(n, r, r);

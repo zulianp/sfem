@@ -44,6 +44,7 @@ void cg_init_cuda(sfem::ConjugateGradient<T> &cg) {
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
+
     MPI_Comm comm = MPI_COMM_WORLD;
 
     int rank, size;
@@ -181,14 +182,16 @@ int main(int argc, char *argv[]) {
         d_copy_at_dirichlet_nodes_vec(n_dirichlet_conditions, d_dirichlet_conditions, 1, x, y);
     };
 
-    // std::vector<real_t> x(mesh.nnodes, 0), b(mesh.nnodes, 0);
+    std::vector<real_t> x(mesh.nnodes, 0);
 
     d_apply_dirichlet_condition_vec(n_dirichlet_conditions, d_dirichlet_conditions, 1, d_x);
     d_apply_dirichlet_condition_vec(n_dirichlet_conditions, d_dirichlet_conditions, 1, d_b);
 
     solver.apply(mesh.nnodes, d_b, d_x);
 
-    // array_write(comm, output_path, SFEM_MPI_REAL_T, x.data(), mesh.nnodes, mesh.nnodes);
+    device_to_host(mesh.nnodes, d_x, x.data());
+
+    array_write(comm, output_path, SFEM_MPI_REAL_T, x.data(), mesh.nnodes, mesh.nnodes);
 
     ptrdiff_t nelements = mesh.nelements;
     ptrdiff_t nnodes = mesh.nnodes;

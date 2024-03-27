@@ -16,12 +16,12 @@ PATH=$SCRIPTPATH/../python/sfem/mesh:$PATH
 PATH=$SCRIPTPATH/../python/sfem/algebra:$PATH
 PATH=$SCRIPTPATH/../data/benchmarks/meshes:$PATH
 
-# export OMP_NUM_THREADS=16
-export OMP_NUM_THREADS=8
+export OMP_NUM_THREADS=16
+# export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true
 
 SFEM_MESH_DIR=mesh
-create_cylinder_p2.sh 5
+create_cylinder_p2.sh 4
 
 sleft=$SFEM_MESH_DIR/sidesets_aos/sinlet.raw
 sright=$SFEM_MESH_DIR/sidesets_aos/soutlet.raw
@@ -36,6 +36,10 @@ export SFEM_DIRICHLET_COMPONENT="0,0"
 export SFEM_USE_PRECONDITIONER=1 
 export SFEM_USE_MACRO=1 
 # lldb -- 
-run_poisson $SFEM_MESH_DIR out.raw
+# run_poisson $SFEM_MESH_DIR out.raw
+
+
+# gdb --args 
+run_poisson_cuda $SFEM_MESH_DIR out.raw
 
 raw_to_db.py $SFEM_MESH_DIR x.vtk -p "out.raw"

@@ -9,20 +9,22 @@ void boundary_conditions_host_to_device(const boundary_condition_t *const host,
     device->local_size = host->local_size;
     device->global_size = host->global_size;
     device->component = host->component;
+    device->value = host->value;
 
     // Copy indices
     SFEM_CUDA_CHECK(cudaMalloc(&device->idx, device->local_size * sizeof(idx_t)));
     SFEM_CUDA_CHECK(cudaMemcpy(
-        &device->idx, host->idx, device->local_size * sizeof(idx_t), cudaMemcpyHostToDevice));
+        device->idx, host->idx, device->local_size * sizeof(idx_t), cudaMemcpyHostToDevice));
 
     if (host->values) {
         SFEM_CUDA_CHECK(cudaMalloc(&device->values, device->local_size * sizeof(real_t)));
-        SFEM_CUDA_CHECK(cudaMemcpy(&device->values,
+        SFEM_CUDA_CHECK(cudaMemcpy(device->values,
                                    host->values,
                                    device->local_size * sizeof(real_t),
                                    cudaMemcpyHostToDevice));
     } else {
-        device->value = host->value;
+        device->values = nullptr;
+
     }
 }
 
@@ -46,18 +48,20 @@ void d_constraint_nodes_copy_vec(const ptrdiff_t n_dirichlet_nodes,
                                  const real_t *source,
                                  real_t *dest) {
     // TODO Hand tuned
-    int block_size = 128;
+    int kernel_block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
         int min_grid_size;
         cuOccupancyMaxPotentialBlockSize(
-            &min_grid_size, &block_size, constraint_nodes_copy_vec_kernel, 0, 0);
+            &min_grid_size, &kernel_block_size, constraint_nodes_copy_vec_kernel, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
-    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (n_dirichlet_nodes + block_size - 1) / block_size);
-    constraint_nodes_copy_vec_kernel<<<n_blocks, block_size, 0>>>(
+    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (n_dirichlet_nodes + kernel_block_size - 1) / kernel_block_size);
+    constraint_nodes_copy_vec_kernel<<<n_blocks, kernel_block_size, 0>>>(
         n_dirichlet_nodes, dirichlet_nodes, block_size, component, source, dest);
+
+     SFEM_DEBUG_SYNCHRONIZE();
 }
 
 void d_copy_at_dirichlet_nodes_vec(const int n_conditions,
@@ -91,18 +95,20 @@ void d_constraint_nodes_to_value_vec(const ptrdiff_t n_dirichlet_nodes,
                                      const real_t value,
                                      real_t *values) {
     // TODO Hand tuned
-    int block_size = 128;
+    int kernel_block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
         int min_grid_size;
         cuOccupancyMaxPotentialBlockSize(
-            &min_grid_size, &block_size, constraint_nodes_to_value_vec_kernel, 0, 0);
+            &min_grid_size, &kernel_block_size, constraint_nodes_to_value_vec_kernel, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
-    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (n_dirichlet_nodes + block_size - 1) / block_size);
-    constraint_nodes_to_value_vec_kernel<<<n_blocks, block_size, 0>>>(
+    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (n_dirichlet_nodes + kernel_block_size - 1) / kernel_block_size);
+    constraint_nodes_to_value_vec_kernel<<<n_blocks, kernel_block_size, 0>>>(
         n_dirichlet_nodes, dirichlet_nodes, block_size, component, value, values);
+
+     SFEM_DEBUG_SYNCHRONIZE();
 }
 
 __global__ void constraint_nodes_to_values_vec_kernel(const ptrdiff_t n_dirichlet_nodes,
@@ -125,18 +131,21 @@ void d_constraint_nodes_to_values_vec(const ptrdiff_t n_dirichlet_nodes,
                                       const real_t *dirichlet_values,
                                       real_t *values) {
     // TODO Hand tuned
-    int block_size = 128;
+    int kernel_block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
         int min_grid_size;
         cuOccupancyMaxPotentialBlockSize(
-            &min_grid_size, &block_size, constraint_nodes_to_values_vec_kernel, 0, 0);
+            &min_grid_size, &kernel_block_size, constraint_nodes_to_values_vec_kernel, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
-    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (n_dirichlet_nodes + block_size - 1) / block_size);
-    constraint_nodes_to_values_vec_kernel<<<n_blocks, block_size, 0>>>(
+    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (n_dirichlet_nodes + kernel_block_size - 1) / kernel_block_size);
+    constraint_nodes_to_values_vec_kernel<<<n_blocks, kernel_block_size, 0>>>(
         n_dirichlet_nodes, dirichlet_nodes, block_size, component, dirichlet_values, values);
+    
+
+     SFEM_DEBUG_SYNCHRONIZE();
 }
 
 void d_apply_dirichlet_condition_vec(const int n_conditions,
