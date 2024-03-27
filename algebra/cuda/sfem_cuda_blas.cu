@@ -3,13 +3,12 @@
 
 #include "sfem_cuda_base.h"
 
-#include <cuda.h>
-#include <cuda_runtime.h>
-// #include "cublas_v2.h"
-
 #include <algorithm>
 #include <cassert>
 #include <cstdio>
+
+#include <cuda.h>
+#include <cuda_runtime.h>
 
 #define CHECK_CUDA(func)                                               \
     do {                                                               \
@@ -24,58 +23,72 @@
         }                                                              \
     } while (0)
 
-// static const char *myCublasGetErrorString(cublasStatus_t error) {
-//     switch (error) {
-//         case CUBLAS_STATUS_SUCCESS:
-//             return "CUBLAS_STATUS_SUCCESS";
+#define SFEM_ENABLE_CUBLAS
+#ifdef SFEM_ENABLE_CUBLAS
+#include "cublas_v2.h"
 
-//         case CUBLAS_STATUS_NOT_INITIALIZED:
-//             return "CUBLAS_STATUS_NOT_INITIALIZED";
+static const char *myCublasGetErrorString(cublasStatus_t error) {
+    switch (error) {
+        case CUBLAS_STATUS_SUCCESS:
+            return "CUBLAS_STATUS_SUCCESS";
 
-//         case CUBLAS_STATUS_ALLOC_FAILED:
-//             return "CUBLAS_STATUS_ALLOC_FAILED";
+        case CUBLAS_STATUS_NOT_INITIALIZED:
+            return "CUBLAS_STATUS_NOT_INITIALIZED";
 
-//         case CUBLAS_STATUS_INVALID_VALUE:
-//             return "CUBLAS_STATUS_INVALID_VALUE";
+        case CUBLAS_STATUS_ALLOC_FAILED:
+            return "CUBLAS_STATUS_ALLOC_FAILED";
 
-//         case CUBLAS_STATUS_ARCH_MISMATCH:
-//             return "CUBLAS_STATUS_ARCH_MISMATCH";
+        case CUBLAS_STATUS_INVALID_VALUE:
+            return "CUBLAS_STATUS_INVALID_VALUE";
 
-//         case CUBLAS_STATUS_MAPPING_ERROR:
-//             return "CUBLAS_STATUS_MAPPING_ERROR";
+        case CUBLAS_STATUS_ARCH_MISMATCH:
+            return "CUBLAS_STATUS_ARCH_MISMATCH";
 
-//         case CUBLAS_STATUS_EXECUTION_FAILED:
-//             return "CUBLAS_STATUS_EXECUTION_FAILED";
+        case CUBLAS_STATUS_MAPPING_ERROR:
+            return "CUBLAS_STATUS_MAPPING_ERROR";
 
-//         case CUBLAS_STATUS_INTERNAL_ERROR:
-//             return "CUBLAS_STATUS_INTERNAL_ERROR";
-//     }
+        case CUBLAS_STATUS_EXECUTION_FAILED:
+            return "CUBLAS_STATUS_EXECUTION_FAILED";
 
-//     return "<unknown>";
-// }
+        case CUBLAS_STATUS_INTERNAL_ERROR:
+            return "CUBLAS_STATUS_INTERNAL_ERROR";
+    }
 
-// #define CHECK_CUBLAS(func)                                               \
-//     do {                                                                 \
-//         cublasStatus_t status = (func);                                  \
-//         if (status != CUBLAS_STATUS_SUCCESS) {                           \
-//             printf("CUBLAS API failed at line %d with error: %s (%d)\n", \
-//                    __LINE__,                                             \
-//                    myCublasGetErrorString(status),                       \
-//                    status);                                              \
-//             assert(false);                                               \
-//             exit(EXIT_FAILURE);                                          \
-//         }                                                                \
-//     } while (0)
+    return "<unknown>";
+}
 
-// static bool sfem_blas_initialized = false;
-// static cublasHandle_t cublas_handle;
-// void __attribute__((destructor)) sfem_blas_destroy() {
-//     if (sfem_blas_initialized) {
-//         printf("Destroy CuBLAS\n");
-//         cublasDestroy(cublas_handle);
-//         // cublasShutdown();
-//     }
-// }
+#define CHECK_CUBLAS(func)                                               \
+    do {                                                                 \
+        cublasStatus_t status = (func);                                  \
+        if (status != CUBLAS_STATUS_SUCCESS) {                           \
+            printf("CUBLAS API failed at line %d with error: %s (%d)\n", \
+                   __LINE__,                                             \
+                   myCublasGetErrorString(status),                       \
+                   status);                                              \
+            assert(false);                                               \
+            exit(EXIT_FAILURE);                                          \
+        }                                                                \
+    } while (0)
+
+static bool sfem_blas_initialized = false;
+static cublasHandle_t cublas_handle;
+void __attribute__((destructor)) sfem_blas_destroy() {
+    if (sfem_blas_initialized) {
+        printf("Destroy CuBLAS\n");
+        cublasDestroy(cublas_handle);
+    }
+}
+
+static void sfem_blas_init() {
+    if (!sfem_blas_initialized) {
+        CHECK_CUBLAS(cublasCreate(&cublas_handle));
+        sfem_blas_initialized = true;
+    }
+}
+
+#else
+static void sfem_blas_init() {}
+#endif
 
 namespace sfem {
     namespace device {
@@ -131,11 +144,13 @@ namespace sfem {
         }
 
         double dot(const ptrdiff_t n, const double *const l, const double *const r) {
-            // sfem_blas_init();
+            sfem_blas_init();
 
-            // double ret = 0;
-            // CHECK_CUBLAS(cublasDdot(cublas_handle, n, l, 1, r, 1, &ret));
-            // return ret;
+#ifdef SFEM_ENABLE_CUBLAS
+            double ret = 0;
+            CHECK_CUBLAS(cublasDdot(cublas_handle, n, l, 1, r, 1, &ret));
+            return ret;
+#else
             int kernel_block_size = 128;
             ptrdiff_t n_blocks =
                 std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
@@ -150,15 +165,17 @@ namespace sfem {
 
             SFEM_DEBUG_SYNCHRONIZE();
             return ret;
+#endif
         }
 
         float dot(const ptrdiff_t n, const float *const l, const float *const r) {
-            // sfem_blas_init();
+            sfem_blas_init();
+#ifdef SFEM_ENABLE_CUBLAS
+            float ret = 0;
+            CHECK_CUBLAS(cublasSdot(cublas_handle, n, l, 1, r, 1, &ret));
+            return ret;
 
-            // float ret = 0;
-            // CHECK_CUBLAS(cublasSdot(cublas_handle, n, l, 1, r, 1, &ret));
-            // return ret;
-
+#else
             int kernel_block_size = 128;
             ptrdiff_t n_blocks =
                 std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
@@ -173,6 +190,7 @@ namespace sfem {
 
             SFEM_DEBUG_SYNCHRONIZE();
             return ret;
+#endif
         }
 
         void axpby(const ptrdiff_t n,
@@ -180,19 +198,16 @@ namespace sfem {
                    const double *const x,
                    const double beta,
                    double *const y) {
-            SFEM_DEBUG_SYNCHRONIZE();
-            // sfem_blas_init();
+            sfem_blas_init();
+#ifdef SFEM_ENABLE_CUBLAS
 
-            // if (beta != 1) {
-            //     // CHECK_CUBLAS(cublasDscal(cublas_handle, n, &beta, y, 1));
-            //         int kernel_block_size = 128;
-            //          ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) /
-            //          kernel_block_size);
+            if (beta != 1) {
+                CHECK_CUBLAS(cublasDscal(cublas_handle, n, &beta, y, 1));
+            }
 
-            //     tscal<<<n_blocks, kernel_block_size>>>(n, (double)beta, y);
-            // }
+            CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &alpha, x, 1, y, 1));
 
-            // CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &alpha, x, 1, y, 1));
+#else
             int kernel_block_size = 128;
             ptrdiff_t n_blocks =
                 std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
@@ -200,6 +215,8 @@ namespace sfem {
             taxpby<<<n_blocks, kernel_block_size>>>(n, alpha, x, beta, y);
 
             SFEM_DEBUG_SYNCHRONIZE();
+
+#endif
         }
 
         void axpby(const ptrdiff_t n,
@@ -207,15 +224,17 @@ namespace sfem {
                    const float *const x,
                    const float beta,
                    float *const y) {
-            SFEM_DEBUG_SYNCHRONIZE();
-            // sfem_blas_init();
+            sfem_blas_init();
 
-            // if (beta != 1) {
-            //     CHECK_CUBLAS(cublasSscal(cublas_handle, n, &beta, y, 1));
-            // }
+#ifdef SFEM_ENABLE_CUBLAS
 
-            // CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &alpha, x, 1, y, 1));
+            if (beta != 1) {
+                CHECK_CUBLAS(cublasSscal(cublas_handle, n, &beta, y, 1));
+            }
 
+            CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &alpha, x, 1, y, 1));
+
+#else
             int kernel_block_size = 128;
             ptrdiff_t n_blocks =
                 std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
@@ -223,19 +242,13 @@ namespace sfem {
             taxpby<<<n_blocks, kernel_block_size>>>(n, alpha, x, beta, y);
 
             SFEM_DEBUG_SYNCHRONIZE();
+#endif
         }
 
     }  // namespace device
 }  // namespace sfem
 
 extern "C" {
-// void sfem_blas_init() {
-//     if (!sfem_blas_initialized) {
-//         // CHECK_CUBLAS(cublasInit());
-//         CHECK_CUBLAS(cublasCreate(&cublas_handle));
-//         sfem_blas_initialized = true;
-//     }
-// }
 
 real_t *d_allocate(const std::size_t n) { return sfem::device::allocate<real_t>(n); }
 
