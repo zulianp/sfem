@@ -220,6 +220,10 @@ int main(int argc, char *argv[]) {
     cvfem_cv_volumes(
         mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, cv_volumes);
 
+
+    real_t integr_concentration = dot(mesh.nnodes, c, cv_volumes);
+    printf("%g/%g dt=%g mc=%g\n", 0., SFEM_MAX_TIME, SFEM_DT, integr_concentration);
+
     real_t dt = SFEM_DT;
     ptrdiff_t step_count = 0;
     for (real_t t = 0; t < SFEM_MAX_TIME; t += dt, step_count++) {
@@ -249,7 +253,7 @@ int main(int argc, char *argv[]) {
         ediv(mesh.nnodes, buff, cv_volumes, update);
         axpy(mesh.nnodes, SFEM_DT, update, c);
 
-        real_t integr_concentration = dot(mesh.nnodes, c, cv_volumes);
+        integr_concentration = dot(mesh.nnodes, c, cv_volumes);
 
         // for (int i = 0; i < n_dirichlet_conditions; i++) {
         //     boundary_condition_t cond = dirichlet_conditions[i];
