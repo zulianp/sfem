@@ -1,7 +1,6 @@
 #ifndef BOUNDARY_CONDITION_H
 #define BOUNDARY_CONDITION_H
 
-#include <mpi.h>
 #include <stddef.h>
 
 #include "sfem_base.h"

@@ -4,8 +4,6 @@
 #include <stddef.h>
 
 #include "sfem_base.h"
-
-
 #include "boundary_condition.h"
 
 #ifdef __cplusplus
