@@ -6,6 +6,7 @@ First we install the `C` code base
 Go to a directory of your choosing and type
 
 ```bash
+git clone https://bitbucket.com/zulianp/isolver.git && \
 git clone https://bitbucket.com/zulianp/matrix.io && \
 git clone https://bitbucket.com/zulianp/sfem && \
 cd matrix.io && make && \
