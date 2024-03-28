@@ -4,9 +4,9 @@
 #include "sfem_vec.h"
 #include "sortreduce.h"
 
+#include <assert.h>
 #include <mpi.h>
 #include <stdio.h>
-#include <assert.h>
 
 #define POW2(a) ((a) * (a))
 
@@ -20,37 +20,39 @@ static SFEM_INLINE void cvfem_tri3_convection_assemble_hessian_kernel(
     const real_t *const SFEM_RESTRICT vx,
     const real_t *const SFEM_RESTRICT vy,
     real_t *const SFEM_RESTRICT element_matrix) {
-    real_t J[4];
-    J[0] = -px0 + px1;
-    J[1] = -px0 + px2;
-    J[2] = -py0 + py1;
-    J[3] = -py0 + py2;
-
-    // generated code
-    const real_t x0 = (1.0 / 6.0) * J[3];
-    const real_t x1 = (25.0 / 864.0) * vx[0] * vx[1] * vx[2];
-    const real_t x2 = (25.0 / 864.0) * vy[0] * vy[1] * vy[2];
-    const real_t x3 =
-        x1 * ((1.0 / 3.0) * J[2] - x0) + x2 * (-1.0 / 3.0 * J[0] + (1.0 / 6.0) * J[1]);
-    const real_t x4 = ((x3 > 0) ? (0) : (-x3));
-    const real_t x5 = (1.0 / 6.0) * J[2];
-    const real_t x6 = (1.0 / 6.0) * J[0];
-    const real_t x7 = x1 * ((1.0 / 3.0) * J[3] - x5) + x2 * (-1.0 / 3.0 * J[1] + x6);
-    const real_t x8 = ((x7 < 0) ? (0) : (x7));
-    const real_t x9 = ((x7 > 0) ? (0) : (-x7));
-    const real_t x10 = ((x3 < 0) ? (0) : (x3));
-    const real_t x11 = x1 * (-x0 - x5) + x2 * ((1.0 / 6.0) * J[1] + x6);
-    const real_t x12 = ((x11 < 0) ? (0) : (x11));
-    const real_t x13 = ((x11 > 0) ? (0) : (-x11));
-    element_matrix[0] = -x4 - x8;
-    element_matrix[1] = x9;
-    element_matrix[2] = x10;
-    element_matrix[3] = x8;
-    element_matrix[4] = -x12 - x9;
-    element_matrix[5] = x13;
-    element_matrix[6] = x4;
-    element_matrix[7] = x12;
-    element_matrix[8] = -x10 - x13;
+    const real_t x0 = (1.0 / 6.0) * px0;
+    const real_t x1 = (1.0 / 6.0) * px1;
+    const real_t x2 = (5.0 / 12.0) * vy[0];
+    const real_t x3 = (5.0 / 12.0) * vy[1];
+    const real_t x4 = (1.0 / 6.0) * py0;
+    const real_t x5 = (1.0 / 6.0) * py1;
+    const real_t x6 = (5.0 / 12.0) * vx[0];
+    const real_t x7 = (5.0 / 12.0) * vx[1];
+    const real_t x8 = (-1.0 / 3.0 * px2 + x0 + x1) * ((1.0 / 6.0) * vy[2] + x2 + x3) +
+                      ((1.0 / 3.0) * py2 - x4 - x5) * ((1.0 / 6.0) * vx[2] + x6 + x7);
+    const real_t x9 = ((x8 < 0) ? (0) : (x8));
+    const real_t x10 = (1.0 / 6.0) * px2;
+    const real_t x11 = (5.0 / 12.0) * vy[2];
+    const real_t x12 = (1.0 / 6.0) * py2;
+    const real_t x13 = (5.0 / 12.0) * vx[2];
+    const real_t x14 = (-1.0 / 3.0 * px1 + x0 + x10) * ((1.0 / 6.0) * vy[1] + x11 + x2) +
+                       ((1.0 / 3.0) * py1 - x12 - x4) * ((1.0 / 6.0) * vx[1] + x13 + x6);
+    const real_t x15 = ((x14 > 0) ? (0) : (-x14));
+    const real_t x16 = ((x8 > 0) ? (0) : (-x8));
+    const real_t x17 = ((x14 < 0) ? (0) : (x14));
+    const real_t x18 = (-1.0 / 3.0 * px0 + x1 + x10) * ((1.0 / 6.0) * vy[0] + x11 + x3) +
+                       ((1.0 / 3.0) * py0 - x12 - x5) * ((1.0 / 6.0) * vx[0] + x13 + x7);
+    const real_t x19 = ((x18 < 0) ? (0) : (x18));
+    const real_t x20 = ((x18 > 0) ? (0) : (-x18));
+    element_matrix[0] = -x15 - x9;
+    element_matrix[1] = x16;
+    element_matrix[2] = x17;
+    element_matrix[3] = x9;
+    element_matrix[4] = -x16 - x19;
+    element_matrix[5] = x20;
+    element_matrix[6] = x15;
+    element_matrix[7] = x19;
+    element_matrix[8] = -x17 - x20;
 }
 
 static SFEM_INLINE void cvfem_tri3_convection_assemble_apply_kernel(
@@ -64,31 +66,33 @@ static SFEM_INLINE void cvfem_tri3_convection_assemble_apply_kernel(
     const real_t *const SFEM_RESTRICT vy,
     const real_t *const SFEM_RESTRICT x,
     real_t *const SFEM_RESTRICT element_vector) {
-    real_t J[4];
-    J[0] = -px0 + px1;
-    J[1] = -px0 + px2;
-    J[2] = -py0 + py1;
-    J[3] = -py0 + py2;
-
-    // generated code
-    const real_t x0 = (1.0 / 6.0) * J[2];
-    const real_t x1 = (25.0 / 864.0) * vx[0] * vx[1] * vx[2];
-    const real_t x2 = (1.0 / 6.0) * J[0];
-    const real_t x3 = (25.0 / 864.0) * vy[0] * vy[1] * vy[2];
-    const real_t x4 = x1 * ((1.0 / 3.0) * J[3] - x0) + x3 * (-1.0 / 3.0 * J[1] + x2);
-    const real_t x5 = ((x4 > 0) ? (0) : (-x4));
-    const real_t x6 = (1.0 / 6.0) * J[3];
-    const real_t x7 =
-        x1 * ((1.0 / 3.0) * J[2] - x6) + x3 * (-1.0 / 3.0 * J[0] + (1.0 / 6.0) * J[1]);
-    const real_t x8 = ((x7 < 0) ? (0) : (x7));
-    const real_t x9 = ((x7 > 0) ? (0) : (-x7));
-    const real_t x10 = ((x4 < 0) ? (0) : (x4));
-    const real_t x11 = x1 * (-x0 - x6) + x3 * ((1.0 / 6.0) * J[1] + x2);
-    const real_t x12 = ((x11 > 0) ? (0) : (-x11));
-    const real_t x13 = ((x11 < 0) ? (0) : (x11));
-    element_vector[0] = x5 * x[1] + x8 * x[2] + x[0] * (-x10 - x9);
-    element_vector[1] = x10 * x[0] + x12 * x[2] + x[1] * (-x13 - x5);
-    element_vector[2] = x13 * x[1] + x9 * x[0] + x[2] * (-x12 - x8);
+    const real_t x0 = (1.0 / 6.0) * px0;
+    const real_t x1 = (1.0 / 6.0) * px2;
+    const real_t x2 = (5.0 / 12.0) * vy[0];
+    const real_t x3 = (5.0 / 12.0) * vy[2];
+    const real_t x4 = (1.0 / 6.0) * py0;
+    const real_t x5 = (1.0 / 6.0) * py2;
+    const real_t x6 = (5.0 / 12.0) * vx[0];
+    const real_t x7 = (5.0 / 12.0) * vx[2];
+    const real_t x8 = (-1.0 / 3.0 * px1 + x0 + x1) * ((1.0 / 6.0) * vy[1] + x2 + x3) +
+                      ((1.0 / 3.0) * py1 - x4 - x5) * ((1.0 / 6.0) * vx[1] + x6 + x7);
+    const real_t x9 = ((x8 < 0) ? (0) : (x8));
+    const real_t x10 = (1.0 / 6.0) * px1;
+    const real_t x11 = (5.0 / 12.0) * vy[1];
+    const real_t x12 = (1.0 / 6.0) * py1;
+    const real_t x13 = (5.0 / 12.0) * vx[1];
+    const real_t x14 = (-1.0 / 3.0 * px2 + x0 + x10) * ((1.0 / 6.0) * vy[2] + x11 + x2) +
+                       ((1.0 / 3.0) * py2 - x12 - x4) * ((1.0 / 6.0) * vx[2] + x13 + x6);
+    const real_t x15 = ((x14 > 0) ? (0) : (-x14));
+    const real_t x16 = ((x14 < 0) ? (0) : (x14));
+    const real_t x17 = ((x8 > 0) ? (0) : (-x8));
+    const real_t x18 = (-1.0 / 3.0 * px0 + x1 + x10) * ((1.0 / 6.0) * vy[0] + x11 + x3) +
+                       ((1.0 / 3.0) * py0 - x12 - x5) * ((1.0 / 6.0) * vx[0] + x13 + x7);
+    const real_t x19 = ((x18 > 0) ? (0) : (-x18));
+    const real_t x20 = ((x18 < 0) ? (0) : (x18));
+    element_vector[0] = x15 * x[1] + x9 * x[2] + x[0] * (-x16 - x17);
+    element_vector[1] = x16 * x[0] + x19 * x[2] + x[1] * (-x15 - x20);
+    element_vector[2] = x17 * x[0] + x20 * x[1] + x[2] * (-x19 - x9);
 }
 
 static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {
@@ -291,7 +295,7 @@ void cvfem_tri3_cv_volumes(const ptrdiff_t nelements,
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = xyz[0];
-    const geom_t *const y = xyz[1]; 
+    const geom_t *const y = xyz[1];
 
 #pragma omp parallel
     {
