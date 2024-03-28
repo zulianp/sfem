@@ -164,6 +164,7 @@ OBJS = \
 	phase_field_for_fracture.o  \
 	navier_stokes.o \
 	boundary_condition.o \
+	boundary_condition_io.o \
 	constrained_gs.o \
 	sfem_logger.o \
 	extract_sharp_features.o \

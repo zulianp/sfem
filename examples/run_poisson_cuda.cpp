@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include "boundary_condition.h"
+#include "boundary_condition_io.h"
 #include "sfem_base.h"
 #include "sfem_defs.h"
 

@@ -11,6 +11,7 @@
 #include "sfem_defs.h"
 
 #include "boundary_condition.h"
+#include "boundary_condition_io.h"
 #include "dirichlet.h"
 #include "neumann.h"
 
@@ -135,7 +136,7 @@ int main(int argc, char *argv[]) {
                 }
 
                 copy_at_dirichlet_nodes_vec(
-                    n_dirichlet_conditions, dirichlet_conditions, &mesh, 1, x, y);
+                    n_dirichlet_conditions, dirichlet_conditions,1, x, y);
             });
         }
     }
@@ -150,13 +151,13 @@ int main(int argc, char *argv[]) {
                 elem_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, x, y);
         }
 
-        copy_at_dirichlet_nodes_vec(n_dirichlet_conditions, dirichlet_conditions, &mesh, 1, x, y);
+        copy_at_dirichlet_nodes_vec(n_dirichlet_conditions, dirichlet_conditions, 1, x, y);
     };
 
     std::vector<real_t> x(mesh.nnodes, 0), b(mesh.nnodes, 0);
 
-    apply_dirichlet_condition_vec(n_dirichlet_conditions, dirichlet_conditions, &mesh, 1, x.data());
-    apply_dirichlet_condition_vec(n_dirichlet_conditions, dirichlet_conditions, &mesh, 1, b.data());
+    apply_dirichlet_condition_vec(n_dirichlet_conditions, dirichlet_conditions, 1, x.data());
+    apply_dirichlet_condition_vec(n_dirichlet_conditions, dirichlet_conditions, 1, b.data());
 
     solver.apply(mesh.nnodes, b.data(), x.data());
 

@@ -5,7 +5,7 @@
 #include <stddef.h>
 
 #include "sfem_base.h"
-#include "sfem_mesh.h"
+#include "sfem_defs.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,64 +19,40 @@ typedef struct {
     real_t value;
 
     // Set for varying
-    real_t * values;
+    real_t *values;
 } boundary_condition_t;
 
-void read_boundary_conditions(MPI_Comm comm,
-                              const char *sets,
-                              const char *values,
-                              const char *components,
-                              boundary_condition_t **bcs,
-                              int *nbc);
-
-void read_dirichlet_conditions(const mesh_t *const mesh,
-                               const char *sets,
-                               const char *values,
-                               const char *components,
-                               boundary_condition_t **bcs,
-                               int *nbc);
-
-void read_neumann_conditions(const mesh_t *const mesh,
-                             const char *sets,
-                             const char *values,
-                             const char *components,
-                             boundary_condition_t **bcs,
-                             int *nbc);
-
-void add_neumann_condition_to_gradient_vec(const int n_conditions,
+void add_neumann_condition_to_gradient_vec(const enum ElemType element_type,
+                                           geom_t **const SFEM_RESTRICT points,
+                                           const int n_conditions,
                                            const boundary_condition_t *const cond,
-                                           const mesh_t *const mesh,
                                            const int block_size,
                                            real_t *g);
 
 void apply_dirichlet_condition_vec(const int n_conditions,
                                    const boundary_condition_t *const cond,
-                                   const mesh_t *const mesh,
                                    const int block_size,
                                    real_t *const x);
 
 void apply_zero_dirichlet_condition_vec(const int n_conditions,
-                                   const boundary_condition_t *const cond,
-                                   const mesh_t *const mesh,
-                                   const int block_size,
-                                   real_t *const x);
+                                        const boundary_condition_t *const cond,
+                                        const int block_size,
+                                        real_t *const x);
 
 void copy_at_dirichlet_nodes_vec(const int n_conditions,
-                                   const boundary_condition_t *const cond,
-                                   const mesh_t *const mesh,
-                                   const int block_size,
-                                   const real_t *const in,
-                                   real_t *const out);
+                                 const boundary_condition_t *const cond,
+                                 const int block_size,
+                                 const real_t *const in,
+                                 real_t *const out);
 
 void apply_dirichlet_condition_to_hessian_crs_vec(const int n_conditions,
                                                   const boundary_condition_t *const cond,
-                                                  const mesh_t *const mesh,
                                                   const int block_size,
                                                   const count_t *const rowptr,
                                                   const idx_t *const colidx,
                                                   real_t *const values);
 
-void destroy_conditions(const int n_conditions, boundary_condition_t * cond);
+void destroy_conditions(const int n_conditions, boundary_condition_t *cond);
 
 #ifdef __cplusplus
 }
