@@ -56,30 +56,12 @@ mkdir -p $folder
 
 idx_type_size=4
 
-if [[ "$elem_type" = "triangle" ]]
-then
-	box_2D.py $mesh_db $nrefs $width $height
-	db_to_raw.py $mesh_db $mesh_original --select_elem_type=$elem_type
-else
-	# box_2D_quad.py $mesh_db $nrefs $width $height
-	pnrefs=$(( nrefs + 1 ))
-	pnrefs=$(( pnrefs * 10 ))
-	rectangle_mesh.py $mesh_raw -x $(( 2 * width * pnrefs)) -y $(( 2 * height * pnrefs)) --width=$width --height=$height
-	mesh_original=$mesh_raw
-fi
-
-
+pnrefs=$(( nrefs + 1 ))
+pnrefs=$(( pnrefs * 10 ))
+rectangle_mesh.py $mesh_raw -x $(( 2 * width * pnrefs)) -y $(( 2 * height * pnrefs)) --width=$width --height=$height --cell_type=$elem_type
+mesh_original=$mesh_raw
 
 rm -rf  $mesh_original/z.raw
-
-if [[ "$elem_type" = "triangle" ]]
-then
-	refine $mesh_original $mesh_raw
-else
-	echo "skipping refinement"
-fi
-
-# set -x
 
 $LAUNCH skin $mesh_raw $mesh_surface
 raw_to_db.py $mesh_surface $mesh_surface/surf.vtk

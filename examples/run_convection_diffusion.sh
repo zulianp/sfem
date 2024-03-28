@@ -28,11 +28,11 @@ export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true
 
 SFEM_MESH_DIR=mesh
-export SFEM_ELEM_TYPE=quad 
-# export SFEM_ELEM_TYPE=triangle
+# export SFEM_ELEM_TYPE=quad 
+export SFEM_ELEM_TYPE=triangle
 
-# rm -rf $SFEM_MESH_DIR
-create_box_2D.sh 10 2 1
+rm -rf $SFEM_MESH_DIR
+create_box_2D.sh 1 2 1
 
 sleft=$SFEM_MESH_DIR/sidesets_aos/sleft.raw
 sright=$SFEM_MESH_DIR/sidesets_aos/sright.raw
@@ -42,9 +42,9 @@ export SFEM_DIRICHLET_VALUE="1"
 export SFEM_DIRICHLET_COMPONENT="0"
 
 export SFEM_MAX_TIME=2
-export SFEM_DT=0.001
+export SFEM_DT=0.0001
 export SFEM_EXPORT_FREQUENCY=0.02
-export SFEM_DIFFUSIVITY=1
+export SFEM_DIFFUSIVITY=0
 export SFEM_VELX=1
 export SFEM_VELY=0
 
