@@ -4,7 +4,7 @@
 #include <stddef.h>
 
 #include "sfem_base.h"
-#include "sfem_mesh.h"
+
 
 #include "boundary_condition.h"
 
