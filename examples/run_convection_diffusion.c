@@ -259,6 +259,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    sprintf(path, "%s/cv_volumes.raw", output_folder);
+    array_write(comm, path, SFEM_MPI_REAL_T, cv_volumes, mesh.nnodes, mesh.nnodes);
+
     ptrdiff_t nelements = mesh.nelements;
     ptrdiff_t nnodes = mesh.nnodes;
 
@@ -271,6 +274,7 @@ int main(int argc, char *argv[]) {
     free(update);
     free(buff);
     free(c);
+    free(cv_volumes);
 
     for (int d = 0; d < sdim; d++) {
         free(vel[d]);

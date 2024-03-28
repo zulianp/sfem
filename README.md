@@ -16,8 +16,8 @@ make
 
 In the `sfem` folder
 
-- Enter `python3 -m venv venv`
-- Enter `source venv/bin/activate` (to be activated for every new command-line window)
+- Enter `python3 -m venv venv` (**Optional/Recommended**)
+- Enter `source venv/bin/activate` (to be activated for every new command-line window) (**Optional/Recommended**)
 - Type `pip install -r python/requirements.txt` (Python 3 is assumed here) to install `Python3` dependencies.
 
 Both makefiles allow to pass options such as 

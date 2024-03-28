@@ -35,11 +35,8 @@ export SFEM_DIRICHLET_COMPONENT="0,0"
 
 export SFEM_USE_PRECONDITIONER=1 
 export SFEM_USE_MACRO=1 
-# lldb -- 
-# run_poisson $SFEM_MESH_DIR out.raw
-
-
-# gdb --args 
-run_poisson_cuda $SFEM_MESH_DIR out.raw
+ 
+# $SFEM_LAUNCH run_poisson $SFEM_MESH_DIR out.raw
+$SFEM_LAUNCH run_poisson_cuda $SFEM_MESH_DIR out.raw
 
 raw_to_db.py $SFEM_MESH_DIR x.vtk -p "out.raw"

@@ -56,4 +56,8 @@ raw_to_db.py $SFEM_MESH_DIR out.xmf  \
  --time_whole_txt="out/time.txt" \
  --cell_type=$SFEM_ELEM_TYPE
 
+raw_to_db.py $SFEM_MESH_DIR extras.vtk  \
+ --point_data="out/cv_volumes.raw" \
+ --cell_type=$SFEM_ELEM_TYPE
+
 cd $HERE

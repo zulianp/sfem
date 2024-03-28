@@ -355,7 +355,7 @@ void cvfem_quad4_cv_volumes(const ptrdiff_t nelements,
             J[2] = -y[ev[0]] + y[ev[1]];
             J[3] = -y[ev[0]] + y[ev[3]];
 
-            const real_t measure = ((J[0] * J[3] - J[1] * J[2]) / 2) / 4;
+            const real_t measure = (J[0] * J[3] - J[1] * J[2]) / 4;
 
             assert(measure > 0);
             for (int edof_i = 0; edof_i < 4; ++edof_i) {
