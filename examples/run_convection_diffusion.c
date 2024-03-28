@@ -115,15 +115,19 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_NEUMANN_SIDESET, );
     SFEM_READ_ENV(SFEM_NEUMANN_VALUE, );
 
-    float SFEM_DT = 0.1;
-    float SFEM_MAX_TIME = 1;
-    float SFEM_EXPORT_FREQUENCY = 1;
-    float SFEM_DIFFUSIVITY = 1;
+    real_t SFEM_DT = 0.1;
+    real_t SFEM_MAX_TIME = 1;
+    real_t SFEM_EXPORT_FREQUENCY = 1;
+    real_t SFEM_DIFFUSIVITY = 1;
+    real_t SFEM_VELX = 1;
+    real_t SFEM_VELY = 0;
 
     SFEM_READ_ENV(SFEM_DT, atof);
     SFEM_READ_ENV(SFEM_MAX_TIME, atof);
     SFEM_READ_ENV(SFEM_EXPORT_FREQUENCY, atof);
     SFEM_READ_ENV(SFEM_DIFFUSIVITY, atof);
+    SFEM_READ_ENV(SFEM_VELX, atof);
+    SFEM_READ_ENV(SFEM_VELY, atof);
 
     const char *SFEM_RESTART_FOLDER = 0;
     SFEM_READ_ENV(SFEM_RESTART_FOLDER, );
@@ -139,10 +143,16 @@ int main(int argc, char *argv[]) {
             "- SFEM_DT=%g\n"
             "- SFEM_RESTART_FOLDER=%s\n"
             "- SFEM_RESTART_ID=%d\n"
+            "- SFEM_DIFFUSIVITY=%g\n"
+            "- SFEM_VELX=%g\n"
+            "- SFEM_VELY=%g\n"
             "----------------------------------------\n",
             SFEM_DT,
             SFEM_RESTART_FOLDER,
-            SFEM_RESTART_ID);
+            SFEM_RESTART_ID,
+            (double)SFEM_DIFFUSIVITY,
+            (double)SFEM_VELX,
+            (double)SFEM_VELY);
     }
 
     if (SFEM_RESTART_FOLDER && !SFEM_RESTART_ID) {
@@ -172,8 +182,8 @@ int main(int argc, char *argv[]) {
     }
 
     for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
-        vel[0][i] = 1;
-        // vel[1][i] = 0.01;
+        vel[0][i] = SFEM_VELX;
+        vel[1][i] = SFEM_VELY;
     }
 
     update = calloc(mesh.nnodes, sizeof(real_t));
