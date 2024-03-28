@@ -1,7 +1,6 @@
 #ifndef BOUNDARY_CONDITION_INCORE_CUDA_H
 #define BOUNDARY_CONDITION_INCORE_CUDA_H
 
-#include <mpi.h>
 #include <stddef.h>
 
 #include "sfem_base.h"
