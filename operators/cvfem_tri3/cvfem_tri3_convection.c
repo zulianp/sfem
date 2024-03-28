@@ -181,20 +181,15 @@ void cvfem_tri3_convection_assemble_hessian(const ptrdiff_t nelements,
                 vy[v] = velocity[1][ev[v]];
             }
 
-            // Element indices
-            const idx_t i0 = ev[0];
-            const idx_t i1 = ev[1];
-            const idx_t i2 = ev[2];
-
             cvfem_tri3_convection_assemble_hessian_kernel(
                 // X-coordinates
-                xyz[0][i0],
-                xyz[0][i1],
-                xyz[0][i2],
+                xyz[0][ev[0]],
+                xyz[0][ev[1]],
+                xyz[0][ev[2]],
                 // Y-coordinates
-                xyz[1][i0],
-                xyz[1][i1],
-                xyz[1][i2],
+                xyz[1][ev[0]],
+                xyz[1][ev[1]],
+                xyz[1][ev[2]],
                 vx,
                 vy,
                 element_matrix);
@@ -233,8 +228,6 @@ void cvfem_tri3_convection_apply(const ptrdiff_t nelements,
                                  real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    // double tick = MPI_Wtime();
-
 #pragma omp parallel
     {
 #pragma omp for  // nowait
@@ -266,20 +259,15 @@ void cvfem_tri3_convection_apply(const ptrdiff_t nelements,
                 element_u[v] = u[ev[v]];
             }
 
-            // Element indices
-            const idx_t i0 = ev[0];
-            const idx_t i1 = ev[1];
-            const idx_t i2 = ev[2];
-
             cvfem_tri3_convection_assemble_apply_kernel(
                 // X-coordinates
-                xyz[0][i0],
-                xyz[0][i1],
-                xyz[0][i2],
+                xyz[0][ev[0]],
+                xyz[0][ev[1]],
+                xyz[0][ev[2]],
                 // Y-coordinates
-                xyz[1][i0],
-                xyz[1][i1],
-                xyz[1][i2],
+                xyz[1][ev[0]],
+                xyz[1][ev[1]],
+                xyz[1][ev[2]],
                 vx,
                 vy,
                 element_u,
@@ -293,9 +281,6 @@ void cvfem_tri3_convection_apply(const ptrdiff_t nelements,
             }
         }
     }
-
-    // double tock = MPI_Wtime();
-    // printf("cvfem_tri3_convection.c: cvfem_tri3_convection_apply\t%g seconds\n", tock - tick);
 }
 
 void cvfem_tri3_cv_volumes(const ptrdiff_t nelements,
