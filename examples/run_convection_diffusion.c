@@ -25,10 +25,10 @@
 #include "dirichlet.h"
 #include "neumann.h"
 
+#include "cvfem_operators.h"
 #include "laplacian.h"
 #include "navier_stokes.h"
 #include "read_mesh.h"
-#include "cvfem_operators.h"
 
 #include "sfem_logger.h"
 
@@ -271,6 +271,19 @@ int main(int argc, char *argv[]) {
 
     sprintf(path, "%s/cv_volumes.raw", output_folder);
     array_write(comm, path, SFEM_MPI_REAL_T, cv_volumes, mesh.nnodes, mesh.nnodes);
+
+    // if(0)
+    {
+        for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+            c[i] = 1;
+            buff[i] = 0;
+        }
+        cvfem_laplacian_apply(
+            mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, c, buff);
+
+        sprintf(path, "%s/lapl_one.float64.raw", output_folder);
+        array_write(comm, path, SFEM_MPI_REAL_T, buff, mesh.nnodes, mesh.nnodes);
+    }
 
     ptrdiff_t nelements = mesh.nelements;
     ptrdiff_t nnodes = mesh.nnodes;

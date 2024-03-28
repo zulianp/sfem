@@ -96,17 +96,23 @@ def laplace_op(dn):
 	return A
 
 def ref_subs(expr):
-	expr = expr.subs(x0, 0)
-	expr = expr.subs(y0, 0)
+	mmx = 0
+	ppx = 1
 
-	expr = expr.subs(x1, 1)
-	expr = expr.subs(y1, 0)
+	mmy = -1
+	ppy = 1
+
+	expr = expr.subs(x0, mmx)
+	expr = expr.subs(y0, mmy)
+
+	expr = expr.subs(x1, ppx)
+	expr = expr.subs(y1, mmy)
 	
-	expr = expr.subs(x2, 1)
-	expr = expr.subs(y2, 1)
+	expr = expr.subs(x2, ppx)
+	expr = expr.subs(y2, ppy)
 
-	expr = expr.subs(x3, 0)
-	expr = expr.subs(y3, 1)
+	expr = expr.subs(x3, mmx)
+	expr = expr.subs(y3, ppy)
 	return expr
 
 dn = cv_normals()

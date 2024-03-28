@@ -59,12 +59,16 @@ idx_type_size=4
 if [[ "$elem_type" = "triangle" ]]
 then
 	box_2D.py $mesh_db $nrefs $width $height
+	db_to_raw.py $mesh_db $mesh_original --select_elem_type=$elem_type
 else
-	box_2D_quad.py $mesh_db $nrefs $width $height
+	# box_2D_quad.py $mesh_db $nrefs $width $height
+	pnrefs=$(( nrefs + 1 ))
+	pnrefs=$(( pnrefs * 10 ))
+	rectangle_mesh.py $mesh_raw -x $(( 2 * width * pnrefs)) -y $(( 2 * height * pnrefs)) --width=$width --height=$height
 	mesh_original=$mesh_raw
 fi
 
-db_to_raw.py $mesh_db $mesh_original --select_elem_type=$elem_type
+
 
 rm -rf  $mesh_original/z.raw
 

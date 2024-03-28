@@ -10,16 +10,16 @@
 
 #define POW2(a) ((a) * (a))
 
-static SFEM_INLINE void cvfem_quad4_laplacian_assemble_hessian_kernel(
-    const real_t px0,
-    const real_t px1,
-    const real_t px2,
-    const real_t px3,
-    const real_t py0,
-    const real_t py1,
-    const real_t py2,
-    const real_t py3,
-    real_t *const SFEM_RESTRICT element_matrix) {
+static SFEM_INLINE void cvfem_quad4_laplacian_assemble_hessian_kernel(const real_t px0,
+                                                                      const real_t px1,
+                                                                      const real_t px2,
+                                                                      const real_t px3,
+                                                                      const real_t py0,
+                                                                      const real_t py1,
+                                                                      const real_t py2,
+                                                                      const real_t py3,
+                                                                      real_t *const SFEM_RESTRICT
+                                                                          element_matrix) {
     const real_t x0 = 0.0625 * px0 - 0.0625 * px2 + 0.0625 * py0 - 0.0625 * py2;
     const real_t x1 = 0.3125 * py1 - 0.3125 * py3 + x0;
     const real_t x2 = -0.3125 * px1 + 0.3125 * px3;
@@ -172,30 +172,23 @@ void cvfem_quad4_laplacian_assemble_hessian(const ptrdiff_t nelements,
             idx_t ev[4];
             idx_t ks[4];
             real_t element_matrix[4 * 4];
-            
 
 #pragma unroll(4)
             for (int v = 0; v < 4; ++v) {
                 ev[v] = elems[v][i];
             }
 
-            // Element indices
-            const idx_t i0 = ev[0];
-            const idx_t i1 = ev[1];
-            const idx_t i2 = ev[2];
-            const idx_t i3 = ev[3];
-
             cvfem_quad4_laplacian_assemble_hessian_kernel(
                 // X-coordinates
-                xyz[0][i0],
-                xyz[0][i1],
-                xyz[0][i2],
-                xyz[0][i3],
+                xyz[0][ev[0]],
+                xyz[0][ev[1]],
+                xyz[0][ev[2]],
+                xyz[0][ev[3]],
                 // Y-coordinates
-                xyz[1][i0],
-                xyz[1][i1],
-                xyz[1][i2],
-                xyz[1][i3],
+                xyz[1][ev[0]],
+                xyz[1][ev[1]],
+                xyz[1][ev[2]],
+                xyz[1][ev[3]],
                 element_matrix);
 
             for (int edof_i = 0; edof_i < 4; ++edof_i) {
@@ -236,7 +229,6 @@ void cvfem_quad4_laplacian_apply(const ptrdiff_t nelements,
 #pragma omp for  // nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
-
             real_t element_u[4];
             real_t element_vector[4];
 
@@ -250,23 +242,17 @@ void cvfem_quad4_laplacian_apply(const ptrdiff_t nelements,
                 element_u[v] = u[ev[v]];
             }
 
-            // Element indices
-            const idx_t i0 = ev[0];
-            const idx_t i1 = ev[1];
-            const idx_t i2 = ev[2];
-            const idx_t i3 = ev[3];
-
             cvfem_quad4_laplacian_assemble_apply_kernel(
                 // X-coordinates
-                xyz[0][i0],
-                xyz[0][i1],
-                xyz[0][i2],
-                xyz[0][i3],
+                xyz[0][ev[0]],
+                xyz[0][ev[1]],
+                xyz[0][ev[2]],
+                xyz[0][ev[3]],
                 // Y-coordinates
-                xyz[1][i0],
-                xyz[1][i1],
-                xyz[1][i2],
-                xyz[1][i3],
+                xyz[1][ev[0]],
+                xyz[1][ev[1]],
+                xyz[1][ev[2]],
+                xyz[1][ev[3]],
                 element_u,
                 element_vector);
 
