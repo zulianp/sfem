@@ -71,12 +71,12 @@ class LinearElasticityOp:
 				eval_grad[i] = inner(P, shape_grad[i])
 			self.P = de
 		else:
-			P = matrix_coeff('P', dims, dims)
+			P = matrix_coeff('JinvXP', dims, dims)
 			eval_grad = sp.Matrix(rows, 1, [0] * rows)
 			JintXde = s_jac_inv * de
 			for i in range(0, fe.n_nodes() * dims):
 				eval_grad[i] = inner(P, ref_shape_grad[i])
-			self.P = JintXde
+			self.P = de
 
 		dde = sp.Matrix(dims, dims, [0]*(dims*dims))
 		eval_hessian =  sp.Matrix(rows, cols, [0] * (rows * cols))
@@ -202,13 +202,19 @@ class LinearElasticityOp:
 
 	def displacement_gradient(self):
 		e_gradu = self.e_disp_grad
-		expr = assign_matrix('gradu', e_gradu)
+		expr = assign_matrix('disp_grad', e_gradu)
 		return expr
 
 	def first_piola(self):
 		P = self.P 
 		expr = assign_matrix('P', P)
 		return expr
+
+	def JinvXP(self):
+		dims = self.fe.manifold_dim()
+		P = matrix_coeff('P', dims, dims)
+		Jinv = self.fe.symbol_jacobian_inverse()
+		return assign_matrix('JinvXP', Jinv * P)
 
 	def hessian(self):
 		H = self.integr_hessian
@@ -273,9 +279,15 @@ def main():
 	c_code(op.displacement_gradient())
 
 	c_log("--------------------------")
-	c_log("Piola or (Jinv * P)")	
+	c_log("Piola")	
 	c_log("--------------------------")
 	c_code(op.first_piola())
+
+	c_log("--------------------------")
+	c_log("(Jinv * P)")	
+	c_log("--------------------------")
+
+	c_code(op.JinvXP())
 
 	c_log("--------------------------")
 	c_log("value")
@@ -292,10 +304,10 @@ def main():
 	# c_log("--------------------------")
 	# c_code(op.hessian())
 
-	c_log("--------------------------")
-	c_log("apply")	
-	c_log("--------------------------")
-	c_code(op.apply())
+	# c_log("--------------------------")
+	# c_log("apply")	
+	# c_log("--------------------------")
+	# c_code(op.apply())
 
 	
 
