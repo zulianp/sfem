@@ -3,35 +3,40 @@
 from sfem_codegen import *
 import matplotlib.pyplot as plt
 
-# import pdb
-
 debug=False
 use_jac=not debug
 
 # Tet4 nodes
-p0 = sp.Matrix(3, 1, [x0, y0, z0])
-p1 = sp.Matrix(3, 1, [x1, y1, z1])
-p2 = sp.Matrix(3, 1, [x2, y2, z2])
-p3 = sp.Matrix(3, 1, [x3, y3, z3])
+tp0 = sp.Matrix(3, 1, [x0, y0, z0])
+tp1 = sp.Matrix(3, 1, [x1, y1, z1])
+tp2 = sp.Matrix(3, 1, [x2, y2, z2])
+tp3 = sp.Matrix(3, 1, [x3, y3, z3])
 
-if use_jac:
+# Ref Tet4 nodes
+ref0 = sp.Matrix(3, 1, [0, 0, 0])
+ref1 = sp.Matrix(3, 1, [1, 0, 0])
+ref2 = sp.Matrix(3, 1, [0, 1, 0])
+ref3 = sp.Matrix(3, 1, [0, 0, 1])
+
+if debug: 
+# Debug override
+    p0 = ref0
+    p1 = ref1
+    p2 = ref2
+    p3 = ref3
+elif use_jac:
+# For Jacobian-based assembly
     J = matrix_coeff('J', 3, 3)
     p0 = sp.Matrix(3, 1, [0, 0, 0])
     p1 = sp.Matrix(3, 1, [J[0, 0], J[1, 0], J[2, 0]])
     p2 = sp.Matrix(3, 1, [J[0, 1], J[1, 1], J[2, 1]])
     p3 = sp.Matrix(3, 1, [J[0, 2], J[1, 2], J[2, 2]])
-
-# Debug override
-if debug:
-    p0 = sp.Matrix(3, 1, [0, 0, 0])
-    p1 = sp.Matrix(3, 1, [1, 0, 0])
-    p2 = sp.Matrix(3, 1, [0, 1, 0])
-    p3 = sp.Matrix(3, 1, [0, 0, 1])
-
-ref0 = sp.Matrix(3, 1, [0, 0, 0])
-ref1 = sp.Matrix(3, 1, [1, 0, 0])
-ref2 = sp.Matrix(3, 1, [0, 1, 0])
-ref3 = sp.Matrix(3, 1, [0, 0, 1])
+else:
+# For point-based assembly
+    p0 = tp0 
+    p1 = tp1 
+    p2 = tp2 
+    p3 = tp3 
 
 ptet = [p0, p1, p2, p3]
 rtet = [ref0, ref1, ref2, ref3]
@@ -50,7 +55,7 @@ def fun(x, y, z):
     return [1 - x - y - z, x, y, z]
 
 # Centroid
-centroid  = sp.Matrix(3, 1, [sp.Rational(1, 4), sp.Rational(1, 4), sp.Rational(1, 4)])
+centroid = sp.Matrix(3, 1, [sp.Rational(1, 4), sp.Rational(1, 4), sp.Rational(1, 4)])
 
 # Sides opposite to corner
 tri = [
@@ -58,36 +63,33 @@ tri = [
     [2, 0, 3],
     [1, 3, 0],
     [2, 1, 0]
-];
+]
 
 def poly_surf_area_normal(poly):
-    ndA = sp.zeros(3, 1);
-    area = 0;
-    n = len(poly);
-    p0 = poly[0];
+    ndA = sp.zeros(3, 1)
+    area = 0
+    n = len(poly)
+    p0 = poly[0]
 
     for i in range(1, n-1):
-        ip1 = i + 1;
+        ip1 = i + 1
 
-        p1 = poly[i];
-        p2 = poly[ip1];
+        p1 = poly[i]
+        p2 = poly[ip1]
 
         u = p1 - p0
-        v = p2 - p0;
+        v = p2 - p0
 
-        ndAi = cross(u, v) / 2;
+        ndAi = cross(u, v) / 2
         
         if debug:
             if i > 1:
                 assert(dot3(ndAi, ndA) > 0)
 
-        ndA += ndAi;
-        area += sp.sqrt(ndAi[0]*ndAi[0] + ndAi[1]*ndAi[1] + ndAi[2]*ndAi[2]);
+        ndA += ndAi
+        area += sp.sqrt(ndAi[0]*ndAi[0] + ndAi[1]*ndAi[1] + ndAi[2]*ndAi[2])
 
     if debug:
-        # print("------------")
-        # print(area*area)
-        # print(dot3(ndA, ndA))
         assert( abs(area*area -  dot3(ndA, ndA)) < 1e-8 )
 
     return ndA, area
@@ -97,14 +99,14 @@ def cv_faces(v0, v1, v2, v3):
     m02 = (v0 + v2)/2
     m03 = (v0 + v3)/2
 
-    bf012 = (v0 + v1 + v2)/3;
-    bf013 = (v0 + v1 + v3)/3;
-    bf023 = (v0 + v2 + v3)/3;
+    bf012 = (v0 + v1 + v2)/3
+    bf013 = (v0 + v1 + v3)/3
+    bf023 = (v0 + v2 + v3)/3
 
     # Order here matters!!!
-    f0 = [m01,  bf013, centroid, bf012];
-    f1 = [m02,  bf012, centroid, bf023];
-    f2 = [m03,  bf023, centroid, bf013];
+    f0 = [m01,  bf013, centroid, bf012]
+    f1 = [m02,  bf012, centroid, bf023]
+    f2 = [m03,  bf023, centroid, bf013]
     return f0, f1, f2
 
 def cv_ips(v0, v1, v2, v3):
@@ -209,24 +211,13 @@ for i in range(0, 4):
     vcz = cv_interp4([ip0, ip1, ip2], vz)
 
     # Scaled normals
-    dn0, area0 = poly_surf_area_normal(f0);
-    dn1, area1 = poly_surf_area_normal(f1);
-    dn2, area2 = poly_surf_area_normal(f2);
+    dn0, area0 = poly_surf_area_normal(f0)
+    dn1, area1 = poly_surf_area_normal(f1)
+    dn2, area2 = poly_surf_area_normal(f2)
 
     q = advective_fluxes([vcx, vcy, vcz], [dn0, dn1, dn2])
     B = advection_op(q, i, o[0], o[1], o[2])
     A += B
-
-    # print(f'idx = {i}, {o[0]}, {o[1]}, {o[2]}')
-    # print(vcx, vcy, vcz)
-    # print(dn0[:], dn1[:], dn2[:])
-    # print(dn0[0], dn1[0], dn2[0])
-    # print(q)
-
-    #
-    # print(f'area = {area0}, {area1}, {area2}')
-    # print(q)
-    # print(B)
 
     if debug:
         assert(dot3(dn0, dn1) > 0)
@@ -240,9 +231,24 @@ for i in range(0, 4):
         assert(dc1 > 0)
         assert(dc2 > 0)
 
-    # pdb.set_trace()
-
 if not debug:    
+    if use_jac:
+        print('----------------------------')
+        print('Jacobian')
+        print('----------------------------')
+
+        u = tp1 - tp0
+        v = tp2 - tp0
+        w = tp3 - tp0
+
+        Jx = sp.Matrix(3, 3, [
+        u[0], v[0], w[0],
+        u[1], v[1], w[1],
+        u[2], v[2], w[2],
+        ])
+
+        expr =  assign_matrix('J', Jx)
+        c_code(expr)
 
     print('----------------------------')
     print('Hessian')
