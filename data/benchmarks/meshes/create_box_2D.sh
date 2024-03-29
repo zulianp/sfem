@@ -73,8 +73,8 @@ echo $x_middle
 # 									x 				y 					z 	cos(angle)
 $LAUNCH select_surf $mesh_surface  0  			$y_middle 	0  	0.99 $mesh_surface/sides_left.raw
 $LAUNCH select_surf $mesh_surface  $width  		$y_middle  	0  	0.99 $mesh_surface/sides_right.raw
-$LAUNCH select_surf $mesh_surface  $x_middle  	0  					0  	0.99 $mesh_surface/sides_bottom.raw
-$LAUNCH select_surf $mesh_surface  $x_middle   	$height  			0  	0.99 $mesh_surface/sides_top.raw
+$LAUNCH select_surf $mesh_surface  $x_middle  	0  			0  	0.99 $mesh_surface/sides_bottom.raw
+$LAUNCH select_surf $mesh_surface  $x_middle   	$height  	0  	0.99 $mesh_surface/sides_top.raw
 
 print_array()
 {
