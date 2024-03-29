@@ -37,14 +37,14 @@ create_box.sh $SFEM_ELEM_TYPE 50 50 100 1 1 2 $SFEM_MESH_DIR
 export SFEM_MAX_TIME=2
 export SFEM_DT=0.001
 export SFEM_EXPORT_FREQUENCY=0.01
-export SFEM_DIFFUSIVITY=0.1
+export SFEM_DIFFUSIVITY=0
 export SFEM_VELX=0
 export SFEM_VELY=0
 export SFEM_VELZ=1
 export SFEM_INITIAL_CONDITION="ivp.raw"
 
 eval_nodal_function.py \
-	"(1-x)*x *(1-y)*y * (2-z)**4" \
+	"np.exp(-2*(0.5-x)**2) * np.exp(-2*(0.5-y)**2) * np.exp(-2*(0.2-z)**2)" \
 	$SFEM_MESH_DIR/x.raw $SFEM_MESH_DIR/y.raw $SFEM_MESH_DIR/z.raw $SFEM_INITIAL_CONDITION
 
 run_convection_diffusion $SFEM_MESH_DIR out

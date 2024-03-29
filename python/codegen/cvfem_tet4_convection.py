@@ -262,8 +262,6 @@ if not debug:
         expr = det3(Jx)
         c_code(expr)
 
-
-
     print('----------------------------')
     print('Hessian')
     print('----------------------------')

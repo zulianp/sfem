@@ -27,8 +27,15 @@ depth=$7
 
 output_dir=$8
 
-box_mesh.py $output_dir 		\
+tempdir=`mktemp -d`
+
+box_mesh.py $tempdir 		\
 	--cell_type=$cell_type 		\
 	-x $x -y $y -z $z  			\
 	--width=$width --height=$height --depth=$depth
+
+sfc $tempdir $output_dir
+rm -rf $tempdir
+
 raw_to_db.py $output_dir $output_dir/mesh.vtk   
+
