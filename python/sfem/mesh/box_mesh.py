@@ -196,9 +196,6 @@ def box_mesh(argv):
 					# Tet 3
 					i0[count] = hexa[0]
 					i1[count] = hexa[2]
-					# i2[count] = hexa[5]
-					# i3[count] = hexa[7]
-
 					i2[count] = hexa[7]
 					i3[count] = hexa[5]
 					count += 1
