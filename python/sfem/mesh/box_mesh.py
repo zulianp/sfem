@@ -78,10 +78,9 @@ def box_mesh(argv):
 	y = np.reshape(y, y.shape[0] * y.shape[1] * y.shape[2])
 	z = np.reshape(z, z.shape[0] * z.shape[1] * z.shape[2])
 
-	if cell_type == "hexahedron":
+	if cell_type == "hexahedron" or cell_type == "hex" or cell_type == "hex8":
 		ne = (nx - 1) * (ny - 1) * (nz - 1)
 		
-
 		i0 = np.zeros(ne, dtype=idx_t)
 		i1 = np.zeros(ne, dtype=idx_t)
 		i2 = np.zeros(ne, dtype=idx_t)
