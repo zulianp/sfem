@@ -63,7 +63,7 @@ def box_mesh(argv):
 	if not os.path.exists(output_folder):
 		os.mkdir(f'{output_folder}')
 
-	print(f'nx={nx} ny={ny} width={w} height={h}')
+	print(f'nx={nx} ny={ny} nz={nz} width={w} height={h} depth={t}')
 
 	gx = np.linspace(0, w, num=nx, dtype=geom_t)
 	gy = np.linspace(0, h, num=ny, dtype=geom_t)
@@ -139,7 +139,7 @@ def box_mesh(argv):
 		i6.tofile(f'{output_folder}/i6.raw')
 		i7.tofile(f'{output_folder}/i7.raw')
 
-	elif cell_type == "tetrahedron":
+	elif cell_type == "tetra" or cell_type == "tetrahedron" or cell_type == "tetra4" or cell_type == "tet4":
 		ne = 5 * (nx - 1) * (ny - 1) * (nz - 1)
 
 		i0 = np.zeros(ne, dtype=idx_t)
@@ -172,30 +172,38 @@ def box_mesh(argv):
 						x0 + y1 + z1  # 8 (0, 1, 1)
 						], dtype=idx_t)
 
+					# Tet 0
 					i0[count] = hexa[0]
 					i1[count] = hexa[1]
 					i2[count] = hexa[2]
 					i3[count] = hexa[5]
 					count += 1
 
+					# Tet 1
 					i0[count] = hexa[0]
 					i1[count] = hexa[5]
 					i2[count] = hexa[7]
 					i3[count] = hexa[4]
 					count += 1
 
+					# Tet 2
 					i0[count] = hexa[2]
 					i1[count] = hexa[5]
 					i2[count] = hexa[6]
 					i3[count] = hexa[7]
 					count += 1
 
+					# Tet 3
 					i0[count] = hexa[0]
 					i1[count] = hexa[2]
-					i2[count] = hexa[5]
-					i3[count] = hexa[7]
+					# i2[count] = hexa[5]
+					# i3[count] = hexa[7]
+
+					i2[count] = hexa[7]
+					i3[count] = hexa[5]
 					count += 1
 
+					# Tet 4
 					i0[count] = hexa[0]
 					i1[count] = hexa[2]
 					i2[count] = hexa[3]

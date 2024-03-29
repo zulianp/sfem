@@ -482,6 +482,10 @@ void cvfem_tet4_convection_assemble_hessian(const ptrdiff_t nelements,
                                             real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
+    const geom_t *const x = xyz[0];
+    const geom_t *const y = xyz[1];
+    const geom_t *const z = xyz[2];
+
 #pragma omp parallel
     {
 #pragma omp for
@@ -515,20 +519,20 @@ void cvfem_tet4_convection_assemble_hessian(const ptrdiff_t nelements,
 
             cvfem_tet4_convection_assemble_hessian_kernel(
                 // X-coordinates
-                xyz[0][ev[0]],
-                xyz[0][ev[1]],
-                xyz[0][ev[2]],
-                xyz[0][ev[3]],
+                x[ev[0]],
+                x[ev[1]],
+                x[ev[2]],
+                x[ev[3]],
                 // Y-coordinates
-                xyz[1][ev[0]],
-                xyz[1][ev[1]],
-                xyz[1][ev[2]],
-                xyz[1][ev[3]],
+                y[ev[0]],
+                y[ev[1]],
+                y[ev[2]],
+                y[ev[3]],
                 // Z-coordinates
-                xyz[2][ev[0]],
-                xyz[2][ev[1]],
-                xyz[2][ev[2]],
-                xyz[2][ev[3]],
+                z[ev[0]],
+                z[ev[1]],
+                z[ev[2]],
+                z[ev[3]],
                 vx,
                 vy,
                 vz,
@@ -563,6 +567,10 @@ void cvfem_tet4_convection_apply(const ptrdiff_t nelements,
                                  const real_t *const SFEM_RESTRICT u,
                                  real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
+
+    const geom_t *const x = xyz[0];
+    const geom_t *const y = xyz[1];
+    const geom_t *const z = xyz[2];
 
 #pragma omp parallel
     {
@@ -603,20 +611,20 @@ void cvfem_tet4_convection_apply(const ptrdiff_t nelements,
 
             cvfem_tet4_convection_apply_kernel(
                 // X-coordinates
-                xyz[0][ev[0]],
-                xyz[0][ev[1]],
-                xyz[0][ev[2]],
-                xyz[0][ev[3]],
+                x[ev[0]],
+                x[ev[1]],
+                x[ev[2]],
+                x[ev[3]],
                 // Y-coordinates
-                xyz[1][ev[0]],
-                xyz[1][ev[1]],
-                xyz[1][ev[2]],
-                xyz[1][ev[3]],
+                y[ev[0]],
+                y[ev[1]],
+                y[ev[2]],
+                y[ev[3]],
                 // Z-coordinates
-                xyz[2][ev[0]],
-                xyz[2][ev[1]],
-                xyz[2][ev[2]],
-                xyz[2][ev[3]],
+                z[ev[0]],
+                z[ev[1]],
+                z[ev[2]],
+                z[ev[3]],
                 // Velocity
                 vx,
                 vy,
@@ -645,7 +653,7 @@ void cvfem_tet4_cv_volumes(const ptrdiff_t nelements,
 
     const geom_t *const x = xyz[0];
     const geom_t *const y = xyz[1];
-    const geom_t *const z = xyz[1];
+    const geom_t *const z = xyz[2];
 
 #pragma omp parallel
     {
@@ -660,24 +668,24 @@ void cvfem_tet4_cv_volumes(const ptrdiff_t nelements,
 
             const real_t measure = det_jacobian(
                                        // X-coordinates
-                                       xyz[0][ev[0]],
-                                       xyz[0][ev[1]],
-                                       xyz[0][ev[2]],
-                                       xyz[0][ev[3]],
+                                       x[ev[0]],
+                                       x[ev[1]],
+                                       x[ev[2]],
+                                       x[ev[3]],
                                        // Y-coordinates
-                                       xyz[1][ev[0]],
-                                       xyz[1][ev[1]],
-                                       xyz[1][ev[2]],
-                                       xyz[1][ev[3]],
+                                       y[ev[0]],
+                                       y[ev[1]],
+                                       y[ev[2]],
+                                       y[ev[3]],
                                        // Z-coordinates
-                                       xyz[2][ev[0]],
-                                       xyz[2][ev[1]],
-                                       xyz[2][ev[2]],
-                                       xyz[2][ev[3]]) /
+                                       z[ev[0]],
+                                       z[ev[1]],
+                                       z[ev[2]],
+                                       z[ev[3]]) /
                                    4;
 
             assert(measure > 0);
-            for (int edof_i = 0; edof_i < 3; ++edof_i) {
+            for (int edof_i = 0; edof_i < 4; ++edof_i) {
                 const idx_t dof_i = ev[edof_i];
 
 #pragma omp atomic update

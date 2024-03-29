@@ -121,6 +121,7 @@ int main(int argc, char *argv[]) {
     real_t SFEM_DIFFUSIVITY = 1;
     real_t SFEM_VELX = 1;
     real_t SFEM_VELY = 0;
+    real_t SFEM_VELZ = 0;
 
     SFEM_READ_ENV(SFEM_DT, atof);
     SFEM_READ_ENV(SFEM_MAX_TIME, atof);
@@ -128,6 +129,7 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_DIFFUSIVITY, atof);
     SFEM_READ_ENV(SFEM_VELX, atof);
     SFEM_READ_ENV(SFEM_VELY, atof);
+    SFEM_READ_ENV(SFEM_VELZ, atof);
 
     char * SFEM_INITIAL_CONDITION = 0;
     SFEM_READ_ENV(SFEM_INITIAL_CONDITION, );
@@ -149,6 +151,7 @@ int main(int argc, char *argv[]) {
             "- SFEM_DIFFUSIVITY=%g\n"
             "- SFEM_VELX=%g\n"
             "- SFEM_VELY=%g\n"
+            "- SFEM_VELZ=%g\n"
             "- SFEM_INITIAL_CONDITION=%s\n"
             "----------------------------------------\n",
             SFEM_DT,
@@ -157,6 +160,7 @@ int main(int argc, char *argv[]) {
             (double)SFEM_DIFFUSIVITY,
             (double)SFEM_VELX,
             (double)SFEM_VELY,
+            (double)SFEM_VELZ,
             SFEM_INITIAL_CONDITION);
     }
 
@@ -189,6 +193,12 @@ int main(int argc, char *argv[]) {
     for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
         vel[0][i] = SFEM_VELX;
         vel[1][i] = SFEM_VELY;
+    }
+
+    if(sdim >= 3) {
+        for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+            vel[2][i] = SFEM_VELZ;
+        }
     }
 
     update = calloc(mesh.nnodes, sizeof(real_t));
