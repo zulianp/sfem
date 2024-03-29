@@ -66,6 +66,16 @@ def inverse(mat):
 	else:
 		return inv3(mat)
 
+# Optimization for CUDA can be added here
+class SFEMCodePrinter(sp.printing.c.C99CodePrinter):
+	def _print_Pow(self, expr):
+		if expr.exp == 2:
+			return "POW2({})".format(self._print(expr.base))
+		elif expr.exp == -2:
+			return "(1/POW2({}))".format(self._print(expr.base))
+		else:
+			return super()._print_Pow(expr)
+
 def c_gen(expr, dump=False):
     console.print("--------------------------")
     console.print(f'Running cse')
@@ -77,7 +87,7 @@ def c_gen(expr, dump=False):
     # result_ops = sp.count_ops(simpl_expr, visual=True)
     # cost = f'FLOATING POINT OPS!\n//\t- Result: {result_ops}\n//\t- Subexpressions: {sub_ops}'
     
-    printer = sp.printing.c.C99CodePrinter()
+    printer = SFEMCodePrinter()
     lines = []
 
     for var,expr in sub_expr:
