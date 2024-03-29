@@ -129,6 +129,9 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_VELX, atof);
     SFEM_READ_ENV(SFEM_VELY, atof);
 
+    char * SFEM_INITIAL_CONDITION = 0;
+    SFEM_READ_ENV(SFEM_INITIAL_CONDITION, );
+
     const char *SFEM_RESTART_FOLDER = 0;
     SFEM_READ_ENV(SFEM_RESTART_FOLDER, );
 
@@ -146,13 +149,15 @@ int main(int argc, char *argv[]) {
             "- SFEM_DIFFUSIVITY=%g\n"
             "- SFEM_VELX=%g\n"
             "- SFEM_VELY=%g\n"
+            "- SFEM_INITIAL_CONDITION=%s\n"
             "----------------------------------------\n",
             SFEM_DT,
             SFEM_RESTART_FOLDER,
             SFEM_RESTART_ID,
             (double)SFEM_DIFFUSIVITY,
             (double)SFEM_VELX,
-            (double)SFEM_VELY);
+            (double)SFEM_VELY,
+            SFEM_INITIAL_CONDITION);
     }
 
     if (SFEM_RESTART_FOLDER && !SFEM_RESTART_ID) {
@@ -188,7 +193,10 @@ int main(int argc, char *argv[]) {
 
     update = calloc(mesh.nnodes, sizeof(real_t));
 
-    // FIXME these are initial conditions (rename)
+    if(SFEM_INITIAL_CONDITION) {
+        array_read(comm, SFEM_INITIAL_CONDITION, SFEM_MPI_REAL_T, (void *)c, mesh.nnodes, mesh.nnodes);
+    }
+
     for (int i = 0; i < n_dirichlet_conditions; i++) {
         boundary_condition_t cond = dirichlet_conditions[i];
         constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, c);
@@ -255,10 +263,10 @@ int main(int argc, char *argv[]) {
 
         integr_concentration = dot(mesh.nnodes, c, cv_volumes);
 
-        // for (int i = 0; i < n_dirichlet_conditions; i++) {
-        //     boundary_condition_t cond = dirichlet_conditions[i];
-        //     constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, c);
-        // }
+        for (int i = 0; i < n_dirichlet_conditions; i++) {
+            boundary_condition_t cond = dirichlet_conditions[i];
+            constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, c);
+        }
 
         if (t >= (next_check_point - SFEM_DT / 2)) {  // Write to disk
             printf("%g/%g dt=%g mc=%g\n", t, SFEM_MAX_TIME, dt, integr_concentration);

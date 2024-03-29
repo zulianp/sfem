@@ -13,6 +13,7 @@ PATH=$SCRIPTPATH:$PATH
 PATH=$SCRIPTPATH/..:$PATH
 PATH=$SCRIPTPATH/../python/sfem:$PATH
 PATH=$SCRIPTPATH/../python/sfem/mesh:$PATH
+PATH=$SCRIPTPATH/../python/sfem/utils:$PATH
 PATH=$SCRIPTPATH/../python/sfem/algebra:$PATH
 PATH=$SCRIPTPATH/../data/benchmarks/meshes:$PATH
 
@@ -28,8 +29,8 @@ export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true
 
 SFEM_MESH_DIR=mesh
-# export SFEM_ELEM_TYPE=quad 
-export SFEM_ELEM_TYPE=triangle
+export SFEM_ELEM_TYPE=quad 
+# export SFEM_ELEM_TYPE=triangle
 
 rm -rf $SFEM_MESH_DIR
 create_box_2D.sh 1 2 1
@@ -37,16 +38,19 @@ create_box_2D.sh 1 2 1
 sleft=$SFEM_MESH_DIR/sidesets_aos/sleft.raw
 sright=$SFEM_MESH_DIR/sidesets_aos/sright.raw
 
-export SFEM_DIRICHLET_NODESET="$sleft"
-export SFEM_DIRICHLET_VALUE="1"
-export SFEM_DIRICHLET_COMPONENT="0"
+# export SFEM_DIRICHLET_NODESET="$sleft"
+# export SFEM_DIRICHLET_VALUE="1"
+# export SFEM_DIRICHLET_COMPONENT="0"
 
 export SFEM_MAX_TIME=2
 export SFEM_DT=0.0001
 export SFEM_EXPORT_FREQUENCY=0.02
-export SFEM_DIFFUSIVITY=0
+export SFEM_DIFFUSIVITY=0.01
 export SFEM_VELX=1
 export SFEM_VELY=0
+export SFEM_INITIAL_CONDITION="ivp.raw"
+
+eval_nodal_function.py "np.exp(-1000*(x-0.3)*(x-0.3)*(y-0.5)*(y-0.5))*(2-x)*(2-x)*x*(1-y)*(1-y)*y*y" $SFEM_MESH_DIR/x.raw $SFEM_MESH_DIR/y.raw $SFEM_MESH_DIR/y.raw $SFEM_INITIAL_CONDITION
 
 # lldb -- 
 run_convection_diffusion $SFEM_MESH_DIR out
