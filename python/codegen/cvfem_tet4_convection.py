@@ -3,6 +3,12 @@
 from sfem_codegen import *
 import matplotlib.pyplot as plt
 
+# Simple but wastefull implementation of
+# Upwind-convection scheme for CVFEM
+# TODO: 
+#   1) Optimize computations by computing normals and fluxes once
+#   2) Create code blocks for intermediate values in order to reduce register usage
+
 debug=False
 use_jac=not debug
 
@@ -141,7 +147,6 @@ def advective_fluxes(vc, dn):
         # Quite important reduction of register usage here
         qi = sp.simplify(qi)
         q.append(qi)
-
     return q
 
 def pw_max(a, b):
@@ -266,9 +271,8 @@ if not debug:
     expr = assign_matrix('element_vector', y)
     c_code(expr)
 
-# Check on ref element
-# if False:
-if debug:
+else:
+    # Check on ref element
     print('------------------')
     sum_A = 0
     for i in range(0, 4):
@@ -285,10 +289,8 @@ if debug:
                 su = su.subs(v, 0)
 
             sum_A += su
-
             line += f"{round(su, 5)} "
 
         print(line)
         print('\n')
-
     print(f'sum_A={sum_A}')
