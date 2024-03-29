@@ -255,6 +255,15 @@ if not debug:
         expr =  assign_matrix('J', Jx)
         c_code(expr)
 
+        print('----------------------------')
+        print('det(Jacobian)')
+        print('----------------------------')
+
+        expr = det3(Jx)
+        c_code(expr)
+
+
+
     print('----------------------------')
     print('Hessian')
     print('----------------------------')

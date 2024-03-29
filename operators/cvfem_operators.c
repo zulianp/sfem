@@ -8,6 +8,7 @@
 #include "cvfem_quad4_laplacian.h"
 #include "cvfem_quad4_convection.h"
 
+#include "cvfem_tet4_convection.h"
 #include "cvfem_tet4_laplacian.h"
 
 void cvfem_laplacian_assemble_hessian(const enum ElemType element_type,
