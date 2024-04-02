@@ -23,6 +23,7 @@
 #include "sfem_mesh.h"
 
 #include "boundary_condition.h"
+#include "boundary_condition_io.h"
 #include "dirichlet.h"
 #include "neumann.h"
 

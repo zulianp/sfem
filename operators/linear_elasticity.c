@@ -98,10 +98,10 @@ void linear_elasticity_apply_soa(const enum ElemType element_type,
             tri3_linear_elasticity_apply_soa(nelements, nnodes, elems, xyz, mu, lambda, u, values);
             break;
         }
-        // case TET4: {
-        //     tet4_linear_elasticity_apply_soa(nelements, nnodes, elems, xyz, mu, lambda, u,
-        //     values); break;
-        // }
+        case TET4: {
+            tet4_linear_elasticity_apply_soa(nelements, nnodes, elems, xyz, mu, lambda, u,
+            values); break;
+        }
         default: {
             MPI_Abort(MPI_COMM_WORLD, -1);
         }

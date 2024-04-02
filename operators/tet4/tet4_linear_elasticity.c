@@ -258,18 +258,18 @@ static SFEM_INLINE void tet4_linear_elasticity_assemble_gradient_kernel(
     const real_t x69 = x21 * x29;
     const real_t x70 = x20 * x69 + x27 * x69 + x29 * x65 + x32 * x69 + x33 * x62 + x36 * x62 +
                        x50 * x53 + x50 * x54;
-    element_vector[0 * stride] = x14 * (-x42 - x46 - x51);
-    element_vector[1 * stride] = x14 * x42;
-    element_vector[2 * stride] = x14 * x46;
-    element_vector[3 * stride] = x14 * x51;
-    element_vector[4 * stride] = x14 * (-x57 - x60 - x63);
-    element_vector[5 * stride] = x14 * x57;
-    element_vector[6 * stride] = x14 * x60;
-    element_vector[7 * stride] = x14 * x63;
-    element_vector[8 * stride] = x14 * (-x66 - x68 - x70);
-    element_vector[9 * stride] = x14 * x66;
-    element_vector[10 * stride] = x14 * x68;
-    element_vector[11 * stride] = x14 * x70;
+    element_vector[0] = x14 * (-x42 - x46 - x51);
+    element_vector[1] = x14 * x42;
+    element_vector[2] = x14 * x46;
+    element_vector[3] = x14 * x51;
+    element_vector[4] = x14 * (-x57 - x60 - x63);
+    element_vector[5] = x14 * x57;
+    element_vector[6] = x14 * x60;
+    element_vector[7] = x14 * x63;
+    element_vector[8] = x14 * (-x66 - x68 - x70);
+    element_vector[9] = x14 * x66;
+    element_vector[10] = x14 * x68;
+    element_vector[11] = x14 * x70;
 }
 
 static SFEM_INLINE void tet4_linear_elasticity_assemble_hessian_kernel(const real_t mu,
@@ -924,7 +924,7 @@ static SFEM_INLINE void tet4_linear_elasticity_apply_kernel(
 
 #else
 
-static SFEM_INLINE void tet4_linear_elasticity_apply_kernel(
+static SFEM_INLINE void tet4_linear_elasticity_apply_kernel_old(
     const real_t mu,
     const real_t lambda,
     const real_t px0,
@@ -1184,6 +1184,178 @@ static SFEM_INLINE void tet4_linear_elasticity_apply_kernel(
                                   x193 * x41 + x36 * x97;
 }
 
+static SFEM_INLINE void tet4_linear_elasticity_apply_kernel_opt(const real_t mu,
+                                                                const real_t lambda,
+                                                                const real_t px0,
+                                                                const real_t px1,
+                                                                const real_t px2,
+                                                                const real_t px3,
+                                                                const real_t py0,
+                                                                const real_t py1,
+                                                                const real_t py2,
+                                                                const real_t py3,
+                                                                const real_t pz0,
+                                                                const real_t pz1,
+                                                                const real_t pz2,
+                                                                const real_t pz3,
+                                                                const real_t *const SFEM_RESTRICT u,
+                                                                real_t *const SFEM_RESTRICT
+                                                                    element_vector) {
+    real_t jacobian_inverse[9];
+    real_t jacobian_determinant = 0;
+    {
+        const real_t x0 = -py0 + py2;
+        const real_t x1 = -pz0 + pz3;
+        const real_t x2 = x0 * x1;
+        const real_t x3 = -py0 + py3;
+        const real_t x4 = -pz0 + pz2;
+        const real_t x5 = x3 * x4;
+        const real_t x6 = -px0 + px1;
+        const real_t x7 = -pz0 + pz1;
+        const real_t x8 = -px0 + px2;
+        const real_t x9 = x3 * x8;
+        const real_t x10 = -py0 + py1;
+        const real_t x11 = -px0 + px3;
+        const real_t x12 = x1 * x8;
+        const real_t x13 = x0 * x11;
+        const real_t x14 = x10 * x11 * x4 - x10 * x12 - x13 * x7 + x2 * x6 - x5 * x6 + x7 * x9;
+        const real_t x15 = 1.0 / x14;
+        jacobian_inverse[0] = x15 * (x2 - x5);
+        jacobian_inverse[1] = x15 * (x11 * x4 - x12);
+        jacobian_inverse[2] = x15 * (-x13 + x9);
+        jacobian_inverse[3] = x15 * (-x1 * x10 + x3 * x7);
+        jacobian_inverse[4] = x15 * (x1 * x6 - x11 * x7);
+        jacobian_inverse[5] = x15 * (x10 * x11 - x3 * x6);
+        jacobian_inverse[6] = x15 * (-x0 * x7 + x10 * x4);
+        jacobian_inverse[7] = x15 * (-x4 * x6 + x7 * x8);
+        jacobian_inverse[8] = x15 * (x0 * x6 - x10 * x8);
+        jacobian_determinant = x14;
+        assert(jacobian_determinant > 0);
+    }
+
+    real_t disp_grad[9];
+    {
+        const real_t x0 = -jacobian_inverse[0] - jacobian_inverse[3] - jacobian_inverse[6];
+        const real_t x1 = -jacobian_inverse[1] - jacobian_inverse[4] - jacobian_inverse[7];
+        const real_t x2 = -jacobian_inverse[2] - jacobian_inverse[5] - jacobian_inverse[8];
+        disp_grad[0] = jacobian_inverse[0] * u[1] + jacobian_inverse[3] * u[2] +
+                       jacobian_inverse[6] * u[3] + u[0] * x0;
+        disp_grad[1] = jacobian_inverse[1] * u[1] + jacobian_inverse[4] * u[2] +
+                       jacobian_inverse[7] * u[3] + u[0] * x1;
+        disp_grad[2] = jacobian_inverse[2] * u[1] + jacobian_inverse[5] * u[2] +
+                       jacobian_inverse[8] * u[3] + u[0] * x2;
+        disp_grad[3] = jacobian_inverse[0] * u[5] + jacobian_inverse[3] * u[6] +
+                       jacobian_inverse[6] * u[7] + u[4] * x0;
+        disp_grad[4] = jacobian_inverse[1] * u[5] + jacobian_inverse[4] * u[6] +
+                       jacobian_inverse[7] * u[7] + u[4] * x1;
+        disp_grad[5] = jacobian_inverse[2] * u[5] + jacobian_inverse[5] * u[6] +
+                       jacobian_inverse[8] * u[7] + u[4] * x2;
+        disp_grad[6] = jacobian_inverse[0] * u[9] + jacobian_inverse[3] * u[10] +
+                       jacobian_inverse[6] * u[11] + u[8] * x0;
+        disp_grad[7] = jacobian_inverse[1] * u[9] + jacobian_inverse[4] * u[10] +
+                       jacobian_inverse[7] * u[11] + u[8] * x1;
+        disp_grad[8] = jacobian_inverse[2] * u[9] + jacobian_inverse[5] * u[10] +
+                       jacobian_inverse[8] * u[11] + u[8] * x2;
+    }
+
+    // real_t P[9];
+    real_t *P = disp_grad;
+    {
+        const real_t x0 = 2 * disp_grad[0];
+        const real_t x1 = 2 * disp_grad[4];
+        const real_t x2 = 2 * disp_grad[8];
+        const real_t x3 = (1.0 / 2.0) * lambda * (x0 + x1 + x2);
+        const real_t x4 = mu * (disp_grad[1] + disp_grad[3]);
+        const real_t x5 = mu * (disp_grad[2] + disp_grad[6]);
+        const real_t x6 = mu * (disp_grad[5] + disp_grad[7]);
+        P[0] = mu * x0 + x3;
+        P[1] = x4;
+        P[2] = x5;
+        P[3] = x4;
+        P[4] = mu * x1 + x3;
+        P[5] = x6;
+        P[6] = x5;
+        P[7] = x6;
+        P[8] = mu * x2 + x3;
+    }
+
+    // Bilinear form
+    {
+        const real_t x0 = -jacobian_inverse[0] - jacobian_inverse[3] - jacobian_inverse[6];
+        const real_t x1 = -jacobian_inverse[1] - jacobian_inverse[4] - jacobian_inverse[7];
+        const real_t x2 = -jacobian_inverse[2] - jacobian_inverse[5] - jacobian_inverse[8];
+        const real_t x3 = -pz0 + pz3;
+        const real_t x4 = -py0 + py2;
+        const real_t x5 = -1.0 / 6.0 * px0 + (1.0 / 6.0) * px1;
+        const real_t x6 = -py0 + py3;
+        const real_t x7 = -pz0 + pz2;
+        const real_t x8 = -py0 + py1;
+        const real_t x9 = -1.0 / 6.0 * px0 + (1.0 / 6.0) * px2;
+        const real_t x10 = -pz0 + pz1;
+        const real_t x11 = -1.0 / 6.0 * px0 + (1.0 / 6.0) * px3;
+        const real_t x12 = -x10 * x11 * x4 + x10 * x6 * x9 + x11 * x7 * x8 + x3 * x4 * x5 -
+                           x3 * x8 * x9 - x5 * x6 * x7;
+        element_vector[0] = x12 * (P[0] * x0 + P[1] * x1 + P[2] * x2);
+        element_vector[1] =
+            x12 *
+            (P[0] * jacobian_inverse[0] + P[1] * jacobian_inverse[1] + P[2] * jacobian_inverse[2]);
+        element_vector[2] =
+            x12 *
+            (P[0] * jacobian_inverse[3] + P[1] * jacobian_inverse[4] + P[2] * jacobian_inverse[5]);
+        element_vector[3] =
+            x12 *
+            (P[0] * jacobian_inverse[6] + P[1] * jacobian_inverse[7] + P[2] * jacobian_inverse[8]);
+        element_vector[4] = x12 * (P[3] * x0 + P[4] * x1 + P[5] * x2);
+        element_vector[5] =
+            x12 *
+            (P[3] * jacobian_inverse[0] + P[4] * jacobian_inverse[1] + P[5] * jacobian_inverse[2]);
+        element_vector[6] =
+            x12 *
+            (P[3] * jacobian_inverse[3] + P[4] * jacobian_inverse[4] + P[5] * jacobian_inverse[5]);
+        element_vector[7] =
+            x12 *
+            (P[3] * jacobian_inverse[6] + P[4] * jacobian_inverse[7] + P[5] * jacobian_inverse[8]);
+        element_vector[8] = x12 * (P[6] * x0 + P[7] * x1 + P[8] * x2);
+        element_vector[9] =
+            x12 *
+            (P[6] * jacobian_inverse[0] + P[7] * jacobian_inverse[1] + P[8] * jacobian_inverse[2]);
+        element_vector[10] =
+            x12 *
+            (P[6] * jacobian_inverse[3] + P[7] * jacobian_inverse[4] + P[8] * jacobian_inverse[5]);
+        element_vector[11] =
+            x12 *
+            (P[6] * jacobian_inverse[6] + P[7] * jacobian_inverse[7] + P[8] * jacobian_inverse[8]);
+    }
+
+    // real_t test_vector[3 * 4];
+    // {
+    //     tet4_linear_elasticity_apply_kernel_old(
+    //         mu, lambda, px0, px1, px2, px3, py0, py1, py2, py3, pz0, pz1, pz2, pz3, u,
+    //         test_vector);
+
+    //     // for(int i = 0; i < 12; i++) {
+    //     //     printf("%d) %g - %g = %g\n", i, element_vector[i], test_vector[i],
+    //     element_vector[i]
+    //     //     - test_vector[i]);
+    //     // }
+
+    //     assert(fabs(element_vector[0] - test_vector[0]) < 1e-8);
+    //     assert(fabs(element_vector[1] - test_vector[1]) < 1e-8);
+    //     assert(fabs(element_vector[2] - test_vector[2]) < 1e-8);
+    //     assert(fabs(element_vector[3] - test_vector[3]) < 1e-8);
+    //     assert(fabs(element_vector[4] - test_vector[4]) < 1e-8);
+    //     assert(fabs(element_vector[5] - test_vector[5]) < 1e-8);
+    //     assert(fabs(element_vector[6] - test_vector[6]) < 1e-8);
+    //     assert(fabs(element_vector[7] - test_vector[7]) < 1e-8);
+    //     assert(fabs(element_vector[8] - test_vector[8]) < 1e-8);
+    //     assert(fabs(element_vector[9] - test_vector[9]) < 1e-8);
+    //     assert(fabs(element_vector[10] - test_vector[10]) < 1e-8);
+    //     assert(fabs(element_vector[11] - test_vector[11]) < 1e-8);
+    // }
+}
+
+#define tet4_linear_elasticity_apply_kernel tet4_linear_elasticity_apply_kernel_opt
+// #define tet4_linear_elasticity_apply_kernel tet4_linear_elasticity_apply_kernel_old
 #endif
 
 void tet4_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
@@ -1196,7 +1368,7 @@ void tet4_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
                                                real_t *const SFEM_RESTRICT value) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    // double tick = MPI_Wtime();
 
     static const int block_size = 3;
 
@@ -1256,9 +1428,9 @@ void tet4_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
-    printf("tet4_linear_elasticity.c: tet4_linear_elasticity_assemble_value_aos\t%g seconds\n",
-           tock - tick);
+    // double tock = MPI_Wtime();
+    // printf("tet4_linear_elasticity.c: tet4_linear_elasticity_assemble_value_aos\t%g seconds\n",
+    //        tock - tick);
 }
 
 void tet4_linear_elasticity_assemble_gradient_aos(const ptrdiff_t nelements,
@@ -1271,7 +1443,7 @@ void tet4_linear_elasticity_assemble_gradient_aos(const ptrdiff_t nelements,
                                                   real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    // double tick = MPI_Wtime();
 
     static const int block_size = 3;
 
@@ -1338,9 +1510,10 @@ void tet4_linear_elasticity_assemble_gradient_aos(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
-    printf("tet4_linear_elasticity.c: tet4_linear_elasticity_assemble_gradient_aos\t%g seconds\n",
-           tock - tick);
+    // double tock = MPI_Wtime();
+    // printf("tet4_linear_elasticity.c: tet4_linear_elasticity_assemble_gradient_aos\t%g
+    // seconds\n",
+    //        tock - tick);
 }
 
 void tet4_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
@@ -1354,7 +1527,7 @@ void tet4_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
                                                  real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    const double tick = MPI_Wtime();
+    // const double tick = MPI_Wtime();
 
     static const int block_size = 3;
     static const int mat_block_size = block_size * block_size;
@@ -1437,9 +1610,9 @@ void tet4_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
             }
         }
     }
-    const double tock = MPI_Wtime();
-    printf("tet4_linear_elasticity.c: tet4_linear_elasticity_assemble_hessian_aos\t%g seconds\n",
-           tock - tick);
+    // const double tock = MPI_Wtime();
+    // printf("tet4_linear_elasticity.c: tet4_linear_elasticity_assemble_hessian_aos\t%g seconds\n",
+    //        tock - tick);
 }
 
 #ifdef SFEM_ENABLE_EXPLICIT_VECTORIZATION
@@ -1454,7 +1627,7 @@ void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
                                       real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    // double tick = MPI_Wtime();
 
     vreal_t vmu;
     vreal_t vlambda;
@@ -1548,11 +1721,10 @@ void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
-    printf(
-        "tet4_linear_elasticity.c: tet4_linear_elasticity_apply_aos (explicit vectorization)\t%g "
-        "seconds\n",
-        tock - tick);
+    // double tock = MPI_Wtime();
+    // printf(
+    //     "tet4_linear_elasticity.c: tet4_linear_elasticity_apply_aos (explicit vectorization)\t%g
+    //     " "seconds\n", tock - tick);
 }
 
 #else
@@ -1567,7 +1739,7 @@ void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
                                       real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    // double tick = MPI_Wtime();
 
     static const int block_size = 3;
 #pragma omp parallel
@@ -1632,161 +1804,12 @@ void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
-    printf("tet4_linear_elasticity.c: tet4_linear_elasticity_apply_aos\t%g seconds\n", tock - tick);
+    // double tock = MPI_Wtime();
+    // printf("tet4_linear_elasticity.c: tet4_linear_elasticity_apply_aos\t%g seconds\n", tock -
+    // tick);
 }
 
 #endif
-
-static SFEM_INLINE void tet4_linear_elasticity_apply_kernel_opt(const real_t mu,
-                                                                const real_t lambda,
-                                                                const real_t px0,
-                                                                const real_t px1,
-                                                                const real_t px2,
-                                                                const real_t px3,
-                                                                const real_t py0,
-                                                                const real_t py1,
-                                                                const real_t py2,
-                                                                const real_t py3,
-                                                                const real_t pz0,
-                                                                const real_t pz1,
-                                                                const real_t pz2,
-                                                                const real_t pz3,
-                                                                const real_t *const SFEM_RESTRICT u,
-                                                                real_t *const SFEM_RESTRICT
-                                                                    element_vector) {
-    real_t jacobian_inverse[9];
-    real_t jacobian_determinant = 0;
-    {
-        const real_t x0 = -py0 + py2;
-        const real_t x1 = -pz0 + pz3;
-        const real_t x2 = x0 * x1;
-        const real_t x3 = -py0 + py3;
-        const real_t x4 = -pz0 + pz2;
-        const real_t x5 = x3 * x4;
-        const real_t x6 = -px0 + px1;
-        const real_t x7 = -pz0 + pz1;
-        const real_t x8 = -px0 + px2;
-        const real_t x9 = x3 * x8;
-        const real_t x10 = -py0 + py1;
-        const real_t x11 = -px0 + px3;
-        const real_t x12 = x1 * x8;
-        const real_t x13 = x0 * x11;
-        const real_t x14 = x10 * x11 * x4 - x10 * x12 - x13 * x7 + x2 * x6 - x5 * x6 + x7 * x9;
-        const real_t x15 = 1.0 / x14;
-        jacobian_inverse[0] = x15 * (x2 - x5);
-        jacobian_inverse[1] = x15 * (x11 * x4 - x12);
-        jacobian_inverse[2] = x15 * (-x13 + x9);
-        jacobian_inverse[3] = x15 * (-x1 * x10 + x3 * x7);
-        jacobian_inverse[4] = x15 * (x1 * x6 - x11 * x7);
-        jacobian_inverse[5] = x15 * (x10 * x11 - x3 * x6);
-        jacobian_inverse[6] = x15 * (-x0 * x7 + x10 * x4);
-        jacobian_inverse[7] = x15 * (-x4 * x6 + x7 * x8);
-        jacobian_inverse[8] = x15 * (x0 * x6 - x10 * x8);
-        jacobian_determinant = x14;
-    }
-
-    real_t buff[9];
-    {
-        const real_t x0 = -jacobian_inverse[0] - jacobian_inverse[3] - jacobian_inverse[6];
-        const real_t x1 = -jacobian_inverse[1] - jacobian_inverse[4] - jacobian_inverse[7];
-        const real_t x2 = -jacobian_inverse[2] - jacobian_inverse[5] - jacobian_inverse[8];
-        buff[0] = jacobian_inverse[0] * u[1] + jacobian_inverse[3] * u[2] +
-                       jacobian_inverse[6] * u[3] + u[0] * x0;
-        buff[1] = jacobian_inverse[1] * u[1] + jacobian_inverse[4] * u[2] +
-                       jacobian_inverse[7] * u[3] + u[0] * x1;
-        buff[2] = jacobian_inverse[2] * u[1] + jacobian_inverse[5] * u[2] +
-                       jacobian_inverse[8] * u[3] + u[0] * x2;
-        buff[3] = jacobian_inverse[0] * u[5] + jacobian_inverse[3] * u[6] +
-                       jacobian_inverse[6] * u[7] + u[4] * x0;
-        buff[4] = jacobian_inverse[1] * u[5] + jacobian_inverse[4] * u[6] +
-                       jacobian_inverse[7] * u[7] + u[4] * x1;
-        buff[5] = jacobian_inverse[2] * u[5] + jacobian_inverse[5] * u[6] +
-                       jacobian_inverse[8] * u[7] + u[4] * x2;
-        buff[6] = jacobian_inverse[0] * u[9] + jacobian_inverse[3] * u[10] +
-                       jacobian_inverse[6] * u[11] + u[8] * x0;
-        buff[7] = jacobian_inverse[1] * u[9] + jacobian_inverse[4] * u[10] +
-                       jacobian_inverse[7] * u[11] + u[8] * x1;
-        buff[8] = jacobian_inverse[2] * u[9] + jacobian_inverse[5] * u[10] +
-                       jacobian_inverse[8] * u[11] + u[8] * x2;
-    }
-
-    real_t P[9];
-    {
-        const real_t x0 = 2 * buff[0];
-        const real_t x1 = 2 * buff[4];
-        const real_t x2 = 2 * buff[8];
-        const real_t x3 = (1.0 / 2.0) * lambda * (x0 + x1 + x2);
-        const real_t x4 = mu * (buff[1] + buff[3]);
-        const real_t x5 = mu * (buff[2] + buff[6]);
-        const real_t x6 = mu * (buff[5] + buff[7]);
-        P[0] = mu * x0 + x3;
-        P[1] = x4;
-        P[2] = x5;
-        P[3] = x4;
-        P[4] = mu * x1 + x3;
-        P[5] = x6;
-        P[6] = x5;
-        P[7] = x6;
-        P[8] = mu * x2 + x3;
-    }
-
-    // buff = det(J)J^-1 * P
-    {
-        buff[0] =
-            jacobian_determinant *
-            (P[0] * jacobian_inverse[0] + P[3] * jacobian_inverse[1] + P[6] * jacobian_inverse[2]);
-        buff[1] =
-            jacobian_determinant *
-            (P[1] * jacobian_inverse[0] + P[4] * jacobian_inverse[1] + P[7] * jacobian_inverse[2]);
-        buff[2] =
-            jacobian_determinant *
-            (P[2] * jacobian_inverse[0] + P[5] * jacobian_inverse[1] + P[8] * jacobian_inverse[2]);
-        buff[3] =
-            jacobian_determinant *
-            (P[0] * jacobian_inverse[3] + P[3] * jacobian_inverse[4] + P[6] * jacobian_inverse[5]);
-        buff[4] =
-            jacobian_determinant *
-            (P[1] * jacobian_inverse[3] + P[4] * jacobian_inverse[4] + P[7] * jacobian_inverse[5]);
-        buff[5] =
-            jacobian_determinant *
-            (P[2] * jacobian_inverse[3] + P[5] * jacobian_inverse[4] + P[8] * jacobian_inverse[5]);
-        buff[6] =
-            jacobian_determinant *
-            (P[0] * jacobian_inverse[6] + P[3] * jacobian_inverse[7] + P[6] * jacobian_inverse[8]);
-        buff[7] =
-            jacobian_determinant *
-            (P[1] * jacobian_inverse[6] + P[4] * jacobian_inverse[7] + P[7] * jacobian_inverse[8]);
-        buff[8] =
-            jacobian_determinant *
-            (P[2] * jacobian_inverse[6] + P[5] * jacobian_inverse[7] + P[8] * jacobian_inverse[8]);
-    }
-
-    // Evaluate bilinear form
-    {
-        const real_t x0 = (1.0 / 6.0) * buff[0];
-        const real_t x1 = (1.0 / 6.0) * buff[1];
-        const real_t x2 = (1.0 / 6.0) * buff[2];
-        const real_t x3 = (1.0 / 6.0) * buff[3];
-        const real_t x4 = (1.0 / 6.0) * buff[4];
-        const real_t x5 = (1.0 / 6.0) * buff[5];
-        const real_t x6 = (1.0 / 6.0) * buff[6];
-        const real_t x7 = (1.0 / 6.0) * buff[7];
-        const real_t x8 = (1.0 / 6.0) * buff[8];
-        element_vector[0 * stride] = -x0 - x1 - x2;
-        element_vector[1 * stride] = x0;
-        element_vector[2 * stride] = x1;
-        element_vector[3 * stride] = x2;
-        element_vector[4 * stride] = -x3 - x4 - x5;
-        element_vector[5 * stride] = x3;
-        element_vector[6 * stride] = x4;
-        element_vector[7 * stride] = x5;
-        element_vector[8 * stride] = -x6 - x7 - x8;
-        element_vector[9 * stride] = x6;
-        element_vector[10 * stride] = x7;
-        element_vector[11 * stride] = x8;
-    }
-}
 
 void tet4_linear_elasticity_apply_soa(const ptrdiff_t nelements,
                                       const ptrdiff_t nnodes,
