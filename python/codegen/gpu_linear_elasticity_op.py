@@ -30,6 +30,8 @@ class LinearElasticityOp:
 		s_jac_inv = fe.symbol_jacobian_inverse()
 		disp = coeffs('u', dims * fe.n_nodes())
 
+		self.jac = fe.jacobian(q)
+
 		full_eval = False
 
 		if not full_eval:
@@ -104,14 +106,15 @@ class LinearElasticityOp:
 		if full_eval:
 			integr_value = subsmat(integr_value, s_disp_grad, e_disp_grad)
 			integr_value = subsmat(integr_value, s_jac_inv, e_jac_inv)
-		integr_value = integr_value * dV
+			integr_value = integr_value * dV
 
 		for i in range(0, rows):
 			integr = fe.integrate(q, eval_grad[i])
 			if full_eval:
 				integr = subsmat(integr, s_disp_grad, e_disp_grad)
 				integr = subsmat(integr, s_jac_inv, e_jac_inv)
-			integr = integr * dV
+				integr = integr * dV
+
 			integr_gradient[i] = integr
 
 		for i in range(0, rows):
@@ -120,7 +123,7 @@ class LinearElasticityOp:
 				if full_eval:
 					integr = subsmat(integr, s_disp_grad, e_disp_grad)
 					integr = subsmat(integr, s_jac_inv, e_jac_inv)
-				integr = integr * dV
+					integr = integr * dV
 				integr_hessian[i, j] = integr
 
 		###################################################################
@@ -214,7 +217,8 @@ class LinearElasticityOp:
 		dims = self.fe.manifold_dim()
 		P = matrix_coeff('P', dims, dims)
 		Jinv = self.fe.symbol_jacobian_inverse()
-		return assign_matrix('JinvXP', Jinv * P)
+		expr = Jinv * P * self.fe.symbol_jacobian_determinant()
+		return assign_matrix('JinvXP', expr)
 
 	def hessian(self):
 		H = self.integr_hessian
@@ -227,6 +231,21 @@ class LinearElasticityOp:
 				expr.append(ast.Assignment(var, H[i, j]))
 
 		return expr
+
+	def geometry(self):
+		expr = []
+		J = self.jac
+
+		# expr = assign_matrix('jacobian', J)
+		J_inv = inverse(J)
+
+
+		expr.extend(assign_matrix('jacobian_inverse', J_inv))
+
+		J_det = determinant(J)
+		expr.append(ast.Assignment(sp.symbols('jacobian_determinant'), J_det))
+		return expr
+
 
 	def gradient(self):
 		g = self.integr_gradient
@@ -272,6 +291,12 @@ def main():
 
 	op = LinearElasticityOp(fe, q)
 	# op.hessian_check()
+
+
+	c_log("--------------------------")
+	c_log("geometry")	
+	c_log("--------------------------")
+	c_code(op.geometry())
 
 	c_log("--------------------------")
 	c_log("displacement_gradient")	
