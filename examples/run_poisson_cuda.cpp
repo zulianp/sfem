@@ -20,9 +20,7 @@
 
 #include "laplacian.h"
 
-#include "macro_tet4_laplacian_incore_cuda.h"
-#include "tet10_laplacian_incore_cuda.h"
-#include "tet4_laplacian_incore_cuda.h"
+#include "laplacian_incore_cuda.h"
 
 #include "read_mesh.h"
 #include "sfem_bcgs.hpp"
@@ -74,9 +72,9 @@ int main(int argc, char *argv[]) {
 
     double tick = MPI_Wtime();
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Read data
-    ///////////////////////////////////////////////////////////////////////////////
+    // -------------------------------
+    // Read inputs
+    // -------------------------------
 
     const char *folder = argv[1];
 
@@ -119,11 +117,14 @@ int main(int argc, char *argv[]) {
             SFEM_USE_PRECONDITIONER);
     }
 
+    // -------------------------------
+    // Boundary conditions set-up
+    // -------------------------------
+
     int n_dirichlet_conditions;
     boundary_condition_t *d_dirichlet_conditions = 0;
 
     {
-        //
         boundary_condition_t *h_dirichlet_conditions;
         read_dirichlet_conditions(&mesh,
                                   SFEM_DIRICHLET_NODESET,
@@ -149,6 +150,10 @@ int main(int argc, char *argv[]) {
         elem_type = macro_type_variant(elem_type);
     }
 
+    // -------------------------------
+    // Solver set-up
+    // -------------------------------
+
     // using Solver_t = sfem::ConjugateGradient<real_t>;
     using Solver_t = sfem::BiCGStab<real_t>;
 
@@ -164,72 +169,62 @@ int main(int argc, char *argv[]) {
     real_t *d_d = nullptr;
 
     cuda_incore_laplacian_t ctx;
+    cuda_incore_laplacian_init(elem_type, &ctx, mesh.nelements, mesh.elements, mesh.points);
 
-    if (mesh.element_type == TET4) {
-        tet4_cuda_incore_laplacian_init(&ctx, mesh.nelements, mesh.elements, mesh.points);
+    if (SFEM_USE_PRECONDITIONER) {
+        d_d = d_allocate(mesh.nnodes);
 
-    } else if (mesh.element_type == TET10) {
-        // Go for macro just for testing
-        if (SFEM_USE_MACRO) {
-            macro_tet4_cuda_incore_laplacian_init(&ctx, mesh.nelements, mesh.elements, mesh.points);
+        // Make sure preconditioner is available for element
+        SFEM_USE_PRECONDITIONER = !cuda_incore_laplacian_diag(&ctx, d_d);
 
-            if (SFEM_USE_PRECONDITIONER) {
-                d_d = d_allocate(mesh.nnodes);
-                macro_tet4_cuda_incore_laplacian_diag(&ctx, d_d);
-                solver.set_preconditioner([&](const real_t *const x, real_t *const y) {
-                    d_ediv(mesh.nnodes, x, d_d, y);
-                    d_copy_at_dirichlet_nodes_vec(
-                        n_dirichlet_conditions, d_dirichlet_conditions, 1, x, y);
-                });
-            }
+        if (SFEM_USE_PRECONDITIONER) {
+            solver.set_preconditioner([&](const real_t *const x, real_t *const y) {
+                d_ediv(mesh.nnodes, x, d_d, y);
+                d_copy_at_dirichlet_nodes_vec(
+                    n_dirichlet_conditions, d_dirichlet_conditions, 1, x, y);
+            });
         } else {
-            tet10_cuda_incore_laplacian_init(&ctx, mesh.nelements, mesh.elements, mesh.points);
+            fprintf(stderr, "[Warning] preconditioner not avaialble for selected element\n");
+            d_destroy(d_d);
+            d_d = nullptr;
         }
     }
 
     solver.apply_op = [&](const real_t *const x, real_t *const y) {
         d_memset(y, 0, mesh.nnodes * sizeof(real_t));
-
-        if (mesh.element_type == TET4) {
-            tet4_cuda_incore_laplacian_apply(&ctx, x, y);
-        } else if (mesh.element_type == TET10) {
-            if (SFEM_USE_MACRO) {
-                macro_tet4_cuda_incore_laplacian_apply(&ctx, x, y);
-            } else {
-                tet10_cuda_incore_laplacian_apply(&ctx, x, y);
-            }
-        }
-
+        cuda_incore_laplacian_apply(&ctx, x, y);
         d_copy_at_dirichlet_nodes_vec(n_dirichlet_conditions, d_dirichlet_conditions, 1, x, y);
     };
 
-    std::vector<real_t> x(mesh.nnodes, 0);
+    // -------------------------------
+    // Solve
+    // -------------------------------
 
     d_apply_dirichlet_condition_vec(n_dirichlet_conditions, d_dirichlet_conditions, 1, d_x);
     d_apply_dirichlet_condition_vec(n_dirichlet_conditions, d_dirichlet_conditions, 1, d_b);
 
     solver.apply(mesh.nnodes, d_b, d_x);
 
-    device_to_host(mesh.nnodes, d_x, x.data());
+    // -------------------------------
+    // Save to disk
+    // -------------------------------
 
+    std::vector<real_t> x(mesh.nnodes, 0);
+    device_to_host(mesh.nnodes, d_x, x.data());
     array_write(comm, output_path, SFEM_MPI_REAL_T, x.data(), mesh.nnodes, mesh.nnodes);
 
     ptrdiff_t nelements = mesh.nelements;
     ptrdiff_t nnodes = mesh.nnodes;
 
+    // -------------------------------
+    // Clean-up
+    // -------------------------------
+
     mesh_destroy(&mesh);
     d_destroy_conditions(n_dirichlet_conditions, d_dirichlet_conditions);
     // destroy_conditions(n_neumann_conditions, neumann_conditions);
 
-    if (mesh.element_type == TET4) {
-        tet4_cuda_incore_laplacian_destroy(&ctx);
-    } else if (mesh.element_type == TET10) {
-        if (SFEM_USE_MACRO) {
-            macro_tet4_cuda_incore_laplacian_destroy(&ctx);
-        } else {
-            tet10_cuda_incore_laplacian_destroy(&ctx);
-        }
-    }
+    cuda_incore_laplacian_destroy(&ctx);
 
     d_destroy(d_b);
     d_destroy(d_x);
@@ -237,6 +232,10 @@ int main(int argc, char *argv[]) {
     if (d_d) {
         d_destroy(d_d);
     }
+
+    // -------------------------------
+    // Stats
+    // -------------------------------
 
     double tock = MPI_Wtime();
     if (!rank) {

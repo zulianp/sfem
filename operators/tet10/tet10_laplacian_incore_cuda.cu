@@ -9,7 +9,7 @@ extern "C" {
 #include "sfem_vec.h"
 #include "sortreduce.h"
 }
-
+#include "sfem_defs.h"
 #include "sfem_cuda_base.h"
 #include "tet10_laplacian_incore_cuda.h"
 
@@ -317,6 +317,7 @@ extern int tet10_cuda_incore_laplacian_init(cuda_incore_laplacian_t *ctx,
         }
     }
 
+    ctx->element_type = TET10;
     ctx->nelements = nelements;
     return 0;
 }

@@ -16,7 +16,7 @@ PATH=$SCRIPTPATH/../../python/sfem/mesh:$PATH
 PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 PATH=$SCRIPTPATH/../../../matrix.io:$PATH
 
-# create_cylinder.sh 4
+# create_cylinder.sh 6
 # create_cylinder.sh 2
 
 export SFEM_MESH_DIR=mesh
@@ -49,8 +49,8 @@ export SFEM_OUTPUT_DIR=sfem_output
 export SFEM_MATERIAL=linear
 
 # export OMP_NUM_THREADS=32
-# export OMP_NUM_THREADS=16
-export OMP_NUM_THREADS=8
+export OMP_NUM_THREADS=16
+# export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true
 
 

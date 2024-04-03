@@ -9,7 +9,7 @@ extern "C" {
 #include "sfem_vec.h"
 #include "sortreduce.h"
 }
-
+#include "sfem_defs.h"
 #include "macro_tet4_laplacian_incore_cuda.h"
 #include "sfem_cuda_base.h"
 
@@ -510,6 +510,7 @@ extern int macro_tet4_cuda_incore_laplacian_init(cuda_incore_laplacian_t *ctx,
         }
     }
 
+    ctx->element_type = MACRO_TET4;
     ctx->nelements = nelements;
     return 0;
 }

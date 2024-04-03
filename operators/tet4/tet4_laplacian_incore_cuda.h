@@ -9,6 +9,7 @@ extern "C" {
 #endif
 
 typedef struct {
+    enum ElemType element_type;
     ptrdiff_t nelements;
     void *d_fff;
     idx_t *d_elems;
