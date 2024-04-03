@@ -924,268 +924,8 @@ static SFEM_INLINE void tet4_linear_elasticity_apply_kernel(
 
 #else
 
-static SFEM_INLINE void tet4_linear_elasticity_apply_kernel_old(
-    const real_t mu,
-    const real_t lambda,
-    const real_t px0,
-    const real_t px1,
-    const real_t px2,
-    const real_t px3,
-    const real_t py0,
-    const real_t py1,
-    const real_t py2,
-    const real_t py3,
-    const real_t pz0,
-    const real_t pz1,
-    const real_t pz2,
-    const real_t pz3,
-    const real_t *const SFEM_RESTRICT increment,
-    real_t *const SFEM_RESTRICT element_vector) {
-    const real_t x0 = -py0 + py2;
-    const real_t x1 = -pz0 + pz3;
-    const real_t x2 = x0 * x1;
-    const real_t x3 = -py0 + py3;
-    const real_t x4 = -pz0 + pz2;
-    const real_t x5 = x3 * x4;
-    const real_t x6 = x2 - x5;
-    const real_t x7 = -px0 + px1;
-    const real_t x8 = -px0 + px3;
-    const real_t x9 = -py0 + py1;
-    const real_t x10 = -x3 * x7 + x8 * x9;
-    const real_t x11 = -px0 + px2;
-    const real_t x12 = -pz0 + pz1;
-    const real_t x13 = x4 * x9;
-    const real_t x14 = x1 * x9;
-    const real_t x15 = x0 * x12;
-    const real_t x16 = x11 * x12 * x3 - x11 * x14 + x13 * x8 - x15 * x8 + x2 * x7 - x5 * x7;
-    const real_t x17 = RPOW2(x16);
-    const real_t x18 = (1.0 / 6.0) * lambda;
-    const real_t x19 = x17 * x18;
-    const real_t x20 = x10 * x19;
-    const real_t x21 = -x0 * x8 + x11 * x3;
-    const real_t x22 = x12 * x3 - x14;
-    const real_t x23 = (1.0 / 6.0) * mu;
-    const real_t x24 = x17 * x23;
-    const real_t x25 = x22 * x24;
-    const real_t x26 = x20 * x6 + x21 * x25;
-    const real_t x27 = x10 * x25 + x20 * x22;
-    const real_t x28 = x13 - x15;
-    const real_t x29 = x0 * x7 - x11 * x9;
-    const real_t x30 = x20 * x28 + x25 * x29;
-    const real_t x31 = x26 + x27 + x30;
-    const real_t x32 = -x31;
-    const real_t x33 = increment[10] * x16;
-    const real_t x34 = x19 * x29;
-    const real_t x35 = x24 * x28;
-    const real_t x36 = x21 * x35 + x34 * x6;
-    const real_t x37 = x10 * x35 + x22 * x34;
-    const real_t x38 = x28 * x34 + x29 * x35;
-    const real_t x39 = x36 + x37 + x38;
-    const real_t x40 = -x39;
-    const real_t x41 = increment[11] * x16;
-    const real_t x42 = -x1 * x11 + x4 * x8;
-    const real_t x43 = x19 * x6;
-    const real_t x44 = x24 * x6;
-    const real_t x45 = x42 * x43 + x42 * x44;
-    const real_t x46 = x19 * x42;
-    const real_t x47 = x1 * x7 - x12 * x8;
-    const real_t x48 = x24 * x47;
-    const real_t x49 = x22 * x46 + x48 * x6;
-    const real_t x50 = x11 * x12 - x4 * x7;
-    const real_t x51 = x28 * x46 + x44 * x50;
-    const real_t x52 = x45 + x49 + x51;
-    const real_t x53 = -x52;
-    const real_t x54 = increment[5] * x16;
-    const real_t x55 = x25 * x42 + x43 * x47;
-    const real_t x56 = x19 * x47;
-    const real_t x57 = x22 * x56 + x25 * x47;
-    const real_t x58 = x25 * x50 + x28 * x56;
-    const real_t x59 = x55 + x57 + x58;
-    const real_t x60 = -x59;
-    const real_t x61 = increment[6] * x16;
-    const real_t x62 = x35 * x42 + x43 * x50;
-    const real_t x63 = x19 * x50;
-    const real_t x64 = x22 * x63 + x35 * x47;
-    const real_t x65 = x28 * x63 + x35 * x50;
-    const real_t x66 = x62 + x64 + x65;
-    const real_t x67 = -x66;
-    const real_t x68 = increment[7] * x16;
-    const real_t x69 = x21 * x43 + x21 * x44;
-    const real_t x70 = x19 * x21;
-    const real_t x71 = x10 * x44 + x22 * x70;
-    const real_t x72 = x24 * x29;
-    const real_t x73 = x28 * x70 + x6 * x72;
-    const real_t x74 = x69 + x71 + x73;
-    const real_t x75 = -x74;
-    const real_t x76 = increment[9] * x16;
-    const real_t x77 = POW2(x6);
-    const real_t x78 = POW2(x21);
-    const real_t x79 = x24 * x78;
-    const real_t x80 = POW2(x42);
-    const real_t x81 = x24 * x80;
-    const real_t x82 = (1.0 / 3.0) * mu;
-    const real_t x83 = x17 * x82;
-    const real_t x84 = x19 * x77 + x77 * x83 + x79 + x81;
-    const real_t x85 = x10 * x21;
-    const real_t x86 = x24 * x85;
-    const real_t x87 = x42 * x48;
-    const real_t x88 = x6 * x83;
-    const real_t x89 = x22 * x88;
-    const real_t x90 = x22 * x43 + x86 + x87 + x89;
-    const real_t x91 = x21 * x72;
-    const real_t x92 = x42 * x50;
-    const real_t x93 = x24 * x92;
-    const real_t x94 = x28 * x88;
-    const real_t x95 = x28 * x43 + x91 + x93 + x94;
-    const real_t x96 = -x84 - x90 - x95;
-    const real_t x97 = increment[1] * x16;
-    const real_t x98 = POW2(x22);
-    const real_t x99 = POW2(x10);
-    const real_t x100 = x24 * x99;
-    const real_t x101 = POW2(x47);
-    const real_t x102 = x101 * x24;
-    const real_t x103 = x100 + x102 + x19 * x98 + x83 * x98;
-    const real_t x104 = x22 * x28;
-    const real_t x105 = x10 * x72;
-    const real_t x106 = x48 * x50;
-    const real_t x107 = x104 * x83;
-    const real_t x108 = x104 * x19 + x105 + x106 + x107;
-    const real_t x109 = -x103 - x108 - x90;
-    const real_t x110 = increment[2] * x16;
-    const real_t x111 = x17 * POW2(x28);
-    const real_t x112 = POW2(x29);
-    const real_t x113 = x112 * x24;
-    const real_t x114 = POW2(x50);
-    const real_t x115 = x114 * x24;
-    const real_t x116 = x111 * x18 + x111 * x82 + x113 + x115;
-    const real_t x117 = -x108 - x116 - x95;
-    const real_t x118 = increment[3] * x16;
-    const real_t x119 = x52 + x59 + x66;
-    const real_t x120 = increment[4] * x16;
-    const real_t x121 = x31 + x39 + x74;
-    const real_t x122 = increment[8] * x16;
-    const real_t x123 = x17 * x28;
-    const real_t x124 = x123 * x6;
-    const real_t x125 = (1.0 / 3.0) * lambda;
-    const real_t x126 = x125 * x22;
-    const real_t x127 = x17 * x6;
-    const real_t x128 = (2.0 / 3.0) * mu;
-    const real_t x129 = x128 * x22;
-    const real_t x130 = x83 * x85;
-    const real_t x131 = x29 * x83;
-    const real_t x132 = x131 * x21;
-    const real_t x133 = x10 * x131;
-    const real_t x134 = x130 + x132 + x133;
-    const real_t x135 = x47 * x83;
-    const real_t x136 = x135 * x42;
-    const real_t x137 = x83 * x92;
-    const real_t x138 = x135 * x50;
-    const real_t x139 = x136 + x137 + x138;
-    const real_t x140 = increment[0] * x16;
-    const real_t x141 = -x45 - x55 - x62;
-    const real_t x142 = -x26 - x36 - x69;
-    const real_t x143 = -x49 - x57 - x64;
-    const real_t x144 = -x27 - x37 - x71;
-    const real_t x145 = -x51 - x58 - x65;
-    const real_t x146 = -x30 - x38 - x73;
-    const real_t x147 = x20 * x42 + x21 * x48;
-    const real_t x148 = x10 * x48 + x20 * x47;
-    const real_t x149 = x20 * x50 + x47 * x72;
-    const real_t x150 = x147 + x148 + x149;
-    const real_t x151 = -x150;
-    const real_t x152 = x24 * x50;
-    const real_t x153 = x152 * x21 + x34 * x42;
-    const real_t x154 = x10 * x152 + x34 * x47;
-    const real_t x155 = x34 * x50 + x50 * x72;
-    const real_t x156 = x153 + x154 + x155;
-    const real_t x157 = -x156;
-    const real_t x158 = x24 * x42;
-    const real_t x159 = x158 * x21 + x21 * x46;
-    const real_t x160 = x10 * x158 + x21 * x56;
-    const real_t x161 = x21 * x63 + x42 * x72;
-    const real_t x162 = x159 + x160 + x161;
-    const real_t x163 = -x162;
-    const real_t x164 = x24 * x77;
-    const real_t x165 = x164 + x19 * x80 + x79 + x80 * x83;
-    const real_t x166 = x25 * x6;
-    const real_t x167 = x136 + x166 + x42 * x56 + x86;
-    const real_t x168 = x35 * x6;
-    const real_t x169 = x137 + x168 + x19 * x92 + x91;
-    const real_t x170 = -x165 - x167 - x169;
-    const real_t x171 = x24 * x98;
-    const real_t x172 = x100 + x101 * x19 + x101 * x83 + x171;
-    const real_t x173 = x25 * x28;
-    const real_t x174 = x105 + x138 + x173 + x50 * x56;
-    const real_t x175 = -x167 - x172 - x174;
-    const real_t x176 = x111 * x23;
-    const real_t x177 = x113 + x114 * x19 + x114 * x83 + x176;
-    const real_t x178 = -x169 - x174 - x177;
-    const real_t x179 = x150 + x156 + x162;
-    const real_t x180 = x125 * x17;
-    const real_t x181 = x180 * x47;
-    const real_t x182 = x128 * x17;
-    const real_t x183 = x182 * x47;
-    const real_t x184 = x107 + x89 + x94;
-    const real_t x185 = -x147 - x153 - x159;
-    const real_t x186 = -x148 - x154 - x160;
-    const real_t x187 = -x149 - x155 - x161;
-    const real_t x188 = x130 + x166 + x19 * x85 + x87;
-    const real_t x189 = x102 + x171 + x19 * x99 + x83 * x99;
-    const real_t x190 = x106 + x133 + x173 + x20 * x29;
-    const real_t x191 = -x188 - x189 - x190;
-    const real_t x192 = x132 + x168 + x21 * x34 + x93;
-    const real_t x193 = x112 * x19 + x112 * x83 + x115 + x176;
-    const real_t x194 = -x190 - x192 - x193;
-    const real_t x195 = x164 + x19 * x78 + x78 * x83 + x81;
-    const real_t x196 = -x188 - x192 - x195;
-    const real_t x197 = x180 * x29;
-    const real_t x198 = x182 * x29;
-    element_vector[0 * stride] =
-        x109 * x110 + x117 * x118 + x119 * x120 + x121 * x122 +
-        x140 * (x103 + x116 + x123 * x126 + x123 * x129 + x124 * x125 + x124 * x128 + x126 * x127 +
-                x127 * x129 + x134 + x139 + x84) +
-        x32 * x33 + x40 * x41 + x53 * x54 + x60 * x61 + x67 * x68 + x75 * x76 + x96 * x97;
-    element_vector[1 * stride] = x110 * x90 + x118 * x95 + x120 * x141 + x122 * x142 + x140 * x96 +
-                                 x26 * x33 + x36 * x41 + x45 * x54 + x55 * x61 + x62 * x68 +
-                                 x69 * x76 + x84 * x97;
-    element_vector[2 * stride] = x103 * x110 + x108 * x118 + x109 * x140 + x120 * x143 +
-                                 x122 * x144 + x27 * x33 + x37 * x41 + x49 * x54 + x57 * x61 +
-                                 x64 * x68 + x71 * x76 + x90 * x97;
-    element_vector[3 * stride] = x108 * x110 + x116 * x118 + x117 * x140 + x120 * x145 +
-                                 x122 * x146 + x30 * x33 + x38 * x41 + x51 * x54 + x58 * x61 +
-                                 x65 * x68 + x73 * x76 + x95 * x97;
-    element_vector[4 * stride] = x110 * x143 + x118 * x145 + x119 * x140 +
-                                 x120 * (x134 + x165 + x172 + x177 + x180 * x92 + x181 * x42 +
-                                         x181 * x50 + x182 * x92 + x183 * x42 + x183 * x50 + x184) +
-                                 x122 * x179 + x141 * x97 + x151 * x33 + x157 * x41 + x163 * x76 +
-                                 x170 * x54 + x175 * x61 + x178 * x68;
-    element_vector[5 * stride] = x110 * x49 + x118 * x51 + x120 * x170 + x122 * x185 + x140 * x53 +
-                                 x147 * x33 + x153 * x41 + x159 * x76 + x165 * x54 + x167 * x61 +
-                                 x169 * x68 + x45 * x97;
-    element_vector[6 * stride] = x110 * x57 + x118 * x58 + x120 * x175 + x122 * x186 + x140 * x60 +
-                                 x148 * x33 + x154 * x41 + x160 * x76 + x167 * x54 + x172 * x61 +
-                                 x174 * x68 + x55 * x97;
-    element_vector[7 * stride] = x110 * x64 + x118 * x65 + x120 * x178 + x122 * x187 + x140 * x67 +
-                                 x149 * x33 + x155 * x41 + x161 * x76 + x169 * x54 + x174 * x61 +
-                                 x177 * x68 + x62 * x97;
-    element_vector[8 * stride] = x110 * x144 + x118 * x146 + x120 * x179 + x121 * x140 +
-                                 x122 * (x10 * x197 + x10 * x198 + x139 + x180 * x85 + x182 * x85 +
-                                         x184 + x189 + x193 + x195 + x197 * x21 + x198 * x21) +
-                                 x142 * x97 + x185 * x54 + x186 * x61 + x187 * x68 + x191 * x33 +
-                                 x194 * x41 + x196 * x76;
-    element_vector[9 * stride] = x110 * x71 + x118 * x73 + x120 * x163 + x122 * x196 + x140 * x75 +
-                                 x159 * x54 + x160 * x61 + x161 * x68 + x188 * x33 + x192 * x41 +
-                                 x195 * x76 + x69 * x97;
-    element_vector[10 * stride] = x110 * x27 + x118 * x30 + x120 * x151 + x122 * x191 + x140 * x32 +
-                                  x147 * x54 + x148 * x61 + x149 * x68 + x188 * x76 + x189 * x33 +
-                                  x190 * x41 + x26 * x97;
-    element_vector[11 * stride] = x110 * x37 + x118 * x38 + x120 * x157 + x122 * x194 + x140 * x40 +
-                                  x153 * x54 + x154 * x61 + x155 * x68 + x190 * x33 + x192 * x76 +
-                                  x193 * x41 + x36 * x97;
-}
-
 #define tet4_linear_elasticity_apply_kernel tet4_linear_elasticity_apply_kernel_opt
-// #define tet4_linear_elasticity_apply_kernel tet4_linear_elasticity_apply_kernel_old
+
 #endif
 
 static SFEM_INLINE void tet4_linear_elasticity_apply_kernel_opt(const real_t mu,
@@ -1266,7 +1006,7 @@ static SFEM_INLINE void tet4_linear_elasticity_apply_kernel_opt(const real_t mu,
         disp_grad[8] = u[10] * x10 + u[11] * x11 + u[8] * x12 + u[9] * x9;
     }
 
-    // real_t P[9];
+    // We can reuse the buffer to avoid additional register usage
     real_t *P = disp_grad;
     {
         const real_t x0 = (1.0 / 3.0) * mu;
@@ -1317,7 +1057,6 @@ void tet4_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
                                                real_t *const SFEM_RESTRICT value) {
     SFEM_UNUSED(nnodes);
 
-    // double tick = MPI_Wtime();
 
     static const int block_size = 3;
 
@@ -1376,10 +1115,6 @@ void tet4_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
             *value += element_scalar;
         }
     }
-
-    // double tock = MPI_Wtime();
-    // printf("tet4_linear_elasticity.c: tet4_linear_elasticity_assemble_value_aos\t%g seconds\n",
-    //        tock - tick);
 }
 
 void tet4_linear_elasticity_assemble_gradient_aos(const ptrdiff_t nelements,
@@ -1391,8 +1126,6 @@ void tet4_linear_elasticity_assemble_gradient_aos(const ptrdiff_t nelements,
                                                   const real_t *const SFEM_RESTRICT displacement,
                                                   real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
-
-    // double tick = MPI_Wtime();
 
     static const int block_size = 3;
 
@@ -1458,11 +1191,6 @@ void tet4_linear_elasticity_assemble_gradient_aos(const ptrdiff_t nelements,
             }
         }
     }
-
-    // double tock = MPI_Wtime();
-    // printf("tet4_linear_elasticity.c: tet4_linear_elasticity_assemble_gradient_aos\t%g
-    // seconds\n",
-    //        tock - tick);
 }
 
 void tet4_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
@@ -1475,8 +1203,6 @@ void tet4_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
                                                  const idx_t *const SFEM_RESTRICT colidx,
                                                  real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
-
-    // const double tick = MPI_Wtime();
 
     static const int block_size = 3;
     static const int mat_block_size = block_size * block_size;
@@ -1559,9 +1285,6 @@ void tet4_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
             }
         }
     }
-    // const double tock = MPI_Wtime();
-    // printf("tet4_linear_elasticity.c: tet4_linear_elasticity_assemble_hessian_aos\t%g seconds\n",
-    //        tock - tick);
 }
 
 #ifdef SFEM_ENABLE_EXPLICIT_VECTORIZATION
@@ -1575,8 +1298,6 @@ void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
                                       const real_t *const SFEM_RESTRICT displacement,
                                       real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
-
-    // double tick = MPI_Wtime();
 
     vreal_t vmu;
     vreal_t vlambda;
@@ -1669,11 +1390,6 @@ void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
             }
         }
     }
-
-    // double tock = MPI_Wtime();
-    // printf(
-    //     "tet4_linear_elasticity.c: tet4_linear_elasticity_apply_aos (explicit vectorization)\t%g
-    //     " "seconds\n", tock - tick);
 }
 
 #else
@@ -1688,7 +1404,9 @@ void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
                                       real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    // double tick = MPI_Wtime();
+    const geom_t *const x = xyz[0];
+    const geom_t *const y = xyz[1];
+    const geom_t *const z = xyz[2];
 
     static const int block_size = 3;
 #pragma omp parallel
@@ -1696,20 +1414,12 @@ void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
 #pragma omp for  // nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
-            idx_t ks[4];
-
             real_t element_vector[(4 * 3)];
             real_t element_displacement[(4 * 3)];
 #pragma unroll(4)
             for (int v = 0; v < 4; ++v) {
                 ev[v] = elems[v][i];
             }
-
-            // Element indices
-            const idx_t i0 = ev[0];
-            const idx_t i1 = ev[1];
-            const idx_t i2 = ev[2];
-            const idx_t i3 = ev[3];
 
             for (int enode = 0; enode < 4; ++enode) {
                 idx_t dof = ev[enode] * block_size;
@@ -1723,21 +1433,20 @@ void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
                 mu,
                 lambda,
                 // X-coordinates
-                xyz[0][i0],
-                xyz[0][i1],
-                xyz[0][i2],
-                xyz[0][i3],
+                x[ev[0]],
+                x[ev[1]],
+                x[ev[2]],
+                x[ev[3]],
                 // Y-coordinates
-                xyz[1][i0],
-                xyz[1][i1],
-                xyz[1][i2],
-                xyz[1][i3],
+                y[ev[0]],
+                y[ev[1]],
+                y[ev[2]],
+                y[ev[3]],
                 // Z-coordinates
-                xyz[2][i0],
-                xyz[2][i1],
-                xyz[2][i2],
-                xyz[2][i3],
-
+                z[ev[0]],
+                z[ev[1]],
+                z[ev[2]],
+                z[ev[3]],
                 element_displacement,
                 // output vector
                 element_vector);
@@ -1752,10 +1461,6 @@ void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
             }
         }
     }
-
-    // double tock = MPI_Wtime();
-    // printf("tet4_linear_elasticity.c: tet4_linear_elasticity_apply_aos\t%g seconds\n", tock -
-    // tick);
 }
 
 #endif

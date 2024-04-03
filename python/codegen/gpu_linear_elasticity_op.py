@@ -39,7 +39,6 @@ class GPULinearElasticityOp:
 		c_log("Material law")
 
 		self.disp_grad_name = 'disp_grad'
-		self.JinvXPDetJ_name = 'JinvXPDetJ'
 
 
 		mu, lmbda = sp.symbols('mu lambda', real=True)
@@ -61,8 +60,6 @@ class GPULinearElasticityOp:
 		for d1 in range(0, dims):
 			for d2 in range(0, dims):
 				P[d1, d2] = sp.diff(e, disp_grad[d1, d2])
-
-		JinvXPDetJ = matrix_coeff(self.JinvXPDetJ_name, dims, dims)
 		
 		eval_grad = sp.zeros(rows, 1)
 		self.eval_grad = sp.zeros(rows, 1)
@@ -255,8 +252,8 @@ def main():
 	# fe = Tri6()
 	# q = sp.Matrix(2, 1, [qx, qy])
 
-	fe = Tet4()
-	# fe = Tet10()
+	# fe = Tet4()
+	fe = Tet10()
 	q = sp.Matrix(3, 1, [qx, qy, qz])
 
 	op = GPULinearElasticityOp(fe, q)
