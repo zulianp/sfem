@@ -33,6 +33,14 @@ def inv2(mat):
 	mat_inv[3] = mat[0,0] / det
 	return mat_inv
 
+def adjugate2(mat):
+	ret = sp.zeros(2, 2)
+	ret[0] = mat[1,1]
+	ret[1] = -mat[0,1]
+	ret[2] = -mat[1,0]
+	ret[3] = mat[0,0]
+	return ret
+
 def det3(mat):
     return mat[0, 0] * mat[1, 1] * mat[2, 2] + mat[0, 1] * mat[1, 2] * mat[2, 0] + mat[0, 2] * mat[1, 0] * mat[2, 1] - mat[0, 0] * mat[1, 2] * mat[2, 1] - mat[0, 1] * mat[1, 0] * mat[2, 2] - mat[0, 2] * mat[1, 1] * mat[2, 0]
 
@@ -59,12 +67,34 @@ def inv3(mat):
     mat_inv[2, 2] = (mat[0, 0] * mat[1, 1] - mat[0, 1] * mat[1, 0]) / det
     return mat_inv
 
+def adjugate3(mat):
+	# Sympy version (same but slower)
+	# return mat.inv()
+    ret = sp.zeros(3, 3)
+    ret[0, 0] = (mat[1, 1] * mat[2, 2] - mat[1, 2] * mat[2, 1])
+    ret[0, 1] = (mat[0, 2] * mat[2, 1] - mat[0, 1] * mat[2, 2])
+    ret[0, 2] = (mat[0, 1] * mat[1, 2] - mat[0, 2] * mat[1, 1])
+    ret[1, 0] = (mat[1, 2] * mat[2, 0] - mat[1, 0] * mat[2, 2])
+    ret[1, 1] = (mat[0, 0] * mat[2, 2] - mat[0, 2] * mat[2, 0])
+    ret[1, 2] = (mat[0, 2] * mat[1, 0] - mat[0, 0] * mat[1, 2])
+    ret[2, 0] = (mat[1, 0] * mat[2, 1] - mat[1, 1] * mat[2, 0])
+    ret[2, 1] = (mat[0, 1] * mat[2, 0] - mat[0, 0] * mat[2, 1])
+    ret[2, 2] = (mat[0, 0] * mat[1, 1] - mat[0, 1] * mat[1, 0])
+    return ret
+
 def inverse(mat):
 	rows, cols = mat.shape
 	if rows == 2:
 		return inv2(mat)
 	else:
 		return inv3(mat)
+
+def adjugate(mat):
+	rows, cols = mat.shape
+	if rows == 2:
+		return adjugate2(mat)
+	else:
+		return adjugate3(mat)
 
 # Optimization for CUDA can be added here
 class SFEMCodePrinter(sp.printing.c.C99CodePrinter):

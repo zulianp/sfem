@@ -1184,6 +1184,10 @@ static SFEM_INLINE void tet4_linear_elasticity_apply_kernel_old(
                                   x193 * x41 + x36 * x97;
 }
 
+#define tet4_linear_elasticity_apply_kernel tet4_linear_elasticity_apply_kernel_opt
+// #define tet4_linear_elasticity_apply_kernel tet4_linear_elasticity_apply_kernel_old
+#endif
+
 static SFEM_INLINE void tet4_linear_elasticity_apply_kernel_opt(const real_t mu,
                                                                 const real_t lambda,
                                                                 const real_t px0,
@@ -1201,162 +1205,107 @@ static SFEM_INLINE void tet4_linear_elasticity_apply_kernel_opt(const real_t mu,
                                                                 const real_t *const SFEM_RESTRICT u,
                                                                 real_t *const SFEM_RESTRICT
                                                                     element_vector) {
-    real_t jacobian_inverse[9];
+    real_t adjugate[9];
     real_t jacobian_determinant = 0;
     {
-        const real_t x0 = -py0 + py2;
-        const real_t x1 = -pz0 + pz3;
-        const real_t x2 = x0 * x1;
-        const real_t x3 = -py0 + py3;
-        const real_t x4 = -pz0 + pz2;
-        const real_t x5 = x3 * x4;
-        const real_t x6 = -px0 + px1;
-        const real_t x7 = -pz0 + pz1;
-        const real_t x8 = -px0 + px2;
-        const real_t x9 = x3 * x8;
-        const real_t x10 = -py0 + py1;
-        const real_t x11 = -px0 + px3;
-        const real_t x12 = x1 * x8;
-        const real_t x13 = x0 * x11;
-        const real_t x14 = x10 * x11 * x4 - x10 * x12 - x13 * x7 + x2 * x6 - x5 * x6 + x7 * x9;
-        const real_t x15 = 1.0 / x14;
-        jacobian_inverse[0] = x15 * (x2 - x5);
-        jacobian_inverse[1] = x15 * (x11 * x4 - x12);
-        jacobian_inverse[2] = x15 * (-x13 + x9);
-        jacobian_inverse[3] = x15 * (-x1 * x10 + x3 * x7);
-        jacobian_inverse[4] = x15 * (x1 * x6 - x11 * x7);
-        jacobian_inverse[5] = x15 * (x10 * x11 - x3 * x6);
-        jacobian_inverse[6] = x15 * (-x0 * x7 + x10 * x4);
-        jacobian_inverse[7] = x15 * (-x4 * x6 + x7 * x8);
-        jacobian_inverse[8] = x15 * (x0 * x6 - x10 * x8);
-        jacobian_determinant = x14;
+        real_t jacobian[9];
+
+        jacobian[0] = -px0 + px1;
+        jacobian[1] = -px0 + px2;
+        jacobian[2] = -px0 + px3;
+        jacobian[3] = -py0 + py1;
+        jacobian[4] = -py0 + py2;
+        jacobian[5] = -py0 + py3;
+        jacobian[6] = -pz0 + pz1;
+        jacobian[7] = -pz0 + pz2;
+        jacobian[8] = -pz0 + pz3;
+
+        const real_t x0 = jacobian[4] * jacobian[8];
+        const real_t x1 = jacobian[5] * jacobian[7];
+        const real_t x2 = jacobian[1] * jacobian[8];
+        const real_t x3 = jacobian[1] * jacobian[5];
+        const real_t x4 = jacobian[2] * jacobian[4];
+        adjugate[0] = x0 - x1;
+        adjugate[1] = jacobian[2] * jacobian[7] - x2;
+        adjugate[2] = x3 - x4;
+        adjugate[3] = -jacobian[3] * jacobian[8] + jacobian[5] * jacobian[6];
+        adjugate[4] = jacobian[0] * jacobian[8] - jacobian[2] * jacobian[6];
+        adjugate[5] = -jacobian[0] * jacobian[5] + jacobian[2] * jacobian[3];
+        adjugate[6] = jacobian[3] * jacobian[7] - jacobian[4] * jacobian[6];
+        adjugate[7] = -jacobian[0] * jacobian[7] + jacobian[1] * jacobian[6];
+        adjugate[8] = jacobian[0] * jacobian[4] - jacobian[1] * jacobian[3];
+        jacobian_determinant = jacobian[0] * x0 - jacobian[0] * x1 +
+                               jacobian[2] * jacobian[3] * jacobian[7] - jacobian[3] * x2 +
+                               jacobian[6] * x3 - jacobian[6] * x4;
         assert(jacobian_determinant > 0);
     }
 
     real_t disp_grad[9];
     {
-        const real_t x0 = -jacobian_inverse[0] - jacobian_inverse[3] - jacobian_inverse[6];
-        const real_t x1 = -jacobian_inverse[1] - jacobian_inverse[4] - jacobian_inverse[7];
-        const real_t x2 = -jacobian_inverse[2] - jacobian_inverse[5] - jacobian_inverse[8];
-        disp_grad[0] = jacobian_inverse[0] * u[1] + jacobian_inverse[3] * u[2] +
-                       jacobian_inverse[6] * u[3] + u[0] * x0;
-        disp_grad[1] = jacobian_inverse[1] * u[1] + jacobian_inverse[4] * u[2] +
-                       jacobian_inverse[7] * u[3] + u[0] * x1;
-        disp_grad[2] = jacobian_inverse[2] * u[1] + jacobian_inverse[5] * u[2] +
-                       jacobian_inverse[8] * u[3] + u[0] * x2;
-        disp_grad[3] = jacobian_inverse[0] * u[5] + jacobian_inverse[3] * u[6] +
-                       jacobian_inverse[6] * u[7] + u[4] * x0;
-        disp_grad[4] = jacobian_inverse[1] * u[5] + jacobian_inverse[4] * u[6] +
-                       jacobian_inverse[7] * u[7] + u[4] * x1;
-        disp_grad[5] = jacobian_inverse[2] * u[5] + jacobian_inverse[5] * u[6] +
-                       jacobian_inverse[8] * u[7] + u[4] * x2;
-        disp_grad[6] = jacobian_inverse[0] * u[9] + jacobian_inverse[3] * u[10] +
-                       jacobian_inverse[6] * u[11] + u[8] * x0;
-        disp_grad[7] = jacobian_inverse[1] * u[9] + jacobian_inverse[4] * u[10] +
-                       jacobian_inverse[7] * u[11] + u[8] * x1;
-        disp_grad[8] = jacobian_inverse[2] * u[9] + jacobian_inverse[5] * u[10] +
-                       jacobian_inverse[8] * u[11] + u[8] * x2;
+        const real_t x0 = 1.0 / jacobian_determinant;
+        const real_t x1 = adjugate[0] * x0;
+        const real_t x2 = adjugate[3] * x0;
+        const real_t x3 = adjugate[6] * x0;
+        const real_t x4 = -x1 - x2 - x3;
+        const real_t x5 = adjugate[1] * x0;
+        const real_t x6 = adjugate[4] * x0;
+        const real_t x7 = adjugate[7] * x0;
+        const real_t x8 = -x5 - x6 - x7;
+        const real_t x9 = adjugate[2] * x0;
+        const real_t x10 = adjugate[5] * x0;
+        const real_t x11 = adjugate[8] * x0;
+        const real_t x12 = -x10 - x11 - x9;
+        disp_grad[0] = u[0] * x4 + u[1] * x1 + u[2] * x2 + u[3] * x3;
+        disp_grad[1] = u[0] * x8 + u[1] * x5 + u[2] * x6 + u[3] * x7;
+        disp_grad[2] = u[0] * x12 + u[1] * x9 + u[2] * x10 + u[3] * x11;
+        disp_grad[3] = u[4] * x4 + u[5] * x1 + u[6] * x2 + u[7] * x3;
+        disp_grad[4] = u[4] * x8 + u[5] * x5 + u[6] * x6 + u[7] * x7;
+        disp_grad[5] = u[4] * x12 + u[5] * x9 + u[6] * x10 + u[7] * x11;
+        disp_grad[6] = u[10] * x2 + u[11] * x3 + u[8] * x4 + u[9] * x1;
+        disp_grad[7] = u[10] * x6 + u[11] * x7 + u[8] * x8 + u[9] * x5;
+        disp_grad[8] = u[10] * x10 + u[11] * x11 + u[8] * x12 + u[9] * x9;
     }
 
     // real_t P[9];
     real_t *P = disp_grad;
     {
-        const real_t x0 = 2 * disp_grad[0];
-        const real_t x1 = 2 * disp_grad[4];
-        const real_t x2 = 2 * disp_grad[8];
-        const real_t x3 = (1.0 / 2.0) * lambda * (x0 + x1 + x2);
-        const real_t x4 = mu * (disp_grad[1] + disp_grad[3]);
-        const real_t x5 = mu * (disp_grad[2] + disp_grad[6]);
-        const real_t x6 = mu * (disp_grad[5] + disp_grad[7]);
-        P[0] = mu * x0 + x3;
-        P[1] = x4;
-        P[2] = x5;
-        P[3] = x4;
-        P[4] = mu * x1 + x3;
-        P[5] = x6;
-        P[6] = x5;
-        P[7] = x6;
-        P[8] = mu * x2 + x3;
+        const real_t x0 = (1.0 / 3.0) * mu;
+        const real_t x1 =
+            (1.0 / 12.0) * lambda * (2 * disp_grad[0] + 2 * disp_grad[4] + 2 * disp_grad[8]);
+        const real_t x2 = (1.0 / 6.0) * mu;
+        const real_t x3 = x2 * (disp_grad[1] + disp_grad[3]);
+        const real_t x4 = x2 * (disp_grad[2] + disp_grad[6]);
+        const real_t x5 = x2 * (disp_grad[5] + disp_grad[7]);
+        P[0] = disp_grad[0] * x0 + x1;
+        P[1] = x3;
+        P[2] = x4;
+        P[3] = x3;
+        P[4] = disp_grad[4] * x0 + x1;
+        P[5] = x5;
+        P[6] = x4;
+        P[7] = x5;
+        P[8] = disp_grad[8] * x0 + x1;
     }
 
     // Bilinear form
     {
-        const real_t x0 = -jacobian_inverse[0] - jacobian_inverse[3] - jacobian_inverse[6];
-        const real_t x1 = -jacobian_inverse[1] - jacobian_inverse[4] - jacobian_inverse[7];
-        const real_t x2 = -jacobian_inverse[2] - jacobian_inverse[5] - jacobian_inverse[8];
-        const real_t x3 = -pz0 + pz3;
-        const real_t x4 = -py0 + py2;
-        const real_t x5 = -1.0 / 6.0 * px0 + (1.0 / 6.0) * px1;
-        const real_t x6 = -py0 + py3;
-        const real_t x7 = -pz0 + pz2;
-        const real_t x8 = -py0 + py1;
-        const real_t x9 = -1.0 / 6.0 * px0 + (1.0 / 6.0) * px2;
-        const real_t x10 = -pz0 + pz1;
-        const real_t x11 = -1.0 / 6.0 * px0 + (1.0 / 6.0) * px3;
-        const real_t x12 = -x10 * x11 * x4 + x10 * x6 * x9 + x11 * x7 * x8 + x3 * x4 * x5 -
-                           x3 * x8 * x9 - x5 * x6 * x7;
-        element_vector[0] = x12 * (P[0] * x0 + P[1] * x1 + P[2] * x2);
-        element_vector[1] =
-            x12 *
-            (P[0] * jacobian_inverse[0] + P[1] * jacobian_inverse[1] + P[2] * jacobian_inverse[2]);
-        element_vector[2] =
-            x12 *
-            (P[0] * jacobian_inverse[3] + P[1] * jacobian_inverse[4] + P[2] * jacobian_inverse[5]);
-        element_vector[3] =
-            x12 *
-            (P[0] * jacobian_inverse[6] + P[1] * jacobian_inverse[7] + P[2] * jacobian_inverse[8]);
-        element_vector[4] = x12 * (P[3] * x0 + P[4] * x1 + P[5] * x2);
-        element_vector[5] =
-            x12 *
-            (P[3] * jacobian_inverse[0] + P[4] * jacobian_inverse[1] + P[5] * jacobian_inverse[2]);
-        element_vector[6] =
-            x12 *
-            (P[3] * jacobian_inverse[3] + P[4] * jacobian_inverse[4] + P[5] * jacobian_inverse[5]);
-        element_vector[7] =
-            x12 *
-            (P[3] * jacobian_inverse[6] + P[4] * jacobian_inverse[7] + P[5] * jacobian_inverse[8]);
-        element_vector[8] = x12 * (P[6] * x0 + P[7] * x1 + P[8] * x2);
-        element_vector[9] =
-            x12 *
-            (P[6] * jacobian_inverse[0] + P[7] * jacobian_inverse[1] + P[8] * jacobian_inverse[2]);
-        element_vector[10] =
-            x12 *
-            (P[6] * jacobian_inverse[3] + P[7] * jacobian_inverse[4] + P[8] * jacobian_inverse[5]);
-        element_vector[11] =
-            x12 *
-            (P[6] * jacobian_inverse[6] + P[7] * jacobian_inverse[7] + P[8] * jacobian_inverse[8]);
+        const real_t x0 = adjugate[0] + adjugate[3] + adjugate[6];
+        const real_t x1 = adjugate[1] + adjugate[4] + adjugate[7];
+        const real_t x2 = adjugate[2] + adjugate[5] + adjugate[8];
+        element_vector[0 * stride] = -P[0] * x0 - P[1] * x1 - P[2] * x2;
+        element_vector[1 * stride] = P[0] * adjugate[0] + P[1] * adjugate[1] + P[2] * adjugate[2];
+        element_vector[2 * stride] = P[0] * adjugate[3] + P[1] * adjugate[4] + P[2] * adjugate[5];
+        element_vector[3 * stride] = P[0] * adjugate[6] + P[1] * adjugate[7] + P[2] * adjugate[8];
+        element_vector[4 * stride] = -P[3] * x0 - P[4] * x1 - P[5] * x2;
+        element_vector[5 * stride] = P[3] * adjugate[0] + P[4] * adjugate[1] + P[5] * adjugate[2];
+        element_vector[6 * stride] = P[3] * adjugate[3] + P[4] * adjugate[4] + P[5] * adjugate[5];
+        element_vector[7 * stride] = P[3] * adjugate[6] + P[4] * adjugate[7] + P[5] * adjugate[8];
+        element_vector[8 * stride] = -P[6] * x0 - P[7] * x1 - P[8] * x2;
+        element_vector[9 * stride] = P[6] * adjugate[0] + P[7] * adjugate[1] + P[8] * adjugate[2];
+        element_vector[10 * stride] = P[6] * adjugate[3] + P[7] * adjugate[4] + P[8] * adjugate[5];
+        element_vector[11 * stride] = P[6] * adjugate[6] + P[7] * adjugate[7] + P[8] * adjugate[8];
     }
-
-    // real_t test_vector[3 * 4];
-    // {
-    //     tet4_linear_elasticity_apply_kernel_old(
-    //         mu, lambda, px0, px1, px2, px3, py0, py1, py2, py3, pz0, pz1, pz2, pz3, u,
-    //         test_vector);
-
-    //     // for(int i = 0; i < 12; i++) {
-    //     //     printf("%d) %g - %g = %g\n", i, element_vector[i], test_vector[i],
-    //     element_vector[i]
-    //     //     - test_vector[i]);
-    //     // }
-
-    //     assert(fabs(element_vector[0] - test_vector[0]) < 1e-8);
-    //     assert(fabs(element_vector[1] - test_vector[1]) < 1e-8);
-    //     assert(fabs(element_vector[2] - test_vector[2]) < 1e-8);
-    //     assert(fabs(element_vector[3] - test_vector[3]) < 1e-8);
-    //     assert(fabs(element_vector[4] - test_vector[4]) < 1e-8);
-    //     assert(fabs(element_vector[5] - test_vector[5]) < 1e-8);
-    //     assert(fabs(element_vector[6] - test_vector[6]) < 1e-8);
-    //     assert(fabs(element_vector[7] - test_vector[7]) < 1e-8);
-    //     assert(fabs(element_vector[8] - test_vector[8]) < 1e-8);
-    //     assert(fabs(element_vector[9] - test_vector[9]) < 1e-8);
-    //     assert(fabs(element_vector[10] - test_vector[10]) < 1e-8);
-    //     assert(fabs(element_vector[11] - test_vector[11]) < 1e-8);
-    // }
 }
-
-#define tet4_linear_elasticity_apply_kernel tet4_linear_elasticity_apply_kernel_opt
-// #define tet4_linear_elasticity_apply_kernel tet4_linear_elasticity_apply_kernel_old
-#endif
 
 void tet4_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
                                                const ptrdiff_t nnodes,

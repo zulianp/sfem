@@ -8,6 +8,7 @@ from sfem_codegen import real_t
 from sfem_codegen import coeffs
 from sfem_codegen import det2
 from sfem_codegen import det3
+from sfem_codegen import matrix_coeff
 import sympy.codegen.ast as ast
 import sympy as sp
 import numpy as np
@@ -29,6 +30,7 @@ def str_to_file(path, mystr):
 class FE:
 	SoA = True
 	strided = False
+	use_adjugate = False
 
 	def subparam_n_nodes(self):
 		return self.n_nodes()
@@ -152,6 +154,10 @@ class FE:
 		return g
 
 	def symbol_jacobian_inverse(self):
+		if self.use_adjugate:
+			return self.symbol_jacobian_inverse_as_adjugate()
+		
+
 		rows = self.manifold_dim()
 		cols = self.spatial_dim()
 
@@ -166,6 +172,13 @@ class FE:
 				# var = sp.symbols(f'jac_inv_{i*cols + j}]')
 				sls.append(var)
 		return sp.Matrix(rows, cols, sls)
+
+	def symbol_jacobian_inverse_as_adjugate(self):
+		rows = self.manifold_dim()
+		cols = self.spatial_dim()
+
+		coff = matrix_coeff('adjugate', rows, cols)
+		return coff / self.symbol_jacobian_determinant()
 
 	def symbol_jacobian(self):
 		rows = self.spatial_dim()

@@ -20,11 +20,13 @@ def assign_matrix(name, mat):
 
 class GPULinearElasticityOp:
 	def __init__(self, fe, q):
+		fe.use_adjugate = True
 		dims = fe.manifold_dim()
 		q = sp.Matrix(dims, 1, q)
 		shape_grad = fe.physical_tgrad(q)
 		shape_grad_ref = fe.tgrad(q)
-		jac_inv = fe.symbol_jacobian_inverse()
+		# jac_inv = fe.symbol_jacobian_inverse()
+		jac_inv = fe.symbol_jacobian_inverse_as_adjugate()
 		disp = coeffs('u', dims * fe.n_nodes())
 		
 		self.jac = fe.jacobian(q)
@@ -51,6 +53,9 @@ class GPULinearElasticityOp:
 		epsu = (disp_grad + disp_grad.T) / 2
 		e = mu * inner(epsu, epsu) + (lmbda/2) * (tr(epsu) * tr(epsu))
 
+		self.eval_value = e * fe.reference_measure() * fe.symbol_jacobian_determinant()
+		self.eval_value = sp.simplify(self.eval_value)
+
 		# Gradient
 		P = sp.Matrix(dims, dims, [0]*(dims*dims))
 		for d1 in range(0, dims):
@@ -59,28 +64,35 @@ class GPULinearElasticityOp:
 
 		JinvXPDetJ = matrix_coeff(self.JinvXPDetJ_name, dims, dims)
 		
-		# eval_grad = sp.zeros(rows, 1)
+		eval_grad = sp.zeros(rows, 1)
 		self.eval_grad = sp.zeros(rows, 1)
-		self.P = P
+
+		# Reference measure scaled here for reducing register usage
+		self.P = P * fe.reference_measure() 
 
 		P_sym = matrix_coeff('P', dims, dims)
 		
 		for i in range(0, fe.n_nodes() * dims):
-			self.eval_grad[i] = inner(P_sym, shape_grad[i]) * fe.measure(q)
-			# self.eval_grad[i] = inner(P, shape_grad[i]) * fe.measure(q)
+			self.eval_grad[i] = inner(P_sym, shape_grad[i]) * fe.symbol_jacobian_determinant()
+			self.eval_grad[i] = sp.simplify(self.eval_grad[i])
+			eval_grad[i] = inner(P, shape_grad[i])
 
-			# eval_grad[i] = inner(P, shape_grad[i])
+		
+		self.eval_hessian =  sp.zeros(rows, cols)
+		self.lin_stress = []
 
-		# dde = sp.zeros(dims, dims)
-		# eval_hessian =  sp.Matrix(rows, cols, [0] * (rows * cols))
+		
+		for j in range(0, rows):
+			dde = sp.zeros(dims, dims)
+			for d1 in range(0, dims):
+				for d2 in range(0, dims):
+					dde[d1, d2] = sp.diff(eval_grad[j], disp_grad[d1, d2])
 
-		# for j in range(0, rows):
-		# 	for d1 in range(0, dims):
-		# 		for d2 in range(0, dims):
-		# 			dde[d1, d2] = sp.diff(eval_grad[j], disp_grad[d1, d2])
+			self.lin_stress.append(dde)
+			lin_stress_sym = matrix_coeff(f'lin_stress{j}', dims, dims)
 
-		# 	for i in range(0, cols):
-		# 		eval_hessian[i, j] = inner(dde, shape_grad[i])
+			for i in range(0, cols):
+				self.eval_hessian[i, j] = inner(lin_stress_sym, shape_grad[i]) * fe.reference_measure() * fe.symbol_jacobian_determinant()
 
 		###################################################################
 		# Integrate and substitute
@@ -166,7 +178,7 @@ class GPULinearElasticityOp:
 		return expr
 
 	def hessian(self):
-		H = self.integr_hessian
+		H = self.eval_hessian
 		rows, cols = H.shape
 
 		expr = []
@@ -177,15 +189,29 @@ class GPULinearElasticityOp:
 
 		return expr
 
+	def linerized_stres(self, i):
+		s = self.lin_stress[i]
+		expr = assign_matrix('lin_stress', s)
+		return expr
+
+	def jacobian(self):
+		expr = []
+		expr.extend(assign_matrix('jacobian', self.jac))
+		return expr
+
 	def geometry(self):
 		expr = []
-		J = self.jac
+		# J = self.jac
+		J = matrix_coeff('jacobian', self.fe.spatial_dim(), self.fe.manifold_dim())
 
 		# expr = assign_matrix('jacobian', J)
-		jac_inv = inverse(J)
 
-
-		expr.extend(assign_matrix('jacobian_inverse', jac_inv))
+		if self.fe.use_adjugate:
+			adj = adjugate(J)
+			expr.extend(assign_matrix('adjugate', adj))
+		else:
+			jac_inv = inverse(J)
+			expr.extend(assign_matrix('jacobian_inverse', jac_inv))
 
 		J_det = determinant(J)
 		expr.append(ast.Assignment(sp.symbols('jacobian_determinant'), J_det))
@@ -204,7 +230,7 @@ class GPULinearElasticityOp:
 
 	def value(self):
 		form = sp.symbols(f'element_scalar[0]')
-		return [ast.Assignment(form, self.integr_value)]
+		return [ast.Assignment(form, self.eval_value)]
 
 	def apply(self):
 		H = self.integr_hessian
@@ -240,7 +266,10 @@ def main():
 	c_log("--------------------------")
 	c_log("geometry")	
 	c_log("--------------------------")
+	
+	c_code(op.jacobian())
 	c_code(op.geometry())
+
 
 	c_log("--------------------------")
 	c_log("displacement_gradient")	
@@ -259,15 +288,23 @@ def main():
 	c_code(op.gradient())
 
 
-	# c_log("--------------------------")
-	# c_log("value")
-	# c_log("--------------------------")
-	# c_code(op.value())
+	c_log("--------------------------")
+	c_log("value")
+	c_log("--------------------------")
+	c_code(op.value())
 
 	# c_log("--------------------------")
 	# c_log("hessian")	
 	# c_log("--------------------------")
 	# c_code(op.hessian())
+
+	# c_log("--------------------------")
+	# c_log("lin stress")	
+	# c_log("--------------------------")
+
+	# for i in range(0, fe.n_nodes() * fe.spatial_dim()):
+	# 	c_code(op.linerized_stres(i))
+
 
 	# c_log("--------------------------")
 	# c_log("apply")	
