@@ -74,11 +74,9 @@ class GPULinearElasticityOp:
 			self.eval_grad[i] = sp.simplify(self.eval_grad[i])
 			eval_grad[i] = inner(P, shape_grad[i])
 
-		
 		self.eval_hessian =  sp.zeros(rows, cols)
 		self.lin_stress = []
 
-		
 		for j in range(0, rows):
 			dde = sp.zeros(dims, dims)
 			for d1 in range(0, dims):

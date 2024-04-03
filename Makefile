@@ -183,6 +183,7 @@ OBJS += macro_tri3_laplacian.o
 
 # Macro Tet4
 OBJS += macro_tet4_laplacian.o
+OBJS += macro_tet4_linear_elasticity.o
 # This is bugged
 # OBJS += macro_tet4_laplacian_simd.o
 

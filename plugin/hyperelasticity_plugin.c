@@ -83,6 +83,9 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
     SFEM_READ_ENV(SFEM_NEUMANN_VALUE, );
     SFEM_READ_ENV(SFEM_NEUMANN_COMPONENT, );
 
+    int SFEM_USE_MACRO = 1;
+    SFEM_READ_ENV(SFEM_USE_MACRO, atoi);
+
     const char *SFEM_OUTPUT_DIR = "./sfem_output";
     SFEM_READ_ENV(SFEM_OUTPUT_DIR, );
 
@@ -114,7 +117,8 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
         "- SFEM_SHEAR_MODULUS=%g\n"
         "- SFEM_FIRST_LAME_PARAMETER=%g\n"
         "- SFEM_OUTPUT_DIR=%s\n"
-        "- SFEM_DEBUG_DUMP=%d\n",
+        "- SFEM_DEBUG_DUMP=%d\n"
+        "- SFEM_USE_MACRO=%d\n",
         SFEM_DIRICHLET_NODESET,
         SFEM_DIRICHLET_VALUE,
         SFEM_DIRICHLET_COMPONENT,
@@ -125,7 +129,8 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
         SFEM_SHEAR_MODULUS,
         SFEM_FIRST_LAME_PARAMETER,
         SFEM_OUTPUT_DIR,
-        SFEM_DEBUG_DUMP);
+        SFEM_DEBUG_DUMP,
+        SFEM_USE_MACRO);
 
     if (!SFEM_MESH_DIR || !SFEM_DIRICHLET_NODESET) {
         return ISOLVER_FUNCTION_FAILURE;
@@ -140,6 +145,10 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
 
     if (mesh_read(info->comm, SFEM_MESH_DIR, mesh)) {
         return ISOLVER_FUNCTION_FAILURE;
+    }
+
+    if(SFEM_USE_MACRO) {
+        mesh->element_type = macro_type_variant(mesh->element_type);
     }
 
     sfem_problem_t *problem = (sfem_problem_t *)malloc(sizeof(sfem_problem_t));
