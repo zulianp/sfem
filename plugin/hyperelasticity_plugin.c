@@ -10,6 +10,7 @@
 #include "array_dtof.h"
 #include "matrixio_array.h"
 #include "matrixio_crs.h"
+#include "mpi.h"
 #include "utils.h"
 
 #include "crs_graph.h"
@@ -45,6 +46,9 @@ typedef struct {
     const char *output_dir;
 
     const char *material;
+
+
+    double matrix_free_time;
 } sfem_problem_t;
 
 static int SFEM_DEBUG_DUMP = 0;
@@ -83,7 +87,7 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
     SFEM_READ_ENV(SFEM_NEUMANN_VALUE, );
     SFEM_READ_ENV(SFEM_NEUMANN_COMPONENT, );
 
-    int SFEM_USE_MACRO = 1;
+    int SFEM_USE_MACRO = 0;
     SFEM_READ_ENV(SFEM_USE_MACRO, atoi);
 
     const char *SFEM_OUTPUT_DIR = "./sfem_output";
@@ -177,6 +181,8 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
     problem->material = SFEM_MATERIAL;
     problem->n2n_rowptr = NULL;
     problem->n2n_colidx = NULL;
+
+    problem->matrix_free_time = 0;
 
     // Store problem
     info->private_data = (void *)problem;
@@ -467,6 +473,8 @@ int ISOLVER_EXPORT isolver_function_apply(const isolver_function_t *info,
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
+    double tick = MPI_Wtime();
+
     if (strcmp(problem->material, "linear") == 0) {
         linear_elasticity_apply_aos(mesh->element_type,
                                     mesh->nelements,
@@ -481,6 +489,10 @@ int ISOLVER_EXPORT isolver_function_apply(const isolver_function_t *info,
         // TODO
         assert(0);
     }
+
+    double tock = MPI_Wtime();
+
+    problem->matrix_free_time += tock - tick;
 
     return ISOLVER_FUNCTION_SUCCESS;
 }
@@ -580,6 +592,8 @@ int ISOLVER_EXPORT isolver_function_destroy(isolver_function_t *info) {
 
         free(problem->neumann_conditions);
     }
+
+    printf("Time spent in matrix-free kernel %g (seconds)\n", problem->matrix_free_time);
 
     return ISOLVER_FUNCTION_SUCCESS;
 }

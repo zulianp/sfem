@@ -555,6 +555,8 @@ void macro_tet4_linear_elasticity_diag(const linear_elasticity_t *const ctx,
     assert(0);
 }
 
+
+
 void macro_tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
                                             const ptrdiff_t nnodes,
                                             idx_t **const SFEM_RESTRICT elements,
@@ -563,9 +565,21 @@ void macro_tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
                                             const real_t lambda,
                                             const real_t *const SFEM_RESTRICT u,
                                             real_t *const SFEM_RESTRICT values) {
-    // FIXME
+
+#if 0
     linear_elasticity_t ctx;
     macro_tet4_linear_elasticity_init(&ctx, mu, lambda, nelements, elements, points);
     macro_tet4_linear_elasticity_apply_opt(&ctx, u, values);
     macro_tet4_linear_elasticity_destroy(&ctx);
+#else
+    static linear_elasticity_t ctx;
+    static int initialized = 0;
+
+    if(!initialized) {
+        macro_tet4_linear_elasticity_init(&ctx, mu, lambda, nelements, elements, points);
+        initialized = 1;
+    }
+
+    macro_tet4_linear_elasticity_apply_opt(&ctx, u, values);
+#endif
 }
