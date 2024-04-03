@@ -14,7 +14,6 @@ int cuda_incore_laplacian_init(const enum ElemType element_type,cuda_incore_lapl
                                idx_t **const SFEM_RESTRICT elements,
                                geom_t **const SFEM_RESTRICT points)
 {
-	// TODO
 	switch(element_type) {
 		case TET4: {
 			return tet4_cuda_incore_laplacian_init(ctx, nelements, elements, points);
@@ -35,7 +34,6 @@ int cuda_incore_laplacian_init(const enum ElemType element_type,cuda_incore_lapl
 
 int cuda_incore_laplacian_destroy(cuda_incore_laplacian_t *ctx)
 {
-	// TODO
 	switch(ctx->element_type) {
 		case TET4: {
 			return tet4_cuda_incore_laplacian_destroy(ctx);
@@ -57,7 +55,6 @@ int cuda_incore_laplacian_apply(cuda_incore_laplacian_t *ctx,
                                 const real_t *const d_x,
                                 real_t *const d_y)
 {
-	// TODO
 	switch(ctx->element_type) {
 		case TET4: {
 			return tet4_cuda_incore_laplacian_apply(ctx, d_x, d_y);
@@ -78,7 +75,6 @@ int cuda_incore_laplacian_apply(cuda_incore_laplacian_t *ctx,
 
 int cuda_incore_laplacian_diag(cuda_incore_laplacian_t *ctx, real_t *const d_t)
 {
-	// TODO
 	switch(ctx->element_type) {
 		// case TET4: {
 		// 	return tet4_cuda_incore_laplacian_diag(ctx, d_t);
