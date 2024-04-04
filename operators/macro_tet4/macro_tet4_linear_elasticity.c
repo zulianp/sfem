@@ -348,7 +348,7 @@ void macro_tet4_linear_elasticity_apply_opt(const linear_elasticity_t *const ctx
             // Sub-geometry
             jacobian_t sub_adjugate[9];
 
-            // Is it sensibile to have so many registers here?
+            // Is it sensibile to have so many "registers" here?
             real_t ux[10];
             real_t uy[10];
             real_t uz[10];
