@@ -4,20 +4,11 @@
 #include <stddef.h>
 #include "sfem_base.h"
 #include "sfem_defs.h"
+#include "tet4_linear_elasticity.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef struct {
-    real_t mu;
-    real_t lambda;
-    enum ElemType element_type;
-    ptrdiff_t nelements;
-    void *jacobian_determinant;
-    void *jacobian_adjugate;
-    idx_t **elements;
-} linear_elasticity_t;
 
 void macro_tet4_linear_elasticity_init(linear_elasticity_t *const ctx,
                                        const real_t mu,

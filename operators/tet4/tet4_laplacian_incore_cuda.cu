@@ -350,7 +350,7 @@ extern int tet4_cuda_incore_laplacian_apply(cuda_incore_laplacian_t *ctx,
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
         int min_grid_size;
-        cuOccupancyMaxPotentialBlockSize(
+        cudaOccupancyMaxPotentialBlockSize(
             &min_grid_size, &block_size, tet4_cuda_incore_laplacian_apply_kernel, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
@@ -367,7 +367,7 @@ extern int tet4_cuda_incore_laplacian_diag(cuda_incore_laplacian_t *ctx, real_t 
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
         int min_grid_size;
-        cuOccupancyMaxPotentialBlockSize(
+        cudaOccupancyMaxPotentialBlockSize(
             &min_grid_size, &block_size, tet4_cuda_incore_laplacian_apply_kernel, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
