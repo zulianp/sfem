@@ -533,7 +533,7 @@ namespace sfem {
 
         real_t mu{1}, lambda{1};
 
-        static std::unique_ptr<Op> New(const std::shared_ptr<FunctionSpace> &space) {
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             assert(mesh.spatial_dim == space.block_size());
@@ -635,7 +635,7 @@ namespace sfem {
         static std::map<std::string, FactoryFunction> name_to_create;
 
         if (name_to_create.empty()) {
-            name_to_create["LinearElasticity"] = LinearElasticity::New;
+            name_to_create["LinearElasticity"] = LinearElasticity::create;
         }
 
         auto it = name_to_create.find(name);
