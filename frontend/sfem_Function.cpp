@@ -534,6 +534,10 @@ namespace sfem {
         real_t mu{1}, lambda{1};
 
         static std::unique_ptr<Op> New(const std::shared_ptr<FunctionSpace> &space) {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            assert(mesh.spatial_dim == space.block_size());
+
             auto ret = std::make_unique<LinearElasticity>(space);
 
             real_t SFEM_SHEAR_MODULUS = 1;
