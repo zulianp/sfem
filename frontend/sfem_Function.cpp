@@ -551,12 +551,14 @@ namespace sfem {
             return ret;
         }
 
+        int initialize() override {return ISOLVER_FUNCTION_SUCCESS;}
+
         LinearElasticity(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
         int hessian_crs(const isolver_scalar_t *const x,
                         const isolver_idx_t *const rowptr,
                         const isolver_idx_t *const colidx,
-                        isolver_scalar_t *const values) {
+                        isolver_scalar_t *const values) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             linear_elasticity_assemble_hessian_aos((enum ElemType)mesh->element_type,
@@ -573,7 +575,7 @@ namespace sfem {
             return ISOLVER_FUNCTION_SUCCESS;
         }
 
-        int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) {
+        int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             linear_elasticity_assemble_gradient_aos((enum ElemType)mesh->element_type,
@@ -591,7 +593,7 @@ namespace sfem {
 
         int apply(const isolver_scalar_t *const x,
                   const isolver_scalar_t *const h,
-                  isolver_scalar_t *const out) {
+                  isolver_scalar_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             linear_elasticity_apply_aos((enum ElemType)mesh->element_type,
@@ -607,7 +609,7 @@ namespace sfem {
             return ISOLVER_FUNCTION_SUCCESS;
         }
 
-        int value(const isolver_scalar_t *x, isolver_scalar_t *const out) {
+        int value(const isolver_scalar_t *x, isolver_scalar_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             linear_elasticity_assemble_value_aos((enum ElemType)mesh->element_type,
@@ -623,7 +625,7 @@ namespace sfem {
             return ISOLVER_FUNCTION_SUCCESS;
         }
 
-        int report(const isolver_scalar_t *const) { return ISOLVER_FUNCTION_SUCCESS; }
+        int report(const isolver_scalar_t *const) override { return ISOLVER_FUNCTION_SUCCESS; }
     };
 
     std::unique_ptr<Op> Factory::create_op(const std::shared_ptr<FunctionSpace> &space,

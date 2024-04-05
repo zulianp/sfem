@@ -9,6 +9,11 @@
 
 namespace sfem {
 
+    enum ExecutionSpace {
+        EXECUTION_SPACE_HOST = 0,
+        EXECUTION_SPACE_DEVICE = 1
+    };
+
     class Function;
     class Mesh;
     class FunctionSpace;
@@ -70,6 +75,7 @@ namespace sfem {
     public:
         virtual ~Op() = default;
 
+        virtual int initialize() { return ISOLVER_FUNCTION_SUCCESS; }
         virtual int hessian_crs(const isolver_scalar_t *const x,
                                 const isolver_idx_t *const rowptr,
                                 const isolver_idx_t *const colidx,
@@ -82,6 +88,7 @@ namespace sfem {
 
         virtual int value(const isolver_scalar_t *x, isolver_scalar_t *const out) = 0;
         virtual int report(const isolver_scalar_t *const /*x*/) { return ISOLVER_FUNCTION_SUCCESS; }
+        virtual ExecutionSpace execution_space() const { return EXECUTION_SPACE_HOST; }
     };
 
     class NeumannBoundaryConditions final : public Op {

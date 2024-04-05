@@ -44,9 +44,7 @@ typedef struct {
     real_t mu, lambda;
 
     const char *output_dir;
-
     const char *material;
-
 
     double matrix_free_time;
 } sfem_problem_t;
