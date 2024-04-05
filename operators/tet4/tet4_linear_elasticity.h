@@ -8,6 +8,16 @@
 extern "C" {
 #endif
 
+typedef struct {
+    real_t mu;
+    real_t lambda;
+    enum ElemType element_type;
+    ptrdiff_t nelements;
+    void *jacobian_determinant;
+    void *jacobian_adjugate;
+    idx_t **elements;
+} linear_elasticity_t;
+
 
 void tet4_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
                                                const ptrdiff_t nnodes,

@@ -69,7 +69,7 @@ CFLAGS += -pedantic -Wextra
 CFLAGS += -fPIC
 # CFLAGS += -std=c99
 
-CXXFLAGS += -std=c++11
+CXXFLAGS += -std=c++14
 CXXFLAGS += -fvisibility=hidden
 CXXFLAGS += -fPIC
 INTERNAL_CXXFLAGS += -fno-exceptions -fno-rtti

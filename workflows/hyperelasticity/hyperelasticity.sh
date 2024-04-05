@@ -19,7 +19,7 @@ PATH=$SCRIPTPATH/../../../matrix.io:$PATH
 # create_cylinder.sh 6
 # create_cylinder.sh 3
 
-# create_cylinder_p2.sh 2
+create_cylinder_p2.sh 4
 export SFEM_USE_MACRO=1
 
 export SFEM_MESH_DIR=mesh
@@ -52,8 +52,8 @@ export SFEM_OUTPUT_DIR=sfem_output
 export SFEM_MATERIAL=linear
 
 # export OMP_NUM_THREADS=32
-# export OMP_NUM_THREADS=16
-export OMP_NUM_THREADS=8
+export OMP_NUM_THREADS=16
+# export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true
 
 

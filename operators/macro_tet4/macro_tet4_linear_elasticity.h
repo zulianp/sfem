@@ -1,5 +1,5 @@
-#ifndef MACRO_TET4_LAPLACIAN_H
-#define MACRO_TET4_LAPLACIAN_H
+#ifndef MACRO_TET4_LINEAR_ELASTICITY_H
+#define MACRO_TET4_LINEAR_ELASTICITY_H
 
 #include <stddef.h>
 #include "sfem_base.h"
@@ -39,4 +39,4 @@ void macro_tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
 #ifdef __cplusplus
 }
 #endif
-#endif  // MACRO_TET4_LAPLACIAN_H
+#endif  // MACRO_TET4_LINEAR_ELASTICITY_H
