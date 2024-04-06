@@ -40,7 +40,9 @@ NB_MODULE(pysfem, m) {
 
     nb::class_<Function>(m, "Function")
         .def(nb::init<std::shared_ptr<FunctionSpace>>())
-        .def("add_operator", &Function::add_operator);
+        .def("add_operator", &Function::add_operator)
+        .def("add_dirichlet_conditions",
+           &Function::add_dirichlet_conditions);
 
     m.def("apply",
           [](std::shared_ptr<Function> &fun,
@@ -49,7 +51,21 @@ NB_MODULE(pysfem, m) {
              nb::ndarray<real_t> y) { fun->apply(x.data(), h.data(), y.data()); });
 
     m.def("gradient",
+          [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x, nb::ndarray<real_t> y) {
+              fun->gradient(x.data(), y.data());
+          });
+
+    m.def("apply_constraints",
           [](std::shared_ptr<Function> &fun,
-             nb::ndarray<real_t> x,
-             nb::ndarray<real_t> y) { fun->gradient(x.data(), y.data()); });
+             nb::ndarray<real_t> x) { fun->apply_constraints(x.data()); });
+
+    m.def("report_solution",
+          [](std::shared_ptr<Function> &fun,
+             nb::ndarray<real_t> x) { fun->report_solution(x.data()); });
+
+   // auto c = nb::class_<Constraint>(m, "Constraint")
+   //      .def(nb::init<std::shared_ptr<FunctionSpace>>());
+
+    nb::class_<DirichletConditions>(m, "DirichletConditions")
+        .def(nb::init<std::shared_ptr<FunctionSpace>>());
 }

@@ -393,7 +393,7 @@ namespace sfem {
         : impl_(std::make_unique<Impl>()) {
         impl_->space = space;
 
-        const char *SFEM_OUTPUT_DIR = "./sfem_output";
+        const char *SFEM_OUTPUT_DIR = "./";
         SFEM_READ_ENV(SFEM_OUTPUT_DIR, );
         impl_->output_dir = SFEM_OUTPUT_DIR;
     }
@@ -405,6 +405,11 @@ namespace sfem {
         impl_->ops.push_back(op); }
     void Function::add_constraint(const std::shared_ptr<Constraint> &c) {
         impl_->constraints.push_back(c);
+    }
+
+    void Function::add_dirichlet_conditions(const std::shared_ptr<DirichletConditions> &c)
+    {
+        add_constraint(c);
     }
 
     int Function::create_crs_graph(ptrdiff_t *nlocal,
@@ -492,6 +497,8 @@ namespace sfem {
 
         char path[2048];
         sprintf(path, "%s/out.raw", impl_->output_dir.c_str());
+
+        printf("report_solution %s\n", path);
 
         if (array_write(mesh->comm,
                         path,
