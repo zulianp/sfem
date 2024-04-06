@@ -1,4 +1,5 @@
 #include "sfem_Function.hpp"
+#include <stddef.h>
 
 #include "matrixio_array.h"
 
@@ -18,6 +19,10 @@
 #include <map>
 #include <vector>
 
+// Ops
+
+#include "cvfem_operators.h"
+#include "laplacian.h"
 #include "linear_elasticity.h"
 
 namespace sfem {
@@ -357,6 +362,7 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace> space;
         std::vector<std::shared_ptr<Op>> ops;
+        std::vector<std::shared_ptr<Constraint>> constraints;
         std::string output_dir;
     };
 
@@ -372,6 +378,7 @@ namespace sfem {
     Function::~Function() {}
 
     void Function::add_operator(const std::shared_ptr<Op> &op) { impl_->ops.push_back(op); }
+    void Function::add_operator(const std::shared_ptr<Constraint> &c) { impl_->constraints.push_back(c); }
 
     int Function::create_crs_graph(ptrdiff_t *nlocal,
                                    ptrdiff_t *nglobal,
@@ -430,14 +437,24 @@ namespace sfem {
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
-    int Function::apply_constraints(isolver_scalar_t *const x) { return ISOLVER_FUNCTION_SUCCESS; }
+    int Function::apply_constraints(isolver_scalar_t *const x) { 
+        for(auto &c : impl_->constraints) {
+            c->apply_constraints(x);
+        }
+        return ISOLVER_FUNCTION_SUCCESS; }
 
     int Function::apply_zero_constraints(isolver_scalar_t *const x) {
+        for(auto &c : impl_->constraints) {
+            c->apply_zero_constraints(x);
+        }
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
     int Function::copy_constrained_dofs(const isolver_scalar_t *const src,
                                         isolver_scalar_t *const dest) {
+        for(auto &c : impl_->constraints) {
+            c->copy_constrained_dofs(src, dest);
+        }
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
@@ -445,7 +462,7 @@ namespace sfem {
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
 
         char path[2048];
-        sprintf(path, "%s/out.raw", impl_->output_dir);
+        sprintf(path, "%s/out.raw", impl_->output_dir.c_str());
 
         if (array_write(mesh->comm,
                         path,
@@ -551,7 +568,7 @@ namespace sfem {
             return ret;
         }
 
-        int initialize() override {return ISOLVER_FUNCTION_SUCCESS;}
+        int initialize() override { return ISOLVER_FUNCTION_SUCCESS; }
 
         LinearElasticity(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
@@ -628,18 +645,257 @@ namespace sfem {
         int report(const isolver_scalar_t *const) override { return ISOLVER_FUNCTION_SUCCESS; }
     };
 
-    std::unique_ptr<Op> Factory::create_op(const std::shared_ptr<FunctionSpace> &space,
-                                           const char *name) {
-        using FactoryFunction =
-            std::function<std::unique_ptr<Op>(const std::shared_ptr<FunctionSpace> &)>;
-        static std::map<std::string, FactoryFunction> name_to_create;
+    class Laplacian final : public Op {
+    public:
+        std::shared_ptr<FunctionSpace> space;
 
-        if (name_to_create.empty()) {
-            name_to_create["LinearElasticity"] = LinearElasticity::create;
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            assert(1 == space.block_size());
+
+            auto ret = std::make_unique<Laplacian>(space);
+            return ret;
         }
 
-        auto it = name_to_create.find(name);
-        if (it == name_to_create.end()) {
+        int initialize() override { return ISOLVER_FUNCTION_SUCCESS; }
+
+        Laplacian(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+        int hessian_crs(const isolver_scalar_t *const x,
+                        const isolver_idx_t *const rowptr,
+                        const isolver_idx_t *const colidx,
+                        isolver_scalar_t *const values) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            laplacian_assemble_hessian((enum ElemType)mesh->element_type,
+                                       mesh->nelements,
+                                       mesh->nnodes,
+                                       mesh->elements,
+                                       mesh->points,
+                                       space->mesh().node_to_node_rowptr(),
+                                       space->mesh().node_to_node_colidx(),
+                                       values);
+
+            return ISOLVER_FUNCTION_SUCCESS;
+        }
+
+        int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            laplacian_assemble_gradient((enum ElemType)mesh->element_type,
+                                        mesh->nelements,
+                                        mesh->nnodes,
+                                        mesh->elements,
+                                        mesh->points,
+                                        x,
+                                        out);
+
+            return ISOLVER_FUNCTION_SUCCESS;
+        }
+
+        int apply(const isolver_scalar_t *const x,
+                  const isolver_scalar_t *const h,
+                  isolver_scalar_t *const out) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            laplacian_apply((enum ElemType)mesh->element_type,
+                            mesh->nelements,
+                            mesh->nnodes,
+                            mesh->elements,
+                            mesh->points,
+                            h,
+                            out);
+
+            return ISOLVER_FUNCTION_SUCCESS;
+        }
+
+        int value(const isolver_scalar_t *x, isolver_scalar_t *const out) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            laplacian_assemble_value((enum ElemType)mesh->element_type,
+                                     mesh->nelements,
+                                     mesh->nnodes,
+                                     mesh->elements,
+                                     mesh->points,
+                                     x,
+                                     out);
+
+            return ISOLVER_FUNCTION_SUCCESS;
+        }
+
+        int report(const isolver_scalar_t *const) override { return ISOLVER_FUNCTION_SUCCESS; }
+    };
+
+    class CVFEMConvection final : public Op {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+        real_t *vel[3];
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            assert(1 == space.block_size());
+
+            const char *SFEM_VELX = nullptr;
+            const char *SFEM_VELY = nullptr;
+            const char *SFEM_VELZ = nullptr;
+
+            SFEM_READ_ENV(SFEM_VELX, );
+            SFEM_READ_ENV(SFEM_VELY, );
+            SFEM_READ_ENV(SFEM_VELZ, );
+
+            if (!SFEM_VELX || !SFEM_VELY || (!SFEM_VELZ && mesh->spatial_dim == 3)) {
+                fprintf(stderr,
+                        "Missing input velocity SFEM_VELX=%s\n,SFEM_VELY=%s\n,SFEM_VELZ=%s\n",
+                        SFEM_VELX,
+                        SFEM_VELY,
+                        SFEM_VELZ);
+                assert(0);
+                return nullptr;
+            }
+
+            auto ret = std::make_unique<CVFEMConvection>(space);
+
+            ptrdiff_t nlocal, nglobal;
+            if (array_create_from_file(mesh->comm,
+                                       SFEM_VELX,
+                                       SFEM_MPI_REAL_T,
+                                       (void **)&ret->vel[0],
+                                       &nlocal,
+                                       &nglobal) ||
+                array_create_from_file(mesh->comm,
+                                       SFEM_VELY,
+                                       SFEM_MPI_REAL_T,
+                                       (void **)&ret->vel[1],
+                                       &nlocal,
+                                       &nglobal) ||
+                array_create_from_file(mesh->comm,
+                                       SFEM_VELZ,
+                                       SFEM_MPI_REAL_T,
+                                       (void **)&ret->vel[2],
+                                       &nlocal,
+                                       &nglobal)) {
+
+                fprintf(stderr, "Unable to read input velocity\n");
+                assert(0);
+                return nullptr;
+            }
+
+            return ret;
+        }
+
+        int initialize() override { return ISOLVER_FUNCTION_SUCCESS; }
+
+        CVFEMConvection(const std::shared_ptr<FunctionSpace> &space) : space(space) {
+            vel[0] = nullptr;
+            vel[1] = nullptr;
+            vel[2] = nullptr;
+        }
+
+        ~CVFEMConvection() {}
+
+        int hessian_crs(const isolver_scalar_t *const x,
+                        const isolver_idx_t *const rowptr,
+                        const isolver_idx_t *const colidx,
+                        isolver_scalar_t *const values) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            // cvfem_convection_assemble_hessian((enum ElemType)mesh->element_type,
+            //                            mesh->nelements,
+            //                            mesh->nnodes,
+            //                            mesh->elements,
+            //                            mesh->points,
+            //                            space->mesh().node_to_node_rowptr(),
+            //                            space->mesh().node_to_node_colidx(),
+            //                            values);
+
+            // return ISOLVER_FUNCTION_SUCCESS;
+
+            assert(0);
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            // cvfem_convection_assemble_gradient((enum ElemType)mesh->element_type,
+            //                             mesh->nelements,
+            //                             mesh->nnodes,
+            //                             mesh->elements,
+            //                             mesh->points,
+            //                             x,
+            //                             out);
+
+            // return ISOLVER_FUNCTION_SUCCESS;
+
+            assert(0);
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        int apply(const isolver_scalar_t *const x,
+                  const isolver_scalar_t *const h,
+                  isolver_scalar_t *const out) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            cvfem_convection_apply((enum ElemType)mesh->element_type,
+                                   mesh->nelements,
+                                   mesh->nnodes,
+                                   mesh->elements,
+                                   mesh->points,
+                                   vel,
+                                   h,
+                                   out);
+
+            return ISOLVER_FUNCTION_SUCCESS;
+        }
+
+        int value(const isolver_scalar_t *x, isolver_scalar_t *const out) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            // cvfem_convection_assemble_value((enum ElemType)mesh->element_type,
+            //                          mesh->nelements,
+            //                          mesh->nnodes,
+            //                          mesh->elements,
+            //                          mesh->points,
+            //                          x,
+            //                          out);
+
+            // return ISOLVER_FUNCTION_SUCCESS;
+
+            assert(0);
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        int report(const isolver_scalar_t *const) override { return ISOLVER_FUNCTION_SUCCESS; }
+    };
+
+    class Factory::Impl {
+    public:
+        std::map<std::string, FactoryFunction> name_to_create;
+    };
+
+    Factory::Factory() : impl_(std::make_unique<Impl>()) {
+        register_op("LinearElasticity", LinearElasticity::create);
+        register_op("Laplacian", Laplacian::create);
+        register_op("CVFEMConvection", CVFEMConvection::create);
+    }
+
+    Factory::~Factory() = default;
+
+    Factory &Factory::instance() {
+        static Factory instance_;
+        return instance_;
+    }
+
+    void Factory::register_op(const std::string &name, FactoryFunction factory_function) {
+        instance().impl_->name_to_create[name] = factory_function;
+    }
+
+    std::unique_ptr<Op> Factory::create_op(const std::shared_ptr<FunctionSpace> &space,
+                                           const char *name) {
+        auto it = instance().impl_->name_to_create.find(name);
+        if (it == instance().impl_->name_to_create.end()) {
             std::cerr << "Unable to find op " << name << "\n";
             return nullptr;
         }

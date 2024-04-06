@@ -2,6 +2,7 @@
 #define SFEM_FUNCTION_HPP
 
 #include <mpi.h>
+#include <algorithm>
 #include <memory>
 #include <string>
 
@@ -9,10 +10,7 @@
 
 namespace sfem {
 
-    enum ExecutionSpace {
-        EXECUTION_SPACE_HOST = 0,
-        EXECUTION_SPACE_DEVICE = 1
-    };
+    enum ExecutionSpace { EXECUTION_SPACE_HOST = 0, EXECUTION_SPACE_DEVICE = 1 };
 
     class Function;
     class Mesh;
@@ -158,6 +156,7 @@ namespace sfem {
         ~Function();
 
         void add_operator(const std::shared_ptr<Op> &op);
+        void add_operator(const std::shared_ptr<Constraint> &c);
 
         int create_crs_graph(ptrdiff_t *nlocal,
                              ptrdiff_t *nglobal,
@@ -192,7 +191,21 @@ namespace sfem {
 
     class Factory {
     public:
-        static std::unique_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space, const char *name);
+        using FactoryFunction =
+            std::function<std::unique_ptr<Op>(const std::shared_ptr<FunctionSpace> &)>;
+
+        static void register_op(const std::string &name, FactoryFunction factory_function);
+        static std::unique_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,
+                                             const char *name);
+
+    private:
+        static Factory &instance();
+
+        Factory();
+        ~Factory();
+
+        class Impl;
+        std::unique_ptr<Impl> impl_;
     };
 }  // namespace sfem
 

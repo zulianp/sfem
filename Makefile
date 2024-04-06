@@ -529,7 +529,7 @@ hyperelasticity_plugin.o : plugin/hyperelasticity_plugin.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
 
 sfem_Function.o : sfem_Function.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) $(INTERNAL_CXXFLAGS) -I../isolver/interfaces/nlsolve -c $<
+	$(MPICXX) $(CXXFLAGS) $(INCLUDES) $(INTERNAL_CXXFLAGS) -I../isolver/interfaces/nlsolve -c $<
 
 sortreduce.o : sortreduce.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(INTERNAL_CXXFLAGS) -c $<
