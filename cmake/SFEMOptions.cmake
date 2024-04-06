@@ -13,6 +13,7 @@ option(SFEM_ENABLE_DEV_MODE
 
 option(SFEM_ENABLE_CUDA "Enable CUDA support" OFF)
 option(SFEM_ENABLE_OPENMP "Enable OpenMP support" OFF)
+option(SFEM_ENABLE_PYTHON "Enable python bindings for SFEM" ON)
 
 
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)

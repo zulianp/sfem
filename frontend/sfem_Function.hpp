@@ -22,6 +22,7 @@ namespace sfem {
 
     class Mesh final {
     public:
+        Mesh();
         Mesh(MPI_Comm comm);
         ~Mesh();
 
@@ -61,6 +62,7 @@ namespace sfem {
 
         Mesh &mesh();
         int block_size() const;
+        ptrdiff_t n_dofs() const;
 
         friend class Op;
 
@@ -72,6 +74,8 @@ namespace sfem {
     class Op {
     public:
         virtual ~Op() = default;
+
+        virtual const char *name() const = 0;
 
         virtual int initialize() { return ISOLVER_FUNCTION_SUCCESS; }
         virtual int hessian_crs(const isolver_scalar_t *const x,
@@ -93,6 +97,8 @@ namespace sfem {
     public:
         static std::unique_ptr<NeumannBoundaryConditions> create_from_env(
             const std::shared_ptr<FunctionSpace> &space);
+
+        const char *name() const override;
 
         NeumannBoundaryConditions(const std::shared_ptr<FunctionSpace> &space);
         ~NeumannBoundaryConditions();
@@ -150,13 +156,13 @@ namespace sfem {
         std::unique_ptr<Impl> impl_;
     };
 
-    class Function final {
+    class Function final /* : public isolver::Function */ {
     public:
         Function(const std::shared_ptr<FunctionSpace> &space);
         ~Function();
 
         void add_operator(const std::shared_ptr<Op> &op);
-        void add_operator(const std::shared_ptr<Constraint> &c);
+        void add_constraint(const std::shared_ptr<Constraint> &c);
 
         int create_crs_graph(ptrdiff_t *nlocal,
                              ptrdiff_t *nglobal,
@@ -195,9 +201,8 @@ namespace sfem {
             std::function<std::unique_ptr<Op>(const std::shared_ptr<FunctionSpace> &)>;
 
         static void register_op(const std::string &name, FactoryFunction factory_function);
-        static std::unique_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,
+        static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,
                                              const char *name);
-
     private:
         static Factory &instance();
 
@@ -206,6 +211,8 @@ namespace sfem {
 
         class Impl;
         std::unique_ptr<Impl> impl_;
+
+        void private_register_op(const std::string &name, FactoryFunction factory_function);
     };
 }  // namespace sfem
 

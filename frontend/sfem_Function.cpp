@@ -42,6 +42,11 @@ namespace sfem {
         }
     };
 
+    Mesh::Mesh() : impl_(std::make_unique<Impl>()) {
+        impl_->comm = MPI_COMM_WORLD;
+        mesh_init(&impl_->mesh);
+    }
+
     Mesh::Mesh(MPI_Comm comm) : impl_(std::make_unique<Impl>()) {
         impl_->comm = comm;
         mesh_init(&impl_->mesh);
@@ -111,6 +116,13 @@ namespace sfem {
     Mesh &FunctionSpace::mesh() { return *impl_->mesh; }
 
     int FunctionSpace::block_size() const { return impl_->block_size; }
+
+    ptrdiff_t FunctionSpace::n_dofs() const
+    {
+        auto &mesh = *impl_->mesh;
+        auto c_mesh = &mesh.impl_->mesh;
+        return c_mesh->nnodes * block_size();
+    }
 
     int FunctionSpace::create_crs_graph(ptrdiff_t *nlocal,
                                         ptrdiff_t *nglobal,
@@ -194,6 +206,8 @@ namespace sfem {
         boundary_condition_t *neumann_conditions{nullptr};
     };
 
+    const char *NeumannBoundaryConditions::name() const { return "NeumannBoundaryConditions"; }
+
     NeumannBoundaryConditions::NeumannBoundaryConditions(
         const std::shared_ptr<FunctionSpace> &space)
         : impl_(std::make_unique<Impl>()) {
@@ -247,6 +261,7 @@ namespace sfem {
                                          impl_->neumann_conditions[i].component,
                                          out);
         }
+
         return ISOLVER_FUNCTION_SUCCESS;
     }
     int NeumannBoundaryConditions::apply(const isolver_scalar_t *const /*x*/,
@@ -277,6 +292,14 @@ namespace sfem {
         int n_dirichlet_conditions{0};
         boundary_condition_t *dirichlet_conditions{nullptr};
     };
+
+    DirichletConditions::DirichletConditions(
+        const std::shared_ptr<FunctionSpace> &space)
+        : impl_(std::make_unique<Impl>()) {
+        impl_->space = space;
+    }
+
+    DirichletConditions::~DirichletConditions() = default;
 
     std::unique_ptr<DirichletConditions> DirichletConditions::create_from_env(
         const std::shared_ptr<FunctionSpace> &space) {
@@ -377,8 +400,12 @@ namespace sfem {
 
     Function::~Function() {}
 
-    void Function::add_operator(const std::shared_ptr<Op> &op) { impl_->ops.push_back(op); }
-    void Function::add_operator(const std::shared_ptr<Constraint> &c) { impl_->constraints.push_back(c); }
+    void Function::add_operator(const std::shared_ptr<Op> &op) { 
+        printf("Adding operator %s\n", op->name());
+        impl_->ops.push_back(op); }
+    void Function::add_constraint(const std::shared_ptr<Constraint> &c) {
+        impl_->constraints.push_back(c);
+    }
 
     int Function::create_crs_graph(ptrdiff_t *nlocal,
                                    ptrdiff_t *nglobal,
@@ -419,6 +446,7 @@ namespace sfem {
                         const isolver_scalar_t *const h,
                         isolver_scalar_t *const out) {
         for (auto &op : impl_->ops) {
+            printf("Calling apply on %s\n", op->name());
             if (op->apply(x, h, out)) {
                 return ISOLVER_FUNCTION_FAILURE;
             }
@@ -437,14 +465,15 @@ namespace sfem {
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
-    int Function::apply_constraints(isolver_scalar_t *const x) { 
-        for(auto &c : impl_->constraints) {
+    int Function::apply_constraints(isolver_scalar_t *const x) {
+        for (auto &c : impl_->constraints) {
             c->apply_constraints(x);
         }
-        return ISOLVER_FUNCTION_SUCCESS; }
+        return ISOLVER_FUNCTION_SUCCESS;
+    }
 
     int Function::apply_zero_constraints(isolver_scalar_t *const x) {
-        for(auto &c : impl_->constraints) {
+        for (auto &c : impl_->constraints) {
             c->apply_zero_constraints(x);
         }
         return ISOLVER_FUNCTION_SUCCESS;
@@ -452,7 +481,7 @@ namespace sfem {
 
     int Function::copy_constrained_dofs(const isolver_scalar_t *const src,
                                         isolver_scalar_t *const dest) {
-        for(auto &c : impl_->constraints) {
+        for (auto &c : impl_->constraints) {
             c->copy_constrained_dofs(src, dest);
         }
         return ISOLVER_FUNCTION_SUCCESS;
@@ -478,72 +507,6 @@ namespace sfem {
 
     int Function::initial_guess(isolver_scalar_t *const x) { return ISOLVER_FUNCTION_SUCCESS; }
 
-    class FunctionPtrOp final : public Op {
-    public:
-        using HessianCrs_t = std::function<int(const isolver_scalar_t *const,
-                                               const isolver_idx_t *const,
-                                               const isolver_idx_t *const,
-                                               isolver_scalar_t *const)>;
-
-        using Gradient_t =
-            std::function<int(const isolver_scalar_t *const, isolver_scalar_t *const)>;
-
-        using Apply_t = std::function<int(const isolver_scalar_t *const,
-                                          const isolver_scalar_t *const,
-                                          isolver_scalar_t *const)>;
-
-        using Value_t = std::function<int(const isolver_scalar_t *const, isolver_scalar_t *const)>;
-
-        using Report_t = std::function<int(const isolver_scalar_t *const)>;
-
-        HessianCrs_t hessian_crs_;
-        Gradient_t gradient_;
-        Apply_t apply_;
-        Value_t value_;
-        Report_t report_;
-
-        FunctionPtrOp(HessianCrs_t hessian_crs,
-                      Gradient_t gradient,
-                      Apply_t apply,
-                      Value_t value,
-                      Report_t report = Report_t())
-            : hessian_crs_(hessian_crs),
-              gradient_(gradient),
-              apply_(apply),
-              value_(value),
-              report_(report) {}
-
-        int hessian_crs(const isolver_scalar_t *const x,
-                        const isolver_idx_t *const rowptr,
-                        const isolver_idx_t *const colidx,
-                        isolver_scalar_t *const values) {
-            if (hessian_crs_) return hessian_crs_(x, rowptr, colidx, values);
-            return ISOLVER_FUNCTION_SUCCESS;
-        }
-
-        int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) {
-            if (gradient_) return gradient_(x, out);
-            return ISOLVER_FUNCTION_SUCCESS;
-        }
-
-        int apply(const isolver_scalar_t *const x,
-                  const isolver_scalar_t *const h,
-                  isolver_scalar_t *const out) {
-            if (apply_) return apply_(x, h, out);
-            return ISOLVER_FUNCTION_SUCCESS;
-        }
-
-        int value(const isolver_scalar_t *x, isolver_scalar_t *const out) {
-            if (value_) return value_(x, out);
-            return ISOLVER_FUNCTION_SUCCESS;
-        }
-
-        int report(const isolver_scalar_t *const x) {
-            if (report_) return report_(x);
-            return ISOLVER_FUNCTION_SUCCESS;
-        }
-    };
-
     class LinearElasticity final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
@@ -553,7 +516,7 @@ namespace sfem {
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            assert(mesh.spatial_dim == space.block_size());
+            assert(mesh->spatial_dim == space->block_size());
 
             auto ret = std::make_unique<LinearElasticity>(space);
 
@@ -567,6 +530,8 @@ namespace sfem {
             ret->lambda = SFEM_FIRST_LAME_PARAMETER;
             return ret;
         }
+
+        const char *name() const override { return "LinearElasticity"; }
 
         int initialize() override { return ISOLVER_FUNCTION_SUCCESS; }
 
@@ -649,10 +614,12 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace> space;
 
+        const char *name() const override { return "Laplacian"; }
+
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            assert(1 == space.block_size());
+            assert(1 == space->block_size());
 
             auto ret = std::make_unique<Laplacian>(space);
             return ret;
@@ -732,10 +699,12 @@ namespace sfem {
         std::shared_ptr<FunctionSpace> space;
         real_t *vel[3];
 
+        const char *name() const override { return "CVFEMConvection"; }
+
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            assert(1 == space.block_size());
+            assert(1 == space->block_size());
 
             const char *SFEM_VELX = nullptr;
             const char *SFEM_VELY = nullptr;
@@ -776,7 +745,6 @@ namespace sfem {
                                        (void **)&ret->vel[2],
                                        &nlocal,
                                        &nglobal)) {
-
                 fprintf(stderr, "Unable to read input velocity\n");
                 assert(0);
                 return nullptr;
@@ -875,32 +843,43 @@ namespace sfem {
         std::map<std::string, FactoryFunction> name_to_create;
     };
 
-    Factory::Factory() : impl_(std::make_unique<Impl>()) {
-        register_op("LinearElasticity", LinearElasticity::create);
-        register_op("Laplacian", Laplacian::create);
-        register_op("CVFEMConvection", CVFEMConvection::create);
-    }
+    Factory::Factory() : impl_(std::make_unique<Impl>()) {}
 
     Factory::~Factory() = default;
 
     Factory &Factory::instance() {
         static Factory instance_;
+        
+        if(instance_.impl_->name_to_create.empty()) {
+            instance_.private_register_op("LinearElasticity", LinearElasticity::create);
+            instance_.private_register_op("Laplacian", Laplacian::create);
+            instance_.private_register_op("CVFEMConvection", CVFEMConvection::create);
+        }
+
         return instance_;
     }
 
-    void Factory::register_op(const std::string &name, FactoryFunction factory_function) {
-        instance().impl_->name_to_create[name] = factory_function;
+    void Factory::private_register_op(const std::string &name, FactoryFunction factory_function)
+    {
+        impl_->name_to_create[name] = factory_function;
     }
 
-    std::unique_ptr<Op> Factory::create_op(const std::shared_ptr<FunctionSpace> &space,
+    void Factory::register_op(const std::string &name, FactoryFunction factory_function) {
+        instance().private_register_op(name, factory_function);
+    }
+
+    std::shared_ptr<Op> Factory::create_op(const std::shared_ptr<FunctionSpace> &space,
                                            const char *name) {
-        auto it = instance().impl_->name_to_create.find(name);
-        if (it == instance().impl_->name_to_create.end()) {
+        assert(instance().impl_);
+
+        auto &ntc = instance().impl_->name_to_create;
+        auto it = ntc.find(name);
+
+        if (it == ntc.end()) {
             std::cerr << "Unable to find op " << name << "\n";
             return nullptr;
         }
 
         return it->second(space);
     }
-
 }  // namespace sfem
