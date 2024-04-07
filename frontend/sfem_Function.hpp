@@ -151,6 +151,18 @@ namespace sfem {
                         const isolver_idx_t *const colidx,
                         isolver_scalar_t *const values) override;
 
+        void add_condition(const ptrdiff_t local_size,
+                           const ptrdiff_t global_size,
+                           isolver_idx_t *const idx,
+                           const int component,
+                           isolver_scalar_t *const values);
+
+        void add_condition(const ptrdiff_t local_size,
+                           const ptrdiff_t global_size,
+                           isolver_idx_t *const idx,
+                           const int component,
+                           const isolver_scalar_t value);
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;
@@ -204,6 +216,7 @@ namespace sfem {
         static void register_op(const std::string &name, FactoryFunction factory_function);
         static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,
                                              const char *name);
+
     private:
         static Factory &instance();
 

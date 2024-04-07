@@ -117,8 +117,7 @@ namespace sfem {
 
     int FunctionSpace::block_size() const { return impl_->block_size; }
 
-    ptrdiff_t FunctionSpace::n_dofs() const
-    {
+    ptrdiff_t FunctionSpace::n_dofs() const {
         auto &mesh = *impl_->mesh;
         auto c_mesh = &mesh.impl_->mesh;
         return c_mesh->nnodes * block_size();
@@ -293,13 +292,52 @@ namespace sfem {
         boundary_condition_t *dirichlet_conditions{nullptr};
     };
 
-    DirichletConditions::DirichletConditions(
-        const std::shared_ptr<FunctionSpace> &space)
+    DirichletConditions::DirichletConditions(const std::shared_ptr<FunctionSpace> &space)
         : impl_(std::make_unique<Impl>()) {
         impl_->space = space;
     }
 
     DirichletConditions::~DirichletConditions() = default;
+
+    void DirichletConditions::add_condition(const ptrdiff_t local_size,
+                                            const ptrdiff_t global_size,
+                                            isolver_idx_t *const idx,
+                                            const int component,
+                                            const isolver_scalar_t value) {
+        impl_->dirichlet_conditions = (boundary_condition_t *)realloc(
+            impl_->dirichlet_conditions,
+            (impl_->n_dirichlet_conditions + 1) * sizeof(boundary_condition_t));
+
+        boundary_condition_create(&impl_->dirichlet_conditions[impl_->n_dirichlet_conditions],
+                                  local_size,
+                                  global_size,
+                                  idx,
+                                  component,
+                                  value,
+                                  nullptr);
+
+        impl_->n_dirichlet_conditions++;
+    }
+
+    void DirichletConditions::add_condition(const ptrdiff_t local_size,
+                                            const ptrdiff_t global_size,
+                                            isolver_idx_t *const idx,
+                                            const int component,
+                                            isolver_scalar_t *const values) {
+        impl_->dirichlet_conditions = (boundary_condition_t *)realloc(
+            impl_->dirichlet_conditions,
+            (impl_->n_dirichlet_conditions + 1) * sizeof(boundary_condition_t));
+
+        boundary_condition_create(&impl_->dirichlet_conditions[impl_->n_dirichlet_conditions],
+                                  local_size,
+                                  global_size,
+                                  idx,
+                                  component,
+                                  0,
+                                  values);
+
+        impl_->n_dirichlet_conditions++;
+    }
 
     std::unique_ptr<DirichletConditions> DirichletConditions::create_from_env(
         const std::shared_ptr<FunctionSpace> &space) {
@@ -400,15 +438,15 @@ namespace sfem {
 
     Function::~Function() {}
 
-    void Function::add_operator(const std::shared_ptr<Op> &op) { 
+    void Function::add_operator(const std::shared_ptr<Op> &op) {
         printf("Adding operator %s\n", op->name());
-        impl_->ops.push_back(op); }
+        impl_->ops.push_back(op);
+    }
     void Function::add_constraint(const std::shared_ptr<Constraint> &c) {
         impl_->constraints.push_back(c);
     }
 
-    void Function::add_dirichlet_conditions(const std::shared_ptr<DirichletConditions> &c)
-    {
+    void Function::add_dirichlet_conditions(const std::shared_ptr<DirichletConditions> &c) {
         add_constraint(c);
     }
 
@@ -856,8 +894,8 @@ namespace sfem {
 
     Factory &Factory::instance() {
         static Factory instance_;
-        
-        if(instance_.impl_->name_to_create.empty()) {
+
+        if (instance_.impl_->name_to_create.empty()) {
             instance_.private_register_op("LinearElasticity", LinearElasticity::create);
             instance_.private_register_op("Laplacian", Laplacian::create);
             instance_.private_register_op("CVFEMConvection", CVFEMConvection::create);
@@ -866,8 +904,7 @@ namespace sfem {
         return instance_;
     }
 
-    void Factory::private_register_op(const std::string &name, FactoryFunction factory_function)
-    {
+    void Factory::private_register_op(const std::string &name, FactoryFunction factory_function) {
         impl_->name_to_create[name] = factory_function;
     }
 

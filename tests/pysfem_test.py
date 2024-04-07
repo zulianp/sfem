@@ -1,10 +1,17 @@
 import pysfem as s
 import numpy as np
 
+idx_t = np.int32
+
 def main():
 	s.init()
 	m = s.Mesh()
-	m.read('/Users/patrickzulian/Desktop/code/sfem/examples/mesh')
+
+	path = '/Users/patrickzulian/Desktop/code/sfem/examples/mesh'
+	m.read(path)
+
+	sinlet = np.fromfile(f'{path}/sidesets_aos/sinlet.raw', dtype=idx_t)
+	soutlet = np.fromfile(f'{path}/sidesets_aos/soutlet.raw', dtype=idx_t)
 
 	fs = s.FunctionSpace(m, 1)
 	fun = s.Function(fs)
@@ -13,6 +20,8 @@ def main():
 	fun.add_operator(op)
 
 	bc = s.DirichletConditions(fs)
+	s.add_condition(bc, sinlet, 0, -1);
+	s.add_condition(bc, soutlet, 0, 1);
 	# fun.add_constraint(bc)
 
 	x = np.linspace(0, 1, fs.n_dofs())

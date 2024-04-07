@@ -41,8 +41,7 @@ NB_MODULE(pysfem, m) {
     nb::class_<Function>(m, "Function")
         .def(nb::init<std::shared_ptr<FunctionSpace>>())
         .def("add_operator", &Function::add_operator)
-        .def("add_dirichlet_conditions",
-           &Function::add_dirichlet_conditions);
+        .def("add_dirichlet_conditions", &Function::add_dirichlet_conditions);
 
     m.def("apply",
           [](std::shared_ptr<Function> &fun,
@@ -55,17 +54,30 @@ NB_MODULE(pysfem, m) {
               fun->gradient(x.data(), y.data());
           });
 
-    m.def("apply_constraints",
-          [](std::shared_ptr<Function> &fun,
-             nb::ndarray<real_t> x) { fun->apply_constraints(x.data()); });
+    m.def("apply_constraints", [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x) {
+        fun->apply_constraints(x.data());
+    });
 
-    m.def("report_solution",
-          [](std::shared_ptr<Function> &fun,
-             nb::ndarray<real_t> x) { fun->report_solution(x.data()); });
+    m.def("report_solution", [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x) {
+        fun->report_solution(x.data());
+    });
 
-   // auto c = nb::class_<Constraint>(m, "Constraint")
-   //      .def(nb::init<std::shared_ptr<FunctionSpace>>());
+    // auto c = nb::class_<Constraint>(m, "Constraint")
+    //      .def(nb::init<std::shared_ptr<FunctionSpace>>());
 
     nb::class_<DirichletConditions>(m, "DirichletConditions")
         .def(nb::init<std::shared_ptr<FunctionSpace>>());
+
+    m.def("add_condition",
+          [](std::shared_ptr<DirichletConditions> &dc,
+              nb::ndarray<isolver_idx_t> idx,
+             const int component,
+             const isolver_scalar_t value) {
+              
+              size_t n = idx.shape(0);
+              auto c_idx = (idx_t *)malloc(n * sizeof(isolver_idx_t));
+              memcpy(c_idx, idx.data(), n * sizeof(isolver_idx_t));
+
+              dc->add_condition(n, n, c_idx, component, value);
+          });
 }
