@@ -42,6 +42,8 @@ namespace sfem {
         }
     };
 
+    int Mesh::spatial_dimension() const { return impl_->mesh.spatial_dim; }
+
     Mesh::Mesh() : impl_(std::make_unique<Impl>()) {
         impl_->comm = MPI_COMM_WORLD;
         mesh_init(&impl_->mesh);
@@ -187,7 +189,7 @@ namespace sfem {
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
-    class NeumannBoundaryConditions::Impl {
+    class NeumannConditions::Impl {
     public:
         std::shared_ptr<FunctionSpace> space;
 
@@ -205,18 +207,17 @@ namespace sfem {
         boundary_condition_t *neumann_conditions{nullptr};
     };
 
-    const char *NeumannBoundaryConditions::name() const { return "NeumannBoundaryConditions"; }
+    const char *NeumannConditions::name() const { return "NeumannConditions"; }
 
-    NeumannBoundaryConditions::NeumannBoundaryConditions(
-        const std::shared_ptr<FunctionSpace> &space)
+    NeumannConditions::NeumannConditions(const std::shared_ptr<FunctionSpace> &space)
         : impl_(std::make_unique<Impl>()) {
         impl_->space = space;
     }
 
-    std::unique_ptr<NeumannBoundaryConditions> NeumannBoundaryConditions::create_from_env(
+    std::unique_ptr<NeumannConditions> NeumannConditions::create_from_env(
         const std::shared_ptr<FunctionSpace> &space) {
         //
-        auto nc = std::make_unique<NeumannBoundaryConditions>(space);
+        auto nc = std::make_unique<NeumannConditions>(space);
 
         char *SFEM_NEUMANN_SIDESET = 0;
         char *SFEM_NEUMANN_VALUE = 0;
@@ -236,17 +237,16 @@ namespace sfem {
         return nc;
     }
 
-    NeumannBoundaryConditions::~NeumannBoundaryConditions() = default;
+    NeumannConditions::~NeumannConditions() = default;
 
-    int NeumannBoundaryConditions::hessian_crs(const isolver_scalar_t *const /*x*/,
-                                               const isolver_idx_t *const /*rowptr*/,
-                                               const isolver_idx_t *const /*colidx*/,
-                                               isolver_scalar_t *const /*values*/) {
+    int NeumannConditions::hessian_crs(const isolver_scalar_t *const /*x*/,
+                                       const isolver_idx_t *const /*rowptr*/,
+                                       const isolver_idx_t *const /*colidx*/,
+                                       isolver_scalar_t *const /*values*/) {
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
-    int NeumannBoundaryConditions::gradient(const isolver_scalar_t *const x,
-                                            isolver_scalar_t *const out) {
+    int NeumannConditions::gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) {
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
 
         for (int i = 0; i < impl_->n_neumann_conditions; i++) {
@@ -263,15 +263,66 @@ namespace sfem {
 
         return ISOLVER_FUNCTION_SUCCESS;
     }
-    int NeumannBoundaryConditions::apply(const isolver_scalar_t *const /*x*/,
-                                         const isolver_scalar_t *const /*h*/,
-                                         isolver_scalar_t *const /*out*/) {
+    int NeumannConditions::apply(const isolver_scalar_t *const /*x*/,
+                                 const isolver_scalar_t *const /*h*/,
+                                 isolver_scalar_t *const /*out*/) {
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
-    int NeumannBoundaryConditions::value(const isolver_scalar_t *x, isolver_scalar_t *const out) {
+    int NeumannConditions::value(const isolver_scalar_t *x, isolver_scalar_t *const out) {
         // TODO
         return ISOLVER_FUNCTION_SUCCESS;
+    }
+
+    void NeumannConditions::add_condition(const ptrdiff_t local_size,
+                                          const ptrdiff_t global_size,
+                                          isolver_idx_t *const idx,
+                                          const int component,
+                                          const isolver_scalar_t value) {
+        impl_->neumann_conditions = (boundary_condition_t *)realloc(
+            impl_->neumann_conditions,
+            (impl_->n_neumann_conditions + 1) * sizeof(boundary_condition_t));
+
+        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
+        enum ElemType stype = side_type((enum ElemType)mesh->element_type);
+        int nns = elem_num_nodes(stype);
+
+        assert((local_size / nns) * nns == local_size);
+        assert((global_size / nns) * nns == global_size);
+
+        boundary_condition_create(&impl_->neumann_conditions[impl_->n_neumann_conditions],
+                                  local_size / nns,
+                                  global_size / nns,
+                                  idx,
+                                  component,
+                                  value,
+                                  nullptr);
+
+        impl_->n_neumann_conditions++;
+    }
+
+    void NeumannConditions::add_condition(const ptrdiff_t local_size,
+                                          const ptrdiff_t global_size,
+                                          isolver_idx_t *const idx,
+                                          const int component,
+                                          isolver_scalar_t *const values) {
+        impl_->neumann_conditions = (boundary_condition_t *)realloc(
+            impl_->neumann_conditions,
+            (impl_->n_neumann_conditions + 1) * sizeof(boundary_condition_t));
+
+        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
+        enum ElemType stype = side_type((enum ElemType)mesh->element_type);
+        int nns = elem_num_sides(stype);
+
+        boundary_condition_create(&impl_->neumann_conditions[impl_->n_neumann_conditions],
+                                  local_size / nns,
+                                  global_size / nns,
+                                  idx,
+                                  component,
+                                  0,
+                                  values);
+
+        impl_->n_neumann_conditions++;
     }
 
     class DirichletConditions::Impl {
@@ -431,7 +482,7 @@ namespace sfem {
         : impl_(std::make_unique<Impl>()) {
         impl_->space = space;
 
-        const char *SFEM_OUTPUT_DIR = "./";
+        const char *SFEM_OUTPUT_DIR = ".";
         SFEM_READ_ENV(SFEM_OUTPUT_DIR, );
         impl_->output_dir = SFEM_OUTPUT_DIR;
     }
@@ -551,6 +602,11 @@ namespace sfem {
     }
 
     int Function::initial_guess(isolver_scalar_t *const x) { return ISOLVER_FUNCTION_SUCCESS; }
+
+    int Function::set_output_dir(const char *path) {
+        impl_->output_dir = path;
+        return ISOLVER_FUNCTION_SUCCESS;
+    }
 
     class LinearElasticity final : public Op {
     public:

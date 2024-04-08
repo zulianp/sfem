@@ -18,7 +18,7 @@ namespace sfem {
     class Op;
 
     class DirichletConditions;
-    class NeumannBoundaryConditions;
+    class NeumannConditions;
 
     class Mesh final {
     public:
@@ -28,11 +28,13 @@ namespace sfem {
 
         friend class FunctionSpace;
         friend class Op;
-        // friend class NeumannBoundaryConditions;
+        // friend class NeumannConditions;
 
         int read(const char *path);
         int initialize_node_to_node_graph();
         int convert_to_macro_element_mesh();
+
+        int spatial_dimension() const;
 
         const isolver_idx_t *node_to_node_rowptr() const;
         const isolver_idx_t *node_to_node_colidx() const;
@@ -93,15 +95,15 @@ namespace sfem {
         virtual ExecutionSpace execution_space() const { return EXECUTION_SPACE_HOST; }
     };
 
-    class NeumannBoundaryConditions final : public Op {
+    class NeumannConditions final : public Op {
     public:
-        static std::unique_ptr<NeumannBoundaryConditions> create_from_env(
+        static std::unique_ptr<NeumannConditions> create_from_env(
             const std::shared_ptr<FunctionSpace> &space);
 
         const char *name() const override;
 
-        NeumannBoundaryConditions(const std::shared_ptr<FunctionSpace> &space);
-        ~NeumannBoundaryConditions();
+        NeumannConditions(const std::shared_ptr<FunctionSpace> &space);
+        ~NeumannConditions();
 
         int hessian_crs(const isolver_scalar_t *const x,
                         const isolver_idx_t *const rowptr,
@@ -114,6 +116,18 @@ namespace sfem {
                   isolver_scalar_t *const out) override;
 
         int value(const isolver_scalar_t *x, isolver_scalar_t *const out) override;
+
+        void add_condition(const ptrdiff_t local_size,
+                           const ptrdiff_t global_size,
+                           isolver_idx_t *const idx,
+                           const int component,
+                           isolver_scalar_t *const values);
+
+        void add_condition(const ptrdiff_t local_size,
+                           const ptrdiff_t global_size,
+                           isolver_idx_t *const idx,
+                           const int component,
+                           const isolver_scalar_t value);
 
     private:
         class Impl;
@@ -202,6 +216,8 @@ namespace sfem {
         int copy_constrained_dofs(const isolver_scalar_t *const src, isolver_scalar_t *const dest);
         int report_solution(const isolver_scalar_t *const x);
         int initial_guess(isolver_scalar_t *const x);
+
+        int set_output_dir(const char *path);
 
     private:
         class Impl;
