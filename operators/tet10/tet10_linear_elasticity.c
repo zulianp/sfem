@@ -86,6 +86,8 @@ static SFEM_INLINE void tet10_linear_elasticity_apply_kernel_opt(
     const real_t qw,
     const real_t *const SFEM_RESTRICT u,
     real_t *const SFEM_RESTRICT element_vector) {
+
+    // This can be reduced with 1D products (ref_shape_grad_{x,y,z})
     real_t disp_grad[9];
     {
         const real_t x0 = 1.0 / jacobian_determinant;
@@ -154,10 +156,12 @@ static SFEM_INLINE void tet10_linear_elasticity_apply_kernel_opt(
         P_tXJinv_t[8] = adjugate[6]*x2 + adjugate[7]*x6 + adjugate[8]*x8;
     }
 
+    // Scale by quadrature weight
     for (int i = 0; i < 9; i++) {
         P_tXJinv_t[i] *= qw;
     }
 
+    // This can be reduced with 1D dot products (ref_shape_grad_{x,y,z})
     {
         const real_t x0 = 4*qx;
         const real_t x1 = 4*qy;
