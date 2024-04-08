@@ -32,7 +32,6 @@ NB_MODULE(pysfem, m) {
         .def("convert_to_macro_element_mesh", &Mesh::convert_to_macro_element_mesh)
         .def("spatial_dimension", &Mesh::spatial_dimension);
 
-
     nb::class_<FunctionSpace>(m, "FunctionSpace")
         .def(nb::init<std::shared_ptr<Mesh>>())
         .def(nb::init<std::shared_ptr<Mesh>, const int>())

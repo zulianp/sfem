@@ -12,7 +12,7 @@ def solve_poisson(options):
 
 	path = options.input_mesh
 	m.read(path)
-	m.convert_to_macro_element_mesh()
+	# m.convert_to_macro_element_mesh()
 
 	sinlet = np.fromfile(f'{path}/sidesets_aos/sinlet.raw', dtype=idx_t)
 	soutlet = np.fromfile(f'{path}/sidesets_aos/soutlet.raw', dtype=idx_t)
@@ -25,8 +25,14 @@ def solve_poisson(options):
 	fun.add_operator(op)
 
 	bc = s.DirichletConditions(fs)
-	s.add_condition(bc, sinlet, 0, 0.1);
-	s.add_condition(bc, soutlet, 0, -0.1);
+	s.add_condition(bc, sinlet, 0, 0.);
+	s.add_condition(bc, sinlet, 1, 0.);
+	s.add_condition(bc, sinlet, 2, 0.);
+
+	s.add_condition(bc, soutlet, 0, 0.1);
+	s.add_condition(bc, soutlet, 1, 0.);
+	s.add_condition(bc, soutlet, 2, 0.);
+
 	fun.add_dirichlet_conditions(bc)
 
 	# nc = s.NeumannConditions(fs)
@@ -39,8 +45,8 @@ def solve_poisson(options):
 	s.apply_constraints(fun, x)
 
 	tol = 1e-8
-	alpha = 0.01
-	max_it = 100000
+	alpha = 0.001
+	max_it = 1000000
 	for k in range(0, max_it):
 		g.fill(0)
 		s.gradient(fun, x, g)

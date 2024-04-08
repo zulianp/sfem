@@ -40,13 +40,25 @@ class GPULinearElasticityOp:
 
 		self.disp_grad_name = 'disp_grad'
 
-
 		mu, lmbda = sp.symbols('mu lambda', real=True)
 		disp_grad = sp.Matrix(dims, dims, coeffs(self.disp_grad_name, dims * dims))
 
 		self.eval_disp_grad  = sp.zeros(dims, dims)
 		for i in range(0, dims * fe.n_nodes()):
-			self.eval_disp_grad  += disp[i] * shape_grad[i]
+			self.eval_disp_grad += disp[i] * shape_grad_ref[i]
+		self.eval_disp_grad = self.eval_disp_grad * jac_inv
+
+		test_disp_grad = sp.zeros(dims, dims)
+		for i in range(0, dims * fe.n_nodes()):
+			test_disp_grad  += disp[i] * shape_grad[i]
+
+		for i in range(0, dims):
+			for j in range(0, dims):
+				self.eval_disp_grad[i, j] = sp.simplify(self.eval_disp_grad[i, j])
+
+				# Check
+				diff = sp.simplify(test_disp_grad[i, j] - self.eval_disp_grad[i, j])
+				assert diff == 0
 
 		# strain energy function
 		epsu = (disp_grad + disp_grad.T) / 2
