@@ -1,13 +1,16 @@
 import pysfem as s
 import numpy as np
+from numpy import linalg
+
+import sys, getopt
 
 idx_t = np.int32
 
-def main():
+def solve_poisson(options):
 	s.init()
 	m = s.Mesh()
 
-	path = '/Users/patrickzulian/Desktop/code/sfem/examples/mesh'
+	path = options.input_mesh
 	m.read(path)
 
 	sinlet = np.fromfile(f'{path}/sidesets_aos/sinlet.raw', dtype=idx_t)
@@ -15,24 +18,72 @@ def main():
 
 	fs = s.FunctionSpace(m, 1)
 	fun = s.Function(fs)
+	fun.set_output_dir(options.output_dir)
 
 	op = s.create_op(fs, "Laplacian")
 	fun.add_operator(op)
 
 	bc = s.DirichletConditions(fs)
 	s.add_condition(bc, sinlet, 0, -1);
-	s.add_condition(bc, soutlet, 0, 1);
-	# fun.add_constraint(bc)
+	fun.add_dirichlet_conditions(bc)
 
-	x = np.linspace(0, 1, fs.n_dofs())
-	y = np.zeros(fs.n_dofs())
-	
-	s.gradient(fun, x, y)
+	nc = s.NeumannConditions(fs)
+	s.add_condition(nc, soutlet, 0, 1)
+	fun.add_operator(nc)
+
+	x = np.zeros(fs.n_dofs())
+	g = np.zeros(fs.n_dofs())
+
 	s.apply_constraints(fun, x)
 
-	s.report_solution(fun, x)
+	alpha = 0.1
+	max_it = 1000000
+	for k in range(0, max_it):
+		g.fill(0)
+		s.gradient(fun, x, g)
+		s.apply_zero_constraints(fun, g)
 
-	print(y)
+		x -= alpha * g
+
+		norm_g = linalg.norm(g)
+		stop = norm_g < 1e-5
+		if np.mod(k, 100000) == 0 or stop:
+			val = s.value(fun, x)
+			print(f'{k}) v = {val}, norm(g) = {norm_g}')
+			s.report_solution(fun, x)
+
+		if stop:
+			break
+
+class Opts:
+	def __init__(self):
+		self.input_mesh = ''
+		self.output_dir = '.'
+
 
 if __name__ == '__main__':
-	main()
+	print(sys.argv)
+	if len(sys.argv) < 3:
+		print(f'usage: {sys.argv[0]} <input_mesh> <output.raw>')
+		exit(1)
+
+	options = Opts()
+	options.input_mesh = sys.argv[1]
+	options.output = sys.argv[2]
+	
+	try:
+	    opts, args = getopt.getopt(
+	        sys.argv[3:], "h",
+	        ["help"])
+
+	except getopt.GetoptError as err:
+	    print(err)
+	    print(usage)
+	    sys.exit(1)
+
+	for opt, arg in opts:
+	    if opt in ('-h', '--help'):
+	        print(usage)
+	        sys.exit()
+
+	solve_poisson(options)
