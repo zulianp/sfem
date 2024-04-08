@@ -86,6 +86,18 @@ class GPULinearElasticityOp:
 			self.eval_grad[i] = sp.simplify(self.eval_grad[i])
 			eval_grad[i] = inner(P, shape_grad[i])
 
+
+		# Trying to optimize the bilinear form 
+		P_tXJinv_t_sym =  matrix_coeff('P_tXJinv_t', dims, dims)
+		self.P_tXJinv_t_sym = P_tXJinv_t_sym
+
+		self.eval_grad_opt = sp.zeros(rows, 1)
+		for i in range(0, fe.n_nodes() * dims):
+			self.eval_grad_opt[i] = inner(P_tXJinv_t_sym, shape_grad_ref[i]) 
+			self.eval_grad_opt[i] = sp.simplify(self.eval_grad_opt[i])
+
+		# 
+
 		self.eval_hessian =  sp.zeros(rows, cols)
 		self.lin_stress = []
 
@@ -184,6 +196,20 @@ class GPULinearElasticityOp:
 		expr = assign_matrix('P', P)
 		return expr
 
+	def loperand(self):
+		P = self.P 
+
+		jac_inv = self.fe.symbol_jacobian_inverse_as_adjugate()
+		P_tXJinv_t = P.T * jac_inv.T * self.fe.symbol_jacobian_determinant()
+
+		dims = self.fe.manifold_dim()
+		for i in range(0, dims):
+			for j in range(0, dims):
+				P_tXJinv_t[i, j] = sp.simplify(P_tXJinv_t[i, j])
+
+		expr = assign_matrix('P_tXJinv_t', P_tXJinv_t)
+		return expr
+
 	def hessian(self):
 		H = self.eval_hessian
 		rows, cols = H.shape
@@ -235,6 +261,17 @@ class GPULinearElasticityOp:
 
 		return expr
 
+	def gradient_opt(self):
+		g = self.eval_grad_opt
+		rows, cols = g.shape
+
+		expr = []
+		for i in range(0, rows):
+			var = sp.symbols(f'element_vector[{i}*stride]')
+			expr.append(ast.Assignment(var, g[i]))
+
+		return expr
+
 	def value(self):
 		form = sp.symbols(f'element_scalar[0]')
 		return [ast.Assignment(form, self.eval_value)]
@@ -270,34 +307,44 @@ def main():
 	# op.hessian_check()
 
 
-	c_log("--------------------------")
-	c_log("geometry")	
-	c_log("--------------------------")
+	c_log("//--------------------------")
+	c_log("// geometry")	
+	c_log("//--------------------------")
 	
 	c_code(op.jacobian())
 	c_code(op.geometry())
 
 
-	c_log("--------------------------")
-	c_log("displacement_gradient")	
-	c_log("--------------------------")
+	c_log("//--------------------------")
+	c_log("// displacement_gradient")	
+	c_log("//--------------------------")
 	c_code(op.displacement_gradient())
 
-	c_log("--------------------------")
-	c_log("Piola")	
-	c_log("--------------------------")
+	c_log("//--------------------------")
+	c_log("// Piola")	
+	c_log("//--------------------------")
 	c_code(op.first_piola())
 
-
-	c_log("--------------------------")
-	c_log("gradient")
-	c_log("--------------------------")
+	c_log("//--------------------------")
+	c_log("// gradient")
+	c_log("//--------------------------")
 	c_code(op.gradient())
 
 
-	c_log("--------------------------")
-	c_log("value")
-	c_log("--------------------------")
+
+	c_log("//--------------------------")
+	c_log("// loperand")	
+	c_log("//--------------------------")
+	c_code(op.loperand())
+
+	c_log("//--------------------------")
+	c_log("// gradient_opt")
+	c_log("//--------------------------")
+	c_code(op.gradient_opt())
+
+	c_log("//--------------------------")
+	c_log("// value")
+	c_log("//--------------------------")
 	c_code(op.value())
 
 	# c_log("--------------------------")

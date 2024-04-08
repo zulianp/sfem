@@ -196,7 +196,9 @@ static SFEM_INLINE void tet4_linear_elasticity_apply_kernel_opt(
         disp_grad[8] = x0 * (-adjugate[2] * x10 + adjugate[5] * x8 + adjugate[8] * x9);
     }
 
-    // We can reuse the buffer to avoid additional register usage
+// Which one is better?
+#if 0
+    We can reuse the buffer to avoid additional register usage
     real_t *P = disp_grad;
     {
         const real_t x0 = (1.0 / 3.0) * mu;
@@ -238,6 +240,52 @@ static SFEM_INLINE void tet4_linear_elasticity_apply_kernel_opt(
         outz[2] = P[6] * adjugate[3] + P[7] * adjugate[4] + P[8] * adjugate[5];
         outz[3] = P[6] * adjugate[6] + P[7] * adjugate[7] + P[8] * adjugate[8];
     }
+
+#else
+    //--------------------------
+    // loperand
+    //--------------------------
+    // We can reuse the buffer to avoid additional register usage
+    real_t *P_tXJinv_t = disp_grad;
+    {
+       const real_t x0 = (1.0/6.0)*mu;
+       const real_t x1 = x0*(disp_grad[1] + disp_grad[3]);
+       const real_t x2 = x0*(disp_grad[2] + disp_grad[6]);
+       const real_t x3 = 2*mu;
+       const real_t x4 = lambda*(disp_grad[0] + disp_grad[4] + disp_grad[8]);
+       const real_t x5 = (1.0/6.0)*disp_grad[0]*x3 + (1.0/6.0)*x4;
+       const real_t x6 = x0*(disp_grad[5] + disp_grad[7]);
+       const real_t x7 = (1.0/6.0)*disp_grad[4]*x3 + (1.0/6.0)*x4;
+       const real_t x8 = (1.0/6.0)*disp_grad[8]*x3 + (1.0/6.0)*x4;
+       P_tXJinv_t[0] = adjugate[0]*x5 + adjugate[1]*x1 + adjugate[2]*x2;
+       P_tXJinv_t[1] = adjugate[3]*x5 + adjugate[4]*x1 + adjugate[5]*x2;
+       P_tXJinv_t[2] = adjugate[6]*x5 + adjugate[7]*x1 + adjugate[8]*x2;
+       P_tXJinv_t[3] = adjugate[0]*x1 + adjugate[1]*x7 + adjugate[2]*x6;
+       P_tXJinv_t[4] = adjugate[3]*x1 + adjugate[4]*x7 + adjugate[5]*x6;
+       P_tXJinv_t[5] = adjugate[6]*x1 + adjugate[7]*x7 + adjugate[8]*x6;
+       P_tXJinv_t[6] = adjugate[0]*x2 + adjugate[1]*x6 + adjugate[2]*x8;
+       P_tXJinv_t[7] = adjugate[3]*x2 + adjugate[4]*x6 + adjugate[5]*x8;
+       P_tXJinv_t[8] = adjugate[6]*x2 + adjugate[7]*x6 + adjugate[8]*x8;
+    }
+    //--------------------------
+    // gradient_opt
+    //--------------------------
+    {
+        outx[0] = -P_tXJinv_t[0] - P_tXJinv_t[1] - P_tXJinv_t[2];
+        outx[1] = P_tXJinv_t[0];
+        outx[2] = P_tXJinv_t[1];
+        outx[3] = P_tXJinv_t[2];
+        outy[0] = -P_tXJinv_t[3] - P_tXJinv_t[4] - P_tXJinv_t[5];
+        outy[1] = P_tXJinv_t[3];
+        outy[2] = P_tXJinv_t[4];
+        outy[3] = P_tXJinv_t[5];
+        outz[0] = -P_tXJinv_t[6] - P_tXJinv_t[7] - P_tXJinv_t[8];
+        outz[1] = P_tXJinv_t[6];
+        outz[2] = P_tXJinv_t[7];
+        outz[3] = P_tXJinv_t[8];
+    }
+#endif
+
 }
 
 void macro_tet4_linear_elasticity_init(linear_elasticity_t *const ctx,

@@ -45,8 +45,8 @@ def solve_poisson(options):
 	s.apply_constraints(fun, x)
 
 	tol = 1e-8
-	alpha = 0.001
-	max_it = 1000000
+	alpha = 0.01
+	max_it = 100000
 	for k in range(0, max_it):
 		g.fill(0)
 		s.gradient(fun, x, g)
