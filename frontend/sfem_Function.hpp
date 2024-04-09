@@ -86,6 +86,9 @@ namespace sfem {
                                 const isolver_idx_t *const colidx,
                                 isolver_scalar_t *const values) = 0;
 
+        virtual int hessian_diag(const isolver_scalar_t *const /*x*/,
+                                 isolver_scalar_t *const /*values*/) { return ISOLVER_FUNCTION_FAILURE;}
+
         virtual int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) = 0;
         virtual int apply(const isolver_scalar_t *const x,
                           const isolver_scalar_t *const h,
@@ -219,7 +222,7 @@ namespace sfem {
         int value(const isolver_scalar_t *x, isolver_scalar_t *const out);
 
         int apply_constraints(isolver_scalar_t *const x);
-        int constraints_gradient(isolver_scalar_t *const x, isolver_scalar_t *const g);
+        int constraints_gradient(const isolver_scalar_t *const x, isolver_scalar_t *const g);
         int apply_zero_constraints(isolver_scalar_t *const x);
         int copy_constrained_dofs(const isolver_scalar_t *const src, isolver_scalar_t *const dest);
         int report_solution(const isolver_scalar_t *const x);

@@ -9,6 +9,8 @@
 #include "sfem_Function.hpp"
 #include "sfem_base.h"
 
+#include "sfem_cg.hpp"
+
 namespace nb = nanobind;
 
 void SFEM_init() {
@@ -60,21 +62,23 @@ NB_MODULE(pysfem, m) {
           });
 
     m.def("gradient",
-          [](std::shared_ptr<Function> &fun, nb::ndarray<isolver_scalar_t> x, nb::ndarray<isolver_scalar_t> y) {
-              fun->gradient(x.data(), y.data());
-          });
+          [](std::shared_ptr<Function> &fun,
+             nb::ndarray<isolver_scalar_t> x,
+             nb::ndarray<isolver_scalar_t> y) { fun->gradient(x.data(), y.data()); });
 
     m.def("apply_constraints", [](std::shared_ptr<Function> &fun, nb::ndarray<isolver_scalar_t> x) {
         fun->apply_constraints(x.data());
     });
 
-    m.def("apply_zero_constraints", [](std::shared_ptr<Function> &fun, nb::ndarray<isolver_scalar_t> x) {
-        fun->apply_zero_constraints(x.data());
-    });
+    m.def("apply_zero_constraints",
+          [](std::shared_ptr<Function> &fun, nb::ndarray<isolver_scalar_t> x) {
+              fun->apply_zero_constraints(x.data());
+          });
 
-    m.def("constraints_gradient", [](std::shared_ptr<Function> &fun, nb::ndarray<isolver_scalar_t> x, nb::ndarray<isolver_scalar_t> g) {
-        fun->constraints_gradient(x.data(), g.data());
-    });
+    m.def("constraints_gradient",
+          [](std::shared_ptr<Function> &fun,
+             nb::ndarray<isolver_scalar_t> x,
+             nb::ndarray<isolver_scalar_t> g) { fun->constraints_gradient(x.data(), g.data()); });
 
     m.def("report_solution", [](std::shared_ptr<Function> &fun, nb::ndarray<isolver_scalar_t> x) {
         fun->report_solution(x.data());
@@ -108,5 +112,35 @@ NB_MODULE(pysfem, m) {
               memcpy(c_idx, idx.data(), n * sizeof(isolver_idx_t));
 
               nc->add_condition(n, n, c_idx, component, value);
+          });
+
+    using Operator_t = Operator<isolver_scalar_t>;
+
+    nb::class_<Operator_t>(m, "Operator");
+    m.def("make_op",
+          [](std::shared_ptr<Function> &fun,
+             nb::ndarray<isolver_scalar_t> u) -> std::shared_ptr<Operator_t> {
+              auto ret = std::make_shared<Operator_t>();
+
+              ret->apply = [=](const isolver_scalar_t *const x, isolver_scalar_t *const y) {
+                  fun->apply(u.data(), x, y);
+              };
+
+              return ret;
+          });
+
+    using ConjugateGradient_t = sfem::ConjugateGradient<isolver_scalar_t>;
+
+    nb::class_<ConjugateGradient_t>(m, "ConjugateGradient")
+        .def(nb::init<>())
+        .def("default_init", &ConjugateGradient_t::default_init)
+        .def("set_op", &ConjugateGradient_t::set_op);
+
+    m.def("apply",
+          [](std::shared_ptr<ConjugateGradient_t> &cg,
+             nb::ndarray<isolver_scalar_t> x,
+             nb::ndarray<isolver_scalar_t> y) {
+              size_t n = x.shape(0);
+              cg->apply(n, x.data(), y.data());
           });
 }

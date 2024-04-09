@@ -37,23 +37,36 @@ def solve_poisson(options):
 	g = np.zeros(fs.n_dofs())
 
 	alpha = 0.1
-	max_it = 1000000
+	max_it = 10000
 	for k in range(0, max_it):
 		g.fill(0)
 		s.gradient(fun, x, g)
-		s.constraints_gradient(fun, x, g)
-
+		
 		x -= alpha * g
 
 		norm_g = linalg.norm(g)
 		stop = norm_g < 1e-5
-		if np.mod(k, 100000) == 0 or stop:
+		if np.mod(k, 1000) == 0 or stop:
 			val = s.value(fun, x)
 			print(f'{k}) v = {val}, norm(g) = {norm_g}')
 			s.report_solution(fun, x)
 
 		if stop:
 			break
+
+	# cg = s.ConjugateGradient()
+	# cg.default_init()
+	
+	# lop = s.make_op(fun, x)
+	# cg.set_op(lop)
+
+	# g.fill(0)
+	# s.gradient(fun, x, g)
+	# g = -g
+
+	# c = np.zeros(fs.n_dofs())
+	# s.apply(cg, g, c)
+	# x += c
 
 class Opts:
 	def __init__(self):

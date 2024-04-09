@@ -553,6 +553,8 @@ namespace sfem {
         std::vector<std::shared_ptr<Constraint>> constraints;
         std::string output_dir;
         Timings timings;
+
+        bool handle_constraints{true};
     };
 
     Function::Function(const std::shared_ptr<FunctionSpace> &space)
@@ -608,6 +610,12 @@ namespace sfem {
             }
         }
 
+        if(impl_->handle_constraints) {
+            for(auto &c : impl_->constraints) {
+                c->hessian_crs(x, rowptr, colidx, values);
+            }
+        }
+
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
@@ -618,6 +626,10 @@ namespace sfem {
             if (op->gradient(x, out)) {
                 return ISOLVER_FUNCTION_FAILURE;
             }
+        }
+
+        if(impl_->handle_constraints) {
+            constraints_gradient(x, out);
         }
 
         return ISOLVER_FUNCTION_SUCCESS;
@@ -632,6 +644,10 @@ namespace sfem {
             if (op->apply(x, h, out)) {
                 return ISOLVER_FUNCTION_FAILURE;
             }
+        }
+
+        if(impl_->handle_constraints) {
+            copy_constrained_dofs(h, out);
         }
 
         return ISOLVER_FUNCTION_SUCCESS;
@@ -658,7 +674,7 @@ namespace sfem {
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
-    int Function::constraints_gradient(isolver_scalar_t *const x, isolver_scalar_t *const g) {
+    int Function::constraints_gradient(const isolver_scalar_t *const x, isolver_scalar_t *const g) {
         SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.constraints_gradient);
 
         for (auto &c : impl_->constraints) {
@@ -1148,6 +1164,7 @@ namespace sfem {
             instance_.private_register_op("LinearElasticity", LinearElasticity::create);
             instance_.private_register_op("Laplacian", Laplacian::create);
             instance_.private_register_op("CVFEMConvection", CVFEMConvection::create);
+            instance_.private_register_op("Mass", Mass::create);
         }
 
         return instance_;
