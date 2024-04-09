@@ -69,9 +69,7 @@ def solve_poisson(options):
 	c = np.zeros(fs.n_dofs())
 	s.apply(cg, g, c)
 	x -= c
-
-	g.fill(0)
-	s.gradient(fun, x, g)
+	
 	s.report_solution(fun, x)
 
 class Opts:

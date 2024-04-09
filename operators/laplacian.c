@@ -28,6 +28,7 @@ void laplacian_assemble_value(int element_type,
             break;
         }
         default: {
+            assert(0);
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
     }
@@ -49,7 +50,12 @@ void laplacian_assemble_gradient(int element_type,
             tet10_laplacian_assemble_gradient(nelements, nnodes, elems, xyz, u, values);
             break;
         }
+        case MACRO_TET4: {
+            macro_tet4_laplacian_apply(nelements, nnodes, elems, xyz, u, values);
+            break;
+        }
         default: {
+            assert(0);
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
     }
@@ -81,6 +87,7 @@ void laplacian_assemble_hessian(int element_type,
             break;
         }
         default: {
+            assert(0);
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
     }

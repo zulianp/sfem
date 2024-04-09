@@ -34,6 +34,12 @@ NB_MODULE(pysfem, m) {
         .def("convert_to_macro_element_mesh", &Mesh::convert_to_macro_element_mesh)
         .def("spatial_dimension", &Mesh::spatial_dimension);
 
+        // return nb::ndarray<nb::numpy, const float, nb::shape<2, -1>>(
+        //            /* data = */ data,
+        //            /* ndim = */ 2,
+        //            /* shape pointer = */ shape,
+        //            /* owner = */ nb::handle());
+
     nb::class_<FunctionSpace>(m, "FunctionSpace")
         .def(nb::init<std::shared_ptr<Mesh>>())
         .def(nb::init<std::shared_ptr<Mesh>, const int>())
@@ -123,6 +129,7 @@ NB_MODULE(pysfem, m) {
               auto ret = std::make_shared<Operator_t>();
 
               ret->apply = [=](const isolver_scalar_t *const x, isolver_scalar_t *const y) {
+                  memset(y, 0, u.shape(0) * sizeof(isolver_scalar_t));
                   fun->apply(u.data(), x, y);
               };
 
@@ -134,7 +141,8 @@ NB_MODULE(pysfem, m) {
     nb::class_<ConjugateGradient_t>(m, "ConjugateGradient")
         .def(nb::init<>())
         .def("default_init", &ConjugateGradient_t::default_init)
-        .def("set_op", &ConjugateGradient_t::set_op);
+        .def("set_op", &ConjugateGradient_t::set_op)
+        .def("set_max_it", &ConjugateGradient_t::set_max_it);
 
     m.def("apply",
           [](std::shared_ptr<ConjugateGradient_t> &cg,

@@ -42,6 +42,11 @@ namespace sfem {
             apply_op = op.apply;
         }
 
+        void set_max_it(const int it)
+        {
+            max_it = it;
+        }
+
         void set_preconditioner(std::function<void(const T* const, T* const)> &&in)
         {
             preconditioner_op = in;
