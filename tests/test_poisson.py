@@ -73,7 +73,6 @@ class Opts:
 		self.input_mesh = ''
 		self.output_dir = '.'
 
-
 if __name__ == '__main__':
 	print(sys.argv)
 	if len(sys.argv) < 3:
