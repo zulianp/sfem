@@ -16,6 +16,8 @@ PATH=$SCRIPTPATH/../python/sfem/mesh:$PATH
 PATH=$SCRIPTPATH/../data/benchmarks/meshes:$PATH
 PATH=$SCRIPTPATH/../../matrix.io:$PATH
 
+export OMP_NUM_THREADS=8
+export OMP_PROC_BIND=true
 
 if [[ $# -lt 1 ]]
 then
@@ -25,9 +27,10 @@ fi
 mesh=$1
 
 source $SCRIPTPATH/../venv/bin/activate
+export PATH=$PWD:$PATH
 
 # FIXME
-cp $SCRIPTPATH/test_linear_elasticity.py ./
+# cp $SCRIPTPATH/test_linear_elasticity.py ./
 
 mkdir -p output
 python3 test_linear_elasticity.py $mesh output

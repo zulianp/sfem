@@ -18,6 +18,7 @@
 #include <iostream>
 #include <map>
 #include <vector>
+#include <fstream>
 
 // Ops
 
@@ -470,12 +471,80 @@ namespace sfem {
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
+    class Timings {
+    public:
+        static double tick()
+        {
+            return MPI_Wtime();
+        }
+
+        class Scoped {
+        public:
+            double tick_{0};
+            double *value_;
+            Scoped(double *value)
+            :value_(value)
+            {
+                tick_ = tick();
+            }
+
+            ~Scoped()
+            {
+                *value_ += tick() - tick_;
+            }
+        };
+
+        double create_crs_graph{0};
+        double destroy_crs_graph{0};
+        double hessian_crs{0};
+        double gradient{0};
+        double apply{0};
+        double value{0};
+        double apply_constraints{0};
+        double apply_zero_constraints{0};
+        double copy_constrained_dofs{0};
+        double report_solution{0};
+        double initial_guess{0};
+
+        void clear() {
+            create_crs_graph = 0;
+            destroy_crs_graph = 0;
+            hessian_crs = 0;
+            gradient = 0;
+            apply = 0;
+            value = 0;
+            apply_constraints = 0;
+            apply_zero_constraints = 0;
+            copy_constrained_dofs = 0;
+            report_solution = 0;
+            initial_guess = 0;
+        }
+
+        void describe(std::ostream &os) const {
+            os << "function,seconds\n";
+            os << "create_crs_graph," << create_crs_graph << "\n";
+            os << "destroy_crs_graph," << destroy_crs_graph << "\n";
+            os << "hessian_crs," << hessian_crs << "\n";
+            os << "gradient," << gradient << "\n";
+            os << "apply," << apply << "\n";
+            os << "value," << value << "\n";
+            os << "apply_constraints," << apply_constraints << "\n";
+            os << "apply_zero_constraints," << apply_zero_constraints << "\n";
+            os << "copy_constrained_dofs," << copy_constrained_dofs << "\n";
+            os << "report_solution," << report_solution << "\n";
+            os << "initial_guess," << initial_guess << "\n";
+        }
+    };
+
+    #define SFEM_FUNCTION_SCOPED_TIMING(acc) Timings::Scoped scoped_(&(acc))
+
     class Function::Impl {
     public:
         std::shared_ptr<FunctionSpace> space;
         std::vector<std::shared_ptr<Op>> ops;
         std::vector<std::shared_ptr<Constraint>> constraints;
         std::string output_dir;
+        Timings timings;
     };
 
     Function::Function(const std::shared_ptr<FunctionSpace> &space)
@@ -487,7 +556,14 @@ namespace sfem {
         impl_->output_dir = SFEM_OUTPUT_DIR;
     }
 
-    Function::~Function() {}
+    Function::~Function() {
+        std::ofstream os;
+        os.open("perf.csv");
+        if(!os.good()) return;
+
+        impl_->timings.describe(os);
+        os.close();
+    }
 
     void Function::add_operator(const std::shared_ptr<Op> &op) {
         printf("Adding operator %s\n", op->name());
@@ -506,6 +582,9 @@ namespace sfem {
                                    ptrdiff_t *nnz,
                                    isolver_idx_t **rowptr,
                                    isolver_idx_t **colidx) {
+
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.create_crs_graph);
+
         return impl_->space->create_crs_graph(nlocal, nglobal, nnz, rowptr, colidx);
     }
 
@@ -517,6 +596,8 @@ namespace sfem {
                               const isolver_idx_t *const rowptr,
                               const isolver_idx_t *const colidx,
                               isolver_scalar_t *const values) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.hessian_crs);
+
         for (auto &op : impl_->ops) {
             if (op->hessian_crs(x, rowptr, colidx, values)) {
                 return ISOLVER_FUNCTION_FAILURE;
@@ -527,6 +608,8 @@ namespace sfem {
     }
 
     int Function::gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.gradient);
+
         for (auto &op : impl_->ops) {
             if (op->gradient(x, out)) {
                 return ISOLVER_FUNCTION_FAILURE;
@@ -539,6 +622,8 @@ namespace sfem {
     int Function::apply(const isolver_scalar_t *const x,
                         const isolver_scalar_t *const h,
                         isolver_scalar_t *const out) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.apply);
+
         for (auto &op : impl_->ops) {
             printf("Calling apply on %s\n", op->name());
             if (op->apply(x, h, out)) {
@@ -550,6 +635,8 @@ namespace sfem {
     }
 
     int Function::value(const isolver_scalar_t *x, isolver_scalar_t *const out) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.value);
+
         for (auto &op : impl_->ops) {
             if (op->value(x, out)) {
                 return ISOLVER_FUNCTION_FAILURE;
@@ -560,6 +647,8 @@ namespace sfem {
     }
 
     int Function::apply_constraints(isolver_scalar_t *const x) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.apply_constraints);
+
         for (auto &c : impl_->constraints) {
             c->apply_constraints(x);
         }
@@ -567,6 +656,8 @@ namespace sfem {
     }
 
     int Function::apply_zero_constraints(isolver_scalar_t *const x) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.apply_zero_constraints);
+
         for (auto &c : impl_->constraints) {
             c->apply_zero_constraints(x);
         }
@@ -575,6 +666,8 @@ namespace sfem {
 
     int Function::copy_constrained_dofs(const isolver_scalar_t *const src,
                                         isolver_scalar_t *const dest) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.copy_constrained_dofs);
+
         for (auto &c : impl_->constraints) {
             c->copy_constrained_dofs(src, dest);
         }

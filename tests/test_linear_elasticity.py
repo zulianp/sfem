@@ -6,7 +6,7 @@ import sys, getopt
 
 idx_t = np.int32
 
-def solve_poisson(options):
+def solve_linear_elasticity(options):
 	s.init()
 	m = s.Mesh()
 
@@ -44,7 +44,7 @@ def solve_poisson(options):
 
 	s.apply_constraints(fun, x)
 
-	tol = 1e-8
+	tol = 1e-5
 	alpha = 0.01
 	max_it = 100000
 	for k in range(0, max_it):
@@ -94,4 +94,4 @@ if __name__ == '__main__':
 	        print(usage)
 	        sys.exit()
 
-	solve_poisson(options)
+	solve_linear_elasticity(options)
