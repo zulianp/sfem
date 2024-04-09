@@ -32,38 +32,33 @@ def solve_linear_elasticity(options):
 	s.add_condition(bc, sinlet, 1, 0.);
 	s.add_condition(bc, sinlet, 2, 0.);
 
-	s.add_condition(bc, soutlet, 0, 1);
+	# s.add_condition(bc, soutlet, 0, 1);
 	# s.add_condition(bc, soutlet, 1, 0.);
 	# s.add_condition(bc, soutlet, 2, 0.);
 
 	fun.add_dirichlet_conditions(bc)
 
-	# nc = s.NeumannConditions(fs)
-	# s.add_condition(nc, soutlet, 0, 1)
-	# fun.add_operator(nc)
+	nc = s.NeumannConditions(fs)
+	s.add_condition(nc, soutlet, 0, 1)
+	fun.add_operator(nc)
 
 	x = np.zeros(fs.n_dofs())
+	cg = s.ConjugateGradient()
+	cg.default_init()
+	cg.set_max_it(3000)
+
+	lop = s.make_op(fun, x)
+	cg.set_op(lop)
+	
 	g = np.zeros(fs.n_dofs())
+	s.gradient(fun, x, g)
+	c = np.zeros(fs.n_dofs())
+	s.apply(cg, g, c)
+	x -= c
 
-	tol = 1e-5
-	alpha = 0.2
-	max_it = 10000
-	for k in range(0, max_it):
-		g.fill(0)
-		s.gradient(fun, x, g)
-		s.constraints_gradient(fun, x, g)
-
-		x -= alpha * g
-
-		norm_g = linalg.norm(g)
-		stop = norm_g < tol or k == max_it - 1 
-		if np.mod(k, 100000) == 0 or stop:
-			# val = s.value(fun, x)
-			print(f'{k}) norm(g) = {norm_g}')
-			s.report_solution(fun, x)
-
-		if stop:
-			break
+	g.fill(0)
+	s.gradient(fun, x, g)
+	s.report_solution(fun, x)
 
 class Opts:
 	def __init__(self):

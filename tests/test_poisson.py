@@ -8,12 +8,33 @@ import sys, getopt
 
 idx_t = np.int32
 
+def gradient_descent(fun, x):
+	g = np.zeros(fs.n_dofs())
+
+	alpha = 0.1
+	max_it = 1
+	for k in range(0, max_it):
+		g.fill(0)
+		s.gradient(fun, x, g)
+		
+		x -= alpha * g
+
+		norm_g = linalg.norm(g)
+		stop = norm_g < 1e-5
+		if np.mod(k, 1000) == 0 or stop:
+			val = s.value(fun, x)
+			print(f'{k}) v = {val}, norm(g) = {norm_g}')
+			
+		if stop:
+			break
+	return x
+
 def solve_poisson(options):
 	s.init()
 	m = s.Mesh()
-
 	path = options.input_mesh
 	m.read(path)
+	m.convert_to_macro_element_mesh()
 
 	sinlet = np.fromfile(f'{path}/sidesets_aos/sinlet.raw', dtype=idx_t)
 	soutlet = np.fromfile(f'{path}/sidesets_aos/soutlet.raw', dtype=idx_t)
@@ -27,6 +48,7 @@ def solve_poisson(options):
 
 	bc = s.DirichletConditions(fs)
 	s.add_condition(bc, sinlet, 0, -1);
+	# s.add_condition(bc, soutlet, 0, 1);
 	fun.add_dirichlet_conditions(bc)
 
 	nc = s.NeumannConditions(fs)
@@ -34,39 +56,23 @@ def solve_poisson(options):
 	fun.add_operator(nc)
 
 	x = np.zeros(fs.n_dofs())
-	g = np.zeros(fs.n_dofs())
-
-	alpha = 0.1
-	max_it = 10000
-	for k in range(0, max_it):
-		g.fill(0)
-		s.gradient(fun, x, g)
-		
-		x -= alpha * g
-
-		norm_g = linalg.norm(g)
-		stop = norm_g < 1e-5
-		if np.mod(k, 1000) == 0 or stop:
-			val = s.value(fun, x)
-			print(f'{k}) v = {val}, norm(g) = {norm_g}')
-			s.report_solution(fun, x)
-
-		if stop:
-			break
-
-	# cg = s.ConjugateGradient()
-	# cg.default_init()
 	
-	# lop = s.make_op(fun, x)
-	# cg.set_op(lop)
+	cg = s.ConjugateGradient()
+	cg.default_init()
+	cg.set_max_it(3000)
 
-	# g.fill(0)
-	# s.gradient(fun, x, g)
-	# g = -g
+	lop = s.make_op(fun, x)
+	cg.set_op(lop)
+	
+	g = np.zeros(fs.n_dofs())
+	s.gradient(fun, x, g)
+	c = np.zeros(fs.n_dofs())
+	s.apply(cg, g, c)
+	x -= c
 
-	# c = np.zeros(fs.n_dofs())
-	# s.apply(cg, g, c)
-	# x += c
+	g.fill(0)
+	s.gradient(fun, x, g)
+	s.report_solution(fun, x)
 
 class Opts:
 	def __init__(self):
