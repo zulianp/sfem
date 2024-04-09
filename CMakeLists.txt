@@ -137,6 +137,11 @@ endforeach()
 #     include(benchmarks/benchmarks.cmake)
 # endif()
 
+if(SFEM_ENABLE_PYTHON)
+    add_subdirectory(python/bindings)
+    set(SFEM_TARGETS ${SFEM_TARGETS} pysfem)
+endif()
+
 ######################################################
 ######################################################
 ######################################################
@@ -182,9 +187,7 @@ install(
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/python/sfem DESTINATION scripts)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/python/requirements.txt DESTINATION scripts)
 
-if(SFEM_ENABLE_PYTHON)
-    add_subdirectory(python/bindings)
-endif()
+
 
 
 ######################################################

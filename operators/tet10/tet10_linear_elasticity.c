@@ -75,7 +75,67 @@ static SFEM_INLINE void adjugate_and_det_micro_kernel(const geom_t px0,
                               jacobian[6] * x3 - jacobian[6] * x4;
 }
 
-static SFEM_INLINE void tet10_linear_elasticity_apply_kernel_opt(
+static SFEM_INLINE void ref_shape_grad_x(const real_t qx,
+                                         const real_t qy,
+                                         const real_t qz,
+                                         real_t *const out) {
+    const real_t x0 = 4 * qx;
+    const real_t x1 = 4 * qy;
+    const real_t x2 = 4 * qz;
+    const real_t x3 = x1 + x2;
+    out[0] = x0 + x3 - 3;
+    out[1] = x0 - 1;
+    out[2] = 0;
+    out[3] = 0;
+    out[4] = -8 * qx - x3 + 4;
+    out[5] = x1;
+    out[6] = -x1;
+    out[7] = -x2;
+    out[8] = x2;
+    out[9] = 0;
+}
+
+static SFEM_INLINE void ref_shape_grad_y(const real_t qx,
+                                         const real_t qy,
+                                         const real_t qz,
+                                         real_t *const out) {
+    const real_t x0 = 4 * qy;
+    const real_t x1 = 4 * qx;
+    const real_t x2 = 4 * qz;
+    const real_t x3 = x1 + x2;
+    out[0] = x0 + x3 - 3;
+    out[1] = 0;
+    out[2] = x0 - 1;
+    out[3] = 0;
+    out[4] = -x1;
+    out[5] = x1;
+    out[6] = -8 * qy - x3 + 4;
+    out[7] = -x2;
+    out[8] = 0;
+    out[9] = x2;
+}
+
+static SFEM_INLINE void ref_shape_grad_z(const real_t qx,
+                                         const real_t qy,
+                                         const real_t qz,
+                                         real_t *const out) {
+    const real_t x0 = 4 * qz;
+    const real_t x1 = 4 * qx;
+    const real_t x2 = 4 * qy;
+    const real_t x3 = x1 + x2;
+    out[0] = x0 + x3 - 3;
+    out[1] = 0;
+    out[2] = 0;
+    out[3] = x0 - 1;
+    out[4] = -x1;
+    out[5] = 0;
+    out[6] = -x2;
+    out[7] = -8 * qz - x3 + 4;
+    out[8] = x1;
+    out[9] = x2;
+}
+
+static SFEM_INLINE void tet10_linear_elasticity_apply_micro_kernel(
     const real_t mu,
     const real_t lambda,
     const jacobian_t *const SFEM_RESTRICT adjugate,
@@ -86,9 +146,15 @@ static SFEM_INLINE void tet10_linear_elasticity_apply_kernel_opt(
     const real_t qw,
     const real_t *const SFEM_RESTRICT u,
     real_t *const SFEM_RESTRICT element_vector) {
-
     // This can be reduced with 1D products (ref_shape_grad_{x,y,z})
-    real_t disp_grad[9];
+    real_t disp_grad[9] = {0};
+
+#define MICRO_KERNEL_USE_CODEGEN 1
+
+#if MICRO_KERNEL_USE_CODEGEN
+    // Code-gen way
+
+    const real_t denom = 1;
     {
         const real_t x0 = 1.0 / jacobian_determinant;
         const real_t x1 = 4 * qx;
@@ -133,96 +199,184 @@ static SFEM_INLINE void tet10_linear_elasticity_apply_kernel_opt(
         disp_grad[7] = x0 * (adjugate[1] * x29 + adjugate[4] * x31 + adjugate[7] * x32);
         disp_grad[8] = x0 * (adjugate[2] * x29 + adjugate[5] * x31 + adjugate[8] * x32);
     }
+#else
+    // Programmatic way
+
+    const real_t denom = jacobian_determinant;
+    {
+        real_t temp[9] = {0};
+        real_t grad[10];
+        
+        ref_shape_grad_x(qx, qy, qz, grad);
+#pragma unroll
+        for (int i = 0; i < 10; i++) {
+            const real_t g = grad[i];
+            temp[0] += u[i] * g;
+            temp[3] += u[10 + i] * g;
+            temp[6] += u[20 + i] * g;
+        }
+
+        ref_shape_grad_y(qx, qy, qz, grad);
+#pragma unroll
+        for (int i = 0; i < 10; i++) {
+            const real_t g = grad[i];
+            temp[1] += u[i] * g;
+            temp[4] += u[10 + i] * g;
+            temp[7] += u[20 + i] * g;
+        }
+
+        ref_shape_grad_z(qx, qy, qz, grad);
+#pragma unroll
+        for (int i = 0; i < 10; i++) {
+            const real_t g = grad[i];
+            temp[2] += u[i] * g;
+            temp[5] += u[10 + i] * g;
+            temp[8] += u[20 + i] * g;
+        }
+
+        for (int i = 0; i < 3; i++) {
+#pragma unroll
+            for (int j = 0; j < 3; j++) {
+#pragma unroll
+                for (int k = 0; k < 3; k++) {
+                    disp_grad[i * 3 + j] += temp[i * 3 + k] * adjugate[k * 3 + j];
+                }
+            }
+        }
+    }
+
+#endif
+    // Includes first Piola-Kirchoff stress: P^T * J^-T * det(J)
 
     real_t *P_tXJinv_t = disp_grad;
     {
-        const real_t x0 = (1.0/6.0)*mu;
-        const real_t x1 = x0*(disp_grad[1] + disp_grad[3]);
-        const real_t x2 = x0*(disp_grad[2] + disp_grad[6]);
-        const real_t x3 = 2*mu;
-        const real_t x4 = lambda*(disp_grad[0] + disp_grad[4] + disp_grad[8]);
-        const real_t x5 = (1.0/6.0)*disp_grad[0]*x3 + (1.0/6.0)*x4;
-        const real_t x6 = x0*(disp_grad[5] + disp_grad[7]);
-        const real_t x7 = (1.0/6.0)*disp_grad[4]*x3 + (1.0/6.0)*x4;
-        const real_t x8 = (1.0/6.0)*disp_grad[8]*x3 + (1.0/6.0)*x4;
-        P_tXJinv_t[0] = adjugate[0]*x5 + adjugate[1]*x1 + adjugate[2]*x2;
-        P_tXJinv_t[1] = adjugate[3]*x5 + adjugate[4]*x1 + adjugate[5]*x2;
-        P_tXJinv_t[2] = adjugate[6]*x5 + adjugate[7]*x1 + adjugate[8]*x2;
-        P_tXJinv_t[3] = adjugate[0]*x1 + adjugate[1]*x7 + adjugate[2]*x6;
-        P_tXJinv_t[4] = adjugate[3]*x1 + adjugate[4]*x7 + adjugate[5]*x6;
-        P_tXJinv_t[5] = adjugate[6]*x1 + adjugate[7]*x7 + adjugate[8]*x6;
-        P_tXJinv_t[6] = adjugate[0]*x2 + adjugate[1]*x6 + adjugate[2]*x8;
-        P_tXJinv_t[7] = adjugate[3]*x2 + adjugate[4]*x6 + adjugate[5]*x8;
-        P_tXJinv_t[8] = adjugate[6]*x2 + adjugate[7]*x6 + adjugate[8]*x8;
+        const real_t x0 = (1.0 / 6.0) * mu;
+        const real_t x1 = x0 * (disp_grad[1] + disp_grad[3]);
+        const real_t x2 = x0 * (disp_grad[2] + disp_grad[6]);
+        const real_t x3 = 2 * mu;
+        const real_t x4 = lambda * (disp_grad[0] + disp_grad[4] + disp_grad[8]);
+        const real_t x5 = (1.0 / 6.0) * disp_grad[0] * x3 + (1.0 / 6.0) * x4;
+        const real_t x6 = x0 * (disp_grad[5] + disp_grad[7]);
+        const real_t x7 = (1.0 / 6.0) * disp_grad[4] * x3 + (1.0 / 6.0) * x4;
+        const real_t x8 = (1.0 / 6.0) * disp_grad[8] * x3 + (1.0 / 6.0) * x4;
+        P_tXJinv_t[0] = adjugate[0] * x5 + adjugate[1] * x1 + adjugate[2] * x2;
+        P_tXJinv_t[1] = adjugate[3] * x5 + adjugate[4] * x1 + adjugate[5] * x2;
+        P_tXJinv_t[2] = adjugate[6] * x5 + adjugate[7] * x1 + adjugate[8] * x2;
+        P_tXJinv_t[3] = adjugate[0] * x1 + adjugate[1] * x7 + adjugate[2] * x6;
+        P_tXJinv_t[4] = adjugate[3] * x1 + adjugate[4] * x7 + adjugate[5] * x6;
+        P_tXJinv_t[5] = adjugate[6] * x1 + adjugate[7] * x7 + adjugate[8] * x6;
+        P_tXJinv_t[6] = adjugate[0] * x2 + adjugate[1] * x6 + adjugate[2] * x8;
+        P_tXJinv_t[7] = adjugate[3] * x2 + adjugate[4] * x6 + adjugate[5] * x8;
+        P_tXJinv_t[8] = adjugate[6] * x2 + adjugate[7] * x6 + adjugate[8] * x8;
     }
 
     // Scale by quadrature weight
     for (int i = 0; i < 9; i++) {
-        P_tXJinv_t[i] *= qw;
+        P_tXJinv_t[i] *= qw / denom;
     }
 
-    // This can be reduced with 1D dot products (ref_shape_grad_{x,y,z})
+// On CPU both versions are equivalent
+#if MICRO_KERNEL_USE_CODEGEN
     {
-        const real_t x0 = 4*qx;
-        const real_t x1 = 4*qy;
-        const real_t x2 = 4*qz;
+        const real_t x0 = 4 * qx;
+        const real_t x1 = 4 * qy;
+        const real_t x2 = 4 * qz;
         const real_t x3 = x0 + x1 + x2 - 3;
         const real_t x4 = x0 - 1;
         const real_t x5 = x1 - 1;
         const real_t x6 = x2 - 1;
-        const real_t x7 = P_tXJinv_t[1]*x0;
-        const real_t x8 = P_tXJinv_t[2]*x0;
+        const real_t x7 = P_tXJinv_t[1] * x0;
+        const real_t x8 = P_tXJinv_t[2] * x0;
         const real_t x9 = qz - 1;
-        const real_t x10 = 8*qx + 4*qy + 4*x9;
-        const real_t x11 = P_tXJinv_t[0]*x1;
-        const real_t x12 = P_tXJinv_t[2]*x1;
-        const real_t x13 = 4*qx + 8*qy + 4*x9;
-        const real_t x14 = P_tXJinv_t[0]*x2;
-        const real_t x15 = P_tXJinv_t[1]*x2;
-        const real_t x16 = 4*qx + 4*qy + 8*qz - 4;
-        const real_t x17 = P_tXJinv_t[4]*x0;
-        const real_t x18 = P_tXJinv_t[5]*x0;
-        const real_t x19 = P_tXJinv_t[3]*x1;
-        const real_t x20 = P_tXJinv_t[5]*x1;
-        const real_t x21 = P_tXJinv_t[3]*x2;
-        const real_t x22 = P_tXJinv_t[4]*x2;
-        const real_t x23 = P_tXJinv_t[7]*x0;
-        const real_t x24 = P_tXJinv_t[8]*x0;
-        const real_t x25 = P_tXJinv_t[6]*x1;
-        const real_t x26 = P_tXJinv_t[8]*x1;
-        const real_t x27 = P_tXJinv_t[6]*x2;
-        const real_t x28 = P_tXJinv_t[7]*x2;
-        element_vector[0] += x3*(P_tXJinv_t[0] + P_tXJinv_t[1] + P_tXJinv_t[2]);
-        element_vector[1] += P_tXJinv_t[0]*x4;
-        element_vector[2] += P_tXJinv_t[1]*x5;
-        element_vector[3] += P_tXJinv_t[2]*x6;
-        element_vector[4] += -P_tXJinv_t[0]*x10 - x7 - x8;
+        const real_t x10 = 8 * qx + 4 * qy + 4 * x9;
+        const real_t x11 = P_tXJinv_t[0] * x1;
+        const real_t x12 = P_tXJinv_t[2] * x1;
+        const real_t x13 = 4 * qx + 8 * qy + 4 * x9;
+        const real_t x14 = P_tXJinv_t[0] * x2;
+        const real_t x15 = P_tXJinv_t[1] * x2;
+        const real_t x16 = 4 * qx + 4 * qy + 8 * qz - 4;
+        const real_t x17 = P_tXJinv_t[4] * x0;
+        const real_t x18 = P_tXJinv_t[5] * x0;
+        const real_t x19 = P_tXJinv_t[3] * x1;
+        const real_t x20 = P_tXJinv_t[5] * x1;
+        const real_t x21 = P_tXJinv_t[3] * x2;
+        const real_t x22 = P_tXJinv_t[4] * x2;
+        const real_t x23 = P_tXJinv_t[7] * x0;
+        const real_t x24 = P_tXJinv_t[8] * x0;
+        const real_t x25 = P_tXJinv_t[6] * x1;
+        const real_t x26 = P_tXJinv_t[8] * x1;
+        const real_t x27 = P_tXJinv_t[6] * x2;
+        const real_t x28 = P_tXJinv_t[7] * x2;
+        element_vector[0] += x3 * (P_tXJinv_t[0] + P_tXJinv_t[1] + P_tXJinv_t[2]);
+        element_vector[1] += P_tXJinv_t[0] * x4;
+        element_vector[2] += P_tXJinv_t[1] * x5;
+        element_vector[3] += P_tXJinv_t[2] * x6;
+        element_vector[4] += -P_tXJinv_t[0] * x10 - x7 - x8;
         element_vector[5] += x11 + x7;
-        element_vector[6] += -P_tXJinv_t[1]*x13 - x11 - x12;
-        element_vector[7] += -P_tXJinv_t[2]*x16 - x14 - x15;
+        element_vector[6] += -P_tXJinv_t[1] * x13 - x11 - x12;
+        element_vector[7] += -P_tXJinv_t[2] * x16 - x14 - x15;
         element_vector[8] += x14 + x8;
         element_vector[9] += x12 + x15;
-        element_vector[10] += x3*(P_tXJinv_t[3] + P_tXJinv_t[4] + P_tXJinv_t[5]);
-        element_vector[11] += P_tXJinv_t[3]*x4;
-        element_vector[12] += P_tXJinv_t[4]*x5;
-        element_vector[13] += P_tXJinv_t[5]*x6;
-        element_vector[14] += -P_tXJinv_t[3]*x10 - x17 - x18;
+        element_vector[10] += x3 * (P_tXJinv_t[3] + P_tXJinv_t[4] + P_tXJinv_t[5]);
+        element_vector[11] += P_tXJinv_t[3] * x4;
+        element_vector[12] += P_tXJinv_t[4] * x5;
+        element_vector[13] += P_tXJinv_t[5] * x6;
+        element_vector[14] += -P_tXJinv_t[3] * x10 - x17 - x18;
         element_vector[15] += x17 + x19;
-        element_vector[16] += -P_tXJinv_t[4]*x13 - x19 - x20;
-        element_vector[17] += -P_tXJinv_t[5]*x16 - x21 - x22;
+        element_vector[16] += -P_tXJinv_t[4] * x13 - x19 - x20;
+        element_vector[17] += -P_tXJinv_t[5] * x16 - x21 - x22;
         element_vector[18] += x18 + x21;
         element_vector[19] += x20 + x22;
-        element_vector[20] += x3*(P_tXJinv_t[6] + P_tXJinv_t[7] + P_tXJinv_t[8]);
-        element_vector[21] += P_tXJinv_t[6]*x4;
-        element_vector[22] += P_tXJinv_t[7]*x5;
-        element_vector[23] += P_tXJinv_t[8]*x6;
-        element_vector[24] += -P_tXJinv_t[6]*x10 - x23 - x24;
+        element_vector[20] += x3 * (P_tXJinv_t[6] + P_tXJinv_t[7] + P_tXJinv_t[8]);
+        element_vector[21] += P_tXJinv_t[6] * x4;
+        element_vector[22] += P_tXJinv_t[7] * x5;
+        element_vector[23] += P_tXJinv_t[8] * x6;
+        element_vector[24] += -P_tXJinv_t[6] * x10 - x23 - x24;
         element_vector[25] += x23 + x25;
-        element_vector[26] += -P_tXJinv_t[7]*x13 - x25 - x26;
-        element_vector[27] += -P_tXJinv_t[8]*x16 - x27 - x28;
+        element_vector[26] += -P_tXJinv_t[7] * x13 - x25 - x26;
+        element_vector[27] += -P_tXJinv_t[8] * x16 - x27 - x28;
         element_vector[28] += x24 + x27;
         element_vector[29] += x26 + x28;
     }
+
+#else
+
+    {
+        real_t grad[10];
+        ref_shape_grad_x(qx, qy, qz, grad);
+
+#pragma unroll
+        for (int i = 0; i < 10; i++) {
+            real_t g = grad[i];
+            element_vector[i] += P_tXJinv_t[0] * g;
+            element_vector[10 + i] += P_tXJinv_t[3] * g;
+            element_vector[20 + i] += P_tXJinv_t[6] * g;
+        }
+
+        ref_shape_grad_y(qx, qy, qz, grad);
+
+#pragma unroll
+        for (int i = 0; i < 10; i++) {
+            real_t g = grad[i];
+            element_vector[i] += P_tXJinv_t[1] * g;
+            element_vector[10 + i] += P_tXJinv_t[4] * g;
+            element_vector[20 + i] += P_tXJinv_t[7] * g;
+        }
+
+        ref_shape_grad_z(qx, qy, qz, grad);
+
+#pragma unroll
+        for (int i = 0; i < 10; i++) {
+            real_t g = grad[i];
+            element_vector[i] += P_tXJinv_t[2] * g;
+            element_vector[10 + i] += P_tXJinv_t[5] * g;
+            element_vector[20 + i] += P_tXJinv_t[8] * g;
+        }
+    }
+
+#endif
+
+#undef MICRO_KERNEL_USE_CODEGEN
 }
 
 static const int n_qp = 8;
@@ -321,7 +475,7 @@ void tet10_linear_elasticity_apply_opt(const linear_elasticity_t *const ctx,
             }
 
             for (int k = 0; k < n_qp; k++) {
-                tet10_linear_elasticity_apply_kernel_opt(mu,
+                tet10_linear_elasticity_apply_micro_kernel(mu,
                                                          lambda,
                                                          jacobian_adjugate,
                                                          jacobian_determinant,

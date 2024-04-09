@@ -14,17 +14,18 @@
 #include "dirichlet.h"
 #include "neumann.h"
 
+#include <fstream>
 #include <functional>
 #include <iostream>
 #include <map>
 #include <vector>
-#include <fstream>
 
 // Ops
 
 #include "cvfem_operators.h"
 #include "laplacian.h"
 #include "linear_elasticity.h"
+#include "mass.h"
 
 namespace sfem {
 
@@ -414,7 +415,7 @@ namespace sfem {
         return dc;
     }
 
-    int DirichletConditions::apply_constraints(isolver_scalar_t *const x) {
+    int DirichletConditions::apply(isolver_scalar_t *const x) {
         for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
             constraint_nodes_to_value_vec(impl_->dirichlet_conditions[i].local_size,
                                           impl_->dirichlet_conditions[i].idx,
@@ -427,7 +428,21 @@ namespace sfem {
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
-    int DirichletConditions::apply_zero_constraints(isolver_scalar_t *const x) {
+    int DirichletConditions::gradient(const isolver_scalar_t *const x, isolver_scalar_t *const g) {
+        for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
+            constraint_gradient_nodes_to_value_vec(impl_->dirichlet_conditions[i].local_size,
+                                                   impl_->dirichlet_conditions[i].idx,
+                                                   impl_->space->block_size(),
+                                                   impl_->dirichlet_conditions[i].component,
+                                                   impl_->dirichlet_conditions[i].value,
+                                                   x,
+                                                   g);
+        }
+
+        return ISOLVER_FUNCTION_SUCCESS;
+    }
+
+    int DirichletConditions::apply_zero(isolver_scalar_t *const x) {
         for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
             constraint_nodes_to_value_vec(impl_->dirichlet_conditions[i].local_size,
                                           impl_->dirichlet_conditions[i].idx,
@@ -473,25 +488,15 @@ namespace sfem {
 
     class Timings {
     public:
-        static double tick()
-        {
-            return MPI_Wtime();
-        }
+        static double tick() { return MPI_Wtime(); }
 
         class Scoped {
         public:
             double tick_{0};
             double *value_;
-            Scoped(double *value)
-            :value_(value)
-            {
-                tick_ = tick();
-            }
+            Scoped(double *value) : value_(value) { tick_ = tick(); }
 
-            ~Scoped()
-            {
-                *value_ += tick() - tick_;
-            }
+            ~Scoped() { *value_ += tick() - tick_; }
         };
 
         double create_crs_graph{0};
@@ -501,6 +506,7 @@ namespace sfem {
         double apply{0};
         double value{0};
         double apply_constraints{0};
+        double constraints_gradient{0};
         double apply_zero_constraints{0};
         double copy_constrained_dofs{0};
         double report_solution{0};
@@ -514,6 +520,7 @@ namespace sfem {
             apply = 0;
             value = 0;
             apply_constraints = 0;
+            constraints_gradient = 0;
             apply_zero_constraints = 0;
             copy_constrained_dofs = 0;
             report_solution = 0;
@@ -529,6 +536,7 @@ namespace sfem {
             os << "apply," << apply << "\n";
             os << "value," << value << "\n";
             os << "apply_constraints," << apply_constraints << "\n";
+            os << "constraints_gradient," << constraints_gradient << "\n";
             os << "apply_zero_constraints," << apply_zero_constraints << "\n";
             os << "copy_constrained_dofs," << copy_constrained_dofs << "\n";
             os << "report_solution," << report_solution << "\n";
@@ -536,7 +544,7 @@ namespace sfem {
         }
     };
 
-    #define SFEM_FUNCTION_SCOPED_TIMING(acc) Timings::Scoped scoped_(&(acc))
+#define SFEM_FUNCTION_SCOPED_TIMING(acc) Timings::Scoped scoped_(&(acc))
 
     class Function::Impl {
     public:
@@ -559,16 +567,13 @@ namespace sfem {
     Function::~Function() {
         std::ofstream os;
         os.open("perf.csv");
-        if(!os.good()) return;
+        if (!os.good()) return;
 
         impl_->timings.describe(os);
         os.close();
     }
 
-    void Function::add_operator(const std::shared_ptr<Op> &op) {
-        printf("Adding operator %s\n", op->name());
-        impl_->ops.push_back(op);
-    }
+    void Function::add_operator(const std::shared_ptr<Op> &op) { impl_->ops.push_back(op); }
     void Function::add_constraint(const std::shared_ptr<Constraint> &c) {
         impl_->constraints.push_back(c);
     }
@@ -582,7 +587,6 @@ namespace sfem {
                                    ptrdiff_t *nnz,
                                    isolver_idx_t **rowptr,
                                    isolver_idx_t **colidx) {
-
         SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.create_crs_graph);
 
         return impl_->space->create_crs_graph(nlocal, nglobal, nnz, rowptr, colidx);
@@ -625,7 +629,6 @@ namespace sfem {
         SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.apply);
 
         for (auto &op : impl_->ops) {
-            printf("Calling apply on %s\n", op->name());
             if (op->apply(x, h, out)) {
                 return ISOLVER_FUNCTION_FAILURE;
             }
@@ -650,7 +653,16 @@ namespace sfem {
         SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.apply_constraints);
 
         for (auto &c : impl_->constraints) {
-            c->apply_constraints(x);
+            c->apply(x);
+        }
+        return ISOLVER_FUNCTION_SUCCESS;
+    }
+
+    int Function::constraints_gradient(isolver_scalar_t *const x, isolver_scalar_t *const g) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.constraints_gradient);
+
+        for (auto &c : impl_->constraints) {
+            c->gradient(x, g);
         }
         return ISOLVER_FUNCTION_SUCCESS;
     }
@@ -659,7 +671,7 @@ namespace sfem {
         SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.apply_zero_constraints);
 
         for (auto &c : impl_->constraints) {
-            c->apply_zero_constraints(x);
+            c->apply_zero(x);
         }
         return ISOLVER_FUNCTION_SUCCESS;
     }
@@ -679,9 +691,6 @@ namespace sfem {
 
         char path[2048];
         sprintf(path, "%s/out.raw", impl_->output_dir.c_str());
-
-        printf("report_solution %s\n", path);
-
         if (array_write(mesh->comm,
                         path,
                         SFEM_MPI_REAL_T,
@@ -726,6 +735,7 @@ namespace sfem {
         }
 
         const char *name() const override { return "LinearElasticity"; }
+        inline bool is_linear() const override { return true; }
 
         int initialize() override { return ISOLVER_FUNCTION_SUCCESS; }
 
@@ -809,6 +819,7 @@ namespace sfem {
         std::shared_ptr<FunctionSpace> space;
 
         const char *name() const override { return "Laplacian"; }
+        inline bool is_linear() const override { return true; }
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
@@ -888,12 +899,101 @@ namespace sfem {
         int report(const isolver_scalar_t *const) override { return ISOLVER_FUNCTION_SUCCESS; }
     };
 
+    class Mass final : public Op {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+
+        const char *name() const override { return "Mass"; }
+        inline bool is_linear() const override { return true; }
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            assert(1 == space->block_size());
+
+            auto ret = std::make_unique<Mass>(space);
+            return ret;
+        }
+
+        int initialize() override { return ISOLVER_FUNCTION_SUCCESS; }
+
+        Mass(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+        int hessian_crs(const isolver_scalar_t *const x,
+                        const isolver_idx_t *const rowptr,
+                        const isolver_idx_t *const colidx,
+                        isolver_scalar_t *const values) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            assemble_mass((enum ElemType)mesh->element_type,
+                                  mesh->nelements,
+                                  mesh->nnodes,
+                                  mesh->elements,
+                                  mesh->points,
+                                  space->mesh().node_to_node_rowptr(),
+                                  space->mesh().node_to_node_colidx(),
+                                  values);
+
+            return ISOLVER_FUNCTION_SUCCESS;
+        }
+
+        int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            apply_mass((enum ElemType)mesh->element_type,
+                                   mesh->nelements,
+                                   mesh->nnodes,
+                                   mesh->elements,
+                                   mesh->points,
+                                   x,
+                                   out);
+
+            return ISOLVER_FUNCTION_SUCCESS;
+        }
+
+        int apply(const isolver_scalar_t *const x,
+                  const isolver_scalar_t *const h,
+                  isolver_scalar_t *const out) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            apply_mass((enum ElemType)mesh->element_type,
+                       mesh->nelements,
+                       mesh->nnodes,
+                       mesh->elements,
+                       mesh->points,
+                       h,
+                       out);
+
+            return ISOLVER_FUNCTION_SUCCESS;
+        }
+
+        int value(const isolver_scalar_t *x, isolver_scalar_t *const out) override {
+            // auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            // mass_assemble_value((enum ElemType)mesh->element_type,
+            //                     mesh->nelements,
+            //                     mesh->nnodes,
+            //                     mesh->elements,
+            //                     mesh->points,
+            //                     x,
+            //                     out);
+
+            // return ISOLVER_FUNCTION_SUCCESS;
+
+            assert(0);
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        int report(const isolver_scalar_t *const) override { return ISOLVER_FUNCTION_SUCCESS; }
+    };
+
     class CVFEMConvection final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
         real_t *vel[3];
 
         const char *name() const override { return "CVFEMConvection"; }
+        inline bool is_linear() const override { return true; }
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();

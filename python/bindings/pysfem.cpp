@@ -72,6 +72,10 @@ NB_MODULE(pysfem, m) {
         fun->apply_zero_constraints(x.data());
     });
 
+    m.def("constraints_gradient", [](std::shared_ptr<Function> &fun, nb::ndarray<isolver_scalar_t> x, nb::ndarray<isolver_scalar_t> g) {
+        fun->constraints_gradient(x.data(), g.data());
+    });
+
     m.def("report_solution", [](std::shared_ptr<Function> &fun, nb::ndarray<isolver_scalar_t> x) {
         fun->report_solution(x.data());
     });

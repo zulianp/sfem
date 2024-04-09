@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import pysfem as s
 import numpy as np
 from numpy import linalg
@@ -34,14 +36,12 @@ def solve_poisson(options):
 	x = np.zeros(fs.n_dofs())
 	g = np.zeros(fs.n_dofs())
 
-	s.apply_constraints(fun, x)
-
 	alpha = 0.1
 	max_it = 1000000
 	for k in range(0, max_it):
 		g.fill(0)
 		s.gradient(fun, x, g)
-		s.apply_zero_constraints(fun, g)
+		s.constraints_gradient(fun, x, g)
 
 		x -= alpha * g
 

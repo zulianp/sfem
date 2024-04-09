@@ -156,5 +156,10 @@ class SymbolicFE3D(FE):
 	def measure(self, q):
 		return sp.symbols('measure')
 
+	def reference_measure(self):
+		return sp.symbols('reference_measure')
+
+
+
 
 

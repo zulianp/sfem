@@ -79,6 +79,7 @@ namespace sfem {
 
         virtual const char *name() const = 0;
 
+        virtual bool is_linear() const = 0;
         virtual int initialize() { return ISOLVER_FUNCTION_SUCCESS; }
         virtual int hessian_crs(const isolver_scalar_t *const x,
                                 const isolver_idx_t *const rowptr,
@@ -111,6 +112,7 @@ namespace sfem {
                         isolver_scalar_t *const values) override;
 
         int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) override;
+
         int apply(const isolver_scalar_t *const x,
                   const isolver_scalar_t *const h,
                   isolver_scalar_t *const out) override;
@@ -129,6 +131,8 @@ namespace sfem {
                            const int component,
                            const isolver_scalar_t value);
 
+        inline bool is_linear() const override { return true; }
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;
@@ -137,8 +141,9 @@ namespace sfem {
     class Constraint {
     public:
         virtual ~Constraint() = default;
-        virtual int apply_constraints(isolver_scalar_t *const x) = 0;
-        virtual int apply_zero_constraints(isolver_scalar_t *const x) = 0;
+        virtual int apply(isolver_scalar_t *const x) = 0;
+        virtual int apply_zero(isolver_scalar_t *const x) = 0;
+        virtual int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const g) = 0;
         virtual int copy_constrained_dofs(const isolver_scalar_t *const src,
                                           isolver_scalar_t *const dest) = 0;
 
@@ -155,10 +160,12 @@ namespace sfem {
 
         static std::unique_ptr<DirichletConditions> create_from_env(
             const std::shared_ptr<FunctionSpace> &space);
-        int apply_constraints(isolver_scalar_t *const x) override;
-        int apply_zero_constraints(isolver_scalar_t *const x) override;
+        int apply(isolver_scalar_t *const x) override;
+        int apply_zero(isolver_scalar_t *const x) override;
         int copy_constrained_dofs(const isolver_scalar_t *const src,
                                   isolver_scalar_t *const dest) override;
+
+        int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const g) override;
 
         int hessian_crs(const isolver_scalar_t *const x,
                         const isolver_idx_t *const rowptr,
@@ -212,6 +219,7 @@ namespace sfem {
         int value(const isolver_scalar_t *x, isolver_scalar_t *const out);
 
         int apply_constraints(isolver_scalar_t *const x);
+        int constraints_gradient(isolver_scalar_t *const x, isolver_scalar_t *const g);
         int apply_zero_constraints(isolver_scalar_t *const x);
         int copy_constrained_dofs(const isolver_scalar_t *const src, isolver_scalar_t *const dest);
         int report_solution(const isolver_scalar_t *const x);

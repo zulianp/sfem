@@ -29,7 +29,7 @@ void read_boundary_conditions(MPI_Comm comm,
     int rank;
     MPI_Comm_rank(comm, &rank);
 
-    const const char *splitter = ",";
+    const char *splitter = ",";
 
     int count = 1;
     {

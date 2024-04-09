@@ -307,7 +307,7 @@ int mesh_build_global_ids(mesh_t *mesh) {
             idx_t iii = keys[k] - begin;
 
             if (iii >= n_lnodes_temp) {
-                printf("[%d] %d < %d < %d\n", rank, begin, keys[k], begin + n_lnodes_temp);
+                printf("[%d] %ld < %d < %ld\n", rank, begin, keys[k], begin + n_lnodes_temp);
             }
 
             assert(iii < n_lnodes_temp);
