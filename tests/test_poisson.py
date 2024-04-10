@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import pysfem as s
+import pysfem as sfem
 import numpy as np
 from numpy import linalg
 
@@ -14,15 +14,16 @@ def gradient_descent(fun, x):
 	alpha = 0.1
 	max_it = 1
 	for k in range(0, max_it):
+		# Reset content of g to zero before calling gradient
 		g.fill(0)
-		s.gradient(fun, x, g)
+		sfem.gradient(fun, x, g)
 		
 		x -= alpha * g
 
 		norm_g = linalg.norm(g)
 		stop = norm_g < 1e-5
 		if np.mod(k, 1000) == 0 or stop:
-			val = s.value(fun, x)
+			val = sfem.value(fun, x)
 			print(f'{k}) v = {val}, norm(g) = {norm_g}')
 			
 		if stop:
@@ -30,8 +31,8 @@ def gradient_descent(fun, x):
 	return x
 
 def solve_poisson(options):
-	s.init()
-	m = s.Mesh()
+	sfem.init()
+	m = sfem.Mesh()
 	path = options.input_mesh
 	m.read(path)
 	m.convert_to_macro_element_mesh()
@@ -39,38 +40,38 @@ def solve_poisson(options):
 	sinlet = np.fromfile(f'{path}/sidesets_aos/sinlet.raw', dtype=idx_t)
 	soutlet = np.fromfile(f'{path}/sidesets_aos/soutlet.raw', dtype=idx_t)
 
-	fs = s.FunctionSpace(m, 1)
-	fun = s.Function(fs)
+	fs = sfem.FunctionSpace(m, 1)
+	fun = sfem.Function(fs)
 	fun.set_output_dir(options.output_dir)
 
-	op = s.create_op(fs, "Laplacian")
+	op = sfem.create_op(fs, "Laplacian")
 	fun.add_operator(op)
 
-	bc = s.DirichletConditions(fs)
-	s.add_condition(bc, sinlet, 0, -1);
-	# s.add_condition(bc, soutlet, 0, 1);
+	bc = sfem.DirichletConditions(fs)
+	sfem.add_condition(bc, sinlet, 0, -1);
+	# sfem.add_condition(bc, soutlet, 0, 1);
 	fun.add_dirichlet_conditions(bc)
 
-	nc = s.NeumannConditions(fs)
-	s.add_condition(nc, soutlet, 0, 1)
+	nc = sfem.NeumannConditions(fs)
+	sfem.add_condition(nc, soutlet, 0, 1)
 	fun.add_operator(nc)
 
 	x = np.zeros(fs.n_dofs())
 	
-	cg = s.ConjugateGradient()
+	cg = sfem.ConjugateGradient()
 	cg.default_init()
 	cg.set_max_it(3000)
 
-	lop = s.make_op(fun, x)
+	lop = sfem.make_op(fun, x)
 	cg.set_op(lop)
 	
 	g = np.zeros(fs.n_dofs())
-	s.gradient(fun, x, g)
+	sfem.gradient(fun, x, g)
 	c = np.zeros(fs.n_dofs())
-	s.apply(cg, g, c)
+	sfem.apply(cg, g, c)
 	x -= c
-	
-	s.report_solution(fun, x)
+
+	sfem.report_solution(fun, x)
 
 class Opts:
 	def __init__(self):

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import pysfem as s
+import pysfem as sfem
 import numpy as np
 from numpy import linalg
 
@@ -9,8 +9,8 @@ import sys, getopt
 idx_t = np.int32
 
 def solve_linear_elasticity(options):
-	s.init()
-	m = s.Mesh()
+	sfem.init()
+	m = sfem.Mesh()
 
 	path = options.input_mesh
 	m.read(path)
@@ -19,46 +19,45 @@ def solve_linear_elasticity(options):
 	sinlet = np.fromfile(f'{path}/sidesets_aos/sinlet.raw', dtype=idx_t)
 	soutlet = np.fromfile(f'{path}/sidesets_aos/soutlet.raw', dtype=idx_t)
 
-	fs = s.FunctionSpace(m, m.spatial_dimension())
-	fun = s.Function(fs)
+	fs = sfem.FunctionSpace(m, m.spatial_dimension())
+	fun = sfem.Function(fs)
 	fun.set_output_dir(options.output_dir)
 
-	op = s.create_op(fs, "LinearElasticity")
+	op = sfem.create_op(fs, "LinearElasticity")
 	fun.add_operator(op)
 
-	bc = s.DirichletConditions(fs)
+	bc = sfem.DirichletConditions(fs)
 
-	s.add_condition(bc, sinlet, 0, 0.);
-	s.add_condition(bc, sinlet, 1, 0.);
-	s.add_condition(bc, sinlet, 2, 0.);
+	sfem.add_condition(bc, sinlet, 0, 0.);
+	sfem.add_condition(bc, sinlet, 1, 0.);
+	sfem.add_condition(bc, sinlet, 2, 0.);
 
-	# s.add_condition(bc, soutlet, 0, 1);
-	# s.add_condition(bc, soutlet, 1, 0.);
-	# s.add_condition(bc, soutlet, 2, 0.);
+	# sfem.add_condition(bc, soutlet, 0, 1);
+	# sfem.add_condition(bc, soutlet, 1, 0.);
+	# sfem.add_condition(bc, soutlet, 2, 0.);
 
 	fun.add_dirichlet_conditions(bc)
 
-	nc = s.NeumannConditions(fs)
-	s.add_condition(nc, soutlet, 0, 1)
+	nc = sfem.NeumannConditions(fs)
+	sfem.add_condition(nc, soutlet, 0, 1)
 	fun.add_operator(nc)
 
 	x = np.zeros(fs.n_dofs())
-	cg = s.ConjugateGradient()
+	cg = sfem.ConjugateGradient()
 	cg.default_init()
 	cg.set_max_it(3000)
 
-	lop = s.make_op(fun, x)
+	lop = sfem.make_op(fun, x)
 	cg.set_op(lop)
 	
 	g = np.zeros(fs.n_dofs())
-	s.gradient(fun, x, g)
+	sfem.gradient(fun, x, g)
 	c = np.zeros(fs.n_dofs())
-	s.apply(cg, g, c)
+	sfem.apply(cg, g, c)
 	x -= c
 
-	g.fill(0)
-	s.gradient(fun, x, g)
-	s.report_solution(fun, x)
+	# Write result to disk
+	sfem.report_solution(fun, x)
 
 class Opts:
 	def __init__(self):
