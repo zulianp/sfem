@@ -83,8 +83,7 @@ namespace sfem {
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
-    int Mesh::write(const char *path) const
-    {
+    int Mesh::write(const char *path) const {
         if (mesh_write(path, &impl_->mesh)) {
             return ISOLVER_FUNCTION_FAILURE;
         }
@@ -742,6 +741,13 @@ namespace sfem {
 
     int Function::report_solution(const isolver_scalar_t *const x) {
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
+
+        {
+            struct stat st = {0};
+            if (stat(impl_->output_dir, &st) == -1) {
+                mkdir(impl_->output_dir, 0700);
+            }
+        }
 
         char path[2048];
         sprintf(path, "%s/out.raw", impl_->output_dir.c_str());

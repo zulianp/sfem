@@ -24,6 +24,8 @@ void SFEM_init() {
     free(argv);
 }
 
+void SFEM_finalize() { MPI_Finalize(); }
+
 NB_MODULE(pysfem, m) {
     using namespace sfem;
 
@@ -31,6 +33,7 @@ NB_MODULE(pysfem, m) {
     using ConjugateGradient_t = sfem::ConjugateGradient<isolver_scalar_t>;
 
     m.def("init", &SFEM_init);
+    m.def("finalize", &SFEM_finalize);
     nb::class_<Mesh>(m, "Mesh")  //
         .def(nb::init<>())
         .def("read", &Mesh::read)
@@ -42,7 +45,7 @@ NB_MODULE(pysfem, m) {
           [](const char *elem_type_name,
              nb::ndarray<idx_t> idx,
              nb::ndarray<geom_t> p) -> std::shared_ptr<Mesh> {
-                size_t n = idx.shape(0);
+              size_t n = idx.shape(0);
               enum ElemType element_type = type_from_string(elem_type_name);
 
               int nnxe = idx.shape(0);
@@ -53,15 +56,15 @@ NB_MODULE(pysfem, m) {
               idx_t **elements = (idx_t **)malloc(nnxe * sizeof(idx_t *));
               geom_t **points = (geom_t **)malloc(spatial_dimension * sizeof(geom_t *));
 
-              for (int d = 0; d <  nnxe; d++) {
+              for (int d = 0; d < nnxe; d++) {
                   elements[d] = (idx_t *)malloc(nelements * sizeof(idx_t));
 
-                  for (ptrdiff_t i = 0; i <  nelements; i++) {
+                  for (ptrdiff_t i = 0; i < nelements; i++) {
                       elements[d][i] = idx.data()[d * nelements + i];
                   }
               }
 
-              for (int d = 0; d <  spatial_dimension; d++) {
+              for (int d = 0; d < spatial_dimension; d++) {
                   points[d] = (geom_t *)malloc(nnodes * sizeof(geom_t));
                   for (ptrdiff_t i = 0; i < nnodes; i++) {
                       points[d][i] = p.data()[d * nnodes + i];
@@ -140,7 +143,7 @@ NB_MODULE(pysfem, m) {
              nb::ndarray<isolver_idx_t> idx,
              const int component,
              const isolver_scalar_t value) {
-             size_t n = idx.size();
+              size_t n = idx.size();
               auto c_idx = (idx_t *)malloc(n * sizeof(isolver_idx_t));
               memcpy(c_idx, idx.data(), n * sizeof(isolver_idx_t));
 
@@ -152,7 +155,7 @@ NB_MODULE(pysfem, m) {
              nb::ndarray<isolver_idx_t> idx,
              const int component,
              const isolver_scalar_t value) {
-               size_t n = idx.size();
+              size_t n = idx.size();
               auto c_idx = (idx_t *)malloc(n * sizeof(isolver_idx_t));
               memcpy(c_idx, idx.data(), n * sizeof(isolver_idx_t));
 

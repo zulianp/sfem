@@ -7,6 +7,7 @@ import sfem.mesh.rectangle_mesh as rectangle_mesh
 import pysfem as pysfem
 import sys, getopt
 import pdb
+import os
 
 idx_t = np.int32
 
@@ -33,14 +34,18 @@ def gradient_descent(fun, x):
 	return x
 
 def solve_poisson(options):
-	pysfem.init()
+
 	path = options.input_mesh
+
+	if not os.path.exists(options.output_dir):
+		os.mkdir(f'{options.output_dir}')
+
 	if path == "gen:rectangle":
-		idx, points = rectangle_mesh.create(2, 1, 1000, 1000, "triangle")
+		idx, points = rectangle_mesh.create(2, 1, 100, 100, "triangle")
 		sinlet  = np.array(np.where(np.abs(points[0]) 	< 1e-8), dtype=idx_t)
 		soutlet = np.array(np.where(np.abs(points[0] - 2) < 1e-8), dtype=idx_t)
 		m = pysfem.create_mesh("TRI3", np.array(idx), np.array(points))
-		m.write("rect_mesh")
+		m.write(f"{options.output_dir}/rect_mesh")
 	else:
 		m = pysfem.Mesh()		
 		m.read(path)
@@ -48,7 +53,7 @@ def solve_poisson(options):
 		sinlet = np.unique(np.fromfile(f'{path}/sidesets_aos/sinlet.raw', dtype=idx_t))
 		soutlet = np.fromfile(f'{path}/sidesets_aos/soutlet.raw', dtype=idx_t)
 
-	fs = pysfem.FunctionSpace(m, 1)
+	fs  = pysfem.FunctionSpace(m, 1)
 	fun = pysfem.Function(fs)
 	fun.set_output_dir(options.output_dir)
 
@@ -59,6 +64,7 @@ def solve_poisson(options):
 	pysfem.add_condition(bc, sinlet, 0, -1);
 	pysfem.add_condition(bc, soutlet, 0, 1);
 	fun.add_dirichlet_conditions(bc)
+	fun.set_output_dir(options.output_dir)
 
 	# If we have surface element sideset we can use Neumann conditions
 	# nc = pysfem.NeumannConditions(fs)
@@ -98,7 +104,7 @@ if __name__ == '__main__':
 
 	options = Opts()
 	options.input_mesh = sys.argv[1]
-	options.output = sys.argv[2]
+	options.output_dir = sys.argv[2]
 	
 	try:
 	    opts, args = getopt.getopt(
@@ -115,4 +121,6 @@ if __name__ == '__main__':
 	        print(usage)
 	        sys.exit()
 
+	pysfem.init()
 	solve_poisson(options)
+	pysfem.finalize()
