@@ -4,6 +4,7 @@
 #include "sfem_base.h"
 
 #include <assert.h>
+#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,6 +31,26 @@ enum ElemType {
     MACRO_TET4 = (MACRO + TET4),
     INVALID = -1
 };
+
+SFEM_INLINE static enum ElemType type_from_string(const char*str)
+{
+    if(!strcmp(str, "NODE1")) return NODE1;
+    if(!strcmp(str, "EDGE2")) return EDGE2;
+    if(!strcmp(str, "EDGE3")) return EDGE3;
+    if(!strcmp(str, "TRI3")) return TRI3;
+    if(!strcmp(str, "TRISHELL3")) return TRISHELL3;
+    if(!strcmp(str, "WEDGE6")) return WEDGE6;
+    if(!strcmp(str, "QUAD4")) return QUAD4;
+    if(!strcmp(str, "TET4")) return TET4;
+    if(!strcmp(str, "TRI6")) return TRI6;
+    if(!strcmp(str, "MACRO_TRI3")) return MACRO_TRI3;
+    if(!strcmp(str, "MACRO_TET4")) return MACRO_TET4;
+    if(!strcmp(str, "HEX8")) return HEX8;
+    if(!strcmp(str, "TET10")) return TET10;
+
+    assert(0);
+    return INVALID;
+}
 
 SFEM_INLINE static enum ElemType side_type(const enum ElemType type) {
     switch (type) {

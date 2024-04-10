@@ -8,7 +8,86 @@ import glob
 idx_t = np.int32
 geom_t = np.float32
 
-def rectangle_mesh(argv):
+def create(w, h, nx, ny, cell_type):
+	gx = np.linspace(0, w, num=nx, dtype=geom_t)
+	gy = np.linspace(0, h, num=ny, dtype=geom_t)
+
+	x, y = np.meshgrid(gx, gy)
+
+	x = np.reshape(x, x.shape[0] * x.shape[1])
+	y = np.reshape(y, y.shape[0] * y.shape[1])
+
+	points = [x, y]
+	idx = []
+
+	if cell_type == "quad":
+		i0 = np.zeros((nx - 1) * (ny - 1), dtype=idx_t)
+		i1 = np.zeros((nx - 1) * (ny - 1), dtype=idx_t)
+		i2 = np.zeros((nx - 1) * (ny - 1), dtype=idx_t)
+		i3 = np.zeros((nx - 1) * (ny - 1), dtype=idx_t)
+
+		count = 0
+		for yi in range(0, ny-1):
+			for xi in range(0, nx-1):
+				quad = np.array([
+				yi * nx + xi,
+				yi * nx + xi + 1,
+				(yi+1) * nx + xi + 1,
+				(yi+1) * nx + xi], dtype=idx_t)
+
+				i0[count] = quad[0]
+				i1[count] = quad[1]
+				i2[count] = quad[2]
+				i3[count] = quad[3]
+
+				count += 1
+
+
+		idx.append(i0)
+		idx.append(i1)
+		idx.append(i2)
+		idx.append(i3)
+
+	elif cell_type == "triangle":
+		i0 = np.zeros(2 * (nx - 1) * (ny - 1), dtype=idx_t)
+		i1 = np.zeros(2 * (nx - 1) * (ny - 1), dtype=idx_t)
+		i2 = np.zeros(2 * (nx - 1) * (ny - 1), dtype=idx_t)
+
+		count = 0
+		for yi in range(0, ny-1):
+			for xi in range(0, nx-1):
+				tri = np.array([
+				yi * nx + xi,
+				yi * nx + xi + 1,
+				(yi+1) * nx + xi], dtype=idx_t)
+
+				i0[count] = tri[0]
+				i1[count] = tri[1]
+				i2[count] = tri[2]
+				count += 1
+
+				tri = np.array([
+				yi * nx + xi + 1,
+				(yi+1) * nx + xi + 1,
+				(yi+1) * nx + xi], dtype=idx_t)
+
+				i0[count] = tri[0]
+				i1[count] = tri[1]
+				i2[count] = tri[2]
+				count += 1
+
+		idx.append(i0)
+		idx.append(i1)
+		idx.append(i2)
+	else:
+		print(f'Invalid cell_type {cell_type}')
+		sys.exit(1)
+
+	return idx, points
+
+if __name__ == '__main__':
+	argv = sys.argv
+
 	usage = f'usage: {argv[0]} <output_foler>'
 
 	if(len(argv) < 2):
@@ -54,82 +133,11 @@ def rectangle_mesh(argv):
 
 	print(f'nx={nx} ny={ny} width={w} height={h}')
 
-	gx = np.linspace(0, w, num=nx, dtype=geom_t)
-	gy = np.linspace(0, h, num=ny, dtype=geom_t)
+	idx, points = create(w, h, nx, ny, cell_type)
 
-	x, y = np.meshgrid(gx, gy)
+	prefix = ['x', 'y', 'z']
+	for d in range(0, len(points)):
+		points[d].tofile(f'{output_folder}/{prefix[d]}.raw')
 
-	x = np.reshape(x, x.shape[0] * x.shape[1])
-	y = np.reshape(y, y.shape[0] * y.shape[1])
-
-
-	if cell_type == "quad":
-		i0 = np.zeros((nx - 1) * (ny - 1), dtype=idx_t)
-		i1 = np.zeros((nx - 1) * (ny - 1), dtype=idx_t)
-		i2 = np.zeros((nx - 1) * (ny - 1), dtype=idx_t)
-		i3 = np.zeros((nx - 1) * (ny - 1), dtype=idx_t)
-
-		count = 0
-		for yi in range(0, ny-1):
-			for xi in range(0, nx-1):
-				quad = np.array([
-				yi * nx + xi,
-				yi * nx + xi + 1,
-				(yi+1) * nx + xi + 1,
-				(yi+1) * nx + xi], dtype=idx_t)
-
-				i0[count] = quad[0]
-				i1[count] = quad[1]
-				i2[count] = quad[2]
-				i3[count] = quad[3]
-
-				count += 1
-
-
-		i0.tofile(f'{output_folder}/i0.raw')
-		i1.tofile(f'{output_folder}/i1.raw')
-		i2.tofile(f'{output_folder}/i2.raw')
-		i3.tofile(f'{output_folder}/i3.raw')
-
-	elif cell_type == "triangle":
-		i0 = np.zeros(2 * (nx - 1) * (ny - 1), dtype=idx_t)
-		i1 = np.zeros(2 * (nx - 1) * (ny - 1), dtype=idx_t)
-		i2 = np.zeros(2 * (nx - 1) * (ny - 1), dtype=idx_t)
-
-		count = 0
-		for yi in range(0, ny-1):
-			for xi in range(0, nx-1):
-				tri = np.array([
-				yi * nx + xi,
-				yi * nx + xi + 1,
-				(yi+1) * nx + xi], dtype=idx_t)
-
-				i0[count] = tri[0]
-				i1[count] = tri[1]
-				i2[count] = tri[2]
-				count += 1
-
-				tri = np.array([
-				yi * nx + xi + 1,
-				(yi+1) * nx + xi + 1,
-				(yi+1) * nx + xi], dtype=idx_t)
-
-				i0[count] = tri[0]
-				i1[count] = tri[1]
-				i2[count] = tri[2]
-				count += 1
-
-		i0.tofile(f'{output_folder}/i0.raw')
-		i1.tofile(f'{output_folder}/i1.raw')
-		i2.tofile(f'{output_folder}/i2.raw')
-
-	else:
-		print(f'Invalid cell_type {cell_type}')
-		sys.exit(1)
-
-
-	x.tofile(f'{output_folder}/x.raw')
-	y.tofile(f'{output_folder}/y.raw')
-
-if __name__ == '__main__':
-	rectangle_mesh(sys.argv)
+	for d in range(0, len(idx)):
+		idx[d].tofile(f'{output_folder}/i{d}.raw')

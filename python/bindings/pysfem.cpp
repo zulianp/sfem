@@ -27,18 +27,57 @@ void SFEM_init() {
 NB_MODULE(pysfem, m) {
     using namespace sfem;
 
+    using Operator_t = Operator<isolver_scalar_t>;
+    using ConjugateGradient_t = sfem::ConjugateGradient<isolver_scalar_t>;
+
     m.def("init", &SFEM_init);
     nb::class_<Mesh>(m, "Mesh")  //
         .def(nb::init<>())
         .def("read", &Mesh::read)
+        .def("write", &Mesh::write)
         .def("convert_to_macro_element_mesh", &Mesh::convert_to_macro_element_mesh)
         .def("spatial_dimension", &Mesh::spatial_dimension);
 
-        // return nb::ndarray<nb::numpy, const float, nb::shape<2, -1>>(
-        //            /* data = */ data,
-        //            /* ndim = */ 2,
-        //            /* shape pointer = */ shape,
-        //            /* owner = */ nb::handle());
+    m.def("create_mesh",
+          [](const char *elem_type_name,
+             nb::ndarray<idx_t> idx,
+             nb::ndarray<geom_t> p) -> std::shared_ptr<Mesh> {
+                size_t n = idx.shape(0);
+              enum ElemType element_type = type_from_string(elem_type_name);
+
+              int nnxe = idx.shape(0);
+              ptrdiff_t nelements = idx.shape(1);
+              int spatial_dimension = p.shape(0);
+              ptrdiff_t nnodes = p.shape(1);
+
+              idx_t **elements = (idx_t **)malloc(nnxe * sizeof(idx_t *));
+              geom_t **points = (geom_t **)malloc(spatial_dimension * sizeof(geom_t *));
+
+              for (int d = 0; d <  nnxe; d++) {
+                  elements[d] = (idx_t *)malloc(nelements * sizeof(idx_t));
+
+                  for (ptrdiff_t i = 0; i <  nelements; i++) {
+                      elements[d][i] = idx.data()[d * nelements + i];
+                  }
+              }
+
+              for (int d = 0; d <  spatial_dimension; d++) {
+                  points[d] = (geom_t *)malloc(nnodes * sizeof(geom_t));
+                  for (ptrdiff_t i = 0; i < nnodes; i++) {
+                      points[d][i] = p.data()[d * nnodes + i];
+                  }
+              }
+
+              // Transfer ownership to mesh
+              return std::make_shared<Mesh>(
+                  spatial_dimension, element_type, nelements, elements, nnodes, points);
+          });
+
+    m.def("points",
+          [](std::shared_ptr<Mesh> &mesh, int coord) -> nb::ndarray<nb::numpy, const geom_t> {
+              return nb::ndarray<nb::numpy, const geom_t>(
+                  mesh->points(coord), {(size_t)mesh->n_nodes()}, nb::handle());
+          });
 
     nb::class_<FunctionSpace>(m, "FunctionSpace")
         .def(nb::init<std::shared_ptr<Mesh>>())
@@ -101,7 +140,7 @@ NB_MODULE(pysfem, m) {
              nb::ndarray<isolver_idx_t> idx,
              const int component,
              const isolver_scalar_t value) {
-              size_t n = idx.shape(0);
+             size_t n = idx.size();
               auto c_idx = (idx_t *)malloc(n * sizeof(isolver_idx_t));
               memcpy(c_idx, idx.data(), n * sizeof(isolver_idx_t));
 
@@ -113,14 +152,12 @@ NB_MODULE(pysfem, m) {
              nb::ndarray<isolver_idx_t> idx,
              const int component,
              const isolver_scalar_t value) {
-              size_t n = idx.shape(0);
+               size_t n = idx.size();
               auto c_idx = (idx_t *)malloc(n * sizeof(isolver_idx_t));
               memcpy(c_idx, idx.data(), n * sizeof(isolver_idx_t));
 
               nc->add_condition(n, n, c_idx, component, value);
           });
-
-    using Operator_t = Operator<isolver_scalar_t>;
 
     nb::class_<Operator_t>(m, "Operator");
     m.def("make_op",
@@ -129,14 +166,12 @@ NB_MODULE(pysfem, m) {
               auto ret = std::make_shared<Operator_t>();
 
               ret->apply = [=](const isolver_scalar_t *const x, isolver_scalar_t *const y) {
-                  memset(y, 0, u.shape(0) * sizeof(isolver_scalar_t));
+                  memset(y, 0, u.size() * sizeof(isolver_scalar_t));
                   fun->apply(u.data(), x, y);
               };
 
               return ret;
           });
-
-    using ConjugateGradient_t = sfem::ConjugateGradient<isolver_scalar_t>;
 
     nb::class_<ConjugateGradient_t>(m, "ConjugateGradient")
         .def(nb::init<>())
@@ -148,7 +183,7 @@ NB_MODULE(pysfem, m) {
           [](std::shared_ptr<ConjugateGradient_t> &cg,
              nb::ndarray<isolver_scalar_t> x,
              nb::ndarray<isolver_scalar_t> y) {
-              size_t n = x.shape(0);
+              size_t n = x.size();
               cg->apply(n, x.data(), y.data());
           });
 }

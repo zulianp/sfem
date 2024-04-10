@@ -7,6 +7,7 @@
 #include "read_mesh.h"
 #include "sfem_defs.h"
 #include "sfem_mesh.h"
+#include "sfem_mesh_write.h"
 
 #include "boundary_condition.h"
 #include "boundary_condition_io.h"
@@ -44,7 +45,23 @@ namespace sfem {
         }
     };
 
+    Mesh::Mesh(int spatial_dim,
+               enum ElemType element_type,
+               ptrdiff_t nelements,
+               idx_t **elements,
+               ptrdiff_t nnodes,
+               geom_t **points)
+        : impl_(std::make_unique<Impl>()) {
+        mesh_create_serial(
+            &impl_->mesh, spatial_dim, element_type, nelements, elements, nnodes, points);
+    }
+
     int Mesh::spatial_dimension() const { return impl_->mesh.spatial_dim; }
+    int Mesh::n_nodes_per_elem() const {
+        return elem_num_nodes((enum ElemType)impl_->mesh.element_type);
+    }
+    ptrdiff_t Mesh::n_nodes() const { return impl_->mesh.nnodes; }
+    ptrdiff_t Mesh::n_elements() const { return impl_->mesh.nelements; }
 
     Mesh::Mesh() : impl_(std::make_unique<Impl>()) {
         impl_->comm = MPI_COMM_WORLD;
@@ -64,6 +81,27 @@ namespace sfem {
         }
 
         return ISOLVER_FUNCTION_SUCCESS;
+    }
+
+    int Mesh::write(const char *path) const
+    {
+        if (mesh_write(path, &impl_->mesh)) {
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        return ISOLVER_FUNCTION_SUCCESS;
+    }
+
+    const geom_t *const Mesh::points(const int coord) const {
+        assert(coord < spatial_dimension());
+        assert(coord >= 0);
+        return impl_->mesh.points[coord];
+    }
+
+    const idx_t *const Mesh::idx(const int node_num) const {
+        assert(node_num < n_nodes_per_elem());
+        assert(node_num >= 0);
+        return impl_->mesh.elements[node_num];
     }
 
     int Mesh::initialize_node_to_node_graph() {
@@ -610,8 +648,8 @@ namespace sfem {
             }
         }
 
-        if(impl_->handle_constraints) {
-            for(auto &c : impl_->constraints) {
+        if (impl_->handle_constraints) {
+            for (auto &c : impl_->constraints) {
                 c->hessian_crs(x, rowptr, colidx, values);
             }
         }
@@ -628,7 +666,7 @@ namespace sfem {
             }
         }
 
-        if(impl_->handle_constraints) {
+        if (impl_->handle_constraints) {
             constraints_gradient(x, out);
         }
 
@@ -646,7 +684,7 @@ namespace sfem {
             }
         }
 
-        if(impl_->handle_constraints) {
+        if (impl_->handle_constraints) {
             copy_constrained_dofs(h, out);
         }
 
@@ -942,13 +980,13 @@ namespace sfem {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             assemble_mass((enum ElemType)mesh->element_type,
-                                  mesh->nelements,
-                                  mesh->nnodes,
-                                  mesh->elements,
-                                  mesh->points,
-                                  space->mesh().node_to_node_rowptr(),
-                                  space->mesh().node_to_node_colidx(),
-                                  values);
+                          mesh->nelements,
+                          mesh->nnodes,
+                          mesh->elements,
+                          mesh->points,
+                          space->mesh().node_to_node_rowptr(),
+                          space->mesh().node_to_node_colidx(),
+                          values);
 
             return ISOLVER_FUNCTION_SUCCESS;
         }
@@ -957,12 +995,12 @@ namespace sfem {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             apply_mass((enum ElemType)mesh->element_type,
-                                   mesh->nelements,
-                                   mesh->nnodes,
-                                   mesh->elements,
-                                   mesh->points,
-                                   x,
-                                   out);
+                       mesh->nelements,
+                       mesh->nnodes,
+                       mesh->elements,
+                       mesh->points,
+                       x,
+                       out);
 
             return ISOLVER_FUNCTION_SUCCESS;
         }

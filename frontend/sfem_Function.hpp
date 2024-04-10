@@ -3,8 +3,12 @@
 
 #include <mpi.h>
 #include <algorithm>
+#include <cstddef>
 #include <memory>
 #include <string>
+
+#include "sfem_base.h"
+#include "sfem_defs.h"
 
 #include "isolver_function.h"
 
@@ -26,18 +30,32 @@ namespace sfem {
         Mesh(MPI_Comm comm);
         ~Mesh();
 
+        Mesh(int spatial_dim,
+             enum ElemType element_type,
+             ptrdiff_t nelements,
+             idx_t **elements,
+             ptrdiff_t nnodes,
+             geom_t **points);
+
         friend class FunctionSpace;
         friend class Op;
         // friend class NeumannConditions;
 
         int read(const char *path);
+        int write(const char *path) const;
         int initialize_node_to_node_graph();
         int convert_to_macro_element_mesh();
 
         int spatial_dimension() const;
+        int n_nodes_per_elem() const;
+        ptrdiff_t n_nodes() const;
+        ptrdiff_t n_elements() const;
 
         const isolver_idx_t *node_to_node_rowptr() const;
         const isolver_idx_t *node_to_node_colidx() const;
+
+        const geom_t *const points(const int coord) const;
+        const idx_t *const idx(const int node_num) const;
 
         void *impl_mesh();
 
@@ -87,7 +105,9 @@ namespace sfem {
                                 isolver_scalar_t *const values) = 0;
 
         virtual int hessian_diag(const isolver_scalar_t *const /*x*/,
-                                 isolver_scalar_t *const /*values*/) { return ISOLVER_FUNCTION_FAILURE;}
+                                 isolver_scalar_t *const /*values*/) {
+            return ISOLVER_FUNCTION_FAILURE;
+        }
 
         virtual int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) = 0;
         virtual int apply(const isolver_scalar_t *const x,

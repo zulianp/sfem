@@ -35,6 +35,26 @@ void mesh_init(mesh_t *mesh) {
     mesh->ghosts = 0;
 }
 
+void mesh_create_serial(
+    mesh_t *mesh,
+    int spatial_dim,
+    enum ElemType element_type,
+    ptrdiff_t nelements,
+    idx_t **elements,
+    ptrdiff_t nnodes,
+    geom_t **points
+    )
+{
+    mesh_init(mesh);
+    mesh->comm = MPI_COMM_SELF;
+    mesh->spatial_dim = spatial_dim;
+    mesh->element_type = element_type;
+    mesh->nelements = nelements;
+    mesh->elements = elements;
+    mesh->nnodes = nnodes;
+    mesh->points = points;
+}
+
 void mesh_minmax_edge_length(const mesh_t *const mesh, real_t *emin, real_t *emax) {
     const int nnxe = elem_num_nodes(mesh->element_type);
     *emin = 1e10;

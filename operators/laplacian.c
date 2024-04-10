@@ -4,8 +4,8 @@
 #include "tri3_laplacian.h"
 #include "tri6_laplacian.h"
 
-#include "macro_tri3_laplacian.h"
 #include "macro_tet4_laplacian.h"
+#include "macro_tri3_laplacian.h"
 
 #include "sfem_defs.h"
 
@@ -42,6 +42,10 @@ void laplacian_assemble_gradient(int element_type,
                                  const real_t *const SFEM_RESTRICT u,
                                  real_t *const SFEM_RESTRICT values) {
     switch (element_type) {
+        case TRI3: {
+            tri3_laplacian_apply(nelements, nnodes, elems, xyz, u, values);
+            break;
+        }
         case TET4: {
             tet4_laplacian_assemble_gradient(nelements, nnodes, elems, xyz, u, values);
             break;
@@ -101,6 +105,10 @@ void laplacian_apply(int element_type,
                      const real_t *const SFEM_RESTRICT u,
                      real_t *const SFEM_RESTRICT values) {
     switch (element_type) {
+        case TRI3: {
+            tri3_laplacian_apply(nelements, nnodes, elems, xyz, u, values);
+            break;
+        }
         case TET4: {
             tet4_laplacian_apply(nelements, nnodes, elems, xyz, u, values);
             break;
