@@ -56,6 +56,11 @@ std::tuple<int, int> get_nearest_coordinates(const double x,
 }
 
 int main() {
+    const double xmin = 0;
+    const double xmax = 10;
+    const double ymin = 0;
+    const double ymax = 10;
+
     const double delta = 0.001;
     std::valarray<double> grid;
 
@@ -64,7 +69,7 @@ int main() {
     std::cout << "Generating grid..." << std::endl;
     std::cout << "delta = " << delta << std::endl;
 
-    const bool flag = generate_grid(grid, f, delta);
+    const bool flag = generate_grid(grid, f, delta, xmin, xmax, ymin, ymax);
 
     if (flag) {
         std::cout << "Grid generated successfully" << std::endl;
@@ -73,13 +78,13 @@ int main() {
     }
 
     {
-        const double x = 1.01;
-        const double y = 1.0;
+        const double x = 1.014;
+        const double y = 1.10;
 
         const auto [i, j] = get_nearest_coordinates(x, y, delta);
 
-        int nx = std::ceil((10 - 0) / delta);
-        int ny = std::ceil((10 - 0) / delta);
+        int nx = std::ceil((xmax - xmin) / delta);
+        int ny = std::ceil((ymax - ymin) / delta);
 
         std::cout << "x = " << x << ", y = " << y << std::endl;
         std::cout << "i = " << i << ", j = " << j << std::endl << std::endl;
