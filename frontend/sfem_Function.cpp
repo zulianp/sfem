@@ -20,6 +20,7 @@
 #include <iostream>
 #include <map>
 #include <vector>
+#include <sys/stat.h>
 
 // Ops
 
@@ -744,8 +745,8 @@ namespace sfem {
 
         {
             struct stat st = {0};
-            if (stat(impl_->output_dir, &st) == -1) {
-                mkdir(impl_->output_dir, 0700);
+            if (stat(impl_->output_dir.c_str(), &st) == -1) {
+                mkdir(impl_->output_dir.c_str(), 0700);
             }
         }
 

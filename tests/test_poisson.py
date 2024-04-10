@@ -4,6 +4,7 @@
 import numpy as np
 from numpy import linalg
 import sfem.mesh.rectangle_mesh as rectangle_mesh
+import sfem.mesh.box_mesh as box_mesh
 import pysfem as pysfem
 import sys, getopt
 import pdb
@@ -41,10 +42,17 @@ def solve_poisson(options):
 		os.mkdir(f'{options.output_dir}')
 
 	if path == "gen:rectangle":
-		idx, points = rectangle_mesh.create(2, 1, 100, 100, "triangle")
+		idx, points = rectangle_mesh.create(2, 1, 200, 100, "triangle")
 		sinlet  = np.array(np.where(np.abs(points[0]) 	< 1e-8), dtype=idx_t)
 		soutlet = np.array(np.where(np.abs(points[0] - 2) < 1e-8), dtype=idx_t)
 		m = pysfem.create_mesh("TRI3", np.array(idx), np.array(points))
+		m.write(f"{options.output_dir}/rect_mesh")
+	elif path == "gen:box":
+		resolution = 10
+		idx, points = box_mesh.create(2, 1, 1, resolution * 20, resolution * 10, resolution * 10, "tet4")
+		sinlet  = np.array(np.where(np.abs(points[0]) 	< 1e-8), dtype=idx_t)
+		soutlet = np.array(np.where(np.abs(points[0] - 2) < 1e-8), dtype=idx_t)
+		m = pysfem.create_mesh("TET4", np.array(idx), np.array(points))
 		m.write(f"{options.output_dir}/rect_mesh")
 	else:
 		m = pysfem.Mesh()		
