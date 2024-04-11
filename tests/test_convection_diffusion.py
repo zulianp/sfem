@@ -109,6 +109,8 @@ def convection_diffusion(options):
 
 	pysfem.write_time_step(out, "c", t, x)
 	buff = np.zeros(fs.n_dofs())
+
+	domain_integral0 = np.dot(x, mass)
 	
 	while(t < T):
 		t += dt
@@ -123,7 +125,7 @@ def convection_diffusion(options):
 			next_check_point += export_freq
 
 			domain_integral = np.dot(x, mass)
-			print(f't={t}, integr x = {domain_integral}')
+			print(f't={round(t, 5)}/{T}, integr(x) = {round(domain_integral, 5)}, diff  = {round((domain_integral - domain_integral0)/domain_integral0)}')
 
 class Opts:
 	def __init__(self):
