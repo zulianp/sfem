@@ -1216,11 +1216,11 @@ namespace sfem {
             SFEM_READ_ENV(SFEM_VELZ, );
 
             if (!SFEM_VELX || !SFEM_VELY || (!SFEM_VELZ && mesh->spatial_dim == 3)) {
-                fprintf(stderr,
-                        "No input velocity in env: SFEM_VELX=%s\n,SFEM_VELY=%s\n,SFEM_VELZ=%s\n",
-                        SFEM_VELX,
-                        SFEM_VELY,
-                        SFEM_VELZ);
+                // fprintf(stderr,
+                //         "No input velocity in env: SFEM_VELX=%s\n,SFEM_VELY=%s\n,SFEM_VELZ=%s\n",
+                //         SFEM_VELX,
+                //         SFEM_VELY,
+                //         SFEM_VELZ);
                 return ret;
             }
 

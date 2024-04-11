@@ -14,26 +14,44 @@ idx_t = np.int32
 real_t = np.float64
 
 def convection_diffusion(options):
-
 	path = options.input_mesh
 
 	if not os.path.exists(options.output_dir):
 		os.mkdir(f'{options.output_dir}')
 
-	n = 400
+	n = 100
 	h = 1./(n - 1)
 
 	if path == "gen:rectangle":
 		idx, points = rectangle_mesh.create(2, 1, 2*n, n, "triangle")
-		sinlet  = np.array(np.where(np.abs(points[0]) 	< 1e-8), dtype=idx_t)
-		soutlet = np.array(np.where(np.abs(points[0] - 2) < 1e-8), dtype=idx_t)
+
+		select_inlet  = np.abs(points[0]) 	< 1e-8
+		select_outlet = np.abs(points[0] - 2) < 1e-8
+		select_walls  = np.logical_or(np.abs(points[1]) < 1e-8, np.abs(points[1] - 1) < 1e-8)
+
+		sinlet  = np.array(np.where(select_inlet), dtype=idx_t)
+		soutlet = np.array(np.where(select_outlet), dtype=idx_t)
+		swalls  = np.array(np.where(select_walls), dtype=idx_t)
+
 		m = pysfem.create_mesh("TRI3", np.array(idx), np.array(points))
 		m.write(f"{options.output_dir}/rect_mesh")
 	elif path == "gen:box":
-		resolution = 10
-		idx, points = box_mesh.create(2, 1, 1, resolution * 20, resolution * 10, resolution * 10, "tet4")
-		sinlet  = np.array(np.where(np.abs(points[0]) 	< 1e-8), dtype=idx_t)
-		soutlet = np.array(np.where(np.abs(points[0] - 2) < 1e-8), dtype=idx_t)
+		idx, points = box_mesh.create(2, 1, 1, n * 2, n * 1, n * 1, "tet4")
+		
+		select_inlet  = np.abs(points[0]) 	< 1e-8
+		select_outlet = np.abs(points[0] - 2) < 1e-8
+		select_walls  = np.logical_or(
+			np.logical_or(
+				np.abs(points[1]) < 1e-8, 
+				np.abs(points[1] - 1) < 1e-8),
+			np.logical_or(
+				np.abs(points[2]) < 1e-8,
+				np.abs(points[2] - 1) < 1e-8))
+
+		sinlet  = np.array(np.where(select_inlet), dtype=idx_t)
+		soutlet = np.array(np.where(select_outlet), dtype=idx_t)
+		swalls  = np.array(np.where(select_walls), dtype=idx_t)
+
 		m = pysfem.create_mesh("TET4", np.array(idx), np.array(points))
 		m.write(f"{options.output_dir}/rect_mesh")
 	else:
@@ -72,20 +90,18 @@ def convection_diffusion(options):
 	fun.add_operator(convection_op)
 
 	# bc = pysfem.DirichletConditions(fs)
-	# pysfem.add_condition(bc, sinlet,  0, 0);
-	# pysfem.add_condition(bc, soutlet, 0, 1);
+	# pysfem.add_condition(bc, swalls,  0, 0);
 	# fun.add_dirichlet_conditions(bc)
 	
 	x = np.zeros(fs.n_dofs(),dtype=real_t)
-	
 	x[sinlet] = 1
 
 	mass = np.zeros(fs.n_dofs(), dtype=real_t)
 	pysfem.hessian_diag(mass_op, x, mass)
 	pysfem.apply_constraints(fun, x)
 
-	dt = 0.5/CFL
-	export_freq = 0.01
+	dt = 0.1/(CFL * m.spatial_dimension())
+	export_freq = 0.001
 	T = 1
 	t = 0
 
