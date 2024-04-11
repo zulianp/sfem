@@ -90,6 +90,27 @@ NB_MODULE(pysfem, m) {
     nb::class_<Op>(m, "Op");
     m.def("create_op", &Factory::create_op);
 
+    nb::class_<Output>(m, "Output")
+    .def("set_output_dir", &Output::set_output_dir)
+    .def("write", &Output::write)
+    .def("write_time_step", &Output::write_time_step);
+
+    m.def("set_field",
+          [](std::shared_ptr<Op> &op,
+             const char *name,
+             const int component,
+             nb::ndarray<isolver_scalar_t> v) {
+              size_t n = v.size();
+              auto c_v = (isolver_scalar_t *)malloc(n * sizeof(isolver_scalar_t));
+              memcpy(c_v, v.data(), n * sizeof(isolver_scalar_t));
+              op->set_field(name, component, c_v);
+          });
+
+    m.def("hessian_diag",
+          [](std::shared_ptr<Op> &op,
+             nb::ndarray<isolver_scalar_t> x,
+             nb::ndarray<isolver_scalar_t> d) { op->hessian_diag(x.data(), d.data()); });
+
     nb::class_<Function>(m, "Function")
         .def(nb::init<std::shared_ptr<FunctionSpace>>())
         .def("add_operator", &Function::add_operator)
@@ -144,7 +165,7 @@ NB_MODULE(pysfem, m) {
              const int component,
              const isolver_scalar_t value) {
               size_t n = idx.size();
-              auto c_idx = (idx_t *)malloc(n * sizeof(isolver_idx_t));
+              auto c_idx = (isolver_idx_t *)malloc(n * sizeof(isolver_idx_t));
               memcpy(c_idx, idx.data(), n * sizeof(isolver_idx_t));
 
               dc->add_condition(n, n, c_idx, component, value);
@@ -156,7 +177,7 @@ NB_MODULE(pysfem, m) {
              const int component,
              const isolver_scalar_t value) {
               size_t n = idx.size();
-              auto c_idx = (idx_t *)malloc(n * sizeof(isolver_idx_t));
+              auto c_idx = (isolver_idx_t *)malloc(n * sizeof(isolver_idx_t));
               memcpy(c_idx, idx.data(), n * sizeof(isolver_idx_t));
 
               nc->add_condition(n, n, c_idx, component, value);

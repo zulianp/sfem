@@ -118,7 +118,7 @@ int main(int argc, char *argv[]) {
     real_t SFEM_DT = 0.1;
     real_t SFEM_MAX_TIME = 1;
     real_t SFEM_EXPORT_FREQUENCY = 1;
-    real_t SFEM_DIFFUSIVITY = 1;
+    real_t SFEM_DIFFUSIVITY = 0;
     real_t SFEM_VELX = 1;
     real_t SFEM_VELY = 0;
     real_t SFEM_VELZ = 0;

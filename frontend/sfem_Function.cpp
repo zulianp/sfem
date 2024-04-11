@@ -6,6 +6,7 @@
 #include "crs_graph.h"
 #include "read_mesh.h"
 #include "sfem_defs.h"
+#include "sfem_logger.h"
 #include "sfem_mesh.h"
 #include "sfem_mesh_write.h"
 
@@ -15,12 +16,14 @@
 #include "dirichlet.h"
 #include "neumann.h"
 
+#include <sys/_types/_size_t.h>
+#include <sys/stat.h>
+#include <__nullptr>
 #include <fstream>
 #include <functional>
 #include <iostream>
 #include <map>
 #include <vector>
-#include <sys/stat.h>
 
 // Ops
 
@@ -584,6 +587,89 @@ namespace sfem {
 
 #define SFEM_FUNCTION_SCOPED_TIMING(acc) Timings::Scoped scoped_(&(acc))
 
+    class Output::Impl {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+        std::string output_dir{"."};
+        std::string file_format{"%s/%s.raw"};
+        std::string time_dependent_file_format{"%s/%s.%09d.raw"};
+        size_t export_counter{0};
+        logger_t time_logger;
+        Impl() { log_init(&time_logger); }
+        ~Impl() { log_destroy(&time_logger); }
+    };
+
+    Output::Output(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>()) {
+        impl_->space = space;
+
+        const char *SFEM_OUTPUT_DIR = ".";
+        SFEM_READ_ENV(SFEM_OUTPUT_DIR, );
+        impl_->output_dir = SFEM_OUTPUT_DIR;
+    }
+
+    Output::~Output() = default;
+
+    void Output::clear() { impl_->export_counter = 0; }
+
+    void Output::set_output_dir(const char *path) { impl_->output_dir = path; }
+
+    int Output::write(const char *name, const isolver_scalar_t *const x) {
+        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
+
+        {
+            struct stat st = {0};
+            if (stat(impl_->output_dir.c_str(), &st) == -1) {
+                mkdir(impl_->output_dir.c_str(), 0700);
+            }
+        }
+
+        char path[2048];
+        sprintf(path, impl_->file_format.c_str(), impl_->output_dir.c_str(), name);
+        if (array_write(mesh->comm,
+                        path,
+                        SFEM_MPI_REAL_T,
+                        x,
+                        mesh->nnodes * impl_->space->block_size(),
+                        mesh->nnodes * impl_->space->block_size())) {
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        return ISOLVER_FUNCTION_SUCCESS;
+    }
+
+    int Output::write_time_step(const char *name, const isolver_scalar_t t, const isolver_scalar_t *const x) {
+        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
+
+        {
+            struct stat st = {0};
+            if (stat(impl_->output_dir.c_str(), &st) == -1) {
+                mkdir(impl_->output_dir.c_str(), 0700);
+            }
+        }
+
+        if (impl_->export_counter) {
+            log_create_file(&impl_->time_logger, impl_->output_dir.c_str(), "w");
+        }
+
+        char path[2048];
+        sprintf(path,
+                impl_->time_dependent_file_format.c_str(),
+                impl_->output_dir.c_str(),
+                name,
+                impl_->export_counter++);
+        if (array_write(mesh->comm,
+                        path,
+                        SFEM_MPI_REAL_T,
+                        x,
+                        mesh->nnodes * impl_->space->block_size(),
+                        mesh->nnodes * impl_->space->block_size())) {
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        log_write_double(&impl_->time_logger, t);
+        return ISOLVER_FUNCTION_SUCCESS;
+    }
+
     class Function::Impl {
     public:
         std::shared_ptr<FunctionSpace> space;
@@ -592,16 +678,14 @@ namespace sfem {
         std::string output_dir;
         Timings timings;
 
+        std::shared_ptr<Output> output;
         bool handle_constraints{true};
     };
 
     Function::Function(const std::shared_ptr<FunctionSpace> &space)
         : impl_(std::make_unique<Impl>()) {
         impl_->space = space;
-
-        const char *SFEM_OUTPUT_DIR = ".";
-        SFEM_READ_ENV(SFEM_OUTPUT_DIR, );
-        impl_->output_dir = SFEM_OUTPUT_DIR;
+        impl_->output = std::make_shared<Output>(space);
     }
 
     Function::~Function() {
@@ -742,26 +826,7 @@ namespace sfem {
 
     int Function::report_solution(const isolver_scalar_t *const x) {
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
-
-        {
-            struct stat st = {0};
-            if (stat(impl_->output_dir.c_str(), &st) == -1) {
-                mkdir(impl_->output_dir.c_str(), 0700);
-            }
-        }
-
-        char path[2048];
-        sprintf(path, "%s/out.raw", impl_->output_dir.c_str());
-        if (array_write(mesh->comm,
-                        path,
-                        SFEM_MPI_REAL_T,
-                        x,
-                        mesh->nnodes * impl_->space->block_size(),
-                        mesh->nnodes * impl_->space->block_size())) {
-            return ISOLVER_FUNCTION_FAILURE;
-        }
-
-        return ISOLVER_FUNCTION_SUCCESS;
+        return impl_->output->write("out", x);
     }
 
     int Function::initial_guess(isolver_scalar_t *const x) { return ISOLVER_FUNCTION_SUCCESS; }
@@ -769,6 +834,11 @@ namespace sfem {
     int Function::set_output_dir(const char *path) {
         impl_->output_dir = path;
         return ISOLVER_FUNCTION_SUCCESS;
+    }
+
+    std::shared_ptr<Output> Function::output()
+    {
+        return impl_->output;
     }
 
     class LinearElasticity final : public Op {
@@ -1048,18 +1118,94 @@ namespace sfem {
         int report(const isolver_scalar_t *const) override { return ISOLVER_FUNCTION_SUCCESS; }
     };
 
-    class CVFEMConvection final : public Op {
+    class CVFEMMass final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        real_t *vel[3];
 
-        const char *name() const override { return "CVFEMConvection"; }
+        const char *name() const override { return "CVFEMMass"; }
         inline bool is_linear() const override { return true; }
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             assert(1 == space->block_size());
+
+            auto ret = std::make_unique<CVFEMMass>(space);
+            return ret;
+        }
+
+        int initialize() override { return ISOLVER_FUNCTION_SUCCESS; }
+
+        CVFEMMass(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+        int hessian_diag(const isolver_scalar_t *const /*x*/,
+                         isolver_scalar_t *const values) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            cvfem_cv_volumes((enum ElemType)mesh->element_type,
+                             mesh->nelements,
+                             mesh->nnodes,
+                             mesh->elements,
+                             mesh->points,
+                             values);
+            return ISOLVER_FUNCTION_SUCCESS;
+        }
+
+        int hessian_crs(const isolver_scalar_t *const x,
+                        const isolver_idx_t *const rowptr,
+                        const isolver_idx_t *const colidx,
+                        isolver_scalar_t *const values) override {
+            assert(0);
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) override {
+            assert(0);
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        int apply(const isolver_scalar_t *const x,
+                  const isolver_scalar_t *const h,
+                  isolver_scalar_t *const out) override {
+            assert(0);
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        int value(const isolver_scalar_t *x, isolver_scalar_t *const out) override {
+            assert(0);
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        int report(const isolver_scalar_t *const) override { return ISOLVER_FUNCTION_SUCCESS; }
+    };
+
+    class CVFEMUpwindConvection final : public Op {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+        real_t *vel[3];
+
+        const char *name() const override { return "CVFEMUpwindConvection"; }
+        inline bool is_linear() const override { return true; }
+
+        void set_field(const char * /* name  = velocity */,
+                       const int component,
+                       isolver_scalar_t *v) override {
+            if (vel[component]) {
+                free(vel[component]);
+            }
+
+            vel[component] = v;
+        }
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            assert(1 == space->block_size());
+
+            auto ret = std::make_unique<CVFEMUpwindConvection>(space);
+            ret->vel[0] = nullptr;
+            ret->vel[1] = nullptr;
+            ret->vel[2] = nullptr;
 
             const char *SFEM_VELX = nullptr;
             const char *SFEM_VELY = nullptr;
@@ -1071,15 +1217,12 @@ namespace sfem {
 
             if (!SFEM_VELX || !SFEM_VELY || (!SFEM_VELZ && mesh->spatial_dim == 3)) {
                 fprintf(stderr,
-                        "Missing input velocity SFEM_VELX=%s\n,SFEM_VELY=%s\n,SFEM_VELZ=%s\n",
+                        "No input velocity in env: SFEM_VELX=%s\n,SFEM_VELY=%s\n,SFEM_VELZ=%s\n",
                         SFEM_VELX,
                         SFEM_VELY,
                         SFEM_VELZ);
-                assert(0);
-                return nullptr;
+                return ret;
             }
-
-            auto ret = std::make_unique<CVFEMConvection>(space);
 
             ptrdiff_t nlocal, nglobal;
             if (array_create_from_file(mesh->comm,
@@ -1110,13 +1253,13 @@ namespace sfem {
 
         int initialize() override { return ISOLVER_FUNCTION_SUCCESS; }
 
-        CVFEMConvection(const std::shared_ptr<FunctionSpace> &space) : space(space) {
+        CVFEMUpwindConvection(const std::shared_ptr<FunctionSpace> &space) : space(space) {
             vel[0] = nullptr;
             vel[1] = nullptr;
             vel[2] = nullptr;
         }
 
-        ~CVFEMConvection() {}
+        ~CVFEMUpwindConvection() {}
 
         int hessian_crs(const isolver_scalar_t *const x,
                         const isolver_idx_t *const rowptr,
@@ -1208,8 +1351,9 @@ namespace sfem {
         if (instance_.impl_->name_to_create.empty()) {
             instance_.private_register_op("LinearElasticity", LinearElasticity::create);
             instance_.private_register_op("Laplacian", Laplacian::create);
-            instance_.private_register_op("CVFEMConvection", CVFEMConvection::create);
+            instance_.private_register_op("CVFEMUpwindConvection", CVFEMUpwindConvection::create);
             instance_.private_register_op("Mass", Mass::create);
+            instance_.private_register_op("CVFEMMass", Mass::create);
         }
 
         return instance_;

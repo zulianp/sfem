@@ -51,6 +51,7 @@ def solve_linear_elasticity(options):
 	cg.set_op(lop)
 	
 	g = np.zeros(fs.n_dofs())
+	sfem.apply_constraints(fun, x)
 	sfem.gradient(fun, x, g)
 	c = np.zeros(fs.n_dofs())
 	sfem.apply(cg, g, c)

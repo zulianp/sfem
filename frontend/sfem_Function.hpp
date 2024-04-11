@@ -117,6 +117,13 @@ namespace sfem {
         virtual int value(const isolver_scalar_t *x, isolver_scalar_t *const out) = 0;
         virtual int report(const isolver_scalar_t *const /*x*/) { return ISOLVER_FUNCTION_SUCCESS; }
         virtual ExecutionSpace execution_space() const { return EXECUTION_SPACE_HOST; }
+
+        virtual void set_field(
+            const char */*name*/, 
+            const int /*component*/, 
+            isolver_scalar_t */*x*/) {
+            assert(0);
+        }
     };
 
     class NeumannConditions final : public Op {
@@ -206,6 +213,20 @@ namespace sfem {
                            isolver_idx_t *const idx,
                            const int component,
                            const isolver_scalar_t value);
+    private:
+        class Impl;
+        std::unique_ptr<Impl> impl_;
+    };
+
+    class Output {
+    public:
+        Output(const std::shared_ptr<FunctionSpace> &space);
+        ~Output();
+        void set_output_dir(const char *path);
+        int write(const char *name, const isolver_scalar_t *const x);
+        int write_time_step(const char *name, const isolver_scalar_t t, const isolver_scalar_t *const x);
+
+        void clear();
 
     private:
         class Impl;
@@ -250,6 +271,8 @@ namespace sfem {
 
         int set_output_dir(const char *path);
 
+        std::shared_ptr<Output> output();
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;
@@ -263,7 +286,6 @@ namespace sfem {
         static void register_op(const std::string &name, FactoryFunction factory_function);
         static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,
                                              const char *name);
-
     private:
         static Factory &instance();
 

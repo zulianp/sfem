@@ -65,35 +65,62 @@ def solve_poisson(options):
 	fun = pysfem.Function(fs)
 	fun.set_output_dir(options.output_dir)
 
-	op = pysfem.create_op(fs, "Laplacian")
-	fun.add_operator(op)
+	velx = np.ones(fs.n_dofs());
+	vely = np.zeros(fs.n_dofs());
 
-	bc = pysfem.DirichletConditions(fs)
-	pysfem.add_condition(bc, sinlet, 0,  0);
-	pysfem.add_condition(bc, soutlet, 0, 1);
-	fun.add_dirichlet_conditions(bc)
+
+	mass_op = pysfem.create_op(fs, "CVFEMMass")
+	convection_op = pysfem.create_op(fs, "CVFEMUpwindConvection")
+	print(convection_op)
+	pysfem.set_field(convection_op, "velocity", 0, velx)
+	pysfem.set_field(convection_op, "velocity", 1, vely)
+
+	if m.spatial_dimension() == 3:
+		velz = np.zeros(fs.n_dofs());
+		pysfem.set_field(convection_op, "velocity", 2, velz)
+
+	fun.add_operator(convection_op)
+
+	# bc = pysfem.DirichletConditions(fs)
+	# pysfem.add_condition(bc, sinlet,  0, 0);
+	# pysfem.add_condition(bc, soutlet, 0, 1);
+	# fun.add_dirichlet_conditions(bc)
 	fun.set_output_dir(options.output_dir)
-
-	# If we have surface element sideset we can use Neumann conditions
-	# nc = pysfem.NeumannConditions(fs)
-	# pysfem.add_condition(nc, soutlet, 0, 1)
-	# fun.add_operator(nc)
+	out = fun.output()
 
 	x = np.zeros(fs.n_dofs())
-	g = np.zeros(fs.n_dofs())
-	c = np.zeros(fs.n_dofs())
 	
-	cg = pysfem.ConjugateGradient()
-	cg.default_init()
-	cg.set_max_it(30000)
+	x[sinlet] = 1
 
-	lop = pysfem.make_op(fun, x)
-	cg.set_op(lop)
-
+	mass = np.zeros(fs.n_dofs())
+	pysfem.hessian_diag(mass_op, x, mass)
 	pysfem.apply_constraints(fun, x)
-	pysfem.gradient(fun, x, g)
-	pysfem.apply(cg, g, c)
+
+	dt = 0.001
+	export_freq = 0.01
+	T = 0.1
+	t = 0
+
+	next_check_point = T * export_freq
+
+	out.write_time_step("c", t, x)
+	buff = np.zeros(fs.n_dofs())
 	
+	while(t < T):
+		t += dt
+
+		buff.fill(0)
+		pysfem.gradient(fun, x, buff)
+
+		x += dt * buff / mass
+
+		if t >= (next_check_point - dt / 2):
+			out.write_time_step("c", t, x)
+			next_check_point += export_freq
+
+			domain_integral = np.dot(x, mass)
+			print(f't={t}, integr x = {domain_integral}')
+
 	# Apply correction 
 	x -= c
 
