@@ -11,38 +11,20 @@ import pdb
 import os
 
 idx_t = np.int32
+real_t = np.float64
 
-def gradient_descent(fun, x):
-	g = np.zeros(fs.n_dofs())
-
-	alpha = 0.1
-	max_it = 1
-	for k in range(0, max_it):
-		# Reset content of g to zero before calling gradient
-		g.fill(0)
-		pysfem.gradient(fun, x, g)
-		
-		x -= alpha * g
-
-		norm_g = linalg.norm(g)
-		stop = norm_g < 1e-5
-		if np.mod(k, 1000) == 0 or stop:
-			val = pysfem.value(fun, x)
-			print(f'{k}) v = {val}, norm(g) = {norm_g}')
-			
-		if stop:
-			break
-	return x
-
-def solve_poisson(options):
+def convection_diffusion(options):
 
 	path = options.input_mesh
 
 	if not os.path.exists(options.output_dir):
 		os.mkdir(f'{options.output_dir}')
 
+	n = 400
+	h = 1./(n - 1)
+
 	if path == "gen:rectangle":
-		idx, points = rectangle_mesh.create(2, 1, 200, 100, "triangle")
+		idx, points = rectangle_mesh.create(2, 1, 2*n, n, "triangle")
 		sinlet  = np.array(np.where(np.abs(points[0]) 	< 1e-8), dtype=idx_t)
 		soutlet = np.array(np.where(np.abs(points[0] - 2) < 1e-8), dtype=idx_t)
 		m = pysfem.create_mesh("TRI3", np.array(idx), np.array(points))
@@ -63,21 +45,29 @@ def solve_poisson(options):
 
 	fs  = pysfem.FunctionSpace(m, 1)
 	fun = pysfem.Function(fs)
+
 	fun.set_output_dir(options.output_dir)
+	out = fun.output()
 
-	velx = np.ones(fs.n_dofs());
-	vely = np.zeros(fs.n_dofs());
+	velx = np.ones(fs.n_dofs(),dtype=real_t);
+	vely = np.zeros(fs.n_dofs(),dtype=real_t);
+	acc = velx * velx + vely * vely
 
+	CFL = np.max(np.abs(velx))/h
+	CFL += np.max(np.abs(vely))/h
 
 	mass_op = pysfem.create_op(fs, "CVFEMMass")
 	convection_op = pysfem.create_op(fs, "CVFEMUpwindConvection")
-	print(convection_op)
+
 	pysfem.set_field(convection_op, "velocity", 0, velx)
 	pysfem.set_field(convection_op, "velocity", 1, vely)
 
 	if m.spatial_dimension() == 3:
 		velz = np.zeros(fs.n_dofs());
 		pysfem.set_field(convection_op, "velocity", 2, velz)
+		CFL += np.max(np.abs(velz))/h
+
+	speed = np.max(np.sqrt(acc))
 
 	fun.add_operator(convection_op)
 
@@ -85,25 +75,23 @@ def solve_poisson(options):
 	# pysfem.add_condition(bc, sinlet,  0, 0);
 	# pysfem.add_condition(bc, soutlet, 0, 1);
 	# fun.add_dirichlet_conditions(bc)
-	fun.set_output_dir(options.output_dir)
-	out = fun.output()
-
-	x = np.zeros(fs.n_dofs())
+	
+	x = np.zeros(fs.n_dofs(),dtype=real_t)
 	
 	x[sinlet] = 1
 
-	mass = np.zeros(fs.n_dofs())
+	mass = np.zeros(fs.n_dofs(), dtype=real_t)
 	pysfem.hessian_diag(mass_op, x, mass)
 	pysfem.apply_constraints(fun, x)
 
-	dt = 0.001
+	dt = 0.5/CFL
 	export_freq = 0.01
-	T = 0.1
+	T = 1
 	t = 0
 
 	next_check_point = T * export_freq
 
-	out.write_time_step("c", t, x)
+	pysfem.write_time_step(out, "c", t, x)
 	buff = np.zeros(fs.n_dofs())
 	
 	while(t < T):
@@ -115,16 +103,11 @@ def solve_poisson(options):
 		x += dt * buff / mass
 
 		if t >= (next_check_point - dt / 2):
-			out.write_time_step("c", t, x)
+			pysfem.write_time_step(out, "c", t, x)
 			next_check_point += export_freq
 
 			domain_integral = np.dot(x, mass)
 			print(f't={t}, integr x = {domain_integral}')
-
-	# Apply correction 
-	x -= c
-
-	pysfem.report_solution(fun, x)
 
 class Opts:
 	def __init__(self):
@@ -157,5 +140,5 @@ if __name__ == '__main__':
 	        sys.exit()
 
 	pysfem.init()
-	solve_poisson(options)
+	convection_diffusion(options)
 	pysfem.finalize()

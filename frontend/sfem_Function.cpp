@@ -637,7 +637,9 @@ namespace sfem {
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
-    int Output::write_time_step(const char *name, const isolver_scalar_t t, const isolver_scalar_t *const x) {
+    int Output::write_time_step(const char *name,
+                                const isolver_scalar_t t,
+                                const isolver_scalar_t *const x) {
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
 
         {
@@ -645,10 +647,6 @@ namespace sfem {
             if (stat(impl_->output_dir.c_str(), &st) == -1) {
                 mkdir(impl_->output_dir.c_str(), 0700);
             }
-        }
-
-        if (impl_->export_counter) {
-            log_create_file(&impl_->time_logger, impl_->output_dir.c_str(), "w");
         }
 
         char path[2048];
@@ -666,6 +664,11 @@ namespace sfem {
             return ISOLVER_FUNCTION_FAILURE;
         }
 
+        if (log_is_empty(&impl_->time_logger)) {
+            sprintf(path, "%s/time.txt", impl_->output_dir.c_str());
+            log_create_file(&impl_->time_logger, path, "w");
+        }
+
         log_write_double(&impl_->time_logger, t);
         return ISOLVER_FUNCTION_SUCCESS;
     }
@@ -675,7 +678,6 @@ namespace sfem {
         std::shared_ptr<FunctionSpace> space;
         std::vector<std::shared_ptr<Op>> ops;
         std::vector<std::shared_ptr<Constraint>> constraints;
-        std::string output_dir;
         Timings timings;
 
         std::shared_ptr<Output> output;
@@ -832,14 +834,11 @@ namespace sfem {
     int Function::initial_guess(isolver_scalar_t *const x) { return ISOLVER_FUNCTION_SUCCESS; }
 
     int Function::set_output_dir(const char *path) {
-        impl_->output_dir = path;
+        impl_->output->set_output_dir(path);
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
-    std::shared_ptr<Output> Function::output()
-    {
-        return impl_->output;
-    }
+    std::shared_ptr<Output> Function::output() { return impl_->output; }
 
     class LinearElasticity final : public Op {
     public:
@@ -1148,6 +1147,7 @@ namespace sfem {
                              mesh->elements,
                              mesh->points,
                              values);
+
             return ISOLVER_FUNCTION_SUCCESS;
         }
 
@@ -1285,18 +1285,16 @@ namespace sfem {
         int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            // cvfem_convection_assemble_gradient((enum ElemType)mesh->element_type,
-            //                             mesh->nelements,
-            //                             mesh->nnodes,
-            //                             mesh->elements,
-            //                             mesh->points,
-            //                             x,
-            //                             out);
+            cvfem_convection_apply((enum ElemType)mesh->element_type,
+                                   mesh->nelements,
+                                   mesh->nnodes,
+                                   mesh->elements,
+                                   mesh->points,
+                                   vel,
+                                   x,
+                                   out);
 
-            // return ISOLVER_FUNCTION_SUCCESS;
-
-            assert(0);
-            return ISOLVER_FUNCTION_FAILURE;
+            return ISOLVER_FUNCTION_SUCCESS;
         }
 
         int apply(const isolver_scalar_t *const x,
@@ -1353,7 +1351,7 @@ namespace sfem {
             instance_.private_register_op("Laplacian", Laplacian::create);
             instance_.private_register_op("CVFEMUpwindConvection", CVFEMUpwindConvection::create);
             instance_.private_register_op("Mass", Mass::create);
-            instance_.private_register_op("CVFEMMass", Mass::create);
+            instance_.private_register_op("CVFEMMass", CVFEMMass::create);
         }
 
         return instance_;

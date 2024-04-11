@@ -91,9 +91,15 @@ NB_MODULE(pysfem, m) {
     m.def("create_op", &Factory::create_op);
 
     nb::class_<Output>(m, "Output")
-    .def("set_output_dir", &Output::set_output_dir)
-    .def("write", &Output::write)
-    .def("write_time_step", &Output::write_time_step);
+        .def("set_output_dir", &Output::set_output_dir)
+        .def("write", &Output::write)
+        .def("write_time_step", &Output::write_time_step);
+
+    m.def("write_time_step",
+          [](std::shared_ptr<Output> &out,
+             const char *name,
+             const isolver_scalar_t t,
+             nb::ndarray<isolver_scalar_t> x) { out->write_time_step(name, t, x.data()); });
 
     m.def("set_field",
           [](std::shared_ptr<Op> &op,
@@ -115,7 +121,8 @@ NB_MODULE(pysfem, m) {
         .def(nb::init<std::shared_ptr<FunctionSpace>>())
         .def("add_operator", &Function::add_operator)
         .def("add_dirichlet_conditions", &Function::add_dirichlet_conditions)
-        .def("set_output_dir", &Function::set_output_dir);
+        .def("set_output_dir", &Function::set_output_dir)
+        .def("output", &Function::output);
 
     m.def("apply",
           [](std::shared_ptr<Function> &fun,
