@@ -368,6 +368,11 @@ namespace sfem {
         impl_->n_neumann_conditions++;
     }
 
+    int Constraint::apply_zero(isolver_scalar_t *const x)
+    {
+        return apply_value(0, x);
+    }
+
     class DirichletConditions::Impl {
     public:
         std::shared_ptr<FunctionSpace> space;
@@ -483,18 +488,19 @@ namespace sfem {
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
-    int DirichletConditions::apply_zero(isolver_scalar_t *const x) {
+    int DirichletConditions::apply_value(const isolver_scalar_t value, isolver_scalar_t *const x) {
         for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
             constraint_nodes_to_value_vec(impl_->dirichlet_conditions[i].local_size,
                                           impl_->dirichlet_conditions[i].idx,
                                           impl_->space->block_size(),
                                           impl_->dirichlet_conditions[i].component,
-                                          0,
+                                          value,
                                           x);
         }
 
         return ISOLVER_FUNCTION_SUCCESS;
     }
+
     int DirichletConditions::copy_constrained_dofs(const isolver_scalar_t *const src,
                                                    isolver_scalar_t *const dest) {
         for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
@@ -1117,6 +1123,86 @@ namespace sfem {
         int report(const isolver_scalar_t *const) override { return ISOLVER_FUNCTION_SUCCESS; }
     };
 
+    class LumpedMass final : public Op {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+
+        const char *name() const override { return "LumpedMass"; }
+        inline bool is_linear() const override { return true; }
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            auto ret = std::make_unique<LumpedMass>(space);
+            return ret;
+        }
+
+        int initialize() override { return ISOLVER_FUNCTION_SUCCESS; }
+
+        LumpedMass(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+        int hessian_diag(const isolver_scalar_t *const /*x*/,
+                         isolver_scalar_t *const values) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            if (space->block_size() == 1) {
+                assemble_lumped_mass((enum ElemType)mesh->element_type,
+                                     mesh->nelements,
+                                     mesh->nnodes,
+                                     mesh->elements,
+                                     mesh->points,
+                                     values);
+            } else {
+                real_t *temp = (real_t *)calloc(mesh->nnodes, sizeof(real_t));
+                assemble_lumped_mass((enum ElemType)mesh->element_type,
+                                     mesh->nelements,
+                                     mesh->nnodes,
+                                     mesh->elements,
+                                     mesh->points,
+                                     temp);
+
+                int bs = space->block_size();
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < mesh->nnodes; i++) {
+                    for (int b = 0; b < bs; b++) {
+                        values[i * bs + b] += temp[i];
+                    }
+                }
+
+                free(temp);
+            }
+
+            return ISOLVER_FUNCTION_SUCCESS;
+        }
+
+        int hessian_crs(const isolver_scalar_t *const x,
+                        const isolver_idx_t *const rowptr,
+                        const isolver_idx_t *const colidx,
+                        isolver_scalar_t *const values) override {
+            assert(0);
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) override {
+            assert(0);
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        int apply(const isolver_scalar_t *const x,
+                  const isolver_scalar_t *const h,
+                  isolver_scalar_t *const out) override {
+            assert(0);
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        int value(const isolver_scalar_t *x, isolver_scalar_t *const out) override {
+            assert(0);
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        int report(const isolver_scalar_t *const) override { return ISOLVER_FUNCTION_SUCCESS; }
+    };
+
     class CVFEMMass final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
@@ -1352,6 +1438,7 @@ namespace sfem {
             instance_.private_register_op("CVFEMUpwindConvection", CVFEMUpwindConvection::create);
             instance_.private_register_op("Mass", Mass::create);
             instance_.private_register_op("CVFEMMass", CVFEMMass::create);
+            instance_.private_register_op("LumpedMass", LumpedMass::create);
         }
 
         return instance_;

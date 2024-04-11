@@ -38,6 +38,7 @@ NB_MODULE(pysfem, m) {
         .def(nb::init<>())
         .def("read", &Mesh::read)
         .def("write", &Mesh::write)
+        .def("n_nodes", &Mesh::n_nodes)
         .def("convert_to_macro_element_mesh", &Mesh::convert_to_macro_element_mesh)
         .def("spatial_dimension", &Mesh::spatial_dimension);
 
@@ -177,6 +178,11 @@ NB_MODULE(pysfem, m) {
 
               dc->add_condition(n, n, c_idx, component, value);
           });
+
+    m.def("apply_value",
+          [](std::shared_ptr<DirichletConditions> &dc,
+             isolver_scalar_t value,
+             nb::ndarray<isolver_scalar_t> y) { dc->apply_value(value, y.data()); });
 
     m.def("add_condition",
           [](std::shared_ptr<NeumannConditions> &nc,

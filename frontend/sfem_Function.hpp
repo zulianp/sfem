@@ -172,7 +172,8 @@ namespace sfem {
     public:
         virtual ~Constraint() = default;
         virtual int apply(isolver_scalar_t *const x) = 0;
-        virtual int apply_zero(isolver_scalar_t *const x) = 0;
+        virtual int apply_value(const isolver_scalar_t value, isolver_scalar_t *const x) = 0;
+        virtual int apply_zero(isolver_scalar_t *const x);
         virtual int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const g) = 0;
         virtual int copy_constrained_dofs(const isolver_scalar_t *const src,
                                           isolver_scalar_t *const dest) = 0;
@@ -191,7 +192,7 @@ namespace sfem {
         static std::unique_ptr<DirichletConditions> create_from_env(
             const std::shared_ptr<FunctionSpace> &space);
         int apply(isolver_scalar_t *const x) override;
-        int apply_zero(isolver_scalar_t *const x) override;
+        int apply_value(const isolver_scalar_t value, isolver_scalar_t *const x) override;
         int copy_constrained_dofs(const isolver_scalar_t *const src,
                                   isolver_scalar_t *const dest) override;
 
