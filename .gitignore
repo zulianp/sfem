@@ -215,3 +215,5 @@ libsfem.a
 linear_elasticity_assemble
 lumped_boundary_mass_inv
 lumped_mass_inv
+resampling/test_grid/local_grid.txt
+resampling/test_grid/test_grid
