@@ -554,7 +554,7 @@ __global__ void tet10_cuda_incore_linear_elasticity_apply_opt_kernel(
         }
 
 #ifdef SFEM_ENABLE_FP32_KERNELS
-        // 
+        //
         {
             // real_t use here instead of scalar_t to have division in full precision
             const real_t jacobian_determinant = g_jacobian_determinant[e];
