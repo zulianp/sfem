@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <functional>
 
 #include "sfem_base.h"
 #include "sfem_defs.h"

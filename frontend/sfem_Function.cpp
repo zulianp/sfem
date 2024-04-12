@@ -16,9 +16,7 @@
 #include "dirichlet.h"
 #include "neumann.h"
 
-#include <sys/_types/_size_t.h>
 #include <sys/stat.h>
-#include <__nullptr>
 #include <fstream>
 #include <functional>
 #include <iostream>
