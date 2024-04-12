@@ -70,4 +70,4 @@ class ProteusTet(FE):
 		self.points = points
 
 
-tet = ProteusTet(4)
+tet = ProteusTet(3)

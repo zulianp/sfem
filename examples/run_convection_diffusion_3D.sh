@@ -24,27 +24,27 @@ rm -rf convection_diffusion/out
 
 cd convection_diffusion
 
-export OMP_NUM_THREADS=16
-# export OMP_NUM_THREADS=8
+# export OMP_NUM_THREADS=16
+export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true
 
 SFEM_MESH_DIR=mesh
 export SFEM_ELEM_TYPE=tetra
 
 rm -rf $SFEM_MESH_DIR
-create_box.sh $SFEM_ELEM_TYPE 100 100 200 1 1 2 $SFEM_MESH_DIR
+create_box.sh $SFEM_ELEM_TYPE 50 50 100 1 1 2 $SFEM_MESH_DIR
 
 export SFEM_MAX_TIME=2
-export SFEM_DT=0.0005
-export SFEM_EXPORT_FREQUENCY=0.01
+export SFEM_DT=0.001
+export SFEM_EXPORT_FREQUENCY=0.05
 export SFEM_DIFFUSIVITY=0
 export SFEM_VELX=0
 export SFEM_VELY=0
-export SFEM_VELZ=1
+export SFEM_VELZ=2
 export SFEM_INITIAL_CONDITION="ivp.raw"
 
 eval_nodal_function.py \
-	"np.exp(-2*(0.5-x)**2) * np.exp(-2*(0.5-y)**2) * np.exp(-2*(0.2-z)**2)" \
+	"np.exp(-400*(0.5-x)**2) * np.exp(-400*(0.5-y)**2) * np.exp(-400*(0.2-z)**2)" \
 	$SFEM_MESH_DIR/x.raw $SFEM_MESH_DIR/y.raw $SFEM_MESH_DIR/z.raw $SFEM_INITIAL_CONDITION
 
 run_convection_diffusion $SFEM_MESH_DIR out

@@ -142,7 +142,6 @@ def subJ(micro_ref):
 
 	return sub_fff_generic(micro_ref, FFFs)
 
-
 def sub_adjugate(micro_ref):
 	return sub_adj_generic(micro_ref, adjugate)
 
