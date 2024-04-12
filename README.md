@@ -37,5 +37,5 @@ mkdir -p build && \
 cd build && \
 cmake .. -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR/sfem -DSFEM_ENABLE_PYTHON=ON && \
 make && make install
-export PYTHONPATH=$INSTALL_DIR/sfem/lib:$PYTHONPATH
+export PYTHONPATH=$INSTALL_DIR/sfem/lib:$INSTALL_DIR/sfem/scripts:$PYTHONPATH
 ```

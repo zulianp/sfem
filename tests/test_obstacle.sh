@@ -23,8 +23,8 @@ fi
 
 mesh=$1
 
-source $SCRIPTPATH/../venv/bin/activate
-export PATH=$PWD:$PATH
+# source $SCRIPTPATH/../venv/bin/activate
+# export PATH=$PWD:$PATH
 
 rm -rf output
 mkdir -p output
@@ -60,4 +60,4 @@ raw_to_db.py output/rect_mesh out.xmf  \
  --point_data="output/soa/disp.0.*.raw,output/soa/disp.1.*.raw" \
  --time_whole_txt="output/time.txt"
 
-deactivate
+# deactivate
