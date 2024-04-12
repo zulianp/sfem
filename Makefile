@@ -242,6 +242,7 @@ ifeq ($(cuda), 1)
 	CUDA_OBJS += sfem_cuda_blas.o
 	CUDA_OBJS += boundary_condition_incore_cuda.o
 	CUDA_OBJS += tet4_linear_elasticity_incore_cuda.o
+	CUDA_OBJS += tet10_linear_elasticity_incore_cuda.o
 
 	OBJS += laplacian_incore_cuda.o
 

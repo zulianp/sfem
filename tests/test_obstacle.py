@@ -17,7 +17,7 @@ def solve_obstacle(options):
 	if not os.path.exists(options.output_dir):
 		os.mkdir(f'{options.output_dir}')
 
-	n = 20
+	n = 10
 	h = 1./(n - 1)
 
 	if path == "gen:rectangle":
@@ -108,7 +108,7 @@ def solve_obstacle(options):
 	obs = np.zeros(fs.n_dofs())
 	obs[0::m.spatial_dimension()] = 2.0 - pysfem.points(m, 0)
 	penalty_param = (1/(dt * 1000))
-	penalty_param = 0 # Deactivate penalty
+	# penalty_param = 0 # Deactivate penalty
 
 	for d in range(1, m.spatial_dimension()):
 		obs[d::m.spatial_dimension()] = 1000

@@ -57,7 +57,7 @@ done
 
 raw_to_db.py output/rect_mesh out.xmf  \
  --transient \
- --point_data="output/soa/disp.0.*.raw,output/soa/disp.1.*.raw" \
+ --point_data="output/soa/disp.0.*.raw,output/soa/disp.1.*.raw,output/soa/disp.2.*.raw" \
  --time_whole_txt="output/time.txt"
 
 # deactivate
