@@ -17,6 +17,7 @@ extern "C" {
 #define POW2(a) ((a) * (a))
 
 // #define SFEM_ENABLE_FP32_KERNELS
+// #define SFEM_ENABLE_FP16_JACOBIANS
 
 #ifdef SFEM_ENABLE_FP32_KERNELS
 typedef float scalar_t;
@@ -45,8 +46,8 @@ static inline __device__ __host__ void adjugate_and_det_micro_kernel(
     const geom_t pz2,
     const geom_t pz3,
     const ptrdiff_t stride,
-    jacobian_t *adjugate,
-    jacobian_t *jacobian_determinant) {
+    cu_jacobian_t *adjugate,
+    cu_jacobian_t *jacobian_determinant) {
     // Compute jacobian in high precision
     real_t jacobian[9];
     jacobian[0] = -px0 + px1;
