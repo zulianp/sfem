@@ -1,4 +1,4 @@
-CC = g++
+CC = g++-13
 CFLAGS = -Wall -Ofast -std=c++17 -mtune=native -march=native
 LDFLAGS = 
 

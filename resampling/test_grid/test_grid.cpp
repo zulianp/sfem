@@ -151,14 +151,157 @@ inline void generate_MC_nodes(const int n,
     }
 }
 
-void make_square_domaind_stripe(const unsigned int nr_squares,
-                                const double side,
-                                const double xmin,
-                                const double ymin) {
+/**
+ * @brief Creates a square domain with stripes.
+ *
+ * This function creates a square domain with stripes by specifying the number of squares, side
+ * length, starting coordinates, and domain boundaries.
+ *
+ * @param nr_squares The number of squares in the domain.
+ * @param side The side length of each square.
+ * @param xstart The starting x-coordinate of the domain.
+ * @param ystart The starting y-coordinate of the domain.
+ * @param xmin The minimum x-coordinate of the domain.
+ * @param xmax The maximum x-coordinate of the domain.
+ * @param ymin The minimum y-coordinate of the domain.
+ * @param ymax The maximum y-coordinate of the domain.
+ * @param x_coords Reference to a valarray to store the x-coordinates of the squares.
+ * @param y_coords Reference to a valarray to store the y-coordinates of the squares.
+ * @return The number of squares created in the domain.
+ */
+unsigned int make_square_domaind_stripe(const unsigned int nr_squares,      //
+                                        const double side,                  //
+                                        const double xstart,                //
+                                        const double ystart,                //
+                                        const double xmin,                  //
+                                        const double xmax,                  //
+                                        const double ymin,                  //
+                                        const double ymax,                  //
+                                        std::valarray<double> &x_coords,    //
+                                        std::valarray<double> &y_coords) {  //
+    //
+    // if (xstart < xmin or xstart + nr_squares * side > xmax or ystart < ymin or
+    //     ystart + nr_squares * side > ymax) {
+    //     std::cerr << "Invalid domain" << std::endl;
+    //     return 0;
+    // }
+
+    x_coords.resize(nr_squares);
+    y_coords.resize(nr_squares);
+
+    unsigned int i = 0;
+    unsigned int j = 0;
+    unsigned int cnt = 0;
+
+    while (true) {
+        if (xstart + i * side + side > xmax) {
+            i = 0;
+            ++j;
+        }
+
+        if (ystart + j * side + side > ymax) {
+            break;
+        }
+
+        x_coords[cnt] = xstart + i * side;
+        y_coords[cnt] = ystart + j * side;
+
+        if (cnt >= nr_squares) {
+            break;
+        }
+        cnt++;
+        i++;
+    }
+
+    return cnt;
+}
+
+/**
+ * This function tests the generation of a grid and the creation of square domains.
+ *
+ * @param argc The number of command-line arguments.
+ * @param argv An array of command-line arguments.
+ * @return 0 indicating successful execution.
+ */
+int test_quadratures(int argc, char **argv) {
+    // Define the domain
+    const double xmin = 0.0;
+    const double xmax = 10.0;
+
+    const double ymin = 0.0;
+    const double ymax = 10.0;
+
+    const double delta = 0.04;
+    std::valarray<double> grid;
+
+    auto f = [](double x, double y) { return x * x + y * y; };
+
+    std::cout << "Generating grid..." << std::endl;
+    std::cout << "delta = " << delta << std::endl;
+
+    int nx = 0;
+    int ny = 0;
+
+    const bool flag = generate_grid(grid, nx, ny, f, delta, xmin, xmax, ymin, ymax);
+
+    if (flag) {
+        std::cout << "Grid generated successfully" << std::endl;
+    } else {
+        std::cout << "Failed to generate grid" << std::endl;
+    }
+
+    std::valarray<double> x_coords, y_coords;
+    const unsigned int nr_squares = 200;
+    const double side = 0.42;
+    const double xstart = 1.21;
+    const double ystart = 1.33;
+
+    const unsigned int n = make_square_domaind_stripe(nr_squares,  //
+                                                      side,
+                                                      xstart,
+                                                      ystart,
+                                                      xmin,
+                                                      xmax,
+                                                      ymin,
+                                                      ymax,
+                                                      x_coords,
+                                                      y_coords);
+
+    std::cout << "Number of squares created = " << n << std::endl;
+
+    // for (unsigned int i = 0; i < n; ++i) {
+    //     std::cout << "Square " << i << ": (" << x_coords[i] << ", " << y_coords[i] << ")"
+    //               << std::endl;
+    // }
+
+    std::vector<std::valarray<double>> x_MC, y_MC, w_MC;
+
+    unsigned int MC_nodes = 100;
+
+    for (unsigned int i = 0; i < n; ++i) {
+        std::valarray<double> x, y, w;
+        generate_MC_nodes(MC_nodes,  //
+                          x_coords[i],
+                          x_coords[i] + side,
+                          y_coords[i],
+                          y_coords[i] + side,
+                          x,
+                          y,
+                          w);
+        x_MC.push_back(x);
+        y_MC.push_back(y);
+        w_MC.push_back(w);
+    }
+
+    std::valarray<double> local_grid;
+    int n_local = 0;
+    copy_to_local_grid(grid, nx, ny, x_coords[0], y_coords[0], side, delta, local_grid, n_local);
+
+    std::cout << "local_grid.size() = " << local_grid.size() << std::endl;
 
 
-                                    
-                                }
+    return 0;
+}
 
 /**
  * @brief The main function of the program.
@@ -171,6 +314,8 @@ void make_square_domaind_stripe(const unsigned int nr_squares,
  * @return 0 on successful execution.
  */
 int main(int argc, char **argv) {
+    return test_quadratures(argc, argv);
+
     // Define the domain
     const double xmin = 0.0;
     const double xmax = 10.0;
