@@ -6,7 +6,9 @@
 #include "crs_graph.h"
 #include "read_mesh.h"
 #include "sfem_defs.h"
+#include "sfem_logger.h"
 #include "sfem_mesh.h"
+#include "sfem_mesh_write.h"
 
 #include "boundary_condition.h"
 #include "boundary_condition_io.h"
@@ -14,6 +16,10 @@
 #include "dirichlet.h"
 #include "neumann.h"
 
+#include <sys/_types/_size_t.h>
+#include <sys/stat.h>
+#include <__nullptr>
+#include <fstream>
 #include <functional>
 #include <iostream>
 #include <map>
@@ -24,6 +30,7 @@
 #include "cvfem_operators.h"
 #include "laplacian.h"
 #include "linear_elasticity.h"
+#include "mass.h"
 
 namespace sfem {
 
@@ -42,6 +49,29 @@ namespace sfem {
         }
     };
 
+    Mesh::Mesh(int spatial_dim,
+               enum ElemType element_type,
+               ptrdiff_t nelements,
+               idx_t **elements,
+               ptrdiff_t nnodes,
+               geom_t **points)
+        : impl_(std::make_unique<Impl>()) {
+        mesh_create_serial(
+            &impl_->mesh, spatial_dim, element_type, nelements, elements, nnodes, points);
+    }
+
+    int Mesh::spatial_dimension() const { return impl_->mesh.spatial_dim; }
+    int Mesh::n_nodes_per_elem() const {
+        return elem_num_nodes((enum ElemType)impl_->mesh.element_type);
+    }
+    ptrdiff_t Mesh::n_nodes() const { return impl_->mesh.nnodes; }
+    ptrdiff_t Mesh::n_elements() const { return impl_->mesh.nelements; }
+
+    Mesh::Mesh() : impl_(std::make_unique<Impl>()) {
+        impl_->comm = MPI_COMM_WORLD;
+        mesh_init(&impl_->mesh);
+    }
+
     Mesh::Mesh(MPI_Comm comm) : impl_(std::make_unique<Impl>()) {
         impl_->comm = comm;
         mesh_init(&impl_->mesh);
@@ -55,6 +85,26 @@ namespace sfem {
         }
 
         return ISOLVER_FUNCTION_SUCCESS;
+    }
+
+    int Mesh::write(const char *path) const {
+        if (mesh_write(path, &impl_->mesh)) {
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        return ISOLVER_FUNCTION_SUCCESS;
+    }
+
+    const geom_t *const Mesh::points(const int coord) const {
+        assert(coord < spatial_dimension());
+        assert(coord >= 0);
+        return impl_->mesh.points[coord];
+    }
+
+    const idx_t *const Mesh::idx(const int node_num) const {
+        assert(node_num < n_nodes_per_elem());
+        assert(node_num >= 0);
+        return impl_->mesh.elements[node_num];
     }
 
     int Mesh::initialize_node_to_node_graph() {
@@ -111,6 +161,12 @@ namespace sfem {
     Mesh &FunctionSpace::mesh() { return *impl_->mesh; }
 
     int FunctionSpace::block_size() const { return impl_->block_size; }
+
+    ptrdiff_t FunctionSpace::n_dofs() const {
+        auto &mesh = *impl_->mesh;
+        auto c_mesh = &mesh.impl_->mesh;
+        return c_mesh->nnodes * block_size();
+    }
 
     int FunctionSpace::create_crs_graph(ptrdiff_t *nlocal,
                                         ptrdiff_t *nglobal,
@@ -176,7 +232,7 @@ namespace sfem {
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
-    class NeumannBoundaryConditions::Impl {
+    class NeumannConditions::Impl {
     public:
         std::shared_ptr<FunctionSpace> space;
 
@@ -194,16 +250,17 @@ namespace sfem {
         boundary_condition_t *neumann_conditions{nullptr};
     };
 
-    NeumannBoundaryConditions::NeumannBoundaryConditions(
-        const std::shared_ptr<FunctionSpace> &space)
+    const char *NeumannConditions::name() const { return "NeumannConditions"; }
+
+    NeumannConditions::NeumannConditions(const std::shared_ptr<FunctionSpace> &space)
         : impl_(std::make_unique<Impl>()) {
         impl_->space = space;
     }
 
-    std::unique_ptr<NeumannBoundaryConditions> NeumannBoundaryConditions::create_from_env(
+    std::unique_ptr<NeumannConditions> NeumannConditions::create_from_env(
         const std::shared_ptr<FunctionSpace> &space) {
         //
-        auto nc = std::make_unique<NeumannBoundaryConditions>(space);
+        auto nc = std::make_unique<NeumannConditions>(space);
 
         char *SFEM_NEUMANN_SIDESET = 0;
         char *SFEM_NEUMANN_VALUE = 0;
@@ -223,17 +280,16 @@ namespace sfem {
         return nc;
     }
 
-    NeumannBoundaryConditions::~NeumannBoundaryConditions() = default;
+    NeumannConditions::~NeumannConditions() = default;
 
-    int NeumannBoundaryConditions::hessian_crs(const isolver_scalar_t *const /*x*/,
-                                               const isolver_idx_t *const /*rowptr*/,
-                                               const isolver_idx_t *const /*colidx*/,
-                                               isolver_scalar_t *const /*values*/) {
+    int NeumannConditions::hessian_crs(const isolver_scalar_t *const /*x*/,
+                                       const isolver_idx_t *const /*rowptr*/,
+                                       const isolver_idx_t *const /*colidx*/,
+                                       isolver_scalar_t *const /*values*/) {
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
-    int NeumannBoundaryConditions::gradient(const isolver_scalar_t *const x,
-                                            isolver_scalar_t *const out) {
+    int NeumannConditions::gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) {
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
 
         for (int i = 0; i < impl_->n_neumann_conditions; i++) {
@@ -247,17 +303,74 @@ namespace sfem {
                                          impl_->neumann_conditions[i].component,
                                          out);
         }
+
         return ISOLVER_FUNCTION_SUCCESS;
     }
-    int NeumannBoundaryConditions::apply(const isolver_scalar_t *const /*x*/,
-                                         const isolver_scalar_t *const /*h*/,
-                                         isolver_scalar_t *const /*out*/) {
+    int NeumannConditions::apply(const isolver_scalar_t *const /*x*/,
+                                 const isolver_scalar_t *const /*h*/,
+                                 isolver_scalar_t *const /*out*/) {
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
-    int NeumannBoundaryConditions::value(const isolver_scalar_t *x, isolver_scalar_t *const out) {
+    int NeumannConditions::value(const isolver_scalar_t *x, isolver_scalar_t *const out) {
         // TODO
         return ISOLVER_FUNCTION_SUCCESS;
+    }
+
+    void NeumannConditions::add_condition(const ptrdiff_t local_size,
+                                          const ptrdiff_t global_size,
+                                          isolver_idx_t *const idx,
+                                          const int component,
+                                          const isolver_scalar_t value) {
+        impl_->neumann_conditions = (boundary_condition_t *)realloc(
+            impl_->neumann_conditions,
+            (impl_->n_neumann_conditions + 1) * sizeof(boundary_condition_t));
+
+        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
+        enum ElemType stype = side_type((enum ElemType)mesh->element_type);
+        int nns = elem_num_nodes(stype);
+
+        assert((local_size / nns) * nns == local_size);
+        assert((global_size / nns) * nns == global_size);
+
+        boundary_condition_create(&impl_->neumann_conditions[impl_->n_neumann_conditions],
+                                  local_size / nns,
+                                  global_size / nns,
+                                  idx,
+                                  component,
+                                  value,
+                                  nullptr);
+
+        impl_->n_neumann_conditions++;
+    }
+
+    void NeumannConditions::add_condition(const ptrdiff_t local_size,
+                                          const ptrdiff_t global_size,
+                                          isolver_idx_t *const idx,
+                                          const int component,
+                                          isolver_scalar_t *const values) {
+        impl_->neumann_conditions = (boundary_condition_t *)realloc(
+            impl_->neumann_conditions,
+            (impl_->n_neumann_conditions + 1) * sizeof(boundary_condition_t));
+
+        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
+        enum ElemType stype = side_type((enum ElemType)mesh->element_type);
+        int nns = elem_num_sides(stype);
+
+        boundary_condition_create(&impl_->neumann_conditions[impl_->n_neumann_conditions],
+                                  local_size / nns,
+                                  global_size / nns,
+                                  idx,
+                                  component,
+                                  0,
+                                  values);
+
+        impl_->n_neumann_conditions++;
+    }
+
+    int Constraint::apply_zero(isolver_scalar_t *const x)
+    {
+        return apply_value(0, x);
     }
 
     class DirichletConditions::Impl {
@@ -277,6 +390,53 @@ namespace sfem {
         int n_dirichlet_conditions{0};
         boundary_condition_t *dirichlet_conditions{nullptr};
     };
+
+    DirichletConditions::DirichletConditions(const std::shared_ptr<FunctionSpace> &space)
+        : impl_(std::make_unique<Impl>()) {
+        impl_->space = space;
+    }
+
+    DirichletConditions::~DirichletConditions() = default;
+
+    void DirichletConditions::add_condition(const ptrdiff_t local_size,
+                                            const ptrdiff_t global_size,
+                                            isolver_idx_t *const idx,
+                                            const int component,
+                                            const isolver_scalar_t value) {
+        impl_->dirichlet_conditions = (boundary_condition_t *)realloc(
+            impl_->dirichlet_conditions,
+            (impl_->n_dirichlet_conditions + 1) * sizeof(boundary_condition_t));
+
+        boundary_condition_create(&impl_->dirichlet_conditions[impl_->n_dirichlet_conditions],
+                                  local_size,
+                                  global_size,
+                                  idx,
+                                  component,
+                                  value,
+                                  nullptr);
+
+        impl_->n_dirichlet_conditions++;
+    }
+
+    void DirichletConditions::add_condition(const ptrdiff_t local_size,
+                                            const ptrdiff_t global_size,
+                                            isolver_idx_t *const idx,
+                                            const int component,
+                                            isolver_scalar_t *const values) {
+        impl_->dirichlet_conditions = (boundary_condition_t *)realloc(
+            impl_->dirichlet_conditions,
+            (impl_->n_dirichlet_conditions + 1) * sizeof(boundary_condition_t));
+
+        boundary_condition_create(&impl_->dirichlet_conditions[impl_->n_dirichlet_conditions],
+                                  local_size,
+                                  global_size,
+                                  idx,
+                                  component,
+                                  0,
+                                  values);
+
+        impl_->n_dirichlet_conditions++;
+    }
 
     std::unique_ptr<DirichletConditions> DirichletConditions::create_from_env(
         const std::shared_ptr<FunctionSpace> &space) {
@@ -301,7 +461,7 @@ namespace sfem {
         return dc;
     }
 
-    int DirichletConditions::apply_constraints(isolver_scalar_t *const x) {
+    int DirichletConditions::apply(isolver_scalar_t *const x) {
         for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
             constraint_nodes_to_value_vec(impl_->dirichlet_conditions[i].local_size,
                                           impl_->dirichlet_conditions[i].idx,
@@ -314,18 +474,33 @@ namespace sfem {
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
-    int DirichletConditions::apply_zero_constraints(isolver_scalar_t *const x) {
+    int DirichletConditions::gradient(const isolver_scalar_t *const x, isolver_scalar_t *const g) {
+        for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
+            constraint_gradient_nodes_to_value_vec(impl_->dirichlet_conditions[i].local_size,
+                                                   impl_->dirichlet_conditions[i].idx,
+                                                   impl_->space->block_size(),
+                                                   impl_->dirichlet_conditions[i].component,
+                                                   impl_->dirichlet_conditions[i].value,
+                                                   x,
+                                                   g);
+        }
+
+        return ISOLVER_FUNCTION_SUCCESS;
+    }
+
+    int DirichletConditions::apply_value(const isolver_scalar_t value, isolver_scalar_t *const x) {
         for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
             constraint_nodes_to_value_vec(impl_->dirichlet_conditions[i].local_size,
                                           impl_->dirichlet_conditions[i].idx,
                                           impl_->space->block_size(),
                                           impl_->dirichlet_conditions[i].component,
-                                          0,
+                                          value,
                                           x);
         }
 
         return ISOLVER_FUNCTION_SUCCESS;
     }
+
     int DirichletConditions::copy_constrained_dofs(const isolver_scalar_t *const src,
                                                    isolver_scalar_t *const dest) {
         for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
@@ -358,112 +533,104 @@ namespace sfem {
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
-    class Function::Impl {
+    class Timings {
     public:
-        std::shared_ptr<FunctionSpace> space;
-        std::vector<std::shared_ptr<Op>> ops;
-        std::vector<std::shared_ptr<Constraint>> constraints;
-        std::string output_dir;
+        static double tick() { return MPI_Wtime(); }
+
+        class Scoped {
+        public:
+            double tick_{0};
+            double *value_;
+            Scoped(double *value) : value_(value) { tick_ = tick(); }
+
+            ~Scoped() { *value_ += tick() - tick_; }
+        };
+
+        double create_crs_graph{0};
+        double destroy_crs_graph{0};
+        double hessian_crs{0};
+        double gradient{0};
+        double apply{0};
+        double value{0};
+        double apply_constraints{0};
+        double constraints_gradient{0};
+        double apply_zero_constraints{0};
+        double copy_constrained_dofs{0};
+        double report_solution{0};
+        double initial_guess{0};
+
+        void clear() {
+            create_crs_graph = 0;
+            destroy_crs_graph = 0;
+            hessian_crs = 0;
+            gradient = 0;
+            apply = 0;
+            value = 0;
+            apply_constraints = 0;
+            constraints_gradient = 0;
+            apply_zero_constraints = 0;
+            copy_constrained_dofs = 0;
+            report_solution = 0;
+            initial_guess = 0;
+        }
+
+        void describe(std::ostream &os) const {
+            os << "function,seconds\n";
+            os << "create_crs_graph," << create_crs_graph << "\n";
+            os << "destroy_crs_graph," << destroy_crs_graph << "\n";
+            os << "hessian_crs," << hessian_crs << "\n";
+            os << "gradient," << gradient << "\n";
+            os << "apply," << apply << "\n";
+            os << "value," << value << "\n";
+            os << "apply_constraints," << apply_constraints << "\n";
+            os << "constraints_gradient," << constraints_gradient << "\n";
+            os << "apply_zero_constraints," << apply_zero_constraints << "\n";
+            os << "copy_constrained_dofs," << copy_constrained_dofs << "\n";
+            os << "report_solution," << report_solution << "\n";
+            os << "initial_guess," << initial_guess << "\n";
+        }
     };
 
-    Function::Function(const std::shared_ptr<FunctionSpace> &space)
-        : impl_(std::make_unique<Impl>()) {
+#define SFEM_FUNCTION_SCOPED_TIMING(acc) Timings::Scoped scoped_(&(acc))
+
+    class Output::Impl {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+        std::string output_dir{"."};
+        std::string file_format{"%s/%s.raw"};
+        std::string time_dependent_file_format{"%s/%s.%09d.raw"};
+        size_t export_counter{0};
+        logger_t time_logger;
+        Impl() { log_init(&time_logger); }
+        ~Impl() { log_destroy(&time_logger); }
+    };
+
+    Output::Output(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>()) {
         impl_->space = space;
 
-        const char *SFEM_OUTPUT_DIR = "./sfem_output";
+        const char *SFEM_OUTPUT_DIR = ".";
         SFEM_READ_ENV(SFEM_OUTPUT_DIR, );
         impl_->output_dir = SFEM_OUTPUT_DIR;
     }
 
-    Function::~Function() {}
+    Output::~Output() = default;
 
-    void Function::add_operator(const std::shared_ptr<Op> &op) { impl_->ops.push_back(op); }
-    void Function::add_operator(const std::shared_ptr<Constraint> &c) { impl_->constraints.push_back(c); }
+    void Output::clear() { impl_->export_counter = 0; }
 
-    int Function::create_crs_graph(ptrdiff_t *nlocal,
-                                   ptrdiff_t *nglobal,
-                                   ptrdiff_t *nnz,
-                                   isolver_idx_t **rowptr,
-                                   isolver_idx_t **colidx) {
-        return impl_->space->create_crs_graph(nlocal, nglobal, nnz, rowptr, colidx);
-    }
+    void Output::set_output_dir(const char *path) { impl_->output_dir = path; }
 
-    int Function::destroy_crs_graph(isolver_idx_t *rowptr, isolver_idx_t *colidx) {
-        return impl_->space->destroy_crs_graph(rowptr, colidx);
-    }
-
-    int Function::hessian_crs(const isolver_scalar_t *const x,
-                              const isolver_idx_t *const rowptr,
-                              const isolver_idx_t *const colidx,
-                              isolver_scalar_t *const values) {
-        for (auto &op : impl_->ops) {
-            if (op->hessian_crs(x, rowptr, colidx, values)) {
-                return ISOLVER_FUNCTION_FAILURE;
-            }
-        }
-
-        return ISOLVER_FUNCTION_SUCCESS;
-    }
-
-    int Function::gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) {
-        for (auto &op : impl_->ops) {
-            if (op->gradient(x, out)) {
-                return ISOLVER_FUNCTION_FAILURE;
-            }
-        }
-
-        return ISOLVER_FUNCTION_SUCCESS;
-    }
-
-    int Function::apply(const isolver_scalar_t *const x,
-                        const isolver_scalar_t *const h,
-                        isolver_scalar_t *const out) {
-        for (auto &op : impl_->ops) {
-            if (op->apply(x, h, out)) {
-                return ISOLVER_FUNCTION_FAILURE;
-            }
-        }
-
-        return ISOLVER_FUNCTION_SUCCESS;
-    }
-
-    int Function::value(const isolver_scalar_t *x, isolver_scalar_t *const out) {
-        for (auto &op : impl_->ops) {
-            if (op->value(x, out)) {
-                return ISOLVER_FUNCTION_FAILURE;
-            }
-        }
-
-        return ISOLVER_FUNCTION_SUCCESS;
-    }
-
-    int Function::apply_constraints(isolver_scalar_t *const x) { 
-        for(auto &c : impl_->constraints) {
-            c->apply_constraints(x);
-        }
-        return ISOLVER_FUNCTION_SUCCESS; }
-
-    int Function::apply_zero_constraints(isolver_scalar_t *const x) {
-        for(auto &c : impl_->constraints) {
-            c->apply_zero_constraints(x);
-        }
-        return ISOLVER_FUNCTION_SUCCESS;
-    }
-
-    int Function::copy_constrained_dofs(const isolver_scalar_t *const src,
-                                        isolver_scalar_t *const dest) {
-        for(auto &c : impl_->constraints) {
-            c->copy_constrained_dofs(src, dest);
-        }
-        return ISOLVER_FUNCTION_SUCCESS;
-    }
-
-    int Function::report_solution(const isolver_scalar_t *const x) {
+    int Output::write(const char *name, const isolver_scalar_t *const x) {
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
 
-        char path[2048];
-        sprintf(path, "%s/out.raw", impl_->output_dir.c_str());
+        {
+            struct stat st = {0};
+            if (stat(impl_->output_dir.c_str(), &st) == -1) {
+                mkdir(impl_->output_dir.c_str(), 0700);
+            }
+        }
 
+        char path[2048];
+        sprintf(path, impl_->file_format.c_str(), impl_->output_dir.c_str(), name);
         if (array_write(mesh->comm,
                         path,
                         SFEM_MPI_REAL_T,
@@ -476,73 +643,208 @@ namespace sfem {
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
+    int Output::write_time_step(const char *name,
+                                const isolver_scalar_t t,
+                                const isolver_scalar_t *const x) {
+        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
+
+        {
+            struct stat st = {0};
+            if (stat(impl_->output_dir.c_str(), &st) == -1) {
+                mkdir(impl_->output_dir.c_str(), 0700);
+            }
+        }
+
+        char path[2048];
+        sprintf(path,
+                impl_->time_dependent_file_format.c_str(),
+                impl_->output_dir.c_str(),
+                name,
+                impl_->export_counter++);
+        if (array_write(mesh->comm,
+                        path,
+                        SFEM_MPI_REAL_T,
+                        x,
+                        mesh->nnodes * impl_->space->block_size(),
+                        mesh->nnodes * impl_->space->block_size())) {
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        if (log_is_empty(&impl_->time_logger)) {
+            sprintf(path, "%s/time.txt", impl_->output_dir.c_str());
+            log_create_file(&impl_->time_logger, path, "w");
+        }
+
+        log_write_double(&impl_->time_logger, t);
+        return ISOLVER_FUNCTION_SUCCESS;
+    }
+
+    class Function::Impl {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+        std::vector<std::shared_ptr<Op>> ops;
+        std::vector<std::shared_ptr<Constraint>> constraints;
+        Timings timings;
+
+        std::shared_ptr<Output> output;
+        bool handle_constraints{true};
+    };
+
+    Function::Function(const std::shared_ptr<FunctionSpace> &space)
+        : impl_(std::make_unique<Impl>()) {
+        impl_->space = space;
+        impl_->output = std::make_shared<Output>(space);
+    }
+
+    Function::~Function() {
+        std::ofstream os;
+        os.open("perf.csv");
+        if (!os.good()) return;
+
+        impl_->timings.describe(os);
+        os.close();
+    }
+
+    void Function::add_operator(const std::shared_ptr<Op> &op) { impl_->ops.push_back(op); }
+    void Function::add_constraint(const std::shared_ptr<Constraint> &c) {
+        impl_->constraints.push_back(c);
+    }
+
+    void Function::add_dirichlet_conditions(const std::shared_ptr<DirichletConditions> &c) {
+        add_constraint(c);
+    }
+
+    int Function::create_crs_graph(ptrdiff_t *nlocal,
+                                   ptrdiff_t *nglobal,
+                                   ptrdiff_t *nnz,
+                                   isolver_idx_t **rowptr,
+                                   isolver_idx_t **colidx) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.create_crs_graph);
+
+        return impl_->space->create_crs_graph(nlocal, nglobal, nnz, rowptr, colidx);
+    }
+
+    int Function::destroy_crs_graph(isolver_idx_t *rowptr, isolver_idx_t *colidx) {
+        return impl_->space->destroy_crs_graph(rowptr, colidx);
+    }
+
+    int Function::hessian_crs(const isolver_scalar_t *const x,
+                              const isolver_idx_t *const rowptr,
+                              const isolver_idx_t *const colidx,
+                              isolver_scalar_t *const values) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.hessian_crs);
+
+        for (auto &op : impl_->ops) {
+            if (op->hessian_crs(x, rowptr, colidx, values)) {
+                return ISOLVER_FUNCTION_FAILURE;
+            }
+        }
+
+        if (impl_->handle_constraints) {
+            for (auto &c : impl_->constraints) {
+                c->hessian_crs(x, rowptr, colidx, values);
+            }
+        }
+
+        return ISOLVER_FUNCTION_SUCCESS;
+    }
+
+    int Function::gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.gradient);
+
+        for (auto &op : impl_->ops) {
+            if (op->gradient(x, out)) {
+                return ISOLVER_FUNCTION_FAILURE;
+            }
+        }
+
+        if (impl_->handle_constraints) {
+            constraints_gradient(x, out);
+        }
+
+        return ISOLVER_FUNCTION_SUCCESS;
+    }
+
+    int Function::apply(const isolver_scalar_t *const x,
+                        const isolver_scalar_t *const h,
+                        isolver_scalar_t *const out) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.apply);
+
+        for (auto &op : impl_->ops) {
+            if (op->apply(x, h, out)) {
+                return ISOLVER_FUNCTION_FAILURE;
+            }
+        }
+
+        if (impl_->handle_constraints) {
+            copy_constrained_dofs(h, out);
+        }
+
+        return ISOLVER_FUNCTION_SUCCESS;
+    }
+
+    int Function::value(const isolver_scalar_t *x, isolver_scalar_t *const out) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.value);
+
+        for (auto &op : impl_->ops) {
+            if (op->value(x, out)) {
+                return ISOLVER_FUNCTION_FAILURE;
+            }
+        }
+
+        return ISOLVER_FUNCTION_SUCCESS;
+    }
+
+    int Function::apply_constraints(isolver_scalar_t *const x) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.apply_constraints);
+
+        for (auto &c : impl_->constraints) {
+            c->apply(x);
+        }
+        return ISOLVER_FUNCTION_SUCCESS;
+    }
+
+    int Function::constraints_gradient(const isolver_scalar_t *const x, isolver_scalar_t *const g) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.constraints_gradient);
+
+        for (auto &c : impl_->constraints) {
+            c->gradient(x, g);
+        }
+        return ISOLVER_FUNCTION_SUCCESS;
+    }
+
+    int Function::apply_zero_constraints(isolver_scalar_t *const x) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.apply_zero_constraints);
+
+        for (auto &c : impl_->constraints) {
+            c->apply_zero(x);
+        }
+        return ISOLVER_FUNCTION_SUCCESS;
+    }
+
+    int Function::copy_constrained_dofs(const isolver_scalar_t *const src,
+                                        isolver_scalar_t *const dest) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.copy_constrained_dofs);
+
+        for (auto &c : impl_->constraints) {
+            c->copy_constrained_dofs(src, dest);
+        }
+        return ISOLVER_FUNCTION_SUCCESS;
+    }
+
+    int Function::report_solution(const isolver_scalar_t *const x) {
+        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
+        return impl_->output->write("out", x);
+    }
+
     int Function::initial_guess(isolver_scalar_t *const x) { return ISOLVER_FUNCTION_SUCCESS; }
 
-    class FunctionPtrOp final : public Op {
-    public:
-        using HessianCrs_t = std::function<int(const isolver_scalar_t *const,
-                                               const isolver_idx_t *const,
-                                               const isolver_idx_t *const,
-                                               isolver_scalar_t *const)>;
+    int Function::set_output_dir(const char *path) {
+        impl_->output->set_output_dir(path);
+        return ISOLVER_FUNCTION_SUCCESS;
+    }
 
-        using Gradient_t =
-            std::function<int(const isolver_scalar_t *const, isolver_scalar_t *const)>;
-
-        using Apply_t = std::function<int(const isolver_scalar_t *const,
-                                          const isolver_scalar_t *const,
-                                          isolver_scalar_t *const)>;
-
-        using Value_t = std::function<int(const isolver_scalar_t *const, isolver_scalar_t *const)>;
-
-        using Report_t = std::function<int(const isolver_scalar_t *const)>;
-
-        HessianCrs_t hessian_crs_;
-        Gradient_t gradient_;
-        Apply_t apply_;
-        Value_t value_;
-        Report_t report_;
-
-        FunctionPtrOp(HessianCrs_t hessian_crs,
-                      Gradient_t gradient,
-                      Apply_t apply,
-                      Value_t value,
-                      Report_t report = Report_t())
-            : hessian_crs_(hessian_crs),
-              gradient_(gradient),
-              apply_(apply),
-              value_(value),
-              report_(report) {}
-
-        int hessian_crs(const isolver_scalar_t *const x,
-                        const isolver_idx_t *const rowptr,
-                        const isolver_idx_t *const colidx,
-                        isolver_scalar_t *const values) {
-            if (hessian_crs_) return hessian_crs_(x, rowptr, colidx, values);
-            return ISOLVER_FUNCTION_SUCCESS;
-        }
-
-        int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) {
-            if (gradient_) return gradient_(x, out);
-            return ISOLVER_FUNCTION_SUCCESS;
-        }
-
-        int apply(const isolver_scalar_t *const x,
-                  const isolver_scalar_t *const h,
-                  isolver_scalar_t *const out) {
-            if (apply_) return apply_(x, h, out);
-            return ISOLVER_FUNCTION_SUCCESS;
-        }
-
-        int value(const isolver_scalar_t *x, isolver_scalar_t *const out) {
-            if (value_) return value_(x, out);
-            return ISOLVER_FUNCTION_SUCCESS;
-        }
-
-        int report(const isolver_scalar_t *const x) {
-            if (report_) return report_(x);
-            return ISOLVER_FUNCTION_SUCCESS;
-        }
-    };
+    std::shared_ptr<Output> Function::output() { return impl_->output; }
 
     class LinearElasticity final : public Op {
     public:
@@ -553,7 +855,7 @@ namespace sfem {
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            assert(mesh.spatial_dim == space.block_size());
+            assert(mesh->spatial_dim == space->block_size());
 
             auto ret = std::make_unique<LinearElasticity>(space);
 
@@ -567,6 +869,9 @@ namespace sfem {
             ret->lambda = SFEM_FIRST_LAME_PARAMETER;
             return ret;
         }
+
+        const char *name() const override { return "LinearElasticity"; }
+        inline bool is_linear() const override { return true; }
 
         int initialize() override { return ISOLVER_FUNCTION_SUCCESS; }
 
@@ -649,10 +954,13 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace> space;
 
+        const char *name() const override { return "Laplacian"; }
+        inline bool is_linear() const override { return true; }
+
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            assert(1 == space.block_size());
+            assert(1 == space->block_size());
 
             auto ret = std::make_unique<Laplacian>(space);
             return ret;
@@ -727,15 +1035,263 @@ namespace sfem {
         int report(const isolver_scalar_t *const) override { return ISOLVER_FUNCTION_SUCCESS; }
     };
 
-    class CVFEMConvection final : public Op {
+    class Mass final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        real_t *vel[3];
+
+        const char *name() const override { return "Mass"; }
+        inline bool is_linear() const override { return true; }
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            assert(1 == space.block_size());
+            assert(1 == space->block_size());
+
+            auto ret = std::make_unique<Mass>(space);
+            return ret;
+        }
+
+        int initialize() override { return ISOLVER_FUNCTION_SUCCESS; }
+
+        Mass(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+        int hessian_crs(const isolver_scalar_t *const x,
+                        const isolver_idx_t *const rowptr,
+                        const isolver_idx_t *const colidx,
+                        isolver_scalar_t *const values) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            assemble_mass((enum ElemType)mesh->element_type,
+                          mesh->nelements,
+                          mesh->nnodes,
+                          mesh->elements,
+                          mesh->points,
+                          space->mesh().node_to_node_rowptr(),
+                          space->mesh().node_to_node_colidx(),
+                          values);
+
+            return ISOLVER_FUNCTION_SUCCESS;
+        }
+
+        int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            apply_mass((enum ElemType)mesh->element_type,
+                       mesh->nelements,
+                       mesh->nnodes,
+                       mesh->elements,
+                       mesh->points,
+                       x,
+                       out);
+
+            return ISOLVER_FUNCTION_SUCCESS;
+        }
+
+        int apply(const isolver_scalar_t *const x,
+                  const isolver_scalar_t *const h,
+                  isolver_scalar_t *const out) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            apply_mass((enum ElemType)mesh->element_type,
+                       mesh->nelements,
+                       mesh->nnodes,
+                       mesh->elements,
+                       mesh->points,
+                       h,
+                       out);
+
+            return ISOLVER_FUNCTION_SUCCESS;
+        }
+
+        int value(const isolver_scalar_t *x, isolver_scalar_t *const out) override {
+            // auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            // mass_assemble_value((enum ElemType)mesh->element_type,
+            //                     mesh->nelements,
+            //                     mesh->nnodes,
+            //                     mesh->elements,
+            //                     mesh->points,
+            //                     x,
+            //                     out);
+
+            // return ISOLVER_FUNCTION_SUCCESS;
+
+            assert(0);
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        int report(const isolver_scalar_t *const) override { return ISOLVER_FUNCTION_SUCCESS; }
+    };
+
+    class LumpedMass final : public Op {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+
+        const char *name() const override { return "LumpedMass"; }
+        inline bool is_linear() const override { return true; }
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            auto ret = std::make_unique<LumpedMass>(space);
+            return ret;
+        }
+
+        int initialize() override { return ISOLVER_FUNCTION_SUCCESS; }
+
+        LumpedMass(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+        int hessian_diag(const isolver_scalar_t *const /*x*/,
+                         isolver_scalar_t *const values) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            if (space->block_size() == 1) {
+                assemble_lumped_mass((enum ElemType)mesh->element_type,
+                                     mesh->nelements,
+                                     mesh->nnodes,
+                                     mesh->elements,
+                                     mesh->points,
+                                     values);
+            } else {
+                real_t *temp = (real_t *)calloc(mesh->nnodes, sizeof(real_t));
+                assemble_lumped_mass((enum ElemType)mesh->element_type,
+                                     mesh->nelements,
+                                     mesh->nnodes,
+                                     mesh->elements,
+                                     mesh->points,
+                                     temp);
+
+                int bs = space->block_size();
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < mesh->nnodes; i++) {
+                    for (int b = 0; b < bs; b++) {
+                        values[i * bs + b] += temp[i];
+                    }
+                }
+
+                free(temp);
+            }
+
+            return ISOLVER_FUNCTION_SUCCESS;
+        }
+
+        int hessian_crs(const isolver_scalar_t *const x,
+                        const isolver_idx_t *const rowptr,
+                        const isolver_idx_t *const colidx,
+                        isolver_scalar_t *const values) override {
+            assert(0);
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) override {
+            assert(0);
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        int apply(const isolver_scalar_t *const x,
+                  const isolver_scalar_t *const h,
+                  isolver_scalar_t *const out) override {
+            assert(0);
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        int value(const isolver_scalar_t *x, isolver_scalar_t *const out) override {
+            assert(0);
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        int report(const isolver_scalar_t *const) override { return ISOLVER_FUNCTION_SUCCESS; }
+    };
+
+    class CVFEMMass final : public Op {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+
+        const char *name() const override { return "CVFEMMass"; }
+        inline bool is_linear() const override { return true; }
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            assert(1 == space->block_size());
+
+            auto ret = std::make_unique<CVFEMMass>(space);
+            return ret;
+        }
+
+        int initialize() override { return ISOLVER_FUNCTION_SUCCESS; }
+
+        CVFEMMass(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+        int hessian_diag(const isolver_scalar_t *const /*x*/,
+                         isolver_scalar_t *const values) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            cvfem_cv_volumes((enum ElemType)mesh->element_type,
+                             mesh->nelements,
+                             mesh->nnodes,
+                             mesh->elements,
+                             mesh->points,
+                             values);
+
+            return ISOLVER_FUNCTION_SUCCESS;
+        }
+
+        int hessian_crs(const isolver_scalar_t *const x,
+                        const isolver_idx_t *const rowptr,
+                        const isolver_idx_t *const colidx,
+                        isolver_scalar_t *const values) override {
+            assert(0);
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) override {
+            assert(0);
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        int apply(const isolver_scalar_t *const x,
+                  const isolver_scalar_t *const h,
+                  isolver_scalar_t *const out) override {
+            assert(0);
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        int value(const isolver_scalar_t *x, isolver_scalar_t *const out) override {
+            assert(0);
+            return ISOLVER_FUNCTION_FAILURE;
+        }
+
+        int report(const isolver_scalar_t *const) override { return ISOLVER_FUNCTION_SUCCESS; }
+    };
+
+    class CVFEMUpwindConvection final : public Op {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+        real_t *vel[3];
+
+        const char *name() const override { return "CVFEMUpwindConvection"; }
+        inline bool is_linear() const override { return true; }
+
+        void set_field(const char * /* name  = velocity */,
+                       const int component,
+                       isolver_scalar_t *v) override {
+            if (vel[component]) {
+                free(vel[component]);
+            }
+
+            vel[component] = v;
+        }
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            assert(1 == space->block_size());
+
+            auto ret = std::make_unique<CVFEMUpwindConvection>(space);
+            ret->vel[0] = nullptr;
+            ret->vel[1] = nullptr;
+            ret->vel[2] = nullptr;
 
             const char *SFEM_VELX = nullptr;
             const char *SFEM_VELY = nullptr;
@@ -746,16 +1302,13 @@ namespace sfem {
             SFEM_READ_ENV(SFEM_VELZ, );
 
             if (!SFEM_VELX || !SFEM_VELY || (!SFEM_VELZ && mesh->spatial_dim == 3)) {
-                fprintf(stderr,
-                        "Missing input velocity SFEM_VELX=%s\n,SFEM_VELY=%s\n,SFEM_VELZ=%s\n",
-                        SFEM_VELX,
-                        SFEM_VELY,
-                        SFEM_VELZ);
-                assert(0);
-                return nullptr;
+                // fprintf(stderr,
+                //         "No input velocity in env: SFEM_VELX=%s\n,SFEM_VELY=%s\n,SFEM_VELZ=%s\n",
+                //         SFEM_VELX,
+                //         SFEM_VELY,
+                //         SFEM_VELZ);
+                return ret;
             }
-
-            auto ret = std::make_unique<CVFEMConvection>(space);
 
             ptrdiff_t nlocal, nglobal;
             if (array_create_from_file(mesh->comm,
@@ -776,7 +1329,6 @@ namespace sfem {
                                        (void **)&ret->vel[2],
                                        &nlocal,
                                        &nglobal)) {
-
                 fprintf(stderr, "Unable to read input velocity\n");
                 assert(0);
                 return nullptr;
@@ -787,13 +1339,13 @@ namespace sfem {
 
         int initialize() override { return ISOLVER_FUNCTION_SUCCESS; }
 
-        CVFEMConvection(const std::shared_ptr<FunctionSpace> &space) : space(space) {
+        CVFEMUpwindConvection(const std::shared_ptr<FunctionSpace> &space) : space(space) {
             vel[0] = nullptr;
             vel[1] = nullptr;
             vel[2] = nullptr;
         }
 
-        ~CVFEMConvection() {}
+        ~CVFEMUpwindConvection() {}
 
         int hessian_crs(const isolver_scalar_t *const x,
                         const isolver_idx_t *const rowptr,
@@ -819,18 +1371,16 @@ namespace sfem {
         int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            // cvfem_convection_assemble_gradient((enum ElemType)mesh->element_type,
-            //                             mesh->nelements,
-            //                             mesh->nnodes,
-            //                             mesh->elements,
-            //                             mesh->points,
-            //                             x,
-            //                             out);
+            cvfem_convection_apply((enum ElemType)mesh->element_type,
+                                   mesh->nelements,
+                                   mesh->nnodes,
+                                   mesh->elements,
+                                   mesh->points,
+                                   vel,
+                                   x,
+                                   out);
 
-            // return ISOLVER_FUNCTION_SUCCESS;
-
-            assert(0);
-            return ISOLVER_FUNCTION_FAILURE;
+            return ISOLVER_FUNCTION_SUCCESS;
         }
 
         int apply(const isolver_scalar_t *const x,
@@ -875,32 +1425,45 @@ namespace sfem {
         std::map<std::string, FactoryFunction> name_to_create;
     };
 
-    Factory::Factory() : impl_(std::make_unique<Impl>()) {
-        register_op("LinearElasticity", LinearElasticity::create);
-        register_op("Laplacian", Laplacian::create);
-        register_op("CVFEMConvection", CVFEMConvection::create);
-    }
+    Factory::Factory() : impl_(std::make_unique<Impl>()) {}
 
     Factory::~Factory() = default;
 
     Factory &Factory::instance() {
         static Factory instance_;
+
+        if (instance_.impl_->name_to_create.empty()) {
+            instance_.private_register_op("LinearElasticity", LinearElasticity::create);
+            instance_.private_register_op("Laplacian", Laplacian::create);
+            instance_.private_register_op("CVFEMUpwindConvection", CVFEMUpwindConvection::create);
+            instance_.private_register_op("Mass", Mass::create);
+            instance_.private_register_op("CVFEMMass", CVFEMMass::create);
+            instance_.private_register_op("LumpedMass", LumpedMass::create);
+        }
+
         return instance_;
     }
 
-    void Factory::register_op(const std::string &name, FactoryFunction factory_function) {
-        instance().impl_->name_to_create[name] = factory_function;
+    void Factory::private_register_op(const std::string &name, FactoryFunction factory_function) {
+        impl_->name_to_create[name] = factory_function;
     }
 
-    std::unique_ptr<Op> Factory::create_op(const std::shared_ptr<FunctionSpace> &space,
+    void Factory::register_op(const std::string &name, FactoryFunction factory_function) {
+        instance().private_register_op(name, factory_function);
+    }
+
+    std::shared_ptr<Op> Factory::create_op(const std::shared_ptr<FunctionSpace> &space,
                                            const char *name) {
-        auto it = instance().impl_->name_to_create.find(name);
-        if (it == instance().impl_->name_to_create.end()) {
+        assert(instance().impl_);
+
+        auto &ntc = instance().impl_->name_to_create;
+        auto it = ntc.find(name);
+
+        if (it == ntc.end()) {
             std::cerr << "Unable to find op " << name << "\n";
             return nullptr;
         }
 
         return it->second(space);
     }
-
 }  // namespace sfem

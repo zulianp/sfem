@@ -172,37 +172,33 @@ static SFEM_INLINE void tet4_linear_elasticity_apply_kernel_opt(
     real_t *const SFEM_RESTRICT outz) {
     // Evaluation of displacement gradient
     real_t disp_grad[9];
+
     {
         const real_t x0 = 1.0 / jacobian_determinant;
-        const real_t x1 = adjugate[0] * x0;
-        const real_t x2 = adjugate[3] * x0;
-        const real_t x3 = adjugate[6] * x0;
-        const real_t x4 = -x1 - x2 - x3;
-        const real_t x5 = adjugate[1] * x0;
-        const real_t x6 = adjugate[4] * x0;
-        const real_t x7 = adjugate[7] * x0;
-        const real_t x8 = -x5 - x6 - x7;
-        const real_t x9 = adjugate[2] * x0;
-        const real_t x10 = adjugate[5] * x0;
-        const real_t x11 = adjugate[8] * x0;
-        const real_t x12 = -x10 - x11 - x9;
-        // X
-        disp_grad[0] = ux[0] * x4 + ux[1] * x1 + ux[2] * x2 + ux[3] * x3;
-        disp_grad[1] = ux[0] * x8 + ux[1] * x5 + ux[2] * x6 + ux[3] * x7;
-        disp_grad[2] = ux[0] * x12 + ux[1] * x9 + ux[2] * x10 + ux[3] * x11;
-
-        // Y
-        disp_grad[3] = uy[0] * x4 + uy[1] * x1 + uy[2] * x2 + uy[3] * x3;
-        disp_grad[4] = uy[0] * x8 + uy[1] * x5 + uy[2] * x6 + uy[3] * x7;
-        disp_grad[5] = uy[0] * x12 + uy[1] * x9 + uy[2] * x10 + uy[3] * x11;
-
-        // Z
-        disp_grad[6] = uz[2] * x2 + uz[3] * x3 + uz[0] * x4 + uz[1] * x1;
-        disp_grad[7] = uz[2] * x6 + uz[3] * x7 + uz[0] * x8 + uz[1] * x5;
-        disp_grad[8] = uz[2] * x10 + uz[3] * x11 + uz[0] * x12 + uz[1] * x9;
+        const real_t x1 = ux[0] - ux[1];
+        const real_t x2 = ux[0] - ux[2];
+        const real_t x3 = ux[0] - ux[3];
+        const real_t x4 = uy[0] - uy[1];
+        const real_t x5 = uy[0] - uy[2];
+        const real_t x6 = uy[0] - uy[3];
+        const real_t x7 = -uz[0];
+        const real_t x8 = uz[2] + x7;
+        const real_t x9 = uz[3] + x7;
+        const real_t x10 = uz[0] - uz[1];
+        disp_grad[0] = x0 * (-adjugate[0] * x1 - adjugate[3] * x2 - adjugate[6] * x3);
+        disp_grad[1] = x0 * (-adjugate[1] * x1 - adjugate[4] * x2 - adjugate[7] * x3);
+        disp_grad[2] = x0 * (-adjugate[2] * x1 - adjugate[5] * x2 - adjugate[8] * x3);
+        disp_grad[3] = x0 * (-adjugate[0] * x4 - adjugate[3] * x5 - adjugate[6] * x6);
+        disp_grad[4] = x0 * (-adjugate[1] * x4 - adjugate[4] * x5 - adjugate[7] * x6);
+        disp_grad[5] = x0 * (-adjugate[2] * x4 - adjugate[5] * x5 - adjugate[8] * x6);
+        disp_grad[6] = x0 * (-adjugate[0] * x10 + adjugate[3] * x8 + adjugate[6] * x9);
+        disp_grad[7] = x0 * (-adjugate[1] * x10 + adjugate[4] * x8 + adjugate[7] * x9);
+        disp_grad[8] = x0 * (-adjugate[2] * x10 + adjugate[5] * x8 + adjugate[8] * x9);
     }
 
-    // We can reuse the buffer to avoid additional register usage
+// Which one is better?
+#if 0
+    We can reuse the buffer to avoid additional register usage
     real_t *P = disp_grad;
     {
         const real_t x0 = (1.0 / 3.0) * mu;
@@ -244,6 +240,52 @@ static SFEM_INLINE void tet4_linear_elasticity_apply_kernel_opt(
         outz[2] = P[6] * adjugate[3] + P[7] * adjugate[4] + P[8] * adjugate[5];
         outz[3] = P[6] * adjugate[6] + P[7] * adjugate[7] + P[8] * adjugate[8];
     }
+
+#else
+    //--------------------------
+    // loperand
+    //--------------------------
+    // We can reuse the buffer to avoid additional register usage
+    real_t *P_tXJinv_t = disp_grad;
+    {
+       const real_t x0 = (1.0/6.0)*mu;
+       const real_t x1 = x0*(disp_grad[1] + disp_grad[3]);
+       const real_t x2 = x0*(disp_grad[2] + disp_grad[6]);
+       const real_t x3 = 2*mu;
+       const real_t x4 = lambda*(disp_grad[0] + disp_grad[4] + disp_grad[8]);
+       const real_t x5 = (1.0/6.0)*disp_grad[0]*x3 + (1.0/6.0)*x4;
+       const real_t x6 = x0*(disp_grad[5] + disp_grad[7]);
+       const real_t x7 = (1.0/6.0)*disp_grad[4]*x3 + (1.0/6.0)*x4;
+       const real_t x8 = (1.0/6.0)*disp_grad[8]*x3 + (1.0/6.0)*x4;
+       P_tXJinv_t[0] = adjugate[0]*x5 + adjugate[1]*x1 + adjugate[2]*x2;
+       P_tXJinv_t[1] = adjugate[3]*x5 + adjugate[4]*x1 + adjugate[5]*x2;
+       P_tXJinv_t[2] = adjugate[6]*x5 + adjugate[7]*x1 + adjugate[8]*x2;
+       P_tXJinv_t[3] = adjugate[0]*x1 + adjugate[1]*x7 + adjugate[2]*x6;
+       P_tXJinv_t[4] = adjugate[3]*x1 + adjugate[4]*x7 + adjugate[5]*x6;
+       P_tXJinv_t[5] = adjugate[6]*x1 + adjugate[7]*x7 + adjugate[8]*x6;
+       P_tXJinv_t[6] = adjugate[0]*x2 + adjugate[1]*x6 + adjugate[2]*x8;
+       P_tXJinv_t[7] = adjugate[3]*x2 + adjugate[4]*x6 + adjugate[5]*x8;
+       P_tXJinv_t[8] = adjugate[6]*x2 + adjugate[7]*x6 + adjugate[8]*x8;
+    }
+    //--------------------------
+    // gradient_opt
+    //--------------------------
+    {
+        outx[0] = -P_tXJinv_t[0] - P_tXJinv_t[1] - P_tXJinv_t[2];
+        outx[1] = P_tXJinv_t[0];
+        outx[2] = P_tXJinv_t[1];
+        outx[3] = P_tXJinv_t[2];
+        outy[0] = -P_tXJinv_t[3] - P_tXJinv_t[4] - P_tXJinv_t[5];
+        outy[1] = P_tXJinv_t[3];
+        outy[2] = P_tXJinv_t[4];
+        outy[3] = P_tXJinv_t[5];
+        outz[0] = -P_tXJinv_t[6] - P_tXJinv_t[7] - P_tXJinv_t[8];
+        outz[1] = P_tXJinv_t[6];
+        outz[2] = P_tXJinv_t[7];
+        outz[3] = P_tXJinv_t[8];
+    }
+#endif
+
 }
 
 void macro_tet4_linear_elasticity_init(linear_elasticity_t *const ctx,
@@ -555,8 +597,6 @@ void macro_tet4_linear_elasticity_diag(const linear_elasticity_t *const ctx,
     assert(0);
 }
 
-
-
 void macro_tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
                                             const ptrdiff_t nnodes,
                                             idx_t **const SFEM_RESTRICT elements,
@@ -565,7 +605,6 @@ void macro_tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
                                             const real_t lambda,
                                             const real_t *const SFEM_RESTRICT u,
                                             real_t *const SFEM_RESTRICT values) {
-
 #if 0
     linear_elasticity_t ctx;
     macro_tet4_linear_elasticity_init(&ctx, mu, lambda, nelements, elements, points);
@@ -575,7 +614,7 @@ void macro_tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
     static linear_elasticity_t ctx;
     static int initialized = 0;
 
-    if(!initialized) {
+    if (!initialized) {
         macro_tet4_linear_elasticity_init(&ctx, mu, lambda, nelements, elements, points);
         initialized = 1;
     }

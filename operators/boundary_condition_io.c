@@ -29,7 +29,7 @@ void read_boundary_conditions(MPI_Comm comm,
     int rank;
     MPI_Comm_rank(comm, &rank);
 
-    const const char *splitter = ",";
+    const char *splitter = ",";
 
     int count = 1;
     {
@@ -143,7 +143,7 @@ void read_neumann_conditions(const mesh_t *const mesh,
     read_boundary_conditions(mesh->comm, sets, values, components, bcs, nbc);
 
     enum ElemType stype = side_type(mesh->element_type);
-    int nns = elem_num_sides(stype);
+    int nns = elem_num_nodes(stype);
 
     for (int i = 0; i < *nbc; i++) {
         (*bcs)[i].global_size /= nns;

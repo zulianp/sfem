@@ -217,7 +217,8 @@ OBJS += tet10_grad.o \
 	tet10_mass.o \
 	tet10_laplacian.o \
 	tet10_l2_projection_p1_p2.o \
-	tet10_navier_stokes.o
+	tet10_navier_stokes.o \
+	tet10_linear_elasticity.o
 
 # Resampling
 OBJS += sfem_resample_gap.o sfem_resample_field.o

@@ -7,8 +7,8 @@ project(
     LANGUAGES "C" "CXX"
     HOMEPAGE_URL "https://bitbucket.org/zulianp/sfem"
     DESCRIPTION
-        "SFEM: Simple FEM"
-)
+    "SFEM: Simple FEM"
+    )
 
 # Std CMake imports
 include(CMakePackageConfigHelpers)
@@ -22,32 +22,39 @@ include(cmake/SFEMBuildTypes.cmake)
 include(cmake/SFEMCMakeFunctions.cmake)
 include(cmake/SFEMDependencies.cmake)
 
+if(SFEM_ENABLE_PYTHON)
+    include(cmake/SFEMPython.cmake)
+endif()
+
 ######################################################
 ######################################################
 # Library
 ######################################################
 
 find_package(MatrixIO)
+find_package(ISolver)
 
 set(SFEM_MODULES
     algebra base matrix mesh pizzastack resampling solver
     operators 
-        operators/beam2 
-        operators/cvfem 
-        operators/kernels 
-        operators/navier_stokes
-        operators/phase_field_for_fracture
-        operators/tet10
-        operators/tet4
-        operators/tri3
-        operators/tri6
-        operators/trishell3
-        operators/cvfem_tri3
-        operators/cvfem_tet4
-        operators/cvfem_quad4
-        operators/macro_tri3
-        operators/macro_tet4
-            )
+    operators/beam2 
+    operators/cvfem 
+    operators/kernels 
+    operators/navier_stokes
+    operators/phase_field_for_fracture
+    operators/tet10
+    operators/tet4
+    operators/tri3
+    operators/tri6
+    operators/trishell3
+    operators/cvfem_tri3
+    operators/cvfem_tet4
+    operators/cvfem_quad4
+    operators/macro_tri3
+    operators/macro_tet4
+    )
+
+list(APPEND SFEM_MODULES frontend)
 
 if(SFEM_ENABLE_METIS)
     list(APPEND SFEM_MODULES graphs)
@@ -55,7 +62,7 @@ endif()
 
 foreach(MODULE ${SFEM_MODULES})
     scan_directories(${CMAKE_SOURCE_DIR}/${MODULE} "." SFEM_BUILD_INCLUDES
-                     SFEM_HEADERS SFEM_SOURCES)
+       SFEM_HEADERS SFEM_SOURCES)
 endforeach(MODULE)
 
 # message(STATUS "SFEM_BUILD_INCLUDES: ${SFEM_BUILD_INCLUDES}")
@@ -64,19 +71,20 @@ endforeach(MODULE)
 
 add_library(sfem ${SFEM_SOURCES} ${SFEM_HEADERS})
 
+
 ######################################################
 # include
 
 foreach(include ${SFEM_BUILD_INCLUDES})
     target_include_directories(sfem BEFORE
-                               PUBLIC $<BUILD_INTERFACE:${include}>)
+     PUBLIC $<BUILD_INTERFACE:${include}>)
 endforeach()
 
 target_include_directories(
     sfem BEFORE
     PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
-           $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-           $<INSTALL_INTERFACE:include> $<INSTALL_INTERFACE:include/kernels>)
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include> $<INSTALL_INTERFACE:include/kernels>)
 
 target_include_directories(sfem PUBLIC ${SFEM_DEP_INCLUDES})
 
@@ -84,6 +92,7 @@ target_include_directories(sfem PUBLIC ${SFEM_DEP_INCLUDES})
 # link
 
 target_link_libraries(sfem PUBLIC ${SFEM_DEP_LIBRARIES})
+# message(STATUS "SFEM_DEP_LIBRARIES: ${SFEM_DEP_LIBRARIES}")
 
 ######################################################
 # properties
@@ -91,7 +100,7 @@ target_link_libraries(sfem PUBLIC ${SFEM_DEP_LIBRARIES})
 set_compiler_features(sfem)
 set_target_properties(
     sfem PROPERTIES VERSION ${SFEM_VERSION}
-                             SOVERSION ${SFEM_VERSION_MAJOR})
+    SOVERSION ${SFEM_VERSION_MAJOR})
 
 set(SFEM_TARGETS sfem)
 
@@ -127,6 +136,11 @@ endforeach()
 # if(SFEM_ENABLE_BENCHMARK)
 #     include(benchmarks/benchmarks.cmake)
 # endif()
+
+if(SFEM_ENABLE_PYTHON)
+    add_subdirectory(python/bindings)
+    set(SFEM_TARGETS ${SFEM_TARGETS} pysfem)
+endif()
 
 ######################################################
 ######################################################
@@ -173,6 +187,9 @@ install(
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/python/sfem DESTINATION scripts)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/python/requirements.txt DESTINATION scripts)
 
+
+
+
 ######################################################
 
 ######################################################
@@ -191,8 +208,8 @@ write_basic_package_version_file(
 
 # install the configuration file
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/SFEMConfig.cmake
-              ${CMAKE_CURRENT_BINARY_DIR}/SFEMConfigVersion.cmake
-        DESTINATION lib/cmake/)
+  ${CMAKE_CURRENT_BINARY_DIR}/SFEMConfigVersion.cmake
+  DESTINATION lib/cmake/)
 
 include(cmake/PostInstall.cmake)
 

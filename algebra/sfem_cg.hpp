@@ -9,6 +9,13 @@
 
 // https://en.wikipedia.org/wiki/Conjugate_gradient_method
 namespace sfem {
+
+    template<typename T>
+    class Operator {
+    public:
+        std::function<void(const T* const, T* const)> apply;
+    };
+
     template <typename T>
     class ConjugateGradient {
     public:
@@ -29,6 +36,16 @@ namespace sfem {
         // Solver parameters
         T tol{1e-10};
         int max_it{10000};
+
+
+        void set_op(const Operator<T> &op) {
+            apply_op = op.apply;
+        }
+
+        void set_max_it(const int it)
+        {
+            max_it = it;
+        }
 
         void set_preconditioner(std::function<void(const T* const, T* const)> &&in)
         {
@@ -92,6 +109,7 @@ namespace sfem {
     private:
         int aux_apply_basic(const ptrdiff_t n, const T* const b, T* const x) {
             if (!good()) {
+                assert(0);
                 return -1;
             }
 

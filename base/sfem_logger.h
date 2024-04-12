@@ -15,6 +15,8 @@ typedef struct {
     // off_t eob;
 } logger_t;
 
+void log_init(logger_t *l);
+int log_is_empty(logger_t *l);
 void log_write_double(logger_t *l, const double val);
 int log_create_memstream(logger_t *l);
 int log_create_file(logger_t *l, const char *path, const char *mode);

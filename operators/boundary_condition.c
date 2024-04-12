@@ -6,6 +6,47 @@
 
 #include <assert.h>
 #include <math.h>
+#include <string.h>
+
+void boundary_condition_init(boundary_condition_t *const bc) {
+    bc->local_size = 0;
+    bc->global_size = 0;
+    bc->idx = 0;
+    bc->component = 0;
+    bc->value = 0;
+    bc->values = 0;
+}
+
+void boundary_condition_create(boundary_condition_t *const bc,
+                               const ptrdiff_t local_size,
+                               const ptrdiff_t global_size,
+                               idx_t *const idx,
+                               // const int idx_giveup_ownership,
+                               const int component,
+                               const real_t value,
+                               real_t *const values
+                               // ,
+                               // const int values_giveup_ownership
+                               ) {
+    bc->local_size = local_size;
+    bc->global_size = global_size;
+
+    // if (idx_giveup_ownership) {
+        bc->idx = idx;
+    // } else {
+    //     bc->idx = (idx_t *)malloc(local_size * sizeof(idx_t));
+    //     memcpy(bc->idx, idx, sizeof(idx_t) * local_size);
+    // }
+
+    bc->component = component;
+    bc->value = value;
+
+    // if (values_giveup_ownership) {
+        bc->values = values;
+    // } else {
+    //     bc->values = (real_t *)malloc(local_size * sizeof(real_t));
+    // }
+}
 
 void add_neumann_condition_to_gradient_vec(const enum ElemType element_type,
                                            geom_t **const SFEM_RESTRICT points,

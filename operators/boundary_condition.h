@@ -21,6 +21,16 @@ typedef struct {
     real_t *values;
 } boundary_condition_t;
 
+void boundary_condition_init(boundary_condition_t *const bc);
+
+void boundary_condition_create(boundary_condition_t *const bc,
+                               const ptrdiff_t local_size,
+                               const ptrdiff_t global_size,
+                               idx_t *const idx,
+                               const int component,
+                               const real_t value,
+                               real_t *const values);
+
 void add_neumann_condition_to_gradient_vec(const enum ElemType element_type,
                                            geom_t **const SFEM_RESTRICT points,
                                            const int n_conditions,

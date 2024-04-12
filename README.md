@@ -23,3 +23,19 @@ In the `sfem` folder
 Both makefiles allow to pass options such as 
 `MPICC=<path_to_your_mpicc_compiler>` and `MPICXX=<path_to_your_mpicxx_compiler>`.
 
+
+# Installing the Python frontend
+
+1. downloading sfem and submodules and installing the python env requirements.
+2. Activate python env
+3. Install nanobind in the environment `pip install nanobind`
+
+Then compile and install sfem
+```
+export INSTALL_DIR=<path_to_your_libs>
+mkdir -p build && \
+cd build && \
+cmake .. -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR/sfem -DSFEM_ENABLE_PYTHON=ON && \
+make && make install
+export PYTHONPATH=$INSTALL_DIR/sfem/lib:$PYTHONPATH
+```

@@ -3,8 +3,10 @@
 
 #include <stddef.h>
 #include "sfem_base.h"
+#include "sfem_defs.h"
 
 #include <mpi.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,6 +47,16 @@ typedef struct {
 
 void mesh_init(mesh_t *mesh);
 void mesh_destroy(mesh_t *mesh);
+
+void mesh_create_serial(
+    mesh_t *mesh,
+    int spatial_dim,
+    enum ElemType element_type,
+    ptrdiff_t nelements,
+    idx_t **elements,
+    ptrdiff_t nnodes,
+    geom_t **points
+    );
 
 void mesh_minmax_edge_length(const mesh_t *const mesh, real_t *emin, real_t *emax);
 

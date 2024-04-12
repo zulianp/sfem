@@ -16,12 +16,12 @@ PATH=$SCRIPTPATH/../python/sfem/mesh:$PATH
 PATH=$SCRIPTPATH/../python/sfem/algebra:$PATH
 PATH=$SCRIPTPATH/../data/benchmarks/meshes:$PATH
 
-export OMP_NUM_THREADS=16
-# export OMP_NUM_THREADS=8
+# export OMP_NUM_THREADS=16
+export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true
 
 SFEM_MESH_DIR=mesh
-# create_cylinder_p2.sh 4
+create_cylinder_p2.sh 3
 
 sleft=$SFEM_MESH_DIR/sidesets_aos/sinlet.raw
 sright=$SFEM_MESH_DIR/sidesets_aos/soutlet.raw
