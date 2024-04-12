@@ -120,6 +120,56 @@ inline void copy_to_local_grid(const std::valarray<double> &grid,  //
     }
 }
 
+/**
+ * Generates Monte Carlo nodes.
+ *
+ * @param n The number of nodes to generate.
+ * @param xmin The minimum x-coordinate value.
+ * @param xmax The maximum x-coordinate value.
+ * @param ymin The minimum y-coordinate value.
+ * @param ymax The maximum y-coordinate value.
+ * @param x The array to store the x-coordinates of the generated nodes.
+ * @param y The array to store the y-coordinates of the generated nodes.
+ * @param w The array to store the weights of the generated nodes.
+ */
+inline void generate_MC_nodes(const int n,
+                              const double xmin,
+                              const double xmax,
+                              const double ymin,
+                              const double ymax,
+                              std::valarray<double> &x,
+                              std::valarray<double> &y,
+                              std::valarray<double> &w) {
+    x.resize(n);
+    y.resize(n);
+    w.resize(n);
+
+    for (int i = 0; i < n; ++i) {
+        x[i] = xmin + (xmax - xmin) * std::rand() / RAND_MAX;
+        y[i] = ymin + (ymax - ymin) * std::rand() / RAND_MAX;
+        w[i] = 1.0 / (double)n;
+    }
+}
+
+void make_square_domaind_stripe(const unsigned int nr_squares,
+                                const double side,
+                                const double xmin,
+                                const double ymin) {
+
+
+                                    
+                                }
+
+/**
+ * @brief The main function of the program.
+ *
+ * This function generates a grid, performs some calculations on the grid, and writes a local grid
+ * to a file. It demonstrates the usage of various functions and variables.
+ *
+ * @param argc The number of command-line arguments.
+ * @param argv An array of command-line arguments.
+ * @return 0 on successful execution.
+ */
 int main(int argc, char **argv) {
     // Define the domain
     const double xmin = 0.0;
@@ -159,9 +209,9 @@ int main(int argc, char **argv) {
         std::cout << "x = " << x << ", y = " << y << std::endl;
         std::cout << "i = " << i << ", j = " << j << std::endl << std::endl;
 
-        std::cout << "grid[i * ny + j] = " << grid[i * ny + j] << std::endl;
-        std::cout << "grid[(i+1) * ny + j] = " << grid[(i + 1) * ny + j] << std::endl;
-        std::cout << "grid[i * ny + (j+1)] = " << grid[i * ny + (j + 1)] << std::endl;
+        std::cout << "grid[i * ny + j]         = " << grid[i * ny + j] << std::endl;
+        std::cout << "grid[(i+1) * ny + j]     = " << grid[(i + 1) * ny + j] << std::endl;
+        std::cout << "grid[i * ny + (j+1)]     = " << grid[i * ny + (j + 1)] << std::endl;
         std::cout << "grid[(i+1) * ny + (j+1)] = " << grid[(i + 1) * ny + (j + 1)] << std::endl;
     }
 
@@ -190,6 +240,8 @@ int main(int argc, char **argv) {
         } else {
             std::cout << "Failed to open file for writing" << std::endl;
         }
+
+        std::cout << "local_grid.size() = " << local_grid.size() << std::endl;
     }
     return 0;
 }
