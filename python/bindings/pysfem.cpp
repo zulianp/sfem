@@ -3,7 +3,6 @@
 #include <nanobind/stl/shared_ptr.h>
 
 #include <mpi.h>
-#include <__nullptr>
 #include <memory>
 
 #include "sfem_Function.hpp"
