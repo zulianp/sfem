@@ -8,7 +8,7 @@ if(NOT NB_DIR)
     OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE NB_DIR)
 
   if(NOT NB_DIR)
-    message(FATAL_ERROR "Unable to execute nanobind query")
+    message(WARNING "Unable to execute nanobind query")
   endif()
 
 endif()
