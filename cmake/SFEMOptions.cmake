@@ -14,7 +14,8 @@ option(SFEM_ENABLE_DEV_MODE
 option(SFEM_ENABLE_CUDA "Enable CUDA support" OFF)
 option(SFEM_ENABLE_OPENMP "Enable OpenMP support" OFF)
 option(SFEM_ENABLE_PYTHON "Enable python bindings for SFEM" ON)
-
+option(SFEM_ENABLE_FP32_KERNELS "Enable single precision kernels when using Cuda" OFF)
+option(SFEM_ENABLE_FP16_JACOBIANS "Enable half precision jacobians when using Cuda" OFF)
 
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)
 
