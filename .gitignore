@@ -60,6 +60,14 @@ Thumbs.db
 *.dSYM
 *.csv
 *.out
+*.xmf
+*.xdmf
+*.e
+*.sublime-workspace
+
+CMakeCache.txt
 
 build/
 .cache/
+CMakeFiles/
+venv/
