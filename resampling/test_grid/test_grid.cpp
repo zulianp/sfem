@@ -6,6 +6,20 @@
 #include <valarray>
 #include <vector>
 
+
+struct global_grid {
+    std::valarray<double> grid;
+
+    double delta;
+    
+    double x_zero;
+    double y_zero;
+    
+    double x_max;
+    double y_max;
+};
+
+
 /**
  * Generates a grid of values by evaluating a given function at each grid point.
  *
@@ -79,8 +93,8 @@ inline std::tuple<int, int> get_nearest_coordinates(const double x,
                                                     const double delta,
                                                     const double xmin = 0,
                                                     const double ymin = 0) {
-    const int nx = std::ceil((x - xmin) / delta);
-    const int ny = std::ceil((y - ymin) / delta);
+    const int nx = std::floor((x - xmin) / delta);
+    const int ny = std::floor((y - ymin) / delta);
 
     return std::make_tuple(nx, ny);
 }
@@ -145,8 +159,8 @@ inline void generate_MC_nodes(const int n,
     w.resize(n);
 
     for (int i = 0; i < n; ++i) {
-        x[i] = xmin + (xmax - xmin) * std::rand() / RAND_MAX;
-        y[i] = ymin + (ymax - ymin) * std::rand() / RAND_MAX;
+        x[i] = xmin + (xmax - xmin) * double(std::rand()) / double(RAND_MAX);
+        y[i] = ymin + (ymax - ymin) * double(std::rand()) / double(RAND_MAX);
         w[i] = 1.0 / (double)n;
     }
 }
@@ -217,6 +231,95 @@ unsigned int make_square_domaind_stripe(const unsigned int nr_squares,      //
 }
 
 /**
+ * @brief Computes the integral of a function over a square domain using quadrature.
+ *
+ * This function computes the integral of a function over a square domain using quadrature. The
+ * function is evaluated at the quadrature nodes and the integral is computed using the quadrature
+ * weights.
+ *
+ * @param local_grid The local grid of values.
+ * @param x_min_grid The minimum x-coordinate of the grid.
+ * @param y_min_grid The minimum y-coordinate of the grid.
+ * @param n The number of grid points in each dimension of the local grid.
+ * @param x_min The minimum x-coordinate of the square domain.
+ * @param y_min The minimum y-coordinate of the square domain.
+ * @param side The side length of the square domain.
+ * @param x_Q The x-coordinates of the quadrature nodes.
+ * @param y_Q The y-coordinates of the quadrature nodes.
+ * @param w_Q The weights of the quadrature nodes.
+ * @return The computed integral value.
+ */
+double quadrture_local(const std::valarray<double> &local_grid,  //
+                       const double x_min_grid,                  //
+                       const double y_min_grid,                  //
+                       const int n,                              //
+                       const double x_min,                       //
+                       const double y_min,                       //
+                       const double side,                        //
+                       const std::valarray<double> &x_Q,         //
+                       const std::valarray<double> &y_Q,         //
+                       const std::valarray<double> &w_Q) {       //
+    //
+    // const int n_nodes = n * n;
+    unsigned int Q_nodes = x_Q.size();
+
+    double Q = 0.0;
+
+    if (Q_nodes != y_Q.size() or Q_nodes != w_Q.size()) {
+        return false;
+    }
+
+    const double delta_side_X = side / std::sqrt(w_Q.size());
+    const double delta_side_Y = side / std::sqrt(w_Q.size());
+
+    for (unsigned int cnt = 0; cnt < Q_nodes; ++cnt) {
+        const auto [i, j] = get_nearest_coordinates(x_Q[cnt],      //
+                                                    y_Q[cnt],      //
+                                                    delta_side_X,  //
+                                                    x_min_grid,    //
+                                                    y_min_grid);   //
+
+        const double x1 = x_min_grid + i * delta_side_X;
+        const double y1 = y_min_grid + j * delta_side_Y;
+
+        const double x2 = x_min_grid + (i + 1) * delta_side_X;
+        const double y2 = y_min_grid + (j + 1) * delta_side_Y;
+
+        // std::cout << "X1 = " << x1 << ", Y1 = " << y1 << std::endl;
+        // std::cout << "X2 = " << x2 << ", Y2 = " << y2 << std::endl;
+        // std::cout << "XQ = " << x_Q[cnt] << ", YQ = " << y_Q[cnt] << std::endl;
+        // std::cout << std::endl;
+
+        const double f1 = local_grid[i * n + j];
+        const double f2 = local_grid[(i + 1) * n + j];
+        const double f3 = local_grid[i * n + (j + 1)];
+        const double f4 = local_grid[(i + 1) * n + (j + 1)];
+
+        const double delta_x = x2 - x1;
+        const double delta_y = y2 - y1;
+
+        const double w11 = (x2 - x_Q[cnt]) * (y2 - y_Q[cnt]) / (delta_x * delta_y);
+        const double w12 = (x2 - x_Q[cnt]) * (y_Q[cnt] - y1) / (delta_x * delta_y);
+        const double w21 = (x_Q[cnt] - x1) * (y2 - y_Q[cnt]) / (delta_x * delta_y);
+        const double w22 = (x_Q[cnt] - x1) * (y_Q[cnt] - y1) / (delta_x * delta_y);
+
+        const double fxy = f1 * w11 + f2 * w12 + f3 * w21 + f4 * w22;
+
+        std::cout << "X1 = " << x1 << ", Y1 = " << y1 << std::endl;
+        std::cout << "X2 = " << x2 << ", Y2 = " << y2 << std::endl;
+        std::cout << "XQ = " << x_Q[cnt] << ", YQ = " << y_Q[cnt] << std::endl;
+        std::cout << "f1 = " << f1 << ", f2 = " << f2 << ", f3 = " << f3 << ", f4 = " << f4
+                  << std::endl;
+        std::cout << "fxy = " << fxy << std::endl;
+        std::cout << std::endl;
+
+        Q += fxy * w_Q[cnt];
+    }
+
+    return Q;
+}
+
+/**
  * This function tests the generation of a grid and the creation of square domains.
  *
  * @param argc The number of command-line arguments.
@@ -264,8 +367,8 @@ int test_quadratures(int argc, char **argv) {
                                                       xmax,
                                                       ymin,
                                                       ymax,
-                                                      x_coords,
-                                                      y_coords);
+                                                      x_coords,   // x-coordinates of the squares
+                                                      y_coords);  // y-coordinates of the squares
 
     std::cout << "Number of squares created = " << n << std::endl;
 
@@ -276,29 +379,71 @@ int test_quadratures(int argc, char **argv) {
 
     std::vector<std::valarray<double>> x_MC, y_MC, w_MC;
 
-    unsigned int MC_nodes = 100;
+    std::valarray<double> x_MC_zero, y_MC_zero, w_MC_zero;
+
+    unsigned int MC_nodes = 200*200;
 
     for (unsigned int i = 0; i < n; ++i) {
-        std::valarray<double> x, y, w;
-        generate_MC_nodes(MC_nodes,  //
-                          x_coords[i],
-                          x_coords[i] + side,
-                          y_coords[i],
-                          y_coords[i] + side,
-                          x,
-                          y,
-                          w);
-        x_MC.push_back(x);
-        y_MC.push_back(y);
-        w_MC.push_back(w);
+        // std::valarray<double> x, y, w;
+        // generate_MC_nodes(MC_nodes,  //
+        //                   x_coords[i],
+        //                   x_coords[i] + side,
+        //                   y_coords[i],
+        //                   y_coords[i] + side,
+        //                   x,
+        //                   y,
+        //                   w);
+        // x_MC.push_back(x);
+        // y_MC.push_back(y);
+        // w_MC.push_back(w);
     }
 
     std::valarray<double> local_grid;
     int n_local = 0;
+
     copy_to_local_grid(grid, nx, ny, x_coords[0], y_coords[0], side, delta, local_grid, n_local);
 
-    std::cout << "local_grid.size() = " << local_grid.size() << std::endl;
+    generate_MC_nodes(MC_nodes,            // numebr of nodes
+                      x_coords[0],         // x_min of the square
+                      x_coords[0] + side,  // x_max of the square
+                      y_coords[0],         // y_min of the square
+                      y_coords[0] + side,  // y_max of the square
+                      x_MC_zero,           // x-coordinates of the nodes
+                      y_MC_zero,           // y-coordinates of the nodes
+                      w_MC_zero);          // weights of the nodes
 
+    std::cout << "local_grid.size() = " << local_grid.size() << std::endl;
+    std::cout << "x_MC_zero.size() = " << x_MC_zero.size() << std::endl;
+    std::cout << "nx = " << nx << ", ny = " << ny << std::endl;
+    std::cout << "n_local = " << n_local << std::endl;
+
+    double Q = quadrture_local(
+            local_grid,   //
+            x_coords[0],  //
+            y_coords[0],  //
+            n_local,      //
+            x_coords[0],  //
+            y_coords[0],  //
+            side,         //
+            x_MC_zero,    // x-coordinates of the nodes are random in the square with no sorting
+            y_MC_zero,    //
+            w_MC_zero);
+
+    std::cout << "Q = " << Q << std::endl;
+    std::cout << std::endl;
+
+    std::cout << std::endl;
+    std::cout << std::endl;
+    std::cout << std::endl;
+
+    for (unsigned int ii = 0; ii < (unsigned int)n_local; ++ii) {
+        for (unsigned int jj = 0; jj < (unsigned int)n_local; ++jj) {
+            double x = x_coords[0] + ii * delta;
+            double y = y_coords[0] + jj * delta;
+            std::cout << x << " " << y << " " << local_grid[ii * n_local + jj] << " || ";
+        }
+        std::cout << std::endl;
+    }
 
     return 0;
 }
@@ -316,77 +461,77 @@ int test_quadratures(int argc, char **argv) {
 int main(int argc, char **argv) {
     return test_quadratures(argc, argv);
 
-    // Define the domain
-    const double xmin = 0.0;
-    const double xmax = 10.0;
+    // // Define the domain
+    // const double xmin = 0.0;
+    // const double xmax = 10.0;
 
-    const double ymin = 0.0;
-    const double ymax = 10.0;
+    // const double ymin = 0.0;
+    // const double ymax = 10.0;
 
-    const double delta = 0.001;
-    std::valarray<double> grid;
+    // const double delta = 0.001;
+    // std::valarray<double> grid;
 
-    auto f = [](double x, double y) { return x * x + y * y; };
+    // auto f = [](double x, double y) { return x * x + y * y; };
 
-    std::cout << "Generating grid..." << std::endl;
-    std::cout << "delta = " << delta << std::endl;
+    // std::cout << "Generating grid..." << std::endl;
+    // std::cout << "delta = " << delta << std::endl;
 
-    int nx = 0;
-    int ny = 0;
+    // int nx = 0;
+    // int ny = 0;
 
-    const bool flag = generate_grid(grid, nx, ny, f, delta, xmin, xmax, ymin, ymax);
+    // const bool flag = generate_grid(grid, nx, ny, f, delta, xmin, xmax, ymin, ymax);
 
-    if (flag) {
-        std::cout << "Grid generated successfully" << std::endl;
-    } else {
-        std::cout << "Failed to generate grid" << std::endl;
-    }
+    // if (flag) {
+    //     std::cout << "Grid generated successfully" << std::endl;
+    // } else {
+    //     std::cout << "Failed to generate grid" << std::endl;
+    // }
 
-    {
-        const double x = 1.014;
-        const double y = 1.10;
+    // {
+    //     const double x = 1.014;
+    //     const double y = 1.10;
 
-        const auto [i, j] = get_nearest_coordinates(x, y, delta);
+    //     const auto [i, j] = get_nearest_coordinates(x, y, delta);
 
-        // int nx = std::ceil((xmax - xmin) / delta);
-        int ny = std::ceil((ymax - ymin) / delta);
+    //     // int nx = std::ceil((xmax - xmin) / delta);
+    //     int ny = std::ceil((ymax - ymin) / delta);
 
-        std::cout << "x = " << x << ", y = " << y << std::endl;
-        std::cout << "i = " << i << ", j = " << j << std::endl << std::endl;
+    //     std::cout << "x = " << x << ", y = " << y << std::endl;
+    //     std::cout << "i = " << i << ", j = " << j << std::endl << std::endl;
 
-        std::cout << "grid[i * ny + j]         = " << grid[i * ny + j] << std::endl;
-        std::cout << "grid[(i+1) * ny + j]     = " << grid[(i + 1) * ny + j] << std::endl;
-        std::cout << "grid[i * ny + (j+1)]     = " << grid[i * ny + (j + 1)] << std::endl;
-        std::cout << "grid[(i+1) * ny + (j+1)] = " << grid[(i + 1) * ny + (j + 1)] << std::endl;
-    }
+    //     std::cout << "grid[i * ny + j]         = " << grid[i * ny + j] << std::endl;
+    //     std::cout << "grid[(i+1) * ny + j]     = " << grid[(i + 1) * ny + j] << std::endl;
+    //     std::cout << "grid[i * ny + (j+1)]     = " << grid[i * ny + (j + 1)] << std::endl;
+    //     std::cout << "grid[(i+1) * ny + (j+1)] = " << grid[(i + 1) * ny + (j + 1)] << std::endl;
+    // }
 
-    {
-        std::valarray<double> local_grid;
-        int n = 0;
-        const double x = 2.014;
-        const double y = 3.10;
-        const double square_side = 1.0;
+    // {
+    //     std::valarray<double> local_grid;
+    //     int n = 0;
+    //     const double x = 2.014;
+    //     const double y = 3.10;
+    //     const double square_side = 1.0;
 
-        copy_to_local_grid(grid, nx, ny, x, y, square_side, delta, local_grid, n);
+    //     copy_to_local_grid(grid, nx, ny, x, y, square_side, delta, local_grid, n);
 
-        std::cout << "x = " << x << ", y = " << y << std::endl << std::endl;
+    //     std::cout << "x = " << x << ", y = " << y << std::endl << std::endl;
 
-        // Write local_grid to a file
-        std::ofstream file("local_grid.txt");
-        if (file.is_open()) {
-            for (int i = 0; i < n; ++i) {
-                for (int j = 0; j < n; ++j) {
-                    file << local_grid[i * n + j] << " ";
-                }
-                file << std::endl;
-            }
-            file.close();
-            std::cout << "local_grid written to file successfully" << std::endl;
-        } else {
-            std::cout << "Failed to open file for writing" << std::endl;
-        }
+    //     // Write local_grid to a file
+    //     std::ofstream file("local_grid.txt");
+    //     if (file.is_open()) {
+    //         for (int i = 0; i < n; ++i) {
+    //             for (int j = 0; j < n; ++j) {
+    //                 file << local_grid[i * n + j] << " ";
+    //             }
+    //             file << std::endl;
+    //         }
+    //         file.close();
+    //         std::cout << "local_grid written to file successfully" << std::endl;
+    //     } else {
+    //         std::cout << "Failed to open file for writing" << std::endl;
+    //     }
 
-        std::cout << "local_grid.size() = " << local_grid.size() << std::endl;
-    }
+    //     std::cout << "local_grid.size() = " << local_grid.size() << std::endl;
+    // }
     return 0;
 }
