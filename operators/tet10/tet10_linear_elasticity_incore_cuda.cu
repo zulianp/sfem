@@ -24,7 +24,7 @@ typedef float scalar_t;
 typedef real_t scalar_t;
 #endif
 
-typedef real_t accumulator_t;
+typedef scalar_t accumulator_t;
 
 #ifdef SFEM_ENABLE_FP16_JACOBIANS
 #include <cuda_fp16.h>
@@ -158,7 +158,7 @@ static inline __device__ __host__ void apply_micro_kernel(
     // This can be reduced with 1D products (ref_shape_grad_{x,y,z})
     scalar_t disp_grad[9] = {0};
 
-#define MICRO_KERNEL_USE_CODEGEN 1
+#define MICRO_KERNEL_USE_CODEGEN 0
 
 #if MICRO_KERNEL_USE_CODEGEN
     // Code-gen way
@@ -407,11 +407,12 @@ __constant__ scalar_t qw[8];
 
 static void init_quadrature() {
     static bool initialized = false;
-    if (initialized) {
+    if (!initialized) {
         SFEM_CUDA_CHECK(cudaMemcpyToSymbol(qx, h_qx, 8 * sizeof(scalar_t)));
         SFEM_CUDA_CHECK(cudaMemcpyToSymbol(qy, h_qy, 8 * sizeof(scalar_t)));
         SFEM_CUDA_CHECK(cudaMemcpyToSymbol(qz, h_qz, 8 * sizeof(scalar_t)));
         SFEM_CUDA_CHECK(cudaMemcpyToSymbol(qw, h_qw, 8 * sizeof(scalar_t)));
+        initialized = true;
     }
 }
 
@@ -633,13 +634,13 @@ extern int tet10_cuda_incore_linear_elasticity_diag(
 }
 
 extern int tet10_cuda_incore_linear_elasticity_apply_aos(const ptrdiff_t nelements,
-                                                             const ptrdiff_t nnodes,
-                                                             idx_t **const SFEM_RESTRICT elements,
-                                                             geom_t **const SFEM_RESTRICT points,
-                                                             const real_t mu,
-                                                             const real_t lambda,
-                                                             const real_t *const SFEM_RESTRICT u,
-                                                             real_t *const SFEM_RESTRICT values) {
+                                                         const ptrdiff_t nnodes,
+                                                         idx_t **const SFEM_RESTRICT elements,
+                                                         geom_t **const SFEM_RESTRICT points,
+                                                         const real_t mu,
+                                                         const real_t lambda,
+                                                         const real_t *const SFEM_RESTRICT u,
+                                                         real_t *const SFEM_RESTRICT values) {
     cuda_incore_linear_elasticity_t ctx;
     tet10_cuda_incore_linear_elasticity_init(&ctx, mu, lambda, nelements, elements, points);
     tet10_cuda_incore_linear_elasticity_apply(&ctx, u, values);
