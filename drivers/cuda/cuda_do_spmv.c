@@ -129,6 +129,12 @@ int main(int argc, char *argv[]) {
         cusparseOperation_t op_type =
             transpose ? CUSPARSE_OPERATION_TRANSPOSE : CUSPARSE_OPERATION_NON_TRANSPOSE;
 
+#if CUDART_VERSION < 12000
+        cusparseSpMVAlg_t alg = CUSPARSE_MV_ALG_DEFAULT;
+#else
+        cusparseSpMVAlg_t alg = CUSPARSE_SPMV_ALG_DEFAULT;
+#endif
+
         CHECK_CUSPARSE(cusparseCreateCsr(&d_matrix,
                                          crs.lrows,
                                          crs.lrows,
@@ -156,7 +162,7 @@ int main(int argc, char *argv[]) {
                                                &beta,
                                                vecY,
                                                valueType,
-                                               CUSPARSE_SPMV_ALG_DEFAULT,
+                                               alg,
                                                &bufferSize));
 
         CHECK_CUDA(cudaMemcpy(dY, y, crs.lrows * sizeof(real_t), cudaMemcpyHostToDevice));
@@ -180,7 +186,7 @@ int main(int argc, char *argv[]) {
                                         &beta,
                                         vecY,
                                         valueType,
-                                        CUSPARSE_SPMV_ALG_DEFAULT,
+                                        alg,
                                         dBuffer));
         }
 
