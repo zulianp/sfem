@@ -119,19 +119,20 @@ __device__ void hex_aa_8_eval_fun_cu(
         // Quadrature point (local coordinates)
         // With respect to the hat functions of a cube element
         // In a local coordinate system
-        const real_t x,
-        const real_t y,
-        const real_t z,
-
-        // Output
-        real_t* const MY_RESTRICT f0,
-        real_t* const MY_RESTRICT f1,
-        real_t* const MY_RESTRICT f2,
-        real_t* const MY_RESTRICT f3,
-        real_t* const MY_RESTRICT f4,
-        real_t* const MY_RESTRICT f5,
-        real_t* const MY_RESTRICT f6,
-        real_t* const MY_RESTRICT f7) {
+        //
+        const real_t x,  //
+        const real_t y,  //
+        const real_t z,  //
+        //
+        //
+        real_t* const MY_RESTRICT f0,    //
+        real_t* const MY_RESTRICT f1,    //
+        real_t* const MY_RESTRICT f2,    //
+        real_t* const MY_RESTRICT f3,    //
+        real_t* const MY_RESTRICT f4,    //
+        real_t* const MY_RESTRICT f5,    //
+        real_t* const MY_RESTRICT f6,    //
+        real_t* const MY_RESTRICT f7) {  //
     //
     *f0 = (1.0 - x) * (1.0 - y) * (1.0 - z);
     *f1 = x * (1.0 - y) * (1.0 - z);
@@ -151,12 +152,12 @@ __device__ void hex_aa_8_collect_coeffs_cu(
         const ptrdiff_t MY_RESTRICT stride0,
         const ptrdiff_t MY_RESTRICT stride1,
         const ptrdiff_t MY_RESTRICT stride2,
-
+        //
         const ptrdiff_t i,
         const ptrdiff_t j,
         const ptrdiff_t k,
         // Attention this is geometric data transformed to solver data!
-        const real_t* const MY_RESTRICT data,
+        const real_t* const MY_RESTRICT data,  //
         //
         real_t* MY_RESTRICT out0,
         real_t* MY_RESTRICT out1,
@@ -565,7 +566,7 @@ extern "C" int tet4_resample_field_local_CUDA(
                                                                      nnodes,        //
                                                                      elems_device,  //
                                                                      xyz_device,    //
-                                                                     //  NULL,
+                                                                     //  NULL, //
 
                                                                      stride[0],
                                                                      stride[1],
