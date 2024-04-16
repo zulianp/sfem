@@ -244,6 +244,7 @@ ifeq ($(cuda), 1)
 	CUDA_OBJS += tet4_linear_elasticity_incore_cuda.o
 	CUDA_OBJS += tet10_linear_elasticity_incore_cuda.o
 
+	OBJS += linear_elasticity_incore_cuda.o
 	OBJS += laplacian_incore_cuda.o
 
 	INCLUDES += -Ioperators/cuda
@@ -550,6 +551,9 @@ cuspmv : drivers/cuda/cuda_do_spmv.c libsfem.a
 
 
 lapl_matrix_free : drivers/cuda/lapl_matrix_free.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+linear_elasticity_matrix_free : drivers/cuda/linear_elasticity_matrix_free.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 run_poisson_cuda : examples/run_poisson_cuda.cpp libsfem.a

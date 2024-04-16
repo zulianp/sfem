@@ -14,6 +14,8 @@ extern "C" {
 
 int cuda_incore_linear_elasticity_init(const enum ElemType element_type,
                                cuda_incore_linear_elasticity_t *ctx,
+                               const real_t mu,
+                               const real_t lambda,
                                const ptrdiff_t nelements,
                                idx_t **const SFEM_RESTRICT elements,
                                geom_t **const SFEM_RESTRICT points);

@@ -1,11 +1,11 @@
 #include "tet4_linear_elasticity_incore_cuda.h"
 
-#include "sfem_defs.h"
 #include "sfem_cuda_base.h"
+#include "sfem_defs.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
-#include <algorithm>
 #include <cstddef>
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -169,11 +169,11 @@ static inline __device__ __host__ void tet4_linear_elasticity_micro_kernel(
 }
 
 int tet4_cuda_incore_linear_elasticity_init(cuda_incore_linear_elasticity_t *const ctx,
-                                             const real_t mu,
-                                             const real_t lambda,
-                                             const ptrdiff_t nelements,
-                                             idx_t **const SFEM_RESTRICT elements,
-                                             geom_t **const SFEM_RESTRICT points) {
+                                            const real_t mu,
+                                            const real_t lambda,
+                                            const ptrdiff_t nelements,
+                                            idx_t **const SFEM_RESTRICT elements,
+                                            geom_t **const SFEM_RESTRICT points) {
     {
         cu_jacobian_t *jacobian_adjugate =
             (cu_jacobian_t *)calloc(9 * nelements, sizeof(cu_jacobian_t));
@@ -258,8 +258,7 @@ __global__ void tet4_cuda_incore_linear_elasticity_apply_opt_kernel(
     const real_t mu,
     const real_t lambda,
     const real_t *const u,
-    real_t *const values) 
-{
+    real_t *const values) {
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
          e += blockDim.x * gridDim.x) {
         idx_t ev[4];
@@ -309,9 +308,10 @@ __global__ void tet4_cuda_incore_linear_elasticity_apply_opt_kernel(
 
 #define SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
-int tet4_cuda_incore_linear_elasticity_apply_opt(const cuda_incore_linear_elasticity_t *const ctx,
-                                                  const real_t *const SFEM_RESTRICT u,
-                                                  real_t *const SFEM_RESTRICT values) {
+extern int tet4_cuda_incore_linear_elasticity_apply(
+    const cuda_incore_linear_elasticity_t *const ctx,
+    const real_t *const SFEM_RESTRICT u,
+    real_t *const SFEM_RESTRICT values) {
     const real_t mu = ctx->mu;
     const real_t lambda = ctx->lambda;
 
@@ -329,29 +329,36 @@ int tet4_cuda_incore_linear_elasticity_apply_opt(const cuda_incore_linear_elasti
 
     ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (ctx->nelements + block_size - 1) / block_size);
     tet4_cuda_incore_linear_elasticity_apply_opt_kernel<<<n_blocks, block_size, 0>>>(
-        ctx->nelements, ctx->elements, jacobian_adjugate, jacobian_determinant, mu, lambda, u, values);
+        ctx->nelements,
+        ctx->elements,
+        jacobian_adjugate,
+        jacobian_determinant,
+        mu,
+        lambda,
+        u,
+        values);
 
     return 0;
 }
 
-int tet4_cuda_incore_linear_elasticity_diag(const cuda_incore_linear_elasticity_t *const ctx,
-                                             real_t *const SFEM_RESTRICT diag) {
+extern int tet4_cuda_incore_linear_elasticity_diag(const cuda_incore_linear_elasticity_t *const ctx,
+                                                   real_t *const SFEM_RESTRICT diag) {
     //
     assert(0);
     return 1;
 }
 
-int tet4_cuda_incore_linear_elasticity_apply_aos(const ptrdiff_t nelements,
-                                                  const ptrdiff_t nnodes,
-                                                  idx_t **const SFEM_RESTRICT elements,
-                                                  geom_t **const SFEM_RESTRICT points,
-                                                  const real_t mu,
-                                                  const real_t lambda,
-                                                  const real_t *const SFEM_RESTRICT u,
-                                                  real_t *const SFEM_RESTRICT values) {
-    cuda_incore_linear_elasticity_t ctx;
-    tet4_cuda_incore_linear_elasticity_init(&ctx, mu, lambda, nelements, elements, points);
-    tet4_cuda_incore_linear_elasticity_apply_opt(&ctx, u, values);
-    tet4_cuda_incore_linear_elasticity_destroy(&ctx);
-    return 0;
-}
+// extern int tet4_cuda_incore_linear_elasticity_apply_aos(const ptrdiff_t nelements,
+//                                                         const ptrdiff_t nnodes,
+//                                                         idx_t **const SFEM_RESTRICT elements,
+//                                                         geom_t **const SFEM_RESTRICT points,
+//                                                         const real_t mu,
+//                                                         const real_t lambda,
+//                                                         const real_t *const SFEM_RESTRICT u,
+//                                                         real_t *const SFEM_RESTRICT values) {
+//     cuda_incore_linear_elasticity_t ctx;
+//     tet4_cuda_incore_linear_elasticity_init(&ctx, mu, lambda, nelements, elements, points);
+//     tet4_cuda_incore_linear_elasticity_apply(&ctx, u, values);
+//     tet4_cuda_incore_linear_elasticity_destroy(&ctx);
+//     return 0;
+// }

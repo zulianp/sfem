@@ -12,7 +12,6 @@
 extern "C" {
 #endif
 
-
 typedef struct {
     real_t mu;
     real_t lambda;
@@ -23,21 +22,20 @@ typedef struct {
     idx_t *elements;
 } cuda_incore_linear_elasticity_t;
 
-
 int tet4_cuda_incore_linear_elasticity_init(cuda_incore_linear_elasticity_t *const ctx,
-                                             const real_t mu,
-                                             const real_t lambda,
-                                             const ptrdiff_t nelements,
-                                             idx_t **const SFEM_RESTRICT elements,
-                                             geom_t **const SFEM_RESTRICT points);
+                                            const real_t mu,
+                                            const real_t lambda,
+                                            const ptrdiff_t nelements,
+                                            idx_t **const SFEM_RESTRICT elements,
+                                            geom_t **const SFEM_RESTRICT points);
 
 int tet4_cuda_incore_linear_elasticity_destroy(cuda_incore_linear_elasticity_t *ctx);
-int tet4_cuda_incore_linear_elasticity_apply(cuda_incore_linear_elasticity_t *ctx,
-                                             const real_t *const d_x,
-                                             real_t *const d_y);
+int tet4_cuda_incore_linear_elasticity_apply(const cuda_incore_linear_elasticity_t *const ctx,
+                                             const real_t *const SFEM_RESTRICT u,
+                                             real_t *const SFEM_RESTRICT values);
 
 int tet4_cuda_incore_linear_elasticity_diag(cuda_incore_linear_elasticity_t *ctx,
-                                            real_t *const d_t);
+                                            real_t *const SFEM_RESTRICT d_t);
 
 #ifdef __cplusplus
 }

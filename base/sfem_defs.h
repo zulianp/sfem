@@ -221,7 +221,7 @@ SFEM_INLINE static enum ElemType macro_type_variant(const enum ElemType type) {
         case TRI6: return MACRO_TRI3;
         default: {
             assert(0);
-            return INVALID;
+            return type;
         }
     }
 }

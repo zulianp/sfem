@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -88,9 +89,20 @@ int main(int argc, char *argv[]) {
              SFEM_MPI_REAL_T,
              &crs);
 
-    ptrdiff_t _nope_, x_n;
+    
     real_t *x = 0;
-    array_create_from_file(comm, x_path, SFEM_MPI_REAL_T, (void **)&x, &_nope_, &x_n);
+    if (strcmp("gen:ones", x_path) == 0) {
+        ptrdiff_t ndofs = crs.lrows;
+        x = malloc(ndofs * sizeof(real_t));
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < ndofs; ++i) {
+            x[i] = 1;
+        }
+
+    } else {
+        ptrdiff_t _nope_, x_n;
+        array_create_from_file(comm, x_path, SFEM_MPI_REAL_T, (void **)&x, &_nope_, &x_n);
+    }
 
     real_t *y = calloc(crs.grows, sizeof(real_t));
 
@@ -154,16 +166,8 @@ int main(int argc, char *argv[]) {
         CHECK_CUSPARSE(cusparseCreateDnVec(&vecY, crs.lrows, dY, valueType));
 
         size_t bufferSize = 0;
-        CHECK_CUSPARSE(cusparseSpMV_bufferSize(handle,
-                                               op_type,
-                                               &alpha,
-                                               d_matrix,
-                                               vecX,
-                                               &beta,
-                                               vecY,
-                                               valueType,
-                                               alg,
-                                               &bufferSize));
+        CHECK_CUSPARSE(cusparseSpMV_bufferSize(
+            handle, op_type, &alpha, d_matrix, vecX, &beta, vecY, valueType, alg, &bufferSize));
 
         CHECK_CUDA(cudaMemcpy(dY, y, crs.lrows * sizeof(real_t), cudaMemcpyHostToDevice));
 
@@ -178,16 +182,8 @@ int main(int argc, char *argv[]) {
         double spmv_tick = MPI_Wtime();
 
         for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
-            CHECK_CUSPARSE(cusparseSpMV(handle,
-                                        op_type,
-                                        &alpha,
-                                        d_matrix,
-                                        vecX,
-                                        &beta,
-                                        vecY,
-                                        valueType,
-                                        alg,
-                                        dBuffer));
+            CHECK_CUSPARSE(cusparseSpMV(
+                handle, op_type, &alpha, d_matrix, vecX, &beta, vecY, valueType, alg, dBuffer));
         }
 
         cudaDeviceSynchronize();

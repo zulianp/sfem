@@ -4,9 +4,9 @@
 #include <mpi.h>
 #include <algorithm>
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <string>
-#include <functional>
 
 #include "sfem_base.h"
 #include "sfem_defs.h"
@@ -16,6 +16,11 @@
 namespace sfem {
 
     enum ExecutionSpace { EXECUTION_SPACE_HOST = 0, EXECUTION_SPACE_DEVICE = 1 };
+    
+    enum MemorySpace {
+        MEMORY_SPACE_HOST = EXECUTION_SPACE_HOST,
+        MEMORY_SPACE_DEVICE = EXECUTION_SPACE_DEVICE
+    };
 
     class Function;
     class Mesh;
@@ -119,10 +124,9 @@ namespace sfem {
         virtual int report(const isolver_scalar_t *const /*x*/) { return ISOLVER_FUNCTION_SUCCESS; }
         virtual ExecutionSpace execution_space() const { return EXECUTION_SPACE_HOST; }
 
-        virtual void set_field(
-            const char */*name*/, 
-            const int /*component*/, 
-            isolver_scalar_t */*x*/) {
+        virtual void set_field(const char * /*name*/,
+                               const int /*component*/,
+                               isolver_scalar_t * /*x*/) {
             assert(0);
         }
     };
@@ -215,6 +219,7 @@ namespace sfem {
                            isolver_idx_t *const idx,
                            const int component,
                            const isolver_scalar_t value);
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;
@@ -226,7 +231,9 @@ namespace sfem {
         ~Output();
         void set_output_dir(const char *path);
         int write(const char *name, const isolver_scalar_t *const x);
-        int write_time_step(const char *name, const isolver_scalar_t t, const isolver_scalar_t *const x);
+        int write_time_step(const char *name,
+                            const isolver_scalar_t t,
+                            const isolver_scalar_t *const x);
 
         void clear();
 
@@ -288,6 +295,7 @@ namespace sfem {
         static void register_op(const std::string &name, FactoryFunction factory_function);
         static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,
                                              const char *name);
+
     private:
         static Factory &instance();
 
