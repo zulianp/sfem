@@ -9,6 +9,7 @@
 #include "array_dtof.h"
 #include "matrixio_array.h"
 #include "matrixio_crs.h"
+#include "mpi.h"
 #include "utils.h"
 
 #include "crs_graph.h"
@@ -69,7 +70,8 @@ int main(int argc, char *argv[]) {
         lelements[d] = calloc(mesh.nelements, sizeof(lidx_t));
     }
 
-    ptrdiff_t SFEM_ELEMENT_BLOCK_SIZE = 1 << (8 * sizeof(lidx_t) - 1);
+    ptrdiff_t max_rep_limit = 1 << (8 * sizeof(lidx_t) - 1);
+    ptrdiff_t SFEM_ELEMENT_BLOCK_SIZE = max_rep_limit;
     SFEM_READ_ENV(SFEM_ELEMENT_BLOCK_SIZE, atol);
 
     // max_block_size <= 32'768
@@ -77,7 +79,7 @@ int main(int argc, char *argv[]) {
     ptrdiff_t num_blocks = MAX((mesh.nelements + max_block_size - 1) / max_block_size, 1);
 
     lidx_t *node_lidx = malloc(mesh.nnodes * sizeof(lidx_t));
-    lidx_t *nodes_in_block = calloc(num_blocks, sizeof(lidx_t));
+    int *nodes_in_block = calloc(num_blocks, sizeof(int));
 
     for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
         node_lidx[i] = -1;
@@ -112,9 +114,20 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    int violated_max_count = 0;
     ptrdiff_t new_num_nodes = 0;
     for (int b = 0; b < num_blocks; b++) {
         new_num_nodes += nodes_in_block[b];
+        violated_max_count += nodes_in_block[b] > max_rep_limit;
+    }
+
+    if(violated_max_count) {
+        fprintf(stderr, "Error: violated max rep count\n");
+        for (int b = 0; b < num_blocks; b++) {
+            fprintf(stderr, "%d < %ld\n", nodes_in_block[b], max_rep_limit);
+        }
+
+        MPI_Abort(comm, -1);
     }
 
     idx_t *node_mapping = calloc(new_num_nodes, sizeof(idx_t));
@@ -140,35 +153,37 @@ int main(int argc, char *argv[]) {
         lnode_offset += nodes_in_block[block_num];
     }
 
-    lnode_offset = 0;
-    for (ptrdiff_t e_offset = 0, block_num = 0; e_offset < mesh.nelements;
-         e_offset += max_block_size, block_num++) {
-        ptrdiff_t block_size = MIN(max_block_size, mesh.nelements - e_offset);
-        ptrdiff_t next_offset = e_offset + block_size;
+    if (0) {
+        lnode_offset = 0;
+        for (ptrdiff_t e_offset = 0, block_num = 0; e_offset < mesh.nelements;
+             e_offset += max_block_size, block_num++) {
+            ptrdiff_t block_size = MIN(max_block_size, mesh.nelements - e_offset);
+            ptrdiff_t next_offset = e_offset + block_size;
 
-        printf("block %ld) [%ld, %ld) #elements %ld #nodes %" d_ELEMENT_LIDX_T "\n",
-               block_num,
-               e_offset,
-               next_offset,
-               block_size,
-               nodes_in_block[block_num]);
+            printf("block %ld) [%ld, %ld) #elements %ld #nodes %d\n",
+                   block_num,
+                   e_offset,
+                   next_offset,
+                   block_size,
+                   nodes_in_block[block_num]);
 
-        lidx_t last_index = 0;
-        for (ptrdiff_t e = e_offset; e < next_offset; e++) {
-            for (int d = 0; d < nnxe; d++) {
-                printf("%" d_ELEMENT_LIDX_T " ", lelements[d][e]);
+            lidx_t last_index = 0;
+            for (ptrdiff_t e = e_offset; e < next_offset; e++) {
+                for (int d = 0; d < nnxe; d++) {
+                    printf("%" d_ELEMENT_LIDX_T " ", lelements[d][e]);
+                }
+
+                printf("\t-> ");
+
+                for (int d = 0; d < nnxe; d++) {
+                    printf("%" d_IDX_T " ", node_mapping[lnode_offset + lelements[d][e]]);
+                }
+
+                printf("\n");
             }
 
-            printf("\t-> ");
-
-            for (int d = 0; d < nnxe; d++) {
-                printf("%" d_IDX_T " ", node_mapping[lnode_offset + lelements[d][e]]);
-            }
-
-            printf("\n");
+            lnode_offset += nodes_in_block[block_num];
         }
-
-        lnode_offset += nodes_in_block[block_num];
     }
 
     // int * node_membership_count = calloc(mesh.nnodes, sizeof(int));
@@ -177,9 +192,11 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("mesh_to_blocks.c: #elements  %ld #nodes %ld\n",
+        printf("mesh_to_blocks.c: #elements %ld #nodes %ld #blocks %ld #node_mapping %ld\n",
                (long)mesh.nelements,
-               (long)mesh.nnodes);
+               (long)mesh.nnodes,
+               (long)num_blocks,
+               (long)new_num_nodes);
         printf("----------------------------------------\n");
     }
 

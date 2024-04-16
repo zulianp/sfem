@@ -231,7 +231,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     output_folder = argv[1]
-    cell_type = "quad"
+    cell_type = "tet4"
     nx = 2
     ny = 2
     nz = 2
