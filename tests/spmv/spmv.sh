@@ -31,7 +31,7 @@ if [[ -d "$ref2" ]]
 then
 	echo "Reusing mesh: $ref2"
 else
-	create_sphere.sh 2
+	create_sphere.sh 3
 	refine mesh ref1
 	sfc ref1 sfc1
 	refine sfc1 ref2

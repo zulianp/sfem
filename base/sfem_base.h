@@ -63,4 +63,7 @@ typedef int element_idx_t;
 typedef geom_t jacobian_t;
 // typedef geom_t jacobian_t;
 
+typedef int16_t lidx_t;
+#define d_ELEMENT_LIDX_T "hd"
+
 #endif  // SFEM_BASE_H
