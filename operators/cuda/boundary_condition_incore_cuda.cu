@@ -24,7 +24,6 @@ void boundary_conditions_host_to_device(const boundary_condition_t *const host,
                                    cudaMemcpyHostToDevice));
     } else {
         device->values = nullptr;
-
     }
 }
 
@@ -57,11 +56,12 @@ void d_constraint_nodes_copy_vec(const ptrdiff_t n_dirichlet_nodes,
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
-    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (n_dirichlet_nodes + kernel_block_size - 1) / kernel_block_size);
+    ptrdiff_t n_blocks =
+        std::max(ptrdiff_t(1), (n_dirichlet_nodes + kernel_block_size - 1) / kernel_block_size);
     constraint_nodes_copy_vec_kernel<<<n_blocks, kernel_block_size, 0>>>(
         n_dirichlet_nodes, dirichlet_nodes, block_size, component, source, dest);
 
-     SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE();
 }
 
 void d_copy_at_dirichlet_nodes_vec(const int n_conditions,
@@ -104,11 +104,12 @@ void d_constraint_nodes_to_value_vec(const ptrdiff_t n_dirichlet_nodes,
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
-    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (n_dirichlet_nodes + kernel_block_size - 1) / kernel_block_size);
+    ptrdiff_t n_blocks =
+        std::max(ptrdiff_t(1), (n_dirichlet_nodes + kernel_block_size - 1) / kernel_block_size);
     constraint_nodes_to_value_vec_kernel<<<n_blocks, kernel_block_size, 0>>>(
         n_dirichlet_nodes, dirichlet_nodes, block_size, component, value, values);
 
-     SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE();
 }
 
 __global__ void constraint_nodes_to_values_vec_kernel(const ptrdiff_t n_dirichlet_nodes,
@@ -140,12 +141,12 @@ void d_constraint_nodes_to_values_vec(const ptrdiff_t n_dirichlet_nodes,
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
-    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (n_dirichlet_nodes + kernel_block_size - 1) / kernel_block_size);
+    ptrdiff_t n_blocks =
+        std::max(ptrdiff_t(1), (n_dirichlet_nodes + kernel_block_size - 1) / kernel_block_size);
     constraint_nodes_to_values_vec_kernel<<<n_blocks, kernel_block_size, 0>>>(
         n_dirichlet_nodes, dirichlet_nodes, block_size, component, dirichlet_values, values);
-    
 
-     SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE();
 }
 
 void d_apply_dirichlet_condition_vec(const int n_conditions,
@@ -161,6 +162,44 @@ void d_apply_dirichlet_condition_vec(const int n_conditions,
                 cond[i].local_size, cond[i].idx, block_size, cond[i].component, cond[i].value, x);
         }
     }
+}
+
+__global__ void constraint_gradient_nodes_to_value_vec_kernel(const ptrdiff_t n_dirichlet_nodes,
+                                                              const idx_t *dirichlet_nodes,
+                                                              const int block_size,
+                                                              const int component,
+                                                              const real_t value,
+                                                              const real_t *const SFEM_RESTRICT x,
+                                                              real_t *const SFEM_RESTRICT g) {
+    for (ptrdiff_t node = blockIdx.x * blockDim.x + threadIdx.x; node < n_dirichlet_nodes;
+         node += blockDim.x * gridDim.x) {
+        idx_t i = dirichlet_nodes[node] * block_size + component;
+        g[i] = x[i] - value;
+    }
+}
+
+void d_constraint_gradient_nodes_to_value_vec(const ptrdiff_t n_dirichlet_nodes,
+                                              const idx_t *dirichlet_nodes,
+                                              const int block_size,
+                                              const int component,
+                                              const real_t value,
+                                              const real_t *const SFEM_RESTRICT x,
+                                              real_t *const SFEM_RESTRICT g) {
+    int kernel_block_size = 128;
+#ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+    {
+        int min_grid_size;
+        cuOccupancyMaxPotentialBlockSize(
+            &min_grid_size, &kernel_block_size, constraint_nodes_to_values_vec_kernel, 0, 0);
+    }
+#endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+
+    ptrdiff_t n_blocks =
+        std::max(ptrdiff_t(1), (n_dirichlet_nodes + kernel_block_size - 1) / kernel_block_size);
+    constraint_gradient_nodes_to_value_vec_kernel<<<n_blocks, kernel_block_size, 0>>>(
+        n_dirichlet_nodes, dirichlet_nodes, block_size, component, value, x, g);
+
+    SFEM_DEBUG_SYNCHRONIZE();
 }
 
 void d_destroy_conditions(const int n_conditions, boundary_condition_t *cond) {

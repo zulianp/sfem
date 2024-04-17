@@ -45,6 +45,14 @@ void d_apply_dirichlet_condition_vec(const int n_conditions,
                                      const int block_size,
                                      real_t *const x);
 
+void d_constraint_gradient_nodes_to_value_vec(const ptrdiff_t n_dirichlet_nodes,
+                                              const idx_t *dirichlet_nodes,
+                                              const int block_size,
+                                              const int component,
+                                              const real_t value,
+                                              const real_t *const SFEM_RESTRICT x,
+                                              real_t *const SFEM_RESTRICT g);
+
 void d_destroy_conditions(const int n_conditions, boundary_condition_t *cond);
 
 #ifdef __cplusplus

@@ -168,6 +168,9 @@ namespace sfem {
 
         inline bool is_linear() const override { return true; }
 
+        int n_conditions() const;
+        void *impl_conditions();
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;
@@ -194,6 +197,8 @@ namespace sfem {
         DirichletConditions(const std::shared_ptr<FunctionSpace> &space);
         ~DirichletConditions();
 
+        std::shared_ptr<FunctionSpace> space();
+
         static std::unique_ptr<DirichletConditions> create_from_env(
             const std::shared_ptr<FunctionSpace> &space);
         int apply(isolver_scalar_t *const x) override;
@@ -219,6 +224,9 @@ namespace sfem {
                            isolver_idx_t *const idx,
                            const int component,
                            const isolver_scalar_t value);
+
+        int n_conditions() const;
+        void *impl_conditions();
 
     private:
         class Impl;

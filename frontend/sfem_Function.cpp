@@ -248,6 +248,9 @@ namespace sfem {
         boundary_condition_t *neumann_conditions{nullptr};
     };
 
+    int NeumannConditions::n_conditions() const { return impl_->n_neumann_conditions; }
+    void *NeumannConditions::impl_conditions() { return (void *)impl_->neumann_conditions; }
+
     const char *NeumannConditions::name() const { return "NeumannConditions"; }
 
     NeumannConditions::NeumannConditions(const std::shared_ptr<FunctionSpace> &space)
@@ -366,10 +369,7 @@ namespace sfem {
         impl_->n_neumann_conditions++;
     }
 
-    int Constraint::apply_zero(isolver_scalar_t *const x)
-    {
-        return apply_value(0, x);
-    }
+    int Constraint::apply_zero(isolver_scalar_t *const x) { return apply_value(0, x); }
 
     class DirichletConditions::Impl {
     public:
@@ -388,6 +388,14 @@ namespace sfem {
         int n_dirichlet_conditions{0};
         boundary_condition_t *dirichlet_conditions{nullptr};
     };
+
+    std::shared_ptr<FunctionSpace> DirichletConditions::space()
+    {
+        return impl_->space;
+    }
+
+    int DirichletConditions::n_conditions() const { return impl_->n_dirichlet_conditions; }
+    void *DirichletConditions::impl_conditions() { return (void *)impl_->dirichlet_conditions; }
 
     DirichletConditions::DirichletConditions(const std::shared_ptr<FunctionSpace> &space)
         : impl_(std::make_unique<Impl>()) {
