@@ -258,7 +258,7 @@ namespace sfem {
         impl_->space = space;
     }
 
-    std::unique_ptr<NeumannConditions> NeumannConditions::create_from_env(
+    std::shared_ptr<NeumannConditions> NeumannConditions::create_from_env(
         const std::shared_ptr<FunctionSpace> &space) {
         //
         auto nc = std::make_unique<NeumannConditions>(space);
@@ -444,7 +444,7 @@ namespace sfem {
         impl_->n_dirichlet_conditions++;
     }
 
-    std::unique_ptr<DirichletConditions> DirichletConditions::create_from_env(
+    std::shared_ptr<DirichletConditions> DirichletConditions::create_from_env(
         const std::shared_ptr<FunctionSpace> &space) {
         //
         auto dc = std::make_unique<DirichletConditions>(space);

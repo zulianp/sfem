@@ -65,15 +65,28 @@ namespace sfem {
 
         void *impl_mesh();
 
+        inline static std::shared_ptr<Mesh> create_from_file(MPI_Comm comm, const char *path) {
+            auto ret = std::make_shared<Mesh>(comm);
+            ret->read(path);
+            return ret;
+        }
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;
     };
 
+
+
     class FunctionSpace final {
     public:
         FunctionSpace(const std::shared_ptr<Mesh> &mesh, const int block_size = 1);
         ~FunctionSpace();
+
+        static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<Mesh> &mesh, const int block_size = 1)
+        {
+            return std::make_shared<FunctionSpace>(mesh, block_size);
+        }
 
         int create_crs_graph(ptrdiff_t *nlocal,
                              ptrdiff_t *nglobal,
@@ -133,7 +146,7 @@ namespace sfem {
 
     class NeumannConditions final : public Op {
     public:
-        static std::unique_ptr<NeumannConditions> create_from_env(
+        static std::shared_ptr<NeumannConditions> create_from_env(
             const std::shared_ptr<FunctionSpace> &space);
 
         const char *name() const override;
@@ -199,7 +212,7 @@ namespace sfem {
 
         std::shared_ptr<FunctionSpace> space();
 
-        static std::unique_ptr<DirichletConditions> create_from_env(
+        static std::shared_ptr<DirichletConditions> create_from_env(
             const std::shared_ptr<FunctionSpace> &space);
         int apply(isolver_scalar_t *const x) override;
         int apply_value(const isolver_scalar_t value, isolver_scalar_t *const x) override;
@@ -254,6 +267,12 @@ namespace sfem {
     public:
         Function(const std::shared_ptr<FunctionSpace> &space);
         ~Function();
+
+
+        inline static std::shared_ptr<Function> create(const std::shared_ptr<FunctionSpace> &space)
+        {
+            return std::make_shared<Function>(space);
+        }
 
         void add_operator(const std::shared_ptr<Op> &op);
         void add_constraint(const std::shared_ptr<Constraint> &c);

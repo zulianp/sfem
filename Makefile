@@ -264,7 +264,9 @@ endif
 
 OBJS += $(SIMD_OBJS)
 
-plugins: isolver_sfem.dylib franetg_plugin.dylib hyperelasticity_plugin.dylib nse_plugin.dylib stokes_plugin.dylib sfem_Function.o
+OBJS += sfem_Function.o 
+
+plugins: isolver_sfem.dylib franetg_plugin.dylib hyperelasticity_plugin.dylib nse_plugin.dylib stokes_plugin.dylib
 
 libsfem.a : $(OBJS)
 	ar rcs $@ $^
@@ -537,7 +539,7 @@ hyperelasticity_plugin.o : plugin/hyperelasticity_plugin.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
 
 sfem_Function.o : sfem_Function.cpp
-	$(MPICXX) $(CXXFLAGS) $(INCLUDES) $(INTERNAL_CXXFLAGS) -I../isolver/interfaces/nlsolve -c $<
+	$(MPICXX) $(CXXFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
 
 sfem_Function_incore_cuda.o : sfem_Function_incore_cuda.cpp
 	$(MPICXX) $(CXXFLAGS) $(INCLUDES) $(CXXFLAGS) -I../isolver/interfaces/nlsolve -c $<
@@ -565,6 +567,9 @@ linear_elasticity_matrix_free : drivers/cuda/linear_elasticity_matrix_free.c lib
 
 run_poisson_cuda : examples/run_poisson_cuda.cpp libsfem.a
 	$(MPICXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+steady_state_sim_cuda  : drivers/cuda/steady_state_sim_cuda.cpp libsfem.a
+	$(MPICXX) $(CXXFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve  -o $@ $^ $(LDFLAGS) ; \
 
 spmv : drivers/cuda/do_spmv.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
