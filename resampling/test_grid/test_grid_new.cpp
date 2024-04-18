@@ -108,6 +108,56 @@ inline std::tuple<int, int> get_nearest_coordinates(const double x_zero,  //
 }
 
 /**
+ * Calculates the nearest grid coordinates (floor values) for a given point (x, y)
+ * based on the grid origin (x_zero, y_zero) and grid spacing (delta_x, delta_y).
+ *
+ * @param x_zero The x-coordinate of the grid origin.
+ * @param y_zero The y-coordinate of the grid origin.
+ * @param delta_x The spacing between grid points along the x-axis.
+ * @param delta_y The spacing between grid points along the y-axis.
+ * @param x The x-coordinate of the point for which nearest grid coordinates are to be calculated.
+ * @param y The y-coordinate of the point for which nearest grid coordinates are to be calculated.
+ * @param i Reference to the variable to store the nearest grid coordinate along the x-axis.
+ * @param j Reference to the variable to store the nearest grid coordinate along the y-axis.
+ */
+inline void get_nearest_coordinates_floor(const double x_zero,  //
+                                          const double y_zero,
+                                          const double delta_x,
+                                          const double delta_y,
+                                          const double x,
+                                          const double y,
+                                          int& i,
+                                          int& j) {
+    i = static_cast<int>(std::floor((x - x_zero) / delta_x));
+    j = static_cast<int>(std::floor((y - y_zero) / delta_y));
+}
+
+/**
+ * Calculates the nearest coordinates (i, j) rounded up to the next integer values,
+ * based on the given parameters.
+ *
+ * @param x_zero The starting x-coordinate of the grid.
+ * @param y_zero The starting y-coordinate of the grid.
+ * @param delta_x The spacing between adjacent grid points along the x-axis.
+ * @param delta_y The spacing between adjacent grid points along the y-axis.
+ * @param x The x-coordinate for which to find the nearest grid point.
+ * @param y The y-coordinate for which to find the nearest grid point.
+ * @param i [out] The nearest x-coordinate rounded up to the next integer value.
+ * @param j [out] The nearest y-coordinate rounded up to the next integer value.
+ */
+inline void get_nearest_coordinates_ceil(const double x_zero,  //
+                                         const double y_zero,
+                                         const double delta_x,
+                                         const double delta_y,
+                                         const double x,
+                                         const double y,
+                                         int& i,
+                                         int& j) {
+    i = static_cast<int>(std::ceil((x - x_zero) / delta_x));
+    j = static_cast<int>(std::ceil((y - y_zero) / delta_y));
+}
+
+/**
  * @brief Creates a global grid and populates it with values computed by the provided function.
  *
  * This function creates a global grid of type `global_grid_type` and populates it with values
@@ -228,6 +278,7 @@ bool get_local_grid(local_grid_type& lg,
             // }
 
             lg.grid[index_local] = gg.grid[index_global];
+
             // std::cout << "i: " << i << " j: " << j << " value: " << gg.grid[i_global * gg.y_size
             // + j_global]
             //           << std::endl;
@@ -277,6 +328,82 @@ bool make_domains_stripe(domains_stripe& ds,
 
     ds.x_max = x_min + nr_domains * side_x;
     ds.y_max = y_min + side_y;
+
+    return true;
+}
+
+/**
+ * @brief Creates a set of stripes from a global grid.
+ *
+ * This function creates a set of stripes from a given global grid. Each stripe is defined by its
+ * minimum and maximum coordinates in the x and y directions. The number of stripes and the number
+ * of domains per stripe are specified as input parameters. The size of each stripe is determined by
+ * the side lengths in the x and y directions.
+ *
+ * @param stripes The output vector of domains_stripes representing the set of stripes.
+ * @param gg The global grid from which the stripes are created.
+ * @param nr_stripes The number of stripes to create.
+ * @param nr_domains_per_stripe The number of domains per stripe.
+ * @param side_x The side length in the x direction.
+ * @param side_y The side length in the y direction.
+ * @return True if the stripes are successfully created, false otherwise.
+ */
+bool make_stripes_set_from_global_grid(std::vector<domains_stripe>& stripes,
+                                       const global_grid_type& gg,
+                                       const double start_x,
+                                       const double start_y,
+                                       const size_t nr_stripes,
+                                       const size_t nr_domains_per_stripe,
+                                       const double side_x,
+                                       const double side_y) {
+    stripes.resize(nr_stripes);
+
+    const double x_min = start_x;
+    const double y_min = start_y;
+
+    // check if the start coordinates are within the global grid
+    if (x_min < gg.x_zero || y_min < gg.y_zero || x_min > gg.x_max || y_min > gg.y_max) {
+        return false;
+    }
+
+    // const double x_max = gg.x_max;
+    // const double y_max = gg.y_max;
+
+    size_t i = 0, j = 0;
+
+    for (size_t n = 0; n < nr_stripes; ++n) {
+        double x_min_stripe = x_min + i * side_x * nr_domains_per_stripe;
+        double y_min_stripe = y_min + j * side_y;
+
+        double x_max_stripe = x_min_stripe + nr_domains_per_stripe * side_x;
+        double y_max_stripe = y_min_stripe + side_y;
+
+        i += 1;
+
+        if (x_max_stripe > gg.x_max) {
+            i = 0;
+            j++;
+
+            x_min_stripe = x_min + i * side_x * nr_domains_per_stripe;
+            y_min_stripe = y_min + j * side_y;
+
+            x_max_stripe = x_min_stripe + nr_domains_per_stripe * side_x;
+            y_max_stripe = y_min_stripe + side_y;
+
+            i += 1;
+        }
+
+        if (y_max_stripe > gg.y_max) {
+            return false;
+        }
+
+        make_domains_stripe(stripes[n],  //
+                            x_min_stripe,
+                            y_min_stripe,
+                            nr_domains_per_stripe,
+                            side_x,
+                            side_y);
+    }
 
     return true;
 }
@@ -460,6 +587,19 @@ double perform_quadrature_local(const local_grid_type& lg,  //
     return result_Q;
 }
 
+/**
+ * @brief Performs quadrature on local stripes.
+ *
+ * This function calculates the quadrature on local stripes using the provided
+ * local grid, quadrature rule, and domains stripe. It updates the `Qs` array
+ * with the calculated values.
+ *
+ * @param Qs The array to store the calculated quadrature values.
+ * @param lg The local grid.
+ * @param qr The quadrature rule.
+ * @param ds The domains stripe.
+ * @return True if the quadrature calculation is successful, false otherwise.
+ */
 bool perform_quadrature_local_stripe(std::valarray<double>& Qs,
                                      const local_grid_type& lg,
                                      const quadrature_rule& qr,
@@ -479,19 +619,26 @@ bool perform_quadrature_local_stripe(std::valarray<double>& Qs,
 
         const double volume = (x_d_max - x_d_min) * (y_d_max - y_d_min);
 
-        for (size_t q_i = 0; q_i < qr.x_nodes.size(); ++q_i) {
+        double Qs_i = 0.0;
+
+        const size_t qr_size = qr.x_nodes.size();
+
+        for (size_t q_i = 0; q_i < qr_size; ++q_i) {
             const double x_Q = (qr.x_nodes[q_i]) * (x_d_max - x_d_min) + x_d_min;
             const double y_Q = (qr.y_nodes[q_i]) * (y_d_max - y_d_min) + y_d_min;
 
             // std::cout << "x_Q: " << x_Q << " y_Q: " << y_Q << std::endl;
 
-            auto [i_local, j_local] = get_nearest_coordinates(lg.x_d_min,  //
-                                                              lg.y_d_min,  //
-                                                              lg.delta,
-                                                              lg.delta,
-                                                              x_Q,
-                                                              y_Q,
-                                                              false);
+            int i_local, j_local;
+
+            get_nearest_coordinates_floor(lg.x_d_min,  //
+                                          lg.y_d_min,  //
+                                          lg.delta,
+                                          lg.delta,
+                                          x_Q,
+                                          y_Q,
+                                          i_local,
+                                          j_local);
 
             const double f1 = lg.grid[i_local * lg.y_size + j_local];
             const double f2 = lg.grid[i_local * lg.y_size + j_local + 1];
@@ -524,11 +671,142 @@ bool perform_quadrature_local_stripe(std::valarray<double>& Qs,
 
             const double f_Q = w11 * f1 + w12 * f2 + w21 * f3 + w22 * f4;
 
-            Qs[i] += f_Q * qr.weights[q_i] * volume;
+            Qs_i += f_Q * qr.weights[q_i] * volume;
         }
+
+        Qs[i] = Qs_i;
     }
 
     return true;
+}
+
+bool perform_local_quadratures_stripe_set(std::valarray<double>& Qs,
+                                          const std::vector<domains_stripe>& stripes,
+                                          const global_grid_type& gg,
+                                          const quadrature_rule& qr) {
+    const size_t nr_stripes = stripes.size();
+    Qs.resize(nr_stripes, 0.0);
+
+    for (size_t i = 0; i < nr_stripes; ++i) {
+        local_grid_type lg_stripe;
+        make_local_grid_from_stripe(lg_stripe, gg, stripes[i]);
+
+        std::valarray<double> Qs_stripe;
+        perform_quadrature_local_stripe(Qs_stripe, lg_stripe, qr, stripes[i]);
+
+        Qs[i] = Qs_stripe.sum();
+    }
+
+    return true;
+}
+
+/**
+ * @brief Test function for the stripes.
+ *
+ * This function tests the creation of stripes and the quadrature calculation on local stripes.
+ *
+ * @param argc
+ * @param argv
+ * @return int
+ */
+int test_stripes(int argc, char* argv[]) {
+    //
+    // Set quadrature rule
+    //
+    srand(time(NULL));
+    const size_t quad_nodes_nr = 1000;
+    const double x_min_QMC = 0.0;
+    const double y_min_QMC = 0.0;
+    const double x_max_QMC = 1.0;
+    const double y_max_QMC = 1.0;
+
+    quadrature_rule qr;
+    make_MC_quadrature_rule(qr, quad_nodes_nr, x_min_QMC, y_min_QMC, x_max_QMC, y_max_QMC);
+
+    //
+    // Set global grid
+    //
+    auto f = [](double x, double y) { return std::sin(x) + std::cos(y + x); };
+
+    const double delta = 0.1;
+    const double x_zero = 0.0;
+    const double y_zero = 0.0;
+    const double x_max = 1000.0;
+    const double y_max = 1000.0;
+
+    global_grid_type gg;
+    make_gloal_grid(gg, delta, x_zero, y_zero, x_max, y_max, f);
+
+    //
+    // Set stripes
+    //
+    domains_stripe ds;
+    const double x_min_stripe = 0.511;
+    const double y_min_stripe = 0.522;
+    const size_t nr_domains = 16;
+    const double side_x_stripe = 0.52;
+    const double side_y_stripe = 0.52;
+
+    make_domains_stripe(ds, x_min_stripe, y_min_stripe, nr_domains, side_x_stripe, side_y_stripe);
+
+    local_grid_type lg_stripe;
+    make_local_grid_from_stripe(lg_stripe, gg, ds);
+
+    print_local_grid_info(lg_stripe);
+
+    std::valarray<double> Qs;
+    perform_quadrature_local_stripe(Qs, lg_stripe, qr, ds);
+
+    std::cout << std::endl;
+    std::cout << "Qs: ";
+    for (size_t i = 0; i < Qs.size(); ++i) {
+        std::cout << Qs[i] << " ";
+    }
+    std::cout << std::endl;
+    std::cout << std::endl;
+
+    std::vector<domains_stripe> stripes;
+    const size_t nr_stripes = 20200;
+    const size_t nr_domains_per_stripe = 64;
+    const double start_x = 0.111;
+    const double start_y = 0.122;
+    const bool flag = make_stripes_set_from_global_grid(stripes,  //
+                                                        gg,
+                                                        start_x,
+                                                        start_y,
+                                                        nr_stripes,
+                                                        nr_domains_per_stripe,
+                                                        side_x_stripe,
+                                                        side_y_stripe);
+
+    if (!flag) {
+        std::cout << "Failed to create stripes" << std::endl;
+        return 1;
+    }
+
+    // for (size_t i = 0; i < stripes.size(); ++i) {
+    //     std::cout << "Stripe: " << i << std::endl;
+    //     std::cout << "x_min: " << stripes[i].x_min << " x_max: " << stripes[i].x_max << "; ";
+    //     std::cout << "y_min: " << stripes[i].y_min << " y_max: " << stripes[i].y_max << std::endl;
+    //     std::cout << std::endl;
+    // }
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    std::valarray<double> Qs_stripes;
+    perform_local_quadratures_stripe_set(Qs_stripes, stripes, gg, qr);
+
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+    std::cout << "Qs_stripes: " << Qs.sum() << std::endl;
+    // for (size_t i = 0; i < Qs_stripes.size(); ++i) {
+    //     std::cout << Qs_stripes[i] << " " << std::endl;
+    // }
+
+    std::cout << "Execution time: " << (duration.count() / 1000.0) << " milliseconds" << std::endl;
+
+    return 0;
 }
 
 /**
@@ -539,83 +817,58 @@ bool perform_quadrature_local_stripe(std::valarray<double>& Qs,
  * @return int
  */
 int main(int argc, char* argv[]) {
-    global_grid_type gg;
+    return test_stripes(argc, argv);
 
-    auto f = [](double x, double y) { return x * x + y * y; };
+    // global_grid_type gg;
 
-    const double delta = 0.1;
-    const double x_zero = 0.0;
-    const double y_zero = 0.0;
-    const double x_max = 10.0;
-    const double y_max = 10.0;
+    // auto f = [](double x, double y) { return x * x + y * y; };
 
-    make_gloal_grid(gg, delta, x_zero, y_zero, x_max, y_max, f);
+    // const double delta = 0.1;
+    // const double x_zero = 0.0;
+    // const double y_zero = 0.0;
+    // const double x_max = 10.0;
+    // const double y_max = 10.0;
 
-    local_grid_type lg;
+    // make_gloal_grid(gg, delta, x_zero, y_zero, x_max, y_max, f);
 
-    get_local_grid(lg, gg, 1.0, 1.0, 2.0, 2.0);
+    // local_grid_type lg;
 
-    print_local_grid_info(lg);
+    // get_local_grid(lg, gg, 1.0, 1.0, 2.0, 2.0);
 
-    // print_local_grid(lg);
+    // print_local_grid_info(lg);
 
-    quadrature_rule qr;
+    // // print_local_grid(lg);
 
-    srand(time(NULL));
+    // quadrature_rule qr;
 
-    const size_t quad_nodes_nr = 10;
-    const double x_min_QMC = 0.0;
-    const double y_min_QMC = 0.0;
-    const double x_max_QMC = 1.0;
-    const double y_max_QMC = 1.0;
-    make_MC_quadrature_rule(qr, quad_nodes_nr, x_min_QMC, y_min_QMC, x_max_QMC, y_max_QMC);
+    // srand(time(NULL));
 
-    // std::cout << "Quadrature rule:" << std::endl;
-    // for (size_t i = 0; i < quad_nodes_nr; ++i) {
-    //     std::cout << "X: " << qr.x_nodes[i] << " Y: " << qr.y_nodes[i] << " W: " << qr.weights[i]
-    //               << std::endl;
-    // }
+    // const size_t quad_nodes_nr = 10000000;
+    // const double x_min_QMC = 0.0;
+    // const double y_min_QMC = 0.0;
+    // const double x_max_QMC = 1.0;
+    // const double y_max_QMC = 1.0;
+    // make_MC_quadrature_rule(qr, quad_nodes_nr, x_min_QMC, y_min_QMC, x_max_QMC, y_max_QMC);
 
-    auto start = std::chrono::high_resolution_clock::now();
+    // // std::cout << "Quadrature rule:" << std::endl;
+    // // for (size_t i = 0; i < quad_nodes_nr; ++i) {
+    // //     std::cout << "X: " << qr.x_nodes[i] << " Y: " << qr.y_nodes[i] << " W: " <<
+    // qr.weights[i]
+    // //               << std::endl;
+    // // }
 
-    const double Q = perform_quadrature_local(lg, qr, 1.0, 1.0, 2.0, 2.0);
+    // auto start = std::chrono::high_resolution_clock::now();
 
-    auto end = std::chrono::high_resolution_clock::now();
+    // const double Q = perform_quadrature_local(lg, qr, 1.0, 1.0, 2.0, 2.0);
 
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    // auto end = std::chrono::high_resolution_clock::now();
 
-    std::cout << std::endl;
-    std::cout << "Execution time: " << (duration.count() / 1000.0) << " milliseconds" << std::endl;
-    std::cout << std::fixed << std::setprecision(6);
-    std::cout << "Q: " << Q << std::endl;
+    // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
-    {  // Test stripe
-        domains_stripe ds;
-        const double x_min_stripe = 0.511;
-        const double y_min_stripe = 0.522;
-        const size_t nr_domains = 10;
-        const double side_x_stripe = 0.52;
-        const double side_y_stripe = 0.52;
-
-        make_domains_stripe(
-                ds, x_min_stripe, y_min_stripe, nr_domains, side_x_stripe, side_y_stripe);
-
-        local_grid_type lg_stripe;
-        make_local_grid_from_stripe(lg_stripe, gg, ds);
-
-        print_local_grid_info(lg_stripe);
-
-        std::valarray<double> Qs;
-        perform_quadrature_local_stripe(Qs, lg_stripe, qr, ds);
-
-        std::cout << std::endl;
-        std::cout << "Qs: ";
-        for (size_t i = 0; i < Qs.size(); ++i) {
-            std::cout << Qs[i] << " ";
-        }
-        std::cout << std::endl;
-        std::cout << std::endl;
-    }
+    // std::cout << std::endl;
+    // std::cout << "Execution time: " << (duration.count() / 1000.0) << " milliseconds" <<
+    // std::endl; std::cout << std::fixed << std::setprecision(6); std::cout << "Q: " << Q <<
+    // std::endl;
 
     return 0;
 }
