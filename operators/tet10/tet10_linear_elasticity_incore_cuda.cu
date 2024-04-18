@@ -481,8 +481,7 @@ int tet10_cuda_incore_linear_elasticity_init(cuda_incore_linear_elasticity_t *co
     ctx->mu = mu;
     ctx->lambda = lambda;
     ctx->nelements = nelements;
-    ctx->element_type = TET4;
-
+    ctx->element_type = TET10;
     return 0;
 }
 

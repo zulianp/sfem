@@ -35,7 +35,7 @@ set -x
 export VAR_UX=0
 export VAR_UY=1
 export VAR_UZ=2
-export BLOCK_SIZE=3
+export SFEM_BLOCK_SIZE=3
 
 export SFEM_DIRICHLET_NODESET="$sleft,$sleft,$sleft,$sright"
 export SFEM_DIRICHLET_VALUE="0,0,0,0.5"
@@ -60,5 +60,5 @@ export OMP_PROC_BIND=true
 # lldb -- 
 utopia_exec -app nlsolve -path $CODE_DIR/sfem/hyperelasticity_plugin.dylib -solver_type ConjugateGradient --verbose -max_it 10000 -apply_gradient_descent_step true -atol 1e-6 #-matrix_free false
 
-aos_to_soa $SFEM_OUTPUT_DIR/out.raw 8 $BLOCK_SIZE $SFEM_OUTPUT_DIR/out
+aos_to_soa $SFEM_OUTPUT_DIR/out.raw 8 $SFEM_BLOCK_SIZE $SFEM_OUTPUT_DIR/out
 raw_to_db.py $SFEM_MESH_DIR $SFEM_OUTPUT_DIR/x.vtk -p "$SFEM_OUTPUT_DIR/out.*.raw"
