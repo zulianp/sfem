@@ -27,7 +27,7 @@ export OMP_PROC_BIND=true
 # rm -rf mesh
 # create_cylinder.sh 4
 
-create_cylinder_p2.sh 4
+# create_cylinder_p2.sh 4
 # export SFEM_USE_MACRO=1
 
 sleft=mesh/sidesets_aos/sinlet.raw
@@ -44,7 +44,7 @@ then
 	export SFEM_BLOCK_SIZE=3
 
 	export SFEM_DIRICHLET_NODESET="$sleft,$sleft,$sleft,$sright,$sright,$sright"
-	export SFEM_DIRICHLET_VALUE="0,0,0,0.1,0,0"
+	export SFEM_DIRICHLET_VALUE="-0.2,0.05,0,0.2,0,-0.05"
 	export SFEM_DIRICHLET_COMPONENT="$VAR_UX,$VAR_UY,$VAR_UZ,$VAR_UX,$VAR_UY,$VAR_UZ"
 else
 	export SFEM_OPERATOR="Laplacian"

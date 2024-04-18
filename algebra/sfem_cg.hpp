@@ -2,22 +2,20 @@
 #define SFEM_CG_HPP
 
 #include <cmath>
+#include <cstddef>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <iostream>
+#include <memory>
+
+#include "sfem_MatrixFreeLinearSolver.hpp"
 
 // https://en.wikipedia.org/wiki/Conjugate_gradient_method
 namespace sfem {
 
-    template<typename T>
-    class Operator {
-    public:
-        std::function<void(const T* const, T* const)> apply;
-    };
-
     template <typename T>
-    class ConjugateGradient {
+    class ConjugateGradient final : public MatrixFreeLinearSolver<T> {
     public:
         // Operator
         std::function<void(const T* const, T* const)> apply_op;
@@ -36,19 +34,19 @@ namespace sfem {
         // Solver parameters
         T tol{1e-10};
         int max_it{10000};
+        ptrdiff_t n_dofs{-1};
 
-
-        void set_op(const Operator<T> &op) {
-            apply_op = op.apply;
+        void set_op(const std::shared_ptr<Operator<T>>& op) override {
+            this->apply_op = [=](const T* const x, T* const y) { op->apply(x, y); };
         }
 
-        void set_max_it(const int it)
-        {
-            max_it = it;
+        void set_preconditioner(const std::shared_ptr<Operator<T>>& op) override {
+            this->preconditioner_op = [=](const T* const x, T* const y) { op->apply(x, y); };
         }
 
-        void set_preconditioner(std::function<void(const T* const, T* const)> &&in)
-        {
+        void set_max_it(const int it) override { max_it = it; }
+
+        void set_preconditioner(std::function<void(const T* const, T* const)>&& in) {
             preconditioner_op = in;
         }
 
@@ -106,6 +104,19 @@ namespace sfem {
             }
         }
 
+        int apply(const T* const b, T* const x) override {
+            assert(n_dofs >= 0);
+            if (this->n_dofs < 0) {
+                std::cerr
+                    << "Error uninitiaized n_dofs. Set set_n_dofs to set the number of dofs\n";
+                return 1;
+            }
+
+            return apply(this->n_dofs, b, x);
+        }
+
+        void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
+
     private:
         int aux_apply_basic(const ptrdiff_t n, const T* const b, T* const x) {
             if (!good()) {
@@ -116,7 +127,7 @@ namespace sfem {
             T* r = allocate(n);
 
             apply_op(x, r);
-            
+
             axpby(n, 1, b, -1, r);
 
             T rtr = dot(n, r, r);

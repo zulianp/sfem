@@ -358,4 +358,20 @@ void d_zaxpby(const ptrdiff_t n,
 }
 
 void d_memset(void *ptr, int value, const std::size_t n) { cudaMemset(ptr, value, n); }
+
+
+void *d_buffer_alloc(const size_t n)
+{
+    void *ptr = nullptr;
+    cudaMalloc((void **)&ptr, n);
+    cudaMemset(ptr, 0, n);
+
+    SFEM_DEBUG_SYNCHRONIZE();
+    return ptr;
+}
+
+void d_buffer_destroy(void *a) {
+    cudaFree(a);
+    SFEM_DEBUG_SYNCHRONIZE();
+}
 }

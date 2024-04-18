@@ -15,7 +15,7 @@ namespace sfem {
 	};
 
     template<typename T>
-    class LampdaOperator final : public Operator<T> {
+    class LambdaOperator final : public Operator<T> {
     public:
         std::function<void(const T* const, T* const)> apply_;
         int apply(const T* const x, T* const y) override{
@@ -26,8 +26,8 @@ namespace sfem {
 
     template<typename T>
     inline std::shared_ptr<Operator<T>> make_op(std::function<void(const T* const, T* const)> op) {
-    	auto ret = std::make_shared<LampdaOperator<T>>();
-    	ret->apply = op;
+    	auto ret = std::make_shared<LambdaOperator<T>>();
+    	ret->apply_ = op;
     	return ret;
     }
 

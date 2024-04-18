@@ -2,15 +2,18 @@
 #define SFEM_BCGS_HPP
 
 #include <cmath>
+#include <cstddef>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <iostream>
 
+#include "sfem_MatrixFreeLinearSolver.hpp"
+
 // https://en.wikipedia.org/wiki/Biconjugate_gradient_stabilized_method
 namespace sfem {
     template <typename T>
-    class BiCGStab {
+    class BiCGStab final : public MatrixFreeLinearSolver<T> {
     public:
         // Operator
         std::function<void(const T* const, T* const)> apply_op;
@@ -30,9 +33,19 @@ namespace sfem {
             void(const ptrdiff_t, const T, const T* const, const T, const T* const, T* const)>
             zaxpby;
 
+        ptrdiff_t n_dofs{-1};
 
-        void set_preconditioner(std::function<void(const T* const, T* const)> &&in)
-        {
+        void set_op(const std::shared_ptr<Operator<T>>& op) override {
+            this->apply_op = [=](const T* const x, T* const y) { op->apply(x, y); };
+        }
+
+        void set_preconditioner(const std::shared_ptr<Operator<T>>& op) override {
+            this->right_preconditioner_op = [=](const T* const x, T* const y) { op->apply(x, y); };
+        }
+
+        void set_max_it(const int it) override { max_it = it; }
+
+        void set_preconditioner(std::function<void(const T* const, T* const)>&& in) {
             // left_preconditioner_op = in;
             right_preconditioner_op = in;
         }
@@ -107,6 +120,19 @@ namespace sfem {
                 return aux_apply_basic(n, b, x);
             }
         }
+
+        int apply(const T* const b, T* const x) override {
+            assert(n_dofs >= 0);
+            if (this->n_dofs < 0) {
+                std::cerr
+                    << "Error uninitiaized n_dofs. Set set_n_dofs to set the number of dofs\n";
+                return 1;
+            }
+
+            return apply(this->n_dofs, b, x);
+        }
+
+        void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
 
     private:
         int aux_apply_basic(const ptrdiff_t n, const T* const b, T* const x) {
@@ -222,7 +248,7 @@ namespace sfem {
 
             int info = -1;
             for (int k = 0; k < max_it; k++) {
-                auto y = t; // reuse t as a temp for y
+                auto y = t;  // reuse t as a temp for y
                 right_preconditioner_op(p, y);
                 apply_op(y, v);
 
@@ -241,7 +267,7 @@ namespace sfem {
                     break;
                 }
 
-                auto z = x; // reuse x as a temp for z
+                auto z = x;  // reuse x as a temp for z
                 right_preconditioner_op(s, z);
                 apply_op(z, t);
 

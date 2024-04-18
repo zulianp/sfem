@@ -28,7 +28,8 @@ void SFEM_finalize() { MPI_Finalize(); }
 NB_MODULE(pysfem, m) {
     using namespace sfem;
 
-    using Operator_t = Operator<isolver_scalar_t>;
+    using LambdaOperator_t = sfem::LambdaOperator<isolver_scalar_t>;
+    using Operator_t = sfem::Operator<isolver_scalar_t>;
     using ConjugateGradient_t = sfem::ConjugateGradient<isolver_scalar_t>;
 
     m.def("init", &SFEM_init);
@@ -199,14 +200,10 @@ NB_MODULE(pysfem, m) {
     m.def("make_op",
           [](std::shared_ptr<Function> &fun,
              nb::ndarray<isolver_scalar_t> u) -> std::shared_ptr<Operator_t> {
-              auto ret = std::make_shared<Operator_t>();
-
-              ret->apply = [=](const isolver_scalar_t *const x, isolver_scalar_t *const y) {
+              return sfem::make_op<isolver_scalar_t>([=](const isolver_scalar_t *const x, isolver_scalar_t *const y) {
                   memset(y, 0, u.size() * sizeof(isolver_scalar_t));
                   fun->apply(u.data(), x, y);
-              };
-
-              return ret;
+              });
           });
 
     nb::class_<ConjugateGradient_t>(m, "ConjugateGradient")

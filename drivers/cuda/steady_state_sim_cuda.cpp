@@ -6,32 +6,9 @@
 
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
-
+#include "sfem_cuda_solver.hpp"
 
 #include <vector>
-
-
-template <typename T>
-void sfem_cuda_init_solver(sfem::ConjugateGradient<T> &cg) {
-    cg.allocate = d_allocate;
-    cg.destroy = d_destroy;
-    cg.copy = d_copy;
-    cg.dot = d_dot;
-    cg.axpby = d_axpby;
-}
-
-template <typename T>
-void sfem_cuda_init_solver(sfem::BiCGStab<T> &cg) {
-    cg.allocate = d_allocate;
-    cg.destroy = d_destroy;
-    cg.copy = d_copy;
-    cg.dot = d_dot;
-    cg.axpby = d_axpby;
-    cg.zaxpby = d_zaxpby;
-}
-
-using Solver_t = sfem::ConjugateGradient<real_t>;
-// using Solver_t = sfem::BiCGStab<real_t>;
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -72,35 +49,38 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
 
-    auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
+    auto fs    = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
     auto conds = sfem::DirichletConditions::create_from_env(fs);
-    auto f = sfem::Function::create(fs);
+    auto f     = sfem::Function::create(fs);
 
-    Solver_t solver;
-    solver.max_it = 9000;
-    solver.tol = 1e-10;
+    std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> solver;
+    std::shared_ptr<sfem::Buffer<real_t>> b_x;
+    std::shared_ptr<sfem::Buffer<real_t>> b_b;
 
-    real_t *d_x;
-    real_t *d_b;
-
-    if(SFEM_USE_GPU) {
+    if (SFEM_USE_GPU) {
         printf("Using GPU...\n");
-        sfem_cuda_init_solver(solver);
-        
+        solver = sfem::d_cg<real_t>();
+
+        // Register CUDA kernels
         sfem::register_device_ops();
-        auto le = sfem::Factory::create_op(fs, (std::string("gpu:") + SFEM_OPERATOR).c_str());
+        auto le = sfem::Factory::create_op(
+            fs, 
+            sfem::d_op_str(SFEM_OPERATOR).c_str()
+        );
+
         le->initialize();
 
+        // Transfer Boundary conditions to device
         auto d_conds = sfem::to_device(conds);
-        
+
         f->add_constraint(d_conds);
         f->add_operator(le);
 
-        d_x = d_allocate(fs->n_dofs());
-        d_b = d_allocate(fs->n_dofs());
-        
+        // Create device buffers
+        b_x = sfem::d_buffer<real_t>(fs->n_dofs());
+        b_b = sfem::d_buffer<real_t>(fs->n_dofs());
     } else {
-        solver.default_init();
+        solver = sfem::h_cg<real_t>();
 
         auto le = sfem::Factory::create_op(fs, SFEM_OPERATOR);
         le->initialize();
@@ -108,34 +88,34 @@ int main(int argc, char *argv[]) {
         f->add_constraint(conds);
         f->add_operator(le);
 
-        d_x = (real_t*)calloc(fs->n_dofs(), sizeof(real_t));
-        d_b = (real_t*)calloc(fs->n_dofs(), sizeof(real_t));
+        b_x = sfem::h_buffer<real_t>(fs->n_dofs());
+        b_b = sfem::h_buffer<real_t>(fs->n_dofs());
     }
 
     // -------------------------------
     // Solver set-up
     // -------------------------------
-
-    solver.apply_op = [=](const real_t *const x, real_t *const y) {
-        if(SFEM_USE_GPU) {
+    solver->set_op(sfem::make_op<real_t>([=](const real_t *const x, real_t *const y) {
+        if (SFEM_USE_GPU) {
             d_memset(y, 0, fs->n_dofs() * sizeof(real_t));
         } else {
             memset(y, 0, fs->n_dofs() * sizeof(real_t));
         }
 
         f->apply(nullptr, x, y);
-    };
+    }));
 
     // -------------------------------
     // Solve
     // -------------------------------
     double solve_tick = MPI_Wtime();
 
-    f->apply_constraints(d_x);
-    f->apply_constraints(d_b);
+    f->apply_constraints(b_x->data());
+    f->apply_constraints(b_b->data());
 
-    solver.max_it = 40000;
-    solver.apply(fs->n_dofs(), d_b, d_x);
+    solver->set_max_it(40000);
+    solver->set_n_dofs(fs->n_dofs());
+    solver->apply(b_b->data(), b_x->data());
 
     double solve_tock = MPI_Wtime();
 
@@ -146,12 +126,13 @@ int main(int argc, char *argv[]) {
     f->set_output_dir(output_path);
     auto output = f->output();
 
-    if(SFEM_USE_GPU) {
+    if (SFEM_USE_GPU) {
         std::vector<real_t> x(fs->n_dofs(), 0);
-        device_to_host(fs->n_dofs(), d_x, x.data());
+        device_to_host(fs->n_dofs(), b_x->data(), x.data());
         output->write("x", x.data());
+
     } else {
-        output->write("x", d_x);
+        output->write("x", b_x->data());
     }
 
     double tock = MPI_Wtime();

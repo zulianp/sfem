@@ -251,4 +251,9 @@ namespace sfem {
         Factory::register_op("gpu:LinearElasticity", &GPULinearElasticity::create);
         Factory::register_op("gpu:Laplacian", &GPULaplacian::create);
     }
+
+    std::string d_op_str(const std::string &name)
+    {
+        return "gpu:" + name;
+    }
 }  // namespace sfem

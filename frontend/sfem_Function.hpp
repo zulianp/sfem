@@ -16,7 +16,7 @@
 namespace sfem {
 
     enum ExecutionSpace { EXECUTION_SPACE_HOST = 0, EXECUTION_SPACE_DEVICE = 1 };
-    
+
     enum MemorySpace {
         MEMORY_SPACE_HOST = EXECUTION_SPACE_HOST,
         MEMORY_SPACE_DEVICE = EXECUTION_SPACE_DEVICE
@@ -29,6 +29,41 @@ namespace sfem {
 
     class DirichletConditions;
     class NeumannConditions;
+
+    template <typename T>
+    class Buffer {
+    public:
+        Buffer(
+            T *const ptr, 
+            std::function<void(void *)> destroy,
+            MemorySpace mem_space
+            ) : ptr_(ptr), destroy_(destroy), mem_space_(mem_space) {}
+
+        ~Buffer() {
+            if (destroy_) {
+                destroy_((void*)ptr_);
+            }
+        }
+
+        inline T *const data() { return ptr_; }
+        inline const T * const data() const { return ptr_; }
+
+    private:
+        T *ptr_{nullptr};
+        std::function<void(void *)> destroy_;
+        MemorySpace mem_space_;
+    };
+
+    template<typename T>
+    std::shared_ptr<Buffer<T>> h_buffer(const std::ptrdiff_t n)
+    {   
+        auto ret = std::make_shared<Buffer<T>>(
+            (T *)calloc(n, sizeof(T)), 
+            &free,
+            MEMORY_SPACE_HOST
+        );
+        return ret;
+    }
 
     class Mesh final {
     public:
@@ -76,15 +111,13 @@ namespace sfem {
         std::unique_ptr<Impl> impl_;
     };
 
-
-
     class FunctionSpace final {
     public:
         FunctionSpace(const std::shared_ptr<Mesh> &mesh, const int block_size = 1);
         ~FunctionSpace();
 
-        static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<Mesh> &mesh, const int block_size = 1)
-        {
+        static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<Mesh> &mesh,
+                                                     const int block_size = 1) {
             return std::make_shared<FunctionSpace>(mesh, block_size);
         }
 
@@ -268,9 +301,8 @@ namespace sfem {
         Function(const std::shared_ptr<FunctionSpace> &space);
         ~Function();
 
-
-        inline static std::shared_ptr<Function> create(const std::shared_ptr<FunctionSpace> &space)
-        {
+        inline static std::shared_ptr<Function> create(
+            const std::shared_ptr<FunctionSpace> &space) {
             return std::make_shared<Function>(space);
         }
 
