@@ -1,5 +1,5 @@
 CC = g++-13
-CFLAGS = -Wall -Ofast -std=c++17 -mtune=native -march=native  -mprefer-vector-width=512
+CFLAGS = -Wall -Ofast -std=c++17 -mtune=native -march=native  -mprefer-vector-width=512 -Wshadow=local
 LDFLAGS = 
 
 DEBUG ?= 0
