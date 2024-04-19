@@ -75,3 +75,4 @@ CMakeFiles/
 venv/
 api/
 pysfem.egg-info/
+external/nanobind
