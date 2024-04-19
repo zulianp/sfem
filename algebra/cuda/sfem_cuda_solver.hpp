@@ -5,7 +5,6 @@
 #include "sfem_cg.hpp"
 #include "sfem_cuda_blas.h"
 
-
 #include <map>
 #include <memory>
 
@@ -19,11 +18,12 @@ namespace sfem {
         cg->copy = d_copy;
         cg->dot = d_dot;
         cg->axpby = d_axpby;
+        cg->zeros = [](const std::size_t n, T* const x) { d_memset(x, 0, n * sizeof(T)); };
         return cg;
     }
 
     template <typename T>
-    std::shared_ptr<MatrixFreeLinearSolver<T>> d_bcgstab() {
+    std::shared_ptr<MatrixFreeLinearSolver<T>> d_bcgs() {
         auto cg = std::make_shared<BiCGStab<T>>();
         cg->allocate = d_allocate;
         cg->destroy = d_destroy;
@@ -31,6 +31,7 @@ namespace sfem {
         cg->dot = d_dot;
         cg->axpby = d_axpby;
         cg->zaxpby = d_zaxpby;
+        cg->zeros = [](const std::size_t n, T* const x) { d_memset(x, 0, n * sizeof(T)); };
         return cg;
     }
 
@@ -42,20 +43,20 @@ namespace sfem {
     }
 
     template <typename T>
-    std::shared_ptr<MatrixFreeLinearSolver<T>> h_bcgstab() {
+    std::shared_ptr<MatrixFreeLinearSolver<T>> h_bcgs() {
         auto cg = std::make_shared<BiCGStab<T>>();
         cg->default_init();
         return cg;
     }
 
     template <typename T>
-    std::shared_ptr<MatrixFreeLinearSolver<T>> d_solver(const std::string &name) {
+    std::shared_ptr<MatrixFreeLinearSolver<T>> d_solver(const std::string& name) {
         using SP_t = std::shared_ptr<MatrixFreeLinearSolver<T>>;
         static bool initialized = false;
         static std::map<std::string, SP_t> factory;
 
         if (!initialized) {
-            factory["BiCGStab"] = &d_bcgstab<T>;
+            factory["BiCGStab"] = &d_bcgs<T>;
             factory["ConjugateGradient"] = &d_cg<T>;
             initialized = true;
         }

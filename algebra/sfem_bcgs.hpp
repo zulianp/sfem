@@ -24,6 +24,8 @@ namespace sfem {
         std::function<T*(const std::size_t)> allocate;
         std::function<void(T*)> destroy;
 
+        std::function<void(const std::size_t, T* const x)> zeros;
+
         std::function<void(const ptrdiff_t, const T* const, T* const)> copy;
 
         // blas
@@ -92,6 +94,10 @@ namespace sfem {
                 for (ptrdiff_t i = 0; i < n; i++) {
                     z[i] = alpha * x[i] + beta * y[i];
                 }
+            };
+
+            zeros = [](const std::size_t n, T* const x) {
+                memset(x, 0, n*sizeof(T));
             };
         }
 
@@ -165,6 +171,7 @@ namespace sfem {
 
             int info = -1;
             for (int k = 0; k < max_it; k++) {
+                zeros(n, v);
                 apply_op(p, v);
 
                 const T ptv = dot(n, r0, v);
@@ -182,6 +189,7 @@ namespace sfem {
                     break;
                 }
 
+                zeros(n, t);
                 apply_op(s, t);
 
                 const T tts = dot(n, t, s);
@@ -249,7 +257,10 @@ namespace sfem {
             int info = -1;
             for (int k = 0; k < max_it; k++) {
                 auto y = t;  // reuse t as a temp for y
+                zeros(n, y);
                 right_preconditioner_op(p, y);
+
+                zeros(n, y);
                 apply_op(y, v);
 
                 const T ptv = dot(n, r0, v);
@@ -268,7 +279,11 @@ namespace sfem {
                 }
 
                 auto z = x;  // reuse x as a temp for z
+
+                zeros(n, z);
                 right_preconditioner_op(s, z);
+
+                zeros(n, t);
                 apply_op(z, t);
 
                 const T tts = dot(n, t, s);

@@ -23,6 +23,7 @@ namespace sfem {
 
         // Mem management
         std::function<T*(const std::size_t)> allocate;
+        std::function<void(const std::size_t, T* const x)> zeros;
         std::function<void(T*)> destroy;
 
         std::function<void(const ptrdiff_t, const T* const, T* const)> copy;
@@ -77,6 +78,10 @@ namespace sfem {
                         y[i] = alpha * x[i] + beta * y[i];
                     }
                 };
+
+            zeros = [](const std::size_t n, T* const x) {
+                memset(x, 0, n*sizeof(T));
+            };
         }
 
         bool good() const {
@@ -144,6 +149,7 @@ namespace sfem {
 
             int info = -1;
             for (int k = 0; k < max_it; k++) {
+                zeros(n, Ap);
                 apply_op(p, Ap);
 
                 const T ptAp = dot(n, p, Ap);
@@ -197,6 +203,8 @@ namespace sfem {
 
             preconditioner_op(r, z);
             copy(n, z, p);
+
+            zeros(n, Ap);
             apply_op(p, Ap);
 
             T rtz = dot(n, r, z);
@@ -218,6 +226,7 @@ namespace sfem {
 
                 axpby(n, 1, z, beta, p);
 
+                zeros(n, Ap);
                 apply_op(p, Ap);
 
                 const T ptAp = dot(n, p, Ap);

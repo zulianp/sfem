@@ -313,25 +313,30 @@ namespace sfem {
     }  // namespace device
 }  // namespace sfem
 
-extern "C" {
+extern real_t *d_allocate(const std::size_t n) { return sfem::device::allocate<real_t>(n); }
 
-real_t *d_allocate(const std::size_t n) { return sfem::device::allocate<real_t>(n); }
-
-void device_to_host(const std::size_t n, const real_t *const d, real_t *h) {
+extern void device_to_host(const std::size_t n, const real_t *const d, real_t *h) {
     CHECK_CUDA(cudaMemcpy(h, d, n * sizeof(real_t), cudaMemcpyDeviceToHost));
 }
 
-void d_destroy(real_t *a) { sfem::device::destroy(a); }
+extern void host_to_device(const std::size_t n, const real_t *const h, real_t *d) {
+    CHECK_CUDA(cudaMemcpy(d, h, n * sizeof(real_t), cudaMemcpyHostToDevice));
+}
 
-void d_copy(const ptrdiff_t n, const real_t *const src, real_t *const dest) {
+extern void d_destroy(real_t *a) { sfem::device::destroy(a); }
+
+extern void d_copy(const ptrdiff_t n, const real_t *const src, real_t *const dest) {
     sfem::device::copy(n, src, dest);
 }
 
-real_t d_dot(const ptrdiff_t n, const real_t *const l, const real_t *const r) {
+extern real_t d_dot(const ptrdiff_t n, const real_t *const l, const real_t *const r) {
     return sfem::device::dot(n, l, r);
 }
 
-void d_ediv(const ptrdiff_t n, const real_t *const l, const real_t *const r, real_t *const result) {
+extern void d_ediv(const ptrdiff_t n,
+                   const real_t *const l,
+                   const real_t *const r,
+                   real_t *const result) {
     int kernel_block_size = 128;
     ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
@@ -340,28 +345,26 @@ void d_ediv(const ptrdiff_t n, const real_t *const l, const real_t *const r, rea
     SFEM_DEBUG_SYNCHRONIZE();
 }
 
-void d_axpby(const ptrdiff_t n,
-             const real_t alpha,
-             const real_t *const x,
-             const real_t beta,
-             real_t *const y) {
+extern void d_axpby(const ptrdiff_t n,
+                    const real_t alpha,
+                    const real_t *const x,
+                    const real_t beta,
+                    real_t *const y) {
     sfem::device::axpby(n, alpha, x, beta, y);
 }
 
-void d_zaxpby(const ptrdiff_t n,
-              const real_t alpha,
-              const real_t *const x,
-              const real_t beta,
-              const real_t *const y,
-              real_t *const z) {
+extern void d_zaxpby(const ptrdiff_t n,
+                     const real_t alpha,
+                     const real_t *const x,
+                     const real_t beta,
+                     const real_t *const y,
+                     real_t *const z) {
     sfem::device::zaxpby(n, alpha, x, beta, y, z);
 }
 
-void d_memset(void *ptr, int value, const std::size_t n) { cudaMemset(ptr, value, n); }
+extern void d_memset(void *ptr, int value, const std::size_t n) { cudaMemset(ptr, value, n); }
 
-
-void *d_buffer_alloc(const size_t n)
-{
+extern void *d_buffer_alloc(const size_t n) {
     void *ptr = nullptr;
     cudaMalloc((void **)&ptr, n);
     cudaMemset(ptr, 0, n);
@@ -370,8 +373,7 @@ void *d_buffer_alloc(const size_t n)
     return ptr;
 }
 
-void d_buffer_destroy(void *a) {
+extern void d_buffer_destroy(void *a) {
     cudaFree(a);
     SFEM_DEBUG_SYNCHRONIZE();
-}
 }

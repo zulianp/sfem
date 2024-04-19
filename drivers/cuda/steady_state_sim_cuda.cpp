@@ -49,9 +49,9 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
 
-    auto fs    = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
+    auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
     auto conds = sfem::DirichletConditions::create_from_env(fs);
-    auto f     = sfem::Function::create(fs);
+    auto f = sfem::Function::create(fs);
 
     std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> solver;
     std::shared_ptr<sfem::Buffer<real_t>> b_x;
@@ -63,10 +63,7 @@ int main(int argc, char *argv[]) {
 
         // Register CUDA kernels
         sfem::register_device_ops();
-        auto le = sfem::Factory::create_op(
-            fs, 
-            sfem::d_op_str(SFEM_OPERATOR).c_str()
-        );
+        auto le = sfem::Factory::create_op(fs, sfem::d_op_str(SFEM_OPERATOR).c_str());
 
         le->initialize();
 
@@ -95,15 +92,8 @@ int main(int argc, char *argv[]) {
     // -------------------------------
     // Solver set-up
     // -------------------------------
-    solver->set_op(sfem::make_op<real_t>([=](const real_t *const x, real_t *const y) {
-        if (SFEM_USE_GPU) {
-            d_memset(y, 0, fs->n_dofs() * sizeof(real_t));
-        } else {
-            memset(y, 0, fs->n_dofs() * sizeof(real_t));
-        }
-
-        f->apply(nullptr, x, y);
-    }));
+    solver->set_op(sfem::make_op<real_t>(
+        [=](const real_t *const x, real_t *const y) { f->apply(nullptr, x, y); }));
 
     // -------------------------------
     // Solve
@@ -126,14 +116,8 @@ int main(int argc, char *argv[]) {
     f->set_output_dir(output_path);
     auto output = f->output();
 
-    if (SFEM_USE_GPU) {
-        std::vector<real_t> x(fs->n_dofs(), 0);
-        device_to_host(fs->n_dofs(), b_x->data(), x.data());
-        output->write("x", x.data());
-
-    } else {
-        output->write("x", b_x->data());
-    }
+    auto h_x = sfem::to_host(b_x);
+    output->write("x", h_x->data());
 
     double tock = MPI_Wtime();
     if (!rank) {
