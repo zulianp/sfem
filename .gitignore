@@ -14,7 +14,7 @@ dist/
 *.class
 
 # Compiled Python bytecode
-*.py[cod]
+*.py[cod]   
 
 # Log files
 *.log
