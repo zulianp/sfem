@@ -4,6 +4,8 @@
 #include <functional>
 #include <iomanip>
 #include <iostream>
+#include <mutex>
+#include <thread>
 #include <tuple>
 #include <valarray>
 #include <vector>
@@ -757,6 +759,65 @@ bool perform_local_quadratures_stripe_set(std::valarray<double>& Qs,
     return true;
 }
 
+// std::mutex mtx;
+
+/**
+ * @brief Performs local quadratures on a range of stripes.
+ *
+ * This function calculates the local quadratures for a range of stripes within a global grid.
+ * It iterates over the specified range of stripes, creates a local grid for each stripe,
+ * performs the quadrature calculation, and stores the results in the output array `Qs`.
+ *
+ * @param Qs The output array to store the results of the quadrature calculations.
+ * @param start_index The starting index of the range of stripes to process.
+ * @param end_index The ending index (exclusive) of the range of stripes to process.
+ * @param stripes The vector of stripes containing the domain information.
+ * @param gg The global grid type.
+ * @param qr The quadrature rule to use for the calculations.
+ * @return Returns true if the quadratures were performed successfully, false otherwise.
+ */
+bool perform_local_quadratures_stripe_set_range(std::valarray<double>& Qs,
+                                                const size_t start_index,  //
+                                                const size_t end_index,    //
+                                                const std::vector<domains_stripe>& stripes,
+                                                const global_grid_type& gg,
+                                                const quadrature_rule& qr) {
+    //
+    const size_t nr_stripes = end_index - start_index;
+    Qs.resize(nr_stripes, 0.0);
+
+    // mtx.lock();
+    // std::cout << "Number of stripes: " << nr_stripes << std::endl;
+    // std::cout << "Start index: " << start_index << std::endl;
+    // std::cout << "End index: " << end_index << std::endl;
+    // std::cout << std::endl;
+    // mtx.unlock();
+
+    double num_nodes_per_stripe = 0.0;
+
+    for (size_t i = start_index; i < end_index; ++i) {
+        local_grid_type lg_stripe;
+        make_local_grid_from_stripe(lg_stripe, gg, stripes[i]);
+
+        num_nodes_per_stripe += lg_stripe.x_size * lg_stripe.y_size;
+
+        std::valarray<double> Qs_stripe;
+        perform_quadrature_local_stripe(Qs_stripe, lg_stripe, qr, stripes[i]);
+
+        Qs[i - start_index] = Qs_stripe.sum();
+    }
+
+    num_nodes_per_stripe /= double(nr_stripes);
+
+    // std::cout << "Number of nodes per stripe: " << num_nodes_per_stripe << std::endl;
+    // std::cout << "Number of nodes per domain: "
+    //           << num_nodes_per_stripe / double(stripes[0].nr_domains) << std::endl;
+
+    // std::cout << std::endl;
+
+    return true;
+}
+
 /**
  * @brief Performs quadrature on a global stripe of domains.
  *
@@ -861,6 +922,15 @@ bool perform_quadrature_global_stripe(std::valarray<double>& Qs,
     return true;
 }
 
+/**
+ * @brief Performs global quadratures on a set of stripes.
+ *
+ * @param Qs Resulting quadrature values.
+ * @param stripes Set of stripes.
+ * @param gg Global grid.
+ * @param qr Quadrature rule.
+ * @return true if the quadratures were performed successfully, false otherwise.
+ */
 bool perform_global_quadratures_stripe_set(std::valarray<double>& Qs,
                                            const std::vector<domains_stripe>& stripes,
                                            const global_grid_type& gg,
@@ -882,6 +952,37 @@ bool perform_global_quadratures_stripe_set(std::valarray<double>& Qs,
 }
 
 /**
+ * Performs global quadratures on a range of stripes and stores the results in a valarray.
+ *
+ * @param Qs The valarray to store the results of the quadratures.
+ * @param start_index The starting index of the range of stripes.
+ * @param end_index The ending index of the range of stripes.
+ * @param stripes The vector of domains stripes to perform quadratures on.
+ * @param gg The global grid type.
+ * @param qr The quadrature rule to use for the quadratures.
+ * @return True if the quadratures were performed successfully, false otherwise.
+ */
+bool perform_global_quadratures_stripe_set_range(std::valarray<double>& Qs,
+                                                 const size_t start_index,
+                                                 const size_t end_index,
+                                                 const std::vector<domains_stripe>& stripes,
+                                                 const global_grid_type& gg,
+                                                 const quadrature_rule& qr) {
+    const size_t nr_stripes = end_index - start_index;
+    Qs.resize(nr_stripes, 0.0);
+
+    for (size_t i = start_index; i < end_index; ++i) {
+        std::valarray<double> Qs_stripe;
+
+        perform_quadrature_global_stripe(Qs_stripe, gg, qr, stripes[i]);
+
+        Qs[i - start_index] = Qs_stripe.sum();
+    }
+
+    return true;
+}
+
+/**
  * @brief Test function for the stripes.
  *
  * This function tests the creation of stripes and the quadrature calculation on local stripes.
@@ -890,12 +991,16 @@ bool perform_global_quadratures_stripe_set(std::valarray<double>& Qs,
  * @param argv
  * @return int
  */
-int test_stripes(int argc, char* argv[]) {
+int test_stripes(int argc,
+                 char* argv[],
+                 const size_t quad_nodes_nr_ = 250,
+                 const double xy_max = 3500.0,
+                 const unsigned int nr_stripes_ = 220200) {
     //
     // Set quadrature rule
     //
-    srand(time(NULL));
-    const size_t quad_nodes_nr = 92;
+    srand(0);
+    const size_t quad_nodes_nr = quad_nodes_nr_;
     const double x_min_QMC = 0.0;
     const double y_min_QMC = 0.0;
     const double x_max_QMC = 1.0;
@@ -907,13 +1012,13 @@ int test_stripes(int argc, char* argv[]) {
     //
     // Set global grid
     //
-    auto f = [](double x, double y) { return std::sin(x) + std::log10(1.0 + (y * x) / 1000.0); };
+    auto f = [](double x, double y) { return std::sin(x) + std::log(1.0 + (y + x) * 0.0000001); };
 
     const double delta = 0.06;
     const double x_zero = 0.0;
     const double y_zero = 0.0;
-    const double x_max = 1500.0;
-    const double y_max = 1500.0;
+    const double x_max = xy_max;
+    const double y_max = xy_max;
 
     global_grid_type gg;
     make_gloal_grid(gg, delta, x_zero, y_zero, x_max, y_max, f);
@@ -928,22 +1033,23 @@ int test_stripes(int argc, char* argv[]) {
     //
     // Set stripes
     //
-    domains_stripe ds;
-    const double x_min_stripe = 0.511;
-    const double y_min_stripe = 0.522;
-    const size_t nr_domains = 16;
+    // domains_stripe ds;
+    // const double x_min_stripe = 0.511;
+    // const double y_min_stripe = 0.522;
+    // const size_t nr_domains = 16;
     const double side_x_stripe = 0.52;
     const double side_y_stripe = 0.52;
 
-    make_domains_stripe(ds, x_min_stripe, y_min_stripe, nr_domains, side_x_stripe, side_y_stripe);
+    // make_domains_stripe(ds, x_min_stripe, y_min_stripe, nr_domains, side_x_stripe,
+    // side_y_stripe);
 
-    local_grid_type lg_stripe;
-    make_local_grid_from_stripe(lg_stripe, gg, ds);
+    // local_grid_type lg_stripe;
+    // make_local_grid_from_stripe(lg_stripe, gg, ds);
 
-    print_local_grid_info(lg_stripe);
+    // print_local_grid_info(lg_stripe);
 
     std::valarray<double> Qs;
-    perform_quadrature_local_stripe(Qs, lg_stripe, qr, ds);
+    // perform_quadrature_local_stripe(Qs, lg_stripe, qr, ds);
 
     std::cout << std::endl;
     std::cout << "Qs: ";
@@ -954,8 +1060,8 @@ int test_stripes(int argc, char* argv[]) {
     std::cout << std::endl;
 
     std::vector<domains_stripe> stripes;
-    const size_t nr_stripes = 80200;
-    const size_t nr_domains_per_stripe = 64;
+    const size_t nr_stripes = nr_stripes_;
+    const size_t nr_domains_per_stripe = 32;
     const double start_x = 0.111;
     const double start_y = 0.122;
     const bool flag = make_stripes_set_from_global_grid(stripes,  //
@@ -983,6 +1089,9 @@ int test_stripes(int argc, char* argv[]) {
     //     std::endl; std::cout << std::endl;
     // }
 
+    double Qg = 0.0;
+    double Ql = 0.0;
+
     {
         std::cout << "++ Local quadratures:" << std::endl;
         std::cout << "-------------------------------------------------------" << std::endl
@@ -999,6 +1108,7 @@ int test_stripes(int argc, char* argv[]) {
         std::cout.precision(16);
         std::cout << "Qs_stripes: " << Qs_stripes.sum() << std::endl;
         std::cout.precision(3);  // Set precision back to default
+        Ql = Qs_stripes.sum();
         // for (size_t i = 0; i < Qs_stripes.size(); ++i) {
         //     std::cout << Qs_stripes[i] << " ";
         // }
@@ -1025,9 +1135,12 @@ int test_stripes(int argc, char* argv[]) {
                   << std::endl;
 
         std::cout << std::endl;
+        std::cout << std::endl;
     }
 
     {
+        std::cout << "-------------------------------------------------------" << std::endl
+                  << std::endl;
         std::cout << "++ Global quadratures:" << std::endl;
         std::cout << "-------------------------------------------------------" << std::endl
                   << std::endl;
@@ -1043,6 +1156,7 @@ int test_stripes(int argc, char* argv[]) {
         std::cout.precision(16);
         std::cout << "Qs_stripes: " << Qs_stripes.sum() << std::endl;
         std::cout.precision(6);  // Set precision back to default
+        Qg = Qs_stripes.sum();
 
         const double seconds = double(duration.count()) / 1000000.0;
 
@@ -1065,7 +1179,316 @@ int test_stripes(int argc, char* argv[]) {
 
     std::cout << std::endl;
 
+    std::cout << "Ql: " << Ql << std::endl;
+    std::cout << "Qg: " << Qg << std::endl;
+
+    std::cout << "Error: " << std::scientific << std::abs(Ql - Qg) / std::abs(Ql) << std::endl;
+
+    std::cout << std::endl;
+
     return 0;
+}
+
+/**
+ * @brief Test function for the stripes using multiple threads.
+ *
+ * @param argc The number of command-line arguments.
+ * @param argv The command-line arguments.
+ * @return true if the test is successful, false otherwise.
+ * @return false if the test is unsuccessful.
+ */
+bool test_stripes_mt(int argc,
+                     char* argv[],
+                     const size_t nr_threads,
+                     const size_t quad_nodes_nr_ = 250,
+                     const double xy_max = 3500.0,
+                     const unsigned int nr_stripes_ = 220200) {
+    //
+    // Set quadrature rule
+    //
+    srand(0);
+    const size_t quad_nodes_nr = quad_nodes_nr_;
+    const double x_min_QMC = 0.0;
+    const double y_min_QMC = 0.0;
+    const double x_max_QMC = 1.0;
+    const double y_max_QMC = 1.0;
+
+    quadrature_rule qr;
+    make_MC_quadrature_rule(qr, quad_nodes_nr, x_min_QMC, y_min_QMC, x_max_QMC, y_max_QMC);
+
+    //
+    // Set global grid
+    //
+    auto f = [](double x, double y) { return std::sin(x) + std::log(1.0 + (y + x) * 0.0000001); };
+
+    const double delta = 0.06;
+    const double x_zero = 0.0;
+    const double y_zero = 0.0;
+    const double x_max = xy_max;
+    const double y_max = xy_max;
+
+    global_grid_type gg;
+    make_gloal_grid(gg, delta, x_zero, y_zero, x_max, y_max, f);
+
+    const double gg_bytes = global_grid_bytes(gg);
+
+    std::cout.setf(std::ios::fixed, std::ios::floatfield);
+
+    std::cout.precision(6);  // Set precision back to default
+    std::cout << std::endl;
+    std::cout << "Global grid size: " << double(gg_bytes) / (1024.0 * 1024.0 * 1024.0) << " GBytes"
+              << std::endl
+              << std::endl;
+
+    std::cout << std::endl;
+    std::cout << "Global grid size: " << double(gg_bytes) / (1024.0 * 1024.0 * 1024.0) << " GBytes"
+              << std::endl
+              << std::endl;
+
+    //
+    // Set stripes
+    //
+    // domains_stripe ds;
+    // const double x_min_stripe = 0.511;
+    // const double y_min_stripe = 0.522;
+    // const size_t nr_domains = 16;
+    const double side_x_stripe = 0.52;
+    const double side_y_stripe = 0.52;
+
+    // make_domains_stripe(ds, x_min_stripe, y_min_stripe, nr_domains, side_x_stripe,
+    // side_y_stripe);
+
+    // local_grid_type lg_stripe;
+    // make_local_grid_from_stripe(lg_stripe, gg, ds);
+
+    // print_local_grid_info(lg_stripe);
+
+    // std::valarray<double> Qs;
+    // perform_quadrature_local_stripe(Qs, lg_stripe, qr, ds);
+
+    // std::cout << std::endl;
+    // std::cout << "Qs: ";
+    // for (size_t i = 0; i < Qs.size(); ++i) {
+    //     std::cout << Qs[i] << " ";
+    // }
+    // std::cout << std::endl;
+    // std::cout << std::endl;
+
+    std::vector<domains_stripe> stripes;
+    const size_t nr_stripes = nr_stripes_;
+    const size_t nr_domains_per_stripe = 32;
+    const double start_x = 0.111;
+    const double start_y = 0.122;
+    const bool flag = make_stripes_set_from_global_grid(stripes,  //
+                                                        gg,
+                                                        start_x,
+                                                        start_y,
+                                                        nr_stripes,
+                                                        nr_domains_per_stripe,
+                                                        side_x_stripe,
+                                                        side_y_stripe);
+
+    std::cout << "Nr of stripes: " << stripes.size() << std::endl;
+    std::cout << "Nr of quadrature nodes: " << quad_nodes_nr << std::endl;
+    std::cout << std::endl;
+
+    if (!flag) {
+        std::cout << "Failed to create stripes" << std::endl;
+        return 1;
+    }
+
+    // for (size_t i = 0; i < stripes.size(); ++i) {
+    //     std::cout << "Stripe: " << i << std::endl;
+    //     std::cout << "x_min: " << stripes[i].x_min << " x_max: " << stripes[i].x_max << "; ";
+    //     std::cout << "y_min: " << stripes[i].y_min << " y_max: " << stripes[i].y_max <<
+    //     std::endl; std::cout << std::endl;
+    // }
+
+    double Qg = 0.0;
+    double Ql = 0.0;
+
+    {
+        std::cout << "++ Local quadratures:" << std::endl;
+        std::cout << "-------------------------------------------------------" << std::endl
+                  << std::endl;
+
+        // std::valarray<double> Qs_stripes;
+
+        std::vector<std::thread> threads(nr_threads);
+        const size_t nr_stripes_per_thread = nr_stripes / nr_threads;
+        const size_t tail_threads = nr_stripes % nr_threads;
+
+        size_t start_index = 0;
+        size_t end_index = nr_stripes_per_thread;
+
+        std::valarray<double> Qs_threads;
+        Qs_threads.resize(nr_threads, 0.0);
+
+        auto start = std::chrono::high_resolution_clock::now();
+
+        for (size_t i = 0; i < nr_threads; ++i) {
+            if (i == nr_threads - 1) {
+                end_index += tail_threads;
+            }
+
+            threads[i] = std::thread([thread_index = i,  //
+                                      &Qs_threads,       //
+                                      &stripes,          //
+                                      &gg,
+                                      &qr,
+                                      start_index,
+                                      end_index]() {
+                //
+                std::valarray<double> Qs_stripes;
+                perform_local_quadratures_stripe_set_range(Qs_stripes,  //
+                                                           start_index,
+                                                           end_index,
+                                                           stripes,
+                                                           gg,
+                                                           qr);
+                // std::cout << "Thread: " << thread_index << " Qs_stripes: " << Qs_stripes.sum()
+                //           << std::endl;
+                // std::cout << "Qs thread size: "  << Qs_threads.size() << std::endl;
+                Qs_threads[thread_index] = Qs_stripes.sum();
+                //
+            });
+
+            start_index = end_index;
+            end_index += nr_stripes_per_thread;
+        }
+
+        for (size_t i = 0; i < nr_threads; ++i) {
+            threads[i].join();
+        }
+
+        Ql = Qs_threads.sum();
+
+        // std::cout << "Ql threads: " << Ql << std::endl;
+
+        // perform_local_quadratures_stripe_set(Qs_stripes, stripes, gg, qr);
+
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+        std::cout.precision(16);
+        std::cout << "Ql threads: " << Ql << std::endl;
+        std::cout.precision(3);  // Set precision back to default
+
+        const double seconds = double(duration.count()) / 1000000.0;
+
+        std::cout << "Execution time: " << seconds << " seconds" << std::endl;
+
+        const double tot_flop = nr_stripes * (7.0 * nr_domains_per_stripe +
+                                              51.0 * nr_domains_per_stripe * quad_nodes_nr);
+        const double flops = tot_flop / seconds;
+
+        const double data_transfer =
+                8.0 * nr_stripes * nr_domains_per_stripe * quad_nodes_nr * (4 + 2);
+
+        std::cout << std::endl;
+
+        std::cout << "Total GFLOP: " << flops / (1024.0 * 1024.0 * 1024.0) << std::endl;
+        std::cout << "Total data transfer: " << data_transfer / (1024.0 * 1024.0 * 1024.0) << " GB"
+                  << std::endl;
+
+        std::cout << std::endl;
+        std::cout << std::endl;
+    }
+
+    {
+        std::cout << "-------------------------------------------------------" << std::endl;
+        std::cout << "++ Global quadratures:" << std::endl;
+        std::cout << "-------------------------------------------------------" << std::endl
+                  << std::endl;
+
+        std::vector<std::thread> threads(nr_threads);
+        const size_t nr_stripes_per_thread = nr_stripes / nr_threads;
+        const size_t tail_threads = nr_stripes % nr_threads;
+
+        size_t start_index = 0;
+        size_t end_index = nr_stripes_per_thread;
+
+        std::valarray<double> Qs_threads;
+        Qs_threads.resize(nr_threads, 0.0);
+
+        auto start = std::chrono::high_resolution_clock::now();
+
+        for (size_t i = 0; i < nr_threads; ++i) {
+            if (i == nr_threads - 1) {
+                end_index += tail_threads;
+            }
+
+            threads[i] = std::thread([thread_index = i,  //
+                                      &Qs_threads,       //
+                                      &stripes,          //
+                                      &gg,
+                                      &qr,
+                                      start_index,
+                                      end_index]() {
+                //
+                std::valarray<double> Qs_stripes;
+                perform_global_quadratures_stripe_set_range(Qs_stripes,  //
+                                                            start_index,
+                                                            end_index,
+                                                            stripes,
+                                                            gg,
+                                                            qr);
+                // std::cout << "Thread: " << thread_index << " Qs_stripes: " << Qs_stripes.sum()
+                //           << std::endl;
+                // std::cout << "Qs thread size: "  << Qs_threads.size() << std::endl;
+                Qs_threads[thread_index] = Qs_stripes.sum();
+                //
+            });
+
+            start_index = end_index;
+            end_index += nr_stripes_per_thread;
+        }
+
+        for (size_t i = 0; i < nr_threads; ++i) {
+            threads[i].join();
+        }
+
+        Qg = Qs_threads.sum();
+
+        // std::cout << "Ql threads: " << Ql << std::endl;
+
+        // perform_local_quadratures_stripe_set(Qs_stripes, stripes, gg, qr);
+
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+        std::cout.precision(16);
+        std::cout << "Qg threads: " << Ql << std::endl;
+        std::cout.precision(3);  // Set precision back to default
+
+        const double seconds = double(duration.count()) / 1000000.0;
+
+        std::cout << "Global Execution time: " << seconds << " seconds" << std::endl;
+
+        const double tot_flop = nr_stripes * (7.0 * nr_domains_per_stripe +
+                                              51.0 * nr_domains_per_stripe * quad_nodes_nr);
+        const double flops = tot_flop / seconds;
+
+        const double data_transfer =
+                8.0 * nr_stripes * nr_domains_per_stripe * quad_nodes_nr * (4 + 1);
+
+        std::cout << std::endl;
+
+        std::cout << "Global Total GFLOP: " << flops / (1024.0 * 1024.0 * 1024.0) << std::endl;
+        std::cout << "Global Total data transfer: " << data_transfer / (1024.0 * 1024.0 * 1024.0)
+                  << " GB" << std::endl;
+
+        std::cout << std::endl;
+        std::cout << std::endl;
+    }
+
+    std::cout << std::endl;
+    std::cout << "Ql: " << Ql << std::endl;
+    std::cout << "Qg: " << Qg << std::endl;
+    std::cout << "Error: " << std::scientific << std::abs(Ql - Qg) / std::abs(Ql) << std::endl;
+    std::cout << std::endl;
+
+    return true;
 }
 
 /**
@@ -1076,100 +1499,117 @@ int test_stripes(int argc, char* argv[]) {
  * @return int
  */
 int main(int argc, char* argv[]) {
-    return test_stripes(argc, argv);
+    size_t quad_nodes_nr = 130;
+    size_t nr_threads = 18;
 
-    global_grid_type gg;
+    int a = 0, b = 0;
 
-    auto f = [](double x, double y) { return x * x + y * y; };
+    const double xy_max = 3500.0;
+    const unsigned int nr_stripes = 620200;
 
-    const double delta = 0.1;
-    const double x_zero = 0.0;
-    const double y_zero = 0.0;
-    const double x_max = 100.0;
-    const double y_max = 100.0;
-
-    make_gloal_grid(gg, delta, x_zero, y_zero, x_max, y_max, f);
-
-    local_grid_type lg;
-
-    get_local_grid(lg, gg, 1.0, 1.0, 2.0, 2.0);
-
-    print_local_grid_info(lg);
-
-    // print_local_grid(lg);
-
-    quadrature_rule qr;
-
-    srand(time(NULL));
-
-    const size_t quad_nodes_nr = 5;
-    const double x_min_QMC = 0.0;
-    const double y_min_QMC = 0.0;
-    const double x_max_QMC = 1.0;
-    const double y_max_QMC = 1.0;
-
-    make_MC_quadrature_rule(qr, quad_nodes_nr, x_min_QMC, y_min_QMC, x_max_QMC, y_max_QMC);
-
-    // std::cout << "Quadrature rule:" << std::endl;
-    // for (size_t i = 0; i < quad_nodes_nr; ++i) {
-    //     std::cout << "X: " << qr.x_nodes[i] << " Y: " << qr.y_nodes[i] << " W: " <<
-    // qr.weights[i]
-    //               << std::endl;
-    // }
-
-    auto start = std::chrono::high_resolution_clock::now();
-
-    const double Q = perform_quadrature_local(lg, qr, 1.0, 1.0, 2.0, 2.0);
-
-    auto end = std::chrono::high_resolution_clock::now();
-
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
-    std::cout << std::endl;
-    std::cout << "Execution time: " << (duration.count() / 1000.0) << " milliseconds" << std::endl;
-    std::cout << std::fixed << std::setprecision(6);
-    std::cout << "Q: " << Q << std::endl;
+    // a = test_stripes(argc, argv, quad_nodes_nr, xy_max, nr_stripes);
 
     std::cout << "-------------------------------------------------------" << std::endl
-              << std::endl;
+              << "-------------------------------------------------------" << std::endl
+              << "-------------------------------------------------------" << std::endl;
 
-    std::cout << std::setprecision(6);
+    b = test_stripes_mt(argc, argv, nr_threads, quad_nodes_nr, xy_max, nr_stripes);
 
-    domains_stripe ds;
-    const double x_min_stripe = 0.511;
-    const double y_min_stripe = 0.522;
-    const size_t nr_domains = 2;
-    const double side_x_stripe = 0.52;
-    const double side_y_stripe = 0.52;
+    return b && a;
 
-    make_domains_stripe(ds, x_min_stripe, y_min_stripe, nr_domains, side_x_stripe, side_y_stripe);
+    // global_grid_type gg;
 
-    local_grid_type lg_stripe;
-    make_local_grid_from_stripe(lg_stripe, gg, ds);
+    // auto f = [](double x, double y) { return x * x + y * y; };
 
-    print_local_grid_info(lg_stripe);
+    // const double delta = 0.1;
+    // const double x_zero = 0.0;
+    // const double y_zero = 0.0;
+    // const double x_max = 100.0;
+    // const double y_max = 100.0;
 
-    std::valarray<double> Qs;
-    perform_quadrature_local_stripe(Qs, lg_stripe, qr, ds);
+    // make_gloal_grid(gg, delta, x_zero, y_zero, x_max, y_max, f);
 
-    std::cout << std::endl;
-    std::cout << std::setprecision(16);
-    std::cout << "Qs: " << Qs.sum() << std::endl;
-    std::cout << std::setprecision(6);
-    for (size_t i = 0; i < Qs.size(); ++i) {
-        std::cout << Qs[i] << " ";
-    }
+    // local_grid_type lg;
 
-    std::cout << std::endl;
-    std::cout << std::endl;
+    // get_local_grid(lg, gg, 1.0, 1.0, 2.0, 2.0);
 
-    perform_quadrature_global_stripe(Qs, gg, qr, ds);
+    // print_local_grid_info(lg);
 
-    std::cout << std::endl;
-    std::cout << "Qs: " << Qs.sum() << std::endl;
-    for (size_t i = 0; i < Qs.size(); ++i) {
-        std::cout << Qs[i] << " ";
-    }
+    // // print_local_grid(lg);
+
+    // quadrature_rule qr;
+
+    // srand(time(NULL));
+
+    // const size_t quad_nodes_nr = 5;
+    // const double x_min_QMC = 0.0;
+    // const double y_min_QMC = 0.0;
+    // const double x_max_QMC = 1.0;
+    // const double y_max_QMC = 1.0;
+
+    // make_MC_quadrature_rule(qr, quad_nodes_nr, x_min_QMC, y_min_QMC, x_max_QMC, y_max_QMC);
+
+    // // std::cout << "Quadrature rule:" << std::endl;
+    // // for (size_t i = 0; i < quad_nodes_nr; ++i) {
+    // //     std::cout << "X: " << qr.x_nodes[i] << " Y: " << qr.y_nodes[i] << " W: " <<
+    // // qr.weights[i]
+    // //               << std::endl;
+    // // }
+
+    // auto start = std::chrono::high_resolution_clock::now();
+
+    // const double Q = perform_quadrature_local(lg, qr, 1.0, 1.0, 2.0, 2.0);
+
+    // auto end = std::chrono::high_resolution_clock::now();
+
+    // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+    // std::cout << std::endl;
+    // std::cout << "Execution time: " << (duration.count() / 1000.0) << " milliseconds" <<
+    // std::endl; std::cout << std::fixed << std::setprecision(6); std::cout << "Q: " << Q <<
+    // std::endl;
+
+    // std::cout << "-------------------------------------------------------" << std::endl
+    //           << std::endl;
+
+    // std::cout << std::setprecision(6);
+
+    // domains_stripe ds;
+    // const double x_min_stripe = 0.511;
+    // const double y_min_stripe = 0.522;
+    // const size_t nr_domains = 2;
+    // const double side_x_stripe = 0.52;
+    // const double side_y_stripe = 0.52;
+
+    // make_domains_stripe(ds, x_min_stripe, y_min_stripe, nr_domains, side_x_stripe,
+    // side_y_stripe);
+
+    // local_grid_type lg_stripe;
+    // make_local_grid_from_stripe(lg_stripe, gg, ds);
+
+    // print_local_grid_info(lg_stripe);
+
+    // std::valarray<double> Qs;
+    // perform_quadrature_local_stripe(Qs, lg_stripe, qr, ds);
+
+    // std::cout << std::endl;
+    // std::cout << std::setprecision(16);
+    // std::cout << "Qs: " << Qs.sum() << std::endl;
+    // std::cout << std::setprecision(6);
+    // for (size_t i = 0; i < Qs.size(); ++i) {
+    //     std::cout << Qs[i] << " ";
+    // }
+
+    // std::cout << std::endl;
+    // std::cout << std::endl;
+
+    // perform_quadrature_global_stripe(Qs, gg, qr, ds);
+
+    // std::cout << std::endl;
+    // std::cout << "Qs: " << Qs.sum() << std::endl;
+    // for (size_t i = 0; i < Qs.size(); ++i) {
+    //     std::cout << Qs[i] << " ";
+    // }
 
     return 0;
 }
