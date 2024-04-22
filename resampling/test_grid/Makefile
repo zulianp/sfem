@@ -1,9 +1,11 @@
-CC = g++-13
-CC = clang++-15
+# set compiler
+
+# # CC = g++-13
+# CC = clang++-15
 CC = icpx
 
 CFLAGS = -Wall -Ofast -std=c++17 -mtune=native -march=native  -mprefer-vector-width=512 -Wshadow=local
-LDFLAGS = 
+LDFLAGS = -lpthread -lstdc++ -lm
 
 DEBUG ?= 0
 
@@ -13,7 +15,7 @@ ifeq ($(DEBUG),1)
 endif
 
 test_grid_new: test_grid_new.cpp
-	$(CC) $(CFLAGS) -o test_grid_new test_grid_new.cpp $(LDFLAGS)
+	$(CC) $(CFLAGS) -o test_grid_new test_grid_new.cpp $(LDFLAGS) 
 
 clean:
 	rm -f test_grid_new
