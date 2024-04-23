@@ -1432,9 +1432,8 @@ extern "C" int test_grid_cuda();
  * @return int
  */
 int main(int argc, char* argv[]) {
-
-test_grid_cuda();
-return 0;
+    // test_grid_cuda();
+    // return 0;
 
     size_t quad_nodes_nr = 130;
     size_t nr_threads = 18;
@@ -1444,15 +1443,13 @@ return 0;
     const double xy_max = 3500.0;
     const unsigned int nr_stripes = 620200;
 
-    // a = test_stripes(argc, argv, quad_nodes_nr, xy_max, nr_stripes);
+    a = test_stripes(argc, argv, quad_nodes_nr, xy_max, nr_stripes);
 
     std::cout << "-------------------------------------------------------" << std::endl
               << "-------------------------------------------------------" << std::endl
               << "-------------------------------------------------------" << std::endl;
 
     b = test_stripes_mt(argc, argv, nr_threads, quad_nodes_nr, xy_max, nr_stripes);
-
-    
 
     return b && a;
 
