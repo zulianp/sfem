@@ -1422,6 +1422,8 @@ bool test_stripes_mt(int argc,
     return true;
 }
 
+extern "C" int test_grid_cuda();
+
 /**
  * @brief
  *
@@ -1430,6 +1432,10 @@ bool test_stripes_mt(int argc,
  * @return int
  */
 int main(int argc, char* argv[]) {
+
+test_grid_cuda();
+return 0;
+
     size_t quad_nodes_nr = 130;
     size_t nr_threads = 18;
 
@@ -1445,6 +1451,8 @@ int main(int argc, char* argv[]) {
               << "-------------------------------------------------------" << std::endl;
 
     b = test_stripes_mt(argc, argv, nr_threads, quad_nodes_nr, xy_max, nr_stripes);
+
+    
 
     return b && a;
 
