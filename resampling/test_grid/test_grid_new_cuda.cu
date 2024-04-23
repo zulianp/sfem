@@ -1,5 +1,4 @@
 #include <cuda_profiler_api.h>
-#include <curand_kernel.h>
 #include <stdio.h>
 
 int getSPcores(cudaDeviceProp devProp) {
@@ -132,9 +131,13 @@ __device__ void perform_quadrature_global_stripe(double* Qs,                  //
                                                  const size_t qr_nodes_nr_,   //
                                                  const domains_stripe& ds) {  //
     //
-    const size_t id = blockIdx.x * blockDim.x + threadIdx.x;
-    const size_t domain_nr = threadIdx.x;
-    const size_t stripe_nr = blockIdx.x;
+    // const size_t id = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t domain_nr = blockIdx.x * blockDim.x + threadIdx.x;
+    // const size_t stripe_nr = blockIdx.x;
+
+    if (domain_nr >= ds.nr_domains) {
+        return;
+    }
 
     // double Ql = 0.0;
 
@@ -217,11 +220,140 @@ __device__ void perform_quadrature_global_stripe(double* Qs,                  //
     // Qs[i] = Qs_i;
     // }
 
-    Qs[id] = Qs_i;
+    Qs[domain_nr] = Qs_i;
 
     return;
 }
 
+/**
+ * @brief Kernel function to perform the quadrature in the global domain.
+ *
+ * @param Qs
+ * @param gg
+ * @param qr
+ * @param qr_nodes_nr_
+ * @return __global__
+ */
+__global__ void perform_quadrature_global_stripe_kernel(double* Qs,                  //
+                                                        const global_grid_type& gg,  //
+                                                        const quadrature_rule& qr,   //
+                                                        const size_t qr_nodes_nr_,   //
+                                                        const domains_stripe& ds) {  //
+    //
+    const size_t id = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t domain_nr = threadIdx.x;
+    const size_t stripe_nr = blockIdx.x;
+}
+
+/**
+ * @brief
+ *
+ * @param gg
+ * @return true
+ * @return false
+ */
+bool copy_global_grid_to_device(const global_grid_type& gg) {
+    cudaError e1 = cudaMalloc((void**)&gg.grid_ptr_cu,  //
+                              (unsigned long)gg.grid.size() * sizeof(double));
+
+    cudaError e2 = cudaMemcpy(gg.grid_ptr_cu,
+                              &gg.grid[0],
+                              (unsigned long)gg.grid.size() * sizeof(double),
+                              cudaMemcpyHostToDevice);
+
+    if (e1 != cudaSuccess || e2 != cudaSuccess) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * @brief
+ *
+ * @param gg
+ * @return true
+ * @return false
+ */
+bool free_global_grid_on_device(global_grid_type& gg) {
+    cudaError e1 = cudaFree(gg.grid_ptr_cu);
+
+    if (e1 != cudaSuccess) {
+        return false;
+    }
+
+    gg.grid_ptr_cu = nullptr;
+
+    return true;
+}
+
+/**
+ * @brief Copies the global grid to the device.
+ *
+ * @param qr
+ * @return true
+ * @return false
+ */
+bool copy_quadrature_rule_to_device(const quadrature_rule& qr) {
+    cudaError e1 = cudaMalloc((void**)&qr.x_nodes_ptr_cu,  //
+                              (unsigned long)qr.x_nodes.size() * sizeof(double));
+
+    cudaError e2 = cudaMalloc((void**)&qr.y_nodes_ptr_cu,  //
+                              (unsigned long)qr.y_nodes.size() * sizeof(double));
+
+    cudaError e3 = cudaMalloc((void**)&qr.weights_ptr_cu,  //
+                              (unsigned long)qr.weights.size() * sizeof(double));
+
+    cudaError e4 = cudaMemcpy(qr.x_nodes_ptr_cu,
+                              &qr.x_nodes[0],
+                              (unsigned long)qr.x_nodes.size() * sizeof(double),
+                              cudaMemcpyHostToDevice);
+
+    cudaError e5 = cudaMemcpy(qr.y_nodes_ptr_cu,
+                              &qr.y_nodes[0],
+                              (unsigned long)qr.y_nodes.size() * sizeof(double),
+                              cudaMemcpyHostToDevice);
+
+    cudaError e6 = cudaMemcpy(qr.weights_ptr_cu,
+                              &qr.weights[0],
+                              (unsigned long)qr.weights.size() * sizeof(double),
+                              cudaMemcpyHostToDevice);
+
+    if (e1 != cudaSuccess || e2 != cudaSuccess || e3 != cudaSuccess || e4 != cudaSuccess ||
+        e5 != cudaSuccess || e6 != cudaSuccess) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * @brief Frees the quadrature rule on the device.
+ *
+ * @param qr
+ * @return true
+ * @return false
+ */
+bool free_quadrature_rule_on_device(quadrature_rule& qr) {
+    cudaError e1 = cudaFree(qr.x_nodes_ptr_cu);
+    cudaError e2 = cudaFree(qr.y_nodes_ptr_cu);
+    cudaError e3 = cudaFree(qr.weights_ptr_cu);
+
+    if (e1 != cudaSuccess || e2 != cudaSuccess || e3 != cudaSuccess) {
+        return false;
+    }
+
+    qr.x_nodes_ptr_cu = nullptr;
+    qr.y_nodes_ptr_cu = nullptr;
+    qr.weights_ptr_cu = nullptr;
+
+    return true;
+}
+
+/**
+ * @brief
+ *
+ */
 extern "C" int test_grid_cuda() {
     int dev;
     cudaGetDevice(&dev);
@@ -244,6 +376,9 @@ extern "C" int test_grid_cuda() {
 
     printf("\n");
 
+    move_global_grid_to_device(gg);
+
+    free_global_grid_on_device(gg);
 
     return 0;
 }

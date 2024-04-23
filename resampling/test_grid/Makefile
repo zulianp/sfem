@@ -4,7 +4,6 @@
 # CC = clang++-15
 CC ?= icpx
 
-
 ifeq (${VERBOSE}, on)
 	VERBOSE_FLAG = -v
 endif
