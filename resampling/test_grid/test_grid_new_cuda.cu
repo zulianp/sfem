@@ -1,8 +1,81 @@
+#include <cuda_profiler_api.h>
+#include <curand_kernel.h>
 #include <stdio.h>
+
+int getSPcores(cudaDeviceProp devProp) {
+    int cores = 0;
+    int mp = devProp.multiProcessorCount;
+    switch (devProp.major) {
+        case 2:  // Fermi
+            if (devProp.minor == 1)
+                cores = mp * 48;
+            else
+                cores = mp * 32;
+            break;
+        case 3:  // Kepler
+            cores = mp * 192;
+            break;
+        case 5:  // Maxwell
+            cores = mp * 128;
+            break;
+        case 6:  // Pascal
+            if ((devProp.minor == 1) || (devProp.minor == 2))
+                cores = mp * 128;
+            else if (devProp.minor == 0)
+                cores = mp * 64;
+            else
+                printf("Unknown device type\n");
+            break;
+        case 7:  // Volta and Turing
+            if ((devProp.minor == 0) || (devProp.minor == 5))
+                cores = mp * 64;
+            else
+                printf("Unknown device type\n");
+            break;
+        case 8:  // Ampere
+            if (devProp.minor == 0)
+                cores = mp * 64;
+            else if (devProp.minor == 6)
+                cores = mp * 128;
+            else if (devProp.minor == 9)
+                cores = mp * 128;  // ada lovelace
+            else
+                printf("Unknown device type\n");
+            break;
+        case 9:  // Hopper
+            if (devProp.minor == 0)
+                cores = mp * 128;
+            else
+                printf("Unknown device type\n");
+            break;
+        default:
+            printf("Unknown device type\n");
+            break;
+    }
+    return cores;
+}
 
 #include "test_grid_new.h"
 
-__device__ void get_nearest_coordinates_floor_cu(const double x_zero,  //
+/**
+ * @brief Calculates the nearest grid coordinates (floor values) for a given point.
+ *
+ * This function calculates the nearest grid coordinates (floor values) for a given point (x, y)
+ * based on the grid origin (x_zero, y_zero) and grid spacing (delta_x, delta_y). The calculated
+ * grid coordinates are stored in the variables i and j.
+ *
+ * @param x_zero The x-coordinate of the grid origin.
+ * @param y_zero The y-coordinate of the grid origin.
+ * @param delta_x The spacing between grid points along the x-axis.
+ * @param delta_y The spacing between grid points along the y-axis.
+ * @param x The x-coordinate of the point for which nearest grid coordinates are to be calculated.
+ * @param y The y-coordinate of the point for which nearest grid coordinates are to be calculated.
+ * @param i Reference to the variable where the calculated x-coordinate of the nearest grid point
+ * will be stored.
+ * @param j Reference to the variable where the calculated y-coordinate of the nearest grid point
+ * will be stored.
+ */
+__device__ void get_nearest_coordinates_floor_cu(const double x_zero,
                                                  const double y_zero,
                                                  const double delta_x,
                                                  const double delta_y,
@@ -10,16 +83,32 @@ __device__ void get_nearest_coordinates_floor_cu(const double x_zero,  //
                                                  const double y,
                                                  int& i,
                                                  int& j) {
+    //
     i = static_cast<int>(floor((x - x_zero) / delta_x));
     j = static_cast<int>(floor((y - y_zero) / delta_y));
 }
 
+/**
+ * @brief Calculates the domain boundaries for a given domain number within a stripe.
+ *
+ * This function calculates the minimum and maximum values of the x and y coordinates
+ * for a specific domain within a stripe. The domain number is used to determine the
+ * position of the domain within the stripe.
+ *
+ * @param ds The domains_stripe struct containing information about the stripe.
+ * @param domain_nr The number of the domain within the stripe.
+ * @param x_min The minimum x coordinate of the domain.
+ * @param y_min The minimum y coordinate of the domain.
+ * @param x_max The maximum x coordinate of the domain.
+ * @param y_max The maximum y coordinate of the domain.
+ */
 __device__ void get_domain_from_stripe_cu(const domains_stripe& ds,
                                           const size_t domain_nr,
                                           double& x_min,
                                           double& y_min,
                                           double& x_max,
                                           double& y_max) {
+    //
     x_min = ds.x_min + domain_nr * ds.side_x;
     y_min = ds.y_min;
 
@@ -27,6 +116,16 @@ __device__ void get_domain_from_stripe_cu(const domains_stripe& ds,
     y_max = y_min + ds.side_y;
 }
 
+/**
+ * @brief Performs the quadrature for a single stripe.
+ *
+ * @param Qs Pointer to the array where the calculated quadrature values will be stored.
+ * @param gg The global_grid_type struct containing information about the global grid.
+ * @param qr The quadrature_rule struct containing information about the quadrature rule.
+ * @param qr_nodes_nr_  The number of nodes in the quadrature rule.
+ * @param ds The domains_stripe struct containing information about the stripe.
+ * @return void
+ */
 __device__ void perform_quadrature_global_stripe(double* Qs,                  //
                                                  const global_grid_type& gg,  //
                                                  const quadrature_rule& qr,   //
@@ -37,7 +136,7 @@ __device__ void perform_quadrature_global_stripe(double* Qs,                  //
     const size_t domain_nr = threadIdx.x;
     const size_t stripe_nr = blockIdx.x;
 
-    double Ql = 0.0;
+    // double Ql = 0.0;
 
     // for (size_t i = 0; i < ds.nr_domains; ++i) {
     double x_d_min, y_d_min, x_d_max, y_d_max;
@@ -123,7 +222,28 @@ __device__ void perform_quadrature_global_stripe(double* Qs,                  //
     return;
 }
 
-extern "C" int test_grid() {
-    printf("Hello from test_grid_new_cuda.cu\n");
+extern "C" int test_grid_cuda() {
+    int dev;
+    cudaGetDevice(&dev);
+    cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, dev);
+
+    printf("\n");
+
+    printf("Device:                %s\n", deviceProp.name);
+    printf("CUDA Capability:       %d.%d\n", deviceProp.major, deviceProp.minor);
+    printf("Memory available:      %.3lf Gbytes\n",
+           (double)deviceProp.totalGlobalMem / (double)(1024 * 1024 * 1024));
+    printf("Number of SMs:         %d\n", deviceProp.multiProcessorCount);
+    printf("Max threads per block: %d\n", deviceProp.maxThreadsPerBlock);
+    printf("Max threads per SM:    %d\n", deviceProp.maxThreadsPerMultiProcessor);
+    printf("Shared memory per SM:  %d\n", deviceProp.sharedMemPerMultiprocessor);
+    printf("Number of SP:          %d\n", getSPcores(deviceProp));
+    printf("Warp size:             %d\n", deviceProp.warpSize);
+    printf("Max lane per SM:       %d\n", getSPcores(deviceProp) / deviceProp.multiProcessorCount);
+
+    printf("\n");
+
+
     return 0;
 }

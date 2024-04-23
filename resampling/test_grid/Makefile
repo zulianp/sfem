@@ -2,9 +2,26 @@
 
 # # CC = g++-13
 # CC = clang++-15
-CC = icpx
+CC ?= icpx
 
 
+ifeq (${VERBOSE}, on)
+	VERBOSE_FLAG = -v
+endif
+
+CFLAGS = -Wall -Ofast -std=c++17 -mtune=native -march=native  -mprefer-vector-width=512 -Wshadow=local
+LDFLAGS = -lpthread -lstdc++ -lm
+
+DEBUG ?= 0
+
+TARGET = test_grid_new
+
+# if debug 
+ifeq ($(DEBUG),1)
+	CFLAGS += -g
+endif
+
+CU_OPT_FLAGS = -O3 -use_fast_math -Xptxas=-O3
 CU_TEST_GRID = test_grid_new_cuda
 CU_LIB=lib${CU_TEST_GRID}.a
 GPU_ARCH ?= sm_75
@@ -12,26 +29,14 @@ GPU_ARCH ?= sm_75
 CU_VERBOSE_FLAG = 
 CU_VERBOSE ?= off
 
-CU_OPT_FLAGS = -O3 -use_fast_math -Xptxas=-O3
+CUDA_LIBS_PATH = /usr/local/cuda-12.3/targets/x86_64-linux/lib
+CUDA_FLAGS = -L${CUDA_LIBS_PATH} -lcudart  -L. -ltest_grid_new_cuda  
 
-ifeq (${VERBOSE}, on)
-	VERBOSE_FLAG = -v
-endif
+#######################################
+#######################################
 
-
-
-CFLAGS = -Wall -Ofast -std=c++17 -mtune=native -march=native  -mprefer-vector-width=512 -Wshadow=local
-LDFLAGS = -lpthread -lstdc++ -lm
-
-DEBUG ?= 0
-
-# if debug 
-ifeq ($(DEBUG),1)
-	CFLAGS += -g
-endif
-
-test_grid_new: test_grid_new.cpp test_grid_new.h ${CU_LIB}
-	$(CC) $(CFLAGS) -o test_grid_new test_grid_new.cpp $(LDFLAGS) -I.  -L. -ltest_grid_new_cuda 
+${TARGET}: ${TARGET}.cpp test_grid_new.h ${CU_LIB}
+	$(CC) -o ${TARGET} ${TARGET}.cpp  $(CFLAGS) $(LDFLAGS) -I. $(CUDA_FLAGS)
 
 #######################################
 #######################################
