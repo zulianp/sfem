@@ -1,5 +1,6 @@
 #include <cuda_profiler_api.h>
 #include <stdio.h>
+#include <vector>
 
 int getSPcores(cudaDeviceProp devProp) {
     int cores = 0;
@@ -83,8 +84,8 @@ __device__ void get_nearest_coordinates_floor_cu(const double x_zero,
                                                  int& i,
                                                  int& j) {
     //
-    i = static_cast<int>(floor((x - x_zero) / delta_x));
-    j = static_cast<int>(floor((y - y_zero) / delta_y));
+    i = int(floor((x - x_zero) / delta_x));
+    j = int(floor((y - y_zero) / delta_y));
 }
 
 /**
@@ -130,14 +131,26 @@ __device__ void perform_quadrature_global_stripe(double* Qs,                  //
                                                  const quadrature_rule& qr,   //
                                                  const size_t qr_nodes_nr_,   //
                                                  const domains_stripe& ds) {  //
-    //
-    // const size_t id = blockIdx.x * blockDim.x + threadIdx.x;
-    const size_t domain_nr = blockIdx.x * blockDim.x + threadIdx.x;
+                                                                              //
+    const size_t id = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t domain_nr = threadIdx.x;
+    // printf("domain_nr: %lu, id %lu \n", domain_nr, id);
+
+    // printf("domain_nr: %lu, id %lu \n", domain_nr, id);
+    // return ;
+
+    // Qs[id] = 1.0;
+
+    // return ;
+
+    // return;
     // const size_t stripe_nr = blockIdx.x;
 
-    if (domain_nr >= ds.nr_domains) {
-        return;
-    }
+    //    const size_t domain_nr = threadIdx.x;
+
+    // if (domain_nr >= ds.nr_domains) {
+    //     return;
+    // }
 
     // double Ql = 0.0;
 
@@ -157,9 +170,18 @@ __device__ void perform_quadrature_global_stripe(double* Qs,                  //
         const double x_Q = (qr.x_nodes_ptr_cu[q_i]) * (x_d_max - x_d_min) + x_d_min;
         const double y_Q = (qr.y_nodes_ptr_cu[q_i]) * (y_d_max - y_d_min) + y_d_min;
 
+        // const double x_Q = q_i * (x_d_max - x_d_min) + x_d_min;
+        //         const double y_Q = q_i * (y_d_max - y_d_min) + y_d_min;
+        //     Qs_i = x_Q + y_Q;
+
+        //     continue;
+
         // std::cout << "x_Q: " << x_Q << " y_Q: " << y_Q << std::endl;
 
         int i_local, j_local;
+
+        // Qs_i += 2.0 * qr.weights_ptr_cu[q_i] * volume;
+        // continue;
 
         get_nearest_coordinates_floor_cu(gg.x_zero,  //
                                          gg.y_zero,  //
@@ -170,11 +192,13 @@ __device__ void perform_quadrature_global_stripe(double* Qs,                  //
                                          i_local,
                                          j_local);
 
-        // data trasfer 4 * 8 * qr_size * dsnr_domains
+        /////// data trasfer 4 * 8 * qr_size * dsnr_domains
         const double f1 = gg.grid_ptr_cu[i_local * gg.x_size + j_local];
         const double f2 = gg.grid_ptr_cu[i_local * gg.y_size + j_local + 1];
         const double f3 = gg.grid_ptr_cu[(i_local + 1) * gg.y_size + j_local];
         const double f4 = gg.grid_ptr_cu[(i_local + 1) * gg.y_size + j_local + 1];
+
+        // const double f1 = 0.0 , f2 = 0.0, f3 = 0.0, f4 = 0.0;
 
         // std::cout << "i_local: " << i_local << " j_local: " << j_local << std::endl;
         // std::cout << "f1: " << f1 << " f2: " << f2 << " f3: " << f3 << " f4: " << f4
@@ -210,6 +234,8 @@ __device__ void perform_quadrature_global_stripe(double* Qs,                  //
         // 7 * qr_size * ds.nr_domains
         const double f_Q = w11 * f1 + w12 * f2 + w21 * f3 + w22 * f4;
 
+        // Qs_i += f_Q * volume;
+
         // 3 * qr_size * ds.nr_domains
         // data transfer 8 * qr_size * ds.nr_domains
         Qs_i += f_Q * qr.weights_ptr_cu[q_i] * volume;
@@ -220,7 +246,7 @@ __device__ void perform_quadrature_global_stripe(double* Qs,                  //
     // Qs[i] = Qs_i;
     // }
 
-    Qs[domain_nr] = Qs_i;
+    Qs[id] = Qs_i;
 
     return;
 }
@@ -234,25 +260,37 @@ __device__ void perform_quadrature_global_stripe(double* Qs,                  //
  * @param qr_nodes_nr_
  * @return __global__
  */
-__global__ void perform_quadrature_global_stripe_kernel(double* Qs,                  //
-                                                        const global_grid_type& gg,  //
-                                                        const quadrature_rule& qr,   //
-                                                        const size_t qr_nodes_nr_,   //
-                                                        const domains_stripe& ds) {  //
+__global__ void perform_quadrature_global_stripe_kernel(double* Qs,                            //
+                                                        const global_grid_type gg,             //
+                                                        const quadrature_rule qr,              //
+                                                        const size_t qr_nodes_nr_,             //
+                                                        const domains_stripe* ds_vector,       //
+                                                        const size_t nr_of_domains_stripes) {  //
     //
     const size_t id = blockIdx.x * blockDim.x + threadIdx.x;
     const size_t domain_nr = threadIdx.x;
     const size_t stripe_nr = blockIdx.x;
+
+    // printf("id: %lu\n", id);
+
+    // Qs[id] = 1.0;
+
+    // if (stripe_nr >= id) {
+    //     return;
+    // }
+
+    perform_quadrature_global_stripe(Qs, gg, qr, qr_nodes_nr_, ds_vector[stripe_nr]);
 }
 
 /**
- * @brief
+ * @brief Copies the global grid to the device.
  *
  * @param gg
  * @return true
  * @return false
  */
-bool copy_global_grid_to_device(const global_grid_type& gg) {
+bool copy_global_grid_to_device(global_grid_type& gg) {
+    //
     cudaError e1 = cudaMalloc((void**)&gg.grid_ptr_cu,  //
                               (unsigned long)gg.grid.size() * sizeof(double));
 
@@ -262,6 +300,9 @@ bool copy_global_grid_to_device(const global_grid_type& gg) {
                               cudaMemcpyHostToDevice);
 
     if (e1 != cudaSuccess || e2 != cudaSuccess) {
+        printf("Error Alloccating and copying global grid to device\n");
+        printf("Error code e1: %s\n", cudaGetErrorString(e1));
+        printf("Error code e2: %s\n", cudaGetErrorString(e2));
         return false;
     }
 
@@ -279,6 +320,8 @@ bool free_global_grid_on_device(global_grid_type& gg) {
     cudaError e1 = cudaFree(gg.grid_ptr_cu);
 
     if (e1 != cudaSuccess) {
+        printf("!!!!! Error freeing global grid on device\n");
+        printf("!!!!! Error code: %s\n", cudaGetErrorString(e1));
         return false;
     }
 
@@ -319,8 +362,22 @@ bool copy_quadrature_rule_to_device(const quadrature_rule& qr) {
                               (unsigned long)qr.weights.size() * sizeof(double),
                               cudaMemcpyHostToDevice);
 
-    if (e1 != cudaSuccess || e2 != cudaSuccess || e3 != cudaSuccess || e4 != cudaSuccess ||
-        e5 != cudaSuccess || e6 != cudaSuccess) {
+    printf("qr.x_nodes.size(): %lu\n", qr.x_nodes.size());
+    printf("qr.y_nodes.size(): %lu\n", qr.y_nodes.size());
+    printf("qr.weights.size(): %lu\n", qr.weights.size());
+
+    if (e1 != cudaSuccess || e2 != cudaSuccess ||  //
+        e3 != cudaSuccess || e4 != cudaSuccess ||  //
+        e5 != cudaSuccess || e6 != cudaSuccess) {  //
+
+        printf("Error Copying quadrature rule to device\n");
+        printf("Error code e1: %s\n", cudaGetErrorString(e1));
+        printf("Error code e2: %s\n", cudaGetErrorString(e2));
+        printf("Error code e3: %s\n", cudaGetErrorString(e3));
+        printf("Error code e4: %s\n", cudaGetErrorString(e4));
+        printf("Error code e5: %s\n", cudaGetErrorString(e5));
+        printf("Error code e6: %s\n", cudaGetErrorString(e6));
+
         return false;
     }
 
@@ -350,11 +407,7 @@ bool free_quadrature_rule_on_device(quadrature_rule& qr) {
     return true;
 }
 
-/**
- * @brief
- *
- */
-extern "C" int test_grid_cuda() {
+void print_GPU_info() {
     int dev;
     cudaGetDevice(&dev);
     cudaDeviceProp deviceProp;
@@ -375,10 +428,104 @@ extern "C" int test_grid_cuda() {
     printf("Max lane per SM:       %d\n", getSPcores(deviceProp) / deviceProp.multiProcessorCount);
 
     printf("\n");
+}
 
-    move_global_grid_to_device(gg);
+/**
+ * @brief
+ *
+ */
+extern "C" int test_grid_cuda(global_grid_type& gg,                      //
+                              quadrature_rule& qr,                       //
+                              std::vector<domains_stripe>& ds_vector) {  //
+    print_GPU_info();
+
+    copy_global_grid_to_device(gg);
+    copy_quadrature_rule_to_device(qr);
+
+    domains_stripe* ds_vector_cu = nullptr;
+
+    cudaError e1 = cudaMalloc((void**)&ds_vector_cu, ds_vector.size() * sizeof(domains_stripe));
+    cudaError e2 = cudaMemcpy(ds_vector_cu,
+                              &ds_vector[0],
+                              ds_vector.size() * sizeof(domains_stripe),
+                              cudaMemcpyHostToDevice);
+    if (e1 != cudaSuccess || e2 != cudaSuccess) {
+        printf("Error allocating memory for ds_vector_cu\n");
+        printf("Error code e1: %s\n", cudaGetErrorString(e1));
+        printf("Error code e2: %s\n", cudaGetErrorString(e2));
+        return 1;
+    }
+
+    size_t nr_domains_tot = ds_vector.size() * ds_vector[0].nr_domains;
+
+    double *Qs, *Qs_cu;
+    cudaMalloc((void**)&Qs_cu, nr_domains_tot * sizeof(double));
+    Qs = (double*)malloc(nr_domains_tot * sizeof(double));
+
+    ///// Kernel here /////
+    const size_t nr_stripes = ds_vector.size();
+    const size_t nr_domains_per_stripe = ds_vector[0].nr_domains;
+
+    printf("\nnr_stripes:            %lu\n", nr_stripes);
+    printf("nr_domains_per_stripe: %lu\n\n", nr_domains_per_stripe);
+
+    printf("Nr of qr nodes: %lu\n", qr.x_nodes.size());
+
+    printf("Nr of threads: %lu\n", nr_stripes * nr_domains_per_stripe);
+    printf("Nr of domains: %lu\n", nr_domains_tot);
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    cudaDeviceSynchronize();
+
+    cudaEventRecord(start);
+
+    /// start kernel ///
+    perform_quadrature_global_stripe_kernel<<<nr_stripes, nr_domains_per_stripe>>>(  //
+            Qs_cu,                                                                   //
+            gg,                                                                      //
+            qr,                                                                      //
+            qr.weights.size(),                                                       //
+            ds_vector_cu,                                                            //
+            ds_vector.size());                                                       //
+
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+
+    // get error code
+    cudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess) {
+        fprintf(stderr, "KERNEL ERROR: %s\n", cudaGetErrorString(error));
+        return 1;
+    }
+
+    cudaDeviceSynchronize();
+
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+
+    printf("Time elapsed: %f ms\n", milliseconds);
+
+    ///// end kernel /////
+
+    cudaMemcpy(Qs, Qs_cu, nr_domains_tot * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaFree(Qs_cu);
 
     free_global_grid_on_device(gg);
+    free_quadrature_rule_on_device(qr);
+
+    cudaFree(ds_vector_cu);
+
+    double Q_tot = 0.0;
+    for (size_t i = 0; i < nr_domains_tot; ++i) {
+        Q_tot += Qs[i];
+    }
+
+    free(Qs);
+
+    printf("\n+++++ Global Q_tot GPU : %f   \n\n", Q_tot);
 
     return 0;
 }
