@@ -89,6 +89,37 @@ __device__ void get_nearest_coordinates_floor_cu(const double x_zero,
 }
 
 /**
+ * @brief Calculates the nearest grid coordinates (ceil values) for a given point.
+ *
+ * This function calculates the nearest grid coordinates (ceil values) for a given point (x, y)
+ * based on the grid origin (x_zero, y_zero) and grid spacing (delta_x, delta_y). The calculated
+ * grid coordinates are stored in the variables i and j.
+ *
+ * @param x_zero The x-coordinate of the grid origin.
+ * @param y_zero The y-coordinate of the grid origin.
+ * @param delta_x The spacing between grid points along the x-axis.
+ * @param delta_y The spacing between grid points along the y-axis.
+ * @param x The x-coordinate of the point for which nearest grid coordinates are to be calculated.
+ * @param y The y-coordinate of the point for which nearest grid coordinates are to be calculated.
+ * @param i Reference to the variable where the calculated x-coordinate of the nearest grid point
+ * will be stored.
+ * @param j Reference to the variable where the calculated y-coordinate of the nearest grid point
+ * will be stored.
+ */
+__device__ void get_nearest_coordinates_ceil_cu(const double x_zero,
+                                                const double y_zero,
+                                                const double delta_x,
+                                                const double delta_y,
+                                                const double x,
+                                                const double y,
+                                                int& i,
+                                                int& j) {
+    //
+    i = int(ceil((x - x_zero) / delta_x));
+    j = int(ceil((y - y_zero) / delta_y));
+}
+
+/**
  * @brief Calculates the domain boundaries for a given domain number within a stripe.
  *
  * This function calculates the minimum and maximum values of the x and y coordinates
@@ -271,15 +302,98 @@ __global__ void perform_quadrature_global_stripe_kernel(double* Qs,             
     const size_t domain_nr = threadIdx.x;
     const size_t stripe_nr = blockIdx.x;
 
-    // printf("id: %lu\n", id);
-
-    // Qs[id] = 1.0;
-
-    // if (stripe_nr >= id) {
-    //     return;
-    // }
-
     perform_quadrature_global_stripe(Qs, gg, qr, qr_nodes_nr_, ds_vector[stripe_nr]);
+}
+
+struct local_grid_cuda_type {
+    double delta; /**< The grid spacing. */
+
+    double x_d_min; /**< The x-coordinate of the domain grid origin. */
+    double y_d_min; /**< The y-coordinate of the domain grid origin. */
+
+    double x_d_max; /**< The maximum x-coordinate domain of the grid. */
+    double y_d_max; /**< The maximum y-coordinate domain of the grid. */
+
+    double x_grid_min; /**< The min x-coordinate in the local grid. */
+    double y_grid_min; /**< The min y-coordinate in the local grid. */
+
+    double x_grid_max; /**< The maximum x-coordinate in the local grid. */
+    double y_grid_max; /**< The maximum y-coordinate in the local grid. */
+
+    size_t x_size; /**< The number of grid points in the x-direction. */
+    size_t y_size; /**< The number of grid points in the y-direction. */
+};
+
+/**
+ * @brief
+ *
+ * @param Qs
+ * @param gg
+ * @param qr
+ * @param qr_nodes_nr_
+ * @param ds_vector
+ * @param nr_of_domains_stripes
+ * @return __global__
+ */
+__global__ void perform_quadrature_local_stripe_kernel(double* Qs,                            //
+                                                       const global_grid_type gg,             //
+                                                       const quadrature_rule qr,              //
+                                                       const size_t qr_nodes_nr_,             //
+                                                       const domains_stripe* ds_vector,       //
+                                                       const size_t nr_of_domains_stripes) {  //
+    //
+    const size_t id = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t domain_nr = threadIdx.x;
+    const size_t stripe_nr = blockIdx.x;
+
+    struct local_grid_cuda_type lg;
+
+    lg.delta = gg.delta;
+    double x_d_min, y_d_min, x_d_max, y_d_max;
+    x_d_min = ds_vector[stripe_nr].x_min;
+    x_d_max = ds_vector[stripe_nr].x_min +
+              ds_vector[stripe_nr].nr_domains * ds_vector[stripe_nr].side_x;
+
+    y_d_min = ds_vector[stripe_nr].y_min;
+    y_d_max = ds_vector[stripe_nr].y_min + ds_vector[stripe_nr].side_y;
+
+    lg.x_d_min = x_d_min;
+    lg.y_d_min = y_d_min;
+    lg.x_d_max = x_d_max;
+    lg.y_d_max = y_d_max;
+
+    int i_local_min, j_local_min;
+    get_nearest_coordinates_floor_cu(gg.x_zero,  //
+                                     gg.y_zero,  //
+                                     gg.delta,
+                                     gg.delta,
+                                     x_d_min,
+                                     y_d_min,
+                                     i_local_min,
+                                     j_local_min);
+
+    int i_local_max, j_local_max;
+    get_nearest_coordinates_ceil_cu(gg.x_zero,  //
+                                    gg.y_zero,  //
+                                    gg.delta,
+                                    gg.delta,
+                                    x_d_max,
+                                    y_d_max,
+                                    i_local_max,
+                                    j_local_max);
+
+    lg.x_grid_min = gg.x_zero + i_local_min * gg.delta;
+    lg.y_grid_min = gg.y_zero + j_local_min * gg.delta;
+
+    lg.x_grid_max = gg.x_zero + i_local_max * gg.delta;
+    lg.y_grid_max = gg.y_zero + j_local_max * gg.delta;
+
+    lg.x_size = i_local_max - i_local_min + 1;
+    lg.y_size = j_local_max - j_local_min + 1;
+
+    __shared__ double local_grid_shared[1024];
+
+    // perform_quadrature_global_stripe(Qs, gg, qr, qr_nodes_nr_, ds_vector[stripe_nr]);
 }
 
 /**

@@ -52,7 +52,7 @@ test_grid_new_cuda.o: temp.o
 	nvcc --gpu-architecture=${GPU_ARCH} -dlink -o test_grid_new_cuda.o temp.o $(CUDA_DEBUG)
 
 temp.o: test_grid_new_cuda.cu test_grid_new.h
-	nvcc ${OPT_FLAGS} ${VERBOSE_FLAG} --gpu-architecture=${GPU_ARCH} -rdc=true -c test_grid_new_cuda.cu -o temp.o $(CUDA_DEBUG)
+	nvcc ${CU_OPT_FLAGS} ${VERBOSE_FLAG} --gpu-architecture=${GPU_ARCH} -rdc=true -c test_grid_new_cuda.cu -o temp.o $(CUDA_DEBUG)
 
 clean:
 	rm -f test_grid_new *.o ${CU_LIB}
