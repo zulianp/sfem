@@ -857,6 +857,8 @@ namespace sfem {
     }
 
     int Function::report_solution(const isolver_scalar_t *const x) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.report_solution);
+        
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
         return impl_->output->write("out", x);
     }
