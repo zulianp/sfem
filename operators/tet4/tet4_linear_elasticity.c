@@ -928,6 +928,114 @@ static SFEM_INLINE void tet4_linear_elasticity_apply_kernel(
 
 #endif
 
+static SFEM_INLINE void diag_micro_kernel(const real_t mu,
+                                          const real_t lambda,
+                                          const real_t px0,
+                                          const real_t px1,
+                                          const real_t px2,
+                                          const real_t px3,
+                                          const real_t py0,
+                                          const real_t py1,
+                                          const real_t py2,
+                                          const real_t py3,
+                                          const real_t pz0,
+                                          const real_t pz1,
+                                          const real_t pz2,
+                                          const real_t pz3,
+                                          real_t *const SFEM_RESTRICT diag) {
+    real_t adjugate[9];
+    real_t jacobian_determinant = 0;
+    {
+        real_t jacobian[9];
+
+        jacobian[0] = -px0 + px1;
+        jacobian[1] = -px0 + px2;
+        jacobian[2] = -px0 + px3;
+        jacobian[3] = -py0 + py1;
+        jacobian[4] = -py0 + py2;
+        jacobian[5] = -py0 + py3;
+        jacobian[6] = -pz0 + pz1;
+        jacobian[7] = -pz0 + pz2;
+        jacobian[8] = -pz0 + pz3;
+
+        const real_t x0 = jacobian[4] * jacobian[8];
+        const real_t x1 = jacobian[5] * jacobian[7];
+        const real_t x2 = jacobian[1] * jacobian[8];
+        const real_t x3 = jacobian[1] * jacobian[5];
+        const real_t x4 = jacobian[2] * jacobian[4];
+        adjugate[0] = x0 - x1;
+        adjugate[1] = jacobian[2] * jacobian[7] - x2;
+        adjugate[2] = x3 - x4;
+        adjugate[3] = -jacobian[3] * jacobian[8] + jacobian[5] * jacobian[6];
+        adjugate[4] = jacobian[0] * jacobian[8] - jacobian[2] * jacobian[6];
+        adjugate[5] = -jacobian[0] * jacobian[5] + jacobian[2] * jacobian[3];
+        adjugate[6] = jacobian[3] * jacobian[7] - jacobian[4] * jacobian[6];
+        adjugate[7] = -jacobian[0] * jacobian[7] + jacobian[1] * jacobian[6];
+        adjugate[8] = jacobian[0] * jacobian[4] - jacobian[1] * jacobian[3];
+        jacobian_determinant = jacobian[0] * x0 - jacobian[0] * x1 +
+                               jacobian[2] * jacobian[3] * jacobian[7] - jacobian[3] * x2 +
+                               jacobian[6] * x3 - jacobian[6] * x4;
+        assert(jacobian_determinant > 0);
+    }
+
+    const real_t x0 = lambda + 2 * mu;
+    const real_t x1 = adjugate[0] + adjugate[3] + adjugate[6];
+    const real_t x2 = x0 * x1;
+    const real_t x3 = adjugate[2] + adjugate[5] + adjugate[8];
+    const real_t x4 = mu * x3;
+    const real_t x5 = adjugate[2] * x4 + adjugate[5] * x4 + adjugate[8] * x4;
+    const real_t x6 = adjugate[1] + adjugate[4] + adjugate[7];
+    const real_t x7 = mu * x6;
+    const real_t x8 = adjugate[1] * x7 + adjugate[4] * x7 + adjugate[7] * x7;
+    const real_t x9 = (1.0 / 6.0) / jacobian_determinant;
+    const real_t x10 = POW2(adjugate[1]);
+    const real_t x11 = mu * x10;
+    const real_t x12 = POW2(adjugate[2]);
+    const real_t x13 = mu * x12;
+    const real_t x14 = POW2(adjugate[0]);
+    const real_t x15 = POW2(adjugate[4]);
+    const real_t x16 = mu * x15;
+    const real_t x17 = POW2(adjugate[5]);
+    const real_t x18 = mu * x17;
+    const real_t x19 = POW2(adjugate[3]);
+    const real_t x20 = POW2(adjugate[7]);
+    const real_t x21 = mu * x20;
+    const real_t x22 = POW2(adjugate[8]);
+    const real_t x23 = mu * x22;
+    const real_t x24 = POW2(adjugate[6]);
+    const real_t x25 = x0 * x6;
+    const real_t x26 = mu * x1;
+    const real_t x27 = adjugate[0] * x26 + adjugate[3] * x26 + adjugate[6] * x26;
+    const real_t x28 = mu * x14;
+    const real_t x29 = mu * x19;
+    const real_t x30 = mu * x24;
+    const real_t x31 = x0 * x3;
+    diag[0 * stride] = x9 * (adjugate[0] * x2 + adjugate[3] * x2 + adjugate[6] * x2 + x5 + x8);
+    diag[1 * stride] = x9 * (x0 * x14 + x11 + x13);
+    diag[2 * stride] = x9 * (x0 * x19 + x16 + x18);
+    diag[3 * stride] = x9 * (x0 * x24 + x21 + x23);
+    diag[4 * stride] = x9 * (adjugate[1] * x25 + adjugate[4] * x25 + adjugate[7] * x25 + x27 + x5);
+    diag[5 * stride] = x9 * (x0 * x10 + x13 + x28);
+    diag[6 * stride] = x9 * (x0 * x15 + x18 + x29);
+    diag[7 * stride] = x9 * (x0 * x20 + x23 + x30);
+    diag[8 * stride] = x9 * (adjugate[2] * x31 + adjugate[5] * x31 + adjugate[8] * x31 + x27 + x8);
+    diag[9 * stride] = x9 * (x0 * x12 + x11 + x28);
+    diag[10 * stride] = x9 * (x0 * x17 + x16 + x29);
+    diag[11 * stride] = x9 * (x0 * x22 + x21 + x30);
+
+#ifndef NDEBUG
+    {
+        real_t element_matrix[12 * 12];
+        tet4_linear_elasticity_assemble_hessian_kernel(
+            mu, lambda, px0, px1, px2, px3, py0, py1, py2, py3, pz0, pz1, pz2, pz3, element_matrix);
+
+        for(int i = 0; i < 12; i++) {
+            assert(fabs(diag[i] - element_matrix[i*12+i]) < 1e-8); 
+        }
+    }
+#endif
+}
+
 static SFEM_INLINE void tet4_linear_elasticity_apply_kernel_opt(const real_t mu,
                                                                 const real_t lambda,
                                                                 const real_t px0,
@@ -1007,26 +1115,26 @@ static SFEM_INLINE void tet4_linear_elasticity_apply_kernel_opt(const real_t mu,
     // }
 
     {
-       const real_t x0 = 1.0/jacobian_determinant;
-       const real_t x1 = u[0] - u[1];
-       const real_t x2 = u[0] - u[2];
-       const real_t x3 = u[0] - u[3];
-       const real_t x4 = u[4] - u[5];
-       const real_t x5 = u[4] - u[6];
-       const real_t x6 = u[4] - u[7];
-       const real_t x7 = -u[8];
-       const real_t x8 = u[10] + x7;
-       const real_t x9 = u[11] + x7;
-       const real_t x10 = u[8] - u[9];
-       disp_grad[0] = x0*(-adjugate[0]*x1 - adjugate[3]*x2 - adjugate[6]*x3);
-       disp_grad[1] = x0*(-adjugate[1]*x1 - adjugate[4]*x2 - adjugate[7]*x3);
-       disp_grad[2] = x0*(-adjugate[2]*x1 - adjugate[5]*x2 - adjugate[8]*x3);
-       disp_grad[3] = x0*(-adjugate[0]*x4 - adjugate[3]*x5 - adjugate[6]*x6);
-       disp_grad[4] = x0*(-adjugate[1]*x4 - adjugate[4]*x5 - adjugate[7]*x6);
-       disp_grad[5] = x0*(-adjugate[2]*x4 - adjugate[5]*x5 - adjugate[8]*x6);
-       disp_grad[6] = x0*(-adjugate[0]*x10 + adjugate[3]*x8 + adjugate[6]*x9);
-       disp_grad[7] = x0*(-adjugate[1]*x10 + adjugate[4]*x8 + adjugate[7]*x9);
-       disp_grad[8] = x0*(-adjugate[2]*x10 + adjugate[5]*x8 + adjugate[8]*x9);
+        const real_t x0 = 1.0 / jacobian_determinant;
+        const real_t x1 = u[0] - u[1];
+        const real_t x2 = u[0] - u[2];
+        const real_t x3 = u[0] - u[3];
+        const real_t x4 = u[4] - u[5];
+        const real_t x5 = u[4] - u[6];
+        const real_t x6 = u[4] - u[7];
+        const real_t x7 = -u[8];
+        const real_t x8 = u[10] + x7;
+        const real_t x9 = u[11] + x7;
+        const real_t x10 = u[8] - u[9];
+        disp_grad[0] = x0 * (-adjugate[0] * x1 - adjugate[3] * x2 - adjugate[6] * x3);
+        disp_grad[1] = x0 * (-adjugate[1] * x1 - adjugate[4] * x2 - adjugate[7] * x3);
+        disp_grad[2] = x0 * (-adjugate[2] * x1 - adjugate[5] * x2 - adjugate[8] * x3);
+        disp_grad[3] = x0 * (-adjugate[0] * x4 - adjugate[3] * x5 - adjugate[6] * x6);
+        disp_grad[4] = x0 * (-adjugate[1] * x4 - adjugate[4] * x5 - adjugate[7] * x6);
+        disp_grad[5] = x0 * (-adjugate[2] * x4 - adjugate[5] * x5 - adjugate[8] * x6);
+        disp_grad[6] = x0 * (-adjugate[0] * x10 + adjugate[3] * x8 + adjugate[6] * x9);
+        disp_grad[7] = x0 * (-adjugate[1] * x10 + adjugate[4] * x8 + adjugate[7] * x9);
+        disp_grad[8] = x0 * (-adjugate[2] * x10 + adjugate[5] * x8 + adjugate[8] * x9);
     }
 
     // We can reuse the buffer to avoid additional register usage
@@ -1079,7 +1187,6 @@ void tet4_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
                                                const real_t *const SFEM_RESTRICT displacement,
                                                real_t *const SFEM_RESTRICT value) {
     SFEM_UNUSED(nnodes);
-
 
     static const int block_size = 3;
 
@@ -1547,6 +1654,73 @@ void tet4_linear_elasticity_apply_soa(const ptrdiff_t nelements,
         for (int bi = 0; bi < block_size; ++bi) {
             for (int edof_i = 0; edof_i < 4; edof_i++) {
                 values[bi][ev[edof_i]] += element_vector[bi * 4 + edof_i];
+            }
+        }
+    }
+}
+
+void tet4_linear_elasticity_assemble_diag_aos(const ptrdiff_t nelements,
+                                 const ptrdiff_t nnodes,
+                                 idx_t **const SFEM_RESTRICT elems,
+                                 geom_t **const SFEM_RESTRICT xyz,
+                                 const real_t mu,
+                                 const real_t lambda,
+                                 real_t *const SFEM_RESTRICT values) {
+    SFEM_UNUSED(nnodes);
+
+    static const int block_size = 3;
+
+#pragma omp parallel
+    {
+#pragma omp for  // nowait
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[4];
+            real_t element_vector[(4 * 3)];
+
+#pragma unroll(4)
+            for (int v = 0; v < 4; ++v) {
+                ev[v] = elems[v][i];
+            }
+
+            // Element indices
+            const idx_t i0 = ev[0];
+            const idx_t i1 = ev[1];
+            const idx_t i2 = ev[2];
+            const idx_t i3 = ev[3];
+
+            for (int enode = 0; enode < 4; ++enode) {
+                idx_t dof = ev[enode] * block_size;
+            }
+
+            diag_micro_kernel(
+                // Model parameters
+                mu,
+                lambda,
+                // X-coordinates
+                xyz[0][i0],
+                xyz[0][i1],
+                xyz[0][i2],
+                xyz[0][i3],
+                // Y-coordinates
+                xyz[1][i0],
+                xyz[1][i1],
+                xyz[1][i2],
+                xyz[1][i3],
+                // Z-coordinates
+                xyz[2][i0],
+                xyz[2][i1],
+                xyz[2][i2],
+                xyz[2][i3],
+                // output vector
+                element_vector);
+
+            for (int edof_i = 0; edof_i < 4; ++edof_i) {
+                const idx_t dof_i = elems[edof_i][i];
+
+                for (int b = 0; b < block_size; b++) {
+#pragma omp atomic update
+                    values[dof_i * block_size + b] += element_vector[b * 4 + edof_i];
+                }
             }
         }
     }

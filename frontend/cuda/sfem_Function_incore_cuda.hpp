@@ -19,8 +19,6 @@ namespace sfem {
         return ret;
     }
 
-    std::string d_op_str(const std::string &name);
-
     template <typename T>
     std::shared_ptr<Buffer<T>> to_device(const std::shared_ptr<Buffer<T>> &in) {
     	if(in->mem_space() == MEMORY_SPACE_DEVICE) {

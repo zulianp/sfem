@@ -37,11 +37,14 @@ namespace sfem {
 
         ptrdiff_t n_dofs{-1};
 
+        inline std::ptrdiff_t rows() const override { return n_dofs; }
+        inline std::ptrdiff_t cols() const override { return n_dofs; }
+
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
             this->apply_op = [=](const T* const x, T* const y) { op->apply(x, y); };
         }
 
-        void set_preconditioner(const std::shared_ptr<Operator<T>>& op) override {
+        void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) override {
             this->right_preconditioner_op = [=](const T* const x, T* const y) { op->apply(x, y); };
         }
 

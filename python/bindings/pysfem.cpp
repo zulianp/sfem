@@ -118,12 +118,32 @@ NB_MODULE(pysfem, m) {
              nb::ndarray<isolver_scalar_t> x,
              nb::ndarray<isolver_scalar_t> d) { op->hessian_diag(x.data(), d.data()); });
 
+    m.def("hessian_diag",
+          [](std::shared_ptr<Function> &fun,
+             nb::ndarray<isolver_scalar_t> x,
+             nb::ndarray<isolver_scalar_t> d) { fun->hessian_diag(x.data(), d.data()); });
+
     nb::class_<Function>(m, "Function")
         .def(nb::init<std::shared_ptr<FunctionSpace>>())
         .def("add_operator", &Function::add_operator)
         .def("add_dirichlet_conditions", &Function::add_dirichlet_conditions)
         .def("set_output_dir", &Function::set_output_dir)
         .def("output", &Function::output);
+
+    m.def("diag", [](nb::ndarray<isolver_scalar_t> d) -> std::shared_ptr<Operator_t> {
+        auto op = std::make_shared<LambdaOperator<isolver_scalar_t>>(
+            d.size(), d.size(), [=](const isolver_scalar_t *const x, isolver_scalar_t *const y) {
+                ptrdiff_t n = d.size();
+                const isolver_scalar_t *d_ = d.data();
+
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; i++) {
+                    y[i] = d_[i] * x[i];
+                }
+            });
+
+        return op;
+    });
 
     m.def("apply",
           [](std::shared_ptr<Function> &fun,
@@ -200,16 +220,20 @@ NB_MODULE(pysfem, m) {
     m.def("make_op",
           [](std::shared_ptr<Function> &fun,
              nb::ndarray<isolver_scalar_t> u) -> std::shared_ptr<Operator_t> {
-              return sfem::make_op<isolver_scalar_t>([=](const isolver_scalar_t *const x, isolver_scalar_t *const y) {
-                  memset(y, 0, u.size() * sizeof(isolver_scalar_t));
-                  fun->apply(u.data(), x, y);
-              });
+              return sfem::make_op<isolver_scalar_t>(
+                  u.size(),
+                  u.size(),
+                  [=](const isolver_scalar_t *const x, isolver_scalar_t *const y) {
+                      memset(y, 0, u.size() * sizeof(isolver_scalar_t));
+                      fun->apply(u.data(), x, y);
+                  });
           });
 
     nb::class_<ConjugateGradient_t>(m, "ConjugateGradient")
         .def(nb::init<>())
         .def("default_init", &ConjugateGradient_t::default_init)
         .def("set_op", &ConjugateGradient_t::set_op)
+        .def("set_preconditioner_op", &ConjugateGradient_t::set_preconditioner_op)
         .def("set_max_it", &ConjugateGradient_t::set_max_it);
 
     m.def("apply",

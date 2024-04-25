@@ -389,10 +389,7 @@ namespace sfem {
         boundary_condition_t *dirichlet_conditions{nullptr};
     };
 
-    std::shared_ptr<FunctionSpace> DirichletConditions::space()
-    {
-        return impl_->space;
-    }
+    std::shared_ptr<FunctionSpace> DirichletConditions::space() { return impl_->space; }
 
     int DirichletConditions::n_conditions() const { return impl_->n_dirichlet_conditions; }
     void *DirichletConditions::impl_conditions() { return (void *)impl_->dirichlet_conditions; }
@@ -555,6 +552,7 @@ namespace sfem {
         double create_crs_graph{0};
         double destroy_crs_graph{0};
         double hessian_crs{0};
+        double hessian_diag{0};
         double gradient{0};
         double apply{0};
         double value{0};
@@ -569,6 +567,7 @@ namespace sfem {
             create_crs_graph = 0;
             destroy_crs_graph = 0;
             hessian_crs = 0;
+            hessian_diag = 0;
             gradient = 0;
             apply = 0;
             value = 0;
@@ -585,6 +584,7 @@ namespace sfem {
             os << "create_crs_graph," << create_crs_graph << "\n";
             os << "destroy_crs_graph," << destroy_crs_graph << "\n";
             os << "hessian_crs," << hessian_crs << "\n";
+            os << "hessian_diag," << hessian_diag << "\n";
             os << "gradient," << gradient << "\n";
             os << "apply," << apply << "\n";
             os << "value," << value << "\n";
@@ -755,6 +755,24 @@ namespace sfem {
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
+    int Function::hessian_diag(const isolver_scalar_t *const x, isolver_scalar_t *const values) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.hessian_diag);
+
+        for (auto &op : impl_->ops) {
+            if (op->hessian_diag(x, values)) {
+                return ISOLVER_FUNCTION_FAILURE;
+            }
+        }
+
+        if (impl_->handle_constraints) {
+            for (auto &c : impl_->constraints) {
+                c->apply_value(1, values);
+            }
+        }
+
+        return ISOLVER_FUNCTION_SUCCESS;
+    }
+
     int Function::gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) {
         SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.gradient);
 
@@ -900,6 +918,20 @@ namespace sfem {
                                                    space->mesh().node_to_node_colidx(),
                                                    values);
 
+            return ISOLVER_FUNCTION_SUCCESS;
+        }
+
+        int hessian_diag(const isolver_scalar_t *const, isolver_scalar_t *const out) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            linear_elasticity_assemble_diag_aos((enum ElemType)mesh->element_type,
+                                            mesh->nelements,
+                                            mesh->nnodes,
+                                            mesh->elements,
+                                            mesh->points,
+                                            this->mu,
+                                            this->lambda,
+                                            out);
             return ISOLVER_FUNCTION_SUCCESS;
         }
 
@@ -1458,6 +1490,12 @@ namespace sfem {
         instance().private_register_op(name, factory_function);
     }
 
+    std::shared_ptr<Op> Factory::create_op_gpu(const std::shared_ptr<FunctionSpace> &space,
+                                         const char *name)
+    {
+        return Factory::create_op(space, d_op_str(name).c_str());
+    }
+
     std::shared_ptr<Op> Factory::create_op(const std::shared_ptr<FunctionSpace> &space,
                                            const char *name) {
         assert(instance().impl_);
@@ -1472,4 +1510,11 @@ namespace sfem {
 
         return it->second(space);
     }
+
+    std::string d_op_str(const std::string &name)
+    {
+        return "gpu:" + name;
+    }
+
+    
 }  // namespace sfem

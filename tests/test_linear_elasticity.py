@@ -49,6 +49,12 @@ def solve_linear_elasticity(options):
 
 	lop = sfem.make_op(fun, x)
 	cg.set_op(lop)
+
+	d = np.zeros(fs.n_dofs())
+	sfem.hessian_diag(fun, x, d)
+
+	prec = sfem.diag(1./d)
+	cg.set_preconditioner_op(prec)
 	
 	g = np.zeros(fs.n_dofs())
 	sfem.apply_constraints(fun, x)

@@ -322,6 +322,8 @@ namespace sfem {
                         const isolver_idx_t *const colidx,
                         isolver_scalar_t *const values);
 
+        int hessian_diag(const isolver_scalar_t *const x, isolver_scalar_t *const values);
+
         int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out);
         int apply(const isolver_scalar_t *const x,
                   const isolver_scalar_t *const h,
@@ -354,6 +356,9 @@ namespace sfem {
         static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,
                                              const char *name);
 
+        static std::shared_ptr<Op> create_op_gpu(const std::shared_ptr<FunctionSpace> &space,
+                                             const char *name);
+
     private:
         static Factory &instance();
 
@@ -365,6 +370,8 @@ namespace sfem {
 
         void private_register_op(const std::string &name, FactoryFunction factory_function);
     };
+
+    std::string d_op_str(const std::string &name);
 }  // namespace sfem
 
 #endif  // SFEM_FUNCTION_HPP

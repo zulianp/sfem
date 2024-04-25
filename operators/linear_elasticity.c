@@ -205,6 +205,33 @@ void linear_elasticity_assemble_hessian_aos(const enum ElemType element_type,
     }
 }
 
+void linear_elasticity_assemble_diag_aos(const enum ElemType element_type,
+                                             const ptrdiff_t nelements,
+                                             const ptrdiff_t nnodes,
+                                             idx_t **const SFEM_RESTRICT elems,
+                                             geom_t **const SFEM_RESTRICT xyz,
+                                             const real_t mu,
+                                             const real_t lambda,
+                                             real_t *const SFEM_RESTRICT values)
+{
+    switch (element_type) {
+        // case TRI3: {
+        //     tri3_linear_elasticity_assemble_diag(
+        //         nelements, nnodes, elems, xyz, mu, lambda, values);
+        //     break;
+        // }
+        case TET4: {
+            tet4_linear_elasticity_assemble_diag_aos(
+                nelements, nnodes, elems, xyz, mu, lambda, values);
+            break;
+        }
+        default: {
+            assert(0);
+            MPI_Abort(MPI_COMM_WORLD, -1);
+        }
+    }
+}
+
 void linear_elasticity_apply_aos(const enum ElemType element_type,
                                  const ptrdiff_t nelements,
                                  const ptrdiff_t nnodes,

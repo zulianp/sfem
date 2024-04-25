@@ -45,9 +45,11 @@ int main(int argc, char *argv[]) {
 
     const char *SFEM_OPERATOR = "Laplacian";
     int SFEM_BLOCK_SIZE = 1;
+    int SFEM_USE_PRECONDITIONER = 0;
 
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
+    SFEM_READ_ENV(SFEM_USE_PRECONDITIONER, atoi);
 
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
     auto conds = sfem::DirichletConditions::create_from_env(fs);
@@ -63,7 +65,7 @@ int main(int argc, char *argv[]) {
 
         // Register CUDA kernels
         sfem::register_device_ops();
-        auto le = sfem::Factory::create_op(fs, sfem::d_op_str(SFEM_OPERATOR).c_str());
+        auto le = sfem::Factory::create_op_gpu(fs, SFEM_OPERATOR);
 
         le->initialize();
 
@@ -76,6 +78,18 @@ int main(int argc, char *argv[]) {
         // Create device buffers
         b_x = sfem::d_buffer<real_t>(fs->n_dofs());
         b_b = sfem::d_buffer<real_t>(fs->n_dofs());
+
+        if (SFEM_USE_PRECONDITIONER) {
+            auto b_d = sfem::d_buffer<real_t>(fs->n_dofs());
+            if (f->hessian_diag(b_x->data(), b_d->data()) == 0) {
+                solver->set_preconditioner_op(sfem::make_op<real_t>(
+                    b_x->size(), b_x->size(), [=](const real_t *const x, real_t *const y) {
+                        d_ediv(b_d->size(), x, b_d->data(), y);
+                    }));
+            } else {
+                fprintf(stderr, "[Warning] Preconditioner unavailable for mesh %s\n", folder);
+            }
+        }
     } else {
         solver = sfem::h_cg<real_t>();
 
@@ -87,13 +101,33 @@ int main(int argc, char *argv[]) {
 
         b_x = sfem::h_buffer<real_t>(fs->n_dofs());
         b_b = sfem::h_buffer<real_t>(fs->n_dofs());
+
+        if (SFEM_USE_PRECONDITIONER) {
+            auto b_d = sfem::h_buffer<real_t>(fs->n_dofs());
+
+            if (f->hessian_diag(b_x->data(), b_d->data()) == 0) {
+                solver->set_preconditioner_op(sfem::make_op<real_t>(
+                    b_x->size(), b_x->size(), [=](const real_t *const x, real_t *const y) {
+                        auto d = b_d->data();
+
+#pragma omp parallel for
+                        for (ptrdiff_t i = 0; i < b_d->size(); ++i) {
+                            y[i] = x[i] / d[i];
+                        }
+                    }));
+            } else {
+                fprintf(stderr, "[Warning] Preconditioner unavailable for mesh %s\n", folder);
+            }
+        }
     }
 
     // -------------------------------
     // Solver set-up
     // -------------------------------
     solver->set_op(sfem::make_op<real_t>(
-        [=](const real_t *const x, real_t *const y) { f->apply(nullptr, x, y); }));
+        fs->n_dofs(), fs->n_dofs(), [=](const real_t *const x, real_t *const y) {
+            f->apply(nullptr, x, y);
+        }));
 
     // -------------------------------
     // Solve

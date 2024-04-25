@@ -227,6 +227,14 @@ namespace sfem {
             return ISOLVER_FUNCTION_FAILURE;
         }
 
+        int hessian_diag(
+            const isolver_scalar_t *const /*x*/, 
+            isolver_scalar_t *const values) override
+        {
+            cuda_incore_linear_elasticity_diag(&ctx, values);
+            return ISOLVER_FUNCTION_SUCCESS;
+        }
+
         int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) override {
             cuda_incore_linear_elasticity_apply(&ctx, x, out);
             return ISOLVER_FUNCTION_SUCCESS;
@@ -252,8 +260,4 @@ namespace sfem {
         Factory::register_op("gpu:Laplacian", &GPULaplacian::create);
     }
 
-    std::string d_op_str(const std::string &name)
-    {
-        return "gpu:" + name;
-    }
 }  // namespace sfem
