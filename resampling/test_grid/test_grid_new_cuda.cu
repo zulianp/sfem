@@ -57,6 +57,25 @@ int getSPcores(cudaDeviceProp devProp) {
 
 #include "test_grid_new.h"
 
+struct local_grid_cuda_type {
+    double delta; /**< The grid spacing. */
+
+    double x_d_min; /**< The x-coordinate of the domain grid origin. */
+    double y_d_min; /**< The y-coordinate of the domain grid origin. */
+
+    double x_d_max; /**< The maximum x-coordinate domain of the grid. */
+    double y_d_max; /**< The maximum y-coordinate domain of the grid. */
+
+    double x_grid_min; /**< The min x-coordinate in the local grid. */
+    double y_grid_min; /**< The min y-coordinate in the local grid. */
+
+    double x_grid_max; /**< The maximum x-coordinate in the local grid. */
+    double y_grid_max; /**< The maximum y-coordinate in the local grid. */
+
+    size_t x_size; /**< The number of grid points in the x-direction. */
+    size_t y_size; /**< The number of grid points in the y-direction. */
+};
+
 /**
  * @brief Calculates the nearest grid coordinates (floor values) for a given point.
  *
@@ -75,14 +94,14 @@ int getSPcores(cudaDeviceProp devProp) {
  * @param j Reference to the variable where the calculated y-coordinate of the nearest grid point
  * will be stored.
  */
-__device__ void get_nearest_coordinates_floor_cu(const double x_zero,
-                                                 const double y_zero,
-                                                 const double delta_x,
-                                                 const double delta_y,
-                                                 const double x,
-                                                 const double y,
-                                                 int& i,
-                                                 int& j) {
+__device__ __forceinline__ void get_nearest_coordinates_floor_cu(const double x_zero,
+                                                                 const double y_zero,
+                                                                 const double delta_x,
+                                                                 const double delta_y,
+                                                                 const double x,
+                                                                 const double y,
+                                                                 int& i,
+                                                                 int& j) {
     //
     i = int(floor((x - x_zero) / delta_x));
     j = int(floor((y - y_zero) / delta_y));
@@ -157,12 +176,12 @@ __device__ void get_domain_from_stripe_cu(const domains_stripe& ds,
  * @param ds The domains_stripe struct containing information about the stripe.
  * @return void
  */
-__device__ void perform_quadrature_global_stripe(double* Qs,                  //
-                                                 const global_grid_type& gg,  //
-                                                 const quadrature_rule& qr,   //
-                                                 const size_t qr_nodes_nr_,   //
-                                                 const domains_stripe& ds) {  //
-                                                                              //
+__device__ __forceinline__ void perform_quadrature_global_stripe(double* Qs,                  //
+                                                                 const global_grid_type& gg,  //
+                                                                 const quadrature_rule& qr,   //
+                                                                 const size_t qr_nodes_nr_,   //
+                                                                 const domains_stripe& ds) {  //
+                                                                                              //
     const size_t id = blockIdx.x * blockDim.x + threadIdx.x;
     const size_t domain_nr = threadIdx.x;
     // printf("domain_nr: %lu, id %lu \n", domain_nr, id);
@@ -197,23 +216,13 @@ __device__ void perform_quadrature_global_stripe(double* Qs,                  //
 
     for (size_t q_i = 0; q_i < qr_size; ++q_i) {
         //
-        // 2 * 3 * qr_size * ds.nr_domains
+        // 2 * 3 * qnr * dnr
         const double x_Q = (qr.x_nodes_ptr_cu[q_i]) * (x_d_max - x_d_min) + x_d_min;
         const double y_Q = (qr.y_nodes_ptr_cu[q_i]) * (y_d_max - y_d_min) + y_d_min;
 
-        // const double x_Q = q_i * (x_d_max - x_d_min) + x_d_min;
-        //         const double y_Q = q_i * (y_d_max - y_d_min) + y_d_min;
-        //     Qs_i = x_Q + y_Q;
-
-        //     continue;
-
-        // std::cout << "x_Q: " << x_Q << " y_Q: " << y_Q << std::endl;
-
         int i_local, j_local;
 
-        // Qs_i += 2.0 * qr.weights_ptr_cu[q_i] * volume;
-        // continue;
-
+        // dnr * qnr * 8
         get_nearest_coordinates_floor_cu(gg.x_zero,  //
                                          gg.y_zero,  //
                                          gg.delta,
@@ -223,52 +232,33 @@ __device__ void perform_quadrature_global_stripe(double* Qs,                  //
                                          i_local,
                                          j_local);
 
-        /////// data trasfer 4 * 8 * qr_size * dsnr_domains
+        /////// data trasfer 4 * 8 * qnr * dnr
         const double f1 = gg.grid_ptr_cu[i_local * gg.x_size + j_local];
         const double f2 = gg.grid_ptr_cu[i_local * gg.y_size + j_local + 1];
         const double f3 = gg.grid_ptr_cu[(i_local + 1) * gg.y_size + j_local];
         const double f4 = gg.grid_ptr_cu[(i_local + 1) * gg.y_size + j_local + 1];
 
-        // const double f1 = 0.0 , f2 = 0.0, f3 = 0.0, f4 = 0.0;
-
-        // std::cout << "i_local: " << i_local << " j_local: " << j_local << std::endl;
-        // std::cout << "f1: " << f1 << " f2: " << f2 << " f3: " << f3 << " f4: " << f4
-        //           << std::endl;
-
-        // std::cout << std::endl;
-
-        // check if qs is correct
-        // if (x_Q < x_d_min || x_Q > x_d_max || y_Q < y_d_min || y_Q > y_d_max) {
-        //     std::cout << "x_Q: " << x_Q << " y_Q: " << y_Q << std::endl;
-        //     std::cout << "x_d_min: " << x_d_min << " x_d_max: " << x_d_max << std::endl;
-        //     std::cout << "y_d_min: " << y_d_min << " y_d_max: " << y_d_max << std::endl;
-        //     return false;
-        // }
-
-        const double x1 = gg.x_zero + i_local * gg.delta;        // 2 * qr_size * ds_nr_domains
-        const double x2 = gg.x_zero + (i_local + 1) * gg.delta;  // 3 * qr_size * ds_nr_domains
-        const double y1 = gg.y_zero + j_local * gg.delta;        // 1 * qr_size * ds_nr_domains
-        const double y2 = gg.y_zero + (j_local + 1) * gg.delta;  // 3 * qr_size * ds_nr_domains
+        const double x1 = gg.x_zero + i_local * gg.delta;        // 2 * qnr * dnr
+        const double x2 = gg.x_zero + (i_local + 1) * gg.delta;  // 3 * qnr * dnr
+        const double y1 = gg.y_zero + j_local * gg.delta;        // 1 * qnr * dnr
+        const double y2 = gg.y_zero + (j_local + 1) * gg.delta;  // 3 * qnr * dnr
 
         // std::cout << "x1: " << x1 << " x2: " << x2 << " y1: " << y1 << " y2: " << y2
         //           << std::endl;
 
-        // 5 * 4 * qr_size * ds.nr_domains
+        // 5 * 4 * qnr * dnr
         const double w11 = (x2 - x_Q) * (y2 - y_Q) / (gg.delta * gg.delta);
         const double w12 = (x2 - x_Q) * (y_Q - y1) / (gg.delta * gg.delta);
         const double w21 = (x_Q - x1) * (y2 - y_Q) / (gg.delta * gg.delta);
         const double w22 = (x_Q - x1) * (y_Q - y1) / (gg.delta * gg.delta);
 
-        // std::cout << "w11: " << w11 << " w12: " << w12 << " w21: " << w21 << " w22: " << w22
-        //           << std::endl;
-
-        // 7 * qr_size * ds.nr_domains
+        // 7 * qnr * dnr
         const double f_Q = w11 * f1 + w12 * f2 + w21 * f3 + w22 * f4;
 
         // Qs_i += f_Q * volume;
 
-        // 3 * qr_size * ds.nr_domains
-        // data transfer 8 * qr_size * ds.nr_domains
+        // 3 * qnr * dnr
+        // data transfer 8 * qne * dnr
         Qs_i += f_Q * qr.weights_ptr_cu[q_i] * volume;
 
         // std::cout << "---gg" << std::endl;
@@ -276,6 +266,115 @@ __device__ void perform_quadrature_global_stripe(double* Qs,                  //
 
     // Qs[i] = Qs_i;
     // }
+
+    Qs[id] = Qs_i;
+
+    return;
+}
+
+/**
+ * @brief Performs the quadrature for a single stripe.
+ *
+ * @param Qs
+ * @param gg
+ * @param qr
+ * @param qr_nodes_nr_
+ * @param ds
+ * @return __device__
+ */
+__device__ __forceinline__                                              //
+        void                                                            //
+        perform_quadrature_local_stripe(double* Qs,                     //
+                                        double* local_grid_shared,      //
+                                        const local_grid_cuda_type lg,  //
+                                        // const global_grid_type& gg,     //
+                                        const quadrature_rule& qr,   //
+                                        const size_t qr_nodes_nr_,   //
+                                        const domains_stripe& ds) {  //
+                                                                     //
+    const size_t id = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t domain_nr = threadIdx.x;
+
+    // for (size_t i = 0; i < ds.nr_domains; ++i) {
+    double x_d_min, y_d_min, x_d_max, y_d_max;
+    get_domain_from_stripe_cu(ds, domain_nr, x_d_min, y_d_min, x_d_max, y_d_max);
+
+    printf("Domain %d: x_min: %f, x_max: %f, y_min: %f, y_max: %f  -- GPU\n", domain_nr, x_d_min, x_d_max, y_d_min, y_d_max);
+           
+
+    const double volume = (x_d_max - x_d_min) * (y_d_max - y_d_min);  // 3 * ds_nr_domains
+
+    double Qs_i = 0.0;
+
+    const size_t qr_size = qr_nodes_nr_;
+
+    for (size_t q_i = 0; q_i < qr_size; ++q_i) {
+        //
+        // 2 * 3 * qnr * dnr
+        const double x_Q = (qr.x_nodes_ptr_cu[q_i]) * (x_d_max - x_d_min) + x_d_min;
+        const double y_Q = (qr.y_nodes_ptr_cu[q_i]) * (y_d_max - y_d_min) + y_d_min;
+
+        int i_local, j_local;
+
+        // dnr * qnr * 8
+        get_nearest_coordinates_floor_cu(lg.x_grid_min,  //
+                                         lg.y_grid_min,  //
+                                         lg.delta,
+                                         lg.delta,
+                                         x_Q,
+                                         y_Q,
+                                         i_local,
+                                         j_local);
+
+        /////// data trasfer 4 * 8 * qnr * dnr
+        const double f1 = local_grid_shared[i_local * lg.y_size + j_local];
+        const double f2 = local_grid_shared[i_local * lg.y_size + j_local + 1];
+        const double f3 = local_grid_shared[(i_local + 1) * lg.y_size + j_local];
+        const double f4 = local_grid_shared[(i_local + 1) * lg.y_size + j_local + 1];
+
+        // if (q_i == 1)
+        // printf("f1: %f, f2: %f, f3: %f, f4: %f\n", f1, f2, f3, f4);
+
+        const double x1 = lg.x_grid_min + i_local * lg.delta;        // 2 * qnr * dnr
+        const double x2 = lg.x_grid_min + (i_local + 1) * lg.delta;  // 3 * qnr * dnr
+        const double y1 = lg.y_grid_min + j_local * lg.delta;        // 1 * qnr * dnr
+        const double y2 = lg.y_grid_min + (j_local + 1) * lg.delta;  // 3 * qnr * dnr
+
+        //  if (q_i == 1)
+        // printf("x1: %f, x2: %f, y1: %f, y2: %f\n", x1, x2, y1, y2);
+
+        // 5 * 4 * qnr * dnr
+        const double w11 = (x2 - x_Q) * (y2 - y_Q) / (lg.delta * lg.delta);
+        const double w12 = (x2 - x_Q) * (y_Q - y1) / (lg.delta * lg.delta);
+        const double w21 = (x_Q - x1) * (y2 - y_Q) / (lg.delta * lg.delta);
+        const double w22 = (x_Q - x1) * (y_Q - y1) / (lg.delta * lg.delta);
+
+        // if (q_i == 1)
+        // printf("w11: %f, w12: %f, w21: %f, w22: %f\n", w11, w12, w21, w22);
+
+        // 7 * qnr * dnr
+        const double f_Q = w11 * f1 + w12 * f2 + w21 * f3 + w22 * f4;
+
+        // // Qs_i += f_Q * volume;
+        // if (q_i == 1)
+        // printf("f_Q: %f ", f_Q);
+
+        // if (q_i == 1)
+        // printf("volume: %f\n", volume);
+
+        // 3 * qnr * dnr
+        // data transfer 8 * qne * dnr
+        Qs_i += f_Q * qr.weights_ptr_cu[q_i] * volume;
+        printf("Qs_i: %d, %d, %f\n", domain_nr, q_i, Qs_i);
+
+        // std::cout << "---gg" << std::endl;
+    }
+    printf("\n");
+
+    // Qs[i] = Qs_i;
+    // }
+
+    printf("Qs_i: %f\n", Qs_i);
 
     Qs[id] = Qs_i;
 
@@ -305,27 +404,8 @@ __global__ void perform_quadrature_global_stripe_kernel(double* Qs,             
     perform_quadrature_global_stripe(Qs, gg, qr, qr_nodes_nr_, ds_vector[stripe_nr]);
 }
 
-struct local_grid_cuda_type {
-    double delta; /**< The grid spacing. */
-
-    double x_d_min; /**< The x-coordinate of the domain grid origin. */
-    double y_d_min; /**< The y-coordinate of the domain grid origin. */
-
-    double x_d_max; /**< The maximum x-coordinate domain of the grid. */
-    double y_d_max; /**< The maximum y-coordinate domain of the grid. */
-
-    double x_grid_min; /**< The min x-coordinate in the local grid. */
-    double y_grid_min; /**< The min y-coordinate in the local grid. */
-
-    double x_grid_max; /**< The maximum x-coordinate in the local grid. */
-    double y_grid_max; /**< The maximum y-coordinate in the local grid. */
-
-    size_t x_size; /**< The number of grid points in the x-direction. */
-    size_t y_size; /**< The number of grid points in the y-direction. */
-};
-
 /**
- * @brief
+ * @brief Kernel function to perform the quadrature in the local domain.
  *
  * @param Qs
  * @param gg
@@ -350,58 +430,104 @@ __global__ void perform_quadrature_local_stripe_kernel(double* Qs,              
 
     lg.delta = gg.delta;
     double x_d_min, y_d_min, x_d_max, y_d_max;
-    x_d_min = ds_vector[stripe_nr].x_min;
-    x_d_max = ds_vector[stripe_nr].x_min +
-              ds_vector[stripe_nr].nr_domains * ds_vector[stripe_nr].side_x;
 
+    x_d_min = ds_vector[stripe_nr].x_min;
     y_d_min = ds_vector[stripe_nr].y_min;
-    y_d_max = ds_vector[stripe_nr].y_min + ds_vector[stripe_nr].side_y;
+
+    x_d_max = x_d_min + ds_vector[stripe_nr].nr_domains * ds_vector[stripe_nr].side_x;
+    y_d_max = y_d_min + ds_vector[stripe_nr].side_y;
 
     lg.x_d_min = x_d_min;
     lg.y_d_min = y_d_min;
     lg.x_d_max = x_d_max;
     lg.y_d_max = y_d_max;
 
-    int i_local_min, j_local_min;
+    int i_global_min, j_global_min;
     get_nearest_coordinates_floor_cu(gg.x_zero,  //
                                      gg.y_zero,  //
                                      gg.delta,
                                      gg.delta,
                                      x_d_min,
                                      y_d_min,
-                                     i_local_min,
-                                     j_local_min);
+                                     i_global_min,
+                                     j_global_min);
 
-    int i_local_max, j_local_max;
+    int i_global_max, j_global_max;
     get_nearest_coordinates_ceil_cu(gg.x_zero,  //
                                     gg.y_zero,  //
                                     gg.delta,
                                     gg.delta,
                                     x_d_max,
                                     y_d_max,
-                                    i_local_max,
-                                    j_local_max);
+                                    i_global_max,
+                                    j_global_max);
 
-    lg.x_grid_min = gg.x_zero + i_local_min * gg.delta;
-    lg.y_grid_min = gg.y_zero + j_local_min * gg.delta;
+    lg.x_grid_min = gg.x_zero + i_global_min * gg.delta;
+    lg.y_grid_min = gg.y_zero + j_global_min * gg.delta;
 
-    lg.x_grid_max = gg.x_zero + i_local_max * gg.delta;
-    lg.y_grid_max = gg.y_zero + j_local_max * gg.delta;
+    lg.x_grid_max = gg.x_zero + i_global_max * gg.delta;
+    lg.y_grid_max = gg.y_zero + j_global_max * gg.delta;
 
-    lg.x_size = i_local_max - i_local_min + 1;
-    lg.y_size = j_local_max - j_local_min + 1;
+    lg.x_size = size_t(i_global_max - i_global_min + 1);
+    lg.y_size = size_t(j_global_max - j_global_min + 1);
 
-    __shared__ double local_grid_shared[1024];
+#define LOCAL_GRID_SIZE 4096
 
-    // perform_quadrature_global_stripe(Qs, gg, qr, qr_nodes_nr_, ds_vector[stripe_nr]);
+    __shared__ double local_grid_shared[LOCAL_GRID_SIZE];
+    // __shared__ double local_grid_shared_b[LOCAL_GRID_SIZE];
+
+    int i = 0, j = 0;
+
+    int i_global = i_global_min;
+    int j_global = j_global_min;
+
+    const int local_grid_size = lg.x_size * lg.y_size;
+    // printf("local_grid_size: %d\n", local_grid_size);
+
+    if (local_grid_size > LOCAL_GRID_SIZE) {
+        printf("Error: local_grid_size > LOCAL_GRID_SIZE\n");
+        printf("local_grid_size: %d\n", local_grid_size);
+        printf("LOCAL_GRID_SIZE: %d\n", LOCAL_GRID_SIZE);
+        return;
+    }
+
+    int cnt = 0;
+
+    while (true) {
+        int index_abs_local = cnt * blockDim.x + threadIdx.x;
+
+        i = index_abs_local % lg.x_size;
+        j = index_abs_local / lg.x_size;
+
+        if ((i * j) >= local_grid_size) break;
+
+        i_global = i_global_min + i;
+        j_global = j_global_min + j;
+
+        local_grid_shared[i * lg.y_size + j] = gg.grid_ptr_cu[i_global * gg.y_size + j_global];
+        // local_grid_shared[j * lg.x_size + i] = 0.01;
+
+        cnt += 1;
+    }
+
+    __syncthreads();
+
+    perform_quadrature_local_stripe(Qs,  //
+                                    local_grid_shared,
+                                    lg,
+                                    qr,
+                                    qr_nodes_nr_,
+                                    ds_vector[stripe_nr]);
+
+    // printf("shared: %f\n", local_grid_shared_b[0]);
 }
 
 /**
  * @brief Copies the global grid to the device.
  *
- * @param gg
- * @return true
- * @return false
+ * @param gg The global grid to be copied.
+ * @return true if the global grid was successfully copied to the device.
+ * @return false if an error occurred while copying the global grid to the device.
  */
 bool copy_global_grid_to_device(global_grid_type& gg) {
     //
@@ -424,11 +550,11 @@ bool copy_global_grid_to_device(global_grid_type& gg) {
 }
 
 /**
- * @brief
+ * @brief Frees the global grid on the device.
  *
- * @param gg
- * @return true
- * @return false
+ * @param gg The global grid to be freed.
+ * @return true if the memory was successfully freed.
+ * @return false if an error occurred while freeing the memory.
  */
 bool free_global_grid_on_device(global_grid_type& gg) {
     cudaError e1 = cudaFree(gg.grid_ptr_cu);
@@ -447,9 +573,9 @@ bool free_global_grid_on_device(global_grid_type& gg) {
 /**
  * @brief Copies the global grid to the device.
  *
- * @param qr
- * @return true
- * @return false
+ * @param qr The quadrature rule to be copied.
+ * @return true if the quadrature rule was successfully copied to the device.
+ * @return false if an error occurred while copying the quadrature rule to the device.
  */
 bool copy_quadrature_rule_to_device(const quadrature_rule& qr) {
     cudaError e1 = cudaMalloc((void**)&qr.x_nodes_ptr_cu,  //
@@ -501,9 +627,9 @@ bool copy_quadrature_rule_to_device(const quadrature_rule& qr) {
 /**
  * @brief Frees the quadrature rule on the device.
  *
- * @param qr
- * @return true
- * @return false
+ * @param qr The quadrature rule to be freed.
+ * @return true if the memory was successfully freed.
+ * @return false if an error occurred while freeing the memory.
  */
 bool free_quadrature_rule_on_device(quadrature_rule& qr) {
     cudaError e1 = cudaFree(qr.x_nodes_ptr_cu);
@@ -521,6 +647,9 @@ bool free_quadrature_rule_on_device(quadrature_rule& qr) {
     return true;
 }
 
+/**
+ * @brief Prints the GPU information.
+ */
 void print_GPU_info() {
     int dev;
     cudaGetDevice(&dev);
@@ -547,11 +676,16 @@ void print_GPU_info() {
 /**
  * @brief
  *
+ * @param Q_global
+ * @param gg
+ * @param qr
+ * @param ds_vector
+ * @return int
  */
-extern "C" int test_grid_cuda(global_grid_type& gg,                      //
-                              quadrature_rule& qr,                       //
-                              std::vector<domains_stripe>& ds_vector) {  //
-    print_GPU_info();
+int test_global(double& Q_global,                          //
+                global_grid_type& gg,                      //
+                quadrature_rule& qr,                       //
+                std::vector<domains_stripe>& ds_vector) {  //
 
     copy_global_grid_to_device(gg);
     copy_quadrature_rule_to_device(qr);
@@ -640,6 +774,147 @@ extern "C" int test_grid_cuda(global_grid_type& gg,                      //
     free(Qs);
 
     printf("\n+++++ Global Q_tot GPU : %f   \n\n", Q_tot);
+
+    Q_global = Q_tot;
+
+    return 0;
+}
+
+/**
+ * @brief
+ *
+ * @param Q_global
+ * @param gg
+ * @param qr
+ * @param ds_vector
+ * @return int
+ */
+int test_local(double& Q_local,                           //
+               global_grid_type& gg,                      //
+               quadrature_rule& qr,                       //
+               std::vector<domains_stripe>& ds_vector) {  //
+
+    copy_global_grid_to_device(gg);
+    copy_quadrature_rule_to_device(qr);
+
+    domains_stripe* ds_vector_cu = nullptr;
+
+    cudaError e1 = cudaMalloc((void**)&ds_vector_cu, ds_vector.size() * sizeof(domains_stripe));
+    cudaError e2 = cudaMemcpy(ds_vector_cu,
+                              &ds_vector[0],
+                              ds_vector.size() * sizeof(domains_stripe),
+                              cudaMemcpyHostToDevice);
+    if (e1 != cudaSuccess || e2 != cudaSuccess) {
+        printf("Error allocating memory for ds_vector_cu\n");
+        printf("Error code e1: %s\n", cudaGetErrorString(e1));
+        printf("Error code e2: %s\n", cudaGetErrorString(e2));
+        return 1;
+    }
+
+    size_t nr_domains_tot = ds_vector.size() * ds_vector[0].nr_domains;
+
+    double *Qs, *Qs_cu;
+    cudaMalloc((void**)&Qs_cu, nr_domains_tot * sizeof(double));
+    Qs = (double*)malloc(nr_domains_tot * sizeof(double));
+
+    ///// Kernel here /////
+    const size_t nr_stripes = 1 ; // ds_vector.size();
+    const size_t nr_domains_per_stripe = ds_vector[0].nr_domains;
+
+    printf("--------------------------------\n");
+    printf("--------------------------------\n");
+
+    printf("\nnr_stripes:            %lu\n", nr_stripes);
+    printf("nr_domains_per_stripe: %lu\n\n", nr_domains_per_stripe);
+
+    printf("Nr of qr nodes: %lu\n", qr.x_nodes.size());
+
+    printf("Nr of threads: %lu\n", nr_stripes * nr_domains_per_stripe);
+    printf("Nr of domains: %lu\n", nr_domains_tot);
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    cudaDeviceSynchronize();
+
+    cudaEventRecord(start);
+
+    /// start kernel ///
+    perform_quadrature_local_stripe_kernel<<<nr_stripes, nr_domains_per_stripe>>>(  //
+            Qs_cu,                                                                  //
+            gg,                                                                     //
+            qr,                                                                     //
+            qr.weights.size(),                                                      //
+            ds_vector_cu,                                                           //
+            ds_vector.size());                                                      //
+
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+
+    // get error code
+    cudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess) {
+        fprintf(stderr, "KERNEL ERROR: %s\n", cudaGetErrorString(error));
+        return 1;
+    }
+
+    cudaDeviceSynchronize();
+
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+
+    printf("Local Time elapsed: %f ms\n", milliseconds);
+
+    ///// end kernel /////
+
+    cudaMemcpy(Qs, Qs_cu, nr_domains_tot * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaFree(Qs_cu);
+
+    free_global_grid_on_device(gg);
+    free_quadrature_rule_on_device(qr);
+
+    cudaFree(ds_vector_cu);
+
+    double Q_tot = 0.0;
+    for (size_t i = 0; i < nr_domains_tot; ++i) {
+        Q_tot += Qs[i];
+    }
+
+    free(Qs);
+
+    printf("--------------------------------\n");
+    printf("\n+++++ Local Q_tot GPU : %f   \n\n", Q_tot);
+
+    Q_local = Q_tot;
+
+    return 0;
+}
+
+/**
+ * @brief
+ *
+ */
+extern "C" int test_grid_cuda(global_grid_type& gg,                      //
+                              quadrature_rule& qr,                       //
+                              std::vector<domains_stripe>& ds_vector) {  //
+                                                                         //
+    print_GPU_info();
+
+    double Q_global = 0.0;
+    test_global(Q_global, gg, qr, ds_vector);
+
+    double Q_local = 0.0;
+    test_local(Q_local, gg, qr, ds_vector);
+
+    printf("\n");
+    printf("Result *************************************************************\n");
+    printf("Q_global: %f\n", Q_global);
+    printf("Q_local:  %f\n", Q_local);
+    printf("Q_global - Q_local: %f\n", Q_global - Q_local);
+    printf("Q_global / Q_local: %f\n", Q_global / Q_local);
+    printf("\n");
+    printf("\n");
 
     return 0;
 }
