@@ -715,6 +715,8 @@ int tet10_cuda_incore_linear_elasticity_init(cuda_incore_linear_elasticity_t *co
     ctx->lambda = lambda;
     ctx->nelements = nelements;
     ctx->element_type = TET10;
+
+    SFEM_DEBUG_SYNCHRONIZE();
     return 0;
 }
 
@@ -953,14 +955,17 @@ extern int tet10_cuda_incore_linear_elasticity_diag(
     {
         int min_grid_size;
         cudaOccupancyMaxPotentialBlockSize(
-            &min_grid_size, &block_size, tet10_cuda_incore_linear_elasticity_apply_kernel, 0, 0);
+            &min_grid_size, &block_size, tet10_cuda_incore_linear_elasticity_diag_kernel, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
     ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (ctx->nelements + block_size - 1) / block_size);
+
+    // printf("tet10_cuda_incore_linear_elasticity_diag %ld %ld", n_blocks, block_size);
     tet10_cuda_incore_linear_elasticity_diag_kernel<<<n_blocks, block_size, 0>>>(
         ctx->nelements, ctx->elements, jacobian_adjugate, jacobian_determinant, mu, lambda, diag);
 
+    SFEM_DEBUG_SYNCHRONIZE();
     return 0;
 }
 

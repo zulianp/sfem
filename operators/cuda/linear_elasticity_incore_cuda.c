@@ -104,9 +104,9 @@ extern int cuda_incore_linear_elasticity_diag(cuda_incore_linear_elasticity_t *c
         // case MACRO_TET4: {
         //     return macro_tet4_cuda_incore_linear_elasticity_diag(ctx, d_t);
         // }
-        // case TET10: {
-        // 	return tet10_cuda_incore_linear_elasticity_diag(ctx, d_t);
-        // }
+        case TET10: {
+        	return tet10_cuda_incore_linear_elasticity_diag(ctx, d_t);
+        }
         default: {
             // for the moment we gracefully decline
             // assert(0);

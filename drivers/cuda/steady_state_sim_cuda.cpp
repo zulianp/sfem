@@ -82,6 +82,9 @@ int main(int argc, char *argv[]) {
         if (SFEM_USE_PRECONDITIONER) {
             auto b_d = sfem::d_buffer<real_t>(fs->n_dofs());
             if (f->hessian_diag(b_x->data(), b_d->data()) == 0) {
+                // auto h_d = sfem::to_host(b_d);
+                // h_d->print(std::cout);
+
                 solver->set_preconditioner_op(sfem::make_op<real_t>(
                     b_x->size(), b_x->size(), [=](const real_t *const x, real_t *const y) {
                         d_ediv(b_d->size(), x, b_d->data(), y);

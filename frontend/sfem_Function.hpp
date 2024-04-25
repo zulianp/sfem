@@ -7,6 +7,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <iostream>
 
 #include "sfem_base.h"
 #include "sfem_defs.h"
@@ -49,6 +50,18 @@ namespace sfem {
         inline const T *const data() const { return ptr_; }
         inline size_t size() const { return n_; }
         inline MemorySpace mem_space() const { return mem_space_; }
+
+        void print(std::ostream &os) {
+            if (mem_space_ == MEMORY_SPACE_DEVICE) {
+                os << "On the device!\n";
+                return;
+            } else {
+                for (std::ptrdiff_t i = 0; i < n_; i++) {
+                    os << ptr_[i] << " ";
+                }
+                os << "\n";
+            }
+        }
 
     private:
         size_t n_{0};
