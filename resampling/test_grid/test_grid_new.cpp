@@ -212,6 +212,7 @@ bool get_local_grid(local_grid_type& lg,
     int j_global = j_min;
 
     for (size_t i = 0; i < (size_t)lg.x_size; ++i) {
+
         double* lg_ptr = &lg.grid[i * lg.y_size];
         const double* gg_ptr = &gg.grid[i_global * gg.y_size];
 
@@ -225,6 +226,14 @@ bool get_local_grid(local_grid_type& lg,
         i_global++;
         // std::cout << std::endl;
     }
+
+    // for (size_t i = 0; i < lg.x_size; ++i) {
+    //     for (size_t j = 0; j < lg.y_size; ++j) {
+    //         printf("%ld %ld %f, ", i, j, lg.grid[i * lg.y_size + j]);
+    //     }
+    //     printf("\n");
+    // }
+
 
     return true;
 }
@@ -595,9 +604,10 @@ bool perform_quadrature_local_stripe(std::valarray<double>& Qs,
             const double f3 = lg.grid[(i_local + 1) * lg.y_size + j_local];
             const double f4 = lg.grid[(i_local + 1) * lg.y_size + j_local + 1];
 
-// if (q_i == 1)
-//             std::cout << "f1: " << f1 << ", f2: " << f2 << ", f3: " << f3 << ", f4: " << f4
-//                       << std::endl;
+            // if (q_i == 1)
+            //             std::cout << "f1: " << f1 << ", f2: " << f2 << ", f3: " << f3 << ", f4: "
+            //             << f4
+            //                       << std::endl;
 
             // std::cout << "i_local: " << i_local << " j_local: " << j_local << std::endl;
             // std::cout << "f1: " << f1 << " f2: " << f2 << " f3: " << f3 << " f4: " << f4
@@ -633,7 +643,8 @@ bool perform_quadrature_local_stripe(std::valarray<double>& Qs,
             //           << std::endl;
 
             // if (q_i == 1)
-            // std::cout << "w11: " << w11 << ", w12: " << w12 << ", w21: " << w21 << ", w22: " << w22
+            // std::cout << "w11: " << w11 << ", w12: " << w12 << ", w21: " << w21 << ", w22: " <<
+            // w22
             //           << std::endl;
 
             // 7 * qr_size * ds.nr_domains
@@ -648,14 +659,29 @@ bool perform_quadrature_local_stripe(std::valarray<double>& Qs,
             // 3 * qr_size * ds.nr_domains
             // data transfer 8 * qr_size * ds.nr_domains
             Qs_i += f_Q * qr.weights[q_i] * volume;
-printf("Qs_i: %d, %d, %f\n", i, q_i, Qs_i);
-            
+
+            // if (q_i == 2 and i == 25) {
+            //     printf("w: %f, f_Q: %f, volume: %f, Qs_i: %f, q_i: %lu, domanin_nr: %lu\n",
+            //            qr.weights[q_i],
+            //            f_Q,
+            //            volume,
+            //            Qs_i,
+            //            q_i,
+            //            i);
+            //     printf("f1: %f, f2: %f, f3: %f, f4: %f\n", f1, f2, f3, f4);
+            //     printf("x1: %f, x2: %f, y1: %f, y2: %f\n", x1, x2, y1, y2);
+            //     printf("w11: %f, w12: %f, w21: %f, w22: %f\n", w11, w12, w21, w22);
+            //     printf("i_local: %d, j_local: %d\n", i_local, j_local);
+            //     printf("lg.x_grid_min: %f, lg.y_grid_min: %f, lg.delta: %f\n", lg.x_grid_min, lg.y_grid_min, lg.delta); 
+            //     printf("lg.x_grid_max: %f, lg.y_grid_max: %f\n", lg.x_grid_max, lg.y_grid_max);
+            // printf("lg.x_size: %lu, lg.y_size: %lu\n", lg.x_size, lg.y_size);
+            // }
 
             // std::cout << "---ll" << std::endl;
         }
-        std::cout << std::endl;
+        // std::cout << std::endl;
 
-        std::cout << "Qs_i: " << Qs_i << std::endl;
+        // std::cout << "Qs_i: " << Qs_i << std::endl;
 
         Qs[i] = Qs_i;
     }
@@ -685,7 +711,7 @@ bool perform_local_quadratures_stripe_set(std::valarray<double>& Qs,
 
     double num_nodes_per_stripe = 0.0;
 
-    for (size_t i = 0; i < 1; ++i) {
+    for (size_t i = 0; i < nr_stripes; ++i) {
         local_grid_type lg_stripe;
         make_local_grid_from_stripe(lg_stripe, gg, stripes[i]);
 

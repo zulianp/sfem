@@ -24,7 +24,7 @@ ifeq ($(DEBUG),1)
 	CUDA_DEBUG += -g
 endif
 
-CU_OPT_FLAGS = -O3 -use_fast_math -Xptxas=-O3,-v 
+CU_OPT_FLAGS = -O3 -use_fast_math -Xptxas=-O3,-v -Xcompiler -O3,-march=native,-mtune=native
 CU_TEST_GRID = test_grid_new_cuda
 CU_LIB=lib${CU_TEST_GRID}.a
 GPU_ARCH ?= sm_75

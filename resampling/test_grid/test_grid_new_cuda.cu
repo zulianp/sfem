@@ -299,8 +299,12 @@ __device__ __forceinline__                                              //
     double x_d_min, y_d_min, x_d_max, y_d_max;
     get_domain_from_stripe_cu(ds, domain_nr, x_d_min, y_d_min, x_d_max, y_d_max);
 
-    printf("Domain %d: x_min: %f, x_max: %f, y_min: %f, y_max: %f  -- GPU\n", domain_nr, x_d_min, x_d_max, y_d_min, y_d_max);
-           
+    // printf("Domain %d: x_min: %f, x_max: %f, y_min: %f, y_max: %f  -- GPU\n",
+    //        domain_nr,
+    //        x_d_min,
+    //        x_d_max,
+    //        y_d_min,
+    //        y_d_max);
 
     const double volume = (x_d_max - x_d_min) * (y_d_max - y_d_min);  // 3 * ds_nr_domains
 
@@ -365,16 +369,37 @@ __device__ __forceinline__                                              //
         // 3 * qnr * dnr
         // data transfer 8 * qne * dnr
         Qs_i += f_Q * qr.weights_ptr_cu[q_i] * volume;
-        printf("Qs_i: %d, %d, %f\n", domain_nr, q_i, Qs_i);
+
+        // if (q_i == 2 and domain_nr == 25) {
+        //     printf("w: %f, f_Q: %f, volume: %f, Qs_i: %f, q_i: %lu, domanin_nr: %lu\n",
+        //            qr.weights_ptr_cu[q_i],
+        //            f_Q,
+        //            volume,
+        //            Qs_i,
+        //            q_i,
+        //            domain_nr);
+        //     printf("f1: %f, f2: %f, f3: %f, f4: %f\n", f1, f2, f3, f4);
+        //     printf("x1: %f, x2: %f, y1: %f, y2: %f\n", x1, x2, y1, y2);
+        //     printf("w11: %f, w12: %f, w21: %f, w22: %f\n", w11, w12, w21, w22);
+        //     printf("i_local: %d, j_local: %d\n", i_local, j_local);
+        //     printf("lg.x_grid_min: %f, lg.y_grid_min: %f, lg.delta: %f\n",
+        //            lg.x_grid_min,
+        //            lg.y_grid_min,
+        //            lg.delta);
+        //     printf("lg.x_grid_max: %f, lg.y_grid_max: %f\n", lg.x_grid_max, lg.y_grid_max);
+        //     printf("lg.x_size: %lu, lg.y_size: %lu\n", lg.x_size, lg.y_size);
+        // }
+        // printf("Qs_i: %lf, q_i: %lu, domanin_nr: %lu\n", Qs_i, q_i, domain_nr);
 
         // std::cout << "---gg" << std::endl;
     }
-    printf("\n");
+
+    // printf("\n");
 
     // Qs[i] = Qs_i;
     // }
 
-    printf("Qs_i: %f\n", Qs_i);
+    // printf("Qs_i: %f\n", Qs_i);
 
     Qs[id] = Qs_i;
 
@@ -434,7 +459,7 @@ __global__ void perform_quadrature_local_stripe_kernel(double* Qs,              
     x_d_min = ds_vector[stripe_nr].x_min;
     y_d_min = ds_vector[stripe_nr].y_min;
 
-    x_d_max = x_d_min + ds_vector[stripe_nr].nr_domains * ds_vector[stripe_nr].side_x;
+    x_d_max = x_d_min + double(ds_vector[stripe_nr].nr_domains) * ds_vector[stripe_nr].side_x;
     y_d_max = y_d_min + ds_vector[stripe_nr].side_y;
 
     lg.x_d_min = x_d_min;
@@ -499,7 +524,7 @@ __global__ void perform_quadrature_local_stripe_kernel(double* Qs,              
         i = index_abs_local % lg.x_size;
         j = index_abs_local / lg.x_size;
 
-        if ((i * j) >= local_grid_size) break;
+        if (index_abs_local >= local_grid_size) break;
 
         i_global = i_global_min + i;
         j_global = j_global_min + j;
@@ -509,6 +534,17 @@ __global__ void perform_quadrature_local_stripe_kernel(double* Qs,              
 
         cnt += 1;
     }
+
+    // __syncthreads();
+
+    //     if (threadIdx.x == 0) {
+    //         for (size_t i = 0; i < lg.x_size; ++i) {
+    //             for (size_t j = 0; j < lg.y_size; ++j) {
+    //                 printf("%ld %ld %f, ", i, j, local_grid_shared[i * lg.y_size + j]);
+    //             }
+    //             printf("\n");
+    //         }
+    //     }
 
     __syncthreads();
 
@@ -520,6 +556,12 @@ __global__ void perform_quadrature_local_stripe_kernel(double* Qs,              
                                     ds_vector[stripe_nr]);
 
     // printf("shared: %f\n", local_grid_shared_b[0]);
+}
+
+__global__ void axpy(double* x, double* y, double a, size_t n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i < n) y[i] = a * x[i] + y[i];
 }
 
 /**
@@ -739,6 +781,8 @@ int test_global(double& Q_global,                          //
             ds_vector_cu,                                                            //
             ds_vector.size());                                                       //
 
+    // axpy<<<nr_domains_tot, 1024>>>(Qs_cu, Qs_cu, 1.0, nr_domains_tot);
+
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
 
@@ -818,7 +862,7 @@ int test_local(double& Q_local,                           //
     Qs = (double*)malloc(nr_domains_tot * sizeof(double));
 
     ///// Kernel here /////
-    const size_t nr_stripes = 1 ; // ds_vector.size();
+    const size_t nr_stripes = ds_vector.size();
     const size_t nr_domains_per_stripe = ds_vector[0].nr_domains;
 
     printf("--------------------------------\n");
