@@ -23,7 +23,7 @@ namespace sfem {
     public:
         std::function<T*(const std::size_t)> allocate;
         std::function<void(const std::size_t, T* const x)> zeros;
-        std::function<void(T*)> destroy;
+        std::function<void(void*)> destroy;
         // std::function<void(const ptrdiff_t, const T* const, T* const)> copy;
         std::function<void(const ptrdiff_t, const T, const T* const, const T, T* const)> axpby;
 
@@ -50,11 +50,13 @@ namespace sfem {
                 Buffer<T>::wrap(smoother_[finest_level()]->rows(), x);
 
             memory_[finest_level()]->residual =
-                Buffer<T>::wrap(smoother_[finest_level()]->rows(), r);
+                Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T *)r);
 
             for (int k = 0; k < max_it_; k++) {
                 cycle(finest_level());
             }
+
+            return 0;
         }
 
         void clear() {
@@ -147,6 +149,8 @@ namespace sfem {
                 auto w = this->allocate(n);
                 memory_[l]->work = Buffer<T>::own(n, w, this->destroy);
             }
+
+            return 0;
         }
 
         int cycle(const int level) {
@@ -170,7 +174,7 @@ namespace sfem {
                 op->apply(mem->solution->data(), mem->work->data());
 
                 this->axpby(mem->size(), 1, mem->residual->data(), -1, mem->work->data());
-                restriction->apply(mem->work->data(), memory_->residual[coarsest_level(level)]);
+                restriction->apply(mem->work->data(), memory_[coarser_level(level)]->residual->data());
 
                 int err = cycle(coarser_level(level));
                 assert(!err);
@@ -181,7 +185,10 @@ namespace sfem {
                 this->axpby(mem->size(), 1, mem->work->data(), 1, mem->solution->data());
                 smoother_[level]->apply(mem->residual->data(), mem->solution->data());
             }
+        return 0;
         }
+
+
     };
 
 }  // namespace sfem
