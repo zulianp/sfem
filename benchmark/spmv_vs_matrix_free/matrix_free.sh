@@ -52,27 +52,31 @@ geo=(`ls $BENCHMARK_DIR`)
 
 workspace=`mktemp -d`
 
-echo "rep,geo,op_type,ref,ptype,TTS,ndofs,nnz" > spmv.csv
+scalar_mf=lapl_matrix_free
+vector_mf=linear_elasticity_matrix_free
 
-function bench_spmv()
+echo "rep,geo,op_type,ref,ptype,TTS,ndofs,nnz" > matrix_free.csv
+
+function bench_matrix_free_cuda()
 {
-	exec=$1
-	case_path=$2
+	case_path=$1
 
 	p1=$case_path/p1
 	p2=$case_path/p2
 	
-	$exec 1 0 $p1/matrix_scalar "gen:ones" $workspace/test.raw > temp_log.txt
+	# Scalar problem
+	lapl_matrix_free $p1/refined 1 "gen:ones" $workspace/test.raw > temp_log.txt
 	op_type=`grep "op: " $p1/matrix_scalar/meta.yaml | awk '{print $2}'`
 
-	stats=`grep "spmv:" temp_log.txt | awk '{print $2, $3, $4}' | tr ' ' ','`
-	echo "crs,$g,$op_type,$r,scalar,$stats" >> spmv.csv
+	stats=`grep "mf:" temp_log.txt | awk '{print $2, $3, $4}' | tr ' ' ','`
+	echo "tet4,$g,$op_type,$r,scalar,$stats" >> matrix_free.csv
 
-	$exec 1 0 $p1/matrix_vector "gen:ones" $workspace/test.raw > temp_log.txt
+	# Vector problem
+	SFEM_USE_MACRO=0 $vector_mf $p2 1 "gen:ones" $workspace/test.raw > temp_log.txt
 	op_type=`grep "op: " $p1/matrix_vector/meta.yaml | awk '{print $2}'`
 
-	stats=`grep "spmv:" temp_log.txt | awk '{print $2, $3, $4}' | tr ' ' ','`
-	echo "crs,$g,$op_type,$r,vector,$stats" >> spmv.csv
+	stats=`grep "mf:" temp_log.txt | awk '{print $2, $3, $4}' | tr ' ' ','`
+	echo "tet10,$g,$op_type,$r,vector,$stats" >> matrix_free.csv
 }
 
 for g in ${geo[@]}
@@ -83,15 +87,14 @@ do
 	for r in ${resolutions[@]}
 	do
 		case_path="$BENCHMARK_DIR/$g/$r"
-		bench_spmv spmv $case_path
 
 		if [[ $ENABLE_CUDA ==  1 ]]
 		then
-			bench_spmv cuspmv $case_path
+			bench_matrix_free_cuda $case_path
 		fi
 	done
 done	
 
 rm -rf $workspace
 
-cat spmv.csv
+cat matrix_free.csv

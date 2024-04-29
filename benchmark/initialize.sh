@@ -18,6 +18,7 @@ export PATH=$SCRIPTPATH/../python/sfem:$PATH
 export PATH=$SCRIPTPATH/../python/sfem/mesh:$PATH
 export PATH=$SCRIPTPATH/../data/benchmarks/meshes:$PATH
 
+TOP_FOLDER=$PWD
 BENCH_FOLDER=$PWD/db
 
 if [[ -z $LAUNCH ]]
@@ -66,13 +67,17 @@ do
 
 	mkdir -p matrix_scalar
 	SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble refined matrix_scalar
+	echo "op: Laplacian" > matrix_scalar/meta.yaml
+
+	mkdir -p matrix_vector
+	SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble3 refined matrix_vector
+	echo "op: LinearElasticity" > matrix_vector/meta.yaml
 
 	# P2 folder
 	mesh_p1_to_p2 sorted ../p2
 
 	cd $SPHERE_FOLDER
 done
-
 
 cd $BENCH_FOLDER
 
@@ -100,6 +105,11 @@ do
 
 	mkdir -p matrix_scalar
 	SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble refined matrix_scalar
+	echo "op: Laplacian" > matrix_scalar/meta.yaml
+
+	mkdir -p matrix_vector
+	SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble3 refined matrix_vector
+	echo "op: LinearElasticity" > matrix_vector/meta.yaml
 
 	# P2 folder
 	mesh_p1_to_p2 sorted ../p2
@@ -107,6 +117,5 @@ do
 	cd $CYLINDER_FOLDER
 done
 
-
 cd $BENCH_FOLDER
-
+cd $TOP_FOLDER

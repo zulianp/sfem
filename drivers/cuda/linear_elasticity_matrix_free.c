@@ -117,15 +117,15 @@ int main(int argc, char *argv[]) {
                                            mesh.points);
 
         cudaDeviceSynchronize();
-        double spmv_tick = MPI_Wtime();
+        double mf_tick = MPI_Wtime();
 
         for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
             cuda_incore_linear_elasticity_apply(&ctx, d_x, d_y);
         }
 
         cudaDeviceSynchronize();
-        double spmv_tock = MPI_Wtime();
-        printf("mf: %g (seconds)\n", (spmv_tock - spmv_tick) / SFEM_REPEAT);
+        double mf_tock = MPI_Wtime();
+        printf("mf: %g %ld %ld\n", (mf_tock - mf_tick) / SFEM_REPEAT, ndofs, 0l);
 
         CHECK_CUDA(cudaPeekAtLastError());
         CHECK_CUDA(cudaMemcpy(y, d_y, ndofs * sizeof(real_t), cudaMemcpyDeviceToHost));

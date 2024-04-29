@@ -62,15 +62,25 @@ int main(int argc, char *argv[]) {
              SFEM_MPI_REAL_T,
              &crs);
 
-    ptrdiff_t _nope_, x_n;
     real_t *x = 0;
-    array_create_from_file(comm, x_path, SFEM_MPI_REAL_T, (void **)&x, &_nope_, &x_n);
+    if (strcmp("gen:ones", x_path) == 0) {
+        ptrdiff_t ndofs = crs.lrows;
+        x = malloc(ndofs * sizeof(real_t));
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < ndofs; ++i) {
+            x[i] = 1;
+        }
+
+    } else {
+        ptrdiff_t _nope_, x_n;
+        array_create_from_file(comm, x_path, SFEM_MPI_REAL_T, (void **)&x, &_nope_, &x_n);
+    }
 
     real_t *y = calloc(crs.grows, sizeof(real_t));
 
     double spmv_tick = MPI_Wtime();
 
-    scal(x_n, alpha, x);
+    scal(crs.grows, alpha, x);
 
     for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
         crs_spmv(crs.grows,
@@ -82,7 +92,7 @@ int main(int argc, char *argv[]) {
     }
 
     double spmv_tock = MPI_Wtime();
-    printf("spmv: %g (seconds)\n", (spmv_tock - spmv_tick)/SFEM_REPEAT);
+    printf("spmv: %g %ld %ld\n", (spmv_tock - spmv_tick) / SFEM_REPEAT, crs.lrows, crs.lnnz);
 
     array_write(comm, output_path, SFEM_MPI_REAL_T, y, crs.grows, crs.grows);
     crs_free(&crs);
