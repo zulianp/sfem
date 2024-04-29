@@ -189,7 +189,10 @@ int main(int argc, char *argv[]) {
         cudaDeviceSynchronize();
 
         double spmv_tock = MPI_Wtime();
-        printf("spmv: %g %ld %ld\n", (spmv_tock - spmv_tick) / SFEM_REPEAT, crs.lrows, crs.lnnz);
+        double avg_time = (spmv_tock - spmv_tick) / SFEM_REPEAT;
+        double avg_throughput = (crs.grows / avg_time) * (sizeof(real_t) * 1e-9);
+
+        printf("spmv: %g %ld %ld %g\n", avg_time, crs.lrows, crs.lnnz, avg_throughput);
 
         CHECK_CUDA(cudaPeekAtLastError());
         CHECK_CUDA(cudaMemcpy(y, dY, crs.lrows * sizeof(real_t), cudaMemcpyDeviceToHost));

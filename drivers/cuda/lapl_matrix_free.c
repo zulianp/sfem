@@ -165,7 +165,11 @@ int main(int argc, char *argv[]) {
 
         cudaDeviceSynchronize();
         double mf_tock = MPI_Wtime();
-        printf("mf: %g %ld %ld\n", (mf_tock - mf_tick) / SFEM_REPEAT, nnodes, 0l);
+        
+        double avg_time = (mf_tock - mf_tick) / SFEM_REPEAT;
+        double avg_throughput = (nnodes / avg_time) * (sizeof(real_t) * 1e-9);
+
+        printf("mf: %g %ld %ld %g\n", avg_time, nnodes, 0l, avg_throughput);
 
         CHECK_CUDA(cudaPeekAtLastError());
         CHECK_CUDA(cudaMemcpy(y, d_y, nnodes * sizeof(real_t), cudaMemcpyDeviceToHost));
