@@ -140,7 +140,8 @@ bool make_gloal_grid(global_grid_type& gg,
 
     for (size_t i = 0; i < gg.x_size; ++i) {
         for (size_t j = 0; j < gg.y_size; ++j) {
-            gg.grid[i * gg.y_size + j] = f(x_zero + i * delta, y_zero + j * delta);
+            const size_t index = XY_INDEX(gg.x_size, gg.y_size, i, j);
+            gg.grid[index] = f(x_zero + i * delta, y_zero + j * delta);
         }
     }
 
@@ -206,15 +207,21 @@ bool get_local_grid(local_grid_type& lg,
     lg.x_size = static_cast<size_t>(i_max - i_min + 1);
     lg.y_size = static_cast<size_t>(j_max - j_min + 1);
 
+    // std::cout << "x_size: " << lg.x_size << " y_size: " << lg.y_size << std::endl;
+
     lg.grid.resize(lg.x_size * lg.y_size);
 
     int i_global = i_min;
     int j_global = j_min;
 
+#if Y_MAJOR == 1
     for (size_t i = 0; i < (size_t)lg.x_size; ++i) {
+        //
+        const size_t index_local = XY_INDEX(lg.x_size, lg.y_size, i, 0);
+        double* lg_ptr = &lg.grid[index_local];
 
-        double* lg_ptr = &lg.grid[i * lg.y_size];
-        const double* gg_ptr = &gg.grid[i_global * gg.y_size];
+        const size_t index_global = XY_INDEX(gg.x_size, gg.y_size, i_global, 0);
+        const double* gg_ptr = &gg.grid[index_global];
 
         for (size_t j = 0; j < (size_t)lg.y_size; ++j) {
             // lg.grid[index_local] = gg.grid[index_global];
@@ -226,6 +233,26 @@ bool get_local_grid(local_grid_type& lg,
         i_global++;
         // std::cout << std::endl;
     }
+#elif X_MAJOR == 1
+
+    for (size_t j = 0; j < (size_t)lg.y_size; ++j) {
+        const size_t index_local = XY_INDEX(lg.x_size, lg.y_size, 0, j);
+        double* lg_ptr = &lg.grid[index_local];
+
+        const size_t index_global = XY_INDEX(gg.x_size, gg.y_size, 0, j_global);
+        const double* gg_ptr = &gg.grid[index_global];
+
+        for (size_t i = 0; i < (size_t)lg.x_size; ++i) {
+            lg_ptr[i] = gg_ptr[i_global];
+            i_global++;
+        }
+        i_global = i_min;
+        j_global++;
+    }
+
+#else
+#error "Either Y_MAJOR or X_MAJOR must be defined as 1"
+#endif
 
     // for (size_t i = 0; i < lg.x_size; ++i) {
     //     for (size_t j = 0; j < lg.y_size; ++j) {
@@ -233,7 +260,6 @@ bool get_local_grid(local_grid_type& lg,
     //     }
     //     printf("\n");
     // }
-
 
     return true;
 }
@@ -467,78 +493,81 @@ bool make_MC_quadrature_rule(quadrature_rule& qr,
     return true;
 }
 
-/**
- * @brief Performs quadrature on a local grid using a given quadrature rule.
- *
- * This function calculates the quadrature of a local grid by evaluating the function values at the
- * quadrature nodes and applying the corresponding weights. The quadrature is performed within the
- * specified domain defined by the minimum and maximum values of x and y.
- *
- * @param lg The local grid to perform quadrature on.
- * @param qr The quadrature rule to use.
- * @param x_d_min The minimum x value of the domain.
- * @param y_d_min The minimum y value of the domain.
- * @param x_d_max The maximum x value of the domain.
- * @param y_d_max The maximum y value of the domain.
- * @return The result of the quadrature.
- */
-double perform_quadrature_local(const local_grid_type& lg,  //
-                                const quadrature_rule& qr,  //
-                                const double x_d_min,       //
-                                const double y_d_min,       //
-                                const double x_d_max,       //
-                                const double y_d_max) {     //
-    //
-    double result_Q = 0.0;
+// /**
+//  * @brief Performs quadrature on a local grid using a given quadrature rule.
+//  *
+//  * This function calculates the quadrature of a local grid by evaluating the function values at
+//  the
+//  * quadrature nodes and applying the corresponding weights. The quadrature is performed within
+//  the
+//  * specified domain defined by the minimum and maximum values of x and y.
+//  *
+//  * @param lg The local grid to perform quadrature on.
+//  * @param qr The quadrature rule to use.
+//  * @param x_d_min The minimum x value of the domain.
+//  * @param y_d_min The minimum y value of the domain.
+//  * @param x_d_max The maximum x value of the domain.
+//  * @param y_d_max The maximum y value of the domain.
+//  * @return The result of the quadrature.
+//  */
+// double perform_quadrature_local(const local_grid_type& lg,  //
+//                                 const quadrature_rule& qr,  //
+//                                 const double x_d_min,       //
+//                                 const double y_d_min,       //
+//                                 const double x_d_max,       //
+//                                 const double y_d_max) {     //
+//     //
+//     double result_Q = 0.0;
 
-    const double volume = (x_d_max - x_d_min) * (y_d_max - y_d_min);
+//     const double volume = (x_d_max - x_d_min) * (y_d_max - y_d_min);
 
-    for (size_t i = 0; i < qr.x_nodes.size(); ++i) {
-        const double x_Q = (qr.x_nodes[i] + x_d_min) / (x_d_max - x_d_min);
-        const double y_Q = (qr.y_nodes[i] + y_d_min) / (y_d_max - y_d_min);
+//     for (size_t i = 0; i < qr.x_nodes.size(); ++i) {
+//         const double x_Q = (qr.x_nodes[i] + x_d_min) / (x_d_max - x_d_min);
+//         const double y_Q = (qr.y_nodes[i] + y_d_min) / (y_d_max - y_d_min);
 
-        auto [i_local, j_local] = get_nearest_coordinates(lg.x_grid_min,  //
-                                                          lg.y_grid_min,
-                                                          lg.delta,
-                                                          lg.delta,
-                                                          x_Q,
-                                                          y_Q,
-                                                          false);
+//         auto [i_local, j_local] = get_nearest_coordinates(lg.x_grid_min,  //
+//                                                           lg.y_grid_min,
+//                                                           lg.delta,
+//                                                           lg.delta,
+//                                                           x_Q,
+//                                                           y_Q,
+//                                                           false);
 
-        const double f1 = lg.grid[i_local * lg.y_size + j_local];
-        const double f2 = lg.grid[i_local * lg.y_size + j_local + 1];
-        const double f3 = lg.grid[(i_local + 1) * lg.y_size + j_local];
-        const double f4 = lg.grid[(i_local + 1) * lg.y_size + j_local + 1];
+//         const double f1 = lg.grid[i_local * lg.y_size + j_local];
+//         const double f2 = lg.grid[i_local * lg.y_size + j_local + 1];
+//         const double f3 = lg.grid[(i_local + 1) * lg.y_size + j_local];
+//         const double f4 = lg.grid[(i_local + 1) * lg.y_size + j_local + 1];
 
-        // const double delta_x = lg.x_grid_max - lg.x_grid_min;
-        // const double delta_y = lg.y_grid_max - lg.y_grid_min;
+//         // const double delta_x = lg.x_grid_max - lg.x_grid_min;
+//         // const double delta_y = lg.y_grid_max - lg.y_grid_min;
 
-        const double x1 = lg.x_grid_min + i_local * lg.delta;
-        const double x2 = lg.x_grid_min + (i_local + 1) * lg.delta;
-        const double y1 = lg.y_grid_min + j_local * lg.delta;
-        const double y2 = lg.y_grid_min + (j_local + 1) * lg.delta;
+//         const double x1 = lg.x_grid_min + i_local * lg.delta;
+//         const double x2 = lg.x_grid_min + (i_local + 1) * lg.delta;
+//         const double y1 = lg.y_grid_min + j_local * lg.delta;
+//         const double y2 = lg.y_grid_min + (j_local + 1) * lg.delta;
 
-        // std::cout << "Volume: " << volume << std::endl;
-        // std::cout << "x1: " << x1 << " x2: " << x2 << " y1: " << y1 << " y2: " << y2 <<
-        // std::endl; std::cout << "f1: " << f1 << " f2: " << f2 << " f3: " << f3 << " f4: " << f4
-        // << std::endl; std::cout << "x_Q: " << x_Q << " y_Q: " << y_Q << std::endl ;
+//         // std::cout << "Volume: " << volume << std::endl;
+//         // std::cout << "x1: " << x1 << " x2: " << x2 << " y1: " << y1 << " y2: " << y2 <<
+//         // std::endl; std::cout << "f1: " << f1 << " f2: " << f2 << " f3: " << f3 << " f4: " <<
+//         f4
+//         // << std::endl; std::cout << "x_Q: " << x_Q << " y_Q: " << y_Q << std::endl ;
 
-        const double w11 = (x2 - x_Q) * (y2 - y_Q) / (lg.delta * lg.delta);
-        const double w12 = (x2 - x_Q) * (y_Q - y1) / (lg.delta * lg.delta);
-        const double w21 = (x_Q - x1) * (y2 - y_Q) / (lg.delta * lg.delta);
-        const double w22 = (x_Q - x1) * (y_Q - y1) / (lg.delta * lg.delta);
+//         const double w11 = (x2 - x_Q) * (y2 - y_Q) / (lg.delta * lg.delta);
+//         const double w12 = (x2 - x_Q) * (y_Q - y1) / (lg.delta * lg.delta);
+//         const double w21 = (x_Q - x1) * (y2 - y_Q) / (lg.delta * lg.delta);
+//         const double w22 = (x_Q - x1) * (y_Q - y1) / (lg.delta * lg.delta);
 
-        const double f_Q = w11 * f1 + w12 * f2 + w21 * f3 + w22 * f4;
+//         const double f_Q = w11 * f1 + w12 * f2 + w21 * f3 + w22 * f4;
 
-        // std::cout << "w11: " << w11 << " w12: " << w12 << " w21: " << w21 << " w22: " << w22
-        //           << std::endl;
-        // std::cout << "f_Q: " << f_Q << std::endl << std::endl;
+//         // std::cout << "w11: " << w11 << " w12: " << w12 << " w21: " << w21 << " w22: " << w22
+//         //           << std::endl;
+//         // std::cout << "f_Q: " << f_Q << std::endl << std::endl;
 
-        result_Q += f_Q * qr.weights[i] * volume;
-    }
+//         result_Q += f_Q * qr.weights[i] * volume;
+//     }
 
-    return result_Q;
-}
+//     return result_Q;
+// }
 
 /**
  * @brief Performs quadrature on local stripes.
@@ -599,10 +628,15 @@ bool perform_quadrature_local_stripe(std::valarray<double>& Qs,
                                           j_local);
 
             // data trasfer 4 * 8 * qr_size * ds.nr_domains
-            const double f1 = lg.grid[i_local * lg.y_size + j_local];
-            const double f2 = lg.grid[i_local * lg.y_size + j_local + 1];
-            const double f3 = lg.grid[(i_local + 1) * lg.y_size + j_local];
-            const double f4 = lg.grid[(i_local + 1) * lg.y_size + j_local + 1];
+            const size_t i1 = XY_INDEX(lg.x_size, lg.y_size, i_local, j_local);
+            const size_t i2 = XY_INDEX(lg.x_size, lg.y_size, i_local, j_local + 1);
+            const size_t i3 = XY_INDEX(lg.x_size, lg.y_size, i_local + 1, j_local);
+            const size_t i4 = XY_INDEX(lg.x_size, lg.y_size, i_local + 1, j_local + 1);
+
+            const double f1 = lg.grid[i1];
+            const double f2 = lg.grid[i2];
+            const double f3 = lg.grid[i3];
+            const double f4 = lg.grid[i4];
 
             // if (q_i == 1)
             //             std::cout << "f1: " << f1 << ", f2: " << f2 << ", f3: " << f3 << ", f4: "
@@ -672,8 +706,9 @@ bool perform_quadrature_local_stripe(std::valarray<double>& Qs,
             //     printf("x1: %f, x2: %f, y1: %f, y2: %f\n", x1, x2, y1, y2);
             //     printf("w11: %f, w12: %f, w21: %f, w22: %f\n", w11, w12, w21, w22);
             //     printf("i_local: %d, j_local: %d\n", i_local, j_local);
-            //     printf("lg.x_grid_min: %f, lg.y_grid_min: %f, lg.delta: %f\n", lg.x_grid_min, lg.y_grid_min, lg.delta); 
-            //     printf("lg.x_grid_max: %f, lg.y_grid_max: %f\n", lg.x_grid_max, lg.y_grid_max);
+            //     printf("lg.x_grid_min: %f, lg.y_grid_min: %f, lg.delta: %f\n", lg.x_grid_min,
+            //     lg.y_grid_min, lg.delta); printf("lg.x_grid_max: %f, lg.y_grid_max: %f\n",
+            //     lg.x_grid_max, lg.y_grid_max);
             // printf("lg.x_size: %lu, lg.y_size: %lu\n", lg.x_size, lg.y_size);
             // }
 
@@ -845,10 +880,15 @@ bool perform_quadrature_global_stripe(std::valarray<double>& Qs,
                                           j_local);
 
             // data trasfer 4 * 8 * qr_size * dsnr_domains
-            const double f1 = gg.grid[i_local * gg.x_size + j_local];
-            const double f2 = gg.grid[i_local * gg.y_size + j_local + 1];
-            const double f3 = gg.grid[(i_local + 1) * gg.y_size + j_local];
-            const double f4 = gg.grid[(i_local + 1) * gg.y_size + j_local + 1];
+            const size_t i1 = XY_INDEX(gg.x_size, gg.y_size, i_local, j_local);
+            const size_t i2 = XY_INDEX(gg.x_size, gg.y_size, i_local, j_local + 1);
+            const size_t i3 = XY_INDEX(gg.x_size, gg.y_size, i_local + 1, j_local);
+            const size_t i4 = XY_INDEX(gg.x_size, gg.y_size, i_local + 1, j_local + 1);
+
+            const double f1 = gg.grid[i1];
+            const double f2 = gg.grid[i2];
+            const double f3 = gg.grid[i3];
+            const double f4 = gg.grid[i4];
 
             // std::cout << "i_local: " << i_local << " j_local: " << j_local << std::endl;
             // std::cout << "f1: " << f1 << " f2: " << f2 << " f3: " << f3 << " f4: " << f4
@@ -1069,7 +1109,7 @@ int test_stripes(int argc,
     std::cout << std::fixed << std::setprecision(6);
 
     {
-        std::cout << "++ Local quadratures:" << std::endl;
+        std::cout << "++ Local quadratures Mono:" << std::endl;
         std::cout << "-------------------------------------------------------" << std::endl
                   << std::endl;
 
@@ -1118,12 +1158,12 @@ int test_stripes(int argc,
         std::cout << std::endl;
     }
 
-    return 0;
+    // return 0;
 
     {
         std::cout << "-------------------------------------------------------" << std::endl
                   << std::endl;
-        std::cout << "++ Global quadratures:" << std::endl;
+        std::cout << "++ Global quadratures  Mono:" << std::endl;
         std::cout << "-------------------------------------------------------" << std::endl
                   << std::endl;
 
@@ -1201,7 +1241,7 @@ bool test_stripes_mt(int argc,
     std::cout << std::fixed << std::setprecision(6);
 
     {
-        std::cout << "++ Local quadratures:" << std::endl;
+        std::cout << "++ Local quadratures MT:" << std::endl;
         std::cout << "-------------------------------------------------------" << std::endl
                   << std::endl;
 
@@ -1290,7 +1330,7 @@ bool test_stripes_mt(int argc,
 
     {
         std::cout << "-------------------------------------------------------" << std::endl;
-        std::cout << "++ Global quadratures:" << std::endl;
+        std::cout << "++ Global quadratures MT:" << std::endl;
         std::cout << "-------------------------------------------------------" << std::endl
                   << std::endl;
 
@@ -1397,6 +1437,15 @@ extern "C" int test_grid_cuda(global_grid_type& gg,  //
  * @return int
  */
 int main(int argc, char* argv[]) {
+    if (X_MAJOR) {
+        std::cout << " ********** X_MAJOR **********" << std::endl;
+    } else {
+        std::cout << " ********** Y_MAJOR **********" << std::endl;
+    }
+
+    std::cout << "-------------------------------------------------------" << std::endl
+              << "-------------------------------------------------------" << std::endl;
+
     // test_grid_cuda();
     // return 0;
 
@@ -1406,14 +1455,14 @@ int main(int argc, char* argv[]) {
 
     problem_parameters prs = {
             .quad_nodes_nr = 120,
-            .xy_max_domain = 1000.0,
+            .xy_max_domain = 1500.0,
             .xy_zero_domain = 0.0,
-            .delta_domain = 0.06,
-            .nr_stripes = 22020,
+            .delta_domain = 0.06,  // delta of the gloabl grid
+            .nr_stripes = 120200,
             .random_seed = 0,
             .nr_domains_per_stripe = 32,
-            .side_x_stripe = 0.52,
-            .side_y_stripe = 0.52,
+            .side_x_stripe = 0.52, // side of the stripe subdomain
+            .side_y_stripe = 0.52, // side of the stripe subdomain
             .start_x_stripes = 0.111,
             .start_y_stripes = 0.122,
             .fun = [](double x,
@@ -1442,13 +1491,17 @@ int main(int argc, char* argv[]) {
     // const double xy_max = 3500.0;
     // const unsigned int nr_stripes = 620200;
 
+    std::cout << "-------------------------------------------------------" << std::endl
+              << "-------------------------------------------------------" << std::endl
+              << "-------------------------------------------------------" << std::endl;
+
     a = test_stripes(argc, argv, gg, stripes, qr);
 
     std::cout << "-------------------------------------------------------" << std::endl
               << "-------------------------------------------------------" << std::endl
               << "-------------------------------------------------------" << std::endl;
 
-    return a && b && c;
+    // return a && b && c;
 
     b = test_stripes_mt(argc, argv, nr_threads, gg, stripes, qr);
 
