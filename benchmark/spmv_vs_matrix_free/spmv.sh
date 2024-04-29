@@ -52,7 +52,12 @@ geo=(`ls $BENCHMARK_DIR`)
 
 workspace=`mktemp -d`
 
-echo "rep,geo,op_type,ref,ptype,TTS,ndofs,nnz" > spmv.csv
+
+mkdir -p results
+today=`date +"%Y_%m_%d"`
+csv_output=results/"$today"_crs.csv
+
+echo "rep,geo,op_type,ref,ptype,TTS,ndofs,nnz" > $csv_output
 
 function bench_spmv()
 {
@@ -62,17 +67,17 @@ function bench_spmv()
 	p1=$case_path/p1
 	p2=$case_path/p2
 	
-	$exec 1 0 $p1/matrix_scalar "gen:ones" $workspace/test.raw > temp_log.txt
+	$exec 1 0 $p1/matrix_scalar "gen:ones" $workspace/test.raw > $workspace/temp_log.txt
 	op_type=`grep "op: " $p1/matrix_scalar/meta.yaml | awk '{print $2}'`
 
-	stats=`grep "spmv:" temp_log.txt | awk '{print $2, $3, $4}' | tr ' ' ','`
-	echo "crs,$g,$op_type,$r,scalar,$stats" >> spmv.csv
+	stats=`grep "spmv:" $workspace/temp_log.txt | awk '{print $2, $3, $4}' | tr ' ' ','`
+	echo "crs,$g,$op_type,$r,scalar,$stats" >> $csv_output
 
-	$exec 1 0 $p1/matrix_vector "gen:ones" $workspace/test.raw > temp_log.txt
+	$exec 1 0 $p1/matrix_vector "gen:ones" $workspace/test.raw > $workspace/temp_log.txt
 	op_type=`grep "op: " $p1/matrix_vector/meta.yaml | awk '{print $2}'`
 
-	stats=`grep "spmv:" temp_log.txt | awk '{print $2, $3, $4}' | tr ' ' ','`
-	echo "crs,$g,$op_type,$r,vector,$stats" >> spmv.csv
+	stats=`grep "spmv:" $workspace/temp_log.txt | awk '{print $2, $3, $4}' | tr ' ' ','`
+	echo "crs,$g,$op_type,$r,vector,$stats" >> $csv_output
 }
 
 for g in ${geo[@]}
@@ -82,16 +87,16 @@ do
 
 	for r in ${resolutions[@]}
 	do
-		case_path="$BENCHMARK_DIR/$g/$r"
-		bench_spmv spmv $case_path
-
 		if [[ $ENABLE_CUDA ==  1 ]]
 		then
 			bench_spmv cuspmv $case_path
+		else
+			case_path="$BENCHMARK_DIR/$g/$r"
+			bench_spmv spmv $case_path
 		fi
 	done
 done	
 
 rm -rf $workspace
 
-cat spmv.csv
+cat $csv_output
