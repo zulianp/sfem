@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-# refs=(1 2 3 4 5)
-refs=(0 1)
+refs=(1 2 3 4 5)
+# refs=(0 1)
 
 set -e
 

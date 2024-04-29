@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -123,19 +124,20 @@ int main(int argc, char *argv[]) {
         elem_type = macro_type_variant(elem_type);
     }
 
-        real_t *x = 0;
-        if (strcmp("gen:ones", x_path) == 0) {
-            ptrdiff_t ndofs = crs.lrows;
-            x = malloc(ndofs * sizeof(real_t));
-    #pragma omp parallel for
-            for (ptrdiff_t i = 0; i < ndofs; ++i) {
-                x[i] = 1;
-            }
+    ptrdiff_t nnodes = mesh.nnodes;
 
-        } else {
-            ptrdiff_t _nope_, x_n;
-            array_create_from_file(comm, x_path, SFEM_MPI_REAL_T, (void **)&x, &_nope_, &x_n);
+    real_t *x = 0;
+    if (strcmp("gen:ones", x_path) == 0) {
+        x = malloc(nnodes * sizeof(real_t));
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            x[i] = 1;
         }
+
+    } else {
+        ptrdiff_t _nope_, x_n;
+        array_create_from_file(comm, x_path, SFEM_MPI_REAL_T, (void **)&x, &_nope_, &x_n);
+    }
 
     real_t *y = calloc(nnodes, sizeof(real_t));
 
@@ -163,7 +165,7 @@ int main(int argc, char *argv[]) {
 
         cudaDeviceSynchronize();
         double mf_tock = MPI_Wtime();
-        printf("mf: %g %ld %ld\n", (mf_tock - mf_tick) / SFEM_REPEAT, ndofs, 0l);
+        printf("mf: %g %ld %ld\n", (mf_tock - mf_tick) / SFEM_REPEAT, nnodes, 0l);
 
         CHECK_CUDA(cudaPeekAtLastError());
         CHECK_CUDA(cudaMemcpy(y, d_y, nnodes * sizeof(real_t), cudaMemcpyDeviceToHost));

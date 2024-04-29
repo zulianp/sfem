@@ -11,12 +11,6 @@ export PATH=$SCRIPTPATH/../../bin/:$PATH
 
 export PATH=$SCRIPTPATH:$PATH
 export PATH=$SCRIPTPATH/../..:$PATH
-export PATH=$SCRIPTPATH/../../python/sfem:$PATH
-export PATH=$SCRIPTPATH/../../python/sfem/mesh:$PATH
-export PATH=$SCRIPTPATH/../../python/sfem/grid:$PATH
-export PATH=$SCRIPTPATH/../../python/sfem/algebra:$PATH
-export PATH=$SCRIPTPATH/../../python/sfem/utils:$PATH
-export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 if [[ -z $BENCHMARK_DIR ]]
 then
@@ -40,18 +34,19 @@ then
 	export SFEM_REPEAT=10
 fi
 
-if !command -v cuspmv &> /dev/null
+if [[ -z $ENABLE_CUDA ]]
 then
 	export ENABLE_CUDA=1
-else
-	export ENABLE_CUDA=0
-	echo "cuspmv not found! setting ENABLE_CUDA=$ENABLE_CUDA"
+fi
+
+if [[ $ENABLE_CUDA ==  1 ]]
+then
+	echo "CUDA is enabled!"
 fi
 
 geo=(`ls $BENCHMARK_DIR`)
 
 workspace=`mktemp -d`
-
 
 mkdir -p results
 today=`date +"%Y_%m_%d"`
@@ -87,11 +82,12 @@ do
 
 	for r in ${resolutions[@]}
 	do
+		case_path="$BENCHMARK_DIR/$g/$r"
+
 		if [[ $ENABLE_CUDA ==  1 ]]
 		then
 			bench_spmv cuspmv $case_path
 		else
-			case_path="$BENCHMARK_DIR/$g/$r"
 			bench_spmv spmv $case_path
 		fi
 	done

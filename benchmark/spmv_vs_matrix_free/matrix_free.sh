@@ -40,27 +40,28 @@ then
 	export SFEM_REPEAT=10
 fi
 
-if !command -v cuspmv &> /dev/null
+if [[ -z $ENABLE_CUDA ]]
 then
 	export ENABLE_CUDA=1
-else
-	export ENABLE_CUDA=0
-	echo "cuspmv not found! setting ENABLE_CUDA=$ENABLE_CUDA"
+fi
+
+if [[ $ENABLE_CUDA ==  1 ]]
+then
+	echo "CUDA is enabled!"
 fi
 
 geo=(`ls $BENCHMARK_DIR`)
 
 workspace=`mktemp -d`
 
-scalar_mf=lapl_matrix_free
-vector_mf=linear_elasticity_matrix_free
-
 mkdir -p results
-
 today=`date +"%Y_%m_%d"`
 csv_output=results/"$today"_matrix_free.csv
 
 echo "rep,geo,op_type,ref,ptype,TTS,ndofs,nnz" > $csv_output
+
+scalar_mf=lapl_matrix_free
+vector_mf=linear_elasticity_matrix_free
 
 function bench_matrix_free_cuda()
 {
