@@ -125,14 +125,14 @@ __device__ __forceinline__ void get_nearest_coordinates_floor_cu(const double x_
  * @param j Reference to the variable where the calculated y-coordinate of the nearest grid point
  * will be stored.
  */
-__device__ void get_nearest_coordinates_ceil_cu(const double x_zero,
-                                                const double y_zero,
-                                                const double delta_x,
-                                                const double delta_y,
-                                                const double x,
-                                                const double y,
-                                                int& i,
-                                                int& j) {
+__device__ __forceinline__ void get_nearest_coordinates_ceil_cu(const double x_zero,
+                                                                const double y_zero,
+                                                                const double delta_x,
+                                                                const double delta_y,
+                                                                const double x,
+                                                                const double y,
+                                                                int& i,
+                                                                int& j) {
     //
     i = int(ceil((x - x_zero) / delta_x));
     j = int(ceil((y - y_zero) / delta_y));
@@ -176,12 +176,14 @@ __device__ void get_domain_from_stripe_cu(const domains_stripe& ds,
  * @param ds The domains_stripe struct containing information about the stripe.
  * @return void
  */
-__device__ __forceinline__ void perform_quadrature_global_stripe(double* Qs,                  //
-                                                                 const global_grid_type& gg,  //
-                                                                 const quadrature_rule& qr,   //
-                                                                 const size_t qr_nodes_nr_,   //
-                                                                 const domains_stripe& ds) {  //
-                                                                                              //
+__device__ __forceinline__                                                 //
+        void                                                               //
+        perform_quadrature_global_stripe(double* Qs,                       //
+                                         const global_grid_cuda_type& gg,  //
+                                         const quadrature_rule& qr,        //
+                                         const size_t qr_nodes_nr_,        //
+                                         const domains_stripe& ds) {       //
+                                                                           //
     const size_t id = blockIdx.x * blockDim.x + threadIdx.x;
     const size_t domain_nr = threadIdx.x;
     // printf("domain_nr: %lu, id %lu \n", domain_nr, id);
@@ -232,11 +234,21 @@ __device__ __forceinline__ void perform_quadrature_global_stripe(double* Qs,    
                                          i_local,
                                          j_local);
 
-        /////// data trasfer 4 * 8 * qnr * dnr
-        const double f1 = gg.grid_ptr_cu[i_local * gg.x_size + j_local];
-        const double f2 = gg.grid_ptr_cu[i_local * gg.y_size + j_local + 1];
-        const double f3 = gg.grid_ptr_cu[(i_local + 1) * gg.y_size + j_local];
-        const double f4 = gg.grid_ptr_cu[(i_local + 1) * gg.y_size + j_local + 1];
+        /////// data trasfer: 4 * 8 * qnr * dnr
+        // const size_t i1 = INDEX_ABS(gg.y_size, i_local, j_local);
+        // const size_t i2 = INDEX_ABS(gg.y_size, i_local, j_local + 1);
+        // const size_t i3 = INDEX_ABS(gg.y_size, i_local + 1, j_local);
+        // const size_t i4 = INDEX_ABS(gg.y_size, i_local + 1, j_local + 1);
+
+        const size_t i1 = XY_INDEX(gg.x_size, gg.y_size, i_local, j_local);
+        const size_t i2 = XY_INDEX(gg.x_size, gg.y_size, i_local, j_local + 1);
+        const size_t i3 = XY_INDEX(gg.x_size, gg.y_size, i_local + 1, j_local);
+        const size_t i4 = XY_INDEX(gg.x_size, gg.y_size, i_local + 1, j_local + 1);
+
+        const double f1 = gg.grid_ptr_cu[i1];
+        const double f2 = gg.grid_ptr_cu[i2];
+        const double f3 = gg.grid_ptr_cu[i3];
+        const double f4 = gg.grid_ptr_cu[i4];
 
         const double x1 = gg.x_zero + i_local * gg.delta;        // 2 * qnr * dnr
         const double x2 = gg.x_zero + (i_local + 1) * gg.delta;  // 3 * qnr * dnr
@@ -272,6 +284,11 @@ __device__ __forceinline__ void perform_quadrature_global_stripe(double* Qs,    
     return;
 }
 
+__device__ void foo(double* Qs, double* local_grid_shared) {
+    const size_t id = blockIdx.x * blockDim.x + threadIdx.x;
+    Qs[id] = local_grid_shared[id % blockDim.x];
+}
+
 /**
  * @brief Performs the quadrature for a single stripe.
  *
@@ -282,22 +299,23 @@ __device__ __forceinline__ void perform_quadrature_global_stripe(double* Qs,    
  * @param ds
  * @return __device__
  */
-__device__ __forceinline__                                              //
+__device__                                                              //
         void                                                            //
         perform_quadrature_local_stripe(double* Qs,                     //
                                         double* local_grid_shared,      //
                                         const local_grid_cuda_type lg,  //
-                                        // const global_grid_type& gg,     //
-                                        const quadrature_rule& qr,   //
-                                        const size_t qr_nodes_nr_,   //
-                                        const domains_stripe& ds) {  //
-                                                                     //
+                                        const quadrature_rule& qr,      //
+                                        const size_t qr_nodes_nr_,      //
+                                        const domains_stripe& ds) {     //
+                                                                        //
     const size_t id = blockIdx.x * blockDim.x + threadIdx.x;
     const size_t domain_nr = threadIdx.x;
 
     // for (size_t i = 0; i < ds.nr_domains; ++i) {
     double x_d_min, y_d_min, x_d_max, y_d_max;
     get_domain_from_stripe_cu(ds, domain_nr, x_d_min, y_d_min, x_d_max, y_d_max);
+
+    const size_t lg_size = lg.x_size * lg.y_size;
 
     // printf("Domain %d: x_min: %f, x_max: %f, y_min: %f, y_max: %f  -- GPU\n",
     //        domain_nr,
@@ -331,10 +349,34 @@ __device__ __forceinline__                                              //
                                          j_local);
 
         /////// data trasfer 4 * 8 * qnr * dnr
-        const double f1 = local_grid_shared[i_local * lg.y_size + j_local];
-        const double f2 = local_grid_shared[i_local * lg.y_size + j_local + 1];
-        const double f3 = local_grid_shared[(i_local + 1) * lg.y_size + j_local];
-        const double f4 = local_grid_shared[(i_local + 1) * lg.y_size + j_local + 1];
+
+        // const size_t i1 = INDEX_ABS(lg.y_size, i_local, j_local);
+        // const size_t i2 = INDEX_ABS(lg.y_size, i_local, j_local + 1);
+        // const size_t i3 = INDEX_ABS(lg.y_size, i_local + 1, j_local);
+        // const size_t i4 = INDEX_ABS(lg.y_size, i_local + 1, j_local + 1);
+
+        const size_t i1 = XY_INDEX(lg.x_size, lg.y_size, i_local, j_local);
+        const size_t i2 = XY_INDEX(lg.x_size, lg.y_size, i_local, j_local + 1);
+        const size_t i3 = XY_INDEX(lg.x_size, lg.y_size, i_local + 1, j_local);
+        const size_t i4 = XY_INDEX(lg.x_size, lg.y_size, i_local + 1, j_local + 1);
+
+        // if (i1 >= 4096 or i2 >= 4096 or i3 >= 4096 or i4 >= 4096 or lg_size >= 4096) {
+        //     printf("Error: i1: %lu, i2: %lu, i3: %lu, i4: %lu, lg_size: %lu\n",
+        //            i1,
+        //            i2,
+        //            i3,
+        //            i4,
+        //            lg_size);
+        //     // interupt cuda kernel
+        //     return;
+        // }
+
+        const double f1 = local_grid_shared[i1];
+        const double f2 = local_grid_shared[i2];
+        const double f3 = local_grid_shared[i3];
+        const double f4 = local_grid_shared[i4];
+
+        // const double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0;
 
         // if (q_i == 1)
         // printf("f1: %f, f2: %f, f3: %f, f4: %f\n", f1, f2, f3, f4);
@@ -416,7 +458,7 @@ __device__ __forceinline__                                              //
  * @return __global__
  */
 __global__ void perform_quadrature_global_stripe_kernel(double* Qs,                            //
-                                                        const global_grid_type gg,             //
+                                                        const global_grid_cuda_type gg,        //
                                                         const quadrature_rule qr,              //
                                                         const size_t qr_nodes_nr_,             //
                                                         const domains_stripe* ds_vector,       //
@@ -440,12 +482,14 @@ __global__ void perform_quadrature_global_stripe_kernel(double* Qs,             
  * @param nr_of_domains_stripes
  * @return __global__
  */
-__global__ void perform_quadrature_local_stripe_kernel(double* Qs,                            //
-                                                       const global_grid_type gg,             //
-                                                       const quadrature_rule qr,              //
-                                                       const size_t qr_nodes_nr_,             //
-                                                       const domains_stripe* ds_vector,       //
-                                                       const size_t nr_of_domains_stripes) {  //
+__global__                                                                            //
+        void                                                                          //
+        perform_quadrature_local_stripe_kernel(double* Qs,                            //
+                                               const global_grid_cuda_type gg,        //
+                                               const quadrature_rule qr,              //
+                                               const size_t qr_nodes_nr_,             //
+                                               const domains_stripe* ds_vector,       //
+                                               const size_t nr_of_domains_stripes) {  //
     //
     const size_t id = blockIdx.x * blockDim.x + threadIdx.x;
     const size_t domain_nr = threadIdx.x;
@@ -464,10 +508,12 @@ __global__ void perform_quadrature_local_stripe_kernel(double* Qs,              
 
     lg.x_d_min = x_d_min;
     lg.y_d_min = y_d_min;
+
     lg.x_d_max = x_d_max;
     lg.y_d_max = y_d_max;
 
-    int i_global_min, j_global_min;
+    int i_global_min;
+    int j_global_min;
     get_nearest_coordinates_floor_cu(gg.x_zero,  //
                                      gg.y_zero,  //
                                      gg.delta,
@@ -477,7 +523,8 @@ __global__ void perform_quadrature_local_stripe_kernel(double* Qs,              
                                      i_global_min,
                                      j_global_min);
 
-    int i_global_max, j_global_max;
+    int i_global_max;
+    int j_global_max;
     get_nearest_coordinates_ceil_cu(gg.x_zero,  //
                                     gg.y_zero,  //
                                     gg.delta,
@@ -518,24 +565,36 @@ __global__ void perform_quadrature_local_stripe_kernel(double* Qs,              
 
     int cnt = 0;
 
-    while (true) {
-        int index_abs_local = cnt * blockDim.x + threadIdx.x;
+    const int block_dim = blockDim.x;
+    const int thread_id = threadIdx.x;
 
+    while (true) {
+        int index_abs_local = cnt * block_dim + thread_id;
+
+#if Y_MAJOR == 1
         i = index_abs_local % lg.x_size;
         j = index_abs_local / lg.x_size;
+#elif X_MAJOR == 1
+        i = index_abs_local / lg.y_size;
+        j = index_abs_local % lg.y_size;
+#else
+#error "Either Y_MAJOR or X_MAJOR should be defined"
+#endif
 
         if (index_abs_local >= local_grid_size) break;
 
         i_global = i_global_min + i;
         j_global = j_global_min + j;
 
-        local_grid_shared[i * lg.y_size + j] = gg.grid_ptr_cu[i_global * gg.y_size + j_global];
-        // local_grid_shared[j * lg.x_size + i] = 0.01;
+        const size_t i_global_abs = XY_INDEX(gg.x_size, gg.y_size, i_global, j_global);
+        const size_t i_local_abs = XY_INDEX(lg.x_size, lg.y_size, i, j);
+
+        local_grid_shared[i_local_abs] = gg.grid_ptr_cu[i_global_abs];
 
         cnt += 1;
     }
 
-    // __syncthreads();
+    __syncthreads();
 
     //     if (threadIdx.x == 0) {
     //         for (size_t i = 0; i < lg.x_size; ++i) {
@@ -546,7 +605,9 @@ __global__ void perform_quadrature_local_stripe_kernel(double* Qs,              
     //         }
     //     }
 
-    __syncthreads();
+    // __syncthreads();
+
+    // foo(Qs, local_grid_shared);
 
     perform_quadrature_local_stripe(Qs,  //
                                     local_grid_shared,
@@ -587,6 +648,38 @@ bool copy_global_grid_to_device(global_grid_type& gg) {
         printf("Error code e2: %s\n", cudaGetErrorString(e2));
         return false;
     }
+
+    return true;
+}
+
+/**
+ * @brief Frees the global grid on the device.
+ *
+ * @param gg The global grid to be freed.
+ * @return true if the memory was successfully freed.
+ * @return false if an error occurred while freeing the memory.
+ */
+bool copy_global_grid_to_device(const global_grid_type& gg, global_grid_cuda_type& gg_dev) {
+    cudaError e1 = cudaMalloc((void**)&gg_dev.grid_ptr_cu,  //
+                              (unsigned long)gg.grid.size() * sizeof(double));
+
+    cudaError e2 = cudaMemcpy(gg_dev.grid_ptr_cu,
+                              &gg.grid[0],
+                              (unsigned long)gg.grid.size() * sizeof(double),
+                              cudaMemcpyHostToDevice);
+
+    if (e1 != cudaSuccess || e2 != cudaSuccess) {
+        printf("!!!!!  Error Alloccating and copying global grid to device\n");
+        printf("!!!!!  Error code e1: %s\n", cudaGetErrorString(e1));
+        printf("!!!!!  Error code e2: %s\n", cudaGetErrorString(e2));
+        return false;
+    }
+
+    gg_dev.delta = gg.delta;
+    gg_dev.x_zero = gg.x_zero;
+    gg_dev.y_zero = gg.y_zero;
+    gg_dev.x_size = gg.x_size;
+    gg_dev.y_size = gg.y_size;
 
     return true;
 }
@@ -729,7 +822,9 @@ int test_global(double& Q_global,                          //
                 quadrature_rule& qr,                       //
                 std::vector<domains_stripe>& ds_vector) {  //
 
-    copy_global_grid_to_device(gg);
+    global_grid_cuda_type gg_dev;
+
+    copy_global_grid_to_device(gg, gg_dev);
     copy_quadrature_rule_to_device(qr);
 
     domains_stripe* ds_vector_cu = nullptr;
@@ -775,7 +870,7 @@ int test_global(double& Q_global,                          //
     /// start kernel ///
     perform_quadrature_global_stripe_kernel<<<nr_stripes, nr_domains_per_stripe>>>(  //
             Qs_cu,                                                                   //
-            gg,                                                                      //
+            gg_dev,                                                                  //
             qr,                                                                      //
             qr.weights.size(),                                                       //
             ds_vector_cu,                                                            //
@@ -798,7 +893,7 @@ int test_global(double& Q_global,                          //
     float milliseconds = 0;
     cudaEventElapsedTime(&milliseconds, start, stop);
 
-    printf("Time elapsed: %f ms\n", milliseconds);
+    printf("Global Time elapsed: %f ms\n", milliseconds);
 
     ///// end kernel /////
 
@@ -838,7 +933,9 @@ int test_local(double& Q_local,                           //
                quadrature_rule& qr,                       //
                std::vector<domains_stripe>& ds_vector) {  //
 
-    copy_global_grid_to_device(gg);
+    global_grid_cuda_type gg_dev;
+
+    copy_global_grid_to_device(gg, gg_dev);
     copy_quadrature_rule_to_device(qr);
 
     domains_stripe* ds_vector_cu = nullptr;
@@ -884,17 +981,19 @@ int test_local(double& Q_local,                           //
 
     cudaEventRecord(start);
 
-    /// start kernel ///
+    /* start kernel  */
     perform_quadrature_local_stripe_kernel<<<nr_stripes, nr_domains_per_stripe>>>(  //
             Qs_cu,                                                                  //
-            gg,                                                                     //
+            gg_dev,                                                                 //
             qr,                                                                     //
             qr.weights.size(),                                                      //
             ds_vector_cu,                                                           //
             ds_vector.size());                                                      //
 
-    cudaEventRecord(stop);
+    // axpy<<<nr_domains_tot, 1024>>>(Qs_cu, Qs_cu, 1.0, nr_domains_tot);
+
     cudaEventSynchronize(stop);
+    cudaEventRecord(stop);
 
     // get error code
     cudaError_t error = cudaGetLastError();

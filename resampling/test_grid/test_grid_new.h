@@ -3,12 +3,54 @@
 #define TEST_GRID_NEW_H
 
 #include <valarray>
+
+#define INDEX_ABS(major_size, minor_index, major_index) \
+    ((minor_index) * (major_size) + (major_index))
+
+#define Y_MAJOR 0
+// #define X_MAJOR 1
+
+#if Y_MAJOR == 1
+#define X_MAJOR 0
+#else
+#define X_MAJOR 1
+#endif
+
+#define XY_INDEX(x_size, y_size, i_index, j_index)       \
+    ({                                                   \
+        size_t index = 0;                                \
+        if (X_MAJOR == 1) {                              \
+            index = INDEX_ABS(x_size, j_index, i_index); \
+        } else {                                         \
+            index = INDEX_ABS(y_size, i_index, j_index); \
+        }                                                \
+        index;                                           \
+    })
+
 /**
  * @brief Represents a global grid with specified dimensions and properties.
  */
 struct global_grid_type {
     std::valarray<double> grid; /**< The grid values. */
 
+    double *grid_ptr_cu = nullptr; /**< Pointer to the grid values for cuda device */
+
+    double delta; /**< The grid spacing. */
+
+    double x_zero; /**< The x-coordinate of the grid origin. */
+    double y_zero; /**< The y-coordinate of the grid origin. */
+
+    double x_max; /**< The maximum x-coordinate of the grid. */
+    double y_max; /**< The maximum y-coordinate of the grid. */
+
+    size_t x_size; /**< The number of grid points in the x-direction. */
+    size_t y_size; /**< The number of grid points in the y-direction. */
+};
+
+/**
+ * @brief Represents a global grid with specified dimensions and properties for cuda.
+ */
+struct global_grid_cuda_type {
     double *grid_ptr_cu = nullptr; /**< Pointer to the grid values for cuda device */
 
     double delta; /**< The grid spacing. */

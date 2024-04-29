@@ -8,7 +8,7 @@ ifeq (${VERBOSE}, on)
 	VERBOSE_FLAG = -v
 endif
 
-CFLAGS = -Wall -Ofast -std=c++17 -mtune=native -march=native  -mprefer-vector-width=512 -Wshadow=local
+CFLAGS = -Wall 
 LDFLAGS = -lpthread -lstdc++ -lm
 
 DEBUG ?= 0
@@ -22,9 +22,11 @@ CUDA_DEBUG =
 ifeq ($(DEBUG),1)
 	CFLAGS += -g
 	CUDA_DEBUG += -g
+else
+	CFLAGS += -std=c++17 -mtune=native -march=native  -mprefer-vector-width=512 -Wshadow=local -Ofast 
 endif
 
-CU_OPT_FLAGS = -O3 -use_fast_math -Xptxas=-O3,-v -Xcompiler -O3,-march=native,-mtune=native
+CU_OPT_FLAGS = -O3 -use_fast_math -Xptxas=-O3,-v -Xcompiler=-O3,-march=native,-mtune=native
 CU_TEST_GRID = test_grid_new_cuda
 CU_LIB=lib${CU_TEST_GRID}.a
 GPU_ARCH ?= sm_75
