@@ -128,4 +128,37 @@ struct quadrature_rule {
     double y_max; /**< The maximum y-coordinate of the domain. */
 };
 
+struct quadrature_rule_cuda {
+    double *weights_ptr_cu = nullptr; /**< Pointer to the quadrature weights for cuda device */
+    double *x_nodes_ptr_cu = nullptr; /**< Pointer to the x-coordinates of the quadrature nodes for
+                               cuda device */
+    double *y_nodes_ptr_cu = nullptr; /**< Pointer to the y-coordinates of the quadrature nodes for
+                              cuda device */
+
+    double x_min; /**< The minimum x-coordinate of the domain. */
+    double y_min; /**< The minimum y-coordinate of the domain. */
+    double x_max; /**< The maximum x-coordinate of the domain. */
+    double y_max; /**< The maximum y-coordinate of the domain. */
+};
+
+/**
+ * Calculates the number of floating-point operations per second (FLOPS) for a given set of
+ * parameters.
+ *
+ * @param nr_stripes The number of stripes.
+ * @param nr_domains_per_stripe The number of domains per stripe.
+ * @param quad_nodes_nr The number of quad nodes.
+ * @param time_sec The time in seconds.
+ * @return The number of FLOPS per second.
+ */
+inline double q_flops(const size_t nr_stripes,
+                      const size_t nr_domains_per_stripe,
+                      const size_t quad_nodes_nr,
+                      const double time_sec) {
+    const double tot_flop = nr_stripes * (7.0 * nr_domains_per_stripe +
+                                          51.0 * nr_domains_per_stripe * quad_nodes_nr);
+
+    return tot_flop / time_sec;
+}
+
 #endif  // TEST_GRID_NEW_H

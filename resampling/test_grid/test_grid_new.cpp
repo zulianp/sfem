@@ -1141,9 +1141,11 @@ int test_stripes(int argc,
         const double nr_domains_per_stripe = stripes[0].nr_domains;
         const double quad_nodes_nr = qr.x_nodes.size();
 
-        const double tot_flop = nr_stripes * (7.0 * nr_domains_per_stripe +
-                                              51.0 * nr_domains_per_stripe * quad_nodes_nr);
-        const double flops = tot_flop / seconds;
+        // const double tot_flop = nr_stripes * (7.0 * nr_domains_per_stripe +
+        //                                       51.0 * nr_domains_per_stripe * quad_nodes_nr);
+        // const double flops = tot_flop / seconds;
+
+        const double flops = q_flops(nr_stripes, nr_domains_per_stripe, quad_nodes_nr, seconds);
 
         const double data_transfer =
                 8.0 * nr_stripes * nr_domains_per_stripe * quad_nodes_nr * (4 + 1);
@@ -1188,10 +1190,12 @@ int test_stripes(int argc,
         const double nr_domains_per_stripe = stripes[0].nr_domains;
         const double quad_nodes_nr = qr.x_nodes.size();
 
-        const double tot_flop = nr_stripes * (7.0 * nr_domains_per_stripe +
-                                              51.0 * nr_domains_per_stripe * quad_nodes_nr);
+        // const double tot_flop = nr_stripes * (7.0 * nr_domains_per_stripe +
+        //                                       51.0 * nr_domains_per_stripe * quad_nodes_nr);
 
-        const double flops = tot_flop / seconds;
+        // const double flops = tot_flop / seconds;
+
+        const double flops = q_flops(nr_stripes, nr_domains_per_stripe, quad_nodes_nr, seconds);
 
         const double data_transfer =
                 8.0 * nr_stripes * nr_domains_per_stripe * quad_nodes_nr * (4 + 1);
@@ -1290,9 +1294,7 @@ bool test_stripes_mt(int argc,
             end_index += nr_stripes_per_thread;
         }
 
-        for (size_t i = 0; i < nr_threads; ++i) {
-            threads[i].join();
-        }
+        for (size_t i = 0; i < nr_threads; ++i) threads[i].join();
 
         Ql = Qs_threads.sum();
 
@@ -1311,9 +1313,11 @@ bool test_stripes_mt(int argc,
 
         std::cout << "Execution time: " << seconds << " seconds" << std::endl;
 
-        const double tot_flop = nr_stripes * (7.0 * nr_domains_per_stripe +
-                                              51.0 * nr_domains_per_stripe * quad_nodes_nr);
-        const double flops = tot_flop / seconds;
+        // const double tot_flop = nr_stripes * (7.0 * nr_domains_per_stripe +
+        //                                       51.0 * nr_domains_per_stripe * quad_nodes_nr);
+        // const double flops = tot_flop / seconds;
+
+        const double flops = q_flops(nr_stripes, nr_domains_per_stripe, quad_nodes_nr, seconds);
 
         const double data_transfer =
                 8.0 * nr_stripes * nr_domains_per_stripe * quad_nodes_nr * (4 + 2);
@@ -1398,9 +1402,11 @@ bool test_stripes_mt(int argc,
 
         std::cout << "Global Execution time: " << seconds << " seconds" << std::endl;
 
-        const double tot_flop = nr_stripes * (7.0 * nr_domains_per_stripe +
-                                              51.0 * nr_domains_per_stripe * quad_nodes_nr);
-        const double flops = tot_flop / seconds;
+        // const double tot_flop = nr_stripes * (7.0 * nr_domains_per_stripe +
+        //                                       51.0 * nr_domains_per_stripe * quad_nodes_nr);
+        // const double flops = tot_flop / seconds;
+
+        const double flops = q_flops(nr_stripes, nr_domains_per_stripe, quad_nodes_nr, seconds);
 
         const double data_transfer =
                 8.0 * nr_stripes * nr_domains_per_stripe * quad_nodes_nr * (4 + 1);
@@ -1459,10 +1465,10 @@ int main(int argc, char* argv[]) {
             .xy_zero_domain = 0.0,
             .delta_domain = 0.06,  // delta of the gloabl grid
             .nr_stripes = 120200,
-            .random_seed = 0,
+            .random_seed = 22,
             .nr_domains_per_stripe = 32,
-            .side_x_stripe = 0.52, // side of the stripe subdomain
-            .side_y_stripe = 0.52, // side of the stripe subdomain
+            .side_x_stripe = 0.52,  // side of the stripe subdomain
+            .side_y_stripe = 0.52,  // side of the stripe subdomain
             .start_x_stripes = 0.111,
             .start_y_stripes = 0.122,
             .fun = [](double x,
@@ -1478,7 +1484,7 @@ int main(int argc, char* argv[]) {
     build_problem(gg, stripes, qr, prs);
 
     // size_t quad_nodes_nr = 130;
-    size_t nr_threads = 18;
+    size_t nr_threads = 36;
 
     int a = 0, b = 0, c = 0;
 

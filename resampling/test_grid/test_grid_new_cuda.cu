@@ -759,6 +759,53 @@ bool copy_quadrature_rule_to_device(const quadrature_rule& qr) {
     return true;
 }
 
+bool copy_quadrature_rule_to_device(const quadrature_rule& qr, quadrature_rule_cuda& qr_dev) {
+    cudaError e1 = cudaMalloc((void**)&qr_dev.x_nodes_ptr_cu,  //
+                              (unsigned long)qr.x_nodes.size() * sizeof(double));
+
+    cudaError e2 = cudaMalloc((void**)&qr_dev.y_nodes_ptr_cu,  //
+                              (unsigned long)qr.y_nodes.size() * sizeof(double));
+
+    cudaError e3 = cudaMalloc((void**)&qr_dev.weights_ptr_cu,  //
+                              (unsigned long)qr.weights.size() * sizeof(double));
+
+    cudaError e4 = cudaMemcpy(qr_dev.x_nodes_ptr_cu,
+                              &qr.x_nodes[0],
+                              (unsigned long)qr.x_nodes.size() * sizeof(double),
+                              cudaMemcpyHostToDevice);
+
+    cudaError e5 = cudaMemcpy(qr_dev.y_nodes_ptr_cu,
+                              &qr.y_nodes[0],
+                              (unsigned long)qr.y_nodes.size() * sizeof(double),
+                              cudaMemcpyHostToDevice);
+
+    cudaError e6 = cudaMemcpy(qr_dev.weights_ptr_cu,
+                              &qr.weights[0],
+                              (unsigned long)qr.weights.size() * sizeof(double),
+                              cudaMemcpyHostToDevice);
+
+    printf("\nqr.x_nodes.size(): %lu\n", qr.x_nodes.size());
+    printf("qr.y_nodes.size(): %lu\n", qr.y_nodes.size());
+    printf("qr.weights.size(): %lu\n", qr.weights.size());
+
+    if (e1 != cudaSuccess || e2 != cudaSuccess ||  //
+        e3 != cudaSuccess || e4 != cudaSuccess ||  //
+        e5 != cudaSuccess || e6 != cudaSuccess) {  //
+
+        printf("Error Copying quadrature rule to device\n");
+        printf("Error code e1: %s\n", cudaGetErrorString(e1));
+        printf("Error code e2: %s\n", cudaGetErrorString(e2));
+        printf("Error code e3: %s\n", cudaGetErrorString(e3));
+        printf("Error code e4: %s\n", cudaGetErrorString(e4));
+        printf("Error code e5: %s\n", cudaGetErrorString(e5));
+        printf("Error code e6: %s\n", cudaGetErrorString(e6));
+
+        return false;
+    }
+
+    return true;
+}
+
 /**
  * @brief Frees the quadrature rule on the device.
  *
@@ -778,6 +825,27 @@ bool free_quadrature_rule_on_device(quadrature_rule& qr) {
     qr.x_nodes_ptr_cu = nullptr;
     qr.y_nodes_ptr_cu = nullptr;
     qr.weights_ptr_cu = nullptr;
+
+    return true;
+}
+
+bool free_quadrature_rule_on_device(quadrature_rule_cuda& qr_dev) {
+    cudaError e1 = cudaFree(qr_dev.x_nodes_ptr_cu);
+    cudaError e2 = cudaFree(qr_dev.y_nodes_ptr_cu);
+    cudaError e3 = cudaFree(qr_dev.weights_ptr_cu);
+
+    if (e1 != cudaSuccess || e2 != cudaSuccess || e3 != cudaSuccess) {
+        printf("Error freeing quadrature rule on device\n");
+        printf("Error code e1: %s\n", cudaGetErrorString(e1));
+        printf("Error code e2: %s\n", cudaGetErrorString(e2));
+        printf("Error code e3: %s\n", cudaGetErrorString(e3));
+
+        return false;
+    }
+
+    qr_dev.x_nodes_ptr_cu = nullptr;
+    qr_dev.y_nodes_ptr_cu = nullptr;
+    qr_dev.weights_ptr_cu = nullptr;
 
     return true;
 }
@@ -913,6 +981,9 @@ int test_global(double& Q_global,                          //
     free(Qs);
 
     printf("\n+++++ Global Q_tot GPU : %f   \n\n", Q_tot);
+    const double flops =
+            q_flops(nr_stripes, nr_domains_per_stripe, qr.weights.size(), milliseconds / 1000.0);
+    printf("Global CUDA GFLOPS: %f\n\n", flops / (1024.0 * 1024.0 * 1024.0));
 
     Q_global = Q_tot;
 
@@ -934,9 +1005,12 @@ int test_local(double& Q_local,                           //
                std::vector<domains_stripe>& ds_vector) {  //
 
     global_grid_cuda_type gg_dev;
+    quadrature_rule_cuda qr_dev;
 
     copy_global_grid_to_device(gg, gg_dev);
-    copy_quadrature_rule_to_device(qr);
+    copy_quadrature_rule_to_device(qr, qr_dev);
+
+    // copy_quadrature_rule_to_device(qr);
 
     domains_stripe* ds_vector_cu = nullptr;
 
@@ -1028,6 +1102,10 @@ int test_local(double& Q_local,                           //
 
     printf("--------------------------------\n");
     printf("\n+++++ Local Q_tot GPU : %f   \n\n", Q_tot);
+
+    const double flops =
+            q_flops(nr_stripes, nr_domains_per_stripe, qr.weights.size(), milliseconds / 1000.0);
+    printf("Local CUDA GFLOPS: %f\n", flops / (1024.0 * 1024.0 * 1024.0));
 
     Q_local = Q_tot;
 
