@@ -94,8 +94,7 @@ int main(int argc, char *argv[]) {
     double spmv_tock = MPI_Wtime();
     double avg_time = (spmv_tock - spmv_tick) / SFEM_REPEAT;
     double avg_throughput = (crs.grows / avg_time) * (sizeof(real_t) * 1e-9);
-
-    printf("spmv: %g %ld %ld %g\n", avg_time, crs.lrows, crs.lnnz, avg_throughput);
+    printf("spmv:  %g %g %ld %ld %ld\n", avg_time, avg_throughput, 0l, crs.lrows, crs.lnnz);
 
     array_write(comm, output_path, SFEM_MPI_REAL_T, y, crs.grows, crs.grows);
     crs_free(&crs);

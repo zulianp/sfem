@@ -192,7 +192,8 @@ int main(int argc, char *argv[]) {
         double avg_time = (spmv_tock - spmv_tick) / SFEM_REPEAT;
         double avg_throughput = (crs.grows / avg_time) * (sizeof(real_t) * 1e-9);
 
-        printf("spmv: %g %ld %ld %g\n", avg_time, crs.lrows, crs.lnnz, avg_throughput);
+
+        printf("spmv:  %g %g %ld %ld %ld\n", avg_time, avg_throughput, 0l, crs.lrows, crs.lnnz);
 
         CHECK_CUDA(cudaPeekAtLastError());
         CHECK_CUDA(cudaMemcpy(y, dY, crs.lrows * sizeof(real_t), cudaMemcpyDeviceToHost));

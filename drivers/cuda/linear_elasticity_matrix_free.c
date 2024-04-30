@@ -129,7 +129,8 @@ int main(int argc, char *argv[]) {
         double avg_time = (mf_tock - mf_tick) / SFEM_REPEAT;
         double avg_throughput = (ndofs / avg_time) * (sizeof(real_t) * 1e-9);
 
-        printf("mf: %g %ld %ld %g\n", avg_time, ndofs, 0l, avg_throughput);
+        printf("mf: %g %g %ld %ld %ld\n", 
+            avg_time, avg_throughput, mesh.nelements, ndofs, 0l);
 
         CHECK_CUDA(cudaPeekAtLastError());
         CHECK_CUDA(cudaMemcpy(y, d_y, ndofs * sizeof(real_t), cudaMemcpyDeviceToHost));

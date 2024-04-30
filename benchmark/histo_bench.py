@@ -14,7 +14,7 @@ op_type = "LinearElasticity"
 elem_type 	 = "tet10"
 elem_type_p1 = "tet4"
 size_of_real = 8
-gpu = "P100"
+gpu = "1 x P100 GPU"
 
 # Check for command line arguments
 if len(sys.argv) < 3:
@@ -54,8 +54,8 @@ plt.plot(MF_x,    MF_y,	 marker='x', linestyle='-', label=f"MF ({elem_type})")
 plt.plot(MF_x_p1, MF_y_p1,	 marker='x', linestyle='-', label=f"MF ({elem_type_p1})")
 
 plt.xlabel('# dofs')
-plt.ylabel(f"G DOFS / second")
-plt.title(f"Operator: {op_type}, Mesh: {geo}, GPU {gpu}")
+plt.ylabel(f"G DOFs / second")
+plt.title(f"Operator: {op_type}, Mesh: {geo}, {gpu}")
 plt.legend()
 
 # Display the plot

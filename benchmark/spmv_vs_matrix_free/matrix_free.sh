@@ -59,46 +59,49 @@ today=`date +"%Y_%m_%d"`
 csv_output=results/"$today"_matrix_free.csv
 # csv_output_extra=results/"$today"_matrix_free_extra.csv
 
-echo "rep,geo,op_type,ref,ptype,TTS [s],ndofs,nnz,throughput [GB/s]" > $csv_output
+echo "rep,geo,op_type,ref,ptype,TTS [s],throughput [GB/s],nelements,ndofs,nnz" > $csv_output
 
 scalar_mf=lapl_matrix_free
 vector_mf=linear_elasticity_matrix_free
 
 function bench_matrix_free_cuda()
 {
-	case_path=$1
+	local case_path=$1
 
-	p1=$case_path/p1
-	p2=$case_path/p2
+	local p1=$case_path/p1
+	local p2=$case_path/p2
 	
+	##############################################
 	# Scalar problem
+	##############################################
+
 	lapl_matrix_free $p1/refined 1 "gen:ones" $workspace/test.raw > $workspace/temp_log.txt
 	op_type=`grep "op: " $p1/matrix_scalar/meta.yaml | awk '{print $2}'`
 
-	stats=`grep "mf:" $workspace/temp_log.txt | awk '{print $2, $3, $4, $5}' | tr ' ' ','`
+	stats=`grep "mf:" $workspace/temp_log.txt | awk '{print $2, $3, $4, $5, $6}' | tr ' ' ','`
 	echo "tet4,$g,$op_type,$r,scalar,$stats" >> $csv_output
 
 	lapl_matrix_free $p2 1 "gen:ones" $workspace/test.raw > $workspace/temp_log.txt
 	op_type=`grep "op: " $p1/matrix_scalar/meta.yaml | awk '{print $2}'`
 
-	stats=`grep "mf:" $workspace/temp_log.txt | awk '{print $2, $3, $4, $5}' | tr ' ' ','`
+	stats=`grep "mf:" $workspace/temp_log.txt | awk '{print $2, $3, $4, $5, $6}' | tr ' ' ','`
 	echo "tet10,$g,$op_type,$r,scalar,$stats" >> $csv_output
 
-
+	##############################################
 	# Vector problem
+	##############################################
+
 	SFEM_USE_MACRO=0 $vector_mf $p1/refined 1 "gen:ones" $workspace/test.raw > $workspace/temp_log.txt
 	op_type=`grep "op: " $p1/matrix_vector/meta.yaml | awk '{print $2}'`
 
-	stats=`grep "mf:" $workspace/temp_log.txt | awk '{print $2, $3, $4, $5}' | tr ' ' ','`
+	stats=`grep "mf:" $workspace/temp_log.txt | awk '{print $2, $3, $4, $5, $6}' | tr ' ' ','`
 	echo "tet4,$g,$op_type,$r,vector,$stats" >> $csv_output
 
 	SFEM_USE_MACRO=0 $vector_mf $p2 1 "gen:ones" $workspace/test.raw > $workspace/temp_log.txt
 	op_type=`grep "op: " $p1/matrix_vector/meta.yaml | awk '{print $2}'`
 
-	stats=`grep "mf:" $workspace/temp_log.txt | awk '{print $2, $3, $4, $5}' | tr ' ' ','`
+	stats=`grep "mf:" $workspace/temp_log.txt | awk '{print $2, $3, $4, $5, $6}' | tr ' ' ','`
 	echo "tet10,$g,$op_type,$r,vector,$stats" >> $csv_output
-
-
 }
 
 for g in ${geo[@]}
