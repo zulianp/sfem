@@ -87,6 +87,12 @@ function bench_matrix_free_cuda()
 	stats=`grep "mf:" $workspace/temp_log.txt | awk '{print $2, $3, $4, $5, $6}' | tr ' ' ','`
 	echo "tet10,$g,$op_type,$r,scalar,$stats" >> $csv_output
 
+	SFEM_USE_MACRO=1 lapl_matrix_free $p2 1 "gen:ones" $workspace/test.raw > $workspace/temp_log.txt
+	op_type=`grep "op: " $p1/matrix_scalar/meta.yaml | awk '{print $2}'`
+
+	stats=`grep "mf:" $workspace/temp_log.txt | awk '{print $2, $3, $4, $5, $6}' | tr ' ' ','`
+	echo "macrotet4,$g,$op_type,$r,scalar,$stats" >> $csv_output
+
 	##############################################
 	# Vector problem
 	##############################################

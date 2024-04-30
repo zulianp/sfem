@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
-refs=(1 2 3 4)
+refs=(0 1 2 3 4 5)
+
+# Largest matrix-based experiment (can vary w.r.t. SFEM idx_t count_t)
+largest_matrix=4
 # refs=(0 1)
 
 set -e
@@ -66,12 +69,16 @@ do
 	refine sorted refined
 
 	mkdir -p matrix_scalar
-	SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble refined matrix_scalar
 	echo "op: Laplacian" > matrix_scalar/meta.yaml
 
 	mkdir -p matrix_vector
-	SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble3 refined matrix_vector
 	echo "op: LinearElasticity" > matrix_vector/meta.yaml
+
+	if [[ $r -le $largest_matrix ]]
+	then
+		SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble refined matrix_scalar
+		SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble3 refined matrix_vector
+	fi
 
 	# P2 folder
 	mesh_p1_to_p2 sorted ../p2
@@ -104,12 +111,16 @@ do
 	refine sorted refined
 
 	mkdir -p matrix_scalar
-	SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble refined matrix_scalar
 	echo "op: Laplacian" > matrix_scalar/meta.yaml
 
 	mkdir -p matrix_vector
-	SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble3 refined matrix_vector
 	echo "op: LinearElasticity" > matrix_vector/meta.yaml
+
+	if [[ $r -le $largest_matrix ]]
+	then
+		SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble refined matrix_scalar
+		SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble3 refined matrix_vector
+	fi
 
 	# P2 folder
 	mesh_p1_to_p2 sorted ../p2
