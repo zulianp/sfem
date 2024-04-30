@@ -134,6 +134,10 @@ namespace sfem {
                                isolver_scalar_t * /*x*/) {
             assert(0);
         }
+
+        /// Make low-order-refinement operator
+        virtual std::shared_ptr<Op> lor_op() { assert(false); return nullptr; }
+        virtual std::shared_ptr<Op> coarsen_op() { assert(false); return nullptr; }
     };
 
     class NeumannConditions final : public Op {

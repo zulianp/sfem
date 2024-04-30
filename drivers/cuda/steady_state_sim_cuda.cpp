@@ -1,12 +1,15 @@
-#include "mpi.h"
 #include "sfem_Function.hpp"
-#include "sfem_Function_incore_cuda.hpp"
-#include "sfem_base.h"
-#include "sfem_cuda_blas.h"
 
+#include "sfem_Multigrid.hpp"
+#include "sfem_base.h"
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
+
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_Function_incore_cuda.hpp"
+#include "sfem_cuda_blas.h"
 #include "sfem_cuda_solver.hpp"
+#endif
 
 #include <vector>
 
@@ -59,6 +62,7 @@ int main(int argc, char *argv[]) {
     std::shared_ptr<sfem::Buffer<real_t>> b_x;
     std::shared_ptr<sfem::Buffer<real_t>> b_b;
 
+#ifdef SFEM_ENABLE_CUDA
     if (SFEM_USE_GPU) {
         printf("Using GPU...\n");
         solver = sfem::d_cg<real_t>();
@@ -93,19 +97,44 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr, "[Warning] Preconditioner unavailable for mesh %s\n", folder);
             }
         }
-    } else {
+    } else
+#else
+    SFEM_USE_GPU = false;
+#endif
+    {
         solver = sfem::h_cg<real_t>();
 
-        auto le = sfem::Factory::create_op(fs, SFEM_OPERATOR);
-        le->initialize();
+        auto op = sfem::Factory::create_op(fs, SFEM_OPERATOR);
+        op->initialize();
 
         f->add_constraint(conds);
-        f->add_operator(le);
+        f->add_operator(op);
 
         b_x = sfem::h_buffer<real_t>(fs->n_dofs());
         b_b = sfem::h_buffer<real_t>(fs->n_dofs());
 
         if (SFEM_USE_PRECONDITIONER) {
+            auto mg = std::make_shared<sfem::Multigrid<real_t>>();
+
+            // Level 0
+            {
+                //auto f_lor = f->lor();
+                std::shared_ptr<sfem::Operator<real_t>> mg_op;  // = f->lor();
+                std::shared_ptr<sfem::Operator<real_t>> smoother;
+
+                // auto prolongation = sfem::make_op<real_t>(
+                //     fs->n_dofs(), fs->n_dofs(), [=](const real_t *const x, real_t *const y) {
+                //         // TODO
+                //     });
+
+                auto restriction = sfem::make_op<real_t>(
+                    fs->n_dofs(), fs->n_dofs(), [=](const real_t *const x, real_t *const y) {
+                        // TODO
+                    });
+
+                mg->add_level(mg_op, smoother, nullptr, restriction);
+            }
+
             auto b_d = sfem::h_buffer<real_t>(fs->n_dofs());
 
             if (f->hessian_diag(b_x->data(), b_d->data()) == 0) {
@@ -153,7 +182,11 @@ int main(int argc, char *argv[]) {
     f->set_output_dir(output_path);
     auto output = f->output();
 
+#ifdef SFEM_ENABLE_CUDA
     auto h_x = sfem::to_host(b_x);
+#else
+    auto h_x = b_x;
+#endif
     output->write("x", h_x->data());
 
     double tock = MPI_Wtime();

@@ -50,7 +50,7 @@ namespace sfem {
                 Buffer<T>::wrap(smoother_[finest_level()]->rows(), x);
 
             memory_[finest_level()]->residual =
-                Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T *)r);
+                Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T*)r);
 
             for (int k = 0; k < max_it_; k++) {
                 cycle(finest_level());
@@ -74,9 +74,9 @@ namespace sfem {
         // Fine level prolongation has to be null
         // Coarse level restriction has to be null
         inline void add_level(const std::shared_ptr<Operator<T>>& op,
-                       const std::shared_ptr<Operator<T>>& smoother,
-                       const std::shared_ptr<Operator<T>>& prolongation,
-                       const std::shared_ptr<Operator<T>>& restriction) {
+                              const std::shared_ptr<Operator<T>>& smoother,
+                              const std::shared_ptr<Operator<T>>& prolongation,
+                              const std::shared_ptr<Operator<T>>& restriction) {
             operator_.push_back(op);
             smoother_.push_back(smoother);
             prolongation_.push_back(prolongation);
@@ -174,21 +174,21 @@ namespace sfem {
                 op->apply(mem->solution->data(), mem->work->data());
 
                 this->axpby(mem->size(), 1, mem->residual->data(), -1, mem->work->data());
-                restriction->apply(mem->work->data(), memory_[coarser_level(level)]->residual->data());
+                restriction->apply(mem->work->data(),
+                                   memory_[coarser_level(level)]->residual->data());
 
                 int err = cycle(coarser_level(level));
                 assert(!err);
 
-                prolongation->apply(memory_[coarser_level(level)]->solution->data(), mem->work->data());
+                prolongation->apply(memory_[coarser_level(level)]->solution->data(),
+                                    mem->work->data());
 
                 // Apply correction
                 this->axpby(mem->size(), 1, mem->work->data(), 1, mem->solution->data());
                 smoother_[level]->apply(mem->residual->data(), mem->solution->data());
             }
-        return 0;
+            return 0;
         }
-
-
     };
 
 }  // namespace sfem

@@ -858,7 +858,7 @@ namespace sfem {
 
     int Function::report_solution(const isolver_scalar_t *const x) {
         SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.report_solution);
-        
+
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
         return impl_->output->write("out", x);
     }
@@ -875,6 +875,7 @@ namespace sfem {
     class LinearElasticity final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
+        enum ElemType element_type { INVALID };
 
         real_t mu{1}, lambda{1};
 
@@ -893,6 +894,23 @@ namespace sfem {
 
             ret->mu = SFEM_SHEAR_MODULUS;
             ret->lambda = SFEM_FIRST_LAME_PARAMETER;
+            ret->element_type = (enum ElemType)mesh->element_type;
+            return ret;
+        }
+
+        std::shared_ptr<Op> lor_op() override {
+            auto ret = std::make_shared<LinearElasticity>(space);
+            ret->element_type = macro_type_variant(element_type);
+            ret->mu = mu;
+            ret->lambda = lambda;
+            return ret;
+        }
+
+        std::shared_ptr<Op> coarsen_op() override {
+            auto ret = std::make_shared<LinearElasticity>(space);
+            ret->element_type = macro_base_elem(element_type);
+            ret->mu = mu;
+            ret->lambda = lambda;
             return ret;
         }
 
@@ -909,7 +927,7 @@ namespace sfem {
                         isolver_scalar_t *const values) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            linear_elasticity_assemble_hessian_aos((enum ElemType)mesh->element_type,
+            linear_elasticity_assemble_hessian_aos(element_type,
                                                    mesh->nelements,
                                                    mesh->nnodes,
                                                    mesh->elements,
@@ -926,21 +944,21 @@ namespace sfem {
         int hessian_diag(const isolver_scalar_t *const, isolver_scalar_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            linear_elasticity_assemble_diag_aos((enum ElemType)mesh->element_type,
-                                            mesh->nelements,
-                                            mesh->nnodes,
-                                            mesh->elements,
-                                            mesh->points,
-                                            this->mu,
-                                            this->lambda,
-                                            out);
+            linear_elasticity_assemble_diag_aos(element_type,
+                                                mesh->nelements,
+                                                mesh->nnodes,
+                                                mesh->elements,
+                                                mesh->points,
+                                                this->mu,
+                                                this->lambda,
+                                                out);
             return ISOLVER_FUNCTION_SUCCESS;
         }
 
         int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            linear_elasticity_assemble_gradient_aos((enum ElemType)mesh->element_type,
+            linear_elasticity_assemble_gradient_aos(element_type,
                                                     mesh->nelements,
                                                     mesh->nnodes,
                                                     mesh->elements,
@@ -958,7 +976,7 @@ namespace sfem {
                   isolver_scalar_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            linear_elasticity_apply_aos((enum ElemType)mesh->element_type,
+            linear_elasticity_apply_aos(element_type,
                                         mesh->nelements,
                                         mesh->nnodes,
                                         mesh->elements,
@@ -974,7 +992,7 @@ namespace sfem {
         int value(const isolver_scalar_t *x, isolver_scalar_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            linear_elasticity_assemble_value_aos((enum ElemType)mesh->element_type,
+            linear_elasticity_assemble_value_aos(element_type,
                                                  mesh->nelements,
                                                  mesh->nnodes,
                                                  mesh->elements,
@@ -993,7 +1011,7 @@ namespace sfem {
     class Laplacian final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        enum ElemType element_type{INVALID};
+        enum ElemType element_type { INVALID };
 
         const char *name() const override { return "Laplacian"; }
         inline bool is_linear() const override { return true; }
@@ -1001,12 +1019,22 @@ namespace sfem {
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            
-
             assert(1 == space->block_size());
 
             auto ret = std::make_unique<Laplacian>(space);
             ret->element_type = (enum ElemType)mesh->element_type;
+            return ret;
+        }
+
+        std::shared_ptr<Op> lor_op() override {
+            auto ret = std::make_shared<Laplacian>(space);
+            ret->element_type = macro_type_variant(element_type);
+            return ret;
+        }
+
+        std::shared_ptr<Op> coarsen_op() override {
+            auto ret = std::make_shared<Laplacian>(space);
+            ret->element_type = macro_base_elem(element_type);
             return ret;
         }
 
@@ -1035,13 +1063,8 @@ namespace sfem {
         int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            laplacian_assemble_gradient(element_type,
-                                        mesh->nelements,
-                                        mesh->nnodes,
-                                        mesh->elements,
-                                        mesh->points,
-                                        x,
-                                        out);
+            laplacian_assemble_gradient(
+                element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
 
             return ISOLVER_FUNCTION_SUCCESS;
         }
@@ -1051,13 +1074,8 @@ namespace sfem {
                   isolver_scalar_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            laplacian_apply(element_type,
-                            mesh->nelements,
-                            mesh->nnodes,
-                            mesh->elements,
-                            mesh->points,
-                            h,
-                            out);
+            laplacian_apply(
+                element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, h, out);
 
             return ISOLVER_FUNCTION_SUCCESS;
         }
@@ -1065,13 +1083,8 @@ namespace sfem {
         int value(const isolver_scalar_t *x, isolver_scalar_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            laplacian_assemble_value(element_type,
-                                     mesh->nelements,
-                                     mesh->nnodes,
-                                     mesh->elements,
-                                     mesh->points,
-                                     x,
-                                     out);
+            laplacian_assemble_value(
+                element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
 
             return ISOLVER_FUNCTION_SUCCESS;
         }
@@ -1082,7 +1095,7 @@ namespace sfem {
     class Mass final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        enum ElemType element_type{INVALID};
+        enum ElemType element_type { INVALID };
 
         const char *name() const override { return "Mass"; }
         inline bool is_linear() const override { return true; }
@@ -1121,13 +1134,8 @@ namespace sfem {
         int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            apply_mass(element_type,
-                       mesh->nelements,
-                       mesh->nnodes,
-                       mesh->elements,
-                       mesh->points,
-                       x,
-                       out);
+            apply_mass(
+                element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
 
             return ISOLVER_FUNCTION_SUCCESS;
         }
@@ -1137,13 +1145,8 @@ namespace sfem {
                   isolver_scalar_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            apply_mass(element_type,
-                       mesh->nelements,
-                       mesh->nnodes,
-                       mesh->elements,
-                       mesh->points,
-                       h,
-                       out);
+            apply_mass(
+                element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, h, out);
 
             return ISOLVER_FUNCTION_SUCCESS;
         }
@@ -1171,7 +1174,7 @@ namespace sfem {
     class LumpedMass final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        enum ElemType element_type{INVALID};
+        enum ElemType element_type { INVALID };
 
         const char *name() const override { return "LumpedMass"; }
         inline bool is_linear() const override { return true; }
@@ -1252,7 +1255,7 @@ namespace sfem {
     class CVFEMMass final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        enum ElemType element_type{INVALID};
+        enum ElemType element_type { INVALID };
 
         const char *name() const override { return "CVFEMMass"; }
         inline bool is_linear() const override { return true; }
@@ -1274,12 +1277,8 @@ namespace sfem {
                          isolver_scalar_t *const values) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            cvfem_cv_volumes(element_type,
-                             mesh->nelements,
-                             mesh->nnodes,
-                             mesh->elements,
-                             mesh->points,
-                             values);
+            cvfem_cv_volumes(
+                element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, values);
 
             return ISOLVER_FUNCTION_SUCCESS;
         }
@@ -1316,7 +1315,7 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace> space;
         real_t *vel[3];
-        enum ElemType element_type{INVALID};
+        enum ElemType element_type { INVALID };
 
         const char *name() const override { return "CVFEMUpwindConvection"; }
         inline bool is_linear() const override { return true; }
@@ -1502,8 +1501,7 @@ namespace sfem {
     }
 
     std::shared_ptr<Op> Factory::create_op_gpu(const std::shared_ptr<FunctionSpace> &space,
-                                         const char *name)
-    {
+                                               const char *name) {
         return Factory::create_op(space, d_op_str(name).c_str());
     }
 
@@ -1522,10 +1520,6 @@ namespace sfem {
         return it->second(space);
     }
 
-    std::string d_op_str(const std::string &name)
-    {
-        return "gpu:" + name;
-    }
+    std::string d_op_str(const std::string &name) { return "gpu:" + name; }
 
-    
 }  // namespace sfem

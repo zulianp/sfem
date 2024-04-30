@@ -259,7 +259,7 @@ ifeq ($(cuda), 1)
 	CUDA_OBJS += cuda_crs.o
 	DEPS += -L/opt/cuda/lib64 -lcudart -lcusparse -lcusolver -lcublas
 	DEPS += -lnvToolsExt
-	CFLAGS += -I/opt/cuda/include
+	CFLAGS += -I/opt/cuda/include -DSFEM_ENABLE_CUDA
 
 	OBJS += $(CUDA_OBJS)
 else

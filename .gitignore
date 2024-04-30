@@ -68,7 +68,7 @@ Thumbs.db
 *.zip
 
 CMakeCache.txt
-
+api/
 build/
 .cache/
 CMakeFiles/

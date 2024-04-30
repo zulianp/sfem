@@ -323,6 +323,13 @@ namespace sfem {
             return info;
         }
     };
+
+    template <typename T>
+    std::shared_ptr<MatrixFreeLinearSolver<T>> h_bcgs() {
+        auto cg = std::make_shared<BiCGStab<T>>();
+        cg->default_init();
+        return cg;
+    }
 }  // namespace sfem
 
 #endif  // SFEM_BCGS_HPP

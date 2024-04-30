@@ -256,6 +256,13 @@ namespace sfem {
             return info;
         }
     };
+
+    template <typename T>
+    std::shared_ptr<MatrixFreeLinearSolver<T>> h_cg() {
+        auto cg = std::make_shared<ConjugateGradient<T>>();
+        cg->default_init();
+        return cg;
+    }
 }  // namespace sfem
 
 #endif  // SFEM_CG_HPP

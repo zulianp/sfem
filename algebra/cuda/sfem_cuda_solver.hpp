@@ -36,20 +36,6 @@ namespace sfem {
     }
 
     template <typename T>
-    std::shared_ptr<MatrixFreeLinearSolver<T>> h_cg() {
-        auto cg = std::make_shared<ConjugateGradient<T>>();
-        cg->default_init();
-        return cg;
-    }
-
-    template <typename T>
-    std::shared_ptr<MatrixFreeLinearSolver<T>> h_bcgs() {
-        auto cg = std::make_shared<BiCGStab<T>>();
-        cg->default_init();
-        return cg;
-    }
-
-    template <typename T>
     std::shared_ptr<MatrixFreeLinearSolver<T>> d_solver(const std::string& name) {
         using SP_t = std::shared_ptr<MatrixFreeLinearSolver<T>>;
         static bool initialized = false;
