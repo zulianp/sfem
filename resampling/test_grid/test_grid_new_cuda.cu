@@ -568,7 +568,7 @@ __global__                                                                      
     const int block_dim = blockDim.x;
     const int thread_id = threadIdx.x;
 
-    while (true) {
+    while (true) {  /// begin while // copy global grid to local grid //////////////////////
         int index_abs_local = cnt * block_dim + thread_id;
 
 #if Y_MAJOR == 1
@@ -592,7 +592,17 @@ __global__                                                                      
         local_grid_shared[i_local_abs] = gg.grid_ptr_cu[i_global_abs];
 
         cnt += 1;
+    }  /// end while //////////////////////
+
+#ifdef NEW_COPY
+    const size_t i_tail_size = (i_global_max - i_global_min + 1) % block_dim;
+    const int i_tail = i_global_max - i_tail_size + 1;
+
+    for (size_t jj = j_global_min; jj <= j_global_max; jj++) {
+        for (size_t ii = i_global_min; ii <= i_global_max - i_tail_size; ii += block_dim) {
+        }
     }
+#endif
 
     __syncthreads();
 
