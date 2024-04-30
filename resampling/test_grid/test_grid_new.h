@@ -33,7 +33,7 @@
 struct global_grid_type {
     std::valarray<double> grid; /**< The grid values. */
 
-    double *grid_ptr_cu = nullptr; /**< Pointer to the grid values for cuda device */
+    // double *grid_ptr_cu = nullptr; /**< Pointer to the grid values for cuda device */
 
     double delta; /**< The grid spacing. */
 
@@ -116,11 +116,11 @@ struct quadrature_rule {
     std::valarray<double> x_nodes; /**< The x-coordinates of the quadrature nodes. */
     std::valarray<double> y_nodes; /**< The y-coordinates of the quadrature nodes. */
 
-    double *weights_ptr_cu = nullptr; /**< Pointer to the quadrature weights for cuda device */
-    double *x_nodes_ptr_cu = nullptr; /**< Pointer to the x-coordinates of the quadrature nodes for
-                               cuda device */
-    double *y_nodes_ptr_cu = nullptr; /**< Pointer to the y-coordinates of the quadrature nodes for
-                              cuda device */
+    // double *weights_ptr_cu = nullptr; /**< Pointer to the quadrature weights for cuda device */
+    // double *x_nodes_ptr_cu = nullptr; /**< Pointer to the x-coordinates of the quadrature nodes for
+    //                            cuda device */
+    // double *y_nodes_ptr_cu = nullptr; /**< Pointer to the y-coordinates of the quadrature nodes for
+    //                           cuda device */
 
     double x_min; /**< The minimum x-coordinate of the domain. */
     double y_min; /**< The minimum y-coordinate of the domain. */

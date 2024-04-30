@@ -625,32 +625,32 @@ __global__ void axpy(double* x, double* y, double a, size_t n) {
     if (i < n) y[i] = a * x[i] + y[i];
 }
 
-/**
- * @brief Copies the global grid to the device.
- *
- * @param gg The global grid to be copied.
- * @return true if the global grid was successfully copied to the device.
- * @return false if an error occurred while copying the global grid to the device.
- */
-bool copy_global_grid_to_device(global_grid_type& gg) {
-    //
-    cudaError e1 = cudaMalloc((void**)&gg.grid_ptr_cu,  //
-                              (unsigned long)gg.grid.size() * sizeof(double));
+// /**
+//  * @brief Copies the global grid to the device.
+//  *
+//  * @param gg The global grid to be copied.
+//  * @return true if the global grid was successfully copied to the device.
+//  * @return false if an error occurred while copying the global grid to the device.
+//  */
+// bool copy_global_grid_to_device(global_grid_type& gg) {
+//     //
+//     cudaError e1 = cudaMalloc((void**)&gg.grid_ptr_cu,  //
+//                               (unsigned long)gg.grid.size() * sizeof(double));
 
-    cudaError e2 = cudaMemcpy(gg.grid_ptr_cu,
-                              &gg.grid[0],
-                              (unsigned long)gg.grid.size() * sizeof(double),
-                              cudaMemcpyHostToDevice);
+//     cudaError e2 = cudaMemcpy(gg.grid_ptr_cu,
+//                               &gg.grid[0],
+//                               (unsigned long)gg.grid.size() * sizeof(double),
+//                               cudaMemcpyHostToDevice);
 
-    if (e1 != cudaSuccess || e2 != cudaSuccess) {
-        printf("Error Alloccating and copying global grid to device\n");
-        printf("Error code e1: %s\n", cudaGetErrorString(e1));
-        printf("Error code e2: %s\n", cudaGetErrorString(e2));
-        return false;
-    }
+//     if (e1 != cudaSuccess || e2 != cudaSuccess) {
+//         printf("Error Alloccating and copying global grid to device\n");
+//         printf("Error code e1: %s\n", cudaGetErrorString(e1));
+//         printf("Error code e2: %s\n", cudaGetErrorString(e2));
+//         return false;
+//     }
 
-    return true;
-}
+//     return true;
+// }
 
 /**
  * @brief Frees the global grid on the device.
@@ -684,26 +684,26 @@ bool copy_global_grid_to_device(const global_grid_type& gg, global_grid_cuda_typ
     return true;
 }
 
-/**
- * @brief Frees the global grid on the device.
- *
- * @param gg The global grid to be freed.
- * @return true if the memory was successfully freed.
- * @return false if an error occurred while freeing the memory.
- */
-bool free_global_grid_on_device(global_grid_type& gg) {
-    cudaError e1 = cudaFree(gg.grid_ptr_cu);
+// /**
+//  * @brief Frees the global grid on the device.
+//  *
+//  * @param gg The global grid to be freed.
+//  * @return true if the memory was successfully freed.
+//  * @return false if an error occurred while freeing the memory.
+//  */
+// bool free_global_grid_on_device(global_grid_type& gg) {
+//     cudaError e1 = cudaFree(gg.grid_ptr_cu);
 
-    if (e1 != cudaSuccess) {
-        printf("!!!!! Error freeing global grid on device\n");
-        printf("!!!!! Error code: %s\n", cudaGetErrorString(e1));
-        return false;
-    }
+//     if (e1 != cudaSuccess) {
+//         printf("!!!!! Error freeing global grid on device\n");
+//         printf("!!!!! Error code: %s\n", cudaGetErrorString(e1));
+//         return false;
+//     }
 
-    gg.grid_ptr_cu = nullptr;
+//     gg.grid_ptr_cu = nullptr;
 
-    return true;
-}
+//     return true;
+// }
 
 bool free_global_grid_on_device(global_grid_cuda_type& gg) {
     cudaError e1 = cudaFree(gg.grid_ptr_cu);
@@ -719,59 +719,59 @@ bool free_global_grid_on_device(global_grid_cuda_type& gg) {
     return true;
 }
 
-/**
- * @brief Copies the global grid to the device.
- *
- * @param qr The quadrature rule to be copied.
- * @return true if the quadrature rule was successfully copied to the device.
- * @return false if an error occurred while copying the quadrature rule to the device.
- */
-bool copy_quadrature_rule_to_device(const quadrature_rule& qr) {
-    cudaError e1 = cudaMalloc((void**)&qr.x_nodes_ptr_cu,  //
-                              (unsigned long)qr.x_nodes.size() * sizeof(double));
+// /**
+//  * @brief Copies the global grid to the device.
+//  *
+//  * @param qr The quadrature rule to be copied.
+//  * @return true if the quadrature rule was successfully copied to the device.
+//  * @return false if an error occurred while copying the quadrature rule to the device.
+//  */
+// bool copy_quadrature_rule_to_device(const quadrature_rule& qr) {
+//     cudaError e1 = cudaMalloc((void**)&qr.x_nodes_ptr_cu,  //
+//                               (unsigned long)qr.x_nodes.size() * sizeof(double));
 
-    cudaError e2 = cudaMalloc((void**)&qr.y_nodes_ptr_cu,  //
-                              (unsigned long)qr.y_nodes.size() * sizeof(double));
+//     cudaError e2 = cudaMalloc((void**)&qr.y_nodes_ptr_cu,  //
+//                               (unsigned long)qr.y_nodes.size() * sizeof(double));
 
-    cudaError e3 = cudaMalloc((void**)&qr.weights_ptr_cu,  //
-                              (unsigned long)qr.weights.size() * sizeof(double));
+//     cudaError e3 = cudaMalloc((void**)&qr.weights_ptr_cu,  //
+//                               (unsigned long)qr.weights.size() * sizeof(double));
 
-    cudaError e4 = cudaMemcpy(qr.x_nodes_ptr_cu,
-                              &qr.x_nodes[0],
-                              (unsigned long)qr.x_nodes.size() * sizeof(double),
-                              cudaMemcpyHostToDevice);
+//     cudaError e4 = cudaMemcpy(qr.x_nodes_ptr_cu,
+//                               &qr.x_nodes[0],
+//                               (unsigned long)qr.x_nodes.size() * sizeof(double),
+//                               cudaMemcpyHostToDevice);
 
-    cudaError e5 = cudaMemcpy(qr.y_nodes_ptr_cu,
-                              &qr.y_nodes[0],
-                              (unsigned long)qr.y_nodes.size() * sizeof(double),
-                              cudaMemcpyHostToDevice);
+//     cudaError e5 = cudaMemcpy(qr.y_nodes_ptr_cu,
+//                               &qr.y_nodes[0],
+//                               (unsigned long)qr.y_nodes.size() * sizeof(double),
+//                               cudaMemcpyHostToDevice);
 
-    cudaError e6 = cudaMemcpy(qr.weights_ptr_cu,
-                              &qr.weights[0],
-                              (unsigned long)qr.weights.size() * sizeof(double),
-                              cudaMemcpyHostToDevice);
+//     cudaError e6 = cudaMemcpy(qr.weights_ptr_cu,
+//                               &qr.weights[0],
+//                               (unsigned long)qr.weights.size() * sizeof(double),
+//                               cudaMemcpyHostToDevice);
 
-    printf("qr.x_nodes.size(): %lu\n", qr.x_nodes.size());
-    printf("qr.y_nodes.size(): %lu\n", qr.y_nodes.size());
-    printf("qr.weights.size(): %lu\n", qr.weights.size());
+//     printf("qr.x_nodes.size(): %lu\n", qr.x_nodes.size());
+//     printf("qr.y_nodes.size(): %lu\n", qr.y_nodes.size());
+//     printf("qr.weights.size(): %lu\n", qr.weights.size());
 
-    if (e1 != cudaSuccess || e2 != cudaSuccess ||  //
-        e3 != cudaSuccess || e4 != cudaSuccess ||  //
-        e5 != cudaSuccess || e6 != cudaSuccess) {  //
+//     if (e1 != cudaSuccess || e2 != cudaSuccess ||  //
+//         e3 != cudaSuccess || e4 != cudaSuccess ||  //
+//         e5 != cudaSuccess || e6 != cudaSuccess) {  //
 
-        printf("Error Copying quadrature rule to device\n");
-        printf("Error code e1: %s\n", cudaGetErrorString(e1));
-        printf("Error code e2: %s\n", cudaGetErrorString(e2));
-        printf("Error code e3: %s\n", cudaGetErrorString(e3));
-        printf("Error code e4: %s\n", cudaGetErrorString(e4));
-        printf("Error code e5: %s\n", cudaGetErrorString(e5));
-        printf("Error code e6: %s\n", cudaGetErrorString(e6));
+//         printf("Error Copying quadrature rule to device\n");
+//         printf("Error code e1: %s\n", cudaGetErrorString(e1));
+//         printf("Error code e2: %s\n", cudaGetErrorString(e2));
+//         printf("Error code e3: %s\n", cudaGetErrorString(e3));
+//         printf("Error code e4: %s\n", cudaGetErrorString(e4));
+//         printf("Error code e5: %s\n", cudaGetErrorString(e5));
+//         printf("Error code e6: %s\n", cudaGetErrorString(e6));
 
-        return false;
-    }
+//         return false;
+//     }
 
-    return true;
-}
+//     return true;
+// }
 
 /**
  * @brief Copies the global grid to the device.
@@ -829,28 +829,28 @@ bool copy_quadrature_rule_to_device_cu(const quadrature_rule& qr, quadrature_rul
     return true;
 }
 
-/**
- * @brief Frees the quadrature rule on the device.
- *
- * @param qr The quadrature rule to be freed.
- * @return true if the memory was successfully freed.
- * @return false if an error occurred while freeing the memory.
- */
-bool free_quadrature_rule_on_device(quadrature_rule& qr) {
-    cudaError e1 = cudaFree(qr.x_nodes_ptr_cu);
-    cudaError e2 = cudaFree(qr.y_nodes_ptr_cu);
-    cudaError e3 = cudaFree(qr.weights_ptr_cu);
+// /**
+//  * @brief Frees the quadrature rule on the device.
+//  *
+//  * @param qr The quadrature rule to be freed.
+//  * @return true if the memory was successfully freed.
+//  * @return false if an error occurred while freeing the memory.
+//  */
+// bool free_quadrature_rule_on_device(quadrature_rule& qr) {
+//     cudaError e1 = cudaFree(qr.x_nodes_ptr_cu);
+//     cudaError e2 = cudaFree(qr.y_nodes_ptr_cu);
+//     cudaError e3 = cudaFree(qr.weights_ptr_cu);
 
-    if (e1 != cudaSuccess || e2 != cudaSuccess || e3 != cudaSuccess) {
-        return false;
-    }
+//     if (e1 != cudaSuccess || e2 != cudaSuccess || e3 != cudaSuccess) {
+//         return false;
+//     }
 
-    qr.x_nodes_ptr_cu = nullptr;
-    qr.y_nodes_ptr_cu = nullptr;
-    qr.weights_ptr_cu = nullptr;
+//     qr.x_nodes_ptr_cu = nullptr;
+//     qr.y_nodes_ptr_cu = nullptr;
+//     qr.weights_ptr_cu = nullptr;
 
-    return true;
-}
+//     return true;
+// }
 
 bool free_quadrature_rule_on_device(quadrature_rule_cuda& qr_dev) {
     cudaError e1 = cudaFree(qr_dev.x_nodes_ptr_cu);
