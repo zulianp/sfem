@@ -23,7 +23,7 @@ ifeq ($(DEBUG),1)
 	CFLAGS += -g
 	CUDA_DEBUG += -g
 else
-	CFLAGS += -std=c++17 -mtune=native -march=native  -mprefer-vector-width=512 -Wshadow=local -Ofast 
+	CFLAGS += -std=c++17 -mtune=native -march=native  -mprefer-vector-width=512 -Wshadow=local -Ofast -fno-signed-zeros -fno-trapping-math -fassociative-math 
 endif
 
 CU_OPT_FLAGS = -O3 -use_fast_math -Xptxas=-O3,-v -Xcompiler=-O3,-march=native,-mtune=native
