@@ -180,7 +180,7 @@ __device__ __forceinline__                                                 //
         void                                                               //
         perform_quadrature_global_stripe(double* Qs,                       //
                                          const global_grid_cuda_type& gg,  //
-                                         const quadrature_rule& qr,        //
+                                         const quadrature_rule_cuda& qr,   //
                                          const size_t qr_nodes_nr_,        //
                                          const domains_stripe& ds) {       //
                                                                            //
@@ -299,15 +299,15 @@ __device__ void foo(double* Qs, double* local_grid_shared) {
  * @param ds
  * @return __device__
  */
-__device__                                                              //
-        void                                                            //
-        perform_quadrature_local_stripe(double* Qs,                     //
-                                        double* local_grid_shared,      //
-                                        const local_grid_cuda_type lg,  //
-                                        const quadrature_rule& qr,      //
-                                        const size_t qr_nodes_nr_,      //
-                                        const domains_stripe& ds) {     //
-                                                                        //
+__device__                                                               //
+        void                                                             //
+        perform_quadrature_local_stripe(double* Qs,                      //
+                                        double* local_grid_shared,       //
+                                        const local_grid_cuda_type lg,   //
+                                        const quadrature_rule_cuda& qr,  //
+                                        const size_t qr_nodes_nr_,       //
+                                        const domains_stripe& ds) {      //
+                                                                         //
     const size_t id = blockIdx.x * blockDim.x + threadIdx.x;
     const size_t domain_nr = threadIdx.x;
 
@@ -459,7 +459,7 @@ __device__                                                              //
  */
 __global__ void perform_quadrature_global_stripe_kernel(double* Qs,                            //
                                                         const global_grid_cuda_type gg,        //
-                                                        const quadrature_rule qr,              //
+                                                        const quadrature_rule_cuda qr,         //
                                                         const size_t qr_nodes_nr_,             //
                                                         const domains_stripe* ds_vector,       //
                                                         const size_t nr_of_domains_stripes) {  //
@@ -486,7 +486,7 @@ __global__                                                                      
         void                                                                          //
         perform_quadrature_local_stripe_kernel(double* Qs,                            //
                                                const global_grid_cuda_type gg,        //
-                                               const quadrature_rule qr,              //
+                                               const quadrature_rule_cuda qr,         //
                                                const size_t qr_nodes_nr_,             //
                                                const domains_stripe* ds_vector,       //
                                                const size_t nr_of_domains_stripes) {  //
@@ -705,6 +705,20 @@ bool free_global_grid_on_device(global_grid_type& gg) {
     return true;
 }
 
+bool free_global_grid_on_device(global_grid_cuda_type& gg) {
+    cudaError e1 = cudaFree(gg.grid_ptr_cu);
+
+    if (e1 != cudaSuccess) {
+        printf("!!!!! Error freeing global grid on device\n");
+        printf("!!!!! Error code: %s\n", cudaGetErrorString(e1));
+        return false;
+    }
+
+    gg.grid_ptr_cu = nullptr;
+
+    return true;
+}
+
 /**
  * @brief Copies the global grid to the device.
  *
@@ -759,7 +773,16 @@ bool copy_quadrature_rule_to_device(const quadrature_rule& qr) {
     return true;
 }
 
-bool copy_quadrature_rule_to_device(const quadrature_rule& qr, quadrature_rule_cuda& qr_dev) {
+/**
+ * @brief Copies the global grid to the device.
+ *
+ * @param qr The quadrature rule to be copied.
+ * @param qr_dev The quadrature rule on the device.
+ * @return true if the quadrature rule was successfully copied to the device.
+ * @return false if an error occurred while copying the quadrature rule to the device.
+ */
+bool copy_quadrature_rule_to_device_cu(const quadrature_rule& qr, quadrature_rule_cuda& qr_dev) {
+    //
     cudaError e1 = cudaMalloc((void**)&qr_dev.x_nodes_ptr_cu,  //
                               (unsigned long)qr.x_nodes.size() * sizeof(double));
 
@@ -891,9 +914,11 @@ int test_global(double& Q_global,                          //
                 std::vector<domains_stripe>& ds_vector) {  //
 
     global_grid_cuda_type gg_dev;
+    quadrature_rule_cuda qr_dev;
 
     copy_global_grid_to_device(gg, gg_dev);
-    copy_quadrature_rule_to_device(qr);
+    // copy_quadrature_rule_to_device(qr);
+    copy_quadrature_rule_to_device_cu(qr, qr_dev);
 
     domains_stripe* ds_vector_cu = nullptr;
 
@@ -939,7 +964,7 @@ int test_global(double& Q_global,                          //
     perform_quadrature_global_stripe_kernel<<<nr_stripes, nr_domains_per_stripe>>>(  //
             Qs_cu,                                                                   //
             gg_dev,                                                                  //
-            qr,                                                                      //
+            qr_dev,                                                                  //
             qr.weights.size(),                                                       //
             ds_vector_cu,                                                            //
             ds_vector.size());                                                       //
@@ -968,8 +993,8 @@ int test_global(double& Q_global,                          //
     cudaMemcpy(Qs, Qs_cu, nr_domains_tot * sizeof(double), cudaMemcpyDeviceToHost);
     cudaFree(Qs_cu);
 
-    free_global_grid_on_device(gg);
-    free_quadrature_rule_on_device(qr);
+    free_global_grid_on_device(gg_dev);
+    free_quadrature_rule_on_device(qr_dev);
 
     cudaFree(ds_vector_cu);
 
@@ -1008,7 +1033,7 @@ int test_local(double& Q_local,                           //
     quadrature_rule_cuda qr_dev;
 
     copy_global_grid_to_device(gg, gg_dev);
-    copy_quadrature_rule_to_device(qr, qr_dev);
+    copy_quadrature_rule_to_device_cu(qr, qr_dev);
 
     // copy_quadrature_rule_to_device(qr);
 
@@ -1059,7 +1084,7 @@ int test_local(double& Q_local,                           //
     perform_quadrature_local_stripe_kernel<<<nr_stripes, nr_domains_per_stripe>>>(  //
             Qs_cu,                                                                  //
             gg_dev,                                                                 //
-            qr,                                                                     //
+            qr_dev,                                                                 //
             qr.weights.size(),                                                      //
             ds_vector_cu,                                                           //
             ds_vector.size());                                                      //
@@ -1088,8 +1113,8 @@ int test_local(double& Q_local,                           //
     cudaMemcpy(Qs, Qs_cu, nr_domains_tot * sizeof(double), cudaMemcpyDeviceToHost);
     cudaFree(Qs_cu);
 
-    free_global_grid_on_device(gg);
-    free_quadrature_rule_on_device(qr);
+    free_global_grid_on_device(gg_dev);
+    free_quadrature_rule_on_device(qr_dev);
 
     cudaFree(ds_vector_cu);
 
