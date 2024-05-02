@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
 refs=(0 1 2 3 4 5)
+n_refs=${#refs[@]}
+last_idx=$(( n_refs  - 1 ))
+last=${refs[$last_idx]}
 
 # Largest matrix-based experiment (can vary w.r.t. SFEM idx_t count_t)
 largest_matrix=4
@@ -86,6 +89,23 @@ do
 	cd $SPHERE_FOLDER
 done
 
+function gen_by_refinement()
+{
+	last=$1
+	next=$((last + 1))
+	
+	mkdir -p $next
+	mkdir -p $next/p1
+	mkdir -p $next/p2
+
+	refine $last/p1/refined $next/p1/mesh
+	sfc $next/p1/mesh $next/p1/sorted
+	refine $next/p1/sorted $next/p1/refined
+	mesh_p1_to_p2 $next/p1/sorted  $next/p2
+}
+
+gen_by_refinement $last
+
 cd $BENCH_FOLDER
 
 #####################################
@@ -127,6 +147,8 @@ do
 
 	cd $CYLINDER_FOLDER
 done
+
+gen_by_refinement $last
 
 cd $BENCH_FOLDER
 cd $TOP_FOLDER
