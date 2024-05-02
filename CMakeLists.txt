@@ -31,8 +31,8 @@ endif()
 # Library
 ######################################################
 
-find_package(MatrixIO)
-find_package(ISolver)
+find_package(MatrixIO REQUIRED)
+find_package(ISolver REQUIRED)
 
 set(SFEM_MODULES
     algebra base matrix mesh pizzastack resampling solver
@@ -60,14 +60,36 @@ if(SFEM_ENABLE_METIS)
     list(APPEND SFEM_MODULES graphs)
 endif()
 
+if(SFEM_ENABLE_CUDA)
+     list(APPEND SFEM_MODULES 
+        algebra/cuda
+        operators/cuda
+        frontend/cuda
+        )
+endif()
+
 foreach(MODULE ${SFEM_MODULES})
     scan_directories(${CMAKE_SOURCE_DIR}/${MODULE} "." SFEM_BUILD_INCLUDES
        SFEM_HEADERS SFEM_SOURCES)
+
+    if(SFEM_ENABLE_CUDA)
+        file(GLOB SFEM_MODULE_KERNEL_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/${MODULE}/*.cu")
+    endif()
+
+    if(SFEM_MODULE_KERNEL_SOURCES)
+        list(APPEND SFEM_KERNEL_SOURCES "${SFEM_MODULE_KERNEL_SOURCES}")
+    endif()
 endforeach(MODULE)
 
 # message(STATUS "SFEM_BUILD_INCLUDES: ${SFEM_BUILD_INCLUDES}")
 # message(STATUS "SFEM_HEADERS: ${SFEM_HEADERS}") 
 # message(STATUS "SFEM_SOURCES: ${SFEM_SOURCES}")
+# message(STATUS "SFEM_KERNEL_SOURCES: ${SFEM_KERNEL_SOURCES}")
+
+
+if(SFEM_ENABLE_CUDA)
+    list(APPEND SFEM_SOURCES, "${SFEM_KERNEL_SOURCES}")
+endif()
 
 add_library(sfem ${SFEM_SOURCES} ${SFEM_HEADERS})
 
@@ -104,6 +126,12 @@ set_target_properties(
 
 set(SFEM_TARGETS sfem)
 
+if(SFEM_ENABLE_CUDA)
+# set_target_properties(sfem PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+# https://gt3rs.medium.com/compile-with-nvcc-3566fbdfdbf
+      set_property(TARGET sfem PROPERTY CUDA_ARCHITECTURES 60)
+endif()
+
 ######################################################
 ######################################################
 # Executables
@@ -116,6 +144,16 @@ file(GLOB C_EXAMPLES CONFIGURE_DEPENDS "examples/*.c")
 set(DRIVERS "${C_DRIVERS};${CPP_DRIVERS};${C_EXAMPLES}")
 
 list(APPEND SFEM_EXCLUDED_EXEC "grad_and_project;heat_equation;integrate_divergence;partition_mesh_based_on_operator;taylor_hood_navier_stokes;ssolve")
+
+if(SFEM_ENABLE_CUDA)
+    list(APPEND SFEM_EXCLUDED_EXEC "run_poisson_cuda;steady_state_sim_cuda;cuda_do_spmv;lapl_matrix_free;linear_elasticity_matrix_free")
+    
+    file(GLOB CUDA_C_EXAMPLES CONFIGURE_DEPENDS "drivers/cuda/*.c")
+    file(GLOB CUDA_CXX_EXAMPLES CONFIGURE_DEPENDS "drivers/cuda/*.cpp")
+
+    list(APPEND DRIVERS "${CUDA_C_EXAMPLES}")
+    list(APPEND DRIVERS "${CUDA_CXX_EXAMPLES}")
+endif()
 
 foreach(DRIVER ${DRIVERS})
     get_filename_component(DRIVER_NAME ${DRIVER} NAME_WE)
@@ -141,6 +179,8 @@ if(SFEM_ENABLE_PYTHON)
     add_subdirectory(python/bindings)
     set(SFEM_TARGETS ${SFEM_TARGETS} pysfem)
 endif()
+
+message(STATUS "SFEM_TARGETS: ${SFEM_TARGETS}")
 
 ######################################################
 ######################################################
@@ -188,10 +228,7 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/python/sfem DESTINATION scripts)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/python/requirements.txt DESTINATION scripts)
 
 
-
-
 ######################################################
-
 ######################################################
 
 # generate the config file that is includes the exports
