@@ -98,7 +98,7 @@ function gen_by_refinement()
 	mkdir -p $next/p1
 	mkdir -p $next/p2
 
-	refine $last/p1/refined $next/p1/mesh
+	cp -r $last/p1/refined $next/p1/mesh
 	sfc $next/p1/mesh $next/p1/sorted
 	refine $next/p1/sorted $next/p1/refined
 	mesh_p1_to_p2 $next/p1/sorted  $next/p2
