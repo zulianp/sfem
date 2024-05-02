@@ -2,6 +2,8 @@
 
 #include "tet10_linear_elasticity_incore_cuda.h"
 #include "tet4_linear_elasticity_incore_cuda.h"
+#include "macro_tet4_linear_elasticity_incore_cuda.h"
+
 
 #include <mpi.h>
 #include <stdio.h>
@@ -18,10 +20,10 @@ extern int cuda_incore_linear_elasticity_init(const enum ElemType element_type,
             return tet4_cuda_incore_linear_elasticity_init(
                 ctx, mu, lambda, nelements, elements, points);
         }
-        // case MACRO_TET4: {
-        //     return macro_tet4_cuda_incore_linear_elasticity_init(ctx, mu, lambda, nelements,
-        //     elements, points);
-        // }
+        case MACRO_TET4: {
+            return macro_tet4_cuda_incore_linear_elasticity_init(ctx, mu, lambda, nelements,
+            elements, points);
+        }
         case TET10: {
             return tet10_cuda_incore_linear_elasticity_init(
                 ctx, mu, lambda, nelements, elements, points);
@@ -46,9 +48,9 @@ extern int cuda_incore_linear_elasticity_destroy(cuda_incore_linear_elasticity_t
         case TET4: {
             return tet4_cuda_incore_linear_elasticity_destroy(ctx);
         }
-        // case MACRO_TET4: {
-        //     return macro_tet4_cuda_incore_linear_elasticity_destroy(ctx);
-        // }
+        case MACRO_TET4: {
+            return macro_tet4_cuda_incore_linear_elasticity_destroy(ctx);
+        }
         case TET10: {
             return tet10_cuda_incore_linear_elasticity_destroy(ctx);
         }
@@ -74,9 +76,9 @@ extern int cuda_incore_linear_elasticity_apply(cuda_incore_linear_elasticity_t *
         case TET4: {
             return tet4_cuda_incore_linear_elasticity_apply(ctx, d_x, d_y);
         }
-        // case MACRO_TET4: {
-        //     return macro_tet4_cuda_incore_linear_elasticity_apply(ctx, d_x, d_y);
-        // }
+        case MACRO_TET4: {
+            return macro_tet4_cuda_incore_linear_elasticity_apply(ctx, d_x, d_y);
+        }
         case TET10: {
             return tet10_cuda_incore_linear_elasticity_apply(ctx, d_x, d_y);
         }
