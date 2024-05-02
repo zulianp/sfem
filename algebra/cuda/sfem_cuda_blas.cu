@@ -377,3 +377,11 @@ extern void d_buffer_destroy(void *a) {
     cudaFree(a);
     SFEM_DEBUG_SYNCHRONIZE();
 }
+
+extern void buffer_device_to_host(const std::size_t n, const void *const d, void *h) {
+    cudaMemcpy(h, d, n, cudaMemcpyDeviceToHost);
+}
+
+extern void buffer_host_to_device(const std::size_t n, const void *const h, void *d) {
+    cudaMemcpy(d, h, n, cudaMemcpyHostToDevice);
+}

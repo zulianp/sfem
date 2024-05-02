@@ -1,7 +1,7 @@
 #include <cassert>
 #include <cmath>
 // #include <cstdio>
-#include <cuda_stdint.h>
+// #include <cuda_stdint.h>
 #include <algorithm>
 #include <cstddef>
 
@@ -276,8 +276,8 @@ __constant__ int8_t i2[8];
 __constant__ int8_t i3[8];
 
 static inline __device__ void subtet_gather(const int i,
-                                            const real_t *const SFEM_RESTRICT in,
-                                            real_t *const SFEM_RESTRICT out) {
+                                            const scalar_t *const SFEM_RESTRICT in,
+                                            scalar_t *const SFEM_RESTRICT out) {
     out[0] = in[i0[i]];
     out[1] = in[i1[i]];
     out[2] = in[i2[i]];
@@ -285,8 +285,8 @@ static inline __device__ void subtet_gather(const int i,
 }
 
 static inline __device__ void subtet_scatter_add(const int i,
-                                                 const real_t *const SFEM_RESTRICT in,
-                                                 real_t *const SFEM_RESTRICT out) {
+                                                 const accumulator_t *const SFEM_RESTRICT in,
+                                                 accumulator_t *const SFEM_RESTRICT out) {
     out[i0[i]] += in[0];
     out[i1[i]] += in[1];
     out[i2[i]] += in[2];

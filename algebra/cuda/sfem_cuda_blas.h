@@ -14,6 +14,9 @@ void *d_buffer_alloc(const size_t n);
 void d_buffer_destroy(void *a);
 
 void d_memset(void *ptr, int value, const std::size_t n);
+void buffer_device_to_host(const std::size_t n, const void *const d, void * h);
+void buffer_host_to_device(const std::size_t n, const void *const h, void * d);
+
 void device_to_host(const std::size_t n, const real_t *const d, real_t * h);
 void host_to_device(const std::size_t n, const real_t *const h, real_t * d);
 
