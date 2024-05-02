@@ -86,6 +86,23 @@ plt.savefig('plot.pdf')
 plt.savefig('plot.pgf')
 
 print('----------------------------')
+print('Memory overhead (lower bound)')
+print('----------------------------')
+
+mem_scale = 1e-6 #MB
+factor = (9+1)*2*mem_scale # Half-precision
+
+print(f'MF P1          (Elasticity) {round(np.min(MF_nels_p1)*factor, 3)}-{round(np.max(MF_nels_p1)*factor, 3)} MB')
+print(f'MF P2/Macro-P1 (Elasticity) {round(np.min(MF_nels)*factor, 3)}-{round(np.max(MF_nels)*factor, 3)} MB')
+
+factor = 6*mem_scale # Half-precision
+print(f'MF P1          (Laplacian)  {round(np.min(MF_nels_p1)*factor, 3)}-{round(np.max(MF_nels_p1)*factor, 3)} MB')
+print(f'MF P2/Macro-P1 (Laplacian)  {round(np.min(MF_nels)*factor, 3)}-{round(np.max(MF_nels)*factor, 3)} MB')
+
+crs_factor = 8*2*mem_scale
+print(f'CRS                         {round(np.min(SpMV_nnz)*crs_factor, 3)}-{round(np.max(SpMV_nnz)*crs_factor, 3)} MB')
+
+print('----------------------------')
 print('Mesh')
 print('----------------------------')
 print(f'#elements P1 {np.min(MF_nels_p1)}-{np.max(MF_nels_p1)}')
