@@ -30,7 +30,7 @@ void SFEM_finalize() { MPI_Finalize(); }
 NB_MODULE(pysfem, m) {
     using namespace sfem;
 
-    // Multigrid<isolver_scalar_t> mg;
+    Multigrid<isolver_scalar_t> mg;
 
     using LambdaOperator_t = sfem::LambdaOperator<isolver_scalar_t>;
     using Operator_t = sfem::Operator<isolver_scalar_t>;

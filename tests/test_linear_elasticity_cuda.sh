@@ -21,13 +21,14 @@ mkdir -p le_test
 cd le_test
 
 mkdir -p output
-export OMP_NUM_THREADS=12
+# export OMP_NUM_THREADS=12
+export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 
 # rm -rf mesh
-# create_cylinder.sh 4
+# create_cylinder.sh 3
 
-# create_cylinder_p2.sh 4
+# create_cylinder_p2.sh 0
 # export SFEM_USE_MACRO=1
 
 sleft=mesh/sidesets_aos/sinlet.raw
@@ -56,6 +57,7 @@ else
 fi
 
 # export SFEM_USE_GPU=0
+export SFEM_USE_PRECONDITIONER=1
 steady_state_sim_cuda mesh output
 
 if [[ $SFEM_BLOCK_SIZE != 1 ]]
