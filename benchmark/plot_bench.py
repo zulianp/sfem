@@ -104,8 +104,8 @@ print(f'SpMV (P1)    {round(np.max(SpMV_y), 1)}')
 print(f'tet10        {round(np.max(MF_y), 1)}')
 print(f'tet4         {round(np.max(MF_y_p1), 1)}')
 
-if op_type == "Laplacian":
-    print(f'macrotet4    {round(np.max(MF_y_macro_p1), 1)}')
+# if op_type == "Laplacian":
+print(f'macrotet4    {round(np.max(MF_y_macro_p1), 1)}')
 
 print('----------------------------')
 print('Speed-up (range)')
@@ -115,9 +115,9 @@ print(f'tet4/tet10:     {round(np.min(speedup), 1)}-{round(np.max(speedup), 1)}'
 speedup = MF_y[:len(SpMV_y)] / SpMV_y 
 print(f'SpMV/tet10:     {round(np.min(speedup), 1)}-{round(np.max(speedup), 1)}')
 
-if op_type == "Laplacian":
-    speedup = MF_y_macro_p1 / MF_y_p1
-    print(f'tet4/macrotet4: {round(np.min(speedup), 1)}-{round(np.max(speedup), 1)}')
-    speedup = MF_y_macro_p1[:len(SpMV_y)] / SpMV_y
-    print(f'SpMV/macrotet4: {round(np.min(speedup), 1)}-{round(np.max(speedup), 1)}')
+# if op_type == "Laplacian":
+speedup = MF_y_macro_p1 / MF_y_p1
+print(f'tet4/macrotet4: {round(np.min(speedup), 1)}-{round(np.max(speedup), 1)}')
+speedup = MF_y_macro_p1[:len(SpMV_y)] / SpMV_y
+print(f'SpMV/macrotet4: {round(np.min(speedup), 1)}-{round(np.max(speedup), 1)}')
 print('----------------------------')

@@ -1,9 +1,9 @@
 #include <cassert>
 #include <cmath>
 // #include <cstdio>
+#include <cuda_stdint.h>
 #include <algorithm>
 #include <cstddef>
-#include <cuda_stdint.h>
 
 #include "sfem_base.h"
 #include "sfem_vec.h"
@@ -177,97 +177,92 @@ static inline __device__ __host__ void diag_micro_kernel(const scalar_t mu,
                                                              adjugate,
                                                          const scalar_t jacobian_determinant,
                                                          accumulator_t *const SFEM_RESTRICT diag) {
-    //TODO
+    // TODO
 }
 
-static inline __device__ void sub_adj_0(const cu_jacobian_t *const SFEM_RESTRICT adjugate,
-                                                 const ptrdiff_t stride,
-                                                 scalar_t *const SFEM_RESTRICT sub_adjugate) {
-    
-    const cu_jacobian_t two = 2;
-    sub_adjugate[0] = two * adjugate[0 * stride];
-    sub_adjugate[1] = two * adjugate[1 * stride];
-    sub_adjugate[2] = two * adjugate[2 * stride];
-    sub_adjugate[3] = two * adjugate[3 * stride];
-    sub_adjugate[4] = two * adjugate[4 * stride];
-    sub_adjugate[5] = two * adjugate[5 * stride];
-    sub_adjugate[6] = two * adjugate[6 * stride];
-    sub_adjugate[7] = two * adjugate[7 * stride];
-    sub_adjugate[8] = two * adjugate[8 * stride];
+static inline __device__ void sub_adj_0(const scalar_t *const SFEM_RESTRICT adjugate,
+                                        const ptrdiff_t stride,
+                                        scalar_t *const SFEM_RESTRICT sub_adjugate) {
+    sub_adjugate[0] = 2 * adjugate[0 * stride];
+    sub_adjugate[1] = 2 * adjugate[1 * stride];
+    sub_adjugate[2] = 2 * adjugate[2 * stride];
+    sub_adjugate[3] = 2 * adjugate[3 * stride];
+    sub_adjugate[4] = 2 * adjugate[4 * stride];
+    sub_adjugate[5] = 2 * adjugate[5 * stride];
+    sub_adjugate[6] = 2 * adjugate[6 * stride];
+    sub_adjugate[7] = 2 * adjugate[7 * stride];
+    sub_adjugate[8] = 2 * adjugate[8 * stride];
 }
-static inline __device__ void sub_adj_4(const cu_jacobian_t *const SFEM_RESTRICT adjugate,
-                                                 const ptrdiff_t stride,
-                                                 scalar_t *const SFEM_RESTRICT sub_adjugate) {
-    const cu_jacobian_t two = 2;
-    const cu_jacobian_t x0 = two * adjugate[0 * stride];
-    const cu_jacobian_t x1 = two * adjugate[1 * stride];
-    const cu_jacobian_t x2 = two * adjugate[2 * stride];
-    sub_adjugate[0] = two * adjugate[3 * stride] + x0;
-    sub_adjugate[1] = two * adjugate[4 * stride] + x1;
-    sub_adjugate[2] = two * adjugate[5 * stride] + x2;
+
+static inline __device__ void sub_adj_4(const scalar_t *const SFEM_RESTRICT adjugate,
+                                        const ptrdiff_t stride,
+                                        scalar_t *const SFEM_RESTRICT sub_adjugate) {
+    const scalar_t x0 = 2 * adjugate[0 * stride];
+    const scalar_t x1 = 2 * adjugate[1 * stride];
+    const scalar_t x2 = 2 * adjugate[2 * stride];
+    sub_adjugate[0] = 2 * adjugate[3 * stride] + x0;
+    sub_adjugate[1] = 2 * adjugate[4 * stride] + x1;
+    sub_adjugate[2] = 2 * adjugate[5 * stride] + x2;
     sub_adjugate[3] = -x0;
     sub_adjugate[4] = -x1;
     sub_adjugate[5] = -x2;
-    sub_adjugate[6] = two * adjugate[6 * stride];
-    sub_adjugate[7] = two * adjugate[7 * stride];
-    sub_adjugate[8] = two * adjugate[8 * stride];
+    sub_adjugate[6] = 2 * adjugate[6 * stride];
+    sub_adjugate[7] = 2 * adjugate[7 * stride];
+    sub_adjugate[8] = 2 * adjugate[8 * stride];
 }
 
-static inline __device__ void sub_adj_5(const cu_jacobian_t *const SFEM_RESTRICT adjugate,
-                                                 const ptrdiff_t stride,
-                                                 scalar_t *const SFEM_RESTRICT sub_adjugate) {
-    const cu_jacobian_t two = 2;
-    const cu_jacobian_t x0 = two * adjugate[3 * stride];
-    const cu_jacobian_t x1 = two * adjugate[6 * stride] + x0;
-    const cu_jacobian_t x2 = two * adjugate[4 * stride];
-    const cu_jacobian_t x3 = two * adjugate[7 * stride] + x2;
-    const cu_jacobian_t x4 = two * adjugate[5 * stride];
-    const cu_jacobian_t x5 = two * adjugate[8 * stride] + x4;
+static inline __device__ void sub_adj_5(const scalar_t *const SFEM_RESTRICT adjugate,
+                                        const ptrdiff_t stride,
+                                        scalar_t *const SFEM_RESTRICT sub_adjugate) {
+    const scalar_t x0 = 2 * adjugate[3 * stride];
+    const scalar_t x1 = 2 * adjugate[6 * stride] + x0;
+    const scalar_t x2 = 2 * adjugate[4 * stride];
+    const scalar_t x3 = 2 * adjugate[7 * stride] + x2;
+    const scalar_t x4 = 2 * adjugate[5 * stride];
+    const scalar_t x5 = 2 * adjugate[8 * stride] + x4;
     sub_adjugate[0] = -x1;
     sub_adjugate[1] = -x3;
     sub_adjugate[2] = -x5;
     sub_adjugate[3] = x0;
     sub_adjugate[4] = x2;
     sub_adjugate[5] = x4;
-    sub_adjugate[6] = two * adjugate[0 * stride] + x1;
-    sub_adjugate[7] = two * adjugate[1 * stride] + x3;
-    sub_adjugate[8] = two * adjugate[2 * stride] + x5;
+    sub_adjugate[6] = 2 * adjugate[0 * stride] + x1;
+    sub_adjugate[7] = 2 * adjugate[1 * stride] + x3;
+    sub_adjugate[8] = 2 * adjugate[2 * stride] + x5;
 }
 
-static inline __device__ void sub_adj_6(const cu_jacobian_t *const SFEM_RESTRICT adjugate,
-                                                 const ptrdiff_t stride,
-                                                 scalar_t *const SFEM_RESTRICT sub_adjugate) {
-    const cu_jacobian_t two = 2;
-    const cu_jacobian_t x0 = two * adjugate[3 * stride];
-    const cu_jacobian_t x1 = two * adjugate[4 * stride];
-    const cu_jacobian_t x2 = two * adjugate[5 * stride];
-    sub_adjugate[0] = two * adjugate[0 * stride] + x0;
-    sub_adjugate[1] = two * adjugate[1 * stride] + x1;
-    sub_adjugate[2] = two * adjugate[2 * stride] + x2;
-    sub_adjugate[3] = two * adjugate[6 * stride] + x0;
-    sub_adjugate[4] = two * adjugate[7 * stride] + x1;
-    sub_adjugate[5] = two * adjugate[8 * stride] + x2;
+static inline __device__ void sub_adj_6(const scalar_t *const SFEM_RESTRICT adjugate,
+                                        const ptrdiff_t stride,
+                                        scalar_t *const SFEM_RESTRICT sub_adjugate) {
+    const scalar_t x0 = 2 * adjugate[3 * stride];
+    const scalar_t x1 = 2 * adjugate[4 * stride];
+    const scalar_t x2 = 2 * adjugate[5 * stride];
+    sub_adjugate[0] = 2 * adjugate[0 * stride] + x0;
+    sub_adjugate[1] = 2 * adjugate[1 * stride] + x1;
+    sub_adjugate[2] = 2 * adjugate[2 * stride] + x2;
+    sub_adjugate[3] = 2 * adjugate[6 * stride] + x0;
+    sub_adjugate[4] = 2 * adjugate[7 * stride] + x1;
+    sub_adjugate[5] = 2 * adjugate[8 * stride] + x2;
     sub_adjugate[6] = -x0;
     sub_adjugate[7] = -x1;
     sub_adjugate[8] = -x2;
 }
 
-static inline __device__ void sub_adj_7(const cu_jacobian_t *const SFEM_RESTRICT adjugate,
-                                                 const ptrdiff_t stride,
-                                                 scalar_t *const SFEM_RESTRICT sub_adjugate) {
-    const cu_jacobian_t two = 2;
-    const cu_jacobian_t x0 = two * adjugate[6 * stride];
-    const cu_jacobian_t x1 = two * adjugate[7 * stride];
-    const cu_jacobian_t x2 = two * adjugate[8 * stride];
+static inline __device__ void sub_adj_7(const scalar_t *const SFEM_RESTRICT adjugate,
+                                        const ptrdiff_t stride,
+                                        scalar_t *const SFEM_RESTRICT sub_adjugate) {
+    const scalar_t x0 = 2 * adjugate[6 * stride];
+    const scalar_t x1 = 2 * adjugate[7 * stride];
+    const scalar_t x2 = 2 * adjugate[8 * stride];
     sub_adjugate[0] = -x0;
     sub_adjugate[1] = -x1;
     sub_adjugate[2] = -x2;
-    sub_adjugate[3] = two * adjugate[3 * stride] + x0;
-    sub_adjugate[4] = two * adjugate[4 * stride] + x1;
-    sub_adjugate[5] = two * adjugate[5 * stride] + x2;
-    sub_adjugate[6] = two * adjugate[0 * stride];
-    sub_adjugate[7] = two * adjugate[1 * stride];
-    sub_adjugate[8] = two * adjugate[2 * stride];
+    sub_adjugate[3] = 2 * adjugate[3 * stride] + x0;
+    sub_adjugate[4] = 2 * adjugate[4 * stride] + x1;
+    sub_adjugate[5] = 2 * adjugate[5 * stride] + x2;
+    sub_adjugate[6] = 2 * adjugate[0 * stride];
+    sub_adjugate[7] = 2 * adjugate[1 * stride];
+    sub_adjugate[8] = 2 * adjugate[2 * stride];
 }
 
 static const int8_t h_i0[8] = {0, 4, 6, 7, 4, 7, 6, 7};
@@ -281,8 +276,8 @@ __constant__ int8_t i2[8];
 __constant__ int8_t i3[8];
 
 static inline __device__ void subtet_gather(const int i,
-                                                     const real_t *const SFEM_RESTRICT in,
-                                                     real_t *const SFEM_RESTRICT out) {
+                                            const real_t *const SFEM_RESTRICT in,
+                                            real_t *const SFEM_RESTRICT out) {
     out[0] = in[i0[i]];
     out[1] = in[i1[i]];
     out[2] = in[i2[i]];
@@ -290,8 +285,8 @@ static inline __device__ void subtet_gather(const int i,
 }
 
 static inline __device__ void subtet_scatter_add(const int i,
-                                                          const real_t *const SFEM_RESTRICT in,
-                                                          real_t *const SFEM_RESTRICT out) {
+                                                 const real_t *const SFEM_RESTRICT in,
+                                                 real_t *const SFEM_RESTRICT out) {
     out[i0[i]] += in[0];
     out[i1[i]] += in[1];
     out[i2[i]] += in[2];
@@ -317,7 +312,7 @@ int macro_tet4_cuda_incore_linear_elasticity_init(cuda_incore_linear_elasticity_
                                                   geom_t **const SFEM_RESTRICT points) {
     {
         init_local_indexing();
-        
+
         cu_jacobian_t *jacobian_adjugate =
             (cu_jacobian_t *)calloc(9 * nelements, sizeof(cu_jacobian_t));
         cu_jacobian_t *jacobian_determinant =
@@ -408,7 +403,7 @@ __global__ void macro_tet4_cuda_incore_linear_elasticity_apply_kernel(
         idx_t ev[10];
 
         // Sub-geometry
-        cu_jacobian_t adjugate[9];
+        scalar_t adjugate[9];
         scalar_t sub_adjugate[9];
 
         scalar_t ux[10];
