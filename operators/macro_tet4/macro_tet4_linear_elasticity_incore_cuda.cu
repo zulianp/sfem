@@ -265,43 +265,28 @@ static inline __device__ void sub_adj_7(const scalar_t *const SFEM_RESTRICT adju
     sub_adjugate[8] = 2 * adjugate[2 * stride];
 }
 
-static const int8_t h_i0[8] = {0, 4, 6, 7, 4, 7, 6, 7};
-static const int8_t h_i1[8] = {4, 1, 5, 8, 5, 4, 5, 6};
-static const int8_t h_i2[8] = {6, 5, 2, 9, 6, 6, 9, 9};
-static const int8_t h_i3[8] = {7, 8, 9, 3, 8, 8, 8, 8};
-
-__constant__ int8_t i0[8];
-__constant__ int8_t i1[8];
-__constant__ int8_t i2[8];
-__constant__ int8_t i3[8];
-
-static inline __device__ void subtet_gather(const int i,
+static inline __device__ void subtet_gather(const int i0,
+                                            const int i1,
+                                            const int i2,
+                                            const int i3,
                                             const scalar_t *const SFEM_RESTRICT in,
                                             scalar_t *const SFEM_RESTRICT out) {
-    out[0] = in[i0[i]];
-    out[1] = in[i1[i]];
-    out[2] = in[i2[i]];
-    out[3] = in[i3[i]];
+    out[0] = in[i0];
+    out[1] = in[i1];
+    out[2] = in[i2];
+    out[3] = in[i3];
 }
 
-static inline __device__ void subtet_scatter_add(const int i,
+static inline __device__ void subtet_scatter_add(const int i0,
+                                                 const int i1,
+                                                 const int i2,
+                                                 const int i3,
                                                  const accumulator_t *const SFEM_RESTRICT in,
                                                  accumulator_t *const SFEM_RESTRICT out) {
-    out[i0[i]] += in[0];
-    out[i1[i]] += in[1];
-    out[i2[i]] += in[2];
-    out[i3[i]] += in[3];
-}
-
-static void init_local_indexing() {
-    static bool initialized = false;
-    if (!initialized) {
-        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(i0, h_i0, 8 * sizeof(int8_t)));
-        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(i1, h_i1, 8 * sizeof(int8_t)));
-        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(i2, h_i2, 8 * sizeof(int8_t)));
-        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(i3, h_i3, 8 * sizeof(int8_t)));
-        initialized = true;
-    }
+    out[i0] += in[0];
+    out[i1] += in[1];
+    out[i2] += in[2];
+    out[i3] += in[3];
 }
 
 int macro_tet4_cuda_incore_linear_elasticity_init(cuda_incore_linear_elasticity_t *const ctx,
@@ -311,7 +296,7 @@ int macro_tet4_cuda_incore_linear_elasticity_init(cuda_incore_linear_elasticity_
                                                   idx_t **const SFEM_RESTRICT elements,
                                                   geom_t **const SFEM_RESTRICT points) {
     {
-        init_local_indexing();
+        // init_local_indexing();
 
         cu_jacobian_t *jacobian_adjugate =
             (cu_jacobian_t *)calloc(9 * nelements, sizeof(cu_jacobian_t));
@@ -444,36 +429,10 @@ __global__ void macro_tet4_cuda_incore_linear_elasticity_apply_kernel(
         {  // Corner tests
             sub_adj_0(adjugate, 1, sub_adjugate);
 
-            for (int i = 0; i < 4; i++) {
-                subtet_gather(i, ux, sub_ux);
-                subtet_gather(i, uy, sub_uy);
-                subtet_gather(i, uz, sub_uz);
-
-                apply_micro_kernel(mu,
-                                   lambda,
-                                   sub_adjugate,
-                                   1.0,
-                                   sub_ux,
-                                   sub_uy,
-                                   sub_uz,
-                                   sub_outx,
-                                   sub_outy,
-                                   sub_outz);
-
-                subtet_scatter_add(i, sub_outx, outx);
-                subtet_scatter_add(i, sub_outy, outy);
-                subtet_scatter_add(i, sub_outz, outz);
-            }
-        }
-
-        {  // Octahedron tets
-
-            // 4)
-            sub_adj_4(adjugate, 1, sub_adjugate);
-
-            subtet_gather(4, ux, sub_ux);
-            subtet_gather(4, uy, sub_uy);
-            subtet_gather(4, uz, sub_uz);
+            // 0)
+            subtet_gather(0, 4, 6, 7, ux, sub_ux);
+            subtet_gather(0, 4, 6, 7, uy, sub_uy);
+            subtet_gather(0, 4, 6, 7, uz, sub_uz);
 
             apply_micro_kernel(mu,
                                lambda,
@@ -486,16 +445,99 @@ __global__ void macro_tet4_cuda_incore_linear_elasticity_apply_kernel(
                                sub_outy,
                                sub_outz);
 
-            subtet_scatter_add(4, sub_outx, outx);
-            subtet_scatter_add(4, sub_outy, outy);
-            subtet_scatter_add(4, sub_outz, outz);
+            subtet_scatter_add(0, 4, 6, 7, sub_outx, outx);
+            subtet_scatter_add(0, 4, 6, 7, sub_outy, outy);
+            subtet_scatter_add(0, 4, 6, 7, sub_outz, outz);
+
+            // 1)
+            subtet_gather(4, 1, 5, 8, ux, sub_ux);
+            subtet_gather(4, 1, 5, 8, uy, sub_uy);
+            subtet_gather(4, 1, 5, 8, uz, sub_uz);
+
+            apply_micro_kernel(mu,
+                               lambda,
+                               sub_adjugate,
+                               1.0,
+                               sub_ux,
+                               sub_uy,
+                               sub_uz,
+                               sub_outx,
+                               sub_outy,
+                               sub_outz);
+
+            subtet_scatter_add(4, 1, 5, 8, sub_outx, outx);
+            subtet_scatter_add(4, 1, 5, 8, sub_outy, outy);
+            subtet_scatter_add(4, 1, 5, 8, sub_outz, outz);
+
+            // 2)
+            subtet_gather(6, 5, 2, 9, ux, sub_ux);
+            subtet_gather(6, 5, 2, 9, uy, sub_uy);
+            subtet_gather(6, 5, 2, 9, uz, sub_uz);
+
+            apply_micro_kernel(mu,
+                               lambda,
+                               sub_adjugate,
+                               1.0,
+                               sub_ux,
+                               sub_uy,
+                               sub_uz,
+                               sub_outx,
+                               sub_outy,
+                               sub_outz);
+
+            subtet_scatter_add(6, 5, 2, 9, sub_outx, outx);
+            subtet_scatter_add(6, 5, 2, 9, sub_outy, outy);
+            subtet_scatter_add(6, 5, 2, 9, sub_outz, outz);
+
+            // 3)
+            subtet_gather(7, 8, 9, 3, ux, sub_ux);
+            subtet_gather(7, 8, 9, 3, uy, sub_uy);
+            subtet_gather(7, 8, 9, 3, uz, sub_uz);
+
+            apply_micro_kernel(mu,
+                               lambda,
+                               sub_adjugate,
+                               1.0,
+                               sub_ux,
+                               sub_uy,
+                               sub_uz,
+                               sub_outx,
+                               sub_outy,
+                               sub_outz);
+            subtet_scatter_add(7, 8, 9, 3, sub_outx, outx);
+            subtet_scatter_add(7, 8, 9, 3, sub_outy, outy);
+            subtet_scatter_add(7, 8, 9, 3, sub_outz, outz);
+        }
+
+        {  // Octahedron tets
+            // 4)
+            sub_adj_4(adjugate, 1, sub_adjugate);
+
+            subtet_gather(4, 5, 6, 8, ux, sub_ux);
+            subtet_gather(4, 5, 6, 8, uy, sub_uy);
+            subtet_gather(4, 5, 6, 8, uz, sub_uz);
+
+            apply_micro_kernel(mu,
+                               lambda,
+                               sub_adjugate,
+                               1.0,
+                               sub_ux,
+                               sub_uy,
+                               sub_uz,
+                               sub_outx,
+                               sub_outy,
+                               sub_outz);
+
+            subtet_scatter_add(4, 5, 6, 8, sub_outx, outx);
+            subtet_scatter_add(4, 5, 6, 8, sub_outy, outy);
+            subtet_scatter_add(4, 5, 6, 8, sub_outz, outz);
 
             // 5)
             sub_adj_5(adjugate, 1, sub_adjugate);
 
-            subtet_gather(5, ux, sub_ux);
-            subtet_gather(5, uy, sub_uy);
-            subtet_gather(5, uz, sub_uz);
+            subtet_gather(7, 4, 6, 8, ux, sub_ux);
+            subtet_gather(7, 4, 6, 8, uy, sub_uy);
+            subtet_gather(7, 4, 6, 8, uz, sub_uz);
 
             apply_micro_kernel(mu,
                                lambda,
@@ -507,17 +549,16 @@ __global__ void macro_tet4_cuda_incore_linear_elasticity_apply_kernel(
                                sub_outx,
                                sub_outy,
                                sub_outz);
-
-            subtet_scatter_add(5, sub_outx, outx);
-            subtet_scatter_add(5, sub_outy, outy);
-            subtet_scatter_add(5, sub_outz, outz);
+            subtet_scatter_add(7, 4, 6, 8, sub_outx, outx);
+            subtet_scatter_add(7, 4, 6, 8, sub_outy, outy);
+            subtet_scatter_add(7, 4, 6, 8, sub_outz, outz);
 
             // 6)
             sub_adj_6(adjugate, 1, sub_adjugate);
 
-            subtet_gather(6, ux, sub_ux);
-            subtet_gather(6, uy, sub_uy);
-            subtet_gather(6, uz, sub_uz);
+            subtet_gather(6, 5, 9, 8, ux, sub_ux);
+            subtet_gather(6, 5, 9, 8, uy, sub_uy);
+            subtet_gather(6, 5, 9, 8, uz, sub_uz);
 
             apply_micro_kernel(mu,
                                lambda,
@@ -530,16 +571,17 @@ __global__ void macro_tet4_cuda_incore_linear_elasticity_apply_kernel(
                                sub_outy,
                                sub_outz);
 
-            subtet_scatter_add(6, sub_outx, outx);
-            subtet_scatter_add(6, sub_outy, outy);
-            subtet_scatter_add(6, sub_outz, outz);
+            subtet_scatter_add(6, 5, 9, 8, sub_outx, outx);
+            subtet_scatter_add(6, 5, 9, 8, sub_outy, outy);
+            subtet_scatter_add(6, 5, 9, 8, sub_outz, outz);
 
             // 7)
-            subtet_gather(7, ux, sub_ux);
-            subtet_gather(7, uy, sub_uy);
-            subtet_gather(7, uz, sub_uz);
-
             sub_adj_7(adjugate, 1, sub_adjugate);
+
+            subtet_gather(7, 6, 9, 8, ux, sub_ux);
+            subtet_gather(7, 6, 9, 8, uy, sub_uy);
+            subtet_gather(7, 6, 9, 8, uz, sub_uz);
+
             apply_micro_kernel(mu,
                                lambda,
                                sub_adjugate,
@@ -550,10 +592,10 @@ __global__ void macro_tet4_cuda_incore_linear_elasticity_apply_kernel(
                                sub_outx,
                                sub_outy,
                                sub_outz);
-
-            subtet_scatter_add(7, sub_outx, outx);
-            subtet_scatter_add(7, sub_outy, outy);
-            subtet_scatter_add(7, sub_outz, outz);
+            
+            subtet_scatter_add(7, 6, 9, 8, sub_outx, outx);
+            subtet_scatter_add(7, 6, 9, 8, sub_outy, outy);
+            subtet_scatter_add(7, 6, 9, 8, sub_outz, outz);
         }
 
         {
