@@ -96,21 +96,21 @@ static inline __device__ __host__ void apply_micro_kernel(const scalar_t mu,
                                                           accumulator_t *const SFEM_RESTRICT outx,
                                                           accumulator_t *const SFEM_RESTRICT outy,
                                                           accumulator_t *const SFEM_RESTRICT outz) {
-    real_t disp_grad[9];
+    scalar_t disp_grad[9];
     {
-        const real_t x0 = 1.0 / jacobian_determinant;
-        const real_t x1 = adjugate[0] * x0;
-        const real_t x2 = adjugate[3] * x0;
-        const real_t x3 = adjugate[6] * x0;
-        const real_t x4 = -x1 - x2 - x3;
-        const real_t x5 = adjugate[1] * x0;
-        const real_t x6 = adjugate[4] * x0;
-        const real_t x7 = adjugate[7] * x0;
-        const real_t x8 = -x5 - x6 - x7;
-        const real_t x9 = adjugate[2] * x0;
-        const real_t x10 = adjugate[5] * x0;
-        const real_t x11 = adjugate[8] * x0;
-        const real_t x12 = -x10 - x11 - x9;
+        const scalar_t x0 = (scalar_t)1.0 / jacobian_determinant;
+        const scalar_t x1 = adjugate[0] * x0;
+        const scalar_t x2 = adjugate[3] * x0;
+        const scalar_t x3 = adjugate[6] * x0;
+        const scalar_t x4 = -x1 - x2 - x3;
+        const scalar_t x5 = adjugate[1] * x0;
+        const scalar_t x6 = adjugate[4] * x0;
+        const scalar_t x7 = adjugate[7] * x0;
+        const scalar_t x8 = -x5 - x6 - x7;
+        const scalar_t x9 = adjugate[2] * x0;
+        const scalar_t x10 = adjugate[5] * x0;
+        const scalar_t x11 = adjugate[8] * x0;
+        const scalar_t x12 = -x10 - x11 - x9;
         // X
         disp_grad[0] = ux[0] * x4 + ux[1] * x1 + ux[2] * x2 + ux[3] * x3;
         disp_grad[1] = ux[0] * x8 + ux[1] * x5 + ux[2] * x6 + ux[3] * x7;
@@ -128,15 +128,15 @@ static inline __device__ __host__ void apply_micro_kernel(const scalar_t mu,
     }
 
     // We can reuse the buffer to avoid additional register usage
-    real_t *P = disp_grad;
+    scalar_t *P = disp_grad;
     {
-        const real_t x0 = (1.0 / 3.0) * mu;
-        const real_t x1 =
-            (1.0 / 12.0) * lambda * (2 * disp_grad[0] + 2 * disp_grad[4] + 2 * disp_grad[8]);
-        const real_t x2 = (1.0 / 6.0) * mu;
-        const real_t x3 = x2 * (disp_grad[1] + disp_grad[3]);
-        const real_t x4 = x2 * (disp_grad[2] + disp_grad[6]);
-        const real_t x5 = x2 * (disp_grad[5] + disp_grad[7]);
+        const scalar_t x0 = (scalar_t)(1.0 / 3.0) * mu;
+        const scalar_t x1 = (scalar_t)(1.0 / 12.0) * lambda *
+                            (2 * disp_grad[0] + 2 * disp_grad[4] + 2 * disp_grad[8]);
+        const scalar_t x2 = (scalar_t)(1.0 / 6.0) * mu;
+        const scalar_t x3 = x2 * (disp_grad[1] + disp_grad[3]);
+        const scalar_t x4 = x2 * (disp_grad[2] + disp_grad[6]);
+        const scalar_t x5 = x2 * (disp_grad[5] + disp_grad[7]);
         P[0] = disp_grad[0] * x0 + x1;
         P[1] = x3;
         P[2] = x4;
@@ -150,9 +150,9 @@ static inline __device__ __host__ void apply_micro_kernel(const scalar_t mu,
 
     // Bilinear form
     {
-        const real_t x0 = adjugate[0] + adjugate[3] + adjugate[6];
-        const real_t x1 = adjugate[1] + adjugate[4] + adjugate[7];
-        const real_t x2 = adjugate[2] + adjugate[5] + adjugate[8];
+        const scalar_t x0 = adjugate[0] + adjugate[3] + adjugate[6];
+        const scalar_t x1 = adjugate[1] + adjugate[4] + adjugate[7];
+        const scalar_t x2 = adjugate[2] + adjugate[5] + adjugate[8];
         // X
         outx[0] = -P[0] * x0 - P[1] * x1 - P[2] * x2;
         outx[1] = P[0] * adjugate[0] + P[1] * adjugate[1] + P[2] * adjugate[2];
@@ -437,7 +437,7 @@ __global__ void macro_tet4_cuda_incore_linear_elasticity_apply_kernel(
             apply_micro_kernel(mu,
                                lambda,
                                sub_adjugate,
-                               1.0,
+                               (scalar_t)1.0,
                                sub_ux,
                                sub_uy,
                                sub_uz,
@@ -457,7 +457,7 @@ __global__ void macro_tet4_cuda_incore_linear_elasticity_apply_kernel(
             apply_micro_kernel(mu,
                                lambda,
                                sub_adjugate,
-                               1.0,
+                               (scalar_t)1.0,
                                sub_ux,
                                sub_uy,
                                sub_uz,
@@ -477,7 +477,7 @@ __global__ void macro_tet4_cuda_incore_linear_elasticity_apply_kernel(
             apply_micro_kernel(mu,
                                lambda,
                                sub_adjugate,
-                               1.0,
+                               (scalar_t)1.0,
                                sub_ux,
                                sub_uy,
                                sub_uz,
@@ -497,7 +497,7 @@ __global__ void macro_tet4_cuda_incore_linear_elasticity_apply_kernel(
             apply_micro_kernel(mu,
                                lambda,
                                sub_adjugate,
-                               1.0,
+                               (scalar_t)1.0,
                                sub_ux,
                                sub_uy,
                                sub_uz,
@@ -520,7 +520,7 @@ __global__ void macro_tet4_cuda_incore_linear_elasticity_apply_kernel(
             apply_micro_kernel(mu,
                                lambda,
                                sub_adjugate,
-                               1.0,
+                               (scalar_t)1.0,
                                sub_ux,
                                sub_uy,
                                sub_uz,
@@ -542,7 +542,7 @@ __global__ void macro_tet4_cuda_incore_linear_elasticity_apply_kernel(
             apply_micro_kernel(mu,
                                lambda,
                                sub_adjugate,
-                               1.0,
+                               (scalar_t)1.0,
                                sub_ux,
                                sub_uy,
                                sub_uz,
@@ -563,7 +563,7 @@ __global__ void macro_tet4_cuda_incore_linear_elasticity_apply_kernel(
             apply_micro_kernel(mu,
                                lambda,
                                sub_adjugate,
-                               1.0,
+                               (scalar_t)1.0,
                                sub_ux,
                                sub_uy,
                                sub_uz,
@@ -585,14 +585,14 @@ __global__ void macro_tet4_cuda_incore_linear_elasticity_apply_kernel(
             apply_micro_kernel(mu,
                                lambda,
                                sub_adjugate,
-                               1.0,
+                               (scalar_t)1.0,
                                sub_ux,
                                sub_uy,
                                sub_uz,
                                sub_outx,
                                sub_outy,
                                sub_outz);
-            
+
             subtet_scatter_add(7, 6, 9, 8, sub_outx, outx);
             subtet_scatter_add(7, 6, 9, 8, sub_outy, outy);
             subtet_scatter_add(7, 6, 9, 8, sub_outz, outz);
@@ -600,7 +600,7 @@ __global__ void macro_tet4_cuda_incore_linear_elasticity_apply_kernel(
 
         {
             // real_t use here instead of scalar_t to have division in full precision
-            const real_t jacobian_determinant = g_jacobian_determinant[e];
+            const scalar_t jacobian_determinant = g_jacobian_determinant[e];
 
             for (int v = 0; v < 10; v++) {
                 atomicAdd(&values[ev[v] * 3], outx[v] / jacobian_determinant);
@@ -647,7 +647,7 @@ __global__ void macro_tet4_cuda_incore_linear_elasticity_diag_kernel(
         }
 
         {  // TODO
-            diag_micro_kernel(mu, lambda, adjugate, 1.0, element_vector);
+            diag_micro_kernel(mu, lambda, adjugate, (scalar_t)1.0, element_vector);
         }
 
         //
