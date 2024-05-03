@@ -11,32 +11,26 @@ The peak throughput reached on the A100 is **5.3 GDOF/s**
 
 ### Linear elasticity 
 
-cylinder 	 A100		P100
-tet10        4226.2 	2312.4
-tet4         2016.7     909.6
-macrotet4    5330.6     2632.0
+| Geometry   | Test      |   A100 |   P100 |
+|:-----------|:----------|-------:|-------:|
+| cylinder   | tet10     | 4226.2 | 2312.4 |
+| cylinder   | tet4      | 2016.7 |  909.6 |
+| cylinder   | macrotet4 | 5330.6 | 2632   |
+| sphere     | tet10     | 4369.9 | 2311.8 |
+| sphere     | tet4      | 1989.7 |  909.7 |
+| sphere     | macrotet4 | 4493.1 | 2623.6 |
 
-sphere 	 	 A100		P100
-tet10        4369.9 	2311.8
-tet4         1989.7  	909.7
-macrotet4    4493.1 	2623.6
 
 ### Laplacian
 
-cylinder 	 A100		P100
-tet10        4788.2 	2628.9
-tet4         1809.3 	888.3
-macrotet4    4945.9     2720.6
-
-sphere 	 	 A100		P100
-tet10        4695.7 	2611.8
-tet4         1759.3     887.5
-macrotet4    4856.4     2719.5
-
-
-
-
-
+| Geometry | Element     |   A100 |   P100 |
+|:-----------|:----------|-------:|-------:|
+| cylinder   | tet10     | 4788.2 | 2628.9 |
+| cylinder   | tet4      | 1809.3 |  888.3 |
+| cylinder   | macrotet4 | 4945.9 | 2720.6 |
+| sphere     | tet10     | 4695.7 | 2611.8 |
+| sphere     | tet4      | 1759.3 |  887.5 |
+| sphere     | macrotet4 | 4856.4 | 2719.5 |
 
 
 # Comparision with other Utopia software
