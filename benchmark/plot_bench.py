@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
-import sys
+import sys, getopt
 
 col = 'throughput [GB/s]'
 real_str = "double"
@@ -12,24 +12,8 @@ elem_type 	 = "tet10"
 elem_type_p1 = "tet4"
 elem_type_macro_p1 = "macrotet4"
 size_of_real = 8
-gpu = "1 x P100 GPU"
 
-# Check for command line arguments
-if len(sys.argv) < 3:
-    print("Error: Please provide the CSV file path as an argument.")
-    exit(1)
-
-
-def plot(geo, op_type):   
-
-    # Get the CSV file path from the first argument
-    SpMV_data_path = sys.argv[1]
-    MF_data_path   = sys.argv[2]
-
-    # Read the CSV data into a DataFrame
-    SpMV_df = pd.read_csv(SpMV_data_path)
-    MF_df   = pd.read_csv(MF_data_path)
-
+def plot(spMV_df, MF_df, geo, op_type, gpu):
     SpMV_rep 		= "CRS"
     SpMV_is_geo 	= SpMV_df["geo"] == geo
     SpMV_is_op_type = SpMV_df["op_type"] == op_type
@@ -156,10 +140,46 @@ def plot(geo, op_type):
 
 
 
+if __name__ == '__main__':
+    argv = sys.argv
 
+    usage = f'usage: {argv[0]} <spmv.csv> <matrix_free.csv>'
 
-plot("cylinder", "LinearElasticity")
-plot("sphere", "LinearElasticity")
+    if len(argv) < 3:
+        print("Error: Please provide the CSV file path as an argument.")
+        print(usage)
+        exit(1)
 
-plot("cylinder", "Laplacian")
-plot("sphere", "Laplacian")
+    gpu = "1 x P100 GPU"
+
+    try:
+        opts, args = getopt.getopt(
+            argv[3:], "d:h",
+            ["device=", "help"])
+
+    except getopt.GetoptError as err:
+        print(err)
+        print(usage)
+        sys.exit(1)
+
+    for opt, arg in opts:
+        if opt in ('-h', '--help'):
+            print(usage)
+            sys.exit()
+        elif opt in ("-d", "--device"):
+            gpu = arg
+
+    # Get the CSV file path from the first argument
+    SpMV_data_path = sys.argv[1]
+    MF_data_path   = sys.argv[2]
+
+    # Read the CSV data into a DataFrame
+    SpMV_df = pd.read_csv(SpMV_data_path)
+    MF_df   = pd.read_csv(MF_data_path)
+
+    plot(SpMV_df, MF_df, "cylinder", "LinearElasticity", gpu)
+    plot(SpMV_df, MF_df, "sphere", "LinearElasticity", gpu)
+
+    plot(SpMV_df, MF_df, "cylinder", "Laplacian", gpu)
+    plot(SpMV_df, MF_df, "sphere", "Laplacian", gpu)
+
