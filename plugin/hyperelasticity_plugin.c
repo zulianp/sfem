@@ -10,6 +10,7 @@
 #include "array_dtof.h"
 #include "matrixio_array.h"
 #include "matrixio_crs.h"
+#include "mpi.h"
 #include "utils.h"
 
 #include "crs_graph.h"
@@ -23,6 +24,7 @@
 #include "sfem_mesh.h"
 
 #include "boundary_condition.h"
+#include "boundary_condition_io.h"
 #include "dirichlet.h"
 #include "neumann.h"
 
@@ -42,8 +44,9 @@ typedef struct {
     real_t mu, lambda;
 
     const char *output_dir;
-
     const char *material;
+
+    double matrix_free_time;
 } sfem_problem_t;
 
 static int SFEM_DEBUG_DUMP = 0;
@@ -82,6 +85,9 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
     SFEM_READ_ENV(SFEM_NEUMANN_VALUE, );
     SFEM_READ_ENV(SFEM_NEUMANN_COMPONENT, );
 
+    int SFEM_USE_MACRO = 0;
+    SFEM_READ_ENV(SFEM_USE_MACRO, atoi);
+
     const char *SFEM_OUTPUT_DIR = "./sfem_output";
     SFEM_READ_ENV(SFEM_OUTPUT_DIR, );
 
@@ -113,7 +119,8 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
         "- SFEM_SHEAR_MODULUS=%g\n"
         "- SFEM_FIRST_LAME_PARAMETER=%g\n"
         "- SFEM_OUTPUT_DIR=%s\n"
-        "- SFEM_DEBUG_DUMP=%d\n",
+        "- SFEM_DEBUG_DUMP=%d\n"
+        "- SFEM_USE_MACRO=%d\n",
         SFEM_DIRICHLET_NODESET,
         SFEM_DIRICHLET_VALUE,
         SFEM_DIRICHLET_COMPONENT,
@@ -124,7 +131,8 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
         SFEM_SHEAR_MODULUS,
         SFEM_FIRST_LAME_PARAMETER,
         SFEM_OUTPUT_DIR,
-        SFEM_DEBUG_DUMP);
+        SFEM_DEBUG_DUMP,
+        SFEM_USE_MACRO);
 
     if (!SFEM_MESH_DIR || !SFEM_DIRICHLET_NODESET) {
         return ISOLVER_FUNCTION_FAILURE;
@@ -139,6 +147,10 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
 
     if (mesh_read(info->comm, SFEM_MESH_DIR, mesh)) {
         return ISOLVER_FUNCTION_FAILURE;
+    }
+
+    if(SFEM_USE_MACRO) {
+        mesh->element_type = macro_type_variant(mesh->element_type);
     }
 
     sfem_problem_t *problem = (sfem_problem_t *)malloc(sizeof(sfem_problem_t));
@@ -167,6 +179,8 @@ int ISOLVER_EXPORT isolver_function_init(isolver_function_t *info) {
     problem->material = SFEM_MATERIAL;
     problem->n2n_rowptr = NULL;
     problem->n2n_colidx = NULL;
+
+    problem->matrix_free_time = 0;
 
     // Store problem
     info->private_data = (void *)problem;
@@ -457,6 +471,8 @@ int ISOLVER_EXPORT isolver_function_apply(const isolver_function_t *info,
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
+    double tick = MPI_Wtime();
+
     if (strcmp(problem->material, "linear") == 0) {
         linear_elasticity_apply_aos(mesh->element_type,
                                     mesh->nelements,
@@ -471,6 +487,10 @@ int ISOLVER_EXPORT isolver_function_apply(const isolver_function_t *info,
         // TODO
         assert(0);
     }
+
+    double tock = MPI_Wtime();
+
+    problem->matrix_free_time += tock - tick;
 
     return ISOLVER_FUNCTION_SUCCESS;
 }
@@ -570,6 +590,8 @@ int ISOLVER_EXPORT isolver_function_destroy(isolver_function_t *info) {
 
         free(problem->neumann_conditions);
     }
+
+    printf("Time spent in matrix-free kernel %g (seconds)\n", problem->matrix_free_time);
 
     return ISOLVER_FUNCTION_SUCCESS;
 }

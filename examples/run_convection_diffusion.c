@@ -21,15 +21,14 @@
 #include "mass.h"
 
 #include "boundary_condition.h"
+#include "boundary_condition_io.h"
 #include "dirichlet.h"
 #include "neumann.h"
 
+#include "cvfem_operators.h"
 #include "laplacian.h"
 #include "navier_stokes.h"
 #include "read_mesh.h"
-// #include "constrained_gs.h"
-#include "cvfem_tri3_convection.h"
-#include "tri3_laplacian.h"
 
 #include "sfem_logger.h"
 
@@ -40,7 +39,6 @@ void axpy(const ptrdiff_t n, const real_t alpha, const real_t *const x, real_t *
     }
 }
 
-
 void scal(const ptrdiff_t n, const real_t alpha, real_t *const x) {
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < n; i++) {
@@ -48,9 +46,7 @@ void scal(const ptrdiff_t n, const real_t alpha, real_t *const x) {
     }
 }
 
-
 real_t dot(const ptrdiff_t n, const real_t *const x, const real_t *const y) {
-
     real_t ret = 0;
 #pragma omp parallel for reduction(+ : ret)
     for (ptrdiff_t i = 0; i < n; i++) {
@@ -119,15 +115,24 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_NEUMANN_SIDESET, );
     SFEM_READ_ENV(SFEM_NEUMANN_VALUE, );
 
-    float SFEM_DT = 0.1;
-    float SFEM_MAX_TIME = 1;
-    float SFEM_EXPORT_FREQUENCY = 1;
-    float SFEM_DIFFUSIVITY = 1;
+    real_t SFEM_DT = 0.1;
+    real_t SFEM_MAX_TIME = 1;
+    real_t SFEM_EXPORT_FREQUENCY = 1;
+    real_t SFEM_DIFFUSIVITY = 0;
+    real_t SFEM_VELX = 1;
+    real_t SFEM_VELY = 0;
+    real_t SFEM_VELZ = 0;
 
     SFEM_READ_ENV(SFEM_DT, atof);
     SFEM_READ_ENV(SFEM_MAX_TIME, atof);
     SFEM_READ_ENV(SFEM_EXPORT_FREQUENCY, atof);
     SFEM_READ_ENV(SFEM_DIFFUSIVITY, atof);
+    SFEM_READ_ENV(SFEM_VELX, atof);
+    SFEM_READ_ENV(SFEM_VELY, atof);
+    SFEM_READ_ENV(SFEM_VELZ, atof);
+
+    char * SFEM_INITIAL_CONDITION = 0;
+    SFEM_READ_ENV(SFEM_INITIAL_CONDITION, );
 
     const char *SFEM_RESTART_FOLDER = 0;
     SFEM_READ_ENV(SFEM_RESTART_FOLDER, );
@@ -143,10 +148,20 @@ int main(int argc, char *argv[]) {
             "- SFEM_DT=%g\n"
             "- SFEM_RESTART_FOLDER=%s\n"
             "- SFEM_RESTART_ID=%d\n"
+            "- SFEM_DIFFUSIVITY=%g\n"
+            "- SFEM_VELX=%g\n"
+            "- SFEM_VELY=%g\n"
+            "- SFEM_VELZ=%g\n"
+            "- SFEM_INITIAL_CONDITION=%s\n"
             "----------------------------------------\n",
             SFEM_DT,
             SFEM_RESTART_FOLDER,
-            SFEM_RESTART_ID);
+            SFEM_RESTART_ID,
+            (double)SFEM_DIFFUSIVITY,
+            (double)SFEM_VELX,
+            (double)SFEM_VELY,
+            (double)SFEM_VELZ,
+            SFEM_INITIAL_CONDITION);
     }
 
     if (SFEM_RESTART_FOLDER && !SFEM_RESTART_ID) {
@@ -176,13 +191,22 @@ int main(int argc, char *argv[]) {
     }
 
     for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
-        vel[0][i] = 1;
-        // vel[1][i] = 0.01;
+        vel[0][i] = SFEM_VELX;
+        vel[1][i] = SFEM_VELY;
+    }
+
+    if(sdim >= 3) {
+        for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+            vel[2][i] = SFEM_VELZ;
+        }
     }
 
     update = calloc(mesh.nnodes, sizeof(real_t));
 
-    // FIXME these are initial conditions (rename)
+    if(SFEM_INITIAL_CONDITION) {
+        array_read(comm, SFEM_INITIAL_CONDITION, SFEM_MPI_REAL_T, (void *)c, mesh.nnodes, mesh.nnodes);
+    }
+
     for (int i = 0; i < n_dirichlet_conditions; i++) {
         boundary_condition_t cond = dirichlet_conditions[i];
         constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, c);
@@ -211,7 +235,12 @@ int main(int argc, char *argv[]) {
     }
 
     real_t *cv_volumes = calloc(mesh.nnodes, sizeof(real_t));
-    cvfem_tri3_cv_volumes(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, cv_volumes);
+    cvfem_cv_volumes(
+        mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, cv_volumes);
+
+
+    real_t integr_concentration = dot(mesh.nnodes, c, cv_volumes);
+    printf("%g/%g dt=%g mc=%g\n", 0., SFEM_MAX_TIME, SFEM_DT, integr_concentration);
 
     real_t dt = SFEM_DT;
     ptrdiff_t step_count = 0;
@@ -219,26 +248,37 @@ int main(int argc, char *argv[]) {
         // Integrate
         memset(buff, 0, mesh.nnodes * sizeof(real_t));
 
-        if(SFEM_DIFFUSIVITY != 0.) {
-            tri3_laplacian_apply(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, c, buff);
+        if (SFEM_DIFFUSIVITY != 0.) {
+            cvfem_laplacian_apply(mesh.element_type,
+                                  mesh.nelements,
+                                  mesh.nnodes,
+                                  mesh.elements,
+                                  mesh.points,
+                                  c,
+                                  buff);
             scal(mesh.nnodes, -SFEM_DIFFUSIVITY, buff);
         }
 
-        cvfem_tri3_convection_apply(
-            mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, vel, c, buff);
-
+        cvfem_convection_apply(mesh.element_type,
+                               mesh.nelements,
+                               mesh.nnodes,
+                               mesh.elements,
+                               mesh.points,
+                               vel,
+                               c,
+                               buff);
 
         ediv(mesh.nnodes, buff, cv_volumes, update);
         axpy(mesh.nnodes, SFEM_DT, update, c);
 
-        real_t integr_concentration = dot(mesh.nnodes, c, cv_volumes);
+        integr_concentration = dot(mesh.nnodes, c, cv_volumes);
 
-        // for (int i = 0; i < n_dirichlet_conditions; i++) {
-        //     boundary_condition_t cond = dirichlet_conditions[i];
-        //     constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, c);
-        // }
+        for (int i = 0; i < n_dirichlet_conditions; i++) {
+            boundary_condition_t cond = dirichlet_conditions[i];
+            constraint_nodes_to_value(cond.local_size, cond.idx, cond.value, c);
+        }
 
-        if (t >= (next_check_point - SFEM_DT/2)) {  // Write to disk
+        if (t >= (next_check_point - SFEM_DT / 2)) {  // Write to disk
             printf("%g/%g dt=%g mc=%g\n", t, SFEM_MAX_TIME, dt, integr_concentration);
 
             sprintf(path, "%s/c.%09d.raw", output_folder, export_counter);
@@ -249,6 +289,22 @@ int main(int argc, char *argv[]) {
             next_check_point += SFEM_EXPORT_FREQUENCY;
             export_counter++;
         }
+    }
+
+    sprintf(path, "%s/cv_volumes.raw", output_folder);
+    array_write(comm, path, SFEM_MPI_REAL_T, cv_volumes, mesh.nnodes, mesh.nnodes);
+
+    // if(0)
+    {
+        for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+            c[i] = 1;
+            buff[i] = 0;
+        }
+        cvfem_laplacian_apply(
+            mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, c, buff);
+
+        sprintf(path, "%s/lapl_one.float64.raw", output_folder);
+        array_write(comm, path, SFEM_MPI_REAL_T, buff, mesh.nnodes, mesh.nnodes);
     }
 
     ptrdiff_t nelements = mesh.nelements;
@@ -263,6 +319,7 @@ int main(int argc, char *argv[]) {
     free(update);
     free(buff);
     free(c);
+    free(cv_volumes);
 
     for (int d = 0; d < sdim; d++) {
         free(vel[d]);

@@ -66,8 +66,8 @@ static SFEM_INLINE void cvfem_quad4_convection_assemble_hessian_kernel(
     element_matrix[11] = x29;
     element_matrix[12] = x19;
     element_matrix[13] = 0;
-    element_matrix[14] = x29;
-    element_matrix[15] = -x21 - x28;
+    element_matrix[14] = x28;
+    element_matrix[15] = -x21 - x29;
 }
 
 static SFEM_INLINE void cvfem_quad4_convection_assemble_apply_kernel(
@@ -116,7 +116,7 @@ static SFEM_INLINE void cvfem_quad4_convection_assemble_apply_kernel(
     element_vector[0] = x13 * x[3] + x19 * x[1] + x[0] * (-x20 - x21);
     element_vector[1] = x20 * x[0] + x25 * x[2] + x[1] * (-x19 - x26);
     element_vector[2] = x26 * x[1] + x28 * x[3] + x[2] * (-x25 - x29);
-    element_vector[3] = x21 * x[0] + x28 * x[2] + x[3] * (-x13 - x29);
+    element_vector[3] = x21 * x[0] + x29 * x[2] + x[3] * (-x13 - x28);
 }
 
 static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {
@@ -264,8 +264,6 @@ void cvfem_quad4_convection_apply(const ptrdiff_t nelements,
                                   real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    // double tick = MPI_Wtime();
-
 #pragma omp parallel
     {
 #pragma omp for  // nowait
@@ -327,9 +325,6 @@ void cvfem_quad4_convection_apply(const ptrdiff_t nelements,
             }
         }
     }
-
-    // double tock = MPI_Wtime();
-    // printf("cvfem_quad4_convection.c: cvfem_quad4_convection_apply\t%g seconds\n", tock - tick);
 }
 
 void cvfem_quad4_cv_volumes(const ptrdiff_t nelements,
@@ -346,10 +341,10 @@ void cvfem_quad4_cv_volumes(const ptrdiff_t nelements,
     {
 #pragma omp for  // nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
-            idx_t ev[3];
+            idx_t ev[4];
 
-#pragma unroll(3)
-            for (int v = 0; v < 3; ++v) {
+#pragma unroll(4)
+            for (int v = 0; v < 4; ++v) {
                 ev[v] = elems[v][i];
             }
 
@@ -360,10 +355,10 @@ void cvfem_quad4_cv_volumes(const ptrdiff_t nelements,
             J[2] = -y[ev[0]] + y[ev[1]];
             J[3] = -y[ev[0]] + y[ev[3]];
 
-            const real_t measure = ((J[0] * J[3] - J[1] * J[2]) / 2) / 4;
+            const real_t measure = (J[0] * J[3] - J[1] * J[2]) / 4;
 
             assert(measure > 0);
-            for (int edof_i = 0; edof_i < 3; ++edof_i) {
+            for (int edof_i = 0; edof_i < 4; ++edof_i) {
                 const idx_t dof_i = ev[edof_i];
 
 #pragma omp atomic update

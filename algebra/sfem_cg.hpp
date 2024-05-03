@@ -2,15 +2,20 @@
 #define SFEM_CG_HPP
 
 #include <cmath>
+#include <cstddef>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <iostream>
+#include <memory>
+
+#include "sfem_MatrixFreeLinearSolver.hpp"
 
 // https://en.wikipedia.org/wiki/Conjugate_gradient_method
 namespace sfem {
+
     template <typename T>
-    class ConjugateGradient {
+    class ConjugateGradient final : public MatrixFreeLinearSolver<T> {
     public:
         // Operator
         std::function<void(const T* const, T* const)> apply_op;
@@ -18,37 +23,51 @@ namespace sfem {
 
         // Mem management
         std::function<T*(const std::size_t)> allocate;
+        std::function<void(const std::size_t, T* const x)> zeros;
         std::function<void(T*)> destroy;
 
-        std::function<void(const std::size_t, const T* const, T* const)> copy;
+        std::function<void(const ptrdiff_t, const T* const, T* const)> copy;
 
         // blas
-        std::function<T(const std::size_t, const T* const, const T* const)> dot;
-        std::function<void(const std::size_t, const T, const T* const, const T, T* const)> axpby;
+        std::function<T(const ptrdiff_t, const T* const, const T* const)> dot;
+        std::function<void(const ptrdiff_t, const T, const T* const, const T, T* const)> axpby;
 
         // Solver parameters
         T tol{1e-10};
         int max_it{10000};
+        ptrdiff_t n_dofs{-1};
 
-        void set_preconditioner(std::function<void(const T* const, T* const)> &&in)
-        {
+        inline std::ptrdiff_t rows() const override { return n_dofs; }
+        inline std::ptrdiff_t cols() const override { return n_dofs; }
+
+        void set_op(const std::shared_ptr<Operator<T>>& op) override {
+            this->apply_op = [=](const T* const x, T* const y) { op->apply(x, y); };
+        }
+
+        void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) override {
+            this->preconditioner_op = [=](const T* const x, T* const y) { op->apply(x, y); };
+        }
+
+        void set_max_it(const int it) override { max_it = it; }
+
+        void set_preconditioner(std::function<void(const T* const, T* const)>&& in) {
             preconditioner_op = in;
         }
 
         void default_init() {
-            allocate = [](const std::size_t n) -> T* { return (T*)calloc(n, sizeof(T)); };
+            allocate = [](const std::ptrdiff_t n) -> T* { return (T*)calloc(n, sizeof(T)); };
 
             destroy = [](T* a) { free(a); };
 
-            copy = [](const std::size_t n, const T* const src, T* const dest) {
+            copy = [](const ptrdiff_t n, const T* const src, T* const dest) {
                 std::memcpy(dest, src, n * sizeof(T));
             };
 
-            dot = [](const std::size_t n, const T* const l, const T* const r) -> T {
+            dot = [](const ptrdiff_t n, const T* const l, const T* const r) -> T {
                 T ret = 0;
 
 #pragma omp parallel for reduction(+ : ret)
-                for (std::size_t i = 0; i < n; i++) {
+                for (ptrdiff_t i = 0; i < n; i++) {
                     ret += l[i] * r[i];
                 }
 
@@ -56,12 +75,16 @@ namespace sfem {
             };
 
             axpby =
-                [](const std::size_t n, const T alpha, const T* const x, const T beta, T* const y) {
+                [](const ptrdiff_t n, const T alpha, const T* const x, const T beta, T* const y) {
 #pragma omp parallel for
-                    for (std::size_t i = 0; i < n; i++) {
+                    for (ptrdiff_t i = 0; i < n; i++) {
                         y[i] = alpha * x[i] + beta * y[i];
                     }
                 };
+
+            zeros = [](const std::size_t n, T* const x) {
+                memset(x, 0, n*sizeof(T));
+            };
         }
 
         bool good() const {
@@ -81,7 +104,7 @@ namespace sfem {
             }
         }
 
-        int apply(const size_t n, const T* const b, T* const x) {
+        int apply(const ptrdiff_t n, const T* const b, T* const x) {
             if (preconditioner_op) {
                 return aux_apply_precond(n, b, x);
             } else {
@@ -89,15 +112,30 @@ namespace sfem {
             }
         }
 
+        int apply(const T* const b, T* const x) override {
+            assert(n_dofs >= 0);
+            if (this->n_dofs < 0) {
+                std::cerr
+                    << "Error uninitiaized n_dofs. Set set_n_dofs to set the number of dofs\n";
+                return 1;
+            }
+
+            return apply(this->n_dofs, b, x);
+        }
+
+        void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
+
     private:
-        int aux_apply_basic(const size_t n, const T* const b, T* const x) {
+        int aux_apply_basic(const ptrdiff_t n, const T* const b, T* const x) {
             if (!good()) {
+                assert(0);
                 return -1;
             }
 
             T* r = allocate(n);
 
             apply_op(x, r);
+
             axpby(n, 1, b, -1, r);
 
             T rtr = dot(n, r, r);
@@ -114,6 +152,7 @@ namespace sfem {
 
             int info = -1;
             for (int k = 0; k < max_it; k++) {
+                zeros(n, Ap);
                 apply_op(p, Ap);
 
                 const T ptAp = dot(n, p, Ap);
@@ -143,7 +182,7 @@ namespace sfem {
             return info;
         }
 
-        int aux_apply_precond(const size_t n, const T* const b, T* const x) {
+        int aux_apply_precond(const ptrdiff_t n, const T* const b, T* const x) {
             if (!good()) {
                 return -1;
             }
@@ -167,6 +206,8 @@ namespace sfem {
 
             preconditioner_op(r, z);
             copy(n, z, p);
+
+            zeros(n, Ap);
             apply_op(p, Ap);
 
             T rtz = dot(n, r, z);
@@ -188,6 +229,7 @@ namespace sfem {
 
                 axpby(n, 1, z, beta, p);
 
+                zeros(n, Ap);
                 apply_op(p, Ap);
 
                 const T ptAp = dot(n, p, Ap);
@@ -214,6 +256,13 @@ namespace sfem {
             return info;
         }
     };
+
+    template <typename T>
+    std::shared_ptr<MatrixFreeLinearSolver<T>> h_cg() {
+        auto cg = std::make_shared<ConjugateGradient<T>>();
+        cg->default_init();
+        return cg;
+    }
 }  // namespace sfem
 
 #endif  // SFEM_CG_HPP

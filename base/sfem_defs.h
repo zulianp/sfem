@@ -4,11 +4,11 @@
 #include "sfem_base.h"
 
 #include <assert.h>
+#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 
 enum ElemType {
     NIL = 0,
@@ -31,6 +31,60 @@ enum ElemType {
     INVALID = -1
 };
 
+SFEM_INLINE static enum ElemType type_from_string(const char* str) {
+    if (!strcmp(str, "NODE1")) return NODE1;
+    if (!strcmp(str, "EDGE2")) return EDGE2;
+    if (!strcmp(str, "EDGE3")) return EDGE3;
+    if (!strcmp(str, "TRI3")) return TRI3;
+    if (!strcmp(str, "TRISHELL3")) return TRISHELL3;
+    if (!strcmp(str, "WEDGE6")) return WEDGE6;
+    if (!strcmp(str, "QUAD4")) return QUAD4;
+    if (!strcmp(str, "TET4")) return TET4;
+    if (!strcmp(str, "TRI6")) return TRI6;
+    if (!strcmp(str, "MACRO_TRI3")) return MACRO_TRI3;
+    if (!strcmp(str, "MACRO_TET4")) return MACRO_TET4;
+    if (!strcmp(str, "HEX8")) return HEX8;
+    if (!strcmp(str, "TET10")) return TET10;
+
+    assert(0);
+    return INVALID;
+}
+
+SFEM_INLINE static const char* type_to_string(enum ElemType type) {
+    switch (type) {
+        case NODE1:
+            return "NODE1";
+        case EDGE2:
+            return "EDGE2";
+        case EDGE3:
+            return "EDGE3";
+        case TRI3:
+            return "TRI3";
+        case TRISHELL3:
+            return "TRISHELL3";
+        case WEDGE6:
+            return "WEDGE6";
+        case QUAD4:
+            return "QUAD4";
+        case TET4:
+            return "TET4";
+        case TRI6:
+            return "TRI6";
+        case MACRO_TRI3:
+            return "MACRO_TRI3";
+        case MACRO_TET4:
+            return "MACRO_TET4";
+        case HEX8:
+            return "HEX8";
+        case TET10:
+            return "TET10";
+        default: {
+            assert(0);
+            return "INVALID";
+        }
+    }
+}
+
 SFEM_INLINE static enum ElemType side_type(const enum ElemType type) {
     switch (type) {
         case TRI3:
@@ -46,6 +100,8 @@ SFEM_INLINE static enum ElemType side_type(const enum ElemType type) {
             return NODE1;
         case TRISHELL3:
             return BEAM2;
+        case MACRO_TET4:
+            return TRI6;  // FIXME
         default: {
             assert(0);
             return INVALID;
@@ -139,7 +195,7 @@ SFEM_INLINE static int elem_num_sides(const enum ElemType type) {
         case TRISHELL3:
             return 3;
         case MACRO_TRI3:
-            return 3; // Really?
+            return 3;  // Really?
         case MACRO_TET4:
             return 4;
         case QUAD4:
@@ -194,11 +250,26 @@ SFEM_INLINE static int elem_manifold_dim(const enum ElemType type) {
 
 SFEM_INLINE static enum ElemType macro_type_variant(const enum ElemType type) {
     switch (type) {
-        case TET10: return MACRO_TET4;
-        case TRI6: return MACRO_TRI3;
+        case TET10:
+            return MACRO_TET4;
+        case TRI6:
+            return MACRO_TRI3;
         default: {
             assert(0);
-            return INVALID;
+            return type;
+        }
+    }
+}
+
+SFEM_INLINE static enum ElemType macro_base_elem(const enum ElemType macro_type) {
+    switch (macro_type) {
+        case MACRO_TET4:
+            return TET4;
+        case MACRO_TRI3:
+            return TRI3;
+        default: {
+            assert(0);
+            return macro_type;
         }
     }
 }

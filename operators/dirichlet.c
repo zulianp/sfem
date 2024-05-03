@@ -123,6 +123,23 @@ void constraint_nodes_to_value_vec(const ptrdiff_t n_dirichlet_nodes,
     }
 }
 
+void constraint_gradient_nodes_to_value_vec(const ptrdiff_t n_dirichlet_nodes,
+                                            const idx_t *dirichlet_nodes,
+                                            const int block_size,
+                                            const int component,
+                                            const real_t value,
+                                            const real_t *const SFEM_RESTRICT x,
+                                            real_t *const SFEM_RESTRICT g) {
+#pragma omp parallel
+    {
+#pragma omp for
+        for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
+            idx_t i = dirichlet_nodes[node] * block_size + component;
+            g[i] = x[i] - value;
+        }
+    }
+}
+
 void constraint_nodes_to_values_vec(const ptrdiff_t n_dirichlet_nodes,
                                     const idx_t *dirichlet_nodes,
                                     const int block_size,
@@ -135,6 +152,23 @@ void constraint_nodes_to_values_vec(const ptrdiff_t n_dirichlet_nodes,
         for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
             idx_t i = dirichlet_nodes[node] * block_size + component;
             values[i] = dirichlet_values[node];
+        }
+    }
+}
+
+void constraint_gradient_nodes_to_values_vec(const ptrdiff_t n_dirichlet_nodes,
+                                             const idx_t *dirichlet_nodes,
+                                             const int block_size,
+                                             const int component,
+                                             const real_t *dirichlet_values,
+                                             const real_t *const SFEM_RESTRICT x,
+                                             real_t *const SFEM_RESTRICT g) {
+#pragma omp parallel
+    {
+#pragma omp for
+        for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
+            idx_t i = dirichlet_nodes[node] * block_size + component;
+            g[i] = x[i] - dirichlet_values[node];
         }
     }
 }

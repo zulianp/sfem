@@ -8,8 +8,8 @@ void tet4_assemble_mass(const ptrdiff_t nelements,
                         const ptrdiff_t nnodes,
                         idx_t **const SFEM_RESTRICT elems,
                         geom_t **const SFEM_RESTRICT xyz,
-                        count_t *const rowptr,
-                        idx_t *const colidx,
+                        const count_t *const SFEM_RESTRICT rowptr,
+                        const idx_t *const SFEM_RESTRICT colidx,
                         real_t *const values);
 
 void tet4_assemble_lumped_mass(const ptrdiff_t nelements,

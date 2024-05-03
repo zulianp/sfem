@@ -20,7 +20,7 @@
 
 #include "read_mesh.h"
 
-#include "cvfem_tet4_laplacian.h"
+#include "tet4_laplacian.h"
 #include "cvfem_tri3_diffusion.h"
 
 ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
@@ -135,7 +135,7 @@ int main(int argc, char *argv[]) {
                 break;
             }
             case TET4: {
-                cvfem_tet4_laplacian_assemble_hessian(mesh.nelements,
+                tet4_laplacian_assemble_hessian(mesh.nelements,
                                                       mesh.nnodes,
                                                       mesh.elements,
                                                       mesh.points,

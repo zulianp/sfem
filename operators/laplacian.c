@@ -4,8 +4,8 @@
 #include "tri3_laplacian.h"
 #include "tri6_laplacian.h"
 
-#include "macro_tri3_laplacian.h"
 #include "macro_tet4_laplacian.h"
+#include "macro_tri3_laplacian.h"
 
 #include "sfem_defs.h"
 
@@ -28,6 +28,7 @@ void laplacian_assemble_value(int element_type,
             break;
         }
         default: {
+            assert(0);
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
     }
@@ -41,6 +42,10 @@ void laplacian_assemble_gradient(int element_type,
                                  const real_t *const SFEM_RESTRICT u,
                                  real_t *const SFEM_RESTRICT values) {
     switch (element_type) {
+        case TRI3: {
+            tri3_laplacian_apply(nelements, nnodes, elems, xyz, u, values);
+            break;
+        }
         case TET4: {
             tet4_laplacian_assemble_gradient(nelements, nnodes, elems, xyz, u, values);
             break;
@@ -49,7 +54,12 @@ void laplacian_assemble_gradient(int element_type,
             tet10_laplacian_assemble_gradient(nelements, nnodes, elems, xyz, u, values);
             break;
         }
+        case MACRO_TET4: {
+            macro_tet4_laplacian_apply(nelements, nnodes, elems, xyz, u, values);
+            break;
+        }
         default: {
+            assert(0);
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
     }
@@ -81,6 +91,7 @@ void laplacian_assemble_hessian(int element_type,
             break;
         }
         default: {
+            assert(0);
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
     }
@@ -94,6 +105,10 @@ void laplacian_apply(int element_type,
                      const real_t *const SFEM_RESTRICT u,
                      real_t *const SFEM_RESTRICT values) {
     switch (element_type) {
+        case TRI3: {
+            tri3_laplacian_apply(nelements, nnodes, elems, xyz, u, values);
+            break;
+        }
         case TET4: {
             tet4_laplacian_apply(nelements, nnodes, elems, xyz, u, values);
             break;

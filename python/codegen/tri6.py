@@ -80,6 +80,9 @@ class Tri6(FE):
 	def measure(self, q):
 		return det2(self.A_) / 2
 
+	def reference_measure(self):
+		return sp.Rational(1, 2)
+
 class TriShell6(Tri6):
 	def __init__(self):
 		super().__init__()
@@ -117,6 +120,9 @@ class TriShell6(Tri6):
 
 	def measure(self, q):
 		return self.detS / 2
+
+	def reference_measure(self):
+		return sp.Rational(1, 2)
 
 # Hard-coded alpha 1./5.
 r24div5 = sp.Rational(24, 5)

@@ -4,6 +4,11 @@
 #include <stddef.h>
 #include "sfem_base.h"
 
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void surface_forcing_function(const int element_type,
                               const ptrdiff_t nfaces,
                               const idx_t *SFEM_RESTRICT faces_neumann,
@@ -20,5 +25,10 @@ void surface_forcing_function_vec(
                               const int block_size,
                               const int component,
                               real_t *output);
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  // SFEM_NEUMANN_H

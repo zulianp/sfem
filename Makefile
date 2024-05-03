@@ -61,22 +61,23 @@ endif
 CFLAGS += -DSFEM_MEM_DIAGNOSTICS
 
 # Folder structure
-VPATH = pizzastack:resampling:mesh:operators:drivers:drivers/cuda:base:algebra:matrix:operators/tet10:operators/tet4:operators/macro_tet4:operators/tri3:operators/macro_tri3:operators/trishell3:operators/tri6:operators/beam2:operators/cvfem:graphs:parametrize:operators/phase_field_for_fracture:operators/kernels:operators/navier_stokes:solver:operators/cvfem_tet4:operators/cvfem_tri3:operators/cvfem_quad4:examples
-INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/macro_tet4 -Ioperators/tri3 -Ioperators/macro_tri3 -Ioperators/trishell3 -Ioperators/tri6 -Ioperators/beam2 -Ioperators/cvfem -Igraphs -Iparametrize -Ioperators/phase_field_for_fracture  -Ioperators/kernels -Ioperators/navier_stokes -Isolver -Ioperators/cvfem_tet4 -Ioperators/cvfem_tri3
+VPATH = pizzastack:resampling:mesh:operators:operators/cuda:drivers:drivers/cuda:base:algebra:matrix:operators/tet10:operators/tet4:operators/macro_tet4:operators/tri3:operators/macro_tri3:operators/trishell3:operators/tri6:operators/beam2:operators/cvfem:graphs:parametrize:operators/phase_field_for_fracture:operators/kernels:operators/navier_stokes:solver:operators/cvfem_tet4:operators/cvfem_tri3:operators/cvfem_quad4:examples:algebra/cuda:frontend:frontend/cuda:operators/hierarchical
+INCLUDES += -Ipizzastack -Iresampling -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/macro_tet4 -Ioperators/tri3 -Ioperators/macro_tri3 -Ioperators/trishell3 -Ioperators/tri6 -Ioperators/beam2 -Ioperators/cvfem -Igraphs -Iparametrize -Ioperators/phase_field_for_fracture  -Ioperators/kernels -Ioperators/navier_stokes -Isolver -Ioperators/cvfem_tet4 -Ioperators/cvfem_tri3 -Ioperators/cvfem_quad4 -Ialgebra/cuda -Ifrontend -Ifrontend/cuda  -Ialgebra/cuda -Ioperators/hierarchical
 
 
 CFLAGS += -pedantic -Wextra
 CFLAGS += -fPIC
 # CFLAGS += -std=c99
 
-CXXFLAGS += -std=c++11
+CXXFLAGS += -std=c++14
 CXXFLAGS += -fvisibility=hidden
 CXXFLAGS += -fPIC
 INTERNAL_CXXFLAGS += -fno-exceptions -fno-rtti
 
-# CUFLAGS += --compiler-options "-fPIC $(CXXFLAGS)" -std=c++14 -arch=sm_60  #-arch=native
+CUFLAGS += --compiler-options "-fPIC $(CXXFLAGS)" -std=c++14 -arch=sm_60 -Xptxas=-O3,-v -use_fast_math
+#-arch=native
+# CUFLAGS += --compiler-options "-fPIC $(CXXFLAGS)" -std=c++14 -arch=sm_86  #-arch=native
 
-CUFLAGS += --compiler-options "-fPIC $(CXXFLAGS)" -std=c++14 -arch=sm_86  #-arch=native
 # CUFLAGS += --compiler-options -fPIC -O0 -g -std=c++17
 
 INCLUDES += -I$(PWD) -I$(PWD)/.. -I$(PWD)/../matrix.io
@@ -88,6 +89,7 @@ GOALS += macro_element_apply
 # Mesh manipulation
 GOALS += partition select_submesh refine skin extract_sharp_edges extrude wedge6_to_tet4 mesh_self_intersect select_surf volumes sfc
 GOALS += mesh_p1_to_p2 create_dual_graph create_element_adjaciency_table create_surface_from_element_adjaciency_table
+GOALS += mesh_to_blocks
 
 # FE post-process
 GOALS += cgrad cshear cstrain cprincipal_strains cprincipal_stresses cauchy_stress vonmises
@@ -164,6 +166,7 @@ OBJS = \
 	phase_field_for_fracture.o  \
 	navier_stokes.o \
 	boundary_condition.o \
+	boundary_condition_io.o \
 	constrained_gs.o \
 	sfem_logger.o \
 	extract_sharp_features.o \
@@ -182,6 +185,7 @@ OBJS += macro_tri3_laplacian.o
 
 # Macro Tet4
 OBJS += macro_tet4_laplacian.o
+OBJS += macro_tet4_linear_elasticity.o
 # This is bugged
 # OBJS += macro_tet4_laplacian_simd.o
 
@@ -215,14 +219,18 @@ OBJS += tet10_grad.o \
 	tet10_mass.o \
 	tet10_laplacian.o \
 	tet10_l2_projection_p1_p2.o \
-	tet10_navier_stokes.o
+	tet10_navier_stokes.o \
+	tet10_linear_elasticity.o
+
+# Multilevel
+OBJS += sfem_prolongation_restriction.o
 
 # Resampling
 OBJS += sfem_resample_gap.o sfem_resample_field.o
 
 # CVFEM
-OBJS += cvfem_tri3_diffusion.o cvfem_tet4_laplacian.o cvfem_tri3_convection.o cvfem_quad4_convection.o
-
+OBJS += cvfem_tri3_diffusion.o cvfem_tet4_convection.o cvfem_tri3_convection.o cvfem_quad4_convection.o cvfem_quad4_laplacian.o
+OBJS += cvfem_operators.o
 # Graphs
 ifeq ($(metis), 1)
 	OBJS += sfem_metis.o
@@ -231,17 +239,28 @@ endif
 ifeq ($(cuda), 1)
 # 	CUDA_OBJS = tet4_cuda_laplacian.o
 # 	CUDA_OBJS = tet4_cuda_laplacian_2.o
-	CUDA_OBJS = tet4_cuda_laplacian_3.o
+# 	CUDA_OBJS = tet4_cuda_laplacian_3.o # FIXME
+	CUDA_OBJS = tet4_laplacian.o
 	CUDA_OBJS += tet4_cuda_phase_field_for_fracture.o
 	CUDA_OBJS += tet4_laplacian_incore_cuda.o
 	CUDA_OBJS += tet10_laplacian_incore_cuda.o
 	CUDA_OBJS += macro_tet4_laplacian_incore_cuda.o
+	CUDA_OBJS += sfem_cuda_blas.o
+	CUDA_OBJS += boundary_condition_incore_cuda.o
+	CUDA_OBJS += tet4_linear_elasticity_incore_cuda.o
+	CUDA_OBJS += tet10_linear_elasticity_incore_cuda.o
+	CUDA_OBJS += macro_tet4_linear_elasticity_incore_cuda.o
 
+	OBJS += linear_elasticity_incore_cuda.o
+	OBJS += laplacian_incore_cuda.o
+	OBJS += sfem_Function_incore_cuda.o
+
+	INCLUDES += -Ioperators/cuda
 
 	CUDA_OBJS += cuda_crs.o
 	DEPS += -L/opt/cuda/lib64 -lcudart -lcusparse -lcusolver -lcublas
 	DEPS += -lnvToolsExt
-	CFLAGS += -I/opt/cuda/include
+	CFLAGS += -I/opt/cuda/include -DSFEM_ENABLE_CUDA
 
 	OBJS += $(CUDA_OBJS)
 else
@@ -250,6 +269,8 @@ else
 endif
 
 OBJS += $(SIMD_OBJS)
+
+OBJS += sfem_Function.o 
 
 plugins: isolver_sfem.dylib franetg_plugin.dylib hyperelasticity_plugin.dylib nse_plugin.dylib stokes_plugin.dylib
 
@@ -379,6 +400,9 @@ mesh_to_sdf : mesh_to_sdf.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
 mesh_p1_to_p2 : mesh_p1_to_p2.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
+
+mesh_to_blocks : mesh_to_blocks.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
 volumes : drivers/volumes.c libsfem.a
@@ -520,6 +544,12 @@ hyperelasticity_plugin.dylib : hyperelasticity_plugin.o libsfem.a
 hyperelasticity_plugin.o : plugin/hyperelasticity_plugin.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
 
+sfem_Function.o : sfem_Function.cpp
+	$(MPICXX) $(CXXFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
+
+sfem_Function_incore_cuda.o : sfem_Function_incore_cuda.cpp
+	$(MPICXX) $(CXXFLAGS) $(INCLUDES) $(CXXFLAGS) -I../isolver/interfaces/nlsolve -c $<
+
 sortreduce.o : sortreduce.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(INTERNAL_CXXFLAGS) -c $<
 
@@ -535,10 +565,17 @@ tet4_neohookean_principal_stresses.o : tet4_neohookean_principal_stresses.cpp
 cuspmv : drivers/cuda/cuda_do_spmv.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
-
 lapl_matrix_free : drivers/cuda/lapl_matrix_free.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
+linear_elasticity_matrix_free : drivers/cuda/linear_elasticity_matrix_free.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+run_poisson_cuda : examples/run_poisson_cuda.cpp libsfem.a
+	$(MPICXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+steady_state_sim_cuda  : drivers/cuda/steady_state_sim_cuda.cpp libsfem.a
+	$(MPICXX) $(CXXFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve  -o $@ $^ $(LDFLAGS) ; \
 
 spmv : drivers/cuda/do_spmv.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
