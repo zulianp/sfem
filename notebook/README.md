@@ -5,11 +5,11 @@ You can find folders with dates (Year Month day) with the performance runs from 
 
 ## 2024/05/03 (SFEM comparision A100 vs P100)
 
-Throughput [MDOF/s] for largest mesh. Significant speed up is observed by using A100 on large meshes. For small meshes, however, the we have the opposite picture.
+ for largest mesh. Significant speed up is observed by using A100 on large meshes. For small meshes, however, the we have the opposite picture.
 
 The peak throughput reached on the A100 is **5.3 GDOF/s**
 
-### Linear elasticity 
+### Linear elasticity (Throughput [MDOF/s]) 
 
 | Geometry   | Element   |   A100 |   P100 |
 |:-----------|:----------|-------:|-------:|
@@ -21,7 +21,7 @@ The peak throughput reached on the A100 is **5.3 GDOF/s**
 | sphere     | macrotet4 | 4493.1 | 2623.6 |
 
 
-### Laplacian
+### Laplacian (Throughput [MDOF/s]) 
 
 | Geometry | Element     |   A100 |   P100 |
 |:-----------|:----------|-------:|-------:|
@@ -69,6 +69,5 @@ Total Op time:		38.8    [s]
 Op time:			0.0338	[s]
 Iteration time:		0.037 	[s]
 all:				- 		[s]
-
-**Op time ratio 0.0338/0.010 approx 3x**
 ```
+**Op time ratio 0.0338/0.010 approx 3x**
