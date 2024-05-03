@@ -80,9 +80,24 @@ all:				- 		[s]
 ### Idea 1
 
 1) Sort mesh based on node connectivity (e.g., graph-based partitioning)
-2) Split node index into offset + int16 (local idx) for indexing subset of nodes in local subdomains.
-3) Identify element sets based on incidence. Elements may be incident to multiple partitions. 
+2) Split node index into offset + int16 (max 65'536 local idx) for indexing subset of nodes in local subdomains. For tet10 we would reduce footprint to `100/((32 * 10)/(16 * 10 + 32)) = 60%` of the original.
+3) Identify element sets based on incidence. Elements may be incident to multiple partitions.	
+Options:
 
+	- Assign element to the one of the partitions -> requires halo handling
+	- Assign element to all the incident partitions (duplicate elements) -> requires node skipping
+	- Create a separate partition, which we call ``elemental skeleton'', for elements incident to more than 1 node-partition -> Heavily rely on the previous decomposition step. might loose memory locality in the skeleton. Requires aggregation from skeleton to contiguous dof vector (scatter), similar to spMV (consider the surface to volume ratio for cost), skeleton could be evaluated on the CPU while the rest on the GPU?
+	- Skeleton based on separating nodes elements connected to such nodes are put in their own set (difference is that there is a complete separation between subsets of nodes)
 
+### Idea 2
+
+1) Macro elements and boundary operator
+	
+	- Outer layer is explicitly indexed
+	- Inner layer is implicitly indexed (global_offset + element_idx * n_inner_nodes + lid)
+	- Boundary elements have a polynomial map or they are piecewise polynomial for describing more complex structures
+	- Inner elements are sub-parametric
+
+This idea requires integration with a mesh generator in order to generate appropriate representations
 
 
