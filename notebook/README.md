@@ -1,6 +1,40 @@
-# Performance Diary
+# Performance
 
 You can find folders with dates (Year Month day) with the performance runs from the `benchmarks` folder.
+
+
+## 2024/05/03 (SFEM comparision A100 vs P100)
+
+Throughput [MDOF/s] for largest mesh. Significant speed up is observed by using A100 on large meshes. For small meshes, however, the we have the opposite picture.
+
+### Linear elasticity 
+
+cylinder 	 A100		P100
+tet10        4226.2 	2312.4
+tet4         2016.7     909.6
+macrotet4    5330.6     2632.0
+
+sphere 	 	 A100		P100
+tet10        4369.9 	2311.8
+tet4         1989.7  	909.7
+macrotet4    4493.1 	2623.6
+
+### Laplacian
+
+cylinder 	 A100		P100
+tet10        4788.2 	2628.9
+tet4         1809.3 	888.3
+macrotet4    4945.9     2720.6
+
+sphere 	 	 A100		P100
+tet10        4695.7 	2611.8
+tet4         1759.3     887.5
+macrotet4    4856.4     2719.5
+
+
+
+
+
 
 
 # Comparision with other Utopia software
