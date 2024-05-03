@@ -5,7 +5,7 @@ You can find folders with dates (Year Month day) with the performance runs from 
 
 ## 2024/05/03 (SFEM comparision A100 vs P100)
 
- for largest mesh. Significant speed up is observed by using A100 on large meshes. For small meshes, however, the we have the opposite picture.
+ for largest mesh. Significant speed up is observed by using A100 on large meshes **(167.7 million tet4 elements)**. For small meshes, however, the we have the opposite picture.
 
 The peak throughput reached on the A100 is **5.3 GDOF/s**
 
@@ -71,3 +71,18 @@ Iteration time:		0.037 	[s]
 all:				- 		[s]
 ```
 **Op time ratio 0.0338/0.010 approx 3x**
+
+
+# Ideas
+
+## Mesh footprint reduction
+
+### Idea 1
+
+1) Sort mesh based on node connectivity (e.g., graph-based partitioning)
+2) Split node index into offset + int16 (local idx) for indexing subset of nodes in local subdomains.
+3) Identify element sets based on incidence. Elements may be incident to multiple partitions. 
+
+
+
+
