@@ -102,9 +102,15 @@ function gen_by_refinement()
 	sfc $next/p1/mesh $next/p1/sorted
 	refine $next/p1/sorted $next/p1/refined
 	mesh_p1_to_p2 $next/p1/sorted  $next/p2
+
+	mkdir -p $last/p1/matrix_scalar
+	echo "op: Laplacian" > $last/p1/matrix_scalar/meta.yaml
+
+	mkdir -p $last/p1/matrix_vector
+	echo "op: LinearElasticity" > $last/p1/matrix_vector/meta.yaml
 }
 
-gen_by_refinement $last
+# gen_by_refinement $last
 
 cd $BENCH_FOLDER
 
@@ -148,7 +154,7 @@ do
 	cd $CYLINDER_FOLDER
 done
 
-gen_by_refinement $last
+# gen_by_refinement $last
 
 cd $BENCH_FOLDER
 cd $TOP_FOLDER

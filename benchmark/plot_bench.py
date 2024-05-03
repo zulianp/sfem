@@ -8,10 +8,6 @@ import sys
 
 col = 'throughput [GB/s]'
 real_str = "double"
-geo = "sphere"
-# geo = "cylinder"
-# op_type = "Laplacian"
-op_type = "LinearElasticity"
 elem_type 	 = "tet10"
 elem_type_p1 = "tet4"
 elem_type_macro_p1 = "macrotet4"
@@ -23,118 +19,147 @@ if len(sys.argv) < 3:
     print("Error: Please provide the CSV file path as an argument.")
     exit(1)
 
-# Get the CSV file path from the first argument
-SpMV_data_path = sys.argv[1]
-MF_data_path   = sys.argv[2]
 
-# Read the CSV data into a DataFrame
-SpMV_df = pd.read_csv(SpMV_data_path)
-MF_df   = pd.read_csv(MF_data_path)
+def plot(geo, op_type):   
 
-SpMV_rep 		= "CRS"
-SpMV_is_geo 	= SpMV_df["geo"] == geo
-SpMV_is_op_type = SpMV_df["op_type"] == op_type
-SpMV_series 	= SpMV_df[SpMV_is_geo & SpMV_is_op_type]
-SpMV_x 			= SpMV_series['ndofs'].values
+    # Get the CSV file path from the first argument
+    SpMV_data_path = sys.argv[1]
+    MF_data_path   = sys.argv[2]
 
-# From Giga to Mega
-SpMV_y 			= 1000 * SpMV_series[col].values / size_of_real
+    # Read the CSV data into a DataFrame
+    SpMV_df = pd.read_csv(SpMV_data_path)
+    MF_df   = pd.read_csv(MF_data_path)
 
-MF_is_geo 	  = MF_df["geo"] == geo
-MF_is_elem	  = MF_df["rep"] == elem_type
-MF_is_elem_p1 = MF_df["rep"] == elem_type_p1
-MF_is_elem_macro_p1 = MF_df["rep"] == elem_type_macro_p1
+    SpMV_rep 		= "CRS"
+    SpMV_is_geo 	= SpMV_df["geo"] == geo
+    SpMV_is_op_type = SpMV_df["op_type"] == op_type
+    SpMV_series 	= SpMV_df[SpMV_is_geo & SpMV_is_op_type]
+    SpMV_x 			= SpMV_series['ndofs'].values
 
-MF_is_op_type = MF_df["op_type"] == op_type
-MF_series 	  = MF_df[MF_is_geo & MF_is_op_type & MF_is_elem]
-MF_series_p1  = MF_df[MF_is_geo & MF_is_op_type & MF_is_elem_p1]
-MF_series_macro_p1  = MF_df[MF_is_geo & MF_is_op_type & MF_is_elem_macro_p1]
+    # From Giga to Mega
+    SpMV_y 			= 1000 * SpMV_series[col].values / size_of_real
 
-MF_nels_p1 = MF_series_p1['nelements'].values
-MF_nels    = MF_series['nelements'].values
-SpMV_nnz   = SpMV_series['nnz'].values
+    MF_is_geo 	  = MF_df["geo"] == geo
+    MF_is_elem	  = MF_df["rep"] == elem_type
+    MF_is_elem_p1 = MF_df["rep"] == elem_type_p1
+    MF_is_elem_macro_p1 = MF_df["rep"] == elem_type_macro_p1
 
-MF_x 		  = MF_series['ndofs'].values
-# From Giga to Mega
-MF_y 		  = 1000 * MF_series[col].values / size_of_real
+    MF_is_op_type = MF_df["op_type"] == op_type
+    MF_series 	  = MF_df[MF_is_geo & MF_is_op_type & MF_is_elem]
+    MF_series_p1  = MF_df[MF_is_geo & MF_is_op_type & MF_is_elem_p1]
+    MF_series_macro_p1  = MF_df[MF_is_geo & MF_is_op_type & MF_is_elem_macro_p1]
 
-MF_x_p1 	  = MF_series_p1['ndofs'].values
-# From Giga to Mega
-MF_y_p1 	  = 1000 * MF_series_p1[col].values / size_of_real
+    MF_nels_p1 = MF_series_p1['nelements'].values
+    MF_nels    = MF_series['nelements'].values
+    SpMV_nnz   = SpMV_series['nnz'].values
 
-MF_x_macro_p1 	  = MF_series_macro_p1['ndofs'].values
-# From Giga to Mega
-MF_y_macro_p1 	  = 1000 * MF_series_macro_p1[col].values / size_of_real
+    MF_x 		  = MF_series['ndofs'].values
+    # From Giga to Mega
+    MF_y 		  = 1000 * MF_series[col].values / size_of_real
 
-plt.loglog(SpMV_x,  SpMV_y,  marker='o', linestyle='-', label=f"SpMV (cuSPARSE: {SpMV_rep})")
-plt.loglog(MF_x,    MF_y,	 marker='x', linestyle='-', label=f"MF ({elem_type})")
-plt.loglog(MF_x_p1, MF_y_p1, marker='.', linestyle='-', label=f"MF ({elem_type_p1})")
-plt.loglog(MF_x_macro_p1, MF_y_macro_p1, marker='o', linestyle='-', label=f"MF ({elem_type_macro_p1})")
+    MF_x_p1 	  = MF_series_p1['ndofs'].values
+    # From Giga to Mega
+    MF_y_p1 	  = 1000 * MF_series_p1[col].values / size_of_real
 
-plt.xlabel('Degrees of Freedom (DOF)')
-plt.ylabel(f"MDOF/s")
-plt.title(f"Operator: {op_type}, Mesh: {geo}, {gpu}")
-plt.legend()
+    MF_x_macro_p1 	  = MF_series_macro_p1['ndofs'].values
+    # From Giga to Mega
+    MF_y_macro_p1 	  = 1000 * MF_series_macro_p1[col].values / size_of_real
 
-# Display the plot
-plt.grid(True)  # Optional: Add grid for better readability
-plt.grid(True, which='minor', linestyle='--')
-plt.tight_layout()
-# plt.show()
+    plt.figure().clear()
+    plt.loglog(SpMV_x,  SpMV_y,  marker='o', linestyle='-', label=f"SpMV (cuSPARSE: {SpMV_rep})")
+    plt.loglog(MF_x,    MF_y,	 marker='x', linestyle='-', label=f"MF ({elem_type})")
+    plt.loglog(MF_x_p1, MF_y_p1, marker='.', linestyle='-', label=f"MF ({elem_type_p1})")
+    plt.loglog(MF_x_macro_p1, MF_y_macro_p1, marker='o', linestyle='-', label=f"MF ({elem_type_macro_p1})")
 
-plt.savefig('plot.pdf')
-plt.savefig('plot.pgf')
+    plt.xlabel('Degrees of Freedom (DOF)')
+    plt.ylabel(f"MDOF/s")
+    plt.title(f"Operator: {op_type}, Mesh: {geo}, {gpu}")
+    plt.legend()
 
-print('----------------------------')
-print('Memory overhead (lower bound)')
-print('----------------------------')
+    # Display the plot
+    plt.grid(True)  # Optional: Add grid for better readability
+    plt.grid(True, which='minor', linestyle='--')
+    plt.tight_layout()
+    # plt.show()
 
-mem_scale = 1e-6 #MB
-factor = (9+1)*2*mem_scale # Half-precision
+    plt.savefig(f'plot_{geo}_{op_type}.pdf')
+    # plt.savefig(f'plot_{geo}_{op_type}.pgf')
 
-print(f'MF P1          (Elasticity) {round(np.min(MF_nels_p1)*factor, 3)}-{round(np.max(MF_nels_p1)*factor, 3)} MB')
-print(f'MF P2/Macro-P1 (Elasticity) {round(np.min(MF_nels)*factor, 3)}-{round(np.max(MF_nels)*factor, 3)} MB')
 
-factor = 6*mem_scale # Half-precision
-print(f'MF P1          (Laplacian)  {round(np.min(MF_nels_p1)*factor, 3)}-{round(np.max(MF_nels_p1)*factor, 3)} MB')
-print(f'MF P2/Macro-P1 (Laplacian)  {round(np.min(MF_nels)*factor, 3)}-{round(np.max(MF_nels)*factor, 3)} MB')
+    print('############################')
+    print(f'Summary for {geo} {op_type}')
+    print('############################')
 
-crs_factor = 8*2*mem_scale
-print(f'CRS                         {round(np.min(SpMV_nnz)*crs_factor, 3)}-{round(np.max(SpMV_nnz)*crs_factor, 3)} MB')
 
-print('----------------------------')
-print('Mesh')
-print('----------------------------')
-print(f'#elements P1 {np.min(MF_nels_p1)}-{np.max(MF_nels_p1)}')
-print(f'#elements    {np.min(MF_nels)}-{np.max(MF_nels)}')
+    print('----------------------------')
+    print('Memory overhead (lower bound)')
+    print('----------------------------')
 
-print('----------------------------')
-print('Matrix')
-print('----------------------------')
-print(f'DOFs (SpMV)  {np.min(MF_x)}-{np.max(MF_x)} ({np.max(SpMV_x)})')
-print(f'NNZ          {np.min(SpMV_nnz)}-{np.max(SpMV_nnz)}')
+    mem_scale = 1e-6 #MB
+    geo_elast_factor = (9+1)*2*mem_scale # Half-precision
+    geo_lapl_factor = 6*2*mem_scale # Half-precision
+    p1_idx_factor = (4 * 4*mem_scale)
+    p2_idx_factor = (10 * 4*mem_scale)
 
-print('----------------------------')
-print('Max throughput (MDOF/s)')
-print('----------------------------')
-print(f'SpMV (P1)    {round(np.max(SpMV_y), 1)}')
-print(f'tet10        {round(np.max(MF_y), 1)}')
-print(f'tet4         {round(np.max(MF_y_p1), 1)}')
+    p1_elast_factor = p1_idx_factor + geo_elast_factor
+    p2_elast_factor = p2_idx_factor + geo_elast_factor
 
-# if op_type == "Laplacian":
-print(f'macrotet4    {round(np.max(MF_y_macro_p1), 1)}')
+    p1_lapl_factor = p1_idx_factor + geo_lapl_factor
+    p2_lapl_factor = p2_idx_factor + geo_lapl_factor
 
-print('----------------------------')
-print('Speed-up (range)')
-print('----------------------------')
-speedup = MF_y / MF_y_p1
-print(f'tet4/tet10:     {round(np.min(speedup), 1)}-{round(np.max(speedup), 1)}')
-speedup = MF_y[:len(SpMV_y)] / SpMV_y 
-print(f'SpMV/tet10:     {round(np.min(speedup), 1)}-{round(np.max(speedup), 1)}')
+    print(f'MF P1          (Elasticity) {round(np.min(MF_nels_p1)*p1_elast_factor, 3)}-{round(np.max(MF_nels_p1)*p1_elast_factor, 3)} MB')
+    print(f'MF P2/Macro-P1 (Elasticity) {round(np.min(MF_nels)*p2_elast_factor, 3)}-{round(np.max(MF_nels)*p2_elast_factor, 3)} MB')
 
-# if op_type == "Laplacian":
-speedup = MF_y_macro_p1 / MF_y_p1
-print(f'tet4/macrotet4: {round(np.min(speedup), 1)}-{round(np.max(speedup), 1)}')
-speedup = MF_y_macro_p1[:len(SpMV_y)] / SpMV_y
-print(f'SpMV/macrotet4: {round(np.min(speedup), 1)}-{round(np.max(speedup), 1)}')
-print('----------------------------')
+    geo_factor = 6*mem_scale # Half-precision
+    print(f'MF P1          (Laplacian)  {round(np.min(MF_nels_p1)*p1_lapl_factor, 3)}-{round(np.max(MF_nels_p1)*p1_lapl_factor, 3)} MB')
+    print(f'MF P2/Macro-P1 (Laplacian)  {round(np.min(MF_nels)*p2_lapl_factor, 3)}-{round(np.max(MF_nels)*p2_lapl_factor, 3)} MB')
+
+    crs_factor = 8*2*mem_scale
+    print(f'CRS                         {round(np.min(SpMV_nnz)*crs_factor, 3)}-{round(np.max(SpMV_nnz)*crs_factor, 3)} MB')
+
+    print('----------------------------')
+    print('Mesh')
+    print('----------------------------')
+    print(f'#elements P1 {np.min(MF_nels_p1)}-{np.max(MF_nels_p1)}')
+    print(f'#elements    {np.min(MF_nels)}-{np.max(MF_nels)}')
+
+    print('----------------------------')
+    print('Matrix')
+    print('----------------------------')
+    print(f'DOFs (SpMV)  {np.min(MF_x)}-{np.max(MF_x)} ({np.max(SpMV_x)})')
+    print(f'NNZ          {np.min(SpMV_nnz)}-{np.max(SpMV_nnz)}')
+
+    print('----------------------------')
+    print('Max throughput (MDOF/s)')
+    print('----------------------------')
+    print(f'SpMV (P1)    {round(np.max(SpMV_y), 1)}')
+    print(f'tet10        {round(np.max(MF_y), 1)}')
+    print(f'tet4         {round(np.max(MF_y_p1), 1)}')
+
+    # if op_type == "Laplacian":
+    print(f'macrotet4    {round(np.max(MF_y_macro_p1), 1)}')
+
+    print('----------------------------')
+    print('Speed-up (range)')
+    print('----------------------------')
+    speedup = MF_y / MF_y_p1
+    print(f'tet4/tet10:     {round(np.min(speedup), 1)}-{round(np.max(speedup), 1)}')
+    speedup = MF_y[:len(SpMV_y)] / SpMV_y 
+    print(f'SpMV/tet10:     {round(np.min(speedup), 1)}-{round(np.max(speedup), 1)}')
+
+    # if op_type == "Laplacian":
+    speedup = MF_y_macro_p1 / MF_y_p1
+    print(f'tet4/macrotet4: {round(np.min(speedup), 1)}-{round(np.max(speedup), 1)}')
+    speedup = MF_y_macro_p1[:len(SpMV_y)] / SpMV_y
+    print(f'SpMV/macrotet4: {round(np.min(speedup), 1)}-{round(np.max(speedup), 1)}')
+    print('----------------------------')
+
+
+
+
+
+plot("cylinder", "LinearElasticity")
+plot("sphere", "LinearElasticity")
+
+plot("cylinder", "Laplacian")
+plot("sphere", "Laplacian")

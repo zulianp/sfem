@@ -50,6 +50,8 @@ then
 	echo "CUDA is enabled!"
 fi
 
+# Limitation is GPU memory
+max_tet4_size=1000000000
 geo=(`ls $BENCHMARK_DIR`)
 
 workspace=`mktemp -d`
@@ -75,11 +77,16 @@ function bench_matrix_free_cuda()
 	# Scalar problem
 	##############################################
 
-	lapl_matrix_free $p1/refined 1 "gen:ones" $workspace/test.raw > $workspace/temp_log.txt
-	op_type=`grep "op: " $p1/matrix_scalar/meta.yaml | awk '{print $2}'`
+	mesh_size=`ls -la $p1/refined/i0.raw | awk '{print $5}'`
 
-	stats=`grep "mf:" $workspace/temp_log.txt | awk '{print $2, $3, $4, $5, $6}' | tr ' ' ','`
-	echo "tet4,$g,$op_type,$r,scalar,$stats" >> $csv_output
+	if [[ $mesh_size -le $max_tet4_size ]]
+	then
+		lapl_matrix_free $p1/refined 1 "gen:ones" $workspace/test.raw > $workspace/temp_log.txt
+		op_type=`grep "op: " $p1/matrix_scalar/meta.yaml | awk '{print $2}'`
+
+		stats=`grep "mf:" $workspace/temp_log.txt | awk '{print $2, $3, $4, $5, $6}' | tr ' ' ','`
+		echo "tet4,$g,$op_type,$r,scalar,$stats" >> $csv_output
+	fi
 
 	lapl_matrix_free $p2 1 "gen:ones" $workspace/test.raw > $workspace/temp_log.txt
 	op_type=`grep "op: " $p1/matrix_scalar/meta.yaml | awk '{print $2}'`
@@ -96,12 +103,14 @@ function bench_matrix_free_cuda()
 	##############################################
 	# Vector problem
 	##############################################
+	if [[ $mesh_size -le $max_tet4_size ]]
+	then
+		SFEM_USE_MACRO=0 $vector_mf $p1/refined 1 "gen:ones" $workspace/test.raw > $workspace/temp_log.txt
+		op_type=`grep "op: " $p1/matrix_vector/meta.yaml | awk '{print $2}'`
 
-	SFEM_USE_MACRO=0 $vector_mf $p1/refined 1 "gen:ones" $workspace/test.raw > $workspace/temp_log.txt
-	op_type=`grep "op: " $p1/matrix_vector/meta.yaml | awk '{print $2}'`
-
-	stats=`grep "mf:" $workspace/temp_log.txt | awk '{print $2, $3, $4, $5, $6}' | tr ' ' ','`
-	echo "tet4,$g,$op_type,$r,vector,$stats" >> $csv_output
+		stats=`grep "mf:" $workspace/temp_log.txt | awk '{print $2, $3, $4, $5, $6}' | tr ' ' ','`
+		echo "tet4,$g,$op_type,$r,vector,$stats" >> $csv_output
+	fi
 
 	SFEM_USE_MACRO=0 $vector_mf $p2 1 "gen:ones" $workspace/test.raw > $workspace/temp_log.txt
 	op_type=`grep "op: " $p1/matrix_vector/meta.yaml | awk '{print $2}'`
