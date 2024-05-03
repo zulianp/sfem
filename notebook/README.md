@@ -7,6 +7,8 @@ You can find folders with dates (Year Month day) with the performance runs from 
 
 Throughput [MDOF/s] for largest mesh. Significant speed up is observed by using A100 on large meshes. For small meshes, however, the we have the opposite picture.
 
+The peak throughput reached on the A100 is **5.3 GDOF/s**
+
 ### Linear elasticity 
 
 cylinder 	 A100		P100
