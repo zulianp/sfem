@@ -11,7 +11,7 @@ The peak throughput reached on the A100 is **5.3 GDOF/s**
 
 ### Linear elasticity 
 
-| Geometry   | Test      |   A100 |   P100 |
+| Geometry   | Element   |   A100 |   P100 |
 |:-----------|:----------|-------:|-------:|
 | cylinder   | tet10     | 4226.2 | 2312.4 |
 | cylinder   | tet4      | 2016.7 |  909.6 |
