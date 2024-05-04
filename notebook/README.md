@@ -100,4 +100,18 @@ Options:
 
 This idea requires integration with a mesh generator in order to generate appropriate representations
 
+## High-order, contact and multigrid
+
+For multibody contact we need to construct a system of the form
+
+(I + C)^T A (I + C) = (C^T A + A) (I + C) = (C^T A) + (C^T A C) + (A C) + A = B + A = L
+
+- A is a matrix-free operator
+- B is a sparse block matrix with the coupled degrees of freedom, which we construct performing a partial assembly of A exclusively on the element incident to contact-boundary nodes. Due to a small surface to volume ratio B memory footprint should be rather small and will allow us to perform special operations and apply it separtely from A.
+- In case of monotone-mg the coarse operator is constructed as 
+```
+L_c = P^T L P = P^T (B + A) P  = (P^T B + P^T A) P = P^T B P + P^T A P = P^T ((C^T A) + (C^T A C) + (A C)) P + (P^T A P) =  P^T ((C^T A) + (C^T A C) + (A C)) P + A_c + B_c + A_c
+```
+where `A_c` is the full coarse matrix-free operator and B_c is the contact-based extension created with the Galerkin project (in case of truncated basis we can also include the diff matrix to subtract the unwanted contributions arising from A_c) 
+
 
