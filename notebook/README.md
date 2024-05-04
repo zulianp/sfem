@@ -5,7 +5,7 @@ You can find folders with dates (Year Month day) with the performance runs from 
 
 ## 2024/05/03 (SFEM comparision A100 vs P100)
 
- for largest mesh. Significant speed up is observed by using A100 on large meshes **(167.7 million tet4 elements)**. For small meshes, however, the we have the opposite picture.
+ for largest mesh. Significant speed up is observed by using A100 on large meshes **(167.7 million tet4 elements)**. For small meshes, however, we have the opposite picture.
 
 The peak throughput reached on the A100 is **5.3 GDOF/s**
 
@@ -15,7 +15,7 @@ The peak throughput reached on the A100 is **5.3 GDOF/s**
 |:-----------|:----------|-------:|-------:|
 | cylinder   | tet10     | 4226.2 | 2312.4 |
 | cylinder   | tet4      | 2016.7 |  909.6 |
-| cylinder   | macrotet4 | 5330.6 | 2632   |
+| cylinder   | macrotet4 | 5330.6 | 2632.0 |
 | sphere     | tet10     | 4369.9 | 2311.8 |
 | sphere     | tet4      | 1989.7 |  909.7 |
 | sphere     | macrotet4 | 4493.1 | 2623.6 |
@@ -104,14 +104,17 @@ This idea requires integration with a mesh generator in order to generate approp
 
 For multibody contact we need to construct a system of the form
 
+```
 (I + C)^T A (I + C) = (C^T A + A) (I + C) = (C^T A) + (C^T A C) + (A C) + A = B + A = L
-
+```
 - A is a matrix-free operator
 - B is a sparse block matrix with the coupled degrees of freedom, which we construct performing a partial assembly of A exclusively on the element incident to contact-boundary nodes. Due to a small surface to volume ratio B memory footprint should be rather small and will allow us to perform special operations and apply it separtely from A.
-- In case of monotone-mg the coarse operator is constructed as 
+
+In case of (monotone-)mg the coarse operator is constructed as 
+
 ```
-L_c = P^T L P = P^T (B + A) P  = (P^T B + P^T A) P = P^T B P + P^T A P = P^T ((C^T A) + (C^T A C) + (A C)) P + (P^T A P) =  P^T ((C^T A) + (C^T A C) + (A C)) P + A_c + B_c + A_c
+L_c = P^T L P = P^T (B + A) P  = (P^T B + P^T A) P = P^T B P + P^T A P = P^T ((C^T A) + (C^T A C) + (A C)) P + (P^T A P) =  P^T ((C^T A) + (C^T A C) + (A C)) P + A_c = B_c + A_c
 ```
-where `A_c` is the full coarse matrix-free operator and B_c is the contact-based extension created with the Galerkin project (in case of truncated basis we can also include the diff matrix to subtract the unwanted contributions arising from A_c) 
+where `A_c` is the full coarse matrix-free operator and B_c is the contact-based extension created with the Galerkin projection (in case of truncated basis we can also include the diff matrix to subtract the unwanted contributions arising from A_c) 
 
 
