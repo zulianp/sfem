@@ -6,9 +6,15 @@ from tri3 import *
 from tri6 import *
 from tet4 import *
 from tet10 import *
+from tet20 import *
 from symbolic_fe import *
 
 from time import perf_counter
+
+
+def simplify(expr):
+	return expr;
+	# return sp.simplify(expr)
 
 def assign_matrix(name, mat):
 	rows, cols = mat.shape
@@ -66,7 +72,7 @@ class GPULinearElasticityOp:
 		e = mu * inner(epsu, epsu) + (lmbda/2) * (tr(epsu) * tr(epsu))
 
 		self.eval_value = e * fe.reference_measure() * fe.symbol_jacobian_determinant()
-		self.eval_value = sp.simplify(self.eval_value)
+		self.eval_value = simplify(self.eval_value)
 
 		# Gradient
 		P = sp.Matrix(dims, dims, [0]*(dims*dims))
@@ -83,7 +89,7 @@ class GPULinearElasticityOp:
 		
 		for i in range(0, fe.n_nodes() * dims):
 			self.eval_grad[i] = inner(P_sym, shape_grad[i]) * (fe.symbol_jacobian_determinant() * fe.reference_measure())
-			self.eval_grad[i] = sp.simplify(self.eval_grad[i])
+			self.eval_grad[i] = simplify(self.eval_grad[i])
 			eval_grad[i] = inner(P, shape_grad[i])
 
 
@@ -95,7 +101,7 @@ class GPULinearElasticityOp:
 		eval_grad_opt = sp.zeros(rows, 1)
 		for i in range(0, fe.n_nodes() * dims):
 			self.eval_grad_opt[i] = inner(P_tXJinv_t_sym, shape_grad_ref[i]) 
-			self.eval_grad_opt[i] = sp.simplify(self.eval_grad_opt[i])
+			self.eval_grad_opt[i] = simplify(self.eval_grad_opt[i])
 
 			# Evaluation for computing hessian
 			eval_grad_opt[i] = inner(P.T * jac_inv.T * (fe.symbol_jacobian_determinant() * fe.reference_measure()), shape_grad_ref[i])
@@ -109,7 +115,7 @@ class GPULinearElasticityOp:
 			dde = sp.zeros(dims, dims)
 			for d1 in range(0, dims):
 				for d2 in range(0, dims):
-					dde[d1, d2] = sp.simplify(sp.diff(eval_grad_opt[j], disp_grad[d1, d2]))
+					dde[d1, d2] = simplify(sp.diff(eval_grad_opt[j], disp_grad[d1, d2]))
 
 			# self.lin_stress.append(dde)
 			self.lin_stress.append(dde.T * jac_inv.T)
@@ -117,7 +123,7 @@ class GPULinearElasticityOp:
 
 			for i in range(0, cols):
 				test = inner(dde, shape_grad[i])
-				actual = sp.simplify(inner(dde.T * jac_inv.T, shape_grad_ref[i]))
+				actual = simplify(inner(dde.T * jac_inv.T, shape_grad_ref[i]))
 				self.eval_hessian[i, j] = actual
 
 		###################################################################
@@ -212,7 +218,7 @@ class GPULinearElasticityOp:
 		dims = self.fe.manifold_dim()
 		for i in range(0, dims):
 			for j in range(0, dims):
-				P_tXJinv_t[i, j] = sp.simplify(P_tXJinv_t[i, j])
+				P_tXJinv_t[i, j] = simplify(P_tXJinv_t[i, j])
 
 		expr = assign_matrix('P_tXJinv_t', P_tXJinv_t)
 		return expr
@@ -236,7 +242,7 @@ class GPULinearElasticityOp:
 		expr = []
 		for i in range(0, rows):
 			var = sp.symbols(f'diag[{i}*stride]')
-			expr.append(ast.Assignment(var, sp.simplify(H[i, i])))
+			expr.append(ast.Assignment(var, simplify(H[i, i])))
 		return expr
 
 
@@ -247,7 +253,7 @@ class GPULinearElasticityOp:
 
 		for i in range(0, rows):
 			for j in range(0, cols):
-				s[i, j] = sp.simplify(s[i, j])
+				s[i, j] = simplify(s[i, j])
 
 		expr = assign_matrix('lin_stress', s)
 		return expr
@@ -324,7 +330,8 @@ def main():
 	# fe = Tri6()
 	# q = sp.Matrix(2, 1, [qx, qy])
 
-	fe = Tet4()
+	# fe = Tet4()
+	fe = Tet20()
 	# fe = Tet10()
 	# fe = SymbolicFE3D()	
 	q = sp.Matrix(3, 1, [qx, qy, qz])
@@ -341,10 +348,10 @@ def main():
 	# c_code(op.geometry())
 
 
-	# c_log("//--------------------------")
-	# c_log("// displacement_gradient")	
-	# c_log("//--------------------------")
-	# c_code(op.displacement_gradient())
+	c_log("//--------------------------")
+	c_log("// displacement_gradient")	
+	c_log("//--------------------------")
+	c_code(op.displacement_gradient())
 
 	# c_log("//--------------------------")
 	# c_log("// Piola")	
@@ -356,25 +363,25 @@ def main():
 	# c_log("//--------------------------")
 	# c_code(op.gradient())
 
-	# c_log("//--------------------------")
-	# c_log("// loperand")	
-	# c_log("//--------------------------")
-	# c_code(op.loperand())
+	c_log("//--------------------------")
+	c_log("// loperand")	
+	c_log("//--------------------------")
+	c_code(op.loperand())
 
-	# c_log("//--------------------------")
-	# c_log("// gradient_opt")
-	# c_log("//--------------------------")
-	# c_code(op.gradient_opt())
+	c_log("//--------------------------")
+	c_log("// gradient_opt")
+	c_log("//--------------------------")
+	c_code(op.gradient_opt())
 
 	# c_log("//--------------------------")
 	# c_log("// value")
 	# c_log("//--------------------------")
 	# c_code(op.value())
 
-	c_log("--------------------------")
-	c_log("hessian")	
-	c_log("--------------------------")
-	c_code(op.hessian())
+	# c_log("--------------------------")
+	# c_log("hessian")	
+	# c_log("--------------------------")
+	# c_code(op.hessian())
 
 	# c_log("--------------------------")
 	# c_log("hessian_diag")	
