@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <fstream>  // Include the necessary header file
@@ -5,6 +6,7 @@
 #include <iomanip>
 #include <iostream>
 #include <mutex>
+#include <numeric>
 #include <thread>
 #include <tuple>
 #include <valarray>
@@ -455,6 +457,18 @@ void print_local_grid_info(const local_grid_type& lg) {
               << "y_size:" << std::setw(width) << lg.y_size << std::endl;
 }
 
+inline std::vector<int> VectorArgSort(std::valarray<double>& v) {
+    /* Get the indices that gives a sorted vector v*/
+
+    std::vector<int> retIndices(v.size());
+    std::iota(retIndices.begin(), retIndices.end(), 0);
+
+    std::stable_sort(
+            retIndices.begin(), retIndices.end(), [&v](int i1, int i2) { return v[i1] < v[i2]; });
+
+    return retIndices;
+}
+
 /**
  * @brief Generates a Monte Carlo quadrature rule.
  *
@@ -474,7 +488,8 @@ bool make_MC_quadrature_rule(quadrature_rule& qr,
                              const double x_min,
                              const double y_min,
                              const double x_max,
-                             const double y_max) {
+                             const double y_max,
+                             const bool sort_rule_x = false) {
     qr.x_min = x_min;
     qr.y_min = y_min;
     qr.x_max = x_max;
@@ -488,6 +503,34 @@ bool make_MC_quadrature_rule(quadrature_rule& qr,
         qr.weights[i] = 1.0 / n;
         qr.x_nodes[i] = x_min + (x_max - x_min) * ((double)rand() / (double)RAND_MAX);
         qr.y_nodes[i] = y_min + (y_max - y_min) * ((double)rand() / (double)RAND_MAX);
+    }
+
+    if (sort_rule_x) {
+        // print x and y nodes
+        // for (size_t i = 0; i < n; ++i) {
+        //     std::cout << "x: " << qr.x_nodes[i] << " y: " << qr.y_nodes[i] << std::endl;
+        // }
+
+        std::vector<int> sorted_indices = VectorArgSort(qr.x_nodes);
+
+        std::valarray<double> x_nodes_sorted(n);
+        std::valarray<double> y_nodes_sorted(n);
+        std::valarray<double> weights_sorted(n);
+
+        for (size_t i = 0; i < n; ++i) {
+            x_nodes_sorted[i] = qr.x_nodes[sorted_indices[i]];
+            y_nodes_sorted[i] = qr.y_nodes[sorted_indices[i]];
+            weights_sorted[i] = qr.weights[sorted_indices[i]];
+        }
+
+        qr.x_nodes = x_nodes_sorted;
+        qr.y_nodes = y_nodes_sorted;
+        qr.weights = weights_sorted;
+
+        std::cout << "Sorted x and y nodes" << std::endl;
+        // for (size_t i = 0; i < n; ++i) {
+        //     std::cout << "x: " << qr.x_nodes[i] << " y: " << qr.y_nodes[i] << std::endl;
+        // }
     }
 
     return true;
@@ -627,7 +670,7 @@ bool perform_quadrature_local_stripe(std::valarray<double>& Qs,
                                           i_local,
                                           j_local);
 
-            // data trasfer 4 * 8 * qr_size * ds.nr_domains
+            // data trasfer 4 * 8 * qnr * dnr
             const size_t i1 = XY_INDEX(lg.x_size, lg.y_size, i_local, j_local);
             const size_t i2 = XY_INDEX(lg.x_size, lg.y_size, i_local, j_local + 1);
             const size_t i3 = XY_INDEX(lg.x_size, lg.y_size, i_local + 1, j_local);
@@ -637,6 +680,10 @@ bool perform_quadrature_local_stripe(std::valarray<double>& Qs,
             const double f2 = lg.grid[i2];
             const double f3 = lg.grid[i3];
             const double f4 = lg.grid[i4];
+            // __builtin_prefetch(&lg.grid[i4 + 1], 1, 3);
+            // __builtin_prefetch(&lg.grid[i3 + 1], 1, 3);
+            // __builtin_prefetch(&lg.grid[i2 + 1], 1, 3);
+            // __builtin_prefetch(&lg.grid[i1 + 1], 1, 3);
 
             // if (q_i == 1)
             //             std::cout << "f1: " << f1 << ", f2: " << f2 << ", f3: " << f3 << ", f4: "
@@ -1023,7 +1070,8 @@ struct problem_parameters {
 int build_problem(global_grid_type& gg,
                   std::vector<domains_stripe>& stripes,
                   quadrature_rule& qr,
-                  problem_parameters prs) {
+                  const problem_parameters prs,
+                  const bool sort_quadrule = false) {
     //
     srand(prs.random_seed);
     const size_t quad_nodes_nr = prs.quad_nodes_nr;
@@ -1032,7 +1080,8 @@ int build_problem(global_grid_type& gg,
     const double x_max_QMC = 1.0;
     const double y_max_QMC = 1.0;
 
-    make_MC_quadrature_rule(qr, quad_nodes_nr, x_min_QMC, y_min_QMC, x_max_QMC, y_max_QMC);
+    make_MC_quadrature_rule(
+            qr, quad_nodes_nr, x_min_QMC, y_min_QMC, x_max_QMC, y_max_QMC, sort_quadrule);
 
     // auto f = [](double x, double y) { return std::sin(x) + std::log(1.0 + (y + x) * 0.0000001);
     // };
@@ -1481,7 +1530,7 @@ int main(int argc, char* argv[]) {
     std::cout << "-------------------------------------------------------" << std::endl
               << "-------------------------------------------------------" << std::endl;
 
-    build_problem(gg, stripes, qr, prs);
+    build_problem(gg, stripes, qr, prs, true);
 
     // size_t quad_nodes_nr = 130;
     size_t nr_threads = 36;
