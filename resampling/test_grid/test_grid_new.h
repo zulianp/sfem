@@ -117,9 +117,11 @@ struct quadrature_rule {
     std::valarray<double> y_nodes; /**< The y-coordinates of the quadrature nodes. */
 
     // double *weights_ptr_cu = nullptr; /**< Pointer to the quadrature weights for cuda device */
-    // double *x_nodes_ptr_cu = nullptr; /**< Pointer to the x-coordinates of the quadrature nodes for
+    // double *x_nodes_ptr_cu = nullptr; /**< Pointer to the x-coordinates of the quadrature nodes
+    // for
     //                            cuda device */
-    // double *y_nodes_ptr_cu = nullptr; /**< Pointer to the y-coordinates of the quadrature nodes for
+    // double *y_nodes_ptr_cu = nullptr; /**< Pointer to the y-coordinates of the quadrature nodes
+    // for
     //                           cuda device */
 
     double x_min; /**< The minimum x-coordinate of the domain. */
@@ -155,8 +157,9 @@ inline double q_flops(const size_t nr_stripes,
                       const size_t nr_domains_per_stripe,
                       const size_t quad_nodes_nr,
                       const double time_sec) {
+    //
     const double tot_flop = nr_stripes * (7.0 * nr_domains_per_stripe +
-                                          51.0 * nr_domains_per_stripe * quad_nodes_nr);
+                                          48.0 * nr_domains_per_stripe * quad_nodes_nr);
 
     return tot_flop / time_sec;
 }
