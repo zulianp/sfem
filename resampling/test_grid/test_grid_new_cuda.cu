@@ -371,6 +371,7 @@ __device__ __noinline__                                                  //
         //     return;
         // }
 
+        // data transfer 4 * 8 * qnr * dnr
         const double f1 = local_grid_shared[i1];
         const double f2 = local_grid_shared[i2];
         const double f3 = local_grid_shared[i3];
@@ -568,6 +569,9 @@ __global__                                                                      
     const int block_dim = blockDim.x;
     const int thread_id = threadIdx.x;
 
+#define NEW_COPY
+
+#ifndef NEW_COPY
     while (true) {  /// begin while // copy global grid to local grid //////////////////////
         int index_abs_local = cnt * block_dim + thread_id;
 
@@ -593,14 +597,55 @@ __global__                                                                      
 
         cnt += 1;
     }  /// end while //////////////////////
+#endif
 
 #ifdef NEW_COPY
     const size_t i_tail_size = (i_global_max - i_global_min + 1) % block_dim;
     const int i_tail = i_global_max - i_tail_size + 1;
+    const int i_tail_local = lg.x_size - i_tail_size;
+
+    i = 0, j = 0;
 
     for (size_t jj = j_global_min; jj <= j_global_max; jj++) {
         for (size_t ii = i_global_min; ii <= i_global_max - i_tail_size; ii += block_dim) {
+            const size_t i_global_abs = XY_INDEX(gg.x_size, gg.y_size, (ii + thread_id), jj);
+            const size_t i_local_abs = XY_INDEX(lg.x_size, lg.y_size, (i + thread_id), j);
+
+            local_grid_shared[i_local_abs] = gg.grid_ptr_cu[i_global_abs];
+
+            i += block_dim;
         }
+        i = 0;
+        j++;
+    }
+
+    i = 0, j = 0;
+    for (size_t jj = j_global_min; jj <= j_global_max; jj++) {
+        //
+        const size_t i_global_abs = XY_INDEX(gg.x_size, gg.y_size, (i_tail + thread_id), jj);
+        const size_t i_local_abs = XY_INDEX(lg.x_size, lg.y_size, (i_tail_local + thread_id), j);
+
+        // if (i_global_abs >= gg.x_size * gg.y_size) {
+        //     printf("Error: i_global_abs: %lu, gg.grid.size(): %lu\n",
+        //            i_global_abs,
+        //            (gg.x_size * gg.y_size));
+        //     return;
+        // }
+
+        // if (i_local_abs >= lg.x_size * lg.y_size) {
+        //     printf("Error: i_local_abs: %lu, lg.x_size * lg.y_size: %lu\n",
+        //            i_local_abs,
+        //            (lg.x_size * lg.y_size));
+        //     return;
+        // }
+
+        if ((thread_id) < i_tail_size)
+            local_grid_shared[i_local_abs] = gg.grid_ptr_cu[i_global_abs];
+
+        // i++;
+
+        // i = 0;
+        j++;
     }
 #endif
 
