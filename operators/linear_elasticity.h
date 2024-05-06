@@ -44,6 +44,15 @@ void linear_elasticity_assemble_hessian_soa(const enum ElemType element_type,
                                             const idx_t *const SFEM_RESTRICT colidx,
                                             real_t **const SFEM_RESTRICT values);
 
+void linear_elasticity_assemble_diag_aos(const enum ElemType element_type,
+                                             const ptrdiff_t nelements,
+                                             const ptrdiff_t nnodes,
+                                             idx_t **const SFEM_RESTRICT elems,
+                                             geom_t **const SFEM_RESTRICT xyz,
+                                             const real_t mu,
+                                             const real_t lambda,
+                                             real_t *const SFEM_RESTRICT values);
+
 void linear_elasticity_apply_soa(const enum ElemType element_type,
                                  const ptrdiff_t nelements,
                                  const ptrdiff_t nnodes,

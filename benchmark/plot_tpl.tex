@@ -1,0 +1,24 @@
+\documentclass[a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{tikz}
+\usepackage{tikz-cd}
+\usepackage{pgfplots}
+\usepackage{pgf}
+\usepackage{lmodern}
+\usepackage{import}
+
+\def\mathdefault#1{#1}
+\everymath=\expandafter{\the\everymath\displaystyle}
+
+\begin{document}
+
+\section{Operator performance comparison.}
+
+\begin{figure}[h]
+    \begin{center}
+        \input{plot.pgf}
+    \end{center}
+    \caption{Sparse matrix-vector multiplication (SpMV) vs. matrix-free evaluation (MF).}
+\end{figure}
+
+\end{document}

@@ -95,3 +95,20 @@ if(CMAKE_BUILD_TYPE MATCHES "[Cc][Oo][Vv][Ee][Rr][Aa][Gg][Ee]")
     include(cmake/CodeCoverage.cmake)
     add_codecov(sfem_coverage sfem_test coverage)
 endif()
+
+# ##############################################################################
+
+if(SFEM_ENABLE_CUDA)
+  enable_language(CUDA)
+
+  if(NOT DEFINED CMAKE_CUDA_STANDARD)
+      set(CMAKE_CUDA_STANDARD 17)
+      set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+  endif()
+
+  set(SFEM_DEP_INCLUDES "${SFEM_DEP_INCLUDES};${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}")
+  #set(SFEM_DEP_LIBRARIES "${SFEM_DEP_LIBRARIES};${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES}")
+
+  include(CheckLanguage)
+  check_language(CUDA)
+endif()

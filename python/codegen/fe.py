@@ -8,9 +8,12 @@ from sfem_codegen import real_t
 from sfem_codegen import coeffs
 from sfem_codegen import det2
 from sfem_codegen import det3
+from sfem_codegen import matrix_coeff
 import sympy.codegen.ast as ast
 import sympy as sp
 import numpy as np
+
+
 
 def read_file(path):
 	with open(path, 'r') as f:
@@ -26,6 +29,8 @@ def str_to_file(path, mystr):
 
 class FE:
 	SoA = True
+	strided = False
+	use_adjugate = False
 
 	def subparam_n_nodes(self):
 		return self.n_nodes()
@@ -149,6 +154,10 @@ class FE:
 		return g
 
 	def symbol_jacobian_inverse(self):
+		if self.use_adjugate:
+			return self.symbol_jacobian_inverse_as_adjugate()
+		
+
 		rows = self.manifold_dim()
 		cols = self.spatial_dim()
 
@@ -156,10 +165,20 @@ class FE:
 
 		for i in range(0, rows):
 			for j in range(0, cols):
-				var = sp.symbols(f'jacobian_inverse[{i*cols + j}*stride_jacobian_inverse]')
+				if self.strided:
+					var = sp.symbols(f'jacobian_inverse[{i*cols + j}*stride_jacobian_inverse]')
+				else:
+					var = sp.symbols(f'jacobian_inverse[{i*cols + j}]')
 				# var = sp.symbols(f'jac_inv_{i*cols + j}]')
 				sls.append(var)
 		return sp.Matrix(rows, cols, sls)
+
+	def symbol_jacobian_inverse_as_adjugate(self):
+		rows = self.manifold_dim()
+		cols = self.spatial_dim()
+
+		coff = matrix_coeff('adjugate', rows, cols)
+		return coff / self.symbol_jacobian_determinant()
 
 	def symbol_jacobian(self):
 		rows = self.spatial_dim()
@@ -182,7 +201,10 @@ class FE:
 		
 		for d1 in range(0, self.manifold_dim()):
 			for d2 in range(0, self.manifold_dim()):
-				mat[d1, d2] = sp.symbols(f'a[{d1*self.manifold_dim() + d2}*stride]')
+				if self.strided:
+					mat[d1, d2] = sp.symbols(f'a[{d1*self.manifold_dim() + d2}*stride]')
+				else:
+					mat[d1, d2] = sp.symbols(f'a[{d1*self.manifold_dim() + d2}]')
 		
 		expr = []
 		if self.manifold_dim() == 2:
@@ -288,7 +310,11 @@ class FE:
 
 		fun_expr = []
 		for i in range(0, nfun):
-			fx = ast.Assignment(sp.symbols(f'f[{i}*stride_fun]'), f[i])
+			if self.strided:
+				fx = ast.Assignment(sp.symbols(f'f[{i}*stride_fun]'), f[i])
+			else:
+				fx = ast.Assignment(sp.symbols(f'f[{i}]'), f[i])
+
 			fun_expr.append(fx)
 
 		g = self.physical_grad(qp)
@@ -298,7 +324,10 @@ class FE:
 		for d in range(0, self.spatial_dim()):
 			gx = []
 			for i in range(0, nfun):
-				fx = ast.Assignment(sp.symbols(f'g{coordname[d]}[{i}*stride_grad]'), g[i][d])
+				if self.strided:
+					fx = ast.Assignment(sp.symbols(f'g{coordname[d]}[{i}*stride_grad]'), g[i][d])
+				else:
+					fx = ast.Assignment(sp.symbols(f'g{coordname[d]}[{i}]'), g[i][d])
 				gx.append(fx)
 			grad_expr.append(gx)
 
@@ -307,14 +336,20 @@ class FE:
 		jac_expr = []
 		for r in range(0, rows):
 			for c in range(0, cols):
-				jac_expr.append(ast.Assignment(sp.symbols(f'jacobian[{r*cols+c}*stride_jacobian]'), jac[r, c]))
+				if self.strided:
+					jac_expr.append(ast.Assignment(sp.symbols(f'jacobian[{r*cols+c}*stride_jacobian]'), jac[r, c]))
+				else:
+					jac_expr.append(ast.Assignment(sp.symbols(f'jacobian[{r*cols+c}]'), jac[r, c]))
 
 		jac_inv = self.jacobian_inverse(qp)
 		rows, cols = jac_inv.shape
 		jac_inv_expr = []
 		for r in range(0, rows):
 			for c in range(0, cols):
-				jac_inv_expr.append(ast.Assignment(sp.symbols(f'jacobian_inverse[{r*cols+c}*stride_jacobian_inverse]'), jac_inv[r, c]))
+				if self.strided:
+					jac_inv_expr.append(ast.Assignment(sp.symbols(f'jacobian_inverse[{r*cols+c}*stride_jacobian_inverse]'), jac_inv[r, c]))
+				else:
+					jac_inv_expr.append(ast.Assignment(sp.symbols(f'jacobian_inverse[{r*cols+c}]'), jac_inv[r, c]))
 
 		jacobian_determinant = self.jacobian_determinant(qp)
 
@@ -357,7 +392,10 @@ class FE:
 
 		g = self.grad_interpolate(qp, c)
 		for d in range(0, self.spatial_dim()):
-			grad_interp.append(ast.Assignment(sp.symbols(f"grad[{d}*stride_grad]"), g[d]))
+			if self.strided:
+				grad_interp.append(ast.Assignment(sp.symbols(f"grad[{d}*stride_grad]"), g[d]))
+			else:
+				grad_interp.append(ast.Assignment(sp.symbols(f"grad[{d}]"), g[d]))
 
 		utilities=""
 		utilities += self.generate_det_code()

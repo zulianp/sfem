@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,9 +17,7 @@
 #include "sfem_defs.h"
 #include "sfem_mesh.h"
 
-#include "macro_tet4_laplacian_incore_cuda.h"
-#include "tet10_laplacian_incore_cuda.h"
-#include "tet4_laplacian_incore_cuda.h"
+#include "laplacian_incore_cuda.h"
 
 /*
 Architecture:            x86_64
@@ -86,19 +85,6 @@ Vendor ID:               AuthenticAMD
         }                                                              \
     } while (0)
 
-#define CHECK_CUSPARSE(func)                                               \
-    do {                                                                   \
-        cusparseStatus_t status = (func);                                  \
-        if (status != CUSPARSE_STATUS_SUCCESS) {                           \
-            printf("CUSPARSE API failed at line %d with error: %s (%d)\n", \
-                   __LINE__,                                               \
-                   cusparseGetErrorString(status),                         \
-                   status);                                                \
-            return EXIT_FAILURE;                                           \
-        }                                                                  \
-    } while (0)
-
-// make spmv cuda=1
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -107,6 +93,8 @@ int main(int argc, char *argv[]) {
     int rank, size;
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
+
+    double tick = MPI_Wtime();
 
     if (size != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
@@ -125,19 +113,31 @@ int main(int argc, char *argv[]) {
     int SFEM_REPEAT = 1;
     SFEM_READ_ENV(SFEM_REPEAT, atoi);
 
-    int SFEM_USE_MACRO = 1;
+    int SFEM_USE_MACRO = 0;
     SFEM_READ_ENV(SFEM_USE_MACRO, atoi);
 
     mesh_t mesh;
     mesh_read(comm, mesh_folder, &mesh);
+    enum ElemType elem_type = mesh.element_type;
+
+    if (SFEM_USE_MACRO) {
+        elem_type = macro_type_variant(elem_type);
+    }
 
     ptrdiff_t nnodes = mesh.nnodes;
 
-    double tick = MPI_Wtime();
-
-    ptrdiff_t _nope_, x_n;
     real_t *x = 0;
-    array_create_from_file(comm, x_path, SFEM_MPI_REAL_T, (void **)&x, &_nope_, &x_n);
+    if (strcmp("gen:ones", x_path) == 0) {
+        x = malloc(nnodes * sizeof(real_t));
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            x[i] = 1;
+        }
+
+    } else {
+        ptrdiff_t _nope_, x_n;
+        array_create_from_file(comm, x_path, SFEM_MPI_REAL_T, (void **)&x, &_nope_, &x_n);
+    }
 
     real_t *y = calloc(nnodes, sizeof(real_t));
 
@@ -154,54 +154,30 @@ int main(int argc, char *argv[]) {
         CHECK_CUDA(cudaPeekAtLastError());
 
         cuda_incore_laplacian_t ctx;
-
-        if (mesh.element_type == TET4) {
-            tet4_cuda_incore_laplacian_init(&ctx, mesh.nelements, mesh.elements, mesh.points);
-        } else if (mesh.element_type == TET10) {
-            // Go for macro just for testing
-            if (SFEM_USE_MACRO) {
-                macro_tet4_cuda_incore_laplacian_init(
-                    &ctx, mesh.nelements, mesh.elements, mesh.points);
-            } else {
-                tet10_cuda_incore_laplacian_init(&ctx, mesh.nelements, mesh.elements, mesh.points);
-            }
-        }
+        cuda_incore_laplacian_init(elem_type, &ctx, mesh.nelements, mesh.elements, mesh.points);
 
         cudaDeviceSynchronize();
-
-        double spmv_tick = MPI_Wtime();
+        double mf_tick = MPI_Wtime();
 
         for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
-            if (mesh.element_type == TET4) {
-                tet4_cuda_incore_laplacian_apply(&ctx, d_x, d_y);
-            } else if (mesh.element_type == TET10) {
-                if (SFEM_USE_MACRO) {
-                    macro_tet4_cuda_incore_laplacian_apply(&ctx, d_x, d_y);
-                } else {
-                    tet10_cuda_incore_laplacian_apply(&ctx, d_x, d_y);
-                }
-            }
+            cuda_incore_laplacian_apply(&ctx, d_x, d_y);
         }
 
         cudaDeviceSynchronize();
+        double mf_tock = MPI_Wtime();
+        
+        double avg_time = (mf_tock - mf_tick) / SFEM_REPEAT;
+        double avg_throughput = (nnodes / avg_time) * (sizeof(real_t) * 1e-9);
 
-        double spmv_tock = MPI_Wtime();
-        printf("mf: %g (seconds)\n", (spmv_tock - spmv_tick) / SFEM_REPEAT);
+        printf("mf: %g %g %ld %ld %ld\n", 
+            avg_time, avg_throughput, mesh.nelements, nnodes, 0l);
 
         CHECK_CUDA(cudaPeekAtLastError());
         CHECK_CUDA(cudaMemcpy(y, d_y, nnodes * sizeof(real_t), cudaMemcpyDeviceToHost));
         CHECK_CUDA(cudaFree(d_x));
         CHECK_CUDA(cudaFree(d_y));
 
-        if (mesh.element_type == TET4) {
-            tet4_cuda_incore_laplacian_destroy(&ctx);
-        } else if (mesh.element_type == TET10) {
-            if (SFEM_USE_MACRO) {
-                macro_tet4_cuda_incore_laplacian_destroy(&ctx);
-            } else {
-                tet10_cuda_incore_laplacian_destroy(&ctx);
-            }
-        }
+        cuda_incore_laplacian_destroy(&ctx);
     }
 
     array_write(comm, output_path, SFEM_MPI_REAL_T, y, nnodes, nnodes);

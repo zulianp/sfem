@@ -3,8 +3,10 @@
 
 #include <stddef.h>
 #include "sfem_base.h"
+#include "sfem_defs.h"
 
 #include <mpi.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,8 +45,43 @@ typedef struct {
     idx_t *ghosts;
 } mesh_t;
 
+
+/**
+ * @brief Initialize mesh data structure to empty
+ *
+ * This function initializes the mesh data structure to an empty state.
+ *
+ * @param mesh Pointer to the mesh data structure
+ */
 void mesh_init(mesh_t *mesh);
+
+/**
+ * @brief Destroy mesh data structure
+ *
+ * This function cleans up and destroys the mesh data structure.
+ *
+ * @param mesh Pointer to the mesh data structure
+ */
 void mesh_destroy(mesh_t *mesh);
+
+
+/**
+ * @brief Create mesh in serial mode
+ *
+ * This function creates the mesh data structure in serial mode.
+ *
+ * @param mesh Pointer to the mesh data structure
+ * @param spatial_dim Spatial dimension
+ */
+void mesh_create_serial(
+    mesh_t *mesh,
+    int spatial_dim,
+    enum ElemType element_type,
+    ptrdiff_t nelements,
+    idx_t **elements,
+    ptrdiff_t nnodes,
+    geom_t **points
+    );
 
 void mesh_minmax_edge_length(const mesh_t *const mesh, real_t *emin, real_t *emax);
 

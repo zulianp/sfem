@@ -64,8 +64,7 @@ void fill_local_side_table(enum ElemType element_type, int *local_side_table) {
 
         LST(2, 0) = 3 - 1;
         LST(2, 1) = 1 - 1;
-    } 
-    else if (element_type == TRI6) {
+    } else if (element_type == TRI6) {
         LST(0, 0) = 1 - 1;
         LST(0, 1) = 2 - 1;
         LST(0, 2) = 4 - 1;
@@ -77,25 +76,36 @@ void fill_local_side_table(enum ElemType element_type, int *local_side_table) {
         LST(2, 0) = 3 - 1;
         LST(2, 1) = 1 - 1;
         LST(2, 2) = 6 - 1;
-    }  else {
+    } else if (element_type == QUAD4) {
+        LST(0, 0) = 1 - 1;
+        LST(0, 1) = 2 - 1;
+
+        LST(1, 0) = 2 - 1;
+        LST(1, 1) = 3 - 1;
+
+        LST(2, 0) = 3 - 1;
+        LST(2, 1) = 4 - 1;
+
+        LST(3, 0) = 4 - 1;
+        LST(3, 1) = 1 - 1;
+    } else {
         assert(0);
     }
 }
 
 void create_element_adj_table_from_dual_graph(const ptrdiff_t n_elements,
-                            const ptrdiff_t n_nodes,
-                            enum ElemType element_type,
-                            idx_t **const SFEM_RESTRICT elems,
-                            const count_t *const adj_ptr,
-                            const element_idx_t *const adj_idx,
-                            element_idx_t *const SFEM_RESTRICT table)
-{
+                                              const ptrdiff_t n_nodes,
+                                              enum ElemType element_type,
+                                              idx_t **const SFEM_RESTRICT elems,
+                                              const count_t *const adj_ptr,
+                                              const element_idx_t *const adj_idx,
+                                              element_idx_t *const SFEM_RESTRICT table) {
     int element_type_for_algo = element_type;
 
     if (element_type == TET10) {
         // This is enough for many operations
         element_type_for_algo = TET4;
-    } else if(element_type == TRI6) {
+    } else if (element_type == TRI6) {
         element_type_for_algo = TRI3;
     }
 
@@ -155,19 +165,18 @@ void create_element_adj_table_from_dual_graph(const ptrdiff_t n_elements,
 }
 
 void create_element_adj_table_from_dual_graph_soa(const ptrdiff_t n_elements,
-                            const ptrdiff_t n_nodes,
-                            enum ElemType element_type,
-                            idx_t **const SFEM_RESTRICT elems,
-                            const count_t *const adj_ptr,
-                            const element_idx_t *const adj_idx,
-                            element_idx_t **const SFEM_RESTRICT table)
-{
+                                                  const ptrdiff_t n_nodes,
+                                                  enum ElemType element_type,
+                                                  idx_t **const SFEM_RESTRICT elems,
+                                                  const count_t *const adj_ptr,
+                                                  const element_idx_t *const adj_idx,
+                                                  element_idx_t **const SFEM_RESTRICT table) {
     int element_type_for_algo = element_type;
 
     if (element_type == TET10) {
         // This is enough for many operations
         element_type_for_algo = TET4;
-    } else if(element_type == TRI6) {
+    } else if (element_type == TRI6) {
         element_type_for_algo = TRI3;
     }
 
@@ -227,16 +236,16 @@ void create_element_adj_table_from_dual_graph_soa(const ptrdiff_t n_elements,
 }
 
 void create_element_adj_table(const ptrdiff_t n_elements,
-                            const ptrdiff_t n_nodes,
-                            enum ElemType element_type,
-                            idx_t **const SFEM_RESTRICT elems,
-                            element_idx_t **const SFEM_RESTRICT table_out) {
+                              const ptrdiff_t n_nodes,
+                              enum ElemType element_type,
+                              idx_t **const SFEM_RESTRICT elems,
+                              element_idx_t **const SFEM_RESTRICT table_out) {
     int element_type_for_algo = element_type;
 
     if (element_type == TET10) {
         // This is enough for many operations
         element_type_for_algo = TET4;
-    } else if(element_type == TRI6) {
+    } else if (element_type == TRI6) {
         element_type_for_algo = TRI3;
     }
 
@@ -246,7 +255,8 @@ void create_element_adj_table(const ptrdiff_t n_elements,
 
     const int ns = elem_num_sides(element_type);
     element_idx_t *table = (element_idx_t *)malloc(n_elements * ns * sizeof(element_idx_t));
-    create_element_adj_table_from_dual_graph(n_elements, n_nodes, element_type, elems, adj_ptr, adj_idx, table);
+    create_element_adj_table_from_dual_graph(
+        n_elements, n_nodes, element_type, elems, adj_ptr, adj_idx, table);
 
     free(adj_ptr);
     free(adj_idx);

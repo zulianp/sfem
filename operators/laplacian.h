@@ -4,6 +4,10 @@
 #include <stddef.h>
 #include "sfem_base.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void laplacian_assemble_value(int element_type,
                               const ptrdiff_t nelements,
                               const ptrdiff_t nnodes,
@@ -36,5 +40,10 @@ void laplacian_apply(int element_type,
                      geom_t **const SFEM_RESTRICT xyz,
                      const real_t *const SFEM_RESTRICT u,
                      real_t *const SFEM_RESTRICT values);
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  // LAPLACIAN_H
