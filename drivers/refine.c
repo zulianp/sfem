@@ -37,6 +37,19 @@ static const int tri3_refine_pattern[4][3] = {
     // Center triangle
     {3, 4, 5}};
 
+static const int quad4_refine_pattern[4][4] = {
+    {0, 4, 8, 7},
+    {4, 1, 5, 8},
+    {8, 5, 2, 6},
+    {7, 8, 6, 3}};
+
+static const int quad4_remove_connections[4][1] = {
+    {2},
+    {3},
+    {0},
+    {1}
+};
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -93,6 +106,10 @@ int main(int argc, char *argv[]) {
                                   coarse_mesh.elements,
                                   &rowptr,
                                   &colidx);
+
+    if(coarse_mesh.element_type == QUAD4) {
+        // TODO Clean up the extra connectivity
+    }
 
     ///////////////////////////////////////////////////////////////////////////////
 
@@ -242,7 +259,11 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
-    } else {
+    } else 
+    // if(coarse_mesh.element_type == QUAD4) {
+
+    // } else
+    {
         fprintf(stderr, "Implement for element_type %d\n!", coarse_mesh.element_type);
         return EXIT_FAILURE;
     }

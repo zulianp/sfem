@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) {
 
     if (argc != 3) {
         if (!rank) {
-            fprintf(stderr, "usage: %s <folder> <output_folder>", argv[0]);
+            fprintf(stderr, "usage: %s <folder> <output_folder>\n", argv[0]);
         }
 
         return EXIT_FAILURE;

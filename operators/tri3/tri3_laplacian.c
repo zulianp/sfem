@@ -3,8 +3,8 @@
 #include "sfem_vec.h"
 #include "sortreduce.h"
 
-#include <stdio.h>
 #include <mpi.h>
+#include <stdio.h>
 
 #define POW2(a) ((a) * (a))
 
@@ -51,6 +51,49 @@ static SFEM_INLINE void tri3_laplacian_assemble_hessian_kernel(const real_t px0,
     element_matrix[8 * stride] = x1;
 }
 
+static SFEM_INLINE void tri3_laplacian_apply_kernel(const real_t px0,
+                                                    const real_t px1,
+                                                    const real_t px2,
+                                                    const real_t py0,
+                                                    const real_t py1,
+                                                    const real_t py2,
+                                                    const real_t *SFEM_RESTRICT u,
+                                                    real_t *SFEM_RESTRICT element_vector) {
+    static const int stride = 1;
+    real_t fff[3];
+    {
+        // FLOATING POINT OPS!
+        //       - Result: 3*ADD + 3*ASSIGNMENT + 9*MUL + 4*POW
+        //       - Subexpressions: 2*MUL + NEG + POW + 5*SUB
+        const real_t x0 = -px0 + px1;
+        const real_t x1 = -py0 + py2;
+        const real_t x2 = px0 - px2;
+        const real_t x3 = py0 - py1;
+        const real_t x4 = x0 * x1 - x2 * x3;
+        const real_t x5 = 1. / POW2(x4);
+        fff[0 * stride] = x4 * (POW2(x1) * x5 + POW2(x2) * x5);
+        fff[1 * stride] = x4 * (x0 * x2 * x5 + x1 * x3 * x5);
+        fff[2 * stride] = x4 * (POW2(x0) * x5 + POW2(x3) * x5);
+    }
+
+    // FLOATING POINT OPS!
+    //       - Result: ADD + 9*ASSIGNMENT
+    //       - Subexpressions: 3*DIV + 2*NEG + 2*SUB
+    const real_t x0 = (1.0 / 2.0) * u[0];
+    const real_t x1 = fff[0 * stride] * x0;
+    const real_t x2 = (1.0 / 2.0) * u[1];
+    const real_t x3 = fff[0 * stride] * x2;
+    const real_t x4 = fff[1 * stride] * x2;
+    const real_t x5 = (1.0 / 2.0) * u[2];
+    const real_t x6 = fff[1 * stride] * x5;
+    const real_t x7 = fff[2 * stride] * x0;
+    const real_t x8 = fff[2 * stride] * x5;
+    const real_t x9 = (1.0 / 2.0) * fff[1 * stride] * u[0];
+    element_vector[0 * stride] = fff[1 * stride] * u[0] + x1 - x3 - x4 - x6 + x7 - x8;
+    element_vector[1 * stride] = -x1 + x3 + x6 - x9;
+    element_vector[2 * stride] = x4 - x7 + x8 - x9;
+}
+
 static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {
     int i;
     for (i = 0; i < size - 4; i += 4) {
@@ -81,7 +124,10 @@ static SFEM_INLINE int find_col(const idx_t key, const idx_t *const row, const i
     }
 }
 
-static SFEM_INLINE void find_cols3(const idx_t *targets, const idx_t *const row, const int lenrow, int *ks) {
+static SFEM_INLINE void find_cols3(const idx_t *targets,
+                                   const idx_t *const row,
+                                   const int lenrow,
+                                   int *ks) {
     if (lenrow > 32) {
         for (int d = 0; d < 3; ++d) {
             ks[d] = find_col(targets[d], row, lenrow);
@@ -159,4 +205,53 @@ void tri3_laplacian_assemble_hessian(const ptrdiff_t nelements,
 
     double tock = MPI_Wtime();
     printf("tri3_laplacian.c: tri3_laplacian_assemble_hessian\t%g seconds\n", tock - tick);
+}
+
+void tri3_laplacian_apply(const ptrdiff_t nelements,
+                          const ptrdiff_t nnodes,
+                          idx_t **const SFEM_RESTRICT elems,
+                          geom_t **const SFEM_RESTRICT xyz,
+                          const real_t *const SFEM_RESTRICT u,
+                          real_t *const SFEM_RESTRICT values) {
+    SFEM_UNUSED(nnodes);
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[3];
+        real_t element_u[3];
+        real_t element_vector[3] = {0};
+
+#pragma unroll(3)
+        for (int v = 0; v < 3; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+#pragma unroll(3)
+        for (int v = 0; v < 3; ++v) {
+            element_u[v] = u[ev[v]];
+        }
+
+        // Element indices
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+
+        tri3_laplacian_apply_kernel(
+            // X-coordinates
+            xyz[0][i0],
+            xyz[0][i1],
+            xyz[0][i2],
+            // Y-coordinates
+            xyz[1][i0],
+            xyz[1][i1],
+            xyz[1][i2],
+            element_u,
+            element_vector);
+
+#pragma unroll(3)
+        for (int edof_i = 0; edof_i < 3; ++edof_i) {
+#pragma omp atomic update
+            values[ev[edof_i]] += element_vector[edof_i];
+        }
+    }
 }

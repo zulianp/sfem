@@ -904,7 +904,7 @@ void tet10_laplacian_assemble_gradient(const ptrdiff_t nelements,
                                        real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    // double tick = MPI_Wtime();
 
 #pragma omp parallel
     {
@@ -957,8 +957,8 @@ void tet10_laplacian_assemble_gradient(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
-    printf("tet10_laplacian.c: tet10_laplacian_assemble_gradient\t%g seconds\n", tock - tick);
+    // double tock = MPI_Wtime();
+    // printf("tet10_laplacian.c: tet10_laplacian_assemble_gradient\t%g seconds\n", tock - tick);
 }
 
 void tet10_laplacian_assemble_value(const ptrdiff_t nelements,
