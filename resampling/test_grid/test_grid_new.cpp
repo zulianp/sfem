@@ -1509,7 +1509,7 @@ int main(int argc, char* argv[]) {
     quadrature_rule qr;
 
     problem_parameters prs = {
-            .quad_nodes_nr = 120,
+            .quad_nodes_nr = 123,
             .xy_max_domain = 1500.0,
             .xy_zero_domain = 0.0,
             .delta_domain = 0.06,  // delta of the gloabl grid
