@@ -225,6 +225,11 @@ void linear_elasticity_assemble_diag_aos(const enum ElemType element_type,
                 nelements, nnodes, elems, xyz, mu, lambda, values);
             break;
         }
+        case TET10: {
+            tet10_linear_elasticity_assemble_diag_aos(
+                nelements, nnodes, elems, xyz, mu, lambda, values);
+            break;
+        }
         default: {
             assert(0);
             MPI_Abort(MPI_COMM_WORLD, -1);
