@@ -45,9 +45,9 @@ def plot(spMV_df, MF_df, geo, op_type, gpu):
     # From Giga to Mega
     MF_y_p1 	  = 1000 * MF_series_p1[col].values / size_of_real
 
-    MF_x_macro_p1 	  = MF_series_macro_p1['ndofs'].values
+    MF_x_macro_p1 = MF_series_macro_p1['ndofs'].values
     # From Giga to Mega
-    MF_y_macro_p1 	  = 1000 * MF_series_macro_p1[col].values / size_of_real
+    MF_y_macro_p1 = 1000 * MF_series_macro_p1[col].values / size_of_real
 
     plt.figure().clear()
     plt.loglog(SpMV_x,  SpMV_y,  marker='o', linestyle='-', label=f"SpMV (cuSPARSE: {SpMV_rep})")

@@ -28,7 +28,7 @@ export OMP_PROC_BIND=true
 # rm -rf mesh
 # create_cylinder.sh 3
 
-# create_cylinder_p2.sh 0
+create_cylinder_p2.sh 4
 # export SFEM_USE_MACRO=1
 
 sleft=mesh/sidesets_aos/sinlet.raw
@@ -56,9 +56,11 @@ else
 	export SFEM_DIRICHLET_COMPONENT="0,0"
 fi
 
-# export SFEM_USE_GPU=0
+export SFEM_USE_GPU=1
 export SFEM_USE_PRECONDITIONER=1
-steady_state_sim_cuda mesh output
+export CUDA_LAUNCH_BLOCKING=0
+
+$LAUNCH steady_state_sim_cuda mesh output
 
 if [[ $SFEM_BLOCK_SIZE != 1 ]]
 then
