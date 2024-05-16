@@ -11,6 +11,7 @@ export PATH=$SCRIPTPATH/../bin/:$PATH
 
 PATH=$SCRIPTPATH:$PATH
 PATH=$SCRIPTPATH/..:$PATH
+PATH=$SCRIPTPATH/../build:$PATH
 PATH=$SCRIPTPATH/../python/sfem:$PATH
 PATH=$SCRIPTPATH/../python/sfem/mesh:$PATH
 PATH=$SCRIPTPATH/../python/sfem/algebra:$PATH
@@ -21,8 +22,8 @@ export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true
 
 SFEM_MESH_DIR=mesh
-# create_cylinder_p2.sh 3
-create_cylinder.sh 3
+create_cylinder_p2.sh 1
+# create_cylinder.sh 3
 
 sleft=$SFEM_MESH_DIR/sidesets_aos/sinlet.raw
 sright=$SFEM_MESH_DIR/sidesets_aos/soutlet.raw

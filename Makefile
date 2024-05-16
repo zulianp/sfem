@@ -590,7 +590,7 @@ spmv : drivers/cuda/do_spmv.c libsfem.a
 .PRECIOUS :
 
 clean:
-	rm *.o *.a $(GOALS); rm -r *.dSYM
+	rm *.o *.a *.dylib *.so $(GOALS); rm -r *.dSYM
 
 
 .SUFFIXES:

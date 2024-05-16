@@ -27,8 +27,8 @@ def assign_matrix(name, mat):
 
 class GPULinearElasticityOp:
 	def __init__(self, fe, q):
-		# self.init_opt(fe, q)
-		self.init_basic(fe, q)
+		self.init_opt(fe, q)
+		# self.init_basic(fe, q)
 
 	def init_basic(self, fe, q):
 		fe.use_adjugate = True
@@ -63,7 +63,7 @@ class GPULinearElasticityOp:
 		epsu = (disp_grad + disp_grad.T) / 2
 		e = mu * inner(epsu, epsu) + (lmbda/2) * (tr(epsu) * tr(epsu))
 
-		dV = fe.reference_measure() * fe.symbol_jacobian_determinant()
+		dV = (fe.reference_measure() * fe.quadrature_weight()) * fe.symbol_jacobian_determinant() 
 
 		# Objective
 		self.eval_value = e * dV
@@ -151,8 +151,10 @@ class GPULinearElasticityOp:
 		epsu = (disp_grad + disp_grad.T) / 2
 		e = mu * inner(epsu, epsu) + (lmbda/2) * (tr(epsu) * tr(epsu))
 
+
+		dV = fe.reference_measure() * fe.symbol_jacobian_determinant() * fe.quadrature_weight()
 		# Objective
-		self.eval_value = e * fe.reference_measure() * fe.symbol_jacobian_determinant()
+		self.eval_value = e * dV
 		self.eval_value = simplify(self.eval_value)
 
 		# Gradient
@@ -169,7 +171,7 @@ class GPULinearElasticityOp:
 		P_sym = matrix_coeff('P', dims, dims)
 		
 		for i in range(0, fe.n_nodes() * dims):
-			self.eval_grad[i] = inner(P_sym, shape_grad[i]) * (fe.symbol_jacobian_determinant() * fe.reference_measure())
+			self.eval_grad[i] = inner(P_sym, shape_grad[i]) * dV
 			self.eval_grad[i] = simplify(self.eval_grad[i])
 			eval_grad[i] = inner(P, shape_grad[i])
 
@@ -185,7 +187,7 @@ class GPULinearElasticityOp:
 			self.eval_grad_opt[i] = simplify(self.eval_grad_opt[i])
 
 			# Evaluation for computing hessian
-			eval_grad_opt[i] = inner(P.T * jac_inv.T * (fe.symbol_jacobian_determinant() * fe.reference_measure()), shape_grad_ref[i])
+			eval_grad_opt[i] = simplify(inner(P.T * jac_inv.T * dV, shape_grad_ref[i]))
 
 		self.eval_hessian =  sp.zeros(rows, cols)
 		self.lin_stress = []
