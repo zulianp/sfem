@@ -65,22 +65,25 @@ function bench_spmv()
 	##############################################
 	# Scalar problem
 	##############################################
-	
-	$exec 1 0 $p1/matrix_scalar "gen:ones" $workspace/test.raw > $workspace/temp_log.txt
-	op_type=`grep "op: " $p1/matrix_scalar/meta.yaml | awk '{print $2}'`
+	if [ -f "$p1/matrix_scalar/rowptr.raw" ]; then
+		$exec 1 0 $p1/matrix_scalar "gen:ones" $workspace/test.raw > $workspace/temp_log.txt
+		op_type=`grep "op: " $p1/matrix_scalar/meta.yaml | awk '{print $2}'`
 
-	stats=`grep "spmv:" $workspace/temp_log.txt | awk '{print $2, $3, $4, $5, $6}' | tr ' ' ','`
-	echo "crs,$g,$op_type,$r,scalar,$stats" >> $csv_output
+		stats=`grep "spmv:" $workspace/temp_log.txt | awk '{print $2, $3, $4, $5, $6}' | tr ' ' ','`
+		echo "crs,$g,$op_type,$r,scalar,$stats" >> $csv_output
+	fi
 
 	##############################################
 	# Vector problem
 	##############################################
-	
-	$exec 1 0 $p1/matrix_vector "gen:ones" $workspace/test.raw > $workspace/temp_log.txt
-	op_type=`grep "op: " $p1/matrix_vector/meta.yaml | awk '{print $2}'`
 
-	stats=`grep "spmv:" $workspace/temp_log.txt | awk '{print $2, $3, $4, $5, $6}' | tr ' ' ','`
-	echo "crs,$g,$op_type,$r,vector,$stats" >> $csv_output
+	if [ -f "$p1/matrix_vector/rowptr.raw" ]; then	
+		$exec 1 0 $p1/matrix_vector "gen:ones" $workspace/test.raw > $workspace/temp_log.txt
+		op_type=`grep "op: " $p1/matrix_vector/meta.yaml | awk '{print $2}'`
+
+		stats=`grep "spmv:" $workspace/temp_log.txt | awk '{print $2, $3, $4, $5, $6}' | tr ' ' ','`
+		echo "crs,$g,$op_type,$r,vector,$stats" >> $csv_output
+	fi
 }
 
 for g in ${geo[@]}
