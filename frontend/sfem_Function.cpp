@@ -741,7 +741,8 @@ namespace sfem {
         SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.hessian_crs);
 
         for (auto &op : impl_->ops) {
-            if (op->hessian_crs(x, rowptr, colidx, values)) {
+            if (op->hessian_crs(x, rowptr, colidx, values) != ISOLVER_FUNCTION_SUCCESS) {
+                std::cerr << "Failed hessian_crs in op: " << op->name() << "\n";
                 return ISOLVER_FUNCTION_FAILURE;
             }
         }
@@ -759,7 +760,8 @@ namespace sfem {
         SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.hessian_diag);
 
         for (auto &op : impl_->ops) {
-            if (op->hessian_diag(x, values)) {
+            if (op->hessian_diag(x, values) != ISOLVER_FUNCTION_SUCCESS) {
+                std::cerr << "Failed hessian_diag in op: " << op->name() << "\n";
                 return ISOLVER_FUNCTION_FAILURE;
             }
         }
@@ -777,7 +779,8 @@ namespace sfem {
         SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.gradient);
 
         for (auto &op : impl_->ops) {
-            if (op->gradient(x, out)) {
+            if (op->gradient(x, out) != ISOLVER_FUNCTION_SUCCESS) {
+                std::cerr << "Failed gradient in op: " << op->name() << "\n";
                 return ISOLVER_FUNCTION_FAILURE;
             }
         }
@@ -795,7 +798,8 @@ namespace sfem {
         SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.apply);
 
         for (auto &op : impl_->ops) {
-            if (op->apply(x, h, out)) {
+            if (op->apply(x, h, out) != ISOLVER_FUNCTION_SUCCESS) {
+                std::cerr << "Failed apply in op: " << op->name() << "\n";
                 return ISOLVER_FUNCTION_FAILURE;
             }
         }
@@ -811,7 +815,8 @@ namespace sfem {
         SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.value);
 
         for (auto &op : impl_->ops) {
-            if (op->value(x, out)) {
+            if (op->value(x, out) != ISOLVER_FUNCTION_SUCCESS) {
+                std::cerr << "Failed value in op: " << op->name() << "\n";
                 return ISOLVER_FUNCTION_FAILURE;
             }
         }
