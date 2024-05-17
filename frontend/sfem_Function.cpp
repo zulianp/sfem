@@ -2,6 +2,7 @@
 #include <stddef.h>
 
 #include "matrixio_array.h"
+#include "utils.h"
 
 #include "crs_graph.h"
 #include "read_mesh.h"
@@ -17,11 +18,13 @@
 #include "neumann.h"
 
 #include <sys/stat.h>
+// #include <sys/wait.h>
 #include <cstddef>
 #include <fstream>
 #include <functional>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <vector>
 
 // Ops
@@ -138,10 +141,13 @@ namespace sfem {
     public:
         std::shared_ptr<Mesh> mesh;
         int block_size{1};
+        enum ElemType element_type { INVALID };
 
-        // CRS graph
+        // Number of nodes of function-space (TODO)
         ptrdiff_t nlocal{0};
         ptrdiff_t nglobal{0};
+
+        // CRS graph
         ptrdiff_t nnz{0};
         isolver_idx_t *rowptr{nullptr};
         isolver_idx_t *colidx{nullptr};
@@ -152,10 +158,29 @@ namespace sfem {
         }
     };
 
-    FunctionSpace::FunctionSpace(const std::shared_ptr<Mesh> &mesh, const int block_size)
+    enum ElemType FunctionSpace::element_type() const {
+        assert(impl_->element_type != INVALID);
+        return impl_->element_type;
+    }
+
+    std::shared_ptr<FunctionSpace> FunctionSpace::derefine() const {
+        // FIXME the number of nodes in mesh does not change, will lead to bugs
+        return std::make_shared<FunctionSpace>(
+            impl_->mesh, impl_->block_size, macro_base_elem(impl_->element_type));
+    }
+
+    FunctionSpace::FunctionSpace(const std::shared_ptr<Mesh> &mesh,
+                                 const int block_size,
+                                 const enum ElemType element_type)
         : impl_(std::make_unique<Impl>()) {
         impl_->mesh = mesh;
         impl_->block_size = block_size;
+
+        if (element_type == INVALID) {
+            impl_->element_type = (enum ElemType)mesh->impl_->mesh.element_type;
+        } else {
+            impl_->element_type = element_type;
+        }
     }
 
     FunctionSpace::~FunctionSpace() = default;
@@ -298,7 +323,7 @@ namespace sfem {
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
 
         for (int i = 0; i < impl_->n_neumann_conditions; i++) {
-            surface_forcing_function_vec(side_type((enum ElemType)mesh->element_type),
+            surface_forcing_function_vec(side_type((enum ElemType)impl_->space->element_type()),
                                          impl_->neumann_conditions[i].local_size,
                                          impl_->neumann_conditions[i].idx,
                                          mesh->points,
@@ -332,7 +357,7 @@ namespace sfem {
             (impl_->n_neumann_conditions + 1) * sizeof(boundary_condition_t));
 
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
-        enum ElemType stype = side_type((enum ElemType)mesh->element_type);
+        enum ElemType stype = side_type((enum ElemType)impl_->space->element_type());
         int nns = elem_num_nodes(stype);
 
         assert((local_size / nns) * nns == local_size);
@@ -359,7 +384,7 @@ namespace sfem {
             (impl_->n_neumann_conditions + 1) * sizeof(boundary_condition_t));
 
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
-        enum ElemType stype = side_type((enum ElemType)mesh->element_type);
+        enum ElemType stype = side_type((enum ElemType)impl_->space->element_type());
         int nns = elem_num_sides(stype);
 
         boundary_condition_create(&impl_->neumann_conditions[impl_->n_neumann_conditions],
@@ -401,6 +426,52 @@ namespace sfem {
     DirichletConditions::DirichletConditions(const std::shared_ptr<FunctionSpace> &space)
         : impl_(std::make_unique<Impl>()) {
         impl_->space = space;
+    }
+
+    std::shared_ptr<Constraint> DirichletConditions::derefine() const {
+        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
+        auto et = (enum ElemType)impl_->space->element_type();
+        auto coarse_et = macro_base_elem(et);
+        const ptrdiff_t max_coarse_idx = max_node_id(coarse_et, mesh->nelements, mesh->elements);
+
+        auto coarse = std::make_shared<DirichletConditions>(nullptr);
+
+        for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
+            ptrdiff_t coarse_local_size = 0;
+            idx_t *coarse_indices = nullptr;
+            real_t *coarse_values = nullptr;
+            hierarchical_create_coarse_indices(max_coarse_idx,
+                                               impl_->dirichlet_conditions[i].local_size,
+                                               impl_->dirichlet_conditions[i].idx,
+                                               &coarse_local_size,
+                                               &coarse_indices);
+
+            if (impl_->dirichlet_conditions[i].values) {
+                coarse_values = (real_t *)malloc(coarse_local_size * sizeof(real_t));
+
+                hierarchical_collect_coarse_values(max_coarse_idx,
+                                                   impl_->dirichlet_conditions[i].local_size,
+                                                   impl_->dirichlet_conditions[i].idx,
+                                                   impl_->dirichlet_conditions[i].values,
+                                                   coarse_values);
+            }
+
+            long coarse_global_size = coarse_local_size;
+
+            CATCH_MPI_ERROR(
+                MPI_Allreduce(MPI_IN_PLACE, &coarse_global_size, 1, MPI_LONG, MPI_SUM, mesh->comm));
+
+            boundary_condition_create(
+                &coarse->impl_->dirichlet_conditions[coarse->impl_->n_dirichlet_conditions],
+                coarse_local_size,
+                coarse_global_size,
+                coarse_indices,
+                impl_->dirichlet_conditions[i].component,
+                impl_->dirichlet_conditions[i].value,
+                coarse_values);
+        }
+
+        return coarse;
     }
 
     DirichletConditions::~DirichletConditions() = default;
@@ -884,21 +955,40 @@ namespace sfem {
     std::shared_ptr<Operator<isolver_scalar_t>> Function::hierarchical_restriction() {
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
 
-        auto et = (enum ElemType)mesh->element_type;
-        auto coarse_et =  macro_base_elem(et);
+        auto et = (enum ElemType)impl_->space->element_type();
+        auto coarse_et = macro_base_elem(et);
 
         const ptrdiff_t rows = max_node_id(coarse_et, mesh->nelements, mesh->elements) + 1;
         const ptrdiff_t cols = impl_->space->n_dofs();
 
         return std::make_shared<LambdaOperator<isolver_scalar_t>>(
             rows, cols, [=](const isolver_scalar_t *const from, isolver_scalar_t *const to) {
-                
                 ::hierarchical_restriction(
                     et, coarse_et, mesh->nelements, mesh->elements, from, to);
             });
     }
 
     std::shared_ptr<Operator<isolver_scalar_t>> Function::hierarchical_prolongation() {
+        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
+
+        auto et = (enum ElemType)impl_->space->element_type();
+        auto coarse_et = macro_base_elem(et);
+
+        const ptrdiff_t rows = impl_->space->n_dofs();
+        const ptrdiff_t cols = max_node_id(coarse_et, mesh->nelements, mesh->elements) + 1;
+
+        return std::make_shared<LambdaOperator<isolver_scalar_t>>(
+            rows, cols, [=](const isolver_scalar_t *const from, isolver_scalar_t *const to) {
+                ::hierarchical_prolongation(
+                    coarse_et, et, mesh->nelements, mesh->elements, from, to);
+            });
+    }
+
+    std::shared_ptr<Function> Function::lor() {
+        // auto ret = std::make_shared<Function>(space);
+        // return ret;
+
+        assert(false);
         return nullptr;
     }
 
@@ -924,7 +1014,7 @@ namespace sfem {
 
             ret->mu = SFEM_SHEAR_MODULUS;
             ret->lambda = SFEM_FIRST_LAME_PARAMETER;
-            ret->element_type = (enum ElemType)mesh->element_type;
+            ret->element_type = (enum ElemType)space->element_type();
             return ret;
         }
 
@@ -936,7 +1026,7 @@ namespace sfem {
             return ret;
         }
 
-        std::shared_ptr<Op> coarsen_op() override {
+        std::shared_ptr<Op> derefine_op() override {
             auto ret = std::make_shared<LinearElasticity>(space);
             ret->element_type = macro_base_elem(element_type);
             ret->mu = mu;
@@ -1052,7 +1142,7 @@ namespace sfem {
             assert(1 == space->block_size());
 
             auto ret = std::make_unique<Laplacian>(space);
-            ret->element_type = (enum ElemType)mesh->element_type;
+            ret->element_type = (enum ElemType)space->element_type();
             return ret;
         }
 
@@ -1062,7 +1152,7 @@ namespace sfem {
             return ret;
         }
 
-        std::shared_ptr<Op> coarsen_op() override {
+        std::shared_ptr<Op> derefine_op() override {
             auto ret = std::make_shared<Laplacian>(space);
             ret->element_type = macro_base_elem(element_type);
             return ret;
@@ -1135,7 +1225,7 @@ namespace sfem {
             assert(1 == space->block_size());
 
             auto ret = std::make_unique<Mass>(space);
-            ret->element_type = (enum ElemType)mesh->element_type;
+            ret->element_type = (enum ElemType)space->element_type();
             return ret;
         }
 
@@ -1184,7 +1274,7 @@ namespace sfem {
         int value(const isolver_scalar_t *x, isolver_scalar_t *const out) override {
             // auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            // mass_assemble_value((enum ElemType)mesh->element_type,
+            // mass_assemble_value((enum ElemType)space->element_type(),
             //                     mesh->nelements,
             //                     mesh->nnodes,
             //                     mesh->elements,
@@ -1212,7 +1302,7 @@ namespace sfem {
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
             auto ret = std::make_unique<LumpedMass>(space);
-            ret->element_type = (enum ElemType)mesh->element_type;
+            ret->element_type = (enum ElemType)space->element_type();
             return ret;
         }
 
@@ -1295,7 +1385,7 @@ namespace sfem {
             assert(1 == space->block_size());
 
             auto ret = std::make_unique<CVFEMMass>(space);
-            ret->element_type = (enum ElemType)mesh->element_type;
+            ret->element_type = (enum ElemType)space->element_type();
             return ret;
         }
 
@@ -1384,7 +1474,7 @@ namespace sfem {
                 //         SFEM_VELX,
                 //         SFEM_VELY,
                 //         SFEM_VELZ);
-                ret->element_type = (enum ElemType)mesh->element_type;
+                ret->element_type = (enum ElemType)space->element_type();
                 return ret;
             }
 

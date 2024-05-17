@@ -4,8 +4,8 @@
 #include "sfem_defs.h"
 
 #include <mpi.h>
-#include <stdio.h>
 #include <stddef.h>
+#include <stdio.h>
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -21,6 +21,47 @@ ptrdiff_t max_node_id(const enum ElemType type,
         }
     }
     return ret;
+}
+
+// We assume that fine indices have a higher id
+int hierarchical_create_coarse_indices(const idx_t max_coarse_idx,
+                                       const ptrdiff_t n_indices,
+                                       idx_t *const SFEM_RESTRICT fine_indices,
+                                       ptrdiff_t *n_coarse_indices,
+                                       idx_t **SFEM_RESTRICT coarse_indices) {
+    ptrdiff_t count = 0;
+#pragma omp parallel for reduction(+ : count)
+    for (ptrdiff_t i = 0; i < n_indices; i++) {
+        count += fine_indices[i] <= max_coarse_idx;
+    }
+
+    *n_coarse_indices = count;
+    *coarse_indices = (idx_t *)malloc(count * sizeof(idx_t));
+
+    count = 0;
+    for (ptrdiff_t i = 0; i < n_indices; i++) {
+        if (fine_indices[i] <= max_coarse_idx) {
+            (*coarse_indices)[count++] = fine_indices[i];
+        }
+    }
+
+    return 0;
+}
+
+int hierarchical_collect_coarse_values(const idx_t max_coarse_idx,
+                                       const ptrdiff_t n_indices,
+                                       idx_t *const SFEM_RESTRICT fine_indices,
+                                       const real_t *const SFEM_RESTRICT fine_values,
+                                       real_t *const SFEM_RESTRICT coarse_values)
+{
+    ptrdiff_t count = 0;
+    for (ptrdiff_t i = 0; i < n_indices; i++) {
+        if (fine_indices[i] <= max_coarse_idx) {
+            coarse_values[count++] = fine_values[i];
+        }
+    }
+
+    return 0;
 }
 
 int hierarchical_prolongation(const enum ElemType from_element,

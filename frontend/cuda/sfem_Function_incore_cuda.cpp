@@ -3,8 +3,8 @@
 #include "boundary_condition.h"
 #include "isolver_function.h"
 
-#include "linear_elasticity_incore_cuda.h"
 #include "laplacian_incore_cuda.h"
+#include "linear_elasticity_incore_cuda.h"
 
 #include "sfem_mesh.h"
 
@@ -18,9 +18,13 @@ namespace sfem {
         int n_dirichlet_conditions{0};
         boundary_condition_t *dirichlet_conditions{nullptr};
 
-        GPUDirichletConditions(const std::shared_ptr<DirichletConditions> &dc) 
-        : space(dc->space())
-        {
+        std::shared_ptr<Constraint> derefine() const {
+            assert(false);
+            return nullptr;
+        }
+
+        GPUDirichletConditions(const std::shared_ptr<DirichletConditions> &dc)
+            : space(dc->space()) {
             n_dirichlet_conditions = dc->n_conditions();
             auto *h_dirichlet_conditions = (boundary_condition_t *)dc->impl_conditions();
 
@@ -115,8 +119,7 @@ namespace sfem {
         }
     };
 
-    std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc)
-    {
+    std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc) {
         return std::make_shared<GPUDirichletConditions>(dc);
     }
 
@@ -144,11 +147,11 @@ namespace sfem {
         int initialize() override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            cuda_incore_laplacian_init((enum ElemType)mesh->element_type,
-                                               &ctx,
-                                               mesh->nelements,
-                                               mesh->elements,
-                                               mesh->points);
+            cuda_incore_laplacian_init((enum ElemType)space->element_type(),
+                                       &ctx,
+                                       mesh->nelements,
+                                       mesh->elements,
+                                       mesh->points);
 
             return ISOLVER_FUNCTION_SUCCESS;
         }
@@ -209,7 +212,7 @@ namespace sfem {
             SFEM_READ_ENV(SFEM_SHEAR_MODULUS, atof);
             SFEM_READ_ENV(SFEM_FIRST_LAME_PARAMETER, atof);
 
-            cuda_incore_linear_elasticity_init((enum ElemType)mesh->element_type,
+            cuda_incore_linear_elasticity_init((enum ElemType)space->element_type(),
                                                &ctx,
                                                SFEM_SHEAR_MODULUS,
                                                SFEM_FIRST_LAME_PARAMETER,
@@ -231,10 +234,8 @@ namespace sfem {
             return ISOLVER_FUNCTION_FAILURE;
         }
 
-        int hessian_diag(
-            const isolver_scalar_t *const /*x*/, 
-            isolver_scalar_t *const values) override
-        {
+        int hessian_diag(const isolver_scalar_t *const /*x*/,
+                         isolver_scalar_t *const values) override {
             cuda_incore_linear_elasticity_diag(&ctx, values);
             return ISOLVER_FUNCTION_SUCCESS;
         }

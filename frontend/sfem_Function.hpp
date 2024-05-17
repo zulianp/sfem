@@ -73,7 +73,9 @@ namespace sfem {
 
     class FunctionSpace final {
     public:
-        FunctionSpace(const std::shared_ptr<Mesh> &mesh, const int block_size = 1);
+        FunctionSpace(const std::shared_ptr<Mesh> &mesh,
+                      const int block_size = 1,
+                      const enum ElemType element_type = INVALID);
         ~FunctionSpace();
 
         static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<Mesh> &mesh,
@@ -95,6 +97,10 @@ namespace sfem {
         Mesh &mesh();
         int block_size() const;
         ptrdiff_t n_dofs() const;
+
+        enum ElemType element_type() const;
+
+        std::shared_ptr<FunctionSpace> derefine() const;
 
         friend class Op;
 
@@ -137,8 +143,14 @@ namespace sfem {
         }
 
         /// Make low-order-refinement operator
-        virtual std::shared_ptr<Op> lor_op() { assert(false); return nullptr; }
-        virtual std::shared_ptr<Op> coarsen_op() { assert(false); return nullptr; }
+        virtual std::shared_ptr<Op> lor_op() {
+            assert(false);
+            return nullptr;
+        }
+        virtual std::shared_ptr<Op> derefine_op() {
+            assert(false);
+            return nullptr;
+        }
     };
 
     class NeumannConditions final : public Op {
@@ -200,6 +212,8 @@ namespace sfem {
                                 const isolver_idx_t *const rowptr,
                                 const isolver_idx_t *const colidx,
                                 isolver_scalar_t *const values) = 0;
+
+        virtual std::shared_ptr<Constraint> derefine() const = 0;
     };
 
     class DirichletConditions final : public Constraint {
@@ -238,6 +252,8 @@ namespace sfem {
         int n_conditions() const;
         void *impl_conditions();
 
+        std::shared_ptr<Constraint> derefine() const override;
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;
@@ -269,6 +285,8 @@ namespace sfem {
             const std::shared_ptr<FunctionSpace> &space) {
             return std::make_shared<Function>(space);
         }
+
+        std::shared_ptr<Function> lor();
 
         void add_operator(const std::shared_ptr<Op> &op);
         void add_constraint(const std::shared_ptr<Constraint> &c);
