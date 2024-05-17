@@ -290,6 +290,10 @@ SFEM_INLINE static enum ElemType macro_base_elem(const enum ElemType macro_type)
             return TET4;
         case MACRO_TRI3:
             return TRI3;
+        case TET10:
+            return TET4;
+        case TRI6:
+            return TRI3;
         default: {
             assert(0);
             return macro_type;

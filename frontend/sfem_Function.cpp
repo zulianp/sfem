@@ -17,6 +17,7 @@
 #include "neumann.h"
 
 #include <sys/stat.h>
+#include <cstddef>
 #include <fstream>
 #include <functional>
 #include <iostream>
@@ -29,6 +30,9 @@
 #include "laplacian.h"
 #include "linear_elasticity.h"
 #include "mass.h"
+
+// Multigrid
+#include "sfem_prolongation_restriction.h"
 
 namespace sfem {
 
@@ -876,6 +880,27 @@ namespace sfem {
     }
 
     std::shared_ptr<Output> Function::output() { return impl_->output; }
+
+    std::shared_ptr<Operator<isolver_scalar_t>> Function::hierarchical_restriction() {
+        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
+
+        auto et = (enum ElemType)mesh->element_type;
+        auto coarse_et =  macro_base_elem(et);
+
+        const ptrdiff_t rows = max_node_id(coarse_et, mesh->nelements, mesh->elements) + 1;
+        const ptrdiff_t cols = impl_->space->n_dofs();
+
+        return std::make_shared<LambdaOperator<isolver_scalar_t>>(
+            rows, cols, [=](const isolver_scalar_t *const from, isolver_scalar_t *const to) {
+                
+                ::hierarchical_restriction(
+                    et, coarse_et, mesh->nelements, mesh->elements, from, to);
+            });
+    }
+
+    std::shared_ptr<Operator<isolver_scalar_t>> Function::hierarchical_prolongation() {
+        return nullptr;
+    }
 
     class LinearElasticity final : public Op {
     public:

@@ -52,6 +52,7 @@ set(SFEM_MODULES
     operators/cvfem_quad4
     operators/macro_tri3
     operators/macro_tet4
+    operators/hierarchical
     )
 
 list(APPEND SFEM_MODULES frontend)
