@@ -60,7 +60,7 @@ export SFEM_USE_GPU=1
 export SFEM_USE_PRECONDITIONER=1
 export CUDA_LAUNCH_BLOCKING=0
 
-$LAUNCH steady_state_sim_cuda mesh output
+$LAUNCH steady_state_sim mesh output
 
 if [[ $SFEM_BLOCK_SIZE != 1 ]]
 then

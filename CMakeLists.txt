@@ -154,7 +154,7 @@ if(SFEM_ENABLE_CUDA)
     list(APPEND DRIVERS "${CUDA_C_EXAMPLES}")
     list(APPEND DRIVERS "${CUDA_CXX_EXAMPLES}")
 else()
-    list(APPEND SFEM_EXCLUDED_EXEC "run_poisson_cuda;steady_state_sim_cuda;cuda_do_spmv;lapl_matrix_free;linear_elasticity_matrix_free")
+    list(APPEND SFEM_EXCLUDED_EXEC "run_poisson_cuda;cuda_do_spmv;lapl_matrix_free;linear_elasticity_matrix_free")
 endif()
 
 foreach(DRIVER ${DRIVERS})
