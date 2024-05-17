@@ -3,12 +3,15 @@
 import pysfem as sfem
 import numpy as np
 from numpy import linalg
+from time import perf_counter
 
 import sys, getopt
 
 idx_t = np.int32
 
 def solve_linear_elasticity(options):
+	tick = perf_counter()
+
 	sfem.init()
 	m = sfem.Mesh()
 
@@ -45,16 +48,23 @@ def solve_linear_elasticity(options):
 	x = np.zeros(fs.n_dofs())
 	cg = sfem.ConjugateGradient()
 	cg.default_init()
-	cg.set_max_it(3000)
+	cg.set_max_it(1000)
 
 	lop = sfem.make_op(fun, x)
 	cg.set_op(lop)
 
-	d = np.zeros(fs.n_dofs())
-	sfem.hessian_diag(fun, x, d)
-
-	prec = sfem.diag(1./d)
-	cg.set_preconditioner_op(prec)
+	use_prec = True
+	# use_prec = False
+	if use_prec:
+		d = np.zeros(fs.n_dofs())
+		sfem.hessian_diag(fun, x, d)
+		prec = sfem.diag(1./d)
+		cg.set_preconditioner_op(prec)
+	
+		print(np.max(d))
+		print(np.min(d))
+		print(np.max(np.abs(d)))
+		print(np.min(np.abs(d)))
 	
 	g = np.zeros(fs.n_dofs())
 	sfem.apply_constraints(fun, x)
@@ -65,6 +75,10 @@ def solve_linear_elasticity(options):
 
 	# Write result to disk
 	sfem.report_solution(fun, x)
+
+	tock = perf_counter()
+
+	print(f'Summary: {fs.n_dofs()} dofs, {round(tock - tick, 4)} seconds')
 
 class Opts:
 	def __init__(self):

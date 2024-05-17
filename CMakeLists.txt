@@ -39,9 +39,9 @@ set(SFEM_MODULES
     operators 
     operators/beam2 
     operators/cvfem 
-    operators/kernels 
+    # operators/kernels 
     operators/navier_stokes
-    operators/phase_field_for_fracture
+    # operators/phase_field_for_fracture
     operators/tet10
     operators/tet4
     operators/tri3
@@ -52,6 +52,7 @@ set(SFEM_MODULES
     operators/cvfem_quad4
     operators/macro_tri3
     operators/macro_tet4
+    operators/hierarchical
     )
 
 list(APPEND SFEM_MODULES frontend)
@@ -74,6 +75,7 @@ foreach(MODULE ${SFEM_MODULES})
 
     if(SFEM_ENABLE_CUDA)
         file(GLOB SFEM_MODULE_KERNEL_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/${MODULE}/*.cu")
+        # message(STATUS "${MODULE} : ${SFEM_MODULE_KERNEL_SOURCES}")
     endif()
 
     if(SFEM_MODULE_KERNEL_SOURCES)
@@ -81,18 +83,16 @@ foreach(MODULE ${SFEM_MODULES})
     endif()
 endforeach(MODULE)
 
+if(SFEM_ENABLE_CUDA)
+    list(APPEND SFEM_SOURCES "${SFEM_KERNEL_SOURCES}")
+endif()
+
 # message(STATUS "SFEM_BUILD_INCLUDES: ${SFEM_BUILD_INCLUDES}")
 # message(STATUS "SFEM_HEADERS: ${SFEM_HEADERS}") 
 # message(STATUS "SFEM_SOURCES: ${SFEM_SOURCES}")
 # message(STATUS "SFEM_KERNEL_SOURCES: ${SFEM_KERNEL_SOURCES}")
 
-
-if(SFEM_ENABLE_CUDA)
-    list(APPEND SFEM_SOURCES, "${SFEM_KERNEL_SOURCES}")
-endif()
-
 add_library(sfem ${SFEM_SOURCES} ${SFEM_HEADERS})
-
 
 ######################################################
 # include
@@ -107,6 +107,7 @@ target_include_directories(
     PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:include> $<INSTALL_INTERFACE:include/kernels>)
+
 
 target_include_directories(sfem PUBLIC ${SFEM_DEP_INCLUDES})
 
@@ -143,23 +144,28 @@ file(GLOB C_EXAMPLES CONFIGURE_DEPENDS "examples/*.c")
 
 set(DRIVERS "${C_DRIVERS};${CPP_DRIVERS};${C_EXAMPLES}")
 
-list(APPEND SFEM_EXCLUDED_EXEC "grad_and_project;heat_equation;integrate_divergence;partition_mesh_based_on_operator;taylor_hood_navier_stokes;ssolve")
+# list(APPEND SFEM_EXCLUDED_EXEC "grad_and_project;heat_equation;integrate_divergence;partition_mesh_based_on_operator;taylor_hood_navier_stokes;ssolve")
+
+list(APPEND SFEM_EXCLUDED_EXEC "ssolve")
 
 if(SFEM_ENABLE_CUDA)
-    list(APPEND SFEM_EXCLUDED_EXEC "run_poisson_cuda;steady_state_sim_cuda;cuda_do_spmv;lapl_matrix_free;linear_elasticity_matrix_free")
-    
     file(GLOB CUDA_C_EXAMPLES CONFIGURE_DEPENDS "drivers/cuda/*.c")
     file(GLOB CUDA_CXX_EXAMPLES CONFIGURE_DEPENDS "drivers/cuda/*.cpp")
 
     list(APPEND DRIVERS "${CUDA_C_EXAMPLES}")
     list(APPEND DRIVERS "${CUDA_CXX_EXAMPLES}")
+else()
+    list(APPEND SFEM_EXCLUDED_EXEC "run_poisson_cuda;cuda_do_spmv;lapl_matrix_free;linear_elasticity_matrix_free")
 endif()
 
 foreach(DRIVER ${DRIVERS})
     get_filename_component(DRIVER_NAME ${DRIVER} NAME_WE)
     list(FIND SFEM_EXCLUDED_EXEC "${DRIVER_NAME}" LIST_INDEX)
+
+    
     
     if (${LIST_INDEX} GREATER -1)
+        message(STATUS "Skipped DRIVER_NAME: ${DRIVER_NAME}")
     else()
         add_executable(${DRIVER_NAME} ${DRIVER})
         target_link_libraries(${DRIVER_NAME} PRIVATE sfem)
@@ -180,7 +186,7 @@ if(SFEM_ENABLE_PYTHON)
     set(SFEM_TARGETS ${SFEM_TARGETS} pysfem)
 endif()
 
-message(STATUS "SFEM_TARGETS: ${SFEM_TARGETS}")
+# message(STATUS "SFEM_TARGETS: ${SFEM_TARGETS}")
 
 ######################################################
 ######################################################

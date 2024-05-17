@@ -41,7 +41,7 @@ namespace sfem {
 
         T *buff = static_cast<T*>(malloc(in->size() * sizeof(T)));
         // cudaMemcpy(buff, in->data(), in->size() * sizeof(T), cudaMemcpyDeviceToHost);
-        buffer_device_to_host(in->size(), in->data() * sizeof(T), buff);
+        buffer_device_to_host(in->size() * sizeof(T), in->data(), buff);
         return
             std::make_shared<Buffer<T>>(in->size(), buff, &free, MEMORY_SPACE_HOST);
     }

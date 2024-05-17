@@ -156,21 +156,48 @@ int main(int argc, char *argv[]) {
         cuda_incore_laplacian_t ctx;
         cuda_incore_laplacian_init(elem_type, &ctx, mesh.nelements, mesh.elements, mesh.points);
 
+        cudaEvent_t start, stop;
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+
         cudaDeviceSynchronize();
         double mf_tick = MPI_Wtime();
+
+        // With CUDA
+        cudaEventRecord(start, 0);
+
+        // ---------------------------------------------------
 
         for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
             cuda_incore_laplacian_apply(&ctx, d_x, d_y);
         }
 
+        // ---------------------------------------------------
+
+        // With CUDA
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+
+        // With MPI Wtime
         cudaDeviceSynchronize();
         double mf_tock = MPI_Wtime();
-        
-        double avg_time = (mf_tock - mf_tick) / SFEM_REPEAT;
-        double avg_throughput = (nnodes / avg_time) * (sizeof(real_t) * 1e-9);
 
-        printf("mf: %g %g %ld %ld %ld\n", 
-            avg_time, avg_throughput, mesh.nelements, nnodes, 0l);
+        float cuda_elapsed;
+        cudaEventElapsedTime(&cuda_elapsed, start, stop);
+        cudaEventDestroy(start);
+        cudaEventDestroy(stop);
+
+        {  // Using MPI Wtime
+            double avg_time = (mf_tock - mf_tick) / SFEM_REPEAT;
+            double avg_throughput = (nnodes / avg_time) * (sizeof(real_t) * 1e-9);
+            printf("mf: %g %g %ld %ld %ld\n", avg_time, avg_throughput, mesh.nelements, nnodes, 0l);
+        }
+
+        {  // Using CUDA perf-counter (from ms to s)
+            double avg_time = (cuda_elapsed / 1000) / SFEM_REPEAT;
+            double avg_throughput = (nnodes / avg_time) * (sizeof(real_t) * 1e-9);
+            printf("cf: %g %g %ld %ld %ld\n", avg_time, avg_throughput, mesh.nelements, nnodes, 0l);
+        }
 
         CHECK_CUDA(cudaPeekAtLastError());
         CHECK_CUDA(cudaMemcpy(y, d_y, nnodes * sizeof(real_t), cudaMemcpyDeviceToHost));
