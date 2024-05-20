@@ -21,9 +21,29 @@ namespace sfem {
     class Mesh;
     class FunctionSpace;
     class Op;
+    class CRSGraph;
 
     class DirichletConditions;
     class NeumannConditions;
+
+    class CRSGraph final {
+    public:
+        CRSGraph();
+        ~CRSGraph();
+
+        friend class Mesh;
+
+        ptrdiff_t n_nodes() const;
+        ptrdiff_t nnz() const;
+        isolver_idx_t *rowptr();
+        isolver_idx_t *colidx();
+
+        std::shared_ptr<CRSGraph> block_to_scalar(const int block_size);
+
+    private:
+        class Impl;
+        std::unique_ptr<Impl> impl_;
+    };
 
     class Mesh final {
     public:
@@ -52,8 +72,11 @@ namespace sfem {
         ptrdiff_t n_nodes() const;
         ptrdiff_t n_elements() const;
 
-        const isolver_idx_t *node_to_node_rowptr() const;
-        const isolver_idx_t *node_to_node_colidx() const;
+        std::shared_ptr<CRSGraph> node_to_node_graph();
+        std::shared_ptr<CRSGraph> create_node_to_node_graph(const enum ElemType element_type);
+
+        isolver_idx_t *node_to_node_rowptr();
+        isolver_idx_t *node_to_node_colidx();
 
         const geom_t *const points(const int coord) const;
         const idx_t *const idx(const int node_num) const;
@@ -101,6 +124,7 @@ namespace sfem {
         enum ElemType element_type() const;
 
         std::shared_ptr<FunctionSpace> derefine() const;
+        std::shared_ptr<FunctionSpace> lor() const;
 
         friend class Op;
 
@@ -143,11 +167,11 @@ namespace sfem {
         }
 
         /// Make low-order-refinement operator
-        virtual std::shared_ptr<Op> lor_op() {
+        virtual std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &) {
             assert(false);
             return nullptr;
         }
-        virtual std::shared_ptr<Op> derefine_op() {
+        virtual std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &) {
             assert(false);
             return nullptr;
         }
@@ -281,12 +305,16 @@ namespace sfem {
         Function(const std::shared_ptr<FunctionSpace> &space);
         ~Function();
 
+        std::shared_ptr<Function> derefine();
+        std::shared_ptr<Function> derefine(const std::shared_ptr<FunctionSpace> &space);
+
         inline static std::shared_ptr<Function> create(
             const std::shared_ptr<FunctionSpace> &space) {
             return std::make_shared<Function>(space);
         }
 
         std::shared_ptr<Function> lor();
+        std::shared_ptr<Function> lor(const std::shared_ptr<FunctionSpace> &space);
 
         void add_operator(const std::shared_ptr<Op> &op);
         void add_constraint(const std::shared_ptr<Constraint> &c);

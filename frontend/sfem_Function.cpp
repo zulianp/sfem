@@ -39,19 +39,56 @@
 
 namespace sfem {
 
+    class CRSGraph::Impl {
+    public:
+        std::ptrdiff_t n_nodes{0};
+        isolver_idx_t *rowptr{nullptr};
+        isolver_idx_t *colidx{nullptr};
+
+        ~Impl() {
+            free(rowptr);
+            free(colidx);
+        }
+    };
+
+    CRSGraph::CRSGraph() : impl_(std::make_unique<Impl>()) {}
+    CRSGraph::~CRSGraph() = default;
+
+    ptrdiff_t CRSGraph::n_nodes() const { return impl_->n_nodes; }
+
+    ptrdiff_t CRSGraph::nnz() const { return impl_->rowptr[impl_->n_nodes]; }
+
+    isolver_idx_t *CRSGraph::rowptr() { return impl_->rowptr; }
+
+    isolver_idx_t *CRSGraph::colidx() { return impl_->colidx; }
+
+    std::shared_ptr<CRSGraph> CRSGraph::block_to_scalar(const int block_size) {
+        auto ret = std::make_shared<CRSGraph>();
+
+        ret->impl_->rowptr =
+            (count_t *)malloc((this->n_nodes() + 1) * block_size * sizeof(count_t));
+        ret->impl_->colidx = (idx_t *)malloc(this->rowptr()[this->n_nodes()] * block_size *
+                                             block_size * sizeof(idx_t));
+
+        crs_graph_block_to_scalar(this->n_nodes(),
+                                  block_size,
+                                  this->rowptr(),
+                                  this->colidx(),
+                                  ret->impl_->rowptr,
+                                  ret->impl_->colidx);
+
+        ret->impl_->n_nodes = this->n_nodes() * block_size;
+        return ret;
+    }
+
     class Mesh::Impl {
     public:
         MPI_Comm comm;
         mesh_t mesh;
 
-        isolver_idx_t *node_to_node_rowptr{nullptr};
-        isolver_idx_t *node_to_node_colidx{nullptr};
+        std::shared_ptr<CRSGraph> crs_graph;
 
-        ~Impl() {
-            mesh_destroy(&mesh);
-            free(node_to_node_rowptr);
-            free(node_to_node_colidx);
-        }
+        ~Impl() { mesh_destroy(&mesh); }
     };
 
     Mesh::Mesh(int spatial_dim,
@@ -69,6 +106,7 @@ namespace sfem {
     int Mesh::n_nodes_per_elem() const {
         return elem_num_nodes((enum ElemType)impl_->mesh.element_type);
     }
+
     ptrdiff_t Mesh::n_nodes() const { return impl_->mesh.nnodes; }
     ptrdiff_t Mesh::n_elements() const { return impl_->mesh.nelements; }
 
@@ -112,17 +150,48 @@ namespace sfem {
         return impl_->mesh.elements[node_num];
     }
 
+    std::shared_ptr<CRSGraph> Mesh::node_to_node_graph() {
+        initialize_node_to_node_graph();
+        return impl_->crs_graph;
+    }
+
+    std::shared_ptr<CRSGraph> Mesh::create_node_to_node_graph(const enum ElemType element_type) {
+        auto mesh = &impl_->mesh;
+        if (mesh->element_type == element_type) {
+            return node_to_node_graph();
+        }
+
+        auto crs_graph = std::make_shared<CRSGraph>();
+        const ptrdiff_t n_nodes = max_node_id(element_type, mesh->nelements, mesh->elements) + 1;
+
+        build_crs_graph_for_elem_type(element_type,
+                                      mesh->nelements,
+                                      n_nodes,
+                                      mesh->elements,
+                                      &crs_graph->impl_->rowptr,
+                                      &crs_graph->impl_->colidx);
+
+        crs_graph->impl_->n_nodes = n_nodes;
+        return crs_graph;
+    }
+
     int Mesh::initialize_node_to_node_graph() {
+        if (impl_->crs_graph) {
+            return ISOLVER_FUNCTION_SUCCESS;
+        }
+
+        impl_->crs_graph = std::make_shared<CRSGraph>();
+
         auto mesh = &impl_->mesh;
 
-        if (!impl_->node_to_node_rowptr) {
-            build_crs_graph_for_elem_type(mesh->element_type,
-                                          mesh->nelements,
-                                          mesh->nnodes,
-                                          mesh->elements,
-                                          &impl_->node_to_node_rowptr,
-                                          &impl_->node_to_node_colidx);
-        }
+        build_crs_graph_for_elem_type(mesh->element_type,
+                                      mesh->nelements,
+                                      mesh->nnodes,
+                                      mesh->elements,
+                                      &impl_->crs_graph->impl_->rowptr,
+                                      &impl_->crs_graph->impl_->colidx);
+
+        impl_->crs_graph->impl_->n_nodes = mesh->nnodes;
 
         return ISOLVER_FUNCTION_SUCCESS;
     }
@@ -134,8 +203,8 @@ namespace sfem {
 
     void *Mesh::impl_mesh() { return (void *)&impl_->mesh; }
 
-    const isolver_idx_t *Mesh::node_to_node_rowptr() const { return impl_->node_to_node_rowptr; }
-    const isolver_idx_t *Mesh::node_to_node_colidx() const { return impl_->node_to_node_colidx; }
+    isolver_idx_t *Mesh::node_to_node_rowptr() { return impl_->crs_graph->rowptr(); }
+    isolver_idx_t *Mesh::node_to_node_colidx() { return impl_->crs_graph->colidx(); }
 
     class FunctionSpace::Impl {
     public:
@@ -148,14 +217,10 @@ namespace sfem {
         ptrdiff_t nglobal{0};
 
         // CRS graph
-        ptrdiff_t nnz{0};
-        isolver_idx_t *rowptr{nullptr};
-        isolver_idx_t *colidx{nullptr};
+        std::shared_ptr<CRSGraph> node_to_node_graph;
+        std::shared_ptr<CRSGraph> dof_to_dof_graph;
 
-        ~Impl() {
-            free(rowptr);
-            free(colidx);
-        }
+        ~Impl() {}
     };
 
     enum ElemType FunctionSpace::element_type() const {
@@ -181,6 +246,22 @@ namespace sfem {
         } else {
             impl_->element_type = element_type;
         }
+
+        auto c_mesh = &mesh->impl_->mesh;
+        if (impl_->element_type == c_mesh->element_type) {
+            impl_->nlocal = c_mesh->n_owned_nodes * block_size;
+            impl_->nglobal = c_mesh->nnodes * block_size;
+        } else {
+            // FIXME in parallel it will not work
+            impl_->nlocal =
+                (max_node_id(impl_->element_type, c_mesh->nelements, c_mesh->elements) + 1) *
+                block_size;
+            impl_->nglobal = impl_->nlocal;
+
+            // CATCH_MPI_ERROR(
+            //     MPI_Allreduce(MPI_IN_PLACE, &impl_->nglobal, 1, MPI_LONG, MPI_SUM,
+            //     c_mesh->comm));
+        }
     }
 
     FunctionSpace::~FunctionSpace() = default;
@@ -189,11 +270,7 @@ namespace sfem {
 
     int FunctionSpace::block_size() const { return impl_->block_size; }
 
-    ptrdiff_t FunctionSpace::n_dofs() const {
-        auto &mesh = *impl_->mesh;
-        auto c_mesh = &mesh.impl_->mesh;
-        return c_mesh->nnodes * block_size();
-    }
+    ptrdiff_t FunctionSpace::n_dofs() const { return impl_->nlocal; }
 
     int FunctionSpace::create_crs_graph(ptrdiff_t *nlocal,
                                         ptrdiff_t *nglobal,
@@ -204,59 +281,51 @@ namespace sfem {
         auto c_mesh = &mesh.impl_->mesh;
 
         // This is for nodal discretizations (CG)
-        mesh.initialize_node_to_node_graph();
+        auto node_to_node = impl_->node_to_node_graph;
+        if (!node_to_node) {
+            node_to_node = mesh.create_node_to_node_graph(impl_->element_type);
+            impl_->node_to_node_graph = node_to_node;
+        }
+
         if (impl_->block_size == 1) {
-            *rowptr = mesh.impl_->node_to_node_rowptr;
-            *colidx = mesh.impl_->node_to_node_colidx;
+            *rowptr = node_to_node->rowptr();
+            *colidx = node_to_node->colidx();
 
             *nlocal = c_mesh->nnodes;
             *nglobal = c_mesh->nnodes;
             *nnz = (*rowptr)[c_mesh->nnodes];
+
+            impl_->dof_to_dof_graph = node_to_node;
         } else {
-            if (!impl_->rowptr) {
-                impl_->rowptr =
-                    (count_t *)malloc((c_mesh->nnodes + 1) * impl_->block_size * sizeof(count_t));
-                impl_->colidx =
-                    (idx_t *)malloc(mesh.impl_->node_to_node_rowptr[c_mesh->nnodes] *
-                                    impl_->block_size * impl_->block_size * sizeof(idx_t));
-
-                crs_graph_block_to_scalar(c_mesh->nnodes,
-                                          impl_->block_size,
-                                          mesh.impl_->node_to_node_rowptr,
-                                          mesh.impl_->node_to_node_colidx,
-                                          impl_->rowptr,
-                                          impl_->colidx);
-
-                impl_->nlocal = c_mesh->nnodes * impl_->block_size;
-                impl_->nglobal = c_mesh->nnodes * impl_->block_size;
-                impl_->nnz = mesh.impl_->node_to_node_rowptr[c_mesh->nnodes] *
-                             (impl_->block_size * impl_->block_size);
+            if (!impl_->dof_to_dof_graph) {
+                impl_->dof_to_dof_graph = node_to_node->block_to_scalar(impl_->element_type);
             }
 
-            *rowptr = impl_->rowptr;
-            *colidx = impl_->colidx;
+            *rowptr = impl_->dof_to_dof_graph->rowptr();
+            *colidx = impl_->dof_to_dof_graph->colidx();
 
             *nlocal = impl_->nlocal;
             *nglobal = impl_->nglobal;
-            *nnz = impl_->nnz;
+            *nnz = impl_->dof_to_dof_graph->nnz();
         }
 
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
     int FunctionSpace::destroy_crs_graph(isolver_idx_t *rowptr, isolver_idx_t *colidx) {
-        if (rowptr == impl_->rowptr) {
-            impl_->rowptr = nullptr;
+        if (rowptr == impl_->dof_to_dof_graph->rowptr()) {
+            impl_->dof_to_dof_graph = nullptr;
+        } else {
+            free(rowptr);
+            free(colidx);
         }
-
-        free(rowptr);
-
-        if (colidx == impl_->colidx) {
-            impl_->colidx = nullptr;
-        }
-        free(colidx);
 
         return ISOLVER_FUNCTION_SUCCESS;
+    }
+
+    std::shared_ptr<FunctionSpace> FunctionSpace::lor() const {
+        return std::make_shared<FunctionSpace>(
+            impl_->mesh, impl_->block_size, macro_base_elem(impl_->element_type));
     }
 
     class NeumannConditions::Impl {
@@ -984,10 +1053,15 @@ namespace sfem {
             });
     }
 
-    std::shared_ptr<Function> Function::lor() {
-        // auto ret = std::make_shared<Function>(space);
-        // return ret;
+    std::shared_ptr<Function> Function::derefine() { return derefine(impl_->space->derefine()); }
 
+    std::shared_ptr<Function> Function::derefine(const std::shared_ptr<FunctionSpace> &space) {
+        assert(false);
+        return nullptr;
+    }
+
+    std::shared_ptr<Function> Function::lor() { return lor(impl_->space->lor()); }
+    std::shared_ptr<Function> Function::lor(const std::shared_ptr<FunctionSpace> &space) {
         assert(false);
         return nullptr;
     }
@@ -1018,7 +1092,7 @@ namespace sfem {
             return ret;
         }
 
-        std::shared_ptr<Op> lor_op() override {
+        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
             auto ret = std::make_shared<LinearElasticity>(space);
             ret->element_type = macro_type_variant(element_type);
             ret->mu = mu;
@@ -1026,7 +1100,7 @@ namespace sfem {
             return ret;
         }
 
-        std::shared_ptr<Op> derefine_op() override {
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
             auto ret = std::make_shared<LinearElasticity>(space);
             ret->element_type = macro_base_elem(element_type);
             ret->mu = mu;
@@ -1146,13 +1220,13 @@ namespace sfem {
             return ret;
         }
 
-        std::shared_ptr<Op> lor_op() override {
+        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
             auto ret = std::make_shared<Laplacian>(space);
             ret->element_type = macro_type_variant(element_type);
             return ret;
         }
 
-        std::shared_ptr<Op> derefine_op() override {
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
             auto ret = std::make_shared<Laplacian>(space);
             ret->element_type = macro_base_elem(element_type);
             return ret;
