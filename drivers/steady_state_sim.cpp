@@ -114,41 +114,63 @@ int main(int argc, char *argv[]) {
         b_b = sfem::h_buffer<real_t>(fs->n_dofs());
 
         if (SFEM_USE_PRECONDITIONER) {
-            auto mg = std::make_shared<sfem::Multigrid<real_t>>();
+            // if (true) {
+                if (false) {
+                auto mg = std::make_shared<sfem::Multigrid<real_t>>();
 
-            // Level 0
-            {
-                //auto f_lor = f->lor();
-                std::shared_ptr<sfem::Operator<real_t>> mg_op;  // = f->lor();
-                std::shared_ptr<sfem::Operator<real_t>> smoother;
+                auto lor_fs = fs->lor();
+                auto lor_f = f->lor(lor_fs);
 
-                // auto prolongation = sfem::make_op<real_t>(
-                //     fs->n_dofs(), fs->n_dofs(), [=](const real_t *const x, real_t *const y) {
-                //         // TODO
-                //     });
+                auto coarse_fs = lor_fs->derefine();
+                auto coarse_f = lor_f->derefine(coarse_fs);
 
-                auto restriction = sfem::make_op<real_t>(
-                    fs->n_dofs(), fs->n_dofs(), [=](const real_t *const x, real_t *const y) {
-                        // TODO
-                    });
+                auto restriction = lor_f->hierarchical_restriction();
+                auto prolongation = lor_f->hierarchical_prolongation();
 
-                mg->add_level(mg_op, smoother, nullptr, restriction);
-            }
+                // Fine level
+                {
+                    std::shared_ptr<sfem::Operator<real_t>> fine_op =
+                        sfem::make_op<real_t>(lor_fs->n_dofs(),
+                                              lor_fs->n_dofs(),
+                                              [=](const real_t *const x, real_t *const y) {
+                                                  lor_f->apply(nullptr, x, y);
+                                              });
 
-            auto b_d = sfem::h_buffer<real_t>(fs->n_dofs());
+                    std::shared_ptr<sfem::Operator<real_t>> fine_smoother = sfem::h_cg<real_t>();
+                    mg->add_level(fine_op, fine_smoother, nullptr, restriction);
+                }
 
-            if (f->hessian_diag(b_x->data(), b_d->data()) == 0) {
-                solver->set_preconditioner_op(sfem::make_op<real_t>(
-                    b_x->size(), b_x->size(), [=](const real_t *const x, real_t *const y) {
-                        auto d = b_d->data();
+                // Coarse level
+                {
+                    std::shared_ptr<sfem::Operator<real_t>> coarse_op =
+                        sfem::make_op<real_t>(lor_fs->n_dofs(),
+                                              lor_fs->n_dofs(),
+                                              [=](const real_t *const x, real_t *const y) {
+                                                  coarse_f->apply(nullptr, x, y);
+                                              });
+
+                    std::shared_ptr<sfem::Operator<real_t>> coarse_smoother = sfem::h_cg<real_t>();
+                    mg->add_level(coarse_op, coarse_smoother, prolongation, nullptr);
+                }
+
+                solver->set_preconditioner_op(mg);
+
+            } else {
+                auto b_d = sfem::h_buffer<real_t>(fs->n_dofs());
+
+                if (f->hessian_diag(b_x->data(), b_d->data()) == 0) {
+                    solver->set_preconditioner_op(sfem::make_op<real_t>(
+                        b_x->size(), b_x->size(), [=](const real_t *const x, real_t *const y) {
+                            auto d = b_d->data();
 
 #pragma omp parallel for
-                        for (ptrdiff_t i = 0; i < b_d->size(); ++i) {
-                            y[i] = x[i] / d[i];
-                        }
-                    }));
-            } else {
-                fprintf(stderr, "[Warning] Preconditioner unavailable for mesh %s\n", folder);
+                            for (ptrdiff_t i = 0; i < b_d->size(); ++i) {
+                                y[i] = x[i] / d[i];
+                            }
+                        }));
+                } else {
+                    fprintf(stderr, "[Warning] Preconditioner unavailable for mesh %s\n", folder);
+                }
             }
         }
     }
@@ -192,7 +214,10 @@ int main(int argc, char *argv[]) {
     double tock = MPI_Wtime();
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld #dofs %ld\n", (long)m->n_elements(), (long)m->n_nodes(), (long)fs->n_dofs());
+        printf("#elements %ld #nodes %ld #dofs %ld\n",
+               (long)m->n_elements(),
+               (long)m->n_nodes(),
+               (long)fs->n_dofs());
         printf("TTS:\t\t\t%g seconds (solve: %g)\n", tock - tick, solve_tock - solve_tick);
     }
 
