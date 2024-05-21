@@ -1063,8 +1063,19 @@ namespace sfem {
     std::shared_ptr<Function> Function::derefine() { return derefine(impl_->space->derefine()); }
 
     std::shared_ptr<Function> Function::derefine(const std::shared_ptr<FunctionSpace> &space) {
-        assert(false);
-        return nullptr;
+        auto ret = std::make_shared<Function>(space);
+
+        for(auto &o : impl_->ops) {
+            ret->impl_->ops.push_back(o->derefine_op(space));
+        }
+
+        for(auto &c : impl_->constraints) {
+            ret->impl_->constraints.push_back(c->derefine());
+        }
+
+        ret->impl_->handle_constraints = impl_->handle_constraints;
+
+        return ret;
     }
 
     std::shared_ptr<Function> Function::lor() { return lor(impl_->space->lor()); }
@@ -1078,6 +1089,8 @@ namespace sfem {
         for(auto &c : impl_->constraints) {
             ret->impl_->constraints.push_back(c->lor());
         }
+
+        ret->impl_->handle_constraints = impl_->handle_constraints;
 
         return ret;
     }
