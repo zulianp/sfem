@@ -1,3 +1,4 @@
+#include <cooperative_groups.h>
 #include <cuda_profiler_api.h>
 #include <stdio.h>
 #include <vector>
@@ -680,6 +681,92 @@ __global__ void axpy(double* x, double* y, double a, size_t n) {
     if (i < n) y[i] = a * x[i] + y[i];
 }
 
+__device__ int thread_sum(int* input, int n) {
+    int sum = 0;
+
+    for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < n / 4; i += blockDim.x * gridDim.x) {
+        int4 in = ((int4*)input)[i];
+        sum += in.x + in.y + in.z + in.w;
+    }
+    return sum;
+}
+
+/**
+ * @brief Kernel function to perform the quadrature in the global domain.
+ *
+ * @param Qs
+ * @param gg
+ * @param qr
+ * @param qr_nodes_nr_
+ * @param ds_vector
+ * @param nr_of_domains_stripes
+ * @return __global__
+ */
+__global__                                                                             //
+        void                                                                           //
+        perform_quadrature_global_reduce_kernel(double* Qs,                            //
+                                                const global_grid_cuda_type gg,        //
+                                                const quadrature_rule_cuda qr,         //
+                                                const size_t qr_nodes_nr_,             //
+                                                const domains_stripe* ds_vector,       //
+                                                const size_t nr_of_domains_stripes) {  //
+
+    namespace cg = cooperative_groups;
+
+    cg::thread_block g = cg::this_thread_block();
+
+    // unsigned tile_size = 32;
+
+    // cg::thread_group tile = cg::tiled_partition(g, tile_size);
+    auto tile2 = cg::tiled_partition<32>(g);
+
+    const size_t id = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // get warp absolute index
+    const int warp_abs_index = id / 32;
+
+    const int gd = gridDim.x;
+    const int gd_bd = blockDim.x * gd;
+
+    // __syncthreads();
+
+    printf("gd: %d, gd_bd: %d, blockDim: %d\n", gd, gd_bd, blockDim.x);
+
+    const size_t node_nr = threadIdx.x;
+    const size_t domain_nr = blockIdx.x;
+
+    double reduce_result = domain_nr;
+
+    unsigned sz = g.size();
+    unsigned lane = g.thread_rank();
+
+    // get the tile rank
+    unsigned tile_rank = 1111;
+    tile_rank = tile2.thread_rank();
+
+    printf("sz: %d, lane %d\n", sz, lane);
+
+    // if (tile_rank == 0)
+    printf("Tile4 size: %d, tile.thread_rank %d, thread rank %d \n", tile2.size(), tile_rank, lane);
+
+    // if (tile.thread_rank() == 0)
+    //     printf("Hello from tile4 rank 0: %d\n", cg::this_thread_block().thread_rank());
+
+    reduce_result = double(lane);
+
+    for (int i = tile2.size() / 2; i > 0; i /= 2) {
+        reduce_result += tile2.shfl_down(reduce_result, i);
+    }
+
+    if (tile_rank == 0) {
+        printf("Warp abs index: %d,  Block: %d, theread id: %d, reduce_result: %f\n",
+               warp_abs_index,
+               blockIdx.x,
+               threadIdx.x,
+               reduce_result);
+    }
+}
+
 /**
  * @brief Frees the global grid on the device.
  *
@@ -1029,13 +1116,21 @@ int test_local(double& Q_local,                           //
     cudaEventRecord(start);
 
     /* start kernel  */
-    perform_quadrature_local_stripe_kernel<<<nr_stripes, nr_domains_per_stripe>>>(  //
-            Qs_cu,                                                                  //
-            gg_dev,                                                                 //
-            qr_dev,                                                                 //
-            qr.weights.size(),                                                      //
-            ds_vector_cu,                                                           //
-            ds_vector.size());                                                      //
+    // perform_quadrature_local_stripe_kernel<<<nr_stripes, nr_domains_per_stripe>>>(  //
+    //         Qs_cu,                                                                  //
+    //         gg_dev,                                                                 //
+    //         qr_dev,                                                                 //
+    //         qr.weights.size(),                                                      //
+    //         ds_vector_cu,                                                           //
+    //         ds_vector.size());                                                      //
+
+    perform_quadrature_global_reduce_kernel<<<1, 64>>>(  //
+            Qs_cu,                                       //
+            gg_dev,                                      //
+            qr_dev,                                      //
+            qr.weights.size(),                           //
+            ds_vector_cu,                                //
+            ds_vector.size());                           //
 
     // axpy<<<nr_domains_tot, 1024>>>(Qs_cu, Qs_cu, 1.0, nr_domains_tot);
 
