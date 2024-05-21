@@ -1184,7 +1184,7 @@ int test_stripes(int argc,
 
         const double seconds = double(duration.count()) / 1000000.0;
 
-        std::cout << "Execution time: " << seconds << " seconds" << std::endl;
+        std::cout << "Execution time: " << seconds * 1000.0 << " ms" << std::endl;
 
         const double nr_stripes = stripes.size();
         const double nr_domains_per_stripe = stripes[0].nr_domains;
@@ -1233,7 +1233,7 @@ int test_stripes(int argc,
 
         const double seconds = double(duration.count()) / 1000000.0;
 
-        std::cout << "Execution time: " << seconds << " seconds" << std::endl;
+        std::cout << "Execution time: " << seconds * 1000.0 << " ms" << std::endl;
 
         const double nr_stripes = stripes.size();
         const double nr_domains_per_stripe = stripes[0].nr_domains;
@@ -1360,7 +1360,7 @@ bool test_stripes_mt(int argc,
 
         const double seconds = double(duration.count()) / 1000000.0;
 
-        std::cout << "Execution time: " << seconds << " seconds" << std::endl;
+        std::cout << "Execution time: " << seconds * 1000.0 << " ms" << std::endl;
 
         // const double tot_flop = nr_stripes * (7.0 * nr_domains_per_stripe +
         //                                       51.0 * nr_domains_per_stripe * quad_nodes_nr);
@@ -1449,7 +1449,7 @@ bool test_stripes_mt(int argc,
 
         const double seconds = double(duration.count()) / 1000000.0;
 
-        std::cout << "Global Execution time: " << seconds << " seconds" << std::endl;
+        std::cout << "Global Execution time: " << (seconds * 1000.0) << " ms" << std::endl;
 
         // const double tot_flop = nr_stripes * (7.0 * nr_domains_per_stripe +
         //                                       51.0 * nr_domains_per_stripe * quad_nodes_nr);
