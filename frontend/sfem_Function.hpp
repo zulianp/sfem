@@ -171,6 +171,7 @@ namespace sfem {
             assert(false);
             return nullptr;
         }
+        
         virtual std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &) {
             assert(false);
             return nullptr;
@@ -238,6 +239,7 @@ namespace sfem {
                                 isolver_scalar_t *const values) = 0;
 
         virtual std::shared_ptr<Constraint> derefine() const = 0;
+        virtual std::shared_ptr<Constraint> lor() const = 0;
     };
 
     class DirichletConditions final : public Constraint {
@@ -277,6 +279,7 @@ namespace sfem {
         void *impl_conditions();
 
         std::shared_ptr<Constraint> derefine() const override;
+        std::shared_ptr<Constraint> lor() const override;
 
     private:
         class Impl;

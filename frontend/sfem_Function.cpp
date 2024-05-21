@@ -240,6 +240,7 @@ namespace sfem {
         : impl_(std::make_unique<Impl>()) {
         impl_->mesh = mesh;
         impl_->block_size = block_size;
+        assert(block_size > 0);
 
         if (element_type == INVALID) {
             impl_->element_type = (enum ElemType)mesh->impl_->mesh.element_type;
@@ -249,7 +250,7 @@ namespace sfem {
 
         auto c_mesh = &mesh->impl_->mesh;
         if (impl_->element_type == c_mesh->element_type) {
-            impl_->nlocal = c_mesh->n_owned_nodes * block_size;
+            impl_->nlocal = c_mesh->nnodes * block_size;
             impl_->nglobal = c_mesh->nnodes * block_size;
         } else {
             // FIXME in parallel it will not work
@@ -541,6 +542,12 @@ namespace sfem {
         }
 
         return coarse;
+    }
+
+    std::shared_ptr<Constraint> DirichletConditions::lor() const
+    {
+        assert(false);
+        return nullptr;
     }
 
     DirichletConditions::~DirichletConditions() = default;
@@ -1062,8 +1069,17 @@ namespace sfem {
 
     std::shared_ptr<Function> Function::lor() { return lor(impl_->space->lor()); }
     std::shared_ptr<Function> Function::lor(const std::shared_ptr<FunctionSpace> &space) {
-        assert(false);
-        return nullptr;
+        auto ret = std::make_shared<Function>(space);
+
+        for(auto &o : impl_->ops) {
+            ret->impl_->ops.push_back(o->lor_op(space));
+        }
+
+        for(auto &c : impl_->constraints) {
+            ret->impl_->constraints.push_back(c->lor());
+        }
+
+        return ret;
     }
 
     class LinearElasticity final : public Op {
