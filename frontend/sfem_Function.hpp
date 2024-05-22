@@ -238,7 +238,7 @@ namespace sfem {
                                 const isolver_idx_t *const colidx,
                                 isolver_scalar_t *const values) = 0;
 
-        virtual std::shared_ptr<Constraint> derefine() const = 0;
+        virtual std::shared_ptr<Constraint> derefine(const std::shared_ptr<FunctionSpace> &coarse_space) const = 0;
         virtual std::shared_ptr<Constraint> lor() const = 0;
     };
 
@@ -278,7 +278,7 @@ namespace sfem {
         int n_conditions() const;
         void *impl_conditions();
 
-        std::shared_ptr<Constraint> derefine() const override;
+        std::shared_ptr<Constraint> derefine(const std::shared_ptr<FunctionSpace> &coarse_space) const override;
         std::shared_ptr<Constraint> lor() const override;
 
     private:

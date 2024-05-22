@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
             if (true) {
                 // if (false) {
                 auto mg = sfem::h_mg<real_t>();
-                mg->set_coarse_grid_solver(sfem::h_cg<real_t>());
+
 
                 auto lor_fs = fs->lor();
                 auto lor_f = f->lor(lor_fs);
@@ -152,10 +152,10 @@ int main(int argc, char *argv[]) {
                                                   coarse_f->apply(nullptr, x, y);
                                               });
 
-                    auto coarse_smoother = sfem::h_cg<real_t>();
-                    coarse_smoother->set_n_dofs(coarse_fs->n_dofs());
-                    coarse_smoother->set_op(coarse_op);
-                    mg->add_level(coarse_op, coarse_smoother, prolongation, nullptr);
+                    auto coarse_grid_solver = sfem::h_cg<real_t>();
+                    coarse_grid_solver->set_n_dofs(coarse_fs->n_dofs());
+                    coarse_grid_solver->set_op(coarse_op);
+                    mg->add_level(coarse_op, coarse_grid_solver, prolongation, nullptr);
                 }
 
                 solver->set_preconditioner_op(mg);

@@ -498,13 +498,13 @@ namespace sfem {
         impl_->space = space;
     }
 
-    std::shared_ptr<Constraint> DirichletConditions::derefine() const {
+    std::shared_ptr<Constraint> DirichletConditions::derefine(const std::shared_ptr<FunctionSpace> &coarse_space) const {
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
         auto et = (enum ElemType)impl_->space->element_type();
-        auto coarse_et = macro_base_elem(et);
-        const ptrdiff_t max_coarse_idx = max_node_id(coarse_et, mesh->nelements, mesh->elements);
 
-        auto coarse = std::make_shared<DirichletConditions>(nullptr);
+        const ptrdiff_t max_coarse_idx = max_node_id(coarse_space->element_type(), mesh->nelements, mesh->elements);
+
+        auto coarse = std::make_shared<DirichletConditions>(coarse_space);
 
         coarse->impl_->dirichlet_conditions = (boundary_condition_t *)malloc(
             impl_->n_dirichlet_conditions * sizeof(boundary_condition_t));
@@ -823,6 +823,7 @@ namespace sfem {
                 impl_->output_dir.c_str(),
                 name,
                 impl_->export_counter++);
+
         if (array_write(mesh->comm,
                         path,
                         SFEM_MPI_REAL_T,
@@ -1075,7 +1076,7 @@ namespace sfem {
         }
 
         for (auto &c : impl_->constraints) {
-            ret->impl_->constraints.push_back(c->derefine());
+            ret->impl_->constraints.push_back(c->derefine(space));
         }
 
         ret->impl_->handle_constraints = impl_->handle_constraints;

@@ -59,19 +59,18 @@ namespace sfem {
             return 0;
         }
 
-        void set_coarse_grid_solver(const std::shared_ptr<Operator<T>>& op)
-        {
-            coarse_grid_solver_ = op;
-        }
+        // void set_coarse_grid_solver(const std::shared_ptr<Operator<T>>& op)
+        // {
+        //     coarse_grid_solver_ = op;
+        // }
 
         void clear() {
             prolongation_.clear();
             restriction_.clear();
             smoother_.clear();
-            coarse_grid_solver_ = nullptr;
         }
 
-        inline int n_levels() const { return smoother_.size() + 1; }
+        inline int n_levels() const { return smoother_.size(); }
 
         inline std::ptrdiff_t rows() const override { return operator_[finest_level()]->rows(); }
         inline std::ptrdiff_t cols() const override { return operator_[finest_level()]->cols(); }
@@ -79,11 +78,11 @@ namespace sfem {
         // Fine level prolongation has to be null
         // Coarse level restriction has to be null
         inline void add_level(const std::shared_ptr<Operator<T>>& op,
-                              const std::shared_ptr<Operator<T>>& smoother,
+                              const std::shared_ptr<Operator<T>>& smoother_or_solver,
                               const std::shared_ptr<Operator<T>>& prolongation,
                               const std::shared_ptr<Operator<T>>& restriction) {
             operator_.push_back(op);
-            smoother_.push_back(smoother);
+            smoother_.push_back(smoother_or_solver);
             prolongation_.push_back(prolongation);
             restriction_.push_back(restriction);
         }
@@ -111,8 +110,6 @@ namespace sfem {
         std::vector<std::shared_ptr<Operator<T>>> prolongation_;
         std::vector<std::shared_ptr<Operator<T>>> restriction_;
 
-        std::shared_ptr<Operator<T>> coarse_grid_solver_;
-
         // Internals
         std::vector<std::shared_ptr<Memory>> memory_;
 
@@ -121,7 +118,7 @@ namespace sfem {
 
         inline int finest_level() const { return 0; }
 
-        inline int coarsest_level() const { return smoother_.size(); }
+        inline int coarsest_level() const { return n_levels() - 1; }
 
         inline int coarser_level(int level) const { return level + 1; }
 
@@ -136,12 +133,11 @@ namespace sfem {
         int init() {
             assert(prolongation_.size() == restriction_.size());
             assert(operator_.size() == smoother_.size());
-            assert(static_cast<bool>(coarse_grid_solver_));
 
             memory_.clear();
             memory_.resize(this->n_levels());
 
-            for (int l = 0; l < coarsest_level(); l++) {
+            for (int l = 0; l < n_levels(); l++) {
                 memory_[l] = std::make_shared<Memory>();
 
                 size_t n = smoother_[l]->rows();
@@ -167,7 +163,7 @@ namespace sfem {
             this->zeros(mem->size(), mem->solution->data());
 
             if (coarsest_level() == level) {
-                return coarse_grid_solver_->apply(mem->residual->data(), mem->solution->data());
+                return smoother_[level]->apply(mem->residual->data(), mem->solution->data());
             }
 
             auto op = operator_[level];
