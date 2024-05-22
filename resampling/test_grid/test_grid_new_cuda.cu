@@ -450,6 +450,120 @@ __device__ __noinline__                                                  //
     return;
 }
 
+__device__ double                                          //
+compute_quad_node_reduce(const double x_d_min,             //
+                         const double y_d_min,             //
+                         const double x_d_max,             //
+                         const double y_d_max,             //
+                         const double volume,              //
+                         const global_grid_cuda_type& gg,  //
+                         const double Qx,                  //
+                         const double Qy,                  //
+                         const double Weight               //
+                                                           //  const domains_stripe& ds
+) {                                                        //
+                                                           //
+    // const size_t id = blockIdx.x * blockDim.x + threadIdx.x;
+    // const size_t domain_nr = threadIdx.x;
+    // printf("domain_nr: %lu, id %lu \n", domain_nr, id);
+
+    // printf("domain_nr: %lu, id %lu \n", domain_nr, id);
+    // return ;
+
+    // Qs[id] = 1.0;
+
+    // return ;
+
+    // return;
+    // const size_t stripe_nr = blockIdx.x;
+
+    //    const size_t domain_nr = threadIdx.x;
+
+    // if (domain_nr >= ds.nr_domains) {
+    //     return;
+    // }
+
+    // double Ql = 0.0;
+
+    // for (size_t i = 0; i < ds.nr_domains; ++i) {
+    // double x_d_min, y_d_min, x_d_max, y_d_max;
+    // get_domain_from_stripe_cu(ds, domain_nr, x_d_min, y_d_min, x_d_max, y_d_max);
+
+    // const double volume = (x_d_max - x_d_min) * (y_d_max - y_d_min);  // 3 * ds_nr_domains
+
+    double Qs_i = 0.0;
+
+    // const size_t qr_size = qr_nodes_nr_;
+
+    // for (size_t q_i = 0; q_i < qr_size; ++q_i)
+    {
+        //
+        // 2 * 3 * qnr * dnr
+        const double x_Q = (Qx) * (x_d_max - x_d_min) + x_d_min;
+        const double y_Q = (Qy) * (y_d_max - y_d_min) + y_d_min;
+
+        int i_local, j_local;
+
+        // dnr * qnr * 8
+        get_nearest_coordinates_floor_cu(gg.x_zero,  //
+                                         gg.y_zero,  //
+                                         gg.delta,
+                                         gg.delta,
+                                         x_Q,
+                                         y_Q,
+                                         i_local,
+                                         j_local);
+
+        /////// data trasfer: 4 * 8 * qnr * dnr
+        // const size_t i1 = INDEX_ABS(gg.y_size, i_local, j_local);
+        // const size_t i2 = INDEX_ABS(gg.y_size, i_local, j_local + 1);
+        // const size_t i3 = INDEX_ABS(gg.y_size, i_local + 1, j_local);
+        // const size_t i4 = INDEX_ABS(gg.y_size, i_local + 1, j_local + 1);
+
+        const size_t i1 = XY_INDEX(gg.x_size, gg.y_size, i_local, j_local);
+        const size_t i2 = XY_INDEX(gg.x_size, gg.y_size, i_local, j_local + 1);
+        const size_t i3 = XY_INDEX(gg.x_size, gg.y_size, i_local + 1, j_local);
+        const size_t i4 = XY_INDEX(gg.x_size, gg.y_size, i_local + 1, j_local + 1);
+
+        const double f1 = gg.grid_ptr_cu[i1];
+        const double f2 = gg.grid_ptr_cu[i2];
+        const double f3 = gg.grid_ptr_cu[i3];
+        const double f4 = gg.grid_ptr_cu[i4];
+
+        const double x1 = gg.x_zero + i_local * gg.delta;        // 2 * qnr * dnr
+        const double x2 = gg.x_zero + (i_local + 1) * gg.delta;  // 3 * qnr * dnr
+        const double y1 = gg.y_zero + j_local * gg.delta;        // 1 * qnr * dnr
+        const double y2 = gg.y_zero + (j_local + 1) * gg.delta;  // 3 * qnr * dnr
+
+        // std::cout << "x1: " << x1 << " x2: " << x2 << " y1: " << y1 << " y2: " << y2
+        //           << std::endl;
+
+        // 5 * 4 * qnr * dnr
+        const double w11 = (x2 - x_Q) * (y2 - y_Q) / (gg.delta * gg.delta);
+        const double w12 = (x2 - x_Q) * (y_Q - y1) / (gg.delta * gg.delta);
+        const double w21 = (x_Q - x1) * (y2 - y_Q) / (gg.delta * gg.delta);
+        const double w22 = (x_Q - x1) * (y_Q - y1) / (gg.delta * gg.delta);
+
+        // 7 * qnr * dnr
+        const double f_Q = w11 * f1 + w12 * f2 + w21 * f3 + w22 * f4;
+
+        // Qs_i += f_Q * volume;
+
+        // 3 * qnr * dnr
+        // data transfer 8 * qne * dnr
+        Qs_i += f_Q * Weight * volume;
+
+        // std::cout << "---gg" << std::endl;
+    }
+
+    // Qs[i] = Qs_i;
+    // }
+
+    // Qs[id] = Qs_i;
+
+    return Qs_i;
+}
+
 /**
  * @brief Kernel function to perform the quadrature in the global domain.
  *
@@ -691,6 +805,8 @@ __device__ int thread_sum(int* input, int n) {
     return sum;
 }
 
+#define __WARP_SIZE 32
+
 /**
  * @brief Kernel function to perform the quadrature in the global domain.
  *
@@ -702,68 +818,80 @@ __device__ int thread_sum(int* input, int n) {
  * @param nr_of_domains_stripes
  * @return __global__
  */
-__global__                                                                             //
-        void                                                                           //
-        perform_quadrature_global_reduce_kernel(double* Qs,                            //
-                                                const global_grid_cuda_type gg,        //
-                                                const quadrature_rule_cuda qr,         //
-                                                const size_t qr_nodes_nr_,             //
-                                                const domains_stripe* ds_vector,       //
-                                                const size_t nr_of_domains_stripes) {  //
+__global__                                                                                //
+        void                                                                              //
+        perform_quadrature_global_reduce_kernel(double* Qs,                               //
+                                                const global_grid_cuda_type gg,           //
+                                                const quadrature_rule_cuda qr,            //
+                                                const size_t qr_nodes_nr_,                //
+                                                const domains_stripe* ds_vector,          //
+                                                const size_t nr_of_stripes,               //
+                                                const size_t nr_of_domains_per_stripe) {  //
 
     namespace cg = cooperative_groups;
 
     cg::thread_block g = cg::this_thread_block();
+    // printf("g.size(): %d\n", g.size());
 
     // unsigned tile_size = 32;
 
     // cg::thread_group tile = cg::tiled_partition(g, tile_size);
-    auto tile2 = cg::tiled_partition<32>(g);
+    auto tile2 = cg::tiled_partition<__WARP_SIZE>(g);
+    const unsigned tile_rank = tile2.thread_rank();
+    // printf("tile_rank: %d\n", tile_rank);
 
-    const size_t id = blockIdx.x * blockDim.x + threadIdx.x;
+    // const size_t nr_of_domains_per_stripe = ds_vector[0].nr_domains;
+
+    // const size_t id = blockIdx.x * blockDim.x + threadIdx.x;
 
     // get warp absolute index
-    const int warp_abs_index = id / 32;
+    // printf("blockIdx.x: %d, blockDim.x: %d, warp_size: %d\n", blockIdx.x, blockDim.x,
+    // __WARP_SIZE);
+    const int warp_abs_index = (blockIdx.x * blockDim.x + threadIdx.x) / __WARP_SIZE;
 
-    const int gd = gridDim.x;
-    const int gd_bd = blockDim.x * gd;
+    // if (warp_abs_index > nr_of_domains_per_stripe * nr_of_stripes) return;
 
-    // __syncthreads();
+    // domain nr in the stripe
+    const size_t domain_nr = warp_abs_index % nr_of_domains_per_stripe;
 
-    printf("gd: %d, gd_bd: %d, blockDim: %d\n", gd, gd_bd, blockDim.x);
+    double reduce_result = 0.0;
 
-    const size_t node_nr = threadIdx.x;
-    const size_t domain_nr = blockIdx.x;
+    const size_t nr_warp_loop =
+            qr_nodes_nr_ / __WARP_SIZE + ((qr_nodes_nr_ % __WARP_SIZE) == 0 ? 0 : 1);
 
-    double reduce_result = domain_nr;
+    const size_t stripe_nr = warp_abs_index / nr_of_domains_per_stripe;
 
-    unsigned sz = g.size();
-    unsigned lane = g.thread_rank();
+    double x_d_min, y_d_min, x_d_max, y_d_max;
+    get_domain_from_stripe_cu(ds_vector[stripe_nr], domain_nr, x_d_min, y_d_min, x_d_max, y_d_max);
 
-    // get the tile rank
-    unsigned tile_rank = 1111;
-    tile_rank = tile2.thread_rank();
+    const double volume = (x_d_max - x_d_min) * (y_d_max - y_d_min);  // 3 * ds_nr_domains
 
-    printf("sz: %d, lane %d\n", sz, lane);
+    for (size_t i = 0; i < nr_warp_loop; i++) {
+        const size_t q_i = i * size_t(__WARP_SIZE) + tile_rank;
 
-    // if (tile_rank == 0)
-    printf("Tile4 size: %d, tile.thread_rank %d, thread rank %d \n", tile2.size(), tile_rank, lane);
+        const double x_Q = (q_i < qr_nodes_nr_) ? qr.x_nodes_ptr_cu[q_i] : qr.x_nodes_ptr_cu[0];
+        const double y_Q = (q_i < qr_nodes_nr_) ? qr.y_nodes_ptr_cu[q_i] : qr.y_nodes_ptr_cu[0];
+        const double w_Q = (q_i < qr_nodes_nr_) ? qr.weights_ptr_cu[q_i] : 0.0;
 
-    // if (tile.thread_rank() == 0)
-    //     printf("Hello from tile4 rank 0: %d\n", cg::this_thread_block().thread_rank());
+        // reduce_result += 1.0;
 
-    reduce_result = double(lane);
+        reduce_result += compute_quad_node_reduce(x_d_min,  //
+                                                  y_d_min,  //
+                                                  x_d_max,  //
+                                                  y_d_max,  //
+                                                  volume,   //
+                                                  gg,
+                                                  x_Q,
+                                                  y_Q,
+                                                  w_Q);
+    }
 
     for (int i = tile2.size() / 2; i > 0; i /= 2) {
         reduce_result += tile2.shfl_down(reduce_result, i);
     }
 
     if (tile_rank == 0) {
-        printf("Warp abs index: %d,  Block: %d, theread id: %d, reduce_result: %f\n",
-               warp_abs_index,
-               blockIdx.x,
-               threadIdx.x,
-               reduce_result);
+        Qs[warp_abs_index] = reduce_result;
     }
 }
 
@@ -1115,22 +1243,14 @@ int test_local(double& Q_local,                           //
 
     cudaEventRecord(start);
 
-    /* start kernel  */
-    // perform_quadrature_local_stripe_kernel<<<nr_stripes, nr_domains_per_stripe>>>(  //
-    //         Qs_cu,                                                                  //
-    //         gg_dev,                                                                 //
-    //         qr_dev,                                                                 //
-    //         qr.weights.size(),                                                      //
-    //         ds_vector_cu,                                                           //
-    //         ds_vector.size());                                                      //
-
-    perform_quadrature_global_reduce_kernel<<<1, 64>>>(  //
-            Qs_cu,                                       //
-            gg_dev,                                      //
-            qr_dev,                                      //
-            qr.weights.size(),                           //
-            ds_vector_cu,                                //
-            ds_vector.size());                           //
+    // /* start kernel  */
+    perform_quadrature_local_stripe_kernel<<<nr_stripes, nr_domains_per_stripe>>>(  //
+            Qs_cu,                                                                  //
+            gg_dev,                                                                 //
+            qr_dev,                                                                 //
+            qr.weights.size(),                                                      //
+            ds_vector_cu,                                                           //
+            ds_vector.size());                                                      //
 
     // axpy<<<nr_domains_tot, 1024>>>(Qs_cu, Qs_cu, 1.0, nr_domains_tot);
 
@@ -1183,6 +1303,129 @@ int test_local(double& Q_local,                           //
 /**
  * @brief
  *
+ * @param Q_global
+ * @param gg
+ * @param qr
+ * @param ds_vector
+ * @return int
+ */
+int test_reduce(double& Q_global,                          //
+                global_grid_type& gg,                      //
+                quadrature_rule& qr,                       //
+                std::vector<domains_stripe>& ds_vector) {  //
+
+    global_grid_cuda_type gg_dev;
+    quadrature_rule_cuda qr_dev;
+
+    copy_global_grid_to_device(gg, gg_dev);
+    // copy_quadrature_rule_to_device(qr);
+    copy_quadrature_rule_to_device_cu(qr, qr_dev);
+
+    domains_stripe* ds_vector_cu = nullptr;
+
+    cudaError e1 = cudaMalloc((void**)&ds_vector_cu, ds_vector.size() * sizeof(domains_stripe));
+    cudaError e2 = cudaMemcpy(ds_vector_cu,
+                              &ds_vector[0],
+                              ds_vector.size() * sizeof(domains_stripe),
+                              cudaMemcpyHostToDevice);
+    if (e1 != cudaSuccess || e2 != cudaSuccess) {
+        printf("Error allocating memory for ds_vector_cu\n");
+        printf("Error code e1: %s\n", cudaGetErrorString(e1));
+        printf("Error code e2: %s\n", cudaGetErrorString(e2));
+        return 1;
+    }
+
+    size_t nr_domains_tot = ds_vector.size() * ds_vector[0].nr_domains;
+
+    double *Qs, *Qs_cu;
+    cudaMalloc((void**)&Qs_cu, nr_domains_tot * sizeof(double));
+    Qs = (double*)malloc(nr_domains_tot * sizeof(double));
+
+    ///// Kernel here /////
+    const size_t nr_stripes = ds_vector.size();
+    const size_t nr_domains_per_stripe = ds_vector[0].nr_domains;
+
+    printf("\nnr_stripes:            %lu\n", nr_stripes);
+    printf("nr_domains_per_stripe: %lu\n\n", nr_domains_per_stripe);
+
+    printf("Nr of qr nodes: %lu\n", qr.x_nodes.size());
+
+    printf("Nr of threads: %lu\n", nr_stripes * nr_domains_per_stripe);
+    printf("Nr of domains: %lu\n", nr_domains_tot);
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    cudaDeviceSynchronize();
+    // cudaProfilerStart();
+
+    cudaEventRecord(start);
+
+#define NN 4
+
+    /// start kernel ///
+    perform_quadrature_global_reduce_kernel<<<(nr_stripes * nr_domains_per_stripe) / NN,  //
+                                              NN * __WARP_SIZE>>>(                        //
+            Qs_cu,                                                                        //
+            gg_dev,                                                                       //
+            qr_dev,                                                                       //
+            qr.weights.size(),                                                            //
+            ds_vector_cu,                                                                 //
+            nr_stripes,                                                                   //
+            nr_domains_per_stripe);                                                       //
+
+    // axpy<<<nr_domains_tot, 1024>>>(Qs_cu, Qs_cu, 1.0, nr_domains_tot);
+
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+
+    // cudaProfilerStop();
+
+    // get error code
+    cudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess) {
+        fprintf(stderr, "Reduce KERNEL ERROR: %s\n", cudaGetErrorString(error));
+        return 1;
+    }
+
+    cudaDeviceSynchronize();
+
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+
+    printf("Reduce Time elapsed: %f ms\n", milliseconds);
+
+    ///// end kernel /////
+
+    cudaMemcpy(Qs, Qs_cu, nr_domains_tot * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaFree(Qs_cu);
+
+    free_global_grid_on_device(gg_dev);
+    free_quadrature_rule_on_device(qr_dev);
+
+    cudaFree(ds_vector_cu);
+
+    double Q_tot = 0.0;
+    for (size_t i = 0; i < nr_domains_tot; ++i) {
+        Q_tot += Qs[i];
+    }
+
+    free(Qs);
+
+    printf("\n+++++ Reduce Q_tot GPU : %f   \n\n", Q_tot);
+    const double flops =
+            q_flops(nr_stripes, nr_domains_per_stripe, qr.weights.size(), milliseconds / 1000.0);
+    printf("Reduce CUDA GFLOPS: %f\n\n", flops / (1024.0 * 1024.0 * 1024.0));
+
+    Q_global = Q_tot;
+
+    return 0;
+}
+
+/**
+ * @brief
+ *
  */
 extern "C" int test_grid_cuda(global_grid_type& gg,                      //
                               quadrature_rule& qr,                       //
@@ -1196,12 +1439,19 @@ extern "C" int test_grid_cuda(global_grid_type& gg,                      //
     double Q_local = 0.0;
     test_local(Q_local, gg, qr, ds_vector);
 
+    double Q_reduce = 0.0;
+    test_reduce(Q_reduce, gg, qr, ds_vector);
+
     printf("\n");
     printf("Result *************************************************************\n");
-    printf("Q_global: %f\n", Q_global);
-    printf("Q_local:  %f\n", Q_local);
+    printf("Q_global: %.10f\n", Q_global);
+    printf("Q_local:  %.10f\n", Q_local);
+    printf("Q_reduce: %.10f\n", Q_reduce);
+
     printf("Q_global - Q_local: %f\n", Q_global - Q_local);
     printf("Q_global / Q_local: %f\n", Q_global / Q_local);
+    printf("Q_global - Q_reduce: %f\n", Q_global - Q_reduce);
+    printf("Q_global / Q_reduce: %f\n", Q_global / Q_reduce);
     printf("\n");
     printf("\n");
 
