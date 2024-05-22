@@ -91,7 +91,7 @@ namespace sfem {
         void default_init() {
             allocate = [](const std::ptrdiff_t n) -> T* { return (T*)calloc(n, sizeof(T)); };
 
-            destroy = [](T* a) { free(a); };
+            destroy = [](void* a) { free(a); };
 
             axpby =
                 [](const ptrdiff_t n, const T alpha, const T* const x, const T beta, T* const y) {
@@ -142,10 +142,12 @@ namespace sfem {
             memory_.resize(this->n_levels());
 
             for (int l = 0; l < coarsest_level(); l++) {
+                memory_[l] = std::make_shared<Memory>();
+
                 size_t n = smoother_[l]->rows();
                 if (l != finest_level()) {
                     auto x = this->allocate(n);
-                    memory_[l]->residual = Buffer<T>::own(n, x, this->destroy);
+                    memory_[l]->solution = Buffer<T>::own(n, x, this->destroy);
 
                     auto r = this->allocate(n);
                     memory_[l]->residual = Buffer<T>::own(n, r, this->destroy);
@@ -195,6 +197,13 @@ namespace sfem {
             return 0;
         }
     };
+
+    template <typename T>
+    std::shared_ptr<Multigrid<T>> h_mg() {
+        auto mg = std::make_shared<Multigrid<T>>();
+        mg->default_init();
+        return mg;
+    }
 
 }  // namespace sfem
 

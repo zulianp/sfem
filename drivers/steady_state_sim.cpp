@@ -114,9 +114,9 @@ int main(int argc, char *argv[]) {
         b_b = sfem::h_buffer<real_t>(fs->n_dofs());
 
         if (SFEM_USE_PRECONDITIONER) {
-            // if (true) {
-                if (false) {
-                auto mg = std::make_shared<sfem::Multigrid<real_t>>();
+            if (true) {
+                // if (false) {
+                auto mg = sfem::h_mg<real_t>();
                 mg->set_coarse_grid_solver(sfem::h_cg<real_t>());
 
                 auto lor_fs = fs->lor();
@@ -137,20 +137,24 @@ int main(int argc, char *argv[]) {
                                                   lor_f->apply(nullptr, x, y);
                                               });
 
-                    std::shared_ptr<sfem::Operator<real_t>> fine_smoother = sfem::h_cg<real_t>();
+                    auto fine_smoother = sfem::h_cg<real_t>();
+                    fine_smoother->set_n_dofs(fs->n_dofs());
+                    fine_smoother->set_op(fine_op);
                     mg->add_level(fine_op, fine_smoother, nullptr, restriction);
                 }
 
                 // Coarse level
                 {
                     std::shared_ptr<sfem::Operator<real_t>> coarse_op =
-                        sfem::make_op<real_t>(lor_fs->n_dofs(),
-                                              lor_fs->n_dofs(),
+                        sfem::make_op<real_t>(coarse_fs->n_dofs(),
+                                              coarse_fs->n_dofs(),
                                               [=](const real_t *const x, real_t *const y) {
                                                   coarse_f->apply(nullptr, x, y);
                                               });
 
-                    std::shared_ptr<sfem::Operator<real_t>> coarse_smoother = sfem::h_cg<real_t>();
+                    auto coarse_smoother = sfem::h_cg<real_t>();
+                    coarse_smoother->set_n_dofs(coarse_fs->n_dofs());
+                    coarse_smoother->set_op(coarse_op);
                     mg->add_level(coarse_op, coarse_smoother, prolongation, nullptr);
                 }
 

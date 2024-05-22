@@ -17,7 +17,7 @@ ptrdiff_t max_node_id(const enum ElemType type,
     ptrdiff_t ret = 0;
     for (int i = 0; i < nxe; i++) {
         for (ptrdiff_t e = 0; e < nelements; e++) {
-            ret = MAX(ret, elements[nxe][e]);
+            ret = MAX(ret, elements[i][e]);
         }
     }
     return ret;
@@ -143,18 +143,18 @@ int hierarchical_restriction(const enum ElemType from_element,
 #pragma omp parallel for
         for (ptrdiff_t e = 0; e < nelements; e++) {
             // P1
-            const idx_t i0 = elements[e][0];
-            const idx_t i1 = elements[e][1];
-            const idx_t i2 = elements[e][2];
-            const idx_t i3 = elements[e][3];
+            const idx_t i0 = elements[0][e];
+            const idx_t i1 = elements[1][e];
+            const idx_t i2 = elements[2][e];
+            const idx_t i3 = elements[3][e];
 
             // P2
-            const idx_t i4 = elements[e][4];
-            const idx_t i5 = elements[e][5];
-            const idx_t i6 = elements[e][6];
-            const idx_t i7 = elements[e][7];
-            const idx_t i8 = elements[e][8];
-            const idx_t i9 = elements[e][9];
+            const idx_t i4 = elements[4][e];
+            const idx_t i5 = elements[5][e];
+            const idx_t i6 = elements[6][e];
+            const idx_t i7 = elements[7][e];
+            const idx_t i8 = elements[8][e];
+            const idx_t i9 = elements[9][e];
 
             to[i0] = from[i0] + 0.5 * (from[i4] + from[i6] + from[i7]);
             to[i1] = from[i1] + 0.5 * (from[i4] + from[i5] + from[i8]);
@@ -166,14 +166,14 @@ int hierarchical_restriction(const enum ElemType from_element,
 #pragma omp parallel for
         for (ptrdiff_t e = 0; e < nelements; e++) {
             // P1
-            const idx_t i0 = elements[e][0];
-            const idx_t i1 = elements[e][1];
-            const idx_t i2 = elements[e][2];
+            const idx_t i0 = elements[0][e];
+            const idx_t i1 = elements[1][e];
+            const idx_t i2 = elements[2][e];
 
             // P2
-            const idx_t i3 = elements[e][3];
-            const idx_t i4 = elements[e][4];
-            const idx_t i5 = elements[e][5];
+            const idx_t i3 = elements[3][e];
+            const idx_t i4 = elements[4][e];
+            const idx_t i5 = elements[5][e];
 
             to[i0] = from[i0] + 0.5 * (from[i3] + from[i5]);
             to[i1] = from[i1] + 0.5 * (from[i3] + from[i4]);

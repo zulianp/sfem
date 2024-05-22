@@ -326,7 +326,7 @@ namespace sfem {
 
     std::shared_ptr<FunctionSpace> FunctionSpace::lor() const {
         return std::make_shared<FunctionSpace>(
-            impl_->mesh, impl_->block_size, macro_base_elem(impl_->element_type));
+            impl_->mesh, impl_->block_size, macro_type_variant(impl_->element_type));
     }
 
     class NeumannConditions::Impl {
@@ -506,6 +506,10 @@ namespace sfem {
 
         auto coarse = std::make_shared<DirichletConditions>(nullptr);
 
+        coarse->impl_->dirichlet_conditions = (boundary_condition_t *)malloc(
+            impl_->n_dirichlet_conditions * sizeof(boundary_condition_t));
+        coarse->impl_->n_dirichlet_conditions = 0;
+
         for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
             ptrdiff_t coarse_local_size = 0;
             idx_t *coarse_indices = nullptr;
@@ -531,21 +535,22 @@ namespace sfem {
             CATCH_MPI_ERROR(
                 MPI_Allreduce(MPI_IN_PLACE, &coarse_global_size, 1, MPI_LONG, MPI_SUM, mesh->comm));
 
-            boundary_condition_create(
-                &coarse->impl_->dirichlet_conditions[coarse->impl_->n_dirichlet_conditions],
-                coarse_local_size,
-                coarse_global_size,
-                coarse_indices,
-                impl_->dirichlet_conditions[i].component,
-                impl_->dirichlet_conditions[i].value,
-                coarse_values);
+
+
+                boundary_condition_create(
+                    &coarse->impl_->dirichlet_conditions[coarse->impl_->n_dirichlet_conditions++],
+                    coarse_local_size,
+                    coarse_global_size,
+                    coarse_indices,
+                    impl_->dirichlet_conditions[i].component,
+                    impl_->dirichlet_conditions[i].value,
+                    coarse_values);
         }
 
         return coarse;
     }
 
-    std::shared_ptr<Constraint> DirichletConditions::lor() const
-    {
+    std::shared_ptr<Constraint> DirichletConditions::lor() const {
         assert(false);
         return nullptr;
     }
@@ -1065,11 +1070,11 @@ namespace sfem {
     std::shared_ptr<Function> Function::derefine(const std::shared_ptr<FunctionSpace> &space) {
         auto ret = std::make_shared<Function>(space);
 
-        for(auto &o : impl_->ops) {
+        for (auto &o : impl_->ops) {
             ret->impl_->ops.push_back(o->derefine_op(space));
         }
 
-        for(auto &c : impl_->constraints) {
+        for (auto &c : impl_->constraints) {
             ret->impl_->constraints.push_back(c->derefine());
         }
 
@@ -1082,11 +1087,11 @@ namespace sfem {
     std::shared_ptr<Function> Function::lor(const std::shared_ptr<FunctionSpace> &space) {
         auto ret = std::make_shared<Function>(space);
 
-        for(auto &o : impl_->ops) {
+        for (auto &o : impl_->ops) {
             ret->impl_->ops.push_back(o->lor_op(space));
         }
 
-        for(auto &c : impl_->constraints) {
+        for (auto &c : impl_->constraints) {
             // ret->impl_->constraints.push_back(c->lor());
             ret->impl_->constraints.push_back(c);
         }
