@@ -1087,7 +1087,8 @@ namespace sfem {
         }
 
         for(auto &c : impl_->constraints) {
-            ret->impl_->constraints.push_back(c->lor());
+            // ret->impl_->constraints.push_back(c->lor());
+            ret->impl_->constraints.push_back(c);
         }
 
         ret->impl_->handle_constraints = impl_->handle_constraints;

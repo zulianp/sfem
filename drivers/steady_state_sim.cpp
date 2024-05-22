@@ -117,6 +117,7 @@ int main(int argc, char *argv[]) {
             // if (true) {
                 if (false) {
                 auto mg = std::make_shared<sfem::Multigrid<real_t>>();
+                mg->set_coarse_grid_solver(sfem::h_cg<real_t>());
 
                 auto lor_fs = fs->lor();
                 auto lor_f = f->lor(lor_fs);

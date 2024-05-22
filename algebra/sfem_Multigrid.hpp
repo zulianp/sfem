@@ -59,6 +59,11 @@ namespace sfem {
             return 0;
         }
 
+        void set_coarse_grid_solver(const std::shared_ptr<Operator<T>>& op)
+        {
+            coarse_grid_solver_ = op;
+        }
+
         void clear() {
             prolongation_.clear();
             restriction_.clear();
