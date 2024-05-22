@@ -849,6 +849,20 @@ int tet4_resample_field_local_CUDA(  // Mesh
         // Output
         real_type* const MY_RESTRICT weighted_field);
 
+int tet4_resample_field_local_reduce_CUDA(  // Mesh
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        int** const MY_RESTRICT elems,
+        float** const MY_RESTRICT xyz,
+        // SDF
+        const ptrdiff_t* const MY_RESTRICT n,
+        const ptrdiff_t* const MY_RESTRICT stride,
+        const float* const MY_RESTRICT origin,
+        const float* const MY_RESTRICT delta,
+        const real_type* const MY_RESTRICT data,
+        // Output
+        real_type* const MY_RESTRICT weighted_field);
+
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 // resample_field_local ////////////////////////////////////////////////////
@@ -870,13 +884,14 @@ int resample_field_local(
         // Output
         real_t* const SFEM_RESTRICT weighted_field,
         sfem_resample_field_info* info) {
+    //
     switch (element_type) {
         case TET4: {
             info->quad_nodes_cnt = TET4_NQP;
             info->nelements = nelements;
 
-            return tet4_resample_field_local_CUDA(  ////// v2 test V4 V8 CUDA
-                                                  //   0,
+            return tet4_resample_field_local_reduce_CUDA(  ////// v2 test V4 V8 CUDA
+                                                           //   0,
                     nelements,
                     nnodes,
                     elems,

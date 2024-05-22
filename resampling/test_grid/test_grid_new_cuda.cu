@@ -450,6 +450,20 @@ __device__ __noinline__                                                  //
     return;
 }
 
+/**
+ * @brief Calculates the quadrature for a single node.
+ *
+ * @param x_d_min
+ * @param y_d_min
+ * @param x_d_max
+ * @param y_d_max
+ * @param volume
+ * @param gg
+ * @param Qx
+ * @param Qy
+ * @param Weight
+ * @return __device__
+ */
 __device__ double                                          //
 compute_quad_node_reduce(const double x_d_min,             //
                          const double y_d_min,             //
@@ -457,45 +471,14 @@ compute_quad_node_reduce(const double x_d_min,             //
                          const double y_d_max,             //
                          const double volume,              //
                          const global_grid_cuda_type& gg,  //
-                         const double Qx,                  //
-                         const double Qy,                  //
-                         const double Weight               //
-                                                           //  const domains_stripe& ds
+                         const double Qx,                  // Quad x
+                         const double Qy,                  // Quad y
+                         const double Weight               // Quad weight
+                                                           //
 ) {                                                        //
                                                            //
-    // const size_t id = blockIdx.x * blockDim.x + threadIdx.x;
-    // const size_t domain_nr = threadIdx.x;
-    // printf("domain_nr: %lu, id %lu \n", domain_nr, id);
-
-    // printf("domain_nr: %lu, id %lu \n", domain_nr, id);
-    // return ;
-
-    // Qs[id] = 1.0;
-
-    // return ;
-
-    // return;
-    // const size_t stripe_nr = blockIdx.x;
-
-    //    const size_t domain_nr = threadIdx.x;
-
-    // if (domain_nr >= ds.nr_domains) {
-    //     return;
-    // }
-
-    // double Ql = 0.0;
-
-    // for (size_t i = 0; i < ds.nr_domains; ++i) {
-    // double x_d_min, y_d_min, x_d_max, y_d_max;
-    // get_domain_from_stripe_cu(ds, domain_nr, x_d_min, y_d_min, x_d_max, y_d_max);
-
-    // const double volume = (x_d_max - x_d_min) * (y_d_max - y_d_min);  // 3 * ds_nr_domains
-
     double Qs_i = 0.0;
 
-    // const size_t qr_size = qr_nodes_nr_;
-
-    // for (size_t q_i = 0; q_i < qr_size; ++q_i)
     {
         //
         // 2 * 3 * qnr * dnr
@@ -555,11 +538,6 @@ compute_quad_node_reduce(const double x_d_min,             //
 
         // std::cout << "---gg" << std::endl;
     }
-
-    // Qs[i] = Qs_i;
-    // }
-
-    // Qs[id] = Qs_i;
 
     return Qs_i;
 }
@@ -805,7 +783,7 @@ __device__ int thread_sum(int* input, int n) {
     return sum;
 }
 
-#define __WARP_SIZE 32
+#define __WARP_SIZE__ 32
 
 /**
  * @brief Kernel function to perform the quadrature in the global domain.
@@ -836,7 +814,7 @@ __global__                                                                      
     // unsigned tile_size = 32;
 
     // cg::thread_group tile = cg::tiled_partition(g, tile_size);
-    auto tile2 = cg::tiled_partition<__WARP_SIZE>(g);
+    auto tile2 = cg::tiled_partition<__WARP_SIZE__>(g);
     const unsigned tile_rank = tile2.thread_rank();
     // printf("tile_rank: %d\n", tile_rank);
 
@@ -846,8 +824,8 @@ __global__                                                                      
 
     // get warp absolute index
     // printf("blockIdx.x: %d, blockDim.x: %d, warp_size: %d\n", blockIdx.x, blockDim.x,
-    // __WARP_SIZE);
-    const int warp_abs_index = (blockIdx.x * blockDim.x + threadIdx.x) / __WARP_SIZE;
+    // __WARP_SIZE__);
+    const int warp_abs_index = (blockIdx.x * blockDim.x + threadIdx.x) / __WARP_SIZE__;
 
     // if (warp_abs_index > nr_of_domains_per_stripe * nr_of_stripes) return;
 
@@ -857,7 +835,7 @@ __global__                                                                      
     double reduce_result = 0.0;
 
     const size_t nr_warp_loop =
-            qr_nodes_nr_ / __WARP_SIZE + ((qr_nodes_nr_ % __WARP_SIZE) == 0 ? 0 : 1);
+            qr_nodes_nr_ / __WARP_SIZE__ + ((qr_nodes_nr_ % __WARP_SIZE__) == 0 ? 0 : 1);
 
     const size_t stripe_nr = warp_abs_index / nr_of_domains_per_stripe;
 
@@ -867,13 +845,11 @@ __global__                                                                      
     const double volume = (x_d_max - x_d_min) * (y_d_max - y_d_min);  // 3 * ds_nr_domains
 
     for (size_t i = 0; i < nr_warp_loop; i++) {
-        const size_t q_i = i * size_t(__WARP_SIZE) + tile_rank;
+        const size_t q_i = i * size_t(__WARP_SIZE__) + tile_rank;
 
         const double x_Q = (q_i < qr_nodes_nr_) ? qr.x_nodes_ptr_cu[q_i] : qr.x_nodes_ptr_cu[0];
         const double y_Q = (q_i < qr_nodes_nr_) ? qr.y_nodes_ptr_cu[q_i] : qr.y_nodes_ptr_cu[0];
         const double w_Q = (q_i < qr_nodes_nr_) ? qr.weights_ptr_cu[q_i] : 0.0;
-
-        // reduce_result += 1.0;
 
         reduce_result += compute_quad_node_reduce(x_d_min,  //
                                                   y_d_min,  //
@@ -1301,7 +1277,7 @@ int test_local(double& Q_local,                           //
 }
 
 /**
- * @brief
+ * @brief Test the reduction kernel.
  *
  * @param Q_global
  * @param gg
@@ -1366,7 +1342,7 @@ int test_reduce(double& Q_global,                          //
 
     /// start kernel ///
     perform_quadrature_global_reduce_kernel<<<(nr_stripes * nr_domains_per_stripe) / NN,  //
-                                              NN * __WARP_SIZE>>>(                        //
+                                              NN * __WARP_SIZE__>>>(                      //
             Qs_cu,                                                                        //
             gg_dev,                                                                       //
             qr_dev,                                                                       //
