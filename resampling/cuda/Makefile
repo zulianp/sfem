@@ -4,7 +4,7 @@ GPU_ARCH ?= sm_75
 VERBOSE_FLAG = 
 VERBOSE ?= off
 
-OPT_FLAGS = -O3 -use_fast_math -Xptxas=-O3
+OPT_FLAGS = -O3 -use_fast_math -Xptxas=-O3,-v  -Xcompiler=-O3,-march=native,-mtune=native
 
 ifeq (${VERBOSE}, on)
 	VERBOSE_FLAG = -v
