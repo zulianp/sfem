@@ -5,6 +5,8 @@ SHELL := /bin/bash
 MARCH ?= native
 VECTOR_SIZE ?= 512
 
+GPU_ARCH ?= sm_75
+
 ifeq ($(debug),1)
 	CFLAGS += -O0 -g
 	CXXFLAGS += -O0 -g
@@ -375,7 +377,7 @@ grid_to_mesh: grid_to_mesh.c libsfem.a ${PWD}/resampling/cuda/libsfem_resample_f
 
 ${PWD}/resampling/cuda/libsfem_resample_field_cuda.a: ${PWD}/resampling/cuda/sfem_resample_field_cuda.cu ${PWD}/resampling/cuda/quadratures_rule_cuda.h
 	cd ${PWD}/resampling/cuda ; \
-	make ; \
+	make GPU_ARCH=${GPU_ARCH} ; \
 	cd ${PWD} ; 
 
 geometry_aware_gap_from_sdf : geometry_aware_gap_from_sdf.c libsfem.a
