@@ -59,7 +59,7 @@ Thumbs.db
 *.h5
 *.o
 *.dSYM
-*.csv
+# *.csv
 *.out
 *.xmf
 *.xdmf

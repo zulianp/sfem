@@ -153,6 +153,9 @@ class FE:
 
 		return g
 
+	def quadrature_weight(self):
+		return sp.symbols('qw')
+
 	def symbol_jacobian_inverse(self):
 		if self.use_adjugate:
 			return self.symbol_jacobian_inverse_as_adjugate()

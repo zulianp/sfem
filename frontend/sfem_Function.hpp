@@ -14,6 +14,7 @@
 #include "isolver_function.h"
 
 #include "sfem_Buffer.hpp"
+#include "sfem_MatrixFreeLinearSolver.hpp"
 
 namespace sfem {
     class Function;
@@ -305,6 +306,9 @@ namespace sfem {
         int set_output_dir(const char *path);
 
         std::shared_ptr<Output> output();
+
+        std::shared_ptr<Operator<isolver_scalar_t>> hierarchical_restriction();
+        std::shared_ptr<Operator<isolver_scalar_t>> hierarchical_prolongation();
 
     private:
         class Impl;

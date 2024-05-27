@@ -7,7 +7,7 @@ __global__ void saxpy(int n, float a, float *x, float *y)
         y[i] = a * x[i] + y[i];
 }
 
-// nvcc -O3 --gpu-architecture=sm_80 perf_metric.cu
+// nvcc -O3 --gpu-architecture=sm_80 baseline.cu
 int main(void)
 {
     long int N = 11 * (1 << 26);

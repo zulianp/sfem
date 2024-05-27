@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-refs=(0 1 2 3 4 5)
+refs=(0 1 2 3 4)
 n_refs=${#refs[@]}
 last_idx=$(( n_refs  - 1 ))
 last=${refs[$last_idx]}

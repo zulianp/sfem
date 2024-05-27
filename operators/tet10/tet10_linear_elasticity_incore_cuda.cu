@@ -388,237 +388,139 @@ static inline __device__ __host__ void apply_micro_kernel(
 #undef MICRO_KERNEL_USE_CODEGEN
 }
 
-static inline __device__ __host__ void diag_micro_kernel(
-    const scalar_t mu,
-    const scalar_t lambda,
-    const scalar_t *const SFEM_RESTRICT adjugate,
-    const scalar_t jacobian_determinant,
-    const scalar_t qx,
-    const scalar_t qy,
-    const scalar_t qz,
-    const scalar_t qw,
-    accumulator_t *const SFEM_RESTRICT diag) {
-    const real_t x0 = lambda + 2 * mu;
-    const real_t x1 = adjugate[0] + adjugate[3] + adjugate[6];
-    const real_t x2 = x0 * x1;
-    const real_t x3 = adjugate[2] + adjugate[5] + adjugate[8];
-    const real_t x4 = mu * x3;
-    const real_t x5 = adjugate[2] * x4 + adjugate[5] * x4 + adjugate[8] * x4;
-    const real_t x6 = adjugate[1] + adjugate[4] + adjugate[7];
-    const real_t x7 = mu * x6;
-    const real_t x8 = adjugate[1] * x7 + adjugate[4] * x7 + adjugate[7] * x7;
-    const real_t x9 = 4 * qx;
-    const real_t x10 = 4 * qy;
-    const real_t x11 = 4 * qz;
-    const real_t x12 = 1.0 / jacobian_determinant;
-    const real_t x13 = (1.0 / 6.0) * x12;
-    const real_t x14 = x13 * POW2(x10 + x11 + x9 - 3);
-    const real_t x15 = POW2(adjugate[1]);
-    const real_t x16 = mu * x15;
-    const real_t x17 = POW2(adjugate[2]);
-    const real_t x18 = mu * x17;
-    const real_t x19 = POW2(adjugate[0]);
-    const real_t x20 = x13 * POW2(x9 - 1);
-    const real_t x21 = POW2(adjugate[4]);
-    const real_t x22 = mu * x21;
-    const real_t x23 = POW2(adjugate[5]);
-    const real_t x24 = mu * x23;
-    const real_t x25 = POW2(adjugate[3]);
-    const real_t x26 = x13 * POW2(x10 - 1);
-    const real_t x27 = POW2(adjugate[7]);
-    const real_t x28 = mu * x27;
-    const real_t x29 = POW2(adjugate[8]);
-    const real_t x30 = mu * x29;
-    const real_t x31 = POW2(adjugate[6]);
-    const real_t x32 = x13 * POW2(x11 - 1);
-    const real_t x33 = adjugate[4] * qx;
-    const real_t x34 = adjugate[7] * qx;
-    const real_t x35 = qz - 1;
-    const real_t x36 = 2 * qx + qy + x35;
-    const real_t x37 = adjugate[1] * x36 + x33 + x34;
-    const real_t x38 = mu * x37;
-    const real_t x39 = adjugate[4] * x38;
-    const real_t x40 = adjugate[5] * qx;
-    const real_t x41 = adjugate[8] * qx;
-    const real_t x42 = adjugate[2] * x36 + x40 + x41;
-    const real_t x43 = mu * x42;
-    const real_t x44 = adjugate[5] * x43;
-    const real_t x45 = adjugate[3] * qx;
-    const real_t x46 = adjugate[6] * qx;
-    const real_t x47 = adjugate[0] * x36 + x45 + x46;
-    const real_t x48 = x0 * x47;
-    const real_t x49 = adjugate[7] * x38;
-    const real_t x50 = adjugate[8] * x43;
-    const real_t x51 = adjugate[1] * x38;
-    const real_t x52 = adjugate[2] * x43;
-    const real_t x53 = (8.0 / 3.0) * x12;
-    const real_t x54 = adjugate[1] * qy;
-    const real_t x55 = x33 + x54;
-    const real_t x56 = mu * x55;
-    const real_t x57 = adjugate[4] * x56;
-    const real_t x58 = adjugate[2] * qy;
-    const real_t x59 = x40 + x58;
-    const real_t x60 = mu * x59;
-    const real_t x61 = adjugate[5] * x60;
-    const real_t x62 = adjugate[0] * qy;
-    const real_t x63 = x45 + x62;
-    const real_t x64 = x0 * x63;
-    const real_t x65 = adjugate[1] * x56;
-    const real_t x66 = adjugate[2] * x60;
-    const real_t x67 = adjugate[7] * qy;
-    const real_t x68 = qx + 2 * qy + x35;
-    const real_t x69 = adjugate[4] * x68 + x54 + x67;
-    const real_t x70 = mu * x69;
-    const real_t x71 = adjugate[1] * x70;
-    const real_t x72 = adjugate[8] * qy;
-    const real_t x73 = adjugate[5] * x68 + x58 + x72;
-    const real_t x74 = mu * x73;
-    const real_t x75 = adjugate[2] * x74;
-    const real_t x76 = adjugate[6] * qy;
-    const real_t x77 = adjugate[3] * x68 + x62 + x76;
-    const real_t x78 = x0 * x77;
-    const real_t x79 = adjugate[7] * x70;
-    const real_t x80 = adjugate[8] * x74;
-    const real_t x81 = adjugate[4] * x70;
-    const real_t x82 = adjugate[5] * x74;
-    const real_t x83 = adjugate[1] * qz;
-    const real_t x84 = adjugate[4] * qz;
-    const real_t x85 = qx + qy + 2 * qz - 1;
-    const real_t x86 = adjugate[7] * x85 + x83 + x84;
-    const real_t x87 = mu * x86;
-    const real_t x88 = adjugate[1] * x87;
-    const real_t x89 = adjugate[2] * qz;
-    const real_t x90 = adjugate[5] * qz;
-    const real_t x91 = adjugate[8] * x85 + x89 + x90;
-    const real_t x92 = mu * x91;
-    const real_t x93 = adjugate[2] * x92;
-    const real_t x94 = adjugate[0] * qz;
-    const real_t x95 = adjugate[3] * qz;
-    const real_t x96 = adjugate[6] * x85 + x94 + x95;
-    const real_t x97 = x0 * x96;
-    const real_t x98 = adjugate[4] * x87;
-    const real_t x99 = adjugate[5] * x92;
-    const real_t x100 = adjugate[7] * x87;
-    const real_t x101 = adjugate[8] * x92;
-    const real_t x102 = x34 + x83;
-    const real_t x103 = mu * x102;
-    const real_t x104 = adjugate[7] * x103;
-    const real_t x105 = x41 + x89;
-    const real_t x106 = mu * x105;
-    const real_t x107 = adjugate[8] * x106;
-    const real_t x108 = x46 + x94;
-    const real_t x109 = x0 * x108;
-    const real_t x110 = adjugate[1] * x103;
-    const real_t x111 = adjugate[2] * x106;
-    const real_t x112 = x67 + x84;
-    const real_t x113 = mu * x112;
-    const real_t x114 = adjugate[7] * x113;
-    const real_t x115 = x72 + x90;
-    const real_t x116 = mu * x115;
-    const real_t x117 = adjugate[8] * x116;
-    const real_t x118 = x76 + x95;
-    const real_t x119 = x0 * x118;
-    const real_t x120 = adjugate[4] * x113;
-    const real_t x121 = adjugate[5] * x116;
-    const real_t x122 = x0 * x6;
-    const real_t x123 = mu * x1;
-    const real_t x124 = adjugate[0] * x123 + adjugate[3] * x123 + adjugate[6] * x123;
-    const real_t x125 = mu * x19;
-    const real_t x126 = mu * x25;
-    const real_t x127 = mu * x31;
-    const real_t x128 = mu * x47;
-    const real_t x129 = adjugate[3] * x128;
-    const real_t x130 = x0 * x37;
-    const real_t x131 = adjugate[6] * x128;
-    const real_t x132 = adjugate[0] * x128;
-    const real_t x133 = mu * x63;
-    const real_t x134 = adjugate[3] * x133;
-    const real_t x135 = x0 * x55;
-    const real_t x136 = adjugate[0] * x133;
-    const real_t x137 = mu * x77;
-    const real_t x138 = adjugate[0] * x137;
-    const real_t x139 = x0 * x69;
-    const real_t x140 = adjugate[6] * x137;
-    const real_t x141 = adjugate[3] * x137;
-    const real_t x142 = mu * x96;
-    const real_t x143 = adjugate[0] * x142;
-    const real_t x144 = x0 * x86;
-    const real_t x145 = adjugate[3] * x142;
-    const real_t x146 = adjugate[6] * x142;
-    const real_t x147 = mu * x108;
-    const real_t x148 = adjugate[6] * x147;
-    const real_t x149 = x0 * x102;
-    const real_t x150 = adjugate[0] * x147;
-    const real_t x151 = mu * x118;
-    const real_t x152 = adjugate[6] * x151;
-    const real_t x153 = x0 * x112;
-    const real_t x154 = adjugate[3] * x151;
-    const real_t x155 = x0 * x3;
-    const real_t x156 = x0 * x42;
-    const real_t x157 = x0 * x59;
-    const real_t x158 = x0 * x73;
-    const real_t x159 = x0 * x91;
-    const real_t x160 = x0 * x105;
-    const real_t x161 = x0 * x115;
-    diag[0] += x14 * (adjugate[0] * x2 + adjugate[3] * x2 + adjugate[6] * x2 + x5 + x8);
-    diag[1] += x20 * (x0 * x19 + x16 + x18);
-    diag[2] += x26 * (x0 * x25 + x22 + x24);
-    diag[3] += x32 * (x0 * x31 + x28 + x30);
-    diag[4] +=
-        x53 * (qx * (adjugate[3] * x48 + x39 + x44) + qx * (adjugate[6] * x48 + x49 + x50) +
-               x36 * (adjugate[0] * x48 + x51 + x52));
-    diag[5] +=
-        x53 * (qx * (adjugate[3] * x64 + x57 + x61) + qy * (adjugate[0] * x64 + x65 + x66));
-    diag[6] +=
-        x53 * (qy * (adjugate[0] * x78 + x71 + x75) + qy * (adjugate[6] * x78 + x79 + x80) +
-               x68 * (adjugate[3] * x78 + x81 + x82));
-    diag[7] +=
-        x53 * (qz * (adjugate[0] * x97 + x88 + x93) + qz * (adjugate[3] * x97 + x98 + x99) +
-               x85 * (adjugate[6] * x97 + x100 + x101));
-    diag[8] +=
-        x53 * (qx * (adjugate[6] * x109 + x104 + x107) + qz * (adjugate[0] * x109 + x110 + x111));
-    diag[9] +=
-        x53 * (qy * (adjugate[6] * x119 + x114 + x117) + qz * (adjugate[3] * x119 + x120 + x121));
-    diag[10] +=
-        x14 * (adjugate[1] * x122 + adjugate[4] * x122 + adjugate[7] * x122 + x124 + x5);
-    diag[11] += x20 * (x0 * x15 + x125 + x18);
-    diag[12] += x26 * (x0 * x21 + x126 + x24);
-    diag[13] += x32 * (x0 * x27 + x127 + x30);
-    diag[14] +=
-        x53 * (qx * (adjugate[4] * x130 + x129 + x44) + qx * (adjugate[7] * x130 + x131 + x50) +
-               x36 * (adjugate[1] * x130 + x132 + x52));
-    diag[15] +=
-        x53 * (qx * (adjugate[4] * x135 + x134 + x61) + qy * (adjugate[1] * x135 + x136 + x66));
-    diag[16] +=
-        x53 * (qy * (adjugate[1] * x139 + x138 + x75) + qy * (adjugate[7] * x139 + x140 + x80) +
-               x68 * (adjugate[4] * x139 + x141 + x82));
-    diag[17] +=
-        x53 * (qz * (adjugate[1] * x144 + x143 + x93) + qz * (adjugate[4] * x144 + x145 + x99) +
-               x85 * (adjugate[7] * x144 + x101 + x146));
-    diag[18] +=
-        x53 * (qx * (adjugate[7] * x149 + x107 + x148) + qz * (adjugate[1] * x149 + x111 + x150));
-    diag[19] +=
-        x53 * (qy * (adjugate[7] * x153 + x117 + x152) + qz * (adjugate[4] * x153 + x121 + x154));
-    diag[20] +=
-        x14 * (adjugate[2] * x155 + adjugate[5] * x155 + adjugate[8] * x155 + x124 + x8);
-    diag[21] += x20 * (x0 * x17 + x125 + x16);
-    diag[22] += x26 * (x0 * x23 + x126 + x22);
-    diag[23] += x32 * (x0 * x29 + x127 + x28);
-    diag[24] +=
-        x53 * (qx * (adjugate[5] * x156 + x129 + x39) + qx * (adjugate[8] * x156 + x131 + x49) +
-               x36 * (adjugate[2] * x156 + x132 + x51));
-    diag[25] +=
-        x53 * (qx * (adjugate[5] * x157 + x134 + x57) + qy * (adjugate[2] * x157 + x136 + x65));
-    diag[26] +=
-        x53 * (qy * (adjugate[2] * x158 + x138 + x71) + qy * (adjugate[8] * x158 + x140 + x79) +
-               x68 * (adjugate[5] * x158 + x141 + x81));
-    diag[27] +=
-        x53 * (qz * (adjugate[2] * x159 + x143 + x88) + qz * (adjugate[5] * x159 + x145 + x98) +
-               x85 * (adjugate[8] * x159 + x100 + x146));
-    diag[28] +=
-        x53 * (qx * (adjugate[8] * x160 + x104 + x148) + qz * (adjugate[2] * x160 + x110 + x150));
-    diag[29] +=
-        x53 * (qy * (adjugate[8] * x161 + x114 + x152) + qz * (adjugate[5] * x161 + x120 + x154));
+static inline __device__ __host__ void diag_micro_kernel(const scalar_t mu,
+                                                         const scalar_t lambda,
+                                                         const scalar_t *const SFEM_RESTRICT
+                                                             adjugate,
+                                                         const scalar_t jacobian_determinant,
+                                                         const scalar_t qx,
+                                                         const scalar_t qy,
+                                                         const scalar_t qz,
+                                                         const scalar_t qw,
+                                                         accumulator_t *const SFEM_RESTRICT diag) {
+    const scalar_t x0 = POW2(adjugate[1] + adjugate[4] + adjugate[7]);
+    const scalar_t x1 = mu * x0;
+    const scalar_t x2 = POW2(adjugate[2] + adjugate[5] + adjugate[8]);
+    const scalar_t x3 = mu * x2;
+    const scalar_t x4 = lambda + 2 * mu;
+    const scalar_t x5 = POW2(adjugate[0] + adjugate[3] + adjugate[6]);
+    const scalar_t x6 = 4 * qx;
+    const scalar_t x7 = 4 * qy;
+    const scalar_t x8 = 4 * qz;
+    const scalar_t x9 = 1.0 / jacobian_determinant;
+    const scalar_t x10 = (1.0 / 6.0) * x9;
+    const scalar_t x11 = x10 * POW2(x6 + x7 + x8 - 3);
+    const scalar_t x12 = POW2(adjugate[1]);
+    const scalar_t x13 = mu * x12;
+    const scalar_t x14 = POW2(adjugate[2]);
+    const scalar_t x15 = mu * x14;
+    const scalar_t x16 = POW2(adjugate[0]);
+    const scalar_t x17 = x10 * POW2(x6 - 1);
+    const scalar_t x18 = POW2(adjugate[4]);
+    const scalar_t x19 = mu * x18;
+    const scalar_t x20 = POW2(adjugate[5]);
+    const scalar_t x21 = mu * x20;
+    const scalar_t x22 = POW2(adjugate[3]);
+    const scalar_t x23 = x10 * POW2(x7 - 1);
+    const scalar_t x24 = POW2(adjugate[7]);
+    const scalar_t x25 = mu * x24;
+    const scalar_t x26 = POW2(adjugate[8]);
+    const scalar_t x27 = mu * x26;
+    const scalar_t x28 = POW2(adjugate[6]);
+    const scalar_t x29 = x10 * POW2(x8 - 1);
+    const scalar_t x30 = adjugate[4] * qx;
+    const scalar_t x31 = adjugate[7] * qx;
+    const scalar_t x32 = qz - 1;
+    const scalar_t x33 = 2 * qx + qy + x32;
+    const scalar_t x34 = POW2(adjugate[1] * x33 + x30 + x31);
+    const scalar_t x35 = mu * x34;
+    const scalar_t x36 = adjugate[5] * qx;
+    const scalar_t x37 = adjugate[8] * qx;
+    const scalar_t x38 = POW2(adjugate[2] * x33 + x36 + x37);
+    const scalar_t x39 = mu * x38;
+    const scalar_t x40 = adjugate[3] * qx;
+    const scalar_t x41 = adjugate[6] * qx;
+    const scalar_t x42 = POW2(adjugate[0] * x33 + x40 + x41);
+    const scalar_t x43 = (8.0 / 3.0) * x9;
+    const scalar_t x44 = adjugate[1] * qy;
+    const scalar_t x45 = POW2(x30 + x44);
+    const scalar_t x46 = mu * x45;
+    const scalar_t x47 = adjugate[2] * qy;
+    const scalar_t x48 = POW2(x36 + x47);
+    const scalar_t x49 = mu * x48;
+    const scalar_t x50 = adjugate[0] * qy;
+    const scalar_t x51 = POW2(x40 + x50);
+    const scalar_t x52 = adjugate[7] * qy;
+    const scalar_t x53 = qx + 2 * qy + x32;
+    const scalar_t x54 = POW2(adjugate[4] * x53 + x44 + x52);
+    const scalar_t x55 = mu * x54;
+    const scalar_t x56 = adjugate[8] * qy;
+    const scalar_t x57 = POW2(adjugate[5] * x53 + x47 + x56);
+    const scalar_t x58 = mu * x57;
+    const scalar_t x59 = adjugate[6] * qy;
+    const scalar_t x60 = POW2(adjugate[3] * x53 + x50 + x59);
+    const scalar_t x61 = adjugate[1] * qz;
+    const scalar_t x62 = adjugate[4] * qz;
+    const scalar_t x63 = qx + qy + 2 * qz - 1;
+    const scalar_t x64 = POW2(adjugate[7] * x63 + x61 + x62);
+    const scalar_t x65 = mu * x64;
+    const scalar_t x66 = adjugate[2] * qz;
+    const scalar_t x67 = adjugate[5] * qz;
+    const scalar_t x68 = POW2(adjugate[8] * x63 + x66 + x67);
+    const scalar_t x69 = mu * x68;
+    const scalar_t x70 = adjugate[0] * qz;
+    const scalar_t x71 = adjugate[3] * qz;
+    const scalar_t x72 = POW2(adjugate[6] * x63 + x70 + x71);
+    const scalar_t x73 = POW2(x31 + x61);
+    const scalar_t x74 = mu * x73;
+    const scalar_t x75 = POW2(x37 + x66);
+    const scalar_t x76 = mu * x75;
+    const scalar_t x77 = POW2(x41 + x70);
+    const scalar_t x78 = POW2(x52 + x62);
+    const scalar_t x79 = mu * x78;
+    const scalar_t x80 = POW2(x56 + x67);
+    const scalar_t x81 = mu * x80;
+    const scalar_t x82 = POW2(x59 + x71);
+    const scalar_t x83 = mu * x5;
+    const scalar_t x84 = mu * x16;
+    const scalar_t x85 = mu * x22;
+    const scalar_t x86 = mu * x28;
+    const scalar_t x87 = mu * x42;
+    const scalar_t x88 = mu * x51;
+    const scalar_t x89 = mu * x60;
+    const scalar_t x90 = mu * x72;
+    const scalar_t x91 = mu * x77;
+    const scalar_t x92 = mu * x82;
+    diag[0] += qw * (x11 * (x1 + x3 + x4 * x5));
+    diag[1] += qw * (x17 * (x13 + x15 + x16 * x4));
+    diag[2] += qw * (x23 * (x19 + x21 + x22 * x4));
+    diag[3] += qw * (x29 * (x25 + x27 + x28 * x4));
+    diag[4] += qw * (x43 * (x35 + x39 + x4 * x42));
+    diag[5] += qw * (x43 * (x4 * x51 + x46 + x49));
+    diag[6] += qw * (x43 * (x4 * x60 + x55 + x58));
+    diag[7] += qw * (x43 * (x4 * x72 + x65 + x69));
+    diag[8] += qw * (x43 * (x4 * x77 + x74 + x76));
+    diag[9] += qw * (x43 * (x4 * x82 + x79 + x81));
+    diag[10] += qw * (x11 * (x0 * x4 + x3 + x83));
+    diag[11] += qw * (x17 * (x12 * x4 + x15 + x84));
+    diag[12] += qw * (x23 * (x18 * x4 + x21 + x85));
+    diag[13] += qw * (x29 * (x24 * x4 + x27 + x86));
+    diag[14] += qw * (x43 * (x34 * x4 + x39 + x87));
+    diag[15] += qw * (x43 * (x4 * x45 + x49 + x88));
+    diag[16] += qw * (x43 * (x4 * x54 + x58 + x89));
+    diag[17] += qw * (x43 * (x4 * x64 + x69 + x90));
+    diag[18] += qw * (x43 * (x4 * x73 + x76 + x91));
+    diag[19] += qw * (x43 * (x4 * x78 + x81 + x92));
+    diag[20] += qw * (x11 * (x1 + x2 * x4 + x83));
+    diag[21] += qw * (x17 * (x13 + x14 * x4 + x84));
+    diag[22] += qw * (x23 * (x19 + x20 * x4 + x85));
+    diag[23] += qw * (x29 * (x25 + x26 * x4 + x86));
+    diag[24] += qw * (x43 * (x35 + x38 * x4 + x87));
+    diag[25] += qw * (x43 * (x4 * x48 + x46 + x88));
+    diag[26] += qw * (x43 * (x4 * x57 + x55 + x89));
+    diag[27] += qw * (x43 * (x4 * x68 + x65 + x90));
+    diag[28] += qw * (x43 * (x4 * x75 + x74 + x91));
+    diag[29] += qw * (x43 * (x4 * x80 + x79 + x92));
 }
 
 static const int n_qp = 8;

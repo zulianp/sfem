@@ -183,6 +183,17 @@ class LinearElasticityOp:
 
 		return expr
 
+	def hessian_diag(self):
+		H = self.integr_hessian
+		rows, cols = H.shape
+
+		expr = []
+		for i in range(0, rows):
+			var = sp.symbols(f'element_vector[{i}*stride]')
+			expr.append(ast.Assignment(var, H[i, i]))
+
+		return expr
+
 	def gradient(self):
 		g = self.integr_gradient
 		rows, cols = g.shape
@@ -221,32 +232,37 @@ def main():
 	# fe = Tri6()
 	# q = sp.Matrix(2, 1, [qx, qy])
 
-	fe = Tet4()
-	# fe = Tet10()
+	# fe = Tet4()
+	fe = Tet10()
 	q = sp.Matrix(3, 1, [qx, qy, qz])
 
 	op = LinearElasticityOp(fe, q)
 	# op.hessian_check()
 
-	c_log("--------------------------")
-	c_log("value")
-	c_log("--------------------------")
-	c_code(op.value())
+	# c_log("--------------------------")
+	# c_log("value")
+	# c_log("--------------------------")
+	# c_code(op.value())
+
+	# c_log("--------------------------")
+	# c_log("gradient")
+	# c_log("--------------------------")
+	# c_code(op.gradient())
+
+	# c_log("--------------------------")
+	# c_log("hessian")	
+	# c_log("--------------------------")
+	# c_code(op.hessian())
+
+	# c_log("--------------------------")
+	# c_log("apply")	
+	# c_log("--------------------------")
+	# c_code(op.apply())
 
 	c_log("--------------------------")
-	c_log("gradient")
+	c_log("hessian_diag")	
 	c_log("--------------------------")
-	c_code(op.gradient())
-
-	c_log("--------------------------")
-	c_log("hessian")	
-	c_log("--------------------------")
-	c_code(op.hessian())
-
-	c_log("--------------------------")
-	c_log("apply")	
-	c_log("--------------------------")
-	c_code(op.apply())
+	c_code(op.hessian_diag())
 
 	stop = perf_counter()
 	console.print(f'Overall: {stop - start} seconds')

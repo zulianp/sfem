@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <cstddef>
 
-#include <mpi.h>
+// #include <mpi.h>
 
 extern "C" {
 #include "sfem_base.h"
@@ -494,7 +494,7 @@ extern "C" void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
                                            const count_t *const SFEM_RESTRICT rowptr,
                                            const idx_t *const SFEM_RESTRICT colidx,
                                            real_t *const SFEM_RESTRICT values) {
-    double tick = MPI_Wtime();
+    // double tick = MPI_Wtime();
 
     const ptrdiff_t nbatch = nelements;
 
@@ -548,7 +548,7 @@ extern "C" void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
         SFEM_CUDA_CHECK(cudaMemcpy(d_values, values, nnz * sizeof(real_t), cudaMemcpyHostToDevice));
     }
 
-    double ktick = MPI_Wtime();
+    // double ktick = MPI_Wtime();
     {
         laplacian_assemble_hessian_kernel<<<n_blocks, block_size>>>(
             nelements, nnodes, d_elems, d_xyz, d_rowptr, d_colidx, d_values);
@@ -561,7 +561,7 @@ extern "C" void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
         // Copy result to Host memory
         SFEM_CUDA_CHECK(cudaMemcpy(values, d_values, nnz * sizeof(real_t), cudaMemcpyDeviceToHost));
     }
-    double ktock = MPI_Wtime();
+    // double ktock = MPI_Wtime();
 
     {  // Free element indices
         for (int d = 0; d < 4; ++d) {
@@ -585,10 +585,10 @@ extern "C" void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
         SFEM_CUDA_CHECK(cudaFree(d_values));
     }
 
-    double tock = MPI_Wtime();
-    printf("cuda_laplacian.c: laplacian_assemble_hessian\t%g seconds (GPU kernel %g seconds)\n",
-           tock - tick,
-           ktock - ktick);
+    // double tock = MPI_Wtime();
+    // printf("cuda_laplacian.c: laplacian_assemble_hessian\t%g seconds (GPU kernel %g seconds)\n",
+    //        tock - tick,
+    //        ktock - ktick);
 }
 
 __global__ void laplacian_assemble_gradient_kernel(const ptrdiff_t nelements,
@@ -737,9 +737,9 @@ extern "C" void tet4_laplacian_assemble_gradient(const ptrdiff_t nelements,
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
 
-    printf("cuda_laplacian.c: laplacian_assemble_gradient\t%g seconds\nloops %d\n",
-           milliseconds / 1000,
-           int(nelements / nbatch));
+    // printf("cuda_laplacian.c: laplacian_assemble_gradient\t%g seconds\nloops %d\n",
+    //        milliseconds / 1000,
+    //        int(nelements / nbatch));
 }
 
 extern "C" void tet4_laplacian_apply(const ptrdiff_t nelements,

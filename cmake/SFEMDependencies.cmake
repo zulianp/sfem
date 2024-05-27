@@ -111,4 +111,9 @@ if(SFEM_ENABLE_CUDA)
 
   include(CheckLanguage)
   check_language(CUDA)
+
+  find_package(CUDAToolkit REQUIRED)
+
+  set(SFEM_DEP_LIBRARIES
+      "${SFEM_DEP_LIBRARIES};CUDA::cusparse;CUDA::cublas;CUDA::nvToolsExt")
 endif()
