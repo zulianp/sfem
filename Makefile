@@ -2,6 +2,11 @@ SHELL := /bin/bash
 
 # LDFLAGS=`mpic++ -showme:link`
 
+MARCH ?= native
+VECTOR_SIZE ?= 512
+
+GPU_ARCH ?= sm_75
+
 ifeq ($(debug),1)
 	CFLAGS += -O0 -g
 	CXXFLAGS += -O0 -g
@@ -19,8 +24,8 @@ else ifeq ($(asan), 1)
 # 	DEPS += -static-libsan
 # 	DEPS += -static
 else
-	CFLAGS += -Ofast -DNDEBUG
-	CXXFLAGS += -Ofast -DNDEBUG
+	CFLAGS += -Ofast -DNDEBUG -march=${MARCH} -fno-signed-zeros -fno-trapping-math -fassociative-math -mprefer-vector-width=${VECTOR_SIZE}  -fPIC
+	CXXFLAGS += -Ofast -DNDEBUG -march=${MARCH} -fno-signed-zeros -fno-trapping-math -fassociative-math -mprefer-vector-width=${VECTOR_SIZE} -fPIC
 	CUFLAGS += -O3 -DNDEBUG
 endif
 
@@ -84,7 +89,6 @@ INCLUDES += -I$(PWD) -I$(PWD)/.. -I$(PWD)/../matrix.io
 
 # Assemble systems
 GOALS = assemble assemble3 assemble4 neohookean_assemble stokes stokes_check linear_elasticity_assemble
-GOALS += macro_element_apply
 
 # Mesh manipulation
 GOALS += partition select_submesh refine skin extract_sharp_edges extrude wedge6_to_tet4 mesh_self_intersect select_surf volumes sfc
@@ -131,15 +135,28 @@ endif
 
 DEPS += -L$(PWD)/../matrix.io/ -lmatrix.io -lstdc++
 
-LDFLAGS += $(DEPS) -lm
+LDFLAGS += $(DEPS) -lm -fPIC
 
 MPICC ?= mpicc
 CXX ?= c++
+CC ?= cc
 MPICXX ?= mpicxx
 AR ?= ar
 NVCC ?= nvcc
 
-all : $(GOALS)
+export MPICH_CXX=${CXX}
+export OMPI_CXX=${CXX}
+
+export MPICH_CC=${CC}
+export OMPI_CC=${CC}
+
+
+all :    $(GOALS)
+
+pre-build:
+	mpicc --version
+
+
 
 OBJS = \
 	sortreduce.o \
@@ -178,6 +195,7 @@ OBJS += tri3_stokes_mini.o \
 		tri3_phase_field_for_fracture.o \
 		tri3_linear_elasticity.o \
 		tri3_laplacian.o
+
 
 
 # Macro Tri3
@@ -226,7 +244,7 @@ OBJS += tet10_grad.o \
 OBJS += sfem_prolongation_restriction.o
 
 # Resampling
-OBJS += sfem_resample_gap.o sfem_resample_field.o
+OBJS += sfem_resample_gap.o sfem_resample_field.o sfem_resample_field_v2.o sfem_resample_field_V8.o sfem_resample_field_V4.o
 
 # CVFEM
 OBJS += cvfem_tri3_diffusion.o cvfem_tet4_convection.o cvfem_tri3_convection.o cvfem_quad4_convection.o cvfem_quad4_laplacian.o
@@ -391,8 +409,13 @@ create_surface_from_element_adjaciency_table : create_surface_from_element_adjac
 gap_from_sdf : gap_from_sdf.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
-grid_to_mesh : grid_to_mesh.c libsfem.a
-	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
+# Resampling
+CUDA_LIBS_PATH = /usr/local/cuda-12.3/targets/x86_64-linux/lib
+grid_to_mesh: grid_to_mesh.c libsfem.a ${PWD}/resampling/cuda/libsfem_resample_field_cuda.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) -L${PWD}/resampling/cuda -lsfem_resample_field_cuda -L${CUDA_LIBS_PATH} -lcudart ; \
+
+${PWD}/resampling/cuda/libsfem_resample_field_cuda.a: ${PWD}/resampling/cuda/sfem_resample_field_cuda.cu ${PWD}/resampling/cuda/quadratures_rule_cuda.h
+	${MAKE} -C ${PWD}/resampling/cuda GPU_ARCH=${GPU_ARCH}
 
 geometry_aware_gap_from_sdf : geometry_aware_gap_from_sdf.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \

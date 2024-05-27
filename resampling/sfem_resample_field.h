@@ -11,37 +11,44 @@
 extern "C" {
 #endif
 
+typedef struct {
+    ptrdiff_t quad_nodes_cnt;
+    ptrdiff_t nelements;
+} sfem_resample_field_info;
+
 int resample_field_local(
-    // Mesh
-    const enum ElemType element_type,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t** const SFEM_RESTRICT elems,
-    geom_t** const SFEM_RESTRICT xyz,
-    // SDF
-    const ptrdiff_t* const SFEM_RESTRICT n,
-    const ptrdiff_t* const SFEM_RESTRICT stride,
-    const geom_t* const SFEM_RESTRICT origin,
-    const geom_t* const SFEM_RESTRICT delta,
-    const real_t* const SFEM_RESTRICT data,
-    // Output
-    real_t* const SFEM_RESTRICT wg);
+        // Mesh
+        const enum ElemType element_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t** const SFEM_RESTRICT elems,
+        geom_t** const SFEM_RESTRICT xyz,
+        // SDF
+        const ptrdiff_t* const SFEM_RESTRICT n,
+        const ptrdiff_t* const SFEM_RESTRICT stride,
+        const geom_t* const SFEM_RESTRICT origin,
+        const geom_t* const SFEM_RESTRICT delta,
+        const real_t* const SFEM_RESTRICT data,
+        // Output
+        real_t* const SFEM_RESTRICT wg,
+        sfem_resample_field_info* info);
 
 int resample_field(
-    // Mesh
-    const enum ElemType element_type,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t** const SFEM_RESTRICT elems,
-    geom_t** const SFEM_RESTRICT xyz,
-    // SDF
-    const ptrdiff_t* const SFEM_RESTRICT n,
-    const ptrdiff_t* const SFEM_RESTRICT stride,
-    const geom_t* const SFEM_RESTRICT origin,
-    const geom_t* const SFEM_RESTRICT delta,
-    const real_t* const SFEM_RESTRICT data,
-    // Output
-    real_t* const SFEM_RESTRICT field);
+        // Mesh
+        const enum ElemType element_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t** const SFEM_RESTRICT elems,
+        geom_t** const SFEM_RESTRICT xyz,
+        // SDF
+        const ptrdiff_t* const SFEM_RESTRICT n,
+        const ptrdiff_t* const SFEM_RESTRICT stride,
+        const geom_t* const SFEM_RESTRICT origin,
+        const geom_t* const SFEM_RESTRICT delta,
+        const real_t* const SFEM_RESTRICT data,
+        // Output
+        real_t* const SFEM_RESTRICT field,
+        sfem_resample_field_info* info);
 
 int interpolate_field(const ptrdiff_t nnodes,
                       geom_t** const SFEM_RESTRICT xyz,

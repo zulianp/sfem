@@ -18,6 +18,9 @@ PATH=$SCRIPTPATH/../../python/sfem/algebra:$PATH
 PATH=$SCRIPTPATH/../../python/sfem/sdf:$PATH
 PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
+export OMP_PROC_BIND=true
+export OMP_NUM_THREADS=18
+
 field=field.raw
 mesh=mesh
 out=resampled
@@ -37,7 +40,7 @@ if [[ -d "$skinned" ]]
 then
 	echo "Reusing existing mesh $skinned and SDF!"
 else
-	create_sphere.sh 5
+	create_sphere.sh 5 
 	sfc $mesh $mesh_sorted
 	mkdir -p $skinned
 	skin $mesh $skinned
@@ -53,15 +56,21 @@ echo $sizes
 echo $origins
 echo $scaling
 
-# n_procs=1
+n_procs=1
 # n_procs=2
-n_procs=8
+# n_procs=8
+
 LAUNCH="mpiexec -np $n_procs"
+# LAUNCH=" "
+
+GRID_TO_MESH="grid_to_mesh"
+# GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
+
 # LAUNCH="lldb --"
 
 # export OMP_NUM_THREADS=8
 # export OMP_PROC_BIND=true
 
 set -x
-time SFEM_INTERPOLATE=0 SFEM_READ_FP32=1 $LAUNCH grid_to_mesh $sizes $origins $scaling $sdf $resample_target $field
+time SFEM_INTERPOLATE= SFEM_READ_FP32=1 $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field
 raw_to_db.py $resample_target out.vtk --point_data=$field
