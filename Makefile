@@ -376,9 +376,7 @@ grid_to_mesh: grid_to_mesh.c libsfem.a ${PWD}/resampling/cuda/libsfem_resample_f
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) -L${PWD}/resampling/cuda -lsfem_resample_field_cuda -L${CUDA_LIBS_PATH} -lcudart ; \
 
 ${PWD}/resampling/cuda/libsfem_resample_field_cuda.a: ${PWD}/resampling/cuda/sfem_resample_field_cuda.cu ${PWD}/resampling/cuda/quadratures_rule_cuda.h
-	cd ${PWD}/resampling/cuda ; \
-	make GPU_ARCH=${GPU_ARCH} ; \
-	cd ${PWD} ; 
+	${MAKE} -C ${PWD}/resampling/cuda GPU_ARCH=${GPU_ARCH}
 
 geometry_aware_gap_from_sdf : geometry_aware_gap_from_sdf.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
