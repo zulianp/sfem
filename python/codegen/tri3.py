@@ -73,6 +73,9 @@ class Tri3(FE):
 	def measure(self, q):
 		return det2(self.A_) / 2
 
+	def reference_measure(self):
+		return sp.Rational(1, 2)
+
 class TriShell3(Tri3):
 	def __init__(self):
 		super().__init__()
@@ -110,6 +113,9 @@ class TriShell3(Tri3):
 
 	def measure(self, q):
 		return self.detS / 2
+
+	def reference_measure(self):
+		return sp.Rational(1, 2)
 
 if __name__ == '__main__':
 	# Tri3().generate_c_code()

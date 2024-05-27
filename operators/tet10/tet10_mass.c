@@ -220,11 +220,11 @@ static SFEM_INLINE void find_cols10(const idx_t *targets,
 
 void tet10_assemble_mass(const ptrdiff_t nelements,
                          const ptrdiff_t nnodes,
-                         idx_t **const elems,
-                         geom_t **const xyz,
-                         count_t *const rowptr,
-                         idx_t *const colidx,
-                         real_t *const values) {
+                         idx_t **const SFEM_RESTRICT elems,
+                         geom_t **const SFEM_RESTRICT xyz,
+                         const count_t *const SFEM_RESTRICT rowptr,
+                         const idx_t *const SFEM_RESTRICT colidx,
+                         real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
     double tick = MPI_Wtime();

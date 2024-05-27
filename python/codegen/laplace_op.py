@@ -5,6 +5,7 @@ from tri3 import *
 from tri6 import *
 from tet4 import *
 from tet10 import *
+from tet20 import *
 
 
 
@@ -159,8 +160,7 @@ def main():
 	# op = LaplaceOp(fe, q)
 
 	# fe = Tet4()
-	fe = Tet10()
-
+	fe = Tet20()
 	q = sp.Matrix(3, 1, [qx, qy, qz])
 	op = LaplaceOp(fe, q)
 

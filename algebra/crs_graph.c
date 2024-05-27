@@ -284,10 +284,10 @@ int build_crs_graph_for_elem_type(const int element_type,
 
     if (SFEM_CRS_MEM_CONSERVATIVE) {
         return build_crs_graph_mem_conservative(
-            nelements, nnodes, element_type, elems, out_rowptr, out_colidx);
+            nelements, nnodes, elem_num_nodes(element_type), elems, out_rowptr, out_colidx);
     } else {
         return build_crs_graph_faster(
-            nelements, nnodes, element_type, elems, out_rowptr, out_colidx);
+            nelements, nnodes, elem_num_nodes(element_type), elems, out_rowptr, out_colidx);
     }
 }
 
@@ -416,9 +416,9 @@ int create_dual_graph_mem_conservative(const ptrdiff_t n_elements,
     element_idx_t *elindex = 0;
 
     if (element_type == TET10) {
-        build_n2e(n_elements, n_nodes, TET4, elems, &n2eptr, &elindex);
+        build_n2e(n_elements, n_nodes, elem_num_nodes(TET4), elems, &n2eptr, &elindex);
     } else {
-        build_n2e(n_elements, n_nodes, element_type, elems, &n2eptr, &elindex);
+        build_n2e(n_elements, n_nodes, elem_num_nodes(element_type), elems, &n2eptr, &elindex);
     }
 
 #ifdef SFEM_MEM_DIAGNOSTICS

@@ -7,8 +7,8 @@ project(
     LANGUAGES "C" "CXX"
     HOMEPAGE_URL "https://bitbucket.org/zulianp/sfem"
     DESCRIPTION
-        "SFEM: Simple FEM"
-)
+    "SFEM: Simple FEM"
+    )
 
 # Std CMake imports
 include(CMakePackageConfigHelpers)
@@ -22,40 +22,75 @@ include(cmake/SFEMBuildTypes.cmake)
 include(cmake/SFEMCMakeFunctions.cmake)
 include(cmake/SFEMDependencies.cmake)
 
+if(SFEM_ENABLE_PYTHON)
+    include(cmake/SFEMPython.cmake)
+endif()
+
 ######################################################
 ######################################################
 # Library
 ######################################################
 
-find_package(MatrixIO)
+find_package(MatrixIO REQUIRED)
+find_package(ISolver REQUIRED)
 
 set(SFEM_MODULES
     algebra base matrix mesh pizzastack resampling solver
     operators 
-        operators/beam2 
-        operators/cvfem 
-        operators/kernels 
-        operators/navier_stokes
-        operators/phase_field_for_fracture
-        operators/tet10
-        operators/tet4
-        operators/tri3
-        operators/tri6
-        operators/trishell3
-            )
+    operators/beam2 
+    operators/cvfem 
+    # operators/kernels 
+    operators/navier_stokes
+    # operators/phase_field_for_fracture
+    operators/tet10
+    operators/tet4
+    operators/tri3
+    operators/tri6
+    operators/trishell3
+    operators/cvfem_tri3
+    operators/cvfem_tet4
+    operators/cvfem_quad4
+    operators/macro_tri3
+    operators/macro_tet4
+    operators/hierarchical
+    )
+
+list(APPEND SFEM_MODULES frontend)
 
 if(SFEM_ENABLE_METIS)
     list(APPEND SFEM_MODULES graphs)
 endif()
 
+if(SFEM_ENABLE_CUDA)
+     list(APPEND SFEM_MODULES 
+        algebra/cuda
+        operators/cuda
+        frontend/cuda
+        )
+endif()
+
 foreach(MODULE ${SFEM_MODULES})
     scan_directories(${CMAKE_SOURCE_DIR}/${MODULE} "." SFEM_BUILD_INCLUDES
-                     SFEM_HEADERS SFEM_SOURCES)
+       SFEM_HEADERS SFEM_SOURCES)
+
+    if(SFEM_ENABLE_CUDA)
+        file(GLOB SFEM_MODULE_KERNEL_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/${MODULE}/*.cu")
+        # message(STATUS "${MODULE} : ${SFEM_MODULE_KERNEL_SOURCES}")
+    endif()
+
+    if(SFEM_MODULE_KERNEL_SOURCES)
+        list(APPEND SFEM_KERNEL_SOURCES "${SFEM_MODULE_KERNEL_SOURCES}")
+    endif()
 endforeach(MODULE)
+
+if(SFEM_ENABLE_CUDA)
+    list(APPEND SFEM_SOURCES "${SFEM_KERNEL_SOURCES}")
+endif()
 
 # message(STATUS "SFEM_BUILD_INCLUDES: ${SFEM_BUILD_INCLUDES}")
 # message(STATUS "SFEM_HEADERS: ${SFEM_HEADERS}") 
 # message(STATUS "SFEM_SOURCES: ${SFEM_SOURCES}")
+# message(STATUS "SFEM_KERNEL_SOURCES: ${SFEM_KERNEL_SOURCES}")
 
 add_library(sfem ${SFEM_SOURCES} ${SFEM_HEADERS})
 
@@ -64,14 +99,15 @@ add_library(sfem ${SFEM_SOURCES} ${SFEM_HEADERS})
 
 foreach(include ${SFEM_BUILD_INCLUDES})
     target_include_directories(sfem BEFORE
-                               PUBLIC $<BUILD_INTERFACE:${include}>)
+     PUBLIC $<BUILD_INTERFACE:${include}>)
 endforeach()
 
 target_include_directories(
     sfem BEFORE
     PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
-           $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-           $<INSTALL_INTERFACE:include> $<INSTALL_INTERFACE:include/kernels>)
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include> $<INSTALL_INTERFACE:include/kernels>)
+
 
 target_include_directories(sfem PUBLIC ${SFEM_DEP_INCLUDES})
 
@@ -79,6 +115,7 @@ target_include_directories(sfem PUBLIC ${SFEM_DEP_INCLUDES})
 # link
 
 target_link_libraries(sfem PUBLIC ${SFEM_DEP_LIBRARIES})
+# message(STATUS "SFEM_DEP_LIBRARIES: ${SFEM_DEP_LIBRARIES}")
 
 ######################################################
 # properties
@@ -86,9 +123,15 @@ target_link_libraries(sfem PUBLIC ${SFEM_DEP_LIBRARIES})
 set_compiler_features(sfem)
 set_target_properties(
     sfem PROPERTIES VERSION ${SFEM_VERSION}
-                             SOVERSION ${SFEM_VERSION_MAJOR})
+    SOVERSION ${SFEM_VERSION_MAJOR})
 
 set(SFEM_TARGETS sfem)
+
+if(SFEM_ENABLE_CUDA)
+# set_target_properties(sfem PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+# https://gt3rs.medium.com/compile-with-nvcc-3566fbdfdbf
+      set_property(TARGET sfem PROPERTY CUDA_ARCHITECTURES 60)
+endif()
 
 ######################################################
 ######################################################
@@ -96,16 +139,33 @@ set(SFEM_TARGETS sfem)
 
 file(GLOB C_DRIVERS CONFIGURE_DEPENDS "drivers/*.c")
 file(GLOB CPP_DRIVERS CONFIGURE_DEPENDS "drivers/*.cpp")
+# file(GLOB CPP_EXAMPLES CONFIGURE_DEPENDS "examples/*.cpp")
+file(GLOB C_EXAMPLES CONFIGURE_DEPENDS "examples/*.c")
 
-set(DRIVERS "${C_DRIVERS};${CPP_DRIVERS}")
+set(DRIVERS "${C_DRIVERS};${CPP_DRIVERS};${C_EXAMPLES}")
 
-list(APPEND SFEM_EXCLUDED_EXEC "grad_and_project;heat_equation;integrate_divergence;partition_mesh_based_on_operator;taylor_hood_navier_stokes;ssolve")
+# list(APPEND SFEM_EXCLUDED_EXEC "grad_and_project;heat_equation;integrate_divergence;partition_mesh_based_on_operator;taylor_hood_navier_stokes;ssolve")
+
+list(APPEND SFEM_EXCLUDED_EXEC "ssolve")
+
+if(SFEM_ENABLE_CUDA)
+    file(GLOB CUDA_C_EXAMPLES CONFIGURE_DEPENDS "drivers/cuda/*.c")
+    file(GLOB CUDA_CXX_EXAMPLES CONFIGURE_DEPENDS "drivers/cuda/*.cpp")
+
+    list(APPEND DRIVERS "${CUDA_C_EXAMPLES}")
+    list(APPEND DRIVERS "${CUDA_CXX_EXAMPLES}")
+else()
+    list(APPEND SFEM_EXCLUDED_EXEC "run_poisson_cuda;cuda_do_spmv;lapl_matrix_free;linear_elasticity_matrix_free")
+endif()
 
 foreach(DRIVER ${DRIVERS})
     get_filename_component(DRIVER_NAME ${DRIVER} NAME_WE)
     list(FIND SFEM_EXCLUDED_EXEC "${DRIVER_NAME}" LIST_INDEX)
+
+    
     
     if (${LIST_INDEX} GREATER -1)
+        message(STATUS "Skipped DRIVER_NAME: ${DRIVER_NAME}")
     else()
         add_executable(${DRIVER_NAME} ${DRIVER})
         target_link_libraries(${DRIVER_NAME} PRIVATE sfem)
@@ -120,6 +180,13 @@ endforeach()
 # if(SFEM_ENABLE_BENCHMARK)
 #     include(benchmarks/benchmarks.cmake)
 # endif()
+
+if(SFEM_ENABLE_PYTHON)
+    add_subdirectory(python/bindings)
+    set(SFEM_TARGETS ${SFEM_TARGETS} pysfem)
+endif()
+
+# message(STATUS "SFEM_TARGETS: ${SFEM_TARGETS}")
 
 ######################################################
 ######################################################
@@ -166,8 +233,8 @@ install(
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/python/sfem DESTINATION scripts)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/python/requirements.txt DESTINATION scripts)
 
-######################################################
 
+######################################################
 ######################################################
 
 # generate the config file that is includes the exports
@@ -184,8 +251,8 @@ write_basic_package_version_file(
 
 # install the configuration file
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/SFEMConfig.cmake
-              ${CMAKE_CURRENT_BINARY_DIR}/SFEMConfigVersion.cmake
-        DESTINATION lib/cmake/)
+  ${CMAKE_CURRENT_BINARY_DIR}/SFEMConfigVersion.cmake
+  DESTINATION lib/cmake/)
 
 include(cmake/PostInstall.cmake)
 

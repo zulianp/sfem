@@ -572,8 +572,6 @@ void tri3_linear_elasticity_apply_soa(const ptrdiff_t nelements,
     const double tick = MPI_Wtime();
 
     idx_t ev[3];
-    idx_t ks[3][3];
-
     real_t element_vector[(3 * 2)];
     real_t element_displacement[(3 * 2)];
 

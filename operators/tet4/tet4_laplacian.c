@@ -350,7 +350,7 @@ void tet4_laplacian_assemble_gradient(const ptrdiff_t nelements,
                                       real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    // double tick = MPI_Wtime();
 
 #pragma omp parallel
     {
@@ -404,8 +404,8 @@ void tet4_laplacian_assemble_gradient(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
-    printf("tet4_laplacian.c: tet4_laplacian_assemble_gradient\t%g seconds\n", tock - tick);
+    // double tock = MPI_Wtime();
+    // printf("tet4_laplacian.c: tet4_laplacian_assemble_gradient\t%g seconds\n", tock - tick);
 }
 
 void tet4_laplacian_assemble_value(const ptrdiff_t nelements,
@@ -416,7 +416,7 @@ void tet4_laplacian_assemble_value(const ptrdiff_t nelements,
                                    real_t *const SFEM_RESTRICT value) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    // double tick = MPI_Wtime();
 
 #pragma omp parallel
     {
@@ -467,8 +467,8 @@ void tet4_laplacian_assemble_value(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
-    printf("tet4_laplacian.c: tet4_laplacian_assemble_value\t%g seconds\n", tock - tick);
+    // double tock = MPI_Wtime();
+    // printf("tet4_laplacian.c: tet4_laplacian_assemble_value\t%g seconds\n", tock - tick);
 }
 
 void tet4_laplacian_apply(const ptrdiff_t nelements,

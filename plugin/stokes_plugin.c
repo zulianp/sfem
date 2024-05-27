@@ -22,6 +22,7 @@
 #include "sfem_mesh.h"
 
 #include "boundary_condition.h"
+#include "boundary_condition_io.h"
 #include "dirichlet.h"
 #include "neumann.h"
 
@@ -304,7 +305,10 @@ int ISOLVER_EXPORT isolver_function_gradient(const isolver_function_t *info,
                                       out);
 
     add_neumann_condition_to_gradient_vec(
-        problem->n_neumann_conditions, problem->neumann_conditions, mesh, problem->block_size, out);
+        mesh->element_type,
+        mesh->points,
+        problem->n_neumann_conditions, problem->neumann_conditions, 
+        problem->block_size, out);
 
     if (SFEM_DEBUG_DUMP) {
         static int gradient_counter = 0;
@@ -346,7 +350,7 @@ int ISOLVER_EXPORT isolver_function_hessian_crs(const isolver_function_t *info,
 
     apply_dirichlet_condition_to_hessian_crs_vec(problem->n_dirichlet_conditions,
                                                  problem->dirichlet_conditions,
-                                                 mesh,
+                                                 // mesh,
                                                  problem->block_size,
                                                  rowptr,
                                                  colidx,
@@ -431,7 +435,7 @@ int ISOLVER_EXPORT isolver_function_apply_constraints(const isolver_function_t *
 
     apply_dirichlet_condition_vec(problem->n_dirichlet_conditions,
                                   problem->dirichlet_conditions,
-                                  mesh,
+                                  // mesh,
                                   problem->block_size,
                                   x);
 
@@ -447,7 +451,7 @@ int ISOLVER_EXPORT isolver_function_apply_zero_constraints(const isolver_functio
 
     apply_zero_dirichlet_condition_vec(problem->n_dirichlet_conditions,
                                        problem->dirichlet_conditions,
-                                       mesh,
+                                       // mesh,
                                        problem->block_size,
                                        x);
 
@@ -464,7 +468,7 @@ int ISOLVER_EXPORT isolver_function_copy_constrained_dofs(const isolver_function
 
     copy_at_dirichlet_nodes_vec(problem->n_dirichlet_conditions,
                                 problem->dirichlet_conditions,
-                                mesh,
+                                // mesh,
                                 problem->block_size,
                                 src,
                                 dest);
