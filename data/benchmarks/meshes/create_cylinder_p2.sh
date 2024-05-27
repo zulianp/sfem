@@ -43,7 +43,7 @@ mkdir -p $folder
 idx_type_size=4
 
 cylinder.py $mesh_db $nrefs
-db_to_raw.py $mesh_db $mesh_raw/p1
+db_to_raw.py $mesh_db $mesh_raw/p1 --select_elem_type=tetra
 mesh_p1_to_p2 $mesh_raw/p1 $mesh_raw
 # sfc $mesh_raw $mesh_raw/sorted
 refine $mesh_raw/p1 $mesh_raw/p1/refined

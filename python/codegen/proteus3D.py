@@ -6,6 +6,7 @@ from fe import FE
 from sfem_codegen import *
 from weighted_fe import *
 
+idx_offset = 0	# or 1 for fortran
 
 def plot_points(points):
 	import matplotlib.pyplot as plt
@@ -31,7 +32,7 @@ def plot_points(points):
 	    offset = (0.01, 0.01, 0.01)  # adjust offset as needed
 
 	       # Add text label near the point
-	    ax.text(x[i] + offset[0], y[i] + offset[1], z[i] + offset[2], f"{i+1}", zdir=(1, 1, 1))  # adjust zdir for better visibility
+	    ax.text(x[i] + offset[0], y[i] + offset[1], z[i] + offset[2], f"{i+idx_offset}", zdir=(1, 1, 1))  # adjust zdir for better visibility
 
 
 	# Set labels and title
@@ -60,14 +61,16 @@ class ProteusTet(FE):
 					z = k / (order)
 					p = [x, y, z]
 					points.append(p)
-					
+		
+
+		
 		idx = 0
 		for p in points:
-			print(f'{idx+1})\t{p[0]},{p[1]},{p[2]}')
+			print(f'{idx+idx_offset})\t{p[0]},{p[1]},{p[2]}')
 			idx += 1
 
 		plot_points(points)
 		self.points = points
 
 
-tet = ProteusTet(4)
+tet = ProteusTet(3)

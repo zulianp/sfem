@@ -139,10 +139,6 @@ int main(int argc, char *argv[]) {
     idx_t **surf_elems = (idx_t **)malloc(nnxs * sizeof(idx_t *));
     element_idx_t *parent = 0;
 
-    // if (mesh.element_type == TET4) {
-    //     extract_surface_connectivity(mesh.nelements, mesh.elements, &n_surf_elements, surf_elems,
-    //     &parent);
-    // } else {
     extract_surface_connectivity_with_adj_table(mesh.nelements,
                                                 mesh.nnodes,
                                                 mesh.element_type,
@@ -150,7 +146,6 @@ int main(int argc, char *argv[]) {
                                                 &n_surf_elements,
                                                 surf_elems,
                                                 &parent);
-    // }
 
     idx_t *vol2surf = (idx_t *)malloc(mesh.nnodes * sizeof(idx_t));
     for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {

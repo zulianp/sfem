@@ -6,10 +6,12 @@
 #include <cuda_runtime_api.h>
 
 #include <stdio.h>
+#include <assert.h>
 
 inline void sfem_cuda_check(cudaError_t code, const char* file, int line, bool abort = true) {
     if (code != cudaSuccess) {
         fprintf(stderr, "cuda_check: %s %s:%d\n", cudaGetErrorString(code), file, line);
+        assert(!code);
         if (abort) exit(code);
     }
 }

@@ -9,8 +9,9 @@ extern "C" {
 #endif
 
 typedef struct {
+    enum ElemType element_type;
     ptrdiff_t nelements;
-    geom_t *d_fff;
+    void *d_fff;
     idx_t *d_elems;
 } cuda_incore_laplacian_t;
 
@@ -24,6 +25,8 @@ int tet4_cuda_incore_laplacian_destroy(cuda_incore_laplacian_t *ctx);
 int tet4_cuda_incore_laplacian_apply(cuda_incore_laplacian_t *ctx,
                                      const real_t *const d_x,
                                      real_t *const d_y);
+
+int tet4_cuda_incore_laplacian_diag(cuda_incore_laplacian_t *ctx, real_t *const d_t);
 
 #ifdef __cplusplus
 }
