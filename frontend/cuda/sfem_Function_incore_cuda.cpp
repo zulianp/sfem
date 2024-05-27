@@ -159,6 +159,7 @@ namespace sfem {
                         const isolver_idx_t *const rowptr,
                         const isolver_idx_t *const colidx,
                         isolver_scalar_t *const values) override {
+            std::cerr << "Unimplemented function hessian_crs in GPULaplacian\n";
             assert(0);
             return ISOLVER_FUNCTION_FAILURE;
         }
@@ -176,6 +177,7 @@ namespace sfem {
         }
 
         int value(const isolver_scalar_t *x, isolver_scalar_t *const out) override {
+            std::cerr << "Unimplemented function value in GPULaplacian\n";
             assert(0);
             return ISOLVER_FUNCTION_FAILURE;
         }
@@ -224,6 +226,8 @@ namespace sfem {
                         const isolver_idx_t *const rowptr,
                         const isolver_idx_t *const colidx,
                         isolver_scalar_t *const values) override {
+            std::cerr << "Unimplemented function hessian_crs in GPULinearElasticity\n";
+            assert(0);
             return ISOLVER_FUNCTION_FAILURE;
         }
 
@@ -248,6 +252,8 @@ namespace sfem {
         }
 
         int value(const isolver_scalar_t *x, isolver_scalar_t *const out) override {
+            std::cerr << "Unimplemented function value in GPULinearElasticity\n";
+            assert(0);
             return ISOLVER_FUNCTION_FAILURE;
         }
 

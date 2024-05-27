@@ -35,6 +35,14 @@ void tet10_linear_elasticity_apply_aos(const ptrdiff_t nelements,
                                        const real_t *const SFEM_RESTRICT u,
                                        real_t *const SFEM_RESTRICT values);
 
+void tet10_linear_elasticity_assemble_diag_aos(const ptrdiff_t nelements,
+                                       const ptrdiff_t nnodes,
+                                       idx_t **const SFEM_RESTRICT elements,
+                                       geom_t **const SFEM_RESTRICT points,
+                                       const real_t mu,
+                                       const real_t lambda,
+                                       real_t *const SFEM_RESTRICT values);
+
 #ifdef __cplusplus
 }
 #endif

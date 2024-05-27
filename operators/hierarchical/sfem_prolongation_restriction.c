@@ -5,6 +5,23 @@
 
 #include <mpi.h>
 #include <stdio.h>
+#include <stddef.h>
+
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
+ptrdiff_t max_node_id(const enum ElemType type,
+                      const ptrdiff_t nelements,
+                      idx_t **const SFEM_RESTRICT elements) {
+    const int nxe = elem_num_nodes(type);
+    ptrdiff_t ret = 0;
+    for (int i = 0; i < nxe; i++) {
+        for (ptrdiff_t e = 0; e < nelements; e++) {
+            ret = MAX(ret, elements[nxe][e]);
+        }
+    }
+    return ret;
+}
 
 int hierarchical_prolongation(const enum ElemType from_element,
                               const enum ElemType to_element,

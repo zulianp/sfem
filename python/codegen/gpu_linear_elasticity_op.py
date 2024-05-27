@@ -6,9 +6,15 @@ from tri3 import *
 from tri6 import *
 from tet4 import *
 from tet10 import *
+from tet20 import *
 from symbolic_fe import *
 
 from time import perf_counter
+
+
+def simplify(expr):
+	# return expr;
+	return sp.simplify(expr)
 
 def assign_matrix(name, mat):
 	rows, cols = mat.shape
@@ -21,6 +27,86 @@ def assign_matrix(name, mat):
 
 class GPULinearElasticityOp:
 	def __init__(self, fe, q):
+		self.init_opt(fe, q)
+		# self.init_basic(fe, q)
+
+	def init_basic(self, fe, q):
+		fe.use_adjugate = True
+		dims = fe.manifold_dim()
+		q = sp.Matrix(dims, 1, q)
+		shape_grad = fe.physical_tgrad(q)
+		shape_grad_ref = fe.tgrad(q)
+		# jac_inv = fe.symbol_jacobian_inverse()
+		jac_inv = fe.symbol_jacobian_inverse_as_adjugate()
+		disp = coeffs('u', dims * fe.n_nodes())
+		
+		self.jac = fe.jacobian(q)
+		rows = fe.n_nodes() * dims
+		cols = rows
+
+		###################################################################
+		# Material law
+		###################################################################
+		c_log("Material law")
+
+		self.disp_grad_name = 'disp_grad'
+
+		mu, lmbda = sp.symbols('mu lambda', real=True)
+		disp_grad = sp.Matrix(dims, dims, coeffs(self.disp_grad_name, dims * dims))
+
+		self.eval_disp_grad  = sp.zeros(dims, dims)
+		for i in range(0, dims * fe.n_nodes()):
+			self.eval_disp_grad += disp[i] * shape_grad_ref[i]
+		self.eval_disp_grad = self.eval_disp_grad * jac_inv
+
+		# strain energy function
+		epsu = (disp_grad + disp_grad.T) / 2
+		e = mu * inner(epsu, epsu) + (lmbda/2) * (tr(epsu) * tr(epsu))
+
+		dV = (fe.reference_measure() * fe.quadrature_weight()) * fe.symbol_jacobian_determinant() 
+
+		# Objective
+		self.eval_value = e * dV
+		self.eval_value = simplify(self.eval_value)
+
+		# Gradient
+		P = sp.Matrix(dims, dims, [0]*(dims*dims))
+		for d1 in range(0, dims):
+			for d2 in range(0, dims):
+				P[d1, d2] = sp.diff(e, disp_grad[d1, d2])
+		
+		self.eval_grad = sp.zeros(rows, 1)
+
+		# Reference measure scaled here for reducing register usage
+		self.P = P 
+		P_sym = matrix_coeff('P', dims, dims)
+		
+		for i in range(0, rows):
+			self.eval_grad[i] = inner(P, shape_grad[i]) * dV
+		
+		self.eval_hessian =  sp.zeros(rows, cols)
+
+		for j in range(0, rows):
+			# Construct gradient for row j
+			dde = sp.zeros(dims, dims)
+			for d1 in range(0, dims):
+				for d2 in range(0, dims):
+					dde[d1, d2] = simplify(sp.diff(self.eval_grad[j], disp_grad[d1, d2]))
+
+			for i in range(0, cols):
+				actual = inner(dde, shape_grad[i])
+				self.eval_hessian[i, j] = actual
+
+		self.e = e
+		self.de = P
+		self.mu = mu
+		self.lmbda = lmbda
+
+		self.fe = fe
+		self.increment = coeffs('u', fe.n_nodes() * dims)
+
+
+	def init_opt(self, fe, q):
 		fe.use_adjugate = True
 		dims = fe.manifold_dim()
 		q = sp.Matrix(dims, 1, q)
@@ -51,7 +137,7 @@ class GPULinearElasticityOp:
 
 		test_disp_grad = sp.zeros(dims, dims)
 		for i in range(0, dims * fe.n_nodes()):
-			test_disp_grad  += disp[i] * shape_grad[i]
+			test_disp_grad += disp[i] * shape_grad[i]
 
 		for i in range(0, dims):
 			for j in range(0, dims):
@@ -65,8 +151,11 @@ class GPULinearElasticityOp:
 		epsu = (disp_grad + disp_grad.T) / 2
 		e = mu * inner(epsu, epsu) + (lmbda/2) * (tr(epsu) * tr(epsu))
 
-		self.eval_value = e * fe.reference_measure() * fe.symbol_jacobian_determinant()
-		self.eval_value = sp.simplify(self.eval_value)
+
+		dV = fe.reference_measure() * fe.symbol_jacobian_determinant() * fe.quadrature_weight()
+		# Objective
+		self.eval_value = e * dV
+		self.eval_value = simplify(self.eval_value)
 
 		# Gradient
 		P = sp.Matrix(dims, dims, [0]*(dims*dims))
@@ -82,8 +171,8 @@ class GPULinearElasticityOp:
 		P_sym = matrix_coeff('P', dims, dims)
 		
 		for i in range(0, fe.n_nodes() * dims):
-			self.eval_grad[i] = inner(P_sym, shape_grad[i]) * (fe.symbol_jacobian_determinant() * fe.reference_measure())
-			self.eval_grad[i] = sp.simplify(self.eval_grad[i])
+			self.eval_grad[i] = inner(P_sym, shape_grad[i]) * dV
+			self.eval_grad[i] = simplify(self.eval_grad[i])
 			eval_grad[i] = inner(P, shape_grad[i])
 
 
@@ -95,10 +184,10 @@ class GPULinearElasticityOp:
 		eval_grad_opt = sp.zeros(rows, 1)
 		for i in range(0, fe.n_nodes() * dims):
 			self.eval_grad_opt[i] = inner(P_tXJinv_t_sym, shape_grad_ref[i]) 
-			self.eval_grad_opt[i] = sp.simplify(self.eval_grad_opt[i])
+			self.eval_grad_opt[i] = simplify(self.eval_grad_opt[i])
 
 			# Evaluation for computing hessian
-			eval_grad_opt[i] = inner(P.T * jac_inv.T * (fe.symbol_jacobian_determinant() * fe.reference_measure()), shape_grad_ref[i])
+			eval_grad_opt[i] = simplify(inner(P.T * jac_inv.T * dV, shape_grad_ref[i]))
 
 		self.eval_hessian =  sp.zeros(rows, cols)
 		self.lin_stress = []
@@ -109,7 +198,7 @@ class GPULinearElasticityOp:
 			dde = sp.zeros(dims, dims)
 			for d1 in range(0, dims):
 				for d2 in range(0, dims):
-					dde[d1, d2] = sp.simplify(sp.diff(eval_grad_opt[j], disp_grad[d1, d2]))
+					dde[d1, d2] = simplify(sp.diff(eval_grad_opt[j], disp_grad[d1, d2]))
 
 			# self.lin_stress.append(dde)
 			self.lin_stress.append(dde.T * jac_inv.T)
@@ -117,7 +206,7 @@ class GPULinearElasticityOp:
 
 			for i in range(0, cols):
 				test = inner(dde, shape_grad[i])
-				actual = sp.simplify(inner(dde.T * jac_inv.T, shape_grad_ref[i]))
+				actual = simplify(inner(dde.T * jac_inv.T, shape_grad_ref[i]))
 				self.eval_hessian[i, j] = actual
 
 		###################################################################
@@ -138,6 +227,7 @@ class GPULinearElasticityOp:
 		self.increment = coeffs('u', fe.n_nodes() * dims)
 
 		###################################################################
+	
 	def hessian_check(self):
 		H = self.integr_hessian
 		rows, cols = H.shape
@@ -212,7 +302,7 @@ class GPULinearElasticityOp:
 		dims = self.fe.manifold_dim()
 		for i in range(0, dims):
 			for j in range(0, dims):
-				P_tXJinv_t[i, j] = sp.simplify(P_tXJinv_t[i, j])
+				P_tXJinv_t[i, j] = simplify(P_tXJinv_t[i, j])
 
 		expr = assign_matrix('P_tXJinv_t', P_tXJinv_t)
 		return expr
@@ -236,7 +326,7 @@ class GPULinearElasticityOp:
 		expr = []
 		for i in range(0, rows):
 			var = sp.symbols(f'diag[{i}*stride]')
-			expr.append(ast.Assignment(var, sp.simplify(H[i, i])))
+			expr.append(ast.Assignment(var, (H[i, i])))
 		return expr
 
 
@@ -247,7 +337,7 @@ class GPULinearElasticityOp:
 
 		for i in range(0, rows):
 			for j in range(0, cols):
-				s[i, j] = sp.simplify(s[i, j])
+				s[i, j] = simplify(s[i, j])
 
 		expr = assign_matrix('lin_stress', s)
 		return expr
@@ -324,8 +414,9 @@ def main():
 	# fe = Tri6()
 	# q = sp.Matrix(2, 1, [qx, qy])
 
-	fe = Tet4()
-	# fe = Tet10()
+	# fe = Tet4()
+	# fe = Tet20()
+	fe = Tet10()
 	# fe = SymbolicFE3D()	
 	q = sp.Matrix(3, 1, [qx, qy, qz])
 
@@ -333,9 +424,9 @@ def main():
 	# op.hessian_check()
 
 
-	c_log("//--------------------------")
-	c_log("// geometry")	
-	c_log("//--------------------------")
+	# c_log("//--------------------------")
+	# c_log("// geometry")	
+	# c_log("//--------------------------")
 	
 	# c_code(op.jacobian())
 	# c_code(op.geometry())
@@ -371,15 +462,15 @@ def main():
 	# c_log("//--------------------------")
 	# c_code(op.value())
 
-	c_log("--------------------------")
-	c_log("hessian")	
-	c_log("--------------------------")
-	c_code(op.hessian())
+	# c_log("--------------------------")
+	# c_log("hessian")	
+	# c_log("--------------------------")
+	# c_code(op.hessian())
 
-	# c_log("--------------------------")
-	# c_log("hessian_diag")	
-	# c_log("--------------------------")
-	# c_code(op.hessian_diag())
+	c_log("--------------------------")
+	c_log("hessian_diag")	
+	c_log("--------------------------")
+	c_code(op.hessian_diag())
 
 	# c_log("--------------------------")
 	# c_log("lin stress")	
