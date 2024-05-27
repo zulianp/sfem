@@ -890,8 +890,10 @@ int resample_field_local(
             info->quad_nodes_cnt = TET4_NQP;
             info->nelements = nelements;
 
-            return tet4_resample_field_local_reduce_CUDA(  ////// v2 test V4 V8 CUDA
-                                                           //   0,
+            // tet4_resample_field_local_reduce_CUDA
+
+            return tet4_resample_field_local_reduce_CUDA(  ////// v2 test V4 V8 CUDA  reduce_CUDA
+                                                  //   0,
                     nelements,
                     nnodes,
                     elems,
