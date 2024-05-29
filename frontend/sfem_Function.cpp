@@ -498,11 +498,14 @@ namespace sfem {
         impl_->space = space;
     }
 
-    std::shared_ptr<Constraint> DirichletConditions::derefine(const std::shared_ptr<FunctionSpace> &coarse_space) const {
+    std::shared_ptr<Constraint> DirichletConditions::derefine(
+        const std::shared_ptr<FunctionSpace> &coarse_space,
+        const bool as_zero) const {
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
         auto et = (enum ElemType)impl_->space->element_type();
 
-        const ptrdiff_t max_coarse_idx = max_node_id(coarse_space->element_type(), mesh->nelements, mesh->elements);
+        const ptrdiff_t max_coarse_idx =
+            max_node_id(coarse_space->element_type(), mesh->nelements, mesh->elements);
 
         auto coarse = std::make_shared<DirichletConditions>(coarse_space);
 
@@ -520,7 +523,7 @@ namespace sfem {
                                                &coarse_local_size,
                                                &coarse_indices);
 
-            if (impl_->dirichlet_conditions[i].values) {
+            if (!as_zero && impl_->dirichlet_conditions[i].values) {
                 coarse_values = (real_t *)malloc(coarse_local_size * sizeof(real_t));
 
                 hierarchical_collect_coarse_values(max_coarse_idx,
@@ -532,11 +535,20 @@ namespace sfem {
 
             long coarse_global_size = coarse_local_size;
 
-            CATCH_MPI_ERROR(
-                MPI_Allreduce(MPI_IN_PLACE, &coarse_global_size, 1, MPI_LONG, MPI_SUM, mesh->comm));
+            // CATCH_MPI_ERROR(
+            // MPI_Allreduce(MPI_IN_PLACE, &coarse_global_size, 1, MPI_LONG, MPI_SUM, mesh->comm));
 
+            if (as_zero) {
+                boundary_condition_create(
+                    &coarse->impl_->dirichlet_conditions[coarse->impl_->n_dirichlet_conditions++],
+                    coarse_local_size,
+                    coarse_global_size,
+                    coarse_indices,
+                    impl_->dirichlet_conditions[i].component,
+                    0,
+                    nullptr);
 
-
+            } else {
                 boundary_condition_create(
                     &coarse->impl_->dirichlet_conditions[coarse->impl_->n_dirichlet_conditions++],
                     coarse_local_size,
@@ -545,6 +557,7 @@ namespace sfem {
                     impl_->dirichlet_conditions[i].component,
                     impl_->dirichlet_conditions[i].value,
                     coarse_values);
+            }
         }
 
         return coarse;
@@ -1063,12 +1076,16 @@ namespace sfem {
             rows, cols, [=](const isolver_scalar_t *const from, isolver_scalar_t *const to) {
                 ::hierarchical_prolongation(
                     coarse_et, et, mesh->nelements, mesh->elements, from, to);
+                this->apply_zero_constraints(to);
             });
     }
 
-    std::shared_ptr<Function> Function::derefine() { return derefine(impl_->space->derefine()); }
+    std::shared_ptr<Function> Function::derefine(const bool dirichlet_as_zero) {
+        return derefine(impl_->space->derefine(), dirichlet_as_zero);
+    }
 
-    std::shared_ptr<Function> Function::derefine(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Function> Function::derefine(const std::shared_ptr<FunctionSpace> &space,
+                                                 const bool dirichlet_as_zero) {
         auto ret = std::make_shared<Function>(space);
 
         for (auto &o : impl_->ops) {
@@ -1076,7 +1093,7 @@ namespace sfem {
         }
 
         for (auto &c : impl_->constraints) {
-            ret->impl_->constraints.push_back(c->derefine(space));
+            ret->impl_->constraints.push_back(c->derefine(space, dirichlet_as_zero));
         }
 
         ret->impl_->handle_constraints = impl_->handle_constraints;
@@ -1093,7 +1110,6 @@ namespace sfem {
         }
 
         for (auto &c : impl_->constraints) {
-            // ret->impl_->constraints.push_back(c->lor());
             ret->impl_->constraints.push_back(c);
         }
 

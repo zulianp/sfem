@@ -102,7 +102,10 @@ int main(int argc, char *argv[]) {
     SFEM_USE_GPU = false;
 #endif
     {
-        solver = sfem::h_cg<real_t>();
+        auto cg = sfem::h_cg<real_t>();
+        cg->verbose = true;
+        cg->set_max_it(10);
+        solver = cg;
 
         auto op = sfem::Factory::create_op(fs, SFEM_OPERATOR);
         op->initialize();
@@ -114,19 +117,32 @@ int main(int argc, char *argv[]) {
         b_b = sfem::h_buffer<real_t>(fs->n_dofs());
 
         if (SFEM_USE_PRECONDITIONER) {
-            if (true) {
-                // if (false) {
+            // if (true) {
+                if (false) {
                 auto mg = sfem::h_mg<real_t>();
-
 
                 auto lor_fs = fs->lor();
                 auto lor_f = f->lor(lor_fs);
 
                 auto coarse_fs = lor_fs->derefine();
-                auto coarse_f = lor_f->derefine(coarse_fs);
+                auto coarse_f = lor_f->derefine(coarse_fs, true);
 
                 auto restriction = lor_f->hierarchical_restriction();
                 auto prolongation = lor_f->hierarchical_prolongation();
+
+                if (false) {
+                    for (ptrdiff_t i = 0; i < b_x->size(); i++) {
+                        b_x->data()[i] = 1;
+                    }
+
+                    restriction->apply(b_x->data(), b_b->data());
+
+                    for (ptrdiff_t i = 0; i < coarse_fs->n_dofs(); i++) {
+                        printf("%g ", b_b->data()[i]);
+                        b_b->data()[i] = 0;
+                    }
+                    printf("\n");
+                }
 
                 // Fine level
                 {
@@ -135,12 +151,24 @@ int main(int argc, char *argv[]) {
                                               lor_fs->n_dofs(),
                                               [=](const real_t *const x, real_t *const y) {
                                                   lor_f->apply(nullptr, x, y);
+                                                  // lor_f->apply_zero_constraints(y);
+                                              });
+
+                    std::shared_ptr<sfem::Operator<real_t>> fine_residual_op =
+                        sfem::make_op<real_t>(lor_fs->n_dofs(),
+                                              lor_fs->n_dofs(),
+                                              [=](const real_t *const x, real_t *const y) {
+                                                  lor_f->gradient(x, y);
+                                                  // lor_f->apply_zero_constraints(y);
                                               });
 
                     auto fine_smoother = sfem::h_cg<real_t>();
                     fine_smoother->set_n_dofs(fs->n_dofs());
                     fine_smoother->set_op(fine_op);
-                    mg->add_level(fine_op, fine_smoother, nullptr, restriction);
+                    fine_smoother->verbose = false;
+                    fine_smoother->set_max_it(10);
+
+                    mg->add_level(fine_residual_op, fine_smoother, nullptr, restriction);
                 }
 
                 // Coarse level
@@ -150,12 +178,22 @@ int main(int argc, char *argv[]) {
                                               coarse_fs->n_dofs(),
                                               [=](const real_t *const x, real_t *const y) {
                                                   coarse_f->apply(nullptr, x, y);
+                                                  // coarse_f->apply_zero_constraints(y);
+                                              });
+
+                    std::shared_ptr<sfem::Operator<real_t>> coarse_residual_op =
+                        sfem::make_op<real_t>(coarse_fs->n_dofs(),
+                                              coarse_fs->n_dofs(),
+                                              [=](const real_t *const x, real_t *const y) {
+                                                  coarse_f->gradient(x, y);
+                                                  // coarse_f->apply_zero_constraints(y);
                                               });
 
                     auto coarse_grid_solver = sfem::h_cg<real_t>();
                     coarse_grid_solver->set_n_dofs(coarse_fs->n_dofs());
                     coarse_grid_solver->set_op(coarse_op);
-                    mg->add_level(coarse_op, coarse_grid_solver, prolongation, nullptr);
+                    coarse_grid_solver->verbose = true;
+                    mg->add_level(coarse_residual_op, coarse_grid_solver, prolongation, nullptr);
                 }
 
                 solver->set_preconditioner_op(mg);
@@ -184,8 +222,8 @@ int main(int argc, char *argv[]) {
     // Solver set-up
     // -------------------------------
     solver->set_op(sfem::make_op<real_t>(
-        fs->n_dofs(), fs->n_dofs(), [=](const real_t *const x, real_t *const y) {
-            f->apply(nullptr, x, y);
+        fs->n_dofs(), fs->n_dofs(), [=](const real_t *const v, real_t *const w) {
+            f->apply(nullptr, v, w);
         }));
 
     // -------------------------------
@@ -196,7 +234,7 @@ int main(int argc, char *argv[]) {
     f->apply_constraints(b_x->data());
     f->apply_constraints(b_b->data());
 
-    solver->set_max_it(40000);
+    // solver->set_max_it(40000);
     solver->set_n_dofs(fs->n_dofs());
     solver->apply(b_b->data(), b_x->data());
 
