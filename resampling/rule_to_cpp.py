@@ -9,6 +9,44 @@ matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
+def nearest_neighbour_rule(rule):
+    n = rule.shape[0]
+    
+    distances = np.zeros((n, n))
+    
+    for i in range(n):
+        for j in range(n):
+            distances[i, j] = np.linalg.norm(rule[i, :3] - rule[j, :3])
+            
+    coord = np.zeros((3))
+    print(f"coord: {coord}")
+    
+    new_rule = []
+    used = []
+    
+    # put n growing number in a list
+    todo = []
+    for i in range(n):
+        todo.append(i)
+        
+    # search the nearest neighbour for coord
+    while len(todo) > 0:
+        min_dist = np.inf
+        for i in todo:
+            dist = np.linalg.norm(rule[i, :3] - coord)
+            if dist < min_dist:
+                min_dist = dist
+                index = i
+                
+        coord = rule[index, :3]
+        # remove index from todo
+        todo.remove(index)
+        
+        new_rule.append(rule[index, :])
+        
+    return np.array(new_rule)
+        
+
 def generate_rule(file_name, precision=16):
     """
     Generate a rule from a csv file.
@@ -30,6 +68,8 @@ def generate_rule(file_name, precision=16):
             rule[row_i, :3] = rule[row_i, :3] + thet_e[i, :] * rule_base[row_i, i]
         
         rule[row_i, 3] = rule_base[row_i, 4]
+    
+    rule = nearest_neighbour_rule(rule)
     
     return rule
 
