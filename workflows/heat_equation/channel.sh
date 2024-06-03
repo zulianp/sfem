@@ -29,9 +29,7 @@ then
 fi
 
 SFEM_MESH_DIR=mesh
-create_box_2D_p2.sh 5
-# create_box_2D.sh 2
-rm -f $mesh/z.raw
+create_cylinder.sh 4
 
 sleft=$SFEM_MESH_DIR/sidesets_aos/sleft.raw
 sright=$SFEM_MESH_DIR/sidesets_aos/sright.raw

@@ -182,6 +182,8 @@ static SFEM_INLINE void tri_shell_6_integrate(const real_t px0,
              x20 * x25 - x20 * x7 + x21 * x22 + x21 * x23 + x22 * x23 + x22 * x24 + x23 * x25 +
              x24 * x25 - x26 * x3 - x26 * x6 - x27 * x6 - x27 * x9 - x28 * x3 - x28 * x9 -
              2 * x3 * x6 + x3 * x7 + x4 * x7 - x5 * x7 + x6 * x7);
+
+    assert(x29 == x29);
     element_vector[0 * stride] = x29;
     element_vector[1 * stride] = x29;
     element_vector[2 * stride] = x29;
@@ -193,33 +195,41 @@ static void tri_shell_6_surface_forcing_function(const ptrdiff_t nfaces,
                                                  const real_t value,
                                                  const int stride,
                                                  real_t *SFEM_RESTRICT output) {
-    double tick = MPI_Wtime();
+    // double tick = MPI_Wtime();
 
 #pragma omp parallel
     {
 #pragma omp for  // nowait
 
         for (idx_t f = 0; f < nfaces; ++f) {
-            real_t element_vector[3];
+            real_t element_vector[3] = {0};
 
             idx_t i0 = faces_neumann[f * 6];
             idx_t i1 = faces_neumann[f * 6 + 1];
             idx_t i2 = faces_neumann[f * 6 + 2];
-            idx_t i3 = faces_neumann[f * 6 + 3];
-            idx_t i4 = faces_neumann[f * 6 + 4];
-            idx_t i5 = faces_neumann[f * 6 + 5];
 
             tri_shell_6_integrate(xyz[0][i0],
                                   xyz[0][i1],
                                   xyz[0][i2],
+                                  //
                                   xyz[1][i0],
                                   xyz[1][i1],
                                   xyz[1][i2],
+                                  //
                                   xyz[2][i0],
                                   xyz[2][i1],
                                   xyz[2][i2],
                                   &value,
+                                  //
                                   element_vector);
+
+            assert(element_vector[0] == element_vector[0]);
+            assert(element_vector[1] == element_vector[1]);
+            assert(element_vector[2] == element_vector[2]);
+
+            idx_t i3 = faces_neumann[f * 6 + 3];
+            idx_t i4 = faces_neumann[f * 6 + 4];
+            idx_t i5 = faces_neumann[f * 6 + 5];
 
 // Only edge dofs
 #pragma omp atomic update
@@ -233,8 +243,8 @@ static void tri_shell_6_surface_forcing_function(const ptrdiff_t nfaces,
         }
     }
 
-    double tock = MPI_Wtime();
-    printf("neumann.c: tri_shell_6_surface_forcing_function\t%g seconds\n", tock - tick);
+    // double tock = MPI_Wtime();
+    // printf("neumann.c: tri_shell_6_surface_forcing_function\t%g seconds\n", tock - tick);
 }
 
 static SFEM_INLINE void edge_shell_2_surface_forcing_function_kernel(
