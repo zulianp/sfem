@@ -17,6 +17,9 @@ int macro_tet4_cuda_incore_laplacian_apply(cuda_incore_laplacian_t *ctx,
                                            const real_t *const d_x,
                                            real_t *const d_y);
 
+
+int macro_tet4_cuda_incore_laplacian_diag(cuda_incore_laplacian_t *ctx, real_t *const d_t);
+
 #ifdef __cplusplus
 }
 #endif

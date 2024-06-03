@@ -2,6 +2,7 @@
 #include "read_mesh.h"
 
 #include "matrixio_array.h"
+#include "sfem_defs.h"
 #include "utils.h"
 
 #include <assert.h>
@@ -306,7 +307,7 @@ int mesh_build_global_ids(mesh_t *mesh) {
             idx_t iii = keys[k] - begin;
 
             if (iii >= n_lnodes_temp) {
-                printf("[%d] %d < %d < %d\n", rank, begin, keys[k], begin + n_lnodes_temp);
+                printf("[%d] %ld < %d < %ld\n", rank, begin, keys[k], begin + n_lnodes_temp);
             }
 
             assert(iii < n_lnodes_temp);
@@ -849,6 +850,10 @@ int mesh_read_generic(MPI_Comm comm,
         mesh->spatial_dim = ndims;
         mesh->element_type = nnodesxelem;
 
+        if(nnodesxelem == 4 && ndims == 2) {
+            mesh->element_type = QUAD4;
+        }
+
         mesh->elements = elems;
         mesh->points = part_xyz;
         mesh->nelements = n_local_elements;
@@ -943,6 +948,10 @@ int mesh_read_generic(MPI_Comm comm,
 
         mesh->spatial_dim = ndims;
         mesh->element_type = nnodesxelem;
+
+        if(nnodesxelem == 4 && ndims == 2) {
+            mesh->element_type = QUAD4;
+        }
 
         mesh->nelements = n_local_elements;
         mesh->nnodes = n_local_nodes;

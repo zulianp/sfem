@@ -59,6 +59,8 @@ else:
 		c[2], c[4], c[5]
 	])
 
+adjugate = strided_matrix_coeff("adjugate", dim, dim, "stride")
+
 def read_file(path):
 	with open(path, 'r') as f:
 	    tpl = f.read()
@@ -83,7 +85,19 @@ def assign_fff(name, mat):
 			idx += 1
 	return expr
 
-def subJ_generic(micro_ref, FFFs):
+def assign_adjugate(name, mat):
+	rows, cols = mat.shape
+
+	expr = []
+	idx = 0
+	for i in range(0, rows):
+		for j in range(0, cols):
+			var = sp.symbols(f'{name}[{idx}]')
+			expr.append(ast.Assignment(var, mat[i, j]))
+			idx += 1
+	return expr
+
+def sub_fff_generic(micro_ref, FFFs):
 	Am = sp.zeros(dim, dim)
 
 	for d1 in range(0, dim):
@@ -102,14 +116,34 @@ def subJ_generic(micro_ref, FFFs):
 
 
 	FFAms = Aminv * FFFs * Aminv.T * detAm
+
+	print("------------------")
+	print(Aminv)
+	print(detAm)
+	print(FFAms)
 	return FFAms
+
+def sub_adj_generic(micro_ref, adj):
+	Am = sp.zeros(dim, dim)
+
+	for d1 in range(0, dim):
+		for d2 in range(0, dim):
+			Am[d2, d1] = micro_ref[d1+1][d2] - micro_ref[0][d2]
+	
+	# detAm = determinant(Am)
+	Aminv = inverse(Am)
+
+	return Aminv * adj
 
 def subJ(micro_ref):
 	for d1 in range(0, dim):
 		for d2 in range(d1+1, dim):
 			FFFs[d2, d1] = FFFs[d1, d2] 
 
-	return subJ_generic(micro_ref, FFFs)
+	return sub_fff_generic(micro_ref, FFFs)
+
+def sub_adjugate(micro_ref):
+	return sub_adj_generic(micro_ref, adjugate)
 
 def fff_code_basic(FFF):
 	funs = []
@@ -137,6 +171,16 @@ def fff_code(name, FFF):
 
 	return code
 
+def adjugate_code(name, adj):
+	funs = []
+	tpl = read_file('tpl/macro_sub_adjugate_tpl.c')
+	code = tpl.format(
+		NUM=name,
+		CODE=c_gen(assign_adjugate("sub_adjugate", adj))
+	)
+
+	return code
+
 class MacroSimplex:
 	def __init__(self):
 		points = []
@@ -151,6 +195,27 @@ class MacroSimplex:
 			points.append(p)
 
 		self.points = np.array(points)
+
+	def adjugate_level_n(self, n_levels):
+		levels = [[]] * n_levels
+		x = self.points
+
+		for ss in sub_simplices:
+			refpattern = x[ss]
+			adj = sub_adjugate(refpattern)
+			levels[0].append(adj)
+
+		for l in range(1, n_levels):
+			n_ffs = len(levels[l-1])
+			levels[l] = [0]*(n_ffs * 2)
+
+			for i in range(0, n_ffs):
+				adj = levels[l-1][i]
+				for ss in sub_simplices:
+					refpattern = x[ss]
+					sub_adj = sub_adj_generic(refpattern, adj)
+					levels[l].append(sub_adj)
+		return levels
 
 	def fff_level_n(self, n_levels):
 		levels = [[]] * n_levels
@@ -169,7 +234,7 @@ class MacroSimplex:
 				fff = levels[l-1][i]
 				for ss in sub_simplices:
 					refpattern = x[ss]
-					sub_fff = subJ_generic(refpattern, fff)
+					sub_fff = sub_fff_generic(refpattern, fff)
 					levels[l].append(sub_fff)
 		return levels
 
@@ -183,4 +248,23 @@ for l in range(0, nl):
 	for i in range(0, len(fffl[l])):
 		f = fffl[l][i]
 		print(fff_code(f'{l}_{num}',f))
+		num += 1
+
+
+print("------------------------------------")
+print("ADJUGATE")
+print("------------------------------------")
+
+fffl = MacroSimplex().adjugate_level_n(nl)
+
+for l in range(0, nl):
+	num = 0
+	print(f'level {l} #adjugate {len(fffl[l])}')
+	# for i in unique:
+	for i in range(0, len(fffl[l])):
+		f = fffl[l][i]
+		if nl > 1:
+			print(adjugate_code(f'{l}_{num}',f))
+		else:
+			print(adjugate_code(f'{num}',f))
 		num += 1

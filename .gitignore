@@ -53,6 +53,7 @@ Thumbs.db
 
 # C/C++ artifacts
 *.o
+*.dylib
 
 # Output files
 *.raw
@@ -61,15 +62,23 @@ Thumbs.db
 *.h5
 *.o
 *.dSYM
-*.csv
+# *.csv
 *.out
+*.xmf
+*.xdmf
+*.e
+*.sublime-workspace
+*.zip
 
+CMakeCache.txt
+api/
 build/
 .cache/
-
-
-build/
-.cache/
+CMakeFiles/
+venv/
+api/
+pysfem.egg-info/
+external/nanobind
 workflows/resample/sdf.float32.xdmf
 *.xdmf
 

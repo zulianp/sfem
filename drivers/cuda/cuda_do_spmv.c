@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -88,9 +89,20 @@ int main(int argc, char *argv[]) {
              SFEM_MPI_REAL_T,
              &crs);
 
-    ptrdiff_t _nope_, x_n;
+    
     real_t *x = 0;
-    array_create_from_file(comm, x_path, SFEM_MPI_REAL_T, (void **)&x, &_nope_, &x_n);
+    if (strcmp("gen:ones", x_path) == 0) {
+        ptrdiff_t ndofs = crs.lrows;
+        x = malloc(ndofs * sizeof(real_t));
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < ndofs; ++i) {
+            x[i] = 1;
+        }
+
+    } else {
+        ptrdiff_t _nope_, x_n;
+        array_create_from_file(comm, x_path, SFEM_MPI_REAL_T, (void **)&x, &_nope_, &x_n);
+    }
 
     real_t *y = calloc(crs.grows, sizeof(real_t));
 
@@ -129,6 +141,12 @@ int main(int argc, char *argv[]) {
         cusparseOperation_t op_type =
             transpose ? CUSPARSE_OPERATION_TRANSPOSE : CUSPARSE_OPERATION_NON_TRANSPOSE;
 
+#if CUDART_VERSION < 12000
+        cusparseSpMVAlg_t alg = CUSPARSE_MV_ALG_DEFAULT;
+#else
+        cusparseSpMVAlg_t alg = CUSPARSE_SPMV_ALG_DEFAULT;
+#endif
+
         CHECK_CUSPARSE(cusparseCreateCsr(&d_matrix,
                                          crs.lrows,
                                          crs.lrows,
@@ -148,16 +166,8 @@ int main(int argc, char *argv[]) {
         CHECK_CUSPARSE(cusparseCreateDnVec(&vecY, crs.lrows, dY, valueType));
 
         size_t bufferSize = 0;
-        CHECK_CUSPARSE(cusparseSpMV_bufferSize(handle,
-                                               op_type,
-                                               &alpha,
-                                               d_matrix,
-                                               vecX,
-                                               &beta,
-                                               vecY,
-                                               valueType,
-                                               CUSPARSE_SPMV_ALG_DEFAULT,
-                                               &bufferSize));
+        CHECK_CUSPARSE(cusparseSpMV_bufferSize(
+            handle, op_type, &alpha, d_matrix, vecX, &beta, vecY, valueType, alg, &bufferSize));
 
         CHECK_CUDA(cudaMemcpy(dY, y, crs.lrows * sizeof(real_t), cudaMemcpyHostToDevice));
 
@@ -172,22 +182,18 @@ int main(int argc, char *argv[]) {
         double spmv_tick = MPI_Wtime();
 
         for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
-            CHECK_CUSPARSE(cusparseSpMV(handle,
-                                        op_type,
-                                        &alpha,
-                                        d_matrix,
-                                        vecX,
-                                        &beta,
-                                        vecY,
-                                        valueType,
-                                        CUSPARSE_SPMV_ALG_DEFAULT,
-                                        dBuffer));
+            CHECK_CUSPARSE(cusparseSpMV(
+                handle, op_type, &alpha, d_matrix, vecX, &beta, vecY, valueType, alg, dBuffer));
         }
 
         cudaDeviceSynchronize();
 
         double spmv_tock = MPI_Wtime();
-        printf("spmv: %g (seconds)\n", (spmv_tock - spmv_tick) / SFEM_REPEAT);
+        double avg_time = (spmv_tock - spmv_tick) / SFEM_REPEAT;
+        double avg_throughput = (crs.grows / avg_time) * (sizeof(real_t) * 1e-9);
+
+
+        printf("spmv:  %g %g %ld %ld %ld\n", avg_time, avg_throughput, 0l, crs.lrows, crs.lnnz);
 
         CHECK_CUDA(cudaPeekAtLastError());
         CHECK_CUDA(cudaMemcpy(y, dY, crs.lrows * sizeof(real_t), cudaMemcpyDeviceToHost));

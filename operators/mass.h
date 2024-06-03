@@ -13,8 +13,8 @@ void assemble_mass(const int element_type,
                    const ptrdiff_t nnodes,
                    idx_t **const SFEM_RESTRICT elems,
                    geom_t **const SFEM_RESTRICT xyz,
-                   count_t *const SFEM_RESTRICT rowptr,
-                   idx_t *const SFEM_RESTRICT colidx,
+                   const count_t *const SFEM_RESTRICT rowptr,
+                   const idx_t *const SFEM_RESTRICT colidx,
                    real_t *const SFEM_RESTRICT values);
 
 void assemble_lumped_mass(const int element_type,
