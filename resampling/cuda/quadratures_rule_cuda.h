@@ -190,6 +190,8 @@ static __constant__ real_t tet4_qz[TET4_NQP] = {
 #ifdef SFEM_USE_RULE56
 #define TET4_NQP 56
 
+// #define USE_STD_QUADRATURE
+
 #ifdef USE_STD_QUADRATURE
 
 static __constant__ real_t tet4_qw[TET4_NQP] = {

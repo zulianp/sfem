@@ -10,6 +10,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#define real_t double
+
 #include "quadratures_rule.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -892,7 +894,7 @@ int resample_field_local(
 
             // tet4_resample_field_local_reduce_CUDA
 
-            return tet4_resample_field_local_reduce_CUDA(  ////// v2 test V4 V8 CUDA  reduce_CUDA
+            return tet4_resample_field_local_V8(  ////// v2 test V4 V8 CUDA  reduce_CUDA
                                                   //   0,
                     nelements,
                     nnodes,
