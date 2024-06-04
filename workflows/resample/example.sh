@@ -44,7 +44,7 @@ else
 	sfc $mesh $mesh_sorted
 	mkdir -p $skinned
 	skin $mesh $skinned
-	mesh_to_sdf.py $skinned $sdf --hmax=0.01 --margin=0.2
+	mesh_to_sdf.py $skinned $sdf --hmax=0.01 --margin=0.1
 	raw_to_xdmf.py $sdf
 fi
 
@@ -56,7 +56,7 @@ echo $sizes
 echo $origins
 echo $scaling
 
-n_procs=1
+n_procs=18
 # n_procs=2
 # n_procs=8
 
