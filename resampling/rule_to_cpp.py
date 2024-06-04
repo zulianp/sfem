@@ -11,13 +11,7 @@ from mpl_toolkits.mplot3d import Axes3D
 
 def nearest_neighbour_rule(rule):
     n = rule.shape[0]
-    
-    distances = np.zeros((n, n))
-    
-    for i in range(n):
-        for j in range(n):
-            distances[i, j] = np.linalg.norm(rule[i, :3] - rule[j, :3])
-            
+              
     coord = np.zeros((3))
     print(f"coord: {coord}")
     
