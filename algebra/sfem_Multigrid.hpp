@@ -58,7 +58,7 @@ namespace sfem {
 
                 cycle(finest_level());
 
-                auto c = memory_[finest_level()]->solution
+                auto c = memory_[finest_level()]->solution;
                 axpby(c->size(), 1, c->data(), 1, x);
 
 
@@ -183,7 +183,7 @@ namespace sfem {
             for (int k = 0; k < this->cycle_type_; k++) {
                 // std::cout << "Cycle " << k << " \n";
 
-                this->zeros(solution->size(), mem->solution->data());
+                this->zeros(mem->solution->size(), mem->solution->data());
                 smoother_[level]->apply(mem->residual->data(), mem->solution->data());
 
                 this->zeros(mem->size(), mem->work->data());
