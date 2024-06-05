@@ -46,11 +46,14 @@ namespace sfem {
             ensure_init();
 
             // Wrap input arrays into fine level of mg
-            // memory_[finest_level()]->solution =
-            //     Buffer<T>::wrap(smoother_[finest_level()]->rows(), x);
 
-            // memory_[finest_level()]->residual =
-            //     Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T*)r);
+            if(wrap_input_) {
+            memory_[finest_level()]->solution =
+                Buffer<T>::wrap(smoother_[finest_level()]->rows(), x);
+
+            memory_[finest_level()]->residual =
+                Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T*)r);
+            }
 
             for (int k = 0; k < max_it_; k++) {
                 // std::cout << "iteration: " << k << ")\n";
@@ -120,6 +123,7 @@ namespace sfem {
 
         // Internals
         std::vector<std::shared_ptr<Memory>> memory_;
+        bool wrap_input_{true};
 
         int max_it_{1};
         int cycle_type_{V_CYCLE};
@@ -149,7 +153,7 @@ namespace sfem {
                 memory_[l] = std::make_shared<Memory>();
 
                 size_t n = smoother_[l]->rows();
-                // if (l != finest_level()) 
+                if (l != finest_level() || !wrap_input_) 
                 {
                     auto x = this->allocate(n);
                     memory_[l]->solution = Buffer<T>::own(n, x, this->destroy);
