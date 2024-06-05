@@ -47,12 +47,12 @@ namespace sfem {
 
             // Wrap input arrays into fine level of mg
 
-            if(wrap_input_) {
-            memory_[finest_level()]->solution =
-                Buffer<T>::wrap(smoother_[finest_level()]->rows(), x);
+            if (wrap_input_) {
+                memory_[finest_level()]->solution =
+                    Buffer<T>::wrap(smoother_[finest_level()]->rows(), x);
 
-            memory_[finest_level()]->residual =
-                Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T*)r);
+                memory_[finest_level()]->residual =
+                    Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T*)r);
             }
 
             for (int k = 0; k < max_it_; k++) {
@@ -63,8 +63,6 @@ namespace sfem {
 
                 auto c = memory_[finest_level()]->solution;
                 axpby(c->size(), 1, c->data(), 1, x);
-
-
             }
 
             return 0;
@@ -153,8 +151,7 @@ namespace sfem {
                 memory_[l] = std::make_shared<Memory>();
 
                 size_t n = smoother_[l]->rows();
-                if (l != finest_level() || !wrap_input_) 
-                {
+                if (l != finest_level() || !wrap_input_) {
                     auto x = this->allocate(n);
                     memory_[l]->solution = Buffer<T>::own(n, x, this->destroy);
 
@@ -207,7 +204,7 @@ namespace sfem {
                 this->axpby(mem->size(), 1, mem->work->data(), 1, mem->solution->data());
                 smoother_[level]->apply(mem->residual->data(), mem->solution->data());
             }
-            
+
             return 0;
         }
     };
