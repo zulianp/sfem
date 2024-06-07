@@ -3,11 +3,10 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-
-plt.rcParams["figure.figsize"] = (4,4)
-
+import os
 import sys, getopt
 
+plt.rcParams["figure.figsize"] = (6,4)
 col = 'throughput [GB/s]'
 real_str = "double"
 elem_type 	 = "tet10"
@@ -52,13 +51,15 @@ def plot(spMV_df, MF_df, geo, op_type, gpu):
     MF_y_macro_p1 = 1000 * MF_series_macro_p1[col].values / size_of_real
 
     plt.figure().clear()
-    plt.loglog(SpMV_x,  SpMV_y,  marker='o', linestyle='-', label=f"SpMV (cuSPARSE: {SpMV_rep})")
+    plt.loglog(SpMV_x,  SpMV_y,  marker='o', linestyle='-', label=f"SpMV")
     plt.loglog(MF_x,    MF_y,	 marker='x', linestyle='-', label=f"MF ({elem_type})")
     plt.loglog(MF_x_p1, MF_y_p1, marker='.', linestyle='-', label=f"MF ({elem_type_p1})")
     plt.loglog(MF_x_macro_p1, MF_y_macro_p1, marker='o', linestyle='-', label=f"MF ({elem_type_macro_p1})")
 
+
+
     plt.xlabel('Degrees of Freedom (DOF)')
-    plt.ylabel(f"MDOF/s")
+    plt.ylabel(f"Throughput [MDOF/s]")
     # plt.title(f"Operator: {op_type}, Mesh: {geo}, {gpu}")
     plt.legend()
 
@@ -71,6 +72,22 @@ def plot(spMV_df, MF_df, geo, op_type, gpu):
     plt.savefig(f'plot_{geo}_{op_type}.pdf')
     # plt.savefig(f'plot_{geo}_{op_type}.pgf')
 
+    # Export arrays for other plotters
+    if False:
+        if not os.path.exists(geo):
+            os.mkdir(f'{geo}')
+
+        np.array(SpMV_x, dtype=np.int32).tofile(f"{geo}/{op_type}_SpMV_x.int32")
+        np.array(SpMV_y, dtype=np.float32).tofile(f"{geo}/{op_type}_SpMV_y.float32")
+
+        np.array(MF_x, dtype=np.int32).tofile(f"{geo}/{op_type}_tet10_x.int32")
+        np.array(MF_y, dtype=np.float32).tofile(f"{geo}/{op_type}_tet10_y.float32")
+
+        np.array(MF_x_p1, dtype=np.int32).tofile(f"{geo}/{op_type}_tet4_x.int32")
+        np.array(MF_y_p1, dtype=np.float32).tofile(f"{geo}/{op_type}_tet4_y.float32")
+
+        np.array(MF_x_macro_p1, dtype=np.int32).tofile(f"{geo}/{op_type}_macrotet4_x.int32")
+        np.array(MF_y_macro_p1, dtype=np.float32).tofile(f"{geo}/{op_type}_macrotet4_y.float32")
 
     print('############################')
     print(f'Summary for {geo} {op_type}')
