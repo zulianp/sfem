@@ -114,6 +114,18 @@ namespace sfem {
             return ISOLVER_FUNCTION_FAILURE;
         }
 
+        std::shared_ptr<Constraint> lor() const override
+        {
+            assert(false);
+            return nullptr;
+        }
+
+        std::shared_ptr<Constraint> derefine(const std::shared_ptr<sfem::FunctionSpace>&, bool) const override
+        {
+            assert(false);
+            return nullptr;
+        } 
+
         ~GPUDirichletConditions() {
             d_destroy_conditions(n_dirichlet_conditions, dirichlet_conditions);
         }

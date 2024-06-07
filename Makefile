@@ -575,7 +575,7 @@ linear_elasticity_matrix_free : drivers/cuda/linear_elasticity_matrix_free.c lib
 run_poisson_cuda : examples/run_poisson_cuda.cpp libsfem.a
 	$(MPICXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
-steady_state_sim  : drivers/cuda/steady_state_sim.cpp libsfem.a
+steady_state_sim  : drivers/steady_state_sim.cpp libsfem.a
 	$(MPICXX) $(CXXFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve  -o $@ $^ $(LDFLAGS) ; \
 
 spmv : drivers/cuda/do_spmv.c libsfem.a
