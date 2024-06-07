@@ -33,6 +33,29 @@ The peak throughput reached on the A100 is **5.3 GDOF/s**
 | sphere     | macrotet4 | 4856.4 | 2719.5 |
 
 
+### FLOP/s
+
+#### Laplacian tet10
+
+***Ops per quadrature point***
+Generated FEM code 			= 35 + 46 + 34
+Dot products (FMA is 2 ops) = 10 * 3 * 2
+
+***Reduction***
+atomic_add 	= 10
+
+***Ops per element***
+8 point quadrature rule
+````
+8 * (35 + 46 + 34 + 10 * 3 * 2) + 10 = 1410 [FLOP/element]
+````
+***Top measurement (P100)***
+1e-12 * (1410 * 20971520)/0.0108968 = 2.7 TFLOP/s
+2.7/4.7 = 57% of peak
+
+1e-12 * (1410 * 20971520)/0.0058258 = 5 TFLOP/s 
+5/9.7 = 51% of peak
+
 # Comparision with other Utopia software
 
 ## Plain CG on Piz Daint (NVIDIA P100)

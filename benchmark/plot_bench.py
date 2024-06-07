@@ -4,6 +4,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
+plt.rcParams["figure.figsize"] = (4,4)
+
 import sys, getopt
 
 col = 'throughput [GB/s]'
@@ -57,7 +59,7 @@ def plot(spMV_df, MF_df, geo, op_type, gpu):
 
     plt.xlabel('Degrees of Freedom (DOF)')
     plt.ylabel(f"MDOF/s")
-    plt.title(f"Operator: {op_type}, Mesh: {geo}, {gpu}")
+    # plt.title(f"Operator: {op_type}, Mesh: {geo}, {gpu}")
     plt.legend()
 
     # Display the plot
@@ -97,6 +99,12 @@ def plot(spMV_df, MF_df, geo, op_type, gpu):
     geo_factor = 6*mem_scale # Half-precision
     print(f'MF P1          (Laplacian)  {round(np.min(MF_nels_p1)*p1_lapl_factor, 3)}-{round(np.max(MF_nels_p1)*p1_lapl_factor, 3)} MB')
     print(f'MF P2/Macro-P1 (Laplacian)  {round(np.min(MF_nels)*p2_lapl_factor, 3)}-{round(np.max(MF_nels)*p2_lapl_factor, 3)} MB')
+
+    max_elems = np.max(MF_nels)
+    max_dofs  = np.max(MF_x)
+    mem = max_elems * (6 * 2 + 10 * 4) + 2 * max_dofs * size_of_real
+    AI = round((1410 * max_elems)/mem, 2)
+    print(f'MF arithmetic intensity Jacobian (max_elems={max_elems}, max_dofs={max_dofs}):\n - half-precision {AI}\n - single-precision {AI/2} ')
 
     crs_factor = 8*2*mem_scale
     print(f'CRS                         {round(np.min(SpMV_nnz)*crs_factor, 3)}-{round(np.max(SpMV_nnz)*crs_factor, 3)} MB')

@@ -262,3 +262,9 @@ include(cmake/PostInstall.cmake)
 ######################################################
 
 ######################################################
+
+add_custom_command(TARGET cuda_do_spmv  POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy
+                       $<TARGET_FILE:cuda_do_spmv>
+                       cuspmv
+                   COMMENT "Copying 'cuda_do_spmv' executable to 'cuspmv'")

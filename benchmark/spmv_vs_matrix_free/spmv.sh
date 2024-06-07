@@ -51,6 +51,8 @@ workspace=`mktemp -d`
 mkdir -p results
 today=`date +"%Y_%m_%d"`
 csv_output=results/"$today"_crs.csv
+spmv_pattern="spmv:"
+spmv_pattern="cuspa:"
 
 echo "rep,geo,op_type,ref,ptype,TTS [s],throughput [GB/s],nelements,ndofs,nnz" > $csv_output
 
@@ -69,7 +71,7 @@ function bench_spmv()
 		$exec 1 0 $p1/matrix_scalar "gen:ones" $workspace/test.raw > $workspace/temp_log.txt
 		op_type=`grep "op: " $p1/matrix_scalar/meta.yaml | awk '{print $2}'`
 
-		stats=`grep "spmv:" $workspace/temp_log.txt | awk '{print $2, $3, $4, $5, $6}' | tr ' ' ','`
+		stats=`grep $spmv_pattern $workspace/temp_log.txt | awk '{print $2, $3, $4, $5, $6}' | tr ' ' ','`
 		echo "crs,$g,$op_type,$r,scalar,$stats" >> $csv_output
 	fi
 
@@ -81,7 +83,7 @@ function bench_spmv()
 		$exec 1 0 $p1/matrix_vector "gen:ones" $workspace/test.raw > $workspace/temp_log.txt
 		op_type=`grep "op: " $p1/matrix_vector/meta.yaml | awk '{print $2}'`
 
-		stats=`grep "spmv:" $workspace/temp_log.txt | awk '{print $2, $3, $4, $5, $6}' | tr ' ' ','`
+		stats=`grep $spmv_pattern $workspace/temp_log.txt | awk '{print $2, $3, $4, $5, $6}' | tr ' ' ','`
 		echo "crs,$g,$op_type,$r,vector,$stats" >> $csv_output
 	fi
 }
