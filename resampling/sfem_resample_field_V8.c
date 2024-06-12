@@ -1,9 +1,8 @@
 #include "sfem_resample_field.h"
 
 #include "mass.h"
-#include "read_mesh.h"
-
 #include "matrixio_array.h"
+#include "sfem_resample_V.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -762,6 +761,8 @@ int tet4_resample_field_local_V8_aligned(
     }  // end for over elements
 
     //
+
+    return 0;
 }  // end tet4_resample_field_local_V8_aligned
 
 
@@ -818,4 +819,6 @@ int tet4_resample_field_local_V8(
                                      data,
                                      weighted_field);
     }
+
+    return 0;
 }
