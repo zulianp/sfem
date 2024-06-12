@@ -4,6 +4,7 @@ from fe import FE
 from sfem_codegen import *
 from weighted_fe import *
 
+from tri6 import *
 from tet10 import *
 from fields import *
 # from mass_op import MassOp
@@ -16,6 +17,23 @@ def print_matrix(name, mat):
 		for j in range(0, cols):
 			print(f'{mat[i, j]}', end="\t")
 		print("")
+
+def assign_matrix(name, mat):
+	rows, cols = mat.shape
+	expr = []
+	for i in range(0, rows):
+		for j in range(0, cols):
+			var = sp.symbols(f'{name}[{i*cols + j}]')
+			expr.append(ast.Assignment(var, mat[i, j]))
+	return expr
+
+def assign_matrix_diag(name, mat):
+	rows, cols = mat.shape
+	expr = []
+	for i in range(0, rows):
+			var = sp.symbols(f'{name}[{i}]')
+			expr.append(ast.Assignment(var, mat[i, i]))
+	return expr
 
 def value_elem_sub(v):
 	v = v.subs(x0, 0)
@@ -96,8 +114,17 @@ class DSFE(WeightedFE):
 
 		W = (M_numeric_inv * D_numeric).T
 
-		print_matrix("W", W)
+		self.M = M
+		self.D = D
+
+		# print_matrix("W", W)
 		super().__init__(fe, W, prefix_)
+
+	def generate_mass_vector(self):
+		D = self.D
+		expr = assign_matrix_diag("diag", D)
+		print("------ lumped mass vector -------")
+		c_code(expr)
 
 	def check(self):
 		q = [qx, qy, qz]
@@ -121,6 +148,8 @@ class DSFE(WeightedFE):
 
 if __name__ == '__main__':
 	fe = DSFE(Tet10())
+	fe.generate_mass_vector()
+	# fe = DSFE(Tri6())
 	# fe.check()
 	fe.generate_qp_based_code()
 

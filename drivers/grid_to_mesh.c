@@ -13,6 +13,8 @@
 #include "sfem_mesh_write.h"
 #include "sfem_resample_field.h"
 
+#include "tet10_resample_field.h"
+
 #include "mesh_utils.h"
 
 #include "mass.h"
@@ -145,7 +147,7 @@ int main(int argc, char* argv[]) {
                     // Mesh
                     mesh.n_owned_nodes,
                     mesh.points,
-                    // SDF
+                    // discrete field
                     nlocal,
                     stride,
                     origin,
@@ -162,7 +164,7 @@ int main(int argc, char* argv[]) {
                         mesh.n_owned_nodes,
                         mesh.elements,
                         mesh.points,
-                        // SDF
+                        // discrete field
                         nlocal,
                         stride,
                         origin,
@@ -180,7 +182,7 @@ int main(int argc, char* argv[]) {
                         mesh.nnodes,
                         mesh.elements,
                         mesh.points,
-                        // SDF
+                        // discrete field
                         nlocal,
                         stride,
                         origin,
@@ -192,17 +194,13 @@ int main(int argc, char* argv[]) {
 
                 real_t* mass_vector = calloc(mesh.nnodes, sizeof(real_t));
 
-                if (is_second_order_lagrange(mesh.element_type)) {
-                    assert(mesh.element_type == TET10);
-                    assert(size == 1);
-                    assert(0);
-
-                    // subparametric_tet10_assemble_dual_mass_vector(mesh.element_type,
-                    //                                               mesh.nelements,
-                    //                                               mesh.nnodes,
-                    //                                               mesh.elements,
-                    //                                               mesh.points,
-                    //                                               mass_vector);
+                if (mesh.element_type == TET10) {
+                    // FIXME (we should wrap mass vector assembly in sfem_resample_field.c)
+                    subparametric_tet10_assemble_dual_mass_vector(mesh.nelements,
+                                                                  mesh.nnodes,
+                                                                  mesh.elements,
+                                                                  mesh.points,
+                                                                  mass_vector);
                 } else {
                     enum ElemType st = shell_type(mesh.element_type);
 
@@ -250,14 +248,6 @@ int main(int argc, char* argv[]) {
 
                     assert(mass_vector[i] != 0);
                     g[i] /= mass_vector[i];
-                }
-
-                if (is_second_order_lagrange(mesh.element_type)) {
-                    // TODO: Apply inverse transform for recovering standard basis
-                    // coefficients.
-                    assert(mesh.element_type == TET10);
-                    assert(size == 1);
-                    assert(0);
                 }
 
                 free(mass_vector);
