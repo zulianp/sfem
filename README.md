@@ -14,6 +14,7 @@ cd ../sfem && git submodule update --init --recursive && \
 make
 ```
 
+
 In the `sfem` folder
 
 - Enter `python3 -m venv venv` (**Optional/Recommended**)

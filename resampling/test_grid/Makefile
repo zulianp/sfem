@@ -19,11 +19,14 @@ TARGET = test_grid_new
 
 CUDA_DEBUG =
 
+SIMD ?= 512
+CPU_ARCH = native
+
 ifeq ($(DEBUG),1)
 	CFLAGS += -g
 	CUDA_DEBUG += -g
 else
-	CFLAGS += -std=c++17 -mtune=native -march=native  -mprefer-vector-width=512 -Wshadow=local -Ofast -fno-signed-zeros -fno-trapping-math -fassociative-math 
+	CFLAGS += -std=c++17 -mtune=${CPU_ARCH} -march=${CPU_ARCH}  -mprefer-vector-width=${SIMD} -Wshadow=local -Ofast -fno-signed-zeros -fno-trapping-math -fassociative-math 
 endif
 
 CU_OPT_FLAGS = -O3 -use_fast_math -Xptxas=-O3,-v -Xcompiler=-O3,-march=native,-mtune=native
@@ -34,14 +37,24 @@ GPU_ARCH ?= sm_75
 CU_VERBOSE_FLAG = 
 CU_VERBOSE ?= off
 
-CUDA_LIBS_PATH = /usr/local/cuda-12.3/targets/x86_64-linux/lib
-CUDA_FLAGS = -L${CUDA_LIBS_PATH} -lcudart  -L. -ltest_grid_new_cuda 
+DISABLE_CUDA ?= 0
+
+ifeq (${DISABLE_CUDA}, 1)
+	CUDA_FLAGS = 
+	CU_LIB =
+	CUDA_FLAGS = 
+else
+	CUDA_LIBS_PATH = /usr/local/cuda-12.3/targets/x86_64-linux/lib
+	CUDA_FLAGS = -L${CUDA_LIBS_PATH} -lcudart  -L. -ltest_grid_new_cuda 
+endif
+
+
 
 #######################################
 #######################################
 
 ${TARGET}: ${TARGET}.cpp test_grid_new.h ${CU_LIB}
-	$(CC) -o ${TARGET} ${TARGET}.cpp  $(CFLAGS) $(LDFLAGS) -I. $(CUDA_FLAGS)
+	$(CC) -o ${TARGET} ${TARGET}.cpp  $(CFLAGS) $(LDFLAGS) -I. $(CUDA_FLAGS) -D DISABLE_CUDA=${DISABLE_CUDA} 
 
 #######################################
 #######################################

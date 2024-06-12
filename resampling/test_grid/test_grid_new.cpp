@@ -1510,10 +1510,10 @@ int main(int argc, char* argv[]) {
 
     problem_parameters prs = {
             .quad_nodes_nr = 123,
-            .xy_max_domain = 1500.0,
+            .xy_max_domain = 3500.0,
             .xy_zero_domain = 0.0,
             .delta_domain = 0.06,  // delta of the gloabl grid
-            .nr_stripes = 120200,
+            .nr_stripes = 920200,
             .random_seed = 22,
             .nr_domains_per_stripe = 32,
             .side_x_stripe = 0.52,  // side of the stripe subdomain
@@ -1533,15 +1533,18 @@ int main(int argc, char* argv[]) {
     build_problem(gg, stripes, qr, prs, true);
 
     // size_t quad_nodes_nr = 130;
-    size_t nr_threads = 36;
+    size_t nr_threads = 128;
 
     int a = 0, b = 0, c = 0;
 
+
+#if DISABLE_CUDA == 0
     std::cout << "-------------------------------------------------------" << std::endl
               << "-------------------------------------------------------" << std::endl
               << "-------------------------------------------------------" << std::endl;
 
     c = test_grid_cuda(gg, qr, stripes);
+#endif
 
     // const double xy_max = 3500.0;
     // const unsigned int nr_stripes = 620200;
