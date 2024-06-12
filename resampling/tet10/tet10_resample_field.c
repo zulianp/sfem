@@ -300,9 +300,9 @@ int hex8_to_subparametric_tet10_resample_field_local(
         // Output
         real_t* const SFEM_RESTRICT weighted_field) {
     //
-    printf("============================================================\n");
-    printf("Start: hex8_to_tet10_resample_field_local\n");
-    printf("============================================================\n");
+    // printf("============================================================\n");
+    // printf("Start: hex8_to_tet10_resample_field_local\n");
+    // printf("============================================================\n");
     //
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];
@@ -529,7 +529,7 @@ static SFEM_INLINE void lumped_mass_kernel_hrt(const real_t px0,
                                                const real_t pz2,
                                                const real_t pz3,
                                                real_t* const SFEM_RESTRICT diag) {
-    // Symbolic integration (for iso-parametric is not possible)
+    // Symbolic integration (for iso-parametric tet10, this is not possible)
     const real_t x0 = -px0 + px1;
     const real_t x1 = (1.0 / 216.0) * x0;
     const real_t x2 = -pz0 + pz3;
@@ -584,8 +584,8 @@ int subparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements,
             ev[v] = elems[v][i];
         }
 
-        // lumped_mass_kernel_popp
-        lumped_mass_kernel_hrt(
+        // lumped_mass_kernel_popp (this method has been studied in the literature, but requires a matrix transformation at the end)
+        lumped_mass_kernel_hrt( // (this method is kinda (epsilon) novel, perfect for matrix-free and parallel computing, unclear on the properties)
                 // X-coordinates
                 x[ev[0]],
                 x[ev[1]],
