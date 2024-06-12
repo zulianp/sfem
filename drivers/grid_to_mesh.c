@@ -196,11 +196,8 @@ int main(int argc, char* argv[]) {
 
                 if (mesh.element_type == TET10) {
                     // FIXME (we should wrap mass vector assembly in sfem_resample_field.c)
-                    subparametric_tet10_assemble_dual_mass_vector(mesh.nelements,
-                                                                  mesh.nnodes,
-                                                                  mesh.elements,
-                                                                  mesh.points,
-                                                                  mass_vector);
+                    tet10_assemble_dual_mass_vector(
+                            mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mass_vector);
                 } else {
                     enum ElemType st = shell_type(mesh.element_type);
 

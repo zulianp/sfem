@@ -6,6 +6,10 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+
+#define POW2(x) ((x) * (x))
+#define POW3(x) ((x) * (x) * (x))
 
 SFEM_INLINE static void tet10_dual_basis_popp(const real_t qx,
                                               const real_t qy,
@@ -570,13 +574,13 @@ int subparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements,
                                                   idx_t** const SFEM_RESTRICT elems,
                                                   geom_t** const SFEM_RESTRICT xyz,
                                                   real_t* const diag) {
-    const geom_t * x = xyz[0];
-    const geom_t * y = xyz[1];
-    const geom_t * z = xyz[2];
+    const geom_t* x = xyz[0];
+    const geom_t* y = xyz[1];
+    const geom_t* z = xyz[2];
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-        idx_t ev[10]; // Element indices
+        idx_t ev[10];  // Element indices
         real_t element_diag[10];
 
 #pragma unroll(10)
@@ -584,9 +588,10 @@ int subparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements,
             ev[v] = elems[v][i];
         }
 
-        // lumped_mass_kernel_popp (this method has been studied in the literature, but requires a matrix transformation at the end)
-        lumped_mass_kernel_hrt( // (this method is kinda (epsilon) novel, perfect for matrix-free and parallel computing, unclear on the properties)
-                // X-coordinates
+        // lumped_mass_kernel_popp (this method has been studied in the literature, but requires a
+        // matrix transformation at the end)
+        lumped_mass_kernel_hrt(  // (this method is kinda (epsilon) novel, perfect for matrix-free
+                                 // and parallel computing, unclear on the properties) X-coordinates
                 x[ev[0]],
                 x[ev[1]],
                 x[ev[2]],
@@ -612,4 +617,364 @@ int subparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements,
     }
 
     return 0;
+}
+
+//-------------------------------------------
+/// iso-parametric version
+//-------------------------------------------
+
+SFEM_INLINE static real_t tet10_measure(const geom_t* const SFEM_RESTRICT x,
+                                        const geom_t* const SFEM_RESTRICT y,
+                                        const geom_t* const SFEM_RESTRICT z,
+                                        // Quadrature point
+                                        const real_t qx,
+                                        const real_t qy,
+                                        const real_t qz) {
+   const real_t x0 = 4*qz;
+   const real_t x1 = x0 - 1;
+   const real_t x2 = 4*qy;
+   const real_t x3 = 4*qx;
+   const real_t x4 = x3 - 4;
+   const real_t x5 = -8*qz - x2 - x4;
+   const real_t x6 = -x3*y[4];
+   const real_t x7 = x0 + x2;
+   const real_t x8 = x3 + x7 - 3;
+   const real_t x9 = x8*y[0];
+   const real_t x10 = -x2*y[6] + x9;
+   const real_t x11 = x1*y[3] + x10 + x2*y[9] + x3*y[8] + x5*y[7] + x6;
+   const real_t x12 = -x2*z[6];
+   const real_t x13 = -x0*z[7];
+   const real_t x14 = x3 - 1;
+   const real_t x15 = x8*z[0];
+   const real_t x16 = -8*qx - x7 + 4;
+   const real_t x17 = x0*z[8] + x12 + x13 + x14*z[1] + x15 + x16*z[4] + x2*z[5];
+   const real_t x18 = x2 - 1;
+   const real_t x19 = -8*qy - x0 - x4;
+   const real_t x20 = -x3*x[4];
+   const real_t x21 = x8*x[0];
+   const real_t x22 = -x0*x[7] + x21;
+   const real_t x23 = (1.0/6.0)*x0*x[9] + (1.0/6.0)*x18*x[2] + (1.0/6.0)*x19*x[6] + (1.0/6.0)*x20 + (1.0/6.0)*x22 + (1.0/6.0)*x3*x[5];
+   const real_t x24 = -x0*y[7];
+   const real_t x25 = x0*y[8] + x10 + x14*y[1] + x16*y[4] + x2*y[5] + x24;
+   const real_t x26 = x15 - x3*z[4];
+   const real_t x27 = x1*z[3] + x12 + x2*z[9] + x26 + x3*z[8] + x5*z[7];
+   const real_t x28 = x0*y[9] + x18*y[2] + x19*y[6] + x24 + x3*y[5] + x6 + x9;
+   const real_t x29 = -x2*x[6];
+   const real_t x30 = (1.0/6.0)*x1*x[3] + (1.0/6.0)*x2*x[9] + (1.0/6.0)*x20 + (1.0/6.0)*x21 + (1.0/6.0)*x29 + (1.0/6.0)*x3*x[8] + (1.0/6.0)*x5*x[7];
+   const real_t x31 = x0*z[9] + x13 + x18*z[2] + x19*z[6] + x26 + x3*z[5];
+   const real_t x32 = (1.0/6.0)*x0*x[8] + (1.0/6.0)*x14*x[1] + (1.0/6.0)*x16*x[4] + (1.0/6.0)*x2*x[5] + (1.0/6.0)*x22 + (1.0/6.0)*x29;
+   return x11*x17*x23 - x11*x31*x32 - x17*x28*x30 - x23*x25*x27 + x25*x30*x31 + x27*x28*x32;
+}
+
+SFEM_INLINE static void tet10_transform(const geom_t* const SFEM_RESTRICT x,
+                                        const geom_t* const SFEM_RESTRICT y,
+                                        const geom_t* const SFEM_RESTRICT z,
+                                        // Quadrature point
+                                        const real_t qx,
+                                        const real_t qy,
+                                        const real_t qz,
+                                        // Output
+                                        real_t* const SFEM_RESTRICT out_x,
+                                        real_t* const SFEM_RESTRICT out_y,
+                                        real_t* const SFEM_RESTRICT out_z) {
+    const real_t x0 = 4 * qx;
+    const real_t x1 = qy * x0;
+    const real_t x2 = qz * x0;
+    const real_t x3 = 4 * qy;
+    const real_t x4 = qz * x3;
+    const real_t x5 = 2 * qx - 1;
+    const real_t x6 = qx * x5;
+    const real_t x7 = 2 * qy;
+    const real_t x8 = qy * (x7 - 1);
+    const real_t x9 = 2 * qz;
+    const real_t x10 = qz * (x9 - 1);
+    const real_t x11 = -4 * qz - x0 - x3 + 4;
+    const real_t x12 = qx * x11;
+    const real_t x13 = qy * x11;
+    const real_t x14 = qz * x11;
+    const real_t x15 = (-x5 - x7 - x9) * (-qx - qy - qz + 1);
+
+    *out_x = x[0] * x15 + x[1] * x6 + x[2] * x8 + x[3] * x10 + x[4] * x12 + x[5] * x1 + x[6] * x13 +
+             x[7] * x14 + x[8] * x2 + x[9] * x4;
+    *out_y = y[0] * x15 + y[1] * x6 + y[2] * x8 + y[3] * x10 + y[4] * x12 + y[5] * x1 + y[6] * x13 +
+             y[7] * x14 + y[8] * x2 + y[9] * x4;
+    *out_z = z[0] * x15 + z[1] * x6 + z[2] * x8 + z[3] * x10 + z[4] * x12 + z[5] * x1 + z[6] * x13 +
+             z[7] * x14 + z[8] * x2 + z[9] * x4;
+}
+
+int hex8_to_isoparametric_tet10_resample_field_local(
+        // Mesh
+        const ptrdiff_t nelements,          // number of elements
+        const ptrdiff_t nnodes,             // number of nodes
+        idx_t** const SFEM_RESTRICT elems,  // connectivity
+        geom_t** const SFEM_RESTRICT xyz,   // coordinates
+        // SDF
+        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
+        const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
+        const geom_t* const SFEM_RESTRICT origin,     // origin of the domain
+        const geom_t* const SFEM_RESTRICT delta,      // delta of the domain
+        const real_t* const SFEM_RESTRICT data,       // SDF
+        // Output
+        real_t* const SFEM_RESTRICT weighted_field) {
+    //
+    // printf("============================================================\n");
+    // printf("Start: hex8_to_tet10_resample_field_local\n");
+    // printf("============================================================\n");
+    //
+    const real_t ox = (real_t)origin[0];
+    const real_t oy = (real_t)origin[1];
+    const real_t oz = (real_t)origin[2];
+
+    const real_t dx = (real_t)delta[0];
+    const real_t dy = (real_t)delta[1];
+    const real_t dz = (real_t)delta[2];
+
+#pragma omp parallel
+    {
+#pragma omp for  // nowait
+        /// Loop over the elements of the mesh
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[10];
+
+            // ISOPARAMETRIC
+            geom_t x[10], y[10], z[10];
+
+            real_t hex8_f[8];
+            real_t coeffs[8];
+
+            real_t tet10_f[10];
+            real_t element_field[10];
+
+            // loop over the 4 vertices of the tetrahedron
+            // UNROLL_ZERO?
+            for (int v = 0; v < 10; ++v) {
+                ev[v] = elems[v][i];
+            }
+
+            // ISOPARAMETRIC
+            for (int v = 0; v < 10; ++v) {
+                x[v] = xyz[0][ev[v]];  // x-coordinates
+                y[v] = xyz[1][ev[v]];  // y-coordinates
+                z[v] = xyz[2][ev[v]];  // z-coordinates
+            }
+
+            memset(element_field, 0,
+                   10 * sizeof(real_t));  // set to zero the element field
+
+            // SUBPARAMETRIC (for iso-parametric tassellation of tet10 might be necessary)
+            for (int q = 0; q < TET4_NQP; q++) {  // loop over the quadrature points
+                const real_t measure = tet10_measure(x, y, z, tet4_qx[q], tet4_qy[q], tet4_qz[q]);
+                assert(measure > 0);
+                const real_t dV = measure * tet4_qw[q];
+
+                real_t g_qx, g_qy, g_qz;
+                // Transform quadrature point to physical space
+                // g_qx, g_qy, g_qz are the coordinates of the quadrature point in the physical
+                // space
+                tet10_transform(x, y, z, tet4_qx[q], tet4_qy[q], tet4_qz[q], &g_qx, &g_qy, &g_qz);
+                tet10_dual_basis_hrt(tet4_qx[q], tet4_qy[q], tet4_qz[q], tet10_f);
+
+                const real_t grid_x = (g_qx - ox) / dx;
+                const real_t grid_y = (g_qy - oy) / dy;
+                const real_t grid_z = (g_qz - oz) / dz;
+
+                const ptrdiff_t i = floor(grid_x);
+                const ptrdiff_t j = floor(grid_y);
+                const ptrdiff_t k = floor(grid_z);
+
+                // If outside
+                if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) ||
+                    (k + 1 >= n[2])) {
+                    fprintf(stderr,
+                            "warning (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
+                            "%ld)!\n",
+                            g_qx,
+                            g_qy,
+                            g_qz,
+                            i,
+                            j,
+                            k,
+                            n[0],
+                            n[1],
+                            n[2]);
+                    continue;
+                }
+
+                // Get the reminder [0, 1]
+                real_t l_x = (grid_x - i);
+                real_t l_y = (grid_y - j);
+                real_t l_z = (grid_z - k);
+
+                assert(l_x >= -1e-8);
+                assert(l_y >= -1e-8);
+                assert(l_z >= -1e-8);
+
+                assert(l_x <= 1 + 1e-8);
+                assert(l_y <= 1 + 1e-8);
+                assert(l_z <= 1 + 1e-8);
+
+                hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
+                hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
+
+                // Integrate field
+                {
+                    real_t eval_field = 0;
+                    // UNROLL_ZERO?
+                    for (int edof_j = 0; edof_j < 8; edof_j++) {
+                        eval_field += hex8_f[edof_j] * coeffs[edof_j];
+                    }
+
+                    // UNROLL_ZERO?
+                    for (int edof_i = 0; edof_i < 10; edof_i++) {
+                        element_field[edof_i] += eval_field * tet10_f[edof_i] * dV;
+                    }  // end edof_i loop
+                }
+            }  // end quadrature loop
+
+            // UNROLL_ZERO?
+            for (int v = 0; v < 10; ++v) {
+#pragma omp atomic update
+                weighted_field[ev[v]] += element_field[v];
+
+            }  // end vertex loop
+        }      // end element loop
+    }          // end parallel region
+
+    return 0;
+}
+
+SFEM_INLINE static void isoparametric_lumped_mass_kernel_hrt(const real_t dV,
+                                                             // Quadrature
+                                                             const real_t qx,
+                                                             const real_t qy,
+                                                             const real_t qz,
+                                                             real_t* const SFEM_RESTRICT
+                                                                     element_diag) {
+    const real_t x0 = 4 * qx;
+    const real_t x1 = qy * qz;
+    const real_t x2 = 2 * qx - 1;
+    const real_t x3 = qx * x2;
+    const real_t x4 = 2 * qy;
+    const real_t x5 = qy * (x4 - 1);
+    const real_t x6 = 2 * qz;
+    const real_t x7 = qz * (x6 - 1);
+    const real_t x8 = qx + qy + qz - 1;
+    const real_t x9 = qx * x8;
+    const real_t x10 = qy * x8;
+    const real_t x11 = qz * x8;
+    const real_t x12 = x8 * (x2 + x4 + x6);
+    const real_t x13 = (5.0 / 18.0) * dV;
+    const real_t x14 = POW2(qx);
+    const real_t x15 = POW2(qy);
+    const real_t x16 = POW2(qz);
+    const real_t x17 = 11 * qx;
+    const real_t x18 = -qy * x17 + 11 * x11 + x12 + 4 * x7;
+    const real_t x19 = -qz * x17 + 11 * x10 + 4 * x5;
+    const real_t x20 = (40.0 / 27.0) * dV;
+    const real_t x21 = qx * qy;
+    const real_t x22 = -24 * qx + 21 * x14 + 4;
+    const real_t x23 = -24 * qy + 21 * x15;
+    const real_t x24 = qx * qz;
+    const real_t x25 = -11 * x1 + 4 * x3 + 11 * x9;
+    const real_t x26 = -24 * qz + 21 * x16;
+    element_diag[0] +=
+            x12 * x13 * (qy * x0 + qz * x0 + 4 * x1 - x10 - x11 + 10 * x12 + x3 + x5 + x7 - x9);
+    element_diag[1] += qx * x13 * (42 * (POW3(qx)) + 14 * qx - 45 * x14 - 1);
+    element_diag[2] += qy * x13 * (42 * (POW3(qy)) + 14 * qy - 45 * x15 - 1);
+    element_diag[3] += qz * x13 * (42 * (POW3(qz)) + 14 * qz - 45 * x16 - 1);
+    element_diag[4] += -x20 * x9 * (16 * x1 + x18 + x19 + x3 - 46 * x9);
+    element_diag[5] += x20 * x21 * (84 * x21 + x22 + x23);
+    element_diag[6] += -x10 * x20 * (-46 * x10 + x18 + 16 * x24 + x25 + x5);
+    element_diag[7] += -x11 * x20 * (-46 * x11 + x12 + x19 + 16 * x21 + x25 + x7);
+    element_diag[8] += x20 * x24 * (x22 + 84 * x24 + x26);
+    element_diag[9] += x1 * x20 * (84 * x1 + x23 + x26 + 4);
+}
+
+int isoparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements,
+                                                  const ptrdiff_t nnodes,
+                                                  idx_t** const SFEM_RESTRICT elems,
+                                                  geom_t** const SFEM_RESTRICT xyz,
+                                                  real_t* const diag) {
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[10];  // Element indices
+        real_t element_diag[10];
+        geom_t x[10], y[10], z[10];
+
+#pragma unroll(10)
+        for (int v = 0; v < 10; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        for (int v = 0; v < 10; ++v) {
+            x[v] = xyz[0][ev[v]];  // x-coordinates
+            y[v] = xyz[1][ev[v]];  // y-coordinates
+            z[v] = xyz[2][ev[v]];  // z-coordinates
+        }
+
+        memset(element_diag, 0, 10 * sizeof(real_t));
+
+        // We do this numerical integration due to the det J
+        for (int q = 0; q < TET4_NQP; q++) {  // loop over the quadrature points
+            real_t dV = tet10_measure(x, y, z, tet4_qx[q], tet4_qy[q], tet4_qz[q]) * tet4_qw[q];
+            isoparametric_lumped_mass_kernel_hrt(dV,
+                                                 // Quadrature
+                                                 tet4_qx[q],
+                                                 tet4_qy[q],
+                                                 tet4_qz[q],
+                                                 element_diag);
+        }
+
+        for (int v = 0; v < 10; ++v) {
+            const idx_t idx = ev[v];
+
+#pragma omp atomic update
+            diag[idx] += element_diag[v];
+        }
+    }
+
+    return 0;
+}
+
+int tet10_assemble_dual_mass_vector(const ptrdiff_t nelements,
+                                    const ptrdiff_t nnodes,
+                                    idx_t** const SFEM_RESTRICT elems,
+                                    geom_t** const SFEM_RESTRICT xyz,
+                                    real_t* const mass_vector) {
+    int SFEM_ENABLE_ISOPARAMETRIC = 0;
+    SFEM_READ_ENV(SFEM_ENABLE_ISOPARAMETRIC, atoi);
+
+    if (SFEM_ENABLE_ISOPARAMETRIC) {
+        return isoparametric_tet10_assemble_dual_mass_vector(
+                nelements, nnodes, elems, xyz, mass_vector);
+    } else {
+        return subparametric_tet10_assemble_dual_mass_vector(
+                nelements, nnodes, elems, xyz, mass_vector);
+    }
+}
+
+int hex8_to_tet10_resample_field_local(
+        // Mesh
+        const ptrdiff_t nelements,          // number of elements
+        const ptrdiff_t nnodes,             // number of nodes
+        idx_t** const SFEM_RESTRICT elems,  // connectivity
+        geom_t** const SFEM_RESTRICT xyz,   // coordinates
+        // SDF
+        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
+        const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
+        const geom_t* const SFEM_RESTRICT origin,     // origin of the domain
+        const geom_t* const SFEM_RESTRICT delta,      // delta of the domain
+        const real_t* const SFEM_RESTRICT data,       // SDF
+        // Output
+        real_t* const SFEM_RESTRICT weighted_field) {
+    int SFEM_ENABLE_ISOPARAMETRIC = 0;
+    SFEM_READ_ENV(SFEM_ENABLE_ISOPARAMETRIC, atoi);
+
+    if (SFEM_ENABLE_ISOPARAMETRIC) {
+        return hex8_to_isoparametric_tet10_resample_field_local(
+                nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+    } else {
+        return hex8_to_subparametric_tet10_resample_field_local(
+                nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+    }
 }
