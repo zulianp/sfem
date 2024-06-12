@@ -10,9 +10,11 @@
 #include <stdio.h>
 #include <string.h>
 
+#define real_t double
+
 #include "quadratures_rule.h"
 
-#define real_t double
+
 #define real_type real_t
 #define SFEM_RESTRICT __restrict__
 
