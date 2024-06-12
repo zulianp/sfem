@@ -204,6 +204,6 @@ def DualTet10():
 
 
 if __name__ == '__main__':
-	# Tet10().generate_c_code()
-	DualTet10().generate_qp_based_code();
+	Tet10().generate_c_code()
+	# DualTet10().generate_qp_based_code();
 	
