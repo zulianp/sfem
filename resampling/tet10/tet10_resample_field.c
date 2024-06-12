@@ -7,10 +7,10 @@
 #include <stdio.h>
 #include <string.h>
 
-SFEM_INLINE static void tet10_dual_basis_functions(const real_t qx,
-                                                   const real_t qy,
-                                                   const real_t qz,
-                                                   real_t* const f) {
+SFEM_INLINE static void tet10_dual_basis_popp(const real_t qx,
+                                              const real_t qy,
+                                              const real_t qz,
+                                              real_t* const f) {
     const real_t x0 = -qx - qy - qz + 1;
     const real_t x1 = 2 * qy;
     const real_t x2 = 2 * qz;
@@ -71,6 +71,74 @@ SFEM_INLINE static void tet10_dual_basis_functions(const real_t qx,
     f[7] = (24.0 / 5.0) * qx * qy + (111.0 / 20.0) * qz * x12 - x38 - x45 - x47 - x48;
     f[8] = (111.0 / 5.0) * qx * qz + (6.0 / 5.0) * qy * x12 - x34 - x40 - x41 - x47 - x49;
     f[9] = (6.0 / 5.0) * qx * x12 + (111.0 / 5.0) * qy * qz - x43 - x44 - x46 - x48 - x49;
+}
+
+SFEM_INLINE static void tet10_dual_basis_hrt(const real_t qx,
+                                             const real_t qy,
+                                             const real_t qz,
+                                             real_t* const f) {
+    const real_t x0 = 2 * qy;
+    const real_t x1 = 2 * qz;
+    const real_t x2 = 2 * qx - 1;
+    const real_t x3 = (-x0 - x1 - x2) * (-qx - qy - qz + 1);
+    const real_t x4 = x0 - 1;
+    const real_t x5 = (5.0 / 18.0) * qy;
+    const real_t x6 = x4 * x5;
+    const real_t x7 = x1 - 1;
+    const real_t x8 = (5.0 / 18.0) * qz;
+    const real_t x9 = x7 * x8;
+    const real_t x10 = -4 * qx - 4 * qy - 4 * qz + 4;
+    const real_t x11 = (5.0 / 72.0) * x10;
+    const real_t x12 = qy * qz;
+    const real_t x13 = qx * x11 + (10.0 / 9.0) * x12 + x6 + x9;
+    const real_t x14 = (5.0 / 18.0) * qx;
+    const real_t x15 = x14 * x2;
+    const real_t x16 = (10.0 / 9.0) * qx;
+    const real_t x17 = qy * x11 + qz * x16 + x15;
+    const real_t x18 = qy * x16 + qz * x11;
+    const real_t x19 = qx * x2;
+    const real_t x20 = (5.0 / 18.0) * x3;
+    const real_t x21 = qy * x14 + x10 * x8 + x20;
+    const real_t x22 = qz * x14 + x10 * x5;
+    const real_t x23 = qy * x4;
+    const real_t x24 = qz * x5 + x10 * x14;
+    const real_t x25 = qz * x7;
+    const real_t x26 = (40.0 / 27.0) * x23;
+    const real_t x27 = (115.0 / 27.0) * x10;
+    const real_t x28 = (110.0 / 27.0) * qx;
+    const real_t x29 = -qz * x28;
+    const real_t x30 = (55.0 / 54.0) * x10;
+    const real_t x31 = -qy * x30;
+    const real_t x32 = (10.0 / 27.0) * x19;
+    const real_t x33 = (40.0 / 27.0) * x25;
+    const real_t x34 = x29 + x31 + x32 + x33;
+    const real_t x35 = -qy * x28;
+    const real_t x36 = -qz * x30;
+    const real_t x37 = (10.0 / 27.0) * x3;
+    const real_t x38 = x35 + x36 + x37;
+    const real_t x39 = (40.0 / 27.0) * x10;
+    const real_t x40 = qx * qy;
+    const real_t x41 = -qx * x30 - 110.0 / 27.0 * x12;
+    const real_t x42 = (10.0 / 27.0) * x23;
+    const real_t x43 = (40.0 / 27.0) * x3;
+    const real_t x44 = x42 + x43;
+    const real_t x45 = qx * qz;
+    const real_t x46 = (40.0 / 27.0) * x19;
+    const real_t x47 = x41 + x46;
+    const real_t x48 = (10.0 / 27.0) * x25;
+    const real_t x49 = x26 + x48;
+    const real_t x50 = x29 + x31;
+    const real_t x51 = x35 + x36;
+    f[0] = x13 + x17 + x18 + (25.0 / 9.0) * x3;
+    f[1] = x13 + (25.0 / 9.0) * x19 + x21 + x22;
+    f[2] = x17 + x21 + (25.0 / 9.0) * x23 + x24 + x9;
+    f[3] = x15 + x18 + x20 + x22 + x24 + (25.0 / 9.0) * x25 + x6;
+    f[4] = qx * x27 + (160.0 / 27.0) * x12 + x26 + x34 + x38;
+    f[5] = qz * x39 + x34 + (460.0 / 27.0) * x40 + x41 + x44;
+    f[6] = qy * x27 + x33 + x38 + x42 + (160.0 / 27.0) * x45 + x47;
+    f[7] = qz * x27 + x37 + (160.0 / 27.0) * x40 + x47 + x49 + x50;
+    f[8] = qy * x39 + x32 + x41 + x43 + (460.0 / 27.0) * x45 + x49 + x51;
+    f[9] = qx * x39 + (460.0 / 27.0) * x12 + x44 + x46 + x48 + x50 + x51;
 }
 
 SFEM_INLINE static real_t tet4_measure(
@@ -280,19 +348,19 @@ int hex8_to_subparametric_tet10_resample_field_local(
 
             // SUBPARAMETRIC (for isoparametric this is a nonlinear map computed for each qp)
             const real_t measure = tet4_measure(x[0],
-                         x[1],
-                         x[2],
-                         x[3],
-                         //
-                         y[0],
-                         y[1],
-                         y[2],
-                         y[3],
-                         //
-                         z[0],
-                         z[1],
-                         z[2],
-                         z[3]);
+                                                x[1],
+                                                x[2],
+                                                x[3],
+                                                //
+                                                y[0],
+                                                y[1],
+                                                y[2],
+                                                y[3],
+                                                //
+                                                z[0],
+                                                z[1],
+                                                z[2],
+                                                z[3]);
 
             assert(measure > 0);
 
@@ -331,7 +399,8 @@ int hex8_to_subparametric_tet10_resample_field_local(
 
                 // No standard basis function (tet10 cannot lump as for tet4, needs special
                 // treatment)
-                tet10_dual_basis_functions(tet4_qx[q], tet4_qy[q], tet4_qz[q], tet10_f);
+                // tet10_dual_basis_popp(tet4_qx[q], tet4_qy[q], tet4_qz[q], tet10_f);
+                tet10_dual_basis_hrt(tet4_qx[q], tet4_qy[q], tet4_qz[q], tet10_f);
 
                 const real_t dV = measure * tet4_qw[q];
 
@@ -404,23 +473,19 @@ int hex8_to_subparametric_tet10_resample_field_local(
     return 0;
 }
 
-static SFEM_INLINE void lumped_mass_kernel(const real_t px0,
-                                           const real_t px1,
-                                           const real_t px2,
-                                           const real_t px3,
-                                           const real_t py0,
-                                           const real_t py1,
-                                           const real_t py2,
-                                           const real_t py3,
-                                           const real_t pz0,
-                                           const real_t pz1,
-                                           const real_t pz2,
-                                           const real_t pz3,
-                                           real_t* const SFEM_RESTRICT element_matrix_diag) {
-    // generated code
-    // FLOATING POINT OPS!
-    //       - Result: 10*ASSIGNMENT
-    //       - Subexpressions: 4*ADD + 12*DIV + 27*MUL + 15*SUB
+static SFEM_INLINE void lumped_mass_kernel_popp(const real_t px0,
+                                                const real_t px1,
+                                                const real_t px2,
+                                                const real_t px3,
+                                                const real_t py0,
+                                                const real_t py1,
+                                                const real_t py2,
+                                                const real_t py3,
+                                                const real_t pz0,
+                                                const real_t pz1,
+                                                const real_t pz2,
+                                                const real_t pz3,
+                                                real_t* const SFEM_RESTRICT element_matrix_diag) {
     const real_t x0 = px0 - px1;
     const real_t x1 = py0 - py2;
     const real_t x2 = pz0 - pz3;
@@ -451,49 +516,98 @@ static SFEM_INLINE void lumped_mass_kernel(const real_t px0,
     element_matrix_diag[9] = x13;
 }
 
+static SFEM_INLINE void lumped_mass_kernel_hrt(const real_t px0,
+                                               const real_t px1,
+                                               const real_t px2,
+                                               const real_t px3,
+                                               const real_t py0,
+                                               const real_t py1,
+                                               const real_t py2,
+                                               const real_t py3,
+                                               const real_t pz0,
+                                               const real_t pz1,
+                                               const real_t pz2,
+                                               const real_t pz3,
+                                               real_t* const SFEM_RESTRICT diag) {
+    // Symbolic integration (for iso-parametric is not possible)
+    const real_t x0 = -px0 + px1;
+    const real_t x1 = (1.0 / 216.0) * x0;
+    const real_t x2 = -pz0 + pz3;
+    const real_t x3 = -py0 + py2;
+    const real_t x4 = x2 * x3;
+    const real_t x5 = -py0 + py3;
+    const real_t x6 = -pz0 + pz2;
+    const real_t x7 = x5 * x6;
+    const real_t x8 = -px0 + px2;
+    const real_t x9 = (1.0 / 216.0) * x8;
+    const real_t x10 = -py0 + py1;
+    const real_t x11 = x10 * x2;
+    const real_t x12 = -pz0 + pz1;
+    const real_t x13 = x12 * x5;
+    const real_t x14 = -px0 + px3;
+    const real_t x15 = (1.0 / 216.0) * x14;
+    const real_t x16 = x10 * x6;
+    const real_t x17 = x12 * x3;
+    const real_t x18 = x1 * x4 - x1 * x7 - x11 * x9 + x13 * x9 + x15 * x16 - x15 * x17;
+    const real_t x19 = (2.0 / 81.0) * x0;
+    const real_t x20 = (2.0 / 81.0) * x8;
+    const real_t x21 = (2.0 / 81.0) * x14;
+    const real_t x22 = -x11 * x20 + x13 * x20 + x16 * x21 - x17 * x21 + x19 * x4 - x19 * x7;
+    diag[0] = x18;
+    diag[1] = x18;
+    diag[2] = x18;
+    diag[3] = x18;
+    diag[4] = x22;
+    diag[5] = x22;
+    diag[6] = x22;
+    diag[7] = x22;
+    diag[8] = x22;
+    diag[9] = x22;
+}
+
 int subparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements,
                                                   const ptrdiff_t nnodes,
                                                   idx_t** const SFEM_RESTRICT elems,
                                                   geom_t** const SFEM_RESTRICT xyz,
-                                                  real_t* const values) {
+                                                  real_t* const diag) {
+    const geom_t * x = xyz[0];
+    const geom_t * y = xyz[1];
+    const geom_t * z = xyz[2];
+
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-        idx_t ev[10];
-        real_t element_weights[10];
+        idx_t ev[10]; // Element indices
+        real_t element_diag[10];
+
 #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
             ev[v] = elems[v][i];
         }
 
-        // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
-        const idx_t i3 = ev[3];
-
-        lumped_mass_kernel(
+        // lumped_mass_kernel_popp
+        lumped_mass_kernel_hrt(
                 // X-coordinates
-                xyz[0][i0],
-                xyz[0][i1],
-                xyz[0][i2],
-                xyz[0][i3],
+                x[ev[0]],
+                x[ev[1]],
+                x[ev[2]],
+                x[ev[3]],
                 // Y-coordinates
-                xyz[1][i0],
-                xyz[1][i1],
-                xyz[1][i2],
-                xyz[1][i3],
+                y[ev[0]],
+                y[ev[1]],
+                y[ev[2]],
+                y[ev[3]],
                 // Z-coordinates
-                xyz[2][i0],
-                xyz[2][i1],
-                xyz[2][i2],
-                xyz[2][i3],
-                element_weights);
+                z[ev[0]],
+                z[ev[1]],
+                z[ev[2]],
+                z[ev[3]],
+                element_diag);
 
         for (int v = 0; v < 10; ++v) {
             const idx_t idx = ev[v];
 
 #pragma omp atomic update
-            values[idx] += element_weights[v];
+            diag[idx] += element_diag[v];
         }
     }
 
