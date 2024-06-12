@@ -14,6 +14,11 @@
 #include "sfem_base.h"
 #include "sfem_vec.h"
 
+// References
+// Zienkiewicz, O.C., Taylor, R.L. and Zhu, J.Z., 2005. The finite element method: its basis and fundamentals. Elsevier.
+// Duczek, S. and Gravenkamp, H., 2019. Critical assessment of different mass lumping schemes for higher order serendipity finite elements. Computer Methods in Applied Mechanics and Engineering, 350, pp.836-897.
+
+
 static SFEM_INLINE void tet10_mass_kernel(const real_t px0,
                                           const real_t px1,
                                           const real_t px2,

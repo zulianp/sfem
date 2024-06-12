@@ -262,6 +262,21 @@ class FE:
 		c_log(c_gen(expr))
 
 
+		f = self.fun(qp)
+		nfun = len(f)
+
+		fun_expr = []
+		for i in range(0, nfun):
+			if self.strided:
+				fx = ast.Assignment(sp.symbols(f'f[{i}*stride_fun]'), f[i])
+			else:
+				fx = ast.Assignment(sp.symbols(f'f[{i}]'), f[i])
+
+			fun_expr.append(fx)
+
+		print(f"------ basis functions ({nfun}) -------")
+		c_log(c_gen(fun_expr))
+
 
 
 	def generate_c_code(self):
