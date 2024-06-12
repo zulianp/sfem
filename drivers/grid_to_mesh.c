@@ -25,9 +25,9 @@ double calculate_flops(const ptrdiff_t nelements, const ptrdiff_t quad_nodes, do
 }
 
 int main(int argc, char* argv[]) {
-    printf("========================================\n");
-    printf("Starting grid_to_mesh\n");
-    printf("========================================\n\n");
+    // printf("========================================\n");
+    // printf("Starting grid_to_mesh\n");
+    // printf("========================================\n\n");
 
     sfem_resample_field_info info;
 
@@ -40,12 +40,14 @@ int main(int argc, char* argv[]) {
     MPI_Comm_size(comm, &size);
 
     // print argv
-    printf("argc: %d\n", argc);
-    printf("argv: \n");
-    for (int i = 0; i < argc; i++) {
-        printf(" %s", argv[i]);
-    }
-    printf("\n");
+    // if (!rank) {
+    //     printf("argc: %d\n", argc);
+    //     printf("argv: \n");
+    //     for (int i = 0; i < argc; i++) {
+    //         printf(" %s", argv[i]);
+    //     }
+    //     printf("\n");
+    // }
 
     if (argc != 13) {
         fprintf(stderr, "Error: Invalid number of arguments\n\n");
@@ -196,11 +198,8 @@ int main(int argc, char* argv[]) {
 
                 if (mesh.element_type == TET10) {
                     // FIXME (we should wrap mass vector assembly in sfem_resample_field.c)
-                    subparametric_tet10_assemble_dual_mass_vector(mesh.nelements,
-                                                                  mesh.nnodes,
-                                                                  mesh.elements,
-                                                                  mesh.points,
-                                                                  mass_vector);
+                    tet10_assemble_dual_mass_vector(
+                            mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mass_vector);
                 } else {
                     enum ElemType st = shell_type(mesh.element_type);
 

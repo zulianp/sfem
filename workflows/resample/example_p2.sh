@@ -37,9 +37,13 @@ if [[ -d "$p2_mesh" ]]
 then
 	echo "Reusing existing mesh $p2_mesh!"
 else
-	create_sphere.sh 4
+	# create_sphere.sh 5
+	create_sphere.sh 0 # Visibily see the curvy surface
 	sfc $mesh $mesh_sorted
-	mesh_p1_to_p2 $mesh_sorted $p2_mesh
+	# Project p2 nodes to sphere isosurfaces (to check if nonlinear map are creating errors)
+	SFEM_SPERE_TOL=1e-5 SFEM_MAP_TO_SPHERE=1 mesh_p1_to_p2 $mesh_sorted $p2_mesh
+
+	raw_to_db.py $p2_mesh test_mapping.vtk 
 fi
 
 if [[ -f "$sdf" ]]
@@ -70,9 +74,18 @@ n_procs=8
 # n_procs=2
 # n_procs=1
 
+if [[ -z "$LAUNCH" ]]
+then
+	LAUNCH="mpiexec -np $n_procs"
+fi
 
-LAUNCH="mpiexec -np $n_procs"
 GRID_TO_MESH="grid_to_mesh"
+
+# To enable iso-parametric transformation of p2 meshes
+# for the resampling
+
+# Enable second order mesh parametrizations
+export SFEM_ENABLE_ISOPARAMETRIC=1
 
 set -x
 time SFEM_INTERPOLATE=0 SFEM_READ_FP32=1 $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field

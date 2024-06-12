@@ -910,7 +910,7 @@ int resample_field_local(
                     weighted_field);
         }
         case TET10: {
-            return hex8_to_subparametric_tet10_resample_field_local(
+            return hex8_to_tet10_resample_field_local(
                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
         }
 
@@ -975,7 +975,7 @@ int resample_field(
         // FIXME
         if (element_type == TET10) {
             real_t* mass_vector = calloc(nnodes, sizeof(real_t));
-            subparametric_tet10_assemble_dual_mass_vector(
+            tet10_assemble_dual_mass_vector(
                     nelements, nnodes, elems, xyz, mass_vector);
 
             for (ptrdiff_t i = 0; i < nnodes; i++) {
