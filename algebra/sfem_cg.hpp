@@ -36,6 +36,7 @@ namespace sfem {
         T tol{1e-10};
         int max_it{10000};
         ptrdiff_t n_dofs{-1};
+        bool verbose{true};
 
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
@@ -99,7 +100,9 @@ namespace sfem {
         }
 
         void monitor(const int iter, const T residual) {
-            if (iter == max_it || iter % 100 == 0 || residual < tol) {
+            if(!verbose) return;
+
+            if (iter == max_it || iter % std::max(1, int(max_it * 0.1)) == 0 || residual < tol) {
                 std::cout << iter << ": " << residual << "\n";
             }
         }
@@ -145,6 +148,8 @@ namespace sfem {
                 return 0;
             }
 
+            monitor(0, sqrt(rtr));
+
             T* p = allocate(n);
             T* Ap = allocate(n);
 
@@ -163,7 +168,7 @@ namespace sfem {
 
                 const T rtr_new = dot(n, r, r);
 
-                monitor(k, sqrt(rtr_new));
+                monitor(k+1, sqrt(rtr_new));
 
                 if (sqrt(rtr_new) < tol) {
                     info = 0;
@@ -238,7 +243,7 @@ namespace sfem {
                 axpby(n, alpha, p, 1, x);
                 axpby(n, -alpha, Ap, 1, r);
 
-                monitor(k, sqrt(rtz));
+                monitor(k+1, sqrt(rtz));
 
                 if (sqrt(rtz) < tol) {
                     info = 0;
@@ -258,7 +263,7 @@ namespace sfem {
     };
 
     template <typename T>
-    std::shared_ptr<MatrixFreeLinearSolver<T>> h_cg() {
+    std::shared_ptr<ConjugateGradient<T>> h_cg() {
         auto cg = std::make_shared<ConjugateGradient<T>>();
         cg->default_init();
         return cg;
