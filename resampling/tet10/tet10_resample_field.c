@@ -279,7 +279,7 @@ int hex8_to_subparametric_tet10_resample_field_local(
                    10 * sizeof(real_t));  // set to zero the element field
 
             // SUBPARAMETRIC (for isoparametric this is a nonlinear map computed for each qp)
-            tet4_measure(x[0],
+            const real_t measure = tet4_measure(x[0],
                          x[1],
                          x[2],
                          x[3],
@@ -300,9 +300,6 @@ int hex8_to_subparametric_tet10_resample_field_local(
             for (int q = 0; q < TET4_NQP; q++) {  // loop over the quadrature points
 
                 // det of jacobian
-                const real_t measure = 0;
-                assert(0);
-
                 real_t g_qx, g_qy, g_qz;
                 // Transform quadrature point to physical space
                 // g_qx, g_qy, g_qz are the coordinates of the quadrature point in the physical

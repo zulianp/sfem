@@ -301,7 +301,7 @@ SFEM_INLINE static enum ElemType macro_base_elem(const enum ElemType macro_type)
     }
 }
 
-SFEM_INLINE int is_second_order_lagrange(const enum ElemType type) {
+SFEM_INLINE static int is_second_order_lagrange(const enum ElemType type) {
     switch (type) {
         case TET10:
             return 1;
