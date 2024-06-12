@@ -1056,10 +1056,11 @@ namespace sfem {
         const ptrdiff_t rows = max_node_id(coarse_et, mesh->nelements, mesh->elements) + 1;
         const ptrdiff_t cols = impl_->space->n_dofs();
 
+        auto crs_graph = impl_->space->mesh().create_node_to_node_graph(coarse_et);
         return std::make_shared<LambdaOperator<isolver_scalar_t>>(
             rows, cols, [=](const isolver_scalar_t *const from, isolver_scalar_t *const to) {
                 ::hierarchical_restriction(
-                    et, coarse_et, mesh->nelements, mesh->elements, from, to);
+                    crs_graph->n_nodes(), crs_graph->rowptr(), crs_graph->colidx(), from, to);
             });
     }
 

@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 
 import pandas as pd
+
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import sys, getopt
+
+# import matplotlib
+# print(matplotlib.get_configdir())
 
 plt.rcParams["figure.figsize"] = (6,4)
 col = 'throughput [GB/s]'

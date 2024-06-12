@@ -10,7 +10,6 @@
 extern "C" {
 #endif
 
-
 ptrdiff_t max_node_id(const enum ElemType type,
                       const ptrdiff_t nelements,
                       idx_t **const SFEM_RESTRICT elements);
@@ -34,12 +33,13 @@ int hierarchical_prolongation(const enum ElemType from_element,
                               const real_t *const SFEM_RESTRICT from,
                               real_t *const SFEM_RESTRICT to);
 
-int hierarchical_restriction(const enum ElemType from_element,
-                             const enum ElemType to_element,
-                             const ptrdiff_t nelements,
-                             idx_t **const SFEM_RESTRICT elements,
-                             const real_t *const SFEM_RESTRICT from,
-                             real_t *const SFEM_RESTRICT to);
+int hierarchical_restriction(
+    // CRS-node-graph of the coarse mesh
+    const ptrdiff_t nnodes,
+    const count_t *const SFEM_RESTRICT coarse_rowptr,
+    const idx_t *const SFEM_RESTRICT coarse_colidx,
+    const real_t *const SFEM_RESTRICT from,
+    real_t *const SFEM_RESTRICT to);
 
 #ifdef __cplusplus
 }
