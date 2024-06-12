@@ -192,23 +192,36 @@ int main(int argc, char* argv[]) {
 
                 real_t* mass_vector = calloc(mesh.nnodes, sizeof(real_t));
 
-                enum ElemType st = shell_type(mesh.element_type);
+                if (is_second_order_lagrange(mesh.element_type)) {
+                    assert(mesh.element_type == TET10);
+                    assert(size == 1);
+                    assert(0);
 
-                if (st == INVALID) {
-                    assemble_lumped_mass(mesh.element_type,
-                                         mesh.nelements,
-                                         mesh.nnodes,
-                                         mesh.elements,
-                                         mesh.points,
-                                         mass_vector);
-
+                    // subparametric_tet10_assemble_dual_mass_vector(mesh.element_type,
+                    //                                               mesh.nelements,
+                    //                                               mesh.nnodes,
+                    //                                               mesh.elements,
+                    //                                               mesh.points,
+                    //                                               mass_vector);
                 } else {
-                    assemble_lumped_mass(st,
-                                         mesh.nelements,
-                                         mesh.nnodes,
-                                         mesh.elements,
-                                         mesh.points,
-                                         mass_vector);
+                    enum ElemType st = shell_type(mesh.element_type);
+
+                    if (st == INVALID) {
+                        assemble_lumped_mass(mesh.element_type,
+                                             mesh.nelements,
+                                             mesh.nnodes,
+                                             mesh.elements,
+                                             mesh.points,
+                                             mass_vector);
+
+                    } else {
+                        assemble_lumped_mass(st,
+                                             mesh.nelements,
+                                             mesh.nnodes,
+                                             mesh.elements,
+                                             mesh.points,
+                                             mass_vector);
+                    }
                 }
 
                 // exchange ghost nodes and add contribution
@@ -237,6 +250,14 @@ int main(int argc, char* argv[]) {
 
                     assert(mass_vector[i] != 0);
                     g[i] /= mass_vector[i];
+                }
+
+                if (is_second_order_lagrange(mesh.element_type)) {
+                    // TODO: Apply inverse transform for recovering standard basis
+                    // coefficients.
+                    assert(mesh.element_type == TET10);
+                    assert(size == 1);
+                    assert(0);
                 }
 
                 free(mass_vector);

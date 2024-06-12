@@ -1,9 +1,12 @@
 #include "sfem_resample_field.h"
 
-#include "sfem_resample_V.h"
-#include "mass.h"
-// #include "read_mesh.h"
+
 #include "matrixio_array.h"
+
+#include "mass.h"
+
+#include "sfem_resample_V.h"
+#include "tet10_resample_field.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -907,6 +910,20 @@ int resample_field_local(
                     data,
                     weighted_field);
         }
+        case TET10: {
+            return hex8_to_subparametric_tet10_resample_field_local(  
+                    nelements,
+                    nnodes,
+                    elems,
+                    xyz,
+                    n,
+                    stride,
+                    origin,
+                    delta,
+                    data,
+                    weighted_field);
+        }
+
         default:
             break;
     }
