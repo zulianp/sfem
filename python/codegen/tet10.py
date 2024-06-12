@@ -17,6 +17,9 @@ class Tet10(FE):
 	def coords_sub_parametric(self):
 		return [[x0, x1, x2, x3], [y0, y1, y2, y3], [z0, z1, z2, z3]]
 
+	def coords(self):
+		return  [coeffs('x', 10), coeffs('y', 10), coeffs('z', 10) ]
+
 	def name(self):
 		return "Tet10"
 

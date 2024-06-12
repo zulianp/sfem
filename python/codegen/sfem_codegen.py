@@ -103,6 +103,8 @@ class SFEMCodePrinter(sp.printing.c.C99CodePrinter):
             return "POW2({})".format(self._print(expr.base))
         elif expr.exp == -2:
             return "(1/POW2({}))".format(self._print(expr.base))
+        elif expr.exp == 3:
+            return "(POW3({}))".format(self._print(expr.base))
         else:
             return super()._print_Pow(expr)
 
@@ -207,6 +209,10 @@ z0, z1, z2, z3 = sp.symbols('pz0 pz1 pz2 pz3', real=True)
 x4, x5, x6, x7 = sp.symbols('px4 px5 px6 px7', real=True)
 y4, y5, y6, y7 = sp.symbols('py4 py5 py6 py7', real=True)
 z4, z5, z6, z7 = sp.symbols('pz4 pz5 pz6 pz7', real=True)
+
+x8, x9, x10, x11 = sp.symbols('px8 px9 px10 px11', real=True)
+y8, y9, y10, y11 = sp.symbols('py8 py9 py10 py11', real=True)
+z8, z9, z10, z11 = sp.symbols('pz8 pz9 pz10 pz11', real=True)
 
 px = [x0, x1, x2, x3]
 py = [y0, y1, y2, y3]

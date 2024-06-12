@@ -23,6 +23,9 @@ class WeightedFE(FE):
 	def coords_sub_parametric(self):
 		return self.fe.coords_sub_parametric()
 
+	def coords(self):
+		return self.fe.coords()
+
 	def name(self):
 		return f'{self.prefix_}({self.fe.name()})'
 				
