@@ -117,8 +117,8 @@ int main(int argc, char *argv[]) {
         b_b = sfem::h_buffer<real_t>(fs->n_dofs());
 
         if (SFEM_USE_PRECONDITIONER) {
-            // if (true) {
-                if (false) {
+            if (true) {
+                // if (false) {
                 auto mg = sfem::h_mg<real_t>();
 
                 auto lor_fs = fs->lor();
@@ -166,7 +166,7 @@ int main(int argc, char *argv[]) {
                     fine_smoother->set_n_dofs(fs->n_dofs());
                     fine_smoother->set_op(fine_op);
                     fine_smoother->verbose = false;
-                    fine_smoother->set_max_it(10);
+                    fine_smoother->set_max_it(4);
 
                     mg->add_level(fine_residual_op, fine_smoother, nullptr, restriction);
                 }
