@@ -221,6 +221,57 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    { //This is a hack
+        int SFEM_MAP_TO_SPHERE = 0;
+        SFEM_READ_ENV(SFEM_MAP_TO_SPHERE, atoi);
+        if (SFEM_MAP_TO_SPHERE) {
+            float SFEM_SPERE_RADIUS = 0.5;
+            SFEM_READ_ENV(SFEM_SPERE_RADIUS, atof);
+
+            double SFEM_SPERE_TOL = 1e-8;
+            SFEM_READ_ENV(SFEM_SPERE_TOL, atof);
+
+            for (ptrdiff_t i = 0; i < p1_mesh.nnodes; i++) {
+                const count_t begin = rowptr[i];
+                const count_t end = rowptr[i + 1];
+
+                for (count_t k = begin; k < end; k++) {
+                    const idx_t j = colidx[k];
+
+                    if (i < j) {
+                        const idx_t nidx = p2idx[k];
+
+                        geom_t r1 = 0;
+                        geom_t r2 = 0;
+                        geom_t mr = 0;
+
+                        for (int d = 0; d < p2_mesh.spatial_dim; d++) {
+                            const geom_t xi = p2_mesh.points[d][i];
+                            const geom_t xj = p2_mesh.points[d][j];
+                            r1 += xi * xi;
+                            r2 += xj * xj;
+
+                            const geom_t mxi = p2_mesh.points[d][nidx];
+                            mr += mxi * mxi;
+                        }
+
+                        r1 = sqrt(r1);
+                        r2 = sqrt(r2);
+                        mr = r1 / sqrt(mr);
+
+                        // On the surface
+                        if (fabs(r1 - SFEM_SPERE_RADIUS) < SFEM_SPERE_TOL &&
+                            fabs(r2 - SFEM_SPERE_RADIUS) < SFEM_SPERE_TOL) {
+                            for (int d = 0; d < p2_mesh.spatial_dim; d++) {
+                                p2_mesh.points[d][nidx] *= mr;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     ///////////////////////////////////////////////////////////////////////////////
     // Write P2 mesh to disk
     ///////////////////////////////////////////////////////////////////////////////
