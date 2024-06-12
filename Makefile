@@ -410,12 +410,20 @@ gap_from_sdf : gap_from_sdf.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
 # Resampling
+ifeq ($(cuda), 1)
 CUDA_LIBS_PATH = /usr/local/cuda-12.3/targets/x86_64-linux/lib
 grid_to_mesh: grid_to_mesh.c libsfem.a ${PWD}/resampling/cuda/libsfem_resample_field_cuda.a ${PWD}/resampling/quadratures_rule.h
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) -L${PWD}/resampling/cuda -lsfem_resample_field_cuda -L${CUDA_LIBS_PATH} -lcudart ; \
 
 ${PWD}/resampling/cuda/libsfem_resample_field_cuda.a: ${PWD}/resampling/cuda/sfem_resample_field_cuda.cu ${PWD}/resampling/cuda/quadratures_rule_cuda.h
 	${MAKE} -C ${PWD}/resampling/cuda GPU_ARCH=${GPU_ARCH}
+
+else
+# CPU version
+grid_to_mesh: grid_to_mesh.c libsfem.a
+	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+endif
 
 geometry_aware_gap_from_sdf : geometry_aware_gap_from_sdf.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
