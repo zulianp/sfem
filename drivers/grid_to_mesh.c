@@ -4,11 +4,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <mpi.h>
+
 
 #include "matrixio_array.h"
 #include "matrixio_ndarray.h"
 
-#include "mesh_aura.h"
+#include "mesh_aura.h"  
 #include "read_mesh.h"
 #include "sfem_mesh_write.h"
 #include "sfem_resample_field.h"

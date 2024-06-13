@@ -40,7 +40,7 @@ if [[ -d "$skinned" ]]
 then
 	echo "Reusing existing mesh $skinned and SDF!"
 else
-	create_sphere.sh 5 
+	create_sphere.sh 6 
 	sfc $mesh $mesh_sorted
 	mkdir -p $skinned
 	skin $mesh $skinned
@@ -64,7 +64,7 @@ LAUNCH="mpiexec -np $n_procs"
 # LAUNCH=" "
 
 GRID_TO_MESH="grid_to_mesh"
-# GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
+#GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
 
 # LAUNCH="lldb --"
 
