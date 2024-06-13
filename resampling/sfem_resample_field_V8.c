@@ -14,7 +14,6 @@
 
 #include "quadratures_rule.h"
 
-
 #define real_type real_t
 #define SFEM_RESTRICT __restrict__
 
@@ -31,6 +30,22 @@ SFEM_INLINE vec8_int64 floor_V8(const vec8_double x) {
     const vec8_int64 res = __builtin_convertvector(x, vec8_int64);
     return res;
 }
+
+int tet4_resample_field_local_v2(
+        // Mesh
+        const ptrdiff_t start_element,
+        const ptrdiff_t end_element,
+        const ptrdiff_t nnodes,
+        idx_t** const SFEM_RESTRICT elems,
+        geom_t** const SFEM_RESTRICT xyz,
+        // SDF
+        const ptrdiff_t* const SFEM_RESTRICT n,
+        const ptrdiff_t* const SFEM_RESTRICT stride,
+        const geom_t* const SFEM_RESTRICT origin,
+        const geom_t* const SFEM_RESTRICT delta,
+        const real_type* const SFEM_RESTRICT data,
+        // Output
+        real_type* const SFEM_RESTRICT weighted_field);
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
@@ -763,7 +778,6 @@ int tet4_resample_field_local_V8_aligned(
 
     //
 }  // end tet4_resample_field_local_V8_aligned
-
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
