@@ -14,13 +14,12 @@ def bspline(i, order, t):
 
 order = 5
 extras = 0
-nctrl = (order + 1) + extras
+nctrl = int((order + 1) + extras)
+
 # if False:
-if True:
-	
+if True:	
 	x = np.linspace(0, nctrl-1, nctrl)
-	# y = np.sin(x * (2*3.14/nctrl))
-	y = (x-nctrl/2)**2 + np.sin(x * (2*3.14/nctrl))
+	y = np.sin(x * (2*3.14/nctrl)) + np.sin(x * (4.4*3.14/nctrl))
 
 	n = 100
 	t = np.linspace(0, nctrl-1, n)
@@ -36,8 +35,9 @@ if True:
 
 		f = 0
 		for j in range(0, nctrl):
-			f += y[j] * bspline(j-(order+1)/2, order+1, ti)
-			b[j][i] = bspline(j-(order+1)/2, order+1, ti)
+			bj = bspline(j-(order+1)/2, order+1, ti)
+			b[j][i] = bj
+			f += y[j] * bj
 
 		yt[i] = f
 
