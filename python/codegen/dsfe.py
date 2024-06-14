@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+# References
+# [1] Zienkiewicz, O.C., Taylor, R.L. and Zhu, J.Z., 2005. 	The finite element method: its basis and fundamentals. Elsevier.
+# [2] Duczek, S. and Gravenkamp, H., 2019. 					Critical assessment of different mass lumping schemes for higher order serendipity finite elements. Computer Methods in Applied Mechanics and Engineering, 350, pp.836-897.
+# [3] Hinton, E., Rock, T. and Zienkiewicz, O.C., 1976. 	A note on mass lumping and related processes in the finite element method. Earthquake Engineering & Structural Dynamics, 4(3), pp.245-249.
+
+
 from fe import FE
 from sfem_codegen import *
 from weighted_fe import *
