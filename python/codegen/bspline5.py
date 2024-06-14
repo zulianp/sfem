@@ -30,7 +30,7 @@ if True:
 	x = np.linspace(0, nctrl-1, nctrl)
 	y = np.sin(x * (2*3.14/nctrl)) + np.sin(x * (4.4*3.14/nctrl))
 
-	n = 40
+	n = 10
 	t = np.linspace(2, 3, n)
 	yt = np.zeros(t.shape)
 	ytref = np.zeros(t.shape)
@@ -65,14 +65,14 @@ if True:
 
 	axs[0].plot(x, y, marker='8')
 	axs[0].plot(t, yt, label='spline5')
-	axs[0].plot(t, ytref, label='spline ref')
+	axs[0].plot(t, ytref,  linestyle='None', marker='.', label='spline ref')
 	axs[0].set_title("Evalutation (evaluation assumed in interval is [2-3])")
 	axs[0].legend()
 
 	# for j in range(0, nctrl):
 	for j in [2, 3]:
 		axs[1].plot(t, b[j],  label=f'b{j}')
-		axs[1].plot(t, bref[j],  marker='.', label=f'ref{j}')
+		axs[1].plot(t, bref[j],  linestyle='None', marker='.', label=f'ref{j}')
 
 	axs[1].set_title("Basis functions")
 	axs[1].legend()
