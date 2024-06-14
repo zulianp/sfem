@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
 
     if (array_read(comm, path_input, SFEM_MPI_REAL_T, from, coarse_nodes, coarse_nodes) ||
         hierarchical_prolongation(
-            from_element, to_element, mesh.nelements, mesh.elements, from, to) ||
+            from_element, to_element, mesh.nelements, mesh.elements, 1, from, to) ||
         array_write(comm, path_output, SFEM_MPI_REAL_T, to, mesh.nnodes, mesh.nnodes)) {
         return EXIT_FAILURE;
     }

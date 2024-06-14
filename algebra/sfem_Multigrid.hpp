@@ -173,7 +173,6 @@ namespace sfem {
             this->zeros(mem->size(), mem->solution->data());
 
             if (coarsest_level() == level) {
-                // std::cout << "Coarse level solve!\n";
                 return smoother_[level]->apply(mem->residual->data(), mem->solution->data());
             }
 
@@ -182,8 +181,6 @@ namespace sfem {
             auto prolongation = prolongation_[coarser_level(level)];
 
             for (int k = 0; k < this->cycle_type_; k++) {
-                // std::cout << "Cycle " << k << " \n";
-
                 this->zeros(mem->solution->size(), mem->solution->data());
                 smoother_[level]->apply(mem->residual->data(), mem->solution->data());
 
