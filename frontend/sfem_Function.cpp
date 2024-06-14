@@ -127,6 +127,13 @@ namespace sfem {
             return ISOLVER_FUNCTION_FAILURE;
         }
 
+        int SFEM_USE_MACRO = 0;
+        SFEM_READ_ENV(SFEM_USE_MACRO, atoi);
+
+        if(SFEM_USE_MACRO) {
+            impl_->mesh.element_type = macro_type_variant((enum ElemType)impl_->mesh.element_type);
+        }
+
         return ISOLVER_FUNCTION_SUCCESS;
     }
 
@@ -1302,6 +1309,16 @@ namespace sfem {
                                        space->mesh().node_to_node_rowptr(),
                                        space->mesh().node_to_node_colidx(),
                                        values);
+
+            return ISOLVER_FUNCTION_SUCCESS;
+        }
+
+        int hessian_diag(const isolver_scalar_t *const /*x*/,
+                         isolver_scalar_t *const values) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            laplacian_diag(
+                element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, values);
 
             return ISOLVER_FUNCTION_SUCCESS;
         }

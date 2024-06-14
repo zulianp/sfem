@@ -194,9 +194,9 @@ int main(int argc, char *argv[]) {
 #else  // Basic solvers
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());
-#if 0
+#if 1
     // Point Jacobi solver (relaxed)
-    auto solver = sfem::h_pjacobi(fs->n_dofs(), diag->data(), 0.6);
+    auto solver = sfem::h_pjacobi<real_t>(fs->n_dofs(), diag->data(), 0.8);
     solver->set_op(linear_op);
     solver->verbose = true;
 #else

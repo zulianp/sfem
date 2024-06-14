@@ -131,3 +131,41 @@ void laplacian_apply(int element_type,
         }
     }
 }
+
+void laplacian_diag(int element_type,
+                    const ptrdiff_t nelements,
+                    const ptrdiff_t nnodes,
+                    idx_t **const SFEM_RESTRICT elements,
+                    geom_t **const SFEM_RESTRICT points,
+                    real_t *const SFEM_RESTRICT values)
+{
+    switch (element_type) {
+        // case TRI3: {
+        //     tri3_laplacian_diag(nelements, nnodes, elems, xyz, values);
+        //     break;
+        // }
+        // case TET4: {
+        //     tet4_laplacian_diag(nelements, nnodes, elems, xyz, values);
+        //     break;
+        // }
+        // case TET10: {
+        //     tet10_laplacian_diag(nelements, nnodes, elems, xyz, values);
+        //     break;
+        // }
+        case MACRO_TET4: {
+            macro_tet4_laplacian_t ctx;
+            macro_tet4_laplacian_init(&ctx, nelements, elements, points);
+            macro_tet4_laplacian_diag(&ctx, values);
+            macro_tet4_laplacian_destroy(&ctx);
+            return;
+        }
+        // case MACRO_TRI3: {
+        //     macro_tri3_laplacian_diag(nelements, nnodes, elems, xyz, values);
+        //     break;
+        // }
+        default: {
+            assert(0);
+            MPI_Abort(MPI_COMM_WORLD, -1);
+        }
+    }
+}

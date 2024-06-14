@@ -170,10 +170,11 @@ namespace sfem {
             }
 
             if (verbose) {
+                const T norm_r = sqrt(dot(n, r, r));
                 std::printf("Finished at iteration %d with |r| = %g, reduction %g\n",
                             k,
                             (double)norm_r,
-                            (double)(norm_r - norm_r0) / norm_r0);
+                            (double)(norm_r / norm_r0));
             }
 
             // clean-up
@@ -187,8 +188,8 @@ namespace sfem {
 
     template <typename T>
     std::shared_ptr<PointJacobi<T>> h_pjacobi(const ptrdiff_t n,
-                                                         const T* const d,
-                                                         const T relax = T(0.5)) {
+                                              const T* const d,
+                                              const T relax = T(1.0)) {
         auto jacobi = std::make_shared<PointJacobi<T>>();
 
         jacobi->jacobi_correction_op = [=](const std::size_t n, const T* const r, T* const x) {
