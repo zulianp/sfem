@@ -13,13 +13,17 @@ def bspline(i, order, t):
 		return (t - i)/(i+order-1 - i) * bspline(i, order-1, t) + (i+order - t)/(i+order - (i+1)) * bspline(i+1, order-1, t) 
 
 order = 5
-extras = 0
+extras = 10
 nctrl = int((order + 1) + extras)
 
 # if False:
 if True:	
 	x = np.linspace(0, nctrl-1, nctrl)
-	y = np.sin(x * (2*3.14/nctrl)) + np.sin(x * (4.4*3.14/nctrl))
+	# y = 0.1*(np.sin(x * (2*3.14/nctrl)) + 50*np.sin(x * (8.4*3.14/nctrl)) + 5*np.sin(x * (19.4*3.14/nctrl)))
+
+	y = np.zeros(x.shape) - 1
+	y[int(len(y)/2):len(y)] = 1
+
 
 	n = 100
 	t = np.linspace(0, nctrl-1, n)
@@ -45,11 +49,14 @@ if True:
 	fig, axs = plt.subplots(2)
 	fig.suptitle('Quintic Uniform B-Splines')
 	axs[0].plot(x, y)
-	axs[0].axvspan(2, 3, color='green', alpha=0.2)
+
+	valid_begin=(order+1)/2
+	valid_end=nctrl-(order+1)/2
+	axs[0].axvspan(valid_begin, valid_end, color='green', alpha=0.2)
 
 	axs[0].plot(x, y, marker='8')
 	axs[0].plot(t, yt)
-	axs[0].set_title("Evalutation (valid interval is [2-3])")
+	axs[0].set_title(f"Evaluation (valid interval is [{valid_begin}-{valid_end}])")
 
 	for j in range(0, nctrl):
 		axs[1].plot(t, b[j])
@@ -57,6 +64,7 @@ if True:
 	axs[1].set_title("Basis functions")
 	fig.tight_layout()
 	plt.savefig("bspline.pdf")
+	plt.savefig("bspline.png")
 
 expr = []
 t = sp.symbols('t', positive=True)
