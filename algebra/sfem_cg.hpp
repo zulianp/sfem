@@ -12,6 +12,7 @@
 #include "sfem_MatrixFreeLinearSolver.hpp"
 
 // https://en.wikipedia.org/wiki/Conjugate_gradient_method
+// Must check: https://www.dcs.warwick.ac.uk/pmbs/pmbs14/PMBS14/Workshop_Schedule_files/8-CUDAHPCG.pdf
 namespace sfem {
 
     template <typename T>
@@ -102,7 +103,7 @@ namespace sfem {
         void monitor(const int iter, const T residual) {
             if(!verbose) return;
 
-            if (iter == max_it || iter % std::max(1, int(max_it * 0.1)) == 0 || residual < tol) {
+            if (iter == max_it || iter == 0 || iter % std::max(1, int(max_it * 0.1)) == 0 || residual < tol) {
                 std::cout << iter << ": " << residual << "\n";
             }
         }
@@ -198,6 +199,8 @@ namespace sfem {
             axpby(n, 1, b, -1, r);
 
             T rtr = dot(n, r, r);
+
+            monitor(0, sqrt(rtr));
 
             if (sqrt(rtr) < tol) {
                 destroy(r);

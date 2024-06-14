@@ -1060,7 +1060,7 @@ namespace sfem {
         return std::make_shared<LambdaOperator<isolver_scalar_t>>(
             rows, cols, [=](const isolver_scalar_t *const from, isolver_scalar_t *const to) {
                 ::hierarchical_restriction(
-                    crs_graph->n_nodes(), crs_graph->rowptr(), crs_graph->colidx(), from, to);
+                    crs_graph->n_nodes(), crs_graph->rowptr(), crs_graph->colidx(), impl_->space->block_size(), from, to);
             });
     }
 
@@ -1076,8 +1076,7 @@ namespace sfem {
         return std::make_shared<LambdaOperator<isolver_scalar_t>>(
             rows, cols, [=](const isolver_scalar_t *const from, isolver_scalar_t *const to) {
                 ::hierarchical_prolongation(
-                    coarse_et, et, mesh->nelements, mesh->elements, from, to);
-                this->apply_zero_constraints(to);
+                    coarse_et, et, mesh->nelements, mesh->elements,  impl_->space->block_size(), from, to);
             });
     }
 

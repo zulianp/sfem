@@ -67,6 +67,7 @@ int hierarchical_prolongation(const enum ElemType from_element,
                               const enum ElemType to_element,
                               const ptrdiff_t nelements,
                               idx_t **const SFEM_RESTRICT elements,
+                              const int vec_size,
                               const real_t *const SFEM_RESTRICT from,
                               real_t *const SFEM_RESTRICT to) {
     if (from_element == TET4 && (to_element == TET10 || to_element == MACRO_TET4)) {
@@ -86,17 +87,22 @@ int hierarchical_prolongation(const enum ElemType from_element,
             const idx_t i8 = elements[8][e];
             const idx_t i9 = elements[9][e];
 
-            to[i0] = from[i0];
-            to[i1] = from[i1];
-            to[i2] = from[i2];
-            to[i3] = from[i3];
+            assert(i0 != i4);
 
-            to[i4] = 0.5 * (from[i0] + from[i1]);
-            to[i5] = 0.5 * (from[i1] + from[i2]);
-            to[i6] = 0.5 * (from[i0] + from[i2]);
-            to[i7] = 0.5 * (from[i0] + from[i3]);
-            to[i8] = 0.5 * (from[i1] + from[i3]);
-            to[i9] = 0.5 * (from[i2] + from[i3]);
+
+            for (int v = 0; v < vec_size; v++) {
+                to[i0 * vec_size + v] = from[i0 * vec_size + v];
+                to[i1 * vec_size + v] = from[i1 * vec_size + v];
+                to[i2 * vec_size + v] = from[i2 * vec_size + v];
+                to[i3 * vec_size + v] = from[i3 * vec_size + v];
+
+                to[i4 * vec_size + v] = 0.5 * (from[i0 * vec_size + v] + from[i1 * vec_size + v]);
+                to[i5 * vec_size + v] = 0.5 * (from[i1 * vec_size + v] + from[i2 * vec_size + v]);
+                to[i6 * vec_size + v] = 0.5 * (from[i0 * vec_size + v] + from[i2 * vec_size + v]);
+                to[i7 * vec_size + v] = 0.5 * (from[i0 * vec_size + v] + from[i3 * vec_size + v]);
+                to[i8 * vec_size + v] = 0.5 * (from[i1 * vec_size + v] + from[i3 * vec_size + v]);
+                to[i9 * vec_size + v] = 0.5 * (from[i2 * vec_size + v] + from[i3 * vec_size + v]);
+            }
         }
     } else if (from_element == TRI3 && (to_element == TRI6 || to_element == MACRO_TRI3)) {
 #pragma omp parallel for
@@ -111,13 +117,15 @@ int hierarchical_prolongation(const enum ElemType from_element,
             const idx_t i4 = elements[4][e];
             const idx_t i5 = elements[5][e];
 
-            to[i0] = from[i0];
-            to[i1] = from[i1];
-            to[i2] = from[i2];
+            for (int v = 0; v < vec_size; v++) {
+                to[i0 * vec_size + v] = from[i0 * vec_size + v];
+                to[i1 * vec_size + v] = from[i1 * vec_size + v];
+                to[i2 * vec_size + v] = from[i2 * vec_size + v];
 
-            to[i3] = 0.5 * (from[i0] + from[i1]);
-            to[i4] = 0.5 * (from[i1] + from[i2]);
-            to[i5] = 0.5 * (from[i0] + from[i2]);
+                to[i3 * vec_size + v] = 0.5 * (from[i0 * vec_size + v] + from[i1 * vec_size + v]);
+                to[i4 * vec_size + v] = 0.5 * (from[i1 * vec_size + v] + from[i2 * vec_size + v]);
+                to[i5 * vec_size + v] = 0.5 * (from[i0 * vec_size + v] + from[i2 * vec_size + v]);
+            }
         }
     } else {
         assert(0);
@@ -133,27 +141,34 @@ int hierarchical_prolongation(const enum ElemType from_element,
 }
 
 int hierarchical_restriction(
-    // CRS-node-graph of the coarse mesh
-    const ptrdiff_t nnodes,
-    const count_t *const SFEM_RESTRICT coarse_rowptr,
-    const idx_t *const SFEM_RESTRICT coarse_colidx,
-    const real_t *const SFEM_RESTRICT from,
-    real_t *const SFEM_RESTRICT to) {
+        // CRS-node-graph of the coarse mesh
+        const ptrdiff_t nnodes,
+        const count_t *const SFEM_RESTRICT coarse_rowptr,
+        const idx_t *const SFEM_RESTRICT coarse_colidx,
+        const int vec_size,
+        const real_t *const SFEM_RESTRICT from,
+        real_t *const SFEM_RESTRICT to) {
     // Serial only
     ptrdiff_t fine_idx = nnodes;
     for (ptrdiff_t i = 0; i < nnodes; i++) {
+        for (int v = 0; v < vec_size; v++) {
+            to[i * vec_size + v] += from[i * vec_size + v];
+        }
+
         const count_t start = coarse_rowptr[i];
         const count_t end = coarse_rowptr[i + 1];
         int extent = end - start;
         const idx_t *const cols = &coarse_colidx[start];
 
-        to[i] += from[i];
-
         for (int k = 0; k < extent; k++) {
             const idx_t j = cols[k];
             if (i < j) {
-                to[i] += 0.5 * from[fine_idx];
-                to[j] += 0.5 * from[fine_idx];
+                for (int v = 0; v < vec_size; v++) {
+                    const real_t edge_value = from[fine_idx * vec_size + v];
+                    to[i * vec_size + v] += 0.5 * edge_value;
+                    to[j * vec_size + v] += 0.5 * edge_value;
+                }
+
                 fine_idx++;
             }
         }

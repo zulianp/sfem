@@ -27,10 +27,10 @@ export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 
 # rm -rf mesh
-# create_cylinder.sh 3
+# create_cylinder.sh 1
 
-# create_cylinder_p2.sh 1
-# export SFEM_USE_MACRO=1
+# create_cylinder_p2.sh 2
+export SFEM_USE_MACRO=1
 
 sleft=mesh/sidesets_aos/sinlet.raw
 sright=mesh/sidesets_aos/soutlet.raw
@@ -61,12 +61,16 @@ export SFEM_USE_GPU=1
 export SFEM_USE_PRECONDITIONER=1
 export CUDA_LAUNCH_BLOCKING=0
 
-$LAUNCH steady_state_sim mesh output
+# $LAUNCH steady_state_sim mesh output
+$LAUNCH mgsolve mesh output
 
 if [[ $SFEM_BLOCK_SIZE != 1 ]]
 then
 	aos_to_soa output/x.raw 8 $SFEM_BLOCK_SIZE output/disp
-	raw_to_db.py mesh output/x.vtk -p "output/disp.*.raw"
+	aos_to_soa output/rhs.raw 8 $SFEM_BLOCK_SIZE output/rhs
+	aos_to_soa output/r.raw 8 $SFEM_BLOCK_SIZE output/r
+
+	raw_to_db.py mesh output/x.vtk -p "output/disp.*.raw,output/rhs.*.raw,output/r.*.raw"
 else
 	raw_to_db.py mesh output/x.vtk -p "output/x.raw"
 fi

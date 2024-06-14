@@ -151,7 +151,6 @@ int main(int argc, char *argv[]) {
                                               lor_fs->n_dofs(),
                                               [=](const real_t *const x, real_t *const y) {
                                                   lor_f->apply(nullptr, x, y);
-                                                  // lor_f->apply_zero_constraints(y);
                                               });
 
                     std::shared_ptr<sfem::Operator<real_t>> fine_residual_op =
@@ -159,7 +158,6 @@ int main(int argc, char *argv[]) {
                                               lor_fs->n_dofs(),
                                               [=](const real_t *const x, real_t *const y) {
                                                   lor_f->gradient(x, y);
-                                                  // lor_f->apply_zero_constraints(y);
                                               });
 
                     auto fine_smoother = sfem::h_cg<real_t>();
