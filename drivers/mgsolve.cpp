@@ -1,11 +1,15 @@
+#include <memory>
 #include "sfem_Function.hpp"
 
+#include "sfem_GaussSeidel.hpp"
 #include "sfem_Multigrid.hpp"
-#include "sfem_PointJacobi.hpp"
-
 #include "sfem_base.h"
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
+#include "sfem_crs_SpMV.hpp"
+#include "spmv.h"
+
+#include "matrixio_array.h"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
@@ -70,16 +74,43 @@ int main(int argc, char *argv[]) {
     f->add_operator(op);
 
     real_t tol = 1e-8;
-
+    bool matrix_free = false;
     double solve_tick = MPI_Wtime();
 
-    // Fine level
-    auto linear_op = sfem::make_op<real_t>(
-            fs->n_dofs(), fs->n_dofs(), [=](const real_t *const x, real_t *const y) {
-                f->apply(nullptr, x, y);
-            });
+    f->apply_constraints(x->data());
+    f->apply_constraints(rhs->data());
 
-    f->hessian_diag(nullptr, diag->data());
+    std::shared_ptr<sfem::Operator<real_t>> linear_op;
+    std::shared_ptr<sfem::Smoother<real_t>> smoother;
+
+    if (matrix_free) {
+        linear_op = sfem::make_op<real_t>(
+                fs->n_dofs(), fs->n_dofs(), [=](const real_t *const x, real_t *const y) {
+                    f->apply(nullptr, x, y);
+                });
+
+        f->hessian_diag(nullptr, diag->data());
+    } else {
+        ptrdiff_t nlocal;
+        ptrdiff_t nglobal;
+        ptrdiff_t nnz;
+        isolver_idx_t *rowptr;
+        isolver_idx_t *colidx;
+        fs->create_crs_graph(&nlocal, &nglobal, &nnz, &rowptr, &colidx);
+        real_t *values = (real_t *)calloc(rowptr[nlocal], sizeof(real_t));
+        f->hessian_crs(nullptr, rowptr, colidx, values);
+
+        // Owns the pointers
+        linear_op = sfem::h_crs_spmv(nlocal, nlocal, rowptr, colidx, values);
+        crs_diag(nlocal, rowptr, colidx, values, diag->data());
+        smoother = sfem::h_gauss_seidel<real_t>(fs->n_dofs(), rowptr, colidx, values, diag->data());
+
+        array_write(comm, "./rhs.raw", SFEM_MPI_REAL_T, rhs->data(), nlocal, nlocal);
+        array_write(comm, "./diag.raw", SFEM_MPI_REAL_T, diag->data(), nlocal, nlocal);
+        array_write(comm, "./rowptr.raw", SFEM_MPI_COUNT_T, rowptr, nlocal + 1, nlocal + 1);
+        array_write(comm, "./colidx.raw", SFEM_MPI_IDX_T, colidx, rowptr[nlocal], rowptr[nlocal]);
+        array_write(comm, "./values.raw", SFEM_MPI_REAL_T, values, rowptr[nlocal], rowptr[nlocal]);
+    }
 
 #if 0  // MG
     bool cascadic_mg = false;
@@ -192,15 +223,13 @@ int main(int argc, char *argv[]) {
     }
 
 #else  // Basic solvers
-    f->apply_constraints(x->data());
-    f->apply_constraints(rhs->data());
-#if 1
+#if 0
     // Point Jacobi solver (relaxed)
-    auto solver = sfem::h_pjacobi<real_t>(fs->n_dofs(), diag->data(), 0.8);
+    auto solver = smoother;
     solver->set_op(linear_op);
     solver->verbose = true;
-#else
-    // CG solver
+#else  // CG solver
+
     auto preconditioner = sfem::make_op<real_t>(
             diag->size(), diag->size(), [=](const real_t *const x, real_t *const y) {
                 auto d = diag->data();
@@ -210,6 +239,9 @@ int main(int argc, char *argv[]) {
                     y[i] = x[i] / d[i];
                 }
             });
+
+    // smoother->set_max_it(3);
+    // auto preconditioner = smoother;
 
     auto solver = sfem::h_cg<real_t>();
     solver->set_n_dofs(fs->n_dofs());
@@ -234,7 +266,6 @@ int main(int argc, char *argv[]) {
 
     output->write("x", x->data());
     output->write("rhs", rhs->data());
-
 
     double tock = MPI_Wtime();
     if (!rank) {
