@@ -46,4 +46,8 @@ void tet4_laplacian_apply(const ptrdiff_t nelements,
                      const real_t *const SFEM_RESTRICT u,
                      real_t *const SFEM_RESTRICT values);
 
+
+// void tet4_laplacian_diag(const macro_tet4_laplacian_t *const ctx,
+//                                real_t *const SFEM_RESTRICT diag);
+
 #endif  // TET4_LAPLACIAN_H

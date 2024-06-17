@@ -1,5 +1,5 @@
-#ifndef SFEM_POINT_JACOBI_HPP
-#define SFEM_POINT_JACOBI_HPP
+#ifndef SFEM_GUASS_SEIDEL_HPP
+#define SFEM_GUASS_SEIDEL_HPP
 
 #include <cmath>
 #include <cstddef>
@@ -10,12 +10,10 @@
 #include <iostream>
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
-#include "sfem_PointJacobi.hpp"
 
-// https://en.wikipedia.org/wiki/Biconjugate_gradient_stabilized_method
 namespace sfem {
     template <typename T>
-    class PointJacobi final : public MatrixFreeLinearSolver<T> {
+    class Smoother final : public MatrixFreeLinearSolver<T> {
     public:
         // Operator
         std::function<void(const T* const, T* const)> apply_op;
@@ -38,7 +36,7 @@ namespace sfem {
                 zaxpby;
 
         // x[i] += r[i] / d[i];
-        std::function<void(const std::size_t, const T* const, T* const)> jacobi_correction_op;
+        std::function<void(const std::size_t, const T* const, T* const)> smooth_;
 
         ptrdiff_t n_dofs{-1};
 
@@ -120,10 +118,9 @@ namespace sfem {
             assert(axpby);
             assert(zaxpby);
             assert(apply_op);
-            assert(jacobi_correction_op);
+            assert(smooth_);
 
-            return allocate && destroy && copy && dot && axpby && zaxpby && apply_op &&
-                   jacobi_correction_op;
+            return allocate && destroy && copy && dot && axpby && zaxpby && apply_op && smooth_;
         }
 
         void monitor(const int iter, const T residual) {
@@ -153,12 +150,12 @@ namespace sfem {
             int info = -1;
             int k = 1;
             for (; k < max_it; k++) {
-                zeros(n, r);
-                apply_op(x, r);
-                axpby(n, 1, b, -1, r);
-                jacobi_correction_op(n, r, x);
+                smooth_(n, b, x);
 
-                if (k % check_each == 0) {
+                if (k % check_each == 0) {  
+                    zeros(n, r);
+                    apply_op(x, r);
+                    axpby(n, 1, b, -1, r);
                     const T norm_r = sqrt(dot(n, r, r));
                     monitor(k, norm_r);
 
@@ -187,23 +184,35 @@ namespace sfem {
     };
 
     template <typename T>
-    std::shared_ptr<PointJacobi<T>> h_pjacobi(const ptrdiff_t n,
-                                              const T* const d,
-                                              const T relax = T(1.0)) {
-        auto jacobi = std::make_shared<PointJacobi<T>>();
+    std::shared_ptr<Smoother<T>> h_gauss_seidel(const ptrdiff_t n,
+                                                const count_t* const rowptr,
+                                                const idx_t* const colidx,
+                                                const T* const values,
+                                                const T* const d) {
+        auto gs = std::make_shared<Smoother<T>>();
 
-        jacobi->jacobi_correction_op = [=](const std::size_t n, const T* const r, T* const x) {
-#pragma omp parallel for
+        gs->smooth_ = [=](const std::size_t n, const T* const r, T* const x) {
             for (ptrdiff_t i = 0; i < n; i++) {
-                assert(d[i] != 0);
-                x[i] += relax * r[i] / d[i];
+                const int extent = rowptr[i + 1] - rowptr[i];
+                const T* row = &values[rowptr[i]];
+                const idx_t* cols = &colidx[rowptr[i]];
+
+                T acc = r[i];
+                for (int k = 0; k < extent; k++) {
+                    const idx_t j = cols[k];
+                    const T aij = row[k];
+
+                    acc -= aij * x[j];
+                }
+
+                x[i] += acc / d[i];
             }
         };
 
-        jacobi->set_n_dofs(n);
-        jacobi->default_init();
-        return jacobi;
+        gs->set_n_dofs(n);
+        gs->default_init();
+        return gs;
     }
 }  // namespace sfem
 
-#endif  // SFEM_POINT_JACOBI_HPP
+#endif  // SFEM_GUASS_SEIDEL_HPP
