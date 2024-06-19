@@ -2,10 +2,17 @@
 
 #include <mpi.h>
 #include <stdio.h>
+#include <assert.h>
+
 #include "sfem_base.h"
 #include "sortreduce.h"
 
 #define POW2(a) ((a) * (a))
+
+static SFEM_INLINE geom_t fff_det(const geom_t *const fff)
+{
+    return fff[0]*fff[3]*fff[5] - fff[0]*POW2(fff[4]) - POW2(fff[1])*fff[5] + 2*fff[1]*fff[2]*fff[4] - POW2(fff[2])*fff[3];
+}
 
 static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {
     int i;
@@ -61,11 +68,11 @@ static SFEM_INLINE void find_cols4(const idx_t *targets,
 }
 
 static void local_to_global4(const idx_t *const SFEM_RESTRICT ev,
-                             idx_t *const SFEM_RESTRICT ks,
                              const real_t *const SFEM_RESTRICT element_matrix,
                              const count_t *const SFEM_RESTRICT rowptr,
                              const idx_t *const SFEM_RESTRICT colidx,
                              real_t *const SFEM_RESTRICT values) {
+    idx_t ks[4] = {-1, -1, -1, -1};
     for (int edof_i = 0; edof_i < 4; ++edof_i) {
         const idx_t dof_i = ev[edof_i];
         const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
@@ -78,6 +85,7 @@ static void local_to_global4(const idx_t *const SFEM_RESTRICT ev,
 
 #pragma unroll(4)
         for (int edof_j = 0; edof_j < 4; ++edof_j) {
+            assert(ks[edof_j]>=0);
 #pragma omp atomic update
             rowvalues[ks[edof_j]] += element_row[edof_j];
         }
@@ -148,6 +156,8 @@ static SFEM_INLINE void sub_fff_0(const geom_t *const SFEM_RESTRICT fff,
     sub_fff[3] = (1.0 / 2.0) * fff[3];
     sub_fff[4] = (1.0 / 2.0) * fff[4];
     sub_fff[5] = (1.0 / 2.0) * fff[5];
+
+    assert(fff_det(sub_fff) > 0);
 }
 
 static SFEM_INLINE void sub_fff_4(const geom_t *const SFEM_RESTRICT fff,
@@ -160,6 +170,8 @@ static SFEM_INLINE void sub_fff_4(const geom_t *const SFEM_RESTRICT fff,
     sub_fff[3] = x0;
     sub_fff[4] = -x1;
     sub_fff[5] = (1.0 / 2.0) * fff[5];
+
+    assert(fff_det(sub_fff) > 0);
 }
 
 static SFEM_INLINE void sub_fff_5(const geom_t *const SFEM_RESTRICT fff,
@@ -174,6 +186,8 @@ static SFEM_INLINE void sub_fff_5(const geom_t *const SFEM_RESTRICT fff,
     sub_fff[3] = x0;
     sub_fff[4] = x2 + x3;
     sub_fff[5] = (1.0 / 2.0) * fff[0] + fff[1] + fff[2] + x1;
+
+    assert(fff_det(sub_fff) > 0);
 }
 
 static SFEM_INLINE void sub_fff_6(const geom_t *const SFEM_RESTRICT fff,
@@ -187,6 +201,8 @@ static SFEM_INLINE void sub_fff_6(const geom_t *const SFEM_RESTRICT fff,
     sub_fff[3] = fff[4] + (1.0 / 2.0) * fff[5] + x0;
     sub_fff[4] = -x0 - x1;
     sub_fff[5] = x0;
+
+    assert(fff_det(sub_fff) > 0);
 }
 
 static SFEM_INLINE void sub_fff_7(const geom_t *const SFEM_RESTRICT fff,
@@ -199,6 +215,8 @@ static SFEM_INLINE void sub_fff_7(const geom_t *const SFEM_RESTRICT fff,
     sub_fff[3] = (1.0 / 2.0) * fff[3] + fff[4] + x0;
     sub_fff[4] = (1.0 / 2.0) * fff[1] + x1;
     sub_fff[5] = (1.0 / 2.0) * fff[0];
+
+    assert(fff_det(sub_fff) > 0);
 }
 
 static void lapl_apply_micro_kernel(const geom_t *const SFEM_RESTRICT fff,
@@ -421,24 +439,21 @@ void macro_tet4_laplacian_init(macro_tet4_laplacian_t *const ctx,
                                        points) {  // Create FFF and store it on device
     geom_t *h_fff = (geom_t *)calloc(6 * nelements, sizeof(geom_t));
 
-#pragma omp parallel
-    {
-#pragma omp for
-        for (ptrdiff_t e = 0; e < nelements; e++) {
-            fff_micro_kernel(points[0][elements[0][e]],
-                             points[0][elements[1][e]],
-                             points[0][elements[2][e]],
-                             points[0][elements[3][e]],
-                             points[1][elements[0][e]],
-                             points[1][elements[1][e]],
-                             points[1][elements[2][e]],
-                             points[1][elements[3][e]],
-                             points[2][elements[0][e]],
-                             points[2][elements[1][e]],
-                             points[2][elements[2][e]],
-                             points[2][elements[3][e]],
-                             &h_fff[e * 6]);
-        }
+#pragma omp parallel for
+    for (ptrdiff_t e = 0; e < nelements; e++) {
+        fff_micro_kernel(points[0][elements[0][e]],
+                         points[0][elements[1][e]],
+                         points[0][elements[2][e]],
+                         points[0][elements[3][e]],
+                         points[1][elements[0][e]],
+                         points[1][elements[1][e]],
+                         points[1][elements[2][e]],
+                         points[1][elements[3][e]],
+                         points[2][elements[0][e]],
+                         points[2][elements[1][e]],
+                         points[2][elements[2][e]],
+                         points[2][elements[3][e]],
+                         &h_fff[e * 6]);
     }
 
     ctx->fff = h_fff;
@@ -592,6 +607,8 @@ void macro_tet4_laplacian_diag(const macro_tet4_laplacian_t *const ctx,
             real_t element_vector[10] = {0};
             const geom_t *const fff = &ctx->fff[i * 6];
 
+            assert(fff_det(fff) > 0);
+
 #pragma unroll(10)
             for (int v = 0; v < 10; ++v) {
                 ev[v] = ctx->elements[v][i];
@@ -688,7 +705,6 @@ void macro_tet4_laplacian_assemble_hessian_opt(const macro_tet4_laplacian_t *con
 #pragma omp parallel for  // nowait
     for (ptrdiff_t i = 0; i < ctx->nelements; ++i) {
         idx_t ev10[10];
-        idx_t ks[4];
         idx_t ev[4];
         real_t element_matrix[4 * 4];
 
@@ -704,42 +720,42 @@ void macro_tet4_laplacian_assemble_hessian_opt(const macro_tet4_laplacian_t *con
             lapl_hessian_micro_kernel(sub_fff, element_matrix);
 
             // [0, 4, 6, 7],
-            gather_idx(ev10, 0, 4, 6, 6, ev);
-            local_to_global4(ev, ks, element_matrix, rowptr, colidx, values);
+            gather_idx(ev10, 0, 4, 6, 7, ev);
+            local_to_global4(ev, element_matrix, rowptr, colidx, values);
 
             // [4, 1, 5, 8],
             gather_idx(ev10, 4, 1, 5, 8, ev);
-            local_to_global4(ev, ks, element_matrix, rowptr, colidx, values);
+            local_to_global4(ev, element_matrix, rowptr, colidx, values);
 
             // [6, 5, 2, 9],
             gather_idx(ev10, 6, 5, 2, 9, ev);
-            local_to_global4(ev, ks, element_matrix, rowptr, colidx, values);
+            local_to_global4(ev, element_matrix, rowptr, colidx, values);
 
             // [7, 8, 9, 3],
             gather_idx(ev10, 7, 8, 9, 3, ev);
-            local_to_global4(ev, ks, element_matrix, rowptr, colidx, values);
+            local_to_global4(ev, element_matrix, rowptr, colidx, values);
         }
 
         {  // Octahedron tets
             // [4, 5, 6, 8],
             sub_fff_4(fff, sub_fff);
             gather_idx(ev10, 4, 5, 6, 8, ev);
-            local_to_global4(ev, ks, element_matrix, rowptr, colidx, values);
+            local_to_global4(ev, element_matrix, rowptr, colidx, values);
 
             // [7, 4, 6, 8],
             sub_fff_5(fff, sub_fff);
             gather_idx(ev10, 7, 4, 6, 8, ev);
-            local_to_global4(ev, ks, element_matrix, rowptr, colidx, values);
+            local_to_global4(ev, element_matrix, rowptr, colidx, values);
 
             // [6, 5, 9, 8],
             sub_fff_6(fff, sub_fff);
             gather_idx(ev10, 6, 5, 9, 8, ev);
-            local_to_global4(ev, ks, element_matrix, rowptr, colidx, values);
+            local_to_global4(ev, element_matrix, rowptr, colidx, values);
 
             // [7, 6, 9, 8]]
             sub_fff_7(fff, sub_fff);
             gather_idx(ev10, 7, 6, 9, 8, ev);
-            local_to_global4(ev, ks, element_matrix, rowptr, colidx, values);
+            local_to_global4(ev, element_matrix, rowptr, colidx, values);
         }
     }
 }
