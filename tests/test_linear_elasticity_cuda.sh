@@ -72,7 +72,7 @@ then
 
 	raw_to_db.py mesh output/x.vtk -p "output/disp.*.raw,output/rhs.*.raw,output/r.*.raw"
 else
-	raw_to_db.py mesh output/x.vtk -p "output/x.raw"
+	raw_to_db.py mesh output/x.vtk -p "output/x.raw,output/c*.raw,output/residual*.raw"
 fi
 
 cd $HERE

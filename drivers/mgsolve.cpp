@@ -208,6 +208,9 @@ int main(int argc, char *argv[]) {
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());
 
+    f->set_output_dir(output_path);
+    auto output = f->output();
+
     real_t rtr = 0;
     for (int k = 0; k < 20; k++) {
         // Coarse grid
@@ -229,7 +232,10 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        f->apply_zero_constraints(r->data());
+        output->write(("residual" + std::to_string(k)).c_str(), r->data());
+
+        // CHECK: Zero out contributions to boundary dofs?
+        // f->apply_zero_constraints(r->data());
 
         // Restriction
         zeros(fs_coarse->n_dofs(), r_coarse->data());
@@ -243,11 +249,16 @@ int main(int argc, char *argv[]) {
         solver_coarse->apply(r_coarse->data(), c_coarse->data());
 
         // Prolongation
+        zeros(fs->n_dofs(), c->data());
         prolongation->apply(c_coarse->data(), c->data());
+
+        output->write(("c" + std::to_string(k)).c_str(), c->data());
+
+        // CHECK: Zero out contributions to boundary dofs?
+        // f->apply_zero_constraints(c->data());
 
         // Apply correction
         axpby<real_t>(fs->n_dofs(), 1, c->data(), 1, x->data());
-        f->apply_constraints(x->data());
 
         smoother->apply(rhs->data(), x->data());
     }
@@ -292,8 +303,7 @@ int main(int argc, char *argv[]) {
     // Write output
     // -------------------------------
 
-    f->set_output_dir(output_path);
-    auto output = f->output();
+ 
 
     output->write("x", x->data());
     output->write("rhs", rhs->data());

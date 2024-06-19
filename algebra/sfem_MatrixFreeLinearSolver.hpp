@@ -52,6 +52,7 @@ namespace sfem {
         virtual void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) = 0;
         virtual void set_max_it(const int it) = 0;
         virtual void set_n_dofs(const ptrdiff_t n) = 0;
+        virtual void set_initial_guess_zero(const bool /*val*/) {}
     };
 }  // namespace sfem
 
