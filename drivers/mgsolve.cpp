@@ -152,7 +152,10 @@ int main(int argc, char *argv[]) {
         smoother = cheb;
     }
 
-#if 1  // MG
+    f->set_output_dir(output_path);
+    auto output = f->output();
+
+#if 0 // MG
     auto c = sfem::h_buffer<real_t>(fs->n_dofs());
     auto r = sfem::h_buffer<real_t>(fs->n_dofs());
 
@@ -208,8 +211,7 @@ int main(int argc, char *argv[]) {
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());
 
-    f->set_output_dir(output_path);
-    auto output = f->output();
+    
 
     real_t rtr = 0;
     for (int k = 0; k < 20; k++) {

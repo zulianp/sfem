@@ -35,6 +35,19 @@ void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
                                 const real_t *const SFEM_RESTRICT u,
                                 real_t *const SFEM_RESTRICT values);
 
+void macro_tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
+                                   const ptrdiff_t nnodes,
+                                   idx_t **const SFEM_RESTRICT elems,
+                                   geom_t **const SFEM_RESTRICT xyz,
+                                   const count_t *const SFEM_RESTRICT rowptr,
+                                   const idx_t *const SFEM_RESTRICT colidx,
+                                   real_t *const SFEM_RESTRICT values);
+
+void macro_tet4_laplacian_assemble_hessian_opt(const macro_tet4_laplacian_t *const ctx,
+                                   const count_t *const SFEM_RESTRICT rowptr,
+                                   const idx_t *const SFEM_RESTRICT colidx,
+                                   real_t *const SFEM_RESTRICT values);
+
 #ifdef __cplusplus
 }
 #endif

@@ -92,8 +92,15 @@ void laplacian_assemble_hessian(int element_type,
             tet10_laplacian_assemble_hessian(nelements, nnodes, elems, xyz, rowptr, colidx, values);
             break;
         }
+        case MACRO_TET4: {
+            macro_tet4_laplacian_assemble_hessian(
+                    nelements, nnodes, elems, xyz, rowptr, colidx, values);
+            break;
+        }
         default: {
-            fprintf(stderr, "laplacian_assemble_hessian not implemented for type %s\n", type_to_string(element_type));
+            fprintf(stderr,
+                    "laplacian_assemble_hessian not implemented for type %s\n",
+                    type_to_string(element_type));
             assert(0);
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
@@ -140,8 +147,7 @@ void laplacian_diag(int element_type,
                     const ptrdiff_t nnodes,
                     idx_t **const SFEM_RESTRICT elements,
                     geom_t **const SFEM_RESTRICT points,
-                    real_t *const SFEM_RESTRICT values)
-{
+                    real_t *const SFEM_RESTRICT values) {
     switch (element_type) {
         // case TRI3: {
         //     tri3_laplacian_diag(nelements, nnodes, elems, xyz, values);
