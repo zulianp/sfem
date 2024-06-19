@@ -126,6 +126,9 @@ namespace sfem {
         std::shared_ptr<FunctionSpace> derefine() const;
         std::shared_ptr<FunctionSpace> lor() const;
 
+        int initialize_dof_to_dof_graph();
+        std::shared_ptr<CRSGraph> dof_to_dof_graph();
+
         friend class Op;
 
     private:
@@ -319,6 +322,8 @@ namespace sfem {
             const std::shared_ptr<FunctionSpace> &space) {
             return std::make_shared<Function>(space);
         }
+
+        std::shared_ptr<FunctionSpace> space();
 
         std::shared_ptr<Function> lor();
         std::shared_ptr<Function> lor(const std::shared_ptr<FunctionSpace> &space);

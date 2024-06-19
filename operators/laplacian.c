@@ -11,6 +11,8 @@
 
 #include <mpi.h>
 
+#include <stdio.h>
+
 void laplacian_assemble_value(int element_type,
                               const ptrdiff_t nelements,
                               const ptrdiff_t nnodes,
@@ -91,6 +93,7 @@ void laplacian_assemble_hessian(int element_type,
             break;
         }
         default: {
+            fprintf(stderr, "laplacian_assemble_hessian not implemented for type %s\n", type_to_string(element_type));
             assert(0);
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
