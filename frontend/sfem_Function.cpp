@@ -230,6 +230,11 @@ namespace sfem {
         ~Impl() {}
     };
 
+    std::shared_ptr<CRSGraph> FunctionSpace::dof_to_dof_graph() {
+        initialize_dof_to_dof_graph();
+        return impl_->dof_to_dof_graph;
+    }
+
     enum ElemType FunctionSpace::element_type() const {
         assert(impl_->element_type != INVALID);
         return impl_->element_type;
@@ -280,11 +285,8 @@ namespace sfem {
 
     ptrdiff_t FunctionSpace::n_dofs() const { return impl_->nlocal; }
 
-    int FunctionSpace::create_crs_graph(ptrdiff_t *nlocal,
-                                        ptrdiff_t *nglobal,
-                                        ptrdiff_t *nnz,
-                                        isolver_idx_t **rowptr,
-                                        isolver_idx_t **colidx) {
+    int FunctionSpace::initialize_dof_to_dof_graph()
+    {
         auto &mesh = *impl_->mesh;
         auto c_mesh = &mesh.impl_->mesh;
 
@@ -296,26 +298,28 @@ namespace sfem {
         }
 
         if (impl_->block_size == 1) {
-            *rowptr = node_to_node->rowptr();
-            *colidx = node_to_node->colidx();
-
-            *nlocal = c_mesh->nnodes;
-            *nglobal = c_mesh->nnodes;
-            *nnz = (*rowptr)[c_mesh->nnodes];
-
             impl_->dof_to_dof_graph = node_to_node;
         } else {
             if (!impl_->dof_to_dof_graph) {
                 impl_->dof_to_dof_graph = node_to_node->block_to_scalar(impl_->element_type);
             }
-
-            *rowptr = impl_->dof_to_dof_graph->rowptr();
-            *colidx = impl_->dof_to_dof_graph->colidx();
-
-            *nlocal = impl_->nlocal;
-            *nglobal = impl_->nglobal;
-            *nnz = impl_->dof_to_dof_graph->nnz();
         }
+
+        return 0;
+    }
+
+    int FunctionSpace::create_crs_graph(ptrdiff_t *nlocal,
+                                        ptrdiff_t *nglobal,
+                                        ptrdiff_t *nnz,
+                                        isolver_idx_t **rowptr,
+                                        isolver_idx_t **colidx) {
+       initialize_dof_to_dof_graph();
+       *rowptr = impl_->dof_to_dof_graph->rowptr();
+       *colidx = impl_->dof_to_dof_graph->colidx();
+
+       *nlocal = impl_->nlocal;
+       *nglobal = impl_->nglobal;
+       *nnz = impl_->dof_to_dof_graph->nnz();
 
         return ISOLVER_FUNCTION_SUCCESS;
     }
@@ -879,6 +883,8 @@ namespace sfem {
         impl_->output = std::make_shared<Output>(space);
     }
 
+    std::shared_ptr<FunctionSpace> Function::space() {return impl_->space;}
+
     Function::~Function() {
         std::ofstream os;
         os.open("perf.csv");
@@ -1180,6 +1186,8 @@ namespace sfem {
                         isolver_scalar_t *const values) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
+            auto graph = space->dof_to_dof_graph();
+
             linear_elasticity_assemble_hessian_aos(element_type,
                                                    mesh->nelements,
                                                    mesh->nnodes,
@@ -1187,8 +1195,8 @@ namespace sfem {
                                                    mesh->points,
                                                    this->mu,
                                                    this->lambda,
-                                                   space->mesh().node_to_node_rowptr(),
-                                                   space->mesh().node_to_node_colidx(),
+                                                   graph->rowptr(),
+                                                   graph->colidx(),
                                                    values);
 
             return ISOLVER_FUNCTION_SUCCESS;
@@ -1301,13 +1309,15 @@ namespace sfem {
                         isolver_scalar_t *const values) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
+            auto graph = space->dof_to_dof_graph();
+
             laplacian_assemble_hessian(element_type,
                                        mesh->nelements,
                                        mesh->nnodes,
                                        mesh->elements,
                                        mesh->points,
-                                       space->mesh().node_to_node_rowptr(),
-                                       space->mesh().node_to_node_colidx(),
+                                       graph->rowptr(),
+                                       graph->colidx(),
                                        values);
 
             return ISOLVER_FUNCTION_SUCCESS;
@@ -1382,13 +1392,15 @@ namespace sfem {
                         isolver_scalar_t *const values) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
+            auto graph = space->dof_to_dof_graph();
+
             assemble_mass(element_type,
                           mesh->nelements,
                           mesh->nnodes,
                           mesh->elements,
                           mesh->points,
-                          space->mesh().node_to_node_rowptr(),
-                          space->mesh().node_to_node_colidx(),
+                          graph->rowptr(),
+                          graph->colidx(),
                           values);
 
             return ISOLVER_FUNCTION_SUCCESS;
@@ -1664,13 +1676,15 @@ namespace sfem {
                         isolver_scalar_t *const values) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
+            // auto graph = space->dof_to_dof_graph();
+
             // cvfem_convection_assemble_hessian(element_type,
             //                            mesh->nelements,
             //                            mesh->nnodes,
             //                            mesh->elements,
             //                            mesh->points,
-            //                            space->mesh().node_to_node_rowptr(),
-            //                            space->mesh().node_to_node_colidx(),
+            //                            graph->rowptr(),
+            //                            graph->colidx(),
             //                            values);
 
             // return ISOLVER_FUNCTION_SUCCESS;

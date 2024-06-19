@@ -440,12 +440,12 @@ static SFEM_INLINE void tet10_laplacian_gradient(const real_t px0,
                             x103 + x64;
         const real_t x109 = u[5] * x75 + x91;
         element_vector[0 * stride] =
-            fff[0 * stride] * x0 + fff[1 * stride] * x9 + fff[2 * stride] * x9 +
-            fff[3 * stride] * x0 + fff[4 * stride] * x9 + fff[5 * stride] * x0 - u[4] * x13 -
-            u[4] * x20 - u[4] * x35 + u[5] * x14 - u[6] * x13 - u[6] * x22 - u[6] * x37 -
-            u[7] * x14 - u[7] * x20 - u[7] * x37 + u[8] * x22 + u[9] * x35 + x11 + x12 + x15 + x16 +
-            x18 + x19 + x2 + x21 + x23 + x25 - x26 + x27 + x29 - x30 + x31 + x33 + x34 + x36 + x38 +
-            x4 + x40 - x41 - x42 + x44 + x45 + x46 + x5 - x6 - x7 + x8;
+                fff[0 * stride] * x0 + fff[1 * stride] * x9 + fff[2 * stride] * x9 +
+                fff[3 * stride] * x0 + fff[4 * stride] * x9 + fff[5 * stride] * x0 - u[4] * x13 -
+                u[4] * x20 - u[4] * x35 + u[5] * x14 - u[6] * x13 - u[6] * x22 - u[6] * x37 -
+                u[7] * x14 - u[7] * x20 - u[7] * x37 + u[8] * x22 + u[9] * x35 + x11 + x12 + x15 +
+                x16 + x18 + x19 + x2 + x21 + x23 + x25 - x26 + x27 + x29 - x30 + x31 + x33 + x34 +
+                x36 + x38 + x4 + x40 - x41 - x42 + x44 + x45 + x46 + x5 - x6 - x7 + x8;
         element_vector[1 * stride] = fff[0 * stride] * x49 - fff[1 * stride] * x47 -
                                      fff[2 * stride] * x47 - x16 - x23 + x4 + x48 - x5 + x52 + x54 +
                                      x56 + x58 + x6 + x7 - x8;
@@ -684,90 +684,93 @@ static SFEM_INLINE void tet10_laplacian_value(const real_t px0,
     const real_t x193 = x117 * x83;
     const real_t x194 = x119 * x83;
     element_scalar[0] =
-        x14 *
-        (u[6] * x60 + u[7] * x19 * x31 + u[7] * x60 - u[7] * x95 + u[9] * x151 * x157 + u[9] * x95 -
-         x100 * x52 - x100 * x54 - x101 * x22 - x101 * x25 - x101 * x38 - x101 * x41 - x102 * x88 -
-         x103 * x123 - x103 * x124 - x103 * x127 - x103 * x129 - x103 * x130 - x103 * x131 -
-         x103 * x38 - x103 * x41 + x104 * x135 - x104 * x54 - x105 * x123 - x105 * x124 -
-         x105 * x125 - x105 * x126 - x105 * x127 - x105 * x128 - x105 * x22 - x105 * x25 -
-         x106 * x125 - x106 * x126 - x106 * x128 - x106 * x129 - x106 * x130 - x106 * x131 -
-         x106 * x27 - x106 * x30 - x106 * x33 + x107 * x123 + x107 * x124 + x107 * x127 +
-         x107 * x129 + x107 * x130 + x107 * x131 + x107 * x38 + x107 * x41 + x110 * x16 +
-         x110 * x22 + x110 * x25 + x110 * x27 + x110 * x30 + x110 * x33 + x110 * x35 + x110 * x38 +
-         x110 * x41 + x111 * x16 + x111 * x22 + x111 * x25 + x112 * x27 + x112 * x30 + x112 * x33 +
-         x113 * x35 + x113 * x38 + x113 * x41 + x115 * x124 + x115 * x126 + x115 * x127 +
-         x115 * x128 + x115 * x16 + x115 * x22 + x115 * x25 + x115 * x27 + x115 * x30 + x115 * x33 +
-         x115 * x35 + x115 * x38 + x115 * x41 + x116 * x125 + x116 * x126 + x116 * x128 +
-         x116 * x16 + x116 * x22 + x116 * x25 + x116 * x27 + x116 * x30 + x116 * x33 + x118 * x125 +
-         x118 * x126 + x118 * x128 + x118 * x129 + x118 * x130 + x118 * x131 + x118 * x16 +
-         x118 * x22 + x118 * x25 + x118 * x27 + x118 * x30 + x118 * x33 + x118 * x35 + x118 * x38 +
-         x118 * x41 + x120 * x123 + x120 * x124 + x120 * x127 + x120 * x129 + x120 * x130 +
-         x120 * x131 + x120 * x16 + x120 * x22 + x120 * x25 + x120 * x27 + x120 * x30 + x120 * x33 +
-         x120 * x35 + x120 * x38 + x120 * x41 + x121 * x123 + x121 * x124 + x121 * x127 +
-         x121 * x16 + x121 * x22 + x121 * x25 + x121 * x35 + x121 * x38 + x121 * x41 + x122 * x129 +
-         x122 * x130 + x122 * x131 + x122 * x27 + x122 * x30 + x122 * x33 + x122 * x35 +
-         x122 * x38 + x122 * x41 - x123 * x144 - x123 * x150 + x123 * x155 - x123 * x156 -
-         x123 * x164 - x123 * x166 - x123 * x170 + x123 * x179 - x123 * x185 + x123 * x193 +
-         x123 * x23 + x123 * x39 + x123 * x47 + x123 * x55 + x123 * x62 + x123 * x77 + x123 * x86 -
-         x123 * x90 - x123 * x93 + x123 * x97 + x123 * x99 - x124 * x138 - x124 * x143 -
-         x124 * x144 + x124 * x147 - x124 * x150 - x124 * x153 + x124 * x155 - x124 * x156 -
-         x124 * x164 - x124 * x166 + x124 * x168 - x124 * x170 + x124 * x172 + x124 * x179 -
-         x124 * x182 - x124 * x185 + x124 * x187 + x124 * x193 + x124 * x23 + x124 * x39 +
-         x124 * x47 + x124 * x55 + x124 * x62 + x124 * x77 + x124 * x86 - x124 * x90 - x124 * x93 +
-         x124 * x97 + x124 * x99 - x125 * x138 + x125 * x139 - x125 * x141 - x125 * x145 -
-         x125 * x149 - x125 * x153 + x125 * x154 - x125 * x156 + x125 * x160 - x125 * x161 -
-         x125 * x162 + x125 * x171 - x125 * x173 - x125 * x177 - x125 * x183 + x125 * x186 +
-         x125 * x194 + x125 * x23 + x125 * x28 + x125 * x53 + x125 * x55 + x125 * x63 + x125 * x71 -
-         x125 * x85 + x125 * x87 - x125 * x93 + x125 * x97 + x125 * x98 + x125 * x99 - x126 * x138 -
-         x126 * x141 - x126 * x145 - x126 * x149 - x126 * x153 + x126 * x154 - x126 * x156 -
-         x126 * x161 - x126 * x162 + x126 * x171 - x126 * x173 - x126 * x177 - x126 * x183 +
-         x126 * x186 + x126 * x194 + x126 * x23 + x126 * x28 + x126 * x53 + x126 * x55 +
-         x126 * x63 + x126 * x71 - x126 * x85 + x126 * x87 - x126 * x93 + x126 * x97 + x126 * x98 +
-         x126 * x99 - x127 * x138 - x127 * x143 - x127 * x144 + x127 * x147 - x127 * x150 -
-         x127 * x153 + x127 * x155 - x127 * x156 - x127 * x164 - x127 * x166 + x127 * x168 -
-         x127 * x170 + x127 * x172 + x127 * x179 - x127 * x182 - x127 * x185 + x127 * x193 +
-         x127 * x23 + x127 * x39 + x127 * x47 + x127 * x55 + x127 * x62 + x127 * x77 + x127 * x86 -
-         x127 * x90 - x127 * x93 + x127 * x97 + x127 * x99 - x128 * x138 + x128 * x139 -
-         x128 * x141 - x128 * x145 - x128 * x149 - x128 * x153 + x128 * x154 - x128 * x156 +
-         x128 * x160 - x128 * x161 - x128 * x162 + x128 * x171 - x128 * x173 - x128 * x177 -
-         x128 * x183 + x128 * x186 + x128 * x187 + x128 * x194 + x128 * x23 + x128 * x28 +
-         x128 * x53 + x128 * x55 + x128 * x63 + x128 * x71 - x128 * x85 + x128 * x87 - x128 * x93 +
-         x128 * x97 + x128 * x98 + x128 * x99 - x129 * x141 - x129 * x144 + x129 * x148 -
-         x129 * x161 - x129 * x162 + x129 * x163 - x129 * x176 + x129 * x178 + x129 * x180 -
-         x129 * x184 + x129 * x187 + x129 * x191 + x129 * x28 + x129 * x39 + x129 * x47 +
-         x129 * x53 + x129 * x66 + x129 * x75 - x129 * x85 + x129 * x86 + x129 * x87 - x129 * x90 +
-         x129 * x98 - x130 * x137 - x130 * x141 - x130 * x144 + x130 * x148 - x130 * x158 -
-         x130 * x161 - x130 * x162 + x130 * x163 - x130 * x164 - x130 * x166 + x130 * x169 -
-         x130 * x175 - x130 * x176 + x130 * x178 + x130 * x180 - x130 * x184 + x130 * x191 +
-         x130 * x28 + x130 * x39 + x130 * x47 + x130 * x53 + x130 * x66 + x130 * x75 - x130 * x85 +
-         x130 * x86 + x130 * x87 - x130 * x90 + x130 * x98 - x131 * x137 - x131 * x141 -
-         x131 * x144 + x131 * x148 - x131 * x158 - x131 * x161 - x131 * x162 + x131 * x163 -
-         x131 * x164 - x131 * x166 + x131 * x169 - x131 * x175 - x131 * x176 + x131 * x178 +
-         x131 * x180 - x131 * x184 + x131 * x191 + x131 * x28 + x131 * x39 + x131 * x47 +
-         x131 * x53 + x131 * x66 + x131 * x75 - x131 * x85 + x131 * x86 + x131 * x87 - x131 * x90 +
-         x131 * x98 - x132 * x134 - x132 * x174 + x134 * x140 - x134 * x142 + x134 * x146 -
-         x135 * x136 - x135 * x152 + x140 * x159 - x142 * x181 + x146 * x167 - x157 * x165 -
-         x157 * x58 - x157 * x65 - x16 * x46 + x16 * x47 - x16 * x48 - x16 * x51 - x16 * x93 -
-         x16 * x94 + x16 * x99 + x17 * x20 - x17 * x56 - x17 * x58 + x188 * x26 + x188 * x34 +
-         x189 * x21 + x189 * x37 + x190 * x24 + x190 * x32 + x192 * x26 + x192 * x34 + x20 * x31 +
-         x20 * x36 - x20 * x43 + x20 * x52 + x20 * x54 + x22 * x23 - x22 * x46 + x22 * x47 -
-         x22 * x48 - x22 * x51 + x22 * x53 - x22 * x57 - x22 * x59 + x22 * x62 + x22 * x63 -
-         x22 * x64 - x22 * x93 - x22 * x94 + x22 * x97 + x22 * x99 + x23 * x25 - x25 * x46 +
-         x25 * x47 - x25 * x48 - x25 * x51 + x25 * x53 - x25 * x57 - x25 * x59 + x25 * x62 +
-         x25 * x63 - x25 * x64 - x25 * x93 - x25 * x94 + x25 * x97 + x25 * x99 + x27 * x28 -
-         x27 * x42 + x27 * x47 - x27 * x49 - x27 * x51 + x27 * x55 + x27 * x66 - x27 * x67 -
-         x27 * x69 + x27 * x71 - x27 * x73 - x27 * x85 + x27 * x87 - x27 * x91 - x27 * x94 +
-         x27 * x98 + x28 * x33 + x30 * x47 - x30 * x49 - x30 * x51 + x30 * x55 - x30 * x67 -
-         x31 * x72 - x33 * x42 + x33 * x47 - x33 * x49 - x33 * x51 + x33 * x55 + x33 * x66 -
-         x33 * x67 - x33 * x69 + x33 * x71 - x33 * x73 - x33 * x85 + x33 * x87 - x33 * x91 -
-         x33 * x94 + x33 * x98 - x35 * x42 - x35 * x48 - x35 * x50 + x35 * x55 + x35 * x86 -
-         x35 * x91 - x36 * x72 + x36 * x74 + x36 * x76 - x36 * x78 - x36 * x80 + x38 * x39 -
-         x38 * x42 - x38 * x48 - x38 * x50 + x38 * x53 + x38 * x55 + x38 * x75 + x38 * x77 -
-         x38 * x79 - x38 * x81 - x38 * x82 + x38 * x86 - x38 * x90 - x38 * x91 + x39 * x41 -
-         x41 * x42 - x41 * x48 - x41 * x50 + x41 * x53 + x41 * x55 + x41 * x75 + x41 * x77 -
-         x41 * x79 - x41 * x81 - x41 * x82 + x41 * x86 - x41 * x90 - x41 * x91 + x43 * x65 +
-         x43 * x78 - x43 * x84 - x43 * x92 + x52 * x92 - x54 * x61 + x54 * x96 - x68 * x70 -
-         x88 * x89);
+            x14 *
+            (u[6] * x60 + u[7] * x19 * x31 + u[7] * x60 - u[7] * x95 + u[9] * x151 * x157 +
+             u[9] * x95 - x100 * x52 - x100 * x54 - x101 * x22 - x101 * x25 - x101 * x38 -
+             x101 * x41 - x102 * x88 - x103 * x123 - x103 * x124 - x103 * x127 - x103 * x129 -
+             x103 * x130 - x103 * x131 - x103 * x38 - x103 * x41 + x104 * x135 - x104 * x54 -
+             x105 * x123 - x105 * x124 - x105 * x125 - x105 * x126 - x105 * x127 - x105 * x128 -
+             x105 * x22 - x105 * x25 - x106 * x125 - x106 * x126 - x106 * x128 - x106 * x129 -
+             x106 * x130 - x106 * x131 - x106 * x27 - x106 * x30 - x106 * x33 + x107 * x123 +
+             x107 * x124 + x107 * x127 + x107 * x129 + x107 * x130 + x107 * x131 + x107 * x38 +
+             x107 * x41 + x110 * x16 + x110 * x22 + x110 * x25 + x110 * x27 + x110 * x30 +
+             x110 * x33 + x110 * x35 + x110 * x38 + x110 * x41 + x111 * x16 + x111 * x22 +
+             x111 * x25 + x112 * x27 + x112 * x30 + x112 * x33 + x113 * x35 + x113 * x38 +
+             x113 * x41 + x115 * x124 + x115 * x126 + x115 * x127 + x115 * x128 + x115 * x16 +
+             x115 * x22 + x115 * x25 + x115 * x27 + x115 * x30 + x115 * x33 + x115 * x35 +
+             x115 * x38 + x115 * x41 + x116 * x125 + x116 * x126 + x116 * x128 + x116 * x16 +
+             x116 * x22 + x116 * x25 + x116 * x27 + x116 * x30 + x116 * x33 + x118 * x125 +
+             x118 * x126 + x118 * x128 + x118 * x129 + x118 * x130 + x118 * x131 + x118 * x16 +
+             x118 * x22 + x118 * x25 + x118 * x27 + x118 * x30 + x118 * x33 + x118 * x35 +
+             x118 * x38 + x118 * x41 + x120 * x123 + x120 * x124 + x120 * x127 + x120 * x129 +
+             x120 * x130 + x120 * x131 + x120 * x16 + x120 * x22 + x120 * x25 + x120 * x27 +
+             x120 * x30 + x120 * x33 + x120 * x35 + x120 * x38 + x120 * x41 + x121 * x123 +
+             x121 * x124 + x121 * x127 + x121 * x16 + x121 * x22 + x121 * x25 + x121 * x35 +
+             x121 * x38 + x121 * x41 + x122 * x129 + x122 * x130 + x122 * x131 + x122 * x27 +
+             x122 * x30 + x122 * x33 + x122 * x35 + x122 * x38 + x122 * x41 - x123 * x144 -
+             x123 * x150 + x123 * x155 - x123 * x156 - x123 * x164 - x123 * x166 - x123 * x170 +
+             x123 * x179 - x123 * x185 + x123 * x193 + x123 * x23 + x123 * x39 + x123 * x47 +
+             x123 * x55 + x123 * x62 + x123 * x77 + x123 * x86 - x123 * x90 - x123 * x93 +
+             x123 * x97 + x123 * x99 - x124 * x138 - x124 * x143 - x124 * x144 + x124 * x147 -
+             x124 * x150 - x124 * x153 + x124 * x155 - x124 * x156 - x124 * x164 - x124 * x166 +
+             x124 * x168 - x124 * x170 + x124 * x172 + x124 * x179 - x124 * x182 - x124 * x185 +
+             x124 * x187 + x124 * x193 + x124 * x23 + x124 * x39 + x124 * x47 + x124 * x55 +
+             x124 * x62 + x124 * x77 + x124 * x86 - x124 * x90 - x124 * x93 + x124 * x97 +
+             x124 * x99 - x125 * x138 + x125 * x139 - x125 * x141 - x125 * x145 - x125 * x149 -
+             x125 * x153 + x125 * x154 - x125 * x156 + x125 * x160 - x125 * x161 - x125 * x162 +
+             x125 * x171 - x125 * x173 - x125 * x177 - x125 * x183 + x125 * x186 + x125 * x194 +
+             x125 * x23 + x125 * x28 + x125 * x53 + x125 * x55 + x125 * x63 + x125 * x71 -
+             x125 * x85 + x125 * x87 - x125 * x93 + x125 * x97 + x125 * x98 + x125 * x99 -
+             x126 * x138 - x126 * x141 - x126 * x145 - x126 * x149 - x126 * x153 + x126 * x154 -
+             x126 * x156 - x126 * x161 - x126 * x162 + x126 * x171 - x126 * x173 - x126 * x177 -
+             x126 * x183 + x126 * x186 + x126 * x194 + x126 * x23 + x126 * x28 + x126 * x53 +
+             x126 * x55 + x126 * x63 + x126 * x71 - x126 * x85 + x126 * x87 - x126 * x93 +
+             x126 * x97 + x126 * x98 + x126 * x99 - x127 * x138 - x127 * x143 - x127 * x144 +
+             x127 * x147 - x127 * x150 - x127 * x153 + x127 * x155 - x127 * x156 - x127 * x164 -
+             x127 * x166 + x127 * x168 - x127 * x170 + x127 * x172 + x127 * x179 - x127 * x182 -
+             x127 * x185 + x127 * x193 + x127 * x23 + x127 * x39 + x127 * x47 + x127 * x55 +
+             x127 * x62 + x127 * x77 + x127 * x86 - x127 * x90 - x127 * x93 + x127 * x97 +
+             x127 * x99 - x128 * x138 + x128 * x139 - x128 * x141 - x128 * x145 - x128 * x149 -
+             x128 * x153 + x128 * x154 - x128 * x156 + x128 * x160 - x128 * x161 - x128 * x162 +
+             x128 * x171 - x128 * x173 - x128 * x177 - x128 * x183 + x128 * x186 + x128 * x187 +
+             x128 * x194 + x128 * x23 + x128 * x28 + x128 * x53 + x128 * x55 + x128 * x63 +
+             x128 * x71 - x128 * x85 + x128 * x87 - x128 * x93 + x128 * x97 + x128 * x98 +
+             x128 * x99 - x129 * x141 - x129 * x144 + x129 * x148 - x129 * x161 - x129 * x162 +
+             x129 * x163 - x129 * x176 + x129 * x178 + x129 * x180 - x129 * x184 + x129 * x187 +
+             x129 * x191 + x129 * x28 + x129 * x39 + x129 * x47 + x129 * x53 + x129 * x66 +
+             x129 * x75 - x129 * x85 + x129 * x86 + x129 * x87 - x129 * x90 + x129 * x98 -
+             x130 * x137 - x130 * x141 - x130 * x144 + x130 * x148 - x130 * x158 - x130 * x161 -
+             x130 * x162 + x130 * x163 - x130 * x164 - x130 * x166 + x130 * x169 - x130 * x175 -
+             x130 * x176 + x130 * x178 + x130 * x180 - x130 * x184 + x130 * x191 + x130 * x28 +
+             x130 * x39 + x130 * x47 + x130 * x53 + x130 * x66 + x130 * x75 - x130 * x85 +
+             x130 * x86 + x130 * x87 - x130 * x90 + x130 * x98 - x131 * x137 - x131 * x141 -
+             x131 * x144 + x131 * x148 - x131 * x158 - x131 * x161 - x131 * x162 + x131 * x163 -
+             x131 * x164 - x131 * x166 + x131 * x169 - x131 * x175 - x131 * x176 + x131 * x178 +
+             x131 * x180 - x131 * x184 + x131 * x191 + x131 * x28 + x131 * x39 + x131 * x47 +
+             x131 * x53 + x131 * x66 + x131 * x75 - x131 * x85 + x131 * x86 + x131 * x87 -
+             x131 * x90 + x131 * x98 - x132 * x134 - x132 * x174 + x134 * x140 - x134 * x142 +
+             x134 * x146 - x135 * x136 - x135 * x152 + x140 * x159 - x142 * x181 + x146 * x167 -
+             x157 * x165 - x157 * x58 - x157 * x65 - x16 * x46 + x16 * x47 - x16 * x48 - x16 * x51 -
+             x16 * x93 - x16 * x94 + x16 * x99 + x17 * x20 - x17 * x56 - x17 * x58 + x188 * x26 +
+             x188 * x34 + x189 * x21 + x189 * x37 + x190 * x24 + x190 * x32 + x192 * x26 +
+             x192 * x34 + x20 * x31 + x20 * x36 - x20 * x43 + x20 * x52 + x20 * x54 + x22 * x23 -
+             x22 * x46 + x22 * x47 - x22 * x48 - x22 * x51 + x22 * x53 - x22 * x57 - x22 * x59 +
+             x22 * x62 + x22 * x63 - x22 * x64 - x22 * x93 - x22 * x94 + x22 * x97 + x22 * x99 +
+             x23 * x25 - x25 * x46 + x25 * x47 - x25 * x48 - x25 * x51 + x25 * x53 - x25 * x57 -
+             x25 * x59 + x25 * x62 + x25 * x63 - x25 * x64 - x25 * x93 - x25 * x94 + x25 * x97 +
+             x25 * x99 + x27 * x28 - x27 * x42 + x27 * x47 - x27 * x49 - x27 * x51 + x27 * x55 +
+             x27 * x66 - x27 * x67 - x27 * x69 + x27 * x71 - x27 * x73 - x27 * x85 + x27 * x87 -
+             x27 * x91 - x27 * x94 + x27 * x98 + x28 * x33 + x30 * x47 - x30 * x49 - x30 * x51 +
+             x30 * x55 - x30 * x67 - x31 * x72 - x33 * x42 + x33 * x47 - x33 * x49 - x33 * x51 +
+             x33 * x55 + x33 * x66 - x33 * x67 - x33 * x69 + x33 * x71 - x33 * x73 - x33 * x85 +
+             x33 * x87 - x33 * x91 - x33 * x94 + x33 * x98 - x35 * x42 - x35 * x48 - x35 * x50 +
+             x35 * x55 + x35 * x86 - x35 * x91 - x36 * x72 + x36 * x74 + x36 * x76 - x36 * x78 -
+             x36 * x80 + x38 * x39 - x38 * x42 - x38 * x48 - x38 * x50 + x38 * x53 + x38 * x55 +
+             x38 * x75 + x38 * x77 - x38 * x79 - x38 * x81 - x38 * x82 + x38 * x86 - x38 * x90 -
+             x38 * x91 + x39 * x41 - x41 * x42 - x41 * x48 - x41 * x50 + x41 * x53 + x41 * x55 +
+             x41 * x75 + x41 * x77 - x41 * x79 - x41 * x81 - x41 * x82 + x41 * x86 - x41 * x90 -
+             x41 * x91 + x43 * x65 + x43 * x78 - x43 * x84 - x43 * x92 + x52 * x92 - x54 * x61 +
+             x54 * x96 - x68 * x70 - x88 * x89);
 }
 
 static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {
@@ -836,7 +839,7 @@ void tet10_laplacian_assemble_hessian(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for //nowait
+#pragma omp for  // nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[10];
             idx_t ks[10];
@@ -855,22 +858,22 @@ void tet10_laplacian_assemble_hessian(const ptrdiff_t nelements,
             const idx_t i3 = ev[3];
 
             tet10_laplacian_hessian(
-                // X-coordinates
-                xyz[0][i0],
-                xyz[0][i1],
-                xyz[0][i2],
-                xyz[0][i3],
-                // Y-coordinates
-                xyz[1][i0],
-                xyz[1][i1],
-                xyz[1][i2],
-                xyz[1][i3],
-                // Z-coordinates
-                xyz[2][i0],
-                xyz[2][i1],
-                xyz[2][i2],
-                xyz[2][i3],
-                element_matrix);
+                    // X-coordinates
+                    xyz[0][i0],
+                    xyz[0][i1],
+                    xyz[0][i2],
+                    xyz[0][i3],
+                    // Y-coordinates
+                    xyz[1][i0],
+                    xyz[1][i1],
+                    xyz[1][i2],
+                    xyz[1][i3],
+                    // Z-coordinates
+                    xyz[2][i0],
+                    xyz[2][i1],
+                    xyz[2][i2],
+                    xyz[2][i3],
+                    element_matrix);
 
             for (int edof_i = 0; edof_i < 10; ++edof_i) {
                 const idx_t dof_i = elems[edof_i][i];
@@ -904,32 +907,28 @@ void tet10_laplacian_assemble_gradient(const ptrdiff_t nelements,
                                        real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    // double tick = MPI_Wtime();
-
-#pragma omp parallel
-    {
-#pragma omp for //nowait
-        for (ptrdiff_t i = 0; i < nelements; ++i) {
-            idx_t ev[10];
-            real_t element_vector[10 * 10];
-            real_t element_u[10];
+#pragma omp parallel for  // nowait
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[10];
+        real_t element_vector[10];
+        real_t element_u[10];
 
 #pragma unroll(10)
-            for (int v = 0; v < 10; ++v) {
-                ev[v] = elems[v][i];
-            }
+        for (int v = 0; v < 10; ++v) {
+            ev[v] = elems[v][i];
+        }
 
-            for (int v = 0; v < 10; ++v) {
-                element_u[v] = u[ev[v]];
-            }
+        for (int v = 0; v < 10; ++v) {
+            element_u[v] = u[ev[v]];
+        }
 
-            // Element indices
-            const idx_t i0 = ev[0];
-            const idx_t i1 = ev[1];
-            const idx_t i2 = ev[2];
-            const idx_t i3 = ev[3];
+        // Element indices
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+        const idx_t i3 = ev[3];
 
-            tet10_laplacian_gradient(
+        tet10_laplacian_gradient(
                 // X-coordinates
                 xyz[0][i0],
                 xyz[0][i1],
@@ -948,17 +947,13 @@ void tet10_laplacian_assemble_gradient(const ptrdiff_t nelements,
                 element_u,
                 element_vector);
 
-            for (int edof_i = 0; edof_i < 10; ++edof_i) {
-                const idx_t dof_i = ev[edof_i];
+        for (int edof_i = 0; edof_i < 10; ++edof_i) {
+            const idx_t dof_i = ev[edof_i];
 
 #pragma omp atomic update
-                values[dof_i] += element_vector[edof_i];
-            }
+            values[dof_i] += element_vector[edof_i];
         }
     }
-
-    // double tock = MPI_Wtime();
-    // printf("tet10_laplacian.c: tet10_laplacian_assemble_gradient\t%g seconds\n", tock - tick);
 }
 
 void tet10_laplacian_assemble_value(const ptrdiff_t nelements,
@@ -973,7 +968,7 @@ void tet10_laplacian_assemble_value(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for //nowait
+#pragma omp for  // nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[10];
             real_t element_u[10];
@@ -996,23 +991,23 @@ void tet10_laplacian_assemble_value(const ptrdiff_t nelements,
             real_t element_scalar = 0;
 
             tet10_laplacian_value(
-                // X-coordinates
-                xyz[0][i0],
-                xyz[0][i1],
-                xyz[0][i2],
-                xyz[0][i3],
-                // Y-coordinates
-                xyz[1][i0],
-                xyz[1][i1],
-                xyz[1][i2],
-                xyz[1][i3],
-                // Z-coordinates
-                xyz[2][i0],
-                xyz[2][i1],
-                xyz[2][i2],
-                xyz[2][i3],
-                element_u,
-                &element_scalar);
+                    // X-coordinates
+                    xyz[0][i0],
+                    xyz[0][i1],
+                    xyz[0][i2],
+                    xyz[0][i3],
+                    // Y-coordinates
+                    xyz[1][i0],
+                    xyz[1][i1],
+                    xyz[1][i2],
+                    xyz[1][i3],
+                    // Z-coordinates
+                    xyz[2][i0],
+                    xyz[2][i1],
+                    xyz[2][i2],
+                    xyz[2][i3],
+                    element_u,
+                    &element_scalar);
 
 #pragma omp atomic update
             *value += element_scalar;
