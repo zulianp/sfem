@@ -229,6 +229,7 @@ namespace sfem {
 
             int info = -1;
             for (int k = 0; k < max_it; k++) {
+                zeros(n, z);
                 preconditioner_op(r, z);
 
                 const T rtz_new = dot(n, r, z);
