@@ -9,6 +9,7 @@ rf = ref_fun(qx, qy, qz)
 dV = det3(A) / 6
 
 FFF = (Ainv * Ainv.T) * dV
+# FFF = (Ainv.T * Ainv) * dV
 cFFF = sp.Matrix(3, 3, [0]*9)
 
 varidx = 0
