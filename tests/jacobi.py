@@ -51,6 +51,10 @@ def gauss_seidel(r, x):
 		x[i] += acc / diag[i]
 	return x
 
+r = rhs - A * x
+norm_r = np.sqrt(np.sum(r * r))
+print(f'{0}) {norm_r}')
+
 for i in range(0, 100):
 	# r = rhs - A * x
 	# x += 0.001 * r
@@ -60,6 +64,6 @@ for i in range(0, 100):
 
 
 	r = rhs - A * x
-	norm_r = np.sum(r * r)
-	print(norm_r)
+	norm_r = np.sqrt(np.sum(r * r))
+	print(f'{i+1}) {norm_r}')
 	

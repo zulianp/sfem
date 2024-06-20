@@ -36,6 +36,7 @@ namespace sfem {
         // Solver parameters
         T tol{1e-10};
         int max_it{10000};
+        int check_each{1};
         ptrdiff_t n_dofs{-1};
         bool verbose{true};
 
@@ -103,7 +104,7 @@ namespace sfem {
         void monitor(const int iter, const T residual) {
             if(!verbose) return;
 
-            if (iter == max_it || iter == 0 || iter % std::max(1, int(max_it * 0.1)) == 0 || residual < tol) {
+            if (iter == max_it || iter == 0 || iter % check_each == 0 || residual < tol) {
                 std::cout << iter << ": " << residual << "\n";
             }
         }
@@ -219,8 +220,11 @@ namespace sfem {
             apply_op(p, Ap);
 
             T rtz = dot(n, r, z);
+            
             {
                 const T ptAp = dot(n, p, Ap);
+                
+                assert(ptAp != 0);
                 const T alpha = rtr / ptAp;
 
                 axpby(n, alpha, p, 1, x);
@@ -233,6 +237,8 @@ namespace sfem {
                 preconditioner_op(r, z);
 
                 const T rtz_new = dot(n, r, z);
+
+                assert(rtz != 0);
                 const T beta = rtz_new / rtz;
                 rtz = rtz_new;
 

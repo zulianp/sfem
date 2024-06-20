@@ -10,6 +10,7 @@
 #include <iostream>
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
+#include "sfem_crs_SpMV.hpp"
 
 namespace sfem {
     template <typename T>
@@ -44,6 +45,7 @@ namespace sfem {
         inline std::ptrdiff_t cols() const override { return n_dofs; }
 
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
+            set_n_dofs(op->rows());
             this->apply_op = [=](const T* const x, T* const y) { op->apply(x, y); };
         }
 
@@ -61,7 +63,7 @@ namespace sfem {
         // Solver parameters
         T tol{1e-10};
         int max_it{10000};
-        int check_each{100};
+        int check_each{1};
         bool verbose{false};
 
         void default_init() {
@@ -183,15 +185,21 @@ namespace sfem {
         void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
     };
 
-    template <typename T>
-    std::shared_ptr<Smoother<T>> h_gauss_seidel(const ptrdiff_t n,
-                                                const count_t* const rowptr,
-                                                const idx_t* const colidx,
-                                                const T* const values,
-                                                const T* const d) {
+    template <typename R,  typename C, typename T>
+    std::shared_ptr<Smoother<T>> h_gauss_seidel(
+        const std::shared_ptr<CRSSpMV<R, C, T>> &crs,
+        const T*d
+        )
+    {
         auto gs = std::make_shared<Smoother<T>>();
+        gs->set_op(crs);
 
         gs->smooth_ = [=](const std::size_t n, const T* const r, T* const x) {
+            auto rowptr = crs->row_ptr->data();
+            auto colidx = crs->col_idx->data();
+            auto values = crs->values->data();
+            assert(n == crs->rows());
+
             for (ptrdiff_t i = 0; i < n; i++) {
                 const int extent = rowptr[i + 1] - rowptr[i];
                 const T* row = &values[rowptr[i]];
@@ -209,10 +217,40 @@ namespace sfem {
             }
         };
 
-        gs->set_n_dofs(n);
         gs->default_init();
         return gs;
     }
+
+    // template <typename T>
+    // std::shared_ptr<Smoother<T>> h_gauss_seidel(const ptrdiff_t n,
+    //                                             const count_t* const rowptr,
+    //                                             const idx_t* const colidx,
+    //                                             const T* const values,
+    //                                             const T* const d) {
+    //     auto gs = std::make_shared<Smoother<T>>();
+
+    //     gs->smooth_ = [=](const std::size_t n, const T* const r, T* const x) {
+    //         for (ptrdiff_t i = 0; i < n; i++) {
+    //             const int extent = rowptr[i + 1] - rowptr[i];
+    //             const T* row = &values[rowptr[i]];
+    //             const idx_t* cols = &colidx[rowptr[i]];
+
+    //             T acc = r[i];
+    //             for (int k = 0; k < extent; k++) {
+    //                 const idx_t j = cols[k];
+    //                 const T aij = row[k];
+
+    //                 acc -= aij * x[j];
+    //             }
+
+    //             x[i] += acc / d[i];
+    //         }
+    //     };
+
+    //     gs->set_n_dofs(n);
+    //     gs->default_init();
+    //     return gs;
+    // }
 }  // namespace sfem
 
 #endif  // SFEM_GUASS_SEIDEL_HPP
