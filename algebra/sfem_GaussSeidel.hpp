@@ -63,7 +63,7 @@ namespace sfem {
         // Solver parameters
         T tol{1e-10};
         int max_it{10000};
-        int check_each{1};
+        int check_each{100};
         bool verbose{false};
 
         void default_init() {
