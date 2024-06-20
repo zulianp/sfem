@@ -132,7 +132,7 @@ int main(int argc, char *argv[]) {
     f->add_constraint(conds);
     f->add_operator(op);
 
-    real_t tol = 1e-8;
+    real_t tol = 1e-12;
 
     bool use_diag_preconditioner = false;
     double solve_tick = MPI_Wtime();
@@ -165,7 +165,7 @@ int main(int argc, char *argv[]) {
         } else {
             f->hessian_diag(nullptr, diag->data());
             auto gs = sfem::h_gauss_seidel(crs, diag->data());
-            gs->set_max_it(4);
+            gs->set_max_it(5);
             // gs->verbose = true;
             smoother = gs;
 
@@ -237,7 +237,7 @@ int main(int argc, char *argv[]) {
     f->apply_constraints(rhs->data());
 
     real_t rtr = residual(*linear_op, rhs->data(), x->data(), r->data());
-    for (int k = 0; k < 100; k++) {
+    for (int k = 0; k < 200; k++) {
         smoother->apply(rhs->data(), x->data());
 
         {  // Residual
@@ -245,27 +245,29 @@ int main(int argc, char *argv[]) {
             real_t rate = rtr_new/rtr;
             rtr = rtr_new;
             printf("MG: %d)\tresidual: %g,\trate: %g\n", k, rtr, rate);
-            if (rtr < tol) {
+            if (rtr < tol || rate > 0.999) {
                 break;
             }
         }
 
         // Restriction
-        zeros(fs_coarse->n_dofs(), r_coarse->data());
+        zeros(solver_coarse->rows(), r_coarse->data());
         restriction->apply(r->data(), r_coarse->data());
 
         // Set guess to zero
-        zeros(fs_coarse->n_dofs(), c_coarse->data());
+        zeros(solver_coarse->rows(), c_coarse->data());
 
         solver_coarse->apply(r_coarse->data(), c_coarse->data());
 
         // Prolongation
-        zeros(fs->n_dofs(), c->data());
+        zeros(smoother->rows(), c->data());
         prolongation->apply(c_coarse->data(), c->data());
+        
+        // Check do we need this?
         f->apply_zero_constraints(c->data());
 
         // Apply correction
-        axpby<real_t>(fs->n_dofs(), 1, c->data(), 1, x->data());
+        axpby<real_t>(smoother->rows(), 1, c->data(), 1, x->data());
 
         smoother->apply(rhs->data(), x->data());
     }
