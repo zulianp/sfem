@@ -1,3 +1,6 @@
+#include "sortreduce.h"
+#include <assert.h>
+
 #ifndef POW2
 #define POW2(a) ((a) * (a))
 #endif
@@ -57,7 +60,7 @@ static SFEM_INLINE void tet4_find_cols(const idx_t *const SFEM_RESTRICT targets,
     }
 }
 
-static SFEM_INLINE tet4_local_to_global(const idx_t *const SFEM_RESTRICT ev,
+static SFEM_INLINE void tet4_local_to_global(const idx_t *const SFEM_RESTRICT ev,
                                         const real_t *const SFEM_RESTRICT element_matrix,
                                         const count_t *const SFEM_RESTRICT rowptr,
                                         const idx_t *const SFEM_RESTRICT colidx,
@@ -94,7 +97,7 @@ static SFEM_INLINE void tet4_fff(const geom_t px0,
                                  const geom_t pz1,
                                  const geom_t pz2,
                                  const geom_t pz3,
-                                 geom_t *const fff) {
+                                 jacobian_t *const fff) {
     const geom_t x0 = -px0 + px1;
     const geom_t x1 = -py0 + py2;
     const geom_t x2 = -pz0 + pz3;
