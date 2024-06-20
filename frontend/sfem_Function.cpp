@@ -887,7 +887,7 @@ namespace sfem {
 
     Function::~Function() {
         std::ofstream os;
-        os.open("perf.csv");
+        os.open("perf_" + std::to_string(space()->n_dofs()) + ".csv");
         if (!os.good()) return;
 
         impl_->timings.describe(os);

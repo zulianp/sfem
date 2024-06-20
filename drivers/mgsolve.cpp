@@ -244,7 +244,7 @@ int main(int argc, char *argv[]) {
             real_t rtr_new = residual(*linear_op, rhs->data(), x->data(), r->data());
             real_t rate = rtr_new/rtr;
             rtr = rtr_new;
-            printf("MG: %d)\tresidual: %g,\trate %g\n", k, rtr, rate);
+            printf("MG: %d)\tresidual: %g,\trate: %g\n", k, rtr, rate);
             if (rtr < tol) {
                 break;
             }
