@@ -59,6 +59,14 @@ auto crs_hessian(sfem::Function &f) {
     return sfem::h_crs_spmv(nlocal, nlocal, rowptr, colidx, values, (real_t)1);
 }
 
+real_t residual(sfem::Operator<real_t> &op, const real_t*const rhs, const real_t*const x, real_t*const r)
+{
+    zeros(op.rows(), r);
+    op.apply(x, r);
+    axpby<real_t>(op.rows(), 1, rhs, -1, r);
+    return sqrt(dot(op.rows(), r, r));
+}
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -157,8 +165,8 @@ int main(int argc, char *argv[]) {
         } else {
             f->hessian_diag(nullptr, diag->data());
             auto gs = sfem::h_gauss_seidel(crs, diag->data());
-            gs->set_max_it(5);
-            gs->verbose = true;
+            gs->set_max_it(4);
+            // gs->verbose = true;
             smoother = gs;
 
 
@@ -173,7 +181,7 @@ int main(int argc, char *argv[]) {
     f->set_output_dir(output_path);
     auto output = f->output();
 
-#if 0  // MG
+#if 1  // MG
     auto c = sfem::h_buffer<real_t>(fs->n_dofs());
     auto r = sfem::h_buffer<real_t>(fs->n_dofs());
 
@@ -185,7 +193,6 @@ int main(int argc, char *argv[]) {
     //         fs_coarse->n_dofs(), fs_coarse->n_dofs(), [=](const real_t *const x, real_t *const y)
     //         {
     //             f_coarse->apply(nullptr, x, y);
-    //             f_coarse->apply_zero_constraints(y);
     //         });
 
     auto linear_op_coarse = crs_hessian(*f_coarse);
@@ -198,7 +205,7 @@ int main(int argc, char *argv[]) {
     {
         solver_coarse->set_n_dofs(fs_coarse->n_dofs());
         solver_coarse->set_op(linear_op_coarse);
-        solver_coarse->verbose = true;
+        solver_coarse->verbose = false;
         solver_coarse->set_max_it(1000);
         solver_coarse->tol = 1e-12;
 
@@ -229,37 +236,23 @@ int main(int argc, char *argv[]) {
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());
 
-    real_t rtr = 0;
-    for (int k = 0; k < 20; k++) {
-        // Coarse grid
+    real_t rtr = residual(*linear_op, rhs->data(), x->data(), r->data());
+    for (int k = 0; k < 100; k++) {
         smoother->apply(rhs->data(), x->data());
 
-        const real_t xtx = dot(fs->n_dofs(), x->data(), x->data());
-
         {  // Residual
-            zeros(fs->n_dofs(), r->data());
-            linear_op->apply(x->data(), r->data());
-            axpby<real_t>(fs->n_dofs(), 1, rhs->data(), -1, r->data());
-
-            rtr = dot(fs->n_dofs(), r->data(), r->data());
-
-            printf("MG: %d) residual norm: %g, x norm: %g\n", k, rtr, xtx);
-
+            real_t rtr_new = residual(*linear_op, rhs->data(), x->data(), r->data());
+            real_t rate = rtr_new/rtr;
+            rtr = rtr_new;
+            printf("MG: %d)\tresidual: %g,\trate %g\n", k, rtr, rate);
             if (rtr < tol) {
                 break;
             }
         }
 
-        output->write(("residual" + std::to_string(k)).c_str(), r->data());
-
-        // CHECK: Zero out contributions to boundary dofs?
-        // f->apply_zero_constraints(r->data());
-
         // Restriction
         zeros(fs_coarse->n_dofs(), r_coarse->data());
         restriction->apply(r->data(), r_coarse->data());
-
-        // f_coarse->apply_zero_constraints(r_coarse->data());
 
         // Set guess to zero
         zeros(fs_coarse->n_dofs(), c_coarse->data());
@@ -269,11 +262,7 @@ int main(int argc, char *argv[]) {
         // Prolongation
         zeros(fs->n_dofs(), c->data());
         prolongation->apply(c_coarse->data(), c->data());
-
-        output->write(("c" + std::to_string(k)).c_str(), c->data());
-
-        // CHECK: Zero out contributions to boundary dofs?
-        // f->apply_zero_constraints(c->data());
+        f->apply_zero_constraints(c->data());
 
         // Apply correction
         axpby<real_t>(fs->n_dofs(), 1, c->data(), 1, x->data());
