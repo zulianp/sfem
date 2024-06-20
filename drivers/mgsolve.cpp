@@ -149,21 +149,24 @@ int main(int argc, char *argv[]) {
         auto crs = crs_hessian(*f);
         linear_op = crs;
 
-        bool use_cheb = true;
+        bool use_cheb = false;
         if (use_cheb) {
             auto cheb = sfem::h_cheb3<real_t>(linear_op);
             cheb->init(rhs->data());
             smoother = cheb;
         } else {
             f->hessian_diag(nullptr, diag->data());
-            auto gs = sfem::h_gauss_seidel(fs->n_dofs(),
-                                           crs->row_ptr->data(),
-                                           crs->col_idx->data(),
-                                           crs->values->data(),
-                                           diag->data());
-
+            auto gs = sfem::h_gauss_seidel(crs, diag->data());
             gs->set_max_it(5);
+            gs->verbose = true;
             smoother = gs;
+
+
+            array_write(comm, "./rhs.raw", SFEM_MPI_REAL_T, rhs->data(), fs->n_dofs(), fs->n_dofs());
+            array_write(comm, "./diag.raw", SFEM_MPI_REAL_T, diag->data(), fs->n_dofs(), fs->n_dofs());
+            array_write(comm, "./rowptr.raw", SFEM_MPI_COUNT_T, crs->row_ptr->data(), fs->n_dofs() + 1, fs->n_dofs() + 1);
+            array_write(comm, "./colidx.raw", SFEM_MPI_IDX_T, crs->col_idx->data(), crs->row_ptr->data()[fs->n_dofs()], crs->row_ptr->data()[fs->n_dofs()]);
+            array_write(comm, "./values.raw", SFEM_MPI_REAL_T, crs->values->data(), crs->row_ptr->data()[fs->n_dofs()], crs->row_ptr->data()[fs->n_dofs()]);
         }
     }
 
@@ -280,10 +283,10 @@ int main(int argc, char *argv[]) {
 
 #else  // Basic solvers
 #if 0
-    // Point Jacobi solver (relaxed)
     auto solver = smoother;
+    solver->set_max_it(100);
     solver->set_op(linear_op);
-    solver->verbose = true;
+    
 #else  // CG solver
 
     //     auto preconditioner = sfem::make_op<real_t>(
