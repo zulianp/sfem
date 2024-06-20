@@ -49,7 +49,7 @@ else
 fi
 
 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_DIRICHLET=0 assemble $refined_mesh linear_system
-SFEM_USE_MACRO=1 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_DIRICHLET=0 assemble $simulation_mesh linear_system_macro
+SFEM_USE_MACRO=1 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_DIRICHLET=0 $LAUNCH assemble $simulation_mesh linear_system_macro
 
 MATRIXIO_DENSE_OUTPUT=1 print_crs linear_system/rowptr.raw linear_system/colidx.raw linear_system/values.raw int int double
 MATRIXIO_DENSE_OUTPUT=1 print_crs linear_system_macro/rowptr.raw linear_system_macro/colidx.raw linear_system_macro/values.raw int int double

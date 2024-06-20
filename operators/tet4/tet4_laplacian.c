@@ -318,6 +318,22 @@ void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
                 xyz[2][i3],
                 element_matrix);
 
+            // {
+            //     {
+            //         printf("-----------------------------------\n");
+            //         printf("TET4 (%d)\n", i);
+            //         printf("-----------------------------------\n");
+            //         printf("[%d, %d, %d, %d]\n", ev[0], ev[1], ev[2], ev[3]);
+            //         for(int k = 0; k < 4; k++) {
+            //             for(int j = 0; j < 4; j++) {
+            //                 printf("%g\t", element_matrix[k*4+j]);
+            //             }
+                        
+            //             printf("\n");
+            //         }
+            //     }
+            // }
+
             for (int edof_i = 0; edof_i < 4; ++edof_i) {
                 const idx_t dof_i = elems[edof_i][i];
                 const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
