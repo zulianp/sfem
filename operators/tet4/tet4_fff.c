@@ -36,4 +36,13 @@ void tet4_fff_create(tet4_fff_t *ctx,
     ctx->fff = fff;
     ctx->elements = elements;
     ctx->nelements = nelements;
+    ctx->element_type = TET4;
+}
+
+void tet4_fff_destroy(tet4_fff_t *ctx) {
+    free(ctx->fff);
+
+    ctx->nelements = 0;
+    ctx->elements = 0;
+    ctx->element_type = INVALID;
 }
