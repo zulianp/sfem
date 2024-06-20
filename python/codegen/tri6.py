@@ -22,6 +22,12 @@ class Tri6(FE):
 	def coords_sub_parametric(self):
 		return [[x0, x1, x2], [y0, y1, y2]]
 
+	def transform(self, p):
+		return self.A_ * p + sp.Matrix(2, 1, [x0, y0])
+
+	def inverse_transform(self, p):
+		return self.Ainv_ * (p - sp.Matrix(2, 1, [x0, y0]))
+
 	def name(self):
 		return "Tri6"
 

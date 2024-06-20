@@ -1,8 +1,7 @@
 #include "sfem_resample_field.h"
 
 #include "mass.h"
-#include "read_mesh.h"
-
+// #include "read_mesh.h"
 #include "matrixio_array.h"
 
 #include <math.h>
@@ -462,4 +461,5 @@ int tet4_resample_field_local_v2(
 
     }  // end for i over elements
 
+    return 0;
 }  // tet4_resample_field_local

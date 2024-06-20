@@ -181,19 +181,40 @@ int main(int argc, char *argv[]) {
 
         double spmv_tick = MPI_Wtime();
 
+        // With CUDA
+        cudaEvent_t start, stop;
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+        cudaEventRecord(start, 0);
+
         for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
             CHECK_CUSPARSE(cusparseSpMV(
                 handle, op_type, &alpha, d_matrix, vecX, &beta, vecY, valueType, alg, dBuffer));
         }
 
+        // With CUDA
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+
+        // With MPI Wtime
         cudaDeviceSynchronize();
 
         double spmv_tock = MPI_Wtime();
         double avg_time = (spmv_tock - spmv_tick) / SFEM_REPEAT;
         double avg_throughput = (crs.grows / avg_time) * (sizeof(real_t) * 1e-9);
 
+        float cuda_elapsed;
+        cudaEventElapsedTime(&cuda_elapsed, start, stop);
+        cudaEventDestroy(start);
+        cudaEventDestroy(stop);
 
         printf("spmv:  %g %g %ld %ld %ld\n", avg_time, avg_throughput, 0l, crs.lrows, crs.lnnz);
+
+        {  // Using CUDA perf-counter (from ms to s)
+            double avg_time =  (cuda_elapsed/1000) / SFEM_REPEAT;
+            double avg_throughput = (crs.grows / avg_time) * (sizeof(real_t) * 1e-9);
+            printf("cuspa: %g %g %ld %ld %ld\n", avg_time, avg_throughput, 0l, crs.lrows, crs.lnnz);
+        }
 
         CHECK_CUDA(cudaPeekAtLastError());
         CHECK_CUDA(cudaMemcpy(y, dY, crs.lrows * sizeof(real_t), cudaMemcpyDeviceToHost));

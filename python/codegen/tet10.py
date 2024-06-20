@@ -17,6 +17,9 @@ class Tet10(FE):
 	def coords_sub_parametric(self):
 		return [[x0, x1, x2, x3], [y0, y1, y2, y3], [z0, z1, z2, z3]]
 
+	def coords(self):
+		return  [coeffs('x', 10), coeffs('y', 10), coeffs('z', 10) ]
+
 	def name(self):
 		return "Tet10"
 
@@ -101,6 +104,13 @@ class Tet10(FE):
 
 	def jacobian_inverse(self, q):
 		return Ainv
+
+	def transform(self, q):
+		return self.jacobian(q) * q + sp.Matrix(3, 1, [x0, y0, z0])
+
+	def inverse_transform(self, p):
+		diff = (p - sp.Matrix(3, 1, [x0, y0, z0]))
+		return self.jacobian_inverse(p) * diff
 
 	def jacobian_determinant(self, q):
 		return det3(A)
@@ -198,3 +208,5 @@ def DualTet10():
 
 if __name__ == '__main__':
 	Tet10().generate_c_code()
+	# DualTet10().generate_qp_based_code();
+	

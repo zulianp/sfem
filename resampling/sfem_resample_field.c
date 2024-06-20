@@ -1,9 +1,11 @@
 #include "sfem_resample_field.h"
 
-#include "mass.h"
-#include "read_mesh.h"
-
 #include "matrixio_array.h"
+
+#include "mass.h"
+
+#include "sfem_resample_V.h"
+#include "tet10_resample_field.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -921,6 +923,11 @@ int resample_field_local(
                     data,
                     weighted_field);
         }
+        case TET10: {
+            return hex8_to_tet10_resample_field_local(
+                    nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+        }
+
         default:
             break;
     }
@@ -979,8 +986,22 @@ int resample_field(
     enum ElemType st = shell_type(element_type);
 
     if (INVALID == st) {
-        // Removing the mass-contributions from the weighted gap function "weighted_field"
-        apply_inv_lumped_mass(element_type, nelements, nnodes, elems, xyz, weighted_field, g);
+        // FIXME
+        if (element_type == TET10) {
+            real_t* mass_vector = calloc(nnodes, sizeof(real_t));
+            tet10_assemble_dual_mass_vector(
+                    nelements, nnodes, elems, xyz, mass_vector);
+
+            for (ptrdiff_t i = 0; i < nnodes; i++) {
+                assert(mass_vector[i] != 0);
+                g[i] = weighted_field[i] / mass_vector[i];
+            }
+
+            free(mass_vector);
+        } else {
+            // Removing the mass-contributions from the weighted gap function "weighted_field"
+            apply_inv_lumped_mass(element_type, nelements, nnodes, elems, xyz, weighted_field, g);
+        }
     } else {
         apply_inv_lumped_mass(st, nelements, nnodes, elems, xyz, weighted_field, g);
     }

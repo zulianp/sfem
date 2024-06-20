@@ -46,27 +46,40 @@ namespace sfem {
             ensure_init();
 
             // Wrap input arrays into fine level of mg
-            memory_[finest_level()]->solution =
-                Buffer<T>::wrap(smoother_[finest_level()]->rows(), x);
 
-            memory_[finest_level()]->residual =
-                Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T*)r);
+            if (wrap_input_) {
+                memory_[finest_level()]->solution =
+                    Buffer<T>::wrap(smoother_[finest_level()]->rows(), x);
+
+                memory_[finest_level()]->residual =
+                    Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T*)r);
+            }
 
             for (int k = 0; k < max_it_; k++) {
+                // std::cout << "iteration: " << k << ")\n";
+                // operator_->apply(r, )
+
                 cycle(finest_level());
+
+                auto c = memory_[finest_level()]->solution;
+                axpby(c->size(), 1, c->data(), 1, x);
             }
 
             return 0;
         }
 
+        // void set_coarse_grid_solver(const std::shared_ptr<Operator<T>>& op)
+        // {
+        //     coarse_grid_solver_ = op;
+        // }
+
         void clear() {
             prolongation_.clear();
             restriction_.clear();
             smoother_.clear();
-            coarse_grid_solver_ = nullptr;
         }
 
-        inline int n_levels() const { return smoother_.size() + 1; }
+        inline int n_levels() const { return smoother_.size(); }
 
         inline std::ptrdiff_t rows() const override { return operator_[finest_level()]->rows(); }
         inline std::ptrdiff_t cols() const override { return operator_[finest_level()]->cols(); }
@@ -74,11 +87,11 @@ namespace sfem {
         // Fine level prolongation has to be null
         // Coarse level restriction has to be null
         inline void add_level(const std::shared_ptr<Operator<T>>& op,
-                              const std::shared_ptr<Operator<T>>& smoother,
+                              const std::shared_ptr<Operator<T>>& smoother_or_solver,
                               const std::shared_ptr<Operator<T>>& prolongation,
                               const std::shared_ptr<Operator<T>>& restriction) {
             operator_.push_back(op);
-            smoother_.push_back(smoother);
+            smoother_.push_back(smoother_or_solver);
             prolongation_.push_back(prolongation);
             restriction_.push_back(restriction);
         }
@@ -86,7 +99,7 @@ namespace sfem {
         void default_init() {
             allocate = [](const std::ptrdiff_t n) -> T* { return (T*)calloc(n, sizeof(T)); };
 
-            destroy = [](T* a) { free(a); };
+            destroy = [](void* a) { free(a); };
 
             axpby =
                 [](const ptrdiff_t n, const T alpha, const T* const x, const T beta, T* const y) {
@@ -106,17 +119,16 @@ namespace sfem {
         std::vector<std::shared_ptr<Operator<T>>> prolongation_;
         std::vector<std::shared_ptr<Operator<T>>> restriction_;
 
-        std::shared_ptr<Operator<T>> coarse_grid_solver_;
-
         // Internals
         std::vector<std::shared_ptr<Memory>> memory_;
+        bool wrap_input_{true};
 
         int max_it_{1};
         int cycle_type_{V_CYCLE};
 
         inline int finest_level() const { return 0; }
 
-        inline int coarsest_level() const { return smoother_.size(); }
+        inline int coarsest_level() const { return n_levels() - 1; }
 
         inline int coarser_level(int level) const { return level + 1; }
 
@@ -131,16 +143,17 @@ namespace sfem {
         int init() {
             assert(prolongation_.size() == restriction_.size());
             assert(operator_.size() == smoother_.size());
-            assert(static_cast<bool>(coarse_grid_solver_));
 
             memory_.clear();
             memory_.resize(this->n_levels());
 
-            for (int l = 0; l < coarsest_level(); l++) {
+            for (int l = 0; l < n_levels(); l++) {
+                memory_[l] = std::make_shared<Memory>();
+
                 size_t n = smoother_[l]->rows();
-                if (l != finest_level()) {
+                if (l != finest_level() || !wrap_input_) {
                     auto x = this->allocate(n);
-                    memory_[l]->residual = Buffer<T>::own(n, x, this->destroy);
+                    memory_[l]->solution = Buffer<T>::own(n, x, this->destroy);
 
                     auto r = this->allocate(n);
                     memory_[l]->residual = Buffer<T>::own(n, r, this->destroy);
@@ -160,7 +173,8 @@ namespace sfem {
             this->zeros(mem->size(), mem->solution->data());
 
             if (coarsest_level() == level) {
-                return coarse_grid_solver_->apply(mem->residual->data(), mem->solution->data());
+                // std::cout << "Coarse level solve!\n";
+                return smoother_[level]->apply(mem->residual->data(), mem->solution->data());
             }
 
             auto op = operator_[level];
@@ -168,6 +182,9 @@ namespace sfem {
             auto prolongation = prolongation_[coarser_level(level)];
 
             for (int k = 0; k < this->cycle_type_; k++) {
+                // std::cout << "Cycle " << k << " \n";
+
+                this->zeros(mem->solution->size(), mem->solution->data());
                 smoother_[level]->apply(mem->residual->data(), mem->solution->data());
 
                 this->zeros(mem->size(), mem->work->data());
@@ -187,9 +204,17 @@ namespace sfem {
                 this->axpby(mem->size(), 1, mem->work->data(), 1, mem->solution->data());
                 smoother_[level]->apply(mem->residual->data(), mem->solution->data());
             }
+
             return 0;
         }
     };
+
+    template <typename T>
+    std::shared_ptr<Multigrid<T>> h_mg() {
+        auto mg = std::make_shared<Multigrid<T>>();
+        mg->default_init();
+        return mg;
+    }
 
 }  // namespace sfem
 

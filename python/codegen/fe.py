@@ -153,6 +153,30 @@ class FE:
 
 		return g
 
+	def isoparametric_transform(self, q):
+		p = self.coords()
+		f = self.fun(q)
+		ret = sp.zeros(self.spatial_dim(), 1)
+
+		for i in range(0, self.n_nodes()):
+			for d in range(0, self.spatial_dim()):
+				ret[d] += p[d][i] * f[i]
+
+		return ret
+
+	def isoparametric_jacobian(self, q):
+		p = self.coords()
+		g = self.grad(q)
+
+		ret = sp.zeros(self.spatial_dim(), self.manifold_dim())
+
+		for i in range(0, self.n_nodes()):
+			for d1 in range(0, self.spatial_dim()):
+				for d2 in range(0, self.manifold_dim()):
+					ret[d1, d2] += p[d1][i] * g[i][d2]
+		return ret
+
+
 	def quadrature_weight(self):
 		return sp.symbols('qw')
 
@@ -195,6 +219,8 @@ class FE:
 				# var = sp.symbols(f'jac_inv_{i*cols + j}]')
 				sls.append(var)
 		return sp.Matrix(rows, cols, sls)
+
+
 
 	def symbol_jacobian_determinant(self):
 		return sp.symbols('jacobian_determinant')
@@ -261,6 +287,21 @@ class FE:
 		print("------ measure -------")
 		c_log(c_gen(expr))
 
+
+		f = self.fun(qp)
+		nfun = len(f)
+
+		fun_expr = []
+		for i in range(0, nfun):
+			if self.strided:
+				fx = ast.Assignment(sp.symbols(f'f[{i}*stride_fun]'), f[i])
+			else:
+				fx = ast.Assignment(sp.symbols(f'f[{i}]'), f[i])
+
+			fun_expr.append(fx)
+
+		print(f"------ basis functions ({nfun}) -------")
+		c_log(c_gen(fun_expr))
 
 
 
