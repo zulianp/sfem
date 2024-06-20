@@ -5,8 +5,8 @@
 #include <math.h>
 #include <stddef.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define POW2(x) ((x) * (x))
 #define POW3(x) ((x) * (x) * (x))
@@ -630,40 +630,47 @@ SFEM_INLINE static real_t tet10_measure(const geom_t* const SFEM_RESTRICT x,
                                         const real_t qx,
                                         const real_t qy,
                                         const real_t qz) {
-   const real_t x0 = 4*qz;
-   const real_t x1 = x0 - 1;
-   const real_t x2 = 4*qy;
-   const real_t x3 = 4*qx;
-   const real_t x4 = x3 - 4;
-   const real_t x5 = -8*qz - x2 - x4;
-   const real_t x6 = -x3*y[4];
-   const real_t x7 = x0 + x2;
-   const real_t x8 = x3 + x7 - 3;
-   const real_t x9 = x8*y[0];
-   const real_t x10 = -x2*y[6] + x9;
-   const real_t x11 = x1*y[3] + x10 + x2*y[9] + x3*y[8] + x5*y[7] + x6;
-   const real_t x12 = -x2*z[6];
-   const real_t x13 = -x0*z[7];
-   const real_t x14 = x3 - 1;
-   const real_t x15 = x8*z[0];
-   const real_t x16 = -8*qx - x7 + 4;
-   const real_t x17 = x0*z[8] + x12 + x13 + x14*z[1] + x15 + x16*z[4] + x2*z[5];
-   const real_t x18 = x2 - 1;
-   const real_t x19 = -8*qy - x0 - x4;
-   const real_t x20 = -x3*x[4];
-   const real_t x21 = x8*x[0];
-   const real_t x22 = -x0*x[7] + x21;
-   const real_t x23 = (1.0/6.0)*x0*x[9] + (1.0/6.0)*x18*x[2] + (1.0/6.0)*x19*x[6] + (1.0/6.0)*x20 + (1.0/6.0)*x22 + (1.0/6.0)*x3*x[5];
-   const real_t x24 = -x0*y[7];
-   const real_t x25 = x0*y[8] + x10 + x14*y[1] + x16*y[4] + x2*y[5] + x24;
-   const real_t x26 = x15 - x3*z[4];
-   const real_t x27 = x1*z[3] + x12 + x2*z[9] + x26 + x3*z[8] + x5*z[7];
-   const real_t x28 = x0*y[9] + x18*y[2] + x19*y[6] + x24 + x3*y[5] + x6 + x9;
-   const real_t x29 = -x2*x[6];
-   const real_t x30 = (1.0/6.0)*x1*x[3] + (1.0/6.0)*x2*x[9] + (1.0/6.0)*x20 + (1.0/6.0)*x21 + (1.0/6.0)*x29 + (1.0/6.0)*x3*x[8] + (1.0/6.0)*x5*x[7];
-   const real_t x31 = x0*z[9] + x13 + x18*z[2] + x19*z[6] + x26 + x3*z[5];
-   const real_t x32 = (1.0/6.0)*x0*x[8] + (1.0/6.0)*x14*x[1] + (1.0/6.0)*x16*x[4] + (1.0/6.0)*x2*x[5] + (1.0/6.0)*x22 + (1.0/6.0)*x29;
-   return x11*x17*x23 - x11*x31*x32 - x17*x28*x30 - x23*x25*x27 + x25*x30*x31 + x27*x28*x32;
+    const real_t x0 = 4 * qz;
+    const real_t x1 = x0 - 1;
+    const real_t x2 = 4 * qy;
+    const real_t x3 = 4 * qx;
+    const real_t x4 = x3 - 4;
+    const real_t x5 = -8 * qz - x2 - x4;
+    const real_t x6 = -x3 * y[4];
+    const real_t x7 = x0 + x2;
+    const real_t x8 = x3 + x7 - 3;
+    const real_t x9 = x8 * y[0];
+    const real_t x10 = -x2 * y[6] + x9;
+    const real_t x11 = x1 * y[3] + x10 + x2 * y[9] + x3 * y[8] + x5 * y[7] + x6;
+    const real_t x12 = -x2 * z[6];
+    const real_t x13 = -x0 * z[7];
+    const real_t x14 = x3 - 1;
+    const real_t x15 = x8 * z[0];
+    const real_t x16 = -8 * qx - x7 + 4;
+    const real_t x17 = x0 * z[8] + x12 + x13 + x14 * z[1] + x15 + x16 * z[4] + x2 * z[5];
+    const real_t x18 = x2 - 1;
+    const real_t x19 = -8 * qy - x0 - x4;
+    const real_t x20 = -x3 * x[4];
+    const real_t x21 = x8 * x[0];
+    const real_t x22 = -x0 * x[7] + x21;
+    const real_t x23 = (1.0 / 6.0) * x0 * x[9] + (1.0 / 6.0) * x18 * x[2] +
+                       (1.0 / 6.0) * x19 * x[6] + (1.0 / 6.0) * x20 + (1.0 / 6.0) * x22 +
+                       (1.0 / 6.0) * x3 * x[5];
+    const real_t x24 = -x0 * y[7];
+    const real_t x25 = x0 * y[8] + x10 + x14 * y[1] + x16 * y[4] + x2 * y[5] + x24;
+    const real_t x26 = x15 - x3 * z[4];
+    const real_t x27 = x1 * z[3] + x12 + x2 * z[9] + x26 + x3 * z[8] + x5 * z[7];
+    const real_t x28 = x0 * y[9] + x18 * y[2] + x19 * y[6] + x24 + x3 * y[5] + x6 + x9;
+    const real_t x29 = -x2 * x[6];
+    const real_t x30 = (1.0 / 6.0) * x1 * x[3] + (1.0 / 6.0) * x2 * x[9] + (1.0 / 6.0) * x20 +
+                       (1.0 / 6.0) * x21 + (1.0 / 6.0) * x29 + (1.0 / 6.0) * x3 * x[8] +
+                       (1.0 / 6.0) * x5 * x[7];
+    const real_t x31 = x0 * z[9] + x13 + x18 * z[2] + x19 * z[6] + x26 + x3 * z[5];
+    const real_t x32 = (1.0 / 6.0) * x0 * x[8] + (1.0 / 6.0) * x14 * x[1] +
+                       (1.0 / 6.0) * x16 * x[4] + (1.0 / 6.0) * x2 * x[5] + (1.0 / 6.0) * x22 +
+                       (1.0 / 6.0) * x29;
+    return x11 * x17 * x23 - x11 * x31 * x32 - x17 * x28 * x30 - x23 * x25 * x27 + x25 * x30 * x31 +
+           x27 * x28 * x32;
 }
 
 SFEM_INLINE static void tet10_transform(const geom_t* const SFEM_RESTRICT x,
@@ -746,7 +753,7 @@ int hex8_to_isoparametric_tet10_resample_field_local(
             real_t element_field[10];
 
             // loop over the 4 vertices of the tetrahedron
-            // UNROLL_ZERO?
+            // UNROLL_ZERO ?
             for (int v = 0; v < 10; ++v) {
                 ev[v] = elems[v][i];
             }
