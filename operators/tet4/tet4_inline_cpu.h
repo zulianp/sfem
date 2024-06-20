@@ -158,7 +158,6 @@ static SFEM_INLINE void tet4_adjugate_and_det(const geom_t px0,
                                               const geom_t pz1,
                                               const geom_t pz2,
                                               const geom_t pz3,
-                                              const ptrdiff_t stride,
                                               jacobian_t *const SFEM_RESTRICT adjugate,
                                               jacobian_t *const SFEM_RESTRICT jacobian_determinant) {
     // Compute jacobian in high precision

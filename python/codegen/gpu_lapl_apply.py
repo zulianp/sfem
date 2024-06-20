@@ -133,3 +133,23 @@ print('Gradient')
 print('---------------------------------------------------')
 c_code(expr)
 print('---------------------------------------------------')
+
+
+integr = 0
+for i in range(0, 4):
+	
+
+	for j in range(0, 4):
+		integr += u[i] * left_gx[i] * right_gx[j] * u[j]
+		integr += u[i] * left_gy[i] * right_gy[j] * u[j]
+		integr += u[i] * left_gz[i] * right_gz[j] * u[j]
+
+	integr /= 2
+
+expr=[sp.simplify(integr)]
+
+print('---------------------------------------------------')
+print('Value')
+print('---------------------------------------------------')
+c_code(expr)
+print('---------------------------------------------------')

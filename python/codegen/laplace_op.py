@@ -10,7 +10,7 @@ from tet20 import *
 
 
 # import pdb
-
+# TO BE FIXED (using older verion of FFF)
 class LaplaceOp:
 	def __init__(self, fe, q):
 
@@ -108,6 +108,28 @@ class LaplaceOp:
 
 		return expr
 
+	def hessian_diag(self):
+		fe = self.fe
+		g = self.g
+		cFFF = self.cFFF
+		fe = self.fe
+		q = self.q
+
+		expr = []
+		for i in range(0, fe.n_nodes()):
+			gi = cFFF * g[i]
+
+
+			integr = 0
+			for d in range(0, fe.manifold_dim()):
+				gdotg = gi[d] * g[i][d]
+				integr += fe.integrate(q, gdotg)
+
+			var = sp.symbols(f'element_vector[{i}*stride]')
+			expr.append(ast.Assignment(var, integr))
+
+		return expr
+
 	def gradient(self):
 		fe = self.fe
 		g = self.g
@@ -124,10 +146,9 @@ class LaplaceOp:
 
 			lform = sp.symbols(f'element_vector[{i}*stride]')
 			expr.append(ast.Assignment(lform, integr))
-
-		# pdb.set_trace()
 		return expr
 
+	# FIXME
 	def value(self):
 		fe = self.fe
 		integr = 0
@@ -159,8 +180,8 @@ def main():
 	# q = sp.Matrix(2, 1, [qx, qy])
 	# op = LaplaceOp(fe, q)
 
-	# fe = Tet4()
-	fe = Tet20()
+	fe = Tet4()
+	# fe = Tet20()
 	q = sp.Matrix(3, 1, [qx, qy, qz])
 	op = LaplaceOp(fe, q)
 
@@ -172,6 +193,12 @@ def main():
 
 	print("Gradient")
 	c_code(op.gradient())
+
+	# print("Diag")
+	# c_code(op.hessian_diag())
+
+	# print("Value")
+	# c_code(op.value())
 
 if __name__ == '__main__':
 	main()

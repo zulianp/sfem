@@ -4,12 +4,20 @@
 #include <stddef.h>
 #include "sfem_base.h"
 
+// UNTESTED
 void tet4_laplacian_assemble_value(const ptrdiff_t nelements,
                               const ptrdiff_t nnodes,
                               idx_t **const SFEM_RESTRICT elems,
                               geom_t **const SFEM_RESTRICT xyz,
                               const real_t *const SFEM_RESTRICT u,
                               real_t *const SFEM_RESTRICT value);
+
+void tet4_laplacian_apply(const ptrdiff_t nelements,
+                     const ptrdiff_t nnodes,
+                     idx_t **const SFEM_RESTRICT elems,
+                     geom_t **const SFEM_RESTRICT xyz,
+                     const real_t *const SFEM_RESTRICT u,
+                     real_t *const SFEM_RESTRICT values);
 
 /**
  * @brief Assembles the gradient of the Laplacian matrix for tetrahedral elements.
@@ -39,15 +47,10 @@ void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
                                 const idx_t *const SFEM_RESTRICT colidx,
                                 real_t *const SFEM_RESTRICT values);
 
-void tet4_laplacian_apply(const ptrdiff_t nelements,
-                     const ptrdiff_t nnodes,
-                     idx_t **const SFEM_RESTRICT elems,
-                     geom_t **const SFEM_RESTRICT xyz,
-                     const real_t *const SFEM_RESTRICT u,
-                     real_t *const SFEM_RESTRICT values);
-
-
-// void tet4_laplacian_diag(const macro_tet4_laplacian_t *const ctx,
-//                                real_t *const SFEM_RESTRICT diag);
+void tet4_laplacian_diag(const ptrdiff_t nelements,
+                          const ptrdiff_t nnodes,
+                          idx_t **const SFEM_RESTRICT elems,
+                          geom_t **const SFEM_RESTRICT xyz,
+                          real_t *const SFEM_RESTRICT diag);
 
 #endif  // TET4_LAPLACIAN_H
