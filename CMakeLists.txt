@@ -272,3 +272,9 @@ if(TARGET cuda_do_spmv)
                            cuspmv
                        COMMENT "Copying 'cuda_do_spmv' executable to 'cuspmv'")
 endif()
+
+add_custom_command(TARGET do_spmv  POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy
+                       $<TARGET_FILE:do_spmv>
+                       spmv
+                   COMMENT "Copying 'do_spmv' executable to 'spmv'")
