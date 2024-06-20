@@ -15,6 +15,8 @@
 #include "sfem_mesh_write.h"
 #include "sfem_resample_field.h"
 
+#include "tet10_resample_field.h"
+
 #include "mesh_utils.h"
 
 #include "mass.h"
@@ -25,9 +27,9 @@ double calculate_flops(const ptrdiff_t nelements, const ptrdiff_t quad_nodes, do
 }
 
 int main(int argc, char* argv[]) {
-    printf("========================================\n");
-    printf("Starting grid_to_mesh\n");
-    printf("========================================\n\n");
+    // printf("========================================\n");
+    // printf("Starting grid_to_mesh\n");
+    // printf("========================================\n\n");
 
     sfem_resample_field_info info;
 
@@ -40,12 +42,14 @@ int main(int argc, char* argv[]) {
     MPI_Comm_size(comm, &size);
 
     // print argv
-    printf("argc: %d\n", argc);
-    printf("argv: \n");
-    for (int i = 0; i < argc; i++) {
-        printf(" %s", argv[i]);
-    }
-    printf("\n");
+    // if (!rank) {
+    //     printf("argc: %d\n", argc);
+    //     printf("argv: \n");
+    //     for (int i = 0; i < argc; i++) {
+    //         printf(" %s", argv[i]);
+    //     }
+    //     printf("\n");
+    // }
 
     if (argc != 13) {
         fprintf(stderr, "Error: Invalid number of arguments\n\n");
@@ -147,7 +151,7 @@ int main(int argc, char* argv[]) {
                     // Mesh
                     mesh.n_owned_nodes,
                     mesh.points,
-                    // SDF
+                    // discrete field
                     nlocal,
                     stride,
                     origin,
@@ -164,7 +168,7 @@ int main(int argc, char* argv[]) {
                         mesh.n_owned_nodes,
                         mesh.elements,
                         mesh.points,
-                        // SDF
+                        // discrete field
                         nlocal,
                         stride,
                         origin,
@@ -182,7 +186,7 @@ int main(int argc, char* argv[]) {
                         mesh.nnodes,
                         mesh.elements,
                         mesh.points,
-                        // SDF
+                        // discrete field
                         nlocal,
                         stride,
                         origin,
@@ -194,23 +198,29 @@ int main(int argc, char* argv[]) {
 
                 real_t* mass_vector = calloc(mesh.nnodes, sizeof(real_t));
 
-                enum ElemType st = shell_type(mesh.element_type);
-
-                if (st == INVALID) {
-                    assemble_lumped_mass(mesh.element_type,
-                                         mesh.nelements,
-                                         mesh.nnodes,
-                                         mesh.elements,
-                                         mesh.points,
-                                         mass_vector);
-
+                if (mesh.element_type == TET10) {
+                    // FIXME (we should wrap mass vector assembly in sfem_resample_field.c)
+                    tet10_assemble_dual_mass_vector(
+                            mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mass_vector);
                 } else {
-                    assemble_lumped_mass(st,
-                                         mesh.nelements,
-                                         mesh.nnodes,
-                                         mesh.elements,
-                                         mesh.points,
-                                         mass_vector);
+                    enum ElemType st = shell_type(mesh.element_type);
+
+                    if (st == INVALID) {
+                        assemble_lumped_mass(mesh.element_type,
+                                             mesh.nelements,
+                                             mesh.nnodes,
+                                             mesh.elements,
+                                             mesh.points,
+                                             mass_vector);
+
+                    } else {
+                        assemble_lumped_mass(st,
+                                             mesh.nelements,
+                                             mesh.nnodes,
+                                             mesh.elements,
+                                             mesh.points,
+                                             mass_vector);
+                    }
                 }
 
                 // exchange ghost nodes and add contribution

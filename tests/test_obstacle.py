@@ -59,6 +59,7 @@ def solve_obstacle(options):
 		sinlet = np.unique(np.fromfile(f'{path}/sidesets_aos/sinlet.raw', dtype=idx_t))
 		soutlet = np.fromfile(f'{path}/sidesets_aos/soutlet.raw', dtype=idx_t)
 
+
 	fs = pysfem.FunctionSpace(m, m.spatial_dimension())
 	fun = pysfem.Function(fs)
 	

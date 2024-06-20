@@ -20,6 +20,12 @@ class WeightedFE(FE):
 				ret[i] += f[j] * weights[i, j]
 		return ret
 
+	def coords_sub_parametric(self):
+		return self.fe.coords_sub_parametric()
+
+	def coords(self):
+		return self.fe.coords()
+
 	def name(self):
 		return f'{self.prefix_}({self.fe.name()})'
 				
@@ -44,5 +50,14 @@ class WeightedFE(FE):
 	def jacobian_determinant(self, q):
 		return self.fe.jacobian_determinant(q)
 
+	def transform(self, q):
+		return self.fe.transform(q)
+
+	def inverse_transform(self, p):
+		return self.fe.inverse_transform(p)
+
 	def measure(self, q):
 		return self.fe.measure(q)
+
+	def reference_measure(self):
+		return self.fe.reference_measure()

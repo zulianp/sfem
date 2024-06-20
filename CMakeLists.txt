@@ -35,7 +35,7 @@ find_package(MatrixIO REQUIRED)
 find_package(ISolver REQUIRED)
 
 set(SFEM_MODULES
-    algebra base matrix mesh pizzastack resampling solver
+    algebra base matrix mesh pizzastack solver
     operators 
     operators/beam2 
     operators/cvfem 
@@ -53,6 +53,8 @@ set(SFEM_MODULES
     operators/macro_tri3
     operators/macro_tet4
     operators/hierarchical
+    resampling
+    resampling/tet10
     )
 
 list(APPEND SFEM_MODULES frontend)
@@ -262,3 +264,11 @@ include(cmake/PostInstall.cmake)
 ######################################################
 
 ######################################################
+
+if(TARGET cuda_do_spmv)
+    add_custom_command(TARGET cuda_do_spmv  POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy
+                           $<TARGET_FILE:cuda_do_spmv>
+                           cuspmv
+                       COMMENT "Copying 'cuda_do_spmv' executable to 'cuspmv'")
+endif()
