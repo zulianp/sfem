@@ -45,7 +45,7 @@ T dot(const ptrdiff_t n, const T *const l, const T *const r) {
     return ret;
 }
 
-std::shared_ptr<sfem::Operator<real_t>> crs_hessian(sfem::Function &f) {
+auto crs_hessian(sfem::Function &f) {
     ptrdiff_t nlocal;
     ptrdiff_t nglobal;
     ptrdiff_t nnz;
@@ -146,16 +146,31 @@ int main(int argc, char *argv[]) {
         cheb->set_max_it(3);
         smoother = cheb;
     } else {
-        linear_op = crs_hessian(*f);
-        auto cheb = sfem::h_cheb3<real_t>(linear_op);
-        cheb->init(rhs->data());
-        smoother = cheb;
+        auto crs = crs_hessian(*f);
+        linear_op = crs;
+
+        bool use_cheb = true;
+        if (use_cheb) {
+            auto cheb = sfem::h_cheb3<real_t>(linear_op);
+            cheb->init(rhs->data());
+            smoother = cheb;
+        } else {
+            f->hessian_diag(nullptr, diag->data());
+            auto gs = sfem::h_gauss_seidel(fs->n_dofs(),
+                                           crs->row_ptr->data(),
+                                           crs->col_idx->data(),
+                                           crs->values->data(),
+                                           diag->data());
+
+            gs->set_max_it(5);
+            smoother = gs;
+        }
     }
 
     f->set_output_dir(output_path);
     auto output = f->output();
 
-#if 0 // MG
+#if 0  // MG
     auto c = sfem::h_buffer<real_t>(fs->n_dofs());
     auto r = sfem::h_buffer<real_t>(fs->n_dofs());
 
@@ -210,8 +225,6 @@ int main(int argc, char *argv[]) {
 
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());
-
-    
 
     real_t rtr = 0;
     for (int k = 0; k < 20; k++) {
@@ -292,6 +305,7 @@ int main(int argc, char *argv[]) {
     solver->set_preconditioner_op(preconditioner);
     solver->verbose = true;
     solver->tol = tol;
+    solver->set_max_it(400);
 
 #endif
 
@@ -304,8 +318,6 @@ int main(int argc, char *argv[]) {
     // -------------------------------
     // Write output
     // -------------------------------
-
- 
 
     output->write("x", x->data());
     output->write("rhs", rhs->data());

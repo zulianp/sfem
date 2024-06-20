@@ -72,6 +72,23 @@ static void local_to_global4(const idx_t *const SFEM_RESTRICT ev,
                              const count_t *const SFEM_RESTRICT rowptr,
                              const idx_t *const SFEM_RESTRICT colidx,
                              real_t *const SFEM_RESTRICT values) {
+
+    // {
+    //     static int counter = 0;
+    //     printf("-----------------------------------\n");
+    //     printf("MACROTET4 (%d)\n", counter++);
+    //     printf("-----------------------------------\n");
+
+    //     printf("[%d, %d, %d, %d]\n", ev[0], ev[1], ev[2], ev[3]);
+    //     for(int i = 0; i < 4; i++) {
+    //         for(int j = 0; j < 4; j++) {
+    //             printf("%g\t", element_matrix[i*4+j]);
+    //         }
+
+    //         printf("\n");
+    //     }
+    // }
+
     idx_t ks[4] = {-1, -1, -1, -1};
     for (int edof_i = 0; edof_i < 4; ++edof_i) {
         const idx_t dof_i = ev[edof_i];
@@ -739,21 +756,25 @@ void macro_tet4_laplacian_assemble_hessian_opt(const macro_tet4_laplacian_t *con
         {  // Octahedron tets
             // [4, 5, 6, 8],
             sub_fff_4(fff, sub_fff);
+            lapl_hessian_micro_kernel(sub_fff, element_matrix);
             gather_idx(ev10, 4, 5, 6, 8, ev);
             local_to_global4(ev, element_matrix, rowptr, colidx, values);
 
             // [7, 4, 6, 8],
             sub_fff_5(fff, sub_fff);
+            lapl_hessian_micro_kernel(sub_fff, element_matrix);
             gather_idx(ev10, 7, 4, 6, 8, ev);
             local_to_global4(ev, element_matrix, rowptr, colidx, values);
 
             // [6, 5, 9, 8],
             sub_fff_6(fff, sub_fff);
+            lapl_hessian_micro_kernel(sub_fff, element_matrix);
             gather_idx(ev10, 6, 5, 9, 8, ev);
             local_to_global4(ev, element_matrix, rowptr, colidx, values);
 
             // [7, 6, 9, 8]]
             sub_fff_7(fff, sub_fff);
+            lapl_hessian_micro_kernel(sub_fff, element_matrix);
             gather_idx(ev10, 7, 6, 9, 8, ev);
             local_to_global4(ev, element_matrix, rowptr, colidx, values);
         }
