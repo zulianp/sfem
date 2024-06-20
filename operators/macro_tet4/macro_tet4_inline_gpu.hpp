@@ -1,3 +1,6 @@
+#ifndef MACRO_TET4_INLINE_GPU_HPP
+#define MACRO_TET4_INLINE_GPU_HPP
+
 #include "tet4_inline_gpu.hpp"
 
 template <typename geom_t>
@@ -188,3 +191,5 @@ static inline __device__ void subtet_scatter_add(const int i0,
     out[i2] += in[2];
     out[i3] += in[3];
 }
+
+#endif  // MACRO_TET4_INLINE_GPU_HPP
