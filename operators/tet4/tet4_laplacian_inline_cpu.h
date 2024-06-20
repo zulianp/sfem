@@ -1,5 +1,8 @@
-// FFF
+#ifndef TET4_LAPLACIAN_INLINE_CPU_H
+#define TET4_LAPLACIAN_INLINE_CPU_H
 
+
+// FFF
 static SFEM_INLINE void tet4_laplacian_hessian_fff(const jacobian_t *const SFEM_RESTRICT fff,
                                                    real_t *const SFEM_RESTRICT element_matrix) {
     const real_t x0 = -fff[0] - fff[1] - fff[2];
@@ -24,10 +27,10 @@ static SFEM_INLINE void tet4_laplacian_hessian_fff(const jacobian_t *const SFEM_
 }
 
 static SFEM_INLINE void tet4_laplacian_diag_fff(const jacobian_t *const SFEM_RESTRICT fff,
-                                                    real_t *const SFEM_RESTRICT e0,
-                                                    real_t *const SFEM_RESTRICT e1,
-                                                    real_t *const SFEM_RESTRICT e2,
-                                                    real_t *const SFEM_RESTRICT e3) {
+                                                real_t *const SFEM_RESTRICT e0,
+                                                real_t *const SFEM_RESTRICT e1,
+                                                real_t *const SFEM_RESTRICT e2,
+                                                real_t *const SFEM_RESTRICT e3) {
     *e0 = fff[0] + 2 * fff[1] + 2 * fff[2] + fff[3] + 2 * fff[4] + fff[5];
     *e1 = fff[0];
     *e2 = fff[3];
@@ -46,14 +49,14 @@ static SFEM_INLINE void tet4_laplacian_diag_add_fff(const jacobian_t *const SFEM
 }
 
 static SFEM_INLINE void tet4_laplacian_apply_fff(const jacobian_t *const SFEM_RESTRICT fff,
-                                                     const real_t u0,
-                                                     const real_t u1,
-                                                     const real_t u2,
-                                                     const real_t u3,
-                                                     real_t *const SFEM_RESTRICT e0,
-                                                     real_t *const SFEM_RESTRICT e1,
-                                                     real_t *const SFEM_RESTRICT e2,
-                                                     real_t *const SFEM_RESTRICT e3) {
+                                                 const real_t u0,
+                                                 const real_t u1,
+                                                 const real_t u2,
+                                                 const real_t u3,
+                                                 real_t *const SFEM_RESTRICT e0,
+                                                 real_t *const SFEM_RESTRICT e1,
+                                                 real_t *const SFEM_RESTRICT e2,
+                                                 real_t *const SFEM_RESTRICT e3) {
     const real_t x0 = fff[0] + fff[1] + fff[2];
     const real_t x1 = fff[1] + fff[3] + fff[4];
     const real_t x2 = fff[2] + fff[4] + fff[5];
@@ -194,3 +197,5 @@ static SFEM_INLINE void tet4_laplacian_diag_points(const geom_t px0,
     element_vector[2] = fff[3];
     element_vector[3] = fff[5];
 }
+
+#endif //TET4_LAPLACIAN_INLINE_CPU_H

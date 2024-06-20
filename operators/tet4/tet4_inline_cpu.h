@@ -1,5 +1,8 @@
-#include "sortreduce.h"
+#ifndef TET4_INLINE_CPU_H
+#define TET4_INLINE_CPU_H
+
 #include <assert.h>
+#include "sortreduce.h"
 
 #ifndef POW2
 #define POW2(a) ((a) * (a))
@@ -21,7 +24,9 @@ static SFEM_INLINE int tet4_linear_search(const idx_t target,
     return -1;
 }
 
-static SFEM_INLINE int tet4_find_col(const idx_t key, const idx_t *const SFEM_RESTRICT row, const int lenrow) {
+static SFEM_INLINE int tet4_find_col(const idx_t key,
+                                     const idx_t *const SFEM_RESTRICT row,
+                                     const int lenrow) {
     if (lenrow <= 32) {
         return tet4_linear_search(key, row, lenrow);
 
@@ -61,10 +66,10 @@ static SFEM_INLINE void tet4_find_cols(const idx_t *const SFEM_RESTRICT targets,
 }
 
 static SFEM_INLINE void tet4_local_to_global(const idx_t *const SFEM_RESTRICT ev,
-                                        const real_t *const SFEM_RESTRICT element_matrix,
-                                        const count_t *const SFEM_RESTRICT rowptr,
-                                        const idx_t *const SFEM_RESTRICT colidx,
-                                        real_t *const SFEM_RESTRICT values) {
+                                             const real_t *const SFEM_RESTRICT element_matrix,
+                                             const count_t *const SFEM_RESTRICT rowptr,
+                                             const idx_t *const SFEM_RESTRICT colidx,
+                                             real_t *const SFEM_RESTRICT values) {
     idx_t ks[4];
     for (int edof_i = 0; edof_i < 4; ++edof_i) {
         const idx_t dof_i = ev[edof_i];
@@ -159,7 +164,8 @@ static SFEM_INLINE void tet4_adjugate_and_det(const geom_t px0,
                                               const geom_t pz2,
                                               const geom_t pz3,
                                               jacobian_t *const SFEM_RESTRICT adjugate,
-                                              jacobian_t *const SFEM_RESTRICT jacobian_determinant) {
+                                              jacobian_t *const SFEM_RESTRICT
+                                                      jacobian_determinant) {
     // Compute jacobian in high precision
     real_t jacobian[9];
     jacobian[0] = -px0 + px1;
@@ -194,3 +200,5 @@ static SFEM_INLINE void tet4_adjugate_and_det(const geom_t px0,
                               jacobian[2] * jacobian[3] * jacobian[7] - jacobian[3] * x2 +
                               jacobian[6] * x3 - jacobian[6] * x4;
 }
+
+#endif  // TET4_INLINE_CPU_H

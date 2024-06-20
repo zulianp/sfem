@@ -1,7 +1,8 @@
+#ifndef TET4_LAPLACIAN_INLINE_GPU_HPP
+#define TET4_LAPLACIAN_INLINE_GPU_HPP
 
 template <typename fff_t, typename scalar_t>
 static inline __device__ __host__ void tet4_laplacian_diag_fff(const fff_t *const SFEM_RESTRICT fff,
-
                                                                scalar_t *const SFEM_RESTRICT e0,
                                                                scalar_t *const SFEM_RESTRICT e1,
                                                                scalar_t *const SFEM_RESTRICT e2,
@@ -35,3 +36,4 @@ static /*inline*/ __device__ __host__ void tet4_laplacian_apply_fff(
     *e3 += fff[2] * u1 + fff[4] * u2 - fff[5] * u0 + fff[5] * u3 - x4 - x5;
 }
 
+#endif  // TET4_LAPLACIAN_INLINE_GPU_HPP
