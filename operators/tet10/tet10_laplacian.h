@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include "sfem_base.h"
 
+// Code generated with laplace_op.py (mixed symbolic and numerical integration)
+
 int tet10_laplacian_assemble_value(const ptrdiff_t nelements,
                                  const ptrdiff_t nnodes,
                                  idx_t **const SFEM_RESTRICT elems,

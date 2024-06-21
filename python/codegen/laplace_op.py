@@ -218,7 +218,7 @@ def main():
 		print("Fallback with TET10")
 		fe = Tet10()
 
-	symbolic_integration = True
+	symbolic_integration = False
 	op = LaplaceOp(fe, symbolic_integration)
 
 	print('---------------------------------------------------')

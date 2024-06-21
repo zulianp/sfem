@@ -1,10 +1,10 @@
 #include "tet4_laplacian.h"
+
 #include "tet4_inline_cpu.h"
 #include "tet4_laplacian_inline_cpu.h"
 
 #include <assert.h>
 #include <math.h>
-#include <mpi.h>
 #include <stdio.h>
 
 // Classic mesh-based assembly

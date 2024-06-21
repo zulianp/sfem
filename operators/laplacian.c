@@ -10,7 +10,6 @@
 #include "sfem_defs.h"
 
 #include <mpi.h>
-
 #include <stdio.h>
 
 int laplacian_is_opt(int element_type) {
@@ -186,10 +185,10 @@ int laplacian_apply_opt(int element_type,
         case TET4: {
             return tet4_laplacian_apply_opt(nelements, elements, fff, u, values);
         }
-        // case TET10: {
-        //     tet10_laplacian_apply_opt(nelements, elements, fff, u, values);
-        //     break;
-        // }
+        case TET10: {
+            tet10_laplacian_apply_opt(nelements, elements, fff, u, values);
+            break;
+        }
         case MACRO_TET4: {
             return macro_tet4_laplacian_apply_opt(nelements, elements, fff, u, values);
         }

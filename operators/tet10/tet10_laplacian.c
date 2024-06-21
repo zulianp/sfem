@@ -1,15 +1,11 @@
+#include "tet10_laplacian.h"
+
+#include "tet10_laplacian_inline_cpu.h"
+
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
-
-#include <mpi.h>
-
-#include "crs_graph.h"
-#include "sortreduce.h"
-
-#include "sfem_vec.h"
-
-#include "tet10_laplacian_inline_cpu.h"
+#include <string.h>
 
 int tet10_laplacian_assemble_value(const ptrdiff_t nelements,
                                     const ptrdiff_t nnodes,
@@ -23,7 +19,7 @@ int tet10_laplacian_assemble_value(const ptrdiff_t nelements,
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
 
-#pragma omp parallel for  // nowait
+#pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[10];
         jacobian_t fff[6];
@@ -80,12 +76,12 @@ int tet10_laplacian_apply(const ptrdiff_t nelements,
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
 
-#pragma omp parallel for  // nowait
+#pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[10];
         jacobian_t fff[6];
         scalar_t element_u[10];
-        accumulator_t element_vector[10];
+        accumulator_t element_vector[10] = {0};
 
 #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
@@ -191,7 +187,7 @@ int tet10_laplacian_diag(const ptrdiff_t nelements,
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
 
-#pragma omp parallel for  // nowait
+#pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[10];
         jacobian_t fff[6];
@@ -242,11 +238,11 @@ int tet10_laplacian_apply_opt(const ptrdiff_t nelements,
                               const jacobian_t *const SFEM_RESTRICT fff_all,
                               const real_t *const SFEM_RESTRICT u,
                               real_t *const SFEM_RESTRICT values) {
-#pragma omp parallel for  // nowait
+#pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[10];
         scalar_t element_u[10];
-        accumulator_t element_vector[10];
+        accumulator_t element_vector[10]= {0};
 
         // Affine transformation
         const jacobian_t *const fff = &fff_all[i * 6];
@@ -277,7 +273,7 @@ int tet10_laplacian_diag_opt(const ptrdiff_t nelements,
                              idx_t **const SFEM_RESTRICT elements,
                              const jacobian_t *const SFEM_RESTRICT fff_all,
                              real_t *const SFEM_RESTRICT diag) {
-#pragma omp parallel for  // nowait
+#pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[10];
         accumulator_t element_vector[10];
