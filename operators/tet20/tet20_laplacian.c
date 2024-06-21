@@ -1,5 +1,7 @@
 
 #include "tet20_laplacian.h"
+
+// TODO
 #include "tet20_laplacian_inline_cpu.h"
 
 #include <assert.h>

@@ -49,10 +49,10 @@ int tet4_laplacian_assemble_value(const ptrdiff_t nelements,
                 y[ev[2]],
                 y[ev[3]],
                 // Z-coordinates
-                x[ev[0]],
-                x[ev[1]],
-                x[ev[2]],
-                x[ev[3]],
+                z[ev[0]],
+                z[ev[1]],
+                z[ev[2]],
+                z[ev[3]],
                 element_u,
                 &element_scalar);
 

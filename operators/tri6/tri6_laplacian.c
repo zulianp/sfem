@@ -8,16 +8,15 @@
 #include <string.h>
 
 int tri6_laplacian_assemble_value(const ptrdiff_t nelements,
-                                    const ptrdiff_t nnodes,
-                                    idx_t **const SFEM_RESTRICT elements,
-                                    geom_t **const SFEM_RESTRICT points,
-                                    const real_t *const SFEM_RESTRICT u,
-                                    real_t *const SFEM_RESTRICT value) {
+                                  const ptrdiff_t nnodes,
+                                  idx_t **const SFEM_RESTRICT elements,
+                                  geom_t **const SFEM_RESTRICT points,
+                                  const real_t *const SFEM_RESTRICT u,
+                                  real_t *const SFEM_RESTRICT value) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
     const geom_t *const y = points[1];
-    
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
@@ -59,16 +58,15 @@ int tri6_laplacian_assemble_value(const ptrdiff_t nelements,
 }
 
 int tri6_laplacian_apply(const ptrdiff_t nelements,
-                           const ptrdiff_t nnodes,
-                           idx_t **const SFEM_RESTRICT elements,
-                           geom_t **const SFEM_RESTRICT points,
-                           const real_t *const SFEM_RESTRICT u,
-                           real_t *const SFEM_RESTRICT values) {
+                         const ptrdiff_t nnodes,
+                         idx_t **const SFEM_RESTRICT elements,
+                         geom_t **const SFEM_RESTRICT points,
+                         const real_t *const SFEM_RESTRICT u,
+                         real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
     const geom_t *const y = points[1];
-    
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
@@ -114,17 +112,16 @@ int tri6_laplacian_apply(const ptrdiff_t nelements,
 }
 
 int tri6_laplacian_assemble_hessian(const ptrdiff_t nelements,
-                                      const ptrdiff_t nnodes,
-                                      idx_t **const SFEM_RESTRICT elements,
-                                      geom_t **const SFEM_RESTRICT points,
-                                      const count_t *const SFEM_RESTRICT rowptr,
-                                      const idx_t *const SFEM_RESTRICT colidx,
-                                      real_t *const SFEM_RESTRICT values) {
+                                    const ptrdiff_t nnodes,
+                                    idx_t **const SFEM_RESTRICT elements,
+                                    geom_t **const SFEM_RESTRICT points,
+                                    const count_t *const SFEM_RESTRICT rowptr,
+                                    const idx_t *const SFEM_RESTRICT colidx,
+                                    real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
     const geom_t *const y = points[1];
-    
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
@@ -159,15 +156,14 @@ int tri6_laplacian_assemble_hessian(const ptrdiff_t nelements,
 }
 
 int tri6_laplacian_diag(const ptrdiff_t nelements,
-                          const ptrdiff_t nnodes,
-                          idx_t **const SFEM_RESTRICT elements,
-                          geom_t **const SFEM_RESTRICT points,
-                          real_t *const SFEM_RESTRICT diag) {
+                        const ptrdiff_t nnodes,
+                        idx_t **const SFEM_RESTRICT elements,
+                        geom_t **const SFEM_RESTRICT points,
+                        real_t *const SFEM_RESTRICT diag) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
     const geom_t *const y = points[1];
-    
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
@@ -210,10 +206,10 @@ int tri6_laplacian_diag(const ptrdiff_t nelements,
 /////////////
 
 int tri6_laplacian_apply_opt(const ptrdiff_t nelements,
-                              idx_t **const SFEM_RESTRICT elements,
-                              const jacobian_t *const SFEM_RESTRICT fff_all,
-                              const real_t *const SFEM_RESTRICT u,
-                              real_t *const SFEM_RESTRICT values) {
+                             idx_t **const SFEM_RESTRICT elements,
+                             const jacobian_t *const SFEM_RESTRICT fff_all,
+                             const real_t *const SFEM_RESTRICT u,
+                             real_t *const SFEM_RESTRICT values) {
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[6];
@@ -246,9 +242,9 @@ int tri6_laplacian_apply_opt(const ptrdiff_t nelements,
 }
 
 int tri6_laplacian_diag_opt(const ptrdiff_t nelements,
-                             idx_t **const SFEM_RESTRICT elements,
-                             const jacobian_t *const SFEM_RESTRICT fff_all,
-                             real_t *const SFEM_RESTRICT diag) {
+                            idx_t **const SFEM_RESTRICT elements,
+                            const jacobian_t *const SFEM_RESTRICT fff_all,
+                            real_t *const SFEM_RESTRICT diag) {
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[6];
