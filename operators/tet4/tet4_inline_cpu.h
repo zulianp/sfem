@@ -29,13 +29,6 @@ static SFEM_INLINE int tet4_find_col(const idx_t key,
                                      const int lenrow) {
     if (lenrow <= 32) {
         return tet4_linear_search(key, row, lenrow);
-
-        // Using sentinel (potentially dangerous if matrix is buggy and column does not exist)
-        // while (key > row[++k]) {
-        //     // Hi
-        // }
-        // assert(k < lenrow);
-        // assert(key == row[k]);
     } else {
         // Use this for larger number of dofs per row
         return find_idx_binary_search(key, row, lenrow);

@@ -14,30 +14,8 @@
 
 #include "read_mesh.h"
 
-#include "macro_tet4_laplacian.h"
-#include "macro_tri3_laplacian.h"
-
-
-// OLD
-// Tet4 on Arm (MF Slower than naive SPMV), 8 cores
-// Serial    MF: 0.131053,           SPMV: 0.0386919 (3.38x)
-// OpenMP    MF: 0.031211 (0.03891), SPMV: 0.0115319 (2.7x)
-// SpeedUp   MF: 4.198x,             SPMV: 3.355x
-// Tet4 on Zen4 (MF-AVX2 faster with 16 cores, SPMV does not scale with TLP)
-// Serial    MF: 0.106794            SPMV: 0.0571115 
-// OpenMP(8) MF: 0.0287701           SPMV: 0.0268007
-// OpenMP(16)MF: 0.0163542           SPMV: 0.0292629 
-
-// 23.02.2024
-// 166'723'584 elements, 28'113'633 nodes
-// Tet4 on Arm 
-// Serial     MF:  0.949059,              SPMV: 0.388978   (2.2 - 2.5x)
-// OpenMP(8)  MF:  0.165526,              SPMV: 0.087171   (2-2.5x)
-
-// 20'840'448 elements, 3'555'185  nodes
-// Tet4 on Arm 
-// Serial     MF:  0.108304,              SPMV: 0.041439  (2.2 - 2.5x)
-// OpenMP(8)  MF:  0.024739,              SPMV: 0.011346   (2 - 2.5x)
+#include "laplacian.h"
+#include "tet4_fff.h"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -59,10 +37,12 @@ int main(int argc, char *argv[]) {
     }
 
     int SFEM_REPEAT = 1;
-    SFEM_READ_ENV(SFEM_REPEAT, atoi);
-
     int SFEM_USE_OPT = 1;
+    int SFEM_USE_MACRO = 1;
+
+    SFEM_READ_ENV(SFEM_REPEAT, atoi);
     SFEM_READ_ENV(SFEM_USE_OPT, atoi);
+    SFEM_READ_ENV(SFEM_USE_MACRO, atoi);
 
     const char *folder = argv[1];
     const char *path_f = argv[2];
@@ -73,7 +53,7 @@ int main(int argc, char *argv[]) {
     double tick = MPI_Wtime();
 
     ///////////////////////////////////////////////////////////////////////////////
-    // Read data
+    // Set-up (read and init)
     ///////////////////////////////////////////////////////////////////////////////
 
     mesh_t mesh;
@@ -81,44 +61,51 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    if (SFEM_USE_MACRO) {
+        mesh.element_type = macro_type_variant(mesh.element_type);
+    }
+
     real_t *x;
     ptrdiff_t u_n_local, u_n_global;
     array_create_from_file(comm, path_f, SFEM_MPI_REAL_T, (void **)&x, &u_n_local, &u_n_global);
-
     real_t *y = calloc(u_n_local, sizeof(real_t));
 
-    macro_tet4_laplacian_t tet4_ctx;
-    if (mesh.element_type == TET10) {
-        macro_tet4_laplacian_init(&tet4_ctx, mesh.nelements, mesh.elements, mesh.points);
+    if (!laplacian_is_opt(mesh.element_type)) {
+        SFEM_USE_OPT = 0;
     }
+
+    fff_t fff;
+    if (SFEM_USE_OPT) {
+        tet4_fff_create(&fff, mesh.nelements, mesh.elements, mesh.points);
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////
+    // Measure
+    ///////////////////////////////////////////////////////////////////////////////
 
     double spmv_tick = MPI_Wtime();
 
     for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
-        if (mesh.element_type == TRI6) {
-            // mesh.element_type = MACRO_TRI3;
-            macro_tri3_laplacian_apply(
-                mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, x, y);
-        } else if (mesh.element_type == TET10) {
-
-            if(SFEM_USE_OPT) {
-                macro_tet4_laplacian_apply_opt(
-                   &tet4_ctx, x, y);
-            } else {
-                macro_tet4_laplacian_apply(
-                mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, x, y);
-            }
+        if (SFEM_USE_OPT) {
+            laplacian_apply_opt(mesh.element_type, fff.nelements, fff.elements, fff.data, x, y);
         } else {
-            return EXIT_FAILURE;
+            laplacian_apply(mesh.element_type,
+                            mesh.nelements,
+                            mesh.nnodes,
+                            mesh.elements,
+                            mesh.points,
+                            x,
+                            y);
         }
     }
 
     double spmv_tock = MPI_Wtime();
-    printf("macro_element_apply: %g (seconds)\n", (spmv_tock - spmv_tick) / SFEM_REPEAT);
+    long nelements = mesh.nelements;
+    long nnodes = mesh.nnodes;
 
-    if (mesh.element_type == TET10) {
-        macro_tet4_laplacian_destroy(&tet4_ctx);
-    }
+    ///////////////////////////////////////////////////////////////////////////////
+    // Output for testing
+    ///////////////////////////////////////////////////////////////////////////////
 
     array_write(comm, path_output, SFEM_MPI_REAL_T, y, u_n_local, u_n_global);
 
@@ -126,15 +113,32 @@ int main(int argc, char *argv[]) {
     // Free resources
     ///////////////////////////////////////////////////////////////////////////////
 
+    if (SFEM_USE_OPT) {
+        tet4_fff_destroy(&fff);
+    }
+
     free(x);
     free(y);
+    mesh_destroy(&mesh);
+
+    ///////////////////////////////////////////////////////////////////////////////
+    // Stats
+    ///////////////////////////////////////////////////////////////////////////////
 
     double tock = MPI_Wtime();
+    float TTS = tock - tick;
+    float TTS_op = (spmv_tock - spmv_tick) / SFEM_REPEAT;
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
-        printf("TTS:\t\t\t%g seconds\n", tock - tick);
+        printf("SUMMARY: %s\n", argv[0]);
+        printf("----------------------------------------\n");
+        printf("#elements %ld #nodes %ld\n", nelements, nnodes);
+        printf("Operator TTS:\t\t%.4f\t[s]\n", TTS_op);
+        printf("Operator throughput:\t%.1f\t[ME/s]\n", 1e-6f * nelements / TTS_op);
+        printf("Operator throughput:\t%.1f\t[MDOF/s]\n", 1e-6f * nnodes / TTS_op);
+        printf("Total:\t\t\t%.4f\t[s]\n", TTS);
+        printf("----------------------------------------\n");
     }
 
     return MPI_Finalize();

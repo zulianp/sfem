@@ -1,3 +1,6 @@
+#ifndef MACRO_TET4_INLINE_CPU_H
+#define MACRO_TET4_INLINE_CPU_H
+
 #include "tet4_inline_cpu.h"
 
 // FFF
@@ -11,7 +14,7 @@ static SFEM_INLINE void tet4_sub_fff_0(const geom_t *const SFEM_RESTRICT fff,
     sub_fff[4] = (1.0 / 2.0) * fff[4];
     sub_fff[5] = (1.0 / 2.0) * fff[5];
 
-    assert(tet4_fff_det(sub_fff) > 0);
+    assert(tet4_det_fff(sub_fff) > 0);
 }
 
 static SFEM_INLINE void tet4_sub_fff_4(const geom_t *const SFEM_RESTRICT fff,
@@ -25,7 +28,7 @@ static SFEM_INLINE void tet4_sub_fff_4(const geom_t *const SFEM_RESTRICT fff,
     sub_fff[4] = -x1;
     sub_fff[5] = (1.0 / 2.0) * fff[5];
 
-    assert(tet4_fff_det(sub_fff) > 0);
+    assert(tet4_det_fff(sub_fff) > 0);
 }
 
 static SFEM_INLINE void tet4_sub_fff_5(const geom_t *const SFEM_RESTRICT fff,
@@ -41,7 +44,7 @@ static SFEM_INLINE void tet4_sub_fff_5(const geom_t *const SFEM_RESTRICT fff,
     sub_fff[4] = x2 + x3;
     sub_fff[5] = (1.0 / 2.0) * fff[0] + fff[1] + fff[2] + x1;
 
-    assert(tet4_fff_det(sub_fff) > 0);
+    assert(tet4_det_fff(sub_fff) > 0);
 }
 
 static SFEM_INLINE void tet4_sub_fff_6(const geom_t *const SFEM_RESTRICT fff,
@@ -56,7 +59,7 @@ static SFEM_INLINE void tet4_sub_fff_6(const geom_t *const SFEM_RESTRICT fff,
     sub_fff[4] = -x0 - x1;
     sub_fff[5] = x0;
 
-    assert(tet4_fff_det(sub_fff) > 0);
+    assert(tet4_det_fff(sub_fff) > 0);
 }
 
 static SFEM_INLINE void tet4_sub_fff_7(const geom_t *const SFEM_RESTRICT fff,
@@ -70,7 +73,7 @@ static SFEM_INLINE void tet4_sub_fff_7(const geom_t *const SFEM_RESTRICT fff,
     sub_fff[4] = (1.0 / 2.0) * fff[1] + x1;
     sub_fff[5] = (1.0 / 2.0) * fff[0];
 
-    assert(tet4_fff_det(sub_fff) > 0);
+    assert(tet4_det_fff(sub_fff) > 0);
 }
 
 // Adjugate
@@ -158,3 +161,13 @@ static SFEM_INLINE void tet4_sub_adj_7(const jacobian_t *const SFEM_RESTRICT adj
     sub_adjugate[7] = 2 * adjugate[1 * stride];
     sub_adjugate[8] = 2 * adjugate[2 * stride];
 }
+
+#define tet4_gather_idx(from, i0, i1, i2, i3, to) \
+    do {                                     \
+        to[0] = from[i0];                    \
+        to[1] = from[i1];                    \
+        to[2] = from[i2];                    \
+        to[3] = from[i3];                    \
+    } while (0);
+
+#endif  // MACRO_TET4_INLINE_CPU_H
