@@ -9,12 +9,12 @@
 
 // Classic mesh-based assembly
 
-void tet4_laplacian_assemble_value(const ptrdiff_t nelements,
-                                   const ptrdiff_t nnodes,
-                                   idx_t **const SFEM_RESTRICT elements,
-                                   geom_t **const SFEM_RESTRICT points,
-                                   const real_t *const SFEM_RESTRICT u,
-                                   real_t *const SFEM_RESTRICT value) {
+int tet4_laplacian_assemble_value(const ptrdiff_t nelements,
+                                  const ptrdiff_t nnodes,
+                                  idx_t **const SFEM_RESTRICT elements,
+                                  geom_t **const SFEM_RESTRICT points,
+                                  const real_t *const SFEM_RESTRICT u,
+                                  real_t *const SFEM_RESTRICT value) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
@@ -59,14 +59,16 @@ void tet4_laplacian_assemble_value(const ptrdiff_t nelements,
 #pragma omp atomic update
         *value += element_scalar;
     }
+
+    return 0;
 }
 
-void tet4_laplacian_apply(const ptrdiff_t nelements,
-                          const ptrdiff_t nnodes,
-                          idx_t **const SFEM_RESTRICT elements,
-                          geom_t **const SFEM_RESTRICT points,
-                          const real_t *const SFEM_RESTRICT u,
-                          real_t *const SFEM_RESTRICT values) {
+int tet4_laplacian_apply(const ptrdiff_t nelements,
+                         const ptrdiff_t nnodes,
+                         idx_t **const SFEM_RESTRICT elements,
+                         geom_t **const SFEM_RESTRICT points,
+                         const real_t *const SFEM_RESTRICT u,
+                         real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
@@ -115,24 +117,17 @@ void tet4_laplacian_apply(const ptrdiff_t nelements,
             values[dof_i] += element_vector[edof_i];
         }
     }
+
+    return 0;
 }
 
-void tet4_laplacian_assemble_gradient(const ptrdiff_t nelements,
-                                      const ptrdiff_t nnodes,
-                                      idx_t **const SFEM_RESTRICT elements,
-                                      geom_t **const SFEM_RESTRICT points,
-                                      const real_t *const SFEM_RESTRICT u,
-                                      real_t *const SFEM_RESTRICT values) {
-    tet4_laplacian_apply(nelements, nnodes, elements, points, u, values);
-}
-
-void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
-                                     const ptrdiff_t nnodes,
-                                     idx_t **const SFEM_RESTRICT elements,
-                                     geom_t **const SFEM_RESTRICT points,
-                                     const count_t *const SFEM_RESTRICT rowptr,
-                                     const idx_t *const SFEM_RESTRICT colidx,
-                                     real_t *const SFEM_RESTRICT values) {
+int tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
+                                    const ptrdiff_t nnodes,
+                                    idx_t **const SFEM_RESTRICT elements,
+                                    geom_t **const SFEM_RESTRICT points,
+                                    const count_t *const SFEM_RESTRICT rowptr,
+                                    const idx_t *const SFEM_RESTRICT colidx,
+                                    real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
@@ -170,13 +165,15 @@ void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
 
         tet4_local_to_global(ev, element_matrix, rowptr, colidx, values);
     }
+
+    return 0;
 }
 
-void tet4_laplacian_diag(const ptrdiff_t nelements,
-                         const ptrdiff_t nnodes,
-                         idx_t **const SFEM_RESTRICT elements,
-                         geom_t **const SFEM_RESTRICT points,
-                         real_t *const SFEM_RESTRICT diag) {
+int tet4_laplacian_diag(const ptrdiff_t nelements,
+                        const ptrdiff_t nnodes,
+                        idx_t **const SFEM_RESTRICT elements,
+                        geom_t **const SFEM_RESTRICT points,
+                        real_t *const SFEM_RESTRICT diag) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
@@ -219,6 +216,8 @@ void tet4_laplacian_diag(const ptrdiff_t nelements,
             diag[dof_i] += element_vector[edof_i];
         }
     }
+
+    return 0;
 }
 
 // Optimized for matrix-free
