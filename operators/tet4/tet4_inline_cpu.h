@@ -1,6 +1,8 @@
 #ifndef TET4_INLINE_CPU_H
 #define TET4_INLINE_CPU_H
 
+#include "operator_inline_cpu.h"
+
 #include <assert.h>
 #include "sortreduce.h"
 
@@ -59,7 +61,7 @@ static SFEM_INLINE void tet4_find_cols(const idx_t *const SFEM_RESTRICT targets,
 }
 
 static SFEM_INLINE void tet4_local_to_global(const idx_t *const SFEM_RESTRICT ev,
-                                             const real_t *const SFEM_RESTRICT element_matrix,
+                                             const accumulator_t *const SFEM_RESTRICT element_matrix,
                                              const count_t *const SFEM_RESTRICT rowptr,
                                              const idx_t *const SFEM_RESTRICT colidx,
                                              real_t *const SFEM_RESTRICT values) {
@@ -72,7 +74,7 @@ static SFEM_INLINE void tet4_local_to_global(const idx_t *const SFEM_RESTRICT ev
         tet4_find_cols(ev, row, lenrow, ks);
 
         real_t *rowvalues = &values[rowptr[dof_i]];
-        const real_t *element_row = &element_matrix[edof_i * 4];
+        const accumulator_t *element_row = &element_matrix[edof_i * 4];
 
 #pragma unroll(4)
         for (int edof_j = 0; edof_j < 4; ++edof_j) {

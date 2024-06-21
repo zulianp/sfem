@@ -204,10 +204,10 @@ install(
     ARCHIVE DESTINATION lib)
 
 configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/configuration/sfem_config.hpp.in
-    ${CMAKE_BINARY_DIR}/sfem_config.hpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/configuration/sfem_config.h.in
+    ${CMAKE_BINARY_DIR}/sfem_config.h)
 
-install(FILES ${CMAKE_BINARY_DIR}/sfem_config.hpp DESTINATION include)
+install(FILES ${CMAKE_BINARY_DIR}/sfem_config.h DESTINATION include)
 
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/configuration/sfem_config.py.in
