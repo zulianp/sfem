@@ -13,10 +13,8 @@
 
 #include <stdio.h>
 
-int laplacian_is_opt(int element_type)
-{
-    return element_type == TET10 || element_type == TET4 ||
-                     element_type == MACRO_TET4;
+int laplacian_is_opt(int element_type) {
+    return element_type == TET10 || element_type == TET4 || element_type == MACRO_TET4;
 }
 
 void laplacian_assemble_value(int element_type,
@@ -148,14 +146,14 @@ void laplacian_diag(int element_type,
         //     tri3_laplacian_diag(nelements, nnodes, elements, points, values);
         //     break;
         // }
-        // case TET4: {
-        //     tet4_laplacian_diag(nelements, nnodes, elements, points, values);
-        //     break;
-        // }
-        // case TET10: {
-        //     tet10_laplacian_diag(nelements, nnodes, elements, points, values);
-        //     break;
-        // }
+        case TET4: {
+            tet4_laplacian_diag(nelements, nnodes, elements, points, values);
+            break;
+        }
+        case TET10: {
+            tet10_laplacian_diag(nelements, nnodes, elements, points, values);
+            break;
+        }
         case MACRO_TET4: {
             macro_tet4_laplacian_diag(nelements, nnodes, elements, points, values);
             return;
@@ -179,8 +177,7 @@ int laplacian_apply_opt(int element_type,
                         idx_t **const SFEM_RESTRICT elements,
                         const jacobian_t *const SFEM_RESTRICT fff,
                         const real_t *const SFEM_RESTRICT u,
-                        real_t *const SFEM_RESTRICT values)
-{
+                        real_t *const SFEM_RESTRICT values) {
     switch (element_type) {
         // case TRI3: {
         //     tri3_laplacian_apply_opt(nelements, elements, fff, u, values);
@@ -195,7 +192,6 @@ int laplacian_apply_opt(int element_type,
         // }
         case MACRO_TET4: {
             return macro_tet4_laplacian_apply_opt(nelements, elements, fff, u, values);
-            
         }
         // case MACRO_TRI3: {
         //     macro_tri3_laplacian_apply_opt(nelements, elements, fff, u, values);

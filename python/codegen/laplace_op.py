@@ -194,6 +194,8 @@ class LaplaceOp:
 				gsquared = trial_operand[d] * self.ref_grad_interp[d] / 2
 			integr += gsquared
 
+		integr = sp.simplify(integr)
+
 		form = sp.symbols(f'element_scalar[0]')
 
 		if self.symbolic_integration:
@@ -216,7 +218,7 @@ def main():
 		print("Fallback with TET10")
 		fe = Tet10()
 
-	symbolic_integration = False
+	symbolic_integration = True
 	op = LaplaceOp(fe, symbolic_integration)
 
 	print('---------------------------------------------------')
