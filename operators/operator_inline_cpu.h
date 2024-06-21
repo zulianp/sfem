@@ -13,4 +13,7 @@ typedef real_t scalar_t;
 
 typedef real_t accumulator_t;
 
+typedef scalar_t vscalar_t
+        __attribute__((vector_size(VSCALAR_SIZE * sizeof(scalar_t)), aligned(sizeof(scalar_t))));
+
 #endif
