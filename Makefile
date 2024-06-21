@@ -340,7 +340,7 @@ assemble3 : assemble3.o libsfem.a
 assemble4 : assemble4.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
-macro_element_apply : macro_element_apply.o libsfem.a
+laplacian_apply : laplacian_apply.o libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 stokes : stokes.o libsfem.a
