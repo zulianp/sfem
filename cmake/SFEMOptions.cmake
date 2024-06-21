@@ -16,6 +16,8 @@ option(SFEM_ENABLE_OPENMP "Enable OpenMP support" OFF)
 option(SFEM_ENABLE_PYTHON "Enable python bindings for SFEM" ON)
 option(SFEM_ENABLE_FP32_KERNELS "Enable single precision kernels when using Cuda" OFF)
 option(SFEM_ENABLE_FP16_JACOBIANS "Enable half precision jacobians when using Cuda" OFF)
+option(SFEM_ENABLE_AVX2 "Enable AVX2 intrinsics" OFF)
+# option(SFEM_ENABLE_AVX512 "Enable AVX2 intrinsics" OFF) # TODO
 
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)
 
@@ -122,6 +124,11 @@ if(SFEM_ENABLE_PROFILER)
     set(SFEM_PROFILING_ENABLED TRUE)
 endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  ${SFEM_DEV_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SFEM_DEV_FLAGS}")
 set(CMAKE_CXX_FLAGS_DEBUG
     "${CMAKE_CXX_FLAGS_DEBUG} ${SFEM_SPECIAL_DEBUG_FLAGS}")
+
+if(SFEM_ENABLE_AVX2)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=core-avx2 -DSFEM_ENABLE_AVX2_SORT")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=core-avx2 -DSFEM_ENABLE_AVX2_SORT")
+endif()

@@ -94,6 +94,9 @@ endif()
 # message(STATUS "SFEM_HEADERS: ${SFEM_HEADERS}") 
 # message(STATUS "SFEM_SOURCES: ${SFEM_SOURCES}")
 # message(STATUS "SFEM_KERNEL_SOURCES: ${SFEM_KERNEL_SOURCES}")
+message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
+message(STATUS "CMAKE_C_FLAGS: ${CMAKE_C_FLAGS}")
+
 
 add_library(sfem ${SFEM_SOURCES} ${SFEM_HEADERS})
 
@@ -104,6 +107,9 @@ foreach(include ${SFEM_BUILD_INCLUDES})
     target_include_directories(sfem BEFORE
      PUBLIC $<BUILD_INTERFACE:${include}>)
 endforeach()
+
+target_include_directories(sfem BEFORE
+     PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/external>)
 
 target_include_directories(
     sfem BEFORE
