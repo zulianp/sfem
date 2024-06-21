@@ -2,11 +2,9 @@
 #define VTET4_INLINE_CPU_H
 
 #include "operator_inline_cpu.h"
-
 #include "tet4_inline_cpu.h"
 
-#define VSCALAR_SIZE 8
-        typedef scalar_t vscalar_t
+typedef scalar_t vscalar_t
         __attribute__((vector_size(VSCALAR_SIZE * sizeof(scalar_t)), aligned(sizeof(scalar_t))));
 
 static SFEM_INLINE void vtet4_fff(const vscalar_t px0,
@@ -42,8 +40,9 @@ static SFEM_INLINE void vtet4_fff(const vscalar_t px0,
     const vscalar_t x17 = x16 * x6 * x9;
     const vscalar_t x18 = x1 * x16;
     const vscalar_t x19 = x13 * x18;
-    const vscalar_t x20 = -(scalar_t)(1.0 / 6.0) * x12 + (scalar_t)(1.0 / 6.0) * x15 + (scalar_t)(1.0 / 6.0) * x17 -
-                          (scalar_t)(1.0 / 6.0) * x19 + (scalar_t)(1.0 / 6.0) * x4 - (scalar_t)(1.0 / 6.0) * x8;
+    const vscalar_t x20 = -(scalar_t)(1.0 / 6.0) * x12 + (scalar_t)(1.0 / 6.0) * x15 +
+                          (scalar_t)(1.0 / 6.0) * x17 - (scalar_t)(1.0 / 6.0) * x19 +
+                          (scalar_t)(1.0 / 6.0) * x4 - (scalar_t)(1.0 / 6.0) * x8;
     const vscalar_t x21 = x14 - x18;
     const vscalar_t x22 = (scalar_t)1. / POW2(-x12 + x15 + x17 - x19 + x4 - x8);
     const vscalar_t x23 = -x11 + x16 * x6;
