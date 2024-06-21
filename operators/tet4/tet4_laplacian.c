@@ -3,6 +3,8 @@
 #include "tet4_inline_cpu.h"
 #include "tet4_laplacian_inline_cpu.h"
 
+#include "vtet4_laplacian.h"
+
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
@@ -69,6 +71,13 @@ int tet4_laplacian_apply(const ptrdiff_t nelements,
                          geom_t **const SFEM_RESTRICT points,
                          const real_t *const SFEM_RESTRICT u,
                          real_t *const SFEM_RESTRICT values) {
+    int SFEM_ENABLE_V = 0;
+    SFEM_READ_ENV(SFEM_ENABLE_V, atoi);
+
+    if (SFEM_ENABLE_V) {
+        return vtet4_laplacian_apply(nelements, nnodes, elements, points, u, values);
+    }
+
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
@@ -226,6 +235,13 @@ int tet4_laplacian_apply_opt(const ptrdiff_t nelements,
                              const jacobian_t *const SFEM_RESTRICT fff,
                              const real_t *const SFEM_RESTRICT u,
                              real_t *const SFEM_RESTRICT values) {
+    int SFEM_ENABLE_V = 0;
+    SFEM_READ_ENV(SFEM_ENABLE_V, atoi);
+
+    if (SFEM_ENABLE_V) {
+        return vtet4_laplacian_apply_opt(nelements, elements, fff, u, values);
+    }
+
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         accumulator_t element_vector[4];

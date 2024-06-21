@@ -10,6 +10,10 @@
 #define POW2(a) ((a) * (a))
 #endif
 
+#ifndef MIN
+#define MIN(a, b) ((a) < (b)? (a) : (b))
+#endif
+
 static SFEM_INLINE int tet4_linear_search(const idx_t target,
                                           const idx_t *const arr,
                                           const int size) {
