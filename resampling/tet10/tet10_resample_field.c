@@ -781,6 +781,8 @@ int hex8_to_isoparametric_tet10_resample_field_local(
                 tet10_transform(x, y, z, tet4_qx[q], tet4_qy[q], tet4_qz[q], &g_qx, &g_qy, &g_qz);
                 tet10_dual_basis_hrt(tet4_qx[q], tet4_qy[q], tet4_qz[q], tet10_f);
 
+                ///// ======================================================
+
                 const real_t grid_x = (g_qx - ox) / dx;
                 const real_t grid_y = (g_qy - oy) / dy;
                 const real_t grid_z = (g_qz - oz) / dz;
