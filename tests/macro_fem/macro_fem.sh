@@ -45,8 +45,10 @@ else
 
 	mesh_p1_to_p2 $mesh $simulation_mesh
 	refine $mesh $refined_mesh
-	mkdir -p linear_system linear_system_macro
+	
 fi
+
+mkdir -p linear_system linear_system_macro
 
 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_DIRICHLET=0 assemble $refined_mesh linear_system
 SFEM_USE_MACRO=1 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_DIRICHLET=0 assemble $simulation_mesh linear_system_macro
