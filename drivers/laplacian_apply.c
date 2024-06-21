@@ -76,6 +76,7 @@ int main(int argc, char *argv[]) {
 
     fff_t fff;
     if (SFEM_USE_OPT) {
+        // FIXME!
         tet4_fff_create(&fff, mesh.nelements, mesh.elements, mesh.points);
     }
 
@@ -102,6 +103,7 @@ int main(int argc, char *argv[]) {
     double spmv_tock = MPI_Wtime();
     long nelements = mesh.nelements;
     long nnodes = mesh.nnodes;
+    int element_type = mesh.element_type;
 
     ///////////////////////////////////////////////////////////////////////////////
     // Output for testing
@@ -131,7 +133,7 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("SUMMARY: %s\n", argv[0]);
+        printf("SUMMARY (%s): %s\n", type_to_string(element_type), argv[0]);
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld\n", nelements, nnodes);
         printf("Operator TTS:\t\t%.4f\t[s]\n", TTS_op);
