@@ -82,6 +82,9 @@ class LaplaceOp:
 				expr.append(ast.Assignment(var, val))
 		return expr
 
+	def det_fff(self):
+		return [determinant(self.FFF_symbolic)]
+
 	def hessian(self):
 		fe = self.fe
 		ref_grad = self.ref_grad
@@ -212,13 +215,16 @@ def main():
 	"TET10": Tet10(),
 	"TET20": Tet20()}
 
-	if len(sys.argv) == 2:
+	if len(sys.argv) >= 2:
 		fe = fes[sys.argv[1]]
 	else:
 		print("Fallback with TET10")
 		fe = Tet10()
 
 	symbolic_integration = False
+	if len(sys.argv) >= 3:
+		symbolic_integration = int(sys.argv[2])
+
 	op = LaplaceOp(fe, symbolic_integration)
 
 	print('---------------------------------------------------')
@@ -226,6 +232,13 @@ def main():
 	print('---------------------------------------------------')
 
 	c_code(op.fff())
+
+	print('---------------------------------------------------')
+	print("det_fff")
+	print('---------------------------------------------------')
+
+	c_code(op.det_fff())
+
 
 	if not symbolic_integration:
 		print('---------------------------------------------------')

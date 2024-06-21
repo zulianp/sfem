@@ -1,16 +1,14 @@
 #include "macro_tet4_laplacian.h"
 
-#include <assert.h>
-#include <mpi.h>
-#include <stdio.h>
-
 #include "sfem_base.h"
-#include "sortreduce.h"
 
 #include "tet4_inline_cpu.h"
 #include "tet4_laplacian_inline_cpu.h"
-
 #include "macro_tet4_inline_cpu.h"
+
+#include <assert.h>
+#include <stdio.h>
+
 
 static SFEM_INLINE void element_apply(const idx_t *const SFEM_RESTRICT ev,
                                       const jacobian_t *const SFEM_RESTRICT fff,

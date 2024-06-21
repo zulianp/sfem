@@ -13,7 +13,8 @@
 #include <stdio.h>
 
 int laplacian_is_opt(int element_type) {
-    return element_type == TET10 || element_type == TET4 || element_type == MACRO_TET4;
+    return element_type == TRI3 || element_type == TET10 || element_type == TET4 ||
+           element_type == MACRO_TET4 || element_type == MACRO_TRI3;
 }
 
 void laplacian_assemble_value(int element_type,
@@ -24,6 +25,14 @@ void laplacian_assemble_value(int element_type,
                               const real_t *const SFEM_RESTRICT u,
                               real_t *const SFEM_RESTRICT value) {
     switch (element_type) {
+        case TRI3: {
+            tri3_laplacian_assemble_value(nelements, nnodes, elements, points, u, value);
+            break;
+        }
+        case TRI6: {
+            tri6_laplacian_assemble_value(nelements, nnodes, elements, points, u, value);
+            break;
+        }
         case TET4: {
             tet4_laplacian_assemble_value(nelements, nnodes, elements, points, u, value);
             break;
@@ -32,6 +41,10 @@ void laplacian_assemble_value(int element_type,
             tet10_laplacian_assemble_value(nelements, nnodes, elements, points, u, value);
             break;
         }
+        // case MACRO_TRI3: {
+        //     macro_tri3_laplacian_assemble_value(nelements, nnodes, elements, points, u, value);
+        //     break;
+        // }
         default: {
             fprintf(stderr,
                     "laplacian_assemble_value not implemented for type %s\n",
@@ -52,6 +65,10 @@ void laplacian_apply(int element_type,
     switch (element_type) {
         case TRI3: {
             tri3_laplacian_apply(nelements, nnodes, elements, points, u, values);
+            break;
+        }
+        case TRI6: {
+            tri6_laplacian_apply(nelements, nnodes, elements, points, u, values);
             break;
         }
         case TET4: {
@@ -124,6 +141,11 @@ void laplacian_assemble_hessian(int element_type,
                     nelements, nnodes, elements, points, rowptr, colidx, values);
             break;
         }
+        case MACRO_TRI3: {
+            macro_tri3_laplacian_assemble_hessian(
+                    nelements, nnodes, elements, points, rowptr, colidx, values);
+            break;
+        }
         default: {
             fprintf(stderr,
                     "laplacian_assemble_hessian not implemented for type %s\n",
@@ -141,10 +163,14 @@ void laplacian_diag(int element_type,
                     geom_t **const SFEM_RESTRICT points,
                     real_t *const SFEM_RESTRICT values) {
     switch (element_type) {
-        // case TRI3: {
-        //     tri3_laplacian_diag(nelements, nnodes, elements, points, values);
-        //     break;
-        // }
+        case TRI3: {
+            tri3_laplacian_diag(nelements, nnodes, elements, points, values);
+            break;
+        }
+        case TRI6: {
+            tri6_laplacian_diag(nelements, nnodes, elements, points, values);
+            break;
+        }
         case TET4: {
             tet4_laplacian_diag(nelements, nnodes, elements, points, values);
             break;
@@ -157,10 +183,10 @@ void laplacian_diag(int element_type,
             macro_tet4_laplacian_diag(nelements, nnodes, elements, points, values);
             return;
         }
-        // case MACRO_TRI3: {
-        //     macro_tri3_laplacian_diag(nelements, nnodes, elements, points, values);
-        //     break;
-        // }
+        case MACRO_TRI3: {
+            macro_tri3_laplacian_diag(nelements, nnodes, elements, points, values);
+            break;
+        }
         default: {
             fprintf(stderr,
                     "laplacian_diag not implemented for type %s\n",
@@ -178,10 +204,14 @@ int laplacian_apply_opt(int element_type,
                         const real_t *const SFEM_RESTRICT u,
                         real_t *const SFEM_RESTRICT values) {
     switch (element_type) {
-        // case TRI3: {
-        //     tri3_laplacian_apply_opt(nelements, elements, fff, u, values);
-        //     break;
-        // }
+        case TRI3: {
+            tri3_laplacian_apply_opt(nelements, elements, fff, u, values);
+            break;
+        }
+        case TRI6: {
+            tri6_laplacian_apply_opt(nelements, elements, fff, u, values);
+            break;
+        }
         case TET4: {
             return tet4_laplacian_apply_opt(nelements, elements, fff, u, values);
         }
@@ -192,10 +222,10 @@ int laplacian_apply_opt(int element_type,
         case MACRO_TET4: {
             return macro_tet4_laplacian_apply_opt(nelements, elements, fff, u, values);
         }
-        // case MACRO_TRI3: {
-        //     macro_tri3_laplacian_apply_opt(nelements, elements, fff, u, values);
-        //     break;
-        // }
+        case MACRO_TRI3: {
+            macro_tri3_laplacian_apply_opt(nelements, elements, fff, u, values);
+            break;
+        }
         default: {
             fprintf(stderr,
                     "laplacian_apply_opt not implemented for type %s\n",
