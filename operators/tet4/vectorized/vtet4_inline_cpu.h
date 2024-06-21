@@ -4,9 +4,6 @@
 #include "operator_inline_cpu.h"
 #include "tet4_inline_cpu.h"
 
-typedef scalar_t vscalar_t
-        __attribute__((vector_size(VSCALAR_SIZE * sizeof(scalar_t)), aligned(sizeof(scalar_t))));
-
 static SFEM_INLINE void vtet4_fff(const vscalar_t px0,
                                   const vscalar_t px1,
                                   const vscalar_t px2,
