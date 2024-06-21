@@ -24,7 +24,7 @@ int tet4_laplacian_assemble_value(const ptrdiff_t nelements,
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[4];
-        real_t element_u[4];
+        scalar_t element_u[4];
 
         // Element indices
 #pragma unroll(4)
@@ -36,7 +36,7 @@ int tet4_laplacian_assemble_value(const ptrdiff_t nelements,
             element_u[v] = u[ev[v]];
         }
 
-        real_t element_scalar = 0;
+        accumulator_t element_scalar = 0;
         tet4_laplacian_value_points(
                 // X-coordinates
                 x[ev[0]],
@@ -78,8 +78,8 @@ int tet4_laplacian_apply(const ptrdiff_t nelements,
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[4];
-        real_t element_vector[4];
-        real_t element_u[4];
+        accumulator_t element_vector[4];
+        scalar_t element_u[4];
 
         // Element indices
 #pragma unroll(4)
@@ -137,7 +137,7 @@ int tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[4];
-        real_t element_matrix[4 * 4];
+        accumulator_t element_matrix[4 * 4];
 
         // Element indices
 #pragma unroll(4)
@@ -183,7 +183,7 @@ int tet4_laplacian_diag(const ptrdiff_t nelements,
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[4];
-        real_t element_vector[4];
+        accumulator_t element_vector[4];
 
         // Element indices
 #pragma unroll(4)
@@ -228,7 +228,7 @@ int tet4_laplacian_apply_opt(const ptrdiff_t nelements,
                              real_t *const SFEM_RESTRICT values) {
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-        real_t element_vector[4];
+        accumulator_t element_vector[4];
         idx_t ev[4];
 
         // Element indices
@@ -265,7 +265,7 @@ int tet4_laplacian_diag_opt(const ptrdiff_t nelements,
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[4];
-        real_t element_vector[4];
+        accumulator_t element_vector[4];
 
         // Element indices
 #pragma unroll(4)

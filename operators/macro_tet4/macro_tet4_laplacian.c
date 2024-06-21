@@ -14,10 +14,10 @@
 
 static SFEM_INLINE void element_apply(const idx_t *const SFEM_RESTRICT ev,
                                       const jacobian_t *const SFEM_RESTRICT fff,
-                                      const real_t *const SFEM_RESTRICT element_u,
+                                      const scalar_t *const SFEM_RESTRICT element_u,
                                       real_t *const SFEM_RESTRICT values) {
     jacobian_t sub_fff[6];
-    real_t element_vector[10] = {0};
+    accumulator_t element_vector[10] = {0};
 
     {  // Corner tests
         tet4_sub_fff_0(fff, sub_fff);
@@ -141,7 +141,7 @@ int macro_tet4_laplacian_apply(const ptrdiff_t nelements,
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[10];
         jacobian_t fff[6];
-        real_t element_u[10];
+        scalar_t element_u[10];
 
         // Element indices
 #pragma unroll(10)
@@ -186,7 +186,7 @@ int macro_tet4_laplacian_apply_opt(const ptrdiff_t nelements,
 #pragma omp parallel for  // nowait
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[10];
-        real_t element_u[10];
+        scalar_t element_u[10];
         const jacobian_t *const fff = &all_fff[i * 6];
 
 #pragma unroll(10)
@@ -210,7 +210,7 @@ static SFEM_INLINE void element_assemble_matrix(const idx_t *const SFEM_RESTRICT
                                                 const idx_t *const SFEM_RESTRICT colidx,
                                                 real_t *const SFEM_RESTRICT values) {
     idx_t ev[4];
-    real_t element_matrix[4 * 4];
+    accumulator_t element_matrix[4 * 4];
     jacobian_t sub_fff[6];
 
     {  // Corner tests
@@ -334,7 +334,7 @@ static SFEM_INLINE void element_assemble_matrix_diag(const idx_t *const SFEM_RES
                                                      const jacobian_t *const fff,
                                                      real_t *const SFEM_RESTRICT diag) {
     jacobian_t sub_fff[6];
-    real_t element_vector[10] = {0};
+    accumulator_t element_vector[10] = {0};
 
     {  // Corner tests
         tet4_sub_fff_0(fff, sub_fff);
