@@ -4,8 +4,6 @@
 #include <stddef.h>
 #include "sfem_base.h"
 
-#include "tet4_fff.h"
-
 // UNTESTED
 int tet4_laplacian_assemble_value(const ptrdiff_t nelements,
                                    const ptrdiff_t nnodes,

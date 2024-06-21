@@ -44,6 +44,7 @@ set(SFEM_MODULES
     # operators/phase_field_for_fracture
     operators/tet10
     operators/tet4
+    operators/tet4/vectorized
     operators/tri3
     operators/tri6
     operators/trishell3
