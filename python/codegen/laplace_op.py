@@ -7,101 +7,102 @@ from tet4 import *
 from tet10 import *
 from tet20 import *
 
+import sys
 
-
-# import pdb
-# TO BE FIXED (using older verion of FFF)
 class LaplaceOp:
-	def __init__(self, fe, q):
+	def __init__(self, fe, symbolic_integration = False):
+		self.symbolic_integration = symbolic_integration
 
+		# Ref element dims
 		dims = fe.manifold_dim()
+
+		if dims == 1:
+			q = [qx]
+		elif dims == 2:
+			q = [qx, qy]
+		else:
+			q = [qx, qy, qz]
+
+		# Quadrature point
 		q = sp.Matrix(dims, 1, q)
 
-		f = fe.fun(q)
-		g = fe.grad(q)
+		# Quadrature weight
+		qw = sp.symbols('qw')
+
+		ref_grad = fe.grad(q)
 
 		u = coeffs('u', fe.n_nodes())
 
-		jac_inv = fe.jacobian_inverse(q)
-		dV = fe.jacobian_determinant(q)
-		FFF = (jac_inv * jac_inv.T) * dV
+		J_inv = fe.jacobian_inverse(q)
+		# (First Fundamental Form)
+		FFF = (J_inv * J_inv.T) * fe.jacobian_determinant(q)
+
+		# We include the reference measure in numerical quadrature
+		if not symbolic_integration:
+			FFF *= fe.reference_measure()
 
 		###################################################################
 
-		cFFF = sp.Matrix(dims, dims, [0]*(dims*dims))
+		FFF_symbolic = sp.Matrix(dims, dims, [0]*(dims*dims))
 		varidx = 0
 		for i in range(0, dims):
 			for j in range(i, dims):
 				var = sp.symbols(f'fff[{varidx}*stride]')
 				varidx += 1
-				cFFF[i, j] = var
-				cFFF[j, i] = var;
+				FFF_symbolic[i, j] = var
+				FFF_symbolic[j, i] = var;
 
 		###################################################################
 
-		FFF_x_g = sp.Matrix(dims, 1, [0] * dims)
+		ref_grad_interp = sp.Matrix(dims, 1, [0] * dims)
 		for i in range(0, fe.n_nodes()):
 			for d in range(0, dims):
-				FFF_x_g[d] += g[i][d] * u[i]
+				ref_grad_interp[d] += ref_grad[i][d] * u[i]
 
-
-		FFF_x_g = cFFF * FFF_x_g
-		################################################################### 
-		c_jac_inv = sp.Matrix(dims, dims, coeffs('c_jac_inv', dims*dims))
-
-		grad_uh = sp.Matrix(dims, 1, [0] * dims)
-		for i in range(0, fe.n_nodes()):
-			gi = g[i]
-			for d in range(0, dims):
-				grad_uh[d] += gi[d] * u[i]
-
-		grad_uh = c_jac_inv * grad_uh
+		trial_operand = FFF_symbolic * ref_grad_interp
 
 		###################################################################
 
 		self.fe = fe
-		self.f = f
-		self.g = g
-		self.u = u
+		self.ref_grad = ref_grad
 		self.q = q
-
-		self.grad_uh = grad_uh
-
-		self.dV = dV
-		self.c_jac_inv = c_jac_inv
-
-		self.FFF_x_g = FFF_x_g
-		self.cFFF = cFFF
+		self.qw = qw
+		self.trial_operand = trial_operand
+		self.trial_operand_symbolic = coeffs('trial_operand', dims)
+		self.ref_grad_interp = ref_grad_interp
+		self.FFF_symbolic = FFF_symbolic
 		self.FFF = FFF
-		self.jac_inv = jac_inv
 
 	def fff(self):
 		expr = []
-
 		for d1 in range(0, self.fe.spatial_dim()):
 			for d2 in range(d1,  self.fe.spatial_dim()):
-				var = self.cFFF[d1, d2]
+				var = self.FFF_symbolic[d1, d2]
 				val = self.FFF[d1, d2]
 				expr.append(ast.Assignment(var, val))
-
 		return expr
 
 	def hessian(self):
 		fe = self.fe
-		g = self.g
-		cFFF = self.cFFF
+		ref_grad = self.ref_grad
+		FFF_symbolic = self.FFF_symbolic
 		fe = self.fe
 		q = self.q
 
 		expr = []
 		for i in range(0, fe.n_nodes()):
-			gi = cFFF * g[i]
+			gi = FFF_symbolic * ref_grad[i]
 
 			for j in range(0, fe.n_nodes()):
 				integr = 0
+
 				for d in range(0, fe.manifold_dim()):
-					gdotg = gi[d] * g[j][d]
-					integr += fe.integrate(q, gdotg)
+					gdotg = gi[d] * ref_grad[j][d]
+
+					if self.symbolic_integration:
+						integr += fe.integrate(q, gdotg)
+					else:
+						integr += gdotg * self.qw
 
 				var = sp.symbols(f'element_matrix[{i*fe.n_nodes() + j}*stride]')
 				expr.append(ast.Assignment(var, integr))
@@ -110,95 +111,149 @@ class LaplaceOp:
 
 	def hessian_diag(self):
 		fe = self.fe
-		g = self.g
-		cFFF = self.cFFF
+		ref_grad = self.ref_grad
+		FFF_symbolic = self.FFF_symbolic
 		fe = self.fe
 		q = self.q
 
 		expr = []
 		for i in range(0, fe.n_nodes()):
-			gi = cFFF * g[i]
-
+			gi = FFF_symbolic * ref_grad[i]
 
 			integr = 0
 			for d in range(0, fe.manifold_dim()):
-				gdotg = gi[d] * g[i][d]
-				integr += fe.integrate(q, gdotg)
+				gdotg = gi[d] * ref_grad[i][d]
+
+				if self.symbolic_integration:
+					integr += fe.integrate(q, gdotg)
+				else:
+					integr += gdotg * self.qw
 
 			var = sp.symbols(f'element_vector[{i}*stride]')
-			expr.append(ast.Assignment(var, integr))
+
+			if self.symbolic_integration:
+				expr.append(ast.Assignment(var, integr))
+			else:
+				expr.append(ast.AddAugmentedAssignment(var, integr))
 
 		return expr
 
-	def gradient(self):
+	def trial_operand_expr(self):
+		expr = []
+		for d in range(0,  self.fe.spatial_dim()):
+			var = self.trial_operand_symbolic[d]
+			val = self.trial_operand[d] * self.qw # NOTE that quadrature weight is used here
+			expr.append(ast.Assignment(var, val))
+		return expr
+
+	def apply(self):
 		fe = self.fe
-		g = self.g
-		FFF_x_g = self.FFF_x_g
+		ref_grad = self.ref_grad
 		q = self.q
+
+		if self.symbolic_integration:
+			trial_operand = self.FFF_symbolic * self.ref_grad_interp 
+		else:
+			trial_operand = self.trial_operand_symbolic # NOTE that quadrature weight is included here
 
 		expr = []
 		for i in range(0, fe.n_nodes()):
 			integr = 0
 
 			for d in range(0, fe.manifold_dim()):
-				gdotg = FFF_x_g[d] * g[i][d]
-				integr += fe.integrate(q, gdotg)
+				gdotg = trial_operand[d] * ref_grad[i][d]
+
+				if self.symbolic_integration:
+					integr += fe.integrate(q, gdotg)
+				else:
+					integr += gdotg
 
 			lform = sp.symbols(f'element_vector[{i}*stride]')
-			expr.append(ast.Assignment(lform, integr))
+
+			if self.symbolic_integration:
+				expr.append(ast.Assignment(lform, integr))
+			else:
+				expr.append(ast.AddAugmentedAssignment(lform, integr))
+
 		return expr
 
-	# FIXME
 	def value(self):
 		fe = self.fe
-		integr = 0
 		q = self.q
-		c_jac_inv = self.c_jac_inv
-		grad_uh = self.grad_uh
-		jac_inv = self.jac_inv
-		dV = self.dV
 
-		expr = []
+		if self.symbolic_integration:
+			trial_operand = self.FFF_symbolic * self.ref_grad_interp
+		else:
+			trial_operand = self.trial_operand_symbolic  # NOTE that quadrature weight is included here
+
+		integr = 0
 		for d in range(0, fe.manifold_dim()):
-			gsquared = fe.integrate(q, (grad_uh[d] **2)) / 2
+			if self.symbolic_integration:
+				gsquared = fe.integrate(q, (trial_operand[d] * self.ref_grad_interp[d])) / 2
+			else:
+				gsquared = trial_operand[d] * self.ref_grad_interp[d] / 2
 			integr += gsquared
 
-
-		for d1 in range(0, fe.manifold_dim()):
-			for d2 in range(0, fe.manifold_dim()):
-				integr = integr.subs(c_jac_inv[d1, d2], jac_inv[d1, d2])
-
-		integr *= dV
-
 		form = sp.symbols(f'element_scalar[0]')
-		expr.append(ast.Assignment(form, integr))
-		return expr
+
+		if self.symbolic_integration:
+			return [ast.Assignment(form, integr)]
+		else:
+			return [ast.AddAugmentedAssignment(form, integr)]
 
 def main():
-	# fe = Tri6()
-	# fe = Tri3()
-	# q = sp.Matrix(2, 1, [qx, qy])
-	# op = LaplaceOp(fe, q)
 
-	fe = Tet4()
-	# fe = Tet20()
-	q = sp.Matrix(3, 1, [qx, qy, qz])
-	op = LaplaceOp(fe, q)
+	fes = {
+	"TRI6": Tri6(),
+	"TRI3": Tri3(),
+	"TET4": Tet4(),
+	"TET10": Tet10(),
+	"TET20": Tet20()}
 
-	print("FFF")
+	if len(sys.argv) == 2:
+		fe = fes[sys.argv[1]]
+	else:
+		print("Fallback with TET10")
+		fe = Tet10()
+
+	symbolic_integration = False
+	op = LaplaceOp(fe, symbolic_integration)
+
+	print('---------------------------------------------------')
+	print("fff")
+	print('---------------------------------------------------')
+
 	c_code(op.fff())
 
-	print("Hessian")
+	if not symbolic_integration:
+		print('---------------------------------------------------')
+		print("trial_operand")
+		print('---------------------------------------------------')
+		c_code(op.trial_operand_expr())
+
+	print('---------------------------------------------------')
+	print("hessian")
+	print('---------------------------------------------------')
+
 	c_code(op.hessian())
 
-	print("Gradient")
-	c_code(op.gradient())
+	print('---------------------------------------------------')
+	print("apply")
+	print('---------------------------------------------------')
 
-	# print("Diag")
-	# c_code(op.hessian_diag())
+	c_code(op.apply())
 
-	# print("Value")
-	# c_code(op.value())
+	print('---------------------------------------------------')
+	print("hessian_diag")
+	print('---------------------------------------------------')
+
+	c_code(op.hessian_diag())
+
+	print('---------------------------------------------------')
+	print("Value")
+	print('---------------------------------------------------')
+
+	c_code(op.value())
 
 if __name__ == '__main__':
 	main()
