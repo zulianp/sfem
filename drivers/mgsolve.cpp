@@ -59,8 +59,10 @@ auto crs_hessian(sfem::Function &f) {
     return sfem::h_crs_spmv(nlocal, nlocal, rowptr, colidx, values, (real_t)1);
 }
 
-real_t residual(sfem::Operator<real_t> &op, const real_t*const rhs, const real_t*const x, real_t*const r)
-{
+real_t residual(sfem::Operator<real_t> &op,
+                const real_t *const rhs,
+                const real_t *const x,
+                real_t *const r) {
     zeros(op.rows(), r);
     op.apply(x, r);
     axpby<real_t>(op.rows(), 1, rhs, -1, r);
@@ -104,20 +106,24 @@ int main(int argc, char *argv[]) {
     int SFEM_BLOCK_SIZE = 1;
     int SFEM_USE_PRECONDITIONER = 0;
     int SFEM_MATRIX_FREE = 0;
+    int SFEM_USE_CHEB = 0;
 
     SFEM_READ_ENV(SFEM_MATRIX_FREE, atoi);
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
     SFEM_READ_ENV(SFEM_USE_PRECONDITIONER, atoi);
+    SFEM_READ_ENV(SFEM_USE_CHEB, atoi);
 
     printf("SFEM_MATRIX_FREE: %d\n"
            "SFEM_OPERATOR: %s\n"
            "SFEM_BLOCK_SIZE: %d\n"
-           "SFEM_USE_PRECONDITIONER: %d\n",
+           "SFEM_USE_PRECONDITIONER: %d\n"
+           "SFEM_USE_CHEB: %d\n",
            SFEM_MATRIX_FREE,
            SFEM_OPERATOR,
            SFEM_BLOCK_SIZE,
-           SFEM_USE_PRECONDITIONER);
+           SFEM_USE_PRECONDITIONER,
+           SFEM_USE_CHEB);
 
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
     auto conds = sfem::DirichletConditions::create_from_env(fs);
@@ -142,6 +148,7 @@ int main(int argc, char *argv[]) {
 
     std::shared_ptr<sfem::Operator<real_t>> linear_op;
     std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> smoother;
+    
 
     if (SFEM_MATRIX_FREE) {
         linear_op = sfem::make_op<real_t>(
@@ -149,16 +156,20 @@ int main(int argc, char *argv[]) {
                     f->apply(nullptr, x, y);
                 });
 
-        auto cheb = sfem::h_cheb3<real_t>(linear_op);
-        cheb->init(rhs->data());
-        cheb->set_max_it(3);
-        smoother = cheb;
+        if (SFEM_USE_CHEB) {
+            auto cheb = sfem::h_cheb3<real_t>(linear_op);
+            cheb->init(rhs->data());
+            cheb->set_max_it(3);
+            smoother = cheb;
+        } else {
+            f->hessian_diag(nullptr, diag->data());
+        }
+
     } else {
         auto crs = crs_hessian(*f);
         linear_op = crs;
 
-        bool use_cheb = false;
-        if (use_cheb) {
+        if (SFEM_USE_CHEB) {
             auto cheb = sfem::h_cheb3<real_t>(linear_op);
             cheb->init(rhs->data());
             smoother = cheb;
@@ -169,12 +180,28 @@ int main(int argc, char *argv[]) {
             // gs->verbose = true;
             smoother = gs;
 
-
-            array_write(comm, "./rhs.raw", SFEM_MPI_REAL_T, rhs->data(), fs->n_dofs(), fs->n_dofs());
-            array_write(comm, "./diag.raw", SFEM_MPI_REAL_T, diag->data(), fs->n_dofs(), fs->n_dofs());
-            array_write(comm, "./rowptr.raw", SFEM_MPI_COUNT_T, crs->row_ptr->data(), fs->n_dofs() + 1, fs->n_dofs() + 1);
-            array_write(comm, "./colidx.raw", SFEM_MPI_IDX_T, crs->col_idx->data(), crs->row_ptr->data()[fs->n_dofs()], crs->row_ptr->data()[fs->n_dofs()]);
-            array_write(comm, "./values.raw", SFEM_MPI_REAL_T, crs->values->data(), crs->row_ptr->data()[fs->n_dofs()], crs->row_ptr->data()[fs->n_dofs()]);
+            array_write(
+                    comm, "./rhs.raw", SFEM_MPI_REAL_T, rhs->data(), fs->n_dofs(), fs->n_dofs());
+            array_write(
+                    comm, "./diag.raw", SFEM_MPI_REAL_T, diag->data(), fs->n_dofs(), fs->n_dofs());
+            array_write(comm,
+                        "./rowptr.raw",
+                        SFEM_MPI_COUNT_T,
+                        crs->row_ptr->data(),
+                        fs->n_dofs() + 1,
+                        fs->n_dofs() + 1);
+            array_write(comm,
+                        "./colidx.raw",
+                        SFEM_MPI_IDX_T,
+                        crs->col_idx->data(),
+                        crs->row_ptr->data()[fs->n_dofs()],
+                        crs->row_ptr->data()[fs->n_dofs()]);
+            array_write(comm,
+                        "./values.raw",
+                        SFEM_MPI_REAL_T,
+                        crs->values->data(),
+                        crs->row_ptr->data()[fs->n_dofs()],
+                        crs->row_ptr->data()[fs->n_dofs()]);
         }
     }
 
@@ -277,26 +304,31 @@ int main(int argc, char *argv[]) {
     auto solver = smoother;
     solver->set_max_it(100);
     solver->set_op(linear_op);
-    
+
 #else  // CG solver
-
-    //     auto preconditioner = sfem::make_op<real_t>(
-    //             diag->size(), diag->size(), [=](const real_t *const x, real_t *const y) {
-    //                 auto d = diag->data();
-
-    // #pragma omp parallel for
-    //                 for (ptrdiff_t i = 0; i < diag->size(); ++i) {
-    //                     y[i] = x[i] / d[i];
-    //                 }
-    //             });
-
-    // smoother->set_max_it(3);
-    auto preconditioner = smoother;
-    smoother->set_initial_guess_zero(true);
 
     auto solver = sfem::h_cg<real_t>();
     solver->set_n_dofs(fs->n_dofs());
-    solver->set_preconditioner_op(preconditioner);
+    solver->set_op(linear_op);
+
+    if (smoother) {
+        auto preconditioner = smoother;
+        smoother->set_initial_guess_zero(true);
+        solver->set_preconditioner_op(preconditioner);
+    } else {
+        auto preconditioner = sfem::make_op<real_t>(
+                diag->size(), diag->size(), [=](const real_t *const x, real_t *const y) {
+                    auto d = diag->data();
+
+#pragma omp parallel for
+                    for (ptrdiff_t i = 0; i < diag->size(); ++i) {
+                        y[i] = x[i] / d[i];
+                    }
+                });
+
+        solver->set_preconditioner_op(preconditioner);
+    }
+
     solver->verbose = true;
     solver->tol = tol;
     solver->set_max_it(400);

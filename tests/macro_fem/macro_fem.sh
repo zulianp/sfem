@@ -19,8 +19,8 @@ export PATH=$SCRIPTPATH/../../python/sfem/algebra:$PATH
 export PATH=$SCRIPTPATH/../../python/sfem/utils:$PATH
 export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
-export OMP_NUM_THREADS=16
-# export OMP_NUM_THREADS=8
+# export OMP_NUM_THREADS=16
+export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 
 # export SFEM_REPEAT=40
@@ -61,9 +61,10 @@ eval_nodal_function.py "x+y+z" $simulation_mesh/x.raw $simulation_mesh/y.raw  $s
 spmv 1 0 linear_system 		 linear_system/rhs.raw test.raw
 spmv 1 0 linear_system_macro linear_system/rhs.raw test_macro.raw
 
+SFEM_USE_MACRO=0 SFEM_USE_OPT=1 $LAUNCH laplacian_apply $simulation_mesh linear_system/rhs.raw p2_test.raw
 SFEM_USE_MACRO=1 SFEM_USE_OPT=1 $LAUNCH laplacian_apply $simulation_mesh linear_system/rhs.raw mea_test.raw
 SFEM_USE_MACRO=0 SFEM_USE_OPT=1 $LAUNCH laplacian_apply $refined_mesh linear_system/rhs.raw std_test.raw
 
-raw_to_db.py $refined_mesh mf_out.vtk --point_data="linear_system/rhs.raw,mea_test.raw,test.raw,test_macro.raw,std_test.raw"
+raw_to_db.py $refined_mesh mf_out.vtk --point_data="linear_system/rhs.raw,mea_test.raw,test.raw,test_macro.raw,std_test.raw,p2_test.raw"
 # raw_to_db.py $simulation_mesh macro_mf_out.vtk --point_data="linear_system/rhs.raw,mea_test.raw,test.raw,test_macro.raw"
 
