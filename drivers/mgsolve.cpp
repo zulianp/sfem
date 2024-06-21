@@ -181,7 +181,7 @@ int main(int argc, char *argv[]) {
     f->set_output_dir(output_path);
     auto output = f->output();
 
-#if 1  // MG
+#if 0  // MG
     auto c = sfem::h_buffer<real_t>(fs->n_dofs());
     auto r = sfem::h_buffer<real_t>(fs->n_dofs());
 
