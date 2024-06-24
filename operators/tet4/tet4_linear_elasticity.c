@@ -14,67 +14,68 @@
 // #define MIN(a, b) ((a) < (b) ? (a) : (b))
 // #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-static SFEM_INLINE void value_kernel(const real_t mu,
-                                     const real_t lambda,
-                                     const real_t px0,
-                                     const real_t px1,
-                                     const real_t px2,
-                                     const real_t px3,
-                                     const real_t py0,
-                                     const real_t py1,
-                                     const real_t py2,
-                                     const real_t py3,
-                                     const real_t pz0,
-                                     const real_t pz1,
-                                     const real_t pz2,
-                                     const real_t pz3,
-
-                                     const real_t *const SFEM_RESTRICT u,
-                                     real_t *const SFEM_RESTRICT element_scalar) {
-    const real_t x0 = -px0 + px1;
-    const real_t x1 = -py0 + py2;
-    const real_t x2 = -pz0 + pz3;
-    const real_t x3 = x1 * x2;
-    const real_t x4 = -px0 + px2;
-    const real_t x5 = -py0 + py3;
-    const real_t x6 = -pz0 + pz1;
-    const real_t x7 = -px0 + px3;
-    const real_t x8 = -py0 + py1;
-    const real_t x9 = -pz0 + pz2;
-    const real_t x10 = x8 * x9;
-    const real_t x11 = x5 * x9;
-    const real_t x12 = x2 * x8;
-    const real_t x13 = x1 * x6;
-    const real_t x14 = -x0 * x11 + x0 * x3 + x10 * x7 - x12 * x4 - x13 * x7 + x4 * x5 * x6;
-    const real_t x15 = 1.0 / x14;
-    const real_t x16 = x15 * (-x11 + x3);
-    const real_t x17 = x15 * (-x12 + x5 * x6);
-    const real_t x18 = x15 * (x10 - x13);
-    const real_t x19 = -x16 - x17 - x18;
-    const real_t x20 = u[0] * x19 + u[1] * x16 + u[2] * x17 + u[3] * x18;
-    const real_t x21 = POW2(x20);
-    const real_t x22 = (1.0 / 12.0) * lambda;
-    const real_t x23 = x15 * (-x2 * x4 + x7 * x9);
-    const real_t x24 = x15 * (x0 * x2 - x6 * x7);
-    const real_t x25 = x15 * (-x0 * x9 + x4 * x6);
-    const real_t x26 = -x23 - x24 - x25;
-    const real_t x27 = u[4] * x26 + u[5] * x23 + u[6] * x24 + u[7] * x25;
-    const real_t x28 = POW2(x27);
-    const real_t x29 = x15 * (-x0 * x5 + x7 * x8);
-    const real_t x30 = x15 * (x0 * x1 - x4 * x8);
-    const real_t x31 = x15 * (-x1 * x7 + x4 * x5);
-    const real_t x32 = -x29 - x30 - x31;
-    const real_t x33 = u[10] * x29 + u[11] * x30 + u[8] * x32 + u[9] * x31;
-    const real_t x34 = POW2(x33);
-    const real_t x35 = u[0] * x32 + u[1] * x31 + u[2] * x29 + u[3] * x30;
-    const real_t x36 = (1.0 / 12.0) * mu;
-    const real_t x37 = u[0] * x26 + u[1] * x23 + u[2] * x24 + u[3] * x25;
-    const real_t x38 = (1.0 / 6.0) * mu;
-    const real_t x39 = u[4] * x32 + u[5] * x31 + u[6] * x29 + u[7] * x30;
-    const real_t x40 = u[4] * x19 + u[5] * x16 + u[6] * x17 + u[7] * x18;
-    const real_t x41 = u[10] * x24 + u[11] * x25 + u[8] * x26 + u[9] * x23;
-    const real_t x42 = u[10] * x17 + u[11] * x18 + u[8] * x19 + u[9] * x16;
-    const real_t x43 = (1.0 / 6.0) * lambda * x20;
+static SFEM_INLINE void value_kernel(const scalar_t mu,
+                                     const scalar_t lambda,
+                                     const scalar_t px0,
+                                     const scalar_t px1,
+                                     const scalar_t px2,
+                                     const scalar_t px3,
+                                     const scalar_t py0,
+                                     const scalar_t py1,
+                                     const scalar_t py2,
+                                     const scalar_t py3,
+                                     const scalar_t pz0,
+                                     const scalar_t pz1,
+                                     const scalar_t pz2,
+                                     const scalar_t pz3,
+                                     const scalar_t *const SFEM_RESTRICT ux,
+                                     const scalar_t *const SFEM_RESTRICT uy,
+                                     const scalar_t *const SFEM_RESTRICT uz,
+                                     accumulator_t *const SFEM_RESTRICT element_scalar) {
+    const scalar_t x0 = -px0 + px1;
+    const scalar_t x1 = -py0 + py2;
+    const scalar_t x2 = -pz0 + pz3;
+    const scalar_t x3 = x1 * x2;
+    const scalar_t x4 = -px0 + px2;
+    const scalar_t x5 = -py0 + py3;
+    const scalar_t x6 = -pz0 + pz1;
+    const scalar_t x7 = -px0 + px3;
+    const scalar_t x8 = -py0 + py1;
+    const scalar_t x9 = -pz0 + pz2;
+    const scalar_t x10 = x8 * x9;
+    const scalar_t x11 = x5 * x9;
+    const scalar_t x12 = x2 * x8;
+    const scalar_t x13 = x1 * x6;
+    const scalar_t x14 = -x0 * x11 + x0 * x3 + x10 * x7 - x12 * x4 - x13 * x7 + x4 * x5 * x6;
+    const scalar_t x15 = 1.0 / x14;
+    const scalar_t x16 = x15 * (-x11 + x3);
+    const scalar_t x17 = x15 * (-x12 + x5 * x6);
+    const scalar_t x18 = x15 * (x10 - x13);
+    const scalar_t x19 = -x16 - x17 - x18;
+    const scalar_t x20 = ux[0] * x19 + ux[1] * x16 + ux[2] * x17 + ux[3] * x18;
+    const scalar_t x21 = POW2(x20);
+    const scalar_t x22 = (1.0 / 12.0) * lambda;
+    const scalar_t x23 = x15 * (-x2 * x4 + x7 * x9);
+    const scalar_t x24 = x15 * (x0 * x2 - x6 * x7);
+    const scalar_t x25 = x15 * (-x0 * x9 + x4 * x6);
+    const scalar_t x26 = -x23 - x24 - x25;
+    const scalar_t x27 = uy[0] * x26 + uy[1] * x23 + uy[2] * x24 + uy[3] * x25;
+    const scalar_t x28 = POW2(x27);
+    const scalar_t x29 = x15 * (-x0 * x5 + x7 * x8);
+    const scalar_t x30 = x15 * (x0 * x1 - x4 * x8);
+    const scalar_t x31 = x15 * (-x1 * x7 + x4 * x5);
+    const scalar_t x32 = -x29 - x30 - x31;
+    const scalar_t x33 = uz[2] * x29 + uz[3] * x30 + uz[0] * x32 + uz[1] * x31;
+    const scalar_t x34 = POW2(x33);
+    const scalar_t x35 = ux[0] * x32 + ux[1] * x31 + ux[2] * x29 + ux[3] * x30;
+    const scalar_t x36 = (1.0 / 12.0) * mu;
+    const scalar_t x37 = ux[0] * x26 + ux[1] * x23 + ux[2] * x24 + ux[3] * x25;
+    const scalar_t x38 = (1.0 / 6.0) * mu;
+    const scalar_t x39 = uy[0] * x32 + uy[1] * x31 + uy[2] * x29 + uy[3] * x30;
+    const scalar_t x40 = uy[0] * x19 + uy[1] * x16 + uy[2] * x17 + uy[3] * x18;
+    const scalar_t x41 = uz[2] * x24 + uz[3] * x25 + uz[0] * x26 + uz[1] * x23;
+    const scalar_t x42 = uz[2] * x17 + uz[3] * x18 + uz[0] * x19 + uz[1] * x16;
+    const scalar_t x43 = (1.0 / 6.0) * lambda * x20;
     element_scalar[0] =
             x14 * ((1.0 / 6.0) * lambda * x27 * x33 + x21 * x22 + x21 * x38 + x22 * x28 +
                    x22 * x34 + x27 * x43 + x28 * x38 + x33 * x43 + x34 * x38 + POW2(x35) * x36 +
@@ -320,313 +321,309 @@ static SFEM_INLINE void hessian_kernel(const real_t mu,
     const real_t x220 = x14 * x214;
     const real_t x221 = x14 * x215;
     const real_t x222 = x14 * x217;
-    element_matrix[0 * stride] = x14 * (x18 * x22 + x18 * x25 + x19 * x20 + x19 * x24 + x22 * x23 +
-                                        x23 * x25 + x39 + x47 + x55 + x61 + x67);
-    element_matrix[1 * stride] = x80;
-    element_matrix[2 * stride] = x86;
-    element_matrix[3 * stride] = x87;
-    element_matrix[4 * stride] = x105;
-    element_matrix[5 * stride] = x106;
-    element_matrix[6 * stride] = x107;
-    element_matrix[7 * stride] = x108;
-    element_matrix[8 * stride] = x126;
-    element_matrix[9 * stride] = x127;
-    element_matrix[10 * stride] = x128;
-    element_matrix[11 * stride] = x129;
-    element_matrix[12 * stride] = x80;
-    element_matrix[13 * stride] = x14 * x39;
-    element_matrix[14 * stride] = x130;
-    element_matrix[15 * stride] = x131;
-    element_matrix[16 * stride] = x132;
-    element_matrix[17 * stride] = x133;
-    element_matrix[18 * stride] = x134;
-    element_matrix[19 * stride] = x135;
-    element_matrix[20 * stride] = x136;
-    element_matrix[21 * stride] = x137;
-    element_matrix[22 * stride] = x138;
-    element_matrix[23 * stride] = x139;
-    element_matrix[24 * stride] = x86;
-    element_matrix[25 * stride] = x130;
-    element_matrix[26 * stride] = x14 * x47;
-    element_matrix[27 * stride] = x140;
-    element_matrix[28 * stride] = x141;
-    element_matrix[29 * stride] = x142;
-    element_matrix[30 * stride] = x143;
-    element_matrix[31 * stride] = x144;
-    element_matrix[32 * stride] = x145;
-    element_matrix[33 * stride] = x146;
-    element_matrix[34 * stride] = x147;
-    element_matrix[35 * stride] = x148;
-    element_matrix[36 * stride] = x87;
-    element_matrix[37 * stride] = x131;
-    element_matrix[38 * stride] = x140;
-    element_matrix[39 * stride] = x14 * x55;
-    element_matrix[40 * stride] = x149;
-    element_matrix[41 * stride] = x150;
-    element_matrix[42 * stride] = x151;
-    element_matrix[43 * stride] = x152;
-    element_matrix[44 * stride] = x153;
-    element_matrix[45 * stride] = x154;
-    element_matrix[46 * stride] = x155;
-    element_matrix[47 * stride] = x156;
-    element_matrix[48 * stride] = x105;
-    element_matrix[49 * stride] = x132;
-    element_matrix[50 * stride] = x141;
-    element_matrix[51 * stride] = x149;
-    element_matrix[52 * stride] = x14 * (x157 * x64 + x158 * x34 + x158 * x52 + x159 * x64 +
-                                         x160 * x34 + x160 * x52 + x162 + x164 + x166 + x167 + x61);
-    element_matrix[53 * stride] = x173;
-    element_matrix[54 * stride] = x176;
-    element_matrix[55 * stride] = x177;
-    element_matrix[56 * stride] = x190;
-    element_matrix[57 * stride] = x191;
-    element_matrix[58 * stride] = x192;
-    element_matrix[59 * stride] = x193;
-    element_matrix[60 * stride] = x106;
-    element_matrix[61 * stride] = x133;
-    element_matrix[62 * stride] = x142;
-    element_matrix[63 * stride] = x150;
-    element_matrix[64 * stride] = x173;
-    element_matrix[65 * stride] = x14 * x162;
-    element_matrix[66 * stride] = x194;
-    element_matrix[67 * stride] = x195;
-    element_matrix[68 * stride] = x196;
-    element_matrix[69 * stride] = x197;
-    element_matrix[70 * stride] = x198;
-    element_matrix[71 * stride] = x199;
-    element_matrix[72 * stride] = x107;
-    element_matrix[73 * stride] = x134;
-    element_matrix[74 * stride] = x143;
-    element_matrix[75 * stride] = x151;
-    element_matrix[76 * stride] = x176;
-    element_matrix[77 * stride] = x194;
-    element_matrix[78 * stride] = x14 * x164;
-    element_matrix[79 * stride] = x200;
-    element_matrix[80 * stride] = x201;
-    element_matrix[81 * stride] = x202;
-    element_matrix[82 * stride] = x203;
-    element_matrix[83 * stride] = x204;
-    element_matrix[84 * stride] = x108;
-    element_matrix[85 * stride] = x135;
-    element_matrix[86 * stride] = x144;
-    element_matrix[87 * stride] = x152;
-    element_matrix[88 * stride] = x177;
-    element_matrix[89 * stride] = x195;
-    element_matrix[90 * stride] = x200;
-    element_matrix[91 * stride] = x14 * x166;
-    element_matrix[92 * stride] = x205;
-    element_matrix[93 * stride] = x206;
-    element_matrix[94 * stride] = x207;
-    element_matrix[95 * stride] = x208;
-    element_matrix[96 * stride] = x126;
-    element_matrix[97 * stride] = x136;
-    element_matrix[98 * stride] = x145;
-    element_matrix[99 * stride] = x153;
-    element_matrix[100 * stride] = x190;
-    element_matrix[101 * stride] = x196;
-    element_matrix[102 * stride] = x201;
-    element_matrix[103 * stride] = x205;
-    element_matrix[104 * stride] = x14 * (x157 * x56 + x159 * x56 + x167 + x209 * x29 + x209 * x41 +
-                                          x210 * x29 + x210 * x41 + x211 + x212 + x213 + x67);
-    element_matrix[105 * stride] = x216;
-    element_matrix[106 * stride] = x218;
-    element_matrix[107 * stride] = x219;
-    element_matrix[108 * stride] = x127;
-    element_matrix[109 * stride] = x137;
-    element_matrix[110 * stride] = x146;
-    element_matrix[111 * stride] = x154;
-    element_matrix[112 * stride] = x191;
-    element_matrix[113 * stride] = x197;
-    element_matrix[114 * stride] = x202;
-    element_matrix[115 * stride] = x206;
-    element_matrix[116 * stride] = x216;
-    element_matrix[117 * stride] = x14 * x211;
-    element_matrix[118 * stride] = x220;
-    element_matrix[119 * stride] = x221;
-    element_matrix[120 * stride] = x128;
-    element_matrix[121 * stride] = x138;
-    element_matrix[122 * stride] = x147;
-    element_matrix[123 * stride] = x155;
-    element_matrix[124 * stride] = x192;
-    element_matrix[125 * stride] = x198;
-    element_matrix[126 * stride] = x203;
-    element_matrix[127 * stride] = x207;
-    element_matrix[128 * stride] = x218;
-    element_matrix[129 * stride] = x220;
-    element_matrix[130 * stride] = x14 * x212;
-    element_matrix[131 * stride] = x222;
-    element_matrix[132 * stride] = x129;
-    element_matrix[133 * stride] = x139;
-    element_matrix[134 * stride] = x148;
-    element_matrix[135 * stride] = x156;
-    element_matrix[136 * stride] = x193;
-    element_matrix[137 * stride] = x199;
-    element_matrix[138 * stride] = x204;
-    element_matrix[139 * stride] = x208;
-    element_matrix[140 * stride] = x219;
-    element_matrix[141 * stride] = x221;
-    element_matrix[142 * stride] = x222;
-    element_matrix[143 * stride] = x14 * x213;
+    element_matrix[0] = x14 * (x18 * x22 + x18 * x25 + x19 * x20 + x19 * x24 + x22 * x23 +
+                               x23 * x25 + x39 + x47 + x55 + x61 + x67);
+    element_matrix[1] = x80;
+    element_matrix[2] = x86;
+    element_matrix[3] = x87;
+    element_matrix[4] = x105;
+    element_matrix[5] = x106;
+    element_matrix[6] = x107;
+    element_matrix[7] = x108;
+    element_matrix[8] = x126;
+    element_matrix[9] = x127;
+    element_matrix[10] = x128;
+    element_matrix[11] = x129;
+    element_matrix[12] = x80;
+    element_matrix[13] = x14 * x39;
+    element_matrix[14] = x130;
+    element_matrix[15] = x131;
+    element_matrix[16] = x132;
+    element_matrix[17] = x133;
+    element_matrix[18] = x134;
+    element_matrix[19] = x135;
+    element_matrix[20] = x136;
+    element_matrix[21] = x137;
+    element_matrix[22] = x138;
+    element_matrix[23] = x139;
+    element_matrix[24] = x86;
+    element_matrix[25] = x130;
+    element_matrix[26] = x14 * x47;
+    element_matrix[27] = x140;
+    element_matrix[28] = x141;
+    element_matrix[29] = x142;
+    element_matrix[30] = x143;
+    element_matrix[31] = x144;
+    element_matrix[32] = x145;
+    element_matrix[33] = x146;
+    element_matrix[34] = x147;
+    element_matrix[35] = x148;
+    element_matrix[36] = x87;
+    element_matrix[37] = x131;
+    element_matrix[38] = x140;
+    element_matrix[39] = x14 * x55;
+    element_matrix[40] = x149;
+    element_matrix[41] = x150;
+    element_matrix[42] = x151;
+    element_matrix[43] = x152;
+    element_matrix[44] = x153;
+    element_matrix[45] = x154;
+    element_matrix[46] = x155;
+    element_matrix[47] = x156;
+    element_matrix[48] = x105;
+    element_matrix[49] = x132;
+    element_matrix[50] = x141;
+    element_matrix[51] = x149;
+    element_matrix[52] = x14 * (x157 * x64 + x158 * x34 + x158 * x52 + x159 * x64 + x160 * x34 +
+                                x160 * x52 + x162 + x164 + x166 + x167 + x61);
+    element_matrix[53] = x173;
+    element_matrix[54] = x176;
+    element_matrix[55] = x177;
+    element_matrix[56] = x190;
+    element_matrix[57] = x191;
+    element_matrix[58] = x192;
+    element_matrix[59] = x193;
+    element_matrix[60] = x106;
+    element_matrix[61] = x133;
+    element_matrix[62] = x142;
+    element_matrix[63] = x150;
+    element_matrix[64] = x173;
+    element_matrix[65] = x14 * x162;
+    element_matrix[66] = x194;
+    element_matrix[67] = x195;
+    element_matrix[68] = x196;
+    element_matrix[69] = x197;
+    element_matrix[70] = x198;
+    element_matrix[71] = x199;
+    element_matrix[72] = x107;
+    element_matrix[73] = x134;
+    element_matrix[74] = x143;
+    element_matrix[75] = x151;
+    element_matrix[76] = x176;
+    element_matrix[77] = x194;
+    element_matrix[78] = x14 * x164;
+    element_matrix[79] = x200;
+    element_matrix[80] = x201;
+    element_matrix[81] = x202;
+    element_matrix[82] = x203;
+    element_matrix[83] = x204;
+    element_matrix[84] = x108;
+    element_matrix[85] = x135;
+    element_matrix[86] = x144;
+    element_matrix[87] = x152;
+    element_matrix[88] = x177;
+    element_matrix[89] = x195;
+    element_matrix[90] = x200;
+    element_matrix[91] = x14 * x166;
+    element_matrix[92] = x205;
+    element_matrix[93] = x206;
+    element_matrix[94] = x207;
+    element_matrix[95] = x208;
+    element_matrix[96] = x126;
+    element_matrix[97] = x136;
+    element_matrix[98] = x145;
+    element_matrix[99] = x153;
+    element_matrix[100] = x190;
+    element_matrix[101] = x196;
+    element_matrix[102] = x201;
+    element_matrix[103] = x205;
+    element_matrix[104] = x14 * (x157 * x56 + x159 * x56 + x167 + x209 * x29 + x209 * x41 +
+                                 x210 * x29 + x210 * x41 + x211 + x212 + x213 + x67);
+    element_matrix[105] = x216;
+    element_matrix[106] = x218;
+    element_matrix[107] = x219;
+    element_matrix[108] = x127;
+    element_matrix[109] = x137;
+    element_matrix[110] = x146;
+    element_matrix[111] = x154;
+    element_matrix[112] = x191;
+    element_matrix[113] = x197;
+    element_matrix[114] = x202;
+    element_matrix[115] = x206;
+    element_matrix[116] = x216;
+    element_matrix[117] = x14 * x211;
+    element_matrix[118] = x220;
+    element_matrix[119] = x221;
+    element_matrix[120] = x128;
+    element_matrix[121] = x138;
+    element_matrix[122] = x147;
+    element_matrix[123] = x155;
+    element_matrix[124] = x192;
+    element_matrix[125] = x198;
+    element_matrix[126] = x203;
+    element_matrix[127] = x207;
+    element_matrix[128] = x218;
+    element_matrix[129] = x220;
+    element_matrix[130] = x14 * x212;
+    element_matrix[131] = x222;
+    element_matrix[132] = x129;
+    element_matrix[133] = x139;
+    element_matrix[134] = x148;
+    element_matrix[135] = x156;
+    element_matrix[136] = x193;
+    element_matrix[137] = x199;
+    element_matrix[138] = x204;
+    element_matrix[139] = x208;
+    element_matrix[140] = x219;
+    element_matrix[141] = x221;
+    element_matrix[142] = x222;
+    element_matrix[143] = x14 * x213;
 }
 
-void tet4_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
-                                               const ptrdiff_t nnodes,
-                                               idx_t **const SFEM_RESTRICT elements,
-                                               geom_t **const SFEM_RESTRICT points,
-                                               const real_t mu,
-                                               const real_t lambda,
-                                               const real_t *const SFEM_RESTRICT displacement,
-                                               real_t *const SFEM_RESTRICT value) {
+int tet4_linear_elasticity_value(const ptrdiff_t nelements,
+                                 const ptrdiff_t nnodes,
+                                 idx_t **const SFEM_RESTRICT elements,
+                                 geom_t **const SFEM_RESTRICT points,
+                                 const real_t mu,
+                                 const real_t lambda,
+                                 const ptrdiff_t u_stride,
+                                 const real_t *const ux,
+                                 const real_t *const uy,
+                                 const real_t *const uz,
+                                 real_t *const SFEM_RESTRICT value) {
     SFEM_UNUSED(nnodes);
 
-    static const int block_size = 3;
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
 
-#pragma omp parallel
-    {
-#pragma omp for
-        for (ptrdiff_t i = 0; i < nelements; ++i) {
-            idx_t ev[4];
-            idx_t ks[4];
+    real_t acc = 0;
+#pragma omp parallel for reduction(+ : acc)
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[4];
+        scalar_t element_ux[4];
+        scalar_t element_uy[4];
+        scalar_t element_uz[4];
 
-            real_t element_displacement[(4 * 3)];
 #pragma unroll(4)
-            for (int v = 0; v < 4; ++v) {
-                ev[v] = elements[v][i];
-            }
-
-            // Element indices
-            const idx_t i0 = ev[0];
-            const idx_t i1 = ev[1];
-            const idx_t i2 = ev[2];
-            const idx_t i3 = ev[3];
-
-            for (int enode = 0; enode < 4; ++enode) {
-                idx_t dof = ev[enode] * block_size;
-
-                for (int b = 0; b < block_size; ++b) {
-                    element_displacement[b * 4 + enode] = displacement[dof + b];
-                }
-            }
-
-            real_t element_scalar = 0;
-            value_kernel(  // Model parameters
-                    mu,
-                    lambda,
-                    // X-coordinates
-                    points[0][i0],
-                    points[0][i1],
-                    points[0][i2],
-                    points[0][i3],
-                    // Y-coordinates
-                    points[1][i0],
-                    points[1][i1],
-                    points[1][i2],
-                    points[1][i3],
-                    // Z-coordinates
-                    points[2][i0],
-                    points[2][i1],
-                    points[2][i2],
-                    points[2][i3],
-
-                    element_displacement,
-                    // output vector
-                    &element_scalar);
-
-#pragma omp atomic update
-            *value += element_scalar;
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elements[v][i];
         }
+
+        for (int enode = 0; enode < 4; ++enode) {
+            idx_t dof = ev[enode] * u_stride;
+            element_ux[enode] = ux[dof];
+            element_uy[enode] = uy[dof];
+            element_uz[enode] = uz[dof];
+        }
+
+        real_t element_scalar = 0;
+        value_kernel(  // Model parameters
+                mu,
+                lambda,
+                // X-coordinates
+                x[ev[0]],
+                x[ev[1]],
+                x[ev[2]],
+                x[ev[3]],
+                // Y-coordinates
+                y[ev[0]],
+                y[ev[1]],
+                y[ev[2]],
+                y[ev[3]],
+                // Z-coordinates
+                z[ev[0]],
+                z[ev[1]],
+                z[ev[2]],
+                z[ev[3]],
+                element_ux,
+                element_uy,
+                element_uz,
+                // output vector
+                &element_scalar);
+
+        acc += element_scalar;
     }
+
+    *value += acc;
 
     return 0;
 }
 
-void tet4_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
-                                                 const ptrdiff_t nnodes,
-                                                 idx_t **const SFEM_RESTRICT elements,
-                                                 geom_t **const SFEM_RESTRICT points,
-                                                 const real_t mu,
-                                                 const real_t lambda,
-                                                 const count_t *const SFEM_RESTRICT rowptr,
-                                                 const idx_t *const SFEM_RESTRICT colidx,
-                                                 real_t *const SFEM_RESTRICT values) {
+int tet4_linear_elasticity_hessian(const ptrdiff_t nelements,
+                                   const ptrdiff_t nnodes,
+                                   idx_t **const SFEM_RESTRICT elements,
+                                   geom_t **const SFEM_RESTRICT points,
+                                   const real_t mu,
+                                   const real_t lambda,
+                                   const count_t *const SFEM_RESTRICT rowptr,
+                                   const idx_t *const SFEM_RESTRICT colidx,
+                                   real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
     static const int block_size = 3;
     static const int mat_block_size = block_size * block_size;
 
-#pragma omp parallel
-    {
-#pragma omp for
-        for (ptrdiff_t i = 0; i < nelements; ++i) {
-            idx_t ev[4];
-            idx_t ks[4];
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[4];
+        idx_t ks[4];
 
-            real_t element_matrix[(4 * 3) * (4 * 3)];
+        real_t element_matrix[(4 * 3) * (4 * 3)];
 
 #pragma unroll(4)
-            for (int v = 0; v < 4; ++v) {
-                ev[v] = elements[v][i];
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        // Element indices
+        const idx_t i0 = ev[0];
+        const idx_t i1 = ev[1];
+        const idx_t i2 = ev[2];
+        const idx_t i3 = ev[3];
+
+        hessian_kernel(
+                // Model parameters
+                mu,
+                lambda,
+                // X-coordinates
+                points[0][i0],
+                points[0][i1],
+                points[0][i2],
+                points[0][i3],
+                // Y-coordinates
+                points[1][i0],
+                points[1][i1],
+                points[1][i2],
+                points[1][i3],
+                // Z-coordinates
+                points[2][i0],
+                points[2][i1],
+                points[2][i2],
+                points[2][i3],
+
+                // output matrix
+                element_matrix);
+
+        // assert(!check_symmetric(4 * block_size, element_matrix));
+
+        for (int edof_i = 0; edof_i < 4; ++edof_i) {
+            const idx_t dof_i = elements[edof_i][i];
+            const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
+
+            {
+                const idx_t *row = &colidx[rowptr[dof_i]];
+                tet4_find_cols(ev, row, lenrow, ks);
             }
 
-            // Element indices
-            const idx_t i0 = ev[0];
-            const idx_t i1 = ev[1];
-            const idx_t i2 = ev[2];
-            const idx_t i3 = ev[3];
+            // Blocks for row
+            real_t *block_start = &values[rowptr[dof_i] * mat_block_size];
 
-            hessian_kernel(
-                    // Model parameters
-                    mu,
-                    lambda,
-                    // X-coordinates
-                    points[0][i0],
-                    points[0][i1],
-                    points[0][i2],
-                    points[0][i3],
-                    // Y-coordinates
-                    points[1][i0],
-                    points[1][i1],
-                    points[1][i2],
-                    points[1][i3],
-                    // Z-coordinates
-                    points[2][i0],
-                    points[2][i1],
-                    points[2][i2],
-                    points[2][i3],
+            for (int edof_j = 0; edof_j < 4; ++edof_j) {
+                const idx_t offset_j = ks[edof_j] * block_size;
 
-                    // output matrix
-                    element_matrix);
+                for (int bi = 0; bi < block_size; ++bi) {
+                    const int ii = bi * 4 + edof_i;
 
-            assert(!check_symmetric(4 * block_size, element_matrix));
+                    // Jump rows (including the block-size for the columns)
+                    real_t *row = &block_start[bi * lenrow * block_size];
 
-            for (int edof_i = 0; edof_i < 4; ++edof_i) {
-                const idx_t dof_i = elements[edof_i][i];
-                const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
-
-                {
-                    const idx_t *row = &colidx[rowptr[dof_i]];
-                    find_cols4(ev, row, lenrow, ks);
-                }
-
-                // Blocks for row
-                real_t *block_start = &values[rowptr[dof_i] * mat_block_size];
-
-                for (int edof_j = 0; edof_j < 4; ++edof_j) {
-                    const idx_t offset_j = ks[edof_j] * block_size;
-
-                    for (int bi = 0; bi < block_size; ++bi) {
-                        const int ii = bi * 4 + edof_i;
-
-                        // Jump rows (including the block-size for the columns)
-                        real_t *row = &block_start[bi * lenrow * block_size];
-
-                        for (int bj = 0; bj < block_size; ++bj) {
-                            const int jj = bj * 4 + edof_j;
-                            const real_t val = element_matrix[ii * 12 + jj];
+                    for (int bj = 0; bj < block_size; ++bj) {
+                        const int jj = bj * 4 + edof_j;
+                        const real_t val = element_matrix[ii * 12 + jj];
 
 #pragma omp atomic update
-                            row[offset_j + bj] += val;
-                        }
+                        row[offset_j + bj] += val;
                     }
                 }
             }
@@ -695,11 +692,19 @@ int tet4_linear_elasticity_apply(const ptrdiff_t nelements,
                               z[ev[2]],
                               z[ev[3]],
                               // Output
-                              adjugate,
+                              jacobian_adjugate,
                               &jacobian_determinant);
 
-        tet4_linear_elasticity_apply_adj(
-                mu, lambda, adjugate, jacobian_determinant, ux, uy, uz, outx, outy, outz);
+        tet4_linear_elasticity_apply_adj(mu,
+                                         lambda,
+                                         jacobian_adjugate,
+                                         jacobian_determinant,
+                                         element_ux,
+                                         element_uy,
+                                         element_uz,
+                                         element_outx,
+                                         element_outy,
+                                         element_outz);
 
         for (int edof_i = 0; edof_i < 4; edof_i++) {
             const ptrdiff_t idx = ev[edof_i] * out_stride;
@@ -765,7 +770,7 @@ int tet4_linear_elasticity_diag(const ptrdiff_t nelements,
                               z[ev[2]],
                               z[ev[3]],
                               // Output
-                              adjugate,
+                              jacobian_adjugate,
                               &jacobian_determinant);
 
         tet4_linear_elasticity_diag_adj(mu,
