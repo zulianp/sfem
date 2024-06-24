@@ -597,3 +597,102 @@ int tet10_linear_elasticity_diag_opt(const ptrdiff_t nelements,
 
     return 0;
 }
+
+int tet10_linear_elasticity_hessian(const ptrdiff_t nelements,
+                                    const ptrdiff_t nnodes,
+                                    idx_t **const SFEM_RESTRICT elements,
+                                    geom_t **const SFEM_RESTRICT points,
+                                    const real_t mu,
+                                    const real_t lambda,
+                                    const count_t *const SFEM_RESTRICT rowptr,
+                                    const idx_t *const SFEM_RESTRICT colidx,
+                                    real_t *const SFEM_RESTRICT values) {
+    SFEM_UNUSED(nnodes);
+
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+    static const int block_size = 3;
+    static const int mat_block_size = block_size * block_size;
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[10];
+        idx_t ks[10];
+
+        jacobian_t jacobian_adjugate[9];
+        jacobian_t jacobian_determinant = 0;
+
+        accumulator_t element_matrix[(10 * 3) * (10 * 3)] = {0};
+
+#pragma unroll(10)
+        for (int v = 0; v < 10; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        tet4_adjugate_and_det(x[ev[0]],
+                              x[ev[1]],
+                              x[ev[2]],
+                              x[ev[3]],
+                              // Y-coordinates
+                              y[ev[0]],
+                              y[ev[1]],
+                              y[ev[2]],
+                              y[ev[3]],
+                              // Z-coordinates
+                              z[ev[0]],
+                              z[ev[1]],
+                              z[ev[2]],
+                              z[ev[3]],
+                              // Output
+                              jacobian_adjugate,
+                              &jacobian_determinant);
+
+        for (int k = 0; k < n_qp; k++) {
+            tet10_linear_elasticity_hessian_adj(qx[k],
+                                                qy[k],
+                                                qz[k],
+                                                qw[k],
+                                                jacobian_adjugate,
+                                                jacobian_determinant,
+                                                mu,
+                                                lambda,
+                                                element_matrix);
+        }
+
+        for (int edof_i = 0; edof_i < 10; ++edof_i) {
+            const idx_t dof_i = elements[edof_i][i];
+            const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
+
+            {
+                const idx_t *row = &colidx[rowptr[dof_i]];
+                tet10_find_cols(ev, row, lenrow, ks);
+            }
+
+            // Blocks for row
+            real_t *block_start = &values[rowptr[dof_i] * mat_block_size];
+
+            for (int edof_j = 0; edof_j < 10; ++edof_j) {
+                const idx_t offset_j = ks[edof_j] * block_size;
+
+                for (int bi = 0; bi < block_size; ++bi) {
+                    const int ii = bi * 10 + edof_i;
+
+                    // Jump rows (including the block-size for the columns)
+                    real_t *row = &block_start[bi * lenrow * block_size];
+
+                    for (int bj = 0; bj < block_size; ++bj) {
+                        const int jj = bj * 10 + edof_j;
+                        const real_t val = element_matrix[ii * 30 + jj];
+
+#pragma omp atomic update
+                        row[offset_j + bj] += val;
+                    }
+                }
+            }
+        }
+    }
+
+    return 0;
+}
