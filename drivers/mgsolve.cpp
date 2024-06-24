@@ -107,23 +107,27 @@ int main(int argc, char *argv[]) {
     int SFEM_USE_PRECONDITIONER = 0;
     int SFEM_MATRIX_FREE = 0;
     int SFEM_USE_CHEB = 0;
+    int SFEM_DEBUG = 0;
 
     SFEM_READ_ENV(SFEM_MATRIX_FREE, atoi);
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
     SFEM_READ_ENV(SFEM_USE_PRECONDITIONER, atoi);
     SFEM_READ_ENV(SFEM_USE_CHEB, atoi);
+    SFEM_READ_ENV(SFEM_DEBUG, atoi);
 
     printf("SFEM_MATRIX_FREE: %d\n"
            "SFEM_OPERATOR: %s\n"
            "SFEM_BLOCK_SIZE: %d\n"
            "SFEM_USE_PRECONDITIONER: %d\n"
-           "SFEM_USE_CHEB: %d\n",
+           "SFEM_USE_CHEB: %d\n"
+           "SFEM_DEBUG: %d\n",
            SFEM_MATRIX_FREE,
            SFEM_OPERATOR,
            SFEM_BLOCK_SIZE,
            SFEM_USE_PRECONDITIONER,
-           SFEM_USE_CHEB);
+           SFEM_USE_CHEB,
+           SFEM_DEBUG);
 
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
     auto conds = sfem::DirichletConditions::create_from_env(fs);
@@ -140,7 +144,6 @@ int main(int argc, char *argv[]) {
 
     real_t tol = 1e-12;
 
-    bool use_diag_preconditioner = SFEM_USE_PRECONDITIONER;
     double solve_tick = MPI_Wtime();
 
     f->apply_constraints(x->data());
@@ -148,7 +151,6 @@ int main(int argc, char *argv[]) {
 
     std::shared_ptr<sfem::Operator<real_t>> linear_op;
     std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> smoother;
-    
 
     if (SFEM_MATRIX_FREE) {
         linear_op = sfem::make_op<real_t>(
@@ -180,28 +182,38 @@ int main(int argc, char *argv[]) {
             // gs->verbose = true;
             smoother = gs;
 
-            array_write(
-                    comm, "./rhs.raw", SFEM_MPI_REAL_T, rhs->data(), fs->n_dofs(), fs->n_dofs());
-            array_write(
-                    comm, "./diag.raw", SFEM_MPI_REAL_T, diag->data(), fs->n_dofs(), fs->n_dofs());
-            array_write(comm,
-                        "./rowptr.raw",
-                        SFEM_MPI_COUNT_T,
-                        crs->row_ptr->data(),
-                        fs->n_dofs() + 1,
-                        fs->n_dofs() + 1);
-            array_write(comm,
-                        "./colidx.raw",
-                        SFEM_MPI_IDX_T,
-                        crs->col_idx->data(),
-                        crs->row_ptr->data()[fs->n_dofs()],
-                        crs->row_ptr->data()[fs->n_dofs()]);
-            array_write(comm,
-                        "./values.raw",
-                        SFEM_MPI_REAL_T,
-                        crs->values->data(),
-                        crs->row_ptr->data()[fs->n_dofs()],
-                        crs->row_ptr->data()[fs->n_dofs()]);
+            if (SFEM_DEBUG) {
+                array_write(comm,
+                            "./rhs.raw",
+                            SFEM_MPI_REAL_T,
+                            rhs->data(),
+                            fs->n_dofs(),
+                            fs->n_dofs());
+                array_write(comm,
+                            "./diag.raw",
+                            SFEM_MPI_REAL_T,
+                            diag->data(),
+                            fs->n_dofs(),
+                            fs->n_dofs());
+                array_write(comm,
+                            "./rowptr.raw",
+                            SFEM_MPI_COUNT_T,
+                            crs->row_ptr->data(),
+                            fs->n_dofs() + 1,
+                            fs->n_dofs() + 1);
+                array_write(comm,
+                            "./colidx.raw",
+                            SFEM_MPI_IDX_T,
+                            crs->col_idx->data(),
+                            crs->row_ptr->data()[fs->n_dofs()],
+                            crs->row_ptr->data()[fs->n_dofs()]);
+                array_write(comm,
+                            "./values.raw",
+                            SFEM_MPI_REAL_T,
+                            crs->values->data(),
+                            crs->row_ptr->data()[fs->n_dofs()],
+                            crs->row_ptr->data()[fs->n_dofs()]);
+            }
         }
     }
 
@@ -216,13 +228,15 @@ int main(int argc, char *argv[]) {
     auto fs_coarse = fs->derefine();
     auto f_coarse = f->derefine(fs_coarse, true);
 
-    // auto linear_op_coarse = sfem::make_op<real_t>(
-    //         fs_coarse->n_dofs(), fs_coarse->n_dofs(), [=](const real_t *const x, real_t *const y)
-    //         {
-    //             f_coarse->apply(nullptr, x, y);
-    //         });
-
-    auto linear_op_coarse = crs_hessian(*f_coarse);
+    std::shared_ptr<sfem::Operator<real_t>> linear_op_coarse;
+    if (SFEM_MATRIX_FREE) {
+        linear_op_coarse = sfem::make_op<real_t>(
+                fs_coarse->n_dofs(),
+                fs_coarse->n_dofs(),
+                [=](const real_t *const x, real_t *const y) { f_coarse->apply(nullptr, x, y); });
+    } else {
+        linear_op_coarse = crs_hessian(*f_coarse);
+    }
 
     auto c_coarse = sfem::h_buffer<real_t>(fs_coarse->n_dofs());
     auto r_coarse = sfem::h_buffer<real_t>(fs_coarse->n_dofs());
@@ -236,7 +250,7 @@ int main(int argc, char *argv[]) {
         solver_coarse->set_max_it(1000);
         solver_coarse->tol = 1e-12;
 
-        if (use_diag_preconditioner) {
+        if (SFEM_USE_PRECONDITIONER) {
             f_coarse->hessian_diag(nullptr, diag_coarse->data());
             auto preconditioner =
                     sfem::make_op<real_t>(diag_coarse->size(),
@@ -269,7 +283,7 @@ int main(int argc, char *argv[]) {
 
         {  // Residual
             real_t rtr_new = residual(*linear_op, rhs->data(), x->data(), r->data());
-            real_t rate = rtr_new/rtr;
+            real_t rate = rtr_new / rtr;
             rtr = rtr_new;
             printf("MG: %d)\tresidual: %g,\trate: %g\n", k, rtr, rate);
             if (rtr < tol || rate > 0.999) {
@@ -289,7 +303,7 @@ int main(int argc, char *argv[]) {
         // Prolongation
         zeros(smoother->rows(), c->data());
         prolongation->apply(c_coarse->data(), c->data());
-        
+
         // Check do we need this?
         f->apply_zero_constraints(c->data());
 
