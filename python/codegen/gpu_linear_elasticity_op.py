@@ -455,9 +455,9 @@ def main():
 	# fe = Tri6()
 	# q = sp.Matrix(2, 1, [qx, qy])
 
-	fe = Tet4()
+	# fe = Tet4()
 	# fe = Tet20()
-	# fe = Tet10()
+	fe = Tet10()
 	# fe = SymbolicFE3D()	
 	q = sp.Matrix(3, 1, [qx, qy, qz])
 
@@ -503,15 +503,15 @@ def main():
 	# c_log("//--------------------------")
 	# c_code(op.value())
 
-	# c_log("--------------------------")
-	# c_log("hessian")	
-	# c_log("--------------------------")
-	# c_code(op.hessian())
+	c_log("--------------------------")
+	c_log("hessian")	
+	c_log("--------------------------")
+	c_code(op.hessian())
 
-	# c_log("--------------------------")
-	# c_log("hessian_diag")	
-	# c_log("--------------------------")
-	# c_code(op.hessian_diag())
+	c_log("--------------------------")
+	c_log("hessian_diag")	
+	c_log("--------------------------")
+	c_code(op.hessian_diag())
 
 	# c_log("--------------------------")
 	# c_log("lin stress")	
