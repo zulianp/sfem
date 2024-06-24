@@ -82,9 +82,6 @@ int tet4_linear_elasticity_hessian(const ptrdiff_t nelements,
                                    const idx_t *const SFEM_RESTRICT colidx,
                                    real_t *const SFEM_RESTRICT values);
 
-
-
-
 #ifdef __cplusplus
 }
 #endif
