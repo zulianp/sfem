@@ -108,6 +108,8 @@ int main(int argc, char *argv[]) {
     int SFEM_MATRIX_FREE = 0;
     int SFEM_USE_CHEB = 0;
     int SFEM_DEBUG = 0;
+    int SFEM_MG = 0;
+    float SFEM_CHEB_EIG_MAX_SCALE = 1;
 
     SFEM_READ_ENV(SFEM_MATRIX_FREE, atoi);
     SFEM_READ_ENV(SFEM_OPERATOR, );
@@ -115,19 +117,25 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_USE_PRECONDITIONER, atoi);
     SFEM_READ_ENV(SFEM_USE_CHEB, atoi);
     SFEM_READ_ENV(SFEM_DEBUG, atoi);
+    SFEM_READ_ENV(SFEM_MG, atoi);
+    SFEM_READ_ENV(SFEM_CHEB_EIG_MAX_SCALE, atof);
 
     printf("SFEM_MATRIX_FREE: %d\n"
            "SFEM_OPERATOR: %s\n"
            "SFEM_BLOCK_SIZE: %d\n"
            "SFEM_USE_PRECONDITIONER: %d\n"
            "SFEM_USE_CHEB: %d\n"
-           "SFEM_DEBUG: %d\n",
+           "SFEM_DEBUG: %d\n"
+           "SFEM_MG: %d\n"
+           "SFEM_CHEB_EIG_MAX_SCALE: %f\n",
            SFEM_MATRIX_FREE,
            SFEM_OPERATOR,
            SFEM_BLOCK_SIZE,
            SFEM_USE_PRECONDITIONER,
            SFEM_USE_CHEB,
-           SFEM_DEBUG);
+           SFEM_DEBUG,
+           SFEM_MG,
+           SFEM_CHEB_EIG_MAX_SCALE);
 
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
     auto conds = sfem::DirichletConditions::create_from_env(fs);
@@ -161,6 +169,7 @@ int main(int argc, char *argv[]) {
         if (SFEM_USE_CHEB) {
             auto cheb = sfem::h_cheb3<real_t>(linear_op);
             cheb->init(rhs->data());
+            cheb->scale_eig_max = SFEM_CHEB_EIG_MAX_SCALE;
             cheb->set_max_it(3);
             smoother = cheb;
         } else {
@@ -174,6 +183,8 @@ int main(int argc, char *argv[]) {
         if (SFEM_USE_CHEB) {
             auto cheb = sfem::h_cheb3<real_t>(linear_op);
             cheb->init(rhs->data());
+            cheb->scale_eig_max = SFEM_CHEB_EIG_MAX_SCALE;
+            cheb->set_max_it(3);
             smoother = cheb;
         } else {
             f->hessian_diag(nullptr, diag->data());
@@ -220,100 +231,101 @@ int main(int argc, char *argv[]) {
     f->set_output_dir(output_path);
     auto output = f->output();
 
-#if 1  // MG
-    auto c = sfem::h_buffer<real_t>(fs->n_dofs());
-    auto r = sfem::h_buffer<real_t>(fs->n_dofs());
+    if (SFEM_MG) {
+        auto c = sfem::h_buffer<real_t>(fs->n_dofs());
+        auto r = sfem::h_buffer<real_t>(fs->n_dofs());
 
-    //  Coarse level
-    auto fs_coarse = fs->derefine();
-    auto f_coarse = f->derefine(fs_coarse, true);
+        //  Coarse level
+        auto fs_coarse = fs->derefine();
+        auto f_coarse = f->derefine(fs_coarse, true);
 
-    std::shared_ptr<sfem::Operator<real_t>> linear_op_coarse;
-    if (SFEM_MATRIX_FREE) {
-        linear_op_coarse = sfem::make_op<real_t>(
-                fs_coarse->n_dofs(),
-                fs_coarse->n_dofs(),
-                [=](const real_t *const x, real_t *const y) { f_coarse->apply(nullptr, x, y); });
-    } else {
-        linear_op_coarse = crs_hessian(*f_coarse);
-    }
-
-    auto c_coarse = sfem::h_buffer<real_t>(fs_coarse->n_dofs());
-    auto r_coarse = sfem::h_buffer<real_t>(fs_coarse->n_dofs());
-    auto diag_coarse = sfem::h_buffer<real_t>(fs_coarse->n_dofs());
-    auto solver_coarse = sfem::h_cg<real_t>();
-
-    {
-        solver_coarse->set_n_dofs(fs_coarse->n_dofs());
-        solver_coarse->set_op(linear_op_coarse);
-        solver_coarse->verbose = false;
-        solver_coarse->set_max_it(1000);
-        solver_coarse->tol = 1e-12;
-
-        if (SFEM_USE_PRECONDITIONER) {
-            f_coarse->hessian_diag(nullptr, diag_coarse->data());
-            auto preconditioner =
-                    sfem::make_op<real_t>(diag_coarse->size(),
-                                          diag_coarse->size(),
-                                          [=](const real_t *const x, real_t *const y) {
-                                              auto d = diag_coarse->data();
-#pragma omp parallel for
-                                              for (ptrdiff_t i = 0; i < diag_coarse->size(); ++i) {
-                                                  y[i] = x[i] / d[i];
-                                              }
-                                          });
-
-            solver_coarse->set_preconditioner_op(preconditioner);
-            solver_coarse->set_initial_guess_zero(true);
+        std::shared_ptr<sfem::Operator<real_t>> linear_op_coarse;
+        if (SFEM_MATRIX_FREE) {
+            linear_op_coarse = sfem::make_op<real_t>(fs_coarse->n_dofs(),
+                                                     fs_coarse->n_dofs(),
+                                                     [=](const real_t *const x, real_t *const y) {
+                                                         f_coarse->apply(nullptr, x, y);
+                                                     });
+        } else {
+            linear_op_coarse = crs_hessian(*f_coarse);
         }
-    }
 
-    smoother->set_initial_guess_zero(false);
+        auto c_coarse = sfem::h_buffer<real_t>(fs_coarse->n_dofs());
+        auto r_coarse = sfem::h_buffer<real_t>(fs_coarse->n_dofs());
+        auto diag_coarse = sfem::h_buffer<real_t>(fs_coarse->n_dofs());
+        auto solver_coarse = sfem::h_cg<real_t>();
 
-    // Multigrid
-    auto restriction = f->hierarchical_restriction();
-    auto prolongation = f->hierarchical_prolongation();
+        {
+            solver_coarse->set_n_dofs(fs_coarse->n_dofs());
+            solver_coarse->set_op(linear_op_coarse);
+            solver_coarse->verbose = false;
+            solver_coarse->set_max_it(1000);
+            solver_coarse->tol = 1e-12;
 
-    f->apply_constraints(x->data());
-    f->apply_constraints(rhs->data());
+            if (SFEM_USE_PRECONDITIONER) {
+                f_coarse->hessian_diag(nullptr, diag_coarse->data());
+                auto preconditioner = sfem::make_op<real_t>(
+                        diag_coarse->size(),
+                        diag_coarse->size(),
+                        [=](const real_t *const x, real_t *const y) {
+                            auto d = diag_coarse->data();
+#pragma omp parallel for
+                            for (ptrdiff_t i = 0; i < diag_coarse->size(); ++i) {
+                                y[i] = x[i] / d[i];
+                            }
+                        });
 
-    real_t rtr = residual(*linear_op, rhs->data(), x->data(), r->data());
-    for (int k = 0; k < 200; k++) {
-        smoother->apply(rhs->data(), x->data());
-
-        {  // Residual
-            real_t rtr_new = residual(*linear_op, rhs->data(), x->data(), r->data());
-            real_t rate = rtr_new / rtr;
-            rtr = rtr_new;
-            printf("MG: %d)\tresidual: %g,\trate: %g\n", k, rtr, rate);
-            if (rtr < tol || rate > 0.999) {
-                break;
+                solver_coarse->set_preconditioner_op(preconditioner);
+                solver_coarse->set_initial_guess_zero(true);
             }
         }
 
-        // Restriction
-        zeros(solver_coarse->rows(), r_coarse->data());
-        restriction->apply(r->data(), r_coarse->data());
+        smoother->set_initial_guess_zero(false);
 
-        // Set guess to zero
-        zeros(solver_coarse->rows(), c_coarse->data());
+        // Multigrid
+        auto restriction = f->hierarchical_restriction();
+        auto prolongation = f->hierarchical_prolongation();
 
-        solver_coarse->apply(r_coarse->data(), c_coarse->data());
+        f->apply_constraints(x->data());
+        f->apply_constraints(rhs->data());
 
-        // Prolongation
-        zeros(smoother->rows(), c->data());
-        prolongation->apply(c_coarse->data(), c->data());
+        real_t rtr = residual(*linear_op, rhs->data(), x->data(), r->data());
+        for (int k = 0; k < 200; k++) {
+            smoother->apply(rhs->data(), x->data());
 
-        // Check do we need this?
-        f->apply_zero_constraints(c->data());
+            {  // Residual
+                real_t rtr_new = residual(*linear_op, rhs->data(), x->data(), r->data());
+                real_t rate = rtr_new / rtr;
+                rtr = rtr_new;
+                printf("MG: %d)\tresidual: %g,\trate: %g\n", k, rtr, rate);
+                if (rtr < tol || rate > 0.999) {
+                    break;
+                }
+            }
 
-        // Apply correction
-        axpby<real_t>(smoother->rows(), 1, c->data(), 1, x->data());
+            // Restriction
+            zeros(solver_coarse->rows(), r_coarse->data());
+            restriction->apply(r->data(), r_coarse->data());
 
-        smoother->apply(rhs->data(), x->data());
-    }
+            // Set guess to zero
+            zeros(solver_coarse->rows(), c_coarse->data());
 
-#else  // Basic solvers
+            solver_coarse->apply(r_coarse->data(), c_coarse->data());
+
+            // Prolongation
+            zeros(smoother->rows(), c->data());
+            prolongation->apply(c_coarse->data(), c->data());
+
+            // Check do we need this?
+            f->apply_zero_constraints(c->data());
+
+            // Apply correction
+            axpby<real_t>(smoother->rows(), 1, c->data(), 1, x->data());
+
+            smoother->apply(rhs->data(), x->data());
+        }
+
+    } else {
 #if 0
     auto solver = smoother;
     solver->set_max_it(100);
@@ -321,39 +333,42 @@ int main(int argc, char *argv[]) {
 
 #else  // CG solver
 
-    auto solver = sfem::h_cg<real_t>();
-    solver->set_n_dofs(fs->n_dofs());
-    solver->set_op(linear_op);
+        auto solver = sfem::h_cg<real_t>();
+        solver->set_n_dofs(fs->n_dofs());
+        solver->set_op(linear_op);
 
-    if (smoother) {
-        auto preconditioner = smoother;
-        smoother->set_initial_guess_zero(true);
-        solver->set_preconditioner_op(preconditioner);
-    } else {
-        auto preconditioner = sfem::make_op<real_t>(
-                diag->size(), diag->size(), [=](const real_t *const x, real_t *const y) {
-                    auto d = diag->data();
+        if (smoother) {
+            auto preconditioner = smoother;
+            smoother->set_initial_guess_zero(true);
+            solver->set_preconditioner_op(preconditioner);
+        } else {
+            auto preconditioner = sfem::make_op<real_t>(
+                    diag->size(), diag->size(), [=](const real_t *const x, real_t *const y) {
+                        auto d = diag->data();
 
 #pragma omp parallel for
-                    for (ptrdiff_t i = 0; i < diag->size(); ++i) {
-                        y[i] = x[i] / d[i];
-                    }
-                });
+                        for (ptrdiff_t i = 0; i < diag->size(); ++i) {
+                            y[i] = x[i] / d[i];
+                        }
+                    });
 
-        solver->set_preconditioner_op(preconditioner);
-    }
+            solver->set_preconditioner_op(preconditioner);
+        }
 
-    solver->verbose = true;
-    solver->tol = tol;
-    solver->set_max_it(400);
+        solver->verbose = true;
+        solver->tol = tol;
+        solver->set_max_it(400);
 
 #endif
 
-    solver->set_op(linear_op);
-    solver->apply(rhs->data(), x->data());
-#endif  // MG
+        solver->set_op(linear_op);
+        solver->apply(rhs->data(), x->data());
+    }
 
     double solve_tock = MPI_Wtime();
+
+    auto r = sfem::h_buffer<real_t>(fs->n_dofs());
+    real_t rtr = residual(*linear_op, rhs->data(), x->data(), r->data());
 
     // -------------------------------
     // Write output
@@ -361,6 +376,7 @@ int main(int argc, char *argv[]) {
 
     output->write("x", x->data());
     output->write("rhs", rhs->data());
+    output->write("residual", r->data());
 
     double tock = MPI_Wtime();
     if (!rank) {
@@ -370,6 +386,7 @@ int main(int argc, char *argv[]) {
                (long)m->n_nodes(),
                (long)fs->n_dofs());
         printf("TTS:\t\t\t%g seconds (solve: %g)\n", tock - tick, solve_tock - solve_tick);
+        printf("residual: %g\n", rtr);
     }
 
     return MPI_Finalize();
