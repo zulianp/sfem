@@ -140,7 +140,7 @@ int main(int argc, char *argv[]) {
 
     real_t tol = 1e-12;
 
-    bool use_diag_preconditioner = false;
+    bool use_diag_preconditioner = SFEM_USE_PRECONDITIONER;
     double solve_tick = MPI_Wtime();
 
     f->apply_constraints(x->data());
@@ -208,7 +208,7 @@ int main(int argc, char *argv[]) {
     f->set_output_dir(output_path);
     auto output = f->output();
 
-#if 0  // MG
+#if 1  // MG
     auto c = sfem::h_buffer<real_t>(fs->n_dofs());
     auto r = sfem::h_buffer<real_t>(fs->n_dofs());
 
