@@ -26,6 +26,8 @@ def assign_matrix(name, mat):
 	return expr
 
 class GPULinearElasticityOp:
+	SoA_IO = True
+
 	def __init__(self, fe, q):
 		self.init_opt(fe, q)
 		# self.init_basic(fe, q)
@@ -38,7 +40,11 @@ class GPULinearElasticityOp:
 		shape_grad_ref = fe.tgrad(q)
 		# jac_inv = fe.symbol_jacobian_inverse()
 		jac_inv = fe.symbol_jacobian_inverse_as_adjugate()
-		disp = coeffs('u', dims * fe.n_nodes())
+
+		if self.SoA_IO:
+			disp = coeffs_SoA('u', dims, fe.n_nodes())
+		else:
+			disp = coeffs('u', dims * fe.n_nodes())
 		
 		self.jac = fe.jacobian(q)
 		rows = fe.n_nodes() * dims
@@ -114,7 +120,11 @@ class GPULinearElasticityOp:
 		shape_grad_ref = fe.tgrad(q)
 		# jac_inv = fe.symbol_jacobian_inverse()
 		jac_inv = fe.symbol_jacobian_inverse_as_adjugate()
-		disp = coeffs('u', dims * fe.n_nodes())
+		
+		if self.SoA_IO:
+			disp = coeffs_SoA('u', dims, fe.n_nodes())
+		else:
+			disp = coeffs('u', dims * fe.n_nodes())
 		
 		self.jac = fe.jacobian(q)
 		rows = fe.n_nodes() * dims
@@ -324,9 +334,26 @@ class GPULinearElasticityOp:
 		rows, cols = H.shape
 
 		expr = []
-		for i in range(0, rows):
-			var = sp.symbols(f'diag[{i}*stride]')
-			expr.append(ast.Assignment(var, (H[i, i])))
+
+
+		if self.SoA_IO:
+			assert self.fe.SoA
+
+			coords = ['x', 'y', 'z']
+			for d in range(0, self.fe.spatial_dim()):
+				name = f'diag{coords[d]}'
+				for i in range(0, self.fe.n_nodes()):
+					idx = d * self.fe.n_nodes() + i
+					Hii = H[idx, idx]
+
+					var = sp.symbols(f'{name}[{i}]')
+					expr.append(ast.Assignment(var, Hii))
+		else:
+			for i in range(0, rows):
+				var = sp.symbols(f'diag[{i}*stride]')
+				expr.append(ast.Assignment(var, (H[i, i])))
+
+
 		return expr
 
 
@@ -380,10 +407,24 @@ class GPULinearElasticityOp:
 		g = self.eval_grad_opt
 		rows, cols = g.shape
 
+
 		expr = []
-		for i in range(0, rows):
-			var = sp.symbols(f'element_vector[{i}*stride]')
-			expr.append(ast.Assignment(var, g[i]))
+		if self.SoA_IO:
+			assert self.fe.SoA
+
+			coords = ['x', 'y', 'z']
+			for d in range(0, self.fe.spatial_dim()):
+				name = f'out{coords[d]}'
+				for i in range(0, self.fe.n_nodes()):
+					idx = d * self.fe.n_nodes() + i
+
+					var = sp.symbols(f'{name}[{i}]')
+					expr.append(ast.Assignment(var, g[idx]))
+
+		else:
+			for i in range(0, rows):
+				var = sp.symbols(f'element_vector[{i}*stride]')
+				expr.append(ast.Assignment(var, g[i]))
 
 		return expr
 
@@ -414,9 +455,9 @@ def main():
 	# fe = Tri6()
 	# q = sp.Matrix(2, 1, [qx, qy])
 
-	# fe = Tet4()
+	fe = Tet4()
 	# fe = Tet20()
-	fe = Tet10()
+	# fe = Tet10()
 	# fe = SymbolicFE3D()	
 	q = sp.Matrix(3, 1, [qx, qy, qz])
 
@@ -424,38 +465,38 @@ def main():
 	# op.hessian_check()
 
 
-	# c_log("//--------------------------")
-	# c_log("// geometry")	
-	# c_log("//--------------------------")
+	c_log("//--------------------------")
+	c_log("// geometry")	
+	c_log("//--------------------------")
 	
-	# c_code(op.jacobian())
-	# c_code(op.geometry())
+	c_code(op.jacobian())
+	c_code(op.geometry())
 
 
-	# c_log("//--------------------------")
-	# c_log("// displacement_gradient")	
-	# c_log("//--------------------------")
-	# c_code(op.displacement_gradient())
+	c_log("//--------------------------")
+	c_log("// displacement_gradient")	
+	c_log("//--------------------------")
+	c_code(op.displacement_gradient())
 
-	# c_log("//--------------------------")
-	# c_log("// Piola")	
-	# c_log("//--------------------------")
-	# c_code(op.first_piola())
+	c_log("//--------------------------")
+	c_log("// Piola")	
+	c_log("//--------------------------")
+	c_code(op.first_piola())
 
 	# c_log("//--------------------------")
 	# c_log("// gradient")
 	# c_log("//--------------------------")
 	# c_code(op.gradient())
 
-	# c_log("//--------------------------")
-	# c_log("// loperand")	
-	# c_log("//--------------------------")
-	# c_code(op.loperand())
+	c_log("//--------------------------")
+	c_log("// loperand")	
+	c_log("//--------------------------")
+	c_code(op.loperand())
 
-	# c_log("//--------------------------")
-	# c_log("// gradient_opt")
-	# c_log("//--------------------------")
-	# c_code(op.gradient_opt())
+	c_log("//--------------------------")
+	c_log("// gradient_opt")
+	c_log("//--------------------------")
+	c_code(op.gradient_opt())
 
 	# c_log("//--------------------------")
 	# c_log("// value")
@@ -467,10 +508,10 @@ def main():
 	# c_log("--------------------------")
 	# c_code(op.hessian())
 
-	c_log("--------------------------")
-	c_log("hessian_diag")	
-	c_log("--------------------------")
-	c_code(op.hessian_diag())
+	# c_log("--------------------------")
+	# c_log("hessian_diag")	
+	# c_log("--------------------------")
+	# c_code(op.hessian_diag())
 
 	# c_log("--------------------------")
 	# c_log("lin stress")	

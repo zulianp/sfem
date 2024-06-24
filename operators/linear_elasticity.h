@@ -13,7 +13,7 @@ extern "C" {
 // Structure of arrays
 //////////////////////////
 
-void linear_elasticity_assemble_value_soa(const enum ElemType element_type,
+int linear_elasticity_assemble_value_soa(const enum ElemType element_type,
                                           const ptrdiff_t nelements,
                                           const ptrdiff_t nnodes,
                                           idx_t **const SFEM_RESTRICT elems,
@@ -23,7 +23,7 @@ void linear_elasticity_assemble_value_soa(const enum ElemType element_type,
                                           const real_t **const SFEM_RESTRICT u,
                                           real_t *const SFEM_RESTRICT value);
 
-void linear_elasticity_assemble_gradient_soa(const enum ElemType element_type,
+int linear_elasticity_assemble_gradient_soa(const enum ElemType element_type,
                                              const ptrdiff_t nelements,
                                              const ptrdiff_t nnodes,
                                              idx_t **const SFEM_RESTRICT elems,
@@ -33,7 +33,7 @@ void linear_elasticity_assemble_gradient_soa(const enum ElemType element_type,
                                              const real_t **const SFEM_RESTRICT u,
                                              real_t **const SFEM_RESTRICT values);
 
-void linear_elasticity_assemble_hessian_soa(const enum ElemType element_type,
+int linear_elasticity_assemble_hessian_soa(const enum ElemType element_type,
                                             const ptrdiff_t nelements,
                                             const ptrdiff_t nnodes,
                                             idx_t **const SFEM_RESTRICT elems,
@@ -44,7 +44,7 @@ void linear_elasticity_assemble_hessian_soa(const enum ElemType element_type,
                                             const idx_t *const SFEM_RESTRICT colidx,
                                             real_t **const SFEM_RESTRICT values);
 
-void linear_elasticity_assemble_diag_aos(const enum ElemType element_type,
+int linear_elasticity_assemble_diag_aos(const enum ElemType element_type,
                                              const ptrdiff_t nelements,
                                              const ptrdiff_t nnodes,
                                              idx_t **const SFEM_RESTRICT elems,
@@ -53,7 +53,7 @@ void linear_elasticity_assemble_diag_aos(const enum ElemType element_type,
                                              const real_t lambda,
                                              real_t *const SFEM_RESTRICT values);
 
-void linear_elasticity_apply_soa(const enum ElemType element_type,
+int linear_elasticity_apply_soa(const enum ElemType element_type,
                                  const ptrdiff_t nelements,
                                  const ptrdiff_t nnodes,
                                  idx_t **const SFEM_RESTRICT elems,
@@ -68,7 +68,7 @@ void linear_elasticity_apply_soa(const enum ElemType element_type,
 // Array of structures
 //////////////////////////
 
-void linear_elasticity_assemble_value_aos(const enum ElemType element_type,
+int linear_elasticity_assemble_value_aos(const enum ElemType element_type,
                                           const ptrdiff_t nelements,
                                           const ptrdiff_t nnodes,
                                           idx_t **const SFEM_RESTRICT elems,
@@ -78,7 +78,7 @@ void linear_elasticity_assemble_value_aos(const enum ElemType element_type,
                                           const real_t *const SFEM_RESTRICT u,
                                           real_t *const SFEM_RESTRICT value);
 
-void linear_elasticity_assemble_gradient_aos(const enum ElemType element_type,
+int linear_elasticity_assemble_gradient_aos(const enum ElemType element_type,
                                              const ptrdiff_t nelements,
                                              const ptrdiff_t nnodes,
                                              idx_t **const SFEM_RESTRICT elems,
@@ -88,7 +88,7 @@ void linear_elasticity_assemble_gradient_aos(const enum ElemType element_type,
                                              const real_t *const SFEM_RESTRICT u,
                                              real_t *const SFEM_RESTRICT values);
 
-void linear_elasticity_assemble_hessian_aos(const enum ElemType element_type,
+int linear_elasticity_assemble_hessian_aos(const enum ElemType element_type,
                                             const ptrdiff_t nelements,
                                             const ptrdiff_t nnodes,
                                             idx_t **const SFEM_RESTRICT elems,
@@ -99,7 +99,7 @@ void linear_elasticity_assemble_hessian_aos(const enum ElemType element_type,
                                             const idx_t *const SFEM_RESTRICT colidx,
                                             real_t *const SFEM_RESTRICT values);
 
-void linear_elasticity_apply_aos(const enum ElemType element_type,
+int linear_elasticity_apply_aos(const enum ElemType element_type,
                                  const ptrdiff_t nelements,
                                  const ptrdiff_t nnodes,
                                  idx_t **const SFEM_RESTRICT elems,
