@@ -3,6 +3,8 @@
 
 #include "tet4_inline_cpu.h"
 
+#define RPOW2(l) (1. / ((l) * (l)))
+
 static SFEM_INLINE void tet4_gradient_3(const jacobian_t *const SFEM_RESTRICT adjugate,
                                         const jacobian_t jacobian_determinant,
                                         const scalar_t *const SFEM_RESTRICT ux,
@@ -176,29 +178,25 @@ static SFEM_INLINE void tet4_linear_elasticity_diag_adj(const scalar_t mu,
     diagz[3] = x9 * (x0 * x22 + x21 + x30);
 }
 
-
-#define RPOW2(l) (1. / ((l) * (l)))
-// #define MIN(a, b) ((a) < (b) ? (a) : (b))
-// #define MAX(a, b) ((a) > (b) ? (a) : (b))
-
-static SFEM_INLINE void value_kernel(const scalar_t mu,
-                                     const scalar_t lambda,
-                                     const scalar_t px0,
-                                     const scalar_t px1,
-                                     const scalar_t px2,
-                                     const scalar_t px3,
-                                     const scalar_t py0,
-                                     const scalar_t py1,
-                                     const scalar_t py2,
-                                     const scalar_t py3,
-                                     const scalar_t pz0,
-                                     const scalar_t pz1,
-                                     const scalar_t pz2,
-                                     const scalar_t pz3,
-                                     const scalar_t *const SFEM_RESTRICT ux,
-                                     const scalar_t *const SFEM_RESTRICT uy,
-                                     const scalar_t *const SFEM_RESTRICT uz,
-                                     accumulator_t *const SFEM_RESTRICT element_scalar) {
+static SFEM_INLINE void tet4_linear_elasticity_value_points(const scalar_t mu,
+                                                            const scalar_t lambda,
+                                                            const scalar_t px0,
+                                                            const scalar_t px1,
+                                                            const scalar_t px2,
+                                                            const scalar_t px3,
+                                                            const scalar_t py0,
+                                                            const scalar_t py1,
+                                                            const scalar_t py2,
+                                                            const scalar_t py3,
+                                                            const scalar_t pz0,
+                                                            const scalar_t pz1,
+                                                            const scalar_t pz2,
+                                                            const scalar_t pz3,
+                                                            const scalar_t *const SFEM_RESTRICT ux,
+                                                            const scalar_t *const SFEM_RESTRICT uy,
+                                                            const scalar_t *const SFEM_RESTRICT uz,
+                                                            accumulator_t *const SFEM_RESTRICT
+                                                                    element_scalar) {
     const scalar_t x0 = -px0 + px1;
     const scalar_t x1 = -py0 + py2;
     const scalar_t x2 = -pz0 + pz3;
@@ -250,21 +248,22 @@ static SFEM_INLINE void value_kernel(const scalar_t mu,
                    x36 * POW2(x41) + x36 * POW2(x42) + x37 * x38 * x40 + x38 * x39 * x41);
 }
 
-static SFEM_INLINE void hessian_kernel(const scalar_t mu,
-                                       const scalar_t lambda,
-                                       const scalar_t px0,
-                                       const scalar_t px1,
-                                       const scalar_t px2,
-                                       const scalar_t px3,
-                                       const scalar_t py0,
-                                       const scalar_t py1,
-                                       const scalar_t py2,
-                                       const scalar_t py3,
-                                       const scalar_t pz0,
-                                       const scalar_t pz1,
-                                       const scalar_t pz2,
-                                       const scalar_t pz3,
-                                       accumulator_t *const SFEM_RESTRICT element_matrix) {
+static SFEM_INLINE void tet4_linear_elasticity_hessian_points(const scalar_t mu,
+                                                              const scalar_t lambda,
+                                                              const scalar_t px0,
+                                                              const scalar_t px1,
+                                                              const scalar_t px2,
+                                                              const scalar_t px3,
+                                                              const scalar_t py0,
+                                                              const scalar_t py1,
+                                                              const scalar_t py2,
+                                                              const scalar_t py3,
+                                                              const scalar_t pz0,
+                                                              const scalar_t pz1,
+                                                              const scalar_t pz2,
+                                                              const scalar_t pz3,
+                                                              accumulator_t *const SFEM_RESTRICT
+                                                                      element_matrix) {
     const scalar_t x0 = -px0 + px1;
     const scalar_t x1 = -py0 + py2;
     const scalar_t x2 = -pz0 + pz3;
@@ -635,6 +634,337 @@ static SFEM_INLINE void hessian_kernel(const scalar_t mu,
     element_matrix[141] = x221;
     element_matrix[142] = x222;
     element_matrix[143] = x14 * x213;
+}
+
+static SFEM_INLINE void tet4_linear_elasticity_hessian_adj(
+        const scalar_t mu,
+        const scalar_t lambda,
+        const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+        const jacobian_t jacobian_determinant,
+        accumulator_t *const SFEM_RESTRICT element_matrix) 
+{
+    const scalar_t x0 = jacobian_adjugate[1] + jacobian_adjugate[4] + jacobian_adjugate[7];
+    const scalar_t x1 = mu * x0;
+    const scalar_t x2 = jacobian_adjugate[1] * x1;
+    const scalar_t x3 = jacobian_adjugate[2] + jacobian_adjugate[5] + jacobian_adjugate[8];
+    const scalar_t x4 = mu * x3;
+    const scalar_t x5 = jacobian_adjugate[2] * x4;
+    const scalar_t x6 = lambda + 2 * mu;
+    const scalar_t x7 = jacobian_adjugate[0] + jacobian_adjugate[3] + jacobian_adjugate[6];
+    const scalar_t x8 = x6 * x7;
+    const scalar_t x9 = jacobian_adjugate[0] * x8 + x2 + x5;
+    const scalar_t x10 = jacobian_adjugate[4] * x1;
+    const scalar_t x11 = jacobian_adjugate[5] * x4;
+    const scalar_t x12 = jacobian_adjugate[3] * x8 + x10 + x11;
+    const scalar_t x13 = jacobian_adjugate[7] * x1;
+    const scalar_t x14 = jacobian_adjugate[8] * x4;
+    const scalar_t x15 = jacobian_adjugate[6] * x8 + x13 + x14;
+    const scalar_t x16 = (1.0 / 6.0) / jacobian_determinant;
+    const scalar_t x17 = POW2(jacobian_adjugate[1]);
+    const scalar_t x18 = mu * x17;
+    const scalar_t x19 = POW2(jacobian_adjugate[2]);
+    const scalar_t x20 = mu * x19;
+    const scalar_t x21 = POW2(jacobian_adjugate[0]);
+    const scalar_t x22 = x18 + x20 + x21 * x6;
+    const scalar_t x23 = jacobian_adjugate[1] * mu;
+    const scalar_t x24 = jacobian_adjugate[4] * x23;
+    const scalar_t x25 = jacobian_adjugate[2] * mu;
+    const scalar_t x26 = jacobian_adjugate[5] * x25;
+    const scalar_t x27 = jacobian_adjugate[0] * x6;
+    const scalar_t x28 = jacobian_adjugate[3] * x27 + x24 + x26;
+    const scalar_t x29 = jacobian_adjugate[7] * x23;
+    const scalar_t x30 = jacobian_adjugate[8] * x25;
+    const scalar_t x31 = jacobian_adjugate[6] * x27 + x29 + x30;
+    const scalar_t x32 = POW2(jacobian_adjugate[4]);
+    const scalar_t x33 = mu * x32;
+    const scalar_t x34 = POW2(jacobian_adjugate[5]);
+    const scalar_t x35 = mu * x34;
+    const scalar_t x36 = POW2(jacobian_adjugate[3]);
+    const scalar_t x37 = x33 + x35 + x36 * x6;
+    const scalar_t x38 = jacobian_adjugate[4] * mu;
+    const scalar_t x39 = jacobian_adjugate[7] * x38;
+    const scalar_t x40 = jacobian_adjugate[5] * mu;
+    const scalar_t x41 = jacobian_adjugate[8] * x40;
+    const scalar_t x42 = jacobian_adjugate[3] * jacobian_adjugate[6];
+    const scalar_t x43 = x39 + x41 + x42 * x6;
+    const scalar_t x44 = POW2(jacobian_adjugate[7]);
+    const scalar_t x45 = mu * x44;
+    const scalar_t x46 = POW2(jacobian_adjugate[8]);
+    const scalar_t x47 = mu * x46;
+    const scalar_t x48 = POW2(jacobian_adjugate[6]);
+    const scalar_t x49 = x45 + x47 + x48 * x6;
+    const scalar_t x50 = lambda * x0;
+    const scalar_t x51 = jacobian_adjugate[0] * x50 + x23 * x7;
+    const scalar_t x52 = jacobian_adjugate[3] * x50 + x38 * x7;
+    const scalar_t x53 = jacobian_adjugate[7] * mu;
+    const scalar_t x54 = jacobian_adjugate[6] * x50 + x53 * x7;
+    const scalar_t x55 = jacobian_adjugate[1] * lambda;
+    const scalar_t x56 = jacobian_adjugate[0] * x38 + jacobian_adjugate[3] * x55;
+    const scalar_t x57 = jacobian_adjugate[0] * x53 + jacobian_adjugate[6] * x55;
+    const scalar_t x58 = jacobian_adjugate[0] * x23 + jacobian_adjugate[0] * x55;
+    const scalar_t x59 = jacobian_adjugate[4] * lambda;
+    const scalar_t x60 = jacobian_adjugate[0] * x59 + jacobian_adjugate[3] * x23;
+    const scalar_t x61 = jacobian_adjugate[3] * x53 + jacobian_adjugate[6] * x59;
+    const scalar_t x62 = jacobian_adjugate[3] * x38 + jacobian_adjugate[3] * x59;
+    const scalar_t x63 = jacobian_adjugate[7] * lambda;
+    const scalar_t x64 = jacobian_adjugate[0] * x63 + jacobian_adjugate[6] * x23;
+    const scalar_t x65 = jacobian_adjugate[3] * x63 + jacobian_adjugate[6] * x38;
+    const scalar_t x66 = jacobian_adjugate[6] * x53 + jacobian_adjugate[6] * x63;
+    const scalar_t x67 = lambda * x3;
+    const scalar_t x68 = jacobian_adjugate[0] * x67 + x25 * x7;
+    const scalar_t x69 = jacobian_adjugate[3] * x67 + x40 * x7;
+    const scalar_t x70 = jacobian_adjugate[8] * mu;
+    const scalar_t x71 = jacobian_adjugate[6] * x67 + x7 * x70;
+    const scalar_t x72 = jacobian_adjugate[2] * lambda;
+    const scalar_t x73 = jacobian_adjugate[0] * x40 + jacobian_adjugate[3] * x72;
+    const scalar_t x74 = jacobian_adjugate[0] * x70 + jacobian_adjugate[6] * x72;
+    const scalar_t x75 = jacobian_adjugate[0] * x25 + jacobian_adjugate[0] * x72;
+    const scalar_t x76 = jacobian_adjugate[5] * lambda;
+    const scalar_t x77 = jacobian_adjugate[0] * x76 + jacobian_adjugate[3] * x25;
+    const scalar_t x78 = jacobian_adjugate[3] * x70 + jacobian_adjugate[6] * x76;
+    const scalar_t x79 = jacobian_adjugate[3] * x40 + jacobian_adjugate[3] * x76;
+    const scalar_t x80 = jacobian_adjugate[8] * lambda;
+    const scalar_t x81 = jacobian_adjugate[0] * x80 + jacobian_adjugate[6] * x25;
+    const scalar_t x82 = jacobian_adjugate[3] * x80 + jacobian_adjugate[6] * x40;
+    const scalar_t x83 = jacobian_adjugate[6] * x70 + jacobian_adjugate[6] * x80;
+    const scalar_t x84 = x16 * x28;
+    const scalar_t x85 = x16 * x31;
+    const scalar_t x86 = x16 * (lambda + mu);
+    const scalar_t x87 = jacobian_adjugate[0] * x86;
+    const scalar_t x88 = jacobian_adjugate[1] * x87;
+    const scalar_t x89 = x16 * x60;
+    const scalar_t x90 = x16 * x64;
+    const scalar_t x91 = jacobian_adjugate[2] * x87;
+    const scalar_t x92 = x16 * x77;
+    const scalar_t x93 = x16 * x81;
+    const scalar_t x94 = x16 * x43;
+    const scalar_t x95 = x16 * x56;
+    const scalar_t x96 = jacobian_adjugate[3] * x86;
+    const scalar_t x97 = jacobian_adjugate[4] * x96;
+    const scalar_t x98 = x16 * x65;
+    const scalar_t x99 = x16 * x73;
+    const scalar_t x100 = jacobian_adjugate[5] * x96;
+    const scalar_t x101 = x16 * x82;
+    const scalar_t x102 = x16 * x57;
+    const scalar_t x103 = x16 * x61;
+    const scalar_t x104 = jacobian_adjugate[6] * x86;
+    const scalar_t x105 = jacobian_adjugate[7] * x104;
+    const scalar_t x106 = x16 * x74;
+    const scalar_t x107 = x16 * x78;
+    const scalar_t x108 = jacobian_adjugate[8] * x104;
+    const scalar_t x109 = jacobian_adjugate[0] * x1 + x55 * x7;
+    const scalar_t x110 = jacobian_adjugate[3] * x1 + x59 * x7;
+    const scalar_t x111 = jacobian_adjugate[6] * x1 + x63 * x7;
+    const scalar_t x112 = mu * x7;
+    const scalar_t x113 = jacobian_adjugate[0] * x112;
+    const scalar_t x114 = x0 * x6;
+    const scalar_t x115 = jacobian_adjugate[1] * x114 + x113 + x5;
+    const scalar_t x116 = jacobian_adjugate[3] * x112;
+    const scalar_t x117 = jacobian_adjugate[4] * x114 + x11 + x116;
+    const scalar_t x118 = jacobian_adjugate[6] * x112;
+    const scalar_t x119 = jacobian_adjugate[7] * x114 + x118 + x14;
+    const scalar_t x120 = mu * x21;
+    const scalar_t x121 = x120 + x17 * x6 + x20;
+    const scalar_t x122 = jacobian_adjugate[0] * mu;
+    const scalar_t x123 = jacobian_adjugate[3] * x122;
+    const scalar_t x124 = jacobian_adjugate[1] * x6;
+    const scalar_t x125 = jacobian_adjugate[4] * x124 + x123 + x26;
+    const scalar_t x126 = jacobian_adjugate[6] * x122;
+    const scalar_t x127 = jacobian_adjugate[7] * x124 + x126 + x30;
+    const scalar_t x128 = mu * x36;
+    const scalar_t x129 = x128 + x32 * x6 + x35;
+    const scalar_t x130 = mu * x42;
+    const scalar_t x131 = jacobian_adjugate[4] * jacobian_adjugate[7] * x6 + x130 + x41;
+    const scalar_t x132 = mu * x48;
+    const scalar_t x133 = x132 + x44 * x6 + x47;
+    const scalar_t x134 = jacobian_adjugate[2] * x1 + x3 * x55;
+    const scalar_t x135 = jacobian_adjugate[5] * x1 + x3 * x59;
+    const scalar_t x136 = jacobian_adjugate[8] * x1 + x3 * x63;
+    const scalar_t x137 = jacobian_adjugate[2] * x59 + jacobian_adjugate[5] * x23;
+    const scalar_t x138 = jacobian_adjugate[2] * x63 + jacobian_adjugate[8] * x23;
+    const scalar_t x139 = jacobian_adjugate[2] * x23 + jacobian_adjugate[2] * x55;
+    const scalar_t x140 = jacobian_adjugate[4] * x25 + jacobian_adjugate[5] * x55;
+    const scalar_t x141 = jacobian_adjugate[5] * x63 + jacobian_adjugate[8] * x38;
+    const scalar_t x142 = jacobian_adjugate[5] * x38 + jacobian_adjugate[5] * x59;
+    const scalar_t x143 = jacobian_adjugate[7] * x25 + jacobian_adjugate[8] * x55;
+    const scalar_t x144 = jacobian_adjugate[7] * x40 + jacobian_adjugate[8] * x59;
+    const scalar_t x145 = jacobian_adjugate[8] * x53 + jacobian_adjugate[8] * x63;
+    const scalar_t x146 = x125 * x16;
+    const scalar_t x147 = x127 * x16;
+    const scalar_t x148 = jacobian_adjugate[1] * jacobian_adjugate[2] * x86;
+    const scalar_t x149 = x140 * x16;
+    const scalar_t x150 = x143 * x16;
+    const scalar_t x151 = x131 * x16;
+    const scalar_t x152 = x137 * x16;
+    const scalar_t x153 = jacobian_adjugate[4] * jacobian_adjugate[5] * x86;
+    const scalar_t x154 = x144 * x16;
+    const scalar_t x155 = x138 * x16;
+    const scalar_t x156 = x141 * x16;
+    const scalar_t x157 = jacobian_adjugate[7] * jacobian_adjugate[8] * x86;
+    const scalar_t x158 = jacobian_adjugate[0] * x4 + x7 * x72;
+    const scalar_t x159 = jacobian_adjugate[3] * x4 + x7 * x76;
+    const scalar_t x160 = jacobian_adjugate[6] * x4 + x7 * x80;
+    const scalar_t x161 = jacobian_adjugate[1] * x4 + jacobian_adjugate[2] * x50;
+    const scalar_t x162 = jacobian_adjugate[4] * x4 + jacobian_adjugate[5] * x50;
+    const scalar_t x163 = jacobian_adjugate[7] * x4 + jacobian_adjugate[8] * x50;
+    const scalar_t x164 = x3 * x6;
+    const scalar_t x165 = jacobian_adjugate[2] * x164 + x113 + x2;
+    const scalar_t x166 = jacobian_adjugate[5] * x164 + x10 + x116;
+    const scalar_t x167 = jacobian_adjugate[8] * x164 + x118 + x13;
+    const scalar_t x168 = x120 + x18 + x19 * x6;
+    const scalar_t x169 = jacobian_adjugate[2] * x6;
+    const scalar_t x170 = jacobian_adjugate[5] * x169 + x123 + x24;
+    const scalar_t x171 = jacobian_adjugate[8] * x169 + x126 + x29;
+    const scalar_t x172 = x128 + x33 + x34 * x6;
+    const scalar_t x173 = jacobian_adjugate[5] * jacobian_adjugate[8] * x6 + x130 + x39;
+    const scalar_t x174 = x132 + x45 + x46 * x6;
+    const scalar_t x175 = x16 * x170;
+    const scalar_t x176 = x16 * x171;
+    const scalar_t x177 = x16 * x173;
+    element_matrix[0] = x16 * (x12 + x15 + x9);
+    element_matrix[1] = x16 * (-x22 - x28 - x31);
+    element_matrix[2] = x16 * (-x28 - x37 - x43);
+    element_matrix[3] = x16 * (-x31 - x43 - x49);
+    element_matrix[4] = x16 * (x51 + x52 + x54);
+    element_matrix[5] = x16 * (-x56 - x57 - x58);
+    element_matrix[6] = x16 * (-x60 - x61 - x62);
+    element_matrix[7] = x16 * (-x64 - x65 - x66);
+    element_matrix[8] = x16 * (x68 + x69 + x71);
+    element_matrix[9] = x16 * (-x73 - x74 - x75);
+    element_matrix[10] = x16 * (-x77 - x78 - x79);
+    element_matrix[11] = x16 * (-x81 - x82 - x83);
+    element_matrix[12] = -x16 * x9;
+    element_matrix[13] = x16 * x22;
+    element_matrix[14] = x84;
+    element_matrix[15] = x85;
+    element_matrix[16] = -x16 * x51;
+    element_matrix[17] = x88;
+    element_matrix[18] = x89;
+    element_matrix[19] = x90;
+    element_matrix[20] = -x16 * x68;
+    element_matrix[21] = x91;
+    element_matrix[22] = x92;
+    element_matrix[23] = x93;
+    element_matrix[24] = -x12 * x16;
+    element_matrix[25] = x84;
+    element_matrix[26] = x16 * x37;
+    element_matrix[27] = x94;
+    element_matrix[28] = -x16 * x52;
+    element_matrix[29] = x95;
+    element_matrix[30] = x97;
+    element_matrix[31] = x98;
+    element_matrix[32] = -x16 * x69;
+    element_matrix[33] = x99;
+    element_matrix[34] = x100;
+    element_matrix[35] = x101;
+    element_matrix[36] = -x15 * x16;
+    element_matrix[37] = x85;
+    element_matrix[38] = x94;
+    element_matrix[39] = x16 * x49;
+    element_matrix[40] = -x16 * x54;
+    element_matrix[41] = x102;
+    element_matrix[42] = x103;
+    element_matrix[43] = x105;
+    element_matrix[44] = -x16 * x71;
+    element_matrix[45] = x106;
+    element_matrix[46] = x107;
+    element_matrix[47] = x108;
+    element_matrix[48] = x16 * (x109 + x110 + x111);
+    element_matrix[49] = x16 * (-x58 - x60 - x64);
+    element_matrix[50] = x16 * (-x56 - x62 - x65);
+    element_matrix[51] = x16 * (-x57 - x61 - x66);
+    element_matrix[52] = x16 * (x115 + x117 + x119);
+    element_matrix[53] = x16 * (-x121 - x125 - x127);
+    element_matrix[54] = x16 * (-x125 - x129 - x131);
+    element_matrix[55] = x16 * (-x127 - x131 - x133);
+    element_matrix[56] = x16 * (x134 + x135 + x136);
+    element_matrix[57] = x16 * (-x137 - x138 - x139);
+    element_matrix[58] = x16 * (-x140 - x141 - x142);
+    element_matrix[59] = x16 * (-x143 - x144 - x145);
+    element_matrix[60] = -x109 * x16;
+    element_matrix[61] = x88;
+    element_matrix[62] = x95;
+    element_matrix[63] = x102;
+    element_matrix[64] = -x115 * x16;
+    element_matrix[65] = x121 * x16;
+    element_matrix[66] = x146;
+    element_matrix[67] = x147;
+    element_matrix[68] = -x134 * x16;
+    element_matrix[69] = x148;
+    element_matrix[70] = x149;
+    element_matrix[71] = x150;
+    element_matrix[72] = -x110 * x16;
+    element_matrix[73] = x89;
+    element_matrix[74] = x97;
+    element_matrix[75] = x103;
+    element_matrix[76] = -x117 * x16;
+    element_matrix[77] = x146;
+    element_matrix[78] = x129 * x16;
+    element_matrix[79] = x151;
+    element_matrix[80] = -x135 * x16;
+    element_matrix[81] = x152;
+    element_matrix[82] = x153;
+    element_matrix[83] = x154;
+    element_matrix[84] = -x111 * x16;
+    element_matrix[85] = x90;
+    element_matrix[86] = x98;
+    element_matrix[87] = x105;
+    element_matrix[88] = -x119 * x16;
+    element_matrix[89] = x147;
+    element_matrix[90] = x151;
+    element_matrix[91] = x133 * x16;
+    element_matrix[92] = -x136 * x16;
+    element_matrix[93] = x155;
+    element_matrix[94] = x156;
+    element_matrix[95] = x157;
+    element_matrix[96] = x16 * (x158 + x159 + x160);
+    element_matrix[97] = x16 * (-x75 - x77 - x81);
+    element_matrix[98] = x16 * (-x73 - x79 - x82);
+    element_matrix[99] = x16 * (-x74 - x78 - x83);
+    element_matrix[100] = x16 * (x161 + x162 + x163);
+    element_matrix[101] = x16 * (-x139 - x140 - x143);
+    element_matrix[102] = x16 * (-x137 - x142 - x144);
+    element_matrix[103] = x16 * (-x138 - x141 - x145);
+    element_matrix[104] = x16 * (x165 + x166 + x167);
+    element_matrix[105] = x16 * (-x168 - x170 - x171);
+    element_matrix[106] = x16 * (-x170 - x172 - x173);
+    element_matrix[107] = x16 * (-x171 - x173 - x174);
+    element_matrix[108] = -x158 * x16;
+    element_matrix[109] = x91;
+    element_matrix[110] = x99;
+    element_matrix[111] = x106;
+    element_matrix[112] = -x16 * x161;
+    element_matrix[113] = x148;
+    element_matrix[114] = x152;
+    element_matrix[115] = x155;
+    element_matrix[116] = -x16 * x165;
+    element_matrix[117] = x16 * x168;
+    element_matrix[118] = x175;
+    element_matrix[119] = x176;
+    element_matrix[120] = -x159 * x16;
+    element_matrix[121] = x92;
+    element_matrix[122] = x100;
+    element_matrix[123] = x107;
+    element_matrix[124] = -x16 * x162;
+    element_matrix[125] = x149;
+    element_matrix[126] = x153;
+    element_matrix[127] = x156;
+    element_matrix[128] = -x16 * x166;
+    element_matrix[129] = x175;
+    element_matrix[130] = x16 * x172;
+    element_matrix[131] = x177;
+    element_matrix[132] = -x16 * x160;
+    element_matrix[133] = x93;
+    element_matrix[134] = x101;
+    element_matrix[135] = x108;
+    element_matrix[136] = -x16 * x163;
+    element_matrix[137] = x150;
+    element_matrix[138] = x154;
+    element_matrix[139] = x157;
+    element_matrix[140] = -x16 * x167;
+    element_matrix[141] = x176;
+    element_matrix[142] = x177;
+    element_matrix[143] = x16 * x174;
 }
 
 #endif  // TET4_LINEAR_ELASTICITY_INLINE_CPU_H

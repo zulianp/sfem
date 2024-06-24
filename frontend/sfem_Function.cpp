@@ -235,6 +235,12 @@ namespace sfem {
         return impl_->dof_to_dof_graph;
     }
 
+    std::shared_ptr<CRSGraph> FunctionSpace::node_to_node_graph()
+    {
+        initialize_dof_to_dof_graph();
+        return impl_->node_to_node_graph;
+    }
+
     enum ElemType FunctionSpace::element_type() const {
         assert(impl_->element_type != INVALID);
         return impl_->element_type;
@@ -301,7 +307,7 @@ namespace sfem {
             impl_->dof_to_dof_graph = node_to_node;
         } else {
             if (!impl_->dof_to_dof_graph) {
-                impl_->dof_to_dof_graph = node_to_node->block_to_scalar(impl_->element_type);
+                impl_->dof_to_dof_graph = node_to_node->block_to_scalar(this->block_size());
             }
         }
 
@@ -1186,7 +1192,7 @@ namespace sfem {
                         isolver_scalar_t *const values) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            auto graph = space->dof_to_dof_graph();
+            auto graph = space->node_to_node_graph();
 
             linear_elasticity_assemble_hessian_aos(element_type,
                                                    mesh->nelements,

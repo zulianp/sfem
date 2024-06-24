@@ -48,7 +48,7 @@ int tet4_linear_elasticity_value(const ptrdiff_t nelements,
         }
 
         real_t element_scalar = 0;
-        value_kernel(  // Model parameters
+        tet4_linear_elasticity_value_points(  // Model parameters
                 mu,
                 lambda,
                 // X-coordinates
@@ -268,34 +268,75 @@ int tet4_linear_elasticity_hessian(const ptrdiff_t nelements,
         idx_t ev[4];
         idx_t ks[4];
 
+        jacobian_t jacobian_adjugate[9];
+        jacobian_t jacobian_determinant = 0;
+
         accumulator_t element_matrix[(4 * 3) * (4 * 3)];
 
 #pragma unroll(4)
         for (int v = 0; v < 4; ++v) {
             ev[v] = elements[v][i];
         }
-        
-        hessian_kernel(
-                // Model parameters
-                mu,
-                lambda,
-                // X-coordinates
-                x[ev[0]],
-                x[ev[1]],
-                x[ev[2]],
-                x[ev[3]],
-                // Y-coordinates
-                y[ev[0]],
-                y[ev[1]],
-                y[ev[2]],
-                y[ev[3]],
-                // Z-coordinates
-                z[ev[0]],
-                z[ev[1]],
-                z[ev[2]],
-                z[ev[3]],
-                // output matrix
-                element_matrix);
+
+        tet4_adjugate_and_det(x[ev[0]],
+                              x[ev[1]],
+                              x[ev[2]],
+                              x[ev[3]],
+                              // Y-coordinates
+                              y[ev[0]],
+                              y[ev[1]],
+                              y[ev[2]],
+                              y[ev[3]],
+                              // Z-coordinates
+                              z[ev[0]],
+                              z[ev[1]],
+                              z[ev[2]],
+                              z[ev[3]],
+                              // Output
+                              jacobian_adjugate,
+                              &jacobian_determinant);
+
+        tet4_linear_elasticity_hessian_adj(
+                mu, lambda, jacobian_adjugate, jacobian_determinant, element_matrix);
+
+#ifndef NDEBUG
+        {
+            accumulator_t test_matrix[(4 * 3) * (4 * 3)];
+            tet4_linear_elasticity_hessian_points(
+                    // Model parameters
+                    mu,
+                    lambda,
+                    // X-coordinates
+                    x[ev[0]],
+                    x[ev[1]],
+                    x[ev[2]],
+                    x[ev[3]],
+                    // Y-coordinates
+                    y[ev[0]],
+                    y[ev[1]],
+                    y[ev[2]],
+                    y[ev[3]],
+                    // Z-coordinates
+                    z[ev[0]],
+                    z[ev[1]],
+                    z[ev[2]],
+                    z[ev[3]],
+                    // output matrix
+                    test_matrix);
+
+            for (int ii = 0; ii < 12; ii++) {
+                for (int jj = 0; jj < 12; jj++) {
+                    int idx = ii * 12 + jj;
+                    double diff = fabs(test_matrix[idx] - element_matrix[idx]);
+                    if(diff > 1e-8) {
+                        printf("Diff %d %d) %g != %g\n", ii, jj, element_matrix[idx], test_matrix[idx]);
+                    }
+
+                    assert(diff < 1e-5);
+                }
+            }
+        }
+#endif  // NDEBUG
 
         // assert(!check_symmetric(4 * block_size, element_matrix));
 

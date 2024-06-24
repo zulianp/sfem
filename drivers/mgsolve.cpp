@@ -357,7 +357,7 @@ int main(int argc, char *argv[]) {
 
         solver->verbose = true;
         solver->tol = tol;
-        solver->set_max_it(400);
+        solver->set_max_it(800);
 
 #endif
 
