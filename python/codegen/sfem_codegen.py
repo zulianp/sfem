@@ -354,6 +354,19 @@ def coeffs(name, n):
     ret = sp.Matrix(n, 1, list_coeffs)
     return ret
 
+
+def coeffs_SoA(name, dim, n, prefix=['x', 'y', 'z']):
+    list_coeffs = []
+
+    for d in range(0, dim):
+        name_d = f'{name}{prefix[d]}'
+        for i in range(0, n):
+            ui= sp.symbols(f'{name_d}[{i}]', real=True)
+            list_coeffs.append(ui)
+
+    ret = sp.Matrix(dim*n, 1, list_coeffs)
+    return ret
+
 def matrix_coeff(name, rows, cols):
     list_coeffs = []
 

@@ -8,108 +8,29 @@
 #include "sortreduce.h"
 
 #include "sfem_vec.h"
+#include "tet4_linear_elasticity_inline_cpu.h"
 
-// Does not lead to improvements on Apple M1, however 2x on x86 with avx2
-// #define SFEM_ENABLE_EXPLICIT_VECTORIZATION
-
-#define POW2(l) ((l) * (l))
 #define RPOW2(l) (1. / ((l) * (l)))
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
+// #define MIN(a, b) ((a) < (b) ? (a) : (b))
+// #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-static const int stride = 1;
+static SFEM_INLINE void value_kernel(const real_t mu,
+                                     const real_t lambda,
+                                     const real_t px0,
+                                     const real_t px1,
+                                     const real_t px2,
+                                     const real_t px3,
+                                     const real_t py0,
+                                     const real_t py1,
+                                     const real_t py2,
+                                     const real_t py3,
+                                     const real_t pz0,
+                                     const real_t pz1,
+                                     const real_t pz2,
+                                     const real_t pz3,
 
-static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {
-    int i;
-    for (i = 0; i < size - 4; i += 4) {
-        if (arr[i] == target) return i;
-        if (arr[i + 1] == target) return i + 1;
-        if (arr[i + 2] == target) return i + 2;
-        if (arr[i + 3] == target) return i + 3;
-    }
-    for (; i < size; i++) {
-        if (arr[i] == target) return i;
-    }
-    return -1;
-}
-
-static SFEM_INLINE int find_col(const idx_t key, const idx_t *const row, const int lenrow) {
-    if (lenrow <= 32) {
-        return linear_search(key, row, lenrow);
-
-        // Using sentinel (potentially dangerous if matrix is buggy and column does not exist)
-        // while (key > row[++k]) {
-        //     // Hi
-        // }
-        // assert(k < lenrow);
-        // assert(key == row[k]);
-    } else {
-        // Use this for larger number of dofs per row
-        return find_idx_binary_search(key, row, lenrow);
-    }
-}
-
-static SFEM_INLINE void find_cols4(const idx_t *targets,
-                                   const idx_t *const row,
-                                   const int lenrow,
-                                   int *ks) {
-    if (lenrow > 32) {
-        for (int d = 0; d < 4; ++d) {
-            ks[d] = find_col(targets[d], row, lenrow);
-        }
-    } else {
-#pragma unroll(4)
-        for (int d = 0; d < 4; ++d) {
-            ks[d] = 0;
-        }
-
-        for (int i = 0; i < lenrow; ++i) {
-#pragma unroll(4)
-            for (int d = 0; d < 4; ++d) {
-                ks[d] += row[i] < targets[d];
-            }
-        }
-    }
-}
-
-static int check_symmetric(int n, const real_t *const element_matrix) {
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            const real_t diff = element_matrix[i * n + j] - element_matrix[i + j * n];
-            assert(diff < 1e-16);
-            if (diff > 1e-16) {
-                return 1;
-            }
-
-            // printf("%g ",  element_matrix[i*n + j] );
-        }
-
-        // printf("\n");
-    }
-
-    // printf("\n");
-
-    return 0;
-}
-
-static SFEM_INLINE void tet4_linear_elasticity_assemble_value_kernel(
-    const real_t mu,
-    const real_t lambda,
-    const real_t px0,
-    const real_t px1,
-    const real_t px2,
-    const real_t px3,
-    const real_t py0,
-    const real_t py1,
-    const real_t py2,
-    const real_t py3,
-    const real_t pz0,
-    const real_t pz1,
-    const real_t pz2,
-    const real_t pz3,
-
-    const real_t *const SFEM_RESTRICT u,
-    real_t *const SFEM_RESTRICT element_scalar) {
+                                     const real_t *const SFEM_RESTRICT u,
+                                     real_t *const SFEM_RESTRICT element_scalar) {
     const real_t x0 = -px0 + px1;
     const real_t x1 = -py0 + py2;
     const real_t x2 = -pz0 + pz3;
@@ -155,139 +76,27 @@ static SFEM_INLINE void tet4_linear_elasticity_assemble_value_kernel(
     const real_t x42 = u[10] * x17 + u[11] * x18 + u[8] * x19 + u[9] * x16;
     const real_t x43 = (1.0 / 6.0) * lambda * x20;
     element_scalar[0] =
-        x14 * ((1.0 / 6.0) * lambda * x27 * x33 + x21 * x22 + x21 * x38 + x22 * x28 + x22 * x34 +
-               x27 * x43 + x28 * x38 + x33 * x43 + x34 * x38 + POW2(x35) * x36 + x35 * x38 * x42 +
-               x36 * POW2(x37) + x36 * POW2(x39) + x36 * POW2(x40) + x36 * POW2(x41) +
-               x36 * POW2(x42) + x37 * x38 * x40 + x38 * x39 * x41);
+            x14 * ((1.0 / 6.0) * lambda * x27 * x33 + x21 * x22 + x21 * x38 + x22 * x28 +
+                   x22 * x34 + x27 * x43 + x28 * x38 + x33 * x43 + x34 * x38 + POW2(x35) * x36 +
+                   x35 * x38 * x42 + x36 * POW2(x37) + x36 * POW2(x39) + x36 * POW2(x40) +
+                   x36 * POW2(x41) + x36 * POW2(x42) + x37 * x38 * x40 + x38 * x39 * x41);
 }
 
-static SFEM_INLINE void tet4_linear_elasticity_assemble_gradient_kernel(
-    const real_t mu,
-    const real_t lambda,
-    const real_t px0,
-    const real_t px1,
-    const real_t px2,
-    const real_t px3,
-    const real_t py0,
-    const real_t py1,
-    const real_t py2,
-    const real_t py3,
-    const real_t pz0,
-    const real_t pz1,
-    const real_t pz2,
-    const real_t pz3,
-    const real_t *const SFEM_RESTRICT u,
-    real_t *const SFEM_RESTRICT element_vector) {
-    const real_t x0 = -px0 + px1;
-    const real_t x1 = -py0 + py2;
-    const real_t x2 = -pz0 + pz3;
-    const real_t x3 = x1 * x2;
-    const real_t x4 = -px0 + px2;
-    const real_t x5 = -py0 + py3;
-    const real_t x6 = -pz0 + pz1;
-    const real_t x7 = -px0 + px3;
-    const real_t x8 = -py0 + py1;
-    const real_t x9 = -pz0 + pz2;
-    const real_t x10 = x8 * x9;
-    const real_t x11 = x5 * x9;
-    const real_t x12 = x2 * x8;
-    const real_t x13 = x1 * x6;
-    const real_t x14 = -x0 * x11 + x0 * x3 + x10 * x7 - x12 * x4 - x13 * x7 + x4 * x5 * x6;
-    const real_t x15 = 1.0 / x14;
-    const real_t x16 = x15 * (-x11 + x3);
-    const real_t x17 = x15 * (-x12 + x5 * x6);
-    const real_t x18 = x15 * (x10 - x13);
-    const real_t x19 = -x16 - x17 - x18;
-    const real_t x20 = u[0] * x19 + u[1] * x16 + u[2] * x17 + u[3] * x18;
-    const real_t x21 = (1.0 / 6.0) * lambda;
-    const real_t x22 = x16 * x21;
-    const real_t x23 = x15 * (-x2 * x4 + x7 * x9);
-    const real_t x24 = x15 * (x0 * x2 - x6 * x7);
-    const real_t x25 = x15 * (-x0 * x9 + x4 * x6);
-    const real_t x26 = -x23 - x24 - x25;
-    const real_t x27 = u[4] * x26 + u[5] * x23 + u[6] * x24 + u[7] * x25;
-    const real_t x28 = x15 * (-x0 * x5 + x7 * x8);
-    const real_t x29 = x15 * (x0 * x1 - x4 * x8);
-    const real_t x30 = x15 * (-x1 * x7 + x4 * x5);
-    const real_t x31 = -x28 - x29 - x30;
-    const real_t x32 = u[10] * x28 + u[11] * x29 + u[8] * x31 + u[9] * x30;
-    const real_t x33 = u[0] * x31 + u[1] * x30 + u[2] * x28 + u[3] * x29;
-    const real_t x34 = (1.0 / 6.0) * mu;
-    const real_t x35 = x30 * x34;
-    const real_t x36 = u[10] * x17 + u[11] * x18 + u[8] * x19 + u[9] * x16;
-    const real_t x37 = u[0] * x26 + u[1] * x23 + u[2] * x24 + u[3] * x25;
-    const real_t x38 = x23 * x34;
-    const real_t x39 = u[4] * x19 + u[5] * x16 + u[6] * x17 + u[7] * x18;
-    const real_t x40 = (1.0 / 3.0) * mu;
-    const real_t x41 = x20 * x40;
-    const real_t x42 = x16 * x41 + x20 * x22 + x22 * x27 + x22 * x32 + x33 * x35 + x35 * x36 +
-                       x37 * x38 + x38 * x39;
-    const real_t x43 = x17 * x21;
-    const real_t x44 = x28 * x34;
-    const real_t x45 = x24 * x34;
-    const real_t x46 = x17 * x41 + x20 * x43 + x27 * x43 + x32 * x43 + x33 * x44 + x36 * x44 +
-                       x37 * x45 + x39 * x45;
-    const real_t x47 = x18 * x20;
-    const real_t x48 = x18 * x21;
-    const real_t x49 = x29 * x34;
-    const real_t x50 = x25 * x34;
-    const real_t x51 = x21 * x47 + x27 * x48 + x32 * x48 + x33 * x49 + x36 * x49 + x37 * x50 +
-                       x39 * x50 + x40 * x47;
-    const real_t x52 = x21 * x23;
-    const real_t x53 = u[4] * x31 + u[5] * x30 + u[6] * x28 + u[7] * x29;
-    const real_t x54 = u[10] * x24 + u[11] * x25 + u[8] * x26 + u[9] * x23;
-    const real_t x55 = x27 * x40;
-    const real_t x56 = x16 * x34;
-    const real_t x57 = x20 * x52 + x23 * x55 + x27 * x52 + x32 * x52 + x35 * x53 + x35 * x54 +
-                       x37 * x56 + x39 * x56;
-    const real_t x58 = x21 * x24;
-    const real_t x59 = x17 * x34;
-    const real_t x60 = x20 * x58 + x24 * x55 + x27 * x58 + x32 * x58 + x37 * x59 + x39 * x59 +
-                       x44 * x53 + x44 * x54;
-    const real_t x61 = x21 * x25;
-    const real_t x62 = x18 * x34;
-    const real_t x63 = x20 * x61 + x25 * x55 + x27 * x61 + x32 * x61 + x37 * x62 + x39 * x62 +
-                       x49 * x53 + x49 * x54;
-    const real_t x64 = x21 * x30;
-    const real_t x65 = x32 * x40;
-    const real_t x66 = x20 * x64 + x27 * x64 + x30 * x65 + x32 * x64 + x33 * x56 + x36 * x56 +
-                       x38 * x53 + x38 * x54;
-    const real_t x67 = x21 * x28;
-    const real_t x68 = x20 * x67 + x27 * x67 + x28 * x65 + x32 * x67 + x33 * x59 + x36 * x59 +
-                       x45 * x53 + x45 * x54;
-    const real_t x69 = x21 * x29;
-    const real_t x70 = x20 * x69 + x27 * x69 + x29 * x65 + x32 * x69 + x33 * x62 + x36 * x62 +
-                       x50 * x53 + x50 * x54;
-    element_vector[0] = x14 * (-x42 - x46 - x51);
-    element_vector[1] = x14 * x42;
-    element_vector[2] = x14 * x46;
-    element_vector[3] = x14 * x51;
-    element_vector[4] = x14 * (-x57 - x60 - x63);
-    element_vector[5] = x14 * x57;
-    element_vector[6] = x14 * x60;
-    element_vector[7] = x14 * x63;
-    element_vector[8] = x14 * (-x66 - x68 - x70);
-    element_vector[9] = x14 * x66;
-    element_vector[10] = x14 * x68;
-    element_vector[11] = x14 * x70;
-}
-
-static SFEM_INLINE void tet4_linear_elasticity_assemble_hessian_kernel(const real_t mu,
-                                                                       const real_t lambda,
-                                                                       const real_t px0,
-                                                                       const real_t px1,
-                                                                       const real_t px2,
-                                                                       const real_t px3,
-                                                                       const real_t py0,
-                                                                       const real_t py1,
-                                                                       const real_t py2,
-                                                                       const real_t py3,
-                                                                       const real_t pz0,
-                                                                       const real_t pz1,
-                                                                       const real_t pz2,
-                                                                       const real_t pz3,
-                                                                       real_t *const SFEM_RESTRICT
-                                                                           element_matrix) {
+static SFEM_INLINE void hessian_kernel(const real_t mu,
+                                       const real_t lambda,
+                                       const real_t px0,
+                                       const real_t px1,
+                                       const real_t px2,
+                                       const real_t px3,
+                                       const real_t py0,
+                                       const real_t py1,
+                                       const real_t py2,
+                                       const real_t py3,
+                                       const real_t pz0,
+                                       const real_t pz1,
+                                       const real_t pz2,
+                                       const real_t pz3,
+                                       real_t *const SFEM_RESTRICT element_matrix) {
     const real_t x0 = -px0 + px1;
     const real_t x1 = -py0 + py2;
     const real_t x2 = -pz0 + pz3;
@@ -660,528 +469,10 @@ static SFEM_INLINE void tet4_linear_elasticity_assemble_hessian_kernel(const rea
     element_matrix[143 * stride] = x14 * x213;
 }
 
-#ifdef SFEM_ENABLE_EXPLICIT_VECTORIZATION
-
-static SFEM_INLINE void tet4_linear_elasticity_apply_kernel(
-    const vreal_t mu,
-    const vreal_t lambda,
-    const vreal_t px0,
-    const vreal_t px1,
-    const vreal_t px2,
-    const vreal_t px3,
-    const vreal_t py0,
-    const vreal_t py1,
-    const vreal_t py2,
-    const vreal_t py3,
-    const vreal_t pz0,
-    const vreal_t pz1,
-    const vreal_t pz2,
-    const vreal_t pz3,
-    const vreal_t *const SFEM_RESTRICT increment,
-    vreal_t *const SFEM_RESTRICT element_vector) {
-    const vreal_t x0 = -py0 + py2;
-    const vreal_t x1 = -pz0 + pz3;
-    const vreal_t x2 = x0 * x1;
-    const vreal_t x3 = -py0 + py3;
-    const vreal_t x4 = -pz0 + pz2;
-    const vreal_t x5 = x3 * x4;
-    const vreal_t x6 = x2 - x5;
-    const vreal_t x7 = -px0 + px1;
-    const vreal_t x8 = -px0 + px3;
-    const vreal_t x9 = -py0 + py1;
-    const vreal_t x10 = -x3 * x7 + x8 * x9;
-    const vreal_t x11 = -px0 + px2;
-    const vreal_t x12 = -pz0 + pz1;
-    const vreal_t x13 = x4 * x9;
-    const vreal_t x14 = x1 * x9;
-    const vreal_t x15 = x0 * x12;
-    const vreal_t x16 = x11 * x12 * x3 - x11 * x14 + x13 * x8 - x15 * x8 + x2 * x7 - x5 * x7;
-    const vreal_t x17 = RPOW2(x16);
-    const vreal_t x18 = (1.0 / 6.0) * lambda;
-    const vreal_t x19 = x17 * x18;
-    const vreal_t x20 = x10 * x19;
-    const vreal_t x21 = -x0 * x8 + x11 * x3;
-    const vreal_t x22 = x12 * x3 - x14;
-    const vreal_t x23 = (1.0 / 6.0) * mu;
-    const vreal_t x24 = x17 * x23;
-    const vreal_t x25 = x22 * x24;
-    const vreal_t x26 = x20 * x6 + x21 * x25;
-    const vreal_t x27 = x10 * x25 + x20 * x22;
-    const vreal_t x28 = x13 - x15;
-    const vreal_t x29 = x0 * x7 - x11 * x9;
-    const vreal_t x30 = x20 * x28 + x25 * x29;
-    const vreal_t x31 = x26 + x27 + x30;
-    const vreal_t x32 = -x31;
-    const vreal_t x33 = increment[10] * x16;
-    const vreal_t x34 = x19 * x29;
-    const vreal_t x35 = x24 * x28;
-    const vreal_t x36 = x21 * x35 + x34 * x6;
-    const vreal_t x37 = x10 * x35 + x22 * x34;
-    const vreal_t x38 = x28 * x34 + x29 * x35;
-    const vreal_t x39 = x36 + x37 + x38;
-    const vreal_t x40 = -x39;
-    const vreal_t x41 = increment[11] * x16;
-    const vreal_t x42 = -x1 * x11 + x4 * x8;
-    const vreal_t x43 = x19 * x6;
-    const vreal_t x44 = x24 * x6;
-    const vreal_t x45 = x42 * x43 + x42 * x44;
-    const vreal_t x46 = x19 * x42;
-    const vreal_t x47 = x1 * x7 - x12 * x8;
-    const vreal_t x48 = x24 * x47;
-    const vreal_t x49 = x22 * x46 + x48 * x6;
-    const vreal_t x50 = x11 * x12 - x4 * x7;
-    const vreal_t x51 = x28 * x46 + x44 * x50;
-    const vreal_t x52 = x45 + x49 + x51;
-    const vreal_t x53 = -x52;
-    const vreal_t x54 = increment[5] * x16;
-    const vreal_t x55 = x25 * x42 + x43 * x47;
-    const vreal_t x56 = x19 * x47;
-    const vreal_t x57 = x22 * x56 + x25 * x47;
-    const vreal_t x58 = x25 * x50 + x28 * x56;
-    const vreal_t x59 = x55 + x57 + x58;
-    const vreal_t x60 = -x59;
-    const vreal_t x61 = increment[6] * x16;
-    const vreal_t x62 = x35 * x42 + x43 * x50;
-    const vreal_t x63 = x19 * x50;
-    const vreal_t x64 = x22 * x63 + x35 * x47;
-    const vreal_t x65 = x28 * x63 + x35 * x50;
-    const vreal_t x66 = x62 + x64 + x65;
-    const vreal_t x67 = -x66;
-    const vreal_t x68 = increment[7] * x16;
-    const vreal_t x69 = x21 * x43 + x21 * x44;
-    const vreal_t x70 = x19 * x21;
-    const vreal_t x71 = x10 * x44 + x22 * x70;
-    const vreal_t x72 = x24 * x29;
-    const vreal_t x73 = x28 * x70 + x6 * x72;
-    const vreal_t x74 = x69 + x71 + x73;
-    const vreal_t x75 = -x74;
-    const vreal_t x76 = increment[9] * x16;
-    const vreal_t x77 = POW2(x6);
-    const vreal_t x78 = POW2(x21);
-    const vreal_t x79 = x24 * x78;
-    const vreal_t x80 = POW2(x42);
-    const vreal_t x81 = x24 * x80;
-    const vreal_t x82 = (1.0 / 3.0) * mu;
-    const vreal_t x83 = x17 * x82;
-    const vreal_t x84 = x19 * x77 + x77 * x83 + x79 + x81;
-    const vreal_t x85 = x10 * x21;
-    const vreal_t x86 = x24 * x85;
-    const vreal_t x87 = x42 * x48;
-    const vreal_t x88 = x6 * x83;
-    const vreal_t x89 = x22 * x88;
-    const vreal_t x90 = x22 * x43 + x86 + x87 + x89;
-    const vreal_t x91 = x21 * x72;
-    const vreal_t x92 = x42 * x50;
-    const vreal_t x93 = x24 * x92;
-    const vreal_t x94 = x28 * x88;
-    const vreal_t x95 = x28 * x43 + x91 + x93 + x94;
-    const vreal_t x96 = -x84 - x90 - x95;
-    const vreal_t x97 = increment[1] * x16;
-    const vreal_t x98 = POW2(x22);
-    const vreal_t x99 = POW2(x10);
-    const vreal_t x100 = x24 * x99;
-    const vreal_t x101 = POW2(x47);
-    const vreal_t x102 = x101 * x24;
-    const vreal_t x103 = x100 + x102 + x19 * x98 + x83 * x98;
-    const vreal_t x104 = x22 * x28;
-    const vreal_t x105 = x10 * x72;
-    const vreal_t x106 = x48 * x50;
-    const vreal_t x107 = x104 * x83;
-    const vreal_t x108 = x104 * x19 + x105 + x106 + x107;
-    const vreal_t x109 = -x103 - x108 - x90;
-    const vreal_t x110 = increment[2] * x16;
-    const vreal_t x111 = x17 * POW2(x28);
-    const vreal_t x112 = POW2(x29);
-    const vreal_t x113 = x112 * x24;
-    const vreal_t x114 = POW2(x50);
-    const vreal_t x115 = x114 * x24;
-    const vreal_t x116 = x111 * x18 + x111 * x82 + x113 + x115;
-    const vreal_t x117 = -x108 - x116 - x95;
-    const vreal_t x118 = increment[3] * x16;
-    const vreal_t x119 = x52 + x59 + x66;
-    const vreal_t x120 = increment[4] * x16;
-    const vreal_t x121 = x31 + x39 + x74;
-    const vreal_t x122 = increment[8] * x16;
-    const vreal_t x123 = x17 * x28;
-    const vreal_t x124 = x123 * x6;
-    const vreal_t x125 = (1.0 / 3.0) * lambda;
-    const vreal_t x126 = x125 * x22;
-    const vreal_t x127 = x17 * x6;
-    const vreal_t x128 = (2.0 / 3.0) * mu;
-    const vreal_t x129 = x128 * x22;
-    const vreal_t x130 = x83 * x85;
-    const vreal_t x131 = x29 * x83;
-    const vreal_t x132 = x131 * x21;
-    const vreal_t x133 = x10 * x131;
-    const vreal_t x134 = x130 + x132 + x133;
-    const vreal_t x135 = x47 * x83;
-    const vreal_t x136 = x135 * x42;
-    const vreal_t x137 = x83 * x92;
-    const vreal_t x138 = x135 * x50;
-    const vreal_t x139 = x136 + x137 + x138;
-    const vreal_t x140 = increment[0] * x16;
-    const vreal_t x141 = -x45 - x55 - x62;
-    const vreal_t x142 = -x26 - x36 - x69;
-    const vreal_t x143 = -x49 - x57 - x64;
-    const vreal_t x144 = -x27 - x37 - x71;
-    const vreal_t x145 = -x51 - x58 - x65;
-    const vreal_t x146 = -x30 - x38 - x73;
-    const vreal_t x147 = x20 * x42 + x21 * x48;
-    const vreal_t x148 = x10 * x48 + x20 * x47;
-    const vreal_t x149 = x20 * x50 + x47 * x72;
-    const vreal_t x150 = x147 + x148 + x149;
-    const vreal_t x151 = -x150;
-    const vreal_t x152 = x24 * x50;
-    const vreal_t x153 = x152 * x21 + x34 * x42;
-    const vreal_t x154 = x10 * x152 + x34 * x47;
-    const vreal_t x155 = x34 * x50 + x50 * x72;
-    const vreal_t x156 = x153 + x154 + x155;
-    const vreal_t x157 = -x156;
-    const vreal_t x158 = x24 * x42;
-    const vreal_t x159 = x158 * x21 + x21 * x46;
-    const vreal_t x160 = x10 * x158 + x21 * x56;
-    const vreal_t x161 = x21 * x63 + x42 * x72;
-    const vreal_t x162 = x159 + x160 + x161;
-    const vreal_t x163 = -x162;
-    const vreal_t x164 = x24 * x77;
-    const vreal_t x165 = x164 + x19 * x80 + x79 + x80 * x83;
-    const vreal_t x166 = x25 * x6;
-    const vreal_t x167 = x136 + x166 + x42 * x56 + x86;
-    const vreal_t x168 = x35 * x6;
-    const vreal_t x169 = x137 + x168 + x19 * x92 + x91;
-    const vreal_t x170 = -x165 - x167 - x169;
-    const vreal_t x171 = x24 * x98;
-    const vreal_t x172 = x100 + x101 * x19 + x101 * x83 + x171;
-    const vreal_t x173 = x25 * x28;
-    const vreal_t x174 = x105 + x138 + x173 + x50 * x56;
-    const vreal_t x175 = -x167 - x172 - x174;
-    const vreal_t x176 = x111 * x23;
-    const vreal_t x177 = x113 + x114 * x19 + x114 * x83 + x176;
-    const vreal_t x178 = -x169 - x174 - x177;
-    const vreal_t x179 = x150 + x156 + x162;
-    const vreal_t x180 = x125 * x17;
-    const vreal_t x181 = x180 * x47;
-    const vreal_t x182 = x128 * x17;
-    const vreal_t x183 = x182 * x47;
-    const vreal_t x184 = x107 + x89 + x94;
-    const vreal_t x185 = -x147 - x153 - x159;
-    const vreal_t x186 = -x148 - x154 - x160;
-    const vreal_t x187 = -x149 - x155 - x161;
-    const vreal_t x188 = x130 + x166 + x19 * x85 + x87;
-    const vreal_t x189 = x102 + x171 + x19 * x99 + x83 * x99;
-    const vreal_t x190 = x106 + x133 + x173 + x20 * x29;
-    const vreal_t x191 = -x188 - x189 - x190;
-    const vreal_t x192 = x132 + x168 + x21 * x34 + x93;
-    const vreal_t x193 = x112 * x19 + x112 * x83 + x115 + x176;
-    const vreal_t x194 = -x190 - x192 - x193;
-    const vreal_t x195 = x164 + x19 * x78 + x78 * x83 + x81;
-    const vreal_t x196 = -x188 - x192 - x195;
-    const vreal_t x197 = x180 * x29;
-    const vreal_t x198 = x182 * x29;
-    element_vector[0 * stride] =
-        x109 * x110 + x117 * x118 + x119 * x120 + x121 * x122 +
-        x140 * (x103 + x116 + x123 * x126 + x123 * x129 + x124 * x125 + x124 * x128 + x126 * x127 +
-                x127 * x129 + x134 + x139 + x84) +
-        x32 * x33 + x40 * x41 + x53 * x54 + x60 * x61 + x67 * x68 + x75 * x76 + x96 * x97;
-    element_vector[1 * stride] = x110 * x90 + x118 * x95 + x120 * x141 + x122 * x142 + x140 * x96 +
-                                 x26 * x33 + x36 * x41 + x45 * x54 + x55 * x61 + x62 * x68 +
-                                 x69 * x76 + x84 * x97;
-    element_vector[2 * stride] = x103 * x110 + x108 * x118 + x109 * x140 + x120 * x143 +
-                                 x122 * x144 + x27 * x33 + x37 * x41 + x49 * x54 + x57 * x61 +
-                                 x64 * x68 + x71 * x76 + x90 * x97;
-    element_vector[3 * stride] = x108 * x110 + x116 * x118 + x117 * x140 + x120 * x145 +
-                                 x122 * x146 + x30 * x33 + x38 * x41 + x51 * x54 + x58 * x61 +
-                                 x65 * x68 + x73 * x76 + x95 * x97;
-    element_vector[4 * stride] = x110 * x143 + x118 * x145 + x119 * x140 +
-                                 x120 * (x134 + x165 + x172 + x177 + x180 * x92 + x181 * x42 +
-                                         x181 * x50 + x182 * x92 + x183 * x42 + x183 * x50 + x184) +
-                                 x122 * x179 + x141 * x97 + x151 * x33 + x157 * x41 + x163 * x76 +
-                                 x170 * x54 + x175 * x61 + x178 * x68;
-    element_vector[5 * stride] = x110 * x49 + x118 * x51 + x120 * x170 + x122 * x185 + x140 * x53 +
-                                 x147 * x33 + x153 * x41 + x159 * x76 + x165 * x54 + x167 * x61 +
-                                 x169 * x68 + x45 * x97;
-    element_vector[6 * stride] = x110 * x57 + x118 * x58 + x120 * x175 + x122 * x186 + x140 * x60 +
-                                 x148 * x33 + x154 * x41 + x160 * x76 + x167 * x54 + x172 * x61 +
-                                 x174 * x68 + x55 * x97;
-    element_vector[7 * stride] = x110 * x64 + x118 * x65 + x120 * x178 + x122 * x187 + x140 * x67 +
-                                 x149 * x33 + x155 * x41 + x161 * x76 + x169 * x54 + x174 * x61 +
-                                 x177 * x68 + x62 * x97;
-    element_vector[8 * stride] = x110 * x144 + x118 * x146 + x120 * x179 + x121 * x140 +
-                                 x122 * (x10 * x197 + x10 * x198 + x139 + x180 * x85 + x182 * x85 +
-                                         x184 + x189 + x193 + x195 + x197 * x21 + x198 * x21) +
-                                 x142 * x97 + x185 * x54 + x186 * x61 + x187 * x68 + x191 * x33 +
-                                 x194 * x41 + x196 * x76;
-    element_vector[9 * stride] = x110 * x71 + x118 * x73 + x120 * x163 + x122 * x196 + x140 * x75 +
-                                 x159 * x54 + x160 * x61 + x161 * x68 + x188 * x33 + x192 * x41 +
-                                 x195 * x76 + x69 * x97;
-    element_vector[10 * stride] = x110 * x27 + x118 * x30 + x120 * x151 + x122 * x191 + x140 * x32 +
-                                  x147 * x54 + x148 * x61 + x149 * x68 + x188 * x76 + x189 * x33 +
-                                  x190 * x41 + x26 * x97;
-    element_vector[11 * stride] = x110 * x37 + x118 * x38 + x120 * x157 + x122 * x194 + x140 * x40 +
-                                  x153 * x54 + x154 * x61 + x155 * x68 + x190 * x33 + x192 * x76 +
-                                  x193 * x41 + x36 * x97;
-}
-
-#else
-
-#define tet4_linear_elasticity_apply_kernel tet4_linear_elasticity_apply_kernel_opt
-
-#endif
-
-static SFEM_INLINE void diag_micro_kernel(const real_t mu,
-                                          const real_t lambda,
-                                          const real_t px0,
-                                          const real_t px1,
-                                          const real_t px2,
-                                          const real_t px3,
-                                          const real_t py0,
-                                          const real_t py1,
-                                          const real_t py2,
-                                          const real_t py3,
-                                          const real_t pz0,
-                                          const real_t pz1,
-                                          const real_t pz2,
-                                          const real_t pz3,
-                                          real_t *const SFEM_RESTRICT diag) {
-    real_t adjugate[9];
-    real_t jacobian_determinant = 0;
-    {
-        real_t jacobian[9];
-
-        jacobian[0] = -px0 + px1;
-        jacobian[1] = -px0 + px2;
-        jacobian[2] = -px0 + px3;
-        jacobian[3] = -py0 + py1;
-        jacobian[4] = -py0 + py2;
-        jacobian[5] = -py0 + py3;
-        jacobian[6] = -pz0 + pz1;
-        jacobian[7] = -pz0 + pz2;
-        jacobian[8] = -pz0 + pz3;
-
-        const real_t x0 = jacobian[4] * jacobian[8];
-        const real_t x1 = jacobian[5] * jacobian[7];
-        const real_t x2 = jacobian[1] * jacobian[8];
-        const real_t x3 = jacobian[1] * jacobian[5];
-        const real_t x4 = jacobian[2] * jacobian[4];
-        adjugate[0] = x0 - x1;
-        adjugate[1] = jacobian[2] * jacobian[7] - x2;
-        adjugate[2] = x3 - x4;
-        adjugate[3] = -jacobian[3] * jacobian[8] + jacobian[5] * jacobian[6];
-        adjugate[4] = jacobian[0] * jacobian[8] - jacobian[2] * jacobian[6];
-        adjugate[5] = -jacobian[0] * jacobian[5] + jacobian[2] * jacobian[3];
-        adjugate[6] = jacobian[3] * jacobian[7] - jacobian[4] * jacobian[6];
-        adjugate[7] = -jacobian[0] * jacobian[7] + jacobian[1] * jacobian[6];
-        adjugate[8] = jacobian[0] * jacobian[4] - jacobian[1] * jacobian[3];
-        jacobian_determinant = jacobian[0] * x0 - jacobian[0] * x1 +
-                               jacobian[2] * jacobian[3] * jacobian[7] - jacobian[3] * x2 +
-                               jacobian[6] * x3 - jacobian[6] * x4;
-        assert(jacobian_determinant > 0);
-    }
-
-    const real_t x0 = lambda + 2 * mu;
-    const real_t x1 = adjugate[0] + adjugate[3] + adjugate[6];
-    const real_t x2 = x0 * x1;
-    const real_t x3 = adjugate[2] + adjugate[5] + adjugate[8];
-    const real_t x4 = mu * x3;
-    const real_t x5 = adjugate[2] * x4 + adjugate[5] * x4 + adjugate[8] * x4;
-    const real_t x6 = adjugate[1] + adjugate[4] + adjugate[7];
-    const real_t x7 = mu * x6;
-    const real_t x8 = adjugate[1] * x7 + adjugate[4] * x7 + adjugate[7] * x7;
-    const real_t x9 = (1.0 / 6.0) / jacobian_determinant;
-    const real_t x10 = POW2(adjugate[1]);
-    const real_t x11 = mu * x10;
-    const real_t x12 = POW2(adjugate[2]);
-    const real_t x13 = mu * x12;
-    const real_t x14 = POW2(adjugate[0]);
-    const real_t x15 = POW2(adjugate[4]);
-    const real_t x16 = mu * x15;
-    const real_t x17 = POW2(adjugate[5]);
-    const real_t x18 = mu * x17;
-    const real_t x19 = POW2(adjugate[3]);
-    const real_t x20 = POW2(adjugate[7]);
-    const real_t x21 = mu * x20;
-    const real_t x22 = POW2(adjugate[8]);
-    const real_t x23 = mu * x22;
-    const real_t x24 = POW2(adjugate[6]);
-    const real_t x25 = x0 * x6;
-    const real_t x26 = mu * x1;
-    const real_t x27 = adjugate[0] * x26 + adjugate[3] * x26 + adjugate[6] * x26;
-    const real_t x28 = mu * x14;
-    const real_t x29 = mu * x19;
-    const real_t x30 = mu * x24;
-    const real_t x31 = x0 * x3;
-    diag[0 * stride] = x9 * (adjugate[0] * x2 + adjugate[3] * x2 + adjugate[6] * x2 + x5 + x8);
-    diag[1 * stride] = x9 * (x0 * x14 + x11 + x13);
-    diag[2 * stride] = x9 * (x0 * x19 + x16 + x18);
-    diag[3 * stride] = x9 * (x0 * x24 + x21 + x23);
-    diag[4 * stride] = x9 * (adjugate[1] * x25 + adjugate[4] * x25 + adjugate[7] * x25 + x27 + x5);
-    diag[5 * stride] = x9 * (x0 * x10 + x13 + x28);
-    diag[6 * stride] = x9 * (x0 * x15 + x18 + x29);
-    diag[7 * stride] = x9 * (x0 * x20 + x23 + x30);
-    diag[8 * stride] = x9 * (adjugate[2] * x31 + adjugate[5] * x31 + adjugate[8] * x31 + x27 + x8);
-    diag[9 * stride] = x9 * (x0 * x12 + x11 + x28);
-    diag[10 * stride] = x9 * (x0 * x17 + x16 + x29);
-    diag[11 * stride] = x9 * (x0 * x22 + x21 + x30);
-
-#ifndef NDEBUG
-    {
-        real_t element_matrix[12 * 12];
-        tet4_linear_elasticity_assemble_hessian_kernel(
-            mu, lambda, px0, px1, px2, px3, py0, py1, py2, py3, pz0, pz1, pz2, pz3, element_matrix);
-
-        for(int i = 0; i < 12; i++) {
-            assert(fabs(diag[i] - element_matrix[i*12+i]) < 1e-8); 
-        }
-    }
-#endif
-}
-
-static SFEM_INLINE void tet4_linear_elasticity_apply_kernel_opt(const real_t mu,
-                                                                const real_t lambda,
-                                                                const real_t px0,
-                                                                const real_t px1,
-                                                                const real_t px2,
-                                                                const real_t px3,
-                                                                const real_t py0,
-                                                                const real_t py1,
-                                                                const real_t py2,
-                                                                const real_t py3,
-                                                                const real_t pz0,
-                                                                const real_t pz1,
-                                                                const real_t pz2,
-                                                                const real_t pz3,
-                                                                const real_t *const SFEM_RESTRICT u,
-                                                                real_t *const SFEM_RESTRICT
-                                                                    element_vector) {
-    real_t adjugate[9];
-    real_t jacobian_determinant = 0;
-    {
-        real_t jacobian[9];
-
-        jacobian[0] = -px0 + px1;
-        jacobian[1] = -px0 + px2;
-        jacobian[2] = -px0 + px3;
-        jacobian[3] = -py0 + py1;
-        jacobian[4] = -py0 + py2;
-        jacobian[5] = -py0 + py3;
-        jacobian[6] = -pz0 + pz1;
-        jacobian[7] = -pz0 + pz2;
-        jacobian[8] = -pz0 + pz3;
-
-        const real_t x0 = jacobian[4] * jacobian[8];
-        const real_t x1 = jacobian[5] * jacobian[7];
-        const real_t x2 = jacobian[1] * jacobian[8];
-        const real_t x3 = jacobian[1] * jacobian[5];
-        const real_t x4 = jacobian[2] * jacobian[4];
-        adjugate[0] = x0 - x1;
-        adjugate[1] = jacobian[2] * jacobian[7] - x2;
-        adjugate[2] = x3 - x4;
-        adjugate[3] = -jacobian[3] * jacobian[8] + jacobian[5] * jacobian[6];
-        adjugate[4] = jacobian[0] * jacobian[8] - jacobian[2] * jacobian[6];
-        adjugate[5] = -jacobian[0] * jacobian[5] + jacobian[2] * jacobian[3];
-        adjugate[6] = jacobian[3] * jacobian[7] - jacobian[4] * jacobian[6];
-        adjugate[7] = -jacobian[0] * jacobian[7] + jacobian[1] * jacobian[6];
-        adjugate[8] = jacobian[0] * jacobian[4] - jacobian[1] * jacobian[3];
-        jacobian_determinant = jacobian[0] * x0 - jacobian[0] * x1 +
-                               jacobian[2] * jacobian[3] * jacobian[7] - jacobian[3] * x2 +
-                               jacobian[6] * x3 - jacobian[6] * x4;
-        assert(jacobian_determinant > 0);
-    }
-
-    real_t disp_grad[9];
-    // {
-    //     const real_t x0 = 1.0 / jacobian_determinant;
-    //     const real_t x1 = adjugate[0] * x0;
-    //     const real_t x2 = adjugate[3] * x0;
-    //     const real_t x3 = adjugate[6] * x0;
-    //     const real_t x4 = -x1 - x2 - x3;
-    //     const real_t x5 = adjugate[1] * x0;
-    //     const real_t x6 = adjugate[4] * x0;
-    //     const real_t x7 = adjugate[7] * x0;
-    //     const real_t x8 = -x5 - x6 - x7;
-    //     const real_t x9 = adjugate[2] * x0;
-    //     const real_t x10 = adjugate[5] * x0;
-    //     const real_t x11 = adjugate[8] * x0;
-    //     const real_t x12 = -x10 - x11 - x9;
-    //     disp_grad[0] = u[0] * x4 + u[1] * x1 + u[2] * x2 + u[3] * x3;
-    //     disp_grad[1] = u[0] * x8 + u[1] * x5 + u[2] * x6 + u[3] * x7;
-    //     disp_grad[2] = u[0] * x12 + u[1] * x9 + u[2] * x10 + u[3] * x11;
-    //     disp_grad[3] = u[4] * x4 + u[5] * x1 + u[6] * x2 + u[7] * x3;
-    //     disp_grad[4] = u[4] * x8 + u[5] * x5 + u[6] * x6 + u[7] * x7;
-    //     disp_grad[5] = u[4] * x12 + u[5] * x9 + u[6] * x10 + u[7] * x11;
-    //     disp_grad[6] = u[10] * x2 + u[11] * x3 + u[8] * x4 + u[9] * x1;
-    //     disp_grad[7] = u[10] * x6 + u[11] * x7 + u[8] * x8 + u[9] * x5;
-    //     disp_grad[8] = u[10] * x10 + u[11] * x11 + u[8] * x12 + u[9] * x9;
-    // }
-
-    {
-        const real_t x0 = 1.0 / jacobian_determinant;
-        const real_t x1 = u[0] - u[1];
-        const real_t x2 = u[0] - u[2];
-        const real_t x3 = u[0] - u[3];
-        const real_t x4 = u[4] - u[5];
-        const real_t x5 = u[4] - u[6];
-        const real_t x6 = u[4] - u[7];
-        const real_t x7 = -u[8];
-        const real_t x8 = u[10] + x7;
-        const real_t x9 = u[11] + x7;
-        const real_t x10 = u[8] - u[9];
-        disp_grad[0] = x0 * (-adjugate[0] * x1 - adjugate[3] * x2 - adjugate[6] * x3);
-        disp_grad[1] = x0 * (-adjugate[1] * x1 - adjugate[4] * x2 - adjugate[7] * x3);
-        disp_grad[2] = x0 * (-adjugate[2] * x1 - adjugate[5] * x2 - adjugate[8] * x3);
-        disp_grad[3] = x0 * (-adjugate[0] * x4 - adjugate[3] * x5 - adjugate[6] * x6);
-        disp_grad[4] = x0 * (-adjugate[1] * x4 - adjugate[4] * x5 - adjugate[7] * x6);
-        disp_grad[5] = x0 * (-adjugate[2] * x4 - adjugate[5] * x5 - adjugate[8] * x6);
-        disp_grad[6] = x0 * (-adjugate[0] * x10 + adjugate[3] * x8 + adjugate[6] * x9);
-        disp_grad[7] = x0 * (-adjugate[1] * x10 + adjugate[4] * x8 + adjugate[7] * x9);
-        disp_grad[8] = x0 * (-adjugate[2] * x10 + adjugate[5] * x8 + adjugate[8] * x9);
-    }
-
-    // We can reuse the buffer to avoid additional register usage
-    real_t *P = disp_grad;
-    {
-        const real_t x0 = (1.0 / 3.0) * mu;
-        const real_t x1 =
-            (1.0 / 12.0) * lambda * (2 * disp_grad[0] + 2 * disp_grad[4] + 2 * disp_grad[8]);
-        const real_t x2 = (1.0 / 6.0) * mu;
-        const real_t x3 = x2 * (disp_grad[1] + disp_grad[3]);
-        const real_t x4 = x2 * (disp_grad[2] + disp_grad[6]);
-        const real_t x5 = x2 * (disp_grad[5] + disp_grad[7]);
-        P[0] = disp_grad[0] * x0 + x1;
-        P[1] = x3;
-        P[2] = x4;
-        P[3] = x3;
-        P[4] = disp_grad[4] * x0 + x1;
-        P[5] = x5;
-        P[6] = x4;
-        P[7] = x5;
-        P[8] = disp_grad[8] * x0 + x1;
-    }
-
-    // Bilinear form
-    {
-        const real_t x0 = adjugate[0] + adjugate[3] + adjugate[6];
-        const real_t x1 = adjugate[1] + adjugate[4] + adjugate[7];
-        const real_t x2 = adjugate[2] + adjugate[5] + adjugate[8];
-        element_vector[0 * stride] = -P[0] * x0 - P[1] * x1 - P[2] * x2;
-        element_vector[1 * stride] = P[0] * adjugate[0] + P[1] * adjugate[1] + P[2] * adjugate[2];
-        element_vector[2 * stride] = P[0] * adjugate[3] + P[1] * adjugate[4] + P[2] * adjugate[5];
-        element_vector[3 * stride] = P[0] * adjugate[6] + P[1] * adjugate[7] + P[2] * adjugate[8];
-        element_vector[4 * stride] = -P[3] * x0 - P[4] * x1 - P[5] * x2;
-        element_vector[5 * stride] = P[3] * adjugate[0] + P[4] * adjugate[1] + P[5] * adjugate[2];
-        element_vector[6 * stride] = P[3] * adjugate[3] + P[4] * adjugate[4] + P[5] * adjugate[5];
-        element_vector[7 * stride] = P[3] * adjugate[6] + P[4] * adjugate[7] + P[5] * adjugate[8];
-        element_vector[8 * stride] = -P[6] * x0 - P[7] * x1 - P[8] * x2;
-        element_vector[9 * stride] = P[6] * adjugate[0] + P[7] * adjugate[1] + P[8] * adjugate[2];
-        element_vector[10 * stride] = P[6] * adjugate[3] + P[7] * adjugate[4] + P[8] * adjugate[5];
-        element_vector[11 * stride] = P[6] * adjugate[6] + P[7] * adjugate[7] + P[8] * adjugate[8];
-    }
-}
-
 void tet4_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
                                                const ptrdiff_t nnodes,
-                                               idx_t **const SFEM_RESTRICT elems,
-                                               geom_t **const SFEM_RESTRICT xyz,
+                                               idx_t **const SFEM_RESTRICT elements,
+                                               geom_t **const SFEM_RESTRICT points,
                                                const real_t mu,
                                                const real_t lambda,
                                                const real_t *const SFEM_RESTRICT displacement,
@@ -1192,7 +483,7 @@ void tet4_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for  // nowait
+#pragma omp for
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             idx_t ks[4];
@@ -1200,7 +491,7 @@ void tet4_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
             real_t element_displacement[(4 * 3)];
 #pragma unroll(4)
             for (int v = 0; v < 4; ++v) {
-                ev[v] = elems[v][i];
+                ev[v] = elements[v][i];
             }
 
             // Element indices
@@ -1218,115 +509,41 @@ void tet4_linear_elasticity_assemble_value_aos(const ptrdiff_t nelements,
             }
 
             real_t element_scalar = 0;
-            tet4_linear_elasticity_assemble_value_kernel(  // Model parameters
-                mu,
-                lambda,
-                // X-coordinates
-                xyz[0][i0],
-                xyz[0][i1],
-                xyz[0][i2],
-                xyz[0][i3],
-                // Y-coordinates
-                xyz[1][i0],
-                xyz[1][i1],
-                xyz[1][i2],
-                xyz[1][i3],
-                // Z-coordinates
-                xyz[2][i0],
-                xyz[2][i1],
-                xyz[2][i2],
-                xyz[2][i3],
+            value_kernel(  // Model parameters
+                    mu,
+                    lambda,
+                    // X-coordinates
+                    points[0][i0],
+                    points[0][i1],
+                    points[0][i2],
+                    points[0][i3],
+                    // Y-coordinates
+                    points[1][i0],
+                    points[1][i1],
+                    points[1][i2],
+                    points[1][i3],
+                    // Z-coordinates
+                    points[2][i0],
+                    points[2][i1],
+                    points[2][i2],
+                    points[2][i3],
 
-                element_displacement,
-                // output vector
-                &element_scalar);
+                    element_displacement,
+                    // output vector
+                    &element_scalar);
 
 #pragma omp atomic update
             *value += element_scalar;
         }
     }
-}
 
-void tet4_linear_elasticity_assemble_gradient_aos(const ptrdiff_t nelements,
-                                                  const ptrdiff_t nnodes,
-                                                  idx_t **const SFEM_RESTRICT elems,
-                                                  geom_t **const SFEM_RESTRICT xyz,
-                                                  const real_t mu,
-                                                  const real_t lambda,
-                                                  const real_t *const SFEM_RESTRICT displacement,
-                                                  real_t *const SFEM_RESTRICT values) {
-    SFEM_UNUSED(nnodes);
-
-    static const int block_size = 3;
-
-#pragma omp parallel
-    {
-#pragma omp for  // nowait
-        for (ptrdiff_t i = 0; i < nelements; ++i) {
-            idx_t ev[4];
-            idx_t ks[4];
-
-            real_t element_vector[(4 * 3)];
-            real_t element_displacement[(4 * 3)];
-
-#pragma unroll(4)
-            for (int v = 0; v < 4; ++v) {
-                ev[v] = elems[v][i];
-            }
-
-            // Element indices
-            const idx_t i0 = ev[0];
-            const idx_t i1 = ev[1];
-            const idx_t i2 = ev[2];
-            const idx_t i3 = ev[3];
-
-            for (int enode = 0; enode < 4; ++enode) {
-                idx_t dof = ev[enode] * block_size;
-
-                for (int b = 0; b < block_size; ++b) {
-                    element_displacement[b * 4 + enode] = displacement[dof + b];
-                }
-            }
-
-            tet4_linear_elasticity_assemble_gradient_kernel(  // Model parameters
-                mu,
-                lambda,
-                // X-coordinates
-                xyz[0][i0],
-                xyz[0][i1],
-                xyz[0][i2],
-                xyz[0][i3],
-                // Y-coordinates
-                xyz[1][i0],
-                xyz[1][i1],
-                xyz[1][i2],
-                xyz[1][i3],
-                // Z-coordinates
-                xyz[2][i0],
-                xyz[2][i1],
-                xyz[2][i2],
-                xyz[2][i3],
-
-                element_displacement,
-                // output vector
-                element_vector);
-
-            for (int edof_i = 0; edof_i < 4; ++edof_i) {
-                const idx_t dof_i = elems[edof_i][i];
-
-                for (int b = 0; b < block_size; b++) {
-#pragma omp atomic update
-                    values[dof_i * block_size + b] += element_vector[b * 4 + edof_i];
-                }
-            }
-        }
-    }
+    return 0;
 }
 
 void tet4_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
                                                  const ptrdiff_t nnodes,
-                                                 idx_t **const SFEM_RESTRICT elems,
-                                                 geom_t **const SFEM_RESTRICT xyz,
+                                                 idx_t **const SFEM_RESTRICT elements,
+                                                 geom_t **const SFEM_RESTRICT points,
                                                  const real_t mu,
                                                  const real_t lambda,
                                                  const count_t *const SFEM_RESTRICT rowptr,
@@ -1339,7 +556,7 @@ void tet4_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for  // nowait
+#pragma omp for
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             idx_t ks[4];
@@ -1348,7 +565,7 @@ void tet4_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
 
 #pragma unroll(4)
             for (int v = 0; v < 4; ++v) {
-                ev[v] = elems[v][i];
+                ev[v] = elements[v][i];
             }
 
             // Element indices
@@ -1357,33 +574,33 @@ void tet4_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
             const idx_t i2 = ev[2];
             const idx_t i3 = ev[3];
 
-            tet4_linear_elasticity_assemble_hessian_kernel(
-                // Model parameters
-                mu,
-                lambda,
-                // X-coordinates
-                xyz[0][i0],
-                xyz[0][i1],
-                xyz[0][i2],
-                xyz[0][i3],
-                // Y-coordinates
-                xyz[1][i0],
-                xyz[1][i1],
-                xyz[1][i2],
-                xyz[1][i3],
-                // Z-coordinates
-                xyz[2][i0],
-                xyz[2][i1],
-                xyz[2][i2],
-                xyz[2][i3],
+            hessian_kernel(
+                    // Model parameters
+                    mu,
+                    lambda,
+                    // X-coordinates
+                    points[0][i0],
+                    points[0][i1],
+                    points[0][i2],
+                    points[0][i3],
+                    // Y-coordinates
+                    points[1][i0],
+                    points[1][i1],
+                    points[1][i2],
+                    points[1][i3],
+                    // Z-coordinates
+                    points[2][i0],
+                    points[2][i1],
+                    points[2][i2],
+                    points[2][i3],
 
-                // output matrix
-                element_matrix);
+                    // output matrix
+                    element_matrix);
 
             assert(!check_symmetric(4 * block_size, element_matrix));
 
             for (int edof_i = 0; edof_i < 4; ++edof_i) {
-                const idx_t dof_i = elems[edof_i][i];
+                const idx_t dof_i = elements[edof_i][i];
                 const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
 
                 {
@@ -1415,313 +632,164 @@ void tet4_linear_elasticity_assemble_hessian_aos(const ptrdiff_t nelements,
             }
         }
     }
+
+    return 0;
 }
 
-#ifdef SFEM_ENABLE_EXPLICIT_VECTORIZATION
-
-void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
-                                      const ptrdiff_t nnodes,
-                                      idx_t **const SFEM_RESTRICT elems,
-                                      geom_t **const SFEM_RESTRICT xyz,
-                                      const real_t mu,
-                                      const real_t lambda,
-                                      const real_t *const SFEM_RESTRICT displacement,
-                                      real_t *const SFEM_RESTRICT values) {
-    SFEM_UNUSED(nnodes);
-
-    vreal_t vmu;
-    vreal_t vlambda;
-
-    for (int vi = 0; vi < SFEM_VECTOR_SIZE; ++vi) {
-        vmu[vi] = mu;
-        vlambda[vi] = lambda;
-    }
-
-    static const int block_size = 3;
-
-#pragma omp parallel
-    {
-#pragma omp for  // nowait
-        for (ptrdiff_t i = 0; i < nelements; i += SFEM_VECTOR_SIZE) {
-            const int nvec = MAX(1, MIN(nelements - (i + SFEM_VECTOR_SIZE), SFEM_VECTOR_SIZE));
-
-            idx_t ev[4];
-            idx_t ks[4];
-
-            vreal_t x[4];
-            vreal_t y[4];
-            vreal_t z[4];
-
-            vreal_t element_vector[(4 * 3)];
-            vreal_t element_displacement[(4 * 3)];
-
-            for (int vi = 0; vi < nvec; ++vi) {
-                const ptrdiff_t offset = i + vi;
-#pragma unroll(4)
-                for (int v = 0; v < 4; ++v) {
-                    ev[v] = elems[v][offset];
-                }
-
-#pragma unroll(4)
-                for (int v = 0; v < 4; ++v) {
-                    x[v][vi] = xyz[0][ev[v]];
-                    y[v][vi] = xyz[1][ev[v]];
-                    z[v][vi] = xyz[2][ev[v]];
-                }
-
-                for (int enode = 0; enode < 4; ++enode) {
-                    idx_t dof = ev[enode] * block_size;
-
-                    for (int b = 0; b < block_size; ++b) {
-                        element_displacement[b * 4 + enode][vi] = displacement[dof + b];
-                    }
-                }
-            }
-
-            tet4_linear_elasticity_apply_kernel(  // Model parameters
-                vmu,
-                vlambda,
-                // X-coordinates
-                x[0],
-                x[1],
-                x[2],
-                x[3],
-                // Y-coordinates
-                y[0],
-                y[1],
-                y[2],
-                y[3],
-                // Z-coordinates
-                z[0],
-                z[1],
-                z[2],
-                z[3],
-                element_displacement,
-                // output vector
-                element_vector);
-
-            for (int vi = 0; vi < nvec; ++vi) {
-                const ptrdiff_t offset = i + vi;
-
-#pragma unroll(4)
-                for (int v = 0; v < 4; ++v) {
-                    ev[v] = elems[v][offset];
-                }
-
-                for (int edof_i = 0; edof_i < 4; ++edof_i) {
-                    const idx_t dof = ev[edof_i] * block_size;
-
-                    for (int b = 0; b < block_size; b++) {
-                        const int evdof_i = b * 4 + edof_i;
-#pragma omp atomic update
-                        values[dof + b] += element_vector[evdof_i][vi];
-                    }
-                }
-            }
-        }
-    }
-}
-
-#else
-
-void tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
-                                      const ptrdiff_t nnodes,
-                                      idx_t **const SFEM_RESTRICT elems,
-                                      geom_t **const SFEM_RESTRICT xyz,
-                                      const real_t mu,
-                                      const real_t lambda,
-                                      const real_t *const SFEM_RESTRICT displacement,
-                                      real_t *const SFEM_RESTRICT values) {
-    SFEM_UNUSED(nnodes);
-
-    const geom_t *const x = xyz[0];
-    const geom_t *const y = xyz[1];
-    const geom_t *const z = xyz[2];
-
-    static const int block_size = 3;
-#pragma omp parallel
-    {
-#pragma omp for  // nowait
-        for (ptrdiff_t i = 0; i < nelements; ++i) {
-            idx_t ev[4];
-            real_t element_vector[(4 * 3)];
-            real_t element_displacement[(4 * 3)];
-#pragma unroll(4)
-            for (int v = 0; v < 4; ++v) {
-                ev[v] = elems[v][i];
-            }
-
-            for (int enode = 0; enode < 4; ++enode) {
-                idx_t dof = ev[enode] * block_size;
-
-                for (int b = 0; b < block_size; ++b) {
-                    element_displacement[b * 4 + enode] = displacement[dof + b];
-                }
-            }
-
-            tet4_linear_elasticity_apply_kernel(  // Model parameters
-                mu,
-                lambda,
-                // X-coordinates
-                x[ev[0]],
-                x[ev[1]],
-                x[ev[2]],
-                x[ev[3]],
-                // Y-coordinates
-                y[ev[0]],
-                y[ev[1]],
-                y[ev[2]],
-                y[ev[3]],
-                // Z-coordinates
-                z[ev[0]],
-                z[ev[1]],
-                z[ev[2]],
-                z[ev[3]],
-                element_displacement,
-                // output vector
-                element_vector);
-
-            for (int edof_i = 0; edof_i < 4; ++edof_i) {
-                const idx_t dof = ev[edof_i] * block_size;
-
-                for (int b = 0; b < block_size; b++) {
-#pragma omp atomic update
-                    values[dof + b] += element_vector[b * 4 + edof_i];
-                }
-            }
-        }
-    }
-}
-
-#endif
-
-void tet4_linear_elasticity_apply_soa(const ptrdiff_t nelements,
-                                      const ptrdiff_t nnodes,
-                                      idx_t **const SFEM_RESTRICT elems,
-                                      geom_t **const SFEM_RESTRICT xyz,
-                                      const real_t mu,
-                                      const real_t lambda,
-                                      const real_t **const SFEM_RESTRICT u,
-                                      real_t **const SFEM_RESTRICT values) {
-    SFEM_UNUSED(nnodes);
-
-    const geom_t *const x = xyz[0];
-    const geom_t *const y = xyz[1];
-    const geom_t *const z = xyz[2];
-
-    idx_t ev[4];
-    real_t element_vector[(4 * 3)];
-    real_t element_displacement[(4 * 3)];
-
-    static const int block_size = 3;
-
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
-#pragma unroll(4)
-        for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
-        }
-
-        for (int b = 0; b < block_size; b++) {
-            for (int v = 0; v < 4; ++v) {
-                element_displacement[b * 4 + v] = u[b][ev[v]];
-            }
-        }
-
-        tet4_linear_elasticity_apply_kernel_opt(
-            // Model parameters
-            mu,
-            lambda,
-            // X-coordinates
-            x[ev[0]],
-            x[ev[1]],
-            x[ev[2]],
-            x[ev[3]],
-            // Y-coordinates
-            y[ev[0]],
-            y[ev[1]],
-            y[ev[2]],
-            y[ev[3]],
-            // Z-coordinates
-            z[ev[0]],
-            z[ev[1]],
-            z[ev[2]],
-            z[ev[3]],
-            // input
-            element_displacement,
-            // output
-            element_vector);
-
-        for (int bi = 0; bi < block_size; ++bi) {
-            for (int edof_i = 0; edof_i < 4; edof_i++) {
-                values[bi][ev[edof_i]] += element_vector[bi * 4 + edof_i];
-            }
-        }
-    }
-}
-
-void tet4_linear_elasticity_assemble_diag_aos(const ptrdiff_t nelements,
+int tet4_linear_elasticity_apply(const ptrdiff_t nelements,
                                  const ptrdiff_t nnodes,
-                                 idx_t **const SFEM_RESTRICT elems,
-                                 geom_t **const SFEM_RESTRICT xyz,
+                                 idx_t **const SFEM_RESTRICT elements,
+                                 geom_t **const SFEM_RESTRICT points,
                                  const real_t mu,
                                  const real_t lambda,
-                                 real_t *const SFEM_RESTRICT values) {
+                                 const ptrdiff_t u_stride,
+                                 const real_t *const ux,
+                                 const real_t *const uy,
+                                 const real_t *const uz,
+                                 const ptrdiff_t out_stride,
+                                 real_t *const outx,
+                                 real_t *const outy,
+                                 real_t *const outz) {
     SFEM_UNUSED(nnodes);
 
-    static const int block_size = 3;
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
 
-#pragma omp parallel
-    {
-#pragma omp for  // nowait
-        for (ptrdiff_t i = 0; i < nelements; ++i) {
-            idx_t ev[4];
-            real_t element_vector[(4 * 3)];
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[4];
+        scalar_t element_ux[4];
+        scalar_t element_uy[4];
+        scalar_t element_uz[4];
 
-#pragma unroll(4)
-            for (int v = 0; v < 4; ++v) {
-                ev[v] = elems[v][i];
-            }
+        accumulator_t element_outx[4];
+        accumulator_t element_outy[4];
+        accumulator_t element_outz[4];
 
-            // Element indices
-            const idx_t i0 = ev[0];
-            const idx_t i1 = ev[1];
-            const idx_t i2 = ev[2];
-            const idx_t i3 = ev[3];
+        jacobian_t jacobian_adjugate[9];
+        jacobian_t jacobian_determinant = 0;
 
-            for (int enode = 0; enode < 4; ++enode) {
-                idx_t dof = ev[enode] * block_size;
-            }
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elements[v][i];
+        }
 
-            diag_micro_kernel(
-                // Model parameters
-                mu,
-                lambda,
-                // X-coordinates
-                xyz[0][i0],
-                xyz[0][i1],
-                xyz[0][i2],
-                xyz[0][i3],
-                // Y-coordinates
-                xyz[1][i0],
-                xyz[1][i1],
-                xyz[1][i2],
-                xyz[1][i3],
-                // Z-coordinates
-                xyz[2][i0],
-                xyz[2][i1],
-                xyz[2][i2],
-                xyz[2][i3],
-                // output vector
-                element_vector);
+        for (int v = 0; v < 4; ++v) {
+            element_ux[v] = ux[ev[v] * u_stride];
+            element_uy[v] = uy[ev[v] * u_stride];
+            element_uz[v] = uz[ev[v] * u_stride];
+        }
 
-            for (int edof_i = 0; edof_i < 4; ++edof_i) {
-                const idx_t dof_i = elems[edof_i][i];
+        tet4_adjugate_and_det(x[ev[0]],
+                              x[ev[1]],
+                              x[ev[2]],
+                              x[ev[3]],
+                              // Y-coordinates
+                              y[ev[0]],
+                              y[ev[1]],
+                              y[ev[2]],
+                              y[ev[3]],
+                              // Z-coordinates
+                              z[ev[0]],
+                              z[ev[1]],
+                              z[ev[2]],
+                              z[ev[3]],
+                              // Output
+                              adjugate,
+                              &jacobian_determinant);
 
-                for (int b = 0; b < block_size; b++) {
+        tet4_linear_elasticity_apply_adj(
+                mu, lambda, adjugate, jacobian_determinant, ux, uy, uz, outx, outy, outz);
+
+        for (int edof_i = 0; edof_i < 4; edof_i++) {
+            const ptrdiff_t idx = ev[edof_i] * out_stride;
+
 #pragma omp atomic update
-                    values[dof_i * block_size + b] += element_vector[b * 4 + edof_i];
-                }
-            }
+            outx[idx] += element_outx[edof_i];
+
+#pragma omp atomic update
+            outy[idx] += element_outy[edof_i];
+
+#pragma omp atomic update
+            outz[idx] += element_outz[edof_i];
         }
     }
+
+    return 0;
+}
+
+int tet4_linear_elasticity_diag(const ptrdiff_t nelements,
+                                const ptrdiff_t nnodes,
+                                idx_t **const SFEM_RESTRICT elements,
+                                geom_t **const SFEM_RESTRICT points,
+                                const real_t mu,
+                                const real_t lambda,
+                                const ptrdiff_t out_stride,
+                                real_t *const outx,
+                                real_t *const outy,
+                                real_t *const outz) {
+    SFEM_UNUSED(nnodes);
+
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[4];
+
+        accumulator_t element_outx[4];
+        accumulator_t element_outy[4];
+        accumulator_t element_outz[4];
+
+        jacobian_t jacobian_adjugate[9];
+        jacobian_t jacobian_determinant = 0;
+
+#pragma unroll(4)
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        tet4_adjugate_and_det(x[ev[0]],
+                              x[ev[1]],
+                              x[ev[2]],
+                              x[ev[3]],
+                              // Y-coordinates
+                              y[ev[0]],
+                              y[ev[1]],
+                              y[ev[2]],
+                              y[ev[3]],
+                              // Z-coordinates
+                              z[ev[0]],
+                              z[ev[1]],
+                              z[ev[2]],
+                              z[ev[3]],
+                              // Output
+                              adjugate,
+                              &jacobian_determinant);
+
+        tet4_linear_elasticity_diag_adj(mu,
+                                        lambda,
+                                        jacobian_adjugate,
+                                        jacobian_determinant,
+                                        // Output
+                                        element_outx,
+                                        element_outy,
+                                        element_outz);
+
+        for (int edof_i = 0; edof_i < 4; ++edof_i) {
+            const ptrdiff_t idx = ev[edof_i] * out_stride;
+
+#pragma omp atomic update
+            outx[idx] += element_outx[edof_i];
+
+#pragma omp atomic update
+            outy[idx] += element_outy[edof_i];
+
+#pragma omp atomic update
+            outz[idx] += element_outz[edof_i];
+        }
+    }
+
+    return 0;
 }
