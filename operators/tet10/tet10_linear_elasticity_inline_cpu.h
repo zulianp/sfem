@@ -3,17 +3,18 @@
 
 #include "tet10_inline_cpu.h"
 
-static SFEM_INLINE void tet10_linear_elasticity_diag_adj(const scalar_t mu,
-                                          const scalar_t lambda,
-                                          const jacobian_t *const SFEM_RESTRICT adjugate,
-                                          const jacobian_t jacobian_determinant,
-                                          const scalar_t qx,
-                                          const scalar_t qy,
-                                          const scalar_t qz,
-                                          const scalar_t qw,
-                                          accumulator_t *const SFEM_RESTRICT outx,
-                                          accumulator_t *const SFEM_RESTRICT outy,
-                                          accumulator_t *const SFEM_RESTRICT outz) {
+static SFEM_INLINE void tet10_linear_elasticity_diag_adj(const jacobian_t *const SFEM_RESTRICT
+                                                                 adjugate,
+                                                         const jacobian_t jacobian_determinant,
+                                                         const scalar_t mu,
+                                                         const scalar_t lambda,
+                                                         const scalar_t qx,
+                                                         const scalar_t qy,
+                                                         const scalar_t qz,
+                                                         const scalar_t qw,
+                                                         accumulator_t *const SFEM_RESTRICT outx,
+                                                         accumulator_t *const SFEM_RESTRICT outy,
+                                                         accumulator_t *const SFEM_RESTRICT outz) {
     const scalar_t x0 = POW2(adjugate[1] + adjugate[4] + adjugate[7]);
     const scalar_t x1 = mu * x0;
     const scalar_t x2 = POW2(adjugate[2] + adjugate[5] + adjugate[8]);
@@ -142,4 +143,4 @@ static SFEM_INLINE void tet10_linear_elasticity_diag_adj(const scalar_t mu,
     outz[9] += qw * (x43 * (x4 * x80 + x79 + x92));
 }
 
-#endif //TET10_LINEAR_ELASTICITY_INLINE_CPU_H
+#endif  // TET10_LINEAR_ELASTICITY_INLINE_CPU_H
