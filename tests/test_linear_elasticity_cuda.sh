@@ -27,10 +27,10 @@ export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 
 # rm -rf mesh
-# create_cylinder.sh 0
+# create_cylinder.sh 4
 
 # create_cylinder_p2.sh 3
-export SFEM_USE_MACRO=1
+# export SFEM_USE_MACRO=1
 
 sleft=mesh/sidesets_aos/sinlet.raw
 sright=mesh/sidesets_aos/soutlet.raw
@@ -68,9 +68,9 @@ if [[ $SFEM_BLOCK_SIZE != 1 ]]
 then
 	aos_to_soa output/x.raw 8 $SFEM_BLOCK_SIZE output/disp
 	aos_to_soa output/rhs.raw 8 $SFEM_BLOCK_SIZE output/rhs
-	aos_to_soa output/r.raw 8 $SFEM_BLOCK_SIZE output/r
+	# aos_to_soa output/r.raw 8 $SFEM_BLOCK_SIZE output/r
 
-	raw_to_db.py mesh output/x.vtk -p "output/disp.*.raw,output/rhs.*.raw,output/r.*.raw"
+	raw_to_db.py mesh output/x.vtk -p "output/disp.*.raw,output/rhs.*.raw"
 else
 	raw_to_db.py mesh output/x.vtk -p "output/x.raw,output/c*.raw,output/residual*.raw"
 fi

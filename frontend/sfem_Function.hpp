@@ -128,6 +128,7 @@ namespace sfem {
 
         int initialize_dof_to_dof_graph();
         std::shared_ptr<CRSGraph> dof_to_dof_graph();
+        std::shared_ptr<CRSGraph> node_to_node_graph();
 
         friend class Op;
 
