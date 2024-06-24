@@ -422,17 +422,17 @@ int tet10_linear_elasticity_diag(const ptrdiff_t nelements,
                               &jacobian_determinant);
 
         for (int k = 0; k < n_qp; k++) {
-            tet10_linear_elasticity_diag_adj(mu,
-                              lambda,
-                              jacobian_adjugate,
-                              jacobian_determinant,
-                              qx[k],
-                              qy[k],
-                              qz[k],
-                              qw[k],
-                              element_outx,
-                              element_outy,
-                              element_outz);
+            tet10_linear_elasticity_diag_adj(jacobian_adjugate,
+                                             jacobian_determinant,
+                                             mu,
+                                             lambda,
+                                             qx[k],
+                                             qy[k],
+                                             qz[k],
+                                             qw[k],
+                                             element_outx,
+                                             element_outy,
+                                             element_outz);
         }
 
 #pragma unroll(10)
@@ -563,17 +563,17 @@ int tet10_linear_elasticity_diag_opt(const ptrdiff_t nelements,
         }
 
         for (int k = 0; k < n_qp; k++) {
-            tet10_linear_elasticity_diag_adj(mu,
-                              lambda,
-                              jacobian_adjugate,
-                              jacobian_determinant,
-                              qx[k],
-                              qy[k],
-                              qz[k],
-                              qw[k],
-                              element_outx,
-                              element_outy,
-                              element_outz);
+            tet10_linear_elasticity_diag_adj(jacobian_adjugate,
+                                             jacobian_determinant,
+                                             mu,
+                                             lambda,
+                                             qx[k],
+                                             qy[k],
+                                             qz[k],
+                                             qw[k],
+                                             element_outx,
+                                             element_outy,
+                                             element_outz);
         }
 
 #pragma unroll(10)

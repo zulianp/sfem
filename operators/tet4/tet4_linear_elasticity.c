@@ -695,10 +695,11 @@ int tet4_linear_elasticity_apply(const ptrdiff_t nelements,
                               jacobian_adjugate,
                               &jacobian_determinant);
 
-        tet4_linear_elasticity_apply_adj(mu,
-                                         lambda,
+        tet4_linear_elasticity_apply_adj(
                                          jacobian_adjugate,
                                          jacobian_determinant,
+                                         mu,
+                                                                                  lambda,
                                          element_ux,
                                          element_uy,
                                          element_uz,
