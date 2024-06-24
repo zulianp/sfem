@@ -6,6 +6,7 @@
 
 #include "sfem_resample_V.h"
 #include "tet10_resample_field.h"
+#include "tet10_resample_field_V2.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -903,7 +904,7 @@ int resample_field_local(
         real_t* const SFEM_RESTRICT weighted_field,
         sfem_resample_field_info* info) {
     //
-    switch (element_type) {
+    switch (TET10) {
         case TET4: {
             info->quad_nodes_cnt = TET4_NQP;
             info->nelements = nelements;
@@ -924,8 +925,15 @@ int resample_field_local(
                     weighted_field);
         }
         case TET10: {
+// #define TET10_V2
+
+#ifdef TET10_V2  // V2
+            return hex8_to_tet10_resample_field_local_V2(
+                    nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+#else
             return hex8_to_tet10_resample_field_local(
                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+#endif
         }
 
         default:
@@ -989,8 +997,7 @@ int resample_field(
         // FIXME
         if (element_type == TET10) {
             real_t* mass_vector = calloc(nnodes, sizeof(real_t));
-            tet10_assemble_dual_mass_vector(
-                    nelements, nnodes, elems, xyz, mass_vector);
+            tet10_assemble_dual_mass_vector(nelements, nnodes, elems, xyz, mass_vector);
 
             for (ptrdiff_t i = 0; i < nnodes; i++) {
                 assert(mass_vector[i] != 0);

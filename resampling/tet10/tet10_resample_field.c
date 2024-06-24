@@ -724,10 +724,10 @@ int hex8_to_isoparametric_tet10_resample_field_local(
         // Output
         real_t* const SFEM_RESTRICT weighted_field) {
     //
-    // printf("============================================================\n");
-    // printf("Start: hex8_to_tet10_resample_field_local\n");
-    // printf("============================================================\n");
-    //
+    printf("============================================================\n");
+    printf("Start: hex8_to_isoparametric_tet10_resample_field_local\n");
+    printf("============================================================\n");
+
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];
     const real_t oz = (real_t)origin[2];
@@ -741,6 +741,8 @@ int hex8_to_isoparametric_tet10_resample_field_local(
 #pragma omp for  // nowait
         /// Loop over the elements of the mesh
         for (ptrdiff_t i = 0; i < nelements; ++i) {
+            // printf("element = %d\n", i);
+
             idx_t ev[10];
 
             // ISOPARAMETRIC
@@ -770,9 +772,22 @@ int hex8_to_isoparametric_tet10_resample_field_local(
 
             // SUBPARAMETRIC (for iso-parametric tassellation of tet10 might be necessary)
             for (int q = 0; q < TET4_NQP; q++) {  // loop over the quadrature points
+
+                // if (q == 8) {
+                //     break;
+                // }
+
                 const real_t measure = tet10_measure(x, y, z, tet4_qx[q], tet4_qy[q], tet4_qz[q]);
+
+                // printf("measure[%d]: %e\n", q, measure);
+                // printf("tet4_qw[%d]: %e\n", q, tet4_qw[q]);
+                // printf("tet4_qx[%d]: %e\n", q, tet4_qx[q]);
+                // printf("tet4_qy[%d]: %e\n", q, tet4_qy[q]);
+                // printf("tet4_qz[%d]: %e\n", q, tet4_qz[q]);
+
                 assert(measure > 0);
                 const real_t dV = measure * tet4_qw[q];
+                // printf("dV[%d]: %e\n", q, dV);
 
                 real_t g_qx, g_qy, g_qz;
                 // Transform quadrature point to physical space
@@ -781,15 +796,30 @@ int hex8_to_isoparametric_tet10_resample_field_local(
                 tet10_transform(x, y, z, tet4_qx[q], tet4_qy[q], tet4_qz[q], &g_qx, &g_qy, &g_qz);
                 tet10_dual_basis_hrt(tet4_qx[q], tet4_qy[q], tet4_qz[q], tet10_f);
 
+                // printf("g_qx[%d]: %e\n", q, g_qx);
+                // printf("g_qy[%d]: %e\n", q, g_qy);
+                // printf("g_qz[%d]: %e\n", q, g_qz);4
+                // for (int jjj = 0; jjj < 10; jjj++) {
+                //     printf("tet10_f[%d]: %e\n", jjj, tet10_f[jjj]);
+                // }
+
                 ///// ======================================================
 
                 const real_t grid_x = (g_qx - ox) / dx;
                 const real_t grid_y = (g_qy - oy) / dy;
                 const real_t grid_z = (g_qz - oz) / dz;
 
+                // printf("grid_x[%d]: %lf\n", q, grid_x);
+                // printf("grid_y[%d]: %lf\n", q, grid_y);
+                // printf("grid_z[%d]: %lf\n", q, grid_z);
+
                 const ptrdiff_t i = floor(grid_x);
                 const ptrdiff_t j = floor(grid_y);
                 const ptrdiff_t k = floor(grid_z);
+
+                // printf("i[%d]: %ld\n", q, i);
+                // printf("j[%d]: %ld\n", q, j);
+                // printf("k[%d]: %ld\n", q, k);
 
                 // If outside
                 if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) ||
@@ -822,8 +852,17 @@ int hex8_to_isoparametric_tet10_resample_field_local(
                 assert(l_y <= 1 + 1e-8);
                 assert(l_z <= 1 + 1e-8);
 
+                // printf("l_x[%d]: %lf\n", q, l_x);
+                // printf("l_y[%d]: %lf\n", q, l_y);
+                // printf("l_z[%d]: %lf\n", q, l_z);
+
                 hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
                 hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
+
+                // for (int jjj = 0; jjj < 8; jjj++) {
+                //     printf("hex8_f[%d]: %e\n", jjj, hex8_f[jjj]);
+                //     // printf("coeffs[%d]: %e\n", jjj, coeffs[jjj][iii]);
+                // }
 
                 // Integrate field
                 {
@@ -979,7 +1018,7 @@ int hex8_to_tet10_resample_field_local(
     int SFEM_ENABLE_ISOPARAMETRIC = 0;
     SFEM_READ_ENV(SFEM_ENABLE_ISOPARAMETRIC, atoi);
 
-    if (SFEM_ENABLE_ISOPARAMETRIC) {
+    if (1 | SFEM_ENABLE_ISOPARAMETRIC) {
         return hex8_to_isoparametric_tet10_resample_field_local(
                 nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
     } else {
