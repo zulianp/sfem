@@ -42,6 +42,7 @@ namespace sfem {
         int max_it{3};
 
         T eig_max{0};
+        T scale_eig_max{1};
         T scale_eig_min{0.06};
         ptrdiff_t n_dofs{-1};
         bool is_initial_guess_zero{false};
@@ -188,6 +189,7 @@ namespace sfem {
 
             const ptrdiff_t n = this->rows();
 
+            const T eig_max = this->eig_max * scale_eig_max;
             const T eig_min = scale_eig_min * eig_max;
             const T eig_avg = (eig_min + eig_max) / 2;
             const T eig_diff = (eig_min - eig_max) / 2;
