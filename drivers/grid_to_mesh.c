@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    ptrdiff_t n = nglobal[0] * nglobal[1] * nglobal[2];
+    // ptrdiff_t n = nglobal[0] * nglobal[1] * nglobal[2];
     real_t* field = 0;
     ptrdiff_t nlocal[3];
 

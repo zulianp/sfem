@@ -26,34 +26,22 @@ static SFEM_INLINE real_t put_inside(const real_t v) { return MIN(MAX(1e-7, v), 
 
 SFEM_INLINE static int hex_aa_8_contains(
         // X-coordinates
-        const real_t xmin,
-        const real_t xmax,
+        const real_t xmin, const real_t xmax,
         // Y-coordinates
-        const real_t ymin,
-        const real_t ymax,
+        const real_t ymin, const real_t ymax,
         // Z-coordinates
-        const real_t zmin,
-        const real_t zmax,
-        const real_t x,
-        const real_t y,
-        const real_t z) {
+        const real_t zmin, const real_t zmax, const real_t x, const real_t y, const real_t z) {
     int outside = (x < xmin) | (x > xmax) | (y < ymin) | (y > ymax) | (z < zmin) | (x > zmax);
     return !outside;
 }
 
 SFEM_INLINE static real_t tri_shell_3_measure(
         // X-coordinates
-        const real_t px0,
-        const real_t px1,
-        const real_t px2,
+        const real_t px0, const real_t px1, const real_t px2,
         // Y-coordinates
-        const real_t py0,
-        const real_t py1,
-        const real_t py2,
+        const real_t py0, const real_t py1, const real_t py2,
         // Z-coordinates
-        const real_t pz0,
-        const real_t pz1,
-        const real_t pz2) {
+        const real_t pz0, const real_t pz1, const real_t pz2) {
     const real_t x0 = -px0 + px1;
     const real_t x1 = -px0 + px2;
     const real_t x2 = -py0 + py1;
@@ -67,23 +55,15 @@ SFEM_INLINE static real_t tri_shell_3_measure(
 
 SFEM_INLINE static void tri_shell_3_transform(
         // X-coordinates
-        const real_t x0,
-        const real_t x1,
-        const real_t x2,
+        const real_t x0, const real_t x1, const real_t x2,
         // Y-coordinates
-        const real_t y0,
-        const real_t y1,
-        const real_t y2,
+        const real_t y0, const real_t y1, const real_t y2,
         // Z-coordinates
-        const real_t z0,
-        const real_t z1,
-        const real_t z2,
+        const real_t z0, const real_t z1, const real_t z2,
         // Quadrature point
-        const real_t x,
-        const real_t y,
+        const real_t x, const real_t y,
         // Output
-        real_t* const SFEM_RESTRICT out_x,
-        real_t* const SFEM_RESTRICT out_y,
+        real_t* const SFEM_RESTRICT out_x, real_t* const SFEM_RESTRICT out_y,
         real_t* const SFEM_RESTRICT out_z) {
     const real_t phi0 = 1 - x - y;
     const real_t phi1 = x;
@@ -96,32 +76,25 @@ SFEM_INLINE static void tri_shell_3_transform(
 
 SFEM_INLINE static real_t beam2_measure(
         // X-coordinates
-        const real_t px0,
-        const real_t px1,
+        const real_t px0, const real_t px1,
         // Y-coordinates
-        const real_t py0,
-        const real_t py1,
+        const real_t py0, const real_t py1,
         // Z-coordinates
-        const real_t pz0,
-        const real_t pz1) {
+        const real_t pz0, const real_t pz1) {
     return sqrt(pow(-px0 + px1, 2) + pow(-py0 + py1, 2) + pow(-pz0 + pz1, 2));
 }
 
 SFEM_INLINE static void beam2_transform(
         // X-coordinates
-        const real_t px0,
-        const real_t px1,
+        const real_t px0, const real_t px1,
         // Y-coordinates
-        const real_t py0,
-        const real_t py1,
+        const real_t py0, const real_t py1,
         // Z-coordinates
-        const real_t pz0,
-        const real_t pz1,
+        const real_t pz0, const real_t pz1,
         // Quadrature point
         const real_t x,
         // Output
-        real_t* const SFEM_RESTRICT out_x,
-        real_t* const SFEM_RESTRICT out_y,
+        real_t* const SFEM_RESTRICT out_x, real_t* const SFEM_RESTRICT out_y,
         real_t* const SFEM_RESTRICT out_z) {
     *out_x = px0 + x * (-px0 + px1);
     *out_y = py0 + x * (-py0 + py1);
@@ -130,20 +103,11 @@ SFEM_INLINE static void beam2_transform(
 
 SFEM_INLINE static real_t tet4_measure(
         // X-coordinates
-        const real_t px0,
-        const real_t px1,
-        const real_t px2,
-        const real_t px3,
+        const real_t px0, const real_t px1, const real_t px2, const real_t px3,
         // Y-coordinates
-        const real_t py0,
-        const real_t py1,
-        const real_t py2,
-        const real_t py3,
+        const real_t py0, const real_t py1, const real_t py2, const real_t py3,
         // Z-coordinates
-        const real_t pz0,
-        const real_t pz1,
-        const real_t pz2,
-        const real_t pz3) {
+        const real_t pz0, const real_t pz1, const real_t pz2, const real_t pz3) {
     //
     // determinant of the Jacobian
     // M = [px0, py0, pz0, 1]
@@ -196,27 +160,15 @@ SFEM_INLINE static void tet4_transform(
       */
 
         // X-coordinates
-        const real_t px0,
-        const real_t px1,
-        const real_t px2,
-        const real_t px3,
+        const real_t px0, const real_t px1, const real_t px2, const real_t px3,
         // Y-coordinates
-        const real_t py0,
-        const real_t py1,
-        const real_t py2,
-        const real_t py3,
+        const real_t py0, const real_t py1, const real_t py2, const real_t py3,
         // Z-coordinates
-        const real_t pz0,
-        const real_t pz1,
-        const real_t pz2,
-        const real_t pz3,
+        const real_t pz0, const real_t pz1, const real_t pz2, const real_t pz3,
         // Quadrature point
-        const real_t qx,
-        const real_t qy,
-        const real_t qz,
+        const real_t qx, const real_t qy, const real_t qz,
         // Output
-        real_t* const SFEM_RESTRICT out_x,
-        real_t* const SFEM_RESTRICT out_y,
+        real_t* const SFEM_RESTRICT out_x, real_t* const SFEM_RESTRICT out_y,
         real_t* const SFEM_RESTRICT out_z) {
     //
     //
@@ -229,9 +181,7 @@ SFEM_INLINE static void hex_aa_8_eval_fun(
         // Quadrature point (local coordinates)
         // With respect to the hat functions of a cube element
         // In a local coordinate system
-        const real_t x,
-        const real_t y,
-        const real_t z,
+        const real_t x, const real_t y, const real_t z,
         // Output
         real_t* const SFEM_RESTRICT f) {
     //
@@ -246,13 +196,10 @@ SFEM_INLINE static void hex_aa_8_eval_fun(
 }
 
 SFEM_INLINE static void hex_aa_8_collect_coeffs(
-        const ptrdiff_t* const SFEM_RESTRICT stride,
-        const ptrdiff_t i,
-        const ptrdiff_t j,
+        const ptrdiff_t* const SFEM_RESTRICT stride, const ptrdiff_t i, const ptrdiff_t j,
         const ptrdiff_t k,
         // Attention this is geometric data transformed to solver data!
-        const real_t* const SFEM_RESTRICT data,
-        real_t* const SFEM_RESTRICT out) {
+        const real_t* const SFEM_RESTRICT data, real_t* const SFEM_RESTRICT out) {
     const ptrdiff_t i0 = i * stride[0] + j * stride[1] + k * stride[2];
     const ptrdiff_t i1 = (i + 1) * stride[0] + j * stride[1] + k * stride[2];
     const ptrdiff_t i2 = (i + 1) * stride[0] + (j + 1) * stride[1] + k * stride[2];
@@ -274,12 +221,9 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs(
 
 SFEM_INLINE static void hex_aa_8_eval_grad(
         // Quadrature point (local coordinates)
-        const real_t x,
-        const real_t y,
-        const real_t z,
+        const real_t x, const real_t y, const real_t z,
         // Output
-        real_t* const SFEM_RESTRICT gx,
-        real_t* const SFEM_RESTRICT gy,
+        real_t* const SFEM_RESTRICT gx, real_t* const SFEM_RESTRICT gy,
         real_t* const SFEM_RESTRICT gz) {
     //
     // Transformation to ref element
@@ -526,15 +470,11 @@ int tet4_resample_field_local(
 
 int trishell3_resample_field_local(
         // Mesh
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t** const SFEM_RESTRICT elems,
+        const ptrdiff_t nelements, const ptrdiff_t nnodes, idx_t** const SFEM_RESTRICT elems,
         geom_t** const SFEM_RESTRICT xyz,
         // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,
-        const ptrdiff_t* const SFEM_RESTRICT stride,
-        const geom_t* const SFEM_RESTRICT origin,
-        const geom_t* const SFEM_RESTRICT delta,
+        const ptrdiff_t* const SFEM_RESTRICT n, const ptrdiff_t* const SFEM_RESTRICT stride,
+        const geom_t* const SFEM_RESTRICT origin, const geom_t* const SFEM_RESTRICT delta,
         const real_t* const SFEM_RESTRICT data,
         // Output
         real_t* const SFEM_RESTRICT weighted_field) {
@@ -688,10 +628,8 @@ int trishell3_resample_field_local(
     return 0;
 }  // end trishell3_resample_field_local
 
-int beam2_resample_field_local(const ptrdiff_t nelements,
-                               const ptrdiff_t nnodes,
-                               idx_t** const SFEM_RESTRICT elems,
-                               geom_t** const SFEM_RESTRICT xyz,
+int beam2_resample_field_local(const ptrdiff_t nelements, const ptrdiff_t nnodes,
+                               idx_t** const SFEM_RESTRICT elems, geom_t** const SFEM_RESTRICT xyz,
                                // SDF
                                const ptrdiff_t* const SFEM_RESTRICT n,
                                const ptrdiff_t* const SFEM_RESTRICT stride,
@@ -841,46 +779,51 @@ int beam2_resample_field_local(const ptrdiff_t nelements,
 #define real_type double
 
 int tet4_resample_field_local_CUDA(  // Mesh
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        int** const MY_RESTRICT elems,
+        const ptrdiff_t nelements, const ptrdiff_t nnodes, int** const MY_RESTRICT elems,
         float** const MY_RESTRICT xyz,
         // SDF
-        const ptrdiff_t* const MY_RESTRICT n,
-        const ptrdiff_t* const MY_RESTRICT stride,
-        const float* const MY_RESTRICT origin,
-        const float* const MY_RESTRICT delta,
+        const ptrdiff_t* const MY_RESTRICT n, const ptrdiff_t* const MY_RESTRICT stride,
+        const float* const MY_RESTRICT origin, const float* const MY_RESTRICT delta,
         const real_type* const MY_RESTRICT data,
         // Output
         real_type* const MY_RESTRICT weighted_field);
 
 int tet4_resample_field_local_reduce_CUDA(  // Mesh
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        int** const MY_RESTRICT elems,
+        const ptrdiff_t nelements, const ptrdiff_t nnodes, int** const MY_RESTRICT elems,
         float** const MY_RESTRICT xyz,
         // SDF
-        const ptrdiff_t* const MY_RESTRICT n,
-        const ptrdiff_t* const MY_RESTRICT stride,
-        const float* const MY_RESTRICT origin,
-        const float* const MY_RESTRICT delta,
+        const ptrdiff_t* const MY_RESTRICT n, const ptrdiff_t* const MY_RESTRICT stride,
+        const float* const MY_RESTRICT origin, const float* const MY_RESTRICT delta,
         const real_type* const MY_RESTRICT data,
         // Output
         real_type* const MY_RESTRICT weighted_field);
 
-int tet4_resample_field_local_V8(  // Mesh
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        int** const MY_RESTRICT elems,
+int tet4_resample_field_local_V8(
+        // Mesh
+        const ptrdiff_t nelements, const ptrdiff_t nnodes, int** const MY_RESTRICT elems,
         float** const MY_RESTRICT xyz,
         // SDF
-        const ptrdiff_t* const MY_RESTRICT n,
-        const ptrdiff_t* const MY_RESTRICT stride,
-        const float* const MY_RESTRICT origin,
-        const float* const MY_RESTRICT delta,
+        const ptrdiff_t* const MY_RESTRICT n, const ptrdiff_t* const MY_RESTRICT stride,
+        const float* const MY_RESTRICT origin, const float* const MY_RESTRICT delta,
         const real_type* const MY_RESTRICT data,
         // Output
         real_type* const MY_RESTRICT weighted_field);
+
+int hex8_to_tet10_resample_field_local_CUDA(
+        // Mesh
+        const ptrdiff_t nelements,  // number of elements
+        const ptrdiff_t nnodes,     // number of nodes
+        const idx_t** const elems,  // connectivity
+        const geom_t** const xyz,   // coordinates
+        // SDF
+        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
+        const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
+
+        const geom_t* const SFEM_RESTRICT origin,  // origin of the domain
+        const geom_t* const SFEM_RESTRICT delta,   // delta of the domain
+        const real_t* const SFEM_RESTRICT data,    // SDF
+        // Output //
+        real_t* const SFEM_RESTRICT weighted_field);
 
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
@@ -889,20 +832,14 @@ int tet4_resample_field_local_V8(  // Mesh
 ////////////////////////////////////////////////////////////////////////////
 int resample_field_local(
         // Mesh
-        const enum ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t** const SFEM_RESTRICT elems,
-        geom_t** const SFEM_RESTRICT xyz,
+        const enum ElemType element_type, const ptrdiff_t nelements, const ptrdiff_t nnodes,
+        idx_t** const SFEM_RESTRICT elems, geom_t** const SFEM_RESTRICT xyz,
         // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,
-        const ptrdiff_t* const SFEM_RESTRICT stride,
-        const geom_t* const SFEM_RESTRICT origin,
-        const geom_t* const SFEM_RESTRICT delta,
+        const ptrdiff_t* const SFEM_RESTRICT n, const ptrdiff_t* const SFEM_RESTRICT stride,
+        const geom_t* const SFEM_RESTRICT origin, const geom_t* const SFEM_RESTRICT delta,
         const real_t* const SFEM_RESTRICT data,
         // Output
-        real_t* const SFEM_RESTRICT weighted_field,
-        sfem_resample_field_info* info) {
+        real_t* const SFEM_RESTRICT weighted_field, sfem_resample_field_info* info) {
     //
     switch (TET10) {
         case TET4: {
@@ -925,11 +862,10 @@ int resample_field_local(
                     weighted_field);
         }
         case TET10: {
-            
 #define TET10_V2
 
 #ifdef TET10_V2  // V2
-            return hex8_to_tet10_resample_field_local_V2(
+            return hex8_to_tet10_resample_field_local_CUDA(
                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
 #else
             return hex8_to_tet10_resample_field_local(
@@ -962,20 +898,14 @@ int resample_field_local(
 
 int resample_field(
         // Mesh
-        const enum ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t** const SFEM_RESTRICT elems,
-        geom_t** const SFEM_RESTRICT xyz,
+        const enum ElemType element_type, const ptrdiff_t nelements, const ptrdiff_t nnodes,
+        idx_t** const SFEM_RESTRICT elems, geom_t** const SFEM_RESTRICT xyz,
         // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,
-        const ptrdiff_t* const SFEM_RESTRICT stride,
-        const geom_t* const SFEM_RESTRICT origin,
-        const geom_t* const SFEM_RESTRICT delta,
+        const ptrdiff_t* const SFEM_RESTRICT n, const ptrdiff_t* const SFEM_RESTRICT stride,
+        const geom_t* const SFEM_RESTRICT origin, const geom_t* const SFEM_RESTRICT delta,
         const real_t* const SFEM_RESTRICT data,
         // Output
-        real_t* const SFEM_RESTRICT g,
-        sfem_resample_field_info* info) {
+        real_t* const SFEM_RESTRICT g, sfem_resample_field_info* info) {
     //
     real_t* weighted_field = calloc(nnodes, sizeof(real_t));
 
@@ -1018,8 +948,7 @@ int resample_field(
     return 0;
 }
 
-int interpolate_field(const ptrdiff_t nnodes,
-                      geom_t** const SFEM_RESTRICT xyz,
+int interpolate_field(const ptrdiff_t nnodes, geom_t** const SFEM_RESTRICT xyz,
                       // SDF
                       const ptrdiff_t* const SFEM_RESTRICT n,
                       const ptrdiff_t* const SFEM_RESTRICT stride,
@@ -1112,9 +1041,7 @@ int interpolate_field(const ptrdiff_t nnodes,
     return 0;
 }
 
-SFEM_INLINE static void minmax(const ptrdiff_t n,
-                               const geom_t* const SFEM_RESTRICT x,
-                               geom_t* xmin,
+SFEM_INLINE static void minmax(const ptrdiff_t n, const geom_t* const SFEM_RESTRICT x, geom_t* xmin,
                                geom_t* xmax) {
     *xmin = x[0];
     *xmax = x[0];
@@ -1124,17 +1051,11 @@ SFEM_INLINE static void minmax(const ptrdiff_t n,
     }
 }
 
-int field_view(MPI_Comm comm,
-               const ptrdiff_t nnodes,
-               const geom_t* SFEM_RESTRICT z_coordinate,
-               const ptrdiff_t* const nlocal,
-               const ptrdiff_t* const SFEM_RESTRICT nglobal,
-               const ptrdiff_t* const SFEM_RESTRICT stride,
-               const geom_t* const origin,
-               const geom_t* const SFEM_RESTRICT delta,
-               const real_t* const field,
-               real_t** field_out,
-               ptrdiff_t* z_nlocal_out,
+int field_view(MPI_Comm comm, const ptrdiff_t nnodes, const geom_t* SFEM_RESTRICT z_coordinate,
+               const ptrdiff_t* const nlocal, const ptrdiff_t* const SFEM_RESTRICT nglobal,
+               const ptrdiff_t* const SFEM_RESTRICT stride, const geom_t* const origin,
+               const geom_t* const SFEM_RESTRICT delta, const real_t* const field,
+               real_t** field_out, ptrdiff_t* z_nlocal_out,
                geom_t* const SFEM_RESTRICT z_origin_out) {
     return field_view_ensure_margin(comm,
                                     nnodes,
@@ -1151,18 +1072,14 @@ int field_view(MPI_Comm comm,
                                     z_origin_out);
 }
 
-int field_view_ensure_margin(MPI_Comm comm,
-                             const ptrdiff_t nnodes,
+int field_view_ensure_margin(MPI_Comm comm, const ptrdiff_t nnodes,
                              const geom_t* SFEM_RESTRICT z_coordinate,
                              const ptrdiff_t* const nlocal,
                              const ptrdiff_t* const SFEM_RESTRICT nglobal,
                              const ptrdiff_t* const SFEM_RESTRICT stride,
-                             const geom_t* const origin,
-                             const geom_t* const SFEM_RESTRICT delta,
-                             const real_t* const field,
-                             const ptrdiff_t z_margin,
-                             real_t** field_out,
-                             ptrdiff_t* z_nlocal_out,
+                             const geom_t* const origin, const geom_t* const SFEM_RESTRICT delta,
+                             const real_t* const field, const ptrdiff_t z_margin,
+                             real_t** field_out, ptrdiff_t* z_nlocal_out,
                              geom_t* const SFEM_RESTRICT z_origin_out) {
     int rank, size;
     MPI_Comm_rank(comm, &rank);
