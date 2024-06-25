@@ -8,6 +8,10 @@ VECTOR_SIZE ?= 512
 GPU_ARCH ?= sm_75
 DISABLE_CUDA ?= 0
 
+$(info $$DISABLE_CUDA is [${DISABLE_CUDA}])
+$(info $$GPU_ARCH is [${GPU_ARCH}])
+
+
 ifeq ($(debug),1)
 	CFLAGS += -O0 -g
 	CXXFLAGS += -O0 -g
@@ -412,20 +416,24 @@ gap_from_sdf : gap_from_sdf.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
 # Resampling
+
+
 ifeq ($(DISABLE_CUDA), 1)
-	CUDA_LIBS_PATH = 
-	CUDART_LINK =
-	SFEM_CUDA_A = 
-	LINK_SFEM_CUDA =
+    CUDA_LIBS_PATH = 
+    CUDART_LINK =
+    SFEM_CUDA_A = 
+    LINK_SFEM_CUDA =
 else
-	CUDA_LIBS_PATH = -L/usr/local/cuda-12.3/targets/x86_64-linux/lib64
-	CUDART_LINK =  -lcudart
-	SFEM_CUDA_A = ${PWD}/resampling/cuda/libsfem_resample_field_cuda.a
-	LINK_SFEM_CUDA = -L${PWD}/resampling/cuda -lsfem_resample_field_cuda
+    CUDA_LIBS_PATH = -L/usr/local/cuda-12.4/targets/x86_64-linux/lib
+    CUDART_LINK =  -lcudart
+    SFEM_CUDA_A = ${PWD}/resampling/cuda/libsfem_resample_field_cuda.a
+    LINK_SFEM_CUDA = -L${PWD}/resampling/cuda -lsfem_resample_field_cuda
 endif
 
+$(info $$SFEM_CUDA_A is [${SFEM_CUDA_A}])
+
 grid_to_mesh: grid_to_mesh.c libsfem.a ${SFEM_CUDA_A} ${PWD}/resampling/quadratures_rule.h
-	$(MPICC) -o $@ drivers/grid_to_mesh.c libsfem.a $(CFLAGS) $(INCLUDES)  $(LDFLAGS) ${LINK_SFEM_CUDA} ${CUDA_LIBS_PATH} ${CUDART_LINK}  ${SFEM_CUDA_A}  ; \
+	$(MPICC) -o $@ drivers/grid_to_mesh.c libsfem.a $(CFLAGS) $(INCLUDES)  $(LDFLAGS) ${LINK_SFEM_CUDA} ${CUDA_LIBS_PATH} ${CUDART_LINK}  ${SFEM_CUDA_A}
 
 ${PWD}/resampling/cuda/libsfem_resample_field_cuda.a: ${PWD}/resampling/cuda/sfem_resample_field_cuda.cu ${PWD}/resampling/cuda/quadratures_rule_cuda.h
 	${MAKE} -C ${PWD}/resampling/cuda GPU_ARCH=${GPU_ARCH}

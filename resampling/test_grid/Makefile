@@ -1,8 +1,8 @@
 # set compiler
 
-# # CC = g++-13
+CC = g++-13
 # CC = clang++-15
-CC = icpx
+# CC = icpx
 
 ifeq (${VERBOSE}, on)
 	VERBOSE_FLAG = -v

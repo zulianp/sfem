@@ -25,8 +25,9 @@ typedef double vec_double __attribute__((vector_size(_VL_ * sizeof(double)),  //
 typedef ptrdiff_t vec_int64 __attribute__((vector_size(_VL_ * sizeof(ptrdiff_t)),  //
                                            aligned(sizeof(ptrdiff_t))));
 
-// cast from vec_int64 to vec_double
+// Casting from int64 to double SIMD vector
 vec_double vec_int64_to_double(const vec_int64 a) {
+#ifdef AVX512  //// AVX512
     return (vec_double){(double)a[0],
                         (double)a[1],
                         (double)a[2],
@@ -35,6 +36,9 @@ vec_double vec_int64_to_double(const vec_int64 a) {
                         (double)a[5],
                         (double)a[6],
                         (double)a[7]};
+#elif defined(AVX2)  //// AVX2
+    return (vec_double){(double)a[0], (double)a[1], (double)a[2], (double)a[3]};
+#endif
 }
 
 #define ASSIGN_QUADRATURE_POINT_MACRO(_q, _qx_V, _qy_V, _qz_V, _qw_V) \
@@ -45,50 +49,11 @@ vec_double vec_int64_to_double(const vec_int64 a) {
         _qw_V = *((vec_double*)(&tet4_qw[q]));                        \
     }
 
-// #define ASSIGN_QUADRATURE_POINT_MACRO(_q, _qx_V, _qy_V, _qz_V, _qw_V) \
-//     {                                                                 \
-//         _qx_V[0] = tet4_qx[q + 0];                                    \
-//         _qx_V[1] = tet4_qx[q + 1];                                    \
-//         _qx_V[2] = tet4_qx[q + 2];                                    \
-//         _qx_V[3] = tet4_qx[q + 3];                                    \
-//         _qx_V[4] = tet4_qx[q + 4];                                    \
-//         _qx_V[5] = tet4_qx[q + 5];                                    \
-//         _qx_V[6] = tet4_qx[q + 6];                                    \
-//         _qx_V[7] = tet4_qx[q + 7];                                    \
-//                                                                       \
-//         _qy_V[0] = tet4_qy[q + 0];                                    \
-//         _qy_V[1] = tet4_qy[q + 1];                                    \
-//         _qy_V[2] = tet4_qy[q + 2];                                    \
-//         _qy_V[3] = tet4_qy[q + 3];                                    \
-//         _qy_V[4] = tet4_qy[q + 4];                                    \
-//         _qy_V[5] = tet4_qy[q + 5];                                    \
-//         _qy_V[6] = tet4_qy[q + 6];                                    \
-//         _qy_V[7] = tet4_qy[q + 7];                                    \
-//                                                                       \
-//         _qz_V[0] = tet4_qz[q + 0];                                    \
-//         _qz_V[1] = tet4_qz[q + 1];                                    \
-//         _qz_V[2] = tet4_qz[q + 2];                                    \
-//         _qz_V[3] = tet4_qz[q + 3];                                    \
-//         _qz_V[4] = tet4_qz[q + 4];                                    \
-//         _qz_V[5] = tet4_qz[q + 5];                                    \
-//         _qz_V[6] = tet4_qz[q + 6];                                    \
-//         _qz_V[7] = tet4_qz[q + 7];                                    \
-//                                                                       \
-//         _qw_V[0] = tet4_qw[q + 0];                                    \
-//         _qw_V[1] = tet4_qw[q + 1];                                    \
-//         _qw_V[2] = tet4_qw[q + 2];                                    \
-//         _qw_V[3] = tet4_qw[q + 3];                                    \
-//         _qw_V[4] = tet4_qw[q + 4];                                    \
-//         _qw_V[5] = tet4_qw[q + 5];                                    \
-//         _qw_V[6] = tet4_qw[q + 6];                                    \
-//         _qw_V[7] = tet4_qw[q + 7];                                    \
-//     }
-
 //////////////////////////////////////////////////////////
 /// Macros for the cases of the SIMD implementation
 #ifdef AVX512  //// AVX512
 
-#define ASSIGN_QUADRATURE_POINT_MACRO_T(_q, _qx_V, _qy_V, _qz_V, _qw_V)            \
+#define ASSIGN_QUADRATURE_POINT_MACRO_TAIL(_q, _qx_V, _qy_V, _qz_V, _qw_V)         \
     {                                                                              \
         _qx_V = (vec_double){(_q + 0) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 0],  \
                              (_q + 1) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 1],  \
@@ -129,7 +94,7 @@ vec_double vec_int64_to_double(const vec_int64 a) {
 
 #elif defined(AVX2)  //// AVX2
 
-#define ASSIGN_QUADRATURE_POINT_MACRO_T(_q, _qx_v, _qy_V, _qz_V, _qw_V)            \
+#define ASSIGN_QUADRATURE_POINT_MACRO_TAIL(_q, _qx_v, _qy_V, _qz_V, _qw_V)         \
     {                                                                              \
         _qx_V = (vec_double){(_q + 0) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 0],  \
                              (_q + 1) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 1],  \
@@ -560,14 +525,6 @@ int hex8_to_isoparametric_tet10_resample_field_local_V(
         // SUBPARAMETRIC (for iso-parametric tassellation of tet10 might be necessary)
         for (int q = 0; q < TET4_NQP; q += (_VL_)) {  // loop over the quadrature points
 
-            // if (q == 32) {
-            //     break;
-            // }
-
-            // if (q == 8) {
-            //     break;
-            // }
-
             vec_double tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V;
 
             const int q_next = q + _VL_;
@@ -575,46 +532,14 @@ int hex8_to_isoparametric_tet10_resample_field_local_V(
 
             if (q_next <= TET4_NQP) {
                 ASSIGN_QUADRATURE_POINT_MACRO(q, tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V);
-                // printf("q = %d ", q);
-                // printf("tet4_qx_V[0] = %f ", tet4_qw_V[0]);
-                // printf("tet4_qx_V[1] = %f ", tet4_qw_V[1]);
-                // printf("tet4_qx_V[2] = %f ", tet4_qw_V[2]);
-                // printf("tet4_qx_V[3] = %f ", tet4_qw_V[3]);
-                // printf("tet4_qx_V[4] = %f ", tet4_qw_V[4]);
-                // printf("tet4_qx_V[5] = %f ", tet4_qw_V[5]);
-                // printf("tet4_qx_V[6] = %f ", tet4_qw_V[6]);
-                // printf("tet4_qx_V[7] = %f\n", tet4_qw_V[7]);
+
             } else {
-                ASSIGN_QUADRATURE_POINT_MACRO_T(q, tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V);
-                // printf("q = %d .. \n", q);
+                ASSIGN_QUADRATURE_POINT_MACRO_TAIL(q, tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V);
             }
 
             const vec_double measure = tet10_measure_V(x, y, z, tet4_qx_V, tet4_qy_V, tet4_qz_V);
 
-            // for ( int i = 0; i < _VL_; i++){
-            //     printf("measure[%d] = %e\n", q+i, measure[i]);
-            //     printf("tet4_qw_V[%d] = %e\n", q+i, tet4_qw_V[i]);
-            //     printf("tet4_qx_V[%d] = %e\n", q+i, tet4_qx_V[i]);
-            //     printf("tet4_qy_V[%d] = %e\n", q+i, tet4_qy_V[i]);
-            //     printf("tet4_qz_V[%d] = %e\n", q+i, tet4_qz_V[i]);
-            // }
-
-            // assert(measure > 0);
-
             const vec_double dV = measure * tet4_qw_V;
-
-            // printf("dV[%d] = %e\n",q+0, dV[0]);
-            // printf("dV[%d] = %e\n",q+1, dV[1]);
-            // printf("dV[%d] = %e\n",q+2, dV[2]);
-            // printf("dV[%d] = %e\n",q+3, dV[3]);
-            // printf("dV[%d] = %e\n",q+4, dV[4]);
-            // printf("dV[%d] = %e\n",q+5, dV[5]);
-            // printf("dV[%d] = %e\n",q+6, dV[6]);
-            // printf("dV[%d] = %e\n",q+7, dV[7]);
-
-            // printf("dV[0] = %f, dV[1] = %f, dV[2] = %f, dV[3] = %f, dV[4] = %f, dV[5] = %f, dV[6]
-            // = %f, dV[7] = %f\n",
-            //        dV[0], dV[1], dV[2], dV[3], dV[4], dV[5], dV[6], dV[7]);
 
             vec_double g_qx, g_qy, g_qz;
             // Transform quadrature point to physical space
@@ -623,72 +548,20 @@ int hex8_to_isoparametric_tet10_resample_field_local_V(
             tet10_transform_V(x, y, z, tet4_qx_V, tet4_qy_V, tet4_qz_V, &g_qx, &g_qy, &g_qz);
             tet10_dual_basis_hrt_V(tet4_qx_V, tet4_qy_V, tet4_qz_V, tet10_f);
 
-            // for (int iii = 0; iii < _VL_; iii++) {
-            //     // printf("g_qx[%d] = %e\n", q+iii, g_qx[iii]);
-            //     // printf("g_qy[%d] = %e\n", q+iii, g_qy[iii]);
-            //     // printf("g_qz[%d] = %e\n", q+iii, g_qz[iii]);
-
-            //     for (int jjj = 0; jjj < 10; jjj++) {
-            //         printf("tet10_f[%d]: %e\n", jjj, tet10_f[jjj][iii]);
-            //     }
-            // }
-
             ///// ======================================================
 
             const vec_double grid_x = (g_qx - ox) / dx;
             const vec_double grid_y = (g_qy - oy) / dy;
             const vec_double grid_z = (g_qz - oz) / dz;
 
-            // for( int iii = 0; iii < _VL_; iii++){
-            //     printf("grid_x[%d] = %f\n", iii, grid_x[iii]);
-            //     printf("grid_y[%d] = %f\n", iii, grid_y[iii]);
-            //     printf("grid_z[%d] = %f\n", iii, grid_z[iii]);
-            // }
-
             const vec_int64 i = floor_V(grid_x);
             const vec_int64 j = floor_V(grid_y);
             const vec_int64 k = floor_V(grid_z);
-
-            // for (int iii = 0; iii < _VL_; iii++) {
-            //     printf("i[%d] = %d\n", iii, i[iii]);
-            //     printf("j[%d] = %d\n", iii, j[iii]);
-            //     printf("k[%d] = %d\n", iii, k[iii]);
-            // }
-
-            // // If outside
-            // if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2]))
-            // {
-            //     fprintf(stderr,
-            //             "warning (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
-            //             "%ld)!\n",
-            //             g_qx,
-            //             g_qy,
-            //             g_qz,
-            //             i,
-            //             j,
-            //             k,
-            //             n[0],
-            //             n[1],
-            //             n[2]);
-            //     continue;
-            // }
 
             // Get the reminder [0, 1]
             vec_double l_x = (grid_x - vec_int64_to_double(i));
             vec_double l_y = (grid_y - vec_int64_to_double(j));
             vec_double l_z = (grid_z - vec_int64_to_double(k));
-
-            // for (int iii = 0; iii < _VL_; iii++) {
-            //     printf("(vec_double)(i)[%d] = %f\n", iii, vec_int64_to_double(i)[iii]);
-            //     printf("(vec_double)(j)[%d] = %f\n", iii, vec_int64_to_double(j)[iii]);
-            //     printf("(vec_double)(k)[%d] = %f\n", iii, vec_int64_to_double(k)[iii]);
-            // }
-
-            // for (int iii = 0; iii < _VL_; iii++) {
-            //     printf("l_x[%d] = %lf\n", iii, l_x[iii]);
-            //     printf("l_y[%d] = %lf\n", iii, l_y[iii]);
-            //     printf("l_z[%d] = %lf\n", iii, l_z[iii]);
-            // }
 
             // assert(l_x >= -1e-8); /// Maybe define a macro for the assert in SIMD version
             // assert(l_y >= -1e-8);
@@ -700,13 +573,6 @@ int hex8_to_isoparametric_tet10_resample_field_local_V(
 
             hex_aa_8_eval_fun_V(l_x, l_y, l_z, hex8_f);
             hex_aa_8_collect_coeffs_V(stride0, stride1, stride2, i, j, k, data, coeffs);
-
-            // for (int iii = 0; iii < _VL_; iii++) {
-            //     for (int jjj = 0; jjj < 8; jjj++) {
-            //         printf("hex8_f[%d]: %e\n", jjj, hex8_f[jjj][iii]);
-            //         // printf("coeffs[%d]: %e\n", jjj, coeffs[jjj][iii]);
-            //     }
-            // }
 
             // Integrate field
             {
