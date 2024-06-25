@@ -22,12 +22,12 @@ mkdir -p le_test
 cd le_test
 
 mkdir -p output
-# export OMP_NUM_THREADS=12
-export OMP_NUM_THREADS=8
+export OMP_NUM_THREADS=12
+# export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 
 # rm -rf mesh
-# create_cylinder.sh 4
+# create_cylinder.sh 0
 
 # create_cylinder_p2.sh 3
 # export SFEM_USE_MACRO=1
@@ -74,5 +74,14 @@ then
 else
 	raw_to_db.py mesh output/x.vtk -p "output/x.raw,output/c*.raw,output/residual*.raw"
 fi
+
+# if [[ -z "$SFEM_DEBUG" ]]
+# then
+# 	echo "Skipp debugging"
+# else
+# 	echo "SFEM_DEBUG"
+# 	MATRIXIO_DENSE_OUTPUT=1 print_crs ./rowptr.raw ./colidx.raw ./values.raw int int double
+# fi
+
 
 cd $HERE

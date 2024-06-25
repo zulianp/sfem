@@ -641,8 +641,7 @@ static SFEM_INLINE void tet4_linear_elasticity_hessian_adj(
         const scalar_t lambda,
         const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
         const jacobian_t jacobian_determinant,
-        accumulator_t *const SFEM_RESTRICT element_matrix) 
-{
+        accumulator_t *const SFEM_RESTRICT element_matrix) {
     const scalar_t x0 = jacobian_adjugate[1] + jacobian_adjugate[4] + jacobian_adjugate[7];
     const scalar_t x1 = mu * x0;
     const scalar_t x2 = jacobian_adjugate[1] * x1;
@@ -965,6 +964,148 @@ static SFEM_INLINE void tet4_linear_elasticity_hessian_adj(
     element_matrix[141] = x176;
     element_matrix[142] = x177;
     element_matrix[143] = x16 * x174;
+}
+
+static SFEM_INLINE void aux_tet4_linear_elasticity_hessian_adj_less_registers(
+        const scalar_t mu,
+        const scalar_t lambda,
+        const jacobian_t *const SFEM_RESTRICT adjugate,
+        const jacobian_t jacobian_determinant,
+        const int test_idx,
+        const scalar_t *const SFEM_RESTRICT gtest,
+        scalar_t *const SFEM_RESTRICT element_matrix) {
+    // loperand common expressions
+    const scalar_t x0 = adjugate[1] * gtest[0];
+    const scalar_t x1 = adjugate[4] * gtest[1];
+    const scalar_t x2 = adjugate[7] * gtest[2];
+    const scalar_t x3 = (1.0 / 6.0) / jacobian_determinant;
+    const scalar_t x4 = mu * x3;
+    const scalar_t x5 = x4 * (x0 + x1 + x2);
+    const scalar_t x6 = adjugate[1] * x5;
+    const scalar_t x7 = adjugate[2] * gtest[0];
+    const scalar_t x8 = adjugate[5] * gtest[1];
+    const scalar_t x9 = adjugate[8] * gtest[2];
+    const scalar_t x10 = x4 * (x7 + x8 + x9);
+    const scalar_t x11 = adjugate[2] * x10;
+    const scalar_t x12 = lambda + 2 * mu;
+    const scalar_t x13 = adjugate[0] * gtest[0];
+    const scalar_t x14 = adjugate[3] * gtest[1];
+    const scalar_t x15 = adjugate[6] * gtest[2];
+    const scalar_t x16 = x3 * (x12 * x13 + x12 * x14 + x12 * x15);
+    const scalar_t x17 = adjugate[4] * x5;
+    const scalar_t x18 = adjugate[5] * x10;
+    const scalar_t x19 = adjugate[7] * x5;
+    const scalar_t x20 = adjugate[8] * x10;
+    const scalar_t x21 = x3 * (lambda * x13 + lambda * x14 + lambda * x15);
+    const scalar_t x22 = x4 * (x13 + x14 + x15);
+    const scalar_t x23 = x3 * (lambda * x0 + lambda * x1 + lambda * x2);
+    const scalar_t x24 = adjugate[0] * x22;
+    const scalar_t x25 = x3 * (x0 * x12 + x1 * x12 + x12 * x2);
+    const scalar_t x26 = adjugate[3] * x22;
+    const scalar_t x27 = adjugate[6] * x22;
+    const scalar_t x28 = x3 * (lambda * x7 + lambda * x8 + lambda * x9);
+    const scalar_t x29 = x3 * (x12 * x7 + x12 * x8 + x12 * x9);
+
+    scalar_t loperand[9];
+    scalar_t gtrial[3];
+
+    // x (0)
+    {
+        loperand[0] = adjugate[0] * x16 + x11 + x6;
+        loperand[1] = adjugate[3] * x16 + x17 + x18;
+        loperand[2] = adjugate[6] * x16 + x19 + x20;
+        loperand[3] = adjugate[0] * x5 + adjugate[1] * x21;
+        loperand[4] = adjugate[3] * x5 + adjugate[4] * x21;
+        loperand[5] = adjugate[6] * x5 + adjugate[7] * x21;
+        loperand[6] = adjugate[0] * x10 + adjugate[2] * x21;
+        loperand[7] = adjugate[3] * x10 + adjugate[5] * x21;
+        loperand[8] = adjugate[6] * x10 + adjugate[8] * x21;
+
+        for (int d = 0; d < 3; d++) {
+            const scalar_t *const row = &loperand[d * 3];
+            const int offset = test_idx * 12 + d * 4;
+            element_matrix[offset + 0] = -row[0] - row[1] - row[2];
+            element_matrix[offset + 1] = row[0];
+            element_matrix[offset + 2] = row[1];
+            element_matrix[offset + 3] = row[2];
+        }
+    }
+
+    // y (1)
+    {
+        loperand[0] = adjugate[0] * x23 + adjugate[1] * x22;
+        loperand[1] = adjugate[3] * x23 + adjugate[4] * x22;
+        loperand[2] = adjugate[6] * x23 + adjugate[7] * x22;
+        loperand[3] = adjugate[1] * x25 + x11 + x24;
+        loperand[4] = adjugate[4] * x25 + x18 + x26;
+        loperand[5] = adjugate[7] * x25 + x20 + x27;
+        loperand[6] = adjugate[1] * x10 + adjugate[2] * x23;
+        loperand[7] = adjugate[4] * x10 + adjugate[5] * x23;
+        loperand[8] = adjugate[7] * x10 + adjugate[8] * x23;
+
+        for (int d = 0; d < 3; d++) {
+            const scalar_t *const row = &loperand[d * 3];
+            const int offset = 4 * 12 + test_idx * 12 + d * 4;
+            element_matrix[offset + 0] = -row[0] - row[1] - row[2];
+            element_matrix[offset + 1] = row[0];
+            element_matrix[offset + 2] = row[1];
+            element_matrix[offset + 3] = row[2];
+        }
+    }
+
+    // z (2)
+    {
+        loperand[0] = adjugate[0] * x28 + adjugate[2] * x22;
+        loperand[1] = adjugate[3] * x28 + adjugate[5] * x22;
+        loperand[2] = adjugate[6] * x28 + adjugate[8] * x22;
+        loperand[3] = adjugate[1] * x28 + adjugate[2] * x5;
+        loperand[4] = adjugate[4] * x28 + adjugate[5] * x5;
+        loperand[5] = adjugate[7] * x28 + adjugate[8] * x5;
+        loperand[6] = adjugate[2] * x29 + x24 + x6;
+        loperand[7] = adjugate[5] * x29 + x17 + x26;
+        loperand[8] = adjugate[8] * x29 + x19 + x27;
+
+        for (int d = 0; d < 3; d++) {
+            const scalar_t *const row = &loperand[d * 3];
+            const int offset = 2 * 4 * 12 + test_idx * 12 + d * 4;
+            element_matrix[offset + 0] = -row[0] - row[1] - row[2];
+            element_matrix[offset + 1] = row[0];
+            element_matrix[offset + 2] = row[1];
+            element_matrix[offset + 3] = row[2];
+        }
+    }
+}
+
+// Untested
+static SFEM_INLINE void tet4_linear_elasticity_hessian_adj_less_registers(
+        const scalar_t mu,
+        const scalar_t lambda,
+        const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+        const jacobian_t jacobian_determinant,
+        accumulator_t *const SFEM_RESTRICT element_matrix) {
+    {
+        scalar_t gtest[3] = {-1, -1, -1};
+        aux_tet4_linear_elasticity_hessian_adj_less_registers(
+                mu, lambda, jacobian_adjugate, jacobian_determinant, 0, gtest, element_matrix);
+    }
+
+    {
+        scalar_t gtest[3] = {1, 0, 0};
+        aux_tet4_linear_elasticity_hessian_adj_less_registers(
+                mu, lambda, jacobian_adjugate, jacobian_determinant, 1, gtest, element_matrix);
+    }
+
+    {
+        scalar_t gtest[3] = {0, 1, 0};
+        aux_tet4_linear_elasticity_hessian_adj_less_registers(
+                mu, lambda, jacobian_adjugate, jacobian_determinant, 2, gtest, element_matrix);
+    }
+
+    {
+        scalar_t gtest[3] = {0, 0, 1};
+        aux_tet4_linear_elasticity_hessian_adj_less_registers(
+                mu, lambda, jacobian_adjugate, jacobian_determinant, 3, gtest, element_matrix);
+    }
 }
 
 #endif  // TET4_LINEAR_ELASTICITY_INLINE_CPU_H
