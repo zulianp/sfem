@@ -109,6 +109,7 @@ int main(int argc, char *argv[]) {
     int SFEM_USE_CHEB = 0;
     int SFEM_DEBUG = 0;
     int SFEM_MG = 0;
+    int SFEM_MAX_IT = 4000;
     float SFEM_CHEB_EIG_MAX_SCALE = 1;
 
     SFEM_READ_ENV(SFEM_MATRIX_FREE, atoi);
@@ -119,6 +120,7 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_DEBUG, atoi);
     SFEM_READ_ENV(SFEM_MG, atoi);
     SFEM_READ_ENV(SFEM_CHEB_EIG_MAX_SCALE, atof);
+    SFEM_READ_ENV(SFEM_MAX_IT, atoi);
 
     printf("SFEM_MATRIX_FREE: %d\n"
            "SFEM_OPERATOR: %s\n"
@@ -357,7 +359,7 @@ int main(int argc, char *argv[]) {
 
         solver->verbose = true;
         solver->tol = tol;
-        solver->set_max_it(800);
+        solver->set_max_it(SFEM_MAX_IT);
 
 #endif
 
