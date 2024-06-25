@@ -317,6 +317,61 @@ class GPULinearElasticityOp:
 		expr = assign_matrix('P_tXJinv_t', P_tXJinv_t)
 		return expr
 
+	def hessian_less_registers(self):
+		fe = self.fe
+		dims = fe.manifold_dim()
+		disp_grad_name = 'disp_grad'
+		mu, lmbda = sp.symbols('mu lambda', real=True)
+		disp_grad = sp.Matrix(dims, dims, coeffs(disp_grad_name, dims * dims))
+		trial_symb = sp.Matrix(dims, dims, coeffs("grad_trial", dims * dims))
+		test_symb = sp.Matrix(dims, dims, coeffs("grad_test", dims * dims))
+		loperand_symb = sp.Matrix(dims, dims, coeffs("loperand", dims * dims))
+
+		# Strain energy function
+		epsu = (disp_grad + disp_grad.T) / 2
+		Psi = mu * inner(epsu, epsu) + (lmbda/2) * (tr(epsu) * tr(epsu))
+		jac_inv = fe.symbol_jacobian_inverse_as_adjugate()
+
+		P = sp.Matrix(dims, dims, [0]*(dims*dims))
+		for d1 in range(0, dims):
+			for d2 in range(0, dims):
+				P[d1, d2] = sp.diff(Psi, disp_grad[d1, d2])
+		
+		# Directional derivative of strain energy function
+		dPsi = inner(P.T * jac_inv.T, test_symb)
+
+		linearized_stress = sp.Matrix(dims, dims, [0]*(dims*dims))
+		for d1 in range(0, dims):
+			for d2 in range(0, dims):
+				linearized_stress[d1, d2] = sp.simplify(sp.diff(dPsi, disp_grad[d1, d2]))
+
+		dV = fe.reference_measure() * fe.symbol_jacobian_determinant() * fe.quadrature_weight()
+
+		loperand = linearized_stress.T * (jac_inv.T * dV)
+		bform = inner(loperand_symb, trial_symb)
+
+		if False:
+			loperands = []
+			for d1 in range(0, dims):
+				expr = loperand
+				test_repl = sp.zeros(dims, dims)
+
+				for d2 in range(0, dims):
+					test_repl[d1, d2] = sp.symbols(f'gtest[{d2}]')
+
+				expr = subsmat(expr, test_symb, test_repl)
+				loperands.extend(assign_matrix(f'loperand{d1}', expr))
+
+			return {
+				'loperands' : loperands
+			}
+
+		else:
+			return { 
+				'loperand' : assign_matrix('loperand', loperand),
+				'bform' : [ast.Assignment(sp.symbols('bform'), sp.simplify(bform))]
+				}
+
 	def hessian(self):
 		H = self.eval_hessian
 		rows, cols = H.shape
@@ -464,69 +519,82 @@ def main():
 	op = GPULinearElasticityOp(fe, q)
 	# op.hessian_check()
 
+	if True:
+		c_log("//--------------------------")
+		c_log("// New hessian")	
+		c_log("//--------------------------")
+			
+		kv = op.hessian_less_registers()
+		for k, v in kv.items():
 
-	c_log("//--------------------------")
-	c_log("// geometry")	
-	c_log("//--------------------------")
-	
-	c_code(op.jacobian())
-	c_code(op.geometry())
+			print("---------------------")
+			print(f"{k}")
+			print("---------------------")
+			c_code(v)
 
-
-	c_log("//--------------------------")
-	c_log("// displacement_gradient")	
-	c_log("//--------------------------")
-	c_code(op.displacement_gradient())
-
-	c_log("//--------------------------")
-	c_log("// Piola")	
-	c_log("//--------------------------")
-	c_code(op.first_piola())
-
-	# c_log("//--------------------------")
-	# c_log("// gradient")
-	# c_log("//--------------------------")
-	# c_code(op.gradient())
-
-	c_log("//--------------------------")
-	c_log("// loperand")	
-	c_log("//--------------------------")
-	c_code(op.loperand())
-
-	c_log("//--------------------------")
-	c_log("// gradient_opt")
-	c_log("//--------------------------")
-	c_code(op.gradient_opt())
-
-	# c_log("//--------------------------")
-	# c_log("// value")
-	# c_log("//--------------------------")
-	# c_code(op.value())
-
-	c_log("--------------------------")
-	c_log("hessian")	
-	c_log("--------------------------")
-	c_code(op.hessian())
-
-	c_log("--------------------------")
-	c_log("hessian_diag")	
-	c_log("--------------------------")
-	c_code(op.hessian_diag())
-
-	# c_log("--------------------------")
-	# c_log("lin stress")	
-	# c_log("--------------------------")
-
-	# print(fe.n_nodes() * fe.spatial_dim())
-
-	# for i in range(0, fe.n_nodes() * fe.spatial_dim()):
-	# 	c_code(op.linearized_stress(i))
+	else:
+		c_log("//--------------------------")
+		c_log("// geometry")	
+		c_log("//--------------------------")
+		
+		c_code(op.jacobian())
+		c_code(op.geometry())
 
 
-	# c_log("--------------------------")
-	# c_log("apply")	
-	# c_log("--------------------------")
-	# c_code(op.apply())
+		c_log("//--------------------------")
+		c_log("// displacement_gradient")	
+		c_log("//--------------------------")
+		c_code(op.displacement_gradient())
+
+		c_log("//--------------------------")
+		c_log("// Piola")	
+		c_log("//--------------------------")
+		c_code(op.first_piola())
+
+		# c_log("//--------------------------")
+		# c_log("// gradient")
+		# c_log("//--------------------------")
+		# c_code(op.gradient())
+
+		c_log("//--------------------------")
+		c_log("// loperand")	
+		c_log("//--------------------------")
+		c_code(op.loperand())
+
+		c_log("//--------------------------")
+		c_log("// gradient_opt")
+		c_log("//--------------------------")
+		c_code(op.gradient_opt())
+
+		# c_log("//--------------------------")
+		# c_log("// value")
+		# c_log("//--------------------------")
+		# c_code(op.value())
+
+		c_log("--------------------------")
+		c_log("hessian")	
+		c_log("--------------------------")
+		c_code(op.hessian())
+
+		c_log("--------------------------")
+		c_log("hessian_diag")	
+		c_log("--------------------------")
+		c_code(op.hessian_diag())
+
+		# c_log("--------------------------")
+		# c_log("lin stress")	
+		# c_log("--------------------------")
+
+		# print(fe.n_nodes() * fe.spatial_dim())
+
+		# for i in range(0, fe.n_nodes() * fe.spatial_dim()):
+		# 	c_code(op.linearized_stress(i))
+
+
+		# c_log("--------------------------")
+		# c_log("apply")	
+		# c_log("--------------------------")
+		# c_code(op.apply())
 
 	
 
