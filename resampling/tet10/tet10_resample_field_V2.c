@@ -189,8 +189,7 @@ SFEM_INLINE static vec_double tet10_measure_V(const real_t* const SFEM_RESTRICT 
                                               const real_t* const SFEM_RESTRICT y,
                                               const real_t* const SFEM_RESTRICT z,
                                               // Quadrature point
-                                              const vec_double qx,
-                                              const vec_double qy,
+                                              const vec_double qx, const vec_double qy,
                                               const vec_double qz) {
     const vec_double x0 = 4 * qz;
     const vec_double x1 = x0 - 1;
@@ -240,8 +239,7 @@ SFEM_INLINE static void tet10_transform_V(const real_t* const SFEM_RESTRICT x,
                                           const real_t* const SFEM_RESTRICT y,
                                           const real_t* const SFEM_RESTRICT z,
                                           // Quadrature point
-                                          const vec_double qx,
-                                          const vec_double qy,
+                                          const vec_double qx, const vec_double qy,
                                           const vec_double qz,
                                           // Output
                                           vec_double* const SFEM_RESTRICT out_x,
@@ -272,10 +270,8 @@ SFEM_INLINE static void tet10_transform_V(const real_t* const SFEM_RESTRICT x,
              z[7] * x14 + z[8] * x2 + z[9] * x4;
 }
 
-SFEM_INLINE static void tet10_dual_basis_hrt_V(const vec_double qx,
-                                               const vec_double qy,
-                                               const vec_double qz,
-                                               vec_double* const f) {
+SFEM_INLINE static void tet10_dual_basis_hrt_V(const vec_double qx, const vec_double qy,
+                                               const vec_double qz, vec_double* const f) {
     const vec_double x0 = 2 * qy;
     const vec_double x1 = 2 * qz;
     const vec_double x2 = 2 * qx - 1;
@@ -354,9 +350,7 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V(
         // Quadrature point (local coordinates)
         // With respect to the hat functions of a cube element
         // In a local coordinate system
-        const vec_double x,
-        const vec_double y,
-        const vec_double z,
+        const vec_double x, const vec_double y, const vec_double z,
         // Output
         vec_double* const SFEM_RESTRICT f) {
     //
@@ -406,17 +400,12 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V(
  * @param out
  */
 SFEM_INLINE static void hex_aa_8_collect_coeffs_V(
-        const ptrdiff_t stride0,
-        const ptrdiff_t stride1,
-        const ptrdiff_t stride2,
+        const ptrdiff_t stride0, const ptrdiff_t stride1, const ptrdiff_t stride2,
 
-        const vec_int64 i,
-        const vec_int64 j,
-        const vec_int64 k,
+        const vec_int64 i, const vec_int64 j, const vec_int64 k,
 
         // Attention this is geometric data transformed to solver data!
-        const real_t* const SFEM_RESTRICT data,
-        vec_double* const SFEM_RESTRICT out) {
+        const real_t* const SFEM_RESTRICT data, vec_double* const SFEM_RESTRICT out) {
     //
     const vec_int64 i0 = i * stride0 + j * stride1 + k * stride2;
     const vec_int64 i1 = (i + 1) * stride0 + j * stride1 + k * stride2;
