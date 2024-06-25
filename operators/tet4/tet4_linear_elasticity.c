@@ -296,8 +296,9 @@ int tet4_linear_elasticity_hessian(const ptrdiff_t nelements,
                               jacobian_adjugate,
                               &jacobian_determinant);
 
-        tet4_linear_elasticity_hessian_adj(
-                mu, lambda, jacobian_adjugate, jacobian_determinant, element_matrix);
+        // tet4_linear_elasticity_hessian_adj
+        tet4_linear_elasticity_hessian_adj_less_registers
+        (mu, lambda, jacobian_adjugate, jacobian_determinant, element_matrix);
 
 #ifndef NDEBUG
         {
