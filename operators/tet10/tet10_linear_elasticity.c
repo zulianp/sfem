@@ -8,9 +8,9 @@
 
 static SFEM_INLINE void tet10_linear_elasticity_apply_adj(const scalar_t mu,
                                                           const scalar_t lambda,
-                                                          const jacobian_t *const SFEM_RESTRICT
+                                                          const scalar_t *const SFEM_RESTRICT
                                                                   adjugate,
-                                                          const jacobian_t jacobian_determinant,
+                                                          const scalar_t jacobian_determinant,
                                                           const scalar_t qx,
                                                           const scalar_t qy,
                                                           const scalar_t qz,
@@ -299,8 +299,8 @@ int tet10_linear_elasticity_apply(const ptrdiff_t nelements,
         accumulator_t element_outy[10] = {0};
         accumulator_t element_outz[10] = {0};
 
-        jacobian_t jacobian_adjugate[9];
-        jacobian_t jacobian_determinant = 0;
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant = 0;
 
 #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
@@ -314,7 +314,7 @@ int tet10_linear_elasticity_apply(const ptrdiff_t nelements,
             element_uz[v] = uz[idx];
         }
 
-        tet4_adjugate_and_det(x[ev[0]],
+        tet4_adjugate_and_det_s(x[ev[0]],
                               x[ev[1]],
                               x[ev[2]],
                               x[ev[3]],
@@ -395,15 +395,15 @@ int tet10_linear_elasticity_diag(const ptrdiff_t nelements,
         accumulator_t element_outy[10] = {0};
         accumulator_t element_outz[10] = {0};
 
-        jacobian_t jacobian_adjugate[9];
-        jacobian_t jacobian_determinant = 0;
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant = 0;
 
 #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
             ev[v] = elements[v][i];
         }
 
-        tet4_adjugate_and_det(x[ev[0]],
+        tet4_adjugate_and_det_s(x[ev[0]],
                               x[ev[1]],
                               x[ev[2]],
                               x[ev[3]],
@@ -482,8 +482,11 @@ int tet10_linear_elasticity_apply_opt(const ptrdiff_t nelements,
         accumulator_t element_outy[10] = {0};
         accumulator_t element_outz[10] = {0};
 
-        const jacobian_t *const jacobian_adjugate = &g_jacobian_adjugate[i * 9];
-        const jacobian_t jacobian_determinant = g_jacobian_determinant[i];
+        const scalar_t jacobian_determinant = g_jacobian_determinant[i];
+        scalar_t jacobian_adjugate[9];
+        for(int k = 0; k < 9; k++) {
+            jacobian_adjugate[k] = g_jacobian_adjugate[i * 9 + k];
+        }
 
 #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
@@ -554,8 +557,11 @@ int tet10_linear_elasticity_diag_opt(const ptrdiff_t nelements,
         accumulator_t element_outy[10] = {0};
         accumulator_t element_outz[10] = {0};
 
-        const jacobian_t *const jacobian_adjugate = &g_jacobian_adjugate[i * 9];
-        const jacobian_t jacobian_determinant = g_jacobian_determinant[i];
+        const scalar_t jacobian_determinant = g_jacobian_determinant[i];
+        scalar_t jacobian_adjugate[9];
+        for(int k = 0; k < 9; k++) {
+            jacobian_adjugate[k] = g_jacobian_adjugate[i * 9 + k];
+        }
 
 #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
@@ -621,8 +627,8 @@ int tet10_linear_elasticity_hessian(const ptrdiff_t nelements,
         idx_t ev[10];
         idx_t ks[10];
 
-        jacobian_t jacobian_adjugate[9];
-        jacobian_t jacobian_determinant = 0;
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant = 0;
 
         accumulator_t element_matrix[(10 * 3) * (10 * 3)] = {0};
 
@@ -631,7 +637,7 @@ int tet10_linear_elasticity_hessian(const ptrdiff_t nelements,
             ev[v] = elements[v][i];
         }
 
-        tet4_adjugate_and_det(x[ev[0]],
+        tet4_adjugate_and_det_s(x[ev[0]],
                               x[ev[1]],
                               x[ev[2]],
                               x[ev[3]],
