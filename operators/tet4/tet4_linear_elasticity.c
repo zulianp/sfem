@@ -268,9 +268,6 @@ int tet4_linear_elasticity_hessian(const ptrdiff_t nelements,
         idx_t ev[4];
         idx_t ks[4];
 
-        scalar_t jacobian_adjugate[9];
-        scalar_t jacobian_determinant = 0;
-
         accumulator_t element_matrix[(4 * 3) * (4 * 3)];
 
 #pragma unroll(4)
@@ -278,6 +275,9 @@ int tet4_linear_elasticity_hessian(const ptrdiff_t nelements,
             ev[v] = elements[v][i];
         }
 
+#if 1 // Sperate computation of adjugate and actual element_matrix
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant = 0;
         tet4_adjugate_and_det_s(x[ev[0]],
                                 x[ev[1]],
                                 x[ev[2]],
@@ -296,13 +296,11 @@ int tet4_linear_elasticity_hessian(const ptrdiff_t nelements,
                                 jacobian_adjugate,
                                 &jacobian_determinant);
 
-        tet4_linear_elasticity_hessian_adj
-                // tet4_linear_elasticity_hessian_adj_less_registers
+        tet4_linear_elasticity_hessian_adj // Fastest on M1
+                // tet4_linear_elasticity_hessian_adj_less_registers // Slightly slower on M1
                 (mu, lambda, jacobian_adjugate, jacobian_determinant, element_matrix);
 
-#ifndef NDEBUG
-        {
-            accumulator_t test_matrix[(4 * 3) * (4 * 3)];
+#else // Code generated from points // Slowest on M1
             tet4_linear_elasticity_hessian_points(
                     // Model parameters
                     mu,
@@ -323,27 +321,8 @@ int tet4_linear_elasticity_hessian(const ptrdiff_t nelements,
                     z[ev[2]],
                     z[ev[3]],
                     // output matrix
-                    test_matrix);
-
-            for (int ii = 0; ii < 12; ii++) {
-                for (int jj = 0; jj < 12; jj++) {
-                    int idx = ii * 12 + jj;
-                    double diff = fabs(test_matrix[idx] - element_matrix[idx]);
-                    if (diff > 1e-8) {
-                        printf("Diff %d %d) %g != %g\n",
-                               ii,
-                               jj,
-                               element_matrix[idx],
-                               test_matrix[idx]);
-                    }
-
-                    assert(diff < 1e-5);
-                }
-            }
-        }
-#endif  // NDEBUG
-
-        // assert(!check_symmetric(4 * block_size, element_matrix));
+                    element_matrix);
+#endif 
 
         for (int edof_i = 0; edof_i < 4; ++edof_i) {
             const idx_t dof_i = elements[edof_i][i];
