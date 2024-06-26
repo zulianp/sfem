@@ -5,8 +5,8 @@
 
 // FFF
 
-static SFEM_INLINE void tet4_sub_fff_0(const geom_t *const SFEM_RESTRICT fff,
-                                       geom_t *const SFEM_RESTRICT sub_fff) {
+static SFEM_INLINE void tet4_sub_fff_0(const scalar_t *const SFEM_RESTRICT fff,
+                                       scalar_t *const SFEM_RESTRICT sub_fff) {
     sub_fff[0] = (1.0 / 2.0) * fff[0];
     sub_fff[1] = (1.0 / 2.0) * fff[1];
     sub_fff[2] = (1.0 / 2.0) * fff[2];
@@ -17,10 +17,10 @@ static SFEM_INLINE void tet4_sub_fff_0(const geom_t *const SFEM_RESTRICT fff,
     assert(tet4_det_fff(sub_fff) > 0);
 }
 
-static SFEM_INLINE void tet4_sub_fff_4(const geom_t *const SFEM_RESTRICT fff,
-                                       geom_t *const SFEM_RESTRICT sub_fff) {
-    const geom_t x0 = (1.0 / 2.0) * fff[0];
-    const geom_t x1 = (1.0 / 2.0) * fff[2];
+static SFEM_INLINE void tet4_sub_fff_4(const scalar_t *const SFEM_RESTRICT fff,
+                                       scalar_t *const SFEM_RESTRICT sub_fff) {
+    const scalar_t x0 = (1.0 / 2.0) * fff[0];
+    const scalar_t x1 = (1.0 / 2.0) * fff[2];
     sub_fff[0] = fff[1] + (1.0 / 2.0) * fff[3] + x0;
     sub_fff[1] = -1.0 / 2.0 * fff[1] - x0;
     sub_fff[2] = (1.0 / 2.0) * fff[4] + x1;
@@ -31,12 +31,12 @@ static SFEM_INLINE void tet4_sub_fff_4(const geom_t *const SFEM_RESTRICT fff,
     assert(tet4_det_fff(sub_fff) > 0);
 }
 
-static SFEM_INLINE void tet4_sub_fff_5(const geom_t *const SFEM_RESTRICT fff,
-                                       geom_t *const SFEM_RESTRICT sub_fff) {
-    const geom_t x0 = (1.0 / 2.0) * fff[3];
-    const geom_t x1 = fff[4] + (1.0 / 2.0) * fff[5] + x0;
-    const geom_t x2 = (1.0 / 2.0) * fff[4] + x0;
-    const geom_t x3 = (1.0 / 2.0) * fff[1];
+static SFEM_INLINE void tet4_sub_fff_5(const scalar_t *const SFEM_RESTRICT fff,
+                                       scalar_t *const SFEM_RESTRICT sub_fff) {
+    const scalar_t x0 = (1.0 / 2.0) * fff[3];
+    const scalar_t x1 = fff[4] + (1.0 / 2.0) * fff[5] + x0;
+    const scalar_t x2 = (1.0 / 2.0) * fff[4] + x0;
+    const scalar_t x3 = (1.0 / 2.0) * fff[1];
     sub_fff[0] = x1;
     sub_fff[1] = -x2;
     sub_fff[2] = -1.0 / 2.0 * fff[2] - x1 - x3;
@@ -47,11 +47,11 @@ static SFEM_INLINE void tet4_sub_fff_5(const geom_t *const SFEM_RESTRICT fff,
     assert(tet4_det_fff(sub_fff) > 0);
 }
 
-static SFEM_INLINE void tet4_sub_fff_6(const geom_t *const SFEM_RESTRICT fff,
-                                       geom_t *const SFEM_RESTRICT sub_fff) {
-    const geom_t x0 = (1.0 / 2.0) * fff[3];
-    const geom_t x1 = (1.0 / 2.0) * fff[4];
-    const geom_t x2 = (1.0 / 2.0) * fff[1] + x0;
+static SFEM_INLINE void tet4_sub_fff_6(const scalar_t *const SFEM_RESTRICT fff,
+                                       scalar_t *const SFEM_RESTRICT sub_fff) {
+    const scalar_t x0 = (1.0 / 2.0) * fff[3];
+    const scalar_t x1 = (1.0 / 2.0) * fff[4];
+    const scalar_t x2 = (1.0 / 2.0) * fff[1] + x0;
     sub_fff[0] = (1.0 / 2.0) * fff[0] + fff[1] + x0;
     sub_fff[1] = (1.0 / 2.0) * fff[2] + x1 + x2;
     sub_fff[2] = -x2;
@@ -62,10 +62,10 @@ static SFEM_INLINE void tet4_sub_fff_6(const geom_t *const SFEM_RESTRICT fff,
     assert(tet4_det_fff(sub_fff) > 0);
 }
 
-static SFEM_INLINE void tet4_sub_fff_7(const geom_t *const SFEM_RESTRICT fff,
-                                       geom_t *const SFEM_RESTRICT sub_fff) {
-    const geom_t x0 = (1.0 / 2.0) * fff[5];
-    const geom_t x1 = (1.0 / 2.0) * fff[2];
+static SFEM_INLINE void tet4_sub_fff_7(const scalar_t *const SFEM_RESTRICT fff,
+                                       scalar_t *const SFEM_RESTRICT sub_fff) {
+    const scalar_t x0 = (1.0 / 2.0) * fff[5];
+    const scalar_t x1 = (1.0 / 2.0) * fff[2];
     sub_fff[0] = x0;
     sub_fff[1] = -1.0 / 2.0 * fff[4] - x0;
     sub_fff[2] = -x1;
@@ -78,9 +78,9 @@ static SFEM_INLINE void tet4_sub_fff_7(const geom_t *const SFEM_RESTRICT fff,
 
 // Adjugate
 
-static SFEM_INLINE void tet4_sub_adj_0(const jacobian_t *const SFEM_RESTRICT adjugate,
+static SFEM_INLINE void tet4_sub_adj_0(const scalar_t *const SFEM_RESTRICT adjugate,
                                        const ptrdiff_t stride,
-                                       jacobian_t *const SFEM_RESTRICT sub_adjugate) {
+                                       scalar_t *const SFEM_RESTRICT sub_adjugate) {
     sub_adjugate[0] = 2 * adjugate[0 * stride];
     sub_adjugate[1] = 2 * adjugate[1 * stride];
     sub_adjugate[2] = 2 * adjugate[2 * stride];
@@ -91,9 +91,9 @@ static SFEM_INLINE void tet4_sub_adj_0(const jacobian_t *const SFEM_RESTRICT adj
     sub_adjugate[7] = 2 * adjugate[7 * stride];
     sub_adjugate[8] = 2 * adjugate[8 * stride];
 }
-static SFEM_INLINE void tet4_sub_adj_4(const jacobian_t *const SFEM_RESTRICT adjugate,
+static SFEM_INLINE void tet4_sub_adj_4(const scalar_t *const SFEM_RESTRICT adjugate,
                                        const ptrdiff_t stride,
-                                       jacobian_t *const SFEM_RESTRICT sub_adjugate) {
+                                       scalar_t *const SFEM_RESTRICT sub_adjugate) {
     const real_t x0 = 2 * adjugate[0 * stride];
     const real_t x1 = 2 * adjugate[1 * stride];
     const real_t x2 = 2 * adjugate[2 * stride];
@@ -108,9 +108,9 @@ static SFEM_INLINE void tet4_sub_adj_4(const jacobian_t *const SFEM_RESTRICT adj
     sub_adjugate[8] = 2 * adjugate[8 * stride];
 }
 
-static SFEM_INLINE void tet4_sub_adj_5(const jacobian_t *const SFEM_RESTRICT adjugate,
+static SFEM_INLINE void tet4_sub_adj_5(const scalar_t *const SFEM_RESTRICT adjugate,
                                        const ptrdiff_t stride,
-                                       jacobian_t *const SFEM_RESTRICT sub_adjugate) {
+                                       scalar_t *const SFEM_RESTRICT sub_adjugate) {
     const real_t x0 = 2 * adjugate[3 * stride];
     const real_t x1 = 2 * adjugate[6 * stride] + x0;
     const real_t x2 = 2 * adjugate[4 * stride];
@@ -128,9 +128,9 @@ static SFEM_INLINE void tet4_sub_adj_5(const jacobian_t *const SFEM_RESTRICT adj
     sub_adjugate[8] = 2 * adjugate[2 * stride] + x5;
 }
 
-static SFEM_INLINE void tet4_sub_adj_6(const jacobian_t *const SFEM_RESTRICT adjugate,
+static SFEM_INLINE void tet4_sub_adj_6(const scalar_t *const SFEM_RESTRICT adjugate,
                                        const ptrdiff_t stride,
-                                       jacobian_t *const SFEM_RESTRICT sub_adjugate) {
+                                       scalar_t *const SFEM_RESTRICT sub_adjugate) {
     const real_t x0 = 2 * adjugate[3 * stride];
     const real_t x1 = 2 * adjugate[4 * stride];
     const real_t x2 = 2 * adjugate[5 * stride];
@@ -145,9 +145,9 @@ static SFEM_INLINE void tet4_sub_adj_6(const jacobian_t *const SFEM_RESTRICT adj
     sub_adjugate[8] = -x2;
 }
 
-static SFEM_INLINE void tet4_sub_adj_7(const jacobian_t *const SFEM_RESTRICT adjugate,
+static SFEM_INLINE void tet4_sub_adj_7(const scalar_t *const SFEM_RESTRICT adjugate,
                                        const ptrdiff_t stride,
-                                       jacobian_t *const SFEM_RESTRICT sub_adjugate) {
+                                       scalar_t *const SFEM_RESTRICT sub_adjugate) {
     const real_t x0 = 2 * adjugate[6 * stride];
     const real_t x1 = 2 * adjugate[7 * stride];
     const real_t x2 = 2 * adjugate[8 * stride];

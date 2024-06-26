@@ -24,7 +24,7 @@ int tri3_laplacian_assemble_value(const ptrdiff_t nelements,
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[3];
         scalar_t element_u[3];
-        jacobian_t fff[3];
+        scalar_t fff[3];
 
         // Element indices
 #pragma unroll(3)
@@ -32,7 +32,7 @@ int tri3_laplacian_assemble_value(const ptrdiff_t nelements,
             ev[v] = elements[v][i];
         }
 
-        tri3_fff(
+        tri3_fff_s(
                 // X-coordinates
                 x[ev[0]],
                 x[ev[1]],
@@ -67,7 +67,7 @@ int tri3_laplacian_apply(const ptrdiff_t nelements,
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[3];
-        jacobian_t fff[3];
+        scalar_t fff[3];
         scalar_t element_u[3];
         accumulator_t element_vector[3];
         
@@ -77,7 +77,7 @@ int tri3_laplacian_apply(const ptrdiff_t nelements,
             ev[v] = elements[v][i];
         }
 
-        tri3_fff(
+        tri3_fff_s(
                 // X-coordinates
                 x[ev[0]],
                 x[ev[1]],
@@ -122,7 +122,7 @@ int tri3_laplacian_assemble_hessian(const ptrdiff_t nelements,
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[3];
-        jacobian_t fff[3];
+        scalar_t fff[3];
         accumulator_t element_matrix[3 * 3];
 
         // Element indices
@@ -131,7 +131,7 @@ int tri3_laplacian_assemble_hessian(const ptrdiff_t nelements,
             ev[v] = elements[v][i];
         }
 
-        tri3_fff(
+        tri3_fff_s(
                 // X-coordinates
                 x[ev[0]],
                 x[ev[1]],
@@ -165,7 +165,7 @@ int tri3_laplacian_diag(const ptrdiff_t nelements,
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[3];
-        jacobian_t fff[3];
+        scalar_t fff[3];
         accumulator_t element_vector[3];
 
         // Element indices
@@ -174,7 +174,7 @@ int tri3_laplacian_diag(const ptrdiff_t nelements,
             ev[v] = elements[v][i];
         }
 
-        tri3_fff(
+        tri3_fff_s(
                 // X-coordinates
                 x[ev[0]],
                 x[ev[1]],
@@ -206,13 +206,19 @@ int tri3_laplacian_diag(const ptrdiff_t nelements,
 // Optimized for matrix-free
 int tri3_laplacian_apply_opt(const ptrdiff_t nelements,
                              idx_t **const SFEM_RESTRICT elements,
-                             const jacobian_t *const SFEM_RESTRICT fff,
+                             const jacobian_t *const SFEM_RESTRICT fff_all,
                              const real_t *const SFEM_RESTRICT u,
                              real_t *const SFEM_RESTRICT values) {
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         accumulator_t element_vector[3];
         idx_t ev[3];
+
+        scalar_t fff[3];
+        for(int k = 0; k < 3; k++) {
+            fff[k] = fff_all[i * 3 + k];
+        }
+
 
         // Element indices
 #pragma unroll(3)
@@ -242,12 +248,17 @@ int tri3_laplacian_apply_opt(const ptrdiff_t nelements,
 
 int tri3_laplacian_diag_opt(const ptrdiff_t nelements,
                             idx_t **const SFEM_RESTRICT elements,
-                            const jacobian_t *const SFEM_RESTRICT fff,
+                            const jacobian_t *const SFEM_RESTRICT fff_all,
                             real_t *const SFEM_RESTRICT diag) {
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[3];
         accumulator_t element_vector[3];
+
+        scalar_t fff[3];
+        for(int k = 0; k < 3; k++) {
+            fff[k] = fff_all[i * 3 + k];
+        }
 
         // Element indices
 #pragma unroll(3)

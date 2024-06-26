@@ -11,10 +11,10 @@
 
 
 static SFEM_INLINE void element_apply(const idx_t *const SFEM_RESTRICT ev,
-                                      const jacobian_t *const SFEM_RESTRICT fff,
+                                      const scalar_t *const SFEM_RESTRICT fff,
                                       const scalar_t *const SFEM_RESTRICT element_u,
                                       real_t *const SFEM_RESTRICT values) {
-    jacobian_t sub_fff[6];
+    scalar_t sub_fff[6];
     accumulator_t element_vector[10] = {0};
 
     {  // Corner tests
@@ -138,7 +138,7 @@ int macro_tet4_laplacian_apply(const ptrdiff_t nelements,
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[10];
-        jacobian_t fff[6];
+        scalar_t fff[6];
         scalar_t element_u[10];
 
         // Element indices
@@ -151,7 +151,7 @@ int macro_tet4_laplacian_apply(const ptrdiff_t nelements,
             element_u[v] = u[ev[v]];
         }
 
-        tet4_fff(
+        tet4_fff_s(
                 // X
                 x[ev[0]],
                 x[ev[1]],
@@ -178,14 +178,19 @@ int macro_tet4_laplacian_apply(const ptrdiff_t nelements,
 
 int macro_tet4_laplacian_apply_opt(const ptrdiff_t nelements,
                                    idx_t **const SFEM_RESTRICT elements,
-                                   const jacobian_t *const SFEM_RESTRICT all_fff,
+                                   const jacobian_t *const SFEM_RESTRICT fff_all,
                                    const real_t *const SFEM_RESTRICT u,
                                    real_t *const SFEM_RESTRICT values) {
 #pragma omp parallel for  // nowait
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[10];
         scalar_t element_u[10];
-        const jacobian_t *const fff = &all_fff[i * 6];
+        scalar_t fff[6];
+
+        for(int k = 0; k < 6; k++) {
+            fff[k] = fff_all[i * 6 + k];
+        }
+
 
 #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
@@ -203,13 +208,13 @@ int macro_tet4_laplacian_apply_opt(const ptrdiff_t nelements,
 }
 
 static SFEM_INLINE void element_assemble_matrix(const idx_t *const SFEM_RESTRICT ev10,
-                                                const jacobian_t *const fff,
+                                                const scalar_t *const fff,
                                                 const count_t *const SFEM_RESTRICT rowptr,
                                                 const idx_t *const SFEM_RESTRICT colidx,
                                                 real_t *const SFEM_RESTRICT values) {
     idx_t ev[4];
     accumulator_t element_matrix[4 * 4];
-    jacobian_t sub_fff[6];
+    scalar_t sub_fff[6];
 
     {  // Corner tests
         tet4_sub_fff_0(fff, sub_fff);
@@ -261,14 +266,18 @@ static SFEM_INLINE void element_assemble_matrix(const idx_t *const SFEM_RESTRICT
 
 int macro_tet4_laplacian_assemble_hessian_opt(const ptrdiff_t nelements,
                                               idx_t **const SFEM_RESTRICT elements,
-                                              const jacobian_t *const SFEM_RESTRICT all_fff,
+                                              const jacobian_t *const SFEM_RESTRICT fff_all,
                                               const count_t *const SFEM_RESTRICT rowptr,
                                               const idx_t *const SFEM_RESTRICT colidx,
                                               real_t *const SFEM_RESTRICT values) {
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev10[10];
-        const jacobian_t *const fff = &all_fff[i * 6];
+        scalar_t fff[6];
+
+        for(int k = 0; k < 6; k++) {
+            fff[k] = fff_all[i * 6 + k];
+        }
 
         for (int v = 0; v < 10; ++v) {
             ev10[v] = elements[v][i];
@@ -296,14 +305,14 @@ int macro_tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[10];
-        jacobian_t fff[6];
+        scalar_t fff[6];
 
         // Element indices
         for (int v = 0; v < 10; ++v) {
             ev[v] = elements[v][i];
         }
 
-        tet4_fff(
+        tet4_fff_s(
                 // X
                 x[ev[0]],
                 x[ev[1]],
@@ -329,9 +338,9 @@ int macro_tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
 }
 
 static SFEM_INLINE void element_assemble_matrix_diag(const idx_t *const SFEM_RESTRICT ev,
-                                                     const jacobian_t *const fff,
+                                                     const scalar_t *const fff,
                                                      real_t *const SFEM_RESTRICT diag) {
-    jacobian_t sub_fff[6];
+    scalar_t sub_fff[6];
     accumulator_t element_vector[10] = {0};
 
     {  // Corner tests
@@ -422,14 +431,14 @@ int macro_tet4_laplacian_diag(const ptrdiff_t nelements,
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[10];
-        jacobian_t fff[6];
+        scalar_t fff[6];
 
         // Element indices
         for (int v = 0; v < 10; ++v) {
             ev[v] = elements[v][i];
         }
 
-        tet4_fff(
+        tet4_fff_s(
                 // X
                 x[ev[0]],
                 x[ev[1]],
@@ -456,12 +465,16 @@ int macro_tet4_laplacian_diag(const ptrdiff_t nelements,
 
 int macro_tet4_laplacian_diag_opt(const ptrdiff_t nelements,
                                   idx_t **const SFEM_RESTRICT elements,
-                                  const jacobian_t *const SFEM_RESTRICT all_fff,
+                                  const jacobian_t *const SFEM_RESTRICT fff_all,
                                   real_t *const SFEM_RESTRICT diag) {
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[10];
-        const geom_t *const fff = &all_fff[i * 6];
+
+        scalar_t fff[6];
+        for(int k = 0; k < 6; k++) {
+            fff[k] = fff_all[i * 6 + k];
+        }
 
         assert(tet4_det_fff(fff) > 0);
 

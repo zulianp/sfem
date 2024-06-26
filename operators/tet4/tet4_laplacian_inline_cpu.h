@@ -4,7 +4,7 @@
 #include "operator_inline_cpu.h"
 
 // FFF
-static SFEM_INLINE void tet4_laplacian_hessian_fff(const jacobian_t *const SFEM_RESTRICT fff,
+static SFEM_INLINE void tet4_laplacian_hessian_fff(const scalar_t *const SFEM_RESTRICT fff,
                                                    accumulator_t *const SFEM_RESTRICT element_matrix) {
     const scalar_t x0 = -fff[0] - fff[1] - fff[2];
     const scalar_t x1 = -fff[1] - fff[3] - fff[4];
@@ -27,7 +27,7 @@ static SFEM_INLINE void tet4_laplacian_hessian_fff(const jacobian_t *const SFEM_
     element_matrix[15] = fff[5];
 }
 
-static SFEM_INLINE void tet4_laplacian_diag_fff(const jacobian_t *const SFEM_RESTRICT fff,
+static SFEM_INLINE void tet4_laplacian_diag_fff(const scalar_t *const SFEM_RESTRICT fff,
                                                 accumulator_t *const SFEM_RESTRICT e0,
                                                 accumulator_t *const SFEM_RESTRICT e1,
                                                 accumulator_t *const SFEM_RESTRICT e2,
@@ -38,7 +38,7 @@ static SFEM_INLINE void tet4_laplacian_diag_fff(const jacobian_t *const SFEM_RES
     *e3 = fff[5];
 }
 
-static SFEM_INLINE void tet4_laplacian_diag_add_fff(const jacobian_t *const SFEM_RESTRICT fff,
+static SFEM_INLINE void tet4_laplacian_diag_add_fff(const scalar_t *const SFEM_RESTRICT fff,
                                                     accumulator_t *const SFEM_RESTRICT e0,
                                                     accumulator_t *const SFEM_RESTRICT e1,
                                                     accumulator_t *const SFEM_RESTRICT e2,
@@ -49,7 +49,7 @@ static SFEM_INLINE void tet4_laplacian_diag_add_fff(const jacobian_t *const SFEM
     *e3 += fff[5];
 }
 
-static SFEM_INLINE void tet4_laplacian_apply_fff(const jacobian_t *const SFEM_RESTRICT fff,
+static SFEM_INLINE void tet4_laplacian_apply_fff(const scalar_t *const SFEM_RESTRICT fff,
                                                  const scalar_t u0,
                                                  const scalar_t u1,
                                                  const scalar_t u2,
@@ -70,7 +70,7 @@ static SFEM_INLINE void tet4_laplacian_apply_fff(const jacobian_t *const SFEM_RE
     *e3 = fff[2] * u1 + fff[4] * u2 - fff[5] * u0 + fff[5] * u3 - x4 - x5;
 }
 
-static SFEM_INLINE void tet4_laplacian_apply_add_fff(const jacobian_t *const SFEM_RESTRICT fff,
+static SFEM_INLINE void tet4_laplacian_apply_add_fff(const scalar_t *const SFEM_RESTRICT fff,
                                                      const scalar_t u0,
                                                      const scalar_t u1,
                                                      const scalar_t u2,
@@ -93,22 +93,22 @@ static SFEM_INLINE void tet4_laplacian_apply_add_fff(const jacobian_t *const SFE
 
 // Points
 
-static SFEM_INLINE void tet4_laplacian_apply_points(const geom_t px0,
-                                                    const geom_t px1,
-                                                    const geom_t px2,
-                                                    const geom_t px3,
-                                                    const geom_t py0,
-                                                    const geom_t py1,
-                                                    const geom_t py2,
-                                                    const geom_t py3,
-                                                    const geom_t pz0,
-                                                    const geom_t pz1,
-                                                    const geom_t pz2,
-                                                    const geom_t pz3,
+static SFEM_INLINE void tet4_laplacian_apply_points(const scalar_t px0,
+                                                    const scalar_t px1,
+                                                    const scalar_t px2,
+                                                    const scalar_t px3,
+                                                    const scalar_t py0,
+                                                    const scalar_t py1,
+                                                    const scalar_t py2,
+                                                    const scalar_t py3,
+                                                    const scalar_t pz0,
+                                                    const scalar_t pz1,
+                                                    const scalar_t pz2,
+                                                    const scalar_t pz3,
                                                     const scalar_t *SFEM_RESTRICT u,
                                                     accumulator_t *SFEM_RESTRICT element_vector) {
-    jacobian_t fff[6];
-    tet4_fff(px0, px1, px2, px3, py0, py1, py2, py3, pz0, pz1, pz2, pz3, fff);
+    scalar_t fff[6];
+    tet4_fff_s(px0, px1, px2, px3, py0, py1, py2, py3, pz0, pz1, pz2, pz3, fff);
 
     const scalar_t x0 = fff[0] + fff[1] + fff[2];
     const scalar_t x1 = fff[1] + fff[3] + fff[4];
@@ -123,22 +123,22 @@ static SFEM_INLINE void tet4_laplacian_apply_points(const geom_t px0,
 }
 
 // UNTESTED
-static SFEM_INLINE void tet4_laplacian_value_points(const geom_t px0,
-                                                    const geom_t px1,
-                                                    const geom_t px2,
-                                                    const geom_t px3,
-                                                    const geom_t py0,
-                                                    const geom_t py1,
-                                                    const geom_t py2,
-                                                    const geom_t py3,
-                                                    const geom_t pz0,
-                                                    const geom_t pz1,
-                                                    const geom_t pz2,
-                                                    const geom_t pz3,
+static SFEM_INLINE void tet4_laplacian_value_points(const scalar_t px0,
+                                                    const scalar_t px1,
+                                                    const scalar_t px2,
+                                                    const scalar_t px3,
+                                                    const scalar_t py0,
+                                                    const scalar_t py1,
+                                                    const scalar_t py2,
+                                                    const scalar_t py3,
+                                                    const scalar_t pz0,
+                                                    const scalar_t pz1,
+                                                    const scalar_t pz2,
+                                                    const scalar_t pz3,
                                                     const scalar_t *SFEM_RESTRICT u,
                                                     accumulator_t *SFEM_RESTRICT element_scalar) {
-    jacobian_t fff[6];
-    tet4_fff(px0, px1, px2, px3, py0, py1, py2, py3, pz0, pz1, pz2, pz3, fff);
+    scalar_t fff[6];
+    tet4_fff_s(px0, px1, px2, px3, py0, py1, py2, py3, pz0, pz1, pz2, pz3, fff);
 
     const scalar_t x0 = (3.0 / 16.0) * u[1];
     const scalar_t x1 = fff[1] * u[0];
@@ -159,39 +159,39 @@ static SFEM_INLINE void tet4_laplacian_value_points(const geom_t px0,
                         fff[5] * x8 - x0 * x1 - x0 * x3 - x1 * x2 - x3 * x4;
 }
 
-static SFEM_INLINE void tet4_laplacian_hessian_points(const geom_t px0,
-                                                      const geom_t px1,
-                                                      const geom_t px2,
-                                                      const geom_t px3,
-                                                      const geom_t py0,
-                                                      const geom_t py1,
-                                                      const geom_t py2,
-                                                      const geom_t py3,
-                                                      const geom_t pz0,
-                                                      const geom_t pz1,
-                                                      const geom_t pz2,
-                                                      const geom_t pz3,
+static SFEM_INLINE void tet4_laplacian_hessian_points(const scalar_t px0,
+                                                      const scalar_t px1,
+                                                      const scalar_t px2,
+                                                      const scalar_t px3,
+                                                      const scalar_t py0,
+                                                      const scalar_t py1,
+                                                      const scalar_t py2,
+                                                      const scalar_t py3,
+                                                      const scalar_t pz0,
+                                                      const scalar_t pz1,
+                                                      const scalar_t pz2,
+                                                      const scalar_t pz3,
                                                       accumulator_t *element_matrix) {
-    jacobian_t fff[6];
-    tet4_fff(px0, px1, px2, px3, py0, py1, py2, py3, pz0, pz1, pz2, pz3, fff);
+    scalar_t fff[6];
+    tet4_fff_s(px0, px1, px2, px3, py0, py1, py2, py3, pz0, pz1, pz2, pz3, fff);
     tet4_laplacian_hessian_fff(fff, element_matrix);
 }
 
-static SFEM_INLINE void tet4_laplacian_diag_points(const geom_t px0,
-                                                   const geom_t px1,
-                                                   const geom_t px2,
-                                                   const geom_t px3,
-                                                   const geom_t py0,
-                                                   const geom_t py1,
-                                                   const geom_t py2,
-                                                   const geom_t py3,
-                                                   const geom_t pz0,
-                                                   const geom_t pz1,
-                                                   const geom_t pz2,
-                                                   const geom_t pz3,
+static SFEM_INLINE void tet4_laplacian_diag_points(const scalar_t px0,
+                                                   const scalar_t px1,
+                                                   const scalar_t px2,
+                                                   const scalar_t px3,
+                                                   const scalar_t py0,
+                                                   const scalar_t py1,
+                                                   const scalar_t py2,
+                                                   const scalar_t py3,
+                                                   const scalar_t pz0,
+                                                   const scalar_t pz1,
+                                                   const scalar_t pz2,
+                                                   const scalar_t pz3,
                                                    accumulator_t *SFEM_RESTRICT element_vector) {
-    jacobian_t fff[6];
-    tet4_fff(px0, px1, px2, px3, py0, py1, py2, py3, pz0, pz1, pz2, pz3, fff);
+    scalar_t fff[6];
+    tet4_fff_s(px0, px1, px2, px3, py0, py1, py2, py3, pz0, pz1, pz2, pz3, fff);
 
     element_vector[0] = fff[0] + 2 * fff[1] + 2 * fff[2] + fff[3] + 2 * fff[4] + fff[5];
     element_vector[1] = fff[0];

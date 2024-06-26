@@ -40,3 +40,11 @@ cmake .. -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR/sfem -DSFEM_ENABLE_PYTHON=ON && \
 make && make install
 export PYTHONPATH=$INSTALL_DIR/sfem/lib:$INSTALL_DIR/sfem/scripts:$PYTHONPATH
 ```
+
+# Piz Daint
+
+On Piz Daint the ideal environment is obtained with
+```bash
+source $APPS/UES/anfink/gpu/environment
+```
+

@@ -16,9 +16,9 @@ static const int sub_tets[8][4] = {{0, 4, 6, 7},
                                    {6, 5, 9, 8},
                                    {7, 6, 9, 8}};
 
-typedef void (*SubAdjFun)(const jacobian_t *const SFEM_RESTRICT,
+typedef void (*SubAdjFun)(const scalar_t *const SFEM_RESTRICT,
                           const ptrdiff_t,
-                          jacobian_t *const SFEM_RESTRICT);
+                          scalar_t *const SFEM_RESTRICT);
 
 static SubAdjFun octahedron_adj_fun[4] = {&tet4_sub_adj_4,
                                           &tet4_sub_adj_5,
@@ -43,9 +43,9 @@ static SFEM_INLINE void subtet_scatter_add(const int i,
     }
 }
 
-static SFEM_INLINE void tet10_local_apply_adj(const jacobian_t *const SFEM_RESTRICT
+static SFEM_INLINE void tet10_local_apply_adj(const scalar_t *const SFEM_RESTRICT
                                                       jacobian_adjugate,
-                                              const jacobian_t jacobian_determinant,
+                                              const scalar_t jacobian_determinant,
                                               const scalar_t mu,
                                               const scalar_t lambda,
                                               const scalar_t *const SFEM_RESTRICT ux,
@@ -54,7 +54,7 @@ static SFEM_INLINE void tet10_local_apply_adj(const jacobian_t *const SFEM_RESTR
                                               accumulator_t *const SFEM_RESTRICT outx,
                                               accumulator_t *const SFEM_RESTRICT outy,
                                               accumulator_t *const SFEM_RESTRICT outz) {
-    jacobian_t sub_adjugate[9];
+    scalar_t sub_adjugate[9];
 
     scalar_t sub_ux[4];
     scalar_t sub_uy[4];
@@ -142,8 +142,14 @@ int macro_tet4_linear_elasticity_apply_opt(
             accumulator_t outx[10] = {0};
             accumulator_t outy[10] = {0};
             accumulator_t outz[10] = {0};
-            const jacobian_t *const jacobian_adjugate = &g_jacobian_adjugate[i * 9];
-            const jacobian_t jacobian_determinant = g_jacobian_determinant[i];
+
+            scalar_t jacobian_adjugate[9];
+            for(int k = 0; k < 9; k++) {
+                jacobian_adjugate[k] = g_jacobian_adjugate[i * 9 + k];
+
+            }
+
+            const scalar_t jacobian_determinant = g_jacobian_determinant[i];
 
 #pragma unroll(10)
             for (int v = 0; v < 10; ++v) {
@@ -233,8 +239,8 @@ int macro_tet4_linear_elasticity_apply(const ptrdiff_t nelements,
         accumulator_t outx[10] = {0};
         accumulator_t outy[10] = {0};
         accumulator_t outz[10] = {0};
-        jacobian_t jacobian_adjugate[9];
-        jacobian_t jacobian_determinant = 0;
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant = 0;
 
 #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
@@ -247,7 +253,7 @@ int macro_tet4_linear_elasticity_apply(const ptrdiff_t nelements,
             uz[v] = g_uz[ev[v] * u_stride];
         }
 
-        tet4_adjugate_and_det(x[ev[0]],
+        tet4_adjugate_and_det_s(x[ev[0]],
                               x[ev[1]],
                               x[ev[2]],
                               x[ev[3]],

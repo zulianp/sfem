@@ -12,10 +12,10 @@
 #include "macro_tri3_inline_cpu.h"
 
 static SFEM_INLINE void element_apply(const idx_t *const SFEM_RESTRICT ev,
-                                      const jacobian_t *const SFEM_RESTRICT fff,
+                                      const scalar_t *const SFEM_RESTRICT fff,
                                       const scalar_t *const SFEM_RESTRICT element_u,
-                                      real_t *const SFEM_RESTRICT values) {
-    jacobian_t sub_fff[3];
+                                      accumulator_t *const SFEM_RESTRICT values) {
+    scalar_t sub_fff[3];
     accumulator_t element_vector[6] = {0};
 
     {
@@ -77,7 +77,7 @@ int macro_tri3_laplacian_apply(const ptrdiff_t nelements,
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[6];
-        jacobian_t fff[3];
+        scalar_t fff[3];
         scalar_t element_u[6];
 
         // Element indices
@@ -90,7 +90,7 @@ int macro_tri3_laplacian_apply(const ptrdiff_t nelements,
             element_u[v] = u[ev[v]];
         }
 
-        tri3_fff(
+        tri3_fff_s(
                 // X
                 x[ev[0]],
                 x[ev[1]],
@@ -110,14 +110,19 @@ int macro_tri3_laplacian_apply(const ptrdiff_t nelements,
 
 int macro_tri3_laplacian_apply_opt(const ptrdiff_t nelements,
                                    idx_t **const SFEM_RESTRICT elements,
-                                   const jacobian_t *const SFEM_RESTRICT all_fff,
+                                   const jacobian_t *const SFEM_RESTRICT fff_all,
                                    const real_t *const SFEM_RESTRICT u,
                                    real_t *const SFEM_RESTRICT values) {
 #pragma omp parallel for  // nowait
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[6];
         scalar_t element_u[6];
-        const jacobian_t *const fff = &all_fff[i * 3];
+        scalar_t fff[3];
+        
+        for(int k = 0; k < 3; k++) {
+            fff[k] = fff_all[i * 3 + k];
+        }
+
 
 #pragma unroll(6)
         for (int v = 0; v < 6; ++v) {
@@ -135,13 +140,13 @@ int macro_tri3_laplacian_apply_opt(const ptrdiff_t nelements,
 }
 
 static SFEM_INLINE void element_assemble_matrix(const idx_t *const SFEM_RESTRICT ev6,
-                                                const jacobian_t *const fff,
+                                                const scalar_t *const fff,
                                                 const count_t *const SFEM_RESTRICT rowptr,
                                                 const idx_t *const SFEM_RESTRICT colidx,
-                                                real_t *const SFEM_RESTRICT values) {
+                                                accumulator_t *const SFEM_RESTRICT values) {
     idx_t ev[3];
     accumulator_t element_matrix[3 * 3];
-    jacobian_t sub_fff[3];
+    scalar_t sub_fff[3];
 
     {
         // Corner FFFs (Same as fff)
@@ -167,14 +172,18 @@ static SFEM_INLINE void element_assemble_matrix(const idx_t *const SFEM_RESTRICT
 
 int macro_tri3_laplacian_assemble_hessian_opt(const ptrdiff_t nelements,
                                               idx_t **const SFEM_RESTRICT elements,
-                                              const jacobian_t *const SFEM_RESTRICT all_fff,
+                                              const jacobian_t *const SFEM_RESTRICT fff_all,
                                               const count_t *const SFEM_RESTRICT rowptr,
                                               const idx_t *const SFEM_RESTRICT colidx,
                                               real_t *const SFEM_RESTRICT values) {
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev6[6];
-        const jacobian_t *const fff = &all_fff[i * 3];
+
+        scalar_t fff[3];
+        for(int k = 0; k < 3; k++) {
+            fff[k] = fff_all[i * 3 + k];
+        }
 
         for (int v = 0; v < 6; ++v) {
             ev6[v] = elements[v][i];
@@ -201,14 +210,14 @@ int macro_tri3_laplacian_assemble_hessian(const ptrdiff_t nelements,
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[6];
-        jacobian_t fff[3];
+        scalar_t fff[3];
 
         // Element indices
         for (int v = 0; v < 6; ++v) {
             ev[v] = elements[v][i];
         }
 
-        tri3_fff(
+        tri3_fff_s(
                 // X
                 x[ev[0]],
                 x[ev[1]],
@@ -227,9 +236,9 @@ int macro_tri3_laplacian_assemble_hessian(const ptrdiff_t nelements,
 }
 
 static SFEM_INLINE void element_assemble_matrix_diag(const idx_t *const SFEM_RESTRICT ev,
-                                                     const jacobian_t *const fff,
+                                                     const scalar_t *const fff,
                                                      real_t *const SFEM_RESTRICT diag) {
-    jacobian_t sub_fff[3];
+    scalar_t sub_fff[3];
     accumulator_t element_vector[6] = {0};
 
     {
@@ -270,14 +279,14 @@ int macro_tri3_laplacian_diag(const ptrdiff_t nelements,
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[6];
-        jacobian_t fff[3];
+        scalar_t fff[3];
 
         // Element indices
         for (int v = 0; v < 6; ++v) {
             ev[v] = elements[v][i];
         }
 
-        tri3_fff(
+        tri3_fff_s(
                 // X
                 x[ev[0]],
                 x[ev[1]],
@@ -297,12 +306,15 @@ int macro_tri3_laplacian_diag(const ptrdiff_t nelements,
 
 int macro_tri3_laplacian_diag_opt(const ptrdiff_t nelements,
                                   idx_t **const SFEM_RESTRICT elements,
-                                  const jacobian_t *const SFEM_RESTRICT all_fff,
+                                  const jacobian_t *const SFEM_RESTRICT fff_all,
                                   real_t *const SFEM_RESTRICT diag) {
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[6];
-        const geom_t *const fff = &all_fff[i * 3];
+        scalar_t fff[3];
+        for(int k = 0; k < 3; k++) {
+            fff[k] = fff_all[i * 3 + k];
+        }
 
         assert(tri3_det_fff(fff) > 0);
 

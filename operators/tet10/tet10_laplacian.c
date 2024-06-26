@@ -22,7 +22,7 @@ int tet10_laplacian_assemble_value(const ptrdiff_t nelements,
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[10];
-        jacobian_t fff[6];
+        scalar_t fff[6];
         scalar_t element_u[10];
 
 #pragma unroll(10)
@@ -35,7 +35,7 @@ int tet10_laplacian_assemble_value(const ptrdiff_t nelements,
         }
 
         // Affine transformation
-        tet4_fff(
+        tet4_fff_s(
                 // X
                 x[ev[0]],
                 x[ev[1]],
@@ -79,7 +79,7 @@ int tet10_laplacian_apply(const ptrdiff_t nelements,
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[10];
-        jacobian_t fff[6];
+        scalar_t fff[6];
         scalar_t element_u[10];
         accumulator_t element_vector[10] = {0};
 
@@ -93,7 +93,7 @@ int tet10_laplacian_apply(const ptrdiff_t nelements,
         }
 
         // Affine transformation
-        tet4_fff(
+        tet4_fff_s(
                 // X
                 x[ev[0]],
                 x[ev[1]],
@@ -141,7 +141,7 @@ int tet10_laplacian_assemble_hessian(const ptrdiff_t nelements,
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[10];
-        jacobian_t fff[6];
+        scalar_t fff[6];
         accumulator_t element_matrix[10 * 10];
 
 #pragma unroll(10)
@@ -150,7 +150,7 @@ int tet10_laplacian_assemble_hessian(const ptrdiff_t nelements,
         }
 
         // Affine transformation
-        tet4_fff(
+        tet4_fff_s(
                 // X
                 x[ev[0]],
                 x[ev[1]],
@@ -190,7 +190,7 @@ int tet10_laplacian_diag(const ptrdiff_t nelements,
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[10];
-        jacobian_t fff[6];
+        scalar_t fff[6];
         accumulator_t element_vector[10];
 
 #pragma unroll(10)
@@ -199,7 +199,7 @@ int tet10_laplacian_diag(const ptrdiff_t nelements,
         }
 
         // Affine transformation
-        tet4_fff(
+        tet4_fff_s(
                 // X
                 x[ev[0]],
                 x[ev[1]],
@@ -242,10 +242,12 @@ int tet10_laplacian_apply_opt(const ptrdiff_t nelements,
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[10];
         scalar_t element_u[10];
+        scalar_t fff[6];
         accumulator_t element_vector[10]= {0};
 
-        // Affine transformation
-        const jacobian_t *const fff = &fff_all[i * 6];
+        for(int k = 0; k < 6; k++) {
+            fff[k] = fff_all[i * 6 + k];
+        }
 
 #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
@@ -276,10 +278,12 @@ int tet10_laplacian_diag_opt(const ptrdiff_t nelements,
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[10];
+        scalar_t fff[6];
         accumulator_t element_vector[10];
 
-        // Affine transformation
-        const jacobian_t *const fff = &fff_all[i * 6];
+        for(int k = 0; k < 6; k++) {
+            fff[k] = fff_all[i * 6 + k];
+        }
 
 #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {

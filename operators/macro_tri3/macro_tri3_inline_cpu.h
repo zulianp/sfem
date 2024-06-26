@@ -3,8 +3,8 @@
 
 #include "tri3_inline_cpu.h"
 
-static SFEM_INLINE void tri3_sub_fff_1(const jacobian_t *const SFEM_RESTRICT fff,
-                                       jacobian_t *const SFEM_RESTRICT sub_fff) {
+static SFEM_INLINE void tri3_sub_fff_1(const scalar_t *const SFEM_RESTRICT fff,
+                                       scalar_t *const SFEM_RESTRICT sub_fff) {
     sub_fff[0] = fff[0] + 2 * fff[1] + fff[2];
     sub_fff[1] = -fff[0] - fff[1];
     sub_fff[2] = fff[0];
