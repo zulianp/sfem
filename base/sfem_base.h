@@ -3,6 +3,11 @@
 
 #include <stdlib.h>
 
+// FIXME
+#ifndef SFEM_MAKEFILE_COMPILATION
+#include "sfem_config.h"
+#endif
+
 #define SFEM_READ_ENV(name, conversion) \
     do {                                \
         char *var = getenv(#name);      \
