@@ -94,9 +94,9 @@ static SFEM_INLINE void tet4_sub_adj_0(const scalar_t *const SFEM_RESTRICT adjug
 static SFEM_INLINE void tet4_sub_adj_4(const scalar_t *const SFEM_RESTRICT adjugate,
                                        const ptrdiff_t stride,
                                        scalar_t *const SFEM_RESTRICT sub_adjugate) {
-    const real_t x0 = 2 * adjugate[0 * stride];
-    const real_t x1 = 2 * adjugate[1 * stride];
-    const real_t x2 = 2 * adjugate[2 * stride];
+    const scalar_t x0 = 2 * adjugate[0 * stride];
+    const scalar_t x1 = 2 * adjugate[1 * stride];
+    const scalar_t x2 = 2 * adjugate[2 * stride];
     sub_adjugate[0] = 2 * adjugate[3 * stride] + x0;
     sub_adjugate[1] = 2 * adjugate[4 * stride] + x1;
     sub_adjugate[2] = 2 * adjugate[5 * stride] + x2;
@@ -111,12 +111,12 @@ static SFEM_INLINE void tet4_sub_adj_4(const scalar_t *const SFEM_RESTRICT adjug
 static SFEM_INLINE void tet4_sub_adj_5(const scalar_t *const SFEM_RESTRICT adjugate,
                                        const ptrdiff_t stride,
                                        scalar_t *const SFEM_RESTRICT sub_adjugate) {
-    const real_t x0 = 2 * adjugate[3 * stride];
-    const real_t x1 = 2 * adjugate[6 * stride] + x0;
-    const real_t x2 = 2 * adjugate[4 * stride];
-    const real_t x3 = 2 * adjugate[7 * stride] + x2;
-    const real_t x4 = 2 * adjugate[5 * stride];
-    const real_t x5 = 2 * adjugate[8 * stride] + x4;
+    const scalar_t x0 = 2 * adjugate[3 * stride];
+    const scalar_t x1 = 2 * adjugate[6 * stride] + x0;
+    const scalar_t x2 = 2 * adjugate[4 * stride];
+    const scalar_t x3 = 2 * adjugate[7 * stride] + x2;
+    const scalar_t x4 = 2 * adjugate[5 * stride];
+    const scalar_t x5 = 2 * adjugate[8 * stride] + x4;
     sub_adjugate[0] = -x1;
     sub_adjugate[1] = -x3;
     sub_adjugate[2] = -x5;
@@ -131,9 +131,9 @@ static SFEM_INLINE void tet4_sub_adj_5(const scalar_t *const SFEM_RESTRICT adjug
 static SFEM_INLINE void tet4_sub_adj_6(const scalar_t *const SFEM_RESTRICT adjugate,
                                        const ptrdiff_t stride,
                                        scalar_t *const SFEM_RESTRICT sub_adjugate) {
-    const real_t x0 = 2 * adjugate[3 * stride];
-    const real_t x1 = 2 * adjugate[4 * stride];
-    const real_t x2 = 2 * adjugate[5 * stride];
+    const scalar_t x0 = 2 * adjugate[3 * stride];
+    const scalar_t x1 = 2 * adjugate[4 * stride];
+    const scalar_t x2 = 2 * adjugate[5 * stride];
     sub_adjugate[0] = 2 * adjugate[0 * stride] + x0;
     sub_adjugate[1] = 2 * adjugate[1 * stride] + x1;
     sub_adjugate[2] = 2 * adjugate[2 * stride] + x2;
@@ -148,9 +148,9 @@ static SFEM_INLINE void tet4_sub_adj_6(const scalar_t *const SFEM_RESTRICT adjug
 static SFEM_INLINE void tet4_sub_adj_7(const scalar_t *const SFEM_RESTRICT adjugate,
                                        const ptrdiff_t stride,
                                        scalar_t *const SFEM_RESTRICT sub_adjugate) {
-    const real_t x0 = 2 * adjugate[6 * stride];
-    const real_t x1 = 2 * adjugate[7 * stride];
-    const real_t x2 = 2 * adjugate[8 * stride];
+    const scalar_t x0 = 2 * adjugate[6 * stride];
+    const scalar_t x1 = 2 * adjugate[7 * stride];
+    const scalar_t x2 = 2 * adjugate[8 * stride];
     sub_adjugate[0] = -x0;
     sub_adjugate[1] = -x1;
     sub_adjugate[2] = -x2;
