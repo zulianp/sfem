@@ -213,16 +213,16 @@ int linear_elasticity_assemble_diag_aos(const enum ElemType element_type,
                                                 &values[2]);
         }
         case MACRO_TET4: {
-        //     return macro_tet4_linear_elasticity_diag(nelements,
-        //                                              nnodes,
-        //                                              elements,
-        //                                              points,
-        //                                              mu,
-        //                                              lambda,
-        //                                              3,
-        //                                              &values[0],
-        //                                              &values[1],
-        //                                              &values[2]);
+            return macro_tet4_linear_elasticity_diag(nelements,
+                                                     nnodes,
+                                                     elements,
+                                                     points,
+                                                     mu,
+                                                     lambda,
+                                                     3,
+                                                     &values[0],
+                                                     &values[1],
+                                                     &values[2]);
         }
         default: {
             fprintf(stderr,
