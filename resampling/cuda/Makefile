@@ -24,7 +24,7 @@ tet10_resample_field.o: temp_tet10.o
 	nvcc --gpu-architecture=${GPU_ARCH} -dlink -o tet10_resample_field.o temp_tet10.o
 
 temp_tet10.o: tet10_resample_field.cu quadratures_rule_cuda.h
-	nvcc ${OPT_FLAGS} ${VERBOSE_FLAG} --gpu-architecture=${GPU_ARCH} -rdc=true -c tet10_resample_field.cu -o temp_tet10.o -I${PWD}/workflows/resample/sfem/base
+	nvcc ${OPT_FLAGS} ${VERBOSE_FLAG} --gpu-architecture=${GPU_ARCH} -rdc=true -c tet10_resample_field.cu -o temp_tet10.o -I${PWD}/base
 
 clean:
 	rm -f *.o

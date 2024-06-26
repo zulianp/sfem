@@ -227,3 +227,6 @@ lumped_mass_inv
 resampling/test_grid/local_grid.txt
 resampling/test_grid/test_grid
 resampling/test_grid/test_grid_new
+mesh_to_blocks
+run_convection_diffusion
+spmv
