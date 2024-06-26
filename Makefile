@@ -66,17 +66,19 @@ endif
 CFLAGS += -DSFEM_MEM_DIAGNOSTICS
 
 # Folder structure
-VPATH = pizzastack:resampling:resampling/tet10:mesh:operators:operators/cuda:drivers:drivers/cuda:drivers/metis:base:algebra:matrix:operators/tet10:operators/tet4:operators/macro_tet4:operators/tri3:operators/macro_tri3:operators/trishell3:operators/tri6:operators/beam2:operators/cvfem:graphs:parametrize:operators/phase_field_for_fracture:operators/kernels:operators/navier_stokes:solver:operators/cvfem_tet4:operators/cvfem_tri3:operators/cvfem_quad4:examples:algebra/cuda:frontend:frontend/cuda:operators/hierarchical
-INCLUDES += -Ipizzastack -Iresampling -Iresampling/tet10 -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/macro_tet4 -Ioperators/tri3 -Ioperators/macro_tri3 -Ioperators/trishell3 -Ioperators/tri6 -Ioperators/beam2 -Ioperators/cvfem -Igraphs -Iparametrize -Ioperators/phase_field_for_fracture  -Ioperators/kernels -Ioperators/navier_stokes -Isolver -Ioperators/cvfem_tet4 -Ioperators/cvfem_tri3 -Ioperators/cvfem_quad4 -Ialgebra/cuda -Ifrontend -Ifrontend/cuda  -Ialgebra/cuda -Ioperators/hierarchical
+VPATH = pizzastack:resampling:resampling/tet10:mesh:operators:operators/cuda:drivers:drivers/cuda:drivers/metis:base:algebra:matrix:operators/tet10:operators/tet4:operators/tet4/vectorized:operators/macro_tet4:operators/tri3:operators/macro_tri3:operators/trishell3:operators/tri6:operators/beam2:operators/cvfem:graphs:parametrize:operators/phase_field_for_fracture:operators/kernels:operators/navier_stokes:solver:operators/cvfem_tet4:operators/cvfem_tri3:operators/cvfem_quad4:examples:algebra/cuda:frontend:frontend/cuda:operators/hierarchical
+INCLUDES += -Ipizzastack -Iresampling -Iresampling/tet10 -Imesh -Ioperators -Ibase -Ialgebra -Imatrix -Ioperators/tet10 -Ioperators/tet4 -Ioperators/tet4/vectorized -Ioperators/macro_tet4 -Ioperators/tri3 -Ioperators/macro_tri3 -Ioperators/trishell3 -Ioperators/tri6 -Ioperators/beam2 -Ioperators/cvfem -Igraphs -Iparametrize -Ioperators/phase_field_for_fracture  -Ioperators/kernels -Ioperators/navier_stokes -Isolver -Ioperators/cvfem_tet4 -Ioperators/cvfem_tri3 -Ioperators/cvfem_quad4 -Ialgebra/cuda -Ifrontend -Ifrontend/cuda  -Ialgebra/cuda -Ioperators/hierarchical
 
 
 CFLAGS += -pedantic -Wextra
 CFLAGS += -fPIC
+CFLAGS += -DSFEM_MAKEFILE_COMPILATION
 # CFLAGS += -std=c99
 
 CXXFLAGS += -std=c++14
 CXXFLAGS += -fvisibility=hidden
 CXXFLAGS += -fPIC
+CXXFLAGS += -DSFEM_MAKEFILE_COMPILATION
 INTERNAL_CXXFLAGS += -fno-exceptions -fno-rtti
 
 CUFLAGS += --compiler-options "-fPIC $(CXXFLAGS)" -std=c++14 -arch=sm_60 -Xptxas=-O3,-v -use_fast_math
@@ -214,7 +216,8 @@ OBJS += trishell3_mass.o
 OBJS += tri6_mass.o tri6_laplacian.o tri6_navier_stokes.o
 
 # Tet4
-OBJS += tet4_div.o \
+OBJS += tet4_fff.o \
+	tet4_div.o \
 	tet4_mass.o \
 	tet4_l2_projection_p0_p1.o \
 	tet4_linear_elasticity.o \
@@ -285,6 +288,7 @@ ifeq ($(cuda), 1)
 	OBJS += $(CUDA_OBJS)
 else
 	SERIAL_OBJS = tet4_laplacian.o
+	SERIAL_OBJS += vtet4_laplacian.o
 	OBJS += $(SERIAL_OBJS)
 endif
 
@@ -610,7 +614,7 @@ run_poisson_cuda : examples/run_poisson_cuda.cpp libsfem.a
 steady_state_sim  : drivers/steady_state_sim.cpp libsfem.a
 	$(MPICXX) $(CXXFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve  -o $@ $^ $(LDFLAGS) ; \
 
-spmv : drivers/cuda/do_spmv.c libsfem.a
+spmv : drivers/do_spmv.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
 
 %.o : %.c

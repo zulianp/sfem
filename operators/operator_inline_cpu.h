@@ -1,7 +1,6 @@
 #ifndef OPERATOR_INLINE_CPU_H
 #define OPERATOR_INLINE_CPU_H
 
-#include "sfem_config.h"
 #include "sfem_base.h"
 
 #ifdef SFEM_ENABLE_FP32_KERNELS
