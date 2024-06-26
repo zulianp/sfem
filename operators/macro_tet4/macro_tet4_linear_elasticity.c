@@ -17,7 +17,6 @@ static const int sub_tets[8][4] = {{0, 4, 6, 7},
                                    {7, 6, 9, 8}};
 
 typedef void (*SubAdjFun)(const scalar_t *const SFEM_RESTRICT,
-                          const ptrdiff_t,
                           scalar_t *const SFEM_RESTRICT);
 
 static SubAdjFun octahedron_adj_fun[4] = {&tet4_sub_adj_4,
@@ -65,7 +64,7 @@ static SFEM_INLINE void macro_tet4_local_apply_adj(const scalar_t *const SFEM_RE
     accumulator_t sub_outz[4];
 
     {  // Corner tests
-        tet4_sub_adj_0(jacobian_adjugate, 1, sub_adjugate);
+        tet4_sub_adj_0(jacobian_adjugate, sub_adjugate);
 
         for (int i = 0; i < 4; i++) {
             subtet_gather(i, ux, sub_ux);
@@ -93,7 +92,7 @@ static SFEM_INLINE void macro_tet4_local_apply_adj(const scalar_t *const SFEM_RE
         for (int i = 0; i < 4; i++) {
             SubAdjFun sub_adj_fun = octahedron_adj_fun[i];
 
-            (*sub_adj_fun)(jacobian_adjugate, 1, sub_adjugate);
+            (*sub_adj_fun)(jacobian_adjugate, sub_adjugate);
 
             subtet_gather(4 + i, ux, sub_ux);
             subtet_gather(4 + i, uy, sub_uy);
@@ -143,22 +142,22 @@ int macro_tet4_linear_elasticity_apply_opt(
             accumulator_t outy[10] = {0};
             accumulator_t outz[10] = {0};
 
+            const scalar_t jacobian_determinant = g_jacobian_determinant[i];
             scalar_t jacobian_adjugate[9];
             for (int k = 0; k < 9; k++) {
                 jacobian_adjugate[k] = g_jacobian_adjugate[i * 9 + k];
             }
 
-            const scalar_t jacobian_determinant = g_jacobian_determinant[i];
-
-#pragma unroll(10)
+// #pragma unroll(10)
             for (int v = 0; v < 10; ++v) {
                 ev[v] = elements[v][i];
             }
 
             for (int v = 0; v < 10; ++v) {
-                ux[v] = g_ux[ev[v] * u_stride];
-                uy[v] = g_uy[ev[v] * u_stride];
-                uz[v] = g_uz[ev[v] * u_stride];
+                const ptrdiff_t idx = ev[v] * u_stride;
+                ux[v] = g_ux[idx];
+                uy[v] = g_uy[idx];
+                uz[v] = g_uz[idx];
             }
 
             macro_tet4_local_apply_adj(jacobian_adjugate,
@@ -172,25 +171,23 @@ int macro_tet4_linear_elasticity_apply_opt(
                                        outy,
                                        outz);
 
-#pragma unroll(10)
             for (int v = 0; v < 10; v++) {
 #pragma omp atomic update
                 g_outx[ev[v] * out_stride] += outx[v];
             }
 
-#pragma unroll(10)
             for (int v = 0; v < 10; v++) {
 #pragma omp atomic update
                 g_outy[ev[v] * out_stride] += outy[v];
             }
 
-#pragma unroll(10)
             for (int v = 0; v < 10; v++) {
 #pragma omp atomic update
                 g_outz[ev[v] * out_stride] += outz[v];
             }
         }
     }
+
     return 0;
 }
 

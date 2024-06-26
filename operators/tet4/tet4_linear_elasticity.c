@@ -124,22 +124,22 @@ int tet4_linear_elasticity_apply(const ptrdiff_t nelements,
         }
 
         tet4_adjugate_and_det_s(x[ev[0]],
-                              x[ev[1]],
-                              x[ev[2]],
-                              x[ev[3]],
-                              // Y-coordinates
-                              y[ev[0]],
-                              y[ev[1]],
-                              y[ev[2]],
-                              y[ev[3]],
-                              // Z-coordinates
-                              z[ev[0]],
-                              z[ev[1]],
-                              z[ev[2]],
-                              z[ev[3]],
-                              // Output
-                              jacobian_adjugate,
-                              &jacobian_determinant);
+                                x[ev[1]],
+                                x[ev[2]],
+                                x[ev[3]],
+                                // Y-coordinates
+                                y[ev[0]],
+                                y[ev[1]],
+                                y[ev[2]],
+                                y[ev[3]],
+                                // Z-coordinates
+                                z[ev[0]],
+                                z[ev[1]],
+                                z[ev[2]],
+                                z[ev[3]],
+                                // Output
+                                jacobian_adjugate,
+                                &jacobian_determinant);
 
         tet4_linear_elasticity_apply_adj(jacobian_adjugate,
                                          jacobian_determinant,
@@ -202,22 +202,22 @@ int tet4_linear_elasticity_diag(const ptrdiff_t nelements,
         }
 
         tet4_adjugate_and_det_s(x[ev[0]],
-                              x[ev[1]],
-                              x[ev[2]],
-                              x[ev[3]],
-                              // Y-coordinates
-                              y[ev[0]],
-                              y[ev[1]],
-                              y[ev[2]],
-                              y[ev[3]],
-                              // Z-coordinates
-                              z[ev[0]],
-                              z[ev[1]],
-                              z[ev[2]],
-                              z[ev[3]],
-                              // Output
-                              jacobian_adjugate,
-                              &jacobian_determinant);
+                                x[ev[1]],
+                                x[ev[2]],
+                                x[ev[3]],
+                                // Y-coordinates
+                                y[ev[0]],
+                                y[ev[1]],
+                                y[ev[2]],
+                                y[ev[3]],
+                                // Z-coordinates
+                                z[ev[0]],
+                                z[ev[1]],
+                                z[ev[2]],
+                                z[ev[3]],
+                                // Output
+                                jacobian_adjugate,
+                                &jacobian_determinant);
 
         tet4_linear_elasticity_diag_adj(mu,
                                         lambda,
@@ -279,26 +279,26 @@ int tet4_linear_elasticity_hessian(const ptrdiff_t nelements,
         }
 
         tet4_adjugate_and_det_s(x[ev[0]],
-                              x[ev[1]],
-                              x[ev[2]],
-                              x[ev[3]],
-                              // Y-coordinates
-                              y[ev[0]],
-                              y[ev[1]],
-                              y[ev[2]],
-                              y[ev[3]],
-                              // Z-coordinates
-                              z[ev[0]],
-                              z[ev[1]],
-                              z[ev[2]],
-                              z[ev[3]],
-                              // Output
-                              jacobian_adjugate,
-                              &jacobian_determinant);
+                                x[ev[1]],
+                                x[ev[2]],
+                                x[ev[3]],
+                                // Y-coordinates
+                                y[ev[0]],
+                                y[ev[1]],
+                                y[ev[2]],
+                                y[ev[3]],
+                                // Z-coordinates
+                                z[ev[0]],
+                                z[ev[1]],
+                                z[ev[2]],
+                                z[ev[3]],
+                                // Output
+                                jacobian_adjugate,
+                                &jacobian_determinant);
 
-        // tet4_linear_elasticity_hessian_adj
-        tet4_linear_elasticity_hessian_adj_less_registers
-        (mu, lambda, jacobian_adjugate, jacobian_determinant, element_matrix);
+        tet4_linear_elasticity_hessian_adj
+                // tet4_linear_elasticity_hessian_adj_less_registers
+                (mu, lambda, jacobian_adjugate, jacobian_determinant, element_matrix);
 
 #ifndef NDEBUG
         {
@@ -329,8 +329,12 @@ int tet4_linear_elasticity_hessian(const ptrdiff_t nelements,
                 for (int jj = 0; jj < 12; jj++) {
                     int idx = ii * 12 + jj;
                     double diff = fabs(test_matrix[idx] - element_matrix[idx]);
-                    if(diff > 1e-8) {
-                        printf("Diff %d %d) %g != %g\n", ii, jj, element_matrix[idx], test_matrix[idx]);
+                    if (diff > 1e-8) {
+                        printf("Diff %d %d) %g != %g\n",
+                               ii,
+                               jj,
+                               element_matrix[idx],
+                               test_matrix[idx]);
                     }
 
                     assert(diff < 1e-5);
@@ -346,8 +350,8 @@ int tet4_linear_elasticity_hessian(const ptrdiff_t nelements,
             const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
 
             {
-                const idx_t *row = &colidx[rowptr[dof_i]];
-                tet4_find_cols(ev, row, lenrow, ks);
+                const idx_t *cols = &colidx[rowptr[dof_i]];
+                tet4_find_cols(ev, cols, lenrow, ks);
             }
 
             // Blocks for row
