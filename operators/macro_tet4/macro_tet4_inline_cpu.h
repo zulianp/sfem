@@ -79,95 +79,90 @@ static SFEM_INLINE void tet4_sub_fff_7(const scalar_t *const SFEM_RESTRICT fff,
 // Adjugate
 
 static SFEM_INLINE void tet4_sub_adj_0(const scalar_t *const SFEM_RESTRICT adjugate,
-                                       const ptrdiff_t stride,
                                        scalar_t *const SFEM_RESTRICT sub_adjugate) {
-    sub_adjugate[0] = 2 * adjugate[0 * stride];
-    sub_adjugate[1] = 2 * adjugate[1 * stride];
-    sub_adjugate[2] = 2 * adjugate[2 * stride];
-    sub_adjugate[3] = 2 * adjugate[3 * stride];
-    sub_adjugate[4] = 2 * adjugate[4 * stride];
-    sub_adjugate[5] = 2 * adjugate[5 * stride];
-    sub_adjugate[6] = 2 * adjugate[6 * stride];
-    sub_adjugate[7] = 2 * adjugate[7 * stride];
-    sub_adjugate[8] = 2 * adjugate[8 * stride];
+    sub_adjugate[0] = 2 * adjugate[0];
+    sub_adjugate[1] = 2 * adjugate[1];
+    sub_adjugate[2] = 2 * adjugate[2];
+    sub_adjugate[3] = 2 * adjugate[3];
+    sub_adjugate[4] = 2 * adjugate[4];
+    sub_adjugate[5] = 2 * adjugate[5];
+    sub_adjugate[6] = 2 * adjugate[6];
+    sub_adjugate[7] = 2 * adjugate[7];
+    sub_adjugate[8] = 2 * adjugate[8];
 }
 static SFEM_INLINE void tet4_sub_adj_4(const scalar_t *const SFEM_RESTRICT adjugate,
-                                       const ptrdiff_t stride,
                                        scalar_t *const SFEM_RESTRICT sub_adjugate) {
-    const scalar_t x0 = 2 * adjugate[0 * stride];
-    const scalar_t x1 = 2 * adjugate[1 * stride];
-    const scalar_t x2 = 2 * adjugate[2 * stride];
-    sub_adjugate[0] = 2 * adjugate[3 * stride] + x0;
-    sub_adjugate[1] = 2 * adjugate[4 * stride] + x1;
-    sub_adjugate[2] = 2 * adjugate[5 * stride] + x2;
+    const scalar_t x0 = 2 * adjugate[0];
+    const scalar_t x1 = 2 * adjugate[1];
+    const scalar_t x2 = 2 * adjugate[2];
+    sub_adjugate[0] = 2 * adjugate[3] + x0;
+    sub_adjugate[1] = 2 * adjugate[4] + x1;
+    sub_adjugate[2] = 2 * adjugate[5] + x2;
     sub_adjugate[3] = -x0;
     sub_adjugate[4] = -x1;
     sub_adjugate[5] = -x2;
-    sub_adjugate[6] = 2 * adjugate[6 * stride];
-    sub_adjugate[7] = 2 * adjugate[7 * stride];
-    sub_adjugate[8] = 2 * adjugate[8 * stride];
+    sub_adjugate[6] = 2 * adjugate[6];
+    sub_adjugate[7] = 2 * adjugate[7];
+    sub_adjugate[8] = 2 * adjugate[8];
 }
 
 static SFEM_INLINE void tet4_sub_adj_5(const scalar_t *const SFEM_RESTRICT adjugate,
-                                       const ptrdiff_t stride,
                                        scalar_t *const SFEM_RESTRICT sub_adjugate) {
-    const scalar_t x0 = 2 * adjugate[3 * stride];
-    const scalar_t x1 = 2 * adjugate[6 * stride] + x0;
-    const scalar_t x2 = 2 * adjugate[4 * stride];
-    const scalar_t x3 = 2 * adjugate[7 * stride] + x2;
-    const scalar_t x4 = 2 * adjugate[5 * stride];
-    const scalar_t x5 = 2 * adjugate[8 * stride] + x4;
+    const scalar_t x0 = 2 * adjugate[3];
+    const scalar_t x1 = 2 * adjugate[6] + x0;
+    const scalar_t x2 = 2 * adjugate[4];
+    const scalar_t x3 = 2 * adjugate[7] + x2;
+    const scalar_t x4 = 2 * adjugate[5];
+    const scalar_t x5 = 2 * adjugate[8] + x4;
     sub_adjugate[0] = -x1;
     sub_adjugate[1] = -x3;
     sub_adjugate[2] = -x5;
     sub_adjugate[3] = x0;
     sub_adjugate[4] = x2;
     sub_adjugate[5] = x4;
-    sub_adjugate[6] = 2 * adjugate[0 * stride] + x1;
-    sub_adjugate[7] = 2 * adjugate[1 * stride] + x3;
-    sub_adjugate[8] = 2 * adjugate[2 * stride] + x5;
+    sub_adjugate[6] = 2 * adjugate[0] + x1;
+    sub_adjugate[7] = 2 * adjugate[1] + x3;
+    sub_adjugate[8] = 2 * adjugate[2] + x5;
 }
 
 static SFEM_INLINE void tet4_sub_adj_6(const scalar_t *const SFEM_RESTRICT adjugate,
-                                       const ptrdiff_t stride,
                                        scalar_t *const SFEM_RESTRICT sub_adjugate) {
-    const scalar_t x0 = 2 * adjugate[3 * stride];
-    const scalar_t x1 = 2 * adjugate[4 * stride];
-    const scalar_t x2 = 2 * adjugate[5 * stride];
-    sub_adjugate[0] = 2 * adjugate[0 * stride] + x0;
-    sub_adjugate[1] = 2 * adjugate[1 * stride] + x1;
-    sub_adjugate[2] = 2 * adjugate[2 * stride] + x2;
-    sub_adjugate[3] = 2 * adjugate[6 * stride] + x0;
-    sub_adjugate[4] = 2 * adjugate[7 * stride] + x1;
-    sub_adjugate[5] = 2 * adjugate[8 * stride] + x2;
+    const scalar_t x0 = 2 * adjugate[3];
+    const scalar_t x1 = 2 * adjugate[4];
+    const scalar_t x2 = 2 * adjugate[5];
+    sub_adjugate[0] = 2 * adjugate[0] + x0;
+    sub_adjugate[1] = 2 * adjugate[1] + x1;
+    sub_adjugate[2] = 2 * adjugate[2] + x2;
+    sub_adjugate[3] = 2 * adjugate[6] + x0;
+    sub_adjugate[4] = 2 * adjugate[7] + x1;
+    sub_adjugate[5] = 2 * adjugate[8] + x2;
     sub_adjugate[6] = -x0;
     sub_adjugate[7] = -x1;
     sub_adjugate[8] = -x2;
 }
 
 static SFEM_INLINE void tet4_sub_adj_7(const scalar_t *const SFEM_RESTRICT adjugate,
-                                       const ptrdiff_t stride,
                                        scalar_t *const SFEM_RESTRICT sub_adjugate) {
-    const scalar_t x0 = 2 * adjugate[6 * stride];
-    const scalar_t x1 = 2 * adjugate[7 * stride];
-    const scalar_t x2 = 2 * adjugate[8 * stride];
+    const scalar_t x0 = 2 * adjugate[6];
+    const scalar_t x1 = 2 * adjugate[7];
+    const scalar_t x2 = 2 * adjugate[8];
     sub_adjugate[0] = -x0;
     sub_adjugate[1] = -x1;
     sub_adjugate[2] = -x2;
-    sub_adjugate[3] = 2 * adjugate[3 * stride] + x0;
-    sub_adjugate[4] = 2 * adjugate[4 * stride] + x1;
-    sub_adjugate[5] = 2 * adjugate[5 * stride] + x2;
-    sub_adjugate[6] = 2 * adjugate[0 * stride];
-    sub_adjugate[7] = 2 * adjugate[1 * stride];
-    sub_adjugate[8] = 2 * adjugate[2 * stride];
+    sub_adjugate[3] = 2 * adjugate[3] + x0;
+    sub_adjugate[4] = 2 * adjugate[4] + x1;
+    sub_adjugate[5] = 2 * adjugate[5] + x2;
+    sub_adjugate[6] = 2 * adjugate[0];
+    sub_adjugate[7] = 2 * adjugate[1];
+    sub_adjugate[8] = 2 * adjugate[2];
 }
 
 #define tet4_gather_idx(from, i0, i1, i2, i3, to) \
-    do {                                     \
-        to[0] = from[i0];                    \
-        to[1] = from[i1];                    \
-        to[2] = from[i2];                    \
-        to[3] = from[i3];                    \
+    do {                                          \
+        to[0] = from[i0];                         \
+        to[1] = from[i1];                         \
+        to[2] = from[i2];                         \
+        to[3] = from[i3];                         \
     } while (0);
 
 #endif  // MACRO_TET4_INLINE_CPU_H

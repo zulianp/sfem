@@ -110,7 +110,7 @@ int main(int argc, char *argv[]) {
     int SFEM_DEBUG = 0;
     int SFEM_MG = 0;
     int SFEM_MAX_IT = 4000;
-    float SFEM_CHEB_EIG_MAX_SCALE = 1;
+    float SFEM_CHEB_EIG_MAX_SCALE = 1.02;
 
     SFEM_READ_ENV(SFEM_MATRIX_FREE, atoi);
     SFEM_READ_ENV(SFEM_OPERATOR, );
@@ -170,11 +170,16 @@ int main(int argc, char *argv[]) {
 
         if (SFEM_USE_CHEB) {
             auto cheb = sfem::h_cheb3<real_t>(linear_op);
-            cheb->init(rhs->data());
+
+            // Power-method
+            auto r = sfem::h_buffer<real_t>(fs->n_dofs());
+            residual(*linear_op, rhs->data(), x->data(), r->data());
+            cheb->init(r->data());
+
             cheb->scale_eig_max = SFEM_CHEB_EIG_MAX_SCALE;
             cheb->set_max_it(3);
             smoother = cheb;
-        } else if(SFEM_USE_PRECONDITIONER) {
+        } else if (SFEM_USE_PRECONDITIONER) {
             f->hessian_diag(nullptr, diag->data());
         }
 
@@ -184,16 +189,23 @@ int main(int argc, char *argv[]) {
 
         if (SFEM_USE_CHEB) {
             auto cheb = sfem::h_cheb3<real_t>(linear_op);
-            cheb->init(rhs->data());
+
+            // Power-method
+            auto r = sfem::h_buffer<real_t>(fs->n_dofs());
+            residual(*linear_op, rhs->data(), x->data(), r->data());
+            cheb->init(r->data());
+
             cheb->scale_eig_max = SFEM_CHEB_EIG_MAX_SCALE;
             cheb->set_max_it(3);
             smoother = cheb;
         } else {
             f->hessian_diag(nullptr, diag->data());
-            auto gs = sfem::h_gauss_seidel(crs, diag->data());
-            gs->set_max_it(5);
-            // gs->verbose = true;
-            smoother = gs;
+            if ((!SFEM_USE_PRECONDITIONER || SFEM_MG) && fs->block_size() == 1){
+                auto gs = sfem::h_gauss_seidel(crs, diag->data());
+                gs->set_max_it(5);
+                // gs->verbose = true;
+                smoother = gs;
+            }
 
             if (SFEM_DEBUG) {
                 array_write(comm,
@@ -343,7 +355,7 @@ int main(int argc, char *argv[]) {
             auto preconditioner = smoother;
             smoother->set_initial_guess_zero(true);
             solver->set_preconditioner_op(preconditioner);
-        } else {
+        } else if(SFEM_USE_PRECONDITIONER) {
             auto preconditioner = sfem::make_op<real_t>(
                     diag->size(), diag->size(), [=](const real_t *const x, real_t *const y) {
                         auto d = diag->data();
