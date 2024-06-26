@@ -77,6 +77,7 @@ n_procs=1
 if [[ -z "$LAUNCH" ]]
 then
 	LAUNCH="mpiexec -np $n_procs"
+	LAUNCH=""
 fi
 
 GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
@@ -89,5 +90,5 @@ GRID_TO_MESH="grid_to_mesh"
 export SFEM_ENABLE_ISOPARAMETRIC=1
 
 set -x
-time SFEM_INTERPOLATE=0 SFEM_READ_FP32=1 $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field
+time SFEM_INTERPOLATE=0 SFEM_READ_FP32=1 $LAUNCH  $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field
 raw_to_db.py $resample_target out.vtk --point_data=$field
