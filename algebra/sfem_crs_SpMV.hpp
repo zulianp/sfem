@@ -48,7 +48,7 @@ namespace sfem {
                     const R row_begin = row_ptr[i];
                     const R row_end = row_ptr[i + 1];
 
-                    real_t val = 0;
+                    T val = 0;
                     for (R k = row_begin; k < row_end; k++) {
                         const C j = col_idx[k];
                         const T aij = values[k];
@@ -64,7 +64,7 @@ namespace sfem {
                     const R row_begin = row_ptr[i];
                     const R row_end = row_ptr[i + 1];
 
-                    real_t val = 0;
+                    T val = 0;
                     for (R k = row_begin; k < row_end; k++) {
                         const C j = col_idx[k];
                         const T aij = values[k];
@@ -80,7 +80,7 @@ namespace sfem {
                     const R row_begin = row_ptr[i];
                     const R row_end = row_ptr[i + 1];
 
-                    real_t val = 0;
+                    T val = 0;
                     for (R k = row_begin; k < row_end; k++) {
                         const C j = col_idx[k];
                         const T aij = values[k];
