@@ -26,8 +26,8 @@ mkdir -p output
 export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 
-rm -rf mesh
-create_cylinder.sh 3
+# rm -rf mesh
+# create_cylinder.sh 3
 
 # create_cylinder_p2.sh 2
 # export SFEM_USE_MACRO=1
@@ -58,7 +58,7 @@ else
 fi
 
 export SFEM_USE_GPU=1
-export SFEM_USE_PRECONDITIONER=1
+# export SFEM_USE_PRECONDITIONER=1
 export CUDA_LAUNCH_BLOCKING=0
 
 # $LAUNCH steady_state_sim mesh output
