@@ -195,7 +195,7 @@ int macro_tet4_linear_elasticity_apply_opt(
     return 0;
 }
 
-int macro_tet4_linear_elasticity_diag(const ptrdiff_t nelements,
+int macro_tet4_linear_elasticity_diag_opt(const ptrdiff_t nelements,
                                       idx_t **const SFEM_RESTRICT elements,
                                       const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
                                       const jacobian_t *const SFEM_RESTRICT jacobian_determinant,

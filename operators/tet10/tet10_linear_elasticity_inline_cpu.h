@@ -3,9 +3,9 @@
 
 #include "tet10_inline_cpu.h"
 
-static SFEM_INLINE void tet10_linear_elasticity_diag_adj(const jacobian_t *const SFEM_RESTRICT
+static SFEM_INLINE void tet10_linear_elasticity_diag_adj(const scalar_t *const SFEM_RESTRICT
                                                                  adjugate,
-                                                         const jacobian_t jacobian_determinant,
+                                                         const scalar_t jacobian_determinant,
                                                          const scalar_t mu,
                                                          const scalar_t lambda,
                                                          const scalar_t qx,
@@ -149,8 +149,8 @@ static SFEM_INLINE void tet10_linear_elasticity_hessian_adj(
         const scalar_t qy,
         const scalar_t qz,
         const scalar_t qw,
-        const jacobian_t *const SFEM_RESTRICT adjugate,
-        const jacobian_t jacobian_determinant,
+        const scalar_t *const SFEM_RESTRICT adjugate,
+        const scalar_t jacobian_determinant,
         const scalar_t mu,
         const scalar_t lambda,
         accumulator_t *const SFEM_RESTRICT element_matrix) {
