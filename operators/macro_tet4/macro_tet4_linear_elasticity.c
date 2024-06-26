@@ -43,17 +43,17 @@ static SFEM_INLINE void subtet_scatter_add(const int i,
     }
 }
 
-static SFEM_INLINE void tet10_local_apply_adj(const scalar_t *const SFEM_RESTRICT
-                                                      jacobian_adjugate,
-                                              const scalar_t jacobian_determinant,
-                                              const scalar_t mu,
-                                              const scalar_t lambda,
-                                              const scalar_t *const SFEM_RESTRICT ux,
-                                              const scalar_t *const SFEM_RESTRICT uy,
-                                              const scalar_t *const SFEM_RESTRICT uz,
-                                              accumulator_t *const SFEM_RESTRICT outx,
-                                              accumulator_t *const SFEM_RESTRICT outy,
-                                              accumulator_t *const SFEM_RESTRICT outz) {
+static SFEM_INLINE void macro_tet4_local_apply_adj(const scalar_t *const SFEM_RESTRICT
+                                                           jacobian_adjugate,
+                                                   const scalar_t jacobian_determinant,
+                                                   const scalar_t mu,
+                                                   const scalar_t lambda,
+                                                   const scalar_t *const SFEM_RESTRICT ux,
+                                                   const scalar_t *const SFEM_RESTRICT uy,
+                                                   const scalar_t *const SFEM_RESTRICT uz,
+                                                   accumulator_t *const SFEM_RESTRICT outx,
+                                                   accumulator_t *const SFEM_RESTRICT outy,
+                                                   accumulator_t *const SFEM_RESTRICT outz) {
     scalar_t sub_adjugate[9];
 
     scalar_t sub_ux[4];
@@ -144,9 +144,8 @@ int macro_tet4_linear_elasticity_apply_opt(
             accumulator_t outz[10] = {0};
 
             scalar_t jacobian_adjugate[9];
-            for(int k = 0; k < 9; k++) {
+            for (int k = 0; k < 9; k++) {
                 jacobian_adjugate[k] = g_jacobian_adjugate[i * 9 + k];
-
             }
 
             const scalar_t jacobian_determinant = g_jacobian_determinant[i];
@@ -162,16 +161,16 @@ int macro_tet4_linear_elasticity_apply_opt(
                 uz[v] = g_uz[ev[v] * u_stride];
             }
 
-            tet10_local_apply_adj(jacobian_adjugate,
-                                  jacobian_determinant,
-                                  mu,
-                                  lambda,
-                                  ux,
-                                  uy,
-                                  uz,
-                                  outx,
-                                  outy,
-                                  outz);
+            macro_tet4_local_apply_adj(jacobian_adjugate,
+                                       jacobian_determinant,
+                                       mu,
+                                       lambda,
+                                       ux,
+                                       uy,
+                                       uz,
+                                       outx,
+                                       outy,
+                                       outz);
 
 #pragma unroll(10)
             for (int v = 0; v < 10; v++) {
@@ -196,15 +195,16 @@ int macro_tet4_linear_elasticity_apply_opt(
 }
 
 int macro_tet4_linear_elasticity_diag_opt(const ptrdiff_t nelements,
-                                      idx_t **const SFEM_RESTRICT elements,
-                                      const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
-                                      const jacobian_t *const SFEM_RESTRICT jacobian_determinant,
-                                      const real_t mu,
-                                      const real_t lambda,
-                                      const ptrdiff_t out_stride,
-                                      real_t *const SFEM_RESTRICT outx,
-                                      real_t *const SFEM_RESTRICT outy,
-                                      real_t *const SFEM_RESTRICT outz) {
+                                          idx_t **const SFEM_RESTRICT elements,
+                                          const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+                                          const jacobian_t *const SFEM_RESTRICT
+                                                  jacobian_determinant,
+                                          const real_t mu,
+                                          const real_t lambda,
+                                          const ptrdiff_t out_stride,
+                                          real_t *const SFEM_RESTRICT outx,
+                                          real_t *const SFEM_RESTRICT outy,
+                                          real_t *const SFEM_RESTRICT outz) {
     //
     assert(0);
     return -1;
@@ -254,24 +254,24 @@ int macro_tet4_linear_elasticity_apply(const ptrdiff_t nelements,
         }
 
         tet4_adjugate_and_det_s(x[ev[0]],
-                              x[ev[1]],
-                              x[ev[2]],
-                              x[ev[3]],
-                              // Y-coordinates
-                              y[ev[0]],
-                              y[ev[1]],
-                              y[ev[2]],
-                              y[ev[3]],
-                              // Z-coordinates
-                              z[ev[0]],
-                              z[ev[1]],
-                              z[ev[2]],
-                              z[ev[3]],
-                              // Output
-                              jacobian_adjugate,
-                              &jacobian_determinant);
+                                x[ev[1]],
+                                x[ev[2]],
+                                x[ev[3]],
+                                // Y-coordinates
+                                y[ev[0]],
+                                y[ev[1]],
+                                y[ev[2]],
+                                y[ev[3]],
+                                // Z-coordinates
+                                z[ev[0]],
+                                z[ev[1]],
+                                z[ev[2]],
+                                z[ev[3]],
+                                // Output
+                                jacobian_adjugate,
+                                &jacobian_determinant);
 
-        tet10_local_apply_adj(
+        macro_tet4_local_apply_adj(
                 jacobian_adjugate, jacobian_determinant, mu, lambda, ux, uy, uz, outx, outy, outz);
 
 #pragma unroll(10)

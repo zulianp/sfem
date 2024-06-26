@@ -174,7 +174,7 @@ int main(int argc, char *argv[]) {
             cheb->scale_eig_max = SFEM_CHEB_EIG_MAX_SCALE;
             cheb->set_max_it(3);
             smoother = cheb;
-        } else {
+        } else if(SFEM_USE_PRECONDITIONER) {
             f->hessian_diag(nullptr, diag->data());
         }
 
