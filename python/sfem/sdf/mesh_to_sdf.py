@@ -84,7 +84,7 @@ def compute_aabb(mesh, margin=0):
     pmax[2] = np.max(z).astype(geom_t) + margin
     return np.array(pmin), np.array(pmax)
 
-def mesh_to_sdf(mesh, pmin, pmax, hmax, /, export_normals=False):
+def mesh_to_sdf(mesh, pmin, pmax, hmax, export_normals=False):
     t1_start = perf_counter()
 
     x =  mesh.points[:,0].astype(geom_t)
@@ -398,7 +398,7 @@ if __name__ == '__main__':
     submesh = select_submesh(mesh, pmin, pmax)
     print(submesh)
     submesh.write('submesh.vtk')
-    nedt, dims = mesh_to_sdf(submesh, pmin, pmax, hmax, export_normals=export_normals)
+    nedt, dims = mesh_to_sdf(submesh, pmin, pmax, hmax, export_normals)
     nedt.tofile(output_path)
 
     header =    f'nx: {dims[0]}\n'
