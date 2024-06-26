@@ -5,8 +5,8 @@
 
 #define RPOW2(l) (1. / ((l) * (l)))
 
-static SFEM_INLINE void tet4_gradient_3(const jacobian_t *const SFEM_RESTRICT adjugate,
-                                        const jacobian_t jacobian_determinant,
+static SFEM_INLINE void tet4_gradient_3(const scalar_t *const SFEM_RESTRICT adjugate,
+                                        const scalar_t jacobian_determinant,
                                         const scalar_t *const SFEM_RESTRICT ux,
                                         const scalar_t *const SFEM_RESTRICT uy,
                                         const scalar_t *const SFEM_RESTRICT uz,
@@ -35,7 +35,7 @@ static SFEM_INLINE void tet4_gradient_3(const jacobian_t *const SFEM_RESTRICT ad
 static SFEM_INLINE void tet4_linear_elasticity_loperand(
         const scalar_t mu,
         const scalar_t lambda,
-        const jacobian_t *const SFEM_RESTRICT adjugate,
+        const scalar_t *const SFEM_RESTRICT adjugate,
         scalar_t *const SFEM_RESTRICT in_disp_grad_out_P_tXJinv_t) {
     // Shorter name
     scalar_t *const buff = in_disp_grad_out_P_tXJinv_t;
@@ -60,9 +60,9 @@ static SFEM_INLINE void tet4_linear_elasticity_loperand(
     buff[8] = adjugate[6] * x2 + adjugate[7] * x6 + adjugate[8] * x8;
 }
 
-static SFEM_INLINE void tet4_linear_elasticity_apply_adj(const jacobian_t *const SFEM_RESTRICT
+static SFEM_INLINE void tet4_linear_elasticity_apply_adj(const scalar_t *const SFEM_RESTRICT
                                                                  adjugate,
-                                                         const jacobian_t jacobian_determinant,
+                                                         const scalar_t jacobian_determinant,
                                                          const scalar_t mu,
                                                          const scalar_t lambda,
                                                          const scalar_t *const SFEM_RESTRICT ux,
@@ -92,8 +92,8 @@ static SFEM_INLINE void tet4_linear_elasticity_apply_adj(const jacobian_t *const
 static SFEM_INLINE void tet4_linear_elasticity_apply_add_adj(
         const scalar_t mu,
         const scalar_t lambda,
-        const jacobian_t *const SFEM_RESTRICT adjugate,
-        const jacobian_t jacobian_determinant,
+        const scalar_t *const SFEM_RESTRICT adjugate,
+        const scalar_t jacobian_determinant,
         const scalar_t *const SFEM_RESTRICT ux,
         const scalar_t *const SFEM_RESTRICT uy,
         const scalar_t *const SFEM_RESTRICT uz,
@@ -120,9 +120,9 @@ static SFEM_INLINE void tet4_linear_elasticity_apply_add_adj(
 
 static SFEM_INLINE void tet4_linear_elasticity_diag_adj(const scalar_t mu,
                                                         const scalar_t lambda,
-                                                        const jacobian_t *const SFEM_RESTRICT
+                                                        const scalar_t *const SFEM_RESTRICT
                                                                 jacobian_adjugate,
-                                                        const jacobian_t jacobian_determinant,
+                                                        const scalar_t jacobian_determinant,
                                                         accumulator_t *const SFEM_RESTRICT diagx,
                                                         accumulator_t *const SFEM_RESTRICT diagy,
                                                         accumulator_t *const SFEM_RESTRICT diagz) {
@@ -639,8 +639,8 @@ static SFEM_INLINE void tet4_linear_elasticity_hessian_points(const scalar_t mu,
 static SFEM_INLINE void tet4_linear_elasticity_hessian_adj(
         const scalar_t mu,
         const scalar_t lambda,
-        const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
-        const jacobian_t jacobian_determinant,
+        const scalar_t *const SFEM_RESTRICT jacobian_adjugate,
+        const scalar_t jacobian_determinant,
         accumulator_t *const SFEM_RESTRICT element_matrix) {
     const scalar_t x0 = jacobian_adjugate[1] + jacobian_adjugate[4] + jacobian_adjugate[7];
     const scalar_t x1 = mu * x0;
@@ -969,8 +969,8 @@ static SFEM_INLINE void tet4_linear_elasticity_hessian_adj(
 static SFEM_INLINE void aux_tet4_linear_elasticity_hessian_adj_less_registers(
         const scalar_t mu,
         const scalar_t lambda,
-        const jacobian_t *const SFEM_RESTRICT adjugate,
-        const jacobian_t jacobian_determinant,
+        const scalar_t *const SFEM_RESTRICT adjugate,
+        const scalar_t jacobian_determinant,
         const int test_idx,
         const scalar_t *const SFEM_RESTRICT gtest,
         scalar_t *const SFEM_RESTRICT element_matrix) {
@@ -1080,8 +1080,8 @@ static SFEM_INLINE void aux_tet4_linear_elasticity_hessian_adj_less_registers(
 static SFEM_INLINE void tet4_linear_elasticity_hessian_adj_less_registers(
         const scalar_t mu,
         const scalar_t lambda,
-        const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
-        const jacobian_t jacobian_determinant,
+        const scalar_t *const SFEM_RESTRICT jacobian_adjugate,
+        const scalar_t jacobian_determinant,
         accumulator_t *const SFEM_RESTRICT element_matrix) {
     {
         scalar_t gtest[3] = {-1, -1, -1};

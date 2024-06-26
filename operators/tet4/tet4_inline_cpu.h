@@ -89,6 +89,62 @@ static SFEM_INLINE void tet4_local_to_global(const idx_t *const SFEM_RESTRICT ev
     }
 }
 
+static SFEM_INLINE void tet4_fff_s(const scalar_t px0,
+                                 const scalar_t px1,
+                                 const scalar_t px2,
+                                 const scalar_t px3,
+                                 const scalar_t py0,
+                                 const scalar_t py1,
+                                 const scalar_t py2,
+                                 const scalar_t py3,
+                                 const scalar_t pz0,
+                                 const scalar_t pz1,
+                                 const scalar_t pz2,
+                                 const scalar_t pz3,
+                                 scalar_t *const fff) {
+    const scalar_t x0 = -px0 + px1;
+    const scalar_t x1 = -py0 + py2;
+    const scalar_t x2 = -pz0 + pz3;
+    const scalar_t x3 = x1 * x2;
+    const scalar_t x4 = x0 * x3;
+    const scalar_t x5 = -py0 + py3;
+    const scalar_t x6 = -pz0 + pz2;
+    const scalar_t x7 = x5 * x6;
+    const scalar_t x8 = x0 * x7;
+    const scalar_t x9 = -py0 + py1;
+    const scalar_t x10 = -px0 + px2;
+    const scalar_t x11 = x10 * x2;
+    const scalar_t x12 = x11 * x9;
+    const scalar_t x13 = -pz0 + pz1;
+    const scalar_t x14 = x10 * x5;
+    const scalar_t x15 = x13 * x14;
+    const scalar_t x16 = -px0 + px3;
+    const scalar_t x17 = x16 * x6 * x9;
+    const scalar_t x18 = x1 * x16;
+    const scalar_t x19 = x13 * x18;
+    const scalar_t x20 = -1.0 / 6.0 * x12 + (1.0 / 6.0) * x15 + (1.0 / 6.0) * x17 - 1.0 / 6.0 * x19 +
+                       (1.0 / 6.0) * x4 - 1.0 / 6.0 * x8;
+    const scalar_t x21 = x14 - x18;
+    const scalar_t x22 = 1. / POW2(-x12 + x15 + x17 - x19 + x4 - x8);
+    const scalar_t x23 = -x11 + x16 * x6;
+    const scalar_t x24 = x3 - x7;
+    const scalar_t x25 = -x0 * x5 + x16 * x9;
+    const scalar_t x26 = x21 * x22;
+    const scalar_t x27 = x0 * x2 - x13 * x16;
+    const scalar_t x28 = x22 * x23;
+    const scalar_t x29 = x13 * x5 - x2 * x9;
+    const scalar_t x30 = x22 * x24;
+    const scalar_t x31 = x0 * x1 - x10 * x9;
+    const scalar_t x32 = -x0 * x6 + x10 * x13;
+    const scalar_t x33 = -x1 * x13 + x6 * x9;
+    fff[0] = x20 * (POW2(x21) * x22 + x22 * POW2(x23) + x22 * POW2(x24));
+    fff[1] = x20 * (x25 * x26 + x27 * x28 + x29 * x30);
+    fff[2] = x20 * (x26 * x31 + x28 * x32 + x30 * x33);
+    fff[3] = x20 * (x22 * POW2(x25) + x22 * POW2(x27) + x22 * POW2(x29));
+    fff[4] = x20 * (x22 * x25 * x31 + x22 * x27 * x32 + x22 * x29 * x33);
+    fff[5] = x20 * (x22 * POW2(x31) + x22 * POW2(x32) + x22 * POW2(x33));
+}
+
 static SFEM_INLINE void tet4_fff(const geom_t px0,
                                  const geom_t px1,
                                  const geom_t px2,
@@ -145,7 +201,7 @@ static SFEM_INLINE void tet4_fff(const geom_t px0,
     fff[5] = x20 * (x22 * POW2(x31) + x22 * POW2(x32) + x22 * POW2(x33));
 }
 
-static SFEM_INLINE geom_t tet4_det_fff(const geom_t *const fff) {
+static SFEM_INLINE scalar_t tet4_det_fff(const scalar_t *const fff) {
     return fff[0] * fff[3] * fff[5] - fff[0] * POW2(fff[4]) - POW2(fff[1]) * fff[5] +
            2 * fff[1] * fff[2] * fff[4] - POW2(fff[2]) * fff[3];
 }
@@ -182,6 +238,56 @@ static SFEM_INLINE void tet4_adjugate_and_det(const geom_t px0,
     const real_t x2 = jacobian[1] * jacobian[8];
     const real_t x3 = jacobian[1] * jacobian[5];
     const real_t x4 = jacobian[2] * jacobian[4];
+
+    // Store adjugate in lower precision
+    adjugate[0] = x0 - x1;
+    adjugate[1] = jacobian[2] * jacobian[7] - x2;
+    adjugate[2] = x3 - x4;
+    adjugate[3] = -jacobian[3] * jacobian[8] + jacobian[5] * jacobian[6];
+    adjugate[4] = jacobian[0] * jacobian[8] - jacobian[2] * jacobian[6];
+    adjugate[5] = -jacobian[0] * jacobian[5] + jacobian[2] * jacobian[3];
+    adjugate[6] = jacobian[3] * jacobian[7] - jacobian[4] * jacobian[6];
+    adjugate[7] = -jacobian[0] * jacobian[7] + jacobian[1] * jacobian[6];
+    adjugate[8] = jacobian[0] * jacobian[4] - jacobian[1] * jacobian[3];
+
+    // Store determinant in lower precision
+    jacobian_determinant[0] = jacobian[0] * x0 - jacobian[0] * x1 +
+                              jacobian[2] * jacobian[3] * jacobian[7] - jacobian[3] * x2 +
+                              jacobian[6] * x3 - jacobian[6] * x4;
+}
+
+static SFEM_INLINE void tet4_adjugate_and_det_s(const scalar_t px0,
+                                              const scalar_t px1,
+                                              const scalar_t px2,
+                                              const scalar_t px3,
+                                              const scalar_t py0,
+                                              const scalar_t py1,
+                                              const scalar_t py2,
+                                              const scalar_t py3,
+                                              const scalar_t pz0,
+                                              const scalar_t pz1,
+                                              const scalar_t pz2,
+                                              const scalar_t pz3,
+                                              scalar_t *const SFEM_RESTRICT adjugate,
+                                              scalar_t *const SFEM_RESTRICT
+                                                      jacobian_determinant) {
+    // Compute jacobian in high precision
+    scalar_t jacobian[9];
+    jacobian[0] = -px0 + px1;
+    jacobian[1] = -px0 + px2;
+    jacobian[2] = -px0 + px3;
+    jacobian[3] = -py0 + py1;
+    jacobian[4] = -py0 + py2;
+    jacobian[5] = -py0 + py3;
+    jacobian[6] = -pz0 + pz1;
+    jacobian[7] = -pz0 + pz2;
+    jacobian[8] = -pz0 + pz3;
+
+    const scalar_t x0 = jacobian[4] * jacobian[8];
+    const scalar_t x1 = jacobian[5] * jacobian[7];
+    const scalar_t x2 = jacobian[1] * jacobian[8];
+    const scalar_t x3 = jacobian[1] * jacobian[5];
+    const scalar_t x4 = jacobian[2] * jacobian[4];
 
     // Store adjugate in lower precision
     adjugate[0] = x0 - x1;

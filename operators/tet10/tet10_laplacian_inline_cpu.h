@@ -7,7 +7,7 @@ static SFEM_INLINE void tet10_laplacian_trial_operand(const scalar_t qx,
                                                       const scalar_t qy,
                                                       const scalar_t qz,
                                                       const scalar_t qw,
-                                                      const jacobian_t *const SFEM_RESTRICT fff,
+                                                      const scalar_t *const SFEM_RESTRICT fff,
                                                       const scalar_t *const SFEM_RESTRICT u,
                                                       scalar_t *const SFEM_RESTRICT out) {
     const scalar_t x0 = 4 * qx;
@@ -34,7 +34,7 @@ static SFEM_INLINE void tet10_laplacian_apply_qp_fff(const scalar_t qx,
                                                      const scalar_t qy,
                                                      const scalar_t qz,
                                                      const scalar_t qw,
-                                                     const jacobian_t *const SFEM_RESTRICT fff,
+                                                     const scalar_t *const SFEM_RESTRICT fff,
                                                      const scalar_t *const SFEM_RESTRICT u,
                                                      accumulator_t *const SFEM_RESTRICT
                                                              element_vector) {
@@ -95,7 +95,7 @@ static SFEM_INLINE void tet10_laplacian_apply_qp_fff(const scalar_t qx,
 #endif
 }
 
-static SFEM_INLINE void tet10_laplacian_apply_add_fff(const jacobian_t *const SFEM_RESTRICT fff,
+static SFEM_INLINE void tet10_laplacian_apply_add_fff(const scalar_t *const SFEM_RESTRICT fff,
                                                       const scalar_t *const SFEM_RESTRICT ex,
                                                       accumulator_t *const SFEM_RESTRICT ey) {
     // Numerical quadrature
@@ -111,7 +111,7 @@ static SFEM_INLINE void tet10_laplacian_apply_add_fff(const jacobian_t *const SF
     tet10_laplacian_apply_qp_fff(athird, athird, athird, 0.225, fff, ex, ey);
 }
 
-static SFEM_INLINE void tet10_laplacian_hessian_fff(const jacobian_t *fff,
+static SFEM_INLINE void tet10_laplacian_hessian_fff(const scalar_t *fff,
                                                     accumulator_t *element_matrix) {
     const scalar_t x0 = (1.0 / 10.0) * fff[0];
     const scalar_t x1 = (1.0 / 10.0) * fff[3];
@@ -294,7 +294,7 @@ static SFEM_INLINE void tet10_laplacian_hessian_fff(const jacobian_t *fff,
     element_matrix[99] = x55 + x75;
 }
 
-static SFEM_INLINE void tet10_laplacian_diag_fff(const jacobian_t *const SFEM_RESTRICT fff,
+static SFEM_INLINE void tet10_laplacian_diag_fff(const scalar_t *const SFEM_RESTRICT fff,
                                                  accumulator_t *const SFEM_RESTRICT
                                                          element_vector) {
     const real_t x0 = (1.0 / 10.0) * fff[0];
@@ -321,7 +321,7 @@ static SFEM_INLINE void tet10_laplacian_diag_fff(const jacobian_t *const SFEM_RE
     element_vector[9] = x10 + x4;
 }
 
-static SFEM_INLINE void tet10_laplacian_energy_fff(const jacobian_t *const SFEM_RESTRICT fff,
+static SFEM_INLINE void tet10_laplacian_energy_fff(const scalar_t *const SFEM_RESTRICT fff,
                                                    const scalar_t *const SFEM_RESTRICT u,
                                                    accumulator_t *const SFEM_RESTRICT
                                                            element_scalar) {

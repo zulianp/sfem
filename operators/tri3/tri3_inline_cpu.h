@@ -61,7 +61,8 @@ static SFEM_INLINE void tri3_find_cols(const idx_t *const SFEM_RESTRICT targets,
 }
 
 static SFEM_INLINE void tri3_local_to_global(const idx_t *const SFEM_RESTRICT ev,
-                                             const accumulator_t *const SFEM_RESTRICT element_matrix,
+                                             const accumulator_t *const SFEM_RESTRICT
+                                                     element_matrix,
                                              const count_t *const SFEM_RESTRICT rowptr,
                                              const idx_t *const SFEM_RESTRICT colidx,
                                              real_t *const SFEM_RESTRICT values) {
@@ -96,16 +97,32 @@ static SFEM_INLINE void tri3_fff(const geom_t px0,
     const real_t x1 = -py0 + py2;
     const real_t x2 = px0 - px2;
     const real_t x3 = py0 - py1;
-    const real_t x4 = x0*x1 - x2*x3;
-    const real_t x5 = (1/POW2(x4));
-    fff[0] = x4*(POW2(x1)*x5 + POW2(x2)*x5);
-    fff[1] = x4*(x0*x2*x5 + x1*x3*x5);
-    fff[2] = x4*(POW2(x0)*x5 + POW2(x3)*x5);
-    
+    const real_t x4 = x0 * x1 - x2 * x3;
+    const real_t x5 = (1 / POW2(x4));
+    fff[0] = x4 * (POW2(x1) * x5 + POW2(x2) * x5);
+    fff[1] = x4 * (x0 * x2 * x5 + x1 * x3 * x5);
+    fff[2] = x4 * (POW2(x0) * x5 + POW2(x3) * x5);
+}
+static SFEM_INLINE void tri3_fff_s(const scalar_t px0,
+                                   const scalar_t px1,
+                                   const scalar_t px2,
+                                   const scalar_t py0,
+                                   const scalar_t py1,
+                                   const scalar_t py2,
+                                   scalar_t *const fff) {
+    const scalar_t x0 = -px0 + px1;
+    const scalar_t x1 = -py0 + py2;
+    const scalar_t x2 = px0 - px2;
+    const scalar_t x3 = py0 - py1;
+    const scalar_t x4 = x0 * x1 - x2 * x3;
+    const scalar_t x5 = (1 / POW2(x4));
+    fff[0] = x4 * (POW2(x1) * x5 + POW2(x2) * x5);
+    fff[1] = x4 * (x0 * x2 * x5 + x1 * x3 * x5);
+    fff[2] = x4 * (POW2(x0) * x5 + POW2(x3) * x5);
 }
 
-static SFEM_INLINE geom_t tri3_det_fff(const geom_t *const fff) {
-    return fff[0]*fff[2] - POW2(fff[1]);
+static SFEM_INLINE scalar_t tri3_det_fff(const scalar_t *const fff) {
+    return fff[0] * fff[2] - POW2(fff[1]);
 }
 
 // static SFEM_INLINE void tri3_adjugate_and_det(const geom_t px0,

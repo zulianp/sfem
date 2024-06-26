@@ -110,8 +110,8 @@ int tet4_linear_elasticity_apply(const ptrdiff_t nelements,
         accumulator_t element_outy[4];
         accumulator_t element_outz[4];
 
-        jacobian_t jacobian_adjugate[9];
-        jacobian_t jacobian_determinant = 0;
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant = 0;
 
         for (int v = 0; v < 4; ++v) {
             ev[v] = elements[v][i];
@@ -123,7 +123,7 @@ int tet4_linear_elasticity_apply(const ptrdiff_t nelements,
             element_uz[v] = uz[ev[v] * u_stride];
         }
 
-        tet4_adjugate_and_det(x[ev[0]],
+        tet4_adjugate_and_det_s(x[ev[0]],
                               x[ev[1]],
                               x[ev[2]],
                               x[ev[3]],
@@ -193,15 +193,15 @@ int tet4_linear_elasticity_diag(const ptrdiff_t nelements,
         accumulator_t element_outy[4];
         accumulator_t element_outz[4];
 
-        jacobian_t jacobian_adjugate[9];
-        jacobian_t jacobian_determinant = 0;
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant = 0;
 
 #pragma unroll(4)
         for (int v = 0; v < 4; ++v) {
             ev[v] = elements[v][i];
         }
 
-        tet4_adjugate_and_det(x[ev[0]],
+        tet4_adjugate_and_det_s(x[ev[0]],
                               x[ev[1]],
                               x[ev[2]],
                               x[ev[3]],
@@ -268,8 +268,8 @@ int tet4_linear_elasticity_hessian(const ptrdiff_t nelements,
         idx_t ev[4];
         idx_t ks[4];
 
-        jacobian_t jacobian_adjugate[9];
-        jacobian_t jacobian_determinant = 0;
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant = 0;
 
         accumulator_t element_matrix[(4 * 3) * (4 * 3)];
 
@@ -278,7 +278,7 @@ int tet4_linear_elasticity_hessian(const ptrdiff_t nelements,
             ev[v] = elements[v][i];
         }
 
-        tet4_adjugate_and_det(x[ev[0]],
+        tet4_adjugate_and_det_s(x[ev[0]],
                               x[ev[1]],
                               x[ev[2]],
                               x[ev[3]],

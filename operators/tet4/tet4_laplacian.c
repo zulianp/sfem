@@ -232,20 +232,24 @@ int tet4_laplacian_diag(const ptrdiff_t nelements,
 // Optimized for matrix-free
 int tet4_laplacian_apply_opt(const ptrdiff_t nelements,
                              idx_t **const SFEM_RESTRICT elements,
-                             const jacobian_t *const SFEM_RESTRICT fff,
+                             const jacobian_t *const SFEM_RESTRICT fff_all,
                              const real_t *const SFEM_RESTRICT u,
                              real_t *const SFEM_RESTRICT values) {
     int SFEM_ENABLE_V = 0;
     SFEM_READ_ENV(SFEM_ENABLE_V, atoi);
 
     if (SFEM_ENABLE_V) {
-        return vtet4_laplacian_apply_opt(nelements, elements, fff, u, values);
+        return vtet4_laplacian_apply_opt(nelements, elements, fff_all, u, values);
     }
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         accumulator_t element_vector[4];
         idx_t ev[4];
+        scalar_t fff[6];
+        for(int k = 0; k < 6; k++) {
+            fff[k] = fff_all[i * 6 + k];
+        }
 
         // Element indices
 #pragma unroll(4)
@@ -253,7 +257,7 @@ int tet4_laplacian_apply_opt(const ptrdiff_t nelements,
             ev[v] = elements[v][i];
         }
 
-        tet4_laplacian_apply_fff(&fff[i * 6],
+        tet4_laplacian_apply_fff(fff,
                                  u[ev[0]],
                                  u[ev[1]],
                                  u[ev[2]],
@@ -276,12 +280,17 @@ int tet4_laplacian_apply_opt(const ptrdiff_t nelements,
 
 int tet4_laplacian_diag_opt(const ptrdiff_t nelements,
                             idx_t **const SFEM_RESTRICT elements,
-                            const jacobian_t *const SFEM_RESTRICT fff,
+                            const jacobian_t *const SFEM_RESTRICT fff_all,
                             real_t *const SFEM_RESTRICT diag) {
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[4];
         accumulator_t element_vector[4];
+
+        scalar_t fff[6];
+        for(int k = 0; k < 6; k++) {
+            fff[k] = fff_all[i * 6 + k];
+        }
 
         // Element indices
 #pragma unroll(4)
@@ -289,7 +298,7 @@ int tet4_laplacian_diag_opt(const ptrdiff_t nelements,
             ev[v] = elements[v][i];
         }
 
-        tet4_laplacian_diag_fff(&fff[i * 6],
+        tet4_laplacian_diag_fff(fff,
                                 &element_vector[0],
                                 &element_vector[1],
                                 &element_vector[2],
