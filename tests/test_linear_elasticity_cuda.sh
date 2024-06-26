@@ -27,9 +27,9 @@ export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 
 # rm -rf mesh
-# create_cylinder.sh 3
+# create_cylinder.sh 2
 
-# create_cylinder_p2.sh 2
+# create_cylinder_p2.sh 3
 # export SFEM_USE_MACRO=1
 
 sleft=mesh/sidesets_aos/sinlet.raw
