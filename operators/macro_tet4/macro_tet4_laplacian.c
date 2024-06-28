@@ -220,43 +220,43 @@ static SFEM_INLINE void element_assemble_matrix(const idx_t *const SFEM_RESTRICT
         tet4_sub_fff_0(fff, sub_fff);
         tet4_laplacian_hessian_fff(sub_fff, element_matrix);
 
-        // [0, 4, 6, 7],
+        // [0, 4, 6, 7]
         tet4_gather_idx(ev10, 0, 4, 6, 7, ev);
         tet4_local_to_global(ev, element_matrix, rowptr, colidx, values);
 
-        // [4, 1, 5, 8],
+        // [4, 1, 5, 8]
         tet4_gather_idx(ev10, 4, 1, 5, 8, ev);
         tet4_local_to_global(ev, element_matrix, rowptr, colidx, values);
 
-        // [6, 5, 2, 9],
+        // [6, 5, 2, 9]
         tet4_gather_idx(ev10, 6, 5, 2, 9, ev);
         tet4_local_to_global(ev, element_matrix, rowptr, colidx, values);
 
-        // [7, 8, 9, 3],
+        // [7, 8, 9, 3]
         tet4_gather_idx(ev10, 7, 8, 9, 3, ev);
         tet4_local_to_global(ev, element_matrix, rowptr, colidx, values);
     }
 
     {  // Octahedron tets
-        // [4, 5, 6, 8],
+        // [4, 5, 6, 8]
         tet4_sub_fff_4(fff, sub_fff);
         tet4_laplacian_hessian_fff(sub_fff, element_matrix);
         tet4_gather_idx(ev10, 4, 5, 6, 8, ev);
         tet4_local_to_global(ev, element_matrix, rowptr, colidx, values);
 
-        // [7, 4, 6, 8],
+        // [7, 4, 6, 8]
         tet4_sub_fff_5(fff, sub_fff);
         tet4_laplacian_hessian_fff(sub_fff, element_matrix);
         tet4_gather_idx(ev10, 7, 4, 6, 8, ev);
         tet4_local_to_global(ev, element_matrix, rowptr, colidx, values);
 
-        // [6, 5, 9, 8],
+        // [6, 5, 9, 8]
         tet4_sub_fff_6(fff, sub_fff);
         tet4_laplacian_hessian_fff(sub_fff, element_matrix);
         tet4_gather_idx(ev10, 6, 5, 9, 8, ev);
         tet4_local_to_global(ev, element_matrix, rowptr, colidx, values);
 
-        // [7, 6, 9, 8]]
+        // [7, 6, 9, 8]
         tet4_sub_fff_7(fff, sub_fff);
         tet4_laplacian_hessian_fff(sub_fff, element_matrix);
         tet4_gather_idx(ev10, 7, 6, 9, 8, ev);

@@ -439,3 +439,117 @@ int macro_tet4_linear_elasticity_diag_opt(const ptrdiff_t nelements,
 
     return 0;
 }
+
+static SFEM_INLINE void macro_tet4_local_hessian(const idx_t *const SFEM_RESTRICT ev10,
+                                                 const scalar_t *const SFEM_RESTRICT
+                                                         jacobian_adjugate,
+                                                 const scalar_t jacobian_determinant,
+                                                 const scalar_t mu,
+                                                 const scalar_t lambda,
+                                                 const count_t *const SFEM_RESTRICT rowptr,
+                                                 const idx_t *const SFEM_RESTRICT colidx,
+                                                 real_t *const SFEM_RESTRICT values) {
+    scalar_t sub_adjugate[9];
+    idx_t ev[4];
+    accumulator_t element_matrix[(4 * 3) * (4 * 3)];
+
+    {  // Corner tests
+        tet4_sub_adj_0(jacobian_adjugate, sub_adjugate);
+
+        // Assemble once and reuse for all corners
+        tet4_linear_elasticity_hessian_adj(mu, lambda, sub_adjugate, jacobian_determinant, element_matrix);
+
+        // [0, 4, 6, 7]
+        tet4_gather_idx(ev10, 0, 4, 6, 7, ev);
+        tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
+        
+        // [4, 1, 5, 8] 
+        tet4_gather_idx(ev10, 4, 1, 5, 8, ev);
+        tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
+        
+        // [6, 5, 2, 9]
+        tet4_gather_idx(ev10, 6, 5, 2, 9, ev);
+        tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
+
+        // [7, 8, 9, 3]
+        tet4_gather_idx(ev10, 7, 8, 9, 3, ev);
+        tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
+    }
+
+    {  // Octahedron tets
+        // [4, 5, 6, 8]
+        tet4_sub_adj_4(jacobian_adjugate, sub_adjugate);
+        tet4_linear_elasticity_hessian_adj(mu, lambda, sub_adjugate, jacobian_determinant, element_matrix);
+        tet4_gather_idx(ev10, 4, 5, 6, 8, ev);
+        tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
+                
+        // [7, 4, 6, 8]
+        tet4_sub_adj_5(jacobian_adjugate, sub_adjugate);
+        tet4_linear_elasticity_hessian_adj(mu, lambda, sub_adjugate, jacobian_determinant, element_matrix);
+        tet4_gather_idx(ev10, 7, 4, 6, 8, ev);
+        tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
+            
+        // [6, 5, 9, 8]
+        tet4_sub_adj_6(jacobian_adjugate, sub_adjugate);
+        tet4_linear_elasticity_hessian_adj(mu, lambda, sub_adjugate, jacobian_determinant, element_matrix);
+        tet4_gather_idx(ev10, 6, 5, 9, 8, ev);
+        tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
+
+        // [7, 6, 9, 8]
+        tet4_sub_adj_7(jacobian_adjugate, sub_adjugate);
+        tet4_linear_elasticity_hessian_adj(mu, lambda, sub_adjugate, jacobian_determinant, element_matrix);
+        tet4_gather_idx(ev10, 7, 6, 9, 8, ev);
+        tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
+    
+    }
+}
+
+int macro_tet4_linear_elasticity_hessian(const ptrdiff_t nelements,
+                                         const ptrdiff_t nnodes,
+                                         idx_t **const SFEM_RESTRICT elements,
+                                         geom_t **const SFEM_RESTRICT points,
+                                         const real_t mu,
+                                         const real_t lambda,
+                                         const count_t *const SFEM_RESTRICT rowptr,
+                                         const idx_t *const SFEM_RESTRICT colidx,
+                                         real_t *const SFEM_RESTRICT values) {
+    SFEM_UNUSED(nnodes);
+
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[10];
+
+        for (int v = 0; v < 10; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant = 0;
+        tet4_adjugate_and_det_s(x[ev[0]],
+                                x[ev[1]],
+                                x[ev[2]],
+                                x[ev[3]],
+                                // Y-coordinates
+                                y[ev[0]],
+                                y[ev[1]],
+                                y[ev[2]],
+                                y[ev[3]],
+                                // Z-coordinates
+                                z[ev[0]],
+                                z[ev[1]],
+                                z[ev[2]],
+                                z[ev[3]],
+                                // Output
+                                jacobian_adjugate,
+                                &jacobian_determinant);
+
+        macro_tet4_local_hessian(
+                ev, jacobian_adjugate, jacobian_determinant, mu, lambda, rowptr, colidx, values);
+    }
+
+    return 0;
+}

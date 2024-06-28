@@ -29,7 +29,7 @@ export OMP_PROC_BIND=true
 # rm -rf mesh
 # create_cylinder.sh 2
 
-# create_cylinder_p2.sh 2
+# create_cylinder_p2.sh 0
 # export SFEM_USE_MACRO=1
 
 sleft=mesh/sidesets_aos/sinlet.raw
@@ -80,7 +80,7 @@ then
 	echo "Skipp debugging"
 else
 	echo "SFEM_DEBUG=$SFEM_DEBUG"
-# 	MATRIXIO_DENSE_OUTPUT=1 print_crs ./rowptr.raw ./colidx.raw ./values.raw int int double
+	MATRIXIO_DENSE_OUTPUT=0 print_crs ./rowptr.raw ./colidx.raw ./values.raw int int double
 fi
 
 
