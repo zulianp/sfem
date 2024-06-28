@@ -391,12 +391,15 @@ int main(int argc, char *argv[]) {
     double tock = MPI_Wtime();
     if (!rank) {
         printf("----------------------------------------\n");
+        printf("%s (%s):\n", argv[0], type_to_string(fs->element_type()));
+        printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld #dofs %ld\n",
                (long)m->n_elements(),
                (long)m->n_nodes(),
                (long)fs->n_dofs());
-        printf("TTS:\t\t\t%g seconds (solve: %g)\n", tock - tick, solve_tock - solve_tick);
-        printf("residual: %g\n", rtr);
+        printf("TTS:\t\t%g [s] (solve: %g [s])\n", tock - tick, solve_tock - solve_tick);
+        printf("residual:\t%g\n", rtr);
+        printf("----------------------------------------\n");
     }
 
     return MPI_Finalize();

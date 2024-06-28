@@ -135,10 +135,10 @@ def sub_adj_generic(micro_ref, adj):
 		for d2 in range(0, dim):
 			Am[d2, d1] = micro_ref[d1+1][d2] - micro_ref[0][d2]
 	
-	# detAm = determinant(Am)
+	detAm = determinant(Am)
 	Aminv = inverse(Am)
 
-	return Aminv * adj
+	return Aminv * adj, detAm
 
 def subJ(micro_ref):
 	for d1 in range(0, dim):
@@ -203,12 +203,14 @@ class MacroSimplex:
 
 	def adjugate_level_n(self, n_levels):
 		levels = [[]] * n_levels
+		levels_det = [[]] * n_levels
 		x = self.points
 
 		for ss in sub_simplices:
 			refpattern = x[ss]
-			adj = sub_adjugate(refpattern)
+			adj, adj_det = sub_adjugate(refpattern)
 			levels[0].append(adj)
+			levels_det[0].append(adj_det)
 
 		for l in range(1, n_levels):
 			n_ffs = len(levels[l-1])
@@ -218,9 +220,10 @@ class MacroSimplex:
 				adj = levels[l-1][i]
 				for ss in sub_simplices:
 					refpattern = x[ss]
-					sub_adj = sub_adj_generic(refpattern, adj)
+					sub_adj, sub_det = sub_adj_generic(refpattern, adj)
 					levels[l].append(sub_adj)
-		return levels
+					levels_det[l].append(sub_det)
+		return levels, levels_det
 
 	def fff_level_n(self, n_levels):
 		levels = [[]] * n_levels
@@ -318,7 +321,7 @@ print("------------------------------------")
 print("ADJUGATE")
 print("------------------------------------")
 
-fffl = MacroSimplex().adjugate_level_n(nl)
+fffl, fffl_det = MacroSimplex().adjugate_level_n(nl)
 
 for l in range(0, nl):
 	num = 0
@@ -326,8 +329,12 @@ for l in range(0, nl):
 	# for i in unique:
 	for i in range(0, len(fffl[l])):
 		f = fffl[l][i]
+		f_det = fffl_det[l][i]
 		if nl > 1:
 			print(adjugate_code(f'{l}_{num}',f))
+			print(c_code(f_det));
+
 		else:
 			print(adjugate_code(f'{num}',f))
+			print(c_code(f_det));
 		num += 1

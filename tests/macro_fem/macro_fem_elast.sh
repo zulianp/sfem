@@ -53,7 +53,7 @@ mkdir -p linear_system linear_system_macro
 export SFEM_HANDLE_NEUMANN=0 
 export SFEM_HANDLE_DIRICHLET=0 	
 
-			   		   	 assemble3 $refined_mesh linear_system
+assemble3 $refined_mesh linear_system
 SFEM_USE_MACRO=1 $LAUNCH assemble3 $simulation_mesh linear_system_macro
 
 MATRIXIO_DENSE_OUTPUT=1 print_crs linear_system/rowptr.raw linear_system/colidx.raw linear_system/values.raw int int double
