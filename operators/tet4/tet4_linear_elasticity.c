@@ -260,14 +260,9 @@ int tet4_linear_elasticity_hessian(const ptrdiff_t nelements,
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
 
-    static const int block_size = 3;
-    static const int mat_block_size = block_size * block_size;
-
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[4];
-        idx_t ks[4];
-
         accumulator_t element_matrix[(4 * 3) * (4 * 3)];
 
 #pragma unroll(4)
@@ -275,7 +270,6 @@ int tet4_linear_elasticity_hessian(const ptrdiff_t nelements,
             ev[v] = elements[v][i];
         }
 
-#if 1 // Sperate computation of adjugate and actual element_matrix
         scalar_t jacobian_adjugate[9];
         scalar_t jacobian_determinant = 0;
         tet4_adjugate_and_det_s(x[ev[0]],
@@ -296,65 +290,12 @@ int tet4_linear_elasticity_hessian(const ptrdiff_t nelements,
                                 jacobian_adjugate,
                                 &jacobian_determinant);
 
-        tet4_linear_elasticity_hessian_adj // Fastest on M1
-                // tet4_linear_elasticity_hessian_adj_less_registers // Slightly slower on M1
+        tet4_linear_elasticity_hessian_adj  // Fastest on M1
+                                            // tet4_linear_elasticity_hessian_adj_less_registers //
+                                            // Slightly slower on M1
                 (mu, lambda, jacobian_adjugate, jacobian_determinant, element_matrix);
 
-#else // Code generated from points // Slowest on M1
-            tet4_linear_elasticity_hessian_points(
-                    // Model parameters
-                    mu,
-                    lambda,
-                    // X-coordinates
-                    x[ev[0]],
-                    x[ev[1]],
-                    x[ev[2]],
-                    x[ev[3]],
-                    // Y-coordinates
-                    y[ev[0]],
-                    y[ev[1]],
-                    y[ev[2]],
-                    y[ev[3]],
-                    // Z-coordinates
-                    z[ev[0]],
-                    z[ev[1]],
-                    z[ev[2]],
-                    z[ev[3]],
-                    // output matrix
-                    element_matrix);
-#endif 
-
-        for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            const idx_t dof_i = elements[edof_i][i];
-            const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
-
-            {
-                const idx_t *cols = &colidx[rowptr[dof_i]];
-                tet4_find_cols(ev, cols, lenrow, ks);
-            }
-
-            // Blocks for row
-            real_t *block_start = &values[rowptr[dof_i] * mat_block_size];
-
-            for (int edof_j = 0; edof_j < 4; ++edof_j) {
-                const idx_t offset_j = ks[edof_j] * block_size;
-
-                for (int bi = 0; bi < block_size; ++bi) {
-                    const int ii = bi * 4 + edof_i;
-
-                    // Jump rows (including the block-size for the columns)
-                    real_t *row = &block_start[bi * lenrow * block_size];
-
-                    for (int bj = 0; bj < block_size; ++bj) {
-                        const int jj = bj * 4 + edof_j;
-                        const real_t val = element_matrix[ii * 12 + jj];
-
-#pragma omp atomic update
-                        row[offset_j + bj] += val;
-                    }
-                }
-            }
-        }
+        tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
     }
 
     return 0;

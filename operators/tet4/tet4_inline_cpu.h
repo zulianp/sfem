@@ -11,7 +11,7 @@
 #endif
 
 #ifndef MIN
-#define MIN(a, b) ((a) < (b)? (a) : (b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
 static SFEM_INLINE int tet4_linear_search(const idx_t target,
@@ -65,7 +65,8 @@ static SFEM_INLINE void tet4_find_cols(const idx_t *const SFEM_RESTRICT targets,
 }
 
 static SFEM_INLINE void tet4_local_to_global(const idx_t *const SFEM_RESTRICT ev,
-                                             const accumulator_t *const SFEM_RESTRICT element_matrix,
+                                             const accumulator_t *const SFEM_RESTRICT
+                                                     element_matrix,
                                              const count_t *const SFEM_RESTRICT rowptr,
                                              const idx_t *const SFEM_RESTRICT colidx,
                                              real_t *const SFEM_RESTRICT values) {
@@ -89,19 +90,59 @@ static SFEM_INLINE void tet4_local_to_global(const idx_t *const SFEM_RESTRICT ev
     }
 }
 
+static SFEM_INLINE void tet4_local_to_global_vec3(const idx_t *const SFEM_RESTRICT ev,
+                                                  const accumulator_t *const SFEM_RESTRICT
+                                                          element_matrix,
+                                                  const count_t *const SFEM_RESTRICT rowptr,
+                                                  const idx_t *const SFEM_RESTRICT colidx,
+                                                  real_t *const SFEM_RESTRICT values) {
+    idx_t ks[4];
+    for (int edof_i = 0; edof_i < 4; ++edof_i) {
+        const idx_t dof_i = ev[edof_i];
+        const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
+
+        {
+            const idx_t *cols = &colidx[rowptr[dof_i]];
+            tet4_find_cols(ev, cols, lenrow, ks);
+        }
+
+        // Blocks for row
+        real_t *block_start = &values[rowptr[dof_i] * 9];
+
+        for (int edof_j = 0; edof_j < 4; ++edof_j) {
+            const idx_t offset_j = ks[edof_j] * 3;
+
+            for (int bi = 0; bi < 3; ++bi) {
+                const int ii = bi * 4 + edof_i;
+
+                // Jump rows (including the block-size for the columns)
+                real_t *row = &block_start[bi * lenrow * 3];
+
+                for (int bj = 0; bj < 3; ++bj) {
+                    const int jj = bj * 4 + edof_j;
+                    const real_t val = element_matrix[ii * 12 + jj];
+
+#pragma omp atomic update
+                    row[offset_j + bj] += val;
+                }
+            }
+        }
+    }
+}
+
 static SFEM_INLINE void tet4_fff_s(const scalar_t px0,
-                                 const scalar_t px1,
-                                 const scalar_t px2,
-                                 const scalar_t px3,
-                                 const scalar_t py0,
-                                 const scalar_t py1,
-                                 const scalar_t py2,
-                                 const scalar_t py3,
-                                 const scalar_t pz0,
-                                 const scalar_t pz1,
-                                 const scalar_t pz2,
-                                 const scalar_t pz3,
-                                 scalar_t *const fff) {
+                                   const scalar_t px1,
+                                   const scalar_t px2,
+                                   const scalar_t px3,
+                                   const scalar_t py0,
+                                   const scalar_t py1,
+                                   const scalar_t py2,
+                                   const scalar_t py3,
+                                   const scalar_t pz0,
+                                   const scalar_t pz1,
+                                   const scalar_t pz2,
+                                   const scalar_t pz3,
+                                   scalar_t *const fff) {
     const scalar_t x0 = -px0 + px1;
     const scalar_t x1 = -py0 + py2;
     const scalar_t x2 = -pz0 + pz3;
@@ -122,8 +163,8 @@ static SFEM_INLINE void tet4_fff_s(const scalar_t px0,
     const scalar_t x17 = x16 * x6 * x9;
     const scalar_t x18 = x1 * x16;
     const scalar_t x19 = x13 * x18;
-    const scalar_t x20 = -1.0 / 6.0 * x12 + (1.0 / 6.0) * x15 + (1.0 / 6.0) * x17 - 1.0 / 6.0 * x19 +
-                       (1.0 / 6.0) * x4 - 1.0 / 6.0 * x8;
+    const scalar_t x20 = -1.0 / 6.0 * x12 + (1.0 / 6.0) * x15 + (1.0 / 6.0) * x17 -
+                         1.0 / 6.0 * x19 + (1.0 / 6.0) * x4 - 1.0 / 6.0 * x8;
     const scalar_t x21 = x14 - x18;
     const scalar_t x22 = 1. / POW2(-x12 + x15 + x17 - x19 + x4 - x8);
     const scalar_t x23 = -x11 + x16 * x6;
@@ -257,20 +298,20 @@ static SFEM_INLINE void tet4_adjugate_and_det(const geom_t px0,
 }
 
 static SFEM_INLINE void tet4_adjugate_and_det_s(const scalar_t px0,
-                                              const scalar_t px1,
-                                              const scalar_t px2,
-                                              const scalar_t px3,
-                                              const scalar_t py0,
-                                              const scalar_t py1,
-                                              const scalar_t py2,
-                                              const scalar_t py3,
-                                              const scalar_t pz0,
-                                              const scalar_t pz1,
-                                              const scalar_t pz2,
-                                              const scalar_t pz3,
-                                              scalar_t *const SFEM_RESTRICT adjugate,
-                                              scalar_t *const SFEM_RESTRICT
-                                                      jacobian_determinant) {
+                                                const scalar_t px1,
+                                                const scalar_t px2,
+                                                const scalar_t px3,
+                                                const scalar_t py0,
+                                                const scalar_t py1,
+                                                const scalar_t py2,
+                                                const scalar_t py3,
+                                                const scalar_t pz0,
+                                                const scalar_t pz1,
+                                                const scalar_t pz2,
+                                                const scalar_t pz3,
+                                                scalar_t *const SFEM_RESTRICT adjugate,
+                                                scalar_t *const SFEM_RESTRICT
+                                                        jacobian_determinant) {
     // Compute jacobian in high precision
     scalar_t jacobian[9];
     jacobian[0] = -px0 + px1;

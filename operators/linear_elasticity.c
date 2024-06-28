@@ -162,6 +162,10 @@ int linear_elasticity_assemble_hessian_aos(const enum ElemType element_type,
             return tet10_linear_elasticity_hessian(
                     nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
         }
+        case MACRO_TET4: {
+            return macro_tet4_linear_elasticity_hessian(
+                    nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
+        }
         default: {
             fprintf(stderr,
                     "linear_elasticity_assemble_hessian_aos not implemented for type %s\n",
