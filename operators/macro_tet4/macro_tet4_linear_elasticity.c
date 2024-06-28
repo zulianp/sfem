@@ -62,6 +62,9 @@ static SFEM_INLINE void macro_tet4_local_apply_adj(const scalar_t *const SFEM_RE
     accumulator_t sub_outy[4];
     accumulator_t sub_outz[4];
 
+
+    scalar_t sub_determinant = jacobian_determinant*8.0;
+
     {  // Corner tests
         tet4_sub_adj_0(jacobian_adjugate, sub_adjugate);
 
@@ -71,7 +74,7 @@ static SFEM_INLINE void macro_tet4_local_apply_adj(const scalar_t *const SFEM_RE
             subtet_gather(i, uz, sub_uz);
 
             tet4_linear_elasticity_apply_adj(sub_adjugate,
-                                             jacobian_determinant,
+                                             sub_determinant,
                                              mu,
                                              lambda,
                                              sub_ux,
@@ -98,7 +101,7 @@ static SFEM_INLINE void macro_tet4_local_apply_adj(const scalar_t *const SFEM_RE
             subtet_gather(4 + i, uz, sub_uz);
 
             tet4_linear_elasticity_apply_adj(sub_adjugate,
-                                             jacobian_determinant,
+                                             sub_determinant,
                                              mu,
                                              lambda,
                                              sub_ux,
@@ -288,12 +291,14 @@ static SFEM_INLINE void macro_tet4_local_diag_adj(const scalar_t *const SFEM_RES
     accumulator_t sub_outy[4];
     accumulator_t sub_outz[4];
 
+    scalar_t sub_determinant = jacobian_determinant * 8;
+
     {  // Corner tests
         tet4_sub_adj_0(jacobian_adjugate, sub_adjugate);
 
         for (int i = 0; i < 4; i++) {
             tet4_linear_elasticity_diag_adj(
-                    mu, lambda, sub_adjugate, jacobian_determinant, sub_outx, sub_outy, sub_outz);
+                    mu, lambda, sub_adjugate, sub_determinant, sub_outx, sub_outy, sub_outz);
 
             subtet_scatter_add(i, sub_outx, outx);
             subtet_scatter_add(i, sub_outy, outy);
@@ -308,7 +313,7 @@ static SFEM_INLINE void macro_tet4_local_diag_adj(const scalar_t *const SFEM_RES
             (*sub_adj_fun)(jacobian_adjugate, sub_adjugate);
 
             tet4_linear_elasticity_diag_adj(
-                    mu, lambda, sub_adjugate, jacobian_determinant, sub_outx, sub_outy, sub_outz);
+                    mu, lambda, sub_adjugate, sub_determinant, sub_outx, sub_outy, sub_outz);
 
             subtet_scatter_add(4 + i, sub_outx, outx);
             subtet_scatter_add(4 + i, sub_outy, outy);
@@ -453,11 +458,13 @@ static SFEM_INLINE void macro_tet4_local_hessian(const idx_t *const SFEM_RESTRIC
     idx_t ev[4];
     accumulator_t element_matrix[(4 * 3) * (4 * 3)];
 
+    scalar_t sub_determinant = jacobian_determinant*8.0 ;
+
     {  // Corner tests
         tet4_sub_adj_0(jacobian_adjugate, sub_adjugate);
 
         // Assemble once and reuse for all corners
-        tet4_linear_elasticity_hessian_adj(mu, lambda, sub_adjugate, jacobian_determinant, element_matrix);
+        tet4_linear_elasticity_hessian_adj(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
 
         // [0, 4, 6, 7]
         tet4_gather_idx(ev10, 0, 4, 6, 7, ev);
@@ -479,25 +486,25 @@ static SFEM_INLINE void macro_tet4_local_hessian(const idx_t *const SFEM_RESTRIC
     {  // Octahedron tets
         // [4, 5, 6, 8]
         tet4_sub_adj_4(jacobian_adjugate, sub_adjugate);
-        tet4_linear_elasticity_hessian_adj(mu, lambda, sub_adjugate, jacobian_determinant, element_matrix);
+        tet4_linear_elasticity_hessian_adj(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
         tet4_gather_idx(ev10, 4, 5, 6, 8, ev);
         tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
                 
         // [7, 4, 6, 8]
         tet4_sub_adj_5(jacobian_adjugate, sub_adjugate);
-        tet4_linear_elasticity_hessian_adj(mu, lambda, sub_adjugate, jacobian_determinant, element_matrix);
+        tet4_linear_elasticity_hessian_adj(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
         tet4_gather_idx(ev10, 7, 4, 6, 8, ev);
         tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
             
         // [6, 5, 9, 8]
         tet4_sub_adj_6(jacobian_adjugate, sub_adjugate);
-        tet4_linear_elasticity_hessian_adj(mu, lambda, sub_adjugate, jacobian_determinant, element_matrix);
+        tet4_linear_elasticity_hessian_adj(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
         tet4_gather_idx(ev10, 6, 5, 9, 8, ev);
         tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
 
         // [7, 6, 9, 8]
         tet4_sub_adj_7(jacobian_adjugate, sub_adjugate);
-        tet4_linear_elasticity_hessian_adj(mu, lambda, sub_adjugate, jacobian_determinant, element_matrix);
+        tet4_linear_elasticity_hessian_adj(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
         tet4_gather_idx(ev10, 7, 6, 9, 8, ev);
         tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
     

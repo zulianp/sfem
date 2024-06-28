@@ -29,7 +29,7 @@ export OMP_PROC_BIND=true
 # rm -rf mesh
 # create_cylinder.sh 2
 
-# create_cylinder_p2.sh 0
+# create_cylinder_p2.sh 2
 # export SFEM_USE_MACRO=1
 
 sleft=mesh/sidesets_aos/sinlet.raw
@@ -75,13 +75,13 @@ else
 	raw_to_db.py mesh output/x.vtk -p "output/x.raw,output/c*.raw,output/residual*.raw"
 fi
 
-if [[ -z "$SFEM_DEBUG" ]]
-then
-	echo "Skipp debugging"
-else
-	echo "SFEM_DEBUG=$SFEM_DEBUG"
-	MATRIXIO_DENSE_OUTPUT=0 print_crs ./rowptr.raw ./colidx.raw ./values.raw int int double
-fi
+# if [[ -z "$SFEM_DEBUG" ]]
+# then
+# 	echo "Skipp debugging"
+# else
+# 	# echo "SFEM_DEBUG=$SFEM_DEBUG"
+# 	# MATRIXIO_DENSE_OUTPUT=0 print_crs ./rowptr.raw ./colidx.raw ./values.raw int int double
+# fi
 
 
 cd $HERE
