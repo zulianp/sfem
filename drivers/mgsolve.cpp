@@ -110,6 +110,7 @@ int main(int argc, char *argv[]) {
     int SFEM_DEBUG = 0;
     int SFEM_MG = 0;
     int SFEM_MAX_IT = 4000;
+    int SFEM_SMOOTHER_SWEEPS = 3;
     float SFEM_CHEB_EIG_MAX_SCALE = 1.02;
     float SFEM_TOL = 1e-9;
 
@@ -122,6 +123,8 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_MG, atoi);
     SFEM_READ_ENV(SFEM_CHEB_EIG_MAX_SCALE, atof);
     SFEM_READ_ENV(SFEM_MAX_IT, atoi);
+    SFEM_READ_ENV(SFEM_SMOOTHER_SWEEPS, atoi);
+
 
     printf("SFEM_MATRIX_FREE: %d\n"
            "SFEM_OPERATOR: %s\n"
@@ -131,7 +134,8 @@ int main(int argc, char *argv[]) {
            "SFEM_DEBUG: %d\n"
            "SFEM_MG: %d\n"
            "SFEM_CHEB_EIG_MAX_SCALE: %f\n"
-           "SFEM_TOL: %f\n",
+           "SFEM_TOL: %f\n"
+           "SFEM_SMOOTHER_SWEEPS: %d\n",
            SFEM_MATRIX_FREE,
            SFEM_OPERATOR,
            SFEM_BLOCK_SIZE,
@@ -140,7 +144,8 @@ int main(int argc, char *argv[]) {
            SFEM_DEBUG,
            SFEM_MG,
            SFEM_CHEB_EIG_MAX_SCALE,
-           SFEM_TOL);
+           SFEM_TOL,
+           SFEM_SMOOTHER_SWEEPS);
 
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
     auto conds = sfem::DirichletConditions::create_from_env(fs);
@@ -178,7 +183,7 @@ int main(int argc, char *argv[]) {
             cheb->init(r->data());
 
             cheb->scale_eig_max = SFEM_CHEB_EIG_MAX_SCALE;
-            cheb->set_max_it(3);
+            cheb->set_max_it(SFEM_SMOOTHER_SWEEPS);
             cheb->set_initial_guess_zero(false);
             smoother = cheb;
         } else if (SFEM_USE_PRECONDITIONER) {
@@ -199,13 +204,13 @@ int main(int argc, char *argv[]) {
             cheb->init(r->data());
 
             cheb->scale_eig_max = SFEM_CHEB_EIG_MAX_SCALE;
-            cheb->set_max_it(3);
+            cheb->set_max_it(SFEM_SMOOTHER_SWEEPS);
             cheb->set_initial_guess_zero(false);
             smoother = cheb;
         } else {
             if ((!SFEM_USE_PRECONDITIONER || SFEM_MG) && fs->block_size() == 1) {
                 auto gs = sfem::h_gauss_seidel(crs, diag->data());
-                gs->set_max_it(5);
+                gs->set_max_it(SFEM_SMOOTHER_SWEEPS);
                 // gs->verbose = true;
                 smoother = gs;
             }
