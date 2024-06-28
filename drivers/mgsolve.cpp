@@ -250,15 +250,15 @@ int main(int argc, char *argv[]) {
         auto f_coarse = f->derefine(fs_coarse, true);
 
         std::shared_ptr<sfem::Operator<real_t>> linear_op_coarse;
-        if (SFEM_MATRIX_FREE) {
-            linear_op_coarse = sfem::make_op<real_t>(fs_coarse->n_dofs(),
-                                                     fs_coarse->n_dofs(),
-                                                     [=](const real_t *const x, real_t *const y) {
-                                                         f_coarse->apply(nullptr, x, y);
-                                                     });
-        } else {
+        // if (SFEM_MATRIX_FREE) {
+        //     linear_op_coarse = sfem::make_op<real_t>(fs_coarse->n_dofs(),
+        //                                              fs_coarse->n_dofs(),
+        //                                              [=](const real_t *const x, real_t *const y) {
+        //                                                  f_coarse->apply(nullptr, x, y);
+        //                                              });
+        // } else {
             linear_op_coarse = crs_hessian(*f_coarse);
-        }
+        // }
 
         auto c_coarse = sfem::h_buffer<real_t>(fs_coarse->n_dofs());
         auto r_coarse = sfem::h_buffer<real_t>(fs_coarse->n_dofs());
