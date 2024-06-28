@@ -111,6 +111,7 @@ int main(int argc, char *argv[]) {
     int SFEM_MG = 0;
     int SFEM_MAX_IT = 4000;
     float SFEM_CHEB_EIG_MAX_SCALE = 1.02;
+    float SFEM_TOL = 1e-9;
 
     SFEM_READ_ENV(SFEM_MATRIX_FREE, atoi);
     SFEM_READ_ENV(SFEM_OPERATOR, );
@@ -129,7 +130,8 @@ int main(int argc, char *argv[]) {
            "SFEM_USE_CHEB: %d\n"
            "SFEM_DEBUG: %d\n"
            "SFEM_MG: %d\n"
-           "SFEM_CHEB_EIG_MAX_SCALE: %f\n",
+           "SFEM_CHEB_EIG_MAX_SCALE: %f\n"
+           "SFEM_TOL: %f\n",
            SFEM_MATRIX_FREE,
            SFEM_OPERATOR,
            SFEM_BLOCK_SIZE,
@@ -137,7 +139,8 @@ int main(int argc, char *argv[]) {
            SFEM_USE_CHEB,
            SFEM_DEBUG,
            SFEM_MG,
-           SFEM_CHEB_EIG_MAX_SCALE);
+           SFEM_CHEB_EIG_MAX_SCALE,
+           SFEM_TOL);
 
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
     auto conds = sfem::DirichletConditions::create_from_env(fs);
@@ -151,8 +154,6 @@ int main(int argc, char *argv[]) {
     op->initialize();
     f->add_constraint(conds);
     f->add_operator(op);
-
-    real_t tol = 1e-12;
 
     double solve_tick = MPI_Wtime();
 
@@ -178,6 +179,7 @@ int main(int argc, char *argv[]) {
 
             cheb->scale_eig_max = SFEM_CHEB_EIG_MAX_SCALE;
             cheb->set_max_it(3);
+            cheb->set_initial_guess_zero(false);
             smoother = cheb;
         } else if (SFEM_USE_PRECONDITIONER) {
             f->hessian_diag(nullptr, diag->data());
@@ -186,6 +188,7 @@ int main(int argc, char *argv[]) {
     } else {
         auto crs = crs_hessian(*f);
         linear_op = crs;
+        f->hessian_diag(nullptr, diag->data());
 
         if (SFEM_USE_CHEB) {
             auto cheb = sfem::h_cheb3<real_t>(linear_op);
@@ -197,48 +200,41 @@ int main(int argc, char *argv[]) {
 
             cheb->scale_eig_max = SFEM_CHEB_EIG_MAX_SCALE;
             cheb->set_max_it(3);
+            cheb->set_initial_guess_zero(false);
             smoother = cheb;
         } else {
-            f->hessian_diag(nullptr, diag->data());
-            if ((!SFEM_USE_PRECONDITIONER || SFEM_MG) && fs->block_size() == 1){
+            if ((!SFEM_USE_PRECONDITIONER || SFEM_MG) && fs->block_size() == 1) {
                 auto gs = sfem::h_gauss_seidel(crs, diag->data());
                 gs->set_max_it(5);
                 // gs->verbose = true;
                 smoother = gs;
             }
+        }
 
-            if (SFEM_DEBUG) {
-                array_write(comm,
-                            "./rhs.raw",
-                            SFEM_MPI_REAL_T,
-                            rhs->data(),
-                            fs->n_dofs(),
-                            fs->n_dofs());
-                array_write(comm,
-                            "./diag.raw",
-                            SFEM_MPI_REAL_T,
-                            diag->data(),
-                            fs->n_dofs(),
-                            fs->n_dofs());
-                array_write(comm,
-                            "./rowptr.raw",
-                            SFEM_MPI_COUNT_T,
-                            crs->row_ptr->data(),
-                            fs->n_dofs() + 1,
-                            fs->n_dofs() + 1);
-                array_write(comm,
-                            "./colidx.raw",
-                            SFEM_MPI_IDX_T,
-                            crs->col_idx->data(),
-                            crs->row_ptr->data()[fs->n_dofs()],
-                            crs->row_ptr->data()[fs->n_dofs()]);
-                array_write(comm,
-                            "./values.raw",
-                            SFEM_MPI_REAL_T,
-                            crs->values->data(),
-                            crs->row_ptr->data()[fs->n_dofs()],
-                            crs->row_ptr->data()[fs->n_dofs()]);
-            }
+        
+        if (SFEM_DEBUG) {
+            array_write(
+                    comm, "./rhs.raw", SFEM_MPI_REAL_T, rhs->data(), fs->n_dofs(), fs->n_dofs());
+            array_write(
+                    comm, "./diag.raw", SFEM_MPI_REAL_T, diag->data(), fs->n_dofs(), fs->n_dofs());
+            array_write(comm,
+                        "./rowptr.raw",
+                        SFEM_MPI_COUNT_T,
+                        crs->row_ptr->data(),
+                        fs->n_dofs() + 1,
+                        fs->n_dofs() + 1);
+            array_write(comm,
+                        "./colidx.raw",
+                        SFEM_MPI_IDX_T,
+                        crs->col_idx->data(),
+                        crs->row_ptr->data()[fs->n_dofs()],
+                        crs->row_ptr->data()[fs->n_dofs()]);
+            array_write(comm,
+                        "./values.raw",
+                        SFEM_MPI_REAL_T,
+                        crs->values->data(),
+                        crs->row_ptr->data()[fs->n_dofs()],
+                        crs->row_ptr->data()[fs->n_dofs()]);
         }
     }
 
@@ -312,7 +308,7 @@ int main(int argc, char *argv[]) {
                 real_t rate = rtr_new / rtr;
                 rtr = rtr_new;
                 printf("MG: %d)\tresidual: %g,\trate: %g\n", k, rtr, rate);
-                if (rtr < tol || rate > 0.999) {
+                if (rtr < SFEM_TOL || rate > 0.999) {
                     break;
                 }
             }
@@ -355,7 +351,7 @@ int main(int argc, char *argv[]) {
             auto preconditioner = smoother;
             smoother->set_initial_guess_zero(true);
             solver->set_preconditioner_op(preconditioner);
-        } else if(SFEM_USE_PRECONDITIONER) {
+        } else if (SFEM_USE_PRECONDITIONER) {
             auto preconditioner = sfem::make_op<real_t>(
                     diag->size(), diag->size(), [=](const real_t *const x, real_t *const y) {
                         auto d = diag->data();
@@ -370,7 +366,7 @@ int main(int argc, char *argv[]) {
         }
 
         solver->verbose = true;
-        solver->tol = tol;
+        solver->tol = SFEM_TOL;
         solver->set_max_it(SFEM_MAX_IT);
 
 #endif
