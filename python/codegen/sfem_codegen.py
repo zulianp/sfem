@@ -9,10 +9,12 @@ from rich.syntax import Syntax
 console = rich.get_console()
 verbose_gen = False
 
-real_t = "real_t"
+real_t = "scalar_t"
 
 def c_log(expr):
     console.print(expr)
+
+
 
 
 # from sympy.matrices.dense import eye
@@ -196,6 +198,16 @@ def fun(x, y, z):
     return ref_fun(xref, yref, zref)
 
 qx, qy, qz, qw = sp.symbols('qx qy qz qw', real=True)
+
+def q_point(dims):
+    if dims == 1:
+        return sp.Matrix(1, 1, [qx])
+    elif dims == 2:
+        return sp.Matrix(2, 1, [qx, qy])
+    elif dims == 3:
+        return sp.Matrix(3, 1, [qx, qy, qz])
+    else:
+        assert False 
 
 # Element coordinates
 # x0, x1, x2, x3 = sp.symbols('x0 x1 x2 x3', real=True)

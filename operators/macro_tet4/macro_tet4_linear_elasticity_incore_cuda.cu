@@ -600,7 +600,7 @@ __global__ void macro_tet4_cuda_incore_linear_elasticity_apply_kernel(
 
         {
             // real_t use here instead of scalar_t to have division in full precision
-            const scalar_t jacobian_determinant = g_jacobian_determinant[e];
+            const scalar_t jacobian_determinant = g_jacobian_determinant[e] * 8;
 
             for (int v = 0; v < 10; v++) {
                 atomicAdd(&values[ev[v] * 3], outx[v] / jacobian_determinant);
@@ -653,7 +653,7 @@ __global__ void macro_tet4_cuda_incore_linear_elasticity_diag_kernel(
         //
         {
             // real_t use here instead of scalar_t to have division in full precision
-            const real_t jacobian_determinant = g_jacobian_determinant[e];
+            const real_t jacobian_determinant = g_jacobian_determinant[e] * 8;
 
             for (int v = 0; v < 10; v++) {
                 atomicAdd(&values[ev[v] * 3], element_vector[v] / jacobian_determinant);
