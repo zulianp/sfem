@@ -40,7 +40,7 @@ class HyperElasticity:
 		disp_grad_symb = matrix_coeff('disp_grad', dims, dims)
 		displacement   = coeffs('u', dims * fe.n_nodes())
 		increment 	   = coeffs('h', dims * fe.n_nodes())
-		value 	   = coeffs('v', dims * fe.n_nodes())
+		value 	       = coeffs('v', dims * fe.n_nodes())
 
 		ref_grad = fe.tgrad(q)
 		jac_inv = fe.symbol_jacobian_inverse_as_adjugate()
@@ -95,53 +95,56 @@ class HyperElasticity:
 		self.Psi = Psi
 		self.P = P
 		self.lin_stress = lin_stress
+		self.lin_stress_symb = matrix_coeff('lin_stress', dims, dims) 
 		self.loperand_symb = matrix_coeff('loperand', dims, dims)
 
 		self.disp_grad = disp_grad
 		self.inc_grad = inc_grad
 		self.vec_grad = vec_grad
+		self.ref_grad = ref_grad
 
 
 	def apply(self):
 		lin_stress = self.lin_stress
+		lin_stress_symb = self.lin_stress_symb
 		trial_grad = self.trial_grad
 		test_grad  = self.test_grad
 		inc_grad_symb = self.inc_grad_symb 
 		jac_inv = self.jac_inv
 		dV = self.dV
 		dims = self.fe.spatial_dim()
+		ref_grad = self.ref_grad
 
-		loperand = lin_stress.T * (jac_inv.T * dV)
+		loperand = lin_stress_symb.T * (jac_inv.T * dV)
 
 		expr = loperand.copy()
 		for d1 in range(0, dims):
 			for d2 in range(0, dims):
 				expr[d1, d2] = subsmat(expr[d1, d2], trial_grad, inc_grad_symb)
 
-
-		# Hij = simplify(inner(loperand, trial_grad))
-		# expr = subsmat(Hij, test_grad, inc_grad_symb)
-		# c_code(assign_matrix('loperand', expr))
-
-		# c_code(assign_matrix('lin_stress', lin_stress))
-
-
 		lform = []
-		for d1 in range(0, dims):
-			val = 0
-			for d2 in range(0, dims):
-				val += self.loperand_symb[d1, d2] * test_grad[0, d2]
 
-			lform.append(ast.AddAugmentedAssignment(sp.symbols(f'lform[{d1}]'), val))
+		if True:
+			for d1 in range(0, dims):
+				val = 0
+				for d2 in range(0, dims):
+					val += self.loperand_symb[d1, d2] * test_grad[0, d2]
+				lform.append(ast.AddAugmentedAssignment(sp.symbols(f'lform[{d1}]'), val))
+		else:
+			for i in range(0, dims * self.fe.n_nodes()):
+				lform.append(
+					ast.AddAugmentedAssignment(sp.symbols(f'lform[{i}]'), inner(self.loperand_symb, ref_grad[i]))
+				)
+
 
 		buffers = []
-		# buffers.extend(assign_matrix('F', self.disp_grad_symb + sp.eye(dims, dims)))
 		buffers.extend(assign_matrix('vec_grad', self.vec_grad))
 		ret = {
-			'buffers': buffers,
-			'F' : assign_matrix('F', self.disp_grad_symb + sp.eye(dims, dims)),
-			 'loperand' : assign_matrix('loperand', expr),
-			'lform'   : lform
+			'Gradient'	: buffers,
+			'F' 		: assign_matrix('F', self.disp_grad_symb + sp.eye(dims, dims)),
+			'lin_stress': assign_matrix('lin_stress', lin_stress),
+			'loperand' 	: assign_matrix('loperand', expr),
+			'lform'     : lform
 		}
 
 		return ret
@@ -186,6 +189,7 @@ def main():
 	start = perf_counter()
 
 	fe = Tet10()
+	# fe = Tet4()
 	model = NeoHookeanOgden(fe.spatial_dim())
 	op = HyperElasticity(fe, model)
 
