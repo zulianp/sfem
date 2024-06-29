@@ -6,7 +6,7 @@ from fe import FE
 import sympy as sp
 from sfem_codegen import *
 
-dim = 3
+dim = 2
 
 if dim == 2:
 	sub_simplices = np.array([
@@ -29,6 +29,8 @@ if dim == 2:
 		c[0], c[1],
 		c[1], c[2]
 	])
+
+	ref_volume = sp.Rational(1, 2)
 
 else:
 	sub_simplices = [
@@ -58,6 +60,8 @@ else:
 		c[1], c[3], c[4],
 		c[2], c[4], c[5]
 	])
+
+	ref_volume = sp.Rational(1, 6)
 
 adjugate = strided_matrix_coeff("adjugate", dim, dim, "stride")
 
@@ -252,40 +256,62 @@ class MacroSimplex:
 		import meshio
 		points = np.array(self.points, dtype=np.float32)
 		cells = []
-		cells.append(("tetra", np.array(sub_simplices, np.int32)))
-		mesh = meshio.Mesh(points, cells)
-		mesh.write('macro_simplex.vtk')
 
+		if dim == 3:
+			cells.append(("tetra", np.array(sub_simplices, np.int32)))
+			mesh = meshio.Mesh(points, cells)
+			mesh.write('macro_simplex.vtk')
+	
 		x = self.points[:, 0].flatten()
 		y = self.points[:, 1].flatten()
-		z = self.points[:, 2].flatten()
 
-		J = sp.Matrix(dim, dim, [
-			x[1] - x[0], x[2] - x[0], x[3] - x[0],
-			y[1] - y[0], y[2] - y[0], y[3] - y[0],
-			z[1] - z[0], z[2] - z[0], z[3] - z[0]])
+		if dim == 3:
+			z = self.points[:, 2].flatten()
+			J = sp.Matrix(dim, dim, [
+				x[1] - x[0], x[2] - x[0], x[3] - x[0],
+				y[1] - y[0], y[2] - y[0], y[3] - y[0],
+				z[1] - z[0], z[2] - z[0], z[3] - z[0]])
+		elif dim == 2:
+			J = sp.Matrix(dim, dim, [
+				x[1] - x[0], x[2] - x[0],
+				y[1] - y[0], y[2] - y[0]
+				])
+		else:
+			assert False
+		
+
 
 		dJ = determinant(J)
 		Jinv = inverse(J)
 
-		FFF = (Jinv * Jinv.T) * dJ/6
+		FFF = (Jinv * Jinv.T) * dJ*ref_volume
 
 		for i in range(0, len(sub_simplices)):
 			ss = sub_simplices[i]
 			
 			xi = x[ss]
 			yi = y[ss]
-			zi = z[ss]
 
-			Ji = sp.Matrix(dim, dim, [
-				xi[1] - xi[0], xi[2] - xi[0], xi[3] - xi[0],
-				yi[1] - yi[0], yi[2] - yi[0], yi[3] - yi[0],
-				zi[1] - zi[0], zi[2] - zi[0], zi[3] - zi[0]])
+			if dim == 3:
+				zi = z[ss]
+
+				Ji = sp.Matrix(dim, dim, [
+					xi[1] - xi[0], xi[2] - xi[0], xi[3] - xi[0],
+					yi[1] - yi[0], yi[2] - yi[0], yi[3] - yi[0],
+					zi[1] - zi[0], zi[2] - zi[0], zi[3] - zi[0]])
+			
+			elif dim == 2:
+				Ji = sp.Matrix(dim, dim, [
+					xi[1] - xi[0], xi[2] - xi[0],
+					yi[1] - yi[0], yi[2] - yi[0]
+					])
+			else:
+				assert False
 
 			dJi = determinant(Ji)
 			Jiinv = inverse(Ji)
 
-			FFFi = (Jiinv * Jiinv.T) * dJi/6
+			FFFi = (Jiinv * Jiinv.T) * dJi * ref_volume
 			FFFj = self.levels[0][i]
 
 			for i in range(0, dim):
