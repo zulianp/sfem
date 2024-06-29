@@ -32,90 +32,91 @@ class GPULinearElasticityOp:
 		self.init_opt(fe, q)
 		# self.init_basic(fe, q)
 
-	def init_basic(self, fe, q):
-		fe.use_adjugate = True
-		dims = fe.manifold_dim()
-		q = sp.Matrix(dims, 1, q)
-		shape_grad = fe.physical_tgrad(q)
-		shape_grad_ref = fe.tgrad(q)
-		# jac_inv = fe.symbol_jacobian_inverse()
-		jac_inv = fe.symbol_jacobian_inverse_as_adjugate()
+	# def init_basic(self, fe, q):
+	# 	fe.use_adjugate = True
+	# 	dims = fe.manifold_dim()
+	# 	q = sp.Matrix(dims, 1, q)
+	# 	shape_grad = fe.physical_tgrad(q)
+	# 	shape_grad_ref = fe.tgrad(q)
+	# 	# jac_inv = fe.symbol_jacobian_inverse()
+	# 	jac_inv = fe.symbol_jacobian_inverse_as_adjugate()
 
-		if self.SoA_IO:
-			disp = coeffs_SoA('u', dims, fe.n_nodes())
-		else:
-			disp = coeffs('u', dims * fe.n_nodes())
+	# 	if self.SoA_IO:
+	# 		disp = coeffs_SoA('u', dims, fe.n_nodes())
+	# 	else:
+	# 		disp = coeffs('u', dims * fe.n_nodes())
 		
-		self.jac = fe.jacobian(q)
-		rows = fe.n_nodes() * dims
-		cols = rows
+	# 	self.jac = fe.jacobian(q)
+	# 	rows = fe.n_nodes() * dims
+	# 	cols = rows
 
-		###################################################################
-		# Material law
-		###################################################################
-		c_log("Material law")
+	# 	###################################################################
+	# 	# Material law
+	# 	###################################################################
+	# 	c_log("Material law")
 
-		self.disp_grad_name = 'disp_grad'
+	# 	self.disp_grad_name = 'disp_grad'
 
-		mu, lmbda = sp.symbols('mu lambda', real=True)
-		disp_grad = sp.Matrix(dims, dims, coeffs(self.disp_grad_name, dims * dims))
+	# 	mu, lmbda = sp.symbols('mu lambda', real=True)
+	# 	disp_grad = sp.Matrix(dims, dims, coeffs(self.disp_grad_name, dims * dims))
 
-		self.eval_disp_grad  = sp.zeros(dims, dims)
-		for i in range(0, dims * fe.n_nodes()):
-			self.eval_disp_grad += disp[i] * shape_grad_ref[i]
-		self.eval_disp_grad = self.eval_disp_grad * jac_inv
+	# 	self.eval_disp_grad  = sp.zeros(dims, dims)
+	# 	for i in range(0, dims * fe.n_nodes()):
+	# 		self.eval_disp_grad += disp[i] * shape_grad_ref[i]
+	# 	self.eval_disp_grad = self.eval_disp_grad * jac_inv
 
-		# strain energy function
-		epsu = (disp_grad + disp_grad.T) / 2
-		e = mu * inner(epsu, epsu) + (lmbda/2) * (tr(epsu) * tr(epsu))
+	# 	# strain energy function
+	# 	epsu = (disp_grad + disp_grad.T) / 2
+	# 	e = mu * inner(epsu, epsu) + (lmbda/2) * (tr(epsu) * tr(epsu))
 
-		dV = (fe.reference_measure() * fe.quadrature_weight()) * fe.symbol_jacobian_determinant() 
+	# 	dV = (fe.reference_measure() * fe.quadrature_weight()) * fe.symbol_jacobian_determinant() 
 
-		# Objective
-		self.eval_value = e * dV
-		self.eval_value = simplify(self.eval_value)
+	# 	# Objective
+	# 	self.eval_value = e * dV
+	# 	self.eval_value = simplify(self.eval_value)
 
-		# Gradient
-		P = sp.Matrix(dims, dims, [0]*(dims*dims))
-		for d1 in range(0, dims):
-			for d2 in range(0, dims):
-				P[d1, d2] = sp.diff(e, disp_grad[d1, d2])
+	# 	# Gradient
+	# 	P = sp.Matrix(dims, dims, [0]*(dims*dims))
+	# 	for d1 in range(0, dims):
+	# 		for d2 in range(0, dims):
+	# 			P[d1, d2] = sp.diff(e, disp_grad[d1, d2])
 		
-		self.eval_grad = sp.zeros(rows, 1)
+	# 	self.eval_grad = sp.zeros(rows, 1)
 
-		# Reference measure scaled here for reducing register usage
-		self.P = P 
-		P_sym = matrix_coeff('P', dims, dims)
+	# 	# Reference measure scaled here for reducing register usage
+	# 	self.P = P 
+	# 	P_sym = matrix_coeff('P', dims, dims)
 		
-		for i in range(0, rows):
-			self.eval_grad[i] = inner(P, shape_grad[i]) * dV
+	# 	for i in range(0, rows):
+	# 		self.eval_grad[i] = inner(P, shape_grad[i]) * dV
 		
-		self.eval_hessian =  sp.zeros(rows, cols)
+	# 	self.eval_hessian =  sp.zeros(rows, cols)
 
-		for j in range(0, rows):
-			# Construct gradient for row j
-			dde = sp.zeros(dims, dims)
-			for d1 in range(0, dims):
-				for d2 in range(0, dims):
-					dde[d1, d2] = simplify(sp.diff(self.eval_grad[j], disp_grad[d1, d2]))
+	# 	for j in range(0, rows):
+	# 		# Construct gradient for row j
+	# 		dde = sp.zeros(dims, dims)
+	# 		for d1 in range(0, dims):
+	# 			for d2 in range(0, dims):
+	# 				dde[d1, d2] = simplify(sp.diff(self.eval_grad[j], disp_grad[d1, d2]))
 
-			for i in range(0, cols):
-				actual = inner(dde, shape_grad[i])
-				self.eval_hessian[i, j] = actual
+	# 		for i in range(0, cols):
+	# 			actual = inner(dde, shape_grad[i])
+	# 			self.eval_hessian[i, j] = actual
 
-		self.e = e
-		self.de = P
-		self.mu = mu
-		self.lmbda = lmbda
+	# 	self.e = e
+	# 	self.de = P
+	# 	self.mu = mu
+	# 	self.lmbda = lmbda
 
-		self.fe = fe
-		self.increment = coeffs('u', fe.n_nodes() * dims)
+	# 	self.fe = fe
+	# 	self.increment = coeffs('u', fe.n_nodes() * dims)
 
 
 	def init_opt(self, fe, q):
 		fe.use_adjugate = True
 		dims = fe.manifold_dim()
 		q = sp.Matrix(dims, 1, q)
+		self.q = q
 		shape_grad = fe.physical_tgrad(q)
 		shape_grad_ref = fe.tgrad(q)
 		# jac_inv = fe.symbol_jacobian_inverse()
@@ -316,6 +317,56 @@ class GPULinearElasticityOp:
 
 		expr = assign_matrix('P_tXJinv_t', P_tXJinv_t)
 		return expr
+
+	# def hessian_apply(self):
+	# 	fe = self.fe
+	# 	q = self.q
+	# 	dims = fe.manifold_dim()
+	# 	disp_grad_name = 'disp_grad'
+	# 	mu, lmbda = sp.symbols('mu lambda', real=True)
+	# 	disp_grad = sp.Matrix(dims, dims, coeffs(disp_grad_name, dims * dims))
+	# 	trial_symb = sp.Matrix(dims, dims, coeffs("grad_trial", dims * dims))
+	# 	test_symb = sp.Matrix(dims, dims, coeffs("grad_test", dims * dims))
+	# 	loperand_symb = sp.Matrix(dims, dims, coeffs("loperand", dims * dims))
+	# 	inc = coeffs("inc", dims*dims)
+
+	# 	jac_inv = fe.symbol_jacobian_inverse_as_adjugate()
+
+	# 	# Evaluate physical coordinates displacement gradient
+	# 	shape_grad_ref = fe.tgrad(q)
+	# 	eval_inc_grad = sp.zeros(dims, dims)
+	# 	for i in range(0, dims * fe.n_nodes()):
+	# 		eval_inc_grad += inc[i] * shape_grad_ref[i]
+	# 	eval_inc_grad = eval_inc_grad * jac_inv
+
+	# 	# Strain energy function
+	# 	epsu = (disp_grad + disp_grad.T) / 2
+	# 	Psi = mu * inner(epsu, epsu) + (lmbda/2) * (tr(epsu) * tr(epsu))
+		
+	# 	P = sp.Matrix(dims, dims, [0]*(dims*dims))
+	# 	for d1 in range(0, dims):
+	# 		for d2 in range(0, dims):
+	# 			P[d1, d2] = sp.diff(Psi, disp_grad[d1, d2])
+		
+	# 	# Directional derivative of strain energy function (use trial instead of test, exploit symmetry )
+	# 	dPsi = inner(P.T, trial_symb)
+
+	# 	linearized_stress = sp.Matrix(dims, dims, [0]*(dims*dims))
+	# 	for d1 in range(0, dims):
+	# 		for d2 in range(0, dims):
+	# 			linearized_stress[d1, d2] = sp.simplify(sp.diff(dPsi, disp_grad[d1, d2]))
+
+	# 	dV = fe.reference_measure() * fe.symbol_jacobian_determinant() * fe.quadrature_weight()
+
+	# 	loperand = linearized_stress.T * (jac_inv.T * dV)
+
+	# 	expr = subsmat(expr, test_symb, test_repl)
+
+
+	# 	bform = inner(loperand_symb, test_symb)
+
+
+
 
 	def hessian_less_registers(self):
 		fe = self.fe
@@ -531,6 +582,18 @@ def main():
 			print(f"{k}")
 			print("---------------------")
 			c_code(v)
+
+		# c_log("//--------------------------")
+		# c_log("// New hessian apply")	
+		# c_log("//--------------------------")
+
+		# kv = op.hessian_apply()
+		# for k, v in kv.items():
+
+		# 	print("---------------------")
+		# 	print(f"{k}")
+		# 	print("---------------------")
+		# 	c_code(v)
 
 	else:
 		c_log("//--------------------------")
