@@ -9,6 +9,10 @@ from tet10 import *
 from tet20 import *
 from symbolic_fe import *
 
+# from sympy.utilities.codegen import (InputArgument, OutputArgument,
+                                     # InOutArgument, Routine)
+# https://stackoverflow.com/questions/25309580/simplify-expression-generated-with-sympy-codegen
+
 from time import perf_counter
 
 def simplify(expr):
@@ -103,6 +107,19 @@ class HyperElasticity:
 		self.vec_grad = vec_grad
 		self.ref_grad = ref_grad
 
+	def check_symmetries(self):
+		dims = self.dims
+		P = self.P
+		lin_stress = self.lin_stress
+		T = lin_stress
+
+		T_t = T.T
+		for d1 in range(0, dims):
+			for d2 in range(0, dims):
+				diff = T_t[d1, d2] - T[d1, d2]
+				diff = sp.simplify(diff)
+				print(f'{d1}, {d2}) {diff}')
+
 
 	def apply(self):
 		lin_stress = self.lin_stress
@@ -124,7 +141,8 @@ class HyperElasticity:
 
 		lform = []
 
-		if True:
+		# if True:
+		if False:
 			for d1 in range(0, dims):
 				val = 0
 				for d2 in range(0, dims):
@@ -135,7 +153,6 @@ class HyperElasticity:
 				lform.append(
 					ast.AddAugmentedAssignment(sp.symbols(f'lform[{i}]'), inner(self.loperand_symb, ref_grad[i]))
 				)
-
 
 		buffers = []
 		buffers.extend(assign_matrix('vec_grad', self.vec_grad))
@@ -169,7 +186,7 @@ class HyperElasticModel:
 class NeoHookeanOgden(HyperElasticModel):
 	def __init__(self, dims):
 		super().__init__(dims)
-		self.name = 'NeoHookeanOgden'
+		self.name = 'neohookean_ogden'
 		mu, lmbda = sp.symbols('mu lambda')
 		self.params = [(mu, 1.0), (lmbda, 1.0)]
 
@@ -188,18 +205,22 @@ class NeoHookeanOgden(HyperElasticModel):
 def main():
 	start = perf_counter()
 
-	fe = Tet10()
-	# fe = Tet4()
+	# fe = Tet20()
+	# fe = Tet10()
+	fe = Tet4()
 	model = NeoHookeanOgden(fe.spatial_dim())
 	op = HyperElasticity(fe, model)
 
-	op_apply = op.apply()
-	for k, v in op_apply.items():
-		print('-------------------------------')
-		print(f'{k}')
-		print('-------------------------------')
-		c_code(v)
-		print('-------------------------------')
+	if False:
+		op.check_symmetries()
+	else:
+		op_apply = op.apply()
+		for k, v in op_apply.items():
+			print('-------------------------------')
+			print(f'{k}')
+			print('-------------------------------')
+			c_code(v)
+			print('-------------------------------')
 
 	stop = perf_counter()
 	console.print(f'Overall: {stop - start} seconds')
