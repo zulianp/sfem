@@ -6,7 +6,7 @@
 // #include <stddef.h>
 // #include <stdio.h>
 
-// #define VEC_SIZE SFEM_VECTOR_SIZE
+// #define VEC_SIZE SFEM_VREAL_SIZE
 // typedef real_t scalar_t;
 // typedef vreal_t vec_t;
 

@@ -9,8 +9,8 @@
 static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {{
     int i;
     int v;
-    for (i = 0; i < size - SFEM_VECTOR_SIZE; i += SFEM_VECTOR_SIZE) {{
-        for(v = 0; v < SFEM_VECTOR_SIZE; v++) {
+    for (i = 0; i < size - SFEM_VREAL_SIZE; i += SFEM_VREAL_SIZE) {{
+        for(v = 0; v < SFEM_VREAL_SIZE; v++) {
             if (arr[i + v] == target) return i + v;
         }
     }}

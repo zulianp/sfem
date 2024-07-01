@@ -293,8 +293,8 @@ static SFEM_INLINE vreal_t rvpow2(const vreal_t x) { return 1. / (x * x); }
 
 static SFEM_INLINE vreal_t vlog(const vreal_t x) {
     vreal_t ret;
-#pragma unroll(SFEM_VECTOR_SIZE)
-    for (int vi = 0; vi < SFEM_VECTOR_SIZE; ++vi) {
+#pragma unroll(SFEM_VREAL_SIZE)
+    for (int vi = 0; vi < SFEM_VREAL_SIZE; ++vi) {
         const double xi = x[vi];
         ret[vi] = log(xi);
     }
@@ -925,7 +925,7 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
     vreal_t vmu;
     vreal_t vlambda;
 
-    for (int vi = 0; vi < SFEM_VECTOR_SIZE; ++vi) {
+    for (int vi = 0; vi < SFEM_VREAL_SIZE; ++vi) {
         vmu[vi] = mu;
         vlambda[vi] = lambda;
     }
@@ -933,8 +933,8 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
     static const int block_size = 3;
     static const int mat_block_size = block_size * block_size;
 
-    for (ptrdiff_t i = 0; i < nelements; i += SFEM_VECTOR_SIZE) {
-        const int nvec = MAX(1, MIN(nelements - (i + SFEM_VECTOR_SIZE), SFEM_VECTOR_SIZE));
+    for (ptrdiff_t i = 0; i < nelements; i += SFEM_VREAL_SIZE) {
+        const int nvec = MAX(1, MIN(nelements - (i + SFEM_VREAL_SIZE), SFEM_VREAL_SIZE));
 
         for (int vi = 0; vi < nvec; ++vi) {
             const ptrdiff_t offset = i + vi;
