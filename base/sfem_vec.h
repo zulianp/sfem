@@ -5,12 +5,12 @@
 
 #ifdef __ARM_NEON
 
-#define SFEM_VECTOR_SIZE 8
-typedef real_t vreal_t 	__attribute__ ((vector_size (sizeof(real_t)	* SFEM_VECTOR_SIZE)));
+#define SFEM_VREAL_SIZE 8
+typedef real_t vreal_t 	__attribute__ ((vector_size (sizeof(real_t)	* SFEM_VREAL_SIZE)));
 
-typedef int vint_t 		__attribute__ ((vector_size (sizeof(int)    * SFEM_VECTOR_SIZE)));
-typedef long vmask_t 	__attribute__ ((vector_size (sizeof(long)    * SFEM_VECTOR_SIZE)));
-typedef idx_t vidx_t 	__attribute__ ((vector_size (sizeof(idx_t)  * SFEM_VECTOR_SIZE)));
+typedef int vint_t 		__attribute__ ((vector_size (sizeof(int)    * SFEM_VREAL_SIZE)));
+typedef long vmask_t 	__attribute__ ((vector_size (sizeof(long)    * SFEM_VREAL_SIZE)));
+typedef idx_t vidx_t 	__attribute__ ((vector_size (sizeof(idx_t)  * SFEM_VREAL_SIZE)));
 
 typedef real_t real4_t 	__attribute__ ((vector_size (sizeof(real_t)	* 4)));
 typedef long   mask4_t  __attribute__ ((vector_size (sizeof(long)	* 4)));
@@ -23,11 +23,11 @@ typedef double double8_t 	__attribute__ ((vector_size (sizeof(double)	* 8)));
 
 #else
 
-#define SFEM_VECTOR_SIZE 4
-typedef real_t vreal_t 	__attribute__ ((vector_size (sizeof(real_t)	* SFEM_VECTOR_SIZE)));
-typedef int vint_t 		__attribute__ ((vector_size (sizeof(int)    * SFEM_VECTOR_SIZE)));
-typedef long vmask_t 	__attribute__ ((vector_size (sizeof(long)    * SFEM_VECTOR_SIZE)));
-typedef idx_t vidx_t 	__attribute__ ((vector_size (sizeof(idx_t)  * SFEM_VECTOR_SIZE)));
+#define SFEM_VREAL_SIZE 4
+typedef real_t vreal_t 	__attribute__ ((vector_size (sizeof(real_t)	* SFEM_VREAL_SIZE)));
+typedef int vint_t 		__attribute__ ((vector_size (sizeof(int)    * SFEM_VREAL_SIZE)));
+typedef long vmask_t 	__attribute__ ((vector_size (sizeof(long)    * SFEM_VREAL_SIZE)));
+typedef idx_t vidx_t 	__attribute__ ((vector_size (sizeof(idx_t)  * SFEM_VREAL_SIZE)));
 
 
 typedef real_t real4_t 	__attribute__ ((vector_size (sizeof(real_t)	* 4)));

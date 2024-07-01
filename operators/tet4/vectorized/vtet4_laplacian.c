@@ -20,8 +20,8 @@ int vtet4_laplacian_apply(const ptrdiff_t nelements,
     const geom_t *const z = points[2];
 
 #pragma omp parallel for
-    for (ptrdiff_t i = 0; i < nelements; i += VSCALAR_SIZE) {
-        const int vec_size = MIN(VSCALAR_SIZE, nelements - i);
+    for (ptrdiff_t i = 0; i < nelements; i += SFEM_VEC_SIZE) {
+        const int vec_size = MIN(SFEM_VEC_SIZE, nelements - i);
 
         vec_t fff[6];
         {
@@ -97,8 +97,8 @@ int vtet4_laplacian_apply_opt(const ptrdiff_t nelements,
                               const real_t *const SFEM_RESTRICT u,
                               real_t *const SFEM_RESTRICT values) {
 #pragma omp parallel for
-    for (ptrdiff_t i = 0; i < nelements; i += VSCALAR_SIZE) {
-        const int vec_size = MIN(VSCALAR_SIZE, nelements - i);
+    for (ptrdiff_t i = 0; i < nelements; i += SFEM_VEC_SIZE) {
+        const int vec_size = MIN(SFEM_VEC_SIZE, nelements - i);
 
         vec_t element_u[4];
         vec_t element_vector[4];
