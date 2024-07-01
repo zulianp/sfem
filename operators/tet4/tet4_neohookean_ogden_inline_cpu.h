@@ -338,7 +338,7 @@ static SFEM_INLINE void tet4_neohookean_hessian_adj(const scalar_t *const SFEM_R
     // 2nd Order linearization (lin_stress)
     neohookean_lin_stress_adj(adjugate, jacobian_determinant, mu, lambda, inc_grad, buff);
 
-    // lin_stress.T * (jac_inv.T * dV)
+    // lin_stress^T * (jac_inv^(-T) * det(J)/6)
     const scalar_t x0 = (1.0 / 6.0);
     const scalar_t x1 = buff[0] * x0;
     const scalar_t x2 = buff[3] * x0;
