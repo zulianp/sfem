@@ -120,8 +120,32 @@ class HyperElasticity:
 				diff = sp.simplify(diff)
 				print(f'{d1}, {d2}) {diff}')
 
+	def gradient(self):
+		P = self.P
+		jac_inv = self.fe.symbol_jacobian_inverse_as_adjugate()
+		P_tXJinv_t = P.T * jac_inv.T * (self.fe.symbol_jacobian_determinant() * self.fe.reference_measure())
 
-	def apply(self):
+		dims = self.fe.manifold_dim()
+		for i in range(0, dims):
+			for j in range(0, dims):
+				P_tXJinv_t[i, j] = simplify(P_tXJinv_t[i, j])
+
+		P_tXJinv_t_sym = matrix_coeff('P_tXJinv_t', dims, dims)
+		lform = sp.zeros(self.fe.n_nodes() * dims, 1)
+		for i in range(0, self.fe.n_nodes() * dims):
+			lform[i] = inner(P_tXJinv_t_sym, self.ref_grad[i]) 
+			lform[i] = simplify(lform[i])
+
+		ret = {
+			'disp_grad'	: assign_matrix('disp_grad', self.disp_grad),
+			'F' : assign_matrix('F', self.disp_grad_symb + sp.eye(dims, dims)),
+			'P_tXJinv_t' : assign_matrix('P_tXJinv_t', P_tXJinv_t),
+			'lform' : assign_matrix('lform', lform)
+		}
+
+		return ret
+
+	def hessian_apply(self):
 		lin_stress = self.lin_stress
 		lin_stress_symb = self.lin_stress_symb
 		trial_grad = self.trial_grad
@@ -214,13 +238,22 @@ def main():
 	if False:
 		op.check_symmetries()
 	else:
-		op_apply = op.apply()
-		for k, v in op_apply.items():
+		print("HESSIAN")
+		op_hessian_apply = op.hessian_apply()
+		for k, v in op_hessian_apply.items():
 			print('-------------------------------')
 			print(f'{k}')
 			print('-------------------------------')
 			c_code(v)
 			print('-------------------------------')
+
+		# print("GRADIENT")
+		# op_gradient = op.gradient()
+		# for k, v in op_gradient.items():
+		# 	print('// -------------------------------')
+		# 	print(f'// {k}')
+		# 	print('// -------------------------------')
+		# 	c_code(v)
 
 	stop = perf_counter()
 	console.print(f'Overall: {stop - start} seconds')
@@ -228,3 +261,4 @@ def main():
 
 if __name__ == '__main__':
 	main()
+	
