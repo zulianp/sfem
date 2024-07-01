@@ -23,11 +23,11 @@ int vtet4_laplacian_apply(const ptrdiff_t nelements,
     for (ptrdiff_t i = 0; i < nelements; i += VSCALAR_SIZE) {
         const int vec_size = MIN(VSCALAR_SIZE, nelements - i);
 
-        vscalar_t fff[6];
+        vec_t fff[6];
         {
-            vscalar_t px[4];
-            vscalar_t py[4];
-            vscalar_t pz[4];
+            vec_t px[4];
+            vec_t py[4];
+            vec_t pz[4];
 
             for (int edof_i = 0; edof_i < 4; ++edof_i) {
                 const idx_t *const ii = elements[edof_i];
@@ -53,7 +53,7 @@ int vtet4_laplacian_apply(const ptrdiff_t nelements,
                       fff);
         }
 
-        vscalar_t element_u[4];
+        vec_t element_u[4];
         {
             for (int edof_i = 0; edof_i < 4; ++edof_i) {
                 const idx_t *const ii = elements[edof_i];
@@ -63,7 +63,7 @@ int vtet4_laplacian_apply(const ptrdiff_t nelements,
             }
         }
 
-        vscalar_t element_vector[4];
+        vec_t element_vector[4];
         {
             vtet4_laplacian_apply_fff(fff,
                                       element_u[0],
@@ -100,9 +100,9 @@ int vtet4_laplacian_apply_opt(const ptrdiff_t nelements,
     for (ptrdiff_t i = 0; i < nelements; i += VSCALAR_SIZE) {
         const int vec_size = MIN(VSCALAR_SIZE, nelements - i);
 
-        vscalar_t element_u[4];
-        vscalar_t element_vector[4];
-        vscalar_t fff[6];
+        vec_t element_u[4];
+        vec_t element_vector[4];
+        vec_t fff[6];
 
         for (int v = 0; v < 6; ++v) {
             for (int d = 0; d < vec_size; d++) {
