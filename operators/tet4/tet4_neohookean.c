@@ -6,6 +6,8 @@
 
 #include <mpi.h>
 
+#include "tet4_neohookean_ogden_inline_cpu.h"
+
 #include "crs_graph.h"
 #include "sfem_vec.h"
 #include "sortreduce.h"
