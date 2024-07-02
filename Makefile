@@ -177,6 +177,7 @@ OBJS = \
 	mesh_aura.o \
 	adj_table.o \
 	laplacian.o \
+	neohookean_ogden.o \
 	trishell3_l2_projection_p0_p1.o \
 	trishell6_l2_projection_p1_p2.o \
 	surface_l2_projection.o \
@@ -229,7 +230,9 @@ OBJS += tet4_fff.o \
 	tet4_strain.o \
 	tet4_principal_strains.o \
 	tet4_neohookean_principal_stresses.o \
-	tet4_neohookean.o
+	tet4_neohookean.o \
+	tet4_neohookean_ogden.o
+
 
 # Beam2
 OBJS += beam2_mass.o
