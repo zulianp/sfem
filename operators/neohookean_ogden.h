@@ -21,7 +21,7 @@ int neohookean_ogden_value_soa(const enum ElemType element_type,
                                geom_t **const SFEM_RESTRICT points,
                                const real_t mu,
                                const real_t lambda,
-                               const real_t **const SFEM_RESTRICT u,
+                               real_t **const SFEM_RESTRICT u,
                                real_t *const SFEM_RESTRICT value);
 
 int neohookean_ogden_gradient_soa(const enum ElemType element_type,
@@ -31,7 +31,7 @@ int neohookean_ogden_gradient_soa(const enum ElemType element_type,
                                   geom_t **const SFEM_RESTRICT points,
                                   const real_t mu,
                                   const real_t lambda,
-                                  const real_t **const SFEM_RESTRICT u,
+                                  real_t **const SFEM_RESTRICT u,
                                   real_t **const SFEM_RESTRICT values);
 
 int neohookean_ogden_apply_soa(const enum ElemType element_type,
@@ -41,8 +41,8 @@ int neohookean_ogden_apply_soa(const enum ElemType element_type,
                                geom_t **const SFEM_RESTRICT points,
                                const real_t mu,
                                const real_t lambda,
-                               const real_t **const SFEM_RESTRICT u,
-                               const real_t **const SFEM_RESTRICT h,
+                               real_t **const SFEM_RESTRICT u,
+                               real_t **const SFEM_RESTRICT h,
                                real_t **const SFEM_RESTRICT values);
 
 int neohookean_ogden_hessian_soa(const enum ElemType element_type,

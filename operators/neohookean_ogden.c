@@ -16,7 +16,7 @@ int neohookean_ogden_value_soa(const enum ElemType element_type,
                                geom_t **const SFEM_RESTRICT points,
                                const real_t mu,
                                const real_t lambda,
-                               const real_t **const SFEM_RESTRICT u,
+                               real_t **const SFEM_RESTRICT u,
                                real_t *const SFEM_RESTRICT value) {
     assert(0);  // IMPLEMENT ME
     return -1;
@@ -29,7 +29,7 @@ int neohookean_ogden_gradient_soa(const enum ElemType element_type,
                                   geom_t **const SFEM_RESTRICT points,
                                   const real_t mu,
                                   const real_t lambda,
-                                  const real_t **const SFEM_RESTRICT u,
+                                  real_t **const SFEM_RESTRICT u,
                                   real_t **const SFEM_RESTRICT values) {
     switch (element_type) {
         case TET4: {
@@ -67,8 +67,8 @@ int neohookean_ogden_apply_soa(const enum ElemType element_type,
                                geom_t **const SFEM_RESTRICT points,
                                const real_t mu,
                                const real_t lambda,
-                               const real_t **const SFEM_RESTRICT u,
-                               const real_t **const SFEM_RESTRICT h,
+                               real_t **const SFEM_RESTRICT u,
+                               real_t **const SFEM_RESTRICT h,
                                real_t **const SFEM_RESTRICT values) {
     switch (element_type) {
         case TET4: {

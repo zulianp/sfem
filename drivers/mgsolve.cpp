@@ -106,6 +106,7 @@ int main(int argc, char *argv[]) {
     int SFEM_BLOCK_SIZE = 1;
     int SFEM_USE_PRECONDITIONER = 0;
     int SFEM_MATRIX_FREE = 0;
+    int SFEM_COARSE_MATRIX_FREE = 0;
     int SFEM_USE_CHEB = 0;
     int SFEM_DEBUG = 0;
     int SFEM_MG = 0;
@@ -113,8 +114,10 @@ int main(int argc, char *argv[]) {
     int SFEM_SMOOTHER_SWEEPS = 3;
     float SFEM_CHEB_EIG_MAX_SCALE = 1.02;
     float SFEM_TOL = 1e-9;
+    float SFEM_CHEB_EIG_TOL = 1e-6;
 
     SFEM_READ_ENV(SFEM_MATRIX_FREE, atoi);
+    SFEM_READ_ENV(SFEM_COARSE_MATRIX_FREE, atoi);
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
     SFEM_READ_ENV(SFEM_USE_PRECONDITIONER, atoi);
@@ -124,9 +127,10 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_CHEB_EIG_MAX_SCALE, atof);
     SFEM_READ_ENV(SFEM_MAX_IT, atoi);
     SFEM_READ_ENV(SFEM_SMOOTHER_SWEEPS, atoi);
-
+    SFEM_READ_ENV(SFEM_CHEB_EIG_TOL, atof);
 
     printf("SFEM_MATRIX_FREE: %d\n"
+           "SFEM_COARSE_MATRIX_FREE: %d\n"
            "SFEM_OPERATOR: %s\n"
            "SFEM_BLOCK_SIZE: %d\n"
            "SFEM_USE_PRECONDITIONER: %d\n"
@@ -135,8 +139,10 @@ int main(int argc, char *argv[]) {
            "SFEM_MG: %d\n"
            "SFEM_CHEB_EIG_MAX_SCALE: %f\n"
            "SFEM_TOL: %f\n"
-           "SFEM_SMOOTHER_SWEEPS: %d\n",
+           "SFEM_SMOOTHER_SWEEPS: %d\n"
+           "SFEM_CHEB_EIG_TOL: %f\n",
            SFEM_MATRIX_FREE,
+           SFEM_COARSE_MATRIX_FREE,
            SFEM_OPERATOR,
            SFEM_BLOCK_SIZE,
            SFEM_USE_PRECONDITIONER,
@@ -145,7 +151,8 @@ int main(int argc, char *argv[]) {
            SFEM_MG,
            SFEM_CHEB_EIG_MAX_SCALE,
            SFEM_TOL,
-           SFEM_SMOOTHER_SWEEPS);
+           SFEM_SMOOTHER_SWEEPS,
+           SFEM_CHEB_EIG_TOL);
 
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
     auto conds = sfem::DirichletConditions::create_from_env(fs);
@@ -180,6 +187,7 @@ int main(int argc, char *argv[]) {
             // Power-method
             auto r = sfem::h_buffer<real_t>(fs->n_dofs());
             residual(*linear_op, rhs->data(), x->data(), r->data());
+            cheb->eigen_solver_tol = SFEM_CHEB_EIG_TOL;
             cheb->init(r->data());
 
             cheb->scale_eig_max = SFEM_CHEB_EIG_MAX_SCALE;
@@ -216,7 +224,6 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        
         if (SFEM_DEBUG) {
             array_write(
                     comm, "./rhs.raw", SFEM_MPI_REAL_T, rhs->data(), fs->n_dofs(), fs->n_dofs());
@@ -255,15 +262,15 @@ int main(int argc, char *argv[]) {
         auto f_coarse = f->derefine(fs_coarse, true);
 
         std::shared_ptr<sfem::Operator<real_t>> linear_op_coarse;
-        // if (SFEM_MATRIX_FREE) {
-        //     linear_op_coarse = sfem::make_op<real_t>(fs_coarse->n_dofs(),
-        //                                              fs_coarse->n_dofs(),
-        //                                              [=](const real_t *const x, real_t *const y) {
-        //                                                  f_coarse->apply(nullptr, x, y);
-        //                                              });
-        // } else {
+        if (SFEM_COARSE_MATRIX_FREE) {
+            linear_op_coarse = sfem::make_op<real_t>(fs_coarse->n_dofs(),
+                                                     fs_coarse->n_dofs(),
+                                                     [=](const real_t *const x, real_t *const y) {
+                                                         f_coarse->apply(nullptr, x, y);
+                                                     });
+        } else {
             linear_op_coarse = crs_hessian(*f_coarse);
-        // }
+        }
 
         auto c_coarse = sfem::h_buffer<real_t>(fs_coarse->n_dofs());
         auto r_coarse = sfem::h_buffer<real_t>(fs_coarse->n_dofs());
