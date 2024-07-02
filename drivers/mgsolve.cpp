@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
     int SFEM_SMOOTHER_SWEEPS = 3;
     float SFEM_CHEB_EIG_MAX_SCALE = 1.02;
     float SFEM_TOL = 1e-9;
-    float SFEM_CHEB_EIG_TOL = 1e-6;
+    float SFEM_CHEB_EIG_TOL = 1e-5;
 
     SFEM_READ_ENV(SFEM_MATRIX_FREE, atoi);
     SFEM_READ_ENV(SFEM_COARSE_MATRIX_FREE, atoi);
