@@ -1786,7 +1786,7 @@ namespace sfem {
 
     //
 
-    class NeoHookeanOdgen final : public Op {
+    class NeoHookeanOgden final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
         enum ElemType element_type { INVALID };
@@ -1798,7 +1798,7 @@ namespace sfem {
 
             assert(mesh->spatial_dim == space->block_size());
 
-            auto ret = std::make_unique<NeoHookeanOdgen>(space);
+            auto ret = std::make_unique<NeoHookeanOgden>(space);
 
             real_t SFEM_SHEAR_MODULUS = 1;
             real_t SFEM_FIRST_LAME_PARAMETER = 1;
@@ -1813,7 +1813,7 @@ namespace sfem {
         }
 
         std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
-            auto ret = std::make_shared<NeoHookeanOdgen>(space);
+            auto ret = std::make_shared<NeoHookeanOgden>(space);
             ret->element_type = macro_type_variant(element_type);
             ret->mu = mu;
             ret->lambda = lambda;
@@ -1821,19 +1821,19 @@ namespace sfem {
         }
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
-            auto ret = std::make_shared<NeoHookeanOdgen>(space);
+            auto ret = std::make_shared<NeoHookeanOgden>(space);
             ret->element_type = macro_base_elem(element_type);
             ret->mu = mu;
             ret->lambda = lambda;
             return ret;
         }
 
-        const char *name() const override { return "NeoHookeanOdgen"; }
+        const char *name() const override { return "NeoHookeanOgden"; }
         inline bool is_linear() const override { return true; }
 
         int initialize() override { return ISOLVER_FUNCTION_SUCCESS; }
 
-        NeoHookeanOdgen(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+        NeoHookeanOgden(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
         int hessian_crs(const isolver_scalar_t *const x,
                         const isolver_idx_t *const rowptr,
@@ -1937,7 +1937,7 @@ namespace sfem {
             instance_.private_register_op("Mass", Mass::create);
             instance_.private_register_op("CVFEMMass", CVFEMMass::create);
             instance_.private_register_op("LumpedMass", LumpedMass::create);
-            instance_.private_register_op("NeoHookeanOdgen", NeoHookeanOdgen::create);
+            instance_.private_register_op("NeoHookeanOgden", NeoHookeanOgden::create);
         }
 
         return instance_;

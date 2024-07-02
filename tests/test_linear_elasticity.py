@@ -26,7 +26,8 @@ def solve_linear_elasticity(options):
 	fun = sfem.Function(fs)
 	fun.set_output_dir(options.output_dir)
 
-	op = sfem.create_op(fs, "LinearElasticity")
+	# op = sfem.create_op(fs, "LinearElasticity")
+	op = sfem.create_op(fs, "NeoHookeanOgden")
 	fun.add_operator(op)
 
 	bc = sfem.DirichletConditions(fs)
@@ -35,15 +36,15 @@ def solve_linear_elasticity(options):
 	sfem.add_condition(bc, sinlet, 1, 0.);
 	sfem.add_condition(bc, sinlet, 2, 0.);
 
-	# sfem.add_condition(bc, soutlet, 0, 1);
-	# sfem.add_condition(bc, soutlet, 1, 0.);
-	# sfem.add_condition(bc, soutlet, 2, 0.);
+	sfem.add_condition(bc, soutlet, 0, 0.01);
+	sfem.add_condition(bc, soutlet, 1, 0.);
+	sfem.add_condition(bc, soutlet, 2, 0.);
 
 	fun.add_dirichlet_conditions(bc)
 
-	nc = sfem.NeumannConditions(fs)
-	sfem.add_condition(nc, soutlet, 0, 1)
-	fun.add_operator(nc)
+	# nc = sfem.NeumannConditions(fs)
+	# sfem.add_condition(nc, soutlet, 0, 1)
+	# fun.add_operator(nc)
 
 	x = np.zeros(fs.n_dofs())
 	cg = sfem.ConjugateGradient()
@@ -53,8 +54,8 @@ def solve_linear_elasticity(options):
 	lop = sfem.make_op(fun, x)
 	cg.set_op(lop)
 
-	use_prec = True
-	# use_prec = False
+	# use_prec = True
+	use_prec = False
 	if use_prec:
 		d = np.zeros(fs.n_dofs())
 		sfem.hessian_diag(fun, x, d)
@@ -67,11 +68,13 @@ def solve_linear_elasticity(options):
 		print(np.min(np.abs(d)))
 	
 	g = np.zeros(fs.n_dofs())
-	sfem.apply_constraints(fun, x)
-	sfem.gradient(fun, x, g)
-	c = np.zeros(fs.n_dofs())
-	sfem.apply(cg, g, c)
-	x -= c
+	for i in range(0, 3):
+		sfem.apply_constraints(fun, x)
+		g[:] = 0
+		sfem.gradient(fun, x, g)
+		c = np.zeros(fs.n_dofs())
+		sfem.apply(cg, g, c)
+		x -= c
 
 	# Write result to disk
 	sfem.report_solution(fun, x)
