@@ -303,7 +303,7 @@ static SFEM_INLINE void neohookean_lin_stress_adj(const scalar_t *const SFEM_RES
                     inc_grad[8] * (mu + x111 * x52 - x112 * x51 + POW2(x51) * x8);
 }
 
-static SFEM_INLINE void tet4_neohookean_hessian_adj(const scalar_t *const SFEM_RESTRICT adjugate,
+static SFEM_INLINE void tet4_neohookean_hessian_apply_adj(const scalar_t *const SFEM_RESTRICT adjugate,
                                                     const scalar_t jacobian_determinant,
                                                     const scalar_t mu,
                                                     const scalar_t lambda,
