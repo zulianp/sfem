@@ -19,14 +19,13 @@ int linear_elasticity_assemble_value_soa(const enum ElemType element_type,
                                          real_t *const SFEM_RESTRICT value) {
     switch (element_type) {
         case TRI3: {
-            tri3_linear_elasticity_value(
+            return tri3_linear_elasticity_value(
                     nelements, nnodes, elements, points, mu, lambda, 1, u[0], u[1], value);
-            break;
         }
         // case TET4: {
-        //     tet4_linear_elasticity_assemble_value_soa(
+        //     return tet4_linear_elasticity_assemble_value_soa(
         //         nelements, nnodes, elements, points, mu, lambda, u, value);
-        //     break;
+        //
         // }
         default: {
             fprintf(stderr,
@@ -51,36 +50,34 @@ int linear_elasticity_apply_soa(const enum ElemType element_type,
                                 real_t **const SFEM_RESTRICT values) {
     switch (element_type) {
         case TRI3: {
-            tri3_linear_elasticity_apply(nelements,
-                                         nnodes,
-                                         elements,
-                                         points,
-                                         mu,
-                                         lambda,
-                                         1,
-                                         u[0],
-                                         u[1],
-                                         1,
-                                         values[0],
-                                         values[1]);
-            break;
+            return tri3_linear_elasticity_apply(nelements,
+                                                nnodes,
+                                                elements,
+                                                points,
+                                                mu,
+                                                lambda,
+                                                1,
+                                                u[0],
+                                                u[1],
+                                                1,
+                                                values[0],
+                                                values[1]);
         }
         case TET4: {
-            tet4_linear_elasticity_apply(nelements,
-                                         nnodes,
-                                         elements,
-                                         points,
-                                         mu,
-                                         lambda,
-                                         1,
-                                         u[0],
-                                         u[1],
-                                         u[2],
-                                         1,
-                                         values[0],
-                                         values[1],
-                                         values[2]);
-            break;
+            return tet4_linear_elasticity_apply(nelements,
+                                                nnodes,
+                                                elements,
+                                                points,
+                                                mu,
+                                                lambda,
+                                                1,
+                                                u[0],
+                                                u[1],
+                                                u[2],
+                                                1,
+                                                values[0],
+                                                values[1],
+                                                values[2]);
         }
         default: {
             fprintf(stderr,
@@ -105,9 +102,8 @@ int linear_elasticity_assemble_value_aos(const enum ElemType element_type,
                                          real_t *const SFEM_RESTRICT value) {
     switch (element_type) {
         case TRI3: {
-            tri3_linear_elasticity_value(
+            return tri3_linear_elasticity_value(
                     nelements, nnodes, elements, points, mu, lambda, 2, &u[0], &u[1], value);
-            break;
         }
         case TET4: {
             return tet4_linear_elasticity_value(
@@ -150,9 +146,8 @@ int linear_elasticity_assemble_hessian_aos(const enum ElemType element_type,
                                            real_t *const SFEM_RESTRICT values) {
     switch (element_type) {
         case TRI3: {
-            tri3_linear_elasticity_hessian_aos(
+            return tri3_linear_elasticity_hessian_aos(
                     nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
-            break;
         }
         case TET4: {
             return tet4_linear_elasticity_hessian(
@@ -188,9 +183,9 @@ int linear_elasticity_assemble_diag_aos(const enum ElemType element_type,
                                         real_t *const SFEM_RESTRICT values) {
     switch (element_type) {
         // case TRI3: {
-        //     tri3_linear_elasticity_assemble_diag(
+        //     return tri3_linear_elasticity_assemble_diag(
         //         nelements, nnodes, elements, points, mu, lambda, values);
-        //     break;
+        //
         // }
         case TET4: {
             return tet4_linear_elasticity_diag(nelements,
@@ -251,19 +246,18 @@ int linear_elasticity_apply_aos(const enum ElemType element_type,
                                 real_t *const SFEM_RESTRICT values) {
     switch (element_type) {
         case TRI3: {
-            tri3_linear_elasticity_apply(nelements,
-                                         nnodes,
-                                         elements,
-                                         points,
-                                         mu,
-                                         lambda,
-                                         2,
-                                         &u[0],
-                                         &u[1],
-                                         2,
-                                         &values[0],
-                                         &values[1]);
-            break;
+            return tri3_linear_elasticity_apply(nelements,
+                                                nnodes,
+                                                elements,
+                                                points,
+                                                mu,
+                                                lambda,
+                                                2,
+                                                &u[0],
+                                                &u[1],
+                                                2,
+                                                &values[0],
+                                                &values[1]);
         }
         case TET4: {
             return tet4_linear_elasticity_apply(nelements,
@@ -337,9 +331,8 @@ int linear_elasticity_assemble_hessian_soa(const enum ElemType element_type,
                                            real_t **const SFEM_RESTRICT values) {
     switch (element_type) {
         case TRI3: {
-            tri3_linear_elasticity_assemble_hessian_soa(
+            return tri3_linear_elasticity_assemble_hessian_soa(
                     nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
-            break;
         }
         default: {
             fprintf(stderr,
