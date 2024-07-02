@@ -185,6 +185,15 @@ class GPULinearElasticityOp:
 			self.eval_grad[i] = inner(P_sym, shape_grad[i]) * dV
 			self.eval_grad[i] = simplify(self.eval_grad[i])
 			eval_grad[i] = inner(P, shape_grad[i])
+			
+			# test_g = inner(P * jac_inv.T , shape_grad_ref[i])
+			# diff = sp.simplify(eval_grad[i] - test_g)
+
+			# print(P)
+			# print(diff)
+			# assert diff == 0
+
+
 
 
 		# Trying to optimize the bilinear form 
@@ -198,7 +207,7 @@ class GPULinearElasticityOp:
 			self.eval_grad_opt[i] = simplify(self.eval_grad_opt[i])
 
 			# Evaluation for computing hessian
-			eval_grad_opt[i] = simplify(inner(P.T * jac_inv.T * dV, shape_grad_ref[i]))
+			eval_grad_opt[i] = simplify(inner(P * jac_inv.T * dV, shape_grad_ref[i]))
 
 		self.eval_hessian =  sp.zeros(rows, cols)
 		self.lin_stress = []
@@ -212,12 +221,12 @@ class GPULinearElasticityOp:
 					dde[d1, d2] = simplify(sp.diff(eval_grad_opt[j], disp_grad[d1, d2]))
 
 			# self.lin_stress.append(dde)
-			self.lin_stress.append(dde.T * jac_inv.T)
+			self.lin_stress.append(dde * jac_inv.T)
 			lin_stress_sym = matrix_coeff(f'lin_stress{j}', dims, dims)
 
 			for i in range(0, cols):
 				test = inner(dde, shape_grad[i])
-				actual = simplify(inner(dde.T * jac_inv.T, shape_grad_ref[i]))
+				actual = simplify(inner(dde * jac_inv.T, shape_grad_ref[i]))
 				self.eval_hessian[i, j] = actual
 
 		###################################################################
@@ -308,7 +317,7 @@ class GPULinearElasticityOp:
 		P = self.P 
 
 		jac_inv = self.fe.symbol_jacobian_inverse_as_adjugate()
-		P_tXJinv_t = P.T * jac_inv.T * (self.fe.symbol_jacobian_determinant() * self.fe.reference_measure())
+		P_tXJinv_t = P * jac_inv.T * (self.fe.symbol_jacobian_determinant() * self.fe.reference_measure())
 
 		dims = self.fe.manifold_dim()
 		for i in range(0, dims):
@@ -389,7 +398,7 @@ class GPULinearElasticityOp:
 				P[d1, d2] = sp.diff(Psi, disp_grad[d1, d2])
 		
 		# Directional derivative of strain energy function
-		dPsi = inner(P.T * jac_inv.T, test_symb)
+		dPsi = inner(P * jac_inv.T, test_symb)
 
 		linearized_stress = sp.Matrix(dims, dims, [0]*(dims*dims))
 		for d1 in range(0, dims):
@@ -398,7 +407,9 @@ class GPULinearElasticityOp:
 
 		dV = fe.reference_measure() * fe.symbol_jacobian_determinant() * fe.quadrature_weight()
 
-		loperand = linearized_stress.T * (jac_inv.T * dV)
+		# print(linearized_stress - linearized_stress)
+
+		loperand = linearized_stress * (jac_inv.T * dV)
 		bform = inner(loperand_symb, trial_symb)
 
 		if False:

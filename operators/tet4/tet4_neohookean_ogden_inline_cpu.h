@@ -4,53 +4,51 @@
 #include "tet4_linear_elasticity_inline_cpu.h"  // tet4_gradient_3
 
 // This can be used with any element type
-static SFEM_INLINE void neohookean_P_tXJinv_t_adj(const scalar_t *const SFEM_RESTRICT adjugate,
-                                                  const scalar_t jacobian_determinant,
-                                                  const scalar_t mu,
-                                                  const scalar_t lambda,
-                                                  scalar_t *const SFEM_RESTRICT
-                                                          F_in_P_tXJinv_t_out) {
-    const scalar_t *const F = F_in_P_tXJinv_t_out;
+static SFEM_INLINE void neohookean_PxJinv_t_adj(const scalar_t *const SFEM_RESTRICT adjugate,
+                                                const scalar_t jacobian_determinant,
+                                                const scalar_t mu,
+                                                const scalar_t lambda,
+                                                scalar_t *const SFEM_RESTRICT F_in_PxJinv_t_out) {
+    const scalar_t *const F = F_in_PxJinv_t_out;
+    scalar_t *const PxJinv_t = F_in_PxJinv_t_out;
 
-    const scalar_t x0 = 1.0 / jacobian_determinant;
-    const scalar_t x1 = F[4] * F[8];
-    const scalar_t x2 = F[5] * F[7];
-    const scalar_t x3 = x1 - x2;
-    const scalar_t x4 = F[1] * F[5];
-    const scalar_t x5 = F[1] * F[8];
-    const scalar_t x6 = F[2] * F[4];
-    const scalar_t x7 =
-            F[0] * x1 - F[0] * x2 + F[2] * F[3] * F[7] - F[3] * x5 + F[6] * x4 - F[6] * x6;
-    const scalar_t x8 = 1.0 / x7;
-    const scalar_t x9 = mu * x8;
-    const scalar_t x10 = lambda * x8 * log(x7);
-    const scalar_t x11 = x0 * (F[0] * mu + x10 * x3 - x3 * x9);
-    const scalar_t x12 = F[2] * F[7] - x5;
-    const scalar_t x13 = x0 * (F[3] * mu + x10 * x12 - x12 * x9);
-    const scalar_t x14 = x4 - x6;
-    const scalar_t x15 = x0 * (F[6] * mu + x10 * x14 - x14 * x9);
-    const scalar_t x16 = (1.0 / 6.0) * jacobian_determinant;
-    const scalar_t x17 = -F[3] * F[8] + F[5] * F[6];
-    const scalar_t x18 = x0 * (F[1] * mu + x10 * x17 - x17 * x9);
-    const scalar_t x19 = F[0] * F[8] - F[2] * F[6];
-    const scalar_t x20 = x0 * (F[4] * mu + x10 * x19 - x19 * x9);
-    const scalar_t x21 = -F[0] * F[5] + F[2] * F[3];
-    const scalar_t x22 = x0 * (F[7] * mu + x10 * x21 - x21 * x9);
-    const scalar_t x23 = F[3] * F[7] - F[4] * F[6];
-    const scalar_t x24 = x0 * (F[2] * mu + x10 * x23 - x23 * x9);
-    const scalar_t x25 = -F[0] * F[7] + F[1] * F[6];
-    const scalar_t x26 = x0 * (F[5] * mu + x10 * x25 - x25 * x9);
-    const scalar_t x27 = F[0] * F[4] - F[1] * F[3];
-    const scalar_t x28 = x0 * (F[8] * mu + x10 * x27 - x27 * x9);
-    F_in_P_tXJinv_t_out[0] = x16 * (adjugate[0] * x11 + adjugate[1] * x13 + adjugate[2] * x15);
-    F_in_P_tXJinv_t_out[1] = x16 * (adjugate[3] * x11 + adjugate[4] * x13 + adjugate[5] * x15);
-    F_in_P_tXJinv_t_out[2] = x16 * (adjugate[6] * x11 + adjugate[7] * x13 + adjugate[8] * x15);
-    F_in_P_tXJinv_t_out[3] = x16 * (adjugate[0] * x18 + adjugate[1] * x20 + adjugate[2] * x22);
-    F_in_P_tXJinv_t_out[4] = x16 * (adjugate[3] * x18 + adjugate[4] * x20 + adjugate[5] * x22);
-    F_in_P_tXJinv_t_out[5] = x16 * (adjugate[6] * x18 + adjugate[7] * x20 + adjugate[8] * x22);
-    F_in_P_tXJinv_t_out[6] = x16 * (adjugate[0] * x24 + adjugate[1] * x26 + adjugate[2] * x28);
-    F_in_P_tXJinv_t_out[7] = x16 * (adjugate[3] * x24 + adjugate[4] * x26 + adjugate[5] * x28);
-    F_in_P_tXJinv_t_out[8] = x16 * (adjugate[6] * x24 + adjugate[7] * x26 + adjugate[8] * x28);
+    const scalar_t x0 = F[4] * F[8];
+    const scalar_t x1 = F[5] * F[6];
+    const scalar_t x2 = F[3] * F[7];
+    const scalar_t x3 = F[5] * F[7];
+    const scalar_t x4 = F[3] * F[8];
+    const scalar_t x5 = F[4] * F[6];
+    const scalar_t x6 = F[0] * x0 - F[0] * x3 + F[1] * x1 - F[1] * x4 + F[2] * x2 - F[2] * x5;
+    const scalar_t x7 = 1.0 / x6;
+    const scalar_t x8 = x0 - x3;
+    const scalar_t x9 = mu * x6;
+    const scalar_t x10 = lambda * log(x6);
+    const scalar_t x11 = (1.0 / 6.0) * F[0] * x9 - 1.0 / 6.0 * mu * x8 + (1.0 / 6.0) * x10 * x8;
+    const scalar_t x12 = -x1 + x4;
+    const scalar_t x13 = (1.0 / 6.0) * F[1] * x9 + (1.0 / 6.0) * mu * x12 - 1.0 / 6.0 * x10 * x12;
+    const scalar_t x14 = x2 - x5;
+    const scalar_t x15 = (1.0 / 6.0) * F[2] * x9 - 1.0 / 6.0 * mu * x14 + (1.0 / 6.0) * x10 * x14;
+    const scalar_t x16 = F[1] * F[8] - F[2] * F[7];
+    const scalar_t x17 = (1.0 / 6.0) * F[3] * x9 + (1.0 / 6.0) * mu * x16 - 1.0 / 6.0 * x10 * x16;
+    const scalar_t x18 = F[0] * F[8] - F[2] * F[6];
+    const scalar_t x19 = (1.0 / 6.0) * F[4] * x9 - 1.0 / 6.0 * mu * x18 + (1.0 / 6.0) * x10 * x18;
+    const scalar_t x20 = F[0] * F[7] - F[1] * F[6];
+    const scalar_t x21 = (1.0 / 6.0) * F[5] * x9 + (1.0 / 6.0) * mu * x20 - 1.0 / 6.0 * x10 * x20;
+    const scalar_t x22 = F[1] * F[5] - F[2] * F[4];
+    const scalar_t x23 = (1.0 / 6.0) * F[6] * x9 - 1.0 / 6.0 * mu * x22 + (1.0 / 6.0) * x10 * x22;
+    const scalar_t x24 = F[0] * F[5] - F[2] * F[3];
+    const scalar_t x25 = (1.0 / 6.0) * F[7] * x9 + (1.0 / 6.0) * mu * x24 - 1.0 / 6.0 * x10 * x24;
+    const scalar_t x26 = F[0] * F[4] - F[1] * F[3];
+    const scalar_t x27 = (1.0 / 6.0) * F[8] * x9 - 1.0 / 6.0 * mu * x26 + (1.0 / 6.0) * x10 * x26;
+    PxJinv_t[0] = x7 * (adjugate[0] * x11 + adjugate[1] * x13 + adjugate[2] * x15);
+    PxJinv_t[1] = x7 * (adjugate[3] * x11 + adjugate[4] * x13 + adjugate[5] * x15);
+    PxJinv_t[2] = x7 * (adjugate[6] * x11 + adjugate[7] * x13 + adjugate[8] * x15);
+    PxJinv_t[3] = x7 * (adjugate[0] * x17 + adjugate[1] * x19 + adjugate[2] * x21);
+    PxJinv_t[4] = x7 * (adjugate[3] * x17 + adjugate[4] * x19 + adjugate[5] * x21);
+    PxJinv_t[5] = x7 * (adjugate[6] * x17 + adjugate[7] * x19 + adjugate[8] * x21);
+    PxJinv_t[6] = x7 * (adjugate[0] * x23 + adjugate[1] * x25 + adjugate[2] * x27);
+    PxJinv_t[7] = x7 * (adjugate[3] * x23 + adjugate[4] * x25 + adjugate[5] * x27);
+    PxJinv_t[8] = x7 * (adjugate[6] * x23 + adjugate[7] * x25 + adjugate[8] * x27);
 }
 
 static SFEM_INLINE void tet4_neohookean_gradient_adj(const scalar_t *const SFEM_RESTRICT adjugate,
@@ -64,34 +62,133 @@ static SFEM_INLINE void tet4_neohookean_gradient_adj(const scalar_t *const SFEM_
                                                      scalar_t *const SFEM_RESTRICT outx,
                                                      scalar_t *const SFEM_RESTRICT outy,
                                                      scalar_t *const SFEM_RESTRICT outz) {
+#if 1
     scalar_t buff[9];
 
     // Displacement gradient
-    tet4_gradient_3(adjugate, jacobian_determinant, ux, uy, uz, buff);
+    // tet4_gradient_3(adjugate, jacobian_determinant, ux, uy, uz, buff);
+
+    {
+        scalar_t *const disp_grad = buff;
+
+        const scalar_t x0 = 1.0 / jacobian_determinant;
+        const scalar_t x1 = x0 * (-ux[0] + ux[1]);
+        const scalar_t x2 = x0 * (-ux[0] + ux[2]);
+        const scalar_t x3 = x0 * (-ux[0] + ux[3]);
+        const scalar_t x4 = x0 * (-uy[0] + uy[1]);
+        const scalar_t x5 = x0 * (-uy[0] + uy[2]);
+        const scalar_t x6 = x0 * (-uy[0] + uy[3]);
+        const scalar_t x7 = x0 * (-uz[0] + uz[1]);
+        const scalar_t x8 = x0 * (-uz[0] + uz[2]);
+        const scalar_t x9 = x0 * (-uz[0] + uz[3]);
+        disp_grad[0] = adjugate[0] * x1 + adjugate[3] * x2 + adjugate[6] * x3;
+        disp_grad[1] = adjugate[1] * x1 + adjugate[4] * x2 + adjugate[7] * x3;
+        disp_grad[2] = adjugate[2] * x1 + adjugate[5] * x2 + adjugate[8] * x3;
+        disp_grad[3] = adjugate[0] * x4 + adjugate[3] * x5 + adjugate[6] * x6;
+        disp_grad[4] = adjugate[1] * x4 + adjugate[4] * x5 + adjugate[7] * x6;
+        disp_grad[5] = adjugate[2] * x4 + adjugate[5] * x5 + adjugate[8] * x6;
+        disp_grad[6] = adjugate[0] * x7 + adjugate[3] * x8 + adjugate[6] * x9;
+        disp_grad[7] = adjugate[1] * x7 + adjugate[4] * x8 + adjugate[7] * x9;
+        disp_grad[8] = adjugate[2] * x7 + adjugate[5] * x8 + adjugate[8] * x9;
+    }
 
     // Deformation gradient
     buff[0] += (scalar_t)1;
     buff[4] += (scalar_t)1;
     buff[8] += (scalar_t)1;
 
-    // P.T * J^(-T) * det(J)/6
-    neohookean_P_tXJinv_t_adj(adjugate, jacobian_determinant, mu, lambda, buff);
+    {
+        // // P.T * J^(-T) * det(J)/6
+        neohookean_PxJinv_t_adj(adjugate, jacobian_determinant, mu, lambda, buff);
+        const scalar_t *const PxJinv_t = buff;
 
-    // Inner product
-    outx[0] = -buff[0] - buff[1] - buff[2];
-    outx[1] = buff[0];
-    outx[2] = buff[1];
-    outx[3] = buff[2];
+        // Inner product
+        outx[0] = -PxJinv_t[0] - PxJinv_t[1] - PxJinv_t[2];
+        outx[1] = PxJinv_t[0];
+        outx[2] = PxJinv_t[1];
+        outx[3] = PxJinv_t[2];
+        outy[0] = -PxJinv_t[3] - PxJinv_t[4] - PxJinv_t[5];
+        outy[1] = PxJinv_t[3];
+        outy[2] = PxJinv_t[4];
+        outy[3] = PxJinv_t[5];
+        outz[0] = -PxJinv_t[6] - PxJinv_t[7] - PxJinv_t[8];
+        outz[1] = PxJinv_t[6];
+        outz[2] = PxJinv_t[7];
+        outz[3] = PxJinv_t[8];
+    }
 
-    outy[0] = -buff[3] - buff[4] - buff[5];
-    outy[1] = buff[3];
-    outy[2] = buff[4];
-    outy[3] = buff[5];
-
-    outz[0] = -buff[6] - buff[7] - buff[8];
-    outz[1] = buff[6];
-    outz[2] = buff[7];
-    outz[3] = buff[8];
+#else
+    const scalar_t x0 = 1.0 / jacobian_determinant;
+    const scalar_t x1 = adjugate[1] * x0;
+    const scalar_t x2 = adjugate[4] * x0;
+    const scalar_t x3 = adjugate[7] * x0;
+    const scalar_t x4 = -x1 - x2 - x3;
+    const scalar_t x5 = -ux[0] + ux[1];
+    const scalar_t x6 = -ux[0] + ux[2];
+    const scalar_t x7 = -ux[0] + ux[3];
+    const scalar_t x8 = x1 * x5 + x2 * x6 + x3 * x7;
+    const scalar_t x9 = -uy[0] + uy[1];
+    const scalar_t x10 = adjugate[0] * x0;
+    const scalar_t x11 = -uy[0] + uy[2];
+    const scalar_t x12 = adjugate[3] * x0;
+    const scalar_t x13 = -uy[0] + uy[3];
+    const scalar_t x14 = adjugate[6] * x0;
+    const scalar_t x15 = x10 * x9 + x11 * x12 + x13 * x14;
+    const scalar_t x16 = -uz[0] + uz[1];
+    const scalar_t x17 = adjugate[2] * x0;
+    const scalar_t x18 = -uz[0] + uz[2];
+    const scalar_t x19 = adjugate[5] * x0;
+    const scalar_t x20 = -uz[0] + uz[3];
+    const scalar_t x21 = adjugate[8] * x0;
+    const scalar_t x22 = x16 * x17 + x18 * x19 + x20 * x21 + 1;
+    const scalar_t x23 = x15 * x22;
+    const scalar_t x24 = x10 * x16 + x12 * x18 + x14 * x20;
+    const scalar_t x25 = x11 * x19 + x13 * x21 + x17 * x9;
+    const scalar_t x26 = -x23 + x24 * x25;
+    const scalar_t x27 = x1 * x16 + x18 * x2 + x20 * x3;
+    const scalar_t x28 = x17 * x5 + x19 * x6 + x21 * x7;
+    const scalar_t x29 = x1 * x9 + x11 * x2 + x13 * x3 + 1;
+    const scalar_t x30 = x24 * x29;
+    const scalar_t x31 = x10 * x5 + x12 * x6 + x14 * x7 + 1;
+    const scalar_t x32 = x25 * x27;
+    const scalar_t x33 =
+            x15 * x27 * x28 + x22 * x29 * x31 - x23 * x8 + x24 * x25 * x8 - x28 * x30 - x31 * x32;
+    const scalar_t x34 = 1.0 / x33;
+    const scalar_t x35 = mu * x34;
+    const scalar_t x36 = lambda * x34 * log(x33);
+    const scalar_t x37 = mu * x8 - x26 * x35 + x26 * x36;
+    const scalar_t x38 = -x17 - x19 - x21;
+    const scalar_t x39 = x15 * x27 - x30;
+    const scalar_t x40 = mu * x28 - x35 * x39 + x36 * x39;
+    const scalar_t x41 = -x10 - x12 - x14;
+    const scalar_t x42 = x22 * x29 - x32;
+    const scalar_t x43 = mu * x31 - x35 * x42 + x36 * x42;
+    const scalar_t x44 = (1.0 / 6.0) * jacobian_determinant;
+    const scalar_t x45 = -x22 * x8 + x27 * x28;
+    const scalar_t x46 = mu * x15 - x35 * x45 + x36 * x45;
+    const scalar_t x47 = x24 * x8 - x27 * x31;
+    const scalar_t x48 = mu * x25 - x35 * x47 + x36 * x47;
+    const scalar_t x49 = x22 * x31 - x24 * x28;
+    const scalar_t x50 = mu * x29 - x35 * x49 + x36 * x49;
+    const scalar_t x51 = x25 * x8 - x28 * x29;
+    const scalar_t x52 = mu * x24 - x35 * x51 + x36 * x51;
+    const scalar_t x53 = x15 * x28 - x25 * x31;
+    const scalar_t x54 = mu * x27 - x35 * x53 + x36 * x53;
+    const scalar_t x55 = -x15 * x8 + x29 * x31;
+    const scalar_t x56 = mu * x22 - x35 * x55 + x36 * x55;
+    outx[0] = x44 * (x37 * x4 + x38 * x40 + x41 * x43);
+    outx[1] = x44 * (x1 * x37 + x10 * x43 + x17 * x40);
+    outx[2] = x44 * (x12 * x43 + x19 * x40 + x2 * x37);
+    outx[3] = x44 * (x14 * x43 + x21 * x40 + x3 * x37);
+    outy[0] = x44 * (x38 * x48 + x4 * x50 + x41 * x46);
+    outy[1] = x44 * (x1 * x50 + x10 * x46 + x17 * x48);
+    outy[2] = x44 * (x12 * x46 + x19 * x48 + x2 * x50);
+    outy[3] = x44 * (x14 * x46 + x21 * x48 + x3 * x50);
+    outz[0] = x44 * (x38 * x56 + x4 * x54 + x41 * x52);
+    outz[1] = x44 * (x1 * x54 + x10 * x52 + x17 * x56);
+    outz[2] = x44 * (x12 * x52 + x19 * x56 + x2 * x54);
+    outz[3] = x44 * (x14 * x52 + x21 * x56 + x3 * x54);
+#endif
 }
 
 static SFEM_INLINE void neohookean_lin_stress_adj(const scalar_t *const SFEM_RESTRICT adjugate,
@@ -303,22 +400,23 @@ static SFEM_INLINE void neohookean_lin_stress_adj(const scalar_t *const SFEM_RES
                     inc_grad[8] * (mu + x111 * x52 - x112 * x51 + POW2(x51) * x8);
 }
 
-static SFEM_INLINE void tet4_neohookean_hessian_apply_adj(const scalar_t *const SFEM_RESTRICT adjugate,
-                                                    const scalar_t jacobian_determinant,
-                                                    const scalar_t mu,
-                                                    const scalar_t lambda,
-                                                    // Displacement
-                                                    const scalar_t *const SFEM_RESTRICT ux,
-                                                    const scalar_t *const SFEM_RESTRICT uy,
-                                                    const scalar_t *const SFEM_RESTRICT uz,
-                                                    // Increment
-                                                    const scalar_t *const SFEM_RESTRICT hx,
-                                                    const scalar_t *const SFEM_RESTRICT hy,
-                                                    const scalar_t *const SFEM_RESTRICT hz,
-                                                    // Output
-                                                    scalar_t *const SFEM_RESTRICT outx,
-                                                    scalar_t *const SFEM_RESTRICT outy,
-                                                    scalar_t *const SFEM_RESTRICT outz)
+static SFEM_INLINE void tet4_neohookean_hessian_apply_adj(const scalar_t *const SFEM_RESTRICT
+                                                                  adjugate,
+                                                          const scalar_t jacobian_determinant,
+                                                          const scalar_t mu,
+                                                          const scalar_t lambda,
+                                                          // Displacement
+                                                          const scalar_t *const SFEM_RESTRICT ux,
+                                                          const scalar_t *const SFEM_RESTRICT uy,
+                                                          const scalar_t *const SFEM_RESTRICT uz,
+                                                          // Increment
+                                                          const scalar_t *const SFEM_RESTRICT hx,
+                                                          const scalar_t *const SFEM_RESTRICT hy,
+                                                          const scalar_t *const SFEM_RESTRICT hz,
+                                                          // Output
+                                                          scalar_t *const SFEM_RESTRICT outx,
+                                                          scalar_t *const SFEM_RESTRICT outy,
+                                                          scalar_t *const SFEM_RESTRICT outz)
 
 {
     scalar_t buff[9];
@@ -338,16 +436,16 @@ static SFEM_INLINE void tet4_neohookean_hessian_apply_adj(const scalar_t *const 
     // 2nd Order linearization (lin_stress)
     neohookean_lin_stress_adj(adjugate, jacobian_determinant, mu, lambda, inc_grad, buff);
 
-    // lin_stress^T * (jac_inv^(-T) * det(J)/6)
+    // lin_stress * (jac_inv^(-T) * det(J)/6)
     const scalar_t x0 = (1.0 / 6.0);
     const scalar_t x1 = buff[0] * x0;
-    const scalar_t x2 = buff[3] * x0;
-    const scalar_t x3 = buff[6] * x0;
-    const scalar_t x4 = buff[1] * x0;
+    const scalar_t x2 = buff[1] * x0;
+    const scalar_t x3 = buff[2] * x0;
+    const scalar_t x4 = buff[3] * x0;
     const scalar_t x5 = buff[4] * x0;
-    const scalar_t x6 = buff[7] * x0;
-    const scalar_t x7 = buff[2] * x0;
-    const scalar_t x8 = buff[5] * x0;
+    const scalar_t x6 = buff[5] * x0;
+    const scalar_t x7 = buff[6] * x0;
+    const scalar_t x8 = buff[7] * x0;
     const scalar_t x9 = buff[8] * x0;
     buff[0] = adjugate[0] * x1 + adjugate[1] * x2 + adjugate[2] * x3;
     buff[1] = adjugate[3] * x1 + adjugate[4] * x2 + adjugate[5] * x3;

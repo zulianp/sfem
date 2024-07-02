@@ -16,8 +16,8 @@ from symbolic_fe import *
 from time import perf_counter
 
 def simplify(expr):
-	return expr;
-	# return sp.simplify(expr)
+	# return expr;
+	return sp.simplify(expr)
 
 def assign_matrix(name, mat):
 	rows, cols = mat.shape
@@ -42,9 +42,10 @@ class HyperElasticity:
 		test_grad  	   = matrix_coeff('test_grad', dims, dims)
 		inc_grad_symb  = matrix_coeff('inc_grad', dims, dims)
 		disp_grad_symb = matrix_coeff('disp_grad', dims, dims)
-		displacement   = coeffs('u', dims * fe.n_nodes())
-		increment 	   = coeffs('h', dims * fe.n_nodes())
-		value 	       = coeffs('v', dims * fe.n_nodes())
+
+		displacement   = coeffs_SoA('u', dims, fe.n_nodes())
+		increment 	   = coeffs_SoA('h', dims, fe.n_nodes())
+		value 	       = coeffs_SoA('v', dims, fe.n_nodes())
 
 		ref_grad = fe.tgrad(q)
 		jac_inv = fe.symbol_jacobian_inverse_as_adjugate()
@@ -106,6 +107,7 @@ class HyperElasticity:
 		self.inc_grad = inc_grad
 		self.vec_grad = vec_grad
 		self.ref_grad = ref_grad
+		self.displacement = displacement
 
 	def check_symmetries(self):
 		dims = self.dims
@@ -120,27 +122,71 @@ class HyperElasticity:
 				diff = sp.simplify(diff)
 				print(f'{d1}, {d2}) {diff}')
 
+	# Reference expressions
+	def gradient_expected(self):
+		expr = []	
+
+		dims = self.fe.spatial_dim()
+		test_grad = self.fe.physical_tgrad(self.q)
+		disp_grad = self.disp_grad 
+		F = disp_grad + sp.eye(dims, dims)
+
+		output = coeffs_SoA('out', dims, self.fe.n_nodes())
+
+		for i in range(0, self.fe.spatial_dim() * self.fe.n_nodes()):
+			gi = inner(self.P, test_grad[i]) 
+			gi = subsmat(gi, self.F, F) * (self.fe.symbol_jacobian_determinant() * self.fe.reference_measure())
+			expr.append(ast.Assignment(output[i], gi))
+		
+		c_code(expr)
+
+	def gradient_check(self):
+		expr = []	
+		dims = self.fe.spatial_dim()
+		jac_inv = self.fe.symbol_jacobian_inverse_as_adjugate()
+		P = self.P
+		
+		rtest_grad = self.fe.tgrad(self.q)
+		ptest_grad = self.fe.physical_tgrad(self.q)
+
+
+		disp_grad = self.disp_grad 
+		
+		F = disp_grad + sp.eye(dims, dims)
+		output = coeffs_SoA('out', dims, self.fe.n_nodes())
+		
+
+
+		for i in range(0, self.fe.spatial_dim() * self.fe.n_nodes()):
+			gi_expected = sp.simplify(inner(P, ptest_grad[i]) )
+			gi_actual =   sp.simplify(inner(P * jac_inv.T, rtest_grad[i])) 
+			diff = sp.simplify(gi_expected - gi_actual)
+			print(diff)
+			assert diff == 0
+
+		
+
 	def gradient(self):
 		P = self.P
 		jac_inv = self.fe.symbol_jacobian_inverse_as_adjugate()
-		P_tXJinv_t = P.T * jac_inv.T * (self.fe.symbol_jacobian_determinant() * self.fe.reference_measure())
+		PxJinv_t = P * jac_inv.T * (self.fe.symbol_jacobian_determinant() * self.fe.reference_measure())
 
 		dims = self.fe.manifold_dim()
 		for i in range(0, dims):
 			for j in range(0, dims):
-				P_tXJinv_t[i, j] = simplify(P_tXJinv_t[i, j])
+				PxJinv_t[i, j] = simplify(PxJinv_t[i, j])
 
-		P_tXJinv_t_sym = matrix_coeff('P_tXJinv_t', dims, dims)
-		lform = sp.zeros(self.fe.n_nodes() * dims, 1)
+		PxJinv_t_sym = matrix_coeff('PxJinv_t', dims, dims)
+		lform = []
+		output = coeffs_SoA('out', dims, self.fe.n_nodes())
 		for i in range(0, self.fe.n_nodes() * dims):
-			lform[i] = inner(P_tXJinv_t_sym, self.ref_grad[i]) 
-			lform[i] = simplify(lform[i])
+			lform.append(ast.Assignment(output[i], inner(PxJinv_t_sym, self.ref_grad[i]) ))
 
 		ret = {
 			'disp_grad'	: assign_matrix('disp_grad', self.disp_grad),
 			'F' : assign_matrix('F', self.disp_grad_symb + sp.eye(dims, dims)),
-			'P_tXJinv_t' : assign_matrix('P_tXJinv_t', P_tXJinv_t),
-			'lform' : assign_matrix('lform', lform)
+			'PxJinv_t' : assign_matrix('PxJinv_t', PxJinv_t),
+			'lform' : lform
 		}
 
 		return ret
@@ -156,7 +202,7 @@ class HyperElasticity:
 		dims = self.fe.spatial_dim()
 		ref_grad = self.ref_grad
 
-		loperand = lin_stress_symb.T * (jac_inv.T * dV)
+		loperand = lin_stress_symb * (jac_inv.T * dV)
 
 		expr = loperand.copy()
 		for d1 in range(0, dims):
@@ -235,25 +281,28 @@ def main():
 	model = NeoHookeanOgden(fe.spatial_dim())
 	op = HyperElasticity(fe, model)
 
-	if False:
-		op.check_symmetries()
-	else:
-		print("HESSIAN")
-		op_hessian_apply = op.hessian_apply()
-		for k, v in op_hessian_apply.items():
-			print('-------------------------------')
-			print(f'{k}')
-			print('-------------------------------')
-			c_code(v)
-			print('-------------------------------')
+	# op.gradient_check()
 
-		# print("GRADIENT")
-		# op_gradient = op.gradient()
-		# for k, v in op_gradient.items():
-		# 	print('// -------------------------------')
-		# 	print(f'// {k}')
-		# 	print('// -------------------------------')
-		# 	c_code(v)
+	# op.gradient_expected()
+	# if False:
+	# 	op.check_symmetries()
+	# else:
+	print("HESSIAN")
+	op_hessian_apply = op.hessian_apply()
+	for k, v in op_hessian_apply.items():
+		print('-------------------------------')
+		print(f'{k}')
+		print('-------------------------------')
+		c_code(v)
+		print('-------------------------------')
+
+	# print("GRADIENT")
+	# op_gradient = op.gradient()
+	# for k, v in op_gradient.items():
+	# 	print('// -------------------------------')
+	# 	print(f'// {k}')
+	# 	print('// -------------------------------')
+	# 	c_code(v)
 
 	stop = perf_counter()
 	console.print(f'Overall: {stop - start} seconds')

@@ -36,9 +36,9 @@ static SFEM_INLINE void tet4_linear_elasticity_loperand(
         const scalar_t mu,
         const scalar_t lambda,
         const scalar_t *const SFEM_RESTRICT adjugate,
-        scalar_t *const SFEM_RESTRICT in_disp_grad_out_P_tXJinv_t) {
+        scalar_t *const SFEM_RESTRICT in_disp_grad_out_PxJinv_t) {
     // Shorter name
-    scalar_t *const buff = in_disp_grad_out_P_tXJinv_t;
+    scalar_t *const buff = in_disp_grad_out_PxJinv_t;
 
     const scalar_t x0 = (1.0 / 6.0) * mu;
     const scalar_t x1 = x0 * (buff[1] + buff[3]);
@@ -71,22 +71,22 @@ static SFEM_INLINE void tet4_linear_elasticity_apply_adj(const scalar_t *const S
                                                          accumulator_t *const SFEM_RESTRICT outx,
                                                          accumulator_t *const SFEM_RESTRICT outy,
                                                          accumulator_t *const SFEM_RESTRICT outz) {
-    scalar_t P_tXJinv_t[9];
-    tet4_gradient_3(adjugate, jacobian_determinant, ux, uy, uz, P_tXJinv_t);
-    tet4_linear_elasticity_loperand(mu, lambda, adjugate, P_tXJinv_t);
+    scalar_t PxJinv_t[9];
+    tet4_gradient_3(adjugate, jacobian_determinant, ux, uy, uz, PxJinv_t);
+    tet4_linear_elasticity_loperand(mu, lambda, adjugate, PxJinv_t);
 
-    outx[0] = -P_tXJinv_t[0] - P_tXJinv_t[1] - P_tXJinv_t[2];
-    outx[1] = P_tXJinv_t[0];
-    outx[2] = P_tXJinv_t[1];
-    outx[3] = P_tXJinv_t[2];
-    outy[0] = -P_tXJinv_t[3] - P_tXJinv_t[4] - P_tXJinv_t[5];
-    outy[1] = P_tXJinv_t[3];
-    outy[2] = P_tXJinv_t[4];
-    outy[3] = P_tXJinv_t[5];
-    outz[0] = -P_tXJinv_t[6] - P_tXJinv_t[7] - P_tXJinv_t[8];
-    outz[1] = P_tXJinv_t[6];
-    outz[2] = P_tXJinv_t[7];
-    outz[3] = P_tXJinv_t[8];
+    outx[0] = -PxJinv_t[0] - PxJinv_t[1] - PxJinv_t[2];
+    outx[1] = PxJinv_t[0];
+    outx[2] = PxJinv_t[1];
+    outx[3] = PxJinv_t[2];
+    outy[0] = -PxJinv_t[3] - PxJinv_t[4] - PxJinv_t[5];
+    outy[1] = PxJinv_t[3];
+    outy[2] = PxJinv_t[4];
+    outy[3] = PxJinv_t[5];
+    outz[0] = -PxJinv_t[6] - PxJinv_t[7] - PxJinv_t[8];
+    outz[1] = PxJinv_t[6];
+    outz[2] = PxJinv_t[7];
+    outz[3] = PxJinv_t[8];
 }
 
 static SFEM_INLINE void tet4_linear_elasticity_apply_add_adj(
@@ -100,22 +100,22 @@ static SFEM_INLINE void tet4_linear_elasticity_apply_add_adj(
         accumulator_t *const SFEM_RESTRICT outx,
         accumulator_t *const SFEM_RESTRICT outy,
         accumulator_t *const SFEM_RESTRICT outz) {
-    scalar_t P_tXJinv_t[9];
-    tet4_gradient_3(adjugate, jacobian_determinant, ux, uy, uz, P_tXJinv_t);
-    tet4_linear_elasticity_loperand(mu, lambda, adjugate, P_tXJinv_t);
+    scalar_t PxJinv_t[9];
+    tet4_gradient_3(adjugate, jacobian_determinant, ux, uy, uz, PxJinv_t);
+    tet4_linear_elasticity_loperand(mu, lambda, adjugate, PxJinv_t);
 
-    outx[0] = -P_tXJinv_t[0] - P_tXJinv_t[1] - P_tXJinv_t[2];
-    outx[1] = P_tXJinv_t[0];
-    outx[2] = P_tXJinv_t[1];
-    outx[3] = P_tXJinv_t[2];
-    outy[0] = -P_tXJinv_t[3] - P_tXJinv_t[4] - P_tXJinv_t[5];
-    outy[1] = P_tXJinv_t[3];
-    outy[2] = P_tXJinv_t[4];
-    outy[3] = P_tXJinv_t[5];
-    outz[0] = -P_tXJinv_t[6] - P_tXJinv_t[7] - P_tXJinv_t[8];
-    outz[1] = P_tXJinv_t[6];
-    outz[2] = P_tXJinv_t[7];
-    outz[3] = P_tXJinv_t[8];
+    outx[0] = -PxJinv_t[0] - PxJinv_t[1] - PxJinv_t[2];
+    outx[1] = PxJinv_t[0];
+    outx[2] = PxJinv_t[1];
+    outx[3] = PxJinv_t[2];
+    outy[0] = -PxJinv_t[3] - PxJinv_t[4] - PxJinv_t[5];
+    outy[1] = PxJinv_t[3];
+    outy[2] = PxJinv_t[4];
+    outy[3] = PxJinv_t[5];
+    outz[0] = -PxJinv_t[6] - PxJinv_t[7] - PxJinv_t[8];
+    outz[1] = PxJinv_t[6];
+    outz[2] = PxJinv_t[7];
+    outz[3] = PxJinv_t[8];
 }
 
 static SFEM_INLINE void tet4_linear_elasticity_diag_adj(const scalar_t mu,
