@@ -235,6 +235,7 @@ int neohookean_ogden_diag_aos(const enum ElemType element_type,
                               geom_t **const SFEM_RESTRICT points,
                               const real_t mu,
                               const real_t lambda,
+                              const real_t *const SFEM_RESTRICT u,
                               real_t *const SFEM_RESTRICT values) {
     assert(0);  // IMPLEMENT ME
     return -1;
