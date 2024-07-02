@@ -11,6 +11,7 @@
 #include "crs_graph.h"
 #include "sfem_base.h"
 
+#include "neohookean_ogden.h"
 #include "tet4_neohookean.h"
 
 #include "read_mesh.h"
@@ -67,7 +68,8 @@ int main(int argc, char *argv[]) {
     const int dims = mesh.spatial_dim;
 
     real_t **displacement = (real_t **)malloc(dims * sizeof(real_t *));
-    for (int b = 0; b < dims * dims; b++) {
+    
+    for (int b = 0; b < dims; b++) {
         displacement[b] = (real_t *)calloc(nnodes, sizeof(real_t));
     }
 
@@ -90,7 +92,7 @@ int main(int argc, char *argv[]) {
     count_t *rowptr = 0;
     idx_t *colidx = 0;
     build_crs_graph_for_elem_type(
-        mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
+            mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
     nnz = rowptr[nnodes];
 
     real_t **values = (real_t **)malloc(dims * dims * sizeof(real_t *));
@@ -102,29 +104,44 @@ int main(int argc, char *argv[]) {
     printf("neohookean_assemble.c: build crs\t\t%g seconds\n", tock - tack);
     tack = tock;
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Operator assembly
-    ///////////////////////////////////////////////////////////////////////////////
-
-    neohookean_assemble_hessian_soa(
-        // Mesh
-        mesh.nelements,
-        mesh.nnodes,
-        mesh.elements,
-        mesh.points,
-        // Material
-        SFEM_MU,
-        SFEM_LAMBDA,
-        displacement,
-        // Output
-        rowptr,
-        colidx,
-        values);
 
     real_t **rhs = (real_t **)malloc(dims * sizeof(real_t *));
     for (int b = 0; b < dims; b++) {
         rhs[b] = (real_t *)calloc(nnodes, sizeof(real_t));
     }
+
+    ///////////////////////////////////////////////////////////////////////////////
+    // Gradient assembly
+    ///////////////////////////////////////////////////////////////////////////////
+
+    neohookean_ogden_gradient_soa(mesh.element_type,
+                                  mesh.nelements,
+                                  mesh.nnodes,
+                                  mesh.elements,
+                                  mesh.points,
+                                  SFEM_MU,
+                                  SFEM_LAMBDA,
+                                  displacement,
+                                  rhs);
+
+    ///////////////////////////////////////////////////////////////////////////////
+    // Hessian assembly
+    ///////////////////////////////////////////////////////////////////////////////
+
+    neohookean_assemble_hessian_soa(
+            // Mesh
+            mesh.nelements,
+            mesh.nnodes,
+            mesh.elements,
+            mesh.points,
+            // Material
+            SFEM_MU,
+            SFEM_LAMBDA,
+            displacement,
+            // Output
+            rowptr,
+            colidx,
+            values);
 
     tock = MPI_Wtime();
     printf("neohookean_assemble.c: assembly\t\t%g seconds\n", tock - tack);
