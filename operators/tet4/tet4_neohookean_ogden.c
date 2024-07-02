@@ -10,6 +10,10 @@
 #include "sfem_vec.h"
 #include "tet4_neohookean_ogden_inline_cpu.h"
 
+// #ifndef NDEBUG
+// #include "tet4_neohookean.h"
+// #endif
+
 // int tet4_neohookean_ogden_value(const ptrdiff_t nelements,
 //                                 const ptrdiff_t nnodes,
 //                                 idx_t **const SFEM_RESTRICT elements,
@@ -274,6 +278,29 @@ int tet4_neohookean_ogden_gradient(const ptrdiff_t nelements,
             outz[idx] += element_outz[edof_i];
         }
     }
+
+// #ifndef NDEBUG
+//     printf("TESTING NEO\n");
+//     real_t *test_input = calloc(nnodes * 3, sizeof(real_t));
+//     for (ptrdiff_t i = 0; i < nnodes; i++) {
+//         test_input[i * 3] = ux[i * u_stride];
+//         test_input[i * 3 + 1] = uy[i * u_stride];
+//         test_input[i * 3 + 2] = uz[i * u_stride];
+//     }
+
+//     real_t *test_values = calloc(nnodes * 3, sizeof(real_t));
+//     neohookean_assemble_gradient(
+//             nelements, nnodes, elements, points, mu, lambda, test_input, test_values);
+
+//     for (ptrdiff_t i = 0; i < nnodes; i++) {
+//         assert(fabs(test_values[i * 3] - outx[i * out_stride]) < 1e-10);
+//         assert(fabs(test_values[i * 3 + 1] - outy[i * out_stride]) < 1e-10);
+//         assert(fabs(test_values[i * 3 + 2] - outz[i * out_stride]) < 1e-10);
+//     }
+
+//     free(test_input);
+//     free(test_values);
+// #endif
 
     return 0;
 }
