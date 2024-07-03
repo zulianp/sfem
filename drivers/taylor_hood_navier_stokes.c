@@ -121,6 +121,12 @@ static void shift_diag(const ptrdiff_t n,
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
+     if(sizeof(real_t) != sizeof(isolver_scalar_t)) {
+        fprintf(stderr, "%s Uncompatrible scalar types for isolver (real_t != isolver_scalar_t)\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
+
     MPI_Comm comm = MPI_COMM_WORLD;
     isolver_lsolve_t lsolve[N_SYSTEMS];
 

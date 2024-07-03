@@ -45,6 +45,7 @@ set(SFEM_MODULES
     operators/tet10
     operators/tet4
     operators/tet4/vectorized
+    operators/tet4/cuda
     operators/tri3
     operators/tri6
     operators/trishell3

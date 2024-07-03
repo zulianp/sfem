@@ -1,3 +1,6 @@
+#ifndef TET4_INLINE_GPU_H
+#define TET4_INLINE_GPU_H
+
 #ifndef POW2
 #define POW2(a) ((a) * (a))
 #endif
@@ -160,3 +163,4 @@ static inline __device__ __host__ void tet4_find_cols(const idx_t *SFEM_RESTRICT
         }
     }
 }
+#endif  // TET4_INLINE_GPU_H

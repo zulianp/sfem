@@ -1,7 +1,7 @@
 #include "sfem_Function_incore_cuda.hpp"
 #include <memory>
 #include "boundary_condition.h"
-#include "isolver_function.h"
+// #include "isolver_function.h"
 
 #include "laplacian_incore_cuda.h"
 #include "linear_elasticity_incore_cuda.h"
@@ -37,7 +37,7 @@ namespace sfem {
             }
         }
 
-        int apply(isolver_scalar_t *const x) {
+        int apply(real_t *const x) {
             for (int i = 0; i < n_dirichlet_conditions; i++) {
                 d_constraint_nodes_to_value_vec(dirichlet_conditions[i].local_size,
                                                 dirichlet_conditions[i].idx,
@@ -47,10 +47,10 @@ namespace sfem {
                                                 x);
             }
 
-            return ISOLVER_FUNCTION_SUCCESS;
+            return SFEM_SUCCESS;
         }
 
-        int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const g) {
+        int gradient(const real_t *const x, real_t *const g) {
             for (int i = 0; i < n_dirichlet_conditions; i++) {
                 d_constraint_gradient_nodes_to_value_vec(dirichlet_conditions[i].local_size,
                                                          dirichlet_conditions[i].idx,
@@ -61,13 +61,13 @@ namespace sfem {
                                                          g);
             }
 
-            return ISOLVER_FUNCTION_SUCCESS;
+            return SFEM_SUCCESS;
 
             // assert(false);
-            // return ISOLVER_FUNCTION_FAILURE;
+            // return SFEM_FAILURE;
         }
 
-        int apply_value(const isolver_scalar_t value, isolver_scalar_t *const x) {
+        int apply_value(const real_t value, real_t *const x) {
             for (int i = 0; i < n_dirichlet_conditions; i++) {
                 d_constraint_nodes_to_value_vec(dirichlet_conditions[i].local_size,
                                                 dirichlet_conditions[i].idx,
@@ -77,10 +77,10 @@ namespace sfem {
                                                 x);
             }
 
-            return ISOLVER_FUNCTION_SUCCESS;
+            return SFEM_SUCCESS;
         }
 
-        int copy_constrained_dofs(const isolver_scalar_t *const src, isolver_scalar_t *const dest) {
+        int copy_constrained_dofs(const real_t *const src, real_t *const dest) {
             for (int i = 0; i < n_dirichlet_conditions; i++) {
                 d_constraint_nodes_copy_vec(dirichlet_conditions[i].local_size,
                                             dirichlet_conditions[i].idx,
@@ -90,13 +90,13 @@ namespace sfem {
                                             dest);
             }
 
-            return ISOLVER_FUNCTION_SUCCESS;
+            return SFEM_SUCCESS;
         }
 
-        int hessian_crs(const isolver_scalar_t *const x,
-                        const isolver_idx_t *const rowptr,
-                        const isolver_idx_t *const colidx,
-                        isolver_scalar_t *const values) {
+        int hessian_crs(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values) {
             // for (int i = 0; i < n_dirichlet_conditions; i++) {
             //     d_crs_constraint_nodes_to_identity_vec(dirichlet_conditions[i].local_size,
             //                                            dirichlet_conditions[i].idx,
@@ -108,10 +108,10 @@ namespace sfem {
             //                                            values);
             // }
 
-            // return ISOLVER_FUNCTION_SUCCESS;
+            // return SFEM_SUCCESS;
 
             assert(false);
-            return ISOLVER_FUNCTION_FAILURE;
+            return SFEM_FAILURE;
         }
 
         std::shared_ptr<Constraint> lor() const override
@@ -165,39 +165,39 @@ namespace sfem {
                                        mesh->elements,
                                        mesh->points);
 
-            return ISOLVER_FUNCTION_SUCCESS;
+            return SFEM_SUCCESS;
         }
 
         GPULaplacian(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
-        int hessian_crs(const isolver_scalar_t *const x,
-                        const isolver_idx_t *const rowptr,
-                        const isolver_idx_t *const colidx,
-                        isolver_scalar_t *const values) override {
+        int hessian_crs(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values) override {
             std::cerr << "Unimplemented function hessian_crs in GPULaplacian\n";
             assert(0);
-            return ISOLVER_FUNCTION_FAILURE;
+            return SFEM_FAILURE;
         }
 
-        int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) override {
+        int gradient(const real_t *const x, real_t *const out) override {
             cuda_incore_laplacian_apply(&ctx, x, out);
-            return ISOLVER_FUNCTION_SUCCESS;
+            return SFEM_SUCCESS;
         }
 
-        int apply(const isolver_scalar_t *const x,
-                  const isolver_scalar_t *const h,
-                  isolver_scalar_t *const out) override {
+        int apply(const real_t *const x,
+                  const real_t *const h,
+                  real_t *const out) override {
             cuda_incore_laplacian_apply(&ctx, h, out);
-            return ISOLVER_FUNCTION_SUCCESS;
+            return SFEM_SUCCESS;
         }
 
-        int value(const isolver_scalar_t *x, isolver_scalar_t *const out) override {
+        int value(const real_t *x, real_t *const out) override {
             std::cerr << "Unimplemented function value in GPULaplacian\n";
             assert(0);
-            return ISOLVER_FUNCTION_FAILURE;
+            return SFEM_FAILURE;
         }
 
-        int report(const isolver_scalar_t *const) override { return ISOLVER_FUNCTION_SUCCESS; }
+        int report(const real_t *const) override { return SFEM_SUCCESS; }
         ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
     };
 
@@ -232,45 +232,45 @@ namespace sfem {
                                                mesh->elements,
                                                mesh->points);
 
-            return ISOLVER_FUNCTION_SUCCESS;
+            return SFEM_SUCCESS;
         }
 
         GPULinearElasticity(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
-        int hessian_crs(const isolver_scalar_t *const x,
-                        const isolver_idx_t *const rowptr,
-                        const isolver_idx_t *const colidx,
-                        isolver_scalar_t *const values) override {
+        int hessian_crs(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values) override {
             std::cerr << "Unimplemented function hessian_crs in GPULinearElasticity\n";
             assert(0);
-            return ISOLVER_FUNCTION_FAILURE;
+            return SFEM_FAILURE;
         }
 
-        int hessian_diag(const isolver_scalar_t *const /*x*/,
-                         isolver_scalar_t *const values) override {
+        int hessian_diag(const real_t *const /*x*/,
+                         real_t *const values) override {
             cuda_incore_linear_elasticity_diag(&ctx, values);
-            return ISOLVER_FUNCTION_SUCCESS;
+            return SFEM_SUCCESS;
         }
 
-        int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) override {
+        int gradient(const real_t *const x, real_t *const out) override {
             cuda_incore_linear_elasticity_apply(&ctx, x, out);
-            return ISOLVER_FUNCTION_SUCCESS;
+            return SFEM_SUCCESS;
         }
 
-        int apply(const isolver_scalar_t *const x,
-                  const isolver_scalar_t *const h,
-                  isolver_scalar_t *const out) override {
+        int apply(const real_t *const x,
+                  const real_t *const h,
+                  real_t *const out) override {
             cuda_incore_linear_elasticity_apply(&ctx, h, out);
-            return ISOLVER_FUNCTION_SUCCESS;
+            return SFEM_SUCCESS;
         }
 
-        int value(const isolver_scalar_t *x, isolver_scalar_t *const out) override {
+        int value(const real_t *x, real_t *const out) override {
             std::cerr << "Unimplemented function value in GPULinearElasticity\n";
             assert(0);
-            return ISOLVER_FUNCTION_FAILURE;
+            return SFEM_FAILURE;
         }
 
-        int report(const isolver_scalar_t *const) override { return ISOLVER_FUNCTION_SUCCESS; }
+        int report(const real_t *const) override { return SFEM_SUCCESS; }
         ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
     };
 
