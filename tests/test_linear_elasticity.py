@@ -36,24 +36,25 @@ def solve_linear_elasticity(options):
 	sfem.add_condition(bc, sinlet, 1, 0.);
 	sfem.add_condition(bc, sinlet, 2, 0.);
 
-	sfem.add_condition(bc, soutlet, 0, 1);
-	sfem.add_condition(bc, soutlet, 1, 0.);
-	sfem.add_condition(bc, soutlet, 2, 0.);
+	# sfem.add_condition(bc, soutlet, 0, 1);
+	# sfem.add_condition(bc, soutlet, 1, 0.);
+	# sfem.add_condition(bc, soutlet, 2, 0.);
 
 	fun.add_dirichlet_conditions(bc)
 
-	# nc = sfem.NeumannConditions(fs)
-	# sfem.add_condition(nc, soutlet, 0, 1)
-	# fun.add_operator(nc)
+	nc = sfem.NeumannConditions(fs)
+	sfem.add_condition(nc, soutlet, 0, 1)
+	fun.add_operator(nc)
 
 	x = np.zeros(fs.n_dofs())
 	cg = sfem.ConjugateGradient()
 	cg.default_init()
-	cg.set_max_it(100)
+	cg.set_max_it(50)
+	cg.set_rtol(1e-2)
+	cg.set_atol(1e-12)
 	cg.set_verbose(False)
-
-	lop = sfem.make_op(fun, x)
-	cg.set_op(lop)
+	
+	damping = 1
 
 	# use_prec = True
 	use_prec = False
@@ -70,13 +71,19 @@ def solve_linear_elasticity(options):
 
 	# Newton iteration
 	g = np.zeros(fs.n_dofs())
+	c = np.zeros(fs.n_dofs())
 	for i in range(0, 100):
-		# sfem.apply_constraints(fun, x)
 		g[:] = 0
 		sfem.gradient(fun, x, g)
-		c = np.zeros(fs.n_dofs())
+		
+		# As the pointer of x is used not necessary to be in the loop
+		# But maybe there will be some side effect in the future
+		lop = sfem.make_op(fun, x)
+		cg.set_op(lop)
+
+		c[:] = 0
 		sfem.apply(cg, g, c)
-		x -= c
+		x -= damping * c
 
 		norm_g = linalg.norm(g)
 		print(f'{i}) norm_g = {norm_g}')

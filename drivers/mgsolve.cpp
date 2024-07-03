@@ -282,7 +282,8 @@ int main(int argc, char *argv[]) {
             solver_coarse->set_op(linear_op_coarse);
             solver_coarse->verbose = false;
             solver_coarse->set_max_it(1000);
-            solver_coarse->tol = 1e-12;
+            solver_coarse->set_atol(1e-12);
+            solver_coarse->set_rtol(1e-8);
 
             if (SFEM_USE_PRECONDITIONER) {
                 f_coarse->hessian_diag(nullptr, diag_coarse->data());
@@ -378,7 +379,7 @@ int main(int argc, char *argv[]) {
         }
 
         solver->verbose = true;
-        solver->tol = SFEM_TOL;
+        solver->set_atol(SFEM_TOL);
         solver->set_max_it(SFEM_MAX_IT);
 
 #endif
