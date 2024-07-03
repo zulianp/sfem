@@ -10,22 +10,22 @@
 #include "sfem_vec.h"
 #include "tet4_neohookean_ogden_inline_cpu.h"
 
-static void neohookean_gradient(const real_t mu,
-                                const real_t lambda,
-                                const real_t px0,
-                                const real_t px1,
-                                const real_t px2,
-                                const real_t px3,
-                                const real_t py0,
-                                const real_t py1,
-                                const real_t py2,
-                                const real_t py3,
-                                const real_t pz0,
-                                const real_t pz1,
-                                const real_t pz2,
-                                const real_t pz3,
-                                const real_t *const SFEM_RESTRICT u,
-                                real_t *const SFEM_RESTRICT element_vector) {
+static void neohookean_gradient_ref(const real_t mu,
+                                    const real_t lambda,
+                                    const real_t px0,
+                                    const real_t px1,
+                                    const real_t px2,
+                                    const real_t px3,
+                                    const real_t py0,
+                                    const real_t py1,
+                                    const real_t py2,
+                                    const real_t py3,
+                                    const real_t pz0,
+                                    const real_t pz1,
+                                    const real_t pz2,
+                                    const real_t pz3,
+                                    const real_t *const SFEM_RESTRICT u,
+                                    real_t *const SFEM_RESTRICT element_vector) {
     // FLOATING POINT OPS!
     //  - Result: 12*ADD + 12*ASSIGNMENT + 48*MUL
     //  - Subexpressions: 49*ADD + 5*DIV + LOG + 151*MUL + 13*NEG + 50*SUB
@@ -268,15 +268,17 @@ int tet4_neohookean_ogden_apply(const ptrdiff_t nelements,
         }
 
         for (int v = 0; v < 4; ++v) {
-            element_ux[v] = ux[ev[v] * u_stride];
-            element_uy[v] = uy[ev[v] * u_stride];
-            element_uz[v] = uz[ev[v] * u_stride];
+            const ptrdiff_t idx = ev[v] * u_stride;
+            element_ux[v] = ux[idx];
+            element_uy[v] = uy[idx];
+            element_uz[v] = uz[idx];
         }
 
         for (int v = 0; v < 4; ++v) {
-            element_hx[v] = hx[ev[v] * h_stride];
-            element_hy[v] = hy[ev[v] * h_stride];
-            element_hz[v] = hz[ev[v] * h_stride];
+            const ptrdiff_t idx = ev[v] * h_stride;
+            element_hx[v] = hx[idx];
+            element_hy[v] = hy[idx];
+            element_hz[v] = hz[idx];
         }
 
         tet4_adjugate_and_det_s(x[ev[0]],
@@ -367,9 +369,10 @@ int tet4_neohookean_ogden_gradient(const ptrdiff_t nelements,
         }
 
         for (int v = 0; v < 4; ++v) {
-            element_ux[v] = ux[ev[v] * u_stride];
-            element_uy[v] = uy[ev[v] * u_stride];
-            element_uz[v] = uz[ev[v] * u_stride];
+            const ptrdiff_t idx = ev[v] * u_stride;
+            element_ux[v] = ux[idx];
+            element_uy[v] = uy[idx];
+            element_uz[v] = uz[idx];
         }
 
         tet4_adjugate_and_det_s(
@@ -414,24 +417,24 @@ int tet4_neohookean_ogden_gradient(const ptrdiff_t nelements,
             test_u[2 + k * 3] = element_uz[k];
         }
 
-        neohookean_gradient(mu,
-                            lambda,
-                            x[ev[0]],
-                            x[ev[1]],
-                            x[ev[2]],
-                            x[ev[3]],
-                            // Y-coordinates
-                            y[ev[0]],
-                            y[ev[1]],
-                            y[ev[2]],
-                            y[ev[3]],
-                            // Z-coordinates
-                            z[ev[0]],
-                            z[ev[1]],
-                            z[ev[2]],
-                            z[ev[3]],
-                            test_u,
-                            test_vector);
+        neohookean_gradient_ref(mu,
+                                lambda,
+                                x[ev[0]],
+                                x[ev[1]],
+                                x[ev[2]],
+                                x[ev[3]],
+                                // Y-coordinates
+                                y[ev[0]],
+                                y[ev[1]],
+                                y[ev[2]],
+                                y[ev[3]],
+                                // Z-coordinates
+                                z[ev[0]],
+                                z[ev[1]],
+                                z[ev[2]],
+                                z[ev[3]],
+                                test_u,
+                                test_vector);
 
         for (int k = 0; k < 4; k++) {
             scalar_t diffx = test_vector[0 + k * 3] - element_outx[k];
@@ -507,9 +510,10 @@ int tet4_neohookean_ogden_diag(const ptrdiff_t nelements,
         }
 
         for (int v = 0; v < 4; ++v) {
-            element_ux[v] = ux[ev[v] * u_stride];
-            element_uy[v] = uy[ev[v] * u_stride];
-            element_uz[v] = uz[ev[v] * u_stride];
+            const ptrdiff_t idx = ev[v] * u_stride;
+            element_ux[v] = ux[idx];
+            element_uy[v] = uy[idx];
+            element_uz[v] = uz[idx];
         }
 
         tet4_adjugate_and_det_s(x[ev[0]],
@@ -618,3 +622,74 @@ int tet4_neohookean_ogden_diag(const ptrdiff_t nelements,
 
 //     return 0;
 // }
+
+int tet4_neohookean_ogden_hessian(const ptrdiff_t nelements,
+                                  const ptrdiff_t nnodes,
+                                  idx_t **const SFEM_RESTRICT elements,
+                                  geom_t **const SFEM_RESTRICT points,
+                                  const real_t mu,
+                                  const real_t lambda,
+                                  const ptrdiff_t u_stride,
+                                  const real_t *const SFEM_RESTRICT ux,
+                                  const real_t *const SFEM_RESTRICT uy,
+                                  const real_t *const SFEM_RESTRICT uz,
+                                  count_t *const SFEM_RESTRICT rowptr,
+                                  idx_t *const SFEM_RESTRICT colidx,
+                                  real_t *const SFEM_RESTRICT values) {
+    SFEM_UNUSED(nnodes);
+
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+#pragma omp parallel for  // nowait
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[4];
+        scalar_t element_ux[4];
+        scalar_t element_uy[4];
+        scalar_t element_uz[4];
+        accumulator_t element_matrix[(4 * 3) * (4 * 3)];
+
+#pragma unroll(4)
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        for (int v = 0; v < 4; ++v) {
+            const ptrdiff_t idx = ev[v] * u_stride;
+            element_ux[v] = ux[idx];
+            element_uy[v] = uy[idx];
+            element_uz[v] = uz[idx];
+        }
+
+        neohookean_ogden_hessian_points(
+                // X-coordinates
+                x[ev[0]],
+                x[ev[1]],
+                x[ev[2]],
+                x[ev[3]],
+                // Y-coordinates
+                y[ev[0]],
+                y[ev[1]],
+                y[ev[2]],
+                y[ev[3]],
+                // Z-coordinates
+                z[ev[0]],
+                z[ev[1]],
+                z[ev[2]],
+                z[ev[3]],
+                // Model parameters
+                mu,
+                lambda,
+                // element dispalcement
+                element_ux,
+                element_uy,
+                element_uz,
+                // output matrix
+                element_matrix);
+
+        tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
+    }
+
+    return 0;
+}
