@@ -134,10 +134,10 @@ int main(int argc, char *argv[]) {
 
         cusparseSpMatDescr_t d_matrix;
 
-        cusparseIndexType_t csrRowOffsetsType = CUSPARSE_INDEX_32I;
-        cusparseIndexType_t csrColIndType = CUSPARSE_INDEX_32I;
+        cusparseIndexType_t csrRowOffsetsType = SFEM_CUSPARSE_COUNT_T;
+        cusparseIndexType_t csrColIndType = SFEM_CUSPARSE_IDX_T;
         cusparseIndexBase_t idxBase = CUSPARSE_INDEX_BASE_ZERO;
-        cudaDataType valueType = CUDA_R_64F;
+        cudaDataType valueType = SFEM_CUSPARSE_REAL_T;
         cusparseOperation_t op_type =
             transpose ? CUSPARSE_OPERATION_TRANSPOSE : CUSPARSE_OPERATION_NON_TRANSPOSE;
 
