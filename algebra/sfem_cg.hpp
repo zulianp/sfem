@@ -40,6 +40,12 @@ namespace sfem {
         ptrdiff_t n_dofs{-1};
         bool verbose{true};
 
+        void set_verbose(const bool val)
+        {
+            verbose = val;
+        }
+
+
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
 

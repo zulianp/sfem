@@ -36,7 +36,7 @@ def solve_linear_elasticity(options):
 	sfem.add_condition(bc, sinlet, 1, 0.);
 	sfem.add_condition(bc, sinlet, 2, 0.);
 
-	sfem.add_condition(bc, soutlet, 0, 0.01);
+	sfem.add_condition(bc, soutlet, 0, 1);
 	sfem.add_condition(bc, soutlet, 1, 0.);
 	sfem.add_condition(bc, soutlet, 2, 0.);
 
@@ -49,7 +49,8 @@ def solve_linear_elasticity(options):
 	x = np.zeros(fs.n_dofs())
 	cg = sfem.ConjugateGradient()
 	cg.default_init()
-	cg.set_max_it(1000)
+	cg.set_max_it(100)
+	cg.set_verbose(False)
 
 	lop = sfem.make_op(fun, x)
 	cg.set_op(lop)
@@ -66,15 +67,21 @@ def solve_linear_elasticity(options):
 		print(np.min(d))
 		print(np.max(np.abs(d)))
 		print(np.min(np.abs(d)))
-	
+
+	# Newton iteration
 	g = np.zeros(fs.n_dofs())
-	for i in range(0, 3):
-		sfem.apply_constraints(fun, x)
+	for i in range(0, 100):
+		# sfem.apply_constraints(fun, x)
 		g[:] = 0
 		sfem.gradient(fun, x, g)
 		c = np.zeros(fs.n_dofs())
 		sfem.apply(cg, g, c)
 		x -= c
+
+		norm_g = linalg.norm(g)
+		print(f'{i}) norm_g = {norm_g}')
+		if(norm_g < 1e-10):
+			break
 
 	# Write result to disk
 	sfem.report_solution(fun, x)
