@@ -29,22 +29,26 @@ typedef float geom_t;
 
 typedef int idx_t;
 #define SFEM_MPI_IDX_T MPI_INT
+#define SFEM_CUSPARSE_IDX_T CUSPARSE_INDEX_32I
 #define d_IDX_T "d"
 #define dtype_IDX_T "int32"
 
 typedef double real_t;
 #define SFEM_MPI_REAL_T MPI_DOUBLE
+#define SFEM_CUSPARSE_REAL_T CUDA_R_64F
 #define d_REAL_T "g"
 #define dtype_REAL_T "float64"
 
 typedef long count_t;
 #define SFEM_MPI_COUNT_T MPI_LONG
+#define SFEM_CUSPARSE_COUNT_T CUSPARSE_INDEX_64I
 #define d_COUNT_T "l"
 #define dtype_COUNT_T "int64"
 
 
 // typedef int count_t;
 // #define SFEM_MPI_COUNT_T MPI_INT
+// #define SFEM_CUSPARSE_COUNT_T CUSPARSE_INDEX_32I
 // #define d_COUNT_T "d"
 // #define dtype_COUNT_T "int32"
 
