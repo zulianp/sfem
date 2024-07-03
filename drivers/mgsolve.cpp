@@ -305,46 +305,20 @@ int main(int argc, char *argv[]) {
 
         smoother->set_initial_guess_zero(false);
 
-        // Multigrid
         auto restriction = f->hierarchical_restriction();
         auto prolongation = f->hierarchical_prolongation();
 
         f->apply_constraints(x->data());
         f->apply_constraints(rhs->data());
 
-        real_t rtr = residual(*linear_op, rhs->data(), x->data(), r->data());
-        for (int k = 0; k < 200; k++) {
-            smoother->apply(rhs->data(), x->data());
-
-            {  // Residual
-                real_t rtr_new = residual(*linear_op, rhs->data(), x->data(), r->data());
-                real_t rate = rtr_new / rtr;
-                rtr = rtr_new;
-                printf("MG: %d)\tresidual: %g,\trate: %g\n", k, rtr, rate);
-                if (rtr < SFEM_TOL || rate > 0.999) {
-                    break;
-                }
-            }
-
-            // Restriction
-            zeros(solver_coarse->rows(), r_coarse->data());
-            restriction->apply(r->data(), r_coarse->data());
-
-            // Set guess to zero
-            zeros(solver_coarse->rows(), c_coarse->data());
-
-            solver_coarse->apply(r_coarse->data(), c_coarse->data());
-
-            // Prolongation
-            zeros(smoother->rows(), c->data());
-            prolongation->apply(c_coarse->data(), c->data());
-
-            // Apply correction
-            axpby<real_t>(smoother->rows(), 1, c->data(), 1, x->data());
-
-            smoother->apply(rhs->data(), x->data());
-        }
-
+        // Multigrid
+        auto mg = sfem::h_mg<real_t>();
+        mg->add_level(linear_op, smoother, nullptr, restriction);
+        mg->add_level(nullptr, solver_coarse, prolongation, nullptr);
+        mg->set_max_it(SFEM_MAX_IT);
+        mg->set_atol(SFEM_TOL);
+        mg->apply(rhs->data(), x->data());
+        
     } else {
 #if 0
     auto solver = smoother;

@@ -26,11 +26,14 @@ namespace sfem {
         std::function<void(void*)> destroy;
         // std::function<void(const ptrdiff_t, const T* const, T* const)> copy;
         std::function<void(const ptrdiff_t, const T, const T* const, const T, T* const)> axpby;
+        std::function<T(const std::size_t, const T* const)> norm2;
 
         enum CycleType {
             V_CYCLE = 1,
             W_CYCLE = 2,
         };
+
+        enum CycleReturnCode { CYCLE_CONTINUE = 0, CYCLE_CONVERGED = 1, CYCLE_FAILURE = 2 };
 
         class Memory {
         public:
@@ -41,7 +44,7 @@ namespace sfem {
             ~Memory() {}
         };
 
-        int apply(const T* const r, T* const x) override {
+        int apply(const T* const rhs, T* const x) override {
             ensure_init();
 
             // Wrap input arrays into fine level of mg
@@ -50,11 +53,14 @@ namespace sfem {
                         Buffer<T>::wrap(smoother_[finest_level()]->rows(), x);
 
                 memory_[finest_level()]->rhs =
-                        Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T*)r);
+                        Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T*)rhs);
             }
 
-            for (int k = 0; k < max_it_; k++) {
-                cycle(finest_level());
+            for (iterations_ = 0; iterations_ < max_it_; iterations_++) {
+                CycleReturnCode ret = cycle(finest_level());
+                if (ret == CYCLE_CONVERGED) {
+                    break;
+                }
             }
 
             return 0;
@@ -100,7 +106,21 @@ namespace sfem {
             };
 
             zeros = [](const std::size_t n, T* const x) { memset(x, 0, n * sizeof(T)); };
+            norm2 = [](const std::size_t n, const T* const x) -> T {
+                T ret = 0;
+
+#pragma omp parallel for reduction(+ : ret)
+                for (ptrdiff_t i = 0; i < n; i++) {
+                    ret += x[i] * x[i];
+                }
+
+                return sqrt(ret);
+            };
         }
+
+        void set_max_it(const int val) { max_it_ = val; }
+
+        void set_atol(const T val) { atol_ = val; }
 
     private:
         std::vector<std::shared_ptr<Operator<T>>> operator_;
@@ -113,8 +133,13 @@ namespace sfem {
         std::vector<std::shared_ptr<Memory>> memory_;
         bool wrap_input_{true};
 
-        int max_it_{1};
+        int max_it_{10};
+        int iterations_{0};
         int cycle_type_{V_CYCLE};
+        T atol_{1e-10};
+
+        T norm_residual_0{1};
+        T norm_residual_previous{1};
 
         inline int finest_level() const { return 0; }
 
@@ -156,15 +181,17 @@ namespace sfem {
             return 0;
         }
 
-        int cycle(const int level) {
+        CycleReturnCode cycle(const int level) {
             auto mem = memory_[level];
             auto smoother = smoother_[level];
 
-            // As we are solving for the correction we start from 0
-            this->zeros(mem->size(), mem->solution->data());
-
             if (coarsest_level() == level) {
-                return smoother->apply(mem->rhs->data(), mem->solution->data());
+                this->zeros(mem->solution->size(), mem->solution->data());
+                if (!smoother->apply(mem->rhs->data(), mem->solution->data())) {
+                    return CYCLE_CONTINUE;
+                } else {
+                    return CYCLE_FAILURE;
+                }
             }
 
             auto op = operator_[level];
@@ -180,6 +207,33 @@ namespace sfem {
                     this->zeros(mem->size(), mem->work->data());
                     op->apply(mem->solution->data(), mem->work->data());
                     this->axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
+
+                    if (finest_level() == level) {
+                        T norm_residual = this->norm2(mem->work->size(), mem->work->data());
+
+                        if (iterations_ == 0) {
+                            norm_residual_0 = norm_residual;
+                            norm_residual_previous = norm_residual;
+
+                            printf("Multigrid\n");
+                            printf("iter\tabs\t\trel\t\trate\n");
+                            printf("%d\t%g\t-\t\t-\n",
+                               iterations_,
+                               (double)(norm_residual));
+                        } else {
+                            printf("%d\t%g\t%g\t%g\n",
+                               iterations_,
+                               (double)(norm_residual),
+                               (double)(norm_residual / norm_residual_0),
+                               (double)(norm_residual / norm_residual_previous));
+                        }
+                        
+
+                        norm_residual_previous = norm_residual;
+                        if (norm_residual < atol_) {
+                            return CYCLE_CONVERGED;
+                        }
+                    }
                 }
 
                 {
@@ -188,8 +242,8 @@ namespace sfem {
                     restriction->apply(mem->work->data(), mem_coarse->rhs->data());
                 }
 
-                int err = cycle(coarser_level(level));
-                assert(!err);
+                CycleReturnCode ret = cycle(coarser_level(level));
+                assert(ret != CYCLE_FAILURE);
 
                 {
                     // Prolongation
@@ -203,7 +257,7 @@ namespace sfem {
                 smoother->apply(mem->rhs->data(), mem->solution->data());
             }
 
-            return 0;
+            return CYCLE_CONTINUE;
         }
     };
 
