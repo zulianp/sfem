@@ -155,16 +155,12 @@ class HyperElasticity:
 		F = disp_grad + sp.eye(dims, dims)
 		output = coeffs_SoA('out', dims, self.fe.n_nodes())
 		
-
-
 		for i in range(0, self.fe.spatial_dim() * self.fe.n_nodes()):
 			gi_expected = sp.simplify(inner(P, ptest_grad[i]) )
 			gi_actual =   sp.simplify(inner(P * jac_inv.T, rtest_grad[i])) 
 			diff = sp.simplify(gi_expected - gi_actual)
 			print(diff)
 			assert diff == 0
-
-		
 
 	def gradient(self):
 		P = self.P
@@ -190,6 +186,25 @@ class HyperElasticity:
 		}
 
 		return ret
+
+	def hessian(self):
+		lin_stress = self.lin_stress
+		lin_stress_symb = self.lin_stress_symb
+		trial_grad = self.trial_grad
+		test_grad  = self.test_grad
+		inc_grad_symb = self.inc_grad_symb 
+		jac_inv = self.jac_inv
+		dV = self.dV
+		dims = self.fe.spatial_dim()
+		ref_grad = self.ref_grad
+
+		loperand = lin_stress_symb * (jac_inv.T * dV)
+
+		expr = loperand.copy()
+		for d1 in range(0, dims):
+			for d2 in range(0, dims):
+				expr[d1, d2] = subsmat(expr[d1, d2], trial_grad, inc_grad_symb)
+
 
 	def hessian_apply(self):
 		lin_stress = self.lin_stress
