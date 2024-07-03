@@ -166,15 +166,25 @@ void free_elems_tet10_device(elems_tet10_device elems) {
 //-------------------------------------------
 /// iso-parametric version
 //-------------------------------------------
-__device__ real_t                                    //
-tet10_measure_cu(const double* const MY_RESTRICT x,  //
-                 const double* const MY_RESTRICT y,  //
-                 const double* const MY_RESTRICT z,  //
+/**
+ * @brief Compute the measure of a tet10 element
+ *
+ * @param x
+ * @param y
+ * @param z
+ * @param qx
+ * @param qy
+ * @param qz
+ * @return __device__
+ */
+__device__ real_t tet10_measure_cu(const double* const MY_RESTRICT x,  //
+                                   const double* const MY_RESTRICT y,  //
+                                   const double* const MY_RESTRICT z,  //
 
-                 // Quadrature point //
-                 const double qx,    //
-                 const double qy,    //
-                 const double qz) {  //
+                                   // Quadrature point //
+                                   const double qx,    //
+                                   const double qy,    //
+                                   const double qz) {  //
     //
     const real_t x0 = 4 * qz;
     const real_t x1 = x0 - 1;
@@ -220,6 +230,20 @@ tet10_measure_cu(const double* const MY_RESTRICT x,  //
            x27 * x28 * x32;
 }  // end tet10_measure_cu
 
+/**
+ * @brief Transform a quadrature point from the reference tet10 element to the physical space
+ *
+ * @param x
+ * @param y
+ * @param z
+ * @param qx
+ * @param qy
+ * @param qz
+ * @param out_x
+ * @param out_y
+ * @param out_z
+ * @return __device__
+ */
 __device__ void tet10_transform_cu(const real_t* const MY_RESTRICT x,
                                    const real_t* const MY_RESTRICT y,
                                    const real_t* const MY_RESTRICT z,
@@ -253,6 +277,15 @@ __device__ void tet10_transform_cu(const real_t* const MY_RESTRICT x,
              z[7] * x14 + z[8] * x2 + z[9] * x4;
 }  // end tet10_transform_cu
 
+/**
+ * @brief Compute the dual basis of the tet10 element
+ *
+ * @param qx
+ * @param qy
+ * @param qz
+ * @param f
+ * @return __device__
+ */
 __device__ void tet10_dual_basis_hrt_cu(const real_t qx, const real_t qy, const real_t qz,
                                         real_t* const f) {
     const real_t x0 = 2 * qy;
