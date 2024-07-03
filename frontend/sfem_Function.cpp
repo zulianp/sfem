@@ -1106,6 +1106,8 @@ namespace sfem {
                                                 impl_->space->block_size(),
                                                 from,
                                                 to);
+
+                    this->apply_zero_constraints(to);
                 });
     }
 

@@ -34,10 +34,9 @@ namespace sfem {
 
         class Memory {
         public:
+            std::shared_ptr<Buffer<T>> rhs;
             std::shared_ptr<Buffer<T>> solution;
-            std::shared_ptr<Buffer<T>> residual;
             std::shared_ptr<Buffer<T>> work;
-
             inline ptrdiff_t size() const { return solution->size(); }
             ~Memory() {}
         };
@@ -46,32 +45,20 @@ namespace sfem {
             ensure_init();
 
             // Wrap input arrays into fine level of mg
-
             if (wrap_input_) {
                 memory_[finest_level()]->solution =
-                    Buffer<T>::wrap(smoother_[finest_level()]->rows(), x);
+                        Buffer<T>::wrap(smoother_[finest_level()]->rows(), x);
 
-                memory_[finest_level()]->residual =
-                    Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T*)r);
+                memory_[finest_level()]->rhs =
+                        Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T*)r);
             }
 
             for (int k = 0; k < max_it_; k++) {
-                // std::cout << "iteration: " << k << ")\n";
-                // operator_->apply(r, )
-
                 cycle(finest_level());
-
-                auto c = memory_[finest_level()]->solution;
-                axpby(c->size(), 1, c->data(), 1, x);
             }
 
             return 0;
         }
-
-        // void set_coarse_grid_solver(const std::shared_ptr<Operator<T>>& op)
-        // {
-        //     coarse_grid_solver_ = op;
-        // }
 
         void clear() {
             prolongation_.clear();
@@ -101,13 +88,16 @@ namespace sfem {
 
             destroy = [](void* a) { free(a); };
 
-            axpby =
-                [](const ptrdiff_t n, const T alpha, const T* const x, const T beta, T* const y) {
+            axpby = [](const ptrdiff_t n,
+                       const T alpha,
+                       const T* const x,
+                       const T beta,
+                       T* const y) {
 #pragma omp parallel for
-                    for (ptrdiff_t i = 0; i < n; i++) {
-                        y[i] = alpha * x[i] + beta * y[i];
-                    }
-                };
+                for (ptrdiff_t i = 0; i < n; i++) {
+                    y[i] = alpha * x[i] + beta * y[i];
+                }
+            };
 
             zeros = [](const std::size_t n, T* const x) { memset(x, 0, n * sizeof(T)); };
         }
@@ -156,7 +146,7 @@ namespace sfem {
                     memory_[l]->solution = Buffer<T>::own(n, x, this->destroy);
 
                     auto r = this->allocate(n);
-                    memory_[l]->residual = Buffer<T>::own(n, r, this->destroy);
+                    memory_[l]->rhs = Buffer<T>::own(n, r, this->destroy);
                 }
 
                 auto w = this->allocate(n);
@@ -168,38 +158,49 @@ namespace sfem {
 
         int cycle(const int level) {
             auto mem = memory_[level];
+            auto smoother = smoother_[level];
 
             // As we are solving for the correction we start from 0
             this->zeros(mem->size(), mem->solution->data());
 
             if (coarsest_level() == level) {
-                return smoother_[level]->apply(mem->residual->data(), mem->solution->data());
+                return smoother->apply(mem->rhs->data(), mem->solution->data());
             }
 
             auto op = operator_[level];
             auto restriction = restriction_[level];
             auto prolongation = prolongation_[coarser_level(level)];
+            auto mem_coarse = memory_[coarser_level(level)];
 
             for (int k = 0; k < this->cycle_type_; k++) {
-                this->zeros(mem->solution->size(), mem->solution->data());
-                smoother_[level]->apply(mem->residual->data(), mem->solution->data());
+                smoother->apply(mem->rhs->data(), mem->solution->data());
 
-                this->zeros(mem->size(), mem->work->data());
-                op->apply(mem->solution->data(), mem->work->data());
+                {
+                    // Compute residual
+                    this->zeros(mem->size(), mem->work->data());
+                    op->apply(mem->solution->data(), mem->work->data());
+                    this->axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
+                }
 
-                this->axpby(mem->size(), 1, mem->residual->data(), -1, mem->work->data());
-                restriction->apply(mem->work->data(),
-                                   memory_[coarser_level(level)]->residual->data());
+                {
+                    // Restriction
+                    this->zeros(mem_coarse->rhs->size(), mem_coarse->rhs->data());
+                    restriction->apply(mem->work->data(), mem_coarse->rhs->data());
+                }
 
                 int err = cycle(coarser_level(level));
                 assert(!err);
 
-                prolongation->apply(memory_[coarser_level(level)]->solution->data(),
-                                    mem->work->data());
+                {
+                    // Prolongation
+                    this->zeros(mem->work->size(), mem->work->data());
+                    prolongation->apply(mem_coarse->solution->data(), mem->work->data());
 
-                // Apply correction
-                this->axpby(mem->size(), 1, mem->work->data(), 1, mem->solution->data());
-                smoother_[level]->apply(mem->residual->data(), mem->solution->data());
+                    // Apply coarse space correction
+                    this->axpby(mem->size(), 1, mem->work->data(), 1, mem->solution->data());
+                }
+
+                smoother->apply(mem->rhs->data(), mem->solution->data());
             }
 
             return 0;

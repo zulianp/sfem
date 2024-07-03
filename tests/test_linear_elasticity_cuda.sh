@@ -26,10 +26,10 @@ mkdir -p output
 export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 
-rm -rf mesh
-create_cylinder.sh 0
+# rm -rf mesh
+# create_cylinder.sh 0
 
-# create_cylinder_p2.sh 3
+# create_cylinder_p2.sh 2
 # export SFEM_USE_MACRO=1
 
 sleft=mesh/sidesets_aos/sinlet.raw
