@@ -339,9 +339,6 @@ int main(int argc, char *argv[]) {
             zeros(smoother->rows(), c->data());
             prolongation->apply(c_coarse->data(), c->data());
 
-            // Check do we need this?
-            f->apply_zero_constraints(c->data());
-
             // Apply correction
             axpby<real_t>(smoother->rows(), 1, c->data(), 1, x->data());
 
