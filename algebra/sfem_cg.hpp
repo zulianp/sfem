@@ -37,7 +37,7 @@ namespace sfem {
         T rtol{1e-10};
         T atol{1e-16};
         int max_it{10000};
-        int check_each{1};
+        int check_each{100};
         ptrdiff_t n_dofs{-1};
         bool verbose{true};
 
