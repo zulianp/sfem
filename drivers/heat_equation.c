@@ -48,6 +48,11 @@ int main(int argc, char *argv[]) {
         isolver_lsolve_init(&lsolve[s]);
     }
 
+    if(sizeof(real_t) != sizeof(isolver_scalar_t)) {
+        fprintf(stderr, "%s Uncompatrible scalar types for isolver (real_t != isolver_scalar_t)\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
     int rank, size;
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);

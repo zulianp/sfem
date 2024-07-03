@@ -11,7 +11,7 @@
 #include "sfem_base.h"
 #include "sfem_defs.h"
 
-#include "isolver_function.h"
+// #include "isolver_function.h"
 
 #include "sfem_Buffer.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
@@ -35,8 +35,8 @@ namespace sfem {
 
         ptrdiff_t n_nodes() const;
         ptrdiff_t nnz() const;
-        isolver_idx_t *rowptr();
-        isolver_idx_t *colidx();
+        count_t *rowptr();
+        idx_t *colidx();
 
         std::shared_ptr<CRSGraph> block_to_scalar(const int block_size);
 
@@ -75,8 +75,8 @@ namespace sfem {
         std::shared_ptr<CRSGraph> node_to_node_graph();
         std::shared_ptr<CRSGraph> create_node_to_node_graph(const enum ElemType element_type);
 
-        isolver_idx_t *node_to_node_rowptr();
-        isolver_idx_t *node_to_node_colidx();
+        count_t *node_to_node_rowptr();
+        idx_t *node_to_node_colidx();
 
         const geom_t *const points(const int coord) const;
         const idx_t *const idx(const int node_num) const;
@@ -109,13 +109,13 @@ namespace sfem {
         int create_crs_graph(ptrdiff_t *nlocal,
                              ptrdiff_t *nglobal,
                              ptrdiff_t *nnz,
-                             isolver_idx_t **rowptr,
-                             isolver_idx_t **colidx);
+                             count_t **rowptr,
+                             idx_t **colidx);
 
-        int destroy_crs_graph(isolver_idx_t *rowptr, isolver_idx_t *colidx);
+        int destroy_crs_graph(count_t *rowptr, idx_t *colidx);
 
-        int create_vector(ptrdiff_t *nlocal, ptrdiff_t *nglobal, isolver_scalar_t **values);
-        int destroy_vector(isolver_scalar_t *values);
+        int create_vector(ptrdiff_t *nlocal, ptrdiff_t *nglobal, real_t **values);
+        int destroy_vector(real_t *values);
 
         Mesh &mesh();
         int block_size() const;
@@ -144,29 +144,29 @@ namespace sfem {
         virtual const char *name() const = 0;
 
         virtual bool is_linear() const = 0;
-        virtual int initialize() { return ISOLVER_FUNCTION_SUCCESS; }
-        virtual int hessian_crs(const isolver_scalar_t *const x,
-                                const isolver_idx_t *const rowptr,
-                                const isolver_idx_t *const colidx,
-                                isolver_scalar_t *const values) = 0;
+        virtual int initialize() { return SFEM_SUCCESS; }
+        virtual int hessian_crs(const real_t *const x,
+                                const count_t *const rowptr,
+                                const idx_t *const colidx,
+                                real_t *const values) = 0;
 
-        virtual int hessian_diag(const isolver_scalar_t *const /*x*/,
-                                 isolver_scalar_t *const /*values*/) {
-            return ISOLVER_FUNCTION_FAILURE;
+        virtual int hessian_diag(const real_t *const /*x*/,
+                                 real_t *const /*values*/) {
+            return SFEM_FAILURE;
         }
 
-        virtual int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) = 0;
-        virtual int apply(const isolver_scalar_t *const x,
-                          const isolver_scalar_t *const h,
-                          isolver_scalar_t *const out) = 0;
+        virtual int gradient(const real_t *const x, real_t *const out) = 0;
+        virtual int apply(const real_t *const x,
+                          const real_t *const h,
+                          real_t *const out) = 0;
 
-        virtual int value(const isolver_scalar_t *x, isolver_scalar_t *const out) = 0;
-        virtual int report(const isolver_scalar_t *const /*x*/) { return ISOLVER_FUNCTION_SUCCESS; }
+        virtual int value(const real_t *x, real_t *const out) = 0;
+        virtual int report(const real_t *const /*x*/) { return SFEM_SUCCESS; }
         virtual ExecutionSpace execution_space() const { return EXECUTION_SPACE_HOST; }
 
         virtual void set_field(const char * /*name*/,
                                const int /*component*/,
-                               isolver_scalar_t * /*x*/) {
+                               real_t * /*x*/) {
             assert(0);
         }
 
@@ -192,30 +192,30 @@ namespace sfem {
         NeumannConditions(const std::shared_ptr<FunctionSpace> &space);
         ~NeumannConditions();
 
-        int hessian_crs(const isolver_scalar_t *const x,
-                        const isolver_idx_t *const rowptr,
-                        const isolver_idx_t *const colidx,
-                        isolver_scalar_t *const values) override;
+        int hessian_crs(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values) override;
 
-        int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out) override;
+        int gradient(const real_t *const x, real_t *const out) override;
 
-        int apply(const isolver_scalar_t *const x,
-                  const isolver_scalar_t *const h,
-                  isolver_scalar_t *const out) override;
+        int apply(const real_t *const x,
+                  const real_t *const h,
+                  real_t *const out) override;
 
-        int value(const isolver_scalar_t *x, isolver_scalar_t *const out) override;
-
-        void add_condition(const ptrdiff_t local_size,
-                           const ptrdiff_t global_size,
-                           isolver_idx_t *const idx,
-                           const int component,
-                           isolver_scalar_t *const values);
+        int value(const real_t *x, real_t *const out) override;
 
         void add_condition(const ptrdiff_t local_size,
                            const ptrdiff_t global_size,
-                           isolver_idx_t *const idx,
+                           idx_t *const idx,
                            const int component,
-                           const isolver_scalar_t value);
+                           real_t *const values);
+
+        void add_condition(const ptrdiff_t local_size,
+                           const ptrdiff_t global_size,
+                           idx_t *const idx,
+                           const int component,
+                           const real_t value);
 
         inline bool is_linear() const override { return true; }
 
@@ -230,17 +230,17 @@ namespace sfem {
     class Constraint {
     public:
         virtual ~Constraint() = default;
-        virtual int apply(isolver_scalar_t *const x) = 0;
-        virtual int apply_value(const isolver_scalar_t value, isolver_scalar_t *const x) = 0;
-        virtual int apply_zero(isolver_scalar_t *const x);
-        virtual int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const g) = 0;
-        virtual int copy_constrained_dofs(const isolver_scalar_t *const src,
-                                          isolver_scalar_t *const dest) = 0;
+        virtual int apply(real_t *const x) = 0;
+        virtual int apply_value(const real_t value, real_t *const x) = 0;
+        virtual int apply_zero(real_t *const x);
+        virtual int gradient(const real_t *const x, real_t *const g) = 0;
+        virtual int copy_constrained_dofs(const real_t *const src,
+                                          real_t *const dest) = 0;
 
-        virtual int hessian_crs(const isolver_scalar_t *const x,
-                                const isolver_idx_t *const rowptr,
-                                const isolver_idx_t *const colidx,
-                                isolver_scalar_t *const values) = 0;
+        virtual int hessian_crs(const real_t *const x,
+                                const count_t *const rowptr,
+                                const idx_t *const colidx,
+                                real_t *const values) = 0;
 
         virtual std::shared_ptr<Constraint> derefine(
             const std::shared_ptr<FunctionSpace> &coarse_space,
@@ -258,29 +258,29 @@ namespace sfem {
 
         static std::shared_ptr<DirichletConditions> create_from_env(
             const std::shared_ptr<FunctionSpace> &space);
-        int apply(isolver_scalar_t *const x) override;
-        int apply_value(const isolver_scalar_t value, isolver_scalar_t *const x) override;
-        int copy_constrained_dofs(const isolver_scalar_t *const src,
-                                  isolver_scalar_t *const dest) override;
+        int apply(real_t *const x) override;
+        int apply_value(const real_t value, real_t *const x) override;
+        int copy_constrained_dofs(const real_t *const src,
+                                  real_t *const dest) override;
 
-        int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const g) override;
+        int gradient(const real_t *const x, real_t *const g) override;
 
-        int hessian_crs(const isolver_scalar_t *const x,
-                        const isolver_idx_t *const rowptr,
-                        const isolver_idx_t *const colidx,
-                        isolver_scalar_t *const values) override;
-
-        void add_condition(const ptrdiff_t local_size,
-                           const ptrdiff_t global_size,
-                           isolver_idx_t *const idx,
-                           const int component,
-                           isolver_scalar_t *const values);
+        int hessian_crs(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values) override;
 
         void add_condition(const ptrdiff_t local_size,
                            const ptrdiff_t global_size,
-                           isolver_idx_t *const idx,
+                           idx_t *const idx,
                            const int component,
-                           const isolver_scalar_t value);
+                           real_t *const values);
+
+        void add_condition(const ptrdiff_t local_size,
+                           const ptrdiff_t global_size,
+                           idx_t *const idx,
+                           const int component,
+                           const real_t value);
 
         int n_conditions() const;
         void *impl_conditions();
@@ -299,10 +299,10 @@ namespace sfem {
         Output(const std::shared_ptr<FunctionSpace> &space);
         ~Output();
         void set_output_dir(const char *path);
-        int write(const char *name, const isolver_scalar_t *const x);
+        int write(const char *name, const real_t *const x);
         int write_time_step(const char *name,
-                            const isolver_scalar_t t,
-                            const isolver_scalar_t *const x);
+                            const real_t t,
+                            const real_t *const x);
 
         void clear();
 
@@ -336,38 +336,38 @@ namespace sfem {
         int create_crs_graph(ptrdiff_t *nlocal,
                              ptrdiff_t *nglobal,
                              ptrdiff_t *nnz,
-                             isolver_idx_t **rowptr,
-                             isolver_idx_t **colidx);
+                             count_t **rowptr,
+                             idx_t **colidx);
 
-        int destroy_crs_graph(isolver_idx_t *rowptr, isolver_idx_t *colidx);
+        int destroy_crs_graph(count_t *rowptr, idx_t *colidx);
 
-        int hessian_crs(const isolver_scalar_t *const x,
-                        const isolver_idx_t *const rowptr,
-                        const isolver_idx_t *const colidx,
-                        isolver_scalar_t *const values);
+        int hessian_crs(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values);
 
-        int hessian_diag(const isolver_scalar_t *const x, isolver_scalar_t *const values);
+        int hessian_diag(const real_t *const x, real_t *const values);
 
-        int gradient(const isolver_scalar_t *const x, isolver_scalar_t *const out);
-        int apply(const isolver_scalar_t *const x,
-                  const isolver_scalar_t *const h,
-                  isolver_scalar_t *const out);
+        int gradient(const real_t *const x, real_t *const out);
+        int apply(const real_t *const x,
+                  const real_t *const h,
+                  real_t *const out);
 
-        int value(const isolver_scalar_t *x, isolver_scalar_t *const out);
+        int value(const real_t *x, real_t *const out);
 
-        int apply_constraints(isolver_scalar_t *const x);
-        int constraints_gradient(const isolver_scalar_t *const x, isolver_scalar_t *const g);
-        int apply_zero_constraints(isolver_scalar_t *const x);
-        int copy_constrained_dofs(const isolver_scalar_t *const src, isolver_scalar_t *const dest);
-        int report_solution(const isolver_scalar_t *const x);
-        int initial_guess(isolver_scalar_t *const x);
+        int apply_constraints(real_t *const x);
+        int constraints_gradient(const real_t *const x, real_t *const g);
+        int apply_zero_constraints(real_t *const x);
+        int copy_constrained_dofs(const real_t *const src, real_t *const dest);
+        int report_solution(const real_t *const x);
+        int initial_guess(real_t *const x);
 
         int set_output_dir(const char *path);
 
         std::shared_ptr<Output> output();
 
-        std::shared_ptr<Operator<isolver_scalar_t>> hierarchical_restriction();
-        std::shared_ptr<Operator<isolver_scalar_t>> hierarchical_prolongation();
+        std::shared_ptr<Operator<real_t>> hierarchical_restriction();
+        std::shared_ptr<Operator<real_t>> hierarchical_prolongation();
 
     private:
         class Impl;

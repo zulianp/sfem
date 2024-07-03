@@ -49,8 +49,8 @@ auto crs_hessian(sfem::Function &f) {
     ptrdiff_t nlocal;
     ptrdiff_t nglobal;
     ptrdiff_t nnz;
-    isolver_idx_t *rowptr;
-    isolver_idx_t *colidx;
+    count_t *rowptr;
+    idx_t *colidx;
     f.space()->create_crs_graph(&nlocal, &nglobal, &nnz, &rowptr, &colidx);
     real_t *values = (real_t *)calloc(rowptr[nlocal], sizeof(real_t));
     f.hessian_crs(nullptr, rowptr, colidx, values);

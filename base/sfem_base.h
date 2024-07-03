@@ -37,13 +37,16 @@ typedef double real_t;
 #define d_REAL_T "g"
 #define dtype_REAL_T "float64"
 
-// typedef long count_t;
-// #define SFEM_MPI_COUNT_T MPI_LONG
+typedef long count_t;
+#define SFEM_MPI_COUNT_T MPI_LONG
+#define d_COUNT_T "l"
+#define dtype_COUNT_T "int64"
 
-typedef int count_t;
-#define SFEM_MPI_COUNT_T MPI_INT
-#define d_COUNT_T "d"
-#define dtype_COUNT_T "int32"
+
+// typedef int count_t;
+// #define SFEM_MPI_COUNT_T MPI_INT
+// #define d_COUNT_T "d"
+// #define dtype_COUNT_T "int32"
 
 // typedef count_t element_idx_t;
 // #define SFEM_MPI_ELEMENT_IDX_T SFEM_MPI_COUNT_T
@@ -70,5 +73,8 @@ typedef geom_t jacobian_t;
 
 typedef int16_t lidx_t;
 #define d_ELEMENT_LIDX_T "hd"
+
+#define SFEM_SUCCESS 0
+#define SFEM_FAILURE 1
 
 #endif  // SFEM_BASE_H

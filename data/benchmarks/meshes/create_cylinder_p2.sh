@@ -43,11 +43,21 @@ mkdir -p $folder
 idx_type_size=4
 
 cylinder.py $mesh_db $nrefs
-db_to_raw.py $mesh_db $mesh_raw/p1 --select_elem_type=tetra
+ db_to_raw.py $mesh_db $mesh_raw/p1 --select_elem_type=tetra
+
+if [[ 1 == "$SFEM_MESH_REFINE" ]]
+then
+	echo "refining mesh"
+	rm -rf coarse
+	mv $mesh_raw/p1 coarse
+	refine coarse $mesh_raw/p1
+fi
+
 mesh_p1_to_p2 $mesh_raw/p1 $mesh_raw
-# sfc $mesh_raw $mesh_raw/sorted
 refine $mesh_raw/p1 $mesh_raw/p1/refined
-raw_to_db.py $mesh_raw $mesh_db_p2
+
+#
+# raw_to_db.py $mesh_raw $mesh_db_p2
 
 $LAUNCH skin $mesh_raw $mesh_surface
 
@@ -118,6 +128,6 @@ $LAUNCH smask $mesh_raw/sidesets_aos/sinlet.raw  $sides $sides 1
 $LAUNCH smask $mesh_raw/sidesets_aos/soutlet.raw $sides $sides 2
 $LAUNCH smask $mesh_raw/sidesets_aos/swall.raw   $sides $sides 3
 
-raw_to_db.py $mesh_raw $mesh_raw/dirichlet.vtk --point_data="$sides"
-raw_to_db.py $mesh_raw/p1/refined $mesh_raw/p1_dirichlet.vtk --point_data="$sides"
+# raw_to_db.py $mesh_raw $mesh_raw/dirichlet.vtk --point_data="$sides"
+# raw_to_db.py $mesh_raw/p1/refined $mesh_raw/p1_dirichlet.vtk --point_data="$sides"
 
