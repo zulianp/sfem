@@ -238,7 +238,8 @@ NB_MODULE(pysfem, m) {
         .def("default_init", &ConjugateGradient_t::default_init)
         .def("set_op", &ConjugateGradient_t::set_op)
         .def("set_preconditioner_op", &ConjugateGradient_t::set_preconditioner_op)
-        .def("set_max_it", &ConjugateGradient_t::set_max_it);
+        .def("set_max_it", &ConjugateGradient_t::set_max_it)
+        .def("set_verbose", &ConjugateGradient_t::set_verbose);
 
     m.def("apply",
           [](std::shared_ptr<ConjugateGradient_t> &cg,
