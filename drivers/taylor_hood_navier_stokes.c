@@ -121,11 +121,19 @@ static void shift_diag(const ptrdiff_t n,
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
-     if(sizeof(real_t) != sizeof(isolver_scalar_t)) {
-        fprintf(stderr, "%s Uncompatrible scalar types for isolver (real_t != isolver_scalar_t)\n", argv[0]);
+    if (sizeof(count_t) != sizeof(isolver_idx_t)) {
+        fprintf(stderr,
+                "%s Incompatible types for isolver (count_t != isolver_idx_t)\n",
+                argv[0]);
         return EXIT_FAILURE;
     }
 
+    if (sizeof(real_t) != sizeof(isolver_scalar_t)) {
+        fprintf(stderr,
+                "%s Incompatible types for isolver (real_t != isolver_scalar_t)\n",
+                argv[0]);
+        return EXIT_FAILURE;
+    }
 
     MPI_Comm comm = MPI_COMM_WORLD;
     isolver_lsolve_t lsolve[N_SYSTEMS];
@@ -234,29 +242,28 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_RESTART_ID, atoi);
 
     if (rank == 0) {
-        printf(
-            "----------------------------------------\n"
-            "Options:\n"
-            "----------------------------------------\n"
-            "- SFEM_DT=%g\n"
-            "- SFEM_CFL=%g\n"
-            "- SFEM_LUMPED_MASS=%d\n"
-            "- SFEM_VISCOSITY=%g\n"
-            "- SFEM_MASS_DENSITY=%g\n"
-            "- SFEM_VELOCITY_DIRICHLET_NODESET=%s\n"
-            "- SFEM_AVG_PRESSURE_CONSTRAINT=%d\n"
-            "- SFEM_RESTART_FOLDER=%s\n"
-            "- SFEM_RESTART_ID=%d\n"
-            "----------------------------------------\n",
-            SFEM_DT,
-            SFEM_CFL,
-            SFEM_LUMPED_MASS,
-            SFEM_VISCOSITY,
-            SFEM_MASS_DENSITY,
-            SFEM_VELOCITY_DIRICHLET_NODESET,
-            SFEM_AVG_PRESSURE_CONSTRAINT,
-            SFEM_RESTART_FOLDER,
-            SFEM_RESTART_ID);
+        printf("----------------------------------------\n"
+               "Options:\n"
+               "----------------------------------------\n"
+               "- SFEM_DT=%g\n"
+               "- SFEM_CFL=%g\n"
+               "- SFEM_LUMPED_MASS=%d\n"
+               "- SFEM_VISCOSITY=%g\n"
+               "- SFEM_MASS_DENSITY=%g\n"
+               "- SFEM_VELOCITY_DIRICHLET_NODESET=%s\n"
+               "- SFEM_AVG_PRESSURE_CONSTRAINT=%d\n"
+               "- SFEM_RESTART_FOLDER=%s\n"
+               "- SFEM_RESTART_ID=%d\n"
+               "----------------------------------------\n",
+               SFEM_DT,
+               SFEM_CFL,
+               SFEM_LUMPED_MASS,
+               SFEM_VISCOSITY,
+               SFEM_MASS_DENSITY,
+               SFEM_VELOCITY_DIRICHLET_NODESET,
+               SFEM_AVG_PRESSURE_CONSTRAINT,
+               SFEM_RESTART_FOLDER,
+               SFEM_RESTART_ID);
     }
 
     if (SFEM_RESTART_FOLDER && !SFEM_RESTART_ID) {
@@ -318,16 +325,16 @@ int main(int argc, char *argv[]) {
 
     for (int c = 0; c < n_pressure_dirichlet_conditions; c++) {
         pressure_dirichlet_conditions[c].local_size =
-            remove_p2_nodes(pressure_dirichlet_conditions[c].local_size,
-                            p1_nnodes,
-                            pressure_dirichlet_conditions[c].idx);
+                remove_p2_nodes(pressure_dirichlet_conditions[c].local_size,
+                                p1_nnodes,
+                                pressure_dirichlet_conditions[c].idx);
     }
 
     ptrdiff_t p1_nnz = 0;
     count_t *p1_rowptr = 0;
     idx_t *p1_colidx = 0;
     build_crs_graph_for_elem_type(
-        p1_type, mesh.nelements, p1_nnodes, mesh.elements, &p1_rowptr, &p1_colidx);
+            p1_type, mesh.nelements, p1_nnodes, mesh.elements, &p1_rowptr, &p1_colidx);
     p1_nnz = p1_rowptr[p1_nnodes];
     real_t *p1_values = calloc(p1_nnz, sizeof(real_t));
 
@@ -349,14 +356,14 @@ int main(int argc, char *argv[]) {
         p1_inv_diag = calloc(p1_nnodes, sizeof(real_t));
 
         assemble_lumped_mass(
-            p1_type, mesh.nelements, p1_nnodes, mesh.elements, mesh.points, p1_mass_vector);
+                p1_type, mesh.nelements, p1_nnodes, mesh.elements, mesh.points, p1_mass_vector);
 
         for (ptrdiff_t i = 0; i < p1_nnodes; i++) {
             sum_mass += p1_mass_vector[i];
         }
 
         constrained_gs_init(
-            p1_nnodes, p1_rowptr, p1_colidx, p1_values, p1_mass_vector, p1_inv_diag);
+                p1_nnodes, p1_rowptr, p1_colidx, p1_values, p1_mass_vector, p1_inv_diag);
 
     } else {
         for (int i = 0; i < n_pressure_dirichlet_conditions; i++) {
@@ -387,8 +394,12 @@ int main(int argc, char *argv[]) {
         //     free(p1_mass_vector);
         // }
 
-        isolver_lsolve_update_crs(
-            &lsolve[INVERSE_POISSON_MATRIX], p1_nnodes, p1_nnodes, p1_rowptr, p1_colidx, p1_values);
+        isolver_lsolve_update_crs(&lsolve[INVERSE_POISSON_MATRIX],
+                                  p1_nnodes,
+                                  p1_nnodes,
+                                  p1_rowptr,
+                                  p1_colidx,
+                                  p1_values);
     }
 
     ptrdiff_t p2_nnz = 0;
@@ -400,8 +411,12 @@ int main(int argc, char *argv[]) {
     int implicit_momentum = 0;
 
     if (!SFEM_LUMPED_MASS || implicit_momentum) {
-        build_crs_graph_for_elem_type(
-            mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &p2_rowptr, &p2_colidx);
+        build_crs_graph_for_elem_type(mesh.element_type,
+                                      mesh.nelements,
+                                      mesh.nnodes,
+                                      mesh.elements,
+                                      &p2_rowptr,
+                                      &p2_colidx);
 
         p2_nnz = p2_rowptr[mesh.nnodes];
         p2_mass_matrix = calloc(p2_nnz, sizeof(real_t));
@@ -434,7 +449,7 @@ int main(int argc, char *argv[]) {
             }
 
             isolver_lsolve_update_crs(
-                &lsolve[1], mesh.nnodes, mesh.nnodes, p2_rowptr, p2_colidx, p2_diffusion);
+                    &lsolve[1], mesh.nnodes, mesh.nnodes, p2_rowptr, p2_colidx, p2_diffusion);
         }
     }
 
@@ -569,16 +584,16 @@ int main(int argc, char *argv[]) {
                 dt = MAX(1e-12, MIN(SFEM_DT, SFEM_CFL / ((2 * max_velocity * emin * emin))));
 
                 navier_stokes_mixed_explict_momentum_tentative(
-                    mesh.element_type,
-                    mesh.nelements,
-                    mesh.nnodes,
-                    mesh.elements,
-                    mesh.points,
-                    dt,
-                    SFEM_VISCOSITY,
-                    1,  // Turn-off convective term for debugging with 0
-                    vel,
-                    correction);
+                        mesh.element_type,
+                        mesh.nelements,
+                        mesh.nnodes,
+                        mesh.elements,
+                        mesh.points,
+                        dt,
+                        SFEM_VISCOSITY,
+                        1,  // Turn-off convective term for debugging with 0
+                        vel,
+                        correction);
 
                 {  // CHECK NaN
                     ptrdiff_t stop = 0;
@@ -596,7 +611,7 @@ int main(int argc, char *argv[]) {
                 for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
                     boundary_condition_t cond = velocity_dirichlet_conditions[i];
                     constraint_nodes_to_value(
-                        cond.local_size, cond.idx, 0, correction[cond.component]);
+                            cond.local_size, cond.idx, 0, correction[cond.component]);
                 }
 
                 for (int d = 0; d < sdim; d++) {
@@ -614,7 +629,7 @@ int main(int argc, char *argv[]) {
                     } else {
                         memset(tentative_vel[d], 0, mesh.nnodes * sizeof(real_t));
                         isolver_lsolve_apply(
-                            &lsolve[INVERSE_MASS_MATRIX], correction[d], tentative_vel[d]);
+                                &lsolve[INVERSE_MASS_MATRIX], correction[d], tentative_vel[d]);
                     }
 
                     for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
@@ -651,7 +666,7 @@ int main(int argc, char *argv[]) {
                 memset(p, 0, p1_nnodes * sizeof(real_t));
 
                 apply_inv_lumped_mass(
-                    p1_type, mesh.nelements, p1_nnodes, mesh.elements, mesh.points, buff, p);
+                        p1_type, mesh.nelements, p1_nnodes, mesh.elements, mesh.points, buff, p);
 
                 sprintf(path, "%s/div_pre.%09d.raw", output_folder, export_counter);
                 array_write(comm, path, SFEM_MPI_REAL_T, p, p1_nnodes, p1_nnodes);
@@ -746,10 +761,10 @@ int main(int argc, char *argv[]) {
                 boundary_condition_t cond = velocity_dirichlet_conditions[i];
                 if (cond.values) {
                     constraint_nodes_to_values(
-                        cond.local_size, cond.idx, cond.values, vel[cond.component]);
+                            cond.local_size, cond.idx, cond.values, vel[cond.component]);
                 } else {
                     constraint_nodes_to_value(
-                        cond.local_size, cond.idx, cond.value, vel[cond.component]);
+                            cond.local_size, cond.idx, cond.value, vel[cond.component]);
                 }
             }
         }
@@ -780,7 +795,7 @@ int main(int argc, char *argv[]) {
 
                 memset(p, 0, p1_nnodes * sizeof(real_t));
                 apply_inv_lumped_mass(
-                    p1_type, mesh.nelements, p1_nnodes, mesh.elements, mesh.points, buff, p);
+                        p1_type, mesh.nelements, p1_nnodes, mesh.elements, mesh.points, buff, p);
 
                 sprintf(path, "%s/div.%09d.raw", output_folder, export_counter);
                 array_write(comm, path, SFEM_MPI_REAL_T, p, p1_nnodes, p1_nnodes);
