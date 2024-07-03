@@ -15,3 +15,6 @@ set(CMAKE_CXX_FLAGS_PROF
     "-O1 -g -DNDEBUG "
     CACHE STRING "Flags for profiling configuration" FORCE
     )
+
+
+set(CMAKE_CUDA_FLAGS "--compiler-options \"-fPIC ${CMAKE_CXX_FLAGS}\" -std=c++14 -arch=sm_60 -Xptxas=-O3,-v -use_fast_math")
