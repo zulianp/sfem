@@ -16,8 +16,8 @@ from symbolic_fe import *
 from time import perf_counter
 
 def simplify(expr):
-	# return expr;
-	return sp.simplify(expr)
+	return expr;
+	# return sp.simplify(expr)
 
 def assign_matrix(name, mat):
 	rows, cols = mat.shape
@@ -188,8 +188,7 @@ class HyperElasticity:
 		return ret
 
 	def hessian(self):
-		lin_stress = self.lin_stress
-		lin_stress_symb = self.lin_stress_symb
+		# lin_stress = self.lin_stress
 		trial_grad = self.trial_grad
 		test_grad  = self.test_grad
 		inc_grad_symb = self.inc_grad_symb 
@@ -197,13 +196,39 @@ class HyperElasticity:
 		dV = self.dV
 		dims = self.fe.spatial_dim()
 		ref_grad = self.ref_grad
+		P = self.P
+		F = self.F
 
-		loperand = lin_stress_symb * (jac_inv.T * dV)
-
-		expr = loperand.copy()
+		lin_stress = []
 		for d1 in range(0, dims):
 			for d2 in range(0, dims):
-				expr[d1, d2] = subsmat(expr[d1, d2], trial_grad, inc_grad_symb)
+				block = sp.zeros(dims, dims)
+				
+				for d3 in range(0, dims):
+					for d4 in range(0, dims):
+						block[d3, d4] = simplify(sp.diff(P[d1, d2], F[d3, d4]))
+
+				# Sandwich to include Jac
+				JBJT = jac_inv * block * jac_inv.T
+
+				spblock = sp.zeros(dims, 1)
+				# for d3 in range(0, dims):
+				for d4 in range(0, dims):
+					spblock[d4] = simplify(JBJT[d2, d4])
+
+				lin_stress.extend(assign_matrix(f'block_{d1}{d2}', spblock))
+
+		# loperand = lin_stress * (jac_inv.T * dV)
+
+		# ref_trial_grad = matrix_coeff('ref_trial_grad', dims, dims)
+		# RT = ref_trial_grad * jac_inv
+
+		# expr = loperand.copy()
+		# for d1 in range(0, dims):
+		# 	for d2 in range(0, dims):
+		# 		expr[d1, d2] = subsmat(expr[d1, d2], trial_grad, RT)
+
+		c_code(lin_stress)
 
 
 	def hessian_apply(self):
@@ -302,14 +327,7 @@ def main():
 	# if False:
 	# 	op.check_symmetries()
 	# else:
-	print("HESSIAN")
-	op_hessian_apply = op.hessian_apply()
-	for k, v in op_hessian_apply.items():
-		print('-------------------------------')
-		print(f'{k}')
-		print('-------------------------------')
-		c_code(v)
-		print('-------------------------------')
+
 
 	# print("GRADIENT")
 	# op_gradient = op.gradient()
@@ -318,6 +336,17 @@ def main():
 	# 	print(f'// {k}')
 	# 	print('// -------------------------------')
 	# 	c_code(v)
+
+	# print("HESSIAN")
+	# op_hessian_apply = op.hessian_apply()
+	# for k, v in op_hessian_apply.items():
+	# 	print('-------------------------------')
+	# 	print(f'{k}')
+	# 	print('-------------------------------')
+	# 	c_code(v)
+		# print('-------------------------------')
+
+	op.hessian()
 
 	stop = perf_counter()
 	console.print(f'Overall: {stop - start} seconds')

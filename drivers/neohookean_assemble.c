@@ -73,6 +73,10 @@ int main(int argc, char *argv[]) {
         displacement[b] = (real_t *)calloc(nnodes, sizeof(real_t));
     }
 
+    displacement[0][0] = 0.1;
+
+
+
     real_t SFEM_MU = 1;
     real_t SFEM_LAMBDA = 1;
     SFEM_READ_ENV(SFEM_MU, atof);
