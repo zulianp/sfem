@@ -9,3 +9,4 @@ idx_t = np.@SFEM_IDX_TYPE@
 count_t = np.@SFEM_COUNT_TYPE@
 element_idx_t = np.@SFEM_ELEMENT_IDX_TYPE@
 local_idx_t = np.@SFEM_LOCAL_IDX_TYPE@
+SFEM_VEC_SIZE = @SFEM_VEC_SIZE@

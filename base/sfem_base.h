@@ -53,7 +53,7 @@ typedef geom_t jacobian_t;
 typedef long count_t;
 #define SFEM_MPI_COUNT_T MPI_LONG
 #define SFEM_CUSPARSE_COUNT_T CUSPARSE_INDEX_64I
-#define d_COUNT_T "l"
+#define d_COUNT_T "ld"
 #define dtype_COUNT_T "int64"
 
 typedef int element_idx_t;
@@ -61,8 +61,14 @@ typedef int element_idx_t;
 #define d_ELEMENT_IDX_T "d"
 #define dtype_ELEMENT_IDX_T "int32"
 
-typedef int16_t lidx_t;
-#define d_ELEMENT_LIDX_T "hd"
+typedef int16_t local_idx_t;
+#define d_LOCAL_IDX_T "hd"
+
+typedef real_t scalar_t;
+typedef real_t accumulator_t;
+#define SFEM_VEC_SIZE 4
+typedef scalar_t vec_t
+        __attribute__((vector_size(SFEM_VEC_SIZE * sizeof(scalar_t)), aligned(SFEM_VEC_SIZE * sizeof(scalar_t))));
 
 #endif
 #endif  // SFEM_BASE_H

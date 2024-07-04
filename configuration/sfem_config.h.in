@@ -4,11 +4,6 @@
 #cmakedefine SFEM_ENABLE_OPENMP
 #cmakedefine SFEM_ENABLE_AVX2
 #cmakedefine SFEM_ENABLE_AVX512
-#cmakedefine SFEM_INDEX_BITSIZE @SFEM_INDEX_BITSIZE @
-#cmakedefine SFEM_COUNT_BITSIZE @SFEM_COUNT_BITSIZE @
-
-#cmakedefine SFEM_ENABLE_FP32_KERNELS
-#cmakedefine SFEM_ENABLE_FP16_JACOBIANS
 #cmakedefine SFEM_ENABLE_CUSTOM_NUMBERS
 
 #ifdef SFEM_ENABLE_CUSTOM_NUMBERS
@@ -34,12 +29,16 @@ typedef @SFEM_REAL_C_TYPE@ real_t;
 #define d_REAL_T "@SFEM_REAL_PRINT_TYPE@"
 #define dtype_REAL_T "@SFEM_REAL_TYPE@"
 
-// computation real numbers
-typedef @SFEM_SCALAR_C_TYPE@ real_t;
+// computation real numbers and explicit vectorized types
+typedef @SFEM_SCALAR_C_TYPE@ scalar_t;
 #define SFEM_MPI_SCALAR_T @SFEM_SCALAR_MPI_TYPE@
 #define SFEM_CUSPARSE_SCALAR_T @SFEM_SCALAR_CUSPARSE_TYPE@
 #define d_SCALAR_T "@SFEM_SCALAR_PRINT_TYPE@"
 #define dtype_SCALAR_T "@SFEM_SCALAR_TYPE@"
+
+#define SFEM_VEC_SIZE @SFEM_VEC_SIZE@
+typedef scalar_t vec_t
+        __attribute__((vector_size(SFEM_VEC_SIZE * sizeof(scalar_t)), aligned(SFEM_VEC_SIZE * sizeof(scalar_t))));
 
 // Jacobian
 typedef @SFEM_JACOBIAN_CPU_C_TYPE@ jacobian_t;
@@ -50,6 +49,9 @@ typedef @SFEM_JACOBIAN_CPU_C_TYPE@ jacobian_t;
 
 // Jacobian (GPU)
 #define cu_jacobian_t @SFEM_JACOBIAN_GPU_TYPE@
+
+// Accumulator for local kernels (before local to global)
+typedef @SFEM_ACCUMULATOR_C_TYPE@ accumulator_t;
 
 // -----------------------------
 // Indexing representation
