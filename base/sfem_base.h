@@ -22,6 +22,15 @@
 #define SFEM_INLINE
 #endif
 
+#define SFEM_UNUSED(var) (void)var
+#define SFEM_RESTRICT __restrict__
+#define SFEM_MAX_PATH_LENGTH 2056
+#define SFEM_OK 0
+#define SFEM_SUCCESS 0
+#define SFEM_FAILURE 1
+
+#ifndef SFEM_ENABLE_CUSTOM_NUMBERS
+
 typedef float geom_t;
 #define SFEM_MPI_GEOM_T MPI_FLOAT
 #define d_GEOM_T "f"
@@ -39,46 +48,21 @@ typedef double real_t;
 #define d_REAL_T "g"
 #define dtype_REAL_T "float64"
 
+typedef geom_t jacobian_t;
+
 typedef long count_t;
 #define SFEM_MPI_COUNT_T MPI_LONG
 #define SFEM_CUSPARSE_COUNT_T CUSPARSE_INDEX_64I
 #define d_COUNT_T "l"
 #define dtype_COUNT_T "int64"
 
-
-// typedef int count_t;
-// #define SFEM_MPI_COUNT_T MPI_INT
-// #define SFEM_CUSPARSE_COUNT_T CUSPARSE_INDEX_32I
-// #define d_COUNT_T "d"
-// #define dtype_COUNT_T "int32"
-
-// typedef count_t element_idx_t;
-// #define SFEM_MPI_ELEMENT_IDX_T SFEM_MPI_COUNT_T
-
-// typedef long element_idx_t;
-// #define SFEM_MPI_ELEMENT_IDX_T MPI_LONG
-
 typedef int element_idx_t;
 #define SFEM_MPI_ELEMENT_IDX_T MPI_INT
 #define d_ELEMENT_IDX_T "d"
 #define dtype_ELEMENT_IDX_T "int32"
 
-#define SFEM_UNUSED(var) (void)var
-
-#define SFEM_RESTRICT __restrict__
-
-#define SFEM_MAX_PATH_LENGTH 2056
-#define SFEM_OK 0
-
-// typedef  __half2 jacobian_t;
-// typedef __fp16 jacobian_t;
-typedef geom_t jacobian_t;
-// typedef geom_t jacobian_t;
-
 typedef int16_t lidx_t;
 #define d_ELEMENT_LIDX_T "hd"
 
-#define SFEM_SUCCESS 0
-#define SFEM_FAILURE 1
-
+#endif
 #endif  // SFEM_BASE_H

@@ -30,44 +30,6 @@ else()
 endif()
 
 # ##############################################################################
-# XSDK_PRECISION
-# ##############################################################################
-
-# if(NOT XSDK_PRECISION OR USE_XSDK_DEFAULTS)
-#     set(XSDK_PRECISION "DOUBLE")
-# endif()
-
-# string(COMPARE EQUAL ${XSDK_PRECISION} "DOUBLE" SFEM_HAVE_DOUBLE_PRECISION)
-# string(COMPARE EQUAL ${XSDK_PRECISION} "SINGLE" SFEM_HAVE_SINGLE_PRECISION)
-# string(COMPARE EQUAL ${XSDK_PRECISION} "QUAD" SFEM_HAVE_QUAD_PRECISION)
-
-# # ##############################################################################
-# # XSDK_INDEX_SIZE
-# # ##############################################################################
-
-
-if(NOT SFEM_INDEX_BITSIZE)
-    set(SFEM_INDEX_BITSIZE 32 CACHE STRING "Choice of idx_t size between 32 or 64 bits" FORCE)
-endif()
-
-if(NOT SFEM_COUNT_BITSIZE)
-    set(SFEM_COUNT_BITSIZE 32 CACHE STRING "Choice of count_t size between 32 or 64 bits" FORCE)
-endif()
-
-
-# if(USE_XSDK_DEFAULTS)
-#     set(XSDK_INDEX_SIZE 32)
-#     set(SFEM_INDEX_BITSIZE 32)
-# else()
-#     if(XSDK_INDEX_SIZE)
-#         set(SFEM_INDEX_BITSIZE ${XSDK_INDEX_SIZE})
-#     elseif(NOT SFEM_INDEX_BITSIZE)
-#         set(XSDK_INDEX_SIZE 64)
-#         set(SFEM_INDEX_BITSIZE 64)
-#     endif()
-# endif()
-
-# ##############################################################################
 # Handle xSDK defaults
 # ##############################################################################
 

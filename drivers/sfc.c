@@ -26,7 +26,7 @@
 typedef uint32_t sfc_t;
 
 #define sort_function argsort_u32
-typedef idx_t element_idx_t;
+// typedef idx_t element_idx_t;
 
 // #define sort_function argsort_u32_ptrdiff_t
 // typedef ptrdiff_t element_idx_t;
