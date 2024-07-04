@@ -1,17 +1,11 @@
 import numpy as np
 
-SFEM_INDEX_BITSIZE=32
-SFEM_COUNT_BITSIZE=32
-
-if SFEM_INDEX_BITSIZE == 64:
-	idx_t = np.int64
-else:
-	idx_t = np.int32
-	
-if SFEM_COUNT_BITSIZE == 64:
-	count_t = np.int64
-else:
-	count_t = np.int32
-	
+# Automatically filled with CMake
 geom_t = np.float32
 real_t = np.float64
+scalar_t = np.float64
+jacobian_t = np.float32
+idx_t = np.int32
+count_t = np.int64
+element_idx_t = np.int32
+local_idx_t = np.int16

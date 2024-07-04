@@ -167,7 +167,10 @@ int main(int argc, char *argv[]) {
     f->add_constraint(conds);
     f->add_operator(op);
 
-    double solve_tick = MPI_Wtime();
+    double compute_tick = MPI_Wtime();
+    double init_tick = MPI_Wtime();
+    double init_tock;
+    double solve_tick, solve_tock;
 
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());
@@ -317,8 +320,13 @@ int main(int argc, char *argv[]) {
         mg->add_level(nullptr, solver_coarse, prolongation, nullptr);
         mg->set_max_it(SFEM_MAX_IT);
         mg->set_atol(SFEM_TOL);
+
+        init_tock = MPI_Wtime();
+
+        solve_tick = MPI_Wtime();
         mg->apply(rhs->data(), x->data());
-        
+        solve_tock = MPI_Wtime();
+
     } else {
 #if 0
     auto solver = smoother;
@@ -356,10 +364,14 @@ int main(int argc, char *argv[]) {
 #endif
 
         solver->set_op(linear_op);
+
+        init_tock = MPI_Wtime();
+        solve_tick = MPI_Wtime();
         solver->apply(rhs->data(), x->data());
+        solve_tock = MPI_Wtime();
     }
 
-    double solve_tock = MPI_Wtime();
+    double compute_tock = MPI_Wtime();
 
     auto r = sfem::h_buffer<real_t>(fs->n_dofs());
     real_t rtr = residual(*linear_op, rhs->data(), x->data(), r->data());
@@ -381,7 +393,11 @@ int main(int argc, char *argv[]) {
                (long)m->n_elements(),
                (long)m->n_nodes(),
                (long)fs->n_dofs());
-        printf("TTS:\t\t%g [s] (solve: %g [s])\n", tock - tick, solve_tock - solve_tick);
+        printf("TTS:\t\t%g [s], compute %g [s] (solve: %g [s], init: %g [s])\n",
+               tock - tick,
+               compute_tock - compute_tick,
+               solve_tock - solve_tick,
+               init_tock - init_tick);
         printf("residual:\t%g\n", rtr);
         printf("----------------------------------------\n");
     }
