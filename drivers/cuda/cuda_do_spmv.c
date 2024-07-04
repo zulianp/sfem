@@ -128,11 +128,17 @@ int main(int argc, char *argv[]) {
         CHECK_CUDA(cudaMalloc((void **)&csrValues, crs.lnnz * sizeof(real_t)));
 
         if (sizeof(cu_compat_count_t) != sizeof(count_t)) {
+            fprintf(stderr, "[Warning] cu_compat_count_t (%d) != count_t (%d). Converting rowptr\n", (int)sizeof(cu_compat_count_t), (int)sizeof(count_t));
             cu_compat_count_t * h_rowptr = malloc((crs.lrows + 1) * sizeof(cu_compat_count_t));
 
             for(ptrdiff_t i = 0; i < crs.lrows + 1; i++) {
                 h_rowptr[i] = crs.rowptr[i];
                 assert((count_t)h_rowptr[i] == crs.rowptr[i]);
+            }
+
+            if(crs.rowptr[crs.lrows] != (count_t)h_rowptr[crs.lrows]) {
+                fprintf(stderr, "[Warning] current rowptr representation cannot represent the indices\n");
+                return EXIT_FAILURE;
             }
 
             CHECK_CUDA(cudaMemcpy(csrRowOffsets,

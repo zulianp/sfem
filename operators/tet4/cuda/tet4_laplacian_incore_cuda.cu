@@ -1,6 +1,6 @@
+#include <algorithm>
 #include <cassert>
 #include <cmath>
-#include <algorithm>
 #include <cstddef>
 
 #include "sfem_base.h"
@@ -17,12 +17,11 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define POW2(a) ((a) * (a))
 
-
 template <typename cu_jacobian_t, typename real_t, typename scalar_t = real_t>
 __global__ void tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t nelements,
                                                         idx_t *const SFEM_RESTRICT elems,
                                                         const cu_jacobian_t *const SFEM_RESTRICT
-                                                            fff,
+                                                                fff,
                                                         const real_t *const SFEM_RESTRICT x,
                                                         real_t *const SFEM_RESTRICT y) {
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
@@ -104,22 +103,22 @@ extern int tet4_cuda_incore_laplacian_init(cuda_incore_laplacian_t *ctx,
                          points[0][elements[1][e]],
                          points[0][elements[2][e]],
                          points[0][elements[3][e]],
-                                 points[1][elements[0][e]],
-                                 points[1][elements[1][e]],
-                                 points[1][elements[2][e]],
-                                 points[1][elements[3][e]],
-                                 points[2][elements[0][e]],
-                                 points[2][elements[1][e]],
-                                 points[2][elements[2][e]],
-                                 points[2][elements[3][e]],
-                                 nelements,
-                                 &h_fff[e]);
+                         points[1][elements[0][e]],
+                         points[1][elements[1][e]],
+                         points[1][elements[2][e]],
+                         points[1][elements[3][e]],
+                         points[2][elements[0][e]],
+                         points[2][elements[1][e]],
+                         points[2][elements[2][e]],
+                         points[2][elements[3][e]],
+                         nelements,
+                         &h_fff[e]);
             }
         }
 
         SFEM_CUDA_CHECK(cudaMalloc(&ctx->d_fff, 6 * nelements * sizeof(cu_jacobian_t)));
         SFEM_CUDA_CHECK(cudaMemcpy(
-            ctx->d_fff, h_fff, 6 * nelements * sizeof(cu_jacobian_t), cudaMemcpyHostToDevice));
+                ctx->d_fff, h_fff, 6 * nelements * sizeof(cu_jacobian_t), cudaMemcpyHostToDevice));
         free(h_fff);
     }
 
@@ -155,7 +154,7 @@ extern int tet4_cuda_incore_laplacian_destroy(cuda_incore_laplacian_t *ctx) {
 __global__ void tet4_cuda_incore_laplacian_apply_kernel_V2(const ptrdiff_t nelements,
                                                            idx_t *const SFEM_RESTRICT elems,
                                                            const cu_jacobian_t *const SFEM_RESTRICT
-                                                               fff,
+                                                                   fff,
                                                            const real_t *const SFEM_RESTRICT x,
                                                            real_t *const SFEM_RESTRICT y) {
     int v = threadIdx.y;
@@ -230,7 +229,7 @@ extern int tet4_cuda_incore_laplacian_apply_V2(cuda_incore_laplacian_t *ctx,
     dim3 block_size_2(block_size, 4);
 
     tet4_cuda_incore_laplacian_apply_kernel_V2<<<n_blocks_2, block_size_2, 0>>>(
-        ctx->nelements, ctx->d_elems, (cu_jacobian_t *)ctx->d_fff, d_x, d_y);
+            ctx->nelements, ctx->d_elems, (cu_jacobian_t *)ctx->d_fff, d_x, d_y);
     printf("tet4_cuda_incore_laplacian_apply_V2\n");
     return 0;
 }
@@ -249,29 +248,33 @@ extern int tet4_cuda_incore_laplacian_apply(cuda_incore_laplacian_t *ctx,
     {
         int min_grid_size;
         cudaOccupancyMaxPotentialBlockSize(
-            &min_grid_size, &block_size, tet4_cuda_incore_laplacian_apply_kernel<cu_jacobian_t, real_t, real_t>, 0, 0);
+                &min_grid_size,
+                &block_size,
+                tet4_cuda_incore_laplacian_apply_kernel<cu_jacobian_t, real_t, real_t>,
+                0,
+                0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
     ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (ctx->nelements + block_size - 1) / block_size);
     tet4_cuda_incore_laplacian_apply_kernel<<<n_blocks, block_size, 0>>>(
-        ctx->nelements, ctx->d_elems, (cu_jacobian_t *)ctx->d_fff, d_x, d_y);
+            ctx->nelements, ctx->d_elems, (cu_jacobian_t *)ctx->d_fff, d_x, d_y);
     return 0;
 }
 
 extern int tet4_cuda_incore_laplacian_diag(cuda_incore_laplacian_t *ctx, real_t *const d_d) {
-        // Hand tuned
+    // Hand tuned
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
         int min_grid_size;
         cudaOccupancyMaxPotentialBlockSize(
-            &min_grid_size, &block_size, tet4_cuda_incore_laplacian_diag_kernel, 0, 0);
+                &min_grid_size, &block_size, tet4_cuda_incore_laplacian_diag_kernel, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
     ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (ctx->nelements + block_size - 1) / block_size);
     tet4_cuda_incore_laplacian_diag_kernel<<<n_blocks, block_size, 0>>>(
-        ctx->nelements, ctx->d_elems, (cu_jacobian_t *)ctx->d_fff, d_d);
+            ctx->nelements, ctx->d_elems, (cu_jacobian_t *)ctx->d_fff, d_d);
     return 0;
 }
