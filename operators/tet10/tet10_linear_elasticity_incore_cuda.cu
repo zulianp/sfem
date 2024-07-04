@@ -238,7 +238,7 @@ static inline __device__ __host__ void apply_micro_kernel(
 #endif
     // Includes first Piola-Kirchoff stress: P^T * J^-T * det(J)
 
-    scalar_t *P_tXJinv_t = disp_grad;
+    scalar_t *PxJinv_t = disp_grad;
     {
         const scalar_t x0 = (1.0 / 6.0) * mu;
         const scalar_t x1 = x0 * (disp_grad[1] + disp_grad[3]);
@@ -249,20 +249,20 @@ static inline __device__ __host__ void apply_micro_kernel(
         const scalar_t x6 = x0 * (disp_grad[5] + disp_grad[7]);
         const scalar_t x7 = (1.0 / 6.0) * disp_grad[4] * x3 + (1.0 / 6.0) * x4;
         const scalar_t x8 = (1.0 / 6.0) * disp_grad[8] * x3 + (1.0 / 6.0) * x4;
-        P_tXJinv_t[0] = adjugate[0] * x5 + adjugate[1] * x1 + adjugate[2] * x2;
-        P_tXJinv_t[1] = adjugate[3] * x5 + adjugate[4] * x1 + adjugate[5] * x2;
-        P_tXJinv_t[2] = adjugate[6] * x5 + adjugate[7] * x1 + adjugate[8] * x2;
-        P_tXJinv_t[3] = adjugate[0] * x1 + adjugate[1] * x7 + adjugate[2] * x6;
-        P_tXJinv_t[4] = adjugate[3] * x1 + adjugate[4] * x7 + adjugate[5] * x6;
-        P_tXJinv_t[5] = adjugate[6] * x1 + adjugate[7] * x7 + adjugate[8] * x6;
-        P_tXJinv_t[6] = adjugate[0] * x2 + adjugate[1] * x6 + adjugate[2] * x8;
-        P_tXJinv_t[7] = adjugate[3] * x2 + adjugate[4] * x6 + adjugate[5] * x8;
-        P_tXJinv_t[8] = adjugate[6] * x2 + adjugate[7] * x6 + adjugate[8] * x8;
+        PxJinv_t[0] = adjugate[0] * x5 + adjugate[1] * x1 + adjugate[2] * x2;
+        PxJinv_t[1] = adjugate[3] * x5 + adjugate[4] * x1 + adjugate[5] * x2;
+        PxJinv_t[2] = adjugate[6] * x5 + adjugate[7] * x1 + adjugate[8] * x2;
+        PxJinv_t[3] = adjugate[0] * x1 + adjugate[1] * x7 + adjugate[2] * x6;
+        PxJinv_t[4] = adjugate[3] * x1 + adjugate[4] * x7 + adjugate[5] * x6;
+        PxJinv_t[5] = adjugate[6] * x1 + adjugate[7] * x7 + adjugate[8] * x6;
+        PxJinv_t[6] = adjugate[0] * x2 + adjugate[1] * x6 + adjugate[2] * x8;
+        PxJinv_t[7] = adjugate[3] * x2 + adjugate[4] * x6 + adjugate[5] * x8;
+        PxJinv_t[8] = adjugate[6] * x2 + adjugate[7] * x6 + adjugate[8] * x8;
     }
 
     // Scale by quadrature weight
     for (int i = 0; i < 9; i++) {
-        P_tXJinv_t[i] *= qw / denom;
+        PxJinv_t[i] *= qw / denom;
     }
 
 // On CPU both versions are equivalent
@@ -275,56 +275,56 @@ static inline __device__ __host__ void apply_micro_kernel(
         const scalar_t x4 = x0 - 1;
         const scalar_t x5 = x1 - 1;
         const scalar_t x6 = x2 - 1;
-        const scalar_t x7 = P_tXJinv_t[1] * x0;
-        const scalar_t x8 = P_tXJinv_t[2] * x0;
+        const scalar_t x7 = PxJinv_t[1] * x0;
+        const scalar_t x8 = PxJinv_t[2] * x0;
         const scalar_t x9 = qz - 1;
         const scalar_t x10 = 8 * qx + 4 * qy + 4 * x9;
-        const scalar_t x11 = P_tXJinv_t[0] * x1;
-        const scalar_t x12 = P_tXJinv_t[2] * x1;
+        const scalar_t x11 = PxJinv_t[0] * x1;
+        const scalar_t x12 = PxJinv_t[2] * x1;
         const scalar_t x13 = 4 * qx + 8 * qy + 4 * x9;
-        const scalar_t x14 = P_tXJinv_t[0] * x2;
-        const scalar_t x15 = P_tXJinv_t[1] * x2;
+        const scalar_t x14 = PxJinv_t[0] * x2;
+        const scalar_t x15 = PxJinv_t[1] * x2;
         const scalar_t x16 = 4 * qx + 4 * qy + 8 * qz - 4;
-        const scalar_t x17 = P_tXJinv_t[4] * x0;
-        const scalar_t x18 = P_tXJinv_t[5] * x0;
-        const scalar_t x19 = P_tXJinv_t[3] * x1;
-        const scalar_t x20 = P_tXJinv_t[5] * x1;
-        const scalar_t x21 = P_tXJinv_t[3] * x2;
-        const scalar_t x22 = P_tXJinv_t[4] * x2;
-        const scalar_t x23 = P_tXJinv_t[7] * x0;
-        const scalar_t x24 = P_tXJinv_t[8] * x0;
-        const scalar_t x25 = P_tXJinv_t[6] * x1;
-        const scalar_t x26 = P_tXJinv_t[8] * x1;
-        const scalar_t x27 = P_tXJinv_t[6] * x2;
-        const scalar_t x28 = P_tXJinv_t[7] * x2;
-        element_vector[0] += x3 * (P_tXJinv_t[0] + P_tXJinv_t[1] + P_tXJinv_t[2]);
-        element_vector[1] += P_tXJinv_t[0] * x4;
-        element_vector[2] += P_tXJinv_t[1] * x5;
-        element_vector[3] += P_tXJinv_t[2] * x6;
-        element_vector[4] += -P_tXJinv_t[0] * x10 - x7 - x8;
+        const scalar_t x17 = PxJinv_t[4] * x0;
+        const scalar_t x18 = PxJinv_t[5] * x0;
+        const scalar_t x19 = PxJinv_t[3] * x1;
+        const scalar_t x20 = PxJinv_t[5] * x1;
+        const scalar_t x21 = PxJinv_t[3] * x2;
+        const scalar_t x22 = PxJinv_t[4] * x2;
+        const scalar_t x23 = PxJinv_t[7] * x0;
+        const scalar_t x24 = PxJinv_t[8] * x0;
+        const scalar_t x25 = PxJinv_t[6] * x1;
+        const scalar_t x26 = PxJinv_t[8] * x1;
+        const scalar_t x27 = PxJinv_t[6] * x2;
+        const scalar_t x28 = PxJinv_t[7] * x2;
+        element_vector[0] += x3 * (PxJinv_t[0] + PxJinv_t[1] + PxJinv_t[2]);
+        element_vector[1] += PxJinv_t[0] * x4;
+        element_vector[2] += PxJinv_t[1] * x5;
+        element_vector[3] += PxJinv_t[2] * x6;
+        element_vector[4] += -PxJinv_t[0] * x10 - x7 - x8;
         element_vector[5] += x11 + x7;
-        element_vector[6] += -P_tXJinv_t[1] * x13 - x11 - x12;
-        element_vector[7] += -P_tXJinv_t[2] * x16 - x14 - x15;
+        element_vector[6] += -PxJinv_t[1] * x13 - x11 - x12;
+        element_vector[7] += -PxJinv_t[2] * x16 - x14 - x15;
         element_vector[8] += x14 + x8;
         element_vector[9] += x12 + x15;
-        element_vector[10] += x3 * (P_tXJinv_t[3] + P_tXJinv_t[4] + P_tXJinv_t[5]);
-        element_vector[11] += P_tXJinv_t[3] * x4;
-        element_vector[12] += P_tXJinv_t[4] * x5;
-        element_vector[13] += P_tXJinv_t[5] * x6;
-        element_vector[14] += -P_tXJinv_t[3] * x10 - x17 - x18;
+        element_vector[10] += x3 * (PxJinv_t[3] + PxJinv_t[4] + PxJinv_t[5]);
+        element_vector[11] += PxJinv_t[3] * x4;
+        element_vector[12] += PxJinv_t[4] * x5;
+        element_vector[13] += PxJinv_t[5] * x6;
+        element_vector[14] += -PxJinv_t[3] * x10 - x17 - x18;
         element_vector[15] += x17 + x19;
-        element_vector[16] += -P_tXJinv_t[4] * x13 - x19 - x20;
-        element_vector[17] += -P_tXJinv_t[5] * x16 - x21 - x22;
+        element_vector[16] += -PxJinv_t[4] * x13 - x19 - x20;
+        element_vector[17] += -PxJinv_t[5] * x16 - x21 - x22;
         element_vector[18] += x18 + x21;
         element_vector[19] += x20 + x22;
-        element_vector[20] += x3 * (P_tXJinv_t[6] + P_tXJinv_t[7] + P_tXJinv_t[8]);
-        element_vector[21] += P_tXJinv_t[6] * x4;
-        element_vector[22] += P_tXJinv_t[7] * x5;
-        element_vector[23] += P_tXJinv_t[8] * x6;
-        element_vector[24] += -P_tXJinv_t[6] * x10 - x23 - x24;
+        element_vector[20] += x3 * (PxJinv_t[6] + PxJinv_t[7] + PxJinv_t[8]);
+        element_vector[21] += PxJinv_t[6] * x4;
+        element_vector[22] += PxJinv_t[7] * x5;
+        element_vector[23] += PxJinv_t[8] * x6;
+        element_vector[24] += -PxJinv_t[6] * x10 - x23 - x24;
         element_vector[25] += x23 + x25;
-        element_vector[26] += -P_tXJinv_t[7] * x13 - x25 - x26;
-        element_vector[27] += -P_tXJinv_t[8] * x16 - x27 - x28;
+        element_vector[26] += -PxJinv_t[7] * x13 - x25 - x26;
+        element_vector[27] += -PxJinv_t[8] * x16 - x27 - x28;
         element_vector[28] += x24 + x27;
         element_vector[29] += x26 + x28;
     }
@@ -338,9 +338,9 @@ static inline __device__ __host__ void apply_micro_kernel(
 #pragma unroll
         for (int i = 0; i < 10; i++) {
             scalar_t g = grad[i];
-            element_vector[i] += P_tXJinv_t[0] * g;
-            element_vector[10 + i] += P_tXJinv_t[3] * g;
-            element_vector[20 + i] += P_tXJinv_t[6] * g;
+            element_vector[i] += PxJinv_t[0] * g;
+            element_vector[10 + i] += PxJinv_t[3] * g;
+            element_vector[20 + i] += PxJinv_t[6] * g;
         }
 
         ref_shape_grad_y(qx, qy, qz, grad);
@@ -348,9 +348,9 @@ static inline __device__ __host__ void apply_micro_kernel(
 #pragma unroll
         for (int i = 0; i < 10; i++) {
             scalar_t g = grad[i];
-            element_vector[i] += P_tXJinv_t[1] * g;
-            element_vector[10 + i] += P_tXJinv_t[4] * g;
-            element_vector[20 + i] += P_tXJinv_t[7] * g;
+            element_vector[i] += PxJinv_t[1] * g;
+            element_vector[10 + i] += PxJinv_t[4] * g;
+            element_vector[20 + i] += PxJinv_t[7] * g;
         }
 
         ref_shape_grad_z(qx, qy, qz, grad);
@@ -358,9 +358,9 @@ static inline __device__ __host__ void apply_micro_kernel(
 #pragma unroll
         for (int i = 0; i < 10; i++) {
             scalar_t g = grad[i];
-            element_vector[i] += P_tXJinv_t[2] * g;
-            element_vector[10 + i] += P_tXJinv_t[5] * g;
-            element_vector[20 + i] += P_tXJinv_t[8] * g;
+            element_vector[i] += PxJinv_t[2] * g;
+            element_vector[10 + i] += PxJinv_t[5] * g;
+            element_vector[20 + i] += PxJinv_t[8] * g;
         }
     }
 
