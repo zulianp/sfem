@@ -17,7 +17,7 @@ option(SFEM_ENABLE_PYTHON "Enable python bindings for SFEM" ON)
 option(SFEM_ENABLE_FP32_KERNELS "Enable single precision kernels when using Cuda" OFF)
 option(SFEM_ENABLE_FP16_JACOBIANS "Enable half precision jacobians when using Cuda" ON)
 option(SFEM_ENABLE_AVX2 "Enable AVX2 intrinsics" OFF)
-option(SFEM_USE_OCCUPANCY_MAX_POTENTIAL "Enable usage of cuOccupancyMaxPotentialBlockSize" OFF)
+option(SFEM_USE_OCCUPANCY_MAX_POTENTIAL "Enable usage of cudaOccupancyMaxPotentialBlockSize" OFF)
 # option(SFEM_ENABLE_AVX512 "Enable AVX2 intrinsics" OFF) # TODO
 
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)

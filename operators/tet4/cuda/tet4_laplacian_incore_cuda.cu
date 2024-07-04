@@ -1,6 +1,5 @@
 #include <cassert>
 #include <cmath>
-// #include <cstdio>
 #include <algorithm>
 #include <cstddef>
 
@@ -250,7 +249,7 @@ extern int tet4_cuda_incore_laplacian_apply(cuda_incore_laplacian_t *ctx,
     {
         int min_grid_size;
         cudaOccupancyMaxPotentialBlockSize(
-            &min_grid_size, &block_size, tet4_cuda_incore_laplacian_apply_kernel, 0, 0);
+            &min_grid_size, &block_size, tet4_cuda_incore_laplacian_apply_kernel<cu_jacobian_t, real_t, real_t>, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
@@ -267,7 +266,7 @@ extern int tet4_cuda_incore_laplacian_diag(cuda_incore_laplacian_t *ctx, real_t 
     {
         int min_grid_size;
         cudaOccupancyMaxPotentialBlockSize(
-            &min_grid_size, &block_size, tet4_cuda_incore_laplacian_apply_kernel, 0, 0);
+            &min_grid_size, &block_size, tet4_cuda_incore_laplacian_diag_kernel, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
