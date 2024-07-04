@@ -144,6 +144,7 @@ sfem_print_type(${SFEM_ELEMENT_IDX_TYPE} SFEM_ELEMENT_IDX_PRINT_TYPE)
 sfem_print_type(${SFEM_LOCAL_IDX_TYPE} SFEM_LOCAL_IDX_PRINT_TYPE)
 
 message(STATUS 
+    "--------------------------------------------------------------------------------------\n"
     "\nSFEM Numbers\n"
     "--------------------------------------------------------------------------------------\n"
     "type\t\tC\t\tId\tMPI\t\tprintf\t(CMake option)\n"

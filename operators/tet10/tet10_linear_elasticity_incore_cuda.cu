@@ -1,6 +1,5 @@
 #include <cassert>
 #include <cmath>
-// #include <cstdio>
 #include <algorithm>
 #include <cstddef>
 
@@ -14,24 +13,6 @@
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define POW2(a) ((a) * (a))
-
-// #define SFEM_ENABLE_FP32_KERNELS
-// #define SFEM_ENABLE_FP16_JACOBIANS
-
-#ifdef SFEM_ENABLE_FP32_KERNELS
-typedef float scalar_t;
-#else
-typedef real_t scalar_t;
-#endif
-
-typedef scalar_t accumulator_t;
-
-#ifdef SFEM_ENABLE_FP16_JACOBIANS
-#include <cuda_fp16.h>
-typedef half cu_jacobian_t;
-#else
-typedef geom_t cu_jacobian_t;
-#endif
 
 static inline __device__ __host__ void adjugate_and_det_micro_kernel(
     const geom_t px0,

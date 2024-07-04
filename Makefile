@@ -183,7 +183,6 @@ OBJS = \
 	surface_l2_projection.o \
 	linear_elasticity.o \
 	stokes_mini.o \
-	phase_field_for_fracture.o  \
 	navier_stokes.o \
 	boundary_condition.o \
 	boundary_condition_io.o \
@@ -191,13 +190,14 @@ OBJS = \
 	sfem_logger.o \
 	extract_sharp_features.o \
 	mesh_utils.o
+# 	phase_field_for_fracture.o  \
 
 # Tri3
 OBJS += tri3_stokes_mini.o \
 		tri3_mass.o \
-		tri3_phase_field_for_fracture.o \
 		tri3_linear_elasticity.o \
 		tri3_laplacian.o
+# 		tri3_phase_field_for_fracture.o \
 
 
 
@@ -222,7 +222,6 @@ OBJS += tet4_fff.o \
 	tet4_mass.o \
 	tet4_l2_projection_p0_p1.o \
 	tet4_linear_elasticity.o \
-	tet4_phase_field_for_fracture.o \
 	tet4_stokes_mini.o \
 	trishell3_l2_projection_p0_p1.o \
 	tet4_grad.o \
@@ -232,6 +231,7 @@ OBJS += tet4_fff.o \
 	tet4_neohookean_principal_stresses.o \
 	tet4_neohookean.o \
 	tet4_neohookean_ogden.o
+# 	tet4_phase_field_for_fracture.o \
 
 
 # Beam2
@@ -266,7 +266,7 @@ ifeq ($(cuda), 1)
 # 	CUDA_OBJS = tet4_cuda_laplacian_2.o
 # 	CUDA_OBJS = tet4_cuda_laplacian_3.o # FIXME
 	CUDA_OBJS = tet4_laplacian.o
-	CUDA_OBJS += tet4_cuda_phase_field_for_fracture.o
+# 	CUDA_OBJS += tet4_cuda_phase_field_for_fracture.o
 	CUDA_OBJS += tet4_laplacian_incore_cuda.o
 	CUDA_OBJS += tet10_laplacian_incore_cuda.o
 	CUDA_OBJS += macro_tet4_laplacian_incore_cuda.o
@@ -299,7 +299,7 @@ OBJS += $(SIMD_OBJS)
 
 OBJS += sfem_Function.o 
 
-plugins: isolver_sfem.dylib franetg_plugin.dylib hyperelasticity_plugin.dylib nse_plugin.dylib stokes_plugin.dylib
+plugins: isolver_sfem.dylib hyperelasticity_plugin.dylib nse_plugin.dylib stokes_plugin.dylib
 
 libsfem.a : $(OBJS)
 	ar rcs $@ $^
@@ -560,11 +560,11 @@ isolver_sfem.dylib : isolver_sfem_plugin.o libsfem.a
 isolver_sfem_plugin.o : plugin/isolver_sfem_plugin.c
 	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
 
-franetg_plugin.dylib : franetg_plugin.o libsfem.a
-	$(MPICC) -shared -o $@ $^ $(LDFLAGS)
+# franetg_plugin.dylib : franetg_plugin.o libsfem.a
+# 	$(MPICC) -shared -o $@ $^ $(LDFLAGS)
 
-franetg_plugin.o : plugin/franetg_plugin.c
-	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
+# franetg_plugin.o : plugin/franetg_plugin.c
+# 	$(MPICC) $(CFLAGS) $(INCLUDES) -I../isolver/interfaces/nlsolve -c $<
 
 nse_plugin.dylib : nse_plugin.o libsfem.a
 	$(MPICC) -shared -o $@ $^ $(LDFLAGS)

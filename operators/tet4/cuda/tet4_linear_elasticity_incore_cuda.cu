@@ -1,36 +1,15 @@
 #include "tet4_linear_elasticity_incore_cuda.h"
 
-#include "sfem_cuda_base.h"
-#include "sfem_defs.h"
-
 #include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
 
+#include "sfem_cuda_base.h"
+#include "sfem_defs.h"
+
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define POW2(a) ((a) * (a))
-
-#ifdef SFEM_ENABLE_FP32_KERNELS
-typedef float scalar_t;
-#else
-typedef real_t scalar_t;
-#endif
-
-#ifdef SFEM_ENABLE_FP32_KERNELS
-typedef float scalar_t;
-#else
-typedef real_t scalar_t;
-#endif
-
-#ifdef SFEM_ENABLE_FP16_JACOBIANS
-#include <cuda_fp16.h>
-typedef half cu_jacobian_t;
-#else
-typedef geom_t cu_jacobian_t;
-#endif
-
-typedef scalar_t accumulator_t;
 
 static inline __device__ __host__ void adjugate_and_det_micro_kernel(
     const geom_t px0,
