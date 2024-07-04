@@ -17,4 +17,4 @@ set(CMAKE_CXX_FLAGS_PROF
     )
 
 
-set(CMAKE_CUDA_FLAGS "--compiler-options \"-fPIC ${CMAKE_CXX_FLAGS}\" -std=c++14 -arch=sm_60 -Xptxas=-O3,-v -use_fast_math")
+set(CMAKE_CUDA_FLAGS "--compiler-options \"-fPIC\" -arch=sm_60 -Xptxas=-O3,-v -use_fast_math")

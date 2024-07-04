@@ -18,22 +18,6 @@ extern "C" {
 
 #define block_size 128
 
-// #define SFEM_ENABLE_FP32_KERNELS
-// #define SFEM_ENABLE_FP16_JACOBIANS
-
-#ifdef SFEM_ENABLE_FP32_KERNELS
-typedef float scalar_t;
-#else
-typedef real_t scalar_t;
-#endif
-
-#ifdef SFEM_ENABLE_FP16_JACOBIANS
-#include <cuda_fp16.h>
-typedef half cu_jacobian_t;
-#else
-typedef geom_t cu_jacobian_t;
-#endif
-
 static inline __device__ __host__ void fff_micro_kernel(const geom_t px0,
                                                         const geom_t px1,
                                                         const geom_t px2,

@@ -18,18 +18,6 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define POW2(a) ((a) * (a))
 
-#ifdef SFEM_ENABLE_FP32_KERNELS
-typedef float scalar_t;
-#else
-typedef real_t scalar_t;
-#endif
-
-#ifdef SFEM_ENABLE_FP16_JACOBIANS
-#include <cuda_fp16.h>
-typedef half cu_jacobian_t;
-#else
-typedef geom_t cu_jacobian_t;
-#endif
 
 template <typename cu_jacobian_t, typename real_t, typename scalar_t = real_t>
 __global__ void tet4_cuda_incore_laplacian_apply_kernel(const ptrdiff_t nelements,

@@ -1,36 +1,17 @@
 #include <cassert>
 #include <cmath>
-// #include <cstdio>
 #include <algorithm>
 #include <cstddef>
 
-extern "C" {
 #include "sfem_base.h"
 #include "sfem_vec.h"
 #include "sortreduce.h"
-}
 #include "sfem_defs.h"
 #include "sfem_cuda_base.h"
 #include "tet10_laplacian_incore_cuda.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define POW2(a) ((a) * (a))
-
-// #define SFEM_ENABLE_FP32_KERNELS
-
-#ifdef SFEM_ENABLE_FP32_KERNELS
-typedef float scalar_t;
-#else
-typedef real_t scalar_t;
-#endif
-
-#ifdef SFEM_ENABLE_FP16_JACOBIANS
-#include <cuda_fp16.h>
-typedef half cu_jacobian_t;
-#else
-typedef geom_t cu_jacobian_t;
-#endif
-
 
 static inline __device__ __host__ void fff_micro_kernel(const geom_t px0,
                                                         const geom_t px1,
