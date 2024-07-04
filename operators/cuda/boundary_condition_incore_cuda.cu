@@ -52,7 +52,7 @@ void d_constraint_nodes_copy_vec(const ptrdiff_t n_dirichlet_nodes,
     {
         int min_grid_size;
         cuOccupancyMaxPotentialBlockSize(
-            &min_grid_size, &kernel_block_size, constraint_nodes_copy_vec_kernel, 0, 0);
+            &min_grid_size, &kernel_block_size, constraint_nodes_copy_vec_kernel, 0, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
@@ -100,7 +100,7 @@ void d_constraint_nodes_to_value_vec(const ptrdiff_t n_dirichlet_nodes,
     {
         int min_grid_size;
         cuOccupancyMaxPotentialBlockSize(
-            &min_grid_size, &kernel_block_size, constraint_nodes_to_value_vec_kernel, 0, 0);
+            &min_grid_size, &kernel_block_size, constraint_nodes_to_value_vec_kernel, 0, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
@@ -137,7 +137,7 @@ void d_constraint_nodes_to_values_vec(const ptrdiff_t n_dirichlet_nodes,
     {
         int min_grid_size;
         cuOccupancyMaxPotentialBlockSize(
-            &min_grid_size, &kernel_block_size, constraint_nodes_to_values_vec_kernel, 0, 0);
+            &min_grid_size, &kernel_block_size, constraint_nodes_to_values_vec_kernel, 0, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
@@ -190,7 +190,7 @@ void d_constraint_gradient_nodes_to_value_vec(const ptrdiff_t n_dirichlet_nodes,
     {
         int min_grid_size;
         cuOccupancyMaxPotentialBlockSize(
-            &min_grid_size, &kernel_block_size, constraint_nodes_to_values_vec_kernel, 0, 0);
+            &min_grid_size, &kernel_block_size, constraint_nodes_to_values_vec_kernel, 0, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 

@@ -6,7 +6,7 @@ n_refs=${#refs[@]}
 # last=${refs[$last_idx]}
 
 # Largest matrix-based experiment (can vary w.r.t. SFEM idx_t count_t)
-largest_matrix=4
+largest_matrix=3
 # refs=(0 1)
 
 set -e
@@ -71,6 +71,9 @@ do
 	sfc mesh sorted
 	refine sorted refined
 
+	# P2 folder
+	mesh_p1_to_p2 sorted ../p2
+
 	mkdir -p matrix_scalar
 	echo "op: Laplacian" > matrix_scalar/meta.yaml
 
@@ -82,9 +85,6 @@ do
 		SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble refined matrix_scalar
 		SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble3 refined matrix_vector
 	fi
-
-	# P2 folder
-	mesh_p1_to_p2 sorted ../p2
 
 	cd $SPHERE_FOLDER
 done
