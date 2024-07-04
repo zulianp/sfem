@@ -1,13 +1,13 @@
+#include <algorithm>
 #include <cassert>
 #include <cmath>
-#include <algorithm>
 #include <cstddef>
 
+#include "macro_tet4_linear_elasticity_incore_cuda.h"
 #include "sfem_base.h"
 #include "sfem_defs.h"
 #include "sfem_vec.h"
 #include "sortreduce.h"
-#include "macro_tet4_linear_elasticity_incore_cuda.h"
 
 #include "sfem_cuda_base.h"
 
@@ -15,21 +15,21 @@
 #define POW2(a) ((a) * (a))
 
 static inline __device__ __host__ void adjugate_and_det_micro_kernel(
-    const geom_t px0,
-    const geom_t px1,
-    const geom_t px2,
-    const geom_t px3,
-    const geom_t py0,
-    const geom_t py1,
-    const geom_t py2,
-    const geom_t py3,
-    const geom_t pz0,
-    const geom_t pz1,
-    const geom_t pz2,
-    const geom_t pz3,
-    const ptrdiff_t stride,
-    cu_jacobian_t *adjugate,
-    cu_jacobian_t *jacobian_determinant) {
+        const geom_t px0,
+        const geom_t px1,
+        const geom_t px2,
+        const geom_t px3,
+        const geom_t py0,
+        const geom_t py1,
+        const geom_t py2,
+        const geom_t py3,
+        const geom_t pz0,
+        const geom_t pz1,
+        const geom_t pz2,
+        const geom_t pz3,
+        const ptrdiff_t stride,
+        cu_jacobian_t *adjugate,
+        cu_jacobian_t *jacobian_determinant) {
     // Compute jacobian in high precision
     real_t jacobian[9];
     jacobian[0] = -px0 + px1;
@@ -68,7 +68,7 @@ static inline __device__ __host__ void adjugate_and_det_micro_kernel(
 static inline __device__ __host__ void apply_micro_kernel(const scalar_t mu,
                                                           const scalar_t lambda,
                                                           const scalar_t *const SFEM_RESTRICT
-                                                              adjugate,
+                                                                  adjugate,
                                                           const scalar_t jacobian_determinant,
                                                           const scalar_t *const SFEM_RESTRICT ux,
                                                           const scalar_t *const SFEM_RESTRICT uy,
@@ -154,7 +154,7 @@ static inline __device__ __host__ void apply_micro_kernel(const scalar_t mu,
 static inline __device__ __host__ void diag_micro_kernel(const scalar_t mu,
                                                          const scalar_t lambda,
                                                          const scalar_t *const SFEM_RESTRICT
-                                                             adjugate,
+                                                                 adjugate,
                                                          const scalar_t jacobian_determinant,
                                                          accumulator_t *const SFEM_RESTRICT diag) {
     // TODO
@@ -279,9 +279,9 @@ int macro_tet4_cuda_incore_linear_elasticity_init(cuda_incore_linear_elasticity_
         // init_local_indexing();
 
         cu_jacobian_t *jacobian_adjugate =
-            (cu_jacobian_t *)calloc(9 * nelements, sizeof(cu_jacobian_t));
+                (cu_jacobian_t *)calloc(9 * nelements, sizeof(cu_jacobian_t));
         cu_jacobian_t *jacobian_determinant =
-            (cu_jacobian_t *)calloc(nelements, sizeof(cu_jacobian_t));
+                (cu_jacobian_t *)calloc(nelements, sizeof(cu_jacobian_t));
 
 #pragma omp parallel
         {
@@ -355,14 +355,14 @@ int macro_tet4_cuda_incore_linear_elasticity_destroy(cuda_incore_linear_elastici
 }
 
 __global__ void macro_tet4_cuda_incore_linear_elasticity_apply_kernel(
-    const ptrdiff_t nelements,
-    idx_t *const elements,
-    const cu_jacobian_t *const g_jacobian_adjugate,
-    const cu_jacobian_t *const g_jacobian_determinant,
-    const scalar_t mu,
-    const scalar_t lambda,
-    const real_t *const u,
-    real_t *const values) {
+        const ptrdiff_t nelements,
+        idx_t *const elements,
+        const cu_jacobian_t *const g_jacobian_adjugate,
+        const cu_jacobian_t *const g_jacobian_determinant,
+        const scalar_t mu,
+        const scalar_t lambda,
+        const real_t *const u,
+        real_t *const values) {
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
          e += blockDim.x * gridDim.x) {
         idx_t ev[10];
@@ -598,13 +598,13 @@ __global__ void macro_tet4_cuda_incore_linear_elasticity_apply_kernel(
 }
 
 __global__ void macro_tet4_cuda_incore_linear_elasticity_diag_kernel(
-    const ptrdiff_t nelements,
-    idx_t *const elements,
-    const cu_jacobian_t *const g_jacobian_adjugate,
-    const cu_jacobian_t *const g_jacobian_determinant,
-    const scalar_t mu,
-    const scalar_t lambda,
-    real_t *const values) {
+        const ptrdiff_t nelements,
+        idx_t *const elements,
+        const cu_jacobian_t *const g_jacobian_adjugate,
+        const cu_jacobian_t *const g_jacobian_determinant,
+        const scalar_t mu,
+        const scalar_t lambda,
+        real_t *const values) {
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
          e += blockDim.x * gridDim.x) {
         idx_t ev[10];
@@ -650,12 +650,10 @@ __global__ void macro_tet4_cuda_incore_linear_elasticity_diag_kernel(
     }
 }
 
-#define SFEM_USE_OCCUPANCY_MAX_POTENTIAL
-
 extern int macro_tet4_cuda_incore_linear_elasticity_apply(
-    const cuda_incore_linear_elasticity_t *const ctx,
-    const real_t *const SFEM_RESTRICT u,
-    real_t *const SFEM_RESTRICT values) {
+        const cuda_incore_linear_elasticity_t *const ctx,
+        const real_t *const SFEM_RESTRICT u,
+        real_t *const SFEM_RESTRICT values) {
     const real_t mu = ctx->mu;
     const real_t lambda = ctx->lambda;
 
@@ -666,31 +664,32 @@ extern int macro_tet4_cuda_incore_linear_elasticity_apply(
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
         int min_grid_size;
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size,
-                                           &block_size,
-                                           macro_tet4_cuda_incore_linear_elasticity_apply_kernel,
-                                           0,
-                                           0);
+        cuOccupancyMaxPotentialBlockSize(&min_grid_size,
+                                         &block_size,
+                                         macro_tet4_cuda_incore_linear_elasticity_apply_kernel,
+                                         0,
+                                         0,
+                                         0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
     ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (ctx->nelements + block_size - 1) / block_size);
     macro_tet4_cuda_incore_linear_elasticity_apply_kernel<<<n_blocks, block_size, 0>>>(
-        ctx->nelements,
-        ctx->elements,
-        jacobian_adjugate,
-        jacobian_determinant,
-        mu,
-        lambda,
-        u,
-        values);
+            ctx->nelements,
+            ctx->elements,
+            jacobian_adjugate,
+            jacobian_determinant,
+            mu,
+            lambda,
+            u,
+            values);
 
     return 0;
 }
 
 extern int macro_tet4_cuda_incore_linear_elasticity_diag(
-    const cuda_incore_linear_elasticity_t *const ctx,
-    real_t *const SFEM_RESTRICT diag) {
+        const cuda_incore_linear_elasticity_t *const ctx,
+        real_t *const SFEM_RESTRICT diag) {
     //     const real_t mu = ctx->mu;
     //     const real_t lambda = ctx->lambda;
 
@@ -702,7 +701,7 @@ extern int macro_tet4_cuda_incore_linear_elasticity_diag(
     // #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     //     {
     //         int min_grid_size;
-    //         cudaOccupancyMaxPotentialBlockSize(&min_grid_size,
+    //         cuOccupancyMaxPotentialBlockSize(&min_grid_size,
     //                                            &block_size,
     //                                            macro_tet4_cuda_incore_linear_elasticity_diag_kernel,
     //                                            0,

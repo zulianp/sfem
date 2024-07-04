@@ -805,8 +805,8 @@ extern int tet10_cuda_incore_linear_elasticity_apply(
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
         int min_grid_size;
-        cudaOccupancyMaxPotentialBlockSize(
-            &min_grid_size, &block_size, tet10_cuda_incore_linear_elasticity_apply_kernel, 0, 0);
+        cuOccupancyMaxPotentialBlockSize(
+            &min_grid_size, &block_size, tet10_cuda_incore_linear_elasticity_apply_kernel, 0, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
@@ -837,8 +837,8 @@ extern int tet10_cuda_incore_linear_elasticity_diag(
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
         int min_grid_size;
-        cudaOccupancyMaxPotentialBlockSize(
-            &min_grid_size, &block_size, tet10_cuda_incore_linear_elasticity_diag_kernel, 0, 0);
+        cuOccupancyMaxPotentialBlockSize(
+            &min_grid_size, &block_size, tet10_cuda_incore_linear_elasticity_diag_kernel, 0, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 

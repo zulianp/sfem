@@ -4,6 +4,7 @@
 #cmakedefine SFEM_ENABLE_OPENMP
 #cmakedefine SFEM_ENABLE_AVX2
 #cmakedefine SFEM_ENABLE_AVX512
+#cmakedefine SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
 // It will be removed in the future (i.e., always true)
 #cmakedefine SFEM_ENABLE_CUSTOM_NUMBERS
