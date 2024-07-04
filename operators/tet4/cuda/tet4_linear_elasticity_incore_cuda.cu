@@ -287,8 +287,6 @@ __global__ void tet4_cuda_incore_linear_elasticity_apply_opt_kernel(
     }
 }
 
-#define SFEM_USE_OCCUPANCY_MAX_POTENTIAL
-
 extern int tet4_cuda_incore_linear_elasticity_apply(
     const cuda_incore_linear_elasticity_t *const ctx,
     const real_t *const SFEM_RESTRICT u,
@@ -300,13 +298,14 @@ extern int tet4_cuda_incore_linear_elasticity_apply(
     const cu_jacobian_t *const jacobian_determinant = (cu_jacobian_t *)ctx->jacobian_determinant;
 
     int block_size = 128;
+
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
         int min_grid_size;
         cudaOccupancyMaxPotentialBlockSize(
             &min_grid_size, &block_size, tet4_cuda_incore_linear_elasticity_apply_opt_kernel, 0, 0);
     }
-#endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+#endif  //SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
     ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (ctx->nelements + block_size - 1) / block_size);
     tet4_cuda_incore_linear_elasticity_apply_opt_kernel<<<n_blocks, block_size, 0>>>(
