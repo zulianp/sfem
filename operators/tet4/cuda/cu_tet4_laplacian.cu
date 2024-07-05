@@ -171,10 +171,10 @@ static int cu_tet4_laplacian_diag_tpl(const ptrdiff_t nelements,
 extern int cu_tet4_laplacian_diag(const ptrdiff_t nelements,
                                   const idx_t *const SFEM_RESTRICT elements,
                                   const void *const SFEM_RESTRICT fff,
-                                  const enum RealType real_type_xy_diag,
+                                  const enum RealType real_type_diag,
                                   void *const diag,
                                   void *stream) {
-    switch (real_type_xy_diag) {
+    switch (real_type_diag) {
         case SFEM_REAL_DEFAULT: {
             return cu_tet4_laplacian_diag_tpl(
                     nelements, elements, (cu_jacobian_t *)fff, (real_t *)diag, stream);
@@ -190,8 +190,8 @@ extern int cu_tet4_laplacian_diag(const ptrdiff_t nelements,
         default: {
             fprintf(stderr,
                     "[Error] cu_tet4_laplacian_diag: not implemented for type %s (code %d)\n",
-                    real_type_to_string(real_type_xy_diag),
-                    real_type_xy_diag);
+                    real_type_to_string(real_type_diag),
+                    real_type_diag);
             assert(0);
             return SFEM_FAILURE;
         }
