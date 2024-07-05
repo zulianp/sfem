@@ -10,8 +10,10 @@
 extern "C" {
 #endif
 
-enum RealType { SFEM_FLOAT16 = 2, SFEM_FLOAT32 = 4, SFEM_FLOAT64 = 8, SFEM_FLOAT_DEFAULT = 0 };
+enum RealType { SFEM_FLOAT16 = 2, SFEM_FLOAT32 = 4, SFEM_FLOAT64 = 8, SFEM_REAL_DEFAULT = 0 };
 enum IntegerType { SFEM_INT16 = 20, SFEM_INT32 = 40, SFEM_INT64 = 80, SFEM_INT_DEFAULT = 0 };
+
+static void * SFEM_DEFAULT_STREAM = 0;
 
 SFEM_INLINE static const char* real_type_to_string(enum RealType type) {
     switch (type) {
@@ -21,8 +23,8 @@ SFEM_INLINE static const char* real_type_to_string(enum RealType type) {
             return "SFEM_FLOAT32";
         case SFEM_FLOAT64:
             return "SFEM_FLOAT64";
-        case SFEM_FLOAT_DEFAULT:
-            return "SFEM_FLOAT_DEFAULT";
+        case SFEM_REAL_DEFAULT:
+            return "SFEM_REAL_DEFAULT";
         default:
             return "SFEM_FLOAT_UNDEFINED";
     }
