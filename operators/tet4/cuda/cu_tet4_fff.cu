@@ -4,9 +4,9 @@
 
 #include "cu_tet4_inline.hpp"
 
-extern int cu_tet4_fff_allocate(const ptrdiff_t nelements,
-                                const enum RealType real_type,
-                                void **const SFEM_RESTRICT fff) {
+static int cu_tet4_fff_allocate_generic(const ptrdiff_t nelements,
+                                        const enum RealType real_type,
+                                        void **const SFEM_RESTRICT fff) {
     switch (real_type) {
         case SFEM_FLOAT_DEFAULT: {
             SFEM_CUDA_CHECK(cudaMalloc(fff, 6 * nelements * sizeof(cu_jacobian_t)));
@@ -67,11 +67,11 @@ static int cu_tet4_fff_fill_tpl(const ptrdiff_t nelements,
     return SFEM_SUCCESS;
 }
 
-extern int cu_tet4_fff_fill(const ptrdiff_t nelements,
-                            idx_t **const SFEM_RESTRICT elements,
-                            geom_t **const SFEM_RESTRICT points,
-                            const enum RealType real_type,
-                            void *const SFEM_RESTRICT fff) {
+static int cu_tet4_fff_fill_generic(const ptrdiff_t nelements,
+                                    idx_t **const SFEM_RESTRICT elements,
+                                    geom_t **const SFEM_RESTRICT points,
+                                    const enum RealType real_type,
+                                    void *const SFEM_RESTRICT fff) {
     switch (real_type) {
         case SFEM_FLOAT_DEFAULT: {
             return cu_tet4_fff_fill_tpl(nelements, elements, points, (cu_jacobian_t *)fff);
@@ -96,7 +96,7 @@ extern int cu_tet4_fff_fill(const ptrdiff_t nelements,
     }
 }
 
-int elements_to_device(const ptrdiff_t nelements,
+extern int elements_to_device(const ptrdiff_t nelements,
                        const int num_nodes_x_element,
                        idx_t **const SFEM_RESTRICT h_elements,
                        idx_t **const SFEM_RESTRICT d_elements) {
@@ -110,4 +110,19 @@ int elements_to_device(const ptrdiff_t nelements,
                                        cudaMemcpyHostToDevice));
         }
     }
+
+    return SFEM_SUCCESS;
+}
+
+extern int cu_tet4_fff_allocate(const ptrdiff_t nelements, void **const SFEM_RESTRICT fff) {
+    // Currently this is the only one supported
+    return cu_tet4_fff_allocate_generic(nelements, SFEM_FLOAT_DEFAULT, fff);
+}
+
+extern int cu_tet4_fff_fill(const ptrdiff_t nelements,
+                            idx_t **const SFEM_RESTRICT elements,
+                            geom_t **const SFEM_RESTRICT points,
+                            void *const SFEM_RESTRICT fff) {
+    // Currently this is the only one supported
+    return cu_tet4_fff_fill_generic(nelements, elements, points, SFEM_FLOAT_DEFAULT, fff);
 }

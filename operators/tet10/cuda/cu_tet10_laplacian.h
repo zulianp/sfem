@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include "sfem_base.h"
 
-#include "tet4_laplacian_incore_cuda.h"
+#include "cu_tet4_laplacian.h"
 
 #ifdef __cplusplus
 extern "C" {

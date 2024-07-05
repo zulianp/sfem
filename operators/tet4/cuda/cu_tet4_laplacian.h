@@ -13,16 +13,16 @@ int cu_tet4_laplacian_apply(const ptrdiff_t nelements,
                             const idx_t *const SFEM_RESTRICT elements,
                             const void *const SFEM_RESTRICT fff,
                             const enum RealType real_type_xy,
-                            const void *const x,
-                            void *const y,
+                            const void *const SFEM_RESTRICT x,
+                            void *const SFEM_RESTRICT y,
                             void *stream);
 
 int cu_tet4_laplacian_diag(const ptrdiff_t nelements,
-                      const idx_t *const SFEM_RESTRICT elements,
-                      const void *const SFEM_RESTRICT fff,
-                      const enum RealType real_type_xy,
-                      void *const diag,
-                      void *stream);
+                           const idx_t *const SFEM_RESTRICT elements,
+                           const void *const SFEM_RESTRICT fff,
+                           const enum RealType real_type_xy,
+                           void *const SFEM_RESTRICT diag,
+                           void *stream);
 
 #ifdef __cplusplus
 }

@@ -8,7 +8,7 @@
 #include "sortreduce.h"
 #include "sfem_defs.h"
 #include "sfem_cuda_base.h"
-#include "tet10_laplacian_incore_cuda.h"
+#include "cu_tet10_laplacian.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define POW2(a) ((a) * (a))

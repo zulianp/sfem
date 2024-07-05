@@ -1,8 +1,8 @@
-#include "linear_elasticity_incore_cuda.h"
+#include "cu_linear_elasticity.h"
 
-#include "tet10_linear_elasticity_incore_cuda.h"
-#include "tet4_linear_elasticity_incore_cuda.h"
-#include "macro_tet4_linear_elasticity_incore_cuda.h"
+#include "cu_tet10_linear_elasticity.h"
+#include "cu_tet4_linear_elasticity.h"
+#include "cu_macro_tet4_linear_elasticity.h"
 
 
 #include <mpi.h>

@@ -1,4 +1,4 @@
-#include "tet4_laplacian_incore_cuda.h"
+#include "cu_tet4_laplacian.h"
 
 #include "sfem_cuda_base.h"
 #include "sfem_defs.h"
@@ -8,7 +8,7 @@
 
 #include <cassert>
 
-template <typename real_t, typename scalar_t = real_t>
+template <typename real_t>
 __global__ void cu_tet4_laplacian_apply_kernel(const ptrdiff_t nelements,
                                                const idx_t *const SFEM_RESTRICT elements,
                                                const cu_jacobian_t *const SFEM_RESTRICT fff,
@@ -43,12 +43,12 @@ __global__ void cu_tet4_laplacian_apply_kernel(const ptrdiff_t nelements,
     }
 }
 
-template <typename scalar_t>
+template <typename T>
 static int cu_tet4_laplacian_apply_tpl(const ptrdiff_t nelements,
                                        const idx_t *const SFEM_RESTRICT elements,
                                        const cu_jacobian_t *const SFEM_RESTRICT fff,
-                                       const scalar_t *const x,
-                                       scalar_t *const y,
+                                       const T *const x,
+                                       T *const y,
                                        void *stream) {
     // Hand tuned
     int block_size = 128;
@@ -57,7 +57,7 @@ static int cu_tet4_laplacian_apply_tpl(const ptrdiff_t nelements,
         int min_grid_size;
         cudaOccupancyMaxPotentialBlockSize(&min_grid_size,
                                            &block_size,
-                                           cu_tet4_laplacian_apply_kernel<scalar_t, scalar_t>,
+                                           cu_tet4_laplacian_apply_kernel<T>,
                                            0,
                                            0);
     }
@@ -88,10 +88,10 @@ extern int cu_tet4_laplacian_apply(const ptrdiff_t nelements,
             return cu_tet4_laplacian_apply_tpl(
                     nelements, elements, (cu_jacobian_t *)fff, (real_t *)x, (real_t *)y, stream);
         }
-        case SFEM_FLOAT16: {
-            return cu_tet4_laplacian_apply_tpl(
-                    nelements, elements, (cu_jacobian_t *)fff, (half *)x, (half *)y, stream);
-        }
+        // case SFEM_FLOAT16: {
+        //     return cu_tet4_laplacian_apply_tpl(
+        //             nelements, elements, (cu_jacobian_t *)fff, (half *)x, (half *)y, stream);
+        // }
         case SFEM_FLOAT32: {
             return cu_tet4_laplacian_apply_tpl(
                     nelements, elements, (cu_jacobian_t *)fff, (float *)x, (float *)y, stream);
@@ -102,8 +102,8 @@ extern int cu_tet4_laplacian_apply(const ptrdiff_t nelements,
         }
         default: {
             fprintf(stderr,
-                    "[Error] cu_tet4_fff_fill: not implemented for type %s (code %d)\n",
-                    real_type_xy_to_string(real_type_xy),
+                    "[Error] cu_tet4_laplacian_apply: not implemented for type %s (code %d)\n",
+                    real_type_to_string(real_type_xy),
                     real_type_xy);
             assert(0);
             return SFEM_FAILURE;
@@ -111,6 +111,7 @@ extern int cu_tet4_laplacian_apply(const ptrdiff_t nelements,
     }
 }
 
+template <typename real_t>
 __global__ void cu_tet4_laplacian_diag_kernel(const ptrdiff_t nelements,
                                               const idx_t *const SFEM_RESTRICT elements,
                                               const cu_jacobian_t *const SFEM_RESTRICT fff,
@@ -143,11 +144,11 @@ __global__ void cu_tet4_laplacian_diag_kernel(const ptrdiff_t nelements,
     }
 }
 
-template <typename scalar_t>
+template <typename T>
 static int cu_tet4_laplacian_diag_tpl(const ptrdiff_t nelements,
                                       const idx_t *const SFEM_RESTRICT elements,
                                       const cu_jacobian_t *const SFEM_RESTRICT fff,
-                                      scalar_t *const diag,
+                                      T *const diag,
                                       void *stream) {
     // Hand tuned
     int block_size = 128;
@@ -155,7 +156,7 @@ static int cu_tet4_laplacian_diag_tpl(const ptrdiff_t nelements,
     {
         int min_grid_size;
         cudaOccupancyMaxPotentialBlockSize(
-                &min_grid_size, &block_size, cu_tet4_laplacian_diag_kernel, 0, 0);
+                &min_grid_size, &block_size, cu_tet4_laplacian_diag_kernel<T>, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
@@ -177,15 +178,15 @@ extern int cu_tet4_laplacian_diag(const ptrdiff_t nelements,
                                   const enum RealType real_type_xy_diag,
                                   void *const diag,
                                   void *stream) {
-    switch (real_type_xy) {
+    switch (real_type_xy_diag) {
         case SFEM_FLOAT_DEFAULT: {
             return cu_tet4_laplacian_diag_tpl(
                     nelements, elements, (cu_jacobian_t *)fff, (real_t *)diag, stream);
         }
-        case SFEM_FLOAT16: {
-            return cu_tet4_laplacian_diag_tpl(
-                    nelements, elements, (cu_jacobian_t *)fff, (half *)diag, stream);
-        }
+        // case SFEM_FLOAT16: {
+        //     return cu_tet4_laplacian_diag_tpl(
+        //             nelements, elements, (cu_jacobian_t *)fff, (half *)diag, stream);
+        // }
         case SFEM_FLOAT32: {
             return cu_tet4_laplacian_diag_tpl(
                     nelements, elements, (cu_jacobian_t *)fff, (float *)diag, stream);
@@ -197,8 +198,8 @@ extern int cu_tet4_laplacian_diag(const ptrdiff_t nelements,
         default: {
             fprintf(stderr,
                     "[Error] cu_tet4_fff_fill: not implemented for type %s (code %d)\n",
-                    real_type_xy_to_string(real_type_xy),
-                    real_type_xy);
+                    real_type_to_string(real_type_xy_diag),
+                    real_type_xy_diag);
             assert(0);
             return SFEM_FAILURE;
         }

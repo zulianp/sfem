@@ -17,7 +17,7 @@
 #include "sfem_defs.h"
 #include "sfem_mesh.h"
 
-#include "linear_elasticity_incore_cuda.h"
+#include "cu_linear_elasticity.h"
 
 #define CHECK_CUDA(func)                                               \
     do {                                                               \
