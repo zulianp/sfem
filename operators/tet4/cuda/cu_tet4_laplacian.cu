@@ -63,7 +63,7 @@ static int cu_tet4_laplacian_apply_tpl(const ptrdiff_t nelements,
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
-    const ptrdiff_t n_blocks = MIN(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
+    const ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
 
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);

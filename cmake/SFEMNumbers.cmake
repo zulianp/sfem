@@ -12,7 +12,7 @@ set(SFEM_JACOBIAN_GPU_TYPE  "half"      CACHE STRING "Set SFEM cu_jacobian_t typ
 set(SFEM_ACCUMULATOR_TYPE   "float64"   CACHE STRING "Set SFEM accumulator_t type")
 
 set(SFEM_IDX_TYPE           "int32"     CACHE STRING "Set SFEM idx_t type")
-set(SFEM_COUNT_TYPE         "int64"     CACHE STRING "Set SFEM count_t type")
+set(SFEM_COUNT_TYPE         "int32"     CACHE STRING "Set SFEM count_t type")
 set(SFEM_ELEMENT_IDX_TYPE   "int32"     CACHE STRING "Set SFEM element_idx_t type")
 set(SFEM_LOCAL_IDX_TYPE     "int16"     CACHE STRING "Set SFEM local_idx_t type")
 
