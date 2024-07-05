@@ -9,8 +9,37 @@
 #include "sfem_mesh.h"
 
 #include "boundary_condition_incore_cuda.h"
+#include "cu_tet4_fff.h"
 
 namespace sfem {
+
+    class FFF {
+    public:
+        enum ElemType element_type_;
+        ptrdiff_t n_elements_;
+        idx_t *elements_;
+        void *fff_;
+
+        FFF(Mesh &mesh, const enum ElemType element_type)
+            : element_type_(element_type), n_elements_(mesh.n_elements()) {
+            auto c_mesh = (mesh_t *)mesh.impl_mesh();
+            cu_tet4_fff_allocate_default(n_elements_, &fff_);
+            cu_tet4_fff_fill_default(n_elements_, c_mesh->elements, c_mesh->points, fff_);
+
+            elements_to_device(
+                    n_elements_, elem_num_nodes(element_type), c_mesh->elements, &elements_);
+        }
+
+        ~FFF() {
+            d_buffer_destroy(fff_);
+            d_buffer_destroy(elements_);
+        }
+
+        enum ElemType element_type() const { return element_type_; }
+        ptrdiff_t n_elements() const { return n_elements_; }
+        idx_t *elements() const { return elements_; }
+        void *fff() const { return fff_; }
+    };
 
     class GPUDirichletConditions final : public Constraint {
     public:
@@ -114,17 +143,16 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
-        std::shared_ptr<Constraint> lor() const override
-        {
+        std::shared_ptr<Constraint> lor() const override {
             assert(false);
             return nullptr;
         }
 
-        std::shared_ptr<Constraint> derefine(const std::shared_ptr<sfem::FunctionSpace>&, bool) const override
-        {
+        std::shared_ptr<Constraint> derefine(const std::shared_ptr<sfem::FunctionSpace> &,
+                                             bool) const override {
             assert(false);
             return nullptr;
-        } 
+        }
 
         ~GPUDirichletConditions() {
             d_destroy_conditions(n_dirichlet_conditions, dirichlet_conditions);
@@ -145,7 +173,8 @@ namespace sfem {
     class GPULaplacian final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        cuda_incore_laplacian_t ctx;
+        std::shared_ptr<FFF> fff;
+        enum RealType real_type { SFEM_FLOAT_DEFAULT };
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
@@ -157,14 +186,7 @@ namespace sfem {
         inline bool is_linear() const override { return true; }
 
         int initialize() override {
-            auto mesh = (mesh_t *)space->mesh().impl_mesh();
-
-            cuda_incore_laplacian_init((enum ElemType)space->element_type(),
-                                       &ctx,
-                                       mesh->nelements,
-                                       mesh->elements,
-                                       mesh->points);
-
+            fff = std::make_shared<FFF>(space->mesh(), space->element_type());
             return SFEM_SUCCESS;
         }
 
@@ -180,15 +202,25 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
-            cuda_incore_laplacian_apply(&ctx, x, out);
-            return SFEM_SUCCESS;
+            return cu_laplacian_apply(fff->element_type(),
+                                      fff->n_elements(),
+                                      fff->elements(),
+                                      fff->fff(),
+                                      real_type,
+                                      x,
+                                      out,
+                                      0);
         }
 
-        int apply(const real_t *const x,
-                  const real_t *const h,
-                  real_t *const out) override {
-            cuda_incore_laplacian_apply(&ctx, h, out);
-            return SFEM_SUCCESS;
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+            return cu_laplacian_apply(fff->element_type(),
+                                      fff->n_elements(),
+                                      fff->elements(),
+                                      fff->fff(),
+                                      real_type,
+                                      h,
+                                      out,
+                                      0);
         }
 
         int value(const real_t *x, real_t *const out) override {
@@ -246,8 +278,7 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
-        int hessian_diag(const real_t *const /*x*/,
-                         real_t *const values) override {
+        int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
             cuda_incore_linear_elasticity_diag(&ctx, values);
             return SFEM_SUCCESS;
         }
@@ -257,9 +288,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        int apply(const real_t *const x,
-                  const real_t *const h,
-                  real_t *const out) override {
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
             cuda_incore_linear_elasticity_apply(&ctx, h, out);
             return SFEM_SUCCESS;
         }

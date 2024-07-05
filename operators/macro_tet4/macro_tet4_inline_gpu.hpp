@@ -1,7 +1,7 @@
 #ifndef MACRO_TET4_INLINE_GPU_HPP
 #define MACRO_TET4_INLINE_GPU_HPP
 
-#include "tet4_inline_gpu.hpp"
+#include "cu_tet4_inline.hpp"
 
 template <typename geom_t>
 static /*inline*/ __device__ __host__ void tet4_sub_fff_0(const geom_t *const SFEM_RESTRICT fff,

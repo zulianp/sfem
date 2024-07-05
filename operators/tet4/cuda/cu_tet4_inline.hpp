@@ -1,12 +1,20 @@
-#ifndef TET4_INLINE_GPU_H
-#define TET4_INLINE_GPU_H
+#ifndef CU_TET_4_INLINE_H
+#define CU_TET_4_INLINE_H
 
 #ifndef POW2
 #define POW2(a) ((a) * (a))
 #endif
 
+#ifndef MIN
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+
+#ifndef MAX
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif
+
 template <typename geom_t, typename jacobian_t, typename jacobian_determinant_t>
-static inline __device__ __host__ void tet4_adjugate_and_det(
+static inline __device__ __host__ void cu_tet4_adjugate_and_det(
         const geom_t px0,
         const geom_t px1,
         const geom_t px2,
@@ -58,20 +66,20 @@ static inline __device__ __host__ void tet4_adjugate_and_det(
 }
 
 template <typename geom_t, typename fff_t>
-static inline __device__ __host__ void tet4_fff(const geom_t px0,
-                                                const geom_t px1,
-                                                const geom_t px2,
-                                                const geom_t px3,
-                                                const geom_t py0,
-                                                const geom_t py1,
-                                                const geom_t py2,
-                                                const geom_t py3,
-                                                const geom_t pz0,
-                                                const geom_t pz1,
-                                                const geom_t pz2,
-                                                const geom_t pz3,
-                                                const ptrdiff_t stride,
-                                                fff_t *const fff) {
+static inline __device__ __host__ void cu_tet4_fff(const geom_t px0,
+                                                   const geom_t px1,
+                                                   const geom_t px2,
+                                                   const geom_t px3,
+                                                   const geom_t py0,
+                                                   const geom_t py1,
+                                                   const geom_t py2,
+                                                   const geom_t py3,
+                                                   const geom_t pz0,
+                                                   const geom_t pz1,
+                                                   const geom_t pz2,
+                                                   const geom_t pz3,
+                                                   const ptrdiff_t stride,
+                                                   fff_t *const fff) {
     const geom_t x0 = -px0 + px1;
     const geom_t x1 = -py0 + py2;
     const geom_t x2 = -pz0 + pz3;
@@ -117,7 +125,7 @@ static inline __device__ __host__ void tet4_fff(const geom_t px0,
 }
 
 template <typename idx_t>
-static inline __device__ __host__ int tet4_linear_search(const idx_t target,
+static inline __device__ __host__ int cu_tet4_linear_search(const idx_t target,
                                                          const idx_t *const arr,
                                                          const int size) {
     int i;
@@ -134,14 +142,14 @@ static inline __device__ __host__ int tet4_linear_search(const idx_t target,
 }
 
 template <typename idx_t>
-static inline __device__ __host__ int tet4_find_col(const idx_t key,
+static inline __device__ __host__ int cu_tet4_find_col(const idx_t key,
                                                     const idx_t *const row,
                                                     const int lenrow) {
     return tet4_linear_search(key, row, lenrow);
 }
 
 template <typename idx_t>
-static inline __device__ __host__ void tet4_find_cols(const idx_t *SFEM_RESTRICT targets,
+static inline __device__ __host__ void cu_tet4_find_cols(const idx_t *SFEM_RESTRICT targets,
                                                       const idx_t *const SFEM_RESTRICT row,
                                                       const int lenrow,
                                                       int *SFEM_RESTRICT ks) {
@@ -163,4 +171,5 @@ static inline __device__ __host__ void tet4_find_cols(const idx_t *SFEM_RESTRICT
         }
     }
 }
-#endif  // TET4_INLINE_GPU_H
+
+#endif  // CU_TET_4_INLINE_H

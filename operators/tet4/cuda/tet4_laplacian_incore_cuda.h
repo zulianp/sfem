@@ -3,30 +3,26 @@
 
 #include <stddef.h>
 #include "sfem_base.h"
+#include "sfem_defs.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef struct {
-    enum ElemType element_type;
-    ptrdiff_t nelements;
-    void *d_fff;
-    idx_t *d_elems;
-} cuda_incore_laplacian_t;
+int cu_tet4_laplacian_apply(const ptrdiff_t nelements,
+                            const idx_t *const SFEM_RESTRICT elements,
+                            const void *const SFEM_RESTRICT fff,
+                            const enum RealType real_type_xy,
+                            const void *const x,
+                            void *const y,
+                            void *stream);
 
-int tet4_cuda_incore_laplacian_init(cuda_incore_laplacian_t *ctx,
-                                    const ptrdiff_t nelements,
-                                    idx_t **const SFEM_RESTRICT elements,
-                                    geom_t **const SFEM_RESTRICT points);
-
-int tet4_cuda_incore_laplacian_destroy(cuda_incore_laplacian_t *ctx);
-
-int tet4_cuda_incore_laplacian_apply(cuda_incore_laplacian_t *ctx,
-                                     const real_t *const d_x,
-                                     real_t *const d_y);
-
-int tet4_cuda_incore_laplacian_diag(cuda_incore_laplacian_t *ctx, real_t *const d_t);
+int cu_tet4_laplacian_diag(const ptrdiff_t nelements,
+                      const idx_t *const SFEM_RESTRICT elements,
+                      const void *const SFEM_RESTRICT fff,
+                      const enum RealType real_type_xy,
+                      void *const diag,
+                      void *stream);
 
 #ifdef __cplusplus
 }
