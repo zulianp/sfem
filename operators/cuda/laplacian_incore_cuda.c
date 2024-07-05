@@ -1,96 +1,73 @@
 #include "laplacian_incore_cuda.h"
 
-#include "macro_tet4_laplacian_incore_cuda.h"
-#include "tet10_laplacian_incore_cuda.h"
+// #include "macro_tet4_laplacian_incore_cuda.h"
+// #include "tet10_laplacian_incore_cuda.h"
 #include "tet4_laplacian_incore_cuda.h"
 
-#include <mpi.h>
 #include <stdio.h>
+#include <mpi.h>
 
-int cuda_incore_laplacian_init(const enum ElemType element_type,
-                               cuda_incore_laplacian_t *ctx,
-                               const ptrdiff_t nelements,
-                               idx_t **const SFEM_RESTRICT elements,
-                               geom_t **const SFEM_RESTRICT points) {
+int cu_laplacian_apply(const enum ElemType element_type,
+                       const ptrdiff_t nelements,
+                       const idx_t *const SFEM_RESTRICT elements,
+                       const void *const SFEM_RESTRICT fff,
+                       const enum RealType real_type_xy,
+                       const void *const x,
+                       void *const y,
+                       void *stream) {
     switch (element_type) {
         case TET4: {
-            return tet4_cuda_incore_laplacian_init(ctx, nelements, elements, points);
+            return cu_tet4_laplacian_apply(nelements, elements, fff, real_type_xy, x, y, stream);
         }
-        case MACRO_TET4: {
-            return macro_tet4_cuda_incore_laplacian_init(ctx, nelements, elements, points);
-        }
-        case TET10: {
-            return tet10_cuda_incore_laplacian_init(ctx, nelements, elements, points);
-        }
-        default: {
-            fprintf(stderr, "Invalid element type %d\n (%s %s:%d)", ctx->element_type, __FUNCTION__, __FILE__, __LINE__);
-            fflush(stderr);
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, 1);
-            return 1;
-        }
-    }
-}
-
-int cuda_incore_laplacian_destroy(cuda_incore_laplacian_t *ctx) {
-    switch (ctx->element_type) {
-        case TET4: {
-            return tet4_cuda_incore_laplacian_destroy(ctx);
-        }
-        case MACRO_TET4: {
-            return macro_tet4_cuda_incore_laplacian_destroy(ctx);
-        }
-        case TET10: {
-            return tet10_cuda_incore_laplacian_destroy(ctx);
-        }
-        default: {
-            fprintf(stderr, "Invalid element type %d\n (%s %s:%d)", ctx->element_type, __FUNCTION__, __FILE__, __LINE__);
-            fflush(stderr);
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, 1);
-            return 1;
-        }
-    }
-}
-int cuda_incore_laplacian_apply(cuda_incore_laplacian_t *ctx,
-                                const real_t *const d_x,
-                                real_t *const d_y) {
-    switch (ctx->element_type) {
-        case TET4: {
-            return tet4_cuda_incore_laplacian_apply(ctx, d_x, d_y);
-        }
-        case MACRO_TET4: {
-            return macro_tet4_cuda_incore_laplacian_apply(ctx, d_x, d_y);
-        }
-        case TET10: {
-            return tet10_cuda_incore_laplacian_apply(ctx, d_x, d_y);
-        }
-        default: {
-            fprintf(stderr, "Invalid element type %d\n (%s %s:%d)", ctx->element_type, __FUNCTION__, __FILE__, __LINE__);
-            fflush(stderr);
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, 1);
-            return 1;
-        }
-    }
-}
-
-int cuda_incore_laplacian_diag(cuda_incore_laplacian_t *ctx, real_t *const d_t) {
-    switch (ctx->element_type) {
-        // case TET4: {
-        // 	return tet4_cuda_incore_laplacian_diag(ctx, d_t);
+        // case MACRO_TET4: {
+        //     return cu_macro_tet4_laplacian_apply(nelements, elements, fff, real_type_xy,
+        //     x, y, stream);
         // }
-        case MACRO_TET4: {
-            return macro_tet4_cuda_incore_laplacian_diag(ctx, d_t);
-        }
         // case TET10: {
-        // 	return tet10_cuda_incore_laplacian_diag(ctx, d_t);
+        //     return cu_tet10_cu_laplacian_apply(nelements, elements, fff, real_type_xy, x,
+        //     y, stream);
         // }
         default: {
-            // for the moment we gracefully decline
-            // assert(0);
-            // MPI_Abort(MPI_COMM_WORLD, 1);
-            return 1;
+            fprintf(stderr,
+                    "cu_laplacian_apply: Invalid element type %d\n (%s:%d)",
+                    element_type,
+                    __FILE__,
+                    __LINE__);
+            fflush(stderr);
+            assert(0);
+            MPI_Abort(MPI_COMM_WORLD, 1);
+            return SFEM_FAILURE;
+        }
+    }
+}
+
+int cu_laplacian_diag(const enum ElemType element_type,
+                      const ptrdiff_t nelements,
+                      const idx_t *const SFEM_RESTRICT elements,
+                      const void *const SFEM_RESTRICT fff,
+                      const enum RealType real_type_xy,
+                      void *const diag,
+                      void *stream) {
+    switch (element_type) {
+        case TET4: {
+            return cu_tet4_laplacian_diag(nelements, elements, fff, real_type_xy, diag, stream);
+        }
+        // case MACRO_TET4: {
+        //     return cu_macro_tet4_laplacian_diag(nelements, fff, real_type_xy, diag, stream);
+        // }
+        // case TET10: {
+        // 	return cu_tet10_laplacian_diag(nelements, fff, real_type_xy, diag, stream);
+        // }
+        default: {
+            fprintf(stderr,
+                    "cu_laplacian_diag: Invalid element type %d\n (%s:%d)",
+                    element_type,
+                    __FILE__,
+                    __LINE__);
+            fflush(stderr);
+            assert(0);
+            MPI_Abort(MPI_COMM_WORLD, 1);
+            return SFEM_FAILURE;
         }
     }
 }

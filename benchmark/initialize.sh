@@ -146,7 +146,7 @@ do
 
 	if [[ $r -le $largest_matrix ]]
 	then
-		SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble refined matrix_scalar
+		SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble  refined matrix_scalar
 		SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble3 refined matrix_vector
 	fi
 
