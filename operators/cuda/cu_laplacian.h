@@ -10,14 +10,6 @@
 extern "C" {
 #endif
 
-// int cuda_incore_laplacian_init(const enum ElemType element_type,
-//                                cuda_incore_laplacian_t *ctx,
-//                                const ptrdiff_t nelements,
-//                                idx_t **const SFEM_RESTRICT elements,
-//                                geom_t **const SFEM_RESTRICT points);
-
-// int cuda_incore_laplacian_destroy(cuda_incore_laplacian_t *ctx);
-
 int cu_laplacian_apply(const enum ElemType element_type,
                        const ptrdiff_t nelements,
                        const idx_t *const SFEM_RESTRICT elements,
