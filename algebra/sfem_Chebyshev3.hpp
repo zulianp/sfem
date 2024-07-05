@@ -157,7 +157,7 @@ namespace sfem {
         T max_eigen_value(T* const guess_eigenvector, T* const work) {
             assert(power_method);
             return power_method->max_eigen_value(
-                    apply_op, 1000, this->eigen_solver_tol, this->rows(), guess_eigenvector, work);
+                    apply_op, 10000, this->eigen_solver_tol, this->rows(), guess_eigenvector, work);
         }
 
         void init(const T* const guess_eigenvector) {
