@@ -8,7 +8,7 @@ static int cu_tet4_fff_allocate_generic(const ptrdiff_t nelements,
                                         const enum RealType real_type,
                                         void **const SFEM_RESTRICT fff) {
     switch (real_type) {
-        case SFEM_FLOAT_DEFAULT: {
+        case SFEM_REAL_DEFAULT: {
             SFEM_CUDA_CHECK(cudaMalloc(fff, 6 * nelements * sizeof(cu_jacobian_t)));
             return SFEM_SUCCESS;
         }
@@ -73,7 +73,7 @@ static int cu_tet4_fff_fill_generic(const ptrdiff_t nelements,
                                     const enum RealType real_type,
                                     void *const SFEM_RESTRICT fff) {
     switch (real_type) {
-        case SFEM_FLOAT_DEFAULT: {
+        case SFEM_REAL_DEFAULT: {
             return cu_tet4_fff_fill_tpl(nelements, elements, points, (cu_jacobian_t *)fff);
         }
         case SFEM_FLOAT16: {
@@ -116,7 +116,7 @@ extern int elements_to_device(const ptrdiff_t nelements,
 
 extern int cu_tet4_fff_allocate(const ptrdiff_t nelements, void **const SFEM_RESTRICT fff) {
     // Currently this is the only one supported
-    return cu_tet4_fff_allocate_generic(nelements, SFEM_FLOAT_DEFAULT, fff);
+    return cu_tet4_fff_allocate_generic(nelements, SFEM_REAL_DEFAULT, fff);
 }
 
 extern int cu_tet4_fff_fill(const ptrdiff_t nelements,
@@ -124,5 +124,5 @@ extern int cu_tet4_fff_fill(const ptrdiff_t nelements,
                             geom_t **const SFEM_RESTRICT points,
                             void *const SFEM_RESTRICT fff) {
     // Currently this is the only one supported
-    return cu_tet4_fff_fill_generic(nelements, elements, points, SFEM_FLOAT_DEFAULT, fff);
+    return cu_tet4_fff_fill_generic(nelements, elements, points, SFEM_REAL_DEFAULT, fff);
 }

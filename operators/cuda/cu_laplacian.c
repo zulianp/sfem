@@ -1,8 +1,8 @@
 #include "cu_laplacian.h"
 
 #include "cu_macro_tet4_laplacian.h"
+#include "cu_tet10_laplacian.h"
 #include "cu_tet4_laplacian.h"
-// #include "cu_tet10_laplacian.h"
 
 #include <mpi.h>
 #include <stdio.h>
@@ -19,17 +19,17 @@ int cu_laplacian_apply(const enum ElemType element_type,
         case TET4: {
             return cu_tet4_laplacian_apply(nelements, elements, fff, real_type_xy, x, y, stream);
         }
+        case TET10: {
+            return cu_tet10_laplacian_apply(nelements, elements, fff, real_type_xy, x, y, stream);
+        }
         case MACRO_TET4: {
             return cu_macro_tet4_laplacian_apply(
                     nelements, elements, fff, real_type_xy, x, y, stream);
         }
-        // case TET10: {
-        //     return cu_tet10_laplacian_apply(nelements, elements, fff, real_type_xy, x,
-        //     y, stream);
-        // }
         default: {
             fprintf(stderr,
-                    "cu_laplacian_apply: Invalid element type %d\n (%s:%d)",
+                    "cu_laplacian_apply: Invalid element type %s (code = %d)\n (%s:%d)",
+                    type_to_string(element_type),
                     element_type,
                     __FILE__,
                     __LINE__);
@@ -52,16 +52,18 @@ int cu_laplacian_diag(const enum ElemType element_type,
         case TET4: {
             return cu_tet4_laplacian_diag(nelements, elements, fff, real_type_xy, diag, stream);
         }
+        // case TET10: {
+        //  return cu_tet10_laplacian_diag(nelements, elements, fff, real_type_xy, diag,
+        // stream);
+        // }
         case MACRO_TET4: {
             return cu_macro_tet4_laplacian_diag(
                     nelements, elements, fff, real_type_xy, diag, stream);
         }
-        // case TET10: {
-        // 	return cu_tet10_laplacian_diag(nelements, fff, real_type_xy, diag, stream);
-        // }
         default: {
             fprintf(stderr,
-                    "cu_laplacian_diag: Invalid element type %d\n (%s:%d)",
+                    "cu_laplacian_diag: Invalid element type %s (code = %d)\n (%s:%d)",
+                    type_to_string(element_type),
                     element_type,
                     __FILE__,
                     __LINE__);

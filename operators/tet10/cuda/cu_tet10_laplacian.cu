@@ -218,7 +218,7 @@ extern int cu_tet10_laplacian_apply(const ptrdiff_t nelements,
                                     void *const SFEM_RESTRICT y,
                                     void *stream) {
     switch (real_type_xy) {
-        case SFEM_FLOAT_DEFAULT: {
+        case SFEM_REAL_DEFAULT: {
             return cu_tet10_laplacian_apply_tpl(
                     nelements, elements, (cu_jacobian_t *)fff, (real_t *)x, (real_t *)y, stream);
         }
