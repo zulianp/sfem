@@ -189,7 +189,7 @@ extern int cu_tet4_laplacian_diag(const ptrdiff_t nelements,
         }
         default: {
             fprintf(stderr,
-                    "[Error] cu_tet4_fff_fill: not implemented for type %s (code %d)\n",
+                    "[Error] cu_tet4_laplacian_diag: not implemented for type %s (code %d)\n",
                     real_type_to_string(real_type_xy_diag),
                     real_type_xy_diag);
             assert(0);
