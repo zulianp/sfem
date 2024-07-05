@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-refs=(0 1 2 3 4)
-n_refs=${#refs[@]}
-largest_matrix=3
+
 
 set -e
 
@@ -52,6 +50,10 @@ echo "Sphere benchmark database"
 
 cd sphere
 export SPHERE_FOLDER=$PWD
+
+refs=(0 1 2 3 4 5)
+n_refs=${#refs[@]}
+largest_matrix=4
 
 for r in ${refs[@]}
 do
@@ -105,8 +107,6 @@ function gen_by_refinement()
 	echo "op: LinearElasticity" > $last/p1/matrix_vector/meta.yaml
 }
 
-# gen_by_refinement $last
-
 cd $BENCH_FOLDER
 
 #####################################
@@ -117,6 +117,10 @@ echo "Cylinder benchmark database"
 
 cd cylinder
 export CYLINDER_FOLDER=$PWD
+
+refs=(0 1 2 3 4)
+n_refs=${#refs[@]}
+largest_matrix=3
 
 for r in ${refs[@]}
 do
