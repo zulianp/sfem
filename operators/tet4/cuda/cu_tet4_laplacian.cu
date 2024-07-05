@@ -88,10 +88,6 @@ extern int cu_tet4_laplacian_apply(const ptrdiff_t nelements,
             return cu_tet4_laplacian_apply_tpl(
                     nelements, elements, (cu_jacobian_t *)fff, (real_t *)x, (real_t *)y, stream);
         }
-        // case SFEM_FLOAT16: {
-        //     return cu_tet4_laplacian_apply_tpl(
-        //             nelements, elements, (cu_jacobian_t *)fff, (half *)x, (half *)y, stream);
-        // }
         case SFEM_FLOAT32: {
             return cu_tet4_laplacian_apply_tpl(
                     nelements, elements, (cu_jacobian_t *)fff, (float *)x, (float *)y, stream);
