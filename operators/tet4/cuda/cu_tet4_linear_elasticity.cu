@@ -1,4 +1,4 @@
-#include "tet4_linear_elasticity_incore_cuda.h"
+#include "cu_tet4_linear_elasticity.h"
 
 #include <algorithm>
 #include <cassert>

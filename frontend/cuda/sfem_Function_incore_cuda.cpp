@@ -1,14 +1,12 @@
 #include "sfem_Function_incore_cuda.hpp"
 #include <memory>
 #include "boundary_condition.h"
-// #include "isolver_function.h"
-
-#include "laplacian_incore_cuda.h"
-#include "linear_elasticity_incore_cuda.h"
 
 #include "sfem_mesh.h"
 
-#include "boundary_condition_incore_cuda.h"
+#include "cu_laplacian.h"
+#include "cu_linear_elasticity.h"
+#include "cu_boundary_condition.h"
 #include "cu_tet4_fff.h"
 
 namespace sfem {
@@ -23,8 +21,10 @@ namespace sfem {
         FFF(Mesh &mesh, const enum ElemType element_type)
             : element_type_(element_type), n_elements_(mesh.n_elements()) {
             auto c_mesh = (mesh_t *)mesh.impl_mesh();
-            cu_tet4_fff_allocate_default(n_elements_, &fff_);
-            cu_tet4_fff_fill_default(n_elements_, c_mesh->elements, c_mesh->points, fff_);
+
+            // FIXME Now harcoded for tets
+            cu_tet4_fff_allocate(n_elements_, &fff_);
+            cu_tet4_fff_fill(n_elements_, c_mesh->elements, c_mesh->points, fff_);
 
             elements_to_device(
                     n_elements_, elem_num_nodes(element_type), c_mesh->elements, &elements_);

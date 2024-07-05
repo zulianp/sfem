@@ -46,7 +46,6 @@ set(SFEM_MODULES
     operators/tet10
     operators/tet4
     operators/tet4/vectorized
-    operators/tet4/cuda
     operators/tri3
     operators/tri6
     operators/trishell3
@@ -71,6 +70,9 @@ if(SFEM_ENABLE_CUDA)
         algebra/cuda
         operators/cuda
         frontend/cuda
+        operators/tet4/cuda
+        operators/macro_tet4/cuda
+        operators/tet10/cuda
         )
 endif()
 

@@ -23,8 +23,8 @@ int cu_laplacian_apply(const enum ElemType element_type,
                        const idx_t *const SFEM_RESTRICT elements,
                        const void *const SFEM_RESTRICT fff,
                        const enum RealType real_type_xy,
-                       const void *const x,
-                       void *const y,
+                       const void *const SFEM_RESTRICT x,
+                       void *const SFEM_RESTRICT y,
                        void *stream);
 
 int cu_laplacian_diag(const enum ElemType element_type,
@@ -32,7 +32,7 @@ int cu_laplacian_diag(const enum ElemType element_type,
                       const idx_t *const SFEM_RESTRICT elements,
                       const void *const SFEM_RESTRICT fff,
                       const enum RealType real_type_xy,
-                      void *const diag,
+                      void *const SFEM_RESTRICT diag,
                       void *stream);
 
 #ifdef __cplusplus

@@ -3,7 +3,7 @@
 #include <cmath>
 #include <cstddef>
 
-#include "macro_tet4_linear_elasticity_incore_cuda.h"
+#include "cu_macro_tet4_linear_elasticity.h"
 #include "sfem_base.h"
 #include "sfem_defs.h"
 #include "sfem_vec.h"

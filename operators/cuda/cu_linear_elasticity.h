@@ -6,7 +6,7 @@
 #include "boundary_condition.h"
 #include "sfem_base.h"
 
-#include "tet4_linear_elasticity_incore_cuda.h"
+#include "cu_tet4_linear_elasticity.h"
 
 #ifdef __cplusplus
 extern "C" {
