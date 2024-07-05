@@ -20,7 +20,7 @@ int cu_tet4_laplacian_apply(const ptrdiff_t nelements,
 int cu_tet4_laplacian_diag(const ptrdiff_t nelements,
                            const idx_t *const SFEM_RESTRICT elements,
                            const void *const SFEM_RESTRICT fff,
-                           const enum RealType real_type_xy,
+                           const enum RealType real_type_diag,
                            void *const SFEM_RESTRICT diag,
                            void *stream);
 
