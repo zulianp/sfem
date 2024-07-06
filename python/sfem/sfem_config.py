@@ -9,4 +9,4 @@ idx_t = np.int32
 count_t = np.int64
 element_idx_t = np.int32
 local_idx_t = np.int16
-SFEM_VEC_SIZE = 8
+SFEM_VEC_SIZE = 4
