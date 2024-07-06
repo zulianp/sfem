@@ -284,8 +284,8 @@ int main(int argc, char *argv[]) {
             solver_coarse->set_n_dofs(fs_coarse->n_dofs());
             solver_coarse->set_op(linear_op_coarse);
             solver_coarse->verbose = false;
-            solver_coarse->set_max_it(1000);
-            solver_coarse->set_atol(1e-12);
+            solver_coarse->set_max_it(10000);
+            solver_coarse->set_atol(1e-8);
             solver_coarse->set_rtol(1e-8);
 
             if (SFEM_USE_PRECONDITIONER) {
