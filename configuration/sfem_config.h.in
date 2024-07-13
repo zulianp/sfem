@@ -89,4 +89,7 @@ typedef @SFEM_LOCAL_IDX_C_TYPE@ local_idx_t;
 #define dtype_LOCAL_IDX_T "@SFEM_LOCAL_IDX_TYPE@"
 
 #endif  // SFEM_ENABLE_CUSTOM_NUMBERS
+
+#define INVALID_IDX (-1)
+
 #endif  // SFEM_CONFIG_HPP

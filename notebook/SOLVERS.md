@@ -17,6 +17,8 @@ SFEM_SMOOTHER_SWEEPS: 30
 SFEM_CHEB_EIG_TOL: 0.000000
 ```
 
+
+```c
 PowerMethod (2718): lambda = 0.25154
 crs_graph.c: build_n2e		4.08965 seconds
 crs_graph.c: overestimate nnz	4.03965 seconds
@@ -45,7 +47,7 @@ mgsolve (MACRO_TET4):
 #elements 236191744 #nodes 316693569 #dofs 950080707
 TTS:		66314.5 [s], compute 66299.9 [s] (solve: 56863.2 [s], init: 9436.72 [s])
 residual:	9.24332e-10
-
+```	
 
 ## perf_950080707.csv (fine level)
 ```

@@ -34,11 +34,26 @@ int hierarchical_prolongation(const enum ElemType from_element,
                               const real_t *const SFEM_RESTRICT from,
                               real_t *const SFEM_RESTRICT to);
 
+int build_p1_to_p2_edge_map(const ptrdiff_t nnodes,
+                            const count_t *const SFEM_RESTRICT coarse_rowptr,
+                            const idx_t *const SFEM_RESTRICT coarse_colidx,
+                            idx_t *const SFEM_RESTRICT p2_vertices);
+
 int hierarchical_restriction(
     // CRS-node-graph of the coarse mesh
     const ptrdiff_t nnodes,
     const count_t *const SFEM_RESTRICT coarse_rowptr,
     const idx_t *const SFEM_RESTRICT coarse_colidx,
+    const int vec_size,
+    const real_t *const SFEM_RESTRICT from,
+    real_t *const SFEM_RESTRICT to);
+
+int hierarchical_restriction_with_edge_map(
+    // CRS-node-graph of the coarse mesh
+    const ptrdiff_t nnodes,
+    const count_t *const SFEM_RESTRICT coarse_rowptr,
+    const idx_t *const SFEM_RESTRICT coarse_colidx,
+    const idx_t *const SFEM_RESTRICT p2_vertices,
     const int vec_size,
     const real_t *const SFEM_RESTRICT from,
     real_t *const SFEM_RESTRICT to);
