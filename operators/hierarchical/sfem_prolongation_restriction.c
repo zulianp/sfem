@@ -162,33 +162,33 @@ int build_p1_to_p2_edge_map(const ptrdiff_t nnodes,
         }
     }
 
-// Fill-up the transpose (very expensive)
-#pragma omp parallel for
-    for (ptrdiff_t i = 0; i < nnodes; i++) {
-        const count_t i_start = coarse_rowptr[i];
-        const int i_extent = coarse_rowptr[i + 1] - i_start;
-        const idx_t *const i_cols = &coarse_colidx[i_start];
-        idx_t *const i_verts = &p2_vertices[i_start];
+    // Fill-up the transpose (very expensive and not needed a.t.m.)
+    // #pragma omp parallel for
+    //     for (ptrdiff_t i = 0; i < nnodes; i++) {
+    //         const count_t i_start = coarse_rowptr[i];
+    //         const int i_extent = coarse_rowptr[i + 1] - i_start;
+    //         const idx_t *const i_cols = &coarse_colidx[i_start];
+    //         idx_t *const i_verts = &p2_vertices[i_start];
 
-        for (int i_k = 0; i_k < i_extent; i_k++) {
-            const idx_t j = i_cols[i_k];
+    //         for (int i_k = 0; i_k < i_extent; i_k++) {
+    //             const idx_t j = i_cols[i_k];
 
-            if (i > j) {
-                const count_t j_start = coarse_rowptr[j];
-                const int j_extent = coarse_rowptr[j + 1] - j_start;
-                const idx_t *const j_cols = &coarse_colidx[j_start];
-                const idx_t *const j_verts = &p2_vertices[j_start];
+    //             if (i > j) {
+    //                 const count_t j_start = coarse_rowptr[j];
+    //                 const int j_extent = coarse_rowptr[j + 1] - j_start;
+    //                 const idx_t *const j_cols = &coarse_colidx[j_start];
+    //                 const idx_t *const j_verts = &p2_vertices[j_start];
 
-                for (int j_k = 0; j_k < j_extent; j_k++) {
-                    const idx_t ii = j_cols[j_k];
-                    if (ii == i) {
-                        i_verts[i_k] = j_verts[j_k];
-                        break;
-                    }
-                }
-            }
-        }
-    }
+    //                 for (int j_k = 0; j_k < j_extent; j_k++) {
+    //                     const idx_t ii = j_cols[j_k];
+    //                     if (ii == i) {
+    //                         i_verts[i_k] = j_verts[j_k];
+    //                         break;
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
 
     return SFEM_SUCCESS;
 }
@@ -321,17 +321,51 @@ int hierarchical_restriction(
     return 0;
 }
 
+int hierarchical_prolongation_with_edge_map(const ptrdiff_t nnodes,
+                                            const count_t *const SFEM_RESTRICT coarse_rowptr,
+                                            const idx_t *const SFEM_RESTRICT coarse_colidx,
+                                            const idx_t *const SFEM_RESTRICT p2_vertices,
+                                            const int vec_size,
+                                            const real_t *const SFEM_RESTRICT from,
+                                            real_t *const SFEM_RESTRICT to) {
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nnodes; i++) {
+        for (int v = 0; v < vec_size; v++) {
+            to[i * vec_size + v] = from[i * vec_size + v];
+        }
+
+        const count_t start = coarse_rowptr[i];
+        const count_t end = coarse_rowptr[i + 1];
+        const int extent = end - start;
+        const idx_t *const cols = &coarse_colidx[start];
+        const idx_t *const verts = &p2_vertices[start];
+
+        for (int k = 0; k < extent; k++) {
+            const idx_t j = cols[k];
+            const idx_t edge = verts[k];
+            if (i < j) {
+                for (int v = 0; v < vec_size; v++) {
+                    const real_t edge_value =
+                            0.5 * (from[i * vec_size + v] + from[j * vec_size + v]);
+                    
+                    to[edge * vec_size + v] = edge_value;
+                }
+            }
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
 
 int hierarchical_restriction_with_edge_map(
-    // CRS-node-graph of the coarse mesh
-    const ptrdiff_t nnodes,
-    const count_t *const SFEM_RESTRICT coarse_rowptr,
-    const idx_t *const SFEM_RESTRICT coarse_colidx,
-    const idx_t *const SFEM_RESTRICT p2_vertices,
-    const int vec_size,
-    const real_t *const SFEM_RESTRICT from,
-    real_t *const SFEM_RESTRICT to)
-{
+        // CRS-node-graph of the coarse mesh
+        const ptrdiff_t nnodes,
+        const count_t *const SFEM_RESTRICT coarse_rowptr,
+        const idx_t *const SFEM_RESTRICT coarse_colidx,
+        const idx_t *const SFEM_RESTRICT p2_vertices,
+        const int vec_size,
+        const real_t *const SFEM_RESTRICT from,
+        real_t *const SFEM_RESTRICT to) {
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nnodes; i++) {
         for (int v = 0; v < vec_size; v++) {
