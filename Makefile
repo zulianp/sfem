@@ -63,7 +63,7 @@ ifeq ($(metis), 1)
 	DEPS += -L$(GKLIB_DIR)/lib -lGKlib
 endif
 
-CFLAGS += -DSFEM_MEM_DIAGNOSTICS
+CFLAGS += -DSFEM_ENABLE_MEM_DIAGNOSTICS
 
 # Folder structure
 VPATH = pizzastack:resampling:resampling/tet10:mesh:operators:operators/cuda:drivers:drivers/cuda:drivers/metis:base:algebra:matrix:operators/tet10:operators/tet4:operators/tet4/vectorized:operators/macro_tet4:operators/tri3:operators/macro_tri3:operators/trishell3:operators/tri6:operators/beam2:operators/cvfem:graphs:parametrize:operators/phase_field_for_fracture:operators/kernels:operators/navier_stokes:solver:operators/cvfem_tet4:operators/cvfem_tri3:operators/cvfem_quad4:examples:algebra/cuda:frontend:frontend/cuda:operators/hierarchical
