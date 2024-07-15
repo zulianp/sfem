@@ -635,7 +635,7 @@ int hex8_to_tet10_resample_field_local_V2(
 
     if (SFEM_ENABLE_ISOPARAMETRIC) {
         int a = 0;
-        a = hex8_to_isoparametric_tet10_resample_field_local_V(nelements,  //
+        a = hex8_to_isoparametric_tet10_resample_field_local_V(nelements,  // 
                                                                nnodes,
                                                                elems,
                                                                xyz,

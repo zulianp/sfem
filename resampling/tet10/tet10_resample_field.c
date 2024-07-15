@@ -1,6 +1,7 @@
 #include "tet10_resample_field.h"
 
 #include "quadratures_rule.h"
+#include "tet10_weno.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -11,9 +12,7 @@
 #define POW2(x) ((x) * (x))
 #define POW3(x) ((x) * (x) * (x))
 
-SFEM_INLINE static void tet10_dual_basis_popp(const real_t qx,
-                                              const real_t qy,
-                                              const real_t qz,
+SFEM_INLINE static void tet10_dual_basis_popp(const real_t qx, const real_t qy, const real_t qz,
                                               real_t* const f) {
     const real_t x0 = -qx - qy - qz + 1;
     const real_t x1 = 2 * qy;
@@ -77,9 +76,7 @@ SFEM_INLINE static void tet10_dual_basis_popp(const real_t qx,
     f[9] = (6.0 / 5.0) * qx * x12 + (111.0 / 5.0) * qy * qz - x43 - x44 - x46 - x48 - x49;
 }
 
-SFEM_INLINE static void tet10_dual_basis_hrt(const real_t qx,
-                                             const real_t qy,
-                                             const real_t qz,
+SFEM_INLINE static void tet10_dual_basis_hrt(const real_t qx, const real_t qy, const real_t qz,
                                              real_t* const f) {
     const real_t x0 = 2 * qy;
     const real_t x1 = 2 * qz;
@@ -147,20 +144,11 @@ SFEM_INLINE static void tet10_dual_basis_hrt(const real_t qx,
 
 SFEM_INLINE static real_t tet4_measure(
         // X-coordinates
-        const real_t px0,
-        const real_t px1,
-        const real_t px2,
-        const real_t px3,
+        const real_t px0, const real_t px1, const real_t px2, const real_t px3,
         // Y-coordinates
-        const real_t py0,
-        const real_t py1,
-        const real_t py2,
-        const real_t py3,
+        const real_t py0, const real_t py1, const real_t py2, const real_t py3,
         // Z-coordinates
-        const real_t pz0,
-        const real_t pz1,
-        const real_t pz2,
-        const real_t pz3) {
+        const real_t pz0, const real_t pz1, const real_t pz2, const real_t pz3) {
     //
     // determinant of the Jacobian
     // M = [px0, py0, pz0, 1]
@@ -213,27 +201,15 @@ SFEM_INLINE static void tet4_transform(
       */
 
         // X-coordinates
-        const real_t px0,
-        const real_t px1,
-        const real_t px2,
-        const real_t px3,
+        const real_t px0, const real_t px1, const real_t px2, const real_t px3,
         // Y-coordinates
-        const real_t py0,
-        const real_t py1,
-        const real_t py2,
-        const real_t py3,
+        const real_t py0, const real_t py1, const real_t py2, const real_t py3,
         // Z-coordinates
-        const real_t pz0,
-        const real_t pz1,
-        const real_t pz2,
-        const real_t pz3,
+        const real_t pz0, const real_t pz1, const real_t pz2, const real_t pz3,
         // Quadrature point
-        const real_t qx,
-        const real_t qy,
-        const real_t qz,
+        const real_t qx, const real_t qy, const real_t qz,
         // Output
-        real_t* const SFEM_RESTRICT out_x,
-        real_t* const SFEM_RESTRICT out_y,
+        real_t* const SFEM_RESTRICT out_x, real_t* const SFEM_RESTRICT out_y,
         real_t* const SFEM_RESTRICT out_z) {
     //
     //
@@ -246,9 +222,7 @@ SFEM_INLINE static void hex_aa_8_eval_fun(
         // Quadrature point (local coordinates)
         // With respect to the hat functions of a cube element
         // In a local coordinate system
-        const real_t x,
-        const real_t y,
-        const real_t z,
+        const real_t x, const real_t y, const real_t z,
         // Output
         real_t* const SFEM_RESTRICT f) {
     //
@@ -263,13 +237,10 @@ SFEM_INLINE static void hex_aa_8_eval_fun(
 }
 
 SFEM_INLINE static void hex_aa_8_collect_coeffs(
-        const ptrdiff_t* const SFEM_RESTRICT stride,
-        const ptrdiff_t i,
-        const ptrdiff_t j,
+        const ptrdiff_t* const SFEM_RESTRICT stride, const ptrdiff_t i, const ptrdiff_t j,
         const ptrdiff_t k,
         // Attention this is geometric data transformed to solver data!
-        const real_t* const SFEM_RESTRICT data,
-        real_t* const SFEM_RESTRICT out) {
+        const real_t* const SFEM_RESTRICT data, real_t* const SFEM_RESTRICT out) {
     const ptrdiff_t i0 = i * stride[0] + j * stride[1] + k * stride[2];
     const ptrdiff_t i1 = (i + 1) * stride[0] + j * stride[1] + k * stride[2];
     const ptrdiff_t i2 = (i + 1) * stride[0] + (j + 1) * stride[1] + k * stride[2];
@@ -289,6 +260,284 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs(
     out[7] = data[i7];
 }
 
+/**
+ * @brief Compute the indices of the field for third order interpolation
+ *
+ * @param stride
+ * @param i
+ * @param j
+ * @param k
+ * @param i0 .. i15
+ * @return SFEM_INLINE
+ */
+SFEM_INLINE static void hex_aa_8_indices_O3(const ptrdiff_t* const SFEM_RESTRICT stride,  //
+                                            const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k,
+                                            // Output
+                                            ptrdiff_t* i0, ptrdiff_t* i1, ptrdiff_t* i2,
+                                            ptrdiff_t* i3, ptrdiff_t* i4, ptrdiff_t* i5,
+                                            ptrdiff_t* i6, ptrdiff_t* i7, ptrdiff_t* i8,
+                                            ptrdiff_t* i9, ptrdiff_t* i10, ptrdiff_t* i11,
+                                            ptrdiff_t* i12, ptrdiff_t* i13, ptrdiff_t* i14,
+                                            ptrdiff_t* i15) {
+    const ptrdiff_t stride_x = stride[0];
+    const ptrdiff_t stride_y = stride[1];
+    const ptrdiff_t stride_z = stride[2];
+
+    *i0 = (i - 1) * stride_x + (j - 1) * stride_y + (k)*stride_z;
+    *i1 = (i)*stride_x + (j - 1) * stride_y + (k)*stride_z;
+    *i2 = (i + 1) * stride_x + (j - 1) * stride_y + (k)*stride_z;
+    *i3 = (i + 2) * stride_x + (j - 1) * stride_y + (k)*stride_z;
+
+    *i4 = (i - 1) * stride_x + (j)*stride_y + (k)*stride_z;
+    *i5 = (i)*stride_x + (j)*stride_y + (k)*stride_z;
+    *i6 = (i + 1) * stride_x + (j)*stride_y + (k)*stride_z;
+    *i7 = (i + 2) * stride_x + (j)*stride_y + (k)*stride_z;
+
+    *i8 = (i - 1) * stride_x + (j + 1) * stride_y + (k)*stride_z;
+    *i9 = (i)*stride_x + (j + 1) * stride_y + (k)*stride_z;
+    *i10 = (i + 1) * stride_x + (j + 1) * stride_y + (k)*stride_z;
+    *i11 = (i + 2) * stride_x + (j + 1) * stride_y + (k)*stride_z;
+
+    *i12 = (i - 1) * stride_x + (j + 2) * stride_y + (k)*stride_z;
+    *i13 = (i)*stride_x + (j + 2) * stride_y + (k)*stride_z;
+    *i14 = (i + 1) * stride_x + (j + 2) * stride_y + (k)*stride_z;
+    *i15 = (i + 2) * stride_x + (j + 2) * stride_y + (k)*stride_z;
+}
+
+/**
+ * @brief Compute the coefficients of the field for third order interpolation
+ *
+ * @param stride
+ * @param i
+ * @param j
+ * @param k
+ * @param data
+ * @param out
+ * @return SFEM_INLINE
+ */
+SFEM_INLINE static void hex_aa_8_collect_coeffs_O3(
+        const ptrdiff_t* const SFEM_RESTRICT stride,  //
+        const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k,
+        // Attention this is geometric data transformed to solver data!
+        const real_t* const SFEM_RESTRICT data, real_t* const SFEM_RESTRICT out) {
+    //
+    ptrdiff_t i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15;
+
+    ptrdiff_t i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26, i27, i28, i29, i30, i31;
+
+    ptrdiff_t i32, i33, i34, i35, i36, i37, i38, i39, i40, i41, i42, i43, i44, i45, i46, i47;
+
+    ptrdiff_t i48, i49, i50, i51, i52, i53, i54, i55, i56, i57, i58, i59, i60, i61, i62, i63;
+
+    hex_aa_8_indices_O3(stride,
+                        i,
+                        j,
+                        k,
+                        &i0,
+                        &i1,
+                        &i2,
+                        &i3,
+                        &i4,
+                        &i5,
+                        &i6,
+                        &i7,
+                        &i8,
+                        &i9,
+                        &i10,
+                        &i11,
+                        &i12,
+                        &i13,
+                        &i14,
+                        &i15);
+
+    hex_aa_8_indices_O3(stride,
+                        i,
+                        j,
+                        k + 1,
+                        &i16,
+                        &i17,
+                        &i18,
+                        &i19,
+                        &i20,
+                        &i21,
+                        &i22,
+                        &i23,
+                        &i24,
+                        &i25,
+                        &i26,
+                        &i27,
+                        &i28,
+                        &i29,
+                        &i30,
+                        &i31);
+
+    hex_aa_8_indices_O3(stride,
+                        i,
+                        j,
+                        k + 2,
+                        &i32,
+                        &i33,
+                        &i34,
+                        &i35,
+                        &i36,
+                        &i37,
+                        &i38,
+                        &i39,
+                        &i40,
+                        &i41,
+                        &i42,
+                        &i43,
+                        &i44,
+                        &i45,
+                        &i46,
+                        &i47);
+
+    hex_aa_8_indices_O3(stride,
+                        i,
+                        j,
+                        k + 3,
+                        &i48,
+                        &i49,
+                        &i50,
+                        &i51,
+                        &i52,
+                        &i53,
+                        &i54,
+                        &i55,
+                        &i56,
+                        &i57,
+                        &i58,
+                        &i59,
+                        &i60,
+                        &i61,
+                        &i62,
+                        &i63);
+
+    out[0] = data[i0];
+    out[1] = data[i1];
+    out[2] = data[i2];
+    out[3] = data[i3];
+    out[4] = data[i4];
+    out[5] = data[i5];
+    out[6] = data[i6];
+    out[7] = data[i7];
+    out[8] = data[i8];
+    out[9] = data[i9];
+    out[10] = data[i10];
+    out[11] = data[i11];
+    out[12] = data[i12];
+    out[13] = data[i13];
+    out[14] = data[i14];
+    out[15] = data[i15];
+    out[16] = data[i16];
+    out[17] = data[i17];
+    out[18] = data[i18];
+    out[19] = data[i19];
+    out[20] = data[i20];
+    out[21] = data[i21];
+    out[22] = data[i22];
+    out[23] = data[i23];
+    out[24] = data[i24];
+    out[25] = data[i25];
+    out[26] = data[i26];
+    out[27] = data[i27];
+    out[28] = data[i28];
+    out[29] = data[i29];
+    out[30] = data[i30];
+    out[31] = data[i31];
+    out[32] = data[i32];
+    out[33] = data[i33];
+    out[34] = data[i34];
+    out[35] = data[i35];
+    out[36] = data[i36];
+    out[37] = data[i37];
+    out[38] = data[i38];
+    out[39] = data[i39];
+    out[40] = data[i40];
+    out[41] = data[i41];
+    out[42] = data[i42];
+    out[43] = data[i43];
+    out[44] = data[i44];
+    out[45] = data[i45];
+    out[46] = data[i46];
+    out[47] = data[i47];
+    out[48] = data[i48];
+    out[49] = data[i49];
+    out[50] = data[i50];
+    out[51] = data[i51];
+    out[52] = data[i52];
+    out[53] = data[i53];
+    out[54] = data[i54];
+    out[55] = data[i55];
+    out[56] = data[i56];
+    out[57] = data[i57];
+    out[58] = data[i58];
+    out[59] = data[i59];
+    out[60] = data[i60];
+    out[61] = data[i61];
+    out[62] = data[i62];
+    out[63] = data[i63];
+}
+
+SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D(const real_t x_,                           //
+                                                 const real_t y_,                           //
+                                                 const real_t z_,                           //
+                                                 const real_t ox,                           //
+                                                 const real_t oy,                           //
+                                                 const real_t oz,                           //
+                                                 const real_t h,                            //
+                                                 const ptrdiff_t i,                         //
+                                                 const ptrdiff_t j,                         //
+                                                 const ptrdiff_t k,                         //
+                                                 const ptrdiff_t* stride,                   //
+                                                 const real_t* const SFEM_RESTRICT data) {  //
+
+    real_t out[64];
+    hex_aa_8_collect_coeffs_O3(stride, i, j, k, data, &out[0]);
+
+    double x = (x_ - ox) - (real_t)i * h + h;
+    double y = (y_ - oy) - (real_t)j * h + h;
+    double z = (z_ - oz) - (real_t)k * h + h;
+
+    // printf("x = %f, x_ = %f, i = %d\n", x, x_, i);
+    // printf("y = %f, y_ = %f, j = %d\n", y, y_, j);
+    // printf("z = %f, z_ = %f, k = %d\n", z, z_, k);
+
+    // printf("delta = %f\n", h);
+
+    const real_t w4 = weno4_3D_ConstH(x,  //
+                                      y,
+                                      z,
+                                      h,
+                                      out,
+                                      1,
+                                      4,
+                                      16);
+
+    // printf("data[%d] = %f\n",
+    //        (i * stride[0] + j * stride[1] + k * stride[2]),
+    //        data[i * stride[0] + j * stride[1] + k * stride[2]]);
+
+    // printf("w4 = %f\n", w4);
+
+    return w4;
+}
+
+/**
+ * @brief Compute the indices of the field for third order interpolation
+ *
+ * @param nelements
+ * @param nnodes
+ * @param elems
+ * @param xyz
+ * @param n
+ * @param stride
+ * @param origin
+ * @param delta
+ * @param data
+ * @param weighted_field
+ * @return int
+ */
 int hex8_to_subparametric_tet10_resample_field_local(
         // Mesh
         const ptrdiff_t nelements,          // number of elements
@@ -477,19 +726,11 @@ int hex8_to_subparametric_tet10_resample_field_local(
     return 0;
 }
 
-static SFEM_INLINE void lumped_mass_kernel_popp(const real_t px0,
-                                                const real_t px1,
-                                                const real_t px2,
-                                                const real_t px3,
-                                                const real_t py0,
-                                                const real_t py1,
-                                                const real_t py2,
-                                                const real_t py3,
-                                                const real_t pz0,
-                                                const real_t pz1,
-                                                const real_t pz2,
-                                                const real_t pz3,
-                                                real_t* const SFEM_RESTRICT element_matrix_diag) {
+static SFEM_INLINE void lumped_mass_kernel_popp(
+        const real_t px0, const real_t px1, const real_t px2, const real_t px3, const real_t py0,
+        const real_t py1, const real_t py2, const real_t py3, const real_t pz0, const real_t pz1,
+        const real_t pz2, const real_t pz3, real_t* const SFEM_RESTRICT element_matrix_diag) {
+    //
     const real_t x0 = px0 - px1;
     const real_t x1 = py0 - py2;
     const real_t x2 = pz0 - pz3;
@@ -520,18 +761,10 @@ static SFEM_INLINE void lumped_mass_kernel_popp(const real_t px0,
     element_matrix_diag[9] = x13;
 }
 
-static SFEM_INLINE void lumped_mass_kernel_hrt(const real_t px0,
-                                               const real_t px1,
-                                               const real_t px2,
-                                               const real_t px3,
-                                               const real_t py0,
-                                               const real_t py1,
-                                               const real_t py2,
-                                               const real_t py3,
-                                               const real_t pz0,
-                                               const real_t pz1,
-                                               const real_t pz2,
-                                               const real_t pz3,
+static SFEM_INLINE void lumped_mass_kernel_hrt(const real_t px0, const real_t px1, const real_t px2,
+                                               const real_t px3, const real_t py0, const real_t py1,
+                                               const real_t py2, const real_t py3, const real_t pz0,
+                                               const real_t pz1, const real_t pz2, const real_t pz3,
                                                real_t* const SFEM_RESTRICT diag) {
     // Symbolic integration (for iso-parametric tet10, this is not possible)
     const real_t x0 = -px0 + px1;
@@ -569,8 +802,7 @@ static SFEM_INLINE void lumped_mass_kernel_hrt(const real_t px0,
     diag[9] = x22;
 }
 
-int subparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements,
-                                                  const ptrdiff_t nnodes,
+int subparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, const ptrdiff_t nnodes,
                                                   idx_t** const SFEM_RESTRICT elems,
                                                   geom_t** const SFEM_RESTRICT xyz,
                                                   real_t* const diag) {
@@ -627,9 +859,7 @@ SFEM_INLINE static real_t tet10_measure(const geom_t* const SFEM_RESTRICT x,
                                         const geom_t* const SFEM_RESTRICT y,
                                         const geom_t* const SFEM_RESTRICT z,
                                         // Quadrature point
-                                        const real_t qx,
-                                        const real_t qy,
-                                        const real_t qz) {
+                                        const real_t qx, const real_t qy, const real_t qz) {
     const real_t x0 = 4 * qz;
     const real_t x1 = x0 - 1;
     const real_t x2 = 4 * qy;
@@ -677,9 +907,7 @@ SFEM_INLINE static void tet10_transform(const geom_t* const SFEM_RESTRICT x,
                                         const geom_t* const SFEM_RESTRICT y,
                                         const geom_t* const SFEM_RESTRICT z,
                                         // Quadrature point
-                                        const real_t qx,
-                                        const real_t qy,
-                                        const real_t qz,
+                                        const real_t qx, const real_t qy, const real_t qz,
                                         // Output
                                         real_t* const SFEM_RESTRICT out_x,
                                         real_t* const SFEM_RESTRICT out_y,
@@ -726,6 +954,8 @@ int hex8_to_isoparametric_tet10_resample_field_local(
     //
     printf("============================================================\n");
     printf("Start: hex8_to_isoparametric_tet10_resample_field_local\n");
+    printf("============================================================\n");
+    printf("dx = %e, dy = %e, dz = %e\n", delta[0], delta[1], delta[2]);
     printf("============================================================\n");
 
     const real_t ox = (real_t)origin[0];
@@ -818,30 +1048,48 @@ int hex8_to_isoparametric_tet10_resample_field_local(
                     continue;
                 }
 
-                // Get the reminder [0, 1]
-                real_t l_x = (grid_x - i);
-                real_t l_y = (grid_y - j);
-                real_t l_z = (grid_z - k);
-
-                assert(l_x >= -1e-8);
-                assert(l_y >= -1e-8);
-                assert(l_z >= -1e-8);
-
-                assert(l_x <= 1 + 1e-8);
-                assert(l_y <= 1 + 1e-8);
-                assert(l_z <= 1 + 1e-8);
-
-                hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
-                hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
-
                 // Integrate field
                 {
+#define WENO
+#ifdef WENO
+
+                    // printf("origin = (%f, %f, %f)\n", ox, oy, oz);
+                    real_t eval_field = hex_aa_8_eval_weno4_3D(g_qx,
+                                                               g_qy,
+                                                               g_qz,  //
+                                                               ox,
+                                                               oy,
+                                                               oz,                            //
+                                                               (dx + dy + dz) * (1.0 / 3.0),  //
+                                                               i,
+                                                               j,
+                                                               k,
+                                                               stride,
+                                                               data);  //
+#else
+
+                    // Get the reminder [0, 1]
+                    real_t l_x = (grid_x - i);
+                    real_t l_y = (grid_y - j);
+                    real_t l_z = (grid_z - k);
+
+                    assert(l_x >= -1e-8);
+                    assert(l_y >= -1e-8);
+                    assert(l_z >= -1e-8);
+
+                    assert(l_x <= 1 + 1e-8);
+                    assert(l_y <= 1 + 1e-8);
+                    assert(l_z <= 1 + 1e-8);
+
+                    hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
+                    hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
+
                     real_t eval_field = 0;
                     // UNROLL_ZERO?
                     for (int edof_j = 0; edof_j < 8; edof_j++) {
                         eval_field += hex8_f[edof_j] * coeffs[edof_j];
                     }
-
+#endif
                     // UNROLL_ZERO?
                     for (int edof_i = 0; edof_i < 10; edof_i++) {
                         element_field[edof_i] += eval_field * tet10_f[edof_i] * dV;
@@ -861,13 +1109,11 @@ int hex8_to_isoparametric_tet10_resample_field_local(
     return 0;
 }
 
-SFEM_INLINE static void isoparametric_lumped_mass_kernel_hrt(const real_t dV,
-                                                             // Quadrature
-                                                             const real_t qx,
-                                                             const real_t qy,
-                                                             const real_t qz,
-                                                             real_t* const SFEM_RESTRICT
-                                                                     element_diag) {
+SFEM_INLINE static void isoparametric_lumped_mass_kernel_hrt(
+        const real_t dV,
+        // Quadrature
+        const real_t qx, const real_t qy, const real_t qz,
+        real_t* const SFEM_RESTRICT element_diag) {
     const real_t x0 = 4 * qx;
     const real_t x1 = qy * qz;
     const real_t x2 = 2 * qx - 1;
@@ -908,8 +1154,7 @@ SFEM_INLINE static void isoparametric_lumped_mass_kernel_hrt(const real_t dV,
     element_diag[9] += x1 * x20 * (84 * x1 + x23 + x26 + 4);
 }
 
-int isoparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements,
-                                                  const ptrdiff_t nnodes,
+int isoparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, const ptrdiff_t nnodes,
                                                   idx_t** const SFEM_RESTRICT elems,
                                                   geom_t** const SFEM_RESTRICT xyz,
                                                   real_t* const diag) {
@@ -954,11 +1199,9 @@ int isoparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements,
     return 0;
 }
 
-int tet10_assemble_dual_mass_vector(const ptrdiff_t nelements,
-                                    const ptrdiff_t nnodes,
+int tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, const ptrdiff_t nnodes,
                                     idx_t** const SFEM_RESTRICT elems,
-                                    geom_t** const SFEM_RESTRICT xyz,
-                                    real_t* const mass_vector) {
+                                    geom_t** const SFEM_RESTRICT xyz, real_t* const mass_vector) {
     int SFEM_ENABLE_ISOPARAMETRIC = 0;
     SFEM_READ_ENV(SFEM_ENABLE_ISOPARAMETRIC, atoi);
 
