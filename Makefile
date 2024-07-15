@@ -243,14 +243,14 @@ OBJS += tet10_grad.o \
 	tet10_laplacian.o \
 	tet10_l2_projection_p1_p2.o \
 	tet10_navier_stokes.o \
-	tet10_linear_elasticity.o
-
+	tet10_linear_elasticity.o 
+	
 # Multilevel
 OBJS += sfem_prolongation_restriction.o
 
 # Resampling
 OBJS += sfem_resample_gap.o sfem_resample_field.o sfem_resample_field_v2.o sfem_resample_field_V8.o sfem_resample_field_V4.o
-OBJS += tet10_resample_field.o tet10_resample_field_V2.o
+OBJS += tet10_weno.o tet10_resample_field.o tet10_resample_field_V2.o
 
 # CVFEM
 OBJS += cvfem_tri3_diffusion.o cvfem_tet4_convection.o cvfem_tri3_convection.o cvfem_quad4_convection.o cvfem_quad4_laplacian.o
