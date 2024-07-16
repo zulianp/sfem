@@ -952,8 +952,12 @@ int hex8_to_isoparametric_tet10_resample_field_local(
         // Output
         real_t* const SFEM_RESTRICT weighted_field) {
     //
+
+#define WENO 1
+
     printf("============================================================\n");
-    printf("Start: hex8_to_isoparametric_tet10_resample_field_local\n");
+    printf("Start: hex8_to_isoparametric_tet10_resample_field_local. Interpolation: %s\n",
+           (WENO == 1 ? "Weno" : "Linear"));
     printf("============================================================\n");
     printf("dx = %e, dy = %e, dz = %e\n", delta[0], delta[1], delta[2]);
     printf("============================================================\n");
@@ -1050,8 +1054,7 @@ int hex8_to_isoparametric_tet10_resample_field_local(
 
                 // Integrate field
                 {
-#define WENO
-#ifdef WENO
+#if WENO == 1
 
                     // printf("origin = (%f, %f, %f)\n", ox, oy, oz);
                     real_t eval_field = hex_aa_8_eval_weno4_3D(g_qx,

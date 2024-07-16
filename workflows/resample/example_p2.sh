@@ -38,7 +38,7 @@ then
 	echo "Reusing existing mesh $p2_mesh!"
 else
 	# create_sphere.sh 5
-	create_sphere.sh 5 # Visibily see the curvy surface <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+	create_sphere.sh 4 # Visibily see the curvy surface <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 	sfc $mesh $mesh_sorted
 	# Project p2 nodes to sphere isosurfaces (to check if nonlinear map are creating errors)
 	SFEM_SPERE_TOL=1e-5 SFEM_MAP_TO_SPHERE=1 mesh_p1_to_p2 $mesh_sorted $p2_mesh
@@ -46,16 +46,19 @@ else
 	raw_to_db.py $p2_mesh test_mapping.vtk 
 fi
 
-if [[ -f "$sdf" ]]
-then
-	echo "Reusing existing sdf $sdf!"
-else
-	echo "Computing SDF!"
-	mkdir -p $skinned
-	skin $mesh_sorted $skinned
-	mesh_to_sdf.py $skinned $sdf --hmax=0.01 --margin=0.1
-	raw_to_xdmf.py $sdf
-fi
+# if [[ -f "$sdf" ]]
+# then
+# 	echo "Reusing existing sdf $sdf!"
+# else
+# 	echo "Computing SDF!"
+# 	mkdir -p $skinned
+# 	skin $mesh_sorted $skinned
+# 	mesh_to_sdf.py $skinned $sdf --hmax=0.01 --margin=0.1
+# 	raw_to_xdmf.py $sdf
+# fi
+
+sdf_test.py
+raw_to_xdmf.py $sdf
 
 sizes=`head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' '`
 origins=`head -8 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' '`

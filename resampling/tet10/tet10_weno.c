@@ -8,7 +8,9 @@ inline double Power(const double x, const double y) { return pow(x, y); }
 inline double Power2(const double x) { return x * x; }
 
 // double Power1p5(const double x) { return exp(1.5 * log(x)); }
-inline double Power1p5(const double x) { return pow(x, 1.5); }
+inline double Power1p5(const double x) { return x * sqrt(x); }
+
+inline double Power_m1p5(const double x) { return 1.0 / (x * sqrt(x)); }
 
 void LagrangePolyArrayConstH(const double x, const double h,  //
                              double *lagrange_poly_0,
@@ -66,20 +68,21 @@ void getNonLinearWeightsConstH(const double x, const double h,    //
 
     List2(alpha,
           // alpha[0]
-          Power(eps + 0.1111111111111111 * Power2(-3. * Abs((a)*inv_h) + Abs((b)*inv_h)), -1.5) -
+          Power_m1p5(eps + 0.1111111111111111 * Power2(-3. * Abs((a)*inv_h) + Abs((b)*inv_h))) -
                   (0.3333333333333333 * x) /
-                          (h * Power(eps + 0.1111111111111111 *
-                                                     Power2(-3. * Abs((a)*inv_h) + Abs((b)*inv_h)),
-                                     1.5)),
+                          (h * Power1p5(eps + 0.1111111111111111 * Power2(-3. * Abs((a)*inv_h) +
+                                                                          Abs((b)*inv_h)))),
           //
           // alpha[1]
-          (0.3333333333333333 *
-           x) / (h * Power(eps + 0.1111111111111111 *
-                                           Power2(Abs((6. * y0 - 9. * y1 + 18. * y2 + 6. * h * y2 -
-                                                       11. * y3) *
-                                                      inv_h) -
-                                                  3. * Abs((y0 - 1. * y1 - 1. * y2 + y3) * inv_h)),
-                           1.5)));
+          (0.3333333333333333 * x) /
+                  (h * Power1p5(eps + 0.1111111111111111 *  //
+                                              Power2(Abs((6. * y0 - 9. * y1 + 18. * y2 +
+                                                          6. * h * y2 - 11. * y3) *
+                                                         inv_h) -
+                                                     3. * Abs((y0 - 1. * y1 - 1. * y2 + y3) *
+                                                              inv_h)  //  end of Abs
+                                                     )                // end of Power2
+                                )));
 
     double den = alpha[0] + alpha[1];
 
