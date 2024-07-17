@@ -284,22 +284,22 @@ SFEM_INLINE static void hex_aa_8_indices_O3(const ptrdiff_t* const SFEM_RESTRICT
     const ptrdiff_t stride_z = stride[2];
 
     *i0 = (i - 1) * stride_x + (j - 1) * stride_y + (k)*stride_z;
-    *i1 = (i)*stride_x + (j - 1) * stride_y + (k)*stride_z;
+    *i1 = (i + 0) * stride_x + (j - 1) * stride_y + (k)*stride_z;
     *i2 = (i + 1) * stride_x + (j - 1) * stride_y + (k)*stride_z;
     *i3 = (i + 2) * stride_x + (j - 1) * stride_y + (k)*stride_z;
 
-    *i4 = (i - 1) * stride_x + (j)*stride_y + (k)*stride_z;
-    *i5 = (i)*stride_x + (j)*stride_y + (k)*stride_z;
-    *i6 = (i + 1) * stride_x + (j)*stride_y + (k)*stride_z;
-    *i7 = (i + 2) * stride_x + (j)*stride_y + (k)*stride_z;
+    *i4 = (i - 1) * stride_x + (j + 0) * stride_y + (k)*stride_z;
+    *i5 = (i + 0) * stride_x + (j + 0) * stride_y + (k)*stride_z;
+    *i6 = (i + 1) * stride_x + (j + 0) * stride_y + (k)*stride_z;
+    *i7 = (i + 2) * stride_x + (j + 0) * stride_y + (k)*stride_z;
 
     *i8 = (i - 1) * stride_x + (j + 1) * stride_y + (k)*stride_z;
-    *i9 = (i)*stride_x + (j + 1) * stride_y + (k)*stride_z;
+    *i9 = (i + 0) * stride_x + (j + 1) * stride_y + (k)*stride_z;
     *i10 = (i + 1) * stride_x + (j + 1) * stride_y + (k)*stride_z;
     *i11 = (i + 2) * stride_x + (j + 1) * stride_y + (k)*stride_z;
 
     *i12 = (i - 1) * stride_x + (j + 2) * stride_y + (k)*stride_z;
-    *i13 = (i)*stride_x + (j + 2) * stride_y + (k)*stride_z;
+    *i13 = (i + 0) * stride_x + (j + 2) * stride_y + (k)*stride_z;
     *i14 = (i + 1) * stride_x + (j + 2) * stride_y + (k)*stride_z;
     *i15 = (i + 2) * stride_x + (j + 2) * stride_y + (k)*stride_z;
 }
@@ -493,7 +493,7 @@ SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D(const real_t x_,               
                                                  const real_t* const SFEM_RESTRICT data) {  //
 
     real_t out[64];
-    hex_aa_8_collect_coeffs_O3(stride, i, j, k, data, &out[0]);
+    hex_aa_8_collect_coeffs_O3(stride, i, j, k, data, out);
 
     double x = (x_ - ox) - (real_t)i * h + h;
     double y = (y_ - oy) - (real_t)j * h + h;
@@ -513,6 +513,17 @@ SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D(const real_t x_,               
                                       1,
                                       4,
                                       16);
+
+    // if (fabs(w4 - 1.0) > 0.2) {
+    //     printf("x = %f, y = %f, z = %f, w4 = %f, delta = %e\n", x, y, z, w4, (w4 - 1.0));
+    //     printf("i = %d, j = %d, k = %d\n\n", i, j, k);
+
+    //     for (int i = 0; i < 64; i++) {
+    //         printf("out[%d] = %f\n", i, out[i]);
+    //     }
+
+    //     exit(1);
+    // }
 
     // printf("data[%d] = %f\n",
     //        (i * stride[0] + j * stride[1] + k * stride[2]),
