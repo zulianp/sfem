@@ -9,6 +9,7 @@
 
 int cu_laplacian_apply(const enum ElemType element_type,
                        const ptrdiff_t nelements,
+                       const ptrdiff_t stride,
                        const idx_t *const SFEM_RESTRICT elements,
                        const void *const SFEM_RESTRICT fff,
                        const enum RealType real_type_xy,
@@ -17,14 +18,14 @@ int cu_laplacian_apply(const enum ElemType element_type,
                        void *stream) {
     switch (element_type) {
         case TET4: {
-            return cu_tet4_laplacian_apply(nelements, elements, fff, real_type_xy, x, y, stream);
+            return cu_tet4_laplacian_apply(nelements, stride, elements, fff, real_type_xy, x, y, stream);
         }
         case TET10: {
-            return cu_tet10_laplacian_apply(nelements, elements, fff, real_type_xy, x, y, stream);
+            return cu_tet10_laplacian_apply(nelements, stride, elements, fff, real_type_xy, x, y, stream);
         }
         case MACRO_TET4: {
             return cu_macro_tet4_laplacian_apply(
-                    nelements, elements, fff, real_type_xy, x, y, stream);
+                    nelements, stride, elements, fff, real_type_xy, x, y, stream);
         }
         default: {
             fprintf(stderr,
@@ -43,6 +44,7 @@ int cu_laplacian_apply(const enum ElemType element_type,
 
 int cu_laplacian_diag(const enum ElemType element_type,
                       const ptrdiff_t nelements,
+                      const ptrdiff_t stride,
                       const idx_t *const SFEM_RESTRICT elements,
                       const void *const SFEM_RESTRICT fff,
                       const enum RealType real_type_xy,
@@ -50,7 +52,7 @@ int cu_laplacian_diag(const enum ElemType element_type,
                       void *stream) {
     switch (element_type) {
         case TET4: {
-            return cu_tet4_laplacian_diag(nelements, elements, fff, real_type_xy, diag, stream);
+            return cu_tet4_laplacian_diag(nelements, stride, elements, fff, real_type_xy, diag, stream);
         }
         // case TET10: {
         //  return cu_tet10_laplacian_diag(nelements, elements, fff, real_type_xy, diag,
@@ -58,7 +60,7 @@ int cu_laplacian_diag(const enum ElemType element_type,
         // }
         case MACRO_TET4: {
             return cu_macro_tet4_laplacian_diag(
-                    nelements, elements, fff, real_type_xy, diag, stream);
+                    nelements, stride, elements, fff, real_type_xy, diag, stream);
         }
         default: {
             fprintf(stderr,

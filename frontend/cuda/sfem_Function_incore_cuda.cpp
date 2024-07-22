@@ -206,6 +206,7 @@ namespace sfem {
         int gradient(const real_t *const x, real_t *const out) override {
             return cu_laplacian_apply(fff->element_type(),
                                       fff->n_elements(),
+                                      fff->n_elements(), // stride
                                       fff->elements(),
                                       fff->fff(),
                                       real_type,
@@ -217,6 +218,7 @@ namespace sfem {
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
             return cu_laplacian_apply(fff->element_type(),
                                       fff->n_elements(),
+                                      fff->n_elements(), // stride
                                       fff->elements(),
                                       fff->fff(),
                                       real_type,

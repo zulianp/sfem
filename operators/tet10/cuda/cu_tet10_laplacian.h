@@ -11,6 +11,7 @@ extern "C" {
 #endif
 
 int cu_tet10_laplacian_apply(const ptrdiff_t nelements,
+                             const ptrdiff_t stride,  // Stride for elements and fff
                              const idx_t *const SFEM_RESTRICT elements,
                              const void *const SFEM_RESTRICT fff,
                              const enum RealType real_type_xy,

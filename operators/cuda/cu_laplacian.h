@@ -12,6 +12,7 @@ extern "C" {
 
 int cu_laplacian_apply(const enum ElemType element_type,
                        const ptrdiff_t nelements,
+                       const ptrdiff_t stride, // Stride for elements and fff
                        const idx_t *const SFEM_RESTRICT elements,
                        const void *const SFEM_RESTRICT fff,
                        const enum RealType real_type_xy,
@@ -21,6 +22,7 @@ int cu_laplacian_apply(const enum ElemType element_type,
 
 int cu_laplacian_diag(const enum ElemType element_type,
                       const ptrdiff_t nelements,
+                      const ptrdiff_t stride, // Stride for elements and fff
                       const idx_t *const SFEM_RESTRICT elements,
                       const void *const SFEM_RESTRICT fff,
                       const enum RealType real_type_xy,

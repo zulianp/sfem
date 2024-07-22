@@ -109,7 +109,8 @@ static inline __device__ __host__ void lapl_diag_micro_kernel(const fff_t *const
                                                               accumulator_t *const SFEM_RESTRICT e0,
                                                               accumulator_t *const SFEM_RESTRICT e1,
                                                               accumulator_t *const SFEM_RESTRICT e2,
-                                                              accumulator_t *const SFEM_RESTRICT e3) {
+                                                              accumulator_t *const SFEM_RESTRICT
+                                                                      e3) {
     *e0 += fff[0] + 2 * fff[1] + 2 * fff[2] + fff[3] + 2 * fff[4] + fff[5];
     *e1 += fff[0];
     *e2 += fff[3];
@@ -117,11 +118,13 @@ static inline __device__ __host__ void lapl_diag_micro_kernel(const fff_t *const
 }
 
 template <typename real_t>
-__global__ void cu_macro_tet4_laplacian_apply_kernel(const ptrdiff_t nelements,
-                                                     const idx_t *const SFEM_RESTRICT elems,
-                                                     const cu_jacobian_t *const SFEM_RESTRICT fff,
-                                                     const real_t *const SFEM_RESTRICT x,
-                                                     real_t *const SFEM_RESTRICT y) {
+__global__ void cu_macro_tet4_laplacian_apply_kernel(
+        const ptrdiff_t nelements,
+        const ptrdiff_t stride,  // Stride for elements and fff
+        const idx_t *const SFEM_RESTRICT elems,
+        const cu_jacobian_t *const SFEM_RESTRICT fff,
+        const real_t *const SFEM_RESTRICT x,
+        real_t *const SFEM_RESTRICT y) {
     scalar_t ex[10];
     scalar_t ey[10];
     geom_t sub_fff[6];
@@ -135,19 +138,18 @@ __global__ void cu_macro_tet4_laplacian_apply_kernel(const ptrdiff_t nelements,
 
         // collect coeffs
         for (int v = 0; v < 10; ++v) {
-            ex[v] = x[elems[v * nelements + e]];
+            ex[v] = x[elems[v * stride + e]];
         }
 
-        const ptrdiff_t stride = 1;
         geom_t offf[6];
 #pragma unroll(6)
         for (int d = 0; d < 6; d++) {
-            offf[d] = fff[d * nelements + e];
+            offf[d] = fff[d * stride + e];
         }
 
         // Apply operator
         {  // Corner tets
-            sub_fff_0(offf, stride, sub_fff);
+            sub_fff_0(offf, 1, sub_fff);
 
             // [0, 4, 6, 7],
             lapl_apply_micro_kernel(sub_fff,
@@ -197,7 +199,7 @@ __global__ void cu_macro_tet4_laplacian_apply_kernel(const ptrdiff_t nelements,
         {  // Octahedron tets
 
             // [4, 5, 6, 8],
-            sub_fff_4(offf, stride, sub_fff);
+            sub_fff_4(offf, 1, sub_fff);
             lapl_apply_micro_kernel(sub_fff,
                                     ex[4],
                                     ex[5],
@@ -209,7 +211,7 @@ __global__ void cu_macro_tet4_laplacian_apply_kernel(const ptrdiff_t nelements,
                                     &ey[8]);
 
             // [7, 4, 6, 8],
-            sub_fff_5(offf, stride, sub_fff);
+            sub_fff_5(offf, 1, sub_fff);
             lapl_apply_micro_kernel(sub_fff,
                                     ex[7],
                                     ex[4],
@@ -221,7 +223,7 @@ __global__ void cu_macro_tet4_laplacian_apply_kernel(const ptrdiff_t nelements,
                                     &ey[8]);
 
             // [6, 5, 9, 8],
-            sub_fff_6(offf, stride, sub_fff);
+            sub_fff_6(offf, 1, sub_fff);
             lapl_apply_micro_kernel(sub_fff,
                                     ex[6],
                                     ex[5],
@@ -233,7 +235,7 @@ __global__ void cu_macro_tet4_laplacian_apply_kernel(const ptrdiff_t nelements,
                                     &ey[8]);
 
             // [7, 6, 9, 8]]
-            sub_fff_7(offf, stride, sub_fff);
+            sub_fff_7(offf, 1, sub_fff);
             lapl_apply_micro_kernel(sub_fff,
                                     ex[7],
                                     ex[6],
@@ -247,13 +249,14 @@ __global__ void cu_macro_tet4_laplacian_apply_kernel(const ptrdiff_t nelements,
 
         // redistribute coeffs
         for (int v = 0; v < 10; ++v) {
-            atomicAdd(&y[elems[v * nelements + e]], ey[v]);
+            atomicAdd(&y[elems[v * stride + e]], ey[v]);
         }
     }
 }
 
 template <typename T>
 static int cu_macro_tet4_laplacian_apply_tpl(const ptrdiff_t nelements,
+                                             const ptrdiff_t stride,  // Stride for elements and fff
                                              const idx_t *const SFEM_RESTRICT elements,
                                              const cu_jacobian_t *const SFEM_RESTRICT fff,
                                              const T *const SFEM_RESTRICT x,
@@ -274,18 +277,18 @@ static int cu_macro_tet4_laplacian_apply_tpl(const ptrdiff_t nelements,
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
 
-        cu_macro_tet4_laplacian_apply_kernel<T><<<n_blocks, block_size, 0, s>>>(
-                nelements, elements, fff, x, y);
+        cu_macro_tet4_laplacian_apply_kernel<T>
+                <<<n_blocks, block_size, 0, s>>>(nelements, stride, elements, fff, x, y);
     } else {
-
-        cu_macro_tet4_laplacian_apply_kernel<T><<<n_blocks, block_size, 0>>>(
-                nelements, elements, fff, x, y);
+        cu_macro_tet4_laplacian_apply_kernel<T>
+                <<<n_blocks, block_size, 0>>>(nelements, stride, elements, fff, x, y);
     }
 
     return SFEM_SUCCESS;
 }
 
 extern int cu_macro_tet4_laplacian_apply(const ptrdiff_t nelements,
+                                         const ptrdiff_t stride,  // Stride for elements and fff
                                          const idx_t *const SFEM_RESTRICT elements,
                                          const void *const SFEM_RESTRICT fff,
                                          const enum RealType real_type_xy,
@@ -294,16 +297,31 @@ extern int cu_macro_tet4_laplacian_apply(const ptrdiff_t nelements,
                                          void *stream) {
     switch (real_type_xy) {
         case SFEM_REAL_DEFAULT: {
-            return cu_macro_tet4_laplacian_apply_tpl(
-                    nelements, elements, (cu_jacobian_t *)fff, (real_t *)x, (real_t *)y, stream);
+            return cu_macro_tet4_laplacian_apply_tpl(nelements,
+                                                     stride,
+                                                     elements,
+                                                     (cu_jacobian_t *)fff,
+                                                     (real_t *)x,
+                                                     (real_t *)y,
+                                                     stream);
         }
         case SFEM_FLOAT32: {
-            return cu_macro_tet4_laplacian_apply_tpl(
-                    nelements, elements, (cu_jacobian_t *)fff, (float *)x, (float *)y, stream);
+            return cu_macro_tet4_laplacian_apply_tpl(nelements,
+                                                     stride,
+                                                     elements,
+                                                     (cu_jacobian_t *)fff,
+                                                     (float *)x,
+                                                     (float *)y,
+                                                     stream);
         }
         case SFEM_FLOAT64: {
-            return cu_macro_tet4_laplacian_apply_tpl(
-                    nelements, elements, (cu_jacobian_t *)fff, (double *)x, (double *)y, stream);
+            return cu_macro_tet4_laplacian_apply_tpl(nelements,
+                                                     stride,
+                                                     elements,
+                                                     (cu_jacobian_t *)fff,
+                                                     (double *)x,
+                                                     (double *)y,
+                                                     stream);
         }
         default: {
             fprintf(stderr,
@@ -320,10 +338,12 @@ extern int cu_macro_tet4_laplacian_apply(const ptrdiff_t nelements,
 // DIAG
 
 template <typename real_t>
-__global__ void cu_macro_tet4_laplacian_diag_kernel(const ptrdiff_t nelements,
-                                                    const idx_t *const SFEM_RESTRICT elems,
-                                                    const cu_jacobian_t *const SFEM_RESTRICT fff,
-                                                    real_t *const SFEM_RESTRICT diag) {
+__global__ void cu_macro_tet4_laplacian_diag_kernel(
+        const ptrdiff_t nelements,
+        const ptrdiff_t stride,  // Stride for elements and fff
+        const idx_t *const SFEM_RESTRICT elems,
+        const cu_jacobian_t *const SFEM_RESTRICT fff,
+        real_t *const SFEM_RESTRICT diag) {
     scalar_t ed[10];
     geom_t sub_fff[6];
 
@@ -338,7 +358,7 @@ __global__ void cu_macro_tet4_laplacian_diag_kernel(const ptrdiff_t nelements,
         geom_t offf[6];
 #pragma unroll(6)
         for (int d = 0; d < 6; d++) {
-            offf[d] = fff[d * nelements + e];
+            offf[d] = fff[d * stride + e];
         }
 
         // Apply operator
@@ -380,13 +400,14 @@ __global__ void cu_macro_tet4_laplacian_diag_kernel(const ptrdiff_t nelements,
         // redistribute coeffs
         // #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
-            atomicAdd(&diag[elems[v * nelements + e]], ed[v]);
+            atomicAdd(&diag[elems[v * stride + e]], ed[v]);
         }
     }
 }
 
 template <typename T>
 static int cu_macro_tet4_laplacian_diag_tpl(const ptrdiff_t nelements,
+                                            const ptrdiff_t stride,  // Stride for elements and fff
                                             const idx_t *const SFEM_RESTRICT elements,
                                             const cu_jacobian_t *const SFEM_RESTRICT fff,
                                             T *const SFEM_RESTRICT diag,
@@ -406,16 +427,17 @@ static int cu_macro_tet4_laplacian_diag_tpl(const ptrdiff_t nelements,
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
         cu_macro_tet4_laplacian_diag_kernel<<<n_blocks, block_size, 0, s>>>(
-                nelements, elements, fff, diag);
+                nelements, stride, elements, fff, diag);
     } else {
         cu_macro_tet4_laplacian_diag_kernel<<<n_blocks, block_size, 0>>>(
-                nelements, elements, fff, diag);
+                nelements, stride, elements, fff, diag);
     }
 
     return SFEM_SUCCESS;
 }
 
 extern int cu_macro_tet4_laplacian_diag(const ptrdiff_t nelements,
+                                        const ptrdiff_t stride,  // Stride for elements and fff
                                         const idx_t *const SFEM_RESTRICT elements,
                                         const void *const SFEM_RESTRICT fff,
                                         const enum RealType real_type_diag,
@@ -424,15 +446,15 @@ extern int cu_macro_tet4_laplacian_diag(const ptrdiff_t nelements,
     switch (real_type_diag) {
         case SFEM_REAL_DEFAULT: {
             return cu_macro_tet4_laplacian_diag_tpl(
-                    nelements, elements, (cu_jacobian_t *)fff, (real_t *)diag, stream);
+                    nelements, stride, elements, (cu_jacobian_t *)fff, (real_t *)diag, stream);
         }
         case SFEM_FLOAT32: {
             return cu_macro_tet4_laplacian_diag_tpl(
-                    nelements, elements, (cu_jacobian_t *)fff, (float *)diag, stream);
+                    nelements, stride, elements, (cu_jacobian_t *)fff, (float *)diag, stream);
         }
         case SFEM_FLOAT64: {
             return cu_macro_tet4_laplacian_diag_tpl(
-                    nelements, elements, (cu_jacobian_t *)fff, (double *)diag, stream);
+                    nelements, stride, elements, (cu_jacobian_t *)fff, (double *)diag, stream);
         }
         default: {
             fprintf(stderr,

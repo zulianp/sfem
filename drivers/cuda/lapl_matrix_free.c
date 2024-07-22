@@ -178,6 +178,7 @@ int main(int argc, char *argv[]) {
         for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
             cu_laplacian_apply(elem_type,
                                mesh.nelements,
+                               mesh.nelements, // stride
                                d_elements,
                                d_fff,
                                SFEM_REAL_DEFAULT,
