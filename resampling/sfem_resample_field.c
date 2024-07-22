@@ -848,7 +848,7 @@ int resample_field_local(
 
             // tet4_resample_field_local_reduce_CUDA
 
-            return tet4_resample_field_local_CUDA(  ////// v2 test V4 V8 CUDA  reduce_CUDA
+            return tet4_resample_field_local_reduce_CUDA(  ////// v2 test V4 V8 CUDA  reduce_CUDA
                                                   //   0,
                     nelements,
                     nnodes,
