@@ -1091,7 +1091,7 @@ extern "C" int tet4_resample_field_local_reduce_CUDA(
     // get cuda error
     cudaError_t error = cudaGetLastError();
     if (error != cudaSuccess) {
-        printf("ERROR: %s\n", cudaGetErrorString(error));
+        printf("!!!!!!!! ERROR: %s  !!!!!!!!!!!!!!!!!!!!!!!!!\n", cudaGetErrorString(error));
     }
 
     // end kernel
