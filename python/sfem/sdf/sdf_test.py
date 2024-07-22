@@ -24,9 +24,9 @@ field = np.zeros(dims, dtype=sdf_t)
 mc = np.float64(10)
 
 def chess_board(x, y, z):
-    vx = 1.0 if np.int(np.abs(mc * x)) % 2 == 0 else -1.0
-    vy = 1.0 if np.int(np.abs(mc * y)) % 2 == 0 else -1.0
-    vz = 1.0 if np.int(np.abs(mc * z)) % 2 == 0 else -1.0
+    vx = 1.0 if np.int32(np.abs(mc * x)) % 2 == 0 else -1.0
+    vy = 1.0 if np.int32(np.abs(mc * y)) % 2 == 0 else -1.0
+    vz = 1.0 if np.int32(np.abs(mc * z)) % 2 == 0 else -1.0
     
     return vx * vy * vz
 

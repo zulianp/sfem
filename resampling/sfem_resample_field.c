@@ -841,7 +841,7 @@ int resample_field_local(
         // Output
         real_t* const SFEM_RESTRICT weighted_field, sfem_resample_field_info* info) {
     //
-    switch (TET4) {
+    switch (TET10) {
         case TET4: {
             info->quad_nodes_cnt = TET4_NQP;
             info->nelements = nelements;
@@ -862,7 +862,7 @@ int resample_field_local(
                     weighted_field);
         }
         case TET10: {
-// #define TET10_V2
+#define TET10_V2
 
 #ifdef TET10_V2  // V2
             return hex8_to_tet10_resample_field_local_CUDA(
