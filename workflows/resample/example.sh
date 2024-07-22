@@ -40,7 +40,7 @@ if [[ -d "$skinned" ]]
 then
 	echo "Reusing existing mesh $skinned and SDF!"
 else
-	create_sphere.sh 3
+	create_sphere.sh 4
 	sfc $mesh $mesh_sorted
 	mkdir -p $skinned
 	skin $mesh $skinned
