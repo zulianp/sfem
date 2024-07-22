@@ -743,7 +743,9 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
            "(hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel): %f seconds\n",
            seconds);
     const double elements_per_second = (double)(nelements) / seconds;
+    printf("GPU:    Number of elements: %d.\n", nelements);
     printf("GPU:    Throughput for the kernel: %e elements/second\n", elements_per_second);
+    printf("GPU:    %d, %f   (CSV friendly)\n ", nelements, elements_per_second);
     printf("============================================================================\n");
 
     {
