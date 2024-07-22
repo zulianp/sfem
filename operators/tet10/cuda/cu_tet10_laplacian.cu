@@ -136,11 +136,13 @@ static inline __device__ __host__ void lapl_apply_micro_kernel(
 }
 
 template <typename real_t>
-__global__ void cu_tet10_laplacian_apply_kernel(const ptrdiff_t nelements,
-                                                const idx_t *const SFEM_RESTRICT elems,
-                                                const cu_jacobian_t *const SFEM_RESTRICT fff,
-                                                const real_t *const SFEM_RESTRICT x,
-                                                real_t *const SFEM_RESTRICT y) {
+__global__ void cu_tet10_laplacian_apply_kernel(
+        const ptrdiff_t nelements,
+        const ptrdiff_t stride,  // Stride for elements and fff
+        const idx_t *const SFEM_RESTRICT elems,
+        const cu_jacobian_t *const SFEM_RESTRICT fff,
+        const real_t *const SFEM_RESTRICT x,
+        real_t *const SFEM_RESTRICT y) {
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
          e += blockDim.x * gridDim.x) {
         scalar_t ex[10];
@@ -150,14 +152,14 @@ __global__ void cu_tet10_laplacian_apply_kernel(const ptrdiff_t nelements,
         // collect coeffs
 #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
-            vidx[v] = elems[v * nelements + e];
+            vidx[v] = elems[v * stride + e];
             ex[v] = x[vidx[v]];
         }
 
         geom_t fffe[6];
 #pragma unroll(6)
         for (int d = 0; d < 6; d++) {
-            fffe[d] = fff[d * nelements + e];
+            fffe[d] = fff[d * stride + e];
         }
 
         {  // Numerical quadrature
@@ -183,11 +185,12 @@ __global__ void cu_tet10_laplacian_apply_kernel(const ptrdiff_t nelements,
 
 template <typename T>
 static int cu_tet10_laplacian_apply_tpl(const ptrdiff_t nelements,
-                                    const idx_t *const SFEM_RESTRICT elements,
-                                    const cu_jacobian_t *const SFEM_RESTRICT fff,
-                                    const T *const SFEM_RESTRICT x,
-                                    T *const SFEM_RESTRICT y,
-                                    void *stream) {
+                                        const ptrdiff_t stride,  // Stride for elements and fff
+                                        const idx_t *const SFEM_RESTRICT elements,
+                                        const cu_jacobian_t *const SFEM_RESTRICT fff,
+                                        const T *const SFEM_RESTRICT x,
+                                        T *const SFEM_RESTRICT y,
+                                        void *stream) {
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
@@ -202,16 +205,17 @@ static int cu_tet10_laplacian_apply_tpl(const ptrdiff_t nelements,
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
         cu_tet10_laplacian_apply_kernel<<<n_blocks, block_size, 0, s>>>(
-                nelements, elements, fff, x, y);
+                nelements, stride, elements, fff, x, y);
     } else {
         cu_tet10_laplacian_apply_kernel<<<n_blocks, block_size, 0>>>(
-                nelements, elements, fff, x, y);
+                nelements, stride, elements, fff, x, y);
     }
 
     return SFEM_SUCCESS;
 }
 
 extern int cu_tet10_laplacian_apply(const ptrdiff_t nelements,
+                                    const ptrdiff_t stride,  // Stride for elements and fff
                                     const idx_t *const SFEM_RESTRICT elements,
                                     const void *const SFEM_RESTRICT fff,
                                     const enum RealType real_type_xy,
@@ -220,16 +224,31 @@ extern int cu_tet10_laplacian_apply(const ptrdiff_t nelements,
                                     void *stream) {
     switch (real_type_xy) {
         case SFEM_REAL_DEFAULT: {
-            return cu_tet10_laplacian_apply_tpl(
-                    nelements, elements, (cu_jacobian_t *)fff, (real_t *)x, (real_t *)y, stream);
+            return cu_tet10_laplacian_apply_tpl(nelements,
+                                                stride,
+                                                elements,
+                                                (cu_jacobian_t *)fff,
+                                                (real_t *)x,
+                                                (real_t *)y,
+                                                stream);
         }
         case SFEM_FLOAT32: {
-            return cu_tet10_laplacian_apply_tpl(
-                    nelements, elements, (cu_jacobian_t *)fff, (float *)x, (float *)y, stream);
+            return cu_tet10_laplacian_apply_tpl(nelements,
+                                                stride,
+                                                elements,
+                                                (cu_jacobian_t *)fff,
+                                                (float *)x,
+                                                (float *)y,
+                                                stream);
         }
         case SFEM_FLOAT64: {
-            return cu_tet10_laplacian_apply_tpl(
-                    nelements, elements, (cu_jacobian_t *)fff, (double *)x, (double *)y, stream);
+            return cu_tet10_laplacian_apply_tpl(nelements,
+                                                stride,
+                                                elements,
+                                                (cu_jacobian_t *)fff,
+                                                (double *)x,
+                                                (double *)y,
+                                                stream);
         }
         default: {
             fprintf(stderr,
