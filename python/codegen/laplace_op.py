@@ -6,6 +6,7 @@ from tri6 import *
 from tet4 import *
 from tet10 import *
 from tet20 import *
+from quad4 import *
 
 import sys
 
@@ -213,7 +214,9 @@ def main():
 	"TRI3": Tri3(),
 	"TET4": Tet4(),
 	"TET10": Tet10(),
-	"TET20": Tet20()}
+	"TET20": Tet20(),
+	"AAQUAD4": AxisAlignedQuad4()
+	}
 
 	if len(sys.argv) >= 2:
 		fe = fes[sys.argv[1]]
