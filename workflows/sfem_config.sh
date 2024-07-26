@@ -25,4 +25,4 @@ export SFEM_ELEMENT_IDX_SIZE=4
 export SFEM_LOCAL_IDX_T="int16"
 export SFEM_LOCAL_IDX_SIZE=2
 
-export SFEM_VEC_SIZE=4
+export SFEM_VEC_SIZE=8
