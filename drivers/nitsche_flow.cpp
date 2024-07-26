@@ -188,5 +188,8 @@ int main(int argc, char *argv[]) {
     sprintf(path, "%s/u.raw", output_folder);
     array_write(comm, path, SFEM_MPI_REAL_T, u, ndofs, ndofs);
 
+    free(u);
+    free(rhs);
+
     return MPI_Finalize();
 }
