@@ -1,6 +1,7 @@
 #include "sfem_defs.h"
 #include "sfem_Function.hpp"
 #include "sfem_cg.hpp"
+#include "sfem_bcgs.hpp"
 
 #include "matrixio_array.h"
 
@@ -59,7 +60,7 @@ static SFEM_INLINE void quad4_laplacian_apply_fff(const scalar_t *const SFEM_RES
 
 int aa_quad4_laplacian_apply(const ptrdiff_t nx,
                              const ptrdiff_t ny,
-                             const ptrdiff_t *const lda,
+                             const ptrdiff_t *const strides,
                              const geom_t ox,
                              const geom_t oy,
                              const geom_t dx,
@@ -81,10 +82,10 @@ int aa_quad4_laplacian_apply(const ptrdiff_t nx,
             const geom_t y2 = oy + (j + 1) * dy;
 
 
-            ev[0] = i * lda[0] + j * lda[1];
-            ev[1] = (i + 1) * lda[0] + j * lda[1];
-            ev[2] = (i + 1) * lda[0] + (j + 1) * lda[1];
-            ev[3] = i * lda[0] + (j + 1) * lda[1];
+            ev[0] = i * strides[0] + j * strides[1];
+            ev[1] = (i + 1) * strides[0] + j * strides[1];
+            ev[2] = (i + 1) * strides[0] + (j + 1) * strides[1];
+            ev[3] = i * strides[0] + (j + 1) * strides[1];
 
             for (int v = 0; v < 4; ++v) {
                 element_u[v] = u[ev[v]];
@@ -107,13 +108,13 @@ int aa_quad4_laplacian_apply(const ptrdiff_t nx,
 
 int copy_at_BC(const ptrdiff_t nx,
                const ptrdiff_t ny,
-               const ptrdiff_t *const lda,
+               const ptrdiff_t *const SFEM_RESTRICT strides,
                const real_t *const SFEM_RESTRICT in,
                real_t *const SFEM_RESTRICT out) {
 #pragma omp parallel for
     for (ptrdiff_t j = 0; j < ny + 1; j++) {
-        out[0 * lda[0] + j * lda[1]] = in[0 * lda[0] + j * lda[1]];
-        out[nx * lda[0] + j * lda[1]] = in[nx * lda[0] + j * lda[1]];
+        out[0 * strides[0] + j * strides[1]] = in[0 * strides[0] + j * strides[1]];
+        out[nx * strides[0] + j * strides[1]] = in[nx * strides[0] + j * strides[1]];
     }
 
     return SFEM_SUCCESS;
@@ -121,12 +122,12 @@ int copy_at_BC(const ptrdiff_t nx,
 
 int set_BC(const ptrdiff_t nx,
            const ptrdiff_t ny,
-           const ptrdiff_t *const lda,
+           const ptrdiff_t *const strides,
            real_t *const SFEM_RESTRICT x) {
 #pragma omp parallel for
     for (ptrdiff_t j = 0; j < ny + 1; j++) {
-        x[0 * lda[0] + j * lda[1]] = -1;
-        x[nx * lda[0] + j * lda[1]] = 1;
+        x[0 * strides[0] + j * strides[1]] = -1;
+        x[nx * strides[0] + j * strides[1]] = 1;
     }
     return SFEM_SUCCESS;
 }
@@ -154,7 +155,7 @@ int main(int argc, char *argv[]) {
     const ptrdiff_t ny = atol(argv[2]);
     const char *output_folder = argv[3];
 
-    const ptrdiff_t lda[2] = {1, nx + 1};
+    const ptrdiff_t strides[2] = {1, nx + 1};
     const geom_t ox = -1;
     const geom_t oy = 1;
     const geom_t dx = 2. / nx;
@@ -165,21 +166,19 @@ int main(int argc, char *argv[]) {
         mkdir(output_folder, 0700);
     }
 
-    ptrdiff_t ndofs = (nx + 1) * (ny + 1);
+    const ptrdiff_t ndofs = (nx + 1) * (ny + 1);
     real_t *u = (real_t *)calloc(ndofs, sizeof(real_t));
     real_t *rhs = (real_t *)calloc(ndofs, sizeof(real_t));
 
-    set_BC(nx, ny, lda, u);
-    set_BC(nx, ny, lda, rhs);
+    set_BC(nx, ny, strides, u);
+    set_BC(nx, ny, strides, rhs);
 
     auto op = sfem::make_op<real_t>(ndofs, ndofs, [=](const real_t *x, real_t *y) {
-        aa_quad4_laplacian_apply(nx, ny, lda, ox, oy, dx, dy, x, y);
-        copy_at_BC(nx, ny, lda, x, y);
+        aa_quad4_laplacian_apply(nx, ny, strides, ox, oy, dx, dy, x, y);
+        copy_at_BC(nx, ny, strides, x, y);
     });
 
-    auto solver = sfem::h_cg<real_t>();
-    solver->check_each = 1;
-    solver->verbose = true;
+    auto solver = sfem::h_bcgs<real_t>();
     solver->set_n_dofs(ndofs);
     solver->set_op(op);
     solver->apply(rhs, u);
@@ -190,6 +189,5 @@ int main(int argc, char *argv[]) {
 
     free(u);
     free(rhs);
-
     return MPI_Finalize();
 }
