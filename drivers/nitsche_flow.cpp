@@ -58,15 +58,15 @@ static SFEM_INLINE void quad4_laplacian_apply_fff(const scalar_t *const SFEM_RES
     element_vector[3] = x1 + x16 + x18 + x3 - x4 - x6;
 }
 
-int aa_quad4_laplacian_apply(const ptrdiff_t nx,
-                             const ptrdiff_t ny,
-                             const ptrdiff_t *const strides,
-                             const geom_t ox,
-                             const geom_t oy,
-                             const geom_t dx,
-                             const geom_t dy,
-                             const real_t *const SFEM_RESTRICT u,
-                             real_t *const SFEM_RESTRICT values) {
+int aa_quad4_laplacian_nitsche_BC_apply(const ptrdiff_t nx,
+                                        const ptrdiff_t ny,
+                                        const ptrdiff_t *const strides,
+                                        const geom_t ox,
+                                        const geom_t oy,
+                                        const geom_t dx,
+                                        const geom_t dy,
+                                        const real_t *const SFEM_RESTRICT u,
+                                        real_t *const SFEM_RESTRICT values) {
 #pragma omp parallel for
     for (ptrdiff_t j = 0; j < ny; ++j) {
         for (ptrdiff_t i = 0; i < nx; ++i) {
@@ -198,18 +198,18 @@ static SFEM_INLINE void nitsche_gradient_adj(const scalar_t *const SFEM_RESTRICT
     element_vector[1] = jacobian_determinant * (-x10 - x3 * x8 - x3 * x9);
 }
 
-static const scalar_t eps_left = 0.000001;
-static const scalar_t eps_right = 10000000;
-static const scalar_t gamma = 0.001;
+static const scalar_t eps_left = 0.01;
+static const scalar_t eps_right = 1000;
+static const scalar_t gamma = 0.01;
 
-int nitsche_BC_rhs(const ptrdiff_t nx,
-                   const ptrdiff_t ny,
-                   const ptrdiff_t *const strides,
-                   const geom_t ox,
-                   const geom_t oy,
-                   const geom_t dx,
-                   const geom_t dy,
-                   real_t *const SFEM_RESTRICT values) {
+int aa_quad4_laplacian_nitsche_BC_rhs(const ptrdiff_t nx,
+                                           const ptrdiff_t ny,
+                                           const ptrdiff_t *const strides,
+                                           const geom_t ox,
+                                           const geom_t oy,
+                                           const geom_t dx,
+                                           const geom_t dy,
+                                           real_t *const SFEM_RESTRICT values) {
     scalar_t u0_left = -1;
     scalar_t u0_right = 1;
     scalar_t g0_left = -2;
@@ -324,8 +324,13 @@ int nitsche_BC_apply(const ptrdiff_t nx,
         edgeshell2_jacobian_adjugate_and_determinant_s(
                 x0, x1, y0, y1, jacobian_adjugate, &jacobian_determinant);
 
-        nitsche_apply_adj(
-                jacobian_adjugate, jacobian_determinant, gamma, eps_left, hE, element_u, element_vector);
+        nitsche_apply_adj(jacobian_adjugate,
+                          jacobian_determinant,
+                          gamma,
+                          eps_left,
+                          hE,
+                          element_u,
+                          element_vector);
 
         for (int d = 0; d < 2; d++) {
 #pragma omp atomic update
@@ -357,8 +362,13 @@ int nitsche_BC_apply(const ptrdiff_t nx,
         edgeshell2_jacobian_adjugate_and_determinant_s(
                 x0, x1, y0, y1, jacobian_adjugate, &jacobian_determinant);
 
-        nitsche_apply_adj(
-                jacobian_adjugate, jacobian_determinant, gamma, eps_right, hE, element_u, element_vector);
+        nitsche_apply_adj(jacobian_adjugate,
+                          jacobian_determinant,
+                          gamma,
+                          eps_right,
+                          hE,
+                          element_u,
+                          element_vector);
 
         for (int d = 0; d < 2; d++) {
 #pragma omp atomic update
@@ -410,14 +420,14 @@ int main(int argc, char *argv[]) {
     bool use_nitsche = true;
 
     if (use_nitsche) {
-        nitsche_BC_rhs(nx, ny, strides, ox, oy, dx, dy, rhs);
+        aa_quad4_laplacian_nitsche_BC_rhs(nx, ny, strides, ox, oy, dx, dy, rhs);
     } else {
         set_BC(nx, ny, strides, u);
         set_BC(nx, ny, strides, rhs);
     }
 
     auto op = sfem::make_op<real_t>(ndofs, ndofs, [=](const real_t *x, real_t *y) {
-        aa_quad4_laplacian_apply(nx, ny, strides, ox, oy, dx, dy, x, y);
+        aa_quad4_laplacian_nitsche_BC_apply(nx, ny, strides, ox, oy, dx, dy, x, y);
 
         if (use_nitsche) {
             nitsche_BC_apply(nx, ny, strides, ox, oy, dx, dy, x, y);
@@ -428,6 +438,7 @@ int main(int argc, char *argv[]) {
 
     auto solver = sfem::h_bcgs<real_t>();
     solver->set_n_dofs(ndofs);
+    solver->set_max_it(2000);
     solver->set_op(op);
     solver->apply(rhs, u);
 
