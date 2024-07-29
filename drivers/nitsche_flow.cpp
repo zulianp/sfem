@@ -1,7 +1,7 @@
-#include "sfem_defs.h"
 #include "sfem_Function.hpp"
-#include "sfem_cg.hpp"
 #include "sfem_bcgs.hpp"
+#include "sfem_cg.hpp"
+#include "sfem_defs.h"
 
 #include "matrixio_array.h"
 
@@ -81,7 +81,6 @@ int aa_quad4_laplacian_apply(const ptrdiff_t nx,
             const geom_t y0 = oy + j * dy;
             const geom_t y2 = oy + (j + 1) * dy;
 
-
             ev[0] = i * strides[0] + j * strides[1];
             ev[1] = (i + 1) * strides[0] + j * strides[1];
             ev[2] = (i + 1) * strides[0] + (j + 1) * strides[1];
@@ -132,6 +131,244 @@ int set_BC(const ptrdiff_t nx,
     return SFEM_SUCCESS;
 }
 
+static SFEM_INLINE void edgeshell2_jacobian_adjugate_and_determinant_s(
+        const geom_t px0,
+        const geom_t px1,
+        const geom_t py0,
+        const geom_t py1,
+        scalar_t *const SFEM_RESTRICT jacobian_adjugate,
+        scalar_t *const SFEM_RESTRICT jacobian_determinant) {
+    const scalar_t x0 = -px0 + px1;
+    const scalar_t x1 = -py0 + py1;
+    const scalar_t x2 = sqrt(POW2(x0) + POW2(x1));
+    const scalar_t x3 = 1.0 / x2;
+    jacobian_adjugate[0] = x0 * x3;
+    jacobian_adjugate[1] = x1 * x3;
+    *jacobian_determinant = x2;
+}
+
+static SFEM_INLINE void nitsche_apply_adj(const scalar_t *const SFEM_RESTRICT adjugate,
+                                          const scalar_t jacobian_determinant,
+                                          const scalar_t gamma,
+                                          const scalar_t eps,
+                                          const scalar_t hE,
+                                          const scalar_t *const SFEM_RESTRICT u,
+                                          accumulator_t *const SFEM_RESTRICT element_vector) {
+    const scalar_t x0 = gamma * hE;
+    const scalar_t x1 = 1.0 / (eps + x0);
+    const scalar_t x2 = 1.0 / jacobian_determinant;
+    const scalar_t x3 = POW2(adjugate[0]);
+    const scalar_t x4 = POW2(adjugate[1]);
+    const scalar_t x5 = sqrt(x3 + x4);
+    const scalar_t x6 = u[0] * x2 * x5;
+    const scalar_t x7 = x0 * x1;
+    const scalar_t x8 = x2 / x5;
+    const scalar_t x9 = x3 * x8;
+    const scalar_t x10 = x4 * x8;
+    const scalar_t x11 = x10 + x9;
+    const scalar_t x12 = -u[0] + u[1];
+    const scalar_t x13 = eps * x7 * (x10 * x12 + x12 * x9);
+    element_vector[0] = jacobian_determinant *
+                        (x1 * ((1.0 / 3.0) * u[0] + (1.0 / 6.0) * u[1]) + x11 * x13 + x6 * x7);
+    element_vector[1] =
+            jacobian_determinant * (x1 * ((1.0 / 6.0) * u[0] + (1.0 / 3.0) * u[1]) - x11 * x13 -
+                                    x7 * (-u[0] * x10 - u[0] * x9 + u[1] * x10 + u[1] * x9 + x6));
+}
+
+static SFEM_INLINE void nitsche_gradient_adj(const scalar_t *const SFEM_RESTRICT adjugate,
+                                             const scalar_t jacobian_determinant,
+                                             const scalar_t gamma,
+                                             const scalar_t eps,
+                                             const scalar_t hE,
+                                             const scalar_t u0,
+                                             const scalar_t g0,
+                                             accumulator_t *const SFEM_RESTRICT element_vector) {
+    const scalar_t x0 = POW2(adjugate[0]);
+    const scalar_t x1 = POW2(adjugate[1]);
+    const scalar_t x2 = 1 / (jacobian_determinant * sqrt(x0 + x1));
+    const scalar_t x3 = x0 * x2 + x1 * x2;
+    const scalar_t x4 = -x3;
+    const scalar_t x5 = gamma * hE;
+    const scalar_t x6 = 1.0 / (eps + x5);
+    const scalar_t x7 = x5 * x6;
+    const scalar_t x8 = u0 * x7;
+    const scalar_t x9 = eps * g0 * x7;
+    const scalar_t x10 = -1.0 / 2.0 * eps * g0 * x6 - 1.0 / 2.0 * u0 * x6;
+    element_vector[0] = jacobian_determinant * (-x10 - x4 * x8 - x4 * x9);
+    element_vector[1] = jacobian_determinant * (-x10 - x3 * x8 - x3 * x9);
+}
+
+static const scalar_t eps_left = 0.000001;
+static const scalar_t eps_right = 10000000;
+static const scalar_t gamma = 0.001;
+
+int nitsche_BC_rhs(const ptrdiff_t nx,
+                   const ptrdiff_t ny,
+                   const ptrdiff_t *const strides,
+                   const geom_t ox,
+                   const geom_t oy,
+                   const geom_t dx,
+                   const geom_t dy,
+                   real_t *const SFEM_RESTRICT values) {
+    scalar_t u0_left = -1;
+    scalar_t u0_right = 1;
+    scalar_t g0_left = -2;
+    scalar_t g0_right = 2;
+    const scalar_t hE = dy;
+
+// Left
+#pragma omp parallel for
+    for (ptrdiff_t j = 0; j < ny; j++) {
+        scalar_t jacobian_adjugate[2];
+        scalar_t jacobian_determinant;
+        accumulator_t element_vector[2];
+        idx_t ev[2];
+
+        ev[0] = (j + 1) * strides[1];
+        ev[1] = j * strides[1];
+
+        const geom_t x0 = ox;
+        const geom_t x1 = ox;
+
+        const geom_t y0 = oy + (j + 1) * dy;
+        const geom_t y1 = oy + j * dy;
+
+        edgeshell2_jacobian_adjugate_and_determinant_s(
+                x0, x1, y0, y1, jacobian_adjugate, &jacobian_determinant);
+
+        nitsche_gradient_adj(jacobian_adjugate,
+                             jacobian_determinant,
+                             gamma,
+                             eps_left,
+                             hE,
+                             u0_left,
+                             g0_left,
+                             element_vector);
+
+        for (int d = 0; d < 2; d++) {
+#pragma omp atomic update
+            values[ev[d]] += element_vector[d];
+        }
+    }
+
+// Right
+#pragma omp parallel for
+    for (ptrdiff_t j = 0; j < ny; j++) {
+        scalar_t jacobian_adjugate[2];
+        scalar_t jacobian_determinant;
+        accumulator_t element_vector[2];
+        idx_t ev[2];
+        ev[0] = nx * strides[0] + j * strides[1];
+        ev[1] = nx * strides[0] + (j + 1) * strides[1];
+
+        const geom_t x0 = ox + nx * dx;
+        const geom_t x1 = ox + nx * dx;
+
+        const geom_t y0 = oy + j * dy;
+        const geom_t y1 = oy + (j + 1) * dy;
+
+        edgeshell2_jacobian_adjugate_and_determinant_s(
+                x0, x1, y0, y1, jacobian_adjugate, &jacobian_determinant);
+
+        nitsche_gradient_adj(jacobian_adjugate,
+                             jacobian_determinant,
+                             gamma,
+                             eps_right,
+                             hE,
+                             u0_right,
+                             g0_right,
+                             element_vector);
+
+        for (int d = 0; d < 2; d++) {
+#pragma omp atomic update
+            values[ev[d]] += element_vector[d];
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int nitsche_BC_apply(const ptrdiff_t nx,
+                     const ptrdiff_t ny,
+                     const ptrdiff_t *const strides,
+                     const geom_t ox,
+                     const geom_t oy,
+                     const geom_t dx,
+                     const geom_t dy,
+                     const real_t *const SFEM_RESTRICT u,
+                     real_t *const SFEM_RESTRICT values) {
+    const scalar_t hE = dy;
+
+// Left
+#pragma omp parallel for
+    for (ptrdiff_t j = 0; j < ny; j++) {
+        scalar_t jacobian_adjugate[2];
+        scalar_t jacobian_determinant;
+        scalar_t element_u[2];
+        accumulator_t element_vector[2];
+        idx_t ev[2];
+
+        ev[0] = (j + 1) * strides[1];
+        ev[1] = j * strides[1];
+
+        for (int d = 0; d < 2; d++) {
+            element_u[d] = u[ev[d]];
+        }
+
+        const geom_t x0 = ox;
+        const geom_t x1 = ox;
+
+        const geom_t y0 = oy + (j + 1) * dy;
+        const geom_t y1 = oy + j * dy;
+
+        edgeshell2_jacobian_adjugate_and_determinant_s(
+                x0, x1, y0, y1, jacobian_adjugate, &jacobian_determinant);
+
+        nitsche_apply_adj(
+                jacobian_adjugate, jacobian_determinant, gamma, eps_left, hE, element_u, element_vector);
+
+        for (int d = 0; d < 2; d++) {
+#pragma omp atomic update
+            values[ev[d]] += element_vector[d];
+        }
+    }
+
+// Right
+#pragma omp parallel for
+    for (ptrdiff_t j = 0; j < ny; j++) {
+        scalar_t jacobian_adjugate[2];
+        scalar_t jacobian_determinant;
+        scalar_t element_u[2];
+        accumulator_t element_vector[2];
+        idx_t ev[2];
+        ev[0] = nx * strides[0] + j * strides[1];
+        ev[1] = nx * strides[0] + (j + 1) * strides[1];
+
+        for (int d = 0; d < 2; d++) {
+            element_u[d] = u[ev[d]];
+        }
+
+        const geom_t x0 = ox + nx * dx;
+        const geom_t x1 = ox + nx * dx;
+
+        const geom_t y0 = oy + j * dy;
+        const geom_t y1 = oy + (j + 1) * dy;
+
+        edgeshell2_jacobian_adjugate_and_determinant_s(
+                x0, x1, y0, y1, jacobian_adjugate, &jacobian_determinant);
+
+        nitsche_apply_adj(
+                jacobian_adjugate, jacobian_determinant, gamma, eps_right, hE, element_u, element_vector);
+
+        for (int d = 0; d < 2; d++) {
+#pragma omp atomic update
+            values[ev[d]] += element_vector[d];
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -170,12 +407,23 @@ int main(int argc, char *argv[]) {
     real_t *u = (real_t *)calloc(ndofs, sizeof(real_t));
     real_t *rhs = (real_t *)calloc(ndofs, sizeof(real_t));
 
-    set_BC(nx, ny, strides, u);
-    set_BC(nx, ny, strides, rhs);
+    bool use_nitsche = true;
+
+    if (use_nitsche) {
+        nitsche_BC_rhs(nx, ny, strides, ox, oy, dx, dy, rhs);
+    } else {
+        set_BC(nx, ny, strides, u);
+        set_BC(nx, ny, strides, rhs);
+    }
 
     auto op = sfem::make_op<real_t>(ndofs, ndofs, [=](const real_t *x, real_t *y) {
         aa_quad4_laplacian_apply(nx, ny, strides, ox, oy, dx, dy, x, y);
-        copy_at_BC(nx, ny, strides, x, y);
+
+        if (use_nitsche) {
+            nitsche_BC_apply(nx, ny, strides, ox, oy, dx, dy, x, y);
+        } else {
+            copy_at_BC(nx, ny, strides, x, y);
+        }
     });
 
     auto solver = sfem::h_bcgs<real_t>();
@@ -186,6 +434,9 @@ int main(int argc, char *argv[]) {
     char path[1024 * 10];
     sprintf(path, "%s/u.raw", output_folder);
     array_write(comm, path, SFEM_MPI_REAL_T, u, ndofs, ndofs);
+
+    sprintf(path, "%s/rhs.raw", output_folder);
+    array_write(comm, path, SFEM_MPI_REAL_T, rhs, ndofs, ndofs);
 
     free(u);
     free(rhs);
