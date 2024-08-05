@@ -198,9 +198,9 @@ static SFEM_INLINE void nitsche_gradient_adj(const scalar_t *const SFEM_RESTRICT
     element_vector[1] = jacobian_determinant * (-x10 - x3 * x8 - x3 * x9);
 }
 
-static const scalar_t eps_left = 0.01;
+static const scalar_t eps_left = 0.1;
 static const scalar_t eps_right = 1000;
-static const scalar_t gamma = 0.01;
+static const scalar_t gamma = 0.001;
 
 int aa_quad4_laplacian_nitsche_BC_rhs(const ptrdiff_t nx,
                                            const ptrdiff_t ny,

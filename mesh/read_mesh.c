@@ -1080,9 +1080,9 @@ int mesh_read(MPI_Comm comm, const char *folder, mesh_t *mesh) {
 
     if (!counts[0] || !counts[1]) {
         if (!rank) {
-            fprintf(stderr, "Could not find any mesh files in directory %s\n", folder);
+            fprintf(stderr, "Could not find any mesh files in directory %s (#i*.raw = %d, {x,y,z}.raw = %d)\n", folder, counts[0], counts[1]);
         }
-
+        assert(0);
         MPI_Abort(comm, -1);
     }
 
