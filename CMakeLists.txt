@@ -73,6 +73,7 @@ if(SFEM_ENABLE_CUDA)
         operators/tet4/cuda
         operators/macro_tet4/cuda
         operators/tet10/cuda
+        operators/hierarchical/cuda
         )
 endif()
 
