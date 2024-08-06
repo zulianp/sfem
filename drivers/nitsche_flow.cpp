@@ -198,18 +198,18 @@ static SFEM_INLINE void nitsche_gradient_adj(const scalar_t *const SFEM_RESTRICT
     element_vector[1] = jacobian_determinant * (-x10 - x3 * x8 - x3 * x9);
 }
 
-static const scalar_t eps_left = 0.1;
-static const scalar_t eps_right = 1000;
-static const scalar_t gamma = 0.001;
+static const scalar_t EPS_LEFT = 0.1;
+static const scalar_t EPS_RIGHT = 1000;
+static const scalar_t GAMMA = 0.001;
 
 int aa_quad4_laplacian_nitsche_BC_rhs(const ptrdiff_t nx,
-                                           const ptrdiff_t ny,
-                                           const ptrdiff_t *const strides,
-                                           const geom_t ox,
-                                           const geom_t oy,
-                                           const geom_t dx,
-                                           const geom_t dy,
-                                           real_t *const SFEM_RESTRICT values) {
+                                      const ptrdiff_t ny,
+                                      const ptrdiff_t *const strides,
+                                      const geom_t ox,
+                                      const geom_t oy,
+                                      const geom_t dx,
+                                      const geom_t dy,
+                                      real_t *const SFEM_RESTRICT values) {
     scalar_t u0_left = -1;
     scalar_t u0_right = 1;
     scalar_t g0_left = -2;
@@ -238,8 +238,8 @@ int aa_quad4_laplacian_nitsche_BC_rhs(const ptrdiff_t nx,
 
         nitsche_gradient_adj(jacobian_adjugate,
                              jacobian_determinant,
-                             gamma,
-                             eps_left,
+                             GAMMA,
+                             EPS_LEFT,
                              hE,
                              u0_left,
                              g0_left,
@@ -272,8 +272,8 @@ int aa_quad4_laplacian_nitsche_BC_rhs(const ptrdiff_t nx,
 
         nitsche_gradient_adj(jacobian_adjugate,
                              jacobian_determinant,
-                             gamma,
-                             eps_right,
+                             GAMMA,
+                             EPS_RIGHT,
                              hE,
                              u0_right,
                              g0_right,
@@ -326,8 +326,8 @@ int nitsche_BC_apply(const ptrdiff_t nx,
 
         nitsche_apply_adj(jacobian_adjugate,
                           jacobian_determinant,
-                          gamma,
-                          eps_left,
+                          GAMMA,
+                          EPS_LEFT,
                           hE,
                           element_u,
                           element_vector);
@@ -364,8 +364,8 @@ int nitsche_BC_apply(const ptrdiff_t nx,
 
         nitsche_apply_adj(jacobian_adjugate,
                           jacobian_determinant,
-                          gamma,
-                          eps_right,
+                          GAMMA,
+                          EPS_RIGHT,
                           hE,
                           element_u,
                           element_vector);
