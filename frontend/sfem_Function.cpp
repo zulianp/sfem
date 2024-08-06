@@ -691,8 +691,7 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int DirichletConditions::copy_constrained_dofs(const real_t *const src,
-                                                   real_t *const dest) {
+    int DirichletConditions::copy_constrained_dofs(const real_t *const src, real_t *const dest) {
         for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
             constraint_nodes_copy_vec(impl_->dirichlet_conditions[i].local_size,
                                       impl_->dirichlet_conditions[i].idx,
@@ -836,9 +835,7 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int Output::write_time_step(const char *name,
-                                const real_t t,
-                                const real_t *const x) {
+    int Output::write_time_step(const char *name, const real_t t, const real_t *const x) {
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
 
         {
@@ -982,9 +979,7 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int Function::apply(const real_t *const x,
-                        const real_t *const h,
-                        real_t *const out) {
+    int Function::apply(const real_t *const x, const real_t *const h, real_t *const out) {
         SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.apply);
 
         for (auto &op : impl_->ops) {
@@ -1041,8 +1036,7 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int Function::copy_constrained_dofs(const real_t *const src,
-                                        real_t *const dest) {
+    int Function::copy_constrained_dofs(const real_t *const src, real_t *const dest) {
         SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.copy_constrained_dofs);
 
         for (auto &c : impl_->constraints) {
@@ -1077,6 +1071,8 @@ namespace sfem {
         const ptrdiff_t cols = impl_->space->n_dofs();
 
         auto crs_graph = impl_->space->mesh().create_node_to_node_graph(coarse_et);
+
+#if 0       
         return std::make_shared<LambdaOperator<real_t>>(
                 rows, cols, [=](const real_t *const from, real_t *const to) {
                     ::hierarchical_restriction(crs_graph->n_nodes(),
@@ -1086,6 +1082,25 @@ namespace sfem {
                                                from,
                                                to);
                 });
+
+#else
+
+        auto p2_vertices = h_buffer<idx_t>(crs_graph->nnz());
+
+        build_p1_to_p2_edge_map(
+                rows, crs_graph->rowptr(), crs_graph->colidx(), p2_vertices->data());
+
+        return std::make_shared<LambdaOperator<real_t>>(
+                rows, cols, [=](const real_t *const from, real_t *const to) {
+                    ::hierarchical_restriction_with_edge_map(crs_graph->n_nodes(),
+                                                             crs_graph->rowptr(),
+                                                             crs_graph->colidx(),
+                                                             p2_vertices->data(),
+                                                             impl_->space->block_size(),
+                                                             from,
+                                                             to);
+                });
+#endif
     }
 
     std::shared_ptr<Operator<real_t>> Function::hierarchical_prolongation() {
@@ -1250,9 +1265,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        int apply(const real_t *const x,
-                  const real_t *const h,
-                  real_t *const out) override {
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             linear_elasticity_apply_aos(element_type,
@@ -1339,8 +1352,7 @@ namespace sfem {
                                               values);
         }
 
-        int hessian_diag(const real_t *const /*x*/,
-                         real_t *const values) override {
+        int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             return laplacian_diag(element_type,
@@ -1363,9 +1375,7 @@ namespace sfem {
                                                out);
         }
 
-        int apply(const real_t *const x,
-                  const real_t *const h,
-                  real_t *const out) override {
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             return laplacian_apply(element_type,
@@ -1447,9 +1457,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        int apply(const real_t *const x,
-                  const real_t *const h,
-                  real_t *const out) override {
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             apply_mass(element_type,
@@ -1502,8 +1510,7 @@ namespace sfem {
 
         LumpedMass(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
-        int hessian_diag(const real_t *const /*x*/,
-                         real_t *const values) override {
+        int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             if (space->block_size() == 1) {
@@ -1549,9 +1556,7 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
-        int apply(const real_t *const x,
-                  const real_t *const h,
-                  real_t *const out) override {
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
             assert(0);
             return SFEM_FAILURE;
         }
@@ -1585,8 +1590,7 @@ namespace sfem {
 
         CVFEMMass(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
-        int hessian_diag(const real_t *const /*x*/,
-                         real_t *const values) override {
+        int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             cvfem_cv_volumes(element_type,
@@ -1612,9 +1616,7 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
-        int apply(const real_t *const x,
-                  const real_t *const h,
-                  real_t *const out) override {
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
             assert(0);
             return SFEM_FAILURE;
         }
@@ -1749,9 +1751,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        int apply(const real_t *const x,
-                  const real_t *const h,
-                  real_t *const out) override {
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             cvfem_convection_apply(element_type,
@@ -1886,9 +1886,7 @@ namespace sfem {
                                                  out);
         }
 
-        int apply(const real_t *const x,
-                  const real_t *const h,
-                  real_t *const out) override {
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             return neohookean_ogden_apply_aos(element_type,

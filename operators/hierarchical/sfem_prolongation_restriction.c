@@ -201,6 +201,8 @@ int hierarchical_restriction(
         const int vec_size,
         const real_t *const SFEM_RESTRICT from,
         real_t *const SFEM_RESTRICT to) {
+    // double tick = MPI_Wtime();
+
     // Serial only
     ptrdiff_t fine_idx = nnodes;
     for (ptrdiff_t i = 0; i < nnodes; i++) {
@@ -227,97 +229,8 @@ int hierarchical_restriction(
         }
     }
 
-    // For parallel we need some other data-structure
-
-    // ptrdiff_t ncoarse = max_node_id(to_element, nelements, elements) + 1;
-
-    // FIXME: Should we pass this from outside? What is the overhead of the allocation?
-    //     int *temp = calloc(ncoarse, sizeof(int));
-    //     if (to_element == TET4 && (from_element == TET10 || from_element == MACRO_TET4)) {
-    // #pragma omp parallel for
-    //         for (ptrdiff_t e = 0; e < nelements; e++) {
-    //             // P1
-    //             const idx_t i0 = elements[0][e];
-    //             const idx_t i1 = elements[1][e];
-    //             const idx_t i2 = elements[2][e];
-    //             const idx_t i3 = elements[3][e];
-
-    //             // P2
-    //             const idx_t i4 = elements[4][e];
-    //             const idx_t i5 = elements[5][e];
-    //             const idx_t i6 = elements[6][e];
-    //             const idx_t i7 = elements[7][e];
-    //             const idx_t i8 = elements[8][e];
-    //             const idx_t i9 = elements[9][e];
-
-    // #pragma omp atomic update
-    //             to[i0] += from[i0] + 0.5 * (from[i4] + from[i6] + from[i7]);
-
-    // #pragma omp atomic update
-    //             to[i1] += from[i1] + 0.5 * (from[i4] + from[i5] + from[i8]);
-
-    // #pragma omp atomic update
-    //             to[i2] += from[i2] + 0.5 * (from[i5] + from[i6] + from[i9]);
-
-    // #pragma omp atomic update
-    //             to[i3] += from[i3] + 0.5 * (from[i7] + from[i8] + from[i9]);
-
-    // #pragma omp atomic update
-    //             temp[i0] += 1;
-    // #pragma omp atomic update
-    //             temp[i1] += 1;
-    // #pragma omp atomic update
-    //             temp[i2] += 1;
-    // #pragma omp atomic update
-    //             temp[i3] += 1;
-    //         }
-
-    //     } else if (to_element == TRI3 && (from_element == TRI6 || from_element ==
-    //     MACRO_TRI3)) {
-    // #pragma omp parallel for
-    //         for (ptrdiff_t e = 0; e < nelements; e++) {
-    //             // P1
-    //             const idx_t i0 = elements[0][e];
-    //             const idx_t i1 = elements[1][e];
-    //             const idx_t i2 = elements[2][e];
-
-    //             // P2
-    //             const idx_t i3 = elements[3][e];
-    //             const idx_t i4 = elements[4][e];
-    //             const idx_t i5 = elements[5][e];
-
-    // #pragma omp atomic update
-    //             to[i0] += from[i0] + 0.5 * (from[i3] + from[i5]);
-
-    // #pragma omp atomic update
-    //             to[i1] += from[i1] + 0.5 * (from[i3] + from[i4]);
-
-    // #pragma omp atomic update
-    //             to[i2] += from[i2] + 0.5 * (from[i4] + from[i5]);
-
-    // #pragma omp atomic update
-    //             temp[i0] += 1;
-    // #pragma omp atomic update
-    //             temp[i1] += 1;
-    // #pragma omp atomic update
-    //             temp[i2] += 1;
-    //         }
-    //     } else {
-    //         assert(0);
-    //         fprintf(stderr,
-    //                 "Unsupported element pair for hierarchical_restriction %d, %d\n",
-    //                 from_element,
-    //                 to_element);
-    //         MPI_Abort(MPI_COMM_WORLD, 1);
-    //         return 1;
-    //     }
-
-    // #pragma omp parallel for
-    //     for (ptrdiff_t i = 0; i < ncoarse; i++) {
-    //         to[i] /= temp[i];
-    //     }
-
-    //     free(temp);
+    // double tock = MPI_Wtime();
+    // printf("hierarchical_restriction %g [s]\n", tock - tick);
     return 0;
 }
 
@@ -347,7 +260,7 @@ int hierarchical_prolongation_with_edge_map(const ptrdiff_t nnodes,
                 for (int v = 0; v < vec_size; v++) {
                     const real_t edge_value =
                             0.5 * (from[i * vec_size + v] + from[j * vec_size + v]);
-                    
+
                     to[edge * vec_size + v] = edge_value;
                 }
             }
@@ -366,6 +279,8 @@ int hierarchical_restriction_with_edge_map(
         const int vec_size,
         const real_t *const SFEM_RESTRICT from,
         real_t *const SFEM_RESTRICT to) {
+    // double tick = MPI_Wtime();
+
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nnodes; i++) {
         for (int v = 0; v < vec_size; v++) {
@@ -384,17 +299,19 @@ int hierarchical_restriction_with_edge_map(
             const idx_t edge = verts[k];
             if (i < j) {
                 for (int v = 0; v < vec_size; v++) {
-                    const real_t edge_value = from[edge * vec_size + v];
+                    const real_t edge_value = 0.5 * from[edge * vec_size + v];
 
 #pragma omp atomic update
-                    to[i * vec_size + v] += 0.5 * edge_value;
+                    to[i * vec_size + v] += edge_value;
 
 #pragma omp atomic update
-                    to[j * vec_size + v] += 0.5 * edge_value;
+                    to[j * vec_size + v] += edge_value;
                 }
             }
         }
     }
 
+    // double tock = MPI_Wtime();
+    // printf("hierarchical_restriction_with_edge_map %g [s]\n", tock - tick);
     return SFEM_SUCCESS;
 }

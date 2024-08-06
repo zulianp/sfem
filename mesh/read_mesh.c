@@ -1062,6 +1062,7 @@ int mesh_read(MPI_Comm comm, const char *folder, mesh_t *mesh) {
 
     if (!rank) {
         char pattern[1024 * 10];
+        // sprintf(pattern, "%s/i[0-9].*", folder);
         sprintf(pattern, "%s/i*.raw", folder);
 
         counts[0] = count_files(pattern);
