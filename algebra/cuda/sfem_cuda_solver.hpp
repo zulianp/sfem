@@ -11,7 +11,7 @@
 namespace sfem {
 
     template <typename T>
-    std::shared_ptr<MatrixFreeLinearSolver<T>> d_cg() {
+    std::shared_ptr<ConjugateGradient<T>> d_cg() {
         auto cg = std::make_shared<ConjugateGradient<T>>();
         cg->allocate = d_allocate;
         cg->destroy = d_destroy;
@@ -23,7 +23,7 @@ namespace sfem {
     }
 
     template <typename T>
-    std::shared_ptr<MatrixFreeLinearSolver<T>> d_bcgs() {
+    std::shared_ptr<BiCGStab<T>> d_bcgs() {
         auto cg = std::make_shared<BiCGStab<T>>();
         cg->allocate = d_allocate;
         cg->destroy = d_destroy;
@@ -35,26 +35,26 @@ namespace sfem {
         return cg;
     }
 
-    template <typename T>
-    std::shared_ptr<MatrixFreeLinearSolver<T>> d_solver(const std::string& name) {
-        using SP_t = std::shared_ptr<MatrixFreeLinearSolver<T>>;
-        static bool initialized = false;
-        static std::map<std::string, SP_t> factory;
+    // template <typename T>
+    // std::shared_ptr<MatrixFreeLinearSolver<T>> d_solver(const std::string& name) {
+    //     using SP_t = std::shared_ptr<MatrixFreeLinearSolver<T>>;
+    //     static bool initialized = false;
+    //     static std::map<std::string, SP_t> factory;
 
-        if (!initialized) {
-            factory["BiCGStab"] = &d_bcgs<T>;
-            factory["ConjugateGradient"] = &d_cg<T>;
-            initialized = true;
-        }
+    //     if (!initialized) {
+    //         factory["BiCGStab"] = &d_bcgs<T>;
+    //         factory["ConjugateGradient"] = &d_cg<T>;
+    //         initialized = true;
+    //     }
 
-        auto it = factory.find(name);
-        if (it == factory.end()) {
-            assert(0);
-            return d_cg<T>();
-        }
+    //     auto it = factory.find(name);
+    //     if (it == factory.end()) {
+    //         assert(0);
+    //         return d_cg<T>();
+    //     }
 
-        return it->second();
-    }
+    //     return it->second();
+    // }
 }  // namespace sfem
 
 #endif

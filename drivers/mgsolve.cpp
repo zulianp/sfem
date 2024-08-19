@@ -12,6 +12,8 @@
 
 #include "matrixio_array.h"
 
+#include "sfem_API.hpp"
+
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_blas.h"
@@ -63,10 +65,17 @@ real_t residual(sfem::Operator<real_t> &op,
                 const real_t *const rhs,
                 const real_t *const x,
                 real_t *const r) {
-    zeros(op.rows(), r);
-    op.apply(x, r);
-    axpby<real_t>(op.rows(), 1, rhs, -1, r);
-    return sqrt(dot(op.rows(), r, r));
+
+    // if(op->execution_space() == sfem::EXECUTION_SPACE_DEVICE) {
+    //     assert(false);
+    //     // TODO
+    //     return -1;
+    // } else {
+        zeros(op.rows(), r);
+        op.apply(x, r);
+        axpby<real_t>(op.rows(), 1, rhs, -1, r);
+        return sqrt(dot(op.rows(), r, r));
+    // }
 }
 
 int main(int argc, char *argv[]) {
@@ -94,6 +103,8 @@ int main(int argc, char *argv[]) {
 
     bool SFEM_USE_GPU = true;
     SFEM_READ_ENV(SFEM_USE_GPU, atoi);
+
+    sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
     // -------------------------------
     // Read inputs
@@ -155,14 +166,14 @@ int main(int argc, char *argv[]) {
            SFEM_CHEB_EIG_TOL);
 
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
-    auto conds = sfem::DirichletConditions::create_from_env(fs);
+    auto conds = sfem::create_dirichlet_conditions_from_env(fs, es);
     auto f = sfem::Function::create(fs);
 
-    auto diag = sfem::h_buffer<real_t>(fs->n_dofs());
-    auto x = sfem::h_buffer<real_t>(fs->n_dofs());
-    auto rhs = sfem::h_buffer<real_t>(fs->n_dofs());
+    auto diag = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    auto x = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    auto rhs = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
-    auto op = sfem::Factory::create_op(fs, SFEM_OPERATOR);
+    auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
     op->initialize();
     f->add_constraint(conds);
     f->add_operator(op);
@@ -185,10 +196,10 @@ int main(int argc, char *argv[]) {
                 });
 
         if (SFEM_USE_CHEB) {
-            auto cheb = sfem::h_cheb3<real_t>(linear_op);
+            auto cheb = sfem::create_cheb3<real_t>(linear_op, es);
 
             // Power-method
-            auto r = sfem::h_buffer<real_t>(fs->n_dofs());
+            auto r = sfem::create_buffer<real_t>(fs->n_dofs(), es);
             residual(*linear_op, rhs->data(), x->data(), r->data());
             cheb->eigen_solver_tol = SFEM_CHEB_EIG_TOL;
             cheb->init(r->data());
@@ -207,10 +218,10 @@ int main(int argc, char *argv[]) {
         f->hessian_diag(nullptr, diag->data());
 
         if (SFEM_USE_CHEB) {
-            auto cheb = sfem::h_cheb3<real_t>(linear_op);
+            auto cheb = sfem::create_cheb3<real_t>(linear_op, es);
 
             // Power-method
-            auto r = sfem::h_buffer<real_t>(fs->n_dofs());
+            auto r = sfem::create_buffer<real_t>(fs->n_dofs(), es);
             residual(*linear_op, rhs->data(), x->data(), r->data());
             cheb->init(r->data());
 
@@ -257,8 +268,8 @@ int main(int argc, char *argv[]) {
     auto output = f->output();
 
     if (SFEM_MG) {
-        auto c = sfem::h_buffer<real_t>(fs->n_dofs());
-        auto r = sfem::h_buffer<real_t>(fs->n_dofs());
+        auto c = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+        auto r = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
         //  Coarse level
         auto fs_coarse = fs->derefine();
@@ -275,14 +286,14 @@ int main(int argc, char *argv[]) {
             linear_op_coarse = crs_hessian(*f_coarse);
         }
 
-        auto c_coarse = sfem::h_buffer<real_t>(fs_coarse->n_dofs());
-        auto r_coarse = sfem::h_buffer<real_t>(fs_coarse->n_dofs());
-        auto diag_coarse = sfem::h_buffer<real_t>(fs_coarse->n_dofs());
-        auto solver_coarse = sfem::h_cg<real_t>();
+        auto c_coarse = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
+        auto r_coarse = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
+        auto diag_coarse = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
+        auto solver_coarse = sfem::create_cg<real_t>(linear_op_coarse, es);
 
         {
-            solver_coarse->set_n_dofs(fs_coarse->n_dofs());
-            solver_coarse->set_op(linear_op_coarse);
+            // solver_coarse->set_n_dofs(fs_coarse->n_dofs());
+            // solver_coarse->set_op(linear_op_coarse);
             solver_coarse->verbose = false;
             solver_coarse->set_max_it(10000);
             solver_coarse->set_atol(1e-8);
@@ -315,7 +326,7 @@ int main(int argc, char *argv[]) {
         f->apply_constraints(rhs->data());
 
         // Multigrid
-        auto mg = sfem::h_mg<real_t>();
+        auto mg = sfem::create_mg<real_t>(es);
         mg->add_level(linear_op, smoother, nullptr, restriction);
         mg->add_level(nullptr, solver_coarse, prolongation, nullptr);
         mg->set_max_it(SFEM_MAX_IT);
@@ -335,9 +346,7 @@ int main(int argc, char *argv[]) {
 
 #else  // CG solver
 
-        auto solver = sfem::h_cg<real_t>();
-        solver->set_n_dofs(fs->n_dofs());
-        solver->set_op(linear_op);
+        auto solver = sfem::create_cg<real_t>(linear_op, es);
 
         if (smoother) {
             auto preconditioner = smoother;
@@ -373,16 +382,20 @@ int main(int argc, char *argv[]) {
 
     double compute_tock = MPI_Wtime();
 
-    auto r = sfem::h_buffer<real_t>(fs->n_dofs());
+    auto r = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     real_t rtr = residual(*linear_op, rhs->data(), x->data(), r->data());
 
     // -------------------------------
     // Write output
     // -------------------------------
 
-    output->write("x", x->data());
-    output->write("rhs", rhs->data());
-    output->write("residual", r->data());
+    auto h_x = sfem::to_host(x);
+    auto h_rhs = sfem::to_host(rhs);
+    auto h_r = sfem::to_host(r);
+
+    output->write("x", h_x->data());
+    output->write("rhs", h_rhs->data());
+    output->write("residual", h_r->data());
 
     double tock = MPI_Wtime();
     if (!rank) {
