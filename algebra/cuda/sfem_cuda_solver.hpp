@@ -35,6 +35,28 @@ namespace sfem {
         return cg;
     }
 
+    template <typename T>
+    std::shared_ptr<BiCGStab<T>> d_cheb3(const std::shared_ptr<Operator<T>>& op) {
+        auto ret = std::make_shared<Chebyshev3<T>>();
+        ret->n_dofs = op->rows();
+        ret->set_op(op);
+
+        ret->allocate = d_allocate;
+        ret->destroy = d_destroy;
+        ret->copy = d_copy;
+        ret->dot = d_dot;
+        ret->axpby = d_axpby;
+        ret->zaxpby = d_zaxpby;
+        ret->zeros = [](const std::size_t n, T* const x) { d_memset(x, 0, n * sizeof(T)); };
+
+        assert(false && "IMPLEMENT ME");
+        // TODO
+        // std::function<T(const ptrdiff_t, const T* const)> norm2;
+        // std::function<void(const ptrdiff_t, const T, const T* const, T* const)> axpy;
+        // std::function<void(const std::ptrdiff_t, const T, T* const)> scal;
+        return ret;
+    }
+
     // template <typename T>
     // std::shared_ptr<MatrixFreeLinearSolver<T>> d_solver(const std::string& name) {
     //     using SP_t = std::shared_ptr<MatrixFreeLinearSolver<T>>;

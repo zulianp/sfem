@@ -19,7 +19,7 @@ namespace sfem {
     std::shared_ptr<Buffer<T>> create_buffer(const std::ptrdiff_t n, const MemorySpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == MEMORY_SPACE_DEVICE) return sfem::d_buffer<T>(n);
-#endif
+#endif //SFEM_ENABLE_CUDA
         return sfem::h_buffer<T>(n);
     }
 
@@ -27,7 +27,7 @@ namespace sfem {
     std::shared_ptr<Buffer<T>> create_buffer(const std::ptrdiff_t n, const ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) return sfem::d_buffer<T>(n);
-#endif
+#endif //SFEM_ENABLE_CUDA
         return sfem::h_buffer<T>(n);
     }
 
@@ -36,8 +36,7 @@ namespace sfem {
                                   const ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) return sfem::Factory::create_op_gpu(space, name);
-
-#endif
+#endif //SFEM_ENABLE_CUDA
         return sfem::Factory::create_op(space, name);
     }
 
@@ -50,7 +49,7 @@ namespace sfem {
         if (es == EXECUTION_SPACE_DEVICE) {
             cg = sfem::d_cg<T>();
         } else
-#endif
+#endif //SFEM_ENABLE_CUDA
         {
             cg = sfem::h_cg<T>();
         }
@@ -69,7 +68,7 @@ namespace sfem {
         if (es == EXECUTION_SPACE_DEVICE) {
             bcgs = sfem::d_bcgs<T>();
         } else
-#endif
+#endif //SFEM_ENABLE_CUDA
         {
             bcgs = sfem::h_bcgs<T>();
         }
@@ -86,10 +85,9 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            // cheb = sfem::d_cheb3<T>(op);
-            assert(false && "IMPLEMENT ME");
+            cheb = sfem::d_cheb3<T>(op);
         } else
-#endif
+#endif //SFEM_ENABLE_CUDA
         {
             cheb = sfem::h_cheb3<T>(op);
         }
@@ -106,7 +104,7 @@ namespace sfem {
             // mg = sfem::d_mg<T>();
             assert(false && "IMPLEMENT ME");
         } else
-#endif
+#endif //SFEM_ENABLE_CUDA
         {
             mg = sfem::h_mg<T>();
         }
@@ -123,21 +121,62 @@ namespace sfem {
         if (es == EXECUTION_SPACE_DEVICE) {
             return sfem::to_device(conds);
         }
-#endif
+#endif  // SFEM_ENABLE_CUDA
 
         return conds;
     }
 
     std::shared_ptr<Operator<real_t>> create_hierarchical_restriction(
-            const std::shared_ptr<FunctionSpace> &fine_space,
+            const std::shared_ptr<Function> &fine_function,
             const ExecutionSpace es) {
-        // TODO
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            assert(false && "IMPLEMENT ME");
+        }
+#endif  // SFEM_ENABLE_CUDA
+        return fine_function->hierarchical_restriction();
     }
 
     std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation(
-            const std::shared_ptr<FunctionSpace> &fine_space,
+            const std::shared_ptr<Function> &fine_function,
             const ExecutionSpace es) {
-        // TODO
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            assert(false && "IMPLEMENT ME");
+        }
+#endif  // SFEM_ENABLE_CUDA
+        return fine_function->hierarchical_prolongation();
+    }
+
+    template <typename T>
+    std::shared_ptr<Operator<T>> create_inverse_diagonal_scaling(
+            const std::shared_ptr<Buffer<T>> &diag,
+            const ExecutionSpace es) {
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            return sfem::make_op<T>(diag->size(), diag->size(), [=](const T *const x, T *const y) {
+                auto d = diag->data();
+                // FIXME (only supports real_t)
+                d_ediv(diag->size(), x, d, y);
+            });
+        }
+#endif  // SFEM_ENABLE_CUDA
+
+        return sfem::make_op<T>(diag->size(), diag->size(), [=](const T *const x, T *const y) {
+            auto d = diag->data();
+
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < diag->size(); ++i) {
+                y[i] = x[i] / d[i];
+            }
+        });
+    }
+
+    std::shared_ptr<Operator<real_t>> make_linear_op(const std::shared_ptr<Function> &f) {
+        return sfem::make_op<real_t>(
+                f->space()->n_dofs(),
+                f->space()->n_dofs(),
+                [=](const real_t *const x, real_t *const y) { f->apply(nullptr, x, y); });
     }
 
 }  // namespace sfem

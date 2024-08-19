@@ -90,6 +90,7 @@ static SFEM_INLINE void tet4_sub_adj_0(const scalar_t *const SFEM_RESTRICT adjug
     sub_adjugate[7] = 2 * adjugate[7];
     sub_adjugate[8] = 2 * adjugate[8];
 }
+
 static SFEM_INLINE void tet4_sub_adj_4(const scalar_t *const SFEM_RESTRICT adjugate,
                                        scalar_t *const SFEM_RESTRICT sub_adjugate) {
     const scalar_t x0 = 2 * adjugate[0];

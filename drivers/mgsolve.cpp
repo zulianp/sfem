@@ -47,7 +47,12 @@ T dot(const ptrdiff_t n, const T *const l, const T *const r) {
     return ret;
 }
 
-auto crs_hessian(sfem::Function &f) {
+auto crs_hessian(sfem::Function &f, const sfem::ExecutionSpace es) {
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            assert(false && "IMPLEMENT ME");
+        }
+#endif
     ptrdiff_t nlocal;
     ptrdiff_t nglobal;
     ptrdiff_t nnz;
@@ -64,18 +69,21 @@ auto crs_hessian(sfem::Function &f) {
 real_t residual(sfem::Operator<real_t> &op,
                 const real_t *const rhs,
                 const real_t *const x,
-                real_t *const r) {
-
-    // if(op->execution_space() == sfem::EXECUTION_SPACE_DEVICE) {
-    //     assert(false);
-    //     // TODO
-    //     return -1;
-    // } else {
+                real_t *const r,
+                const sfem::ExecutionSpace es) {
+#ifdef SFEM_ENABLE_CUDA
+    if (es == sfem::EXECUTION_SPACE_DEVICE) {
+        assert(false);
+        // TODO
+        return -1;
+    } else
+#endif
+    {
         zeros(op.rows(), r);
         op.apply(x, r);
         axpby<real_t>(op.rows(), 1, rhs, -1, r);
         return sqrt(dot(op.rows(), r, r));
-    // }
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -190,17 +198,14 @@ int main(int argc, char *argv[]) {
     std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> smoother;
 
     if (SFEM_MATRIX_FREE) {
-        linear_op = sfem::make_op<real_t>(
-                fs->n_dofs(), fs->n_dofs(), [=](const real_t *const x, real_t *const y) {
-                    f->apply(nullptr, x, y);
-                });
+        linear_op = sfem::make_linear_op(f);
 
         if (SFEM_USE_CHEB) {
             auto cheb = sfem::create_cheb3<real_t>(linear_op, es);
 
             // Power-method
             auto r = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-            residual(*linear_op, rhs->data(), x->data(), r->data());
+            residual(*linear_op, rhs->data(), x->data(), r->data(), es);
             cheb->eigen_solver_tol = SFEM_CHEB_EIG_TOL;
             cheb->init(r->data());
 
@@ -213,7 +218,7 @@ int main(int argc, char *argv[]) {
         }
 
     } else {
-        auto crs = crs_hessian(*f);
+        auto crs = crs_hessian(*f, es);
         linear_op = crs;
         f->hessian_diag(nullptr, diag->data());
 
@@ -222,7 +227,7 @@ int main(int argc, char *argv[]) {
 
             // Power-method
             auto r = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-            residual(*linear_op, rhs->data(), x->data(), r->data());
+            residual(*linear_op, rhs->data(), x->data(), r->data(), es);
             cheb->init(r->data());
 
             cheb->scale_eig_max = SFEM_CHEB_EIG_MAX_SCALE;
@@ -277,13 +282,9 @@ int main(int argc, char *argv[]) {
 
         std::shared_ptr<sfem::Operator<real_t>> linear_op_coarse;
         if (SFEM_COARSE_MATRIX_FREE) {
-            linear_op_coarse = sfem::make_op<real_t>(fs_coarse->n_dofs(),
-                                                     fs_coarse->n_dofs(),
-                                                     [=](const real_t *const x, real_t *const y) {
-                                                         f_coarse->apply(nullptr, x, y);
-                                                     });
+            linear_op_coarse = sfem::make_linear_op(f_coarse);
         } else {
-            linear_op_coarse = crs_hessian(*f_coarse);
+            linear_op_coarse = crs_hessian(*f_coarse, es);
         }
 
         auto c_coarse = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
@@ -292,8 +293,6 @@ int main(int argc, char *argv[]) {
         auto solver_coarse = sfem::create_cg<real_t>(linear_op_coarse, es);
 
         {
-            // solver_coarse->set_n_dofs(fs_coarse->n_dofs());
-            // solver_coarse->set_op(linear_op_coarse);
             solver_coarse->verbose = false;
             solver_coarse->set_max_it(10000);
             solver_coarse->set_atol(1e-8);
@@ -301,17 +300,7 @@ int main(int argc, char *argv[]) {
 
             if (SFEM_USE_PRECONDITIONER) {
                 f_coarse->hessian_diag(nullptr, diag_coarse->data());
-                auto preconditioner = sfem::make_op<real_t>(
-                        diag_coarse->size(),
-                        diag_coarse->size(),
-                        [=](const real_t *const x, real_t *const y) {
-                            auto d = diag_coarse->data();
-#pragma omp parallel for
-                            for (ptrdiff_t i = 0; i < diag_coarse->size(); ++i) {
-                                y[i] = x[i] / d[i];
-                            }
-                        });
-
+                auto preconditioner = sfem::create_inverse_diagonal_scaling(diag_coarse, es);
                 solver_coarse->set_preconditioner_op(preconditioner);
                 solver_coarse->set_initial_guess_zero(true);
             }
@@ -319,8 +308,8 @@ int main(int argc, char *argv[]) {
 
         smoother->set_initial_guess_zero(false);
 
-        auto restriction = f->hierarchical_restriction();
-        auto prolongation = f->hierarchical_prolongation();
+        auto restriction = create_hierarchical_restriction(f, es);
+        auto prolongation = create_hierarchical_prolongation(f, es);
 
         f->apply_constraints(x->data());
         f->apply_constraints(rhs->data());
@@ -353,16 +342,7 @@ int main(int argc, char *argv[]) {
             smoother->set_initial_guess_zero(true);
             solver->set_preconditioner_op(preconditioner);
         } else if (SFEM_USE_PRECONDITIONER) {
-            auto preconditioner = sfem::make_op<real_t>(
-                    diag->size(), diag->size(), [=](const real_t *const x, real_t *const y) {
-                        auto d = diag->data();
-
-#pragma omp parallel for
-                        for (ptrdiff_t i = 0; i < diag->size(); ++i) {
-                            y[i] = x[i] / d[i];
-                        }
-                    });
-
+            auto preconditioner = sfem::create_inverse_diagonal_scaling(diag, es);
             solver->set_preconditioner_op(preconditioner);
         }
 
@@ -371,7 +351,6 @@ int main(int argc, char *argv[]) {
         solver->set_max_it(SFEM_MAX_IT);
 
 #endif
-
         solver->set_op(linear_op);
 
         init_tock = MPI_Wtime();
@@ -383,15 +362,21 @@ int main(int argc, char *argv[]) {
     double compute_tock = MPI_Wtime();
 
     auto r = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-    real_t rtr = residual(*linear_op, rhs->data(), x->data(), r->data());
+    real_t rtr = residual(*linear_op, rhs->data(), x->data(), r->data(), es);
 
     // -------------------------------
     // Write output
     // -------------------------------
 
+#ifdef SFEM_ENABLE_CUDA
     auto h_x = sfem::to_host(x);
     auto h_rhs = sfem::to_host(rhs);
     auto h_r = sfem::to_host(r);
+#else
+    auto h_x = x;
+    auto h_rhs = rhs;
+    auto h_r = r;
+#endif
 
     output->write("x", h_x->data());
     output->write("rhs", h_rhs->data());
