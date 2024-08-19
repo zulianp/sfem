@@ -16,9 +16,9 @@ int cu_tet4_to_macro_tet4_prolongation(const ptrdiff_t coarse_nnodes,
                                        const idx_t *const SFEM_RESTRICT fine_node_map,
                                        const int vec_size,
                                        const enum RealType from_type,
-                                       const real_t *const SFEM_RESTRICT from,
+                                       const void *const SFEM_RESTRICT from,
                                        const enum RealType to_type,
-                                       real_t *const SFEM_RESTRICT to,
+                                       void *const SFEM_RESTRICT to,
                                        void *stream);
 
 int cu_macrotet4_to_tet4_restriction(
@@ -28,9 +28,9 @@ int cu_macrotet4_to_tet4_restriction(
         const idx_t *const SFEM_RESTRICT fine_node_map,
         const int vec_size,
         const enum RealType from_type,
-        const real_t *const SFEM_RESTRICT from,
+        const void *const SFEM_RESTRICT from,
         const enum RealType to_type,
-        real_t *const SFEM_RESTRICT to,
+        void *const SFEM_RESTRICT to,
         void *stream);
 
 #ifdef __cplusplus
