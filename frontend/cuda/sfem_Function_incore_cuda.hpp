@@ -33,6 +33,17 @@ namespace sfem {
             std::make_shared<Buffer<T>>(in->size(), buff, &d_buffer_destroy, MEMORY_SPACE_DEVICE);
     }
 
+
+    inline std::shared_ptr<CRSGraph> to_device(const std::shared_ptr<CRSGraph> &in) {
+        if(in->rowptr()->mem_space() == MEMORY_SPACE_DEVICE) {
+            return in;
+        }
+
+        return
+            std::make_shared<CRSGraph>(to_device(in->rowptr()), to_device(in->colidx()));
+    }
+
+
     template <typename T>
     std::shared_ptr<Buffer<T>> to_host(const std::shared_ptr<Buffer<T>> &in) {
     	if(in->mem_space() == MEMORY_SPACE_HOST) {

@@ -47,27 +47,6 @@ T dot(const ptrdiff_t n, const T *const l, const T *const r) {
     return ret;
 }
 
-auto crs_hessian(sfem::Function &f, const sfem::ExecutionSpace es) {
-#ifdef SFEM_ENABLE_CUDA
-    if (es == sfem::EXECUTION_SPACE_DEVICE) {
-        assert(false && "IMPLEMENT ME");
-    }
-#endif
-    auto crs_graph = f.crs_graph();
-    auto values = sfem::h_buffer<real_t>(crs_graph->nnz());
-
-    f.hessian_crs(
-            nullptr, crs_graph->rowptr()->data(), crs_graph->colidx()->data(), values->data());
-
-    // Owns the pointers
-    return sfem::h_crs_spmv(crs_graph->n_nodes(),
-                            crs_graph->n_nodes(),
-                            crs_graph->rowptr(),
-                            crs_graph->colidx(),
-                            values,
-                            (real_t)1);
-}
-
 real_t residual(sfem::Operator<real_t> &op,
                 const real_t *const rhs,
                 const real_t *const x,
@@ -220,7 +199,7 @@ int main(int argc, char *argv[]) {
         }
 
     } else {
-        auto crs = crs_hessian(*f, es);
+        auto crs = crs_hessian(*f, f->crs_graph(),es);
         linear_op = crs;
         f->hessian_diag(nullptr, diag->data());
 
@@ -286,7 +265,7 @@ int main(int argc, char *argv[]) {
         if (SFEM_COARSE_MATRIX_FREE) {
             linear_op_coarse = sfem::make_linear_op(f_coarse);
         } else {
-            linear_op_coarse = crs_hessian(*f_coarse, es);
+            linear_op_coarse = crs_hessian(*f_coarse, f_coarse->crs_graph(), es);
         }
 
         auto c_coarse = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
@@ -313,10 +292,19 @@ int main(int argc, char *argv[]) {
         auto coarse_graph = sfem::create_derefined_crs_graph(*f->space());
         auto edges = sfem::create_edge_idx(*coarse_graph);
 
-        auto restriction = create_hierarchical_restriction(
+#ifdef SFEM_ENABLE_CUDA
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+            coarse_graph = sfem::to_device(coarse_graph);
+            edges = sfem::to_device(edges);
+        }
+#endif
+
+        auto restriction = sfem::create_hierarchical_restriction(
                 f->space()->mesh().n_nodes(), f->space()->block_size(), coarse_graph, edges, es);
 
-        auto prolongation = create_hierarchical_prolongation(f, es);
+        // auto prolongation = create_hierarchical_prolongation(f, es);
+        auto prolongation = sfem::create_hierarchical_prolongation(
+                f->space()->mesh().n_nodes(), f->space()->block_size(), coarse_graph, edges, es);
 
         f->apply_constraints(x->data());
         f->apply_constraints(rhs->data());

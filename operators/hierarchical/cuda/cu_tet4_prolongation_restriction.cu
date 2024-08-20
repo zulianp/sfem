@@ -9,7 +9,7 @@
 // ------- PROLONGATION -------- //
 
 template <typename From, typename To>
-__global__ void cu_tet4_to_macro_tet4_prolongation_kernel(
+__global__ void cu_tet4_to_macrotet4_prolongation_kernel(
         const ptrdiff_t coarse_nnodes,
         const count_t *const SFEM_RESTRICT coarse_rowptr,
         const idx_t *const SFEM_RESTRICT coarse_colidx,
@@ -44,7 +44,7 @@ __global__ void cu_tet4_to_macro_tet4_prolongation_kernel(
 }
 
 template <typename From, typename To>
-static int cu_tet4_to_macro_tet4_prolongation_tpl(const ptrdiff_t coarse_nnodes,
+static int cu_tet4_to_macrotet4_prolongation_tpl(const ptrdiff_t coarse_nnodes,
                                            const count_t *const SFEM_RESTRICT coarse_rowptr,
                                            const idx_t *const SFEM_RESTRICT coarse_colidx,
                                            const idx_t *const SFEM_RESTRICT fine_node_map,
@@ -59,7 +59,7 @@ static int cu_tet4_to_macro_tet4_prolongation_tpl(const ptrdiff_t coarse_nnodes,
         int min_grid_size;
         cudaOccupancyMaxPotentialBlockSize(&min_grid_size,
                                            &block_size,
-                                           cu_tet4_to_macro_tet4_prolongation_kernel<From, To>,
+                                           cu_tet4_to_macrotet4_prolongation_kernel<From, To>,
                                            0,
                                            0);
     }
@@ -70,17 +70,17 @@ static int cu_tet4_to_macro_tet4_prolongation_tpl(const ptrdiff_t coarse_nnodes,
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
 
-        cu_tet4_to_macro_tet4_prolongation_kernel<From, To><<<n_blocks, block_size, 0, s>>>(
+        cu_tet4_to_macrotet4_prolongation_kernel<From, To><<<n_blocks, block_size, 0, s>>>(
                 coarse_nnodes, coarse_rowptr, coarse_colidx, fine_node_map, vec_size, from, to);
     } else {
-        cu_tet4_to_macro_tet4_prolongation_kernel<From, To><<<n_blocks, block_size, 0>>>(
+        cu_tet4_to_macrotet4_prolongation_kernel<From, To><<<n_blocks, block_size, 0>>>(
                 coarse_nnodes, coarse_rowptr, coarse_colidx, fine_node_map, vec_size, from, to);
     }
 
     return SFEM_SUCCESS;
 }
 
-extern int cu_tet4_to_macro_tet4_prolongation(const ptrdiff_t coarse_nnodes,
+extern int cu_tet4_to_macrotet4_prolongation(const ptrdiff_t coarse_nnodes,
                                        const count_t *const SFEM_RESTRICT coarse_rowptr,
                                        const idx_t *const SFEM_RESTRICT coarse_colidx,
                                        const idx_t *const SFEM_RESTRICT fine_node_map,
@@ -97,7 +97,7 @@ extern int cu_tet4_to_macro_tet4_prolongation(const ptrdiff_t coarse_nnodes,
 
     switch (from_type) {
         case SFEM_REAL_DEFAULT: {
-            return cu_tet4_to_macro_tet4_prolongation_tpl(coarse_nnodes,
+            return cu_tet4_to_macrotet4_prolongation_tpl(coarse_nnodes,
                                                           coarse_rowptr,
                                                           coarse_colidx,
                                                           fine_node_map,
@@ -107,7 +107,7 @@ extern int cu_tet4_to_macro_tet4_prolongation(const ptrdiff_t coarse_nnodes,
                                                           stream);
         }
         case SFEM_FLOAT32: {
-            return cu_tet4_to_macro_tet4_prolongation_tpl(coarse_nnodes,
+            return cu_tet4_to_macrotet4_prolongation_tpl(coarse_nnodes,
                                                           coarse_rowptr,
                                                           coarse_colidx,
                                                           fine_node_map,
@@ -117,7 +117,7 @@ extern int cu_tet4_to_macro_tet4_prolongation(const ptrdiff_t coarse_nnodes,
                                                           stream);
         }
         case SFEM_FLOAT64: {
-            return cu_tet4_to_macro_tet4_prolongation_tpl(coarse_nnodes,
+            return cu_tet4_to_macrotet4_prolongation_tpl(coarse_nnodes,
                                                           coarse_rowptr,
                                                           coarse_colidx,
                                                           fine_node_map,
@@ -128,7 +128,7 @@ extern int cu_tet4_to_macro_tet4_prolongation(const ptrdiff_t coarse_nnodes,
         }
         default: {
             fprintf(stderr,
-                    "[Error] cu_tet4_to_macro_tet4_prolongation_tpl: not implemented for type %s "
+                    "[Error] cu_tet4_to_macrotet4_prolongation_tpl: not implemented for type %s "
                     "(code %d)\n",
                     real_type_to_string(from_type),
                     from_type);
@@ -263,7 +263,7 @@ extern int cu_macrotet4_to_tet4_restriction(const ptrdiff_t coarse_nnodes,
         }
         default: {
             fprintf(stderr,
-                    "[Error] cu_tet4_to_macro_tet4_prolongation_tpl: not implemented for type %s "
+                    "[Error] cu_tet4_to_macrotet4_prolongation_tpl: not implemented for type %s "
                     "(code %d)\n",
                     real_type_to_string(from_type),
                     from_type);

@@ -12,6 +12,7 @@
 #include "cu_tet4_prolongation_restriction.h"
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_blas.h"
+#include "sfem_cuda_crs_SpMV.hpp"
 #include "sfem_cuda_solver.hpp"
 #endif
 
@@ -130,8 +131,7 @@ namespace sfem {
         return conds;
     }
 
-    std::shared_ptr<Buffer<idx_t>> create_edge_idx(CRSGraph &crs_graph)
-    {
+    std::shared_ptr<Buffer<idx_t>> create_edge_idx(CRSGraph &crs_graph) {
         const ptrdiff_t rows = crs_graph.n_nodes();
         auto p2_vertices = h_buffer<idx_t>(crs_graph.nnz());
 
@@ -141,7 +141,7 @@ namespace sfem {
         return p2_vertices;
     }
 
-    std::shared_ptr<CRSGraph> create_derefined_crs_graph(FunctionSpace &space){
+    std::shared_ptr<CRSGraph> create_derefined_crs_graph(FunctionSpace &space) {
         auto et = (enum ElemType)space.element_type();
         auto coarse_et = macro_base_elem(et);
         auto crs_graph = space.mesh().create_node_to_node_graph(coarse_et);
@@ -153,25 +153,23 @@ namespace sfem {
             const int block_size,
             const std::shared_ptr<CRSGraph> &crs_graph,
             const std::shared_ptr<Buffer<idx_t>> &edges,
-            const ExecutionSpace es) 
-    {
+            const ExecutionSpace es) {
         const ptrdiff_t n_coarse_nodes = crs_graph->n_nodes();
 
         ptrdiff_t rows = n_coarse_nodes * block_size;
-        ptrdiff_t cols =  n_fine_nodes * block_size;
-    
+        ptrdiff_t cols = n_fine_nodes * block_size;
+
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
             auto d_edges = to_device(edges);
-            auto d_rowptr = to_device(crs_graph->rowptr());
-            auto d_colidx = to_device(crs_graph->colidx());
+            auto d_crs_graph = to_device(crs_graph);
 
             return std::make_shared<LambdaOperator<real_t>>(
-                     rows, cols, [=](const real_t *const from, real_t *const to) {
+                    rows, cols, [=](const real_t *const from, real_t *const to) {
                         // FIXME make it generic for all elements!
                         cu_macrotet4_to_tet4_restriction(n_coarse_nodes,
-                                                         d_rowptr->data(),
-                                                         d_colidx->data(),
+                                                         d_crs_graph->rowptr()->data(),
+                                                         d_crs_graph->colidx()->data(),
                                                          d_edges->data(),
                                                          block_size,
                                                          SFEM_REAL_DEFAULT,
@@ -195,30 +193,61 @@ namespace sfem {
                 });
     }
 
-//     std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation(
-//         const ptrdiff_t n_fine_nodes,
-//         const int block_size,
-//         const std::shared_ptr<CRSGraph> &crs_graph,
-//         const std::shared_ptr<Buffer<idx_t>> &edges,
-//         const ExecutionSpace es) {
-// #ifdef SFEM_ENABLE_CUDA
-//         if (es == EXECUTION_SPACE_DEVICE) {
-//             assert(false && "IMPLEMENT ME");
-//         }
-// #endif  // SFEM_ENABLE_CUDA
+    std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation(
+            const ptrdiff_t n_fine_nodes,
+            const int block_size,
+            const std::shared_ptr<CRSGraph> &crs_graph,
+            const std::shared_ptr<Buffer<idx_t>> &edges,
+            const ExecutionSpace es) {
+        const ptrdiff_t n_coarse_nodes = crs_graph->n_nodes();
 
-//     }
+        ptrdiff_t rows = n_fine_nodes * block_size;
+        ptrdiff_t cols = n_coarse_nodes * block_size;
 
-        std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation(
-                const std::shared_ptr<Function> &fine_function,
-                const ExecutionSpace es) {
-    #ifdef SFEM_ENABLE_CUDA
-            if (es == EXECUTION_SPACE_DEVICE) {
-                assert(false && "IMPLEMENT ME");
-            }
-    #endif  // SFEM_ENABLE_CUDA
-            return fine_function->hierarchical_prolongation();
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            auto d_edges = to_device(edges);
+            auto d_crs_graph = to_device(crs_graph);
+
+            return std::make_shared<LambdaOperator<real_t>>(
+                    rows, cols, [=](const real_t *const from, real_t *const to) {
+                        // FIXME make it generic for all elements!
+                        cu_tet4_to_macrotet4_prolongation(n_coarse_nodes,
+                                                          d_crs_graph->rowptr()->data(),
+                                                          d_crs_graph->colidx()->data(),
+                                                          d_edges->data(),
+                                                          block_size,
+                                                          SFEM_REAL_DEFAULT,
+                                                          from,
+                                                          SFEM_REAL_DEFAULT,
+                                                          to,
+                                                          SFEM_DEFAULT_STREAM);
+                    });
         }
+#endif  // SFEM_ENABLE_CUDA
+
+        return std::make_shared<LambdaOperator<real_t>>(
+                rows, cols, [=](const real_t *const from, real_t *const to) {
+                    ::hierarchical_prolongation_with_edge_map(n_coarse_nodes,
+                                                              crs_graph->rowptr()->data(),
+                                                              crs_graph->colidx()->data(),
+                                                              edges->data(),
+                                                              block_size,
+                                                              from,
+                                                              to);
+                });
+    }
+
+    std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation(
+            const std::shared_ptr<Function> &fine_function,
+            const ExecutionSpace es) {
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            assert(false && "IMPLEMENT ME");
+        }
+#endif  // SFEM_ENABLE_CUDA
+        return fine_function->hierarchical_prolongation();
+    }
 
     template <typename T>
     std::shared_ptr<Operator<T>> create_inverse_diagonal_scaling(
@@ -249,6 +278,39 @@ namespace sfem {
                 f->space()->n_dofs(),
                 f->space()->n_dofs(),
                 [=](const real_t *const x, real_t *const y) { f->apply(nullptr, x, y); });
+    }
+
+    auto crs_hessian(sfem::Function &f, const std::shared_ptr<CRSGraph> &crs_graph, const sfem::ExecutionSpace es) {
+#ifdef SFEM_ENABLE_CUDA
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+            auto d_crs_graph = sfem::to_device(crs_graph);
+            auto values = sfem::create_buffer<real_t>(d_crs_graph->nnz(), es);
+
+            f.hessian_crs(nullptr,
+                          d_crs_graph->rowptr()->data(),
+                          d_crs_graph->colidx()->data(),
+                          values->data());
+
+            return sfem::d_crs_spmv(d_crs_graph->n_nodes(),
+                                    d_crs_graph->n_nodes(),
+                                    d_crs_graph->rowptr(),
+                                    d_crs_graph->colidx(),
+                                    values,
+                                    (real_t)1);
+        }
+#endif
+        auto values = sfem::h_buffer<real_t>(crs_graph->nnz());
+
+        f.hessian_crs(
+                nullptr, crs_graph->rowptr()->data(), crs_graph->colidx()->data(), values->data());
+
+        // Owns the pointers
+        return sfem::h_crs_spmv(crs_graph->n_nodes(),
+                                crs_graph->n_nodes(),
+                                crs_graph->rowptr(),
+                                crs_graph->colidx(),
+                                values,
+                                (real_t)1);
     }
 
 }  // namespace sfem
