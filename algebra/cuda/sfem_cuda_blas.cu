@@ -164,7 +164,7 @@ namespace sfem {
 #else
             int kernel_block_size = 128;
             ptrdiff_t n_blocks =
-                std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
+                    std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
             double *d_result = 0;
             cudaMalloc((void **)&d_result, sizeof(double));
@@ -189,7 +189,7 @@ namespace sfem {
 #else
             int kernel_block_size = 128;
             ptrdiff_t n_blocks =
-                std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
+                    std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
             float *d_result = 0;
             cudaMalloc((void **)&d_result, sizeof(float));
@@ -201,6 +201,26 @@ namespace sfem {
 
             SFEM_DEBUG_SYNCHRONIZE();
             return ret;
+#endif
+        }
+
+        void axpy(const ptrdiff_t n, const double alpha, const double *const x, double *const y) {
+            sfem_blas_init();
+#ifdef SFEM_ENABLE_CUBLAS
+            CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &alpha, x, 1, y, 1));
+#else
+#error "CUBLAS required!"
+
+#endif
+        }
+
+        void axpy(const ptrdiff_t n, const float alpha, const float *const x, float *const y) {
+            sfem_blas_init();
+#ifdef SFEM_ENABLE_CUBLAS
+            CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &alpha, x, 1, y, 1));
+#else
+#error "CUBLAS required!"
+
 #endif
         }
 
@@ -221,7 +241,7 @@ namespace sfem {
 #else
             int kernel_block_size = 128;
             ptrdiff_t n_blocks =
-                std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
+                    std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
             taxpby<<<n_blocks, kernel_block_size>>>(n, alpha, x, beta, y);
 
@@ -248,7 +268,7 @@ namespace sfem {
 #else
             int kernel_block_size = 128;
             ptrdiff_t n_blocks =
-                std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
+                    std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
             taxpby<<<n_blocks, kernel_block_size>>>(n, alpha, x, beta, y);
 
@@ -310,6 +330,42 @@ namespace sfem {
 #endif
         }
 
+        void scal(const ptrdiff_t n, const double alpha, double *const x) {
+            sfem_blas_init();
+#ifdef SFEM_ENABLE_CUBLAS
+            CHECK_CUBLAS(cublasDscal(cublas_handle, n, &alpha, x, 1));
+#else
+#error "IMPLEMENT ME!"
+#endif
+        }
+
+        void scal(const ptrdiff_t n, const float alpha, float *const x) {
+            sfem_blas_init();
+#ifdef SFEM_ENABLE_CUBLAS
+            CHECK_CUBLAS(cublasSscal(cublas_handle, n, &alpha, x, 1));
+#else
+#error "IMPLEMENT ME!"
+#endif
+        }
+
+        void nrm2(const ptrdiff_t n, const double *const x, double *const result) {
+            sfem_blas_init();
+#ifdef SFEM_ENABLE_CUBLAS
+            CHECK_CUBLAS(cublasDnrm2(cublas_handle, n, x, 1, result));
+#else
+#error "IMPLEMENT ME!"
+#endif
+        }
+
+        void nrm2(const ptrdiff_t n, const float *const x, float *const result) {
+            sfem_blas_init();
+#ifdef SFEM_ENABLE_CUBLAS
+            CHECK_CUBLAS(cublasSnrm2(cublas_handle, n, x, 1, result));
+#else
+#error "IMPLEMENT ME!"
+#endif
+        }
+
     }  // namespace device
 }  // namespace sfem
 
@@ -323,7 +379,7 @@ extern void host_to_device(const std::size_t n, const real_t *const h, real_t *d
     CHECK_CUDA(cudaMemcpy(d, h, n * sizeof(real_t), cudaMemcpyHostToDevice));
 }
 
-extern void d_destroy(real_t *a) { sfem::device::destroy(a); }
+extern void d_destroy(void *a) { sfem::device::destroy(a); }
 
 extern void d_copy(const ptrdiff_t n, const real_t *const src, real_t *const dest) {
     sfem::device::copy(n, src, dest);
@@ -353,6 +409,10 @@ extern void d_axpby(const ptrdiff_t n,
     sfem::device::axpby(n, alpha, x, beta, y);
 }
 
+extern void d_axpy(const ptrdiff_t n, const real_t alpha, const real_t *const x, real_t *const y) {
+    sfem::device::axpy(n, alpha, x, y);
+}
+
 extern void d_zaxpby(const ptrdiff_t n,
                      const real_t alpha,
                      const real_t *const x,
@@ -360,6 +420,16 @@ extern void d_zaxpby(const ptrdiff_t n,
                      const real_t *const y,
                      real_t *const z) {
     sfem::device::zaxpby(n, alpha, x, beta, y, z);
+}
+
+extern void d_scal(const ptrdiff_t n, const real_t alpha, real_t *const x) {
+    sfem::device::scal(n, alpha, x);
+}
+
+extern real_t d_nrm2(const ptrdiff_t n, const real_t *const x) {
+    real_t ret = 0;
+    sfem::device::nrm2(n, x, &ret);
+    return ret;
 }
 
 extern void d_memset(void *ptr, int value, const std::size_t n) { cudaMemset(ptr, value, n); }

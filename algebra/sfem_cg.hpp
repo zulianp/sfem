@@ -25,7 +25,7 @@ namespace sfem {
         // Mem management
         std::function<T*(const std::size_t)> allocate;
         std::function<void(const std::size_t, T* const x)> zeros;
-        std::function<void(T*)> destroy;
+        std::function<void(void*)> destroy;
 
         std::function<void(const ptrdiff_t, const T* const, T* const)> copy;
 
@@ -75,7 +75,7 @@ namespace sfem {
         void default_init() {
             allocate = [](const std::ptrdiff_t n) -> T* { return (T*)calloc(n, sizeof(T)); };
 
-            destroy = [](T* a) { free(a); };
+            destroy = [](void* a) { free(a); };
 
             copy = [](const ptrdiff_t n, const T* const src, T* const dest) {
                 std::memcpy(dest, src, n * sizeof(T));

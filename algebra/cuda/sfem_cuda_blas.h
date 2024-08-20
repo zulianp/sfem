@@ -8,7 +8,7 @@ extern "C" {
 #endif
 // void sfem_blas_init();
 real_t *d_allocate(const size_t n);
-void d_destroy(real_t *a);
+void d_destroy(void *a);
 
 void *d_buffer_alloc(const size_t n);
 void d_buffer_destroy(void *a);
@@ -32,6 +32,17 @@ void d_axpby(const ptrdiff_t n,
              const real_t beta,
              real_t *const y);
 
+void d_axpy(const ptrdiff_t n,
+             const real_t alpha,
+             const real_t *const x,
+             real_t *const y);
+
+void d_scal(const ptrdiff_t n,
+             const real_t alpha,
+            real_t *const x);
+
+real_t d_nrm2(const ptrdiff_t n,
+            const real_t *const x);
 
 void d_zaxpby(const ptrdiff_t, const real_t alpha, const real_t* const x, const real_t beta, const real_t* const y, real_t* const z);
 

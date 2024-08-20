@@ -49,7 +49,7 @@ T dot(const ptrdiff_t n, const T *const l, const T *const r) {
 
 auto crs_hessian(sfem::Function &f, const sfem::ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) {
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
             assert(false && "IMPLEMENT ME");
         }
 #endif
