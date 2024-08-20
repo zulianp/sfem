@@ -95,6 +95,10 @@ int main(int argc, char *argv[]) {
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
+    if(SFEM_USE_GPU) {
+        es = sfem::EXECUTION_SPACE_DEVICE;
+    }
+
     // -------------------------------
     // Read inputs
     // -------------------------------
@@ -153,6 +157,10 @@ int main(int argc, char *argv[]) {
            SFEM_TOL,
            SFEM_SMOOTHER_SWEEPS,
            SFEM_CHEB_EIG_TOL);
+
+#ifdef SFEM_ENABLE_CUDA
+    sfem::register_device_ops();
+#endif
 
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
     auto conds = sfem::create_dirichlet_conditions_from_env(fs, es);
