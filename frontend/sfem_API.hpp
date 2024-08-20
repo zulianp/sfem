@@ -163,14 +163,8 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
             auto d_edges = to_device(edges);
-            auto d_rowptr = d_buffer<count_t>(n_coarse_nodes + 1);
-            auto d_colidx = d_buffer<idx_t>(crs_graph->nnz());
-
-            buffer_host_to_device(
-                    d_rowptr->size() * sizeof(count_t), crs_graph->rowptr(), d_rowptr->data());
-
-            buffer_host_to_device(
-                    d_colidx->size() * sizeof(idx_t), crs_graph->colidx(), d_colidx->data());
+            auto d_rowptr = to_device(crs_graph->rowptr());
+            auto d_colidx = to_device(crs_graph->colidx());
 
             return std::make_shared<LambdaOperator<real_t>>(
                      rows, cols, [=](const real_t *const from, real_t *const to) {
