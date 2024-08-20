@@ -10,7 +10,7 @@
 extern "C" {
 #endif
 
-int cu_tet4_to_macro_tet4_prolongation(const ptrdiff_t coarse_nnodes,
+int cu_tet4_to_macrotet4_prolongation(const ptrdiff_t coarse_nnodes,
                                        const count_t *const SFEM_RESTRICT coarse_rowptr,
                                        const idx_t *const SFEM_RESTRICT coarse_colidx,
                                        const idx_t *const SFEM_RESTRICT fine_node_map,
