@@ -199,7 +199,7 @@ int main(int argc, char *argv[]) {
         }
 
     } else {
-        auto crs = crs_hessian(*f, f->crs_graph(),es);
+        auto crs = crs_hessian(*f, f->crs_graph(), es);
         linear_op = crs;
         f->hessian_diag(nullptr, diag->data());
 
@@ -261,11 +261,25 @@ int main(int argc, char *argv[]) {
         auto fs_coarse = fs->derefine();
         auto f_coarse = f->derefine(fs_coarse, true);
 
+        auto coarse_graph = sfem::create_derefined_crs_graph(*f->space());
+        auto edges = sfem::create_edge_idx(*coarse_graph);
+
+#ifdef SFEM_ENABLE_CUDA
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+            coarse_graph = sfem::to_device(coarse_graph);
+            edges = sfem::to_device(edges);
+        }
+#endif
+
         std::shared_ptr<sfem::Operator<real_t>> linear_op_coarse;
         if (SFEM_COARSE_MATRIX_FREE) {
             linear_op_coarse = sfem::make_linear_op(f_coarse);
         } else {
-            linear_op_coarse = crs_hessian(*f_coarse, f_coarse->crs_graph(), es);
+            if (f_coarse->space()->block_size() == 1) {
+                linear_op_coarse = crs_hessian(*f_coarse, coarse_graph, es);
+            } else {
+                linear_op_coarse = crs_hessian(*f_coarse, f_coarse->crs_graph(), es);
+            }
         }
 
         auto c_coarse = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
@@ -288,16 +302,6 @@ int main(int argc, char *argv[]) {
         }
 
         smoother->set_initial_guess_zero(false);
-
-        auto coarse_graph = sfem::create_derefined_crs_graph(*f->space());
-        auto edges = sfem::create_edge_idx(*coarse_graph);
-
-#ifdef SFEM_ENABLE_CUDA
-        if (es == sfem::EXECUTION_SPACE_DEVICE) {
-            coarse_graph = sfem::to_device(coarse_graph);
-            edges = sfem::to_device(edges);
-        }
-#endif
 
         auto restriction = sfem::create_hierarchical_restriction(
                 f->space()->mesh().n_nodes(), f->space()->block_size(), coarse_graph, edges, es);

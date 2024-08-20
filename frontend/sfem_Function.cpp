@@ -196,7 +196,7 @@ namespace sfem {
                                       &rowptr,
                                       &colidx);
 
-        auto crs_graph = std::make_shared<CRSGraph>(
+        impl_->crs_graph = std::make_shared<CRSGraph>(
                 Buffer<count_t>::own(mesh->nnodes + 1, rowptr, free, MEMORY_SPACE_HOST),
                 Buffer<idx_t>::own(rowptr[mesh->nnodes], colidx, free, MEMORY_SPACE_HOST));
 
