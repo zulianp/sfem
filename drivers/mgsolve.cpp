@@ -54,8 +54,9 @@ real_t residual(sfem::Operator<real_t> &op,
                 const sfem::ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
     if (es == sfem::EXECUTION_SPACE_DEVICE) {
-        assert(false);
         // TODO
+        fprintf(stderr, "[Warning] residual not implemented for CUDA!\n");
+        assert(false);
         return -1;
     } else
 #endif
