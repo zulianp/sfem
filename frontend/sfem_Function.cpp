@@ -42,44 +42,39 @@ namespace sfem {
 
     class CRSGraph::Impl {
     public:
-        std::ptrdiff_t n_nodes{0};
-        count_t *rowptr{nullptr};
-        idx_t *colidx{nullptr};
-
-        ~Impl() {
-            free(rowptr);
-            free(colidx);
-        }
+        std::shared_ptr<Buffer<count_t>> rowptr;
+        std::shared_ptr<Buffer<idx_t>> colidx;
+        ~Impl() {}
     };
+
+    CRSGraph::CRSGraph(const std::shared_ptr<Buffer<count_t>> &rowptr,
+                       const std::shared_ptr<Buffer<idx_t>> &colidx)
+        : impl_(std::make_unique<Impl>()) {
+        impl_->rowptr = rowptr;
+        impl_->colidx = colidx;
+    }
 
     CRSGraph::CRSGraph() : impl_(std::make_unique<Impl>()) {}
     CRSGraph::~CRSGraph() = default;
 
-    ptrdiff_t CRSGraph::n_nodes() const { return impl_->n_nodes; }
+    ptrdiff_t CRSGraph::n_nodes() const { return rowptr()->size() - 1; }
+    ptrdiff_t CRSGraph::nnz() const { return rowptr()->data()[this->n_nodes()]; }
 
-    ptrdiff_t CRSGraph::nnz() const { return impl_->rowptr[impl_->n_nodes]; }
-
-    count_t *CRSGraph::rowptr() { return impl_->rowptr; }
-
-    idx_t *CRSGraph::colidx() { return impl_->colidx; }
+    std::shared_ptr<Buffer<count_t>> CRSGraph::rowptr() const { return impl_->rowptr; }
+    std::shared_ptr<Buffer<idx_t>> CRSGraph::colidx() const { return impl_->colidx; }
 
     std::shared_ptr<CRSGraph> CRSGraph::block_to_scalar(const int block_size) {
-        auto ret = std::make_shared<CRSGraph>();
-
-        ret->impl_->rowptr =
-                (count_t *)malloc((this->n_nodes() + 1) * block_size * sizeof(count_t));
-        ret->impl_->colidx = (idx_t *)malloc(this->rowptr()[this->n_nodes()] * block_size *
-                                             block_size * sizeof(idx_t));
+        auto rowptr = h_buffer<count_t>(this->n_nodes() * block_size + 1);
+        auto colidx = h_buffer<idx_t>(this->nnz() * block_size * block_size);
 
         crs_graph_block_to_scalar(this->n_nodes(),
                                   block_size,
-                                  this->rowptr(),
-                                  this->colidx(),
-                                  ret->impl_->rowptr,
-                                  ret->impl_->colidx);
+                                  this->rowptr()->data(),
+                                  this->colidx()->data(),
+                                  rowptr->data(),
+                                  colidx->data());
 
-        ret->impl_->n_nodes = this->n_nodes() * block_size;
-        return ret;
+        return std::make_shared<CRSGraph>(rowptr, colidx);
     }
 
     class Mesh::Impl {
@@ -169,17 +164,17 @@ namespace sfem {
             return node_to_node_graph();
         }
 
-        auto crs_graph = std::make_shared<CRSGraph>();
         const ptrdiff_t n_nodes = max_node_id(element_type, mesh->nelements, mesh->elements) + 1;
 
-        build_crs_graph_for_elem_type(element_type,
-                                      mesh->nelements,
-                                      n_nodes,
-                                      mesh->elements,
-                                      &crs_graph->impl_->rowptr,
-                                      &crs_graph->impl_->colidx);
+        count_t *rowptr{nullptr};
+        idx_t *colidx{nullptr};
+        build_crs_graph_for_elem_type(
+                element_type, mesh->nelements, n_nodes, mesh->elements, &rowptr, &colidx);
 
-        crs_graph->impl_->n_nodes = n_nodes;
+        auto crs_graph = std::make_shared<CRSGraph>(
+                Buffer<count_t>::own(n_nodes + 1, rowptr, free, MEMORY_SPACE_HOST),
+                Buffer<idx_t>::own(rowptr[n_nodes], colidx, free, MEMORY_SPACE_HOST));
+
         return crs_graph;
     }
 
@@ -192,14 +187,18 @@ namespace sfem {
 
         auto mesh = &impl_->mesh;
 
+        count_t *rowptr{nullptr};
+        idx_t *colidx{nullptr};
         build_crs_graph_for_elem_type(mesh->element_type,
                                       mesh->nelements,
                                       mesh->nnodes,
                                       mesh->elements,
-                                      &impl_->crs_graph->impl_->rowptr,
-                                      &impl_->crs_graph->impl_->colidx);
+                                      &rowptr,
+                                      &colidx);
 
-        impl_->crs_graph->impl_->n_nodes = mesh->nnodes;
+        auto crs_graph = std::make_shared<CRSGraph>(
+                Buffer<count_t>::own(mesh->nnodes + 1, rowptr, free, MEMORY_SPACE_HOST),
+                Buffer<idx_t>::own(rowptr[mesh->nnodes], colidx, free, MEMORY_SPACE_HOST));
 
         return SFEM_SUCCESS;
     }
@@ -211,8 +210,12 @@ namespace sfem {
 
     void *Mesh::impl_mesh() { return (void *)&impl_->mesh; }
 
-    count_t *Mesh::node_to_node_rowptr() { return impl_->crs_graph->rowptr(); }
-    idx_t *Mesh::node_to_node_colidx() { return impl_->crs_graph->colidx(); }
+    std::shared_ptr<Buffer<count_t>> Mesh::node_to_node_rowptr() const {
+        return impl_->crs_graph->rowptr();
+    }
+    std::shared_ptr<Buffer<idx_t>> Mesh::node_to_node_colidx() const {
+        return impl_->crs_graph->colidx();
+    }
 
     class FunctionSpace::Impl {
     public:
@@ -229,15 +232,32 @@ namespace sfem {
         std::shared_ptr<CRSGraph> dof_to_dof_graph;
 
         ~Impl() {}
+
+        int initialize_dof_to_dof_graph(const int block_size) {
+            // This is for nodal discretizations (CG)
+            if (!node_to_node_graph) {
+                node_to_node_graph = mesh->create_node_to_node_graph(element_type);
+            }
+
+            if (block_size == 1) {
+                dof_to_dof_graph = node_to_node_graph;
+            } else {
+                if (!dof_to_dof_graph) {
+                    dof_to_dof_graph = node_to_node_graph->block_to_scalar(block_size);
+                }
+            }
+
+            return 0;
+        }
     };
 
     std::shared_ptr<CRSGraph> FunctionSpace::dof_to_dof_graph() {
-        initialize_dof_to_dof_graph();
+        impl_->initialize_dof_to_dof_graph(this->block_size());
         return impl_->dof_to_dof_graph;
     }
 
     std::shared_ptr<CRSGraph> FunctionSpace::node_to_node_graph() {
-        initialize_dof_to_dof_graph();
+        impl_->initialize_dof_to_dof_graph(this->block_size());
         return impl_->node_to_node_graph;
     }
 
@@ -290,55 +310,6 @@ namespace sfem {
     int FunctionSpace::block_size() const { return impl_->block_size; }
 
     ptrdiff_t FunctionSpace::n_dofs() const { return impl_->nlocal; }
-
-    int FunctionSpace::initialize_dof_to_dof_graph() {
-        auto &mesh = *impl_->mesh;
-        auto c_mesh = &mesh.impl_->mesh;
-
-        // This is for nodal discretizations (CG)
-        auto node_to_node = impl_->node_to_node_graph;
-        if (!node_to_node) {
-            node_to_node = mesh.create_node_to_node_graph(impl_->element_type);
-            impl_->node_to_node_graph = node_to_node;
-        }
-
-        if (impl_->block_size == 1) {
-            impl_->dof_to_dof_graph = node_to_node;
-        } else {
-            if (!impl_->dof_to_dof_graph) {
-                impl_->dof_to_dof_graph = node_to_node->block_to_scalar(this->block_size());
-            }
-        }
-
-        return 0;
-    }
-
-    int FunctionSpace::create_crs_graph(ptrdiff_t *nlocal,
-                                        ptrdiff_t *nglobal,
-                                        ptrdiff_t *nnz,
-                                        count_t **rowptr,
-                                        idx_t **colidx) {
-        initialize_dof_to_dof_graph();
-        *rowptr = impl_->dof_to_dof_graph->rowptr();
-        *colidx = impl_->dof_to_dof_graph->colidx();
-
-        *nlocal = impl_->nlocal;
-        *nglobal = impl_->nglobal;
-        *nnz = impl_->dof_to_dof_graph->nnz();
-
-        return SFEM_SUCCESS;
-    }
-
-    int FunctionSpace::destroy_crs_graph(count_t *rowptr, idx_t *colidx) {
-        if (rowptr == impl_->dof_to_dof_graph->rowptr()) {
-            impl_->dof_to_dof_graph = nullptr;
-        } else {
-            free(rowptr);
-            free(colidx);
-        }
-
-        return SFEM_SUCCESS;
-    }
 
     std::shared_ptr<FunctionSpace> FunctionSpace::lor() const {
         return std::make_shared<FunctionSpace>(
@@ -907,19 +878,23 @@ namespace sfem {
         add_constraint(c);
     }
 
-    int Function::create_crs_graph(ptrdiff_t *nlocal,
-                                   ptrdiff_t *nglobal,
-                                   ptrdiff_t *nnz,
-                                   count_t **rowptr,
-                                   idx_t **colidx) {
-        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.create_crs_graph);
-
-        return impl_->space->create_crs_graph(nlocal, nglobal, nnz, rowptr, colidx);
+    std::shared_ptr<CRSGraph> Function::crs_graph() const {
+        return impl_->space->dof_to_dof_graph();
     }
 
-    int Function::destroy_crs_graph(count_t *rowptr, idx_t *colidx) {
-        return impl_->space->destroy_crs_graph(rowptr, colidx);
-    }
+    // int Function::create_crs_graph(ptrdiff_t *nlocal,
+    //                                ptrdiff_t *nglobal,
+    //                                ptrdiff_t *nnz,
+    //                                count_t **rowptr,
+    //                                idx_t **colidx) {
+    //     SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.create_crs_graph);
+
+    //     return impl_->space->create_crs_graph(nlocal, nglobal, nnz, rowptr, colidx);
+    // }
+
+    // int Function::destroy_crs_graph(count_t *rowptr, idx_t *colidx) {
+    //     return impl_->space->destroy_crs_graph(rowptr, colidx);
+    // }
 
     int Function::hessian_crs(const real_t *const x,
                               const count_t *const rowptr,
@@ -1072,35 +1047,23 @@ namespace sfem {
 
         auto crs_graph = impl_->space->mesh().create_node_to_node_graph(coarse_et);
 
-#if 0       
-        return std::make_shared<LambdaOperator<real_t>>(
-                rows, cols, [=](const real_t *const from, real_t *const to) {
-                    ::hierarchical_restriction(crs_graph->n_nodes(),
-                                               crs_graph->rowptr(),
-                                               crs_graph->colidx(),
-                                               impl_->space->block_size(),
-                                               from,
-                                               to);
-                });
-
-#else
-
         auto p2_vertices = h_buffer<idx_t>(crs_graph->nnz());
 
-        build_p1_to_p2_edge_map(
-                rows, crs_graph->rowptr(), crs_graph->colidx(), p2_vertices->data());
+        build_p1_to_p2_edge_map(rows,
+                                crs_graph->rowptr()->data(),
+                                crs_graph->colidx()->data(),
+                                p2_vertices->data());
 
         return std::make_shared<LambdaOperator<real_t>>(
                 rows, cols, [=](const real_t *const from, real_t *const to) {
                     ::hierarchical_restriction_with_edge_map(crs_graph->n_nodes(),
-                                                             crs_graph->rowptr(),
-                                                             crs_graph->colidx(),
+                                                             crs_graph->rowptr()->data(),
+                                                             crs_graph->colidx()->data(),
                                                              p2_vertices->data(),
                                                              impl_->space->block_size(),
                                                              from,
                                                              to);
                 });
-#endif
     }
 
     std::shared_ptr<Operator<real_t>> Function::hierarchical_prolongation() {
@@ -1228,8 +1191,8 @@ namespace sfem {
                                                    mesh->points,
                                                    this->mu,
                                                    this->lambda,
-                                                   graph->rowptr(),
-                                                   graph->colidx(),
+                                                   graph->rowptr()->data(),
+                                                   graph->colidx()->data(),
                                                    values);
 
             return SFEM_SUCCESS;
@@ -1347,8 +1310,8 @@ namespace sfem {
                                               mesh->nnodes,
                                               mesh->elements,
                                               mesh->points,
-                                              graph->rowptr(),
-                                              graph->colidx(),
+                                              graph->rowptr()->data(),
+                                              graph->colidx()->data(),
                                               values);
         }
 
@@ -1436,8 +1399,8 @@ namespace sfem {
                           mesh->nnodes,
                           mesh->elements,
                           mesh->points,
-                          graph->rowptr(),
-                          graph->colidx(),
+                          graph->rowptr()->data(),
+                          graph->colidx()->data(),
                           values);
 
             return SFEM_SUCCESS;
@@ -1726,8 +1689,8 @@ namespace sfem {
             //                            mesh->nnodes,
             //                            mesh->elements,
             //                            mesh->points,
-            //                            graph->rowptr(),
-            //                            graph->colidx(),
+            //                            graph->rowptr()->data(),
+            //                            graph->colidx()->data(),
             //                            values);
 
             // return SFEM_SUCCESS;
@@ -1853,8 +1816,8 @@ namespace sfem {
                                                 this->mu,
                                                 this->lambda,
                                                 x,
-                                                graph->rowptr(),
-                                                graph->colidx(),
+                                                graph->rowptr()->data(),
+                                                graph->colidx()->data(),
                                                 values);
         }
 

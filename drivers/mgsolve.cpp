@@ -49,21 +49,23 @@ T dot(const ptrdiff_t n, const T *const l, const T *const r) {
 
 auto crs_hessian(sfem::Function &f, const sfem::ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
-        if (es == sfem::EXECUTION_SPACE_DEVICE) {
-            assert(false && "IMPLEMENT ME");
-        }
+    if (es == sfem::EXECUTION_SPACE_DEVICE) {
+        assert(false && "IMPLEMENT ME");
+    }
 #endif
-    ptrdiff_t nlocal;
-    ptrdiff_t nglobal;
-    ptrdiff_t nnz;
-    count_t *rowptr;
-    idx_t *colidx;
-    f.space()->create_crs_graph(&nlocal, &nglobal, &nnz, &rowptr, &colidx);
-    real_t *values = (real_t *)calloc(rowptr[nlocal], sizeof(real_t));
-    f.hessian_crs(nullptr, rowptr, colidx, values);
+    auto crs_graph = f.crs_graph();
+    auto values = sfem::h_buffer<real_t>(crs_graph->nnz());
+
+    f.hessian_crs(
+            nullptr, crs_graph->rowptr()->data(), crs_graph->colidx()->data(), values->data());
 
     // Owns the pointers
-    return sfem::h_crs_spmv(nlocal, nlocal, rowptr, colidx, values, (real_t)1);
+    return sfem::h_crs_spmv(crs_graph->n_nodes(),
+                            crs_graph->n_nodes(),
+                            crs_graph->rowptr(),
+                            crs_graph->colidx(),
+                            values,
+                            (real_t)1);
 }
 
 real_t residual(sfem::Operator<real_t> &op,
@@ -308,7 +310,12 @@ int main(int argc, char *argv[]) {
 
         smoother->set_initial_guess_zero(false);
 
-        auto restriction = create_hierarchical_restriction(f, es);
+        auto coarse_graph = sfem::create_derefined_crs_graph(*f->space());
+        auto edges = sfem::create_edge_idx(*coarse_graph);
+
+        auto restriction = create_hierarchical_restriction(
+                f->space()->mesh().n_nodes(), f->space()->block_size(), coarse_graph, edges, es);
+
         auto prolongation = create_hierarchical_prolongation(f, es);
 
         f->apply_constraints(x->data());

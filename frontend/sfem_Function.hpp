@@ -31,13 +31,15 @@ namespace sfem {
         CRSGraph();
         ~CRSGraph();
 
+        CRSGraph(const std::shared_ptr<Buffer<count_t>> &rowptr,
+                 const std::shared_ptr<Buffer<idx_t>> &colidx);
+
         friend class Mesh;
 
         ptrdiff_t n_nodes() const;
         ptrdiff_t nnz() const;
-        count_t *rowptr();
-        idx_t *colidx();
-
+        std::shared_ptr<Buffer<count_t>> rowptr() const;
+        std::shared_ptr<Buffer<idx_t>> colidx() const;
         std::shared_ptr<CRSGraph> block_to_scalar(const int block_size);
 
     private:
@@ -75,8 +77,8 @@ namespace sfem {
         std::shared_ptr<CRSGraph> node_to_node_graph();
         std::shared_ptr<CRSGraph> create_node_to_node_graph(const enum ElemType element_type);
 
-        count_t *node_to_node_rowptr();
-        idx_t *node_to_node_colidx();
+        std::shared_ptr<Buffer<count_t>> node_to_node_rowptr() const;
+        std::shared_ptr<Buffer<idx_t>> node_to_node_colidx() const;
 
         const geom_t *const points(const int coord) const;
         const idx_t *const idx(const int node_num) const;
@@ -106,14 +108,6 @@ namespace sfem {
             return std::make_shared<FunctionSpace>(mesh, block_size);
         }
 
-        int create_crs_graph(ptrdiff_t *nlocal,
-                             ptrdiff_t *nglobal,
-                             ptrdiff_t *nnz,
-                             count_t **rowptr,
-                             idx_t **colidx);
-
-        int destroy_crs_graph(count_t *rowptr, idx_t *colidx);
-
         int create_vector(ptrdiff_t *nlocal, ptrdiff_t *nglobal, real_t **values);
         int destroy_vector(real_t *values);
 
@@ -126,7 +120,6 @@ namespace sfem {
         std::shared_ptr<FunctionSpace> derefine() const;
         std::shared_ptr<FunctionSpace> lor() const;
 
-        int initialize_dof_to_dof_graph();
         std::shared_ptr<CRSGraph> dof_to_dof_graph();
         std::shared_ptr<CRSGraph> node_to_node_graph();
 
@@ -150,23 +143,18 @@ namespace sfem {
                                 const idx_t *const colidx,
                                 real_t *const values) = 0;
 
-        virtual int hessian_diag(const real_t *const /*x*/,
-                                 real_t *const /*values*/) {
+        virtual int hessian_diag(const real_t *const /*x*/, real_t *const /*values*/) {
             return SFEM_FAILURE;
         }
 
         virtual int gradient(const real_t *const x, real_t *const out) = 0;
-        virtual int apply(const real_t *const x,
-                          const real_t *const h,
-                          real_t *const out) = 0;
+        virtual int apply(const real_t *const x, const real_t *const h, real_t *const out) = 0;
 
         virtual int value(const real_t *x, real_t *const out) = 0;
         virtual int report(const real_t *const /*x*/) { return SFEM_SUCCESS; }
         virtual ExecutionSpace execution_space() const { return EXECUTION_SPACE_HOST; }
 
-        virtual void set_field(const char * /*name*/,
-                               const int /*component*/,
-                               real_t * /*x*/) {
+        virtual void set_field(const char * /*name*/, const int /*component*/, real_t * /*x*/) {
             assert(0);
         }
 
@@ -175,7 +163,7 @@ namespace sfem {
             assert(false);
             return nullptr;
         }
-        
+
         virtual std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &) {
             assert(false);
             return nullptr;
@@ -185,7 +173,7 @@ namespace sfem {
     class NeumannConditions final : public Op {
     public:
         static std::shared_ptr<NeumannConditions> create_from_env(
-            const std::shared_ptr<FunctionSpace> &space);
+                const std::shared_ptr<FunctionSpace> &space);
 
         const char *name() const override;
 
@@ -199,9 +187,7 @@ namespace sfem {
 
         int gradient(const real_t *const x, real_t *const out) override;
 
-        int apply(const real_t *const x,
-                  const real_t *const h,
-                  real_t *const out) override;
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override;
 
         int value(const real_t *x, real_t *const out) override;
 
@@ -234,8 +220,7 @@ namespace sfem {
         virtual int apply_value(const real_t value, real_t *const x) = 0;
         virtual int apply_zero(real_t *const x);
         virtual int gradient(const real_t *const x, real_t *const g) = 0;
-        virtual int copy_constrained_dofs(const real_t *const src,
-                                          real_t *const dest) = 0;
+        virtual int copy_constrained_dofs(const real_t *const src, real_t *const dest) = 0;
 
         virtual int hessian_crs(const real_t *const x,
                                 const count_t *const rowptr,
@@ -243,9 +228,8 @@ namespace sfem {
                                 real_t *const values) = 0;
 
         virtual std::shared_ptr<Constraint> derefine(
-            const std::shared_ptr<FunctionSpace> &coarse_space,
-            const bool as_zero
-            ) const = 0;
+                const std::shared_ptr<FunctionSpace> &coarse_space,
+                const bool as_zero) const = 0;
         virtual std::shared_ptr<Constraint> lor() const = 0;
     };
 
@@ -257,11 +241,10 @@ namespace sfem {
         std::shared_ptr<FunctionSpace> space();
 
         static std::shared_ptr<DirichletConditions> create_from_env(
-            const std::shared_ptr<FunctionSpace> &space);
+                const std::shared_ptr<FunctionSpace> &space);
         int apply(real_t *const x) override;
         int apply_value(const real_t value, real_t *const x) override;
-        int copy_constrained_dofs(const real_t *const src,
-                                  real_t *const dest) override;
+        int copy_constrained_dofs(const real_t *const src, real_t *const dest) override;
 
         int gradient(const real_t *const x, real_t *const g) override;
 
@@ -286,7 +269,7 @@ namespace sfem {
         void *impl_conditions();
 
         std::shared_ptr<Constraint> derefine(const std::shared_ptr<FunctionSpace> &coarse_space,
-            const bool as_zero) const override;
+                                             const bool as_zero) const override;
         std::shared_ptr<Constraint> lor() const override;
 
     private:
@@ -300,9 +283,7 @@ namespace sfem {
         ~Output();
         void set_output_dir(const char *path);
         int write(const char *name, const real_t *const x);
-        int write_time_step(const char *name,
-                            const real_t t,
-                            const real_t *const x);
+        int write_time_step(const char *name, const real_t t, const real_t *const x);
 
         void clear();
 
@@ -317,10 +298,11 @@ namespace sfem {
         ~Function();
 
         std::shared_ptr<Function> derefine(const bool dirichlet_as_zero);
-        std::shared_ptr<Function> derefine(const std::shared_ptr<FunctionSpace> &space, const bool dirichlet_as_zero);
+        std::shared_ptr<Function> derefine(const std::shared_ptr<FunctionSpace> &space,
+                                           const bool dirichlet_as_zero);
 
         inline static std::shared_ptr<Function> create(
-            const std::shared_ptr<FunctionSpace> &space) {
+                const std::shared_ptr<FunctionSpace> &space) {
             return std::make_shared<Function>(space);
         }
 
@@ -333,13 +315,15 @@ namespace sfem {
         void add_constraint(const std::shared_ptr<Constraint> &c);
         void add_dirichlet_conditions(const std::shared_ptr<DirichletConditions> &c);
 
-        int create_crs_graph(ptrdiff_t *nlocal,
-                             ptrdiff_t *nglobal,
-                             ptrdiff_t *nnz,
-                             count_t **rowptr,
-                             idx_t **colidx);
+        std::shared_ptr<CRSGraph> crs_graph() const;
 
-        int destroy_crs_graph(count_t *rowptr, idx_t *colidx);
+        // int create_crs_graph(ptrdiff_t *nlocal,
+        //                      ptrdiff_t *nglobal,
+        //                      ptrdiff_t *nnz,
+        //                      count_t **rowptr,
+        //                      idx_t **colidx);
+
+        // int destroy_crs_graph(count_t *rowptr, idx_t *colidx);
 
         int hessian_crs(const real_t *const x,
                         const count_t *const rowptr,
@@ -349,9 +333,7 @@ namespace sfem {
         int hessian_diag(const real_t *const x, real_t *const values);
 
         int gradient(const real_t *const x, real_t *const out);
-        int apply(const real_t *const x,
-                  const real_t *const h,
-                  real_t *const out);
+        int apply(const real_t *const x, const real_t *const h, real_t *const out);
 
         int value(const real_t *x, real_t *const out);
 
@@ -377,7 +359,7 @@ namespace sfem {
     class Factory {
     public:
         using FactoryFunction =
-            std::function<std::unique_ptr<Op>(const std::shared_ptr<FunctionSpace> &)>;
+                std::function<std::unique_ptr<Op>(const std::shared_ptr<FunctionSpace> &)>;
 
         static void register_op(const std::string &name, FactoryFunction factory_function);
         static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,

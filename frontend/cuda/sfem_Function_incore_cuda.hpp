@@ -25,9 +25,9 @@ namespace sfem {
     		return in;
     	}
 
-        T *buff = d_buffer_alloc(in->size() * sizeof(T));
+        T *buff = (T*)d_buffer_alloc(in->size() * sizeof(T));
         // cudaMemcpy(buff, in->data(), in->size() * sizeof(T), cudaMemcpyHostToDevice);
-        host_to_device(in->size(), in->data(), buff);
+        buffer_host_to_device(in->size() * sizeof(T), in->data(), buff);
 
         return
             std::make_shared<Buffer<T>>(in->size(), buff, &d_buffer_destroy, MEMORY_SPACE_DEVICE);
