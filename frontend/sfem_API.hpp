@@ -19,7 +19,7 @@ namespace sfem {
     std::shared_ptr<Buffer<T>> create_buffer(const std::ptrdiff_t n, const MemorySpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == MEMORY_SPACE_DEVICE) return sfem::d_buffer<T>(n);
-#endif //SFEM_ENABLE_CUDA
+#endif  // SFEM_ENABLE_CUDA
         return sfem::h_buffer<T>(n);
     }
 
@@ -27,7 +27,7 @@ namespace sfem {
     std::shared_ptr<Buffer<T>> create_buffer(const std::ptrdiff_t n, const ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) return sfem::d_buffer<T>(n);
-#endif //SFEM_ENABLE_CUDA
+#endif  // SFEM_ENABLE_CUDA
         return sfem::h_buffer<T>(n);
     }
 
@@ -36,7 +36,7 @@ namespace sfem {
                                   const ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) return sfem::Factory::create_op_gpu(space, name);
-#endif //SFEM_ENABLE_CUDA
+#endif  // SFEM_ENABLE_CUDA
         return sfem::Factory::create_op(space, name);
     }
 
@@ -49,7 +49,7 @@ namespace sfem {
         if (es == EXECUTION_SPACE_DEVICE) {
             cg = sfem::d_cg<T>();
         } else
-#endif //SFEM_ENABLE_CUDA
+#endif  // SFEM_ENABLE_CUDA
         {
             cg = sfem::h_cg<T>();
         }
@@ -68,7 +68,7 @@ namespace sfem {
         if (es == EXECUTION_SPACE_DEVICE) {
             bcgs = sfem::d_bcgs<T>();
         } else
-#endif //SFEM_ENABLE_CUDA
+#endif  // SFEM_ENABLE_CUDA
         {
             bcgs = sfem::h_bcgs<T>();
         }
@@ -87,7 +87,7 @@ namespace sfem {
         if (es == EXECUTION_SPACE_DEVICE) {
             cheb = sfem::d_cheb3<T>(op);
         } else
-#endif //SFEM_ENABLE_CUDA
+#endif  // SFEM_ENABLE_CUDA
         {
             cheb = sfem::h_cheb3<T>(op);
         }
@@ -101,10 +101,10 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            // mg = sfem::d_mg<T>();
-            assert(false && "IMPLEMENT ME");
+            mg = sfem::d_mg<T>();
+
         } else
-#endif //SFEM_ENABLE_CUDA
+#endif  // SFEM_ENABLE_CUDA
         {
             mg = sfem::h_mg<T>();
         }

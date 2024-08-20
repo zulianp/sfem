@@ -1,6 +1,7 @@
 #ifndef SFEM_CUDA_SOLVER_HPP
 #define SFEM_CUDA_SOLVER_HPP
 
+#include "sfem_Chebyshev3.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_cuda_blas.h"
@@ -36,7 +37,7 @@ namespace sfem {
     }
 
     template <typename T>
-    std::shared_ptr<BiCGStab<T>> d_cheb3(const std::shared_ptr<Operator<T>>& op) {
+    std::shared_ptr<Chebyshev3<T>> d_cheb3(const std::shared_ptr<Operator<T>>& op) {
         auto ret = std::make_shared<Chebyshev3<T>>();
         ret->n_dofs = op->rows();
         ret->set_op(op);
@@ -46,15 +47,23 @@ namespace sfem {
         ret->copy = d_copy;
         ret->dot = d_dot;
         ret->axpby = d_axpby;
-        ret->zaxpby = d_zaxpby;
+        ret->axpy = d_axpy;
+        ret->scal = d_scal;
+        ret->norm2 = d_nrm2;
         ret->zeros = [](const std::size_t n, T* const x) { d_memset(x, 0, n * sizeof(T)); };
-
-        assert(false && "IMPLEMENT ME");
-        // TODO
-        // std::function<T(const ptrdiff_t, const T* const)> norm2;
-        // std::function<void(const ptrdiff_t, const T, const T* const, T* const)> axpy;
-        // std::function<void(const std::ptrdiff_t, const T, T* const)> scal;
+        ret->ensure_power_method();
         return ret;
+    }
+
+    template <typename T>
+    std::shared_ptr<Multigrid<T>> d_mg() {
+        auto mg = std::make_shared<Multigrid<T>>();
+        mg->allocate = d_allocate;
+        mg->destroy = d_destroy;
+        mg->axpby = d_axpby;
+        mg->zeros = [](const std::size_t n, T* const x) { d_memset(x, 0, n * sizeof(T)); };
+        mg->norm2 = d_nrm2;
+        return mg;
     }
 
     // template <typename T>
