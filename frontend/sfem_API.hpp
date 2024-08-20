@@ -3,15 +3,19 @@
 
 #include "sfem_Buffer.hpp"
 #include "sfem_base.h"
+#include "sfem_mesh.h"
 
 #include "sfem_Function.hpp"
 #include "sfem_cg.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
+#include "cu_tet4_prolongation_restriction.h"
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_blas.h"
 #include "sfem_cuda_solver.hpp"
 #endif
+
+#include "sfem_prolongation_restriction.h"
 
 namespace sfem {
 
@@ -126,27 +130,101 @@ namespace sfem {
         return conds;
     }
 
-    std::shared_ptr<Operator<real_t>> create_hierarchical_restriction(
-            const std::shared_ptr<Function> &fine_function,
-            const ExecutionSpace es) {
-#ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) {
-            assert(false && "IMPLEMENT ME");
-        }
-#endif  // SFEM_ENABLE_CUDA
-        return fine_function->hierarchical_restriction();
+    std::shared_ptr<Buffer<idx_t>> create_edge_idx(CRSGraph &crs_graph)
+    {
+        const ptrdiff_t rows = crs_graph.n_nodes();
+        auto p2_vertices = h_buffer<idx_t>(crs_graph.nnz());
+
+        build_p1_to_p2_edge_map(
+                rows, crs_graph.rowptr()->data(), crs_graph.colidx()->data(), p2_vertices->data());
+
+        return p2_vertices;
     }
 
-    std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation(
-            const std::shared_ptr<Function> &fine_function,
-            const ExecutionSpace es) {
+    std::shared_ptr<CRSGraph> create_derefined_crs_graph(FunctionSpace &space){
+        auto et = (enum ElemType)space.element_type();
+        auto coarse_et = macro_base_elem(et);
+        auto crs_graph = space.mesh().create_node_to_node_graph(coarse_et);
+        return crs_graph;
+    }
+
+    std::shared_ptr<Operator<real_t>> create_hierarchical_restriction(
+            const ptrdiff_t n_fine_nodes,
+            const int block_size,
+            const std::shared_ptr<CRSGraph> &crs_graph,
+            const std::shared_ptr<Buffer<idx_t>> &edges,
+            const ExecutionSpace es) 
+    {
+        const ptrdiff_t n_coarse_nodes = crs_graph->n_nodes();
+
+        ptrdiff_t rows = n_coarse_nodes * block_size;
+        ptrdiff_t cols =  n_fine_nodes * block_size;
+    
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            assert(false && "IMPLEMENT ME");
+            auto d_edges = to_device(edges);
+            auto d_rowptr = d_buffer<count_t>(n_coarse_nodes + 1);
+            auto d_colidx = d_buffer<idx_t>(crs_graph->nnz());
+
+            buffer_host_to_device(
+                    d_rowptr->size() * sizeof(count_t), crs_graph->rowptr(), d_rowptr->data());
+
+            buffer_host_to_device(
+                    d_colidx->size() * sizeof(idx_t), crs_graph->colidx(), d_colidx->data());
+
+            return std::make_shared<LambdaOperator<real_t>>(
+                     rows, cols, [=](const real_t *const from, real_t *const to) {
+                        // FIXME make it generic for all elements!
+                        cu_macrotet4_to_tet4_restriction(n_coarse_nodes,
+                                                         d_rowptr->data(),
+                                                         d_colidx->data(),
+                                                         d_edges->data(),
+                                                         block_size,
+                                                         SFEM_REAL_DEFAULT,
+                                                         from,
+                                                         SFEM_REAL_DEFAULT,
+                                                         to,
+                                                         SFEM_DEFAULT_STREAM);
+                    });
         }
 #endif  // SFEM_ENABLE_CUDA
-        return fine_function->hierarchical_prolongation();
+
+        return std::make_shared<LambdaOperator<real_t>>(
+                rows, cols, [=](const real_t *const from, real_t *const to) {
+                    ::hierarchical_restriction_with_edge_map(n_coarse_nodes,
+                                                             crs_graph->rowptr()->data(),
+                                                             crs_graph->colidx()->data(),
+                                                             edges->data(),
+                                                             block_size,
+                                                             from,
+                                                             to);
+                });
     }
+
+//     std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation(
+//         const ptrdiff_t n_fine_nodes,
+//         const int block_size,
+//         const std::shared_ptr<CRSGraph> &crs_graph,
+//         const std::shared_ptr<Buffer<idx_t>> &edges,
+//         const ExecutionSpace es) {
+// #ifdef SFEM_ENABLE_CUDA
+//         if (es == EXECUTION_SPACE_DEVICE) {
+//             assert(false && "IMPLEMENT ME");
+//         }
+// #endif  // SFEM_ENABLE_CUDA
+
+//     }
+
+        std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation(
+                const std::shared_ptr<Function> &fine_function,
+                const ExecutionSpace es) {
+    #ifdef SFEM_ENABLE_CUDA
+            if (es == EXECUTION_SPACE_DEVICE) {
+                assert(false && "IMPLEMENT ME");
+            }
+    #endif  // SFEM_ENABLE_CUDA
+            return fine_function->hierarchical_prolongation();
+        }
 
     template <typename T>
     std::shared_ptr<Operator<T>> create_inverse_diagonal_scaling(
