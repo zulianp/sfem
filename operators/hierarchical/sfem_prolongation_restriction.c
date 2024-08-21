@@ -243,8 +243,9 @@ int hierarchical_prolongation_with_edge_map(const ptrdiff_t nnodes,
                                             real_t *const SFEM_RESTRICT to) {
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nnodes; i++) {
+        const ptrdiff_t i_offset = i * vec_size;
         for (int v = 0; v < vec_size; v++) {
-            to[i * vec_size + v] = from[i * vec_size + v];
+            to[i_offset + v] = from[i_offset + v];
         }
 
         const count_t start = coarse_rowptr[i];
@@ -254,14 +255,20 @@ int hierarchical_prolongation_with_edge_map(const ptrdiff_t nnodes,
         const idx_t *const verts = &p2_vertices[start];
 
         for (int k = 0; k < extent; k++) {
-            const idx_t j = cols[k];
+            const ptrdiff_t j = cols[k];
             const idx_t edge = verts[k];
+
             if (i < j) {
+                assert(edge >= nnodes);
+
+                const ptrdiff_t edge_offset = edge * vec_size;
+                const ptrdiff_t j_offset = j * vec_size;
+                
                 for (int v = 0; v < vec_size; v++) {
                     const real_t edge_value =
-                            0.5 * (from[i * vec_size + v] + from[j * vec_size + v]);
+                            0.5 * (from[i_offset + v] + from[j_offset + v]);
 
-                    to[edge * vec_size + v] = edge_value;
+                    to[edge_offset + v] = edge_value;
                 }
             }
         }

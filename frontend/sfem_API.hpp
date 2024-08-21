@@ -200,11 +200,13 @@ namespace sfem {
     }
 
     std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation(
-            const ptrdiff_t n_fine_nodes,
-            const int block_size,
+        const std::shared_ptr<Function> &function,
             const std::shared_ptr<CRSGraph> &crs_graph,
             const std::shared_ptr<Buffer<idx_t>> &edges,
             const ExecutionSpace es) {
+
+        const ptrdiff_t n_fine_nodes = function->space()->mesh().n_nodes();
+        int block_size = function->space()->block_size();
         const ptrdiff_t n_coarse_nodes = crs_graph->n_nodes();
 
         ptrdiff_t rows = n_fine_nodes * block_size;
@@ -230,6 +232,8 @@ namespace sfem {
                                                           SFEM_REAL_DEFAULT,
                                                           to,
                                                           SFEM_DEFAULT_STREAM);
+
+                        function->apply_zero_constraints(to);
                     },
                     EXECUTION_SPACE_DEVICE);
         }
@@ -246,6 +250,8 @@ namespace sfem {
                                                               block_size,
                                                               from,
                                                               to);
+
+                    function->apply_zero_constraints(to);
                 },
                 EXECUTION_SPACE_HOST);
     }
