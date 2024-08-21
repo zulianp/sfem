@@ -144,7 +144,7 @@ NB_MODULE(pysfem, m) {
                 for (ptrdiff_t i = 0; i < n; i++) {
                     y[i] = d_[i] * x[i];
                 }
-            });
+            }, EXECUTION_SPACE_HOST);
 
         return op;
     });
@@ -230,7 +230,7 @@ NB_MODULE(pysfem, m) {
                   [=](const real_t *const x, real_t *const y) {
                       memset(y, 0, u.size() * sizeof(real_t));
                       fun->apply(u.data(), x, y);
-                  });
+                  }, fun->execution_space());
           });
 
     nb::class_<ConjugateGradient_t>(m, "ConjugateGradient")

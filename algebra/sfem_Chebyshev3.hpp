@@ -48,6 +48,10 @@ namespace sfem {
         ptrdiff_t n_dofs{-1};
         bool is_initial_guess_zero{false};
 
+        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
+
+        ExecutionSpace execution_space() const override { return execution_space_; }
+
         void set_initial_guess_zero(const bool val) override { is_initial_guess_zero = val; }
 
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
@@ -124,6 +128,8 @@ namespace sfem {
             };
 
             ensure_power_method();
+
+            execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         void ensure_power_method() {

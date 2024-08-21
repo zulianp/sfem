@@ -426,15 +426,19 @@ int main(int argc, char *argv[]) {
         set_BC(nx, ny, strides, rhs);
     }
 
-    auto op = sfem::make_op<real_t>(ndofs, ndofs, [=](const real_t *x, real_t *y) {
-        aa_quad4_laplacian_nitsche_BC_apply(nx, ny, strides, ox, oy, dx, dy, x, y);
+    auto op = sfem::make_op<real_t>(
+            ndofs,
+            ndofs,
+            [=](const real_t *x, real_t *y) {
+                aa_quad4_laplacian_nitsche_BC_apply(nx, ny, strides, ox, oy, dx, dy, x, y);
 
-        if (use_nitsche) {
-            nitsche_BC_apply(nx, ny, strides, ox, oy, dx, dy, x, y);
-        } else {
-            copy_at_BC(nx, ny, strides, x, y);
-        }
-    });
+                if (use_nitsche) {
+                    nitsche_BC_apply(nx, ny, strides, ox, oy, dx, dy, x, y);
+                } else {
+                    copy_at_BC(nx, ny, strides, x, y);
+                }
+            },
+            sfem::EXECUTION_SPACE_HOST);
 
     auto solver = sfem::h_bcgs<real_t>();
     solver->set_n_dofs(ndofs);
