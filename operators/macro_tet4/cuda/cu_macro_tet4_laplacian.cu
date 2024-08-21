@@ -284,6 +284,7 @@ static int cu_macro_tet4_laplacian_apply_tpl(const ptrdiff_t nelements,
                 <<<n_blocks, block_size, 0>>>(nelements, stride, elements, fff, x, y);
     }
 
+    SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
 }
 
@@ -354,16 +355,14 @@ __global__ void cu_macro_tet4_laplacian_diag_kernel(
             ed[v] = 0;
         }
 
-        const ptrdiff_t stride = 1;
         geom_t offf[6];
-#pragma unroll(6)
         for (int d = 0; d < 6; d++) {
             offf[d] = fff[d * stride + e];
         }
 
         // Apply operator
         {  // Corner tets
-            sub_fff_0(offf, stride, sub_fff);
+            sub_fff_0(offf, 1, sub_fff);
 
             // [0, 4, 6, 7],
             lapl_diag_micro_kernel(sub_fff, &ed[0], &ed[4], &ed[6], &ed[7]);
@@ -381,26 +380,28 @@ __global__ void cu_macro_tet4_laplacian_diag_kernel(
         {  // Octahedron tets
 
             // [4, 5, 6, 8],
-            sub_fff_4(offf, stride, sub_fff);
+            sub_fff_4(offf, 1, sub_fff);
             lapl_diag_micro_kernel(sub_fff, &ed[4], &ed[5], &ed[6], &ed[8]);
 
             // [7, 4, 6, 8],
-            sub_fff_5(offf, stride, sub_fff);
+            sub_fff_5(offf, 1, sub_fff);
             lapl_diag_micro_kernel(sub_fff, &ed[7], &ed[4], &ed[6], &ed[8]);
 
             // [6, 5, 9, 8],
-            sub_fff_6(offf, stride, sub_fff);
+            sub_fff_6(offf, 1, sub_fff);
             lapl_diag_micro_kernel(sub_fff, &ed[6], &ed[5], &ed[9], &ed[8]);
 
             // [7, 6, 9, 8]]
-            sub_fff_7(offf, stride, sub_fff);
+            sub_fff_7(offf, 1, sub_fff);
             lapl_diag_micro_kernel(sub_fff, &ed[7], &ed[6], &ed[9], &ed[8]);
         }
 
         // redistribute coeffs
         // #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
-            atomicAdd(&diag[elems[v * stride + e]], ed[v]);
+            const idx_t idx = elems[v * stride + e];
+            assert(ed[v] != 0);
+            atomicAdd(&diag[idx], ed[v]);
         }
     }
 }
@@ -412,7 +413,6 @@ static int cu_macro_tet4_laplacian_diag_tpl(const ptrdiff_t nelements,
                                             const cu_jacobian_t *const SFEM_RESTRICT fff,
                                             T *const SFEM_RESTRICT diag,
                                             void *stream) {
-    // Hand tuned
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
@@ -433,6 +433,7 @@ static int cu_macro_tet4_laplacian_diag_tpl(const ptrdiff_t nelements,
                 nelements, stride, elements, fff, diag);
     }
 
+    SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
 }
 

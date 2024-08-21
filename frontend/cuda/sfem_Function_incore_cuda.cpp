@@ -16,7 +16,7 @@ namespace sfem {
     public:
         enum ElemType element_type_;
         ptrdiff_t n_elements_;
-        idx_t *elements_;
+        std::shared_ptr<Buffer<idx_t>> elements_;
         void *fff_;
 
         FFF(Mesh &mesh, const enum ElemType element_type)
@@ -27,18 +27,28 @@ namespace sfem {
             cu_tet4_fff_allocate(n_elements_, &fff_);
             cu_tet4_fff_fill(n_elements_, c_mesh->elements, c_mesh->points, fff_);
 
+            // printf("elem_num_nodes = %d\n", elem_num_nodes(element_type));
+
+            idx_t *elements{nullptr};
             elements_to_device(
-                    n_elements_, elem_num_nodes(element_type), c_mesh->elements, &elements_);
+                    n_elements_, elem_num_nodes(element_type), c_mesh->elements, &elements);
+
+            elements_ = Buffer<idx_t>::own(n_elements_ * elem_num_nodes(element_type),
+                                           elements,
+                                           d_buffer_destroy,
+                                           MEMORY_SPACE_DEVICE);
+
+            // to_host(elements_)->print(std::cout);
         }
 
         ~FFF() {
             d_buffer_destroy(fff_);
-            d_buffer_destroy(elements_);
+            // d_buffer_destroy(elements_);
         }
 
         enum ElemType element_type() const { return element_type_; }
         ptrdiff_t n_elements() const { return n_elements_; }
-        idx_t *elements() const { return elements_; }
+        idx_t *elements() const { return elements_->data(); }
         void *fff() const { return fff_; }
     };
 
@@ -216,13 +226,13 @@ namespace sfem {
 
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
             return cu_laplacian_diag(fff->element_type(),
-                                         fff->n_elements(),
-                                         fff->n_elements(),  // stride
-                                         fff->elements(),
-                                         fff->fff(),
-                                         real_type,
-                                         values,
-                                         SFEM_DEFAULT_STREAM);
+                                     fff->n_elements(),
+                                     fff->n_elements(),  // stride
+                                     fff->elements(),
+                                     fff->fff(),
+                                     real_type,
+                                     values,
+                                     SFEM_DEFAULT_STREAM);
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
