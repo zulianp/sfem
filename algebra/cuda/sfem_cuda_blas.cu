@@ -131,6 +131,7 @@ namespace sfem {
                              T *const result) {
             for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n;
                  i += blockDim.x * gridDim.x) {
+                assert(r[i] != 0);
                 result[i] = l[i] / r[i];
             }
         }

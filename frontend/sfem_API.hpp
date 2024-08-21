@@ -250,32 +250,22 @@ namespace sfem {
                 EXECUTION_SPACE_HOST);
     }
 
-    std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation(
-            const std::shared_ptr<Function> &fine_function,
-            const ExecutionSpace es) {
-#ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) {
-            assert(false && "IMPLEMENT ME");
-        }
-#endif  // SFEM_ENABLE_CUDA
-        return fine_function->hierarchical_prolongation();
-    }
-
     template <typename T>
     std::shared_ptr<Operator<T>> create_inverse_diagonal_scaling(
             const std::shared_ptr<Buffer<T>> &diag,
             const ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
+            auto d_diag = to_device(diag);
             return sfem::make_op<T>(
-                    diag->size(),
-                    diag->size(),
+                    d_diag->size(),
+                    d_diag->size(),
                     [=](const T *const x, T *const y) {
-                        auto d = diag->data();
+                        auto d = d_diag->data();
                         // FIXME (only supports real_t)
-                        d_ediv(diag->size(), x, d, y);
+                        d_ediv(d_diag->size(), x, d, y);
                     },
-                    EXECUTION_SPACE_HOST);
+                    EXECUTION_SPACE_DEVICE);
         }
 #endif  // SFEM_ENABLE_CUDA
 

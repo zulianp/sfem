@@ -22,31 +22,6 @@
 
 #include <vector>
 
-template <typename T>
-inline void zeros(std::size_t n, T *arr) {
-    memset(arr, 0, n * sizeof(T));
-}
-
-template <typename T>
-void axpby(const ptrdiff_t n, const T alpha, const T *const x, const T beta, T *const y) {
-#pragma omp parallel for
-    for (ptrdiff_t i = 0; i < n; i++) {
-        y[i] = alpha * x[i] + beta * y[i];
-    }
-}
-
-template <typename T>
-T dot(const ptrdiff_t n, const T *const l, const T *const r) {
-    T ret = 0;
-
-#pragma omp parallel for reduction(+ : ret)
-    for (ptrdiff_t i = 0; i < n; i++) {
-        ret += l[i] * r[i];
-    }
-
-    return ret;
-}
-
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -75,7 +50,7 @@ int main(int argc, char *argv[]) {
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
-    if(SFEM_USE_GPU) {
+    if (SFEM_USE_GPU) {
         es = sfem::EXECUTION_SPACE_DEVICE;
     }
 
@@ -146,6 +121,12 @@ int main(int argc, char *argv[]) {
     auto conds = sfem::create_dirichlet_conditions_from_env(fs, es);
     auto f = sfem::Function::create(fs);
 
+    printf("Running %s\n", argv[0]);
+    printf("#elements %ld #nodes %ld #dofs %ld\n",
+           (long)m->n_elements(),
+           (long)m->n_nodes(),
+           (long)fs->n_dofs());
+
     auto diag = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     auto x = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     auto rhs = sfem::create_buffer<real_t>(fs->n_dofs(), es);
@@ -154,6 +135,11 @@ int main(int argc, char *argv[]) {
     op->initialize();
     f->add_constraint(conds);
     f->add_operator(op);
+
+// #ifdef SFEM_ENABLE_CUDA
+//     op->hessian_diag(nullptr, diag->data());
+//     sfem::to_host(diag)->print(std::cout);
+// #endif
 
     double compute_tick = MPI_Wtime();
     double init_tick = MPI_Wtime();
@@ -183,13 +169,15 @@ int main(int argc, char *argv[]) {
             cheb->set_initial_guess_zero(false);
             smoother = cheb;
         } else if (SFEM_USE_PRECONDITIONER) {
-            f->hessian_diag(nullptr, diag->data());
+            int err = f->hessian_diag(nullptr, diag->data());
+            assert(!err);
         }
 
     } else {
         auto crs = crs_hessian(*f, f->crs_graph(), es);
         linear_op = crs;
-        f->hessian_diag(nullptr, diag->data());
+        int err = f->hessian_diag(nullptr, diag->data());
+        assert(!err);
 
         if (SFEM_USE_CHEB) {
             auto cheb = sfem::create_cheb3<real_t>(linear_op, es);
