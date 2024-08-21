@@ -2,13 +2,12 @@
 #include <memory>
 #include "boundary_condition.h"
 
-
 #include "sfem_defs.h"
 #include "sfem_mesh.h"
 
+#include "cu_boundary_condition.h"
 #include "cu_laplacian.h"
 #include "cu_linear_elasticity.h"
-#include "cu_boundary_condition.h"
 #include "cu_tet4_fff.h"
 
 namespace sfem {
@@ -48,6 +47,7 @@ namespace sfem {
         std::shared_ptr<FunctionSpace> space;
         int n_dirichlet_conditions{0};
         boundary_condition_t *dirichlet_conditions{nullptr};
+        std::shared_ptr<DirichletConditions> h_dirichlet;
 
         std::shared_ptr<Constraint> derefine() const {
             assert(false);
@@ -55,7 +55,7 @@ namespace sfem {
         }
 
         GPUDirichletConditions(const std::shared_ptr<DirichletConditions> &dc)
-            : space(dc->space()) {
+            : space(dc->space()), h_dirichlet(dc) {
             n_dirichlet_conditions = dc->n_conditions();
             auto *h_dirichlet_conditions = (boundary_condition_t *)dc->impl_conditions();
 
@@ -150,10 +150,11 @@ namespace sfem {
             return nullptr;
         }
 
-        std::shared_ptr<Constraint> derefine(const std::shared_ptr<sfem::FunctionSpace> &,
-                                             bool) const override {
-            assert(false);
-            return nullptr;
+        std::shared_ptr<Constraint> derefine(const std::shared_ptr<sfem::FunctionSpace> &space,
+                                             bool as_zeros) const override {
+            auto h_derefined = std::static_pointer_cast<DirichletConditions>(
+                    h_dirichlet->derefine(space, as_zeros));
+            return std::make_shared<GPUDirichletConditions>(h_derefined);
         }
 
         ~GPUDirichletConditions() {
@@ -194,6 +195,16 @@ namespace sfem {
 
         GPULaplacian(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            // FIXME avoid duplicating operator info
+            auto ret = std::make_shared<GPULaplacian>(space);
+            assert(space->element_type() == macro_base_elem(fff->element_type()));
+            ret->fff = std::make_shared<FFF>(space->mesh(), space->element_type());
+            return ret;
+        }
+
         int hessian_crs(const real_t *const x,
                         const count_t *const rowptr,
                         const idx_t *const colidx,
@@ -203,10 +214,21 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
+        int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
+            return cu_laplacian_diag(fff->element_type(),
+                                         fff->n_elements(),
+                                         fff->n_elements(),  // stride
+                                         fff->elements(),
+                                         fff->fff(),
+                                         real_type,
+                                         values,
+                                         SFEM_DEFAULT_STREAM);
+        }
+
         int gradient(const real_t *const x, real_t *const out) override {
             return cu_laplacian_apply(fff->element_type(),
                                       fff->n_elements(),
-                                      fff->n_elements(), // stride
+                                      fff->n_elements(),  // stride
                                       fff->elements(),
                                       fff->fff(),
                                       real_type,
@@ -218,7 +240,7 @@ namespace sfem {
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
             return cu_laplacian_apply(fff->element_type(),
                                       fff->n_elements(),
-                                      fff->n_elements(), // stride
+                                      fff->n_elements(),  // stride
                                       fff->elements(),
                                       fff->fff(),
                                       real_type,
@@ -246,6 +268,24 @@ namespace sfem {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
             assert(mesh->spatial_dim == space->block_size());
             return std::make_unique<GPULinearElasticity>(space);
+        }
+
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            auto ret = std::make_shared<GPULinearElasticity>(space);
+            assert(space->element_type() == macro_base_elem(ctx.element_type));
+
+            // FIXME avoid duplicating operator info
+            cuda_incore_linear_elasticity_init(space->element_type(),
+                                               &ret->ctx,
+                                               ctx.mu,
+                                               ctx.lambda,
+                                               mesh->nelements,
+                                               mesh->elements,
+                                               mesh->points);
+
+            return ret;
         }
 
         const char *name() const override { return "GPULinearElasticity"; }

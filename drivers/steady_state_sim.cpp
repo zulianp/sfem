@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
                 solver->set_preconditioner_op(sfem::make_op<real_t>(
                         b_x->size(), b_x->size(), [=](const real_t *const x, real_t *const y) {
                             d_ediv(b_d->size(), x, b_d->data(), y);
-                        }));
+                        }, sfem::EXECUTION_SPACE_DEVICE));
             } else {
                 fprintf(stderr, "[Warning] Preconditioner unavailable for mesh %s\n", folder);
             }

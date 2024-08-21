@@ -47,27 +47,6 @@ T dot(const ptrdiff_t n, const T *const l, const T *const r) {
     return ret;
 }
 
-real_t residual(sfem::Operator<real_t> &op,
-                const real_t *const rhs,
-                const real_t *const x,
-                real_t *const r,
-                const sfem::ExecutionSpace es) {
-#ifdef SFEM_ENABLE_CUDA
-    if (es == sfem::EXECUTION_SPACE_DEVICE) {
-        // TODO
-        fprintf(stderr, "[Warning] residual not implemented for CUDA!\n");
-        assert(false);
-        return -1;
-    } else
-#endif
-    {
-        zeros(op.rows(), r);
-        op.apply(x, r);
-        axpby<real_t>(op.rows(), 1, rhs, -1, r);
-        return sqrt(dot(op.rows(), r, r));
-    }
-}
-
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -195,7 +174,7 @@ int main(int argc, char *argv[]) {
 
             // Power-method
             auto r = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-            residual(*linear_op, rhs->data(), x->data(), r->data(), es);
+            residual(*linear_op, rhs->data(), x->data(), r->data());
             cheb->eigen_solver_tol = SFEM_CHEB_EIG_TOL;
             cheb->init(r->data());
 
@@ -217,7 +196,7 @@ int main(int argc, char *argv[]) {
 
             // Power-method
             auto r = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-            residual(*linear_op, rhs->data(), x->data(), r->data(), es);
+            residual(*linear_op, rhs->data(), x->data(), r->data());
             cheb->init(r->data());
 
             cheb->scale_eig_max = SFEM_CHEB_EIG_MAX_SCALE;
@@ -297,10 +276,10 @@ int main(int argc, char *argv[]) {
         auto solver_coarse = sfem::create_cg<real_t>(linear_op_coarse, es);
 
         {
-            solver_coarse->verbose = false;
+            solver_coarse->verbose = true;
             solver_coarse->set_max_it(10000);
-            solver_coarse->set_atol(1e-8);
-            solver_coarse->set_rtol(1e-8);
+            solver_coarse->set_atol(1e-9);
+            solver_coarse->set_rtol(1e-9);
 
             if (SFEM_USE_PRECONDITIONER) {
                 f_coarse->hessian_diag(nullptr, diag_coarse->data());
@@ -370,7 +349,7 @@ int main(int argc, char *argv[]) {
     double compute_tock = MPI_Wtime();
 
     auto r = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-    real_t rtr = residual(*linear_op, rhs->data(), x->data(), r->data(), es);
+    real_t rtr = residual(*linear_op, rhs->data(), x->data(), r->data());
 
     // -------------------------------
     // Write output

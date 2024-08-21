@@ -165,7 +165,9 @@ namespace sfem {
             auto d_crs_graph = to_device(crs_graph);
 
             return std::make_shared<LambdaOperator<real_t>>(
-                    rows, cols, [=](const real_t *const from, real_t *const to) {
+                    rows,
+                    cols,
+                    [=](const real_t *const from, real_t *const to) {
                         // FIXME make it generic for all elements!
                         cu_macrotet4_to_tet4_restriction(n_coarse_nodes,
                                                          d_crs_graph->rowptr()->data(),
@@ -177,12 +179,15 @@ namespace sfem {
                                                          SFEM_REAL_DEFAULT,
                                                          to,
                                                          SFEM_DEFAULT_STREAM);
-                    }, EXECUTION_SPACE_DEVICE);
+                    },
+                    EXECUTION_SPACE_DEVICE);
         }
 #endif  // SFEM_ENABLE_CUDA
 
         return std::make_shared<LambdaOperator<real_t>>(
-                rows, cols, [=](const real_t *const from, real_t *const to) {
+                rows,
+                cols,
+                [=](const real_t *const from, real_t *const to) {
                     ::hierarchical_restriction_with_edge_map(n_coarse_nodes,
                                                              crs_graph->rowptr()->data(),
                                                              crs_graph->colidx()->data(),
@@ -190,7 +195,8 @@ namespace sfem {
                                                              block_size,
                                                              from,
                                                              to);
-                }, EXECUTION_SPACE_HOST);
+                },
+                EXECUTION_SPACE_HOST);
     }
 
     std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation(
@@ -210,7 +216,9 @@ namespace sfem {
             auto d_crs_graph = to_device(crs_graph);
 
             return std::make_shared<LambdaOperator<real_t>>(
-                    rows, cols, [=](const real_t *const from, real_t *const to) {
+                    rows,
+                    cols,
+                    [=](const real_t *const from, real_t *const to) {
                         // FIXME make it generic for all elements!
                         cu_tet4_to_macrotet4_prolongation(n_coarse_nodes,
                                                           d_crs_graph->rowptr()->data(),
@@ -222,12 +230,15 @@ namespace sfem {
                                                           SFEM_REAL_DEFAULT,
                                                           to,
                                                           SFEM_DEFAULT_STREAM);
-                    }, EXECUTION_SPACE_DEVICE);
+                    },
+                    EXECUTION_SPACE_DEVICE);
         }
 #endif  // SFEM_ENABLE_CUDA
 
         return std::make_shared<LambdaOperator<real_t>>(
-                rows, cols, [=](const real_t *const from, real_t *const to) {
+                rows,
+                cols,
+                [=](const real_t *const from, real_t *const to) {
                     ::hierarchical_prolongation_with_edge_map(n_coarse_nodes,
                                                               crs_graph->rowptr()->data(),
                                                               crs_graph->colidx()->data(),
@@ -235,7 +246,8 @@ namespace sfem {
                                                               block_size,
                                                               from,
                                                               to);
-                }, EXECUTION_SPACE_HOST);
+                },
+                EXECUTION_SPACE_HOST);
     }
 
     std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation(
@@ -255,32 +267,43 @@ namespace sfem {
             const ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            return sfem::make_op<T>(diag->size(), diag->size(), [=](const T *const x, T *const y) {
-                auto d = diag->data();
-                // FIXME (only supports real_t)
-                d_ediv(diag->size(), x, d, y);
-            }, EXECUTION_SPACE_HOST);
+            return sfem::make_op<T>(
+                    diag->size(),
+                    diag->size(),
+                    [=](const T *const x, T *const y) {
+                        auto d = diag->data();
+                        // FIXME (only supports real_t)
+                        d_ediv(diag->size(), x, d, y);
+                    },
+                    EXECUTION_SPACE_HOST);
         }
 #endif  // SFEM_ENABLE_CUDA
 
-        return sfem::make_op<T>(diag->size(), diag->size(), [=](const T *const x, T *const y) {
-            auto d = diag->data();
+        return sfem::make_op<T>(
+                diag->size(),
+                diag->size(),
+                [=](const T *const x, T *const y) {
+                    auto d = diag->data();
 
 #pragma omp parallel for
-            for (ptrdiff_t i = 0; i < diag->size(); ++i) {
-                y[i] = x[i] / d[i];
-            }
-        }, EXECUTION_SPACE_HOST);
+                    for (ptrdiff_t i = 0; i < diag->size(); ++i) {
+                        y[i] = x[i] / d[i];
+                    }
+                },
+                EXECUTION_SPACE_HOST);
     }
 
     std::shared_ptr<Operator<real_t>> make_linear_op(const std::shared_ptr<Function> &f) {
         return sfem::make_op<real_t>(
                 f->space()->n_dofs(),
                 f->space()->n_dofs(),
-                [=](const real_t *const x, real_t *const y) { f->apply(nullptr, x, y); }, f->execution_space());
+                [=](const real_t *const x, real_t *const y) { f->apply(nullptr, x, y); },
+                f->execution_space());
     }
 
-    auto crs_hessian(sfem::Function &f, const std::shared_ptr<CRSGraph> &crs_graph, const sfem::ExecutionSpace es) {
+    auto crs_hessian(sfem::Function &f,
+                     const std::shared_ptr<CRSGraph> &crs_graph,
+                     const sfem::ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
             auto d_crs_graph = sfem::to_device(crs_graph);
@@ -311,6 +334,32 @@ namespace sfem {
                                 crs_graph->colidx(),
                                 values,
                                 (real_t)1);
+    }
+
+    real_t residual(sfem::Operator<real_t> &op,
+                    const real_t *const rhs,
+                    const real_t *const x,
+                    real_t *const r) {
+#ifdef SFEM_ENABLE_CUDA
+        if (op.execution_space() == sfem::EXECUTION_SPACE_DEVICE) {
+            d_memset(r, 0, op.rows() * sizeof(real_t));
+            op.apply(x, r);
+            d_axpby(op.rows(), 1, rhs, -1, r);
+            return d_nrm2(op.rows(), r);
+        } else
+#endif
+        {
+            memset(r, 0, op.rows() * sizeof(real_t));
+            op.apply(x, r);
+
+            real_t ret = 0;
+#pragma omp parallel for reduction(+ : ret)
+            for (ptrdiff_t i = 0; i < op.rows(); i++) {
+                r[i] = rhs[i] - r[i];
+                ret += r[i] * r[i];
+            }
+            return sqrt(ret);
+        }
     }
 
 }  // namespace sfem
