@@ -237,6 +237,7 @@ namespace sfem {
                     },
                     EXECUTION_SPACE_DEVICE);
         }
+        
 #endif  // SFEM_ENABLE_CUDA
 
         return std::make_shared<LambdaOperator<real_t>>(

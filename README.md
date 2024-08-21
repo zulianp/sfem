@@ -48,3 +48,16 @@ On Piz Daint the ideal environment is obtained with
 source $APPS/UES/anfink/gpu/environment
 ```
 
+# Cite SFEM
+
+Cite SFEM if you use it for your work:
+
+```bibtex
+@misc{sfemgit,
+	author = {Patrick Zulian},
+	title = {{SFEM}: Simple {FEM}},
+	url = {https://bitbucket.org/zulianp/sfem},
+	howpublished = {https://bitbucket.org/zulianp/sfem},
+	year = {2024}
+}
+```

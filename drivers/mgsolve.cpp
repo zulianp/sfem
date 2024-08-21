@@ -282,14 +282,9 @@ int main(int argc, char *argv[]) {
         auto restriction = sfem::create_hierarchical_restriction(
                 f->space()->mesh().n_nodes(), f->space()->block_size(), coarse_graph, edges, es);
 
-#if 1
         // FIXME this does not work properly!
         auto prolongation = sfem::create_hierarchical_prolongation(
                f, coarse_graph, edges, es);
-
-#else
-        auto prolongation = f->hierarchical_prolongation(); // This works!
-#endif
 
         f->apply_constraints(x->data());
         f->apply_constraints(rhs->data());

@@ -256,6 +256,8 @@ namespace sfem {
                     this->zeros(mem->work->size(), mem->work->data());
                     prolongation->apply(mem_coarse->solution->data(), mem->work->data());
 
+                    // mem->work->print(std::cout);
+
                     // Apply coarse space correction
                     this->axpby(mem->size(), 1, mem->work->data(), 1, mem->solution->data());
                 }
