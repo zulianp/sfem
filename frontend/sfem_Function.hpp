@@ -351,6 +351,8 @@ namespace sfem {
         std::shared_ptr<Operator<real_t>> hierarchical_restriction();
         std::shared_ptr<Operator<real_t>> hierarchical_prolongation();
 
+        ExecutionSpace execution_space() const;
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;

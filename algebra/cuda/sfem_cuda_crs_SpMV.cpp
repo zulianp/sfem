@@ -148,6 +148,7 @@ namespace sfem {
         ret->col_idx = colidx;
         ret->values = values;
         ret->cols_ = cols;
+        ret->execution_space_ = EXECUTION_SPACE_DEVICE;
 
         auto impl = std::make_shared<CRSSpMVImpl>(rows, cols, rowptr, colidx, values, scale_output);
         ret->apply_ = [=](const real_t* const x, real_t* const y) { impl->apply(x, y); };

@@ -852,6 +852,17 @@ namespace sfem {
         bool handle_constraints{true};
     };
 
+    ExecutionSpace Function::execution_space() const {
+        ExecutionSpace ret = EXECUTION_SPACE_INVALID;
+
+        for (auto op : impl_->ops) {
+            assert(ret == EXECUTION_SPACE_INVALID || ret == op->execution_space());
+            ret = op->execution_space();
+        }
+
+        return ret;
+    }
+
     Function::Function(const std::shared_ptr<FunctionSpace> &space)
         : impl_(std::make_unique<Impl>()) {
         impl_->space = space;
@@ -1055,7 +1066,9 @@ namespace sfem {
                                 p2_vertices->data());
 
         return std::make_shared<LambdaOperator<real_t>>(
-                rows, cols, [=](const real_t *const from, real_t *const to) {
+                rows,
+                cols,
+                [=](const real_t *const from, real_t *const to) {
                     ::hierarchical_restriction_with_edge_map(crs_graph->n_nodes(),
                                                              crs_graph->rowptr()->data(),
                                                              crs_graph->colidx()->data(),
@@ -1063,7 +1076,8 @@ namespace sfem {
                                                              impl_->space->block_size(),
                                                              from,
                                                              to);
-                });
+                },
+                EXECUTION_SPACE_HOST);
     }
 
     std::shared_ptr<Operator<real_t>> Function::hierarchical_prolongation() {
@@ -1076,7 +1090,9 @@ namespace sfem {
         const ptrdiff_t cols = max_node_id(coarse_et, mesh->nelements, mesh->elements) + 1;
 
         return std::make_shared<LambdaOperator<real_t>>(
-                rows, cols, [=](const real_t *const from, real_t *const to) {
+                rows,
+                cols,
+                [=](const real_t *const from, real_t *const to) {
                     ::hierarchical_prolongation(coarse_et,
                                                 et,
                                                 mesh->nelements,
@@ -1086,7 +1102,8 @@ namespace sfem {
                                                 to);
 
                     this->apply_zero_constraints(to);
-                });
+                },
+                EXECUTION_SPACE_HOST);
     }
 
     std::shared_ptr<Function> Function::derefine(const bool dirichlet_as_zero) {

@@ -37,6 +37,10 @@ namespace sfem {
 
         ptrdiff_t n_dofs{-1};
 
+        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
+
+        ExecutionSpace execution_space() const override { return execution_space_; }
+
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
 
@@ -102,6 +106,8 @@ namespace sfem {
             zeros = [](const std::size_t n, T* const x) {
                 memset(x, 0, n*sizeof(T));
             };
+
+            execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         bool good() const {

@@ -40,6 +40,9 @@ namespace sfem {
         int check_each{100};
         ptrdiff_t n_dofs{-1};
         bool verbose{true};
+        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
+
+        ExecutionSpace execution_space() const override { return execution_space_; }
 
         void set_atol(const T val){
             atol = val;
@@ -103,6 +106,8 @@ namespace sfem {
             zeros = [](const std::size_t n, T* const x) {
                 memset(x, 0, n*sizeof(T));
             };
+
+            execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         bool good() const {

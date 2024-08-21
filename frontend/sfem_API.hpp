@@ -177,7 +177,7 @@ namespace sfem {
                                                          SFEM_REAL_DEFAULT,
                                                          to,
                                                          SFEM_DEFAULT_STREAM);
-                    });
+                    }, EXECUTION_SPACE_DEVICE);
         }
 #endif  // SFEM_ENABLE_CUDA
 
@@ -190,7 +190,7 @@ namespace sfem {
                                                              block_size,
                                                              from,
                                                              to);
-                });
+                }, EXECUTION_SPACE_HOST);
     }
 
     std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation(
@@ -222,7 +222,7 @@ namespace sfem {
                                                           SFEM_REAL_DEFAULT,
                                                           to,
                                                           SFEM_DEFAULT_STREAM);
-                    });
+                    }, EXECUTION_SPACE_DEVICE);
         }
 #endif  // SFEM_ENABLE_CUDA
 
@@ -235,7 +235,7 @@ namespace sfem {
                                                               block_size,
                                                               from,
                                                               to);
-                });
+                }, EXECUTION_SPACE_HOST);
     }
 
     std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation(
@@ -259,7 +259,7 @@ namespace sfem {
                 auto d = diag->data();
                 // FIXME (only supports real_t)
                 d_ediv(diag->size(), x, d, y);
-            });
+            }, EXECUTION_SPACE_HOST);
         }
 #endif  // SFEM_ENABLE_CUDA
 
@@ -270,14 +270,14 @@ namespace sfem {
             for (ptrdiff_t i = 0; i < diag->size(); ++i) {
                 y[i] = x[i] / d[i];
             }
-        });
+        }, EXECUTION_SPACE_HOST);
     }
 
     std::shared_ptr<Operator<real_t>> make_linear_op(const std::shared_ptr<Function> &f) {
         return sfem::make_op<real_t>(
                 f->space()->n_dofs(),
                 f->space()->n_dofs(),
-                [=](const real_t *const x, real_t *const y) { f->apply(nullptr, x, y); });
+                [=](const real_t *const x, real_t *const y) { f->apply(nullptr, x, y); }, f->execution_space());
     }
 
     auto crs_hessian(sfem::Function &f, const std::shared_ptr<CRSGraph> &crs_graph, const sfem::ExecutionSpace es) {

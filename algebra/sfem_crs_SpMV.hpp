@@ -25,6 +25,10 @@ namespace sfem {
         std::shared_ptr<Buffer<C>> col_idx;
         std::shared_ptr<Buffer<T>> values;
         ptrdiff_t cols_{0};
+
+        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
+
+        ExecutionSpace execution_space() const override { return execution_space_; }
     };
 
     template <typename R, typename C, typename T>
@@ -39,6 +43,8 @@ namespace sfem {
         ret->col_idx = colidx;
         ret->values = values;
         ret->cols_ = cols;
+
+        ret->execution_space_ = EXECUTION_SPACE_HOST;
 
         ret->apply_ = [=](const T* const x, T* const y) {
             auto rowptr_ = ret->row_ptr->data();

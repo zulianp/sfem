@@ -44,6 +44,10 @@ namespace sfem {
             ~Memory() {}
         };
 
+        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
+
+        ExecutionSpace execution_space() const override { return execution_space_; }
+
         int apply(const T* const rhs, T* const x) override {
             ensure_init();
 
@@ -116,6 +120,8 @@ namespace sfem {
 
                 return sqrt(ret);
             };
+
+            execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         void set_max_it(const int val) { max_it_ = val; }
