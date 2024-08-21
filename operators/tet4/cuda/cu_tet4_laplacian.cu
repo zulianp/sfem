@@ -154,6 +154,7 @@ __global__ void cu_tet4_laplacian_diag_kernel(
         // redistribute coeffs
 #pragma unroll(4)
         for (int v = 0; v < 4; ++v) {
+            assert(ed[v] != 0);
             atomicAdd(&diag[vidx[v]], ed[v]);
         }
     }
