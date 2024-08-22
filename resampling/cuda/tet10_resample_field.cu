@@ -910,6 +910,9 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(
 
 }  // end kernel hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel
 
+////////////////////////////////////////////////////////////////////////
+// hex8_to_tet10_resample_field_local_CUDA
+////////////////////////////////////////////////////////////////////////
 extern "C" int hex8_to_tet10_resample_field_local_CUDA(
         // Mesh
         const ptrdiff_t nelements,  // number of elements
