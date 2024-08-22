@@ -6,11 +6,11 @@
 
 // UNTESTED
 int tet4_laplacian_assemble_value(const ptrdiff_t nelements,
-                                   const ptrdiff_t nnodes,
-                                   idx_t **const SFEM_RESTRICT elements,
-                                   geom_t **const SFEM_RESTRICT points,
-                                   const real_t *const SFEM_RESTRICT u,
-                                   real_t *const SFEM_RESTRICT value);
+                                  const ptrdiff_t nnodes,
+                                  idx_t **const SFEM_RESTRICT elements,
+                                  geom_t **const SFEM_RESTRICT points,
+                                  const real_t *const SFEM_RESTRICT u,
+                                  real_t *const SFEM_RESTRICT value);
 
 /**
  * @brief Assembles the gradient of the Laplacian matrix for tetrahedral elements. Equivalently
@@ -28,25 +28,25 @@ int tet4_laplacian_assemble_value(const ptrdiff_t nelements,
  * @param[out] values Array of size nnodes where the assembled gradient vector will be stored.
  */
 int tet4_laplacian_apply(const ptrdiff_t nelements,
-                          const ptrdiff_t nnodes,
-                          idx_t **const SFEM_RESTRICT elements,
-                          geom_t **const SFEM_RESTRICT points,
-                          const real_t *const SFEM_RESTRICT u,
-                          real_t *const SFEM_RESTRICT values);
-
-int tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
-                                     const ptrdiff_t nnodes,
-                                     idx_t **const SFEM_RESTRICT elements,
-                                     geom_t **const SFEM_RESTRICT points,
-                                     const count_t *const SFEM_RESTRICT rowptr,
-                                     const idx_t *const SFEM_RESTRICT colidx,
-                                     real_t *const SFEM_RESTRICT values);
-
-int tet4_laplacian_diag(const ptrdiff_t nelements,
                          const ptrdiff_t nnodes,
                          idx_t **const SFEM_RESTRICT elements,
                          geom_t **const SFEM_RESTRICT points,
-                         real_t *const SFEM_RESTRICT diag);
+                         const real_t *const SFEM_RESTRICT u,
+                         real_t *const SFEM_RESTRICT values);
+
+int tet4_laplacian_crs(const ptrdiff_t nelements,
+                       const ptrdiff_t nnodes,
+                       idx_t **const SFEM_RESTRICT elements,
+                       geom_t **const SFEM_RESTRICT points,
+                       const count_t *const SFEM_RESTRICT rowptr,
+                       const idx_t *const SFEM_RESTRICT colidx,
+                       real_t *const SFEM_RESTRICT values);
+
+int tet4_laplacian_diag(const ptrdiff_t nelements,
+                        const ptrdiff_t nnodes,
+                        idx_t **const SFEM_RESTRICT elements,
+                        geom_t **const SFEM_RESTRICT points,
+                        real_t *const SFEM_RESTRICT diag);
 
 int tet4_laplacian_apply_opt(const ptrdiff_t nelements,
                              idx_t **const SFEM_RESTRICT elements,

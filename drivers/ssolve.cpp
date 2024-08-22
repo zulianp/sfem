@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
     crs_matrix_t matrix;
     create_crs_matrix(&mesh, &matrix, 1);
 
-    laplacian_assemble_hessian(
+    laplacian_crs(
         mesh.element_type,
         mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, matrix.rowptr, matrix.colidx, matrix.values);
 

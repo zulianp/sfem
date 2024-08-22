@@ -111,7 +111,7 @@ int tri6_laplacian_apply(const ptrdiff_t nelements,
     return 0;
 }
 
-int tri6_laplacian_assemble_hessian(const ptrdiff_t nelements,
+int tri6_laplacian_crs(const ptrdiff_t nelements,
                                     const ptrdiff_t nnodes,
                                     idx_t **const SFEM_RESTRICT elements,
                                     geom_t **const SFEM_RESTRICT points,

@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-void cvfem_laplacian_assemble_hessian(const enum ElemType element_type,
+void cvfem_laplacian_crs(const enum ElemType element_type,
                                       const ptrdiff_t nelements,
                                       const ptrdiff_t nnodes,
                                       idx_t **const SFEM_RESTRICT elems,

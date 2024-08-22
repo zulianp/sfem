@@ -1322,7 +1322,7 @@ namespace sfem {
 
             auto graph = space->dof_to_dof_graph();
 
-            return laplacian_assemble_hessian(element_type,
+            return laplacian_crs(element_type,
                                               mesh->nelements,
                                               mesh->nnodes,
                                               mesh->elements,
