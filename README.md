@@ -54,7 +54,7 @@ Cite SFEM if you use it for your work:
 
 ```bibtex
 @misc{sfemgit,
-	author = {Patrick Zulian},
+	author = {Zulian, Patrick and Riva, Simone},
 	title = {{SFEM}: Simple {FEM}},
 	url = {https://bitbucket.org/zulianp/sfem},
 	howpublished = {https://bitbucket.org/zulianp/sfem},
