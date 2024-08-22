@@ -43,7 +43,7 @@ mkdir -p $folder
 idx_type_size=4
 
 cylinder.py $mesh_db $nrefs
- db_to_raw.py $mesh_db $mesh_raw/p1 --select_elem_type=tetra
+db_to_raw.py $mesh_db $mesh_raw/p1 --select_elem_type=tetra
 
 if [[ 1 == "$SFEM_MESH_REFINE" ]]
 then

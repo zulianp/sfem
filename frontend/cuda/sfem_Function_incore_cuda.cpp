@@ -183,6 +183,7 @@ namespace sfem {
         std::shared_ptr<FunctionSpace> space;
         std::shared_ptr<FFF> fff;
         enum RealType real_type { SFEM_REAL_DEFAULT };
+        void *stream{SFEM_DEFAULT_STREAM};
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
@@ -227,7 +228,7 @@ namespace sfem {
                                      fff->fff(),
                                      real_type,
                                      values,
-                                     SFEM_DEFAULT_STREAM);
+                                     stream);
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
@@ -239,7 +240,7 @@ namespace sfem {
                                       real_type,
                                       x,
                                       out,
-                                      SFEM_DEFAULT_STREAM);
+                                      stream);
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
@@ -251,7 +252,7 @@ namespace sfem {
                                       real_type,
                                       h,
                                       out,
-                                      SFEM_DEFAULT_STREAM);
+                                      stream);
         }
 
         int value(const real_t *x, real_t *const out) override {
