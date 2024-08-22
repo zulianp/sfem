@@ -59,11 +59,6 @@ namespace sfem {
         boundary_condition_t *dirichlet_conditions{nullptr};
         std::shared_ptr<DirichletConditions> h_dirichlet;
 
-        std::shared_ptr<Constraint> derefine() const {
-            assert(false);
-            return nullptr;
-        }
-
         GPUDirichletConditions(const std::shared_ptr<DirichletConditions> &dc)
             : space(dc->space()), h_dirichlet(dc) {
             n_dirichlet_conditions = dc->n_conditions();

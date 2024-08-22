@@ -272,8 +272,11 @@ namespace sfem {
                 axpby(n, alpha, p, 1, x);
                 axpby(n, -alpha, Ap, 1, r);
 
-                monitor(k+1, sqrt(rtz), sqrt(rtz)/sqrt(rtr0));
-                if (sqrt(rtz)/sqrt(rtr0) < rtol) {
+                auto anorm = sqrt(rtz);
+                auto rnorm = anorm/sqrt(rtr0);
+
+                monitor(k+1, anorm, rnorm);
+                if (anorm < atol || rnorm < rtol) {
                     info = 0;
                     break;
                 }

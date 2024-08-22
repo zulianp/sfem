@@ -1,5 +1,7 @@
 #include "cu_tet4_prolongation_restriction.h"
 
+#include "sfem_cuda_base.h"
+
 #include <cassert>
 #include <cstdio>
 
