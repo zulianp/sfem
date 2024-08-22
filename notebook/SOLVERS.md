@@ -50,7 +50,7 @@ residual:	9.24332e-10
 ```	
 
 ## perf_950080707.csv (fine level)
-```
+```c
 function,seconds
 create_crs_graph,0
 destroy_crs_graph,0
@@ -67,7 +67,7 @@ report_solution,0
 ```
 
 ## perf_119425635.csv (coarse level)
-```
+```c
 function,seconds
 create_crs_graph,0
 destroy_crs_graph,0
@@ -82,4 +82,49 @@ apply_zero_constraints,0
 copy_constrained_dofs,100.477
 report_solution,0
 initial_guess,0
+```
+
+
+## Basic two-level method on NVIDIA P100 GPU (Piz Daint)
+
+```yaml
+
+SFEM_MATRIX_FREE: 1
+SFEM_COARSE_MATRIX_FREE: 1
+SFEM_OPERATOR: LinearElasticity
+SFEM_BLOCK_SIZE: 3
+SFEM_USE_PRECONDITIONER: 0
+SFEM_USE_CHEB: 1
+SFEM_DEBUG: 0
+SFEM_MG: 1
+SFEM_CHEB_EIG_MAX_SCALE: 1.020000
+SFEM_TOL: 1e-6
+SFEM_SMOOTHER_SWEEPS: 30
+SFEM_CHEB_EIG_TOL: 1e-7
+```
+
+```c
+PowerMethod (1344): lambda = 0.55367
+build_n2e: allocating 0.0402536 GB
+build_n2e: allocating 0.472383 GB
+crs_graph.c: build_n2e		0.809775 seconds
+crs_graph.c: build nz (mem conservative) structure	3.50567 seconds
+Multigrid
+iter	abs		rel		rate
+0	0.165836	-		-
+1	0.00667081	0.0402253	0.0402253
+2	0.000985268	0.00594122	0.147698
+3	0.000259423	0.00156434	0.263302
+4	8.21721e-05	0.000495503	0.316749
+5	2.87756e-05	0.000173518	0.350186
+6	1.07654e-05	6.49158e-05	0.374115
+7	4.21896e-06	2.54406e-05	0.391901
+8	1.70991e-06	1.03109e-05	0.405293
+9	7.10327e-07	4.28331e-06	0.415417
+----------------------------------------
+mgsolve (MACRO_TET4):
+----------------------------------------
+#elements 29523968 #nodes 39808545 #dofs 119425635
+TTS:		1036.09 [s], compute 1028.83 [s] (solve: 949.825 [s], init: 78.9262 [s])
+residual:	7.10327e-07
 ```

@@ -265,7 +265,7 @@ int main(int argc, char *argv[]) {
         auto solver_coarse = sfem::create_cg<real_t>(linear_op_coarse, es);
 
         {
-            solver_coarse->verbose = true;
+            solver_coarse->verbose = false;
             solver_coarse->set_max_it(10000);
             solver_coarse->set_atol(1e-14);
             solver_coarse->set_rtol(1e-9);
