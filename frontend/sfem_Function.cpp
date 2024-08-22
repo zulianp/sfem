@@ -58,7 +58,7 @@ namespace sfem {
     CRSGraph::~CRSGraph() = default;
 
     ptrdiff_t CRSGraph::n_nodes() const { return rowptr()->size() - 1; }
-    ptrdiff_t CRSGraph::nnz() const { return rowptr()->data()[this->n_nodes()]; }
+    ptrdiff_t CRSGraph::nnz() const { return colidx()->size(); }
 
     std::shared_ptr<Buffer<count_t>> CRSGraph::rowptr() const { return impl_->rowptr; }
     std::shared_ptr<Buffer<idx_t>> CRSGraph::colidx() const { return impl_->colidx; }
