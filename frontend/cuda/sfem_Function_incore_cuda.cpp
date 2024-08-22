@@ -184,6 +184,7 @@ namespace sfem {
         std::shared_ptr<FFF> fff;
         enum RealType real_type { SFEM_REAL_DEFAULT };
         void *stream{SFEM_DEFAULT_STREAM};
+        enum ElemType element_type { INVALID };
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
@@ -199,15 +200,16 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        GPULaplacian(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+        GPULaplacian(const std::shared_ptr<FunctionSpace> &space)
+            : space(space), element_type(space->element_type()) {}
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            // FIXME avoid duplicating operator info
             auto ret = std::make_shared<GPULaplacian>(space);
             assert(space->element_type() == macro_base_elem(fff->element_type()));
-            ret->fff = std::make_shared<FFF>(space->mesh(), space->element_type());
+            assert(ret->element_type == macro_base_elem(fff->element_type()));
+            ret->fff = fff;
             return ret;
         }
 
@@ -221,7 +223,7 @@ namespace sfem {
         }
 
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
-            return cu_laplacian_diag(fff->element_type(),
+            return cu_laplacian_diag(element_type,
                                      fff->n_elements(),
                                      fff->n_elements(),  // stride
                                      fff->elements(),
@@ -232,7 +234,7 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
-            return cu_laplacian_apply(fff->element_type(),
+            return cu_laplacian_apply(element_type,
                                       fff->n_elements(),
                                       fff->n_elements(),  // stride
                                       fff->elements(),
@@ -244,7 +246,7 @@ namespace sfem {
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
-            return cu_laplacian_apply(fff->element_type(),
+            return cu_laplacian_apply(element_type,
                                       fff->n_elements(),
                                       fff->n_elements(),  // stride
                                       fff->elements(),
