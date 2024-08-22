@@ -203,11 +203,11 @@ namespace sfem {
         GPULaplacian(const std::shared_ptr<FunctionSpace> &space)
             : space(space), element_type(space->element_type()) {}
 
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
-            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
+            auto mesh = (mesh_t *)derefined_space->mesh().impl_mesh();
 
-            auto ret = std::make_shared<GPULaplacian>(space);
-            assert(space->element_type() == macro_base_elem(fff->element_type()));
+            auto ret = std::make_shared<GPULaplacian>(derefined_space);
+            assert(derefined_space->element_type() == macro_base_elem(fff->element_type()));
             assert(ret->element_type == macro_base_elem(fff->element_type()));
             ret->fff = fff;
             return ret;
