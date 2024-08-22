@@ -235,7 +235,7 @@ int main(int argc, char *argv[]) {
     ptrdiff_t nnz = rowptr[mesh.nnodes];
     system_matrix = calloc(nnz, sizeof(real_t));
 
-    laplacian_assemble_hessian(mesh.element_type,
+    laplacian_crs(mesh.element_type,
                                mesh.nelements,
                                mesh.nnodes,
                                mesh.elements,

@@ -35,7 +35,7 @@ int laplacian_assemble_gradient(int element_type,
                                  const real_t *const SFEM_RESTRICT u,
                                  real_t *const SFEM_RESTRICT values);
 
-int laplacian_assemble_hessian(int element_type,
+int laplacian_crs(int element_type,
                                 const ptrdiff_t nelements,
                                 const ptrdiff_t nnodes,
                                 idx_t **const SFEM_RESTRICT elems,

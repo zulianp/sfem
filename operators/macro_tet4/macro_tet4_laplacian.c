@@ -264,7 +264,7 @@ static SFEM_INLINE void element_assemble_matrix(const idx_t *const SFEM_RESTRICT
     }
 }
 
-int macro_tet4_laplacian_assemble_hessian_opt(const ptrdiff_t nelements,
+int macro_tet4_laplacian_crs_opt(const ptrdiff_t nelements,
                                               idx_t **const SFEM_RESTRICT elements,
                                               const jacobian_t *const SFEM_RESTRICT fff_all,
                                               const count_t *const SFEM_RESTRICT rowptr,
@@ -289,7 +289,7 @@ int macro_tet4_laplacian_assemble_hessian_opt(const ptrdiff_t nelements,
     return 0;
 }
 
-int macro_tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
+int macro_tet4_laplacian_crs(const ptrdiff_t nelements,
                                           const ptrdiff_t nnodes,
                                           idx_t **const SFEM_RESTRICT elements,
                                           geom_t **const SFEM_RESTRICT points,

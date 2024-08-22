@@ -102,7 +102,7 @@ int laplacian_assemble_gradient(int element_type,
     return laplacian_apply(element_type, nelements, nnodes, elements, points, u, values);
 }
 
-int laplacian_assemble_hessian(int element_type,
+int laplacian_crs(int element_type,
                                const ptrdiff_t nelements,
                                const ptrdiff_t nnodes,
                                idx_t **const SFEM_RESTRICT elements,
@@ -112,32 +112,32 @@ int laplacian_assemble_hessian(int element_type,
                                real_t *const SFEM_RESTRICT values) {
     switch (element_type) {
         case TRI3: {
-            return tri3_laplacian_assemble_hessian(
+            return tri3_laplacian_crs(
                     nelements, nnodes, elements, points, rowptr, colidx, values);
         }
         case TRI6: {
-            return tri6_laplacian_assemble_hessian(
+            return tri6_laplacian_crs(
                     nelements, nnodes, elements, points, rowptr, colidx, values);
         }
         case TET4: {
-            return tet4_laplacian_assemble_hessian(
+            return tet4_laplacian_crs(
                     nelements, nnodes, elements, points, rowptr, colidx, values);
         }
         case TET10: {
-            return tet10_laplacian_assemble_hessian(
+            return tet10_laplacian_crs(
                     nelements, nnodes, elements, points, rowptr, colidx, values);
         }
         case MACRO_TET4: {
-            return macro_tet4_laplacian_assemble_hessian(
+            return macro_tet4_laplacian_crs(
                     nelements, nnodes, elements, points, rowptr, colidx, values);
         }
         case MACRO_TRI3: {
-            return macro_tri3_laplacian_assemble_hessian(
+            return macro_tri3_laplacian_crs(
                     nelements, nnodes, elements, points, rowptr, colidx, values);
         }
         default: {
             fprintf(stderr,
-                    "laplacian_assemble_hessian not implemented for type %s\n",
+                    "laplacian_crs not implemented for type %s\n",
                     type_to_string(element_type));
             assert(0);
             MPI_Abort(MPI_COMM_WORLD, -1);

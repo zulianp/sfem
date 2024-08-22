@@ -135,7 +135,7 @@ int main(int argc, char *argv[]) {
                 break;
             }
             case TET4: {
-                tet4_laplacian_assemble_hessian(mesh.nelements,
+                tet4_laplacian_crs(mesh.nelements,
                                                       mesh.nnodes,
                                                       mesh.elements,
                                                       mesh.points,

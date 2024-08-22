@@ -130,13 +130,13 @@ int tet4_laplacian_apply(const ptrdiff_t nelements,
     return 0;
 }
 
-int tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
-                                    const ptrdiff_t nnodes,
-                                    idx_t **const SFEM_RESTRICT elements,
-                                    geom_t **const SFEM_RESTRICT points,
-                                    const count_t *const SFEM_RESTRICT rowptr,
-                                    const idx_t *const SFEM_RESTRICT colidx,
-                                    real_t *const SFEM_RESTRICT values) {
+int tet4_laplacian_crs(const ptrdiff_t nelements,
+                       const ptrdiff_t nnodes,
+                       idx_t **const SFEM_RESTRICT elements,
+                       geom_t **const SFEM_RESTRICT points,
+                       const count_t *const SFEM_RESTRICT rowptr,
+                       const idx_t *const SFEM_RESTRICT colidx,
+                       real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
@@ -247,7 +247,7 @@ int tet4_laplacian_apply_opt(const ptrdiff_t nelements,
         accumulator_t element_vector[4];
         idx_t ev[4];
         scalar_t fff[6];
-        for(int k = 0; k < 6; k++) {
+        for (int k = 0; k < 6; k++) {
             fff[k] = fff_all[i * 6 + k];
         }
 
@@ -288,7 +288,7 @@ int tet4_laplacian_diag_opt(const ptrdiff_t nelements,
         accumulator_t element_vector[4];
 
         scalar_t fff[6];
-        for(int k = 0; k < 6; k++) {
+        for (int k = 0; k < 6; k++) {
             fff[k] = fff_all[i * 6 + k];
         }
 

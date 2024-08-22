@@ -20,7 +20,7 @@ int tri6_laplacian_apply(const ptrdiff_t nelements,
                         const real_t *const SFEM_RESTRICT u,
                         real_t *const SFEM_RESTRICT values);
 
-int tri6_laplacian_assemble_hessian(const ptrdiff_t nelements,
+int tri6_laplacian_crs(const ptrdiff_t nelements,
                                    const ptrdiff_t nnodes,
                                    idx_t **const SFEM_RESTRICT elems,
                                    geom_t **const SFEM_RESTRICT xyz,

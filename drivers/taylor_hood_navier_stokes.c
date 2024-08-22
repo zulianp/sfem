@@ -338,7 +338,7 @@ int main(int argc, char *argv[]) {
     p1_nnz = p1_rowptr[p1_nnodes];
     real_t *p1_values = calloc(p1_nnz, sizeof(real_t));
 
-    laplacian_assemble_hessian(p1_type,
+    laplacian_crs(p1_type,
                                mesh.nelements,
                                p1_nnodes,
                                mesh.elements,

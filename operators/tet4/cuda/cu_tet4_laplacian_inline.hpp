@@ -1,12 +1,14 @@
-#ifndef TET4_LAPLACIAN_INLINE_GPU_HPP
-#define TET4_LAPLACIAN_INLINE_GPU_HPP
+#ifndef CU_TET4_LAPLACIAN_INLINE_HPP
+#define CU_TET4_LAPLACIAN_INLINE_HPP
+
+#include "sfem_base.h"
 
 template <typename fff_t, typename scalar_t>
-static inline __device__ __host__ void tet4_laplacian_apply_fff(
-    const fff_t *const SFEM_RESTRICT fff,
-    const ptrdiff_t stride,
-    const scalar_t *const SFEM_RESTRICT u,
-    scalar_t *const SFEM_RESTRICT element_vector) {
+static inline __device__ __host__ void cu_tet4_laplacian_apply_fff(
+        const fff_t *const SFEM_RESTRICT fff,
+        const ptrdiff_t stride,
+        const scalar_t *const SFEM_RESTRICT u,
+        scalar_t *const SFEM_RESTRICT element_vector) {
     const scalar_t x0 = fff[0 * stride] + fff[1 * stride] + fff[2 * stride];
     const scalar_t x1 = fff[1 * stride] + fff[3 * stride] + fff[4 * stride];
     const scalar_t x2 = fff[2 * stride] + fff[4 * stride] + fff[5 * stride];
@@ -23,10 +25,10 @@ static inline __device__ __host__ void tet4_laplacian_apply_fff(
 }
 
 template <typename fff_t, typename scalar_t>
-static inline __device__ __host__ void tet4_laplacian_diag_fff(const fff_t *const SFEM_RESTRICT fff,
-                                                              const ptrdiff_t stride,
-                                                              scalar_t *const SFEM_RESTRICT
-                                                                  element_vector) {
+static inline __device__ __host__ void cu_tet4_laplacian_diag_fff(
+        const fff_t *const SFEM_RESTRICT fff,
+        const ptrdiff_t stride,
+        scalar_t *const SFEM_RESTRICT element_vector) {
     element_vector[0] = fff[0 * stride] + 2 * fff[1 * stride] + 2 * fff[2 * stride] +
                         fff[3 * stride] + 2 * fff[4 * stride] + fff[5 * stride];
     element_vector[1] = fff[0 * stride];
@@ -34,41 +36,29 @@ static inline __device__ __host__ void tet4_laplacian_diag_fff(const fff_t *cons
     element_vector[3] = fff[5 * stride];
 }
 
-// template <typename fff_t, typename scalar_t>
-// static inline __device__ __host__ void tet4_laplacian_diag_fff(const fff_t *const SFEM_RESTRICT fff,
-//                                                                scalar_t *const SFEM_RESTRICT e0,
-//                                                                scalar_t *const SFEM_RESTRICT e1,
-//                                                                scalar_t *const SFEM_RESTRICT e2,
-//                                                                scalar_t *const SFEM_RESTRICT e3) {
-//     *e0 += fff[0] + 2 * fff[1] + 2 * fff[2] + fff[3] + 2 * fff[4] + fff[5];
-//     *e1 += fff[0];
-//     *e2 += fff[3];
-//     *e3 += fff[5];
-// }
+template <typename fff_t, typename accumulator_t>
+static inline __device__ __host__ void cu_tet4_laplacian_matrix_fff(
+        const fff_t *const SFEM_RESTRICT fff,
+        accumulator_t *const SFEM_RESTRICT element_matrix) {
+    const accumulator_t x0 = -fff[0] - fff[1] - fff[2];
+    const accumulator_t x1 = -fff[1] - fff[3] - fff[4];
+    const accumulator_t x2 = -fff[2] - fff[4] - fff[5];
+    element_matrix[0] = fff[0] + 2 * fff[1] + 2 * fff[2] + fff[3] + 2 * fff[4] + fff[5];
+    element_matrix[1] = x0;
+    element_matrix[2] = x1;
+    element_matrix[3] = x2;
+    element_matrix[4] = x0;
+    element_matrix[5] = fff[0];
+    element_matrix[6] = fff[1];
+    element_matrix[7] = fff[2];
+    element_matrix[8] = x1;
+    element_matrix[9] = fff[1];
+    element_matrix[10] = fff[3];
+    element_matrix[11] = fff[4];
+    element_matrix[12] = x2;
+    element_matrix[13] = fff[2];
+    element_matrix[14] = fff[4];
+    element_matrix[15] = fff[5];
+}
 
-
-
-// template <typename fff_t, typename scalar_t>
-// static /*inline*/ __device__ __host__ void tet4_laplacian_apply_fff(
-//         const fff_t *const SFEM_RESTRICT fff,
-//         const scalar_t u0,
-//         const scalar_t u1,
-//         const scalar_t u2,
-//         const scalar_t u3,
-//         scalar_t *const SFEM_RESTRICT e0,
-//         scalar_t *const SFEM_RESTRICT e1,
-//         scalar_t *const SFEM_RESTRICT e2,
-//         scalar_t *const SFEM_RESTRICT e3) {
-//     const scalar_t x0 = fff[0] + fff[1] + fff[2];
-//     const scalar_t x1 = fff[1] + fff[3] + fff[4];
-//     const scalar_t x2 = fff[2] + fff[4] + fff[5];
-//     const scalar_t x3 = fff[1] * u0;
-//     const scalar_t x4 = fff[2] * u0;
-//     const scalar_t x5 = fff[4] * u0;
-//     *e0 += u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
-//     *e1 += -fff[0] * u0 + fff[0] * u1 + fff[1] * u2 + fff[2] * u3 - x3 - x4;
-//     *e2 += fff[1] * u1 - fff[3] * u0 + fff[3] * u2 + fff[4] * u3 - x3 - x5;
-//     *e3 += fff[2] * u1 + fff[4] * u2 - fff[5] * u0 + fff[5] * u3 - x4 - x5;
-// }
-
-#endif  // TET4_LAPLACIAN_INLINE_GPU_HPP
+#endif  // CU_TET4_LAPLACIAN_INLINE_HPP
