@@ -479,6 +479,9 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_O3(
     out[63] = data[i63];
 }
 
+////////////////////////////////////////////////////////////////////////
+// hex_aa_8_eval_weno4_3D
+////////////////////////////////////////////////////////////////////////
 SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D(const real_t x_,                           //
                                                  const real_t y_,                           //
                                                  const real_t z_,                           //
@@ -737,6 +740,9 @@ int hex8_to_subparametric_tet10_resample_field_local(
     return 0;
 }
 
+///////////////////////////////////////////////////////////////////////
+// tet10_assemble_dual_mass_vector
+///////////////////////////////////////////////////////////////////////
 static SFEM_INLINE void lumped_mass_kernel_popp(
         const real_t px0, const real_t px1, const real_t px2, const real_t px3, const real_t py0,
         const real_t py1, const real_t py2, const real_t py3, const real_t pz0, const real_t pz1,
@@ -772,6 +778,9 @@ static SFEM_INLINE void lumped_mass_kernel_popp(
     element_matrix_diag[9] = x13;
 }
 
+///////////////////////////////////////////////////////////////////////
+// tet10_assemble_dual_mass_vector
+///////////////////////////////////////////////////////////////////////
 static SFEM_INLINE void lumped_mass_kernel_hrt(const real_t px0, const real_t px1, const real_t px2,
                                                const real_t px3, const real_t py0, const real_t py1,
                                                const real_t py2, const real_t py3, const real_t pz0,
@@ -813,6 +822,9 @@ static SFEM_INLINE void lumped_mass_kernel_hrt(const real_t px0, const real_t px
     diag[9] = x22;
 }
 
+///////////////////////////////////////////////////////////////////////
+// tet10_assemble_dual_mass_vector
+///////////////////////////////////////////////////////////////////////
 int subparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, const ptrdiff_t nnodes,
                                                   idx_t** const SFEM_RESTRICT elems,
                                                   geom_t** const SFEM_RESTRICT xyz,
@@ -866,6 +878,9 @@ int subparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, con
 /// iso-parametric version
 //-------------------------------------------
 
+///////////////////////////////////////////////////////////////////////
+// tet10_measure
+///////////////////////////////////////////////////////////////////////
 SFEM_INLINE static real_t tet10_measure(const geom_t* const SFEM_RESTRICT x,
                                         const geom_t* const SFEM_RESTRICT y,
                                         const geom_t* const SFEM_RESTRICT z,
@@ -914,6 +929,9 @@ SFEM_INLINE static real_t tet10_measure(const geom_t* const SFEM_RESTRICT x,
            x27 * x28 * x32;
 }
 
+///////////////////////////////////////////////////////////////////////
+// tet10_transform
+///////////////////////////////////////////////////////////////////////
 SFEM_INLINE static void tet10_transform(const geom_t* const SFEM_RESTRICT x,
                                         const geom_t* const SFEM_RESTRICT y,
                                         const geom_t* const SFEM_RESTRICT z,
@@ -948,6 +966,9 @@ SFEM_INLINE static void tet10_transform(const geom_t* const SFEM_RESTRICT x,
              z[7] * x14 + z[8] * x2 + z[9] * x4;
 }
 
+///////////////////////////////////////////////////////////////////////
+// hex8_to_isoparametric_tet10_resample_field_local
+///////////////////////////////////////////////////////////////////////
 int hex8_to_isoparametric_tet10_resample_field_local(
         // Mesh
         const ptrdiff_t nelements,          // number of elements
@@ -1228,6 +1249,9 @@ int tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, const ptrdiff_t n
     }
 }
 
+///////////////////////////////////////////////////////////////////////
+// hex8_to_subparametric_tet10_resample_field_local
+///////////////////////////////////////////////////////////////////////
 int hex8_to_tet10_resample_field_local(
         // Mesh
         const ptrdiff_t nelements,          // number of elements
@@ -1242,6 +1266,7 @@ int hex8_to_tet10_resample_field_local(
         const real_t* const SFEM_RESTRICT data,       // SDF
         // Output
         real_t* const SFEM_RESTRICT weighted_field) {
+    //
     int SFEM_ENABLE_ISOPARAMETRIC = 0;
     SFEM_READ_ENV(SFEM_ENABLE_ISOPARAMETRIC, atoi);
 

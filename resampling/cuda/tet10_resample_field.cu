@@ -3,6 +3,8 @@
 #include <sfem_base.h>
 #include <stdio.h>
 
+#include "tet10_weno_cuda.cuh"
+
 #define real_type real_t
 
 #include "quadratures_rule_cuda.h"
@@ -30,6 +32,9 @@ xyz_tet10_device make_xyz_tet10_device(const ptrdiff_t nnodes) {
 }
 // end make_xyz_tet10_device
 
+//////////////////////////////////////////////////////////
+// coy_xyz_tet10_device
+//////////////////////////////////////////////////////////
 void copy_xyz_tet10_device(const ptrdiff_t nnodes,    //
                            xyz_tet10_device* xyz,     //
                            const float** xyz_host) {  //
@@ -46,6 +51,9 @@ void copy_xyz_tet10_device(const ptrdiff_t nnodes,    //
     }
 }  // end copy_xyz_tet10_device
 
+//////////////////////////////////////////////////////////
+// free_xyz_tet10_device
+//////////////////////////////////////////////////////////
 void free_xyz_tet10_device(xyz_tet10_device xyz) {
     cudaFree(xyz.x);
     cudaFree(xyz.y);
@@ -74,6 +82,9 @@ typedef struct {
 } elems_tet10_device;
 // end struct elems_tet10_device
 
+//////////////////////////////////////////////////////////
+// make_elems_tet10_device
+//////////////////////////////////////////////////////////
 elems_tet10_device make_elems_tet10_device(const ptrdiff_t nelements) {
     elems_tet10_device elems;
 
@@ -98,6 +109,9 @@ elems_tet10_device make_elems_tet10_device(const ptrdiff_t nelements) {
     return elems;
 }  // end make_elems_tet10_device
 
+//////////////////////////////////////////////////////////
+// copy_elems_tet10_device
+//////////////////////////////////////////////////////////
 cudaError_t copy_elems_tet10_device(const ptrdiff_t nelements,   //
                                     elems_tet10_device* elems,   //
                                     const idx_t** elems_host) {  //
@@ -132,6 +146,9 @@ cudaError_t copy_elems_tet10_device(const ptrdiff_t nelements,   //
     return cudaSuccess;
 }  // end copy_elems_tet10_device
 
+//////////////////////////////////////////////////////////
+// free_elems_tet10_device
+//////////////////////////////////////////////////////////
 void free_elems_tet10_device(elems_tet10_device elems) {
     cudaError_t err0 = cudaFree(elems.elems_v0);
     cudaError_t err1 = cudaFree(elems.elems_v1);
@@ -353,6 +370,9 @@ __device__ void tet10_dual_basis_hrt_cu(const real_t qx, const real_t qy, const 
     f[9] = qx * x39 + (460.0 / 27.0) * x12 + x44 + x46 + x48 + x50 + x51;
 }  //    end tet10_dual_basis_hrt_cu
 
+/////////////////////////////////////////////////////////////////
+// hex_aa_8_eval_fun_cu
+/////////////////////////////////////////////////////////////////   
 __device__ void hex_aa_8_eval_fun_cu(
         // Quadrature point (local coordinates)
         // With respect to the hat functions of a cube element
@@ -371,6 +391,9 @@ __device__ void hex_aa_8_eval_fun_cu(
     f[7] = (1.0 - x) * y * z;
 }  // end hex_aa_8_eval_fun_cu
 
+/////////////////////////////////////////////////////////////////
+// hex_aa_8_eval_grad_cu
+/////////////////////////////////////////////////////////////////
 __device__ void hex_aa_8_collect_coeffs_cu(
         const ptrdiff_t stride0, const ptrdiff_t stride1, const ptrdiff_t stride2,
 
@@ -396,6 +419,260 @@ __device__ void hex_aa_8_collect_coeffs_cu(
     out[6] = data[i6];
     out[7] = data[i7];
 }  // end hex_aa_8_collect_coeffs_cu
+
+/**
+ * @brief Compute the indices of the field for third order interpolation
+ *
+ * @param stride
+ * @param i
+ * @param j
+ * @param k
+ * @param i0 .. i15
+ * @return SFEM_INLINE
+ */
+__device__ void hex_aa_8_indices_O3_cuda(const ptrdiff_t* const SFEM_RESTRICT stride,  //
+                                         const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k,
+                                         // Output
+                                         ptrdiff_t* i0, ptrdiff_t* i1, ptrdiff_t* i2, ptrdiff_t* i3,
+                                         ptrdiff_t* i4, ptrdiff_t* i5, ptrdiff_t* i6, ptrdiff_t* i7,
+                                         ptrdiff_t* i8, ptrdiff_t* i9, ptrdiff_t* i10,
+                                         ptrdiff_t* i11, ptrdiff_t* i12, ptrdiff_t* i13,
+                                         ptrdiff_t* i14, ptrdiff_t* i15) {
+    //
+    const ptrdiff_t stride_x = stride[0];
+    const ptrdiff_t stride_y = stride[1];
+    const ptrdiff_t stride_z = stride[2];
+
+    *i0 = (i - 1) * stride_x + (j - 1) * stride_y + (k)*stride_z;
+    *i1 = (i + 0) * stride_x + (j - 1) * stride_y + (k)*stride_z;
+    *i2 = (i + 1) * stride_x + (j - 1) * stride_y + (k)*stride_z;
+    *i3 = (i + 2) * stride_x + (j - 1) * stride_y + (k)*stride_z;
+
+    *i4 = (i - 1) * stride_x + (j + 0) * stride_y + (k)*stride_z;
+    *i5 = (i + 0) * stride_x + (j + 0) * stride_y + (k)*stride_z;
+    *i6 = (i + 1) * stride_x + (j + 0) * stride_y + (k)*stride_z;
+    *i7 = (i + 2) * stride_x + (j + 0) * stride_y + (k)*stride_z;
+
+    *i8 = (i - 1) * stride_x + (j + 1) * stride_y + (k)*stride_z;
+    *i9 = (i + 0) * stride_x + (j + 1) * stride_y + (k)*stride_z;
+    *i10 = (i + 1) * stride_x + (j + 1) * stride_y + (k)*stride_z;
+    *i11 = (i + 2) * stride_x + (j + 1) * stride_y + (k)*stride_z;
+
+    *i12 = (i - 1) * stride_x + (j + 2) * stride_y + (k)*stride_z;
+    *i13 = (i + 0) * stride_x + (j + 2) * stride_y + (k)*stride_z;
+    *i14 = (i + 1) * stride_x + (j + 2) * stride_y + (k)*stride_z;
+    *i15 = (i + 2) * stride_x + (j + 2) * stride_y + (k)*stride_z;
+}
+
+/**
+ * @brief Compute the coefficients of the field for third order interpolation
+ *
+ * @param stride
+ * @param i
+ * @param j
+ * @param k
+ * @param data
+ * @param out
+ * @return SFEM_INLINE
+ */
+__device__ void hex_aa_8_collect_coeffs_O3_cuda(
+        const ptrdiff_t* const SFEM_RESTRICT stride,  //
+        const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k,
+        // Attention this is geometric data transformed to solver data!
+        const real_t* const SFEM_RESTRICT data, real_t* const SFEM_RESTRICT out) {
+    //
+    ptrdiff_t i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15;
+
+    ptrdiff_t i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26, i27, i28, i29, i30, i31;
+
+    ptrdiff_t i32, i33, i34, i35, i36, i37, i38, i39, i40, i41, i42, i43, i44, i45, i46, i47;
+
+    ptrdiff_t i48, i49, i50, i51, i52, i53, i54, i55, i56, i57, i58, i59, i60, i61, i62, i63;
+
+    hex_aa_8_indices_O3_cuda(stride,
+                             i,
+                             j,
+                             k,
+                             &i0,
+                             &i1,
+                             &i2,
+                             &i3,
+                             &i4,
+                             &i5,
+                             &i6,
+                             &i7,
+                             &i8,
+                             &i9,
+                             &i10,
+                             &i11,
+                             &i12,
+                             &i13,
+                             &i14,
+                             &i15);
+
+    hex_aa_8_indices_O3_cuda(stride,
+                             i,
+                             j,
+                             k + 1,
+                             &i16,
+                             &i17,
+                             &i18,
+                             &i19,
+                             &i20,
+                             &i21,
+                             &i22,
+                             &i23,
+                             &i24,
+                             &i25,
+                             &i26,
+                             &i27,
+                             &i28,
+                             &i29,
+                             &i30,
+                             &i31);
+
+    hex_aa_8_indices_O3_cuda(stride,
+                             i,
+                             j,
+                             k + 2,
+                             &i32,
+                             &i33,
+                             &i34,
+                             &i35,
+                             &i36,
+                             &i37,
+                             &i38,
+                             &i39,
+                             &i40,
+                             &i41,
+                             &i42,
+                             &i43,
+                             &i44,
+                             &i45,
+                             &i46,
+                             &i47);
+
+    hex_aa_8_indices_O3_cuda(stride,
+                             i,
+                             j,
+                             k + 3,
+                             &i48,
+                             &i49,
+                             &i50,
+                             &i51,
+                             &i52,
+                             &i53,
+                             &i54,
+                             &i55,
+                             &i56,
+                             &i57,
+                             &i58,
+                             &i59,
+                             &i60,
+                             &i61,
+                             &i62,
+                             &i63);
+
+    out[0] = data[i0];
+    out[1] = data[i1];
+    out[2] = data[i2];
+    out[3] = data[i3];
+    out[4] = data[i4];
+    out[5] = data[i5];
+    out[6] = data[i6];
+    out[7] = data[i7];
+    out[8] = data[i8];
+    out[9] = data[i9];
+    out[10] = data[i10];
+    out[11] = data[i11];
+    out[12] = data[i12];
+    out[13] = data[i13];
+    out[14] = data[i14];
+    out[15] = data[i15];
+    out[16] = data[i16];
+    out[17] = data[i17];
+    out[18] = data[i18];
+    out[19] = data[i19];
+    out[20] = data[i20];
+    out[21] = data[i21];
+    out[22] = data[i22];
+    out[23] = data[i23];
+    out[24] = data[i24];
+    out[25] = data[i25];
+    out[26] = data[i26];
+    out[27] = data[i27];
+    out[28] = data[i28];
+    out[29] = data[i29];
+    out[30] = data[i30];
+    out[31] = data[i31];
+    out[32] = data[i32];
+    out[33] = data[i33];
+    out[34] = data[i34];
+    out[35] = data[i35];
+    out[36] = data[i36];
+    out[37] = data[i37];
+    out[38] = data[i38];
+    out[39] = data[i39];
+    out[40] = data[i40];
+    out[41] = data[i41];
+    out[42] = data[i42];
+    out[43] = data[i43];
+    out[44] = data[i44];
+    out[45] = data[i45];
+    out[46] = data[i46];
+    out[47] = data[i47];
+    out[48] = data[i48];
+    out[49] = data[i49];
+    out[50] = data[i50];
+    out[51] = data[i51];
+    out[52] = data[i52];
+    out[53] = data[i53];
+    out[54] = data[i54];
+    out[55] = data[i55];
+    out[56] = data[i56];
+    out[57] = data[i57];
+    out[58] = data[i58];
+    out[59] = data[i59];
+    out[60] = data[i60];
+    out[61] = data[i61];
+    out[62] = data[i62];
+    out[63] = data[i63];
+}
+
+////////////////////////////////////////////////////////////////////////
+// hex_aa_8_eval_weno4_3D
+////////////////////////////////////////////////////////////////////////
+__device__ real_t hex_aa_8_eval_weno4_3D_cuda(const real_t x_,                           //
+                                              const real_t y_,                           //
+                                              const real_t z_,                           //
+                                              const real_t ox,                           //
+                                              const real_t oy,                           //
+                                              const real_t oz,                           //
+                                              const real_t h,                            //
+                                              const ptrdiff_t i,                         //
+                                              const ptrdiff_t j,                         //
+                                              const ptrdiff_t k,                         //
+                                              const ptrdiff_t* stride,                   //
+                                              const real_t* const SFEM_RESTRICT data) {  //
+
+    real_t out[64];
+    hex_aa_8_collect_coeffs_O3_cuda(stride, i, j, k, data, out);
+
+    double x = (x_ - ox) - (real_t)i * h + h;
+    double y = (y_ - oy) - (real_t)j * h + h;
+    double z = (z_ - oz) - (real_t)k * h + h;
+
+    const real_t w4 = weno4_3D_ConstH_cuda(x,  //
+                                           y,
+                                           z,
+                                           h,
+                                           out,
+                                           1,
+                                           4,
+                                           16);
+
+    return w4;
+}
 
 /**
  * @brief Resample a field from a hex8 mesh to a tet10 mesh
