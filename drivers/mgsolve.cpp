@@ -84,6 +84,7 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_DEBUG, atoi);
     SFEM_READ_ENV(SFEM_MG, atoi);
     SFEM_READ_ENV(SFEM_CHEB_EIG_MAX_SCALE, atof);
+    SFEM_READ_ENV(SFEM_TOL, atof);
     SFEM_READ_ENV(SFEM_MAX_IT, atoi);
     SFEM_READ_ENV(SFEM_SMOOTHER_SWEEPS, atoi);
     SFEM_READ_ENV(SFEM_CHEB_EIG_TOL, atof);
@@ -266,7 +267,7 @@ int main(int argc, char *argv[]) {
         {
             solver_coarse->verbose = true;
             solver_coarse->set_max_it(10000);
-            solver_coarse->set_atol(1e-9);
+            solver_coarse->set_atol(1e-14);
             solver_coarse->set_rtol(1e-9);
 
             if (SFEM_USE_PRECONDITIONER) {
