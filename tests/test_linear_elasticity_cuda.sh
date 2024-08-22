@@ -10,11 +10,17 @@ export PATH=$SCRIPTPATH/../../bin/:$PATH
 
 PATH=$SCRIPTPATH:$PATH
 PATH=$SCRIPTPATH/..:$PATH
-PATH=$SCRIPTPATH/../build:$PATH
 PATH=$SCRIPTPATH/../python/sfem:$PATH
 PATH=$SCRIPTPATH/../python/sfem/mesh:$PATH
 PATH=$SCRIPTPATH/../data/benchmarks/meshes:$PATH
 PATH=$SCRIPTPATH/../../matrix.io:$PATH
+
+if [[ -z $SFEM_BIN_DIR ]]
+then
+	PATH=$SCRIPTPATH/../build:$PATH
+else
+	PATH=$SFEM_BIN_DIR:$PATH
+fi
 
 HERE=$PWD
 
@@ -29,8 +35,8 @@ export OMP_PROC_BIND=true
 # rm -rf mesh
 # create_cylinder.sh 0
 
-# SFEM_MESH_REFINE=1
-# create_cylinder_p2.sh 0
+# export SFEM_MESH_REFINE=1
+create_cylinder_p2.sh 5
 # export SFEM_USE_MACRO=1
 
 sleft=mesh/sidesets_aos/sinlet.raw
