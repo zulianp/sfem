@@ -1,7 +1,9 @@
 #ifndef __TET10_WENO_CUDA_H__
 #define __TET10_WENO_CUDA_H__
 
+#ifndef real_type
 #define real_type double
+#endif
 
 #if real_type == double
 #define Abs(x) fabs(x)

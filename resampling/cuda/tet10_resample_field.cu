@@ -3,15 +3,16 @@
 #include <sfem_base.h>
 #include <stdio.h>
 
-#include "tet10_weno_cuda.cuh"
-
 #define real_type real_t
+
+#include "tet10_weno_cuda.cuh"
 
 #include "quadratures_rule_cuda.h"
 
 #define MY_RESTRICT __restrict__
 
 #define __WARP_SIZE__ 32
+#define WENO_CUDA 0
 
 /////////////////////////////////////////////////////////////////
 // Struct for xyz
@@ -372,7 +373,7 @@ __device__ void tet10_dual_basis_hrt_cu(const real_t qx, const real_t qy, const 
 
 /////////////////////////////////////////////////////////////////
 // hex_aa_8_eval_fun_cu
-/////////////////////////////////////////////////////////////////   
+/////////////////////////////////////////////////////////////////
 __device__ void hex_aa_8_eval_fun_cu(
         // Quadrature point (local coordinates)
         // With respect to the hat functions of a cube element
@@ -430,7 +431,9 @@ __device__ void hex_aa_8_collect_coeffs_cu(
  * @param i0 .. i15
  * @return SFEM_INLINE
  */
-__device__ void hex_aa_8_indices_O3_cuda(const ptrdiff_t* const SFEM_RESTRICT stride,  //
+__device__ void hex_aa_8_indices_O3_cuda(const ptrdiff_t SFEM_RESTRICT stride0,  //
+                                         const ptrdiff_t SFEM_RESTRICT stride1,  //
+                                         const ptrdiff_t SFEM_RESTRICT stride2,  //
                                          const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k,
                                          // Output
                                          ptrdiff_t* i0, ptrdiff_t* i1, ptrdiff_t* i2, ptrdiff_t* i3,
@@ -439,9 +442,9 @@ __device__ void hex_aa_8_indices_O3_cuda(const ptrdiff_t* const SFEM_RESTRICT st
                                          ptrdiff_t* i11, ptrdiff_t* i12, ptrdiff_t* i13,
                                          ptrdiff_t* i14, ptrdiff_t* i15) {
     //
-    const ptrdiff_t stride_x = stride[0];
-    const ptrdiff_t stride_y = stride[1];
-    const ptrdiff_t stride_z = stride[2];
+    const ptrdiff_t stride_x = stride0;
+    const ptrdiff_t stride_y = stride1;
+    const ptrdiff_t stride_z = stride2;
 
     *i0 = (i - 1) * stride_x + (j - 1) * stride_y + (k)*stride_z;
     *i1 = (i + 0) * stride_x + (j - 1) * stride_y + (k)*stride_z;
@@ -475,8 +478,10 @@ __device__ void hex_aa_8_indices_O3_cuda(const ptrdiff_t* const SFEM_RESTRICT st
  * @param out
  * @return SFEM_INLINE
  */
-__device__ void hex_aa_8_collect_coeffs_O3_cuda(
-        const ptrdiff_t* const SFEM_RESTRICT stride,  //
+__device__ void hex_aa_8_collect_coeffs_O3_cuda(  //
+        const ptrdiff_t SFEM_RESTRICT stride0,    //
+        const ptrdiff_t SFEM_RESTRICT stride1,    //
+        const ptrdiff_t SFEM_RESTRICT stride2,    //
         const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k,
         // Attention this is geometric data transformed to solver data!
         const real_t* const SFEM_RESTRICT data, real_t* const SFEM_RESTRICT out) {
@@ -489,7 +494,9 @@ __device__ void hex_aa_8_collect_coeffs_O3_cuda(
 
     ptrdiff_t i48, i49, i50, i51, i52, i53, i54, i55, i56, i57, i58, i59, i60, i61, i62, i63;
 
-    hex_aa_8_indices_O3_cuda(stride,
+    hex_aa_8_indices_O3_cuda(stride0,
+                             stride1,
+                             stride2,
                              i,
                              j,
                              k,
@@ -510,7 +517,9 @@ __device__ void hex_aa_8_collect_coeffs_O3_cuda(
                              &i14,
                              &i15);
 
-    hex_aa_8_indices_O3_cuda(stride,
+    hex_aa_8_indices_O3_cuda(stride0,
+                             stride1,
+                             stride2,
                              i,
                              j,
                              k + 1,
@@ -531,7 +540,9 @@ __device__ void hex_aa_8_collect_coeffs_O3_cuda(
                              &i30,
                              &i31);
 
-    hex_aa_8_indices_O3_cuda(stride,
+    hex_aa_8_indices_O3_cuda(stride0,
+                             stride1,
+                             stride2,
                              i,
                              j,
                              k + 2,
@@ -552,7 +563,9 @@ __device__ void hex_aa_8_collect_coeffs_O3_cuda(
                              &i46,
                              &i47);
 
-    hex_aa_8_indices_O3_cuda(stride,
+    hex_aa_8_indices_O3_cuda(stride0,
+                             stride1,
+                             stride2,
                              i,
                              j,
                              k + 3,
@@ -652,11 +665,13 @@ __device__ real_t hex_aa_8_eval_weno4_3D_cuda(const real_t x_,                  
                                               const ptrdiff_t i,                         //
                                               const ptrdiff_t j,                         //
                                               const ptrdiff_t k,                         //
-                                              const ptrdiff_t* stride,                   //
+                                              const ptrdiff_t stride0,                   //
+                                              const ptrdiff_t stride1,                   //
+                                              const ptrdiff_t stride2,                   //
                                               const real_t* const SFEM_RESTRICT data) {  //
 
     real_t out[64];
-    hex_aa_8_collect_coeffs_O3_cuda(stride, i, j, k, data, out);
+    hex_aa_8_collect_coeffs_O3_cuda(stride0, stride1, stride2, i, j, k, data, out);
 
     double x = (x_ - ox) - (real_t)i * h + h;
     double y = (y_ - oy) - (real_t)j * h + h;
@@ -854,14 +869,32 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(
         hex_aa_8_eval_fun_cu(l_x, l_y, l_z, hex8_f);
         hex_aa_8_collect_coeffs_cu(stride0, stride1, stride2, i, j, k, data, coeffs);
 
+        // #define WENO_CUDA 1
         // Integrate field
         {
+#if WENO_CUDA == 1
+            real_t eval_field = hex_aa_8_eval_weno4_3D_cuda(g_qx,
+                                                            g_qy,
+                                                            g_qz,  //
+                                                            ox,
+                                                            oy,
+                                                            oz,                            //
+                                                            (dx + dy + dz) * (1.0 / 3.0),  //
+                                                            i,
+                                                            j,
+                                                            k,
+                                                            stride0,
+                                                            stride1,
+                                                            stride2,
+                                                            data);
+#else
+
             real_t eval_field = 0.0;
             // UNROLL_ZERO?
             for (int edof_j = 0; edof_j < 8; edof_j++) {
                 eval_field += hex8_f[edof_j] * coeffs[edof_j];
             }
-
+#endif
             // // UNROLL_ZERO?
             // for (int edof_i = 0; edof_i < 10; edof_i++) {
             //     element_field[edof_i] += eval_field * tet10_f[edof_i] * dV;
@@ -961,6 +994,7 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
     printf("GPU:    Number of threads per block: %ld\n", threadsPerBlock);
     printf("GPU:    Total number of threads:     %ld\n", (numBlocks * threadsPerBlock));
     printf("GPU:    Number of elements:          %ld\n", nelements);
+    printf("GPU:    Use WENO:                    %s\n", (WENO_CUDA == 1) ? "Yes" : "No");
     printf("============================================================================\n");
 
     cudaDeviceSynchronize();
