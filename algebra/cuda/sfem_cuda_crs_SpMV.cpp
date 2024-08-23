@@ -17,7 +17,7 @@
                    __LINE__,                                           \
                    cudaGetErrorString(status),                         \
                    status);                                            \
-            abort();                                       \
+            abort();                                                   \
         }                                                              \
     } while (0)
 
@@ -29,7 +29,7 @@
                    __LINE__,                                               \
                    cusparseGetErrorString(status),                         \
                    status);                                                \
-            abort();                                           \
+            abort();                                                       \
         }                                                                  \
     } while (0)
 
@@ -70,12 +70,18 @@ namespace sfem {
 #endif
         cusparseDnVecDescr_t vecX, vecY;
         size_t bufferSize{0};
-        bool xy_init{false};
+        bool initialized{false};
         ptrdiff_t rows;
         ptrdiff_t cols;
         void* dBuffer{NULL};
         double alpha{1};
         double beta{1};
+
+        std::shared_ptr<Buffer<count_t>> rowptr;
+        std::shared_ptr<Buffer<idx_t>> colidx;
+        std::shared_ptr<Buffer<real_t>> values;
+
+        std::shared_ptr<Buffer<cu_compat_count_t>> rowptr_compat;
 
         CRSSpMVImpl(const ptrdiff_t rows,
                     const ptrdiff_t cols,
@@ -83,13 +89,27 @@ namespace sfem {
                     const std::shared_ptr<Buffer<idx_t>>& colidx,
                     const std::shared_ptr<Buffer<real_t>>& values,
                     const real_t scale_output)
-            : rows(rows), cols(cols), beta(scale_output) {
+            : rows(rows), cols(cols), colidx(colidx), values(values), beta(scale_output) {
             sfem_cusparse_init();
+            assign_rowptr(rowptr, this->rowptr);
+        }
+
+        static const int needs_conversion = !std::is_same<cu_compat_count_t, count_t>::value;
+
+        void assign_rowptr(const std::shared_ptr<Buffer<count_t>>& in,
+                           std::shared_ptr<Buffer<cu_compat_count_t>>& out) {
+            static_assert(!needs_conversion);
+            out = in;
+        }
+
+        void initialize(const real_t* const x, real_t* const y) {
+            CHECK_CUSPARSE(cusparseCreateDnVec(&vecX, cols, (void*)x, valueType));
+            CHECK_CUSPARSE(cusparseCreateDnVec(&vecY, rows, (void*)y, valueType));
 
             CHECK_CUSPARSE(cusparseCreateCsr(&matrix,
                                              rows,
                                              rows,
-                                             rowptr->data()[rows],
+                                             colidx->size(),
                                              rowptr->data(),
                                              colidx->data(),
                                              values->data(),
@@ -122,17 +142,24 @@ namespace sfem {
         }
 
         void apply(const real_t* const x, real_t* const y) {
-            if (!xy_init) {
-                CHECK_CUSPARSE(cusparseCreateDnVec(&vecX, cols, (void*)x, valueType));
-                CHECK_CUSPARSE(cusparseCreateDnVec(&vecY, rows, (void*)y, valueType));
-                xy_init = true;
+            if (!initialized) {
+                initialize(x, y);
+                initialized = true;
             } else {
                 CHECK_CUSPARSE(cusparseDnVecSetValues(vecX, (void*)x));
                 CHECK_CUSPARSE(cusparseDnVecSetValues(vecY, (void*)y));
             }
 
-            CHECK_CUSPARSE(cusparseSpMV(
-                    cusparse_handle, op_type, &alpha, matrix, vecX, &beta, vecY, valueType, alg, dBuffer));
+            CHECK_CUSPARSE(cusparseSpMV(cusparse_handle,
+                                        op_type,
+                                        &alpha,
+                                        matrix,
+                                        vecX,
+                                        &beta,
+                                        vecY,
+                                        valueType,
+                                        alg,
+                                        dBuffer));
         }
     };
 
