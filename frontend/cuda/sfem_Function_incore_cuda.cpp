@@ -133,21 +133,18 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const colidx,
                         real_t *const values) {
-            // for (int i = 0; i < n_dirichlet_conditions; i++) {
-            //     d_crs_constraint_nodes_to_identity_vec(dirichlet_conditions[i].local_size,
-            //                                            dirichlet_conditions[i].idx,
-            //                                            space->block_size(),
-            //                                            dirichlet_conditions[i].component,
-            //                                            1,
-            //                                            rowptr,
-            //                                            colidx,
-            //                                            values);
-            // }
+            for (int i = 0; i < n_dirichlet_conditions; i++) {
+                cu_crs_constraint_nodes_to_identity_vec(dirichlet_conditions[i].local_size,
+                                                       dirichlet_conditions[i].idx,
+                                                       space->block_size(),
+                                                       dirichlet_conditions[i].component,
+                                                       1,
+                                                       rowptr,
+                                                       colidx,
+                                                       values);
+            }
 
-            // return SFEM_SUCCESS;
-
-            assert(false);
-            return SFEM_FAILURE;
+            return SFEM_SUCCESS;
         }
 
         std::shared_ptr<Constraint> lor() const override {
