@@ -230,3 +230,4 @@ resampling/test_grid/test_grid_new
 mesh_to_blocks
 run_convection_diffusion
 spmv
+run_poisson
