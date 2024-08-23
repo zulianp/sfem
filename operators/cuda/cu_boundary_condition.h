@@ -3,8 +3,8 @@
 
 #include <stddef.h>
 
-#include "sfem_base.h"
 #include "boundary_condition.h"
+#include "sfem_base.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,6 +52,15 @@ void d_constraint_gradient_nodes_to_value_vec(const ptrdiff_t n_dirichlet_nodes,
                                               const real_t value,
                                               const real_t *const SFEM_RESTRICT x,
                                               real_t *const SFEM_RESTRICT g);
+
+void cu_crs_constraint_nodes_to_identity_vec(const ptrdiff_t n_dirichlet_nodes,
+                                             const idx_t *const SFEM_RESTRICT dirichlet_nodes,
+                                             const int block_size,
+                                             const int component,
+                                             const real_t diag_value,
+                                             const count_t *const SFEM_RESTRICT rowptr,
+                                             const idx_t *const SFEM_RESTRICT colidx,
+                                             real_t *const SFEM_RESTRICT values);
 
 void d_destroy_conditions(const int n_conditions, boundary_condition_t *cond);
 
