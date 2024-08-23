@@ -29,8 +29,8 @@ else ifeq ($(asan), 1)
 # 	DEPS += -static-libsan
 # 	DEPS += -static
 else
-	CFLAGS += -Ofast -DNDEBUG -march=${MARCH} -fno-signed-zeros -fno-trapping-math -fassociative-math -mprefer-vector-width=${VECTOR_SIZE}  -fPIC
-	CXXFLAGS += -Ofast -DNDEBUG -march=${MARCH} -fno-signed-zeros -fno-trapping-math -fassociative-math -mprefer-vector-width=${VECTOR_SIZE} -fPIC
+	CFLAGS += -Ofast -DNDEBUG -march=${MARCH} -fno-signed-zeros -fno-trapping-math -fassociative-math -mprefer-vector-width=${VECTOR_SIZE}  -fPIC  -no-pie 
+	CXXFLAGS += -Ofast -DNDEBUG -march=${MARCH} -fno-signed-zeros -fno-trapping-math -fassociative-math -mprefer-vector-width=${VECTOR_SIZE} -fPIC  -no-pie 
 	CUFLAGS += -O3 -DNDEBUG
 endif
 
@@ -435,7 +435,7 @@ $(info $$SFEM_CUDA_A is [${SFEM_CUDA_A}])
 grid_to_mesh: grid_to_mesh.c libsfem.a ${SFEM_CUDA_A} ${PWD}/resampling/quadratures_rule.h
 	$(MPICC) -o $@ drivers/grid_to_mesh.c libsfem.a $(CFLAGS) $(INCLUDES)  $(LDFLAGS) ${LINK_SFEM_CUDA} ${CUDA_LIBS_PATH} ${CUDART_LINK}  ${SFEM_CUDA_A}
 
-${PWD}/resampling/cuda/libsfem_resample_field_cuda.a: ${PWD}/resampling/cuda/sfem_resample_field_cuda.cu ${PWD}/resampling/cuda/tet10_resample_field.cu ${PWD}/resampling/cuda/quadratures_rule_cuda.h
+${PWD}/resampling/cuda/libsfem_resample_field_cuda.a: ${PWD}/resampling/cuda/sfem_resample_field_cuda.cu ${PWD}/resampling/cuda/tet10_resample_field.cu ${PWD}/resampling/cuda/quadratures_rule_cuda.h ${PWD}/resampling/cuda/tet10_weno_cuda.cu ${PWD}/resampling/cuda/tet10_weno_cuda.cuh
 	${MAKE} -C ${PWD}/resampling/cuda GPU_ARCH=${GPU_ARCH}
 
 # else
