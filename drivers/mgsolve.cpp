@@ -71,6 +71,7 @@ int main(int argc, char *argv[]) {
     int SFEM_MG = 0;
     int SFEM_MAX_IT = 4000;
     int SFEM_SMOOTHER_SWEEPS = 3;
+    int SFEM_USE_MG_PRECONDITIONER = 0;
     float SFEM_CHEB_EIG_MAX_SCALE = 1.02;
     float SFEM_TOL = 1e-9;
     float SFEM_CHEB_EIG_TOL = 1e-5;
@@ -83,9 +84,11 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_USE_CHEB, atoi);
     SFEM_READ_ENV(SFEM_DEBUG, atoi);
     SFEM_READ_ENV(SFEM_MG, atoi);
+    SFEM_READ_ENV(SFEM_MAX_IT, atoi);
+    SFEM_READ_ENV(SFEM_USE_MG_PRECONDITIONER, atoi);
     SFEM_READ_ENV(SFEM_CHEB_EIG_MAX_SCALE, atof);
     SFEM_READ_ENV(SFEM_TOL, atof);
-    SFEM_READ_ENV(SFEM_MAX_IT, atoi);
+
     SFEM_READ_ENV(SFEM_SMOOTHER_SWEEPS, atoi);
     SFEM_READ_ENV(SFEM_CHEB_EIG_TOL, atof);
 
@@ -97,6 +100,7 @@ int main(int argc, char *argv[]) {
            "SFEM_USE_CHEB: %d\n"
            "SFEM_DEBUG: %d\n"
            "SFEM_MG: %d\n"
+           "SFEM_USE_MG_PRECONDITIONER: %d\n"
            "SFEM_CHEB_EIG_MAX_SCALE: %f\n"
            "SFEM_TOL: %f\n"
            "SFEM_SMOOTHER_SWEEPS: %d\n"
@@ -109,6 +113,7 @@ int main(int argc, char *argv[]) {
            SFEM_USE_CHEB,
            SFEM_DEBUG,
            SFEM_MG,
+           SFEM_USE_MG_PRECONDITIONER,
            SFEM_CHEB_EIG_MAX_SCALE,
            SFEM_TOL,
            SFEM_SMOOTHER_SWEEPS,
@@ -137,10 +142,10 @@ int main(int argc, char *argv[]) {
     f->add_constraint(conds);
     f->add_operator(op);
 
-// #ifdef SFEM_ENABLE_CUDA
-//     op->hessian_diag(nullptr, diag->data());
-//     sfem::to_host(diag)->print(std::cout);
-// #endif
+    // #ifdef SFEM_ENABLE_CUDA
+    //     op->hessian_diag(nullptr, diag->data());
+    //     sfem::to_host(diag)->print(std::cout);
+    // #endif
 
     double compute_tick = MPI_Wtime();
     double init_tick = MPI_Wtime();
@@ -284,8 +289,7 @@ int main(int argc, char *argv[]) {
                 f->space()->mesh().n_nodes(), f->space()->block_size(), coarse_graph, edges, es);
 
         // FIXME this does not work properly!
-        auto prolongation = sfem::create_hierarchical_prolongation(
-               f, coarse_graph, edges, es);
+        auto prolongation = sfem::create_hierarchical_prolongation(f, coarse_graph, edges, es);
 
         f->apply_constraints(x->data());
         f->apply_constraints(rhs->data());
@@ -301,21 +305,20 @@ int main(int argc, char *argv[]) {
 
         solve_tick = MPI_Wtime();
 
-#if 1
-        mg->apply(rhs->data(), x->data());
-
-#else
-
-        auto ksp = sfem::create_cg<real_t>(linear_op, es);
-        ksp->check_each = 1;
-        ksp->verbose = true;
-        mg->set_max_it(1);
-        mg->set_atol(0);
-        mg->verbose = false;
-        ksp->set_preconditioner_op(mg);
-        ksp->set_max_it(SFEM_MAX_IT);
-        ksp->apply(rhs->data(), x->data());
-#endif
+        if (SFEM_USE_MG_PRECONDITIONER) {
+            // Poor perf (is there a bug?)
+            auto ksp = sfem::create_cg<real_t>(linear_op, es);
+            ksp->check_each = 1;
+            ksp->verbose = true;
+            mg->set_max_it(1);
+            mg->set_atol(0);
+            mg->verbose = false;
+            ksp->set_preconditioner_op(mg);
+            ksp->set_max_it(SFEM_MAX_IT);
+            ksp->apply(rhs->data(), x->data());
+        } else {
+            mg->apply(rhs->data(), x->data());
+        }
 
         solve_tock = MPI_Wtime();
 

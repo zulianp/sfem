@@ -1323,13 +1323,13 @@ namespace sfem {
             auto graph = space->dof_to_dof_graph();
 
             return laplacian_crs(element_type,
-                                              mesh->nelements,
-                                              mesh->nnodes,
-                                              mesh->elements,
-                                              mesh->points,
-                                              graph->rowptr()->data(),
-                                              graph->colidx()->data(),
-                                              values);
+                                 mesh->nelements,
+                                 mesh->nnodes,
+                                 mesh->elements,
+                                 mesh->points,
+                                 graph->rowptr()->data(),
+                                 graph->colidx()->data(),
+                                 values);
         }
 
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
