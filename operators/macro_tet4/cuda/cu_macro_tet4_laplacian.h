@@ -25,6 +25,7 @@ int cu_macro_tet4_laplacian_diag(const ptrdiff_t nelements,
                                  void *const SFEM_RESTRICT diag,
                                  void *stream);
 
+// FIXME Possibly buggy
 int cu_macro_tet4_laplacian_crs(const ptrdiff_t nelements,
                                 const ptrdiff_t stride,  // Stride for elements and fff
                                 const idx_t *const SFEM_RESTRICT elements,

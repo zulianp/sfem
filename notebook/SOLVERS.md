@@ -148,5 +148,7 @@ TTS:		139.182 [s], compute 132.298 [s] (solve: 116.557 [s], init: 15.6775 [s])
 residual:	3.88119e-10
 ```
 
-For basic TET4 as expected CRS is faster. Matrix-based AMG or equivalent may be used for the coarse level.
+For the coarse elements (TET4) CRS is faster as expected. Matrix-based AMG or equivalent may be used for the coarse level.
+
+
 

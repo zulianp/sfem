@@ -65,9 +65,9 @@ namespace sfem {
     }
 
     template <typename T>
-    std::shared_ptr<BiCGStab<T>> create_bcgs(const std::shared_ptr<Operator<T>> &op,
+    std::shared_ptr<MatrixFreeLinearSolver<T>> create_bcgs(const std::shared_ptr<Operator<T>> &op,
                                              const ExecutionSpace es) {
-        std::shared_ptr<BiCGStab<T>> bcgs;
+        std::shared_ptr<MatrixFreeLinearSolver<T>> bcgs;
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
