@@ -128,3 +128,25 @@ mgsolve (MACRO_TET4):
 TTS:		1036.09 [s], compute 1028.83 [s] (solve: 949.825 [s], init: 78.9262 [s])
 residual:	7.10327e-07
 ```
+
+## Two-level laplacian with coarse grid solver using SpMV vs MF
+
+Note that the fine level CRS does not fit on the P100 for this problem size.
+
+Coarse with CRS SpMV
+```c
+#elements 31031296 #nodes 41828417 #dofs 41828417
+TTS:		110.587 [s], compute 104.27 [s] (solve: 88.2348 [s], init: 15.9743 [s])
+residual:	3.88119e-10
+```
+
+MF
+
+```c
+#elements 31031296 #nodes 41828417 #dofs 41828417
+TTS:		139.182 [s], compute 132.298 [s] (solve: 116.557 [s], init: 15.6775 [s])
+residual:	3.88119e-10
+```
+
+For basic TET4 as expected CRS is faster. Matrix-based AMG or equivalent may be used for the coarse level.
+

@@ -100,10 +100,10 @@ int cu_laplacian_crs(const enum ElemType element_type,
         //  values,
         // stream);
         // }
-        // case MACRO_TET4: {
-        //     return cu_macro_tet4_laplacian_crs(
-        //             nelements, stride, elements, fff, rowptr, colidx, real_type, values, stream);
-        // }
+        case MACRO_TET4: {
+            return cu_macro_tet4_laplacian_crs(
+                    nelements, stride, elements, fff, rowptr, colidx, real_type, values, stream);
+        }
         default: {
             fprintf(stderr,
                     "cu_laplacian_diag: Invalid element type %s (code = %d)\n (%s:%d)",
@@ -118,4 +118,3 @@ int cu_laplacian_crs(const enum ElemType element_type,
         }
     }
 }
-
