@@ -203,7 +203,8 @@ namespace sfem {
         GPULaplacian(const std::shared_ptr<FunctionSpace> &space)
             : space(space), element_type(space->element_type()) {}
 
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
+        std::shared_ptr<Op> derefine_op(
+                const std::shared_ptr<FunctionSpace> &derefined_space) override {
             auto mesh = (mesh_t *)derefined_space->mesh().impl_mesh();
 
             auto ret = std::make_shared<GPULaplacian>(derefined_space);
@@ -217,9 +218,16 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const colidx,
                         real_t *const values) override {
-            std::cerr << "Unimplemented function hessian_crs in GPULaplacian\n";
-            assert(0);
-            return SFEM_FAILURE;
+            return cu_laplacian_crs(element_type,
+                                    fff->n_elements(),
+                                    fff->n_elements(),  // stride
+                                    fff->elements(),
+                                    fff->fff(),
+                                    rowptr,
+                                    colidx,
+                                    real_type,
+                                    values,
+                                    stream);
         }
 
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
