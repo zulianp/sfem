@@ -405,7 +405,6 @@ __global__ void cu_macro_tet4_laplacian_crs_kernel(
         }
 
         {  // Octahedron tets
-
             cu_macro_tet4_sub_fff_4(offf, 1, sub_fff);
             cu_tet4_laplacian_matrix_fff(sub_fff, element_matrix);
             cu_tet4_gather_idx(ev10, 4, 5, 6, 8, ev);

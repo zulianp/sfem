@@ -300,7 +300,23 @@ int main(int argc, char *argv[]) {
         init_tock = MPI_Wtime();
 
         solve_tick = MPI_Wtime();
+
+#if 1
         mg->apply(rhs->data(), x->data());
+
+#else
+
+        auto ksp = sfem::create_cg<real_t>(linear_op, es);
+        ksp->check_each = 1;
+        ksp->verbose = true;
+        mg->set_max_it(1);
+        mg->set_atol(0);
+        mg->verbose = false;
+        ksp->set_preconditioner_op(mg);
+        ksp->set_max_it(SFEM_MAX_IT);
+        ksp->apply(rhs->data(), x->data());
+#endif
+
         solve_tock = MPI_Wtime();
 
     } else {

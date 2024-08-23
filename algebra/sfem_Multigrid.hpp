@@ -27,6 +27,7 @@ namespace sfem {
         // std::function<void(const ptrdiff_t, const T* const, T* const)> copy;
         std::function<void(const ptrdiff_t, const T, const T* const, const T, T* const)> axpby;
         std::function<T(const std::size_t, const T* const)> norm2;
+        bool verbose{true};
 
         enum CycleType {
             V_CYCLE = 1,
@@ -221,19 +222,20 @@ namespace sfem {
                             norm_residual_0 = norm_residual;
                             norm_residual_previous = norm_residual;
 
-                            printf("Multigrid\n");
-                            printf("iter\tabs\t\trel\t\trate\n");
-                            printf("%d\t%g\t-\t\t-\n",
-                               iterations_,
-                               (double)(norm_residual));
+                            if (verbose) {
+                                printf("Multigrid\n");
+                                printf("iter\tabs\t\trel\t\trate\n");
+                                printf("%d\t%g\t-\t\t-\n", iterations_, (double)(norm_residual));
+                            }
                         } else {
-                            printf("%d\t%g\t%g\t%g\n",
-                               iterations_,
-                               (double)(norm_residual),
-                               (double)(norm_residual / norm_residual_0),
-                               (double)(norm_residual / norm_residual_previous));
+                            if (verbose) {
+                                printf("%d\t%g\t%g\t%g\n",
+                                       iterations_,
+                                       (double)(norm_residual),
+                                       (double)(norm_residual / norm_residual_0),
+                                       (double)(norm_residual / norm_residual_previous));
+                            }
                         }
-                        
 
                         norm_residual_previous = norm_residual;
                         if (norm_residual < atol_) {
