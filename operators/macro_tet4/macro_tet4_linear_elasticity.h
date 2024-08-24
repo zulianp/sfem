@@ -64,7 +64,7 @@ int macro_tet4_linear_elasticity_diag_opt(const ptrdiff_t nelements,
                                           real_t *const SFEM_RESTRICT outy,
                                           real_t *const SFEM_RESTRICT outz);
 
-int macro_tet4_linear_elasticity_hessian(const ptrdiff_t nelements,
+int macro_tet4_linear_elasticity_crs(const ptrdiff_t nelements,
                                    const ptrdiff_t nnodes,
                                    idx_t **const SFEM_RESTRICT elements,
                                    geom_t **const SFEM_RESTRICT points,

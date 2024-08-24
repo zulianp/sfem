@@ -36,7 +36,7 @@ export OMP_PROC_BIND=true
 # create_cylinder.sh 0
 
 # export SFEM_MESH_REFINE=1
-create_cylinder_p2.sh 5
+# create_cylinder_p2.sh 1
 # export SFEM_USE_MACRO=1
 
 sleft=mesh/sidesets_aos/sinlet.raw

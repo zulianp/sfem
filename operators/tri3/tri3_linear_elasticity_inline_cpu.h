@@ -92,7 +92,7 @@ static SFEM_INLINE void tri3_linear_elasticity_apply_points(const scalar_t mu,
 
 
 
-static SFEM_INLINE void tri3_linear_elasticity_hessian_points(const real_t mu,
+static SFEM_INLINE void tri3_linear_elasticity_crs_points(const real_t mu,
                                                               const real_t lambda,
                                                               const real_t px0,
                                                               const real_t px1,

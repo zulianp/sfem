@@ -380,7 +380,7 @@ int ISOLVER_EXPORT isolver_function_hessian_crs(const isolver_function_t *info,
     assert(mesh);
 
     if (strcmp(problem->material, "linear") == 0) {
-        linear_elasticity_assemble_hessian_aos(mesh->element_type,
+        linear_elasticity_crsaos(mesh->element_type,
                                                mesh->nelements,
                                                mesh->nnodes,
                                                mesh->elements,

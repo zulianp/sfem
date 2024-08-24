@@ -248,7 +248,7 @@ static SFEM_INLINE void tet4_linear_elasticity_value_points(const scalar_t mu,
                    x36 * POW2(x41) + x36 * POW2(x42) + x37 * x38 * x40 + x38 * x39 * x41);
 }
 
-static SFEM_INLINE void tet4_linear_elasticity_hessian_points(const scalar_t mu,
+static SFEM_INLINE void tet4_linear_elasticity_crs_points(const scalar_t mu,
                                                               const scalar_t lambda,
                                                               const scalar_t px0,
                                                               const scalar_t px1,
@@ -636,7 +636,7 @@ static SFEM_INLINE void tet4_linear_elasticity_hessian_points(const scalar_t mu,
     element_matrix[143] = x14 * x213;
 }
 
-static SFEM_INLINE void tet4_linear_elasticity_hessian_adj(
+static SFEM_INLINE void tet4_linear_elasticity_crs_adj(
         const scalar_t mu,
         const scalar_t lambda,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate,
@@ -966,7 +966,7 @@ static SFEM_INLINE void tet4_linear_elasticity_hessian_adj(
     element_matrix[143] = x16 * x174;
 }
 
-static SFEM_INLINE void aux_tet4_linear_elasticity_hessian_adj_less_registers(
+static SFEM_INLINE void aux_tet4_linear_elasticity_crs_adj_less_registers(
         const scalar_t mu,
         const scalar_t lambda,
         const scalar_t *const SFEM_RESTRICT adjugate,
@@ -1077,7 +1077,7 @@ static SFEM_INLINE void aux_tet4_linear_elasticity_hessian_adj_less_registers(
 }
 
 // Untested
-static SFEM_INLINE void tet4_linear_elasticity_hessian_adj_less_registers(
+static SFEM_INLINE void tet4_linear_elasticity_crs_adj_less_registers(
         const scalar_t mu,
         const scalar_t lambda,
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate,
@@ -1085,25 +1085,25 @@ static SFEM_INLINE void tet4_linear_elasticity_hessian_adj_less_registers(
         accumulator_t *const SFEM_RESTRICT element_matrix) {
     {
         scalar_t gtest[3] = {-1, -1, -1};
-        aux_tet4_linear_elasticity_hessian_adj_less_registers(
+        aux_tet4_linear_elasticity_crs_adj_less_registers(
                 mu, lambda, jacobian_adjugate, jacobian_determinant, 0, gtest, element_matrix);
     }
 
     {
         scalar_t gtest[3] = {1, 0, 0};
-        aux_tet4_linear_elasticity_hessian_adj_less_registers(
+        aux_tet4_linear_elasticity_crs_adj_less_registers(
                 mu, lambda, jacobian_adjugate, jacobian_determinant, 1, gtest, element_matrix);
     }
 
     {
         scalar_t gtest[3] = {0, 1, 0};
-        aux_tet4_linear_elasticity_hessian_adj_less_registers(
+        aux_tet4_linear_elasticity_crs_adj_less_registers(
                 mu, lambda, jacobian_adjugate, jacobian_determinant, 2, gtest, element_matrix);
     }
 
     {
         scalar_t gtest[3] = {0, 0, 1};
-        aux_tet4_linear_elasticity_hessian_adj_less_registers(
+        aux_tet4_linear_elasticity_crs_adj_less_registers(
                 mu, lambda, jacobian_adjugate, jacobian_determinant, 3, gtest, element_matrix);
     }
 }

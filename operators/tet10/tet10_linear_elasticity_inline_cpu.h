@@ -144,7 +144,7 @@ static SFEM_INLINE void tet10_linear_elasticity_diag_adj(const scalar_t *const S
 }
 
 // FIXME too many registers
-static SFEM_INLINE void tet10_linear_elasticity_hessian_adj(
+static SFEM_INLINE void tet10_linear_elasticity_crs_adj(
         const scalar_t qx,
         const scalar_t qy,
         const scalar_t qz,
