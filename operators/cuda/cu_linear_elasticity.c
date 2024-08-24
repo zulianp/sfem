@@ -21,7 +21,7 @@ extern int cuda_incore_linear_elasticity_init(const enum ElemType element_type,
                 ctx, mu, lambda, nelements, elements, points);
         }
         case MACRO_TET4: {
-            return macro_tet4_cuda_incore_linear_elasticity_init(ctx, mu, lambda, nelements,
+            return cu_macro_tet4_linear_elasticity_init(ctx, mu, lambda, nelements,
             elements, points);
         }
         case TET10: {
@@ -49,7 +49,7 @@ extern int cuda_incore_linear_elasticity_destroy(cuda_incore_linear_elasticity_t
             return tet4_cuda_incore_linear_elasticity_destroy(ctx);
         }
         case MACRO_TET4: {
-            return macro_tet4_cuda_incore_linear_elasticity_destroy(ctx);
+            return cu_macro_tet4_linear_elasticity_destroy(ctx);
         }
         case TET10: {
             return tet10_cuda_incore_linear_elasticity_destroy(ctx);
@@ -77,7 +77,7 @@ extern int cuda_incore_linear_elasticity_apply(cuda_incore_linear_elasticity_t *
             return tet4_cuda_incore_linear_elasticity_apply(ctx, d_x, d_y);
         }
         case MACRO_TET4: {
-            return macro_tet4_cuda_incore_linear_elasticity_apply(ctx, d_x, d_y);
+            return cu_macro_tet4_linear_elasticity_apply(ctx, d_x, d_y);
         }
         case TET10: {
             return tet10_cuda_incore_linear_elasticity_apply(ctx, d_x, d_y);
@@ -104,7 +104,7 @@ extern int cuda_incore_linear_elasticity_diag(cuda_incore_linear_elasticity_t *c
         // 	return tet4_cuda_incore_linear_elasticity_diag(ctx, d_t);
         // }
         // case MACRO_TET4: {
-        //     return macro_tet4_cuda_incore_linear_elasticity_diag(ctx, d_t);
+        //     return cu_macro_tet4_linear_elasticity_diag(ctx, d_t);
         // }
         case TET10: {
         	return tet10_cuda_incore_linear_elasticity_diag(ctx, d_t);

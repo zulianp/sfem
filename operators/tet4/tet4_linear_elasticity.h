@@ -72,7 +72,7 @@ int tet4_linear_elasticity_diag_opt(const ptrdiff_t nelements,
                                     real_t *const outy,
                                     real_t *const outz);
 
-int tet4_linear_elasticity_hessian(const ptrdiff_t nelements,
+int tet4_linear_elasticity_crs(const ptrdiff_t nelements,
                                    const ptrdiff_t nnodes,
                                    idx_t **const SFEM_RESTRICT elements,
                                    geom_t **const SFEM_RESTRICT points,

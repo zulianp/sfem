@@ -464,7 +464,7 @@ static SFEM_INLINE void macro_tet4_local_hessian(const idx_t *const SFEM_RESTRIC
         tet4_sub_adj_0(jacobian_adjugate, sub_adjugate);
 
         // Assemble once and reuse for all corners
-        tet4_linear_elasticity_hessian_adj(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
+        tet4_linear_elasticity_crs_adj(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
 
         // [0, 4, 6, 7]
         tet4_gather_idx(ev10, 0, 4, 6, 7, ev);
@@ -486,32 +486,32 @@ static SFEM_INLINE void macro_tet4_local_hessian(const idx_t *const SFEM_RESTRIC
     {  // Octahedron tets
         // [4, 5, 6, 8]
         tet4_sub_adj_4(jacobian_adjugate, sub_adjugate);
-        tet4_linear_elasticity_hessian_adj(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
+        tet4_linear_elasticity_crs_adj(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
         tet4_gather_idx(ev10, 4, 5, 6, 8, ev);
         tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
                 
         // [7, 4, 6, 8]
         tet4_sub_adj_5(jacobian_adjugate, sub_adjugate);
-        tet4_linear_elasticity_hessian_adj(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
+        tet4_linear_elasticity_crs_adj(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
         tet4_gather_idx(ev10, 7, 4, 6, 8, ev);
         tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
             
         // [6, 5, 9, 8]
         tet4_sub_adj_6(jacobian_adjugate, sub_adjugate);
-        tet4_linear_elasticity_hessian_adj(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
+        tet4_linear_elasticity_crs_adj(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
         tet4_gather_idx(ev10, 6, 5, 9, 8, ev);
         tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
 
         // [7, 6, 9, 8]
         tet4_sub_adj_7(jacobian_adjugate, sub_adjugate);
-        tet4_linear_elasticity_hessian_adj(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
+        tet4_linear_elasticity_crs_adj(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
         tet4_gather_idx(ev10, 7, 6, 9, 8, ev);
         tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
     
     }
 }
 
-int macro_tet4_linear_elasticity_hessian(const ptrdiff_t nelements,
+int macro_tet4_linear_elasticity_crs(const ptrdiff_t nelements,
                                          const ptrdiff_t nnodes,
                                          idx_t **const SFEM_RESTRICT elements,
                                          geom_t **const SFEM_RESTRICT points,

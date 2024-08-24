@@ -355,7 +355,7 @@ int tet10_linear_elasticity_diag_opt(const ptrdiff_t nelements,
     return 0;
 }
 
-int tet10_linear_elasticity_hessian(const ptrdiff_t nelements,
+int tet10_linear_elasticity_crs(const ptrdiff_t nelements,
                                     const ptrdiff_t nnodes,
                                     idx_t **const SFEM_RESTRICT elements,
                                     geom_t **const SFEM_RESTRICT points,
@@ -407,7 +407,7 @@ int tet10_linear_elasticity_hessian(const ptrdiff_t nelements,
                               &jacobian_determinant);
 
         for (int k = 0; k < n_qp; k++) {
-            tet10_linear_elasticity_hessian_adj(qx[k],
+            tet10_linear_elasticity_crs_adj(qx[k],
                                                 qy[k],
                                                 qz[k],
                                                 qw[k],

@@ -126,7 +126,7 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     // neohookean_assemble_hessian(
-    linear_elasticity_assemble_hessian_aos(mesh.element_type,
+    linear_elasticity_crsaos(mesh.element_type,
                                            // Mesh
                                            mesh.nelements,
                                            mesh.nnodes,
