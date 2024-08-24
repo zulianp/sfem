@@ -17,6 +17,9 @@
 #include "sfem_defs.h"
 #include "sfem_mesh.h"
 
+#include "cu_tet4_adjugate.h"
+#include "cu_tet4_fff.h"
+
 #include "cu_linear_elasticity.h"
 
 #define CHECK_CUDA(func)                                               \
@@ -107,14 +110,17 @@ int main(int argc, char *argv[]) {
         cudaDeviceSynchronize();
         CHECK_CUDA(cudaPeekAtLastError());
 
-        cuda_incore_linear_elasticity_t ctx;
-        cuda_incore_linear_elasticity_init(elem_type,
-                                           &ctx,
-                                           SFEM_SHEAR_MODULUS,
-                                           SFEM_FIRST_LAME_PARAMETER,
-                                           mesh.nelements,
-                                           mesh.elements,
-                                           mesh.points);
+        void *jacobian_adjugate = 0;
+        void *jacobian_determinant = 0;
+        cu_tet4_adjugate_allocate(mesh.nelements, &jacobian_adjugate, &jacobian_determinant);
+        cu_tet4_adjugate_fill(mesh.nelements,
+                              mesh.elements,
+                              mesh.points,
+                              jacobian_adjugate,
+                              jacobian_determinant);
+
+        idx_t *d_elements = 0;
+        elements_to_device(mesh.nelements, elem_num_nodes(elem_type), mesh.elements, &d_elements);
 
         cudaEvent_t start, stop;
         cudaEventCreate(&start);
@@ -130,7 +136,18 @@ int main(int argc, char *argv[]) {
         // ---------------------------------------------------
 
         for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
-            cuda_incore_linear_elasticity_apply(&ctx, d_x, d_y);
+            cu_linear_elasticity_apply(elem_type,
+                                       mesh.nelements,
+                                       mesh.nelements,
+                                       d_elements,
+                                       jacobian_adjugate,
+                                       jacobian_determinant,
+                                       SFEM_SHEAR_MODULUS,
+                                       SFEM_FIRST_LAME_PARAMETER,
+                                       SFEM_REAL_DEFAULT,
+                                       d_x,
+                                       d_y,
+                                       SFEM_DEFAULT_STREAM);
         }
 
         // ---------------------------------------------------
@@ -155,7 +172,7 @@ int main(int argc, char *argv[]) {
         }
 
         {  // Using CUDA perf-counter (from ms to s)
-            double avg_time =  (cuda_elapsed/1000) / SFEM_REPEAT;
+            double avg_time = (cuda_elapsed / 1000) / SFEM_REPEAT;
             double avg_throughput = (ndofs / avg_time) * (sizeof(real_t) * 1e-9);
             printf("cf: %g %g %ld %ld %ld\n", avg_time, avg_throughput, mesh.nelements, ndofs, 0l);
         }
@@ -165,7 +182,9 @@ int main(int argc, char *argv[]) {
         CHECK_CUDA(cudaFree(d_x));
         CHECK_CUDA(cudaFree(d_y));
 
-        cuda_incore_linear_elasticity_destroy(&ctx);
+        cudaFree(jacobian_adjugate);
+        cudaFree(jacobian_determinant);
+        cudaFree(d_elements);
     }
 
     array_write(comm, output_path, SFEM_MPI_REAL_T, y, ndofs, ndofs);

@@ -1,37 +1,86 @@
 #include "cu_linear_elasticity.h"
 
+#include "cu_macro_tet4_linear_elasticity.h"
 #include "cu_tet10_linear_elasticity.h"
 #include "cu_tet4_linear_elasticity.h"
-#include "cu_macro_tet4_linear_elasticity.h"
-
 
 #include <mpi.h>
 #include <stdio.h>
 
-extern int cuda_incore_linear_elasticity_init(const enum ElemType element_type,
-                                              cuda_incore_linear_elasticity_t *ctx,
-                                              const real_t mu,
-                                              const real_t lambda,
-                                              const ptrdiff_t nelements,
-                                              idx_t **const SFEM_RESTRICT elements,
-                                              geom_t **const SFEM_RESTRICT points) {
+extern int cu_linear_elasticity_apply(const enum ElemType element_type,
+                                      const ptrdiff_t nelements,
+                                      const ptrdiff_t stride,  // Stride for elements and fff
+                                      const idx_t *const SFEM_RESTRICT elements,
+                                      const void *const SFEM_RESTRICT jacobian_adjugate,
+                                      const void *const SFEM_RESTRICT jacobian_determinant,
+                                      const real_t mu,
+                                      const real_t lambda,
+                                      const enum RealType real_type,
+                                      const real_t *const d_x,
+                                      real_t *const d_y,
+                                      void *stream) {
     switch (element_type) {
         case TET4: {
-            return tet4_cuda_incore_linear_elasticity_init(
-                ctx, mu, lambda, nelements, elements, points);
+            return cu_tet4_linear_elasticity_apply(nelements,
+                                                   stride,
+                                                   elements,
+                                                   jacobian_adjugate,
+                                                   jacobian_determinant,
+                                                   mu,
+                                                   lambda,
+                                                   real_type,
+                                                   3,
+                                                   d_x,
+                                                   &d_x[1],
+                                                   &d_x[2],
+                                                   3,
+                                                   d_y,
+                                                   &d_y[1],
+                                                   &d_y[2],
+                                                   stream);
         }
         case MACRO_TET4: {
-            return cu_macro_tet4_linear_elasticity_init(ctx, mu, lambda, nelements,
-            elements, points);
+            return cu_macro_tet4_linear_elasticity_apply(nelements,
+                                                         stride,
+                                                         elements,
+                                                         jacobian_adjugate,
+                                                         jacobian_determinant,
+                                                         mu,
+                                                         lambda,
+                                                         real_type,
+                                                         3,
+                                                         d_x,
+                                                         &d_x[1],
+                                                         &d_x[2],
+                                                         3,
+                                                         d_y,
+                                                         &d_y[1],
+                                                         &d_y[2],
+                                                         stream);
         }
         case TET10: {
-            return tet10_cuda_incore_linear_elasticity_init(
-                ctx, mu, lambda, nelements, elements, points);
+            return cu_tet10_linear_elasticity_apply(nelements,
+                                                    stride,
+                                                    elements,
+                                                    jacobian_adjugate,
+                                                    jacobian_determinant,
+                                                    mu,
+                                                    lambda,
+                                                    real_type,
+                                                    3,
+                                                    d_x,
+                                                    &d_x[1],
+                                                    &d_x[2],
+                                                    3,
+                                                    d_y,
+                                                    &d_y[1],
+                                                    &d_y[2],
+                                                    stream);
         }
         default: {
             fprintf(stderr,
                     "Invalid element type %d\n (%s %s:%d)",
-                    ctx->element_type,
+                    element_type,
                     __FUNCTION__,
                     __FILE__,
                     __LINE__);
@@ -43,76 +92,73 @@ extern int cuda_incore_linear_elasticity_init(const enum ElemType element_type,
     }
 }
 
-extern int cuda_incore_linear_elasticity_destroy(cuda_incore_linear_elasticity_t *ctx) {
-    switch (ctx->element_type) {
+extern int cu_linear_elasticity_diag(const enum ElemType element_type,
+                                     const ptrdiff_t nelements,
+                                     const ptrdiff_t stride,  // Stride for elements and fff
+                                     const idx_t *const SFEM_RESTRICT elements,
+                                     const void *const SFEM_RESTRICT jacobian_adjugate,
+                                     const void *const SFEM_RESTRICT jacobian_determinant,
+                                     const real_t mu,
+                                     const real_t lambda,
+                                     const enum RealType real_type,
+                                     real_t *const d_t,
+                                     void *stream) {
+    switch (element_type) {
         case TET4: {
-            return tet4_cuda_incore_linear_elasticity_destroy(ctx);
+            return cu_tet4_linear_elasticity_diag(nelements,
+                                                  stride,
+                                                  elements,
+                                                  jacobian_adjugate,
+                                                  jacobian_determinant,
+                                                  mu,
+                                                  lambda,
+                                                  real_type,
+                                                  3,
+                                                  d_t,
+                                                  &d_t[1],
+                                                  &d_t[2],
+                                                  stream);
         }
         case MACRO_TET4: {
-            return cu_macro_tet4_linear_elasticity_destroy(ctx);
+            return cu_macro_tet4_linear_elasticity_diag(nelements,
+                                                        stride,
+                                                        elements,
+                                                        jacobian_adjugate,
+                                                        jacobian_determinant,
+                                                        mu,
+                                                        lambda,
+                                                        real_type,
+                                                        3,
+                                                        d_t,
+                                                        &d_t[1],
+                                                        &d_t[2],
+                                                        stream);
         }
         case TET10: {
-            return tet10_cuda_incore_linear_elasticity_destroy(ctx);
+            return cu_tet10_linear_elasticity_diag(nelements,
+                                                   stride,
+                                                   elements,
+                                                   jacobian_adjugate,
+                                                   jacobian_determinant,
+                                                   mu,
+                                                   lambda,
+                                                   real_type,
+                                                   3,
+                                                   d_t,
+                                                   &d_t[1],
+                                                   &d_t[2],
+                                                   stream);
         }
         default: {
             fprintf(stderr,
                     "Invalid element type %d\n (%s %s:%d)",
-                    ctx->element_type,
+                    element_type,
                     __FUNCTION__,
                     __FILE__,
                     __LINE__);
             fflush(stderr);
             assert(0);
             MPI_Abort(MPI_COMM_WORLD, 1);
-            return 1;
-        }
-    }
-}
-
-extern int cuda_incore_linear_elasticity_apply(cuda_incore_linear_elasticity_t *ctx,
-                                               const real_t *const d_x,
-                                               real_t *const d_y) {
-    switch (ctx->element_type) {
-        case TET4: {
-            return tet4_cuda_incore_linear_elasticity_apply(ctx, d_x, d_y);
-        }
-        case MACRO_TET4: {
-            return cu_macro_tet4_linear_elasticity_apply(ctx, d_x, d_y);
-        }
-        case TET10: {
-            return tet10_cuda_incore_linear_elasticity_apply(ctx, d_x, d_y);
-        }
-        default: {
-            fprintf(stderr,
-                    "Invalid element type %d\n (%s %s:%d)",
-                    ctx->element_type,
-                    __FUNCTION__,
-                    __FILE__,
-                    __LINE__);
-            fflush(stderr);
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, 1);
-            return 1;
-        }
-    }
-}
-
-extern int cuda_incore_linear_elasticity_diag(cuda_incore_linear_elasticity_t *ctx,
-                                              real_t *const d_t) {
-    switch (ctx->element_type) {
-        // case TET4: {
-        // 	return tet4_cuda_incore_linear_elasticity_diag(ctx, d_t);
-        // }
-        // case MACRO_TET4: {
-        //     return cu_macro_tet4_linear_elasticity_diag(ctx, d_t);
-        // }
-        case TET10: {
-        	return tet10_cuda_incore_linear_elasticity_diag(ctx, d_t);
-        }
-        default: {
-            // for the moment we gracefully decline
-            // assert(0);
-            // MPI_Abort(MPI_COMM_WORLD, 1);
             return 1;
         }
     }

@@ -12,30 +12,37 @@
 extern "C" {
 #endif
 
-typedef struct {
-    real_t mu;
-    real_t lambda;
-    enum ElemType element_type;
-    ptrdiff_t nelements;
-    void *jacobian_determinant;
-    void *jacobian_adjugate;
-    idx_t *elements;
-} cuda_incore_linear_elasticity_t;
+int cu_tet4_linear_elasticity_apply(const ptrdiff_t nelements,
+                                    const ptrdiff_t stride,  // Stride for elements and fff
+                                    const idx_t *const SFEM_RESTRICT elements,
+                                    const void *const SFEM_RESTRICT jacobian_adjugate,
+                                    const void *const SFEM_RESTRICT jacobian_determinant,
+                                    const real_t mu,
+                                    const real_t lambda,
+                                    const enum RealType real_type,
+                                    const ptrdiff_t u_stride,
+                                    const void *const SFEM_RESTRICT ux,
+                                    const void *const SFEM_RESTRICT uy,
+                                    const void *const SFEM_RESTRICT uz,
+                                    const ptrdiff_t out_stride,
+                                    void *const SFEM_RESTRICT outx,
+                                    void *const SFEM_RESTRICT outy,
+                                    void *const SFEM_RESTRICT outz,
+                                    void *stream);
 
-int tet4_cuda_incore_linear_elasticity_init(cuda_incore_linear_elasticity_t *const ctx,
-                                            const real_t mu,
-                                            const real_t lambda,
-                                            const ptrdiff_t nelements,
-                                            idx_t **const SFEM_RESTRICT elements,
-                                            geom_t **const SFEM_RESTRICT points);
-
-int tet4_cuda_incore_linear_elasticity_destroy(cuda_incore_linear_elasticity_t *ctx);
-int tet4_cuda_incore_linear_elasticity_apply(const cuda_incore_linear_elasticity_t *const ctx,
-                                             const real_t *const SFEM_RESTRICT u,
-                                             real_t *const SFEM_RESTRICT values);
-
-int tet4_cuda_incore_linear_elasticity_diag(cuda_incore_linear_elasticity_t *ctx,
-                                            real_t *const SFEM_RESTRICT d_t);
+int cu_tet4_linear_elasticity_diag(const ptrdiff_t nelements,
+                                   const ptrdiff_t stride,  // Stride for elements and fff
+                                   const idx_t *const SFEM_RESTRICT elements,
+                                   const void *const SFEM_RESTRICT jacobian_adjugate,
+                                   const void *const SFEM_RESTRICT jacobian_determinant,
+                                   const real_t mu,
+                                   const real_t lambda,
+                                   const enum RealType real_type,
+                                   const ptrdiff_t diag_stride,
+                                   void *const SFEM_RESTRICT diagx,
+                                   void *const SFEM_RESTRICT diagy,
+                                   void *const SFEM_RESTRICT diagz,
+                                   void *stream);
 
 #ifdef __cplusplus
 }
