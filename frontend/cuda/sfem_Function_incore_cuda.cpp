@@ -8,6 +8,7 @@
 #include "cu_boundary_condition.h"
 #include "cu_laplacian.h"
 #include "cu_linear_elasticity.h"
+#include "cu_tet4_adjugate.h"
 #include "cu_tet4_fff.h"
 
 namespace sfem {
@@ -50,6 +51,48 @@ namespace sfem {
         ptrdiff_t n_elements() const { return n_elements_; }
         idx_t *elements() const { return elements_->data(); }
         void *fff() const { return fff_; }
+    };
+
+    class Adjugate {
+    public:
+        enum ElemType element_type_;
+        ptrdiff_t n_elements_;
+        std::shared_ptr<Buffer<idx_t>> elements_;
+        void *jacobian_adjugate_{nullptr};
+        void *jacobian_determinant_{nullptr};
+
+        Adjugate(Mesh &mesh, const enum ElemType element_type)
+            : element_type_(element_type), n_elements_(mesh.n_elements()) {
+            auto c_mesh = (mesh_t *)mesh.impl_mesh();
+
+            // FIXME Now harcoded for tets
+            cu_tet4_adjugate_allocate(n_elements_, &jacobian_adjugate_, &jacobian_determinant_);
+            cu_tet4_adjugate_fill(n_elements_,
+                                  c_mesh->elements,
+                                  c_mesh->points,
+                                  jacobian_adjugate_,
+                                  jacobian_determinant_);
+
+            idx_t *elements{nullptr};
+            elements_to_device(
+                    n_elements_, elem_num_nodes(element_type), c_mesh->elements, &elements);
+
+            elements_ = Buffer<idx_t>::own(n_elements_ * elem_num_nodes(element_type),
+                                           elements,
+                                           d_buffer_destroy,
+                                           MEMORY_SPACE_DEVICE);
+        }
+
+        ~Adjugate() {
+            d_buffer_destroy(jacobian_adjugate_);
+            d_buffer_destroy(jacobian_determinant_);
+        }
+
+        enum ElemType element_type() const { return element_type_; }
+        ptrdiff_t n_elements() const { return n_elements_; }
+        idx_t *elements() const { return elements_->data(); }
+        void *jacobian_determinant() const { return jacobian_determinant_; }
+        void *jacobian_adjugate() const { return jacobian_adjugate_; }
     };
 
     class GPUDirichletConditions final : public Constraint {
@@ -135,13 +178,13 @@ namespace sfem {
                         real_t *const values) {
             for (int i = 0; i < n_dirichlet_conditions; i++) {
                 cu_crs_constraint_nodes_to_identity_vec(dirichlet_conditions[i].local_size,
-                                                       dirichlet_conditions[i].idx,
-                                                       space->block_size(),
-                                                       dirichlet_conditions[i].component,
-                                                       1,
-                                                       rowptr,
-                                                       colidx,
-                                                       values);
+                                                        dirichlet_conditions[i].idx,
+                                                        space->block_size(),
+                                                        dirichlet_conditions[i].component,
+                                                        1,
+                                                        rowptr,
+                                                        colidx,
+                                                        values);
             }
 
             return SFEM_SUCCESS;
@@ -275,7 +318,12 @@ namespace sfem {
     class GPULinearElasticity final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        cuda_incore_linear_elasticity_t ctx;
+        std::shared_ptr<Adjugate> adjugate;
+        enum RealType real_type { SFEM_REAL_DEFAULT };
+        void *stream{SFEM_DEFAULT_STREAM};
+        enum ElemType element_type { INVALID };
+        real_t mu{1};
+        real_t lambda{1};
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
@@ -283,21 +331,14 @@ namespace sfem {
             return std::make_unique<GPULinearElasticity>(space);
         }
 
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
-            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+        std::shared_ptr<Op> derefine_op(
+                const std::shared_ptr<FunctionSpace> &derefined_space) override {
+            auto mesh = (mesh_t *)derefined_space->mesh().impl_mesh();
 
-            auto ret = std::make_shared<GPULinearElasticity>(space);
-            assert(space->element_type() == macro_base_elem(ctx.element_type));
-
-            // FIXME avoid duplicating operator info
-            cuda_incore_linear_elasticity_init(space->element_type(),
-                                               &ret->ctx,
-                                               ctx.mu,
-                                               ctx.lambda,
-                                               mesh->nelements,
-                                               mesh->elements,
-                                               mesh->points);
-
+            auto ret = std::make_shared<GPULinearElasticity>(derefined_space);
+            assert(derefined_space->element_type() == macro_base_elem(adjugate->element_type()));
+            assert(ret->element_type == macro_base_elem(adjugate->element_type()));
+            ret->adjugate = adjugate;
             return ret;
         }
 
@@ -312,19 +353,14 @@ namespace sfem {
 
             SFEM_READ_ENV(SFEM_SHEAR_MODULUS, atof);
             SFEM_READ_ENV(SFEM_FIRST_LAME_PARAMETER, atof);
-
-            cuda_incore_linear_elasticity_init((enum ElemType)space->element_type(),
-                                               &ctx,
-                                               SFEM_SHEAR_MODULUS,
-                                               SFEM_FIRST_LAME_PARAMETER,
-                                               mesh->nelements,
-                                               mesh->elements,
-                                               mesh->points);
-
+            mu = SFEM_SHEAR_MODULUS;
+            lambda = SFEM_FIRST_LAME_PARAMETER;
+            adjugate = std::make_shared<Adjugate>(space->mesh(), space->element_type());
             return SFEM_SUCCESS;
         }
 
-        GPULinearElasticity(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+        GPULinearElasticity(const std::shared_ptr<FunctionSpace> &space)
+            : space(space), element_type(space->element_type()) {}
 
         int hessian_crs(const real_t *const x,
                         const count_t *const rowptr,
@@ -336,18 +372,47 @@ namespace sfem {
         }
 
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
-            cuda_incore_linear_elasticity_diag(&ctx, values);
-            return SFEM_SUCCESS;
+            return cu_linear_elasticity_diag(element_type,
+                                             adjugate->n_elements(),
+                                             adjugate->n_elements(),
+                                             adjugate->elements(),
+                                             adjugate->jacobian_adjugate(),
+                                             adjugate->jacobian_determinant(),
+                                             mu,
+                                             lambda,
+                                             real_type,
+                                             values,
+                                             SFEM_DEFAULT_STREAM);
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
-            cuda_incore_linear_elasticity_apply(&ctx, x, out);
-            return SFEM_SUCCESS;
+            return cu_linear_elasticity_apply(element_type,
+                                              adjugate->n_elements(),
+                                              adjugate->n_elements(),
+                                              adjugate->elements(),
+                                              adjugate->jacobian_adjugate(),
+                                              adjugate->jacobian_determinant(),
+                                              mu,
+                                              lambda,
+                                              real_type,
+                                              x,
+                                              out,
+                                              SFEM_DEFAULT_STREAM);
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
-            cuda_incore_linear_elasticity_apply(&ctx, h, out);
-            return SFEM_SUCCESS;
+            return cu_linear_elasticity_apply(element_type,
+                                              adjugate->n_elements(),
+                                              adjugate->n_elements(),
+                                              adjugate->elements(),
+                                              adjugate->jacobian_adjugate(),
+                                              adjugate->jacobian_determinant(),
+                                              mu,
+                                              lambda,
+                                              real_type,
+                                              h,
+                                              out,
+                                              SFEM_DEFAULT_STREAM);
         }
 
         int value(const real_t *x, real_t *const out) override {
