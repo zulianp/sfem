@@ -206,6 +206,12 @@ int main(int argc, char *argv[]) {
             double avg_time = (mf_tock - mf_tick) / SFEM_REPEAT;
             double avg_throughput = (nnodes / avg_time) * (sizeof(real_t) * 1e-9);
             printf("mf: %g %g %ld %ld %ld\n", avg_time, avg_throughput, mesh.nelements, nnodes, 0l);
+
+            if(elem_type == MACRO_TET4) {
+                printf("macrotet4: %g [muE/s]\n", (mesh.nelements * 8)/avg_time);
+            } else {
+                printf("Nothing special for %s\n", type_to_string(elem_type));
+            }
         }
 
         {  // Using CUDA perf-counter (from ms to s)
