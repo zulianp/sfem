@@ -54,6 +54,7 @@ set(SFEM_MODULES
     operators/cvfem_quad4
     operators/macro_tri3
     operators/macro_tet4
+    operators/proteus_tet4
     operators/hierarchical
     resampling
     resampling/tet10
@@ -73,6 +74,7 @@ if(SFEM_ENABLE_CUDA)
         operators/tet4/cuda
         operators/macro_tet4/cuda
         operators/tet10/cuda
+        operators/proteus_tet4/cuda
         operators/hierarchical/cuda
         )
 endif()
