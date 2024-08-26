@@ -442,7 +442,7 @@ int cu_macro_tet4_laplacian_crs_tpl(const ptrdiff_t nelements,
     {
         int min_grid_size;
         cudaOccupancyMaxPotentialBlockSize(
-                &min_grid_size, &block_size, cu_tet4_laplacian_crs_kernel<T>, 0, 0);
+                &min_grid_size, &block_size, cu_macro_tet4_laplacian_crs_kernel<T>, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 

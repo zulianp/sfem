@@ -151,6 +151,7 @@ int main(int argc, char *argv[]) {
             double avg_time = (mf_tock - mf_tick) / SFEM_REPEAT;
             double avg_throughput = (nnodes / avg_time) * (sizeof(real_t) * 1e-9);
             printf("mf: %g %g %ld %ld %ld\n", avg_time, avg_throughput, mesh.nelements, nnodes, 0l);
+            printf("proteus: %g [muE/s]\n", (mesh.nelements * txe)/avg_time);
         }
 
         {  // Using CUDA perf-counter (from ms to s)
