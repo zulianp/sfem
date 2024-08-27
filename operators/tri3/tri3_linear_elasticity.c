@@ -39,7 +39,7 @@ int tri3_linear_elasticity_value(const ptrdiff_t nelements,
             element_uy[v] = uy[idx];
         }
 
-        real_t element_scalar = 0;
+        accumulator_t element_scalar = 0;
         tri3_linear_elasticity_value_points(
                 // Model parameters
                 mu,

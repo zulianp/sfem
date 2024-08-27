@@ -21,6 +21,8 @@ option(SFEM_ENABLE_AVX2 "Enable AVX2 intrinsics" OFF)
 option(SFEM_USE_OCCUPANCY_MAX_POTENTIAL "Enable usage of cudaOccupancyMaxPotentialBlockSize" OFF)
 # option(SFEM_ENABLE_AVX512 "Enable AVX2 intrinsics" OFF) # TODO
 
+option(SFEM_ENABLE_RESAMPLING "Enable resampling features" ON)
+
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)
 
 if(HAS_PARENT)

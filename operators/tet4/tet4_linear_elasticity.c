@@ -47,7 +47,7 @@ int tet4_linear_elasticity_value(const ptrdiff_t nelements,
             element_uz[enode] = uz[dof];
         }
 
-        real_t element_scalar = 0;
+        accumulator_t element_scalar = 0;
         tet4_linear_elasticity_value_points(  // Model parameters
                 mu,
                 lambda,

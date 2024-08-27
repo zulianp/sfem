@@ -47,7 +47,7 @@ int tri6_laplacian_assemble_value(const ptrdiff_t nelements,
                 //
                 fff);
 
-        real_t element_scalar = 0;
+        accumulator_t element_scalar = 0;
         tri6_laplacian_energy_fff(fff, element_u, &element_scalar);
 
 #pragma omp atomic update

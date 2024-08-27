@@ -14,7 +14,7 @@
 static SFEM_INLINE void element_apply(const idx_t *const SFEM_RESTRICT ev,
                                       const scalar_t *const SFEM_RESTRICT fff,
                                       const scalar_t *const SFEM_RESTRICT element_u,
-                                      accumulator_t *const SFEM_RESTRICT values) {
+                                      real_t *const SFEM_RESTRICT values) {
     scalar_t sub_fff[3];
     accumulator_t element_vector[6] = {0};
 
@@ -143,7 +143,7 @@ static SFEM_INLINE void element_assemble_matrix(const idx_t *const SFEM_RESTRICT
                                                 const scalar_t *const fff,
                                                 const count_t *const SFEM_RESTRICT rowptr,
                                                 const idx_t *const SFEM_RESTRICT colidx,
-                                                accumulator_t *const SFEM_RESTRICT values) {
+                                                real_t *const SFEM_RESTRICT values) {
     idx_t ev[3];
     accumulator_t element_matrix[3 * 3];
     scalar_t sub_fff[3];
