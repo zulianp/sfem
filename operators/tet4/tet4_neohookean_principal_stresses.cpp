@@ -5,28 +5,28 @@
 #include <complex>
 #include <algorithm>
 
-using complex_t = std::complex<scalar_t>;
+using complex_t = std::complex<double>;
 
 inline static complex_t operator*(const int l, const complex_t &r) { return real_t(l) * r; }
 
 inline static complex_t operator+(const complex_t &l, const int r) { return l + real_t(r); }
 
-static SFEM_INLINE void neohookean_principal_stresses_kernel(const real_t mu,
-                                                             const real_t lambda,
-                                                             const real_t px0,
-                                                             const real_t px1,
-                                                             const real_t px2,
-                                                             const real_t px3,
-                                                             const real_t py0,
-                                                             const real_t py1,
-                                                             const real_t py2,
-                                                             const real_t py3,
-                                                             const real_t pz0,
-                                                             const real_t pz1,
-                                                             const real_t pz2,
-                                                             const real_t pz3,
-                                                             const real_t *const SFEM_RESTRICT u,
-                                                             real_t *const SFEM_RESTRICT
+static SFEM_INLINE void neohookean_principal_stresses_kernel(const double mu,
+                                                             const double lambda,
+                                                             const double px0,
+                                                             const double px1,
+                                                             const double px2,
+                                                             const double px3,
+                                                             const double py0,
+                                                             const double py1,
+                                                             const double py2,
+                                                             const double py3,
+                                                             const double pz0,
+                                                             const double pz1,
+                                                             const double pz2,
+                                                             const double pz3,
+                                                             const double *const SFEM_RESTRICT u,
+                                                             double *const SFEM_RESTRICT
                                                                  element_vector) {
     // FLOATING POINT OPS!
     //       - Result: 3*ADD + 3*ASSIGNMENT + 6*MUL + 2*POW
@@ -207,8 +207,8 @@ extern "C" void neohookean_principal_stresses_aos(const ptrdiff_t nelements,
 
     static const int block_size = 3;
     idx_t ev[4];
-    real_t element_displacement[4 * 3];
-    real_t element_vector[3];
+    double element_displacement[4 * 3];
+    double element_vector[3];
 
     for (ptrdiff_t i = 0; i < nelements; ++i) {
 #pragma unroll(4)
@@ -272,8 +272,8 @@ extern "C" void neohookean_principal_stresses_soa(const ptrdiff_t nelements,
 
         static const int block_size = 3;
         idx_t ev[4];
-        real_t element_displacement[4 * 3];
-        real_t element_vector[3];
+        double element_displacement[4 * 3];
+        double element_vector[3];
 
         for (ptrdiff_t i = 0; i < nelements; ++i) {
     #pragma unroll(4)
