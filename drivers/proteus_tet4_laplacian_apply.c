@@ -71,8 +71,17 @@ int main(int argc, char *argv[]) {
     real_t *x = calloc(nnodes, sizeof(real_t));
     real_t *y = calloc(nnodes, sizeof(real_t));
 
+    if (!x || !y) {
+        fprintf(stderr, "Unable to allocate memory!\n");
+        MPI_Abort(MPI_COMM_WORLD, -1);
+    }
+
     fff_t fff;
-    tet4_fff_create(&fff, mesh.nelements, mesh.elements, mesh.points);
+    int err = tet4_fff_create(&fff, mesh.nelements, mesh.elements, mesh.points);
+    if(err) {
+        fprintf(stderr, "Unable to create FFFs!\n");
+        MPI_Abort(MPI_COMM_WORLD, -1);
+    }
 
     ///////////////////////////////////////////////////////////////////////////////
     // Measure
@@ -115,15 +124,21 @@ int main(int argc, char *argv[]) {
     float TTS_op = (spmv_tock - spmv_tick) / SFEM_REPEAT;
 
     if (!rank) {
+        double mem_coeffs = 2 * nnodes * sizeof(real_t) * 1e-9;
+        double mem_jacs = 6 * nelements * sizeof(jacobian_t) * 1e-9;
         printf("----------------------------------------\n");
         printf("SUMMARY (%s): %s\n", type_to_string(element_type), argv[0]);
         printf("----------------------------------------\n");
-        printf("#elements %ld #microelements %ld #nodes %ld\n", nelements, nelements * txe,  nnodes);
+        printf("#elements %ld #microelements %ld #nodes %ld\n", nelements, nelements * txe, nnodes);
         printf("#nodexelement %d #microelementsxelement %d\n", nxe, txe);
         printf("Operator TTS:\t\t%.4f\t[s]\n", TTS_op);
         printf("Operator throughput:\t%.1f\t[ME/s]\n", 1e-6f * nelements / TTS_op);
         printf("Operator throughput:\t%.1f\t[MmicroE/s]\n", 1e-6f * nelements * txe / TTS_op);
         printf("Operator throughput:\t%.1f\t[MDOF/s]\n", 1e-6f * nnodes / TTS_op);
+        printf("Operator memory %g (2 x coeffs) + %g (FFFs) = %g [GB]\n",
+               mem_coeffs,
+               mem_jacs,
+               mem_coeffs + mem_jacs);
         printf("Total:\t\t\t%.4f\t[s]\n", TTS);
         printf("----------------------------------------\n");
     }

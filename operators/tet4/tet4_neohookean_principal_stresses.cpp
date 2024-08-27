@@ -5,7 +5,7 @@
 #include <complex>
 #include <algorithm>
 
-using complex_t = std::complex<real_t>;
+using complex_t = std::complex<scalar_t>;
 
 inline static complex_t operator*(const int l, const complex_t &r) { return real_t(l) * r; }
 

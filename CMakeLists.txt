@@ -56,9 +56,15 @@ set(SFEM_MODULES
     operators/macro_tet4
     operators/proteus_tet4
     operators/hierarchical
-    resampling
-    resampling/tet10
+
     )
+
+if(SFEM_ENABLE_RESAMPLING)
+    list(APPEND SFEM_MODULES
+        resampling
+        resampling/tet10
+    )
+endif()
 
 list(APPEND SFEM_MODULES frontend)
 
@@ -163,6 +169,14 @@ set(DRIVERS "${C_DRIVERS};${CPP_DRIVERS};${C_EXAMPLES}")
 # list(APPEND SFEM_EXCLUDED_EXEC "grad_and_project;heat_equation;integrate_divergence;partition_mesh_based_on_operator;taylor_hood_navier_stokes;ssolve")
 
 list(APPEND SFEM_EXCLUDED_EXEC "ssolve")
+
+if(SFEM_ENABLE_RESAMPLING)
+    file(GLOB RESAMPLING_C_EXAMPLES CONFIGURE_DEPENDS "drivers/resampling/*.c")
+    file(GLOB RESAMPLING_CXX_EXAMPLES CONFIGURE_DEPENDS "drivers/resampling/*.cpp")
+
+    list(APPEND DRIVERS "${RESAMPLING_C_EXAMPLES}")
+    list(APPEND DRIVERS "${RESAMPLING_CXX_EXAMPLES}")
+endif()
 
 if(SFEM_ENABLE_CUDA)
     file(GLOB CUDA_C_EXAMPLES CONFIGURE_DEPENDS "drivers/cuda/*.c")

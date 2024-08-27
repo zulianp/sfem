@@ -39,7 +39,8 @@ then
 else
 	# tet_mesh.py
 	# create_square.sh 6
-	create_sphere.sh 4
+	# create_sphere.sh 4
+	create_cylinder.sh 3
 	# refine $mesh temp1
 	# refine temp1 temp2
 
@@ -48,25 +49,26 @@ else
 	
 fi
 
-mkdir -p linear_system linear_system_macro
+# mkdir -p linear_system linear_system_macro
 
-SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_DIRICHLET=0 assemble $refined_mesh linear_system
-SFEM_USE_MACRO=1 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_DIRICHLET=0 assemble $simulation_mesh linear_system_macro
+# SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_DIRICHLET=0 assemble $refined_mesh linear_system
+# SFEM_USE_MACRO=1 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_DIRICHLET=0 assemble $simulation_mesh linear_system_macro
 
-# MATRIXIO_DENSE_OUTPUT=1 print_crs linear_system/rowptr.raw linear_system/colidx.raw linear_system/values.raw int int double
-# MATRIXIO_DENSE_OUTPUT=1 print_crs linear_system_macro/rowptr.raw linear_system_macro/colidx.raw linear_system_macro/values.raw int int double
+# # MATRIXIO_DENSE_OUTPUT=1 print_crs linear_system/rowptr.raw linear_system/colidx.raw linear_system/values.raw int int double
+# # MATRIXIO_DENSE_OUTPUT=1 print_crs linear_system_macro/rowptr.raw linear_system_macro/colidx.raw linear_system_macro/values.raw int int double
 
-# eval_nodal_function.py "100 * x*x + y" $simulation_mesh/x.raw $simulation_mesh/y.raw  $simulation_mesh/z.raw linear_system/rhs.raw
-eval_nodal_function.py "x+y+z" $simulation_mesh/x.raw $simulation_mesh/y.raw  $simulation_mesh/z.raw linear_system/rhs.raw
+# # eval_nodal_function.py "100 * x*x + y" $simulation_mesh/x.raw $simulation_mesh/y.raw  $simulation_mesh/z.raw linear_system/rhs.raw
+# eval_nodal_function.py "x+y+z" $simulation_mesh/x.raw $simulation_mesh/y.raw  $simulation_mesh/z.raw linear_system/rhs.raw
 
 
-spmv 1 0 linear_system 		 linear_system/rhs.raw test.raw
-spmv 1 0 linear_system_macro linear_system/rhs.raw test_macro.raw
+# spmv 1 0 linear_system 		 linear_system/rhs.raw test.raw
+# spmv 1 0 linear_system_macro linear_system/rhs.raw test_macro.raw
 
-SFEM_USE_MACRO=0 SFEM_USE_OPT=1 $LAUNCH laplacian_apply $simulation_mesh linear_system/rhs.raw p2_test.raw
-SFEM_USE_MACRO=1 SFEM_USE_OPT=1 $LAUNCH laplacian_apply $simulation_mesh linear_system/rhs.raw mea_test.raw
-SFEM_USE_MACRO=0 SFEM_USE_OPT=1 $LAUNCH laplacian_apply $refined_mesh linear_system/rhs.raw std_test.raw
+# SFEM_USE_MACRO=0 SFEM_USE_OPT=1 $LAUNCH laplacian_apply $simulation_mesh linear_system/rhs.raw p2_test.raw
+# SFEM_USE_MACRO=1 SFEM_USE_OPT=1 $LAUNCH laplacian_apply $simulation_mesh linear_system/rhs.raw mea_test.raw
+# SFEM_USE_MACRO=0 SFEM_USE_OPT=1 $LAUNCH laplacian_apply $refined_mesh linear_system/rhs.raw std_test.raw
+$LAUNCH proteus_tet4_laplacian_apply $refined_mesh linear_system/rhs.raw std_test.raw
 
-raw_to_db.py $refined_mesh mf_out.vtk --point_data="linear_system/rhs.raw,mea_test.raw,test.raw,test_macro.raw,std_test.raw,p2_test.raw"
+# raw_to_db.py $refined_mesh mf_out.vtk --point_data="linear_system/rhs.raw,mea_test.raw,test.raw,test_macro.raw,std_test.raw,p2_test.raw"
 # raw_to_db.py $simulation_mesh macro_mf_out.vtk --point_data="linear_system/rhs.raw,mea_test.raw,test.raw,test_macro.raw"
 
