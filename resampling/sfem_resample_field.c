@@ -830,6 +830,13 @@ int hex8_to_tet10_resample_field_local_CUDA(
 // resample_field_local ////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
+
+#define USE_TET4_V4 0
+#define USE_TET4_V8 1
+#define USE_TET4_CUDA 2
+
+#define USE_TET4_MODEL USE_TET4_V8
+
 int resample_field_local(
         // Mesh
         const enum ElemType element_type, const ptrdiff_t nelements, const ptrdiff_t nnodes,
@@ -848,21 +855,20 @@ int resample_field_local(
 
             // tet4_resample_field_local_reduce_CUDA
 
-            return tet4_resample_field_local_reduce_CUDA(  ////// v2 test V4 V8 CUDA  reduce_CUDA
-                                                  //   0,
-                    nelements,
-                    nnodes,
-                    elems,
-                    xyz,
-                    n,
-                    stride,
-                    origin,
-                    delta,
-                    data,
-                    weighted_field);
+#if USE_TET4_MODEL == USE_TET4_V4
+            return tet4_resample_field_local_V4(
+                    nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+#elif USE_TET4_MODEL == USE_TET4_V8
+            return tet4_resample_field_local_V8(
+                    nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+#elif USE_TET4_MODEL == USE_TET4_CUDA
+            return tet4_resample_field_local_reduce_CUDA(
+                    nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+#endif
         }
+
         case TET10: {
-#define TET10_V2
+// #define TET10_V2
 
 #ifdef TET10_V2  // V2
             return hex8_to_tet10_resample_field_local_CUDA(
