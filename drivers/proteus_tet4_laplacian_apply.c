@@ -122,6 +122,7 @@ int main(int argc, char *argv[]) {
         printf("#nodexelement %d #microelementsxelement %d\n", nxe, txe);
         printf("Operator TTS:\t\t%.4f\t[s]\n", TTS_op);
         printf("Operator throughput:\t%.1f\t[ME/s]\n", 1e-6f * nelements / TTS_op);
+        printf("Operator throughput:\t%.1f\t[MmicroE/s]\n", 1e-6f * nelements * txe / TTS_op);
         printf("Operator throughput:\t%.1f\t[MDOF/s]\n", 1e-6f * nnodes / TTS_op);
         printf("Total:\t\t\t%.4f\t[s]\n", TTS);
         printf("----------------------------------------\n");
