@@ -45,15 +45,18 @@ static void create_idx(const int L, mesh_t *mesh /*, ..output*/) {
 
     // 2) Compute the unique edge-node indices using the CRSGraph
     // A unique edge index can be used and use the multiple to store all indices
-    // as consecutive ()
+    // as consecutive
 
     count_t *rowptr;
     idx_t *colidx;
     build_crs_graph_for_elem_type(
             mesh->element_type, mesh->nelements, mesh->nnodes, mesh->elements, &rowptr, &colidx);
 
-    ptrdiff_t nxedge = L - 1; // L == 0
+    ptrdiff_t nxedge = L - 1; // L == 0 (is this correct?)
     ptrdiff_t nedges = (rowptr[mesh->nnodes] - mesh->nnodes) / 2;
+
+
+    // TODO
 
     // 3) Compute the unique face-node indices using the adjacency table
     // Two elements share a face, figure out the ordering 
@@ -62,9 +65,13 @@ static void create_idx(const int L, mesh_t *mesh /*, ..output*/) {
     create_element_adj_table(
             mesh->nelements, mesh->nnodes, mesh->element_type, mesh->elements, &adj_table);
 
-    // 4) Compute the unique internal nodes implicitly using the element id and the idx offset of
-    // the total number of explicit indices (offset + element_id * nxelem + local_internal_node_id)
+    // TODO Consistent ordering with implicit looping scheme needs to be figured out (orientation is reflected like mirror)
 
+    // 4) Compute the unique internal nodes implicitly using the element id and the idx offset of
+    // the total number of explicit indices (offset + element_id * n_internal_nodes + local_internal_node_id)
+    // ptrdiff_t n_internal_nodes = ?;
+
+    // TODO
 
 
     // Clean-up
@@ -124,12 +131,12 @@ int main(int argc, char *argv[]) {
 
     const int nxe = proteus_tet4_nxe(L);
     const int txe = proteus_tet4_txe(L);
-    ptrdiff_t nnodes = mesh.nelements * nxe;
+    ptrdiff_t nnodes_discont = mesh.nelements * nxe;
 
     // create_idx(L, &mesh);
 
-    real_t *x = calloc(nnodes, sizeof(real_t));
-    real_t *y = calloc(nnodes, sizeof(real_t));
+    real_t *x = calloc(nnodes_discont, sizeof(real_t));
+    real_t *y = calloc(nnodes_discont, sizeof(real_t));
 
     if (!x || !y) {
         fprintf(stderr, "Unable to allocate memory!\n");
@@ -143,7 +150,7 @@ int main(int argc, char *argv[]) {
         MPI_Abort(MPI_COMM_WORLD, -1);
     }
 
-    for (ptrdiff_t i = 0; i < nnodes; i++) {
+    for (ptrdiff_t i = 0; i < nnodes_discont; i++) {
         x[i] = 1;
     }
 
@@ -166,13 +173,13 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     real_t sq_nrm = 0;
-    for (ptrdiff_t i = 0; i < nnodes; i++) {
+    for (ptrdiff_t i = 0; i < nnodes_discont; i++) {
         sq_nrm += y[i] * y[i];
     }
 
     printf("sq_nrm = %g\n", sq_nrm);
 
-    // array_write(comm, path_output, SFEM_MPI_REAL_T, y, nnodes, u_n_global);
+    // array_write(comm, path_output, SFEM_MPI_REAL_T, y, nnodes_discont, u_n_global);
 
     ///////////////////////////////////////////////////////////////////////////////
     // Free resources
@@ -195,17 +202,17 @@ int main(int argc, char *argv[]) {
     float TTS_op = (spmv_tock - spmv_tick) / SFEM_REPEAT;
 
     if (!rank) {
-        double mem_coeffs = 2 * nnodes * sizeof(real_t) * 1e-9;
+        double mem_coeffs = 2 * nnodes_discont * sizeof(real_t) * 1e-9;
         double mem_jacs = 6 * nelements * sizeof(jacobian_t) * 1e-9;
         printf("----------------------------------------\n");
         printf("SUMMARY (%s): %s\n", type_to_string(element_type), argv[0]);
         printf("----------------------------------------\n");
-        printf("#elements %ld #microelements %ld #nodes %ld\n", nelements, nelements * txe, nnodes);
+        printf("#elements %ld #microelements %ld #nodes %ld\n", nelements, nelements * txe, nnodes_discont);
         printf("#nodexelement %d #microelementsxelement %d\n", nxe, txe);
         printf("Operator TTS:\t\t%.4f\t[s]\n", TTS_op);
         printf("Operator throughput:\t%.1f\t[ME/s]\n", 1e-6f * nelements / TTS_op);
         printf("Operator throughput:\t%.1f\t[MmicroE/s]\n", 1e-6f * nelements * txe / TTS_op);
-        printf("Operator throughput:\t%.1f\t[MDOF/s]\n", 1e-6f * nnodes / TTS_op);
+        printf("Operator throughput:\t%.1f\t[MDOF/s]\n", 1e-6f * nnodes_discont / TTS_op);
         printf("Operator memory %g (2 x coeffs) + %g (FFFs) = %g [GB]\n",
                mem_coeffs,
                mem_jacs,
