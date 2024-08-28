@@ -45,8 +45,8 @@ then
 else
 	# tet_mesh.py
 	# create_square.sh 6
-	# create_sphere.sh 4
-	create_cylinder.sh 3
+	# create_sphere.sh 5
+	create_cylinder.sh 2
 	# refine $mesh temp1
 	# refine temp1 temp2
 
