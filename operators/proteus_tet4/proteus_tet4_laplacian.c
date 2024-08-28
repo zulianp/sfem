@@ -385,5 +385,5 @@ int proteus_tet4_laplacian_apply(const int level,
         }
     }
 
-    return 0;
+    return SFEM_SUCCESS;
 }
