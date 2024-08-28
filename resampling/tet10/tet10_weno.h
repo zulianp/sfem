@@ -45,4 +45,10 @@ double weno4_3D_ConstH(const double x, const double y, const double z,  //
                        const int stride_y,                              //
                        const int stride_z);                             //
 
+double weno4_3D_HOne(const double x, const double y, const double z,  //
+                     const double *f,                                 //
+                     const int stride_x,                              //
+                     const int stride_y,                              //
+                     const int stride_z);
+
 #endif  // __TET10_WENO_H__
