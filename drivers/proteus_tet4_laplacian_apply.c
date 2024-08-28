@@ -18,6 +18,64 @@
 #include "proteus_tet4_laplacian.h"
 #include "tet4_fff.h"
 
+#include "adj_table.h"
+
+// Adj Table
+// (Face, node)
+// LST(0, 0) = 1 - 1;
+// LST(0, 1) = 2 - 1;
+// LST(0, 2) = 4 - 1;
+
+// LST(1, 0) = 2 - 1;
+// LST(1, 1) = 3 - 1;
+// LST(1, 2) = 4 - 1;
+
+// LST(2, 0) = 1 - 1;
+// LST(2, 1) = 4 - 1;
+// LST(2, 2) = 3 - 1;
+
+// LST(3, 0) = 1 - 1;
+// LST(3, 1) = 3 - 1;
+// LST(3, 2) = 2 - 1;
+
+static void create_idx(const int L, mesh_t *mesh /*, ..output*/) {
+    double tick = MPI_Wtime();
+
+    // 1) Get the node indices from the TET4 mesh
+
+    // 2) Compute the unique edge-node indices using the CRSGraph
+    // A unique edge index can be used and use the multiple to store all indices
+    // as consecutive ()
+
+    count_t *rowptr;
+    idx_t *colidx;
+    build_crs_graph_for_elem_type(
+            mesh->element_type, mesh->nelements, mesh->nnodes, mesh->elements, &rowptr, &colidx);
+
+    ptrdiff_t nxedge = L - 1; // L == 0
+    ptrdiff_t nedges = (rowptr[mesh->nnodes] - mesh->nnodes) / 2;
+
+    // 3) Compute the unique face-node indices using the adjacency table
+    // Two elements share a face, figure out the ordering 
+
+    element_idx_t *adj_table = 0;
+    create_element_adj_table(
+            mesh->nelements, mesh->nnodes, mesh->element_type, mesh->elements, &adj_table);
+
+    // 4) Compute the unique internal nodes implicitly using the element id and the idx offset of
+    // the total number of explicit indices (offset + element_id * nxelem + local_internal_node_id)
+
+
+
+    // Clean-up
+    free(rowptr);
+    free(colidx);
+    free(adj_table);
+    double tock = MPI_Wtime();
+
+    printf("Create idx (%s) took %g [s]\n", type_to_string(mesh->element_type), tock - tick);
+}
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -68,6 +126,8 @@ int main(int argc, char *argv[]) {
     const int txe = proteus_tet4_txe(L);
     ptrdiff_t nnodes = mesh.nelements * nxe;
 
+    // create_idx(L, &mesh);
+
     real_t *x = calloc(nnodes, sizeof(real_t));
     real_t *y = calloc(nnodes, sizeof(real_t));
 
@@ -78,9 +138,13 @@ int main(int argc, char *argv[]) {
 
     fff_t fff;
     int err = tet4_fff_create(&fff, mesh.nelements, mesh.elements, mesh.points);
-    if(err) {
+    if (err) {
         fprintf(stderr, "Unable to create FFFs!\n");
         MPI_Abort(MPI_COMM_WORLD, -1);
+    }
+
+    for (ptrdiff_t i = 0; i < nnodes; i++) {
+        x[i] = 1;
     }
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -100,6 +164,13 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
     // Output for testing
     ///////////////////////////////////////////////////////////////////////////////
+
+    real_t sq_nrm = 0;
+    for (ptrdiff_t i = 0; i < nnodes; i++) {
+        sq_nrm += y[i] * y[i];
+    }
+
+    printf("sq_nrm = %g\n", sq_nrm);
 
     // array_write(comm, path_output, SFEM_MPI_REAL_T, y, nnodes, u_n_global);
 
