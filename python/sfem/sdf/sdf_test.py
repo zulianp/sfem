@@ -9,11 +9,11 @@ output_path = '/home/sriva/git/sfem/workflows/resample/sdf.float32.raw'
 
 sdf_t = np.float32
 
-D = 100
-dims = (D, D, D)
+D = 200
+dims = (D+40, D+10, D)
 
-mn = -0.8
-mx = 0.8
+mn = -0.88
+mx = 1.8
 pmin = np.array([mn, mn, mn])
 pmax = np.array([mx, mx, mx])
 
@@ -30,17 +30,17 @@ def chess_board(x, y, z):
     
     return vx * vy * vz
 
-for i in range(D):
-    for j in range(D):
-        for k in range(D):
-            x = pmin[0] + i * (pmax[0] - pmin[0]) / (D - 1)
-            y = pmin[1] + j * (pmax[1] - pmin[1]) / (D - 1)
-            z = pmin[2] + k * (pmax[2] - pmin[2]) / (D - 1)
+for i in range(dims[0]):
+    for j in range(dims[1]):
+        for k in range(dims[2]):
+            x = pmin[0] + i * (pmax[0] - pmin[0]) / (dims[0] - 1)
+            y = pmin[1] + j * (pmax[1] - pmin[1]) / (dims[1] - 1)
+            z = pmin[2] + k * (pmax[2] - pmin[2]) / (dims[2] - 1)
             # field[i, j, k] = 10.0 * np.exp( -( x**2 + y**2 + z**2 ) ) * (1.0 if np.sqrt(x*x + y*y + z*z) < 0.2 else -1.0)
-            # field[i, j, k] = np.sin(4.0 * np.pi * x) + np.cos(4.0 * np.pi * y + 4.0 * np.pi * z)**2 * chass_board(x, y, z)
-            field[i, j, k] = chess_board(x, y, z)
+            field[i, j, k] = np.sin(4.0 * np.pi * x) + np.cos(4.0 * np.pi * y + 4.0 * np.pi * z)**2 
+            # field[i, j, k] = chess_board(x, y, z)
 
-np.reshape(field, (D*D*D, 1)).tofile(output_path)
+np.reshape(field, ( dims[0]*dims[1]*dims[2], 1)).tofile(output_path)
 
 header =    f'nx: {dims[0]}\n'
 header +=   f'ny: {dims[1]}\n'
@@ -62,6 +62,10 @@ if pdir == "":
     pdir = "./"
 
 fname = os.path.basename(fname)
+
+print("sdf_test.py: ==========================================")
+print("sdf_test.py: Writing metadata file to ", end="")
+print(f'{pdir}/metadata_{fname}.yml')
 
 with open(f'{pdir}/metadata_{fname}.yml', 'w') as f:
     f.write(header)

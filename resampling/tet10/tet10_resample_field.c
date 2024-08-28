@@ -76,6 +76,15 @@ SFEM_INLINE static void tet10_dual_basis_popp(const real_t qx, const real_t qy, 
     f[9] = (6.0 / 5.0) * qx * x12 + (111.0 / 5.0) * qy * qz - x43 - x44 - x46 - x48 - x49;
 }
 
+/**
+ * @brief Compute the dual basis of the tet10 element
+ *
+ * @param qx
+ * @param qy
+ * @param qz
+ * @param f
+ * @return SFEM_INLINE
+ */
 SFEM_INLINE static void tet10_dual_basis_hrt(const real_t qx, const real_t qy, const real_t qz,
                                              real_t* const f) {
     const real_t x0 = 2 * qy;
@@ -554,13 +563,16 @@ SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D_Unit(
         const ptrdiff_t* stride,                   //
         const real_t* const SFEM_RESTRICT data) {  //
 
+    // collate the data for the WENO interpolation
     real_t out[64];
     hex_aa_8_collect_coeffs_O3(stride, i, j, k, data, out);
 
-    ptrdiff_t i_local, j_local, k_local;
-    i_local = floor(x_unit - ox_unit);
-    j_local = floor(y_unit - oy_unit);
-    k_local = floor(z_unit - oz_unit);
+    ////// Compute the local indices
+    // ptrdiff_t i_local, j_local, k_local;
+
+    const ptrdiff_t i_local = floor(x_unit - ox_unit);
+    const ptrdiff_t j_local = floor(y_unit - oy_unit);
+    const ptrdiff_t k_local = floor(z_unit - oz_unit);
 
     const double x = (x_unit - ox_unit) - (real_t)i_local + 1.0;
     const double y = (y_unit - oy_unit) - (real_t)j_local + 1.0;
@@ -572,14 +584,13 @@ SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D_Unit(
 
     // printf("delta = %f\n", h);
 
-    const real_t w4 = weno4_3D_ConstH(x,  //
-                                      y,
-                                      z,
-                                      1.0,
-                                      out,
-                                      1,
-                                      4,
-                                      16);
+    const real_t w4 = weno4_3D_HOne(x,  //
+                                    y,
+                                    z,
+                                    out,
+                                    1,
+                                    4,
+                                    16);
 
     return w4;
 }
@@ -1034,13 +1045,13 @@ int hex8_to_isoparametric_tet10_resample_field_local(
         real_t* const SFEM_RESTRICT weighted_field) {
     //
 
-#define WENO 1
+#define WENO 0
 
     printf("============================================================\n");
-    printf("Start: hex8_to_isoparametric_tet10_resample_field_local. Interpolation: %s\n",
+    printf("Start: hex8_to_isoparametric_tet10_resample_field_local. \nInterpolation: %s\n",
            (WENO == 1 ? "Weno" : "Linear"));
     printf("============================================================\n");
-    printf("dx = %e, dy = %e, dz = %e\n", delta[0], delta[1], delta[2]);
+    printf(" dx = %.16e, \n dy = %.16e, \n dz = %.16e\n", delta[0], delta[1], delta[2]);
     printf("============================================================\n");
 
     const real_t ox = (real_t)origin[0];
@@ -1177,6 +1188,7 @@ int hex8_to_isoparametric_tet10_resample_field_local(
                     // UNROLL_ZERO?
                     for (int edof_i = 0; edof_i < 10; edof_i++) {
                         element_field[edof_i] += eval_field * tet10_f[edof_i] * dV;
+                        // element_field[edof_i] += eval_field * dV;
                     }  // end edof_i loop
                 }
             }  // end quadrature loop
@@ -1197,12 +1209,12 @@ int hex8_to_isoparametric_tet10_resample_field_local(
 // hex8_to_isoparametric_tet10_resample_field_local_cube1
 ///////////////////////////////////////////////////////////////////////
 int hex8_to_isoparametric_tet10_resample_field_local_cube1(
-        // Mesh
+        /// Mesh
         const ptrdiff_t nelements,          // number of elements
         const ptrdiff_t nnodes,             // number of nodes
         idx_t** const SFEM_RESTRICT elems,  // connectivity
         geom_t** const SFEM_RESTRICT xyz,   // coordinates
-        // SDF
+        /// SDF
         const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
         const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
         const geom_t* const SFEM_RESTRICT origin,     // origin of the domain
@@ -1214,15 +1226,6 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
 
 #define WENO 1
 
-    printf("============================================================\n");
-    printf("Start: hex8_to_isoparametric_tet10_resample_field_local_cube1. Interpolation: %s\n",
-           (WENO == 1 ? "Weno" : "Linear"));
-    printf("============================================================\n");
-    printf("EXPERIAL: It maps the structured grid to a cubic grid with 1x1x1 spacing\n");
-    printf("============================================================\n");
-    printf("dx = %e, dy = %e, dz = %e\n", delta[0], delta[1], delta[2]);
-    printf("============================================================\n");
-
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];
     const real_t oz = (real_t)origin[2];
@@ -1230,6 +1233,19 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
     const real_t dx = (real_t)delta[0];
     const real_t dy = (real_t)delta[1];
     const real_t dz = (real_t)delta[2];
+
+    const real_t cVolume = dx * dy * dz;
+
+    printf("============================================================\n");
+    printf("Start: hex8_to_isoparametric_tet10_resample_field_local_cube1. Interpolation: %s\n",
+           (WENO == 1 ? "Weno" : "Linear"));
+    printf("============================================================\n");
+    printf("EXPERIAL: It maps the structured grid to a cubic grid with 1x1x1 spacing\n");
+    printf("Interpolation: %s\n", (WENO == 1 ? "Weno" : "Linear"));
+    printf("============================================================\n");
+    printf("dx = %.16e, \ndy = %.16e, \ndz = %.16e\n", delta[0], delta[1], delta[2]);
+    printf("Cube volume = %e\n", cVolume);
+    printf("============================================================\n");
 
 #pragma omp parallel
     {
@@ -1266,8 +1282,9 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
                 y[v] = xyz[1][ev[v]];  // y-coordinates
                 z[v] = xyz[2][ev[v]];  // z-coordinates
 
-                double dist = sqrt((x[v] - ox) * (x[v] - ox) + (y[v] - oy) * (y[v] - oy) +
-                                   (z[v] - oz) * (z[v] - oz));
+                const double dist = sqrt((x[v] - ox) * (x[v] - ox) +  //
+                                         (y[v] - oy) * (y[v] - oy) +  //
+                                         (z[v] - oz) * (z[v] - oz));
 
                 if (dist < dist_min) {
                     dist_min = dist;
@@ -1294,10 +1311,8 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
                 z_unit[v] = (z[v] - z_orig) / dz;
             }
 
-            double cVolume = dx * dy * dz;
-
-            memset(element_field, 0,
-                   10 * sizeof(real_t));  // set to zero the element field
+            // set to zero the element field
+            memset(element_field, 0, 10 * sizeof(real_t));
 
             // SUBPARAMETRIC (for iso-parametric tassellation of tet10 might be necessary)
             for (int q = 0; q < TET4_NQP; q++) {  // loop over the quadrature points
@@ -1310,8 +1325,12 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
                 // tet4_qz[q]);
 
                 // measure with respect to the unitary spacing
-                const real_t measure =
-                        tet10_measure(x_unit, y_unit, z_unit, tet4_qx[q], tet4_qy[q], tet4_qz[q]);
+                const real_t measure = tet10_measure(x_unit,
+                                                     y_unit,
+                                                     z_unit,  //
+                                                     tet4_qx[q],
+                                                     tet4_qy[q],
+                                                     tet4_qz[q]);
 
                 assert(measure > 0);
 
@@ -1321,8 +1340,8 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
                 // printf("dV[%d]: %e\n", q, dV);
 
                 // Transform quadrature point to physical space
-                // g_qx, g_qy, g_qz are the coordinates of the quadrature point in the physical
-                // space
+                // g_qx_glob, g_qy_glob, g_qz_glob are the coordinates of the quadrature point in
+                // the global space
                 real_t g_qx_glob, g_qy_glob, g_qz_glob;
                 tet10_transform(x,
                                 y,
@@ -1333,8 +1352,12 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
                                 &g_qx_glob,
                                 &g_qy_glob,
                                 &g_qz_glob);
+
                 tet10_dual_basis_hrt(tet4_qx[q], tet4_qy[q], tet4_qz[q], tet10_f);
 
+                // Transform quadrature point to unitary space
+                // g_qx_unit, g_qy_unit, g_qz_unit are the coordinates of the quadrature point in
+                // the unitary space
                 real_t g_qx_unit, g_qy_unit, g_qz_unit;
                 tet10_transform(x_unit,
                                 y_unit,
@@ -1348,6 +1371,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
 
                 ///// ======================================================
 
+                // Get the global grid coordinates
                 const real_t grid_x = (g_qx_glob - ox) / dx;
                 const real_t grid_y = (g_qy_glob - oy) / dy;
                 const real_t grid_z = (g_qz_glob - oz) / dz;
@@ -1562,8 +1586,14 @@ int hex8_to_tet10_resample_field_local(
     int SFEM_ENABLE_ISOPARAMETRIC = 0;
     SFEM_READ_ENV(SFEM_ENABLE_ISOPARAMETRIC, atoi);
 
+#define CUBE1 1
+
     if (1 | SFEM_ENABLE_ISOPARAMETRIC) {
+#if CUBE1 == 1
+        return hex8_to_isoparametric_tet10_resample_field_local_cube1(
+#else
         return hex8_to_isoparametric_tet10_resample_field_local(
+#endif
                 nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
     } else {
         return hex8_to_subparametric_tet10_resample_field_local(
