@@ -4,7 +4,7 @@ set -e
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
-source $SCRIPTPATH/../../workflows/sfem_config.sh
+
 export PATH=$SCRIPTPATH/../../:$PATH
 export PATH=$SCRIPTPATH/../../bin/:$PATH
 export PATH=$SCRIPTPATH/../../../matrix.io:$PATH
@@ -21,8 +21,10 @@ export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 if [[ -z $SFEM_BIN_DIR ]]
 then
 	PATH=$SCRIPTPATH/../../build:$PATH
+	source $SCRIPTPATH/../../build/sfem_config.sh
 else
 	PATH=$SFEM_BIN_DIR:$PATH
+	source $SFEM_BIN_DIR/sfem_config.sh
 fi
 
 # export OMP_NUM_THREADS=16
