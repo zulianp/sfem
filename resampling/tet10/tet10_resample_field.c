@@ -342,7 +342,7 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_O3(
     hex_aa_8_indices_O3(stride,
                         i,
                         j,
-                        k,
+                        k - 1,
                         &i0,
                         &i1,
                         &i2,
@@ -363,7 +363,7 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_O3(
     hex_aa_8_indices_O3(stride,
                         i,
                         j,
-                        k + 1,
+                        k,
                         &i16,
                         &i17,
                         &i18,
@@ -384,7 +384,7 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_O3(
     hex_aa_8_indices_O3(stride,
                         i,
                         j,
-                        k + 2,
+                        k + 1,
                         &i32,
                         &i33,
                         &i34,
@@ -405,7 +405,7 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_O3(
     hex_aa_8_indices_O3(stride,
                         i,
                         j,
-                        k + 3,
+                        k + 2,
                         &i48,
                         &i49,
                         &i50,
@@ -508,15 +508,16 @@ SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D(const real_t x_,               
     real_t out[64];
     hex_aa_8_collect_coeffs_O3(stride, i, j, k, data, out);
 
-    double x = (x_ - ox) - (real_t)i * h + h;
-    double y = (y_ - oy) - (real_t)j * h + h;
-    double z = (z_ - oz) - (real_t)k * h + h;
+    const double x = (x_ - ox) - (real_t)i * h + h;
+    const double y = (y_ - oy) - (real_t)j * h + h;
+    const double z = (z_ - oz) - (real_t)k * h + h;
 
     // printf("x = %f, x_ = %f, i = %d\n", x, x_, i);
     // printf("y = %f, y_ = %f, j = %d\n", y, y_, j);
     // printf("z = %f, z_ = %f, k = %d\n", z, z_, k);
 
-    // printf("delta = %f\n", h);
+    // printf("delta (h) = %f\n", h);
+    // printf("x/h = %e \ny/h = %e \nz/h = %e\n", x / h, y / h, z / h);
 
     const real_t w4 = weno4_3D_ConstH(x,  //
                                       y,
@@ -1042,7 +1043,7 @@ int hex8_to_isoparametric_tet10_resample_field_local(
         const geom_t* const SFEM_RESTRICT delta,      // delta of the domain
         const real_t* const SFEM_RESTRICT data,       // SDF
         // Output
-        real_t* const SFEM_RESTRICT weighted_field) {
+        real_t* const SFEM_RESTRICT weighted_field) {  //
     //
 
 #define WENO 0
@@ -1284,7 +1285,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
 
                 const double dist = sqrt((x[v] - ox) * (x[v] - ox) +  //
                                          (y[v] - oy) * (y[v] - oy) +  //
-                                         (z[v] - oz) * (z[v] - oz));
+                                         (z[v] - oz) * (z[v] - oz));  //
 
                 if (dist < dist_min) {
                     dist_min = dist;
@@ -1417,9 +1418,9 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
 #else
 
                     // Get the reminder [0, 1]
-                    real_t l_x = (grid_x - i);
-                    real_t l_y = (grid_y - j);
-                    real_t l_z = (grid_z - k);
+                    real_t l_x = (grid_x - i_glob);
+                    real_t l_y = (grid_y - j_glob);
+                    real_t l_z = (grid_z - k_glob);
 
                     assert(l_x >= -1e-8);
                     assert(l_y >= -1e-8);
@@ -1430,7 +1431,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
                     assert(l_z <= 1 + 1e-8);
 
                     hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
-                    hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
+                    hex_aa_8_collect_coeffs(stride, i_glob, j_glob, k_glob, data, coeffs);
 
                     real_t eval_field = 0;
                     // UNROLL_ZERO?
@@ -1586,7 +1587,7 @@ int hex8_to_tet10_resample_field_local(
     int SFEM_ENABLE_ISOPARAMETRIC = 0;
     SFEM_READ_ENV(SFEM_ENABLE_ISOPARAMETRIC, atoi);
 
-#define CUBE1 1
+#define CUBE1 0
 
     if (1 | SFEM_ENABLE_ISOPARAMETRIC) {
 #if CUBE1 == 1
