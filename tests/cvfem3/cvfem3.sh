@@ -10,6 +10,16 @@ PATH=$SCRIPTPATH/../../python/sfem:$PATH
 PATH=$SCRIPTPATH/../../python/sfem/mesh:$PATH
 PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
+if [[ -z $SFEM_BIN_DIR ]]
+then
+	PATH=$SCRIPTPATH/../../build:$PATH
+	source $SCRIPTPATH/../../build/sfem_config.sh
+else
+	PATH=$SFEM_BIN_DIR:$PATH
+	source $SFEM_BIN_DIR/sfem_config.sh
+fi
+
+
 mkdir -p system
 
 create_cylinder.sh 2
