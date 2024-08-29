@@ -9,11 +9,11 @@ output_path = '/home/sriva/git/sfem/workflows/resample/sdf.float32.raw'
 
 sdf_t = np.float32
 
-D = 200
-dims = (D+40, D+10, D)
+D = 100
+dims = (D+50, D+20, D)
 
 mn = -0.88
-mx = 1.8
+mx = 0.88
 pmin = np.array([mn, mn, mn])
 pmax = np.array([mx, mx, mx])
 
