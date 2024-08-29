@@ -1046,11 +1046,11 @@ int hex8_to_isoparametric_tet10_resample_field_local(
         real_t* const SFEM_RESTRICT weighted_field) {  //
     //
 
-#define WENO 0
+#define WENO_GRID 0
 
     printf("============================================================\n");
     printf("Start: hex8_to_isoparametric_tet10_resample_field_local. \nInterpolation: %s\n",
-           (WENO == 1 ? "Weno" : "Linear"));
+           (WENO_GRID == 1 ? "Weno" : "Linear"));
     printf("============================================================\n");
     printf(" dx = %.16e, \n dy = %.16e, \n dz = %.16e\n", delta[0], delta[1], delta[2]);
     printf("============================================================\n");
@@ -1147,7 +1147,7 @@ int hex8_to_isoparametric_tet10_resample_field_local(
 
                 // Integrate field
                 {
-#if WENO == 1
+#if WENO_GRID == 1
 
                     // printf("origin = (%f, %f, %f)\n", ox, oy, oz);
                     real_t eval_field = hex_aa_8_eval_weno4_3D(g_qx,
@@ -1225,7 +1225,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
         real_t* const SFEM_RESTRICT weighted_field) {
     //
 
-#define WENO 1
+#define WENO_CUBE 1
 
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];
@@ -1239,10 +1239,10 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
 
     printf("============================================================\n");
     printf("Start: hex8_to_isoparametric_tet10_resample_field_local_cube1. Interpolation: %s\n",
-           (WENO == 1 ? "Weno" : "Linear"));
+           (WENO_CUBE == 1 ? "Weno" : "Linear"));
     printf("============================================================\n");
     printf("EXPERIAL: It maps the structured grid to a cubic grid with 1x1x1 spacing\n");
-    printf("Interpolation: %s\n", (WENO == 1 ? "Weno" : "Linear"));
+    printf("Interpolation: %s\n", (WENO_CUBE == 1 ? "Weno" : "Linear"));
     printf("============================================================\n");
     printf("dx = %.16e, \ndy = %.16e, \ndz = %.16e\n", delta[0], delta[1], delta[2]);
     printf("Cube volume = %e\n", cVolume);
@@ -1401,8 +1401,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
 
                 // Integrate field
                 {
-#if WENO == 1
-
+#if WENO_CUBE == 1
                     // printf("origin = (%f, %f, %f)\n", ox, oy, oz);
                     real_t eval_field = hex_aa_8_eval_weno4_3D_Unit(g_qx_unit,
                                                                     g_qy_unit,
@@ -1587,7 +1586,7 @@ int hex8_to_tet10_resample_field_local(
     int SFEM_ENABLE_ISOPARAMETRIC = 0;
     SFEM_READ_ENV(SFEM_ENABLE_ISOPARAMETRIC, atoi);
 
-#define CUBE1 0
+#define CUBE1 1
 
     if (1 | SFEM_ENABLE_ISOPARAMETRIC) {
 #if CUBE1 == 1
