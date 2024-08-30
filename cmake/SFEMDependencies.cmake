@@ -99,21 +99,35 @@ endif()
 # ##############################################################################
 
 if(SFEM_ENABLE_CUDA)
-  enable_language(CUDA)
+    enable_language(CUDA)
 
-  if(NOT DEFINED CMAKE_CUDA_STANDARD)
+    if(NOT DEFINED CMAKE_CUDA_STANDARD)
       set(CMAKE_CUDA_STANDARD 17)
       set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-  endif()
+    endif()
 
-  set(SFEM_DEP_INCLUDES "${SFEM_DEP_INCLUDES};${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}")
-  #set(SFEM_DEP_LIBRARIES "${SFEM_DEP_LIBRARIES};${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES}")
+    set(SFEM_DEP_INCLUDES "${SFEM_DEP_INCLUDES};${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}")
+    #set(SFEM_DEP_LIBRARIES "${SFEM_DEP_LIBRARIES};${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES}")
 
-  include(CheckLanguage)
-  check_language(CUDA)
+    include(CheckLanguage)
+    check_language(CUDA)
 
-  find_package(CUDAToolkit REQUIRED)
+    find_package(CUDAToolkit REQUIRED)
 
-  set(SFEM_DEP_LIBRARIES
-      "${SFEM_DEP_LIBRARIES};CUDA::cusparse;CUDA::cublas;CUDA::nvToolsExt")
+    set(SFEM_DEP_LIBRARIES "CUDA::cudart")
+
+    set(_SFEM_CUDA_MODULES "CUDA::cusparse;CUDA::cublas;CUDA::nvToolsExt")
+    set(SFEM_ENABLE_CUBLAS TRUE)
+    set(SFEM_ENABLE_CUSPARSE TRUE)
+
+    foreach(CUDA_MODULE ${_SFEM_CUDA_MODULES})
+        if(TARGET ${CUDA_MODULE})
+            list(APPEND SFEM_DEP_LIBRARIES "${CUDA_MODULE}")
+        else()
+            message(WARNING "CUDAToolkit does not have module ${CUDA_MODULE}")
+            # FIXME
+            set(SFEM_ENABLE_CUBLAS FALSE)
+            set(SFEM_ENABLE_CUSPARSE FALSE)
+        endif()
+    endforeach()
 endif()

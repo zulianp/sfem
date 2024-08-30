@@ -1,6 +1,8 @@
 #ifndef SFEM_CONFIG_HPP
 
 #cmakedefine SFEM_ENABLE_CUDA
+#cmakedefine SFEM_ENABLE_CUBLAS
+#cmakedefine SFEM_ENABLE_CUSPARSE
 #cmakedefine SFEM_ENABLE_OPENMP
 #cmakedefine SFEM_ENABLE_AVX2
 #cmakedefine SFEM_ENABLE_AVX512
