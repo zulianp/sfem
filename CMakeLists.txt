@@ -188,12 +188,15 @@ else()
     list(APPEND SFEM_EXCLUDED_EXEC "run_poisson_cuda;cuda_do_spmv;lapl_matrix_free;linear_elasticity_matrix_free")
 endif()
 
+if(NOT SFEM_ENABLE_CUSPARSE)
+    # FIXME
+    list(APPEND SFEM_EXCLUDED_EXEC "cuda_do_spmv")
+endif()
+
 foreach(DRIVER ${DRIVERS})
     get_filename_component(DRIVER_NAME ${DRIVER} NAME_WE)
     list(FIND SFEM_EXCLUDED_EXEC "${DRIVER_NAME}" LIST_INDEX)
 
-    
-    
     if (${LIST_INDEX} GREATER -1)
         message(STATUS "Skipped DRIVER_NAME: ${DRIVER_NAME}")
     else()
@@ -300,6 +303,7 @@ if(TARGET cuda_do_spmv)
                            cuspmv
                        COMMENT "Copying 'cuda_do_spmv' executable to 'cuspmv'")
 endif()
+
 
 add_custom_command(TARGET do_spmv  POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy

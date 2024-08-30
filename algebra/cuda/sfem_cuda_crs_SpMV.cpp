@@ -1,13 +1,15 @@
 #include "sfem_cuda_crs_SpMV.hpp"
 
-#include <cuda_runtime_api.h>  // cudaMalloc, cudaMemcpy, etc.
-#include <cusparse.h>
-
+#include "sfem_Buffer.hpp"
+#include "sfem_config.h"
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
 
-#include "sfem_Buffer.hpp"
+#ifdef SFEM_ENABLE_CUSPARSE
+
+#include <cuda_runtime_api.h>  // cudaMalloc, cudaMemcpy, etc.
+#include <cusparse.h>
 
 #define CHECK_CUDA(func)                                               \
     do {                                                               \
@@ -183,3 +185,21 @@ namespace sfem {
     }
 
 }  // namespace sfem
+
+#else
+#warning "No CUSPARSE installation!"
+
+namespace sfem {
+    std::shared_ptr<CRSSpMV<count_t, idx_t, real_t>> d_crs_spmv(
+            const ptrdiff_t rows,
+            const ptrdiff_t cols,
+            const std::shared_ptr<Buffer<count_t>>& rowptr,
+            const std::shared_ptr<Buffer<idx_t>>& colidx,
+            const std::shared_ptr<Buffer<real_t>>& values,
+            const real_t scale_output) {
+        assert(false);
+        return nullptr;
+    }
+}  // namespace sfem
+
+#endif

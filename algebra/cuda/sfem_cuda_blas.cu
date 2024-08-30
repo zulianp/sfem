@@ -23,7 +23,6 @@
         }                                                              \
     } while (0)
 
-#define SFEM_ENABLE_CUBLAS
 #ifdef SFEM_ENABLE_CUBLAS
 #include "cublas_v2.h"
 
@@ -210,7 +209,10 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUBLAS
             CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &alpha, x, 1, y, 1));
 #else
-#error "CUBLAS required!"
+#warning "CUBLAS required!"
+            assert(false);
+            fprintf(stderr, "Missing implementation\n");
+            abort();
 
 #endif
         }
@@ -220,7 +222,10 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUBLAS
             CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &alpha, x, 1, y, 1));
 #else
-#error "CUBLAS required!"
+#warning "CUBLAS required!"
+            assert(false);
+            fprintf(stderr, "Missing implementation\n");
+            abort();
 
 #endif
         }
@@ -300,7 +305,10 @@ namespace sfem {
                 CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &beta, y, 1, z, 1));
             }
 #else
-#error "IMPLEMENT ME!"
+#warning "CUBLAS is required!"
+            assert(false);
+            fprintf(stderr, "Missing implementation\n");
+            abort();
 #endif
         }
 
@@ -327,7 +335,10 @@ namespace sfem {
                 CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &beta, y, 1, z, 1));
             }
 #else
-#error "IMPLEMENT ME!"
+#warning "CUBLAS is required!"
+            assert(false);
+            fprintf(stderr, "Missing implementation\n");
+            abort();
 #endif
         }
 
@@ -336,7 +347,10 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUBLAS
             CHECK_CUBLAS(cublasDscal(cublas_handle, n, &alpha, x, 1));
 #else
-#error "IMPLEMENT ME!"
+#warning "CUBLAS is required!"
+            assert(false);
+            fprintf(stderr, "Missing implementation\n");
+            abort();
 #endif
         }
 
@@ -345,7 +359,10 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUBLAS
             CHECK_CUBLAS(cublasSscal(cublas_handle, n, &alpha, x, 1));
 #else
-#error "IMPLEMENT ME!"
+#warning "CUBLAS is required!"
+            assert(false);
+            fprintf(stderr, "Missing implementation\n");
+            abort();
 #endif
         }
 
@@ -354,7 +371,10 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUBLAS
             CHECK_CUBLAS(cublasDnrm2(cublas_handle, n, x, 1, result));
 #else
-#error "IMPLEMENT ME!"
+#warning "CUBLAS is required!"
+            assert(false);
+            fprintf(stderr, "Missing implementation\n");
+            abort();
 #endif
         }
 
@@ -363,7 +383,10 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUBLAS
             CHECK_CUBLAS(cublasSnrm2(cublas_handle, n, x, 1, result));
 #else
-#error "IMPLEMENT ME!"
+#warning "CUBLAS is required!"
+            assert(false);
+            fprintf(stderr, "Missing implementation\n");
+            abort();
 #endif
         }
 
