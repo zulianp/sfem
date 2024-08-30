@@ -12,6 +12,8 @@
 #define POW2(x) ((x) * (x))
 #define POW3(x) ((x) * (x) * (x))
 
+ptrdiff_t nSizes_global = 0;
+
 SFEM_INLINE static void tet10_dual_basis_popp(const real_t qx, const real_t qy, const real_t qz,
                                               real_t* const f) {
     const real_t x0 = -qx - qy - qz + 1;
@@ -312,6 +314,30 @@ SFEM_INLINE static void hex_aa_8_indices_O3(const ptrdiff_t* const SFEM_RESTRICT
     *i13 = (i + 0) * stride_x + (j + 2) * stride_y + (k)*stride_z;
     *i14 = (i + 1) * stride_x + (j + 2) * stride_y + (k)*stride_z;
     *i15 = (i + 2) * stride_x + (j + 2) * stride_y + (k)*stride_z;
+
+// /*
+
+
+    if (*i0 >= nSizes_global) printf("ERROR i0 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i0, nSizes_global, i-1, j-1, k, stride_x, stride_y, stride_z);
+    if (*i1 >= nSizes_global) printf("ERROR i1 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i1, nSizes_global, i, j-1, k, stride_x, stride_y, stride_z);
+    if (*i2 >= nSizes_global) printf("ERROR i2 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i2, nSizes_global, i+1, j-1, k, stride_x, stride_y, stride_z);
+    if (*i3 >= nSizes_global) printf("ERROR i3 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i3, nSizes_global, i+2, j-1, k, stride_x, stride_y, stride_z);
+    if (*i4 >= nSizes_global) printf("ERROR i4 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i4, nSizes_global, i-1, j, k, stride_x, stride_y, stride_z);
+    if (*i5 >= nSizes_global) printf("ERROR i5 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i5, nSizes_global, i, j, k, stride_x, stride_y, stride_z);
+    if (*i6 >= nSizes_global) printf("ERROR i6 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i6, nSizes_global, i+1, j, k, stride_x, stride_y, stride_z);
+    if (*i7 >= nSizes_global) printf("ERROR i7 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i7, nSizes_global, i+2, j, k, stride_x, stride_y, stride_z);
+    if (*i8 >= nSizes_global) printf("ERROR i8 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i8, nSizes_global, i-1, j+1, k, stride_x, stride_y, stride_z);
+    if (*i9 >= nSizes_global) printf("ERROR i9 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i9, nSizes_global, i, j+1, k, stride_x, stride_y, stride_z);
+    if (*i10 >= nSizes_global) printf("ERROR i10 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i10, nSizes_global, i+1, j+1, k, stride_x, stride_y, stride_z);
+    if (*i11 >= nSizes_global) printf("ERROR i11 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i11, nSizes_global, i+2, j+1, k, stride_x, stride_y, stride_z);
+    if (*i12 >= nSizes_global) printf("ERROR i12 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i12, nSizes_global, i-1, j+2, k, stride_x, stride_y, stride_z);
+    if (*i13 >= nSizes_global) printf("ERROR i13 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i13, nSizes_global, i, j+2, k, stride_x, stride_y, stride_z);
+    if (*i14 >= nSizes_global) printf("ERROR i14 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i14, nSizes_global, i+1, j+2, k, stride_x, stride_y, stride_z);
+    if (*i15 >= nSizes_global) printf("ERROR i15 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i15, nSizes_global, i+2, j+2, k, stride_x, stride_y, stride_z);
+
+   
+
+// */
 }
 
 /**
@@ -1237,6 +1263,9 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
 
     const real_t cVolume = dx * dy * dz;
 
+    const ptrdiff_t nNodes = n[0] * n[1] * n[2];
+    nSizes_global = nNodes;
+
     printf("============================================================\n");
     printf("Start: hex8_to_isoparametric_tet10_resample_field_local_cube1. Interpolation: %s\n",
            (WENO_CUBE == 1 ? "Weno" : "Linear"));
@@ -1246,6 +1275,10 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
     printf("============================================================\n");
     printf("dx = %.16e, \ndy = %.16e, \ndz = %.16e\n", delta[0], delta[1], delta[2]);
     printf("Cube volume = %e\n", cVolume);
+    printf("============================================================\n");
+    printf("n sizes = %ld, %ld, %ld\n", n[0], n[1], n[2]);
+    printf("nNodes   = %ld\n", nNodes);
+    printf("nSizes_global = %ld\n", nSizes_global);
     printf("============================================================\n");
 
 #pragma omp parallel
@@ -1402,6 +1435,13 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
                 // Integrate field
                 {
 #if WENO_CUBE == 1
+
+                    if (nSizes_global != nNodes) {
+                        fprintf(stderr, "nSizes_global != nNodes .. %ld != %ld\n", nSizes_global, nNodes);
+                    }
+
+                    //
+                    // printf("nSizes_global = %ld\n", nSizes_global);
                     // printf("origin = (%f, %f, %f)\n", ox, oy, oz);
                     real_t eval_field = hex_aa_8_eval_weno4_3D_Unit(g_qx_unit,
                                                                     g_qy_unit,
