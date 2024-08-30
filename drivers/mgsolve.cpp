@@ -72,6 +72,7 @@ int main(int argc, char *argv[]) {
     int SFEM_MAX_IT = 4000;
     int SFEM_SMOOTHER_SWEEPS = 3;
     int SFEM_USE_MG_PRECONDITIONER = 0;
+    int SFEM_WRITE_OUTPUT = 1;
     float SFEM_CHEB_EIG_MAX_SCALE = 1.02;
     float SFEM_TOL = 1e-9;
     float SFEM_CHEB_EIG_TOL = 1e-5;
@@ -86,6 +87,7 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_MG, atoi);
     SFEM_READ_ENV(SFEM_MAX_IT, atoi);
     SFEM_READ_ENV(SFEM_USE_MG_PRECONDITIONER, atoi);
+    SFEM_READ_ENV(SFEM_WRITE_OUTPUT, atoi);
     SFEM_READ_ENV(SFEM_CHEB_EIG_MAX_SCALE, atof);
     SFEM_READ_ENV(SFEM_TOL, atof);
 
@@ -101,6 +103,7 @@ int main(int argc, char *argv[]) {
            "SFEM_DEBUG: %d\n"
            "SFEM_MG: %d\n"
            "SFEM_USE_MG_PRECONDITIONER: %d\n"
+           "SFEM_WRITE_OUTPUT: %d\n"
            "SFEM_CHEB_EIG_MAX_SCALE: %f\n"
            "SFEM_TOL: %f\n"
            "SFEM_SMOOTHER_SWEEPS: %d\n"
@@ -114,6 +117,7 @@ int main(int argc, char *argv[]) {
            SFEM_DEBUG,
            SFEM_MG,
            SFEM_USE_MG_PRECONDITIONER,
+           SFEM_WRITE_OUTPUT,
            SFEM_CHEB_EIG_MAX_SCALE,
            SFEM_TOL,
            SFEM_SMOOTHER_SWEEPS,
@@ -373,9 +377,11 @@ int main(int argc, char *argv[]) {
     auto h_r = r;
 #endif
 
-    output->write("x", h_x->data());
-    output->write("rhs", h_rhs->data());
-    output->write("residual", h_r->data());
+    if (SFEM_WRITE_OUTPUT) {
+        output->write("x", h_x->data());
+        output->write("rhs", h_rhs->data());
+        output->write("residual", h_r->data());
+    }
 
     double tock = MPI_Wtime();
     if (!rank) {
