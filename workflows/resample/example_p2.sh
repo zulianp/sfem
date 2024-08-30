@@ -72,7 +72,7 @@ echo $scaling
 # export OMP_PROC_BIND=true
 # export OMP_NUM_THREADS=8
 
-n_procs=1
+n_procs=18
 # n_procs=1
 # n_procs=2
 # n_procs=1
