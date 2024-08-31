@@ -23,6 +23,7 @@ then
 	PATH=$SCRIPTPATH/../../build:$PATH
 	source $SCRIPTPATH/../../build/sfem_config.sh
 else
+	echo "Using binaries in $SFEM_BIN_DIR"
 	PATH=$SFEM_BIN_DIR:$PATH
 	source $SFEM_BIN_DIR/sfem_config.sh
 fi
