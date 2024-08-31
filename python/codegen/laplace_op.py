@@ -7,6 +7,7 @@ from tet4 import *
 from tet10 import *
 from tet20 import *
 from quad4 import *
+from hex8 import *
 
 import sys
 
@@ -215,6 +216,7 @@ def main():
 	"TET4": Tet4(),
 	"TET10": Tet10(),
 	"TET20": Tet20(),
+	"HEX8": Hex8(),
 	"AAQUAD4": AxisAlignedQuad4()
 	}
 
@@ -249,11 +251,11 @@ def main():
 		print('---------------------------------------------------')
 		c_code(op.trial_operand_expr())
 
-	print('---------------------------------------------------')
-	print("hessian")
-	print('---------------------------------------------------')
+	# print('---------------------------------------------------')
+	# print("hessian")
+	# print('---------------------------------------------------')
 
-	c_code(op.hessian())
+	# c_code(op.hessian())
 
 	print('---------------------------------------------------')
 	print("apply")

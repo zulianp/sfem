@@ -56,6 +56,7 @@ set(SFEM_MODULES
     operators/macro_tet4
     operators/proteus_tet4
     operators/hierarchical
+    operators/hex8
 
     )
 
