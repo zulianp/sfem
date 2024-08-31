@@ -30,6 +30,13 @@ fi
 export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 
-box_mesh.py mesh -c hex8 -x 3 -y 3 -z 3 --height=1 --width=1 --depth=1
+
+if [[ -d "mesh" ]]
+then
+	echo "Reusing mesh"
+else
+	N=200
+	box_mesh.py mesh -c hex8 -x $N -y $N -z $N --height=1 --width=1 --depth=1
+fi
 
 SFEM_USE_MACRO=0 laplacian_apply mesh gen:ones AxU.raw
