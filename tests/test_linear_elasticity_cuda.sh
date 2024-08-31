@@ -29,14 +29,15 @@ cd le_test
 
 mkdir -p output
 # export OMP_NUM_THREADS=32
-export OMP_NUM_THREADS=8
+# export OMP_NUM_THREADS=8
+export OMP_NUM_THREADS=288
 export OMP_PROC_BIND=true 
 
 # rm -rf mesh
-# create_cylinder.sh 0
+# create_cylinder.sh 5
 
 # export SFEM_MESH_REFINE=1
-# create_cylinder_p2.sh 1
+# create_cylinder_p2.sh 5
 # export SFEM_USE_MACRO=1
 
 sleft=mesh/sidesets_aos/sinlet.raw
