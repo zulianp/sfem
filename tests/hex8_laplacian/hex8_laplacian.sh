@@ -32,12 +32,14 @@ export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 
 
-if [[ -d "mesh" ]]
+if [[ -d "hex8_mesh" ]]
 then
 	echo "Reusing mesh"
 else
-	N=200
-	box_mesh.py mesh -c hex8 -x $N -y $N -z $N --height=1 --width=1 --depth=1
+	N=100
+	box_mesh.py hex8_mesh -c hex8 -x $N -y $N -z $N --height=1 --width=1 --depth=1
+	box_mesh.py tet4_mesh -c tet4 -x $N -y $N -z $N --height=1 --width=1 --depth=1
 fi
 
-SFEM_USE_MACRO=0 laplacian_apply mesh gen:ones AxU.raw
+laplacian_apply hex8_mesh gen:ones hex8_AxU.raw
+laplacian_apply tet4_mesh gen:ones tet4_AxU.raw

@@ -8,6 +8,8 @@ from tet10 import *
 from tet20 import *
 from quad4 import *
 from hex8 import *
+from aahex8 import *
+
 
 import sys
 
@@ -51,8 +53,10 @@ class LaplaceOp:
 			for j in range(i, dims):
 				var = sp.symbols(f'fff[{varidx}*stride]')
 				varidx += 1
-				FFF_symbolic[i, j] = var
-				FFF_symbolic[j, i] = var;
+
+				if FFF[i, j] != 0:
+					FFF_symbolic[i, j] = var
+					FFF_symbolic[j, i] = var;
 
 		###################################################################
 
@@ -80,6 +84,10 @@ class LaplaceOp:
 		for d1 in range(0, self.fe.spatial_dim()):
 			for d2 in range(d1,  self.fe.spatial_dim()):
 				var = self.FFF_symbolic[d1, d2]
+
+				if var == 0:
+					continue
+					
 				val = self.FFF[d1, d2]
 				expr.append(ast.Assignment(var, val))
 		return expr
@@ -217,6 +225,7 @@ def main():
 	"TET10": Tet10(),
 	"TET20": Tet20(),
 	"HEX8": Hex8(),
+	"AAHEX8": AAHex8(),
 	"AAQUAD4": AxisAlignedQuad4()
 	}
 
