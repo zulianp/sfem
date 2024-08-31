@@ -7,6 +7,8 @@
 #include "macro_tet4_laplacian.h"
 #include "macro_tri3_laplacian.h"
 
+#include "hex8_laplacian.h"
+
 #include "sfem_defs.h"
 
 #include <mpi.h>
@@ -80,6 +82,9 @@ int laplacian_apply(int element_type,
         case MACRO_TRI3: {
             return macro_tri3_laplacian_apply(nelements, nnodes, elements, points, u, values);
         }
+        case HEX8: {
+            return hex8_laplacian_apply(nelements, nnodes, elements, points, u, values);
+        }
         default: {
             fprintf(stderr,
                     "laplacian_apply not implemented for type %s\n",
@@ -103,29 +108,25 @@ int laplacian_assemble_gradient(int element_type,
 }
 
 int laplacian_crs(int element_type,
-                               const ptrdiff_t nelements,
-                               const ptrdiff_t nnodes,
-                               idx_t **const SFEM_RESTRICT elements,
-                               geom_t **const SFEM_RESTRICT points,
-                               const count_t *const SFEM_RESTRICT rowptr,
-                               const idx_t *const SFEM_RESTRICT colidx,
-                               real_t *const SFEM_RESTRICT values) {
+                  const ptrdiff_t nelements,
+                  const ptrdiff_t nnodes,
+                  idx_t **const SFEM_RESTRICT elements,
+                  geom_t **const SFEM_RESTRICT points,
+                  const count_t *const SFEM_RESTRICT rowptr,
+                  const idx_t *const SFEM_RESTRICT colidx,
+                  real_t *const SFEM_RESTRICT values) {
     switch (element_type) {
         case TRI3: {
-            return tri3_laplacian_crs(
-                    nelements, nnodes, elements, points, rowptr, colidx, values);
+            return tri3_laplacian_crs(nelements, nnodes, elements, points, rowptr, colidx, values);
         }
         case TRI6: {
-            return tri6_laplacian_crs(
-                    nelements, nnodes, elements, points, rowptr, colidx, values);
+            return tri6_laplacian_crs(nelements, nnodes, elements, points, rowptr, colidx, values);
         }
         case TET4: {
-            return tet4_laplacian_crs(
-                    nelements, nnodes, elements, points, rowptr, colidx, values);
+            return tet4_laplacian_crs(nelements, nnodes, elements, points, rowptr, colidx, values);
         }
         case TET10: {
-            return tet10_laplacian_crs(
-                    nelements, nnodes, elements, points, rowptr, colidx, values);
+            return tet10_laplacian_crs(nelements, nnodes, elements, points, rowptr, colidx, values);
         }
         case MACRO_TET4: {
             return macro_tet4_laplacian_crs(

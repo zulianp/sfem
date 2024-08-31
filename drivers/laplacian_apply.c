@@ -65,9 +65,23 @@ int main(int argc, char *argv[]) {
         mesh.element_type = macro_type_variant(mesh.element_type);
     }
 
-    real_t *x;
     ptrdiff_t u_n_local, u_n_global;
-    array_create_from_file(comm, path_f, SFEM_MPI_REAL_T, (void **)&x, &u_n_local, &u_n_global);
+
+    real_t *x = 0;
+    if (strcmp("gen:ones", path_f) == 0) {
+        x = malloc(mesh.nnodes * sizeof(real_t));
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {
+            x[i] = 1;
+        }
+
+        u_n_local = mesh.nnodes;
+        u_n_global = mesh.nnodes;
+
+    } else {
+        array_create_from_file(comm, path_f, SFEM_MPI_REAL_T, (void **)&x, &u_n_local, &u_n_global);
+    }
+
     real_t *y = calloc(u_n_local, sizeof(real_t));
 
     if (!laplacian_is_opt(mesh.element_type)) {
