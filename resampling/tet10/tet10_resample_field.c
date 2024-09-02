@@ -249,10 +249,11 @@ SFEM_INLINE static void hex_aa_8_eval_fun(
 }
 
 SFEM_INLINE static void hex_aa_8_collect_coeffs(
-        const ptrdiff_t* const SFEM_RESTRICT stride, const ptrdiff_t i, const ptrdiff_t j,
-        const ptrdiff_t k,
-        // Attention this is geometric data transformed to solver data!
-        const real_t* const SFEM_RESTRICT data, real_t* const SFEM_RESTRICT out) {
+        const ptrdiff_t* const SFEM_RESTRICT stride,              //
+        const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k,  //
+        // Attention this is geometric data transformed to solver data! //
+        const real_t* const SFEM_RESTRICT data, real_t* const SFEM_RESTRICT out) {  //
+    //
     const ptrdiff_t i0 = i * stride[0] + j * stride[1] + k * stride[2];
     const ptrdiff_t i1 = (i + 1) * stride[0] + j * stride[1] + k * stride[2];
     const ptrdiff_t i2 = (i + 1) * stride[0] + (j + 1) * stride[1] + k * stride[2];
@@ -261,6 +262,31 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs(
     const ptrdiff_t i5 = (i + 1) * stride[0] + j * stride[1] + (k + 1) * stride[2];
     const ptrdiff_t i6 = (i + 1) * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
     const ptrdiff_t i7 = i * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
+
+    // if (i0 >= nSizes_global)
+    //     printf("ERROR i0 = %ld > %ld, i %ld, j %ld, k %ld, stride %ld %ld %ld\n",
+    //            i0,
+    //            nSizes_global,
+    //            i,
+    //            j,
+    //            k,
+    //            stride[0],
+    //            stride[1],
+    //            stride[2]);
+    // if (i1 >= nSizes_global) printf("ERROR i1 = %ld > %ld, i+1 %ld, j %ld, k %ld, stride %ld %ld
+    // %ld\n", i1, nSizes_global, i + 1, j, k, stride[0], stride[1], stride[2]); if (i2 >=
+    // nSizes_global) printf("ERROR i2 = %ld > %ld, i+1 %ld, j+1 %ld, k %ld, stride %ld %ld %ld\n",
+    // i2, nSizes_global, i + 1, j + 1, k, stride[0], stride[1], stride[2]); if (i3 >=
+    // nSizes_global) printf("ERROR i3 = %ld > %ld, i %ld, j+1 %ld, k %ld, stride %ld %ld %ld\n",
+    // i3, nSizes_global, i, j + 1, k, stride[0], stride[1], stride[2]); if (i4 >= nSizes_global)
+    // printf("ERROR i4 = %ld > %ld, i %ld, j %ld, k+1 %ld, stride %ld %ld %ld\n", i4,
+    // nSizes_global, i, j, k + 1, stride[0], stride[1], stride[2]); if (i5 >= nSizes_global)
+    // printf("ERROR i5 = %ld > %ld, i+1 %ld, j %ld, k+1 %ld, stride %ld %ld %ld\n", i5,
+    // nSizes_global, i + 1, j, k + 1, stride[0], stride[1], stride[2]); if (i6 >= nSizes_global)
+    // printf("ERROR i6 = %ld > %ld, i+1 %ld, j+1 %ld, k+1 %ld, stride %ld %ld %ld\n", i6,
+    // nSizes_global, i + 1, j + 1, k + 1, stride[0], stride[1], stride[2]); if (i7 >=
+    // nSizes_global) printf("ERROR i7 = %ld > %ld, i %ld, j+1 %ld, k+1 %ld, stride %ld %ld %ld\n",
+    // i7, nSizes_global, i, j + 1, k + 1, stride[0], stride[1], stride[2]);
 
     out[0] = data[i0];
     out[1] = data[i1];
@@ -282,62 +308,57 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs(
  * @param i0 .. i15
  * @return SFEM_INLINE
  */
-SFEM_INLINE static void hex_aa_8_indices_O3(const ptrdiff_t* const SFEM_RESTRICT stride,  //
-                                            const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k,
-                                            // Output
-                                            ptrdiff_t* i0, ptrdiff_t* i1, ptrdiff_t* i2,
-                                            ptrdiff_t* i3, ptrdiff_t* i4, ptrdiff_t* i5,
-                                            ptrdiff_t* i6, ptrdiff_t* i7, ptrdiff_t* i8,
-                                            ptrdiff_t* i9, ptrdiff_t* i10, ptrdiff_t* i11,
-                                            ptrdiff_t* i12, ptrdiff_t* i13, ptrdiff_t* i14,
-                                            ptrdiff_t* i15) {
+SFEM_INLINE static void hex_aa_8_indices_O3(
+        const ptrdiff_t* const SFEM_RESTRICT stride,  //
+        const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k, const ptrdiff_t k_diff,
+        // Output
+        ptrdiff_t* i0, ptrdiff_t* i1, ptrdiff_t* i2, ptrdiff_t* i3, ptrdiff_t* i4, ptrdiff_t* i5,
+        ptrdiff_t* i6, ptrdiff_t* i7, ptrdiff_t* i8, ptrdiff_t* i9, ptrdiff_t* i10, ptrdiff_t* i11,
+        ptrdiff_t* i12, ptrdiff_t* i13, ptrdiff_t* i14, ptrdiff_t* i15) {
     const ptrdiff_t stride_x = stride[0];
     const ptrdiff_t stride_y = stride[1];
     const ptrdiff_t stride_z = stride[2];
 
-    *i0 = (i - 1) * stride_x + (j - 1) * stride_y + (k)*stride_z;
-    *i1 = (i + 0) * stride_x + (j - 1) * stride_y + (k)*stride_z;
-    *i2 = (i + 1) * stride_x + (j - 1) * stride_y + (k)*stride_z;
-    *i3 = (i + 2) * stride_x + (j - 1) * stride_y + (k)*stride_z;
+    *i0 = (i - 1) * stride_x + (j - 1) * stride_y + (k + k_diff) * stride_z;
+    *i1 = (i + 0) * stride_x + (j - 1) * stride_y + (k + k_diff) * stride_z;
+    *i2 = (i + 1) * stride_x + (j - 1) * stride_y + (k + k_diff) * stride_z;
+    *i3 = (i + 2) * stride_x + (j - 1) * stride_y + (k + k_diff) * stride_z;
 
-    *i4 = (i - 1) * stride_x + (j + 0) * stride_y + (k)*stride_z;
-    *i5 = (i + 0) * stride_x + (j + 0) * stride_y + (k)*stride_z;
-    *i6 = (i + 1) * stride_x + (j + 0) * stride_y + (k)*stride_z;
-    *i7 = (i + 2) * stride_x + (j + 0) * stride_y + (k)*stride_z;
+    *i4 = (i - 1) * stride_x + (j + 0) * stride_y + (k + k_diff) * stride_z;
+    *i5 = (i + 0) * stride_x + (j + 0) * stride_y + (k + k_diff) * stride_z;
+    *i6 = (i + 1) * stride_x + (j + 0) * stride_y + (k + k_diff) * stride_z;
+    *i7 = (i + 2) * stride_x + (j + 0) * stride_y + (k + k_diff) * stride_z;
 
-    *i8 = (i - 1) * stride_x + (j + 1) * stride_y + (k)*stride_z;
-    *i9 = (i + 0) * stride_x + (j + 1) * stride_y + (k)*stride_z;
-    *i10 = (i + 1) * stride_x + (j + 1) * stride_y + (k)*stride_z;
-    *i11 = (i + 2) * stride_x + (j + 1) * stride_y + (k)*stride_z;
+    *i8 = (i - 1) * stride_x + (j + 1) * stride_y + (k + k_diff) * stride_z;
+    *i9 = (i + 0) * stride_x + (j + 1) * stride_y + (k + k_diff) * stride_z;
+    *i10 = (i + 1) * stride_x + (j + 1) * stride_y + (k + k_diff) * stride_z;
+    *i11 = (i + 2) * stride_x + (j + 1) * stride_y + (k + k_diff) * stride_z;
 
-    *i12 = (i - 1) * stride_x + (j + 2) * stride_y + (k)*stride_z;
-    *i13 = (i + 0) * stride_x + (j + 2) * stride_y + (k)*stride_z;
-    *i14 = (i + 1) * stride_x + (j + 2) * stride_y + (k)*stride_z;
-    *i15 = (i + 2) * stride_x + (j + 2) * stride_y + (k)*stride_z;
+    *i12 = (i - 1) * stride_x + (j + 2) * stride_y + (k + k_diff) * stride_z;
+    *i13 = (i + 0) * stride_x + (j + 2) * stride_y + (k + k_diff) * stride_z;
+    *i14 = (i + 1) * stride_x + (j + 2) * stride_y + (k + k_diff) * stride_z;
+    *i15 = (i + 2) * stride_x + (j + 2) * stride_y + (k + k_diff) * stride_z;
 
-// /*
+    // /*
 
+    if (*i0 >= nSizes_global) printf("ERROR i0 = %ld > %ld, i-1 %ld, j-1 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i0, nSizes_global, i - 1, j - 1, k_diff, k, stride_x, stride_y, stride_z);
+    if (*i1 >= nSizes_global) printf("ERROR i1 = %ld > %ld, i+0 %ld, j-1 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i1, nSizes_global, i + 0, j - 1, k_diff, k, stride_x, stride_y, stride_z);
+    if (*i2 >= nSizes_global) printf("ERROR i2 = %ld > %ld, i+1 %ld, j-1 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i2, nSizes_global, i + 1, j - 1, k_diff, k, stride_x, stride_y, stride_z);
+    if (*i3 >= nSizes_global) printf("ERROR i3 = %ld > %ld, i+2 %ld, j-1 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i3, nSizes_global, i + 2, j - 1, k_diff, k, stride_x, stride_y, stride_z);
+    if (*i4 >= nSizes_global) printf("ERROR i4 = %ld > %ld, i-1 %ld, j+0 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i4, nSizes_global, i - 1, j + 0, k_diff, k, stride_x, stride_y, stride_z);
+    if (*i5 >= nSizes_global) printf("ERROR i5 = %ld > %ld, i+0 %ld, j+0 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i5, nSizes_global, i + 0, j + 0, k_diff, k, stride_x, stride_y, stride_z);
+    if (*i6 >= nSizes_global) printf("ERROR i6 = %ld > %ld, i+1 %ld, j+0 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i6, nSizes_global, i + 1, j + 0, k_diff, k, stride_x, stride_y, stride_z);
+    if (*i7 >= nSizes_global) printf("ERROR i7 = %ld > %ld, i+2 %ld, j+0 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i7, nSizes_global, i + 2, j + 0, k_diff, k, stride_x, stride_y, stride_z);
+    if (*i8 >= nSizes_global) printf("ERROR i8 = %ld > %ld, i-1 %ld, j+1 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i8, nSizes_global, i - 1, j + 1, k_diff, k, stride_x, stride_y, stride_z);
+    if (*i9 >= nSizes_global) printf("ERROR i9 = %ld > %ld, i+0 %ld, j+1 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i9, nSizes_global, i + 0, j + 1, k_diff, k, stride_x, stride_y, stride_z);
+    if (*i10 >= nSizes_global) printf("ERROR i10 = %ld > %ld, i+1 %ld, j+1 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i10, nSizes_global, i + 1, j + 1, k_diff, k, stride_x, stride_y, stride_z);
+    if (*i11 >= nSizes_global) printf("ERROR i11 = %ld > %ld, i+2 %ld, j+1 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i11, nSizes_global, i + 2, j + 1, k_diff, k, stride_x, stride_y, stride_z);
+    if (*i12 >= nSizes_global) printf("ERROR i12 = %ld > %ld, i-1 %ld, j+2 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i12, nSizes_global, i - 1, j + 2, k_diff, k, stride_x, stride_y, stride_z);
+    if (*i13 >= nSizes_global) printf("ERROR i13 = %ld > %ld, i+0 %ld, j+2 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i13, nSizes_global, i + 0, j + 2, k_diff, k, stride_x, stride_y, stride_z);
+    if (*i14 >= nSizes_global) printf("ERROR i14 = %ld > %ld, i+1 %ld, j+2 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i14, nSizes_global, i + 1, j + 2, k_diff, k, stride_x, stride_y, stride_z);
+    if (*i15 >= nSizes_global) printf("ERROR i15 = %ld > %ld, i+2 %ld, j+2 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i15, nSizes_global, i + 2, j + 2, k_diff, k, stride_x, stride_y, stride_z);
 
-    if (*i0 >= nSizes_global) printf("ERROR i0 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i0, nSizes_global, i-1, j-1, k, stride_x, stride_y, stride_z);
-    if (*i1 >= nSizes_global) printf("ERROR i1 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i1, nSizes_global, i, j-1, k, stride_x, stride_y, stride_z);
-    if (*i2 >= nSizes_global) printf("ERROR i2 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i2, nSizes_global, i+1, j-1, k, stride_x, stride_y, stride_z);
-    if (*i3 >= nSizes_global) printf("ERROR i3 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i3, nSizes_global, i+2, j-1, k, stride_x, stride_y, stride_z);
-    if (*i4 >= nSizes_global) printf("ERROR i4 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i4, nSizes_global, i-1, j, k, stride_x, stride_y, stride_z);
-    if (*i5 >= nSizes_global) printf("ERROR i5 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i5, nSizes_global, i, j, k, stride_x, stride_y, stride_z);
-    if (*i6 >= nSizes_global) printf("ERROR i6 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i6, nSizes_global, i+1, j, k, stride_x, stride_y, stride_z);
-    if (*i7 >= nSizes_global) printf("ERROR i7 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i7, nSizes_global, i+2, j, k, stride_x, stride_y, stride_z);
-    if (*i8 >= nSizes_global) printf("ERROR i8 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i8, nSizes_global, i-1, j+1, k, stride_x, stride_y, stride_z);
-    if (*i9 >= nSizes_global) printf("ERROR i9 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i9, nSizes_global, i, j+1, k, stride_x, stride_y, stride_z);
-    if (*i10 >= nSizes_global) printf("ERROR i10 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i10, nSizes_global, i+1, j+1, k, stride_x, stride_y, stride_z);
-    if (*i11 >= nSizes_global) printf("ERROR i11 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i11, nSizes_global, i+2, j+1, k, stride_x, stride_y, stride_z);
-    if (*i12 >= nSizes_global) printf("ERROR i12 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i12, nSizes_global, i-1, j+2, k, stride_x, stride_y, stride_z);
-    if (*i13 >= nSizes_global) printf("ERROR i13 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i13, nSizes_global, i, j+2, k, stride_x, stride_y, stride_z);
-    if (*i14 >= nSizes_global) printf("ERROR i14 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i14, nSizes_global, i+1, j+2, k, stride_x, stride_y, stride_z);
-    if (*i15 >= nSizes_global) printf("ERROR i15 = %ld > %ld, %ld %ld %ld, stride %ld %ld %ld\n",*i15, nSizes_global, i+2, j+2, k, stride_x, stride_y, stride_z);
-
-   
-
-// */
+    // */
 }
 
 /**
@@ -351,11 +372,13 @@ SFEM_INLINE static void hex_aa_8_indices_O3(const ptrdiff_t* const SFEM_RESTRICT
  * @param out
  * @return SFEM_INLINE
  */
-SFEM_INLINE static void hex_aa_8_collect_coeffs_O3(
-        const ptrdiff_t* const SFEM_RESTRICT stride,  //
-        const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k,
-        // Attention this is geometric data transformed to solver data!
-        const real_t* const SFEM_RESTRICT data, real_t* const SFEM_RESTRICT out) {
+SFEM_INLINE static void hex_aa_8_collect_coeffs_O3(const ptrdiff_t* const SFEM_RESTRICT stride,  //
+                                                   const ptrdiff_t i,                            //
+                                                   const ptrdiff_t j,                            //
+                                                   const ptrdiff_t k,                            //
+                                                                                                 //
+                                                   const real_t* const SFEM_RESTRICT data,       //
+                                                   real_t* const SFEM_RESTRICT out) {            //
     //
     ptrdiff_t i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15;
 
@@ -368,7 +391,8 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_O3(
     hex_aa_8_indices_O3(stride,
                         i,
                         j,
-                        k - 1,
+                        k,
+                        -1,
                         &i0,
                         &i1,
                         &i2,
@@ -390,6 +414,7 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_O3(
                         i,
                         j,
                         k,
+                        0,
                         &i16,
                         &i17,
                         &i18,
@@ -410,7 +435,8 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_O3(
     hex_aa_8_indices_O3(stride,
                         i,
                         j,
-                        k + 1,
+                        k,
+                        +1,
                         &i32,
                         &i33,
                         &i34,
@@ -431,7 +457,8 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_O3(
     hex_aa_8_indices_O3(stride,
                         i,
                         j,
-                        k + 2,
+                        k,
+                        +2,
                         &i48,
                         &i49,
                         &i50,
@@ -577,20 +604,20 @@ SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D(const real_t x_,               
 ////////////////////////////////////////////////////////////////////////
 // hex_aa_8_eval_weno4_3D
 ////////////////////////////////////////////////////////////////////////
-SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D_Unit(
-        const real_t x_unit,                       //
-        const real_t y_unit,                       //
-        const real_t z_unit,                       //
-        const real_t ox_unit,                      //
-        const real_t oy_unit,                      //
-        const real_t oz_unit,                      //
-        const ptrdiff_t i,                         // it is the absulte index
-        const ptrdiff_t j,                         // Used to retrive the data
-        const ptrdiff_t k,                         // From the data array
-        const ptrdiff_t* stride,                   //
-        const real_t* const SFEM_RESTRICT data) {  //
+SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D_Unit(  //
+        const real_t x_unit,                            //
+        const real_t y_unit,                            //
+        const real_t z_unit,                            //
+        const real_t ox_unit,                           //
+        const real_t oy_unit,                           //
+        const real_t oz_unit,                           //
+        const ptrdiff_t i,                              // it must be the absulte index
+        const ptrdiff_t j,                              // Used to retrive the data
+        const ptrdiff_t k,                              // From the data array
+        const ptrdiff_t* stride,                        //
+        const real_t* const SFEM_RESTRICT data) {       //
 
-    // collate the data for the WENO interpolation
+    // collect the data for the WENO interpolation
     real_t out[64];
     hex_aa_8_collect_coeffs_O3(stride, i, j, k, data, out);
 
@@ -1074,11 +1101,21 @@ int hex8_to_isoparametric_tet10_resample_field_local(
 
 #define WENO_GRID 0
 
+    ptrdiff_t nDataNodes = n[0] * n[1] * n[2];
+
     printf("============================================================\n");
     printf("Start: hex8_to_isoparametric_tet10_resample_field_local. \nInterpolation: %s\n",
            (WENO_GRID == 1 ? "Weno" : "Linear"));
     printf("============================================================\n");
     printf(" dx = %.16e, \n dy = %.16e, \n dz = %.16e\n", delta[0], delta[1], delta[2]);
+    printf("nDataNodes = n[0] * n[1] * n[2] = %ld * %ld * %ld = %ld\n",
+           n[0],
+           n[1],
+           n[2],
+           nDataNodes);
+    printf("nSizes_global = %ld\n", nSizes_global);
+    printf("============================================================\n");
+    printf("Stride = %ld, %ld, %ld\n", stride[0], stride[1], stride[2]);
     printf("============================================================\n");
 
     const real_t ox = (real_t)origin[0];
@@ -1263,8 +1300,8 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
 
     const real_t cVolume = dx * dy * dz;
 
-    const ptrdiff_t nNodes = n[0] * n[1] * n[2];
-    nSizes_global = nNodes;
+    const ptrdiff_t nNodesData = n[0] * n[1] * n[2];
+    nSizes_global = nNodesData;
 
     printf("============================================================\n");
     printf("Start: hex8_to_isoparametric_tet10_resample_field_local_cube1. Interpolation: %s\n",
@@ -1275,9 +1312,10 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
     printf("============================================================\n");
     printf("dx = %.16e, \ndy = %.16e, \ndz = %.16e\n", delta[0], delta[1], delta[2]);
     printf("Cube volume = %e\n", cVolume);
+    printf("Strinde = %ld, %ld, %ld\n", stride[0], stride[1], stride[2]);
     printf("============================================================\n");
     printf("n sizes = %ld, %ld, %ld\n", n[0], n[1], n[2]);
-    printf("nNodes   = %ld\n", nNodes);
+    printf("nNodesData   = %ld\n", nNodesData);
     printf("nSizes_global = %ld\n", nSizes_global);
     printf("============================================================\n");
 
@@ -1418,7 +1456,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
                 if (i_glob < 0 || j_glob < 0 || k_glob < 0 || (i_glob + 1 >= n[0]) ||
                     (j_glob + 1 >= n[1]) || (k_glob + 1 >= n[2])) {
                     fprintf(stderr,
-                            "warning (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
+                            "ERROR: (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
                             "%ld)!\n",
                             g_qx_glob,
                             g_qy_glob,
@@ -1429,15 +1467,18 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
                             n[0],
                             n[1],
                             n[2]);
-                    continue;
+                    exit(1);
                 }
 
                 // Integrate field
                 {
 #if WENO_CUBE == 1
 
-                    if (nSizes_global != nNodes) {
-                        fprintf(stderr, "nSizes_global != nNodes .. %ld != %ld\n", nSizes_global, nNodes);
+                    if (nSizes_global != nNodesData) {
+                        fprintf(stderr,
+                                "nSizes_global != nNodes .. %ld != %ld\n",
+                                nSizes_global,
+                                nNodesData);
                     }
 
                     //

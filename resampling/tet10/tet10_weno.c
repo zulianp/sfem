@@ -267,16 +267,18 @@ void LagrangePolyArrayHOne(const double x,             //
 
     // const double h = 1.0;
 
+    const double xx = Power2(x);
+
     List3(lagrange_poly_0,  //
-          (2.0 - 3.0 * x + Power2(x)) / 2.,
+          (2.0 - 3.0 * x + xx) / 2.,
           -((-2.0 + x) * x),
           ((-1.0 + x) * x) / 2.  //
     );                           //
 
     List3(lagrange_poly_1,  //
-          (6.0 - 5.0 * x + Power2(x)) / 2.,
-          -3.0 + 4.0 * x - Power2(x),         //
-          (2.0 - 3.0 * x + Power2(x)) / 2.);  //
+          (6.0 - 5.0 * x + xx) / 2.,
+          -3.0 + 4.0 * x - xx,         //
+          (2.0 - 3.0 * x + xx) / 2.);  //
 }
 
 /**
@@ -383,8 +385,8 @@ double weno4_HOne(const double x,                      //
  * @param y33
  * @return double
  */
-double weno4_2D_HOne(const double x, const double y,  //
-                     //
+double weno4_2D_HOne(const double x, const double y,                                          //
+                                                                                              //
                      const double y00, const double y10, const double y20, const double y30,  //
                      //
                      const double y01, const double y11, const double y21, const double y31,  //

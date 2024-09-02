@@ -12,7 +12,7 @@
 #define MY_RESTRICT __restrict__
 
 #define __WARP_SIZE__ 32
-#define WENO_CUDA 0
+#define WENO_CUDA 1
 
 /////////////////////////////////////////////////////////////////
 // Struct for xyz
@@ -435,6 +435,7 @@ __device__ void hex_aa_8_indices_O3_cuda(const ptrdiff_t SFEM_RESTRICT stride0, 
                                          const ptrdiff_t SFEM_RESTRICT stride1,  //
                                          const ptrdiff_t SFEM_RESTRICT stride2,  //
                                          const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k,
+                                         const ptrdiff_t k_diff,
                                          // Output
                                          ptrdiff_t* i0, ptrdiff_t* i1, ptrdiff_t* i2, ptrdiff_t* i3,
                                          ptrdiff_t* i4, ptrdiff_t* i5, ptrdiff_t* i6, ptrdiff_t* i7,
@@ -446,25 +447,25 @@ __device__ void hex_aa_8_indices_O3_cuda(const ptrdiff_t SFEM_RESTRICT stride0, 
     const ptrdiff_t stride_y = stride1;
     const ptrdiff_t stride_z = stride2;
 
-    *i0 = (i - 1) * stride_x + (j - 1) * stride_y + (k)*stride_z;
-    *i1 = (i + 0) * stride_x + (j - 1) * stride_y + (k)*stride_z;
-    *i2 = (i + 1) * stride_x + (j - 1) * stride_y + (k)*stride_z;
-    *i3 = (i + 2) * stride_x + (j - 1) * stride_y + (k)*stride_z;
+    *i0 = (i - 1) * stride_x + (j - 1) * stride_y + (k + k_diff) * stride_z;
+    *i1 = (i + 0) * stride_x + (j - 1) * stride_y + (k + k_diff) * stride_z;
+    *i2 = (i + 1) * stride_x + (j - 1) * stride_y + (k + k_diff) * stride_z;
+    *i3 = (i + 2) * stride_x + (j - 1) * stride_y + (k + k_diff) * stride_z;
 
-    *i4 = (i - 1) * stride_x + (j + 0) * stride_y + (k)*stride_z;
-    *i5 = (i + 0) * stride_x + (j + 0) * stride_y + (k)*stride_z;
-    *i6 = (i + 1) * stride_x + (j + 0) * stride_y + (k)*stride_z;
-    *i7 = (i + 2) * stride_x + (j + 0) * stride_y + (k)*stride_z;
+    *i4 = (i - 1) * stride_x + (j + 0) * stride_y + (k + k_diff) * stride_z;
+    *i5 = (i + 0) * stride_x + (j + 0) * stride_y + (k + k_diff) * stride_z;
+    *i6 = (i + 1) * stride_x + (j + 0) * stride_y + (k + k_diff) * stride_z;
+    *i7 = (i + 2) * stride_x + (j + 0) * stride_y + (k + k_diff) * stride_z;
 
-    *i8 = (i - 1) * stride_x + (j + 1) * stride_y + (k)*stride_z;
-    *i9 = (i + 0) * stride_x + (j + 1) * stride_y + (k)*stride_z;
-    *i10 = (i + 1) * stride_x + (j + 1) * stride_y + (k)*stride_z;
-    *i11 = (i + 2) * stride_x + (j + 1) * stride_y + (k)*stride_z;
+    *i8 = (i - 1) * stride_x + (j + 1) * stride_y + (k + k_diff) * stride_z;
+    *i9 = (i + 0) * stride_x + (j + 1) * stride_y + (k + k_diff) * stride_z;
+    *i10 = (i + 1) * stride_x + (j + 1) * stride_y + (k + k_diff) * stride_z;
+    *i11 = (i + 2) * stride_x + (j + 1) * stride_y + (k + k_diff) * stride_z;
 
-    *i12 = (i - 1) * stride_x + (j + 2) * stride_y + (k)*stride_z;
-    *i13 = (i + 0) * stride_x + (j + 2) * stride_y + (k)*stride_z;
-    *i14 = (i + 1) * stride_x + (j + 2) * stride_y + (k)*stride_z;
-    *i15 = (i + 2) * stride_x + (j + 2) * stride_y + (k)*stride_z;
+    *i12 = (i - 1) * stride_x + (j + 2) * stride_y + (k + k_diff) * stride_z;
+    *i13 = (i + 0) * stride_x + (j + 2) * stride_y + (k + k_diff) * stride_z;
+    *i14 = (i + 1) * stride_x + (j + 2) * stride_y + (k + k_diff) * stride_z;
+    *i15 = (i + 2) * stride_x + (j + 2) * stride_y + (k + k_diff) * stride_z;
 }
 
 /**
@@ -500,6 +501,7 @@ __device__ void hex_aa_8_collect_coeffs_O3_cuda(  //
                              i,
                              j,
                              k,
+                             -1,
                              &i0,
                              &i1,
                              &i2,
@@ -522,7 +524,8 @@ __device__ void hex_aa_8_collect_coeffs_O3_cuda(  //
                              stride2,
                              i,
                              j,
-                             k + 1,
+                             k,
+                             0,
                              &i16,
                              &i17,
                              &i18,
@@ -545,7 +548,8 @@ __device__ void hex_aa_8_collect_coeffs_O3_cuda(  //
                              stride2,
                              i,
                              j,
-                             k + 2,
+                             k,
+                             1,
                              &i32,
                              &i33,
                              &i34,
@@ -568,7 +572,8 @@ __device__ void hex_aa_8_collect_coeffs_O3_cuda(  //
                              stride2,
                              i,
                              j,
-                             k + 3,
+                             k,
+                             2,
                              &i48,
                              &i49,
                              &i50,
@@ -942,6 +947,209 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(
     }
 
 }  // end kernel hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel
+
+///////////////////////////////////////////////////////////////////////
+// hex8_to_isoparametric_tet10_resample_field_local_cube1_cuda
+///////////////////////////////////////////////////////////////////////
+__global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_cuda(
+        // Mesh
+        const ptrdiff_t start_element,  // start element
+        const ptrdiff_t end_element,    // end element
+        const ptrdiff_t nnodes,         // number of nodes
+
+        elems_tet10_device elems,  // connectivity
+        xyz_tet10_device xyz,      // coordinates
+        // SDF
+        const ptrdiff_t nx,  // number of nodes in each direction x
+        const ptrdiff_t ny,  // number of nodes in each direction y
+        const ptrdiff_t nz,  // number of nodes in each direction z
+
+        const ptrdiff_t stride0,  // stride of the data
+        const ptrdiff_t stride1,  // stride of the data
+        const ptrdiff_t stride2,  // stride of the data
+
+        const geom_t originx,  // origin of the domain
+        const geom_t originy,  // origin of the domain
+        const geom_t originz,  // origin of the domain
+
+        const geom_t deltax,  // delta of the domain
+        const geom_t deltay,  // delta of the domain
+        const geom_t deltaz,  // delta of the domain
+
+        const real_t* const MY_RESTRICT data,  // SDF
+        // Output
+        real_t* const MY_RESTRICT weighted_field) {  //
+
+    //
+    // printf("============================================================\n");
+    // printf("Start: hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel\n");
+    // printf("============================================================\n");
+
+    const real_t ox = (real_t)originx;
+    const real_t oy = (real_t)originy;
+    const real_t oz = (real_t)originz;
+
+    const real_t dx = (real_t)deltax;
+    const real_t dy = (real_t)deltay;
+    const real_t dz = (real_t)deltaz;
+
+    ////////////////////////////////////////
+    // Kernel specific variables
+
+    namespace cg = cooperative_groups;
+
+    cg::thread_block g = cg::this_thread_block();
+
+    const ptrdiff_t element_i = (blockIdx.x * blockDim.x + threadIdx.x) / __WARP_SIZE__;
+
+    if (element_i < start_element or element_i >= end_element) return;
+
+    auto tile = cg::tiled_partition<__WARP_SIZE__>(g);
+    const unsigned tile_rank = tile.thread_rank();
+
+    ////////////////////////////////////////
+    // Quadrature points
+    ptrdiff_t ev[10];
+
+    // ISOPARAMETRIC
+    real_t x[10], y[10], z[10];
+    real_t x_unit[10], y_unit[10], z_unit[10];
+
+    real_t hex8_f[8];
+    real_t coeffs[8];
+
+    real_t tet10_f[10];
+
+    const real_t cVolume = dx * dy * dz;
+
+    // loop over the ndes of the element
+    ev[0] = elems.elems_v0[element_i];
+    ev[1] = elems.elems_v1[element_i];
+    ev[2] = elems.elems_v2[element_i];
+    ev[3] = elems.elems_v3[element_i];
+    ev[4] = elems.elems_v4[element_i];
+    ev[5] = elems.elems_v5[element_i];
+    ev[6] = elems.elems_v6[element_i];
+    ev[7] = elems.elems_v7[element_i];
+    ev[8] = elems.elems_v8[element_i];
+    ev[9] = elems.elems_v9[element_i];
+
+    // ISOPARAMETRIC
+    for (int v = 0; v < 10; ++v) {
+        x[v] = xyz.x[ev[v]];  // x-coordinates
+        y[v] = xyz.y[ev[v]];  // y-coordinates
+        z[v] = xyz.z[ev[v]];  // z-coordinates
+    }
+
+    // ISOPARAMETRIC
+    // and search the node closest to the origin
+    int v_orig = 0;
+    double dist_min = 1e14;
+
+    for (int v = 0; v < 10; ++v) {
+        x[v] = xyz.x[ev[v]];  // x-coordinates
+        y[v] = xyz.y[ev[v]];  // y-coordinates
+        z[v] = xyz.z[ev[v]];  // z-coordinates
+
+        const double dist = sqrt((x[v] - ox) * (x[v] - ox) +  //
+                                 (y[v] - oy) * (y[v] - oy) +  //
+                                 (z[v] - oz) * (z[v] - oz));  //
+
+        if (dist < dist_min) {
+            dist_min = dist;
+            v_orig = v;
+        }
+    }
+
+    const real_t grid_x_orig = (x[v_orig] - ox) / dx;
+    const real_t grid_y_orig = (y[v_orig] - oy) / dy;
+    const real_t grid_z_orig = (z[v_orig] - oz) / dz;
+
+    const ptrdiff_t i_orig = floor(grid_x_orig);
+    const ptrdiff_t j_orig = floor(grid_y_orig);
+    const ptrdiff_t k_orig = floor(grid_z_orig);
+
+    const real_t x_orig = ox + ((real_t)i_orig) * dx;
+    const real_t y_orig = oy + ((real_t)j_orig) * dy;
+    const real_t z_orig = oz + ((real_t)k_orig) * dz;
+
+    // Map element to the grid based on unitary spacing
+    for (int v = 0; v < 10; ++v) {
+        x_unit[v] = (x[v] - x_orig) / dx;
+        y_unit[v] = (y[v] - y_orig) / dy;
+        z_unit[v] = (z[v] - z_orig) / dz;
+    }
+
+    // SUBPARAMETRIC (for iso-parametric tassellation of tet10 might be necessary)
+
+    real_t element_field_v0_reduce = 0.0;
+    real_t element_field_v1_reduce = 0.0;
+    real_t element_field_v2_reduce = 0.0;
+    real_t element_field_v3_reduce = 0.0;
+    real_t element_field_v4_reduce = 0.0;
+    real_t element_field_v5_reduce = 0.0;
+    real_t element_field_v6_reduce = 0.0;
+    real_t element_field_v7_reduce = 0.0;
+    real_t element_field_v8_reduce = 0.0;
+    real_t element_field_v9_reduce = 0.0;
+
+    const size_t nr_warp_loop = (TET4_NQP / __WARP_SIZE__) +                //
+                                ((TET4_NQP % __WARP_SIZE__) == 0 ? 0 : 1);  //
+
+    for (size_t warp_i = 0; warp_i < nr_warp_loop; warp_i++) {
+        const size_t q_i = warp_i * size_t(__WARP_SIZE__) + tile_rank;
+
+        const real_type tet4_qx_v = (q_i < TET4_NQP) ? tet4_qx[q_i] : tet4_qx[0];
+        const real_type tet4_qy_v = (q_i < TET4_NQP) ? tet4_qy[q_i] : tet4_qy[0];
+        const real_type tet4_qz_v = (q_i < TET4_NQP) ? tet4_qz[q_i] : tet4_qz[0];
+        const real_type tet4_qw_v = (q_i < TET4_NQP) ? tet4_qw[q_i] : 0.0;
+
+        const real_t measure = tet10_measure_cu(x_unit,
+                                                y_unit,
+                                                z_unit,  //
+                                                tet4_qx[q_i],
+                                                tet4_qy[q_i],
+                                                tet4_qz[q_i]);
+
+        const real_t dV = measure * tet4_qw[q_i] * cVolume;
+
+        // printf("dV[%d]: %e\n", q, dV);
+
+        // Transform quadrature point to physical space
+        // g_qx_glob, g_qy_glob, g_qz_glob are the coordinates of the quadrature point in
+        // the global space
+        real_t g_qx_glob, g_qy_glob, g_qz_glob;
+        tet10_transform_cu(x,
+                           y,
+                           z,
+                           tet4_qx[q_i],
+                           tet4_qy[q_i],
+                           tet4_qz[q_i],
+                           &g_qx_glob,
+                           &g_qy_glob,
+                           &g_qz_glob);
+
+        tet10_dual_basis_hrt_cu(tet4_qx[q_i], tet4_qy[q_i], tet4_qz[q_i], tet10_f);
+
+        // Transform quadrature point to unitary space
+        // g_qx_unit, g_qy_unit, g_qz_unit are the coordinates of the quadrature point in
+        // the unitary space
+        real_t g_qx_unit, g_qy_unit, g_qz_unit;
+        tet10_transform_cu(x_unit,
+                           y_unit,
+                           z_unit,
+                           tet4_qx[q],
+                           tet4_qy[q],
+                           tet4_qz[q],
+                           &g_qx_unit,
+                           &g_qy_unit,
+                           &g_qz_unit);
+
+        ///// ======================================================
+
+        
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////
 // hex8_to_tet10_resample_field_local_CUDA
