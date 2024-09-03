@@ -1356,7 +1356,7 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
                cudaGetErrorString(errwf));
     }
 
-#define CUBE1 0
+#define CUBE1 1
 
 #if CUBE1 == 1
     char* kernel_name = "hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel";
@@ -1383,7 +1383,7 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
     cudaEventRecord(start);
 
     {
-#if CUBE1 == 1 // WENO
+#if CUBE1 == 1 // WENO ..
         hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel
 #else 
         hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel
@@ -1441,7 +1441,7 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
     const double elements_per_second = (double)(nelements) / seconds;
     printf("GPU:    Number of elements: %d.\n", nelements);
     printf("GPU:    Throughput for the kernel: %e elements/second\n", elements_per_second);
-    printf("GPU:    %d, %f   (CSV friendly)\n ", nelements, elements_per_second);
+    printf("GPU:    %d, %f   (CSV friendly) \n", nelements, elements_per_second);
     printf("============================================================================\n");
 
     {

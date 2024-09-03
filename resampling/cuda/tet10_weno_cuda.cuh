@@ -464,9 +464,9 @@ __device__ void getNonLinearWeightsHOne(const double x,                    //
  * @param y3
  * @return double
  */
-__device__ double weno4_HOne(const double x,                      //
-                             const double y0, const double y1,    //
-                             const double y2, const double y3) {  //
+__device__ double weno4_HOne_cuda(const double x,                      //
+                                  const double y0, const double y1,    //
+                                  const double y2, const double y3) {  //
 
     const double eps = 1e-6;
 
@@ -513,7 +513,7 @@ __device__ double weno4_HOne(const double x,                      //
  * @param y33
  * @return double
  */
-__device__ double weno4_2D_HOne(
+__device__ double weno4_2D_HOne_cuda(
         const double x, const double y,                                          //
                                                                                  //
         const double y00, const double y10, const double y20, const double y30,  //
@@ -524,12 +524,12 @@ __device__ double weno4_2D_HOne(
         //
         const double y03, const double y13, const double y23, const double y33) {  //
 
-    double yw0 = weno4_HOne(x, y00, y10, y20, y30);
-    double yw1 = weno4_HOne(x, y01, y11, y21, y31);
-    double yw2 = weno4_HOne(x, y02, y12, y22, y32);
-    double yw3 = weno4_HOne(x, y03, y13, y23, y33);
+    double yw0 = weno4_HOne_cuda(x, y00, y10, y20, y30);
+    double yw1 = weno4_HOne_cuda(x, y01, y11, y21, y31);
+    double yw2 = weno4_HOne_cuda(x, y02, y12, y22, y32);
+    double yw3 = weno4_HOne_cuda(x, y03, y13, y23, y33);
 
-    double yw = weno4_HOne(y, yw0, yw1, yw2, yw3);
+    double yw = weno4_HOne_cuda(y, yw0, yw1, yw2, yw3);
 
     return yw;
 }
@@ -552,95 +552,95 @@ __device__ double weno4_3D_HOne_cuda(const double x, const double y, const doubl
                                      const int stride_y,                              //
                                      const int stride_z) {                            //
 
-    double w1 = weno4_2D_HOne(x,
-                              y,  //
-                              f[0 * stride_x + 0 * stride_y + 0 * stride_z],
-                              f[1 * stride_x + 0 * stride_y + 0 * stride_z],
-                              f[2 * stride_x + 0 * stride_y + 0 * stride_z],
-                              f[3 * stride_x + 0 * stride_y + 0 * stride_z],
-                              //
-                              f[0 * stride_x + 1 * stride_y + 0 * stride_z],
-                              f[1 * stride_x + 1 * stride_y + 0 * stride_z],
-                              f[2 * stride_x + 1 * stride_y + 0 * stride_z],
-                              f[3 * stride_x + 1 * stride_y + 0 * stride_z],
-                              //
-                              f[0 * stride_x + 2 * stride_y + 0 * stride_z],
-                              f[1 * stride_x + 2 * stride_y + 0 * stride_z],
-                              f[2 * stride_x + 2 * stride_y + 0 * stride_z],
-                              f[3 * stride_x + 2 * stride_y + 0 * stride_z],
-                              //
-                              f[0 * stride_x + 3 * stride_y + 0 * stride_z],
-                              f[1 * stride_x + 3 * stride_y + 0 * stride_z],
-                              f[2 * stride_x + 3 * stride_y + 0 * stride_z],
-                              f[3 * stride_x + 3 * stride_y + 0 * stride_z]);
+    double w1 = weno4_2D_HOne_cuda(x,
+                                   y,  //
+                                   f[0 * stride_x + 0 * stride_y + 0 * stride_z],
+                                   f[1 * stride_x + 0 * stride_y + 0 * stride_z],
+                                   f[2 * stride_x + 0 * stride_y + 0 * stride_z],
+                                   f[3 * stride_x + 0 * stride_y + 0 * stride_z],
+                                   //
+                                   f[0 * stride_x + 1 * stride_y + 0 * stride_z],
+                                   f[1 * stride_x + 1 * stride_y + 0 * stride_z],
+                                   f[2 * stride_x + 1 * stride_y + 0 * stride_z],
+                                   f[3 * stride_x + 1 * stride_y + 0 * stride_z],
+                                   //
+                                   f[0 * stride_x + 2 * stride_y + 0 * stride_z],
+                                   f[1 * stride_x + 2 * stride_y + 0 * stride_z],
+                                   f[2 * stride_x + 2 * stride_y + 0 * stride_z],
+                                   f[3 * stride_x + 2 * stride_y + 0 * stride_z],
+                                   //
+                                   f[0 * stride_x + 3 * stride_y + 0 * stride_z],
+                                   f[1 * stride_x + 3 * stride_y + 0 * stride_z],
+                                   f[2 * stride_x + 3 * stride_y + 0 * stride_z],
+                                   f[3 * stride_x + 3 * stride_y + 0 * stride_z]);
 
-    double w2 = weno4_2D_HOne(x,
-                              y,  //
-                              f[0 * stride_x + 0 * stride_y + 1 * stride_z],
-                              f[1 * stride_x + 0 * stride_y + 1 * stride_z],
-                              f[2 * stride_x + 0 * stride_y + 1 * stride_z],
-                              f[3 * stride_x + 0 * stride_y + 1 * stride_z],
-                              //
-                              f[0 * stride_x + 1 * stride_y + 1 * stride_z],
-                              f[1 * stride_x + 1 * stride_y + 1 * stride_z],
-                              f[2 * stride_x + 1 * stride_y + 1 * stride_z],
-                              f[3 * stride_x + 1 * stride_y + 1 * stride_z],
-                              //
-                              f[0 * stride_x + 2 * stride_y + 1 * stride_z],
-                              f[1 * stride_x + 2 * stride_y + 1 * stride_z],
-                              f[2 * stride_x + 2 * stride_y + 1 * stride_z],
-                              f[3 * stride_x + 2 * stride_y + 1 * stride_z],
-                              //
-                              f[0 * stride_x + 3 * stride_y + 1 * stride_z],
-                              f[1 * stride_x + 3 * stride_y + 1 * stride_z],
-                              f[2 * stride_x + 3 * stride_y + 1 * stride_z],
-                              f[3 * stride_x + 3 * stride_y + 1 * stride_z]);
+    double w2 = weno4_2D_HOne_cuda(x,
+                                   y,  //
+                                   f[0 * stride_x + 0 * stride_y + 1 * stride_z],
+                                   f[1 * stride_x + 0 * stride_y + 1 * stride_z],
+                                   f[2 * stride_x + 0 * stride_y + 1 * stride_z],
+                                   f[3 * stride_x + 0 * stride_y + 1 * stride_z],
+                                   //
+                                   f[0 * stride_x + 1 * stride_y + 1 * stride_z],
+                                   f[1 * stride_x + 1 * stride_y + 1 * stride_z],
+                                   f[2 * stride_x + 1 * stride_y + 1 * stride_z],
+                                   f[3 * stride_x + 1 * stride_y + 1 * stride_z],
+                                   //
+                                   f[0 * stride_x + 2 * stride_y + 1 * stride_z],
+                                   f[1 * stride_x + 2 * stride_y + 1 * stride_z],
+                                   f[2 * stride_x + 2 * stride_y + 1 * stride_z],
+                                   f[3 * stride_x + 2 * stride_y + 1 * stride_z],
+                                   //
+                                   f[0 * stride_x + 3 * stride_y + 1 * stride_z],
+                                   f[1 * stride_x + 3 * stride_y + 1 * stride_z],
+                                   f[2 * stride_x + 3 * stride_y + 1 * stride_z],
+                                   f[3 * stride_x + 3 * stride_y + 1 * stride_z]);
 
-    double w3 = weno4_2D_HOne(x,
-                              y,  //
-                              f[0 * stride_x + 0 * stride_y + 2 * stride_z],
-                              f[1 * stride_x + 0 * stride_y + 2 * stride_z],
-                              f[2 * stride_x + 0 * stride_y + 2 * stride_z],
-                              f[3 * stride_x + 0 * stride_y + 2 * stride_z],
-                              //
-                              f[0 * stride_x + 1 * stride_y + 2 * stride_z],
-                              f[1 * stride_x + 1 * stride_y + 2 * stride_z],
-                              f[2 * stride_x + 1 * stride_y + 2 * stride_z],
-                              f[3 * stride_x + 1 * stride_y + 2 * stride_z],
-                              //
-                              f[0 * stride_x + 2 * stride_y + 2 * stride_z],
-                              f[1 * stride_x + 2 * stride_y + 2 * stride_z],
-                              f[2 * stride_x + 2 * stride_y + 2 * stride_z],
-                              f[3 * stride_x + 2 * stride_y + 2 * stride_z],
-                              //
-                              f[0 * stride_x + 3 * stride_y + 2 * stride_z],
-                              f[1 * stride_x + 3 * stride_y + 2 * stride_z],
-                              f[2 * stride_x + 3 * stride_y + 2 * stride_z],
-                              f[3 * stride_x + 3 * stride_y + 2 * stride_z]);
+    double w3 = weno4_2D_HOne_cuda(x,
+                                   y,  //
+                                   f[0 * stride_x + 0 * stride_y + 2 * stride_z],
+                                   f[1 * stride_x + 0 * stride_y + 2 * stride_z],
+                                   f[2 * stride_x + 0 * stride_y + 2 * stride_z],
+                                   f[3 * stride_x + 0 * stride_y + 2 * stride_z],
+                                   //
+                                   f[0 * stride_x + 1 * stride_y + 2 * stride_z],
+                                   f[1 * stride_x + 1 * stride_y + 2 * stride_z],
+                                   f[2 * stride_x + 1 * stride_y + 2 * stride_z],
+                                   f[3 * stride_x + 1 * stride_y + 2 * stride_z],
+                                   //
+                                   f[0 * stride_x + 2 * stride_y + 2 * stride_z],
+                                   f[1 * stride_x + 2 * stride_y + 2 * stride_z],
+                                   f[2 * stride_x + 2 * stride_y + 2 * stride_z],
+                                   f[3 * stride_x + 2 * stride_y + 2 * stride_z],
+                                   //
+                                   f[0 * stride_x + 3 * stride_y + 2 * stride_z],
+                                   f[1 * stride_x + 3 * stride_y + 2 * stride_z],
+                                   f[2 * stride_x + 3 * stride_y + 2 * stride_z],
+                                   f[3 * stride_x + 3 * stride_y + 2 * stride_z]);
 
-    double w4 = weno4_2D_HOne(x,
-                              y,  //
-                              f[0 * stride_x + 0 * stride_y + 3 * stride_z],
-                              f[1 * stride_x + 0 * stride_y + 3 * stride_z],
-                              f[2 * stride_x + 0 * stride_y + 3 * stride_z],
-                              f[3 * stride_x + 0 * stride_y + 3 * stride_z],
-                              //
-                              f[0 * stride_x + 1 * stride_y + 3 * stride_z],
-                              f[1 * stride_x + 1 * stride_y + 3 * stride_z],
-                              f[2 * stride_x + 1 * stride_y + 3 * stride_z],
-                              f[3 * stride_x + 1 * stride_y + 3 * stride_z],
-                              //
-                              f[0 * stride_x + 2 * stride_y + 3 * stride_z],
-                              f[1 * stride_x + 2 * stride_y + 3 * stride_z],
-                              f[2 * stride_x + 2 * stride_y + 3 * stride_z],
-                              f[3 * stride_x + 2 * stride_y + 3 * stride_z],
-                              //
-                              f[0 * stride_x + 3 * stride_y + 3 * stride_z],
-                              f[1 * stride_x + 3 * stride_y + 3 * stride_z],
-                              f[2 * stride_x + 3 * stride_y + 3 * stride_z],
-                              f[3 * stride_x + 3 * stride_y + 3 * stride_z]);
+    double w4 = weno4_2D_HOne_cuda(x,
+                                   y,  //
+                                   f[0 * stride_x + 0 * stride_y + 3 * stride_z],
+                                   f[1 * stride_x + 0 * stride_y + 3 * stride_z],
+                                   f[2 * stride_x + 0 * stride_y + 3 * stride_z],
+                                   f[3 * stride_x + 0 * stride_y + 3 * stride_z],
+                                   //
+                                   f[0 * stride_x + 1 * stride_y + 3 * stride_z],
+                                   f[1 * stride_x + 1 * stride_y + 3 * stride_z],
+                                   f[2 * stride_x + 1 * stride_y + 3 * stride_z],
+                                   f[3 * stride_x + 1 * stride_y + 3 * stride_z],
+                                   //
+                                   f[0 * stride_x + 2 * stride_y + 3 * stride_z],
+                                   f[1 * stride_x + 2 * stride_y + 3 * stride_z],
+                                   f[2 * stride_x + 2 * stride_y + 3 * stride_z],
+                                   f[3 * stride_x + 2 * stride_y + 3 * stride_z],
+                                   //
+                                   f[0 * stride_x + 3 * stride_y + 3 * stride_z],
+                                   f[1 * stride_x + 3 * stride_y + 3 * stride_z],
+                                   f[2 * stride_x + 3 * stride_y + 3 * stride_z],
+                                   f[3 * stride_x + 3 * stride_y + 3 * stride_z]);
 
-    double wz = weno4_HOne(z, w1, w2, w3, w4);
+    double wz = weno4_HOne_cuda(z, w1, w2, w3, w4);
 
     return wz;
 }
