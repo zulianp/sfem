@@ -12,8 +12,8 @@ print("sdf_test.py: ==========================================")
 
 sdf_t = np.float32
 
-D = 400
-dims = (D, D, D)
+D = 500
+dims = (D-111, D-55, D)
 
 print(f'sdf_test.py: Generating field of size {dims[0]} x {dims[1]} x {dims[2]}')
 
@@ -48,8 +48,8 @@ zv[:] = np.linspace(pmin[2], pmax[2], dims[2])
 
 X, Y, Z = np.meshgrid(xv, yv, zv)
 
-field  = np.sin(4.0 * np.pi * X) + np.cos(4.0 * np.pi * Y + 4.0 * np.pi * Z)**2
-# field += chess_board(X, Y, Z, mc)
+# field  = np.sin(4.0 * np.pi * X) + np.cos(4.0 * np.pi * Y + 4.0 * np.pi * Z)**2
+field = chess_board(X, Y, Z, mc)
 
             
 end_clock = time.time()

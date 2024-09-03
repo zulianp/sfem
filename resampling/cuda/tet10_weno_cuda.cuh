@@ -546,11 +546,11 @@ __device__ double weno4_2D_HOne(
  * @param stride_z
  * @return double
  */
-__device__ double weno4_3D_HOne(const double x, const double y, const double z,  //
-                                const double *f,                                 //
-                                const int stride_x,                              //
-                                const int stride_y,                              //
-                                const int stride_z) {                            //
+__device__ double weno4_3D_HOne_cuda(const double x, const double y, const double z,  //
+                                     const double *f,                                 //
+                                     const int stride_x,                              //
+                                     const int stride_y,                              //
+                                     const int stride_z) {                            //
 
     double w1 = weno4_2D_HOne(x,
                               y,  //
