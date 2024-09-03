@@ -139,5 +139,5 @@ int vtet4_laplacian_apply_opt(const ptrdiff_t nelements,
         }
     }
 
-    return 0;
+    return SFEM_SUCCESS;
 }

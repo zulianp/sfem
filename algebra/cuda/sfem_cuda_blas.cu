@@ -85,315 +85,297 @@ static void sfem_blas_init() {
     }
 }
 
+template <typename T>
+class BLASImpl {};
+
+template <>
+class BLASImpl<double> {
+public:
+    static double dot(const ptrdiff_t n, const double *const l, const double *const r) {
+        sfem_blas_init();
+        double ret = 0;
+        CHECK_CUBLAS(cublasDdot(cublas_handle, n, l, 1, r, 1, &ret));
+        return ret;
+    }
+
+    static void axpy(const ptrdiff_t n,
+                     const double alpha,
+                     const double *const x,
+                     double *const y) {
+        sfem_blas_init();
+        CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &alpha, x, 1, y, 1));
+    }
+
+    static void axpby(const ptrdiff_t n,
+                      const double alpha,
+                      const double *const x,
+                      const double beta,
+                      double *const y) {
+        sfem_blas_init();
+        if (beta != 1) {
+            CHECK_CUBLAS(cublasDscal(cublas_handle, n, &beta, y, 1));
+        }
+
+        CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &alpha, x, 1, y, 1));
+    }
+
+    static void zaxpby(const ptrdiff_t n,
+                       const double alpha,
+                       const double *const x,
+                       const double beta,
+                       const double *const y,
+                       double *const z) {
+        sfem_blas_init();
+
+        if (x == z) {
+            CHECK_CUBLAS(cublasDscal(cublas_handle, n, &alpha, z, 1));
+            CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &beta, y, 1, z, 1));
+
+        } else if (y == z) {
+            CHECK_CUBLAS(cublasDscal(cublas_handle, n, &beta, z, 1));
+            CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &alpha, x, 1, z, 1));
+        } else {
+            cudaMemset(z, 0, n * sizeof(double));
+            CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &alpha, x, 1, z, 1));
+            CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &beta, y, 1, z, 1));
+        }
+    }
+
+    static void scal(const ptrdiff_t n, const double alpha, double *const x) {
+        sfem_blas_init();
+        CHECK_CUBLAS(cublasDscal(cublas_handle, n, &alpha, x, 1));
+    }
+
+    static void nrm2(const ptrdiff_t n, const double *const x, double *const result) {
+        sfem_blas_init();
+        CHECK_CUBLAS(cublasDnrm2(cublas_handle, n, x, 1, result));
+    }
+};
+
+template <>
+class BLASImpl<float> {
+public:
+    static float dot(const ptrdiff_t n, const float *const l, const float *const r) {
+        sfem_blas_init();
+        float ret = 0;
+        CHECK_CUBLAS(cublasSdot(cublas_handle, n, l, 1, r, 1, &ret));
+        return ret;
+    }
+
+    static void axpy(const ptrdiff_t n, const float alpha, const float *const x, float *const y) {
+        sfem_blas_init();
+        CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &alpha, x, 1, y, 1));
+    }
+
+    static void axpby(const ptrdiff_t n,
+                      const float alpha,
+                      const float *const x,
+                      const float beta,
+                      float *const y) {
+        sfem_blas_init();
+        if (beta != 1) {
+            CHECK_CUBLAS(cublasSscal(cublas_handle, n, &beta, y, 1));
+        }
+
+        CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &alpha, x, 1, y, 1));
+    }
+
+    static void zaxpby(const ptrdiff_t n,
+                       const float alpha,
+                       const float *const x,
+                       const float beta,
+                       const float *const y,
+                       float *const z) {
+        sfem_blas_init();
+
+        if (x == z) {
+            CHECK_CUBLAS(cublasSscal(cublas_handle, n, &alpha, z, 1));
+            CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &beta, y, 1, z, 1));
+
+        } else if (y == z) {
+            CHECK_CUBLAS(cublasSscal(cublas_handle, n, &beta, z, 1));
+            CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &alpha, x, 1, z, 1));
+        } else {
+            cudaMemset(z, 0, n * sizeof(float));
+            CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &alpha, x, 1, z, 1));
+            CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &beta, y, 1, z, 1));
+        }
+    }
+
+    static void scal(const ptrdiff_t n, const float alpha, float *const x) {
+        sfem_blas_init();
+        CHECK_CUBLAS(cublasSscal(cublas_handle, n, &alpha, x, 1));
+    }
+
+    static void nrm2(const ptrdiff_t n, const float *const x, float *const result) {
+        sfem_blas_init();
+        CHECK_CUBLAS(cublasSnrm2(cublas_handle, n, x, 1, result));
+    }
+};
+
+template <typename T>
+using BLAS = BLASImpl<T>;
+
 #else
-static void sfem_blas_init() {}
-#endif
 
-namespace sfem {
-    namespace device {
+template <typename T>
+__global__ void tscal(const ptrdiff_t n, const T alpha, T *const x) {
+    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
+        x[i] *= alpha;
+    }
+}
 
-        template <typename T>
-        __global__ void tscal(const ptrdiff_t n, const T alpha, T *const x) {
-            for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n;
-                 i += blockDim.x * gridDim.x) {
-                x[i] *= alpha;
-            }
-        }
+template <typename T>
+__global__ void taxpby(const ptrdiff_t n,
+                       const T alpha,
+                       const T *const x,
+                       const T beta,
+                       T *const y) {
+    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
+        y[i] = alpha * x[i] + beta * y[i];
+    }
+}
 
-        template <typename T>
-        __global__ void taxpby(const ptrdiff_t n,
-                               const T alpha,
-                               const T *const x,
-                               const T beta,
-                               T *const y) {
-            for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n;
-                 i += blockDim.x * gridDim.x) {
-                y[i] = alpha * x[i] + beta * y[i];
-            }
-        }
+template <typename T>
+__global__ void tzaxpby(const ptrdiff_t n,
+                        const T alpha,
+                        const T *const x,
+                        const T beta,
+                        const T *const y,
+                        T *const z) {
+    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
+        z[i] = alpha * x[i] + beta * y[i];
+    }
+}
 
-        template <typename T>
-        __global__ void tdot(const ptrdiff_t n, const T *const l, const T *const r, T *result) {
-            T acc = 0;
-            for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n;
-                 i += blockDim.x * gridDim.x) {
-                acc += l[i] * r[i];
-            }
 
+inline __device__  unsigned int lane_id() { return threadIdx.x % SFEM_WARP_SIZE; }
+
+template<typename T>
+__device__ T warp_reduce_32(const T in) {
+    static_assert(SFEM_WARP_SIZE == 32, "Only implemented for CUDA!");
+    T out = in;
+    out += __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 16, SFEM_WARP_SIZE);  // 0-16, 1-17, ..., 15-31
+    out += __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 8, SFEM_WARP_SIZE);   // 0-8, ..., 1-7, ..., 23-31
+    out += __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 4, SFEM_WARP_SIZE);
+    out += __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 2, SFEM_WARP_SIZE);
+    out += __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 1, SFEM_WARP_SIZE);
+    return out;
+}
+
+template <typename T>
+__global__ void tdot(const ptrdiff_t n, const T *const l, const T *const r, T *result) {
+    __shared__ T block_accumulator[SFEM_WARP_SIZE];
+
+    T acc = 0;
+    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
+        acc += l[i] * r[i];
+    }
+
+    acc = warp_reduce_32(acc);
+
+    unsigned int warp_id = threadIdx.x / SFEM_WARP_SIZE;
+    auto lid = lane_id();
+
+    if(!lid) {
+        block_accumulator[warp_id] = acc;
+    }
+
+    __syncthreads();
+
+    if(!warp_id) {
+        acc = block_accumulator[lid];
+        acc = warp_reduce_32(acc);
+
+        if(!threadIdx.x) {
             atomicAdd(result, acc);
         }
+    }
+}
 
-        template <typename T>
-        __global__ void tdiv(const ptrdiff_t n,
-                             const T *const l,
-                             const T *const r,
-                             T *const result) {
-            for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n;
-                 i += blockDim.x * gridDim.x) {
-                assert(r[i] != 0);
-                result[i] = l[i] / r[i];
-            }
-        }
 
-        template <typename T>
-        T *allocate(const std::size_t n) {
-            T *ptr = nullptr;
-            cudaMalloc((void **)&ptr, n * sizeof(T));
-            cudaMemset(ptr, 0, n * sizeof(T));
-            assert(ptr);
-            return ptr;
-        }
+template <typename T>
+class BLAS {
+public:
+    static float dot(const ptrdiff_t n, const T *const l, const T *const r) {
+        int kernel_block_size = 128;
+        ptrdiff_t n_blocks =
+                std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-        template <typename T>
-        void destroy(T *a) {
-            cudaFree(a);
-        }
+        double *d_result = 0;
+        cudaMalloc((void **)&d_result, sizeof(double));
+        cudaMemset((void *)d_result, 0, sizeof(double));
 
-        template <typename T>
-        void copy(const ptrdiff_t n, const T *const src, T *const dest) {
-            cudaMemcpy(dest, src, n * sizeof(T), cudaMemcpyDeviceToDevice);
-        }
+        tdot<<<n_blocks, kernel_block_size>>>(n, l, r, d_result);
+        SFEM_DEBUG_SYNCHRONIZE();
 
-        double dot(const ptrdiff_t n, const double *const l, const double *const r) {
-            sfem_blas_init();
+        double ret = 0;
+        cudaMemcpy(&ret, d_result, sizeof(double), cudaMemcpyDeviceToHost);
+        cudaFree(d_result);
+        return ret;
+    }
 
-#ifdef SFEM_ENABLE_CUBLAS
-            double ret = 0;
-            CHECK_CUBLAS(cublasDdot(cublas_handle, n, l, 1, r, 1, &ret));
-            return ret;
-#else
-            int kernel_block_size = 128;
-            ptrdiff_t n_blocks =
-                    std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
+    static void axpy(const ptrdiff_t n, const T alpha, const T *const x, T *const y) {
+        int kernel_block_size = 128;
+        ptrdiff_t n_blocks =
+                std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-            double *d_result = 0;
-            cudaMalloc((void **)&d_result, sizeof(double));
-            cudaMemset((void *)d_result, 0, sizeof(double));
-            tdot<<<n_blocks, kernel_block_size>>>(n, l, r, d_result);
+        taxpby<<<n_blocks, kernel_block_size>>>(n, alpha, x, (T)1, y);
+        SFEM_DEBUG_SYNCHRONIZE();
+    }
 
-            double ret = 0;
-            cudaMemcpy(&ret, d_result, sizeof(double), cudaMemcpyDeviceToHost);
+    static void axpby(const ptrdiff_t n,
+                      const T alpha,
+                      const T *const x,
+                      const T beta,
+                      T *const y) {
+        int kernel_block_size = 128;
+        ptrdiff_t n_blocks =
+                std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-            SFEM_DEBUG_SYNCHRONIZE();
-            return ret;
-#endif
-        }
+        taxpby<<<n_blocks, kernel_block_size>>>(n, alpha, x, beta, y);
+        SFEM_DEBUG_SYNCHRONIZE();
+    }
 
-        float dot(const ptrdiff_t n, const float *const l, const float *const r) {
-            sfem_blas_init();
-#ifdef SFEM_ENABLE_CUBLAS
-            float ret = 0;
-            CHECK_CUBLAS(cublasSdot(cublas_handle, n, l, 1, r, 1, &ret));
-            return ret;
+    static void zaxpby(const ptrdiff_t n,
+                       const T alpha,
+                       const T *const x,
+                       const T beta,
+                       const T *const y,
+                       T *const z) {
+        int kernel_block_size = 128;
+        ptrdiff_t n_blocks =
+                std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-#else
-            int kernel_block_size = 128;
-            ptrdiff_t n_blocks =
-                    std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
+        tzaxpby<<<n_blocks, kernel_block_size>>>(n, alpha, x, beta, y, z);
+        SFEM_DEBUG_SYNCHRONIZE();
+    }
 
-            float *d_result = 0;
-            cudaMalloc((void **)&d_result, sizeof(float));
-            cudaMemset((void *)d_result, 0, sizeof(float));
-            tdot<<<n_blocks, kernel_block_size>>>(n, l, r, d_result);
+    static void scal(const ptrdiff_t n, const T alpha, T *const x) {
+        int kernel_block_size = 128;
+        ptrdiff_t n_blocks =
+                std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-            float ret = 0;
-            cudaMemcpy(&ret, d_result, sizeof(float), cudaMemcpyDeviceToHost);
+        tscal<<<n_blocks, kernel_block_size>>>(n, alpha, x);
+        SFEM_DEBUG_SYNCHRONIZE();
+    }
 
-            SFEM_DEBUG_SYNCHRONIZE();
-            return ret;
-#endif
-        }
-
-        void axpy(const ptrdiff_t n, const double alpha, const double *const x, double *const y) {
-            sfem_blas_init();
-#ifdef SFEM_ENABLE_CUBLAS
-            CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &alpha, x, 1, y, 1));
-#else
-#warning "CUBLAS required!"
-            assert(false);
-            fprintf(stderr, "Missing implementation\n");
-            abort();
+    static void nrm2(const ptrdiff_t n, const T *const x, T *const result) {
+        T sq_nrm = dot(n, x, x);
+        *result = sqrt(sq_nrm);
+    }
+};
 
 #endif
-        }
 
-        void axpy(const ptrdiff_t n, const float alpha, const float *const x, float *const y) {
-            sfem_blas_init();
-#ifdef SFEM_ENABLE_CUBLAS
-            CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &alpha, x, 1, y, 1));
-#else
-#warning "CUBLAS required!"
-            assert(false);
-            fprintf(stderr, "Missing implementation\n");
-            abort();
-
-#endif
-        }
-
-        void axpby(const ptrdiff_t n,
-                   const double alpha,
-                   const double *const x,
-                   const double beta,
-                   double *const y) {
-            sfem_blas_init();
-#ifdef SFEM_ENABLE_CUBLAS
-
-            if (beta != 1) {
-                CHECK_CUBLAS(cublasDscal(cublas_handle, n, &beta, y, 1));
-            }
-
-            CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &alpha, x, 1, y, 1));
-
-#else
-            int kernel_block_size = 128;
-            ptrdiff_t n_blocks =
-                    std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
-
-            taxpby<<<n_blocks, kernel_block_size>>>(n, alpha, x, beta, y);
-
-            SFEM_DEBUG_SYNCHRONIZE();
-
-#endif
-        }
-
-        void axpby(const ptrdiff_t n,
-                   const float alpha,
-                   const float *const x,
-                   const float beta,
-                   float *const y) {
-            sfem_blas_init();
-
-#ifdef SFEM_ENABLE_CUBLAS
-
-            if (beta != 1) {
-                CHECK_CUBLAS(cublasSscal(cublas_handle, n, &beta, y, 1));
-            }
-
-            CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &alpha, x, 1, y, 1));
-
-#else
-            int kernel_block_size = 128;
-            ptrdiff_t n_blocks =
-                    std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
-
-            taxpby<<<n_blocks, kernel_block_size>>>(n, alpha, x, beta, y);
-
-            SFEM_DEBUG_SYNCHRONIZE();
-#endif
-        }
-
-        void zaxpby(const ptrdiff_t n,
-                    const double alpha,
-                    const double *const x,
-                    const double beta,
-                    const double *const y,
-                    double *const z) {
-            sfem_blas_init();
-
-#ifdef SFEM_ENABLE_CUBLAS
-
-            if (x == z) {
-                CHECK_CUBLAS(cublasDscal(cublas_handle, n, &alpha, z, 1));
-                CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &beta, y, 1, z, 1));
-
-            } else if (y == z) {
-                CHECK_CUBLAS(cublasDscal(cublas_handle, n, &beta, z, 1));
-                CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &alpha, x, 1, z, 1));
-            } else {
-                cudaMemset(z, 0, n * sizeof(double));
-                CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &alpha, x, 1, z, 1));
-                CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &beta, y, 1, z, 1));
-            }
-#else
-#warning "CUBLAS is required!"
-            assert(false);
-            fprintf(stderr, "Missing implementation\n");
-            abort();
-#endif
-        }
-
-        void zaxpby(const ptrdiff_t n,
-                    const float alpha,
-                    const float *const x,
-                    const float beta,
-                    const float *const y,
-                    float *const z) {
-            sfem_blas_init();
-
-#ifdef SFEM_ENABLE_CUBLAS
-
-            if (x == z) {
-                CHECK_CUBLAS(cublasSscal(cublas_handle, n, &alpha, z, 1));
-                CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &beta, y, 1, z, 1));
-
-            } else if (y == z) {
-                CHECK_CUBLAS(cublasSscal(cublas_handle, n, &beta, z, 1));
-                CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &alpha, x, 1, z, 1));
-            } else {
-                cudaMemset(z, 0, n * sizeof(float));
-                CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &alpha, x, 1, z, 1));
-                CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &beta, y, 1, z, 1));
-            }
-#else
-#warning "CUBLAS is required!"
-            assert(false);
-            fprintf(stderr, "Missing implementation\n");
-            abort();
-#endif
-        }
-
-        void scal(const ptrdiff_t n, const double alpha, double *const x) {
-            sfem_blas_init();
-#ifdef SFEM_ENABLE_CUBLAS
-            CHECK_CUBLAS(cublasDscal(cublas_handle, n, &alpha, x, 1));
-#else
-#warning "CUBLAS is required!"
-            assert(false);
-            fprintf(stderr, "Missing implementation\n");
-            abort();
-#endif
-        }
-
-        void scal(const ptrdiff_t n, const float alpha, float *const x) {
-            sfem_blas_init();
-#ifdef SFEM_ENABLE_CUBLAS
-            CHECK_CUBLAS(cublasSscal(cublas_handle, n, &alpha, x, 1));
-#else
-#warning "CUBLAS is required!"
-            assert(false);
-            fprintf(stderr, "Missing implementation\n");
-            abort();
-#endif
-        }
-
-        void nrm2(const ptrdiff_t n, const double *const x, double *const result) {
-            sfem_blas_init();
-#ifdef SFEM_ENABLE_CUBLAS
-            CHECK_CUBLAS(cublasDnrm2(cublas_handle, n, x, 1, result));
-#else
-#warning "CUBLAS is required!"
-            assert(false);
-            fprintf(stderr, "Missing implementation\n");
-            abort();
-#endif
-        }
-
-        void nrm2(const ptrdiff_t n, const float *const x, float *const result) {
-            sfem_blas_init();
-#ifdef SFEM_ENABLE_CUBLAS
-            CHECK_CUBLAS(cublasSnrm2(cublas_handle, n, x, 1, result));
-#else
-#warning "CUBLAS is required!"
-            assert(false);
-            fprintf(stderr, "Missing implementation\n");
-            abort();
-#endif
-        }
-
-    }  // namespace device
-}  // namespace sfem
-
-extern real_t *d_allocate(const std::size_t n) { return sfem::device::allocate<real_t>(n); }
+extern real_t *d_allocate(const std::size_t n) {
+    // return sfem::device::allocate<real_t>(n);
+    real_t *ptr = nullptr;
+    cudaMalloc((void **)&ptr, n * sizeof(real_t));
+    cudaMemset(ptr, 0, n * sizeof(real_t));
+    assert(ptr);
+    return ptr;
+}
 
 extern void device_to_host(const std::size_t n, const real_t *const d, real_t *h) {
     CHECK_CUDA(cudaMemcpy(h, d, n * sizeof(real_t), cudaMemcpyDeviceToHost));
@@ -403,26 +385,14 @@ extern void host_to_device(const std::size_t n, const real_t *const h, real_t *d
     CHECK_CUDA(cudaMemcpy(d, h, n * sizeof(real_t), cudaMemcpyHostToDevice));
 }
 
-extern void d_destroy(void *a) { sfem::device::destroy(a); }
+extern void d_destroy(void *a) { cudaFree(a); }
 
 extern void d_copy(const ptrdiff_t n, const real_t *const src, real_t *const dest) {
-    sfem::device::copy(n, src, dest);
+    cudaMemcpy(dest, src, n * sizeof(real_t), cudaMemcpyDeviceToDevice);
 }
 
 extern real_t d_dot(const ptrdiff_t n, const real_t *const l, const real_t *const r) {
-    return sfem::device::dot(n, l, r);
-}
-
-extern void d_ediv(const ptrdiff_t n,
-                   const real_t *const l,
-                   const real_t *const r,
-                   real_t *const result) {
-    int kernel_block_size = 128;
-    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
-
-    sfem::device::tdiv<<<n_blocks, kernel_block_size>>>(n, l, r, result);
-
-    SFEM_DEBUG_SYNCHRONIZE();
+    return BLAS<real_t>::dot(n, l, r);
 }
 
 extern void d_axpby(const ptrdiff_t n,
@@ -430,11 +400,11 @@ extern void d_axpby(const ptrdiff_t n,
                     const real_t *const x,
                     const real_t beta,
                     real_t *const y) {
-    sfem::device::axpby(n, alpha, x, beta, y);
+    BLAS<real_t>::axpby(n, alpha, x, beta, y);
 }
 
 extern void d_axpy(const ptrdiff_t n, const real_t alpha, const real_t *const x, real_t *const y) {
-    sfem::device::axpy(n, alpha, x, y);
+    BLAS<real_t>::axpy(n, alpha, x, y);
 }
 
 extern void d_zaxpby(const ptrdiff_t n,
@@ -443,16 +413,16 @@ extern void d_zaxpby(const ptrdiff_t n,
                      const real_t beta,
                      const real_t *const y,
                      real_t *const z) {
-    sfem::device::zaxpby(n, alpha, x, beta, y, z);
+    BLAS<real_t>::zaxpby(n, alpha, x, beta, y, z);
 }
 
 extern void d_scal(const ptrdiff_t n, const real_t alpha, real_t *const x) {
-    sfem::device::scal(n, alpha, x);
+    BLAS<real_t>::scal(n, alpha, x);
 }
 
 extern real_t d_nrm2(const ptrdiff_t n, const real_t *const x) {
     real_t ret = 0;
-    sfem::device::nrm2(n, x, &ret);
+    BLAS<real_t>::nrm2(n, x, &ret);
     return ret;
 }
 
@@ -478,4 +448,24 @@ extern void buffer_device_to_host(const std::size_t n, const void *const d, void
 
 extern void buffer_host_to_device(const std::size_t n, const void *const h, void *d) {
     cudaMemcpy(d, h, n, cudaMemcpyHostToDevice);
+}
+
+template <typename T>
+__global__ void tdiv(const ptrdiff_t n, const T *const l, const T *const r, T *const result) {
+    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
+        assert(r[i] != 0);
+        result[i] = l[i] / r[i];
+    }
+}
+
+extern void d_ediv(const ptrdiff_t n,
+                   const real_t *const l,
+                   const real_t *const r,
+                   real_t *const result) {
+    int kernel_block_size = 128;
+    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
+
+    tdiv<<<n_blocks, kernel_block_size>>>(n, l, r, result);
+
+    SFEM_DEBUG_SYNCHRONIZE();
 }

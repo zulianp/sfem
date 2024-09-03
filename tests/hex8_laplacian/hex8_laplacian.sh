@@ -33,7 +33,7 @@ if [[ -d "hex8_mesh" ]]
 then
 	echo "Reusing mesh"
 else
-	N=150
+	N=100
 	box_mesh.py hex8_mesh -c hex8 -x $N -y $N -z $N --height=1 --width=1 --depth=1
 	box_mesh.py tet4_mesh -c tet4 -x $N -y $N -z $N --height=1 --width=1 --depth=1
 

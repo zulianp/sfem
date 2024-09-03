@@ -95,4 +95,7 @@ typedef @SFEM_LOCAL_IDX_C_TYPE@ local_idx_t;
 
 #define INVALID_IDX (-1)
 
+#define SFEM_WARP_SIZE 32
+#define SFEM_WARP_FULL_MASK 0xfffffff
+
 #endif  // SFEM_CONFIG_HPP
