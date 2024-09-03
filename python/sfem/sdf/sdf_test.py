@@ -6,7 +6,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 
-output_path = '/home/sriva/git/sfem/workflows/resample/sdf.float32.raw'
+output_path = os.path.join(os.environ['HOME'], 'git/sfem/workflows/resample/sdf.float32.raw')
 
 print("sdf_test.py: ==========================================")
 
