@@ -248,15 +248,15 @@ __global__ void tzaxpby(const ptrdiff_t n,
     }
 }
 
+inline __device__ unsigned int lane_id() { return threadIdx.x % SFEM_WARP_SIZE; }
 
-inline __device__  unsigned int lane_id() { return threadIdx.x % SFEM_WARP_SIZE; }
-
-template<typename T>
+template <typename T>
 __device__ T warp_reduce_32(const T in) {
     static_assert(SFEM_WARP_SIZE == 32, "Only implemented for CUDA!");
     T out = in;
     out += __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 16, SFEM_WARP_SIZE);  // 0-16, 1-17, ..., 15-31
-    out += __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 8, SFEM_WARP_SIZE);   // 0-8, ..., 1-7, ..., 23-31
+    out += __shfl_xor_sync(
+            SFEM_WARP_FULL_MASK, out, 8, SFEM_WARP_SIZE);  // 0-8, ..., 1-7, ..., 23-31
     out += __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 4, SFEM_WARP_SIZE);
     out += __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 2, SFEM_WARP_SIZE);
     out += __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 1, SFEM_WARP_SIZE);
@@ -274,25 +274,24 @@ __global__ void tdot(const ptrdiff_t n, const T *const l, const T *const r, T *r
 
     acc = warp_reduce_32(acc);
 
-    unsigned int warp_id = threadIdx.x / SFEM_WARP_SIZE;
-    auto lid = lane_id();
+    const unsigned int warp_id = threadIdx.x / SFEM_WARP_SIZE;
+    const unsigned int lid = lane_id();
 
-    if(!lid) {
+    if (!lid) {
         block_accumulator[warp_id] = acc;
     }
 
     __syncthreads();
 
-    if(!warp_id) {
+    if (!warp_id) {
         acc = block_accumulator[lid];
         acc = warp_reduce_32(acc);
 
-        if(!threadIdx.x) {
+        if (!threadIdx.x) {
             atomicAdd(result, acc);
         }
     }
 }
-
 
 template <typename T>
 class BLAS {
@@ -369,7 +368,6 @@ public:
 #endif
 
 extern real_t *d_allocate(const std::size_t n) {
-    // return sfem::device::allocate<real_t>(n);
     real_t *ptr = nullptr;
     cudaMalloc((void **)&ptr, n * sizeof(real_t));
     cudaMemset(ptr, 0, n * sizeof(real_t));
