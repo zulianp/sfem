@@ -14,7 +14,7 @@ idx_t = np.int32
 geom_t = np.float32
 
 def leading_dim(nx, ny, nz):
-    return [ nz,  nz*nx, 1]
+    return [nz,  nz*nx, 1]
 
 def create_boundary_nodes(nx, ny, nz):
     ld = leading_dim(nx, ny, nz)
