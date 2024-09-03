@@ -877,29 +877,30 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(
         // #define WENO_CUDA 1
         // Integrate field
         {
-#if WENO_CUDA == 1
-            real_t eval_field = hex_aa_8_eval_weno4_3D_cuda(g_qx,
-                                                            g_qy,
-                                                            g_qz,  //
-                                                            ox,
-                                                            oy,
-                                                            oz,                            //
-                                                            (dx + dy + dz) * (1.0 / 3.0),  //
-                                                            i,
-                                                            j,
-                                                            k,
-                                                            stride0,
-                                                            stride1,
-                                                            stride2,
-                                                            data);
-#else
+// #if WENO_CUDA == 7777
+// printf("WENO_CUDA == 777\n");
+//             real_t eval_field = hex_aa_8_eval_weno4_3D_cuda(g_qx,
+//                                                             g_qy,
+//                                                             g_qz,  //
+//                                                             ox,
+//                                                             oy,
+//                                                             oz,                            //
+//                                                             (dx + dy + dz) * (1.0 / 3.0),  //
+//                                                             i,
+//                                                             j,
+//                                                             k,
+//                                                             stride0,
+//                                                             stride1,
+//                                                             stride2,
+//                                                             data);
+// #else
 
             real_t eval_field = 0.0;
-            // UNROLL_ZERO?
+
             for (int edof_j = 0; edof_j < 8; edof_j++) {
                 eval_field += hex8_f[edof_j] * coeffs[edof_j];
             }
-#endif
+// #endif
             // // UNROLL_ZERO?
             // for (int edof_i = 0; edof_i < 10; edof_i++) {
             //     element_field[edof_i] += eval_field * tet10_f[edof_i] * dV;
@@ -931,8 +932,6 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(
         element_field_v9_reduce += tile.shfl_down(element_field_v9_reduce, i);
     }
 
-    // UNROLL_ZERO?
-
     if (tile_rank == 0) {
         atomicAdd(&weighted_field[ev[0]], element_field_v0_reduce);
         atomicAdd(&weighted_field[ev[1]], element_field_v1_reduce);
@@ -948,14 +947,64 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(
 
 }  // end kernel hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel
 
+////////////////////////////////////////////////////////////////////////
+// hex_aa_8_eval_weno4_3D
+////////////////////////////////////////////////////////////////////////
+__device__ real_t hex_aa_8_eval_weno4_3D_Unit_cuda(  //
+        const real_t x_unit,                         //
+        const real_t y_unit,                         //
+        const real_t z_unit,                         //
+        const real_t ox_unit,                        //
+        const real_t oy_unit,                        //
+        const real_t oz_unit,                        //
+        const ptrdiff_t i,                           // it must be the absulte index
+        const ptrdiff_t j,                           // Used to retrive the data
+        const ptrdiff_t k,                           // From the data array
+        const ptrdiff_t stride0,                     //
+        const ptrdiff_t stride1,                     //
+        const ptrdiff_t stride2,                     //
+        const real_t* const SFEM_RESTRICT data) {    //
+
+    // collect the data for the WENO interpolation
+    real_t out[64];
+    hex_aa_8_collect_coeffs_O3_cuda(stride0, stride1, stride2, i, j, k, data, out);
+
+    ////// Compute the local indices
+    // ptrdiff_t i_local, j_local, k_local;
+
+    const ptrdiff_t i_local = floor(x_unit - ox_unit);
+    const ptrdiff_t j_local = floor(y_unit - oy_unit);
+    const ptrdiff_t k_local = floor(z_unit - oz_unit);
+
+    const double x = (x_unit - ox_unit) - (real_t)i_local + 1.0;
+    const double y = (y_unit - oy_unit) - (real_t)j_local + 1.0;
+    const double z = (z_unit - oz_unit) - (real_t)k_local + 1.0;
+
+    // printf("x = %f, x_ = %f, i = %d\n", x, x_, i);
+    // printf("y = %f, y_ = %f, j = %d\n", y, y_, j);
+    // printf("z = %f, z_ = %f, k = %d\n", z, z_, k);
+
+    // printf("delta = %f\n", h);
+
+    const real_t w4 = weno4_3D_HOne_cuda(x,  //
+                                         y,
+                                         z,
+                                         out,
+                                         1,
+                                         4,
+                                         16);
+
+    return w4;
+}
+
 ///////////////////////////////////////////////////////////////////////
 // hex8_to_isoparametric_tet10_resample_field_local_cube1_cuda
 ///////////////////////////////////////////////////////////////////////
-__global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_cuda(
-        // Mesh
-        const ptrdiff_t start_element,  // start element
-        const ptrdiff_t end_element,    // end element
-        const ptrdiff_t nnodes,         // number of nodes
+__global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  //
+                                                                                // Mesh
+        const ptrdiff_t start_element,                                          // start element
+        const ptrdiff_t end_element,                                            // end element
+        const ptrdiff_t nnodes,                                                 // number of nodes
 
         elems_tet10_device elems,  // connectivity
         xyz_tet10_device xyz,      // coordinates
@@ -1020,6 +1069,17 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_cuda(
 
     real_t tet10_f[10];
 
+    real_t element_field_v0_reduce = 0.0;
+    real_t element_field_v1_reduce = 0.0;
+    real_t element_field_v2_reduce = 0.0;
+    real_t element_field_v3_reduce = 0.0;
+    real_t element_field_v4_reduce = 0.0;
+    real_t element_field_v5_reduce = 0.0;
+    real_t element_field_v6_reduce = 0.0;
+    real_t element_field_v7_reduce = 0.0;
+    real_t element_field_v8_reduce = 0.0;
+    real_t element_field_v9_reduce = 0.0;
+
     const real_t cVolume = dx * dy * dz;
 
     // loop over the ndes of the element
@@ -1082,17 +1142,6 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_cuda(
 
     // SUBPARAMETRIC (for iso-parametric tassellation of tet10 might be necessary)
 
-    real_t element_field_v0_reduce = 0.0;
-    real_t element_field_v1_reduce = 0.0;
-    real_t element_field_v2_reduce = 0.0;
-    real_t element_field_v3_reduce = 0.0;
-    real_t element_field_v4_reduce = 0.0;
-    real_t element_field_v5_reduce = 0.0;
-    real_t element_field_v6_reduce = 0.0;
-    real_t element_field_v7_reduce = 0.0;
-    real_t element_field_v8_reduce = 0.0;
-    real_t element_field_v9_reduce = 0.0;
-
     const size_t nr_warp_loop = (TET4_NQP / __WARP_SIZE__) +                //
                                 ((TET4_NQP % __WARP_SIZE__) == 0 ? 0 : 1);  //
 
@@ -1138,16 +1187,127 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_cuda(
         tet10_transform_cu(x_unit,
                            y_unit,
                            z_unit,
-                           tet4_qx[q],
-                           tet4_qy[q],
-                           tet4_qz[q],
+                           tet4_qx[q_i],
+                           tet4_qy[q_i],
+                           tet4_qz[q_i],
                            &g_qx_unit,
                            &g_qy_unit,
                            &g_qz_unit);
 
         ///// ======================================================
 
-        
+        // Get the global grid coordinates
+        const real_t grid_x = (g_qx_glob - ox) / dx;
+        const real_t grid_y = (g_qy_glob - oy) / dy;
+        const real_t grid_z = (g_qz_glob - oz) / dz;
+
+        const ptrdiff_t i_glob = floor(grid_x);
+        const ptrdiff_t j_glob = floor(grid_y);
+        const ptrdiff_t k_glob = floor(grid_z);
+
+        // /* If outside */
+        // if (i_glob < 0 || j_glob < 0 || k_glob < 0 || (i_glob + 1 >= n[0]) ||
+        //     (j_glob + 1 >= n[1]) || (k_glob + 1 >= n[2])) {
+        //     fprintf(stderr,
+        //             "ERROR: (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
+        //             "%ld)!\n",
+        //             g_qx_glob,
+        //             g_qy_glob,
+        //             g_qz_glob,
+        //             i_glob,
+        //             j_glob,
+        //             k_glob,
+        //             n[0],
+        //             n[1],
+        //             n[2]);
+        //     exit(1);
+        // }
+
+#define WENO_CUBE 1
+#if WENO_CUBE == 1
+
+        // if (nSizes_global != nNodesData) {
+        //     fprintf(stderr, "nSizes_global != nNodes .. %ld != %ld\n", nSizes_global,
+        //     nNodesData);
+        // }
+
+        //
+        // printf("nSizes_global = %ld\n", nSizes_global);
+        // printf("origin = (%f, %f, %f)\n", ox, oy, oz);
+        real_t eval_field = hex_aa_8_eval_weno4_3D_Unit_cuda(g_qx_unit,
+                                                             g_qy_unit,
+                                                             g_qz_unit,  //
+                                                             0.0,
+                                                             0.0,
+                                                             0.0,  //
+                                                             i_glob,
+                                                             j_glob,
+                                                             k_glob,
+                                                             stride0,
+                                                             stride1,
+                                                             stride2,
+                                                             data);  //
+#else
+
+        // Get the reminder [0, 1]
+        real_t l_x = (grid_x - i_glob);
+        real_t l_y = (grid_y - j_glob);
+        real_t l_z = (grid_z - k_glob);
+
+        assert(l_x >= -1e-8);
+        assert(l_y >= -1e-8);
+        assert(l_z >= -1e-8);
+
+        assert(l_x <= 1 + 1e-8);
+        assert(l_y <= 1 + 1e-8);
+        assert(l_z <= 1 + 1e-8);
+
+        hex_aa_8_eval_fun_cu(l_x, l_y, l_z, hex8_f);
+        hex_aa_8_collect_coeffs_cu(stride0, stride1, stride2, i_glob, j_glob, k_glob, data, coeffs);
+
+        real_t eval_field = 0;
+        // UNROLL_ZERO?
+        for (int edof_j = 0; edof_j < 8; edof_j++) {
+            eval_field += hex8_f[edof_j] * coeffs[edof_j];
+        }
+#endif
+
+        element_field_v0_reduce += eval_field * tet10_f[0] * dV;
+        element_field_v1_reduce += eval_field * tet10_f[1] * dV;
+        element_field_v2_reduce += eval_field * tet10_f[2] * dV;
+        element_field_v3_reduce += eval_field * tet10_f[3] * dV;
+        element_field_v4_reduce += eval_field * tet10_f[4] * dV;
+        element_field_v5_reduce += eval_field * tet10_f[5] * dV;
+        element_field_v6_reduce += eval_field * tet10_f[6] * dV;
+        element_field_v7_reduce += eval_field * tet10_f[7] * dV;
+        element_field_v8_reduce += eval_field * tet10_f[8] * dV;
+        element_field_v9_reduce += eval_field * tet10_f[9] * dV;
+    }  // end quadrature loop
+
+    for (int i = tile.size() / 2; i > 0; i /= 2) {
+        element_field_v0_reduce += tile.shfl_down(element_field_v0_reduce, i);
+        element_field_v1_reduce += tile.shfl_down(element_field_v1_reduce, i);
+        element_field_v2_reduce += tile.shfl_down(element_field_v2_reduce, i);
+        element_field_v3_reduce += tile.shfl_down(element_field_v3_reduce, i);
+        element_field_v4_reduce += tile.shfl_down(element_field_v4_reduce, i);
+        element_field_v5_reduce += tile.shfl_down(element_field_v5_reduce, i);
+        element_field_v6_reduce += tile.shfl_down(element_field_v6_reduce, i);
+        element_field_v7_reduce += tile.shfl_down(element_field_v7_reduce, i);
+        element_field_v8_reduce += tile.shfl_down(element_field_v8_reduce, i);
+        element_field_v9_reduce += tile.shfl_down(element_field_v9_reduce, i);
+    }
+
+    if (tile_rank == 0) {
+        atomicAdd(&weighted_field[ev[0]], element_field_v0_reduce);
+        atomicAdd(&weighted_field[ev[1]], element_field_v1_reduce);
+        atomicAdd(&weighted_field[ev[2]], element_field_v2_reduce);
+        atomicAdd(&weighted_field[ev[3]], element_field_v3_reduce);
+        atomicAdd(&weighted_field[ev[4]], element_field_v4_reduce);
+        atomicAdd(&weighted_field[ev[5]], element_field_v5_reduce);
+        atomicAdd(&weighted_field[ev[6]], element_field_v6_reduce);
+        atomicAdd(&weighted_field[ev[7]], element_field_v7_reduce);
+        atomicAdd(&weighted_field[ev[8]], element_field_v8_reduce);
+        atomicAdd(&weighted_field[ev[9]], element_field_v9_reduce);
     }
 }
 
@@ -1196,13 +1356,22 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
                cudaGetErrorString(errwf));
     }
 
+#define CUBE1 0
+
+#if CUBE1 == 1
+    char* kernel_name = "hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel";
+#else 
+    char* kernel_name = "hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel";
+#endif
+
     printf("============================================================================\n");
-    printf("GPU:    Launching the kernel hex8_to_tet10_resample_field_local_CUDA \n");
+    printf("GPU:    Launching the kernel %s \n", kernel_name);
     printf("GPU:    Number of blocks:            %ld\n", numBlocks);
     printf("GPU:    Number of threads per block: %ld\n", threadsPerBlock);
     printf("GPU:    Total number of threads:     %ld\n", (numBlocks * threadsPerBlock));
     printf("GPU:    Number of elements:          %ld\n", nelements);
-    printf("GPU:    Use WENO:                    %s\n", (WENO_CUDA == 1) ? "Yes" : "No");
+    printf("GPU:    Use WENO:                    %s\n",
+           (WENO_CUDA == 1 & CUBE1 == 1) ? "Yes" : "No");
     printf("============================================================================\n");
 
     cudaDeviceSynchronize();
@@ -1214,33 +1383,37 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
     cudaEventRecord(start);
 
     {
-        hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel<<<numBlocks,
-                                                                         threadsPerBlock>>>(
-                0,                       //
-                nelements,               //
-                nnodes,                  //
-                                         //
-                elems_device,            //
-                xyz_device,              //
-                                         //
-                n[0],                    //
-                n[1],                    //
-                n[2],                    //
-                                         //
-                stride[0],               //
-                stride[1],               //
-                stride[2],               //
-                                         //
-                origin[0],               //
-                origin[1],               //
-                origin[2],               //
-                                         //
-                delta[0],                //
-                delta[1],                //
-                delta[2],                //
-                                         //
-                data_device,             //
-                weighted_field_device);  //
+#if CUBE1 == 1 // WENO
+        hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel
+#else 
+        hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel
+#endif
+                <<<numBlocks,
+                   threadsPerBlock>>>(0,                       //
+                                      nelements,               //
+                                      nnodes,                  //
+                                                               //
+                                      elems_device,            //
+                                      xyz_device,              //
+                                                               //
+                                      n[0],                    //
+                                      n[1],                    //
+                                      n[2],                    //
+                                                               //
+                                      stride[0],               //
+                                      stride[1],               //
+                                      stride[2],               //
+                                                               //
+                                      origin[0],               //
+                                      origin[1],               //
+                                      origin[2],               //
+                                                               //
+                                      delta[0],                //
+                                      delta[1],                //
+                                      delta[2],                //
+                                                               //
+                                      data_device,             //
+                                      weighted_field_device);  //
     }
 
     // get cuda error
@@ -1261,8 +1434,9 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
     const double seconds = milliseconds / 1000.0;
 
     printf("============================================================================\n");
-    printf("GPU:    Time for the kernel "
-           "(hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel): %f seconds\n",
+    printf("GPU:    Time for the kernel (%s):\n"  //
+           "GPU:    %f seconds\n",                //
+           kernel_name,
            seconds);
     const double elements_per_second = (double)(nelements) / seconds;
     printf("GPU:    Number of elements: %d.\n", nelements);
