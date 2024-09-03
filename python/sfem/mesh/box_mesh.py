@@ -29,8 +29,8 @@ def create_boundary_nodes(nx, ny, nz):
     back = np.zeros(nx*ny, dtype=idx_t)
 
     idx = 0
-    for zi in range(0, nz-1):
-        for yi in range(0, ny-1):
+    for zi in range(0, nz):
+        for yi in range(0, ny):
 
             xl = 0 * ld[0]
             xr = (nx - 1) * ld[0]
@@ -43,10 +43,10 @@ def create_boundary_nodes(nx, ny, nz):
             right[idx] = xr + p
 
             idx += 1
-    
+
     idx = 0 
-    for zi in range(0, nz-1):
-        for xi in range(0, nx-1):
+    for zi in range(0, nz):
+        for xi in range(0, nx):
             
             yb = 0 * ld[1]
             yt = (ny - 1) * ld[1]
@@ -62,8 +62,8 @@ def create_boundary_nodes(nx, ny, nz):
             idx += 1
 
     idx = 0 
-    for yi in range(0, ny-1):
-        for xi in range(0, nx-1):
+    for yi in range(0, ny):
+        for xi in range(0, nx):
             
             zf = 0 * ld[2]
             zb = (nz - 1) * ld[2]

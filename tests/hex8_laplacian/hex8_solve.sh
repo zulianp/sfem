@@ -34,7 +34,7 @@ if [[ -d "hex8_mesh" ]]
 then
 	echo "Reusing mesh"
 else
-	N=200
+	N=100
 	box_mesh.py hex8_mesh -c hex8 -x $N -y $N -z $N --height=1 --width=1 --depth=1
 fi
 
@@ -70,6 +70,7 @@ export SFEM_USE_PRECONDITIONER=0
 export SFEM_MATRIX_FREE=1
 export SFEM_HEX8_ASSUME_AFFINE=1
 export SFEM_HEX8_ASSUME_AXIS_ALIGNED=1
+export SFEM_USE_CHEB=0
 
 $LAUNCH mgsolve hex8_mesh output
 
