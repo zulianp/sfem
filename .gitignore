@@ -233,3 +233,4 @@ spmv
 run_poisson
 heat_equation
 taylor_hood_navier_stokes
+mesh_to_blocks
