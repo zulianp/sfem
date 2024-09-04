@@ -868,7 +868,7 @@ int resample_field_local(
         }
 
         case TET10: {
-#define TET10_V2 
+// #define TET10_V2 
 
 #ifdef TET10_V2  // V2
             return hex8_to_tet10_resample_field_local_CUDA(
@@ -1072,7 +1072,7 @@ int field_view(MPI_Comm comm, const ptrdiff_t nnodes, const geom_t* SFEM_RESTRIC
                                     origin,
                                     delta,
                                     field,
-                                    0,
+                                    2,
                                     field_out,
                                     z_nlocal_out,
                                     z_origin_out);

@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 
-import numpy as np
+import cupy as cp
 import os
 import time
-from concurrent.futures import ThreadPoolExecutor
-
 
 output_path = os.path.join(os.environ['HOME'], 'git/sfem/workflows/resample/sdf.float32.raw')
 
 print("sdf_test.py: ==========================================")
 
-sdf_t = np.float32
+sdf_t = cp.float32
 
 D = 600
 dims = (D, D, D)
@@ -19,45 +17,42 @@ print(f'sdf_test.py: Generating field of size {dims[0]} x {dims[1]} x {dims[2]}'
 
 mn = -0.88
 mx = 0.88
-pmin = np.array([mn, mn, mn])
-pmax = np.array([mx, mx, mx])
+pmin = cp.array([mn, mn, mn])
+pmax = cp.array([mx, mx, mx])
 
-field = np.zeros(dims, dtype=sdf_t)
+field = cp.zeros(dims, dtype=sdf_t)
 
-# nedt = edt.to_numpy().astype(sdf_t)
-
-mc = np.float64(10)
+mc = cp.float64(10)
 
 def chess_board(x, y, z, mc):
-    vx = np.where(np.int32(np.abs(mc * x)) % 2 == 0, np.ones_like(x), -np.ones_like(x))
-    vy = np.where(np.int32(np.abs(mc * y)) % 2 == 0, np.ones_like(y), -np.ones_like(y))
-    vz = np.where(np.int32(np.abs(mc * z)) % 2 == 0, np.ones_like(z), -np.ones_like(z))
+    vx = cp.where(cp.int32(cp.abs(mc * x)) % 2 == 0, cp.ones_like(x), -cp.ones_like(x))
+    vy = cp.where(cp.int32(cp.abs(mc * y)) % 2 == 0, cp.ones_like(y), -cp.ones_like(y))
+    vz = cp.where(cp.int32(cp.abs(mc * z)) % 2 == 0, cp.ones_like(z), -cp.ones_like(z))
     
     return vx * vy * vz
 
 start_clock = time.time()
 
-xv = np.zeros(dims[0], dtype=sdf_t)
-xv[:] = np.linspace(pmin[0], pmax[0], dims[0])
+xv = cp.zeros(dims[0], dtype=sdf_t)
+xv[:] = cp.linspace(pmin[0], pmax[0], dims[0])
 
-yv = np.zeros(dims[1], dtype=sdf_t)
-yv[:] = np.linspace(pmin[1], pmax[1], dims[1])
+yv = cp.zeros(dims[1], dtype=sdf_t)
+yv[:] = cp.linspace(pmin[1], pmax[1], dims[1])
 
-zv = np.zeros(dims[2], dtype=sdf_t)
-zv[:] = np.linspace(pmin[2], pmax[2], dims[2])
+zv = cp.zeros(dims[2], dtype=sdf_t)
+zv[:] = cp.linspace(pmin[2], pmax[2], dims[2])
 
-X, Y, Z = np.meshgrid(xv, yv, zv)
+X, Y, Z = cp.meshgrid(xv, yv, zv)
 
-# field  = np.sin(4.0 * np.pi * X) + np.cos(4.0 * np.pi * Y + 4.0 * np.pi * Z)**2
-field  = np.sin(4.0 * np.pi * X) + np.cos(4.0 * np.pi * Y) * np.tanh(4.0 * np.pi * (Z + X))
+# field  = cp.sin(4.0 * cp.pi * X) + cp.cos(4.0 * cp.pi * Y + 4.0 * cp.pi * Z)**2
+field  = cp.sin(4.0 * cp.pi * X) + cp.cos(4.0 * cp.pi * Y) * cp.tanh(4.0 * cp.pi * (Z + X))
 # field = chess_board(X, Y, Z, mc)
 
-            
 end_clock = time.time()
 clock = end_clock - start_clock
 print(f'sdf_test.py: Time taken to generate field: {clock} seconds')
 
-np.reshape(field, ( dims[0]*dims[1]*dims[2], 1)).tofile(output_path)
+cp.reshape(field, (dims[0]*dims[1]*dims[2], 1)).tofile(output_path)
 
 header =    f'nx: {dims[0]}\n'
 header +=   f'ny: {dims[1]}\n'
