@@ -13,4 +13,3 @@ scipy
 sympy
 taichi
 nanobind
-cupy-cuda12x
