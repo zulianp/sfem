@@ -37,9 +37,9 @@ int main(int argc, char* argv[]) {
 
     MPI_Comm comm = MPI_COMM_WORLD;
 
-    int rank, size;
+    int rank, mpi_size;
     MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
+    MPI_Comm_size(comm, &mpi_size);
 
     // print argv
     // if (!rank) {
@@ -122,7 +122,7 @@ int main(int argc, char* argv[]) {
     // X is contiguous
     ptrdiff_t stride[3] = {1, nlocal[0], nlocal[0] * nlocal[1]};
 
-    if (size > 1) {
+    if (mpi_size > 1) {
         real_t* pfield;
         field_view(comm,
                    mesh.nnodes,
@@ -160,7 +160,7 @@ int main(int argc, char* argv[]) {
                     // Output
                     g);
         } else {
-            if (size == 1) {
+            if (mpi_size == 1) {
                 resample_field(
                         // Mesh
                         mesh.element_type,
@@ -224,7 +224,7 @@ int main(int argc, char* argv[]) {
                 }
 
                 // exchange ghost nodes and add contribution
-                if (size > 1) {
+                if (mpi_size > 1) {
                     send_recv_t slave_to_master;
                     mesh_create_nodal_send_recv(&mesh, &slave_to_master);
 
