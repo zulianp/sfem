@@ -315,6 +315,7 @@ SFEM_INLINE static void hex_aa_8_indices_O3(
         ptrdiff_t* i0, ptrdiff_t* i1, ptrdiff_t* i2, ptrdiff_t* i3, ptrdiff_t* i4, ptrdiff_t* i5,
         ptrdiff_t* i6, ptrdiff_t* i7, ptrdiff_t* i8, ptrdiff_t* i9, ptrdiff_t* i10, ptrdiff_t* i11,
         ptrdiff_t* i12, ptrdiff_t* i13, ptrdiff_t* i14, ptrdiff_t* i15) {
+    //
     const ptrdiff_t stride_x = stride[0];
     const ptrdiff_t stride_y = stride[1];
     const ptrdiff_t stride_z = stride[2];
@@ -338,27 +339,6 @@ SFEM_INLINE static void hex_aa_8_indices_O3(
     *i13 = (i + 0) * stride_x + (j + 2) * stride_y + (k + k_diff) * stride_z;
     *i14 = (i + 1) * stride_x + (j + 2) * stride_y + (k + k_diff) * stride_z;
     *i15 = (i + 2) * stride_x + (j + 2) * stride_y + (k + k_diff) * stride_z;
-
-    // /*
-
-    if (*i0 >= nSizes_global) printf("ERROR i0 = %ld > %ld, i-1 %ld, j-1 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i0, nSizes_global, i - 1, j - 1, k_diff, k, stride_x, stride_y, stride_z);
-    if (*i1 >= nSizes_global) printf("ERROR i1 = %ld > %ld, i+0 %ld, j-1 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i1, nSizes_global, i + 0, j - 1, k_diff, k, stride_x, stride_y, stride_z);
-    if (*i2 >= nSizes_global) printf("ERROR i2 = %ld > %ld, i+1 %ld, j-1 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i2, nSizes_global, i + 1, j - 1, k_diff, k, stride_x, stride_y, stride_z);
-    if (*i3 >= nSizes_global) printf("ERROR i3 = %ld > %ld, i+2 %ld, j-1 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i3, nSizes_global, i + 2, j - 1, k_diff, k, stride_x, stride_y, stride_z);
-    if (*i4 >= nSizes_global) printf("ERROR i4 = %ld > %ld, i-1 %ld, j+0 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i4, nSizes_global, i - 1, j + 0, k_diff, k, stride_x, stride_y, stride_z);
-    if (*i5 >= nSizes_global) printf("ERROR i5 = %ld > %ld, i+0 %ld, j+0 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i5, nSizes_global, i + 0, j + 0, k_diff, k, stride_x, stride_y, stride_z);
-    if (*i6 >= nSizes_global) printf("ERROR i6 = %ld > %ld, i+1 %ld, j+0 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i6, nSizes_global, i + 1, j + 0, k_diff, k, stride_x, stride_y, stride_z);
-    if (*i7 >= nSizes_global) printf("ERROR i7 = %ld > %ld, i+2 %ld, j+0 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i7, nSizes_global, i + 2, j + 0, k_diff, k, stride_x, stride_y, stride_z);
-    if (*i8 >= nSizes_global) printf("ERROR i8 = %ld > %ld, i-1 %ld, j+1 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i8, nSizes_global, i - 1, j + 1, k_diff, k, stride_x, stride_y, stride_z);
-    if (*i9 >= nSizes_global) printf("ERROR i9 = %ld > %ld, i+0 %ld, j+1 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i9, nSizes_global, i + 0, j + 1, k_diff, k, stride_x, stride_y, stride_z);
-    if (*i10 >= nSizes_global) printf("ERROR i10 = %ld > %ld, i+1 %ld, j+1 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i10, nSizes_global, i + 1, j + 1, k_diff, k, stride_x, stride_y, stride_z);
-    if (*i11 >= nSizes_global) printf("ERROR i11 = %ld > %ld, i+2 %ld, j+1 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i11, nSizes_global, i + 2, j + 1, k_diff, k, stride_x, stride_y, stride_z);
-    if (*i12 >= nSizes_global) printf("ERROR i12 = %ld > %ld, i-1 %ld, j+2 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i12, nSizes_global, i - 1, j + 2, k_diff, k, stride_x, stride_y, stride_z);
-    if (*i13 >= nSizes_global) printf("ERROR i13 = %ld > %ld, i+0 %ld, j+2 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i13, nSizes_global, i + 0, j + 2, k_diff, k, stride_x, stride_y, stride_z);
-    if (*i14 >= nSizes_global) printf("ERROR i14 = %ld > %ld, i+1 %ld, j+2 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i14, nSizes_global, i + 1, j + 2, k_diff, k, stride_x, stride_y, stride_z);
-    if (*i15 >= nSizes_global) printf("ERROR i15 = %ld > %ld, i+2 %ld, j+2 %ld, k+%ld  %ld, stride %ld %ld %ld\n", *i15, nSizes_global, i + 2, j + 2, k_diff, k, stride_x, stride_y, stride_z);
-
-    // */
 }
 
 /**

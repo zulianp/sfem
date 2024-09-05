@@ -57,7 +57,7 @@ else
 	raw_to_xdmf.py $sdf
 fi
 
-sdf_test.py
+sdf_test_GPU.py
 # raw_to_xdmf.py $sdf
 
 sizes=`head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' '`
@@ -72,7 +72,7 @@ echo $scaling
 # export OMP_PROC_BIND=true
 # export OMP_NUM_THREADS=8
 
-n_procs=1
+n_procs=18
 # n_procs=1
 # n_procs=2
 # n_procs=1
