@@ -6,14 +6,14 @@ import time
 
 output_path = os.path.join(os.environ['HOME'], 'git/sfem/workflows/resample/sdf.float32.raw')
 
-print("sdf_test.py: ==========================================")
+print("sdf_test_GPU.py: ==========================================")
 
 sdf_t = cp.float32
 
 D = 600
 dims = (D, D, D)
 
-print(f'sdf_test.py: Generating field of size {dims[0]} x {dims[1]} x {dims[2]}')
+print(f'sdf_test_GPU.py: Generating field of size {dims[0]} x {dims[1]} x {dims[2]}')
 
 mn = -0.88
 mx = 0.88
@@ -50,7 +50,7 @@ field  = cp.sin(4.0 * cp.pi * X) + cp.cos(4.0 * cp.pi * Y) * cp.tanh(4.0 * cp.pi
 
 end_clock = time.time()
 clock = end_clock - start_clock
-print(f'sdf_test.py: Time taken to generate field: {clock} seconds')
+print(f'sdf_test_GPU.py: Time taken to generate field: {clock} seconds')
 
 cp.reshape(field, (dims[0]*dims[1]*dims[2], 1)).tofile(output_path)
 
@@ -75,8 +75,8 @@ if pdir == "":
 
 fname = os.path.basename(fname)
 
-print("sdf_test.py: ==========================================")
-print("sdf_test.py: Writing metadata file to ", end="")
+print("sdf_test_GPU.py: ==========================================")
+print("sdf_test_GPU.py: Writing metadata file to ", end="")
 print(f'{pdir}/metadata_{fname}.yml')
 
 with open(f'{pdir}/metadata_{fname}.yml', 'w') as f:
