@@ -148,6 +148,8 @@ SFEM_INLINE static enum ElemType side_type(const enum ElemType type) {
             return BEAM2;
         case MACRO_TET4:
             return TRI6;  // FIXME
+        case HEX8:
+            return QUAD4;
         default: {
             assert(0);
             return INVALID;

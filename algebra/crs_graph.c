@@ -185,22 +185,18 @@ int build_n2e_for_elem_type(const enum ElemType element_type,
     return 0;
 }
 
-static int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
-                                            const ptrdiff_t nnodes,
-                                            const int nnodesxelem,
-                                            idx_t **const elems,
-                                            count_t **out_rowptr,
-                                            idx_t **out_colidx) {
+static int build_crs_graph_from_n2e(const ptrdiff_t nelements,
+                                    const ptrdiff_t nnodes,
+                                    const int nnodesxelem,
+                                    idx_t **const SFEM_RESTRICT elems,
+                                    const count_t *const SFEM_RESTRICT n2eptr,
+                                    const element_idx_t *const SFEM_RESTRICT elindex,
+                                    count_t **out_rowptr,
+                                    idx_t **out_colidx) {
     count_t *rowptr = (count_t *)malloc((nnodes + 1) * sizeof(count_t));
     idx_t *colidx = 0;
 
     {
-        count_t *n2eptr;
-        element_idx_t *elindex;
-        build_n2e(nelements, nnodes, nnodesxelem, elems, &n2eptr, &elindex);
-
-        double tick = MPI_Wtime();
-
         rowptr[0] = 0;
 
 #pragma omp parallel for
@@ -261,18 +257,34 @@ static int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
                 colidx[rowptr[node] + i] = n2nbuff[i];
             }
         }
-
-        free(n2eptr);
-        free(elindex);
-
-        double tock = MPI_Wtime();
-        printf("crs_graph.c: build nz (mem conservative) structure\t%g seconds\n", tock - tick);
     }
 
     *out_rowptr = rowptr;
     *out_colidx = colidx;
-
     return 0;
+}
+
+static int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
+                                            const ptrdiff_t nnodes,
+                                            const int nnodesxelem,
+                                            idx_t **const elems,
+                                            count_t **out_rowptr,
+                                            idx_t **out_colidx) {
+    double tick = MPI_Wtime();
+
+    count_t *n2eptr;
+    element_idx_t *elindex;
+    build_n2e(nelements, nnodes, nnodesxelem, elems, &n2eptr, &elindex);
+
+    int err = build_crs_graph_from_n2e(
+            nelements, nnodes, nnodesxelem, elems, n2eptr, elindex, out_rowptr, out_colidx);
+
+    free(n2eptr);
+    free(elindex);
+
+    double tock = MPI_Wtime();
+    printf("crs_graph.c: build nz (mem conservative) structure\t%g seconds\n", tock - tick);
+    return err;
 }
 
 static int build_crs_graph_faster(const ptrdiff_t nelements,

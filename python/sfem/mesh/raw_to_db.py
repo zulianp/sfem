@@ -230,7 +230,10 @@ def raw_to_db(argv):
         elif len(idx) == 6:
             cell_type = "triangle6"
         elif len(idx) == 4:
-            cell_type = "tetra"
+            if(len(points) == 2):
+                cell_type = "quad"
+            else:
+                cell_type = "tetra"
         elif len(idx) == 8:
             cell_type = "hexahedron"
         elif len(idx) == 10:
