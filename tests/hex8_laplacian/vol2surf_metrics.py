@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-for level in range(1, 6):
+for level in range(1, 9):
 	corner_nodes = 8
 	edge_nodes = 12 * (level - 1);
 	face_nodes = 6 * (level - 1) * (level - 1);
@@ -15,6 +15,8 @@ for level in range(1, 6):
 	print(f"faces\t{face_nodes}")
 	print(f"surf\t{surface_nodes}")
 	print(f"vols\t{vol_nodes}")
+	print(f"tot\t{vol_nodes+surface_nodes}")
+
 	print("--")
 	print("Vol/Surf ratio")
 	print(vol_nodes, " / ", surface_nodes, " = ", float(vol_nodes)/surface_nodes)

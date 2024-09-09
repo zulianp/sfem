@@ -16,11 +16,24 @@
 
 #include "laplacian.h"
 // #include "proteus_hex8_laplacian.h"
+#include "sfem_hex8_mesh_graph.h"
 // #include "hex8_fff.h"
 
 #include "sortreduce.h"
 
 #include "adj_table.h"
+
+ptrdiff_t my_max_node_id(const ptrdiff_t nelements,
+                         const int nxe,
+                         idx_t **const SFEM_RESTRICT elements) {
+    ptrdiff_t ret = 0;
+    for (int i = 0; i < nxe; i++) {
+        for (ptrdiff_t e = 0; e < nelements; e++) {
+            ret = MAX(ret, elements[i][e]);
+        }
+    }
+    return ret;
+}
 
 static SFEM_INLINE int hex8_linear_search(const idx_t target,
                                           const idx_t *const arr,
@@ -90,6 +103,147 @@ int proteus_hex8_lidx(const int L, const int x, const int y, const int z) {
     return ret;
 }
 
+static void index_face(const int L,
+                       mesh_t *mesh,
+                       const int *const local_side_table,
+                       int *lagr_to_proteus_corners,
+                       int **coords,
+                       const idx_t global_face_offset,
+                       const ptrdiff_t e,
+                       const int f,
+                       idx_t **const elements) {
+    int argmin = 0;
+    idx_t valmin = mesh->elements[local_side_table[f * 4 + 0]][e];
+    for (int i = 0; i < 4; i++) {
+        idx_t temp = mesh->elements[local_side_table[f * 4 + i]][e];
+        if (temp < valmin) {
+            argmin = i;
+            valmin = temp;
+        }
+    }
+
+    int lst_o = argmin;
+    int lst_u = ((lst_o + 1) % 4);
+    int lst_v = ((lst_o + 3) % 4);
+    if (mesh->elements[local_side_table[f * 4 + lst_u]][e] >
+        mesh->elements[local_side_table[f * 4 + lst_v]][e]) {
+        int temp = lst_v;
+        lst_v = lst_u;
+        lst_u = temp;
+    }
+
+    // o, u, v are sorted based on global indices
+    int lidx_o = lagr_to_proteus_corners[local_side_table[f * 4 + lst_o]];
+    int lidx_u = lagr_to_proteus_corners[local_side_table[f * 4 + lst_u]];
+    int lidx_v = lagr_to_proteus_corners[local_side_table[f * 4 + lst_v]];
+
+    // printf("lst   (%d, %d, %d)\n", lst_o, lst_u, lst_v);
+
+    // printf("lst[] (%d, %d, %d)\n",
+    //        local_side_table[f * 4 + lst_o],
+    //        local_side_table[f * 4 + lst_u],
+    //        local_side_table[f * 4 + lst_v]);
+
+    // printf("lidx  (%d, %d, %d)\n", lidx_o, lidx_u, lidx_v);
+
+    int o_start[3];
+    int u_len[3], u_dir[3];
+    int v_len[3], v_dir[3];
+
+    // O
+    for (int d = 0; d < 3; d++) {
+        int o = coords[d][lidx_o];
+        o_start[d] = o;
+    }
+
+    // printf("po = [%d %d %d]\n", coords[0][lidx_o], coords[1][lidx_o], coords[2][lidx_o]);
+    // printf("pu = [%d %d %d]\n", coords[0][lidx_u], coords[1][lidx_u], coords[2][lidx_u]);
+    // printf("pv = [%d %d %d]\n", coords[0][lidx_v], coords[1][lidx_v], coords[2][lidx_v]);
+
+    // U
+    for (int d = 0; d < 3; d++) {
+        int x = coords[d][lidx_u] - coords[d][lidx_o];
+
+        u_dir[d] = 1;
+        u_len[d] = 1;
+
+        if (x > 0) {
+            x -= 1;
+            u_len[d] = x;
+            o_start[d] = 1;
+        } else if (x < 0) {
+            x += 1;
+            u_len[d] = x;
+            u_dir[d] = -1;
+            o_start[d] = L - 1;
+        }
+    }
+
+    // V
+    for (int d = 0; d < 3; d++) {
+        int x = coords[d][lidx_v] - coords[d][lidx_o];
+
+        v_dir[d] = 1;
+        v_len[d] = 1;
+
+        if (x > 0) {
+            x -= 1;
+            v_len[d] = x;
+            o_start[d] = 1;
+
+        } else if (x < 0) {
+            x += 1;
+            v_len[d] = x;
+            v_dir[d] = -1;
+            o_start[d] = L - 1;
+        }
+    }
+
+    // printf("global_face_offset = %d\n", global_face_offset);
+    // printf("o  (%d, %d, %d)\n", o_start[0], o_start[1], o_start[2]);
+    // printf("u_dir  (%d, %d, %d)\n", u_dir[0], u_dir[1], u_dir[2]);
+    // printf("u_len    (%d, %d, %d)\n", u_len[0], u_len[1], u_len[2]);
+    // printf("v_dir  (%d, %d, %d)\n", v_dir[0], v_dir[1], v_dir[2]);
+    // printf("v_len    (%d, %d, %d)\n", v_len[0], v_len[1], v_len[2]);
+    // fflush(stdout);
+
+    int local_offset = 0;
+    for (int vzi = 0; vzi != v_len[2]; vzi += v_dir[2]) {
+        for (int vyi = 0; vyi != v_len[1]; vyi += v_dir[1]) {
+            for (int vxi = 0; vxi != v_len[0]; vxi += v_dir[0]) {
+                //
+                for (int uzi = 0; uzi != u_len[2]; uzi += u_dir[2]) {
+                    for (int uyi = 0; uyi != u_len[1]; uyi += u_dir[1]) {
+                        for (int uxi = 0; uxi != u_len[0]; uxi += u_dir[0]) {
+                            // printf("u = [%d %d %d]\n", uxi, uyi, uzi);
+                            // printf("v = [%d %d %d]\n", vxi, vyi, vzi);
+                            // printf("p = [%d %d %d]\n",
+                            //        uxi + vxi + o_start[0],
+                            //        uyi + vyi + o_start[1],
+                            //        uzi + vzi + o_start[2]);
+
+                            int pidx = proteus_hex8_lidx(L,
+                                                         uxi + vxi + o_start[0],
+                                                         uyi + vyi + o_start[1],
+                                                         uzi + vzi + o_start[2]);
+
+                            // idx_t u_offset = u_face_start + (uxi + uyi + uzi) * u_increment;
+                            // idx_t v_offset = v_face_start + (vxi + vyi + vzi) * v_increment;
+
+                            idx_t fidx = global_face_offset + local_offset++;
+                            // v_offset * (L - 1) + u_offset;
+                            elements[pidx][e] = fidx;
+
+                            // printf("offsets %d %d\n", u_offset, v_offset);
+                            // printf("p %d => %d\n", pidx, fidx);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 static void proteus_hex8_create_full_idx(const int L, mesh_t *mesh, idx_t **elements) {
     assert(L >= 2);
 
@@ -98,20 +252,20 @@ static void proteus_hex8_create_full_idx(const int L, mesh_t *mesh, idx_t **elem
     const int nxe = proteus_hex8_nxe(L);
 
     // 1) Get the node indices from the TET4 mesh
-    int corner_lidx[8] = {// Bottom
-                          proteus_hex8_lidx(L, 0, 0, 0),
-                          proteus_hex8_lidx(L, L, 0, 0),
-                          proteus_hex8_lidx(L, 0, L, 0),
-                          proteus_hex8_lidx(L, L, L, 0),
-                          // Top
-                          proteus_hex8_lidx(L, 0, 0, L),
-                          proteus_hex8_lidx(L, L, 0, L),
-                          proteus_hex8_lidx(L, 0, L, L),
-                          proteus_hex8_lidx(L, L, L, L)};
+    int lagr_to_proteus_corners[8] = {// Bottom
+                                      proteus_hex8_lidx(L, 0, 0, 0),
+                                      proteus_hex8_lidx(L, L, 0, 0),
+                                      proteus_hex8_lidx(L, L, L, 0),
+                                      proteus_hex8_lidx(L, 0, L, 0),
+                                      // Top
+                                      proteus_hex8_lidx(L, 0, 0, L),
+                                      proteus_hex8_lidx(L, L, 0, L),
+                                      proteus_hex8_lidx(L, L, L, L),
+                                      proteus_hex8_lidx(L, 0, L, L)};
 
 #ifndef NDEBUG
     for (int i = 0; i < 8; i++) {
-        assert(corner_lidx[i] < nxe);
+        assert(lagr_to_proteus_corners[i] < nxe);
     }
 #endif
 
@@ -137,12 +291,14 @@ static void proteus_hex8_create_full_idx(const int L, mesh_t *mesh, idx_t **elem
     // ------------------------------
     for (int d = 0; d < 8; d++) {
         for (ptrdiff_t e = 0; e < mesh->nelements; e++) {
-            elements[corner_lidx[d]][e] = mesh->elements[d][e];
-            // printf("%d) e[%d][%ld] = %d\n", d, corner_lidx[d], e, elements[corner_lidx[d]][e]);
+            elements[lagr_to_proteus_corners[d]][e] = mesh->elements[d][e];
         }
     }
 
     idx_t index_base = mesh->nnodes;
+
+    double tack = MPI_Wtime();
+    printf("NODES\t%g [s]\n", tack - tick);
 
     // 2) Compute the unique edge-node indices using the CRSGraph
     // A unique edge index can be used and use the multiple to store all indices
@@ -152,20 +308,29 @@ static void proteus_hex8_create_full_idx(const int L, mesh_t *mesh, idx_t **elem
     ptrdiff_t nxedge = L - 1;  // L == 0 (is this correct?)
 
     if (nxedge) {
+        double temp_tick = MPI_Wtime();
+
         count_t *rowptr;
         idx_t *colidx;
-        build_crs_graph_for_elem_type(mesh->element_type,
-                                      mesh->nelements,
-                                      mesh->nnodes,
-                                      mesh->elements,
-                                      &rowptr,
-                                      &colidx);
+        hex8_build_edge_graph(mesh->nelements, mesh->nnodes, mesh->elements, &rowptr, &colidx);
 
-        ptrdiff_t nedges = (rowptr[mesh->nnodes] - mesh->nnodes) / 2;
+        ptrdiff_t nedges = rowptr[mesh->nnodes] / 2;
 
         ptrdiff_t nnz = rowptr[mesh->nnodes];
         idx_t *edge_idx = (idx_t *)malloc(nnz * sizeof(idx_t));
         memset(edge_idx, 0, nnz * sizeof(idx_t));
+
+        // node-to-node for the hex edges in local indexing
+        idx_t lagr_connectivity[8][3] = {// BOTTOM
+                                         {1, 3, 4},
+                                         {0, 2, 5},
+                                         {1, 3, 6},
+                                         {0, 2, 7},
+                                         // TOP
+                                         {0, 5, 7},
+                                         {1, 4, 6},
+                                         {2, 5, 7},
+                                         {3, 4, 6}};
 
         ptrdiff_t edge_count = 0;
         idx_t next_id = 0;
@@ -185,16 +350,6 @@ static void proteus_hex8_create_full_idx(const int L, mesh_t *mesh, idx_t **elem
 
         assert(edge_count == nedges);
 
-        // node-to-node for the hex edges in local indexing
-        idx_t connectivity[8][3] = {{1, 2, 4},
-                                    {0, 3, 5},
-                                    {0, 3, 6},
-                                    {1, 2, 7},
-                                    {0, 5, 6},
-                                    {1, 4, 7},
-                                    {2, 4, 7},
-                                    {3, 5, 6}};
-
         for (ptrdiff_t e = 0; e < mesh->nelements; e++) {
             idx_t nodes[8];
             for (int d = 0; d < 8; d++) {
@@ -210,7 +365,7 @@ static void proteus_hex8_create_full_idx(const int L, mesh_t *mesh, idx_t **elem
                 idx_t g_neigh[3];
 
                 for (int k = 0; k < 3; k++) {
-                    g_neigh[k] = nodes[connectivity[d1][k]];
+                    g_neigh[k] = nodes[lagr_connectivity[d1][k]];
                 }
 
                 idx_t offsets[3];
@@ -220,72 +375,70 @@ static void proteus_hex8_create_full_idx(const int L, mesh_t *mesh, idx_t **elem
                     g_edges[d] = edge_view[offsets[d]];
                 }
 
-                // printf("//-----------\n");
-                // for(int i = rowptr[node1]; i < rowptr[node1+1]; i++) {
-                //     printf("%d ", colidx[i]);
-                // }
-                // printf("\n");
-                // printf("%d => %d [%d %d %d] -> [%d %d %d]\n", d1, node1, g_neigh[0], g_neigh[1],
-                // g_neigh[2],
-                //      g_edges[0], g_edges[1], g_edges[2]);
-
                 for (int d2 = 0; d2 < 3; d2++) {
                     const idx_t node2 = g_neigh[d2];
 
                     // direction of edge is always smaller node id to greater node id
                     if (node1 > node2) continue;
 
-                    const int lid1 = corner_lidx[d1];
-                    const int lid2 = corner_lidx[connectivity[d1][d2]];
+                    const int lid1 = lagr_to_proteus_corners[d1];
+                    const int lid2 = lagr_to_proteus_corners[lagr_connectivity[d1][d2]];
 
-                    int start[3], end[3];
+                    int start[3], len[3], dir[3];
+                    for (int d = 0; d < 3; d++) {
+                        int o = coords[d][lid1];
+                        start[d] = o;
+                    }
 
                     int invert_dir = 0;
                     for (int d = 0; d < 3; d++) {
-                        int s = coords[d][lid1];
-                        int e = coords[d][lid2];
-                        int x = e - s;
+                        int x = coords[d][lid2] - coords[d][lid1];
+                        dir[d] = 1;
+                        len[d] = 1;
 
-                        // If handle local inverted traversals
-                        if (x < 0) {
-                            invert_dir = 1;
-                            int temp = e;
-                            e = s;
-                            s = temp;
+                        if (x > 0) {
+                            x -= 1;
+                            len[d] = x;
+                            start[d] = 1;
+                        } else if (x < 0) {
+                            x += 1;
+                            len[d] = x;
+                            dir[d] = -1;
+                            start[d] = L - 1;
                         }
-
-                        // We make sure we can iterate over the 0 dims once
-                        e += x == 0;
-
-                        // We remove the corner node
-                        s += x != 0;
-
-                        start[d] = s;
-                        end[d] = e;
                     }
 
                     idx_t edge_start = index_base + g_edges[d2] * nxedge;
-                    idx_t edge_increment = 1;
 
-                    if (invert_dir) {
-                        edge_start += nxedge - 1;
-                        edge_increment = -1;
-                    }
+                    // printf("//----------\n");
+                    // printf("po(%d) = [%d %d %d]\n",
+                    //        lid1,
+                    //        coords[0][lid1],
+                    //        coords[1][lid1],
+                    //        coords[2][lid1]);
+                    // printf("pu(%d) = [%d %d %d]\n",
+                    //        lid2,
+                    //        coords[0][lid2],
+                    //        coords[1][lid2],
+                    //        coords[2][lid2]);
+
+                    // printf("start  = [%d %d %d]\n", start[0], start[1], start[2]);
+                    // printf("dir    = [%d %d %d]\n", dir[0], dir[1], dir[2]);
+                    // printf("len    = [%d %d %d]\n", len[0], len[1], len[2]);
 
                     int en = 0;
-                    for (int zi = start[2]; zi < end[2]; zi++) {
-                        for (int yi = start[1]; yi < end[1]; yi++) {
-                            for (int xi = start[0]; xi < end[0]; xi++) {
-                                const int lidx_edge = proteus_hex8_lidx(L, xi, yi, zi);
+                    for (int zi = 0; zi != len[2]; zi += dir[2]) {
+                        for (int yi = 0; yi != len[1]; yi += dir[1]) {
+                            for (int xi = 0; xi != len[0]; xi += dir[0]) {
+                                const int lidx_edge = proteus_hex8_lidx(
+                                        L, start[0] + xi, start[1] + yi, start[2] + zi);
                                 elements[lidx_edge][e] = edge_start + en;
-                                // printf("e[%d][%ld] = %d\n", lidx_edge, e,
-                                // elements[lidx_edge][e]);
-                                en += edge_increment;
+                                en += 1;
+
+                                // printf("%d) => %d\n", lidx_edge, elements[lidx_edge][e]);
                             }
                         }
                     }
-
-                    assert(en * edge_increment == nxedge);
                 }
             }
         }
@@ -293,61 +446,105 @@ static void proteus_hex8_create_full_idx(const int L, mesh_t *mesh, idx_t **elem
         free(rowptr);
         free(colidx);
 
+        // printf("----------------------------\n");
+        // printf("index_base %d + %ld * %d\n", index_base, nedges, nxedge);
+        // printf("----------------------------\n");
         index_base += (nedges * nxedge);
+
+        tack = MPI_Wtime();
+        printf("EDGES\t%g [s]\n", tack - temp_tick);
     }
 
     // 3) Compute the unique face-node indices using the adjacency table
     // Two elements share a face, figure out the ordering
-    int nxf = 0;  // TODO number of nodes in the face interior
+    int nxf = (L - 1) * (L - 1);  // TODO number of nodes in the face interior
     if (nxf) {
+        double temp_tick = MPI_Wtime();
+
+        int local_side_table[6 * 4];
+        fill_local_side_table(HEX8, local_side_table);
+
         element_idx_t *adj_table = 0;
         create_element_adj_table(
                 mesh->nelements, mesh->nnodes, mesh->element_type, mesh->elements, &adj_table);
 
         idx_t n_unique_faces = 0;
         for (ptrdiff_t e = 0; e < mesh->nelements; e++) {
-            for (int f = 0; f < 4; f++) {
-                element_idx_t neigh_element = adj_table[e * 4 + f];
-                if (neigh_element == SFEM_INVALID_IDX) {
-                    // Is boundary face
+            for (int f = 0; f < 6; f++) {
+                element_idx_t neigh_element = adj_table[e * 6 + f];
+                // If this face is not boundary and it has already been processed continue
+                if (neigh_element != -1 && neigh_element < e) continue;
 
-                    for (int fn = 0; fn < nxf; fn++) {
-                        idx_t idx = index_base + n_unique_faces * nxf + fn;
-                        // ...
-                        // TODO we need to generate the index
+                idx_t global_face_offset = index_base + n_unique_faces * nxf;
+                index_face(L,
+                           mesh,
+                           local_side_table,
+                           lagr_to_proteus_corners,
+                           coords,
+                           global_face_offset,
+                           e,
+                           f,
+                           elements);
+
+                if (neigh_element != -1) {
+                    // find same face on neigh element
+                    int neigh_f;
+                    for (neigh_f = 0; neigh_f < 6; neigh_f++) {
+                        if (e == adj_table[neigh_element * 6 + neigh_f]) {
+                            break;
+                        }
                     }
 
-                    n_unique_faces++;
-                } else if (e < neigh_element) {
-                    // TODO we need to generate the index
-                    n_unique_faces++;
-                } else {
-                    // TODO we need to replicate the index
+                    assert(neigh_f != 6);
+
+                    index_face(L,
+                               mesh,
+                               local_side_table,
+                               lagr_to_proteus_corners,
+                               coords,
+                               global_face_offset,
+                               neigh_element,
+                               neigh_f,
+                               elements);
                 }
+
+                // Next id
+                n_unique_faces++;
             }
         }
 
-        index_base += n_unique_faces;
+        index_base += n_unique_faces * nxf;
 
         // Clean-up
         free(adj_table);
-    }
 
-    // TODO Consistent ordering with implicit looping scheme needs to be figured out
-    // (orientation is reflected like mirror)
+        tack = MPI_Wtime();
+        printf("FACES\t%g [s]\n", tack - temp_tick);
+    }
 
     // 4) Compute the unique internal nodes implicitly using the element id and the idx offset
     // of the total number of explicit indices (offset + element_id * n_internal_nodes +
     // local_internal_node_id) ptrdiff_t n_internal_nodes = ?;
-    int nxelement = 0;  // TODO number of nodes in the volume interior
+    int nxelement = (L - 1) * (L - 1) * (L - 1);
     if (nxelement) {
-        for (ptrdiff_t e = 0; e < mesh->nelements; e++) {
-            for (int ne = 0; ne < nxe; ne++) {
-                idx_t idx = index_base + e * nxelement + ne;
-                // TODO figure out the local index/ordering of the interior nodes and assign to
-                // elements
+        double temp_tick = MPI_Wtime();
+
+        for (int zi = 1; zi < L - 1; zi++) {
+            for (int yi = 1; yi < L - 1; yi++) {
+                for (int xi = 1; xi < L - 1; xi++) {
+                    const int lidx_vol = proteus_hex8_lidx(L, xi, yi, zi);
+                    int en = (zi - 1) * (L - 1) * (L - 1) + (yi - 1) * (L - 1) + xi - 1;
+
+#pragma omp parallel for
+                    for (ptrdiff_t e = 0; e < mesh->nelements; e++) {
+                        elements[lidx_vol][e] = index_base + e * nxelement + en;
+                    }
+                }
             }
         }
+
+        tack = MPI_Wtime();
+        printf("ELEMS\t%g [s]\n", tack - temp_tick);
     }
 
     for (int d = 0; d < 3; d++) {
@@ -355,8 +552,7 @@ static void proteus_hex8_create_full_idx(const int L, mesh_t *mesh, idx_t **elem
     }
 
     double tock = MPI_Wtime();
-
-    printf("Create idx (%s) took %g [s]\n", type_to_string(mesh->element_type), tock - tick);
+    printf("Create idx (%s) took\t%g [s]\n", type_to_string(mesh->element_type), tock - tick);
 }
 
 int main(int argc, char *argv[]) {
@@ -401,15 +597,19 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    int L = 2;
+    int L = 6;
 
     const int nxe = proteus_hex8_nxe(L);
     const int txe = proteus_hex8_txe(L);
     ptrdiff_t nnodes_discont = mesh.nelements * nxe;
 
+    printf("nelements %ld\n", mesh.nelements);
+    printf("nnodes    %ld\n", mesh.nnodes);
+    printf("nxe       %d\n", nxe);
+    printf("txe       %d\n", txe);
+
     idx_t **elements = 0;
 
-    // if (SFEM_USE_IDX) {
     elements = malloc(nxe * sizeof(idx_t *));
     for (int d = 0; d < nxe; d++) {
         elements[d] = malloc(mesh.nelements * sizeof(idx_t));
@@ -423,24 +623,36 @@ int main(int argc, char *argv[]) {
 
     proteus_hex8_create_full_idx(L, &mesh, elements);
 
-    printf("ORIGINAL\n");
+    if (0) {
+        printf("//--------------- \n");
+        printf("ORIGINAL\n");
 
-    for (int d = 0; d < 8; d++) {
-        for (ptrdiff_t i = 0; i < mesh.nelements; i++) {
-            printf("%d\t", mesh.elements[d][i]);
+        for (int d = 0; d < 8; d++) {
+            for (ptrdiff_t i = 0; i < mesh.nelements; i++) {
+                printf("%d\t", mesh.elements[d][i]);
+            }
+            printf("\n");
         }
-        printf("\n");
+
+        printf("//--------------- \n");
+        printf("MACRO\n");
+
+        for (int d = 0; d < nxe; d++) {
+            printf("%d)\t", d);
+            for (ptrdiff_t i = 0; i < mesh.nelements; i++) {
+                printf("%d\t", elements[d][i]);
+            }
+            printf("\n");
+        }
+        printf("//--------------- \n");
     }
 
-    printf("MACRO\n");
+    idx_t nunique_nodes = my_max_node_id(mesh.nelements, nxe, elements);
 
-    for (int d = 0; d < nxe; d++) {
-        for (ptrdiff_t i = 0; i < mesh.nelements; i++) {
-            printf("%d\t", elements[d][i]);
-        }
-        printf("\n");
-    }
-    // }
+    ptrdiff_t internal_nodes = mesh.nelements * (L - 1) * (L - 1) * (L - 1);
+    printf("n unique nodes %d\n", nunique_nodes);
+    printf("vol nodes %ld\n", internal_nodes);
+    printf("vol %f%%\n", 100 * (float)internal_nodes / nunique_nodes);
 
     // real_t *x = calloc(nnodes_discont, sizeof(real_t));
     // real_t *y = calloc(nnodes_discont, sizeof(real_t));
