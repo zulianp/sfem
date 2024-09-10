@@ -647,7 +647,7 @@ int main(int argc, char *argv[]) {
         printf("//--------------- \n");
     }
 
-    idx_t nunique_nodes = my_max_node_id(mesh.nelements, nxe, elements);
+    idx_t nunique_nodes = my_max_node_id(mesh.nelements, nxe, elements) + 1;
 
     ptrdiff_t internal_nodes = mesh.nelements * (L - 1) * (L - 1) * (L - 1);
     printf("n unique nodes %d\n", nunique_nodes);
