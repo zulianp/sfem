@@ -15,7 +15,7 @@
 #include "read_mesh.h"
 
 #include "laplacian.h"
-// #include "proteus_hex8_laplacian.h"
+#include "proteus_hex8_laplacian.h"
 #include "sfem_hex8_mesh_graph.h"
 // #include "hex8_fff.h"
 
@@ -85,15 +85,15 @@ static SFEM_INLINE void hex8_find_corner_cols(const idx_t *targets,
 
 #define SFEM_INVALID_IDX (-1)
 
-int proteus_hex8_nxe(int level) {
-    const int corners = 8;
-    const int edge_nodes = 12 * (level - 1);
-    const int face_nodes = 6 * (level - 1) * (level - 1);
-    const int vol_nodes = (level - 1) * (level - 1) * (level - 1);
-    return corners + edge_nodes + face_nodes + vol_nodes;
-}
+// int proteus_hex8_nxe(int level) {
+//     const int corners = 8;
+//     const int edge_nodes = 12 * (level - 1);
+//     const int face_nodes = 6 * (level - 1) * (level - 1);
+//     const int vol_nodes = (level - 1) * (level - 1) * (level - 1);
+//     return corners + edge_nodes + face_nodes + vol_nodes;
+// }
 
-int proteus_hex8_txe(int level) { return level * level * level; }
+// int proteus_hex8_txe(int level) { return level * level * level; }
 
 int proteus_hex8_lidx(const int L, const int x, const int y, const int z) {
     int Lp1 = L + 1;
@@ -244,7 +244,7 @@ static void index_face(const int L,
     }
 }
 
-static void proteus_hex8_create_full_idx(const int L, mesh_t *mesh, idx_t **elements) {
+static ptrdiff_t proteus_hex8_create_full_idx(const int L, mesh_t *mesh, idx_t **elements) {
     assert(L >= 2);
 
     double tick = MPI_Wtime();
@@ -526,18 +526,22 @@ static void proteus_hex8_create_full_idx(const int L, mesh_t *mesh, idx_t **elem
     // of the total number of explicit indices (offset + element_id * n_internal_nodes +
     // local_internal_node_id) ptrdiff_t n_internal_nodes = ?;
     int nxelement = (L - 1) * (L - 1) * (L - 1);
+    ptrdiff_t interior_start = index_base;
     if (nxelement) {
         double temp_tick = MPI_Wtime();
 
-        for (int zi = 1; zi < L - 1; zi++) {
-            for (int yi = 1; yi < L - 1; yi++) {
-                for (int xi = 1; xi < L - 1; xi++) {
+        for (int zi = 1; zi < L; zi++) {
+            for (int yi = 1; yi < L; yi++) {
+                for (int xi = 1; xi < L; xi++) {
                     const int lidx_vol = proteus_hex8_lidx(L, xi, yi, zi);
-                    int en = (zi - 1) * (L - 1) * (L - 1) + (yi - 1) * (L - 1) + xi - 1;
+                    int Lm1 = L - 1;
+                    int en = (zi - 1) * Lm1 * Lm1 + (yi - 1) * Lm1 + xi - 1;
 
 #pragma omp parallel for
                     for (ptrdiff_t e = 0; e < mesh->nelements; e++) {
                         elements[lidx_vol][e] = index_base + e * nxelement + en;
+                        // printf("elements[%d][%ld] = %d + %ld * %d + %d\n", lidx_vol, e,
+                        // index_base, e, nxelement, en);
                     }
                 }
             }
@@ -553,6 +557,8 @@ static void proteus_hex8_create_full_idx(const int L, mesh_t *mesh, idx_t **elem
 
     double tock = MPI_Wtime();
     printf("Create idx (%s) took\t%g [s]\n", type_to_string(mesh->element_type), tock - tick);
+
+    return interior_start;
 }
 
 int main(int argc, char *argv[]) {
@@ -597,11 +603,15 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    int L = 6;
+    int SFEM_ELEMENT_REFINE_LEVEL = 2;
+    SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    const int nxe = proteus_hex8_nxe(L);
-    const int txe = proteus_hex8_txe(L);
-    ptrdiff_t nnodes_discont = mesh.nelements * nxe;
+    int SFEM_HEX8_ASSUME_AFFINE = 0;
+    SFEM_READ_ENV(SFEM_HEX8_ASSUME_AFFINE, atoi);
+
+    const int nxe = proteus_hex8_nxe(SFEM_ELEMENT_REFINE_LEVEL);
+    const int txe = proteus_hex8_txe(SFEM_ELEMENT_REFINE_LEVEL);
+    // ptrdiff_t nnodes_discont = mesh.nelements * nxe;
 
     printf("nelements %ld\n", mesh.nelements);
     printf("nnodes    %ld\n", mesh.nnodes);
@@ -621,7 +631,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    proteus_hex8_create_full_idx(L, &mesh, elements);
+    ptrdiff_t interior_start =
+            proteus_hex8_create_full_idx(SFEM_ELEMENT_REFINE_LEVEL, &mesh, elements);
 
     if (0) {
         printf("//--------------- \n");
@@ -647,56 +658,61 @@ int main(int argc, char *argv[]) {
         printf("//--------------- \n");
     }
 
-    idx_t nunique_nodes = my_max_node_id(mesh.nelements, nxe, elements) + 1;
+    ptrdiff_t n_unique_nodes = my_max_node_id(mesh.nelements, nxe, elements) + 1;
 
-    ptrdiff_t internal_nodes = mesh.nelements * (L - 1) * (L - 1) * (L - 1);
-    printf("n unique nodes %d\n", nunique_nodes);
+    ptrdiff_t internal_nodes = mesh.nelements * (SFEM_ELEMENT_REFINE_LEVEL - 1) *
+                               (SFEM_ELEMENT_REFINE_LEVEL - 1) * (SFEM_ELEMENT_REFINE_LEVEL - 1);
+    printf("n unique nodes %ld\n", n_unique_nodes);
     printf("vol nodes %ld\n", internal_nodes);
-    printf("vol %f%%\n", 100 * (float)internal_nodes / nunique_nodes);
+    printf("vol %f%%\n", 100 * (float)internal_nodes / n_unique_nodes);
 
-    // real_t *x = calloc(nnodes_discont, sizeof(real_t));
-    // real_t *y = calloc(nnodes_discont, sizeof(real_t));
+    real_t *x = calloc(n_unique_nodes, sizeof(real_t));
+    real_t *y = calloc(n_unique_nodes, sizeof(real_t));
 
-    // if (!x || !y) {
-    //     fprintf(stderr, "Unable to allocate memory!\n");
-    //     MPI_Abort(MPI_COMM_WORLD, -1);
-    // }
-
-    // fff_t fff;
-    // int err = hex8_fff_create(&fff, mesh.nelements, mesh.elements, mesh.points);
-    // if (err) {
-    //     fprintf(stderr, "Unable to create FFFs!\n");
-    //     MPI_Abort(MPI_COMM_WORLD, -1);
-    // }
-
-    // for (ptrdiff_t i = 0; i < nnodes_discont; i++) {
-    //     x[i] = 1;
-    // }
+    for (ptrdiff_t i = 0; i < n_unique_nodes; i++) {
+        x[i] = 1;
+    }
 
     // ///////////////////////////////////////////////////////////////////////////////
     // // Measure
     // ///////////////////////////////////////////////////////////////////////////////
 
-    // double spmv_tick = MPI_Wtime();
+    double spmv_tick = MPI_Wtime();
 
-    // for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
-    //     proteus_hex8_laplacian_apply(L, fff.nelements, fff.data, x, y);
-    // }
+    for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
+        if (SFEM_HEX8_ASSUME_AFFINE) {
+            proteus_affine_hex8_laplacian_apply(SFEM_ELEMENT_REFINE_LEVEL,
+                                                mesh.nelements,
+                                                interior_start,
+                                                elements,
+                                                mesh.points,
+                                                x,
+                                                y);
+        } else {
+            proteus_hex8_laplacian_apply(SFEM_ELEMENT_REFINE_LEVEL,
+                                         mesh.nelements,
+                                         interior_start,
+                                         elements,
+                                         mesh.points,
+                                         x,
+                                         y);
+        }
+    }
 
-    // double spmv_tock = MPI_Wtime();
-    // long nelements = mesh.nelements;
-    // int element_type = mesh.element_type;
+    double spmv_tock = MPI_Wtime();
+    long nelements = mesh.nelements;
+    int element_type = mesh.element_type;
 
     // ///////////////////////////////////////////////////////////////////////////////
     // // Output for testing
     // ///////////////////////////////////////////////////////////////////////////////
 
-    // real_t sq_nrm = 0;
-    // for (ptrdiff_t i = 0; i < nnodes_discont; i++) {
-    //     sq_nrm += y[i] * y[i];
-    // }
+    real_t sq_nrm = 0;
+    for (ptrdiff_t i = 0; i < n_unique_nodes; i++) {
+        sq_nrm += y[i] * y[i];
+    }
 
-    // printf("sq_nrm = %g\n", sq_nrm);
+    printf("sq_nrm = %g\n", sq_nrm);
 
     // // array_write(comm, path_output, SFEM_MPI_REAL_T, y, nnodes_discont, u_n_global);
 
@@ -704,53 +720,48 @@ int main(int argc, char *argv[]) {
     // // Free resources
     // ///////////////////////////////////////////////////////////////////////////////
 
-    // hex8_fff_destroy(&fff);
+    free(x);
+    free(y);
+    mesh_destroy(&mesh);
 
-    // free(x);
-    // free(y);
-    // mesh_destroy(&mesh);
+    for (int d = 0; d < nxe; d++) {
+        free(elements[d]);
+    }
 
-    // if (SFEM_USE_IDX) {
-    //     for (int d = 0; d < nxe; d++) {
-    //         free(elements[d]);
-    //     }
-
-    //     free(elements);
-    // }
+    free(elements);
 
     // ///////////////////////////////////////////////////////////////////////////////
     // // Stats
     // ///////////////////////////////////////////////////////////////////////////////
 
-    // double tock = MPI_Wtime();
-    // float TTS = tock - tick;
-    // float TTS_op = (spmv_tock - spmv_tick) / SFEM_REPEAT;
+    double tock = MPI_Wtime();
+    float TTS = tock - tick;
+    float TTS_op = (spmv_tock - spmv_tick) / SFEM_REPEAT;
 
-    // if (!rank) {
-    //     float mem_coeffs = 2 * nnodes_discont * sizeof(real_t) * 1e-9;
-    //     float mem_jacs = 6 * nelements * sizeof(jacobian_t) * 1e-9;
-    //     float mem_idx = nelements * nxe * sizeof(idx_t) * 1e-9;
-    //     printf("----------------------------------------\n");
-    //     printf("SUMMARY (%s): %s\n", type_to_string(element_type), argv[0]);
-    //     printf("----------------------------------------\n");
-    //     printf("#elements %ld #microelements %ld #nodes %ld\n",
-    //            nelements,
-    //            nelements * txe,
-    //            nnodes_discont);
-    //     printf("#nodexelement %d #microelementsxelement %d\n", nxe, txe);
-    //     printf("Operator TTS:\t\t%.4f\t[s]\n", TTS_op);
-    //     printf("Operator throughput:\t%.1f\t[ME/s]\n", 1e-6f * nelements / TTS_op);
-    //     printf("Operator throughput:\t%.1f\t[MmicroE/s]\n", 1e-6f * nelements * txe /
-    //     TTS_op); printf("Operator throughput:\t%.1f\t[MDOF/s]\n", 1e-6f * nnodes_discont /
-    //     TTS_op); printf("Operator memory %g (2 x coeffs) + %g (FFFs) + %g (index) = %g
-    //     [GB]\n",
-    //            mem_coeffs,
-    //            mem_jacs,
-    //            mem_idx,
-    //            mem_coeffs + mem_jacs + mem_idx);
-    //     printf("Total:\t\t\t%.4f\t[s]\n", TTS);
-    //     printf("----------------------------------------\n");
-    // }
+    if (!rank) {
+        float mem_coeffs = 2 * n_unique_nodes * sizeof(real_t) * 1e-9;
+        float mem_jacs = 6 * nelements * sizeof(jacobian_t) * 1e-9;
+        float mem_idx = nelements * nxe * sizeof(idx_t) * 1e-9;
+        printf("----------------------------------------\n");
+        printf("SUMMARY (%s): %s\n", type_to_string(element_type), argv[0]);
+        printf("----------------------------------------\n");
+        printf("#elements %ld #microelements %ld #nodes %ld\n",
+               nelements,
+               nelements * txe,
+               n_unique_nodes);
+        printf("#nodexelement %d #microelementsxelement %d\n", nxe, txe);
+        printf("Operator TTS:\t\t%.4f\t[s]\n", TTS_op);
+        printf("Operator throughput:\t%.1f\t[ME/s]\n", 1e-6f * nelements / TTS_op);
+        printf("Operator throughput:\t%.1f\t[MmicroE/s]\n", 1e-6f * nelements * txe / TTS_op);
+        printf("Operator throughput:\t%.1f\t[MDOF/s]\n", 1e-6f * n_unique_nodes / TTS_op);
+        printf("Operator memory %g (2 x coeffs) + %g (FFFs) + %g (index) = %g [GB]\n",
+               mem_coeffs,
+               mem_jacs,
+               mem_idx,
+               mem_coeffs + mem_jacs + mem_idx);
+        printf("Total:\t\t\t%.4f\t[s]\n", TTS);
+        printf("----------------------------------------\n");
+    }
 
     return MPI_Finalize();
 }
