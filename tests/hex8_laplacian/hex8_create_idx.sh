@@ -31,9 +31,10 @@ export OMP_PROC_BIND=true
 export CUDA_LAUNCH_BLOCKING=0
 
 
-NX=200
-NY=200
-NZ=200
-box_mesh.py hex8_mesh -c hex8 -x $NX -y $NY -z $NZ --height=1 --width=1 --depth=1
+NX=80
+NY=80
+NZ=80
+box_mesh.py hex8_mesh_for_macro -c hex8 -x $NX -y $NY -z $NZ --height=1 --width=1 --depth=1
 
-$LAUNCH proteus_hex8_laplacian_apply hex8_mesh gen:ones null.raw
+export SFEM_ELEMENT_REFINE_LEVEL=8
+$LAUNCH proteus_hex8_laplacian_apply hex8_mesh_for_macro gen:ones null.raw

@@ -6,6 +6,7 @@
 #include "hex8_quadrature.h"
 
 #include <math.h>
+#include <stdio.h>
 
 int proteus_hex8_nxe(int level) {
     const int corners = 8;
@@ -25,8 +26,20 @@ static inline int proteus_hex8_lidx(const int L, const int x, const int y, const
     return ret;
 }
 
+static SFEM_INLINE void hex8_sub_fff_0(const scalar_t *const SFEM_RESTRICT fff,
+                                       const scalar_t h,
+                                       scalar_t *const SFEM_RESTRICT sub_fff) {
+    sub_fff[0] = fff[0] * h;
+    sub_fff[1] = fff[1] * h;
+    sub_fff[2] = fff[2] * h;
+    sub_fff[3] = fff[3] * h;
+    sub_fff[4] = fff[4] * h;
+    sub_fff[5] = fff[5] * h;
+}
+
 int proteus_hex8_laplacian_apply(const int level,
                                  const ptrdiff_t nelements,
+                                 ptrdiff_t interior_start,
                                  idx_t **const SFEM_RESTRICT elements,
                                  geom_t **const SFEM_RESTRICT points,
                                  const real_t *const SFEM_RESTRICT u,
@@ -34,43 +47,47 @@ int proteus_hex8_laplacian_apply(const int level,
     const int nxe = proteus_hex8_nxe(level);
     const int txe = proteus_hex8_txe(level);
 
-    const int proteus_corners[8] = {// Bottom
-                                    proteus_hex8_lidx(level, 0, 0, 0),
-                                    proteus_hex8_lidx(level, level, 0, 0),
-                                    proteus_hex8_lidx(level, 0, level, 0),
-                                    proteus_hex8_lidx(level, level, level, 0),
+    const int proteus_to_std_hex8_corners[8] = {// Bottom
+                                                proteus_hex8_lidx(level, 0, 0, 0),
+                                                proteus_hex8_lidx(level, level, 0, 0),
+                                                proteus_hex8_lidx(level, level, level, 0),
+                                                proteus_hex8_lidx(level, 0, level, 0),
 
-                                    // Top
-                                    proteus_hex8_lidx(level, 0, 0, level),
-                                    proteus_hex8_lidx(level, level, 0, level),
-                                    proteus_hex8_lidx(level, 0, level, level),
-                                    proteus_hex8_lidx(level, level, level, level)};
+                                                // Top
+                                                proteus_hex8_lidx(level, 0, 0, level),
+                                                proteus_hex8_lidx(level, level, 0, level),
+                                                proteus_hex8_lidx(level, level, level, level),
+                                                proteus_hex8_lidx(level, 0, level, level)};
 
-    int n_qp = q27_n;
+    const int n_qp = q27_n;
     const scalar_t *qx = q27_x;
     const scalar_t *qy = q27_y;
     const scalar_t *qz = q27_z;
     const scalar_t *qw = q27_w;
 
+    // const int n_qp = q6_n;
+    // const scalar_t *qx = q6_x;
+    // const scalar_t *qy = q6_y;
+    // const scalar_t *qz = q6_z;
+    // const scalar_t *qw = q6_w;
+
+    int Lm1 = level - 1;
+    int Lm13 = Lm1 * Lm1 * Lm1;
+
 #pragma omp parallel
     {
+        // Allocation per thread
         scalar_t *eu = malloc(nxe * sizeof(scalar_t));
-        idx_t *ev = = malloc(nxe * sizeof(idx_t));
+        idx_t *ev = malloc(nxe * sizeof(idx_t));
         accumulator_t *v = malloc(nxe * sizeof(accumulator_t));
 
         scalar_t x[8];
         scalar_t y[8];
         scalar_t z[8];
 
-        scalar_t refx[2];
-        scalar_t refy[2];
-        scalar_t refz[2];
-
-        scalar_t lx[8];
-        scalar_t ly[8];
-        scalar_t lz[8];
-
-        scalar_t fff[6];
+        scalar_t element_u[8];
+        accumulator_t element_vector[8];
+        scalar_t m_fff[6], fff[6];
 
 #pragma omp for
         for (ptrdiff_t e = 0; e < nelements; ++e) {
@@ -81,9 +98,9 @@ int proteus_hex8_laplacian_apply(const int level,
                 }
 
                 for (int d = 0; d < 8; d++) {
-                    x[d] = points[0][ev[proteus_corners[d]]];
-                    y[d] = points[1][ev[proteus_corners[d]]];
-                    z[d] = points[2][ev[proteus_corners[d]]];
+                    x[d] = points[0][ev[proteus_to_std_hex8_corners[d]]];
+                    y[d] = points[1][ev[proteus_to_std_hex8_corners[d]]];
+                    z[d] = points[2][ev[proteus_to_std_hex8_corners[d]]];
                 }
 
                 for (int d = 0; d < nxe; d++) {
@@ -93,47 +110,58 @@ int proteus_hex8_laplacian_apply(const int level,
                 memset(v, 0, nxe * sizeof(accumulator_t));
             }
 
+            const scalar_t h = 1. / level;
+
             // Iterate over sub-elements
             for (int zi = 0; zi < level - 1; zi++) {
-                refz[0] = (scalar_t)zi / level;
-                refz[1] = (scalar_t)(zi + 1) / level;
-
                 for (int yi = 0; yi < level - 1; yi++) {
-                    refy[0] = (scalar_t)yi / level;
-                    refy[1] = (scalar_t)(yi + 1) / level;
-
                     for (int xi = 0; xi < level - 1; xi++) {
-                        refx[0] = (scalar_t)xi / level;
-                        refx[1] = (scalar_t)(xi + 1) / level;
+                        // Convert to standard HEX8 local ordering (see 3-4 and 6-7)
+                        int lev[8] = {// Bottom
+                                      proteus_hex8_lidx(level, xi, yi, zi),
+                                      proteus_hex8_lidx(level, xi + 1, yi, zi),
+                                      proteus_hex8_lidx(level, xi + 1, yi + 1, zi),
+                                      proteus_hex8_lidx(level, xi, yi + 1, zi),
+                                      // Top
+                                      proteus_hex8_lidx(level, xi, yi, zi + 1),
+                                      proteus_hex8_lidx(level, xi + 1, yi, zi + 1),
+                                      proteus_hex8_lidx(level, xi + 1, yi + 1, zi + 1),
+                                      proteus_hex8_lidx(level, xi, yi + 1, zi + 1)};
 
-                        accumulator_t element_vector[8] = {0};
+                        for (int d = 0; d < 8; d++) {
+                            element_u[d] = eu[lev[d]];
+                        }
 
-                        // Use standard local ordering (see 3-4 and 6-7)
-                        scalar_t element_u[8] = {// Bottom
-                                                 eu[proteus_hex8_lidx(level, xi, yi, zi)],
-                                                 eu[proteus_hex8_lidx(level, xi + 1, yi, zi)],
-                                                 eu[proteus_hex8_lidx(level, xi + 1, yi + 1, zi)],
-                                                 eu[proteus_hex8_lidx(level, xi, yi + 1, zi)],
-                                                 // Top
-                                                 eu[proteus_hex8_lidx(level, xi, yi, zi + 1)],
-                                                 eu[proteus_hex8_lidx(level, xi + 1, yi, zi + 1)],
-                                                 eu[proteus_hex8_lidx(level, xi + 1, yi + 1, zi + 1)],
-                                                 eu[proteus_hex8_lidx(level, xi, yi + 1, zi + 1)]
-                        };
+                        for (int d = 0; d < 8; d++) {
+                            element_vector[d] = 0;
+                        }
 
-                        // TODO compute lx, ly, lz
+                        // Translation
+                        const scalar_t tx = (scalar_t)xi / level;
+                        const scalar_t ty = (scalar_t)yi / level;
+                        const scalar_t tz = (scalar_t)zi / level;
 
                         // Quadrature
                         for (int k = 0; k < n_qp; k++) {
-                            hex8_laplacian_apply_points(lx,
-                                                        ly,
-                                                        lz,
-                                                        qx[k],
-                                                        qy[k],
-                                                        qz[k],
-                                                        qw[k],
-                                                        element_u,
-                                                        element_vector);
+                            // 1) Compute qp in macro-element coordinates
+                            const scalar_t m_qx = h * qx[k] + tx;
+                            const scalar_t m_qy = h * qy[k] + ty;
+                            const scalar_t m_qz = h * qz[k] + tz;
+
+                            // 2) Evaluate FFF
+                            hex8_fff(x, y, z, m_qx, m_qy, m_qz, m_fff);
+
+                            // 3) Transform to sub-FFF
+                            hex8_sub_fff_0(m_fff, h, fff);
+
+                            // Evaluate y = op * x
+                            hex8_laplacian_apply_fff(
+                                    fff, qx[k], qy[k], qz[k], qw[k], element_u, element_vector);
+                        }
+
+                        // Accumulate to macro-element buffer
+                        for (int d = 0; d < 8; d++) {
+                            v[lev[d]] += element_vector[d];
                         }
                     }
                 }
@@ -141,9 +169,128 @@ int proteus_hex8_laplacian_apply(const int level,
 
             {
                 // Scatter elemental data
+                for (int d = 0; d < nxe; d++) {
+#pragma omp atomic update
+                    values[ev[d]] += v[d];
+                }
             }
         }
 
+        // Clean-up
+        free(ev);
+        free(eu);
+        free(v);
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int proteus_affine_hex8_laplacian_apply(const int level,
+                                        const ptrdiff_t nelements,
+                                        ptrdiff_t interior_start,
+                                        idx_t **const SFEM_RESTRICT elements,
+                                        geom_t **const SFEM_RESTRICT points,
+                                        const real_t *const SFEM_RESTRICT u,
+                                        real_t *const SFEM_RESTRICT values) {
+    const int nxe = proteus_hex8_nxe(level);
+    const int txe = proteus_hex8_txe(level);
+
+    const int proteus_to_std_hex8_corners[8] = {// Bottom
+                                                proteus_hex8_lidx(level, 0, 0, 0),
+                                                proteus_hex8_lidx(level, level, 0, 0),
+                                                proteus_hex8_lidx(level, level, level, 0),
+                                                proteus_hex8_lidx(level, 0, level, 0),
+
+                                                // Top
+                                                proteus_hex8_lidx(level, 0, 0, level),
+                                                proteus_hex8_lidx(level, level, 0, level),
+                                                proteus_hex8_lidx(level, level, level, level),
+                                                proteus_hex8_lidx(level, 0, level, level)};
+
+    int Lm1 = level - 1;
+    int Lm13 = Lm1 * Lm1 * Lm1;
+
+#pragma omp parallel
+    {
+        // Allocation per thread
+        scalar_t *eu = malloc(nxe * sizeof(scalar_t));
+        idx_t *ev = malloc(nxe * sizeof(idx_t));
+        accumulator_t *v = malloc(nxe * sizeof(accumulator_t));
+
+        scalar_t x[8];
+        scalar_t y[8];
+        scalar_t z[8];
+
+        scalar_t element_u[8];
+        accumulator_t element_vector[8];
+        scalar_t m_fff[6], fff[6];
+
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            {
+                // Gather elemental data
+                for (int d = 0; d < nxe; d++) {
+                    ev[d] = elements[d][e];
+                }
+
+                for (int d = 0; d < 8; d++) {
+                    x[d] = points[0][ev[proteus_to_std_hex8_corners[d]]];
+                    y[d] = points[1][ev[proteus_to_std_hex8_corners[d]]];
+                    z[d] = points[2][ev[proteus_to_std_hex8_corners[d]]];
+                }
+
+                for (int d = 0; d < nxe; d++) {
+                    eu[d] = u[ev[d]];
+                }
+
+                memset(v, 0, nxe * sizeof(accumulator_t));
+            }
+
+            const scalar_t h = 1. / level;
+
+            hex8_fff(x, y, z, 0.5, 0.5, 0.5, m_fff);
+            hex8_sub_fff_0(m_fff, h, fff);
+
+            // Iterate over sub-elements
+            for (int zi = 0; zi < level - 1; zi++) {
+                for (int yi = 0; yi < level - 1; yi++) {
+                    for (int xi = 0; xi < level - 1; xi++) {
+                        // Convert to standard HEX8 local ordering (see 3-4 and 6-7)
+                        int lev[8] = {// Bottom
+                                      proteus_hex8_lidx(level, xi, yi, zi),
+                                      proteus_hex8_lidx(level, xi + 1, yi, zi),
+                                      proteus_hex8_lidx(level, xi + 1, yi + 1, zi),
+                                      proteus_hex8_lidx(level, xi, yi + 1, zi),
+                                      // Top
+                                      proteus_hex8_lidx(level, xi, yi, zi + 1),
+                                      proteus_hex8_lidx(level, xi + 1, yi, zi + 1),
+                                      proteus_hex8_lidx(level, xi + 1, yi + 1, zi + 1),
+                                      proteus_hex8_lidx(level, xi, yi + 1, zi + 1)};
+
+                        for (int d = 0; d < 8; d++) {
+                            element_u[d] = eu[lev[d]];
+                        }
+
+                        hex8_laplacian_apply_fff_integral(fff, element_u, element_vector);
+
+                        // Accumulate to macro-element buffer
+                        for (int d = 0; d < 8; d++) {
+                            v[lev[d]] += element_vector[d];
+                        }
+                    }
+                }
+            }
+
+            {
+                // Scatter elemental data
+                for (int d = 0; d < nxe; d++) {
+#pragma omp atomic update
+                    values[ev[d]] += v[d];
+                }
+            }
+        }
+
+        // Clean-up
         free(ev);
         free(eu);
         free(v);
