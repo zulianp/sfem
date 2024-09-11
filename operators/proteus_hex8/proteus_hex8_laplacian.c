@@ -18,7 +18,7 @@ int proteus_hex8_nxe(int level) {
 
 int proteus_hex8_txe(int level) { return level * level * level; }
 
-static inline int proteus_hex8_lidx(const int L, const int x, const int y, const int z) {
+static SFEM_INLINE int proteus_hex8_lidx(const int L, const int x, const int y, const int z) {
     int Lp1 = L + 1;
     int ret = z * (Lp1 * Lp1) + y * Lp1 + x;
     assert(ret < proteus_hex8_nxe(L));
@@ -205,8 +205,7 @@ int proteus_affine_hex8_laplacian_apply(const int level,
                                                 proteus_hex8_lidx(level, 0, 0, level),
                                                 proteus_hex8_lidx(level, level, 0, level),
                                                 proteus_hex8_lidx(level, level, level, level),
-                                                proteus_hex8_lidx(level, 0, level, level)
-                                            };
+                                                proteus_hex8_lidx(level, 0, level, level)};
 
     const int Lm1 = level - 1;
     const int Lm13 = Lm1 * Lm1 * Lm1;
@@ -249,8 +248,16 @@ int proteus_affine_hex8_laplacian_apply(const int level,
 
             const scalar_t h = 1. / level;
 
+            // We evaluate the jacobian at the center of the element
+            // in case that it that the mapping is not linear
             hex8_fff(x, y, z, 0.5, 0.5, 0.5, m_fff);
             hex8_sub_fff_0(m_fff, h, fff);
+
+#define PROTEUS_HEX8_USE_MV  // assemblying the elemental matrix is faster
+#ifdef PROTEUS_HEX8_USE_MV
+            scalar_t laplacian_matrix[8 * 8];
+            hex8_laplacian_matrix_fff_integral(fff, laplacian_matrix);
+#endif
 
             // Iterate over sub-elements
             for (int zi = 0; zi < level - 1; zi++) {
@@ -272,7 +279,22 @@ int proteus_affine_hex8_laplacian_apply(const int level,
                             element_u[d] = eu[lev[d]];
                         }
 
+#ifdef PROTEUS_HEX8_USE_MV
+
+                        for (int i = 0; i < 8; i++) {
+                            element_vector[i] = 0;
+                        }
+
+                        for (int i = 0; i < 8; i++) {
+                            const scalar_t *const row = &laplacian_matrix[i * 8];
+                            const scalar_t ui = element_u[i];
+                            for (int j = 0; j < 8; j++) {
+                                element_vector[j] += ui * row[j];
+                            }
+                        }
+#else
                         hex8_laplacian_apply_fff_integral(fff, element_u, element_vector);
+#endif
 
                         // Accumulate to macro-element buffer
                         for (int d = 0; d < 8; d++) {
