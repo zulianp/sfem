@@ -189,7 +189,7 @@ int proteus_affine_hex8_laplacian_apply(const int level,
                                         const ptrdiff_t nelements,
                                         ptrdiff_t interior_start,
                                         idx_t **const SFEM_RESTRICT elements,
-                                        geom_t **const SFEM_RESTRICT points,
+                                        geom_t **const SFEM_RESTRICT std_hex8_points,
                                         const real_t *const SFEM_RESTRICT u,
                                         real_t *const SFEM_RESTRICT values) {
     const int nxe = proteus_hex8_nxe(level);
@@ -205,10 +205,11 @@ int proteus_affine_hex8_laplacian_apply(const int level,
                                                 proteus_hex8_lidx(level, 0, 0, level),
                                                 proteus_hex8_lidx(level, level, 0, level),
                                                 proteus_hex8_lidx(level, level, level, level),
-                                                proteus_hex8_lidx(level, 0, level, level)};
+                                                proteus_hex8_lidx(level, 0, level, level)
+                                            };
 
-    int Lm1 = level - 1;
-    int Lm13 = Lm1 * Lm1 * Lm1;
+    const int Lm1 = level - 1;
+    const int Lm13 = Lm1 * Lm1 * Lm1;
 
 #pragma omp parallel
     {
@@ -234,9 +235,9 @@ int proteus_affine_hex8_laplacian_apply(const int level,
                 }
 
                 for (int d = 0; d < 8; d++) {
-                    x[d] = points[0][ev[proteus_to_std_hex8_corners[d]]];
-                    y[d] = points[1][ev[proteus_to_std_hex8_corners[d]]];
-                    z[d] = points[2][ev[proteus_to_std_hex8_corners[d]]];
+                    x[d] = std_hex8_points[0][ev[proteus_to_std_hex8_corners[d]]];
+                    y[d] = std_hex8_points[1][ev[proteus_to_std_hex8_corners[d]]];
+                    z[d] = std_hex8_points[2][ev[proteus_to_std_hex8_corners[d]]];
                 }
 
                 for (int d = 0; d < nxe; d++) {

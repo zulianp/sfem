@@ -36,5 +36,5 @@ NY=80
 NZ=80
 box_mesh.py hex8_mesh_for_macro -c hex8 -x $NX -y $NY -z $NZ --height=1 --width=1 --depth=1
 
-export SFEM_ELEMENT_REFINE_LEVEL=8
+
 $LAUNCH proteus_hex8_laplacian_apply hex8_mesh_for_macro gen:ones null.raw
