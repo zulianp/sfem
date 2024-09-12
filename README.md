@@ -11,7 +11,7 @@ git clone https://bitbucket.com/zulianp/matrix.io && \
 git clone https://bitbucket.com/zulianp/sfem && \
 cd matrix.io && make && \
 cd ../sfem && git submodule update --init --recursive && \
-make
+mkdir build && cd build && cmake .. -DSFEM_ENABLE_OPENMP=ON && make
 ```
 
 
