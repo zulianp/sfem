@@ -72,8 +72,8 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     ptrdiff_t n_sharp_edges = 0;
-    count_t *e0 = 0;
-    count_t *e1 = 0;
+    idx_t *e0 = 0;
+    idx_t *e1 = 0;
 
     {  // Extract sharp edges!
         count_t *rowptr = 0;

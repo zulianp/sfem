@@ -39,12 +39,18 @@ namespace sfem {
 
         // Solver parameters
         T tol{1e-10};
+        T eigen_solver_tol{1e-6};
         int max_it{3};
 
         T eig_max{0};
+        T scale_eig_max{1};
         T scale_eig_min{0.06};
         ptrdiff_t n_dofs{-1};
         bool is_initial_guess_zero{false};
+
+        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
+
+        ExecutionSpace execution_space() const override { return execution_space_; }
 
         void set_initial_guess_zero(const bool val) override { is_initial_guess_zero = val; }
 
@@ -122,6 +128,8 @@ namespace sfem {
             };
 
             ensure_power_method();
+
+            execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         void ensure_power_method() {
@@ -155,7 +163,7 @@ namespace sfem {
         T max_eigen_value(T* const guess_eigenvector, T* const work) {
             assert(power_method);
             return power_method->max_eigen_value(
-                    apply_op, 1000, 1e-6, this->rows(), guess_eigenvector, work);
+                    apply_op, 10000, this->eigen_solver_tol, this->rows(), guess_eigenvector, work);
         }
 
         void init(const T* const guess_eigenvector) {
@@ -188,6 +196,7 @@ namespace sfem {
 
             const ptrdiff_t n = this->rows();
 
+            const T eig_max = this->eig_max * scale_eig_max;
             const T eig_min = scale_eig_min * eig_max;
             const T eig_avg = (eig_min + eig_max) / 2;
             const T eig_diff = (eig_min - eig_max) / 2;

@@ -57,7 +57,7 @@ int build_n2e(const ptrdiff_t nelements,
               element_idx_t **out_elindex) {
     double tick = MPI_Wtime();
 
-#ifdef SFEM_MEM_DIAGNOSTICS
+#ifdef SFEM_ENABLE_MEM_DIAGNOSTICS
     printf("build_n2e: allocating %g GB\n", (nnodes + 1) * sizeof(count_t) * 1e-9);
 #endif
 
@@ -80,7 +80,7 @@ int build_n2e(const ptrdiff_t nelements,
         n2eptr[i + 1] += n2eptr[i];
     }
 
-#ifdef SFEM_MEM_DIAGNOSTICS
+#ifdef SFEM_ENABLE_MEM_DIAGNOSTICS
     printf("build_n2e: allocating %g GB\n", n2eptr[nnodes] * sizeof(element_idx_t) * 1e-9);
 #endif
     element_idx_t *elindex = (element_idx_t *)malloc(n2eptr[nnodes] * sizeof(element_idx_t));
@@ -105,25 +105,104 @@ int build_n2e(const ptrdiff_t nelements,
     return 0;
 }
 
-static int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
-                                            const ptrdiff_t nnodes,
-                                            const int nnodesxelem,
-                                            idx_t **const elems,
-                                            count_t **out_rowptr,
-                                            idx_t **out_colidx) {
-    ptrdiff_t nnz = 0;
+int build_n2e_for_elem_type(const enum ElemType element_type,
+                            const ptrdiff_t nelements,
+                            const ptrdiff_t nnodes,
+                            idx_t **const elems,
+                            count_t **out_n2eptr,
+                            element_idx_t **out_elindex) {
+    // TODO (maybe)
+    if (element_type != MACRO_TET4 /*&& element_type != MACRO_TRI3*/) {
+        return build_n2e(
+                nelements, nnodes, elem_num_nodes(element_type), elems, out_n2eptr, out_elindex);
+    }
+
+    double tick = MPI_Wtime();
+
+#ifdef SFEM_ENABLE_MEM_DIAGNOSTICS
+    printf("build_n2e_for_elem_type: allocating %g GB\n", (nnodes + 1) * sizeof(count_t) * 1e-9);
+#endif
+
+    count_t *n2eptr = (count_t *)malloc((nnodes + 1) * sizeof(count_t));
+    memset(n2eptr, 0, (nnodes + 1) * sizeof(count_t));
+
+    int *book_keeping = (int *)malloc((nnodes) * sizeof(int));
+    memset(book_keeping, 0, (nnodes) * sizeof(int));
+
+    if (element_type == MACRO_TET4) {
+        static const int tet4_refine_pattern[8][4] = {// Corner tests
+                                                      {0, 4, 6, 7},
+                                                      {4, 1, 5, 8},
+                                                      {6, 5, 2, 9},
+                                                      {7, 8, 9, 3},
+                                                      // Octahedron tets
+                                                      {4, 5, 6, 8},
+                                                      {7, 4, 6, 8},
+                                                      {6, 5, 9, 8},
+                                                      {7, 6, 9, 8}};
+
+        for (int sub_elem = 0; sub_elem < 8; sub_elem++) {
+            for (int sub_elem_node = 0; sub_elem_node < 4; ++sub_elem_node) {
+                int node_number = tet4_refine_pattern[sub_elem][sub_elem_node];
+
+                for (ptrdiff_t i = 0; i < nelements; ++i) {
+                    assert(elems[node_number][i] < nnodes);
+                    assert(elems[node_number][i] >= 0);
+
+                    ++n2eptr[elems[node_number][i] + 1];
+                }
+            }
+        }
+    }
+
+    for (ptrdiff_t i = 0; i < nnodes; ++i) {
+        n2eptr[i + 1] += n2eptr[i];
+    }
+
+#ifdef SFEM_ENABLE_MEM_DIAGNOSTICS
+    printf("build_n2e: allocating %g GB\n", n2eptr[nnodes] * sizeof(element_idx_t) * 1e-9);
+#endif
+    element_idx_t *elindex = (element_idx_t *)malloc(n2eptr[nnodes] * sizeof(element_idx_t));
+
+    const int nnodesxelem = elem_num_nodes(element_type);
+    for (int edof_i = 0; edof_i < nnodesxelem; ++edof_i) {
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            element_idx_t node = elems[edof_i][i];
+
+            assert(n2eptr[node] + book_keeping[node] < n2eptr[node + 1]);
+
+            elindex[n2eptr[node] + book_keeping[node]++] = i;
+        }
+    }
+
+    free(book_keeping);
+
+    *out_n2eptr = n2eptr;
+    *out_elindex = elindex;
+
+    double tock = MPI_Wtime();
+    printf("crs_graph.c: build_n2e\t\t%g seconds\n", tock - tick);
+    return 0;
+}
+
+static int build_crs_graph_from_n2e(const ptrdiff_t nelements,
+                                    const ptrdiff_t nnodes,
+                                    const int nnodesxelem,
+                                    idx_t **const SFEM_RESTRICT elems,
+                                    const count_t *const SFEM_RESTRICT n2eptr,
+                                    const element_idx_t *const SFEM_RESTRICT elindex,
+                                    count_t **out_rowptr,
+                                    idx_t **out_colidx) {
     count_t *rowptr = (count_t *)malloc((nnodes + 1) * sizeof(count_t));
     idx_t *colidx = 0;
 
     {
-        count_t *n2eptr;
-        element_idx_t *elindex;
-        build_n2e(nelements, nnodes, nnodesxelem, elems, &n2eptr, &elindex);
-
         rowptr[0] = 0;
 
-        idx_t n2nbuff[2048];
+#pragma omp parallel for
         for (ptrdiff_t node = 0; node < nnodes; ++node) {
+            idx_t n2nbuff[2048];
+
             count_t ebegin = n2eptr[node];
             count_t eend = n2eptr[node + 1];
 
@@ -141,15 +220,21 @@ static int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
             }
 
             nneighs = sortreduce(n2nbuff, nneighs);
-
-            nnz += nneighs;
-            rowptr[node + 1] = nnz;
+            rowptr[node + 1] = nneighs;
         }
 
+        // Cumulative sum
+        for (ptrdiff_t node = 0; node < nnodes; ++node) {
+            rowptr[node + 1] += rowptr[node];
+        }
+
+        const ptrdiff_t nnz = rowptr[nnodes];
         colidx = (idx_t *)malloc(nnz * sizeof(idx_t));
 
-        ptrdiff_t coloffset = 0;
+#pragma omp parallel for
         for (ptrdiff_t node = 0; node < nnodes; ++node) {
+            idx_t n2nbuff[2048];
+
             count_t ebegin = n2eptr[node];
             count_t eend = n2eptr[node + 1];
 
@@ -169,19 +254,37 @@ static int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
             nneighs = sortreduce(n2nbuff, nneighs);
 
             for (idx_t i = 0; i < nneighs; ++i) {
-                colidx[coloffset + i] = n2nbuff[i];
+                colidx[rowptr[node] + i] = n2nbuff[i];
             }
-
-            coloffset += nneighs;
         }
-
-        free(n2eptr);
-        free(elindex);
     }
 
     *out_rowptr = rowptr;
     *out_colidx = colidx;
     return 0;
+}
+
+static int build_crs_graph_mem_conservative(const ptrdiff_t nelements,
+                                            const ptrdiff_t nnodes,
+                                            const int nnodesxelem,
+                                            idx_t **const elems,
+                                            count_t **out_rowptr,
+                                            idx_t **out_colidx) {
+    double tick = MPI_Wtime();
+
+    count_t *n2eptr;
+    element_idx_t *elindex;
+    build_n2e(nelements, nnodes, nnodesxelem, elems, &n2eptr, &elindex);
+
+    int err = build_crs_graph_from_n2e(
+            nelements, nnodes, nnodesxelem, elems, n2eptr, elindex, out_rowptr, out_colidx);
+
+    free(n2eptr);
+    free(elindex);
+
+    double tock = MPI_Wtime();
+    printf("crs_graph.c: build nz (mem conservative) structure\t%g seconds\n", tock - tick);
+    return err;
 }
 
 static int build_crs_graph_faster(const ptrdiff_t nelements,
@@ -204,24 +307,11 @@ static int build_crs_graph_faster(const ptrdiff_t nelements,
         rowptr[0] = 0;
 
         ptrdiff_t overestimated_nnz = 0;
-        idx_t n2nbuff[2048];
+#pragma omp parallel for reduction(+ : overestimated_nnz)
         for (ptrdiff_t node = 0; node < nnodes; ++node) {
             const count_t ebegin = n2eptr[node];
             const count_t eend = n2eptr[node + 1];
-
-            idx_t nneighs = 0;
-
-            for (count_t e = ebegin; e < eend; ++e) {
-                element_idx_t eidx = elindex[e];
-                assert(eidx < nelements);
-
-                for (int edof_i = 0; edof_i < nnodesxelem; ++edof_i) {
-                    const idx_t neighnode = elems[edof_i][eidx];
-                    assert(nneighs < 2048);
-                    n2nbuff[nneighs++] = neighnode;
-                }
-            }
-
+            idx_t nneighs = (eend - ebegin) * nnodesxelem;
             overestimated_nnz += nneighs;
         }
 
@@ -232,12 +322,12 @@ static int build_crs_graph_faster(const ptrdiff_t nelements,
         tick = tock;
 
         ptrdiff_t coloffset = 0;
+        idx_t n2nbuff[2048];
         for (ptrdiff_t node = 0; node < nnodes; ++node) {
             const count_t ebegin = n2eptr[node];
             const count_t eend = n2eptr[node + 1];
 
             idx_t nneighs = 0;
-
             for (count_t e = ebegin; e < eend; ++e) {
                 const idx_t eidx = elindex[e];
                 assert(eidx < nelements);
@@ -279,16 +369,16 @@ int build_crs_graph_for_elem_type(const int element_type,
                                   idx_t **const elems,
                                   count_t **out_rowptr,
                                   idx_t **out_colidx) {
-    int SFEM_CRS_MEM_CONSERVATIVE = 0;
-    SFEM_READ_ENV(SFEM_CRS_MEM_CONSERVATIVE, atoi);
+    int SFEM_CRS_FAST_SERIAL = 0;
+    SFEM_READ_ENV(SFEM_CRS_FAST_SERIAL, atoi);
 
-    if (SFEM_CRS_MEM_CONSERVATIVE) {
-        return build_crs_graph_mem_conservative(
-            nelements, nnodes, elem_num_nodes(element_type), elems, out_rowptr, out_colidx);
-    } else {
+    if (SFEM_CRS_FAST_SERIAL) {
         return build_crs_graph_faster(
-            nelements, nnodes, elem_num_nodes(element_type), elems, out_rowptr, out_colidx);
+                nelements, nnodes, elem_num_nodes(element_type), elems, out_rowptr, out_colidx);
     }
+
+    return build_crs_graph_mem_conservative(
+            nelements, nnodes, elem_num_nodes(element_type), elems, out_rowptr, out_colidx);
 }
 
 int build_crs_graph(const ptrdiff_t nelements,
@@ -325,7 +415,7 @@ int block_crs_to_crs(const ptrdiff_t nnodes,
     }
 
     rowptr[nnodes * block_size] =
-        2 * rowptr[nnodes * block_size - 1] - rowptr[nnodes * block_size - 2];
+            2 * rowptr[nnodes * block_size - 1] - rowptr[nnodes * block_size - 2];
 
     for (ptrdiff_t i = 0; i < nnodes; ++i) {
         // Block row
@@ -375,7 +465,7 @@ int crs_graph_block_to_scalar(const ptrdiff_t nnodes,
     }
 
     rowptr[nnodes * block_size] =
-        2 * rowptr[nnodes * block_size - 1] - rowptr[nnodes * block_size - 2];
+            2 * rowptr[nnodes * block_size - 1] - rowptr[nnodes * block_size - 2];
 
     for (ptrdiff_t i = 0; i < nnodes; ++i) {
         // Block row
@@ -421,7 +511,7 @@ int create_dual_graph_mem_conservative(const ptrdiff_t n_elements,
         build_n2e(n_elements, n_nodes, elem_num_nodes(element_type), elems, &n2eptr, &elindex);
     }
 
-#ifdef SFEM_MEM_DIAGNOSTICS
+#ifdef SFEM_ENABLE_MEM_DIAGNOSTICS
     printf("create_dual_graph_mem_conservative: allocating %g GB\n",
            n_elements * sizeof(int) * 1e-9);
 #endif
@@ -444,7 +534,7 @@ int create_dual_graph_mem_conservative(const ptrdiff_t n_elements,
         n_nodes_per_side = 3;
     }
 
-#ifdef SFEM_MEM_DIAGNOSTICS
+#ifdef SFEM_ENABLE_MEM_DIAGNOSTICS
     printf("create_dual_graph_mem_conservative: allocating %g GB\n",
            (n_elements + 1) * sizeof(count_t) * 1e-9);
 #endif
@@ -454,13 +544,13 @@ int create_dual_graph_mem_conservative(const ptrdiff_t n_elements,
     // +1 more to avoid illegal access when counting self
     size_t extra_buffer_space = 1000;
 
-#ifdef SFEM_MEM_DIAGNOSTICS
+#ifdef SFEM_ENABLE_MEM_DIAGNOSTICS
     printf("create_dual_graph_mem_conservative: allocating %g GB\n",
            (n_overestimated_connections + extra_buffer_space) * sizeof(element_idx_t) * 1e-9);
 #endif
 
     element_idx_t *dual_eidx = (element_idx_t *)calloc(
-        n_overestimated_connections + extra_buffer_space, sizeof(element_idx_t));
+            n_overestimated_connections + extra_buffer_space, sizeof(element_idx_t));
 
     for (ptrdiff_t e = 0; e < n_elements; e++) {
         count_t offset = dual_e_ptr[e];
@@ -523,7 +613,7 @@ int create_dual_graph(const ptrdiff_t n_elements,
                       element_idx_t **out_colidx) {
     double tick = MPI_Wtime();
     const int ret = create_dual_graph_mem_conservative(
-        n_elements, n_nodes, element_type, elems, out_rowptr, out_colidx);
+            n_elements, n_nodes, element_type, elems, out_rowptr, out_colidx);
 
     double tock = MPI_Wtime();
     printf("crs_graph.c: create_dual_graph\t%g seconds\n", tock - tick);

@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 
 set -e
-set -x
+# set -x
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 PATH=$SCRIPTPATH:$PATH
 PATH=$SCRIPTPATH/../..:$PATH
+PATH=$SCRIPTPATH/../../build:$PATH
 PATH=$SCRIPTPATH/../../python:$PATH
-PATH=$SCRIPTPATH/../../python/mesh:$PATH
+PATH=$SCRIPTPATH/../../python/sfem/utils:$PATH
+PATH=$SCRIPTPATH/../../python/sfem/mesh:$PATH
 
 
 raw_to_db()
@@ -35,22 +37,23 @@ workspace=workspace
 
 mkdir -p $workspace
 
-case=../../data/benchmarks/2_darcy_cylinder/mesh
-# case=meshes/3
+# case=../../data/benchmarks/2_darcy_cylinder/mesh
+case=meshes/3
 p1_mesh=$workspace/p1
 p2_mesh=$workspace/p2 
+
+mkdir -p $p1_mesh
+mkdir -p $p2_mesh
 
 sfc $case $p1_mesh
 mesh_p1_to_p2 $p1_mesh $p2_mesh
 
-
-
 mpiexec -np 2 partition $p1_mesh $p1_mesh/parts
 
-sfc $p2_mesh $p2_mesh/sorted 
-mpiexec -np 2 partition $p2_mesh/sorted  $p2_mesh/parts
+# sfc $p2_mesh $p2_mesh/sorted 
+# mpiexec -np 2 partition $p2_mesh/sorted  $p2_mesh/parts
 
-# mpiexec -np 2 partition $p2_mesh $p2_mesh/parts
+mpiexec -np 2 partition $p2_mesh $p2_mesh/parts
 
 raw_to_db $p1_mesh
 raw_to_db $p2_mesh

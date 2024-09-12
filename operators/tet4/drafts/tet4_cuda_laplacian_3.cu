@@ -199,7 +199,7 @@ __global__ void fff_kernel(const ptrdiff_t nelements,
     }
 }
 
-__global__ void laplacian_assemble_hessian_kernel(const ptrdiff_t nelements,
+__global__ void laplacian_crs_kernel(const ptrdiff_t nelements,
                                                   const real_t *const SFEM_RESTRICT fff,
                                                   real_t *const SFEM_RESTRICT values) {
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
@@ -315,7 +315,7 @@ static void pack_vector(
     SFEM_RANGE_POP();       
 }
 
-extern "C" void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
+extern "C" void tet4_laplacian_crs(const ptrdiff_t nelements,
                                            const ptrdiff_t nnodes,
                                            idx_t **const SFEM_RESTRICT elems,
                                            geom_t **const SFEM_RESTRICT xyz,
@@ -469,7 +469,7 @@ extern "C" void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
         // Make sure that we have new Jacobians
         cudaStreamWaitEvent(stream[1], event[3], 0);
 
-        laplacian_assemble_hessian_kernel<<<n_blocks, block_size, 0, stream[1]>>>(n, d_fff, de_matrix);
+        laplacian_crs_kernel<<<n_blocks, block_size, 0, stream[1]>>>(n, d_fff, de_matrix);
         cudaEventRecord(event[1], stream[1]);
 
         SFEM_DEBUG_SYNCHRONIZE();
@@ -541,7 +541,7 @@ extern "C" void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
 
-    printf("cuda_laplacian_3.c: laplacian_assemble_hessian\t%g seconds\nloops %d\n",
+    printf("cuda_laplacian_3.c: laplacian_crs\t%g seconds\nloops %d\n",
            milliseconds / 1000,
            int(nelements / nbatch));
 }

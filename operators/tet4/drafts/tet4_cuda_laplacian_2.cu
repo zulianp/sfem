@@ -288,7 +288,7 @@ __global__ void jacobian_inverse_kernel(const ptrdiff_t nelements,
     }
 }
 
-__global__ void laplacian_assemble_hessian_kernel(const ptrdiff_t nelements,
+__global__ void laplacian_crs_kernel(const ptrdiff_t nelements,
                                                   const real_t *const SFEM_RESTRICT
                                                       jacobian_inverse,
                                                   real_t *const SFEM_RESTRICT values) {
@@ -373,7 +373,7 @@ __global__ void print_elem_kernel(const ptrdiff_t nelements, idx_t **const elems
 
 #if 0
 
-extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
+extern "C" void laplacian_crs(const ptrdiff_t nelements,
                                            const ptrdiff_t nnodes,
                                            idx_t **const SFEM_RESTRICT elems,
                                            geom_t **const SFEM_RESTRICT xyz,
@@ -461,7 +461,7 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
         }
 
         jacobian_inverse_kernel<<<n_blocks, block_size>>>(n, de_xyz, d_jacobian_inverse);
-        laplacian_assemble_hessian_kernel<<<n_blocks, block_size>>>(n, d_jacobian_inverse, de_matrix);
+        laplacian_crs_kernel<<<n_blocks, block_size>>>(n, d_jacobian_inverse, de_matrix);
         last_n = n;
     }
 
@@ -494,14 +494,14 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
     float milliseconds = 0;
     cudaEventElapsedTime(&milliseconds, start, stop);
 
-    printf("cuda_laplacian_2.c: laplacian_assemble_hessian\t%g seconds\nloops %d\n",
+    printf("cuda_laplacian_2.c: laplacian_crs\t%g seconds\nloops %d\n",
            milliseconds / 1000,
            int(nelements / nbatch));
 }
 
 #else
 
-extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
+extern "C" void laplacian_crs(const ptrdiff_t nelements,
                                            const ptrdiff_t nnodes,
                                            idx_t **const SFEM_RESTRICT elems,
                                            geom_t **const SFEM_RESTRICT xyz,
@@ -638,7 +638,7 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
 
         SFEM_DEBUG_SYNCHRONIZE();
 
-        laplacian_assemble_hessian_kernel<<<n_blocks, block_size, 0, stream[0]>>>(
+        laplacian_crs_kernel<<<n_blocks, block_size, 0, stream[0]>>>(
             n, d_jacobian_inverse, de_matrix);
 
         SFEM_DEBUG_SYNCHRONIZE();
@@ -700,7 +700,7 @@ extern "C" void laplacian_assemble_hessian(const ptrdiff_t nelements,
     float milliseconds = 0;
     cudaEventElapsedTime(&milliseconds, start, stop);
 
-    printf("cuda_laplacian_2.c: laplacian_assemble_hessian\t%g seconds\nloops %d\n",
+    printf("cuda_laplacian_2.c: laplacian_crs\t%g seconds\nloops %d\n",
            milliseconds / 1000,
            int(nelements / nbatch));
 }

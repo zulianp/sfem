@@ -87,7 +87,7 @@ static void tri_shell_3_surface_forcing_function(const ptrdiff_t nfaces,
                                                  const real_t value,
                                                  const int stride,
                                                  real_t *SFEM_RESTRICT output) {  // Neumann
-    double tick = MPI_Wtime();
+    // double tick = MPI_Wtime();
 
 #pragma omp parallel
     {
@@ -123,8 +123,8 @@ static void tri_shell_3_surface_forcing_function(const ptrdiff_t nfaces,
         }
     }
 
-    double tock = MPI_Wtime();
-    printf("neumann.c: tri_shell_3_surface_forcing_function\t%g seconds\n", tock - tick);
+    // double tock = MPI_Wtime();
+    // printf("neumann.c: tri_shell_3_surface_forcing_function\t%g seconds\n", tock - tick);
 }
 
 static SFEM_INLINE void tri_shell_6_integrate(const real_t px0,

@@ -8,45 +8,45 @@
 extern "C" {
 #endif
 
-typedef struct {
-    ptrdiff_t nelements;
-    jacobian_t *fff;
-    idx_t **elements;
-} macro_tet4_laplacian_t;
-
-void macro_tet4_laplacian_init(macro_tet4_laplacian_t *const ctx,
-                               const ptrdiff_t nelements,
-                               idx_t **const SFEM_RESTRICT elems,
-                               geom_t **const SFEM_RESTRICT xyz);
-
-void macro_tet4_laplacian_destroy(macro_tet4_laplacian_t *const ctx);
-
-void macro_tet4_laplacian_apply_opt(const macro_tet4_laplacian_t *const ctx,
-                                    const real_t *const SFEM_RESTRICT u,
-                                    real_t *const SFEM_RESTRICT values);
-
-void macro_tet4_laplacian_diag(const macro_tet4_laplacian_t *const ctx,
-                               real_t *const SFEM_RESTRICT diag);
-
-void macro_tet4_laplacian_apply(const ptrdiff_t nelements,
+int macro_tet4_laplacian_apply(const ptrdiff_t nelements,
                                 const ptrdiff_t nnodes,
                                 idx_t **const SFEM_RESTRICT elems,
                                 geom_t **const SFEM_RESTRICT xyz,
                                 const real_t *const SFEM_RESTRICT u,
                                 real_t *const SFEM_RESTRICT values);
 
-void macro_tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
-                                   const ptrdiff_t nnodes,
-                                   idx_t **const SFEM_RESTRICT elems,
-                                   geom_t **const SFEM_RESTRICT xyz,
-                                   const count_t *const SFEM_RESTRICT rowptr,
-                                   const idx_t *const SFEM_RESTRICT colidx,
+int macro_tet4_laplacian_crs(const ptrdiff_t nelements,
+                                           const ptrdiff_t nnodes,
+                                           idx_t **const SFEM_RESTRICT elems,
+                                           geom_t **const SFEM_RESTRICT xyz,
+                                           const count_t *const SFEM_RESTRICT rowptr,
+                                           const idx_t *const SFEM_RESTRICT colidx,
+                                           real_t *const SFEM_RESTRICT values);
+
+int macro_tet4_laplacian_diag(const ptrdiff_t nelements,
+                               const ptrdiff_t nnodes,
+                               idx_t **const SFEM_RESTRICT elements,
+                               geom_t **const SFEM_RESTRICT points,
+                               real_t *const SFEM_RESTRICT diag);
+
+// Optimized for matrix-free
+int macro_tet4_laplacian_crs_opt(const ptrdiff_t nelements,
+                                               idx_t **const SFEM_RESTRICT elements,
+                                               const jacobian_t *const SFEM_RESTRICT fff,
+                                               const count_t *const SFEM_RESTRICT rowptr,
+                                               const idx_t *const SFEM_RESTRICT colidx,
+                                               real_t *const SFEM_RESTRICT values);
+
+int macro_tet4_laplacian_apply_opt(const ptrdiff_t nelements,
+                                   idx_t **const SFEM_RESTRICT elements,
+                                   const jacobian_t *const SFEM_RESTRICT fff,
+                                   const real_t *const SFEM_RESTRICT u,
                                    real_t *const SFEM_RESTRICT values);
 
-void macro_tet4_laplacian_assemble_hessian_opt(const macro_tet4_laplacian_t *const ctx,
-                                   const count_t *const SFEM_RESTRICT rowptr,
-                                   const idx_t *const SFEM_RESTRICT colidx,
-                                   real_t *const SFEM_RESTRICT values);
+int macro_tet4_laplacian_diag_opt(const ptrdiff_t nelements,
+                                  idx_t **const SFEM_RESTRICT elements,
+                                  const jacobian_t *const SFEM_RESTRICT fff,
+                                  real_t *const SFEM_RESTRICT diag);
 
 #ifdef __cplusplus
 }

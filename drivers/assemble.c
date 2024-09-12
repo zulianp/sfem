@@ -131,7 +131,7 @@ int main(int argc, char *argv[]) {
     // Operator assembly
     ///////////////////////////////////////////////////////////////////////////////
     if (SFEM_LAPLACIAN) {
-        laplacian_assemble_hessian(mesh.element_type,
+        laplacian_crs(mesh.element_type,
                                    mesh.nelements,
                                    mesh.nnodes,
                                    mesh.elements,

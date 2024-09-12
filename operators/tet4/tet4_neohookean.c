@@ -6,6 +6,8 @@
 
 #include <mpi.h>
 
+#include "tet4_neohookean_ogden_inline_cpu.h"
+
 #include "crs_graph.h"
 #include "sfem_vec.h"
 #include "sortreduce.h"
@@ -1783,10 +1785,8 @@ void neohookean_assemble_hessian_soa(const ptrdiff_t nelements,
 
             for (int enode = 0; enode < 4; ++enode) {
                 const idx_t edof = enode * block_size;
-                const idx_t dof = ev[enode] * block_size;
-
                 for (int b = 0; b < block_size; ++b) {
-                    element_displacement[edof + b] = displacement[b][dof];
+                    element_displacement[edof + b] = displacement[b][ev[enode]];
                 }
             }
 

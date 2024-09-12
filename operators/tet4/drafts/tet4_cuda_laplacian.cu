@@ -423,7 +423,7 @@ static inline __device__ void find_cols4(const idx_t *targets, const idx_t *cons
     }
 }
 
-__global__ void laplacian_assemble_hessian_kernel(const ptrdiff_t nelements,
+__global__ void laplacian_crs_kernel(const ptrdiff_t nelements,
                                                   const ptrdiff_t nnodes,
                                                   idx_t **const SFEM_RESTRICT elems,
                                                   geom_t **const SFEM_RESTRICT xyz,
@@ -487,7 +487,7 @@ __global__ void print_elem_kernel(const ptrdiff_t nelements, idx_t **const elems
     printf("%d %d %d %d\n", elems[0][i], elems[1][i], elems[2][i], elems[3][i]);
 }
 
-extern "C" void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
+extern "C" void tet4_laplacian_crs(const ptrdiff_t nelements,
                                            const ptrdiff_t nnodes,
                                            idx_t **const SFEM_RESTRICT elems,
                                            geom_t **const SFEM_RESTRICT xyz,
@@ -550,13 +550,13 @@ extern "C" void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
 
     // double ktick = MPI_Wtime();
     {
-        laplacian_assemble_hessian_kernel<<<n_blocks, block_size>>>(
+        laplacian_crs_kernel<<<n_blocks, block_size>>>(
             nelements, nnodes, d_elems, d_xyz, d_rowptr, d_colidx, d_values);
         SFEM_DEBUG_SYNCHRONIZE();
 
         // cudaDeviceSynchronize();
         // double ktock = MPI_Wtime();
-        // printf("cuda_laplacian.c: laplacian_assemble_hessian_kernel\t%g seconds\n", ktock - ktick);
+        // printf("cuda_laplacian.c: laplacian_crs_kernel\t%g seconds\n", ktock - ktick);
 
         // Copy result to Host memory
         SFEM_CUDA_CHECK(cudaMemcpy(values, d_values, nnz * sizeof(real_t), cudaMemcpyDeviceToHost));
@@ -586,7 +586,7 @@ extern "C" void tet4_laplacian_assemble_hessian(const ptrdiff_t nelements,
     }
 
     // double tock = MPI_Wtime();
-    // printf("cuda_laplacian.c: laplacian_assemble_hessian\t%g seconds (GPU kernel %g seconds)\n",
+    // printf("cuda_laplacian.c: laplacian_crs\t%g seconds (GPU kernel %g seconds)\n",
     //        tock - tick,
     //        ktock - ktick);
 }

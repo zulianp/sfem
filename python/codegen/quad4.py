@@ -82,3 +82,4 @@ class AxisAlignedQuad4(FE):
 
 if __name__ == '__main__':
 	AxisAlignedQuad4().generate_c_code()
+	
