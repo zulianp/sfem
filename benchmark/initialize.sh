@@ -1,13 +1,6 @@
 #!/usr/bin/env bash
 
-refs=(0 1 2 3 4)
-n_refs=${#refs[@]}
-last_idx=$(( n_refs  - 1 ))
-last=${refs[$last_idx]}
 
-# Largest matrix-based experiment (can vary w.r.t. SFEM idx_t count_t)
-largest_matrix=4
-# refs=(0 1)
 
 set -e
 
@@ -58,6 +51,10 @@ echo "Sphere benchmark database"
 cd sphere
 export SPHERE_FOLDER=$PWD
 
+refs=(0 1 2 3 4 5)
+n_refs=${#refs[@]}
+largest_matrix=4
+
 for r in ${refs[@]}
 do
 	echo "spheres: generating case $r"
@@ -71,6 +68,9 @@ do
 	sfc mesh sorted
 	refine sorted refined
 
+	# P2 folder
+	mesh_p1_to_p2 sorted ../p2
+
 	mkdir -p matrix_scalar
 	echo "op: Laplacian" > matrix_scalar/meta.yaml
 
@@ -82,9 +82,6 @@ do
 		SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble refined matrix_scalar
 		SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble3 refined matrix_vector
 	fi
-
-	# P2 folder
-	mesh_p1_to_p2 sorted ../p2
 
 	cd $SPHERE_FOLDER
 done
@@ -110,8 +107,6 @@ function gen_by_refinement()
 	echo "op: LinearElasticity" > $last/p1/matrix_vector/meta.yaml
 }
 
-# gen_by_refinement $last
-
 cd $BENCH_FOLDER
 
 #####################################
@@ -122,6 +117,10 @@ echo "Cylinder benchmark database"
 
 cd cylinder
 export CYLINDER_FOLDER=$PWD
+
+refs=(0 1 2 3 4)
+n_refs=${#refs[@]}
+largest_matrix=3
 
 for r in ${refs[@]}
 do
@@ -136,6 +135,9 @@ do
 	sfc mesh sorted
 	refine sorted refined
 
+	# P2 folder
+	mesh_p1_to_p2 sorted ../p2
+
 	mkdir -p matrix_scalar
 	echo "op: Laplacian" > matrix_scalar/meta.yaml
 
@@ -144,12 +146,9 @@ do
 
 	if [[ $r -le $largest_matrix ]]
 	then
-		SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble refined matrix_scalar
+		SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble  refined matrix_scalar
 		SFEM_HANDLE_DIRICHLET=0 SFEM_HANDLE_NEUMANN=0 SFEM_HANDLE_RHS=0 assemble3 refined matrix_vector
 	fi
-
-	# P2 folder
-	mesh_p1_to_p2 sorted ../p2
 
 	cd $CYLINDER_FOLDER
 done

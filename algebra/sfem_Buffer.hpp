@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <memory>
+#include <functional>
 
 namespace sfem {
 
@@ -43,6 +44,7 @@ namespace sfem {
                 os << "On the device!\n";
                 return;
             } else {
+                os << "Buffer size " << n_ << "\n";    
                 for (std::ptrdiff_t i = 0; i < n_; i++) {
                     os << ptr_[i] << " ";
                 }

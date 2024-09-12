@@ -20,10 +20,10 @@ int main(int argc, char *argv[]) {
 
     if (argc != 6) {
         if (!rank) {
-            fprintf(
-                stderr,
-                "usage: %s <mesh> <from_element> <to_element> <input.float64> <output.float64>\n",
-                argv[0]);
+            fprintf(stderr,
+                    "usage: %s <mesh> <from_element> <to_element> <input.float64> "
+                    "<output.float64>\n",
+                    argv[0]);
         }
 
         return EXIT_FAILURE;
@@ -38,21 +38,17 @@ int main(int argc, char *argv[]) {
     mesh_t mesh;
     mesh_read(comm, folder, &mesh);
 
-
-    ptrdiff_t coarse_nodes =  max_node_id(from_element,
-                          mesh.nelements,
-                          mesh.elements) + 1;
-
+    ptrdiff_t coarse_nodes = max_node_id(from_element, mesh.nelements, mesh.elements) + 1;
 
     real_t *from = malloc(coarse_nodes * sizeof(real_t));
     real_t *to = calloc(mesh.nnodes, sizeof(real_t));
 
     if (array_read(comm, path_input, SFEM_MPI_REAL_T, from, coarse_nodes, coarse_nodes) ||
         hierarchical_prolongation(
-            from_element, to_element, mesh.nelements, mesh.elements, 1, from, to) ||
+                from_element, to_element, mesh.nelements, mesh.elements, 1, from, to) ||
         array_write(comm, path_output, SFEM_MPI_REAL_T, to, mesh.nnodes, mesh.nnodes)) {
         return EXIT_FAILURE;
     }
-    
+
     return MPI_Finalize();
 }

@@ -225,7 +225,7 @@ int ISOLVER_EXPORT isolver_function_hessian_crs(const isolver_function_t *info,
     mesh_t *mesh = problem->mesh;
     assert(mesh);
 
-    laplacian_assemble_hessian(mesh->element_type,
+    laplacian_crs(mesh->element_type,
                                mesh->nelements,
                                mesh->nnodes,
                                mesh->elements,

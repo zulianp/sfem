@@ -11,7 +11,7 @@
 #include "cvfem_tet4_convection.h"
 #include "tet4_laplacian.h"
 
-void cvfem_laplacian_assemble_hessian(const enum ElemType element_type,
+void cvfem_laplacian_crs(const enum ElemType element_type,
                                       const ptrdiff_t nelements,
                                       const ptrdiff_t nnodes,
                                       idx_t **const SFEM_RESTRICT elems,
@@ -23,16 +23,16 @@ void cvfem_laplacian_assemble_hessian(const enum ElemType element_type,
 {
     switch (element_type) {
         case TRI3: {
-            tri3_laplacian_assemble_hessian(nelements, nnodes, elems, xyz, rowptr, colidx, values);
+            tri3_laplacian_crs(nelements, nnodes, elems, xyz, rowptr, colidx, values);
             return;
         }
         case QUAD4: {
-            cvfem_quad4_laplacian_assemble_hessian(
+            cvfem_quad4_laplacian_crs(
                 nelements, nnodes, elems, xyz, rowptr, colidx, values);
             return;
         }
         case TET4: {
-            tet4_laplacian_assemble_hessian(nelements, nnodes, elems, xyz, rowptr, colidx, values);
+            tet4_laplacian_crs(nelements, nnodes, elems, xyz, rowptr, colidx, values);
             return;
         }
         default: {

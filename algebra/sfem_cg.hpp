@@ -25,7 +25,7 @@ namespace sfem {
         // Mem management
         std::function<T*(const std::size_t)> allocate;
         std::function<void(const std::size_t, T* const x)> zeros;
-        std::function<void(T*)> destroy;
+        std::function<void(void*)> destroy;
 
         std::function<void(const ptrdiff_t, const T* const, T* const)> copy;
 
@@ -34,11 +34,29 @@ namespace sfem {
         std::function<void(const ptrdiff_t, const T, const T* const, const T, T* const)> axpby;
 
         // Solver parameters
-        T tol{1e-10};
+        T rtol{1e-10};
+        T atol{1e-16};
         int max_it{10000};
-        int check_each{1};
+        int check_each{100};
         ptrdiff_t n_dofs{-1};
         bool verbose{true};
+        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
+
+        ExecutionSpace execution_space() const override { return execution_space_; }
+
+        void set_atol(const T val){
+            atol = val;
+        }
+
+        void set_rtol(const T val){
+            rtol = val;
+        }
+
+        void set_verbose(const bool val)
+        {
+            verbose = val;
+        }
+
 
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
@@ -60,7 +78,7 @@ namespace sfem {
         void default_init() {
             allocate = [](const std::ptrdiff_t n) -> T* { return (T*)calloc(n, sizeof(T)); };
 
-            destroy = [](T* a) { free(a); };
+            destroy = [](void* a) { free(a); };
 
             copy = [](const ptrdiff_t n, const T* const src, T* const dest) {
                 std::memcpy(dest, src, n * sizeof(T));
@@ -88,6 +106,8 @@ namespace sfem {
             zeros = [](const std::size_t n, T* const x) {
                 memset(x, 0, n*sizeof(T));
             };
+
+            execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         bool good() const {
@@ -101,11 +121,11 @@ namespace sfem {
             return allocate && destroy && copy && dot && axpby && apply_op;
         }
 
-        void monitor(const int iter, const T residual) {
+        void monitor(const int iter, const T residual, const T relative_residual) {
             if(!verbose) return;
 
-            if (iter == max_it || iter == 0 || iter % check_each == 0 || residual < tol) {
-                std::cout << iter << ": " << residual << "\n";
+            if (iter == max_it || iter == 0 || iter % check_each == 0 || relative_residual < rtol) {
+                std::cout << iter << ": residual abs: " << residual << ", rel: " << relative_residual << " (rtol = " << rtol << ", atol = " << atol << ")\n";
             }
         }
 
@@ -143,14 +163,11 @@ namespace sfem {
 
             axpby(n, 1, b, -1, r);
 
-            T rtr = dot(n, r, r);
-
-            if (sqrt(rtr) < tol) {
-                destroy(r);
-                return 0;
-            }
-
-            monitor(0, sqrt(rtr));
+            const T rtr0 = dot(n, r, r);
+            const T r_norm0 = sqrt(rtr0);
+            monitor(0, r_norm0, 1);
+            
+            T rtr = rtr0;
 
             T* p = allocate(n);
             T* Ap = allocate(n);
@@ -169,17 +186,17 @@ namespace sfem {
                 axpby(n, -alpha, Ap, 1, r);
 
                 const T rtr_new = dot(n, r, r);
-
-                monitor(k+1, sqrt(rtr_new));
-
-                if (sqrt(rtr_new) < tol) {
-                    info = 0;
-                    break;
-                }
-
                 const T beta = rtr_new / rtr;
                 rtr = rtr_new;
                 axpby(n, 1, r, beta, p);
+
+                T r_norm = sqrt(rtr_new);
+
+                monitor(k+1, r_norm, r_norm/r_norm0);
+                if (r_norm < atol || r_norm/r_norm0 < rtol) {
+                    info = 0;
+                    break;
+                }
             }
 
             // clean-up
@@ -199,14 +216,16 @@ namespace sfem {
             apply_op(x, r);
             axpby(n, 1, b, -1, r);
 
-            T rtr = dot(n, r, r);
+            const T rtr0 = dot(n, r, r);
+            T rtr = rtr0;
 
-            monitor(0, sqrt(rtr));
 
-            if (sqrt(rtr) < tol) {
-                destroy(r);
-                return 0;
-            }
+            monitor(0, sqrt(rtr), 1);
+
+            // if (sqrt(rtr) < rtol) {
+            //     destroy(r);
+            //     return 0;
+            // }
 
             T* z = allocate(n);
             T* Mz = allocate(n);
@@ -253,9 +272,11 @@ namespace sfem {
                 axpby(n, alpha, p, 1, x);
                 axpby(n, -alpha, Ap, 1, r);
 
-                monitor(k+1, sqrt(rtz));
+                auto anorm = sqrt(rtz);
+                auto rnorm = anorm/sqrt(rtr0);
 
-                if (sqrt(rtz) < tol) {
+                monitor(k+1, anorm, rnorm);
+                if (anorm < atol || rnorm < rtol) {
                     info = 0;
                     break;
                 }

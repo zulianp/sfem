@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include "sfem_base.h"
 
+// FIXME all functionalities to be revisited and moved to tet4_neohookean_ogden.{h,c}
+
 #ifdef __cplusplus
 extern "C" {
 #endif

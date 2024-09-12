@@ -10,11 +10,17 @@ export PATH=$SCRIPTPATH/../../bin/:$PATH
 
 PATH=$SCRIPTPATH:$PATH
 PATH=$SCRIPTPATH/..:$PATH
-PATH=$SCRIPTPATH/../build:$PATH
 PATH=$SCRIPTPATH/../python/sfem:$PATH
 PATH=$SCRIPTPATH/../python/sfem/mesh:$PATH
 PATH=$SCRIPTPATH/../data/benchmarks/meshes:$PATH
 PATH=$SCRIPTPATH/../../matrix.io:$PATH
+
+if [[ -z $SFEM_BIN_DIR ]]
+then
+	PATH=$SCRIPTPATH/../build:$PATH
+else
+	PATH=$SFEM_BIN_DIR:$PATH
+fi
 
 HERE=$PWD
 
@@ -22,14 +28,16 @@ mkdir -p le_test
 cd le_test
 
 mkdir -p output
-# export OMP_NUM_THREADS=12
-export OMP_NUM_THREADS=8
+# export OMP_NUM_THREADS=32
+# export OMP_NUM_THREADS=8
+export OMP_NUM_THREADS=288
 export OMP_PROC_BIND=true 
 
 # rm -rf mesh
-# create_cylinder.sh 0
+create_cylinder.sh 1
 
-# create_cylinder_p2.sh 4
+# export SFEM_MESH_REFINE=1
+# create_cylinder_p2.sh 2
 # export SFEM_USE_MACRO=1
 
 sleft=mesh/sidesets_aos/sinlet.raw
@@ -58,7 +66,7 @@ else
 fi
 
 export SFEM_USE_GPU=1
-export SFEM_USE_PRECONDITIONER=1
+# export SFEM_USE_PRECONDITIONER=1
 export CUDA_LAUNCH_BLOCKING=0
 
 # $LAUNCH steady_state_sim mesh output
@@ -68,11 +76,20 @@ if [[ $SFEM_BLOCK_SIZE != 1 ]]
 then
 	aos_to_soa output/x.raw 8 $SFEM_BLOCK_SIZE output/disp
 	aos_to_soa output/rhs.raw 8 $SFEM_BLOCK_SIZE output/rhs
-	aos_to_soa output/r.raw 8 $SFEM_BLOCK_SIZE output/r
+	# aos_to_soa output/r.raw 8 $SFEM_BLOCK_SIZE output/r
 
-	raw_to_db.py mesh output/x.vtk -p "output/disp.*.raw,output/rhs.*.raw,output/r.*.raw"
+	raw_to_db.py mesh output/x.vtk -p "output/disp.*.raw,output/rhs.*.raw"
 else
 	raw_to_db.py mesh output/x.vtk -p "output/x.raw,output/c*.raw,output/residual*.raw"
 fi
+
+# if [[ -z "$SFEM_DEBUG" ]]
+# then
+# 	echo "Skipp debugging"
+# else
+# 	# echo "SFEM_DEBUG=$SFEM_DEBUG"
+# 	# MATRIXIO_DENSE_OUTPUT=0 print_crs ./rowptr.raw ./colidx.raw ./values.raw int int double
+# fi
+
 
 cd $HERE

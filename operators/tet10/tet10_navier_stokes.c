@@ -1869,7 +1869,7 @@ void tet10_momentum_lhs_scalar_crs(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("tet4_laplacian.c: tet4_laplacian_assemble_hessian\t%g seconds\n", tock - tick);
+    printf("tet4_laplacian.c: tet4_laplacian_crs\t%g seconds\n", tock - tick);
 }
 
 void tet10_explict_momentum_tentative(const ptrdiff_t nelements,

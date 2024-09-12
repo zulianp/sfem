@@ -88,7 +88,38 @@ void fill_local_side_table(enum ElemType element_type, int *local_side_table) {
 
         LST(3, 0) = 4 - 1;
         LST(3, 1) = 1 - 1;
+    } else if (element_type == HEX8) {
+        LST(0, 0) = 1 - 1;
+        LST(0, 1) = 2 - 1;
+        LST(0, 2) = 6 - 1;
+        LST(0, 3) = 5 - 1;
+
+        LST(1, 0) = 2 - 1;
+        LST(1, 1) = 3 - 1;
+        LST(1, 2) = 7 - 1;
+        LST(1, 3) = 6 - 1;
+
+        LST(2, 0) = 3 - 1;
+        LST(2, 1) = 4 - 1;
+        LST(2, 2) = 8 - 1;
+        LST(2, 3) = 7 - 1;
+
+        LST(3, 0) = 4 - 1;
+        LST(3, 1) = 1 - 1;
+        LST(3, 2) = 5 - 1;
+        LST(3, 3) = 8 - 1;
+
+        LST(4, 0) = 4 - 1;
+        LST(4, 1) = 3 - 1;
+        LST(4, 2) = 2 - 1;
+        LST(4, 3) = 1 - 1;
+
+        LST(5, 0) = 5 - 1;
+        LST(5, 1) = 6 - 1;
+        LST(5, 2) = 7 - 1;
+        LST(5, 3) = 8 - 1;
     } else {
+        MPI_Abort(MPI_COMM_WORLD, -1);
         assert(0);
     }
 }
@@ -256,7 +287,7 @@ void create_element_adj_table(const ptrdiff_t n_elements,
     const int ns = elem_num_sides(element_type);
     element_idx_t *table = (element_idx_t *)malloc(n_elements * ns * sizeof(element_idx_t));
     create_element_adj_table_from_dual_graph(
-        n_elements, n_nodes, element_type, elems, adj_ptr, adj_idx, table);
+            n_elements, n_nodes, element_type, elems, adj_ptr, adj_idx, table);
 
     free(adj_ptr);
     free(adj_idx);

@@ -84,143 +84,144 @@ static SFEM_INLINE void find_cols4(const idx_t *targets,
     }
 }
 
-static SFEM_INLINE void tet4_stokes_assemble_hessian_kernel(const real_t mu,
-                                                     const real_t px0,
-                                                     const real_t px1,
-                                                     const real_t px2,
-                                                     const real_t px3,
-                                                     const real_t py0,
-                                                     const real_t py1,
-                                                     const real_t py2,
-                                                     const real_t py3,
-                                                     const real_t pz0,
-                                                     const real_t pz1,
-                                                     const real_t pz2,
-                                                     const real_t pz3,
-                                                     real_t *const SFEM_RESTRICT element_matrix) {
-    const real_t x0 = px0 - px1;
-    const real_t x1 = py0 - py2;
-    const real_t x2 = x0 * x1;
-    const real_t x3 = px0 - px2;
-    const real_t x4 = py0 - py1;
-    const real_t x5 = x3 * x4;
-    const real_t x6 = x2 - x5;
-    const real_t x7 = py0 - py3;
-    const real_t x8 = x0 * x7;
-    const real_t x9 = px0 - px3;
-    const real_t x10 = x4 * x9;
-    const real_t x11 = -x10 + x8;
-    const real_t x12 = x11 * x6;
-    const real_t x13 = x3 * x7;
-    const real_t x14 = -x1 * x9 + x13;
-    const real_t x15 = x11 * x14;
-    const real_t x16 = pz0 - pz2;
-    const real_t x17 = x0 * x16;
-    const real_t x18 = pz0 - pz1;
-    const real_t x19 = x18 * x3;
-    const real_t x20 = x17 - x19;
-    const real_t x21 = pz0 - pz3;
-    const real_t x22 = x0 * x21;
-    const real_t x23 = x18 * x9;
-    const real_t x24 = x22 - x23;
-    const real_t x25 = x20 * x24;
-    const real_t x26 = x21 * x3;
-    const real_t x27 = x16 * x9;
-    const real_t x28 = x26 - x27;
-    const real_t x29 = x24 * x28;
-    const real_t x30 = x16 * x4;
-    const real_t x31 = -x1 * x18 + x30;
-    const real_t x32 = x21 * x4;
-    const real_t x33 = x18 * x7;
-    const real_t x34 = x32 - x33;
-    const real_t x35 = x31 * x34;
-    const real_t x36 = x1 * x21;
-    const real_t x37 = -x16 * x7 + x36;
-    const real_t x38 = x34 * x37;
-    const real_t x39 = x14 * x6;
-    const real_t x40 = x20 * x28;
-    const real_t x41 = x31 * x37;
-    const real_t x42 = pow(x14, 2) + pow(x37, 2);
-    const real_t x43 = pow(x28, 2) + x42;
-    const real_t x44 = pow(x24, 2);
-    const real_t x45 = pow(x11, 2) + pow(x34, 2) + x44;
-    const real_t x46 = pow(x31, 2) + pow(x6, 2);
-    const real_t x47 = pow(x20, 2) + x46;
-    const real_t x48 = x43 + x45 + x47;
-    const real_t x49 = x2 * x21;
-    const real_t x50 = x16 * x8;
-    const real_t x51 = x21 * x5;
-    const real_t x52 = x19 * x7;
-    const real_t x53 = x10 * x16;
-    const real_t x54 = x1 * x23;
-    const real_t x55 = mu / (6 * x49 - 6 * x50 - 6 * x51 + 6 * x52 + 6 * x53 - 6 * x54);
-    const real_t x56 = -x55 * (-2 * x12 - 2 * x15 - 2 * x25 - 2 * x29 - 2 * x35 - 2 * x38 +
-                               2 * x39 + 2 * x40 + 2 * x41 + x48);
-    const real_t x57 = -x3;
-    const real_t x58 = -x21;
-    const real_t x59 = -x9;
-    const real_t x60 = -x16;
-    const real_t x61 = x57 * x58 - x59 * x60;
-    const real_t x62 = x24 * x61;
-    const real_t x63 = -x0;
-    const real_t x64 = -x7;
-    const real_t x65 = -x4;
-    const real_t x66 = -x59 * x65 + x63 * x64;
-    const real_t x67 = x14 * x66;
-    const real_t x68 = -x18;
-    const real_t x69 = x58 * x65 - x64 * x68;
-    const real_t x70 = x37 * x69;
-    const real_t x71 = -x57 * x68 + x60 * x63;
-    const real_t x72 = x39 + x41;
-    const real_t x73 = x61 * x71 + x72;
-    const real_t x74 = x49 - x50 - x51 + x52 + x53 - x54;
-    const real_t x75 = 1.0 / x74;
-    const real_t x76 = (1.0 / 6.0) * mu * x75;
-    const real_t x77 = x76 * (x42 + pow(x61, 2) - x62 - x67 - x70 + x73);
-    const real_t x78 = x62 + x67 + x70;
-    const real_t x79 = x6 * x66;
-    const real_t x80 = x24 * x71;
-    const real_t x81 = x31 * x69;
-    const real_t x82 = x79 + x80 + x81;
-    const real_t x83 = x76 * (x44 + pow(x66, 2) + pow(x69, 2) - x78 - x82);
-    const real_t x84 = x76 * (x46 + pow(x71, 2) + x73 - x79 - x80 - x81);
-    const real_t x85 = (1.0 / 24.0) * py1;
-    const real_t x86 = (1.0 / 24.0) * py2;
-    const real_t x87 = (1.0 / 24.0) * py3;
-    const real_t x88 = -pz1 * x86 + pz1 * x87 + pz2 * x85 - pz2 * x87 - pz3 * x85 + pz3 * x86;
-    const real_t x89 = -x43 * x55;
-    const real_t x90 = x76 * x78;
-    const real_t x91 = x40 + x72;
-    const real_t x92 = -x55 * x91;
-    const real_t x93 = (1.0 / 24.0) * x16 * x7 - 1.0 / 24.0 * x36;
-    const real_t x94 = -x45 * x55;
-    const real_t x95 = x76 * x82;
-    const real_t x96 = (1.0 / 24.0) * x32 - 1.0 / 24.0 * x33;
-    const real_t x97 = -x47 * x55;
-    const real_t x98 = (1.0 / 24.0) * x1 * x18 - 1.0 / 24.0 * x30;
-    const real_t x99 = -1.0 / 24.0 * px1 * pz2 + (1.0 / 24.0) * px1 * pz3 +
-                       (1.0 / 24.0) * px2 * pz1 - 1.0 / 24.0 * px2 * pz3 - 1.0 / 24.0 * px3 * pz1 +
-                       (1.0 / 24.0) * px3 * pz2;
-    const real_t x100 = (1.0 / 24.0) * x26 - 1.0 / 24.0 * x27;
-    const real_t x101 = (1.0 / 24.0) * x18 * x9 - 1.0 / 24.0 * x22;
-    const real_t x102 = (1.0 / 24.0) * x17 - 1.0 / 24.0 * x19;
-    const real_t x103 = px1 * x86 - px1 * x87 - px2 * x85 + px2 * x87 + px3 * x85 - px3 * x86;
-    const real_t x104 = (1.0 / 24.0) * x1 * x9 - 1.0 / 24.0 * x13;
-    const real_t x105 = -1.0 / 24.0 * x10 + (1.0 / 24.0) * x8;
-    const real_t x106 = -1.0 / 24.0 * x2 + (1.0 / 24.0) * x3 * x4;
-    const real_t x107 = -x22 + x23 + x61 + x71;
-    const real_t x108 = -x74;
-    const real_t x109 = x0 * x7 - x10 - x14 - x6;
-    const real_t x110 = x21 * x4 - x31 - x33 - x37;
-    const real_t x111 = (1.0 / 560.0) / (mu * (-x12 - x15 - x25 - x29 - x35 - x38 + x48 + x91));
-    const real_t x112 = x107 * x74;
-    const real_t x113 = x111 * (-x108 * (x109 * x14 + x110 * x37) - x112 * x28);
-    const real_t x114 = x111 * (x108 * (x109 * x11 + x110 * x34) + x112 * x24);
-    const real_t x115 = x111 * (-x108 * (x109 * x6 + x110 * x31) - x112 * x20);
-    const real_t x116 = x111 * x74;
-    const real_t x117 = x116 * (-x15 - x29 - x38);
-    const real_t x118 = x116 * x91;
-    const real_t x119 = x116 * (-x12 - x25 - x35);
+static SFEM_INLINE void tet4_stokes_assemble_hessian_kernel(const scalar_t mu,
+                                                            const scalar_t px0,
+                                                            const scalar_t px1,
+                                                            const scalar_t px2,
+                                                            const scalar_t px3,
+                                                            const scalar_t py0,
+                                                            const scalar_t py1,
+                                                            const scalar_t py2,
+                                                            const scalar_t py3,
+                                                            const scalar_t pz0,
+                                                            const scalar_t pz1,
+                                                            const scalar_t pz2,
+                                                            const scalar_t pz3,
+                                                            accumulator_t *const SFEM_RESTRICT
+                                                                    element_matrix) {
+    const scalar_t x0 = px0 - px1;
+    const scalar_t x1 = py0 - py2;
+    const scalar_t x2 = x0 * x1;
+    const scalar_t x3 = px0 - px2;
+    const scalar_t x4 = py0 - py1;
+    const scalar_t x5 = x3 * x4;
+    const scalar_t x6 = x2 - x5;
+    const scalar_t x7 = py0 - py3;
+    const scalar_t x8 = x0 * x7;
+    const scalar_t x9 = px0 - px3;
+    const scalar_t x10 = x4 * x9;
+    const scalar_t x11 = -x10 + x8;
+    const scalar_t x12 = x11 * x6;
+    const scalar_t x13 = x3 * x7;
+    const scalar_t x14 = -x1 * x9 + x13;
+    const scalar_t x15 = x11 * x14;
+    const scalar_t x16 = pz0 - pz2;
+    const scalar_t x17 = x0 * x16;
+    const scalar_t x18 = pz0 - pz1;
+    const scalar_t x19 = x18 * x3;
+    const scalar_t x20 = x17 - x19;
+    const scalar_t x21 = pz0 - pz3;
+    const scalar_t x22 = x0 * x21;
+    const scalar_t x23 = x18 * x9;
+    const scalar_t x24 = x22 - x23;
+    const scalar_t x25 = x20 * x24;
+    const scalar_t x26 = x21 * x3;
+    const scalar_t x27 = x16 * x9;
+    const scalar_t x28 = x26 - x27;
+    const scalar_t x29 = x24 * x28;
+    const scalar_t x30 = x16 * x4;
+    const scalar_t x31 = -x1 * x18 + x30;
+    const scalar_t x32 = x21 * x4;
+    const scalar_t x33 = x18 * x7;
+    const scalar_t x34 = x32 - x33;
+    const scalar_t x35 = x31 * x34;
+    const scalar_t x36 = x1 * x21;
+    const scalar_t x37 = -x16 * x7 + x36;
+    const scalar_t x38 = x34 * x37;
+    const scalar_t x39 = x14 * x6;
+    const scalar_t x40 = x20 * x28;
+    const scalar_t x41 = x31 * x37;
+    const scalar_t x42 = pow(x14, 2) + pow(x37, 2);
+    const scalar_t x43 = pow(x28, 2) + x42;
+    const scalar_t x44 = pow(x24, 2);
+    const scalar_t x45 = pow(x11, 2) + pow(x34, 2) + x44;
+    const scalar_t x46 = pow(x31, 2) + pow(x6, 2);
+    const scalar_t x47 = pow(x20, 2) + x46;
+    const scalar_t x48 = x43 + x45 + x47;
+    const scalar_t x49 = x2 * x21;
+    const scalar_t x50 = x16 * x8;
+    const scalar_t x51 = x21 * x5;
+    const scalar_t x52 = x19 * x7;
+    const scalar_t x53 = x10 * x16;
+    const scalar_t x54 = x1 * x23;
+    const scalar_t x55 = mu / (6 * x49 - 6 * x50 - 6 * x51 + 6 * x52 + 6 * x53 - 6 * x54);
+    const scalar_t x56 = -x55 * (-2 * x12 - 2 * x15 - 2 * x25 - 2 * x29 - 2 * x35 - 2 * x38 +
+                                 2 * x39 + 2 * x40 + 2 * x41 + x48);
+    const scalar_t x57 = -x3;
+    const scalar_t x58 = -x21;
+    const scalar_t x59 = -x9;
+    const scalar_t x60 = -x16;
+    const scalar_t x61 = x57 * x58 - x59 * x60;
+    const scalar_t x62 = x24 * x61;
+    const scalar_t x63 = -x0;
+    const scalar_t x64 = -x7;
+    const scalar_t x65 = -x4;
+    const scalar_t x66 = -x59 * x65 + x63 * x64;
+    const scalar_t x67 = x14 * x66;
+    const scalar_t x68 = -x18;
+    const scalar_t x69 = x58 * x65 - x64 * x68;
+    const scalar_t x70 = x37 * x69;
+    const scalar_t x71 = -x57 * x68 + x60 * x63;
+    const scalar_t x72 = x39 + x41;
+    const scalar_t x73 = x61 * x71 + x72;
+    const scalar_t x74 = x49 - x50 - x51 + x52 + x53 - x54;
+    const scalar_t x75 = 1.0 / x74;
+    const scalar_t x76 = (1.0 / 6.0) * mu * x75;
+    const scalar_t x77 = x76 * (x42 + pow(x61, 2) - x62 - x67 - x70 + x73);
+    const scalar_t x78 = x62 + x67 + x70;
+    const scalar_t x79 = x6 * x66;
+    const scalar_t x80 = x24 * x71;
+    const scalar_t x81 = x31 * x69;
+    const scalar_t x82 = x79 + x80 + x81;
+    const scalar_t x83 = x76 * (x44 + pow(x66, 2) + pow(x69, 2) - x78 - x82);
+    const scalar_t x84 = x76 * (x46 + pow(x71, 2) + x73 - x79 - x80 - x81);
+    const scalar_t x85 = (1.0 / 24.0) * py1;
+    const scalar_t x86 = (1.0 / 24.0) * py2;
+    const scalar_t x87 = (1.0 / 24.0) * py3;
+    const scalar_t x88 = -pz1 * x86 + pz1 * x87 + pz2 * x85 - pz2 * x87 - pz3 * x85 + pz3 * x86;
+    const scalar_t x89 = -x43 * x55;
+    const scalar_t x90 = x76 * x78;
+    const scalar_t x91 = x40 + x72;
+    const scalar_t x92 = -x55 * x91;
+    const scalar_t x93 = (1.0 / 24.0) * x16 * x7 - 1.0 / 24.0 * x36;
+    const scalar_t x94 = -x45 * x55;
+    const scalar_t x95 = x76 * x82;
+    const scalar_t x96 = (1.0 / 24.0) * x32 - 1.0 / 24.0 * x33;
+    const scalar_t x97 = -x47 * x55;
+    const scalar_t x98 = (1.0 / 24.0) * x1 * x18 - 1.0 / 24.0 * x30;
+    const scalar_t x99 = -1.0 / 24.0 * px1 * pz2 + (1.0 / 24.0) * px1 * pz3 +
+                         (1.0 / 24.0) * px2 * pz1 - 1.0 / 24.0 * px2 * pz3 -
+                         1.0 / 24.0 * px3 * pz1 + (1.0 / 24.0) * px3 * pz2;
+    const scalar_t x100 = (1.0 / 24.0) * x26 - 1.0 / 24.0 * x27;
+    const scalar_t x101 = (1.0 / 24.0) * x18 * x9 - 1.0 / 24.0 * x22;
+    const scalar_t x102 = (1.0 / 24.0) * x17 - 1.0 / 24.0 * x19;
+    const scalar_t x103 = px1 * x86 - px1 * x87 - px2 * x85 + px2 * x87 + px3 * x85 - px3 * x86;
+    const scalar_t x104 = (1.0 / 24.0) * x1 * x9 - 1.0 / 24.0 * x13;
+    const scalar_t x105 = -1.0 / 24.0 * x10 + (1.0 / 24.0) * x8;
+    const scalar_t x106 = -1.0 / 24.0 * x2 + (1.0 / 24.0) * x3 * x4;
+    const scalar_t x107 = -x22 + x23 + x61 + x71;
+    const scalar_t x108 = -x74;
+    const scalar_t x109 = x0 * x7 - x10 - x14 - x6;
+    const scalar_t x110 = x21 * x4 - x31 - x33 - x37;
+    const scalar_t x111 = (1.0 / 560.0) / (mu * (-x12 - x15 - x25 - x29 - x35 - x38 + x48 + x91));
+    const scalar_t x112 = x107 * x74;
+    const scalar_t x113 = x111 * (-x108 * (x109 * x14 + x110 * x37) - x112 * x28);
+    const scalar_t x114 = x111 * (x108 * (x109 * x11 + x110 * x34) + x112 * x24);
+    const scalar_t x115 = x111 * (-x108 * (x109 * x6 + x110 * x31) - x112 * x20);
+    const scalar_t x116 = x111 * x74;
+    const scalar_t x117 = x116 * (-x15 - x29 - x38);
+    const scalar_t x118 = x116 * x91;
+    const scalar_t x119 = x116 * (-x12 - x25 - x35);
     element_matrix[0] = x56;
     element_matrix[1] = x77;
     element_matrix[2] = x83;
@@ -426,7 +427,8 @@ static SFEM_INLINE void tet4_stokes_assemble_hessian_kernel(const real_t mu,
     element_matrix[202] = x105;
     element_matrix[203] = x106;
     element_matrix[204] =
-        x111 * x75 * (pow(x107, 2) * pow(x74, 2) + pow(x108, 2) * (pow(x109, 2) + pow(x110, 2)));
+            x111 * x75 *
+            (pow(x107, 2) * pow(x74, 2) + pow(x108, 2) * (pow(x109, 2) + pow(x110, 2)));
     element_matrix[205] = x113;
     element_matrix[206] = x114;
     element_matrix[207] = x115;
@@ -480,23 +482,24 @@ static SFEM_INLINE void tet4_stokes_assemble_hessian_kernel(const real_t mu,
     element_matrix[255] = x116 * x47;
 }
 
-SFEM_INLINE void tet4_stokes_mini_assemble_rhs_kernel(const real_t mu,
-                                                      const real_t rho,
-                                                      const real_t px0,
-                                                      const real_t px1,
-                                                      const real_t px2,
-                                                      const real_t px3,
-                                                      const real_t py0,
-                                                      const real_t py1,
-                                                      const real_t py2,
-                                                      const real_t py3,
-                                                      const real_t pz0,
-                                                      const real_t pz1,
-                                                      const real_t pz2,
-                                                      const real_t pz3,
-                                                      const real_t *const SFEM_RESTRICT u_rhs,
-                                                      const real_t *const SFEM_RESTRICT p_rhs,
-                                                      real_t *const SFEM_RESTRICT element_vector) {
+static SFEM_INLINE void tet4_stokes_mini_assemble_rhs_kernel(
+        const scalar_t mu,
+        const scalar_t rho,
+        const scalar_t px0,
+        const scalar_t px1,
+        const scalar_t px2,
+        const scalar_t px3,
+        const scalar_t py0,
+        const scalar_t py1,
+        const scalar_t py2,
+        const scalar_t py3,
+        const scalar_t pz0,
+        const scalar_t pz1,
+        const scalar_t pz2,
+        const scalar_t pz3,
+        const scalar_t *const SFEM_RESTRICT u_rhs,
+        const scalar_t *const SFEM_RESTRICT p_rhs,
+        accumulator_t *const SFEM_RESTRICT element_vector) {
     //     const real_t x0 = u_rhs[3] + u_rhs[4];
     //     const real_t x1 = u_rhs[2] + x0;
     //     const real_t x2 = pz0 - pz3;
@@ -644,142 +647,175 @@ SFEM_INLINE void tet4_stokes_mini_assemble_rhs_kernel(const real_t mu,
 }
 
 static SFEM_INLINE void tet4_stokes_mini_apply_kernel(const real_t mu,
-                                               const real_t px0,
-                                               const real_t px1,
-                                               const real_t px2,
-                                               const real_t px3,
-                                               const real_t py0,
-                                               const real_t py1,
-                                               const real_t py2,
-                                               const real_t py3,
-                                               const real_t pz0,
-                                               const real_t pz1,
-                                               const real_t pz2,
-                                               const real_t pz3,
-                                               const real_t *const SFEM_RESTRICT increment,
-                                               real_t *const SFEM_RESTRICT element_vector) {
+                                                      const real_t px0,
+                                                      const real_t px1,
+                                                      const real_t px2,
+                                                      const real_t px3,
+                                                      const real_t py0,
+                                                      const real_t py1,
+                                                      const real_t py2,
+                                                      const real_t py3,
+                                                      const real_t pz0,
+                                                      const real_t pz1,
+                                                      const real_t pz2,
+                                                      const real_t pz3,
+                                                      const real_t *const SFEM_RESTRICT increment,
+                                                      real_t *const SFEM_RESTRICT element_vector) {
     const real_t x0 = -py0 + py1;
     const real_t x1 = -pz0 + pz2;
-    const real_t x2 = x0*x1;
+    const real_t x2 = x0 * x1;
     const real_t x3 = -py0 + py2;
     const real_t x4 = -pz0 + pz1;
-    const real_t x5 = x3*x4;
+    const real_t x5 = x3 * x4;
     const real_t x6 = x2 - x5;
     const real_t x7 = -px0 + px1;
     const real_t x8 = -pz0 + pz3;
-    const real_t x9 = x3*x8;
+    const real_t x9 = x3 * x8;
     const real_t x10 = -px0 + px2;
     const real_t x11 = -py0 + py3;
     const real_t x12 = -px0 + px3;
-    const real_t x13 = x1*x11;
-    const real_t x14 = x0*x8;
-    const real_t x15 = x10*x11*x4 - x10*x14 + x12*x2 - x12*x5 - x13*x7 + x7*x9;
-    const real_t x16 = 1.0/x15;
-    const real_t x17 = (1.0/24.0)*x16;
-    const real_t x18 = x11*x4 - x14;
+    const real_t x13 = x1 * x11;
+    const real_t x14 = x0 * x8;
+    const real_t x15 = x10 * x11 * x4 - x10 * x14 + x12 * x2 - x12 * x5 - x13 * x7 + x7 * x9;
+    const real_t x16 = 1.0 / x15;
+    const real_t x17 = (1.0 / 24.0) * x16;
+    const real_t x18 = x11 * x4 - x14;
     const real_t x19 = -x13 + x9;
-    const real_t x20 = x17*x18 + x17*x19 + x17*x6;
-    const real_t x21 = x15*x20;
-    const real_t x22 = x10*x11 - x12*x3;
+    const real_t x20 = x17 * x18 + x17 * x19 + x17 * x6;
+    const real_t x21 = x15 * x20;
+    const real_t x22 = x10 * x11 - x12 * x3;
     const real_t x23 = pow(x22, 2);
     const real_t x24 = pow(x15, -2);
-    const real_t x25 = (1.0/6.0)*x24;
-    const real_t x26 = x1*x12 - x10*x8;
+    const real_t x25 = (1.0 / 6.0) * x24;
+    const real_t x26 = x1 * x12 - x10 * x8;
     const real_t x27 = pow(x26, 2);
     const real_t x28 = pow(x19, 2);
-    const real_t x29 = x23*x25 + x25*x27 + x25*x28;
-    const real_t x30 = x0*x12 - x11*x7;
-    const real_t x31 = x25*x30;
-    const real_t x32 = -x12*x4 + x7*x8;
-    const real_t x33 = x25*x32;
-    const real_t x34 = x18*x19;
-    const real_t x35 = x22*x31 + x25*x34 + x26*x33;
-    const real_t x36 = -x0*x10 + x3*x7;
-    const real_t x37 = x22*x36;
-    const real_t x38 = -x1*x7 + x10*x4;
-    const real_t x39 = x26*x38;
-    const real_t x40 = x25*x6;
-    const real_t x41 = x19*x40 + x25*x37 + x25*x39;
+    const real_t x29 = x23 * x25 + x25 * x27 + x25 * x28;
+    const real_t x30 = x0 * x12 - x11 * x7;
+    const real_t x31 = x25 * x30;
+    const real_t x32 = -x12 * x4 + x7 * x8;
+    const real_t x33 = x25 * x32;
+    const real_t x34 = x18 * x19;
+    const real_t x35 = x22 * x31 + x25 * x34 + x26 * x33;
+    const real_t x36 = -x0 * x10 + x3 * x7;
+    const real_t x37 = x22 * x36;
+    const real_t x38 = -x1 * x7 + x10 * x4;
+    const real_t x39 = x26 * x38;
+    const real_t x40 = x25 * x6;
+    const real_t x41 = x19 * x40 + x25 * x37 + x25 * x39;
     const real_t x42 = -x29 - x35 - x41;
-    const real_t x43 = mu*x15;
-    const real_t x44 = increment[1]*x43;
+    const real_t x43 = mu * x15;
+    const real_t x44 = increment[1] * x43;
     const real_t x45 = pow(x30, 2);
     const real_t x46 = pow(x32, 2);
     const real_t x47 = pow(x18, 2);
-    const real_t x48 = x25*x45 + x25*x46 + x25*x47;
-    const real_t x49 = x18*x40 + x31*x36 + x33*x38;
+    const real_t x48 = x25 * x45 + x25 * x46 + x25 * x47;
+    const real_t x49 = x18 * x40 + x31 * x36 + x33 * x38;
     const real_t x50 = -x35 - x48 - x49;
-    const real_t x51 = increment[2]*x43;
+    const real_t x51 = increment[2] * x43;
     const real_t x52 = pow(x36, 2);
     const real_t x53 = pow(x38, 2);
     const real_t x54 = pow(x6, 2);
-    const real_t x55 = x25*x52 + x25*x53 + x25*x54;
+    const real_t x55 = x25 * x52 + x25 * x53 + x25 * x54;
     const real_t x56 = -x41 - x49 - x55;
-    const real_t x57 = increment[3]*x43;
-    const real_t x58 = (1.0/3.0)*x24;
-    const real_t x59 = x30*x58;
-    const real_t x60 = x32*x58;
-    const real_t x61 = x58*x6;
-    const real_t x62 = x18*x61 + x19*x61 + x22*x59 + x26*x60 + x29 + x34*x58 + x36*x59 + x37*x58 + x38*x60 + x39*x58 + x48 + x55;
-    const real_t x63 = increment[0]*x43;
-    const real_t x64 = (1.0/24.0)*x19;
-    const real_t x65 = (1.0/24.0)*x18;
-    const real_t x66 = (1.0/24.0)*x6;
-    const real_t x67 = x17*x26 + x17*x32 + x17*x38;
-    const real_t x68 = x15*x67;
-    const real_t x69 = (1.0/24.0)*x26;
-    const real_t x70 = (1.0/24.0)*x32;
-    const real_t x71 = (1.0/24.0)*x38;
-    const real_t x72 = x17*x22 + x17*x30 + x17*x36;
-    const real_t x73 = x15*x72;
-    const real_t x74 = increment[10]*x43;
-    const real_t x75 = increment[11]*x43;
-    const real_t x76 = increment[9]*x43;
-    const real_t x77 = increment[8]*x43;
-    const real_t x78 = (1.0/24.0)*x22;
-    const real_t x79 = (1.0/24.0)*x30;
-    const real_t x80 = (1.0/24.0)*x36;
-    const real_t x81 = (16.0/315.0)*x16;
-    const real_t x82 = -x22*x81 - x30*x81 - x36*x81;
-    const real_t x83 = (4096.0/2835.0)*x24;
-    const real_t x84 = x30*x83;
-    const real_t x85 = x32*x83;
-    const real_t x86 = x6*x83;
-    const real_t x87 = 1/(mu*(x18*x86 + x19*x86 + x22*x84 + x23*x83 + x26*x85 + x27*x83 + x28*x83 + x34*x83 + x36*x84 + x37*x83 + x38*x85 + x39*x83 + x45*x83 + x46*x83 + x47*x83 + x52*x83 + x53*x83 + x54*x83));
-    const real_t x88 = x15*x87;
-    const real_t x89 = -x26*x81 - x32*x81 - x38*x81;
-    const real_t x90 = -x18*x81 - x19*x81 - x6*x81;
-    const real_t x91 = (16.0/315.0)*x87;
-    const real_t x92 = x82*x91;
-    const real_t x93 = x89*x91;
-    const real_t x94 = x90*x91;
-    const real_t x95 = -x19*x94 - x22*x92 - x26*x93;
-    const real_t x96 = -x18*x94 - x30*x92 - x32*x93;
-    const real_t x97 = -x36*x92 - x38*x93 - x6*x94;
-    const real_t x98 = -increment[0]*x15*x20 + increment[10]*x79 + increment[11]*x80 + increment[1]*x64 + increment[2]*x65 + increment[3]*x66 - increment[4]*x15*x67 + increment[5]*x69 + increment[6]*x70 + increment[7]*x71 - increment[8]*x15*x72 + increment[9]*x78;
-    const real_t x99 = (256.0/99225.0)*x16*x87;
-    const real_t x100 = x30*x99;
-    const real_t x101 = x32*x99;
-    const real_t x102 = -x100*x22 - x101*x26 - x34*x99;
-    const real_t x103 = x6*x99;
-    const real_t x104 = -x103*x19 - x37*x99 - x39*x99;
-    const real_t x105 = -x100*x36 - x101*x38 - x103*x18;
-    element_vector[0] = increment[12]*x21 + increment[13]*x21 + increment[14]*x21 + increment[15]*x21 + x42*x44 + x50*x51 + x56*x57 + x62*x63;
-    element_vector[1] = -increment[12]*x64 - increment[13]*x64 - increment[14]*x64 - increment[15]*x64 + x29*x44 + x35*x51 + x41*x57 + x42*x63;
-    element_vector[2] = -increment[12]*x65 - increment[13]*x65 - increment[14]*x65 - increment[15]*x65 + x35*x44 + x48*x51 + x49*x57 + x50*x63;
-    element_vector[3] = -increment[12]*x66 - increment[13]*x66 - increment[14]*x66 - increment[15]*x66 + x41*x44 + x49*x51 + x55*x57 + x56*x63;
-    element_vector[4] = increment[12]*x68 + increment[13]*x68 + increment[14]*x68 + increment[15]*x68 + increment[4]*x43*x62 + increment[5]*x42*x43 + increment[6]*x43*x50 + increment[7]*x43*x56;
-    element_vector[5] = -increment[12]*x69 - increment[13]*x69 - increment[14]*x69 - increment[15]*x69 + increment[4]*mu*x15*x42 + increment[5]*mu*x15*x29 + increment[6]*mu*x15*x35 + increment[7]*mu*x15*x41;
-    element_vector[6] = -increment[12]*x70 - increment[13]*x70 - increment[14]*x70 - increment[15]*x70 + increment[4]*mu*x15*x50 + increment[5]*mu*x15*x35 + increment[6]*mu*x15*x48 + increment[7]*mu*x15*x49;
-    element_vector[7] = -increment[12]*x71 - increment[13]*x71 - increment[14]*x71 - increment[15]*x71 + increment[4]*mu*x15*x56 + increment[5]*mu*x15*x41 + increment[6]*mu*x15*x49 + increment[7]*mu*x15*x55;
-    element_vector[8] = increment[12]*x73 + increment[13]*x73 + increment[14]*x73 + increment[15]*x73 + x42*x76 + x50*x74 + x56*x75 + x62*x77;
-    element_vector[9] = -increment[12]*x78 - increment[13]*x78 - increment[14]*x78 - increment[15]*x78 + x29*x76 + x35*x74 + x41*x75 + x42*x77;
-    element_vector[10] = -increment[12]*x79 - increment[13]*x79 - increment[14]*x79 - increment[15]*x79 + x35*x76 + x48*x74 + x49*x75 + x50*x77;
-    element_vector[11] = -increment[12]*x80 - increment[13]*x80 - increment[14]*x80 - increment[15]*x80 + x41*x76 + x49*x74 + x55*x75 + x56*x77;
-    element_vector[12] = increment[12]*(-pow(x82, 2)*x88 - x88*pow(x89, 2) - x88*pow(x90, 2)) + increment[13]*x95 + increment[14]*x96 + increment[15]*x97 - x98;
-    element_vector[13] = increment[12]*x95 + increment[13]*(-x23*x99 - x27*x99 - x28*x99) + increment[14]*x102 + increment[15]*x104 - x98;
-    element_vector[14] = increment[12]*x96 + increment[13]*x102 + increment[14]*(-x45*x99 - x46*x99 - x47*x99) + increment[15]*x105 - x98;
-    element_vector[15] = increment[12]*x97 + increment[13]*x104 + increment[14]*x105 + increment[15]*(-x52*x99 - x53*x99 - x54*x99) - x98;
+    const real_t x57 = increment[3] * x43;
+    const real_t x58 = (1.0 / 3.0) * x24;
+    const real_t x59 = x30 * x58;
+    const real_t x60 = x32 * x58;
+    const real_t x61 = x58 * x6;
+    const real_t x62 = x18 * x61 + x19 * x61 + x22 * x59 + x26 * x60 + x29 + x34 * x58 + x36 * x59 +
+                       x37 * x58 + x38 * x60 + x39 * x58 + x48 + x55;
+    const real_t x63 = increment[0] * x43;
+    const real_t x64 = (1.0 / 24.0) * x19;
+    const real_t x65 = (1.0 / 24.0) * x18;
+    const real_t x66 = (1.0 / 24.0) * x6;
+    const real_t x67 = x17 * x26 + x17 * x32 + x17 * x38;
+    const real_t x68 = x15 * x67;
+    const real_t x69 = (1.0 / 24.0) * x26;
+    const real_t x70 = (1.0 / 24.0) * x32;
+    const real_t x71 = (1.0 / 24.0) * x38;
+    const real_t x72 = x17 * x22 + x17 * x30 + x17 * x36;
+    const real_t x73 = x15 * x72;
+    const real_t x74 = increment[10] * x43;
+    const real_t x75 = increment[11] * x43;
+    const real_t x76 = increment[9] * x43;
+    const real_t x77 = increment[8] * x43;
+    const real_t x78 = (1.0 / 24.0) * x22;
+    const real_t x79 = (1.0 / 24.0) * x30;
+    const real_t x80 = (1.0 / 24.0) * x36;
+    const real_t x81 = (16.0 / 315.0) * x16;
+    const real_t x82 = -x22 * x81 - x30 * x81 - x36 * x81;
+    const real_t x83 = (4096.0 / 2835.0) * x24;
+    const real_t x84 = x30 * x83;
+    const real_t x85 = x32 * x83;
+    const real_t x86 = x6 * x83;
+    const real_t x87 =
+            1 / (mu * (x18 * x86 + x19 * x86 + x22 * x84 + x23 * x83 + x26 * x85 + x27 * x83 +
+                       x28 * x83 + x34 * x83 + x36 * x84 + x37 * x83 + x38 * x85 + x39 * x83 +
+                       x45 * x83 + x46 * x83 + x47 * x83 + x52 * x83 + x53 * x83 + x54 * x83));
+    const real_t x88 = x15 * x87;
+    const real_t x89 = -x26 * x81 - x32 * x81 - x38 * x81;
+    const real_t x90 = -x18 * x81 - x19 * x81 - x6 * x81;
+    const real_t x91 = (16.0 / 315.0) * x87;
+    const real_t x92 = x82 * x91;
+    const real_t x93 = x89 * x91;
+    const real_t x94 = x90 * x91;
+    const real_t x95 = -x19 * x94 - x22 * x92 - x26 * x93;
+    const real_t x96 = -x18 * x94 - x30 * x92 - x32 * x93;
+    const real_t x97 = -x36 * x92 - x38 * x93 - x6 * x94;
+    const real_t x98 = -increment[0] * x15 * x20 + increment[10] * x79 + increment[11] * x80 +
+                       increment[1] * x64 + increment[2] * x65 + increment[3] * x66 -
+                       increment[4] * x15 * x67 + increment[5] * x69 + increment[6] * x70 +
+                       increment[7] * x71 - increment[8] * x15 * x72 + increment[9] * x78;
+    const real_t x99 = (256.0 / 99225.0) * x16 * x87;
+    const real_t x100 = x30 * x99;
+    const real_t x101 = x32 * x99;
+    const real_t x102 = -x100 * x22 - x101 * x26 - x34 * x99;
+    const real_t x103 = x6 * x99;
+    const real_t x104 = -x103 * x19 - x37 * x99 - x39 * x99;
+    const real_t x105 = -x100 * x36 - x101 * x38 - x103 * x18;
+    element_vector[0] = increment[12] * x21 + increment[13] * x21 + increment[14] * x21 +
+                        increment[15] * x21 + x42 * x44 + x50 * x51 + x56 * x57 + x62 * x63;
+    element_vector[1] = -increment[12] * x64 - increment[13] * x64 - increment[14] * x64 -
+                        increment[15] * x64 + x29 * x44 + x35 * x51 + x41 * x57 + x42 * x63;
+    element_vector[2] = -increment[12] * x65 - increment[13] * x65 - increment[14] * x65 -
+                        increment[15] * x65 + x35 * x44 + x48 * x51 + x49 * x57 + x50 * x63;
+    element_vector[3] = -increment[12] * x66 - increment[13] * x66 - increment[14] * x66 -
+                        increment[15] * x66 + x41 * x44 + x49 * x51 + x55 * x57 + x56 * x63;
+    element_vector[4] = increment[12] * x68 + increment[13] * x68 + increment[14] * x68 +
+                        increment[15] * x68 + increment[4] * x43 * x62 + increment[5] * x42 * x43 +
+                        increment[6] * x43 * x50 + increment[7] * x43 * x56;
+    element_vector[5] = -increment[12] * x69 - increment[13] * x69 - increment[14] * x69 -
+                        increment[15] * x69 + increment[4] * mu * x15 * x42 +
+                        increment[5] * mu * x15 * x29 + increment[6] * mu * x15 * x35 +
+                        increment[7] * mu * x15 * x41;
+    element_vector[6] = -increment[12] * x70 - increment[13] * x70 - increment[14] * x70 -
+                        increment[15] * x70 + increment[4] * mu * x15 * x50 +
+                        increment[5] * mu * x15 * x35 + increment[6] * mu * x15 * x48 +
+                        increment[7] * mu * x15 * x49;
+    element_vector[7] = -increment[12] * x71 - increment[13] * x71 - increment[14] * x71 -
+                        increment[15] * x71 + increment[4] * mu * x15 * x56 +
+                        increment[5] * mu * x15 * x41 + increment[6] * mu * x15 * x49 +
+                        increment[7] * mu * x15 * x55;
+    element_vector[8] = increment[12] * x73 + increment[13] * x73 + increment[14] * x73 +
+                        increment[15] * x73 + x42 * x76 + x50 * x74 + x56 * x75 + x62 * x77;
+    element_vector[9] = -increment[12] * x78 - increment[13] * x78 - increment[14] * x78 -
+                        increment[15] * x78 + x29 * x76 + x35 * x74 + x41 * x75 + x42 * x77;
+    element_vector[10] = -increment[12] * x79 - increment[13] * x79 - increment[14] * x79 -
+                         increment[15] * x79 + x35 * x76 + x48 * x74 + x49 * x75 + x50 * x77;
+    element_vector[11] = -increment[12] * x80 - increment[13] * x80 - increment[14] * x80 -
+                         increment[15] * x80 + x41 * x76 + x49 * x74 + x55 * x75 + x56 * x77;
+    element_vector[12] =
+            increment[12] * (-pow(x82, 2) * x88 - x88 * pow(x89, 2) - x88 * pow(x90, 2)) +
+            increment[13] * x95 + increment[14] * x96 + increment[15] * x97 - x98;
+    element_vector[13] = increment[12] * x95 +
+                         increment[13] * (-x23 * x99 - x27 * x99 - x28 * x99) +
+                         increment[14] * x102 + increment[15] * x104 - x98;
+    element_vector[14] = increment[12] * x96 + increment[13] * x102 +
+                         increment[14] * (-x45 * x99 - x46 * x99 - x47 * x99) +
+                         increment[15] * x105 - x98;
+    element_vector[15] = increment[12] * x97 + increment[13] * x104 + increment[14] * x105 +
+                         increment[15] * (-x52 * x99 - x53 * x99 - x54 * x99) - x98;
 }
 
 void tet4_stokes_mini_assemble_hessian_soa(const ptrdiff_t nelements,
@@ -800,11 +836,11 @@ void tet4_stokes_mini_assemble_hessian_soa(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for //nowait
+#pragma omp for  // nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             idx_t ks[4][4];
-            real_t element_matrix[4 * 4 * 4 * 4];
+            accumulator_t element_matrix[4 * 4 * 4 * 4];
 #pragma unroll(4)
             for (int v = 0; v < 4; ++v) {
                 ev[v] = elems[v][i];
@@ -904,12 +940,12 @@ void tet4_stokes_mini_assemble_hessian_aos(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for //nowait
+#pragma omp for  // nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             idx_t ks[4];
 
-            real_t element_matrix[(4 * 4) * (4 * 4)];
+            accumulator_t element_matrix[(4 * 4) * (4 * 4)];
 
 #pragma unroll(4)
             for (int v = 0; v < 4; ++v) {
@@ -923,25 +959,25 @@ void tet4_stokes_mini_assemble_hessian_aos(const ptrdiff_t nelements,
             const idx_t i3 = ev[3];
 
             tet4_stokes_assemble_hessian_kernel(
-                // Model parameters
-                mu,
-                // X-coordinates
-                points[0][i0],
-                points[0][i1],
-                points[0][i2],
-                points[0][i3],
-                // Y-coordinates
-                points[1][i0],
-                points[1][i1],
-                points[1][i2],
-                points[1][i3],
-                // Z-coordinates
-                points[2][i0],
-                points[2][i1],
-                points[2][i2],
-                points[2][i3],
-                // output matrix
-                element_matrix);
+                    // Model parameters
+                    mu,
+                    // X-coordinates
+                    points[0][i0],
+                    points[0][i1],
+                    points[0][i2],
+                    points[0][i3],
+                    // Y-coordinates
+                    points[1][i0],
+                    points[1][i1],
+                    points[1][i2],
+                    points[1][i3],
+                    // Z-coordinates
+                    points[2][i0],
+                    points[2][i1],
+                    points[2][i2],
+                    points[2][i3],
+                    // output matrix
+                    element_matrix);
 
             assert(!check_symmetric(16, element_matrix));
 
@@ -1000,13 +1036,13 @@ void tet4_stokes_mini_assemble_rhs_soa(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for //nowait
+#pragma omp for  // nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             idx_t ks[4];
-            real_t element_vector[4 * 4];
-            real_t u_rhs[5 * 4];
-            real_t p_rhs[4] = {0., 0., 0., 0.};
+            accumulator_t element_vector[4 * 4];
+            scalar_t u_rhs[5 * 4];
+            scalar_t p_rhs[4] = {0., 0., 0., 0.};
 
 #pragma unroll(4)
             for (int v = 0; v < 4; ++v) {
@@ -1019,7 +1055,7 @@ void tet4_stokes_mini_assemble_rhs_soa(const ptrdiff_t nelements,
             const idx_t i2 = ev[2];
             const idx_t i3 = ev[3];
 
-            memset(u_rhs, 0, 5 * 3 * sizeof(real_t));
+            memset(u_rhs, 0, 5 * 3 * sizeof(scalar_t));
 
             for (int v = 0; v < 3; v++) {
                 for (int ii = 0; ii < 4; ii++) {
@@ -1094,13 +1130,13 @@ void tet4_stokes_mini_assemble_rhs_aos(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for //nowait
+#pragma omp for  // nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             idx_t ks[4];
-            real_t element_vector[4 * 4];
-            real_t u_rhs[5 * 4];
-            real_t p_rhs[4] = {0., 0., 0., 0.};
+            accumulator_t element_vector[4 * 4];
+            scalar_t u_rhs[5 * 4];
+            scalar_t p_rhs[4] = {0., 0., 0., 0.};
 
 #pragma unroll(4)
             for (int v = 0; v < 4; ++v) {
@@ -1113,7 +1149,7 @@ void tet4_stokes_mini_assemble_rhs_aos(const ptrdiff_t nelements,
             const idx_t i2 = ev[2];
             const idx_t i3 = ev[3];
 
-            memset(u_rhs, 0, 5 * 3 * sizeof(real_t));
+            memset(u_rhs, 0, 5 * 3 * sizeof(scalar_t));
 
             for (int v = 0; v < 3; v++) {
                 for (int ii = 0; ii < 4; ii++) {
@@ -1188,7 +1224,7 @@ void tet4_stokes_mini_apply_aos(const ptrdiff_t nelements,
 
 #pragma omp parallel
     {
-#pragma omp for //nowait
+#pragma omp for  // nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
             idx_t ks[4];

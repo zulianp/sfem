@@ -10,6 +10,41 @@
 extern "C" {
 #endif
 
+enum RealType { SFEM_FLOAT16 = 2, SFEM_FLOAT32 = 4, SFEM_FLOAT64 = 8, SFEM_REAL_DEFAULT = 0 };
+enum IntegerType { SFEM_INT16 = 20, SFEM_INT32 = 40, SFEM_INT64 = 80, SFEM_INT_DEFAULT = 0 };
+
+static void * SFEM_DEFAULT_STREAM = 0;
+
+SFEM_INLINE static const char* real_type_to_string(enum RealType type) {
+    switch (type) {
+        case SFEM_FLOAT16:
+            return "SFEM_FLOAT16";
+        case SFEM_FLOAT32:
+            return "SFEM_FLOAT32";
+        case SFEM_FLOAT64:
+            return "SFEM_FLOAT64";
+        case SFEM_REAL_DEFAULT:
+            return "SFEM_REAL_DEFAULT";
+        default:
+            return "SFEM_FLOAT_UNDEFINED";
+    }
+}
+
+SFEM_INLINE static const char* integer_type_to_string(enum IntegerType type) {
+    switch (type) {
+        case SFEM_INT16:
+            return "SFEM_INT16";
+        case SFEM_INT32:
+            return "SFEM_INT32";
+        case SFEM_INT64:
+            return "SFEM_INT64";
+        case SFEM_INT_DEFAULT:
+            return "SFEM_INT_DEFAULT";
+        default:
+            return "SFEM_INT_UNDEFINED";
+    }
+}
+
 enum ElemType {
     NIL = 0,
     NODE1 = 1,
@@ -113,6 +148,8 @@ SFEM_INLINE static enum ElemType side_type(const enum ElemType type) {
             return BEAM2;
         case MACRO_TET4:
             return TRI6;  // FIXME
+        case HEX8:
+            return QUAD4;
         default: {
             assert(0);
             return INVALID;

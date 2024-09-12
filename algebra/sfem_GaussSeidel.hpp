@@ -66,6 +66,10 @@ namespace sfem {
         int check_each{100};
         bool verbose{false};
 
+        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
+
+        ExecutionSpace execution_space() const override { return execution_space_; }
+
         void default_init() {
             allocate = [](const ptrdiff_t n) -> T* { return (T*)calloc(n, sizeof(T)); };
 
@@ -110,6 +114,8 @@ namespace sfem {
             };
 
             zeros = [](const std::size_t n, T* const x) { memset(x, 0, n * sizeof(T)); };
+
+            execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         bool good() const {

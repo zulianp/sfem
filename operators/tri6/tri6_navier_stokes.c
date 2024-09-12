@@ -2534,7 +2534,7 @@ void tri6_momentum_lhs_scalar_crs(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("tri3_laplacian.c: tri3_laplacian_assemble_hessian\t%g seconds\n", tock - tick);
+    printf("tri3_laplacian.c: tri3_laplacian_crs\t%g seconds\n", tock - tick);
 }
 
 void tri6_explict_momentum_tentative(const ptrdiff_t nelements,
