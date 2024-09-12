@@ -12,8 +12,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#define real_t double
-
 #include "quadratures_rule.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
