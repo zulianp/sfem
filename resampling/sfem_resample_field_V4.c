@@ -60,15 +60,16 @@ SFEM_INLINE static vec4_t tet4_measure_V4(
     //
     // V = (1/6) * det(M)
 
+    const scalar_t ref_vol = 1./6;
     const vec4_t x0 = -pz0 + pz3;
     const vec4_t x1 = -py0 + py2;
-    const vec4_t x2 = -(1.0 / 6.0) * px0 + (1.0 / 6.0) * px1;
+    const vec4_t x2 = -ref_vol * px0 + ref_vol * px1;
     const vec4_t x3 = -py0 + py3;
     const vec4_t x4 = -pz0 + pz2;
     const vec4_t x5 = -py0 + py1;
-    const vec4_t x6 = -(1.0 / 6.0) * px0 + (1.0 / 6.0) * px2;
+    const vec4_t x6 = -ref_vol * px0 + ref_vol * px2;
     const vec4_t x7 = -pz0 + pz1;
-    const vec4_t x8 = -(1.0 / 6.0) * px0 + (1.0 / 6.0) * px3;
+    const vec4_t x8 = -ref_vol * px0 + ref_vol * px3;
 
     return x0 * x1 * x2 - x0 * x5 * x6 - x1 * x7 * x8 - x2 * x3 * x4 + x3 * x6 * x7 + x4 * x5 * x8;
 }
