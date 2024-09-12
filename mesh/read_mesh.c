@@ -397,7 +397,7 @@ int mesh_read_elements(MPI_Comm comm,
         }
     }
 
-#ifdef SFEM_MEM_DIAGNOSTICS
+#ifdef SFEM_ENABLE_MEM_DIAGNOSTICS
     printf("mesh_read_elements: allocated %g GB\n",
            nnodesxelem * *n_local_elements * sizeof(idx_t) * 1e-9);
 #endif
@@ -1062,6 +1062,7 @@ int mesh_read(MPI_Comm comm, const char *folder, mesh_t *mesh) {
 
     if (!rank) {
         char pattern[1024 * 10];
+        // sprintf(pattern, "%s/i[0-9].*", folder);
         sprintf(pattern, "%s/i*.raw", folder);
 
         counts[0] = count_files(pattern);
@@ -1080,9 +1081,9 @@ int mesh_read(MPI_Comm comm, const char *folder, mesh_t *mesh) {
 
     if (!counts[0] || !counts[1]) {
         if (!rank) {
-            fprintf(stderr, "Could not find any mesh files in directory %s\n", folder);
+            fprintf(stderr, "Could not find any mesh files in directory %s (#i*.raw = %d, {x,y,z}.raw = %d)\n", folder, counts[0], counts[1]);
         }
-
+        assert(0);
         MPI_Abort(comm, -1);
     }
 

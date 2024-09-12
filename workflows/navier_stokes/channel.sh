@@ -59,7 +59,7 @@ soutlet=$SFEM_MESH_DIR/sidesets_aos/soutlet.raw
 # Shedding
 U=1.5
 # U=10
-python3 -c 'import numpy as np; idx=np.fromfile("'$sinlet'", dtype="'$py_sfem_idx_t'"); y=np.fromfile("'$SFEM_MESH_DIR'/y.raw",dtype="'$py_sfem_geom_t'"); y=y[idx]; U='$U'; fy=4*U*y*(0.41 - y)/(0.41*0.41); fy.astype("'$py_sfem_real_t'").tofile("bcvalues.raw")'
+python3 -c 'import numpy as np; idx=np.fromfile("'$sinlet'", dtype="'$SFEM_IDX_T'"); y=np.fromfile("'$SFEM_MESH_DIR'/y.raw",dtype="'$SFEM_GEOM_T'"); y=y[idx]; U='$U'; fy=4*U*y*(0.41 - y)/(0.41*0.41); fy.astype("'$SFEM_REAL_T'").tofile("bcvalues.raw")'
 
 # export SFEM_VELOCITY_DIRICHLET_NODESET="$sbottom,$sbottom,$stop,$stop,$sleft,$sleft"
 export SFEM_VELOCITY_DIRICHLET_NODESET="$swall,$swall,$sinlet,$sinlet"

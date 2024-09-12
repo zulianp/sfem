@@ -39,6 +39,9 @@
         }                                                                  \
     } while (0)
 
+typedef idx_t cu_compat_count_t;
+#define SFEM_CUSPARSE_COMPAT_COUNT_T SFEM_CUSPARSE_IDX_T
+
 // make spmv cuda=1
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -55,8 +58,9 @@ int main(int argc, char *argv[]) {
     }
 
     if (argc != 6) {
-        fprintf(
-            stderr, "usage: %s <alpha> <transpose> <crs_folder> <x.raw> <output.raw>\n", argv[0]);
+        fprintf(stderr,
+                "usage: %s <alpha> <transpose> <crs_folder> <x.raw> <output.raw>\n",
+                argv[0]);
         return EXIT_FAILURE;
     }
 
@@ -89,7 +93,6 @@ int main(int argc, char *argv[]) {
              SFEM_MPI_REAL_T,
              &crs);
 
-    
     real_t *x = 0;
     if (strcmp("gen:ones", x_path) == 0) {
         ptrdiff_t ndofs = crs.lrows;
@@ -115,31 +118,58 @@ int main(int argc, char *argv[]) {
         cusparseDnVecDescr_t vecX, vecY;
         void *dX, *dY;
 
-        count_t *csrRowOffsets;
+        cu_compat_count_t *csrRowOffsets;
         idx_t *csrColInd;
         real_t *csrValues;
 
-        CHECK_CUDA(cudaMalloc((void **)&csrRowOffsets, (crs.lrows + 1) * sizeof(count_t)));
+        CHECK_CUDA(
+                cudaMalloc((void **)&csrRowOffsets, (crs.lrows + 1) * sizeof(cu_compat_count_t)));
         CHECK_CUDA(cudaMalloc((void **)&csrColInd, crs.lnnz * sizeof(idx_t)));
         CHECK_CUDA(cudaMalloc((void **)&csrValues, crs.lnnz * sizeof(real_t)));
 
-        CHECK_CUDA(cudaMemcpy(csrRowOffsets,
-                              (count_t *)crs.rowptr,
-                              (crs.lrows + 1) * sizeof(count_t),
+        if (sizeof(cu_compat_count_t) != sizeof(count_t)) {
+            fprintf(stderr, "[Warning] cu_compat_count_t (%d) != count_t (%d). Converting rowptr\n", (int)sizeof(cu_compat_count_t), (int)sizeof(count_t));
+            cu_compat_count_t * h_rowptr = malloc((crs.lrows + 1) * sizeof(cu_compat_count_t));
+
+            for(ptrdiff_t i = 0; i < crs.lrows + 1; i++) {
+                h_rowptr[i] = crs.rowptr[i];
+                assert((count_t)h_rowptr[i] == crs.rowptr[i]);
+            }
+
+            if(crs.rowptr[crs.lrows] != (count_t)h_rowptr[crs.lrows]) {
+                fprintf(stderr, "[Warning] current rowptr representation cannot represent the indices\n");
+                return EXIT_FAILURE;
+            }
+
+            CHECK_CUDA(cudaMemcpy(csrRowOffsets,
+                                  h_rowptr,
+                                  (crs.lrows + 1) * sizeof(cu_compat_count_t),
+                                  cudaMemcpyHostToDevice));
+
+            free(h_rowptr);
+
+        } else {
+            CHECK_CUDA(cudaMemcpy(csrRowOffsets,
+                                  (cu_compat_count_t *)crs.rowptr,
+                                  (crs.lrows + 1) * sizeof(cu_compat_count_t),
+                                  cudaMemcpyHostToDevice));
+        }
+        
+        CHECK_CUDA(cudaMemcpy(
+                csrColInd, (idx_t *)crs.colidx, crs.lnnz * sizeof(idx_t), cudaMemcpyHostToDevice));
+        CHECK_CUDA(cudaMemcpy(csrValues,
+                              (real_t *)crs.values,
+                              crs.lnnz * sizeof(real_t),
                               cudaMemcpyHostToDevice));
-        CHECK_CUDA(cudaMemcpy(
-            csrColInd, (idx_t *)crs.colidx, crs.lnnz * sizeof(idx_t), cudaMemcpyHostToDevice));
-        CHECK_CUDA(cudaMemcpy(
-            csrValues, (real_t *)crs.values, crs.lnnz * sizeof(real_t), cudaMemcpyHostToDevice));
 
         cusparseSpMatDescr_t d_matrix;
 
-        cusparseIndexType_t csrRowOffsetsType = CUSPARSE_INDEX_32I;
-        cusparseIndexType_t csrColIndType = CUSPARSE_INDEX_32I;
+        cusparseIndexType_t csrRowOffsetsType = SFEM_CUSPARSE_COMPAT_COUNT_T;
+        cusparseIndexType_t csrColIndType = SFEM_CUSPARSE_IDX_T;
         cusparseIndexBase_t idxBase = CUSPARSE_INDEX_BASE_ZERO;
-        cudaDataType valueType = CUDA_R_64F;
+        cudaDataType valueType = SFEM_CUSPARSE_REAL_T;
         cusparseOperation_t op_type =
-            transpose ? CUSPARSE_OPERATION_TRANSPOSE : CUSPARSE_OPERATION_NON_TRANSPOSE;
+                transpose ? CUSPARSE_OPERATION_TRANSPOSE : CUSPARSE_OPERATION_NON_TRANSPOSE;
 
 #if CUDART_VERSION < 12000
         cusparseSpMVAlg_t alg = CUSPARSE_MV_ALG_DEFAULT;
@@ -167,7 +197,7 @@ int main(int argc, char *argv[]) {
 
         size_t bufferSize = 0;
         CHECK_CUSPARSE(cusparseSpMV_bufferSize(
-            handle, op_type, &alpha, d_matrix, vecX, &beta, vecY, valueType, alg, &bufferSize));
+                handle, op_type, &alpha, d_matrix, vecX, &beta, vecY, valueType, alg, &bufferSize));
 
         CHECK_CUDA(cudaMemcpy(dY, y, crs.lrows * sizeof(real_t), cudaMemcpyHostToDevice));
 
@@ -189,7 +219,7 @@ int main(int argc, char *argv[]) {
 
         for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
             CHECK_CUSPARSE(cusparseSpMV(
-                handle, op_type, &alpha, d_matrix, vecX, &beta, vecY, valueType, alg, dBuffer));
+                    handle, op_type, &alpha, d_matrix, vecX, &beta, vecY, valueType, alg, dBuffer));
         }
 
         // With CUDA
@@ -211,7 +241,7 @@ int main(int argc, char *argv[]) {
         printf("spmv:  %g %g %ld %ld %ld\n", avg_time, avg_throughput, 0l, crs.lrows, crs.lnnz);
 
         {  // Using CUDA perf-counter (from ms to s)
-            double avg_time =  (cuda_elapsed/1000) / SFEM_REPEAT;
+            double avg_time = (cuda_elapsed / 1000) / SFEM_REPEAT;
             double avg_throughput = (crs.grows / avg_time) * (sizeof(real_t) * 1e-9);
             printf("cuspa: %g %g %ld %ld %ld\n", avg_time, avg_throughput, 0l, crs.lrows, crs.lnnz);
         }

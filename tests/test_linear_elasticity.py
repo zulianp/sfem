@@ -26,7 +26,8 @@ def solve_linear_elasticity(options):
 	fun = sfem.Function(fs)
 	fun.set_output_dir(options.output_dir)
 
-	op = sfem.create_op(fs, "LinearElasticity")
+	# op = sfem.create_op(fs, "LinearElasticity")
+	op = sfem.create_op(fs, "NeoHookeanOgden")
 	fun.add_operator(op)
 
 	bc = sfem.DirichletConditions(fs)
@@ -48,13 +49,15 @@ def solve_linear_elasticity(options):
 	x = np.zeros(fs.n_dofs())
 	cg = sfem.ConjugateGradient()
 	cg.default_init()
-	cg.set_max_it(1000)
+	cg.set_max_it(50)
+	cg.set_rtol(1e-2)
+	cg.set_atol(1e-12)
+	cg.set_verbose(False)
+	
+	damping = 1
 
-	lop = sfem.make_op(fun, x)
-	cg.set_op(lop)
-
-	use_prec = True
-	# use_prec = False
+	# use_prec = True
+	use_prec = False
 	if use_prec:
 		d = np.zeros(fs.n_dofs())
 		sfem.hessian_diag(fun, x, d)
@@ -65,13 +68,27 @@ def solve_linear_elasticity(options):
 		print(np.min(d))
 		print(np.max(np.abs(d)))
 		print(np.min(np.abs(d)))
-	
+
+	# Newton iteration
 	g = np.zeros(fs.n_dofs())
-	sfem.apply_constraints(fun, x)
-	sfem.gradient(fun, x, g)
 	c = np.zeros(fs.n_dofs())
-	sfem.apply(cg, g, c)
-	x -= c
+	for i in range(0, 100):
+		g[:] = 0
+		sfem.gradient(fun, x, g)
+		
+		# As the pointer of x is used not necessary to be in the loop
+		# But maybe there will be some side effect in the future
+		lop = sfem.make_op(fun, x)
+		cg.set_op(lop)
+
+		c[:] = 0
+		sfem.apply(cg, g, c)
+		x -= damping * c
+
+		norm_g = linalg.norm(g)
+		print(f'{i}) norm_g = {norm_g}')
+		if(norm_g < 1e-10):
+			break
 
 	# Write result to disk
 	sfem.report_solution(fun, x)

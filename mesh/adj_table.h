@@ -5,6 +5,11 @@
 #include "sfem_defs.h"
 
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 void fill_local_side_table(enum ElemType element_type, int *local_side_table);
 
 void fill_element_adj_table(const ptrdiff_t n_elements,
@@ -37,4 +42,14 @@ void extract_surface_connectivity_with_adj_table(const ptrdiff_t n_elements,
                                                  idx_t **surf_elems,
                                                  element_idx_t **parent_element);
 
+void create_element_adj_table(const ptrdiff_t n_elements,
+                              const ptrdiff_t n_nodes,
+                              enum ElemType element_type,
+                              idx_t **const SFEM_RESTRICT elems,
+                              element_idx_t **const SFEM_RESTRICT table_out);
+
+
+#ifdef __cplusplus
+}
+#endif
 #endif  // ADJ_TABLE_H

@@ -9,10 +9,12 @@ from rich.syntax import Syntax
 console = rich.get_console()
 verbose_gen = False
 
-real_t = "real_t"
+real_t = "scalar_t"
 
 def c_log(expr):
     console.print(expr)
+
+
 
 
 # from sympy.matrices.dense import eye
@@ -197,6 +199,16 @@ def fun(x, y, z):
 
 qx, qy, qz, qw = sp.symbols('qx qy qz qw', real=True)
 
+def q_point(dims):
+    if dims == 1:
+        return sp.Matrix(1, 1, [qx])
+    elif dims == 2:
+        return sp.Matrix(2, 1, [qx, qy])
+    elif dims == 3:
+        return sp.Matrix(3, 1, [qx, qy, qz])
+    else:
+        assert False 
+
 # Element coordinates
 # x0, x1, x2, x3 = sp.symbols('x0 x1 x2 x3', real=True)
 # y0, y1, y2, y3 = sp.symbols('y0 y1 y2 y3', real=True)
@@ -352,6 +364,19 @@ def coeffs(name, n):
         list_coeffs.append(ui)
 
     ret = sp.Matrix(n, 1, list_coeffs)
+    return ret
+
+
+def coeffs_SoA(name, dim, n, prefix=['x', 'y', 'z']):
+    list_coeffs = []
+
+    for d in range(0, dim):
+        name_d = f'{name}{prefix[d]}'
+        for i in range(0, n):
+            ui= sp.symbols(f'{name_d}[{i}]', real=True)
+            list_coeffs.append(ui)
+
+    ret = sp.Matrix(dim*n, 1, list_coeffs)
     return ret
 
 def matrix_coeff(name, rows, cols):

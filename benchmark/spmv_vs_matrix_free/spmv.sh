@@ -47,6 +47,8 @@ fi
 geo=(`ls $BENCHMARK_DIR`)
 
 workspace=`mktemp -d`
+# workspace=workspace
+# mkdir -p $workspace
 
 mkdir -p results
 today=`date +"%Y_%m_%d"`
@@ -68,6 +70,7 @@ function bench_spmv()
 	# Scalar problem
 	##############################################
 	if [ -f "$p1/matrix_scalar/rowptr.raw" ]; then
+
 		$exec 1 0 $p1/matrix_scalar "gen:ones" $workspace/test.raw > $workspace/temp_log.txt
 		op_type=`grep "op: " $p1/matrix_scalar/meta.yaml | awk '{print $2}'`
 
@@ -80,6 +83,7 @@ function bench_spmv()
 	##############################################
 
 	if [ -f "$p1/matrix_vector/rowptr.raw" ]; then	
+		
 		$exec 1 0 $p1/matrix_vector "gen:ones" $workspace/test.raw > $workspace/temp_log.txt
 		op_type=`grep "op: " $p1/matrix_vector/meta.yaml | awk '{print $2}'`
 

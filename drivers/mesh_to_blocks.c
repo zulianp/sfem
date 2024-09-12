@@ -64,13 +64,13 @@ int main(int argc, char *argv[]) {
 
     int nnxe = elem_num_nodes(mesh.element_type);
 
-    lidx_t **lelements = malloc(nnxe * sizeof(lidx_t *));
+    local_idx_t **lelements = malloc(nnxe * sizeof(local_idx_t *));
 
     for (int d = 0; d < nnxe; d++) {
-        lelements[d] = calloc(mesh.nelements, sizeof(lidx_t));
+        lelements[d] = calloc(mesh.nelements, sizeof(local_idx_t));
     }
 
-    ptrdiff_t max_rep_limit = 1 << (8 * sizeof(lidx_t) - 1);
+    ptrdiff_t max_rep_limit = 1 << (8 * sizeof(local_idx_t) - 1);
     ptrdiff_t SFEM_ELEMENT_BLOCK_SIZE = max_rep_limit;
     SFEM_READ_ENV(SFEM_ELEMENT_BLOCK_SIZE, atol);
 
@@ -78,7 +78,7 @@ int main(int argc, char *argv[]) {
     ptrdiff_t max_block_size = MIN(SFEM_ELEMENT_BLOCK_SIZE, mesh.nelements);
     ptrdiff_t num_blocks = MAX((mesh.nelements + max_block_size - 1) / max_block_size, 1);
 
-    lidx_t *node_lidx = malloc(mesh.nnodes * sizeof(lidx_t));
+    local_idx_t *node_lidx = malloc(mesh.nnodes * sizeof(local_idx_t));
     int *nodes_in_block = calloc(num_blocks, sizeof(int));
 
     for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
@@ -89,7 +89,7 @@ int main(int argc, char *argv[]) {
          e_offset += max_block_size, block_num++) {
         const ptrdiff_t next_offset = e_offset + MIN(max_block_size, mesh.nelements - e_offset);
 
-        lidx_t last_index = 0;
+        local_idx_t last_index = 0;
         for (ptrdiff_t e = e_offset; e < next_offset; e++) {
             for (int d = 0; d < nnxe; d++) {
                 const idx_t node = mesh.elements[d][e];
@@ -140,7 +140,7 @@ int main(int argc, char *argv[]) {
 
         for (ptrdiff_t e = e_offset; e < next_offset; e++) {
             for (int d = 0; d < nnxe; d++) {
-                lidx_t lnode = lelements[d][e];
+                local_idx_t lnode = lelements[d][e];
 
                 assert(lnode < nodes_in_block[block_num]);
 
@@ -167,10 +167,10 @@ int main(int argc, char *argv[]) {
                    block_size,
                    nodes_in_block[block_num]);
 
-            lidx_t last_index = 0;
+            local_idx_t last_index = 0;
             for (ptrdiff_t e = e_offset; e < next_offset; e++) {
                 for (int d = 0; d < nnxe; d++) {
-                    printf("%" d_ELEMENT_LIDX_T " ", lelements[d][e]);
+                    printf("%" d_LOCAL_IDX_T " ", lelements[d][e]);
                 }
 
                 printf("\t-> ");
