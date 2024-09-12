@@ -877,30 +877,27 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(
         // #define WENO_CUDA 1
         // Integrate field
         {
-// #if WENO_CUDA == 7777
-// printf("WENO_CUDA == 777\n");
-//             real_t eval_field = hex_aa_8_eval_weno4_3D_cuda(g_qx,
-//                                                             g_qy,
-//                                                             g_qz,  //
-//                                                             ox,
-//                                                             oy,
-//                                                             oz,                            //
-//                                                             (dx + dy + dz) * (1.0 / 3.0),  //
-//                                                             i,
-//                                                             j,
-//                                                             k,
-//                                                             stride0,
-//                                                             stride1,
-//                                                             stride2,
-//                                                             data);
-// #else
+            // #if WENO_CUDA == 7777
+            // printf("WENO_CUDA == 777\n");
+            //             real_t eval_field = hex_aa_8_eval_weno4_3D_cuda(g_qx,
+            //                                                             g_qy,
+            //                                                             g_qz,  //
+            //                                                             ox,
+            //                                                             oy,
+            //                                                             oz, // (dx + dy + dz) *
+            //                                                             (1.0 / 3.0),  // i, j, k,
+            //                                                             stride0,
+            //                                                             stride1,
+            //                                                             stride2,
+            //                                                             data);
+            // #else
 
             real_t eval_field = 0.0;
 
             for (int edof_j = 0; edof_j < 8; edof_j++) {
                 eval_field += hex8_f[edof_j] * coeffs[edof_j];
             }
-// #endif
+            // #endif
             // // UNROLL_ZERO?
             // for (int edof_i = 0; edof_i < 10; edof_i++) {
             //     element_field[edof_i] += eval_field * tet10_f[edof_i] * dV;
@@ -1343,7 +1340,7 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
     copy_xyz_tet10_device(nnodes, &xyz_device, xyz);
 
     // Number of threads
-    const ptrdiff_t warp_per_block = 2;
+    const ptrdiff_t warp_per_block = 8;
     const ptrdiff_t threadsPerBlock = warp_per_block * __WARP_SIZE__;
 
     // Number of blocks
@@ -1356,11 +1353,11 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
                cudaGetErrorString(errwf));
     }
 
-#define CUBE1 1
+#define CUBE1 0
 
-#if CUBE1 == 1
+#if CUBE1 == 1  // WENO ..
     char* kernel_name = "hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel";
-#else 
+#else
     char* kernel_name = "hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel";
 #endif
 
@@ -1383,9 +1380,9 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
     cudaEventRecord(start);
 
     {
-#if CUBE1 == 1 // WENO ..
+#if CUBE1 == 1  // WENO ..
         hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel
-#else 
+#else
         hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel
 #endif
                 <<<numBlocks,
@@ -1420,8 +1417,13 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
         printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+#if CUBE1 == 1  // WENO ..
+        printf("!!!!!! Error in hex8_to_isoparametric_tet10_resample_field_local_cube1_CUDA: %s\n",
+               cudaGetErrorString(err));
+#else
         printf("!!!!!! Error in hex8_to_tet10_resample_field_local_CUDA: %s\n",
                cudaGetErrorString(err));
+#endif
         printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     }
 

@@ -8,6 +8,16 @@ VECTOR_SIZE ?= 512
 GPU_ARCH ?= sm_75
 DISABLE_CUDA ?= 0
 
+ARM ?= 0  # 1 for ARM architecture
+
+VECTOR_WIDTH_OPT = -mprefer-vector-width
+
+ifeq ($(ARM), 1)
+	VECTOR_WIDTH_OPT = -msve-vector-bits
+	# MPICXX = mpicxx
+	# MPICC = mpicc
+endif
+
 $(info $$DISABLE_CUDA is [${DISABLE_CUDA}])
 $(info $$GPU_ARCH is [${GPU_ARCH}])
 
@@ -29,8 +39,8 @@ else ifeq ($(asan), 1)
 # 	DEPS += -static-libsan
 # 	DEPS += -static
 else
-	CFLAGS += -Ofast -DNDEBUG -march=${MARCH} -fno-signed-zeros -fno-trapping-math -fassociative-math -mprefer-vector-width=${VECTOR_SIZE}  -fPIC  -no-pie 
-	CXXFLAGS += -Ofast -DNDEBUG -march=${MARCH} -fno-signed-zeros -fno-trapping-math -fassociative-math -mprefer-vector-width=${VECTOR_SIZE} -fPIC  -no-pie 
+	CFLAGS += -Ofast -DNDEBUG -march=${MARCH} -fno-signed-zeros -fno-trapping-math -fassociative-math ${VECTOR_WIDTH_OPT}=${VECTOR_SIZE}  -fPIC  -no-pie 
+	CXXFLAGS += -Ofast -DNDEBUG -march=${MARCH} -fno-signed-zeros -fno-trapping-math -fassociative-math ${VECTOR_WIDTH_OPT}=${VECTOR_SIZE} -fPIC  -no-pie 
 	CUFLAGS += -O3 -DNDEBUG
 endif
 
@@ -424,7 +434,7 @@ ifeq ($(DISABLE_CUDA), 1)
     SFEM_CUDA_A = 
     LINK_SFEM_CUDA =
 else
-    CUDA_LIBS_PATH = -L/usr/local/cuda-12.4/targets/x86_64-linux/lib
+    CUDA_LIBS_PATH = -L/opt/nvidia/hpc_sdk/Linux_aarch64/23.9/cuda/12.2/targets/sbsa-linux/lib/
     CUDART_LINK =  -lcudart
     SFEM_CUDA_A = ${PWD}/resampling/cuda/libsfem_resample_field_cuda.a
     LINK_SFEM_CUDA = -L${PWD}/resampling/cuda -lsfem_resample_field_cuda
@@ -436,7 +446,7 @@ grid_to_mesh: grid_to_mesh.c libsfem.a ${SFEM_CUDA_A} ${PWD}/resampling/quadratu
 	$(MPICC) -o $@ drivers/grid_to_mesh.c libsfem.a $(CFLAGS) $(INCLUDES)  $(LDFLAGS) ${LINK_SFEM_CUDA} ${CUDA_LIBS_PATH} ${CUDART_LINK}  ${SFEM_CUDA_A}
 
 ${PWD}/resampling/cuda/libsfem_resample_field_cuda.a: ${PWD}/resampling/cuda/sfem_resample_field_cuda.cu ${PWD}/resampling/cuda/tet10_resample_field.cu ${PWD}/resampling/cuda/quadratures_rule_cuda.h ${PWD}/resampling/cuda/tet10_weno_cuda.cu ${PWD}/resampling/cuda/tet10_weno_cuda.cuh
-	${MAKE} -C ${PWD}/resampling/cuda GPU_ARCH=${GPU_ARCH}
+	${MAKE} -C ${PWD}/resampling/cuda GPU_ARCH=${GPU_ARCH} ARM=${ARM}
 
 # else
 # # CPU version

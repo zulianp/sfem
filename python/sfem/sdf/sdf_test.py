@@ -3,7 +3,7 @@
 import numpy as np
 import os
 import time
-from concurrent.futures import ThreadPoolExecutor
+# from concurrent.futures import ThreadPoolExecutor
 
 
 output_path = os.path.join(os.environ['HOME'], 'git/sfem/workflows/resample/sdf.float32.raw')
@@ -12,10 +12,11 @@ print("sdf_test.py: ==========================================")
 
 sdf_t = np.float32
 
-D = 600
+D = 120
 dims = (D, D, D)
 
 print(f'sdf_test.py: Generating field of size {dims[0]} x {dims[1]} x {dims[2]}')
+print(f'sdf_test.py: Size of field in memory: {np.prod(dims) * np.dtype(sdf_t).itemsize / 1024 / 1024 / 1024} GB')
 
 mn = -0.88
 mx = 0.88

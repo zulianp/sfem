@@ -57,7 +57,7 @@ else
 	raw_to_xdmf.py $sdf
 fi
 
-sdf_test_GPU.py
+sdf_test.py
 # raw_to_xdmf.py $sdf
 
 sizes=`head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' '`
