@@ -116,7 +116,7 @@ namespace sfem {
             }
         }
 
-        int apply(real_t *const x) {
+        int apply(real_t *const x) override {
             for (int i = 0; i < n_dirichlet_conditions; i++) {
                 d_constraint_nodes_to_value_vec(dirichlet_conditions[i].local_size,
                                                 dirichlet_conditions[i].idx,
@@ -129,7 +129,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        int gradient(const real_t *const x, real_t *const g) {
+        int gradient(const real_t *const x, real_t *const g) override {
             for (int i = 0; i < n_dirichlet_conditions; i++) {
                 d_constraint_gradient_nodes_to_value_vec(dirichlet_conditions[i].local_size,
                                                          dirichlet_conditions[i].idx,
@@ -146,7 +146,7 @@ namespace sfem {
             // return SFEM_FAILURE;
         }
 
-        int apply_value(const real_t value, real_t *const x) {
+        int apply_value(const real_t value, real_t *const x) override {
             for (int i = 0; i < n_dirichlet_conditions; i++) {
                 d_constraint_nodes_to_value_vec(dirichlet_conditions[i].local_size,
                                                 dirichlet_conditions[i].idx,
@@ -159,7 +159,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        int copy_constrained_dofs(const real_t *const src, real_t *const dest) {
+        int copy_constrained_dofs(const real_t *const src, real_t *const dest) override {
             for (int i = 0; i < n_dirichlet_conditions; i++) {
                 d_constraint_nodes_copy_vec(dirichlet_conditions[i].local_size,
                                             dirichlet_conditions[i].idx,
@@ -175,7 +175,7 @@ namespace sfem {
         int hessian_crs(const real_t *const x,
                         const count_t *const rowptr,
                         const idx_t *const colidx,
-                        real_t *const values) {
+                        real_t *const values) override {
             for (int i = 0; i < n_dirichlet_conditions; i++) {
                 cu_crs_constraint_nodes_to_identity_vec(dirichlet_conditions[i].local_size,
                                                         dirichlet_conditions[i].idx,
@@ -211,12 +211,12 @@ namespace sfem {
         return std::make_shared<GPUDirichletConditions>(dc);
     }
 
-    class GPUNeumannConditions final : public Op {
-    public:
-        GPUNeumannConditions(const std::shared_ptr<NeumannConditions> &dc) {
-            assert(false && "IMPLEMENT ME!");
-        }
-    };
+    // class GPUNeumannConditions final : public Op {
+    // public:
+    //     GPUNeumannConditions(const std::shared_ptr<NeumannConditions> &dc) {
+    //         assert(false && "IMPLEMENT ME!");
+    //     }
+    // };
 
     class GPULaplacian final : public Op {
     public:
