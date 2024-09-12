@@ -162,7 +162,7 @@ const int size
 )
 {{
     int i;
-    for (i = 0; i < size - SFEM_VECTOR_SIZE; i += SFEM_VECTOR_SIZE)
+    for (i = 0; i < size - SFEM_VREAL_SIZE; i += SFEM_VREAL_SIZE)
     {{
         if (arr[i] == target) return i;
         if (arr[i + 1] == target) return i + 1;

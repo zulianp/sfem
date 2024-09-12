@@ -4,7 +4,7 @@ set -e
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
-source $SCRIPTPATH/../workflows/sfem_config.sh
+source $SCRIPTPATH/../build/sfem_config.sh
 export PATH=$SCRIPTPATH/../:$PATH
 export PATH=$SCRIPTPATH/../build/:$PATH
 export PATH=$SCRIPTPATH/../bin/:$PATH

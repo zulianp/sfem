@@ -12,8 +12,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#define real_t double
-
 #include "quadratures_rule.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -315,7 +313,8 @@ SFEM_INLINE static void hex_aa_8_eval_grad(
     gz[7] = (1.0 - x) * y;
 }
 
-#define UNROLL_ZERO _Pragma("GCC unroll(0)")
+// GCC unroll(0) does not compile on Grace
+#define UNROLL_ZERO _Pragma("GCC unroll(1)")
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////

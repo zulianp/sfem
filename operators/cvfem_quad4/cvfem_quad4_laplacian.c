@@ -10,7 +10,7 @@
 
 #define POW2(a) ((a) * (a))
 
-static SFEM_INLINE void cvfem_quad4_laplacian_assemble_hessian_kernel(const real_t px0,
+static SFEM_INLINE void cvfem_quad4_laplacian_crs_kernel(const real_t px0,
                                                                       const real_t px1,
                                                                       const real_t px2,
                                                                       const real_t px3,
@@ -154,7 +154,7 @@ static SFEM_INLINE void find_cols4(const idx_t *targets,
     }
 }
 
-void cvfem_quad4_laplacian_assemble_hessian(const ptrdiff_t nelements,
+void cvfem_quad4_laplacian_crs(const ptrdiff_t nelements,
                                             const ptrdiff_t nnodes,
                                             idx_t **const SFEM_RESTRICT elems,
                                             geom_t **const SFEM_RESTRICT xyz,
@@ -178,7 +178,7 @@ void cvfem_quad4_laplacian_assemble_hessian(const ptrdiff_t nelements,
                 ev[v] = elems[v][i];
             }
 
-            cvfem_quad4_laplacian_assemble_hessian_kernel(
+            cvfem_quad4_laplacian_crs_kernel(
                 // X-coordinates
                 xyz[0][ev[0]],
                 xyz[0][ev[1]],
@@ -212,7 +212,7 @@ void cvfem_quad4_laplacian_assemble_hessian(const ptrdiff_t nelements,
     }
 
     double tock = MPI_Wtime();
-    printf("cvfem_quad4_laplacian.c: cvfem_quad4_laplacian_assemble_hessian\t%g seconds\n",
+    printf("cvfem_quad4_laplacian.c: cvfem_quad4_laplacian_crs\t%g seconds\n",
            tock - tick);
 }
 

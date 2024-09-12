@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
     int err = build_crs_graph_for_elem_type(
                   to_element, mesh.nelements, n_coarse_nodes, mesh.elements, &rowptr, &colidx) ||
               array_read(comm, path_input, SFEM_MPI_REAL_T, from, mesh.nnodes, mesh.nnodes) ||
-              hierarchical_restriction(n_coarse_nodes, rowptr, colidx, from, to) ||
+              hierarchical_restriction(n_coarse_nodes, rowptr, colidx, 1, from, to) ||
               array_write(comm, path_output, SFEM_MPI_REAL_T, to, n_coarse_nodes, n_coarse_nodes);
 
     free(colidx);

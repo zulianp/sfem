@@ -6,7 +6,7 @@ from fe import FE
 import sympy as sp
 from sfem_codegen import *
 
-dim = 3
+dim = 2
 
 if dim == 2:
 	sub_simplices = np.array([
@@ -29,6 +29,8 @@ if dim == 2:
 		c[0], c[1],
 		c[1], c[2]
 	])
+
+	ref_volume = sp.Rational(1, 2)
 
 else:
 	sub_simplices = [
@@ -59,7 +61,14 @@ else:
 		c[2], c[4], c[5]
 	])
 
+	ref_volume = sp.Rational(1, 6)
+
 adjugate = strided_matrix_coeff("adjugate", dim, dim, "stride")
+
+detFFF = determinant(FFFs)
+print('---------------- detFFF ----------------')
+c_code(detFFF)
+print('----------------------------------------')
 
 def read_file(path):
 	with open(path, 'r') as f:
@@ -117,10 +126,10 @@ def sub_fff_generic(micro_ref, FFFs):
 
 	FFAms = Aminv * FFFs * Aminv.T * detAm
 
-	print("------------------")
-	print(Aminv)
-	print(detAm)
-	print(FFAms)
+	# print("------------------")
+	# print(Aminv)
+	# print(detAm)
+	# print(FFAms)
 	return FFAms
 
 def sub_adj_generic(micro_ref, adj):
@@ -130,10 +139,10 @@ def sub_adj_generic(micro_ref, adj):
 		for d2 in range(0, dim):
 			Am[d2, d1] = micro_ref[d1+1][d2] - micro_ref[0][d2]
 	
-	# detAm = determinant(Am)
+	detAm = determinant(Am)
 	Aminv = inverse(Am)
 
-	return Aminv * adj
+	return Aminv * adj, detAm
 
 def subJ(micro_ref):
 	for d1 in range(0, dim):
@@ -198,12 +207,14 @@ class MacroSimplex:
 
 	def adjugate_level_n(self, n_levels):
 		levels = [[]] * n_levels
+		levels_det = [[]] * n_levels
 		x = self.points
 
 		for ss in sub_simplices:
 			refpattern = x[ss]
-			adj = sub_adjugate(refpattern)
+			adj, adj_det = sub_adjugate(refpattern)
 			levels[0].append(adj)
+			levels_det[0].append(adj_det)
 
 		for l in range(1, n_levels):
 			n_ffs = len(levels[l-1])
@@ -213,9 +224,10 @@ class MacroSimplex:
 				adj = levels[l-1][i]
 				for ss in sub_simplices:
 					refpattern = x[ss]
-					sub_adj = sub_adj_generic(refpattern, adj)
+					sub_adj, sub_det = sub_adj_generic(refpattern, adj)
 					levels[l].append(sub_adj)
-		return levels
+					levels_det[l].append(sub_det)
+		return levels, levels_det
 
 	def fff_level_n(self, n_levels):
 		levels = [[]] * n_levels
@@ -236,26 +248,106 @@ class MacroSimplex:
 					refpattern = x[ss]
 					sub_fff = sub_fff_generic(refpattern, fff)
 					levels[l].append(sub_fff)
+		
+		self.levels = levels
 		return levels
 
+	def plot_test(self):
+		import meshio
+		points = np.array(self.points, dtype=np.float32)
+		cells = []
+
+		if dim == 3:
+			cells.append(("tetra", np.array(sub_simplices, np.int32)))
+			mesh = meshio.Mesh(points, cells)
+			mesh.write('macro_simplex.vtk')
+	
+		x = self.points[:, 0].flatten()
+		y = self.points[:, 1].flatten()
+
+		if dim == 3:
+			z = self.points[:, 2].flatten()
+			J = sp.Matrix(dim, dim, [
+				x[1] - x[0], x[2] - x[0], x[3] - x[0],
+				y[1] - y[0], y[2] - y[0], y[3] - y[0],
+				z[1] - z[0], z[2] - z[0], z[3] - z[0]])
+		elif dim == 2:
+			J = sp.Matrix(dim, dim, [
+				x[1] - x[0], x[2] - x[0],
+				y[1] - y[0], y[2] - y[0]
+				])
+		else:
+			assert False
+		
+
+
+		dJ = determinant(J)
+		Jinv = inverse(J)
+
+		FFF = (Jinv * Jinv.T) * dJ*ref_volume
+
+		for i in range(0, len(sub_simplices)):
+			ss = sub_simplices[i]
+			
+			xi = x[ss]
+			yi = y[ss]
+
+			if dim == 3:
+				zi = z[ss]
+
+				Ji = sp.Matrix(dim, dim, [
+					xi[1] - xi[0], xi[2] - xi[0], xi[3] - xi[0],
+					yi[1] - yi[0], yi[2] - yi[0], yi[3] - yi[0],
+					zi[1] - zi[0], zi[2] - zi[0], zi[3] - zi[0]])
+			
+			elif dim == 2:
+				Ji = sp.Matrix(dim, dim, [
+					xi[1] - xi[0], xi[2] - xi[0],
+					yi[1] - yi[0], yi[2] - yi[0]
+					])
+			else:
+				assert False
+
+			dJi = determinant(Ji)
+			Jiinv = inverse(Ji)
+
+			FFFi = (Jiinv * Jiinv.T) * dJi * ref_volume
+			FFFj = self.levels[0][i]
+
+			for i in range(0, dim):
+				for j in range(0, dim):
+					for d1 in range(0, dim):
+						for d2 in range(0, dim):
+							FFFj[i, j] = FFFj[i, j].subs(FFFs[d1, d2], FFF[d1, d2])
+
+			diff = 0
+			for d1 in range(0, dim):
+				for d2 in range(0, dim):
+					diff += FFFi[d1, d2] - FFFj[d1, d2]
+			
+			assert diff == 0
+
 nl = 1
-fffl = MacroSimplex().fff_level_n(nl)
+ms = MacroSimplex()
+fffl = ms.fff_level_n(nl)
+ms.plot_test()
 
 for l in range(0, nl):
 	num = 0
 	print(f'level {l} #fff {len(fffl[l])}')
-	# for i in unique:
 	for i in range(0, len(fffl[l])):
 		f = fffl[l][i]
 		print(fff_code(f'{l}_{num}',f))
 		num += 1
 
 
+
+
 print("------------------------------------")
 print("ADJUGATE")
 print("------------------------------------")
 
-fffl = MacroSimplex().adjugate_level_n(nl)
+fffl, fffl_det = MacroSimplex().adjugate_level_n(nl)
 
 for l in range(0, nl):
 	num = 0
@@ -263,8 +355,12 @@ for l in range(0, nl):
 	# for i in unique:
 	for i in range(0, len(fffl[l])):
 		f = fffl[l][i]
+		f_det = fffl_det[l][i]
 		if nl > 1:
 			print(adjugate_code(f'{l}_{num}',f))
+			print(c_code(f_det));
+
 		else:
 			print(adjugate_code(f'{num}',f))
+			print(c_code(f_det));
 		num += 1

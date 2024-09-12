@@ -30,16 +30,42 @@ int hierarchical_prolongation(const enum ElemType from_element,
                               const enum ElemType to_element,
                               const ptrdiff_t nelements,
                               idx_t **const SFEM_RESTRICT elements,
+                              const int vec_size,
                               const real_t *const SFEM_RESTRICT from,
                               real_t *const SFEM_RESTRICT to);
 
 int hierarchical_restriction(
-    // CRS-node-graph of the coarse mesh
-    const ptrdiff_t nnodes,
-    const count_t *const SFEM_RESTRICT coarse_rowptr,
-    const idx_t *const SFEM_RESTRICT coarse_colidx,
-    const real_t *const SFEM_RESTRICT from,
-    real_t *const SFEM_RESTRICT to);
+        // CRS-node-graph of the coarse mesh
+        const ptrdiff_t nnodes,
+        const count_t *const SFEM_RESTRICT coarse_rowptr,
+        const idx_t *const SFEM_RESTRICT coarse_colidx,
+        const int vec_size,
+        const real_t *const SFEM_RESTRICT from,
+        real_t *const SFEM_RESTRICT to);
+
+// Edge-map versions
+int build_p1_to_p2_edge_map(const ptrdiff_t nnodes,
+                            const count_t *const SFEM_RESTRICT coarse_rowptr,
+                            const idx_t *const SFEM_RESTRICT coarse_colidx,
+                            idx_t *const SFEM_RESTRICT p2_vertices);
+
+int hierarchical_prolongation_with_edge_map(const ptrdiff_t nnodes,
+                                            const count_t *const SFEM_RESTRICT coarse_rowptr,
+                                            const idx_t *const SFEM_RESTRICT coarse_colidx,
+                                            const idx_t *const SFEM_RESTRICT p2_vertices,
+                                            const int vec_size,
+                                            const real_t *const SFEM_RESTRICT from,
+                                            real_t *const SFEM_RESTRICT to);
+
+int hierarchical_restriction_with_edge_map(
+        // CRS-node-graph of the coarse mesh
+        const ptrdiff_t nnodes,
+        const count_t *const SFEM_RESTRICT coarse_rowptr,
+        const idx_t *const SFEM_RESTRICT coarse_colidx,
+        const idx_t *const SFEM_RESTRICT p2_vertices,
+        const int vec_size,
+        const real_t *const SFEM_RESTRICT from,
+        real_t *const SFEM_RESTRICT to);
 
 #ifdef __cplusplus
 }

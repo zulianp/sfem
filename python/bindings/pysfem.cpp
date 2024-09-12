@@ -30,11 +30,11 @@ void SFEM_finalize() { MPI_Finalize(); }
 NB_MODULE(pysfem, m) {
     using namespace sfem;
 
-    Multigrid<isolver_scalar_t> mg;
+    Multigrid<real_t> mg;
 
-    using LambdaOperator_t = sfem::LambdaOperator<isolver_scalar_t>;
-    using Operator_t = sfem::Operator<isolver_scalar_t>;
-    using ConjugateGradient_t = sfem::ConjugateGradient<isolver_scalar_t>;
+    using LambdaOperator_t = sfem::LambdaOperator<real_t>;
+    using Operator_t = sfem::Operator<real_t>;
+    using ConjugateGradient_t = sfem::ConjugateGradient<real_t>;
 
     m.def("init", &SFEM_init);
     m.def("finalize", &SFEM_finalize);
@@ -103,29 +103,29 @@ NB_MODULE(pysfem, m) {
     m.def("write_time_step",
           [](std::shared_ptr<Output> &out,
              const char *name,
-             const isolver_scalar_t t,
-             nb::ndarray<isolver_scalar_t> x) { out->write_time_step(name, t, x.data()); });
+             const real_t t,
+             nb::ndarray<real_t> x) { out->write_time_step(name, t, x.data()); });
 
     m.def("set_field",
           [](std::shared_ptr<Op> &op,
              const char *name,
              const int component,
-             nb::ndarray<isolver_scalar_t> v) {
+             nb::ndarray<real_t> v) {
               size_t n = v.size();
-              auto c_v = (isolver_scalar_t *)malloc(n * sizeof(isolver_scalar_t));
-              memcpy(c_v, v.data(), n * sizeof(isolver_scalar_t));
+              auto c_v = (real_t *)malloc(n * sizeof(real_t));
+              memcpy(c_v, v.data(), n * sizeof(real_t));
               op->set_field(name, component, c_v);
           });
 
     m.def("hessian_diag",
           [](std::shared_ptr<Op> &op,
-             nb::ndarray<isolver_scalar_t> x,
-             nb::ndarray<isolver_scalar_t> d) { op->hessian_diag(x.data(), d.data()); });
+             nb::ndarray<real_t> x,
+             nb::ndarray<real_t> d) { op->hessian_diag(x.data(), d.data()); });
 
     m.def("hessian_diag",
           [](std::shared_ptr<Function> &fun,
-             nb::ndarray<isolver_scalar_t> x,
-             nb::ndarray<isolver_scalar_t> d) { fun->hessian_diag(x.data(), d.data()); });
+             nb::ndarray<real_t> x,
+             nb::ndarray<real_t> d) { fun->hessian_diag(x.data(), d.data()); });
 
     nb::class_<Function>(m, "Function")
         .def(nb::init<std::shared_ptr<FunctionSpace>>())
@@ -134,54 +134,54 @@ NB_MODULE(pysfem, m) {
         .def("set_output_dir", &Function::set_output_dir)
         .def("output", &Function::output);
 
-    m.def("diag", [](nb::ndarray<isolver_scalar_t> d) -> std::shared_ptr<Operator_t> {
-        auto op = std::make_shared<LambdaOperator<isolver_scalar_t>>(
-            d.size(), d.size(), [=](const isolver_scalar_t *const x, isolver_scalar_t *const y) {
+    m.def("diag", [](nb::ndarray<real_t> d) -> std::shared_ptr<Operator_t> {
+        auto op = std::make_shared<LambdaOperator<real_t>>(
+            d.size(), d.size(), [=](const real_t *const x, real_t *const y) {
                 ptrdiff_t n = d.size();
-                const isolver_scalar_t *d_ = d.data();
+                const real_t *d_ = d.data();
 
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n; i++) {
                     y[i] = d_[i] * x[i];
                 }
-            });
+            }, EXECUTION_SPACE_HOST);
 
         return op;
     });
 
     m.def("apply",
           [](std::shared_ptr<Function> &fun,
-             nb::ndarray<isolver_scalar_t> x,
-             nb::ndarray<isolver_scalar_t> h,
-             nb::ndarray<isolver_scalar_t> y) { fun->apply(x.data(), h.data(), y.data()); });
+             nb::ndarray<real_t> x,
+             nb::ndarray<real_t> h,
+             nb::ndarray<real_t> y) { fun->apply(x.data(), h.data(), y.data()); });
 
     m.def("value",
-          [](std::shared_ptr<Function> &fun, nb::ndarray<isolver_scalar_t> x) -> isolver_scalar_t {
-              isolver_scalar_t value = 0;
+          [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x) -> real_t {
+              real_t value = 0;
               fun->value(x.data(), &value);
               return value;
           });
 
     m.def("gradient",
           [](std::shared_ptr<Function> &fun,
-             nb::ndarray<isolver_scalar_t> x,
-             nb::ndarray<isolver_scalar_t> y) { fun->gradient(x.data(), y.data()); });
+             nb::ndarray<real_t> x,
+             nb::ndarray<real_t> y) { fun->gradient(x.data(), y.data()); });
 
-    m.def("apply_constraints", [](std::shared_ptr<Function> &fun, nb::ndarray<isolver_scalar_t> x) {
+    m.def("apply_constraints", [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x) {
         fun->apply_constraints(x.data());
     });
 
     m.def("apply_zero_constraints",
-          [](std::shared_ptr<Function> &fun, nb::ndarray<isolver_scalar_t> x) {
+          [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x) {
               fun->apply_zero_constraints(x.data());
           });
 
     m.def("constraints_gradient",
           [](std::shared_ptr<Function> &fun,
-             nb::ndarray<isolver_scalar_t> x,
-             nb::ndarray<isolver_scalar_t> g) { fun->constraints_gradient(x.data(), g.data()); });
+             nb::ndarray<real_t> x,
+             nb::ndarray<real_t> g) { fun->constraints_gradient(x.data(), g.data()); });
 
-    m.def("report_solution", [](std::shared_ptr<Function> &fun, nb::ndarray<isolver_scalar_t> x) {
+    m.def("report_solution", [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x) {
         fun->report_solution(x.data());
     });
 
@@ -193,29 +193,29 @@ NB_MODULE(pysfem, m) {
 
     m.def("add_condition",
           [](std::shared_ptr<DirichletConditions> &dc,
-             nb::ndarray<isolver_idx_t> idx,
+             nb::ndarray<idx_t> idx,
              const int component,
-             const isolver_scalar_t value) {
+             const real_t value) {
               size_t n = idx.size();
-              auto c_idx = (isolver_idx_t *)malloc(n * sizeof(isolver_idx_t));
-              memcpy(c_idx, idx.data(), n * sizeof(isolver_idx_t));
+              auto c_idx = (idx_t *)malloc(n * sizeof(idx_t));
+              memcpy(c_idx, idx.data(), n * sizeof(idx_t));
 
               dc->add_condition(n, n, c_idx, component, value);
           });
 
     m.def("apply_value",
           [](std::shared_ptr<DirichletConditions> &dc,
-             isolver_scalar_t value,
-             nb::ndarray<isolver_scalar_t> y) { dc->apply_value(value, y.data()); });
+             real_t value,
+             nb::ndarray<real_t> y) { dc->apply_value(value, y.data()); });
 
     m.def("add_condition",
           [](std::shared_ptr<NeumannConditions> &nc,
-             nb::ndarray<isolver_idx_t> idx,
+             nb::ndarray<idx_t> idx,
              const int component,
-             const isolver_scalar_t value) {
+             const real_t value) {
               size_t n = idx.size();
-              auto c_idx = (isolver_idx_t *)malloc(n * sizeof(isolver_idx_t));
-              memcpy(c_idx, idx.data(), n * sizeof(isolver_idx_t));
+              auto c_idx = (idx_t *)malloc(n * sizeof(idx_t));
+              memcpy(c_idx, idx.data(), n * sizeof(idx_t));
 
               nc->add_condition(n, n, c_idx, component, value);
           });
@@ -223,14 +223,14 @@ NB_MODULE(pysfem, m) {
     nb::class_<Operator_t>(m, "Operator");
     m.def("make_op",
           [](std::shared_ptr<Function> &fun,
-             nb::ndarray<isolver_scalar_t> u) -> std::shared_ptr<Operator_t> {
-              return sfem::make_op<isolver_scalar_t>(
+             nb::ndarray<real_t> u) -> std::shared_ptr<Operator_t> {
+              return sfem::make_op<real_t>(
                   u.size(),
                   u.size(),
-                  [=](const isolver_scalar_t *const x, isolver_scalar_t *const y) {
-                      memset(y, 0, u.size() * sizeof(isolver_scalar_t));
+                  [=](const real_t *const x, real_t *const y) {
+                      memset(y, 0, u.size() * sizeof(real_t));
                       fun->apply(u.data(), x, y);
-                  });
+                  }, fun->execution_space());
           });
 
     nb::class_<ConjugateGradient_t>(m, "ConjugateGradient")
@@ -238,12 +238,16 @@ NB_MODULE(pysfem, m) {
         .def("default_init", &ConjugateGradient_t::default_init)
         .def("set_op", &ConjugateGradient_t::set_op)
         .def("set_preconditioner_op", &ConjugateGradient_t::set_preconditioner_op)
-        .def("set_max_it", &ConjugateGradient_t::set_max_it);
+        .def("set_max_it", &ConjugateGradient_t::set_max_it)
+        .def("set_verbose", &ConjugateGradient_t::set_verbose)
+        .def("set_rtol", &ConjugateGradient_t::set_rtol)
+        .def("set_atol", &ConjugateGradient_t::set_atol);
+
 
     m.def("apply",
           [](std::shared_ptr<ConjugateGradient_t> &cg,
-             nb::ndarray<isolver_scalar_t> x,
-             nb::ndarray<isolver_scalar_t> y) {
+             nb::ndarray<real_t> x,
+             nb::ndarray<real_t> y) {
               size_t n = x.size();
               cg->apply(n, x.data(), y.data());
           });

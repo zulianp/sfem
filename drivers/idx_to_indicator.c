@@ -7,9 +7,8 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-typedef float geom_t;
-typedef int idx_t;
-typedef double real_t;
+
+#include "sfem_base.h"
 
 #ifdef NDEBUG
 #define INLINE inline

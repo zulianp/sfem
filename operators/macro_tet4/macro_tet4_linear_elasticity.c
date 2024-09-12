@@ -1,343 +1,11 @@
 #include "macro_tet4_linear_elasticity.h"
-#include <stddef.h>
+
 #include "sfem_base.h"
 
-static SFEM_INLINE void jacobian_micro_kernel(const geom_t px0,
-                                              const geom_t px1,
-                                              const geom_t px2,
-                                              const geom_t px3,
-                                              const geom_t py0,
-                                              const geom_t py1,
-                                              const geom_t py2,
-                                              const geom_t py3,
-                                              const geom_t pz0,
-                                              const geom_t pz1,
-                                              const geom_t pz2,
-                                              const geom_t pz3,
-                                              jacobian_t *jacobian) {
-    jacobian[0] = -px0 + px1;
-    jacobian[1] = -px0 + px2;
-    jacobian[2] = -px0 + px3;
-    jacobian[3] = -py0 + py1;
-    jacobian[4] = -py0 + py2;
-    jacobian[5] = -py0 + py3;
-    jacobian[6] = -pz0 + pz1;
-    jacobian[7] = -pz0 + pz2;
-    jacobian[8] = -pz0 + pz3;
-}
+#include "macro_tet4_inline_cpu.h"
+#include "tet4_linear_elasticity_inline_cpu.h"
 
-static SFEM_INLINE void adjugate_and_det_micro_kernel(const geom_t px0,
-                                                      const geom_t px1,
-                                                      const geom_t px2,
-                                                      const geom_t px3,
-                                                      const geom_t py0,
-                                                      const geom_t py1,
-                                                      const geom_t py2,
-                                                      const geom_t py3,
-                                                      const geom_t pz0,
-                                                      const geom_t pz1,
-                                                      const geom_t pz2,
-                                                      const geom_t pz3,
-                                                      jacobian_t *adjugate,
-                                                      jacobian_t *jacobian_determinant) {
-    // Compute jacobian in high precision
-    real_t jacobian[9];
-    jacobian[0] = -px0 + px1;
-    jacobian[1] = -px0 + px2;
-    jacobian[2] = -px0 + px3;
-    jacobian[3] = -py0 + py1;
-    jacobian[4] = -py0 + py2;
-    jacobian[5] = -py0 + py3;
-    jacobian[6] = -pz0 + pz1;
-    jacobian[7] = -pz0 + pz2;
-    jacobian[8] = -pz0 + pz3;
-
-    const real_t x0 = jacobian[4] * jacobian[8];
-    const real_t x1 = jacobian[5] * jacobian[7];
-    const real_t x2 = jacobian[1] * jacobian[8];
-    const real_t x3 = jacobian[1] * jacobian[5];
-    const real_t x4 = jacobian[2] * jacobian[4];
-
-    // Store adjugate in lower precision
-    adjugate[0] = x0 - x1;
-    adjugate[1] = jacobian[2] * jacobian[7] - x2;
-    adjugate[2] = x3 - x4;
-    adjugate[3] = -jacobian[3] * jacobian[8] + jacobian[5] * jacobian[6];
-    adjugate[4] = jacobian[0] * jacobian[8] - jacobian[2] * jacobian[6];
-    adjugate[5] = -jacobian[0] * jacobian[5] + jacobian[2] * jacobian[3];
-    adjugate[6] = jacobian[3] * jacobian[7] - jacobian[4] * jacobian[6];
-    adjugate[7] = -jacobian[0] * jacobian[7] + jacobian[1] * jacobian[6];
-    adjugate[8] = jacobian[0] * jacobian[4] - jacobian[1] * jacobian[3];
-
-    // Store determinant in lower precision
-    jacobian_determinant[0] = jacobian[0] * x0 - jacobian[0] * x1 +
-                              jacobian[2] * jacobian[3] * jacobian[7] - jacobian[3] * x2 +
-                              jacobian[6] * x3 - jacobian[6] * x4;
-}
-
-static SFEM_INLINE void sub_adj_0(const jacobian_t *const SFEM_RESTRICT adjugate,
-                                  const ptrdiff_t stride,
-                                  jacobian_t *const SFEM_RESTRICT sub_adjugate) {
-    sub_adjugate[0] = 2 * adjugate[0 * stride];
-    sub_adjugate[1] = 2 * adjugate[1 * stride];
-    sub_adjugate[2] = 2 * adjugate[2 * stride];
-    sub_adjugate[3] = 2 * adjugate[3 * stride];
-    sub_adjugate[4] = 2 * adjugate[4 * stride];
-    sub_adjugate[5] = 2 * adjugate[5 * stride];
-    sub_adjugate[6] = 2 * adjugate[6 * stride];
-    sub_adjugate[7] = 2 * adjugate[7 * stride];
-    sub_adjugate[8] = 2 * adjugate[8 * stride];
-}
-static SFEM_INLINE void sub_adj_4(const jacobian_t *const SFEM_RESTRICT adjugate,
-                                  const ptrdiff_t stride,
-                                  jacobian_t *const SFEM_RESTRICT sub_adjugate) {
-    const real_t x0 = 2 * adjugate[0 * stride];
-    const real_t x1 = 2 * adjugate[1 * stride];
-    const real_t x2 = 2 * adjugate[2 * stride];
-    sub_adjugate[0] = 2 * adjugate[3 * stride] + x0;
-    sub_adjugate[1] = 2 * adjugate[4 * stride] + x1;
-    sub_adjugate[2] = 2 * adjugate[5 * stride] + x2;
-    sub_adjugate[3] = -x0;
-    sub_adjugate[4] = -x1;
-    sub_adjugate[5] = -x2;
-    sub_adjugate[6] = 2 * adjugate[6 * stride];
-    sub_adjugate[7] = 2 * adjugate[7 * stride];
-    sub_adjugate[8] = 2 * adjugate[8 * stride];
-}
-
-static SFEM_INLINE void sub_adj_5(const jacobian_t *const SFEM_RESTRICT adjugate,
-                                  const ptrdiff_t stride,
-                                  jacobian_t *const SFEM_RESTRICT sub_adjugate) {
-    const real_t x0 = 2 * adjugate[3 * stride];
-    const real_t x1 = 2 * adjugate[6 * stride] + x0;
-    const real_t x2 = 2 * adjugate[4 * stride];
-    const real_t x3 = 2 * adjugate[7 * stride] + x2;
-    const real_t x4 = 2 * adjugate[5 * stride];
-    const real_t x5 = 2 * adjugate[8 * stride] + x4;
-    sub_adjugate[0] = -x1;
-    sub_adjugate[1] = -x3;
-    sub_adjugate[2] = -x5;
-    sub_adjugate[3] = x0;
-    sub_adjugate[4] = x2;
-    sub_adjugate[5] = x4;
-    sub_adjugate[6] = 2 * adjugate[0 * stride] + x1;
-    sub_adjugate[7] = 2 * adjugate[1 * stride] + x3;
-    sub_adjugate[8] = 2 * adjugate[2 * stride] + x5;
-}
-
-static SFEM_INLINE void sub_adj_6(const jacobian_t *const SFEM_RESTRICT adjugate,
-                                  const ptrdiff_t stride,
-                                  jacobian_t *const SFEM_RESTRICT sub_adjugate) {
-    const real_t x0 = 2 * adjugate[3 * stride];
-    const real_t x1 = 2 * adjugate[4 * stride];
-    const real_t x2 = 2 * adjugate[5 * stride];
-    sub_adjugate[0] = 2 * adjugate[0 * stride] + x0;
-    sub_adjugate[1] = 2 * adjugate[1 * stride] + x1;
-    sub_adjugate[2] = 2 * adjugate[2 * stride] + x2;
-    sub_adjugate[3] = 2 * adjugate[6 * stride] + x0;
-    sub_adjugate[4] = 2 * adjugate[7 * stride] + x1;
-    sub_adjugate[5] = 2 * adjugate[8 * stride] + x2;
-    sub_adjugate[6] = -x0;
-    sub_adjugate[7] = -x1;
-    sub_adjugate[8] = -x2;
-}
-
-static SFEM_INLINE void sub_adj_7(const jacobian_t *const SFEM_RESTRICT adjugate,
-                                  const ptrdiff_t stride,
-                                  jacobian_t *const SFEM_RESTRICT sub_adjugate) {
-    const real_t x0 = 2 * adjugate[6 * stride];
-    const real_t x1 = 2 * adjugate[7 * stride];
-    const real_t x2 = 2 * adjugate[8 * stride];
-    sub_adjugate[0] = -x0;
-    sub_adjugate[1] = -x1;
-    sub_adjugate[2] = -x2;
-    sub_adjugate[3] = 2 * adjugate[3 * stride] + x0;
-    sub_adjugate[4] = 2 * adjugate[4 * stride] + x1;
-    sub_adjugate[5] = 2 * adjugate[5 * stride] + x2;
-    sub_adjugate[6] = 2 * adjugate[0 * stride];
-    sub_adjugate[7] = 2 * adjugate[1 * stride];
-    sub_adjugate[8] = 2 * adjugate[2 * stride];
-}
-
-static SFEM_INLINE void tet4_linear_elasticity_apply_kernel_opt(
-    const real_t mu,
-    const real_t lambda,
-    const jacobian_t *const SFEM_RESTRICT adjugate,
-    const jacobian_t jacobian_determinant,
-    const real_t *const SFEM_RESTRICT ux,
-    const real_t *const SFEM_RESTRICT uy,
-    const real_t *const SFEM_RESTRICT uz,
-    real_t *const SFEM_RESTRICT outx,
-    real_t *const SFEM_RESTRICT outy,
-    real_t *const SFEM_RESTRICT outz) {
-    // Evaluation of displacement gradient
-    real_t disp_grad[9];
-
-    {
-        const real_t x0 = 1.0 / jacobian_determinant;
-        const real_t x1 = ux[0] - ux[1];
-        const real_t x2 = ux[0] - ux[2];
-        const real_t x3 = ux[0] - ux[3];
-        const real_t x4 = uy[0] - uy[1];
-        const real_t x5 = uy[0] - uy[2];
-        const real_t x6 = uy[0] - uy[3];
-        const real_t x7 = -uz[0];
-        const real_t x8 = uz[2] + x7;
-        const real_t x9 = uz[3] + x7;
-        const real_t x10 = uz[0] - uz[1];
-        disp_grad[0] = x0 * (-adjugate[0] * x1 - adjugate[3] * x2 - adjugate[6] * x3);
-        disp_grad[1] = x0 * (-adjugate[1] * x1 - adjugate[4] * x2 - adjugate[7] * x3);
-        disp_grad[2] = x0 * (-adjugate[2] * x1 - adjugate[5] * x2 - adjugate[8] * x3);
-        disp_grad[3] = x0 * (-adjugate[0] * x4 - adjugate[3] * x5 - adjugate[6] * x6);
-        disp_grad[4] = x0 * (-adjugate[1] * x4 - adjugate[4] * x5 - adjugate[7] * x6);
-        disp_grad[5] = x0 * (-adjugate[2] * x4 - adjugate[5] * x5 - adjugate[8] * x6);
-        disp_grad[6] = x0 * (-adjugate[0] * x10 + adjugate[3] * x8 + adjugate[6] * x9);
-        disp_grad[7] = x0 * (-adjugate[1] * x10 + adjugate[4] * x8 + adjugate[7] * x9);
-        disp_grad[8] = x0 * (-adjugate[2] * x10 + adjugate[5] * x8 + adjugate[8] * x9);
-    }
-
-// Which one is better?
-#if 0
-    We can reuse the buffer to avoid additional register usage
-    real_t *P = disp_grad;
-    {
-        const real_t x0 = (1.0 / 3.0) * mu;
-        const real_t x1 =
-            (1.0 / 12.0) * lambda * (2 * disp_grad[0] + 2 * disp_grad[4] + 2 * disp_grad[8]);
-        const real_t x2 = (1.0 / 6.0) * mu;
-        const real_t x3 = x2 * (disp_grad[1] + disp_grad[3]);
-        const real_t x4 = x2 * (disp_grad[2] + disp_grad[6]);
-        const real_t x5 = x2 * (disp_grad[5] + disp_grad[7]);
-        P[0] = disp_grad[0] * x0 + x1;
-        P[1] = x3;
-        P[2] = x4;
-        P[3] = x3;
-        P[4] = disp_grad[4] * x0 + x1;
-        P[5] = x5;
-        P[6] = x4;
-        P[7] = x5;
-        P[8] = disp_grad[8] * x0 + x1;
-    }
-
-    // Bilinear form
-    {
-        const real_t x0 = adjugate[0] + adjugate[3] + adjugate[6];
-        const real_t x1 = adjugate[1] + adjugate[4] + adjugate[7];
-        const real_t x2 = adjugate[2] + adjugate[5] + adjugate[8];
-        // X
-        outx[0] = -P[0] * x0 - P[1] * x1 - P[2] * x2;
-        outx[1] = P[0] * adjugate[0] + P[1] * adjugate[1] + P[2] * adjugate[2];
-        outx[2] = P[0] * adjugate[3] + P[1] * adjugate[4] + P[2] * adjugate[5];
-        outx[3] = P[0] * adjugate[6] + P[1] * adjugate[7] + P[2] * adjugate[8];
-        // Y
-        outy[0] = -P[3] * x0 - P[4] * x1 - P[5] * x2;
-        outy[1] = P[3] * adjugate[0] + P[4] * adjugate[1] + P[5] * adjugate[2];
-        outy[2] = P[3] * adjugate[3] + P[4] * adjugate[4] + P[5] * adjugate[5];
-        outy[3] = P[3] * adjugate[6] + P[4] * adjugate[7] + P[5] * adjugate[8];
-        // Z
-        outz[0] = -P[6] * x0 - P[7] * x1 - P[8] * x2;
-        outz[1] = P[6] * adjugate[0] + P[7] * adjugate[1] + P[8] * adjugate[2];
-        outz[2] = P[6] * adjugate[3] + P[7] * adjugate[4] + P[8] * adjugate[5];
-        outz[3] = P[6] * adjugate[6] + P[7] * adjugate[7] + P[8] * adjugate[8];
-    }
-
-#else
-    //--------------------------
-    // loperand
-    //--------------------------
-    // We can reuse the buffer to avoid additional register usage
-    real_t *P_tXJinv_t = disp_grad;
-    {
-       const real_t x0 = (1.0/6.0)*mu;
-       const real_t x1 = x0*(disp_grad[1] + disp_grad[3]);
-       const real_t x2 = x0*(disp_grad[2] + disp_grad[6]);
-       const real_t x3 = 2*mu;
-       const real_t x4 = lambda*(disp_grad[0] + disp_grad[4] + disp_grad[8]);
-       const real_t x5 = (1.0/6.0)*disp_grad[0]*x3 + (1.0/6.0)*x4;
-       const real_t x6 = x0*(disp_grad[5] + disp_grad[7]);
-       const real_t x7 = (1.0/6.0)*disp_grad[4]*x3 + (1.0/6.0)*x4;
-       const real_t x8 = (1.0/6.0)*disp_grad[8]*x3 + (1.0/6.0)*x4;
-       P_tXJinv_t[0] = adjugate[0]*x5 + adjugate[1]*x1 + adjugate[2]*x2;
-       P_tXJinv_t[1] = adjugate[3]*x5 + adjugate[4]*x1 + adjugate[5]*x2;
-       P_tXJinv_t[2] = adjugate[6]*x5 + adjugate[7]*x1 + adjugate[8]*x2;
-       P_tXJinv_t[3] = adjugate[0]*x1 + adjugate[1]*x7 + adjugate[2]*x6;
-       P_tXJinv_t[4] = adjugate[3]*x1 + adjugate[4]*x7 + adjugate[5]*x6;
-       P_tXJinv_t[5] = adjugate[6]*x1 + adjugate[7]*x7 + adjugate[8]*x6;
-       P_tXJinv_t[6] = adjugate[0]*x2 + adjugate[1]*x6 + adjugate[2]*x8;
-       P_tXJinv_t[7] = adjugate[3]*x2 + adjugate[4]*x6 + adjugate[5]*x8;
-       P_tXJinv_t[8] = adjugate[6]*x2 + adjugate[7]*x6 + adjugate[8]*x8;
-    }
-    //--------------------------
-    // gradient_opt
-    //--------------------------
-    {
-        outx[0] = -P_tXJinv_t[0] - P_tXJinv_t[1] - P_tXJinv_t[2];
-        outx[1] = P_tXJinv_t[0];
-        outx[2] = P_tXJinv_t[1];
-        outx[3] = P_tXJinv_t[2];
-        outy[0] = -P_tXJinv_t[3] - P_tXJinv_t[4] - P_tXJinv_t[5];
-        outy[1] = P_tXJinv_t[3];
-        outy[2] = P_tXJinv_t[4];
-        outy[3] = P_tXJinv_t[5];
-        outz[0] = -P_tXJinv_t[6] - P_tXJinv_t[7] - P_tXJinv_t[8];
-        outz[1] = P_tXJinv_t[6];
-        outz[2] = P_tXJinv_t[7];
-        outz[3] = P_tXJinv_t[8];
-    }
-#endif
-
-}
-
-void macro_tet4_linear_elasticity_init(linear_elasticity_t *const ctx,
-                                       const real_t mu,
-                                       const real_t lambda,
-                                       const ptrdiff_t nelements,
-                                       idx_t **const SFEM_RESTRICT elements,
-                                       geom_t **const SFEM_RESTRICT points) {
-    jacobian_t *jacobian_adjugate = (jacobian_t *)calloc(9 * nelements, sizeof(jacobian_t));
-    jacobian_t *jacobian_determinant = (jacobian_t *)calloc(nelements, sizeof(jacobian_t));
-
-#pragma omp parallel
-    {
-#pragma omp for
-        for (ptrdiff_t e = 0; e < nelements; e++) {
-            adjugate_and_det_micro_kernel(points[0][elements[0][e]],
-                                          points[0][elements[1][e]],
-                                          points[0][elements[2][e]],
-                                          points[0][elements[3][e]],
-                                          points[1][elements[0][e]],
-                                          points[1][elements[1][e]],
-                                          points[1][elements[2][e]],
-                                          points[1][elements[3][e]],
-                                          points[2][elements[0][e]],
-                                          points[2][elements[1][e]],
-                                          points[2][elements[2][e]],
-                                          points[2][elements[3][e]],
-                                          &jacobian_adjugate[e * 9],
-                                          &jacobian_determinant[e]);
-        }
-    }
-
-    ctx->mu = mu;
-    ctx->lambda = lambda;
-    ctx->jacobian_adjugate = jacobian_adjugate;
-    ctx->jacobian_determinant = jacobian_determinant;
-    ctx->elements = elements;
-    ctx->nelements = nelements;
-    ctx->element_type = MACRO_TET4;
-}
-
-void macro_tet4_linear_elasticity_destroy(linear_elasticity_t *const ctx) {
-    free(ctx->jacobian_adjugate);
-    free(ctx->jacobian_determinant);
-
-    ctx->jacobian_adjugate = 0;
-    ctx->jacobian_determinant = 0;
-
-    ctx->elements = 0;
-    ctx->nelements = 0;
-    ctx->element_type = INVALID;
-}
+#include <stddef.h>
 
 static const int sub_tets[8][4] = {{0, 4, 6, 7},
                                    {4, 1, 5, 8},
@@ -348,15 +16,16 @@ static const int sub_tets[8][4] = {{0, 4, 6, 7},
                                    {6, 5, 9, 8},
                                    {7, 6, 9, 8}};
 
-typedef void (*SubAdjFun)(const jacobian_t *const SFEM_RESTRICT,
-                          const ptrdiff_t,
-                          jacobian_t *const SFEM_RESTRICT);
+typedef void (*SubAdjFun)(const scalar_t *const SFEM_RESTRICT, scalar_t *const SFEM_RESTRICT);
 
-static SubAdjFun octahedron_adj_fun[4] = {&sub_adj_4, &sub_adj_5, &sub_adj_6, &sub_adj_7};
+static SubAdjFun octahedron_adj_fun[4] = {&tet4_sub_adj_4,
+                                          &tet4_sub_adj_5,
+                                          &tet4_sub_adj_6,
+                                          &tet4_sub_adj_7};
 
 static SFEM_INLINE void subtet_gather(const int i,
-                                      const real_t *const SFEM_RESTRICT in,
-                                      real_t *const SFEM_RESTRICT out) {
+                                      const scalar_t *const SFEM_RESTRICT in,
+                                      scalar_t *const SFEM_RESTRICT out) {
     const int *g = sub_tets[i];
     for (int v = 0; v < 4; ++v) {
         out[v] = in[g[v]];
@@ -364,261 +33,530 @@ static SFEM_INLINE void subtet_gather(const int i,
 }
 
 static SFEM_INLINE void subtet_scatter_add(const int i,
-                                           const real_t *const SFEM_RESTRICT in,
-                                           real_t *const SFEM_RESTRICT out) {
+                                           const accumulator_t *const SFEM_RESTRICT in,
+                                           accumulator_t *const SFEM_RESTRICT out) {
     const int *s = sub_tets[i];
     for (int v = 0; v < 4; ++v) {
         out[s[v]] += in[v];
     }
 }
 
-void macro_tet4_linear_elasticity_apply_opt(const linear_elasticity_t *const ctx,
-                                            const real_t *const SFEM_RESTRICT u,
-                                            real_t *const SFEM_RESTRICT values) {
-    const real_t mu = ctx->mu;
-    const real_t lambda = ctx->lambda;
+static SFEM_INLINE void macro_tet4_local_apply_adj(const scalar_t *const SFEM_RESTRICT
+                                                           jacobian_adjugate,
+                                                   const scalar_t jacobian_determinant,
+                                                   const scalar_t mu,
+                                                   const scalar_t lambda,
+                                                   const scalar_t *const SFEM_RESTRICT ux,
+                                                   const scalar_t *const SFEM_RESTRICT uy,
+                                                   const scalar_t *const SFEM_RESTRICT uz,
+                                                   accumulator_t *const SFEM_RESTRICT outx,
+                                                   accumulator_t *const SFEM_RESTRICT outy,
+                                                   accumulator_t *const SFEM_RESTRICT outz) {
+    scalar_t sub_adjugate[9];
 
-    const jacobian_t *const g_jacobian_adjugate = (jacobian_t *)ctx->jacobian_adjugate;
-    const jacobian_t *const g_jacobian_determinant = (jacobian_t *)ctx->jacobian_determinant;
+    scalar_t sub_ux[4];
+    scalar_t sub_uy[4];
+    scalar_t sub_uz[4];
 
-#pragma omp parallel
-    {
-#pragma omp for  // nowait
-        for (ptrdiff_t i = 0; i < ctx->nelements; ++i) {
-            idx_t ev[10];
+    accumulator_t sub_outx[4];
+    accumulator_t sub_outy[4];
+    accumulator_t sub_outz[4];
 
-            // Sub-geometry
-            jacobian_t sub_adjugate[9];
 
-            // Is it sensibile to have so many "registers" here?
-            real_t ux[10];
-            real_t uy[10];
-            real_t uz[10];
+    scalar_t sub_determinant = jacobian_determinant*8.0;
 
-            real_t outx[10] = {0};
-            real_t outy[10] = {0};
-            real_t outz[10] = {0};
+    {  // Corner tests
+        tet4_sub_adj_0(jacobian_adjugate, sub_adjugate);
 
-            // Sub-buffers
-            real_t sub_ux[4];
-            real_t sub_uy[4];
-            real_t sub_uz[4];
+        for (int i = 0; i < 4; i++) {
+            subtet_gather(i, ux, sub_ux);
+            subtet_gather(i, uy, sub_uy);
+            subtet_gather(i, uz, sub_uz);
 
-            real_t sub_outx[4];
-            real_t sub_outy[4];
-            real_t sub_outz[4];
+            tet4_linear_elasticity_apply_adj(sub_adjugate,
+                                             sub_determinant,
+                                             mu,
+                                             lambda,
+                                             sub_ux,
+                                             sub_uy,
+                                             sub_uz,
+                                             sub_outx,
+                                             sub_outy,
+                                             sub_outz);
 
-            const jacobian_t *const jacobian_adjugate = &g_jacobian_adjugate[i * 9];
-            const jacobian_t jacobian_determinant = g_jacobian_determinant[i];
+            subtet_scatter_add(i, sub_outx, outx);
+            subtet_scatter_add(i, sub_outy, outy);
+            subtet_scatter_add(i, sub_outz, outz);
+        }
+    }
 
-#pragma unroll(10)
-            for (int v = 0; v < 10; ++v) {
-                ev[v] = ctx->elements[v][i];
-            }
+    {  // Octahedron tets
+        for (int i = 0; i < 4; i++) {
+            SubAdjFun sub_adj_fun = octahedron_adj_fun[i];
 
-            for (int v = 0; v < 10; ++v) {
-                ux[v] = u[ev[v] * 3];
-                uy[v] = u[ev[v] * 3 + 1];
-                uz[v] = u[ev[v] * 3 + 2];
-            }
+            (*sub_adj_fun)(jacobian_adjugate, sub_adjugate);
 
-            // All cached from here
+            subtet_gather(4 + i, ux, sub_ux);
+            subtet_gather(4 + i, uy, sub_uy);
+            subtet_gather(4 + i, uz, sub_uz);
 
-            {  // Corner tests
-                sub_adj_0(jacobian_adjugate, 1, sub_adjugate);
+            tet4_linear_elasticity_apply_adj(sub_adjugate,
+                                             sub_determinant,
+                                             mu,
+                                             lambda,
+                                             sub_ux,
+                                             sub_uy,
+                                             sub_uz,
+                                             sub_outx,
+                                             sub_outy,
+                                             sub_outz);
 
-                for (int i = 0; i < 4; i++) {
-                    subtet_gather(i, ux, sub_ux);
-                    subtet_gather(i, uy, sub_uy);
-                    subtet_gather(i, uz, sub_uz);
-
-                    tet4_linear_elasticity_apply_kernel_opt(mu,
-                                                            lambda,
-                                                            sub_adjugate,
-                                                            jacobian_determinant,
-                                                            sub_ux,
-                                                            sub_uy,
-                                                            sub_uz,
-                                                            sub_outx,
-                                                            sub_outy,
-                                                            sub_outz);
-
-                    subtet_scatter_add(i, sub_outx, outx);
-                    subtet_scatter_add(i, sub_outy, outy);
-                    subtet_scatter_add(i, sub_outz, outz);
-                }
-            }
-
-            {  // Octahedron tets
-#if 1
-                for (int i = 0; i < 4; i++) {
-                    SubAdjFun sub_adj_fun = octahedron_adj_fun[i];
-
-                    (*sub_adj_fun)(jacobian_adjugate, 1, sub_adjugate);
-
-                    subtet_gather(4 + i, ux, sub_ux);
-                    subtet_gather(4 + i, uy, sub_uy);
-                    subtet_gather(4 + i, uz, sub_uz);
-
-                    tet4_linear_elasticity_apply_kernel_opt(mu,
-                                                            lambda,
-                                                            sub_adjugate,
-                                                            jacobian_determinant,
-                                                            sub_ux,
-                                                            sub_uy,
-                                                            sub_uz,
-                                                            sub_outx,
-                                                            sub_outy,
-                                                            sub_outz);
-
-                    subtet_scatter_add(4 + i, sub_outx, outx);
-                    subtet_scatter_add(4 + i, sub_outy, outy);
-                    subtet_scatter_add(4 + i, sub_outz, outz);
-                }
-
-#else
-               // For cuda use this
-
-                // 4)
-                sub_adj_4(jacobian_adjugate, 1, sub_adjugate);
-
-                subtet_gather(4, ux, sub_ux);
-                subtet_gather(4, uy, sub_uy);
-                subtet_gather(4, uz, sub_uz);
-
-                tet4_linear_elasticity_apply_kernel_opt(mu,
-                                                        lambda,
-                                                        sub_adjugate,
-                                                        jacobian_determinant,
-                                                        sub_ux,
-                                                        sub_uy,
-                                                        sub_uz,
-                                                        sub_outx,
-                                                        sub_outy,
-                                                        sub_outz);
-
-                subtet_scatter_add(4, sub_outx, outx);
-                subtet_scatter_add(4, sub_outy, outy);
-                subtet_scatter_add(4, sub_outz, outz);
-
-                // 5)
-                sub_adj_5(jacobian_adjugate, 1, sub_adjugate);
-
-                subtet_gather(5, ux, sub_ux);
-                subtet_gather(5, uy, sub_uy);
-                subtet_gather(5, uz, sub_uz);
-
-                tet4_linear_elasticity_apply_kernel_opt(mu,
-                                                        lambda,
-                                                        sub_adjugate,
-                                                        jacobian_determinant,
-                                                        sub_ux,
-                                                        sub_uy,
-                                                        sub_uz,
-                                                        sub_outx,
-                                                        sub_outy,
-                                                        sub_outz);
-
-                subtet_scatter_add(5, sub_outx, outx);
-                subtet_scatter_add(5, sub_outy, outy);
-                subtet_scatter_add(5, sub_outz, outz);
-
-                // 6)
-                sub_adj_6(jacobian_adjugate, 1, sub_adjugate);
-
-                subtet_gather(6, ux, sub_ux);
-                subtet_gather(6, uy, sub_uy);
-                subtet_gather(6, uz, sub_uz);
-
-                tet4_linear_elasticity_apply_kernel_opt(mu,
-                                                        lambda,
-                                                        sub_adjugate,
-                                                        jacobian_determinant,
-                                                        sub_ux,
-                                                        sub_uy,
-                                                        sub_uz,
-                                                        sub_outx,
-                                                        sub_outy,
-                                                        sub_outz);
-
-                subtet_scatter_add(6, sub_outx, outx);
-                subtet_scatter_add(6, sub_outy, outy);
-                subtet_scatter_add(6, sub_outz, outz);
-
-                // 7)
-                subtet_gather(7, ux, sub_ux);
-                subtet_gather(7, uy, sub_uy);
-                subtet_gather(7, uz, sub_uz);
-
-                sub_adj_7(jacobian_adjugate, 1, sub_adjugate);
-                tet4_linear_elasticity_apply_kernel_opt(mu,
-                                                        lambda,
-                                                        sub_adjugate,
-                                                        jacobian_determinant,
-                                                        sub_ux,
-                                                        sub_uy,
-                                                        sub_uz,
-                                                        sub_outx,
-                                                        sub_outy,
-                                                        sub_outz);
-
-                subtet_scatter_add(7, sub_outx, outx);
-                subtet_scatter_add(7, sub_outy, outy);
-                subtet_scatter_add(7, sub_outz, outz);
-#endif
-            }
-
-            // up to here
-
-#pragma unroll(10)
-            for (int v = 0; v < 10; v++) {
-#pragma omp atomic update
-                values[ev[v] * 3] += outx[v];
-            }
-
-#pragma unroll(10)
-            for (int v = 0; v < 10; v++) {
-#pragma omp atomic update
-                values[ev[v] * 3 + 1] += outy[v];
-            }
-
-#pragma unroll(10)
-            for (int v = 0; v < 10; v++) {
-#pragma omp atomic update
-                values[ev[v] * 3 + 2] += outz[v];
-            }
+            subtet_scatter_add(4 + i, sub_outx, outx);
+            subtet_scatter_add(4 + i, sub_outy, outy);
+            subtet_scatter_add(4 + i, sub_outz, outz);
         }
     }
 }
 
-void macro_tet4_linear_elasticity_diag(const linear_elasticity_t *const ctx,
-                                       real_t *const SFEM_RESTRICT diag) {
-    //
-    assert(0);
+int macro_tet4_linear_elasticity_apply(const ptrdiff_t nelements,
+                                       const ptrdiff_t nnodes,
+                                       idx_t **const SFEM_RESTRICT elements,
+                                       geom_t **const SFEM_RESTRICT points,
+                                       const real_t mu,
+                                       const real_t lambda,
+                                       const ptrdiff_t u_stride,
+                                       const real_t *const SFEM_RESTRICT g_ux,
+                                       const real_t *const SFEM_RESTRICT g_uy,
+                                       const real_t *const SFEM_RESTRICT g_uz,
+                                       const ptrdiff_t out_stride,
+                                       real_t *const SFEM_RESTRICT g_outx,
+                                       real_t *const SFEM_RESTRICT g_outy,
+                                       real_t *const SFEM_RESTRICT g_outz) {
+    SFEM_UNUSED(nnodes);
+
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[10];
+        scalar_t ux[10];
+        scalar_t uy[10];
+        scalar_t uz[10];
+        accumulator_t outx[10] = {0};
+        accumulator_t outy[10] = {0};
+        accumulator_t outz[10] = {0};
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant = 0;
+
+#pragma unroll(10)
+        for (int v = 0; v < 10; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        for (int v = 0; v < 10; ++v) {
+            ux[v] = g_ux[ev[v] * u_stride];
+            uy[v] = g_uy[ev[v] * u_stride];
+            uz[v] = g_uz[ev[v] * u_stride];
+        }
+
+        tet4_adjugate_and_det_s(x[ev[0]],
+                                x[ev[1]],
+                                x[ev[2]],
+                                x[ev[3]],
+                                // Y-coordinates
+                                y[ev[0]],
+                                y[ev[1]],
+                                y[ev[2]],
+                                y[ev[3]],
+                                // Z-coordinates
+                                z[ev[0]],
+                                z[ev[1]],
+                                z[ev[2]],
+                                z[ev[3]],
+                                // Output
+                                jacobian_adjugate,
+                                &jacobian_determinant);
+
+        macro_tet4_local_apply_adj(
+                jacobian_adjugate, jacobian_determinant, mu, lambda, ux, uy, uz, outx, outy, outz);
+
+#pragma unroll(10)
+        for (int v = 0; v < 10; v++) {
+#pragma omp atomic update
+            g_outx[ev[v] * out_stride] += outx[v];
+        }
+
+#pragma unroll(10)
+        for (int v = 0; v < 10; v++) {
+#pragma omp atomic update
+            g_outy[ev[v] * out_stride] += outy[v];
+        }
+
+#pragma unroll(10)
+        for (int v = 0; v < 10; v++) {
+#pragma omp atomic update
+            g_outz[ev[v] * out_stride] += outz[v];
+        }
+    }
+    return 0;
 }
 
-void macro_tet4_linear_elasticity_apply_aos(const ptrdiff_t nelements,
-                                            const ptrdiff_t nnodes,
-                                            idx_t **const SFEM_RESTRICT elements,
-                                            geom_t **const SFEM_RESTRICT points,
-                                            const real_t mu,
-                                            const real_t lambda,
-                                            const real_t *const SFEM_RESTRICT u,
-                                            real_t *const SFEM_RESTRICT values) {
-#if 0
-    linear_elasticity_t ctx;
-    macro_tet4_linear_elasticity_init(&ctx, mu, lambda, nelements, elements, points);
-    macro_tet4_linear_elasticity_apply_opt(&ctx, u, values);
-    macro_tet4_linear_elasticity_destroy(&ctx);
-#else
-    static linear_elasticity_t ctx;
-    static int initialized = 0;
+int macro_tet4_linear_elasticity_apply_opt(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
+        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant,
+        const real_t mu,
+        const real_t lambda,
+        const ptrdiff_t u_stride,
+        const real_t *const SFEM_RESTRICT g_ux,
+        const real_t *const SFEM_RESTRICT g_uy,
+        const real_t *const SFEM_RESTRICT g_uz,
+        const ptrdiff_t out_stride,
+        real_t *const SFEM_RESTRICT g_outx,
+        real_t *const SFEM_RESTRICT g_outy,
+        real_t *const SFEM_RESTRICT g_outz) {
+    {
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[10];
+            scalar_t ux[10];
+            scalar_t uy[10];
+            scalar_t uz[10];
+            accumulator_t outx[10] = {0};
+            accumulator_t outy[10] = {0};
+            accumulator_t outz[10] = {0};
 
-    if (!initialized) {
-        macro_tet4_linear_elasticity_init(&ctx, mu, lambda, nelements, elements, points);
-        initialized = 1;
+            const scalar_t jacobian_determinant = g_jacobian_determinant[i];
+            scalar_t jacobian_adjugate[9];
+            for (int k = 0; k < 9; k++) {
+                jacobian_adjugate[k] = g_jacobian_adjugate[i * 9 + k];
+            }
+
+            // #pragma unroll(10)
+            for (int v = 0; v < 10; ++v) {
+                ev[v] = elements[v][i];
+            }
+
+            for (int v = 0; v < 10; ++v) {
+                const ptrdiff_t idx = ev[v] * u_stride;
+                ux[v] = g_ux[idx];
+                uy[v] = g_uy[idx];
+                uz[v] = g_uz[idx];
+            }
+
+            macro_tet4_local_apply_adj(jacobian_adjugate,
+                                       jacobian_determinant,
+                                       mu,
+                                       lambda,
+                                       ux,
+                                       uy,
+                                       uz,
+                                       outx,
+                                       outy,
+                                       outz);
+
+            for (int v = 0; v < 10; v++) {
+#pragma omp atomic update
+                g_outx[ev[v] * out_stride] += outx[v];
+            }
+
+            for (int v = 0; v < 10; v++) {
+#pragma omp atomic update
+                g_outy[ev[v] * out_stride] += outy[v];
+            }
+
+            for (int v = 0; v < 10; v++) {
+#pragma omp atomic update
+                g_outz[ev[v] * out_stride] += outz[v];
+            }
+        }
     }
 
-    macro_tet4_linear_elasticity_apply_opt(&ctx, u, values);
-#endif
+    return 0;
+}
+
+static SFEM_INLINE void macro_tet4_local_diag_adj(const scalar_t *const SFEM_RESTRICT
+                                                          jacobian_adjugate,
+                                                  const scalar_t jacobian_determinant,
+                                                  const scalar_t mu,
+                                                  const scalar_t lambda,
+                                                  accumulator_t *const SFEM_RESTRICT outx,
+                                                  accumulator_t *const SFEM_RESTRICT outy,
+                                                  accumulator_t *const SFEM_RESTRICT outz) {
+    scalar_t sub_adjugate[9];
+    accumulator_t sub_outx[4];
+    accumulator_t sub_outy[4];
+    accumulator_t sub_outz[4];
+
+    scalar_t sub_determinant = jacobian_determinant * 8;
+
+    {  // Corner tests
+        tet4_sub_adj_0(jacobian_adjugate, sub_adjugate);
+
+        for (int i = 0; i < 4; i++) {
+            tet4_linear_elasticity_diag_adj(
+                    mu, lambda, sub_adjugate, sub_determinant, sub_outx, sub_outy, sub_outz);
+
+            subtet_scatter_add(i, sub_outx, outx);
+            subtet_scatter_add(i, sub_outy, outy);
+            subtet_scatter_add(i, sub_outz, outz);
+        }
+    }
+
+    {  // Octahedron tets
+        for (int i = 0; i < 4; i++) {
+            SubAdjFun sub_adj_fun = octahedron_adj_fun[i];
+
+            (*sub_adj_fun)(jacobian_adjugate, sub_adjugate);
+
+            tet4_linear_elasticity_diag_adj(
+                    mu, lambda, sub_adjugate, sub_determinant, sub_outx, sub_outy, sub_outz);
+
+            subtet_scatter_add(4 + i, sub_outx, outx);
+            subtet_scatter_add(4 + i, sub_outy, outy);
+            subtet_scatter_add(4 + i, sub_outz, outz);
+        }
+    }
+}
+
+int macro_tet4_linear_elasticity_diag(const ptrdiff_t nelements,
+                                      const ptrdiff_t nnodes,
+                                      idx_t **const SFEM_RESTRICT elements,
+                                      geom_t **const SFEM_RESTRICT points,
+                                      const real_t mu,
+                                      const real_t lambda,
+                                      const ptrdiff_t out_stride,
+                                      real_t *const SFEM_RESTRICT g_outx,
+                                      real_t *const SFEM_RESTRICT g_outy,
+                                      real_t *const SFEM_RESTRICT g_outz) {
+    SFEM_UNUSED(nnodes);
+
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[10];
+        accumulator_t outx[10] = {0};
+        accumulator_t outy[10] = {0};
+        accumulator_t outz[10] = {0};
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant = 0;
+
+#pragma unroll(10)
+        for (int v = 0; v < 10; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        tet4_adjugate_and_det_s(x[ev[0]],
+                                x[ev[1]],
+                                x[ev[2]],
+                                x[ev[3]],
+                                // Y-coordinates
+                                y[ev[0]],
+                                y[ev[1]],
+                                y[ev[2]],
+                                y[ev[3]],
+                                // Z-coordinates
+                                z[ev[0]],
+                                z[ev[1]],
+                                z[ev[2]],
+                                z[ev[3]],
+                                // Output
+                                jacobian_adjugate,
+                                &jacobian_determinant);
+
+        macro_tet4_local_diag_adj(
+                jacobian_adjugate, jacobian_determinant, mu, lambda, outx, outy, outz);
+
+#pragma unroll(10)
+        for (int v = 0; v < 10; v++) {
+#pragma omp atomic update
+            g_outx[ev[v] * out_stride] += outx[v];
+        }
+
+#pragma unroll(10)
+        for (int v = 0; v < 10; v++) {
+#pragma omp atomic update
+            g_outy[ev[v] * out_stride] += outy[v];
+        }
+
+#pragma unroll(10)
+        for (int v = 0; v < 10; v++) {
+#pragma omp atomic update
+            g_outz[ev[v] * out_stride] += outz[v];
+        }
+    }
+    return 0;
+}
+
+int macro_tet4_linear_elasticity_diag_opt(const ptrdiff_t nelements,
+                                          idx_t **const SFEM_RESTRICT elements,
+                                          const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
+                                          const jacobian_t *const SFEM_RESTRICT
+                                                  g_jacobian_determinant,
+                                          const real_t mu,
+                                          const real_t lambda,
+                                          const ptrdiff_t out_stride,
+                                          real_t *const SFEM_RESTRICT g_outx,
+                                          real_t *const SFEM_RESTRICT g_outy,
+                                          real_t *const SFEM_RESTRICT g_outz) {
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[10];
+        accumulator_t outx[10] = {0};
+        accumulator_t outy[10] = {0};
+        accumulator_t outz[10] = {0};
+
+        const scalar_t jacobian_determinant = g_jacobian_determinant[i];
+        scalar_t jacobian_adjugate[9];
+        for (int k = 0; k < 9; k++) {
+            jacobian_adjugate[k] = g_jacobian_adjugate[i * 9 + k];
+        }
+
+        // #pragma unroll(10)
+        for (int v = 0; v < 10; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        macro_tet4_local_diag_adj(
+                jacobian_adjugate, jacobian_determinant, mu, lambda, outx, outy, outz);
+
+        for (int v = 0; v < 10; v++) {
+#pragma omp atomic update
+            g_outx[ev[v] * out_stride] += outx[v];
+        }
+
+        for (int v = 0; v < 10; v++) {
+#pragma omp atomic update
+            g_outy[ev[v] * out_stride] += outy[v];
+        }
+
+        for (int v = 0; v < 10; v++) {
+#pragma omp atomic update
+            g_outz[ev[v] * out_stride] += outz[v];
+        }
+    }
+
+    return 0;
+}
+
+static SFEM_INLINE void macro_tet4_local_hessian(const idx_t *const SFEM_RESTRICT ev10,
+                                                 const scalar_t *const SFEM_RESTRICT
+                                                         jacobian_adjugate,
+                                                 const scalar_t jacobian_determinant,
+                                                 const scalar_t mu,
+                                                 const scalar_t lambda,
+                                                 const count_t *const SFEM_RESTRICT rowptr,
+                                                 const idx_t *const SFEM_RESTRICT colidx,
+                                                 real_t *const SFEM_RESTRICT values) {
+    scalar_t sub_adjugate[9];
+    idx_t ev[4];
+    accumulator_t element_matrix[(4 * 3) * (4 * 3)];
+
+    scalar_t sub_determinant = jacobian_determinant*8.0 ;
+
+    {  // Corner tests
+        tet4_sub_adj_0(jacobian_adjugate, sub_adjugate);
+
+        // Assemble once and reuse for all corners
+        tet4_linear_elasticity_crs_adj(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
+
+        // [0, 4, 6, 7]
+        tet4_gather_idx(ev10, 0, 4, 6, 7, ev);
+        tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
+        
+        // [4, 1, 5, 8] 
+        tet4_gather_idx(ev10, 4, 1, 5, 8, ev);
+        tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
+        
+        // [6, 5, 2, 9]
+        tet4_gather_idx(ev10, 6, 5, 2, 9, ev);
+        tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
+
+        // [7, 8, 9, 3]
+        tet4_gather_idx(ev10, 7, 8, 9, 3, ev);
+        tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
+    }
+
+    {  // Octahedron tets
+        // [4, 5, 6, 8]
+        tet4_sub_adj_4(jacobian_adjugate, sub_adjugate);
+        tet4_linear_elasticity_crs_adj(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
+        tet4_gather_idx(ev10, 4, 5, 6, 8, ev);
+        tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
+                
+        // [7, 4, 6, 8]
+        tet4_sub_adj_5(jacobian_adjugate, sub_adjugate);
+        tet4_linear_elasticity_crs_adj(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
+        tet4_gather_idx(ev10, 7, 4, 6, 8, ev);
+        tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
+            
+        // [6, 5, 9, 8]
+        tet4_sub_adj_6(jacobian_adjugate, sub_adjugate);
+        tet4_linear_elasticity_crs_adj(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
+        tet4_gather_idx(ev10, 6, 5, 9, 8, ev);
+        tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
+
+        // [7, 6, 9, 8]
+        tet4_sub_adj_7(jacobian_adjugate, sub_adjugate);
+        tet4_linear_elasticity_crs_adj(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
+        tet4_gather_idx(ev10, 7, 6, 9, 8, ev);
+        tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
+    
+    }
+}
+
+int macro_tet4_linear_elasticity_crs(const ptrdiff_t nelements,
+                                         const ptrdiff_t nnodes,
+                                         idx_t **const SFEM_RESTRICT elements,
+                                         geom_t **const SFEM_RESTRICT points,
+                                         const real_t mu,
+                                         const real_t lambda,
+                                         const count_t *const SFEM_RESTRICT rowptr,
+                                         const idx_t *const SFEM_RESTRICT colidx,
+                                         real_t *const SFEM_RESTRICT values) {
+    SFEM_UNUSED(nnodes);
+
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[10];
+
+        for (int v = 0; v < 10; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant = 0;
+        tet4_adjugate_and_det_s(x[ev[0]],
+                                x[ev[1]],
+                                x[ev[2]],
+                                x[ev[3]],
+                                // Y-coordinates
+                                y[ev[0]],
+                                y[ev[1]],
+                                y[ev[2]],
+                                y[ev[3]],
+                                // Z-coordinates
+                                z[ev[0]],
+                                z[ev[1]],
+                                z[ev[2]],
+                                z[ev[3]],
+                                // Output
+                                jacobian_adjugate,
+                                &jacobian_determinant);
+
+        macro_tet4_local_hessian(
+                ev, jacobian_adjugate, jacobian_determinant, mu, lambda, rowptr, colidx, values);
+    }
+
+    return 0;
 }
