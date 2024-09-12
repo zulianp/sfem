@@ -19,6 +19,13 @@ TARGET = test_grid_new
 
 CUDA_DEBUG =
 
+if eq(${ARM}, 1)
+	VECTOR_WIDTH_OPT = -msve-vector-bits
+# print message (STATUS "ARM")
+print message (STATUS "ARM")
+
+endif
+
 SIMD ?= 512
 CPU_ARCH = native
 
@@ -26,7 +33,7 @@ ifeq ($(DEBUG),1)
 	CFLAGS += -g
 	CUDA_DEBUG += -g
 else
-	CFLAGS += -std=c++17 -mtune=${CPU_ARCH} -march=${CPU_ARCH}  -mprefer-vector-width=${SIMD} -Wshadow=local -Ofast -fno-signed-zeros -fno-trapping-math -fassociative-math 
+	CFLAGS += -std=c++17 -mtune=${CPU_ARCH} -march=${CPU_ARCH}  ${VECTOR_WIDTH_OPT}=${SIMD} -Wshadow=local -Ofast -fno-signed-zeros -fno-trapping-math -fassociative-math 
 endif
 
 CU_OPT_FLAGS = -O3 -use_fast_math -Xptxas=-O3,-v -Xcompiler=-O3,-march=native,-mtune=native
