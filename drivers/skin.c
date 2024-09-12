@@ -22,6 +22,7 @@
 
 #include "adj_table.h"
 
+#include "proteus_hex8_laplacian.h" // FIXME
 #include "sfem_hex8_mesh_graph.h"
 
 static SFEM_INLINE void normalize(real_t *const vec3) {
