@@ -98,7 +98,7 @@ if __name__ == '__main__':
 	h = 1./L
 	for j in range(0, L+1):
 		for i in range(0, L+1):
-			print(f'{i, j}')
+			# print(f'{i, j}')
 
 			f0 = phi0(i*h, j*h)
 			f1 = phi1(i*h, j*h)
