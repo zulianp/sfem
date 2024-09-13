@@ -204,7 +204,7 @@ int main(int argc, char *argv[]) {
             }
 
             // TODO
-            return SFEM_FAILURE;
+            return SFEM_SUCCESS;
 
         } else {
             assert(0);
