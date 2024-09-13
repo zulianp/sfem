@@ -22,7 +22,7 @@
 
 #include "adj_table.h"
 
-#include "proteus_hex8_laplacian.h" // FIXME
+#include "proteus_hex8_laplacian.h"  // FIXME
 #include "sfem_hex8_mesh_graph.h"
 
 static SFEM_INLINE void normalize(real_t *const vec3) {
@@ -178,15 +178,30 @@ int main(int argc, char *argv[]) {
             const int nnxs = (SFEM_ELEMENT_REFINE_LEVEL + 1) * (SFEM_ELEMENT_REFINE_LEVEL + 1);
 
             ptrdiff_t n_surf_elements = 0;
-            idx_t **surf_elems = (idx_t **)malloc(nnxs * sizeof(idx_t *));
+            idx_t **surf_elems = (idx_t **)calloc(nnxs, sizeof(idx_t *));
             element_idx_t *parent = 0;
 
             proteus_hex8_mesh_skin(SFEM_ELEMENT_REFINE_LEVEL,
                                    mesh.nelements,
-                                   mesh.elements,
+                                   elements,
                                    &n_surf_elements,
                                    surf_elems,
                                    &parent);
+
+            // for (ptrdiff_t i = 0; i < n_surf_elements; i++) {
+            //     printf("%d) ", i);
+            //     for (int d = 0; d < nnxs; d++) {
+            //         printf("%d ", surf_elems[d][i]);
+            //     }
+
+            //     printf("\n");
+            // }
+
+            char path[2048];
+            for(int d = 0; d < nnxs; d++) {
+                sprintf(path, "%s/i%d.raw", output_folder, d);
+                array_write(comm, path, SFEM_MPI_IDX_T, surf_elems[d], n_surf_elements, n_surf_elements);
+            }
 
             // TODO
             return SFEM_FAILURE;
