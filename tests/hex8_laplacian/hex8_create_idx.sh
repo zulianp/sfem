@@ -31,9 +31,9 @@ export OMP_PROC_BIND=true
 export CUDA_LAUNCH_BLOCKING=0
 
 
-NX=150
-NY=150
-NZ=150
+NX=10
+NY=10
+NZ=10
 box_mesh.py hex8_mesh_for_macro -c hex8 -x $NX -y $NY -z $NZ --height=1 --width=1 --depth=1
 
 export SFEM_REPEAT=10

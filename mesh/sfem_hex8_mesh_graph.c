@@ -14,6 +14,13 @@
 #define MAX(a, b) ((a < b) ? (b) : (a))
 #endif
 
+#define A3SET(a, x, y, z) \
+    do {                  \
+        a[0] = x;         \
+        a[1] = y;         \
+        a[2] = z;         \
+    } while (0)
+
 // According to exodus doc
 enum HEX8_Sides {
     HEX8_LEFT = 3,
@@ -764,37 +771,51 @@ int proteus_hex8_mesh_skin(const int L,
             const element_idx_t e_adj = table[e * ns + s];
             if (e_adj == SFEM_INVALID_IDX) {
                 int start[3] = {0, 0, 0};
-                int end[3] = {L, L, L};
+                int end[3] = {L + 1, L + 1, L + 1};
+                int increment[3] = {1, 1, 1};
+
+                // printf("side %d: ", s);
 
                 switch (s) {
                     case HEX8_LEFT: {
-                        start[0] = 0;
-                        end[0] = 1;
+                        A3SET(start, 0, L, 0);
+                        A3SET(end, 1, -1, L + 1);
+                        A3SET(increment, 1, -1, 1);
+                        // printf("HEX8_LEFT\n");
                         break;
                     }
                     case HEX8_RIGHT: {
-                        start[0] = L - 1;
-                        end[0] = L;
+                        start[0] = L;
+                        end[0] = L + 1;
+                        // printf("HEX8_RIGHT\n");
                         break;
                     }
                     case HEX8_BOTTOM: {
                         start[2] = 0;
                         end[2] = 1;
+                        A3SET(start, 0, L, 0);
+                        A3SET(end,  L+1, -1, 1);
+                        A3SET(increment, 1, -1, 1);
+                        // printf("HEX8_BOTTOM\n");
                         break;
                     }
                     case HEX8_TOP: {
-                        start[2] = L - 1;
-                        end[2] = L;
+                        start[2] = L;
+                        end[2] = L + 1;
+                        // printf("HEX8_TOP\n");
                         break;
                     }
                     case HEX8_FRONT: {
                         start[1] = 0;
                         end[1] = 1;
+                        // printf("HEX8_FRONT\n");
                         break;
                     }
                     case HEX8_BACK: {
-                        start[1] = L - 1;
-                        end[1] = L;
+                        A3SET(start, L, L, 0);
+                        A3SET(end,  -1, L+1, L + 1);
+                        A3SET(increment, -1, 1, 1);
+                        // printf("HEX8_BACK\n");
                         break;
                     }
                     default: {
@@ -804,12 +825,13 @@ int proteus_hex8_mesh_skin(const int L,
                 }
 
                 int n = 0;
-                for (int zi = start[2]; zi < end[2]; zi++) {
-                    for (int yi = start[1]; yi < end[1]; yi++) {
-                        for (int xi = start[0]; xi < end[0]; xi++) {
+                for (int zi = start[2]; zi != end[2]; zi += increment[2]) {
+                    for (int yi = start[1]; yi != end[1]; yi += increment[1]) {
+                        for (int xi = start[0]; xi != end[0]; xi += increment[0]) {
                             const int lidx = proteus_hex8_lidx(L, xi, yi, zi);
                             const idx_t node = elements[lidx][e];
                             surf_elements[n++][side_offset] = node;
+                            // printf("(%d, %d, %d), l: %d => g:\t%d\n", xi, yi, zi, lidx, node);
                         }
                     }
                 }
