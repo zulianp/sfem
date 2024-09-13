@@ -57,7 +57,7 @@ else
 	raw_to_xdmf.py $sdf
 fi
 
-sdf_test_GPU.py
+sdf_test_GPU.py 
 # raw_to_xdmf.py $sdf
 
 sizes=`head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' '`
@@ -82,7 +82,7 @@ PERF="no"
 
 if [[ -z "$LAUNCH" ]]
 then
-	LAUNCH="mpiexec -np $n_procs"
+	LAUNCH="mpirun -n $n_procs " 
 	LAUNCH=""
 fi
 
