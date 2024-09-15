@@ -44,19 +44,22 @@ export SFEM_ELEMENT_TYPE=HE8
 skin hex8_mesh_2 hex8_mesh_surface_std
 
 export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
-export SFEM_ELEMENT_REFINE_LEVEL=2
+export SFEM_ELEMENT_REFINE_LEVEL=8
 
 skin hex8_mesh_2 hex8_mesh_surface
 cp hex8_mesh_2/{x,y,z}.raw ./hex8_mesh_surface
 
 proteus_quad4_to_quad4.py $SFEM_ELEMENT_REFINE_LEVEL hex8_mesh_surface hex8_mesh_surface/quad4
-# raw_to_db.py hex8_mesh_surface/quad4 quad4_mesh.vtk --cell_type=quad
-# raw_to_db.py hex8_mesh_surface_std quad4_mesh_std.vtk --cell_type=quad
+raw_to_db.py hex8_mesh_surface/quad4 quad4_mesh.vtk --cell_type=quad
+raw_to_db.py hex8_mesh_surface_std quad4_mesh_std.vtk --cell_type=quad
 
 
 
 SFEM_ELEMENT_TYPE=QUAD4 select_surf hex8_mesh_surface/quad4 1.4 -0.01 0.46 0.99 hex8_mesh_surface/quad4/sides_outlet.raw
-SFEM_ELEMENT_TYPE=QUAD4 select_surf hex8_mesh_surface_std  	  1.5  0. 0.5 0.8 	hex8_mesh_surface_std/sides_outlet.raw
+SFEM_ELEMENT_TYPE=QUAD4 select_surf hex8_mesh_surface/quad4 -1.4 -0.01 0.46 0.99 hex8_mesh_surface/quad4/sides_inlet.raw
+
+# SFEM_ELEMENT_TYPE=QUAD4 select_surf hex8_mesh_surface_std  	1.5  0. 0.5 0.8 	hex8_mesh_surface_std/sides_outlet.raw
+
 
 
 boundary_nodes()
@@ -95,10 +98,12 @@ boundary_nodes()
 
 mkdir -p hex8_mesh_surface/quad4/sidesets_aos/
 boundary_nodes hex8_mesh_surface/quad4/ outlet  hex8_mesh_surface/quad4/sidesets_aos/outlet.raw
+boundary_nodes hex8_mesh_surface/quad4/ inlet  hex8_mesh_surface/quad4/sidesets_aos/inlet.raw
 
 sides=hex8_mesh_surface/quad4/dirichlet.raw
 python3 -c "import numpy as np; a=np.fromfile(\"hex8_mesh_surface/quad4/x.raw\", dtype=np.float32); a.fill(0); a.astype(np.float64).tofile(\"$sides\")"
-smask hex8_mesh_surface/sidesets_aos/outlet.raw $sides $sides 1
-raw_to_db.py hex8_mesh_surface/quad4 dirichlet.vtk --point_data="$sides"
+smask hex8_mesh_surface/quad4/sidesets_aos/outlet.raw $sides $sides 1
+smask hex8_mesh_surface/quad4/sidesets_aos/inlet.raw $sides $sides 2
+raw_to_db.py hex8_mesh_surface/quad4 dirichlet.vtk --point_data="$sides" --cell_type=quad
 
 # raw_to_db.py hex8_mesh_surface/quad4/sides_outlet.raw sinline.vtk --cell_type=quad
