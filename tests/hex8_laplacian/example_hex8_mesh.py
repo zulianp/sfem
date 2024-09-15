@@ -37,12 +37,14 @@ PT_STATOR = 0.5  # fill factor for stator teeth from 0 to 1
 # state
 AR = 2  # rotor position in mechanical degrees
 
-# N_RAD_DENSITY = 4
-# N_TAN_DENSITY = 10
+N_RAD_DENSITY = 4
+N_TAN_DENSITY = 10
+Z_SUBDIVIDE = 3
 
-N_RAD_DENSITY = 10
-N_TAN_DENSITY = 20
-Z_SUBDIVIDE = 7
+TIMES=2
+N_RAD_DENSITY = 10 * TIMES
+N_TAN_DENSITY = 20 * TIMES
+Z_SUBDIVIDE = 6 * TIMES
 
 
 def polar_to_cartesian(radius, angle, center):
