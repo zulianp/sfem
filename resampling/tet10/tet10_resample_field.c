@@ -1647,10 +1647,10 @@ int hex8_to_tet10_resample_field_local(
     int SFEM_ENABLE_ISOPARAMETRIC = 0;
     SFEM_READ_ENV(SFEM_ENABLE_ISOPARAMETRIC, atoi);
 
-#define CUBE1 1
+#define CUBE1 0
 
     if (1 | SFEM_ENABLE_ISOPARAMETRIC) {
-#if CUBE1 == 1
+#if CUBE1 == 1  // EXPERIMENTAL
         return hex8_to_isoparametric_tet10_resample_field_local_cube1(
 #else
         return hex8_to_isoparametric_tet10_resample_field_local(
