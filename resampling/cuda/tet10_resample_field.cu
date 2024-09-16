@@ -897,6 +897,9 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(
             for (int edof_j = 0; edof_j < 8; edof_j++) {
                 eval_field += hex8_f[edof_j] * coeffs[edof_j];
             }
+
+            // eval_field = sin (grid_x) * cos (grid_y) * sin (grid_z); ///////////////////// DEBUG
+
             // #endif
             // // UNROLL_ZERO?
             // for (int edof_i = 0; edof_i < 10; edof_i++) {
@@ -1340,7 +1343,7 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
     copy_xyz_tet10_device(nnodes, &xyz_device, xyz);
 
     // Number of threads
-    const ptrdiff_t warp_per_block = 8;
+    const ptrdiff_t warp_per_block = 1;
     const ptrdiff_t threadsPerBlock = warp_per_block * __WARP_SIZE__;
 
     // Number of blocks
