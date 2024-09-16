@@ -1,16 +1,17 @@
 #include <math.h>
 
 #include "tet10_weno.h"
+#include "sfem_base.h"
 
 // double Power(const double x, const double y) { return exp(y * log(x)); }
-inline double Power(const double x, const double y) { return pow(x, y); }
+static SFEM_INLINE double Power(const double x, const double y) { return pow(x, y); }
 
-inline double Power2(const double x) { return x * x; }
+static SFEM_INLINE double Power2(const double x) { return x * x; }
 
 // double Power1p5(const double x) { return exp(1.5 * log(x)); }
-inline double Power1p5(const double x) { return x * sqrt(x); }
+static SFEM_INLINE double Power1p5(const double x) { return x * sqrt(x); }
 
-inline double Power_m1p5(const double x) { return 1.0 / (x * sqrt(x)); }
+static SFEM_INLINE double Power_m1p5(const double x) { return 1.0 / (x * sqrt(x)); }
 
 void LagrangePolyArrayConstH(const double x, const double h,  //
                              double *lagrange_poly_0,
