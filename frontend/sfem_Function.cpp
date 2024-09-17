@@ -297,7 +297,7 @@ namespace sfem {
                     block_size;
             impl_->nglobal = impl_->nlocal;
 
-            // CATCH_MPI_ERROR(
+            // MPI_CATCH_ERROR(
             //     MPI_Allreduce(MPI_IN_PLACE, &impl_->nglobal, 1, MPI_LONG, MPI_SUM,
             //     c_mesh->comm));
         }
@@ -522,7 +522,7 @@ namespace sfem {
 
             long coarse_global_size = coarse_local_size;
 
-            // CATCH_MPI_ERROR(
+            // MPI_CATCH_ERROR(
             // MPI_Allreduce(MPI_IN_PLACE, &coarse_global_size, 1, MPI_LONG, MPI_SUM, mesh->comm));
 
             if (as_zero) {

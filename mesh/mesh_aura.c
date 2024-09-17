@@ -32,7 +32,7 @@ void mesh_exchange_nodal_slave_to_master(const mesh_t *mesh,
                                          void *const SFEM_RESTRICT ghost_data,
                                          void *const SFEM_RESTRICT buffer) {
     // send slave nodes to process with master nodes
-    CATCH_MPI_ERROR(MPI_Alltoallv(ghost_data,
+    MPI_CATCH_ERROR(MPI_Alltoallv(ghost_data,
                                   slave_to_master->send_count,
                                   slave_to_master->send_displs,
                                   data_type,
@@ -56,7 +56,7 @@ void mesh_exchange_nodal_master_to_slave(const mesh_t *mesh,
     int n = slave_to_master->recv_displs[size];
 
     int type_size;
-    CATCH_MPI_ERROR(MPI_Type_size(data_type, &type_size));
+    MPI_CATCH_ERROR(MPI_Type_size(data_type, &type_size));
 
     // Create and pack send data
     char *send_data = (char *)malloc(n * type_size);
@@ -79,7 +79,7 @@ void mesh_exchange_nodal_master_to_slave(const mesh_t *mesh,
 
     // Offset for not owned data
     recv_data = &recv_data[mesh->n_owned_nodes * type_size];
-    CATCH_MPI_ERROR(MPI_Alltoallv(send_data,
+    MPI_CATCH_ERROR(MPI_Alltoallv(send_data,
                                   slave_to_master->recv_count,
                                   slave_to_master->recv_displs,
                                   data_type,
@@ -121,7 +121,7 @@ void mesh_create_nodal_send_recv(const mesh_t *mesh, send_recv_t *const slave_to
     int *recv_displs = (int *)malloc((size + 1) * sizeof(int));
     memset(recv_displs, 0, size * sizeof(int));
 
-    CATCH_MPI_ERROR(MPI_Alltoall(send_count, 1, MPI_INT, recv_count, 1, MPI_INT, mesh->comm));
+    MPI_CATCH_ERROR(MPI_Alltoall(send_count, 1, MPI_INT, recv_count, 1, MPI_INT, mesh->comm));
 
     recv_displs[0] = 0;
     for (int r = 0; r < size; r++) {
@@ -131,7 +131,7 @@ void mesh_create_nodal_send_recv(const mesh_t *mesh, send_recv_t *const slave_to
     idx_t *slave_nodes = (idx_t *)malloc(recv_displs[size] * sizeof(idx_t));
 
     // send slave nodes to process with master nodes
-    CATCH_MPI_ERROR(MPI_Alltoallv(mesh->ghosts,
+    MPI_CATCH_ERROR(MPI_Alltoallv(mesh->ghosts,
                                   send_count,
                                   send_displs,
                                   SFEM_MPI_IDX_T,
@@ -350,7 +350,7 @@ void mesh_create_nodal_send_recv(const mesh_t *mesh, send_recv_t *const slave_to
 //     int *recv_count = (int *)malloc((size + 1) * sizeof(int));
 //     int *recv_displs = (int *)malloc((size + 1) * sizeof(int));
 
-//     CATCH_MPI_ERROR(
+//     MPI_CATCH_ERROR(
 //         MPI_Alltoall(send_count, 1, MPI_INT, recv_count, 1, MPI_INT, comm));
 
 //     recv_displs[0] = 0;
@@ -372,7 +372,7 @@ void mesh_create_nodal_send_recv(const mesh_t *mesh, send_recv_t *const slave_to
 //                 mesh->node_mapping[mesh->elements[d][element_send_lists[i]]];
 //         }
 
-//         CATCH_MPI_ERROR(MPI_Alltoallv(send_buffer,
+//         MPI_CATCH_ERROR(MPI_Alltoallv(send_buffer,
 //                                       send_count,
 //                                       send_displs,
 //                                       SFEM_MPI_IDX_T,
@@ -394,7 +394,7 @@ void mesh_create_nodal_send_recv(const mesh_t *mesh, send_recv_t *const slave_to
 //             send_buffer[i] = mesh->element_mapping[element_send_lists[i]];
 //         }
 
-//         CATCH_MPI_ERROR(MPI_Alltoallv(send_buffer,
+//         MPI_CATCH_ERROR(MPI_Alltoallv(send_buffer,
 //                                       send_count,
 //                                       send_displs,
 //                                       SFEM_MPI_IDX_T,
@@ -480,7 +480,7 @@ void mesh_create_nodal_send_recv(const mesh_t *mesh, send_recv_t *const slave_to
 //         int *node_recv_count = (int *)malloc(size * sizeof(int));
 //         int *node_recv_displs = (int *)malloc((size + 1) * sizeof(int));
 
-//         CATCH_MPI_ERROR(MPI_Alltoall(
+//         MPI_CATCH_ERROR(MPI_Alltoall(
 //             node_send_count, 1, MPI_INT, node_recv_count, 1, MPI_INT, comm));
 
 //         node_recv_displs[0] = 0;
@@ -505,7 +505,7 @@ void mesh_create_nodal_send_recv(const mesh_t *mesh, send_recv_t *const slave_to
 //             aura_points[d] =
 //                 (geom_t *)malloc(node_recv_displs[size] * sizeof(geom_t));
 
-//             CATCH_MPI_ERROR(MPI_Alltoallv(point_send_buff,
+//             MPI_CATCH_ERROR(MPI_Alltoallv(point_send_buff,
 //                                           node_send_count,
 //                                           node_send_displs,
 //                                           SFEM_MPI_IDX_T,
@@ -520,7 +520,7 @@ void mesh_create_nodal_send_recv(const mesh_t *mesh, send_recv_t *const slave_to
 //             node_send_buff[i] = mesh->node_mapping[node_send_buff[i]];
 //         }
 
-//         CATCH_MPI_ERROR(MPI_Alltoallv(node_send_buff,
+//         MPI_CATCH_ERROR(MPI_Alltoallv(node_send_buff,
 //                                       node_send_count,
 //                                       node_send_displs,
 //                                       SFEM_MPI_IDX_T,
@@ -794,7 +794,7 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
     int *recv_count = (int *)malloc(size * sizeof(int));
     int *recv_displs = (int *)malloc((size + 1) * sizeof(int));
 
-    CATCH_MPI_ERROR(MPI_Alltoall(send_count, 1, MPI_INT, recv_count, 1, MPI_INT, mesh->comm));
+    MPI_CATCH_ERROR(MPI_Alltoall(send_count, 1, MPI_INT, recv_count, 1, MPI_INT, mesh->comm));
 
     recv_displs[0] = 0;
     for (int r = 0; r < size; r++) {
@@ -803,7 +803,7 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
 
     idx_t *recv_data = (idx_t *)malloc(recv_displs[size] * sizeof(idx_t));
 
-    CATCH_MPI_ERROR(MPI_Alltoallv(send_data,
+    MPI_CATCH_ERROR(MPI_Alltoallv(send_data,
                                   send_count,
                                   send_displs,
                                   SFEM_MPI_IDX_T,
