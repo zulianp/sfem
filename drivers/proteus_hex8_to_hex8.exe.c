@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "array_dtof.h"
 #include "matrixio_array.h"
@@ -59,21 +60,16 @@ int main(int argc, char *argv[]) {
     }
 
     if (argc < 4) {
-        fprintf(stderr, "usage: %s <folder> <x.raw> <y.raw>\n", argv[0]);
+        fprintf(stderr, "usage: %s <level> <folder> <output>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
-    int SFEM_REPEAT = 1;
-    int SFEM_USE_IDX = 0;
+    int level = atoi(argv[1]);
 
-    SFEM_READ_ENV(SFEM_REPEAT, atoi);
-    SFEM_READ_ENV(SFEM_USE_IDX, atoi);
-
-    const char *folder = argv[1];
-    const char *path_f = argv[2];
+    const char *folder = argv[2];
     const char *path_output = argv[3];
 
-    printf("%s %s %s %s\n", argv[0], folder, path_f, path_output);
+    printf("%s %d %s %s\n", argv[0], level, folder, path_output);
 
     double tick = MPI_Wtime();
 
@@ -86,21 +82,8 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    int SFEM_ELEMENT_REFINE_LEVEL = 2;
-    SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
-
-    int level = SFEM_ELEMENT_REFINE_LEVEL;
-
-    int SFEM_HEX8_ASSUME_AFFINE = 0;
-    SFEM_READ_ENV(SFEM_HEX8_ASSUME_AFFINE, atoi);
-
     const int nxe = proteus_hex8_nxe(level);
     const int txe = proteus_hex8_txe(level);
-
-    printf("nelements %ld\n", mesh.nelements);
-    printf("nnodes    %ld\n", mesh.nnodes);
-    printf("nxe       %d\n", nxe);
-    printf("txe       %d\n", txe);
 
     idx_t **elements = 0;
 
@@ -121,10 +104,11 @@ int main(int argc, char *argv[]) {
     // ///////////////////////////////////////////////////////////////////////////////
     // Generate explicit hex8 micro-mesh
     // ///////////////////////////////////////////////////////////////////////////////
+    ptrdiff_t n_micro_elements = mesh.nelements * txe;
 
     idx_t **hex8_elements = malloc(8 * sizeof(idx_t *));
     for (int d = 0; d < 8; d++) {
-        hex8_elements[d] = malloc(mesh.nelements * txe * sizeof(idx_t));
+        hex8_elements[d] = malloc(n_micro_elements* sizeof(idx_t));
     }
 
     // Elements
@@ -144,10 +128,12 @@ int main(int argc, char *argv[]) {
                 lnode[7] = proteus_hex8_lidx(level, xi, yi + 1, zi + 1);
 
                 int le = zi * level * level + yi * level + xi;
+                assert(le < txe);
 
                 for (int l = 0; l < 8; l++) {
                     for (ptrdiff_t e = 0; e < mesh.nelements; e++) {
-                        hex8_elements[l][e * nxe + le] = elements[lnode[l]][e];
+                        idx_t node = elements[lnode[l]][e];
+                        hex8_elements[l][e * txe + le] = node;
                     }
                 }
             }
@@ -177,12 +163,7 @@ int main(int argc, char *argv[]) {
     for (int zi = 0; zi < level + 1; zi++) {
         for (int yi = 0; yi < level + 1; yi++) {
             for (int xi = 0; xi < level + 1; xi++) {
-                const scalar_t x = xi * h;
-                const scalar_t y = yi * h;
-                const scalar_t z = zi * h;
-
-                hex8_eval_f(x, y, z, f);
-
+                hex8_eval_f(xi * h, yi * h, zi * h, f);
                 int lidx = proteus_hex8_lidx(level, xi, yi, zi);
 
                 for (int d = 0; d < 3; d++) {
@@ -195,12 +176,39 @@ int main(int argc, char *argv[]) {
                             acc += p * f[lnode];
                         }
 
-                        idx_t node = elements[lidx][e];
-                        hex8_points[d][node] = acc;
+                        hex8_points[d][elements[lidx][e]] = acc;
                     }
                 }
             }
         }
+    }
+
+    // ///////////////////////////////////////////////////////////////////////////////
+    // Write to disk
+    // ///////////////////////////////////////////////////////////////////////////////
+
+
+    struct stat st = {0};
+    if (stat(path_output, &st) == -1) {
+        mkdir(path_output, 0700);
+    }
+
+    char path[1024 * 10];
+    for (int lnode = 0; lnode < 8; lnode++) {
+        sprintf(path, "%s/i%d.raw", path_output, lnode);
+        array_write(comm,
+                    path,
+                    SFEM_MPI_IDX_T,
+                    hex8_elements[lnode],
+                    mesh.nelements * txe,
+                    mesh.nelements * txe);
+    }
+
+    const char *tags[3] = {"x", "y", "z"};
+    for (int d = 0; d < 3; d++) {
+        sprintf(path, "%s/%s.raw", path_output, tags[d]);
+        array_write(
+                comm, path, SFEM_MPI_GEOM_T, hex8_points[d], n_unique_nodes, n_unique_nodes);
     }
 
     // ///////////////////////////////////////////////////////////////////////////////
@@ -215,13 +223,15 @@ int main(int argc, char *argv[]) {
 
     free(elements);
 
-    //
+    // --
 
     for (int d = 0; d < 8; d++) {
         free(hex8_elements[d]);
     }
 
     free(hex8_elements);
+
+    // --
 
     for (int d = 0; d < 3; d++) {
         free(hex8_points[d]);
@@ -235,5 +245,13 @@ int main(int argc, char *argv[]) {
 
     double tock = MPI_Wtime();
     float TTS = tock - tick;
+
+    printf("Generated HEX8 mesh in %g [s]\n", TTS);
+    printf("nelements %ld\n", n_micro_elements);
+    printf("nnodes    %ld\n", n_unique_nodes);
+    printf("nxe       %d\n", nxe);
+    printf("txe       %d\n", txe);
+
+
     return MPI_Finalize();
 }

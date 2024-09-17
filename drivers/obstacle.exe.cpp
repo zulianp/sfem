@@ -162,7 +162,7 @@ int main(int argc, char *argv[]) {
         auto cg = sfem::h_cg<real_t>();
         cg->verbose = true;
         cg->set_op(op);
-        cg->set_max_it(10);
+        cg->set_max_it(1000);
         cg->default_init();
         solver = cg;
     }
@@ -176,9 +176,6 @@ int main(int argc, char *argv[]) {
     apply_dirichlet_condition_vec(
             n_dirichlet_conditions, dirichlet_conditions, block_size, rhs->data());
 
-    x->print(std::cout);
-    // rhs->print(std::cout);
-
     solver->apply(x->data(), rhs->data());
 
     struct stat st = {0};
@@ -189,6 +186,11 @@ int main(int argc, char *argv[]) {
     char path[2048];
     sprintf(path, "%s/u.raw", output_path);
     if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)x->data(), ndofs, ndofs)) {
+        return SFEM_FAILURE;
+    }
+
+    sprintf(path, "%s/rhs.raw", output_path);
+    if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)rhs->data(), ndofs, ndofs)) {
         return SFEM_FAILURE;
     }
 

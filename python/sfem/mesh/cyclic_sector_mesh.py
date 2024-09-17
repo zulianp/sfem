@@ -13,11 +13,15 @@ Requirements
 """
 import math
 import time
+import sys
 
 import gmsh
 # import mapdl_archive
 import numpy as np
 # import pyvista as pv
+
+
+
 
 # Define geometric parameters
 r1 = 0.057  # internal radious
@@ -41,7 +45,11 @@ N_RAD_DENSITY = 4
 N_TAN_DENSITY = 10
 Z_SUBDIVIDE = 3
 
-TIMES=2
+TIMES=1
+
+if len(sys.argv) == 2:
+    TIMES = int(sys.argv[1])
+
 N_RAD_DENSITY = 10 * TIMES
 N_TAN_DENSITY = 20 * TIMES
 Z_SUBDIVIDE = 6 * TIMES
