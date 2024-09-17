@@ -260,7 +260,8 @@ SFEM_INLINE static void hex_aa_8_eval_grad(
     gz[7] = (1.0 - x) * y;
 }
 
-#define UNROLL_ZERO _Pragma("GCC unroll(0)")
+// #define UNROLL_ZERO _Pragma("GCC unroll(0)")
+#define UNROLL_ZERO _Pragma("unroll(1)")
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
@@ -868,7 +869,7 @@ int resample_field_local(
         }
 
         case TET10: {
-#define TET10_V2 
+#define TET10_V2
 
 #ifdef TET10_V2  // V2
             return hex8_to_tet10_resample_field_local_CUDA(

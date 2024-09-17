@@ -15,9 +15,10 @@
 #define _VL_ 8
 #elif defined(AVX2)
 #define _VL_ 4
-#endif
+#endif./
 
-#define UNROLL_ZERO _Pragma("GCC unroll(0)")
+// #define UNROLL_ZERO _Pragma("GCC unroll(0)")
+#define UNROLL_ZERO _Pragma("unroll(1)")
 
 typedef double vec_double __attribute__((vector_size(_VL_ * sizeof(double)),  //
                                          aligned(sizeof(double))));
