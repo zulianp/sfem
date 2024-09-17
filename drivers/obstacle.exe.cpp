@@ -143,14 +143,15 @@ int main(int argc, char *argv[]) {
             ndofs,
             [=](const real_t *const x, real_t *const y) {
                 // Apply operator
-                // proteus_affine_hex8_laplacian_apply
-                proteus_hex8_laplacian_apply(ssm->level(),
-                                             ssm->n_elements(),
-                                             ssm->interior_start(),
-                                             ssm->element_data(),
-                                             ssm->point_data(),
-                                             x,
-                                             y);
+                proteus_affine_hex8_laplacian_apply //
+                // proteus_hex8_laplacian_apply  //
+                        (ssm->level(),
+                         ssm->n_elements(),
+                         ssm->interior_start(),
+                         ssm->element_data(),
+                         ssm->point_data(),
+                         x,
+                         y);
                 // Copy constrained nodes
                 copy_at_dirichlet_nodes_vec(
                         n_dirichlet_conditions, dirichlet_conditions, block_size, x, y);
