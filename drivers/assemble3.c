@@ -20,11 +20,11 @@
 //     MPI_Status status;
 //     MPI_Offset nbytes;
 //     MPI_File file;
-//     CATCH_MPI_ERROR(MPI_File_open(comm, path, MPI_MODE_RDONLY, MPI_INFO_NULL, &file));
-//     CATCH_MPI_ERROR(MPI_File_get_size(file, &nbytes));
+//     MPI_CATCH_ERROR(MPI_File_open(comm, path, MPI_MODE_RDONLY, MPI_INFO_NULL, &file));
+//     MPI_CATCH_ERROR(MPI_File_get_size(file, &nbytes));
 //     *data = malloc(nbytes);
 
-//     CATCH_MPI_ERROR(MPI_File_read_at_all(file, 0, *data, nbytes, MPI_CHAR, &status));
+//     MPI_CATCH_ERROR(MPI_File_read_at_all(file, 0, *data, nbytes, MPI_CHAR, &status));
 //     return nbytes;
 // }
 
