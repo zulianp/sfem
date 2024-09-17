@@ -10,7 +10,7 @@ print("sdf_test_GPU.py: ==========================================")
 
 sdf_t = cp.float32
 
-D = 50
+D = 600
 dims = (D, D, D)
 
 print(f'sdf_test_GPU.py: Generating field of size {dims[0]} x {dims[1]} x {dims[2]}')
