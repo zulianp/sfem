@@ -1201,7 +1201,7 @@ namespace sfem {
 
             auto graph = space->node_to_node_graph();
 
-            linear_elasticity_crsaos(element_type,
+            linear_elasticity_crs_aos(element_type,
                                                    mesh->nelements,
                                                    mesh->nnodes,
                                                    mesh->elements,

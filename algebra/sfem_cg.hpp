@@ -63,6 +63,7 @@ namespace sfem {
 
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
             this->apply_op = [=](const T* const x, T* const y) { op->apply(x, y); };
+            n_dofs = op->rows();
         }
 
         void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) override {
@@ -169,6 +170,10 @@ namespace sfem {
             
             T rtr = rtr0;
 
+            if(rtr0 == 0) {
+                return 0;
+            }
+
             T* p = allocate(n);
             T* Ap = allocate(n);
 
@@ -185,6 +190,8 @@ namespace sfem {
                 axpby(n, alpha, p, 1, x);
                 axpby(n, -alpha, Ap, 1, r);
 
+                assert(rtr != 0);
+
                 const T rtr_new = dot(n, r, r);
                 const T beta = rtr_new / rtr;
                 rtr = rtr_new;
@@ -193,7 +200,7 @@ namespace sfem {
                 T r_norm = sqrt(rtr_new);
 
                 monitor(k+1, r_norm, r_norm/r_norm0);
-                if (r_norm < atol || r_norm/r_norm0 < rtol) {
+                if (r_norm < atol || rtr_new == 0 || r_norm/r_norm0 < rtol) {
                     info = 0;
                     break;
                 }

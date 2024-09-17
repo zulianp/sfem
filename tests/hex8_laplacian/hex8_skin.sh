@@ -37,7 +37,7 @@ idx_type_size=4
 # box_mesh.py hex8_mesh_2 -c hex8 -x $NX -y $NY -z $NZ --height=1 --width=1 --depth=1
 
 
-./example_hex8_mesh.py
+cyclic_sector_mesh.py
 db_to_raw.py model.vtk hex8_mesh_2 --select_elem_type=hexahedron
 
 export SFEM_ELEMENT_TYPE=HEX8
