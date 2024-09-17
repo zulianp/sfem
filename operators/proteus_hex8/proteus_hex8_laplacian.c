@@ -105,6 +105,8 @@ int proteus_hex8_laplacian_apply(const int level,
 
                 for (int d = 0; d < nxe; d++) {
                     eu[d] = u[ev[d]];
+
+                    assert(eu[d] == eu[d]);
                 }
 
                 memset(v, 0, nxe * sizeof(accumulator_t));
@@ -130,6 +132,8 @@ int proteus_hex8_laplacian_apply(const int level,
 
                         for (int d = 0; d < 8; d++) {
                             element_u[d] = eu[lev[d]];
+
+                            assert(element_u[d] == element_u[d]);
                         }
 
                         for (int d = 0; d < 8; d++) {
@@ -161,6 +165,7 @@ int proteus_hex8_laplacian_apply(const int level,
 
                         // Accumulate to macro-element buffer
                         for (int d = 0; d < 8; d++) {
+                            assert(element_vector[d] == element_vector[d]);
                             v[lev[d]] += element_vector[d];
                         }
                     }
@@ -241,6 +246,7 @@ int proteus_affine_hex8_laplacian_apply(const int level,
 
                 for (int d = 0; d < nxe; d++) {
                     eu[d] = u[ev[d]];
+                    assert(eu[d] == eu[d]);
                 }
 
                 memset(v, 0, nxe * sizeof(accumulator_t));
@@ -288,7 +294,9 @@ int proteus_affine_hex8_laplacian_apply(const int level,
                         for (int i = 0; i < 8; i++) {
                             const scalar_t *const row = &laplacian_matrix[i * 8];
                             const scalar_t ui = element_u[i];
+                            assert(ui == ui);
                             for (int j = 0; j < 8; j++) {
+                                assert(row[j] == row[j]);
                                 element_vector[j] += ui * row[j];
                             }
                         }
@@ -298,6 +306,7 @@ int proteus_affine_hex8_laplacian_apply(const int level,
 
                         // Accumulate to macro-element buffer
                         for (int d = 0; d < 8; d++) {
+                            assert(element_vector[d] == element_vector[d]);
                             v[lev[d]] += element_vector[d];
                         }
                     }
@@ -307,6 +316,7 @@ int proteus_affine_hex8_laplacian_apply(const int level,
             {
                 // Scatter elemental data
                 for (int d = 0; d < nxe; d++) {
+                    assert(v[d] == v[d]);
 #pragma omp atomic update
                     values[ev[d]] += v[d];
                 }

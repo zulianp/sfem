@@ -104,8 +104,9 @@ namespace sfem {
         ~FunctionSpace();
 
         static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<Mesh> &mesh,
-                                                     const int block_size = 1) {
-            return std::make_shared<FunctionSpace>(mesh, block_size);
+                                                     const int block_size = 1,
+                                                     const enum ElemType element_type = INVALID) {
+            return std::make_shared<FunctionSpace>(mesh, block_size, element_type);
         }
 
         int create_vector(ptrdiff_t *nlocal, ptrdiff_t *nglobal, real_t **values);
