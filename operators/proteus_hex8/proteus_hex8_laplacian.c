@@ -256,7 +256,7 @@ int proteus_affine_hex8_laplacian_apply(const int level,
             const scalar_t h = 1. / level;
 
             // We evaluate the jacobian at the center of the element
-            // in case that it that the mapping is not linear
+            // in case that the mapping is not linear
             hex8_fff(x, y, z, 0.5, 0.5, 0.5, m_fff);
             
             // Assume affine here!
