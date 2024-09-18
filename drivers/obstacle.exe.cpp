@@ -177,7 +177,7 @@ int main(int argc, char *argv[]) {
     apply_dirichlet_condition_vec(
             n_dirichlet_conditions, dirichlet_conditions, block_size, rhs->data());
 
-    solver->apply(x->data(), rhs->data());
+    solver->apply(rhs->data(), x->data());
 
     struct stat st = {0};
     if (stat(output_path, &st) == -1) {
