@@ -4,6 +4,7 @@
 #include "hex8_laplacian_inline_cpu.h"
 
 #include "hex8_quadrature.h"
+#include "tet4_inline_cpu.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -115,9 +116,9 @@ int proteus_hex8_laplacian_apply(const int level,
             const scalar_t h = 1. / level;
 
             // Iterate over sub-elements
-            for (int zi = 0; zi < level - 1; zi++) {
-                for (int yi = 0; yi < level - 1; yi++) {
-                    for (int xi = 0; xi < level - 1; xi++) {
+            for (int zi = 0; zi < level; zi++) {
+                for (int yi = 0; yi < level; yi++) {
+                    for (int xi = 0; xi < level; xi++) {
                         // Convert to standard HEX8 local ordering (see 3-4 and 6-7)
                         int lev[8] = {// Bottom
                                       proteus_hex8_lidx(level, xi, yi, zi),
@@ -257,6 +258,10 @@ int proteus_affine_hex8_laplacian_apply(const int level,
             // We evaluate the jacobian at the center of the element
             // in case that it that the mapping is not linear
             hex8_fff(x, y, z, 0.5, 0.5, 0.5, m_fff);
+            
+            // Assume affine here!
+            // tet4_fff_s(x[0], x[1], x[3], x[4], y[0], y[1], y[3], y[4], z[0], z[1], z[3], z[4], m_fff);
+
             hex8_sub_fff_0(m_fff, h, fff);
 
 #define PROTEUS_HEX8_USE_MV  // assemblying the elemental matrix is faster
@@ -266,9 +271,9 @@ int proteus_affine_hex8_laplacian_apply(const int level,
 #endif
 
             // Iterate over sub-elements
-            for (int zi = 0; zi < level - 1; zi++) {
-                for (int yi = 0; yi < level - 1; yi++) {
-                    for (int xi = 0; xi < level - 1; xi++) {
+            for (int zi = 0; zi < level; zi++) {
+                for (int yi = 0; yi < level; yi++) {
+                    for (int xi = 0; xi < level; xi++) {
                         // Convert to standard HEX8 local ordering (see 3-4 and 6-7)
                         int lev[8] = {// Bottom
                                       proteus_hex8_lidx(level, xi, yi, zi),

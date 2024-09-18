@@ -29,23 +29,27 @@ export OMP_PROC_BIND=true
 export CUDA_LAUNCH_BLOCKING=0
 
 export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
-export SFEM_ELEMENT_REFINE_LEVEL=6
+export SFEM_ELEMENT_REFINE_LEVEL=8
 
 mesh=mesh
 
-if [[ -d "$mesh" ]]
-then
-	echo "Reusing mesh"
-else
-	# create_cyclic_ss_mesh.sh 1 $SFEM_ELEMENT_REFINE_LEVEL
-	create_box_ss_mesh.sh 1 $SFEM_ELEMENT_REFINE_LEVEL
-fi
+# if [[ -d "$mesh" ]]
+# then
+# 	echo "Reusing mesh"
+# else
+	create_cyclic_ss_mesh.sh 4 $SFEM_ELEMENT_REFINE_LEVEL
+	# BOX mesh for testing
+	# create_box_ss_mesh.sh 20 $SFEM_ELEMENT_REFINE_LEVEL
+# fi
 
 
-sinlet=$mesh/surface/sidesets_aos/left.raw 
-soutlet=$mesh/surface/sidesets_aos/right.raw 
-# sinlet=$mesh/surface/sidesets_aos/inlet.raw
-# soutlet=$mesh/surface/sidesets_aos/outlet.raw
+
+sinlet=$mesh/surface/sidesets_aos/inlet.raw
+soutlet=$mesh/surface/sidesets_aos/outlet.raw
+
+# Box mesh for testing
+# sinlet=$mesh/surface/sidesets_aos/left.raw 
+# soutlet=$mesh/surface/sidesets_aos/right.raw 
 
 export SFEM_DIRICHLET_NODESET="$sinlet,$soutlet"
 export SFEM_DIRICHLET_VALUE="1,-1"
