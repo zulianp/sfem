@@ -168,6 +168,8 @@ int main(int argc, char *argv[]) {
         cg->set_op(op);
         cg->set_max_it(10000);
         cg->default_init();
+        cg->set_rtol(1e-7);
+        cg->set_atol(1e-8);
         solver = cg;
     }
 
