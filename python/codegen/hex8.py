@@ -35,7 +35,7 @@ class Hex8(FE):
 		y = p[1]
 		z = p[2]
 
-		f = sp.zeros(8)
+		f = sp.zeros(8, 1)
 
 		xm = (1 - x)
 		ym = (1 - y)
@@ -170,9 +170,23 @@ def sub_fff():
 	expr = assign_fff('sub_fff', sub_FFF)
 	c_code(expr)
 
+
+def check_op():
+	hex8 = Hex8()
+
+	q = vec3(qx, qy, qz)
+	g = hex8.grad(q)
+
+	A = sp.zeros(8, 8)
+	for i in range(0, 8):
+		for j in range(0, 8):
+			A[i, j] = hex8.integrate(q, inner(g[i], g[j]))
+		print(A[i, :])
+
 if __name__ == '__main__':
 	# Hex8().generate_qp_based_code()
 	# points_from_sub_ref_hex8()
-	sub_fff()
+	# sub_fff()
+	check_op()
 
 	

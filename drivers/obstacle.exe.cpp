@@ -152,6 +152,7 @@ int main(int argc, char *argv[]) {
                          ssm->point_data(),
                          x,
                          y);
+                        
                 // Copy constrained nodes
                 copy_at_dirichlet_nodes_vec(
                         n_dirichlet_conditions, dirichlet_conditions, block_size, x, y);
@@ -163,7 +164,7 @@ int main(int argc, char *argv[]) {
         auto cg = sfem::h_cg<real_t>();
         cg->verbose = true;
         cg->set_op(op);
-        cg->set_max_it(1000);
+        cg->set_max_it(10000);
         cg->default_init();
         solver = cg;
     }
@@ -177,7 +178,9 @@ int main(int argc, char *argv[]) {
     apply_dirichlet_condition_vec(
             n_dirichlet_conditions, dirichlet_conditions, block_size, rhs->data());
 
+    double solve_tick = MPI_Wtime();
     solver->apply(rhs->data(), x->data());
+    double solve_tock = MPI_Wtime();
 
     struct stat st = {0};
     if (stat(output_path, &st) == -1) {
@@ -193,6 +196,23 @@ int main(int argc, char *argv[]) {
     sprintf(path, "%s/rhs.raw", output_path);
     if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)rhs->data(), ndofs, ndofs)) {
         return SFEM_FAILURE;
+    }
+
+    double tock = MPI_Wtime();
+
+
+    if (!rank) {
+        printf("----------------------------------------\n");
+        printf("%s (%s):\n", argv[0], "PROTEUS_HEX8");
+        printf("----------------------------------------\n");
+        printf("#elements %ld #nodes %ld #dofs %ld\n",
+               (long)ssm->n_elements(),
+               (long)ssm->n_nodes(),
+               (long)ndofs);
+        printf("TTS:\t\t%g [s], solve: %g [s])\n",
+               tock - tick,
+               solve_tock - solve_tick);
+        printf("----------------------------------------\n");
     }
 
     return MPI_Finalize();
