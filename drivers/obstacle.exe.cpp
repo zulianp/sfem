@@ -3,6 +3,7 @@
 #include "sfem_base.h"
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
+#include "sfem_mprgp.hpp"
 
 #include <sys/stat.h>
 #include <cstdio>
@@ -161,6 +162,7 @@ int main(int argc, char *argv[]) {
 
     std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> solver;
     {
+        auto mprgp = std::make_shared<sfem::MPRGP<real_t>>();
         auto cg = sfem::h_cg<real_t>();
         cg->verbose = true;
         cg->set_op(op);
