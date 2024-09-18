@@ -125,9 +125,10 @@ if(SFEM_ENABLE_CUDA)
     foreach(CUDA_MODULE ${_SFEM_CUDA_MODULES})
         if(TARGET ${CUDA_MODULE})
             list(APPEND SFEM_DEP_LIBRARIES "${CUDA_MODULE}")
+            set(SFEM_CUDA_MATH_LIBS_FOUND TRUE)
         else()
             message(WARNING "[Warning] CUDAToolkit does not have module ${CUDA_MODULE} in a standard location!")
-            set(SFEM_CUDA_MATH_LIBS_FOUND FALSE)
+            
         endif()
     endforeach()
 
