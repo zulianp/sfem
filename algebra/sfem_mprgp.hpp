@@ -37,7 +37,6 @@ namespace sfem {
         std::shared_ptr<Buffer<T>> lower_bound_;
 
         std::function<void(const T* const, T* const)> apply_op;
-        std::function<void(const T* const, T* const)> preconditioner_op;
 
         // Mem management
         std::function<T*(const std::size_t)> allocate;
@@ -59,7 +58,10 @@ namespace sfem {
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
         void set_op(const std::shared_ptr<Operator<T>>& op) override {}
-        void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) override {}
+        void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) override {
+            // Ignoring op!
+        }
+        
         void set_max_it(const int it) override { max_it = it; }
         void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
 
@@ -293,6 +295,89 @@ namespace sfem {
             return ret;
         }
 
+        bool good() const {
+            assert(allocate);
+            assert(destroy);
+            assert(copy);
+            assert(zeros);
+            assert(values);
+            assert(dot);
+            assert(norm2);
+            assert(axpby);
+            assert(scal);
+            assert(apply_op);
+            assert(lower_bound_ || upper_bound_);
+
+            return allocate && destroy && copy && zeros && values && dot && norm2 && axpby &&
+                   scal && apply_op && (lower_bound_ || upper_bound_);
+        }
+
+        void default_init() {
+            allocate = [](const std::ptrdiff_t n) -> T* { return (T*)calloc(n, sizeof(T)); };
+
+            destroy = [](void* a) { free(a); };
+
+            copy = [](const ptrdiff_t n, const T* const src, T* const dest) {
+                std::memcpy(dest, src, n * sizeof(T));
+            };
+
+            dot = [](const ptrdiff_t n, const T* const l, const T* const r) -> T {
+                T ret = 0;
+
+#pragma omp parallel for reduction(+ : ret)
+                for (ptrdiff_t i = 0; i < n; i++) {
+                    ret += l[i] * r[i];
+                }
+
+                return ret;
+            };
+
+            norm2 = [](const ptrdiff_t n, const T* const x) -> T {
+                T ret = 0;
+
+#pragma omp parallel for reduction(+ : ret)
+                for (ptrdiff_t i = 0; i < n; i++) {
+                    ret += x[i] * x[i];
+                }
+
+                return sqrt(ret);
+            };
+
+            axpby = [](const ptrdiff_t n,
+                       const T alpha,
+                       const T* const x,
+                       const T beta,
+                       T* const y) {
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; i++) {
+                    y[i] = alpha * x[i] + beta * y[i];
+                }
+            };
+
+            zeros = [](const std::ptrdiff_t n, T* const x) {
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; i++) {
+                    x[i] = 0;
+                }
+            };
+
+            values = [](const std::ptrdiff_t n, const T v, T* const x) {
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; i++) {
+                    x[i] = v;
+                }
+            };
+
+            scal = [](const std::ptrdiff_t n, const T alpha, T* const x) {
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; i++) {
+                    x[i] *= alpha;
+                }
+            };
+
+            execution_space_ = EXECUTION_SPACE_HOST;
+        }
+
         void cg_step(const T alpha_cg,
                      const T* const Ap,
                      T* const p,
@@ -347,11 +432,6 @@ namespace sfem {
             this->apply_op(x, g);
             this->axpby(n_dofs, -1, b, 1, g);
             this->free_gradient(x, g, gf);
-
-            // x_new = P(x_half - alpha_bar * d_tilde) // ?
-
-            // g_new = A * x_new  - b
-            // p_new = gf  //?
         }
 
         void proportioning_step(T* const p,
@@ -387,23 +467,36 @@ namespace sfem {
             this->axpby(n_dofs, 1, b, -1, g);
         }
 
+        void monitor(const int iter, const T residual) {
+            if (iter == max_it || iter % 100 == 0 || residual < atol) {
+                std::cout << iter << ": " << residual << "\n";
+            }
+        }
+
         int apply(const T* const b, T* const x) override {
+            assert(good());
+            if (!good()) {
+                fprintf(stderr, "[Error] MPRGP needs to be properly initialized!\n");
+                return SFEM_FAILURE;
+            }
+
             int it = 0;
             bool converged = false;
+
             T norm_gp = -1;
             T norm_gf = -1;
             T norm_gc = -1;
             T alpha_feas = -1;  // maximal feasbile step
             T alpha_cg = -1;
 
-            T* g = allocate(n_dofs);  // Gradient
-            T* p = allocate(n_dofs);
-            T* Ap_or_Ag = allocate(n_dofs);
-            T* gf_or_gc = allocate(n_dofs);  // Free Gradient or Chopped Gradient
+            T* g = this->allocate(n_dofs);  // Gradient
+            T* p = this->allocate(n_dofs);
+            T* Ap_or_Ag = this->allocate(n_dofs);
+            T* gf_or_gc = this->allocate(n_dofs);  // Free Gradient or Chopped Gradient
 
             T alpha_bar = 1;
             if (EXPANSION_TYPE_ORGINAL) {
-                ensure_power_method();
+                this->ensure_power_method();
                 this->values(n_dofs, 1, p);
                 T max_eig = power_method->max_eigen_value(
                         apply_op, 10000, this->eigen_solver_tol, n_dofs, p, g);
@@ -439,13 +532,18 @@ namespace sfem {
                 // Check for convergence
                 const T norm_gp = this->norm_projected_gradient(x, g);
                 converged = norm_gp < atol;
+
+                monitor(it, norm_gp);
+                if (++it >= max_it) {
+                    break;
+                }
             }
 
-            destroy(g);
-            destroy(p);
-            destroy(Ap_or_Ag);
-            destroy(gf_or_gc);
-            return SFEM_SUCCESS;
+            this->destroy(g);
+            this->destroy(p);
+            this->destroy(Ap_or_Ag);
+            this->destroy(gf_or_gc);
+            return converged ? SFEM_SUCCESS : SFEM_FAILURE;
         }
     };
 }  // namespace sfem
