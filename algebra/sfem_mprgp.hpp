@@ -8,18 +8,20 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <algorithm>
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
 
 namespace sfem {
-
+    // From Active set expansion strategies in MPRGP algorithm, Kruzik et al. 2020
     template <typename T>
     class MPRGP final : public MatrixFreeLinearSolver<T> {
     public:
-        std::function<void(const T* const, T* const)> apply_op;
-
         T rtol{1e-10};
         T atol{1e-16};
+        T gamma{1};  // gamma > 0
+        T eps{1e-14};
+        T infty{1e15};
         int max_it{10000};
         int check_each{100};
         ptrdiff_t n_dofs{-1};
@@ -28,7 +30,19 @@ namespace sfem {
         std::shared_ptr<Buffer<T>> upper_bound_;
         std::shared_ptr<Buffer<T>> lower_bound_;
 
-        // MPRGP() : eps_eig_est_(1e-1), power_method_max_it_(10) {}
+        std::function<void(const T* const, T* const)> apply_op;
+        std::function<void(const T* const, T* const)> preconditioner_op;
+
+        // Mem management
+        std::function<T*(const std::size_t)> allocate;
+        std::function<void(const std::size_t, T* const x)> zeros;
+        std::function<void(void*)> destroy;
+
+        std::function<void(const ptrdiff_t, const T* const, T* const)> copy;
+
+        // blas
+        std::function<T(const ptrdiff_t, const T* const, const T* const)> dot;
+        std::function<void(const ptrdiff_t, const T, const T* const, const T, T* const)> axpby;
 
         ExecutionSpace execution_space() const override { return execution_space_; }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
@@ -43,325 +57,297 @@ namespace sfem {
         void set_lower_bound(const std::shared_ptr<Buffer<T>>& lb) { lower_bound_ = lb; }
 
         void project(T* const x) {
-            // TODO
-            assert(0);
+            if (lower_bound_ && upper_bound_) {
+                const T* const lb = lower_bound_->data();
+                const T* const ub = upper_bound_->data();
+
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n_dofs; i++) {
+                    x[i] = std::max(std::min(x[i], ub[i]), lb[i]);
+                }
+            } else if (upper_bound_) {
+                const T* const ub = upper_bound_->data();
+
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n_dofs; i++) {
+                    x[i] = std::min(x[i], ub[i]);
+                }
+            } else if (lower_bound_) {
+                const T* const lb = lower_bound_->data();
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n_dofs; i++) {
+                    x[i] = std::max(x[i], lb[i]);
+                }
+            }
         }
 
-        void project_gradient(const T* const x, const T* const g, T* p) const {
-            // TODO
-            assert(0);
-
-            // {
-            //     auto d_lb = const_local_view_device(lb);
-            //     auto d_ub = const_local_view_device(ub);
-            //     auto d_x = const_local_view_device(x);
-            //     auto d_g = const_local_view_device(g);
-            //     auto d_fi = local_view_device(fi);
-
-            //     parallel_for(
-            //         local_range_device(fi), UTOPIA_LAMBDA(const SizeType i) {
-            //             // read all
-            //             const Scalar li = d_lb.get(i);
-            //             const Scalar ui = d_ub.get(i);
-            //             const Scalar xi = d_x.get(i);
-            //             const Scalar gi = d_g.get(i);
-
-            //             d_fi.set(i, (li < xi && xi < ui) ? gi : Scalar(0.0));
-            //         });
-            // }
-        }
-
-        T compute_alpha(const T* const x, const T* const p) const {
-            assert(0);
-            // assert(!empty(help_f1));
-            // assert(!empty(help_f2));
-
-            // {
-            //     auto d_lb = const_local_view_device(lb);
-            //     auto d_ub = const_local_view_device(ub);
-            //     auto d_x = const_local_view_device(x);
-            //     auto d_p = const_local_view_device(p);
-
-            //     auto h1 = local_view_device(help_f1);
-            //     auto h2 = local_view_device(help_f2);
-
-            //     parallel_for(
-            //         local_range_device(x), UTOPIA_LAMBDA(const SizeType i) {
-            //             // read all for quantities
-            //             const T li = d_lb.get(i);
-            //             const T ui = d_ub.get(i);
-            //             const T xi = d_x.get(i);
-            //             const T pi = d_p.get(i);
-
-            //             // write both helpers
-            //             h1.set(i, (pi > 0) ? ((xi - li) / pi) : T(1e15));
-            //             h2.set(i, (pi < 0) ? ((xi - ui) / pi) : T(1e15));
-            //         });
-            // }
-
-            // return multi_min(help_f1, help_f2);
-
+        T norm_projected_gradient(const T* const x,
+                            const T* const g) const {
+            assert(false);
             return -1;
         }
 
-        // void add_beta(const Vector& x,
-        //                   const Vector& g,
-        //                   const Vector& lb,
-        //                   const Vector& ub,
-        //                   Vector& beta) const {
-        //     assert(!empty(beta));
+        void norm_gradients(const T* const x,
+                            const T* const g,
+                            T* const norm_free_gradient,
+                            T* const norm_chopped_gradient) const {
+            // In the paper the free gradient is defined by checking equality
+            // between x and ub/lb, how is that numerically relevant?
+            // we do >/< instead
 
-        //     {
-        //         auto d_lb = const_local_view_device(lb);
-        //         auto d_ub = const_local_view_device(ub);
-        //         auto d_x = const_local_view_device(x);
-        //         auto d_g = const_local_view_device(g);
-        //         auto d_beta = local_view_device(beta);
+            T acc_gf = 0;
+            T acc_gc = 0;
 
-        //         parallel_for(
-        //                 local_range_device(beta), UTOPIA_LAMBDA(const SizeType i) {
-        //                     const T li = d_lb.get(i);
-        //                     const T ui = d_ub.get(i);
-        //                     const T xi = d_x.get(i);
-        //                     const T gi = d_g.get(i);
+            if (lower_bound_ && upper_bound_) {
+                const T* const lb = lower_bound_->data();
+                const T* const ub = upper_bound_->data();
 
-        //                     const T val =
-        //                             (device::abs(li - xi) < 1e-14)
-        //                                     ? device::min(0.0, gi)
-        //                                     : ((device::abs(ui - xi) < 1e-14) ? device::max(0.0,
-        //                                     gi)
-        //                                                                       : 0.0);
+#pragma omp parallel for reduction(+ : acc_gf), reduction(+ : acc_gc)
+                for (ptrdiff_t i = 0; i < n_dofs; i++) {
+                    const T val_gf = (x[i] < lb[i] || x[i] > ub[i]) ? T(0) : g[i];
+                    const T val_gc =
+                            (std::abs(lb[i] - x[i]) < eps)
+                                    ? std::min(T(0), g[i])
+                                    : ((std::abs(ub[i] - x[i]) < eps) ? std::max(T(0), g[i])
+                                                                      : T(0));
+                    acc_gf += val_gf * val_gf;
+                    acc_gc += val_gc * val_gc;
+                }
+            } else if (upper_bound_) {
+                const T* const ub = upper_bound_->data();
 
-        //                     d_beta.set(i, val);
-        //                 });
-        //     }
-        // }
+#pragma omp parallel for reduction(+ : acc_gf), reduction(+ : acc_gc)
+                for (ptrdiff_t i = 0; i < n_dofs; i++) {
+                    const T val_gf = (x[i] > ub[i]) ? T(0) : g[i];
+                    const T val_gc = (std::abs(ub[i] - x[i]) < eps) ? std::max(T(0), g[i]) : T(0);
 
-        int apply(const T* const b, T* const x) override {
-            T pAp, beta_beta, fi_fi, gp_dot, g_betta, beta_Abeta;
-            T alpha_cg, alpha_f, beta_sc;
-            T gnorm = -1;
+                    acc_gf += val_gf * val_gf;
+                    acc_gc += val_gc * val_gc;
+                }
+            } else if (lower_bound_) {
+                const T* const lb = lower_bound_->data();
 
-            int it = 0;
-            bool converged = false;
+#pragma omp parallel for reduction(+ : acc_gf), reduction(+ : acc_gc)
+                for (ptrdiff_t i = 0; i < n_dofs; i++) {
+                    const T val_gf = (x[i] < lb[i]) ? T(0) : g[i];
+                    const T val_gc = (std::abs(lb[i] - x[i]) < eps) ? std::min(T(0), g[i]) : T(0);
 
-            // T* Ax = allocate(n_dofs);
-            // T* g = allocate(n_dofs);
-            // T* p = allocate(n_dofs);
+                    acc_gf += val_gf * val_gf;
+                    acc_gc += val_gc * val_gc;
+                }
+            } else {
+                assert(false);
+            }
 
-            // this->project(x);
-            // this->apply_op(x, g);
-            // this->axpby(n, 1, b, -1, g);
-            // this->project_gradient(x, g, p);
-            // this->add_beta(x, g);
-
-            //             gp = fi + beta;
-            //             p = fi;
-
-            //             dots(beta, beta, beta_beta, fi, fi, fi_fi);
-
-            //             while (!converged) {
-            //                 if (beta_beta <= (gamma * gamma * fi_fi)) {
-            //                     A.apply(p, Ap);
-
-            //                     dots(p, Ap, pAp, g, p, gp_dot);
-
-            //                     // detecting negative curvature
-            //                     if (pAp <= 0.0) {
-            //                         return true;
-            //                     }
-
-            //                     alpha_cg = gp_dot / pAp;
-            //                     alpha_f = compute_alpha(x, p, *lb, *ub, help_f1, help_f2);
-
-            //                     if (hardik_variant_) {
-            //                         x -= alpha_cg * p;
-
-            //                         if (alpha_cg <= alpha_f) {
-            //                             g -= alpha_cg * Ap;
-
-            //                             this->project_gradient(x, g, *lb, *ub, fi);
-            //                             beta_sc = dot(fi, Ap) / pAp;
-            //                             p = fi - beta_sc * p;
-
-            //                         } else {
-            //                             this->project(*lb, *ub, x);
-            //                             A.apply(x, g);
-            //                             g -= rhs;
-            //                             this->project_gradient(x, g, *lb, *ub, p);
-            //                         }
-
-            //                     } else {
-            //                         y = x - alpha_cg * p;
-
-            //                         if (alpha_cg <= alpha_f) {
-            //                             x = y;
-            //                             g = g - alpha_cg * Ap;
-            //                             this->project_gradient(x, g, *lb, *ub, fi);
-            //                             beta_sc = dot(fi, Ap) / pAp;
-            //                             p = fi - beta_sc * p;
-            //                         } else {
-            //                             x = x - alpha_f * p;
-            //                             g = g - alpha_f * Ap;
-            //                             this->project_gradient(x, g, *lb, *ub, fi);
-
-            //                             help_f1 = x - (alpha_bar * fi);
-            //                             this->project(help_f1, *lb, *ub, x);
-
-            //                             A.apply(x, Ax);
-            //                             g = Ax - rhs;
-            //                             this->project_gradient(x, g, *lb, *ub, p);
-            //                         }
-            //                     }
-            //                 } else {
-            //                     A.apply(beta, Abeta);
-
-            //                     dots(g, beta, g_betta, beta, Abeta, beta_Abeta);
-            //                     // detecting negative curvature
-            //                     if (beta_Abeta <= 0.0) {
-            //                         if (this->verbose()) {
-            //                             PrintInfo::print_iter_status(it, {gnorm});
-            //                         }
-
-            //                         return true;
-            //                     }
-
-            //                     alpha_cg = g_betta / beta_Abeta;
-            //                     x = x - alpha_cg * beta;
-            //                     g = g - alpha_cg * Abeta;
-
-            //                     this->project_gradient(x, g, *lb, *ub, p);
-            //                 }
-
-            //                 this->project_gradient(x, g, *lb, *ub, fi);
-            //                 this->add_beta(x, g, *lb, *ub, beta);
-
-            //                 gp = fi + beta;
-
-            //                 dots(beta, beta, beta_beta, fi, fi, fi_fi, gp, gp, gnorm);
-
-            //                 gnorm = std::sqrt(gnorm);
-            //                 it++;
-
-            //                 if (this->verbose()) {
-            //                     PrintInfo::print_iter_status(it, {gnorm});
-            //                 }
-
-            //                 converged = this->check_convergence(it, gnorm, 1, 1);
-            //             }
-
-            //             UTOPIA_TRACE_REGION_END("MPRGP::solve(...)");
-            //             return converged;
-            //         }
-            
-            return SFEM_SUCCESS;
+            *norm_free_gradient = sqrt(acc_gf);
+            *norm_chopped_gradient = sqrt(acc_gc);
         }
 
-        //         void set_eig_comp_tol(const T &eps_eig_est) { eps_eig_est_ = eps_eig_est; }
+        void chopped_gradient(const T* const x, const T* const g, T* gc) const {
+            if (lower_bound_ && upper_bound_) {
+                const T* const lb = lower_bound_->data();
+                const T* const ub = upper_bound_->data();
 
-        //         void add_beta(const Vector &x, const Vector &g, const Vector &lb, const
-        //         Vector &ub, Vector &beta) const {
-        //             assert(!empty(beta));
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n_dofs; i++) {
+                    gc[i] = (std::abs(lb[i] - x[i]) < eps)
+                                    ? std::min(T(0), g[i])
+                                    : ((std::abs(ub[i] - x[i]) < eps) ? std::max(T(0), g[i])
+                                                                      : T(0));
+                }
+            } else if (upper_bound_) {
+                const T* const ub = upper_bound_->data();
 
-        //             {
-        //                 auto d_lb = const_local_view_device(lb);
-        //                 auto d_ub = const_local_view_device(ub);
-        //                 auto d_x = const_local_view_device(x);
-        //                 auto d_g = const_local_view_device(g);
-        //                 auto d_beta = local_view_device(beta);
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n_dofs; i++) {
+                    gc[i] = (std::abs(ub[i] - x[i]) < eps) ? std::max(T(0), g[i]) : T(0);
+                }
+            } else if (lower_bound_) {
+                const T* const lb = lower_bound_->data();
 
-        //                 parallel_for(
-        //                     local_range_device(beta), UTOPIA_LAMBDA(const SizeType i) {
-        //                         const T li = d_lb.get(i);
-        //                         const T ui = d_ub.get(i);
-        //                         const T xi = d_x.get(i);
-        //                         const T gi = d_g.get(i);
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n_dofs; i++) {
+                    gc[i] = (std::abs(lb[i] - x[i]) < eps) ? std::min(T(0), g[i]) : T(0);
+                }
+            }
+        }
 
-        //                         const T val = (device::abs(li - xi) < 1e-14)
-        //                                                ? device::min(0.0, gi)
-        //                                                : ((device::abs(ui - xi) < 1e-14) ?
-        //                                                device::max(0.0, gi) : 0.0);
+        void free_gradient(const T* const x, const T* const g, T* gf) const {
+            // In the paper the free gradient is defined by checking equality
+            // between x and ub/lb, how is that numerically relevant?
+            // we do >/< instead
 
-        //                         d_beta.set(i, val);
-        //                     });
-        //             }
-        //         }
+            if (lower_bound_ && upper_bound_) {
+                const T* const lb = lower_bound_->data();
+                const T* const ub = upper_bound_->data();
 
-        //     private:
-        //         T power_method(const Operator<Vector> &A) {
-        //             // Super simple power method to estimate the biggest eigenvalue
-        //             assert(!empty(help_f2));
-        //             help_f2.set(1.0);
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n_dofs; i++) {
+                    gf[i] = (x[i] < lb[i] || x[i] > ub[i]) ? T(0) : g[i];
+                }
+            } else if (upper_bound_) {
+                const T* const ub = upper_bound_->data();
 
-        //             SizeType it = 0;
-        //             bool converged = false;
-        //             T gnorm, lambda = 0.0, lambda_old;
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n_dofs; i++) {
+                    gf[i] = (x[i] > ub[i]) ? T(0) : g[i];
+                }
+            } else if (lower_bound_) {
+                const T* const lb = lower_bound_->data();
 
-        //             while (!converged) {
-        //                 help_f1 = help_f2;
-        //                 A.apply(help_f1, help_f2);
-        //                 help_f2 = T(1.0 / T(norm2(help_f2))) * help_f2;
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n_dofs; i++) {
+                    gf[i] = (x[i] < lb[i]) ? T(0) : g[i];
+                }
+            }
+        }
 
-        //                 lambda_old = lambda;
+        T max_alpha(const T* const x, const T* const p) const {
+            T ret = infty;
 
-        //                 A.apply(help_f2, help_f1);
-        //                 lambda = dot(help_f2, help_f1);
+            if (lower_bound_ && upper_bound_) {
+                const T* const lb = lower_bound_->data();
+                const T* const ub = upper_bound_->data();
 
-        //                 fi = help_f2 - help_f1;
-        //                 gnorm = norm2(fi);
+#pragma omp parallel for reduction(min : ret)
+                for (ptrdiff_t i = 0; i < n_dofs; i++) {
+                    const T alpha_lb = (p[i] > 0) ? ((x[i] - lb[i]) / p[i]) : infty;
+                    const T alpha_ub = (p[i] < 0) ? ((x[i] - ub[i]) / p[i]) : infty;
+                    const T alpha = std::min(alpha_lb, alpha_ub);
+                    ret = std::min(alpha, ret);
+                }
 
-        //                 converged = ((gnorm < eps_eig_est_) || (std::abs(lambda_old - lambda)
-        //                 < eps_eig_est_) ||
-        //                              it > power_method_max_it_)
-        //                                 ? true
-        //                                 : false;
+            } else if (upper_bound_) {
+                const T* const ub = upper_bound_->data();
 
-        //                 it = it + 1;
-        //             }
+#pragma omp parallel for reduction(min : ret)
+                for (ptrdiff_t i = 0; i < n_dofs; i++) {
+                    const T alpha = (p[i] < 0) ? ((x[i] - ub[i]) / p[i]) : infty;
+                    ret = std::min(alpha, ret);
+                }
+            } else if (lower_bound_) {
+                const T* const lb = lower_bound_->data();
 
-        //             if (this->verbose() && mpi_world_rank() == 0)
-        //                 sfem::out() << "Power method converged in " << it << " iterations.
-        //                 Largest eig: " << lambda << "  \n";
+#pragma omp parallel for reduction(min : ret)
+                for (ptrdiff_t i = 0; i < n_dofs; i++) {
+                    const T alpha = (p[i] > 0) ? ((x[i] - lb[i]) / p[i]) : infty;
+                    ret = std::min(alpha, ret);
+                }
+            }
 
-        //             return lambda;
-        //         }
+            return ret;
+        }
 
-        //     public:
-        //         void init_memory(const Layout &layout) override {
-        //             OperatorBasedQPSolver<Matrix, Vector>::init_memory(layout);
+        void cg_step(const T alpha_cg,
+                     const T* const Ap,
+                     T* const p,
+                     T* const g,
+                     T* const gf,
+                     T* const x) {
+            // x_new = x_old - alpha_CG * p_old
+            this->axpby(n_dofs, -alpha_cg, p, 1, x);
 
-        //             fi.zeros(layout);
-        //             beta.zeros(layout);
-        //             gp.zeros(layout);
-        //             p.zeros(layout);
-        //             y.zeros(layout);
-        //             Ap.zeros(layout);
-        //             Abeta.zeros(layout);
-        //             Ax.zeros(layout);
-        //             g.zeros(layout);
-        //             help_f1.zeros(layout);
-        //             help_f2.zeros(layout);
+            // g_new = g_old - alpha_CG * Ap_old
+            this->axpby(n_dofs, -alpha_cg, Ap, 1, g);
 
-        //             initialized_ = true;
-        //             layout_ = layout;
-        //         }
+            // gf_new
+            this->free_gradient(x, g, gf);
 
-        //         void set_preconditioner(const std::shared_ptr<Preconditioner<Vector> >
-        //         &precond) override {
-        //             precond_ = precond;
-        //         }
+            // beta = dot(Ap, gf_new)/dot(Ap_old, p_old)
+            const T beta = this->dot(n_dofs, Ap, gf) / this->dot(n_dofs, Ap, p);
 
-        //     private:
-        //         Vector fi, beta, gp, p, y, Ap, Abeta, Ax, g, help_f1, help_f2;
+            // p_new = g_new - beta * p_old
+            this->axpby(n_dofs, 1, g, -beta, p);
+        }
 
-        //         T eps_eig_est_;
-        //         SizeType power_method_max_it_;
+        void expansion_step() {
+            // x_half = x_old - alpha_feas * p
+            // g_half = g_old - alpha_feas * Ap
+            // x_new = P(x_half - alpha_bar * d_tilde) // ?
+            // g_new = A * x_new  - b
+            // p_new = gf  //?
+        }
 
-        //         bool initialized_{false};
-        //         Layout layout_;
+        void proportioning_step(T* const p,
+                                T* const Agc,
+                                T* const g,
+                                T* const gf_or_gc,
+                                T* const x) {
+            // Attention!
+            T* gc = gf_or_gc;
+            T* gf = gf_or_gc;
 
-        //         std::shared_ptr<Preconditioner<Vector> > precond_;
-        //         bool hardik_variant_{false};
+            this->chopped_gradient(x, g, gc);
+
+            // alpha_CG = dot(g, gc)/dot(gc, A* gc)
+            apply_op(gc, Agc);
+            T alpha_cg = this->dot(n_dofs, g, gc) / this->dot(n_dofs, gc, Agc);
+
+            // x_new = x_old - alpha_CG * gc
+            this->axpby(n_dofs, -alpha_cg, gc, 1, x);
+
+            // g_new = g_old - alpha_CG * A * gc
+            this->axpby(n_dofs, -alpha_cg, Agc, 1, g);
+            this->free_gradient(x, g, gf);
+
+            // p_new = gf_new
+            this->copy(n_dofs, gf, p);
+        }
+
+        void residual(const T* const x, const T* const b, T* const g) {
+            this->apply_op(x, g);
+            this->axpby(n_dofs, 1, b, -1, g);
+        }
+
+        int apply(const T* const b, T* const x) override {
+            int it = 0;
+            bool converged = false;
+            T norm_gp = -1;
+            T norm_gf = -1;
+            T norm_gc = -1;
+            T alpha_feas = -1;  // maximal feasbile step
+            T alpha_cg = -1;
+
+            T* g = allocate(n_dofs);  // Gradient
+            T* p = allocate(n_dofs);
+            T* Ap_or_Ag = allocate(n_dofs);
+            T* gf_or_gc = allocate(n_dofs);  // Free Gradient or Chopped Gradient
+
+            this->project(x);  // Make iterate feasible
+            this->residual(x, b, g);
+            this->free_gradient(x, g, gf_or_gc);
+            this->copy(n_dofs, gf_or_gc, p);
+
+
+
+            while (!converged) {
+                norm_gradients(x, g, &norm_gf, &norm_gc);
+
+                if (norm_gc < this->gamma * norm_gf) {
+                    alpha_feas = this->max_alpha(x, p);
+                    this->apply_op(p, Ap_or_Ag);
+                    alpha_cg = this->dot(n_dofs, g, p) / this->dot(n_dofs, p, Ap_or_Ag);
+
+                    if (alpha_cg < alpha_feas) {
+                        this->cg_step(alpha_cg, Ap_or_Ag, p, g, gf_or_gc, x);
+                    } else {
+                        this->expansion_step();
+                    }
+                } else {
+                    this->proportioning_step(p, Ap_or_Ag, g, gf_or_gc, x);
+                }
+
+                // Check for convergence
+                const T norm_gp = this->norm_projected_gradient(x, g);
+                converged = norm_gp < atol;
+            }
+
+            destroy(g);
+            destroy(p);
+            destroy(Ap_or_Ag);
+            destroy(gf_or_gc);
+            return SFEM_SUCCESS;
+        }
     };
 }  // namespace sfem
 
