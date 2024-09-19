@@ -125,8 +125,17 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_DIRICHLET_VALUE, );
     SFEM_READ_ENV(SFEM_DIRICHLET_COMPONENT, );
 
+    char *SFEM_CONTACT_NODESET = 0;
+    char *SFEM_CONTACT_VALUE = 0;
+    char *SFEM_CONTACT_COMPONENT = 0;
+
+    SFEM_READ_ENV(SFEM_CONTACT_NODESET, );
+    SFEM_READ_ENV(SFEM_CONTACT_VALUE, );
+    SFEM_READ_ENV(SFEM_CONTACT_COMPONENT, );
+
     auto mesh = (mesh_t *)m->impl_mesh();
 
+    // Allocate conds (FIXME)
     int n_dirichlet_conditions{0};
     boundary_condition_t *dirichlet_conditions{nullptr};
 
@@ -137,15 +146,25 @@ int main(int argc, char *argv[]) {
                               &dirichlet_conditions,
                               &n_dirichlet_conditions);
 
+    int n_contact_conditions{0};
+    boundary_condition_t *contact_conditions{nullptr};
+    read_dirichlet_conditions(mesh,
+                              SFEM_CONTACT_NODESET,
+                              SFEM_CONTACT_VALUE,
+                              SFEM_CONTACT_COMPONENT,
+                              &contact_conditions,
+                              &n_contact_conditions);
+
     printf("n_dirichlet_conditions = %d\n", n_dirichlet_conditions);
+    printf("n_contact_conditions = %d\n", n_contact_conditions);
 
     auto op = sfem::make_op<real_t>(
             ndofs,
             ndofs,
             [=](const real_t *const x, real_t *const y) {
                 // Apply operator
-                proteus_affine_hex8_laplacian_apply //
-                // proteus_hex8_laplacian_apply  //
+                proteus_affine_hex8_laplacian_apply  //
+                                                     // proteus_hex8_laplacian_apply  //
                         (ssm->level(),
                          ssm->n_elements(),
                          ssm->interior_start(),
@@ -153,7 +172,7 @@ int main(int argc, char *argv[]) {
                          ssm->point_data(),
                          x,
                          y);
-                        
+
                 // Copy constrained nodes
                 copy_at_dirichlet_nodes_vec(
                         n_dirichlet_conditions, dirichlet_conditions, block_size, x, y);
@@ -161,8 +180,38 @@ int main(int argc, char *argv[]) {
             sfem::EXECUTION_SPACE_HOST);
 
     std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> solver;
-    {
+
+    if (n_contact_conditions) {
         auto mprgp = std::make_shared<sfem::MPRGP<real_t>>();
+        mprgp->set_expansion_type(sfem::MPRGP<real_t>::EXPANSION_TYPE_ORGINAL);
+        mprgp->set_op(op);
+
+        auto upper_bound = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
+
+        {   // Fill default upper-bound value
+            auto ub = upper_bound->data();
+            for(ptrdiff_t i = 0; i < ndofs; i++) {
+                ub[i] = 1000;
+            }
+        }
+
+        apply_dirichlet_condition_vec(
+                n_contact_conditions, contact_conditions, block_size, upper_bound->data());
+
+
+        char path[2048];
+        sprintf(path, "%s/upper_bound.raw", output_path);
+        if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)upper_bound->data(), ndofs, ndofs)) {
+            return SFEM_FAILURE;
+        }
+
+        mprgp->verbose = true;
+        mprgp->set_max_it(20000);
+        mprgp->set_upper_bound(upper_bound);
+        mprgp->default_init();
+
+        solver = mprgp;
+    } else {
         auto cg = sfem::h_cg<real_t>();
         cg->verbose = true;
         cg->set_op(op);
@@ -202,8 +251,11 @@ int main(int argc, char *argv[]) {
         return SFEM_FAILURE;
     }
 
-    double tock = MPI_Wtime();
+    // Clean-up (FIXME)
+    destroy_conditions(n_contact_conditions, contact_conditions);
+    destroy_conditions(n_dirichlet_conditions, dirichlet_conditions);
 
+    double tock = MPI_Wtime();
 
     if (!rank) {
         printf("----------------------------------------\n");
@@ -213,9 +265,7 @@ int main(int argc, char *argv[]) {
                (long)ssm->n_elements(),
                (long)ssm->n_nodes(),
                (long)ndofs);
-        printf("TTS:\t\t%g [s], solve: %g [s])\n",
-               tock - tick,
-               solve_tock - solve_tick);
+        printf("TTS:\t\t%g [s], solve: %g [s])\n", tock - tick, solve_tock - solve_tick);
         printf("----------------------------------------\n");
     }
 

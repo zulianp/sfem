@@ -29,20 +29,18 @@ export OMP_PROC_BIND=true
 export CUDA_LAUNCH_BLOCKING=0
 
 export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
-export SFEM_ELEMENT_REFINE_LEVEL=8
+export SFEM_ELEMENT_REFINE_LEVEL=2
 
 mesh=mesh
 
-# if [[ -d "$mesh" ]]
-# then
-# 	echo "Reusing mesh"
-# else
-	create_cyclic_ss_mesh.sh 4 $SFEM_ELEMENT_REFINE_LEVEL
+if [[ -d "$mesh" ]]
+then
+	echo "Reusing mesh"
+else
+	create_cyclic_ss_mesh.sh 1 $SFEM_ELEMENT_REFINE_LEVEL
 	# BOX mesh for testing
 	# create_box_ss_mesh.sh 20 $SFEM_ELEMENT_REFINE_LEVEL
-# fi
-
-
+fi
 
 sinlet=$mesh/surface/sidesets_aos/inlet.raw
 soutlet=$mesh/surface/sidesets_aos/outlet.raw
@@ -51,10 +49,22 @@ soutlet=$mesh/surface/sidesets_aos/outlet.raw
 # sinlet=$mesh/surface/sidesets_aos/left.raw 
 # soutlet=$mesh/surface/sidesets_aos/right.raw 
 
-export SFEM_DIRICHLET_NODESET="$sinlet,$soutlet"
-export SFEM_DIRICHLET_VALUE="1,-1"
-export SFEM_DIRICHLET_COMPONENT="0,0"
+# export SFEM_DIRICHLET_NODESET="$sinlet,$soutlet"
+# export SFEM_DIRICHLET_VALUE="1,-1"
+# export SFEM_DIRICHLET_COMPONENT="0,0"
+
+
+# Contact
+
+export SFEM_DIRICHLET_NODESET="$sinlet"
+export SFEM_DIRICHLET_VALUE="1"
+export SFEM_DIRICHLET_COMPONENT="0"
+
+export SFEM_CONTACT_NODESET="$soutlet"
+export SFEM_CONTACT_VALUE="-1"
+export SFEM_CONTACT_COMPONENT="0"
+
 
 obstacle $mesh output
 
-raw_to_db.py $mesh/viz $mesh/viz/hex8.vtk --point_data=output/u.raw,output/rhs.raw
+raw_to_db.py $mesh/viz $mesh/viz/hex8.vtk --point_data=output/u.raw,output/rhs.raw,output/upper_bound.raw
