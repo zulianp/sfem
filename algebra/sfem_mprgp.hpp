@@ -109,11 +109,11 @@ namespace sfem {
             }
         }
 
-        // #define MPRGP_UTOPIA_STYLE_FG
+#define MPRGP_UTOPIA_STYLE_FG
 
         inline T gf_lb_ub(const T lbi, const T ubi, const T xi, const T gi) const {
 #ifdef MPRGP_UTOPIA_STYLE_FG
-            return (xi < lbi || xi > ubi) ? T(0) : gi;
+            return (xi <= lbi || xi >= ubi) ? T(0) : gi;
 #else
             return ((std::abs(lbi - xi) < eps) || (std::abs(ubi - xi) < eps)) ? T(0) : gi;
 #endif
@@ -121,7 +121,7 @@ namespace sfem {
 
         inline T gf_lb(const T lbi, const T xi, const T gi) const {
 #ifdef MPRGP_UTOPIA_STYLE_FG
-            return (xi < lbi) ? T(0) : gi];
+            return (xi <= lbi) ? T(0) : gi;
 #else
             return (std::abs(lbi - xi) < eps) ? T(0) : gi;
 #endif
@@ -129,7 +129,7 @@ namespace sfem {
 
         inline T gf_ub(const T ubi, const T xi, const T gi) const {
 #ifdef MPRGP_UTOPIA_STYLE_FG
-            return (xi > ubi) ? T(0) : gi;
+            return (xi >= ubi) ? T(0) : gi;
 #else
             return (std::abs(ubi - xi) < eps) ? T(0) : gi;
 #endif
@@ -240,24 +240,21 @@ namespace sfem {
 
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    gc[i] = (std::abs(lb[i] - x[i]) < eps)
-                                    ? std::min(T(0), g[i])
-                                    : ((std::abs(ub[i] - x[i]) < eps) ? std::max(T(0), g[i])
-                                                                      : T(0));
+                    gc[i] = gc_lb_ub(lb[i], ub[i], x[i], g[i]);
                 }
             } else if (upper_bound_) {
                 const T* const ub = upper_bound_->data();
 
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    gc[i] = (std::abs(ub[i] - x[i]) < eps) ? std::max(T(0), g[i]) : T(0);
+                    gc[i] = gc_ub(ub[i], x[i], g[i]);
                 }
             } else if (lower_bound_) {
                 const T* const lb = lower_bound_->data();
 
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    gc[i] = (std::abs(lb[i] - x[i]) < eps) ? std::min(T(0), g[i]) : T(0);
+                    gc[i] = gc_lb(lb[i], x[i], g[i]);
                 }
             }
         }
@@ -426,7 +423,7 @@ namespace sfem {
             const T beta = this->dot(n_dofs, Ap, gf) / this->dot(n_dofs, Ap, p);
 
             // p_new = g_new - beta * p_old
-            this->axpby(n_dofs, 1, g, -beta, p);
+            this->axpby(n_dofs, 1, gf, -beta, p);
         }
 
         void expansion_step(const T alpha_feas,
@@ -450,16 +447,14 @@ namespace sfem {
                     break;
                 }
                 default: {  // EXPANSION_TYPE_ORGINAL
-                    // this->free_gradient(x, g, gf); // Should not be needed!
+                    this->free_gradient(x, g, gf);
                     this->axpby(n_dofs, -alpha_bar, gf, 1, x);
                     break;
                 }
             }
 
             this->project(x);
-            this->zeros(n_dofs, g);
-            this->apply_op(x, g);
-            this->axpby(n_dofs, -1, b, 1, g);
+            this->gradient(x, b, g);
             this->free_gradient(x, g, gf);
         }
 
@@ -490,14 +485,14 @@ namespace sfem {
             this->copy(n_dofs, gf, p);
         }
 
-        void residual(const T* const x, const T* const b, T* const g) {
+        void gradient(const T* const x, const T* const b, T* const g) {
             this->zeros(n_dofs, g);
             this->apply_op(x, g);
-            this->axpby(n_dofs, 1, b, -1, g);
+            this->axpby(n_dofs, -1, b, 1, g);
         }
 
         void monitor(const int iter, const T residual) {
-            if (iter == max_it || iter % 100 == 0 || residual < atol) {
+            if (iter == max_it || iter % check_each == 0 || residual < atol) {
                 std::cout << iter << ": " << residual << "\n";
             }
         }
@@ -535,12 +530,26 @@ namespace sfem {
             }
 
             this->project(x);  // Make iterate feasible
-            this->residual(x, b, g);
+            this->gradient(x, b, g);
+
+            // 
+            T norm_g = this->norm2(n_dofs, g);
+            printf("norm_g = %g\n", norm_g);
+            // 
+
             this->free_gradient(x, g, gf_or_gc);
             this->copy(n_dofs, gf_or_gc, p);
 
+            // printf("norm_fg = %g\n", this->norm2(n_dofs, gf_or_gc));
+
+            int count_cg_steps = 0;
+            int count_expansion_steps = 0;  
+            int count_proportioning_steps = 0;
+
             while (!converged) {
                 norm_gradients(x, g, &norm_gf, &norm_gc);
+
+                // printf("A) %g < %g (norm_gc < this->gamma * norm_gf)\n", norm_gc, norm_gf);
 
                 if (norm_gc < this->gamma * norm_gf) {
                     alpha_feas = this->max_alpha(x, p);
@@ -548,16 +557,23 @@ namespace sfem {
                     this->apply_op(p, Ap_or_Ag);
                     alpha_cg = this->dot(n_dofs, g, p) / this->dot(n_dofs, p, Ap_or_Ag);
 
-                    if (alpha_cg < alpha_feas) {
+                    // printf("B) %g < %g (alpha_cg <= alpha_feas)\n", alpha_cg, alpha_feas);
+                    if (alpha_cg <= alpha_feas) {
                         this->cg_step(alpha_cg, Ap_or_Ag, p, g, gf_or_gc, x);
+                        
+                        count_cg_steps++;
                     } else {
                         // apply_op inside!
                         this->expansion_step(
                                 alpha_feas, alpha_bar, alpha_cg, b, p, Ap_or_Ag, g, gf_or_gc, x);
+                   
+                        count_expansion_steps++;
                     }
                 } else {
                     // apply_op inside!
                     this->proportioning_step(p, Ap_or_Ag, g, gf_or_gc, x);
+
+                    count_proportioning_steps++;
                 }
 
                 // Check for convergence
@@ -568,6 +584,12 @@ namespace sfem {
                 if (++it >= max_it) {
                     break;
                 }
+            }
+
+            if(verbose) {
+                printf("#cg_steps\t\t%d\n", count_cg_steps);
+                printf("#expansion_steps\t%d\n", count_expansion_steps);
+                printf("#proportioning_steps\t%d\n", count_proportioning_steps);
             }
 
             this->destroy(g);
