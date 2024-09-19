@@ -22,7 +22,7 @@ namespace sfem {
     public:
         enum ExpansionType { EXPANSION_TYPE_ORGINAL = 0, EXPANSION_TYPE_PROJECTED_CG = 1 };
 
-        ExpansionType expansion_type_{EXPANSION_TYPE_PROJECTED_CG};
+        ExpansionType expansion_type_{EXPANSION_TYPE_ORGINAL};
         T rtol{1e-10};
         T atol{1e-16};
         T gamma{1};  // gamma > 0
