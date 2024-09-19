@@ -1,6 +1,7 @@
 #ifndef SFEM_MPRGP_HPP
 #define SFEM_MPRGP_HPP
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdlib>
@@ -8,20 +9,25 @@
 #include <functional>
 #include <iostream>
 #include <memory>
-#include <algorithm>
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
+
+#include "sfem_PowerMethod.hpp"
 
 namespace sfem {
     // From Active set expansion strategies in MPRGP algorithm, Kruzik et al. 2020
     template <typename T>
     class MPRGP final : public MatrixFreeLinearSolver<T> {
     public:
+        enum ExpansionType { EXPANSION_TYPE_ORGINAL = 0, EXPANSION_TYPE_PROJECTED_CG = 1 };
+
+        ExpansionType expansion_type_{EXPANSION_TYPE_PROJECTED_CG};
         T rtol{1e-10};
         T atol{1e-16};
         T gamma{1};  // gamma > 0
         T eps{1e-14};
         T infty{1e15};
+        T eigen_solver_tol{1e-6};
         int max_it{10000};
         int check_each{100};
         ptrdiff_t n_dofs{-1};
@@ -36,6 +42,7 @@ namespace sfem {
         // Mem management
         std::function<T*(const std::size_t)> allocate;
         std::function<void(const std::size_t, T* const x)> zeros;
+        std::function<void(const std::size_t, const T value, T* const x)> values;
         std::function<void(void*)> destroy;
 
         std::function<void(const ptrdiff_t, const T* const, T* const)> copy;
@@ -43,6 +50,10 @@ namespace sfem {
         // blas
         std::function<T(const ptrdiff_t, const T* const, const T* const)> dot;
         std::function<void(const ptrdiff_t, const T, const T* const, const T, T* const)> axpby;
+        std::function<void(const std::ptrdiff_t, const T, T* const)> scal;
+        std::function<T(const ptrdiff_t, const T* const)> norm2;
+
+        std::shared_ptr<PowerMethod<T>> power_method;
 
         ExecutionSpace execution_space() const override { return execution_space_; }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
@@ -53,8 +64,16 @@ namespace sfem {
         void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
 
         void set_upper_bound(const std::shared_ptr<Buffer<T>>& ub) { upper_bound_ = ub; }
-
         void set_lower_bound(const std::shared_ptr<Buffer<T>>& lb) { lower_bound_ = lb; }
+
+        void ensure_power_method() {
+            if (!power_method) {
+                power_method = std::make_shared<PowerMethod<T>>();
+                power_method->norm2 = norm2;
+                power_method->scal = scal;
+                power_method->zeros = zeros;
+            }
+        }
 
         void project(T* const x) {
             if (lower_bound_ && upper_bound_) {
@@ -81,10 +100,46 @@ namespace sfem {
             }
         }
 
-        T norm_projected_gradient(const T* const x,
-                            const T* const g) const {
-            assert(false);
-            return -1;
+        T norm_projected_gradient(const T* const x, const T* const g) const {
+            T ret = 0;
+            if (lower_bound_ && upper_bound_) {
+                const T* const lb = lower_bound_->data();
+                const T* const ub = upper_bound_->data();
+
+#pragma omp parallel for reduction(+ : ret)
+                for (ptrdiff_t i = 0; i < n_dofs; i++) {
+                    const T d = ((x[i] < lb[i] || x[i] > ub[i]) ? T(0) : g[i]) +
+                                ((std::abs(lb[i] - x[i]) < eps)
+                                         ? std::min(T(0), g[i])
+                                         : ((std::abs(ub[i] - x[i]) < eps) ? std::max(T(0), g[i])
+                                                                           : T(0)));
+                    ret += d * d;
+                }
+            } else if (upper_bound_) {
+                const T* const ub = upper_bound_->data();
+
+#pragma omp parallel for reduction(+ : ret)
+                for (ptrdiff_t i = 0; i < n_dofs; i++) {
+                    const T d = ((x[i] > ub[i]) ? T(0) : g[i]) +
+                                ((std::abs(ub[i] - x[i]) < eps) ? std::max(T(0), g[i]) : T(0));
+
+                    ret += d * d;
+                }
+            } else if (lower_bound_) {
+                const T* const lb = lower_bound_->data();
+
+#pragma omp parallel for reduction(+ : ret)
+                for (ptrdiff_t i = 0; i < n_dofs; i++) {
+                    const T d = ((x[i] < lb[i]) ? T(0) : g[i]) +
+                                ((std::abs(lb[i] - x[i]) < eps) ? std::min(T(0), g[i]) : T(0));
+
+                    ret += d * d;
+                }
+            } else {
+                assert(false);
+            }
+
+            return sqrt(ret);
         }
 
         void norm_gradients(const T* const x,
@@ -260,10 +315,41 @@ namespace sfem {
             this->axpby(n_dofs, 1, g, -beta, p);
         }
 
-        void expansion_step() {
+        void expansion_step(const T alpha_feas,
+                            const T alpha_bar,
+                            const T alpha_cg,
+                            const T* const b,
+                            const T* const p,
+                            const T* const Ap,
+                            T* const g,
+                            T* const gf,
+                            T* const x) {
             // x_half = x_old - alpha_feas * p
+            this->axpby(n_dofs, -alpha_feas, p, 1, x);
+
             // g_half = g_old - alpha_feas * Ap
+            this->axpby(n_dofs, -alpha_feas, Ap, 1, g);
+
+            switch (expansion_type_) {
+                case EXPANSION_TYPE_PROJECTED_CG: {
+                    this->axpby(n_dofs, -alpha_cg, p, 1, x);
+                    break;
+                }
+                default: {  // EXPANSION_TYPE_ORGINAL
+                    // this->free_gradient(x, g, gf); // Should not be needed!
+                    this->axpby(n_dofs, -alpha_bar, gf, 1, x);
+                    break;
+                }
+            }
+
+            this->project(x);
+            this->zeros(n_dofs, g);
+            this->apply_op(x, g);
+            this->axpby(n_dofs, -1, b, 1, g);
+            this->free_gradient(x, g, gf);
+
             // x_new = P(x_half - alpha_bar * d_tilde) // ?
+
             // g_new = A * x_new  - b
             // p_new = gf  //?
         }
@@ -280,6 +366,7 @@ namespace sfem {
             this->chopped_gradient(x, g, gc);
 
             // alpha_CG = dot(g, gc)/dot(gc, A* gc)
+            this->zeros(n_dofs, Agc);
             apply_op(gc, Agc);
             T alpha_cg = this->dot(n_dofs, g, gc) / this->dot(n_dofs, gc, Agc);
 
@@ -295,6 +382,7 @@ namespace sfem {
         }
 
         void residual(const T* const x, const T* const b, T* const g) {
+            this->zeros(n_dofs, g);
             this->apply_op(x, g);
             this->axpby(n_dofs, 1, b, -1, g);
         }
@@ -313,27 +401,38 @@ namespace sfem {
             T* Ap_or_Ag = allocate(n_dofs);
             T* gf_or_gc = allocate(n_dofs);  // Free Gradient or Chopped Gradient
 
+            T alpha_bar = 1;
+            if (EXPANSION_TYPE_ORGINAL) {
+                ensure_power_method();
+                this->values(n_dofs, 1, p);
+                T max_eig = power_method->max_eigen_value(
+                        apply_op, 10000, this->eigen_solver_tol, n_dofs, p, g);
+                alpha_bar = 1.95 / max_eig;
+            }
+
             this->project(x);  // Make iterate feasible
             this->residual(x, b, g);
             this->free_gradient(x, g, gf_or_gc);
             this->copy(n_dofs, gf_or_gc, p);
-
-
 
             while (!converged) {
                 norm_gradients(x, g, &norm_gf, &norm_gc);
 
                 if (norm_gc < this->gamma * norm_gf) {
                     alpha_feas = this->max_alpha(x, p);
+                    this->zeros(n_dofs, Ap_or_Ag);
                     this->apply_op(p, Ap_or_Ag);
                     alpha_cg = this->dot(n_dofs, g, p) / this->dot(n_dofs, p, Ap_or_Ag);
 
                     if (alpha_cg < alpha_feas) {
                         this->cg_step(alpha_cg, Ap_or_Ag, p, g, gf_or_gc, x);
                     } else {
-                        this->expansion_step();
+                        // apply_op inside!
+                        this->expansion_step(
+                                alpha_feas, alpha_bar, alpha_cg, b, p, Ap_or_Ag, g, gf_or_gc, x);
                     }
                 } else {
+                    // apply_op inside!
                     this->proportioning_step(p, Ap_or_Ag, g, gf_or_gc, x);
                 }
 
