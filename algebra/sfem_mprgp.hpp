@@ -30,7 +30,7 @@ namespace sfem {
         T infty{1e15};
         T eigen_solver_tol{1e-6};
         int max_it{10000};
-        int check_each{1};
+        int check_each{10};
         ptrdiff_t n_dofs{-1};
         bool verbose{true};
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
@@ -68,6 +68,12 @@ namespace sfem {
         void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) override {
             // Ignoring op!
         }
+
+        void set_atol(const T val) { atol = val; }
+
+        void set_rtol(const T val) { rtol = val; }
+
+        void set_verbose(const bool val) { verbose = val; }
 
         void set_max_it(const int it) override { max_it = it; }
         void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
@@ -532,10 +538,8 @@ namespace sfem {
             this->project(x);  // Make iterate feasible
             this->gradient(x, b, g);
 
-            // 
             T norm_g = this->norm2(n_dofs, g);
-            printf("norm_g = %g\n", norm_g);
-            // 
+            this->monitor(0, norm_g);
 
             this->free_gradient(x, g, gf_or_gc);
             this->copy(n_dofs, gf_or_gc, p);

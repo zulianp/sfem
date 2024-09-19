@@ -29,7 +29,7 @@ export OMP_PROC_BIND=true
 export CUDA_LAUNCH_BLOCKING=0
 
 export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
-export SFEM_ELEMENT_REFINE_LEVEL=2
+export SFEM_ELEMENT_REFINE_LEVEL=8
 
 mesh=mesh
 
@@ -37,7 +37,7 @@ if [[ -d "$mesh" ]]
 then
 	echo "Reusing mesh"
 else
-	create_cyclic_ss_mesh.sh 1 $SFEM_ELEMENT_REFINE_LEVEL
+	create_cyclic_ss_mesh.sh 2 $SFEM_ELEMENT_REFINE_LEVEL
 	# BOX mesh for testing
 	# create_box_ss_mesh.sh 20 $SFEM_ELEMENT_REFINE_LEVEL
 fi
@@ -65,8 +65,10 @@ else
 	export SFEM_DIRICHLET_NODESET="$sinlet,$soutlet"
 	export SFEM_DIRICHLET_VALUE="1,-1"
 	export SFEM_DIRICHLET_COMPONENT="0,0"
+
+	rm -f output/upper_bound.raw 
 fi
 
 obstacle $mesh output
 
-raw_to_db.py $mesh/viz $mesh/viz/hex8.vtk --point_data=output/u.raw,output/rhs.raw,output/upper_bound.raw
+raw_to_db.py $mesh/viz $mesh/viz/hex8.vtk --point_data=output/u.raw,output/rhs.raw,output/upper_bound.raw --point_data_type="$SFEM_REAL_T,$SFEM_REAL_T,$SFEM_REAL_T"
