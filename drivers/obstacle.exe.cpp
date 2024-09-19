@@ -192,7 +192,7 @@ int main(int argc, char *argv[]) {
 
     if (n_contact_conditions) {
         auto mprgp = std::make_shared<sfem::MPRGP<real_t>>();
-        mprgp->set_expansion_type(sfem::MPRGP<real_t>::EXPANSION_TYPE_ORGINAL);
+        // mprgp->set_expansion_type(sfem::MPRGP<real_t>::EXPANSION_TYPE_PROJECTED_CG);
         mprgp->set_op(op);
 
         auto upper_bound = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
@@ -215,7 +215,7 @@ int main(int argc, char *argv[]) {
         }
 
         mprgp->verbose = true;
-        mprgp->set_max_it(40000);
+        mprgp->set_max_it(10000);
         mprgp->set_rtol(1e-7);
         mprgp->set_atol(1e-8);
         mprgp->set_upper_bound(upper_bound);
