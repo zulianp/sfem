@@ -14,6 +14,7 @@
 
 #include "sfem_PowerMethod.hpp"
 
+// TODO GPU version
 namespace sfem {
     // From Active set expansion strategies in MPRGP algorithm, Kruzik et al. 2020
     template <typename T>
@@ -29,7 +30,7 @@ namespace sfem {
         T infty{1e15};
         T eigen_solver_tol{1e-6};
         int max_it{10000};
-        int check_each{100};
+        int check_each{1};
         ptrdiff_t n_dofs{-1};
         bool verbose{true};
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
@@ -57,11 +58,17 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return execution_space_; }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
-        void set_op(const std::shared_ptr<Operator<T>>& op) override {}
+
+        void set_expansion_type(const enum ExpansionType et) { expansion_type_ = et; }
+
+        void set_op(const std::shared_ptr<Operator<T>>& op) override {
+            this->apply_op = [=](const T* const x, T* const y) { op->apply(x, y); };
+            n_dofs = op->rows();
+        }
         void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) override {
             // Ignoring op!
         }
-        
+
         void set_max_it(const int it) override { max_it = it; }
         void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
 
@@ -102,6 +109,46 @@ namespace sfem {
             }
         }
 
+        // #define MPRGP_UTOPIA_STYLE_FG
+
+        inline T gf_lb_ub(const T lbi, const T ubi, const T xi, const T gi) const {
+#ifdef MPRGP_UTOPIA_STYLE_FG
+            return (xi < lbi || xi > ubi) ? T(0) : gi;
+#else
+            return ((std::abs(lbi - xi) < eps) || (std::abs(ubi - xi) < eps)) ? T(0) : gi;
+#endif
+        }
+
+        inline T gf_lb(const T lbi, const T xi, const T gi) const {
+#ifdef MPRGP_UTOPIA_STYLE_FG
+            return (xi < lbi) ? T(0) : gi];
+#else
+            return (std::abs(lbi - xi) < eps) ? T(0) : gi;
+#endif
+        }
+
+        inline T gf_ub(const T ubi, const T xi, const T gi) const {
+#ifdef MPRGP_UTOPIA_STYLE_FG
+            return (xi > ubi) ? T(0) : gi;
+#else
+            return (std::abs(ubi - xi) < eps) ? T(0) : gi;
+#endif
+        }
+
+        inline T gc_lb_ub(const T lbi, const T ubi, const T xi, const T gi) const {
+            return ((std::abs(lbi - xi) < eps)
+                            ? std::min(T(0), gi)
+                            : ((std::abs(ubi - xi) < eps) ? std::max(T(0), gi) : T(0)));
+        }
+
+        inline T gc_lb(const T lbi, const T xi, const T gi) const {
+            return ((std::abs(lbi - xi) < eps) ? std::min(T(0), gi) : T(0));
+        }
+
+        inline T gc_ub(const T ubi, const T xi, const T gi) const {
+            return ((std::abs(ubi - xi) < eps) ? std::max(T(0), gi) : T(0));
+        }
+
         T norm_projected_gradient(const T* const x, const T* const g) const {
             T ret = 0;
             if (lower_bound_ && upper_bound_) {
@@ -110,11 +157,8 @@ namespace sfem {
 
 #pragma omp parallel for reduction(+ : ret)
                 for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    const T d = ((x[i] < lb[i] || x[i] > ub[i]) ? T(0) : g[i]) +
-                                ((std::abs(lb[i] - x[i]) < eps)
-                                         ? std::min(T(0), g[i])
-                                         : ((std::abs(ub[i] - x[i]) < eps) ? std::max(T(0), g[i])
-                                                                           : T(0)));
+                    const T d =
+                            gf_lb_ub(lb[i], ub[i], x[i], g[i]) + gc_lb_ub(lb[i], ub[i], x[i], g[i]);
                     ret += d * d;
                 }
             } else if (upper_bound_) {
@@ -122,9 +166,7 @@ namespace sfem {
 
 #pragma omp parallel for reduction(+ : ret)
                 for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    const T d = ((x[i] > ub[i]) ? T(0) : g[i]) +
-                                ((std::abs(ub[i] - x[i]) < eps) ? std::max(T(0), g[i]) : T(0));
-
+                    const T d = gf_ub(ub[i], x[i], g[i]) + gc_ub(ub[i], x[i], g[i]);
                     ret += d * d;
                 }
             } else if (lower_bound_) {
@@ -132,9 +174,7 @@ namespace sfem {
 
 #pragma omp parallel for reduction(+ : ret)
                 for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    const T d = ((x[i] < lb[i]) ? T(0) : g[i]) +
-                                ((std::abs(lb[i] - x[i]) < eps) ? std::min(T(0), g[i]) : T(0));
-
+                    const T d = gf_lb(lb[i], x[i], g[i]) + gc_lb(lb[i], x[i], g[i]);
                     ret += d * d;
                 }
             } else {
@@ -148,10 +188,6 @@ namespace sfem {
                             const T* const g,
                             T* const norm_free_gradient,
                             T* const norm_chopped_gradient) const {
-            // In the paper the free gradient is defined by checking equality
-            // between x and ub/lb, how is that numerically relevant?
-            // we do >/< instead
-
             T acc_gf = 0;
             T acc_gc = 0;
 
@@ -161,12 +197,9 @@ namespace sfem {
 
 #pragma omp parallel for reduction(+ : acc_gf), reduction(+ : acc_gc)
                 for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    const T val_gf = (x[i] < lb[i] || x[i] > ub[i]) ? T(0) : g[i];
-                    const T val_gc =
-                            (std::abs(lb[i] - x[i]) < eps)
-                                    ? std::min(T(0), g[i])
-                                    : ((std::abs(ub[i] - x[i]) < eps) ? std::max(T(0), g[i])
-                                                                      : T(0));
+                    const T val_gf = gf_lb_ub(lb[i], ub[i], x[i], g[i]);
+                    const T val_gc = gc_lb_ub(lb[i], ub[i], x[i], g[i]);
+
                     acc_gf += val_gf * val_gf;
                     acc_gc += val_gc * val_gc;
                 }
@@ -175,8 +208,8 @@ namespace sfem {
 
 #pragma omp parallel for reduction(+ : acc_gf), reduction(+ : acc_gc)
                 for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    const T val_gf = (x[i] > ub[i]) ? T(0) : g[i];
-                    const T val_gc = (std::abs(ub[i] - x[i]) < eps) ? std::max(T(0), g[i]) : T(0);
+                    const T val_gf = gf_ub(ub[i], x[i], g[i]);
+                    const T val_gc = gc_ub(ub[i], x[i], g[i]);
 
                     acc_gf += val_gf * val_gf;
                     acc_gc += val_gc * val_gc;
@@ -186,8 +219,8 @@ namespace sfem {
 
 #pragma omp parallel for reduction(+ : acc_gf), reduction(+ : acc_gc)
                 for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    const T val_gf = (x[i] < lb[i]) ? T(0) : g[i];
-                    const T val_gc = (std::abs(lb[i] - x[i]) < eps) ? std::min(T(0), g[i]) : T(0);
+                    const T val_gf = gf_lb(lb[i], x[i], g[i]);
+                    const T val_gc = gc_lb(lb[i], x[i], g[i]);
 
                     acc_gf += val_gf * val_gf;
                     acc_gc += val_gc * val_gc;
@@ -230,31 +263,27 @@ namespace sfem {
         }
 
         void free_gradient(const T* const x, const T* const g, T* gf) const {
-            // In the paper the free gradient is defined by checking equality
-            // between x and ub/lb, how is that numerically relevant?
-            // we do >/< instead
-
             if (lower_bound_ && upper_bound_) {
                 const T* const lb = lower_bound_->data();
                 const T* const ub = upper_bound_->data();
 
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    gf[i] = (x[i] < lb[i] || x[i] > ub[i]) ? T(0) : g[i];
+                    gf[i] = gf_lb_ub(lb[i], ub[i], x[i], g[i]);
                 }
             } else if (upper_bound_) {
                 const T* const ub = upper_bound_->data();
 
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    gf[i] = (x[i] > ub[i]) ? T(0) : g[i];
+                    gf[i] = gf_ub(ub[i], x[i], g[i]);
                 }
             } else if (lower_bound_) {
                 const T* const lb = lower_bound_->data();
 
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    gf[i] = (x[i] < lb[i]) ? T(0) : g[i];
+                    gf[i] = gf_lb(lb[i], x[i], g[i]);
                 }
             }
         }
@@ -495,11 +524,13 @@ namespace sfem {
             T* gf_or_gc = this->allocate(n_dofs);  // Free Gradient or Chopped Gradient
 
             T alpha_bar = 1;
-            if (EXPANSION_TYPE_ORGINAL) {
+            if (expansion_type_ == EXPANSION_TYPE_ORGINAL) {
                 this->ensure_power_method();
                 this->values(n_dofs, 1, p);
                 T max_eig = power_method->max_eigen_value(
                         apply_op, 10000, this->eigen_solver_tol, n_dofs, p, g);
+
+                printf("[MPRGP] max_eig: %g\n", max_eig);
                 alpha_bar = 1.95 / max_eig;
             }
 
