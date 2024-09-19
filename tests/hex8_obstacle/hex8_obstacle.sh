@@ -49,21 +49,23 @@ soutlet=$mesh/surface/sidesets_aos/outlet.raw
 # sinlet=$mesh/surface/sidesets_aos/left.raw 
 # soutlet=$mesh/surface/sidesets_aos/right.raw 
 
-# export SFEM_DIRICHLET_NODESET="$sinlet,$soutlet"
-# export SFEM_DIRICHLET_VALUE="1,-1"
-# export SFEM_DIRICHLET_COMPONENT="0,0"
+SQP=1
 
+if [[ $SQP -eq 1 ]]
+then
+	# Contact
+	export SFEM_DIRICHLET_NODESET="$sinlet"
+	export SFEM_DIRICHLET_VALUE="1"
+	export SFEM_DIRICHLET_COMPONENT="0"
 
-# Contact
-
-export SFEM_DIRICHLET_NODESET="$sinlet"
-export SFEM_DIRICHLET_VALUE="1"
-export SFEM_DIRICHLET_COMPONENT="0"
-
-export SFEM_CONTACT_NODESET="$soutlet"
-export SFEM_CONTACT_VALUE="-1"
-export SFEM_CONTACT_COMPONENT="0"
-
+	export SFEM_CONTACT_NODESET="$soutlet"
+	export SFEM_CONTACT_VALUE="-1"
+	export SFEM_CONTACT_COMPONENT="0"
+else
+	export SFEM_DIRICHLET_NODESET="$sinlet,$soutlet"
+	export SFEM_DIRICHLET_VALUE="1,-1"
+	export SFEM_DIRICHLET_COMPONENT="0,0"
+fi
 
 obstacle $mesh output
 

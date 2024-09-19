@@ -179,6 +179,15 @@ int main(int argc, char *argv[]) {
             },
             sfem::EXECUTION_SPACE_HOST);
 
+    auto x = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
+    auto rhs = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
+
+    apply_dirichlet_condition_vec(
+            n_dirichlet_conditions, dirichlet_conditions, block_size, x->data());
+
+    apply_dirichlet_condition_vec(
+            n_dirichlet_conditions, dirichlet_conditions, block_size, rhs->data());
+
     std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> solver;
 
     if (n_contact_conditions) {
@@ -206,7 +215,7 @@ int main(int argc, char *argv[]) {
         }
 
         mprgp->verbose = true;
-        mprgp->set_max_it(20000);
+        mprgp->set_max_it(40000);
         mprgp->set_upper_bound(upper_bound);
         mprgp->default_init();
 
@@ -221,15 +230,6 @@ int main(int argc, char *argv[]) {
         cg->set_atol(1e-8);
         solver = cg;
     }
-
-    auto x = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
-    auto rhs = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
-
-    apply_dirichlet_condition_vec(
-            n_dirichlet_conditions, dirichlet_conditions, block_size, x->data());
-
-    apply_dirichlet_condition_vec(
-            n_dirichlet_conditions, dirichlet_conditions, block_size, rhs->data());
 
     double solve_tick = MPI_Wtime();
     solver->apply(rhs->data(), x->data());
