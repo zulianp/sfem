@@ -9,6 +9,8 @@
 #include <cstdio>
 #include <vector>
 
+
+#include "proteus_hex8.h"
 #include "proteus_hex8_laplacian.h"
 #include "sfem_API.hpp"
 #include "sfem_hex8_mesh_graph.h"
@@ -113,8 +115,10 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
     auto m = sfem::Mesh::create_from_file(comm, folder);
-    // int block_size = m->spatial_dimension(); // Linear elasticity
-    int block_size = 1;  // Laplace operator
+
+    int SFEM_USE_ELASTICITY = 0;
+    SFEM_READ_ENV(SFEM_USE_ELASTICITY, atoi);
+    int block_size = SFEM_USE_ELASTICITY ? m->spatial_dimension() : 1;
 
     auto ssm = sfem::SemiStructuredMesh::create(m, SFEM_ELEMENT_REFINE_LEVEL);
     ptrdiff_t ndofs = ssm->n_nodes() * block_size;
@@ -134,15 +138,11 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_CONTACT_VALUE, );
     SFEM_READ_ENV(SFEM_CONTACT_COMPONENT, );
 
-    int SFEM_USE_DIAG_PRECONDITIONER = 0;
-    SFEM_READ_ENV(SFEM_USE_DIAG_PRECONDITIONER, atoi);
-
     int SFEM_USE_PROJECTED_CG = 0;
     SFEM_READ_ENV(SFEM_USE_PROJECTED_CG, atoi);
 
     auto mesh = (mesh_t *)m->impl_mesh();
 
-    // Allocate conds (FIXME)
     int n_dirichlet_conditions{0};
     boundary_condition_t *dirichlet_conditions{nullptr};
 
@@ -166,13 +166,18 @@ int main(int argc, char *argv[]) {
     printf("n_contact_conditions = %d\n", n_contact_conditions);
 
     auto inv_diag = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
-    { // Create diagonal operator
-        proteus_affine_hex8_laplacian_diag(ssm->level(),
-                                           ssm->n_elements(),
-                                           ssm->interior_start(),
-                                           ssm->element_data(),
-                                           ssm->point_data(),
-                                           inv_diag->data());
+    {  // Create diagonal operator
+
+        if (SFEM_USE_ELASTICITY) {
+            assert(false);
+        } else {
+            proteus_affine_hex8_laplacian_diag(ssm->level(),
+                                               ssm->n_elements(),
+                                               ssm->interior_start(),
+                                               ssm->element_data(),
+                                               ssm->point_data(),
+                                               inv_diag->data());
+        }
 
         {
             auto d = inv_diag->data();
@@ -182,11 +187,11 @@ int main(int argc, char *argv[]) {
             }
 
             // Identity at eq-contraint nodes
-            for (int i = 0; i < n_contact_conditions; i++) {
-                constraint_nodes_to_value_vec(contact_conditions[i].local_size,
-                                              contact_conditions[i].idx,
+            for (int i = 0; i < n_dirichlet_conditions; i++) {
+                constraint_nodes_to_value_vec(dirichlet_conditions[i].local_size,
+                                              dirichlet_conditions[i].idx,
                                               block_size,
-                                              contact_conditions[i].component,
+                                              dirichlet_conditions[i].component,
                                               1,
                                               d);
             }
@@ -198,23 +203,18 @@ int main(int argc, char *argv[]) {
             ndofs,
             [=](const real_t *const x, real_t *const y) {
                 // Apply operator
-                proteus_affine_hex8_laplacian_apply  //
-                                                     // proteus_hex8_laplacian_apply  //
-                        (ssm->level(),
-                         ssm->n_elements(),
-                         ssm->interior_start(),
-                         ssm->element_data(),
-                         ssm->point_data(),
-                         x,
-                         y);
-
-                if (SFEM_USE_DIAG_PRECONDITIONER) {
-                    auto d = inv_diag->data();
-
-#pragma omp parallel for
-                    for (ptrdiff_t i = 0; i < ndofs; i++) {
-                        y[i] = y[i] * d[i];
-                    }
+                if (SFEM_USE_ELASTICITY) {
+                    assert(false);
+                } else {
+                    proteus_affine_hex8_laplacian_apply  //
+                                                         // proteus_hex8_laplacian_apply  //
+                            (ssm->level(),
+                             ssm->n_elements(),
+                             ssm->interior_start(),
+                             ssm->element_data(),
+                             ssm->point_data(),
+                             x,
+                             y);
                 }
 
                 // Copy constrained nodes
@@ -237,10 +237,10 @@ int main(int argc, char *argv[]) {
     if (n_contact_conditions) {
         auto mprgp = std::make_shared<sfem::MPRGP<real_t>>();
 
-        if(SFEM_USE_PROJECTED_CG) {
+        if (SFEM_USE_PROJECTED_CG) {
             mprgp->set_expansion_type(sfem::MPRGP<real_t>::EXPANSION_TYPE_PROJECTED_CG);
         }
-        
+
         mprgp->set_op(op);
 
         auto upper_bound = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
@@ -270,9 +270,23 @@ int main(int argc, char *argv[]) {
         mprgp->default_init();
         solver = mprgp;
     } else {
+        auto preconditioner = sfem::make_op<real_t>(
+                ndofs,
+                ndofs,
+                [=](const real_t *const x, real_t *const y) {
+                    auto d = inv_diag->data();
+
+#pragma omp parallel for
+                    for (ptrdiff_t i = 0; i < ndofs; i++) {
+                        y[i] =  d[i] * x[i];
+                    }
+                },
+                sfem::EXECUTION_SPACE_HOST);
+
         auto cg = sfem::h_cg<real_t>();
         cg->verbose = true;
         cg->set_op(op);
+        // cg->set_preconditioner_op(preconditioner); // CHECK if diag code is correct!
         cg->set_max_it(10000);
         cg->set_rtol(1e-7);
         cg->set_atol(1e-8);
@@ -300,7 +314,7 @@ int main(int argc, char *argv[]) {
         return SFEM_FAILURE;
     }
 
-    { // Residual test 
+    {  // Residual test
         if (n_contact_conditions) {
             apply_dirichlet_condition_vec(
                     n_contact_conditions, contact_conditions, block_size, rhs->data());
@@ -338,7 +352,6 @@ int main(int argc, char *argv[]) {
         printf("Linear residual: %g\n", rtr);
     }
 
-    // Clean-up (FIXME)
     destroy_conditions(n_contact_conditions, contact_conditions);
     destroy_conditions(n_dirichlet_conditions, dirichlet_conditions);
 

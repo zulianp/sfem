@@ -8,9 +8,6 @@
 extern "C" {
 #endif
 
-int proteus_hex8_nxe(int level);
-int proteus_hex8_txe(int level);
-
 int proteus_hex8_laplacian_apply(const int level,
                                  const ptrdiff_t nelements,
                                  ptrdiff_t interior_start,

@@ -16,6 +16,7 @@
 #include "read_mesh.h"
 
 #include "laplacian.h"
+#include "proteus_hex8.h"
 #include "proteus_hex8_laplacian.h"
 #include "sfem_hex8_mesh_graph.h"
 
@@ -37,13 +38,6 @@ static SFEM_INLINE void hex8_eval_f(const scalar_t x,
     f[7] = xm * y * z;    // (0, 1, 1)
 }
 
-static SFEM_INLINE int proteus_hex8_lidx(const int L, const int x, const int y, const int z) {
-    int Lp1 = L + 1;
-    int ret = z * (Lp1 * Lp1) + y * Lp1 + x;
-    assert(ret < proteus_hex8_nxe(L));
-    assert(ret >= 0);
-    return ret;
-}
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);

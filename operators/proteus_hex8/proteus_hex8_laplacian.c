@@ -9,23 +9,7 @@
 #include <math.h>
 #include <stdio.h>
 
-int proteus_hex8_nxe(int level) {
-    const int corners = 8;
-    const int edge_nodes = 12 * (level - 1);
-    const int face_nodes = 6 * (level - 1) * (level - 1);
-    const int vol_nodes = (level - 1) * (level - 1) * (level - 1);
-    return corners + edge_nodes + face_nodes + vol_nodes;
-}
-
-int proteus_hex8_txe(int level) { return level * level * level; }
-
-static SFEM_INLINE int proteus_hex8_lidx(const int L, const int x, const int y, const int z) {
-    int Lp1 = L + 1;
-    int ret = z * (Lp1 * Lp1) + y * Lp1 + x;
-    assert(ret < proteus_hex8_nxe(L));
-    assert(ret >= 0);
-    return ret;
-}
+#include "proteus_hex8.h"
 
 static SFEM_INLINE void hex8_sub_fff_0(const scalar_t *const SFEM_RESTRICT fff,
                                        const scalar_t h,
@@ -386,8 +370,6 @@ int proteus_affine_hex8_laplacian_diag(const int level,
         scalar_t y[8];
         scalar_t z[8];
 
-        scalar_t element_u[8];
-        accumulator_t element_vector[8];
         scalar_t m_fff[6], fff[6];
 
 #pragma omp for
