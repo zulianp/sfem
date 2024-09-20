@@ -2,6 +2,7 @@
 #define SFEM_PROTEUS_HEX_8_H
 
 #include "sfem_base.h"
+#include <assert.h>
 
 static SFEM_INLINE int proteus_hex8_nxe(int level) {
     const int corners = 8;
