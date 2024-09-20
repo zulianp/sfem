@@ -4,7 +4,7 @@
 #include "sortreduce.h"
 
 #include "adj_table.h"
-#include "proteus_hex8_laplacian.h"  //FIXME
+#include "proteus_hex8.h"  //FIXME
 
 #include <assert.h>
 #include <mpi.h>
@@ -238,13 +238,6 @@ static SFEM_INLINE void hex8_find_corner_cols(const idx_t *targets,
     }
 }
 
-static SFEM_INLINE int proteus_hex8_lidx(const int L, const int x, const int y, const int z) {
-    int Lp1 = L + 1;
-    int ret = z * (Lp1 * Lp1) + y * Lp1 + x;
-    assert(ret < proteus_hex8_nxe(L));
-    assert(ret >= 0);
-    return ret;
-}
 
 static void index_face(const int L,
                        mesh_t *mesh,

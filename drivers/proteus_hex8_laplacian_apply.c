@@ -15,6 +15,7 @@
 #include "read_mesh.h"
 
 #include "laplacian.h"
+#include "proteus_hex8.h"
 #include "proteus_hex8_laplacian.h"
 #include "sfem_hex8_mesh_graph.h"
 
