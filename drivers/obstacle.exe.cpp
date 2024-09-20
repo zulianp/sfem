@@ -9,9 +9,9 @@
 #include <cstdio>
 #include <vector>
 
-
 #include "proteus_hex8.h"
 #include "proteus_hex8_laplacian.h"
+#include "proteus_hex8_linear_elasticity.h"
 #include "sfem_API.hpp"
 #include "sfem_hex8_mesh_graph.h"
 
@@ -141,6 +141,9 @@ int main(int argc, char *argv[]) {
     int SFEM_USE_PROJECTED_CG = 0;
     SFEM_READ_ENV(SFEM_USE_PROJECTED_CG, atoi);
 
+    real_t SFEM_SHEAR_MODULUS = 1;
+    real_t SFEM_FIRST_LAME_PARAMETER = 1;
+
     auto mesh = (mesh_t *)m->impl_mesh();
 
     int n_dirichlet_conditions{0};
@@ -204,7 +207,21 @@ int main(int argc, char *argv[]) {
             [=](const real_t *const x, real_t *const y) {
                 // Apply operator
                 if (SFEM_USE_ELASTICITY) {
-                    assert(false);
+                    proteus_hex8_linear_elasticity_apply(ssm->level(),
+                                                         ssm->n_elements(),
+                                                         ssm->interior_start(),
+                                                         ssm->element_data(),
+                                                         ssm->point_data(),
+                                                         SFEM_SHEAR_MODULUS,
+                                                         SFEM_FIRST_LAME_PARAMETER,
+                                                         3,
+                                                         &x[0],
+                                                         &x[1],
+                                                         &x[2],
+                                                         3,
+                                                         &y[0],
+                                                         &y[1],
+                                                         &y[2]);
                 } else {
                     proteus_affine_hex8_laplacian_apply  //
                                                          // proteus_hex8_laplacian_apply  //
@@ -270,18 +287,18 @@ int main(int argc, char *argv[]) {
         mprgp->default_init();
         solver = mprgp;
     } else {
-        auto preconditioner = sfem::make_op<real_t>(
-                ndofs,
-                ndofs,
-                [=](const real_t *const x, real_t *const y) {
-                    auto d = inv_diag->data();
+//         auto preconditioner = sfem::make_op<real_t>(
+//                 ndofs,
+//                 ndofs,
+//                 [=](const real_t *const x, real_t *const y) {
+//                     auto d = inv_diag->data();
 
-#pragma omp parallel for
-                    for (ptrdiff_t i = 0; i < ndofs; i++) {
-                        y[i] =  d[i] * x[i];
-                    }
-                },
-                sfem::EXECUTION_SPACE_HOST);
+// #pragma omp parallel for
+//                     for (ptrdiff_t i = 0; i < ndofs; i++) {
+//                         y[i] = d[i] * x[i];
+//                     }
+//                 },
+//                 sfem::EXECUTION_SPACE_HOST);
 
         auto cg = sfem::h_cg<real_t>();
         cg->verbose = true;

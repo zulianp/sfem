@@ -1,5 +1,5 @@
-#ifndef PROTEUS_HEX8_LAPLACIAN_H
-#define PROTEUS_HEX8_LAPLACIAN_H
+#ifndef PROTEUS_HEX8_LINEAR_ELASTICITY_H
+#define PROTEUS_HEX8_LINEAR_ELASTICITY_H
 
 #include <stddef.h>
 #include "sfem_base.h"
@@ -35,4 +35,4 @@ int proteus_hex8_linear_elasticity_apply(const int level,
 #ifdef __cplusplus
 }
 #endif
-#endif  // PROTEUS_HEX8_LAPLACIAN_H
+#endif  // PROTEUS_HEX8_LINEAR_ELASTICITY_H
