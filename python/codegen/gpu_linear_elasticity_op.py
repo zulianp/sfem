@@ -7,6 +7,7 @@ from tri6 import *
 from tet4 import *
 from tet10 import *
 from tet20 import *
+from hex8 import *
 from symbolic_fe import *
 
 from time import perf_counter
@@ -572,7 +573,8 @@ def main():
 	# fe = Tri6()
 	# q = sp.Matrix(2, 1, [qx, qy])
 
-	fe = Tet4()
+	fe = Hex8()
+	# fe = Tet4()
 	# fe = Tet20()
 	# fe = Tet10()
 	# fe = SymbolicFE3D()	
@@ -581,7 +583,7 @@ def main():
 	op = GPULinearElasticityOp(fe, q)
 	# op.hessian_check()
 
-	if True:
+	if False:
 		c_log("//--------------------------")
 		c_log("// New hessian")	
 		c_log("//--------------------------")
