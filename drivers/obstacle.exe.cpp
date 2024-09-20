@@ -168,38 +168,38 @@ int main(int argc, char *argv[]) {
     printf("n_dirichlet_conditions = %d\n", n_dirichlet_conditions);
     printf("n_contact_conditions = %d\n", n_contact_conditions);
 
-    auto inv_diag = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
-    {  // Create diagonal operator
+//     auto inv_diag = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
+//     {  // Create diagonal operator
 
-        if (SFEM_USE_ELASTICITY) {
-            assert(false);
-        } else {
-            proteus_affine_hex8_laplacian_diag(ssm->level(),
-                                               ssm->n_elements(),
-                                               ssm->interior_start(),
-                                               ssm->element_data(),
-                                               ssm->point_data(),
-                                               inv_diag->data());
-        }
+//         if (SFEM_USE_ELASTICITY) {
+//             assert(false);
+//         } else {
+//             proteus_affine_hex8_laplacian_diag(ssm->level(),
+//                                                ssm->n_elements(),
+//                                                ssm->interior_start(),
+//                                                ssm->element_data(),
+//                                                ssm->point_data(),
+//                                                inv_diag->data());
+//         }
 
-        {
-            auto d = inv_diag->data();
-#pragma omp parallel for
-            for (ptrdiff_t i = 0; i < ndofs; i++) {
-                d[i] = 1 / d[i];
-            }
+//         {
+//             auto d = inv_diag->data();
+// #pragma omp parallel for
+//             for (ptrdiff_t i = 0; i < ndofs; i++) {
+//                 d[i] = 1 / d[i];
+//             }
 
-            // Identity at eq-contraint nodes
-            for (int i = 0; i < n_dirichlet_conditions; i++) {
-                constraint_nodes_to_value_vec(dirichlet_conditions[i].local_size,
-                                              dirichlet_conditions[i].idx,
-                                              block_size,
-                                              dirichlet_conditions[i].component,
-                                              1,
-                                              d);
-            }
-        }
-    }
+//             // Identity at eq-contraint nodes
+//             for (int i = 0; i < n_dirichlet_conditions; i++) {
+//                 constraint_nodes_to_value_vec(dirichlet_conditions[i].local_size,
+//                                               dirichlet_conditions[i].idx,
+//                                               block_size,
+//                                               dirichlet_conditions[i].component,
+//                                               1,
+//                                               d);
+//             }
+//         }
+    // }
 
     auto op = sfem::make_op<real_t>(
             ndofs,

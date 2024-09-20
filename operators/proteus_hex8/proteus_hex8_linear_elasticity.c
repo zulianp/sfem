@@ -9,8 +9,19 @@
 #include "proteus_hex8_linear_elasticity.h"
 
 #ifndef POW3
-#define POW3(x)((x)*(x)*(x))
+#define POW3(x) ((x) * (x) * (x))
 #endif
+
+#include <stdio.h>
+#include <stdlib.h>
+static void print_matrix(int r, int c, const scalar_t *const m) {
+    for (int i = 0; i < r; i++) {
+        for (int j = 0; j < c; j++) {
+            printf("%g\t", m[i * c + j]);
+        }
+        printf("\n");
+    }
+}
 
 static SFEM_INLINE void hex8_sub_adj_0(const scalar_t *const SFEM_RESTRICT adjugate,
                                        const scalar_t determinant,
@@ -173,14 +184,13 @@ int proteus_hex8_linear_elasticity_apply(const int level,
                             const scalar_t m_qy = h * qy[k] + ty;
                             const scalar_t m_qz = h * qz[k] + tz;
 
-                            // // 2) Evaluate Adjugate
-
+                            // 2) Evaluate Adjugate
                             scalar_t adjugate[9];
                             scalar_t jacobian_determinant;
                             hex8_adjugate_and_det(
                                     x, y, z, qx[k], qy[k], qz[k], adjugate, &jacobian_determinant);
 
-                            // // 3) Transform to sub-FFF
+                            // 3) Transform to sub-FFF
                             scalar_t sub_adjugate[9];
                             scalar_t sub_determinant;
                             hex8_sub_adj_0(adjugate,
@@ -188,6 +198,17 @@ int proteus_hex8_linear_elasticity_apply(const int level,
                                            h,
                                            sub_adjugate,
                                            &sub_determinant);
+
+                            {
+                                printf("adjugate\n");
+                                print_matrix(3, 3, adjugate);
+
+                                printf("sub_adjugate\n");
+                                print_matrix(3, 3, sub_adjugate);
+
+                                fflush(stdout);
+                                abort();
+                            }
 
                             // // Evaluate y = op * x
                             hex8_linear_elasticity_apply_adj(mu,
