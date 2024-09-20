@@ -38,6 +38,16 @@ static SFEM_INLINE void hex8_sub_fff_0(const scalar_t *const SFEM_RESTRICT fff,
     sub_fff[5] = fff[5] * h;
 }
 
+void print_matrix(int r, int c, const accumulator_t * const m)
+{
+    for(int i = 0; i < r; i++) {
+        for(int j = 0; j < c; j++) {
+            printf("%g\t", m[i*c + j]);
+        }
+        printf("\n");
+    }
+}
+
 int proteus_hex8_laplacian_apply(const int level,
                                  const ptrdiff_t nelements,
                                  ptrdiff_t interior_start,
@@ -266,8 +276,13 @@ int proteus_affine_hex8_laplacian_apply(const int level,
 
 #define PROTEUS_HEX8_USE_MV  // assemblying the elemental matrix is faster
 #ifdef PROTEUS_HEX8_USE_MV
-            scalar_t laplacian_matrix[8 * 8];
+            accumulator_t laplacian_matrix[8 * 8];
             hex8_laplacian_matrix_fff_integral(fff, laplacian_matrix);
+
+            // printf("---------------------------\n");
+            // printf("laplacian_matrix\n");
+            // print_matrix(8, 8, laplacian_matrix);
+            // printf("---------------------------\n");
 #endif
 
             // Iterate over sub-elements
@@ -331,6 +346,123 @@ int proteus_affine_hex8_laplacian_apply(const int level,
         // Clean-up
         free(ev);
         free(eu);
+        free(v);
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int proteus_affine_hex8_laplacian_diag(const int level,
+                                        const ptrdiff_t nelements,
+                                        ptrdiff_t interior_start,
+                                        idx_t **const SFEM_RESTRICT elements,
+                                        geom_t **const SFEM_RESTRICT std_hex8_points,
+                                        real_t *const SFEM_RESTRICT diag) {
+    const int nxe = proteus_hex8_nxe(level);
+    const int txe = proteus_hex8_txe(level);
+
+    const int proteus_to_std_hex8_corners[8] = {// Bottom
+                                                proteus_hex8_lidx(level, 0, 0, 0),
+                                                proteus_hex8_lidx(level, level, 0, 0),
+                                                proteus_hex8_lidx(level, level, level, 0),
+                                                proteus_hex8_lidx(level, 0, level, 0),
+
+                                                // Top
+                                                proteus_hex8_lidx(level, 0, 0, level),
+                                                proteus_hex8_lidx(level, level, 0, level),
+                                                proteus_hex8_lidx(level, level, level, level),
+                                                proteus_hex8_lidx(level, 0, level, level)};
+
+    const int Lm1 = level - 1;
+    const int Lm13 = Lm1 * Lm1 * Lm1;
+
+#pragma omp parallel
+    {
+        // Allocation per thread
+        idx_t *ev = malloc(nxe * sizeof(idx_t));
+        accumulator_t *v = malloc(nxe * sizeof(accumulator_t));
+
+        scalar_t x[8];
+        scalar_t y[8];
+        scalar_t z[8];
+
+        scalar_t element_u[8];
+        accumulator_t element_vector[8];
+        scalar_t m_fff[6], fff[6];
+
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            {
+                // Gather elemental data
+                for (int d = 0; d < nxe; d++) {
+                    ev[d] = elements[d][e];
+                }
+
+                for (int d = 0; d < 8; d++) {
+                    x[d] = std_hex8_points[0][ev[proteus_to_std_hex8_corners[d]]];
+                    y[d] = std_hex8_points[1][ev[proteus_to_std_hex8_corners[d]]];
+                    z[d] = std_hex8_points[2][ev[proteus_to_std_hex8_corners[d]]];
+                }
+
+                memset(v, 0, nxe * sizeof(accumulator_t));
+            }
+
+            const scalar_t h = 1. / level;
+
+            // We evaluate the jacobian at the center of the element
+            // in case that the mapping is not linear
+            hex8_fff(x, y, z, 0.5, 0.5, 0.5, m_fff);
+            
+            // Assume affine here!
+            // tet4_fff_s(x[0], x[1], x[3], x[4], y[0], y[1], y[3], y[4], z[0], z[1], z[3], z[4], m_fff);
+
+            hex8_sub_fff_0(m_fff, h, fff);
+
+            accumulator_t laplacian_diag[8];
+            hex8_laplacian_diag_fff_integral(fff, laplacian_diag);
+
+            // printf("---------------------------\n");
+            // printf("laplacian_diag\n");
+            // print_matrix(1, 8, laplacian_diag);
+            // printf("---------------------------\n");
+
+            // Iterate over sub-elements
+            for (int zi = 0; zi < level; zi++) {
+                for (int yi = 0; yi < level; yi++) {
+                    for (int xi = 0; xi < level; xi++) {
+                        // Convert to standard HEX8 local ordering (see 3-4 and 6-7)
+                        int lev[8] = {// Bottom
+                                      proteus_hex8_lidx(level, xi, yi, zi),
+                                      proteus_hex8_lidx(level, xi + 1, yi, zi),
+                                      proteus_hex8_lidx(level, xi + 1, yi + 1, zi),
+                                      proteus_hex8_lidx(level, xi, yi + 1, zi),
+                                      // Top
+                                      proteus_hex8_lidx(level, xi, yi, zi + 1),
+                                      proteus_hex8_lidx(level, xi + 1, yi, zi + 1),
+                                      proteus_hex8_lidx(level, xi + 1, yi + 1, zi + 1),
+                                      proteus_hex8_lidx(level, xi, yi + 1, zi + 1)};
+
+
+                        // Accumulate to macro-element buffer
+                        for (int d = 0; d < 8; d++) {
+                            v[lev[d]] += laplacian_diag[d];
+                        }
+                    }
+                }
+            }
+
+            {
+                // Scatter elemental data
+                for (int d = 0; d < nxe; d++) {
+                    assert(v[d] == v[d]);
+#pragma omp atomic update
+                    diag[ev[d]] += v[d];
+                }
+            }
+        }
+
+        // Clean-up
+        free(ev);
         free(v);
     }
 

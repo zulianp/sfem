@@ -28,11 +28,13 @@ namespace sfem {
         T gamma{1};  // gamma > 0
         T eps{1e-14};
         T infty{1e15};
-        T eigen_solver_tol{1e-6};
+        T eigen_solver_tol{1e-5};
         int max_it{10000};
         int check_each{10};
         ptrdiff_t n_dofs{-1};
         bool verbose{true};
+        T max_eig_{0};
+
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         std::shared_ptr<Buffer<T>> upper_bound_;
         std::shared_ptr<Buffer<T>> lower_bound_;
@@ -411,6 +413,7 @@ namespace sfem {
         }
 
         void cg_step(const T alpha_cg,
+                     const T dot_pAp,
                      const T* const Ap,
                      T* const p,
                      T* const g,
@@ -426,7 +429,7 @@ namespace sfem {
             this->free_gradient(x, g, gf);
 
             // beta = dot(Ap, gf_new)/dot(Ap_old, p_old)
-            const T beta = this->dot(n_dofs, Ap, gf) / this->dot(n_dofs, Ap, p);
+            const T beta = this->dot(n_dofs, Ap, gf) / dot_pAp;
 
             // p_new = g_new - beta * p_old
             this->axpby(n_dofs, 1, gf, -beta, p);
@@ -435,8 +438,9 @@ namespace sfem {
         void expansion_step(const T alpha_feas,
                             const T alpha_bar,
                             const T alpha_cg,
+                            const T dot_pAp,
                             const T* const b,
-                            const T* const p,
+                            T* const p,
                             const T* const Ap,
                             T* const g,
                             T* const gf,
@@ -450,18 +454,30 @@ namespace sfem {
             switch (expansion_type_) {
                 case EXPANSION_TYPE_PROJECTED_CG: {
                     this->axpby(n_dofs, -alpha_cg, p, 1, x);
+
+                    if(alpha_cg <= alpha_feas) {
+                        this->axpby(n_dofs, -alpha_cg, Ap, 1, g);
+                        this->free_gradient(x, g, gf);
+                        T beta = this->dot(n_dofs, Ap, gf) / dot_pAp;
+                        this->axpby(n_dofs, 1, gf, -beta, p);
+                    } else {
+                        this->project(x);
+                        this->gradient(x, b, g);
+                        this->free_gradient(x, g, gf);
+                        this->copy(n_dofs, gf, p);
+                    }
                     break;
                 }
                 default: {  // EXPANSION_TYPE_ORGINAL
                     this->free_gradient(x, g, gf);
                     this->axpby(n_dofs, -alpha_bar, gf, 1, x);
+                    this->project(x);
+                    this->gradient(x, b, g);
+                    this->free_gradient(x, g, gf);
+                    this->copy(n_dofs, gf, p);
                     break;
                 }
             }
-
-            this->project(x);
-            this->gradient(x, b, g);
-            this->free_gradient(x, g, gf);
         }
 
         void proportioning_step(T* const p,
@@ -503,6 +519,8 @@ namespace sfem {
             }
         }
 
+        void set_max_eig(const T max_eig) { max_eig_ = max_eig; }
+
         int apply(const T* const b, T* const x) override {
             assert(good());
             if (!good()) {
@@ -526,13 +544,17 @@ namespace sfem {
 
             T alpha_bar = 1;
             if (expansion_type_ == EXPANSION_TYPE_ORGINAL) {
-                this->ensure_power_method();
-                this->values(n_dofs, 1, p);
-                T max_eig = power_method->max_eigen_value(
-                        apply_op, 10000, this->eigen_solver_tol, n_dofs, p, g);
+                if (max_eig_ == 0) {
+                    this->ensure_power_method();
+                    this->values(n_dofs, 1, p);
+                    max_eig_ = power_method->max_eigen_value(
+                            apply_op, 10000, this->eigen_solver_tol, n_dofs, p, g);
 
-                printf("[MPRGP] max_eig: %g\n", max_eig);
-                alpha_bar = 1.95 / max_eig;
+                    printf("[MPRGP] max_eig: %g\n", max_eig_);
+                }
+                alpha_bar = 1.95 / max_eig_;
+            } else {
+                printf("Skipping power method!\n");
             }
 
             this->project(x);  // Make iterate feasible
@@ -547,7 +569,7 @@ namespace sfem {
             // printf("norm_fg = %g\n", this->norm2(n_dofs, gf_or_gc));
 
             int count_cg_steps = 0;
-            int count_expansion_steps = 0;  
+            int count_expansion_steps = 0;
             int count_proportioning_steps = 0;
 
             while (!converged) {
@@ -555,22 +577,28 @@ namespace sfem {
 
                 // printf("A) %g < %g (norm_gc < this->gamma * norm_gf)\n", norm_gc, norm_gf);
 
-                if (norm_gc < this->gamma * norm_gf) {
+                if (norm_gc <= this->gamma * norm_gf) {
                     alpha_feas = this->max_alpha(x, p);
                     this->zeros(n_dofs, Ap_or_Ag);
                     this->apply_op(p, Ap_or_Ag);
-                    alpha_cg = this->dot(n_dofs, g, p) / this->dot(n_dofs, p, Ap_or_Ag);
+                    const T dot_pAp = this->dot(n_dofs, p, Ap_or_Ag);
 
-                    // printf("B) %g < %g (alpha_cg <= alpha_feas)\n", alpha_cg, alpha_feas);
+                    if(dot_pAp < 0) {
+                        fprintf(stderr, "[Warning][MPRGP] Detected negative curvature\n");
+                    }
+
+                    alpha_cg = this->dot(n_dofs, g, p) / dot_pAp;
+
+                    // printf("B) %g < %g\n", alpha_cg, alpha_feas);
                     if (alpha_cg <= alpha_feas) {
-                        this->cg_step(alpha_cg, Ap_or_Ag, p, g, gf_or_gc, x);
-                        
+                        this->cg_step(alpha_cg, dot_pAp, Ap_or_Ag, p, g, gf_or_gc, x);
+
                         count_cg_steps++;
                     } else {
                         // apply_op inside!
                         this->expansion_step(
-                                alpha_feas, alpha_bar, alpha_cg, b, p, Ap_or_Ag, g, gf_or_gc, x);
-                   
+                                alpha_feas, alpha_bar, alpha_cg, dot_pAp, b, p, Ap_or_Ag, g, gf_or_gc, x);
+
                         count_expansion_steps++;
                     }
                 } else {
@@ -590,7 +618,7 @@ namespace sfem {
                 }
             }
 
-            if(verbose) {
+            if (verbose) {
                 printf("#cg_steps\t\t%d\n", count_cg_steps);
                 printf("#expansion_steps\t%d\n", count_expansion_steps);
                 printf("#proportioning_steps\t%d\n", count_proportioning_steps);
