@@ -80,7 +80,7 @@ else
 	fi
 fi
 
-obstacle $mesh output
+$LAUNCH obstacle $mesh output
 
 if [[ $SFEM_USE_ELASTICITY -eq 1 ]]
 then
