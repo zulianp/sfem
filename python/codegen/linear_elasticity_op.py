@@ -6,6 +6,7 @@ from tri3 import *
 from tri6 import *
 from tet4 import *
 from tet10 import *
+from hex8 import *
 
 from time import perf_counter
 
@@ -16,7 +17,11 @@ class LinearElasticityOp:
 		q = sp.Matrix(dims, 1, q)
 		shape_grad = fe.physical_tgrad(q)
 		e_jac_inv = fe.jacobian_inverse(q)
-		dV = fe.jacobian_determinant(q)
+
+		if fe.use_adjugate:
+			dV = fe.symbol_jacobian_determinant()
+		else:
+			dV = fe.jacobian_determinant(q)
 		s_jac_inv = fe.symbol_jacobian_inverse()
 		disp = coeffs('u', dims * fe.n_nodes())
 
@@ -64,7 +69,7 @@ class LinearElasticityOp:
 		# Integrate and substitute
 		###################################################################
 		c_log("Integrate")
-		full_eval = True
+		full_eval = False
 
 		integr_value = 0
 		integr_gradient = sp.Matrix(rows, 1, [0] * rows)
@@ -233,7 +238,9 @@ def main():
 	# q = sp.Matrix(2, 1, [qx, qy])
 
 	# fe = Tet4()
-	fe = Tet10()
+	# fe = Tet10()
+	fe = Hex8()
+	fe.use_adjugate = True
 	q = sp.Matrix(3, 1, [qx, qy, qz])
 
 	op = LinearElasticityOp(fe, q)
@@ -249,10 +256,10 @@ def main():
 	# c_log("--------------------------")
 	# c_code(op.gradient())
 
-	# c_log("--------------------------")
-	# c_log("hessian")	
-	# c_log("--------------------------")
-	# c_code(op.hessian())
+	c_log("--------------------------")
+	c_log("hessian")	
+	c_log("--------------------------")
+	c_code(op.hessian())
 
 	# c_log("--------------------------")
 	# c_log("apply")	
