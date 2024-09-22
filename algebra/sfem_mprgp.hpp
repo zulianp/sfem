@@ -28,7 +28,7 @@ namespace sfem {
         T gamma{1};  // gamma > 0
         T eps{1e-14};
         T infty{1e15};
-        T eigen_solver_tol{1e-5};
+        T eigen_solver_tol{1e-2};
         int max_it{10000};
         int check_each{10};
         ptrdiff_t n_dofs{-1};
