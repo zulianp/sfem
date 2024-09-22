@@ -168,37 +168,37 @@ int main(int argc, char *argv[]) {
     printf("n_dirichlet_conditions = %d\n", n_dirichlet_conditions);
     printf("n_contact_conditions = %d\n", n_contact_conditions);
 
-//     auto inv_diag = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
-//     {  // Create diagonal operator
+    //     auto inv_diag = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
+    //     {  // Create diagonal operator
 
-//         if (SFEM_USE_ELASTICITY) {
-//             assert(false);
-//         } else {
-//             proteus_affine_hex8_laplacian_diag(ssm->level(),
-//                                                ssm->n_elements(),
-//                                                ssm->interior_start(),
-//                                                ssm->element_data(),
-//                                                ssm->point_data(),
-//                                                inv_diag->data());
-//         }
+    //         if (SFEM_USE_ELASTICITY) {
+    //             assert(false);
+    //         } else {
+    //             proteus_affine_hex8_laplacian_diag(ssm->level(),
+    //                                                ssm->n_elements(),
+    //                                                ssm->interior_start(),
+    //                                                ssm->element_data(),
+    //                                                ssm->point_data(),
+    //                                                inv_diag->data());
+    //         }
 
-//         {
-//             auto d = inv_diag->data();
-// #pragma omp parallel for
-//             for (ptrdiff_t i = 0; i < ndofs; i++) {
-//                 d[i] = 1 / d[i];
-//             }
+    //         {
+    //             auto d = inv_diag->data();
+    // #pragma omp parallel for
+    //             for (ptrdiff_t i = 0; i < ndofs; i++) {
+    //                 d[i] = 1 / d[i];
+    //             }
 
-//             // Identity at eq-contraint nodes
-//             for (int i = 0; i < n_dirichlet_conditions; i++) {
-//                 constraint_nodes_to_value_vec(dirichlet_conditions[i].local_size,
-//                                               dirichlet_conditions[i].idx,
-//                                               block_size,
-//                                               dirichlet_conditions[i].component,
-//                                               1,
-//                                               d);
-//             }
-//         }
+    //             // Identity at eq-contraint nodes
+    //             for (int i = 0; i < n_dirichlet_conditions; i++) {
+    //                 constraint_nodes_to_value_vec(dirichlet_conditions[i].local_size,
+    //                                               dirichlet_conditions[i].idx,
+    //                                               block_size,
+    //                                               dirichlet_conditions[i].component,
+    //                                               1,
+    //                                               d);
+    //             }
+    //         }
     // }
 
     auto op = sfem::make_op<real_t>(
@@ -207,21 +207,23 @@ int main(int argc, char *argv[]) {
             [=](const real_t *const x, real_t *const y) {
                 // Apply operator
                 if (SFEM_USE_ELASTICITY) {
-                    proteus_hex8_linear_elasticity_apply(ssm->level(),
-                                                         ssm->n_elements(),
-                                                         ssm->interior_start(),
-                                                         ssm->element_data(),
-                                                         ssm->point_data(),
-                                                         SFEM_SHEAR_MODULUS,
-                                                         SFEM_FIRST_LAME_PARAMETER,
-                                                         3,
-                                                         &x[0],
-                                                         &x[1],
-                                                         &x[2],
-                                                         3,
-                                                         &y[0],
-                                                         &y[1],
-                                                         &y[2]);
+                    // proteus_affine_hex8_linear_elasticity_apply //
+                    proteus_hex8_linear_elasticity_apply  //
+                            (ssm->level(),
+                             ssm->n_elements(),
+                             ssm->interior_start(),
+                             ssm->element_data(),
+                             ssm->point_data(),
+                             SFEM_SHEAR_MODULUS,
+                             SFEM_FIRST_LAME_PARAMETER,
+                             3,
+                             &x[0],
+                             &x[1],
+                             &x[2],
+                             3,
+                             &y[0],
+                             &y[1],
+                             &y[2]);
                 } else {
                     proteus_affine_hex8_laplacian_apply  //
                                                          // proteus_hex8_laplacian_apply  //
@@ -280,32 +282,32 @@ int main(int argc, char *argv[]) {
 
         mprgp->verbose = true;
         mprgp->set_max_it(10000);
-        mprgp->set_rtol(1e-7);
+        mprgp->set_rtol(1e-12);
         mprgp->set_atol(1e-8);
         mprgp->set_upper_bound(upper_bound);
         // mprgp->set_max_eig(1);
         mprgp->default_init();
         solver = mprgp;
     } else {
-//         auto preconditioner = sfem::make_op<real_t>(
-//                 ndofs,
-//                 ndofs,
-//                 [=](const real_t *const x, real_t *const y) {
-//                     auto d = inv_diag->data();
+        //         auto preconditioner = sfem::make_op<real_t>(
+        //                 ndofs,
+        //                 ndofs,
+        //                 [=](const real_t *const x, real_t *const y) {
+        //                     auto d = inv_diag->data();
 
-// #pragma omp parallel for
-//                     for (ptrdiff_t i = 0; i < ndofs; i++) {
-//                         y[i] = d[i] * x[i];
-//                     }
-//                 },
-//                 sfem::EXECUTION_SPACE_HOST);
+        // #pragma omp parallel for
+        //                     for (ptrdiff_t i = 0; i < ndofs; i++) {
+        //                         y[i] = d[i] * x[i];
+        //                     }
+        //                 },
+        //                 sfem::EXECUTION_SPACE_HOST);
 
         auto cg = sfem::h_cg<real_t>();
         cg->verbose = true;
         cg->set_op(op);
         // cg->set_preconditioner_op(preconditioner); // CHECK if diag code is correct!
         cg->set_max_it(10000);
-        cg->set_rtol(1e-7);
+        cg->set_rtol(1e-12);
         cg->set_atol(1e-8);
         cg->default_init();
         solver = cg;
@@ -342,15 +344,36 @@ int main(int argc, char *argv[]) {
                 ndofs,
                 [=](const real_t *const x, real_t *const y) {
                     // Apply operator
-                    proteus_affine_hex8_laplacian_apply  //
-                                                         // proteus_hex8_laplacian_apply  //
-                            (ssm->level(),
-                             ssm->n_elements(),
-                             ssm->interior_start(),
-                             ssm->element_data(),
-                             ssm->point_data(),
-                             x,
-                             y);
+
+                    if (SFEM_USE_ELASTICITY) {
+                        // proteus_affine_hex8_linear_elasticity_apply //
+                        proteus_hex8_linear_elasticity_apply  //
+                                (ssm->level(),
+                                 ssm->n_elements(),
+                                 ssm->interior_start(),
+                                 ssm->element_data(),
+                                 ssm->point_data(),
+                                 SFEM_SHEAR_MODULUS,
+                                 SFEM_FIRST_LAME_PARAMETER,
+                                 3,
+                                 &x[0],
+                                 &x[1],
+                                 &x[2],
+                                 3,
+                                 &y[0],
+                                 &y[1],
+                                 &y[2]);
+                    } else {
+                        // proteus_affine_hex8_laplacian_apply  //
+                        proteus_hex8_laplacian_apply  //
+                                (ssm->level(),
+                                 ssm->n_elements(),
+                                 ssm->interior_start(),
+                                 ssm->element_data(),
+                                 ssm->point_data(),
+                                 x,
+                                 y);
+                    }
 
                     // Copy constrained nodes
                     copy_at_dirichlet_nodes_vec(

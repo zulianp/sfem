@@ -14,8 +14,8 @@ from time import perf_counter
 
 
 def simplify(expr):
-	# return expr;
-	return sp.simplify(expr)
+	return expr;
+	# return sp.simplify(expr)
 
 def assign_matrix(name, mat):
 	rows, cols = mat.shape
