@@ -37,6 +37,7 @@ find_package(ISolver REQUIRED)
 
 set(SFEM_MODULES
     algebra base matrix mesh pizzastack solver
+    algebra/openmp
     operators 
     operators/beam2 
     operators/cvfem 
