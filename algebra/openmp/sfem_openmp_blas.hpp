@@ -115,15 +115,15 @@ namespace sfem {
         }
 
         static void build_blas(struct BLAS_Tpl<T>& tpl) {
-            tpl.allocate = OpenMP_BLAS<T>::allocate;
-            tpl.destroy = OpenMP_BLAS<T>::destroy;
-            tpl.copy = OpenMP_BLAS<T>::copy;
-            tpl.dot = OpenMP_BLAS<T>::dot;
-            tpl.norm2 = OpenMP_BLAS<T>::norm2;
-            tpl.axpby = OpenMP_BLAS<T>::axpby;
-            tpl.zeros = OpenMP_BLAS<T>::zeros;
-            tpl.values = OpenMP_BLAS<T>::values;
-            tpl.scal = OpenMP_BLAS<T>::scal;
+            tpl.allocate = allocate;
+            tpl.destroy = destroy;
+            tpl.copy = copy;
+            tpl.dot = dot;
+            tpl.norm2 = norm2;
+            tpl.axpby = axpby;
+            tpl.zeros = zeros;
+            tpl.values = values;
+            tpl.scal = scal;
         }
     };
 
