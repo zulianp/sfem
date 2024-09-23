@@ -17,7 +17,6 @@
 #include "sfem_openmp_blas.hpp"
 #include "sfem_openmp_mprgp_impl.hpp"
 
-// TODO GPU version
 namespace sfem {
     // From Active set expansion strategies in MPRGP algorithm, Kruzik et al. 2020
     template <typename T>
