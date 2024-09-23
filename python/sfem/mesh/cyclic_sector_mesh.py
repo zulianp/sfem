@@ -29,7 +29,8 @@ r2 = 0.067  # from bottom of rotor slot to the center
 r3 = 0.08  # from top of rotor slot to the center
 r4 = 0.0814  # from top of stator slot to the center
 r5 = 0.0944  # from bottom of rotor slot to the center
-r6 = 0.1044  # external radious (half of the diameter)
+# r6 = 0.1044  # external radious (half of the diameter)
+r6 = 0.0964  # external radious (half of the diameter)
 
 N_ROTOR = 400
 N_STATOR = 440
@@ -41,18 +42,18 @@ PT_STATOR = 0.5  # fill factor for stator teeth from 0 to 1
 # state
 AR = 2  # rotor position in mechanical degrees
 
-N_RAD_DENSITY = 4
-N_TAN_DENSITY = 10
-Z_SUBDIVIDE = 3
+# N_RAD_DENSITY = 4
+# N_TAN_DENSITY = 10
+# Z_SUBDIVIDE = 3
 
 TIMES=1
 
 if len(sys.argv) == 2:
     TIMES = int(sys.argv[1])
 
-N_RAD_DENSITY = 10 * TIMES
+N_RAD_DENSITY = 1 * TIMES
 N_TAN_DENSITY = 20 * TIMES
-Z_SUBDIVIDE = 6 * TIMES
+Z_SUBDIVIDE = 3 * TIMES
 
 
 def polar_to_cartesian(radius, angle, center):
@@ -137,7 +138,7 @@ def gen_cyc(n_arc, r_inner, r_middle, ang_start=0.0, fill_factor=0.5):
 
 ###############################################################################
 # Generate 2D geometry
-inner_plane = gen_cyc(2, 1, 2)
+inner_plane = gen_cyc(2, 1.8, 2)
 gmsh.model.geo.synchronize()
 
 # Set option to generate quadrilateral elements

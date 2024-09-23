@@ -151,6 +151,7 @@ def raw_to_db(argv):
 
     raw_mesh_folder = argv[1]
     output_path = argv[2]
+    raw_xyz_folder = raw_mesh_folder
     
     point_data  = None
     point_data_type = "float64"
@@ -168,7 +169,7 @@ def raw_to_db(argv):
     try:
         opts, args = getopt.getopt(
             argv[3:], "p:d:c:t:h",
-            ["point_data=", "point_data_type=", "cell_type=", "cell_data=", "cell_data_type=", "transient", "time_step_format", "n_time_steps=", "time_whole=", "time_whole_txt=", "help"])
+            ["coords=", "point_data=", "point_data_type=", "cell_type=", "cell_data=", "cell_data_type=", "transient", "time_step_format", "n_time_steps=", "time_whole=", "time_whole_txt=", "help"])
 
     except getopt.GetoptError as err:
         print(err)
@@ -199,6 +200,8 @@ def raw_to_db(argv):
             n_time_steps = int(arg)
         elif opt in ("--cell_type"):
             cell_type = arg
+        elif opt in ("--coords"):
+            raw_xyz_folder = arg
 
     if transient:
         if len(time_whole) == 0:
@@ -209,7 +212,7 @@ def raw_to_db(argv):
 
     points = []
     for pfn in ['x.raw', 'y.raw', 'z.raw']:
-        path = f'{raw_mesh_folder}/{pfn}'
+        path = f'{raw_xyz_folder}/{pfn}'
         if os.path.exists(path):
             x = np.fromfile(path, dtype=geom_t)
             points.append(x)

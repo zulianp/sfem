@@ -34,3 +34,19 @@ obstacle (PROTEUS_HEX8):
 #elements 591552 #nodes 304390625 #dofs 304390625
 TTS:		10136.8 [s], solve: 10130.4 [s]
 ```
+
+Solving contact with elasticity with MPRGP
+
+```c
+SFEM_ELEMENT_REFINE_LEVEL=8
+Iterations 10011
+residual abs: 9.76926e-09
+#cg_steps		9631
+#expansion_steps	362
+#proportioning_steps	19
+----------------------------------------
+obstacle (PROTEUS_HEX8):
+----------------------------------------
+#elements 1872 #nodes 1030625 #dofs 3091875
+TTS:		480.354 [s], solve: 480.285 [s]
+```

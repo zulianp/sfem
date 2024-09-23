@@ -29,7 +29,7 @@ export OMP_PROC_BIND=true
 export CUDA_LAUNCH_BLOCKING=0
 
 export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
-export SFEM_ELEMENT_REFINE_LEVEL=8
+export SFEM_ELEMENT_REFINE_LEVEL=6
 
 mesh=mesh
 
@@ -62,7 +62,7 @@ then
 	if [[ $SQP -eq 1 ]]
 	then
 		export SFEM_DIRICHLET_NODESET="$sinlet,$sinlet,$sinlet,$soutlet,$soutlet,$soutlet"
-		export SFEM_DIRICHLET_VALUE="0,0.2,0,0,0.2,0"
+		export SFEM_DIRICHLET_VALUE="0,0,0,0,0,0"
 		export SFEM_DIRICHLET_COMPONENT="0,1,2,0,1,2"
 
 		export SFEM_CONTACT_NODESET="$sobstacle"
@@ -114,7 +114,7 @@ then
 	done
 
 	raw_to_db.py $mesh/viz output/hex8.vtk  --point_data="output/soa/*.raw"
-
+	raw_to_db.py mesh/surface/wall1/ output/obstacle.vtk --coords=mesh/viz --cell_type=quad --point_data="output/soa/upper_bound.1.*"
 else
 	raw_to_db.py $mesh/viz output/hex8.vtk --point_data=output/u.raw,output/rhs.raw,output/upper_bound.raw --point_data_type="$SFEM_REAL_T,$SFEM_REAL_T,$SFEM_REAL_T"
 fi

@@ -144,6 +144,9 @@ int main(int argc, char *argv[]) {
     real_t SFEM_SHEAR_MODULUS = 1;
     real_t SFEM_FIRST_LAME_PARAMETER = 1;
 
+    int SFEM_TEST_AGAINST_LINEAR = 0;
+    SFEM_READ_ENV(SFEM_TEST_AGAINST_LINEAR, atoi);
+
     auto mesh = (mesh_t *)m->impl_mesh();
 
     int n_dirichlet_conditions{0};
@@ -212,8 +215,8 @@ int main(int argc, char *argv[]) {
             [=](const real_t *const x, real_t *const y) {
                 // Apply operator
                 if (SFEM_USE_ELASTICITY) {
-                    // proteus_affine_hex8_linear_elasticity_apply //
-                    proteus_hex8_linear_elasticity_apply  //
+                    proteus_affine_hex8_linear_elasticity_apply  //
+                            // proteus_hex8_linear_elasticity_apply  //
                             (ssm->level(),
                              ssm->n_elements(),
                              ssm->interior_start(),
@@ -322,8 +325,6 @@ int main(int argc, char *argv[]) {
     solver->apply(rhs->data(), x->data());
     double solve_tock = MPI_Wtime();
 
-  
-
     char path[2048];
     sprintf(path, "%s/u.raw", output_path);
     if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)x->data(), ndofs, ndofs)) {
@@ -335,64 +336,64 @@ int main(int argc, char *argv[]) {
         return SFEM_FAILURE;
     }
 
-    // {  // Residual test
-    //     if (n_contact_conditions) {
-    //         apply_dirichlet_condition_vec(
-    //                 n_contact_conditions, contact_conditions, block_size, rhs->data());
-    //     }
+    if (SFEM_TEST_AGAINST_LINEAR) {  // Residual test
+        if (n_contact_conditions) {
+            apply_dirichlet_condition_vec(
+                    n_contact_conditions, contact_conditions, block_size, rhs->data());
+        }
 
-    //     auto linear_op = sfem::make_op<real_t>(
-    //             ndofs,
-    //             ndofs,
-    //             [=](const real_t *const x, real_t *const y) {
-    //                 // Apply operator
+        auto linear_op = sfem::make_op<real_t>(
+                ndofs,
+                ndofs,
+                [=](const real_t *const x, real_t *const y) {
+                    // Apply operator
 
-    //                 if (SFEM_USE_ELASTICITY) {
-    //                     // proteus_affine_hex8_linear_elasticity_apply //
-    //                     proteus_hex8_linear_elasticity_apply  //
-    //                             (ssm->level(),
-    //                              ssm->n_elements(),
-    //                              ssm->interior_start(),
-    //                              ssm->element_data(),
-    //                              ssm->point_data(),
-    //                              SFEM_SHEAR_MODULUS,
-    //                              SFEM_FIRST_LAME_PARAMETER,
-    //                              3,
-    //                              &x[0],
-    //                              &x[1],
-    //                              &x[2],
-    //                              3,
-    //                              &y[0],
-    //                              &y[1],
-    //                              &y[2]);
-    //                 } else {
-    //                     // proteus_affine_hex8_laplacian_apply  //
-    //                     proteus_hex8_laplacian_apply  //
-    //                             (ssm->level(),
-    //                              ssm->n_elements(),
-    //                              ssm->interior_start(),
-    //                              ssm->element_data(),
-    //                              ssm->point_data(),
-    //                              x,
-    //                              y);
-    //                 }
+                    if (SFEM_USE_ELASTICITY) {
+                        // proteus_affine_hex8_linear_elasticity_apply //
+                        proteus_hex8_linear_elasticity_apply  //
+                                (ssm->level(),
+                                 ssm->n_elements(),
+                                 ssm->interior_start(),
+                                 ssm->element_data(),
+                                 ssm->point_data(),
+                                 SFEM_SHEAR_MODULUS,
+                                 SFEM_FIRST_LAME_PARAMETER,
+                                 3,
+                                 &x[0],
+                                 &x[1],
+                                 &x[2],
+                                 3,
+                                 &y[0],
+                                 &y[1],
+                                 &y[2]);
+                    } else {
+                        // proteus_affine_hex8_laplacian_apply  //
+                        proteus_hex8_laplacian_apply  //
+                                (ssm->level(),
+                                 ssm->n_elements(),
+                                 ssm->interior_start(),
+                                 ssm->element_data(),
+                                 ssm->point_data(),
+                                 x,
+                                 y);
+                    }
 
-    //                 // Copy constrained nodes
-    //                 copy_at_dirichlet_nodes_vec(
-    //                         n_dirichlet_conditions, dirichlet_conditions, block_size, x, y);
+                    // Copy constrained nodes
+                    copy_at_dirichlet_nodes_vec(
+                            n_dirichlet_conditions, dirichlet_conditions, block_size, x, y);
 
-    //                 if (n_contact_conditions) {
-    //                     copy_at_dirichlet_nodes_vec(
-    //                             n_contact_conditions, contact_conditions, block_size, x, y);
-    //                 }
-    //             },
-    //             sfem::EXECUTION_SPACE_HOST);
+                    if (n_contact_conditions) {
+                        copy_at_dirichlet_nodes_vec(
+                                n_contact_conditions, contact_conditions, block_size, x, y);
+                    }
+                },
+                sfem::EXECUTION_SPACE_HOST);
 
-    //     auto r = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
-    //     real_t rtr = residual(*linear_op, rhs->data(), x->data(), r->data());
+        auto r = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
+        real_t rtr = residual(*linear_op, rhs->data(), x->data(), r->data());
 
-    //     printf("Linear residual: %g\n", rtr);
-    // }
+        printf("Linear residual: %g\n", rtr);
+    }
 
     destroy_conditions(n_contact_conditions, contact_conditions);
     destroy_conditions(n_dirichlet_conditions, dirichlet_conditions);

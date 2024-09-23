@@ -52,12 +52,12 @@ proteus_quad4_to_quad4.py $SFEM_ELEMENT_REFINE_LEVEL $mesh/macro_quad_surface $m
 # Generate full-mesh for visualization
 proteus_hex8_to_hex8 $SFEM_ELEMENT_REFINE_LEVEL $mesh $mesh/viz
 
-SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface 1.4 -0.01 0.46 0.99 	$mesh/surface/sides_outlet.raw
-SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface -1.4 -0.01 0.46 0.99 	$mesh/surface/sides_inlet.raw
-SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface 0 1 0.5 0.95 			$mesh/surface/sides_wall0.raw
-SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface -1 1.7 0.5 0.95 		$mesh/surface/sides_wall1.raw
-SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface 0 1.4 0 0.99 			$mesh/surface/sides_symm0.raw
-SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface 0 1.4 1 0.99 			$mesh/surface/sides_symm1.raw
+SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface 1.925 -0.01 0.46 0.99 	$mesh/surface/sides_outlet.raw
+SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface -1.925 -0.01 0.46 0.99 	$mesh/surface/sides_inlet.raw
+SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface 0 1 0.5 0.95 				$mesh/surface/sides_wall0.raw
+SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface -1 1.7 0.5 0.95 			$mesh/surface/sides_wall1.raw
+SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface 0 1.4 0 0.99 				$mesh/surface/sides_symm0.raw
+SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface 0 1.4 1 0.99 				$mesh/surface/sides_symm1.raw
 
 boundary_nodes()
 {
@@ -98,10 +98,10 @@ boundary_nodes $mesh/surface symm1  $mesh/surface/sidesets_aos/symm1.raw
 sides=$mesh/dirichlet.raw
 python3 -c "import numpy as np; a=np.fromfile(\"$mesh/surface/x.raw\", dtype=np.float32); a.fill(0); a.astype(np.float64).tofile(\"$sides\")"
 
-smask $mesh/surface/sidesets_aos/wall0.raw $sides $sides 3
+# smask $mesh/surface/sidesets_aos/wall0.raw $sides $sides 3
 smask $mesh/surface/sidesets_aos/wall1.raw $sides $sides 4
-smask $mesh/surface/sidesets_aos/symm0.raw $sides $sides 5
-smask $mesh/surface/sidesets_aos/symm1.raw $sides $sides 6
+# smask $mesh/surface/sidesets_aos/symm0.raw $sides $sides 5
+# smask $mesh/surface/sidesets_aos/symm1.raw $sides $sides 6
 smask $mesh/surface/sidesets_aos/outlet.raw $sides $sides 1
 smask $mesh/surface/sidesets_aos/inlet.raw $sides $sides 2
 
