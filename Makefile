@@ -434,7 +434,7 @@ ifeq ($(DISABLE_CUDA), 1)
     SFEM_CUDA_A = 
     LINK_SFEM_CUDA =
 else
-    CUDA_LIBS_PATH = -L/opt/nvidia/hpc_sdk/Linux_aarch64/23.9/cuda/12.2/targets/sbsa-linux/lib/
+    CUDA_LIBS_PATH = -L/user-environment/env/._default/6ofkja7nppzs2jvmcu5x2mmwsjb4a5pf/lib64/
     CUDART_LINK =  -lcudart
     SFEM_CUDA_A = ${PWD}/resampling/cuda/libsfem_resample_field_cuda.a
     LINK_SFEM_CUDA = -L${PWD}/resampling/cuda -lsfem_resample_field_cuda
