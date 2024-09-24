@@ -72,7 +72,7 @@ echo $scaling
 # export OMP_PROC_BIND=true
 # export OMP_NUM_THREADS=8
 
-n_procs=18
+n_procs=1
 # n_procs=1
 # n_procs=2
 # n_procs=1
@@ -82,8 +82,8 @@ PERF="no"
 
 if [[ -z "$LAUNCH" ]]
 then
-	LAUNCH="mpirun -n $n_procs " 
-	LAUNCH=""
+	LAUNCH="mpiexec -np $n_procs"
+#	LAUNCH=""
 fi
 
 # GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"

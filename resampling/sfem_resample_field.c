@@ -871,7 +871,7 @@ int resample_field_local(
         case TET10: {
 #define TET10_V2
 
-#ifdef TET10_V2  // V2 
+#ifdef TET10_V2  // V2
             return hex8_to_tet10_resample_field_local_CUDA(
                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
 #else
