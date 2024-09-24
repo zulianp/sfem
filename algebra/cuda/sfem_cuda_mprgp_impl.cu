@@ -32,7 +32,6 @@ namespace sfem {
         return (a > b) ? a : b;
     }
 
-
     template <typename T>
     __device__ T warp_min_32(const T in) {
         static_assert(SFEM_WARP_SIZE == 32, "Only implemented for CUDA!");
@@ -145,7 +144,6 @@ namespace sfem {
 
     inline static __device__ __host__ double tabs(const double a) { return fabs(a); }
     inline static __device__ __host__ float tabs(const float a) { return fabsf(a); }
-
 
     template <typename T>
     inline static __device__ __host__ T gf_lb_ub(const T lbi, const T ubi, const T xi, const T gi) {
@@ -657,11 +655,12 @@ namespace sfem {
 
         T* device_value = nullptr;
 
-        cudaMalloc((void**)&device_value, n_blocks*sizeof(T));
-        cudaMemset((void*)device_value, 0, n_blocks*sizeof(T));
+        cudaMalloc((void**)&device_value, n_blocks * sizeof(T));
+        cudaMemset((void*)device_value, 0, n_blocks * sizeof(T));
 
         if (lb && ub) {
-            max_alpha_lb_ub_kernel<<<n_blocks, kernel_block_size>>>(n, lb, ub, x, p, infty, device_value);
+            max_alpha_lb_ub_kernel<<<n_blocks, kernel_block_size>>>(
+                    n, lb, ub, x, p, infty, device_value);
             SFEM_DEBUG_SYNCHRONIZE();
         } else if (ub) {
             max_alpha_ub_kernel<<<n_blocks, kernel_block_size>>>(n, ub, x, p, infty, device_value);
@@ -671,14 +670,14 @@ namespace sfem {
             SFEM_DEBUG_SYNCHRONIZE();
         }
 
-        T *host_value = (T*)malloc(n_blocks * sizeof(T));
+        T* host_value = (T*)malloc(n_blocks * sizeof(T));
 
-        cudaMemcpy(&host_value, device_value, n_blocks *sizeof(T), cudaMemcpyDeviceToHost);
+        cudaMemcpy(&host_value, device_value, n_blocks * sizeof(T), cudaMemcpyDeviceToHost);
         cudaFree(device_value);
 
         T ret = host_value[0];
 
-        for(int i = 1; i < n_blocks; i++) {
+        for (int i = 1; i < n_blocks; i++) {
             ret = tmin(host_value[i], ret);
         }
 
