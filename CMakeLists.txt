@@ -59,8 +59,7 @@ set(SFEM_MODULES
     operators/proteus_hex8
     operators/hierarchical
     operators/hex8
-
-    )
+)
 
 if(SFEM_ENABLE_RESAMPLING)
     list(APPEND SFEM_MODULES
@@ -84,6 +83,7 @@ if(SFEM_ENABLE_CUDA)
         operators/macro_tet4/cuda
         operators/tet10/cuda
         operators/proteus_tet4/cuda
+        operators/proteus_hex8/cuda
         operators/hierarchical/cuda
         )
 endif()
