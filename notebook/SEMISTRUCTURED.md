@@ -35,18 +35,36 @@ obstacle (PROTEUS_HEX8):
 TTS:		10136.8 [s], solve: 10130.4 [s]
 ```
 
-Solving contact with elasticity with MPRGP
+Solving contact for linear elasticity with MPRGP
 
 ```c
+SFEM_HEX8_ASSUME_AFFINE=1 
 SFEM_ELEMENT_REFINE_LEVEL=8
+
+// Example 1
 Iterations 10011
 residual abs: 9.76926e-09
-#cg_steps		9631
-#expansion_steps	362
+residual rel: ~2.2e-14
+#cg_steps				9631
+#expansion_steps		362
 #proportioning_steps	19
 ----------------------------------------
 obstacle (PROTEUS_HEX8):
 ----------------------------------------
 #elements 1872 #nodes 1030625 #dofs 3091875
 TTS:		480.354 [s], solve: 480.285 [s]
+
+
+// Example 2
+Iterations 16501 
+residual abs: 9.97225e-09
+residual rel: ~2.2e-14
+#cg_steps				15809
+#expansion_steps		672
+#proportioning_steps	21
+----------------------------------------
+obstacle (PROTEUS_HEX8):
+----------------------------------------
+#elements 1872 #nodes 1030625 #dofs 3091875
+TTS:		451.011 [s], solve: 450.914 [s]
 ```
