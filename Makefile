@@ -9,6 +9,7 @@ GPU_ARCH ?= sm_75
 DISABLE_CUDA ?= 0
 
 ARM ?= 0  # 1 for ARM architecture
+CUDA_HOST_COMPILER ?=
 
 VECTOR_WIDTH_OPT = -mprefer-vector-width
 
@@ -18,8 +19,17 @@ ifeq ($(ARM), 1)
 	# MPICC = mpicc
 endif
 
+
+# autodetect and set the CUDA home directory
+ifeq ($(DISABLE_CUDA), 0)
+	CUDA_HOME=$(shell dirname $(shell dirname $(shell which nvcc)))
+else
+	CUDA_HOME=
+endif
+
 $(info $$DISABLE_CUDA is [${DISABLE_CUDA}])
 $(info $$GPU_ARCH is [${GPU_ARCH}])
+$(info $$CUDA_HOME is [${CUDA_HOME}])
 
 
 ifeq ($(debug),1)
@@ -434,9 +444,7 @@ ifeq ($(DISABLE_CUDA), 1)
     SFEM_CUDA_A = 
     LINK_SFEM_CUDA =
 else
-    CUDA_LIBS_PATH = -L/user-environment/env/._default/6ofkja7nppzs2jvmcu5x2mmwsjb4a5pf/lib64/
-#    CUDA_LIBS_PATH = -L/opt/nvidia/hpc_sdk/Linux_aarch64/23.9/cuda/12.2/targets/sbsa-linux/lib/
-    CUDA_LIBS_PATH = -L/usr/local/cuda-12.3/lib64 
+    CUDA_LIBS_PATH = -L${CUDA_HOME}/lib64
     
     CUDART_LINK =  -lcudart
     SFEM_CUDA_A = ${PWD}/resampling/cuda/libsfem_resample_field_cuda.a
@@ -444,12 +452,13 @@ else
 endif
 
 $(info $$SFEM_CUDA_A is [${SFEM_CUDA_A}])
+$(info $$CUDA_LIBS_PATH is [${CUDA_LIBS_PATH}])
 
 grid_to_mesh: grid_to_mesh.c libsfem.a ${SFEM_CUDA_A} ${PWD}/resampling/quadratures_rule.h
 	$(MPICC) -o $@ drivers/grid_to_mesh.c libsfem.a $(CFLAGS) $(INCLUDES)  $(LDFLAGS) ${LINK_SFEM_CUDA} ${CUDA_LIBS_PATH} ${CUDART_LINK}  ${SFEM_CUDA_A}
 
 ${PWD}/resampling/cuda/libsfem_resample_field_cuda.a: ${PWD}/resampling/cuda/sfem_resample_field_cuda.cu ${PWD}/resampling/cuda/tet10_resample_field.cu ${PWD}/resampling/cuda/quadratures_rule_cuda.h ${PWD}/resampling/cuda/tet10_weno_cuda.cu ${PWD}/resampling/cuda/tet10_weno_cuda.cuh
-	${MAKE} -C ${PWD}/resampling/cuda GPU_ARCH=${GPU_ARCH} ARM=${ARM}
+	${MAKE} -C ${PWD}/resampling/cuda GPU_ARCH=${GPU_ARCH} ARM=${ARM} CUDA_HOST_COMPILER=${CUDA_HOST_COMPILER} 
 
 # else
 # # CPU version

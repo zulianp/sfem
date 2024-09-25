@@ -10,7 +10,7 @@ print("sdf_test_GPU.py: ==========================================")
 
 sdf_t = cp.float32
 
-D = 100
+D = 600
 dims = (D, D, D)
 
 print(f'sdf_test_GPU.py: Generating field of size {dims[0]} x {dims[1]} x {dims[2]}')
@@ -44,8 +44,8 @@ zv[:] = cp.linspace(pmin[2], pmax[2], dims[2])
 
 X, Y, Z = cp.meshgrid(xv, yv, zv)
 
-field  = cp.sin(4.0 * cp.pi * X) + cp.cos(4.0 * cp.pi * Y + 4.0 * cp.pi * Z)**2
-# field  = cp.sin(4.0 * cp.pi * X) + cp.cos(4.0 * cp.pi * Y) * cp.tanh(4.0 * cp.pi * (Z + X))
+# field  = cp.sin(4.0 * cp.pi * X) + cp.cos(4.0 * cp.pi * Y + 4.0 * cp.pi * Z)**2
+field  = cp.sin(4.0 * cp.pi * X) + cp.cos(4.0 * cp.pi * Y) * cp.tanh(4.0 * cp.pi * (Z + X))
 # field = chess_board(X, Y, Z, mc)
 
 end_clock = time.time()
