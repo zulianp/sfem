@@ -54,7 +54,6 @@ def solve_obstacle(options):
 		m = sfem.create_mesh("TET4", np.array(idx), np.array(points))
 		# m = sfem.create_mesh("HEX8", np.array(idx), np.array(points))
 		m.write(f"{options.output_dir}/rect_mesh")
-		# pdb.set_trace()
 	else:
 		m = sfem.Mesh()		
 		m.read(path)
@@ -62,79 +61,120 @@ def solve_obstacle(options):
 		sinlet = np.unique(np.fromfile(f'{path}/sidesets_aos/sinlet.raw', dtype=idx_t))
 		soutlet = np.fromfile(f'{path}/sidesets_aos/soutlet.raw', dtype=idx_t)
 
-
-	fs = sfem.FunctionSpace(m, m.spatial_dimension())
+	dim = m.spatial_dimension()
+	fs = sfem.FunctionSpace(m, dim)
 	fun = sfem.Function(fs)
 	
 	fun.set_output_dir(options.output_dir)
 	out = fun.output()
 
 	linear_elasticity_op = sfem.create_op(fs, "LinearElasticity")
+	# linear_elasticity_op = sfem.create_op(fs, "NeoHookeanOgden")
 	fun.add_operator(linear_elasticity_op)
 
 	bc = sfem.DirichletConditions(fs)
 	sfem.add_condition(bc, sinlet, 0, 0.2);
 	sfem.add_condition(bc, sinlet, 1, 0.);
-	sfem.add_condition(bc, sinlet, 2, 0.);
+
+	if dim > 2:
+		sfem.add_condition(bc, sinlet, 2, 0.);
+
 	fun.add_dirichlet_conditions(bc)
 
-	cg = sfem.ConjugateGradient()
-	cg.default_init()
-	cg.set_max_it(20)
-	cg.set_rtol(1e-2)
-	cg.set_atol(1e-12)
-	cg.set_verbose(False)
+	# solver = sfem.BiCGStab()
+	# solver.default_init()
+	# solver.set_max_it(100)
+	# solver.set_verbose(True)
 
-	g = np.zeros(fs.n_dofs())
-	c = np.zeros(fs.n_dofs())
-	x = np.zeros(fs.n_dofs())
-	sfem.apply_constraints(fun, x)
+	g = np.zeros(fs.n_dofs(), dtype=real_t)
+	g_pen = np.zeros(fs.n_dofs(), dtype=real_t)
+	c = np.zeros(fs.n_dofs(), dtype=real_t)
+	x = np.zeros(fs.n_dofs(), dtype=real_t)
 
-	mass_op = sfem.create_op(fs, "LumpedMass")
-	mass = np.zeros(fs.n_dofs(), dtype=real_t)
-	sfem.hessian_diag(mass_op, x, mass)
+	# mass_op = sfem.create_op(fs, "LumpedMass")
+	# mass = np.zeros(fs.n_dofs(), dtype=real_t)
+	# sfem.hessian_diag(mass_op, x, mass)
 
-	obs = np.zeros(fs.n_dofs()) + 10000
+	obs = np.ones(fs.n_dofs(), dtype=real_t) * 10000
 
-	constrained_dofs = soutlet[:]*m.spatial_dimension()
+	constrained_dofs = soutlet[:] * dim
+	selector = np.zeros(fs.n_dofs())
+	selector[constrained_dofs] = 1
 
-	sdf = 0.6 - sfem.points(m, 0)
+	sdf = (0.6 - sfem.points(m, 0)).astype(real_t)
 	obs[constrained_dofs] = sdf[soutlet]
 
-	for d in range(1, m.spatial_dimension()):
-		obs[d::m.spatial_dimension()] = 10000
+	for d in range(1, dim):
+		obs[d::dim] = 10000
 
-	penalty_param = 1e2
+	use_penalty = False
 
-	# Nonlinear iteration
-	for i in range(0, 500):
-		g[:] = 0
+	if use_penalty:
+		penalty_param = 1.
+		solver = sfem.ConjugateGradient()
+		solver.default_init()
+		solver.set_max_it(1000)
+		solver.set_rtol(1e-2)
+		solver.set_atol(1e-12)
+		solver.set_verbose(False)
+	else:
+		solver = sfem.MPRGP()
+		solver.default_init()
+		sfem.set_upper_bound(solver, obs)
+
+	if use_penalty:
+		# Nonlinear iteration
+		for i in range(0, 80):
+			# Material contribution
+			g[:] = 0.
+			sfem.gradient(fun, x, g)
+			lop = sfem.make_op(fun, x)
 			
-		violation = np.maximum(x - obs, 0)
-		H_diag = penalty_param * mass * ((obs - x) <= 0)
-		sfem.apply_zero_constraints(fun, H_diag)
-		H = sfem.diag(H_diag)
-		
-		g = penalty_param * mass * violation
-		sfem.apply_zero_constraints(fun, g)
+			if use_penalty:
+				# Penalty contribution
+				g_pen[:] = 0.
+				active = selector * ((obs - x) <= 1e-16)
+				violation = (x - obs) * active
+
+				H_diag = (penalty_param * active)
+				sfem.apply_value(bc, 0., H_diag)
+				H = sfem.diag(H_diag)
+				
+				g_pen = (penalty_param * violation)
+				sfem.apply_zero_constraints(fun, g_pen)
+				print(f"#active {np.sum(active)}")
+				g += g_pen
+				lop = H + lop
+			
+			solver.set_op(lop)
+
+			c[:] = 0.
+			sfem.copy_constrained_dofs(fun, g, c)
+			sfem.apply(solver, g, c)
+			x -= c
+
+			norm_g = linalg.norm(g)
+			print(f'{i}) norm_g = {norm_g}')
+
+			if(norm_g < 1e-10):
+				break
+	else:
+		g[:] = 0.
 		sfem.gradient(fun, x, g)
-		
-		
-		# As the pointer of x is used not necessary to be in the loop
-		# But maybe there will be some side effect in the future
-		lop = H + sfem.make_op(fun, x)
-		cg.set_op(lop)
+		lop = sfem.make_op(fun, x)
+		solver.set_op(lop)
+		sfem.apply(solver, -g, x)
 
-		c[:] = 0
-		sfem.apply(cg, g, c)
-		x -= c
+	sfem.gradient(fun, x, g)
 
-		norm_g = linalg.norm(g)
-		print(f'{i}) norm_g = {norm_g}')
-		if(norm_g < 1e-10):
-			break
-
+	sfem.write(out, "g", g)
+	sfem.write(out, "obs", obs)
 	sfem.write(out, "disp", x)
+
+	if use_penalty:
+		sfem.write(out, "H_diag", H_diag)
+		sfem.write(out, "violation", violation)
+		sfem.write(out, "selector", selector)
 
 class Opts:
 	def __init__(self):
