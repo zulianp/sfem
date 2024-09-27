@@ -39,12 +39,12 @@ NB_MODULE(pysfem, m) {
     m.def("init", &SFEM_init);
     m.def("finalize", &SFEM_finalize);
     nb::class_<Mesh>(m, "Mesh")  //
-        .def(nb::init<>())
-        .def("read", &Mesh::read)
-        .def("write", &Mesh::write)
-        .def("n_nodes", &Mesh::n_nodes)
-        .def("convert_to_macro_element_mesh", &Mesh::convert_to_macro_element_mesh)
-        .def("spatial_dimension", &Mesh::spatial_dimension);
+            .def(nb::init<>())
+            .def("read", &Mesh::read)
+            .def("write", &Mesh::write)
+            .def("n_nodes", &Mesh::n_nodes)
+            .def("convert_to_macro_element_mesh", &Mesh::convert_to_macro_element_mesh)
+            .def("spatial_dimension", &Mesh::spatial_dimension);
 
     m.def("create_mesh",
           [](const char *elem_type_name,
@@ -78,33 +78,37 @@ NB_MODULE(pysfem, m) {
 
               // Transfer ownership to mesh
               return std::make_shared<Mesh>(
-                  spatial_dimension, element_type, nelements, elements, nnodes, points);
+                      spatial_dimension, element_type, nelements, elements, nnodes, points);
           });
 
     m.def("points",
           [](std::shared_ptr<Mesh> &mesh, int coord) -> nb::ndarray<nb::numpy, const geom_t> {
               return nb::ndarray<nb::numpy, const geom_t>(
-                  mesh->points(coord), {(size_t)mesh->n_nodes()}, nb::handle());
+                      mesh->points(coord), {(size_t)mesh->n_nodes()}, nb::handle());
           });
 
     nb::class_<FunctionSpace>(m, "FunctionSpace")
-        .def(nb::init<std::shared_ptr<Mesh>>())
-        .def(nb::init<std::shared_ptr<Mesh>, const int>())
-        .def("n_dofs", &FunctionSpace::n_dofs);
+            .def(nb::init<std::shared_ptr<Mesh>>())
+            .def(nb::init<std::shared_ptr<Mesh>, const int>())
+            .def("n_dofs", &FunctionSpace::n_dofs);
 
     nb::class_<Op>(m, "Op");
     m.def("create_op", &Factory::create_op);
 
     nb::class_<Output>(m, "Output")
-        .def("set_output_dir", &Output::set_output_dir)
-        .def("write", &Output::write)
-        .def("write_time_step", &Output::write_time_step);
+            .def("set_output_dir", &Output::set_output_dir)
+            .def("write", &Output::write)
+            .def("write_time_step", &Output::write_time_step);
 
     m.def("write_time_step",
           [](std::shared_ptr<Output> &out,
              const char *name,
              const real_t t,
              nb::ndarray<real_t> x) { out->write_time_step(name, t, x.data()); });
+
+    m.def("write", [](std::shared_ptr<Output> &out, const char *name, nb::ndarray<real_t> x) {
+        out->write(name, x.data());
+    });
 
     m.def("set_field",
           [](std::shared_ptr<Op> &op,
@@ -118,33 +122,36 @@ NB_MODULE(pysfem, m) {
           });
 
     m.def("hessian_diag",
-          [](std::shared_ptr<Op> &op,
-             nb::ndarray<real_t> x,
-             nb::ndarray<real_t> d) { op->hessian_diag(x.data(), d.data()); });
+          [](std::shared_ptr<Op> &op, nb::ndarray<real_t> x, nb::ndarray<real_t> d) {
+              op->hessian_diag(x.data(), d.data());
+          });
 
     m.def("hessian_diag",
-          [](std::shared_ptr<Function> &fun,
-             nb::ndarray<real_t> x,
-             nb::ndarray<real_t> d) { fun->hessian_diag(x.data(), d.data()); });
+          [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x, nb::ndarray<real_t> d) {
+              fun->hessian_diag(x.data(), d.data());
+          });
 
     nb::class_<Function>(m, "Function")
-        .def(nb::init<std::shared_ptr<FunctionSpace>>())
-        .def("add_operator", &Function::add_operator)
-        .def("add_dirichlet_conditions", &Function::add_dirichlet_conditions)
-        .def("set_output_dir", &Function::set_output_dir)
-        .def("output", &Function::output);
+            .def(nb::init<std::shared_ptr<FunctionSpace>>())
+            .def("add_operator", &Function::add_operator)
+            .def("add_dirichlet_conditions", &Function::add_dirichlet_conditions)
+            .def("set_output_dir", &Function::set_output_dir)
+            .def("output", &Function::output);
 
     m.def("diag", [](nb::ndarray<real_t> d) -> std::shared_ptr<Operator_t> {
         auto op = std::make_shared<LambdaOperator<real_t>>(
-            d.size(), d.size(), [=](const real_t *const x, real_t *const y) {
-                ptrdiff_t n = d.size();
-                const real_t *d_ = d.data();
+                d.size(),
+                d.size(),
+                [=](const real_t *const x, real_t *const y) {
+                    ptrdiff_t n = d.size();
+                    const real_t *d_ = d.data();
 
 #pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    y[i] = d_[i] * x[i];
-                }
-            }, EXECUTION_SPACE_HOST);
+                    for (ptrdiff_t i = 0; i < n; i++) {
+                        y[i] = d_[i] * x[i];
+                    }
+                },
+                EXECUTION_SPACE_HOST);
 
         return op;
     });
@@ -155,41 +162,39 @@ NB_MODULE(pysfem, m) {
              nb::ndarray<real_t> h,
              nb::ndarray<real_t> y) { fun->apply(x.data(), h.data(), y.data()); });
 
-    m.def("value",
-          [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x) -> real_t {
-              real_t value = 0;
-              fun->value(x.data(), &value);
-              return value;
-          });
+    m.def("value", [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x) -> real_t {
+        real_t value = 0;
+        fun->value(x.data(), &value);
+        return value;
+    });
 
     m.def("gradient",
-          [](std::shared_ptr<Function> &fun,
-             nb::ndarray<real_t> x,
-             nb::ndarray<real_t> y) { fun->gradient(x.data(), y.data()); });
+          [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x, nb::ndarray<real_t> y) {
+              fun->gradient(x.data(), y.data());
+          });
 
     m.def("apply_constraints", [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x) {
         fun->apply_constraints(x.data());
     });
 
-    m.def("apply_zero_constraints",
-          [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x) {
-              fun->apply_zero_constraints(x.data());
-          });
+    m.def("apply_zero_constraints", [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x) {
+        fun->apply_zero_constraints(x.data());
+    });
 
     m.def("constraints_gradient",
-          [](std::shared_ptr<Function> &fun,
-             nb::ndarray<real_t> x,
-             nb::ndarray<real_t> g) { fun->constraints_gradient(x.data(), g.data()); });
+          [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x, nb::ndarray<real_t> g) {
+              fun->constraints_gradient(x.data(), g.data());
+          });
 
     m.def("report_solution", [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x) {
         fun->report_solution(x.data());
     });
 
     nb::class_<DirichletConditions>(m, "DirichletConditions")
-        .def(nb::init<std::shared_ptr<FunctionSpace>>());
+            .def(nb::init<std::shared_ptr<FunctionSpace>>());
 
     nb::class_<NeumannConditions, Op>(m, "NeumannConditions")
-        .def(nb::init<std::shared_ptr<FunctionSpace>>());
+            .def(nb::init<std::shared_ptr<FunctionSpace>>());
 
     m.def("add_condition",
           [](std::shared_ptr<DirichletConditions> &dc,
@@ -204,9 +209,9 @@ NB_MODULE(pysfem, m) {
           });
 
     m.def("apply_value",
-          [](std::shared_ptr<DirichletConditions> &dc,
-             real_t value,
-             nb::ndarray<real_t> y) { dc->apply_value(value, y.data()); });
+          [](std::shared_ptr<DirichletConditions> &dc, real_t value, nb::ndarray<real_t> y) {
+              dc->apply_value(value, y.data());
+          });
 
     m.def("add_condition",
           [](std::shared_ptr<NeumannConditions> &nc,
@@ -220,29 +225,38 @@ NB_MODULE(pysfem, m) {
               nc->add_condition(n, n, c_idx, component, value);
           });
 
-    nb::class_<Operator_t>(m, "Operator");
+    nb::class_<Operator_t>(m, "Operator")
+            .def("__add__",
+                 [](const std::shared_ptr<Operator_t> &l, const std::shared_ptr<Operator_t> &r) {
+                     assert(l->cols() == r->rows());
+                     return sfem::make_op<real_t>(
+                             l->rows(), r->cols(), [=](const real_t *const x, real_t *const y) {
+                                 l->apply(x, y);
+                                 r->apply(x, y);
+                             }, l->execution_space());
+                 });
+
     m.def("make_op",
-          [](std::shared_ptr<Function> &fun,
-             nb::ndarray<real_t> u) -> std::shared_ptr<Operator_t> {
+          [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> u) -> std::shared_ptr<Operator_t> {
               return sfem::make_op<real_t>(
-                  u.size(),
-                  u.size(),
-                  [=](const real_t *const x, real_t *const y) {
-                      memset(y, 0, u.size() * sizeof(real_t));
-                      fun->apply(u.data(), x, y);
-                  }, fun->execution_space());
+                      u.size(),
+                      u.size(),
+                      [=](const real_t *const x, real_t *const y) {
+                          memset(y, 0, u.size() * sizeof(real_t));
+                          fun->apply(u.data(), x, y);
+                      },
+                      fun->execution_space());
           });
 
     nb::class_<ConjugateGradient_t>(m, "ConjugateGradient")
-        .def(nb::init<>())
-        .def("default_init", &ConjugateGradient_t::default_init)
-        .def("set_op", &ConjugateGradient_t::set_op)
-        .def("set_preconditioner_op", &ConjugateGradient_t::set_preconditioner_op)
-        .def("set_max_it", &ConjugateGradient_t::set_max_it)
-        .def("set_verbose", &ConjugateGradient_t::set_verbose)
-        .def("set_rtol", &ConjugateGradient_t::set_rtol)
-        .def("set_atol", &ConjugateGradient_t::set_atol);
-
+            .def(nb::init<>())
+            .def("default_init", &ConjugateGradient_t::default_init)
+            .def("set_op", &ConjugateGradient_t::set_op)
+            .def("set_preconditioner_op", &ConjugateGradient_t::set_preconditioner_op)
+            .def("set_max_it", &ConjugateGradient_t::set_max_it)
+            .def("set_verbose", &ConjugateGradient_t::set_verbose)
+            .def("set_rtol", &ConjugateGradient_t::set_rtol)
+            .def("set_atol", &ConjugateGradient_t::set_atol);
 
     m.def("apply",
           [](std::shared_ptr<ConjugateGradient_t> &cg,

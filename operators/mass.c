@@ -53,6 +53,10 @@ void assemble_mass(const int element_type,
         }
 
         default: {
+            fprintf(stderr,
+                    "assemble_mass not implemented for type %s\n",
+                    type_to_string(element_type));
+            assert(0);
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
     }
@@ -93,6 +97,10 @@ void assemble_lumped_mass(const int element_type,
         }
 
         default: {
+            fprintf(stderr,
+                    "assemble_lumped_mass not implemented for type %s\n",
+                    type_to_string(element_type));
+            assert(0);
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
     }
@@ -134,6 +142,10 @@ void apply_inv_lumped_mass(const int element_type,
         }
 
         default: {
+            fprintf(stderr,
+                    "apply_inv_lumped_mass not implemented for type %s\n",
+                    type_to_string(element_type));
+            assert(0);
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
     }
@@ -172,8 +184,12 @@ void apply_mass(const int element_type,
             //     break;
             // }
 
-        default: {
-            MPI_Abort(MPI_COMM_WORLD, -1);
-        }
+       default: {
+           fprintf(stderr,
+                   "apply_mass not implemented for type %s\n",
+                   type_to_string(element_type));
+           assert(0);
+           MPI_Abort(MPI_COMM_WORLD, -1);
+       }
     }
 }
