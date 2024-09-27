@@ -8,7 +8,9 @@
 #include "sfem_Function.hpp"
 #include "sfem_base.h"
 
+#include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
+#include "sfem_mprgp.hpp"
 
 #include "sfem_Multigrid.hpp"
 
@@ -35,6 +37,8 @@ NB_MODULE(pysfem, m) {
     using LambdaOperator_t = sfem::LambdaOperator<real_t>;
     using Operator_t = sfem::Operator<real_t>;
     using ConjugateGradient_t = sfem::ConjugateGradient<real_t>;
+    using BiCGStab_t = sfem::BiCGStab<real_t>;
+    using MPRGP_t = sfem::MPRGP<real_t>;
 
     m.def("init", &SFEM_init);
     m.def("finalize", &SFEM_finalize);
@@ -181,6 +185,11 @@ NB_MODULE(pysfem, m) {
         fun->apply_zero_constraints(x.data());
     });
 
+    m.def("copy_constrained_dofs",
+          [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x, nb::ndarray<real_t> g) {
+              fun->copy_constrained_dofs(x.data(), g.data());
+          });
+
     m.def("constraints_gradient",
           [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x, nb::ndarray<real_t> g) {
               fun->constraints_gradient(x.data(), g.data());
@@ -230,10 +239,13 @@ NB_MODULE(pysfem, m) {
                  [](const std::shared_ptr<Operator_t> &l, const std::shared_ptr<Operator_t> &r) {
                      assert(l->cols() == r->rows());
                      return sfem::make_op<real_t>(
-                             l->rows(), r->cols(), [=](const real_t *const x, real_t *const y) {
+                             l->rows(),
+                             r->cols(),
+                             [=](const real_t *const x, real_t *const y) {
                                  l->apply(x, y);
                                  r->apply(x, y);
-                             }, l->execution_space());
+                             },
+                             l->execution_space());
                  });
 
     m.def("make_op",
@@ -262,7 +274,46 @@ NB_MODULE(pysfem, m) {
           [](std::shared_ptr<ConjugateGradient_t> &cg,
              nb::ndarray<real_t> x,
              nb::ndarray<real_t> y) {
-              size_t n = x.size();
-              cg->apply(n, x.data(), y.data());
+              cg->apply(x.data(), y.data());
+          });
+
+
+    nb::class_<BiCGStab_t>(m, "BiCGStab")
+            .def(nb::init<>())
+            .def("default_init", &BiCGStab_t::default_init)
+            .def("set_op", &BiCGStab_t::set_op)
+            .def("set_preconditioner_op", &BiCGStab_t::set_preconditioner_op)
+            .def("set_max_it", &BiCGStab_t::set_max_it);
+            // .def("set_verbose", &BiCGStab_t::set_verbose)
+            // .def("set_rtol", &BiCGStab_t::set_rtol)
+            // .def("set_atol", &BiCGStab_t::set_atol);
+
+    m.def("apply",
+          [](std::shared_ptr<BiCGStab_t> &op,
+             nb::ndarray<real_t> x,
+             nb::ndarray<real_t> y) {
+              op->apply(x.data(), y.data());
+          });
+
+    nb::class_<MPRGP_t>(m, "MPRGP")
+            .def(nb::init<>())
+            .def("default_init", &MPRGP_t::default_init)
+            .def("set_op", &MPRGP_t::set_op)
+            .def("set_max_it", &MPRGP_t::set_max_it)
+            .def("set_verbose", &MPRGP_t::set_verbose)
+            .def("set_rtol", &MPRGP_t::set_rtol)
+            .def("set_atol", &MPRGP_t::set_atol);
+
+    m.def("set_upper_bound",
+          [](std::shared_ptr<MPRGP_t> &op,
+             nb::ndarray<real_t> &x) {
+              op->set_upper_bound(sfem::Buffer<real_t>::wrap(x.size(), x.data()));
+          });
+
+    m.def("apply",
+          [](std::shared_ptr<MPRGP_t> &op,
+             nb::ndarray<real_t> x,
+             nb::ndarray<real_t> y) {
+              op->apply(x.data(), y.data());
           });
 }

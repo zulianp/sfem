@@ -30,14 +30,13 @@ if [[ -d "$mesh" ]]
 then
 	echo "Reusing existing $mesh database"
 else
-	# create_cyclic_hex8_mesh.sh 1
-	create_cylinder.sh 2
+	create_cylinder.sh 0
 fi
 
 dims=3
 ./obstacle.py $mesh output
 
-files=`ls output/disp.*raw`
+files=`ls output/*.raw`
 mkdir -p output/soa
 
 for f in ${files[@]}
@@ -53,4 +52,4 @@ do
 done
 
 raw_to_db.py $mesh out.vtk  \
- --point_data="output/soa/disp.0.*.raw,output/soa/disp.1.*.raw,output/soa/disp.2.*.raw" 
+ --point_data="output/soa/*.raw" 
