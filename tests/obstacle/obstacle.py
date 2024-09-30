@@ -9,7 +9,7 @@ import sys, getopt, os
 idx_t = np.int32
 real_t = np.float64
 
-MAX_NL_ITER = 100
+MAX_NL_ITER = 200
 
 # Assemble matrix in scipy format
 def assemble_scipy_matrix(fun, x):
@@ -59,7 +59,7 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 	# lop = sfem.make_op(fun, x)
 
 	# Solver params
-	max_linear_iterations = 30
+	max_linear_iterations = 60
 	penalty_param = 1
 	
 	use_cheb = True
@@ -183,14 +183,26 @@ def solve_obstacle(options):
 	# Obstacle
 	obs = np.ones(fs.n_dofs(), dtype=real_t) * 10000
 	constrained_dofs = sobstacle[:] * dim
-	sdf = (wall - sfem.points(m, 0)).astype(real_t)
+
+	sy = sfem.points(m, 1)
+	sz = sfem.points(m, 2)
+
+	indentation = 1
+
+	radius = ((0.5 - np.sqrt(sy*sy + sz*sz)))
+	# f = radius**2
+	f = -0.1*np.cos(np.pi*4*radius) - 0.1
+	parabola = -indentation * f + wall
+	print(np.min(wall), np.max(sy*sy) )
+
+	sdf = (parabola - sfem.points(m, 0)).astype(real_t)
 	obs[constrained_dofs] = sdf[sobstacle]
 
 	for d in range(1, dim):
 		obs[d::dim] = 10000
 
-	use_penalty = False
-	# use_penalty = True
+	# use_penalty = False
+	use_penalty = True
 	
 	if use_penalty:
 		solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out)
@@ -199,7 +211,15 @@ def solve_obstacle(options):
 		solver.default_init()
 		solver.set_atol(1e-12)
 		solver.set_rtol(1e-6);
-		solver.set_max_it(600)
+		solver.set_max_it(2000)
+
+		# Matrix-based
+		lop = assemble_crs_spmv(fun, x)
+
+		# Matrix-free
+		# lop = sfem.make_op(fun, x)
+
+		solver.set_op(lop)
 
 		c = np.zeros(fs.n_dofs(), dtype=real_t)
 		g = np.zeros(fs.n_dofs(), dtype=real_t)
@@ -210,9 +230,7 @@ def solve_obstacle(options):
 
 			g[:] = 0.
 			sfem.gradient(fun, x, g)
-			lop = sfem.make_op(fun, x)
-			solver.set_op(lop)
-
+			
 			c[:] = 0.
 			sfem.apply(solver, -g, c)
 
