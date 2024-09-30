@@ -222,9 +222,9 @@ namespace sfem {
             this->blas.axpby(n_dofs, -1, b, 1, g);
         }
 
-        void monitor(const int iter, const T residual) {
-            if (iter == max_it || iter % check_each == 0 || residual < atol) {
-                std::cout << iter << ": " << residual << "\n";
+        void monitor(const int iter, const T residual, const T rel_residual) {
+            if (iter == max_it || iter % check_each == 0 || residual < atol || rel_residual < rtol) {
+                std::cout << iter << ": " << residual << " " << rel_residual << "\n";
             }
         }
 
@@ -237,7 +237,7 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            int it = 0;
+            
             bool converged = false;
 
             T norm_gp = -1;
@@ -270,7 +270,8 @@ namespace sfem {
             this->gradient(x, b, g);
 
             T norm_g = this->blas.norm2(n_dofs, g);
-            this->monitor(0, norm_g);
+            this->monitor(0, norm_g, 1);
+            T norm_gp0 = norm_g;
 
             this->free_gradient(x, g, gf_or_gc);
             this->blas.copy(n_dofs, gf_or_gc, p);
@@ -279,6 +280,8 @@ namespace sfem {
             int count_expansion_steps = 0;
             int count_proportioning_steps = 0;
 
+            int it = 0;
+            
             while (!converged) {
                 norm_gradients(x, g, &norm_gf, &norm_gc);
 
@@ -322,9 +325,10 @@ namespace sfem {
 
                 // Check for convergence
                 const T norm_gp = this->norm_projected_gradient(x, g);
-                converged = norm_gp < atol;
+                const T rel_norm_gp = norm_gp/norm_gp0;
+                converged = norm_gp < atol || rel_norm_gp < rtol;
 
-                monitor(it, norm_gp);
+                monitor(it, norm_gp, rel_norm_gp);
                 if (++it >= max_it) {
                     break;
                 }

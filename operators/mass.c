@@ -156,17 +156,19 @@ void apply_mass(const int element_type,
                 const ptrdiff_t nnodes,
                 idx_t **const SFEM_RESTRICT elems,
                 geom_t **const SFEM_RESTRICT xyz,
+                const ptrdiff_t stride_x,
                 const real_t *const x,
+                const ptrdiff_t stride_values,
                 real_t *const values) {
     if (!nelements) return;
 
     switch (element_type) {
         case TRI3: {
-            tri3_apply_mass(nelements, nnodes, elems, xyz, x, values);
+            tri3_apply_mass(nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
             break;
         }
         case TRISHELL3: {
-            trishell3_apply_mass(nelements, nnodes, elems, xyz, x, values);
+            trishell3_apply_mass(nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
             break;
         }
             // case TRI6: {
@@ -184,12 +186,12 @@ void apply_mass(const int element_type,
             //     break;
             // }
 
-       default: {
-           fprintf(stderr,
-                   "apply_mass not implemented for type %s\n",
-                   type_to_string(element_type));
-           assert(0);
-           MPI_Abort(MPI_COMM_WORLD, -1);
-       }
+        default: {
+            fprintf(stderr,
+                    "apply_mass not implemented for type %s\n",
+                    type_to_string(element_type));
+            assert(0);
+            MPI_Abort(MPI_COMM_WORLD, -1);
+        }
     }
 }

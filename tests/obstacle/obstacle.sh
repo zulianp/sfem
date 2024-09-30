@@ -30,11 +30,17 @@ if [[ -d "$mesh" ]]
 then
 	echo "Reusing existing $mesh database"
 else
-	create_cylinder.sh 0
+	create_cylinder.sh 1
 fi
 
 dims=3
-./obstacle.py $mesh output
+# python3 -m cProfile  -s time 
+
+echo  "---------------------------------"
+echo "Solving ostacle problem"
+echo  "---------------------------------"
+time ./obstacle.py $mesh output
+echo  "---------------------------------"
 
 files=`ls output/*.raw`
 mkdir -p output/soa
