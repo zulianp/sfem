@@ -369,7 +369,9 @@ int main(int argc, char *argv[]) {
                                mesh.nnodes,
                                mesh.elements,
                                mesh.points,
+                               1,
                                rhs_values[i],
+                               1,
                                rhs[i]);
                 }
             }

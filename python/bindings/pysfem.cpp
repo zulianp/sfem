@@ -8,10 +8,12 @@
 #include "sfem_Function.hpp"
 #include "sfem_base.h"
 
+#include "sfem_Chebyshev3.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_mprgp.hpp"
 
+#include "sfem_API.hpp"
 #include "sfem_Multigrid.hpp"
 
 namespace nb = nanobind;
@@ -38,7 +40,11 @@ NB_MODULE(pysfem, m) {
     using Operator_t = sfem::Operator<real_t>;
     using ConjugateGradient_t = sfem::ConjugateGradient<real_t>;
     using BiCGStab_t = sfem::BiCGStab<real_t>;
+    using Chebyshev3_t = sfem::Chebyshev3<real_t>;
     using MPRGP_t = sfem::MPRGP<real_t>;
+    using IdxBuffer2D = sfem::Buffer<idx_t *>;
+    using IdxBuffer = sfem::Buffer<idx_t>;
+    using CountBuffer = sfem::Buffer<count_t>;
 
     m.def("init", &SFEM_init);
     m.def("finalize", &SFEM_finalize);
@@ -49,6 +55,48 @@ NB_MODULE(pysfem, m) {
             .def("n_nodes", &Mesh::n_nodes)
             .def("convert_to_macro_element_mesh", &Mesh::convert_to_macro_element_mesh)
             .def("spatial_dimension", &Mesh::spatial_dimension);
+
+    m.def("mesh_connectivity_from_file", [](const char *folder) -> std::shared_ptr<IdxBuffer2D> {
+        return sfem::mesh_connectivity_from_file(MPI_COMM_WORLD, folder);
+    });
+
+    nb::class_<IdxBuffer2D>(m, "IdxBuffer2D");
+    nb::class_<sfem::Buffer<int>>(m, "Buffer<int>");
+    nb::class_<sfem::Buffer<long>>(m, "Buffer<long>");
+    nb::class_<sfem::Buffer<float>>(m, "Buffer<float>");
+    nb::class_<sfem::Buffer<double>>(m, "Buffer<double>");
+
+    m.def("create_real_buffer", [](const ptrdiff_t n) -> std::shared_ptr<sfem::Buffer<real_t>> {
+        return sfem::h_buffer<real_t>(n);
+    });
+
+    m.def("numpy_view",
+          [](const std::shared_ptr<sfem::Buffer<int>> &b) -> nb::ndarray<nb::numpy, int> {
+              return nb::ndarray<nb::numpy, int>(b->data(), {(size_t)b->size()}, nb::handle());
+          });
+
+    m.def("numpy_view",
+          [](const std::shared_ptr<sfem::Buffer<long>> &b) -> nb::ndarray<nb::numpy, long> {
+              return nb::ndarray<nb::numpy, long>(b->data(), {(size_t)b->size()}, nb::handle());
+          });
+
+    m.def("numpy_view",
+          [](const std::shared_ptr<sfem::Buffer<double>> &b) -> nb::ndarray<nb::numpy, double> {
+              return nb::ndarray<nb::numpy, double>(b->data(), {(size_t)b->size()}, nb::handle());
+          });
+
+    m.def("numpy_view",
+          [](const std::shared_ptr<sfem::Buffer<float>> &b) -> nb::ndarray<nb::numpy, float> {
+              return nb::ndarray<nb::numpy, float>(b->data(), {(size_t)b->size()}, nb::handle());
+          });
+
+    m.def("view", [](nb::ndarray<nb::numpy, float> &v) -> std::shared_ptr<sfem::Buffer<float>> {
+        return sfem::Buffer<float>::wrap(v.size(), v.data(), sfem::MEMORY_SPACE_HOST);
+    });
+
+    m.def("view", [](nb::ndarray<nb::numpy, double> &v) -> std::shared_ptr<sfem::Buffer<double>> {
+        return sfem::Buffer<double>::wrap(v.size(), v.data(), sfem::MEMORY_SPACE_HOST);
+    });
 
     m.def("create_mesh",
           [](const char *elem_type_name,
@@ -98,6 +146,7 @@ NB_MODULE(pysfem, m) {
 
     nb::class_<Op>(m, "Op");
     m.def("create_op", &Factory::create_op);
+    m.def("create_boundary_op", &Factory::create_boundary_op);
 
     nb::class_<Output>(m, "Output")
             .def("set_output_dir", &Output::set_output_dir)
@@ -135,12 +184,53 @@ NB_MODULE(pysfem, m) {
               fun->hessian_diag(x.data(), d.data());
           });
 
+    m.def("hessian_crs",
+          [](std::shared_ptr<Function> fun,
+             std::shared_ptr<sfem::Buffer<real_t>> x,
+             std::shared_ptr<sfem::Buffer<count_t>> rowptr,
+             std::shared_ptr<sfem::Buffer<idx_t>> colidx,
+             std::shared_ptr<sfem::Buffer<real_t>> values) {
+              fun->hessian_crs(x->data(), rowptr->data(), colidx->data(), values->data());
+          });
+
+    m.def("crs_spmv",
+          [](nb::ndarray<count_t> rowptr,
+             nb::ndarray<idx_t> colidx,
+             nb::ndarray<real_t> values) -> std::shared_ptr<Operator_t> {
+              return sfem::h_crs_spmv(
+                      rowptr.size() - 1,
+                      rowptr.size() - 1,
+                      sfem::Buffer<count_t>::wrap(
+                              rowptr.size(), rowptr.data(), sfem::MEMORY_SPACE_HOST),
+                      sfem::Buffer<idx_t>::wrap(
+                              colidx.size(), colidx.data(), sfem::MEMORY_SPACE_HOST),
+                      sfem::Buffer<real_t>::wrap(
+                              values.size(), values.data(), sfem::MEMORY_SPACE_HOST),
+                      real_t(0));
+          });
+
+    m.def("crs_spmv",
+          [](std::shared_ptr<sfem::Buffer<count_t>> rowptr,
+             std::shared_ptr<sfem::Buffer<idx_t>> colidx,
+             std::shared_ptr<sfem::Buffer<real_t>> values) -> std::shared_ptr<Operator_t> {
+              return sfem::h_crs_spmv(
+                      rowptr->size() - 1, rowptr->size() - 1, rowptr, colidx, values, real_t(0));
+          });
+
+    nb::class_<CRSGraph>(m, "CRSGraph")
+            .def("n_nodes", &CRSGraph::n_nodes)
+            .def("nnz", &CRSGraph::nnz)
+            .def("rowptr", &CRSGraph::rowptr)
+            .def("colidx", &CRSGraph::colidx);
+
     nb::class_<Function>(m, "Function")
             .def(nb::init<std::shared_ptr<FunctionSpace>>())
             .def("add_operator", &Function::add_operator)
+            .def("space", &Function::space)
             .def("add_dirichlet_conditions", &Function::add_dirichlet_conditions)
             .def("set_output_dir", &Function::set_output_dir)
-            .def("output", &Function::output);
+            .def("output", &Function::output)
+            .def("crs_graph", &Function::crs_graph);
 
     m.def("diag", [](nb::ndarray<real_t> d) -> std::shared_ptr<Operator_t> {
         auto op = std::make_shared<LambdaOperator<real_t>>(
@@ -246,6 +336,27 @@ NB_MODULE(pysfem, m) {
                                  r->apply(x, y);
                              },
                              l->execution_space());
+                 })
+            .def("__mul__",
+                 [](const std::shared_ptr<Operator_t> &l, const std::shared_ptr<Operator_t> &r) {
+                     assert(l->cols() == r->rows());
+
+                     auto temp = sfem::create_buffer<real_t>(l->rows(), l->execution_space());
+
+                     return sfem::make_op<real_t>(
+                             l->rows(),
+                             r->cols(),
+                             [=](const real_t *const x, real_t *const y) {
+                                 auto data = temp->data();
+                                 ptrdiff_t n = l->rows();
+#pragma omp parallel for
+                                 for (ptrdiff_t i = 0; i < n; i++) {
+                                     data[i] = 0;
+                                 }
+                                 r->apply(x, data);
+                                 l->apply(data, y);
+                             },
+                             l->execution_space());
                  });
 
     m.def("make_op",
@@ -258,6 +369,11 @@ NB_MODULE(pysfem, m) {
                           fun->apply(u.data(), x, y);
                       },
                       fun->execution_space());
+          });
+
+    m.def("apply",
+          [](const std::shared_ptr<Operator_t> &op, nb::ndarray<real_t> x, nb::ndarray<real_t> y) {
+              op->apply(x.data(), y.data());
           });
 
     nb::class_<ConjugateGradient_t>(m, "ConjugateGradient")
@@ -273,10 +389,7 @@ NB_MODULE(pysfem, m) {
     m.def("apply",
           [](std::shared_ptr<ConjugateGradient_t> &cg,
              nb::ndarray<real_t> x,
-             nb::ndarray<real_t> y) {
-              cg->apply(x.data(), y.data());
-          });
-
+             nb::ndarray<real_t> y) { cg->apply(x.data(), y.data()); });
 
     nb::class_<BiCGStab_t>(m, "BiCGStab")
             .def(nb::init<>())
@@ -284,14 +397,28 @@ NB_MODULE(pysfem, m) {
             .def("set_op", &BiCGStab_t::set_op)
             .def("set_preconditioner_op", &BiCGStab_t::set_preconditioner_op)
             .def("set_max_it", &BiCGStab_t::set_max_it);
-            // .def("set_verbose", &BiCGStab_t::set_verbose)
-            // .def("set_rtol", &BiCGStab_t::set_rtol)
-            // .def("set_atol", &BiCGStab_t::set_atol);
+    // .def("set_verbose", &BiCGStab_t::set_verbose)
+    // .def("set_rtol", &BiCGStab_t::set_rtol)
+    // .def("set_atol", &BiCGStab_t::set_atol);
+
+    nb::class_<Chebyshev3_t>(m, "Chebyshev3")
+            .def(nb::init<>())
+            .def("default_init", &Chebyshev3_t::default_init)
+            .def("set_op", &Chebyshev3_t::set_op)
+            // .def("set_preconditioner_op", &Chebyshev3_t::set_preconditioner_op)
+            .def("set_max_it", &Chebyshev3_t::set_max_it)
+            .def("set_verbose", &Chebyshev3_t::set_verbose)
+            .def("init_with_ones", &Chebyshev3_t::init_with_ones)
+            // .def("set_rtol", &Chebyshev3_t::set_rtol)
+            .def("set_atol", &Chebyshev3_t::set_atol);
 
     m.def("apply",
-          [](std::shared_ptr<BiCGStab_t> &op,
-             nb::ndarray<real_t> x,
-             nb::ndarray<real_t> y) {
+          [](std::shared_ptr<Chebyshev3_t> &op, nb::ndarray<real_t> x, nb::ndarray<real_t> y) {
+              op->apply(x.data(), y.data());
+          });
+
+    m.def("apply",
+          [](std::shared_ptr<BiCGStab_t> &op, nb::ndarray<real_t> x, nb::ndarray<real_t> y) {
               op->apply(x.data(), y.data());
           });
 
@@ -304,16 +431,11 @@ NB_MODULE(pysfem, m) {
             .def("set_rtol", &MPRGP_t::set_rtol)
             .def("set_atol", &MPRGP_t::set_atol);
 
-    m.def("set_upper_bound",
-          [](std::shared_ptr<MPRGP_t> &op,
-             nb::ndarray<real_t> &x) {
-              op->set_upper_bound(sfem::Buffer<real_t>::wrap(x.size(), x.data()));
-          });
+    m.def("set_upper_bound", [](std::shared_ptr<MPRGP_t> &op, nb::ndarray<real_t> &x) {
+        op->set_upper_bound(sfem::Buffer<real_t>::wrap(x.size(), x.data()));
+    });
 
-    m.def("apply",
-          [](std::shared_ptr<MPRGP_t> &op,
-             nb::ndarray<real_t> x,
-             nb::ndarray<real_t> y) {
-              op->apply(x.data(), y.data());
-          });
+    m.def("apply", [](std::shared_ptr<MPRGP_t> &op, nb::ndarray<real_t> x, nb::ndarray<real_t> y) {
+        op->apply(x.data(), y.data());
+    });
 }
