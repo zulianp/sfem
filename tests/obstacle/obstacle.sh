@@ -30,7 +30,7 @@ if [[ -d "$mesh" ]]
 then
 	echo "Reusing existing $mesh database"
 else
-	create_cylinder.sh 1
+	create_cylinder.sh 2
 fi
 
 dims=3
@@ -59,3 +59,9 @@ done
 
 raw_to_db.py $mesh out.vtk  \
  --point_data="output/soa/*.raw" 
+
+
+set -x
+raw_to_db.py $mesh/surface/outlet obstacle.vtk  \
+	--coords=$mesh \
+  	--point_data="output/soa/obs.0.raw.raw" 
