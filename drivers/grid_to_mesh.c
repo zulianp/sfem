@@ -109,9 +109,9 @@ int main(int argc, char* argv[]) {
             for (ptrdiff_t i = 0; i < n_zyx; i++) {
                 field[i] = (real_t)(temp[i]);
 
-                norm_temp += temp[i] * temp[i];
-                max_temp = fmax(max_temp, temp[i]);
-                min_temp = fmin(min_temp, temp[i]);
+                norm_temp += (double)(temp[i] * temp[i]);
+                max_temp = (double)(fmax(max_temp, temp[i]));
+                min_temp = (double)(fmin(min_temp, temp[i]));
             }
 
             norm_temp = sqrt(norm_temp);
