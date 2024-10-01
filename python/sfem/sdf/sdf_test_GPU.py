@@ -10,7 +10,7 @@ print("sdf_test_GPU.py: ==========================================")
 
 sdf_t = cp.float32
 
-D = 600
+D = 100
 dims = (D, D, D)
 
 print(f'sdf_test_GPU.py: Generating field of size {dims[0]} x {dims[1]} x {dims[2]}')
@@ -72,6 +72,10 @@ pdir = os.path.dirname(fname)
 
 if pdir == "":
     pdir = "./"
+
+# compute the norm of the field
+norm = cp.linalg.norm(field)
+print(f'sdf_test_GPU.py: Norm of field: {norm}')
 
 fname = os.path.basename(fname)
 
