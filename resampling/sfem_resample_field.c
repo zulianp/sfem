@@ -871,6 +871,15 @@ int resample_field_local(
         case TET10: {
 // #define TET10_V2
 
+double norm_data = 0.0;
+for (ptrdiff_t i = 0; i < n[0] * n[1] * n[2]; i++) {
+    norm_data += data[i] * data[i];
+}
+
+norm_data = sqrt(norm_data);
+printf("norm_data input = %g   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n", norm_data);
+
+
 #ifdef TET10_V2  // V2
             return hex8_to_tet10_resample_field_local_CUDA(
                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
