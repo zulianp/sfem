@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
     }
 
     // ptrdiff_t n = nglobal[0] * nglobal[1] * nglobal[2];
-    real_t* field = 0;
+    real_t* field = NULL;
     ptrdiff_t nlocal[3];
 
     int SFEM_READ_FP32 = 0;
@@ -101,7 +101,9 @@ int main(int argc, char* argv[]) {
             double min_temp = temp[0];
 
             ptrdiff_t n_zyx = nlocal[0] * nlocal[1] * nlocal[2];
+            
             field = malloc(n_zyx * sizeof(real_t));
+
             for (ptrdiff_t i = 0; i < n_zyx; i++) {
                 field[i] = (real_t)(temp[i]);
 
@@ -129,8 +131,8 @@ int main(int argc, char* argv[]) {
             double filed_max = field[0];
             double filed_min = field[0];
 
-            ptrdiff_t n_zyx = nlocal[0] * nlocal[1] * nlocal[2];
-            for(ptrdiff_t i = 0; i < n_zyx; i++) {
+            ptrdiff_t n_zyx_private = nlocal[0] * nlocal[1] * nlocal[2];
+            for(ptrdiff_t i = 0; i < n_zyx_private; i++) {
                 filed_norm += field[i] * field[i];
                 filed_max = fmax(filed_max, field[i]);
                 filed_min = fmin(filed_min, field[i]);
@@ -140,6 +142,7 @@ int main(int argc, char* argv[]) {
             printf("filed_norm = %1.14e , %s:%d\n", filed_norm, __FILE__, __LINE__);
             printf("filed_max  = %1.14e , %s:%d\n", filed_max, __FILE__, __LINE__);
             printf("filed_min  = %1.14e , %s:%d\n", filed_min, __FILE__, __LINE__);
+            printf("n_zyx_private     = %ld , %s:%d\n", n_zyx_private, __FILE__, __LINE__);
         }
         double ndarray_read_tock = MPI_Wtime();
 
