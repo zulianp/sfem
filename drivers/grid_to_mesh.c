@@ -81,8 +81,10 @@ int main(int argc, char* argv[]) {
     real_t* field = NULL;
     ptrdiff_t nlocal[3];
 
-    int SFEM_READ_FP32 = 0;
+    int SFEM_READ_FP32 = 1;
     SFEM_READ_ENV(SFEM_READ_FP32, atoi);
+
+    printf("SFEM_READ_FP32 = %d, %s:%d\n", SFEM_READ_FP32, __FILE__, __LINE__);
 
     {
         double ndarray_read_tick = MPI_Wtime();
@@ -113,11 +115,14 @@ int main(int argc, char* argv[]) {
             }
 
             norm_temp = sqrt(norm_temp);
+
+            printf("\n");
             printf("norm_temp = %1.14e , %s:%d\n", norm_temp, __FILE__, __LINE__);
             printf("max_temp  = %1.14e , %s:%d\n", max_temp, __FILE__, __LINE__);
             printf("min_temp  = %1.14e , %s:%d\n", min_temp, __FILE__, __LINE__);
             printf("n_zyx     = %ld , %s:%d\n", n_zyx, __FILE__, __LINE__);
             printf("field == NULL: %s, %s:%d\n", field == NULL ? "true" : "false", __FILE__, __LINE__);
+            printf("size field = %ld MB , %s:%d\n", (n_zyx * sizeof(real_t) / 1024 / 1024), __FILE__, __LINE__);
 
             free(temp);
 
