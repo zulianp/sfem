@@ -124,6 +124,23 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        {
+            double filed_norm = 0.0;
+            double filed_max = field[0];
+            double filed_min = field[0];
+
+            ptrdiff_t n_zyx = nlocal[0] * nlocal[1] * nlocal[2];
+            for(ptrdiff_t i = 0; i < n_zyx; i++) {
+                filed_norm += field[i] * field[i];
+                filed_max = fmax(filed_max, field[i]);
+                filed_min = fmin(filed_min, field[i]);
+            }
+
+            filed_norm = sqrt(filed_norm);
+            printf("filed_norm = %1.14e , %s:%d\n", filed_norm, __FILE__, __LINE__);
+            printf("filed_max  = %1.14e , %s:%d\n", filed_max, __FILE__, __LINE__);
+            printf("filed_min  = %1.14e , %s:%d\n", filed_min, __FILE__, __LINE__);
+        }
         double ndarray_read_tock = MPI_Wtime();
 
         if (!rank) {
