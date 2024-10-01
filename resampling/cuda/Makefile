@@ -3,8 +3,16 @@ GPU_ARCH ?= sm_75
 
 VERBOSE_FLAG = 
 VERBOSE ?= off
+CUDA_HOST_COMPILER ?=
 
-OPT_FLAGS = -O3 -use_fast_math -Xptxas=-O3,-v  -Xcompiler=-O3,-march=native,-mtune=native
+# if the user has not set the CUDA_HOST_COMPILER, we will use the default nvcc
+ifeq (${CUDA_HOST_COMPILER},)
+	CUDA_HOST_COMPILER=""
+else
+	CUDA_HOST_COMPILER_="--compiler-bindir=${CUDA_HOST_COMPILER}"
+endif
+
+OPT_FLAGS = -O3 -use_fast_math ${CUDA_HOST_COMPILER_}  -Xptxas=-O3,-v  -Xcompiler=-O3,-march=native,-mtune=native
 
 ifeq (${VERBOSE}, on)
 	VERBOSE_FLAG = -v
