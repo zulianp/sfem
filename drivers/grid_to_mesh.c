@@ -117,6 +117,8 @@ int main(int argc, char* argv[]) {
             printf("max_temp  = %1.14e , %s:%d\n", max_temp, __FILE__, __LINE__);
             printf("min_temp  = %1.14e , %s:%d\n", min_temp, __FILE__, __LINE__);
             printf("n_zyx     = %ld , %s:%d\n", n_zyx, __FILE__, __LINE__);
+            printf("field == NULL: %s, %s:%d\n", field == NULL ? "true" : "false", __FILE__, __LINE__);
+
             free(temp);
 
         } else {
