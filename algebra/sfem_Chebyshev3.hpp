@@ -38,7 +38,8 @@ namespace sfem {
         std::shared_ptr<Buffer<T>> p_, temp_;
 
         // Solver parameters
-        T tol{1e-10};
+        T atol{1e-10};
+        T rtol{1e-10};
         T eigen_solver_tol{1e-6};
         int max_it{3};
 
@@ -47,14 +48,21 @@ namespace sfem {
         T scale_eig_min{0.06};
         ptrdiff_t n_dofs{-1};
         bool is_initial_guess_zero{false};
+        bool verbose{true};
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
+
+        void set_atol(const T val) { atol = val; }
+        void set_rtol(const T val) { rtol = val; }
+
+        void set_verbose(const bool val) { verbose = val; }
 
         ExecutionSpace execution_space() const override { return execution_space_; }
 
         void set_initial_guess_zero(const bool val) override { is_initial_guess_zero = val; }
 
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
+            n_dofs = op->rows();
             this->apply_op = [=](const T* const x, T* const y) { op->apply(x, y); };
         }
 
@@ -155,7 +163,7 @@ namespace sfem {
         }
 
         void monitor(const int iter, const T residual) {
-            if (iter == max_it || iter % 100 == 0 || residual < tol) {
+            if (iter == max_it || iter % 100 == 0 || residual < atol) {
                 std::cout << iter << ": " << residual << "\n";
             }
         }
@@ -164,6 +172,19 @@ namespace sfem {
             assert(power_method);
             return power_method->max_eigen_value(
                     apply_op, 10000, this->eigen_solver_tol, this->rows(), guess_eigenvector, work);
+        }
+
+        void init_with_ones() {
+            T* work = allocate(this->rows());
+            auto ones = Buffer<T>::own(this->rows(), work, destroy);
+            assert(execution_space_ == EXECUTION_SPACE_HOST);
+
+            auto v = ones->data();
+            for(ptrdiff_t i = 0; i < this->rows(); i++) {
+                v[i] = 1;
+            }   
+
+            init(ones->data());
         }
 
         void init(const T* const guess_eigenvector) {

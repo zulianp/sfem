@@ -37,6 +37,7 @@ find_package(ISolver REQUIRED)
 
 set(SFEM_MODULES
     algebra base matrix mesh pizzastack solver
+    algebra/openmp
     operators 
     operators/beam2 
     operators/cvfem 
@@ -58,8 +59,7 @@ set(SFEM_MODULES
     operators/proteus_hex8
     operators/hierarchical
     operators/hex8
-
-    )
+)
 
 if(SFEM_ENABLE_RESAMPLING)
     list(APPEND SFEM_MODULES
@@ -83,6 +83,7 @@ if(SFEM_ENABLE_CUDA)
         operators/macro_tet4/cuda
         operators/tet10/cuda
         operators/proteus_tet4/cuda
+        operators/proteus_hex8/cuda
         operators/hierarchical/cuda
         )
 endif()
@@ -244,11 +245,11 @@ install(FILES ${CMAKE_BINARY_DIR}/sfem_config.h DESTINATION include)
 
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/configuration/sfem_config.py.in
-    ${CMAKE_CURRENT_SOURCE_DIR}/python/sfem/sfem_config.py)
+    ${CMAKE_BINARY_DIR}/sfem_config.py)
 
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/configuration/sfem_config.sh.in
-    ${CMAKE_CURRENT_SOURCE_DIR}/workflows/sfem_config.sh)
+    ${CMAKE_BINARY_DIR}/sfem_config.sh)
 
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/python/sfem/sfem_config.py DESTINATION scripts/sfem)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/workflows/sfem_config.sh DESTINATION workflows)
@@ -265,7 +266,7 @@ install(
 # Python scripts
 ######################################################
 
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/python/sfem DESTINATION scripts)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/python/sfem DESTINATION scripts USE_SOURCE_PERMISSIONS)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/python/requirements.txt DESTINATION scripts)
 
 

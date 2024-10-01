@@ -440,14 +440,25 @@ int tet4_neohookean_ogden_gradient(const ptrdiff_t nelements,
             scalar_t diffx = test_vector[0 + k * 3] - element_outx[k];
             scalar_t diffy = test_vector[1 + k * 3] - element_outy[k];
             scalar_t diffz = test_vector[2 + k * 3] - element_outz[k];
+
+#ifndef NDEBUG
+            if(fabs(diffx) >= 1e-12 || fabs(diffy) >= 1e-12 || fabs(diffz) >= 1e-12) {
+                fprintf(stderr, "%d)\n", k);
+                fprintf(stderr, "x: %g - %g = %g\n", test_vector[0 + k * 3], element_outx[k], diffx);
+                fprintf(stderr, "y: %g - %g = %g\n", test_vector[1 + k * 3], element_outy[k], diffy);
+                fprintf(stderr, "z: %g - %g = %g\n", test_vector[2 + k * 3], element_outz[k], diffz);
+                fflush(stderr);
+            }
+#endif
+
+            assert(diffx == diffx);
+            assert(diffy == diffy);
+            assert(diffz == diffz);
+
             assert(fabs(diffx) < 1e-12);
             assert(fabs(diffy) < 1e-12);
             assert(fabs(diffz) < 1e-12);
 
-            // printf("%d)\n", k);
-            // printf("x: %g - %g = %g\n", test_vector[0 + k * 3], element_outx[k], diffx);
-            // printf("y: %g - %g = %g\n", test_vector[1 + k * 3], element_outy[k], diffy);
-            // printf("z: %g - %g = %g\n", test_vector[2 + k * 3], element_outz[k], diffz);
         }
 
 #endif  // NDEBUG

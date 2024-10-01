@@ -235,8 +235,6 @@ class FE:
 				sls.append(var)
 		return sp.Matrix(rows, cols, sls)
 
-
-
 	def symbol_jacobian_determinant(self):
 		return sp.symbols('jacobian_determinant')
 

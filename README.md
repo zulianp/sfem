@@ -41,7 +41,26 @@ make && make install
 export PYTHONPATH=$INSTALL_DIR/sfem/lib:$INSTALL_DIR/sfem/scripts:$PYTHONPATH
 ```
 
-# Piz Daint
+# New Piz daint
+
+Install the `uenv` machinery (https://confluence.cscs.ch/display/KB/UENV+user+environments)
+
+```bash
+uenv image pull prgenv-gnu/24.7:v3
+uenv start prgenv-gnu/24.7:v3
+uenv view default
+
+# Remeber to compile matrix.io
+
+# In the sfem folder
+mkdir build && \
+cd build && \
+cmake .. -DSFEM_ENABLE_CUDA=ON -DSFEM_ENABLE_PYTHON=ON -DSFEM_ENABLE_OPENMP=ON -DCMAKE_C_COMPILER=mpicc -DCMAKE_CXX_COMPILER=mpicxx && \
+make -j12
+```
+
+
+# OLD Piz Daint (XC50/XC40)
 
 On Piz Daint the ideal environment is obtained with
 ```bash

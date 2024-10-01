@@ -12,7 +12,8 @@
 #include "sfem_MatrixFreeLinearSolver.hpp"
 
 // https://en.wikipedia.org/wiki/Conjugate_gradient_method
-// Must check: https://www.dcs.warwick.ac.uk/pmbs/pmbs14/PMBS14/Workshop_Schedule_files/8-CUDAHPCG.pdf
+// Must check:
+// https://www.dcs.warwick.ac.uk/pmbs/pmbs14/PMBS14/Workshop_Schedule_files/8-CUDAHPCG.pdf
 namespace sfem {
 
     template <typename T>
@@ -44,25 +45,18 @@ namespace sfem {
 
         ExecutionSpace execution_space() const override { return execution_space_; }
 
-        void set_atol(const T val){
-            atol = val;
-        }
+        void set_atol(const T val) { atol = val; }
 
-        void set_rtol(const T val){
-            rtol = val;
-        }
+        void set_rtol(const T val) { rtol = val; }
 
-        void set_verbose(const bool val)
-        {
-            verbose = val;
-        }
-
+        void set_verbose(const bool val) { verbose = val; }
 
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
 
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
             this->apply_op = [=](const T* const x, T* const y) { op->apply(x, y); };
+            n_dofs = op->rows();
         }
 
         void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) override {
@@ -95,17 +89,18 @@ namespace sfem {
                 return ret;
             };
 
-            axpby =
-                [](const ptrdiff_t n, const T alpha, const T* const x, const T beta, T* const y) {
+            axpby = [](const ptrdiff_t n,
+                       const T alpha,
+                       const T* const x,
+                       const T beta,
+                       T* const y) {
 #pragma omp parallel for
-                    for (ptrdiff_t i = 0; i < n; i++) {
-                        y[i] = alpha * x[i] + beta * y[i];
-                    }
-                };
-
-            zeros = [](const std::size_t n, T* const x) {
-                memset(x, 0, n*sizeof(T));
+                for (ptrdiff_t i = 0; i < n; i++) {
+                    y[i] = alpha * x[i] + beta * y[i];
+                }
             };
+
+            zeros = [](const std::size_t n, T* const x) { memset(x, 0, n * sizeof(T)); };
 
             execution_space_ = EXECUTION_SPACE_HOST;
         }
@@ -122,10 +117,12 @@ namespace sfem {
         }
 
         void monitor(const int iter, const T residual, const T relative_residual) {
-            if(!verbose) return;
+            if (!verbose) return;
 
             if (iter == max_it || iter == 0 || iter % check_each == 0 || relative_residual < rtol) {
-                std::cout << iter << ": residual abs: " << residual << ", rel: " << relative_residual << " (rtol = " << rtol << ", atol = " << atol << ")\n";
+                std::cout << iter << ": residual abs: " << residual
+                          << ", rel: " << relative_residual << " (rtol = " << rtol
+                          << ", atol = " << atol << ")\n";
             }
         }
 
@@ -141,7 +138,7 @@ namespace sfem {
             assert(n_dofs >= 0);
             if (this->n_dofs < 0) {
                 std::cerr
-                    << "Error uninitiaized n_dofs. Set set_n_dofs to set the number of dofs\n";
+                        << "Error uninitiaized n_dofs. Set set_n_dofs to set the number of dofs\n";
                 return 1;
             }
 
@@ -166,8 +163,12 @@ namespace sfem {
             const T rtr0 = dot(n, r, r);
             const T r_norm0 = sqrt(rtr0);
             monitor(0, r_norm0, 1);
-            
+
             T rtr = rtr0;
+
+            if (rtr0 == 0) {
+                return 0;
+            }
 
             T* p = allocate(n);
             T* Ap = allocate(n);
@@ -185,6 +186,8 @@ namespace sfem {
                 axpby(n, alpha, p, 1, x);
                 axpby(n, -alpha, Ap, 1, r);
 
+                assert(rtr != 0);
+
                 const T rtr_new = dot(n, r, r);
                 const T beta = rtr_new / rtr;
                 rtr = rtr_new;
@@ -192,8 +195,8 @@ namespace sfem {
 
                 T r_norm = sqrt(rtr_new);
 
-                monitor(k+1, r_norm, r_norm/r_norm0);
-                if (r_norm < atol || r_norm/r_norm0 < rtol) {
+                monitor(k + 1, r_norm, r_norm / r_norm0);
+                if (r_norm < atol || rtr_new == 0 || r_norm / r_norm0 < rtol) {
                     info = 0;
                     break;
                 }
@@ -219,7 +222,6 @@ namespace sfem {
             const T rtr0 = dot(n, r, r);
             T rtr = rtr0;
 
-
             monitor(0, sqrt(rtr), 1);
 
             // if (sqrt(rtr) < rtol) {
@@ -239,10 +241,10 @@ namespace sfem {
             apply_op(p, Ap);
 
             T rtz = dot(n, r, z);
-            
+
             {
                 const T ptAp = dot(n, p, Ap);
-                
+
                 assert(ptAp != 0);
                 const T alpha = rtr / ptAp;
 
@@ -273,9 +275,9 @@ namespace sfem {
                 axpby(n, -alpha, Ap, 1, r);
 
                 auto anorm = sqrt(rtz);
-                auto rnorm = anorm/sqrt(rtr0);
+                auto rnorm = anorm / sqrt(rtr0);
 
-                monitor(k+1, anorm, rnorm);
+                monitor(k + 1, anorm, rnorm);
                 if (anorm < atol || rnorm < rtol) {
                     info = 0;
                     break;
