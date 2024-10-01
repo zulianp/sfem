@@ -9,16 +9,13 @@ idx_t = np.int32
 real_t = np.float64
 
 # --------------------------------------
-# Solver params
+# Solver parameters
 # --------------------------------------
-MAX_NL_ITER = 200
-max_linear_iterations = 30
-penalty_param = 10 # Very sensitive to this!
-# use_cheb = False
+MAX_NL_ITER = 2000
+max_linear_iterations = 2
+penalty_param = 10 # Very sensitive to this! If few linear iterations it is less sensitive
 use_cheb = True
-# matrix_free = True
-matrix_free = False
-# use_penalty = False
+matrix_free = True
 use_penalty = True
 
 def create_mg():
@@ -137,12 +134,12 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 		
 		if use_cheb:
 			# Cheb
-			r[:] = 0.
-			sfem.apply(inv_diag, (g_pen - g), r)
 
 			diag_12 = np.sqrt(fun_diag + H_diag)
 			inv_diag = sfem.diag(1./diag_12)
 
+			r[:] = 0.
+			sfem.apply(inv_diag, (g_pen - g), r)
 			solver.set_op(inv_diag * lop * inv_diag)
 		else:
 			# CG
@@ -160,7 +157,7 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 		else:
 			x += c
 
-		norm_g = linalg.norm(r)
+		norm_g = linalg.norm(g_pen - g)
 		norm_penet = linalg.norm(active*d)
 		print(f'{i}) norm_g = {norm_g} #active {int(np.sum(active))} norm_penet = {norm_penet}')
 
@@ -223,7 +220,6 @@ def solve_obstacle(options):
 	indentation = 1
 
 	radius = ((0.5 - np.sqrt(sy*sy + sz*sz)))
-	# f = -0.1*np.cos(np.pi*4*4*radius) - 0.1
 	f = -0.1*np.cos(np.pi*2*radius) - 0.1
 	parabola = -indentation * f + wall
 	print(np.min(wall), np.max(sy*sy) )
