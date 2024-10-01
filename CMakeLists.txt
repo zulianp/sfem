@@ -251,8 +251,8 @@ configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/configuration/sfem_config.sh.in
     ${CMAKE_BINARY_DIR}/sfem_config.sh)
 
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/python/sfem/sfem_config.py DESTINATION scripts/sfem)
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/workflows/sfem_config.sh DESTINATION workflows)
+install(FILES ${CMAKE_BINARY_DIR}/sfem_config.py DESTINATION scripts/sfem)
+install(FILES ${CMAKE_BINARY_DIR}/sfem_config.sh DESTINATION workflows)
 
 install(FILES ${SFEM_HEADERS} DESTINATION include)
 

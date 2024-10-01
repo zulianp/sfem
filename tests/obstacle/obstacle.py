@@ -11,8 +11,8 @@ real_t = np.float64
 # --------------------------------------
 # Solver parameters
 # --------------------------------------
-MAX_NL_ITER = 2000
-max_linear_iterations = 2
+MAX_NL_ITER = 1000
+max_linear_iterations = 4
 penalty_param = 10 # Very sensitive to this! If few linear iterations it is less sensitive
 use_cheb = True
 matrix_free = True
@@ -221,8 +221,8 @@ def solve_obstacle(options):
 
 	radius = ((0.5 - np.sqrt(sy*sy + sz*sz)))
 	f = -0.1*np.cos(np.pi*2*radius) - 0.1
+	# f += -0.05*np.cos(np.pi*8*radius)
 	parabola = -indentation * f + wall
-	print(np.min(wall), np.max(sy*sy) )
 
 	sdf = (parabola - sfem.points(m, 0)).astype(real_t)
 	obs[constrained_dofs] = sdf[sobstacle]
