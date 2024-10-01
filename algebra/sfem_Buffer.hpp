@@ -28,6 +28,10 @@ namespace sfem {
                MemorySpace mem_space)
             : n_(n), ptr_(ptr), destroy_(destroy), mem_space_(mem_space) {}
 
+        Buffer()
+        : n_(0), ptr_(nullptr), destroy_(nullptr), mem_space_(MEMORY_SPACE_INVALID)
+        {}
+        
         ~Buffer() {
             if (destroy_) {
                 destroy_((void *)ptr_);
@@ -64,6 +68,12 @@ namespace sfem {
                                               enum MemorySpace mem_space = MEMORY_SPACE_INVALID) {
             return std::make_shared<Buffer<T>>(n, x, destroy, mem_space);
         }
+
+        static std::shared_ptr<Buffer<T>> make_empty()
+        {
+            return std::make_shared<Buffer<T>>();
+        }
+
 
     private:
         size_t n_{0};

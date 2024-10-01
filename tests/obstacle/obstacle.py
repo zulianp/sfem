@@ -2,17 +2,28 @@
 
 import pysfem as sfem
 import numpy as np
-import scipy
 from numpy import linalg
 import sys, getopt, os
 
 idx_t = np.int32
 real_t = np.float64
 
-MAX_NL_ITER = 200
+# --------------------------------------
+# Solver params
+# --------------------------------------
+MAX_NL_ITER = 100
+max_linear_iterations = 30
+penalty_param = 10 # Very sensitive to this!
+use_cheb = False
+# use_cheb = True
+matrix_free = False
+use_penalty = False
+use_penalty = True
 
 # Assemble matrix in scipy format
 def assemble_scipy_matrix(fun, x):
+	import scipy
+
 	fs = fun.space()
 	crs_graph = fun.crs_graph()
 	rowptr = sfem.numpy_view(crs_graph.rowptr())
@@ -35,11 +46,15 @@ def assemble_crs_spmv(fun, x):
 def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 	fs = fun.space()
 
-	# Sector for constrained dofs
+	# --------------------------------------
+	# Selector for constrained dofs
+	# --------------------------------------
 	selector = np.zeros(fs.n_dofs())
 	selector[constrained_dofs] = 1
 
-	# Boundary Mass Matrix
+	# --------------------------------------
+	# Boundary Mass Matrix (with lumping)
+	# --------------------------------------
 	mass_op = sfem.create_boundary_op(fs, contact_surf, "BoundaryMass")
 	mass = np.zeros(fs.n_dofs(), dtype=real_t)
 	ones = np.ones(fs.n_dofs(), dtype=real_t)
@@ -48,22 +63,18 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 	boundary_op = sfem.make_op(boundary_fun, x)
 	sfem.apply(boundary_op, ones, mass)
 
+	# --------------------------------------
 	# Linear solver
+	# --------------------------------------
 	fun_diag = np.zeros(fs.n_dofs(), dtype=real_t)
 	sfem.hessian_diag(fun, x, fun_diag)
 
-	# Matrix-based
-	lop = assemble_crs_spmv(fun, x)
-
-	# Matrix-free
-	# lop = sfem.make_op(fun, x)
-
-	# Solver params
-	max_linear_iterations = 60
-	penalty_param = 1
-	
-	use_cheb = True
-	# use_cheb = False
+	if matrix_free:
+		# Matrix-free
+		lop = sfem.make_op(fun, x)
+	else:
+		# Matrix-based
+		lop = assemble_crs_spmv(fun, x)
 
 	if use_cheb:
 		solver = sfem.Chebyshev3()
@@ -80,7 +91,9 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 		solver.set_atol(1e-12)
 		solver.set_verbose(False)
 
+	# --------------------------------------
 	# Allocate buffers
+	# --------------------------------------
 	g = np.zeros(fs.n_dofs(), dtype=real_t)
 	g_pen = np.zeros(fs.n_dofs(), dtype=real_t)
 
@@ -90,7 +103,9 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 	s = np.zeros(fs.n_dofs(), dtype=real_t)
 	r = np.zeros(fs.n_dofs(), dtype=real_t)
 
+	# --------------------------------------
 	# Nonlinear iteration
+	# --------------------------------------
 	for i in range(0, MAX_NL_ITER):
 		# Material contribution
 		g[:] = 0.
@@ -142,7 +157,6 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 	sfem.write(out, "selector", selector)
 	return x
 
-
 def solve_obstacle(options):
 	path = options.input_mesh
 
@@ -180,7 +194,9 @@ def solve_obstacle(options):
 	fun.add_dirichlet_conditions(bc)
 	x = np.zeros(fs.n_dofs(), dtype=real_t)
 
+	# --------------------------------------
 	# Obstacle
+	# --------------------------------------
 	obs = np.ones(fs.n_dofs(), dtype=real_t) * 10000
 	constrained_dofs = sobstacle[:] * dim
 
@@ -190,8 +206,7 @@ def solve_obstacle(options):
 	indentation = 1
 
 	radius = ((0.5 - np.sqrt(sy*sy + sz*sz)))
-	# f = radius**2
-	f = -0.1*np.cos(np.pi*4*radius) - 0.1
+	f = -0.1*np.cos(np.pi*4*4*radius) - 0.1
 	parabola = -indentation * f + wall
 	print(np.min(wall), np.max(sy*sy) )
 
@@ -201,9 +216,9 @@ def solve_obstacle(options):
 	for d in range(1, dim):
 		obs[d::dim] = 10000
 
-	# use_penalty = False
-	use_penalty = True
-	
+	# --------------------------------------
+	# Solve obstacle problem
+	# --------------------------------------
 	if use_penalty:
 		solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out)
 	else:
@@ -213,11 +228,12 @@ def solve_obstacle(options):
 		solver.set_rtol(1e-6);
 		solver.set_max_it(2000)
 
-		# Matrix-based
-		lop = assemble_crs_spmv(fun, x)
-
-		# Matrix-free
-		# lop = sfem.make_op(fun, x)
+		if matrix_free:
+			# Matrix-free
+			lop = sfem.make_op(fun, x)
+		else:
+			# Matrix-based
+			lop = assemble_crs_spmv(fun, x)
 
 		solver.set_op(lop)
 
@@ -241,7 +257,10 @@ def solve_obstacle(options):
 			print(f'{i}) norm_c {norm_c}')
 			if norm_c < 1e-8:
 				break
-
+	
+	# --------------------------------------
+	# Write output
+	# --------------------------------------
 	sfem.write(out, "obs", obs)
 	sfem.write(out, "disp", x)
 
