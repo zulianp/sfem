@@ -8,7 +8,7 @@ Go to a directory of your choosing and type
 ```bash
 git clone https://bitbucket.com/zulianp/isolver.git && \
 git clone https://bitbucket.com/zulianp/matrix.io && \
-git clone https://bitbucket.com/zulianp/sfem && \
+git clone https://github.com/zulianp/sfem.git && \
 cd matrix.io && make && \
 cd ../sfem && git submodule update --init --recursive && \
 mkdir build && cd build && cmake .. -DSFEM_ENABLE_OPENMP=ON && make
