@@ -61,10 +61,10 @@ NB_MODULE(pysfem, m) {
     });
 
     nb::class_<IdxBuffer2D>(m, "IdxBuffer2D");
-    nb::class_<sfem::Buffer<int>>(m, "Buffer<int>");
-    nb::class_<sfem::Buffer<long>>(m, "Buffer<long>");
-    nb::class_<sfem::Buffer<float>>(m, "Buffer<float>");
-    nb::class_<sfem::Buffer<double>>(m, "Buffer<double>");
+    nb::class_<sfem::Buffer<int>>(m, "Buffer<int>").def(nb::init<>());
+    nb::class_<sfem::Buffer<long>>(m, "Buffer<long>").def(nb::init<>());
+    nb::class_<sfem::Buffer<float>>(m, "Buffer<float>").def(nb::init<>());
+    nb::class_<sfem::Buffer<double>>(m, "Buffer<double>").def(nb::init<>());
 
     m.def("create_real_buffer", [](const ptrdiff_t n) -> std::shared_ptr<sfem::Buffer<real_t>> {
         return sfem::h_buffer<real_t>(n);
@@ -193,21 +193,21 @@ NB_MODULE(pysfem, m) {
               fun->hessian_crs(x->data(), rowptr->data(), colidx->data(), values->data());
           });
 
-    m.def("crs_spmv",
-          [](nb::ndarray<count_t> rowptr,
-             nb::ndarray<idx_t> colidx,
-             nb::ndarray<real_t> values) -> std::shared_ptr<Operator_t> {
-              return sfem::h_crs_spmv(
-                      rowptr.size() - 1,
-                      rowptr.size() - 1,
-                      sfem::Buffer<count_t>::wrap(
-                              rowptr.size(), rowptr.data(), sfem::MEMORY_SPACE_HOST),
-                      sfem::Buffer<idx_t>::wrap(
-                              colidx.size(), colidx.data(), sfem::MEMORY_SPACE_HOST),
-                      sfem::Buffer<real_t>::wrap(
-                              values.size(), values.data(), sfem::MEMORY_SPACE_HOST),
-                      real_t(0));
-          });
+    // m.def("crs_spmv",
+    //       [](nb::ndarray<count_t> rowptr,
+    //          nb::ndarray<idx_t> colidx,
+    //          nb::ndarray<real_t> values) -> std::shared_ptr<Operator_t> {
+    //           return sfem::h_crs_spmv(
+    //                   rowptr.size() - 1,
+    //                   rowptr.size() - 1,
+    //                   sfem::Buffer<count_t>::wrap(
+    //                           rowptr.size(), rowptr.data(), sfem::MEMORY_SPACE_HOST),
+    //                   sfem::Buffer<idx_t>::wrap(
+    //                           colidx.size(), colidx.data(), sfem::MEMORY_SPACE_HOST),
+    //                   sfem::Buffer<real_t>::wrap(
+    //                           values.size(), values.data(), sfem::MEMORY_SPACE_HOST),
+    //                   real_t(0));
+    //       });
 
     m.def("crs_spmv",
           [](std::shared_ptr<sfem::Buffer<count_t>> rowptr,
