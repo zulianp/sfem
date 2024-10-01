@@ -91,10 +91,10 @@ int main(int argc, char* argv[]) {
 
         if (SFEM_READ_FP32) {
             
-            geom_t* temp = NULL;
+            float* temp = NULL;
 
             if (ndarray_create_from_file(
-                        comm, data_path, SFEM_MPI_GEOM_T, 3, (void**)&temp, nlocal, nglobal)) {
+                        comm, data_path, MPI_FLOAT, 3, (void**)&temp, nlocal, nglobal)) {
                 exit(EXIT_FAILURE);
             }
 
