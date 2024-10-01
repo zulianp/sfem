@@ -877,7 +877,7 @@ for (ptrdiff_t i = 0; i < n[0] * n[1] * n[2]; i++) {
 }
 
 norm_data = sqrt(norm_data);
-printf("norm_data input = %g   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n", norm_data);
+printf("\nnorm_data input = %g   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< %s,%d\n\n", norm_data, __FILE__, __LINE__);
 
 
 #ifdef TET10_V2  // V2
