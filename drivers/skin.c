@@ -22,6 +22,9 @@
 
 #include "adj_table.h"
 
+#include "proteus_hex8.h"  // FIXME
+#include "sfem_hex8_mesh_graph.h"
+
 static SFEM_INLINE void normalize(real_t *const vec3) {
     const real_t len = sqrt(vec3[0] * vec3[0] + vec3[1] * vec3[1] + vec3[2] * vec3[2]);
     vec3[0] /= len;
@@ -132,6 +135,83 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    const char *SFEM_ELEMENT_TYPE = 0;
+    SFEM_READ_ENV(SFEM_ELEMENT_TYPE, );
+    enum ElemType override_element_type = INVALID;
+    if (SFEM_ELEMENT_TYPE) {
+        override_element_type = type_from_string(SFEM_ELEMENT_TYPE);
+    }
+
+    if (override_element_type == PROTEUS_HEX8) {
+        int SFEM_ELEMENT_REFINE_LEVEL = 0;
+        SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
+
+        if (!SFEM_ELEMENT_REFINE_LEVEL) {
+            fprintf(stderr,
+                    "ElemType PROTEUS_HEX8 requires SFEM_ELEMENT_REFINE_LEVEL to be defined and >= "
+                    "2!\n");
+            return EXIT_FAILURE;
+        }
+
+        if (mesh.element_type == HEX8) {
+            // Generate proteus mesh on the fly!
+
+            const int nxe = proteus_hex8_nxe(SFEM_ELEMENT_REFINE_LEVEL);
+            const int txe = proteus_hex8_txe(SFEM_ELEMENT_REFINE_LEVEL);
+            idx_t **elements = 0;
+
+            elements = malloc(nxe * sizeof(idx_t *));
+            for (int d = 0; d < nxe; d++) {
+                elements[d] = malloc(mesh.nelements * sizeof(idx_t));
+            }
+
+            for (int d = 0; d < nxe; d++) {
+                for (ptrdiff_t i = 0; i < mesh.nelements; i++) {
+                    elements[d][i] = -1;
+                }
+            }
+
+            ptrdiff_t n_unique_nodes, interior_start;
+            proteus_hex8_create_full_idx(
+                    SFEM_ELEMENT_REFINE_LEVEL, &mesh, elements, &n_unique_nodes, &interior_start);
+
+            const int nnxs = (SFEM_ELEMENT_REFINE_LEVEL + 1) * (SFEM_ELEMENT_REFINE_LEVEL + 1);
+
+            ptrdiff_t n_surf_elements = 0;
+            idx_t **surf_elems = (idx_t **)calloc(nnxs, sizeof(idx_t *));
+            element_idx_t *parent = 0;
+
+            proteus_hex8_mesh_skin(SFEM_ELEMENT_REFINE_LEVEL,
+                                   mesh.nelements,
+                                   elements,
+                                   &n_surf_elements,
+                                   surf_elems,
+                                   &parent);
+
+            // for (ptrdiff_t i = 0; i < n_surf_elements; i++) {
+            //     printf("%d) ", i);
+            //     for (int d = 0; d < nnxs; d++) {
+            //         printf("%d ", surf_elems[d][i]);
+            //     }
+
+            //     printf("\n");
+            // }
+
+            char path[2048];
+            for(int d = 0; d < nnxs; d++) {
+                sprintf(path, "%s/i%d.raw", output_folder, d);
+                array_write(comm, path, SFEM_MPI_IDX_T, surf_elems[d], n_surf_elements, n_surf_elements);
+            }
+
+            // TODO
+            return SFEM_SUCCESS;
+
+        } else {
+            assert(0);
+            return SFEM_FAILURE;
+        }
+    }
+
     enum ElemType st = side_type(mesh.element_type);
     const int nnxs = elem_num_nodes(st);
 
@@ -176,7 +256,6 @@ int main(int argc, char *argv[]) {
 
     for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {
         if (vol2surf[i] < 0) continue;
-
         mapping[vol2surf[i]] = i;
 
         for (int d = 0; d < mesh.spatial_dim; ++d) {

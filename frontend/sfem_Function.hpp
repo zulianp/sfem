@@ -104,8 +104,9 @@ namespace sfem {
         ~FunctionSpace();
 
         static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<Mesh> &mesh,
-                                                     const int block_size = 1) {
-            return std::make_shared<FunctionSpace>(mesh, block_size);
+                                                     const int block_size = 1,
+                                                     const enum ElemType element_type = INVALID) {
+            return std::make_shared<FunctionSpace>(mesh, block_size, element_type);
         }
 
         int create_vector(ptrdiff_t *nlocal, ptrdiff_t *nglobal, real_t **values);
@@ -363,12 +364,20 @@ namespace sfem {
         using FactoryFunction =
                 std::function<std::unique_ptr<Op>(const std::shared_ptr<FunctionSpace> &)>;
 
+        using FactoryFunctionBoundary =
+                std::function<std::unique_ptr<Op>(const std::shared_ptr<FunctionSpace> &, const std::shared_ptr<Buffer<idx_t *>> &)>;
+
         static void register_op(const std::string &name, FactoryFunction factory_function);
         static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,
                                              const char *name);
 
         static std::shared_ptr<Op> create_op_gpu(const std::shared_ptr<FunctionSpace> &space,
                                                  const char *name);
+
+        static std::shared_ptr<Op> create_boundary_op(
+                const std::shared_ptr<FunctionSpace> &space,
+                const std::shared_ptr<Buffer<idx_t *>> &boundary_elements,
+                const char *name);
 
     private:
         static Factory &instance();
@@ -383,6 +392,8 @@ namespace sfem {
     };
 
     std::string d_op_str(const std::string &name);
+    std::shared_ptr<Buffer<idx_t *>> mesh_connectivity_from_file(MPI_Comm comm,
+                                                                 const char *folder);
 }  // namespace sfem
 
 #endif  // SFEM_FUNCTION_HPP

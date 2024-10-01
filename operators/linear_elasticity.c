@@ -134,7 +134,7 @@ int linear_elasticity_assemble_gradient_aos(const enum ElemType element_type,
             element_type, nelements, nnodes, elements, points, mu, lambda, u, values);
 }
 
-int linear_elasticity_crsaos(const enum ElemType element_type,
+int linear_elasticity_crs_aos(const enum ElemType element_type,
                                            const ptrdiff_t nelements,
                                            const ptrdiff_t nnodes,
                                            idx_t **const SFEM_RESTRICT elements,
@@ -163,7 +163,7 @@ int linear_elasticity_crsaos(const enum ElemType element_type,
         }
         default: {
             fprintf(stderr,
-                    "linear_elasticity_crsaos not implemented for type %s\n",
+                    "linear_elasticity_crs_aos not implemented for type %s\n",
                     type_to_string(element_type));
             assert(0);
             MPI_Abort(MPI_COMM_WORLD, -1);

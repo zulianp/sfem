@@ -132,7 +132,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (closest_element < 0) {
-        fprintf(stderr, "Invalid set up!\n");
+        fprintf(stderr, "Invalid set up! for mesh #nelements %ld #nodes %ld\n", mesh.nelements, mesh.nnodes);
         MPI_Abort(comm, -1);
     }
 

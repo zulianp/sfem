@@ -45,10 +45,10 @@ if [[ -d "$simulation_mesh" ]]
 then
 	echo "Reusing $simulation_mesh"
 else
-	# tet_mesh.py
+	tet_mesh.py
 	# create_square.sh 6
 	# create_sphere.sh 5
-	create_cylinder.sh 2
+	# create_cylinder.sh 2
 	# refine $mesh temp1
 	# refine temp1 temp2
 

@@ -88,7 +88,7 @@ int linear_elasticity_assemble_gradient_aos(const enum ElemType element_type,
                                              const real_t *const SFEM_RESTRICT u,
                                              real_t *const SFEM_RESTRICT values);
 
-int linear_elasticity_crsaos(const enum ElemType element_type,
+int linear_elasticity_crs_aos(const enum ElemType element_type,
                                             const ptrdiff_t nelements,
                                             const ptrdiff_t nnodes,
                                             idx_t **const SFEM_RESTRICT elems,
