@@ -1,16 +1,15 @@
 #include <math.h>
+#include <mpi.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <mpi.h>
-
 
 #include "matrixio_array.h"
 #include "matrixio_ndarray.h"
 
-#include "mesh_aura.h"  
+#include "mesh_aura.h"
 #include "read_mesh.h"
 #include "sfem_mesh_write.h"
 #include "sfem_resample_field.h"
@@ -329,12 +328,22 @@ int main(int argc, char* argv[]) {
 
         double io_tick = MPI_Wtime();
         double norm = 1.0;
+        double max_g = g[0];
+        double min_g = g[0];
 
         for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
-            norm += g[i]*g[i];
+            norm += g[i] * g[i];
+            if (g[i] > max_g) {
+                max_g = g[i];
+            }
+            if (g[i] < min_g) {
+                min_g = g[i];
+            }
         }
 
         printf("\nNorm: %1.14e  <<<< TEST NORM <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n", norm);
+        printf("Max: %1.14e  <<<< TEST MAX <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n", max_g);
+        printf("Min: %1.14e  <<<< TEST MIN <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n", min_g);
         printf("Mesh nnodes: %ld\n", mesh.nnodes);
         printf("SFEM_INTERPOLATE: %d\n\n", SFEM_INTERPOLATE);
 
