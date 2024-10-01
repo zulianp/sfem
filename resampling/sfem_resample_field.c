@@ -869,7 +869,7 @@ int resample_field_local(
         }
 
         case TET10: {
-// #define TET10_V2
+#define TET10_V2
 
 double norm_data = 0.0;
 for (ptrdiff_t i = 0; i < n[0] * n[1] * n[2]; i++) {
