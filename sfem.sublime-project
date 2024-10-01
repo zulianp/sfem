@@ -18,7 +18,8 @@
 				"build_*",
 				"bin_*",
 				"install",
-				".cache"
+				".cache",
+				"venv"
 			],
 		}
 	]

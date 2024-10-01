@@ -113,7 +113,7 @@ int mesh_build_global_ids(mesh_t *mesh) {
     MPI_Bcast(&n_gnodes, 1, MPI_LONG, size - 1, comm);
 
     idx_t *node_offsets = malloc((size + 1) * sizeof(idx_t));
-    CATCH_MPI_ERROR(MPI_Allgather(
+    MPI_CATCH_ERROR(MPI_Allgather(
         &global_node_offset, 1, SFEM_MPI_IDX_T, node_offsets, 1, SFEM_MPI_IDX_T, comm));
 
     node_offsets[size] = n_gnodes;
@@ -152,7 +152,7 @@ int mesh_build_global_ids(mesh_t *mesh) {
         send_count[dest_rank]++;
     }
 
-    CATCH_MPI_ERROR(MPI_Alltoall(send_count, 1, MPI_INT, recv_count, 1, MPI_INT, comm));
+    MPI_CATCH_ERROR(MPI_Alltoall(send_count, 1, MPI_INT, recv_count, 1, MPI_INT, comm));
 
     send_displs[0] = 0;
     for (int r = 0; r < size; r++) {
@@ -166,7 +166,7 @@ int mesh_build_global_ids(mesh_t *mesh) {
 
     idx_t *recv_key_buff = malloc(recv_displs[size] * sizeof(idx_t));
 
-    CATCH_MPI_ERROR(MPI_Alltoallv(ghost_keys,
+    MPI_CATCH_ERROR(MPI_Alltoallv(ghost_keys,
                                   send_count,
                                   send_displs,
                                   SFEM_MPI_IDX_T,
@@ -178,7 +178,7 @@ int mesh_build_global_ids(mesh_t *mesh) {
 
     idx_t *recv_ids_buff = (idx_t *)malloc(recv_displs[size] * sizeof(idx_t));
 
-    CATCH_MPI_ERROR(MPI_Alltoallv(ghost_ids,
+    MPI_CATCH_ERROR(MPI_Alltoallv(ghost_ids,
                                   send_count,
                                   send_displs,
                                   SFEM_MPI_IDX_T,
@@ -277,7 +277,7 @@ int mesh_build_global_ids(mesh_t *mesh) {
         }
     }
 
-    CATCH_MPI_ERROR(MPI_Alltoall(send_count, 1, MPI_INT, recv_count, 1, MPI_INT, comm));
+    MPI_CATCH_ERROR(MPI_Alltoall(send_count, 1, MPI_INT, recv_count, 1, MPI_INT, comm));
 
     recv_displs[0] = 0;
     for (int r = 0; r < size; r++) {
@@ -286,7 +286,7 @@ int mesh_build_global_ids(mesh_t *mesh) {
 
     recv_key_buff = realloc(recv_key_buff, recv_displs[size] * sizeof(idx_t));
 
-    CATCH_MPI_ERROR(MPI_Alltoallv(exchange_buff,
+    MPI_CATCH_ERROR(MPI_Alltoallv(exchange_buff,
                                   send_count,
                                   send_displs,
                                   SFEM_MPI_IDX_T,
@@ -318,7 +318,7 @@ int mesh_build_global_ids(mesh_t *mesh) {
     }
 
     // Send back
-    CATCH_MPI_ERROR(MPI_Alltoallv(recv_key_buff,
+    MPI_CATCH_ERROR(MPI_Alltoallv(recv_key_buff,
                                   recv_count,
                                   recv_displs,
                                   SFEM_MPI_IDX_T,
@@ -473,7 +473,7 @@ int mesh_read_generic(MPI_Comm comm,
         memset(input_node_partitions, 0, sizeof(idx_t) * (size + 1));
         input_node_partitions[rank + 1] = n_local_nodes;
 
-        CATCH_MPI_ERROR(MPI_Allreduce(
+        MPI_CATCH_ERROR(MPI_Allreduce(
             MPI_IN_PLACE, &input_node_partitions[1], size, SFEM_MPI_IDX_T, MPI_SUM, comm));
 
         for (int r = 0; r < size; ++r) {
@@ -503,7 +503,7 @@ int mesh_read_generic(MPI_Comm comm,
         idx_t *scatter_node_count = malloc(size * sizeof(idx_t));
         memset(scatter_node_count, 0, size * sizeof(idx_t));
 
-        CATCH_MPI_ERROR(MPI_Alltoall(
+        MPI_CATCH_ERROR(MPI_Alltoall(
             gather_node_count, 1, SFEM_MPI_IDX_T, scatter_node_count, 1, SFEM_MPI_IDX_T, comm));
 
         idx_t *gather_node_displs = malloc((size + 1) * sizeof(idx_t));
@@ -559,7 +559,7 @@ int mesh_read_generic(MPI_Comm comm,
             }
         }
 
-        CATCH_MPI_ERROR(MPI_Alltoallv(unique_idx,
+        MPI_CATCH_ERROR(MPI_Alltoallv(unique_idx,
                                       gather_node_count,
                                       gather_node_displs,
                                       SFEM_MPI_IDX_T,
@@ -589,7 +589,7 @@ int mesh_read_generic(MPI_Comm comm,
             }
 
             geom_t *recvx = (geom_t *)malloc(n_unique * sizeof(geom_t));
-            CATCH_MPI_ERROR(MPI_Alltoallv(sendx,
+            MPI_CATCH_ERROR(MPI_Alltoallv(sendx,
                                           scatter_node_count,
                                           scatter_node_displs,
                                           SFEM_MPI_GEOM_T,
@@ -648,7 +648,7 @@ int mesh_read_generic(MPI_Comm comm,
                 }
             }
 
-            CATCH_MPI_ERROR(MPI_Alltoallv(send_node_owner,
+            MPI_CATCH_ERROR(MPI_Alltoallv(send_node_owner,
                                           scatter_node_count,
                                           scatter_node_displs,
                                           MPI_INT,
@@ -658,7 +658,7 @@ int mesh_read_generic(MPI_Comm comm,
                                           MPI_INT,
                                           comm));
 
-            CATCH_MPI_ERROR(MPI_Alltoallv(send_share_count,
+            MPI_CATCH_ERROR(MPI_Alltoallv(send_share_count,
                                           scatter_node_count,
                                           scatter_node_displs,
                                           MPI_INT,
@@ -981,11 +981,11 @@ static ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
     MPI_Status status;
     MPI_Offset nbytes;
     MPI_File file;
-    CATCH_MPI_ERROR(MPI_File_open(comm, path, MPI_MODE_RDONLY, MPI_INFO_NULL, &file));
-    CATCH_MPI_ERROR(MPI_File_get_size(file, &nbytes));
+    MPI_CATCH_ERROR(MPI_File_open(comm, path, MPI_MODE_RDONLY, MPI_INFO_NULL, &file));
+    MPI_CATCH_ERROR(MPI_File_get_size(file, &nbytes));
     *data = malloc(nbytes);
 
-    CATCH_MPI_ERROR(MPI_File_read_at_all(file, 0, *data, nbytes, MPI_CHAR, &status));
+    MPI_CATCH_ERROR(MPI_File_read_at_all(file, 0, *data, nbytes, MPI_CHAR, &status));
     return nbytes;
 }
 

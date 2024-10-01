@@ -37,7 +37,9 @@ void apply_mass(const int element_type,
                 const ptrdiff_t nnodes,
                 idx_t **const SFEM_RESTRICT elems,
                 geom_t **const SFEM_RESTRICT xyz,
+                const ptrdiff_t stride_x,
                 const real_t *const x,
+                const ptrdiff_t stride_values,
                 real_t *const values);
 
 #ifdef __cplusplus

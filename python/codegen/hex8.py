@@ -35,7 +35,7 @@ class Hex8(FE):
 		y = p[1]
 		z = p[2]
 
-		f = sp.zeros(8)
+		f = sp.zeros(8, 1)
 
 		xm = (1 - x)
 		ym = (1 - y)
@@ -170,9 +170,57 @@ def sub_fff():
 	expr = assign_fff('sub_fff', sub_FFF)
 	c_code(expr)
 
+def assign_matrix(name, mat):
+	rows, cols = mat.shape
+	expr = []
+	for i in range(0, rows):
+		for j in range(0, cols):
+			var = sp.symbols(f'{name}[{i*cols + j}]')
+			expr.append(ast.Assignment(var, mat[i, j]))
+	return expr
+
+def sub_adj():
+	c = coeffs("adjugate", 9)
+	adj = sp.Matrix(3, 3, c)
+	detJ = sp.symbols('determinant')
+
+	h = sp.symbols('h')
+
+	A = sp.Matrix(3, 3, [
+		h, 0, 0,
+		0, h, 0,
+		0, 0, h
+	])
+	
+	detAm = determinant(A)
+	Aminv = inverse(A)
+
+	sub_adj = Aminv * adj
+	expr = assign_matrix('sub_adjugate', sub_adj)
+	# expr.extend([ast.Assignment('determinant', detAm)])
+
+	c_code(expr)
+
+	c_code([ast.Assignment(sp.symbols('sub_determinant[0]'), detAm*detJ)])
+
+
+def check_op():
+	hex8 = Hex8()
+
+	q = vec3(qx, qy, qz)
+	g = hex8.grad(q)
+
+	A = sp.zeros(8, 8)
+	for i in range(0, 8):
+		for j in range(0, 8):
+			A[i, j] = hex8.integrate(q, inner(g[i], g[j]))
+		print(A[i, :])
+
 if __name__ == '__main__':
 	# Hex8().generate_qp_based_code()
 	# points_from_sub_ref_hex8()
-	sub_fff()
+	# sub_fff()
+	# check_op()
+	sub_adj()
 
 	

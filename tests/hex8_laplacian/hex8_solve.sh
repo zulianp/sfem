@@ -38,7 +38,7 @@ else
 	box_mesh.py hex8_mesh -c hex8 -x $N -y $N -z $N --height=1 --width=1 --depth=1
 fi
 
-laplacian_apply hex8_mesh gen:ones hex8_AxU.raw
+SFEM_USE_MACRO=0 laplacian_apply hex8_mesh gen:ones hex8_AxU.raw
 
 sleft=hex8_mesh/boundary_nodes/left.int32.raw
 sright=hex8_mesh/boundary_nodes/right.int32.raw
@@ -71,6 +71,7 @@ export SFEM_MATRIX_FREE=1
 export SFEM_HEX8_ASSUME_AFFINE=1
 export SFEM_HEX8_ASSUME_AXIS_ALIGNED=1
 export SFEM_USE_CHEB=0
+
 
 $LAUNCH mgsolve hex8_mesh output
 

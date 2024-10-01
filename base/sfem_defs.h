@@ -66,6 +66,9 @@ enum ElemType {
     MACRO = 200,
     MACRO_TRI3 = (MACRO + TRI3),
     MACRO_TET4 = (MACRO + TET4),
+    PROTEUS_TET4 = 4000,
+    PROTEUS_QUAD4 = 40000,
+    PROTEUS_HEX8 = 8000,
     INVALID = -1
 };
 
@@ -85,6 +88,7 @@ SFEM_INLINE static enum ElemType type_from_string(const char* str) {
     if (!strcmp(str, "MACRO_TRI3")) return MACRO_TRI3;
     if (!strcmp(str, "MACRO_TET4")) return MACRO_TET4;
     if (!strcmp(str, "HEX8")) return HEX8;
+    if (!strcmp(str, "PROTEUS_HEX8")) return PROTEUS_HEX8;
 
     assert(0);
     return INVALID;
@@ -118,6 +122,8 @@ SFEM_INLINE static const char* type_to_string(enum ElemType type) {
             return "MACRO_TET4";
         case HEX8:
             return "HEX8";
+        case PROTEUS_HEX8:
+            return "PROTEUS_HEX8";
         case TET10:
             return "TET10";
         case TET20:
@@ -150,6 +156,8 @@ SFEM_INLINE static enum ElemType side_type(const enum ElemType type) {
             return TRI6;  // FIXME
         case HEX8:
             return QUAD4;
+        case PROTEUS_HEX8:
+            return PROTEUS_QUAD4;
         default: {
             assert(0);
             return INVALID;
