@@ -335,7 +335,8 @@ int main(int argc, char* argv[]) {
         }
 
         printf("\nNorm: %1.14e  <<<< TEST NORM <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n", norm);
-        printf("Mesh nnodes: %ld\n\n", mesh.nnodes);
+        printf("Mesh nnodes: %ld\n", mesh.nnodes);
+        printf("SFEM_INTERPOLATE: %d\n\n", SFEM_INTERPOLATE);
 
         mesh_write_nodal_field(&mesh, output_path, SFEM_MPI_REAL_T, g);
 
