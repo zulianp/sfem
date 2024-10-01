@@ -93,7 +93,7 @@ int main(int argc, char* argv[]) {
 
             if (ndarray_create_from_file(
                         comm, data_path, SFEM_MPI_GEOM_T, 3, (void**)&temp, nlocal, nglobal)) {
-                return EXIT_FAILURE;
+                exit(EXIT_FAILURE);
             }
 
             double norm_temp = 0.0;
