@@ -1,4 +1,5 @@
 #include "sfem_Function.hpp"
+#include <glob.h>
 #include <stddef.h>
 
 #include "matrixio_array.h"
@@ -297,7 +298,7 @@ namespace sfem {
                     block_size;
             impl_->nglobal = impl_->nlocal;
 
-            // CATCH_MPI_ERROR(
+            // MPI_CATCH_ERROR(
             //     MPI_Allreduce(MPI_IN_PLACE, &impl_->nglobal, 1, MPI_LONG, MPI_SUM,
             //     c_mesh->comm));
         }
@@ -522,7 +523,7 @@ namespace sfem {
 
             long coarse_global_size = coarse_local_size;
 
-            // CATCH_MPI_ERROR(
+            // MPI_CATCH_ERROR(
             // MPI_Allreduce(MPI_IN_PLACE, &coarse_global_size, 1, MPI_LONG, MPI_SUM, mesh->comm));
 
             if (as_zero) {
@@ -1201,16 +1202,16 @@ namespace sfem {
 
             auto graph = space->node_to_node_graph();
 
-            linear_elasticity_crsaos(element_type,
-                                                   mesh->nelements,
-                                                   mesh->nnodes,
-                                                   mesh->elements,
-                                                   mesh->points,
-                                                   this->mu,
-                                                   this->lambda,
-                                                   graph->rowptr()->data(),
-                                                   graph->colidx()->data(),
-                                                   values);
+            linear_elasticity_crs_aos(element_type,
+                                      mesh->nelements,
+                                      mesh->nnodes,
+                                      mesh->elements,
+                                      mesh->points,
+                                      this->mu,
+                                      this->lambda,
+                                      graph->rowptr()->data(),
+                                      graph->colidx()->data(),
+                                      values);
 
             return SFEM_SUCCESS;
         }
@@ -1431,7 +1432,9 @@ namespace sfem {
                        mesh->nnodes,
                        mesh->elements,
                        mesh->points,
+                       1,
                        x,
+                       1,
                        out);
 
             return SFEM_SUCCESS;
@@ -1445,7 +1448,9 @@ namespace sfem {
                        mesh->nnodes,
                        mesh->elements,
                        mesh->points,
+                       1,
                        h,
+                       1,
                        out);
 
             return SFEM_SUCCESS;
@@ -1898,9 +1903,117 @@ namespace sfem {
         int report(const real_t *const) override { return SFEM_SUCCESS; }
     };
 
+    class BoundaryMass final : public Op {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+        std::shared_ptr<Buffer<idx_t *>> boundary_elements;
+        enum ElemType element_type { INVALID };
+
+        const char *name() const override { return "BoundaryMass"; }
+        inline bool is_linear() const override { return true; }
+
+        static std::unique_ptr<Op> create(
+                const std::shared_ptr<FunctionSpace> &space,
+                const std::shared_ptr<Buffer<idx_t *>> &boundary_elements) {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            auto ret = std::make_unique<BoundaryMass>(space);
+            ret->element_type = shell_type(side_type((enum ElemType)space->element_type()));
+            ret->boundary_elements = boundary_elements;
+            return ret;
+        }
+
+        int initialize() override { return SFEM_SUCCESS; }
+
+        BoundaryMass(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+        int hessian_crs(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values) override {
+            // auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            // auto graph = space->dof_to_dof_graph();
+
+            // assemble_mass(element_type,
+            //               boundary_elements->extent(1),
+            //               mesh->nnodes,
+            //               boundary_elements->data(),
+            //               mesh->points,
+            //               graph->rowptr()->data(),
+            //               graph->colidx()->data(),
+            //               values);
+
+            // return SFEM_SUCCESS;
+
+            assert(0);
+            return SFEM_FAILURE;
+        }
+
+        int gradient(const real_t *const x, real_t *const out) override {
+            // auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            // assert(1 == space->block_size());
+
+            // apply_mass(element_type,
+            //            boundary_elements->extent(1),
+            //            mesh->nnodes,
+            //            boundary_elements->data(),
+            //            mesh->points,
+            //            x,
+            //            out);
+
+            // return SFEM_SUCCESS;
+
+            assert(0);
+            return SFEM_FAILURE;
+        }
+
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            int block_size = space->block_size();
+            auto data = boundary_elements->data();
+
+            for (int d = 0; d < block_size; d++) {
+                apply_mass(element_type,
+                           boundary_elements->extent(1),
+                           mesh->nnodes,
+                           boundary_elements->data(),
+                           mesh->points,
+                           block_size,
+                           &h[d],
+                           block_size,
+                           &out[d]);
+            }
+
+            return SFEM_SUCCESS;
+        }
+
+        int value(const real_t *x, real_t *const out) override {
+            // auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            // mass_assemble_value((enum ElemType)space->element_type(),
+            //                     mesh->nelements,
+            //                     mesh->nnodes,
+            //                     mesh->elements,
+            //                     mesh->points,
+            //                     x,
+            //                     out);
+
+            // return SFEM_SUCCESS;
+
+            assert(0);
+            return SFEM_FAILURE;
+        }
+
+        int report(const real_t *const) override { return SFEM_SUCCESS; }
+    };
+
     class Factory::Impl {
     public:
         std::map<std::string, FactoryFunction> name_to_create;
+        std::map<std::string, FactoryFunctionBoundary> name_to_create_boundary;
     };
 
     Factory::Factory() : impl_(std::make_unique<Impl>()) {}
@@ -1918,6 +2031,8 @@ namespace sfem {
             instance_.private_register_op("CVFEMMass", CVFEMMass::create);
             instance_.private_register_op("LumpedMass", LumpedMass::create);
             instance_.private_register_op("NeoHookeanOgden", NeoHookeanOgden::create);
+
+            instance_.impl_->name_to_create_boundary["BoundaryMass"] = BoundaryMass::create;
         }
 
         return instance_;
@@ -1951,6 +2066,72 @@ namespace sfem {
         return it->second(space);
     }
 
+    std::shared_ptr<Op> Factory::create_boundary_op(
+            const std::shared_ptr<FunctionSpace> &space,
+            const std::shared_ptr<Buffer<idx_t *>> &boundary_elements,
+            const char *name) {
+        assert(instance().impl_);
+
+        auto &ntc = instance().impl_->name_to_create_boundary;
+        auto it = ntc.find(name);
+
+        if (it == ntc.end()) {
+            std::cerr << "Unable to find op " << name << "\n";
+            return nullptr;
+        }
+
+        return it->second(space, boundary_elements);
+    }
+
     std::string d_op_str(const std::string &name) { return "gpu:" + name; }
+
+    std::shared_ptr<Buffer<idx_t *>> mesh_connectivity_from_file(MPI_Comm comm,
+                                                                 const char *folder) {
+        char pattern[1024 * 10];
+        sprintf(pattern, "%s/i*.raw", folder);
+
+        std::shared_ptr<Buffer<idx_t *>> ret;
+
+        glob_t gl;
+        glob(pattern, GLOB_MARK, NULL, &gl);
+
+        int n_files = gl.gl_pathc;
+
+        idx_t **data = (idx_t **)malloc(n_files * sizeof(idx_t *));
+
+        ptrdiff_t local_size = -1;
+        ptrdiff_t size = -1;
+
+        printf("n_files (%d):\n", n_files);
+        int err = 0;
+        for (int np = 0; np < n_files; np++) {
+            printf("%s\n", gl.gl_pathv[np]);
+
+            idx_t *idx = 0;
+            err |= array_create_from_file(
+                    comm, gl.gl_pathv[np], SFEM_MPI_IDX_T, (void **)&idx, &local_size, &size);
+
+            data[np] = idx;
+        }
+
+        globfree(&gl);
+
+        ret = std::make_shared<Buffer<idx_t *>>(
+                n_files,
+                local_size,
+                data,
+                [](int n, void **data) {
+                    for (int i = 0; i < n; i++) {
+                        free(data[i]);
+                    }
+
+                    free(data);
+                },
+                MEMORY_SPACE_HOST);
+
+        assert(!err);
+
+        return ret;
+    }
 
 }  // namespace sfem

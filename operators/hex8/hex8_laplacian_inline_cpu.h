@@ -455,4 +455,31 @@ static SFEM_INLINE void hex8_laplacian_apply_fff_integral(const scalar_t *const 
                         x91 + x98 + x99;
 }
 
+static SFEM_INLINE void hex8_laplacian_diag_fff_integral(const scalar_t *const SFEM_RESTRICT fff,
+                                                          accumulator_t *SFEM_RESTRICT
+                                                                  element_vector) {
+    const scalar_t x0 = (1.0 / 6.0) * fff[1];
+    const scalar_t x1 = (1.0 / 6.0) * fff[2];
+    const scalar_t x2 = (1.0 / 6.0) * fff[4];
+    const scalar_t x3 = (1.0 / 9.0) * fff[0];
+    const scalar_t x4 = (1.0 / 9.0) * fff[3];
+    const scalar_t x5 = (1.0 / 9.0) * fff[5];
+    const scalar_t x6 = x2 + x3 + x4 + x5;
+    const scalar_t x7 = x0 + x1 + x6;
+    const scalar_t x8 = -x0;
+    const scalar_t x9 = -x1;
+    const scalar_t x10 = x6 + x8 + x9;
+    const scalar_t x11 = -x2 + x3 + x4 + x5;
+    const scalar_t x12 = x0 + x11 + x9;
+    const scalar_t x13 = x1 + x11 + x8;
+    element_vector[0] = x7;
+    element_vector[1] = x10;
+    element_vector[2] = x12;
+    element_vector[3] = x13;
+    element_vector[4] = x12;
+    element_vector[5] = x13;
+    element_vector[6] = x7;
+    element_vector[7] = x10;
+}
+
 #endif
