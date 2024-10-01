@@ -9,6 +9,7 @@
 #include "sfem_base.h"
 
 #include "sfem_Chebyshev3.hpp"
+#include "sfem_Multigrid.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_mprgp.hpp"
@@ -34,10 +35,9 @@ void SFEM_finalize() { MPI_Finalize(); }
 NB_MODULE(pysfem, m) {
     using namespace sfem;
 
-    Multigrid<real_t> mg;
-
     using LambdaOperator_t = sfem::LambdaOperator<real_t>;
     using Operator_t = sfem::Operator<real_t>;
+    using Multigrid_t = sfem::Multigrid<real_t>;
     using ConjugateGradient_t = sfem::ConjugateGradient<real_t>;
     using BiCGStab_t = sfem::BiCGStab<real_t>;
     using Chebyshev3_t = sfem::Chebyshev3<real_t>;
@@ -46,8 +46,20 @@ NB_MODULE(pysfem, m) {
     using IdxBuffer = sfem::Buffer<idx_t>;
     using CountBuffer = sfem::Buffer<count_t>;
 
+
     m.def("init", &SFEM_init);
     m.def("finalize", &SFEM_finalize);
+
+    nb::enum_<ExecutionSpace>(m, "ExecutionSpace")
+    .value("EXECUTION_SPACE_HOST", EXECUTION_SPACE_HOST)
+    .value("EXECUTION_SPACE_DEVICE", EXECUTION_SPACE_DEVICE)
+    .value("EXECUTION_SPACE_INVALID", EXECUTION_SPACE_INVALID);
+
+    nb::enum_<MemorySpace>(m, "MemorySpace")
+    .value("MEMORY_SPACE_HOST", MEMORY_SPACE_HOST)
+    .value("MEMORY_SPACE_DEVICE", MEMORY_SPACE_DEVICE)
+    .value("MEMORY_SPACE_INVALID", MEMORY_SPACE_INVALID);
+
     nb::class_<Mesh>(m, "Mesh")  //
             .def(nb::init<>())
             .def("read", &Mesh::read)
@@ -142,7 +154,20 @@ NB_MODULE(pysfem, m) {
     nb::class_<FunctionSpace>(m, "FunctionSpace")
             .def(nb::init<std::shared_ptr<Mesh>>())
             .def(nb::init<std::shared_ptr<Mesh>, const int>())
+            .def("derefine", &FunctionSpace::derefine)
             .def("n_dofs", &FunctionSpace::n_dofs);
+
+    m.def("create_derefined_crs_graph",
+          [](const std::shared_ptr<FunctionSpace> &space) -> std::shared_ptr<CRSGraph> {
+              return sfem::create_derefined_crs_graph(*space);
+          });
+
+    m.def("create_edge_idx", [](const std::shared_ptr<CRSGraph> &crs_graph) -> std::shared_ptr<Buffer<idx_t>> {
+        return sfem::create_edge_idx(*crs_graph);
+    });
+
+    m.def("create_hierarchical_restriction", &sfem::create_hierarchical_restriction);
+    m.def("create_hierarchical_prolongation", &sfem::create_hierarchical_prolongation);
 
     nb::class_<Op>(m, "Op");
     m.def("create_op", &Factory::create_op);
@@ -242,7 +267,7 @@ NB_MODULE(pysfem, m) {
 
 #pragma omp parallel for
                     for (ptrdiff_t i = 0; i < n; i++) {
-                        y[i] = d_[i] * x[i];
+                        y[i] += d_[i] * x[i];
                     }
                 },
                 EXECUTION_SPACE_HOST);
@@ -438,4 +463,17 @@ NB_MODULE(pysfem, m) {
     m.def("apply", [](std::shared_ptr<MPRGP_t> &op, nb::ndarray<real_t> x, nb::ndarray<real_t> y) {
         op->apply(x.data(), y.data());
     });
+
+    nb::class_<Multigrid_t>(m, "Multigrid")
+            .def(nb::init<>())
+            .def("default_init", &Multigrid_t::default_init)
+            .def("set_max_it", &Multigrid_t::set_max_it)
+            .def("set_atol", &Multigrid_t::set_atol)
+            .def("set_max_it", &Multigrid_t::set_max_it)
+            .def("add_level", &Multigrid_t::add_level);
+
+    m.def("apply",
+          [](std::shared_ptr<Multigrid_t> &op, nb::ndarray<real_t> x, nb::ndarray<real_t> y) {
+              op->apply(x.data(), y.data());
+          });
 }
