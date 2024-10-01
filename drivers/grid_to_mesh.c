@@ -98,6 +98,8 @@ int main(int argc, char* argv[]) {
                 exit(EXIT_FAILURE);
             }
 
+            printf("temp (ptr): %p, %s:%d\n", (void *)temp, __FILE__, __LINE__);
+
             double norm_temp = 0.0;
             double max_temp = temp[0];
             double min_temp = temp[0];
