@@ -94,11 +94,23 @@ int main(int argc, char* argv[]) {
                 return EXIT_FAILURE;
             }
 
+            double norm_temp = 0.0;
+            double max_temp = temp[0];
+            double min_temp = temp[0];
+
             ptrdiff_t n_zyx = nlocal[0] * nlocal[1] * nlocal[2];
             field = malloc(n_zyx * sizeof(real_t));
             for (ptrdiff_t i = 0; i < n_zyx; i++) {
                 field[i] = temp[i];
+                norm_temp += temp[i] * temp[i];
+                max_temp = fmax(max_temp, temp[i]);
+                min_temp = fmin(min_temp, temp[i]);
             }
+
+            norm_temp = sqrt(norm_temp);
+            printf("norm_temp = %1.14e , %s:%d\n", norm_temp, __FILE__, __LINE__);
+            printf("max_temp = %1.14e , %s:%d\n", max_temp, __FILE__, __LINE__);
+            printf("min_temp = %1.14e , %s:%d\n", min_temp, __FILE__, __LINE__);
 
             free(temp);
 
