@@ -83,7 +83,7 @@ PERF="no"
 if [[ -z "$LAUNCH" ]]
 then
 	LAUNCH="mpiexec -np $n_procs"
-#	LAUNCH=""
+	LAUNCH=""
 fi
 
 # GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
