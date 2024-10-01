@@ -9,16 +9,21 @@ idx_t = np.int32
 real_t = np.float64
 
 # --------------------------------------
-# Solver params
+# Solver parameters
 # --------------------------------------
-MAX_NL_ITER = 100
-max_linear_iterations = 30
-penalty_param = 10 # Very sensitive to this!
-use_cheb = False
-# use_cheb = True
-matrix_free = False
-use_penalty = False
+MAX_NL_ITER = 2000
+max_linear_iterations = 2
+penalty_param = 10 # Very sensitive to this! If few linear iterations it is less sensitive
+use_cheb = True
+matrix_free = True
 use_penalty = True
+
+def create_mg():
+	mg = sfem.Multigrid()
+	# Example 2-level
+	# mg.add_level(linear_op, smoother, None, restriction);
+	# mg.add_level(None, solver_coarse, prolongation, None);
+	return mg
 
 # Assemble matrix in scipy format
 def assemble_scipy_matrix(fun, x):
@@ -78,8 +83,8 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 
 	if use_cheb:
 		solver = sfem.Chebyshev3()
-		inv_diag = sfem.diag(1./fun_diag)
-		solver.set_op(inv_diag * lop)
+		inv_diag = sfem.diag(1./np.sqrt(fun_diag))
+		solver.set_op(inv_diag * lop * inv_diag)
 		solver.default_init()
 		solver.init_with_ones()
 		solver.set_max_it(max_linear_iterations)
@@ -127,13 +132,18 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 		g_pen = (penalty_param * mass * active * dps)
 		sfem.apply_zero_constraints(fun, g_pen)
 		
-		inv_diag = sfem.diag(1./(fun_diag + H_diag))
-
 		if use_cheb:
+			# Cheb
+
+			diag_12 = np.sqrt(fun_diag + H_diag)
+			inv_diag = sfem.diag(1./diag_12)
+
 			r[:] = 0.
 			sfem.apply(inv_diag, (g_pen - g), r)
-			solver.set_op(inv_diag * lop)
+			solver.set_op(inv_diag * lop * inv_diag)
 		else:
+			# CG
+			inv_diag = sfem.diag(1./(fun_diag + H_diag))
 			solver.set_preconditioner_op(inv_diag)
 			r = g_pen - g
 			solver.set_op(lop)
@@ -141,9 +151,13 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 		c[:] = 0.
 		sfem.copy_constrained_dofs(fun, r, c)
 		sfem.apply(solver, r, c)
-		x += c
 
-		norm_g = linalg.norm(r)
+		if use_cheb:
+			sfem.apply(inv_diag, c, x)
+		else:
+			x += c
+
+		norm_g = linalg.norm(g_pen - g)
 		norm_penet = linalg.norm(active*d)
 		print(f'{i}) norm_g = {norm_g} #active {int(np.sum(active))} norm_penet = {norm_penet}')
 
@@ -206,7 +220,7 @@ def solve_obstacle(options):
 	indentation = 1
 
 	radius = ((0.5 - np.sqrt(sy*sy + sz*sz)))
-	f = -0.1*np.cos(np.pi*4*4*radius) - 0.1
+	f = -0.1*np.cos(np.pi*2*radius) - 0.1
 	parabola = -indentation * f + wall
 	print(np.min(wall), np.max(sy*sy) )
 
