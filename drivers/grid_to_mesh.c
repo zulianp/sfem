@@ -147,10 +147,10 @@ int main(int argc, char* argv[]) {
 
             ptrdiff_t n_zyx_private = nlocal[0] * nlocal[1] * nlocal[2];
             for(ptrdiff_t i = 0; i < n_zyx_private; i++) {
+                field[i] = sin((double)(i) / 10000.0);
                 filed_norm += field[i] * field[i];
                 filed_max = fmax(filed_max, field[i]);
                 filed_min = fmin(filed_min, field[i]);
-                field[i] = sin((double)(i) / 10000.0);
             }
 
             filed_norm = sqrt(filed_norm);
