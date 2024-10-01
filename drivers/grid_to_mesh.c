@@ -334,7 +334,7 @@ int main(int argc, char* argv[]) {
             norm += g[i]*g[i];
         }
 
-        printf("Norm: %g  <<<< \n", norm);
+        printf("\nNorm: %1.14e  <<<< TEST NORM <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n\n", norm);
 
         mesh_write_nodal_field(&mesh, output_path, SFEM_MPI_REAL_T, g);
 
