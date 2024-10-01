@@ -88,7 +88,10 @@ int main(int argc, char* argv[]) {
         double ndarray_read_tick = MPI_Wtime();
 
         if (SFEM_READ_FP32) {
-            geom_t* temp = 0;
+            
+            geom_t* temp = NULL;
+            temp = malloc(mesh.nnodes * sizeof(geom_t));
+
             if (ndarray_create_from_file(
                         comm, data_path, SFEM_MPI_GEOM_T, 3, (void**)&temp, nlocal, nglobal)) {
                 return EXIT_FAILURE;
