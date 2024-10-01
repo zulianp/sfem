@@ -108,6 +108,11 @@ int main(int argc, char* argv[]) {
             
             field = malloc(n_zyx * sizeof(real_t));
 
+            if (field == NULL) {
+                fprintf(stderr, "Error: malloc failed\n");
+                exit(EXIT_FAILURE);
+            }
+
             for (ptrdiff_t i = 0; i < n_zyx; i++) {
                 field[i] = (real_t)(temp[i]);
 
