@@ -328,13 +328,14 @@ int main(int argc, char* argv[]) {
         }
 
         double io_tick = MPI_Wtime();
-        double norm = 0.0;
+        double norm = 1.0;
 
         for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
             norm += g[i]*g[i];
         }
 
-        printf("\nNorm: %1.14e  <<<< TEST NORM <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n\n", norm);
+        printf("\nNorm: %1.14e  <<<< TEST NORM <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n", norm);
+        printf("Mesh nnodes: %ld\n\n", mesh.nnodes);
 
         mesh_write_nodal_field(&mesh, output_path, SFEM_MPI_REAL_T, g);
 
