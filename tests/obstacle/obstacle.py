@@ -134,7 +134,6 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 		
 		if use_cheb:
 			# Cheb
-
 			diag_12 = np.sqrt(fun_diag + H_diag)
 			inv_diag = sfem.diag(1./diag_12)
 

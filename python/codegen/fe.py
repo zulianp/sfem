@@ -155,6 +155,9 @@ class FE:
 
 		return g
 
+	def is_isoparametric(self):
+		return False
+
 	def isoparametric_transform(self, q):
 		p = self.coords()
 		f = self.fun(q)

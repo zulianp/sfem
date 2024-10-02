@@ -15,14 +15,27 @@ def main(argv):
 	output = argv[1]
 	radius=0.5
 	height=1
+	hex_mesh=False
 
 	if(len(argv) > 2):
 		nrefs = int(sys.argv[2])
 		print(f'nrefs = {nrefs}')
 
+	if(len(argv) > 3):
+		hex_mesh = int(sys.argv[3])
+		print(f'hex_mesh = {hex_mesh}')
+
+
 	gmsh.initialize(argv=["","-bin"])
 	gmsh.option.setNumber("General.Terminal", 0)
 	gmsh.option.setNumber("Mesh.SaveAll", 1)
+
+	if hex_mesh:
+		print("[Warning] Does not work!")
+		gmsh.option.setNumber("Mesh.Smoothing", 100)
+		gmsh.option.setNumber("Mesh.RecombineAll", True)
+		exit(1)
+		# gmsh.option.setNumber("Mesh.RecombinationAlgorithm", 2)
 
 	model = gmsh.model()
 	model.add("Cylinder")
@@ -61,6 +74,12 @@ def main(argv):
 
 	# Generate mesh
 	model.occ.synchronize()
+	
+	
+
+
+		
+
 	model.mesh.generate(3)
 
 	for r in range(0, nrefs):
