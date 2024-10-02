@@ -50,7 +50,10 @@ def solve_obstacle(options):
 		soutlet = np.array(np.where(select_outlet), dtype=idx_t)
 		swalls  = np.array(np.where(select_walls), dtype=idx_t)
 
-		m = pysfem.create_mesh("TET4", np.array(idx), np.array(points))
+		if options.elem_type == "INVALID":
+			options.elem_type = "TET4"
+
+		m = pysfem.create_mesh(options.elem_type, np.array(idx), np.array(points))
 		m.write(f"{options.output_dir}/rect_mesh")
 	else:
 		m = pysfem.Mesh()		
@@ -133,6 +136,7 @@ class Opts:
 	def __init__(self):
 		self.input_mesh = ''
 		self.output_dir = './output'
+		self.elem_type = "INVALID"
 
 if __name__ == '__main__':
 	print(sys.argv)
@@ -149,7 +153,7 @@ if __name__ == '__main__':
 	try:
 	    opts, args = getopt.getopt(
 	        sys.argv[3:], "h",
-	        ["help"])
+	        ["help", "elem_type=", "cell_type="])
 
 	except getopt.GetoptError as err:
 	    print(err)
@@ -160,6 +164,8 @@ if __name__ == '__main__':
 	    if opt in ('-h', '--help'):
 	        print(usage)
 	        sys.exit()
+	    elif opt in ('--elem_type', '--cell_type'):
+	       	options.elem_type = arg
 
 	solve_obstacle(options)
 	pysfem.finalize()
