@@ -2,6 +2,13 @@
 
 from sfem_codegen import *
 
+class Constant:
+	def __init__(self, name):
+		self.val = sp.symbols(name)
+
+	def eval(self, q):
+		return self.val
+
 class Field:
 	def __init__(self, fe, coeff):
 		self.fe = fe

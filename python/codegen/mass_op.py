@@ -9,20 +9,46 @@ from sfem_codegen import *
 
 from tet4 import *
 from tet10 import *
+from tet20 import *
+
+from hex8 import *
+from aahex8 import *
 
 from tri3 import *
 from tri6 import *
+from quad4 import *
 
 from edge2 import *
 
 from fields import *
 
+import sys
+
+def simplify(expr):
+	# return sp.simplify(expr)
+	return expr
+
 class MassOp:
-	def __init__(self, field, fe_test, q):
+	def __init__(self, field, fe_test, symbolic_integration):
+		# Ref element dims
+		dims = fe_test.manifold_dim()
+
+		if dims == 1:
+			q = [qx]
+		elif dims == 2:
+			q = [qx, qy]
+		else:
+			q = [qx, qy, qz]
+
+		# Quadrature point
+		q = sp.Matrix(dims, 1, q)
+
 		self.field = field
 		self.fe_trial = field.fe
 		self.fe_test = fe_test
 		self.q = q
+		self.qw = sp.symbols('qw')
+		self.symbolic_integration = symbolic_integration
 
 	def matrix(self):
 		fe_trial = self.fe_trial
@@ -33,12 +59,19 @@ class MassOp:
 		fun_test  = fe_test.fun(q)
 		dV = fe_test.jacobian_determinant(q)
 
+		if not self.symbolic_integration:
+			dV *= fe_test.reference_measure() * self.qw
+
 		expr = []
 		for i in range(0, fe_test.n_nodes()):
 			for j in range(0, fe_trial.n_nodes()):
-				integr = fe_test.integrate(q, fun_test[i] * fun_trial[j]) * dV
+				if not self.symbolic_integration:
+					integr = fun_test[i] * fun_trial[j] * dV
+				else:
+					integr = fe_test.integrate(q, fun_test[i] * fun_trial[j]) * dV
 				var = sp.symbols(f'element_matrix[{i*fe_trial.n_nodes()+j}]')
-				expr.append(ast.Assignment(var, sp.simplify(integr)))
+				
+				expr.append(self.assign_op(var, integr))
 
 		return expr
 
@@ -59,7 +92,7 @@ class MassOp:
 		approx_measure = 0
 		for i in range(0, fe_test.n_nodes()):
 			integr = fe_test.integrate(q, fun_test[i] * fun_trial[i]) * dV
-			integr = sp.simplify(integr)
+			integr = simplify(integr)
 			d[i] = integr
 			approx_measure += integr
 
@@ -72,11 +105,6 @@ class MassOp:
 			expr.append(ast.Assignment(var, d[i]))
 		return expr
 
-	# def biorthogonal_weights(self):
-	# 	mmat = self.matrix()
-	# 	mvec = self.hrz_diagonal_scaling_lumped_matrix()
-
-
 	def lumped_matrix(self):
 		fe_trial = self.fe_trial
 		fe_test = self.fe_test
@@ -86,14 +114,25 @@ class MassOp:
 		fun_test  = fe_test.fun(q)
 		dV = fe_test.jacobian_determinant(q)
 
+		if not self.symbolic_integration:
+			dV *= fe_test.reference_measure() * self.qw
+
 		expr = []
 		for i in range(0, fe_test.n_nodes()):
 			integr = 0
 			for j in range(0, fe_trial.n_nodes()):
-				integr += fe_test.integrate(q, fun_test[i] * fun_trial[j]) * dV
-			
+				if not self.symbolic_integration:
+					integr += fun_test[i] * fun_trial[j] * dV
+				else:
+					if fe_test.is_isoparametric():
+						integrand = fun_test[i] * fun_trial[j] * dV
+						integrand = simplify(integrand)
+						integr += fe_test.integrate(q, integrand) 
+					else:
+						integr += fe_test.integrate(q, fun_test[i] * fun_trial[j]) * dV
+
 			var = sp.symbols(f'element_matrix_diag[{i}]')
-			expr.append(ast.Assignment(var, sp.simplify(integr)))
+			expr.append(self.assign_op(var, integr))
 
 		return expr
 
@@ -107,129 +146,113 @@ class MassOp:
 		fun_test  = fe_test.fun(q)
 		dV = fe_test.jacobian_determinant(q)
 
+		if not self.symbolic_integration:
+			dV *= fe_test.reference_measure() * self.qw
+
 		expr = []
 		for i in range(0, fe_test.n_nodes()):
-			integr = fe_test.integrate(q, fun_test[i] * fun_trial) * dV
+			if not self.symbolic_integration:
+				integr = fun_test[i] * fun_trial  * dV
+			else:
+				if fe_test.is_isoparametric():
+					integr = fe_test.integrate(q, fun_test[i] * fun_trial  * dV)
+				else:
+					integr = fe_test.integrate(q, fun_test[i] * fun_trial) * dV
 
-			integr = sp.simplify(integr)
 			var = sp.symbols(f'element_vector[{i}]')
-			expr.append(ast.Assignment(var, sp.simplify(integr)))
+			expr.append(self.assign_op(var, integr))
+		return expr
 
+	def assign_op(self, var, expr):
+		if self.symbolic_integration:
+			return ast.Assignment(var, simplify(expr))
+		else:
+			return ast.AddAugmentedAssignment(var, simplify(expr))
+
+	def apply_to_constant(self):
+		field = self.field
+		fe_test = self.fe_test
+		q = self.q
+
+		fun_test = fe_test.fun(q)
+		dV = fe_test.jacobian_determinant(q)
+		val = sp.symbols('val')
+
+		if not self.symbolic_integration:
+			dV *= fe_test.reference_measure() * self.qw
+
+		expr = []
+		for i in range(0, fe_test.n_nodes()):
+			if not self.symbolic_integration:
+				integr = fun_test[i] * val * dV
+			else:
+				if fe_test.is_isoparametric():
+					integrand = fun_test[i] * val * dV
+					integrand = simplify(integrand)
+					integr = fe_test.integrate(q, integrand)
+				else:
+					integr = fe_test.integrate(q, fun_test[i] * val) * dV
+
+			var = sp.symbols(f'element_vector[{i}]')
+			expr.append(self.assign_op(var, integr))
 		return expr
 
 def main():
+	fes = {
+		"TRI6": Tri6(),
+		"TRI3": Tri3(),
+		"TRISHELL3": TriShell3(),
+		"TET4": Tet4(),
+		"TET10": Tet10(),
+		"TET20": Tet20(),
+		"HEX8": Hex8(),
+		"AAHEX8": AAHex8(),
+		"AAQUAD4": AxisAlignedQuad4(),
+		"QUAD4": Quad4(),
+		"QUADSHELL4": QuadShell4()
+	}
 
-	if True:
-		fe = Beam2()
-		f =  Field(fe, coeffs('u', 2))
-		op = MassOp(f, fe, [qx])
-		c_code(op.apply())
-		# c_code(op.lumped_matrix())
-		# c_code(op.matrix())
+	symbolic_integration = False
 
-	if False:
-		fe = Tri3()
-		f =  Field(fe, coeffs('u', 3))
-		op = MassOp(f, fe, [qx, qy])
-		c_code(op.apply())
-
-	if False:
-		fe = TriShell3()
-		f =  Field(fe, coeffs('u', 3))
-		op = MassOp(f, fe, [qx, qy])
-		# c_code(op.apply())
-		# c_code(op.lumped_matrix())
-		c_code(op.matrix())
-
-	if False:
+	if len(sys.argv) >= 2:
+		fe = fes[sys.argv[1]]
+	else:
+		print("Fallback with TET10")
 		fe = Tet10()
-		f =  Field(fe, coeffs('u', 10))
-		op = MassOp(f, fe, [qx, qy, qz])
-		# c_code(op.matrix())
-		# c_code(op.hrz_diagonal_scaling_lumped_matrix())
-		c_code(op.lumped_matrix())
 
-	if False:
-		fe = Tri6()
-		f =  Field(fe, coeffs('u', 6))
-		op = MassOp(f, fe, [qx, qy, qz])
-		# c_code(op.matrix())
-		c_code(op.hrz_diagonal_scaling_lumped_matrix())
-		# c_code(op.lumped_matrix())
+	fe_field = fe
+	if len(sys.argv) >= 3:
+		fe_field = fes[sys.argv[2]]
 
-	if False:
-	# if True:
-		# fields = [Field(TriShell3(), coeffs('u', 3)), Field(TransformedTet10(), coeffs('u', 10))]
-		# test_fes  = [TransformedTet10(), DualTet10()]
+	if len(sys.argv) >= 4:
+		symbolic_integration = int(sys.argv[3])
 
-		# fields = [Field(TriShell3(), coeffs('u', 3)), Field(TransformedTriShell6(), coeffs('u', 6))]
-		# test_fes  = [TransformedTriShell6(), DualTriShell6()]
+	f = Field(fe_field, coeffs('u', fe_field.n_nodes()))
+	op = MassOp(f, fe, symbolic_integration)
 
-		# fields = [Field(Tri6(), coeffs('u', 6)), Field(TransformedTri6(), coeffs('u', 6))]
-		# test_fes  = [TransformedTri6(), DualTri6()]
+	print("----------------------------")
+	print("apply_to_constant")
+	print("----------------------------")
+	c_code(op.apply_to_constant())
+	print("----------------------------")	
 
-		# fields = [Field(Tri6(), coeffs('u', 6))]
-		# test_fes  = [Tri6()]
+	print("----------------------------")
+	print("lumped_matrix")
+	print("----------------------------")
+	c_code(op.lumped_matrix())
+	print("----------------------------")	
 
-		fields = [Field(Tri3(), coeffs('u', 3))]
-		test_fes  = [Tri3()]
+	print("----------------------------")
+	print("matrix")
+	print("----------------------------")
+	c_code(op.matrix())
+	print("----------------------------")	
 
-		n_forms = len(test_fes)
-
-		q = [qx, qy, qz]
-		for i in range(0, n_forms):
-			trial = fields[i]
-			test = test_fes[i]
-			op = MassOp(trial, test, q)
-			expr = op.apply()
-
-			print("----------------------------")
-			print(f"MassOp({trial.fe.name()}, {test.name()})")
-			print("----------------------------")
-			print("Eval")
-			print("----------------------------")
-			c_code(expr)
-			print("----------------------------")
-
-			expr = op.lumped_matrix()
-
-			print("----------------------------")
-			print("lumped Matrix")
-			print("----------------------------")
-			c_code(expr)
-			print("----------------------------")	
-
-
-			print("----------------------------")
-			print("Matrix")
-			print("----------------------------")
-			expr = op.matrix()
-			c_code(expr)
-			print("----------------------------")	
-
-			# expr = op.matrix()
-
-			# print("----------------------------")
-			# print("Matrix")
-			# print("----------------------------")
-			# c_code(expr)
-			# print("----------------------------")	
-
-	# if True:
-	if False:
-		print("----------------------------")
-		print("Transform")
-		print("----------------------------")
-		c_code(tet10_basis_transform_expr())
-		print("----------------------------")
-
-	if False:
-	# if False:
-		print("----------------------------")
-		print("Transform")
-		print("----------------------------")
-		c_code(tri6_basis_transform_expr())
-		print("----------------------------")
+	print("----------------------------")
+	print("apply")
+	print("----------------------------")
+	c_code(op.apply())
+	print("----------------------------")	
 
 if __name__ == '__main__':
 	main()
