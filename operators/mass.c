@@ -14,6 +14,7 @@
 #include "sfem_defs.h"
 
 #include "beam2_mass.h"
+#include "quadshell4_mass.h"
 #include "tet10_mass.h"
 #include "tet4_mass.h"
 #include "tri3_mass.h"
@@ -169,6 +170,11 @@ void apply_mass(const int element_type,
         }
         case TRISHELL3: {
             trishell3_apply_mass(nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
+            break;
+        }
+        case QUADSHELL4: {
+            quadshell4_apply_mass(
+                    nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
             break;
         }
             // case TRI6: {
