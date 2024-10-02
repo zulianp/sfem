@@ -13,9 +13,9 @@ void quadshell4_apply_mass(const ptrdiff_t nelements,
                            idx_t **const SFEM_RESTRICT elements,
                            geom_t **const SFEM_RESTRICT points,
                            const ptrdiff_t stride_u,
-                           const real_t *const u,
+                           const real_t *const SFEM_RESTRICT u,
                            const ptrdiff_t stride_values,
-                           real_t *const values);
+                           real_t *const SFEM_RESTRICT values);
 
 #ifdef __cplusplus
 }

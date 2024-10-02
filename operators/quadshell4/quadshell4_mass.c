@@ -82,9 +82,9 @@ void quadshell4_apply_mass(const ptrdiff_t nelements,
                            idx_t **const SFEM_RESTRICT elements,
                            geom_t **const SFEM_RESTRICT points,
                            const ptrdiff_t stride_u,
-                           const real_t *const u,
+                           const real_t *const SFEM_RESTRICT u,
                            const ptrdiff_t stride_values,
-                           real_t *const values) {
+                           real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
@@ -94,7 +94,6 @@ void quadshell4_apply_mass(const ptrdiff_t nelements,
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[4];
-        idx_t ks[4];
         scalar_t element_u[4];
         accumulator_t element_vector[4];
 
@@ -122,7 +121,7 @@ void quadshell4_apply_mass(const ptrdiff_t nelements,
                 z[ev[0]],
                 z[ev[1]],
                 z[ev[2]],
-                z[ev[4]],
+                z[ev[3]],
                 element_u,
                 // output vector
                 element_vector);

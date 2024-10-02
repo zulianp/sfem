@@ -6,7 +6,7 @@
 #include "hex8_linear_elasticity_inline_cpu.h"
 #include "hex8_quadrature.h"
 #include "proteus_hex8.h"
-#include "proteus_hex8_linear_elasticity.h"
+
 
 #ifndef POW3
 #define POW3(x) ((x) * (x) * (x))
