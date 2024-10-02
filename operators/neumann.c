@@ -33,9 +33,6 @@ static SFEM_INLINE void tri_shell_3_integrate(const real_t px0,
                                               const real_t *const SFEM_RESTRICT u,
                                               real_t *const SFEM_RESTRICT element_vector) {
     static const int stride = 1;
-    // FLOATING POINT OPS!
-    //       - Result: 3*ASSIGNMENT
-    //       - Subexpressions: 35*ADD + 2*DIV + 85*MUL + 10*POW + 27*SUB
     const real_t x0 = 2 * px0;
     const real_t x1 = px1 * x0;
     const real_t x2 = py0 * x1;
@@ -87,8 +84,6 @@ static void tri_shell_3_surface_forcing_function(const ptrdiff_t nfaces,
                                                  const real_t value,
                                                  const int stride,
                                                  real_t *SFEM_RESTRICT output) {  // Neumann
-    // double tick = MPI_Wtime();
-
 #pragma omp parallel
     {
 #pragma omp for  // nowait
@@ -122,9 +117,6 @@ static void tri_shell_3_surface_forcing_function(const ptrdiff_t nfaces,
             output[i2 * stride] += element_vector[2];
         }
     }
-
-    // double tock = MPI_Wtime();
-    // printf("neumann.c: tri_shell_3_surface_forcing_function\t%g seconds\n", tock - tick);
 }
 
 static SFEM_INLINE void tri_shell_6_integrate(const real_t px0,
@@ -139,9 +131,6 @@ static SFEM_INLINE void tri_shell_6_integrate(const real_t px0,
                                               const real_t *SFEM_RESTRICT u,
                                               real_t *SFEM_RESTRICT element_vector) {
     static const int stride = 1;
-    // FLOATING POINT OPS!
-    //       - Result: 6*ASSIGNMENT
-    //       - Subexpressions: 35*ADD + 2*DIV + 85*MUL + 10*POW + 27*SUB
     const real_t x0 = 2 * px0;
     const real_t x1 = px1 * x0;
     const real_t x2 = py0 * x1;
@@ -195,8 +184,6 @@ static void tri_shell_6_surface_forcing_function(const ptrdiff_t nfaces,
                                                  const real_t value,
                                                  const int stride,
                                                  real_t *SFEM_RESTRICT output) {
-    // double tick = MPI_Wtime();
-
 #pragma omp parallel
     {
 #pragma omp for  // nowait
@@ -242,9 +229,6 @@ static void tri_shell_6_surface_forcing_function(const ptrdiff_t nfaces,
             output[i5 * stride] += element_vector[2];
         }
     }
-
-    // double tock = MPI_Wtime();
-    // printf("neumann.c: tri_shell_6_surface_forcing_function\t%g seconds\n", tock - tick);
 }
 
 static SFEM_INLINE void edge_shell_2_surface_forcing_function_kernel(
@@ -255,9 +239,6 @@ static SFEM_INLINE void edge_shell_2_surface_forcing_function_kernel(
         const real_t *const SFEM_RESTRICT u,
         real_t *const SFEM_RESTRICT element_vector) {
     static const int stride = 1;
-    // FLOATING POINT OPS!
-    //       - Result: 2*ASSIGNMENT
-    //       - Subexpressions: 3*ADD + 2*DIV + 5*MUL + 5*POW + 2*SUB
     const real_t x0 = (1.0 / 2.0) * u[0] *
                       sqrt(pow(px0, 2) - 2 * px0 * px1 + pow(px1, 2) + pow(py0, 2) - 2 * py0 * py1 +
                            pow(py1, 2));
@@ -318,6 +299,11 @@ static SFEM_INLINE void quad_shell_4_integrate(const real_t px0,
 
     static const scalar_t rule_qw[4] = {0.25, 0.25, 0.25, 0.25};
     static const int rule_n_qp = 4;
+
+    element_vector[0] = 0;
+    element_vector[1] = 0;
+    element_vector[2] = 0;
+    element_vector[3] = 0;
 
     for (int q = 0; q < rule_n_qp; q++) {
         const scalar_t qx = rule_qx[q];
