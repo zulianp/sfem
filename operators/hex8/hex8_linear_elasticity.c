@@ -53,9 +53,10 @@ int hex8_linear_elasticity_apply(const ptrdiff_t nelements,
         }
 
         for (int v = 0; v < 8; ++v) {
-            element_ux[v] = ux[ev[v] * u_stride];
-            element_uy[v] = uy[ev[v] * u_stride];
-            element_uz[v] = uz[ev[v] * u_stride];
+            const ptrdiff_t idx = ev[v] * u_stride;
+            element_ux[v] = ux[idx];
+            element_uy[v] = uy[idx];
+            element_uz[v] = uz[idx];
         }
 
         for (int d = 0; d < 8; d++) {
