@@ -34,6 +34,16 @@ int hierarchical_prolongation(const enum ElemType from_element,
                               const real_t *const SFEM_RESTRICT from,
                               real_t *const SFEM_RESTRICT to);
 
+int hierarchical_restriction_with_counting(
+                              const enum ElemType from_element,
+                              const enum ElemType to_element,
+                              const ptrdiff_t nelements,
+                              idx_t **const SFEM_RESTRICT elements,
+                              const uint16_t *const SFEM_RESTRICT element_to_node_incidence_count,
+                              const int vec_size,
+                              const real_t *const SFEM_RESTRICT from,
+                              real_t *const SFEM_RESTRICT to);
+
 int hierarchical_restriction(
         // CRS-node-graph of the coarse mesh
         const ptrdiff_t nnodes,

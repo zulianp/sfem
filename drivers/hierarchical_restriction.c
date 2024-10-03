@@ -21,10 +21,10 @@ int main(int argc, char *argv[]) {
 
     if (argc != 6) {
         if (!rank) {
-            fprintf(
-                stderr,
-                "usage: %s <mesh> <from_element> <to_element> <input.float64> <output.float64>\n",
-                argv[0]);
+            fprintf(stderr,
+                    "usage: %s <mesh> <from_element> <to_element> <input.float64> "
+                    "<output.float64>\n",
+                    argv[0]);
         }
 
         return EXIT_FAILURE;
@@ -44,17 +44,77 @@ int main(int argc, char *argv[]) {
     real_t *from = malloc(mesh.nnodes * sizeof(real_t));
     real_t *to = calloc(n_coarse_nodes, sizeof(real_t));
 
+    int err = array_read(comm, path_input, SFEM_MPI_REAL_T, from, mesh.nnodes, mesh.nnodes);
+    if (err) return EXIT_FAILURE;
+
+    double tick = MPI_Wtime();
+
+#if 1
+    printf("hierarchical_restriction_with_counting\n");
+
+    double tack = MPI_Wtime();
+
+    int nxe = elem_num_nodes((enum ElemType)mesh.element_type);
+    uint16_t *element_to_node_incidence_count = (uint16_t *)calloc(mesh.nnodes, sizeof(int));
+    for (int d = 0; d < nxe; d++) {
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < mesh.nelements; ++i) {
+#pragma omp atomic update
+            element_to_node_incidence_count[mesh.elements[d][i]]++;
+        }
+    }
+
+    double setup_elapsed = MPI_Wtime() - tack;
+    tack = MPI_Wtime();
+
+    err = hierarchical_restriction_with_counting(from_element,
+                                                 to_element,
+                                                 mesh.nelements,
+                                                 mesh.elements,
+                                                 element_to_node_incidence_count,
+                                                 1,
+                                                 from,
+                                                 to);
+
+    double compute_elapsed = MPI_Wtime() - tack;
+
+    free(element_to_node_incidence_count);
+
+#else
+    printf("hierarchical_restriction with crs graph\n");
+
     idx_t *colidx = 0;
     count_t *rowptr = 0;
 
-    int err = build_crs_graph_for_elem_type(
-                  to_element, mesh.nelements, n_coarse_nodes, mesh.elements, &rowptr, &colidx) ||
-              array_read(comm, path_input, SFEM_MPI_REAL_T, from, mesh.nnodes, mesh.nnodes) ||
-              hierarchical_restriction(n_coarse_nodes, rowptr, colidx, 1, from, to) ||
-              array_write(comm, path_output, SFEM_MPI_REAL_T, to, n_coarse_nodes, n_coarse_nodes);
+    double tack = MPI_Wtime();
+
+    err = build_crs_graph_for_elem_type(
+            to_element, mesh.nelements, n_coarse_nodes, mesh.elements, &rowptr, &colidx);
+
+    double setup_elapsed = MPI_Wtime() - tack;
+
+    tack = MPI_Wtime();
+
+    if (!err) {
+        err = hierarchical_restriction(n_coarse_nodes, rowptr, colidx, 1, from, to);
+    }
+
+    double compute_elapsed = MPI_Wtime() - tack;
 
     free(colidx);
     free(rowptr);
+#endif
+
+    double elapsed = MPI_Wtime() - tick;
+
+    if (!err) {
+        err = array_write(comm, path_output, SFEM_MPI_REAL_T, to, n_coarse_nodes, n_coarse_nodes);
+    }
+
+    printf("---------------------------------------------------------------\n");
+    printf("TTS: %g [s] (setup %g [s], compute %g [s])\n", elapsed, setup_elapsed, compute_elapsed);
+    printf("---------------------------------------------------------------\n");
+
     free(from);
     free(to);
     return MPI_Finalize() || err;
