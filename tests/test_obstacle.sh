@@ -24,7 +24,7 @@ export OMP_NUM_THREADS=4
 export OMP_PROC_BIND=true 
 
 dims=3
-./test_obstacle.py gen:box output #--cell_type=HEX8
+./test_obstacle.py gen:box output --cell_type=HEX8
 
 files=`ls output/disp.*.raw`
 mkdir -p output/soa
