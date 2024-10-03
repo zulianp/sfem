@@ -143,8 +143,7 @@ int hierarchical_restriction_with_counting(const enum ElemType from_element,
                                            const enum ElemType to_element,
                                            const ptrdiff_t nelements,
                                            idx_t **const SFEM_RESTRICT elements,
-                                           const uint16_t *const SFEM_RESTRICT
-                                                   element_to_node_incidence_count,
+                                           const uint16_t *const SFEM_RESTRICT e2n_count,
                                            const int vec_size,
                                            const real_t *const SFEM_RESTRICT from,
                                            real_t *const SFEM_RESTRICT to) {
@@ -169,68 +168,52 @@ int hierarchical_restriction_with_counting(const enum ElemType from_element,
 
             for (int v = 0; v < vec_size; v++) {
 #pragma omp atomic update
-                to[i0 * vec_size + v] +=
-                        from[i0 * vec_size + v] / element_to_node_incidence_count[i0];
+                to[i0 * vec_size + v] += from[i0 * vec_size + v] / e2n_count[i0];
 
 #pragma omp atomic update
-                to[i1 * vec_size + v] +=
-                        from[i1 * vec_size + v] / element_to_node_incidence_count[i1];
+                to[i1 * vec_size + v] += from[i1 * vec_size + v] / e2n_count[i1];
 
 #pragma omp atomic update
-                to[i2 * vec_size + v] +=
-                        from[i2 * vec_size + v] / element_to_node_incidence_count[i2];
+                to[i2 * vec_size + v] += from[i2 * vec_size + v] / e2n_count[i2];
 
 #pragma omp atomic update
-                to[i3 * vec_size + v] +=
-                        from[i3 * vec_size + v] / element_to_node_incidence_count[i3];
+                to[i3 * vec_size + v] += from[i3 * vec_size + v] / e2n_count[i3];
 
 #pragma omp atomic update
-                to[i0 * vec_size + v] +=
-                        from[i4 * vec_size + v] * (0.5 / element_to_node_incidence_count[i4]);
+                to[i0 * vec_size + v] += from[i4 * vec_size + v] * (0.5 / e2n_count[i4]);
 
 #pragma omp atomic update
-                to[i1 * vec_size + v] +=
-                        from[i5 * vec_size + v] * (0.5 / element_to_node_incidence_count[i5]);
+                to[i1 * vec_size + v] += from[i5 * vec_size + v] * (0.5 / e2n_count[i5]);
 
 #pragma omp atomic update
-                to[i0 * vec_size + v] +=
-                        from[i6 * vec_size + v] * (0.5 / element_to_node_incidence_count[i6]);
+                to[i0 * vec_size + v] += from[i6 * vec_size + v] * (0.5 / e2n_count[i6]);
 
 #pragma omp atomic update
-                to[i0 * vec_size + v] +=
-                        from[i7 * vec_size + v] * (0.5 / element_to_node_incidence_count[i7]);
+                to[i0 * vec_size + v] += from[i7 * vec_size + v] * (0.5 / e2n_count[i7]);
 
 #pragma omp atomic update
-                to[i1 * vec_size + v] +=
-                        from[i8 * vec_size + v] * (0.5 / element_to_node_incidence_count[i8]);
+                to[i1 * vec_size + v] += from[i8 * vec_size + v] * (0.5 / e2n_count[i8]);
 
 #pragma omp atomic update
-                to[i2 * vec_size + v] +=
-                        from[i9 * vec_size + v] * (0.5 / element_to_node_incidence_count[i9]);
+                to[i2 * vec_size + v] += from[i9 * vec_size + v] * (0.5 / e2n_count[i9]);
 
 #pragma omp atomic update
-                to[i1 * vec_size + v] +=
-                        from[i4 * vec_size + v] * (0.5 / element_to_node_incidence_count[i4]);
+                to[i1 * vec_size + v] += from[i4 * vec_size + v] * (0.5 / e2n_count[i4]);
 
 #pragma omp atomic update
-                to[i2 * vec_size + v] +=
-                        from[i5 * vec_size + v] * (0.5 / element_to_node_incidence_count[i5]);
+                to[i2 * vec_size + v] += from[i5 * vec_size + v] * (0.5 / e2n_count[i5]);
 
 #pragma omp atomic update
-                to[i2 * vec_size + v] +=
-                        from[i6 * vec_size + v] * (0.5 / element_to_node_incidence_count[i6]);
+                to[i2 * vec_size + v] += from[i6 * vec_size + v] * (0.5 / e2n_count[i6]);
 
 #pragma omp atomic update
-                to[i3 * vec_size + v] +=
-                        from[i7 * vec_size + v] * (0.5 / element_to_node_incidence_count[i7]);
+                to[i3 * vec_size + v] += from[i7 * vec_size + v] * (0.5 / e2n_count[i7]);
 
 #pragma omp atomic update
-                to[i3 * vec_size + v] +=
-                        from[i8 * vec_size + v] * (0.5 / element_to_node_incidence_count[i8]);
+                to[i3 * vec_size + v] += from[i8 * vec_size + v] * (0.5 / e2n_count[i8]);
 
 #pragma omp atomic update
-                to[i3 * vec_size + v] +=
-                        from[i9 * vec_size + v] * (0.5 / element_to_node_incidence_count[i9]);
+                to[i3 * vec_size + v] += from[i9 * vec_size + v] * (0.5 / e2n_count[i9]);
             }
         }
     } else if (to_element == TRI3 && (from_element == TRI6 || from_element == MACRO_TRI3)) {
@@ -248,40 +231,31 @@ int hierarchical_restriction_with_counting(const enum ElemType from_element,
 
             for (int v = 0; v < vec_size; v++) {
 #pragma omp atomic update
-                to[i0 * vec_size + v] +=
-                        from[i0 * vec_size + v] / element_to_node_incidence_count[i0];
+                to[i0 * vec_size + v] += from[i0 * vec_size + v] / e2n_count[i0];
 
 #pragma omp atomic update
-                to[i1 * vec_size + v] +=
-                        from[i1 * vec_size + v] / element_to_node_incidence_count[i1];
+                to[i1 * vec_size + v] += from[i1 * vec_size + v] / e2n_count[i1];
 
 #pragma omp atomic update
-                to[i2 * vec_size + v] +=
-                        from[i2 * vec_size + v] / element_to_node_incidence_count[i2];
+                to[i2 * vec_size + v] += from[i2 * vec_size + v] / e2n_count[i2];
 
 #pragma omp atomic update
-                to[i1 * vec_size + v] +=
-                        from[i3 * vec_size + v] * (0.5 / element_to_node_incidence_count[i3]);
+                to[i1 * vec_size + v] += from[i3 * vec_size + v] * (0.5 / e2n_count[i3]);
 
 #pragma omp atomic update
-                to[i2 * vec_size + v] +=
-                        from[i4 * vec_size + v] * (0.5 / element_to_node_incidence_count[i4]);
+                to[i2 * vec_size + v] += from[i4 * vec_size + v] * (0.5 / e2n_count[i4]);
 
 #pragma omp atomic update
-                to[i2 * vec_size + v] +=
-                        from[i5 * vec_size + v] * (0.5 / element_to_node_incidence_count[i5]);
+                to[i2 * vec_size + v] += from[i5 * vec_size + v] * (0.5 / e2n_count[i5]);
 
 #pragma omp atomic update
-                to[i0 * vec_size + v] +=
-                        from[i3 * vec_size + v] * (0.5 / element_to_node_incidence_count[i3]);
+                to[i0 * vec_size + v] += from[i3 * vec_size + v] * (0.5 / e2n_count[i3]);
 
 #pragma omp atomic update
-                to[i1 * vec_size + v] +=
-                        from[i4 * vec_size + v] * (0.5 / element_to_node_incidence_count[i4]);
+                to[i1 * vec_size + v] += from[i4 * vec_size + v] * (0.5 / e2n_count[i4]);
 
 #pragma omp atomic update
-                to[i0 * vec_size + v] +=
-                        from[i5 * vec_size + v] * (0.5 / element_to_node_incidence_count[i5]);
+                to[i0 * vec_size + v] += from[i5 * vec_size + v] * (0.5 / e2n_count[i5]);
             }
         }
     } else {
