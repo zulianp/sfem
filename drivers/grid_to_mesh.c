@@ -140,14 +140,14 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        {
+        { /// DEBUG ///
             double filed_norm = 0.0;
             double filed_max = field[0];
             double filed_min = field[0];
 
             ptrdiff_t n_zyx_private = nlocal[0] * nlocal[1] * nlocal[2];
             for(ptrdiff_t i = 0; i < n_zyx_private; i++) {
-                field[i] = sin((double)(i) / 10000.0);
+                // field[i] = sin((double)(i) / 10000.0);
                 filed_norm += field[i] * field[i];
                 filed_max = fmax(filed_max, field[i]);
                 filed_min = fmin(filed_min, field[i]);
@@ -159,6 +159,7 @@ int main(int argc, char* argv[]) {
             printf("filed_min  = %1.14e , %s:%d\n", filed_min, __FILE__, __LINE__);
             printf("n_zyx_private     = %ld , %s:%d\n", n_zyx_private, __FILE__, __LINE__);
         }
+
         double ndarray_read_tock = MPI_Wtime();
 
         if (!rank) {
