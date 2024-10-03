@@ -13,6 +13,26 @@
 
 namespace sfem {
 
+    std::shared_ptr<Buffer<idx_t>> create_device_elements(
+            const std::shared_ptr<FunctionSpace> &space,
+            const enum ElemType element_type) {
+        auto c_mesh = (mesh_t *)space->mesh().impl_mesh();
+
+        int nxe = elem_num_nodes(element_type);
+
+        idx_t *elements{nullptr};
+        elements_to_device(
+                c_mesh->nelements, nxe, c_mesh->elements, &elements);
+
+        
+        printf("create_device_elements %ld %d\n", c_mesh->nelements, nxe);
+
+        return Buffer<idx_t>::own(c_mesh->nelements * nxe,
+                                  elements,
+                                  d_buffer_destroy,
+                                  MEMORY_SPACE_DEVICE);
+    }
+
     class FFF {
     public:
         enum ElemType element_type_;
@@ -20,26 +40,17 @@ namespace sfem {
         std::shared_ptr<Buffer<idx_t>> elements_;
         void *fff_;
 
-        FFF(Mesh &mesh, const enum ElemType element_type)
+        void init(mesh_t *c_mesh) {
+            cu_tet4_fff_allocate(c_mesh->nelements, &fff_);
+            cu_tet4_fff_fill(c_mesh->nelements, c_mesh->elements, c_mesh->points, fff_);
+        }
+
+        FFF(Mesh &mesh,
+            const enum ElemType element_type,
+            const std::shared_ptr<Buffer<idx_t>> &elements)
             : element_type_(element_type), n_elements_(mesh.n_elements()) {
             auto c_mesh = (mesh_t *)mesh.impl_mesh();
-
-            // FIXME Now harcoded for tets
-            cu_tet4_fff_allocate(n_elements_, &fff_);
-            cu_tet4_fff_fill(n_elements_, c_mesh->elements, c_mesh->points, fff_);
-
-            // printf("elem_num_nodes = %d\n", elem_num_nodes(element_type));
-
-            idx_t *elements{nullptr};
-            elements_to_device(
-                    n_elements_, elem_num_nodes(element_type), c_mesh->elements, &elements);
-
-            elements_ = Buffer<idx_t>::own(n_elements_ * elem_num_nodes(element_type),
-                                           elements,
-                                           d_buffer_destroy,
-                                           MEMORY_SPACE_DEVICE);
-
-            // to_host(elements_)->print(std::cout);
+            elements_ = elements;
         }
 
         ~FFF() {
@@ -61,26 +72,22 @@ namespace sfem {
         void *jacobian_adjugate_{nullptr};
         void *jacobian_determinant_{nullptr};
 
-        Adjugate(Mesh &mesh, const enum ElemType element_type)
-            : element_type_(element_type), n_elements_(mesh.n_elements()) {
-            auto c_mesh = (mesh_t *)mesh.impl_mesh();
-
-            // FIXME Now harcoded for tets
+        void init(mesh_t *c_mesh) {
             cu_tet4_adjugate_allocate(n_elements_, &jacobian_adjugate_, &jacobian_determinant_);
             cu_tet4_adjugate_fill(n_elements_,
                                   c_mesh->elements,
                                   c_mesh->points,
                                   jacobian_adjugate_,
                                   jacobian_determinant_);
+        }
 
-            idx_t *elements{nullptr};
-            elements_to_device(
-                    n_elements_, elem_num_nodes(element_type), c_mesh->elements, &elements);
-
-            elements_ = Buffer<idx_t>::own(n_elements_ * elem_num_nodes(element_type),
-                                           elements,
-                                           d_buffer_destroy,
-                                           MEMORY_SPACE_DEVICE);
+        Adjugate(Mesh &mesh,
+                 const enum ElemType element_type,
+                 const std::shared_ptr<Buffer<idx_t>> &elements)
+            : element_type_(element_type), n_elements_(mesh.n_elements()) {
+            auto c_mesh = (mesh_t *)mesh.impl_mesh();
+            init(c_mesh);
+            elements_ = elements;
         }
 
         ~Adjugate() {
@@ -236,7 +243,13 @@ namespace sfem {
         inline bool is_linear() const override { return true; }
 
         int initialize() override {
-            fff = std::make_shared<FFF>(space->mesh(), space->element_type());
+            auto elements = space->device_elements();
+            if (!elements) {
+                elements = create_device_elements(space, space->element_type());
+                space->set_device_elements(elements);
+            }
+
+            fff = std::make_shared<FFF>(space->mesh(), space->element_type(), elements);
             return SFEM_SUCCESS;
         }
 
@@ -355,7 +368,14 @@ namespace sfem {
             SFEM_READ_ENV(SFEM_FIRST_LAME_PARAMETER, atof);
             mu = SFEM_SHEAR_MODULUS;
             lambda = SFEM_FIRST_LAME_PARAMETER;
-            adjugate = std::make_shared<Adjugate>(space->mesh(), space->element_type());
+
+            auto elements = space->device_elements();
+            if (!elements) {
+                elements = create_device_elements(space, space->element_type());
+                space->set_device_elements(elements);
+            }
+
+            adjugate = std::make_shared<Adjugate>(space->mesh(), space->element_type(), elements);
             return SFEM_SUCCESS;
         }
 

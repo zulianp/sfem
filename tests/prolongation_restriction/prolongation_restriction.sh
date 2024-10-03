@@ -26,7 +26,7 @@ fine=fine
 
 if [[ -d "$fine" ]]
 then
-	echo "Reusing $coarse"
+	echo "Reusing $coarse and $fine"
 else
 	create_sphere.sh 5
 	mv mesh temp

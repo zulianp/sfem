@@ -234,6 +234,9 @@ namespace sfem {
                                        (double)(norm_residual),
                                        (double)(norm_residual / norm_residual_0),
                                        (double)(norm_residual / norm_residual_previous));
+
+                                fflush(stderr);
+                                fflush(stdout);
                             }
                         }
 
