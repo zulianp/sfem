@@ -8,7 +8,7 @@ set(SFEM_REAL_TYPE          "float64"   CACHE STRING "Set SFEM real_t type. Used
 set(SFEM_SCALAR_TYPE        "float64"   CACHE STRING "Set SFEM scalar_t type. Used for local kernel computations")
 set(SFEM_GEOM_TYPE          "float32"   CACHE STRING "Set SFEM geom_t type")
 set(SFEM_JACOBIAN_CPU_TYPE  "float32"   CACHE STRING "Set SFEM jacobian_t type")
-set(SFEM_JACOBIAN_GPU_TYPE  "half"      CACHE STRING "Set SFEM cu_jacobian_t type")
+set(SFEM_JACOBIAN_GPU_TYPE  "float"     CACHE STRING "Set SFEM cu_jacobian_t type (goal is half)")
 set(SFEM_ACCUMULATOR_TYPE   "float64"   CACHE STRING "Set SFEM accumulator_t type")
 
 set(SFEM_IDX_TYPE           "int32"     CACHE STRING "Set SFEM idx_t type")

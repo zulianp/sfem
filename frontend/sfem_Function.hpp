@@ -112,6 +112,9 @@ namespace sfem {
         int create_vector(ptrdiff_t *nlocal, ptrdiff_t *nglobal, real_t **values);
         int destroy_vector(real_t *values);
 
+        void set_device_elements(const std::shared_ptr<sfem::Buffer<idx_t>> &elems);
+        std::shared_ptr<sfem::Buffer<idx_t>> device_elements();
+
         Mesh &mesh();
         int block_size() const;
         ptrdiff_t n_dofs() const;

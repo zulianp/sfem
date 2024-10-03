@@ -41,6 +41,7 @@ namespace sfem {
         T atol{1e-10};
         T rtol{1e-10};
         T eigen_solver_tol{1e-6};
+        int eigen_solver_max_it{1000};
         int max_it{3};
 
         T eig_max{0};
@@ -171,7 +172,7 @@ namespace sfem {
         T max_eigen_value(T* const guess_eigenvector, T* const work) {
             assert(power_method);
             return power_method->max_eigen_value(
-                    apply_op, 10000, this->eigen_solver_tol, this->rows(), guess_eigenvector, work);
+                    apply_op, eigen_solver_max_it, this->eigen_solver_tol, this->rows(), guess_eigenvector, work);
         }
 
         void init_with_ones() {

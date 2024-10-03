@@ -312,6 +312,11 @@ __global__ void cu_macrotet4_to_tet4_prolongation_element_based_kernel(
         const idx_t i8 = elements[8 * stride + e];
         const idx_t i9 = elements[9 * stride + e];
 
+#ifndef NDEBUG
+        if(i0 == i4) {
+            printf("[%d %d %d %d %d %d %d %d %d %d] (%ld, %ld)\n", i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, e, stride);
+        }
+#endif
         assert(i0 != i4);
 
         for (int v = 0; v < vec_size; v++) {
