@@ -113,7 +113,7 @@ def solve_obstacle(options):
 
 	obs = np.zeros(fs.n_dofs())
 	obs[0::m.spatial_dimension()] = 1.1 - pysfem.points(m, 0)
-	penalty_param = (1/(dt * 1000))
+	penalty_param = 1
 	# penalty_param = 0 # Deactivate penalty
 
 	for d in range(1, m.spatial_dimension()):

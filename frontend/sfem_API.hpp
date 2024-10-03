@@ -7,6 +7,7 @@
 
 #include "sfem_Function.hpp"
 #include "sfem_cg.hpp"
+#include "sfem_bcgs.hpp"
 #include "sfem_Chebyshev3.hpp"
 #include "sfem_Multigrid.hpp"
 #include "sfem_crs_SpMV.hpp"

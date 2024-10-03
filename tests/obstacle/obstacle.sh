@@ -27,7 +27,7 @@ if [[ -d "$mesh" ]]
 then
 	echo "Reusing existing $mesh database"
 else
-	create_cylinder.sh 1
+	create_cylinder.sh 0
 fi
 
 echo  "---------------------------------"
