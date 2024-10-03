@@ -16,6 +16,7 @@
 				"xcode",
 				"doc/api",
 				"build_*",
+				"build*",
 				"bin_*",
 				"install",
 				".cache",

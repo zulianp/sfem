@@ -14,6 +14,7 @@
 #include "sfem_defs.h"
 
 #include "beam2_mass.h"
+#include "hex8_mass.h"
 #include "quadshell4_mass.h"
 #include "tet10_mass.h"
 #include "tet4_mass.h"
@@ -96,7 +97,10 @@ void assemble_lumped_mass(const int element_type,
             beam2_assemble_lumped_mass(nelements, nnodes, elems, xyz, values);
             break;
         }
-
+        case HEX8: {
+            hex8_assemble_lumped_mass(nelements, nnodes, elems, xyz, 1, values);
+            break;
+        }
         default: {
             fprintf(stderr,
                     "assemble_lumped_mass not implemented for type %s\n",
@@ -175,6 +179,10 @@ void apply_mass(const int element_type,
         case QUADSHELL4: {
             quadshell4_apply_mass(
                     nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
+            break;
+        }
+        case HEX8: {
+            hex8_apply_mass(nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
             break;
         }
             // case TRI6: {
