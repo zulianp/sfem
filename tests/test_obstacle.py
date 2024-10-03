@@ -18,7 +18,7 @@ def solve_obstacle(options):
 		os.mkdir(f'{options.output_dir}')
 
 	n = 10
-	h = 1./(n - 1)
+	# h = 1./(n - 1)
 
 	if path == "gen:rectangle":
 		idx, points = rectangle_mesh.create(2, 1, 2*n, n, "triangle")
@@ -34,7 +34,11 @@ def solve_obstacle(options):
 		m = pysfem.create_mesh("TRI3", np.array(idx), np.array(points))
 		m.write(f"{options.output_dir}/rect_mesh")
 	elif path == "gen:box":
-		idx, points = box_mesh.create(2, 1, 1, n * 2, n * 1, n * 1, "tet4")
+		if options.elem_type == "INVALID":
+			options.elem_type = "TET4"
+
+		xlen = 1
+		idx, points = box_mesh.create(xlen, 1, 1, n * xlen, n * 1, n * 1, options.elem_type)
 		
 		select_inlet  = np.abs(points[0]) 	< 1e-8
 		select_outlet = np.abs(points[0] - 2) < 1e-8
@@ -50,9 +54,7 @@ def solve_obstacle(options):
 		soutlet = np.array(np.where(select_outlet), dtype=idx_t)
 		swalls  = np.array(np.where(select_walls), dtype=idx_t)
 
-		if options.elem_type == "INVALID":
-			options.elem_type = "TET4"
-
+	
 		m = pysfem.create_mesh(options.elem_type, np.array(idx), np.array(points))
 		m.write(f"{options.output_dir}/rect_mesh")
 	else:
@@ -110,7 +112,7 @@ def solve_obstacle(options):
 	pysfem.apply_value(bc, 1, mass)
 
 	obs = np.zeros(fs.n_dofs())
-	obs[0::m.spatial_dimension()] = 2.0 - pysfem.points(m, 0)
+	obs[0::m.spatial_dimension()] = 1.1 - pysfem.points(m, 0)
 	penalty_param = (1/(dt * 1000))
 	# penalty_param = 0 # Deactivate penalty
 
