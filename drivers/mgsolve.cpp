@@ -296,7 +296,7 @@ int main(int argc, char *argv[]) {
             solver_coarse->verbose = true;
             solver_coarse->set_max_it(40000);
             solver_coarse->set_atol(1e-14);
-            solver_coarse->set_rtol(1e-12);
+            solver_coarse->set_rtol(1e-9);
 
             if (SFEM_USE_PRECONDITIONER) {
                 f_coarse->hessian_diag(nullptr, diag_coarse->data());
