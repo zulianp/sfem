@@ -38,7 +38,7 @@ then
 	echo "Reusing mesh"
 else
 	# Cyclic mesh
-	create_cyclic_ss_mesh.sh 8 $SFEM_ELEMENT_REFINE_LEVEL
+	create_cyclic_ss_mesh.sh 1 $SFEM_ELEMENT_REFINE_LEVEL
 
 	# BOX mesh for testing
 	# create_box_ss_mesh.sh 8 $SFEM_ELEMENT_REFINE_LEVEL
