@@ -277,6 +277,14 @@ namespace sfem {
                     this->axpby(mem->size(), 1, mem->work->data(), 1, mem->solution->data());
                 }
 
+
+                if(debug) {
+                    this->zeros(mem->size(), mem->work->data());
+                    op->apply(mem->solution->data(), mem->work->data());
+                    this->axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
+                    printf("|| r_h || = %g\n", this->norm2(mem->work->size(), mem->work->data()));
+                }
+
                 smoother->apply(mem->rhs->data(), mem->solution->data());
             }
 

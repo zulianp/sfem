@@ -330,7 +330,15 @@ int main(int argc, char *argv[]) {
                     sfem::create_hierarchical_prolongation_from_graph(f, coarse_graph, edges, es);
         } else {
             restriction = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
-            prolongation = sfem::create_hierarchical_prolongation(fs_coarse, fs, es);
+            // prolongation = sfem::create_hierarchical_prolongation(fs_coarse, fs, es);
+
+
+            auto unconstr = sfem::create_hierarchical_prolongation(fs_coarse, fs, es);
+            prolongation = sfem::make_op<real_t>(
+                unconstr->rows(), unconstr->cols(), [=](const real_t *const from, real_t *const to) {
+                unconstr->apply(from, to);
+                f->apply_zero_constraints(to);
+            }, es);
         }
 
         f->apply_constraints(x->data());
