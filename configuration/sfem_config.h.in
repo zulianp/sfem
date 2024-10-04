@@ -58,6 +58,10 @@ typedef @SFEM_JACOBIAN_CPU_C_TYPE@ jacobian_t;
 
 // Accumulator for local kernels (before local to global)
 typedef @SFEM_ACCUMULATOR_C_TYPE@ accumulator_t;
+#define SFEM_MPI_ACCUMULATOR_T @SFEM_ACCUMULATOR_MPI_TYPE@
+#define SFEM_CUSPARSE_ACCUMULATOR_T @SFEM_ACCUMULATOR_CUSPARSE_TYPE@
+#define d_ACCUMULATOR_T "@SFEM_ACCUMULATOR_PRINT_TYPE@"
+#define dtype_ACCUMULATOR_T "@SFEM_ACCUMULATOR_TYPE@"
 
 // -----------------------------
 // Indexing representation

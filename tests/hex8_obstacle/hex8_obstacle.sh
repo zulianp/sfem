@@ -14,14 +14,17 @@ export PATH=$SCRIPTPATH/../../python/sfem/algebra:$PATH
 export PATH=$SCRIPTPATH/../../python/sfem/utils:$PATH
 export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
-if [[ -z $SFEM_BIN_DIR ]]
+if [[ -z $SFEM_DIR/bin ]]
 then
 	PATH=$SCRIPTPATH/../../build:$PATH
 	source $SCRIPTPATH/../../build/sfem_config.sh
+	export PYTHONPATH=$SCRIPTPATH/../../build:$PYTHONPATH
 else
-	echo "Using binaries in $SFEM_BIN_DIR"
-	PATH=$SFEM_BIN_DIR:$PATH
-	source $SFEM_BIN_DIR/sfem_config.sh
+	echo "Using binaries in $SFEM_DIR/bin"
+	export PATH=$SFEM_DIR/bin:$PATH
+	export PATH=$SFEM_DIR/scripts/sfem/mesh:$PATH
+	export PYTHONPATH=$SFEM_DIR/lib:$SFEM_DIR/scripts/sfem:$PYTHONPATH
+	source $SFEM_DIR/workflows/sfem_config.sh
 fi
 
 export OMP_NUM_THREADS=8
@@ -29,7 +32,7 @@ export OMP_PROC_BIND=true
 export CUDA_LAUNCH_BLOCKING=0
 
 export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
-export SFEM_ELEMENT_REFINE_LEVEL=8
+export SFEM_ELEMENT_REFINE_LEVEL=12
 
 mesh=mesh
 
@@ -107,14 +110,14 @@ then
 		var=`echo $name | tr '.' ' ' | awk '{print $1}'`
 		ts=`echo $name  | tr '.' ' ' | awk '{print $2}'`
 
-		aos_to_soa $f 8 $dims output/soa/$name
+		aos_to_soa $f $SFEM_REAL_SIZE $dims output/soa/$name
 		mv output/soa/$name".0.raw" output/soa/"$var".0."$ts".raw
 		mv output/soa/$name".1.raw" output/soa/"$var".1."$ts".raw
 		mv output/soa/$name".2.raw" output/soa/"$var".2."$ts".raw
 	done
 
-	raw_to_db.py $mesh/viz output/hex8.vtk  --point_data="output/soa/*.raw"
-	raw_to_db.py mesh/surface/wall1/ output/obstacle.vtk --coords=mesh/viz --cell_type=quad --point_data="output/soa/upper_bound.1.*"
+	raw_to_db.py $mesh/viz output/hex8.vtk  --point_data="output/soa/*.raw" --point_data_type="$SFEM_REAL_T"
+	raw_to_db.py mesh/surface/wall1/ output/obstacle.vtk --coords=mesh/viz --cell_type=quad --point_data="output/soa/upper_bound.1.*" --point_data_type="$SFEM_REAL_T"
 else
 	raw_to_db.py $mesh/viz output/hex8.vtk --point_data=output/u.raw,output/rhs.raw,output/upper_bound.raw --point_data_type="$SFEM_REAL_T,$SFEM_REAL_T,$SFEM_REAL_T"
 fi

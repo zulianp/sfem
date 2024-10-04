@@ -28,7 +28,7 @@ namespace sfem {
         std::function<void(const ptrdiff_t, const T, const T* const, const T, T* const)> axpby;
         std::function<T(const std::size_t, const T* const)> norm2;
         bool verbose{true};
-        bool debug{true};
+        bool debug{false};
 
         enum CycleType {
             V_CYCLE = 1,
@@ -275,6 +275,14 @@ namespace sfem {
 
                     // Apply coarse space correction
                     this->axpby(mem->size(), 1, mem->work->data(), 1, mem->solution->data());
+                }
+
+
+                if(debug) {
+                    this->zeros(mem->size(), mem->work->data());
+                    op->apply(mem->solution->data(), mem->work->data());
+                    this->axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
+                    printf("|| r_h || = %g\n", this->norm2(mem->work->size(), mem->work->data()));
                 }
 
                 smoother->apply(mem->rhs->data(), mem->solution->data());
