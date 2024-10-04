@@ -142,7 +142,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        {
+        { /// DEBUG ///
             double filed_norm = 0.0;
             double filed_max = field[0];
             double filed_min = field[0];
@@ -161,6 +161,7 @@ int main(int argc, char* argv[]) {
             printf("filed_min  = %1.14e , %s:%d\n", filed_min, __FILE__, __LINE__);
             printf("n_zyx_private     = %ld , %s:%d\n", n_zyx_private, __FILE__, __LINE__);
         }
+
         double ndarray_read_tock = MPI_Wtime();
 
         if (!rank) {
