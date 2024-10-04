@@ -15,6 +15,7 @@ VECTOR_WIDTH_OPT = -mprefer-vector-width
 
 ifeq ($(ARM), 1)
 	VECTOR_WIDTH_OPT = -msve-vector-bits
+	VECTOR_SIZE = 128
 	# MPICXX = mpicxx
 	# MPICC = mpicc
 endif
@@ -28,8 +29,8 @@ else
 endif
 
 $(info $$DISABLE_CUDA is [${DISABLE_CUDA}])
-$(info $$GPU_ARCH is [${GPU_ARCH}])
-$(info $$CUDA_HOME is [${CUDA_HOME}])
+$(info $$GPU_ARCH     is [${GPU_ARCH}])
+$(info $$CUDA_HOME    is [${CUDA_HOME}])
 
 
 ifeq ($(debug),1)
@@ -49,8 +50,8 @@ else ifeq ($(asan), 1)
 # 	DEPS += -static-libsan
 # 	DEPS += -static
 else
-	CFLAGS += -Ofast -DNDEBUG -march=${MARCH} -fno-signed-zeros -fno-trapping-math -fassociative-math ${VECTOR_WIDTH_OPT}=${VECTOR_SIZE}  -fPIC  -no-pie 
-	CXXFLAGS += -Ofast -DNDEBUG -march=${MARCH} -fno-signed-zeros -fno-trapping-math -fassociative-math ${VECTOR_WIDTH_OPT}=${VECTOR_SIZE} -fPIC  -no-pie 
+	CFLAGS += -Ofast -DNDEBUG -march=${MARCH} -fno-signed-zeros -fno-trapping-math -fassociative-math ${VECTOR_WIDTH_OPT}=${VECTOR_SIZE}  -fPIC -no-pie  
+	CXXFLAGS += -Ofast -DNDEBUG -march=${MARCH} -fno-signed-zeros -fno-trapping-math -fassociative-math ${VECTOR_WIDTH_OPT}=${VECTOR_SIZE} -fPIC -no-pie  
 	CUFLAGS += -O3 -DNDEBUG
 endif
 
@@ -451,8 +452,8 @@ else
     LINK_SFEM_CUDA = -L${PWD}/resampling/cuda -lsfem_resample_field_cuda
 endif
 
-$(info $$SFEM_CUDA_A is [${SFEM_CUDA_A}])
-$(info $$CUDA_LIBS_PATH is [${CUDA_LIBS_PATH}])
+$(info $$SFEM_CUDA_A     is [${SFEM_CUDA_A}])
+$(info $$CUDA_LIBS_PATH  is [${CUDA_LIBS_PATH}])
 
 grid_to_mesh: grid_to_mesh.c libsfem.a ${SFEM_CUDA_A} ${PWD}/resampling/quadratures_rule.h
 	$(MPICC) -o $@ drivers/grid_to_mesh.c libsfem.a $(CFLAGS) $(INCLUDES)  $(LDFLAGS) ${LINK_SFEM_CUDA} ${CUDA_LIBS_PATH} ${CUDART_LINK}  ${SFEM_CUDA_A}

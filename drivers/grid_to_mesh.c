@@ -29,6 +29,7 @@ int main(int argc, char* argv[]) {
     // printf("========================================\n");
     // printf("Starting grid_to_mesh\n");
     // printf("========================================\n\n");
+    PRINT_CURRENT_FUNCTION;
 
     sfem_resample_field_info info;
 
@@ -98,39 +99,40 @@ int main(int argc, char* argv[]) {
                 exit(EXIT_FAILURE);
             }
 
-            printf("temp (ptr): %p, %s:%d\n", (void *)temp, __FILE__, __LINE__);
+            // {  /// DEBUG ///
+            // printf("temp (ptr): %p, %s:%d\n", (void *)temp, __FILE__, __LINE__);
 
-            double norm_temp = 0.0;
-            double max_temp = temp[0];
-            double min_temp = temp[0];
+            // double norm_temp = 0.0;
+            // double max_temp = temp[0];
+            // double min_temp = temp[0];
 
             ptrdiff_t n_zyx = nlocal[0] * nlocal[1] * nlocal[2];
-            
             field = malloc(n_zyx * sizeof(real_t));
 
-            if (field == NULL) {
-                fprintf(stderr, "Error: malloc failed\n");
-                exit(EXIT_FAILURE);
-            }
+            // if (field == NULL) {
+            //     fprintf(stderr, "Error: malloc failed\n");
+            //     exit(EXIT_FAILURE);
+            // }
 
             for (ptrdiff_t i = 0; i < n_zyx; i++) {
                 field[i] = (real_t)(temp[i]);
 
-                norm_temp += (double)(temp[i] * temp[i]);
-                max_temp = (double)(fmax(max_temp, temp[i]));
-                min_temp = (double)(fmin(min_temp, temp[i]));
+                // norm_temp += (double)(temp[i] * temp[i]);
+                // max_temp = (double)(fmax(max_temp, temp[i]));
+                // min_temp = (double)(fmin(min_temp, temp[i]));
             }
 
-            norm_temp = sqrt(norm_temp);
+            // norm_temp = sqrt(norm_temp);
 
-            printf("\n");
-            printf("norm_temp = %1.14e , %s:%d\n", norm_temp, __FILE__, __LINE__);
-            printf("max_temp  = %1.14e , %s:%d\n", max_temp, __FILE__, __LINE__);
-            printf("min_temp  = %1.14e , %s:%d\n", min_temp, __FILE__, __LINE__);
-            printf("n_zyx     = %ld , %s:%d\n", n_zyx, __FILE__, __LINE__);
-            printf("field == NULL: %s, %s:%d\n", field == NULL ? "true" : "false", __FILE__, __LINE__);
-            printf("size field = %ld MB , %s:%d\n", (n_zyx * sizeof(real_t) / 1024 / 1024), __FILE__, __LINE__);
+            // printf("\n");
+            // printf("norm_temp = %1.14e , %s:%d\n", norm_temp, __FILE__, __LINE__);
+            // printf("max_temp  = %1.14e , %s:%d\n", max_temp, __FILE__, __LINE__);
+            // printf("min_temp  = %1.14e , %s:%d\n", min_temp, __FILE__, __LINE__);
+            // printf("n_zyx     = %ld , %s:%d\n", n_zyx, __FILE__, __LINE__);
+            // printf("field == NULL: %s, %s:%d\n", field == NULL ? "true" : "false", __FILE__, __LINE__);
+            // printf("size field = %ld MB , %s:%d\n", (n_zyx * sizeof(real_t) / 1024 / 1024), __FILE__, __LINE__);
 
+            // } /// end DEBUG ///
             free(temp);
 
         } else {
@@ -147,7 +149,7 @@ int main(int argc, char* argv[]) {
 
             ptrdiff_t n_zyx_private = nlocal[0] * nlocal[1] * nlocal[2];
             for(ptrdiff_t i = 0; i < n_zyx_private; i++) {
-                field[i] = sin((double)(i) / 10000.0);
+                // field[i] = sin((double)(i) / 10000.0);
                 filed_norm += field[i] * field[i];
                 filed_max = fmax(filed_max, field[i]);
                 filed_min = fmin(filed_min, field[i]);
@@ -210,6 +212,35 @@ int main(int argc, char* argv[]) {
                     g);
         } else {
             if (mpi_size == 1) {
+
+                // { /// DEBUG ///
+                //     printf("\nFunction: %s\n", __FUNCTION__);
+                //     printf("\nMPI size = 1 DEBUG: %s:%d\n", __FILE__, __LINE__);
+                //     printf("field (ptr): %p, %s:%d\n", (void *)field, __FILE__, __LINE__);
+                //     printf("nlocal[0] = %ld, nlocal[1] = %ld, nlocal[2] = %ld, %s:%d\n",
+                //            nlocal[0],
+                //            nlocal[1],
+                //            nlocal[2],
+                //            __FILE__,
+                //            __LINE__);
+
+                //     double norm_data = 0.0;
+                //     for (ptrdiff_t i = 0; i < nlocal[0] * nlocal[1] * nlocal[2]; i++) {
+                //         norm_data += field[i] * field[i];
+                //     }
+                //     norm_data = sqrt(norm_data);
+                //     printf("norm_data input = %g   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< %s:%d\n\n",
+                //            norm_data,
+                //            __FILE__,
+                //            __LINE__);
+
+                //     int indices[3] = {22, 55, 111};
+                //     printf("field[%d] = %g, %s:%d\n", indices[0], field[indices[0]], __FILE__, __LINE__);
+                //     printf("field[%d] = %g, %s:%d\n", indices[1], field[indices[1]], __FILE__, __LINE__);
+                //     printf("field[%d] = %g, %s:%d\n", indices[2], field[indices[2]], __FILE__, __LINE__);
+
+                // } /// end DEBUG ///
+
                 resample_field(
                         // Mesh
                         mesh.element_type,
@@ -429,5 +460,6 @@ int main(int argc, char* argv[]) {
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
-    return MPI_Finalize();
+    const int return_value = MPI_Finalize();
+    RETURN_FROM_FUNCTION(return_value);
 }

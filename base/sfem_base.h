@@ -53,7 +53,11 @@ typedef int element_idx_t;
 
 #define SFEM_UNUSED(var) (void)var
 
-#define SFEM_RESTRICT __restrict__
+// #define SFEM_RESTRICT __restrict__
+#define SFEM_RESTRICT
+
+#define PRINT_CURRENT_FUNCTION printf("\033[32m\nEnter Function\033[0m: %s, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__);
+#define RETURN_FROM_FUNCTION(__RET_VAL__) printf("\033[31m\nReturn from function\033[0m: %s, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__); return (__RET_VAL__);
 
 #define SFEM_MAX_PATH_LENGTH 2056
 #define SFEM_OK 0
