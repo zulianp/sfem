@@ -166,7 +166,7 @@ int tet4_linear_elasticity_apply(const ptrdiff_t nelements,
         }
     }
 
-    return 0;
+    return SFEM_SUCCESS;
 }
 
 int tet4_linear_elasticity_diag(const ptrdiff_t nelements,

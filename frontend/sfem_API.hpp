@@ -5,10 +5,11 @@
 #include "sfem_base.h"
 #include "sfem_mesh.h"
 
-#include "sfem_Function.hpp"
-#include "sfem_cg.hpp"
 #include "sfem_Chebyshev3.hpp"
+#include "sfem_Function.hpp"
 #include "sfem_Multigrid.hpp"
+#include "sfem_bcgs.hpp"
+#include "sfem_cg.hpp"
 #include "sfem_crs_SpMV.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
@@ -69,7 +70,7 @@ namespace sfem {
 
     template <typename T>
     std::shared_ptr<MatrixFreeLinearSolver<T>> create_bcgs(const std::shared_ptr<Operator<T>> &op,
-                                             const ExecutionSpace es) {
+                                                           const ExecutionSpace es) {
         std::shared_ptr<MatrixFreeLinearSolver<T>> bcgs;
 
 #ifdef SFEM_ENABLE_CUDA
@@ -151,7 +152,131 @@ namespace sfem {
         return crs_graph;
     }
 
+    std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation(
+            const std::shared_ptr<FunctionSpace> &from_space,
+            const std::shared_ptr<FunctionSpace> &to_space,
+            const ExecutionSpace es) {
+#ifdef SFEM_ENABLE_CUDA
+        if (EXECUTION_SPACE_DEVICE == es) {
+            auto elements = to_space->device_elements();
+            if (!elements) {
+                elements = create_device_elements(to_space, to_space->element_type());
+                from_space->set_device_elements(elements);
+            }
+
+            return std::make_shared<LambdaOperator<real_t>>(
+                    to_space->n_dofs(),
+                    from_space->n_dofs(),
+                    [=](const real_t *const from, real_t *const to) {
+                        auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
+                        cu_macrotet4_to_tet4_prolongation_element_based(mesh->nelements,
+                                                                        mesh->nelements,
+                                                                        elements->data(),
+                                                                        from_space->block_size(),
+                                                                        SFEM_REAL_DEFAULT,
+                                                                        1,
+                                                                        from,
+                                                                        SFEM_REAL_DEFAULT,
+                                                                        1,
+                                                                        to,
+                                                                        SFEM_DEFAULT_STREAM);
+                    }, es);
+
+        } else
+#endif
+        {
+            return std::make_shared<LambdaOperator<real_t>>(
+                    to_space->n_dofs(),
+                    from_space->n_dofs(),
+                    [=](const real_t *const from, real_t *const to) {
+                        auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
+                        hierarchical_prolongation(from_space->element_type(),
+                                                  to_space->element_type(),
+                                                  mesh->nelements,
+                                                  mesh->elements,
+                                                  from_space->block_size(),
+                                                  from,
+                                                  to);
+                    }, EXECUTION_SPACE_HOST);
+        }
+    }
+
     std::shared_ptr<Operator<real_t>> create_hierarchical_restriction(
+            const std::shared_ptr<FunctionSpace> &from_space,
+            const std::shared_ptr<FunctionSpace> &to_space,
+            const ExecutionSpace es) {
+        auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
+        auto from_element = (enum ElemType)from_space->element_type();
+        auto to_element = (enum ElemType)to_space->element_type();
+        const int block_size = from_space->block_size();
+
+        auto element_to_node_incidence_count =
+                create_buffer<uint16_t>(mesh->nnodes, MEMORY_SPACE_HOST);
+
+        {
+            auto buff = element_to_node_incidence_count->data();
+            int nxe = elem_num_nodes(from_element);
+            for (int d = 0; d < nxe; d++) {
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < mesh->nelements; ++i) {
+#pragma omp atomic update
+                    buff[mesh->elements[d][i]]++;
+                }
+            }
+        }
+
+#ifdef SFEM_ENABLE_CUDA
+        if (EXECUTION_SPACE_DEVICE == es) {
+            auto dbuff = to_device(element_to_node_incidence_count);
+
+            auto elements = from_space->device_elements();
+            if (!elements) {
+                elements = create_device_elements(from_space, from_space->element_type());
+                from_space->set_device_elements(elements);
+            }
+
+            return std::make_shared<LambdaOperator<real_t>>(
+                    to_space->n_dofs(),
+                    from_space->n_dofs(),
+                    [=](const real_t *const from, real_t *const to) {
+                        auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
+                        cu_macrotet4_to_tet4_restriction_element_based(mesh->nelements,
+                                                                       mesh->nelements,
+                                                                       elements->data(),
+                                                                       dbuff->data(),
+                                                                       block_size,
+                                                                       SFEM_REAL_DEFAULT,
+                                                                       1,
+                                                                       from,
+                                                                       SFEM_REAL_DEFAULT,
+                                                                       1,
+                                                                       to,
+                                                                       SFEM_DEFAULT_STREAM);
+                    },
+                    es);
+        } else
+#endif
+        {
+            return std::make_shared<LambdaOperator<real_t>>(
+                    to_space->n_dofs(),
+                    from_space->n_dofs(),
+                    [=](const real_t *const from, real_t *const to) {
+                        auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
+                        hierarchical_restriction_with_counting(
+                                from_element,
+                                to_element,
+                                mesh->nelements,
+                                mesh->elements,
+                                element_to_node_incidence_count->data(),
+                                block_size,
+                                from,
+                                to);
+                    },
+                    EXECUTION_SPACE_HOST);
+        }
+    }
+
+    std::shared_ptr<Operator<real_t>> create_hierarchical_restriction_from_graph(
             const ptrdiff_t n_fine_nodes,
             const int block_size,
             const std::shared_ptr<CRSGraph> &crs_graph,
@@ -202,12 +327,11 @@ namespace sfem {
                 EXECUTION_SPACE_HOST);
     }
 
-    std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation(
-        const std::shared_ptr<Function> &function,
+    std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation_from_graph(
+            const std::shared_ptr<Function> &function,
             const std::shared_ptr<CRSGraph> &crs_graph,
             const std::shared_ptr<Buffer<idx_t>> &edges,
             const ExecutionSpace es) {
-
         const ptrdiff_t n_fine_nodes = function->space()->mesh().n_nodes();
         int block_size = function->space()->block_size();
         const ptrdiff_t n_coarse_nodes = crs_graph->n_nodes();
@@ -240,7 +364,7 @@ namespace sfem {
                     },
                     EXECUTION_SPACE_DEVICE);
         }
-        
+
 #endif  // SFEM_ENABLE_CUDA
 
         return std::make_shared<LambdaOperator<real_t>>(

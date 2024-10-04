@@ -89,6 +89,8 @@ def create_boundary_nodes(nx, ny, nz):
 
 
 def create(w, h, t, nx, ny, nz, cell_type):
+    cell_type = cell_type.lower()
+    
     gx = np.linspace(0, w, num=nx, dtype=geom_t)
     gy = np.linspace(0, h, num=ny, dtype=geom_t)
     gz = np.linspace(0, t, num=nz, dtype=geom_t)

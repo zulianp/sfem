@@ -1,5 +1,14 @@
 # Simple FEM #
 
+# Requirements
+
+SFEM depends on the following base technologies
+
+- C/C++ Compiler
+- CMake
+- MPI
+- Python 3
+
 # Installation guide
 
 First we install the `C` code base

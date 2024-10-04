@@ -18,7 +18,7 @@ def solve_obstacle(options):
 		os.mkdir(f'{options.output_dir}')
 
 	n = 10
-	h = 1./(n - 1)
+	# h = 1./(n - 1)
 
 	if path == "gen:rectangle":
 		idx, points = rectangle_mesh.create(2, 1, 2*n, n, "triangle")
@@ -34,7 +34,11 @@ def solve_obstacle(options):
 		m = pysfem.create_mesh("TRI3", np.array(idx), np.array(points))
 		m.write(f"{options.output_dir}/rect_mesh")
 	elif path == "gen:box":
-		idx, points = box_mesh.create(2, 1, 1, n * 2, n * 1, n * 1, "tet4")
+		if options.elem_type == "INVALID":
+			options.elem_type = "TET4"
+
+		xlen = 1
+		idx, points = box_mesh.create(xlen, 1, 1, n * xlen, n * 1, n * 1, options.elem_type)
 		
 		select_inlet  = np.abs(points[0]) 	< 1e-8
 		select_outlet = np.abs(points[0] - 2) < 1e-8
@@ -50,7 +54,8 @@ def solve_obstacle(options):
 		soutlet = np.array(np.where(select_outlet), dtype=idx_t)
 		swalls  = np.array(np.where(select_walls), dtype=idx_t)
 
-		m = pysfem.create_mesh("TET4", np.array(idx), np.array(points))
+	
+		m = pysfem.create_mesh(options.elem_type, np.array(idx), np.array(points))
 		m.write(f"{options.output_dir}/rect_mesh")
 	else:
 		m = pysfem.Mesh()		
@@ -107,8 +112,8 @@ def solve_obstacle(options):
 	pysfem.apply_value(bc, 1, mass)
 
 	obs = np.zeros(fs.n_dofs())
-	obs[0::m.spatial_dimension()] = 2.0 - pysfem.points(m, 0)
-	penalty_param = (1/(dt * 1000))
+	obs[0::m.spatial_dimension()] = 1.1 - pysfem.points(m, 0)
+	penalty_param = 1
 	# penalty_param = 0 # Deactivate penalty
 
 	for d in range(1, m.spatial_dimension()):
@@ -133,6 +138,7 @@ class Opts:
 	def __init__(self):
 		self.input_mesh = ''
 		self.output_dir = './output'
+		self.elem_type = "INVALID"
 
 if __name__ == '__main__':
 	print(sys.argv)
@@ -149,7 +155,7 @@ if __name__ == '__main__':
 	try:
 	    opts, args = getopt.getopt(
 	        sys.argv[3:], "h",
-	        ["help"])
+	        ["help", "elem_type=", "cell_type="])
 
 	except getopt.GetoptError as err:
 	    print(err)
@@ -160,6 +166,8 @@ if __name__ == '__main__':
 	    if opt in ('-h', '--help'):
 	        print(usage)
 	        sys.exit()
+	    elif opt in ('--elem_type', '--cell_type'):
+	       	options.elem_type = arg
 
 	solve_obstacle(options)
 	pysfem.finalize()

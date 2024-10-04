@@ -26,9 +26,12 @@ fine=fine
 
 if [[ -d "$fine" ]]
 then
-	echo "Reusing $simulation_coarse"
+	echo "Reusing $coarse and $fine"
 else
-	create_sphere.sh 3
+	create_sphere.sh 5
+	mv mesh temp
+	refine temp refined
+	sfc refined $coarse
 	mesh_p1_to_p2 $coarse $fine
 fi
 
@@ -38,6 +41,7 @@ eval_nodal_function.py "x" $coarse/x.raw $coarse/y.raw  $coarse/z.raw fields/x.r
 # usage: %s <mesh> <from_element> <to_element> <input.float64> <output.float64>
 hierarchical_prolongation $fine "TET4" 		 "MACRO_TET4" fields/x.raw 		fields/fine_x.raw
 hierarchical_restriction  $fine "MACRO_TET4" "TET4"  	  fields/fine_x.raw fields/coarse_x.raw 
+SFEM_USE_CRS_GRAPH_RESTRICT=1 hierarchical_restriction  $fine "MACRO_TET4" "TET4"  	  fields/fine_x.raw fields/crs_coarse_x.raw 
 
 raw_to_db.py $fine   fine.vtk   --point_data="fields/fine_x.raw"
-raw_to_db.py $coarse coarse.vtk --point_data="fields/x.raw,fields/coarse_x.raw"
+raw_to_db.py $coarse coarse.vtk --point_data="fields/x.raw,fields/coarse_x.raw,fields/crs_coarse_x.raw"

@@ -50,6 +50,7 @@ set(SFEM_MODULES
     operators/tri3
     operators/tri6
     operators/trishell3
+    operators/quadshell4
     operators/cvfem_tri3
     operators/cvfem_tet4
     operators/cvfem_quad4
