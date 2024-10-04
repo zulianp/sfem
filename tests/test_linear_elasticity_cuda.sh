@@ -5,8 +5,6 @@ set -e
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 export PATH=$SCRIPTPATH/../../:$PATH
-export PATH=$SCRIPTPATH/../../build/:$PATH
-export PATH=$SCRIPTPATH/../../bin/:$PATH
 
 PATH=$SCRIPTPATH:$PATH
 PATH=$SCRIPTPATH/..:$PATH
@@ -29,16 +27,17 @@ cd le_test
 
 mkdir -p output
 # export OMP_NUM_THREADS=32
-# export OMP_NUM_THREADS=8
-export OMP_NUM_THREADS=288
+export OMP_NUM_THREADS=8
+# export OMP_NUM_THREADS=288
+# export OMP_NUM_THREADS=12
 export OMP_PROC_BIND=true 
 
 # rm -rf mesh
-create_cylinder.sh 1
+# create_cylinder.sh 1
 
-# export SFEM_MESH_REFINE=1
-# create_cylinder_p2.sh 2
-# export SFEM_USE_MACRO=1
+# export SFEM_MESH_REFINE=0
+# create_cylinder_p2.sh 5
+export SFEM_USE_MACRO=1
 
 sleft=mesh/sidesets_aos/sinlet.raw
 sright=mesh/sidesets_aos/soutlet.raw
