@@ -15,9 +15,12 @@ PATH=$SCRIPTPATH/../../matrix.io:$PATH
 
 if [[ -z $SFEM_BIN_DIR ]]
 then
-	PATH=$SCRIPTPATH/../build:$PATH
+	PATH=$SCRIPTPATH/../../build:$PATH
+	source $SCRIPTPATH/../../build/sfem_config.sh
 else
+	echo "Using binaries in $SFEM_BIN_DIR"
 	PATH=$SFEM_BIN_DIR:$PATH
+	source $SFEM_BIN_DIR/sfem_config.sh
 fi
 
 HERE=$PWD
@@ -26,17 +29,14 @@ mkdir -p le_test
 cd le_test
 
 mkdir -p output
-# export OMP_NUM_THREADS=32
+
 export OMP_NUM_THREADS=8
 # export OMP_NUM_THREADS=288
 # export OMP_NUM_THREADS=12
 export OMP_PROC_BIND=true 
 
-# rm -rf mesh
-# create_cylinder.sh 1
-
 # export SFEM_MESH_REFINE=0
-# create_cylinder_p2.sh 5
+# create_cylinder_p2.sh 3
 export SFEM_USE_MACRO=1
 
 sleft=mesh/sidesets_aos/sinlet.raw
@@ -65,30 +65,17 @@ else
 fi
 
 export SFEM_USE_GPU=1
-# export SFEM_USE_PRECONDITIONER=1
 export CUDA_LAUNCH_BLOCKING=0
 
-# $LAUNCH steady_state_sim mesh output
 $LAUNCH mgsolve mesh output
 
 if [[ $SFEM_BLOCK_SIZE != 1 ]]
 then
-	aos_to_soa output/x.raw 8 $SFEM_BLOCK_SIZE output/disp
-	aos_to_soa output/rhs.raw 8 $SFEM_BLOCK_SIZE output/rhs
-	# aos_to_soa output/r.raw 8 $SFEM_BLOCK_SIZE output/r
-
-	raw_to_db.py mesh output/x.vtk -p "output/disp.*.raw,output/rhs.*.raw"
+	aos_to_soa output/x.raw $SFEM_REAL_SIZE $SFEM_BLOCK_SIZE output/disp
+	aos_to_soa output/rhs.raw $SFEM_REAL_SIZE $SFEM_BLOCK_SIZE output/rhs
+	raw_to_db.py mesh output/x.vtk -p "output/disp.*.raw,output/rhs.*.raw" -d "$SFEM_REAL_T,$SFEM_REAL_T"
 else
-	raw_to_db.py mesh output/x.vtk -p "output/x.raw,output/c*.raw,output/residual*.raw"
+	raw_to_db.py mesh output/x.vtk -p "output/x.raw,output/c*.raw,output/residual*.raw" -d "$SFEM_REAL_T,$SFEM_REAL_T,$SFEM_REAL_T"
 fi
-
-# if [[ -z "$SFEM_DEBUG" ]]
-# then
-# 	echo "Skipp debugging"
-# else
-# 	# echo "SFEM_DEBUG=$SFEM_DEBUG"
-# 	# MATRIXIO_DENSE_OUTPUT=0 print_crs ./rowptr.raw ./colidx.raw ./values.raw int int double
-# fi
-
 
 cd $HERE

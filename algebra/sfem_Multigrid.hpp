@@ -28,7 +28,7 @@ namespace sfem {
         std::function<void(const ptrdiff_t, const T, const T* const, const T, T* const)> axpby;
         std::function<T(const std::size_t, const T* const)> norm2;
         bool verbose{true};
-        bool debug{true};
+        bool debug{false};
 
         enum CycleType {
             V_CYCLE = 1,
