@@ -14,6 +14,7 @@ export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 export PATH=$SFEM_DIR/bin:$PATH
 export PATH=$SFEM_DIR/scripts/sfem/mesh:$PATH
 export PYTHONPATH=$SFEM_DIR/lib:$SFEM_DIR/scripts:$PYTHONPATH
+source $SFEM_DIR/workflows/sfem_config.sh
 
 # Clean-up prior output
 rm -rf output
@@ -46,15 +47,18 @@ do
 	ts=`echo $name  | tr '.' ' ' | awk '{print $2}'`
 
 	dims=3
-	aos_to_soa $f 8 $dims output/soa/$name
+	aos_to_soa $f $SFEM_REAL_SIZE $dims output/soa/$name
 	mv output/soa/$name".0.raw" output/soa/"$var".0."$ts".raw
 	mv output/soa/$name".1.raw" output/soa/"$var".1."$ts".raw
 	mv output/soa/$name".2.raw" output/soa/"$var".2."$ts".raw
 done
 
+set -x
+
 raw_to_db.py $mesh out.vtk  \
- --point_data="output/soa/*.raw" 
+ --point_data="output/soa/*.raw" --point_data_type="$SFEM_REAL_T"
 
 raw_to_db.py $mesh/surface/outlet obstacle.vtk  \
 	--coords=$mesh \
-  	--point_data="output/soa/obs.0.raw.raw" 
+  	--point_data="output/soa/obs.0.raw.raw" \
+  	--point_data_type="$SFEM_REAL_T"
