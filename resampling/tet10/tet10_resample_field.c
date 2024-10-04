@@ -659,6 +659,7 @@ int hex8_to_subparametric_tet10_resample_field_local(
         // Output
         real_t* const SFEM_RESTRICT weighted_field) {
     //
+    PRINT_CURRENT_FUNCTION;
     // printf("============================================================\n");
     // printf("Start: hex8_to_tet10_resample_field_local\n");
     // printf("============================================================\n");
@@ -670,6 +671,17 @@ int hex8_to_subparametric_tet10_resample_field_local(
     const real_t dx = (real_t)delta[0];
     const real_t dy = (real_t)delta[1];
     const real_t dz = (real_t)delta[2];
+
+
+    // { /// DEBUG 
+    //     double data_norm = 0.0;
+    //     for (ptrdiff_t i = 0; i < n[0] * n[1] * n[2]; i++) {
+    //         data_norm += data[i] * data[i];
+    //     }
+    //     data_norm = sqrt(data_norm);
+    //     printf("data_norm = %f, file = %s:%d\n", data_norm, __FILE__, __LINE__);
+
+    // } /// end DEBUG
 
 #pragma omp parallel
     {
@@ -1078,6 +1090,7 @@ int hex8_to_isoparametric_tet10_resample_field_local(
         // Output
         real_t* const SFEM_RESTRICT weighted_field) {  //
     //
+    PRINT_CURRENT_FUNCTION;
 
 #define WENO_GRID 0
 
@@ -1105,6 +1118,18 @@ int hex8_to_isoparametric_tet10_resample_field_local(
     const real_t dx = (real_t)delta[0];
     const real_t dy = (real_t)delta[1];
     const real_t dz = (real_t)delta[2];
+
+    // { /// DEBUG
+    //     double data_norm = 0.0;
+    //     for (ptrdiff_t i = 0; i < nDataNodes; i++) {
+    //         data_norm += data[i] * data[i];
+    //         if (i % 100000 == 0) {
+    //             printf("data[%ld] = %f\n", i, data[i]);
+    //         }
+    //     }
+    //     data_norm = sqrt(data_norm);
+    //     printf("data_norm = %f, file = %s:%d\n", data_norm, __FILE__, __LINE__);
+    // } /// end DEBUG
 
 #pragma omp parallel
     {
@@ -1644,10 +1669,12 @@ int hex8_to_tet10_resample_field_local(
         // Output
         real_t* const SFEM_RESTRICT weighted_field) {
     //
+    PRINT_CURRENT_FUNCTION;
+    //
     int SFEM_ENABLE_ISOPARAMETRIC = 0;
     SFEM_READ_ENV(SFEM_ENABLE_ISOPARAMETRIC, atoi);
 
-#define CUBE1 1
+#define CUBE1 0
 
     if (1 | SFEM_ENABLE_ISOPARAMETRIC) {
 #if CUBE1 == 1  // EXPERIMENTAL
