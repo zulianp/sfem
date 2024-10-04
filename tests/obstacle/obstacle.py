@@ -5,8 +5,8 @@ import numpy as np
 from numpy import linalg
 import sys, getopt, os
 
-idx_t = np.int32
-real_t = np.float64
+from sfem.sfem_config import *
+
 
 # --------------------------------------
 # Solver parameters
@@ -14,9 +14,9 @@ real_t = np.float64
 MAX_NL_ITER = 1000
 max_linear_iterations = 4
 penalty_param = 10 # Very sensitive to this! If few linear iterations it is less sensitive
-use_cheb = True
+use_cheb = False
 matrix_free = True
-use_penalty = True
+use_penalty = False
 
 def create_mg():
 	mg = sfem.Multigrid()

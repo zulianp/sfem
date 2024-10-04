@@ -4,17 +4,16 @@
 
 option(SFEM_ENABLE_CUSTOM_NUMBERS "Enable custom numbers support. (this option will be removed in the future)" ON)
 
-set(SFEM_REAL_TYPE          "float64"   CACHE STRING "Set SFEM real_t type. Used for solution vectors.")
-set(SFEM_SCALAR_TYPE        "float64"   CACHE STRING "Set SFEM scalar_t type. Used for local kernel computations")
-set(SFEM_GEOM_TYPE          "float32"   CACHE STRING "Set SFEM geom_t type")
-set(SFEM_JACOBIAN_CPU_TYPE  "float32"   CACHE STRING "Set SFEM jacobian_t type")
-set(SFEM_JACOBIAN_GPU_TYPE  "float"     CACHE STRING "Set SFEM cu_jacobian_t type (goal is half)")
-set(SFEM_ACCUMULATOR_TYPE   "float64"   CACHE STRING "Set SFEM accumulator_t type")
-
-set(SFEM_IDX_TYPE           "int32"     CACHE STRING "Set SFEM idx_t type")
-set(SFEM_COUNT_TYPE         "int32"     CACHE STRING "Set SFEM count_t type")
-set(SFEM_ELEMENT_IDX_TYPE   "int32"     CACHE STRING "Set SFEM element_idx_t type")
-set(SFEM_LOCAL_IDX_TYPE     "int16"     CACHE STRING "Set SFEM local_idx_t type")
+set(SFEM_REAL_TYPE          "float64"           CACHE STRING "Set SFEM real_t type. Used for solution vectors.")
+set(SFEM_SCALAR_TYPE        ${SFEM_REAL_TYPE}   CACHE STRING "Set SFEM scalar_t type. Used for local kernel computations")
+set(SFEM_GEOM_TYPE          "float32"           CACHE STRING "Set SFEM geom_t type")
+set(SFEM_JACOBIAN_CPU_TYPE  "float32"           CACHE STRING "Set SFEM jacobian_t type")
+set(SFEM_JACOBIAN_GPU_TYPE  "float"             CACHE STRING "Set SFEM cu_jacobian_t type (goal is half)")
+set(SFEM_ACCUMULATOR_TYPE   ${SFEM_REAL_TYPE}   CACHE STRING "Set SFEM accumulator_t type")
+set(SFEM_IDX_TYPE           "int32"             CACHE STRING "Set SFEM idx_t type")
+set(SFEM_COUNT_TYPE         "int32"             CACHE STRING "Set SFEM count_t type")
+set(SFEM_ELEMENT_IDX_TYPE   "int32"             CACHE STRING "Set SFEM element_idx_t type")
+set(SFEM_LOCAL_IDX_TYPE     "int16"             CACHE STRING "Set SFEM local_idx_t type")
 
 function(sfem_simd_vector_size type vec_size)
     if("${type}" STREQUAL "float32")
@@ -155,6 +154,7 @@ sfem_cusparse_type(${SFEM_ELEMENT_IDX_TYPE} SFEM_ELEMENT_IDX_CUSPARSE_TYPE)
 # MPI types
 sfem_mpi_type(${SFEM_REAL_TYPE} SFEM_REAL_MPI_TYPE)
 sfem_mpi_type(${SFEM_SCALAR_TYPE} SFEM_SCALAR_MPI_TYPE)
+sfem_mpi_type(${SFEM_ACCUMULATOR_TYPE} SFEM_ACCUMULATOR_MPI_TYPE)
 sfem_mpi_type(${SFEM_GEOM_TYPE} SFEM_GEOM_MPI_TYPE)
 sfem_mpi_type(${SFEM_JACOBIAN_CPU_TYPE} SFEM_JACOBIAN_CPU_MPI_TYPE)
 sfem_mpi_type(${SFEM_IDX_TYPE} SFEM_IDX_MPI_TYPE)
@@ -165,6 +165,7 @@ sfem_mpi_type(${SFEM_LOCAL_IDX_TYPE} SFEM_LOCAL_IDX_MPI_TYPE)
 # Print format
 sfem_print_type(${SFEM_REAL_TYPE} SFEM_REAL_PRINT_TYPE)
 sfem_print_type(${SFEM_SCALAR_TYPE} SFEM_SCALAR_PRINT_TYPE)
+sfem_print_type(${SFEM_ACCUMULATOR_TYPE} SFEM_ACCUMULATOR_PRINT_TYPE)
 sfem_print_type(${SFEM_GEOM_TYPE} SFEM_GEOM_PRINT_TYPE)
 sfem_print_type(${SFEM_JACOBIAN_CPU_TYPE} SFEM_JACOBIAN_CPU_PRINT_TYPE)
 sfem_print_type(${SFEM_IDX_TYPE} SFEM_IDX_PRINT_TYPE)
@@ -180,6 +181,7 @@ message(STATUS
     "--------------------------------------------------------------------------------------\n"
     "real_t\t\t${SFEM_REAL_C_TYPE}\t\t${SFEM_REAL_TYPE}\t${SFEM_REAL_MPI_TYPE}\t${SFEM_REAL_PRINT_TYPE}\t(SFEM_REAL_TYPE)\n"
     "scalar_t\t${SFEM_SCALAR_C_TYPE}\t\t${SFEM_SCALAR_TYPE}\t${SFEM_SCALAR_MPI_TYPE}\t${SFEM_SCALAR_PRINT_TYPE}\t(SFEM_SCALAR_TYPE)\n"
+    "accumulator_t\t${SFEM_ACCUMULATOR_C_TYPE}\t\t${SFEM_ACCUMULATOR_TYPE}\t${SFEM_ACCUMULATOR_MPI_TYPE}\t${SFEM_ACCUMULATOR_PRINT_TYPE}\t(SFEM_ACCUMULATOR_TYPE)\n"
     "geom_t\t\t${SFEM_GEOM_C_TYPE}\t\t${SFEM_GEOM_TYPE}\t${SFEM_GEOM_MPI_TYPE}\t${SFEM_GEOM_PRINT_TYPE}\t(SFEM_GEOM_TYPE)\n"
     "jacobian_t\t${SFEM_JACOBIAN_CPU_C_TYPE}\t\t${SFEM_JACOBIAN_CPU_TYPE}\t${SFEM_JACOBIAN_CPU_MPI_TYPE}\t${SFEM_JACOBIAN_CPU_PRINT_TYPE}\t(SFEM_JACOBIAN_CPU_TYPE)\n"
     "cu_jacobian_t\t${SFEM_JACOBIAN_GPU_TYPE}\t\t-\t-\t\t-\t(SFEM_JACOBIAN_GPU_TYPE)\n"

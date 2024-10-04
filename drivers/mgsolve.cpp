@@ -293,7 +293,7 @@ int main(int argc, char *argv[]) {
         auto solver_coarse = sfem::create_cg<real_t>(linear_op_coarse, es);
 
         {
-            solver_coarse->verbose = true;
+            solver_coarse->verbose = false;
             solver_coarse->set_max_it(40000);
             solver_coarse->set_atol(1e-14);
             solver_coarse->set_rtol(1e-9);
@@ -308,7 +308,7 @@ int main(int argc, char *argv[]) {
 
         smoother->set_initial_guess_zero(false);
 
-        std::shared_ptr<sfem::Operator<real_t>> restriction, prolongation;
+        std::shared_ptr<sfem::Operator<real_t>> restriction, prolongation, prolong_unconstr;
 
         if (SFEM_USE_CRS_GRAPH_RESTRICT) {
             auto edges = sfem::create_edge_idx(*coarse_graph);
@@ -324,22 +324,19 @@ int main(int argc, char *argv[]) {
                                                                      coarse_graph,
                                                                      edges,
                                                                      es);
-
-            // FIXME this does not work properly!
-            prolongation =
+            prolong_unconstr =
                     sfem::create_hierarchical_prolongation_from_graph(f, coarse_graph, edges, es);
         } else {
             restriction = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
-            // prolongation = sfem::create_hierarchical_prolongation(fs_coarse, fs, es);
-
-
-            auto unconstr = sfem::create_hierarchical_prolongation(fs_coarse, fs, es);
-            prolongation = sfem::make_op<real_t>(
-                unconstr->rows(), unconstr->cols(), [=](const real_t *const from, real_t *const to) {
-                unconstr->apply(from, to);
-                f->apply_zero_constraints(to);
-            }, es);
+            prolong_unconstr = sfem::create_hierarchical_prolongation(fs_coarse, fs, es);
+      
         }
+
+        prolongation = sfem::make_op<real_t>(
+            prolong_unconstr->rows(), prolong_unconstr->cols(), [=](const real_t *const from, real_t *const to) {
+            prolong_unconstr->apply(from, to);
+            f->apply_zero_constraints(to);
+        }, es);
 
         f->apply_constraints(x->data());
         f->apply_constraints(rhs->data());
