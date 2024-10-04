@@ -70,6 +70,7 @@ int main(int argc, char *argv[]) {
     int SFEM_DEBUG = 0;
     int SFEM_MG = 0;
     int SFEM_MAX_IT = 4000;
+    int SFEM_USE_CRS_GRAPH_RESTRICT = 1;
     int SFEM_SMOOTHER_SWEEPS = 3;
     int SFEM_USE_MG_PRECONDITIONER = 0;
     int SFEM_WRITE_OUTPUT = 1;
@@ -86,6 +87,7 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_DEBUG, atoi);
     SFEM_READ_ENV(SFEM_MG, atoi);
     SFEM_READ_ENV(SFEM_MAX_IT, atoi);
+    SFEM_READ_ENV(SFEM_USE_CRS_GRAPH_RESTRICT, atoi);
     SFEM_READ_ENV(SFEM_USE_MG_PRECONDITIONER, atoi);
     SFEM_READ_ENV(SFEM_WRITE_OUTPUT, atoi);
     SFEM_READ_ENV(SFEM_CHEB_EIG_MAX_SCALE, atof);
@@ -107,7 +109,8 @@ int main(int argc, char *argv[]) {
            "SFEM_CHEB_EIG_MAX_SCALE: %f\n"
            "SFEM_TOL: %f\n"
            "SFEM_SMOOTHER_SWEEPS: %d\n"
-           "SFEM_CHEB_EIG_TOL: %f\n",
+           "SFEM_CHEB_EIG_TOL: %f\n"
+           "SFEM_USE_CRS_GRAPH_RESTRICT: %d\n",
            SFEM_MATRIX_FREE,
            SFEM_COARSE_MATRIX_FREE,
            SFEM_OPERATOR,
@@ -121,13 +124,24 @@ int main(int argc, char *argv[]) {
            SFEM_CHEB_EIG_MAX_SCALE,
            SFEM_TOL,
            SFEM_SMOOTHER_SWEEPS,
-           SFEM_CHEB_EIG_TOL);
+           SFEM_CHEB_EIG_TOL,
+           SFEM_USE_CRS_GRAPH_RESTRICT);
 
 #ifdef SFEM_ENABLE_CUDA
     sfem::register_device_ops();
 #endif
 
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
+#ifdef SFEM_ENABLE_CUDA
+    {
+        auto elements = fs->device_elements();
+        if (!elements) {
+            elements = create_device_elements(fs, fs->element_type());
+            fs->set_device_elements(elements);
+        }
+    }
+#endif
+
     auto conds = sfem::create_dirichlet_conditions_from_env(fs, es);
     auto f = sfem::Function::create(fs);
 
@@ -136,6 +150,9 @@ int main(int argc, char *argv[]) {
            (long)m->n_elements(),
            (long)m->n_nodes(),
            (long)fs->n_dofs());
+
+    fflush(stderr);
+    fflush(stdout);
 
     auto diag = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     auto x = sfem::create_buffer<real_t>(fs->n_dofs(), es);
@@ -247,15 +264,17 @@ int main(int argc, char *argv[]) {
         auto fs_coarse = fs->derefine();
         auto f_coarse = f->derefine(fs_coarse, true);
 
-        auto coarse_graph = sfem::create_derefined_crs_graph(*f->space());
-        auto edges = sfem::create_edge_idx(*coarse_graph);
+        std::shared_ptr<sfem::CRSGraph> coarse_graph;
+
+        if (!SFEM_COARSE_MATRIX_FREE || SFEM_USE_CRS_GRAPH_RESTRICT) {
+            coarse_graph = sfem::create_derefined_crs_graph(*f->space());
 
 #ifdef SFEM_ENABLE_CUDA
-        if (es == sfem::EXECUTION_SPACE_DEVICE) {
-            coarse_graph = sfem::to_device(coarse_graph);
-            edges = sfem::to_device(edges);
-        }
+            if (es == sfem::EXECUTION_SPACE_DEVICE) {
+                coarse_graph = sfem::to_device(coarse_graph);
+            }
 #endif
+        }
 
         std::shared_ptr<sfem::Operator<real_t>> linear_op_coarse;
         if (SFEM_COARSE_MATRIX_FREE) {
@@ -274,8 +293,8 @@ int main(int argc, char *argv[]) {
         auto solver_coarse = sfem::create_cg<real_t>(linear_op_coarse, es);
 
         {
-            solver_coarse->verbose = false;
-            solver_coarse->set_max_it(10000);
+            solver_coarse->verbose = true;
+            solver_coarse->set_max_it(40000);
             solver_coarse->set_atol(1e-14);
             solver_coarse->set_rtol(1e-9);
 
@@ -289,11 +308,30 @@ int main(int argc, char *argv[]) {
 
         smoother->set_initial_guess_zero(false);
 
-        auto restriction = sfem::create_hierarchical_restriction(
-                f->space()->mesh().n_nodes(), f->space()->block_size(), coarse_graph, edges, es);
+        std::shared_ptr<sfem::Operator<real_t>> restriction, prolongation;
 
-        // FIXME this does not work properly!
-        auto prolongation = sfem::create_hierarchical_prolongation(f, coarse_graph, edges, es);
+        if (SFEM_USE_CRS_GRAPH_RESTRICT) {
+            auto edges = sfem::create_edge_idx(*coarse_graph);
+#ifdef SFEM_ENABLE_CUDA
+            if (es == sfem::EXECUTION_SPACE_DEVICE) {
+                edges = sfem::to_device(edges);
+            }
+#endif
+
+            restriction =
+                    sfem::create_hierarchical_restriction_from_graph(f->space()->mesh().n_nodes(),
+                                                                     f->space()->block_size(),
+                                                                     coarse_graph,
+                                                                     edges,
+                                                                     es);
+
+            // FIXME this does not work properly!
+            prolongation =
+                    sfem::create_hierarchical_prolongation_from_graph(f, coarse_graph, edges, es);
+        } else {
+            restriction = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
+            prolongation = sfem::create_hierarchical_prolongation(fs_coarse, fs, es);
+        }
 
         f->apply_constraints(x->data());
         f->apply_constraints(rhs->data());
@@ -304,6 +342,9 @@ int main(int argc, char *argv[]) {
         mg->add_level(nullptr, solver_coarse, prolongation, nullptr);
         mg->set_max_it(SFEM_MAX_IT);
         mg->set_atol(SFEM_TOL);
+
+        fflush(stderr);
+        fflush(stdout);
 
         init_tock = MPI_Wtime();
 

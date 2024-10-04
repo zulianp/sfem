@@ -5,7 +5,8 @@
 
 // FFF
 static SFEM_INLINE void tet4_laplacian_hessian_fff(const scalar_t *const SFEM_RESTRICT fff,
-                                                   accumulator_t *const SFEM_RESTRICT element_matrix) {
+                                                   accumulator_t *const SFEM_RESTRICT
+                                                           element_matrix) {
     const scalar_t x0 = -fff[0] - fff[1] - fff[2];
     const scalar_t x1 = -fff[1] - fff[3] - fff[4];
     const scalar_t x2 = -fff[2] - fff[4] - fff[5];
@@ -140,22 +141,22 @@ static SFEM_INLINE void tet4_laplacian_value_points(const scalar_t px0,
     scalar_t fff[6];
     tet4_fff_s(px0, px1, px2, px3, py0, py1, py2, py3, pz0, pz1, pz2, pz3, fff);
 
-    const scalar_t x0 = (3.0 / 16.0) * u[1];
+    const scalar_t x0 = (scalar_t)(3.0 / 16.0) * u[1];
     const scalar_t x1 = fff[1] * u[0];
-    const scalar_t x2 = (5.0 / 16.0) * u[2];
+    const scalar_t x2 = (scalar_t)(5.0 / 16.0) * u[2];
     const scalar_t x3 = fff[2] * u[0];
-    const scalar_t x4 = (9.0 / 16.0) * u[3];
+    const scalar_t x4 = (scalar_t)(9.0 / 16.0) * u[3];
     const scalar_t x5 = u[0] * x2;
     const scalar_t x6 = u[0] * x4;
     const scalar_t x7 = POW2(u[0]);
-    const scalar_t x8 = (1.0 / 16.0) * x7;
-    const scalar_t x9 = (1.0 / 8.0) * x7;
-    element_scalar[0] = -fff[0] * u[0] * x0 + (1.0 / 8.0) * fff[0] * POW2(u[1]) + fff[0] * x8 +
-                        (3.0 / 8.0) * fff[1] * u[1] * u[2] + fff[1] * x9 +
-                        (5.0 / 8.0) * fff[2] * u[1] * u[3] + fff[2] * x9 +
-                        (1.0 / 4.0) * fff[3] * POW2(u[2]) - fff[3] * x5 + fff[3] * x8 +
-                        (3.0 / 4.0) * fff[4] * u[2] * u[3] - fff[4] * x5 - fff[4] * x6 +
-                        fff[4] * x9 + (1.0 / 2.0) * fff[5] * POW2(u[3]) - fff[5] * x6 +
+    const scalar_t x8 = (scalar_t)(1.0 / 16.0) * x7;
+    const scalar_t x9 = (scalar_t)(1.0 / 8.0) * x7;
+    element_scalar[0] = -fff[0] * u[0] * x0 + (scalar_t)(1.0 / 8.0) * fff[0] * POW2(u[1]) +
+                        fff[0] * x8 + (scalar_t)(3.0 / 8.0) * fff[1] * u[1] * u[2] + fff[1] * x9 +
+                        (scalar_t)(5.0 / 8.0) * fff[2] * u[1] * u[3] + fff[2] * x9 +
+                        (scalar_t)(1.0 / 4.0) * fff[3] * POW2(u[2]) - fff[3] * x5 + fff[3] * x8 +
+                        (scalar_t)(3.0 / 4.0) * fff[4] * u[2] * u[3] - fff[4] * x5 - fff[4] * x6 +
+                        fff[4] * x9 + (scalar_t)(1.0 / 2.0) * fff[5] * POW2(u[3]) - fff[5] * x6 +
                         fff[5] * x8 - x0 * x1 - x0 * x3 - x1 * x2 - x3 * x4;
 }
 
@@ -199,4 +200,4 @@ static SFEM_INLINE void tet4_laplacian_diag_points(const scalar_t px0,
     element_vector[3] = fff[5];
 }
 
-#endif //TET4_LAPLACIAN_INLINE_CPU_H
+#endif  // TET4_LAPLACIAN_INLINE_CPU_H
