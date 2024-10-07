@@ -129,6 +129,46 @@ TTS:		1036.09 [s], compute 1028.83 [s] (solve: 949.825 [s], init: 78.9262 [s])
 residual:	7.10327e-07
 ```
 
+### Single precision
+
+```yaml
+SFEM_MATRIX_FREE: 1
+SFEM_COARSE_MATRIX_FREE: 1
+SFEM_OPERATOR: LinearElasticity
+SFEM_BLOCK_SIZE: 3
+SFEM_USE_PRECONDITIONER: 0
+SFEM_USE_CHEB: 1
+SFEM_DEBUG: 0
+SFEM_MG: 1
+SFEM_USE_MG_PRECONDITIONER: 0
+SFEM_WRITE_OUTPUT: 1
+SFEM_CHEB_EIG_MAX_SCALE: 1.020000
+SFEM_TOL: 0.000001
+SFEM_SMOOTHER_SWEEPS: 60
+SFEM_CHEB_EIG_TOL: 1e-07
+SFEM_USE_CRS_GRAPH_RESTRICT: 0
+```
+
+```c
+#elements 31031296 #nodes 41828417 #dofs 125485251
+Multigrid
+iter	abs		rel		rate
+0	0.120424	-		-
+1	0.00274531	0.0227971	0.0227971
+2	0.000232685	0.00193221	0.084757
+3	4.49727e-05	0.000373452	0.193277
+4	1.17919e-05	9.79197e-05	0.262201
+5	4.68065e-06	3.88681e-05	0.396938
+6	3.43288e-06	2.85066e-05	0.733419
+7	3.25176e-06	2.70026e-05	0.947241
+----------------------------------------
+mgsolve (MACRO_TET4):
+----------------------------------------
+#elements 31031296 #nodes 41828417 #dofs 125485251
+TTS:		942.985 [s], compute 924.746 [s] (solve: 870.811 [s], init: 50.535 [s])
+residual:	3.23084e-06
+```
+
 ## Two-level laplacian with coarse grid solver using SpMV vs MF
 
 Note that the fine level CRS does not fit on the P100 for this problem size.
