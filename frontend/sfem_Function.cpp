@@ -1141,65 +1141,6 @@ namespace sfem {
 
     std::shared_ptr<Output> Function::output() { return impl_->output; }
 
-    // std::shared_ptr<Operator<real_t>> Function::hierarchical_restriction() {
-    //     auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
-
-    //     auto et = (enum ElemType)impl_->space->element_type();
-    //     auto coarse_et = macro_base_elem(et);
-
-    //     const ptrdiff_t rows = max_node_id(coarse_et, mesh->nelements, mesh->elements) + 1;
-    //     const ptrdiff_t cols = impl_->space->n_dofs();
-
-    //     auto crs_graph = impl_->space->mesh().create_node_to_node_graph(coarse_et);
-
-    //     auto p2_vertices = h_buffer<idx_t>(crs_graph->nnz());
-
-    //     build_p1_to_p2_edge_map(rows,
-    //                             crs_graph->rowptr()->data(),
-    //                             crs_graph->colidx()->data(),
-    //                             p2_vertices->data());
-
-    //     return std::make_shared<LambdaOperator<real_t>>(
-    //             rows,
-    //             cols,
-    //             [=](const real_t *const from, real_t *const to) {
-    //                 ::hierarchical_restriction_with_edge_map(crs_graph->n_nodes(),
-    //                                                          crs_graph->rowptr()->data(),
-    //                                                          crs_graph->colidx()->data(),
-    //                                                          p2_vertices->data(),
-    //                                                          impl_->space->block_size(),
-    //                                                          from,
-    //                                                          to);
-    //             },
-    //             EXECUTION_SPACE_HOST);
-    // }
-
-    // std::shared_ptr<Operator<real_t>> Function::hierarchical_prolongation() {
-    //     auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
-
-    //     auto et = (enum ElemType)impl_->space->element_type();
-    //     auto coarse_et = macro_base_elem(et);
-
-    //     const ptrdiff_t rows = impl_->space->n_dofs();
-    //     const ptrdiff_t cols = max_node_id(coarse_et, mesh->nelements, mesh->elements) + 1;
-
-    //     return std::make_shared<LambdaOperator<real_t>>(
-    //             rows,
-    //             cols,
-    //             [=](const real_t *const from, real_t *const to) {
-    //                 ::hierarchical_prolongation(coarse_et,
-    //                                             et,
-    //                                             mesh->nelements,
-    //                                             mesh->elements,
-    //                                             impl_->space->block_size(),
-    //                                             from,
-    //                                             to);
-
-    //                 this->apply_zero_constraints(to);
-    //             },
-    //             EXECUTION_SPACE_HOST);
-    // }
-
     std::shared_ptr<Function> Function::derefine(const bool dirichlet_as_zero) {
         return derefine(impl_->space->derefine(), dirichlet_as_zero);
     }
