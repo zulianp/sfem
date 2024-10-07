@@ -82,7 +82,7 @@ int proteus_hex8_hierarchical_restriction(int level,
                 for (int i = 0; i < 8; i++) {
                     const int c = corners[i];
 #pragma omp atomic update
-                    to[ev[c]] += element_vector[c] / element_to_node_incidence_count[ev[c]];
+                    to[ev[c]] += element_vector[i] / element_to_node_incidence_count[ev[c]];
                 }
             }
         }
@@ -174,7 +174,7 @@ int proteus_hex8_hierarchical_prolongation(int level,
             }
         }
 
-        free(e_from);
+        free(e_to);
         free(ev);
     }
 

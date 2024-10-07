@@ -353,9 +353,15 @@ namespace sfem {
     }
 
     std::shared_ptr<FunctionSpace> FunctionSpace::derefine() const {
-        // FIXME the number of nodes in mesh does not change, will lead to bugs
-        return std::make_shared<FunctionSpace>(
-                impl_->mesh, impl_->block_size, macro_base_elem(impl_->element_type));
+        // if (has_semi_structured_mesh()) {
+            
+        // }  
+
+        {
+            // FIXME the number of nodes in mesh does not change, will lead to bugs
+            return std::make_shared<FunctionSpace>(
+                    impl_->mesh, impl_->block_size, macro_base_elem(impl_->element_type));
+        }
     }
 
     FunctionSpace::FunctionSpace(const std::shared_ptr<Mesh> &mesh,
