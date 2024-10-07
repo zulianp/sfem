@@ -77,6 +77,7 @@ int main(int argc, char *argv[]) {
     float SFEM_CHEB_EIG_MAX_SCALE = 1.02;
     float SFEM_TOL = 1e-9;
     double SFEM_CHEB_EIG_TOL = 1e-5;
+    int SFEM_ELEMENT_REFINE_LEVEL = 0;
 
     SFEM_READ_ENV(SFEM_MATRIX_FREE, atoi);
     SFEM_READ_ENV(SFEM_COARSE_MATRIX_FREE, atoi);
@@ -95,6 +96,7 @@ int main(int argc, char *argv[]) {
 
     SFEM_READ_ENV(SFEM_SMOOTHER_SWEEPS, atoi);
     SFEM_READ_ENV(SFEM_CHEB_EIG_TOL, atof);
+    SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
     printf("SFEM_MATRIX_FREE: %d\n"
            "SFEM_COARSE_MATRIX_FREE: %d\n"
@@ -110,7 +112,8 @@ int main(int argc, char *argv[]) {
            "SFEM_TOL: %f\n"
            "SFEM_SMOOTHER_SWEEPS: %d\n"
            "SFEM_CHEB_EIG_TOL: %g\n"
-           "SFEM_USE_CRS_GRAPH_RESTRICT: %d\n",
+           "SFEM_USE_CRS_GRAPH_RESTRICT: %d\n"
+           "SFEM_ELEMENT_REFINE_LEVEL: %d\n",
            SFEM_MATRIX_FREE,
            SFEM_COARSE_MATRIX_FREE,
            SFEM_OPERATOR,
@@ -125,13 +128,19 @@ int main(int argc, char *argv[]) {
            SFEM_TOL,
            SFEM_SMOOTHER_SWEEPS,
            SFEM_CHEB_EIG_TOL,
-           SFEM_USE_CRS_GRAPH_RESTRICT);
+           SFEM_USE_CRS_GRAPH_RESTRICT,
+           SFEM_ELEMENT_REFINE_LEVEL);
 
 #ifdef SFEM_ENABLE_CUDA
     sfem::register_device_ops();
 #endif
 
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
+
+    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
+    }
+
 #ifdef SFEM_ENABLE_CUDA
     {
         auto elements = fs->device_elements();
@@ -329,14 +338,16 @@ int main(int argc, char *argv[]) {
         } else {
             restriction = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
             prolong_unconstr = sfem::create_hierarchical_prolongation(fs_coarse, fs, es);
-      
         }
 
         prolongation = sfem::make_op<real_t>(
-            prolong_unconstr->rows(), prolong_unconstr->cols(), [=](const real_t *const from, real_t *const to) {
-            prolong_unconstr->apply(from, to);
-            f->apply_zero_constraints(to);
-        }, es);
+                prolong_unconstr->rows(),
+                prolong_unconstr->cols(),
+                [=](const real_t *const from, real_t *const to) {
+                    prolong_unconstr->apply(from, to);
+                    f->apply_zero_constraints(to);
+                },
+                es);
 
         f->apply_constraints(x->data());
         f->apply_constraints(rhs->data());

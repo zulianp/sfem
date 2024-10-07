@@ -21,63 +21,6 @@
 
 #include "matrixio_array.h"
 
-// namespace sfem {
-//     class SemiStructuredMesh {
-//     public:
-//         std::shared_ptr<Mesh> macro_mesh_;
-//         int level_;
-
-//         idx_t **elements_{nullptr};
-//         ptrdiff_t n_unique_nodes_{-1}, interior_start_{-1};
-
-//         idx_t **element_data() { return elements_; }
-//         geom_t **point_data() { return ((mesh_t *)macro_mesh_->impl_mesh())->points; }
-//         ptrdiff_t interior_start() const { return interior_start_; }
-
-//         SemiStructuredMesh(const std::shared_ptr<Mesh> macro_mesh, const int level)
-//             : macro_mesh_(macro_mesh), level_(level) {
-//             const int nxe = proteus_hex8_nxe(level);
-//             elements_ = (idx_t **)malloc(nxe * sizeof(idx_t *));
-//             for (int d = 0; d < nxe; d++) {
-//                 elements_[d] = (idx_t *)malloc(macro_mesh_->n_elements() * sizeof(idx_t));
-//             }
-
-// #ifndef NDEBUG
-//             for (int d = 0; d < nxe; d++) {
-//                 for (ptrdiff_t i = 0; i < macro_mesh_->n_elements(); i++) {
-//                     elements_[d][i] = -1;
-//                 }
-//             }
-// #endif
-
-//             proteus_hex8_create_full_idx(level,
-//                                          (mesh_t *)macro_mesh_->impl_mesh(),
-//                                          elements_,
-//                                          &n_unique_nodes_,
-//                                          &interior_start_);
-//         }
-
-//         ptrdiff_t n_nodes() const { return n_unique_nodes_; }
-//         int level() const { return level_; }
-//         ptrdiff_t n_elements() const { return macro_mesh_->n_elements(); }
-
-//         ~SemiStructuredMesh() {
-//             const int nxe = proteus_hex8_nxe(level_);
-
-//             for (int d = 0; d < nxe; d++) {
-//                 free(elements_[d]);
-//             }
-
-//             free(elements_);
-//         }
-
-//         static std::shared_ptr<SemiStructuredMesh> create(const std::shared_ptr<Mesh> macro_mesh,
-//                                                           const int level) {
-//             return std::make_shared<SemiStructuredMesh>(macro_mesh, level);
-//         }
-//     };
-// }  // namespace sfem
-
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -176,39 +119,6 @@ int main(int argc, char *argv[]) {
         mkdir(output_path, 0700);
     }
 
-    //     auto inv_diag = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
-    //     {  // Create diagonal operator
-
-    //         if (SFEM_USE_ELASTICITY) {
-    //             assert(false);
-    //         } else {
-    //             proteus_affine_hex8_laplacian_diag(ssm->level(),
-    //                                                ssm->n_elements(),
-    //                                                ssm->interior_start(),
-    //                                                ssm->element_data(),
-    //                                                ssm->point_data(),
-    //                                                inv_diag->data());
-    //         }
-
-    //         {
-    //             auto d = inv_diag->data();
-    // #pragma omp parallel for
-    //             for (ptrdiff_t i = 0; i < ndofs; i++) {
-    //                 d[i] = 1 / d[i];
-    //             }
-
-    //             // Identity at eq-contraint nodes
-    //             for (int i = 0; i < n_dirichlet_conditions; i++) {
-    //                 constraint_nodes_to_value_vec(dirichlet_conditions[i].local_size,
-    //                                               dirichlet_conditions[i].idx,
-    //                                               block_size,
-    //                                               dirichlet_conditions[i].component,
-    //                                               1,
-    //                                               d);
-    //             }
-    //         }
-    // }
-
     auto op = sfem::make_op<real_t>(
             ndofs,
             ndofs,
@@ -297,23 +207,9 @@ int main(int argc, char *argv[]) {
         mprgp->default_init();
         solver = mprgp;
     } else {
-        //         auto preconditioner = sfem::make_op<real_t>(
-        //                 ndofs,
-        //                 ndofs,
-        //                 [=](const real_t *const x, real_t *const y) {
-        //                     auto d = inv_diag->data();
-
-        // #pragma omp parallel for
-        //                     for (ptrdiff_t i = 0; i < ndofs; i++) {
-        //                         y[i] = d[i] * x[i];
-        //                     }
-        //                 },
-        //                 sfem::EXECUTION_SPACE_HOST);
-
         auto cg = sfem::h_cg<real_t>();
         cg->verbose = true;
         cg->set_op(op);
-        // cg->set_preconditioner_op(preconditioner); // CHECK if diag code is correct!
         cg->set_max_it(10000);
         cg->set_rtol(1e-12);
         cg->set_atol(1e-8);

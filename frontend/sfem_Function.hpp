@@ -126,6 +126,8 @@ namespace sfem {
                       const enum ElemType element_type = INVALID);
         ~FunctionSpace();
 
+        int promote_to_semi_structured(const int level);
+
         static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<Mesh> &mesh,
                                                      const int block_size = 1,
                                                      const enum ElemType element_type = INVALID) {

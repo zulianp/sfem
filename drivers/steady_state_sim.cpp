@@ -1,9 +1,6 @@
 #include "sfem_Function.hpp"
 
-#include "sfem_Multigrid.hpp"
-#include "sfem_base.h"
-#include "sfem_bcgs.hpp"
-#include "sfem_cg.hpp"
+#include "sfem_API.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
@@ -32,110 +29,81 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const char *output_path = argv[2];
+#ifdef SFEM_ENABLE_CUDA
+    sfem::register_device_ops();
+#endif
 
     double tick = MPI_Wtime();
-
-    bool SFEM_USE_GPU = true;
-    SFEM_READ_ENV(SFEM_USE_GPU, atoi);
 
     // -------------------------------
     // Read inputs
     // -------------------------------
 
     const char *folder = argv[1];
-    auto m = sfem::Mesh::create_from_file(comm, folder);
-
+    const char *output_path = argv[2];
     const char *SFEM_OPERATOR = "Laplacian";
     int SFEM_BLOCK_SIZE = 1;
     int SFEM_USE_PRECONDITIONER = 0;
+    int SFEM_ELEMENT_REFINE_LEVEL = 0;
+    int SFEM_MAX_IT = 1000;
+    bool SFEM_USE_GPU = true;
 
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
     SFEM_READ_ENV(SFEM_USE_PRECONDITIONER, atoi);
+    SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
+    SFEM_READ_ENV(SFEM_MAX_IT, atoi);
+    SFEM_READ_ENV(SFEM_USE_GPU, atoi);
 
+    sfem::ExecutionSpace es =
+            SFEM_USE_GPU ? sfem::EXECUTION_SPACE_DEVICE : sfem::EXECUTION_SPACE_HOST;
+
+    // -------------------------------
+    // Create discretization
+    // -------------------------------
+
+    auto m = sfem::Mesh::create_from_file(comm, folder);
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
-    auto conds = sfem::DirichletConditions::create_from_env(fs);
-    auto f = sfem::Function::create(fs);
 
-    std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> solver;
-    std::shared_ptr<sfem::Buffer<real_t>> b_x;
-    std::shared_ptr<sfem::Buffer<real_t>> b_b;
-
-#ifdef SFEM_ENABLE_CUDA
-    if (SFEM_USE_GPU) {
-        printf("Using GPU...\n");
-        solver = sfem::d_cg<real_t>();
-
-        // Register CUDA kernels
-        sfem::register_device_ops();
-        auto le = sfem::Factory::create_op_gpu(fs, SFEM_OPERATOR);
-
-        le->initialize();
-
-        // Transfer Boundary conditions to device
-        auto d_conds = sfem::to_device(conds);
-
-        f->add_constraint(d_conds);
-        f->add_operator(le);
-
-        // Create device buffers
-        b_x = sfem::d_buffer<real_t>(fs->n_dofs());
-        b_b = sfem::d_buffer<real_t>(fs->n_dofs());
-
-        if (SFEM_USE_PRECONDITIONER) {
-            auto b_d = sfem::d_buffer<real_t>(fs->n_dofs());
-            if (f->hessian_diag(b_x->data(), b_d->data()) == 0) {
-                // auto h_d = sfem::to_host(b_d);
-                // h_d->print(std::cout);
-
-                solver->set_preconditioner_op(sfem::make_op<real_t>(
-                        b_x->size(), b_x->size(), [=](const real_t *const x, real_t *const y) {
-                            d_ediv(b_d->size(), x, b_d->data(), y);
-                        }, sfem::EXECUTION_SPACE_DEVICE));
-            } else {
-                fprintf(stderr, "[Warning] Preconditioner unavailable for mesh %s\n", folder);
-            }
-        }
-    } else
-#else
-    SFEM_USE_GPU = false;
-#endif
-    {
-        auto cg = sfem::h_cg<real_t>();
-        cg->verbose = true;
-        cg->set_max_it(10);
-        solver = cg;
-
-        auto op = sfem::Factory::create_op(fs, SFEM_OPERATOR);
-        op->initialize();
-
-        f->add_constraint(conds);
-        f->add_operator(op);
-
-        b_x = sfem::h_buffer<real_t>(fs->n_dofs());
-        b_b = sfem::h_buffer<real_t>(fs->n_dofs());
+    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
     }
 
     // -------------------------------
-    // Solver set-up
+    // Create problem
     // -------------------------------
-    solver->set_op(sfem::make_op<real_t>(
-            fs->n_dofs(), fs->n_dofs(), [=](const real_t *const v, real_t *const w) {
-                f->apply(nullptr, v, w);
-            }, f->execution_space()));
+
+    auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
+    op->initialize();
+    auto conds = sfem::create_dirichlet_conditions_from_env(fs, es);
+    auto f = sfem::Function::create(fs);
+    f->add_constraint(conds);
+    f->add_operator(op);
+
+    // -------------------------------
+    // Create linear solver
+    // -------------------------------
+
+    auto linear_op = sfem::make_linear_op(f);
+    auto solver = sfem::create_cg<real_t>(linear_op, es);
+    solver->verbose = true;
+    solver->set_max_it(SFEM_MAX_IT);
+    solver->set_op(linear_op);
+
+    auto x = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    auto rhs = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
     // -------------------------------
     // Solve
     // -------------------------------
+
     double solve_tick = MPI_Wtime();
 
-    f->apply_constraints(b_x->data());
-    f->apply_constraints(b_b->data());
+    f->apply_constraints(x->data());
+    f->apply_constraints(rhs->data());
 
-    // solver->set_max_it(40000);
     solver->set_n_dofs(fs->n_dofs());
-    solver->apply(b_b->data(), b_x->data());
+    solver->apply(rhs->data(), x->data());
 
     double solve_tock = MPI_Wtime();
 
@@ -147,9 +115,9 @@ int main(int argc, char *argv[]) {
     auto output = f->output();
 
 #ifdef SFEM_ENABLE_CUDA
-    auto h_x = sfem::to_host(b_x);
+    auto h_x = sfem::to_host(x);
 #else
-    auto h_x = b_x;
+    auto h_x = x;
 #endif
     output->write("x", h_x->data());
 
