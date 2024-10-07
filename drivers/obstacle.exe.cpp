@@ -21,62 +21,62 @@
 
 #include "matrixio_array.h"
 
-namespace sfem {
-    class SemiStructuredMesh {
-    public:
-        std::shared_ptr<Mesh> macro_mesh_;
-        int level_;
+// namespace sfem {
+//     class SemiStructuredMesh {
+//     public:
+//         std::shared_ptr<Mesh> macro_mesh_;
+//         int level_;
 
-        idx_t **elements_{nullptr};
-        ptrdiff_t n_unique_nodes_{-1}, interior_start_{-1};
+//         idx_t **elements_{nullptr};
+//         ptrdiff_t n_unique_nodes_{-1}, interior_start_{-1};
 
-        idx_t **element_data() { return elements_; }
-        geom_t **point_data() { return ((mesh_t *)macro_mesh_->impl_mesh())->points; }
-        ptrdiff_t interior_start() const { return interior_start_; }
+//         idx_t **element_data() { return elements_; }
+//         geom_t **point_data() { return ((mesh_t *)macro_mesh_->impl_mesh())->points; }
+//         ptrdiff_t interior_start() const { return interior_start_; }
 
-        SemiStructuredMesh(const std::shared_ptr<Mesh> macro_mesh, const int level)
-            : macro_mesh_(macro_mesh), level_(level) {
-            const int nxe = proteus_hex8_nxe(level);
-            elements_ = (idx_t **)malloc(nxe * sizeof(idx_t *));
-            for (int d = 0; d < nxe; d++) {
-                elements_[d] = (idx_t *)malloc(macro_mesh_->n_elements() * sizeof(idx_t));
-            }
+//         SemiStructuredMesh(const std::shared_ptr<Mesh> macro_mesh, const int level)
+//             : macro_mesh_(macro_mesh), level_(level) {
+//             const int nxe = proteus_hex8_nxe(level);
+//             elements_ = (idx_t **)malloc(nxe * sizeof(idx_t *));
+//             for (int d = 0; d < nxe; d++) {
+//                 elements_[d] = (idx_t *)malloc(macro_mesh_->n_elements() * sizeof(idx_t));
+//             }
 
-#ifndef NDEBUG
-            for (int d = 0; d < nxe; d++) {
-                for (ptrdiff_t i = 0; i < macro_mesh_->n_elements(); i++) {
-                    elements_[d][i] = -1;
-                }
-            }
-#endif
+// #ifndef NDEBUG
+//             for (int d = 0; d < nxe; d++) {
+//                 for (ptrdiff_t i = 0; i < macro_mesh_->n_elements(); i++) {
+//                     elements_[d][i] = -1;
+//                 }
+//             }
+// #endif
 
-            proteus_hex8_create_full_idx(level,
-                                         (mesh_t *)macro_mesh_->impl_mesh(),
-                                         elements_,
-                                         &n_unique_nodes_,
-                                         &interior_start_);
-        }
+//             proteus_hex8_create_full_idx(level,
+//                                          (mesh_t *)macro_mesh_->impl_mesh(),
+//                                          elements_,
+//                                          &n_unique_nodes_,
+//                                          &interior_start_);
+//         }
 
-        ptrdiff_t n_nodes() const { return n_unique_nodes_; }
-        int level() const { return level_; }
-        ptrdiff_t n_elements() const { return macro_mesh_->n_elements(); }
+//         ptrdiff_t n_nodes() const { return n_unique_nodes_; }
+//         int level() const { return level_; }
+//         ptrdiff_t n_elements() const { return macro_mesh_->n_elements(); }
 
-        ~SemiStructuredMesh() {
-            const int nxe = proteus_hex8_nxe(level_);
+//         ~SemiStructuredMesh() {
+//             const int nxe = proteus_hex8_nxe(level_);
 
-            for (int d = 0; d < nxe; d++) {
-                free(elements_[d]);
-            }
+//             for (int d = 0; d < nxe; d++) {
+//                 free(elements_[d]);
+//             }
 
-            free(elements_);
-        }
+//             free(elements_);
+//         }
 
-        static std::shared_ptr<SemiStructuredMesh> create(const std::shared_ptr<Mesh> macro_mesh,
-                                                          const int level) {
-            return std::make_shared<SemiStructuredMesh>(macro_mesh, level);
-        }
-    };
-}  // namespace sfem
+//         static std::shared_ptr<SemiStructuredMesh> create(const std::shared_ptr<Mesh> macro_mesh,
+//                                                           const int level) {
+//             return std::make_shared<SemiStructuredMesh>(macro_mesh, level);
+//         }
+//     };
+// }  // namespace sfem
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
