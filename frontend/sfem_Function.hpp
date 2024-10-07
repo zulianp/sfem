@@ -378,10 +378,6 @@ namespace sfem {
         int set_output_dir(const char *path);
 
         std::shared_ptr<Output> output();
-
-        // std::shared_ptr<Operator<real_t>> hierarchical_restriction();
-        // std::shared_ptr<Operator<real_t>> hierarchical_prolongation();
-
         ExecutionSpace execution_space() const;
 
     private:
