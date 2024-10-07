@@ -131,20 +131,25 @@ int main(int argc, char *argv[]) {
     auto Ax_fine = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     auto restricted = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
     auto Ax_coarse = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
-    auto upanddown = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
 
     prolongation->apply(input->data(), prolongated->data());
     fine_op->apply(prolongated->data(), Ax_fine->data());
     restriction->apply(Ax_fine->data(), restricted->data());
     coarse_op->apply(input->data(), Ax_coarse->data());
 
-    restriction->apply(prolongated->data(), upanddown->data());
-
-    printf("#elements %ld #ndofs fine %ld coarse %ld\n", m->n_elements(), fs->n_dofs(), fs_coarse->n_dofs());
+    printf("#elements %ld #ndofs fine %ld coarse %ld\n",
+           m->n_elements(),
+           fs->n_dofs(),
+           fs_coarse->n_dofs());
 
     input->print(std::cout);
     prolongated->print(std::cout);
-    upanddown->print(std::cout);
+
+    if (0) {
+        auto upanddown = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
+        restriction->apply(prolongated->data(), upanddown->data());
+        upanddown->print(std::cout);
+    }
 
     // Compare two results
 #if SFEM_ENABLE_CUDA
@@ -161,9 +166,14 @@ int main(int argc, char *argv[]) {
         for (ptrdiff_t i = 0; i < n; i++) {
             // actual is composition of operators
             // expected is application of coarse operator
-            real_t diff = actual[i] - expected[i];
+            real_t diff = fabs(actual[i] - expected[i]);
             if (diff > 1e-12) {
-                printf("%ld) %g != %g (%g, %g)\n", i, actual[i], expected[i], diff, actual[i] / expected[i]);
+                printf("%ld) %g != %g (%g, %g)\n",
+                       i,
+                       actual[i],
+                       expected[i],
+                       diff,
+                       actual[i] / expected[i]);
             }
         }
     }
