@@ -164,8 +164,8 @@ int main(int argc, char *argv[]) {
         auto actual = h_actual->data();
         auto expected = h_expected->data();
         for (ptrdiff_t i = 0; i < n; i++) {
-            // actual is composition of operators
-            // expected is application of coarse operator
+            // actual: is composition of operators
+            // expected: is application of coarse operator
             real_t diff = fabs(actual[i] - expected[i]);
             if (diff > 1e-12) {
                 printf("%ld) %g != %g (%g, %g)\n",

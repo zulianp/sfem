@@ -354,8 +354,8 @@ namespace sfem {
 
     std::shared_ptr<FunctionSpace> FunctionSpace::derefine() const {
         // if (has_semi_structured_mesh()) {
-            
-        // }  
+
+        // }
 
         {
             // FIXME the number of nodes in mesh does not change, will lead to bugs
@@ -1548,6 +1548,104 @@ namespace sfem {
         int report(const real_t *const) override { return SFEM_SUCCESS; }
     };
 
+    class SemiStructuredLaplacian : public Op {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+        enum ElemType element_type { INVALID };
+        bool use_affine_approximation{false};
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            assert(space->has_semi_structured_mesh());
+            if (!space->has_semi_structured_mesh()) {
+                fprintf(stderr,
+                        "[Error] SemiStructuredLaplacian::create requires space with "
+                        "semi_structured_mesh!\n");
+                return nullptr;
+            }
+
+            assert(space->element_type() == PROTEUS_HEX8);  // REMOVEME once generalized approach
+            auto ret = std::make_unique<SemiStructuredLaplacian>(space);
+
+            ret->element_type = (enum ElemType)space->element_type();
+
+            int SFEM_HEX8_ASSUME_AFFINE = ret->use_affine_approximation;
+            SFEM_READ_ENV(SFEM_HEX8_ASSUME_AFFINE, atoi);
+            ret->use_affine_approximation = SFEM_HEX8_ASSUME_AFFINE;
+
+            return ret;
+        }
+
+        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
+            assert(false);
+            fprintf(stderr, "[Error] ss:Laplacian::lor_op NOT IMPLEMENTED!\n");
+            return nullptr;
+        }
+
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
+            assert(space->element_type() == macro_base_elem(element_type));
+            auto ret = std::make_shared<Laplacian>(space);
+            ret->element_type = macro_base_elem(element_type);
+            return ret;
+        }
+
+        const char *name() const override { return "ss:Laplacian"; }
+        inline bool is_linear() const override { return true; }
+
+        int initialize() override { return SFEM_SUCCESS; }
+
+        SemiStructuredLaplacian(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+        int hessian_crs(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values) override {
+            assert(false);
+            return SFEM_FAILURE;
+        }
+
+        int hessian_diag(const real_t *const, real_t *const out) override {
+            assert(false);
+            return SFEM_FAILURE;
+        }
+
+        int gradient(const real_t *const x, real_t *const out) override {
+            assert(false);
+            return SFEM_FAILURE;
+        }
+
+        int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
+            assert(element_type == PROTEUS_HEX8);  // REMOVEME once generalized approach
+
+            auto &ssm = space->semi_structured_mesh();
+
+            if (use_affine_approximation) {
+                return proteus_affine_hex8_laplacian_apply(ssm.level(),
+                                                           ssm.n_elements(),
+                                                           ssm.interior_start(),
+                                                           ssm.element_data(),
+                                                           ssm.point_data(),
+                                                           h,
+                                                           out);
+
+            } else {
+                return proteus_hex8_laplacian_apply(ssm.level(),
+                                                    ssm.n_elements(),
+                                                    ssm.interior_start(),
+                                                    ssm.element_data(),
+                                                    ssm.point_data(),
+                                                    h,
+                                                    out);
+            }
+        }
+
+        int value(const real_t *x, real_t *const out) override {
+            assert(false);
+            return SFEM_FAILURE;
+        }
+
+        int report(const real_t *const) override { return SFEM_SUCCESS; }
+    };
+
     class Mass final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
@@ -2193,6 +2291,8 @@ namespace sfem {
             instance_.private_register_op("ss:LinearElasticity",
                                           SemiStructuredLinearElasticity::create);
             instance_.private_register_op("Laplacian", Laplacian::create);
+            instance_.private_register_op("ss:Laplacian",
+                                          SemiStructuredLaplacian::create);
             instance_.private_register_op("CVFEMUpwindConvection", CVFEMUpwindConvection::create);
             instance_.private_register_op("Mass", Mass::create);
             instance_.private_register_op("CVFEMMass", CVFEMMass::create);
