@@ -31,12 +31,12 @@ else
 	create_box_ss_mesh.sh 1 $SFEM_ELEMENT_REFINE_LEVEL
 fi
 
-# export SFEM_BLOCK_SIZE=3
-# export SFEM_OPERATOR="LinearElasticity"
+export SFEM_BLOCK_SIZE=3
+export SFEM_OPERATOR="LinearElasticity"
 
-export SFEM_BLOCK_SIZE=1
-export SFEM_OPERATOR="Laplacian"
+# export SFEM_BLOCK_SIZE=1
+# export SFEM_OPERATOR="Laplacian"
 
 
-export SFEM_HEX8_ASSUME_AFFINE=1
+# export SFEM_HEX8_ASSUME_AFFINE=1
 $LAUNCH test_galerkin_assembly $mesh output
