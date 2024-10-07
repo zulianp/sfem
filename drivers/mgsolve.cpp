@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
     int SFEM_DEBUG = 0;
     int SFEM_MG = 0;
     int SFEM_MAX_IT = 4000;
-    int SFEM_USE_CRS_GRAPH_RESTRICT = 1;
+    int SFEM_USE_CRS_GRAPH_RESTRICT = 0;
     int SFEM_SMOOTHER_SWEEPS = 3;
     int SFEM_USE_MG_PRECONDITIONER = 0;
     int SFEM_WRITE_OUTPUT = 1;
@@ -78,6 +78,7 @@ int main(int argc, char *argv[]) {
     float SFEM_TOL = 1e-9;
     double SFEM_CHEB_EIG_TOL = 1e-5;
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
+    int SFEM_VERBOSITY_LEVEL = 1;
 
     SFEM_READ_ENV(SFEM_MATRIX_FREE, atoi);
     SFEM_READ_ENV(SFEM_COARSE_MATRIX_FREE, atoi);
@@ -93,6 +94,7 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_WRITE_OUTPUT, atoi);
     SFEM_READ_ENV(SFEM_CHEB_EIG_MAX_SCALE, atof);
     SFEM_READ_ENV(SFEM_TOL, atof);
+    SFEM_READ_ENV(SFEM_VERBOSITY_LEVEL, atoi);
 
     SFEM_READ_ENV(SFEM_SMOOTHER_SWEEPS, atoi);
     SFEM_READ_ENV(SFEM_CHEB_EIG_TOL, atof);
@@ -236,30 +238,30 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        if (SFEM_DEBUG) {
-            array_write(
-                    comm, "./rhs.raw", SFEM_MPI_REAL_T, rhs->data(), fs->n_dofs(), fs->n_dofs());
-            array_write(
-                    comm, "./diag.raw", SFEM_MPI_REAL_T, diag->data(), fs->n_dofs(), fs->n_dofs());
-            array_write(comm,
-                        "./rowptr.raw",
-                        SFEM_MPI_COUNT_T,
-                        crs->row_ptr->data(),
-                        fs->n_dofs() + 1,
-                        fs->n_dofs() + 1);
-            array_write(comm,
-                        "./colidx.raw",
-                        SFEM_MPI_IDX_T,
-                        crs->col_idx->data(),
-                        crs->row_ptr->data()[fs->n_dofs()],
-                        crs->row_ptr->data()[fs->n_dofs()]);
-            array_write(comm,
-                        "./values.raw",
-                        SFEM_MPI_REAL_T,
-                        crs->values->data(),
-                        crs->row_ptr->data()[fs->n_dofs()],
-                        crs->row_ptr->data()[fs->n_dofs()]);
-        }
+        // if (SFEM_DEBUG) {
+        //     array_write(
+        //             comm, "./rhs.raw", SFEM_MPI_REAL_T, rhs->data(), fs->n_dofs(), fs->n_dofs());
+        //     array_write(
+        //             comm, "./diag.raw", SFEM_MPI_REAL_T, diag->data(), fs->n_dofs(), fs->n_dofs());
+        //     array_write(comm,
+        //                 "./rowptr.raw",
+        //                 SFEM_MPI_COUNT_T,
+        //                 crs->row_ptr->data(),
+        //                 fs->n_dofs() + 1,
+        //                 fs->n_dofs() + 1);
+        //     array_write(comm,
+        //                 "./colidx.raw",
+        //                 SFEM_MPI_IDX_T,
+        //                 crs->col_idx->data(),
+        //                 crs->row_ptr->data()[fs->n_dofs()],
+        //                 crs->row_ptr->data()[fs->n_dofs()]);
+        //     array_write(comm,
+        //                 "./values.raw",
+        //                 SFEM_MPI_REAL_T,
+        //                 crs->values->data(),
+        //                 crs->row_ptr->data()[fs->n_dofs()],
+        //                 crs->row_ptr->data()[fs->n_dofs()]);
+        // }
     }
 
     f->set_output_dir(output_path);
@@ -302,7 +304,7 @@ int main(int argc, char *argv[]) {
         auto solver_coarse = sfem::create_cg<real_t>(linear_op_coarse, es);
 
         {
-            solver_coarse->verbose = false;
+            solver_coarse->verbose = SFEM_VERBOSITY_LEVEL >= 2;
             solver_coarse->set_max_it(40000);
             solver_coarse->set_atol(1e-14);
             solver_coarse->set_rtol(1e-9);
@@ -354,6 +356,7 @@ int main(int argc, char *argv[]) {
 
         // Multigrid
         auto mg = sfem::create_mg<real_t>(es);
+        mg->debug = SFEM_DEBUG;
         mg->add_level(linear_op, smoother, nullptr, restriction);
         mg->add_level(nullptr, solver_coarse, prolongation, nullptr);
         mg->set_max_it(SFEM_MAX_IT);
