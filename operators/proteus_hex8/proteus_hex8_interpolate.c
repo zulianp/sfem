@@ -2,6 +2,8 @@
 
 #include "proteus_hex8.h"
 
+#include <stdio.h>
+
 int proteus_hex8_hierarchical_restriction(int level,
                                           const ptrdiff_t nelements,
                                           idx_t **const SFEM_RESTRICT elements,
@@ -13,9 +15,15 @@ int proteus_hex8_hierarchical_restriction(int level,
 #pragma omp parallel
     {
         const int nxe = proteus_hex8_nxe(level);
-        scalar_t *e_from = malloc(nxe * sizeof(scalar_t));
+        scalar_t **e_from = malloc(vec_size * sizeof(scalar_t *));
+        scalar_t **e_to = malloc(vec_size * sizeof(scalar_t *));
+
+        for (int d = 0; d < vec_size; d++) {
+            e_from[d] = malloc(nxe * sizeof(scalar_t));
+            e_to[d] = malloc(8 * sizeof(scalar_t));
+        }
+
         idx_t *ev = malloc(nxe * sizeof(idx_t));
-        scalar_t element_vector[8];
 
         const int corners[8] = {// Bottom
                                 proteus_hex8_lidx(level, 0, 0, 0),
@@ -36,13 +44,17 @@ int proteus_hex8_hierarchical_restriction(int level,
                     ev[d] = elements[d][e];
                 }
 
-                for (int d = 0; d < nxe; d++) {
-                    e_from[d] = from[ev[d]];
-                    assert(e_from[d] == e_from[d]);
+                for (int d = 0; d < vec_size; d++) {
+                    for (int v = 0; v < nxe; v++) {
+                        e_from[d][v] = from[ev[v] * vec_size + d];
+                        assert(e_from[d][v] == e_from[d][v]);
+                    }
                 }
 
-                for (int d = 0; d < 8; d++) {
-                    element_vector[d] = 0;
+                for (int d = 0; d < vec_size; d++) {
+                    for (int v = 0; v < 8; v++) {
+                        e_to[d][v] = 0;
+                    }
                 }
 
                 const scalar_t h = 1. / level;
@@ -71,23 +83,36 @@ int proteus_hex8_hierarchical_restriction(int level,
                             f[6] = x * y * z;     // (1, 1, 1)
                             f[7] = xm * y * z;    // (0, 1, 1)
 
-                            const scalar_t val = e_from[lidx];
-                            for (int i = 0; i < 8; i++) {
-                                element_vector[i] += f[i] * val;
+                            for (int d = 0; d < vec_size; d++) {
+                                const scalar_t val = e_from[d][lidx];
+                                for (int i = 0; i < 8; i++) {
+                                    e_to[d][i] += f[i] * val;
+                                }
                             }
                         }
                     }
                 }
 
-                for (int i = 0; i < 8; i++) {
-                    const int c = corners[i];
+                for (int d = 0; d < vec_size; d++) {
+                    for (int i = 0; i < 8; i++) {
+                        const int c = corners[i];
 #pragma omp atomic update
-                    to[ev[c]] += element_vector[i] / element_to_node_incidence_count[ev[c]];
+                        to[ev[c] * vec_size + d] +=
+                                e_to[d][i] / element_to_node_incidence_count[ev[c]];
+                    }
                 }
             }
         }
 
+
+        for (int d = 0; d < vec_size; d++) {
+            free(e_to[d]);
+            free(e_from[d]);
+        }
+
         free(e_from);
+        free(e_to);
+
         free(ev);
     }
 
@@ -103,8 +128,14 @@ int proteus_hex8_hierarchical_prolongation(int level,
 #pragma omp parallel
     {
         const int nxe = proteus_hex8_nxe(level);
-        scalar_t e_from[8];
-        scalar_t *e_to = malloc(nxe * sizeof(scalar_t));
+        scalar_t **e_from = malloc(vec_size * sizeof(scalar_t *));
+        scalar_t **e_to = malloc(vec_size * sizeof(scalar_t *));
+
+        for (int d = 0; d < vec_size; d++) {
+            e_from[d] = malloc(8 * sizeof(scalar_t));
+            e_to[d] = malloc(nxe * sizeof(scalar_t));
+        }
+
         idx_t *ev = malloc(nxe * sizeof(idx_t));
 
         const int corners[8] = {// Bottom
@@ -126,13 +157,17 @@ int proteus_hex8_hierarchical_prolongation(int level,
                     ev[d] = elements[d][e];
                 }
 
-                for (int d = 0; d < nxe; d++) {
-                    e_to[d] = 0;
+                for (int d = 0; d < vec_size; d++) {
+                    for (int v = 0; v < nxe; v++) {
+                        e_to[d][v] = 0;
+                    }
                 }
 
-                for (int d = 0; d < 8; d++) {
-                    e_from[d] = from[ev[corners[d]]];
-                    assert(e_from[d] == e_from[d]);
+                for (int d = 0; d < vec_size; d++) {
+                    for (int v = 0; v < 8; v++) {
+                        e_from[d][v] = from[ev[corners[v]] * vec_size + d];
+                        assert(e_from[d][v] == e_from[d][v]);
+                    }
                 }
 
                 const scalar_t h = 1. / level;
@@ -161,19 +196,31 @@ int proteus_hex8_hierarchical_prolongation(int level,
                             f[6] = x * y * z;     // (1, 1, 1)
                             f[7] = xm * y * z;    // (0, 1, 1)
 
-                            for (int i = 0; i < 8; i++) {
-                                e_to[lidx] += f[i] * e_from[i];
+                            for (int d = 0; d < vec_size; d++) {
+                                for (int i = 0; i < 8; i++) {
+                                    e_to[d][lidx] += f[i] * e_from[d][i];
+                                }
                             }
                         }
                     }
                 }
 
                 for (int i = 0; i < nxe; i++) {
-                    to[ev[i]] = e_to[i];
+                    for (int d = 0; d < vec_size; d++) {
+                        to[ev[i] * vec_size + d] = e_to[d][i];
+                    }
+
+                    // printf("to[%d] = %g\n", ev[i], to[ev[i]]);
                 }
             }
         }
 
+        for (int d = 0; d < vec_size; d++) {
+            free(e_to[d]);
+            free(e_from[d]);
+        }
+
+        free(e_from);
         free(e_to);
         free(ev);
     }
