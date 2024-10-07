@@ -389,6 +389,18 @@ namespace sfem {
         }
     }
 
+    int FunctionSpace::promote_to_semi_structured(const int level) {
+        if (impl_->element_type == HEX8) {
+            impl_->semi_structured_mesh = std::make_shared<SemiStructuredMesh>(impl_->mesh, level);
+            impl_->element_type = PROTEUS_HEX8;
+            impl_->nlocal = impl_->semi_structured_mesh->n_nodes() * impl_->block_size;
+            impl_->nglobal = impl_->nlocal;
+            return SFEM_SUCCESS;
+        }
+
+        return SFEM_FAILURE;
+    }
+
     FunctionSpace::~FunctionSpace() = default;
 
     bool FunctionSpace::has_semi_structured_mesh() const {
@@ -892,8 +904,8 @@ namespace sfem {
                         path,
                         SFEM_MPI_REAL_T,
                         x,
-                        mesh->nnodes * impl_->space->block_size(),
-                        mesh->nnodes * impl_->space->block_size())) {
+                        impl_->space->n_dofs(),
+                        impl_->space->n_dofs())) {
             return SFEM_FAILURE;
         }
 
@@ -921,8 +933,8 @@ namespace sfem {
                         path,
                         SFEM_MPI_REAL_T,
                         x,
-                        mesh->nnodes * impl_->space->block_size(),
-                        mesh->nnodes * impl_->space->block_size())) {
+                        impl_->space->n_dofs(),
+                        impl_->space->n_dofs())) {
             return SFEM_FAILURE;
         }
 
@@ -986,20 +998,6 @@ namespace sfem {
     std::shared_ptr<CRSGraph> Function::crs_graph() const {
         return impl_->space->dof_to_dof_graph();
     }
-
-    // int Function::create_crs_graph(ptrdiff_t *nlocal,
-    //                                ptrdiff_t *nglobal,
-    //                                ptrdiff_t *nnz,
-    //                                count_t **rowptr,
-    //                                idx_t **colidx) {
-    //     SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.create_crs_graph);
-
-    //     return impl_->space->create_crs_graph(nlocal, nglobal, nnz, rowptr, colidx);
-    // }
-
-    // int Function::destroy_crs_graph(count_t *rowptr, idx_t *colidx) {
-    //     return impl_->space->destroy_crs_graph(rowptr, colidx);
-    // }
 
     int Function::hessian_crs(const real_t *const x,
                               const count_t *const rowptr,
@@ -1332,7 +1330,7 @@ namespace sfem {
                 return nullptr;
             }
 
-            assert(space.element_type() == PROTEUS_HEX8);   // REMOVEME once generalized approach
+            assert(space->element_type() == PROTEUS_HEX8);  // REMOVEME once generalized approach
             auto ret = std::make_unique<SemiStructuredLinearElasticity>(space);
 
             real_t SFEM_SHEAR_MODULUS = 1;
@@ -1354,7 +1352,7 @@ namespace sfem {
 
         std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
             assert(false);
-            fprintf(stderr, "[Error] SemiStructuredLinearElasticity::lor_op NOT IMPLEMENTED!\n");
+            fprintf(stderr, "[Error] ss:LinearElasticity::lor_op NOT IMPLEMENTED!\n");
             return nullptr;
         }
 
@@ -1367,7 +1365,7 @@ namespace sfem {
             return ret;
         }
 
-        const char *name() const override { return "SemiStructuredLinearElasticity"; }
+        const char *name() const override { return "ss:LinearElasticity"; }
         inline bool is_linear() const override { return true; }
 
         int initialize() override { return SFEM_SUCCESS; }
@@ -2186,6 +2184,8 @@ namespace sfem {
 
         if (instance_.impl_->name_to_create.empty()) {
             instance_.private_register_op("LinearElasticity", LinearElasticity::create);
+            instance_.private_register_op("ss:LinearElasticity",
+                                          SemiStructuredLinearElasticity::create);
             instance_.private_register_op("Laplacian", Laplacian::create);
             instance_.private_register_op("CVFEMUpwindConvection", CVFEMUpwindConvection::create);
             instance_.private_register_op("Mass", Mass::create);
@@ -2216,11 +2216,17 @@ namespace sfem {
                                            const char *name) {
         assert(instance().impl_);
 
+        std::string m_name = name;
+
+        if (space->has_semi_structured_mesh()) {
+            m_name = "ss:" + m_name;
+        }
+
         auto &ntc = instance().impl_->name_to_create;
-        auto it = ntc.find(name);
+        auto it = ntc.find(m_name);
 
         if (it == ntc.end()) {
-            std::cerr << "Unable to find op " << name << "\n";
+            std::cerr << "Unable to find op " << m_name << "\n";
             return nullptr;
         }
 
