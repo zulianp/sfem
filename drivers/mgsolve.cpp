@@ -76,6 +76,7 @@ int main(int argc, char *argv[]) {
     int SFEM_WRITE_OUTPUT = 1;
     float SFEM_CHEB_EIG_MAX_SCALE = 1.02;
     float SFEM_TOL = 1e-9;
+    double SFEM_COARSE_TOL = 1e-10;
     double SFEM_CHEB_EIG_TOL = 1e-5;
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     int SFEM_VERBOSITY_LEVEL = 1;
@@ -95,6 +96,7 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_CHEB_EIG_MAX_SCALE, atof);
     SFEM_READ_ENV(SFEM_TOL, atof);
     SFEM_READ_ENV(SFEM_VERBOSITY_LEVEL, atoi);
+    SFEM_READ_ENV(SFEM_COARSE_TOL, atof);
 
     SFEM_READ_ENV(SFEM_SMOOTHER_SWEEPS, atoi);
     SFEM_READ_ENV(SFEM_CHEB_EIG_TOL, atof);
@@ -306,7 +308,7 @@ int main(int argc, char *argv[]) {
         {
             solver_coarse->verbose = SFEM_VERBOSITY_LEVEL >= 2;
             solver_coarse->set_max_it(40000);
-            solver_coarse->set_atol(1e-14);
+            solver_coarse->set_atol(SFEM_COARSE_TOL);
             solver_coarse->set_rtol(1e-9);
 
             if (SFEM_USE_PRECONDITIONER) {
