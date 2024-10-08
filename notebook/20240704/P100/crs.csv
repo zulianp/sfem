@@ -1,0 +1,17 @@
+rep,geo,op_type,ref,ptype,TTS [s],throughput [GB/s],nelements,ndofs,nnz
+crs,cylinder,Laplacian,0,scalar,1.37888e-05,6.61116,0,11395,156423
+crs,cylinder,LinearElasticity,0,vector,5.51744e-05,4.95665,0,34185,1407807
+crs,cylinder,Laplacian,1,scalar,6.82048e-05,9.842,0,83909,1201997
+crs,cylinder,LinearElasticity,1,vector,0.00033793,5.95928,0,251727,10817973
+crs,cylinder,Laplacian,2,scalar,0.00043399,11.8519,0,642953,9420441
+crs,cylinder,LinearElasticity,2,vector,0.00252228,6.11784,0,1928859,84783969
+crs,cylinder,Laplacian,3,scalar,0.00327686,12.2842,0,5031697,74585393
+crs,cylinder,LinearElasticity,3,vector,0.0195226,6.18569,0,15095091,671268537
+crs,sphere,Laplacian,0,scalar,8.4896e-06,1.13268,0,1202,15132
+crs,sphere,LinearElasticity,0,vector,1.09408e-05,2.63674,0,3606,136188
+crs,sphere,Laplacian,1,scalar,1.05952e-05,6.16657,0,8167,111571
+crs,sphere,LinearElasticity,1,vector,4.16096e-05,4.71064,0,24501,1004139
+crs,sphere,Laplacian,2,scalar,4.93824e-05,9.69884,0,59869,855573
+crs,sphere,LinearElasticity,2,vector,0.000242458,5.92622,0,179607,7700157
+crs,sphere,Laplacian,3,scalar,0.000309776,11.8207,0,457721,6698473
+crs,sphere,LinearElasticity,3,vector,0.00178738,6.14605,0,1373163,60286257

@@ -69,7 +69,7 @@ void read_boundary_conditions(MPI_Comm comm,
     }
 
     if (values) {
-        static const const char *path_key = "path:";
+        static const char *path_key = "path:";
         const int path_key_len = strlen(path_key);
 
         const char *pch = strtok(values, splitter);

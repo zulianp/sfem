@@ -90,9 +90,9 @@ int main(int argc, char *argv[]) {
                 // h_d->print(std::cout);
 
                 solver->set_preconditioner_op(sfem::make_op<real_t>(
-                    b_x->size(), b_x->size(), [=](const real_t *const x, real_t *const y) {
-                        d_ediv(b_d->size(), x, b_d->data(), y);
-                    }));
+                        b_x->size(), b_x->size(), [=](const real_t *const x, real_t *const y) {
+                            d_ediv(b_d->size(), x, b_d->data(), y);
+                        }, sfem::EXECUTION_SPACE_DEVICE));
             } else {
                 fprintf(stderr, "[Warning] Preconditioner unavailable for mesh %s\n", folder);
             }
@@ -146,21 +146,22 @@ int main(int argc, char *argv[]) {
 
                 // Fine level
                 {
-                    std::shared_ptr<sfem::Operator<real_t>> fine_op =
-                        sfem::make_op<real_t>(lor_fs->n_dofs(),
-                                              lor_fs->n_dofs(),
-                                              [=](const real_t *const x, real_t *const y) {
-                                                  lor_f->apply(nullptr, x, y);
-                                                  // lor_f->apply_zero_constraints(y);
-                                              });
+                    std::shared_ptr<sfem::Operator<real_t>> fine_op = sfem::make_op<real_t>(
+                            lor_fs->n_dofs(),
+                            lor_fs->n_dofs(),
+                            [=](const real_t *const x, real_t *const y) {
+                                lor_f->apply(nullptr, x, y);
+                            },
+                            lor_f->execution_space());
 
                     std::shared_ptr<sfem::Operator<real_t>> fine_residual_op =
-                        sfem::make_op<real_t>(lor_fs->n_dofs(),
-                                              lor_fs->n_dofs(),
-                                              [=](const real_t *const x, real_t *const y) {
-                                                  lor_f->gradient(x, y);
-                                                  // lor_f->apply_zero_constraints(y);
-                                              });
+                            sfem::make_op<real_t>(
+                                    lor_fs->n_dofs(),
+                                    lor_fs->n_dofs(),
+                                    [=](const real_t *const x, real_t *const y) {
+                                        lor_f->gradient(x, y);
+                                    },
+                                    lor_f->execution_space());
 
                     auto fine_smoother = sfem::h_cg<real_t>();
                     fine_smoother->set_n_dofs(fs->n_dofs());
@@ -173,21 +174,24 @@ int main(int argc, char *argv[]) {
 
                 // Coarse level
                 {
-                    std::shared_ptr<sfem::Operator<real_t>> coarse_op =
-                        sfem::make_op<real_t>(coarse_fs->n_dofs(),
-                                              coarse_fs->n_dofs(),
-                                              [=](const real_t *const x, real_t *const y) {
-                                                  coarse_f->apply(nullptr, x, y);
-                                                  // coarse_f->apply_zero_constraints(y);
-                                              });
+                    std::shared_ptr<sfem::Operator<real_t>> coarse_op = sfem::make_op<real_t>(
+                            coarse_fs->n_dofs(),
+                            coarse_fs->n_dofs(),
+                            [=](const real_t *const x, real_t *const y) {
+                                coarse_f->apply(nullptr, x, y);
+                                // coarse_f->apply_zero_constraints(y);
+                            },
+                            coarse_f->execution_space());
 
                     std::shared_ptr<sfem::Operator<real_t>> coarse_residual_op =
-                        sfem::make_op<real_t>(coarse_fs->n_dofs(),
-                                              coarse_fs->n_dofs(),
-                                              [=](const real_t *const x, real_t *const y) {
-                                                  coarse_f->gradient(x, y);
-                                                  // coarse_f->apply_zero_constraints(y);
-                                              });
+                            sfem::make_op<real_t>(
+                                    coarse_fs->n_dofs(),
+                                    coarse_fs->n_dofs(),
+                                    [=](const real_t *const x, real_t *const y) {
+                                        coarse_f->gradient(x, y);
+                                        // coarse_f->apply_zero_constraints(y);
+                                    },
+                                    coarse_f->execution_space());
 
                     auto coarse_grid_solver = sfem::h_cg<real_t>();
                     coarse_grid_solver->set_n_dofs(coarse_fs->n_dofs());
@@ -203,14 +207,14 @@ int main(int argc, char *argv[]) {
 
                 if (f->hessian_diag(b_x->data(), b_d->data()) == 0) {
                     solver->set_preconditioner_op(sfem::make_op<real_t>(
-                        b_x->size(), b_x->size(), [=](const real_t *const x, real_t *const y) {
-                            auto d = b_d->data();
+                            b_x->size(), b_x->size(), [=](const real_t *const x, real_t *const y) {
+                                auto d = b_d->data();
 
 #pragma omp parallel for
-                            for (ptrdiff_t i = 0; i < b_d->size(); ++i) {
-                                y[i] = x[i] / d[i];
-                            }
-                        }));
+                                for (ptrdiff_t i = 0; i < b_d->size(); ++i) {
+                                    y[i] = x[i] / d[i];
+                                }
+                            }, sfem::EXECUTION_SPACE_HOST));
                 } else {
                     fprintf(stderr, "[Warning] Preconditioner unavailable for mesh %s\n", folder);
                 }
@@ -222,9 +226,9 @@ int main(int argc, char *argv[]) {
     // Solver set-up
     // -------------------------------
     solver->set_op(sfem::make_op<real_t>(
-        fs->n_dofs(), fs->n_dofs(), [=](const real_t *const v, real_t *const w) {
-            f->apply(nullptr, v, w);
-        }));
+            fs->n_dofs(), fs->n_dofs(), [=](const real_t *const v, real_t *const w) {
+                f->apply(nullptr, v, w);
+            }, f->execution_space()));
 
     // -------------------------------
     // Solve

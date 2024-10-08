@@ -12,6 +12,10 @@ namespace sfem {
     void register_device_ops();
     std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc);
 
+    std::shared_ptr<Buffer<idx_t>> create_device_elements(
+            const std::shared_ptr<FunctionSpace> &space,
+            const enum ElemType element_type);
+
     template <typename T>
     std::shared_ptr<Buffer<T>> d_buffer(const std::ptrdiff_t n) {
         auto ret = std::make_shared<Buffer<T>>(
@@ -25,13 +29,24 @@ namespace sfem {
     		return in;
     	}
 
-        T *buff = d_buffer_alloc(in->size() * sizeof(T));
+        T *buff = (T*)d_buffer_alloc(in->size() * sizeof(T));
         // cudaMemcpy(buff, in->data(), in->size() * sizeof(T), cudaMemcpyHostToDevice);
-        host_to_device(in->size(), in->data(), buff);
+        buffer_host_to_device(in->size() * sizeof(T), in->data(), buff);
 
         return
             std::make_shared<Buffer<T>>(in->size(), buff, &d_buffer_destroy, MEMORY_SPACE_DEVICE);
     }
+
+
+    inline std::shared_ptr<CRSGraph> to_device(const std::shared_ptr<CRSGraph> &in) {
+        if(in->rowptr()->mem_space() == MEMORY_SPACE_DEVICE) {
+            return in;
+        }
+
+        return
+            std::make_shared<CRSGraph>(to_device(in->rowptr()), to_device(in->colidx()));
+    }
+
 
     template <typename T>
     std::shared_ptr<Buffer<T>> to_host(const std::shared_ptr<Buffer<T>> &in) {

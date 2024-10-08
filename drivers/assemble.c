@@ -24,11 +24,11 @@ ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
     MPI_Status status;
     MPI_Offset nbytes;
     MPI_File file;
-    CATCH_MPI_ERROR(MPI_File_open(comm, path, MPI_MODE_RDONLY, MPI_INFO_NULL, &file));
-    CATCH_MPI_ERROR(MPI_File_get_size(file, &nbytes));
+    MPI_CATCH_ERROR(MPI_File_open(comm, path, MPI_MODE_RDONLY, MPI_INFO_NULL, &file));
+    MPI_CATCH_ERROR(MPI_File_get_size(file, &nbytes));
     *data = malloc(nbytes);
 
-    CATCH_MPI_ERROR(MPI_File_read_at_all(file, 0, *data, nbytes, MPI_CHAR, &status));
+    MPI_CATCH_ERROR(MPI_File_read_at_all(file, 0, *data, nbytes, MPI_CHAR, &status));
     return nbytes;
 }
 
@@ -63,22 +63,26 @@ int main(int argc, char *argv[]) {
     int SFEM_HANDLE_NEUMANN = 0;
     int SFEM_HANDLE_RHS = 0;
     int SFEM_EXPORT_FP32 = 0;
+    int SFEM_USE_MACRO = 0;
+    
 
     SFEM_READ_ENV(SFEM_LAPLACIAN, atoi);
     SFEM_READ_ENV(SFEM_HANDLE_DIRICHLET, atoi);
     SFEM_READ_ENV(SFEM_EXPORT_FP32, atoi);
     SFEM_READ_ENV(SFEM_HANDLE_NEUMANN, atoi);
     SFEM_READ_ENV(SFEM_HANDLE_RHS, atoi);
+    SFEM_READ_ENV(SFEM_USE_MACRO, atoi);
 
     printf("----------------------------------------\n");
     printf(
         "Environment variables:\n- SFEM_LAPLACIAN=%d\n- SFEM_HANDLE_DIRICHLET=%d\n- "
-        "SFEM_HANDLE_NEUMANN=%d\n- SFEM_HANDLE_RHS=%d\n- SFEM_EXPORT_FP32=%d\n",
+        "SFEM_HANDLE_NEUMANN=%d\n- SFEM_HANDLE_RHS=%d\n- SFEM_EXPORT_FP32=%d\n- SFEM_USE_MACRO=%d\n",
         SFEM_LAPLACIAN,
         SFEM_HANDLE_DIRICHLET,
         SFEM_HANDLE_NEUMANN,
         SFEM_HANDLE_RHS,
-        SFEM_EXPORT_FP32);
+        SFEM_EXPORT_FP32,
+        SFEM_USE_MACRO);
     printf("----------------------------------------\n");
 
     MPI_Datatype value_type = SFEM_EXPORT_FP32 ? MPI_FLOAT : MPI_DOUBLE;
@@ -94,6 +98,10 @@ int main(int argc, char *argv[]) {
     mesh_t mesh;
     if (mesh_read(comm, folder, &mesh)) {
         return EXIT_FAILURE;
+    }
+
+    if(SFEM_USE_MACRO) {
+        mesh.element_type = macro_type_variant(mesh.element_type);
     }
 
     double tack = MPI_Wtime();
@@ -123,7 +131,7 @@ int main(int argc, char *argv[]) {
     // Operator assembly
     ///////////////////////////////////////////////////////////////////////////////
     if (SFEM_LAPLACIAN) {
-        laplacian_assemble_hessian(mesh.element_type,
+        laplacian_crs(mesh.element_type,
                                    mesh.nelements,
                                    mesh.nnodes,
                                    mesh.elements,

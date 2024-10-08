@@ -27,11 +27,11 @@ ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
     MPI_Status status;
     MPI_Offset nbytes;
     MPI_File file;
-    CATCH_MPI_ERROR(MPI_File_open(comm, path, MPI_MODE_RDONLY, MPI_INFO_NULL, &file));
-    CATCH_MPI_ERROR(MPI_File_get_size(file, &nbytes));
+    MPI_CATCH_ERROR(MPI_File_open(comm, path, MPI_MODE_RDONLY, MPI_INFO_NULL, &file));
+    MPI_CATCH_ERROR(MPI_File_get_size(file, &nbytes));
     *data = malloc(nbytes);
 
-    CATCH_MPI_ERROR(MPI_File_read_at_all(file, 0, *data, nbytes, MPI_CHAR, &status));
+    MPI_CATCH_ERROR(MPI_File_read_at_all(file, 0, *data, nbytes, MPI_CHAR, &status));
     return nbytes;
 }
 
@@ -135,7 +135,7 @@ int main(int argc, char *argv[]) {
                 break;
             }
             case TET4: {
-                tet4_laplacian_assemble_hessian(mesh.nelements,
+                tet4_laplacian_crs(mesh.nelements,
                                                       mesh.nnodes,
                                                       mesh.elements,
                                                       mesh.points,

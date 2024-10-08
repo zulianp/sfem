@@ -117,7 +117,9 @@ void tri3_apply_mass(const ptrdiff_t nelements,
                      const ptrdiff_t nnodes,
                      idx_t **const SFEM_RESTRICT elems,
                      geom_t **const SFEM_RESTRICT xyz,
+                     const ptrdiff_t stride_x,
                      const real_t *const x,
+                     const ptrdiff_t stride_values,
                      real_t *const values) {
     SFEM_UNUSED(nnodes);
 
@@ -143,7 +145,7 @@ void tri3_apply_mass(const ptrdiff_t nelements,
             const idx_t i2 = ev[2];
 
             for (int enode = 0; enode < 3; ++enode) {
-                element_x[enode] = x[ev[enode]];
+                element_x[enode] = x[ev[enode]*stride_x];
             }
 
             tri3_apply_mass_kernel(
@@ -162,7 +164,7 @@ void tri3_apply_mass(const ptrdiff_t nelements,
 #pragma unroll(3)
             for (int edof_i = 0; edof_i < 3; edof_i++) {
 #pragma omp atomic update
-                values[ev[edof_i]] += element_vector[edof_i];
+                values[ev[edof_i]*stride_values] += element_vector[edof_i];
             }
         }
     }

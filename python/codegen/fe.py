@@ -1,6 +1,8 @@
 
 
 import sympy as sp
+from sfem_codegen import adjugate
+from sfem_codegen import norm2
 from sfem_codegen import c_gen
 from sfem_codegen import c_log
 from sfem_codegen import q as quadrature_point
@@ -153,6 +155,9 @@ class FE:
 
 		return g
 
+	def is_isoparametric(self):
+		return False
+
 	def isoparametric_transform(self, q):
 		p = self.coords()
 		f = self.fun(q)
@@ -176,6 +181,8 @@ class FE:
 					ret[d1, d2] += p[d1][i] * g[i][d2]
 		return ret
 
+	def adj(self, q):
+		return  self.jacobian_inverse(q) * self.jacobian_determinant(q)
 
 	def quadrature_weight(self):
 		return sp.symbols('qw')
@@ -200,12 +207,23 @@ class FE:
 				sls.append(var)
 		return sp.Matrix(rows, cols, sls)
 
-	def symbol_jacobian_inverse_as_adjugate(self):
+	def symbol_adjugate(self):
 		rows = self.manifold_dim()
 		cols = self.spatial_dim()
 
 		coff = matrix_coeff('adjugate', rows, cols)
+		return coff
+
+	def symbol_jacobian_inverse_as_adjugate(self):
+		coff = self.symbol_adjugate()
 		return coff / self.symbol_jacobian_determinant()
+
+	def symbol_normal(self):
+		A = self.symbol_adjugate().T
+		n = A[:, self.manifold_dim()-1]
+		print(A)
+		n /= norm2(n)
+		return n
 
 	def symbol_jacobian(self):
 		rows = self.spatial_dim()
@@ -219,8 +237,6 @@ class FE:
 				# var = sp.symbols(f'jac_inv_{i*cols + j}]')
 				sls.append(var)
 		return sp.Matrix(rows, cols, sls)
-
-
 
 	def symbol_jacobian_determinant(self):
 		return sp.symbols('jacobian_determinant')

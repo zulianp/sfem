@@ -17,7 +17,8 @@ include(CMakePackageConfigHelpers)
 include(cmake/SFEMCompilerFeatures.cmake)
 include(cmake/SFEMVersion.cmake)
 include(cmake/SFEMDefaults.cmake)
-include(cmake/SFEMOptions.cmake)
+include(cmake/SFEMOptions.cmake) 
+include(cmake/SFEMNumbers.cmake) # More options here
 include(cmake/SFEMBuildTypes.cmake)
 include(cmake/SFEMCMakeFunctions.cmake)
 include(cmake/SFEMDependencies.cmake)
@@ -36,6 +37,7 @@ find_package(ISolver REQUIRED)
 
 set(SFEM_MODULES
     algebra base matrix mesh pizzastack solver
+    algebra/openmp
     operators 
     operators/beam2 
     operators/cvfem 
@@ -44,18 +46,28 @@ set(SFEM_MODULES
     # operators/phase_field_for_fracture
     operators/tet10
     operators/tet4
+    operators/tet4/vectorized
     operators/tri3
     operators/tri6
     operators/trishell3
+    operators/quadshell4
     operators/cvfem_tri3
     operators/cvfem_tet4
     operators/cvfem_quad4
     operators/macro_tri3
     operators/macro_tet4
+    operators/proteus_tet4
+    operators/proteus_hex8
     operators/hierarchical
-    resampling
-    resampling/tet10
+    operators/hex8
+)
+
+if(SFEM_ENABLE_RESAMPLING)
+    list(APPEND SFEM_MODULES
+        resampling
+        resampling/tet10
     )
+endif()
 
 list(APPEND SFEM_MODULES frontend)
 
@@ -68,6 +80,12 @@ if(SFEM_ENABLE_CUDA)
         algebra/cuda
         operators/cuda
         frontend/cuda
+        operators/tet4/cuda
+        operators/macro_tet4/cuda
+        operators/tet10/cuda
+        operators/proteus_tet4/cuda
+        operators/proteus_hex8/cuda
+        operators/hierarchical/cuda
         )
 endif()
 
@@ -93,6 +111,9 @@ endif()
 # message(STATUS "SFEM_HEADERS: ${SFEM_HEADERS}") 
 # message(STATUS "SFEM_SOURCES: ${SFEM_SOURCES}")
 # message(STATUS "SFEM_KERNEL_SOURCES: ${SFEM_KERNEL_SOURCES}")
+message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
+message(STATUS "CMAKE_C_FLAGS: ${CMAKE_C_FLAGS}")
+
 
 add_library(sfem ${SFEM_SOURCES} ${SFEM_HEADERS})
 
@@ -103,6 +124,9 @@ foreach(include ${SFEM_BUILD_INCLUDES})
     target_include_directories(sfem BEFORE
      PUBLIC $<BUILD_INTERFACE:${include}>)
 endforeach()
+
+target_include_directories(sfem BEFORE
+     PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/external>)
 
 target_include_directories(
     sfem BEFORE
@@ -150,6 +174,14 @@ set(DRIVERS "${C_DRIVERS};${CPP_DRIVERS};${C_EXAMPLES}")
 
 list(APPEND SFEM_EXCLUDED_EXEC "ssolve")
 
+if(SFEM_ENABLE_RESAMPLING)
+    file(GLOB RESAMPLING_C_EXAMPLES CONFIGURE_DEPENDS "drivers/resampling/*.c")
+    file(GLOB RESAMPLING_CXX_EXAMPLES CONFIGURE_DEPENDS "drivers/resampling/*.cpp")
+
+    list(APPEND DRIVERS "${RESAMPLING_C_EXAMPLES}")
+    list(APPEND DRIVERS "${RESAMPLING_CXX_EXAMPLES}")
+endif()
+
 if(SFEM_ENABLE_CUDA)
     file(GLOB CUDA_C_EXAMPLES CONFIGURE_DEPENDS "drivers/cuda/*.c")
     file(GLOB CUDA_CXX_EXAMPLES CONFIGURE_DEPENDS "drivers/cuda/*.cpp")
@@ -160,12 +192,15 @@ else()
     list(APPEND SFEM_EXCLUDED_EXEC "run_poisson_cuda;cuda_do_spmv;lapl_matrix_free;linear_elasticity_matrix_free")
 endif()
 
+if(NOT SFEM_ENABLE_CUSPARSE)
+    # FIXME
+    list(APPEND SFEM_EXCLUDED_EXEC "cuda_do_spmv")
+endif()
+
 foreach(DRIVER ${DRIVERS})
     get_filename_component(DRIVER_NAME ${DRIVER} NAME_WE)
     list(FIND SFEM_EXCLUDED_EXEC "${DRIVER_NAME}" LIST_INDEX)
 
-    
-    
     if (${LIST_INDEX} GREATER -1)
         message(STATUS "Skipped DRIVER_NAME: ${DRIVER_NAME}")
     else()
@@ -204,21 +239,21 @@ install(
     ARCHIVE DESTINATION lib)
 
 configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/configuration/sfem_config.hpp.in
-    ${CMAKE_BINARY_DIR}/sfem_config.hpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/configuration/sfem_config.h.in
+    ${CMAKE_BINARY_DIR}/sfem_config.h)
 
-install(FILES ${CMAKE_BINARY_DIR}/sfem_config.hpp DESTINATION include)
+install(FILES ${CMAKE_BINARY_DIR}/sfem_config.h DESTINATION include)
 
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/configuration/sfem_config.py.in
-    ${CMAKE_CURRENT_SOURCE_DIR}/python/sfem/sfem_config.py)
+    ${CMAKE_BINARY_DIR}/sfem_config.py)
 
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/configuration/sfem_config.sh.in
-    ${CMAKE_CURRENT_SOURCE_DIR}/workflows/sfem_config.sh)
+    ${CMAKE_BINARY_DIR}/sfem_config.sh)
 
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/python/sfem/sfem_config.py DESTINATION scripts/sfem)
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/workflows/sfem_config.sh DESTINATION workflows)
+install(FILES ${CMAKE_BINARY_DIR}/sfem_config.py DESTINATION scripts/sfem)
+install(FILES ${CMAKE_BINARY_DIR}/sfem_config.sh DESTINATION workflows)
 
 install(FILES ${SFEM_HEADERS} DESTINATION include)
 
@@ -232,7 +267,7 @@ install(
 # Python scripts
 ######################################################
 
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/python/sfem DESTINATION scripts)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/python/sfem DESTINATION scripts USE_SOURCE_PERMISSIONS)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/python/requirements.txt DESTINATION scripts)
 
 
@@ -272,3 +307,10 @@ if(TARGET cuda_do_spmv)
                            cuspmv
                        COMMENT "Copying 'cuda_do_spmv' executable to 'cuspmv'")
 endif()
+
+
+add_custom_command(TARGET do_spmv  POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy
+                       $<TARGET_FILE:do_spmv>
+                       spmv
+                   COMMENT "Copying 'do_spmv' executable to 'spmv'")

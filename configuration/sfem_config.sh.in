@@ -1,28 +1,28 @@
-export SFEM_INDEX_BITSIZE=@SFEM_INDEX_BITSIZE@
-export SFEM_COUNT_BITSIZE=@SFEM_COUNT_BITSIZE@
-
-if [[ $SFEM_COUNT_BITSIZE -eq 64 ]]
-then
-	export py_sfem_count_t="int64"
-	export sfem_count_size=8
-else
-	export py_sfem_count_t="int32"
-	export sfem_count_size=4
-fi
-
-if [[ $SFEM_INDEX_BITSIZE -eq 64 ]]
-then
-	export py_sfem_idx_t="int64"
-	export sfem_idx_size=8
-else
-	export py_sfem_idx_t="int32"
-	export sfem_idx_size=4
-fi
-
-export py_sfem_real_t="float64"
-export sfem_real_size=8
-
-export py_sfem_geom_t="float32"
-export sfem_geom_size=4
-
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+
+# Automatically filled with CMake
+export SFEM_GEOM_T="@SFEM_GEOM_TYPE@"
+export SFEM_GEOM_SIZE=@SFEM_GEOM_SIZE@
+
+export SFEM_REAL_T="@SFEM_REAL_TYPE@"
+export SFEM_REAL_SIZE=@SFEM_REAL_SIZE@
+
+export SFEM_SCALAR_T="@SFEM_SCALAR_TYPE@"
+export SFEM_SCALAR_SIZE=@SFEM_SCALAR_SIZE@
+
+export SFEM_JACOBIAN_T="@SFEM_JACOBIAN_CPU_TYPE@"
+export SFEM_JACOBIAN_SIZE=@SFEM_JACOBIAN_CPU_SIZE@
+
+export SFEM_IDX_T="@SFEM_IDX_TYPE@"
+export SFEM_IDX_SIZE=@SFEM_IDX_SIZE@
+
+export SFEM_COUNT_T="@SFEM_COUNT_TYPE@"
+export SFEM_COUNT_SIZE=@SFEM_COUNT_SIZE@
+
+export SFEM_ELEMENT_IDX_T="@SFEM_ELEMENT_IDX_TYPE@"
+export SFEM_ELEMENT_IDX_SIZE=@SFEM_ELEMENT_IDX_SIZE@
+
+export SFEM_LOCAL_IDX_T="@SFEM_LOCAL_IDX_TYPE@"
+export SFEM_LOCAL_IDX_SIZE=@SFEM_LOCAL_IDX_SIZE@
+
+export SFEM_VEC_SIZE=@SFEM_VEC_SIZE@

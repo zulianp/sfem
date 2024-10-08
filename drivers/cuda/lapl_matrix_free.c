@@ -17,7 +17,9 @@
 #include "sfem_defs.h"
 #include "sfem_mesh.h"
 
-#include "laplacian_incore_cuda.h"
+#include "cu_laplacian.h"
+#include "cu_tet4_fff.h"
+#include "sfem_cuda_blas.h"
 
 /*
 Architecture:            x86_64
@@ -153,8 +155,13 @@ int main(int argc, char *argv[]) {
         cudaDeviceSynchronize();
         CHECK_CUDA(cudaPeekAtLastError());
 
-        cuda_incore_laplacian_t ctx;
-        cuda_incore_laplacian_init(elem_type, &ctx, mesh.nelements, mesh.elements, mesh.points);
+        // FIXME hardcoded for tets
+        void *d_fff = 0;
+        cu_tet4_fff_allocate(mesh.nelements, &d_fff);
+        cu_tet4_fff_fill(mesh.nelements, mesh.elements, mesh.points, d_fff);
+
+        idx_t *d_elements;
+        elements_to_device(mesh.nelements, elem_num_nodes(elem_type), mesh.elements, &d_elements);
 
         cudaEvent_t start, stop;
         cudaEventCreate(&start);
@@ -169,7 +176,15 @@ int main(int argc, char *argv[]) {
         // ---------------------------------------------------
 
         for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
-            cuda_incore_laplacian_apply(&ctx, d_x, d_y);
+            cu_laplacian_apply(elem_type,
+                               mesh.nelements,
+                               mesh.nelements, // stride
+                               d_elements,
+                               d_fff,
+                               SFEM_REAL_DEFAULT,
+                               d_x,
+                               d_y,
+                               SFEM_DEFAULT_STREAM);
         }
 
         // ---------------------------------------------------
@@ -191,6 +206,12 @@ int main(int argc, char *argv[]) {
             double avg_time = (mf_tock - mf_tick) / SFEM_REPEAT;
             double avg_throughput = (nnodes / avg_time) * (sizeof(real_t) * 1e-9);
             printf("mf: %g %g %ld %ld %ld\n", avg_time, avg_throughput, mesh.nelements, nnodes, 0l);
+
+            if(elem_type == MACRO_TET4) {
+                printf("macrotet4: %g [muE/s]\n", (mesh.nelements * 8)/avg_time);
+            } else {
+                printf("Nothing special for %s\n", type_to_string(elem_type));
+            }
         }
 
         {  // Using CUDA perf-counter (from ms to s)
@@ -204,7 +225,8 @@ int main(int argc, char *argv[]) {
         CHECK_CUDA(cudaFree(d_x));
         CHECK_CUDA(cudaFree(d_y));
 
-        cuda_incore_laplacian_destroy(&ctx);
+        d_buffer_destroy(d_fff);
+        d_buffer_destroy(d_elements);
     }
 
     array_write(comm, output_path, SFEM_MPI_REAL_T, y, nnodes, nnodes);

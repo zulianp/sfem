@@ -13,7 +13,84 @@ except ImportError:
 idx_t = np.int32
 geom_t = np.float32
 
+def leading_dim(nx, ny, nz):
+    return [nz,  nz*nx, 1]
+
+def create_boundary_nodes(nx, ny, nz):
+    ld = leading_dim(nx, ny, nz)
+
+    left = np.zeros(ny*nz, dtype=idx_t)
+    right = np.zeros(ny*nz, dtype=idx_t)
+
+    top = np.zeros(nx*nz, dtype=idx_t)
+    bottom = np.zeros(nx*nz, dtype=idx_t)
+
+    front = np.zeros(nx*ny, dtype=idx_t)
+    back = np.zeros(nx*ny, dtype=idx_t)
+
+    idx = 0
+    for zi in range(0, nz):
+        for yi in range(0, ny):
+
+            xl = 0 * ld[0]
+            xr = (nx - 1) * ld[0]
+
+            yp = yi * ld[1]
+            zp = zi * ld[2]
+            p = yp + zp
+
+            left[idx]  = xl + p
+            right[idx] = xr + p
+
+            idx += 1
+
+    idx = 0 
+    for zi in range(0, nz):
+        for xi in range(0, nx):
+            
+            yb = 0 * ld[1]
+            yt = (ny - 1) * ld[1]
+
+            xp = yi * ld[1]
+            zp = zi * ld[2]
+
+            p = xp + zp
+
+            bottom[idx]  = yb + p
+            top[idx]     = yt + p
+
+            idx += 1
+
+    idx = 0 
+    for yi in range(0, ny):
+        for xi in range(0, nx):
+            
+            zf = 0 * ld[2]
+            zb = (nz - 1) * ld[2]
+
+            xp = yi * ld[1]
+            yp = yi * ld[1]
+
+            p = xp + yp
+
+            front[idx] = zf + p
+            back[idx]  = zb + p
+
+            idx += 1
+
+    return {
+        "left"      : left,
+        "right"     : right,
+        "top"       : top,
+        "bottom"    : bottom,
+        "front"     : front,
+        "back"      : back
+    }
+
+
 def create(w, h, t, nx, ny, nz, cell_type):
+    cell_type = cell_type.lower()
+    
     gx = np.linspace(0, w, num=nx, dtype=geom_t)
     gy = np.linspace(0, h, num=ny, dtype=geom_t)
     gz = np.linspace(0, t, num=nz, dtype=geom_t)
@@ -21,7 +98,8 @@ def create(w, h, t, nx, ny, nz, cell_type):
     x, y, z = np.meshgrid(gx, gy, gz)
 
     # ld = [ 1, nx, nx * ny ]
-    ld = [ nz,  nz*nx, 1]
+    # ld = [ nz,  nz*nx, 1]
+    ld = leading_dim(nx, ny, nz)
 
     x = np.reshape(x, x.shape[0] * x.shape[1] * x.shape[2])
     y = np.reshape(y, y.shape[0] * y.shape[1] * y.shape[2])
@@ -211,7 +289,6 @@ def create(w, h, t, nx, ny, nz, cell_type):
                         i3[count] = hexa[7]
                         count += 1
 
-
         idx.append(i0)
         idx.append(i1)
         idx.append(i2)
@@ -287,3 +364,11 @@ if __name__ == '__main__':
     for d in range(0, len(idx)):
         idx[d].tofile(f'{output_folder}/i{d}.raw')
 
+    boundary_nodes_dir = f'{output_folder}/boundary_nodes'
+    if not os.path.exists(boundary_nodes_dir):
+        os.mkdir(f'{boundary_nodes_dir}')
+
+    boundary_nodes = create_boundary_nodes(nx, ny, nz)
+    for k, v in boundary_nodes.items():
+        name = f'{k}.{str(idx_t.__name__)}.raw'
+        v.tofile(f'{boundary_nodes_dir}/{name}')

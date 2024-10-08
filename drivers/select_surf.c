@@ -94,11 +94,12 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    int SFEM_ELEMENT_TYPE = mesh.element_type;
-    SFEM_READ_ENV(SFEM_ELEMENT_TYPE, atoi);
-    mesh.element_type = SFEM_ELEMENT_TYPE;
+    const char* SFEM_ELEMENT_TYPE = type_to_string(mesh.element_type);
+    SFEM_READ_ENV(SFEM_ELEMENT_TYPE, );
+    mesh.element_type = type_from_string(SFEM_ELEMENT_TYPE);
 
     int nxe = elem_num_nodes(mesh.element_type);
+
 
     ///////////////////////////////////////////////////////////////////////////////
     // Find approximately closest elemenent
@@ -131,7 +132,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (closest_element < 0) {
-        fprintf(stderr, "Invalid set up!\n");
+        fprintf(stderr, "Invalid set up! for mesh #nelements %ld #nodes %ld\n", mesh.nelements, mesh.nnodes);
         MPI_Abort(comm, -1);
     }
 
@@ -242,9 +243,9 @@ int main(int argc, char *argv[]) {
 
             real_t n[3];
             {
-                const idx_t idx0 = mesh.elements[0][e];
-                const idx_t idx1 = mesh.elements[1][e];
-                const idx_t idx2 = mesh.elements[2][e];
+                idx_t idx0 = mesh.elements[0][e];
+                idx_t idx1 = mesh.elements[1][e];
+                idx_t idx2 = mesh.elements[2][e];
 
                 real_t u[3];
                 real_t v[3];

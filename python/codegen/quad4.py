@@ -4,6 +4,106 @@ from fe import FE
 import sympy as sp
 from sfem_codegen import *
 
+class Quad4(FE):
+	def __init__(self):
+		super().__init__()
+
+	def reference_measure(self):
+		return 1
+
+	def coords_sub_parametric(self):
+		return [[x0, x2], [y0, y2]]
+
+	def coords(self):
+		return  [coeffs('px', 4), coeffs('py', 4), coeffs('pz', 4) ]
+
+	def name(self):
+		return "Quad4"
+
+	def f0(self, x, y):
+		return (1 - x) * (1 - y)
+
+	def f1(self, x, y):
+		return  x * (1 - y)
+
+	def f2(self, x, y):
+		return x * y
+
+	def f3(self, x, y):
+		return (1 - x)  * y
+
+	def fun(self, p):
+		x = p[0]
+		y = p[1]
+
+		return [
+			self.f0(x, y),
+			self.f1(x, y),
+			self.f2(x, y),
+			self.f3(x, y)
+		]
+
+	def n_nodes(self):
+		return 4
+
+	def manifold_dim(self):
+		return 2
+
+	def spatial_dim(self):
+		return 2
+
+	def is_isoparametric(self):
+		return True
+
+	def integrate(self, q, expr):
+		return sp.integrate(expr, (q[1], 0, 1), (q[0], 0, 1)) 
+
+	def jacobian(self, q):
+		return self.isoparametric_jacobian(q)
+
+	def jacobian_inverse(self, q):
+		return inverse(self.isoparametric_jacobian(q))
+
+	def transform(self, q):
+		f = self.fun(q)
+		xyz = self.coords()
+
+		pp = sp.zeros(2, 1)
+
+		for i in range(0, 4):
+			for d in range(0, self.spatial_dim()):
+				pp[d] += xyz[d][i] * f[i]
+
+		return pp
+
+	def inverse_transform(self, p):
+		assert False
+		return 0
+
+	def jacobian_determinant(self, q):
+		return det2(self.jacobian(q))
+
+	def measure(self, q):
+		return self.jacobian_determinant(q)
+
+class QuadShell4(Quad4):
+	def __init__(self):
+		super().__init__()
+
+	def spatial_dim(self):
+		return 3
+
+	def jacobian_inverse(self, q):
+		S = self.jacobian(q)
+		StS = S.T * S
+		Sinv = inv2(StS) * self.S.T
+		return Sinv
+	
+	def jacobian_determinant(self, q):
+		S = self.jacobian(q)
+		StS = S.T * S
+		return sp.sqrt(det2(StS))
+
 class AxisAlignedQuad4(FE):
 	def __init__(self):
 		super().__init__()
@@ -82,3 +182,4 @@ class AxisAlignedQuad4(FE):
 
 if __name__ == '__main__':
 	AxisAlignedQuad4().generate_c_code()
+	
