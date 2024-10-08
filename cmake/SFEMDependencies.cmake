@@ -117,7 +117,7 @@ if(SFEM_ENABLE_CUDA)
 
     find_package(CUDAToolkit REQUIRED)
 
-    set(SFEM_DEP_LIBRARIES "CUDA::cudart")
+    list(APPEND SFEM_DEP_LIBRARIES "CUDA::cudart")
 
     set(_SFEM_CUDA_MODULES "CUDA::cusparse;CUDA::cublas;CUDA::nvToolsExt")
     set(SFEM_ENABLE_CUBLAS TRUE)
