@@ -7,7 +7,6 @@
 #include "hex8_quadrature.h"
 #include "proteus_hex8.h"
 
-
 #ifndef POW3
 #define POW3(x) ((x) * (x) * (x))
 #endif
@@ -36,7 +35,7 @@ static SFEM_INLINE void hex8_sub_adj_0(const scalar_t *const SFEM_RESTRICT adjug
                                        const scalar_t h,
                                        scalar_t *const SFEM_RESTRICT sub_adjugate,
                                        scalar_t *const SFEM_RESTRICT sub_determinant) {
-    const scalar_t x0 = 1.0 / h;
+    const scalar_t x0 = POW2(h);
     sub_adjugate[0] = adjugate[0] * x0;
     sub_adjugate[1] = adjugate[1] * x0;
     sub_adjugate[2] = adjugate[2] * x0;
@@ -234,6 +233,12 @@ int proteus_hex8_linear_elasticity_apply(const int level,
                 }
             }
 
+            // for (int d = 0; d < nxe; d++) {
+            //     printf("%g\t", v[0][d]);
+            // }
+
+            // printf("\n");
+
             {
                 // Scatter elemental data
                 for (int d = 0; d < nxe; d++) {
@@ -359,6 +364,9 @@ int proteus_affine_hex8_linear_elasticity_apply(const int level,
             scalar_t sub_determinant;
             hex8_sub_adj_0(adjugate, jacobian_determinant, h, sub_adjugate, &sub_determinant);
 
+            print_matrix(3, 3, sub_adjugate);
+            printf("det = %g\n", sub_determinant);
+
             hex8_linear_elasticity_matrix(
                     mu, lambda, sub_adjugate, sub_determinant, element_matrix);
 
@@ -422,6 +430,12 @@ int proteus_affine_hex8_linear_elasticity_apply(const int level,
                     }
                 }
             }
+
+            // for (int d = 0; d < nxe; d++) {
+            //     printf("%g\t", v[0][d]);
+            // }
+
+            // printf("\n");
 
             {
                 // Scatter elemental data

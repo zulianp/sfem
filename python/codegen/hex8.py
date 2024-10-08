@@ -193,9 +193,9 @@ def sub_adj():
 	])
 	
 	detAm = determinant(A)
-	Aminv = inverse(A)
+	Aadj = adjugate(A)
 
-	sub_adj = Aminv * adj
+	sub_adj = Aadj * adj
 	expr = assign_matrix('sub_adjugate', sub_adj)
 	# expr.extend([ast.Assignment('determinant', detAm)])
 
