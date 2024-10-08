@@ -43,6 +43,13 @@ int main(int argc, char *argv[]) {
     MPI_Comm comm = MPI_COMM_WORLD;
     isolver_lsolve_t lsolve[N_SYSTEMS];
 
+    if (sizeof(real_t) != sizeof(isolver_scalar_t)) {
+        fprintf(stderr,
+                "%s Incompatible types for isolver (real_t != isolver_scalar_t)\n",
+                argv[0]);
+        return EXIT_FAILURE;
+    }
+
     for (int s = 0; s < N_SYSTEMS; s++) {
         lsolve[s].comm = comm;
         isolver_lsolve_init(&lsolve[s]);
@@ -173,14 +180,24 @@ int main(int argc, char *argv[]) {
 
     const int sdim = elem_manifold_dim(mesh.element_type);
 
-    count_t *rowptr = 0;
+    count_t *sfem_rowptr = 0;
     idx_t *colidx = 0;
     real_t *diffusion = 0;
     real_t *mass_matrix = 0;
     real_t *system_matrix = 0;
 
     build_crs_graph_for_elem_type(
-        mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
+        mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &sfem_rowptr, &colidx);
+
+    isolver_idx_t *rowptr = 0;
+    if(sizeof(count_t) != sizeof(isolver_idx_t)) {
+        rowptr = malloc((mesh.nnodes+1) * sizeof(isolver_idx_t));
+        for(ptrdiff_t i = 0; i < mesh.nnodes+1; i++) {
+            isolver_idx_t converted = sfem_rowptr[i];
+        }
+    } else {
+        rowptr = (isolver_idx_t*)sfem_rowptr;
+    }
 
     if (!SFEM_IMPLICIT) {
         // SFEM_CFL
@@ -218,12 +235,12 @@ int main(int argc, char *argv[]) {
     ptrdiff_t nnz = rowptr[mesh.nnodes];
     system_matrix = calloc(nnz, sizeof(real_t));
 
-    laplacian_assemble_hessian(mesh.element_type,
+    laplacian_crs(mesh.element_type,
                                mesh.nelements,
                                mesh.nnodes,
                                mesh.elements,
                                mesh.points,
-                               rowptr,
+                               sfem_rowptr,
                                colidx,
                                system_matrix);
 
@@ -254,7 +271,7 @@ int main(int argc, char *argv[]) {
                           mesh.nnodes,
                           mesh.elements,
                           mesh.points,
-                          rowptr,
+                          sfem_rowptr,
                           colidx,
                           mass_matrix);
 
@@ -314,7 +331,7 @@ int main(int argc, char *argv[]) {
                 crs_constraint_nodes_to_identity(dirichlet_conditions[i].local_size,
                                                  dirichlet_conditions[i].idx,
                                                  1,
-                                                 rowptr,
+                                                 sfem_rowptr,
                                                  colidx,
                                                  mass_matrix);
             }
@@ -331,7 +348,7 @@ int main(int argc, char *argv[]) {
             crs_constraint_nodes_to_identity(dirichlet_conditions[i].local_size,
                                              dirichlet_conditions[i].idx,
                                              1,
-                                             rowptr,
+                                             sfem_rowptr,
                                              colidx,
                                              system_matrix);
         }
@@ -367,7 +384,7 @@ int main(int argc, char *argv[]) {
                 }
 
             } else {
-                crs_spmv(mesh.nnodes, rowptr, colidx, mass_matrix, u, u_old);
+                crs_spmv(mesh.nnodes, sfem_rowptr, colidx, mass_matrix, u, u_old);
             }
 
             for (int i = 0; i < n_dirichlet_conditions; i++) {
@@ -391,7 +408,7 @@ int main(int argc, char *argv[]) {
             const int i = step_count % 2;
             const int ip1 = (step_count + 1) % 2;
 
-            crs_spmv(mesh.nnodes, rowptr, colidx, system_matrix, u_old, u);
+            crs_spmv(mesh.nnodes, sfem_rowptr, colidx, system_matrix, u_old, u);
 
             if (SFEM_LUMPED_MASS) {
 #pragma omp parallel
@@ -427,7 +444,11 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    free(rowptr);
+    free(sfem_rowptr);
+    if(sizeof(count_t) != sizeof(isolver_idx_t)) {
+        free(rowptr);
+    }
+    
     free(colidx);
     free(diffusion);
     free(mass_matrix);

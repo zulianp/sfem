@@ -12,7 +12,9 @@ void tri3_apply_mass(const ptrdiff_t nelements,
                      const ptrdiff_t nnodes,
                      idx_t **const SFEM_RESTRICT elems,
                      geom_t **const SFEM_RESTRICT xyz,
+                     const ptrdiff_t stride_x,
                      const real_t *const x,
+                     const ptrdiff_t stride_values,
                      real_t *const values);
 
 void tri3_assemble_lumped_mass(const ptrdiff_t nelements,

@@ -4,7 +4,7 @@ set -e
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
-source $SCRIPTPATH/../sfem_config.sh
+source $SCRIPTPATH/../../build/sfem_config.sh
 export PATH=$SCRIPTPATH/../../:$PATH
 export PATH=$SCRIPTPATH/../../build/:$PATH
 export PATH=$SCRIPTPATH/../../bin/:$PATH
@@ -18,8 +18,10 @@ PATH=$SCRIPTPATH/../../python/sfem/algebra:$PATH
 PATH=$SCRIPTPATH/../../python/sfem/sdf:$PATH
 PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
+NCORES=8
+
 export OMP_PROC_BIND=true
-export OMP_NUM_THREADS=18
+export OMP_NUM_THREADS=$NCORES
 
 field=field.raw
 mesh=mesh
@@ -56,12 +58,17 @@ echo $sizes
 echo $origins
 echo $scaling
 
+<<<<<<< HEAD
 n_procs=1
 # n_procs=2
 # n_procs=8
 
 LAUNCH="mpiexec -np $n_procs"
 #LAUNCH=""
+=======
+LAUNCH="mpiexec -np $NCORES"
+# LAUNCH=" "
+>>>>>>> main
 
 GRID_TO_MESH="grid_to_mesh"
 #GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"

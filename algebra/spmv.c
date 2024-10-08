@@ -40,3 +40,32 @@ int crs_spmv(const ptrdiff_t nnodes,
 
     return 0;
 }
+
+int crs_diag(const ptrdiff_t nnodes,
+             const count_t *const SFEM_RESTRICT rowptr,
+             const idx_t *const SFEM_RESTRICT colidx,
+             const real_t *const SFEM_RESTRICT values,
+             real_t *const SFEM_RESTRICT diag) {
+#pragma omp parallel
+    {
+#pragma omp for  // nowait
+        for (ptrdiff_t i = 0; i < nnodes; i++) {
+            const count_t row_begin = rowptr[i];
+            const count_t row_end = rowptr[i + 1];
+
+            diag[i] = 0;
+
+            real_t val = 0;
+            for (count_t k = row_begin; k < row_end; k++) {
+                const idx_t j = colidx[k];
+
+                if (i == j) {
+                    diag[i] = values[k];
+                    break;
+                }
+            }
+        }
+    }
+
+    return 0;
+}

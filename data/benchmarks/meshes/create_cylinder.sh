@@ -10,7 +10,7 @@ PATH=$SCRIPTPATH/../../../python/sfem:$PATH
 PATH=$SCRIPTPATH/../../../python/sfem/mesh:$PATH
 PATH=$SCRIPTPATH/../../../workflows/divergence:$PATH
 
-LAUNCH=""
+# LAUNCH=""
 # LAUNCH=srun
 
 if (($# != 1))
@@ -26,8 +26,8 @@ nrefs=$1
 folder=cylinder
 mesh_db=$folder/mesh.vtk
 mesh_raw=./mesh
-# mesh_original=./original
-mesh_original=$mesh_raw
+mesh_original=./original
+# mesh_original=$mesh_raw
 mesh_surface=$mesh_raw/surface
 
 mkdir -p $mesh_original
@@ -40,11 +40,21 @@ mkdir -p $mesh_raw/sidesets_aos
 mkdir -p $folder
 
 idx_type_size=4
+elem_type=tetra
+is_hex=0
 
-cylinder.py $mesh_db $nrefs
-db_to_raw.py $mesh_db $mesh_original --select_elem_type=tetra
+# if [[ $SFEM_ELEM_TYPE -eq "HEX8" ]]
+# then
+# 	elem_type="hex"
+# 	is_hex=1
+# fi
+
+set -x
+
+cylinder.py $mesh_db $nrefs $is_hex
+db_to_raw.py $mesh_db $mesh_original --select_elem_type=$elem_type
 # refine $mesh_original $mesh_raw
-# sfc $mesh_original $mesh_raw
+$LAUNCH sfc $mesh_original $mesh_raw
 $LAUNCH skin $mesh_raw $mesh_surface
 
 $LAUNCH select_surf $mesh_surface -1 0   0   0.99   $mesh_surface/sides_inlet.raw
@@ -94,10 +104,20 @@ boundary_nodes()
 	$LAUNCH sgather $mesh_surface/sides_"$name".raw $idx_type_size $mesh_surface/i1.raw $workspace/i1.raw
 	$LAUNCH sgather $mesh_surface/sides_"$name".raw $idx_type_size $mesh_surface/i2.raw $workspace/i2.raw
 
+	if [[ $is_hex -eq 1 ]]
+	then
+		$LAUNCH sgather $mesh_surface/sides_"$name".raw $idx_type_size $mesh_surface/i3.raw $workspace/i3.raw
+	fi
+
 	# Convert surf-mesh indices to volume mesh indices
 	$LAUNCH sgather $workspace/i0.raw $idx_type_size $mesh_surface/node_mapping.raw $mesh_surface/"$name"/i0.raw 
 	$LAUNCH sgather $workspace/i1.raw $idx_type_size $mesh_surface/node_mapping.raw $mesh_surface/"$name"/i1.raw 
 	$LAUNCH sgather $workspace/i2.raw $idx_type_size $mesh_surface/node_mapping.raw $mesh_surface/"$name"/i2.raw 
+
+	if [[ $is_hex -eq 1 ]]
+	then
+		$LAUNCH sgather $workspace/i3.raw $idx_type_size $mesh_surface/node_mapping.raw $mesh_surface/"$name"/i3.raw 
+	fi
 
 	$LAUNCH soa_to_aos "$mesh_surface/"$name"/i*.raw" $idx_type_size $sideset_raw
 	rm -r $workspace

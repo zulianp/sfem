@@ -105,7 +105,7 @@ int mesh_write_nodal_field(const mesh_t *const mesh,
     MPI_Comm_rank(mesh->comm, &mpi_rank);
 
     count_t n_global_nodes = mesh->n_owned_nodes;
-    CATCH_MPI_ERROR(
+    MPI_CATCH_ERROR(
         MPI_Allreduce(MPI_IN_PLACE, &n_global_nodes, 1, SFEM_MPI_COUNT_T, MPI_SUM, mesh->comm));
 
     if (!mesh->node_mapping) {
@@ -147,7 +147,7 @@ int write_mapped_field(MPI_Comm comm,
     const uint8_t *const data = (const uint8_t *const)data_in;
 
     int type_size;
-    CATCH_MPI_ERROR(MPI_Type_size(data_type, &type_size));
+    MPI_CATCH_ERROR(MPI_Type_size(data_type, &type_size));
 
     const ptrdiff_t local_output_size_no_remainder = n_global / size;
     const ptrdiff_t begin = (n_global / size) * rank;
@@ -167,7 +167,7 @@ int write_mapped_field(MPI_Comm comm,
     }
 
     idx_t *recv_count = (idx_t *)malloc((size) * sizeof(idx_t));
-    CATCH_MPI_ERROR(
+    MPI_CATCH_ERROR(
         MPI_Alltoall(send_count, 1, SFEM_MPI_IDX_T, recv_count, 1, SFEM_MPI_IDX_T, comm));
 
     int *send_displs = (int *)malloc(size * sizeof(int));
@@ -217,7 +217,7 @@ int write_mapped_field(MPI_Comm comm,
     // Send indices
     ///////////////////////////////////
 
-    CATCH_MPI_ERROR(MPI_Alltoallv(send_list,
+    MPI_CATCH_ERROR(MPI_Alltoallv(send_list,
                                   send_count,
                                   send_displs,
                                   SFEM_MPI_IDX_T,
@@ -231,7 +231,7 @@ int write_mapped_field(MPI_Comm comm,
     // Send data
     ///////////////////////////////////
 
-    CATCH_MPI_ERROR(MPI_Alltoallv(send_data_and_final_storage,
+    MPI_CATCH_ERROR(MPI_Alltoallv(send_data_and_final_storage,
                                   send_count,
                                   send_displs,
                                   data_type,

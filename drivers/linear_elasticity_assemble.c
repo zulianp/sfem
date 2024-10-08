@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
     // Operator assembly
     ///////////////////////////////////////////////////////////////////////////////
 
-    linear_elasticity_assemble_hessian_soa(
+    linear_elasticity_crs_soa(
         // Mesh
         mesh.element_type,
         mesh.nelements,

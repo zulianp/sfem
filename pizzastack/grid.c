@@ -54,7 +54,7 @@ void gridz_create(gridz_t *const g,
 
 void gridz_synchronize_field(const gridz_t *const g, MPI_Datatype data_type, char *const data) {
     int type_size;
-    CATCH_MPI_ERROR(MPI_Type_size(data_type, &type_size));
+    MPI_CATCH_ERROR(MPI_Type_size(data_type, &type_size));
     grid1_synchronize(g->comm,
                       g->extent[2],
                       g->stride[2] * type_size,
@@ -90,7 +90,7 @@ void grid1_synchronize(MPI_Comm comm,
                 int recvtag = m;
                 int sendtag = m;
 
-                CATCH_MPI_ERROR(MPI_Sendrecv(
+                MPI_CATCH_ERROR(MPI_Sendrecv(
                     // send
                     &data[sendoffset * stride],
                     stride * lmargin,
@@ -118,7 +118,7 @@ void grid1_synchronize(MPI_Comm comm,
 
                 int recvtag = m;
                 int sendtag = m;
-                CATCH_MPI_ERROR(MPI_Sendrecv(
+                MPI_CATCH_ERROR(MPI_Sendrecv(
                     // send
                     &data[sendoffset * stride],
                     stride * rmargin,
@@ -160,9 +160,9 @@ int read_raw_file(MPI_Comm comm,
         return 1;
     }
 
-    CATCH_MPI_ERROR(MPI_File_read_at_all(handle, offset, data, ln, datatype, &status));
+    MPI_CATCH_ERROR(MPI_File_read_at_all(handle, offset, data, ln, datatype, &status));
 
-    CATCH_MPI_ERROR(MPI_File_close(&handle));
+    MPI_CATCH_ERROR(MPI_File_close(&handle));
     return 0;
 }
 
@@ -189,11 +189,11 @@ int write_raw_file(MPI_Comm comm,
         return 1;
     }
 
-    CATCH_MPI_ERROR(MPI_File_set_size(handle, n));
+    MPI_CATCH_ERROR(MPI_File_set_size(handle, n));
 
-    CATCH_MPI_ERROR(MPI_File_write_at_all(handle, offset, data, ln, datatype, &status));
+    MPI_CATCH_ERROR(MPI_File_write_at_all(handle, offset, data, ln, datatype, &status));
 
-    CATCH_MPI_ERROR(MPI_File_close(&handle));
+    MPI_CATCH_ERROR(MPI_File_close(&handle));
     return 0;
 }
 
@@ -202,7 +202,7 @@ void gridz_read_field(const gridz_t *const g,
                       MPI_Datatype data_type,
                       void *const data) {
     int type_size;
-    CATCH_MPI_ERROR(MPI_Type_size(data_type, &type_size));
+    MPI_CATCH_ERROR(MPI_Type_size(data_type, &type_size));
 
     ptrdiff_t array_offset = g->z_margin_left * g->stride[2] * type_size;
 
@@ -215,7 +215,7 @@ void gridz_write_field(const gridz_t *const g,
                        MPI_Datatype data_type,
                        const void *const data) {
     int type_size;
-    CATCH_MPI_ERROR(MPI_Type_size(data_type, &type_size));
+    MPI_CATCH_ERROR(MPI_Type_size(data_type, &type_size));
 
     ptrdiff_t array_offset = g->z_margin_left * g->stride[2] * type_size;
 

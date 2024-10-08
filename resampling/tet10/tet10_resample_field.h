@@ -37,9 +37,11 @@ extern "C" {
 //                                                   geom_t** const SFEM_RESTRICT xyz,
 //                                                   real_t* const values);
 
-int tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, const ptrdiff_t nnodes,
+int tet10_assemble_dual_mass_vector(const ptrdiff_t nelements,
+                                    const ptrdiff_t nnodes,
                                     idx_t** const SFEM_RESTRICT elems,
-                                    geom_t** const SFEM_RESTRICT xyz, real_t* const values);
+                                    geom_t** const SFEM_RESTRICT xyz,
+                                    real_t* const values);
 
 int hex8_to_tet10_resample_field_local(
         // Mesh

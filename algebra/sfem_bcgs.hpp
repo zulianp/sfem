@@ -22,7 +22,7 @@ namespace sfem {
 
         // Mem management
         std::function<T*(const std::size_t)> allocate;
-        std::function<void(T*)> destroy;
+        std::function<void( void*)> destroy;
 
         std::function<void(const std::size_t, T* const x)> zeros;
 
@@ -36,6 +36,10 @@ namespace sfem {
             zaxpby;
 
         ptrdiff_t n_dofs{-1};
+
+        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
+
+        ExecutionSpace execution_space() const override { return execution_space_; }
 
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
@@ -62,7 +66,7 @@ namespace sfem {
         void default_init() {
             allocate = [](const ptrdiff_t n) -> T* { return (T*)calloc(n, sizeof(T)); };
 
-            destroy = [](T* a) { free(a); };
+            destroy = [](void* a) { free(a); };
 
             copy = [](const ptrdiff_t n, const T* const src, T* const dest) {
                 std::memcpy(dest, src, n * sizeof(T));
@@ -102,6 +106,8 @@ namespace sfem {
             zeros = [](const std::size_t n, T* const x) {
                 memset(x, 0, n*sizeof(T));
             };
+
+            execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         bool good() const {

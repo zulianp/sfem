@@ -26,52 +26,51 @@ namespace sfem {
         std::function<void(void*)> destroy;
         // std::function<void(const ptrdiff_t, const T* const, T* const)> copy;
         std::function<void(const ptrdiff_t, const T, const T* const, const T, T* const)> axpby;
+        std::function<T(const std::size_t, const T* const)> norm2;
+        bool verbose{true};
+        bool debug{false};
 
         enum CycleType {
             V_CYCLE = 1,
             W_CYCLE = 2,
         };
 
+        enum CycleReturnCode { CYCLE_CONTINUE = 0, CYCLE_CONVERGED = 1, CYCLE_FAILURE = 2 };
+
         class Memory {
         public:
+            std::shared_ptr<Buffer<T>> rhs;
             std::shared_ptr<Buffer<T>> solution;
-            std::shared_ptr<Buffer<T>> residual;
             std::shared_ptr<Buffer<T>> work;
-
             inline ptrdiff_t size() const { return solution->size(); }
             ~Memory() {}
         };
 
-        int apply(const T* const r, T* const x) override {
+        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
+
+        ExecutionSpace execution_space() const override { return execution_space_; }
+
+        int apply(const T* const rhs, T* const x) override {
             ensure_init();
 
             // Wrap input arrays into fine level of mg
-
             if (wrap_input_) {
                 memory_[finest_level()]->solution =
-                    Buffer<T>::wrap(smoother_[finest_level()]->rows(), x);
+                        Buffer<T>::wrap(smoother_[finest_level()]->rows(), x);
 
-                memory_[finest_level()]->residual =
-                    Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T*)r);
+                memory_[finest_level()]->rhs =
+                        Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T*)rhs);
             }
 
-            for (int k = 0; k < max_it_; k++) {
-                // std::cout << "iteration: " << k << ")\n";
-                // operator_->apply(r, )
-
-                cycle(finest_level());
-
-                auto c = memory_[finest_level()]->solution;
-                axpby(c->size(), 1, c->data(), 1, x);
+            for (iterations_ = 0; iterations_ < max_it_; iterations_++) {
+                CycleReturnCode ret = cycle(finest_level());
+                if (ret == CYCLE_CONVERGED) {
+                    break;
+                }
             }
 
             return 0;
         }
-
-        // void set_coarse_grid_solver(const std::shared_ptr<Operator<T>>& op)
-        // {
-        //     coarse_grid_solver_ = op;
-        // }
 
         void clear() {
             prolongation_.clear();
@@ -101,16 +100,35 @@ namespace sfem {
 
             destroy = [](void* a) { free(a); };
 
-            axpby =
-                [](const ptrdiff_t n, const T alpha, const T* const x, const T beta, T* const y) {
+            axpby = [](const ptrdiff_t n,
+                       const T alpha,
+                       const T* const x,
+                       const T beta,
+                       T* const y) {
 #pragma omp parallel for
-                    for (ptrdiff_t i = 0; i < n; i++) {
-                        y[i] = alpha * x[i] + beta * y[i];
-                    }
-                };
+                for (ptrdiff_t i = 0; i < n; i++) {
+                    y[i] = alpha * x[i] + beta * y[i];
+                }
+            };
 
             zeros = [](const std::size_t n, T* const x) { memset(x, 0, n * sizeof(T)); };
+            norm2 = [](const std::size_t n, const T* const x) -> T {
+                T ret = 0;
+
+#pragma omp parallel for reduction(+ : ret)
+                for (ptrdiff_t i = 0; i < n; i++) {
+                    ret += x[i] * x[i];
+                }
+
+                return sqrt(ret);
+            };
+
+            execution_space_ = EXECUTION_SPACE_HOST;
         }
+
+        void set_max_it(const int val) { max_it_ = val; }
+
+        void set_atol(const T val) { atol_ = val; }
 
     private:
         std::vector<std::shared_ptr<Operator<T>>> operator_;
@@ -123,8 +141,13 @@ namespace sfem {
         std::vector<std::shared_ptr<Memory>> memory_;
         bool wrap_input_{true};
 
-        int max_it_{1};
+        int max_it_{10};
+        int iterations_{0};
         int cycle_type_{V_CYCLE};
+        T atol_{1e-10};
+
+        T norm_residual_0{1};
+        T norm_residual_previous{1};
 
         inline int finest_level() const { return 0; }
 
@@ -156,7 +179,7 @@ namespace sfem {
                     memory_[l]->solution = Buffer<T>::own(n, x, this->destroy);
 
                     auto r = this->allocate(n);
-                    memory_[l]->residual = Buffer<T>::own(n, r, this->destroy);
+                    memory_[l]->rhs = Buffer<T>::own(n, r, this->destroy);
                 }
 
                 auto w = this->allocate(n);
@@ -166,46 +189,106 @@ namespace sfem {
             return 0;
         }
 
-        int cycle(const int level) {
+        CycleReturnCode cycle(const int level) {
             auto mem = memory_[level];
-
-            // As we are solving for the correction we start from 0
-            this->zeros(mem->size(), mem->solution->data());
+            auto smoother = smoother_[level];
 
             if (coarsest_level() == level) {
-                // std::cout << "Coarse level solve!\n";
-                return smoother_[level]->apply(mem->residual->data(), mem->solution->data());
+                this->zeros(mem->solution->size(), mem->solution->data());
+                if (!smoother->apply(mem->rhs->data(), mem->solution->data())) {
+                    return CYCLE_CONTINUE;
+                } else {
+                    return CYCLE_FAILURE;
+                }
             }
 
             auto op = operator_[level];
             auto restriction = restriction_[level];
             auto prolongation = prolongation_[coarser_level(level)];
+            auto mem_coarse = memory_[coarser_level(level)];
 
             for (int k = 0; k < this->cycle_type_; k++) {
-                // std::cout << "Cycle " << k << " \n";
+                smoother->apply(mem->rhs->data(), mem->solution->data());
 
-                this->zeros(mem->solution->size(), mem->solution->data());
-                smoother_[level]->apply(mem->residual->data(), mem->solution->data());
+                {
+                    // Compute residual
+                    this->zeros(mem->size(), mem->work->data());
+                    op->apply(mem->solution->data(), mem->work->data());
+                    this->axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
 
-                this->zeros(mem->size(), mem->work->data());
-                op->apply(mem->solution->data(), mem->work->data());
+                    if (finest_level() == level) {
+                        T norm_residual = this->norm2(mem->work->size(), mem->work->data());
 
-                this->axpby(mem->size(), 1, mem->residual->data(), -1, mem->work->data());
-                restriction->apply(mem->work->data(),
-                                   memory_[coarser_level(level)]->residual->data());
+                        if (iterations_ == 0) {
+                            norm_residual_0 = norm_residual;
+                            norm_residual_previous = norm_residual;
 
-                int err = cycle(coarser_level(level));
-                assert(!err);
+                            if (verbose) {
+                                printf("Multigrid\n");
+                                printf("iter\tabs\t\trel\t\trate\n");
+                                printf("%d\t%g\t-\t\t-\n", iterations_, (double)(norm_residual));
+                            }
+                        } else {
+                            if (verbose) {
+                                printf("%d\t%g\t%g\t%g\n",
+                                       iterations_,
+                                       (double)(norm_residual),
+                                       (double)(norm_residual / norm_residual_0),
+                                       (double)(norm_residual / norm_residual_previous));
 
-                prolongation->apply(memory_[coarser_level(level)]->solution->data(),
-                                    mem->work->data());
+                                fflush(stderr);
+                                fflush(stdout);
+                            }
+                        }
 
-                // Apply correction
-                this->axpby(mem->size(), 1, mem->work->data(), 1, mem->solution->data());
-                smoother_[level]->apply(mem->residual->data(), mem->solution->data());
+                        norm_residual_previous = norm_residual;
+                        if (norm_residual < atol_) {
+                            return CYCLE_CONVERGED;
+                        }
+                    }
+                }
+
+                {
+                    // Restriction
+                    this->zeros(mem_coarse->rhs->size(), mem_coarse->rhs->data());
+                    restriction->apply(mem->work->data(), mem_coarse->rhs->data());
+                }
+
+                CycleReturnCode ret = cycle(coarser_level(level));
+                assert(ret != CYCLE_FAILURE);
+
+                {
+                    if (debug) {
+                        printf("|| c_H || = %g\n",
+                               (double)this->norm2(mem_coarse->solution->size(),
+                                                   mem_coarse->solution->data()));
+                    }
+
+                    // Prolongation
+                    this->zeros(mem->work->size(), mem->work->data());
+                    prolongation->apply(mem_coarse->solution->data(), mem->work->data());
+
+                    if (debug) {
+                        printf("|| c_h || = %g\n",
+                               (double)this->norm2(mem->work->size(), mem->work->data()));
+                    }
+
+                    // Apply coarse space correction
+                    this->axpby(mem->size(), 1, mem->work->data(), 1, mem->solution->data());
+                }
+
+
+                if(debug) {
+                    this->zeros(mem->size(), mem->work->data());
+                    op->apply(mem->solution->data(), mem->work->data());
+                    this->axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
+                    printf("|| r_h || = %g\n", this->norm2(mem->work->size(), mem->work->data()));
+                }
+
+                smoother->apply(mem->rhs->data(), mem->solution->data());
             }
 
-            return 0;
+            return CYCLE_CONTINUE;
         }
     };
 

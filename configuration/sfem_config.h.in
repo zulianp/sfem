@@ -1,0 +1,105 @@
+#ifndef SFEM_CONFIG_HPP
+
+#cmakedefine SFEM_ENABLE_CUDA
+#cmakedefine SFEM_ENABLE_CUBLAS
+#cmakedefine SFEM_ENABLE_CUSPARSE
+#cmakedefine SFEM_ENABLE_OPENMP
+#cmakedefine SFEM_ENABLE_AVX2
+#cmakedefine SFEM_ENABLE_AVX512
+#cmakedefine SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+#cmakedefine SFEM_ENABLE_MEM_DIAGNOSTICS
+
+// It will be removed in the future (i.e., always true)
+#cmakedefine SFEM_ENABLE_CUSTOM_NUMBERS
+
+#ifdef SFEM_ENABLE_CUSTOM_NUMBERS
+
+#include <stdint.h>
+#include <stdlib.h>
+
+// -----------------------------
+// Floating point representation
+// -----------------------------
+
+// geometric quantities / mesh
+typedef @SFEM_GEOM_C_TYPE@ geom_t;
+#define SFEM_MPI_GEOM_T @SFEM_GEOM_MPI_TYPE@
+#define SFEM_CUSPARSE_GEOM_T @SFEM_GEOM_CUSPARSE_TYPE@
+#define d_GEOM_T "@SFEM_GEOM_PRINT_TYPE@"
+#define dtype_GEOM_T "@SFEM_GEOM_TYPE@"
+
+// real numbers
+typedef @SFEM_REAL_C_TYPE@ real_t;
+#define SFEM_MPI_REAL_T @SFEM_REAL_MPI_TYPE@
+#define SFEM_CUSPARSE_REAL_T @SFEM_REAL_CUSPARSE_TYPE@
+#define d_REAL_T "@SFEM_REAL_PRINT_TYPE@"
+#define dtype_REAL_T "@SFEM_REAL_TYPE@"
+
+// computation real numbers and explicit vectorized types
+typedef @SFEM_SCALAR_C_TYPE@ scalar_t;
+#define SFEM_MPI_SCALAR_T @SFEM_SCALAR_MPI_TYPE@
+#define SFEM_CUSPARSE_SCALAR_T @SFEM_SCALAR_CUSPARSE_TYPE@
+#define d_SCALAR_T "@SFEM_SCALAR_PRINT_TYPE@"
+#define dtype_SCALAR_T "@SFEM_SCALAR_TYPE@"
+
+#define SFEM_VEC_SIZE @SFEM_VEC_SIZE@
+typedef scalar_t vec_t
+        __attribute__((vector_size(SFEM_VEC_SIZE * sizeof(scalar_t)), aligned(SFEM_VEC_SIZE * sizeof(scalar_t))));
+
+// Jacobian
+typedef @SFEM_JACOBIAN_CPU_C_TYPE@ jacobian_t;
+#define SFEM_MPI_JACOBIAN_CPU_T @SFEM_JACOBIAN_CPU_MPI_TYPE@
+#define SFEM_CUSPARSE_JACOBIAN_CPU_T @SFEM_JACOBIAN_CPU_CUSPARSE_TYPE@
+#define d_JACOBIAN_CPU_T "@SFEM_JACOBIAN_CPU_PRINT_TYPE@"
+#define dtype_JACOBIAN_CPU_T "@SFEM_JACOBIAN_CPU_TYPE@"
+
+// Jacobian (GPU)
+#define cu_jacobian_t @SFEM_JACOBIAN_GPU_TYPE@
+
+// Accumulator for local kernels (before local to global)
+typedef @SFEM_ACCUMULATOR_C_TYPE@ accumulator_t;
+#define SFEM_MPI_ACCUMULATOR_T @SFEM_ACCUMULATOR_MPI_TYPE@
+#define SFEM_CUSPARSE_ACCUMULATOR_T @SFEM_ACCUMULATOR_CUSPARSE_TYPE@
+#define d_ACCUMULATOR_T "@SFEM_ACCUMULATOR_PRINT_TYPE@"
+#define dtype_ACCUMULATOR_T "@SFEM_ACCUMULATOR_TYPE@"
+
+// -----------------------------
+// Indexing representation
+// -----------------------------
+
+// node / dof indices
+typedef @SFEM_IDX_C_TYPE@ idx_t;
+#define SFEM_MPI_IDX_T @SFEM_IDX_MPI_TYPE@
+#define SFEM_CUSPARSE_IDX_T @SFEM_IDX_CUSPARSE_TYPE@
+#define d_IDX_T "@SFEM_IDX_PRINT_TYPE@"
+#define dtype_IDX_T "@SFEM_IDX_TYPE@"
+
+// nnz count
+typedef @SFEM_COUNT_C_TYPE@ count_t;
+#define SFEM_MPI_COUNT_T @SFEM_COUNT_MPI_TYPE@
+#define SFEM_CUSPARSE_COUNT_T @SFEM_COUNT_CUSPARSE_TYPE@
+#define d_COUNT_T "@SFEM_COUNT_PRINT_TYPE@"
+#define dtype_COUNT_T "@SFEM_COUNT_TYPE@"
+
+// element ids
+typedef @SFEM_ELEMENT_IDX_C_TYPE@ element_idx_t;
+#define SFEM_MPI_ELEMENT_IDX_T @SFEM_ELEMENT_IDX_MPI_TYPE@
+#define SFEM_CUSPARSE_ELEMENT_IDX_T @SFEM_ELEMENT_IDX_CUSPARSE_TYPE@
+#define d_ELEMENT_IDX_T "@SFEM_ELEMENT_IDX_PRINT_TYPE@"
+#define dtype_ELEMENT_IDX_T "@SFEM_ELEMENT_IDX_TYPE@"
+
+// Local ids for small block of elements (goal is 16 bits with max id 65'536)
+typedef @SFEM_LOCAL_IDX_C_TYPE@ local_idx_t;
+#define SFEM_MPI_LOCAL_IDX_T @SFEM_LOCAL_IDX_MPI_TYPE@
+#define SFEM_CUSPARSE_LOCAL_IDX_T @SFEM_LOCAL_IDX_CUSPARSE_TYPE@
+#define d_LOCAL_IDX_T "@SFEM_LOCAL_IDX_PRINT_TYPE@"
+#define dtype_LOCAL_IDX_T "@SFEM_LOCAL_IDX_TYPE@"
+
+#endif  // SFEM_ENABLE_CUSTOM_NUMBERS
+
+#define INVALID_IDX (-1)
+
+#define SFEM_WARP_SIZE 32
+#define SFEM_WARP_FULL_MASK 0xfffffff
+
+#endif  // SFEM_CONFIG_HPP

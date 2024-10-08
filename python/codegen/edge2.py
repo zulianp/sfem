@@ -80,6 +80,9 @@ class EdgeShell2(Edge2):
 	def spatial_dim(self):
 		return 2
 
+	def jacobian(self, q):
+		return self.S
+
 	def jacobian_inverse(self, q):
 		return self.Sinv
 

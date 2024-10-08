@@ -66,7 +66,7 @@ axs[0].axvspan(2, 3, color='green', alpha=0.2)
 axs[0].plot(x, y, marker='8')
 axs[0].plot(t, yt, label='Optimized')
 axs[0].plot(t, ytref,  linestyle='None', marker='.', label='Reference')
-axs[0].set_title("Evalutation (evaluation assumed in interval is [2-3])")
+axs[0].set_title("Evaluation (assumed in interval is [2-3])")
 axs[0].legend()
 
 for j in range(0, nctrl):

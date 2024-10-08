@@ -98,7 +98,6 @@ workflows/resample/sdf.float32.xdmf
 ./stokes
 ./stokes_check
 ./linear_elasticity_assemble
-./partition
 ./select_submesh
 ./refine
 ./skin
@@ -236,3 +235,9 @@ run_poisson
 heat_equation
 taylor_hood_navier_stokes
 mesh_to_blocks
+taylor_hood_navier_stokes
+spmv
+run_poisson
+run_convection_diffusion
+mesh_to_blocks
+heat_equation
