@@ -3,6 +3,8 @@
 #include "quadratures_rule.h"
 #include "tet10_weno.h"
 
+#include "sfem_base.h"
+
 #include <math.h>
 #include <stddef.h>
 #include <stdio.h>
