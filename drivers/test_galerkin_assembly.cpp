@@ -142,9 +142,9 @@ int main(int argc, char *argv[]) {
            fs->n_dofs(),
            fs_coarse->n_dofs());
 
-    input->print(std::cout);
-    prolongated->print(std::cout);
-    Ax_fine->print(std::cout);
+    // input->print(std::cout);
+    // prolongated->print(std::cout);
+    // Ax_fine->print(std::cout);
 
     if (0) {
         auto upanddown = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
