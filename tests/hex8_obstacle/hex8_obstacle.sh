@@ -2,37 +2,27 @@
 
 set -e
 
-SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
-export PATH=$SCRIPTPATH/../../../matrix.io:$PATH
-
-export PATH=$SCRIPTPATH:$PATH
-export PATH=$SCRIPTPATH/../../python/sfem:$PATH
-export PATH=$SCRIPTPATH/../../python/sfem/mesh:$PATH
-export PATH=$SCRIPTPATH/../../python/sfem/grid:$PATH
-export PATH=$SCRIPTPATH/../../python/sfem/algebra:$PATH
-export PATH=$SCRIPTPATH/../../python/sfem/utils:$PATH
-export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
-
-if [[ -z $SFEM_DIR/bin ]]
+if [[ -z $SFEM_DIR ]]
 then
-	PATH=$SCRIPTPATH/../../build:$PATH
-	source $SCRIPTPATH/../../build/sfem_config.sh
-	export PYTHONPATH=$SCRIPTPATH/../../build:$PYTHONPATH
-else
-	echo "Using binaries in $SFEM_DIR/bin"
-	export PATH=$SFEM_DIR/bin:$PATH
-	export PATH=$SFEM_DIR/scripts/sfem/mesh:$PATH
-	export PYTHONPATH=$SFEM_DIR/lib:$SFEM_DIR/scripts/sfem:$PYTHONPATH
-	source $SFEM_DIR/workflows/sfem_config.sh
+	echo "SFEM_DIR must be defined with the installation prefix of sfem"
+	exit 1
 fi
+
+SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+export PATH=$SCRIPTPATH:$PATH
+export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
+export PATH=$SFEM_DIR/bin:$PATH
+export PATH=$SFEM_DIR/scripts/sfem/mesh:$PATH
+export PYTHONPATH=$SFEM_DIR/lib:$SFEM_DIR/scripts:$PYTHONPATH
+source $SFEM_DIR/workflows/sfem_config.sh
 
 export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 export CUDA_LAUNCH_BLOCKING=0
 
 export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
-export SFEM_ELEMENT_REFINE_LEVEL=12
+export SFEM_ELEMENT_REFINE_LEVEL=8
 
 mesh=mesh
 

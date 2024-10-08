@@ -355,6 +355,8 @@ SFEM_INLINE static enum ElemType macro_base_elem(const enum ElemType macro_type)
             return TET4;
         case TRI6:
             return TRI3;
+        case PROTEUS_HEX8:
+            return HEX8;
         default: {
             assert(0);
             return macro_type;
