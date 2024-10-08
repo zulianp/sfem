@@ -26,7 +26,7 @@ class AAHex8(FE):
 		y = p[1]
 		z = p[2]
 
-		f = sp.zeros(8)
+		f = sp.zeros(8, 1)
 
 		xm = (1 - x)
 		ym = (1 - y)

@@ -20,6 +20,8 @@
 #include "sfem_cuda_solver.hpp"
 #endif
 
+#include "proteus_hex8.h"
+#include "proteus_hex8_interpolate.h"
 #include "sfem_prolongation_restriction.h"
 
 namespace sfem {
@@ -180,24 +182,42 @@ namespace sfem {
                                                                         1,
                                                                         to,
                                                                         SFEM_DEFAULT_STREAM);
-                    }, es);
+                    },
+                    es);
 
         } else
 #endif
         {
-            return std::make_shared<LambdaOperator<real_t>>(
-                    to_space->n_dofs(),
-                    from_space->n_dofs(),
-                    [=](const real_t *const from, real_t *const to) {
-                        auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
-                        hierarchical_prolongation(from_space->element_type(),
-                                                  to_space->element_type(),
-                                                  mesh->nelements,
-                                                  mesh->elements,
-                                                  from_space->block_size(),
-                                                  from,
-                                                  to);
-                    }, EXECUTION_SPACE_HOST);
+            if (to_space->has_semi_structured_mesh()) {
+                return std::make_shared<LambdaOperator<real_t>>(
+                        to_space->n_dofs(),
+                        from_space->n_dofs(),
+                        [=](const real_t *const from, real_t *const to) {
+                            auto &ssm = to_space->semi_structured_mesh();
+                            proteus_hex8_hierarchical_prolongation(ssm.level(),
+                                                                   ssm.n_elements(),
+                                                                   ssm.element_data(),
+                                                                   from_space->block_size(),
+                                                                   from,
+                                                                   to);
+                        },
+                        EXECUTION_SPACE_HOST);
+            } else {
+                return std::make_shared<LambdaOperator<real_t>>(
+                        to_space->n_dofs(),
+                        from_space->n_dofs(),
+                        [=](const real_t *const from, real_t *const to) {
+                            auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
+                            hierarchical_prolongation(from_space->element_type(),
+                                                      to_space->element_type(),
+                                                      mesh->nelements,
+                                                      mesh->elements,
+                                                      from_space->block_size(),
+                                                      from,
+                                                      to);
+                        },
+                        EXECUTION_SPACE_HOST);
+            }
         }
     }
 
@@ -210,17 +230,30 @@ namespace sfem {
         auto to_element = (enum ElemType)to_space->element_type();
         const int block_size = from_space->block_size();
 
+        ptrdiff_t nnodes = 0;
+        idx_t **elements = nullptr;
+        int nxe;
+        if (from_space->has_semi_structured_mesh()) {
+            auto &mesh = from_space->semi_structured_mesh();
+            nxe = proteus_hex8_nxe(mesh.level());
+            elements = mesh.element_data();
+            nnodes = mesh.n_nodes();
+        } else {
+            nxe = elem_num_nodes(from_element);
+            elements = mesh->elements;
+            nnodes = mesh->nnodes;
+        }
+        
         auto element_to_node_incidence_count =
-                create_buffer<uint16_t>(mesh->nnodes, MEMORY_SPACE_HOST);
-
+                create_buffer<uint16_t>(nnodes, MEMORY_SPACE_HOST);
         {
             auto buff = element_to_node_incidence_count->data();
-            int nxe = elem_num_nodes(from_element);
+
             for (int d = 0; d < nxe; d++) {
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < mesh->nelements; ++i) {
 #pragma omp atomic update
-                    buff[mesh->elements[d][i]]++;
+                    buff[elements[d][i]]++;
                 }
             }
         }
@@ -257,22 +290,40 @@ namespace sfem {
         } else
 #endif
         {
-            return std::make_shared<LambdaOperator<real_t>>(
-                    to_space->n_dofs(),
-                    from_space->n_dofs(),
-                    [=](const real_t *const from, real_t *const to) {
-                        auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
-                        hierarchical_restriction_with_counting(
-                                from_element,
-                                to_element,
-                                mesh->nelements,
-                                mesh->elements,
-                                element_to_node_incidence_count->data(),
-                                block_size,
-                                from,
-                                to);
-                    },
-                    EXECUTION_SPACE_HOST);
+            if (from_space->has_semi_structured_mesh()) {
+                return std::make_shared<LambdaOperator<real_t>>(
+                        to_space->n_dofs(),
+                        from_space->n_dofs(),
+                        [=](const real_t *const from, real_t *const to) {
+                            auto &ssm = from_space->semi_structured_mesh();
+                            proteus_hex8_hierarchical_restriction(
+                                    ssm.level(),
+                                    ssm.n_elements(),
+                                    ssm.element_data(),
+                                    element_to_node_incidence_count->data(),
+                                    block_size,
+                                    from,
+                                    to);
+                        },
+                        EXECUTION_SPACE_HOST);
+            } else {
+                return std::make_shared<LambdaOperator<real_t>>(
+                        to_space->n_dofs(),
+                        from_space->n_dofs(),
+                        [=](const real_t *const from, real_t *const to) {
+                            auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
+                            hierarchical_restriction_with_counting(
+                                    from_element,
+                                    to_element,
+                                    mesh->nelements,
+                                    mesh->elements,
+                                    element_to_node_incidence_count->data(),
+                                    block_size,
+                                    from,
+                                    to);
+                        },
+                        EXECUTION_SPACE_HOST);
+            }
         }
     }
 

@@ -3,11 +3,7 @@
 import numpy as np
 import sys
 
-from sfem_config import *
-
-# geom_t=np.float32
-# idx_t=np.int32
-# real_t=np.float64
+from sfem.sfem_config import *
 
 if __name__ == '__main__':
 	usage = f'{sys.argv[0]} <mesh> <sideset> <output>'

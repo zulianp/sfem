@@ -96,12 +96,37 @@ namespace sfem {
         std::unique_ptr<Impl> impl_;
     };
 
+    class SemiStructuredMesh {
+    public:
+        idx_t **element_data();
+        geom_t **point_data();
+        ptrdiff_t interior_start() const;
+
+        SemiStructuredMesh(const std::shared_ptr<Mesh> macro_mesh, const int level);
+        ~SemiStructuredMesh();
+
+        static std::shared_ptr<SemiStructuredMesh> create(const std::shared_ptr<Mesh> macro_mesh,
+                                                          const int level) {
+            return std::make_shared<SemiStructuredMesh>(macro_mesh, level);
+        }
+
+        ptrdiff_t n_nodes() const;
+        int level() const;
+        ptrdiff_t n_elements() const;
+
+    private:
+        class Impl;
+        std::unique_ptr<Impl> impl_;
+    };
+
     class FunctionSpace final {
     public:
         FunctionSpace(const std::shared_ptr<Mesh> &mesh,
                       const int block_size = 1,
                       const enum ElemType element_type = INVALID);
         ~FunctionSpace();
+
+        int promote_to_semi_structured(const int level);
 
         static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<Mesh> &mesh,
                                                      const int block_size = 1,
@@ -116,6 +141,10 @@ namespace sfem {
         std::shared_ptr<sfem::Buffer<idx_t>> device_elements();
 
         Mesh &mesh();
+
+        bool has_semi_structured_mesh() const;
+        SemiStructuredMesh &semi_structured_mesh();
+
         int block_size() const;
         ptrdiff_t n_dofs() const;
 
@@ -351,10 +380,6 @@ namespace sfem {
         int set_output_dir(const char *path);
 
         std::shared_ptr<Output> output();
-
-        std::shared_ptr<Operator<real_t>> hierarchical_restriction();
-        std::shared_ptr<Operator<real_t>> hierarchical_prolongation();
-
         ExecutionSpace execution_space() const;
 
     private:
@@ -368,7 +393,8 @@ namespace sfem {
                 std::function<std::unique_ptr<Op>(const std::shared_ptr<FunctionSpace> &)>;
 
         using FactoryFunctionBoundary =
-                std::function<std::unique_ptr<Op>(const std::shared_ptr<FunctionSpace> &, const std::shared_ptr<Buffer<idx_t *>> &)>;
+                std::function<std::unique_ptr<Op>(const std::shared_ptr<FunctionSpace> &,
+                                                  const std::shared_ptr<Buffer<idx_t *>> &)>;
 
         static void register_op(const std::string &name, FactoryFunction factory_function);
         static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,
@@ -395,8 +421,7 @@ namespace sfem {
     };
 
     std::string d_op_str(const std::string &name);
-    std::shared_ptr<Buffer<idx_t *>> mesh_connectivity_from_file(MPI_Comm comm,
-                                                                 const char *folder);
+    std::shared_ptr<Buffer<idx_t *>> mesh_connectivity_from_file(MPI_Comm comm, const char *folder);
 }  // namespace sfem
 
 #endif  // SFEM_FUNCTION_HPP

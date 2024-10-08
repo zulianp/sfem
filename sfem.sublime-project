@@ -20,7 +20,8 @@
 				"bin_*",
 				"install",
 				".cache",
-				"venv"
+				"venv",
+				"external"
 			],
 		}
 	]

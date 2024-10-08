@@ -35,6 +35,12 @@
 #include "linear_elasticity.h"
 #include "mass.h"
 #include "neohookean_ogden.h"
+#include "proteus_hex8_laplacian.h"
+#include "proteus_hex8_linear_elasticity.h"
+
+// Mesh
+#include "proteus_hex8.h"
+#include "sfem_hex8_mesh_graph.h"
 
 // Multigrid
 #include "sfem_prolongation_restriction.h"
@@ -218,6 +224,73 @@ namespace sfem {
         return impl_->crs_graph->colidx();
     }
 
+    class SemiStructuredMesh::Impl {
+    public:
+        std::shared_ptr<Mesh> macro_mesh;
+        int level;
+
+        std::shared_ptr<Buffer<idx_t *>> elements;
+        ptrdiff_t n_unique_nodes{-1}, interior_start{-1};
+
+        void init(const std::shared_ptr<Mesh> macro_mesh, const int level) {
+            this->macro_mesh = macro_mesh;
+            this->level = level;
+
+            const int nxe = proteus_hex8_nxe(level);
+            auto elements = (idx_t **)malloc(nxe * sizeof(idx_t *));
+            for (int d = 0; d < nxe; d++) {
+                elements[d] = (idx_t *)malloc(macro_mesh->n_elements() * sizeof(idx_t));
+            }
+
+#ifndef NDEBUG
+            for (int d = 0; d < nxe; d++) {
+                for (ptrdiff_t i = 0; i < macro_mesh->n_elements(); i++) {
+                    elements[d][i] = -1;
+                }
+            }
+#endif
+
+            proteus_hex8_create_full_idx(level,
+                                         (mesh_t *)macro_mesh->impl_mesh(),
+                                         elements,
+                                         &this->n_unique_nodes,
+                                         &this->interior_start);
+
+            this->elements = std::make_shared<Buffer<idx_t *>>(
+                    nxe,
+                    macro_mesh->n_elements(),
+                    elements,
+                    [](int n, void **data) {
+                        for (int i = 0; i < n; i++) {
+                            free(data[i]);
+                        }
+
+                        free(data);
+                    },
+                    MEMORY_SPACE_HOST);
+        }
+
+        Impl() {}
+        ~Impl() {}
+    };
+
+    idx_t **SemiStructuredMesh::element_data() { return impl_->elements->data(); }
+    geom_t **SemiStructuredMesh::point_data() {
+        return ((mesh_t *)(impl_->macro_mesh->impl_mesh()))->points;
+    }
+    ptrdiff_t SemiStructuredMesh::interior_start() const { return impl_->interior_start; }
+
+    SemiStructuredMesh::SemiStructuredMesh(const std::shared_ptr<Mesh> macro_mesh, const int level)
+        : impl_(std::make_unique<Impl>()) {
+        impl_->init(macro_mesh, level);
+    }
+
+    SemiStructuredMesh::~SemiStructuredMesh() {}
+
+    ptrdiff_t SemiStructuredMesh::n_nodes() const { return impl_->n_unique_nodes; }
+    int SemiStructuredMesh::level() const { return impl_->level; }
+    ptrdiff_t SemiStructuredMesh::n_elements() const { return impl_->macro_mesh->n_elements(); }
+
     class FunctionSpace::Impl {
     public:
         std::shared_ptr<Mesh> mesh;
@@ -232,6 +305,9 @@ namespace sfem {
         std::shared_ptr<CRSGraph> node_to_node_graph;
         std::shared_ptr<CRSGraph> dof_to_dof_graph;
         std::shared_ptr<sfem::Buffer<idx_t>> device_elements;
+
+        // Data-structures for semistructured mesh
+        std::shared_ptr<SemiStructuredMesh> semi_structured_mesh;
 
         ~Impl() {}
 
@@ -256,7 +332,7 @@ namespace sfem {
     void FunctionSpace::set_device_elements(const std::shared_ptr<sfem::Buffer<idx_t>> &elems) {
         impl_->device_elements = elems;
     }
-    
+
     std::shared_ptr<sfem::Buffer<idx_t>> FunctionSpace::device_elements() {
         return impl_->device_elements;
     }
@@ -277,9 +353,15 @@ namespace sfem {
     }
 
     std::shared_ptr<FunctionSpace> FunctionSpace::derefine() const {
-        // FIXME the number of nodes in mesh does not change, will lead to bugs
-        return std::make_shared<FunctionSpace>(
-                impl_->mesh, impl_->block_size, macro_base_elem(impl_->element_type));
+        // if (has_semi_structured_mesh()) {
+
+        // }
+
+        {
+            // FIXME the number of nodes in mesh does not change, will lead to bugs
+            return std::make_shared<FunctionSpace>(
+                    impl_->mesh, impl_->block_size, macro_base_elem(impl_->element_type));
+        }
     }
 
     FunctionSpace::FunctionSpace(const std::shared_ptr<Mesh> &mesh,
@@ -313,9 +395,29 @@ namespace sfem {
         }
     }
 
+    int FunctionSpace::promote_to_semi_structured(const int level) {
+        if (impl_->element_type == HEX8) {
+            impl_->semi_structured_mesh = std::make_shared<SemiStructuredMesh>(impl_->mesh, level);
+            impl_->element_type = PROTEUS_HEX8;
+            impl_->nlocal = impl_->semi_structured_mesh->n_nodes() * impl_->block_size;
+            impl_->nglobal = impl_->nlocal;
+            return SFEM_SUCCESS;
+        }
+
+        return SFEM_FAILURE;
+    }
+
     FunctionSpace::~FunctionSpace() = default;
 
+    bool FunctionSpace::has_semi_structured_mesh() const {
+        return static_cast<bool>(impl_->semi_structured_mesh);
+    }
+
     Mesh &FunctionSpace::mesh() { return *impl_->mesh; }
+
+    SemiStructuredMesh &FunctionSpace::semi_structured_mesh() {
+        return *impl_->semi_structured_mesh;
+    }
 
     int FunctionSpace::block_size() const { return impl_->block_size; }
 
@@ -808,8 +910,8 @@ namespace sfem {
                         path,
                         SFEM_MPI_REAL_T,
                         x,
-                        mesh->nnodes * impl_->space->block_size(),
-                        mesh->nnodes * impl_->space->block_size())) {
+                        impl_->space->n_dofs(),
+                        impl_->space->n_dofs())) {
             return SFEM_FAILURE;
         }
 
@@ -837,8 +939,8 @@ namespace sfem {
                         path,
                         SFEM_MPI_REAL_T,
                         x,
-                        mesh->nnodes * impl_->space->block_size(),
-                        mesh->nnodes * impl_->space->block_size())) {
+                        impl_->space->n_dofs(),
+                        impl_->space->n_dofs())) {
             return SFEM_FAILURE;
         }
 
@@ -902,20 +1004,6 @@ namespace sfem {
     std::shared_ptr<CRSGraph> Function::crs_graph() const {
         return impl_->space->dof_to_dof_graph();
     }
-
-    // int Function::create_crs_graph(ptrdiff_t *nlocal,
-    //                                ptrdiff_t *nglobal,
-    //                                ptrdiff_t *nnz,
-    //                                count_t **rowptr,
-    //                                idx_t **colidx) {
-    //     SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.create_crs_graph);
-
-    //     return impl_->space->create_crs_graph(nlocal, nglobal, nnz, rowptr, colidx);
-    // }
-
-    // int Function::destroy_crs_graph(count_t *rowptr, idx_t *colidx) {
-    //     return impl_->space->destroy_crs_graph(rowptr, colidx);
-    // }
 
     int Function::hessian_crs(const real_t *const x,
                               const count_t *const rowptr,
@@ -1056,65 +1144,6 @@ namespace sfem {
     }
 
     std::shared_ptr<Output> Function::output() { return impl_->output; }
-
-    std::shared_ptr<Operator<real_t>> Function::hierarchical_restriction() {
-        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
-
-        auto et = (enum ElemType)impl_->space->element_type();
-        auto coarse_et = macro_base_elem(et);
-
-        const ptrdiff_t rows = max_node_id(coarse_et, mesh->nelements, mesh->elements) + 1;
-        const ptrdiff_t cols = impl_->space->n_dofs();
-
-        auto crs_graph = impl_->space->mesh().create_node_to_node_graph(coarse_et);
-
-        auto p2_vertices = h_buffer<idx_t>(crs_graph->nnz());
-
-        build_p1_to_p2_edge_map(rows,
-                                crs_graph->rowptr()->data(),
-                                crs_graph->colidx()->data(),
-                                p2_vertices->data());
-
-        return std::make_shared<LambdaOperator<real_t>>(
-                rows,
-                cols,
-                [=](const real_t *const from, real_t *const to) {
-                    ::hierarchical_restriction_with_edge_map(crs_graph->n_nodes(),
-                                                             crs_graph->rowptr()->data(),
-                                                             crs_graph->colidx()->data(),
-                                                             p2_vertices->data(),
-                                                             impl_->space->block_size(),
-                                                             from,
-                                                             to);
-                },
-                EXECUTION_SPACE_HOST);
-    }
-
-    std::shared_ptr<Operator<real_t>> Function::hierarchical_prolongation() {
-        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
-
-        auto et = (enum ElemType)impl_->space->element_type();
-        auto coarse_et = macro_base_elem(et);
-
-        const ptrdiff_t rows = impl_->space->n_dofs();
-        const ptrdiff_t cols = max_node_id(coarse_et, mesh->nelements, mesh->elements) + 1;
-
-        return std::make_shared<LambdaOperator<real_t>>(
-                rows,
-                cols,
-                [=](const real_t *const from, real_t *const to) {
-                    ::hierarchical_prolongation(coarse_et,
-                                                et,
-                                                mesh->nelements,
-                                                mesh->elements,
-                                                impl_->space->block_size(),
-                                                from,
-                                                to);
-
-                    this->apply_zero_constraints(to);
-                },
-                EXECUTION_SPACE_HOST);
-    }
 
     std::shared_ptr<Function> Function::derefine(const bool dirichlet_as_zero) {
         return derefine(impl_->space->derefine(), dirichlet_as_zero);
@@ -1290,6 +1319,133 @@ namespace sfem {
         int report(const real_t *const) override { return SFEM_SUCCESS; }
     };
 
+    class SemiStructuredLinearElasticity : public Op {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+        enum ElemType element_type { INVALID };
+
+        real_t mu{1}, lambda{1};
+        bool use_affine_approximation{false};
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            assert(space->has_semi_structured_mesh());
+            if (!space->has_semi_structured_mesh()) {
+                fprintf(stderr,
+                        "[Error] SemiStructuredLinearElasticity::create requires space with "
+                        "semi_structured_mesh!\n");
+                return nullptr;
+            }
+
+            assert(space->element_type() == PROTEUS_HEX8);  // REMOVEME once generalized approach
+            auto ret = std::make_unique<SemiStructuredLinearElasticity>(space);
+
+            real_t SFEM_SHEAR_MODULUS = 1;
+            real_t SFEM_FIRST_LAME_PARAMETER = 1;
+
+            SFEM_READ_ENV(SFEM_SHEAR_MODULUS, atof);
+            SFEM_READ_ENV(SFEM_FIRST_LAME_PARAMETER, atof);
+
+            ret->mu = SFEM_SHEAR_MODULUS;
+            ret->lambda = SFEM_FIRST_LAME_PARAMETER;
+            ret->element_type = (enum ElemType)space->element_type();
+
+            int SFEM_HEX8_ASSUME_AFFINE = ret->use_affine_approximation;
+            SFEM_READ_ENV(SFEM_HEX8_ASSUME_AFFINE, atoi);
+            ret->use_affine_approximation = SFEM_HEX8_ASSUME_AFFINE;
+
+            return ret;
+        }
+
+        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
+            assert(false);
+            fprintf(stderr, "[Error] ss:LinearElasticity::lor_op NOT IMPLEMENTED!\n");
+            return nullptr;
+        }
+
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
+            assert(space->element_type() == macro_base_elem(element_type));
+            auto ret = std::make_shared<LinearElasticity>(space);
+            ret->element_type = macro_base_elem(element_type);
+            ret->mu = mu;
+            ret->lambda = lambda;
+            return ret;
+        }
+
+        const char *name() const override { return "ss:LinearElasticity"; }
+        inline bool is_linear() const override { return true; }
+
+        int initialize() override { return SFEM_SUCCESS; }
+
+        SemiStructuredLinearElasticity(const std::shared_ptr<FunctionSpace> &space)
+            : space(space) {}
+
+        int hessian_crs(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values) override {
+            assert(false);
+            return SFEM_FAILURE;
+        }
+
+        int hessian_diag(const real_t *const, real_t *const out) override {
+            assert(false);
+            return SFEM_FAILURE;
+        }
+
+        int gradient(const real_t *const x, real_t *const out) override {
+            assert(false);
+            return SFEM_FAILURE;
+        }
+
+        int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
+            assert(element_type == PROTEUS_HEX8);  // REMOVEME once generalized approach
+
+            auto &ssm = space->semi_structured_mesh();
+
+            if (use_affine_approximation) {
+                return proteus_affine_hex8_linear_elasticity_apply(ssm.level(),
+                                                                   ssm.n_elements(),
+                                                                   ssm.interior_start(),
+                                                                   ssm.element_data(),
+                                                                   ssm.point_data(),
+                                                                   mu,
+                                                                   lambda,
+                                                                   3,
+                                                                   &h[0],
+                                                                   &h[1],
+                                                                   &h[2],
+                                                                   3,
+                                                                   &out[0],
+                                                                   &out[1],
+                                                                   &out[2]);
+
+            } else {
+                return proteus_hex8_linear_elasticity_apply(ssm.level(),
+                                                            ssm.n_elements(),
+                                                            ssm.interior_start(),
+                                                            ssm.element_data(),
+                                                            ssm.point_data(),
+                                                            mu,
+                                                            lambda,
+                                                            3,
+                                                            &h[0],
+                                                            &h[1],
+                                                            &h[2],
+                                                            3,
+                                                            &out[0],
+                                                            &out[1],
+                                                            &out[2]);
+            }
+        }
+
+        int value(const real_t *x, real_t *const out) override {
+            assert(false);
+            return SFEM_FAILURE;
+        }
+
+        int report(const real_t *const) override { return SFEM_SUCCESS; }
+    };
+
     class Laplacian final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
@@ -1387,6 +1543,104 @@ namespace sfem {
                                             mesh->points,
                                             x,
                                             out);
+        }
+
+        int report(const real_t *const) override { return SFEM_SUCCESS; }
+    };
+
+    class SemiStructuredLaplacian : public Op {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+        enum ElemType element_type { INVALID };
+        bool use_affine_approximation{false};
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            assert(space->has_semi_structured_mesh());
+            if (!space->has_semi_structured_mesh()) {
+                fprintf(stderr,
+                        "[Error] SemiStructuredLaplacian::create requires space with "
+                        "semi_structured_mesh!\n");
+                return nullptr;
+            }
+
+            assert(space->element_type() == PROTEUS_HEX8);  // REMOVEME once generalized approach
+            auto ret = std::make_unique<SemiStructuredLaplacian>(space);
+
+            ret->element_type = (enum ElemType)space->element_type();
+
+            int SFEM_HEX8_ASSUME_AFFINE = ret->use_affine_approximation;
+            SFEM_READ_ENV(SFEM_HEX8_ASSUME_AFFINE, atoi);
+            ret->use_affine_approximation = SFEM_HEX8_ASSUME_AFFINE;
+
+            return ret;
+        }
+
+        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
+            assert(false);
+            fprintf(stderr, "[Error] ss:Laplacian::lor_op NOT IMPLEMENTED!\n");
+            return nullptr;
+        }
+
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
+            assert(space->element_type() == macro_base_elem(element_type));
+            auto ret = std::make_shared<Laplacian>(space);
+            ret->element_type = macro_base_elem(element_type);
+            return ret;
+        }
+
+        const char *name() const override { return "ss:Laplacian"; }
+        inline bool is_linear() const override { return true; }
+
+        int initialize() override { return SFEM_SUCCESS; }
+
+        SemiStructuredLaplacian(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+        int hessian_crs(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values) override {
+            assert(false);
+            return SFEM_FAILURE;
+        }
+
+        int hessian_diag(const real_t *const, real_t *const out) override {
+            assert(false);
+            return SFEM_FAILURE;
+        }
+
+        int gradient(const real_t *const x, real_t *const out) override {
+            assert(false);
+            return SFEM_FAILURE;
+        }
+
+        int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
+            assert(element_type == PROTEUS_HEX8);  // REMOVEME once generalized approach
+
+            auto &ssm = space->semi_structured_mesh();
+
+            if (use_affine_approximation) {
+                return proteus_affine_hex8_laplacian_apply(ssm.level(),
+                                                           ssm.n_elements(),
+                                                           ssm.interior_start(),
+                                                           ssm.element_data(),
+                                                           ssm.point_data(),
+                                                           h,
+                                                           out);
+
+            } else {
+                return proteus_hex8_laplacian_apply(ssm.level(),
+                                                    ssm.n_elements(),
+                                                    ssm.interior_start(),
+                                                    ssm.element_data(),
+                                                    ssm.point_data(),
+                                                    h,
+                                                    out);
+            }
+        }
+
+        int value(const real_t *x, real_t *const out) override {
+            assert(false);
+            return SFEM_FAILURE;
         }
 
         int report(const real_t *const) override { return SFEM_SUCCESS; }
@@ -2034,7 +2288,11 @@ namespace sfem {
 
         if (instance_.impl_->name_to_create.empty()) {
             instance_.private_register_op("LinearElasticity", LinearElasticity::create);
+            instance_.private_register_op("ss:LinearElasticity",
+                                          SemiStructuredLinearElasticity::create);
             instance_.private_register_op("Laplacian", Laplacian::create);
+            instance_.private_register_op("ss:Laplacian",
+                                          SemiStructuredLaplacian::create);
             instance_.private_register_op("CVFEMUpwindConvection", CVFEMUpwindConvection::create);
             instance_.private_register_op("Mass", Mass::create);
             instance_.private_register_op("CVFEMMass", CVFEMMass::create);
@@ -2064,11 +2322,17 @@ namespace sfem {
                                            const char *name) {
         assert(instance().impl_);
 
+        std::string m_name = name;
+
+        if (space->has_semi_structured_mesh()) {
+            m_name = "ss:" + m_name;
+        }
+
         auto &ntc = instance().impl_->name_to_create;
-        auto it = ntc.find(name);
+        auto it = ntc.find(m_name);
 
         if (it == ntc.end()) {
-            std::cerr << "Unable to find op " << name << "\n";
+            std::cerr << "Unable to find op " << m_name << "\n";
             return nullptr;
         }
 
