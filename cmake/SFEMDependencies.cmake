@@ -42,7 +42,7 @@ endif()
 
 # ##############################################################################
 
-find_package(MPIExtended REQUIRED)
+find_package(MPI REQUIRED)
 
 if(MPI_FOUND)
     set(SFEM_HAVE_MPI TRUE)
