@@ -86,6 +86,7 @@ if(SFEM_ENABLE_CUDA)
         operators/proteus_tet4/cuda
         operators/proteus_hex8/cuda
         operators/hierarchical/cuda
+        resampling/cuda
         )
 endif()
 

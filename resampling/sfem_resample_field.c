@@ -867,7 +867,7 @@ int resample_field_local(
         }
 
         case TET10: {
-// #define TET10_V2
+#define TET10_V2
 
 // { /// DEBUG ///
 // double norm_data = 0.0;

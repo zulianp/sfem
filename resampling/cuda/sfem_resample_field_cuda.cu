@@ -4,7 +4,7 @@
 #include <cuda_profiler_api.h>
 #include <stdio.h>
 
-#define real_t double
+// #define real_t double
 #define real_type real_t
 
 #define MY_RESTRICT __restrict__
