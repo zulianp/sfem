@@ -16,6 +16,7 @@
 #define SFEM_RESTRICT __restrict__
 
 #define SFEM_RESAMPLE_GAP_DUAL
+#define real_type real_t
 
 #define _VL4_ 4
 typedef scalar_t vec4_t
