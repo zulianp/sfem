@@ -58,17 +58,12 @@ echo $sizes
 echo $origins
 echo $scaling
 
-<<<<<<< HEAD
 n_procs=1
 # n_procs=2
 # n_procs=8
 
 LAUNCH="mpiexec -np $n_procs"
 #LAUNCH=""
-=======
-LAUNCH="mpiexec -np $NCORES"
-# LAUNCH=" "
->>>>>>> main
 
 GRID_TO_MESH="grid_to_mesh"
 #GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
