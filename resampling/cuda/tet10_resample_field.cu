@@ -1247,6 +1247,8 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  
                                                              stride1,
                                                              stride2,
                                                              data);  //
+
+                                                             eval_field = 1.0; ///////////////////// DEBUG
 #else
 
         // Get the reminder [0, 1]
@@ -1358,7 +1360,7 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
 
 #define CUBE1 1
 
-#if CUBE1 == 1  // WENO ..
+#if CUBE1 == 0  // WENO ..
     char* kernel_name = "hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel";
 #else
     char* kernel_name = "hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel";
@@ -1383,7 +1385,7 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
     cudaEventRecord(start);
 
     {
-#if CUBE1 == 1  // WENO .
+#if CUBE1 == 1  // WENO
         hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel
 #else
         hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel

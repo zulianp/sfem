@@ -71,6 +71,7 @@ if(MPI_FOUND)
         set(SFEM_DEP_LIBRARIES
             "${SFEM_DEP_LIBRARIES};${MPI_CXX_LIBRARIES}")
     endif()
+    
 else()
     message(
         FATAL_ERROR
@@ -117,7 +118,7 @@ if(SFEM_ENABLE_CUDA)
 
     find_package(CUDAToolkit REQUIRED)
 
-    set(SFEM_DEP_LIBRARIES "CUDA::cudart")
+    list(APPEND SFEM_DEP_LIBRARIES "CUDA::cudart")
 
     set(_SFEM_CUDA_MODULES "CUDA::cusparse;CUDA::cublas;CUDA::nvToolsExt")
     set(SFEM_ENABLE_CUBLAS TRUE)
