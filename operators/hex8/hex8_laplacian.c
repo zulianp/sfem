@@ -66,21 +66,17 @@ int hex8_laplacian_apply(const ptrdiff_t nelements,
                 element_u[v] = u[ev[v]];
             }
 
-            // Assume affine here!
-            tet4_fff_s(x[ev[0]],
-                       x[ev[1]],
-                       x[ev[3]],
-                       x[ev[4]],
-                       y[ev[0]],
-                       y[ev[1]],
-                       y[ev[3]],
-                       y[ev[4]],
-                       z[ev[0]],
-                       z[ev[1]],
-                       z[ev[3]],
-                       z[ev[4]],
-                       fff);
+            const scalar_t lx[8] = {
+                    x[ev[0]], x[ev[1]], x[ev[2]], x[ev[3]], x[ev[4]], x[ev[5]], x[ev[6]], x[ev[7]]};
 
+            const scalar_t ly[8] = {
+                    y[ev[0]], y[ev[1]], y[ev[2]], y[ev[3]], y[ev[4]], y[ev[5]], y[ev[6]], y[ev[7]]};
+
+            const scalar_t lz[8] = {
+                    z[ev[0]], z[ev[1]], z[ev[2]], z[ev[3]], z[ev[4]], z[ev[5]], z[ev[6]], z[ev[7]]};
+
+            // Assume affine here!
+            hex8_fff(lx, ly, lz, 0.5, 0.5, 0.5, fff);
             hex8_laplacian_apply_fff_integral(fff, element_u, element_vector);
 
             for (int edof_i = 0; edof_i < 8; ++edof_i) {

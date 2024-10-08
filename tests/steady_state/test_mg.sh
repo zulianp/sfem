@@ -38,5 +38,6 @@ export SFEM_OPERATOR="LinearElasticity"
 # export SFEM_OPERATOR="Laplacian"
 
 
-# export SFEM_HEX8_ASSUME_AFFINE=1
+export SFEM_HEX8_ASSUME_AFFINE=1
+export SFEM_HEX8_ASSUME_AXIS_ALIGNED=0
 $LAUNCH test_galerkin_assembly $mesh output
