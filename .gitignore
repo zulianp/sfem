@@ -226,3 +226,9 @@ lumped_mass_inv
 resampling/test_grid/local_grid.txt
 resampling/test_grid/test_grid
 resampling/test_grid/test_grid_new
+taylor_hood_navier_stokes
+spmv
+run_poisson
+run_convection_diffusion
+mesh_to_blocks
+heat_equation
