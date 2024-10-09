@@ -847,6 +847,9 @@ int resample_field_local(
         // Output
         real_t* const SFEM_RESTRICT weighted_field, sfem_resample_field_info* info) {
     //
+
+    PRINT_CURRENT_FUNCTION;
+
     switch (TET10) {
         case TET4: {
             info->quad_nodes_cnt = TET4_NQP;
@@ -869,26 +872,28 @@ int resample_field_local(
         case TET10: {
 #define TET10_V2
 
-// { /// DEBUG ///
-// double norm_data = 0.0;
-// for (ptrdiff_t i = 0; i < n[0] * n[1] * n[2]; i++) {
-//     norm_data += data[i] * data[i];
-//     if(i % 50000 == 0) {
-//         printf("norm_data[%ld] = %g, %s:%d\n", i, norm_data, __FILE__, __LINE__);
-//     }
-// }
+            // { /// DEBUG ///
+            // double norm_data = 0.0;
+            // for (ptrdiff_t i = 0; i < n[0] * n[1] * n[2]; i++) {
+            //     norm_data += data[i] * data[i];
+            //     if(i % 50000 == 0) {
+            //         printf("norm_data[%ld] = %g, %s:%d\n", i, norm_data, __FILE__, __LINE__);
+            //     }
+            // }
 
-// norm_data = sqrt(norm_data);
-// printf("\nFunction: %s\n", __FUNCTION__);
-// printf("\nnorm_data input = %g   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< %s:%d\n\n", norm_data, __FILE__, __LINE__);
-// } /// end DEBUG ///
+            // norm_data = sqrt(norm_data);
+            // printf("\nFunction: %s\n", __FUNCTION__);
+            // printf("\nnorm_data input = %g   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< %s:%d\n\n",
+            // norm_data, __FILE__, __LINE__); } /// end DEBUG ///
 
 #ifdef TET10_V2  // V2
-            return hex8_to_tet10_resample_field_local_CUDA(
+            const int ret = hex8_to_tet10_resample_field_local_CUDA(
                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+            RETURN_FROM_FUNCTION(ret);
 #else
-            return hex8_to_tet10_resample_field_local(
+            const int ret = hex8_to_tet10_resample_field_local(
                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+            RETURN_FROM_FUNCTION(ret);
 #endif
         }
 
@@ -913,7 +918,9 @@ int resample_field_local(
             return EXIT_FAILURE;
         }
     }
-}
+
+    RETURN_FROM_FUNCTION(0);
+}  // end resample_field_local
 
 int resample_field(
         // Mesh
@@ -926,6 +933,8 @@ int resample_field(
         // Output
         real_t* const SFEM_RESTRICT g, sfem_resample_field_info* info) {
     //
+    PRINT_CURRENT_FUNCTION;
+
     real_t* weighted_field = calloc(nnodes, sizeof(real_t));
 
     // { /// DEBUG ///
@@ -934,9 +943,9 @@ int resample_field(
 
     //     printf("\nFunction: %s\n", __FUNCTION__);
     //     printf("data (ptr): %p, %s:%d\n", (void *)data, __FILE__, __LINE__);
-    //     printf("n[0] = %ld, n[1] = %ld, n[2] = %ld, %s:%d\n", n[0], n[1], n[2], __FILE__, __LINE__);
+    //     printf("n[0] = %ld, n[1] = %ld, n[2] = %ld, %s:%d\n", n[0], n[1], n[2], __FILE__,
+    //     __LINE__);
 
-        
     //     for (ptrdiff_t i = 0; i < (n[0] * n[1] * n[2]); i++) {
     //         norm_data += (data[i] * data[i]);
     //     //     // search a nan value in the data
@@ -945,16 +954,17 @@ int resample_field(
     //         }
     //     }
     //     const double sqrt_norm_data = sqrt(norm_data);
-    //     printf("\nnorm_data input = %e   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< %s:%d\n\n", sqrt_norm_data,
+    //     printf("\nnorm_data input = %e   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< %s:%d\n\n",
+    //     sqrt_norm_data,
     //            __FILE__,
     //            __LINE__);
 
     //     int indices[3] = {22, 55, 111};
-    //                 printf("data[%d] = %g, %s:%d\n", indices[0], data[indices[0]], __FILE__, __LINE__);
-    //                 printf("data[%d] = %g, %s:%d\n", indices[1], data[indices[1]], __FILE__, __LINE__);
-    //                 printf("data[%d] = %g, %s:%d\n", indices[2], data[indices[2]], __FILE__, __LINE__);
+    //                 printf("data[%d] = %g, %s:%d\n", indices[0], data[indices[0]], __FILE__,
+    //                 __LINE__); printf("data[%d] = %g, %s:%d\n", indices[1], data[indices[1]],
+    //                 __FILE__, __LINE__); printf("data[%d] = %g, %s:%d\n", indices[2],
+    //                 data[indices[2]], __FILE__, __LINE__);
     // } /// end DEBUG ///
-
 
     resample_field_local(element_type,
                          nelements,
@@ -992,7 +1002,9 @@ int resample_field(
     }
 
     free(weighted_field);
-    return 0;
+
+    RETURN_FROM_FUNCTION(0);
+    // return 0;
 }
 
 int interpolate_field(const ptrdiff_t nnodes, geom_t** const SFEM_RESTRICT xyz,
