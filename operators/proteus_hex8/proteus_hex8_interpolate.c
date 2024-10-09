@@ -17,6 +17,7 @@ int proteus_hex8_hierarchical_restriction(int level,
         const int nxe = proteus_hex8_nxe(level);
         scalar_t **e_from = malloc(vec_size * sizeof(scalar_t *));
         scalar_t **e_to = malloc(vec_size * sizeof(scalar_t *));
+        uint16_t *weight = malloc(nxe * sizeof(uint16_t));
 
         for (int d = 0; d < vec_size; d++) {
             e_from[d] = malloc(nxe * sizeof(scalar_t));
@@ -49,6 +50,10 @@ int proteus_hex8_hierarchical_restriction(int level,
                         e_from[d][v] = from[ev[v] * vec_size + d];
                         assert(e_from[d][v] == e_from[d][v]);
                     }
+                }
+
+                for (int v = 0; v < nxe; v++) {
+                    weight[v] = element_to_node_incidence_count[ev[v]];
                 }
 
                 for (int d = 0; d < vec_size; d++) {
@@ -84,7 +89,7 @@ int proteus_hex8_hierarchical_restriction(int level,
                             f[7] = xm * y * z;    // (0, 1, 1)
 
                             for (int d = 0; d < vec_size; d++) {
-                                const scalar_t val = e_from[d][lidx];
+                                const scalar_t val = e_from[d][lidx] / weight[lidx];
                                 for (int i = 0; i < 8; i++) {
                                     e_to[d][i] += f[i] * val;
                                 }
@@ -97,8 +102,7 @@ int proteus_hex8_hierarchical_restriction(int level,
                     for (int i = 0; i < 8; i++) {
                         const int c = corners[i];
 #pragma omp atomic update
-                        to[ev[c] * vec_size + d] +=
-                                e_to[d][i] / element_to_node_incidence_count[ev[c]];
+                        to[ev[c] * vec_size + d] += e_to[d][i];
                     }
                 }
             }
@@ -112,8 +116,8 @@ int proteus_hex8_hierarchical_restriction(int level,
 
         free(e_from);
         free(e_to);
-
         free(ev);
+        free(weight);
     }
 
     return SFEM_SUCCESS;
@@ -197,8 +201,8 @@ int proteus_hex8_hierarchical_prolongation(int level,
                             f[7] = xm * y * z;    // (0, 1, 1)
 
                             for (int d = 0; d < vec_size; d++) {
-                                for (int i = 0; i < 8; i++) {
-                                    e_to[d][lidx] += f[i] * e_from[d][i];
+                                for (int v = 0; v < 8; v++) {
+                                    e_to[d][lidx] += f[v] * e_from[d][v];
                                 }
                             }
                         }

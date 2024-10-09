@@ -12,11 +12,11 @@ from sfem.sfem_config import *
 # Solver parameters
 # --------------------------------------
 MAX_NL_ITER = 1000
-max_linear_iterations = 4
-penalty_param = 10 # Very sensitive to this! If few linear iterations it is less sensitive
+max_linear_iterations = 8
+penalty_param = 1 # Very sensitive to this! If few linear iterations it is less sensitive
 use_cheb = False
 matrix_free = True
-use_penalty = False
+use_penalty = True
 
 def create_mg():
 	mg = sfem.Multigrid()
@@ -127,7 +127,7 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 		H_diag = (penalty_param * mass * active)
 		sfem.apply_zero_constraints(fun, H_diag)
 		H = sfem.diag(H_diag)
-		lop = H + lop
+		op = H + lop
 
 		g_pen = (penalty_param * mass * active * dps)
 		sfem.apply_zero_constraints(fun, g_pen)
@@ -139,13 +139,13 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 
 			r[:] = 0.
 			sfem.apply(inv_diag, (g_pen - g), r)
-			solver.set_op(inv_diag * lop * inv_diag)
+			solver.set_op(inv_diag * op * inv_diag)
 		else:
 			# CG
 			inv_diag = sfem.diag(1./(fun_diag + H_diag))
 			solver.set_preconditioner_op(inv_diag)
 			r = g_pen - g
-			solver.set_op(lop)
+			solver.set_op(op)
 
 		c[:] = 0.
 		sfem.copy_constrained_dofs(fun, r, c)

@@ -261,10 +261,18 @@ int proteus_affine_hex8_laplacian_apply(const int level,
 #define PROTEUS_HEX8_USE_MV  // assemblying the elemental matrix is faster
 #ifdef PROTEUS_HEX8_USE_MV
             accumulator_t laplacian_matrix[8 * 8];
+
+            // hex8_laplacian_matrix_fff_integral(m_fff, laplacian_matrix);
+            // printf("---------------------------\n");
+            // printf("laplacian_matrix MACRO (%d)\n", e);
+            // print_matrix(8, 8, laplacian_matrix);
+            // printf("---------------------------\n");
+
+
             hex8_laplacian_matrix_fff_integral(fff, laplacian_matrix);
 
             // printf("---------------------------\n");
-            // printf("laplacian_matrix\n");
+            // printf("laplacian_matrix MICRO (%d)\n", e);
             // print_matrix(8, 8, laplacian_matrix);
             // printf("---------------------------\n");
 #endif

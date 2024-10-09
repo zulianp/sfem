@@ -38,11 +38,19 @@ N=$(( resolution * 2 ))
 export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
 export SFEM_ELEMENT_REFINE_LEVEL=$2
 
+if [[ -z $SFEM_BOX_SIZE ]]
+then
+	SFEM_BOX_SIZE=1
+else
+	echo "SFEM_BOX_SIZE=$SFEM_BOX_SIZE"
+fi
+
 mesh=mesh
 
 mkdir -p $mesh
 
-box_mesh.py $mesh -c hex8 -x $N -y $N -z $N --height=1 --width=1 --depth=1
+box_mesh.py $mesh -c hex8 -x $N -y $N -z $N --height=$SFEM_BOX_SIZE --width=$SFEM_BOX_SIZE --depth=$SFEM_BOX_SIZE
+raw_to_db.py $mesh model.vtk
 
 skin $mesh $mesh/macro_quad_surface
 cp $mesh/{x,y,z}.raw $mesh/macro_quad_surface
