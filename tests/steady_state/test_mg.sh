@@ -41,7 +41,7 @@ export SFEM_OPERATOR="LinearElasticity"
 
 # export SFEM_SHEAR_MODULUS=1
 # export SFEM_FIRST_LAME_PARAMETER=1
-export SFEM_HEX8_ASSUME_AFFINE=0
+export SFEM_HEX8_ASSUME_AFFINE=1
 export SFEM_HEX8_ASSUME_AXIS_ALIGNED=0
 $LAUNCH test_galerkin_assembly $mesh output
 
