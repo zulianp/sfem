@@ -1156,11 +1156,11 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  
         const real_t measure = tet10_measure_cu(x_unit,
                                                 y_unit,
                                                 z_unit,  //
-                                                tet4_qx[q_i],
-                                                tet4_qy[q_i],
-                                                tet4_qz[q_i]);
+                                                tet4_qx_v,
+                                                tet4_qy_v,
+                                                tet4_qz_v);
 
-        const real_t dV = measure * tet4_qw[q_i] * cVolume;
+        const real_t dV = measure * tet4_qw_v * cVolume;
 
         // printf("dV[%d]: %e\n", q, dV);
 
@@ -1171,14 +1171,14 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  
         tet10_transform_cu(x,
                            y,
                            z,
-                           tet4_qx[q_i],
-                           tet4_qy[q_i],
-                           tet4_qz[q_i],
+                           tet4_qx_v,
+                           tet4_qy_v,
+                           tet4_qz_v,
                            &g_qx_glob,
                            &g_qy_glob,
                            &g_qz_glob);
 
-        tet10_dual_basis_hrt_cu(tet4_qx[q_i], tet4_qy[q_i], tet4_qz[q_i], tet10_f);
+        tet10_dual_basis_hrt_cu(tet4_qx_v, tet4_qy_v, tet4_qz_v, tet10_f);
 
         // Transform quadrature point to unitary space
         // g_qx_unit, g_qy_unit, g_qz_unit are the coordinates of the quadrature point in
@@ -1187,9 +1187,9 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  
         tet10_transform_cu(x_unit,
                            y_unit,
                            z_unit,
-                           tet4_qx[q_i],
-                           tet4_qy[q_i],
-                           tet4_qz[q_i],
+                           tet4_qx_v,
+                           tet4_qy_v,
+                           tet4_qz_v,
                            &g_qx_unit,
                            &g_qy_unit,
                            &g_qz_unit);
@@ -1248,8 +1248,8 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  
                                                              stride2,
                                                              data);  //
 
-                                                             eval_field = 1.0; ///////////////////// DEBUG
-#else
+        // eval_field = 1.0;  ///////////////////// DEBUG
+#else   // WENO_CUBE == 0
 
         // Get the reminder [0, 1]
         real_t l_x = (grid_x - i_glob);
@@ -1331,6 +1331,8 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
         const real_t* const SFEM_RESTRICT data,    // SDF
         // Output //
         real_t* const SFEM_RESTRICT weighted_field) {  //
+
+    PRINT_CURRENT_FUNCTION;
 
     // Device memory
     real_t* data_device = NULL;
@@ -1471,5 +1473,7 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
     }
     weighted_field_device = NULL;
 
-    return 0;
+
+    RETURN_FROM_FUNCTION(0);
+    // return 0;
 }

@@ -154,10 +154,12 @@ set_target_properties(
 
 set(SFEM_TARGETS sfem)
 
+set(CUDA_ARCH 75)
+
 if(SFEM_ENABLE_CUDA)
 # set_target_properties(sfem PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 # https://gt3rs.medium.com/compile-with-nvcc-3566fbdfdbf
-      set_property(TARGET sfem PROPERTY CUDA_ARCHITECTURES 60)
+      set_property(TARGET sfem PROPERTY CUDA_ARCHITECTURES ${CUDA_ARCH})
 endif()
 
 ######################################################

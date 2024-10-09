@@ -674,8 +674,7 @@ int hex8_to_subparametric_tet10_resample_field_local(
     const real_t dy = (real_t)delta[1];
     const real_t dz = (real_t)delta[2];
 
-
-    // { /// DEBUG 
+    // { /// DEBUG
     //     double data_norm = 0.0;
     //     for (ptrdiff_t i = 0; i < n[0] * n[1] * n[2]; i++) {
     //         data_norm += data[i] * data[i];
@@ -1295,6 +1294,8 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
         real_t* const SFEM_RESTRICT weighted_field) {
     //
 
+    PRINT_CURRENT_FUNCTION;
+
 #define WENO_CUBE 1
 
     const real_t ox = (real_t)origin[0];
@@ -1502,6 +1503,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
                                                                     k_glob,
                                                                     stride,
                                                                     data);  //
+
 #else
 
                     // Get the reminder [0, 1]
@@ -1676,7 +1678,7 @@ int hex8_to_tet10_resample_field_local(
     int SFEM_ENABLE_ISOPARAMETRIC = 0;
     SFEM_READ_ENV(SFEM_ENABLE_ISOPARAMETRIC, atoi);
 
-#define CUBE1 0
+#define CUBE1 1
 
     if (1 | SFEM_ENABLE_ISOPARAMETRIC) {
 #if CUBE1 == 1  // EXPERIMENTAL
