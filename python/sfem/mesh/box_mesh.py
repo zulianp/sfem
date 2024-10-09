@@ -338,11 +338,11 @@ if __name__ == '__main__':
         elif opt in ('-z'):
             nz = int(arg)
         elif opt in ('--height'):
-            h = int(arg)
+            h = float(arg)
         elif opt in ('--width'):
-            w = int(arg)
+            w = float(arg)
         elif opt in ('--depth'):
-            t = int(arg)
+            t = float(arg)
         else:
             print(f'Unused option {opt} = {arg}')
             sys.exit(1)

@@ -54,17 +54,17 @@ int proteus_hex8_laplacian_apply(const int level,
                                                 proteus_hex8_lidx(level, level, level, level),
                                                 proteus_hex8_lidx(level, 0, level, level)};
 
-    const int n_qp = q27_n;
-    const scalar_t *qx = q27_x;
-    const scalar_t *qy = q27_y;
-    const scalar_t *qz = q27_z;
-    const scalar_t *qw = q27_w;
+    // const int n_qp = q27_n;
+    // const scalar_t *qx = q27_x;
+    // const scalar_t *qy = q27_y;
+    // const scalar_t *qz = q27_z;
+    // const scalar_t *qw = q27_w;
 
-    // const int n_qp = q6_n;
-    // const scalar_t *qx = q6_x;
-    // const scalar_t *qy = q6_y;
-    // const scalar_t *qz = q6_z;
-    // const scalar_t *qw = q6_w;
+    const int n_qp = q6_n;
+    const scalar_t *qx = q6_x;
+    const scalar_t *qy = q6_y;
+    const scalar_t *qz = q6_z;
+    const scalar_t *qw = q6_w;
 
     int Lm1 = level - 1;
     int Lm13 = Lm1 * Lm1 * Lm1;
@@ -261,10 +261,18 @@ int proteus_affine_hex8_laplacian_apply(const int level,
 #define PROTEUS_HEX8_USE_MV  // assemblying the elemental matrix is faster
 #ifdef PROTEUS_HEX8_USE_MV
             accumulator_t laplacian_matrix[8 * 8];
+
+            // hex8_laplacian_matrix_fff_integral(m_fff, laplacian_matrix);
+            // printf("---------------------------\n");
+            // printf("laplacian_matrix MACRO (%d)\n", e);
+            // print_matrix(8, 8, laplacian_matrix);
+            // printf("---------------------------\n");
+
+
             hex8_laplacian_matrix_fff_integral(fff, laplacian_matrix);
 
             // printf("---------------------------\n");
-            // printf("laplacian_matrix\n");
+            // printf("laplacian_matrix MICRO (%d)\n", e);
             // print_matrix(8, 8, laplacian_matrix);
             // printf("---------------------------\n");
 #endif
