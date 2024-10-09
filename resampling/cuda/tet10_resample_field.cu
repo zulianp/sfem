@@ -1363,9 +1363,9 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
 #define CUBE1 1
 
 #if CUBE1 == 0  // WENO ..
-    char* kernel_name = "hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel";
-#else
     char* kernel_name = "hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel";
+#else
+    char* kernel_name = "hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel";
 #endif
 
     printf("============================================================================\n");
