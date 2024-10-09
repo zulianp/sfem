@@ -258,6 +258,8 @@ namespace sfem {
             }
         }
 
+        // element_to_node_incidence_count->print(std::cout);
+
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == es) {
             auto dbuff = to_device(element_to_node_incidence_count);

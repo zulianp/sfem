@@ -24,11 +24,11 @@ int hex8_linear_elasticity_apply(const ptrdiff_t nelements,
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
 
-    // const int n_qp = q6_n;
-    // const scalar_t *qx = q6_x;
-    // const scalar_t *qy = q6_y;
-    // const scalar_t *qz = q6_z;
-    // const scalar_t *qw = q6_w;
+    const int n_qp = q6_n;
+    const scalar_t *qx = q6_x;
+    const scalar_t *qy = q6_y;
+    const scalar_t *qz = q6_z;
+    const scalar_t *qw = q6_w;
 
     // const int n_qp = q27_n;
     // const scalar_t *qx = q27_x;
@@ -36,11 +36,11 @@ int hex8_linear_elasticity_apply(const ptrdiff_t nelements,
     // const scalar_t *qz = q27_z;
     // const scalar_t *qw = q27_w;
 
-    const int n_qp = q58_n;
-    const scalar_t *qx = q58_x;
-    const scalar_t *qy = q58_y;
-    const scalar_t *qz = q58_z;
-    const scalar_t *qw = q58_w;
+    // const int n_qp = q58_n;
+    // const scalar_t *qx = q58_x;
+    // const scalar_t *qy = q58_y;
+    // const scalar_t *qz = q58_z;
+    // const scalar_t *qw = q58_w;
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
