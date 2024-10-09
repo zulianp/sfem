@@ -68,7 +68,7 @@ residual:	7.98989e-10
 
 **Experiment 2**
 
-286782 [Solve DOFS/s]. The dof coarsening factor is `490` 
+286782 [Solve DOFS/s]. The dof coarsening factor is `490`. Fine/coarse operator cost ratio = `957.922 [s] / 39.9906 [s] = 23`
 
 ```c
 #elements 205379 #nodes 216000 #dofs 317471451
