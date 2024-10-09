@@ -54,17 +54,17 @@ int proteus_hex8_laplacian_apply(const int level,
                                                 proteus_hex8_lidx(level, level, level, level),
                                                 proteus_hex8_lidx(level, 0, level, level)};
 
-    const int n_qp = q27_n;
-    const scalar_t *qx = q27_x;
-    const scalar_t *qy = q27_y;
-    const scalar_t *qz = q27_z;
-    const scalar_t *qw = q27_w;
+    // const int n_qp = q27_n;
+    // const scalar_t *qx = q27_x;
+    // const scalar_t *qy = q27_y;
+    // const scalar_t *qz = q27_z;
+    // const scalar_t *qw = q27_w;
 
-    // const int n_qp = q6_n;
-    // const scalar_t *qx = q6_x;
-    // const scalar_t *qy = q6_y;
-    // const scalar_t *qz = q6_z;
-    // const scalar_t *qw = q6_w;
+    const int n_qp = q6_n;
+    const scalar_t *qx = q6_x;
+    const scalar_t *qy = q6_y;
+    const scalar_t *qz = q6_z;
+    const scalar_t *qw = q6_w;
 
     int Lm1 = level - 1;
     int Lm13 = Lm1 * Lm1 * Lm1;

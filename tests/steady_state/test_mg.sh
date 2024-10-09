@@ -29,20 +29,20 @@ then
 	echo "Reusing mesh"
 else
 	export SFEM_BOX_SIZE=1
-	create_box_ss_mesh.sh 50 $SFEM_ELEMENT_REFINE_LEVEL
+	create_box_ss_mesh.sh 40 $SFEM_ELEMENT_REFINE_LEVEL
 fi
 
-# export SFEM_BLOCK_SIZE=3
-# export SFEM_OPERATOR="LinearElasticity"
+export SFEM_BLOCK_SIZE=3
+export SFEM_OPERATOR="LinearElasticity"
 
-export SFEM_BLOCK_SIZE=1
-export SFEM_OPERATOR="Laplacian"
+# export SFEM_BLOCK_SIZE=1
+# export SFEM_OPERATOR="Laplacian"
 
 
 # export SFEM_SHEAR_MODULUS=1
 # export SFEM_FIRST_LAME_PARAMETER=1
-export SFEM_HEX8_ASSUME_AFFINE=1
+export SFEM_HEX8_ASSUME_AFFINE=0
 export SFEM_HEX8_ASSUME_AXIS_ALIGNED=0
 $LAUNCH test_galerkin_assembly $mesh output
 
-raw_to_db.py $mesh error.vtk -p output/error.raw -d $SFEM_REAL_T
+# raw_to_db.py $mesh error.vtk -p output/error.raw -d $SFEM_REAL_T
