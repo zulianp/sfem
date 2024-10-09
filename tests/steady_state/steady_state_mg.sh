@@ -20,7 +20,7 @@ source $SFEM_DIR/workflows/sfem_config.sh
 export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 export CUDA_LAUNCH_BLOCKING=0
-export SFEM_ELEMENT_REFINE_LEVEL=2
+export SFEM_ELEMENT_REFINE_LEVEL=8
 
 mesh=mesh
 
@@ -28,7 +28,7 @@ if [[ -d "$mesh" ]]
 then
 	echo "Reusing mesh"
 else
-	create_box_ss_mesh.sh 7 $SFEM_ELEMENT_REFINE_LEVEL
+	create_box_ss_mesh.sh 30 $SFEM_ELEMENT_REFINE_LEVEL
 fi
 
 # Box mesh for testing
@@ -61,8 +61,8 @@ export SFEM_CRS_MEM_CONSERVATIVE=1
 
 export SFEM_USE_CHEB=1
 export SFEM_CHEB_EIG_MAX_SCALE=1
-export SFEM_CHEB_EIG_TOL=1e-4
-export SFEM_SMOOTHER_SWEEPS=60
+export SFEM_CHEB_EIG_TOL=1e-5
+export SFEM_SMOOTHER_SWEEPS=20
 
 export SFEM_MAX_IT=20
 export SFEM_MG=1
@@ -70,6 +70,8 @@ export SFEM_USE_PRECONDITIONER=0
 
 export SFEM_VERBOSITY_LEVEL=1
 export SFEM_DEBUG=0
+
+# export SFEM_COARSE_TOL=1e-12
 
 $LAUNCH mgsolve $mesh output
 
