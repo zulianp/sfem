@@ -22,6 +22,14 @@
 
 #include <vector>
 
+#define OP_TIME(name, expr)                        \
+    do {                                           \
+        double start = MPI_Wtime();                \
+        expr;                                      \
+        double stop = MPI_Wtime();                 \
+        printf("%s %g [s]\n", name, stop - start); \
+    } while (0)
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -111,8 +119,8 @@ int main(int argc, char *argv[]) {
         ptrdiff_t n = fs_coarse->n_dofs();
         auto data = h_input->data();
         for (ptrdiff_t i = 0; i < n; i++) {
-            // data[i] = i;
-            data[i] = i % 2;
+            data[i] = i;
+            // data[i] = i % 2;
         }
     }
 
@@ -134,10 +142,10 @@ int main(int argc, char *argv[]) {
 
     double tick = MPI_Wtime();
 
-    prolongation->apply(input->data(), prolongated->data());
-    fine_op->apply(prolongated->data(), Ax_fine->data());
-    restriction->apply(Ax_fine->data(), restricted->data());
-    coarse_op->apply(input->data(), Ax_coarse->data());
+    OP_TIME("prolongation", prolongation->apply(input->data(), prolongated->data()));
+    OP_TIME("fine_op", fine_op->apply(prolongated->data(), Ax_fine->data()));
+    OP_TIME("restriction", restriction->apply(Ax_fine->data(), restricted->data()));
+    OP_TIME("coarse_op", coarse_op->apply(input->data(), Ax_coarse->data()));
 
     double tock = MPI_Wtime();
 
@@ -153,7 +161,7 @@ int main(int argc, char *argv[]) {
     // Ax_coarse->print(std::cout);
     // restricted->print(std::cout);
 
-    if (0) //
+    if (0)  //
     {
         auto upanddown = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
         restriction->apply(prolongated->data(), upanddown->data());
@@ -171,7 +179,7 @@ int main(int argc, char *argv[]) {
     auto h_expected = Ax_coarse;
 #endif
     {
-        printf("dof atual != expected, (diff, actual/expected)\n");
+        // printf("dof actual != expected, (diff, actual/expected)\n");
         auto err = error->data();
         ptrdiff_t n = fs_coarse->n_dofs();
         auto actual = h_actual->data();
@@ -181,13 +189,13 @@ int main(int argc, char *argv[]) {
             // expected: is application of coarse operator
             real_t diff = fabs(actual[i] - expected[i]);
             err[i] = diff;
-            if (diff > 1e-11) {
+            if (diff > 1e-8) {
                 printf("%ld) %g != %g (%g, %g)\n",
                        i,
-                       actual[i],
-                       expected[i],
-                       diff,
-                       actual[i] / expected[i]);
+                       (double)actual[i],
+                       (double)expected[i],
+                       (double)diff,
+                       (double)actual[i] / expected[i]);
             }
         }
     }

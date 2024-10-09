@@ -100,9 +100,9 @@ int proteus_hex8_hierarchical_restriction(int level,
 
                 for (int d = 0; d < vec_size; d++) {
                     for (int i = 0; i < 8; i++) {
-                        const int c = corners[i];
+                        const int idx = ev[corners[i]] * vec_size + d;
 #pragma omp atomic update
-                        to[ev[c] * vec_size + d] += e_to[d][i];
+                        to[idx] += e_to[d][i];
                     }
                 }
             }
@@ -213,8 +213,6 @@ int proteus_hex8_hierarchical_prolongation(int level,
                     for (int d = 0; d < vec_size; d++) {
                         to[ev[i] * vec_size + d] = e_to[d][i];
                     }
-
-                    // printf("to[%d] = %g\n", ev[i], to[ev[i]]);
                 }
             }
         }
