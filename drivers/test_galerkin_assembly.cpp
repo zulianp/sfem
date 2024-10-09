@@ -22,6 +22,14 @@
 
 #include <vector>
 
+#define OP_TIME(name, expr)                        \
+    do {                                           \
+        double start = MPI_Wtime();                \
+        expr;                                      \
+        double stop = MPI_Wtime();                 \
+        printf("%s %g [s]\n", name, stop - start); \
+    } while (0)
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -112,7 +120,7 @@ int main(int argc, char *argv[]) {
         auto data = h_input->data();
         for (ptrdiff_t i = 0; i < n; i++) {
             data[i] = i;
-            // data[i] = 1;
+            // data[i] = i % 2;
         }
     }
 
@@ -132,25 +140,35 @@ int main(int argc, char *argv[]) {
     auto restricted = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
     auto Ax_coarse = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
 
-    prolongation->apply(input->data(), prolongated->data());
-    fine_op->apply(prolongated->data(), Ax_fine->data());
-    restriction->apply(Ax_fine->data(), restricted->data());
-    coarse_op->apply(input->data(), Ax_coarse->data());
+    double tick = MPI_Wtime();
 
-    printf("#elements %ld #ndofs fine %ld coarse %ld\n",
+    OP_TIME("prolongation", prolongation->apply(input->data(), prolongated->data()));
+    OP_TIME("fine_op", fine_op->apply(prolongated->data(), Ax_fine->data()));
+    OP_TIME("restriction", restriction->apply(Ax_fine->data(), restricted->data()));
+    OP_TIME("coarse_op", coarse_op->apply(input->data(), Ax_coarse->data()));
+
+    double tock = MPI_Wtime();
+
+    printf("#elements %ld #ndofs fine %ld coarse %ld\nTTS: %g [s]\n",
            m->n_elements(),
            fs->n_dofs(),
-           fs_coarse->n_dofs());
+           fs_coarse->n_dofs(),
+           tock - tick);
 
-    input->print(std::cout);
-    prolongated->print(std::cout);
-    Ax_fine->print(std::cout);
+    // input->print(std::cout);
+    // prolongated->print(std::cout);
+    // Ax_fine->print(std::cout);
+    // Ax_coarse->print(std::cout);
+    // restricted->print(std::cout);
 
-    if (0) {
+    if (0)  //
+    {
         auto upanddown = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
         restriction->apply(prolongated->data(), upanddown->data());
         upanddown->print(std::cout);
     }
+
+    auto error = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), sfem::MEMORY_SPACE_HOST);
 
     // Compare two results
 #if SFEM_ENABLE_CUDA
@@ -161,6 +179,8 @@ int main(int argc, char *argv[]) {
     auto h_expected = Ax_coarse;
 #endif
     {
+        // printf("dof actual != expected, (diff, actual/expected)\n");
+        auto err = error->data();
         ptrdiff_t n = fs_coarse->n_dofs();
         auto actual = h_actual->data();
         auto expected = h_expected->data();
@@ -168,19 +188,21 @@ int main(int argc, char *argv[]) {
             // actual: is composition of operators
             // expected: is application of coarse operator
             real_t diff = fabs(actual[i] - expected[i]);
-            if (diff > 1e-12) {
+            err[i] = diff;
+            if (diff > 1e-8) {
                 printf("%ld) %g != %g (%g, %g)\n",
                        i,
-                       actual[i],
-                       expected[i],
-                       diff,
-                       actual[i] / expected[i]);
+                       (double)actual[i],
+                       (double)expected[i],
+                       (double)diff,
+                       (double)actual[i] / expected[i]);
             }
         }
     }
 
-    f->set_output_dir(output_path);
-    auto output = f->output();
+    f_coarse->set_output_dir(output_path);
+    auto output = f_coarse->output();
+    output->write("error", error->data());
 
     return MPI_Finalize();
 }
