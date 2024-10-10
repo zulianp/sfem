@@ -35,7 +35,7 @@ fi
 sinlet=$mesh/surface/sidesets_aos/left.raw 
 soutlet=$mesh/surface/sidesets_aos/right.raw 
 
-export SFEM_USE_ELASTICITY=1
+export SFEM_USE_ELASTICITY=0
 
 if [[ $SFEM_USE_ELASTICITY -eq 1 ]]
 then
@@ -95,5 +95,5 @@ then
 
 	raw_to_db.py $mesh/viz output/out.vtk  --point_data="output/soa/*.raw" --point_data_type="$SFEM_REAL_T"
 else
-	raw_to_db.py $mesh/viz output/out.vtk --point_data=output/u.raw,output/rhs.raw --point_data_type="$SFEM_REAL_T,$SFEM_REAL_T"
+	raw_to_db.py $mesh/viz output/out.vtk --point_data=output/x.raw,output/rhs.raw --point_data_type="$SFEM_REAL_T,$SFEM_REAL_T"
 fi

@@ -126,8 +126,8 @@ int main(int argc, char *argv[]) {
 
     std::shared_ptr<sfem::Buffer<real_t>> input;
 
-#if SFEM_ENABLE_CUDA
-    if (es == sfem::MEMORY_SPACE_DEVICE) {
+#ifdef SFEM_ENABLE_CUDA
+    if (es == sfem::EXECUTION_SPACE_DEVICE) {
         input = sfem::to_device(h_input);
     } else
 #endif
@@ -161,6 +161,7 @@ int main(int argc, char *argv[]) {
     // Ax_coarse->print(std::cout);
     // restricted->print(std::cout);
 
+
     if (0)  //
     {
         auto upanddown = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
@@ -171,7 +172,7 @@ int main(int argc, char *argv[]) {
     auto error = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), sfem::MEMORY_SPACE_HOST);
 
     // Compare two results
-#if SFEM_ENABLE_CUDA
+#ifdef SFEM_ENABLE_CUDA
     auto h_actual = sfem::to_host(restricted);
     auto h_expected = sfem::to_host(Ax_coarse);
 #else
