@@ -137,6 +137,8 @@ static int cu_hex8_fff_fill_tpl(const ptrdiff_t nelements,
     SFEM_CUDA_CHECK(cudaMemcpy(fff, h_fff, 6 * nelements * sizeof(T), cudaMemcpyHostToDevice));
 
     free(h_fff);
+
+    SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
 }
 

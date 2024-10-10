@@ -239,6 +239,8 @@ static int cu_proteus_affine_hex8_laplacian_apply_tpl(
         const T *const x,
         T *const y,
         void *stream) {
+    SFEM_DEBUG_SYNCHRONIZE();
+
     // Hand tuned
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
@@ -260,6 +262,7 @@ static int cu_proteus_affine_hex8_laplacian_apply_tpl(
                 level, nelements, stride, elements, fff, x, y);
     }
 
+    SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
 }
 
