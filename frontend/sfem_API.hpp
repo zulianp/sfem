@@ -18,6 +18,7 @@
 #include "sfem_cuda_blas.h"
 #include "sfem_cuda_crs_SpMV.hpp"
 #include "sfem_cuda_solver.hpp"
+#include "cu_proteus_hex8_interpolate.h"
 #endif
 
 #include "proteus_hex8.h"
@@ -166,24 +167,48 @@ namespace sfem {
                 from_space->set_device_elements(elements);
             }
 
-            return std::make_shared<LambdaOperator<real_t>>(
-                    to_space->n_dofs(),
-                    from_space->n_dofs(),
-                    [=](const real_t *const from, real_t *const to) {
-                        auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
-                        cu_macrotet4_to_tet4_prolongation_element_based(mesh->nelements,
-                                                                        mesh->nelements,
-                                                                        elements->data(),
-                                                                        from_space->block_size(),
-                                                                        SFEM_REAL_DEFAULT,
-                                                                        1,
-                                                                        from,
-                                                                        SFEM_REAL_DEFAULT,
-                                                                        1,
-                                                                        to,
-                                                                        SFEM_DEFAULT_STREAM);
-                    },
-                    es);
+            if (to_space->has_semi_structured_mesh()) {
+                return std::make_shared<LambdaOperator<real_t>>(
+                        to_space->n_dofs(),
+                        from_space->n_dofs(),
+                        [=](const real_t *const from, real_t *const to) {
+                            auto &ssm = to_space->semi_structured_mesh();
+                            cu_proteus_hex8_hierarchical_prolongation(
+                                    ssm.level(),
+                                    ssm.n_elements(),
+                                    ssm.n_elements(),
+                                    elements->data(),
+                                    from_space->block_size(),
+                                    SFEM_REAL_DEFAULT,
+                                    1,
+                                    from,
+                                    SFEM_REAL_DEFAULT,
+                                    1,
+                                    to,
+                                    SFEM_DEFAULT_STREAM);
+                        },
+                        es);
+            } else {
+                return std::make_shared<LambdaOperator<real_t>>(
+                        to_space->n_dofs(),
+                        from_space->n_dofs(),
+                        [=](const real_t *const from, real_t *const to) {
+                            auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
+                            cu_macrotet4_to_tet4_prolongation_element_based(
+                                    mesh->nelements,
+                                    mesh->nelements,
+                                    elements->data(),
+                                    from_space->block_size(),
+                                    SFEM_REAL_DEFAULT,
+                                    1,
+                                    from,
+                                    SFEM_REAL_DEFAULT,
+                                    1,
+                                    to,
+                                    SFEM_DEFAULT_STREAM);
+                        },
+                        es);
+            }
 
         } else
 #endif
@@ -243,9 +268,8 @@ namespace sfem {
             elements = mesh->elements;
             nnodes = mesh->nnodes;
         }
-        
-        auto element_to_node_incidence_count =
-                create_buffer<uint16_t>(nnodes, MEMORY_SPACE_HOST);
+
+        auto element_to_node_incidence_count = create_buffer<uint16_t>(nnodes, MEMORY_SPACE_HOST);
         {
             auto buff = element_to_node_incidence_count->data();
 
@@ -270,25 +294,49 @@ namespace sfem {
                 from_space->set_device_elements(elements);
             }
 
-            return std::make_shared<LambdaOperator<real_t>>(
-                    to_space->n_dofs(),
-                    from_space->n_dofs(),
-                    [=](const real_t *const from, real_t *const to) {
-                        auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
-                        cu_macrotet4_to_tet4_restriction_element_based(mesh->nelements,
-                                                                       mesh->nelements,
-                                                                       elements->data(),
-                                                                       dbuff->data(),
-                                                                       block_size,
-                                                                       SFEM_REAL_DEFAULT,
-                                                                       1,
-                                                                       from,
-                                                                       SFEM_REAL_DEFAULT,
-                                                                       1,
-                                                                       to,
-                                                                       SFEM_DEFAULT_STREAM);
-                    },
-                    es);
+            if (from_space->has_semi_structured_mesh()) {
+                return std::make_shared<LambdaOperator<real_t>>(
+                        to_space->n_dofs(),
+                        from_space->n_dofs(),
+                        [=](const real_t *const from, real_t *const to) {
+                            auto &ssm = from_space->semi_structured_mesh();
+                            cu_proteus_hex8_hierarchical_restriction(ssm.level(),
+                                                                     ssm.n_elements(),
+                                                                     ssm.n_elements(),
+                                                                     elements->data(),
+                                                                     dbuff->data(),
+                                                                     block_size,
+                                                                     SFEM_REAL_DEFAULT,
+                                                                     1,
+                                                                     from,
+                                                                     SFEM_REAL_DEFAULT,
+                                                                     1,
+                                                                     to,
+                                                                     SFEM_DEFAULT_STREAM);
+                        },
+                        es);
+
+            } else {
+                return std::make_shared<LambdaOperator<real_t>>(
+                        to_space->n_dofs(),
+                        from_space->n_dofs(),
+                        [=](const real_t *const from, real_t *const to) {
+                            auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
+                            cu_macrotet4_to_tet4_restriction_element_based(mesh->nelements,
+                                                                           mesh->nelements,
+                                                                           elements->data(),
+                                                                           dbuff->data(),
+                                                                           block_size,
+                                                                           SFEM_REAL_DEFAULT,
+                                                                           1,
+                                                                           from,
+                                                                           SFEM_REAL_DEFAULT,
+                                                                           1,
+                                                                           to,
+                                                                           SFEM_DEFAULT_STREAM);
+                        },
+                        es);
+            }
         } else
 #endif
         {

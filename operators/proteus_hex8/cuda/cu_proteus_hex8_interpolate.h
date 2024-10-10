@@ -9,17 +9,17 @@
 extern "C" {
 #endif
 
-int cu_proteus_hex8_hierarchical_prolongation(int level,
+int cu_proteus_hex8_hierarchical_prolongation(const int level,
                                               const ptrdiff_t nelements,
                                               const ptrdiff_t stride,
-                                              idx_t **const SFEM_RESTRICT elements,
+                                              const idx_t *const SFEM_RESTRICT elements,
                                               const int vec_size,
                                               const enum RealType from_type,
                                               const ptrdiff_t from_stride,
-                                              const real_t *const SFEM_RESTRICT from,
+                                              const void *const SFEM_RESTRICT from,
                                               const enum RealType to_type,
                                               const ptrdiff_t to_stride,
-                                              real_t *const SFEM_RESTRICT to,
+                                              void *const SFEM_RESTRICT to,
                                               void *stream);
 
 int cu_proteus_hex8_hierarchical_restriction(const int level,

@@ -16,21 +16,27 @@ namespace sfem {
     std::shared_ptr<Buffer<idx_t>> create_device_elements(
             const std::shared_ptr<FunctionSpace> &space,
             const enum ElemType element_type) {
-        auto c_mesh = (mesh_t *)space->mesh().impl_mesh();
+        if (space->has_semi_structured_mesh()) {
+            auto &ssm = space->semi_structured_mesh();
 
-        int nxe = elem_num_nodes(element_type);
+            int nxe = ssm.n_nodes_per_element();
+            idx_t *elements{nullptr};
+            elements_to_device(ssm.n_elements(), nxe, ssm.element_data(), &elements);
 
-        idx_t *elements{nullptr};
-        elements_to_device(
-                c_mesh->nelements, nxe, c_mesh->elements, &elements);
+            return Buffer<idx_t>::own(
+                    ssm.n_elements() * nxe, elements, d_buffer_destroy, MEMORY_SPACE_DEVICE);
 
-        
-        printf("create_device_elements %ld %d\n", c_mesh->nelements, nxe);
+        } else {
+            auto c_mesh = (mesh_t *)space->mesh().impl_mesh();
+            int nxe = elem_num_nodes(element_type);
+            idx_t *elements{nullptr};
+            elements_to_device(c_mesh->nelements, nxe, c_mesh->elements, &elements);
 
-        return Buffer<idx_t>::own(c_mesh->nelements * nxe,
-                                  elements,
-                                  d_buffer_destroy,
-                                  MEMORY_SPACE_DEVICE);
+            printf("create_device_elements %ld %d\n", c_mesh->nelements, nxe);
+
+            return Buffer<idx_t>::own(
+                    c_mesh->nelements * nxe, elements, d_buffer_destroy, MEMORY_SPACE_DEVICE);
+        }
     }
 
     class FFF {

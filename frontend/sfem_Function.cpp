@@ -274,6 +274,11 @@ namespace sfem {
         ~Impl() {}
     };
 
+    int SemiStructuredMesh::n_nodes_per_element() const
+    {
+        return proteus_hex8_nxe(impl_->level);
+    }
+
     idx_t **SemiStructuredMesh::element_data() { return impl_->elements->data(); }
     geom_t **SemiStructuredMesh::point_data() {
         return ((mesh_t *)(impl_->macro_mesh->impl_mesh()))->points;
