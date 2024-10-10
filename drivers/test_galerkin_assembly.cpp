@@ -154,7 +154,7 @@ int main(int argc, char *argv[]) {
            tock - tick);
 
 
-#if 1
+#if 0
 #ifdef SFEM_ENABLE_CUDA
     sfem::to_host(input)->print(std::cout);
     sfem::to_host(prolongated)->print(std::cout);
