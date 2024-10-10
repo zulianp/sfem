@@ -84,6 +84,7 @@ if(SFEM_ENABLE_CUDA)
         operators/macro_tet4/cuda
         operators/tet10/cuda
         operators/proteus_tet4/cuda
+        operators/hex8/cuda
         operators/proteus_hex8/cuda
         operators/hierarchical/cuda
         )
