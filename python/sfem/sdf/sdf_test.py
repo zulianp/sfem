@@ -12,7 +12,7 @@ print("sdf_test.py: ==========================================")
 
 sdf_t = np.float32
 
-D = 120
+D = 600
 dims = (D, D, D)
 
 print(f'sdf_test.py: Generating field of size {dims[0]} x {dims[1]} x {dims[2]}')
