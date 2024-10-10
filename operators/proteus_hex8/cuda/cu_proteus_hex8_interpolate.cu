@@ -142,7 +142,7 @@ static int cu_proteus_hex8_hierarchical_prolongation_tpl(const int level,
     return SFEM_SUCCESS;
 }
 
-int cu_proteus_hex8_hierarchical_prolongation(const int level,
+extern int cu_proteus_hex8_hierarchical_prolongation(const int level,
                                               const ptrdiff_t nelements,
                                               const ptrdiff_t stride,
                                               const idx_t *const SFEM_RESTRICT elements,
@@ -346,7 +346,7 @@ static int cu_proteus_hex8_hierarchical_restriction_tpl(const int level,
     return SFEM_SUCCESS;
 }
 
-int cu_proteus_hex8_hierarchical_restriction(const int level,
+extern int cu_proteus_hex8_hierarchical_restriction(const int level,
                                              const ptrdiff_t nelements,
                                              const ptrdiff_t stride,
                                              const idx_t *const SFEM_RESTRICT elements,
