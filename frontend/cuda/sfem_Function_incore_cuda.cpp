@@ -25,6 +25,8 @@ namespace sfem {
             idx_t *elements{nullptr};
             elements_to_device(ssm.n_elements(), nxe, ssm.element_data(), &elements);
 
+            printf("create_device_elements %ld %d (ss)\n", ssm.n_elements(), nxe);
+
             return Buffer<idx_t>::own(
                     ssm.n_elements() * nxe, elements, d_buffer_destroy, MEMORY_SPACE_DEVICE);
 
