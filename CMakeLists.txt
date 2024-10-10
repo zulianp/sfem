@@ -154,11 +154,7 @@ set_target_properties(
 
 set(SFEM_TARGETS sfem)
 
-option(CUDA_ARCH "Use CUDA architecture" OFF)
-
-if(NOT CUDA_ARCH)
-    set(CUDA_ARCH "70")
-endif()
+# option(CUDA_ARCH "Use CUDA architecture" OFF)
 
 message(STATUS "CUDA_ARCH: ${CUDA_ARCH}")
 
