@@ -95,6 +95,12 @@ typedef @SFEM_LOCAL_IDX_C_TYPE@ local_idx_t;
 #define d_LOCAL_IDX_T "@SFEM_LOCAL_IDX_PRINT_TYPE@"
 #define dtype_LOCAL_IDX_T "@SFEM_LOCAL_IDX_TYPE@"
 
+// -----------------------------
+// Other types
+#define SFEM_TET4_CUDA @SFEM_TET4_CUDA@
+#define SFEM_TET10_CUDA @SFEM_TET10_CUDA@
+#define SFEM_TET10_WENO @SFEM_TET10_WENO@
+
 #endif  // SFEM_ENABLE_CUSTOM_NUMBERS
 
 #define INVALID_IDX (-1)

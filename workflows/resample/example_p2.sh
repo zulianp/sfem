@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+if [[ "$1" == "mpi" ]]
+then
+	export USE_MPI=1
+fi
+
+# launcher
+
 set -e
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
@@ -72,7 +79,7 @@ echo $scaling
 # export OMP_PROC_BIND=true
 # export OMP_NUM_THREADS=8
 
-n_procs=1
+n_procs=18
 # n_procs=1
 # n_procs=2
 # n_procs=1
@@ -80,9 +87,16 @@ n_procs=1
 PERF="yes"
 PERF="no"
 
-if [[ -z "$LAUNCH" ]]
+# if [[ -z "$LAUNCH" ]]
+# then
+# 	LAUNCH="mpiexec -np $n_procs"
+# 	LAUNCH=""
+# fi
+
+if [[ "$USE_MPI" == "1" ]]
 then
 	LAUNCH="mpiexec -np $n_procs"
+else
 	LAUNCH=""
 fi
 

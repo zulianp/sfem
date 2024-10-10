@@ -18,10 +18,13 @@ if(NOT CUDA_ARCH)
     set(CUDA_ARCH "60") ## default CUDA_ARCH
 endif()
 
-set( ARM64_VECTOR_BITS 128 ) ## Default value for ARM64 (at the moment)
+set(ARM64_VECTOR_BITS 128) ## Default value for ARM64 (at the moment)
+
+## TODO:
+## Verify if the aarm64 option -msve-vector-bits is supported also by the Apple Silicon M CPU
 
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-    set (VECTOR_OPT "---msve-vector-bits=${ARM64_VECTOR_BITS}")
+    set (VECTOR_OPT "-msve-vector-bits=${ARM64_VECTOR_BITS}")
 elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
     set (VECTOR_OPT "-mavx2")
     set (VECTOR_OPT_v8 "-mavx512f")
@@ -29,22 +32,24 @@ else()
     set (VECTOR_OPT "")
 endif()
 
+##  -DSFEM_ENABLE_AVX512_SORT ## the lib is not present in the code
+
 message(STATUS "SFEM_CPU_ARCH: ${SFEM_CPU_ARCH}, CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}") 
 
 set(CMAKE_CXX_FLAGS_AVX2
-    "-Ofast -march=${SFEM_CPU_ARCH} ${VECTOR_OPT} -fno-trapping-math -fassociative-math -DNDEBUG -DSFEM_ENABLE_AVX2_SORT -DSFEM_ENABLE_EXPLICIT_VECTORIZATION -Iexternal"
+    "-Ofast -march=${SFEM_CPU_ARCH} ${VECTOR_OPT} -fno-trapping-math   -DNDEBUG -DSFEM_ENABLE_AVX2_SORT -DSFEM_ENABLE_EXPLICIT_VECTORIZATION -Iexternal"
     CACHE STRING "Flags for using fast operations and avx2" FORCE)
 
 set(CMAKE_C_FLAGS_AVX2
-    "-Ofast -march=${SFEM_CPU_ARCH} ${VECTOR_OPT} -fno-trapping-math -fassociative-math -DNDEBUG -DSFEM_ENABLE_AVX2_SORT -DSFEM_ENABLE_EXPLICIT_VECTORIZATION -Iexternal"
+    "-Ofast -march=${SFEM_CPU_ARCH} ${VECTOR_OPT} -fno-trapping-math   -DNDEBUG -DSFEM_ENABLE_AVX2_SORT -DSFEM_ENABLE_EXPLICIT_VECTORIZATION -Iexternal"
     CACHE STRING "Flags for using fast operations and avx2" FORCE)
 
 set(CMAKE_CXX_FLAGS_AVX512
-    "-Ofast -march=${SFEM_CPU_ARCH} ${VECTOR_OPT_v8} -fno-trapping-math -fassociative-math -DNDEBUG -DSFEM_ENABLE_AVX512_SORT -DSFEM_ENABLE_EXPLICIT_VECTORIZATION -Iexternal"
+    "-Ofast -march=${SFEM_CPU_ARCH} ${VECTOR_OPT_v8} -fno-trapping-math   -DNDEBUG  -DSFEM_ENABLE_EXPLICIT_VECTORIZATION -Iexternal"
     CACHE STRING "Flags for using fast operations and avx512" FORCE)
 
 set(CMAKE_C_FLAGS_AVX512
-    "-Ofast -march=${SFEM_CPU_ARCH} ${VECTOR_OPT_v8} -fno-trapping-math -fassociative-math -DNDEBUG -DSFEM_ENABLE_AVX512_SORT -DSFEM_ENABLE_EXPLICIT_VECTORIZATION -Iexternal"
+    "-Ofast -march=${SFEM_CPU_ARCH} ${VECTOR_OPT_v8} -fno-trapping-math   -DNDEBUG  -DSFEM_ENABLE_EXPLICIT_VECTORIZATION -Iexternal"
     CACHE STRING "Flags for using fast operations and avx512" FORCE)
 
 
