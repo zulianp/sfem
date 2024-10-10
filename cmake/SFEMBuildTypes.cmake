@@ -18,8 +18,10 @@ if(NOT CUDA_ARCH)
     set(CUDA_ARCH "60") ## default CUDA_ARCH
 endif()
 
+set( ARM64_VECTOR_BITS 128 ) ## Default value for ARM64 (at the moment)
+
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-    set (VECTOR_OPT "---msve-vector-bits=128")
+    set (VECTOR_OPT "---msve-vector-bits=${ARM64_VECTOR_BITS}")
 elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
     set (VECTOR_OPT "-mavx2")
     set (VECTOR_OPT_v8 "-mavx512f")
