@@ -18,10 +18,6 @@ static inline __device__ __host__ int cu_proteus_hex8_nxe(int level) {
 }
 #endif
 
-// static inline __device__ __host__ int cu_proteus_hex8_txe(int level) {
-//     return level * level * level;
-// }
-
 static inline __device__ __host__ int cu_proteus_hex8_lidx(const int L,
                                                            const int x,
                                                            const int y,
@@ -64,7 +60,7 @@ __global__ void cu_proteus_hex8_hierarchical_prolongation_kernel(
         for (int zi = 0; zi < level + 1; zi++) {
             for (int yi = 0; yi < level + 1; yi++) {
                 for (int xi = 0; xi < level + 1; xi++) {
-                    int idx = elements[cu_proteus_hex8_lidx(level, xi, yi, zi) * stride + e];
+                    idx_t idx = elements[cu_proteus_hex8_lidx(level, xi, yi, zi) * stride + e];
 
                     const scalar_t x = xi * h;
                     const scalar_t y = yi * h;
@@ -90,9 +86,11 @@ __global__ void cu_proteus_hex8_hierarchical_prolongation_kernel(
 
                         for (int v = 0; v < 8; v++) {
                             const ptrdiff_t global_from_idx =
-                                    (corners[v] * vec_size + d) * from_stride;
+                                    (elements[corners[v] * stride + e] * vec_size + d) * from_stride;
                             val += f[v] * from[global_from_idx];
                         }
+
+                        
 
                         const ptrdiff_t global_to_idx = (idx * vec_size + d) * to_stride;
                         to[global_to_idx] = val;
@@ -114,6 +112,8 @@ static int cu_proteus_hex8_hierarchical_prolongation_tpl(const int level,
                                                          const ptrdiff_t to_stride,
                                                          To *const SFEM_RESTRICT to,
                                                          void *stream) {
+    SFEM_DEBUG_SYNCHRONIZE();
+
     // Hand tuned
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
@@ -248,7 +248,8 @@ __global__ void cu_proteus_hex8_hierarchical_restriction_kernel(
             for (int zi = 0; zi < level + 1; zi++) {
                 for (int yi = 0; yi < level + 1; yi++) {
                     for (int xi = 0; xi < level + 1; xi++) {
-                        int idx = elements[cu_proteus_hex8_lidx(level, xi, yi, zi) * stride + e];
+                        const int lidx = cu_proteus_hex8_lidx(level, xi, yi, zi);
+                        const ptrdiff_t idx = elements[lidx * stride + e];
 
                         const scalar_t x = xi * h;
                         const scalar_t y = yi * h;
@@ -280,7 +281,7 @@ __global__ void cu_proteus_hex8_hierarchical_restriction_kernel(
             }
 
             for (int v = 0; v < 8; v++) {
-                const ptrdiff_t global_to_idx = (corners[v] * vec_size + d) * to_stride;
+                const ptrdiff_t global_to_idx = (elements[corners[v] * stride + e] * vec_size + d) * to_stride;
                 atomicAdd(&to[global_to_idx], acc[v]);
             }
         }
@@ -300,6 +301,8 @@ static int cu_proteus_hex8_hierarchical_restriction_tpl(const int level,
                                                         const ptrdiff_t to_stride,
                                                         To *const SFEM_RESTRICT to,
                                                         void *stream) {
+    SFEM_DEBUG_SYNCHRONIZE();
+    
     // Hand tuned
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL

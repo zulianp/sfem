@@ -48,13 +48,15 @@ namespace sfem {
         enum ElemType element_type_;
         ptrdiff_t n_elements_;
         std::shared_ptr<Buffer<idx_t>> elements_;
-        void *fff_;
+        void *fff_{nullptr};
 
         void init(mesh_t *c_mesh) {
             if (c_mesh->element_type == HEX8) {
+                printf("FFF/HEX8\n");
                 cu_hex8_fff_allocate(c_mesh->nelements, &fff_);
                 cu_hex8_fff_fill(c_mesh->nelements, c_mesh->elements, c_mesh->points, fff_);
             } else {
+                printf("FFF/TET4\n");
                 cu_tet4_fff_allocate(c_mesh->nelements, &fff_);
                 cu_tet4_fff_fill(c_mesh->nelements, c_mesh->elements, c_mesh->points, fff_);
             }
@@ -66,6 +68,8 @@ namespace sfem {
             : element_type_(element_type), n_elements_(mesh.n_elements()) {
             auto c_mesh = (mesh_t *)mesh.impl_mesh();
             elements_ = elements;
+
+            init(c_mesh);
         }
 
         ~FFF() {
@@ -378,7 +382,7 @@ namespace sfem {
                 const std::shared_ptr<FunctionSpace> &derefined_space) override {
             auto mesh = (mesh_t *)derefined_space->mesh().impl_mesh();
 
-            auto ret = std::make_shared<SemiStructuredGPULaplacian>(derefined_space);
+            auto ret = std::make_shared<GPULaplacian>(derefined_space);
             assert(derefined_space->element_type() == macro_base_elem(fff->element_type()));
             assert(ret->element_type == macro_base_elem(fff->element_type()));
             ret->initialize();

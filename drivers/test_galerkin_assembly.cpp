@@ -1,12 +1,7 @@
 #include <memory>
 #include "sfem_Function.hpp"
 
-#include "sfem_Chebyshev3.hpp"
-#include "sfem_GaussSeidel.hpp"
-#include "sfem_Multigrid.hpp"
 #include "sfem_base.h"
-#include "sfem_bcgs.hpp"
-#include "sfem_cg.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "spmv.h"
 
@@ -28,6 +23,7 @@
         expr;                                      \
         double stop = MPI_Wtime();                 \
         printf("%s %g [s]\n", name, stop - start); \
+        fflush(stdout);                            \
     } while (0)
 
 int main(int argc, char *argv[]) {
@@ -142,10 +138,12 @@ int main(int argc, char *argv[]) {
 
     double tick = MPI_Wtime();
 
+    
+    OP_TIME("coarse_op", coarse_op->apply(input->data(), Ax_coarse->data()));
+
     OP_TIME("prolongation", prolongation->apply(input->data(), prolongated->data()));
     OP_TIME("fine_op", fine_op->apply(prolongated->data(), Ax_fine->data()));
     OP_TIME("restriction", restriction->apply(Ax_fine->data(), restricted->data()));
-    OP_TIME("coarse_op", coarse_op->apply(input->data(), Ax_coarse->data()));
 
     double tock = MPI_Wtime();
 
@@ -155,12 +153,22 @@ int main(int argc, char *argv[]) {
            fs_coarse->n_dofs(),
            tock - tick);
 
-    // input->print(std::cout);
-    // prolongated->print(std::cout);
-    // Ax_fine->print(std::cout);
-    // Ax_coarse->print(std::cout);
-    // restricted->print(std::cout);
 
+#if 1
+#ifdef SFEM_ENABLE_CUDA
+    sfem::to_host(input)->print(std::cout);
+    sfem::to_host(prolongated)->print(std::cout);
+    sfem::to_host(Ax_fine)->print(std::cout);
+    sfem::to_host(Ax_coarse)->print(std::cout);
+    sfem::to_host(restricted)->print(std::cout);
+#else
+    input->print(std::cout);
+    prolongated->print(std::cout);
+    Ax_fine->print(std::cout);
+    Ax_coarse->print(std::cout);
+    restricted->print(std::cout);
+#endif
+#endif
 
     if (0)  //
     {
