@@ -10,6 +10,8 @@
 #include "cu_linear_elasticity.h"
 #include "cu_tet4_adjugate.h"
 #include "cu_tet4_fff.h"
+#include "cu_hex8_fff.h"
+#include "cu_proteus_hex8_laplacian.h"
 
 namespace sfem {
 
@@ -47,8 +49,13 @@ namespace sfem {
         void *fff_;
 
         void init(mesh_t *c_mesh) {
-            cu_tet4_fff_allocate(c_mesh->nelements, &fff_);
-            cu_tet4_fff_fill(c_mesh->nelements, c_mesh->elements, c_mesh->points, fff_);
+            if (c_mesh->element_type == HEX8) {
+                cu_hex8_fff_allocate(c_mesh->nelements, &fff_);
+                cu_hex8_fff_fill(c_mesh->nelements, c_mesh->elements, c_mesh->points, fff_);
+            } else {
+                cu_tet4_fff_allocate(c_mesh->nelements, &fff_);
+                cu_tet4_fff_fill(c_mesh->nelements, c_mesh->elements, c_mesh->points, fff_);
+            }
         }
 
         FFF(Mesh &mesh,
@@ -334,6 +341,99 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
     };
 
+    class SemiStructuredGPULaplacian final : public Op {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+        std::shared_ptr<FFF> fff;
+        enum RealType real_type { SFEM_REAL_DEFAULT };
+        void *stream{SFEM_DEFAULT_STREAM};
+        enum ElemType element_type { INVALID };
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+            assert(1 == space->block_size());
+            return std::make_unique<SemiStructuredGPULaplacian>(space);
+        }
+
+        const char *name() const override { return "ss:gpu::Laplacian"; }
+        inline bool is_linear() const override { return true; }
+
+        int initialize() override {
+            auto elements = space->device_elements();
+            if (!elements) {
+                elements = create_device_elements(space, space->element_type());
+                space->set_device_elements(elements);
+            }
+
+            fff = std::make_shared<FFF>(space->mesh(), space->element_type(), elements);
+            return SFEM_SUCCESS;
+        }
+
+        SemiStructuredGPULaplacian(const std::shared_ptr<FunctionSpace> &space)
+            : space(space), element_type(space->element_type()) {}
+
+        std::shared_ptr<Op> derefine_op(
+                const std::shared_ptr<FunctionSpace> &derefined_space) override {
+            auto mesh = (mesh_t *)derefined_space->mesh().impl_mesh();
+
+            auto ret = std::make_shared<SemiStructuredGPULaplacian>(derefined_space);
+            assert(derefined_space->element_type() == macro_base_elem(fff->element_type()));
+            assert(ret->element_type == macro_base_elem(fff->element_type()));
+            ret->initialize();
+            return ret;
+        }
+
+        int hessian_crs(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values) override {
+            std::cerr << "Unimplemented function hessian_crs in GPULaplacian\n";
+            assert(false);
+            return SFEM_FAILURE;
+        }
+
+        int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
+        std::cerr << "Unimplemented function hessian_diag in GPULaplacian\n";
+            assert(false);
+            return SFEM_FAILURE;
+        }
+
+        int gradient(const real_t *const x, real_t *const out) override {
+            auto &ssm = space->semi_structured_mesh();
+            return cu_proteus_affine_hex8_laplacian_apply(ssm.level(),
+                                                          fff->n_elements(),
+                                                          fff->n_elements(),  // stride
+                                                          fff->elements(),
+                                                          fff->fff(),
+                                                          real_type,
+                                                          x,
+                                                          out,
+                                                          stream);
+        }
+
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+            auto &ssm = space->semi_structured_mesh();
+            return cu_proteus_affine_hex8_laplacian_apply(ssm.level(),
+                                                          fff->n_elements(),
+                                                          fff->n_elements(),  // stride
+                                                          fff->elements(),
+                                                          fff->fff(),
+                                                          real_type,
+                                                          h,
+                                                          out,
+                                                          stream);
+        }
+
+        int value(const real_t *x, real_t *const out) override {
+            std::cerr << "Unimplemented function value in GPULaplacian\n";
+            assert(0);
+            return SFEM_FAILURE;
+        }
+
+        int report(const real_t *const) override { return SFEM_SUCCESS; }
+        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
+    };
+
     class GPULinearElasticity final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
@@ -454,6 +554,7 @@ namespace sfem {
     void register_device_ops() {
         Factory::register_op("gpu:LinearElasticity", &GPULinearElasticity::create);
         Factory::register_op("gpu:Laplacian", &GPULaplacian::create);
+        Factory::register_op("ss:gpu:Laplacian", &SemiStructuredGPULaplacian::create);
     }
 
 }  // namespace sfem
