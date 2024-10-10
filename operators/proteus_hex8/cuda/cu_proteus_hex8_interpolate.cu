@@ -8,13 +8,15 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-// static inline __device__ __host__ int cu_proteus_hex8_nxe(int level) {
-//     const int corners = 8;
-//     const int edge_nodes = 12 * (level - 1);
-//     const int face_nodes = 6 * (level - 1) * (level - 1);
-//     const int vol_nodes = (level - 1) * (level - 1) * (level - 1);
-//     return corners + edge_nodes + face_nodes + vol_nodes;
-// }
+#ifndef NDEBUG
+static inline __device__ __host__ int cu_proteus_hex8_nxe(int level) {
+    const int corners = 8;
+    const int edge_nodes = 12 * (level - 1);
+    const int face_nodes = 6 * (level - 1) * (level - 1);
+    const int vol_nodes = (level - 1) * (level - 1) * (level - 1);
+    return corners + edge_nodes + face_nodes + vol_nodes;
+}
+#endif
 
 // static inline __device__ __host__ int cu_proteus_hex8_txe(int level) {
 //     return level * level * level;
