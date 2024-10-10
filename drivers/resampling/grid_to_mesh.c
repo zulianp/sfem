@@ -142,25 +142,25 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        { /// DEBUG ///
-            double filed_norm = 0.0;
-            double filed_max = field[0];
-            double filed_min = field[0];
+        // { /// DEBUG ///
+        //     double filed_norm = 0.0;
+        //     double filed_max = field[0];
+        //     double filed_min = field[0];
 
-            ptrdiff_t n_zyx_private = nlocal[0] * nlocal[1] * nlocal[2];
-            for(ptrdiff_t i = 0; i < n_zyx_private; i++) {
-                // field[i] = sin((double)(i) / 10000.0);
-                filed_norm += field[i] * field[i];
-                filed_max = fmax(filed_max, field[i]);
-                filed_min = fmin(filed_min, field[i]);
-            }
+        //     ptrdiff_t n_zyx_private = nlocal[0] * nlocal[1] * nlocal[2];
+        //     for(ptrdiff_t i = 0; i < n_zyx_private; i++) {
+        //         // field[i] = sin((double)(i) / 10000.0);
+        //         filed_norm += field[i] * field[i];
+        //         filed_max = fmax(filed_max, field[i]);
+        //         filed_min = fmin(filed_min, field[i]);
+        //     }
 
-            filed_norm = sqrt(filed_norm);
-            printf("filed_norm = %1.14e , %s:%d\n", filed_norm, __FILE__, __LINE__);
-            printf("filed_max  = %1.14e , %s:%d\n", filed_max, __FILE__, __LINE__);
-            printf("filed_min  = %1.14e , %s:%d\n", filed_min, __FILE__, __LINE__);
-            printf("n_zyx_private     = %ld , %s:%d\n", n_zyx_private, __FILE__, __LINE__);
-        }
+        //     filed_norm = sqrt(filed_norm);
+        //     printf("filed_norm = %1.14e , %s:%d\n", filed_norm, __FILE__, __LINE__);
+        //     printf("filed_max  = %1.14e , %s:%d\n", filed_max, __FILE__, __LINE__);
+        //     printf("filed_min  = %1.14e , %s:%d\n", filed_min, __FILE__, __LINE__);
+        //     printf("n_zyx_private     = %ld , %s:%d\n", n_zyx_private, __FILE__, __LINE__);
+        // }
 
         double ndarray_read_tock = MPI_Wtime();
 
@@ -409,25 +409,28 @@ int main(int argc, char* argv[]) {
         }
 
         double io_tick = MPI_Wtime();
-        double norm = 1.0;
-        double max_g = g[0];
-        double min_g = g[0];
 
-        for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
-            norm += g[i] * g[i];
-            if (g[i] > max_g) {
-                max_g = g[i];
-            }
-            if (g[i] < min_g) {
-                min_g = g[i];
-            }
-        }
+        /// DEBUG ///
+        // double norm = 1.0;
+        // double max_g = g[0];
+        // double min_g = g[0];
 
-        printf("\nNorm: %1.14e  <<<< TEST NORM <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n", norm);
-        printf("Max: %1.14e  <<<< TEST MAX <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n", max_g);
-        printf("Min: %1.14e  <<<< TEST MIN <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n", min_g);
-        printf("Mesh nnodes: %ld\n", mesh.nnodes);
-        printf("SFEM_INTERPOLATE: %d\n\n", SFEM_INTERPOLATE);
+        // for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+        //     norm += g[i] * g[i];
+        //     if (g[i] > max_g) {
+        //         max_g = g[i];
+        //     }
+        //     if (g[i] < min_g) {
+        //         min_g = g[i];
+        //     }
+        // }
+
+        // printf("\nNorm: %1.14e  <<<< TEST NORM <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n", norm);
+        // printf("Max: %1.14e  <<<< TEST MAX <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n", max_g);
+        // printf("Min: %1.14e  <<<< TEST MIN <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n", min_g);
+        // printf("Mesh nnodes: %ld\n", mesh.nnodes);
+        // printf("SFEM_INTERPOLATE: %d\n\n", SFEM_INTERPOLATE);
+        /// end DEBUG ///
 
         mesh_write_nodal_field(&mesh, output_path, SFEM_MPI_REAL_T, g);
 
