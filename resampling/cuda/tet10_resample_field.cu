@@ -1360,7 +1360,11 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
                cudaGetErrorString(errwf));
     }
 
+#if SFEM_TET10_WENO == ON
 #define CUBE1 1
+#else
+#define CUBE1 0
+#endif
 
 #if CUBE1 == 0  // WENO ..
     char* kernel_name = "hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel";

@@ -1678,15 +1678,27 @@ int hex8_to_tet10_resample_field_local(
     int SFEM_ENABLE_ISOPARAMETRIC = 0;
     SFEM_READ_ENV(SFEM_ENABLE_ISOPARAMETRIC, atoi);
 
+#if SFEM_TET10_WENO == ON
 #define CUBE1 1
+#else
+#define CUBE1 0
+#endif
 
     if (1 | SFEM_ENABLE_ISOPARAMETRIC) {
-#if CUBE1 == 1  // EXPERIMENTAL
+#if CUBE1 == 1  // EXPERIMENTAL WENO
         return hex8_to_isoparametric_tet10_resample_field_local_cube1(
+                nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+#else
+
+#if SFEM_VEC_SIZE == 8 || SFEM_VEC_SIZE == 4
+        hex8_to_tet10_resample_field_local_V2(
+                nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
 #else
         return hex8_to_isoparametric_tet10_resample_field_local(
-#endif
                 nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+
+#endif // SFEM_VEC_SIZE
+#endif // CUBE1
     } else {
         return hex8_to_subparametric_tet10_resample_field_local(
                 nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);

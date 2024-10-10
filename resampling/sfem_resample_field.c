@@ -834,7 +834,15 @@ int hex8_to_tet10_resample_field_local_CUDA(
 #define USE_TET4_V8 1
 #define USE_TET4_CUDA 2
 
+#if SFEM_VEC_SIZE == 8
 #define USE_TET4_MODEL USE_TET4_V8
+#else
+#define USE_TET4_MODEL USE_TET4_V4
+#endif
+
+#if SFEM_TET4_CUDA == ON
+#define USE_TET4_MODEL USE_TET4_CUDA
+#endif
 
 int resample_field_local(
         // Mesh
@@ -886,7 +894,7 @@ int resample_field_local(
             // printf("\nnorm_data input = %g   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< %s:%d\n\n",
             // norm_data, __FILE__, __LINE__); } /// end DEBUG ///
 
-#ifdef TET10_V2  // V2
+#if SFEM_TET10_CUDA == ON 
             const int ret = hex8_to_tet10_resample_field_local_CUDA(
                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
             RETURN_FROM_FUNCTION(ret);
