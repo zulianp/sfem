@@ -67,7 +67,7 @@ int proteus_hex8_hierarchical_restriction(int level,
                 for (int zi = 0; zi < level + 1; zi++) {
                     for (int yi = 0; yi < level + 1; yi++) {
                         for (int xi = 0; xi < level + 1; xi++) {
-                            int lidx = proteus_hex8_lidx(level, xi, yi, zi);
+                            const int lidx = proteus_hex8_lidx(level, xi, yi, zi);
 
                             const scalar_t x = xi * h;
                             const scalar_t y = yi * h;
