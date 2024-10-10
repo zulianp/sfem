@@ -8,8 +8,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if SFEM_VEC_SIZE == 8
 #define AVX512
-#undef AVX2
+#elif SFEM_VEC_SIZE == 4
+#define AVX2
+#endif
 
 #ifdef AVX512
 #define _VL_ 8
@@ -95,7 +98,7 @@ vec_double vec_int64_to_double(const vec_int64 a) {
 
 #elif defined(AVX2)  //// AVX2
 
-#define ASSIGN_QUADRATURE_POINT_MACRO_TAIL(_q, _qx_v, _qy_V, _qz_V, _qw_V)         \
+#define ASSIGN_QUADRATURE_POINT_MACRO_TAIL(_q, _qx_V, _qy_V, _qz_V, _qw_V)         \
     {                                                                              \
         _qx_V = (vec_double){(_q + 0) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 0],  \
                              (_q + 1) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 1],  \
@@ -163,7 +166,7 @@ vec_int64 floor_V(vec_double a) {
 
 //// ZEROS for AVX2
 #define ZEROS_SIMD_MACRO \
-    { 0.0, 0.0, 0.0, 0.0 }
+    (vec_double) { 0.0, 0.0, 0.0, 0.0 }
 
 //// SIMD_REDUCE_SUM for AVX2
 #define SIMD_REDUCE_SUM_MACRO(_out, _in) \
@@ -369,22 +372,25 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V(
 /// Macros for the data collection
 #ifdef AVX512
 
-#define GET_DATA_MACRO(_out, _data, _indx_V)   \
-    {                                          \
-        _out = (vec_double){data[_indx_V[0]],  \
-                            data[_indx_V[1]],  \
-                            data[_indx_V[2]],  \
-                            data[_indx_V[3]],  \
-                            data[_indx_V[4]],  \
-                            data[_indx_V[5]],  \
-                            data[_indx_V[6]],  \
-                            data[_indx_V[7]]}; \
+#define GET_DATA_MACRO(_out, _data, _indx_V)    \
+    {                                           \
+        _out = (vec_double){_data[_indx_V[0]],  \
+                            _data[_indx_V[1]],  \
+                            _data[_indx_V[2]],  \
+                            _data[_indx_V[3]],  \
+                            _data[_indx_V[4]],  \
+                            _data[_indx_V[5]],  \
+                            _data[_indx_V[6]],  \
+                            _data[_indx_V[7]]}; \
     }
 
 #elif defined(AVX2)
 
-#define GET_DATA_MACRO(_out, _data, , _indx_V) \
-    { _out = (vec_double){data[_indx_V[0]], data[_indx_V[1]], data[_indx_V[2]], data[_indx_V[3]]}; }
+#define GET_DATA_MACRO(_out, _data, _indx_V)                                                 \
+    {                                                                                        \
+        _out = (vec_double){                                                                 \
+                _data[_indx_V[0]], _data[_indx_V[1]], _data[_indx_V[2]], _data[_indx_V[3]]}; \
+    }
 
 #endif
 
@@ -636,7 +642,7 @@ int hex8_to_tet10_resample_field_local_V2(
 
     if (SFEM_ENABLE_ISOPARAMETRIC) {
         int a = 0;
-        a = hex8_to_isoparametric_tet10_resample_field_local_V(nelements,  // 
+        a = hex8_to_isoparametric_tet10_resample_field_local_V(nelements,  //
                                                                nnodes,
                                                                elems,
                                                                xyz,

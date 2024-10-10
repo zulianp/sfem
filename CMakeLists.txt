@@ -154,7 +154,9 @@ set_target_properties(
 
 set(SFEM_TARGETS sfem)
 
-set(CUDA_ARCH 75)
+# option(CUDA_ARCH "Use CUDA architecture" OFF)
+
+message(STATUS "CUDA_ARCH: ${CUDA_ARCH}")
 
 if(SFEM_ENABLE_CUDA)
 # set_target_properties(sfem PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
