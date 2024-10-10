@@ -8,8 +8,8 @@
 #include "sfem_config.h"
 #endif
 
-#define PRINT_CURRENT_FUNCTION printf("\033[32m\nEnter Function\033[0m: %s, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__);
-#define RETURN_FROM_FUNCTION(__RET_VAL__) printf("\033[31m\nReturn from function\033[0m: %s, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__); return (__RET_VAL__);
+#define PRINT_CURRENT_FUNCTION printf("\033[32m\nEnter Function\033[0m: \033[36m%s\033[0m, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__);
+#define RETURN_FROM_FUNCTION(__RET_VAL__) printf("\033[31m\nReturn from function\033[0m: \033[36m%s\033[0m, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__); return (__RET_VAL__);
 
 
 // #define MPI_CATCH_ERROR(call) \
