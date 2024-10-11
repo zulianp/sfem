@@ -61,12 +61,13 @@ echo $sizes
 echo $origins
 echo $scaling
 
-n_procs=1
+n_procs=288
 # n_procs=2
 # n_procs=8
 
 LAUNCH="mpiexec -np $n_procs"
-#LAUNCH=""
+LAUNCH="srun -p debug -n $n_procs -N 1 "
+# LAUNCH=""
 
 GRID_TO_MESH="grid_to_mesh"
 #GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"

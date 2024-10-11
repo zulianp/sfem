@@ -1034,7 +1034,7 @@ extern "C" int tet4_resample_field_local_reduce_CUDA(
     cudaEvent_t start, stop;
 
     // Number of threads
-    const ptrdiff_t warp_per_block = 2;
+    const ptrdiff_t warp_per_block = 8;
     const ptrdiff_t threadsPerBlock = warp_per_block * __WARP_SIZE__;
 
     // Number of blocks
