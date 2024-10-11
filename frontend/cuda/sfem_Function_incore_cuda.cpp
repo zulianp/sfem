@@ -52,11 +52,11 @@ namespace sfem {
 
         void init(mesh_t *c_mesh) {
             if (c_mesh->element_type == HEX8) {
-                printf("FFF/HEX8\n");
+                // printf("FFF/HEX8\n");
                 cu_hex8_fff_allocate(c_mesh->nelements, &fff_);
                 cu_hex8_fff_fill(c_mesh->nelements, c_mesh->elements, c_mesh->points, fff_);
             } else {
-                printf("FFF/TET4\n");
+                // printf("FFF/TET4\n");
                 cu_tet4_fff_allocate(c_mesh->nelements, &fff_);
                 cu_tet4_fff_fill(c_mesh->nelements, c_mesh->elements, c_mesh->points, fff_);
             }

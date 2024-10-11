@@ -126,3 +126,31 @@ obstacle (PROTEUS_HEX8):
 #elements 1872 #nodes 1030625 #dofs 3091875
 TTS:		451.011 [s], solve: 450.914 [s]
 ```
+
+
+# Laplacian -- GPU implementation on P100 (level 8)
+
+On ARM latop TTS is `174.152 [s]`
+
+## 1 Thread x Macro-element 
+
+**Baseline**
+
+`1.26x` speed-up over CPU implementation (bad)
+
+```c
+#elements 328509 #nodes 343000 #dofs 169112377
+TTS:		145.841 [s], compute 137.394 [s] (solve: 124.731 [s], init: 12.6104 [s])
+residual:	1.28746e-10
+
+```
+
+**Fixed size implementation (LEVEL=8 === BLOCK_SIZE=9)**
+
+`2.8x` speed-up over GPU baseline, and `3.5x` speed-up over CPU implementation 
+
+```c
+#elements 328509 #nodes 343000 #dofs 169112377
+TTS:		57.0432 [s], compute 48.9466 [s] (solve: 43.8373 [s], init: 5.05854 [s])
+residual:	1.28746e-10
+```
