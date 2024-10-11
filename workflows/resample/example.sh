@@ -42,13 +42,16 @@ if [[ -d "$skinned" ]]
 then
 	echo "Reusing existing mesh $skinned and SDF!"
 else
-	create_sphere.sh 1
+	create_sphere.sh 5
 	sfc $mesh $mesh_sorted
 	mkdir -p $skinned
 	skin $mesh $skinned
 	mesh_to_sdf.py $skinned $sdf --hmax=0.01 --margin=0.1
-	raw_to_xdmf.py $sdf
+	# raw_to_xdmf.py $sdf
 fi
+
+# raw_to_xdmf.py $sdf
+sdf_test_GPU.py $sdf
 
 sizes=`head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' '`
 origins=`head -8 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' '`
