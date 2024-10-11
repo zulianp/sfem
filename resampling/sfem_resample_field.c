@@ -834,15 +834,17 @@ int hex8_to_tet10_resample_field_local_CUDA(
 #define USE_TET4_V8 1
 #define USE_TET4_CUDA 2
 
-#if SFEM_VEC_SIZE == 8
+#if SFEM_TET4_CUDA == ON
+#define USE_TET4_MODEL USE_TET4_CUDA
+#elif SFEM_VEC_SIZE == 8
 #define USE_TET4_MODEL USE_TET4_V8
 #else
 #define USE_TET4_MODEL USE_TET4_V4
 #endif
 
-#if SFEM_TET4_CUDA == ON
-#define USE_TET4_MODEL USE_TET4_CUDA
-#endif
+// #if SFEM_TET4_CUDA == ON
+// #define USE_TET4_MODEL USE_TET4_CUDA
+// #endif
 
 int resample_field_local(
         // Mesh
@@ -858,7 +860,7 @@ int resample_field_local(
 
     PRINT_CURRENT_FUNCTION;
 
-    switch (TET10) {
+    switch (info->element_type) {
         case TET4: {
             info->quad_nodes_cnt = TET4_NQP;
             info->nelements = nelements;

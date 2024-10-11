@@ -33,6 +33,8 @@ int main(int argc, char* argv[]) {
 
     sfem_resample_field_info info;
 
+    info.element_type = TET4;
+
     MPI_Init(&argc, &argv);
 
     MPI_Comm comm = MPI_COMM_WORLD;
