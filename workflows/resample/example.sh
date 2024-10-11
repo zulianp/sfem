@@ -66,7 +66,7 @@ n_procs=288
 # n_procs=8
 
 LAUNCH="mpiexec -np $n_procs"
-LAUNCH="srun -p debug -n $n_procs -N 1 "
+# LAUNCH="srun -p debug -n $n_procs -N 1 "
 # LAUNCH=""
 
 GRID_TO_MESH="grid_to_mesh"
