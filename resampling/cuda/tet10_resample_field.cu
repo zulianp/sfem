@@ -1347,7 +1347,7 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
     copy_xyz_tet10_device(nnodes, &xyz_device, xyz);
 
     // Number of threads
-    const ptrdiff_t warp_per_block = 1;
+    const ptrdiff_t warp_per_block = 8;
     const ptrdiff_t threadsPerBlock = warp_per_block * __WARP_SIZE__;
 
     // Number of blocks
