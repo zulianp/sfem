@@ -130,7 +130,9 @@ TTS:		451.011 [s], solve: 450.914 [s]
 
 # Laplacian -- GPU implementation on P100 (level 8)
 
-On ARM latop TTS is `174.152 [s]`
+On ARM latop TTS `compute` is `174.152 [s]` with `OMP_NUM_THREADS=8`
+
+Level 8 has the highest throughput on the ARM but very low on P100. Warp level solution might be required
 
 ## 1 Thread x Macro-element 
 

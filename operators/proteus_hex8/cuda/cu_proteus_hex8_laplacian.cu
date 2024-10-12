@@ -257,6 +257,8 @@ __global__ void cu_proteus_affine_hex8_laplacian_apply_kernel_fixed(
     static const int BLOCK_SIZE = LEVEL + 1;
     static const int BLOCK_SIZE_2 = BLOCK_SIZE * BLOCK_SIZE;
     static const int BLOCK_SIZE_3 = BLOCK_SIZE_2 * BLOCK_SIZE;
+
+    // Uses "local" memory
     scalar_t x_block[BLOCK_SIZE_3];
     scalar_t y_block[BLOCK_SIZE_3];
     scalar_t laplacian_matrix[8 * 8];
@@ -392,9 +394,25 @@ static int cu_proteus_affine_hex8_laplacian_apply_tpl(
         void *stream) {
     SFEM_DEBUG_SYNCHRONIZE();
 
-    if (level == 8) {
-        return cu_proteus_affine_hex8_laplacian_apply_fixed_tpl<T, 8>(
-                nelements, stride, elements, fff, x, y, stream);
+    switch (level) {
+        case 2: {
+            return cu_proteus_affine_hex8_laplacian_apply_fixed_tpl<T, 2>(
+                    nelements, stride, elements, fff, x, y, stream);
+        }
+        case 4: {
+            return cu_proteus_affine_hex8_laplacian_apply_fixed_tpl<T, 4>(
+                    nelements, stride, elements, fff, x, y, stream);
+        }
+        case 6: {
+            return cu_proteus_affine_hex8_laplacian_apply_fixed_tpl<T, 6>(
+                    nelements, stride, elements, fff, x, y, stream);
+        }
+        case 8: {
+            return cu_proteus_affine_hex8_laplacian_apply_fixed_tpl<T, 8>(
+                    nelements, stride, elements, fff, x, y, stream);
+        }
+        default:
+            break;
     }
 
     // Hand tuned
@@ -418,8 +436,6 @@ static int cu_proteus_affine_hex8_laplacian_apply_tpl(
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
 }
-
-
 
 extern int cu_proteus_affine_hex8_laplacian_apply(
         const int level,
@@ -472,7 +488,6 @@ extern int cu_proteus_affine_hex8_laplacian_apply(
         }
     }
 }
-
 
 // TOBEFIXED
 
