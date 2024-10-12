@@ -95,12 +95,14 @@ class LaplaceOp:
 	def det_fff(self):
 		return [determinant(self.FFF_symbolic)]
 
-	def hessian(self):
+	def hessian_aux(self):
 		fe = self.fe
 		ref_grad = self.ref_grad
 		FFF_symbolic = self.FFF_symbolic
 		fe = self.fe
 		q = self.q
+
+		H = sp.zeros(fe.n_nodes(), fe.n_nodes())
 
 		expr = []
 		for i in range(0, fe.n_nodes()):
@@ -117,10 +119,51 @@ class LaplaceOp:
 					else:
 						integr += gdotg * self.qw
 
-				var = sp.symbols(f'element_matrix[{i*fe.n_nodes() + j}*stride]')
-				expr.append(ast.Assignment(var, integr))
+					H[i, j] = integr
+		return H
 
+	def hessian(self):
+		H = self.hessian_aux()
+		rows, cols = H.shape
+		expr = []
+		for i in range(0, rows):
+			for j in range(0, cols):
+				var = sp.symbols(f'element_matrix[{i*cols + j}*stride]')
+				expr.append(ast.Assignment(var, H[i, j]))
 		return expr
+
+	# For block solver (TODO) Box stencil for structured grid
+	# def stencil(self):
+	# 	H = self.hessian_aux()
+	# 	rows, cols = H.shape
+
+	# 	assert rows == 8 # Only works for HEX8
+	# 	S = sp.zeros(27, 1)
+
+	# 	idx3coord = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]]
+
+	# 	def grid(x, y, z):
+	# 		return z*9 + y*3 + x
+
+	# 	def ref_hex8_coord2idx(x,y,z);
+	# 		assert x == 0 || x == 1
+	# 		assert y == 0 || y == 1
+	# 		assert z == 0 || z == 1
+
+	# 		if y == 1 and x == 1
+	# 			return z*4 + 2
+			
+	# 		if y == 1 and x == 0
+	# 			return z*4 + 3
+		
+	# 		return z*4 + x
+
+	# 	I = sp.zeros(8, 1)
+	# 	for i in range(0, 8):
+	# 		I[i] = H[i, i]
+
+	# 	S[grid(1, 1, 1)] = 
+	# 	# Octant 0 (-1, -1, -1)-(0, 0, 0)
 
 	def hessian_diag(self):
 		fe = self.fe
