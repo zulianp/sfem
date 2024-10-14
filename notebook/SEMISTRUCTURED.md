@@ -156,3 +156,32 @@ residual:	1.28746e-10
 TTS:		57.0432 [s], compute 48.9466 [s] (solve: 43.8373 [s], init: 5.05854 [s])
 residual:	1.28746e-10
 ```
+
+
+## Effects of SFEM_ELEMENT_REFINE_LEVEL on P100
+
+This study should be redone with same `#dofs`
+
+| SFEM_ELEMENT_REFINE_LEVEL | #dofs | TTS [s] | TP [GDOF/s] |
+|---|---|---|---|
+| 2 | 115501303 | 116.10 | 0.999 |
+| 4 | 108531333 | 74.177 | 1.4   |
+| 6 | 107171875 | 97.887 | 1.09  |
+| 8 | 105823817	| 97.971 | 1.08  |
+| 10| 118370771 | 108.08 | 1.09	 |
+
+### With interior idx gen
+Here we assume that the interior dofs are order implicitly
+| SFEM_ELEMENT_REFINE_LEVEL | #dofs | TTS [s] | TP [GDOF/s] |
+|---|---|---|---|
+| 4 | 119823157 | 71.512 | 1.67 |
+| 8 | 105823817 | 64.467 | 1.64 |
+
+### With warp code
+
+
+| SFEM_ELEMENT_REFINE_LEVEL | #dofs | TTS [s] | TP [GDOF/s] |
+|---|---|---|---|
+| 4 | 119823157 | 41.371 | 2.89 |
+| 8 | 116930169 | 27.207 | 4.29 |
+

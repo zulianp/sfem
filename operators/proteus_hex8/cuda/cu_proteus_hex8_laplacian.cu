@@ -380,6 +380,9 @@ static int cu_proteus_affine_hex8_laplacian_apply_fixed_tpl(
     return SFEM_SUCCESS;
 }
 
+#include "cu_proteus_hex8_laplacian_variants.hpp"
+#include "cu_proteus_hex8_laplacian_warp.hpp"
+
 #define my_kernel_ cu_proteus_affine_hex8_laplacian_apply_kernel
 
 template <typename T>
@@ -387,12 +390,89 @@ static int cu_proteus_affine_hex8_laplacian_apply_tpl(
         const int level,
         const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
+        const ptrdiff_t interior_start,
         const idx_t *const SFEM_RESTRICT elements,
         const cu_jacobian_t *const SFEM_RESTRICT fff,
         const T *const x,
         T *const y,
         void *stream) {
     SFEM_DEBUG_SYNCHRONIZE();
+
+    int SFEM_HEX8_WARP_LEVEL_KERNEL=1;
+    SFEM_READ_ENV(SFEM_HEX8_WARP_LEVEL_KERNEL, atoi);
+
+    if(SFEM_HEX8_WARP_LEVEL_KERNEL) 
+    {
+        switch (level) {
+            // case 2: {
+            //     return cu_proteus_affine_hex8_laplacian_apply_warp_tpl<T, 2>(
+            //             nelements, stride, interior_start, elements, fff, x, y, stream);
+            // }
+            case 4: {
+                return cu_proteus_affine_hex8_laplacian_apply_warp_tpl<T, 4>(
+                        nelements, stride, interior_start, elements, fff, x, y, stream);
+            }
+            case 6: {
+                return cu_proteus_affine_hex8_laplacian_apply_warp_tpl<T, 6>(
+                        nelements, stride, interior_start, elements, fff, x, y, stream);
+            }
+            // case 7: {
+            //     return cu_proteus_affine_hex8_laplacian_apply_warp_tpl<T, 7>(
+            //             nelements, stride, interior_start, elements, fff, x, y, stream);
+            // }
+            case 8: {
+                return cu_proteus_affine_hex8_laplacian_apply_warp_tpl<T, 8>(
+                        nelements, stride, interior_start, elements, fff, x, y, stream);
+            }
+            // case 9: {
+            //     return cu_proteus_affine_hex8_laplacian_apply_warp_tpl<T, 9>(
+            //             nelements, stride, interior_start, elements, fff, x, y, stream);
+            // }
+            case 10: {
+                return cu_proteus_affine_hex8_laplacian_apply_warp_tpl<T, 10>(
+                        nelements, stride, interior_start, elements, fff, x, y, stream);
+            }
+            default:
+                break;
+        }
+
+    }
+
+#if 1
+    switch (level) {
+        // case 2: {
+        //     return cu_proteus_affine_hex8_laplacian_apply_volgen_tpl<T, 2>(
+        //             nelements, stride, interior_start, elements, fff, x, y, stream);
+        // }
+        case 4: {
+            return cu_proteus_affine_hex8_laplacian_apply_volgen_tpl<T, 4>(
+                    nelements, stride, interior_start, elements, fff, x, y, stream);
+        }
+        case 6: {
+            return cu_proteus_affine_hex8_laplacian_apply_volgen_tpl<T, 6>(
+                    nelements, stride, interior_start, elements, fff, x, y, stream);
+        }
+        // case 7: {
+        //     return cu_proteus_affine_hex8_laplacian_apply_volgen_tpl<T, 7>(
+        //             nelements, stride, interior_start, elements, fff, x, y, stream);
+        // }
+        case 8: {
+            return cu_proteus_affine_hex8_laplacian_apply_volgen_tpl<T, 8>(
+                    nelements, stride, interior_start, elements, fff, x, y, stream);
+        }
+        // case 9: {
+        //     return cu_proteus_affine_hex8_laplacian_apply_volgen_tpl<T, 9>(
+        //             nelements, stride, interior_start, elements, fff, x, y, stream);
+        // }
+        // case 10: {
+        //     return cu_proteus_affine_hex8_laplacian_apply_volgen_tpl<T, 10>(
+        //             nelements, stride, interior_start, elements, fff, x, y, stream);
+        // }
+        default:
+            break;
+    }
+
+#else
 
     switch (level) {
         case 2: {
@@ -407,13 +487,26 @@ static int cu_proteus_affine_hex8_laplacian_apply_tpl(
             return cu_proteus_affine_hex8_laplacian_apply_fixed_tpl<T, 6>(
                     nelements, stride, elements, fff, x, y, stream);
         }
+        case 7: {
+            return cu_proteus_affine_hex8_laplacian_apply_fixed_tpl<T, 7>(
+                    nelements, stride, elements, fff, x, y, stream);
+        }
         case 8: {
             return cu_proteus_affine_hex8_laplacian_apply_fixed_tpl<T, 8>(
+                    nelements, stride, elements, fff, x, y, stream);
+        }
+        case 9: {
+            return cu_proteus_affine_hex8_laplacian_apply_fixed_tpl<T, 9>(
+                    nelements, stride, elements, fff, x, y, stream);
+        }
+        case 10: {
+            return cu_proteus_affine_hex8_laplacian_apply_fixed_tpl<T, 10>(
                     nelements, stride, elements, fff, x, y, stream);
         }
         default:
             break;
     }
+#endif
 
     // Hand tuned
     int block_size = 128;
@@ -441,6 +534,7 @@ extern int cu_proteus_affine_hex8_laplacian_apply(
         const int level,
         const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
+        const ptrdiff_t interior_start,
         const idx_t *const SFEM_RESTRICT elements,
         const void *const SFEM_RESTRICT fff,
         const enum RealType real_type_xy,
@@ -452,6 +546,7 @@ extern int cu_proteus_affine_hex8_laplacian_apply(
             return cu_proteus_affine_hex8_laplacian_apply_tpl(level,
                                                               nelements,
                                                               stride,
+                                                              interior_start,
                                                               elements,
                                                               (cu_jacobian_t *)fff,
                                                               (real_t *)x,
@@ -462,6 +557,7 @@ extern int cu_proteus_affine_hex8_laplacian_apply(
             return cu_proteus_affine_hex8_laplacian_apply_tpl(level,
                                                               nelements,
                                                               stride,
+                                                              interior_start,
                                                               elements,
                                                               (cu_jacobian_t *)fff,
                                                               (float *)x,
@@ -472,6 +568,7 @@ extern int cu_proteus_affine_hex8_laplacian_apply(
             return cu_proteus_affine_hex8_laplacian_apply_tpl(level,
                                                               nelements,
                                                               stride,
+                                                              interior_start,
                                                               elements,
                                                               (cu_jacobian_t *)fff,
                                                               (double *)x,
@@ -485,124 +582,6 @@ extern int cu_proteus_affine_hex8_laplacian_apply(
                     real_type_xy);
             assert(0);
             return SFEM_FAILURE;
-        }
-    }
-}
-
-// TOBEFIXED
-
-// Buggy for level + 1 != BLOCK_SIZE
-template <typename real_t>
-__global__ void cu_proteus_affine_hex8_laplacian_apply_kernel_blocked(
-        const int level,
-        const ptrdiff_t nelements,
-        const ptrdiff_t stride,  // Stride for elements and fff
-        const idx_t *const SFEM_RESTRICT elements,
-        const cu_jacobian_t *const SFEM_RESTRICT fff,
-        const real_t *const SFEM_RESTRICT x,
-        real_t *const SFEM_RESTRICT y) {
-#ifndef NDEBUG
-    const int nxe = cu_proteus_hex8_nxe(level);
-#endif
-
-    static const int BLOCK_SIZE = 3;
-    static const int BLOCK_SIZE_2 = BLOCK_SIZE * BLOCK_SIZE;
-    static const int BLOCK_SIZE_3 = BLOCK_SIZE_2 * BLOCK_SIZE;
-    scalar_t x_block[BLOCK_SIZE_3];
-    scalar_t y_block[BLOCK_SIZE_3];
-    scalar_t laplacian_matrix[8 * 8];
-
-    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
-         e += blockDim.x * gridDim.x) {
-        // Build operator
-        {
-            scalar_t sub_fff[6];
-            const scalar_t h = 1. / level;
-            cu_hex8_sub_fff_0(stride, &fff[e], h, sub_fff);
-            cu_hex8_laplacian_matrix_fff_integral(sub_fff, laplacian_matrix);
-        }
-
-        const int N = level + 1;
-        for (int bz = 0; bz < N; bz += BLOCK_SIZE) {
-            const int sizez = MIN(BLOCK_SIZE, N - bz);
-            for (int by = 0; by < N; by += BLOCK_SIZE) {
-                const int sizey = MIN(BLOCK_SIZE, N - by);
-                for (int bx = 0; bx < N; bx += BLOCK_SIZE) {
-                    const int sizex = MIN(BLOCK_SIZE, N - bx);
-
-                    // Gather
-                    for (int zi = 0; zi < sizez; zi++) {
-                        for (int yi = 0; yi < sizey; yi++) {
-                            for (int xi = 0; xi < sizex; xi++) {
-                                const int lidx =
-                                        cu_proteus_hex8_lidx(level, bx + xi, by + yi, bz + zi);
-
-                                assert(lidx < nxe);
-
-                                const idx_t idx = elements[lidx * stride + e];
-                                x_block[B_(xi, yi, zi)] = x[idx];
-                            }
-                        }
-                    }
-
-                    // Reset
-                    for (int i = 0; i < BLOCK_SIZE_3; i++) {
-                        y_block[i] = 0;
-                    }
-
-                    // Compute
-                    for (int zi = 0; zi < sizez - 1; zi++) {
-                        for (int yi = 0; yi < sizey - 1; yi++) {
-                            for (int xi = 0; xi < sizex - 1; xi++) {
-                                assert(B_(xi + 1, yi + 1, zi + 1) < BLOCK_SIZE_3);
-
-                                scalar_t element_u[8] = {x_block[B_(xi, yi, zi)],
-                                                         x_block[B_(xi + 1, yi, zi)],
-                                                         x_block[B_(xi + 1, yi + 1, zi)],
-                                                         x_block[B_(xi, yi + 1, zi)],
-                                                         x_block[B_(xi, yi, zi + 1)],
-                                                         x_block[B_(xi + 1, yi, zi + 1)],
-                                                         x_block[B_(xi + 1, yi + 1, zi + 1)],
-                                                         x_block[B_(xi, yi + 1, zi + 1)]};
-
-                                scalar_t element_vector[8] = {0};
-                                for (int i = 0; i < 8; i++) {
-                                    const scalar_t *const row = &laplacian_matrix[i * 8];
-                                    const scalar_t ui = element_u[i];
-                                    assert(ui == ui);
-                                    for (int j = 0; j < 8; j++) {
-                                        assert(row[j] == row[j]);
-                                        element_vector[j] += ui * row[j];
-                                    }
-                                }
-
-                                y_block[B_(xi, yi, zi)] += element_vector[0];
-                                y_block[B_(xi + 1, yi, zi)] += element_vector[1];
-                                y_block[B_(xi + 1, yi + 1, zi)] += element_vector[2];
-                                y_block[B_(xi, yi + 1, zi)] += element_vector[3];
-                                y_block[B_(xi, yi, zi + 1)] += element_vector[4];
-                                y_block[B_(xi + 1, yi, zi + 1)] += element_vector[5];
-                                y_block[B_(xi + 1, yi + 1, zi + 1)] += element_vector[6];
-                                y_block[B_(xi, yi + 1, zi + 1)] += element_vector[7];
-                            }
-                        }
-                    }
-
-                    // Scatter
-                    for (int zi = 0; zi < sizez; zi++) {
-                        for (int yi = 0; yi < sizey; yi++) {
-                            for (int xi = 0; xi < sizex; xi++) {
-                                const int lidx =
-                                        cu_proteus_hex8_lidx(level, bx + xi, by + yi, bz + zi);
-
-                                assert(lidx < nxe);
-                                const idx_t idx = elements[lidx * stride + e];
-                                atomicAdd(&y[idx], y_block[B_(xi, yi, zi)]);
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 }
