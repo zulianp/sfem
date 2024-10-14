@@ -241,3 +241,6 @@ run_poisson
 run_convection_diffusion
 mesh_to_blocks
 heat_equation
+workflows/resample/data_5_tet10/metadata_sdf.float32.yml
+workflows/resample/data_5_tet10/metadata_sdf.float32.yml
+workflows/resample/data_5_tet4/metadata_sdf.float32.yml
