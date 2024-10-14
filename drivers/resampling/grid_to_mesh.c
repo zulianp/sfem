@@ -33,7 +33,7 @@ int main(int argc, char* argv[]) {
 
     sfem_resample_field_info info;
 
-    info.element_type = TET10;
+    info.element_type = TET4;
 
     MPI_Init(&argc, &argv);
 
@@ -197,8 +197,11 @@ int main(int argc, char* argv[]) {
 
     real_t* g = calloc(mesh.nnodes, sizeof(real_t));
 
+    
     {
+        MPI_Barrier(MPI_COMM_WORLD);
         double resample_tick = MPI_Wtime();
+
 
         if (SFEM_INTERPOLATE) {
             interpolate_field(
@@ -338,6 +341,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        MPI_Barrier(MPI_COMM_WORLD);
         double resample_tock = MPI_Wtime();
 
         // get MPI world size
