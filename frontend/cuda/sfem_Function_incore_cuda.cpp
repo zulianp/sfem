@@ -409,6 +409,7 @@ namespace sfem {
             return cu_proteus_affine_hex8_laplacian_apply(ssm.level(),
                                                           fff->n_elements(),
                                                           fff->n_elements(),  // stride
+                                                          ssm.interior_start(),
                                                           fff->elements(),
                                                           fff->fff(),
                                                           real_type,
@@ -422,6 +423,7 @@ namespace sfem {
             return cu_proteus_affine_hex8_laplacian_apply(ssm.level(),
                                                           fff->n_elements(),
                                                           fff->n_elements(),  // stride
+                                                          ssm.interior_start(),
                                                           fff->elements(),
                                                           fff->fff(),
                                                           real_type,
