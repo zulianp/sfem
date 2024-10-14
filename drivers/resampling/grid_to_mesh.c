@@ -33,7 +33,7 @@ int main(int argc, char* argv[]) {
 
     sfem_resample_field_info info;
 
-    info.element_type = TET4;
+    info.element_type = TET10;
 
     MPI_Init(&argc, &argv);
 
@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
     //     printf("\n");
     // }
 
-    if (argc != 13) {
+    if (argc < 13 && argc > 14) {
         fprintf(stderr, "Error: Invalid number of arguments\n\n");
 
         fprintf(stderr,
@@ -75,6 +75,29 @@ int main(int argc, char* argv[]) {
     const char* folder = argv[11];
     const char* output_path = argv[12];
 
+    if (argc == 14) {
+        if (strcmp(argv[13], "TET4") == 0) {
+            info.element_type = TET4;
+        } else if (strcmp(argv[13], "TET10") == 0) {
+            info.element_type = TET10;
+        } else {
+            fprintf(stderr, "Error: Invalid element type\n\n");
+            fprintf(stderr,
+                    "usage: %s <nx> <ny> <nz> <ox> <oy> <oz> <dx> <dy> <dz> "
+                    "<data.float32.raw> <folder> <output_path> <element_type>\n",
+                    argv[0]);
+            return EXIT_FAILURE;
+        }
+    }
+
+    if (info.element_type == TET4) {
+        printf("info.element_type = TET4,  %s:%d\n", __FILE__, __LINE__);
+    } else if (info.element_type == TET10) {
+        printf("info.element_type = TET10, %s:%d\n", __FILE__, __LINE__);
+    } else {
+        printf("info.element_type = UNKNOWN, %s:%d\n", __FILE__, __LINE__);
+    }
+
     mesh_t mesh;
     if (mesh_read(comm, folder, &mesh)) {
         return EXIT_FAILURE;
@@ -93,7 +116,6 @@ int main(int argc, char* argv[]) {
         double ndarray_read_tick = MPI_Wtime();
 
         if (SFEM_READ_FP32) {
-            
             float* temp = NULL;
 
             if (ndarray_create_from_file(
@@ -131,8 +153,9 @@ int main(int argc, char* argv[]) {
             // printf("max_temp  = %1.14e , %s:%d\n", max_temp, __FILE__, __LINE__);
             // printf("min_temp  = %1.14e , %s:%d\n", min_temp, __FILE__, __LINE__);
             // printf("n_zyx     = %ld , %s:%d\n", n_zyx, __FILE__, __LINE__);
-            // printf("field == NULL: %s, %s:%d\n", field == NULL ? "true" : "false", __FILE__, __LINE__);
-            // printf("size field = %ld MB , %s:%d\n", (n_zyx * sizeof(real_t) / 1024 / 1024), __FILE__, __LINE__);
+            // printf("field == NULL: %s, %s:%d\n", field == NULL ? "true" : "false", __FILE__,
+            // __LINE__); printf("size field = %ld MB , %s:%d\n", (n_zyx * sizeof(real_t) / 1024 /
+            // 1024), __FILE__, __LINE__);
 
             // } /// end DEBUG ///
             free(temp);
@@ -197,11 +220,9 @@ int main(int argc, char* argv[]) {
 
     real_t* g = calloc(mesh.nnodes, sizeof(real_t));
 
-    
     {
         MPI_Barrier(MPI_COMM_WORLD);
         double resample_tick = MPI_Wtime();
-
 
         if (SFEM_INTERPOLATE) {
             interpolate_field(
@@ -218,7 +239,6 @@ int main(int argc, char* argv[]) {
                     g);
         } else {
             if (mpi_size == 1) {
-
                 // { /// DEBUG ///
                 //     printf("\nFunction: %s\n", __FUNCTION__);
                 //     printf("\nMPI size = 1 DEBUG: %s:%d\n", __FILE__, __LINE__);
@@ -241,9 +261,10 @@ int main(int argc, char* argv[]) {
                 //            __LINE__);
 
                 //     int indices[3] = {22, 55, 111};
-                //     printf("field[%d] = %g, %s:%d\n", indices[0], field[indices[0]], __FILE__, __LINE__);
-                //     printf("field[%d] = %g, %s:%d\n", indices[1], field[indices[1]], __FILE__, __LINE__);
-                //     printf("field[%d] = %g, %s:%d\n", indices[2], field[indices[2]], __FILE__, __LINE__);
+                //     printf("field[%d] = %g, %s:%d\n", indices[0], field[indices[0]], __FILE__,
+                //     __LINE__); printf("field[%d] = %g, %s:%d\n", indices[1], field[indices[1]],
+                //     __FILE__, __LINE__); printf("field[%d] = %g, %s:%d\n", indices[2],
+                //     field[indices[2]], __FILE__, __LINE__);
 
                 // } /// end DEBUG ///
 
