@@ -172,6 +172,7 @@ This study should be redone with same `#dofs`
 
 ### With interior idx gen
 Here we assume that the interior dofs are order implicitly
+
 | SFEM_ELEMENT_REFINE_LEVEL | #dofs | TTS [ms] | TP [GDOF/s] |
 |---|---|---|---|
 | 4 | 119823157 | 71.512 | 1.67 |
