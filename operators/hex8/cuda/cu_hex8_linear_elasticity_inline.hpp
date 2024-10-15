@@ -19,16 +19,16 @@ static __host__ __device__ void cu_hex8_sub_adj_0(const ptrdiff_t stride,
                                                   scalar_t *const SFEM_RESTRICT sub_adjugate,
                                                   scalar_t *const SFEM_RESTRICT sub_determinant) {
     const scalar_t x0 = POW2(h);
-    sub_adjugate[0] = adjugate[0 * stride] * x0;
-    sub_adjugate[1] = adjugate[1 * stride] * x0;
-    sub_adjugate[2] = adjugate[2 * stride] * x0;
-    sub_adjugate[3] = adjugate[3 * stride] * x0;
-    sub_adjugate[4] = adjugate[4 * stride] * x0;
-    sub_adjugate[5] = adjugate[5 * stride] * x0;
-    sub_adjugate[6] = adjugate[6 * stride] * x0;
-    sub_adjugate[7] = adjugate[7 * stride] * x0;
-    sub_adjugate[8] = adjugate[8 * stride] * x0;
-    sub_determinant[0] = determinant * (POW3(h));
+    sub_adjugate[0] = (scalar_t)adjugate[0 * stride] * x0;
+    sub_adjugate[1] = (scalar_t)adjugate[1 * stride] * x0;
+    sub_adjugate[2] = (scalar_t)adjugate[2 * stride] * x0;
+    sub_adjugate[3] = (scalar_t)adjugate[3 * stride] * x0;
+    sub_adjugate[4] = (scalar_t)adjugate[4 * stride] * x0;
+    sub_adjugate[5] = (scalar_t)adjugate[5 * stride] * x0;
+    sub_adjugate[6] = (scalar_t)adjugate[6 * stride] * x0;
+    sub_adjugate[7] = (scalar_t)adjugate[7 * stride] * x0;
+    sub_adjugate[8] = (scalar_t)adjugate[8 * stride] * x0;
+    sub_determinant[0] = (scalar_t)determinant * (POW3(h));
 }
 
 template <typename scalar_t, typename accumulator_t>
