@@ -1,24 +1,28 @@
 
 
-template <typename real_t, int LEVEL>
+template <typename T, int LEVEL>
 __global__ void cu_proteus_affine_hex8_laplacian_apply_kernel_warp(
         const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
         const ptrdiff_t interior_start,
         const idx_t *const SFEM_RESTRICT elements,
         const cu_jacobian_t *const SFEM_RESTRICT fff,
-        const real_t *const SFEM_RESTRICT x,
-        real_t *const SFEM_RESTRICT y) {
+        const T *const SFEM_RESTRICT x,
+        T *const SFEM_RESTRICT y) {
     static const int BLOCK_SIZE = LEVEL + 1;
     static const int BLOCK_SIZE_2 = BLOCK_SIZE * BLOCK_SIZE;
     static const int BLOCK_SIZE_3 = BLOCK_SIZE_2 * BLOCK_SIZE;
 
-    __shared__ scalar_t x_block[BLOCK_SIZE_3];
-    __shared__ accumulator_t y_block[BLOCK_SIZE_3];
+    assert(blockDim.x == BLOCK_SIZE);
+    assert(blockDim.y == BLOCK_SIZE);
+    assert(blockDim.z == BLOCK_SIZE);
+
+    __shared__ T x_block[BLOCK_SIZE_3];
+    __shared__ T y_block[BLOCK_SIZE_3];
 
 #define CU_PROTEUS_HEX8_WARP_USE_ELEMENTAL_MATRIX
 #ifdef CU_PROTEUS_HEX8_WARP_USE_ELEMENTAL_MATRIX
-    scalar_t laplacian_matrix[8 * 8];
+    T laplacian_matrix[8 * 8];
 #endif
 
     for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
@@ -30,15 +34,15 @@ __global__ void cu_proteus_affine_hex8_laplacian_apply_kernel_warp(
 
 #ifdef CU_PROTEUS_HEX8_WARP_USE_ELEMENTAL_MATRIX
         {
-            scalar_t sub_fff[6];
-            const scalar_t h = 1. / LEVEL;
+            T sub_fff[6];
+            const T h = 1. / LEVEL;
             cu_hex8_sub_fff_0(stride, &fff[e], h, sub_fff);
             cu_hex8_laplacian_matrix_fff_integral(sub_fff, laplacian_matrix);
         }
 #else
-        scalar_t sub_fff[6];
+        T sub_fff[6];
         {
-            const scalar_t h = 1. / LEVEL;
+            const T h = 1. / LEVEL;
             cu_hex8_sub_fff_0(stride, &fff[e], h, sub_fff);
         }
 #endif
@@ -47,10 +51,10 @@ __global__ void cu_proteus_affine_hex8_laplacian_apply_kernel_warp(
 
         __syncthreads();  //
 
-        scalar_t element_vector[8] = {0};
+        T element_vector[8] = {0};
         if (is_element) {
             // gather
-            scalar_t element_u[8] = {x_block[B_(threadIdx.x, threadIdx.y, threadIdx.z)],
+            T element_u[8] = {x_block[B_(threadIdx.x, threadIdx.y, threadIdx.z)],
                                      x_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z)],
                                      x_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z)],
                                      x_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z)],
@@ -62,8 +66,8 @@ __global__ void cu_proteus_affine_hex8_laplacian_apply_kernel_warp(
 
 #ifdef CU_PROTEUS_HEX8_WARP_USE_ELEMENTAL_MATRIX
             for (int i = 0; i < 8; i++) {
-                const scalar_t *const row = &laplacian_matrix[i * 8];
-                const scalar_t ui = element_u[i];
+                const T *const row = &laplacian_matrix[i * 8];
+                const T ui = element_u[i];
                 assert(ui == ui);
                 for (int j = 0; j < 8; j++) {
                     assert(row[j] == row[j]);
@@ -105,7 +109,7 @@ template <typename T, int LEVEL>
 static int cu_proteus_affine_hex8_laplacian_apply_warp_tpl(
         const ptrdiff_t nelements,
         const ptrdiff_t stride,          // Stride for elements and fff
-        const ptrdiff_t interior_start,  // Stride for elements and fff
+        const ptrdiff_t interior_start,  
         const idx_t *const SFEM_RESTRICT elements,
         const cu_jacobian_t *const SFEM_RESTRICT fff,
         const T *const x,
