@@ -33,6 +33,7 @@ static inline __device__ __host__ int cu_proteus_hex8_lidx(const int L,
     return ret;
 }
 
+template<typename scalar_t>
 static inline __device__ __host__ void cu_hex8_sub_fff_0(const ptrdiff_t stride,
                                                          const cu_jacobian_t *const SFEM_RESTRICT
                                                                  fff,
@@ -46,6 +47,7 @@ static inline __device__ __host__ void cu_hex8_sub_fff_0(const ptrdiff_t stride,
     sub_fff[5] = (scalar_t)fff[5 * stride] * h;
 }
 
+template<typename scalar_t, typename accumulator_t>
 static inline __device__ __host__ void cu_hex8_laplacian_matrix_fff_integral(
         const scalar_t *const SFEM_RESTRICT fff,
         accumulator_t *const SFEM_RESTRICT element_matrix) {
