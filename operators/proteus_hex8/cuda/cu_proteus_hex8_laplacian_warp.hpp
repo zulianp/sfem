@@ -55,14 +55,13 @@ __global__ void cu_proteus_affine_hex8_laplacian_apply_kernel_warp(
         if (is_element) {
             // gather
             T element_u[8] = {x_block[B_(threadIdx.x, threadIdx.y, threadIdx.z)],
-                                     x_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z)],
-                                     x_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z)],
-                                     x_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z)],
-                                     x_block[B_(threadIdx.x, threadIdx.y, threadIdx.z + 1)],
-                                     x_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z + 1)],
-                                     x_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z + 1)],
-                                     x_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z + 1)]};
-
+                              x_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z)],
+                              x_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z)],
+                              x_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z)],
+                              x_block[B_(threadIdx.x, threadIdx.y, threadIdx.z + 1)],
+                              x_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z + 1)],
+                              x_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z + 1)],
+                              x_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z + 1)]};
 
 #ifdef CU_PROTEUS_HEX8_WARP_USE_ELEMENTAL_MATRIX
             for (int i = 0; i < 8; i++) {
@@ -94,7 +93,7 @@ __global__ void cu_proteus_affine_hex8_laplacian_apply_kernel_warp(
         }
 
         const int interior = threadIdx.x > 0 && threadIdx.y > 0 && threadIdx.z > 0 &&
-                       threadIdx.x < LEVEL && threadIdx.y < LEVEL && threadIdx.z < LEVEL;
+                             threadIdx.x < LEVEL && threadIdx.y < LEVEL && threadIdx.z < LEVEL;
 
         __syncthreads();  //
 
@@ -108,8 +107,8 @@ __global__ void cu_proteus_affine_hex8_laplacian_apply_kernel_warp(
 template <typename T, int LEVEL>
 static int cu_proteus_affine_hex8_laplacian_apply_warp_tpl(
         const ptrdiff_t nelements,
-        const ptrdiff_t stride,          // Stride for elements and fff
-        const ptrdiff_t interior_start,  
+        const ptrdiff_t stride,  // Stride for elements and fff
+        const ptrdiff_t interior_start,
         const idx_t *const SFEM_RESTRICT elements,
         const cu_jacobian_t *const SFEM_RESTRICT fff,
         const T *const x,
