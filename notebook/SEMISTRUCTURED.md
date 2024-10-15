@@ -162,7 +162,7 @@ residual:	1.28746e-10
 
 This study should be redone with same `#dofs`
 
-| SFEM_ELEMENT_REFINE_LEVEL | #dofs | TTS [s] | TP [GDOF/s] |
+| SFEM_ELEMENT_REFINE_LEVEL | #dofs | TTS [ms] | TP [GDOF/s] |
 |---|---|---|---|
 | 2 | 115501303 | 116.10 | 0.999 |
 | 4 | 108531333 | 74.177 | 1.4   |
@@ -172,16 +172,16 @@ This study should be redone with same `#dofs`
 
 ### With interior idx gen
 Here we assume that the interior dofs are order implicitly
-| SFEM_ELEMENT_REFINE_LEVEL | #dofs | TTS [s] | TP [GDOF/s] |
+| SFEM_ELEMENT_REFINE_LEVEL | #dofs | TTS [ms] | TP [GDOF/s] |
 |---|---|---|---|
 | 4 | 119823157 | 71.512 | 1.67 |
 | 8 | 105823817 | 64.467 | 1.64 |
 
 ### With warp code
 
-
-| SFEM_ELEMENT_REFINE_LEVEL | #dofs | TTS [s] | TP [GDOF/s] |
+| SFEM_ELEMENT_REFINE_LEVEL | #dofs | TTS [ms] | TP [GDOF/s] |
 |---|---|---|---|
 | 4 | 119823157 | 41.371 | 2.89 |
 | 8 | 116930169 | 27.207 | 4.29 |
 
+Single precision 8 levels: `116930169` `22.995 [ms]`  `5 [GDOF/s]`

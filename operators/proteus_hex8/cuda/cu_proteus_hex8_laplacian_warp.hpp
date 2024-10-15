@@ -13,9 +13,13 @@ __global__ void cu_proteus_affine_hex8_laplacian_apply_kernel_warp(
     static const int BLOCK_SIZE_2 = BLOCK_SIZE * BLOCK_SIZE;
     static const int BLOCK_SIZE_3 = BLOCK_SIZE_2 * BLOCK_SIZE;
 
-    __shared__ real_t x_block[BLOCK_SIZE_3];
-    __shared__ real_t y_block[BLOCK_SIZE_3];
+    __shared__ scalar_t x_block[BLOCK_SIZE_3];
+    __shared__ accumulator_t y_block[BLOCK_SIZE_3];
+
+#define CU_PROTEUS_HEX8_WARP_USE_ELEMENTAL_MATRIX
+#ifdef CU_PROTEUS_HEX8_WARP_USE_ELEMENTAL_MATRIX
     scalar_t laplacian_matrix[8 * 8];
+#endif
 
     for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
         const int lidx = threadIdx.z * BLOCK_SIZE_2 + threadIdx.y * BLOCK_SIZE + threadIdx.x;
@@ -24,12 +28,20 @@ __global__ void cu_proteus_affine_hex8_laplacian_apply_kernel_warp(
         x_block[lidx] = x[idx];  // Copy coeffs to shared mem
         y_block[lidx] = 0;       // Reset
 
+#ifdef CU_PROTEUS_HEX8_WARP_USE_ELEMENTAL_MATRIX
         {
             scalar_t sub_fff[6];
             const scalar_t h = 1. / LEVEL;
             cu_hex8_sub_fff_0(stride, &fff[e], h, sub_fff);
             cu_hex8_laplacian_matrix_fff_integral(sub_fff, laplacian_matrix);
         }
+#else
+        scalar_t sub_fff[6];
+        {
+            const scalar_t h = 1. / LEVEL;
+            cu_hex8_sub_fff_0(stride, &fff[e], h, sub_fff);
+        }
+#endif
 
         const bool is_element = threadIdx.x < LEVEL && threadIdx.y < LEVEL && threadIdx.z < LEVEL;
 
@@ -47,6 +59,8 @@ __global__ void cu_proteus_affine_hex8_laplacian_apply_kernel_warp(
                                      x_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z + 1)],
                                      x_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z + 1)]};
 
+
+#ifdef CU_PROTEUS_HEX8_WARP_USE_ELEMENTAL_MATRIX
             for (int i = 0; i < 8; i++) {
                 const scalar_t *const row = &laplacian_matrix[i * 8];
                 const scalar_t ui = element_u[i];
@@ -56,6 +70,9 @@ __global__ void cu_proteus_affine_hex8_laplacian_apply_kernel_warp(
                     element_vector[j] += ui * row[j];
                 }
             }
+#else
+            cu_hex8_laplacian_apply_fff_integral(sub_fff, element_u, element_vector);
+#endif
 
             // TODO With stencil version atomics can be avoided
             atomicAdd(&y_block[B_(threadIdx.x, threadIdx.y, threadIdx.z)], element_vector[0]);
@@ -72,7 +89,7 @@ __global__ void cu_proteus_affine_hex8_laplacian_apply_kernel_warp(
                       element_vector[7]);
         }
 
-        int interior = threadIdx.x > 0 && threadIdx.y > 0 && threadIdx.z > 0 &&
+        const int interior = threadIdx.x > 0 && threadIdx.y > 0 && threadIdx.z > 0 &&
                        threadIdx.x < LEVEL && threadIdx.y < LEVEL && threadIdx.z < LEVEL;
 
         __syncthreads();  //
