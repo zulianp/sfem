@@ -140,10 +140,71 @@ class LaplaceOp:
 	# 	assert rows == 8 # Only works for HEX8
 	# 	S = sp.zeros(27, 1)
 
-	# 	idx3coord = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]]
+	# # 	idx3coord = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]]
 
-	# 	def grid(x, y, z):
+
+	# 	def hg(x,y,z):
+	# 		vx = abs(x - 1)
+	# 		vy = abs(y - 1)
+	# 		vz = abs(z - 1)
+
+	# 		ret = vz * 4
+
+	# 		if vx == 0 and vy == 0:
+	# 			return ret
+	# 		if vx == 1 and vy == 0:
+	# 			return ret + 1
+	# 		if vx == 0 and vy == 1:
+	# 			return ret + 3
+	# 		if vx == 1 and vy == 1:
+	# 			return ret + 2
+	# 		assert False
+
+
+	# 	def g(x, y, z):
 	# 		return z*9 + y*3 + x
+
+	# 	# Stencil corners contrib
+	# 	S[g(0,0,0)] += H[6, 0] # (0, 0, 0)
+	# 	S[g(2,0,0)] += H[7, 1] # (0, 1, 0)
+	# 	S[g(2,2,0)] += H[4, 2] # (1, 1, 0)
+	# 	S[g(0,2,0)] += H[5, 3] # (0, 1, 0)
+	# 	S[g(0,0,2)] += H[2, 4] # (0, 0, 1)
+	# 	S[g(2,0,2)] += H[3, 5] # (0, 1, 1)
+	# 	S[g(2,2,2)] += H[0, 6] # (1, 1, 1)
+	# 	S[g(0,2,2)] += H[1, 7] # (0, 1, 1)
+
+	# 	# Stencil face/edge contrib
+	# 	# BOTTOM
+	# 	S[g(0,1,0)] += H[,]
+	# 	S[g(1,0,0)] += H[,]
+	# 	S[g(2,1,0)] += H[,]
+	# 	S[g(1,2,0)] += H[,]
+
+	# 	S[g(1,1,0)] += H[,]
+		
+	# 	# MIDDLE
+	# 	S[g(0,1,1)] += H[,]
+	# 	S[g(1,0,1)] += H[,]
+	# 	S[g(2,1,1)] += H[,]
+	# 	S[g(1,2,1)] += H[,]
+
+	# 	S[g(0,0,1)] += H[,]		
+	# 	S[g(2,0,1)] += H[,]
+	# 	S[g(2,2,1)] += H[,]
+	# 	S[g(0,2,1)] += H[,]
+
+	# 	# TOP
+	# 	S[g(0,1,2)] += H[,]
+	# 	S[g(1,0,2)] += H[,]
+	# 	S[g(2,1,2)] += H[,]
+	# 	S[g(1,2,2)] += H[,]
+
+	# 	S[g(1,1,2)] += H[,]
+
+	# 	# Stencil edge/edge-contrib
+	# 	S[g(1,1,1)] += H[,] #?
+	
 
 	# 	def ref_hex8_coord2idx(x,y,z);
 	# 		assert x == 0 || x == 1

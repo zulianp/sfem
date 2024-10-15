@@ -28,7 +28,7 @@ if [[ -d "$mesh" ]]
 then
 	echo "Reusing mesh"
 else
-	create_box_ss_mesh.sh 35 $SFEM_ELEMENT_REFINE_LEVEL
+	create_box_ss_mesh.sh 31 $SFEM_ELEMENT_REFINE_LEVEL
 fi
 
 # Box mesh for testing
@@ -73,7 +73,7 @@ export SFEM_DEBUG=0
 
 # export SFEM_COARSE_TOL=1e-12
 
-$LAUNCH mgsolve $mesh output
+$LAUNCH mgsolve $mesh output | tee log.txt
 
 if [[ $SFEM_USE_ELASTICITY -eq 1 ]]
 then
