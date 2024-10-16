@@ -54,11 +54,9 @@ namespace sfem {
 
         void init(mesh_t *c_mesh) {
             if (c_mesh->element_type == HEX8) {
-                // printf("FFF/HEX8\n");
                 cu_hex8_fff_allocate(c_mesh->nelements, &fff_);
                 cu_hex8_fff_fill(c_mesh->nelements, c_mesh->elements, c_mesh->points, fff_);
             } else {
-                // printf("FFF/TET4\n");
                 cu_tet4_fff_allocate(c_mesh->nelements, &fff_);
                 cu_tet4_fff_fill(c_mesh->nelements, c_mesh->elements, c_mesh->points, fff_);
             }
@@ -76,7 +74,6 @@ namespace sfem {
 
         ~FFF() {
             d_buffer_destroy(fff_);
-            // d_buffer_destroy(elements_);
         }
 
         enum ElemType element_type() const { return element_type_; }
@@ -676,9 +673,9 @@ namespace sfem {
                                                                   lambda,
                                                                   real_type,
                                                                   3,
-                                                                  &x[0],
-                                                                  &x[1],
-                                                                  &x[2],
+                                                                  &h[0],
+                                                                  &h[1],
+                                                                  &h[2],
                                                                   3,
                                                                   &out[0],
                                                                   &out[1],
