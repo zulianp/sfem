@@ -1,5 +1,6 @@
 #include "cu_linear_elasticity.h"
 
+#include "cu_hex8_linear_elasticity.h"
 #include "cu_macro_tet4_linear_elasticity.h"
 #include "cu_tet10_linear_elasticity.h"
 #include "cu_tet4_linear_elasticity.h"
@@ -77,6 +78,26 @@ extern int cu_linear_elasticity_apply(const enum ElemType element_type,
                                                     &d_y[2],
                                                     stream);
         }
+        case HEX8: {
+            return cu_affine_hex8_linear_elasticity_apply(nelements,
+                                                          stride,
+                                                          elements,
+                                                          jacobian_adjugate,
+                                                          jacobian_determinant,
+                                                          mu,
+                                                          lambda,
+                                                          real_type,
+                                                          3,
+                                                          d_x,
+                                                          &d_x[1],
+                                                          &d_x[2],
+                                                          3,
+                                                          d_y,
+                                                          &d_y[1],
+                                                          &d_y[2],
+                                                          stream);
+        }
+
         default: {
             fprintf(stderr,
                     "Invalid element type %d\n (%s %s:%d)",

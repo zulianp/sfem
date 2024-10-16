@@ -85,12 +85,18 @@ __global__ void cu_proteus_hex8_hierarchical_prolongation_kernel(
                         scalar_t val = 0;
 
                         for (int v = 0; v < 8; v++) {
+                            
+
                             const ptrdiff_t global_from_idx =
                                     (elements[corners[v] * stride + e] * vec_size + d) * from_stride;
+                         
+                            assert(from[global_from_idx] == from[global_from_idx]);
+                            assert(f[v] == f[v]);
+
                             val += f[v] * from[global_from_idx];
                         }
 
-                        
+                        assert(val == val);
 
                         const ptrdiff_t global_to_idx = (idx * vec_size + d) * to_stride;
                         to[global_to_idx] = val;
@@ -272,6 +278,10 @@ __global__ void cu_proteus_hex8_hierarchical_restriction_kernel(
 
                         const ptrdiff_t global_from_idx = (idx * vec_size + d) * from_stride;
                         const scalar_t val = from[global_from_idx] / e2n_count[global_from_idx];
+
+                        assert(from[global_from_idx] == from[global_from_idx]);
+                        assert(e2n_count[global_from_idx] > 0);
+                        assert(val == val);
 
                         for (int i = 0; i < 8; i++) {
                             acc[i] += f[i] * val;
