@@ -242,6 +242,8 @@ vec_double weno4_3D_HOne_V(const vec_double x, const vec_double y, const vec_dou
                            const vec_indices stride_y,                                  //
                            const vec_indices stride_z) {                                //
 
+    /// Da rifare visto che stride_x, stride_y, stride_z non centrano nulla
+
     vec_double ret = ZEROS_VEC;
     vec_double w1, w2, w3, w4;
 

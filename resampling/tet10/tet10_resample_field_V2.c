@@ -463,6 +463,8 @@ int hex8_to_isoparametric_tet10_resample_field_local_V(
         // Output
         real_t* const SFEM_RESTRICT weighted_field) {
     //
+    PRINT_CURRENT_FUNCTION;
+
     printf("============================================================\n");
     printf("Start: hex8_to_isoparametric_tet10_resample_field_local_V\n");
     printf("============================================================\n");
@@ -603,6 +605,76 @@ int hex8_to_isoparametric_tet10_resample_field_local_V(
     return 0;
 }  // end function hex8_to_tet10_resample_field_local
 //////////////////////////////////////////////////////////
+
+//////////////////////////////////////////////////////////
+/// hex8_to_tet10_resample_field_local_cube1_V2
+//////////////////////////////////////////////////////////
+int hex8_to_isoparametric_tet10_resample_field_local_cube1_V2(
+        /// Mesh
+        const ptrdiff_t nelements,          // number of elements
+        const ptrdiff_t nnodes,             // number of nodes
+        idx_t** const SFEM_RESTRICT elems,  // connectivity
+        geom_t** const SFEM_RESTRICT xyz,   // coordinates
+        /// SDF
+        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
+        const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
+        const geom_t* const SFEM_RESTRICT origin,     // origin of the domain
+        const geom_t* const SFEM_RESTRICT delta,      // delta of the domain
+        const real_t* const SFEM_RESTRICT data,       // SDF
+        // Output                                     //
+        real_t* const SFEM_RESTRICT weighted_field) {  //
+    //
+    PRINT_CURRENT_FUNCTION;
+
+    const real_t ox = (real_t)origin[0];
+    const real_t oy = (real_t)origin[1];
+    const real_t oz = (real_t)origin[2];
+
+    const real_t dx = (real_t)delta[0];
+    const real_t dy = (real_t)delta[1];
+    const real_t dz = (real_t)delta[2];
+
+    const ptrdiff_t stride0 = stride[0];
+    const ptrdiff_t stride1 = stride[1];
+    const ptrdiff_t stride2 = stride[2];
+
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        // printf("element = %d\n", i);
+
+        idx_t ev[10];
+
+        // ISOPARAMETRIC
+        real_t x[10], y[10], z[10];
+
+        vec_double hex8_f[8];
+        vec_double coeffs[8];
+
+        vec_double tet10_f[10];
+        vec_double element_field[10];
+
+        // loop over the 4 vertices of the tetrahedron
+        UNROLL_ZERO
+        for (int v = 0; v < 10; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        // ISOPARAMETRIC
+        for (int v = 0; v < 10; ++v) {
+            x[v] = (real_t)(xyz[0][ev[v]]);  // x-coordinates
+            y[v] = (real_t)(xyz[1][ev[v]]);  // y-coordinates
+            z[v] = (real_t)(xyz[2][ev[v]]);  // z-coordinates
+        }
+
+        // memset(element_field, 0, 10 * sizeof(real_t));
+
+        // set to zero the element field
+        for (int ii = 0; ii < 10; ii++) {
+            element_field[ii] = ZEROS_SIMD_MACRO;
+        }
+    }
+
+    RETURN_FROM_FUNCTION(0);
+}
 
 /**
  * @brief
