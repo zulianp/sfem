@@ -21,17 +21,16 @@ __global__ void cu_affine_hex8_linear_elasticity_apply_kernel(
         T *const SFEM_RESTRICT g_outx,
         T *const SFEM_RESTRICT g_outy,
         T *const SFEM_RESTRICT g_outz) {
-
-	static const int n_qp = 6;
-	const T qw[6] = {0.16666666666666666666666666666667,
-	                 0.16666666666666666666666666666667,
-	                 0.16666666666666666666666666666667,
-	                 0.16666666666666666666666666666667,
-	                 0.16666666666666666666666666666667,
-	                 0.16666666666666666666666666666667};
-	const T qx[6] = {0.0, 0.5, 0.5, 0.5, 0.5, 1.0};
-	const T qy[6] = {0.5, 0.0, 0.5, 0.5, 1.0, 0.5};
-	const T qz[6] = {0.5, 0.5, 0.0, 1.0, 0.5, 0.5};
+    static const int n_qp = 6;
+    const T qw[6] = {0.16666666666666666666666666666667,
+                     0.16666666666666666666666666666667,
+                     0.16666666666666666666666666666667,
+                     0.16666666666666666666666666666667,
+                     0.16666666666666666666666666666667,
+                     0.16666666666666666666666666666667};
+    const T qx[6] = {0.0, 0.5, 0.5, 0.5, 0.5, 1.0};
+    const T qy[6] = {0.5, 0.0, 0.5, 0.5, 1.0, 0.5};
+    const T qz[6] = {0.5, 0.5, 0.0, 1.0, 0.5, 0.5};
 
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
          e += blockDim.x * gridDim.x) {
@@ -67,6 +66,10 @@ __global__ void cu_affine_hex8_linear_elasticity_apply_kernel(
             ux[v] = g_ux[ev[v] * u_stride];
             uy[v] = g_uy[ev[v] * u_stride];
             uz[v] = g_uz[ev[v] * u_stride];
+
+            assert(ux[v] == ux[v]);
+            assert(uy[v] == uy[v]);
+            assert(uz[v] == uz[v]);
         }
 
         for (int k = 0; k < n_qp; k++) {
@@ -87,6 +90,10 @@ __global__ void cu_affine_hex8_linear_elasticity_apply_kernel(
         }
 
         for (int v = 0; v < 8; v++) {
+            assert(outx[v] == outx[v]);
+            assert(outy[v] == outy[v]);
+            assert(outz[v] == outz[v]);
+
             atomicAdd(&g_outx[ev[v] * out_stride], outx[v]);
             atomicAdd(&g_outy[ev[v] * out_stride], outy[v]);
             atomicAdd(&g_outz[ev[v] * out_stride], outz[v]);
@@ -128,39 +135,39 @@ int cu_affine_hex8_linear_elasticity_apply_tpl(
 
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_affine_hex8_linear_elasticity_apply_kernel<T><<<n_blocks, block_size, 0, s>>>(
-                nelements,
-                stride,
-                elements,
-                jacobian_adjugate,
-                jacobian_determinant,
-                mu,
-                lambda,
-                u_stride,
-                ux,
-                uy,
-                uz,
-                out_stride,
-                outx,
-                outy,
-                outz);
+        cu_affine_hex8_linear_elasticity_apply_kernel<T>
+                <<<n_blocks, block_size, 0, s>>>(nelements,
+                                                 stride,
+                                                 elements,
+                                                 jacobian_adjugate,
+                                                 jacobian_determinant,
+                                                 mu,
+                                                 lambda,
+                                                 u_stride,
+                                                 ux,
+                                                 uy,
+                                                 uz,
+                                                 out_stride,
+                                                 outx,
+                                                 outy,
+                                                 outz);
     } else {
-        cu_affine_hex8_linear_elasticity_apply_kernel<T><<<n_blocks, block_size, 0>>>(
-                nelements,
-                stride,
-                elements,
-                jacobian_adjugate,
-                jacobian_determinant,
-                mu,
-                lambda,
-                u_stride,
-                ux,
-                uy,
-                uz,
-                out_stride,
-                outx,
-                outy,
-                outz);
+        cu_affine_hex8_linear_elasticity_apply_kernel<T>
+                <<<n_blocks, block_size, 0>>>(nelements,
+                                              stride,
+                                              elements,
+                                              jacobian_adjugate,
+                                              jacobian_determinant,
+                                              mu,
+                                              lambda,
+                                              u_stride,
+                                              ux,
+                                              uy,
+                                              uz,
+                                              out_stride,
+                                              outx,
+                                              outy,
+                                              outz);
     }
 
     SFEM_DEBUG_SYNCHRONIZE();

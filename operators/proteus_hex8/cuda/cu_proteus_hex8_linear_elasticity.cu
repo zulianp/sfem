@@ -13,7 +13,7 @@
 #define B_(x, y, z) ((z)*BLOCK_SIZE_2 + (y)*BLOCK_SIZE + (x))
 
 template <typename T, int LEVEL>
-__global__ void cu_proteus_affine_hex8_linear_elasticity_apply_kernel(
+__global__ void cu_proteus_affine_hex8_linear_elasticity_apply_kernel_warp(
         const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
         const ptrdiff_t interior_start,
@@ -38,13 +38,9 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_kernel(
     assert(blockDim.y == BLOCK_SIZE);
     assert(blockDim.z == BLOCK_SIZE);
 
-    __shared__ T ux_block[BLOCK_SIZE_3];
-    __shared__ T uy_block[BLOCK_SIZE_3];
-    __shared__ T uz_block[BLOCK_SIZE_3];
-
-    __shared__ T outx_block[BLOCK_SIZE_3];
-    __shared__ T outy_block[BLOCK_SIZE_3];
-    __shared__ T outz_block[BLOCK_SIZE_3];
+    // Shared mem
+    __shared__ T u_block[BLOCK_SIZE_3];
+    __shared__ T out_block[BLOCK_SIZE_3];
 
     static const int n_qp = 6;
     const T qw[6] = {0.16666666666666666666666666666667,
@@ -57,22 +53,39 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_kernel(
     const T qy[6] = {0.5, 0.0, 0.5, 0.5, 1.0, 0.5};
     const T qz[6] = {0.5, 0.5, 0.0, 1.0, 0.5, 0.5};
 
+    const T * g_u[3] = {g_ux, g_uy, g_uz};
+    T * g_out[3] = {g_outx, g_outy, g_outz};
+
+    T out[3][8];
+    T u[3][8];
+    T sub_adjugate[9];
+    T sub_determinant;
+
     for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
         const int lidx = threadIdx.z * BLOCK_SIZE_2 + threadIdx.y * BLOCK_SIZE + threadIdx.x;
         const ptrdiff_t idx = elements[lidx * stride + e];
+        const bool is_element = threadIdx.x < LEVEL && threadIdx.y < LEVEL && threadIdx.z < LEVEL;
+        out_block[lidx] = 0;
 
-        ux_block[lidx] = g_ux[idx * u_stride];
-        uy_block[lidx] = g_uy[idx * u_stride];
-        uz_block[lidx] = g_uz[idx * u_stride];
+        for (int d = 0; d < 3; d++) {
+            u_block[lidx] = g_u[d][idx * u_stride];
+            assert(u_block[lidx] == u_block[lidx]);
 
-        outx_block[lidx] = 0;
-        outy_block[lidx] = 0;
-        outz_block[lidx] = 0;
+            __syncthreads();
 
-        T sub_adjugate[9];
-        T sub_determinant;
+            if (is_element) {
+                u[d][0] = u_block[B_(threadIdx.x, threadIdx.y, threadIdx.z)];
+                u[d][1] = u_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z)];
+                u[d][2] = u_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z)];
+                u[d][3] = u_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z)];
+                u[d][4] = u_block[B_(threadIdx.x, threadIdx.y, threadIdx.z + 1)];
+                u[d][5] = u_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z + 1)];
+                u[d][6] = u_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z + 1)];
+                u[d][7] = u_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z + 1)];
+            }
+        }
 
-        {
+        if (is_element) {
             const T h = 1. / LEVEL;
             cu_hex8_sub_adj_0(stride,
                               &g_jacobian_adjugate[e],
@@ -80,43 +93,12 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_kernel(
                               h,
                               sub_adjugate,
                               &sub_determinant);
-        }
 
-        T outx[8] = {0};
-        T outy[8] = {0};
-        T outz[8] = {0};
-
-        const bool is_element = threadIdx.x < LEVEL && threadIdx.y < LEVEL && threadIdx.z < LEVEL;
-
-        __syncthreads();
-        
-        if (is_element) {
-            const T ux[8] = {ux_block[B_(threadIdx.x, threadIdx.y, threadIdx.z)],
-                             ux_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z)],
-                             ux_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z)],
-                             ux_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z)],
-                             ux_block[B_(threadIdx.x, threadIdx.y, threadIdx.z + 1)],
-                             ux_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z + 1)],
-                             ux_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z + 1)],
-                             ux_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z + 1)]};
-
-            const T uy[8] = {uy_block[B_(threadIdx.x, threadIdx.y, threadIdx.z)],
-                             uy_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z)],
-                             uy_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z)],
-                             uy_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z)],
-                             uy_block[B_(threadIdx.x, threadIdx.y, threadIdx.z + 1)],
-                             uy_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z + 1)],
-                             uy_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z + 1)],
-                             uy_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z + 1)]};
-
-            const T uz[8] = {uz_block[B_(threadIdx.x, threadIdx.y, threadIdx.z)],
-                             uz_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z)],
-                             uz_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z)],
-                             uz_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z)],
-                             uz_block[B_(threadIdx.x, threadIdx.y, threadIdx.z + 1)],
-                             uz_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z + 1)],
-                             uz_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z + 1)],
-                             uz_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z + 1)]};
+            for (int d = 0; d < 3; d++) {
+                for (int v = 0; v < 8; v++) {
+                    out[d][v] = 0;
+                }
+            }
 
             for (int k = 0; k < n_qp; k++) {
                 cu_hex8_linear_elasticity_apply_adj(mu,
@@ -127,28 +109,45 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_kernel(
                                                     qy[k],
                                                     qz[k],
                                                     qw[k],
-                                                    ux,
-                                                    uy,
-                                                    uz,
-                                                    outx,
-                                                    outy,
-                                                    outz);
+                                                    u[0],
+                                                    u[1],
+                                                    u[2],
+                                                    out[0],
+                                                    out[1],
+                                                    out[2]);
             }
         }
 
         const int interior = threadIdx.x > 0 && threadIdx.y > 0 && threadIdx.z > 0 &&
                              threadIdx.x < LEVEL && threadIdx.y < LEVEL && threadIdx.z < LEVEL;
 
-        __syncthreads();
+        for (int d = 0; d < 3; d++) {
+            if (is_element) {
+                atomicAdd(&out_block[B_(threadIdx.x, threadIdx.y, threadIdx.z)], out[d][0]);
+                atomicAdd(&out_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z)], out[d][1]);
+                atomicAdd(&out_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z)], out[d][2]);
+                atomicAdd(&out_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z)], out[d][3]);
+                atomicAdd(&out_block[B_(threadIdx.x, threadIdx.y, threadIdx.z + 1)], out[d][4]);
+                atomicAdd(&out_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z + 1)], out[d][5]);
+                atomicAdd(&out_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z + 1)],
+                          out[d][6]);
+                atomicAdd(&out_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z + 1)], out[d][7]);
+            }
 
-        if (interior) {
-            g_outx[idx * out_stride] += outx_block[lidx];
-            g_outy[idx * out_stride] += outy_block[lidx];
-            g_outz[idx * out_stride] += outz_block[lidx];
-        } else {
-            atomicAdd(&g_outx[idx * out_stride], outx_block[lidx]);
-            atomicAdd(&g_outy[idx * out_stride], outy_block[lidx]);
-            atomicAdd(&g_outz[idx * out_stride], outz_block[lidx]);
+            __syncthreads();
+
+            assert(out_block[lidx] == out_block[lidx]);
+
+            if (interior) {
+                g_out[d][idx * out_stride] += out_block[lidx];
+            } else {
+                atomicAdd(&g_out[d][idx * out_stride], out_block[lidx]);
+            }
+
+            if (d < 2) {
+                out_block[lidx] = 0;
+                __syncthreads();
+            }
         }
     }
 }
@@ -181,7 +180,7 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl(
 
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_proteus_affine_hex8_linear_elasticity_apply_kernel<T, LEVEL>
+        cu_proteus_affine_hex8_linear_elasticity_apply_kernel_warp<T, LEVEL>
                 <<<n_blocks, block_size, 0, s>>>(nelements,
                                                  stride,
                                                  interior_start,
@@ -199,7 +198,7 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl(
                                                  outy,
                                                  outz);
     } else {
-        cu_proteus_affine_hex8_linear_elasticity_apply_kernel<T, LEVEL>
+        cu_proteus_affine_hex8_linear_elasticity_apply_kernel_warp<T, LEVEL>
                 <<<n_blocks, block_size, 0>>>(nelements,
                                               stride,
                                               interior_start,
@@ -243,6 +242,86 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_tpl(
         real_t *const SFEM_RESTRICT outz,
         void *stream) {
     switch (level) {
+        case 3: {
+            return cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl<real_t, 3>(
+                    nelements,
+                    stride,
+                    interior_start,
+                    elements,
+                    (cu_jacobian_t *)jacobian_adjugate,
+                    (cu_jacobian_t *)jacobian_determinant,
+                    mu,
+                    lambda,
+                    u_stride,
+                    (real_t *)ux,
+                    (real_t *)uy,
+                    (real_t *)uz,
+                    out_stride,
+                    (real_t *)outx,
+                    (real_t *)outy,
+                    (real_t *)outz,
+                    stream);
+        }
+        case 4: {
+            return cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl<real_t, 4>(
+                    nelements,
+                    stride,
+                    interior_start,
+                    elements,
+                    (cu_jacobian_t *)jacobian_adjugate,
+                    (cu_jacobian_t *)jacobian_determinant,
+                    mu,
+                    lambda,
+                    u_stride,
+                    (real_t *)ux,
+                    (real_t *)uy,
+                    (real_t *)uz,
+                    out_stride,
+                    (real_t *)outx,
+                    (real_t *)outy,
+                    (real_t *)outz,
+                    stream);
+        }
+        case 5: {
+            return cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl<real_t, 5>(
+                    nelements,
+                    stride,
+                    interior_start,
+                    elements,
+                    (cu_jacobian_t *)jacobian_adjugate,
+                    (cu_jacobian_t *)jacobian_determinant,
+                    mu,
+                    lambda,
+                    u_stride,
+                    (real_t *)ux,
+                    (real_t *)uy,
+                    (real_t *)uz,
+                    out_stride,
+                    (real_t *)outx,
+                    (real_t *)outy,
+                    (real_t *)outz,
+                    stream);
+        }
+        case 6: {
+            return cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl<real_t, 6>(
+                    nelements,
+                    stride,
+                    interior_start,
+                    elements,
+                    (cu_jacobian_t *)jacobian_adjugate,
+                    (cu_jacobian_t *)jacobian_determinant,
+                    mu,
+                    lambda,
+                    u_stride,
+                    (real_t *)ux,
+                    (real_t *)uy,
+                    (real_t *)uz,
+                    out_stride,
+                    (real_t *)outx,
+                    (real_t *)outy,
+                    (real_t *)outz,
+                    stream);
+        }
         case 7: {
             return cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl<real_t, 7>(
                     nelements,
@@ -283,46 +362,46 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_tpl(
                     (real_t *)outz,
                     stream);
         }
-        case 9: {
-            return cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl<real_t, 9>(
-                    nelements,
-                    stride,
-                    interior_start,
-                    elements,
-                    (cu_jacobian_t *)jacobian_adjugate,
-                    (cu_jacobian_t *)jacobian_determinant,
-                    mu,
-                    lambda,
-                    u_stride,
-                    (real_t *)ux,
-                    (real_t *)uy,
-                    (real_t *)uz,
-                    out_stride,
-                    (real_t *)outx,
-                    (real_t *)outy,
-                    (real_t *)outz,
-                    stream);
-        }
-        case 10: {
-            return cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl<real_t, 10>(
-                    nelements,
-                    stride,
-                    interior_start,
-                    elements,
-                    (cu_jacobian_t *)jacobian_adjugate,
-                    (cu_jacobian_t *)jacobian_determinant,
-                    mu,
-                    lambda,
-                    u_stride,
-                    (real_t *)ux,
-                    (real_t *)uy,
-                    (real_t *)uz,
-                    out_stride,
-                    (real_t *)outx,
-                    (real_t *)outy,
-                    (real_t *)outz,
-                    stream);
-        }
+        // case 9: {
+        //     return cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl<real_t, 9>(
+        //             nelements,
+        //             stride,
+        //             interior_start,
+        //             elements,
+        //             (cu_jacobian_t *)jacobian_adjugate,
+        //             (cu_jacobian_t *)jacobian_determinant,
+        //             mu,
+        //             lambda,
+        //             u_stride,
+        //             (real_t *)ux,
+        //             (real_t *)uy,
+        //             (real_t *)uz,
+        //             out_stride,
+        //             (real_t *)outx,
+        //             (real_t *)outy,
+        //             (real_t *)outz,
+        //             stream);
+        // }
+        // case 10: {
+        //     return cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl<real_t, 10>(
+        //             nelements,
+        //             stride,
+        //             interior_start,
+        //             elements,
+        //             (cu_jacobian_t *)jacobian_adjugate,
+        //             (cu_jacobian_t *)jacobian_determinant,
+        //             mu,
+        //             lambda,
+        //             u_stride,
+        //             (real_t *)ux,
+        //             (real_t *)uy,
+        //             (real_t *)uz,
+        //             out_stride,
+        //             (real_t *)outx,
+        //             (real_t *)outy,
+        //             (real_t *)outz,
+        //             stream);
+        // }
         default: {
             fprintf(stderr,
                     "cu_proteus_affine_hex8_linear_elasticity_apply_tpl: level %d not supported!\n",
