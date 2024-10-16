@@ -28,14 +28,14 @@ if [[ -d "$mesh" ]]
 then
 	echo "Reusing mesh"
 else
-	create_box_ss_mesh.sh 31 $SFEM_ELEMENT_REFINE_LEVEL
+	create_box_ss_mesh.sh 5 $SFEM_ELEMENT_REFINE_LEVEL
 fi
 
 # Box mesh for testing
 sinlet=$mesh/surface/sidesets_aos/left.raw 
 soutlet=$mesh/surface/sidesets_aos/right.raw 
 
-export SFEM_USE_ELASTICITY=0
+export SFEM_USE_ELASTICITY=1
 
 if [[ $SFEM_USE_ELASTICITY -eq 1 ]]
 then

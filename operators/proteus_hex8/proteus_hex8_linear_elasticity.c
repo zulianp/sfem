@@ -212,6 +212,9 @@ int proteus_hex8_linear_elasticity_apply(const int level,
                                            sub_adjugate,
                                            &sub_determinant);
 
+                            assert(sub_determinant == sub_determinant);
+                            assert(sub_determinant != 0);
+
                             // // Evaluate y = op * x
                             hex8_linear_elasticity_apply_adj(mu,
                                                              lambda,
@@ -231,6 +234,10 @@ int proteus_hex8_linear_elasticity_apply(const int level,
 
                         // Accumulate to macro-element buffer
                         for (int d = 0; d < 8; d++) {
+                            assert(element_outx[d] == element_outx[d]);
+                            assert(element_outy[d] == element_outy[d]);
+                            assert(element_outz[d] == element_outz[d]);
+
                             v[0][lev[d]] += element_outx[d];
                             v[1][lev[d]] += element_outy[d];
                             v[2][lev[d]] += element_outz[d];
@@ -248,6 +255,10 @@ int proteus_hex8_linear_elasticity_apply(const int level,
             {
                 // Scatter elemental data
                 for (int d = 0; d < nxe; d++) {
+                    assert(v[0][d] == v[0][d]);
+                    assert(v[1][d] == v[1][d]);
+                    assert(v[2][d] == v[2][d]);
+
 #pragma omp atomic update
                     outx[ev[d] * out_stride] += v[0][d];
 
