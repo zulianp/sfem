@@ -141,7 +141,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_kernel_warp(
             if (interior) {
                 g_out[d][idx * out_stride] += out_block[lidx];
             } else {
-                atomicAdd(&g_out[d][idx * out_stride], out_block[lidx]);
+                atomicAdd(&(g_out[d][idx * out_stride]), out_block[lidx]);
             }
 
             if (d < 2) {
