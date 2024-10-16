@@ -90,18 +90,18 @@ void getNonLinearWeightsHOne_V(const vec_double x,                        //
     const vec_double a = Abs_V(3. * y0 - 7. * y1 + 5. * y2 - 1. * y3);
     const vec_double b = Power2_V(-3. * (a) + Abs_V(y0 - 12. * y1 + 3. * y2 + 2. * y3));
 
-    List2(alpha,
-          //
-          Power_m1p5_V(eps + 0.1111111111111111 * (b)) -
-                  (0.3333333333333333 * x) / Power1p5_V(eps + 0.1111111111111111 * (b))
-          //
-          ,
-          //
-          (0.3333333333333333 *
-           x) / Power1p5_V(eps +
-                           Power2_V(-2. * Abs_V(y0 - 1.5 * y1 + 4. * y2 - 1.8333333333333333 * y3) +
-                                    Abs_V(y0 - 1. * y1 - 1. * y2 + y3)))
-          //
+    List2_V(alpha,
+            //
+            Power_m1p5_V(eps + 0.1111111111111111 * (b)) -
+                    (0.3333333333333333 * x) / Power1p5_V(eps + 0.1111111111111111 * (b))
+            //
+            ,
+            //
+            (0.3333333333333333 * x) /
+                    Power1p5_V(eps + Power2_V(-2. * Abs_V(y0 - 1.5 * y1 + 4. * y2 -
+                                                          1.8333333333333333 * y3) +
+                                              Abs_V(y0 - 1. * y1 - 1. * y2 + y3)))
+            //
     );
 
     vec_double den = alpha[0] + alpha[1];
@@ -134,7 +134,7 @@ vec_double weno4_HOne_V(const vec_double x,                          //
 
     LagrangePolyArrayHOne_V(x, lagrange_poly_0, lagrange_poly_1);
 
-    getNonLinearWeightsHOne(x, y0, y1, y2, y3, non_linear_weights, eps);
+    getNonLinearWeightsHOne_V(x, y0, y1, y2, y3, non_linear_weights, eps);
     // getNonLinearWeightsConstH(x, 1.0, y0, y1, y2, y3, non_linear_weights, eps);
 
     const vec_double weno4_a =
@@ -208,6 +208,22 @@ vec_indices copy_strides(const vec_indices stride_x,  //
     return ret;
 }
 
+vec_double copy_f(const double *f,             //
+                  const vec_indices stride_x,  //
+                  const vec_indices stride_y,  //
+                  const vec_indices stride_z,  //
+                  const int side_x, const int side_y, const int side_z) {
+    //
+    vec_double ret;
+    vec_indices indx = stride_x * side_x + stride_y * side_y + stride_z * side_z;
+
+    for (int ii = 0; ii < _VL_; ii++) {
+        ret[ii] = f[indx[ii]];
+    }
+
+    return ret;
+}
+
 /**
  * @brief WENO4 interpolation for 3D data with constant grid spacing and h = 1
  *
@@ -230,179 +246,179 @@ vec_double weno4_3D_HOne_V(const vec_double x, const vec_double y, const vec_dou
     vec_double w1, w2, w3, w4;
 
     {
-        vec_indices stride_x_000 = copy_strides(stride_x, stride_y, stride_z, 0, 0, 0);
-        vec_indices stride_x_100 = copy_strides(stride_x, stride_y, stride_z, 1, 0, 0);
-        vec_indices stride_x_200 = copy_strides(stride_x, stride_y, stride_z, 2, 0, 0);
-        vec_indices stride_x_300 = copy_strides(stride_x, stride_y, stride_z, 3, 0, 0);
+        vec_double f_000 = copy_f(f, stride_x, stride_y, stride_z, 0, 0, 0);
+        vec_double f_100 = copy_f(f, stride_x, stride_y, stride_z, 1, 0, 0);
+        vec_double f_200 = copy_f(f, stride_x, stride_y, stride_z, 2, 0, 0);
+        vec_double f_300 = copy_f(f, stride_x, stride_y, stride_z, 3, 0, 0);
 
-        vec_indices stride_x_010 = copy_strides(stride_x, stride_y, stride_z, 0, 1, 0);
-        vec_indices stride_x_110 = copy_strides(stride_x, stride_y, stride_z, 1, 1, 0);
-        vec_indices stride_x_210 = copy_strides(stride_x, stride_y, stride_z, 2, 1, 0);
-        vec_indices stride_x_310 = copy_strides(stride_x, stride_y, stride_z, 3, 1, 0);
+        vec_double f_010 = copy_f(f, stride_x, stride_y, stride_z, 0, 1, 0);
+        vec_double f_110 = copy_f(f, stride_x, stride_y, stride_z, 1, 1, 0);
+        vec_double f_210 = copy_f(f, stride_x, stride_y, stride_z, 2, 1, 0);
+        vec_double f_310 = copy_f(f, stride_x, stride_y, stride_z, 3, 1, 0);
 
-        vec_indices stride_x_020 = copy_strides(stride_x, stride_y, stride_z, 0, 2, 0);
-        vec_indices stride_x_120 = copy_strides(stride_x, stride_y, stride_z, 1, 2, 0);
-        vec_indices stride_x_220 = copy_strides(stride_x, stride_y, stride_z, 2, 2, 0);
-        vec_indices stride_x_320 = copy_strides(stride_x, stride_y, stride_z, 3, 2, 0);
+        vec_double f_020 = copy_f(f, stride_x, stride_y, stride_z, 0, 2, 0);
+        vec_double f_120 = copy_f(f, stride_x, stride_y, stride_z, 1, 2, 0);
+        vec_double f_220 = copy_f(f, stride_x, stride_y, stride_z, 2, 2, 0);
+        vec_double f_320 = copy_f(f, stride_x, stride_y, stride_z, 3, 2, 0);
 
-        vec_indices stride_x_030 = copy_strides(stride_x, stride_y, stride_z, 0, 3, 0);
-        vec_indices stride_x_130 = copy_strides(stride_x, stride_y, stride_z, 1, 3, 0);
-        vec_indices stride_x_230 = copy_strides(stride_x, stride_y, stride_z, 2, 3, 0);
-        vec_indices stride_x_330 = copy_strides(stride_x, stride_y, stride_z, 3, 3, 0);
+        vec_double f_030 = copy_f(f, stride_x, stride_y, stride_z, 0, 3, 0);
+        vec_double f_130 = copy_f(f, stride_x, stride_y, stride_z, 1, 3, 0);
+        vec_double f_230 = copy_f(f, stride_x, stride_y, stride_z, 2, 3, 0);
+        vec_double f_330 = copy_f(f, stride_x, stride_y, stride_z, 3, 3, 0);
 
         w1 = weno4_2D_HOne_V(x,
                              y,  //
-                             stride_x_000,
-                             stride_x_100,
-                             stride_x_200,
-                             stride_x_300,  //
+                             f_000,
+                             f_100,
+                             f_200,
+                             f_300,  //
                              //
-                             stride_x_010,
-                             stride_x_110,
-                             stride_x_210,
-                             stride_x_310,  //
+                             f_010,
+                             f_110,
+                             f_210,
+                             f_310,  //
                              //
-                             stride_x_020,
-                             stride_x_120,
-                             stride_x_220,
-                             stride_x_320,  //
+                             f_020,
+                             f_120,
+                             f_220,
+                             f_320,  //
                              //
-                             stride_x_030,
-                             stride_x_130,
-                             stride_x_230,
-                             stride_x_330);
+                             f_030,
+                             f_130,
+                             f_230,
+                             f_330);
     }
 
     {
-        vec_indices stride_x_001 = copy_strides(stride_x, stride_y, stride_z, 0, 0, 1);
-        vec_indices stride_x_101 = copy_strides(stride_x, stride_y, stride_z, 1, 0, 1);
-        vec_indices stride_x_201 = copy_strides(stride_x, stride_y, stride_z, 2, 0, 1);
-        vec_indices stride_x_301 = copy_strides(stride_x, stride_y, stride_z, 3, 0, 1);
+        vec_double f_001 = copy_f(f, stride_x, stride_y, stride_z, 0, 0, 1);
+        vec_double f_101 = copy_f(f, stride_x, stride_y, stride_z, 1, 0, 1);
+        vec_double f_201 = copy_f(f, stride_x, stride_y, stride_z, 2, 0, 1);
+        vec_double f_301 = copy_f(f, stride_x, stride_y, stride_z, 3, 0, 1);
 
-        vec_indices stride_x_011 = copy_strides(stride_x, stride_y, stride_z, 0, 1, 1);
-        vec_indices stride_x_111 = copy_strides(stride_x, stride_y, stride_z, 1, 1, 1);
-        vec_indices stride_x_211 = copy_strides(stride_x, stride_y, stride_z, 2, 1, 1);
-        vec_indices stride_x_311 = copy_strides(stride_x, stride_y, stride_z, 3, 1, 1);
+        vec_double f_011 = copy_f(f, stride_x, stride_y, stride_z, 0, 1, 1);
+        vec_double f_111 = copy_f(f, stride_x, stride_y, stride_z, 1, 1, 1);
+        vec_double f_211 = copy_f(f, stride_x, stride_y, stride_z, 2, 1, 1);
+        vec_double f_311 = copy_f(f, stride_x, stride_y, stride_z, 3, 1, 1);
 
-        vec_indices stride_x_021 = copy_strides(stride_x, stride_y, stride_z, 0, 2, 1);
-        vec_indices stride_x_121 = copy_strides(stride_x, stride_y, stride_z, 1, 2, 1);
-        vec_indices stride_x_221 = copy_strides(stride_x, stride_y, stride_z, 2, 2, 1);
-        vec_indices stride_x_321 = copy_strides(stride_x, stride_y, stride_z, 3, 2, 1);
+        vec_double f_021 = copy_f(f, stride_x, stride_y, stride_z, 0, 2, 1);
+        vec_double f_121 = copy_f(f, stride_x, stride_y, stride_z, 1, 2, 1);
+        vec_double f_221 = copy_f(f, stride_x, stride_y, stride_z, 2, 2, 1);
+        vec_double f_321 = copy_f(f, stride_x, stride_y, stride_z, 3, 2, 1);
 
-        vec_indices stride_x_031 = copy_strides(stride_x, stride_y, stride_z, 0, 3, 1);
-        vec_indices stride_x_131 = copy_strides(stride_x, stride_y, stride_z, 1, 3, 1);
-        vec_indices stride_x_231 = copy_strides(stride_x, stride_y, stride_z, 2, 3, 1);
-        vec_indices stride_x_331 = copy_strides(stride_x, stride_y, stride_z, 3, 3, 1);
+        vec_double f_031 = copy_f(f, stride_x, stride_y, stride_z, 0, 3, 1);
+        vec_double f_131 = copy_f(f, stride_x, stride_y, stride_z, 1, 3, 1);
+        vec_double f_231 = copy_f(f, stride_x, stride_y, stride_z, 2, 3, 1);
+        vec_double f_331 = copy_f(f, stride_x, stride_y, stride_z, 3, 3, 1);
 
         w2 = weno4_2D_HOne_V(x,
                              y,
-                             stride_x_001,
-                             stride_x_101,
-                             stride_x_201,
-                             stride_x_301,  //
+                             f_001,
+                             f_101,
+                             f_201,
+                             f_301,  //
                              //
-                             stride_x_011,
-                             stride_x_111,
-                             stride_x_211,
-                             stride_x_311,  //
+                             f_011,
+                             f_111,
+                             f_211,
+                             f_311,  //
                              //
-                             stride_x_021,
-                             stride_x_121,
-                             stride_x_221,
-                             stride_x_321,  //
+                             f_021,
+                             f_121,
+                             f_221,
+                             f_321,  //
                              //
-                             stride_x_031,
-                             stride_x_131,
-                             stride_x_231,
-                             stride_x_331);
+                             f_031,
+                             f_131,
+                             f_231,
+                             f_331);
     }
 
     {
-        vec_indices stride_x_002 = copy_strides(stride_x, stride_y, stride_z, 0, 0, 2);
-        vec_indices stride_x_102 = copy_strides(stride_x, stride_y, stride_z, 1, 0, 2);
-        vec_indices stride_x_202 = copy_strides(stride_x, stride_y, stride_z, 2, 0, 2);
-        vec_indices stride_x_302 = copy_strides(stride_x, stride_y, stride_z, 3, 0, 2);
+        vec_double f_002 = copy_f(f, stride_x, stride_y, stride_z, 0, 0, 2);
+        vec_double f_102 = copy_f(f, stride_x, stride_y, stride_z, 1, 0, 2);
+        vec_double f_202 = copy_f(f, stride_x, stride_y, stride_z, 2, 0, 2);
+        vec_double f_302 = copy_f(f, stride_x, stride_y, stride_z, 3, 0, 2);
 
-        vec_indices stride_x_012 = copy_strides(stride_x, stride_y, stride_z, 0, 1, 2);
-        vec_indices stride_x_112 = copy_strides(stride_x, stride_y, stride_z, 1, 1, 2);
-        vec_indices stride_x_212 = copy_strides(stride_x, stride_y, stride_z, 2, 1, 2);
-        vec_indices stride_x_312 = copy_strides(stride_x, stride_y, stride_z, 3, 1, 2);
+        vec_double f_012 = copy_f(f, stride_x, stride_y, stride_z, 0, 1, 2);
+        vec_double f_112 = copy_f(f, stride_x, stride_y, stride_z, 1, 1, 2);
+        vec_double f_212 = copy_f(f, stride_x, stride_y, stride_z, 2, 1, 2);
+        vec_double f_312 = copy_f(f, stride_x, stride_y, stride_z, 3, 1, 2);
 
-        vec_indices stride_x_022 = copy_strides(stride_x, stride_y, stride_z, 0, 2, 2);
-        vec_indices stride_x_122 = copy_strides(stride_x, stride_y, stride_z, 1, 2, 2);
-        vec_indices stride_x_222 = copy_strides(stride_x, stride_y, stride_z, 2, 2, 2);
-        vec_indices stride_x_322 = copy_strides(stride_x, stride_y, stride_z, 3, 2, 2);
+        vec_double f_022 = copy_f(f, stride_x, stride_y, stride_z, 0, 2, 2);
+        vec_double f_122 = copy_f(f, stride_x, stride_y, stride_z, 1, 2, 2);
+        vec_double f_222 = copy_f(f, stride_x, stride_y, stride_z, 2, 2, 2);
+        vec_double f_322 = copy_f(f, stride_x, stride_y, stride_z, 3, 2, 2);
 
-        vec_indices stride_x_032 = copy_strides(stride_x, stride_y, stride_z, 0, 3, 2);
-        vec_indices stride_x_132 = copy_strides(stride_x, stride_y, stride_z, 1, 3, 2);
-        vec_indices stride_x_232 = copy_strides(stride_x, stride_y, stride_z, 2, 3, 2);
-        vec_indices stride_x_332 = copy_strides(stride_x, stride_y, stride_z, 3, 3, 2);
+        vec_double f_032 = copy_f(f, stride_x, stride_y, stride_z, 0, 3, 2);
+        vec_double f_132 = copy_f(f, stride_x, stride_y, stride_z, 1, 3, 2);
+        vec_double f_232 = copy_f(f, stride_x, stride_y, stride_z, 2, 3, 2);
+        vec_double f_332 = copy_f(f, stride_x, stride_y, stride_z, 3, 3, 2);
 
         w3 = weno4_2D_HOne_V(x,
                              y,  //
-                             stride_x_002,
-                             stride_x_102,
-                             stride_x_202,
-                             stride_x_302,  //
+                             f_002,
+                             f_102,
+                             f_202,
+                             f_302,  //
                              //
-                             stride_x_012,
-                             stride_x_112,
-                             stride_x_212,
-                             stride_x_312,  //
+                             f_012,
+                             f_112,
+                             f_212,
+                             f_312,  //
                              //
-                             stride_x_022,
-                             stride_x_122,
-                             stride_x_222,
-                             stride_x_322,  //
+                             f_022,
+                             f_122,
+                             f_222,
+                             f_322,  //
                              //
-                             stride_x_032,
-                             stride_x_132,
-                             stride_x_232,
-                             stride_x_332);
+                             f_032,
+                             f_132,
+                             f_232,
+                             f_332);
     }
 
     {
-        vec_indices stride_x_003 = copy_strides(stride_x, stride_y, stride_z, 0, 0, 3);
-        vec_indices stride_x_103 = copy_strides(stride_x, stride_y, stride_z, 1, 0, 3);
-        vec_indices stride_x_203 = copy_strides(stride_x, stride_y, stride_z, 2, 0, 3);
-        vec_indices stride_x_303 = copy_strides(stride_x, stride_y, stride_z, 3, 0, 3);
+        vec_double f_003 = copy_f(f, stride_x, stride_y, stride_z, 0, 0, 3);
+        vec_double f_103 = copy_f(f, stride_x, stride_y, stride_z, 1, 0, 3);
+        vec_double f_203 = copy_f(f, stride_x, stride_y, stride_z, 2, 0, 3);
+        vec_double f_303 = copy_f(f, stride_x, stride_y, stride_z, 3, 0, 3);
 
-        vec_indices stride_x_013 = copy_strides(stride_x, stride_y, stride_z, 0, 1, 3);
-        vec_indices stride_x_113 = copy_strides(stride_x, stride_y, stride_z, 1, 1, 3);
-        vec_indices stride_x_213 = copy_strides(stride_x, stride_y, stride_z, 2, 1, 3);
-        vec_indices stride_x_313 = copy_strides(stride_x, stride_y, stride_z, 3, 1, 3);
+        vec_double f_013 = copy_f(f, stride_x, stride_y, stride_z, 0, 1, 3);
+        vec_double f_113 = copy_f(f, stride_x, stride_y, stride_z, 1, 1, 3);
+        vec_double f_213 = copy_f(f, stride_x, stride_y, stride_z, 2, 1, 3);
+        vec_double f_313 = copy_f(f, stride_x, stride_y, stride_z, 3, 1, 3);
 
-        vec_indices stride_x_023 = copy_strides(stride_x, stride_y, stride_z, 0, 2, 3);
-        vec_indices stride_x_123 = copy_strides(stride_x, stride_y, stride_z, 1, 2, 3);
-        vec_indices stride_x_223 = copy_strides(stride_x, stride_y, stride_z, 2, 2, 3);
-        vec_indices stride_x_323 = copy_strides(stride_x, stride_y, stride_z, 3, 2, 3);
+        vec_double f_023 = copy_f(f, stride_x, stride_y, stride_z, 0, 2, 3);
+        vec_double f_123 = copy_f(f, stride_x, stride_y, stride_z, 1, 2, 3);
+        vec_double f_223 = copy_f(f, stride_x, stride_y, stride_z, 2, 2, 3);
+        vec_double f_323 = copy_f(f, stride_x, stride_y, stride_z, 3, 2, 3);
 
-        vec_indices stride_x_033 = copy_strides(stride_x, stride_y, stride_z, 0, 3, 3);
-        vec_indices stride_x_133 = copy_strides(stride_x, stride_y, stride_z, 1, 3, 3);
-        vec_indices stride_x_233 = copy_strides(stride_x, stride_y, stride_z, 2, 3, 3);
-        vec_indices stride_x_333 = copy_strides(stride_x, stride_y, stride_z, 3, 3, 3);
+        vec_double f_033 = copy_f(f, stride_x, stride_y, stride_z, 0, 3, 3);
+        vec_double f_133 = copy_f(f, stride_x, stride_y, stride_z, 1, 3, 3);
+        vec_double f_233 = copy_f(f, stride_x, stride_y, stride_z, 2, 3, 3);
+        vec_double f_333 = copy_f(f, stride_x, stride_y, stride_z, 3, 3, 3);
 
         w4 = weno4_2D_HOne_V(x,  //
                              y,  //
-                             stride_x_003,
-                             stride_x_103,
-                             stride_x_203,
-                             stride_x_303,  //
+                             f_003,
+                             f_103,
+                             f_203,
+                             f_303,  //
                              //
-                             stride_x_013,
-                             stride_x_113,
-                             stride_x_213,
-                             stride_x_313,  //
+                             f_013,
+                             f_113,
+                             f_213,
+                             f_313,  //
                              //
-                             stride_x_023,
-                             stride_x_123,
-                             stride_x_223,
-                             stride_x_323,  //
+                             f_023,
+                             f_123,
+                             f_223,
+                             f_323,  //
                              //
-                             stride_x_033,
-                             stride_x_133,
-                             stride_x_233,
-                             stride_x_333);
+                             f_033,
+                             f_133,
+                             f_233,
+                             f_333);
     }
 
     vec_double wz = weno4_HOne_V(z, w1, w2, w3, w4);
