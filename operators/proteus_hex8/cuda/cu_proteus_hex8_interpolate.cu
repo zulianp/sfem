@@ -255,10 +255,10 @@ __global__ void cu_proteus_hex8_hierarchical_restriction_kernel(
                         f[7] = xm * y * z;    // (0, 1, 1)
 
                         const ptrdiff_t global_from_idx = (idx * vec_size + d) * from_stride;
-                        const scalar_t val = from[global_from_idx] / e2n_count[global_from_idx];
+                        const scalar_t val = from[global_from_idx] / e2n_count[idx];
 
                         assert(from[global_from_idx] == from[global_from_idx]);
-                        assert(e2n_count[global_from_idx] > 0);
+                        assert(e2n_count[idx] > 0);
                         assert(val == val);
 
                         for (int i = 0; i < 8; i++) {
