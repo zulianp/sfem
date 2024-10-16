@@ -2,32 +2,10 @@
 
 #include "sfem_cuda_base.h"
 
+#include "cu_proteus_hex8_inline.hpp"
+
 #include <cassert>
 #include <cstdio>
-
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-
-#ifndef NDEBUG
-static inline __device__ __host__ int cu_proteus_hex8_nxe(int level) {
-    const int corners = 8;
-    const int edge_nodes = 12 * (level - 1);
-    const int face_nodes = 6 * (level - 1) * (level - 1);
-    const int vol_nodes = (level - 1) * (level - 1) * (level - 1);
-    return corners + edge_nodes + face_nodes + vol_nodes;
-}
-#endif
-
-static inline __device__ __host__ int cu_proteus_hex8_lidx(const int L,
-                                                           const int x,
-                                                           const int y,
-                                                           const int z) {
-    int Lp1 = L + 1;
-    int ret = z * (Lp1 * Lp1) + y * Lp1 + x;
-    assert(ret < cu_proteus_hex8_nxe(L));
-    assert(ret >= 0);
-    return ret;
-}
 
 // PROLONGATION
 
