@@ -400,6 +400,7 @@ int main(int argc, char* argv[]) {
 
         free(flops_v);
 
+        MPI_Barrier(MPI_COMM_WORLD);
         if (!rank) {
             const int nelements = mesh.nelements;
             const double elements_second =
