@@ -25,7 +25,7 @@
     { 0.0, 0.0, 0.0, 0.0 }
 #define CONST_VEC(__X__) \
     { __X__, __X__, __X__, __X__ }
-#endif./
+#endif
 
 // #define UNROLL_ZERO _Pragma("GCC unroll(0)")
 #define UNROLL_ZERO _Pragma("unroll(1)")
@@ -77,9 +77,9 @@ typedef ptrdiff_t vec_indices __attribute__((vector_size(_VL_ * sizeof(ptrdiff_t
 //                        const int stride_z);                             //
 
 vec_double weno4_3D_HOne_V(const vec_double x, const vec_double y, const vec_double z,  //
-                           const vec_double *f,                                         //
-                           const int stride_x,                                          //
-                           const int stride_y,                                          //
-                           const int stride_z);                                         //
+                           const double *f,                                             //
+                           const vec_indices stride_x,                                  //
+                           const vec_indices stride_y,                                  //
+                           const vec_indices stride_z);                                 //
 
 #endif  // __TET10_WENO_V_H__
