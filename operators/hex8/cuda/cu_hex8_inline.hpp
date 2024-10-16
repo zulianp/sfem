@@ -108,4 +108,22 @@ static __host__ __device__ void cu_hex8_sub_adj_0(const ptrdiff_t stride,
     sub_determinant[0] = (scalar_t)determinant * (POW3(h));
 }
 
+template <typename scalar_t>
+static __host__ __device__ void cu_hex8_sub_adj_0_in_place(
+                                                  const scalar_t h,
+                                                  scalar_t *const SFEM_RESTRICT adjugate,
+                                                  scalar_t *const SFEM_RESTRICT determinant) {
+    const scalar_t x0 = POW2(h);
+    adjugate[0] = (scalar_t)adjugate[0] * x0;
+    adjugate[1] = (scalar_t)adjugate[1] * x0;
+    adjugate[2] = (scalar_t)adjugate[2] * x0;
+    adjugate[3] = (scalar_t)adjugate[3] * x0;
+    adjugate[4] = (scalar_t)adjugate[4] * x0;
+    adjugate[5] = (scalar_t)adjugate[5] * x0;
+    adjugate[6] = (scalar_t)adjugate[6] * x0;
+    adjugate[7] = (scalar_t)adjugate[7] * x0;
+    adjugate[8] = (scalar_t)adjugate[8] * x0;
+    determinant[0] = (scalar_t)determinant * (POW3(h));
+}
+
 #endif  // CU_HEX_INLINE_HPP
