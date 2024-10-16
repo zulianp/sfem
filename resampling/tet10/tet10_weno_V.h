@@ -33,8 +33,8 @@
 typedef double vec_double __attribute__((vector_size(_VL_ * sizeof(double)),  //
                                          aligned(sizeof(double))));
 
-typedef ptrdiff_t vec_int64 __attribute__((vector_size(_VL_ * sizeof(ptrdiff_t)),  //
-                                           aligned(sizeof(ptrdiff_t))));
+typedef ptrdiff_t vec_indices __attribute__((vector_size(_VL_ * sizeof(ptrdiff_t)),  //
+                                             aligned(sizeof(ptrdiff_t))));
 
 #define List2_V(ARRAY, AA, BB) \
     {                          \
@@ -48,7 +48,6 @@ typedef ptrdiff_t vec_int64 __attribute__((vector_size(_VL_ * sizeof(ptrdiff_t))
         ARRAY[1] = (BB);           \
         ARRAY[2] = (CC);           \
     }
-
 
 // void getLinearWeightsConstH(const vec_double x, const vec_double h, vec_double *linear_weights);
 
