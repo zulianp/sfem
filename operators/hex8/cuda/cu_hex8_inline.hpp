@@ -123,7 +123,7 @@ static __host__ __device__ void cu_hex8_sub_adj_0_in_place(
     adjugate[6] = (scalar_t)adjugate[6] * x0;
     adjugate[7] = (scalar_t)adjugate[7] * x0;
     adjugate[8] = (scalar_t)adjugate[8] * x0;
-    determinant[0] = (scalar_t)determinant * (POW3(h));
+    determinant[0] *= POW3(h);
 }
 
 #endif  // CU_HEX_INLINE_HPP

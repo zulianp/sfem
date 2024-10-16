@@ -2,6 +2,7 @@
 #include "cu_proteus_hex8_linear_elasticity.h"
 #include "sfem_cuda_base.h"
 
+#include "cu_hex8_linear_elasticity_inline.hpp"
 #include "cu_proteus_hex8_inline.hpp"
 
 #ifndef B_
@@ -34,6 +35,10 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel(
         T *const SFEM_RESTRICT g_outx,
         T *const SFEM_RESTRICT g_outy,
         T *const SFEM_RESTRICT g_outz) {
+    static const int BLOCK_SIZE = LEVEL + 1;
+    static const int BLOCK_SIZE_2 = BLOCK_SIZE * BLOCK_SIZE;
+    static const int BLOCK_SIZE_3 = BLOCK_SIZE_2 * BLOCK_SIZE;
+
     // "local" memory
     T u_block[3][BLOCK_SIZE_3];
     T out_block[3][BLOCK_SIZE_3];
@@ -58,7 +63,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel(
          e += blockDim.x * gridDim.x) {
         // Gather from global to "local"
         for (int d = 0; d < 3; d++) {
-            cu_proteus_hex8_gather<real_t, LEVEL>(
+            cu_proteus_hex8_gather<T, LEVEL, T>(
                     nelements, stride, interior_start, e, elements, g_u[d], u_block[d]);
         }
 
@@ -90,10 +95,10 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel(
         for (int zi = 0; zi < LEVEL; zi++) {
             for (int yi = 0; yi < LEVEL; yi++) {
                 for (int xi = 0; xi < LEVEL; xi++) {
-                    scalar_t u[3][8];
-                    scalar_t out[3][8];
+                    T u[3][8];
+                    T out[3][8];
 
-                    // "local" to registers
+                    // "local" to micro-buffer
                     for (int d = 0; d < 3; d++) {
                         u[d][0] = u_block[d][B_(threadIdx.x, threadIdx.y, threadIdx.z)];
                         u[d][1] = u_block[d][B_(threadIdx.x + 1, threadIdx.y, threadIdx.z)];
@@ -114,23 +119,23 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel(
 
                     // Compute
                     for (int k = 0; k < n_qp; k++) {
-                        cu_hex8_linear_elasticity_apply_adj(mu,
-                                                            lambda,
-                                                            sub_adjugate,
-                                                            sub_determinant,
-                                                            qx[k],
-                                                            qy[k],
-                                                            qz[k],
-                                                            qw[k],
-                                                            u[0],
-                                                            u[1],
-                                                            u[2],
-                                                            out[0],
-                                                            out[1],
-                                                            out[2]);
+                        cu_hex8_linear_elasticity_apply_adj<T, T>(mu,
+                                                                  lambda,
+                                                                  sub_adjugate,
+                                                                  sub_determinant,
+                                                                  qx[k],
+                                                                  qy[k],
+                                                                  qz[k],
+                                                                  qw[k],
+                                                                  u[0],
+                                                                  u[1],
+                                                                  u[2],
+                                                                  out[0],
+                                                                  out[1],
+                                                                  out[2]);
                     }
 
-                    // registers to "local"
+                    // micro-buffer to "local"
                     for (int d = 0; d < 3; d++) {
                         out_block[d][B_(threadIdx.x, threadIdx.y, threadIdx.z)] += out[d][0];
                         out_block[d][B_(threadIdx.x + 1, threadIdx.y, threadIdx.z)] += out[d][1];
@@ -150,7 +155,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel(
 
             // Scatter from "local" to global
             for (int d = 0; d < 3; d++) {
-                cu_proteus_hex8_scatter_add<real_t, LEVEL>(
+                cu_proteus_hex8_scatter_add<T, LEVEL, T>(
                         nelements, stride, interior_start, e, elements, out_block[d], g_out[d]);
             }
         }
@@ -341,20 +346,20 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
             }
 
             for (int k = 0; k < n_qp; k++) {
-                cu_hex8_linear_elasticity_apply_adj(mu,
-                                                    lambda,
-                                                    sub_adjugate,
-                                                    sub_determinant,
-                                                    qx[k],
-                                                    qy[k],
-                                                    qz[k],
-                                                    qw[k],
-                                                    u[0],
-                                                    u[1],
-                                                    u[2],
-                                                    out[0],
-                                                    out[1],
-                                                    out[2]);
+                cu_hex8_linear_elasticity_apply_adj<T, T>(mu,
+                                                          lambda,
+                                                          sub_adjugate,
+                                                          sub_determinant,
+                                                          qx[k],
+                                                          qy[k],
+                                                          qz[k],
+                                                          qw[k],
+                                                          u[0],
+                                                          u[1],
+                                                          u[2],
+                                                          out[0],
+                                                          out[1],
+                                                          out[2]);
             }
         }
 
@@ -465,8 +470,9 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl(
     return SFEM_SUCCESS;
 }
 
+// Dispatch based on the level
 template <typename real_t>
-int cu_proteus_affine_hex8_linear_elasticity_apply_tpl(
+static int cu_proteus_affine_hex8_linear_elasticity_apply_tpl(
         const int level,
         const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
@@ -487,7 +493,7 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_tpl(
         void *stream) {
     switch (level) {
         case 2: {
-            return cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl<real_t, 3>(
+            return cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl<real_t, 2>(
                     nelements,
                     stride,
                     interior_start,
