@@ -20,7 +20,7 @@ source $SFEM_DIR/workflows/sfem_config.sh
 export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 export CUDA_LAUNCH_BLOCKING=0
-export SFEM_ELEMENT_REFINE_LEVEL=3
+export SFEM_ELEMENT_REFINE_LEVEL=4
 
 mesh=mesh
 
@@ -28,7 +28,7 @@ if [[ -d "$mesh" ]]
 then
 	echo "Reusing mesh"
 else
-	create_box_ss_mesh.sh 5 $SFEM_ELEMENT_REFINE_LEVEL
+	create_box_ss_mesh.sh 50 $SFEM_ELEMENT_REFINE_LEVEL
 fi
 
 # Box mesh for testing
