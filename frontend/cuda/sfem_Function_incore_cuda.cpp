@@ -591,7 +591,8 @@ namespace sfem {
             auto ret = std::make_shared<GPULinearElasticity>(derefined_space);
             assert(derefined_space->element_type() == macro_base_elem(adjugate->element_type()));
             assert(ret->element_type == macro_base_elem(adjugate->element_type()));
-            ret->adjugate = adjugate;
+            // ret->adjugate = adjugate;
+            ret->initialize();
             return ret;
         }
 

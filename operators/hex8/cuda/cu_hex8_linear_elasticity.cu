@@ -4,6 +4,8 @@
 
 #include "cu_hex8_linear_elasticity_inline.hpp"
 
+#include <stdio.h>
+
 template <typename T>
 __global__ void cu_affine_hex8_linear_elasticity_apply_kernel(
         const ptrdiff_t nelements,
@@ -43,9 +45,15 @@ __global__ void cu_affine_hex8_linear_elasticity_apply_kernel(
         T uy[8];
         T uz[8];
 
-        T outx[8] = {0};
-        T outy[8] = {0};
-        T outz[8] = {0};
+        T outx[8];
+        T outy[8];
+        T outz[8];
+
+        for (int d = 0; d < 8; d++) {
+            outx[d] = 0;
+            outy[d] = 0;
+            outz[d] = 0;
+        }
 
         // Copy over jacobian adjugate
         {
@@ -57,15 +65,15 @@ __global__ void cu_affine_hex8_linear_elasticity_apply_kernel(
 
         const T jacobian_determinant = g_jacobian_determinant[e];
 
-#pragma unroll(8)
         for (int v = 0; v < 8; ++v) {
             ev[v] = elements[v * nelements + e];
         }
 
         for (int v = 0; v < 8; ++v) {
-            ux[v] = g_ux[ev[v] * u_stride];
-            uy[v] = g_uy[ev[v] * u_stride];
-            uz[v] = g_uz[ev[v] * u_stride];
+            const ptrdiff_t idx = ev[v] * u_stride;
+            ux[v] = g_ux[idx];
+            uy[v] = g_uy[idx];
+            uz[v] = g_uz[idx];
 
             assert(ux[v] == ux[v]);
             assert(uy[v] == uy[v]);
@@ -90,13 +98,14 @@ __global__ void cu_affine_hex8_linear_elasticity_apply_kernel(
         }
 
         for (int v = 0; v < 8; v++) {
+            const ptrdiff_t idx = ev[v] * out_stride;
             assert(outx[v] == outx[v]);
             assert(outy[v] == outy[v]);
             assert(outz[v] == outz[v]);
 
-            atomicAdd(&g_outx[ev[v] * out_stride], outx[v]);
-            atomicAdd(&g_outy[ev[v] * out_stride], outy[v]);
-            atomicAdd(&g_outz[ev[v] * out_stride], outz[v]);
+            atomicAdd(&g_outx[idx], outx[v]);
+            atomicAdd(&g_outy[idx], outy[v]);
+            atomicAdd(&g_outz[idx], outz[v]);
         }
     }
 }
