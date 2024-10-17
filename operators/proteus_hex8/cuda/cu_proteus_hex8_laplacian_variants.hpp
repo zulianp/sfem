@@ -48,7 +48,7 @@ __global__ void cu_proteus_affine_hex8_laplacian_apply_volgen_kernel(
 
         // Gather
         cu_proteus_hex8_gather<real_t, LEVEL>(
-                nelements, stride, interior_start, e, elements, x, x_block);
+                nelements, stride, interior_start, e, elements, 1, x, x_block);
 
         // Reset
         for (int i = 0; i < BLOCK_SIZE_3; i++) {
@@ -101,7 +101,7 @@ __global__ void cu_proteus_affine_hex8_laplacian_apply_volgen_kernel(
 
         // Scatter
         cu_proteus_hex8_scatter_add<real_t, LEVEL>(
-                nelements, stride, interior_start, e, elements, y_block, y);
+                nelements, stride, interior_start, e, elements, y_block, 1, y);
     }
 }
 

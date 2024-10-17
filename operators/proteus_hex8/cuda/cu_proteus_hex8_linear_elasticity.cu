@@ -5,10 +5,6 @@
 #include "cu_hex8_linear_elasticity_inline.hpp"
 #include "cu_proteus_hex8_inline.hpp"
 
-#ifndef B_
-#define B_(x, y, z) SFEM_HEX8_BLOCK_IDX(x, y, z)
-#endif
-
 #ifndef MAX
 #define MAX(a, b) ((a) < (b) ? (b) : (a))
 #endif
@@ -64,7 +60,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel(
         // Gather from global to "local"
         for (int d = 0; d < 3; d++) {
             cu_proteus_hex8_gather<T, LEVEL, T>(
-                    nelements, stride, interior_start, e, elements, g_u[d], u_block[d]);
+                    nelements, stride, interior_start, e, elements, u_stride, g_u[d], u_block[d]);
         }
 
         // Get geometry
@@ -97,17 +93,20 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel(
                 for (int xi = 0; xi < LEVEL; xi++) {
                     T u[3][8];
                     T out[3][8];
+                    int lev[8] = {cu_proteus_hex8_lidx(LEVEL, xi, yi, zi),
+                                  cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi),
+                                  cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi),
+                                  cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi),
+                                  cu_proteus_hex8_lidx(LEVEL, xi, yi, zi + 1),
+                                  cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi + 1),
+                                  cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi + 1),
+                                  cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi + 1)};
 
                     // "local" to micro-buffer
                     for (int d = 0; d < 3; d++) {
-                        u[d][0] = u_block[d][B_(threadIdx.x, threadIdx.y, threadIdx.z)];
-                        u[d][1] = u_block[d][B_(threadIdx.x + 1, threadIdx.y, threadIdx.z)];
-                        u[d][2] = u_block[d][B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z)];
-                        u[d][3] = u_block[d][B_(threadIdx.x, threadIdx.y + 1, threadIdx.z)];
-                        u[d][4] = u_block[d][B_(threadIdx.x, threadIdx.y, threadIdx.z + 1)];
-                        u[d][5] = u_block[d][B_(threadIdx.x + 1, threadIdx.y, threadIdx.z + 1)];
-                        u[d][6] = u_block[d][B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z + 1)];
-                        u[d][7] = u_block[d][B_(threadIdx.x, threadIdx.y + 1, threadIdx.z + 1)];
+                        for (int v = 0; v < 8; v++) {
+                            u[d][v] = u_block[d][lev[v]];
+                        }
                     }
 
                     // Reset micro-accumulator
@@ -137,27 +136,24 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel(
 
                     // micro-buffer to "local"
                     for (int d = 0; d < 3; d++) {
-                        out_block[d][B_(threadIdx.x, threadIdx.y, threadIdx.z)] += out[d][0];
-                        out_block[d][B_(threadIdx.x + 1, threadIdx.y, threadIdx.z)] += out[d][1];
-                        out_block[d][B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z)] +=
-                                out[d][2];
-                        out_block[d][B_(threadIdx.x, threadIdx.y + 1, threadIdx.z)] += out[d][3];
-                        out_block[d][B_(threadIdx.x, threadIdx.y, threadIdx.z + 1)] += out[d][4];
-                        out_block[d][B_(threadIdx.x + 1, threadIdx.y, threadIdx.z + 1)] +=
-                                out[d][5];
-                        out_block[d][B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z + 1)] +=
-                                out[d][6];
-                        out_block[d][B_(threadIdx.x, threadIdx.y + 1, threadIdx.z + 1)] +=
-                                out[d][7];
+                        for (int v = 0; v < 8; v++) {
+                            out_block[d][lev[v]] += out[d][v];
+                        }
                     }
                 }
             }
+        }
 
-            // Scatter from "local" to global
-            for (int d = 0; d < 3; d++) {
-                cu_proteus_hex8_scatter_add<T, LEVEL, T>(
-                        nelements, stride, interior_start, e, elements, out_block[d], g_out[d]);
-            }
+        // Scatter from "local" to global
+        for (int d = 0; d < 3; d++) {
+            cu_proteus_hex8_scatter_add<T, LEVEL, T>(nelements,
+                                                     stride,
+                                                     interior_start,
+                                                     e,
+                                                     elements,
+                                                     out_block[d],
+                                                     out_stride,
+                                                     g_out[d]);
         }
     }
 }
@@ -190,7 +186,7 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl(
         cudaOccupancyMaxPotentialBlockSize(
                 &min_grid_size,
                 &block_size,
-                cu_proteus_affine_hex8_laplacian_apply_kernel_volgen<T, LEVEL>,
+                cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel<T, LEVEL>,
                 0,
                 0);
     }
@@ -267,6 +263,10 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
     assert(blockDim.y == BLOCK_SIZE);
     assert(blockDim.z == BLOCK_SIZE);
 
+    // Global mem
+    const T *g_u[3] = {g_ux, g_uy, g_uz};
+    T *g_out[3] = {g_outx, g_outy, g_outz};
+
     // Shared mem
     __shared__ T u_block[BLOCK_SIZE_3];
     __shared__ T out_block[BLOCK_SIZE_3];
@@ -281,9 +281,34 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
     const T qx[6] = {0.0, 0.5, 0.5, 0.5, 0.5, 1.0};
     const T qy[6] = {0.5, 0.0, 0.5, 0.5, 1.0, 0.5};
     const T qz[6] = {0.5, 0.5, 0.0, 1.0, 0.5, 0.5};
+    const T h = 1. / LEVEL;
 
-    const T *g_u[3] = {g_ux, g_uy, g_uz};
-    T *g_out[3] = {g_outx, g_outy, g_outz};
+    const auto xi = threadIdx.x;
+    const auto yi = threadIdx.y;
+    const auto zi = threadIdx.z;
+    const int interior = xi > 0 && yi > 0 && zi > 0 && xi < LEVEL && yi < LEVEL && zi < LEVEL;
+    const bool is_element = xi < LEVEL && yi < LEVEL && zi < LEVEL;
+
+    assert(xi < BLOCK_SIZE);
+    assert(yi < BLOCK_SIZE);
+    assert(zi < BLOCK_SIZE);
+
+    const int lidx = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi);
+
+    assert(lidx < BLOCK_SIZE_3);
+    assert(lidx >= 0);
+
+    int lev[8];
+    if (is_element) {
+        lev[0] = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi);
+        lev[1] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi);
+        lev[2] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi);
+        lev[3] = cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi);
+        lev[4] = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi + 1);
+        lev[5] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi + 1);
+        lev[6] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi + 1);
+        lev[7] = cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi + 1);
+    }
 
     T out[3][8];
     T u[3][8];
@@ -291,12 +316,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
     T sub_determinant;
 
     for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
-        const int lidx = threadIdx.z * BLOCK_SIZE_2 + threadIdx.y * BLOCK_SIZE + threadIdx.x;
-        assert(lidx < BLOCK_SIZE_3);
-        assert(lidx >= 0);
-
         const ptrdiff_t idx = elements[lidx * stride + e];
-        const bool is_element = threadIdx.x < LEVEL && threadIdx.y < LEVEL && threadIdx.z < LEVEL;
 
         if (is_element) {
             sub_adjugate[0] = g_jacobian_adjugate[0 * stride + e];
@@ -311,32 +331,22 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
             sub_determinant = g_jacobian_determinant[e];
         }
 
-        // if (lidx < BLOCK_SIZE_3)  // DO WE NEED THIS?
-        { out_block[lidx] = 0; }
+        out_block[lidx] = 0;
 
         for (int d = 0; d < 3; d++) {
-            // if (lidx < BLOCK_SIZE_3)  // DO WE NEED THIS?
-            {
-                u_block[lidx] = g_u[d][idx * u_stride];
-                assert(u_block[lidx] == u_block[lidx]);
-            }
+            u_block[lidx] = g_u[d][idx * u_stride];
+            assert(u_block[lidx] == u_block[lidx]);
 
             __syncthreads();
 
             if (is_element) {
-                u[d][0] = u_block[B_(threadIdx.x, threadIdx.y, threadIdx.z)];
-                u[d][1] = u_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z)];
-                u[d][2] = u_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z)];
-                u[d][3] = u_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z)];
-                u[d][4] = u_block[B_(threadIdx.x, threadIdx.y, threadIdx.z + 1)];
-                u[d][5] = u_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z + 1)];
-                u[d][6] = u_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z + 1)];
-                u[d][7] = u_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z + 1)];
+                for (int v = 0; v < 8; v++) {
+                    u[d][v] = u_block[lev[v]];
+                }
             }
         }
 
         if (is_element) {
-            const T h = 1. / LEVEL;
             cu_hex8_sub_adj_0_in_place(h, sub_adjugate, &sub_determinant);
 
             for (int d = 0; d < 3; d++) {
@@ -363,36 +373,24 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
             }
         }
 
-        const int interior = threadIdx.x > 0 && threadIdx.y > 0 && threadIdx.z > 0 &&
-                             threadIdx.x < LEVEL && threadIdx.y < LEVEL && threadIdx.z < LEVEL;
-
         for (int d = 0; d < 3; d++) {
             if (is_element) {
-                atomicAdd(&out_block[B_(threadIdx.x, threadIdx.y, threadIdx.z)], out[d][0]);
-                atomicAdd(&out_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z)], out[d][1]);
-                atomicAdd(&out_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z)], out[d][2]);
-                atomicAdd(&out_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z)], out[d][3]);
-                atomicAdd(&out_block[B_(threadIdx.x, threadIdx.y, threadIdx.z + 1)], out[d][4]);
-                atomicAdd(&out_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z + 1)], out[d][5]);
-                atomicAdd(&out_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z + 1)],
-                          out[d][6]);
-                atomicAdd(&out_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z + 1)], out[d][7]);
+                for (int v = 0; v < 8; v++) {
+                    atomicAdd(&out_block[lev[v]], out[d][v]);
+                }
             }
 
             __syncthreads();
 
-            // if (lidx < BLOCK_SIZE_3)  // DO WE NEED THIS?
-            {
-                assert(out_block[lidx] == out_block[lidx]);
+            assert(out_block[lidx] == out_block[lidx]);
 
-                if (interior) {
+            if (interior) {
                     g_out[d][idx * out_stride] += out_block[lidx];
                 } else {
                     atomicAdd(&(g_out[d][idx * out_stride]), out_block[lidx]);
-                }
-
-                out_block[lidx] = 0;
             }
+
+            out_block[lidx] = 0;
 
             if (d < 2) {
                 __syncthreads();
@@ -513,7 +511,7 @@ static int cu_proteus_affine_hex8_linear_elasticity_apply_tpl(
                     stream);
         }
         case 3: {
-            return cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl<real_t, 3>(
+            return cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl<real_t, 3>(
                     nelements,
                     stride,
                     interior_start,
@@ -533,7 +531,7 @@ static int cu_proteus_affine_hex8_linear_elasticity_apply_tpl(
                     stream);
         }
         case 4: {
-            return cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl<real_t, 4>(
+            return cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl<real_t, 4>(
                     nelements,
                     stride,
                     interior_start,
@@ -632,26 +630,26 @@ static int cu_proteus_affine_hex8_linear_elasticity_apply_tpl(
                     (real_t *)outz,
                     stream);
         }
-        case 9: {
-            return cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl<real_t, 9>(
-                    nelements,
-                    stride,
-                    interior_start,
-                    elements,
-                    (cu_jacobian_t *)jacobian_adjugate,
-                    (cu_jacobian_t *)jacobian_determinant,
-                    mu,
-                    lambda,
-                    u_stride,
-                    (real_t *)ux,
-                    (real_t *)uy,
-                    (real_t *)uz,
-                    out_stride,
-                    (real_t *)outx,
-                    (real_t *)outy,
-                    (real_t *)outz,
-                    stream);
-        }
+        // case 9: {
+        //     return cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl<real_t, 9>(
+        //             nelements,
+        //             stride,
+        //             interior_start,
+        //             elements,
+        //             (cu_jacobian_t *)jacobian_adjugate,
+        //             (cu_jacobian_t *)jacobian_determinant,
+        //             mu,
+        //             lambda,
+        //             u_stride,
+        //             (real_t *)ux,
+        //             (real_t *)uy,
+        //             (real_t *)uz,
+        //             out_stride,
+        //             (real_t *)outx,
+        //             (real_t *)outy,
+        //             (real_t *)outz,
+        //             stream);
+        // }
         default: {
             fprintf(stderr,
                     "cu_proteus_affine_hex8_linear_elasticity_apply_tpl: level %d not "
