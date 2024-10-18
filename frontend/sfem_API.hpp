@@ -11,14 +11,16 @@
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_crs_SpMV.hpp"
+#include "sfem_ContactConditions.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
+#include "cu_proteus_hex8_interpolate.h"
 #include "cu_tet4_prolongation_restriction.h"
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_blas.h"
 #include "sfem_cuda_crs_SpMV.hpp"
 #include "sfem_cuda_solver.hpp"
-#include "cu_proteus_hex8_interpolate.h"
+#include "sfem_ContactConditions_cuda.hpp"
 #endif
 
 #include "proteus_hex8.h"
@@ -138,6 +140,20 @@ namespace sfem {
         return conds;
     }
 
+    std::shared_ptr<Constraint> create_contact_conditions_from_env(
+            const std::shared_ptr<FunctionSpace> &space,
+            const ExecutionSpace es) {
+        auto conds = sfem::ContactConditions::create_from_env(space);
+
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            return sfem::to_device(conds);
+        }
+#endif  // SFEM_ENABLE_CUDA
+
+        return conds;
+    }
+
     std::shared_ptr<Buffer<idx_t>> create_edge_idx(CRSGraph &crs_graph) {
         const ptrdiff_t rows = crs_graph.n_nodes();
         auto p2_vertices = h_buffer<idx_t>(crs_graph.nnz());
@@ -173,19 +189,18 @@ namespace sfem {
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
                             auto &ssm = to_space->semi_structured_mesh();
-                            cu_proteus_hex8_hierarchical_prolongation(
-                                    ssm.level(),
-                                    ssm.n_elements(),
-                                    ssm.n_elements(),
-                                    elements->data(),
-                                    from_space->block_size(),
-                                    SFEM_REAL_DEFAULT,
-                                    1,
-                                    from,
-                                    SFEM_REAL_DEFAULT,
-                                    1,
-                                    to,
-                                    SFEM_DEFAULT_STREAM);
+                            cu_proteus_hex8_hierarchical_prolongation(ssm.level(),
+                                                                      ssm.n_elements(),
+                                                                      ssm.n_elements(),
+                                                                      elements->data(),
+                                                                      from_space->block_size(),
+                                                                      SFEM_REAL_DEFAULT,
+                                                                      1,
+                                                                      from,
+                                                                      SFEM_REAL_DEFAULT,
+                                                                      1,
+                                                                      to,
+                                                                      SFEM_DEFAULT_STREAM);
                         },
                         es);
             } else {
