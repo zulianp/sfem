@@ -110,6 +110,7 @@ namespace sfem {
             return std::make_shared<SemiStructuredMesh>(macro_mesh, level);
         }
 
+        int n_nodes_per_element() const;
         ptrdiff_t n_nodes() const;
         int level() const;
         ptrdiff_t n_elements() const;

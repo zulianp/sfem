@@ -54,12 +54,6 @@ int proteus_hex8_laplacian_apply(const int level,
                                                 proteus_hex8_lidx(level, level, level, level),
                                                 proteus_hex8_lidx(level, 0, level, level)};
 
-    // const int n_qp = q27_n;
-    // const scalar_t *qx = q27_x;
-    // const scalar_t *qy = q27_y;
-    // const scalar_t *qz = q27_z;
-    // const scalar_t *qw = q27_w;
-
     const int n_qp = q6_n;
     const scalar_t *qx = q6_x;
     const scalar_t *qy = q6_y;
@@ -254,27 +248,12 @@ int proteus_affine_hex8_laplacian_apply(const int level,
             hex8_fff(x, y, z, 0.5, 0.5, 0.5, m_fff);
             
             // Assume affine here!
-            // tet4_fff_s(x[0], x[1], x[3], x[4], y[0], y[1], y[3], y[4], z[0], z[1], z[3], z[4], m_fff);
-
             hex8_sub_fff_0(m_fff, h, fff);
 
 #define PROTEUS_HEX8_USE_MV  // assemblying the elemental matrix is faster
 #ifdef PROTEUS_HEX8_USE_MV
             accumulator_t laplacian_matrix[8 * 8];
-
-            // hex8_laplacian_matrix_fff_integral(m_fff, laplacian_matrix);
-            // printf("---------------------------\n");
-            // printf("laplacian_matrix MACRO (%d)\n", e);
-            // print_matrix(8, 8, laplacian_matrix);
-            // printf("---------------------------\n");
-
-
             hex8_laplacian_matrix_fff_integral(fff, laplacian_matrix);
-
-            // printf("---------------------------\n");
-            // printf("laplacian_matrix MICRO (%d)\n", e);
-            // print_matrix(8, 8, laplacian_matrix);
-            // printf("---------------------------\n");
 #endif
 
             // Iterate over sub-elements
@@ -400,21 +379,12 @@ int proteus_affine_hex8_laplacian_diag(const int level,
             const scalar_t h = 1. / level;
 
             // We evaluate the jacobian at the center of the element
-            // in case that the mapping is not linear
+            // in case that the mapping is affine
             hex8_fff(x, y, z, 0.5, 0.5, 0.5, m_fff);
-            
-            // Assume affine here!
-            // tet4_fff_s(x[0], x[1], x[3], x[4], y[0], y[1], y[3], y[4], z[0], z[1], z[3], z[4], m_fff);
-
             hex8_sub_fff_0(m_fff, h, fff);
 
             accumulator_t laplacian_diag[8];
             hex8_laplacian_diag_fff_integral(fff, laplacian_diag);
-
-            // printf("---------------------------\n");
-            // printf("laplacian_diag\n");
-            // print_matrix(1, 8, laplacian_diag);
-            // printf("---------------------------\n");
 
             // Iterate over sub-elements
             for (int zi = 0; zi < level; zi++) {

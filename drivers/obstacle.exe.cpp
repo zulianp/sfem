@@ -40,10 +40,39 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+#ifdef SFEM_ENABLE_CUDA
+    sfem::register_device_ops();
+#endif
+
+    // -------------------------------
+    // Read inputs
+    // -------------------------------
+
     const char *output_path = argv[2];
 
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
+
+    int SFEM_USE_ELASTICITY = 1;
+    SFEM_READ_ENV(SFEM_USE_ELASTICITY, atoi);
+
+    int SFEM_USE_PROJECTED_CG = 0;
+    SFEM_READ_ENV(SFEM_USE_PROJECTED_CG, atoi);
+
+    int SFEM_TEST_AGAINST_LINEAR = 0;
+    SFEM_READ_ENV(SFEM_TEST_AGAINST_LINEAR, atoi);
+
+    int SFEM_MAX_IT = 4000;
+    SFEM_READ_ENV(SFEM_MAX_IT, atoi);
+
+    bool SFEM_USE_GPU = true;
+    SFEM_READ_ENV(SFEM_USE_GPU, atoi);
+
+    sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
+
+    if (SFEM_USE_GPU) {
+        es = sfem::EXECUTION_SPACE_DEVICE;
+    }
 
     if (!SFEM_ELEMENT_REFINE_LEVEL) {
         fprintf(stderr, "[Error] SFEM_ELEMENT_REFINE_LEVEL must be defined >= 2\n");
@@ -52,169 +81,92 @@ int main(int argc, char *argv[]) {
 
     double tick = MPI_Wtime();
 
-    // -------------------------------
-    // Read inputs
-    // -------------------------------
-
     const char *folder = argv[1];
     auto m = sfem::Mesh::create_from_file(comm, folder);
-
-    int SFEM_USE_ELASTICITY = 0;
-    SFEM_READ_ENV(SFEM_USE_ELASTICITY, atoi);
     int block_size = SFEM_USE_ELASTICITY ? m->spatial_dimension() : 1;
 
-    auto ssm = sfem::SemiStructuredMesh::create(m, SFEM_ELEMENT_REFINE_LEVEL);
-    ptrdiff_t ndofs = ssm->n_nodes() * block_size;
+    auto fs = sfem::FunctionSpace::create(m, block_size);
 
-    char *SFEM_DIRICHLET_NODESET = 0;
-    char *SFEM_DIRICHLET_VALUE = 0;
-    char *SFEM_DIRICHLET_COMPONENT = 0;
-    SFEM_READ_ENV(SFEM_DIRICHLET_NODESET, );
-    SFEM_READ_ENV(SFEM_DIRICHLET_VALUE, );
-    SFEM_READ_ENV(SFEM_DIRICHLET_COMPONENT, );
+    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
+    }
 
-    char *SFEM_CONTACT_NODESET = 0;
-    char *SFEM_CONTACT_VALUE = 0;
-    char *SFEM_CONTACT_COMPONENT = 0;
+#ifdef SFEM_ENABLE_CUDA
+    {
+        auto elements = fs->device_elements();
+        if (!elements) {
+            elements = create_device_elements(fs, fs->element_type());
+            fs->set_device_elements(elements);
+        }
+    }
+#endif
 
-    SFEM_READ_ENV(SFEM_CONTACT_NODESET, );
-    SFEM_READ_ENV(SFEM_CONTACT_VALUE, );
-    SFEM_READ_ENV(SFEM_CONTACT_COMPONENT, );
+    auto conds = sfem::create_dirichlet_conditions_from_env(fs, es);
+    auto f = sfem::Function::create(fs);
+    auto op = sfem::create_op(fs, SFEM_USE_ELASTICITY ? "LinearElasticity" : "Laplacian", es);
+    op->initialize();
+    f->add_constraint(conds);
+    f->add_operator(op);
 
-    int SFEM_USE_PROJECTED_CG = 0;
-    SFEM_READ_ENV(SFEM_USE_PROJECTED_CG, atoi);
-
-    real_t SFEM_SHEAR_MODULUS = 1;
-    real_t SFEM_FIRST_LAME_PARAMETER = 1;
-
-    int SFEM_TEST_AGAINST_LINEAR = 0;
-    SFEM_READ_ENV(SFEM_TEST_AGAINST_LINEAR, atoi);
-
-    auto mesh = (mesh_t *)m->impl_mesh();
-
-    int n_dirichlet_conditions{0};
-    boundary_condition_t *dirichlet_conditions{nullptr};
-
-    read_dirichlet_conditions(mesh,
-                              SFEM_DIRICHLET_NODESET,
-                              SFEM_DIRICHLET_VALUE,
-                              SFEM_DIRICHLET_COMPONENT,
-                              &dirichlet_conditions,
-                              &n_dirichlet_conditions);
-
-    int n_contact_conditions{0};
-    boundary_condition_t *contact_conditions{nullptr};
-    read_dirichlet_conditions(mesh,
-                              SFEM_CONTACT_NODESET,
-                              SFEM_CONTACT_VALUE,
-                              SFEM_CONTACT_COMPONENT,
-                              &contact_conditions,
-                              &n_contact_conditions);
-
-    printf("n_dirichlet_conditions = %d\n", n_dirichlet_conditions);
-    printf("n_contact_conditions = %d\n", n_contact_conditions);
+    auto contact_conds = sfem::create_contact_conditions_from_env(fs, es);
 
     struct stat st = {0};
     if (stat(output_path, &st) == -1) {
         mkdir(output_path, 0700);
     }
 
-    auto op = sfem::make_op<real_t>(
-            ndofs,
-            ndofs,
-            [=](const real_t *const x, real_t *const y) {
-                // Apply operator
-                if (SFEM_USE_ELASTICITY) {
-                    proteus_affine_hex8_linear_elasticity_apply  //
-                            // proteus_hex8_linear_elasticity_apply  //
-                            (ssm->level(),
-                             ssm->n_elements(),
-                             ssm->interior_start(),
-                             ssm->element_data(),
-                             ssm->point_data(),
-                             SFEM_SHEAR_MODULUS,
-                             SFEM_FIRST_LAME_PARAMETER,
-                             3,
-                             &x[0],
-                             &x[1],
-                             &x[2],
-                             3,
-                             &y[0],
-                             &y[1],
-                             &y[2]);
-                } else {
-                    proteus_affine_hex8_laplacian_apply  //
-                                                         // proteus_hex8_laplacian_apply  //
-                            (ssm->level(),
-                             ssm->n_elements(),
-                             ssm->interior_start(),
-                             ssm->element_data(),
-                             ssm->point_data(),
-                             x,
-                             y);
-                }
+    auto linear_op = sfem::make_linear_op(f);
 
-                // Copy constrained nodes
-                copy_at_dirichlet_nodes_vec(
-                        n_dirichlet_conditions, dirichlet_conditions, block_size, x, y);
-            },
-            sfem::EXECUTION_SPACE_HOST);
+    ptrdiff_t ndofs = fs->n_dofs();
+    auto x = sfem::create_buffer<real_t>(ndofs, es);
+    auto rhs = sfem::create_buffer<real_t>(ndofs, es);
 
-    auto x = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
-    auto rhs = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
-
-    apply_dirichlet_condition_vec(
-            n_dirichlet_conditions, dirichlet_conditions, block_size, x->data());
-
-    apply_dirichlet_condition_vec(
-            n_dirichlet_conditions, dirichlet_conditions, block_size, rhs->data());
+    f->apply_constraints(x->data());
+    f->apply_constraints(rhs->data());
 
     std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> solver;
-
-    if (n_contact_conditions) {
-        auto mprgp = std::make_shared<sfem::MPRGP<real_t>>();
+    {
+        auto mprgp = sfem::create_mprgp(linear_op, es);
 
         if (SFEM_USE_PROJECTED_CG) {
             mprgp->set_expansion_type(sfem::MPRGP<real_t>::EXPANSION_TYPE_PROJECTED_CG);
         }
 
-        mprgp->set_op(op);
+        mprgp->set_op(linear_op);
 
-        auto upper_bound = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
+        auto h_upper_bound = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
 
         {  // Fill default upper-bound value
-            auto ub = upper_bound->data();
+            auto ub = h_upper_bound->data();
             for (ptrdiff_t i = 0; i < ndofs; i++) {
                 ub[i] = 1000;
             }
         }
 
-        apply_dirichlet_condition_vec(
-                n_contact_conditions, contact_conditions, block_size, upper_bound->data());
+#ifdef SFEM_ENABLE_CUDA
+       auto upper_bound = sfem::to_device(h_upper_bound);
+#else
+       auto upper_bound = h_upper_bound;
+#endif
+
+        contact_conds->apply(upper_bound->data());
+
+#ifdef SFEM_ENABLE_CUDA
+        h_upper_bound = sfem::to_host(upper_bound);
+#endif
 
         char path[2048];
         sprintf(path, "%s/upper_bound.raw", output_path);
-        if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)upper_bound->data(), ndofs, ndofs)) {
+        if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_upper_bound->data(), ndofs, ndofs)) {
             return SFEM_FAILURE;
         }
 
         mprgp->verbose = true;
-        mprgp->set_max_it(20000);
+        mprgp->set_max_it(SFEM_MAX_IT);
         mprgp->set_rtol(1e-12);
         mprgp->set_atol(1e-8);
         mprgp->set_upper_bound(upper_bound);
-        // mprgp->set_max_eig(1);
-        mprgp->default_init();
         solver = mprgp;
-    } else {
-        auto cg = sfem::h_cg<real_t>();
-        cg->verbose = true;
-        cg->set_op(op);
-        cg->set_max_it(10000);
-        cg->set_rtol(1e-12);
-        cg->set_atol(1e-8);
-        cg->default_init();
-        solver = cg;
     }
 
     double solve_tick = MPI_Wtime();
@@ -232,78 +184,17 @@ int main(int argc, char *argv[]) {
         return SFEM_FAILURE;
     }
 
-    if (SFEM_TEST_AGAINST_LINEAR) {  // Residual test
-        if (n_contact_conditions) {
-            apply_dirichlet_condition_vec(
-                    n_contact_conditions, contact_conditions, block_size, rhs->data());
-        }
-
-        auto linear_op = sfem::make_op<real_t>(
-                ndofs,
-                ndofs,
-                [=](const real_t *const x, real_t *const y) {
-                    // Apply operator
-
-                    if (SFEM_USE_ELASTICITY) {
-                        // proteus_affine_hex8_linear_elasticity_apply //
-                        proteus_hex8_linear_elasticity_apply  //
-                                (ssm->level(),
-                                 ssm->n_elements(),
-                                 ssm->interior_start(),
-                                 ssm->element_data(),
-                                 ssm->point_data(),
-                                 SFEM_SHEAR_MODULUS,
-                                 SFEM_FIRST_LAME_PARAMETER,
-                                 3,
-                                 &x[0],
-                                 &x[1],
-                                 &x[2],
-                                 3,
-                                 &y[0],
-                                 &y[1],
-                                 &y[2]);
-                    } else {
-                        // proteus_affine_hex8_laplacian_apply  //
-                        proteus_hex8_laplacian_apply  //
-                                (ssm->level(),
-                                 ssm->n_elements(),
-                                 ssm->interior_start(),
-                                 ssm->element_data(),
-                                 ssm->point_data(),
-                                 x,
-                                 y);
-                    }
-
-                    // Copy constrained nodes
-                    copy_at_dirichlet_nodes_vec(
-                            n_dirichlet_conditions, dirichlet_conditions, block_size, x, y);
-
-                    if (n_contact_conditions) {
-                        copy_at_dirichlet_nodes_vec(
-                                n_contact_conditions, contact_conditions, block_size, x, y);
-                    }
-                },
-                sfem::EXECUTION_SPACE_HOST);
-
-        auto r = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
-        real_t rtr = residual(*linear_op, rhs->data(), x->data(), r->data());
-
-        printf("Linear residual: %g\n", rtr);
-    }
-
-    destroy_conditions(n_contact_conditions, contact_conditions);
-    destroy_conditions(n_dirichlet_conditions, dirichlet_conditions);
-
     double tock = MPI_Wtime();
+
+    ptrdiff_t nelements = m->n_elements();
+    ptrdiff_t nnodes =
+            fs->has_semi_structured_mesh() ? fs->semi_structured_mesh().n_nodes() : m->n_nodes();
 
     if (!rank) {
         printf("----------------------------------------\n");
         printf("%s (%s):\n", argv[0], "PROTEUS_HEX8");
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld #dofs %ld\n",
-               (long)ssm->n_elements(),
-               (long)ssm->n_nodes(),
-               (long)ndofs);
+        printf("#elements %ld #nodes %ld #dofs %ld\n", (long)nelements, (long)nnodes, (long)ndofs);
         printf("TTS:\t\t%g [s], solve: %g [s])\n", tock - tick, solve_tock - solve_tick);
         printf("----------------------------------------\n");
     }

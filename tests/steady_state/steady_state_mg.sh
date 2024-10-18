@@ -20,7 +20,7 @@ source $SFEM_DIR/workflows/sfem_config.sh
 export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 export CUDA_LAUNCH_BLOCKING=0
-export SFEM_ELEMENT_REFINE_LEVEL=8
+export SFEM_ELEMENT_REFINE_LEVEL=4
 
 mesh=mesh
 
@@ -28,7 +28,7 @@ if [[ -d "$mesh" ]]
 then
 	echo "Reusing mesh"
 else
-	create_box_ss_mesh.sh 30 $SFEM_ELEMENT_REFINE_LEVEL
+	create_box_ss_mesh.sh 50 $SFEM_ELEMENT_REFINE_LEVEL
 fi
 
 # Box mesh for testing
@@ -64,7 +64,7 @@ export SFEM_CHEB_EIG_MAX_SCALE=1
 export SFEM_CHEB_EIG_TOL=1e-5
 export SFEM_SMOOTHER_SWEEPS=20
 
-export SFEM_MAX_IT=20
+export SFEM_MAX_IT=8
 export SFEM_MG=1
 export SFEM_USE_PRECONDITIONER=0
 
@@ -73,7 +73,7 @@ export SFEM_DEBUG=0
 
 # export SFEM_COARSE_TOL=1e-12
 
-$LAUNCH mgsolve $mesh output
+$LAUNCH mgsolve $mesh output | tee log.txt
 
 if [[ $SFEM_USE_ELASTICITY -eq 1 ]]
 then
@@ -95,5 +95,5 @@ then
 
 	raw_to_db.py $mesh/viz output/out.vtk  --point_data="output/soa/*.raw" --point_data_type="$SFEM_REAL_T"
 else
-	raw_to_db.py $mesh/viz output/out.vtk --point_data=output/u.raw,output/rhs.raw --point_data_type="$SFEM_REAL_T,$SFEM_REAL_T"
+	raw_to_db.py $mesh/viz output/out.vtk --point_data=output/x.raw,output/rhs.raw --point_data_type="$SFEM_REAL_T,$SFEM_REAL_T"
 fi

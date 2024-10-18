@@ -1,12 +1,7 @@
 #include <memory>
 #include "sfem_Function.hpp"
 
-#include "sfem_Chebyshev3.hpp"
-#include "sfem_GaussSeidel.hpp"
-#include "sfem_Multigrid.hpp"
 #include "sfem_base.h"
-#include "sfem_bcgs.hpp"
-#include "sfem_cg.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "spmv.h"
 
@@ -28,6 +23,7 @@
         expr;                                      \
         double stop = MPI_Wtime();                 \
         printf("%s %g [s]\n", name, stop - start); \
+        fflush(stdout);                            \
     } while (0)
 
 int main(int argc, char *argv[]) {
@@ -57,11 +53,13 @@ int main(int argc, char *argv[]) {
     bool SFEM_USE_GPU = true;
     int SFEM_BLOCK_SIZE = 1;
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
+    int SFEM_PRINT_VECTORS = 0;
 
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_USE_GPU, atoi);
     SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
+    SFEM_READ_ENV(SFEM_PRINT_VECTORS, atoi);
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
@@ -126,8 +124,8 @@ int main(int argc, char *argv[]) {
 
     std::shared_ptr<sfem::Buffer<real_t>> input;
 
-#if SFEM_ENABLE_CUDA
-    if (es == sfem::MEMORY_SPACE_DEVICE) {
+#ifdef SFEM_ENABLE_CUDA
+    if (es == sfem::EXECUTION_SPACE_DEVICE) {
         input = sfem::to_device(h_input);
     } else
 #endif
@@ -142,10 +140,11 @@ int main(int argc, char *argv[]) {
 
     double tick = MPI_Wtime();
 
+    OP_TIME("coarse_op", coarse_op->apply(input->data(), Ax_coarse->data()));
+
     OP_TIME("prolongation", prolongation->apply(input->data(), prolongated->data()));
     OP_TIME("fine_op", fine_op->apply(prolongated->data(), Ax_fine->data()));
     OP_TIME("restriction", restriction->apply(Ax_fine->data(), restricted->data()));
-    OP_TIME("coarse_op", coarse_op->apply(input->data(), Ax_coarse->data()));
 
     double tock = MPI_Wtime();
 
@@ -155,11 +154,21 @@ int main(int argc, char *argv[]) {
            fs_coarse->n_dofs(),
            tock - tick);
 
-    // input->print(std::cout);
-    // prolongated->print(std::cout);
-    // Ax_fine->print(std::cout);
-    // Ax_coarse->print(std::cout);
-    // restricted->print(std::cout);
+    if (SFEM_PRINT_VECTORS) {
+#ifdef SFEM_ENABLE_CUDA
+        sfem::to_host(input)->print(std::cout);
+        sfem::to_host(prolongated)->print(std::cout);
+        sfem::to_host(Ax_fine)->print(std::cout);
+        sfem::to_host(Ax_coarse)->print(std::cout);
+        sfem::to_host(restricted)->print(std::cout);
+#else
+        input->print(std::cout);
+        prolongated->print(std::cout);
+        Ax_fine->print(std::cout);
+        Ax_coarse->print(std::cout);
+        restricted->print(std::cout);
+#endif
+    }
 
     if (0)  //
     {
@@ -171,7 +180,7 @@ int main(int argc, char *argv[]) {
     auto error = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), sfem::MEMORY_SPACE_HOST);
 
     // Compare two results
-#if SFEM_ENABLE_CUDA
+#ifdef SFEM_ENABLE_CUDA
     auto h_actual = sfem::to_host(restricted);
     auto h_expected = sfem::to_host(Ax_coarse);
 #else

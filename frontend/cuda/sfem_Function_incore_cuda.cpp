@@ -6,8 +6,12 @@
 #include "sfem_mesh.h"
 
 #include "cu_boundary_condition.h"
+#include "cu_hex8_fff.h"
+#include "cu_hex8_adjugate.h"
 #include "cu_laplacian.h"
 #include "cu_linear_elasticity.h"
+#include "cu_proteus_hex8_laplacian.h"
+#include "cu_proteus_hex8_linear_elasticity.h"
 #include "cu_tet4_adjugate.h"
 #include "cu_tet4_fff.h"
 
@@ -16,21 +20,29 @@ namespace sfem {
     std::shared_ptr<Buffer<idx_t>> create_device_elements(
             const std::shared_ptr<FunctionSpace> &space,
             const enum ElemType element_type) {
-        auto c_mesh = (mesh_t *)space->mesh().impl_mesh();
+        if (space->has_semi_structured_mesh()) {
+            auto &ssm = space->semi_structured_mesh();
 
-        int nxe = elem_num_nodes(element_type);
+            int nxe = ssm.n_nodes_per_element();
+            idx_t *elements{nullptr};
+            elements_to_device(ssm.n_elements(), nxe, ssm.element_data(), &elements);
 
-        idx_t *elements{nullptr};
-        elements_to_device(
-                c_mesh->nelements, nxe, c_mesh->elements, &elements);
+            printf("create_device_elements %ld %d (ss)\n", ssm.n_elements(), nxe);
 
-        
-        printf("create_device_elements %ld %d\n", c_mesh->nelements, nxe);
+            return Buffer<idx_t>::own(
+                    ssm.n_elements() * nxe, elements, d_buffer_destroy, MEMORY_SPACE_DEVICE);
 
-        return Buffer<idx_t>::own(c_mesh->nelements * nxe,
-                                  elements,
-                                  d_buffer_destroy,
-                                  MEMORY_SPACE_DEVICE);
+        } else {
+            auto c_mesh = (mesh_t *)space->mesh().impl_mesh();
+            int nxe = elem_num_nodes(element_type);
+            idx_t *elements{nullptr};
+            elements_to_device(c_mesh->nelements, nxe, c_mesh->elements, &elements);
+
+            printf("create_device_elements %ld %d\n", c_mesh->nelements, nxe);
+
+            return Buffer<idx_t>::own(
+                    c_mesh->nelements * nxe, elements, d_buffer_destroy, MEMORY_SPACE_DEVICE);
+        }
     }
 
     class FFF {
@@ -38,11 +50,16 @@ namespace sfem {
         enum ElemType element_type_;
         ptrdiff_t n_elements_;
         std::shared_ptr<Buffer<idx_t>> elements_;
-        void *fff_;
+        void *fff_{nullptr};
 
         void init(mesh_t *c_mesh) {
-            cu_tet4_fff_allocate(c_mesh->nelements, &fff_);
-            cu_tet4_fff_fill(c_mesh->nelements, c_mesh->elements, c_mesh->points, fff_);
+            if (c_mesh->element_type == HEX8) {
+                cu_hex8_fff_allocate(c_mesh->nelements, &fff_);
+                cu_hex8_fff_fill(c_mesh->nelements, c_mesh->elements, c_mesh->points, fff_);
+            } else {
+                cu_tet4_fff_allocate(c_mesh->nelements, &fff_);
+                cu_tet4_fff_fill(c_mesh->nelements, c_mesh->elements, c_mesh->points, fff_);
+            }
         }
 
         FFF(Mesh &mesh,
@@ -51,11 +68,12 @@ namespace sfem {
             : element_type_(element_type), n_elements_(mesh.n_elements()) {
             auto c_mesh = (mesh_t *)mesh.impl_mesh();
             elements_ = elements;
+
+            init(c_mesh);
         }
 
         ~FFF() {
             d_buffer_destroy(fff_);
-            // d_buffer_destroy(elements_);
         }
 
         enum ElemType element_type() const { return element_type_; }
@@ -73,12 +91,22 @@ namespace sfem {
         void *jacobian_determinant_{nullptr};
 
         void init(mesh_t *c_mesh) {
-            cu_tet4_adjugate_allocate(n_elements_, &jacobian_adjugate_, &jacobian_determinant_);
-            cu_tet4_adjugate_fill(n_elements_,
-                                  c_mesh->elements,
-                                  c_mesh->points,
-                                  jacobian_adjugate_,
-                                  jacobian_determinant_);
+            if (c_mesh->element_type == HEX8) {
+                cu_hex8_adjugate_allocate(n_elements_, &jacobian_adjugate_, &jacobian_determinant_);
+                cu_hex8_adjugate_fill(n_elements_,
+                                      c_mesh->elements,
+                                      c_mesh->points,
+                                      jacobian_adjugate_,
+                                      jacobian_determinant_);
+
+            } else {
+                cu_tet4_adjugate_allocate(n_elements_, &jacobian_adjugate_, &jacobian_determinant_);
+                cu_tet4_adjugate_fill(n_elements_,
+                                      c_mesh->elements,
+                                      c_mesh->points,
+                                      jacobian_adjugate_,
+                                      jacobian_determinant_);
+            }
         }
 
         Adjugate(Mesh &mesh,
@@ -239,7 +267,7 @@ namespace sfem {
             return std::make_unique<GPULaplacian>(space);
         }
 
-        const char *name() const override { return "GPULaplacian"; }
+        const char *name() const override { return "gpu:Laplacian"; }
         inline bool is_linear() const override { return true; }
 
         int initialize() override {
@@ -319,7 +347,103 @@ namespace sfem {
         }
 
         int value(const real_t *x, real_t *const out) override {
-            std::cerr << "Unimplemented function value in GPULaplacian\n";
+            std::cerr << "Unimplemented function ---> value in GPULaplacian\n";
+            assert(0);
+            return SFEM_FAILURE;
+        }
+
+        int report(const real_t *const) override { return SFEM_SUCCESS; }
+        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
+    };
+
+    class SemiStructuredGPULaplacian final : public Op {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+        std::shared_ptr<FFF> fff;
+        enum RealType real_type { SFEM_REAL_DEFAULT };
+        void *stream{SFEM_DEFAULT_STREAM};
+        enum ElemType element_type { INVALID };
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+            assert(1 == space->block_size());
+            return std::make_unique<SemiStructuredGPULaplacian>(space);
+        }
+
+        const char *name() const override { return "ss:gpu::Laplacian"; }
+        inline bool is_linear() const override { return true; }
+
+        int initialize() override {
+            auto elements = space->device_elements();
+            if (!elements) {
+                elements = create_device_elements(space, space->element_type());
+                space->set_device_elements(elements);
+            }
+
+            fff = std::make_shared<FFF>(space->mesh(), space->element_type(), elements);
+            return SFEM_SUCCESS;
+        }
+
+        SemiStructuredGPULaplacian(const std::shared_ptr<FunctionSpace> &space)
+            : space(space), element_type(space->element_type()) {}
+
+        std::shared_ptr<Op> derefine_op(
+                const std::shared_ptr<FunctionSpace> &derefined_space) override {
+            auto mesh = (mesh_t *)derefined_space->mesh().impl_mesh();
+
+            auto ret = std::make_shared<GPULaplacian>(derefined_space);
+            assert(derefined_space->element_type() == macro_base_elem(fff->element_type()));
+            assert(ret->element_type == macro_base_elem(fff->element_type()));
+            // FIXME we can save on the storage of FFFs
+            ret->initialize();
+            return ret;
+        }
+
+        int hessian_crs(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values) override {
+            std::cerr << "Unimplemented function ---> hessian_crs in GPULaplacian\n";
+            assert(false);
+            return SFEM_FAILURE;
+        }
+
+        int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
+            std::cerr << "Unimplemented function ---> hessian_diag in GPULaplacian\n";
+            assert(false);
+            return SFEM_FAILURE;
+        }
+
+        int gradient(const real_t *const x, real_t *const out) override {
+            auto &ssm = space->semi_structured_mesh();
+            return cu_proteus_affine_hex8_laplacian_apply(ssm.level(),
+                                                          fff->n_elements(),
+                                                          fff->n_elements(),  // stride
+                                                          ssm.interior_start(),
+                                                          fff->elements(),
+                                                          fff->fff(),
+                                                          real_type,
+                                                          x,
+                                                          out,
+                                                          stream);
+        }
+
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+            auto &ssm = space->semi_structured_mesh();
+            return cu_proteus_affine_hex8_laplacian_apply(ssm.level(),
+                                                          fff->n_elements(),
+                                                          fff->n_elements(),  // stride
+                                                          ssm.interior_start(),
+                                                          fff->elements(),
+                                                          fff->fff(),
+                                                          real_type,
+                                                          h,
+                                                          out,
+                                                          stream);
+        }
+
+        int value(const real_t *x, real_t *const out) override {
+            std::cerr << "Unimplemented function ---> value in GPULaplacian\n";
             assert(0);
             return SFEM_FAILURE;
         }
@@ -355,7 +479,7 @@ namespace sfem {
             return ret;
         }
 
-        const char *name() const override { return "GPULinearElasticity"; }
+        const char *name() const override { return "gpu:LinearElasticity"; }
         inline bool is_linear() const override { return true; }
 
         int initialize() override {
@@ -386,7 +510,7 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const colidx,
                         real_t *const values) override {
-            std::cerr << "Unimplemented function hessian_crs in GPULinearElasticity\n";
+            std::cerr << "Unimplemented function ---> hessian_crs in GPULinearElasticity\n";
             assert(0);
             return SFEM_FAILURE;
         }
@@ -436,7 +560,132 @@ namespace sfem {
         }
 
         int value(const real_t *x, real_t *const out) override {
-            std::cerr << "Unimplemented function value in GPULinearElasticity\n";
+            std::cerr << "Unimplemented function ---> value in GPULinearElasticity\n";
+            assert(0);
+            return SFEM_FAILURE;
+        }
+
+        int report(const real_t *const) override { return SFEM_SUCCESS; }
+        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
+    };
+
+    class SemiStructuredGPULinearElasticity final : public Op {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+        std::shared_ptr<Adjugate> adjugate;
+        enum RealType real_type { SFEM_REAL_DEFAULT };
+        void *stream{SFEM_DEFAULT_STREAM};
+        enum ElemType element_type { INVALID };
+        real_t mu{1}, lambda{1};
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+            assert(mesh->spatial_dim == space->block_size());
+            return std::make_unique<SemiStructuredGPULinearElasticity>(space);
+        }
+
+        std::shared_ptr<Op> derefine_op(
+                const std::shared_ptr<FunctionSpace> &derefined_space) override {
+            auto mesh = (mesh_t *)derefined_space->mesh().impl_mesh();
+
+            auto ret = std::make_shared<GPULinearElasticity>(derefined_space);
+            assert(derefined_space->element_type() == macro_base_elem(adjugate->element_type()));
+            assert(ret->element_type == macro_base_elem(adjugate->element_type()));
+            // ret->adjugate = adjugate;
+            ret->initialize();
+            return ret;
+        }
+
+        const char *name() const override { return "ss::gpu::LinearElasticity"; }
+        inline bool is_linear() const override { return true; }
+
+        int initialize() override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            real_t SFEM_SHEAR_MODULUS = 1;
+            real_t SFEM_FIRST_LAME_PARAMETER = 1;
+
+            SFEM_READ_ENV(SFEM_SHEAR_MODULUS, atof);
+            SFEM_READ_ENV(SFEM_FIRST_LAME_PARAMETER, atof);
+            mu = SFEM_SHEAR_MODULUS;
+            lambda = SFEM_FIRST_LAME_PARAMETER;
+
+            auto elements = space->device_elements();
+            if (!elements) {
+                elements = create_device_elements(space, space->element_type());
+                space->set_device_elements(elements);
+            }
+
+            adjugate = std::make_shared<Adjugate>(space->mesh(), space->element_type(), elements);
+            return SFEM_SUCCESS;
+        }
+
+        SemiStructuredGPULinearElasticity(const std::shared_ptr<FunctionSpace> &space)
+            : space(space), element_type(space->element_type()) {}
+
+        int hessian_crs(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values) override {
+            std::cerr << "Unimplemented function ---> hessian_crs in GPULinearElasticity\n";
+            assert(0);
+            return SFEM_FAILURE;
+        }
+
+        int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
+            std::cerr << "Unimplemented function ---> hessian_diag in GPULinearElasticity\n";
+            assert(0);
+            return SFEM_FAILURE;
+        }
+
+        int gradient(const real_t *const x, real_t *const out) override {
+            auto &ssm = space->semi_structured_mesh();
+            return cu_proteus_affine_hex8_linear_elasticity_apply(ssm.level(),
+                                                                  adjugate->n_elements(),
+                                                                  adjugate->n_elements(),
+                                                                  ssm.interior_start(),
+                                                                  adjugate->elements(),
+                                                                  adjugate->jacobian_adjugate(),
+                                                                  adjugate->jacobian_determinant(),
+                                                                  mu,
+                                                                  lambda,
+                                                                  real_type,
+                                                                  3,
+                                                                  &x[0],
+                                                                  &x[1],
+                                                                  &x[2],
+                                                                  3,
+                                                                  &out[0],
+                                                                  &out[1],
+                                                                  &out[2],
+                                                                  SFEM_DEFAULT_STREAM);
+        }
+
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+            auto &ssm = space->semi_structured_mesh();
+            return cu_proteus_affine_hex8_linear_elasticity_apply(ssm.level(),
+                                                                  adjugate->n_elements(),
+                                                                  adjugate->n_elements(),
+                                                                  ssm.interior_start(),
+                                                                  adjugate->elements(),
+                                                                  adjugate->jacobian_adjugate(),
+                                                                  adjugate->jacobian_determinant(),
+                                                                  mu,
+                                                                  lambda,
+                                                                  real_type,
+                                                                  3,
+                                                                  &h[0],
+                                                                  &h[1],
+                                                                  &h[2],
+                                                                  3,
+                                                                  &out[0],
+                                                                  &out[1],
+                                                                  &out[2],
+                                                                  SFEM_DEFAULT_STREAM);
+        }
+
+        int value(const real_t *x, real_t *const out) override {
+            std::cerr << "Unimplemented function ---> value in GPULinearElasticity\n";
             assert(0);
             return SFEM_FAILURE;
         }
@@ -448,6 +697,8 @@ namespace sfem {
     void register_device_ops() {
         Factory::register_op("gpu:LinearElasticity", &GPULinearElasticity::create);
         Factory::register_op("gpu:Laplacian", &GPULaplacian::create);
+        Factory::register_op("ss:gpu:Laplacian", &SemiStructuredGPULaplacian::create);
+        Factory::register_op("ss:gpu:LinearElasticity", &SemiStructuredGPULinearElasticity::create);
     }
 
 }  // namespace sfem

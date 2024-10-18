@@ -76,6 +76,7 @@ namespace sfem {
 
         const unsigned int warp_id = threadIdx.x / SFEM_WARP_SIZE;
         const unsigned int lid = lane_id();
+        const unsigned int n_warps = (blockDim.x + SFEM_WARP_SIZE - 1) / SFEM_WARP_SIZE;
 
         if (!lid) {
             block_accumulator[warp_id] = acc;
@@ -85,7 +86,7 @@ namespace sfem {
 
         if (!warp_id) {
             assert(warp_id < SFEM_N_WARPS_PER_BLOCK);
-            acc = block_accumulator[lid];
+            acc = lid < n_warps ? block_accumulator[lid] : 0;
             acc = warp_reduce_32(acc);
 
             if (!threadIdx.x) {
@@ -100,6 +101,7 @@ namespace sfem {
 
         const unsigned int warp_id = threadIdx.x / SFEM_WARP_SIZE;
         const unsigned int lid = lane_id();
+        const unsigned int n_warps = (blockDim.x + SFEM_WARP_SIZE - 1) / SFEM_WARP_SIZE;
 
         if (!lid) {
             block_accumulator[warp_id] = acc;
@@ -109,7 +111,7 @@ namespace sfem {
 
         if (!warp_id) {
             assert(warp_id < SFEM_N_WARPS_PER_BLOCK);
-            acc = block_accumulator[lid];
+            acc = lid < n_warps ? block_accumulator[lid] : block_accumulator[0];
             acc = warp_min_32(acc);
 
             if (!threadIdx.x) {
@@ -634,7 +636,7 @@ namespace sfem {
         T acc = infty;
         for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n;
              i += blockDim.x * gridDim.x) {
-            const T alpha = (p[i] > 0) ? ((x[i] - ub[i]) / p[i]) : infty;
+            const T alpha = (p[i] < 0) ? ((x[i] - ub[i]) / p[i]) : infty;
             acc = tmin(alpha, acc);
         }
 
@@ -672,7 +674,7 @@ namespace sfem {
 
         T* host_value = (T*)malloc(n_blocks * sizeof(T));
 
-        cudaMemcpy(&host_value, device_value, n_blocks * sizeof(T), cudaMemcpyDeviceToHost);
+        cudaMemcpy(host_value, device_value, n_blocks * sizeof(T), cudaMemcpyDeviceToHost);
         cudaFree(device_value);
 
         T ret = host_value[0];
