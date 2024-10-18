@@ -115,15 +115,15 @@ int main(int argc, char *argv[]) {
     auto linear_op = sfem::make_linear_op(f);
 
     ptrdiff_t ndofs = fs->n_dofs();
-    auto x = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
-    auto rhs = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
+    auto x = sfem::create_buffer<real_t>(ndofs, es);
+    auto rhs = sfem::create_buffer<real_t>(ndofs, es);
 
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());
 
     std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> solver;
     {
-        auto mprgp = std::make_shared<sfem::MPRGP<real_t>>();
+        auto mprgp = sfem::create_mprgp(linear_op, es);
 
         if (SFEM_USE_PROJECTED_CG) {
             mprgp->set_expansion_type(sfem::MPRGP<real_t>::EXPANSION_TYPE_PROJECTED_CG);
@@ -131,20 +131,30 @@ int main(int argc, char *argv[]) {
 
         mprgp->set_op(linear_op);
 
-        auto upper_bound = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
+        auto h_upper_bound = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
 
         {  // Fill default upper-bound value
-            auto ub = upper_bound->data();
+            auto ub = h_upper_bound->data();
             for (ptrdiff_t i = 0; i < ndofs; i++) {
                 ub[i] = 1000;
             }
         }
 
+#ifdef SFEM_ENABLE_CUDA
+       auto upper_bound = sfem::to_device(h_upper_bound);
+#else
+       auto upper_bound = h_upper_bound;
+#endif
+
         contact_conds->apply(upper_bound->data());
+
+#ifdef SFEM_ENABLE_CUDA
+        h_upper_bound = sfem::to_host(upper_bound);
+#endif
 
         char path[2048];
         sprintf(path, "%s/upper_bound.raw", output_path);
-        if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)upper_bound->data(), ndofs, ndofs)) {
+        if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_upper_bound->data(), ndofs, ndofs)) {
             return SFEM_FAILURE;
         }
 
@@ -153,8 +163,6 @@ int main(int argc, char *argv[]) {
         mprgp->set_rtol(1e-12);
         mprgp->set_atol(1e-8);
         mprgp->set_upper_bound(upper_bound);
-        // mprgp->set_max_eig(1);
-        mprgp->default_init();
         solver = mprgp;
     }
 
