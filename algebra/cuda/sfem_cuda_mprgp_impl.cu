@@ -672,7 +672,7 @@ namespace sfem {
 
         T* host_value = (T*)malloc(n_blocks * sizeof(T));
 
-        cudaMemcpy(&host_value, device_value, n_blocks * sizeof(T), cudaMemcpyDeviceToHost);
+        cudaMemcpy(host_value, device_value, n_blocks * sizeof(T), cudaMemcpyDeviceToHost);
         cudaFree(device_value);
 
         T ret = host_value[0];
