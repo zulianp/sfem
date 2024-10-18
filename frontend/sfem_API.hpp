@@ -6,21 +6,24 @@
 #include "sfem_mesh.h"
 
 #include "sfem_Chebyshev3.hpp"
+#include "sfem_ContactConditions.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_Multigrid.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_crs_SpMV.hpp"
-#include "sfem_ContactConditions.hpp"
+#include "sfem_mprgp.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "cu_proteus_hex8_interpolate.h"
 #include "cu_tet4_prolongation_restriction.h"
+#include "sfem_ContactConditions_cuda.hpp"
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_blas.h"
 #include "sfem_cuda_crs_SpMV.hpp"
 #include "sfem_cuda_solver.hpp"
-#include "sfem_ContactConditions_cuda.hpp"
+#include "sfem_cuda_mprgp_impl.hpp"
+#include "sfem_cuda_blas.hpp"
 #endif
 
 #include "proteus_hex8.h"
@@ -107,6 +110,27 @@ namespace sfem {
         }
 
         return cheb;
+    }
+
+    template <typename T>
+    std::shared_ptr<MPRGP<T>> create_mprgp(const std::shared_ptr<Operator<T>> &op,
+                                           const ExecutionSpace es) {
+        auto mprgp = std::make_shared<sfem::MPRGP<real_t>>();
+        mprgp->set_op(op);
+
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            CUDA_BLAS<T>::build_blas(mprgp->blas);
+            CUDA_MPRGP<T>::build_mprgp(mprgp->impl);
+            mprgp->execution_space_ = es;
+
+        } else
+#endif  // SFEM_ENABLE_CUDA
+        {
+            mprgp->default_init();
+        }
+
+        return mprgp;
     }
 
     template <typename T>
