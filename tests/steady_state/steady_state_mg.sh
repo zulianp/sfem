@@ -28,7 +28,7 @@ if [[ -d "$mesh" ]]
 then
 	echo "Reusing mesh"
 else
-	create_box_ss_mesh.sh 50 $SFEM_ELEMENT_REFINE_LEVEL
+	create_box_ss_mesh.sh 80 $SFEM_ELEMENT_REFINE_LEVEL
 fi
 
 # Box mesh for testing
