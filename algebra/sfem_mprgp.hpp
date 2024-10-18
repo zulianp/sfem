@@ -36,6 +36,7 @@ namespace sfem {
         ptrdiff_t n_dofs{-1};
         bool verbose{true};
         T max_eig_{0};
+        bool debug{false};
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         std::shared_ptr<Buffer<T>> upper_bound_;
@@ -83,12 +84,23 @@ namespace sfem {
             const T* const lb = lower_bound_ ? lower_bound_->data() : nullptr;
             const T* const ub = upper_bound_ ? upper_bound_->data() : nullptr;
             impl.project(n_dofs, lb, ub, x);
+
+            if (debug) {
+                T norm_project = this->blas.norm2(n_dofs, x);
+                printf("norm_project: %g\n", (double)norm_project);
+            }
         }
 
         T norm_projected_gradient(const T* const x, const T* const g) const {
             const T* const lb = lower_bound_ ? lower_bound_->data() : nullptr;
             const T* const ub = upper_bound_ ? upper_bound_->data() : nullptr;
-            return impl.norm_projected_gradient(n_dofs, lb, ub, x, g, eps);
+            auto ret = impl.norm_projected_gradient(n_dofs, lb, ub, x, g, eps);
+
+            if (debug) {
+                printf("norm_projected_gradient: %g\n", (double)ret);
+            }
+
+            return ret;
         }
 
         void norm_gradients(const T* const x,
@@ -99,6 +111,12 @@ namespace sfem {
             const T* const ub = upper_bound_ ? upper_bound_->data() : nullptr;
             impl.norm_gradients(
                     n_dofs, lb, ub, x, g, norm_free_gradient, norm_chopped_gradient, eps);
+
+            if (debug) {
+                printf("norm_free_gradient: %g, norm_chopped_gradient: %g\n",
+                       (double)*norm_free_gradient,
+                       (double)*norm_chopped_gradient);
+            }
         }
 
         void chopped_gradient(const T* const x, const T* const g, T* gc) const {
@@ -111,12 +129,23 @@ namespace sfem {
             const T* const lb = lower_bound_ ? lower_bound_->data() : nullptr;
             const T* const ub = upper_bound_ ? upper_bound_->data() : nullptr;
             impl.free_gradient(n_dofs, lb, ub, x, g, gf);
+
+            if (debug) {
+                T norm_fg = this->blas.norm2(n_dofs, gf);
+                printf("norm_fg: %g\n", (double)norm_fg);
+            }
         }
 
         T max_alpha(const T* const x, const T* const p) const {
             const T* const lb = lower_bound_ ? lower_bound_->data() : nullptr;
             const T* const ub = upper_bound_ ? upper_bound_->data() : nullptr;
-            return impl.max_alpha(n_dofs, lb, ub, x, p, infty);
+            auto ret = impl.max_alpha(n_dofs, lb, ub, x, p, infty);
+
+            if (debug) {
+                printf("max_alpha: %g\n", (double)ret);
+            }
+
+            return ret;
         }
 
         bool good() const {
@@ -145,7 +174,7 @@ namespace sfem {
             this->free_gradient(x, g, gf);
 
             const T beta = this->blas.dot(n_dofs, Ap, gf) / dot_pAp;
-            
+
             this->blas.axpby(n_dofs, 1, gf, -beta, p);
         }
 
@@ -223,7 +252,8 @@ namespace sfem {
         }
 
         void monitor(const int iter, const T residual, const T rel_residual) {
-            if (iter == max_it || iter % check_each == 0 || residual < atol || rel_residual < rtol) {
+            if (iter == max_it || iter % check_each == 0 || residual < atol ||
+                rel_residual < rtol) {
                 std::cout << iter << ": " << residual << " " << rel_residual << "\n";
             }
         }
@@ -237,7 +267,6 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            
             bool converged = false;
 
             T norm_gp = -1;
@@ -281,7 +310,7 @@ namespace sfem {
             int count_proportioning_steps = 0;
 
             int it = 0;
-            
+
             while (!converged) {
                 norm_gradients(x, g, &norm_gf, &norm_gc);
 
@@ -325,7 +354,7 @@ namespace sfem {
 
                 // Check for convergence
                 const T norm_gp = this->norm_projected_gradient(x, g);
-                const T rel_norm_gp = norm_gp/norm_gp0;
+                const T rel_norm_gp = norm_gp / norm_gp0;
                 converged = norm_gp < atol || rel_norm_gp < rtol;
 
                 monitor(it, norm_gp, rel_norm_gp);

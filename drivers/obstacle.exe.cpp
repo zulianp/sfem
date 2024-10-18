@@ -62,6 +62,9 @@ int main(int argc, char *argv[]) {
     int SFEM_TEST_AGAINST_LINEAR = 0;
     SFEM_READ_ENV(SFEM_TEST_AGAINST_LINEAR, atoi);
 
+    int SFEM_MAX_IT = 4000;
+    SFEM_READ_ENV(SFEM_MAX_IT, atoi);
+
     bool SFEM_USE_GPU = true;
     SFEM_READ_ENV(SFEM_USE_GPU, atoi);
 
@@ -159,7 +162,7 @@ int main(int argc, char *argv[]) {
         }
 
         mprgp->verbose = true;
-        mprgp->set_max_it(20000);
+        mprgp->set_max_it(SFEM_MAX_IT);
         mprgp->set_rtol(1e-12);
         mprgp->set_atol(1e-8);
         mprgp->set_upper_bound(upper_bound);
