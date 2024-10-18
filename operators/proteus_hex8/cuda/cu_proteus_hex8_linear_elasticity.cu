@@ -473,6 +473,7 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl(
 
 // #define my_kernel cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl
 #define my_kernel cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl
+#define my_kernel_large cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl
 
 // Dispatch based on the level
 template <typename real_t>
@@ -557,7 +558,7 @@ static int cu_proteus_affine_hex8_linear_elasticity_apply_tpl(
                     stream);
         }
         case 5: {
-            return cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl<real_t, 5>(
+            return my_kernel_large<real_t, 5>(
                     nelements,
                     stride,
                     interior_start,
@@ -577,7 +578,7 @@ static int cu_proteus_affine_hex8_linear_elasticity_apply_tpl(
                     stream);
         }
         case 6: {
-            return cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl<real_t, 6>(
+            return my_kernel_large<real_t, 6>(
                     nelements,
                     stride,
                     interior_start,
@@ -597,7 +598,7 @@ static int cu_proteus_affine_hex8_linear_elasticity_apply_tpl(
                     stream);
         }
         case 7: {
-            return cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl<real_t, 7>(
+            return my_kernel_large<real_t, 7>(
                     nelements,
                     stride,
                     interior_start,
@@ -617,7 +618,7 @@ static int cu_proteus_affine_hex8_linear_elasticity_apply_tpl(
                     stream);
         }
         case 8: {
-            return cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl<real_t, 8>(
+            return my_kernel_large<real_t, 8>(
                     nelements,
                     stride,
                     interior_start,
