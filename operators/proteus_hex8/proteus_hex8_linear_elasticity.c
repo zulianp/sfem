@@ -212,6 +212,9 @@ int proteus_hex8_linear_elasticity_apply(const int level,
                                            sub_adjugate,
                                            &sub_determinant);
 
+                            assert(sub_determinant == sub_determinant);
+                            assert(sub_determinant != 0);
+
                             // // Evaluate y = op * x
                             hex8_linear_elasticity_apply_adj(mu,
                                                              lambda,
@@ -231,6 +234,10 @@ int proteus_hex8_linear_elasticity_apply(const int level,
 
                         // Accumulate to macro-element buffer
                         for (int d = 0; d < 8; d++) {
+                            assert(element_outx[d] == element_outx[d]);
+                            assert(element_outy[d] == element_outy[d]);
+                            assert(element_outz[d] == element_outz[d]);
+
                             v[0][lev[d]] += element_outx[d];
                             v[1][lev[d]] += element_outy[d];
                             v[2][lev[d]] += element_outz[d];
@@ -248,6 +255,10 @@ int proteus_hex8_linear_elasticity_apply(const int level,
             {
                 // Scatter elemental data
                 for (int d = 0; d < nxe; d++) {
+                    assert(v[0][d] == v[0][d]);
+                    assert(v[1][d] == v[1][d]);
+                    assert(v[2][d] == v[2][d]);
+
 #pragma omp atomic update
                     outx[ev[d] * out_stride] += v[0][d];
 
@@ -428,6 +439,12 @@ int proteus_affine_hex8_linear_elasticity_apply(const int level,
                             }
                         }
 
+                        // printf("%d, %d, %d)\n", xi, yi, zi);
+                        // for (int d = 0; d < 8; d++) {
+                        //     printf("%d) %g => %g\n", lev[d], element_u[0][d], element_out[0][d]);
+                        // }
+                        // printf("\n");
+
                         // Accumulate to macro-element buffer
                         for (int d = 0; d < 8; d++) {
                             v[0][lev[d]] += element_out[0][d];
@@ -438,23 +455,24 @@ int proteus_affine_hex8_linear_elasticity_apply(const int level,
                 }
             }
 
-            // for (int d = 0; d < nxe; d++) {
-            //     printf("%g\t", v[0][d]);
-            // }
+            for (int d = 0; d < nxe; d++) {
+                printf("%d)\t%g -> %g\n", ev[d], eu[0][d], v[0][d]);
+            }
 
-            // printf("\n");
+            printf("\n");
 
             {
                 // Scatter elemental data
                 for (int d = 0; d < nxe; d++) {
+                    const ptrdiff_t idx = ev[d] * out_stride;
 #pragma omp atomic update
-                    outx[ev[d] * out_stride] += v[0][d];
+                    outx[idx] += v[0][d];
 
 #pragma omp atomic update
-                    outy[ev[d] * out_stride] += v[1][d];
+                    outy[idx] += v[1][d];
 
 #pragma omp atomic update
-                    outz[ev[d] * out_stride] += v[2][d];
+                    outz[idx] += v[2][d];
                 }
             }
         }

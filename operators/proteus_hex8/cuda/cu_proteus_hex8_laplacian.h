@@ -12,6 +12,7 @@ extern "C" {
 int cu_proteus_affine_hex8_laplacian_apply(const int level,
                                            const ptrdiff_t nelements,
                                            const ptrdiff_t stride,  // Stride for elements and fff
+                                           const ptrdiff_t interior_start,
                                            const idx_t *const SFEM_RESTRICT elements,
                                            const void *const SFEM_RESTRICT fff,
                                            const enum RealType real_type_xy,

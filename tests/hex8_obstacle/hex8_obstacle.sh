@@ -22,7 +22,8 @@ export OMP_PROC_BIND=true
 export CUDA_LAUNCH_BLOCKING=0
 
 export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
-export SFEM_ELEMENT_REFINE_LEVEL=8
+export SFEM_ELEMENT_REFINE_LEVEL=4
+export SFEM_MAX_IT=10000
 
 mesh=mesh
 
@@ -31,7 +32,7 @@ then
 	echo "Reusing mesh"
 else
 	# Cyclic mesh
-	create_cyclic_ss_mesh.sh 1 $SFEM_ELEMENT_REFINE_LEVEL
+	create_cyclic_ss_mesh.sh 10 $SFEM_ELEMENT_REFINE_LEVEL
 
 	# BOX mesh for testing
 	# create_box_ss_mesh.sh 8 $SFEM_ELEMENT_REFINE_LEVEL
@@ -86,7 +87,7 @@ else
 	fi
 fi
 
-$LAUNCH obstacle $mesh output
+$LAUNCH obstacle $mesh output | tee obs.log.txt
 
 if [[ $SFEM_USE_ELASTICITY -eq 1 ]]
 then

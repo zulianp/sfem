@@ -35,7 +35,7 @@ fi
 sinlet=$mesh/surface/sidesets_aos/left.raw 
 soutlet=$mesh/surface/sidesets_aos/right.raw 
 
-export SFEM_USE_ELASTICITY=1
+export SFEM_USE_ELASTICITY=0
 
 if [[ $SFEM_USE_ELASTICITY -eq 1 ]]
 then

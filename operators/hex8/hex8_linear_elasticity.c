@@ -4,6 +4,8 @@
 #include "hex8_linear_elasticity_inline_cpu.h"
 #include "hex8_quadrature.h"
 
+#include <stdio.h>
+
 int hex8_linear_elasticity_apply(const ptrdiff_t nelements,
                                  const ptrdiff_t nnodes,
                                  idx_t **const SFEM_RESTRICT elements,

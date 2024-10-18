@@ -392,7 +392,7 @@ int proteus_hex8_create_full_idx(const int L,
 
     const int nxe = proteus_hex8_nxe(L);
 
-    // 1) Get the node indices from the TET4 mesh
+    // 1) Get the node indices from the HEX8 mesh
     int lagr_to_proteus_corners[8] = {// Bottom
                                       proteus_hex8_lidx(L, 0, 0, 0),
                                       proteus_hex8_lidx(L, L, 0, 0),
