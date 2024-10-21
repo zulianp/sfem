@@ -309,7 +309,7 @@ int main(int argc, char *argv[]) {
             solver_coarse->verbose = SFEM_VERBOSITY_LEVEL >= 2;
             solver_coarse->set_max_it(40000);
             solver_coarse->set_atol(SFEM_COARSE_TOL);
-            solver_coarse->set_rtol(1e-9);
+            solver_coarse->set_rtol(1e-10);
 
             if (SFEM_USE_PRECONDITIONER) {
                 f_coarse->hessian_diag(nullptr, diag_coarse->data());
