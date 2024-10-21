@@ -23,6 +23,12 @@ then
 	exit -1
 fi
 
+if [[ $1 -lt 2 ]]
+then
+	echo "tassellation_level must be larger than 1"
+	exit -1
+fi
+
 export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
 export SFEM_ELEMENT_REFINE_LEVEL=$1
 
@@ -32,17 +38,21 @@ mkdir -p $mesh
 mkdir -p $mesh/viz
 mkdir -p $mesh/macro_quad_surface
 
+rm -rf $mesh/surface
+
 db_to_raw.py joint-hex.vtk $mesh --select_elem_type=hexahedron
 
 hex8_fix_ordering $mesh $mesh
 skin $mesh $mesh/macro_quad_surface
 cp $mesh/{x,y,z}.raw $mesh/macro_quad_surface
 
-# raw_to_db.py $mesh/macro_quad_surface $mesh/viz/surf.vtk --cell_type=quad
-
 proteus_quad4_to_quad4.py $SFEM_ELEMENT_REFINE_LEVEL $mesh/macro_quad_surface $mesh/surface
 
+proteus_hex8_to_hex8 $SFEM_ELEMENT_REFINE_LEVEL $mesh $mesh/viz
+
 SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface -0.41 0.095 -0.094 0.99 $mesh/surface/sides_base.raw
+SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface 0.426 0.248 -0.222 0.90 $mesh/surface/sides_top.raw
+
 
 boundary_nodes()
 {
@@ -74,11 +84,14 @@ boundary_nodes()
 
 mkdir -p $mesh/surface/sidesets_aos/
 boundary_nodes $mesh/surface base $mesh/surface/sidesets_aos/base.raw
+boundary_nodes $mesh/surface top $mesh/surface/sidesets_aos/top.raw
 
 sides=$mesh/dirichlet.raw
 python3 -c "import numpy as np; a=np.fromfile(\"$mesh/surface/x.raw\", dtype=np.float32); a.fill(0); a.astype(np.float64).tofile(\"$sides\")"
 
 
 smask $mesh/surface/sidesets_aos/base.raw $sides $sides 1
+smask $mesh/surface/sidesets_aos/top.raw $sides $sides 2
 raw_to_db.py $mesh/surface $mesh/viz/dirichlet.vtk --point_data="$sides" --cell_type=quad
+raw_to_db.py $mesh/viz $mesh/viz/mesh.vtk
 
