@@ -504,8 +504,8 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl(
     return SFEM_SUCCESS;
 }
 
-#define my_kernel cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl
-// #define my_kernel cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl
+// #define my_kernel cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl
+#define my_kernel cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl
 #define my_kernel_large cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl
 
 // Dispatch based on the level
