@@ -78,11 +78,11 @@ int proteus_hex8_linear_elasticity_apply(const int level,
                                                 proteus_hex8_lidx(level, level, level, level),
                                                 proteus_hex8_lidx(level, 0, level, level)};
 
-    const int n_qp = q6_n;
-    const scalar_t *qx = q6_x;
-    const scalar_t *qy = q6_y;
-    const scalar_t *qz = q6_z;
-    const scalar_t *qw = q6_w;
+    // const int n_qp = q6_n;
+    // const scalar_t *qx = q6_x;
+    // const scalar_t *qy = q6_y;
+    // const scalar_t *qz = q6_z;
+    // const scalar_t *qw = q6_w;
 
     // const int n_qp = q27_n;
     // const scalar_t *qx = q27_x;
@@ -95,6 +95,29 @@ int proteus_hex8_linear_elasticity_apply(const int level,
     // const scalar_t *qy = q58_y;
     // const scalar_t *qz = q58_z;
     // const scalar_t *qw = q58_w;
+
+    int SFEM_HEX8_QUADRATURE_ORDER = 27;
+    SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
+
+    int n_qp = q27_n;
+    const scalar_t *qx = q27_x;
+    const scalar_t *qy = q27_y;
+    const scalar_t *qz = q27_z;
+    const scalar_t *qw = q27_w;
+
+    if (SFEM_HEX8_QUADRATURE_ORDER == 58) {
+        n_qp = q58_n;
+        qx = q58_x;
+        qy = q58_y;
+        qz = q58_z;
+        qw = q58_w;
+    } else if (SFEM_HEX8_QUADRATURE_ORDER == 6) {
+        n_qp = q6_n;
+        qx = q6_x;
+        qy = q6_y;
+        qz = q6_z;
+        qw = q6_w;
+    }
 
     int Lm1 = level - 1;
     int Lm13 = Lm1 * Lm1 * Lm1;
@@ -455,11 +478,11 @@ int proteus_affine_hex8_linear_elasticity_apply(const int level,
                 }
             }
 
-            for (int d = 0; d < nxe; d++) {
-                printf("%d)\t%g -> %g\n", ev[d], eu[0][d], v[0][d]);
-            }
+            // for (int d = 0; d < nxe; d++) {
+            //     printf("%d)\t%g -> %g\n", ev[d], eu[0][d], v[0][d]);
+            // }
 
-            printf("\n");
+            // printf("\n");
 
             {
                 // Scatter elemental data

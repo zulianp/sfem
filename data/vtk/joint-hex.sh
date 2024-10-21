@@ -40,7 +40,13 @@ mkdir -p $mesh/macro_quad_surface
 
 rm -rf $mesh/surface
 
-db_to_raw.py joint-hex.vtk $mesh --select_elem_type=hexahedron
+if [[ -z $SFEM_REFINE ]]
+then
+	db_to_raw.py $SCRIPTPATH/joint-hex.vtk $mesh --select_elem_type=hexahedron
+else
+	echo "Refined mesh!"
+	db_to_raw.py $SCRIPTPATH/joint-hex-refined.vtk $mesh --select_elem_type=hexahedron
+fi
 
 hex8_fix_ordering $mesh $mesh
 skin $mesh $mesh/macro_quad_surface
@@ -52,6 +58,8 @@ proteus_hex8_to_hex8 $SFEM_ELEMENT_REFINE_LEVEL $mesh $mesh/viz
 
 SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface -0.41 0.095 -0.094 0.99 $mesh/surface/sides_base.raw
 SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface 0.426 0.248 -0.222 0.90 $mesh/surface/sides_top.raw
+SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface 0.07 -0.136  0.43  0.99 $mesh/surface/sides_top_small.raw
+SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface -0.16 0.0319  -0.315  0.95 $mesh/surface/sides_inner.raw
 
 
 boundary_nodes()
@@ -83,8 +91,10 @@ boundary_nodes()
 }
 
 mkdir -p $mesh/surface/sidesets_aos/
-boundary_nodes $mesh/surface base $mesh/surface/sidesets_aos/base.raw
-boundary_nodes $mesh/surface top $mesh/surface/sidesets_aos/top.raw
+boundary_nodes $mesh/surface base 		$mesh/surface/sidesets_aos/base.raw
+boundary_nodes $mesh/surface top 		$mesh/surface/sidesets_aos/top.raw
+boundary_nodes $mesh/surface top_small  $mesh/surface/sidesets_aos/top_small.raw
+boundary_nodes $mesh/surface inner  	$mesh/surface/sidesets_aos/inner.raw
 
 sides=$mesh/dirichlet.raw
 python3 -c "import numpy as np; a=np.fromfile(\"$mesh/surface/x.raw\", dtype=np.float32); a.fill(0); a.astype(np.float64).tofile(\"$sides\")"
@@ -92,6 +102,8 @@ python3 -c "import numpy as np; a=np.fromfile(\"$mesh/surface/x.raw\", dtype=np.
 
 smask $mesh/surface/sidesets_aos/base.raw $sides $sides 1
 smask $mesh/surface/sidesets_aos/top.raw $sides $sides 2
+smask $mesh/surface/sidesets_aos/top_small.raw $sides $sides 3
+smask $mesh/surface/sidesets_aos/inner.raw $sides $sides 4
 raw_to_db.py $mesh/surface $mesh/viz/dirichlet.vtk --point_data="$sides" --cell_type=quad
 raw_to_db.py $mesh/viz $mesh/viz/mesh.vtk
 
