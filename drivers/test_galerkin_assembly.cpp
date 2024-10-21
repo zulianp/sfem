@@ -193,6 +193,10 @@ int main(int argc, char *argv[]) {
         ptrdiff_t n = fs_coarse->n_dofs();
         auto actual = h_actual->data();
         auto expected = h_expected->data();
+
+        real_t largest_diff = 0;
+        real_t largest_diff_factor = 0;
+        ptrdiff_t arg_largest_diff = -1;
         for (ptrdiff_t i = 0; i < n; i++) {
             // actual: is composition of operators
             // expected: is application of coarse operator
@@ -206,6 +210,19 @@ int main(int argc, char *argv[]) {
                        (double)diff,
                        (double)actual[i] / expected[i]);
             }
+
+            if (diff > largest_diff) {
+                largest_diff = diff;
+                arg_largest_diff = i;
+                largest_diff_factor = actual[i] / expected[i];
+            }
+        }
+
+        if (arg_largest_diff != -1) {
+            printf("largest_diff(%ld) = %g, %g\n",
+                   arg_largest_diff,
+                   largest_diff,
+                   largest_diff_factor);
         }
     }
 

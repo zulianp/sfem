@@ -22,7 +22,7 @@ export OMP_PROC_BIND=true
 export CUDA_LAUNCH_BLOCKING=0
 export SFEM_ELEMENT_REFINE_LEVEL=2
 
-CASE=4
+CASE=3
 
 case $CASE in
 	1 | 2)
@@ -45,7 +45,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			# export SFEM_REFINE=1
+			export SFEM_REFINE=1
 			$SCRIPTPATH/../../data/vtk/joint-hex.sh $SFEM_ELEMENT_REFINE_LEVEL
 		fi
 		sinlet=$mesh/surface/sidesets_aos/base.raw
@@ -99,30 +99,30 @@ esac
 
 export SFEM_MG=1
 export SFEM_USE_CHEB=$SFEM_MG
-export SFEM_MAX_IT=8
+export SFEM_MAX_IT=20
 
 # export SFEM_MAX_IT=4000
 
-export SFEM_HEX8_ASSUME_AFFINE=0
+export SFEM_HEX8_ASSUME_AFFINE=1
 export SFEM_MATRIX_FREE=1
 export SFEM_COARSE_MATRIX_FREE=1
+export SFEM_COARSE_TOL=1e-8
 
 export SFEM_USE_CRS_GRAPH_RESTRICT=0
 export SFEM_CRS_MEM_CONSERVATIVE=1
 
 
-export SFEM_CHEB_EIG_MAX_SCALE=1.02
-export SFEM_CHEB_EIG_TOL=1e-4
+export SFEM_CHEB_EIG_MAX_SCALE=2
+export SFEM_CHEB_EIG_TOL=1e-5
 export SFEM_SMOOTHER_SWEEPS=20
 
 
 export SFEM_USE_PRECONDITIONER=0
 
-export SFEM_VERBOSITY_LEVEL=1
-export SFEM_DEBUG=0
+export SFEM_VERBOSITY_LEVEL=2
+# export SFEM_DEBUG=1
 
-$LAUNCH mgsolve $mesh output 
-# | tee log.txt
+$LAUNCH mgsolve $mesh output | tee log.txt
 
 if [[ $SFEM_USE_ELASTICITY -eq 1 ]]
 then
@@ -144,5 +144,5 @@ then
 
 	raw_to_db.py $mesh/viz output/out.vtk  --point_data="output/soa/*.raw" --point_data_type="$SFEM_REAL_T"
 else
-	raw_to_db.py $mesh/viz output/out.vtk --point_data=output/x.raw,output/rhs.raw --point_data_type="$SFEM_REAL_T,$SFEM_REAL_T"
+	raw_to_db.py $mesh/viz output/out.vtk --point_data=output/x.raw,output/rhs.raw,output/residual.raw --point_data_type="$SFEM_REAL_T,$SFEM_REAL_T,$SFEM_REAL_T"
 fi

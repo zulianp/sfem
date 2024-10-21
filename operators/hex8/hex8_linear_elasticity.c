@@ -26,24 +26,6 @@ int hex8_linear_elasticity_apply(const ptrdiff_t nelements,
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
 
-    // const int n_qp = q6_n;
-    // const scalar_t *qx = q6_x;
-    // const scalar_t *qy = q6_y;
-    // const scalar_t *qz = q6_z;
-    // const scalar_t *qw = q6_w;
-
-    // const int n_qp = q27_n;
-    // const scalar_t *qx = q27_x;
-    // const scalar_t *qy = q27_y;
-    // const scalar_t *qz = q27_z;
-    // const scalar_t *qw = q27_w;
-
-    // const int n_qp = q58_n;
-    // const scalar_t *qx = q58_x;
-    // const scalar_t *qy = q58_y;
-    // const scalar_t *qz = q58_z;
-    // const scalar_t *qw = q58_w;
-
     int SFEM_HEX8_QUADRATURE_ORDER = 27;
     SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
 
@@ -73,7 +55,7 @@ int hex8_linear_elasticity_apply(const ptrdiff_t nelements,
         scalar_t element_ux[8];
         scalar_t element_uy[8];
         scalar_t element_uz[8];
-        
+
         scalar_t lx[8];
         scalar_t ly[8];
         scalar_t lz[8];
@@ -97,15 +79,15 @@ int hex8_linear_elasticity_apply(const ptrdiff_t nelements,
         }
 
         for (int d = 0; d < 8; d++) {
-            lx[d] = points[0][ev[d]];
-            ly[d] = points[1][ev[d]];
-            lz[d] = points[2][ev[d]];
+            lx[d] = x[ev[d]];
+            ly[d] = y[ev[d]];
+            lz[d] = z[ev[d]];
         }
 
         for (int d = 0; d < 8; d++) {
-        	element_outx[d] = 0;
-        	element_outy[d] = 0;
-        	element_outz[d] = 0;
+            element_outx[d] = 0;
+            element_outy[d] = 0;
+            element_outz[d] = 0;
         }
 
         for (int k = 0; k < n_qp; k++) {
