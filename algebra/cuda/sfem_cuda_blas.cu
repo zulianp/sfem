@@ -514,6 +514,7 @@ namespace sfem {
         tpl.values = &tvalues<T>;
         tpl.dot = &BLASImpl<T>::dot;
         tpl.axpby = &BLASImpl<T>::axpby;
+        tpl.axpy = &BLASImpl<T>::axpy;
         tpl.scal = &BLASImpl<T>::scal;
     }
 

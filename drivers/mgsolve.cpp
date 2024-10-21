@@ -202,7 +202,9 @@ int main(int argc, char *argv[]) {
             auto r = sfem::create_buffer<real_t>(fs->n_dofs(), es);
             residual(*linear_op, rhs->data(), x->data(), r->data());
             cheb->eigen_solver_tol = SFEM_CHEB_EIG_TOL;
-            cheb->init(r->data());
+            // cheb->init(r->data());
+            cheb->init_with_ones();
+            // cheb->init_with_random();
 
             cheb->scale_eig_max = SFEM_CHEB_EIG_MAX_SCALE;
             cheb->set_max_it(SFEM_SMOOTHER_SWEEPS);
@@ -309,7 +311,7 @@ int main(int argc, char *argv[]) {
             solver_coarse->verbose = SFEM_VERBOSITY_LEVEL >= 2;
             solver_coarse->set_max_it(40000);
             solver_coarse->set_atol(SFEM_COARSE_TOL);
-            solver_coarse->set_rtol(1e-10);
+            solver_coarse->set_rtol(1e-12);
 
             if (SFEM_USE_PRECONDITIONER) {
                 f_coarse->hessian_diag(nullptr, diag_coarse->data());
