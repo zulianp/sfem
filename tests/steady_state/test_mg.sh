@@ -62,6 +62,6 @@ export SFEM_HEX8_QUADRATURE_ORDER=58
 # export SFEM_HEX8_QUADRATURE_ORDER=27
 
 echo "Testing SFEM_OPERATOR=$SFEM_OPERATOR"
-$LAUNCH test_galerkin_assembly $mesh output | tee test_mg_log.txt
+$LAUNCH test_galerkin_assembly $mesh test_output | tee test_mg_log.txt
 
 # raw_to_db.py $mesh error.vtk -p output/error.raw -d $SFEM_REAL_T

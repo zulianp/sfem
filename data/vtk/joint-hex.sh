@@ -40,12 +40,15 @@ mkdir -p $mesh/macro_quad_surface
 
 rm -rf $mesh/surface
 
-if [[ -z $SFEM_REFINE ]]
+db_to_raw.py $SCRIPTPATH/joint-hex.vtk $mesh/original --select_elem_type=hexahedron
+
+if [[ $SFEM_REFINE -ge 1 ]]
 then
-	db_to_raw.py $SCRIPTPATH/joint-hex.vtk $mesh --select_elem_type=hexahedron
-else
 	echo "Refined mesh!"
-	db_to_raw.py $SCRIPTPATH/joint-hex-refined.vtk $mesh --select_elem_type=hexahedron
+	proteus_hex8_to_hex8 $(( 1 + $SFEM_REFINE )) $mesh/original $mesh/refined
+	sfc $mesh/refined $mesh
+else
+	sfc $mesh/original $mesh
 fi
 
 hex8_fix_ordering $mesh $mesh
@@ -56,10 +59,10 @@ proteus_quad4_to_quad4.py $SFEM_ELEMENT_REFINE_LEVEL $mesh/macro_quad_surface $m
 
 proteus_hex8_to_hex8 $SFEM_ELEMENT_REFINE_LEVEL $mesh $mesh/viz
 
-SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface -0.41 0.095 -0.094 0.99 $mesh/surface/sides_base.raw
-SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface 0.426 0.248 -0.222 0.90 $mesh/surface/sides_top.raw
-SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface 0.07 -0.136  0.43  0.99 $mesh/surface/sides_top_small.raw
-SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface -0.16 0.0319  -0.315  0.95 $mesh/surface/sides_inner.raw
+SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface -0.41 	0.095 	-0.094 	0.99 $mesh/surface/sides_base.raw
+SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface 0.426 	0.248 	-0.222 	0.90 $mesh/surface/sides_top.raw
+SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface 0.07 		-0.136 	0.43  	0.99 $mesh/surface/sides_top_small.raw
+SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface -0.16 	0.0319  -0.315  0.95 $mesh/surface/sides_inner.raw
 
 
 boundary_nodes()
@@ -69,7 +72,6 @@ boundary_nodes()
 		printf "usage: $0 <mesh> <name> <sideset.raw>\n" 1>&2
 		exit -1
 	fi
-	set -x
 
 	local mesh=$1
 	local name=$2
@@ -96,14 +98,15 @@ boundary_nodes $mesh/surface top 		$mesh/surface/sidesets_aos/top.raw
 boundary_nodes $mesh/surface top_small  $mesh/surface/sidesets_aos/top_small.raw
 boundary_nodes $mesh/surface inner  	$mesh/surface/sidesets_aos/inner.raw
 
-sides=$mesh/dirichlet.raw
-python3 -c "import numpy as np; a=np.fromfile(\"$mesh/surface/x.raw\", dtype=np.float32); a.fill(0); a.astype(np.float64).tofile(\"$sides\")"
+if [[ $SFEM_DEBUG == 1 ]]
+then
+	sides=$mesh/dirichlet.raw
+	python3 -c "import numpy as np; a=np.fromfile(\"$mesh/surface/x.raw\", dtype=np.float32); a.fill(0); a.astype(np.float64).tofile(\"$sides\")"
 
-
-smask $mesh/surface/sidesets_aos/base.raw $sides $sides 1
-smask $mesh/surface/sidesets_aos/top.raw $sides $sides 2
-smask $mesh/surface/sidesets_aos/top_small.raw $sides $sides 3
-smask $mesh/surface/sidesets_aos/inner.raw $sides $sides 4
-raw_to_db.py $mesh/surface $mesh/viz/dirichlet.vtk --point_data="$sides" --cell_type=quad
-raw_to_db.py $mesh/viz $mesh/viz/mesh.vtk
-
+	smask $mesh/surface/sidesets_aos/base.raw $sides $sides 1
+	smask $mesh/surface/sidesets_aos/top.raw $sides $sides 2
+	smask $mesh/surface/sidesets_aos/top_small.raw $sides $sides 3
+	smask $mesh/surface/sidesets_aos/inner.raw $sides $sides 4
+	raw_to_db.py $mesh/surface $mesh/viz/dirichlet.vtk --point_data="$sides" --cell_type=quad
+	raw_to_db.py $mesh/viz $mesh/viz/mesh.vtk
+fi

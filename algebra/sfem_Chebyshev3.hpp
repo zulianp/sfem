@@ -10,6 +10,7 @@
 #include <memory>
 
 #include "sfem_PowerMethod.hpp"
+#include "sfem_openmp_blas.hpp"
 
 // https://en.wikipedia.org/wiki/Conjugate_gradient_method
 namespace sfem {
@@ -20,19 +21,7 @@ namespace sfem {
         std::function<void(const T* const, T* const)> apply_op;
         std::function<void(const T* const, T* const)> preconditioner_op;
 
-        // Mem management
-        std::function<T*(const std::size_t)> allocate;
-        std::function<void(void*)> destroy;
-
-        std::function<void(const ptrdiff_t, const T* const, T* const)> copy;
-        std::function<void(const std::size_t, T* const)> zeros;
-
-        // blas
-        std::function<T(const ptrdiff_t, const T* const, const T* const)> dot;
-        std::function<T(const ptrdiff_t, const T* const)> norm2;
-        std::function<void(const ptrdiff_t, const T, const T* const, T* const)> axpy;
-        std::function<void(const ptrdiff_t, const T, const T* const, const T, T* const)> axpby;
-        std::function<void(const std::ptrdiff_t, const T, T* const)> scal;
+        BLAS_Tpl<T> blas;
         std::shared_ptr<PowerMethod<T>> power_method;
 
         std::shared_ptr<Buffer<T>> p_, temp_;
@@ -74,93 +63,22 @@ namespace sfem {
         }
 
         void default_init() {
-            allocate = [](const std::ptrdiff_t n) -> T* { return (T*)calloc(n, sizeof(T)); };
-
-            destroy = [](void* a) { free(a); };
-
-            copy = [](const ptrdiff_t n, const T* const src, T* const dest) {
-                std::memcpy(dest, src, n * sizeof(T));
-            };
-
-            dot = [](const ptrdiff_t n, const T* const l, const T* const r) -> T {
-                T ret = 0;
-
-#pragma omp parallel for reduction(+ : ret)
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    ret += l[i] * r[i];
-                }
-
-                return ret;
-            };
-
-            norm2 = [](const ptrdiff_t n, const T* const x) -> T {
-                T ret = 0;
-
-#pragma omp parallel for reduction(+ : ret)
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    ret += x[i] * x[i];
-                }
-
-                return sqrt(ret);
-            };
-
-            axpy = [](const ptrdiff_t n, const T alpha, const T* const x, T* const y) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    y[i] = alpha * x[i] + y[i];
-                }
-            };
-
-            axpby = [](const ptrdiff_t n,
-                       const T alpha,
-                       const T* const x,
-                       const T beta,
-                       T* const y) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    y[i] = alpha * x[i] + beta * y[i];
-                }
-            };
-
-            zeros = [](const std::ptrdiff_t n, T* const x) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    x[i] = 0;
-                }
-            };
-
-            scal = [](const std::ptrdiff_t n, const T alpha, T* const x) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    x[i] *= alpha;
-                }
-            };
-
+            OpenMP_BLAS<T>::build_blas(this->blas);
             ensure_power_method();
-
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         void ensure_power_method() {
             if (!power_method) {
                 power_method = std::make_shared<PowerMethod<T>>();
-                power_method->norm2 = norm2;
-                power_method->scal = scal;
-                power_method->zeros = zeros;
+                power_method->norm2 = this->blas.norm2;
+                power_method->scal = this->blas.scal;
+                power_method->zeros = this->blas.zeros;
             }
         }
 
         bool good() const {
-            assert(allocate);
-            assert(destroy);
-            assert(copy);
-            assert(dot);
-            assert(norm2);
-            assert(axpby);
-            assert(apply_op);
-            assert(eig_max != 0);
-
-            return eig_max != 0 && allocate && destroy && copy && dot && norm2 && axpby && apply_op;
+            return blas.good() && apply_op;
         }
 
         void monitor(const int iter, const T residual) {
@@ -176,30 +94,38 @@ namespace sfem {
         }
 
         void init_with_ones() {
-            T* work = allocate(this->rows());
-            auto ones = Buffer<T>::own(this->rows(), work, destroy);
-            assert(execution_space_ == EXECUTION_SPACE_HOST);
-
-            auto v = ones->data();
-            for(ptrdiff_t i = 0; i < this->rows(); i++) {
-                v[i] = 1;
-            }   
-
+            T* work = blas.allocate(this->rows());
+            auto ones = Buffer<T>::own(this->rows(), work, blas.destroy);
+            this->blas.values(n_dofs, 1, ones->data());
             init(ones->data());
         }
 
+        void init_with_random() 
+        {
+            T* work = blas.allocate(this->rows());
+            auto random_vector = Buffer<T>::own(this->rows(), work, blas.destroy);
+            assert(execution_space_ == EXECUTION_SPACE_HOST);
+
+            auto v = random_vector->data();
+            for(ptrdiff_t i = 0; i < this->rows(); i++) {
+                v[i] = -0.5 + rand() * 1.0/RAND_MAX;;
+            }   
+
+            init(random_vector->data());
+        }
+
         void init(const T* const guess_eigenvector) {
-            T* eigenvector = allocate(this->rows());
-            T* work = allocate(this->rows());
-            copy(this->rows(), guess_eigenvector, eigenvector);
+            T* eigenvector = blas.allocate(this->rows());
+            T* work = blas.allocate(this->rows());
+            blas.copy(this->rows(), guess_eigenvector, eigenvector);
 
             eig_max = max_eigen_value(eigenvector, work);
 
             // destroy(eigenvector);  // Maybe we want to keep this around?
             // destroy(work);
 
-            p_ = Buffer<T>::own(this->rows(), work, destroy);
-            temp_ = Buffer<T>::own(this->rows(), eigenvector, destroy);
+            p_ = Buffer<T>::own(this->rows(), work, blas.destroy);
+            temp_ = Buffer<T>::own(this->rows(), eigenvector, blas.destroy);
         }
 
         int apply(const T* const b, T* const x) override {
@@ -232,15 +158,15 @@ namespace sfem {
 
             // Vectors
             if (is_initial_guess_zero) {
-                copy(n, rhs, p);
-                scal(n, -1, p);
+                blas.copy(n, rhs, p);
+                blas.scal(n, -1, p);
             } else {
-                zeros(n, p);
+                blas.zeros(n, p);
                 apply_op(x, p);
-                axpy(n, -1, rhs, p);
+                blas.axpy(n, -1, rhs, p);
             }
 
-            axpy(n, -alpha, p, x);
+            blas.axpy(n, -alpha, p, x);
 
             // Iteration 1
             // Params
@@ -249,18 +175,18 @@ namespace sfem {
             alpha = 1 / (eig_avg - (beta / alpha));
 
             // Vectors
-            axpby(n, -1, rhs, beta, p);
+            blas.axpby(n, -1, rhs, beta, p);
 
             if (temp) {
-                zeros(n, temp);
+                blas.zeros(n, temp);
                 apply_op(x, temp);
-                axpy(n, 1, temp, p);
+                blas.axpy(n, 1, temp, p);
             } else {
                 // This can only be used if boundary conditions are
                 // already satified or applied with a matrix
                 apply_op(x, p);
             }
-            axpy(n, -alpha, p, x);
+            blas.axpy(n, -alpha, p, x);
 
             // Iteration i>=2
             for (int i = 2; i < max_it; i++) {
@@ -268,19 +194,19 @@ namespace sfem {
                 beta = 0.25 * dea * dea;
                 alpha = 1 / (eig_avg - (beta / alpha));
 
-                axpby(n, -1, rhs, beta, p);
+                blas.axpby(n, -1, rhs, beta, p);
 
                 if (temp) {
-                    zeros(n, temp);
+                    blas.zeros(n, temp);
                     apply_op(x, temp);
-                    axpy(n, 1, temp, p);
+                    blas.axpy(n, 1, temp, p);
                 } else {
                     // This can only be used if boundary conditions are
                     // already satified or applied with a matrix
                     apply_op(x, p);
                 }
 
-                axpy(n, -alpha, p, x);
+                blas.axpy(n, -alpha, p, x);
             }
 
             return 0;

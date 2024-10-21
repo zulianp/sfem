@@ -13,6 +13,60 @@
 #define MIN(a, b) ((a) > (b) ? (b) : (a))
 #endif
 
+static const int n_qp = 27;
+
+static const scalar_t h_qw[27] = {
+        0.021433470507545, 0.034293552812071, 0.021433470507545, 0.034293552812071,
+        0.054869684499314, 0.034293552812071, 0.021433470507545, 0.034293552812071,
+        0.021433470507545, 0.034293552812071, 0.054869684499314, 0.034293552812071,
+        0.054869684499314, 0.087791495198903, 0.054869684499314, 0.034293552812071,
+        0.054869684499314, 0.034293552812071, 0.021433470507545, 0.034293552812071,
+        0.021433470507545, 0.034293552812071, 0.054869684499314, 0.034293552812071,
+        0.021433470507545, 0.034293552812071, 0.021433470507545};
+
+static const scalar_t h_qx[27] = {
+        0.112701665379258, 0.500000000000000, 0.887298334620742, 0.112701665379258,
+        0.500000000000000, 0.887298334620742, 0.112701665379258, 0.500000000000000,
+        0.887298334620742, 0.112701665379258, 0.500000000000000, 0.887298334620742,
+        0.112701665379258, 0.500000000000000, 0.887298334620742, 0.112701665379258,
+        0.500000000000000, 0.887298334620742, 0.112701665379258, 0.500000000000000,
+        0.887298334620742, 0.112701665379258, 0.500000000000000, 0.887298334620742,
+        0.112701665379258, 0.500000000000000, 0.887298334620742};
+
+static const scalar_t h_qy[27] = {
+        0.112701665379258, 0.112701665379258, 0.112701665379258, 0.500000000000000,
+        0.500000000000000, 0.500000000000000, 0.887298334620742, 0.887298334620742,
+        0.887298334620742, 0.112701665379258, 0.112701665379258, 0.112701665379258,
+        0.500000000000000, 0.500000000000000, 0.500000000000000, 0.887298334620742,
+        0.887298334620742, 0.887298334620742, 0.112701665379258, 0.112701665379258,
+        0.112701665379258, 0.500000000000000, 0.500000000000000, 0.500000000000000,
+        0.887298334620742, 0.887298334620742, 0.887298334620742};
+
+static const scalar_t h_qz[27] = {
+        0.112701665379258, 0.112701665379258, 0.112701665379258, 0.112701665379258,
+        0.112701665379258, 0.112701665379258, 0.112701665379258, 0.112701665379258,
+        0.112701665379258, 0.500000000000000, 0.500000000000000, 0.500000000000000,
+        0.500000000000000, 0.500000000000000, 0.500000000000000, 0.500000000000000,
+        0.500000000000000, 0.500000000000000, 0.887298334620742, 0.887298334620742,
+        0.887298334620742, 0.887298334620742, 0.887298334620742, 0.887298334620742,
+        0.887298334620742, 0.887298334620742, 0.887298334620742};
+
+__constant__ scalar_t qx[27];
+__constant__ scalar_t qy[27];
+__constant__ scalar_t qz[27];
+__constant__ scalar_t qw[27];
+
+static void init_quadrature() {
+    static bool initialized = false;
+    if (!initialized) {
+        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(qx, h_qx, n_qp * sizeof(scalar_t)));
+        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(qy, h_qy, n_qp * sizeof(scalar_t)));
+        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(qz, h_qz, n_qp * sizeof(scalar_t)));
+        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(qw, h_qw, n_qp * sizeof(scalar_t)));
+        initialized = true;
+    }
+}
+
 template <typename T, int LEVEL>
 __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel(
         const ptrdiff_t nelements,
@@ -43,17 +97,6 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel(
 
     const T *g_u[3] = {g_ux, g_uy, g_uz};
     T *g_out[3] = {g_outx, g_outy, g_outz};
-
-    static const int n_qp = 6;
-    const T qw[6] = {0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667};
-    const T qx[6] = {0.0, 0.5, 0.5, 0.5, 0.5, 1.0};
-    const T qy[6] = {0.5, 0.0, 0.5, 0.5, 1.0, 0.5};
-    const T qz[6] = {0.5, 0.5, 0.0, 1.0, 0.5, 0.5};
 
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
          e += blockDim.x * gridDim.x) {
@@ -271,16 +314,6 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
     __shared__ T u_block[BLOCK_SIZE_3];
     __shared__ T out_block[BLOCK_SIZE_3];
 
-    static const int n_qp = 6;
-    const T qw[6] = {0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667};
-    const T qx[6] = {0.0, 0.5, 0.5, 0.5, 0.5, 1.0};
-    const T qy[6] = {0.5, 0.0, 0.5, 0.5, 1.0, 0.5};
-    const T qz[6] = {0.5, 0.5, 0.0, 1.0, 0.5, 0.5};
     const T h = 1. / LEVEL;
 
     const auto xi = threadIdx.x;
@@ -471,8 +504,8 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl(
     return SFEM_SUCCESS;
 }
 
-// #define my_kernel cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl
-#define my_kernel cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl
+#define my_kernel cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl
+// #define my_kernel cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl
 #define my_kernel_large cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl
 
 // Dispatch based on the level
@@ -498,164 +531,137 @@ static int cu_proteus_affine_hex8_linear_elasticity_apply_tpl(
         void *stream) {
     switch (level) {
         case 2: {
-            return my_kernel<real_t, 2>(
-                    nelements,
-                    stride,
-                    interior_start,
-                    elements,
-                    (cu_jacobian_t *)jacobian_adjugate,
-                    (cu_jacobian_t *)jacobian_determinant,
-                    mu,
-                    lambda,
-                    u_stride,
-                    (real_t *)ux,
-                    (real_t *)uy,
-                    (real_t *)uz,
-                    out_stride,
-                    (real_t *)outx,
-                    (real_t *)outy,
-                    (real_t *)outz,
-                    stream);
+            return my_kernel<real_t, 2>(nelements,
+                                        stride,
+                                        interior_start,
+                                        elements,
+                                        (cu_jacobian_t *)jacobian_adjugate,
+                                        (cu_jacobian_t *)jacobian_determinant,
+                                        mu,
+                                        lambda,
+                                        u_stride,
+                                        (real_t *)ux,
+                                        (real_t *)uy,
+                                        (real_t *)uz,
+                                        out_stride,
+                                        (real_t *)outx,
+                                        (real_t *)outy,
+                                        (real_t *)outz,
+                                        stream);
         }
-        case 3: {
-            return my_kernel<real_t, 3>(
-                    nelements,
-                    stride,
-                    interior_start,
-                    elements,
-                    (cu_jacobian_t *)jacobian_adjugate,
-                    (cu_jacobian_t *)jacobian_determinant,
-                    mu,
-                    lambda,
-                    u_stride,
-                    (real_t *)ux,
-                    (real_t *)uy,
-                    (real_t *)uz,
-                    out_stride,
-                    (real_t *)outx,
-                    (real_t *)outy,
-                    (real_t *)outz,
-                    stream);
-        }
+        // case 3: {
+        //     return my_kernel<real_t, 3>(nelements,
+        //                                 stride,
+        //                                 interior_start,
+        //                                 elements,
+        //                                 (cu_jacobian_t *)jacobian_adjugate,
+        //                                 (cu_jacobian_t *)jacobian_determinant,
+        //                                 mu,
+        //                                 lambda,
+        //                                 u_stride,
+        //                                 (real_t *)ux,
+        //                                 (real_t *)uy,
+        //                                 (real_t *)uz,
+        //                                 out_stride,
+        //                                 (real_t *)outx,
+        //                                 (real_t *)outy,
+        //                                 (real_t *)outz,
+        //                                 stream);
+        // }
         case 4: {
-            return my_kernel<real_t, 4>(
-                    nelements,
-                    stride,
-                    interior_start,
-                    elements,
-                    (cu_jacobian_t *)jacobian_adjugate,
-                    (cu_jacobian_t *)jacobian_determinant,
-                    mu,
-                    lambda,
-                    u_stride,
-                    (real_t *)ux,
-                    (real_t *)uy,
-                    (real_t *)uz,
-                    out_stride,
-                    (real_t *)outx,
-                    (real_t *)outy,
-                    (real_t *)outz,
-                    stream);
+            return my_kernel<real_t, 4>(nelements,
+                                        stride,
+                                        interior_start,
+                                        elements,
+                                        (cu_jacobian_t *)jacobian_adjugate,
+                                        (cu_jacobian_t *)jacobian_determinant,
+                                        mu,
+                                        lambda,
+                                        u_stride,
+                                        (real_t *)ux,
+                                        (real_t *)uy,
+                                        (real_t *)uz,
+                                        out_stride,
+                                        (real_t *)outx,
+                                        (real_t *)outy,
+                                        (real_t *)outz,
+                                        stream);
         }
-        case 5: {
-            return my_kernel_large<real_t, 5>(
-                    nelements,
-                    stride,
-                    interior_start,
-                    elements,
-                    (cu_jacobian_t *)jacobian_adjugate,
-                    (cu_jacobian_t *)jacobian_determinant,
-                    mu,
-                    lambda,
-                    u_stride,
-                    (real_t *)ux,
-                    (real_t *)uy,
-                    (real_t *)uz,
-                    out_stride,
-                    (real_t *)outx,
-                    (real_t *)outy,
-                    (real_t *)outz,
-                    stream);
-        }
-        case 6: {
-            return my_kernel_large<real_t, 6>(
-                    nelements,
-                    stride,
-                    interior_start,
-                    elements,
-                    (cu_jacobian_t *)jacobian_adjugate,
-                    (cu_jacobian_t *)jacobian_determinant,
-                    mu,
-                    lambda,
-                    u_stride,
-                    (real_t *)ux,
-                    (real_t *)uy,
-                    (real_t *)uz,
-                    out_stride,
-                    (real_t *)outx,
-                    (real_t *)outy,
-                    (real_t *)outz,
-                    stream);
-        }
-        case 7: {
-            return my_kernel_large<real_t, 7>(
-                    nelements,
-                    stride,
-                    interior_start,
-                    elements,
-                    (cu_jacobian_t *)jacobian_adjugate,
-                    (cu_jacobian_t *)jacobian_determinant,
-                    mu,
-                    lambda,
-                    u_stride,
-                    (real_t *)ux,
-                    (real_t *)uy,
-                    (real_t *)uz,
-                    out_stride,
-                    (real_t *)outx,
-                    (real_t *)outy,
-                    (real_t *)outz,
-                    stream);
-        }
-        case 8: {
-            return my_kernel_large<real_t, 8>(
-                    nelements,
-                    stride,
-                    interior_start,
-                    elements,
-                    (cu_jacobian_t *)jacobian_adjugate,
-                    (cu_jacobian_t *)jacobian_determinant,
-                    mu,
-                    lambda,
-                    u_stride,
-                    (real_t *)ux,
-                    (real_t *)uy,
-                    (real_t *)uz,
-                    out_stride,
-                    (real_t *)outx,
-                    (real_t *)outy,
-                    (real_t *)outz,
-                    stream);
-        }
-        // case 9: {
-        //     return cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl<real_t, 9>(
-        //             nelements,
-        //             stride,
-        //             interior_start,
-        //             elements,
-        //             (cu_jacobian_t *)jacobian_adjugate,
-        //             (cu_jacobian_t *)jacobian_determinant,
-        //             mu,
-        //             lambda,
-        //             u_stride,
-        //             (real_t *)ux,
-        //             (real_t *)uy,
-        //             (real_t *)uz,
-        //             out_stride,
-        //             (real_t *)outx,
-        //             (real_t *)outy,
-        //             (real_t *)outz,
-        //             stream);
+        // case 5: {
+        //     return my_kernel_large<real_t, 5>(nelements,
+        //                                       stride,
+        //                                       interior_start,
+        //                                       elements,
+        //                                       (cu_jacobian_t *)jacobian_adjugate,
+        //                                       (cu_jacobian_t *)jacobian_determinant,
+        //                                       mu,
+        //                                       lambda,
+        //                                       u_stride,
+        //                                       (real_t *)ux,
+        //                                       (real_t *)uy,
+        //                                       (real_t *)uz,
+        //                                       out_stride,
+        //                                       (real_t *)outx,
+        //                                       (real_t *)outy,
+        //                                       (real_t *)outz,
+        //                                       stream);
+        // }
+        // case 6: {
+        //     return my_kernel_large<real_t, 6>(nelements,
+        //                                       stride,
+        //                                       interior_start,
+        //                                       elements,
+        //                                       (cu_jacobian_t *)jacobian_adjugate,
+        //                                       (cu_jacobian_t *)jacobian_determinant,
+        //                                       mu,
+        //                                       lambda,
+        //                                       u_stride,
+        //                                       (real_t *)ux,
+        //                                       (real_t *)uy,
+        //                                       (real_t *)uz,
+        //                                       out_stride,
+        //                                       (real_t *)outx,
+        //                                       (real_t *)outy,
+        //                                       (real_t *)outz,
+        //                                       stream);
+        // }
+        // case 7: {
+        //     return my_kernel_large<real_t, 7>(nelements,
+        //                                       stride,
+        //                                       interior_start,
+        //                                       elements,
+        //                                       (cu_jacobian_t *)jacobian_adjugate,
+        //                                       (cu_jacobian_t *)jacobian_determinant,
+        //                                       mu,
+        //                                       lambda,
+        //                                       u_stride,
+        //                                       (real_t *)ux,
+        //                                       (real_t *)uy,
+        //                                       (real_t *)uz,
+        //                                       out_stride,
+        //                                       (real_t *)outx,
+        //                                       (real_t *)outy,
+        //                                       (real_t *)outz,
+        //                                       stream);
+        // }
+        // case 8: {
+        //     return my_kernel_large<real_t, 8>(nelements,
+        //                                       stride,
+        //                                       interior_start,
+        //                                       elements,
+        //                                       (cu_jacobian_t *)jacobian_adjugate,
+        //                                       (cu_jacobian_t *)jacobian_determinant,
+        //                                       mu,
+        //                                       lambda,
+        //                                       u_stride,
+        //                                       (real_t *)ux,
+        //                                       (real_t *)uy,
+        //                                       (real_t *)uz,
+        //                                       out_stride,
+        //                                       (real_t *)outx,
+        //                                       (real_t *)outy,
+        //                                       (real_t *)outz,
+        //                                       stream);
         // }
         default: {
             fprintf(stderr,
@@ -688,6 +694,8 @@ extern int cu_proteus_affine_hex8_linear_elasticity_apply(
         void *const SFEM_RESTRICT outy,
         void *const SFEM_RESTRICT outz,
         void *stream) {
+    init_quadrature();
+
     switch (real_type) {
         case SFEM_REAL_DEFAULT: {
             return cu_proteus_affine_hex8_linear_elasticity_apply_tpl<real_t>(
