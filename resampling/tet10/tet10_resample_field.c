@@ -344,6 +344,44 @@ SFEM_INLINE static void hex_aa_8_indices_O3(
 }
 
 /**
+ * @brief Compute the first index of the field for third order interpolation
+ *
+ * @param stride
+ * @param i
+ * @param j
+ * @param k
+ * @return SFEM_INLINE
+ */
+SFEM_INLINE static ptrdiff_t hex_aa_8_indices_O3_first_index(
+        const ptrdiff_t* const SFEM_RESTRICT stride,  //
+        const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k) {
+    //
+    return (i - 1) * stride[0] + (j - 1) * stride[1] + (k - 1) * stride[2];
+}
+
+/**
+ * @brief Compute the coefficients of the field for third order interpolation
+ *
+ * @param stride
+ * @param i
+ * @param j
+ * @param k
+ * @param data
+ * @param out
+ * @return SFEM_INLINE
+ */
+SFEM_INLINE static real_t* hex_aa_8_collect_coeffs_O3_ptr(const ptrdiff_t* const stride,  //
+                                                          const ptrdiff_t i,              //
+                                                          const ptrdiff_t j,              //
+                                                          const ptrdiff_t k,              //
+                                                          const real_t* const data) {     //
+
+    const ptrdiff_t first_index = hex_aa_8_indices_O3_first_index(stride, i, j, k);
+
+    return (real_t*)&data[first_index];
+}
+
+/**
  * @brief Compute the coefficients of the field for third order interpolation
  *
  * @param stride
@@ -586,6 +624,7 @@ SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D(const real_t x_,               
 ////////////////////////////////////////////////////////////////////////
 // hex_aa_8_eval_weno4_3D
 ////////////////////////////////////////////////////////////////////////
+#define WENO_DIRECT
 SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D_Unit(  //
         const real_t x_unit,                            //
         const real_t y_unit,                            //
@@ -593,15 +632,33 @@ SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D_Unit(  //
         const real_t ox_unit,                           //
         const real_t oy_unit,                           //
         const real_t oz_unit,                           //
-        const ptrdiff_t i,                              // it must be the absulte index
-        const ptrdiff_t j,                              // Used to retrive the data
+        const ptrdiff_t i,                              // it must be the absolute index
+        const ptrdiff_t j,                              // Used to get the data
         const ptrdiff_t k,                              // From the data array
         const ptrdiff_t* stride,                        //
         const real_t* const SFEM_RESTRICT data) {       //
 
     // collect the data for the WENO interpolation
+
+#ifdef WENO_DIRECT
+
+#pragma message "WENO_DIRECT"
+
+    const int stride_x = stride[0];
+    const int stride_y = stride[1];
+    const int stride_z = stride[2];
+
+    real_t* out = NULL;
+    out = hex_aa_8_collect_coeffs_O3_ptr(stride, i, j, k, data);
+
+#else
+    const int stride_x = 1;
+    const int stride_y = 4;
+    const int stride_z = 16;
+
     real_t out[64];
     hex_aa_8_collect_coeffs_O3(stride, i, j, k, data, out);
+#endif
 
     ////// Compute the local indices
     // ptrdiff_t i_local, j_local, k_local;
@@ -624,9 +681,9 @@ SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D_Unit(  //
                                     y,
                                     z,
                                     out,
-                                    1,
-                                    4,
-                                    16);
+                                    stride_x,
+                                    stride_y,
+                                    stride_z);
 
     return w4;
 }
@@ -1353,7 +1410,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
             }
 
             // ISOPARAMETRIC
-            // and search the node closest to the origin
+            // Search the node closest to the origin
             int v_orig = 0;
             double dist_min = 1e14;
 
@@ -1451,7 +1508,8 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
 
                 ///// ======================================================
 
-                // Get the global grid coordinates
+                // Get the global grid coordinates of the inner cube
+                // In the global space
                 const real_t grid_x = (g_qx_glob - ox) / dx;
                 const real_t grid_y = (g_qy_glob - oy) / dy;
                 const real_t grid_z = (g_qz_glob - oz) / dz;
@@ -1489,15 +1547,27 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
                                 nNodesData);
                     }
 
+#ifdef WENO_DIRECT
+                    // Calculate the origin of the 4x4x4 cube in the global space
+                    // And transform the coordinates to the the unitary space
+                    const real_t x_cube_origin = (ox + ((real_t)i_glob - 1) * dx) / dx;
+                    const real_t y_cube_origin = (oy + ((real_t)j_glob - 1) * dy) / dy;
+                    const real_t z_cube_origin = (oz + ((real_t)k_glob - 1) * dz) / dz;
+#else
+                    const real_t x_cube_origin = 0.0;
+                    const real_t y_cube_origin = 0.0;
+                    const real_t z_cube_origin = 0.0;
+#endif
+
                     //
                     // printf("nSizes_global = %ld\n", nSizes_global);
                     // printf("origin = (%f, %f, %f)\n", ox, oy, oz);
                     real_t eval_field = hex_aa_8_eval_weno4_3D_Unit(g_qx_unit,
                                                                     g_qy_unit,
                                                                     g_qz_unit,  //
-                                                                    0.0,
-                                                                    0.0,
-                                                                    0.0,  //
+                                                                    x_cube_origin,
+                                                                    y_cube_origin,
+                                                                    z_cube_origin,  //
                                                                     i_glob,
                                                                     j_glob,
                                                                     k_glob,
@@ -1697,8 +1767,8 @@ int hex8_to_tet10_resample_field_local(
         return hex8_to_isoparametric_tet10_resample_field_local(
                 nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
 
-#endif // SFEM_VEC_SIZE
-#endif // CUBE1
+#endif  // SFEM_VEC_SIZE
+#endif  // CUBE1
     } else {
         return hex8_to_subparametric_tet10_resample_field_local(
                 nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
