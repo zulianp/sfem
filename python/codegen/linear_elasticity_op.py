@@ -6,15 +6,19 @@ from tri3 import *
 from tri6 import *
 from tet4 import *
 from tet10 import *
+from tet20 import *
 from hex8 import *
+from aahex8 import *
 
+import sys
 from time import perf_counter
 
-
 class LinearElasticityOp:
-	def __init__(self, fe, q):
+	def __init__(self, fe):
 		dims = fe.manifold_dim()
-		q = sp.Matrix(dims, 1, q)
+
+		q_temp = [qx, qy, qz]
+		q = sp.Matrix(dims, 1, q_temp[0:dims])
 		shape_grad = fe.physical_tgrad(q)
 		e_jac_inv = fe.jacobian_inverse(q)
 
@@ -232,18 +236,26 @@ class LinearElasticityOp:
 def main():
 	start = perf_counter()
 
-	# fe = AxisAlignedQuad4()
-	# fe = Tri3()
-	# fe = Tri6()
-	# q = sp.Matrix(2, 1, [qx, qy])
+	fes = {
+	"TRI6": Tri6(),
+	"TRI3": Tri3(),
+	"TET4": Tet4(),
+	"TET10": Tet10(),
+	"TET20": Tet20(),
+	"HEX8": Hex8(),
+	"AAHEX8": AAHex8(),
+	"AAQUAD4": AxisAlignedQuad4()
+	}
 
-	# fe = Tet4()
-	# fe = Tet10()
-	fe = Hex8()
+	if len(sys.argv) >= 2:
+		fe = fes[sys.argv[1]]
+	else:
+		print("Fallback with TET10")
+		fe = Tet10()
+
 	fe.use_adjugate = True
-	q = sp.Matrix(3, 1, [qx, qy, qz])
-
-	op = LinearElasticityOp(fe, q)
+	
+	op = LinearElasticityOp(fe)
 	# op.hessian_check()
 
 	# c_log("--------------------------")

@@ -20,7 +20,7 @@ source $SFEM_DIR/workflows/sfem_config.sh
 export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 export CUDA_LAUNCH_BLOCKING=0
-export SFEM_ELEMENT_REFINE_LEVEL=4
+export SFEM_ELEMENT_REFINE_LEVEL=2
 
 CASE=3
 
@@ -47,7 +47,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			# export SFEM_REFINE=2
+			export SFEM_REFINE=4
 			$SCRIPTPATH/../../data/vtk/joint-hex.sh $SFEM_ELEMENT_REFINE_LEVEL
 		fi
 		sinlet=$mesh/surface/sidesets_aos/base.raw
@@ -82,7 +82,7 @@ case $CASE in
 		export SFEM_BLOCK_SIZE=3
 		export SFEM_OPERATOR="LinearElasticity"
 		export SFEM_DIRICHLET_NODESET="$sinlet,$sinlet,$sinlet,$soutlet,$soutlet,$soutlet"
-		export SFEM_DIRICHLET_VALUE="0,0,0,-0.1,0,-0.1"
+		export SFEM_DIRICHLET_VALUE="0,0,0,-0.1,0,0.1"
 		export SFEM_DIRICHLET_COMPONENT="0,1,2,0,1,2"
 	;;
 	4)
@@ -102,7 +102,7 @@ esac
 # Parametrize solver
 export SFEM_MG=1
 export SFEM_USE_CHEB=$SFEM_MG
-export SFEM_MAX_IT=40
+export SFEM_MAX_IT=5
 # export SFEM_MAX_IT=4000
 
 export SFEM_HEX8_ASSUME_AFFINE=1
@@ -119,7 +119,7 @@ export SFEM_SMOOTHER_SWEEPS=20
 
 export SFEM_USE_PRECONDITIONER=0
 
-export SFEM_VERBOSITY_LEVEL=2
+export SFEM_VERBOSITY_LEVEL=1
 # export SFEM_DEBUG=1
 
 $LAUNCH mgsolve $mesh output | tee log.txt
