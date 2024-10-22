@@ -100,6 +100,7 @@ then
 	LAUNCH="mpiexec -np $n_procs"
 else
 	LAUNCH="srun -n 288 -p debug "
+	LAUNCH=" "
 fi
 
 # GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"

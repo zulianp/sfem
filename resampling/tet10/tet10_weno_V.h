@@ -36,6 +36,8 @@ typedef double vec_double __attribute__((vector_size(_VL_ * sizeof(double)),  //
 typedef ptrdiff_t vec_indices __attribute__((vector_size(_VL_ * sizeof(ptrdiff_t)),  //
                                              aligned(sizeof(ptrdiff_t))));
 
+typedef float_t* ptr_array[_VL_];
+
 #define List2_V(ARRAY, AA, BB) \
     {                          \
         ARRAY[0] = (AA);       \
@@ -77,7 +79,7 @@ typedef ptrdiff_t vec_indices __attribute__((vector_size(_VL_ * sizeof(ptrdiff_t
 //                        const int stride_z);                             //
 
 vec_double weno4_3D_HOne_V(const vec_double x, const vec_double y, const vec_double z,  //
-                           const double *f,                                             //
+                           const double* f,                                             //
                            const vec_indices stride_x,                                  //
                            const vec_indices stride_y,                                  //
                            const vec_indices stride_z);                                 //

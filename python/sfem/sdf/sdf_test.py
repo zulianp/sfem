@@ -49,8 +49,8 @@ zv[:] = np.linspace(pmin[2], pmax[2], dims[2])
 
 X, Y, Z = np.meshgrid(xv, yv, zv)
 
-# field  = np.sin(4.0 * np.pi * X) + np.cos(4.0 * np.pi * Y + 4.0 * np.pi * Z)**2
-field  = np.sin(4.0 * np.pi * X) + np.cos(4.0 * np.pi * Y) * np.tanh(4.0 * np.pi * (Z + X))
+field  = np.sin(4.0 * np.pi * X) + np.cos(4.0 * np.pi * Y + 4.0 * np.pi * Z)**2
+# field  = np.sin(4.0 * np.pi * X) + np.cos(4.0 * np.pi * Y) * np.tanh(4.0 * np.pi * (Z + X))
 # field = chess_board(X, Y, Z, mc)
 
             

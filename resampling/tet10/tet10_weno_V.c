@@ -225,6 +225,53 @@ vec_double copy_f(const double *f,             //
 }
 
 /**
+ * @brief Compute the first index of the field for third order interpolation
+ *
+ * @param stride
+ * @param i
+ * @param j
+ * @param k
+ * @return SFEM_INLINE
+ */
+vec_indices hex_aa_8_indices_O3_first_index_vec(const ptrdiff_t *const stride,             //
+                                                const vec_indices i, const vec_indices j,  //
+                                                const vec_indices k) {                     //
+    //
+    vec_indices ret = CONST_VEC(0);
+
+    for (int ii = 0; ii < _VL_; ii++) {
+        ret[ii] = (i[ii] - 1) * stride[0] + (j[ii] - 1) * stride[1] + (k[ii] - 1) * stride[2];
+    }
+
+    return ret;
+}
+
+/**
+ * @brief Compute the coefficients of the field for third order interpolation
+ *
+ * @param stride
+ * @param i
+ * @param j
+ * @param k
+ * @param data
+ * @param out
+ * @return SFEM_INLINE
+ */
+void hex_aa_8_collect_coeffs_O3_ptr_vec(const ptrdiff_t *const stride,  //
+                                        const vec_indices i,            //
+                                        const vec_indices j,            //
+                                        const vec_indices k,            //
+                                        const real_t *const data,
+                                        ptr_array *first_ptrs_array) {  //
+
+    const vec_indices first_indices = hex_aa_8_indices_O3_first_index_vec(stride, i, j, k);
+
+    for (int ii = 0; ii < _VL_; ii++) {
+        (*first_ptrs_array)[ii] = &data[first_indices[ii]];
+    }
+}
+
+/**
  * @brief WENO4 interpolation for 3D data with constant grid spacing and h = 1
  *
  * @param x
