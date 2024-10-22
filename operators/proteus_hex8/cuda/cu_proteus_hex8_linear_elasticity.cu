@@ -202,6 +202,306 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel(
 }
 
 template <typename T, int LEVEL>
+static __host__ __device__ void apply_micro_loop(const T *const elemental_matrix,
+                                                 const T *const u_block,
+                                                 T *const out_block) {
+    // Micro-loop
+    for (int zi = 0; zi < LEVEL; zi++) {
+        for (int yi = 0; yi < LEVEL; yi++) {
+            for (int xi = 0; xi < LEVEL; xi++) {
+                T u[8];
+                T out[8];
+
+                int lev[8] = {cu_proteus_hex8_lidx(LEVEL, xi, yi, zi),
+                              cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi),
+                              cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi),
+                              cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi),
+                              cu_proteus_hex8_lidx(LEVEL, xi, yi, zi + 1),
+                              cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi + 1),
+                              cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi + 1),
+                              cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi + 1)};
+
+                // "local" to micro-buffer
+                for (int v = 0; v < 8; v++) {
+                    u[v] = u_block[lev[v]];
+                }
+
+                // Reset micro-accumulator
+                for (int i = 0; i < 8; i++) {
+                    out[i] = 0;
+                }
+
+                // Compute
+                for (int i = 0; i < 8; i++) {
+                    const T *const row = &elemental_matrix[i * 8];
+                    const T ui = u[i];
+
+                    for (int j = 0; j < 8; j++) {
+                        assert(row[j] == row[j]);
+                        out[j] += ui * row[j];
+                    }
+                }
+
+                // micro-buffer to "local"
+                for (int v = 0; v < 8; v++) {
+                    out_block[lev[v]] += out[v];
+                }
+            }
+        }
+    }
+}
+
+template <typename T, int LEVEL>
+__global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segmented_kernel(
+        const ptrdiff_t nelements,
+        const ptrdiff_t stride,  // Stride for elements and fff
+        const ptrdiff_t interior_start,
+        const idx_t *const SFEM_RESTRICT elements,
+        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
+        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_determinant,
+        const T mu,
+        const T lambda,
+        const ptrdiff_t u_stride,
+        const T *const SFEM_RESTRICT g_ux,
+        const T *const SFEM_RESTRICT g_uy,
+        const T *const SFEM_RESTRICT g_uz,
+        const ptrdiff_t out_stride,
+        T *const SFEM_RESTRICT g_outx,
+        T *const SFEM_RESTRICT g_outy,
+        T *const SFEM_RESTRICT g_outz) {
+    static const int BLOCK_SIZE = LEVEL + 1;
+    static const int BLOCK_SIZE_2 = BLOCK_SIZE * BLOCK_SIZE;
+    static const int BLOCK_SIZE_3 = BLOCK_SIZE_2 * BLOCK_SIZE;
+
+    // "local" memory
+    T u_block[BLOCK_SIZE_3];
+    T out_block[3][BLOCK_SIZE_3];
+
+    T sub_adjugate[9];
+    T sub_determinant;
+    T elemental_matrix[8 * 8];
+
+    const T *g_u[3] = {g_ux, g_uy, g_uz};
+    T *g_out[3] = {g_outx, g_outy, g_outz};
+
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
+         e += blockDim.x * gridDim.x) {
+        // Reset block accumulator
+        for (int d = 0; d < 3; d++) {
+            for (int i = 0; i < BLOCK_SIZE_3; i++) {
+                out_block[d][i] = 0;
+            }
+        }
+
+        // Get geometry
+        sub_adjugate[0] = g_jacobian_adjugate[0 * stride + e];
+        sub_adjugate[1] = g_jacobian_adjugate[1 * stride + e];
+        sub_adjugate[2] = g_jacobian_adjugate[2 * stride + e];
+        sub_adjugate[3] = g_jacobian_adjugate[3 * stride + e];
+        sub_adjugate[4] = g_jacobian_adjugate[4 * stride + e];
+        sub_adjugate[5] = g_jacobian_adjugate[5 * stride + e];
+        sub_adjugate[6] = g_jacobian_adjugate[6 * stride + e];
+        sub_adjugate[7] = g_jacobian_adjugate[7 * stride + e];
+        sub_adjugate[8] = g_jacobian_adjugate[8 * stride + e];
+        sub_determinant = g_jacobian_determinant[e];
+
+        {
+            const T h = 1. / LEVEL;
+            cu_hex8_sub_adj_0_in_place(h, sub_adjugate, &sub_determinant);
+        }
+
+        // X
+        {
+            // Gather from global to "local"
+            cu_proteus_hex8_gather<T, LEVEL, T>(
+                    nelements, stride, interior_start, e, elements, u_stride, g_u[0], u_block);
+
+            for (int i = 0; i < 64; i++) {
+                elemental_matrix[i] = 0;
+            }
+            for (int k = 0; k < n_qp; k++) {
+                cu_hex8_linear_elasticity_matrix_block_0_0<T, T>(mu,
+                                                                 lambda,
+                                                                 sub_adjugate,
+                                                                 sub_determinant,
+                                                                 qx[k],
+                                                                 qy[k],
+                                                                 qz[k],
+                                                                 qw[k],
+                                                                 elemental_matrix);
+            }
+
+            apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[0]);
+
+            for (int i = 0; i < 64; i++) {
+                elemental_matrix[i] = 0;
+            }
+            for (int k = 0; k < n_qp; k++) {
+                cu_hex8_linear_elasticity_matrix_block_1_0<T, T>(mu,
+                                                                 lambda,
+                                                                 sub_adjugate,
+                                                                 sub_determinant,
+                                                                 qx[k],
+                                                                 qy[k],
+                                                                 qz[k],
+                                                                 qw[k],
+                                                                 elemental_matrix);
+            }
+
+            apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[1]);
+
+            for (int i = 0; i < 64; i++) {
+                elemental_matrix[i] = 0;
+            }
+            for (int k = 0; k < n_qp; k++) {
+                cu_hex8_linear_elasticity_matrix_block_2_0<T, T>(mu,
+                                                                 lambda,
+                                                                 sub_adjugate,
+                                                                 sub_determinant,
+                                                                 qx[k],
+                                                                 qy[k],
+                                                                 qz[k],
+                                                                 qw[k],
+                                                                 elemental_matrix);
+            }
+
+            apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[2]);
+        }
+
+        // Y
+        {
+            // Gather from global to "local"
+            cu_proteus_hex8_gather<T, LEVEL, T>(
+                    nelements, stride, interior_start, e, elements, u_stride, g_u[1], u_block);
+
+            for (int i = 0; i < 64; i++) {
+                elemental_matrix[i] = 0;
+            }
+            for (int k = 0; k < n_qp; k++) {
+                cu_hex8_linear_elasticity_matrix_block_0_1<T, T>(mu,
+                                                                 lambda,
+                                                                 sub_adjugate,
+                                                                 sub_determinant,
+                                                                 qx[k],
+                                                                 qy[k],
+                                                                 qz[k],
+                                                                 qw[k],
+                                                                 elemental_matrix);
+            }
+
+            apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[0]);
+
+            for (int i = 0; i < 64; i++) {
+                elemental_matrix[i] = 0;
+            }
+            for (int k = 0; k < n_qp; k++) {
+                cu_hex8_linear_elasticity_matrix_block_1_1<T, T>(mu,
+                                                                 lambda,
+                                                                 sub_adjugate,
+                                                                 sub_determinant,
+                                                                 qx[k],
+                                                                 qy[k],
+                                                                 qz[k],
+                                                                 qw[k],
+                                                                 elemental_matrix);
+            }
+
+            apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[1]);
+
+            for (int i = 0; i < 64; i++) {
+                elemental_matrix[i] = 0;
+            }
+            for (int k = 0; k < n_qp; k++) {
+                cu_hex8_linear_elasticity_matrix_block_2_1<T, T>(mu,
+                                                                 lambda,
+                                                                 sub_adjugate,
+                                                                 sub_determinant,
+                                                                 qx[k],
+                                                                 qy[k],
+                                                                 qz[k],
+                                                                 qw[k],
+                                                                 elemental_matrix);
+            }
+
+            apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[2]);
+        }
+
+        // Z
+        {
+            // Gather from global to "local"
+            cu_proteus_hex8_gather<T, LEVEL, T>(
+                    nelements, stride, interior_start, e, elements, u_stride, g_u[2], u_block);
+
+            for (int i = 0; i < 64; i++) {
+                elemental_matrix[i] = 0;
+            }
+            for (int k = 0; k < n_qp; k++) {
+                cu_hex8_linear_elasticity_matrix_block_0_2<T, T>(mu,
+                                                                 lambda,
+                                                                 sub_adjugate,
+                                                                 sub_determinant,
+                                                                 qx[k],
+                                                                 qy[k],
+                                                                 qz[k],
+                                                                 qw[k],
+                                                                 elemental_matrix);
+            }
+
+            apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[0]);
+
+            for (int i = 0; i < 64; i++) {
+                elemental_matrix[i] = 0;
+            }
+            for (int k = 0; k < n_qp; k++) {
+                cu_hex8_linear_elasticity_matrix_block_1_2<T, T>(mu,
+                                                                 lambda,
+                                                                 sub_adjugate,
+                                                                 sub_determinant,
+                                                                 qx[k],
+                                                                 qy[k],
+                                                                 qz[k],
+                                                                 qw[k],
+                                                                 elemental_matrix);
+            }
+
+            apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[1]);
+
+            for (int i = 0; i < 64; i++) {
+                elemental_matrix[i] = 0;
+            }
+            for (int k = 0; k < n_qp; k++) {
+                cu_hex8_linear_elasticity_matrix_block_2_2<T, T>(mu,
+                                                                 lambda,
+                                                                 sub_adjugate,
+                                                                 sub_determinant,
+                                                                 qx[k],
+                                                                 qy[k],
+                                                                 qz[k],
+                                                                 qw[k],
+                                                                 elemental_matrix);
+            }
+
+            apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[2]);
+        }
+
+        // // Scatter from "local" to global
+        for (int d = 0; d < 3; d++) {
+            cu_proteus_hex8_scatter_add<T, LEVEL, T>(nelements,
+                                                     stride,
+                                                     interior_start,
+                                                     e,
+                                                     elements,
+                                                     out_block[d],
+                                                     out_stride,
+                                                     g_out[d]);
+        }
+    }
+}
+
+// #define local_mem_kernel cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segmented_kernel
+#define local_mem_kernel cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel
+
+template <typename T, int LEVEL>
 int cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl(
         const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
@@ -229,7 +529,7 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl(
         cudaOccupancyMaxPotentialBlockSize(
                 &min_grid_size,
                 &block_size,
-                cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel<T, LEVEL>,
+                local_mem_kernel<T, LEVEL>,
                 0,
                 0);
     }
@@ -239,7 +539,7 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl(
 
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel<T, LEVEL>
+        local_mem_kernel<T, LEVEL>
                 <<<n_blocks, block_size, 0, s>>>(nelements,
                                                  stride,
                                                  interior_start,
@@ -257,7 +557,7 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl(
                                                  outy,
                                                  outz);
     } else {
-        cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel<T, LEVEL>
+        local_mem_kernel<T, LEVEL>
                 <<<n_blocks, block_size, 0>>>(nelements,
                                               stride,
                                               interior_start,
@@ -587,44 +887,44 @@ static int cu_proteus_affine_hex8_linear_elasticity_apply_tpl(
                                         (real_t *)outz,
                                         stream);
         }
-        // case 5: {
-        //     return my_kernel_large<real_t, 5>(nelements,
-        //                                       stride,
-        //                                       interior_start,
-        //                                       elements,
-        //                                       (cu_jacobian_t *)jacobian_adjugate,
-        //                                       (cu_jacobian_t *)jacobian_determinant,
-        //                                       mu,
-        //                                       lambda,
-        //                                       u_stride,
-        //                                       (real_t *)ux,
-        //                                       (real_t *)uy,
-        //                                       (real_t *)uz,
-        //                                       out_stride,
-        //                                       (real_t *)outx,
-        //                                       (real_t *)outy,
-        //                                       (real_t *)outz,
-        //                                       stream);
-        // }
-        // case 6: {
-        //     return my_kernel_large<real_t, 6>(nelements,
-        //                                       stride,
-        //                                       interior_start,
-        //                                       elements,
-        //                                       (cu_jacobian_t *)jacobian_adjugate,
-        //                                       (cu_jacobian_t *)jacobian_determinant,
-        //                                       mu,
-        //                                       lambda,
-        //                                       u_stride,
-        //                                       (real_t *)ux,
-        //                                       (real_t *)uy,
-        //                                       (real_t *)uz,
-        //                                       out_stride,
-        //                                       (real_t *)outx,
-        //                                       (real_t *)outy,
-        //                                       (real_t *)outz,
-        //                                       stream);
-        // }
+        case 5: {
+            return my_kernel_large<real_t, 5>(nelements,
+                                              stride,
+                                              interior_start,
+                                              elements,
+                                              (cu_jacobian_t *)jacobian_adjugate,
+                                              (cu_jacobian_t *)jacobian_determinant,
+                                              mu,
+                                              lambda,
+                                              u_stride,
+                                              (real_t *)ux,
+                                              (real_t *)uy,
+                                              (real_t *)uz,
+                                              out_stride,
+                                              (real_t *)outx,
+                                              (real_t *)outy,
+                                              (real_t *)outz,
+                                              stream);
+        }
+        case 6: {
+            return my_kernel_large<real_t, 6>(nelements,
+                                              stride,
+                                              interior_start,
+                                              elements,
+                                              (cu_jacobian_t *)jacobian_adjugate,
+                                              (cu_jacobian_t *)jacobian_determinant,
+                                              mu,
+                                              lambda,
+                                              u_stride,
+                                              (real_t *)ux,
+                                              (real_t *)uy,
+                                              (real_t *)uz,
+                                              out_stride,
+                                              (real_t *)outx,
+                                              (real_t *)outy,
+                                              (real_t *)outz,
+                                              stream);
+        }
         // case 7: {
         //     return my_kernel_large<real_t, 7>(nelements,
         //                                       stride,
