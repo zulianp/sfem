@@ -307,7 +307,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
 
         {
             const T h = 1. / LEVEL;
-            cu_hex8_sub_adj_0_in_place(h, sub_adjugate, &sub_determinant);
+            cu_hex8_sub_adj_0_in_place<T>(h, sub_adjugate, &sub_determinant);
         }
 
         // X
@@ -498,8 +498,8 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
     }
 }
 
-// #define local_mem_kernel cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segmented_kernel
-#define local_mem_kernel cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel
+#define local_mem_kernel cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segmented_kernel
+// #define local_mem_kernel cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel
 
 template <typename T, int LEVEL>
 int cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl(
@@ -527,11 +527,7 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl(
     {
         int min_grid_size;
         cudaOccupancyMaxPotentialBlockSize(
-                &min_grid_size,
-                &block_size,
-                local_mem_kernel<T, LEVEL>,
-                0,
-                0);
+                &min_grid_size, &block_size, local_mem_kernel<T, LEVEL>, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
@@ -539,46 +535,46 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl(
 
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        local_mem_kernel<T, LEVEL>
-                <<<n_blocks, block_size, 0, s>>>(nelements,
-                                                 stride,
-                                                 interior_start,
-                                                 elements,
-                                                 jacobian_adjugate,
-                                                 jacobian_determinant,
-                                                 mu,
-                                                 lambda,
-                                                 u_stride,
-                                                 ux,
-                                                 uy,
-                                                 uz,
-                                                 out_stride,
-                                                 outx,
-                                                 outy,
-                                                 outz);
+        local_mem_kernel<T, LEVEL><<<n_blocks, block_size, 0, s>>>(nelements,
+                                                                   stride,
+                                                                   interior_start,
+                                                                   elements,
+                                                                   jacobian_adjugate,
+                                                                   jacobian_determinant,
+                                                                   mu,
+                                                                   lambda,
+                                                                   u_stride,
+                                                                   ux,
+                                                                   uy,
+                                                                   uz,
+                                                                   out_stride,
+                                                                   outx,
+                                                                   outy,
+                                                                   outz);
     } else {
-        local_mem_kernel<T, LEVEL>
-                <<<n_blocks, block_size, 0>>>(nelements,
-                                              stride,
-                                              interior_start,
-                                              elements,
-                                              jacobian_adjugate,
-                                              jacobian_determinant,
-                                              mu,
-                                              lambda,
-                                              u_stride,
-                                              ux,
-                                              uy,
-                                              uz,
-                                              out_stride,
-                                              outx,
-                                              outy,
-                                              outz);
+        local_mem_kernel<T, LEVEL><<<n_blocks, block_size, 0>>>(nelements,
+                                                                stride,
+                                                                interior_start,
+                                                                elements,
+                                                                jacobian_adjugate,
+                                                                jacobian_determinant,
+                                                                mu,
+                                                                lambda,
+                                                                u_stride,
+                                                                ux,
+                                                                uy,
+                                                                uz,
+                                                                out_stride,
+                                                                outx,
+                                                                outy,
+                                                                outz);
     }
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
 }
+
+// #define B_(x, y, z) ((z)*BLOCK_SIZE_2 + (y)*BLOCK_SIZE + (x))
 
 template <typename T, int LEVEL>
 __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
@@ -670,6 +666,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
         for (int d = 0; d < 3; d++) {
             u_block[lidx] = g_u[d][idx * u_stride];
             assert(u_block[lidx] == u_block[lidx]);
+            assert(d != 0 || fabs(u_block[lidx] - 4) > 1e-8);
 
             __syncthreads();
 
@@ -678,7 +675,10 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
                     u[d][v] = u_block[lev[v]];
                 }
             }
+
+            __syncthreads();
         }
+
 
         // Compute
         if (is_element) {
@@ -728,9 +728,9 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
 
             out_block[lidx] = 0;
 
-            if (d < 2) {
-                __syncthreads();
-            }
+            // if (d < 2) {
+            __syncthreads();
+            // }
         }
     }
 }
@@ -804,9 +804,9 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl(
     return SFEM_SUCCESS;
 }
 
-// #define my_kernel cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl
-#define my_kernel cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl
-#define my_kernel_large cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl
+#define my_kernel cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl
+// #define my_kernel cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl
+#define my_kernel_large cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl
 
 // Dispatch based on the level
 template <typename real_t>
@@ -830,25 +830,25 @@ static int cu_proteus_affine_hex8_linear_elasticity_apply_tpl(
         real_t *const SFEM_RESTRICT outz,
         void *stream) {
     switch (level) {
-        case 2: {
-            return my_kernel<real_t, 2>(nelements,
-                                        stride,
-                                        interior_start,
-                                        elements,
-                                        (cu_jacobian_t *)jacobian_adjugate,
-                                        (cu_jacobian_t *)jacobian_determinant,
-                                        mu,
-                                        lambda,
-                                        u_stride,
-                                        (real_t *)ux,
-                                        (real_t *)uy,
-                                        (real_t *)uz,
-                                        out_stride,
-                                        (real_t *)outx,
-                                        (real_t *)outy,
-                                        (real_t *)outz,
-                                        stream);
-        }
+        // case 2: {
+        //     return my_kernel<real_t, 2>(nelements,
+        //                                 stride,
+        //                                 interior_start,
+        //                                 elements,
+        //                                 (cu_jacobian_t *)jacobian_adjugate,
+        //                                 (cu_jacobian_t *)jacobian_determinant,
+        //                                 mu,
+        //                                 lambda,
+        //                                 u_stride,
+        //                                 (real_t *)ux,
+        //                                 (real_t *)uy,
+        //                                 (real_t *)uz,
+        //                                 out_stride,
+        //                                 (real_t *)outx,
+        //                                 (real_t *)outy,
+        //                                 (real_t *)outz,
+        //                                 stream);
+        // }
         // case 3: {
         //     return my_kernel<real_t, 3>(nelements,
         //                                 stride,
@@ -906,25 +906,25 @@ static int cu_proteus_affine_hex8_linear_elasticity_apply_tpl(
                                               (real_t *)outz,
                                               stream);
         }
-        case 6: {
-            return my_kernel_large<real_t, 6>(nelements,
-                                              stride,
-                                              interior_start,
-                                              elements,
-                                              (cu_jacobian_t *)jacobian_adjugate,
-                                              (cu_jacobian_t *)jacobian_determinant,
-                                              mu,
-                                              lambda,
-                                              u_stride,
-                                              (real_t *)ux,
-                                              (real_t *)uy,
-                                              (real_t *)uz,
-                                              out_stride,
-                                              (real_t *)outx,
-                                              (real_t *)outy,
-                                              (real_t *)outz,
-                                              stream);
-        }
+        // case 6: {
+        //     return my_kernel_large<real_t, 6>(nelements,
+        //                                       stride,
+        //                                       interior_start,
+        //                                       elements,
+        //                                       (cu_jacobian_t *)jacobian_adjugate,
+        //                                       (cu_jacobian_t *)jacobian_determinant,
+        //                                       mu,
+        //                                       lambda,
+        //                                       u_stride,
+        //                                       (real_t *)ux,
+        //                                       (real_t *)uy,
+        //                                       (real_t *)uz,
+        //                                       out_stride,
+        //                                       (real_t *)outx,
+        //                                       (real_t *)outy,
+        //                                       (real_t *)outz,
+        //                                       stream);
+        // }
         // case 7: {
         //     return my_kernel_large<real_t, 7>(nelements,
         //                                       stride,
