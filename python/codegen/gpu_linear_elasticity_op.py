@@ -391,6 +391,25 @@ class GPULinearElasticityOp:
 		return blocks
 
 
+	def hessian_blocks_tpl(self):
+		tpl="""
+template<typename scalar_t, typename accumulator_t>
+static inline __host__ __device__ void  cu_hex8_linear_elasticity_matrix_{BLOCK_NAME}(
+const scalar_t mu,
+const scalar_t lambda,
+const scalar_t *const SFEM_RESTRICT adjugate,
+const scalar_t jacobian_determinant,
+const scalar_t qx,
+const scalar_t qy,
+const scalar_t qz,
+const scalar_t qw,
+accumulator_t *const SFEM_RESTRICT
+element_matrix) 
+{{
+	{CODE}
+}}
+"""
+
 
 	def hessian_diag(self):
 		H = self.eval_hessian
@@ -533,33 +552,14 @@ def main():
 	op = GPULinearElasticityOp(fe)
 	# op.hessian_check()
 
-
-
-	tpl="""
-template<typename scalar_t, typename accumulator_t>
-static inline __host__ __device__ void  cu_hex8_linear_elasticity_matrix_{BLOCK_NAME}(
-const scalar_t mu,
-const scalar_t lambda,
-const scalar_t *const SFEM_RESTRICT adjugate,
-const scalar_t jacobian_determinant,
-const scalar_t qx,
-const scalar_t qy,
-const scalar_t qz,
-const scalar_t qw,
-accumulator_t *const SFEM_RESTRICT
-element_matrix) 
-{{
-	{CODE}
-}}
-"""
-
-	blocks = op.hessian_blocks()
-	for k,v in blocks:
-		c_log("//--------------------------")
-		c_log(f"// hessian {k}")	
-		c_log("//--------------------------")
-		code = c_gen(v)
-		c_log(tpl.format(BLOCK_NAME=k, CODE=code))
+	# tpl = op.hessian_blocks_tpl()
+	# blocks = op.hessian_blocks()
+	# for k,v in blocks:
+	# 	c_log("//--------------------------")
+	# 	c_log(f"// hessian {k}")	
+	# 	c_log("//--------------------------")
+	# 	code = c_gen(v)
+	# 	c_log(tpl.format(BLOCK_NAME=k, CODE=code))
 
 
 
@@ -598,30 +598,30 @@ element_matrix)
 	# 	c_code(op.geometry())
 
 
-	# 	c_log("//--------------------------")
-	# 	c_log("// displacement_gradient")	
-	# 	c_log("//--------------------------")
-	# 	c_code(op.displacement_gradient())
+	c_log("//--------------------------")
+	c_log("// displacement_gradient")	
+	c_log("//--------------------------")
+	c_code(op.displacement_gradient())
 
-	# 	c_log("//--------------------------")
-	# 	c_log("// Piola")	
-	# 	c_log("//--------------------------")
-	# 	c_code(op.first_piola())
+	c_log("//--------------------------")
+	c_log("// Piola")	
+	c_log("//--------------------------")
+	c_code(op.first_piola())
 
-	# 	# c_log("//--------------------------")
-	# 	# c_log("// gradient")
-	# 	# c_log("//--------------------------")
-	# 	# c_code(op.gradient())
+	# c_log("//--------------------------")
+	# c_log("// gradient")
+	# c_log("//--------------------------")
+	# c_code(op.gradient())
 
-	# 	c_log("//--------------------------")
-	# 	c_log("// loperand")	
-	# 	c_log("//--------------------------")
-	# 	c_code(op.loperand())
+	c_log("//--------------------------")
+	c_log("// loperand")	
+	c_log("//--------------------------")
+	c_code(op.loperand())
 
-	# 	c_log("//--------------------------")
-	# 	c_log("// gradient_opt")
-	# 	c_log("//--------------------------")
-	# 	c_code(op.gradient_opt())
+	c_log("//--------------------------")
+	c_log("// gradient_opt")
+	c_log("//--------------------------")
+	c_code(op.gradient_opt())
 
 	# 	# c_log("//--------------------------")
 	# 	# c_log("// value")

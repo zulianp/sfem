@@ -3,6 +3,69 @@
 
 #include "cu_hex8_inline.hpp"
 
+template <typename scalar_t>
+static inline __device__ __host__ void cu_hex8_ref_shape_grad_x(const scalar_t qx,
+                                                                const scalar_t qy,
+                                                                const scalar_t qz,
+                                                                scalar_t *const out) {
+    const scalar_t x0 = 1 - qy;
+    const scalar_t x1 = 1 - qz;
+    const scalar_t x2 = x0 * x1;
+    const scalar_t x3 = qy * x1;
+    const scalar_t x4 = qz * x0;
+    const scalar_t x5 = qy * qz;
+    out[0] = -x2;
+    out[1] = x2;
+    out[2] = x3;
+    out[3] = -x3;
+    out[4] = -x4;
+    out[5] = x4;
+    out[6] = x5;
+    out[7] = -x5;
+}
+
+template <typename scalar_t>
+static inline __device__ __host__ void cu_hex8_ref_shape_grad_y(const scalar_t qx,
+                                                                const scalar_t qy,
+                                                                const scalar_t qz,
+                                                                scalar_t *const out) {
+    const scalar_t x0 = 1 - qx;
+    const scalar_t x1 = 1 - qz;
+    const scalar_t x2 = x0 * x1;
+    const scalar_t x3 = qx * x1;
+    const scalar_t x4 = qz * x0;
+    const scalar_t x5 = qx * qz;
+    out[0] = -x2;
+    out[1] = -x3;
+    out[2] = x3;
+    out[3] = x2;
+    out[4] = -x4;
+    out[5] = -x5;
+    out[6] = x5;
+    out[7] = x4;
+}
+
+template <typename scalar_t>
+static inline __device__ __host__ void cu_hex8_ref_shape_grad_z(const scalar_t qx,
+                                                                const scalar_t qy,
+                                                                const scalar_t qz,
+                                                                scalar_t *const out) {
+    const scalar_t x0 = 1 - qx;
+    const scalar_t x1 = 1 - qy;
+    const scalar_t x2 = x0 * x1;
+    const scalar_t x3 = qx * x1;
+    const scalar_t x4 = qx * qy;
+    const scalar_t x5 = qy * x0;
+    out[0] = -x2;
+    out[1] = -x3;
+    out[2] = -x4;
+    out[3] = -x5;
+    out[4] = x2;
+    out[5] = x3;
+    out[6] = x4;
+    out[7] = x5;
+}
+
 template <typename scalar_t, typename accumulator_t>
 static __host__ __device__ void cu_hex8_linear_elasticity_apply_adj(
         const scalar_t mu,
@@ -19,7 +82,12 @@ static __host__ __device__ void cu_hex8_linear_elasticity_apply_adj(
         accumulator_t *const SFEM_RESTRICT outx,
         accumulator_t *const SFEM_RESTRICT outy,
         accumulator_t *const SFEM_RESTRICT outz) {
+    
+
+#define CU_HEX8_LINEAR_ELASTICITY_USE_CODEGEN 0
+#if CU_HEX8_LINEAR_ELASTICITY_USE_CODEGEN
     scalar_t disp_grad[9];
+    const scalar_t denom = 1;
     {
         const scalar_t x0 = 1.0 / jacobian_determinant;
         const scalar_t x1 = qx * qz;
@@ -65,6 +133,54 @@ static __host__ __device__ void cu_hex8_linear_elasticity_apply_adj(
         disp_grad[7] = x0 * (adjugate[1] * x24 - adjugate[4] * x22 - adjugate[7] * x23);
         disp_grad[8] = x0 * (adjugate[2] * x24 - adjugate[5] * x22 - adjugate[8] * x23);
     }
+#else
+
+    const scalar_t denom = jacobian_determinant;
+    scalar_t disp_grad[9] = {0,0,0, 0,0,0, 0,0,0};
+    assert(denom > 0);
+    {
+        scalar_t temp[9] = {0,0,0, 0,0,0, 0,0,0};
+        scalar_t grad[8];
+
+        cu_hex8_ref_shape_grad_x(qx, qy, qz, grad);
+#pragma unroll
+        for (int i = 0; i < 8; i++) {
+            const scalar_t g = grad[i];
+            temp[0] += ux[i] * g;
+            temp[3] += uy[i] * g;
+            temp[6] += uz[i] * g;
+        }
+
+        cu_hex8_ref_shape_grad_y(qx, qy, qz, grad);
+#pragma unroll
+        for (int i = 0; i < 8; i++) {
+            const scalar_t g = grad[i];
+            temp[1] += ux[i] * g;
+            temp[4] += uy[i] * g;
+            temp[7] += uz[i] * g;
+        }
+
+        cu_hex8_ref_shape_grad_z(qx, qy, qz, grad);
+#pragma unroll
+        for (int i = 0; i < 8; i++) {
+            const scalar_t g = grad[i];
+            temp[2] += ux[i] * g;
+            temp[5] += uy[i] * g;
+            temp[8] += uz[i] * g;
+        }
+
+        for (int i = 0; i < 3; i++) {
+#pragma unroll
+            for (int j = 0; j < 3; j++) {
+#pragma unroll
+                for (int k = 0; k < 3; k++) {
+                    disp_grad[i * 3 + j] += temp[i * 3 + k] * adjugate[k * 3 + j];
+                    assert(disp_grad[i * 3 + j] == disp_grad[i * 3 + j]);
+                }
+            }
+        }
+    }
+#endif
 
     scalar_t *P_tXJinv_t = disp_grad;
     {
@@ -87,6 +203,13 @@ static __host__ __device__ void cu_hex8_linear_elasticity_apply_adj(
         P_tXJinv_t[8] = adjugate[6] * x1 + adjugate[7] * x5 + adjugate[8] * x7;
     }
 
+    // Scale by quadrature weight
+    for (int i = 0; i < 9; i++) {
+        P_tXJinv_t[i] *= qw / denom;
+        assert(P_tXJinv_t[i] == P_tXJinv_t[i]);
+    }
+
+#if CU_HEX8_LINEAR_ELASTICITY_USE_CODEGEN
     {
         const scalar_t x0 = qy - 1;
         const scalar_t x1 = qz - 1;
@@ -145,32 +268,77 @@ static __host__ __device__ void cu_hex8_linear_elasticity_apply_adj(
         const scalar_t x54 = x4 * x53;
         const scalar_t x55 = qx * x53;
         const scalar_t x56 = qy * x51;
-        outx[0] += qw * (-x3 - x6 - x8);
-        outx[1] += qw * (x10 + x3 + x9);
-        outx[2] += qw * (-x12 - x13 - x9);
-        outx[3] += qw * (x13 + x14 + x6);
-        outx[4] += qw * (x16 + x18 + x8);
-        outx[5] += qw * (-x10 - x16 - x19);
-        outx[6] += qw * (x12 + x19 + x20);
-        outx[7] += qw * (-x14 - x18 - x20);
-        outy[0] += qw * (-x22 - x24 - x26);
-        outy[1] += qw * (x22 + x27 + x28);
-        outy[2] += qw * (-x27 - x30 - x31);
-        outy[3] += qw * (x24 + x31 + x32);
-        outy[4] += qw * (x26 + x34 + x36);
-        outy[5] += qw * (-x28 - x34 - x37);
-        outy[6] += qw * (x30 + x37 + x38);
-        outy[7] += qw * (-x32 - x36 - x38);
-        outz[0] += qw * (-x40 - x42 - x44);
-        outz[1] += qw * (x40 + x45 + x46);
-        outz[2] += qw * (-x45 - x48 - x49);
-        outz[3] += qw * (x42 + x49 + x50);
-        outz[4] += qw * (x44 + x52 + x54);
-        outz[5] += qw * (-x46 - x52 - x55);
-        outz[6] += qw * (x48 + x55 + x56);
-        outz[7] += qw * (-x50 - x54 - x56);
+        outx[0] += (-x3 - x6 - x8);
+        outx[1] += (x10 + x3 + x9);
+        outx[2] += (-x12 - x13 - x9);
+        outx[3] += (x13 + x14 + x6);
+        outx[4] += (x16 + x18 + x8);
+        outx[5] += (-x10 - x16 - x19);
+        outx[6] += (x12 + x19 + x20);
+        outx[7] += (-x14 - x18 - x20);
+        outy[0] += (-x22 - x24 - x26);
+        outy[1] += (x22 + x27 + x28);
+        outy[2] += (-x27 - x30 - x31);
+        outy[3] += (x24 + x31 + x32);
+        outy[4] += (x26 + x34 + x36);
+        outy[5] += (-x28 - x34 - x37);
+        outy[6] += (x30 + x37 + x38);
+        outy[7] += (-x32 - x36 - x38);
+        outz[0] += (-x40 - x42 - x44);
+        outz[1] += (x40 + x45 + x46);
+        outz[2] += (-x45 - x48 - x49);
+        outz[3] += (x42 + x49 + x50);
+        outz[4] += (x44 + x52 + x54);
+        outz[5] += (-x46 - x52 - x55);
+        outz[6] += (x48 + x55 + x56);
+        outz[7] += (-x50 - x54 - x56);
     }
+#else
+    {
+        scalar_t grad[8];
+        cu_hex8_ref_shape_grad_x(qx, qy, qz, grad);
+
+#pragma unroll
+        for (int i = 0; i < 8; i++) {
+            scalar_t g = grad[i];
+            outx[i] += P_tXJinv_t[0] * g;
+            outy[i] += P_tXJinv_t[3] * g;
+            outz[i] += P_tXJinv_t[6] * g;
+        }
+
+        cu_hex8_ref_shape_grad_y(qx, qy, qz, grad);
+
+#pragma unroll
+        for (int i = 0; i < 8; i++) {
+            scalar_t g = grad[i];
+            outx[i] += P_tXJinv_t[1] * g;
+            outy[i] += P_tXJinv_t[4] * g;
+            outz[i] += P_tXJinv_t[7] * g;
+        }
+
+        cu_hex8_ref_shape_grad_z(qx, qy, qz, grad);
+
+#pragma unroll
+        for (int i = 0; i < 8; i++) {
+            scalar_t g = grad[i];
+            outx[i] += P_tXJinv_t[2] * g;
+            outy[i] += P_tXJinv_t[5] * g;
+            outz[i] += P_tXJinv_t[8] * g;
+        }
+    }
+
+#ifndef NDEBUG
+    for (int i = 0; i < 8; i++) {
+        assert(outx[i] == outx[i]);
+        assert(outy[i] == outy[i]);
+        assert(outz[i] == outz[i]);
+    }
+#endif
+
+#endif
 }
+
+
 //--------------------------
 // hessian block_0_0
 //--------------------------
