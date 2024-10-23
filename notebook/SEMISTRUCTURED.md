@@ -370,6 +370,13 @@ residual:	3.72803e-08
 | 2 | 473125 |	11761677	| 13.831 | **0.85**  |
 | 4 | 473125 |	92463957	| 135.35 | 0.68 |
 
+With new micro-code
+
+| SFEM_ELEMENT_REFINE_LEVEL | #macro-elems | #dofs | TTS [ms] | TP [GDOF/s] |
+|---|---|---|---|---|
+| 0 | 473125 |	 1521387	| 1.7585| **0.86** |
+| 4 | 473125 |	92463957	| 130.61| 0.7  |
+
 **Segmented matrix-based**
 
 Throughput of fine-op is still bad (`0.4 [GDOF/s]`) with this implementation, with only `3.6x` speed-up over ARM M1 version.
@@ -392,4 +399,6 @@ residual:	3.72803e-08
 | 4 | 242240 |  47549853  	| 56.735 | 0.83 |
 | 4 | 473125 |  92463957  	| 108.57 | **0.85** |
 | 2 | 473125 |	11761677	| 22.997 | 0.51 |
+
+
 

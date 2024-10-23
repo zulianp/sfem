@@ -446,7 +446,7 @@ int proteus_affine_hex8_linear_elasticity_apply(const int level,
 
                         // printf("%d, %d, %d)\n", xi, yi, zi);
                         // for (int d = 0; d < 8; d++) {
-                        //     printf("%d) %g => %g\n", lev[d], element_u[0][d], element_out[0][d]);
+                        //     printf("%d) (%d, %d, %d) %g => %g\n", lev[d],  xi, yi, zi, element_u[0][d], element_out[0][d]);
                         // }
                         // printf("\n");
 

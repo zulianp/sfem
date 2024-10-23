@@ -2,5 +2,5 @@
 
 set -e
 
-rm -rf joint_hex_db   test_output output              
+rm -rf joint_hex_db mesh test_output output              
 rm -f  log.txt perf_*.csv

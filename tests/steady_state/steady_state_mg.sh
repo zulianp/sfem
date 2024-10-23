@@ -20,7 +20,7 @@ source $SFEM_DIR/workflows/sfem_config.sh
 export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 export CUDA_LAUNCH_BLOCKING=0
-export SFEM_ELEMENT_REFINE_LEVEL=2
+export SFEM_ELEMENT_REFINE_LEVEL=5
 
 CASE=3
 
@@ -34,7 +34,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			create_box_ss_mesh.sh 80 $SFEM_ELEMENT_REFINE_LEVEL
+			create_box_ss_mesh.sh 1 $SFEM_ELEMENT_REFINE_LEVEL
 		fi
 
 		sinlet=$mesh/surface/sidesets_aos/left.raw 
@@ -47,7 +47,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			export SFEM_REFINE=4
+			export SFEM_REFINE=3
 			$SCRIPTPATH/../../data/vtk/joint-hex.sh $SFEM_ELEMENT_REFINE_LEVEL
 		fi
 		sinlet=$mesh/surface/sidesets_aos/base.raw
