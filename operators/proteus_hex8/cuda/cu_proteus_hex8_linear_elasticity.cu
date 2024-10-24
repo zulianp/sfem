@@ -3,6 +3,7 @@
 #include "sfem_cuda_base.h"
 
 #include "cu_hex8_linear_elasticity_inline.hpp"
+#include "cu_hex8_linear_elasticity_integral_inline.hpp"
 #include "cu_proteus_hex8_inline.hpp"
 
 #ifndef MAX
@@ -12,6 +13,76 @@
 #ifndef MIN
 #define MIN(a, b) ((a) > (b) ? (b) : (a))
 #endif
+
+static const int n_qp = 27;
+
+static const scalar_t h_qw[27] = {
+        0.021433470507545, 0.034293552812071, 0.021433470507545, 0.034293552812071,
+        0.054869684499314, 0.034293552812071, 0.021433470507545, 0.034293552812071,
+        0.021433470507545, 0.034293552812071, 0.054869684499314, 0.034293552812071,
+        0.054869684499314, 0.087791495198903, 0.054869684499314, 0.034293552812071,
+        0.054869684499314, 0.034293552812071, 0.021433470507545, 0.034293552812071,
+        0.021433470507545, 0.034293552812071, 0.054869684499314, 0.034293552812071,
+        0.021433470507545, 0.034293552812071, 0.021433470507545};
+
+static const scalar_t h_qx[27] = {
+        0.112701665379258, 0.500000000000000, 0.887298334620742, 0.112701665379258,
+        0.500000000000000, 0.887298334620742, 0.112701665379258, 0.500000000000000,
+        0.887298334620742, 0.112701665379258, 0.500000000000000, 0.887298334620742,
+        0.112701665379258, 0.500000000000000, 0.887298334620742, 0.112701665379258,
+        0.500000000000000, 0.887298334620742, 0.112701665379258, 0.500000000000000,
+        0.887298334620742, 0.112701665379258, 0.500000000000000, 0.887298334620742,
+        0.112701665379258, 0.500000000000000, 0.887298334620742};
+
+static const scalar_t h_qy[27] = {
+        0.112701665379258, 0.112701665379258, 0.112701665379258, 0.500000000000000,
+        0.500000000000000, 0.500000000000000, 0.887298334620742, 0.887298334620742,
+        0.887298334620742, 0.112701665379258, 0.112701665379258, 0.112701665379258,
+        0.500000000000000, 0.500000000000000, 0.500000000000000, 0.887298334620742,
+        0.887298334620742, 0.887298334620742, 0.112701665379258, 0.112701665379258,
+        0.112701665379258, 0.500000000000000, 0.500000000000000, 0.500000000000000,
+        0.887298334620742, 0.887298334620742, 0.887298334620742};
+
+static const scalar_t h_qz[27] = {
+        0.112701665379258, 0.112701665379258, 0.112701665379258, 0.112701665379258,
+        0.112701665379258, 0.112701665379258, 0.112701665379258, 0.112701665379258,
+        0.112701665379258, 0.500000000000000, 0.500000000000000, 0.500000000000000,
+        0.500000000000000, 0.500000000000000, 0.500000000000000, 0.500000000000000,
+        0.500000000000000, 0.500000000000000, 0.887298334620742, 0.887298334620742,
+        0.887298334620742, 0.887298334620742, 0.887298334620742, 0.887298334620742,
+        0.887298334620742, 0.887298334620742, 0.887298334620742};
+
+__constant__ scalar_t qx[27];
+__constant__ scalar_t qy[27];
+__constant__ scalar_t qz[27];
+__constant__ scalar_t qw[27];
+
+// static const int n_qp = 6;
+// static const scalar_t h_qw[6] = {0.16666666666666666666666666666667,
+//                                  0.16666666666666666666666666666667,
+//                                  0.16666666666666666666666666666667,
+//                                  0.16666666666666666666666666666667,
+//                                  0.16666666666666666666666666666667,
+//                                  0.16666666666666666666666666666667};
+
+// static const scalar_t h_qx[6] = {0.0, 0.5, 0.5, 0.5, 0.5, 1.0};
+// static const scalar_t h_qy[6] = {0.5, 0.0, 0.5, 0.5, 1.0, 0.5};
+// static const scalar_t h_qz[6] = {0.5, 0.5, 0.0, 1.0, 0.5, 0.5};
+// __constant__ scalar_t qx[6];
+// __constant__ scalar_t qy[6];
+// __constant__ scalar_t qz[6];
+// __constant__ scalar_t qw[6];
+
+static void init_quadrature() {
+    static bool initialized = false;
+    if (!initialized) {
+        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(qx, h_qx, n_qp * sizeof(scalar_t)));
+        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(qy, h_qy, n_qp * sizeof(scalar_t)));
+        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(qz, h_qz, n_qp * sizeof(scalar_t)));
+        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(qw, h_qw, n_qp * sizeof(scalar_t)));
+        initialized = true;
+    }
+}
 
 template <typename T, int LEVEL>
 __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel(
@@ -43,17 +114,6 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel(
 
     const T *g_u[3] = {g_ux, g_uy, g_uz};
     T *g_out[3] = {g_outx, g_outy, g_outz};
-
-    static const int n_qp = 6;
-    const T qw[6] = {0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667};
-    const T qx[6] = {0.0, 0.5, 0.5, 0.5, 0.5, 1.0};
-    const T qy[6] = {0.5, 0.0, 0.5, 0.5, 1.0, 0.5};
-    const T qz[6] = {0.5, 0.5, 0.0, 1.0, 0.5, 0.5};
 
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
          e += blockDim.x * gridDim.x) {
@@ -159,6 +219,353 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel(
 }
 
 template <typename T, int LEVEL>
+static __host__ __device__ void apply_micro_loop(const T *const elemental_matrix,
+                                                 const T *const u_block,
+                                                 T *const out_block) {
+    // Micro-loop
+    for (int zi = 0; zi < LEVEL; zi++) {
+        for (int yi = 0; yi < LEVEL; yi++) {
+            for (int xi = 0; xi < LEVEL; xi++) {
+                T u[8];
+                T out[8];
+
+                int lev[8] = {cu_proteus_hex8_lidx(LEVEL, xi, yi, zi),
+                              cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi),
+                              cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi),
+                              cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi),
+                              cu_proteus_hex8_lidx(LEVEL, xi, yi, zi + 1),
+                              cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi + 1),
+                              cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi + 1),
+                              cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi + 1)};
+
+                // "local" to micro-buffer
+                for (int v = 0; v < 8; v++) {
+                    u[v] = u_block[lev[v]];
+                }
+
+                // Reset micro-accumulator
+                for (int i = 0; i < 8; i++) {
+                    out[i] = 0;
+                }
+
+                // Compute
+                for (int i = 0; i < 8; i++) {
+                    const T *const row = &elemental_matrix[i * 8];
+                    const T ui = u[i];
+
+                    for (int j = 0; j < 8; j++) {
+                        assert(row[j] == row[j]);
+                        out[j] += ui * row[j];
+                    }
+                }
+
+                // micro-buffer to "local"
+                for (int v = 0; v < 8; v++) {
+                    out_block[lev[v]] += out[v];
+                }
+            }
+        }
+    }
+}
+
+#define HEX8_SEGMENTED_SYMBOLIC
+
+template <typename T, int LEVEL>
+__global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segmented_kernel(
+        const ptrdiff_t nelements,
+        const ptrdiff_t stride,  // Stride for elements and fff
+        const ptrdiff_t interior_start,
+        const idx_t *const SFEM_RESTRICT elements,
+        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
+        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_determinant,
+        const T mu,
+        const T lambda,
+        const ptrdiff_t u_stride,
+        const T *const SFEM_RESTRICT g_ux,
+        const T *const SFEM_RESTRICT g_uy,
+        const T *const SFEM_RESTRICT g_uz,
+        const ptrdiff_t out_stride,
+        T *const SFEM_RESTRICT g_outx,
+        T *const SFEM_RESTRICT g_outy,
+        T *const SFEM_RESTRICT g_outz) {
+    static const int BLOCK_SIZE = LEVEL + 1;
+    static const int BLOCK_SIZE_2 = BLOCK_SIZE * BLOCK_SIZE;
+    static const int BLOCK_SIZE_3 = BLOCK_SIZE_2 * BLOCK_SIZE;
+
+    // "local" memory
+    T u_block[BLOCK_SIZE_3];
+    T out_block[3][BLOCK_SIZE_3];
+
+    T sub_adjugate[9];
+    T sub_determinant;
+    T elemental_matrix[8 * 8];
+
+    const T *g_u[3] = {g_ux, g_uy, g_uz};
+    T *g_out[3] = {g_outx, g_outy, g_outz};
+
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
+         e += blockDim.x * gridDim.x) {
+        // Reset block accumulator
+        for (int d = 0; d < 3; d++) {
+            for (int i = 0; i < BLOCK_SIZE_3; i++) {
+                out_block[d][i] = 0;
+            }
+        }
+
+        // Get geometry
+        sub_adjugate[0] = g_jacobian_adjugate[0 * stride + e];
+        sub_adjugate[1] = g_jacobian_adjugate[1 * stride + e];
+        sub_adjugate[2] = g_jacobian_adjugate[2 * stride + e];
+        sub_adjugate[3] = g_jacobian_adjugate[3 * stride + e];
+        sub_adjugate[4] = g_jacobian_adjugate[4 * stride + e];
+        sub_adjugate[5] = g_jacobian_adjugate[5 * stride + e];
+        sub_adjugate[6] = g_jacobian_adjugate[6 * stride + e];
+        sub_adjugate[7] = g_jacobian_adjugate[7 * stride + e];
+        sub_adjugate[8] = g_jacobian_adjugate[8 * stride + e];
+        sub_determinant = g_jacobian_determinant[e];
+
+        {
+            const T h = 1. / LEVEL;
+            cu_hex8_sub_adj_0_in_place<T>(h, sub_adjugate, &sub_determinant);
+        }
+
+        // X
+        {
+            // Gather from global to "local"
+            cu_proteus_hex8_gather<T, LEVEL, T>(
+                    nelements, stride, interior_start, e, elements, u_stride, g_u[0], u_block);
+
+#ifdef HEX8_SEGMENTED_SYMBOLIC
+            cu_hex8_linear_elasticity_integral_matrix_block_0_0<T, T>(
+                    mu, lambda, sub_adjugate, sub_determinant, elemental_matrix);
+#else
+            for (int i = 0; i < 64; i++) {
+                elemental_matrix[i] = 0;
+            }
+            for (int k = 0; k < n_qp; k++) {
+                cu_hex8_linear_elasticity_matrix_block_0_0<T, T>(mu,
+                                                                 lambda,
+                                                                 sub_adjugate,
+                                                                 sub_determinant,
+                                                                 qx[k],
+                                                                 qy[k],
+                                                                 qz[k],
+                                                                 qw[k],
+                                                                 elemental_matrix);
+            }
+#endif
+
+            apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[0]);
+
+#ifdef HEX8_SEGMENTED_SYMBOLIC
+            cu_hex8_linear_elasticity_integral_matrix_block_1_0<T, T>(
+                    mu, lambda, sub_adjugate, sub_determinant, elemental_matrix);
+#else
+            for (int i = 0; i < 64; i++) {
+                elemental_matrix[i] = 0;
+            }
+            for (int k = 0; k < n_qp; k++) {
+                cu_hex8_linear_elasticity_matrix_block_1_0<T, T>(mu,
+                                                                 lambda,
+                                                                 sub_adjugate,
+                                                                 sub_determinant,
+                                                                 qx[k],
+                                                                 qy[k],
+                                                                 qz[k],
+                                                                 qw[k],
+                                                                 elemental_matrix);
+            }
+#endif
+
+            apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[1]);
+
+#ifdef HEX8_SEGMENTED_SYMBOLIC
+            cu_hex8_linear_elasticity_integral_matrix_block_2_0<T, T>(
+                    mu, lambda, sub_adjugate, sub_determinant, elemental_matrix);
+#else
+            for (int i = 0; i < 64; i++) {
+                elemental_matrix[i] = 0;
+            }
+            for (int k = 0; k < n_qp; k++) {
+                cu_hex8_linear_elasticity_matrix_block_2_0<T, T>(mu,
+                                                                 lambda,
+                                                                 sub_adjugate,
+                                                                 sub_determinant,
+                                                                 qx[k],
+                                                                 qy[k],
+                                                                 qz[k],
+                                                                 qw[k],
+                                                                 elemental_matrix);
+            }
+#endif
+
+            apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[2]);
+        }
+
+        // Y
+        {
+            // Gather from global to "local"
+            cu_proteus_hex8_gather<T, LEVEL, T>(
+                    nelements, stride, interior_start, e, elements, u_stride, g_u[1], u_block);
+
+#ifdef HEX8_SEGMENTED_SYMBOLIC
+            cu_hex8_linear_elasticity_integral_matrix_block_0_1<T, T>(
+                    mu, lambda, sub_adjugate, sub_determinant, elemental_matrix);
+#else
+            for (int i = 0; i < 64; i++) {
+                elemental_matrix[i] = 0;
+            }
+            for (int k = 0; k < n_qp; k++) {
+                cu_hex8_linear_elasticity_matrix_block_0_1<T, T>(mu,
+                                                                 lambda,
+                                                                 sub_adjugate,
+                                                                 sub_determinant,
+                                                                 qx[k],
+                                                                 qy[k],
+                                                                 qz[k],
+                                                                 qw[k],
+                                                                 elemental_matrix);
+            }
+#endif
+
+            apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[0]);
+
+#ifdef HEX8_SEGMENTED_SYMBOLIC
+            cu_hex8_linear_elasticity_integral_matrix_block_1_1<T, T>(
+                    mu, lambda, sub_adjugate, sub_determinant, elemental_matrix);
+#else
+            for (int i = 0; i < 64; i++) {
+                elemental_matrix[i] = 0;
+            }
+            for (int k = 0; k < n_qp; k++) {
+                cu_hex8_linear_elasticity_matrix_block_1_1<T, T>(mu,
+                                                                 lambda,
+                                                                 sub_adjugate,
+                                                                 sub_determinant,
+                                                                 qx[k],
+                                                                 qy[k],
+                                                                 qz[k],
+                                                                 qw[k],
+                                                                 elemental_matrix);
+            }
+#endif
+
+            apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[1]);
+
+#ifdef HEX8_SEGMENTED_SYMBOLIC
+            cu_hex8_linear_elasticity_integral_matrix_block_2_1<T, T>(
+                    mu, lambda, sub_adjugate, sub_determinant, elemental_matrix);
+#else
+            for (int i = 0; i < 64; i++) {
+                elemental_matrix[i] = 0;
+            }
+            for (int k = 0; k < n_qp; k++) {
+                cu_hex8_linear_elasticity_matrix_block_2_1<T, T>(mu,
+                                                                 lambda,
+                                                                 sub_adjugate,
+                                                                 sub_determinant,
+                                                                 qx[k],
+                                                                 qy[k],
+                                                                 qz[k],
+                                                                 qw[k],
+                                                                 elemental_matrix);
+            }
+#endif
+
+            apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[2]);
+        }
+
+        // Z
+        {
+            // Gather from global to "local"
+            cu_proteus_hex8_gather<T, LEVEL, T>(
+                    nelements, stride, interior_start, e, elements, u_stride, g_u[2], u_block);
+
+#ifdef HEX8_SEGMENTED_SYMBOLIC
+            cu_hex8_linear_elasticity_integral_matrix_block_0_2<T, T>(
+                    mu, lambda, sub_adjugate, sub_determinant, elemental_matrix);
+#else
+            for (int i = 0; i < 64; i++) {
+                elemental_matrix[i] = 0;
+            }
+            for (int k = 0; k < n_qp; k++) {
+                cu_hex8_linear_elasticity_matrix_block_0_2<T, T>(mu,
+                                                                 lambda,
+                                                                 sub_adjugate,
+                                                                 sub_determinant,
+                                                                 qx[k],
+                                                                 qy[k],
+                                                                 qz[k],
+                                                                 qw[k],
+                                                                 elemental_matrix);
+            }
+#endif
+
+            apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[0]);
+
+#ifdef HEX8_SEGMENTED_SYMBOLIC
+            cu_hex8_linear_elasticity_integral_matrix_block_1_2<T, T>(
+                    mu, lambda, sub_adjugate, sub_determinant, elemental_matrix);
+#else
+            for (int i = 0; i < 64; i++) {
+                elemental_matrix[i] = 0;
+            }
+            for (int k = 0; k < n_qp; k++) {
+                cu_hex8_linear_elasticity_matrix_block_1_2<T, T>(mu,
+                                                                 lambda,
+                                                                 sub_adjugate,
+                                                                 sub_determinant,
+                                                                 qx[k],
+                                                                 qy[k],
+                                                                 qz[k],
+                                                                 qw[k],
+                                                                 elemental_matrix);
+            }
+#endif
+
+            apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[1]);
+
+#ifdef HEX8_SEGMENTED_SYMBOLIC
+            cu_hex8_linear_elasticity_integral_matrix_block_2_2<T, T>(
+                    mu, lambda, sub_adjugate, sub_determinant, elemental_matrix);
+#else
+            for (int i = 0; i < 64; i++) {
+                elemental_matrix[i] = 0;
+            }
+            for (int k = 0; k < n_qp; k++) {
+                cu_hex8_linear_elasticity_matrix_block_2_2<T, T>(mu,
+                                                                 lambda,
+                                                                 sub_adjugate,
+                                                                 sub_determinant,
+                                                                 qx[k],
+                                                                 qy[k],
+                                                                 qz[k],
+                                                                 qw[k],
+                                                                 elemental_matrix);
+            }
+#endif
+
+            apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[2]);
+        }
+
+        // // Scatter from "local" to global
+        for (int d = 0; d < 3; d++) {
+            cu_proteus_hex8_scatter_add<T, LEVEL, T>(nelements,
+                                                     stride,
+                                                     interior_start,
+                                                     e,
+                                                     elements,
+                                                     out_block[d],
+                                                     out_stride,
+                                                     g_out[d]);
+        }
+    }
+}
+
+#define local_mem_kernel cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segmented_kernel
+// #define local_mem_kernel cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel
+
+template <typename T, int LEVEL>
 int cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl(
         const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
@@ -184,11 +591,7 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl(
     {
         int min_grid_size;
         cudaOccupancyMaxPotentialBlockSize(
-                &min_grid_size,
-                &block_size,
-                cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel<T, LEVEL>,
-                0,
-                0);
+                &min_grid_size, &block_size, local_mem_kernel<T, LEVEL>, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
@@ -196,46 +599,203 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl(
 
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel<T, LEVEL>
-                <<<n_blocks, block_size, 0, s>>>(nelements,
-                                                 stride,
-                                                 interior_start,
-                                                 elements,
-                                                 jacobian_adjugate,
-                                                 jacobian_determinant,
-                                                 mu,
-                                                 lambda,
-                                                 u_stride,
-                                                 ux,
-                                                 uy,
-                                                 uz,
-                                                 out_stride,
-                                                 outx,
-                                                 outy,
-                                                 outz);
+        local_mem_kernel<T, LEVEL><<<n_blocks, block_size, 0, s>>>(nelements,
+                                                                   stride,
+                                                                   interior_start,
+                                                                   elements,
+                                                                   jacobian_adjugate,
+                                                                   jacobian_determinant,
+                                                                   mu,
+                                                                   lambda,
+                                                                   u_stride,
+                                                                   ux,
+                                                                   uy,
+                                                                   uz,
+                                                                   out_stride,
+                                                                   outx,
+                                                                   outy,
+                                                                   outz);
     } else {
-        cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel<T, LEVEL>
-                <<<n_blocks, block_size, 0>>>(nelements,
-                                              stride,
-                                              interior_start,
-                                              elements,
-                                              jacobian_adjugate,
-                                              jacobian_determinant,
-                                              mu,
-                                              lambda,
-                                              u_stride,
-                                              ux,
-                                              uy,
-                                              uz,
-                                              out_stride,
-                                              outx,
-                                              outy,
-                                              outz);
+        local_mem_kernel<T, LEVEL><<<n_blocks, block_size, 0>>>(nelements,
+                                                                stride,
+                                                                interior_start,
+                                                                elements,
+                                                                jacobian_adjugate,
+                                                                jacobian_determinant,
+                                                                mu,
+                                                                lambda,
+                                                                u_stride,
+                                                                ux,
+                                                                uy,
+                                                                uz,
+                                                                out_stride,
+                                                                outx,
+                                                                outy,
+                                                                outz);
     }
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
 }
+
+// #define B_(x, y, z) ((z)*BLOCK_SIZE_2 + (y)*BLOCK_SIZE + (x))
+
+// template <typename T, int LEVEL>
+// __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
+//         const ptrdiff_t nelements,
+//         const ptrdiff_t stride,  // Stride for elements and fff
+//         const ptrdiff_t interior_start,
+//         const idx_t *const SFEM_RESTRICT elements,
+//         const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
+//         const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_determinant,
+//         const T mu,
+//         const T lambda,
+//         const ptrdiff_t u_stride,
+//         const T *const SFEM_RESTRICT g_ux,
+//         const T *const SFEM_RESTRICT g_uy,
+//         const T *const SFEM_RESTRICT g_uz,
+//         const ptrdiff_t out_stride,
+//         T *const SFEM_RESTRICT g_outx,
+//         T *const SFEM_RESTRICT g_outy,
+//         T *const SFEM_RESTRICT g_outz) {
+//     static const int BLOCK_SIZE = LEVEL + 1;
+//     static const int BLOCK_SIZE_2 = BLOCK_SIZE * BLOCK_SIZE;
+//     static const int BLOCK_SIZE_3 = BLOCK_SIZE_2 * BLOCK_SIZE;
+
+//     assert(blockDim.x == BLOCK_SIZE);
+//     assert(blockDim.y == BLOCK_SIZE);
+//     assert(blockDim.z == BLOCK_SIZE);
+
+//     // Global mem
+//     const T *g_u[3] = {g_ux, g_uy, g_uz};
+//     T *g_out[3] = {g_outx, g_outy, g_outz};
+
+//     // Shared mem
+//     __shared__ T u_block[BLOCK_SIZE_3];
+//     __shared__ T out_block[BLOCK_SIZE_3];
+
+//     const T h = 1. / LEVEL;
+
+//     const auto xi = threadIdx.x;
+//     const auto yi = threadIdx.y;
+//     const auto zi = threadIdx.z;
+//     const int interior = xi > 0 && yi > 0 && zi > 0 && xi < LEVEL && yi < LEVEL && zi < LEVEL;
+//     const bool is_element = xi < LEVEL && yi < LEVEL && zi < LEVEL;
+
+//     assert(xi < BLOCK_SIZE);
+//     assert(yi < BLOCK_SIZE);
+//     assert(zi < BLOCK_SIZE);
+
+//     const int lidx = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi);
+
+//     assert(lidx < BLOCK_SIZE_3);
+//     assert(lidx >= 0);
+
+//     int lev[8];
+//     if (is_element) {
+//         lev[0] = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi);
+//         lev[1] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi);
+//         lev[2] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi);
+//         lev[3] = cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi);
+//         lev[4] = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi + 1);
+//         lev[5] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi + 1);
+//         lev[6] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi + 1);
+//         lev[7] = cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi + 1);
+//     }
+
+//     T out[3][8];
+//     T u[3][8];
+//     T sub_adjugate[9];
+//     T sub_determinant;
+
+//     for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
+//         const ptrdiff_t idx = elements[lidx * stride + e];
+
+//         if (is_element) {
+//             sub_adjugate[0] = g_jacobian_adjugate[0 * stride + e];
+//             sub_adjugate[1] = g_jacobian_adjugate[1 * stride + e];
+//             sub_adjugate[2] = g_jacobian_adjugate[2 * stride + e];
+//             sub_adjugate[3] = g_jacobian_adjugate[3 * stride + e];
+//             sub_adjugate[4] = g_jacobian_adjugate[4 * stride + e];
+//             sub_adjugate[5] = g_jacobian_adjugate[5 * stride + e];
+//             sub_adjugate[6] = g_jacobian_adjugate[6 * stride + e];
+//             sub_adjugate[7] = g_jacobian_adjugate[7 * stride + e];
+//             sub_adjugate[8] = g_jacobian_adjugate[8 * stride + e];
+//             sub_determinant = g_jacobian_determinant[e];
+//         }
+
+//         out_block[lidx] = 0;
+
+//         // Gather
+//         for (int d = 0; d < 3; d++) {
+//             u_block[lidx] = g_u[d][idx * u_stride];
+//             assert(u_block[lidx] == u_block[lidx]);
+
+//             __syncthreads();
+
+//             if (is_element) {
+//                 for (int v = 0; v < 8; v++) {
+//                     u[d][v] = u_block[lev[v]];
+//                 }
+//             }
+
+//             __syncthreads();
+//         }
+
+//         // Compute
+//         if (is_element) {
+//             cu_hex8_sub_adj_0_in_place(h, sub_adjugate, &sub_determinant);
+
+//             for (int d = 0; d < 3; d++) {
+//                 for (int v = 0; v < 8; v++) {
+//                     out[d][v] = 0;
+//                 }
+//             }
+
+//             for (int k = 0; k < n_qp; k++) {
+//                 cu_hex8_linear_elasticity_apply_adj<T, T>(mu,
+//                                                           lambda,
+//                                                           sub_adjugate,
+//                                                           sub_determinant,
+//                                                           qx[k],
+//                                                           qy[k],
+//                                                           qz[k],
+//                                                           qw[k],
+//                                                           u[0],
+//                                                           u[1],
+//                                                           u[2],
+//                                                           out[0],
+//                                                           out[1],
+//                                                           out[2]);
+//             }
+//         }
+
+//         // Scatter
+//         for (int d = 0; d < 3; d++) {
+//             if (is_element) {
+//                 for (int v = 0; v < 8; v++) {
+//                     atomicAdd(&out_block[lev[v]], out[d][v]);
+//                 }
+//             }
+
+//             __syncthreads();
+
+//             assert(out_block[lidx] == out_block[lidx]);
+
+//             if (interior) {
+//                 g_out[d][idx * out_stride] += out_block[lidx];
+//             } else {
+//                 atomicAdd(&(g_out[d][idx * out_stride]), out_block[lidx]);
+//             }
+
+//             out_block[lidx] = 0;
+
+//             if (d < 2) {
+//                 __syncthreads();
+//             }
+//         }
+//     }
+// }
 
 template <typename T, int LEVEL>
 __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
@@ -268,19 +828,8 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
     T *g_out[3] = {g_outx, g_outy, g_outz};
 
     // Shared mem
-    __shared__ T u_block[BLOCK_SIZE_3];
     __shared__ T out_block[BLOCK_SIZE_3];
 
-    static const int n_qp = 6;
-    const T qw[6] = {0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667};
-    const T qx[6] = {0.0, 0.5, 0.5, 0.5, 0.5, 1.0};
-    const T qy[6] = {0.5, 0.0, 0.5, 0.5, 1.0, 0.5};
-    const T qz[6] = {0.5, 0.5, 0.0, 1.0, 0.5, 0.5};
     const T h = 1. / LEVEL;
 
     const auto xi = threadIdx.x;
@@ -318,6 +867,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
     for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
         const ptrdiff_t idx = elements[lidx * stride + e];
 
+        // Gather
         if (is_element) {
             sub_adjugate[0] = g_jacobian_adjugate[0 * stride + e];
             sub_adjugate[1] = g_jacobian_adjugate[1 * stride + e];
@@ -329,27 +879,21 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
             sub_adjugate[7] = g_jacobian_adjugate[7 * stride + e];
             sub_adjugate[8] = g_jacobian_adjugate[8 * stride + e];
             sub_determinant = g_jacobian_determinant[e];
-        }
 
-        out_block[lidx] = 0;
-
-        // Gather
-        for (int d = 0; d < 3; d++) {
-            u_block[lidx] = g_u[d][idx * u_stride];
-            assert(u_block[lidx] == u_block[lidx]);
-
-            __syncthreads();
-
-            if (is_element) {
+            for (int d = 0; d < 3; d++) {
                 for (int v = 0; v < 8; v++) {
-                    u[d][v] = u_block[lev[v]];
+                    u[d][v] = g_u[d][elements[lev[v] * stride + e] * u_stride];
                 }
             }
         }
 
+        out_block[lidx] = 0;
+
         // Compute
         if (is_element) {
             cu_hex8_sub_adj_0_in_place(h, sub_adjugate, &sub_determinant);
+
+            //
 
             for (int d = 0; d < 3; d++) {
                 for (int v = 0; v < 8; v++) {
@@ -394,10 +938,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
             }
 
             out_block[lidx] = 0;
-
-            if (d < 2) {
-                __syncthreads();
-            }
+            __syncthreads();
         }
     }
 }
@@ -472,6 +1013,7 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl(
 }
 
 // #define my_kernel cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl
+// #define my_kernel_large cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl
 #define my_kernel cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl
 #define my_kernel_large cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl
 
@@ -497,165 +1039,138 @@ static int cu_proteus_affine_hex8_linear_elasticity_apply_tpl(
         real_t *const SFEM_RESTRICT outz,
         void *stream) {
     switch (level) {
-        case 2: {
-            return my_kernel<real_t, 2>(
-                    nelements,
-                    stride,
-                    interior_start,
-                    elements,
-                    (cu_jacobian_t *)jacobian_adjugate,
-                    (cu_jacobian_t *)jacobian_determinant,
-                    mu,
-                    lambda,
-                    u_stride,
-                    (real_t *)ux,
-                    (real_t *)uy,
-                    (real_t *)uz,
-                    out_stride,
-                    (real_t *)outx,
-                    (real_t *)outy,
-                    (real_t *)outz,
-                    stream);
-        }
+        // case 2: {
+        //     return my_kernel<real_t, 2>(nelements,
+        //                                 stride,
+        //                                 interior_start,
+        //                                 elements,
+        //                                 (cu_jacobian_t *)jacobian_adjugate,
+        //                                 (cu_jacobian_t *)jacobian_determinant,
+        //                                 mu,
+        //                                 lambda,
+        //                                 u_stride,
+        //                                 (real_t *)ux,
+        //                                 (real_t *)uy,
+        //                                 (real_t *)uz,
+        //                                 out_stride,
+        //                                 (real_t *)outx,
+        //                                 (real_t *)outy,
+        //                                 (real_t *)outz,
+        //                                 stream);
+        // }
         case 3: {
-            return my_kernel<real_t, 3>(
-                    nelements,
-                    stride,
-                    interior_start,
-                    elements,
-                    (cu_jacobian_t *)jacobian_adjugate,
-                    (cu_jacobian_t *)jacobian_determinant,
-                    mu,
-                    lambda,
-                    u_stride,
-                    (real_t *)ux,
-                    (real_t *)uy,
-                    (real_t *)uz,
-                    out_stride,
-                    (real_t *)outx,
-                    (real_t *)outy,
-                    (real_t *)outz,
-                    stream);
+            return my_kernel<real_t, 3>(nelements,
+                                        stride,
+                                        interior_start,
+                                        elements,
+                                        (cu_jacobian_t *)jacobian_adjugate,
+                                        (cu_jacobian_t *)jacobian_determinant,
+                                        mu,
+                                        lambda,
+                                        u_stride,
+                                        (real_t *)ux,
+                                        (real_t *)uy,
+                                        (real_t *)uz,
+                                        out_stride,
+                                        (real_t *)outx,
+                                        (real_t *)outy,
+                                        (real_t *)outz,
+                                        stream);
         }
         case 4: {
-            return my_kernel<real_t, 4>(
-                    nelements,
-                    stride,
-                    interior_start,
-                    elements,
-                    (cu_jacobian_t *)jacobian_adjugate,
-                    (cu_jacobian_t *)jacobian_determinant,
-                    mu,
-                    lambda,
-                    u_stride,
-                    (real_t *)ux,
-                    (real_t *)uy,
-                    (real_t *)uz,
-                    out_stride,
-                    (real_t *)outx,
-                    (real_t *)outy,
-                    (real_t *)outz,
-                    stream);
+            return my_kernel<real_t, 4>(nelements,
+                                        stride,
+                                        interior_start,
+                                        elements,
+                                        (cu_jacobian_t *)jacobian_adjugate,
+                                        (cu_jacobian_t *)jacobian_determinant,
+                                        mu,
+                                        lambda,
+                                        u_stride,
+                                        (real_t *)ux,
+                                        (real_t *)uy,
+                                        (real_t *)uz,
+                                        out_stride,
+                                        (real_t *)outx,
+                                        (real_t *)outy,
+                                        (real_t *)outz,
+                                        stream);
         }
         case 5: {
-            return my_kernel_large<real_t, 5>(
-                    nelements,
-                    stride,
-                    interior_start,
-                    elements,
-                    (cu_jacobian_t *)jacobian_adjugate,
-                    (cu_jacobian_t *)jacobian_determinant,
-                    mu,
-                    lambda,
-                    u_stride,
-                    (real_t *)ux,
-                    (real_t *)uy,
-                    (real_t *)uz,
-                    out_stride,
-                    (real_t *)outx,
-                    (real_t *)outy,
-                    (real_t *)outz,
-                    stream);
+            return my_kernel_large<real_t, 5>(nelements,
+                                              stride,
+                                              interior_start,
+                                              elements,
+                                              (cu_jacobian_t *)jacobian_adjugate,
+                                              (cu_jacobian_t *)jacobian_determinant,
+                                              mu,
+                                              lambda,
+                                              u_stride,
+                                              (real_t *)ux,
+                                              (real_t *)uy,
+                                              (real_t *)uz,
+                                              out_stride,
+                                              (real_t *)outx,
+                                              (real_t *)outy,
+                                              (real_t *)outz,
+                                              stream);
         }
-        case 6: {
-            return my_kernel_large<real_t, 6>(
-                    nelements,
-                    stride,
-                    interior_start,
-                    elements,
-                    (cu_jacobian_t *)jacobian_adjugate,
-                    (cu_jacobian_t *)jacobian_determinant,
-                    mu,
-                    lambda,
-                    u_stride,
-                    (real_t *)ux,
-                    (real_t *)uy,
-                    (real_t *)uz,
-                    out_stride,
-                    (real_t *)outx,
-                    (real_t *)outy,
-                    (real_t *)outz,
-                    stream);
-        }
-        case 7: {
-            return my_kernel_large<real_t, 7>(
-                    nelements,
-                    stride,
-                    interior_start,
-                    elements,
-                    (cu_jacobian_t *)jacobian_adjugate,
-                    (cu_jacobian_t *)jacobian_determinant,
-                    mu,
-                    lambda,
-                    u_stride,
-                    (real_t *)ux,
-                    (real_t *)uy,
-                    (real_t *)uz,
-                    out_stride,
-                    (real_t *)outx,
-                    (real_t *)outy,
-                    (real_t *)outz,
-                    stream);
-        }
-        case 8: {
-            return my_kernel_large<real_t, 8>(
-                    nelements,
-                    stride,
-                    interior_start,
-                    elements,
-                    (cu_jacobian_t *)jacobian_adjugate,
-                    (cu_jacobian_t *)jacobian_determinant,
-                    mu,
-                    lambda,
-                    u_stride,
-                    (real_t *)ux,
-                    (real_t *)uy,
-                    (real_t *)uz,
-                    out_stride,
-                    (real_t *)outx,
-                    (real_t *)outy,
-                    (real_t *)outz,
-                    stream);
-        }
-        // case 9: {
-        //     return cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl<real_t, 9>(
-        //             nelements,
-        //             stride,
-        //             interior_start,
-        //             elements,
-        //             (cu_jacobian_t *)jacobian_adjugate,
-        //             (cu_jacobian_t *)jacobian_determinant,
-        //             mu,
-        //             lambda,
-        //             u_stride,
-        //             (real_t *)ux,
-        //             (real_t *)uy,
-        //             (real_t *)uz,
-        //             out_stride,
-        //             (real_t *)outx,
-        //             (real_t *)outy,
-        //             (real_t *)outz,
-        //             stream);
+        // case 6: {
+        //     return my_kernel_large<real_t, 6>(nelements,
+        //                                       stride,
+        //                                       interior_start,
+        //                                       elements,
+        //                                       (cu_jacobian_t *)jacobian_adjugate,
+        //                                       (cu_jacobian_t *)jacobian_determinant,
+        //                                       mu,
+        //                                       lambda,
+        //                                       u_stride,
+        //                                       (real_t *)ux,
+        //                                       (real_t *)uy,
+        //                                       (real_t *)uz,
+        //                                       out_stride,
+        //                                       (real_t *)outx,
+        //                                       (real_t *)outy,
+        //                                       (real_t *)outz,
+        //                                       stream);
+        // }
+        // case 7: {
+        //     return my_kernel_large<real_t, 7>(nelements,
+        //                                       stride,
+        //                                       interior_start,
+        //                                       elements,
+        //                                       (cu_jacobian_t *)jacobian_adjugate,
+        //                                       (cu_jacobian_t *)jacobian_determinant,
+        //                                       mu,
+        //                                       lambda,
+        //                                       u_stride,
+        //                                       (real_t *)ux,
+        //                                       (real_t *)uy,
+        //                                       (real_t *)uz,
+        //                                       out_stride,
+        //                                       (real_t *)outx,
+        //                                       (real_t *)outy,
+        //                                       (real_t *)outz,
+        //                                       stream);
+        // }
+        // case 8: {
+        //     return my_kernel_large<real_t, 8>(nelements,
+        //                                       stride,
+        //                                       interior_start,
+        //                                       elements,
+        //                                       (cu_jacobian_t *)jacobian_adjugate,
+        //                                       (cu_jacobian_t *)jacobian_determinant,
+        //                                       mu,
+        //                                       lambda,
+        //                                       u_stride,
+        //                                       (real_t *)ux,
+        //                                       (real_t *)uy,
+        //                                       (real_t *)uz,
+        //                                       out_stride,
+        //                                       (real_t *)outx,
+        //                                       (real_t *)outy,
+        //                                       (real_t *)outz,
+        //                                       stream);
         // }
         default: {
             fprintf(stderr,
@@ -688,6 +1203,8 @@ extern int cu_proteus_affine_hex8_linear_elasticity_apply(
         void *const SFEM_RESTRICT outy,
         void *const SFEM_RESTRICT outz,
         void *stream) {
+    init_quadrature();
+
     switch (real_type) {
         case SFEM_REAL_DEFAULT: {
             return cu_proteus_affine_hex8_linear_elasticity_apply_tpl<real_t>(

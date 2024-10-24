@@ -216,11 +216,28 @@ def check_op():
 			A[i, j] = hex8.integrate(q, inner(g[i], g[j]))
 		print(A[i, :])
 
+def gen_grads():
+	g = Hex8().grad(vec3(qx, qy, qz))
+
+	for d in range(0, 3):
+		expr = []
+		for i in range(0, len(g)):
+			expr.append(ast.Assignment(sp.symbols(f'val[{i}]'), g[i][d]))
+
+		print(f"// grad({d})")
+		c_code(expr)
+
+
+
 if __name__ == '__main__':
 	# Hex8().generate_qp_based_code()
 	# points_from_sub_ref_hex8()
 	# sub_fff()
 	# check_op()
-	sub_adj()
+	# sub_adj()
+
+	gen_grads()
+	
+
 
 	

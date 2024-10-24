@@ -2,7 +2,6 @@
 
 set -e
 
-
 if [[ -z $SFEM_DIR ]]
 then
 	echo "SFEM_DIR must be defined with the installation prefix of sfem"
@@ -22,71 +21,97 @@ export OMP_PROC_BIND=true
 export CUDA_LAUNCH_BLOCKING=0
 
 export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
-export SFEM_ELEMENT_REFINE_LEVEL=4
+export SFEM_ELEMENT_REFINE_LEVEL=8
 export SFEM_MAX_IT=10000
 
-mesh=mesh
+export CASE=3
+case $CASE in
+	1 | 2)
+		mesh=mesh
+		if [[ -d "$mesh" ]]
+		then
+			echo "Reusing mesh"
+		else
+			create_cyclic_ss_mesh.sh 10 $SFEM_ELEMENT_REFINE_LEVEL
+		fi
 
-if [[ -d "$mesh" ]]
-then
-	echo "Reusing mesh"
-else
-	# Cyclic mesh
-	create_cyclic_ss_mesh.sh 10 $SFEM_ELEMENT_REFINE_LEVEL
+		sinlet=$mesh/surface/sidesets_aos/inlet.raw
+		soutlet=$mesh/surface/sidesets_aos/outlet.raw
+		sobstacle=$mesh/surface/sidesets_aos/wall1.raw
+		./compute_distance.py mesh/viz/ $sobstacle ub.raw
+		obstacle_surface=$mesh/surface/wall1/
+	;;
+	3)
+		mesh=joint_hex_db
+		if [[ -d "$mesh" ]]
+		then
+			echo "Reusing mesh"
+		else
+			$SCRIPTPATH/../../data/vtk/joint-hex.sh $SFEM_ELEMENT_REFINE_LEVEL
+		fi
+		sinlet=$mesh/surface/sidesets_aos/base.raw
+		sobstacle=$mesh/surface/sidesets_aos/top.raw
+		./compute_distance_joint.py $mesh/viz/ $sobstacle ub.raw
+		obstacle_surface=$mesh/surface/top/
+	;;
+	10 | 20)
+		mesh=mesh
+		if [[ -d "$mesh" ]]
+		then
+			echo "Reusing mesh"
+		else
+			create_box_ss_mesh.sh 8 $SFEM_ELEMENT_REFINE_LEVEL
+		fi
 
-	# BOX mesh for testing
-	# create_box_ss_mesh.sh 8 $SFEM_ELEMENT_REFINE_LEVEL
-fi
+		sinlet=$mesh/surface/sidesets_aos/left.raw 
+		soutlet=$mesh/surface/sidesets_aos/right.raw
+		# TODO obstacle
 
-# Cyclic mesh
-sinlet=$mesh/surface/sidesets_aos/inlet.raw
-soutlet=$mesh/surface/sidesets_aos/outlet.raw
-sobstacle=$mesh/surface/sidesets_aos/wall1.raw
-./compute_distance.py mesh/viz/ $sobstacle ub.raw
+	;;
+	*)
+		echo "Error wrong case"
+	;;
+esac
 
-# Box mesh for testing
-# sinlet=$mesh/surface/sidesets_aos/left.raw 
-# soutlet=$mesh/surface/sidesets_aos/right.raw 
+case $CASE in
+	1 | 10)
+	export SFEM_DIRICHLET_NODESET="$sinlet,$sinlet,$sinlet,$soutlet,$soutlet,$soutlet"
+	export SFEM_DIRICHLET_VALUE="0,0,0,0,0,0"
+	export SFEM_DIRICHLET_COMPONENT="0,1,2,0,1,2"
 
-SQP=1
-export SFEM_USE_ELASTICITY=1
+	export SFEM_CONTACT_NODESET="$sobstacle"
+	export SFEM_CONTACT_VALUE="path:ub.raw"
+	export SFEM_CONTACT_COMPONENT="1"
+	export SFEM_USE_ELASTICITY=1
+	;;
 
-if [[ $SFEM_USE_ELASTICITY -eq 1 ]]
-then
-	if [[ $SQP -eq 1 ]]
-	then
-		export SFEM_DIRICHLET_NODESET="$sinlet,$sinlet,$sinlet,$soutlet,$soutlet,$soutlet"
-		export SFEM_DIRICHLET_VALUE="0,0,0,0,0,0"
-		export SFEM_DIRICHLET_COMPONENT="0,1,2,0,1,2"
+	2 | 20)
+	export SFEM_DIRICHLET_NODESET="$sinlet"
+	export SFEM_DIRICHLET_VALUE="1"
+	export SFEM_DIRICHLET_COMPONENT="0"
 
-		export SFEM_CONTACT_NODESET="$sobstacle"
-		export SFEM_CONTACT_VALUE="path:ub.raw"
-		export SFEM_CONTACT_COMPONENT="1"
-	else
-		export SFEM_DIRICHLET_NODESET="$sinlet,$sinlet,$sinlet,$soutlet,$soutlet,$soutlet"
-		export SFEM_DIRICHLET_VALUE="0,0.1,0,0,-0.1,0"
-		export SFEM_DIRICHLET_COMPONENT="0,1,2,0,1,2"
-	fi
-else
-	if [[ $SQP -eq 1 ]]
-	then
-		# Contact
-		export SFEM_DIRICHLET_NODESET="$sinlet"
-		export SFEM_DIRICHLET_VALUE="1"
-		export SFEM_DIRICHLET_COMPONENT="0"
+	export SFEM_CONTACT_NODESET="$soutlet"
+	export SFEM_CONTACT_VALUE="-1"
+	export SFEM_CONTACT_COMPONENT="0"
+	export SFEM_USE_ELASTICITY=0
+	;;
 
-		export SFEM_CONTACT_NODESET="$soutlet"
-		export SFEM_CONTACT_VALUE="-1"
-		export SFEM_CONTACT_COMPONENT="0"
-	else
-		export SFEM_DIRICHLET_NODESET="$sinlet,$soutlet"
-		export SFEM_DIRICHLET_VALUE="1,-1"
-		export SFEM_DIRICHLET_COMPONENT="0,0"
+	3)
+	export SFEM_DIRICHLET_NODESET="$sinlet,$sinlet,$sinlet"
+	export SFEM_DIRICHLET_VALUE="0,0,0,"
+	export SFEM_DIRICHLET_COMPONENT="0,1,2"
 
-		rm -f output/upper_bound.raw 
-	fi
-fi
+	export SFEM_CONTACT_NODESET="$sobstacle"
+	export SFEM_CONTACT_VALUE="path:ub.raw"
+	export SFEM_CONTACT_COMPONENT="0"
+	export SFEM_USE_ELASTICITY=1
+	;;
+	*)
+		echo "Error wrong case"
+	;;
+esac
 
+echo "Running: obstacle $mesh output"
 $LAUNCH obstacle $mesh output | tee obs.log.txt
 
 if [[ $SFEM_USE_ELASTICITY -eq 1 ]]
@@ -108,7 +133,11 @@ then
 	done
 
 	raw_to_db.py $mesh/viz output/hex8.vtk  --point_data="output/soa/*.raw" --point_data_type="$SFEM_REAL_T"
-	raw_to_db.py mesh/surface/wall1/ output/obstacle.vtk --coords=mesh/viz --cell_type=quad --point_data="output/soa/upper_bound.1.*" --point_data_type="$SFEM_REAL_T"
+
+	if [[ -d $obstacle_surface ]]
+	then
+		raw_to_db.py $obstacle_surface output/obstacle.vtk --coords=$mesh/viz --cell_type=quad --point_data="output/soa/upper_bound.1.*" --point_data_type="$SFEM_REAL_T"
+	fi
 else
 	raw_to_db.py $mesh/viz output/hex8.vtk --point_data=output/u.raw,output/rhs.raw,output/upper_bound.raw --point_data_type="$SFEM_REAL_T,$SFEM_REAL_T,$SFEM_REAL_T"
 fi

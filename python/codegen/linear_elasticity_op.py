@@ -6,15 +6,19 @@ from tri3 import *
 from tri6 import *
 from tet4 import *
 from tet10 import *
+from tet20 import *
 from hex8 import *
+from aahex8 import *
 
+import sys
 from time import perf_counter
 
-
 class LinearElasticityOp:
-	def __init__(self, fe, q):
+	def __init__(self, fe):
 		dims = fe.manifold_dim()
-		q = sp.Matrix(dims, 1, q)
+
+		q_temp = [qx, qy, qz]
+		q = sp.Matrix(dims, 1, q_temp[0:dims])
 		shape_grad = fe.physical_tgrad(q)
 		e_jac_inv = fe.jacobian_inverse(q)
 
@@ -188,6 +192,89 @@ class LinearElasticityOp:
 
 		return expr
 
+	def hessian_blocks(self):
+		H = self.integr_hessian
+		rows, cols = H.shape
+		fe = self.fe
+
+		n = fe.n_nodes()
+		dims = fe.spatial_dim()
+
+		blocks = []
+
+		for d1 in range(0, dims):
+			for d2 in range(0, dims):
+				expr = []
+				for i in range(0, n):
+					for j in range(0, n):
+						var = sp.symbols(f'element_matrix[{i*n + j}]')
+						expr.append(ast.Assignment(var, H[d1 * n + i, d2 * n + j]))
+				blocks.append((f'block_{d1}_{d2}', expr))
+
+		return blocks
+
+	def hessian_blocks_tpl(self):
+		tpl="""
+template<typename scalar_t, typename accumulator_t>
+static inline __host__ __device__ void  cu_hex8_linear_elasticity_matrix_{BLOCK_NAME}(
+const scalar_t mu,
+const scalar_t lambda,
+const scalar_t *const SFEM_RESTRICT adjugate,
+const scalar_t jacobian_determinant,
+accumulator_t *const SFEM_RESTRICT
+element_matrix) 
+{{
+	{CODE}
+}}
+"""
+		return tpl
+
+	def apply_blocks(self):
+		H = self.integr_hessian
+		rows, cols = H.shape
+		fe = self.fe
+
+		n = fe.n_nodes()
+		dims = fe.spatial_dim()
+
+		blocks = []
+
+		u = coeffs('in', n)
+		for d1 in range(0, dims):
+			for d2 in range(0, dims):
+				expr = []
+				B = sp.zeros(n, n)
+				for i in range(0, n):
+					for j in range(0, n):
+						B[i,j] = H[d1 * n + i, d2 * n + j]
+						
+					val = B * u
+
+				for i in range(0, n):
+					var = sp.symbols(f'out[{i}]')
+					expr.append(ast.Assignment(var, val[i]))
+					
+				blocks.append((f'block_{d1}_{d2}', expr))
+
+		return blocks
+
+	def apply_blocks_tpl(self):
+		tpl="""
+template<typename scalar_t, typename accumulator_t>
+static inline __host__ __device__ void  cu_hex8_linear_elasticity_apply_{BLOCK_NAME}(
+const scalar_t mu,
+const scalar_t lambda,
+const scalar_t *const SFEM_RESTRICT adjugate,
+const scalar_t jacobian_determinant,
+const scalar_t *const SFEM_RESTRICT in,
+accumulator_t *const SFEM_RESTRICT
+oout) 
+{{
+	{CODE}
+}}
+"""
+		return tpl
+
 	def hessian_diag(self):
 		H = self.integr_hessian
 		rows, cols = H.shape
@@ -232,19 +319,48 @@ class LinearElasticityOp:
 def main():
 	start = perf_counter()
 
-	# fe = AxisAlignedQuad4()
-	# fe = Tri3()
-	# fe = Tri6()
-	# q = sp.Matrix(2, 1, [qx, qy])
+	fes = {
+	"TRI6": Tri6(),
+	"TRI3": Tri3(),
+	"TET4": Tet4(),
+	"TET10": Tet10(),
+	"TET20": Tet20(),
+	"HEX8": Hex8(),
+	"AAHEX8": AAHex8(),
+	"AAQUAD4": AxisAlignedQuad4()
+	}
 
-	# fe = Tet4()
-	# fe = Tet10()
-	fe = Hex8()
+	if len(sys.argv) >= 2:
+		fe = fes[sys.argv[1]]
+	else:
+		print("Fallback with TET10")
+		fe = Tet10()
+
 	fe.use_adjugate = True
-	q = sp.Matrix(3, 1, [qx, qy, qz])
-
-	op = LinearElasticityOp(fe, q)
+	
+	op = LinearElasticityOp(fe)
 	# op.hessian_check()
+
+
+	# tpl = op.hessian_blocks_tpl()
+	# blocks = op.hessian_blocks()
+	# for k,v in blocks:
+	# 	c_log("//--------------------------")
+	# 	c_log(f"// hessian {k}")	
+	# 	c_log("//--------------------------")
+	# 	code = c_gen(v)
+	# 	c_log(tpl.format(BLOCK_NAME=k, CODE=code))
+
+
+	# tpl = op.apply_blocks_tpl()
+	# blocks = op.apply_blocks()
+	# for k,v in blocks:
+	# 	c_log("//--------------------------")
+	# 	c_log(f"// apply {k}")	
+	# 	c_log("//--------------------------")
+	# 	code = c_gen(v)
+	# 	c_log(tpl.format(BLOCK_NAME=k, CODE=code))
+
 
 	# c_log("--------------------------")
 	# c_log("value")
@@ -256,20 +372,20 @@ def main():
 	# c_log("--------------------------")
 	# c_code(op.gradient())
 
-	c_log("--------------------------")
-	c_log("hessian")	
-	c_log("--------------------------")
-	c_code(op.hessian())
+	# c_log("--------------------------")
+	# c_log("hessian")	
+	# c_log("--------------------------")
+	# c_code(op.hessian())
 
 	# c_log("--------------------------")
 	# c_log("apply")	
 	# c_log("--------------------------")
 	# c_code(op.apply())
 
-	c_log("--------------------------")
-	c_log("hessian_diag")	
-	c_log("--------------------------")
-	c_code(op.hessian_diag())
+	# c_log("--------------------------")
+	# c_log("hessian_diag")	
+	# c_log("--------------------------")
+	# c_code(op.hessian_diag())
 
 	stop = perf_counter()
 	console.print(f'Overall: {stop - start} seconds')

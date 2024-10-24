@@ -5,6 +5,7 @@
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_cuda_blas.h"
+#include "sfem_cuda_blas.hpp"
 
 #include <map>
 #include <memory>
@@ -42,15 +43,7 @@ namespace sfem {
         ret->n_dofs = op->rows();
         ret->set_op(op);
 
-        ret->allocate = d_allocate;
-        ret->destroy = d_destroy;
-        ret->copy = d_copy;
-        ret->dot = d_dot;
-        ret->axpby = d_axpby;
-        ret->axpy = d_axpy;
-        ret->scal = d_scal;
-        ret->norm2 = d_nrm2;
-        ret->zeros = [](const std::size_t n, T* const x) { d_memset(x, 0, n * sizeof(T)); };
+        CUDA_BLAS<T>::build_blas(ret->blas);
         ret->ensure_power_method();
         return ret;
     }

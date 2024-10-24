@@ -6,6 +6,77 @@
 
 #include <stdio.h>
 
+
+static const int n_qp = 27;
+
+static const scalar_t h_qw[27] = {
+        0.021433470507545, 0.034293552812071, 0.021433470507545, 0.034293552812071,
+        0.054869684499314, 0.034293552812071, 0.021433470507545, 0.034293552812071,
+        0.021433470507545, 0.034293552812071, 0.054869684499314, 0.034293552812071,
+        0.054869684499314, 0.087791495198903, 0.054869684499314, 0.034293552812071,
+        0.054869684499314, 0.034293552812071, 0.021433470507545, 0.034293552812071,
+        0.021433470507545, 0.034293552812071, 0.054869684499314, 0.034293552812071,
+        0.021433470507545, 0.034293552812071, 0.021433470507545};
+
+static const scalar_t h_qx[27] = {
+        0.112701665379258, 0.500000000000000, 0.887298334620742, 0.112701665379258,
+        0.500000000000000, 0.887298334620742, 0.112701665379258, 0.500000000000000,
+        0.887298334620742, 0.112701665379258, 0.500000000000000, 0.887298334620742,
+        0.112701665379258, 0.500000000000000, 0.887298334620742, 0.112701665379258,
+        0.500000000000000, 0.887298334620742, 0.112701665379258, 0.500000000000000,
+        0.887298334620742, 0.112701665379258, 0.500000000000000, 0.887298334620742,
+        0.112701665379258, 0.500000000000000, 0.887298334620742};
+
+static const scalar_t h_qy[27] = {
+        0.112701665379258, 0.112701665379258, 0.112701665379258, 0.500000000000000,
+        0.500000000000000, 0.500000000000000, 0.887298334620742, 0.887298334620742,
+        0.887298334620742, 0.112701665379258, 0.112701665379258, 0.112701665379258,
+        0.500000000000000, 0.500000000000000, 0.500000000000000, 0.887298334620742,
+        0.887298334620742, 0.887298334620742, 0.112701665379258, 0.112701665379258,
+        0.112701665379258, 0.500000000000000, 0.500000000000000, 0.500000000000000,
+        0.887298334620742, 0.887298334620742, 0.887298334620742};
+
+static const scalar_t h_qz[27] = {
+        0.112701665379258, 0.112701665379258, 0.112701665379258, 0.112701665379258,
+        0.112701665379258, 0.112701665379258, 0.112701665379258, 0.112701665379258,
+        0.112701665379258, 0.500000000000000, 0.500000000000000, 0.500000000000000,
+        0.500000000000000, 0.500000000000000, 0.500000000000000, 0.500000000000000,
+        0.500000000000000, 0.500000000000000, 0.887298334620742, 0.887298334620742,
+        0.887298334620742, 0.887298334620742, 0.887298334620742, 0.887298334620742,
+        0.887298334620742, 0.887298334620742, 0.887298334620742};
+
+__constant__ scalar_t qx[27];
+__constant__ scalar_t qy[27];
+__constant__ scalar_t qz[27];
+__constant__ scalar_t qw[27];
+
+// static const int n_qp = 6;
+// static const scalar_t h_qw[6] = {0.16666666666666666666666666666667,
+//                                  0.16666666666666666666666666666667,
+//                                  0.16666666666666666666666666666667,
+//                                  0.16666666666666666666666666666667,
+//                                  0.16666666666666666666666666666667,
+//                                  0.16666666666666666666666666666667};
+
+// static const scalar_t h_qx[6] = {0.0, 0.5, 0.5, 0.5, 0.5, 1.0};
+// static const scalar_t h_qy[6] = {0.5, 0.0, 0.5, 0.5, 1.0, 0.5};
+// static const scalar_t h_qz[6] = {0.5, 0.5, 0.0, 1.0, 0.5, 0.5};
+// __constant__ scalar_t qx[6];
+// __constant__ scalar_t qy[6];
+// __constant__ scalar_t qz[6];
+// __constant__ scalar_t qw[6];
+
+static void init_quadrature() {
+    static bool initialized = false;
+    if (!initialized) {
+        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(qx, h_qx, n_qp * sizeof(scalar_t)));
+        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(qy, h_qy, n_qp * sizeof(scalar_t)));
+        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(qz, h_qz, n_qp * sizeof(scalar_t)));
+        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(qw, h_qw, n_qp * sizeof(scalar_t)));
+        initialized = true;
+    }
+}
+
 template <typename T>
 __global__ void cu_affine_hex8_linear_elasticity_apply_kernel(
         const ptrdiff_t nelements,
@@ -23,17 +94,6 @@ __global__ void cu_affine_hex8_linear_elasticity_apply_kernel(
         T *const SFEM_RESTRICT g_outx,
         T *const SFEM_RESTRICT g_outy,
         T *const SFEM_RESTRICT g_outz) {
-    static const int n_qp = 6;
-    const T qw[6] = {0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667,
-                     0.16666666666666666666666666666667};
-    const T qx[6] = {0.0, 0.5, 0.5, 0.5, 0.5, 1.0};
-    const T qy[6] = {0.5, 0.0, 0.5, 0.5, 1.0, 0.5};
-    const T qz[6] = {0.5, 0.5, 0.0, 1.0, 0.5, 0.5};
-
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
          e += blockDim.x * gridDim.x) {
         idx_t ev[8];
@@ -81,20 +141,20 @@ __global__ void cu_affine_hex8_linear_elasticity_apply_kernel(
         }
 
         for (int k = 0; k < n_qp; k++) {
-            cu_hex8_linear_elasticity_apply_adj(mu,
-                                                lambda,
-                                                adjugate,
-                                                jacobian_determinant,
-                                                qx[k],
-                                                qy[k],
-                                                qz[k],
-                                                qw[k],
-                                                ux,
-                                                uy,
-                                                uz,
-                                                outx,
-                                                outy,
-                                                outz);
+            cu_hex8_linear_elasticity_apply_adj<T, T>(mu,
+                                                      lambda,
+                                                      adjugate,
+                                                      jacobian_determinant,
+                                                      qx[k],
+                                                      qy[k],
+                                                      qz[k],
+                                                      qw[k],
+                                                      ux,
+                                                      uy,
+                                                      uz,
+                                                      outx,
+                                                      outy,
+                                                      outz);
         }
 
         for (int v = 0; v < 8; v++) {
@@ -201,6 +261,8 @@ extern int cu_affine_hex8_linear_elasticity_apply(
         void *const SFEM_RESTRICT outy,
         void *const SFEM_RESTRICT outz,
         void *stream) {
+    init_quadrature();
+
     switch (real_type) {
         case SFEM_REAL_DEFAULT: {
             return cu_affine_hex8_linear_elasticity_apply_tpl(nelements,
