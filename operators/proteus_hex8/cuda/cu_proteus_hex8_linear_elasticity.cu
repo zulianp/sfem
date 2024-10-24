@@ -1115,25 +1115,25 @@ static int cu_proteus_affine_hex8_linear_elasticity_apply_tpl(
                                               (real_t *)outz,
                                               stream);
         }
-        case 6: {
-            return my_kernel_large<real_t, 6>(nelements,
-                                              stride,
-                                              interior_start,
-                                              elements,
-                                              (cu_jacobian_t *)jacobian_adjugate,
-                                              (cu_jacobian_t *)jacobian_determinant,
-                                              mu,
-                                              lambda,
-                                              u_stride,
-                                              (real_t *)ux,
-                                              (real_t *)uy,
-                                              (real_t *)uz,
-                                              out_stride,
-                                              (real_t *)outx,
-                                              (real_t *)outy,
-                                              (real_t *)outz,
-                                              stream);
-        }
+        // case 6: {
+        //     return my_kernel_large<real_t, 6>(nelements,
+        //                                       stride,
+        //                                       interior_start,
+        //                                       elements,
+        //                                       (cu_jacobian_t *)jacobian_adjugate,
+        //                                       (cu_jacobian_t *)jacobian_determinant,
+        //                                       mu,
+        //                                       lambda,
+        //                                       u_stride,
+        //                                       (real_t *)ux,
+        //                                       (real_t *)uy,
+        //                                       (real_t *)uz,
+        //                                       out_stride,
+        //                                       (real_t *)outx,
+        //                                       (real_t *)outy,
+        //                                       (real_t *)outz,
+        //                                       stream);
+        // }
         // case 7: {
         //     return my_kernel_large<real_t, 7>(nelements,
         //                                       stride,

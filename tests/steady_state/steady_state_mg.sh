@@ -47,7 +47,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			export SFEM_REFINE=3
+			export SFEM_REFINE=4
 			$SCRIPTPATH/../../data/vtk/joint-hex.sh $SFEM_ELEMENT_REFINE_LEVEL
 		fi
 		sinlet=$mesh/surface/sidesets_aos/base.raw
@@ -102,7 +102,7 @@ esac
 # Parametrize solver
 export SFEM_MG=1
 export SFEM_USE_CHEB=$SFEM_MG
-export SFEM_MAX_IT=5
+export SFEM_MAX_IT=20
 # export SFEM_MAX_IT=4000
 
 export SFEM_HEX8_ASSUME_AFFINE=1
@@ -115,7 +115,7 @@ export SFEM_CRS_MEM_CONSERVATIVE=1
 
 export SFEM_CHEB_EIG_MAX_SCALE=1.0001
 export SFEM_CHEB_EIG_TOL=1e-6
-export SFEM_SMOOTHER_SWEEPS=20
+export SFEM_SMOOTHER_SWEEPS=30
 
 export SFEM_USE_PRECONDITIONER=0
 
