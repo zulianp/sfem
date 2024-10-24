@@ -96,6 +96,13 @@ namespace sfem {
             tpl.copy = copy;
             tpl.dot = dot;
             tpl.norm2 = norm2;
+            tpl.axpy = [](const ptrdiff_t n, const T alpha, const T* const x, T* const y) {
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; i++) {
+                    y[i] += alpha * x[i];
+                }
+            };
+
             tpl.axpby = axpby;
             tpl.zeros = zeros;
             tpl.values = values;
