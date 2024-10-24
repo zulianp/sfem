@@ -229,6 +229,52 @@ element_matrix)
 """
 		return tpl
 
+	def apply_blocks(self):
+		H = self.integr_hessian
+		rows, cols = H.shape
+		fe = self.fe
+
+		n = fe.n_nodes()
+		dims = fe.spatial_dim()
+
+		blocks = []
+
+		u = coeffs('in', n)
+		for d1 in range(0, dims):
+			for d2 in range(0, dims):
+				expr = []
+				B = sp.zeros(n, n)
+				for i in range(0, n):
+					for j in range(0, n):
+						B[i,j] = H[d1 * n + i, d2 * n + j]
+						
+					val = B * u
+
+				for i in range(0, n):
+					var = sp.symbols(f'out[{i}]')
+					expr.append(ast.Assignment(var, val[i]))
+					
+				blocks.append((f'block_{d1}_{d2}', expr))
+
+		return blocks
+
+	def apply_blocks_tpl(self):
+		tpl="""
+template<typename scalar_t, typename accumulator_t>
+static inline __host__ __device__ void  cu_hex8_linear_elasticity_apply_{BLOCK_NAME}(
+const scalar_t mu,
+const scalar_t lambda,
+const scalar_t *const SFEM_RESTRICT adjugate,
+const scalar_t jacobian_determinant,
+const scalar_t *const SFEM_RESTRICT in,
+accumulator_t *const SFEM_RESTRICT
+oout) 
+{{
+	{CODE}
+}}
+"""
+		return tpl
+
 	def hessian_diag(self):
 		H = self.integr_hessian
 		rows, cols = H.shape
@@ -296,14 +342,25 @@ def main():
 	# op.hessian_check()
 
 
-	tpl = op.hessian_blocks_tpl()
-	blocks = op.hessian_blocks()
-	for k,v in blocks:
-		c_log("//--------------------------")
-		c_log(f"// hessian {k}")	
-		c_log("//--------------------------")
-		code = c_gen(v)
-		c_log(tpl.format(BLOCK_NAME=k, CODE=code))
+	# tpl = op.hessian_blocks_tpl()
+	# blocks = op.hessian_blocks()
+	# for k,v in blocks:
+	# 	c_log("//--------------------------")
+	# 	c_log(f"// hessian {k}")	
+	# 	c_log("//--------------------------")
+	# 	code = c_gen(v)
+	# 	c_log(tpl.format(BLOCK_NAME=k, CODE=code))
+
+
+	# tpl = op.apply_blocks_tpl()
+	# blocks = op.apply_blocks()
+	# for k,v in blocks:
+	# 	c_log("//--------------------------")
+	# 	c_log(f"// apply {k}")	
+	# 	c_log("//--------------------------")
+	# 	code = c_gen(v)
+	# 	c_log(tpl.format(BLOCK_NAME=k, CODE=code))
+
 
 	# c_log("--------------------------")
 	# c_log("value")

@@ -7,7 +7,7 @@
 //--------------------------
 
 template <typename scalar_t, typename accumulator_t>
-static inline __host__ __device__ void cu_hex8_linear_elasticity_matrix_block_0_0(
+static inline __host__ __device__ void cu_hex8_linear_elasticity_integral_matrix_block_0_0(
         const scalar_t mu,
         const scalar_t lambda,
         const scalar_t *const SFEM_RESTRICT adjugate,
@@ -314,7 +314,7 @@ static inline __host__ __device__ void cu_hex8_linear_elasticity_matrix_block_0_
 //--------------------------
 
 template <typename scalar_t, typename accumulator_t>
-static inline __host__ __device__ void cu_hex8_linear_elasticity_matrix_block_0_1(
+static inline __host__ __device__ void cu_hex8_linear_elasticity_integral_matrix_block_0_1(
         const scalar_t mu,
         const scalar_t lambda,
         const scalar_t *const SFEM_RESTRICT adjugate,
@@ -687,7 +687,7 @@ static inline __host__ __device__ void cu_hex8_linear_elasticity_matrix_block_0_
 //--------------------------
 
 template <typename scalar_t, typename accumulator_t>
-static inline __host__ __device__ void cu_hex8_linear_elasticity_matrix_block_0_2(
+static inline __host__ __device__ void cu_hex8_linear_elasticity_integral_matrix_block_0_2(
         const scalar_t mu,
         const scalar_t lambda,
         const scalar_t *const SFEM_RESTRICT adjugate,
@@ -1060,7 +1060,7 @@ static inline __host__ __device__ void cu_hex8_linear_elasticity_matrix_block_0_
 //--------------------------
 
 template <typename scalar_t, typename accumulator_t>
-static inline __host__ __device__ void cu_hex8_linear_elasticity_matrix_block_1_0(
+static inline __host__ __device__ void cu_hex8_linear_elasticity_integral_matrix_block_1_0(
         const scalar_t mu,
         const scalar_t lambda,
         const scalar_t *const SFEM_RESTRICT adjugate,
@@ -1434,7 +1434,7 @@ static inline __host__ __device__ void cu_hex8_linear_elasticity_matrix_block_1_
 //--------------------------
 
 template <typename scalar_t, typename accumulator_t>
-static inline __host__ __device__ void cu_hex8_linear_elasticity_matrix_block_1_1(
+static inline __host__ __device__ void cu_hex8_linear_elasticity_integral_matrix_block_1_1(
         const scalar_t mu,
         const scalar_t lambda,
         const scalar_t *const SFEM_RESTRICT adjugate,
@@ -1741,7 +1741,7 @@ static inline __host__ __device__ void cu_hex8_linear_elasticity_matrix_block_1_
 //--------------------------
 
 template <typename scalar_t, typename accumulator_t>
-static inline __host__ __device__ void cu_hex8_linear_elasticity_matrix_block_1_2(
+static inline __host__ __device__ void cu_hex8_linear_elasticity_integral_matrix_block_1_2(
         const scalar_t mu,
         const scalar_t lambda,
         const scalar_t *const SFEM_RESTRICT adjugate,
@@ -2114,7 +2114,7 @@ static inline __host__ __device__ void cu_hex8_linear_elasticity_matrix_block_1_
 //--------------------------
 
 template <typename scalar_t, typename accumulator_t>
-static inline __host__ __device__ void cu_hex8_linear_elasticity_matrix_block_2_0(
+static inline __host__ __device__ void cu_hex8_linear_elasticity_integral_matrix_block_2_0(
         const scalar_t mu,
         const scalar_t lambda,
         const scalar_t *const SFEM_RESTRICT adjugate,
@@ -2488,7 +2488,7 @@ static inline __host__ __device__ void cu_hex8_linear_elasticity_matrix_block_2_
 //--------------------------
 
 template <typename scalar_t, typename accumulator_t>
-static inline __host__ __device__ void cu_hex8_linear_elasticity_matrix_block_2_1(
+static inline __host__ __device__ void cu_hex8_linear_elasticity_integral_matrix_block_2_1(
         const scalar_t mu,
         const scalar_t lambda,
         const scalar_t *const SFEM_RESTRICT adjugate,
@@ -2862,7 +2862,7 @@ static inline __host__ __device__ void cu_hex8_linear_elasticity_matrix_block_2_
 //--------------------------
 
 template <typename scalar_t, typename accumulator_t>
-static inline __host__ __device__ void cu_hex8_linear_elasticity_matrix_block_2_2(
+static inline __host__ __device__ void cu_hex8_linear_elasticity_integral_matrix_block_2_2(
         const scalar_t mu,
         const scalar_t lambda,
         const scalar_t *const SFEM_RESTRICT adjugate,
