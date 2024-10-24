@@ -192,6 +192,43 @@ class LinearElasticityOp:
 
 		return expr
 
+	def hessian_blocks(self):
+		H = self.integr_hessian
+		rows, cols = H.shape
+		fe = self.fe
+
+		n = fe.n_nodes()
+		dims = fe.spatial_dim()
+
+		blocks = []
+
+		for d1 in range(0, dims):
+			for d2 in range(0, dims):
+				expr = []
+				for i in range(0, n):
+					for j in range(0, n):
+						var = sp.symbols(f'element_matrix[{i*n + j}]')
+						expr.append(ast.Assignment(var, H[d1 * n + i, d2 * n + j]))
+				blocks.append((f'block_{d1}_{d2}', expr))
+
+		return blocks
+
+	def hessian_blocks_tpl(self):
+		tpl="""
+template<typename scalar_t, typename accumulator_t>
+static inline __host__ __device__ void  cu_hex8_linear_elasticity_matrix_{BLOCK_NAME}(
+const scalar_t mu,
+const scalar_t lambda,
+const scalar_t *const SFEM_RESTRICT adjugate,
+const scalar_t jacobian_determinant,
+accumulator_t *const SFEM_RESTRICT
+element_matrix) 
+{{
+	{CODE}
+}}
+"""
+		return tpl
+
 	def hessian_diag(self):
 		H = self.integr_hessian
 		rows, cols = H.shape
@@ -258,6 +295,16 @@ def main():
 	op = LinearElasticityOp(fe)
 	# op.hessian_check()
 
+
+	tpl = op.hessian_blocks_tpl()
+	blocks = op.hessian_blocks()
+	for k,v in blocks:
+		c_log("//--------------------------")
+		c_log(f"// hessian {k}")	
+		c_log("//--------------------------")
+		code = c_gen(v)
+		c_log(tpl.format(BLOCK_NAME=k, CODE=code))
+
 	# c_log("--------------------------")
 	# c_log("value")
 	# c_log("--------------------------")
@@ -268,20 +315,20 @@ def main():
 	# c_log("--------------------------")
 	# c_code(op.gradient())
 
-	c_log("--------------------------")
-	c_log("hessian")	
-	c_log("--------------------------")
-	c_code(op.hessian())
+	# c_log("--------------------------")
+	# c_log("hessian")	
+	# c_log("--------------------------")
+	# c_code(op.hessian())
 
 	# c_log("--------------------------")
 	# c_log("apply")	
 	# c_log("--------------------------")
 	# c_code(op.apply())
 
-	c_log("--------------------------")
-	c_log("hessian_diag")	
-	c_log("--------------------------")
-	c_code(op.hessian_diag())
+	# c_log("--------------------------")
+	# c_log("hessian_diag")	
+	# c_log("--------------------------")
+	# c_code(op.hessian_diag())
 
 	stop = perf_counter()
 	console.print(f'Overall: {stop - start} seconds')

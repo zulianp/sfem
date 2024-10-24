@@ -363,7 +363,7 @@ mgsolve (PROTEUS_HEX8):
 TTS:		23.5485 [s], compute 23.0922 [s] (solve: 22.3401 [s], init: 0.501535 [s])
 residual:	3.72803e-08
 ```
-**Operator**
+__Operator__
 
 | SFEM_ELEMENT_REFINE_LEVEL | #macro-elems | #dofs | TTS [ms] | TP [GDOF/s] |
 |---|---|---|---|---|
@@ -389,7 +389,8 @@ TTS:		17.4191 [s], compute 16.5649 [s] (solve: 15.7444 [s], init: 0.664405 [s])
 residual:	3.72803e-08
 ```
 
-**Operator**
+__Operator__
+With numerical quadrature and with symbolic integration
 
 | SFEM_ELEMENT_REFINE_LEVEL | #macro-elems | #dofs | TTS [ms] | TP [GDOF/s] |
 |---|---|---|---|---|
@@ -399,6 +400,12 @@ residual:	3.72803e-08
 | 4 | 242240 |  47549853  	| 56.735 | 0.83 |
 | 4 | 473125 |  92463957  	| 108.57 | **0.85** |
 | 2 | 473125 |	11761677	| 22.997 | 0.51 |
+|---|---|---|---|---|
+| 6 | 242240 | 159309357	| 225.9  | 0.7 |
+| 5 | 242240 | 92463957	    | 127.62 | 0.72 |
+| 5 | 473125 |179958447		| 245.04 | 0.73	|
 
 
 
+
+**Warp level**
