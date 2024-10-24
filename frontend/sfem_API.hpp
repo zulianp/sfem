@@ -24,6 +24,11 @@
 #include "sfem_cuda_solver.hpp"
 #include "sfem_cuda_mprgp_impl.hpp"
 #include "sfem_cuda_blas.hpp"
+
+#else
+    namespace sfem {
+        void device_synchronize() {}
+    }
 #endif
 
 #include "proteus_hex8.h"

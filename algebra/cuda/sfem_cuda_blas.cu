@@ -521,4 +521,10 @@ namespace sfem {
     template struct CUDA_BLAS<double>;
     template struct CUDA_BLAS<float>;
 
+    void device_synchronize() {
+        CHECK_CUDA(cudaDeviceSynchronize());
+    }
+
 }  // namespace sfem
+
+

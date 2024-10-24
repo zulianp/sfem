@@ -268,7 +268,7 @@ static __host__ __device__ void apply_micro_loop(const T *const elemental_matrix
     }
 }
 
-#define HEX8_SEGMENTED_SYMBOLIC
+// #define HEX8_SEGMENTED_SYMBOLIC
 
 template <typename T, int LEVEL>
 __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segmented_kernel(
@@ -640,6 +640,7 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl(
 
 // #define B_(x, y, z) ((z)*BLOCK_SIZE_2 + (y)*BLOCK_SIZE + (x))
 
+// Warp with limited shared mem buffer
 // template <typename T, int LEVEL>
 // __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
 //         const ptrdiff_t nelements,
@@ -797,6 +798,315 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl(
 //     }
 // }
 
+// Read from global mem
+// template <typename T, int LEVEL>
+// __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
+//         const ptrdiff_t nelements,
+//         const ptrdiff_t stride,  // Stride for elements and fff
+//         const ptrdiff_t interior_start,
+//         const idx_t *const SFEM_RESTRICT elements,
+//         const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
+//         const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_determinant,
+//         const T mu,
+//         const T lambda,
+//         const ptrdiff_t u_stride,
+//         const T *const SFEM_RESTRICT g_ux,
+//         const T *const SFEM_RESTRICT g_uy,
+//         const T *const SFEM_RESTRICT g_uz,
+//         const ptrdiff_t out_stride,
+//         T *const SFEM_RESTRICT g_outx,
+//         T *const SFEM_RESTRICT g_outy,
+//         T *const SFEM_RESTRICT g_outz) {
+//     static const int BLOCK_SIZE = LEVEL + 1;
+//     static const int BLOCK_SIZE_2 = BLOCK_SIZE * BLOCK_SIZE;
+//     static const int BLOCK_SIZE_3 = BLOCK_SIZE_2 * BLOCK_SIZE;
+
+//     assert(blockDim.x == BLOCK_SIZE);
+//     assert(blockDim.y == BLOCK_SIZE);
+//     assert(blockDim.z == BLOCK_SIZE);
+
+//     // Global mem
+//     const T *g_u[3] = {g_ux, g_uy, g_uz};
+//     T *g_out[3] = {g_outx, g_outy, g_outz};
+
+//     // Shared mem
+//     __shared__ T out_block[BLOCK_SIZE_3];
+
+//     const T h = 1. / LEVEL;
+
+//     const auto xi = threadIdx.x;
+//     const auto yi = threadIdx.y;
+//     const auto zi = threadIdx.z;
+//     const int interior = xi > 0 && yi > 0 && zi > 0 && xi < LEVEL && yi < LEVEL && zi < LEVEL;
+//     const bool is_element = xi < LEVEL && yi < LEVEL && zi < LEVEL;
+
+//     assert(xi < BLOCK_SIZE);
+//     assert(yi < BLOCK_SIZE);
+//     assert(zi < BLOCK_SIZE);
+
+//     const int lidx = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi);
+
+//     assert(lidx < BLOCK_SIZE_3);
+//     assert(lidx >= 0);
+
+//     int lev[8];
+//     if (is_element) {
+//         lev[0] = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi);
+//         lev[1] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi);
+//         lev[2] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi);
+//         lev[3] = cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi);
+//         lev[4] = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi + 1);
+//         lev[5] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi + 1);
+//         lev[6] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi + 1);
+//         lev[7] = cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi + 1);
+//     }
+
+//     T out[3][8];
+//     T u[3][8];
+//     T sub_adjugate[9];
+//     T sub_determinant;
+
+//     for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
+//         const ptrdiff_t idx = elements[lidx * stride + e];
+
+//         // Gather
+//         if (is_element) {
+//             sub_adjugate[0] = g_jacobian_adjugate[0 * stride + e];
+//             sub_adjugate[1] = g_jacobian_adjugate[1 * stride + e];
+//             sub_adjugate[2] = g_jacobian_adjugate[2 * stride + e];
+//             sub_adjugate[3] = g_jacobian_adjugate[3 * stride + e];
+//             sub_adjugate[4] = g_jacobian_adjugate[4 * stride + e];
+//             sub_adjugate[5] = g_jacobian_adjugate[5 * stride + e];
+//             sub_adjugate[6] = g_jacobian_adjugate[6 * stride + e];
+//             sub_adjugate[7] = g_jacobian_adjugate[7 * stride + e];
+//             sub_adjugate[8] = g_jacobian_adjugate[8 * stride + e];
+//             sub_determinant = g_jacobian_determinant[e];
+
+//             for (int d = 0; d < 3; d++) {
+//                 for (int v = 0; v < 8; v++) {
+//                     u[d][v] = g_u[d][elements[lev[v] * stride + e] * u_stride];
+//                 }
+//             }
+//         }
+
+//         out_block[lidx] = 0;
+
+//         // Compute
+//         if (is_element) {
+//             cu_hex8_sub_adj_0_in_place(h, sub_adjugate, &sub_determinant);
+
+//             //
+
+//             for (int d = 0; d < 3; d++) {
+//                 for (int v = 0; v < 8; v++) {
+//                     out[d][v] = 0;
+//                 }
+//             }
+
+//             for (int k = 0; k < n_qp; k++) {
+//                 cu_hex8_linear_elasticity_apply_adj<T, T>(mu,
+//                                                           lambda,
+//                                                           sub_adjugate,
+//                                                           sub_determinant,
+//                                                           qx[k],
+//                                                           qy[k],
+//                                                           qz[k],
+//                                                           qw[k],
+//                                                           u[0],
+//                                                           u[1],
+//                                                           u[2],
+//                                                           out[0],
+//                                                           out[1],
+//                                                           out[2]);
+//             }
+//         }
+
+//         // Scatter
+//         for (int d = 0; d < 3; d++) {
+//             if (is_element) {
+//                 for (int v = 0; v < 8; v++) {
+//                     atomicAdd(&out_block[lev[v]], out[d][v]);
+//                 }
+//             }
+
+//             __syncthreads();
+
+//             assert(out_block[lidx] == out_block[lidx]);
+
+//             if (interior) {
+//                 g_out[d][idx * out_stride] += out_block[lidx];
+//             } else {
+//                 atomicAdd(&(g_out[d][idx * out_stride]), out_block[lidx]);
+//             }
+
+//             out_block[lidx] = 0;
+//             __syncthreads();
+//         }
+//     }
+// }
+
+// template <typename T, int LEVEL>
+// __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
+//         const ptrdiff_t nelements,
+//         const ptrdiff_t stride,  // Stride for elements and fff
+//         const ptrdiff_t interior_start,
+//         const idx_t *const SFEM_RESTRICT elements,
+//         const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
+//         const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_determinant,
+//         const T mu,
+//         const T lambda,
+//         const ptrdiff_t u_stride,
+//         const T *const SFEM_RESTRICT g_ux,
+//         const T *const SFEM_RESTRICT g_uy,
+//         const T *const SFEM_RESTRICT g_uz,
+//         const ptrdiff_t out_stride,
+//         T *const SFEM_RESTRICT g_outx,
+//         T *const SFEM_RESTRICT g_outy,
+//         T *const SFEM_RESTRICT g_outz) {
+//     static const int BLOCK_SIZE = LEVEL + 1;
+//     static const int BLOCK_SIZE_2 = BLOCK_SIZE * BLOCK_SIZE;
+//     static const int BLOCK_SIZE_3 = BLOCK_SIZE_2 * BLOCK_SIZE;
+
+//     assert(blockDim.x == BLOCK_SIZE);
+//     assert(blockDim.y == BLOCK_SIZE);
+//     assert(blockDim.z == BLOCK_SIZE);
+
+//     // Global mem
+//     const T *g_u[3] = {g_ux, g_uy, g_uz};
+//     T *g_out[3] = {g_outx, g_outy, g_outz};
+
+//     // Shared mem
+//     __shared__ T u_block[3][BLOCK_SIZE_3];
+//     __shared__ T out_block[3][BLOCK_SIZE_3];
+
+//     const T h = 1. / LEVEL;
+
+//     const auto xi = threadIdx.x;
+//     const auto yi = threadIdx.y;
+//     const auto zi = threadIdx.z;
+//     const int interior = xi > 0 && yi > 0 && zi > 0 && xi < LEVEL && yi < LEVEL && zi < LEVEL;
+//     const bool is_element = xi < LEVEL && yi < LEVEL && zi < LEVEL;
+
+//     assert(xi < BLOCK_SIZE);
+//     assert(yi < BLOCK_SIZE);
+//     assert(zi < BLOCK_SIZE);
+
+//     const int lidx = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi);
+
+//     assert(lidx < BLOCK_SIZE_3);
+//     assert(lidx >= 0);
+
+//     int lev[8];
+//     if (is_element) {
+//         lev[0] = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi);
+//         lev[1] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi);
+//         lev[2] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi);
+//         lev[3] = cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi);
+//         lev[4] = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi + 1);
+//         lev[5] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi + 1);
+//         lev[6] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi + 1);
+//         lev[7] = cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi + 1);
+//     }
+
+//     T out[3][8];
+//     T u[3][8];
+//     T sub_adjugate[9];
+//     T sub_determinant;
+
+//     for (int d = 0; d < 3; d++) {
+//         out_block[d][lidx] = 0;
+//     }
+
+//     for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
+//         const ptrdiff_t idx = elements[lidx * stride + e];
+
+//         // Gather
+//         for (int d = 0; d < 3; d++) {
+//             u_block[d][lidx] = g_u[d][idx * u_stride];
+//             assert(u_block[d][lidx] == u_block[d][lidx]);
+//         }
+
+//         if (is_element) {
+//             sub_adjugate[0] = g_jacobian_adjugate[0 * stride + e];
+//             sub_adjugate[1] = g_jacobian_adjugate[1 * stride + e];
+//             sub_adjugate[2] = g_jacobian_adjugate[2 * stride + e];
+//             sub_adjugate[3] = g_jacobian_adjugate[3 * stride + e];
+//             sub_adjugate[4] = g_jacobian_adjugate[4 * stride + e];
+//             sub_adjugate[5] = g_jacobian_adjugate[5 * stride + e];
+//             sub_adjugate[6] = g_jacobian_adjugate[6 * stride + e];
+//             sub_adjugate[7] = g_jacobian_adjugate[7 * stride + e];
+//             sub_adjugate[8] = g_jacobian_adjugate[8 * stride + e];
+//             sub_determinant = g_jacobian_determinant[e];
+
+//             cu_hex8_sub_adj_0_in_place(h, sub_adjugate, &sub_determinant);
+//             for (int d = 0; d < 3; d++) {
+//                 for (int v = 0; v < 8; v++) {
+//                     out[d][v] = 0;
+//                 }
+//             }
+//         }
+
+//         __syncthreads();
+
+//         // Compute
+//         if (is_element) {
+//             for (int d = 0; d < 3; d++) {
+//                 for (int v = 0; v < 8; v++) {
+//                     u[d][v] = u_block[d][lev[v]];
+//                 }
+//             }
+
+//             for (int k = 0; k < n_qp; k++) {
+//                 cu_hex8_linear_elasticity_apply_adj<T, T>(mu,
+//                                                           lambda,
+//                                                           sub_adjugate,
+//                                                           sub_determinant,
+//                                                           qx[k],
+//                                                           qy[k],
+//                                                           qz[k],
+//                                                           qw[k],
+//                                                           u[0],
+//                                                           u[1],
+//                                                           u[2],
+//                                                           out[0],
+//                                                           out[1],
+//                                                           out[2]);
+//             }
+//         }
+
+//         // Scatter to local mem
+//         for (int d = 0; d < 3; d++) {
+//             if (is_element) {
+//                 for (int v = 0; v < 8; v++) {
+//                     atomicAdd(&out_block[d][lev[v]], out[d][v]);
+//                 }
+//             }
+//         }
+
+//         __syncthreads();
+
+//         // Scatter to global mem
+//         for (int d = 0; d < 3; d++) {
+//             assert(out_block[d][lidx] == out_block[d][lidx]);
+
+//             if (interior) {
+//                 g_out[d][idx * out_stride] += out_block[d][lidx];
+//             } else {
+//                 atomicAdd(&(g_out[d][idx * out_stride]), out_block[d][lidx]);
+//             }
+
+//             out_block[d][lidx] = 0;
+//         }
+//     }
+// }
+
+static __device__ inline bool cu_proteus_hex8_is_interior(const int level,
+                                                          const int xi,
+                                                          const int yi,
+                                                          const int zi) {
+    return xi > 0 && yi > 0 && zi > 0 && xi < level && yi < level && zi < level;
+}
+
 template <typename T, int LEVEL>
 __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
         const ptrdiff_t nelements,
@@ -815,60 +1125,77 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
         T *const SFEM_RESTRICT g_outx,
         T *const SFEM_RESTRICT g_outy,
         T *const SFEM_RESTRICT g_outz) {
-    static const int BLOCK_SIZE = LEVEL + 1;
-    static const int BLOCK_SIZE_2 = BLOCK_SIZE * BLOCK_SIZE;
-    static const int BLOCK_SIZE_3 = BLOCK_SIZE_2 * BLOCK_SIZE;
-
-    assert(blockDim.x == BLOCK_SIZE);
-    assert(blockDim.y == BLOCK_SIZE);
-    assert(blockDim.z == BLOCK_SIZE);
-
-    // Global mem
-    const T *g_u[3] = {g_ux, g_uy, g_uz};
-    T *g_out[3] = {g_outx, g_outy, g_outz};
-
-    // Shared mem
-    __shared__ T out_block[BLOCK_SIZE_3];
-
-    const T h = 1. / LEVEL;
-
     const auto xi = threadIdx.x;
     const auto yi = threadIdx.y;
     const auto zi = threadIdx.z;
-    const int interior = xi > 0 && yi > 0 && zi > 0 && xi < LEVEL && yi < LEVEL && zi < LEVEL;
     const bool is_element = xi < LEVEL && yi < LEVEL && zi < LEVEL;
 
-    assert(xi < BLOCK_SIZE);
-    assert(yi < BLOCK_SIZE);
-    assert(zi < BLOCK_SIZE);
+    assert(is_element);
 
-    const int lidx = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi);
-
-    assert(lidx < BLOCK_SIZE_3);
-    assert(lidx >= 0);
-
-    int lev[8];
     if (is_element) {
-        lev[0] = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi);
-        lev[1] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi);
-        lev[2] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi);
-        lev[3] = cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi);
-        lev[4] = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi + 1);
-        lev[5] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi + 1);
-        lev[6] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi + 1);
-        lev[7] = cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi + 1);
-    }
+        T out[3][8];
+        T u[3][8];
+        T sub_adjugate[9];
+        T sub_determinant;
 
-    T out[3][8];
-    T u[3][8];
-    T sub_adjugate[9];
-    T sub_determinant;
+        for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
+#if 1
+            idx_t ev[8];
+            ev[0] = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi);
+            ev[1] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi);
+            ev[2] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi);
+            ev[3] = cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi);
+            ev[4] = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi + 1);
+            ev[5] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi + 1);
+            ev[6] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi + 1);
+            ev[7] = cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi + 1);
 
-    for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
-        const ptrdiff_t idx = elements[lidx * stride + e];
+            for (int v = 0; v < 8; v++) {
+                ev[v] = elements[ev[v] * stride + e];
+            }
+#else
+            // Something like this can be used when economizing on indices
+            ptrdiff_t ev[8];
+            int v = 0;
+            for (int zz = zi; zz <= zi + 1; zz++) {
+                for (int yy = yi; yy <= yi + 1; yy++) {
+                    for (int xx = xi; xx <= xi + 1; xx++, v++) {
+                        const bool interior = cu_proteus_hex8_is_interior(LEVEL, xx, yy, zz);
+                        const int lidx = cu_proteus_hex8_lidx(LEVEL, xx, yy, zz);
 
-        // Gather
-        if (is_element) {
+                        if (interior) {
+                            static const int Lm1 = LEVEL - 1;
+                            const int en = (zz - 1) * Lm1 * Lm1 + (yy - 1) * Lm1 + xx - 1;
+                            const ptrdiff_t idx = interior_start + e * (Lm1 * Lm1 * Lm1) + en;
+                            ev[v] = idx;
+                        } else {
+                            ev[v] = elements[lidx * stride + e];
+                        }
+                    }
+                }
+            }
+
+            assert(v == 8);
+
+            // Proteus to standard!
+            {
+                ptrdiff_t temp = ev[2];
+                ev[2] = ev[3];
+                ev[3] = temp;
+
+                temp = ev[6];
+                ev[6] = ev[7];
+                ev[7] = temp;
+            }
+#endif
+
+            for (int v = 0; v < 8; v++) {
+                ptrdiff_t idx = ev[v] * u_stride;
+                u[0][v] = g_ux[idx];
+                u[1][v] = g_uy[idx];
+                u[2][v] = g_uz[idx];
+            }
+
             sub_adjugate[0] = g_jacobian_adjugate[0 * stride + e];
             sub_adjugate[1] = g_jacobian_adjugate[1 * stride + e];
             sub_adjugate[2] = g_jacobian_adjugate[2 * stride + e];
@@ -880,20 +1207,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
             sub_adjugate[8] = g_jacobian_adjugate[8 * stride + e];
             sub_determinant = g_jacobian_determinant[e];
 
-            for (int d = 0; d < 3; d++) {
-                for (int v = 0; v < 8; v++) {
-                    u[d][v] = g_u[d][elements[lev[v] * stride + e] * u_stride];
-                }
-            }
-        }
-
-        out_block[lidx] = 0;
-
-        // Compute
-        if (is_element) {
-            cu_hex8_sub_adj_0_in_place(h, sub_adjugate, &sub_determinant);
-
-            //
+            cu_hex8_sub_adj_0_in_place((T)(1. / LEVEL), sub_adjugate, &sub_determinant);
 
             for (int d = 0; d < 3; d++) {
                 for (int v = 0; v < 8; v++) {
@@ -917,28 +1231,13 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
                                                           out[1],
                                                           out[2]);
             }
-        }
 
-        // Scatter
-        for (int d = 0; d < 3; d++) {
-            if (is_element) {
-                for (int v = 0; v < 8; v++) {
-                    atomicAdd(&out_block[lev[v]], out[d][v]);
-                }
+            for (int v = 0; v < 8; v++) {
+                const ptrdiff_t idx = ev[v] * out_stride;
+                atomicAdd(&g_outx[idx], out[0][v]);
+                atomicAdd(&g_outy[idx], out[1][v]);
+                atomicAdd(&g_outz[idx], out[2][v]);
             }
-
-            __syncthreads();
-
-            assert(out_block[lidx] == out_block[lidx]);
-
-            if (interior) {
-                g_out[d][idx * out_stride] += out_block[lidx];
-            } else {
-                atomicAdd(&(g_out[d][idx * out_stride]), out_block[lidx]);
-            }
-
-            out_block[lidx] = 0;
-            __syncthreads();
         }
     }
 }
@@ -964,9 +1263,12 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl(
         void *stream) {
     SFEM_DEBUG_SYNCHRONIZE();
 
-    static const int BLOCK_SIZE = LEVEL + 1;
+    // static const int BLOCK_SIZE = LEVEL + 1;
 
-    dim3 block_size(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+    // dim3 block_size(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+    // dim3 n_blocks(MIN(nelements, 65535), 1, 1);
+
+    dim3 block_size(LEVEL, LEVEL, LEVEL);
     dim3 n_blocks(MIN(nelements, 65535), 1, 1);
 
     if (stream) {
@@ -1012,10 +1314,10 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl(
     return SFEM_SUCCESS;
 }
 
-// #define my_kernel cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl
-// #define my_kernel_large cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl
-#define my_kernel cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl
-#define my_kernel_large cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl
+#define my_kernel cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl
+#define my_kernel_large cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl
+// #define my_kernel cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl
+// #define my_kernel_large cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl
 
 // Dispatch based on the level
 template <typename real_t>
