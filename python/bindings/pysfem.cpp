@@ -110,6 +110,14 @@ NB_MODULE(pysfem, m) {
         return sfem::Buffer<double>::wrap(v.size(), v.data(), sfem::MEMORY_SPACE_HOST);
     });
 
+    m.def("view", [](nb::ndarray<nb::numpy, int> &v) -> std::shared_ptr<sfem::Buffer<int>> {
+        return sfem::Buffer<int>::wrap(v.size(), v.data(), sfem::MEMORY_SPACE_HOST);
+    });
+
+    m.def("view", [](nb::ndarray<nb::numpy, long> &v) -> std::shared_ptr<sfem::Buffer<long>> {
+        return sfem::Buffer<long>::wrap(v.size(), v.data(), sfem::MEMORY_SPACE_HOST);
+    });
+
     m.def("create_mesh",
           [](const char *elem_type_name,
              nb::ndarray<idx_t> idx,
