@@ -10,6 +10,9 @@ namespace sfem {
         static void build_blas(struct BLAS_Tpl<T>& tpl);
     };
 
+    void device_synchronize();
+
+
 }  // namespace sfem
 
 #endif  // SFEM_CUDA_BLAS_HPP

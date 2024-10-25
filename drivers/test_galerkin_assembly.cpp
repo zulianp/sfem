@@ -17,13 +17,16 @@
 
 #include <vector>
 
-#define OP_TIME(name, expr)                        \
-    do {                                           \
-        double start = MPI_Wtime();                \
-        expr;                                      \
-        double stop = MPI_Wtime();                 \
-        printf("%s %g [s]\n", name, stop - start); \
-        fflush(stdout);                            \
+#define OP_TIME(op, x, y)                                                                   \
+    do {                                                                                    \
+        sfem::device_synchronize();                                                         \
+        double start = MPI_Wtime();                                                         \
+        op->apply(x, y);                                                                    \
+        sfem::device_synchronize();                                                         \
+        double stop = MPI_Wtime();                                                          \
+        double elapsed = stop - start;                                                      \
+        printf("%s %g [s], %g [MDOF/s]\n", #op, elapsed, 1e-6 * (op)->rows() / elapsed); \
+        fflush(stdout);                                                                     \
     } while (0)
 
 int main(int argc, char *argv[]) {
@@ -140,11 +143,10 @@ int main(int argc, char *argv[]) {
 
     double tick = MPI_Wtime();
 
-    OP_TIME("coarse_op", coarse_op->apply(input->data(), Ax_coarse->data()));
-
-    OP_TIME("prolongation", prolongation->apply(input->data(), prolongated->data()));
-    OP_TIME("fine_op", fine_op->apply(prolongated->data(), Ax_fine->data()));
-    OP_TIME("restriction", restriction->apply(Ax_fine->data(), restricted->data()));
+    OP_TIME(coarse_op, input->data(), Ax_coarse->data());
+    OP_TIME(prolongation, input->data(), prolongated->data());
+    OP_TIME(fine_op, prolongated->data(), Ax_fine->data());
+    OP_TIME(restriction, Ax_fine->data(), restricted->data());
 
     double tock = MPI_Wtime();
 

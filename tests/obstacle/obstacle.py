@@ -7,7 +7,6 @@ import sys, getopt, os
 
 from sfem.sfem_config import *
 
-
 # --------------------------------------
 # Solver parameters
 # --------------------------------------
@@ -34,7 +33,7 @@ def assemble_scipy_matrix(fun, x):
 	rowptr = sfem.numpy_view(crs_graph.rowptr())
 	colidx = sfem.numpy_view(crs_graph.colidx())
 	values = np.zeros(colidx.shape, dtype=real_t)
-	sfem.hessian_crs(fun, x, rowptr, colidx, values)
+	sfem.hessian_crs(fun,  sfem.view(x), sfem.view(rowptr),  sfem.view(colidx),  sfem.view(values))
 	M = scipy.sparse.csr_matrix((values, colidx, rowptr), shape=(fs.n_dofs(), fs.n_dofs())) 
 	return M
 
@@ -80,6 +79,8 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 	else:
 		# Matrix-based
 		lop = assemble_crs_spmv(fun, x)
+
+	print(assemble_scipy_matrix(fun, x))
 
 	if use_cheb:
 		solver = sfem.Chebyshev3()

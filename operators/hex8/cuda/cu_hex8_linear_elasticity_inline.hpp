@@ -86,7 +86,7 @@ static __host__ __device__ void cu_hex8_linear_elasticity_apply_adj(
     scalar_t disp_grad[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
     assert(denom > 0);
     {
-        scalar_t temp[9] = {0,0,0, 0,0,0, 0,0,0};
+        scalar_t temp[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
         scalar_t grad[8];
 
         cu_hex8_ref_shape_grad_x(qx, qy, qz, grad);

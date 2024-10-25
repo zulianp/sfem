@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 
+#if 1
 
 static const int n_qp = 27;
 
@@ -50,21 +51,25 @@ __constant__ scalar_t qy[27];
 __constant__ scalar_t qz[27];
 __constant__ scalar_t qw[27];
 
-// static const int n_qp = 6;
-// static const scalar_t h_qw[6] = {0.16666666666666666666666666666667,
-//                                  0.16666666666666666666666666666667,
-//                                  0.16666666666666666666666666666667,
-//                                  0.16666666666666666666666666666667,
-//                                  0.16666666666666666666666666666667,
-//                                  0.16666666666666666666666666666667};
+#else
 
-// static const scalar_t h_qx[6] = {0.0, 0.5, 0.5, 0.5, 0.5, 1.0};
-// static const scalar_t h_qy[6] = {0.5, 0.0, 0.5, 0.5, 1.0, 0.5};
-// static const scalar_t h_qz[6] = {0.5, 0.5, 0.0, 1.0, 0.5, 0.5};
-// __constant__ scalar_t qx[6];
-// __constant__ scalar_t qy[6];
-// __constant__ scalar_t qz[6];
-// __constant__ scalar_t qw[6];
+static const int n_qp = 6;
+static const scalar_t h_qw[6] = {0.16666666666666666666666666666667,
+                                 0.16666666666666666666666666666667,
+                                 0.16666666666666666666666666666667,
+                                 0.16666666666666666666666666666667,
+                                 0.16666666666666666666666666666667,
+                                 0.16666666666666666666666666666667};
+
+static const scalar_t h_qx[6] = {0.0, 0.5, 0.5, 0.5, 0.5, 1.0};
+static const scalar_t h_qy[6] = {0.5, 0.0, 0.5, 0.5, 1.0, 0.5};
+static const scalar_t h_qz[6] = {0.5, 0.5, 0.0, 1.0, 0.5, 0.5};
+__constant__ scalar_t qx[6];
+__constant__ scalar_t qy[6];
+__constant__ scalar_t qz[6];
+__constant__ scalar_t qw[6];
+
+#endif
 
 static void init_quadrature() {
     static bool initialized = false;
