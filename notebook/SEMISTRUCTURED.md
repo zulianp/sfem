@@ -406,7 +406,4 @@ With numerical quadrature and with symbolic integration
 | 5 | 242240 | 92463957	    | 127.62 | 0.72 |
 | 5 | 473125 |179958447		| 245.04 | 0.73	|
 
-
-
-
 **Warp level**

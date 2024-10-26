@@ -254,6 +254,8 @@ int proteus_affine_hex8_laplacian_apply(const int level,
 #ifdef PROTEUS_HEX8_USE_MV
             accumulator_t laplacian_matrix[8 * 8];
             hex8_laplacian_matrix_fff_integral(fff, laplacian_matrix);
+            // hex8_laplacian_matrix_fff_taylor(fff, laplacian_matrix);
+
 #endif
 
             // Iterate over sub-elements

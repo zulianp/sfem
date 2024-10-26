@@ -456,8 +456,8 @@ static SFEM_INLINE void hex8_laplacian_apply_fff_integral(const scalar_t *const 
 }
 
 static SFEM_INLINE void hex8_laplacian_diag_fff_integral(const scalar_t *const SFEM_RESTRICT fff,
-                                                          accumulator_t *SFEM_RESTRICT
-                                                                  element_vector) {
+                                                         accumulator_t *SFEM_RESTRICT
+                                                                 element_vector) {
     const scalar_t x0 = (1.0 / 6.0) * fff[1];
     const scalar_t x1 = (1.0 / 6.0) * fff[2];
     const scalar_t x2 = (1.0 / 6.0) * fff[4];
@@ -480,6 +480,199 @@ static SFEM_INLINE void hex8_laplacian_diag_fff_integral(const scalar_t *const S
     element_vector[5] = x13;
     element_vector[6] = x7;
     element_vector[7] = x10;
+}
+
+static SFEM_INLINE void hex8_laplacian_matrix_fff_taylor(const scalar_t *const SFEM_RESTRICT fff,
+                                                         accumulator_t *const SFEM_RESTRICT
+                                                                 element_matrix) {
+    const scalar_t x0 = (1.0 / 6.0) * fff[1];
+    const scalar_t x1 = (1.0 / 6.0) * fff[2];
+    const scalar_t x2 = (1.0 / 6.0) * fff[4];
+    const scalar_t x3 = (5.0 / 48.0) * fff[0];
+    const scalar_t x4 = (5.0 / 48.0) * fff[3];
+    const scalar_t x5 = (5.0 / 48.0) * fff[5];
+    const scalar_t x6 = x2 + x3 + x4 + x5;
+    const scalar_t x7 = x0 + x1 + x6;
+    const scalar_t x8 = (1.0 / 12.0) * fff[4];
+    const scalar_t x9 = (1.0 / 16.0) * fff[3];
+    const scalar_t x10 = (1.0 / 16.0) * fff[5];
+    const scalar_t x11 = x10 + x9;
+    const scalar_t x12 = x11 - x3 + x8;
+    const scalar_t x13 = (1.0 / 48.0) * fff[5];
+    const scalar_t x14 = (1.0 / 16.0) * fff[0];
+    const scalar_t x15 = x14 + x9;
+    const scalar_t x16 = -x13 + x15;
+    const scalar_t x17 = -x0 - x16;
+    const scalar_t x18 = (1.0 / 12.0) * fff[2];
+    const scalar_t x19 = x10 + x14;
+    const scalar_t x20 = x19 - x4;
+    const scalar_t x21 = x18 + x20;
+    const scalar_t x22 = (1.0 / 12.0) * fff[1];
+    const scalar_t x23 = x15 - x5;
+    const scalar_t x24 = x22 + x23;
+    const scalar_t x25 = (1.0 / 48.0) * fff[3];
+    const scalar_t x26 = x19 - x25;
+    const scalar_t x27 = -x1 - x26;
+    const scalar_t x28 = (1.0 / 48.0) * fff[0];
+    const scalar_t x29 = x13 + x25 + x28 + x8;
+    const scalar_t x30 = -x18 - x22 - x29;
+    const scalar_t x31 = -x11 - x2 + x28;
+    const scalar_t x32 = -x0;
+    const scalar_t x33 = -x1;
+    const scalar_t x34 = x32 + x33 + x6;
+    const scalar_t x35 = -x18;
+    const scalar_t x36 = x20 + x35;
+    const scalar_t x37 = -x16 - x32;
+    const scalar_t x38 = -x26 - x33;
+    const scalar_t x39 = -x22;
+    const scalar_t x40 = x23 + x39;
+    const scalar_t x41 = -x29 - x35 - x39;
+    const scalar_t x42 = -x2 + x3 + x4 + x5;
+    const scalar_t x43 = x0 + x33 + x42;
+    const scalar_t x44 = -x10 - x9;
+    const scalar_t x45 = -x3 - x44 - x8;
+    const scalar_t x46 = x13 + x25 + x28 - x8;
+    const scalar_t x47 = -x22 - x35 - x46;
+    const scalar_t x48 = x2 + x28 + x44;
+    const scalar_t x49 = x1 + x32 + x42;
+    const scalar_t x50 = -x18 - x39 - x46;
+    element_matrix[0] = x7;
+    element_matrix[1] = x12;
+    element_matrix[2] = x17;
+    element_matrix[3] = x21;
+    element_matrix[4] = x24;
+    element_matrix[5] = x27;
+    element_matrix[6] = x30;
+    element_matrix[7] = x31;
+    element_matrix[8] = x12;
+    element_matrix[9] = x34;
+    element_matrix[10] = x36;
+    element_matrix[11] = x37;
+    element_matrix[12] = x38;
+    element_matrix[13] = x40;
+    element_matrix[14] = x31;
+    element_matrix[15] = x41;
+    element_matrix[16] = x17;
+    element_matrix[17] = x36;
+    element_matrix[18] = x43;
+    element_matrix[19] = x45;
+    element_matrix[20] = x47;
+    element_matrix[21] = x48;
+    element_matrix[22] = x24;
+    element_matrix[23] = x38;
+    element_matrix[24] = x21;
+    element_matrix[25] = x37;
+    element_matrix[26] = x45;
+    element_matrix[27] = x49;
+    element_matrix[28] = x48;
+    element_matrix[29] = x50;
+    element_matrix[30] = x27;
+    element_matrix[31] = x40;
+    element_matrix[32] = x24;
+    element_matrix[33] = x38;
+    element_matrix[34] = x47;
+    element_matrix[35] = x48;
+    element_matrix[36] = x43;
+    element_matrix[37] = x45;
+    element_matrix[38] = x17;
+    element_matrix[39] = x36;
+    element_matrix[40] = x27;
+    element_matrix[41] = x40;
+    element_matrix[42] = x48;
+    element_matrix[43] = x50;
+    element_matrix[44] = x45;
+    element_matrix[45] = x49;
+    element_matrix[46] = x21;
+    element_matrix[47] = x37;
+    element_matrix[48] = x30;
+    element_matrix[49] = x31;
+    element_matrix[50] = x24;
+    element_matrix[51] = x27;
+    element_matrix[52] = x17;
+    element_matrix[53] = x21;
+    element_matrix[54] = x7;
+    element_matrix[55] = x12;
+    element_matrix[56] = x31;
+    element_matrix[57] = x41;
+    element_matrix[58] = x38;
+    element_matrix[59] = x40;
+    element_matrix[60] = x36;
+    element_matrix[61] = x37;
+    element_matrix[62] = x12;
+    element_matrix[63] = x34;
+}
+
+static SFEM_INLINE void hex8_laplacian_apply_fff_taylor(const scalar_t *const SFEM_RESTRICT fff,
+                                                        const scalar_t *SFEM_RESTRICT u,
+                                                        accumulator_t *SFEM_RESTRICT
+                                                                element_vector) {
+    const scalar_t x0 = (5.0 / 48.0) * fff[0];
+    const scalar_t x1 = (1.0 / 12.0) * fff[4];
+    const scalar_t x2 = (1.0 / 16.0) * fff[3];
+    const scalar_t x3 = (1.0 / 16.0) * fff[5];
+    const scalar_t x4 = x2 + x3;
+    const scalar_t x5 = -x0 + x1 + x4;
+    const scalar_t x6 = (1.0 / 6.0) * fff[1];
+    const scalar_t x7 = (1.0 / 48.0) * fff[5];
+    const scalar_t x8 = (1.0 / 16.0) * fff[0];
+    const scalar_t x9 = x2 + x8;
+    const scalar_t x10 = -x7 + x9;
+    const scalar_t x11 = -x10 - x6;
+    const scalar_t x12 = (1.0 / 12.0) * fff[2];
+    const scalar_t x13 = (5.0 / 48.0) * fff[3];
+    const scalar_t x14 = x3 + x8;
+    const scalar_t x15 = -x13 + x14;
+    const scalar_t x16 = x12 + x15;
+    const scalar_t x17 = (1.0 / 12.0) * fff[1];
+    const scalar_t x18 = (5.0 / 48.0) * fff[5];
+    const scalar_t x19 = -x18 + x9;
+    const scalar_t x20 = x17 + x19;
+    const scalar_t x21 = (1.0 / 6.0) * fff[2];
+    const scalar_t x22 = (1.0 / 48.0) * fff[3];
+    const scalar_t x23 = x14 - x22;
+    const scalar_t x24 = -x21 - x23;
+    const scalar_t x25 = (1.0 / 48.0) * fff[0];
+    const scalar_t x26 = (1.0 / 6.0) * fff[4];
+    const scalar_t x27 = x25 - x26 - x4;
+    const scalar_t x28 = x0 + x13 + x18 + x26;
+    const scalar_t x29 = x21 + x28 + x6;
+    const scalar_t x30 = x1 + x22 + x25 + x7;
+    const scalar_t x31 = -x12 - x17 - x30;
+    const scalar_t x32 = -x12;
+    const scalar_t x33 = x15 + x32;
+    const scalar_t x34 = -x6;
+    const scalar_t x35 = -x10 - x34;
+    const scalar_t x36 = -x21;
+    const scalar_t x37 = -x23 - x36;
+    const scalar_t x38 = -x17;
+    const scalar_t x39 = x19 + x38;
+    const scalar_t x40 = x28 + x34 + x36;
+    const scalar_t x41 = -x30 - x32 - x38;
+    const scalar_t x42 = -x2 - x3;
+    const scalar_t x43 = -x0 - x1 - x42;
+    const scalar_t x44 = x25 + x26 + x42;
+    const scalar_t x45 = x0 + x13 + x18 - x26;
+    const scalar_t x46 = x36 + x45 + x6;
+    const scalar_t x47 = -x1 + x22 + x25 + x7;
+    const scalar_t x48 = -x17 - x32 - x47;
+    const scalar_t x49 = x21 + x34 + x45;
+    const scalar_t x50 = -x12 - x38 - x47;
+    element_vector[0] = u[0] * x29 + u[1] * x5 + u[2] * x11 + u[3] * x16 + u[4] * x20 + u[5] * x24 +
+                        u[6] * x31 + u[7] * x27;
+    element_vector[1] = u[0] * x5 + u[1] * x40 + u[2] * x33 + u[3] * x35 + u[4] * x37 + u[5] * x39 +
+                        u[6] * x27 + u[7] * x41;
+    element_vector[2] = u[0] * x11 + u[1] * x33 + u[2] * x46 + u[3] * x43 + u[4] * x48 +
+                        u[5] * x44 + u[6] * x20 + u[7] * x37;
+    element_vector[3] = u[0] * x16 + u[1] * x35 + u[2] * x43 + u[3] * x49 + u[4] * x44 +
+                        u[5] * x50 + u[6] * x24 + u[7] * x39;
+    element_vector[4] = u[0] * x20 + u[1] * x37 + u[2] * x48 + u[3] * x44 + u[4] * x46 +
+                        u[5] * x43 + u[6] * x11 + u[7] * x33;
+    element_vector[5] = u[0] * x24 + u[1] * x39 + u[2] * x44 + u[3] * x50 + u[4] * x43 +
+                        u[5] * x49 + u[6] * x16 + u[7] * x35;
+    element_vector[6] = u[0] * x31 + u[1] * x27 + u[2] * x20 + u[3] * x24 + u[4] * x11 +
+                        u[5] * x16 + u[6] * x29 + u[7] * x5;
+    element_vector[7] = u[0] * x27 + u[1] * x41 + u[2] * x37 + u[3] * x39 + u[4] * x33 +
+                        u[5] * x35 + u[6] * x5 + u[7] * x40;
 }
 
 #endif

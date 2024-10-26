@@ -47,6 +47,26 @@ def assemble_crs_spmv(fun, x):
 	sfem.hessian_crs(fun, x_buff, rowptr, colidx, values)
 	return sfem.crs_spmv(rowptr, colidx, values)
 
+
+def assemble_crs_and_write(fun, x, path):
+	fs = fun.space()
+	crs_graph = fun.crs_graph()
+	rowptr = crs_graph.rowptr()
+	colidx = crs_graph.colidx()
+	values = sfem.create_real_buffer(crs_graph.nnz())
+	x_buff = sfem.view(x)
+	sfem.hessian_crs(fun, x_buff, rowptr, colidx, values)
+
+	# print(sfem.len(colidx), " ", sfem.numpy_view(colidx).ctypes.data)
+
+	if not os.path.exists(path):
+		os.mkdir(f'{path}')
+		
+	sfem.numpy_view(rowptr).tofile(f'{path}/rowptr.raw')
+	sfem.numpy_view(colidx).tofile(f'{path}/colidx.raw')
+	sfem.numpy_view(values).tofile(f'{path}/values.raw')
+
+
 def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 	fs = fun.space()
 
@@ -80,7 +100,7 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 		# Matrix-based
 		lop = assemble_crs_spmv(fun, x)
 
-	print(assemble_scipy_matrix(fun, x))
+	assemble_crs_and_write(fun, x, "crs")
 
 	if use_cheb:
 		solver = sfem.Chebyshev3()

@@ -402,6 +402,16 @@ def strided_matrix_coeff(name, rows, cols, stride):
     return ret
 
 
+def matrix_sum(M):
+    ret = 0.0;
+    rows, cols = M.shape
+
+    for d1 in range(0, rows):
+        for d2 in range(0, cols):
+            ret += M[d1, d2]
+    return ret
+
+
 def norm2(v):
     ret = 0.0;
 
