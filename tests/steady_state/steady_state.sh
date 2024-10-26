@@ -76,5 +76,5 @@ then
 
 	raw_to_db.py $mesh/viz output/out.vtk  --point_data="output/soa/*.raw" --point_data_type="$SFEM_REAL_T"
 else
-	raw_to_db.py $mesh/viz output/out.vtk --point_data=output/u.raw,output/rhs.raw --point_data_type="$SFEM_REAL_T,$SFEM_REAL_T"
+	raw_to_db.py $mesh/viz output/out.vtk --point_data=output/x.raw,output/rhs.raw --point_data_type="$SFEM_REAL_T,$SFEM_REAL_T"
 fi

@@ -11,9 +11,12 @@ from sfem_codegen import coeffs
 from sfem_codegen import det2
 from sfem_codegen import det3
 from sfem_codegen import matrix_coeff
+from sfem_codegen import subsmat
+from sfem_codegen import inner
 import sympy.codegen.ast as ast
 import sympy as sp
 import numpy as np
+from stensor import *
 
 
 
@@ -57,6 +60,39 @@ class FE:
 
 			g[i] = sp.Matrix(dims, 1, gi)
 		return g
+
+	def hessian(self, p):
+		gx = self.grad(p)
+		dims, __ = p.shape
+		nn = len(gx)
+
+		H = [0]*nn
+
+		for i in range(0, nn):
+			Hi = sp.zeros(dims, dims)
+			for d1 in range(0, dims):
+				for d2 in range(0, dims):
+					HH = sp.diff(gx[i][d1], p[d2])
+					Hi[d1, d2] = HH 
+			H[i] = Hi
+		return H
+
+	def diff3(self, p):
+		Hx = self.hessian(p)
+		dims, __ = p.shape
+		nn = len(Hx)
+
+		T = [0]*nn
+		for i in range(0, nn):
+			t3 = Tensor3(dims, dims, dims)
+			for d1 in range(0, dims):
+				for d2 in range(0, dims):
+					for d3 in range(0, dims):
+						val = Hx[i][d1, d2]
+						t3[d1, d2, d3] = sp.diff(val, p[d3])
+			T[i] = t3
+		
+		return T
 
 	def interpolate(self, p, c):
 		f = self.fun(p)
@@ -104,6 +140,77 @@ class FE:
 					ret[i*ncomp + d] = F
 		return ret
 
+	def eval_grad(self, p):
+		q = self.quadrature_point()
+		g = self.grad(q)
+		dim = self.manifold_dim(), 
+
+		dim = self.spatial_dim()
+		for i in range(0, len(g)):
+			for d in range(0, dim):
+				g[i][d] = subsmat(g[i][d], q, p)
+
+		return g 
+
+	def eval_hessian(self, p):
+		q = self.quadrature_point()
+		dim = self.manifold_dim(), 
+		H = self.hessian(q)
+
+		dim = self.spatial_dim()
+		for i in range(0, len(H)):
+			for d in range(0, dim):
+				for d2 in range(0, dim):
+					H[i][d,d2] = subsmat(H[i][d, d2], q, p) 
+		return H
+
+	def eval_diff3(self, p):
+		q = self.quadrature_point()
+		dim = self.manifold_dim(), 
+		T = self.diff3(q)
+
+		dim = self.spatial_dim()
+		for i in range(0, len(T)):
+			for d1 in range(0, dim):
+				for d2 in range(0, dim):
+					for d2 in range(0, dim):
+						T[i][d1,d2,d2] = subsmat(T[i][d1,d2,d2], q, p) 
+
+		return T
+
+	def taylor_expand_fun(self, center, point):
+		f = self.fun(center)
+		g = self.eval_grad(center)
+		H = self.eval_hessian(center)
+		T3 = self.eval_diff3(center)
+
+		h = (point - center)
+		for i in range(0, self.n_nodes()):
+			f[i] += inner(g[i], h)
+			f[i] += inner(H[i] * h, h) / 2
+			temp = T3[i] * h
+			f[i] += inner(h, temp.T *h) / 6
+
+			f[i] = sp.simplify(f[i])
+
+		return f
+
+	def taylor_expand_grad(self, center, point):
+		g = self.eval_grad(center) 
+		H = self.eval_hessian(center)
+		T3 = self.eval_diff3(center)
+
+		h = (point - center)
+		for i in range(0, self.n_nodes()):
+			g[i] += H[i] * h 
+
+			temp = T3[i] * h
+			g[i] += temp.T * h / 2
+
+			for d in range(0, len(g[i])):
+				g[i][d] = sp.simplify(g[i][d])
+
+		return g
 
 	def grad_tensorize(self, g, ncomp=0):
 		if ncomp == 0:
@@ -187,6 +294,11 @@ class FE:
 	def quadrature_weight(self):
 		return sp.symbols('qw')
 
+	def quadrature_point(self):
+		qx, qy, qz = sp.symbols('qx qy qz')
+		q_temp = [qx, qy, qz]
+		return sp.Matrix(self.manifold_dim(), 1, q_temp[0:self.manifold_dim()])
+
 	def symbol_jacobian_inverse(self):
 		if self.use_adjugate:
 			return self.symbol_jacobian_inverse_as_adjugate()
@@ -240,6 +352,23 @@ class FE:
 
 	def symbol_jacobian_determinant(self):
 		return sp.symbols('jacobian_determinant')
+
+	def symbol_fff(self):
+		rows = self.spatial_dim()
+		cols = self.spatial_dim()
+		FFF_symbolic = sp.Matrix(rows, cols, [0]*(rows*cols))
+		
+		varidx = 0
+		for i in range(0, rows):
+			for j in range(i, cols):
+				var = sp.symbols(f'fff[{varidx}*stride]')
+				varidx += 1
+
+				# if FFF[i, j] != 0:
+				FFF_symbolic[i, j] = var
+				FFF_symbolic[j, i] = var;
+
+		return FFF_symbolic
 
 	def generate_det_code(self):
 		mat = sp.Matrix(self.manifold_dim(), self.manifold_dim(), [0] * (self.manifold_dim() * self.manifold_dim()))

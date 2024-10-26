@@ -22,7 +22,7 @@ export OMP_PROC_BIND=true
 export CUDA_LAUNCH_BLOCKING=0
 export SFEM_ELEMENT_REFINE_LEVEL=4
 
-CASE=3
+CASE=2
 
 # Generate mesh db
 case $CASE in
@@ -34,7 +34,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			create_box_ss_mesh.sh 1 $SFEM_ELEMENT_REFINE_LEVEL
+			create_box_ss_mesh.sh 4 $SFEM_ELEMENT_REFINE_LEVEL
 		fi
 
 		sinlet=$mesh/surface/sidesets_aos/left.raw 
@@ -47,7 +47,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			export SFEM_REFINE=5
+			# export SFEM_REFINE=5
 			$SCRIPTPATH/../../data/vtk/joint-hex.sh $SFEM_ELEMENT_REFINE_LEVEL
 		fi
 		sinlet=$mesh/surface/sidesets_aos/base.raw
