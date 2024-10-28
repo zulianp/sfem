@@ -611,18 +611,18 @@ int hex8_to_isoparametric_tet10_resample_field_local_V(
 ////////////////////////////////////////////////////////////////////////
 // hex_aa_8_eval_weno4_3D
 ////////////////////////////////////////////////////////////////////////
-SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D_Unit_V(  //
-        const vec_double x_unit,                          //
-        const vec_double y_unit,                          //
-        const vec_double z_unit,                          //
-        const real_t ox_unit,                             //
-        const real_t oy_unit,                             //
-        const real_t oz_unit,                             //
-        const vec_int64 i,                                // it must be the absolute index
-        const vec_int64 j,                                // Used to get the data
-        const vec_int64 k,                                // From the data array
-        const ptrdiff_t* stride,                          //
-        const real_t* const SFEM_RESTRICT data) {         //
+SFEM_INLINE static vec_double hex_aa_8_eval_weno4_3D_Unit_V(  //
+        const vec_double x_unit,                              //
+        const vec_double y_unit,                              //
+        const vec_double z_unit,                              //
+        const real_t ox_unit,                                 //
+        const real_t oy_unit,                                 //
+        const real_t oz_unit,                                 //
+        const vec_int64 i,                                    // it must be the absolute index
+        const vec_int64 j,                                    // Used to get the data
+        const vec_int64 k,                                    // From the data array
+        const ptrdiff_t* stride,                              //
+        const real_t* const SFEM_RESTRICT data) {             //
 
     // collect the data for the WENO interpolation
 
@@ -630,11 +630,9 @@ SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D_Unit_V(  //
     const int stride_y = stride[1];
     const int stride_z = stride[2];
 
-    real_t w4 = 0.0;
-
     // real_t* out = NULL;
-    ptr_array first_ptrs_array;
-    hex_aa_8_collect_coeffs_O3_ptr_vec(stride, i, j, k, data, &first_ptrs_array);
+    real_t* first_ptrs_array[_VL_];
+    hex_aa_8_collect_coeffs_O3_ptr_vec(stride, i, j, k, data, first_ptrs_array);
 
     // ////// Compute the local indices
     // vec_int64 i_local, j_local, k_local;
@@ -660,14 +658,16 @@ SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D_Unit_V(  //
 
     // // printf("delta = %f\n", h);
 
-    // const real_t w4 = weno4_3D_HOne(x,  //
-    //                                 y,
-    //                                 z,
-    //                                 out,
-    //                                 stride_x,
-    //                                 stride_y,
-    //                                 stride_z);
+    const vec_double w4 = weno4_3D_HOne_V(stride, x, y, z, (const real_t**)first_ptrs_array);
+    // // (x,  //
+    // //                                 y,
+    // //                                 z,
+    // //                                 out,
+    // //                                 stride_x,
+    // //                                 stride_y,
+    // //                                 stride_z);
 
+    // vec_double w4 = CONST_VEC(1);
     return w4;
 }
 
