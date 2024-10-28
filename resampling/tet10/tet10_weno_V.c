@@ -262,16 +262,16 @@ void hex_aa_8_collect_coeffs_O3_ptr_vec(const ptrdiff_t *const stride,  //
                                         const vec_indices j,            //
                                         const vec_indices k,            //
                                         const real_t *const data,
-                                        ptr_array *first_ptrs_array) {  //
+                                        real_t *first_ptrs_array[]) {  //
 
     const vec_indices first_indices = hex_aa_8_indices_O3_first_index_vec(stride, i, j, k);
 
     for (int ii = 0; ii < _VL_; ii++) {
-        (*first_ptrs_array)[ii] = &data[first_indices[ii]];
+        (first_ptrs_array)[ii] = &data[first_indices[ii]];
     }
 }
 
-vec_double copy_f_vec(const double *f, const ptrdiff_t stride_x, const ptrdiff_t stride_y,
+vec_double copy_f_vec(const real_t *f[], const ptrdiff_t stride_x, const ptrdiff_t stride_y,
                       const ptrdiff_t stride_z, const int side_x, const int side_y,
                       const int side_z) {
     //
@@ -279,7 +279,7 @@ vec_double copy_f_vec(const double *f, const ptrdiff_t stride_x, const ptrdiff_t
     vec_double res = CONST_VEC(0);
 
     for (int ii = 0; ii < _VL_; ii++) {
-        res[ii] = f[side_x * stride_x + side_y * stride_y + side_z * stride_z];
+        res[ii] = f[ii][side_x * stride_x + side_y * stride_y + side_z * stride_z];
     }
 }
 
@@ -297,7 +297,7 @@ vec_double copy_f_vec(const double *f, const ptrdiff_t stride_x, const ptrdiff_t
  */
 vec_double weno4_3D_HOne_V(const ptrdiff_t *const stride,                               //
                            const vec_double x, const vec_double y, const vec_double z,  //
-                           const double *f) {                                           //
+                           const real_t *f[]) {                                         //
 
     const ptrdiff_t stride_x = stride[0];
     const ptrdiff_t stride_y = stride[1];
