@@ -36,7 +36,7 @@ typedef double vec_double __attribute__((vector_size(_VL_ * sizeof(double)),  //
 typedef ptrdiff_t vec_indices __attribute__((vector_size(_VL_ * sizeof(ptrdiff_t)),  //
                                              aligned(sizeof(ptrdiff_t))));
 
-typedef float_t* ptr_array[_VL_];
+typedef real_t *ptr_array[_VL_];
 
 #define List2_V(ARRAY, AA, BB) \
     {                          \
@@ -78,10 +78,17 @@ typedef float_t* ptr_array[_VL_];
 //                        const int stride_y,                              //
 //                        const int stride_z);                             //
 
-vec_double weno4_3D_HOne_V(const vec_double x, const vec_double y, const vec_double z,  //
-                           const double* f,                                             //
-                           const vec_indices stride_x,                                  //
-                           const vec_indices stride_y,                                  //
-                           const vec_indices stride_z);                                 //
+void hex_aa_8_collect_coeffs_O3_ptr_vec(const ptrdiff_t *const stride,  //
+                                        const vec_indices i,            //
+                                        const vec_indices j,            //
+                                        const vec_indices k,            //
+                                        const real_t *const data,       //
+                                        ptr_array *first_ptrs_array);   //
+
+// vec_double weno4_3D_HOne_V(const vec_double x, const vec_double y, const vec_double z,  //
+//                            const double* f,                                             //
+//                            const vec_indices stride_x,                                  //
+//                            const vec_indices stride_y,                                  //
+//                            const vec_indices stride_z);                                 //
 
 #endif  // __TET10_WENO_V_H__

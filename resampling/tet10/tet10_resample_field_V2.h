@@ -61,7 +61,7 @@ int hex8_to_tet10_resample_field_local_V2(
  * @param weighted_field
  * @return int
  */
-int hex8_to_isoparametric_tet10_resample_field_local_cube1_V2(
+int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
         /// Mesh
         const ptrdiff_t nelements,          // number of elements
         const ptrdiff_t nnodes,             // number of nodes

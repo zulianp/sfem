@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "tet10_weno_V.h"
+
 #if SFEM_VEC_SIZE == 8
 #define AVX512
 #elif SFEM_VEC_SIZE == 4
@@ -18,7 +20,7 @@
 #define _VL_ 8
 #elif defined(AVX2)
 #define _VL_ 4
-#endif./
+#endif
 
 // #define UNROLL_ZERO _Pragma("GCC unroll(0)")
 #define UNROLL_ZERO _Pragma("unroll(1)")
@@ -606,10 +608,73 @@ int hex8_to_isoparametric_tet10_resample_field_local_V(
 }  // end function hex8_to_tet10_resample_field_local
 //////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////
+// hex_aa_8_eval_weno4_3D
+////////////////////////////////////////////////////////////////////////
+SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D_Unit_V(  //
+        const vec_double x_unit,                          //
+        const vec_double y_unit,                          //
+        const vec_double z_unit,                          //
+        const real_t ox_unit,                             //
+        const real_t oy_unit,                             //
+        const real_t oz_unit,                             //
+        const vec_int64 i,                                // it must be the absolute index
+        const vec_int64 j,                                // Used to get the data
+        const vec_int64 k,                                // From the data array
+        const ptrdiff_t* stride,                          //
+        const real_t* const SFEM_RESTRICT data) {         //
+
+    // collect the data for the WENO interpolation
+
+    const int stride_x = stride[0];
+    const int stride_y = stride[1];
+    const int stride_z = stride[2];
+
+    real_t w4 = 0.0;
+
+    // real_t* out = NULL;
+    ptr_array first_ptrs_array;
+    hex_aa_8_collect_coeffs_O3_ptr_vec(stride, i, j, k, data, &first_ptrs_array);
+
+    // ////// Compute the local indices
+    // vec_int64 i_local, j_local, k_local;
+
+    const vec_double ones_vec = CONST_VEC(1.0);
+
+    const vec_int64 i_local = floor_V(x_unit - (vec_double)CONST_VEC(ox_unit));
+    const vec_int64 j_local = floor_V(y_unit - (vec_double)CONST_VEC(oy_unit));
+    const vec_int64 k_local = floor_V(z_unit - (vec_double)CONST_VEC(oz_unit));
+
+    const vec_double i_local_vec = vec_int64_to_double(i_local);
+    const vec_double x = (x_unit - (vec_double)CONST_VEC(ox_unit)) - i_local_vec + ones_vec;
+
+    const vec_double j_local_vec = vec_int64_to_double(j_local);
+    const vec_double y = (y_unit - (vec_double)CONST_VEC(oy_unit)) - j_local_vec + ones_vec;
+
+    const vec_double k_local_vec = vec_int64_to_double(k_local);
+    const vec_double z = (z_unit - (vec_double)CONST_VEC(oz_unit)) - k_local_vec + ones_vec;
+
+    // // printf("x = %f, x_ = %f, i = %d\n", x, x_, i);
+    // // printf("y = %f, y_ = %f, j = %d\n", y, y_, j);
+    // // printf("z = %f, z_ = %f, k = %d\n", z, z_, k);
+
+    // // printf("delta = %f\n", h);
+
+    // const real_t w4 = weno4_3D_HOne(x,  //
+    //                                 y,
+    //                                 z,
+    //                                 out,
+    //                                 stride_x,
+    //                                 stride_y,
+    //                                 stride_z);
+
+    return w4;
+}
+
 //////////////////////////////////////////////////////////
 /// hex8_to_tet10_resample_field_local_cube1_V2
 //////////////////////////////////////////////////////////
-int hex8_to_isoparametric_tet10_resample_field_local_cube1_V2(
+int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
         /// Mesh
         const ptrdiff_t nelements,          // number of elements
         const ptrdiff_t nnodes,             // number of nodes
@@ -634,6 +699,8 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V2(
     const real_t dy = (real_t)delta[1];
     const real_t dz = (real_t)delta[2];
 
+    const real_t cVolume = dx * dy * dz;
+
     const ptrdiff_t stride0 = stride[0];
     const ptrdiff_t stride1 = stride[1];
     const ptrdiff_t stride2 = stride[2];
@@ -645,6 +712,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V2(
 
         // ISOPARAMETRIC
         real_t x[10], y[10], z[10];
+        real_t x_unit[10], y_unit[10], z_unit[10];
 
         vec_double hex8_f[8];
         vec_double coeffs[8];
@@ -659,11 +727,37 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V2(
         }
 
         // ISOPARAMETRIC
+        // search for the vertex with the minimum distance to the origin
+
+        int v_orig = 0;
+        double dist_min = 1e14;
+
         for (int v = 0; v < 10; ++v) {
             x[v] = (real_t)(xyz[0][ev[v]]);  // x-coordinates
             y[v] = (real_t)(xyz[1][ev[v]]);  // y-coordinates
             z[v] = (real_t)(xyz[2][ev[v]]);  // z-coordinates
+
+            const double dist = sqrt((x[v] - ox) * (x[v] - ox) +  //
+                                     (y[v] - oy) * (y[v] - oy) +  //
+                                     (z[v] - oz) * (z[v] - oz));  //
+
+            if (dist < dist_min) {
+                dist_min = dist;
+                v_orig = v;
+            }
         }
+
+        const real_t grid_x_orig = (x[v_orig] - ox) / dx;
+        const real_t grid_y_orig = (y[v_orig] - oy) / dy;
+        const real_t grid_z_orig = (z[v_orig] - oz) / dz;
+
+        const ptrdiff_t i_orig = floor(grid_x_orig);
+        const ptrdiff_t j_orig = floor(grid_y_orig);
+        const ptrdiff_t k_orig = floor(grid_z_orig);
+
+        const real_t x_orig = ox + ((real_t)i_orig) * dx;
+        const real_t y_orig = oy + ((real_t)j_orig) * dy;
+        const real_t z_orig = oz + ((real_t)k_orig) * dz;
 
         // memset(element_field, 0, 10 * sizeof(real_t));
 
@@ -671,10 +765,115 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V2(
         for (int ii = 0; ii < 10; ii++) {
             element_field[ii] = ZEROS_SIMD_MACRO;
         }
-    }
+
+        // Map element to the grid based on unitary spacing
+        for (int v = 0; v < 10; ++v) {
+            x_unit[v] = (x[v] - x_orig) / dx;
+            y_unit[v] = (y[v] - y_orig) / dy;
+            z_unit[v] = (z[v] - z_orig) / dz;
+        }
+
+        // set to zero the element field
+        memset(element_field, 0, 10 * sizeof(real_t));
+
+        for (int q = 0; q < TET4_NQP; q += (_VL_)) {
+            vec_double tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V;
+
+            const int q_next = q + (_VL_);
+
+            if (q_next <= TET4_NQP) {
+                ASSIGN_QUADRATURE_POINT_MACRO(q, tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V);
+            } else {
+                ASSIGN_QUADRATURE_POINT_MACRO_TAIL(q, tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V);
+            }
+
+            const vec_double measure_V = tet10_measure_V(x, y, z, tet4_qx_V, tet4_qy_V, tet4_qz_V);
+
+            const vec_double dV = measure_V * tet4_qw_V * cVolume;
+
+            vec_double g_qx_glob_V, g_qy_glob_V, g_qz_glob_V;
+            tet10_transform_V(x,
+                              y,
+                              z,
+                              tet4_qx_V,
+                              tet4_qy_V,
+                              tet4_qz_V,
+                              &g_qx_glob_V,
+                              &g_qy_glob_V,
+                              &g_qz_glob_V);
+
+            tet10_dual_basis_hrt_V(tet4_qx_V, tet4_qy_V, tet4_qz_V, tet10_f);
+
+            // Transform quadrature point to unitary space
+            // g_qx_unit, g_qy_unit, g_qz_unit are the coordinates of the quadrature point in
+            // the unitary space
+            vec_double g_qx_unit_V, g_qy_unit_V, g_qz_unit_V;
+            tet10_transform_V(x_unit,
+                              y_unit,
+                              z_unit,
+                              tet4_qx_V,
+                              tet4_qy_V,
+                              tet4_qz_V,
+                              &g_qx_unit_V,
+                              &g_qy_unit_V,
+                              &g_qz_unit_V);
+
+            ///// ======================================================
+
+            // Get the global grid coordinates of the inner cube
+            // In the global space
+
+            const vec_double grid_x_V = (g_qx_glob_V - ox) / dx;
+            const vec_double grid_y_V = (g_qy_glob_V - oy) / dy;
+            const vec_double grid_z_V = (g_qz_glob_V - oz) / dz;
+
+            const vec_int64 i_glob_V = floor_V(grid_x_V);
+            const vec_int64 j_glob_V = floor_V(grid_y_V);
+            const vec_int64 k_glob_V = floor_V(grid_z_V);
+
+            // If outside the domain, omit the control at the moment
+
+            // This is the WENO direct approach
+            // The main approach is omitted in this version
+            const vec_double x_cube_origin = (ox + ((vec_double)i_glob_V - 1) * dx) / dx;
+            const vec_double y_cube_origin = (oy + ((vec_double)j_glob_V - 1) * dy) / dy;
+            const vec_double z_cube_origin = (oz + ((vec_double)k_glob_V - 1) * dz) / dz;
+
+            // TODO: Check if this is correct
+            // TODO: Check if this is correct
+            vec_double eval_field = ZEROS_SIMD_MACRO;
+
+            // Integrate field
+            {
+                vec_double eval_field = ZEROS_SIMD_MACRO;
+                // UNROLL_ZERO
+                for (int edof_j = 0; edof_j < 8; edof_j++) {
+                    eval_field += hex8_f[edof_j] * coeffs[edof_j];
+                }
+
+                // UNROLL_ZERO
+                for (int edof_i = 0; edof_i < 10; edof_i++) {
+                    element_field[edof_i] += eval_field * tet10_f[edof_i] * dV;
+                }  // end edof_i loop
+            }
+
+        }  // end quadrature loop
+
+        ///// QUI ======================================================
+        UNROLL_ZERO
+        for (int v = 0; v < 10; ++v) {
+            // #pragma omp atomic update
+
+            double element_field_v = 0.0;
+            SIMD_REDUCE_SUM_MACRO(element_field_v, element_field[v]);
+
+            weighted_field[ev[v]] += element_field_v;
+        }  // end vertex loop
+
+    }  // end element loop
 
     RETURN_FROM_FUNCTION(0);
-}
+}  // end function hex8_to_tet10_resample_field_local_cube1_V2
 
 /**
  * @brief
