@@ -136,7 +136,7 @@ class Hex8(FE):
 		ld = [1, 3, 9]
 		ii = [-1] * 8
 
-		mask = [1] * 8
+		mask = [True] * 8
 
 		left = 0
 		right = 2
@@ -164,15 +164,23 @@ class Hex8(FE):
 					lb  = [xi + im1, yi + jm1, zi + km1 ]
 					rb = [xi + ip1, yi + jp1, zi + kp1 ]
 
-					mask[0] = (lb[0].equals(-1))
-					print(mask[0])
+					mask[0] = (lb[0] >= 0) & (lb[1] >= 0) & (lb[2] >= 0)
+					mask[1] = (lb[0] < level) & (lb[1] >= 0) & (lb[2] >= 0)
+					mask[2] = (lb[0] < level) & (rb[1] < level) & (lb[2] >= 0)
+					mask[3] = (lb[0] >= 0) & (rb[1] < level) & (lb[2] >= 0)
+					
+					mask[4] = (lb[0] >= 0) & (lb[1] >= 0) & (rb[2] < level)
+					mask[5] = (rb[0] < level) & (lb[1] >= 0) & (rb[2] < level)
+					mask[6] = (rb[0] < level) & (rb[1] < level) & (rb[2] < level)
+					mask[7] = (lb[0] >= 0) & (rb[1] < level) & (rb[2] < level)
 
 					for l in range(0, 8):
 						for s in range(0, 8):
 							ll = ii[l]
 							ss = ii[s]
-							G[ll, ss] += M[l, s] 
-							# *mask[l]
+
+							nonz = sp.simplify(mask[l] & mask[s])
+							G[ll, ss] += M[l, s] * sp.Piecewise((1, nonz), (0, True))
 
 		ii_center = 1 * ld[0] + 1 * ld[1] + 1 * ld[2]
 		stencil = G[ii_center, :]

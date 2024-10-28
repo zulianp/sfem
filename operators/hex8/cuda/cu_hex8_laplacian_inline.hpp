@@ -1,6 +1,7 @@
 #ifndef CU_HEX8_LAPLACIAN_INLINE_HPP
 #define CU_HEX8_LAPLACIAN_INLINE_HPP
 
+#include "sfem_cuda_base.h"
 #include "sfem_defs.h"
 
 template <typename scalar_t, typename accumulator_t>
@@ -126,4 +127,244 @@ static SFEM_INLINE __host__ __device__ void cu_hex8_laplacian_apply_fff_integral
                         x91 + x98 + x99;
 }
 
-#endif // CU_HEX8_LAPLACIAN_INLINE_HPP
+//// Taylor expansion version
+
+static const scalar_t h_hex8_g_0_x[8] = {-1.0 / 4.0,
+                                         1.0 / 4.0,
+                                         1.0 / 4.0,
+                                         -1.0 / 4.0,
+                                         -1.0 / 4.0,
+                                         1.0 / 4.0,
+                                         1.0 / 4.0,
+                                         -1.0 / 4.0};
+
+static const scalar_t h_hex8_g_0_y[8] = {-1.0 / 4.0,
+                                         -1.0 / 4.0,
+                                         1.0 / 4.0,
+                                         1.0 / 4.0,
+                                         -1.0 / 4.0,
+                                         -1.0 / 4.0,
+                                         1.0 / 4.0,
+                                         1.0 / 4.0};
+
+static const scalar_t h_hex8_g_0_z[8] = {-1.0 / 4.0,
+                                         -1.0 / 4.0,
+                                         -1.0 / 4.0,
+                                         -1.0 / 4.0,
+                                         1.0 / 4.0,
+                                         1.0 / 4.0,
+                                         1.0 / 4.0,
+                                         1.0 / 4.0};
+
+static const scalar_t h_hex8_H_0_x[8] = {1.0 / 2.0,
+                                         -1.0 / 2.0,
+                                         1.0 / 2.0,
+                                         -1.0 / 2.0,
+                                         1.0 / 2.0,
+                                         -1.0 / 2.0,
+                                         1.0 / 2.0,
+                                         -1.0 / 2.0};
+
+static const scalar_t h_hex8_H_0_y[8] = {1.0 / 2.0,
+                                         -1.0 / 2.0,
+                                         -1.0 / 2.0,
+                                         1.0 / 2.0,
+                                         -1.0 / 2.0,
+                                         1.0 / 2.0,
+                                         1.0 / 2.0,
+                                         -1.0 / 2.0};
+
+static const scalar_t h_hex8_H_0_z[8] = {1.0 / 2.0,
+                                         1.0 / 2.0,
+                                         -1.0 / 2.0,
+                                         -1.0 / 2.0,
+                                         -1.0 / 2.0,
+                                         -1.0 / 2.0,
+                                         1.0 / 2.0,
+                                         1.0 / 2.0};
+
+static const scalar_t h_hex8_diff3_0[8] = {-1, 1, -1, 1, 1, -1, 1, -1};
+
+__constant__ scalar_t hex8_g_0_x[8];
+__constant__ scalar_t hex8_g_0_y[8];
+__constant__ scalar_t hex8_g_0_z[8];
+__constant__ scalar_t hex8_H_0_x[8];
+__constant__ scalar_t hex8_H_0_y[8];
+__constant__ scalar_t hex8_H_0_z[8];
+__constant__ scalar_t hex8_diff3_0[8];
+
+static void cu_hex8_taylor_expansion_init() {
+    static bool initialized = false;
+    if (!initialized) {
+        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(hex8_g_0_x, h_hex8_g_0_x, 8 * sizeof(scalar_t)));
+        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(hex8_g_0_y, h_hex8_g_0_y, 8 * sizeof(scalar_t)));
+        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(hex8_g_0_z, h_hex8_g_0_z, 8 * sizeof(scalar_t)));
+        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(hex8_H_0_x, h_hex8_H_0_x, 8 * sizeof(scalar_t)));
+        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(hex8_H_0_y, h_hex8_H_0_y, 8 * sizeof(scalar_t)));
+        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(hex8_H_0_z, h_hex8_H_0_z, 8 * sizeof(scalar_t)));
+        SFEM_CUDA_CHECK(cudaMemcpyToSymbol(hex8_diff3_0, h_hex8_diff3_0, 8 * sizeof(scalar_t)));
+        initialized = true;
+    }
+}
+
+template <typename scalar_t, typename accumulator_t>
+static SFEM_INLINE __host__ __device__ void hex8_laplacian_matrix_ij_taylor(
+        const scalar_t *const SFEM_RESTRICT fff,
+        const scalar_t trial_gx,
+        const scalar_t trial_gy,
+        const scalar_t trial_gz,
+        const scalar_t trial_Hx,
+        const scalar_t trial_Hy,
+        const scalar_t trial_Hz,
+        const scalar_t trial_diff3,
+        const scalar_t test_gx,
+        const scalar_t test_gy,
+        const scalar_t test_gz,
+        const scalar_t test_Hx,
+        const scalar_t test_Hy,
+        const scalar_t test_Hz,
+        const scalar_t test_diff3,
+        accumulator_t *const SFEM_RESTRICT val) {
+    const scalar_t x0 = (1.0 / 12.0) * fff[0];
+    const scalar_t x1 = test_Hx * trial_Hx;
+    const scalar_t x2 = test_Hy * trial_Hy;
+    const scalar_t x3 = (1.0 / 576.0) * fff[0];
+    const scalar_t x4 = test_diff3 * x3;
+    const scalar_t x5 = test_diff3 * x3;
+    const scalar_t x6 = (1.0 / 12.0) * fff[1];
+    const scalar_t x7 = (1.0 / 12.0) * fff[2];
+    const scalar_t x8 = (1.0 / 12.0) * fff[3];
+    const scalar_t x9 = test_Hz * trial_Hz;
+    const scalar_t x10 = (1.0 / 576.0) * fff[3];
+    const scalar_t x11 = test_diff3 * x10;
+    const scalar_t x12 = test_diff3 * x10;
+    const scalar_t x13 = (1.0 / 12.0) * fff[4];
+    const scalar_t x14 = (1.0 / 12.0) * fff[5];
+    const scalar_t x15 = (1.0 / 576.0) * fff[5];
+    const scalar_t x16 = test_diff3 * x15;
+    const scalar_t x17 = test_diff3 * x15;
+    val[0] = fff[0] * test_gx * trial_gx + fff[1] * test_gx * trial_gy +
+             fff[1] * test_gy * trial_gx + fff[2] * test_gx * trial_gz +
+             fff[2] * test_gz * trial_gx + fff[3] * test_gy * trial_gy +
+             fff[4] * test_gy * trial_gz + fff[4] * test_gz * trial_gy +
+             fff[5] * test_gz * trial_gz + test_Hx * trial_Hy * x13 + test_Hx * trial_Hz * x7 +
+             test_Hy * trial_Hx * x13 + test_Hy * trial_Hz * x6 + test_Hz * trial_Hx * x7 +
+             test_Hz * trial_Hy * x6 + trial_diff3 * x11 + trial_diff3 * x12 + trial_diff3 * x16 +
+             trial_diff3 * x17 + trial_diff3 * x4 + trial_diff3 * x5 + trial_diff3 * x16 +
+             trial_diff3 * x17 + trial_diff3 * x4 + trial_diff3 * x5 + trial_diff3 * x11 +
+             trial_diff3 * x12 + x0 * x1 + x0 * x2 + x1 * x8 + x14 * x2 + x14 * x9 + x8 * x9;
+}
+
+template <typename scalar_t, typename accumulator_t>
+static SFEM_INLINE __host__ __device__ void hex8_laplacian_matrix_fff_taylor(
+        const scalar_t *const SFEM_RESTRICT fff,
+        accumulator_t *const SFEM_RESTRICT element_matrix) {
+    for (int i = 0; i < 8; i++) {
+        accumulator_t val;
+        hex8_laplacian_matrix_ij_taylor(fff,
+                                        // Trial
+                                        hex8_g_0_x[i],
+                                        hex8_g_0_y[i],
+                                        hex8_g_0_z[i],
+                                        hex8_H_0_x[i],
+                                        hex8_H_0_y[i],
+                                        hex8_H_0_z[i],
+                                        hex8_diff3_0[i],
+                                        // Test
+                                        hex8_g_0_x[i],
+                                        hex8_g_0_y[i],
+                                        hex8_g_0_z[i],
+                                        hex8_H_0_x[i],
+                                        hex8_H_0_y[i],
+                                        hex8_H_0_z[i],
+                                        hex8_diff3_0[i],
+                                        &val);
+
+        element_matrix[i * 8 + i] = val;
+
+        for (int j = i + 1; j < 8; j++) {
+            hex8_laplacian_matrix_ij_taylor(fff,
+                                            // Trial
+                                            hex8_g_0_x[j],
+                                            hex8_g_0_y[j],
+                                            hex8_g_0_z[j],
+                                            hex8_H_0_x[j],
+                                            hex8_H_0_y[j],
+                                            hex8_H_0_z[j],
+                                            hex8_diff3_0[j],
+                                            // Test
+                                            hex8_g_0_x[i],
+                                            hex8_g_0_y[i],
+                                            hex8_g_0_z[i],
+                                            hex8_H_0_x[i],
+                                            hex8_H_0_y[i],
+                                            hex8_H_0_z[i],
+                                            hex8_diff3_0[i],
+                                            &val);
+            // Exploit symmetry
+            element_matrix[i * 8 + j] = val;
+            element_matrix[j * 8 + i] = val;
+        }
+    }
+}
+
+template <typename scalar_t, typename accumulator_t>
+static SFEM_INLINE __host__ __device__ void hex8_laplacian_apply_fff_taylor(
+        const scalar_t *const SFEM_RESTRICT fff,
+        const scalar_t *SFEM_RESTRICT u,
+        accumulator_t *SFEM_RESTRICT element_vector) {
+    scalar_t gu[3], Hu[3], diff3u;
+    {
+        const scalar_t x0 = (1.0 / 4.0) * u[1];
+        const scalar_t x1 = (1.0 / 4.0) * u[7];
+        const scalar_t x2 = (1.0 / 4.0) * u[2];
+        const scalar_t x3 = -1.0 / 4.0 * u[6];
+        const scalar_t x4 = (1.0 / 4.0) * u[0];
+        const scalar_t x5 = (1.0 / 4.0) * u[4];
+        const scalar_t x6 = -x2 + x3 + x4 + x5;
+        const scalar_t x7 = (1.0 / 4.0) * u[5];
+        const scalar_t x8 = (1.0 / 4.0) * u[3];
+        const scalar_t x9 = -x7 + x8;
+        const scalar_t x10 = x0 - x1;
+        const scalar_t x11 = (1.0 / 2.0) * u[2];
+        const scalar_t x12 = (1.0 / 2.0) * u[4];
+        const scalar_t x13 = (1.0 / 2.0) * u[0];
+        const scalar_t x14 = (1.0 / 2.0) * u[6];
+        const scalar_t x15 = (1.0 / 2.0) * u[1];
+        const scalar_t x16 = (1.0 / 2.0) * u[7];
+        const scalar_t x17 = x13 + x14 - x15 - x16;
+        const scalar_t x18 = (1.0 / 2.0) * u[3];
+        const scalar_t x19 = (1.0 / 2.0) * u[5];
+        const scalar_t x20 = -x18 - x19;
+        const scalar_t x21 = -x11 - x12;
+        const scalar_t x22 = -u[0] + u[1] - u[2] + u[3] + u[4] - u[5] + u[6] - u[7];
+        gu[0] = x0 - x1 - x6 - x9;
+        gu[1] = -x10 - x6 - x7 + x8;
+        gu[2] = -x10 - x2 - x3 - x4 + x5 - x9;
+        Hu[0] = x11 + x12 + x17 + x20;
+        Hu[1] = x17 + x18 + x19 + x21;
+        Hu[2] = x13 + x14 + x15 + x16 + x20 + x21;
+        diff3u = x22;
+    }
+
+    for (int i = 0; i < 8; i++) {
+        hex8_laplacian_matrix_ij_taylor(fff,
+                                        gu[0],
+                                        gu[1],
+                                        gu[2],
+                                        Hu[0],
+                                        Hu[1],
+                                        Hu[2],
+                                        diff3u,
+                                        hex8_g_0_x[i],
+                                        hex8_g_0_y[i],
+                                        hex8_g_0_z[i],
+                                        hex8_H_0_x[i],
+                                        hex8_H_0_y[i],
+                                        hex8_H_0_z[i],
+                                        hex8_diff3_0[i],
+                                        &element_vector[i]);
+    }
+}
+
+#endif  // CU_HEX8_LAPLACIAN_INLINE_HPP

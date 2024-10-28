@@ -250,7 +250,7 @@ int proteus_affine_hex8_laplacian_apply(const int level,
             // Assume affine here!
             hex8_sub_fff_0(m_fff, h, fff);
 
-#define PROTEUS_HEX8_USE_MV  // assemblying the elemental matrix is faster
+#define PROTEUS_HEX8_USE_MV  // assemblying the elemental matrix is much faster
 #ifdef PROTEUS_HEX8_USE_MV
             accumulator_t laplacian_matrix[8 * 8];
             hex8_laplacian_matrix_fff_integral(fff, laplacian_matrix);
@@ -294,7 +294,8 @@ int proteus_affine_hex8_laplacian_apply(const int level,
                             }
                         }
 #else
-                        hex8_laplacian_apply_fff_integral(fff, element_u, element_vector);
+                        hex8_laplacian_apply_fff_integral(fff, element_u, element_vector); // 2x faster than taylor version below
+                        // hex8_laplacian_apply_fff_taylor(fff, element_u, element_vector);
 #endif
 
                         // Accumulate to macro-element buffer

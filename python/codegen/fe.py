@@ -1,5 +1,3 @@
-
-
 import sympy as sp
 from sfem_codegen import adjugate
 from sfem_codegen import norm2
@@ -178,40 +176,107 @@ class FE:
 
 		return T
 
-	def taylor_expand_fun(self, center, point):
+	def taylor_expand_fun(self, center, point, order = -1):
 		f = self.fun(center)
 		g = self.eval_grad(center)
 		H = self.eval_hessian(center)
 		T3 = self.eval_diff3(center)
 
+		if order == -1:
+			order = 100
+
 		h = (point - center)
 		for i in range(0, self.n_nodes()):
 			f[i] += inner(g[i], h)
-			f[i] += inner(H[i] * h, h) / 2
-			temp = T3[i] * h
-			f[i] += inner(h, temp.T *h) / 6
+
+			if order >= 1:
+				f[i] += inner(H[i] * h, h) / 2
+			
+			if order >= 2:
+				temp = T3[i] * h
+				f[i] += inner(h, temp.T * h) / 6
 
 			f[i] = sp.simplify(f[i])
 
 		return f
 
-	def taylor_expand_grad(self, center, point):
+	def taylor_expand_grad(self, center, point, order = -1):
 		g = self.eval_grad(center) 
 		H = self.eval_hessian(center)
 		T3 = self.eval_diff3(center)
+
+		if order == -1:
+			order = 100
 
 		h = (point - center)
 		for i in range(0, self.n_nodes()):
 			g[i] += H[i] * h 
 
-			temp = T3[i] * h
-			g[i] += temp.T * h / 2
+			if order >= 1:
+				temp = T3[i] * h
+				g[i] += temp.T * h / 2
 
 			for d in range(0, len(g[i])):
 				g[i][d] = sp.simplify(g[i][d])
 
 		return g
 
+	def grad_nnz(self, prefix):
+		dim = self.spatial_dim()
+		g = coeffs(f'{prefix}_g', dim)
+		return g
+
+	def hessian_nnz(self, prefix):
+		point = self.quadrature_point()
+		dim = self.spatial_dim()
+		H = sp.zeros(dim,  dim)
+
+		T2 = self.eval_hessian(point)
+		T2_nnz = sp.zeros(dim, dim)
+
+		for t2 in T2:
+			for d1 in range(0, dim):
+				for d2 in range(0, dim):
+					T2_nnz[d1, d2] += (t2[d1, d2] != 0) * 1
+
+		next_idx = 0
+		for d1 in range(0, dim):
+			for d2 in range(d1, dim):
+				if T2_nnz[d1, d2] != 0:
+					H[d1, d2] = sp.symbols(f'{prefix}_H[{next_idx}]')
+					H[d2, d1] =  H[d1, d2]
+					next_idx += 1
+		return H
+
+	def diff3_nnz(self, prefix):
+		point = self.quadrature_point()
+		dim = self.spatial_dim()
+		T3_eval = self.eval_diff3(point)
+		T3 = Tensor3(dim, dim, dim)
+		
+		for t3 in T3_eval:
+			T3.iadd(t3.nnz_op())
+
+		return T3.nnz_symbolic(prefix)
+		
+	def taylor_grad_symbolic(self, prefix, center, point, order = -1):
+		if order == -1:
+			order = 100
+
+		dim = self.spatial_dim()
+		g = coeffs(f'{prefix}_g', dim)
+		H = self.hessian_nnz(prefix)
+
+		h = (point - center)
+
+		g += H * h
+
+		if order >= 1:
+			T3 = self.diff3_nnz(prefix)
+			temp = T3 * h
+			g += temp.T * h / 2
+		return g
+			
 	def grad_tensorize(self, g, ncomp=0):
 		if ncomp == 0:
 			ncomp = self.manifold_dim()
