@@ -30,6 +30,7 @@ def assign_matrix(name, mat):
 
 class GPULinearElasticityOp:
 	SoA_IO = True
+	# use_taylor = True
 
 	def __init__(self, fe):
 		dims = fe.manifold_dim()

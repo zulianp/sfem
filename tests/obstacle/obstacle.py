@@ -17,6 +17,45 @@ use_cheb = False
 matrix_free = True
 use_penalty = True
 
+def rigid_body_modes(m):
+	x = sfem.points(m, 1)
+	y = sfem.points(m, 2)
+	z = sfem.points(m, 2)
+
+	n = m.n_nodes()
+
+	e0 = np.zeros(n * 3)
+	e1 = np.zeros(n * 3)
+	e2 = np.zeros(n * 3)
+	e3 = np.zeros(n * 3)
+	e4 = np.zeros(n * 3)
+	e5 = np.zeros(n * 3)
+
+	# Translation
+	e0[range(0, n*3, 3)] = 1
+	
+	e1[range(1, n*3, 3)] = 1
+	
+	e2[range(2, n*3, 3)] = 1
+
+	# Rotation
+	e3[range(1, n*3, 3)] = -z
+	e3[range(2, n*3, 3)] = y
+	
+	e4[range(0, n*3, 3)] = z
+	e4[range(2, n*3, 3)] = -x
+
+	e5[range(0, n*3, 3)] = -y
+	e5[range(1, n*3, 3)] = x
+
+	# print(e0[0:6])
+	# print(e1[0:6])
+	# print(e2[0:6])
+	# print(e3[0:6])
+	# print(e4[0:6])
+	# print(e5[0:6])
+	return e0, e1, e2, e3, e4, e5 
+	
 def create_mg():
 	mg = sfem.Multigrid()
 	# Example 2-level
@@ -205,6 +244,9 @@ def solve_obstacle(options):
 	m.read(path)
 	sdirichlet = np.unique(np.fromfile(f'{path}/sidesets_aos/sinlet.raw', dtype=idx_t))
 	sobstacle = np.fromfile(f'{path}/sidesets_aos/soutlet.raw', dtype=idx_t)
+
+	# rigid_body_modes(m)
+	# return
 
 	contact_surf = sfem.mesh_connectivity_from_file(f'{path}/surface/outlet')
 
