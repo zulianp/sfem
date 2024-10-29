@@ -26,8 +26,9 @@ int hex8_linear_elasticity_apply(const ptrdiff_t nelements,
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
 
-    int SFEM_HEX8_QUADRATURE_ORDER = 27;
+    int SFEM_HEX8_QUADRATURE_ORDER = 8;
     SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
+    // printf("SFEM_HEX8_QUADRATURE_ORDER = %d\n", SFEM_HEX8_QUADRATURE_ORDER);
 
     int n_qp = q27_n;
     const scalar_t *qx = q27_x;
@@ -47,7 +48,15 @@ int hex8_linear_elasticity_apply(const ptrdiff_t nelements,
         qy = q6_y;
         qz = q6_z;
         qw = q6_w;
+    } else if (SFEM_HEX8_QUADRATURE_ORDER == 8) {
+        n_qp = q8_n;
+        qx = q8_x;
+        qy = q8_y;
+        qz = q8_z;
+        qw = q8_w;
     }
+
+
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
@@ -127,23 +136,20 @@ int hex8_linear_elasticity_apply(const ptrdiff_t nelements,
     return SFEM_SUCCESS;
 }
 
-
-
-
 int affine_hex8_linear_elasticity_apply(const ptrdiff_t nelements,
-                                 const ptrdiff_t nnodes,
-                                 idx_t **const SFEM_RESTRICT elements,
-                                 geom_t **const SFEM_RESTRICT points,
-                                 const real_t mu,
-                                 const real_t lambda,
-                                 const ptrdiff_t u_stride,
-                                 const real_t *const ux,
-                                 const real_t *const uy,
-                                 const real_t *const uz,
-                                 const ptrdiff_t out_stride,
-                                 real_t *const outx,
-                                 real_t *const outy,
-                                 real_t *const outz) {
+                                        const ptrdiff_t nnodes,
+                                        idx_t **const SFEM_RESTRICT elements,
+                                        geom_t **const SFEM_RESTRICT points,
+                                        const real_t mu,
+                                        const real_t lambda,
+                                        const ptrdiff_t u_stride,
+                                        const real_t *const ux,
+                                        const real_t *const uy,
+                                        const real_t *const uz,
+                                        const ptrdiff_t out_stride,
+                                        real_t *const outx,
+                                        real_t *const outy,
+                                        real_t *const outz) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
@@ -152,6 +158,7 @@ int affine_hex8_linear_elasticity_apply(const ptrdiff_t nelements,
 
     int SFEM_HEX8_QUADRATURE_ORDER = 27;
     SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
+    // printf("SFEM_HEX8_QUADRATURE_ORDER = %d\n", SFEM_HEX8_QUADRATURE_ORDER);
 
     int n_qp = q27_n;
     const scalar_t *qx = q27_x;
@@ -171,6 +178,12 @@ int affine_hex8_linear_elasticity_apply(const ptrdiff_t nelements,
         qy = q6_y;
         qz = q6_z;
         qw = q6_w;
+    } else if (SFEM_HEX8_QUADRATURE_ORDER == 8) {
+        n_qp = q8_n;
+        qx = q8_x;
+        qy = q8_y;
+        qz = q8_z;
+        qw = q8_w;
     }
 
 #pragma omp parallel for
@@ -214,8 +227,7 @@ int affine_hex8_linear_elasticity_apply(const ptrdiff_t nelements,
             element_outz[d] = 0;
         }
 
-        hex8_adjugate_and_det(
-                lx, ly, lz, 0.5, 0.5, 0.5, jacobian_adjugate, &jacobian_determinant);
+        hex8_adjugate_and_det(lx, ly, lz, 0.5, 0.5, 0.5, jacobian_adjugate, &jacobian_determinant);
 
         for (int k = 0; k < n_qp; k++) {
             hex8_linear_elasticity_apply_adj(mu,
@@ -250,4 +262,3 @@ int affine_hex8_linear_elasticity_apply(const ptrdiff_t nelements,
 
     return SFEM_SUCCESS;
 }
-

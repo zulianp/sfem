@@ -78,7 +78,7 @@ int proteus_hex8_linear_elasticity_apply(const int level,
                                                 proteus_hex8_lidx(level, level, level, level),
                                                 proteus_hex8_lidx(level, 0, level, level)};
 
-    int SFEM_HEX8_QUADRATURE_ORDER = 27;
+    int SFEM_HEX8_QUADRATURE_ORDER = 8;
     SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
 
     int n_qp = q27_n;
@@ -99,6 +99,12 @@ int proteus_hex8_linear_elasticity_apply(const int level,
         qy = q6_y;
         qz = q6_z;
         qw = q6_w;
+    } else if (SFEM_HEX8_QUADRATURE_ORDER == 8) {
+        n_qp = q8_n;
+        qx = q8_x;
+        qy = q8_y;
+        qz = q8_z;
+        qw = q8_w;
     }
 
     int Lm1 = level - 1;

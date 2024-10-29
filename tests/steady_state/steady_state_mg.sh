@@ -20,9 +20,9 @@ source $SFEM_DIR/workflows/sfem_config.sh
 export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 export CUDA_LAUNCH_BLOCKING=0
-export SFEM_ELEMENT_REFINE_LEVEL=4
+export SFEM_ELEMENT_REFINE_LEVEL=5
 
-CASE=2
+CASE=3
 
 # Generate mesh db
 case $CASE in
@@ -34,7 +34,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			create_box_ss_mesh.sh 4 $SFEM_ELEMENT_REFINE_LEVEL
+			create_box_ss_mesh.sh 40 $SFEM_ELEMENT_REFINE_LEVEL
 		fi
 
 		sinlet=$mesh/surface/sidesets_aos/left.raw 
@@ -47,7 +47,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			# export SFEM_REFINE=5
+			export SFEM_REFINE=1
 			$SCRIPTPATH/../../data/vtk/joint-hex.sh $SFEM_ELEMENT_REFINE_LEVEL
 		fi
 		sinlet=$mesh/surface/sidesets_aos/base.raw
@@ -102,7 +102,7 @@ esac
 # Parametrize solver
 export SFEM_MG=1
 export SFEM_USE_CHEB=$SFEM_MG
-export SFEM_MAX_IT=20
+export SFEM_MAX_IT=30
 # export SFEM_MAX_IT=4000
 
 export SFEM_HEX8_ASSUME_AFFINE=1
@@ -114,15 +114,17 @@ export SFEM_USE_CRS_GRAPH_RESTRICT=0
 export SFEM_CRS_MEM_CONSERVATIVE=1
 
 export SFEM_CHEB_EIG_MAX_SCALE=1.0001
-export SFEM_CHEB_EIG_TOL=1e-6
-export SFEM_SMOOTHER_SWEEPS=30
+export SFEM_CHEB_EIG_TOL=1e-3
+export SFEM_SMOOTHER_SWEEPS=40
 
 export SFEM_USE_PRECONDITIONER=0
 
 export SFEM_VERBOSITY_LEVEL=1
+export SFEM_HEX8_QUADRATURE_ORDER=8
 # export SFEM_DEBUG=1
 
-$LAUNCH mgsolve $mesh output | tee log.txt
+$LAUNCH mgsolve $mesh output 
+# | tee log.txt
 
 if [[ $SFEM_USE_ELASTICITY -eq 1 ]]
 then

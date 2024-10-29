@@ -178,6 +178,9 @@ class FE:
 
 	def taylor_expand_fun(self, center, point, order = -1):
 		f = self.fun(center)
+		if order == 0:
+			return f
+
 		g = self.eval_grad(center)
 		H = self.eval_hessian(center)
 		T3 = self.eval_diff3(center)
@@ -202,6 +205,10 @@ class FE:
 
 	def taylor_expand_grad(self, center, point, order = -1):
 		g = self.eval_grad(center) 
+
+		if order == 0:
+			return g
+
 		H = self.eval_hessian(center)
 		T3 = self.eval_diff3(center)
 
@@ -268,6 +275,9 @@ class FE:
 
 		dim = self.spatial_dim()
 		g = coeffs(f'{prefix}_g', dim)
+		if order == 0:
+			return g
+
 		H = self.hessian_nnz(prefix)
 
 		h = (point - center)
