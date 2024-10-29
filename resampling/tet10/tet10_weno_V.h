@@ -92,6 +92,6 @@ void hex_aa_8_collect_coeffs_O3_ptr_vec(const ptrdiff_t *const stride,  //
 /// @return
 vec_double weno4_3D_HOne_V(const ptrdiff_t *const stride,                               //
                            const vec_double x, const vec_double y, const vec_double z,  //
-                           const real_t *f[]);                                                //
+                           const real_t *f[]);                                          //
 
 #endif  // __TET10_WENO_V_H__
