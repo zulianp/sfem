@@ -164,7 +164,7 @@ __global__ void cu_affine_hex8_laplacian_apply_taylor_kernel(
             element_u[v] = u[ev[v]];
         }
 
-        hex8_laplacian_apply_fff_taylor(fff, element_u, element_vector);
+        cu_hex8_laplacian_apply_fff_taylor(fff, element_u, element_vector);
 
         for (int edof_i = 0; edof_i < 8; ++edof_i) {
             const idx_t dof_i = ev[edof_i];
@@ -183,6 +183,8 @@ static int cu_affine_hex8_laplacian_apply_taylor_tpl(
         T *const y,
         void *stream) {
     SFEM_DEBUG_SYNCHRONIZE();
+
+    cu_hex8_taylor_expansion_init();
 
     // Hand tuned
     int block_size = 128;
@@ -222,7 +224,6 @@ __global__ void cu_affine_hex8_laplacian_apply_taylor_kernel(
         const cu_jacobian_t *const SFEM_RESTRICT g_fff,
         const real_t *const SFEM_RESTRICT u,
         real_t *const SFEM_RESTRICT values) {
-
     const int elements_per_block = blockDim.x / 8;
     const int node = threadIdx.x % 8;
     const int e_block = threadIdx.x / 8;
@@ -238,13 +239,13 @@ __global__ void cu_affine_hex8_laplacian_apply_taylor_kernel(
         }
 
         const idx_t idx = elements[node * stride + e];
-        
+
         scalar_t row[8];
         for (int j = 0; j < 8; j++) {
-            hex8_laplacian_matrix_ij_taylor(fff,
-                                            // Trial
-                                            hex8_g_0_x[j],
-                                            hex8_g_0_y[j],
+            cu_hex8_laplacian_matrix_ij_taylor(fff,
+                                               // Trial
+                                               hex8_g_0_x[j],
+                                               hex8_g_0_y[j],
                                             hex8_g_0_z[j],
                                             hex8_H_0_x[j],
                                             hex8_H_0_y[j],
@@ -282,8 +283,6 @@ __global__ void cu_affine_hex8_laplacian_apply_taylor_kernel(
         __syncwarp();
     }
 }
-
-
 
 template <typename T>
 static int cu_affine_hex8_laplacian_apply_taylor_tpl(
