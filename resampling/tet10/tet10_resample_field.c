@@ -629,9 +629,9 @@ SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D_Unit(  //
         const real_t x_unit,                            //
         const real_t y_unit,                            //
         const real_t z_unit,                            //
-        const real_t ox_unit,                           //
-        const real_t oy_unit,                           //
-        const real_t oz_unit,                           //
+        const real_t ox_unit,                           // Coordinates of the origin of the grid in the unitary space
+        const real_t oy_unit,                           // for the structured grid
+        const real_t oz_unit,                           // X, Y and Z
         const ptrdiff_t i,                              // it must be the absolute index
         const ptrdiff_t j,                              // Used to get the data
         const ptrdiff_t k,                              // From the data array

@@ -615,9 +615,9 @@ SFEM_INLINE static vec_double hex_aa_8_eval_weno4_3D_Unit_V(  //
         const vec_double x_unit,                              //
         const vec_double y_unit,                              //
         const vec_double z_unit,                              //
-        const real_t ox_unit,                                 //
-        const real_t oy_unit,                                 //
-        const real_t oz_unit,                                 //
+        const vec_double ox_unit,                             //
+        const vec_double oy_unit,                             //
+        const vec_double oz_unit,                             //
         const vec_int64 i,                                    // it must be the absolute index
         const vec_int64 j,                                    // Used to get the data
         const vec_int64 k,                                    // From the data array
@@ -626,9 +626,9 @@ SFEM_INLINE static vec_double hex_aa_8_eval_weno4_3D_Unit_V(  //
 
     // collect the data for the WENO interpolation
 
-    const int stride_x = stride[0];
-    const int stride_y = stride[1];
-    const int stride_z = stride[2];
+    // const int stride_x = stride[0];
+    // const int stride_y = stride[1];
+    // const int stride_z = stride[2];
 
     // real_t* out = NULL;
     real_t* first_ptrs_array[_VL_];
@@ -639,18 +639,18 @@ SFEM_INLINE static vec_double hex_aa_8_eval_weno4_3D_Unit_V(  //
 
     const vec_double ones_vec = CONST_VEC(1.0);
 
-    const vec_int64 i_local = floor_V(x_unit - (vec_double)CONST_VEC(ox_unit));
-    const vec_int64 j_local = floor_V(y_unit - (vec_double)CONST_VEC(oy_unit));
-    const vec_int64 k_local = floor_V(z_unit - (vec_double)CONST_VEC(oz_unit));
+    const vec_int64 i_local = floor_V(x_unit - ox_unit);
+    const vec_int64 j_local = floor_V(y_unit - oy_unit);
+    const vec_int64 k_local = floor_V(z_unit - oz_unit);
 
     const vec_double i_local_vec = vec_int64_to_double(i_local);
-    const vec_double x = (x_unit - (vec_double)CONST_VEC(ox_unit)) - i_local_vec + ones_vec;
+    const vec_double x = (x_unit - ox_unit) - i_local_vec + ones_vec;
 
     const vec_double j_local_vec = vec_int64_to_double(j_local);
-    const vec_double y = (y_unit - (vec_double)CONST_VEC(oy_unit)) - j_local_vec + ones_vec;
+    const vec_double y = (y_unit - oy_unit) - j_local_vec + ones_vec;
 
     const vec_double k_local_vec = vec_int64_to_double(k_local);
-    const vec_double z = (z_unit - (vec_double)CONST_VEC(oz_unit)) - k_local_vec + ones_vec;
+    const vec_double z = (z_unit - oz_unit) - k_local_vec + ones_vec;
 
     // // printf("x = %f, x_ = %f, i = %d\n", x, x_, i);
     // // printf("y = %f, y_ = %f, j = %d\n", y, y_, j);
@@ -774,7 +774,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
         }
 
         // set to zero the element field
-        memset(element_field, 0, 10 * sizeof(real_t));
+        // memset(element_field, 0, 10 * sizeof(real_t));
 
         for (int q = 0; q < TET4_NQP; q += (_VL_)) {
             vec_double tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V;
@@ -787,7 +787,12 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
                 ASSIGN_QUADRATURE_POINT_MACRO_TAIL(q, tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V);
             }
 
-            const vec_double measure_V = tet10_measure_V(x, y, z, tet4_qx_V, tet4_qy_V, tet4_qz_V);
+            const vec_double measure_V = tet10_measure_V(x_unit,  //
+                                                         y_unit,
+                                                         z_unit,
+                                                         tet4_qx_V,
+                                                         tet4_qy_V,
+                                                         tet4_qz_V);
 
             const vec_double dV = measure_V * tet4_qw_V * cVolume;
 
@@ -835,27 +840,45 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
 
             // This is the WENO direct approach
             // The main approach is omitted in this version
-            const vec_double x_cube_origin = (ox + ((vec_double)i_glob_V - 1) * dx) / dx;
-            const vec_double y_cube_origin = (oy + ((vec_double)j_glob_V - 1) * dy) / dy;
-            const vec_double z_cube_origin = (oz + ((vec_double)k_glob_V - 1) * dz) / dz;
+
+            // Calculate the origin of the 4x4x4 cube in the global space
+            // And transform the coordinates to the the unitary space
+            const vec_double x_cube_origin_V = (ox + ((vec_double)i_glob_V - 1.0) * dx) / dx;
+            const vec_double y_cube_origin_V = (oy + ((vec_double)j_glob_V - 1.0) * dy) / dy;
+            const vec_double z_cube_origin_V = (oz + ((vec_double)k_glob_V - 1.0) * dz) / dz;
+
+            //// Compute the WENO interpolation
+            vec_double eval_field = hex_aa_8_eval_weno4_3D_Unit_V(g_qx_unit_V,      //
+                                                                  g_qy_unit_V,      //
+                                                                  g_qz_unit_V,      //
+                                                                  x_cube_origin_V,  //
+                                                                  y_cube_origin_V,  //
+                                                                  z_cube_origin_V,  //  //
+                                                                  i_glob_V,         //
+                                                                  j_glob_V,         //
+                                                                  k_glob_V,         //
+                                                                  stride,           //
+                                                                  data);            //
+
+            // vec_double eval_field = CONST_VEC(1.0);
 
             // TODO: Check if this is correct
             // TODO: Check if this is correct
-            vec_double eval_field = ZEROS_SIMD_MACRO;
+            // vec_double eval_field = ZEROS_SIMD_MACRO;
 
             // Integrate field
-            {
-                vec_double eval_field = ZEROS_SIMD_MACRO;
-                // UNROLL_ZERO
-                for (int edof_j = 0; edof_j < 8; edof_j++) {
-                    eval_field += hex8_f[edof_j] * coeffs[edof_j];
-                }
+            // {
+            //     // vec_double eval_field = ZEROS_SIMD_MACRO;
+            //     // UNROLL_ZERO
+            //     for (int edof_j = 0; edof_j < 8; edof_j++) {
+            //         eval_field += hex8_f[edof_j] * coeffs[edof_j];
+            //     }
 
-                // UNROLL_ZERO
-                for (int edof_i = 0; edof_i < 10; edof_i++) {
-                    element_field[edof_i] += eval_field * tet10_f[edof_i] * dV;
-                }  // end edof_i loop
-            }
+            // UNROLL_ZERO
+            for (int edof_i = 0; edof_i < 10; edof_i++) {
+                element_field[edof_i] += eval_field * tet10_f[edof_i] * dV;
+            }  // end edof_i loop
+            // }
 
         }  // end quadrature loop
 
@@ -913,16 +936,27 @@ int hex8_to_tet10_resample_field_local_V2(
 
     if (SFEM_ENABLE_ISOPARAMETRIC) {
         int a = 0;
-        a = hex8_to_isoparametric_tet10_resample_field_local_V(nelements,  //
-                                                               nnodes,
-                                                               elems,
-                                                               xyz,
-                                                               n,
-                                                               stride,
-                                                               origin,
-                                                               delta,
-                                                               data,
-                                                               weighted_field);
+        // a = hex8_to_isoparametric_tet10_resample_field_local_V(nelements,  //
+        //                                                        nnodes,
+        //                                                        elems,
+        //                                                        xyz,
+        //                                                        n,
+        //                                                        stride,
+        //                                                        origin,
+        //                                                        delta,
+        //                                                        data,
+        //                                                        weighted_field);
+
+        a = hex8_to_isoparametric_tet10_resample_field_local_cube1_V(nelements,  //
+                                                                     nnodes,
+                                                                     elems,
+                                                                     xyz,
+                                                                     n,
+                                                                     stride,
+                                                                     origin,
+                                                                     delta,
+                                                                     data,
+                                                                     weighted_field);
 
         return a;
     } else {
