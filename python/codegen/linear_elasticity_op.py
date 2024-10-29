@@ -26,8 +26,8 @@ class LinearElasticityOpTaylor:
 
 		point = coeffs('p', dims)
 		c = fe.barycenter()
-		# order = -1
-		order = 1
+		order = -1
+		# order = 1
 	
 		trial_shape_grad = fe.taylor_tgrad_symbolic(trial, c, point, order)
 		test_shape_grad  = fe.taylor_tgrad_symbolic(trial, c, point, order)
@@ -97,13 +97,13 @@ class LinearElasticityOpTaylor:
 			expr.append(ast.Assignment(var, Hu))
 		c_code(expr)
 
-		c_log("// Code Hessian")
-		expr = []
-		for i in range(0, dims):
-			for j in range(0, dims):
-				var = sp.symbols(f'element_matrix[{i*dims + j}*stride]')
-				expr.append(ast.Assignment(var, H[i, j]))
-		c_code(expr)
+		# c_log("// Code Hessian")
+		# expr = []
+		# for i in range(0, dims):
+		# 	for j in range(0, dims):
+		# 		var = sp.symbols(f'element_matrix[{i*dims + j}*stride]')
+		# 		expr.append(ast.Assignment(var, H[i, j]))
+		# c_code(expr)
 
 class LinearElasticityOp:
 	
@@ -431,8 +431,8 @@ def main():
 
 	fe.use_adjugate = True
 	
-	op = LinearElasticityOp(fe)
-	# op = LinearElasticityOpTaylor(fe)
+	# op = LinearElasticityOp(fe)
+	op = LinearElasticityOpTaylor(fe)
 	# op.hessian_check()
 
 
