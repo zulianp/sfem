@@ -189,10 +189,10 @@ class FE:
 		for i in range(0, self.n_nodes()):
 			f[i] += inner(g[i], h)
 
-			if order >= 1:
+			if order >= 2:
 				f[i] += inner(H[i] * h, h) / 2
 			
-			if order >= 2:
+			if order >= 3:
 				temp = T3[i] * h
 				f[i] += inner(h, temp.T * h) / 6
 
@@ -212,7 +212,7 @@ class FE:
 		for i in range(0, self.n_nodes()):
 			g[i] += H[i] * h 
 
-			if order >= 1:
+			if order >= 2:
 				temp = T3[i] * h
 				g[i] += temp.T * h / 2
 
@@ -220,6 +220,9 @@ class FE:
 				g[i][d] = sp.simplify(g[i][d])
 
 		return g
+
+	def taylor_tgrad_symbolic(self, prefix, c, point, order, ncomp=0):
+		return self.grad_tensorize([self.taylor_grad_symbolic(prefix, c, point, order)], ncomp)
 
 	def grad_nnz(self, prefix):
 		dim = self.spatial_dim()
@@ -271,7 +274,7 @@ class FE:
 
 		g += H * h
 
-		if order >= 1:
+		if order > 1:
 			T3 = self.diff3_nnz(prefix)
 			temp = T3 * h
 			g += temp.T * h / 2

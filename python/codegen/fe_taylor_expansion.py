@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from tet10 import *
+from tet20 import *
 from tet4 import *
 from tri6 import *
 from quad4 import *
@@ -11,8 +12,6 @@ from stensor import Tensor3
 sp.init_printing()
 
 def try_laplacian(fe):
-	fe = Hex8(False)
-	# fe = Tet10()
 	dim = fe.spatial_dim()
 
 	start = perf_counter()
@@ -157,33 +156,6 @@ def try_laplacian(fe):
 				eval_expr.append(se)	
 		c_code(eval_expr)
 
-
-def assign_nnz_matrix(names, mat):
-	rows, cols = mat.shape
-	expr = []
-	check = set()
-	for i in range(0, rows):
-		for j in range(0, cols):
-			name = names[i, j]
-			if name and name not in check:
-				expr.append(ast.Assignment(name, mat[i, j]))
-				check.add(name)
-	return expr
-
-def compress_nnz(names, mat):
-	rows, cols = mat.shape
-	vals = []
-
-	check = set()
-	for i in range(0, rows):
-		for j in range(0, cols):
-			name = names[i, j]
-			if name and name not in check:
-				vals.append(mat[i, j])
-				check.add(name)
-	return sp.Matrix(len(vals), 1, vals)
-
-
 def try_laplacian_symbolic(fe):
 	dim = fe.spatial_dim()
 	point = coeffs('p', dim)
@@ -196,8 +168,13 @@ def try_laplacian_symbolic(fe):
 	gi = fe.taylor_grad_symbolic(trial, c, point, order)
 	gj = fe.taylor_grad_symbolic(test, c, point, order)
 
-	Lij = fe.integrate(point, inner(fe.symbol_fff() * gi, gj))
+	fff_x_gi = fe.symbol_fff() * gi
+	Lij = 0
 
+	print("// Integrating...")
+	for d in range(0, dim):
+		print(f"// {d})")
+		Lij += fe.integrate(point, fff_x_gi[d] * gj[d])
 
 	var = sp.symbols(f"Lij")
 	expr = [ast.Assignment(var, sp.simplify(Lij))]
@@ -239,21 +216,12 @@ def try_laplacian_symbolic(fe):
 		c_code(fe_vals)
 		print('//---------------------------------')
 
-
 	print("// Evals")
 	evals_expr = []
 	evals_expr.extend(assign_matrix("gu", gu))
 	evals_expr.extend(assign_matrix("Hu", Hu))
 	evals_expr.extend(assign_matrix("diff3u", T3u))
 	c_code(evals_expr)
-
-
-
-
-	# sp.pprint(Lij)
-	
-	
-
 
 
 if __name__ == '__main__':

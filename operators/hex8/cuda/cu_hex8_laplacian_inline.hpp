@@ -208,7 +208,7 @@ static void cu_hex8_taylor_expansion_init() {
 }
 
 template <typename scalar_t, typename accumulator_t>
-static SFEM_INLINE __host__ __device__ void hex8_laplacian_matrix_ij_taylor(
+static SFEM_INLINE __host__ __device__ void cu_hex8_laplacian_matrix_ij_taylor(
         const scalar_t *const SFEM_RESTRICT fff,
         const scalar_t trial_gx,
         const scalar_t trial_gy,
@@ -256,12 +256,12 @@ static SFEM_INLINE __host__ __device__ void hex8_laplacian_matrix_ij_taylor(
 }
 
 template <typename scalar_t, typename accumulator_t>
-static SFEM_INLINE __host__ __device__ void hex8_laplacian_matrix_fff_taylor(
+static SFEM_INLINE __host__ __device__ void cu_hex8_laplacian_matrix_fff_taylor(
         const scalar_t *const SFEM_RESTRICT fff,
         accumulator_t *const SFEM_RESTRICT element_matrix) {
     for (int i = 0; i < 8; i++) {
         accumulator_t val;
-        hex8_laplacian_matrix_ij_taylor(fff,
+        cu_hex8_laplacian_matrix_ij_taylor(fff,
                                         // Trial
                                         hex8_g_0_x[i],
                                         hex8_g_0_y[i],
@@ -283,7 +283,7 @@ static SFEM_INLINE __host__ __device__ void hex8_laplacian_matrix_fff_taylor(
         element_matrix[i * 8 + i] = val;
 
         for (int j = i + 1; j < 8; j++) {
-            hex8_laplacian_matrix_ij_taylor(fff,
+            cu_hex8_laplacian_matrix_ij_taylor(fff,
                                             // Trial
                                             hex8_g_0_x[j],
                                             hex8_g_0_y[j],
@@ -309,7 +309,7 @@ static SFEM_INLINE __host__ __device__ void hex8_laplacian_matrix_fff_taylor(
 }
 
 template <typename scalar_t, typename accumulator_t>
-static SFEM_INLINE __host__ __device__ void hex8_laplacian_apply_fff_taylor(
+static SFEM_INLINE __host__ __device__ void cu_hex8_laplacian_apply_fff_taylor(
         const scalar_t *const SFEM_RESTRICT fff,
         const scalar_t *SFEM_RESTRICT u,
         accumulator_t *SFEM_RESTRICT element_vector) {
@@ -348,7 +348,7 @@ static SFEM_INLINE __host__ __device__ void hex8_laplacian_apply_fff_taylor(
     }
 
     for (int i = 0; i < 8; i++) {
-        hex8_laplacian_matrix_ij_taylor(fff,
+        cu_hex8_laplacian_matrix_ij_taylor(fff,
                                         gu[0],
                                         gu[1],
                                         gu[2],
