@@ -406,7 +406,9 @@ With numerical quadrature and with symbolic integration
 | 5 | 242240 | 92463957	    | 127.62 | 0.72 |
 | 5 | 473125 |179958447		| 245.04 | 0.73	|
 
-
-
-
 **Warp level**
+
+| SFEM_ELEMENT_REFINE_LEVEL | #macro-elems | #dofs | TTS [ms] | TP [GDOF/s] |
+| 4 | 473125 | 92463957  | 38.223 | 2.41 |
+| 5 | 473125 | 179958447 | 78.153 |	2.3	 |
+

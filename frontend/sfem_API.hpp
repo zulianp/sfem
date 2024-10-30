@@ -82,9 +82,9 @@ namespace sfem {
     }
 
     template <typename T>
-    std::shared_ptr<MatrixFreeLinearSolver<T>> create_bcgs(const std::shared_ptr<Operator<T>> &op,
+    std::shared_ptr<BiCGStab<T>> create_bcgs(const std::shared_ptr<Operator<T>> &op,
                                                            const ExecutionSpace es) {
-        std::shared_ptr<MatrixFreeLinearSolver<T>> bcgs;
+        std::shared_ptr<BiCGStab<T>> bcgs;
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
@@ -567,6 +567,15 @@ namespace sfem {
                 f->space()->n_dofs(),
                 f->space()->n_dofs(),
                 [=](const real_t *const x, real_t *const y) { f->apply(nullptr, x, y); },
+                f->execution_space());
+    }
+
+    std::shared_ptr<Operator<real_t>> make_linear_op_variant(const std::shared_ptr<Function> &f, const std::vector<std::pair<std::string, int>> &opts) {
+        auto variant = f->linear_op_variant(opts);
+        return sfem::make_op<real_t>(
+                f->space()->n_dofs(),
+                f->space()->n_dofs(),
+                [=](const real_t *const x, real_t *const y) { variant->apply(x, y); },
                 f->execution_space());
     }
 

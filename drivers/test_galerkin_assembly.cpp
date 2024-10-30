@@ -17,16 +17,16 @@
 
 #include <vector>
 
-#define OP_TIME(op, x, y)                                                                   \
-    do {                                                                                    \
-        sfem::device_synchronize();                                                         \
-        double start = MPI_Wtime();                                                         \
-        op->apply(x, y);                                                                    \
-        sfem::device_synchronize();                                                         \
-        double stop = MPI_Wtime();                                                          \
-        double elapsed = stop - start;                                                      \
+#define OP_TIME(op, x, y)                                                                \
+    do {                                                                                 \
+        sfem::device_synchronize();                                                      \
+        double start = MPI_Wtime();                                                      \
+        op->apply(x, y);                                                                 \
+        sfem::device_synchronize();                                                      \
+        double stop = MPI_Wtime();                                                       \
+        double elapsed = stop - start;                                                   \
         printf("%s %g [s], %g [MDOF/s]\n", #op, elapsed, 1e-6 * (op)->rows() / elapsed); \
-        fflush(stdout);                                                                     \
+        fflush(stdout);                                                                  \
     } while (0)
 
 int main(int argc, char *argv[]) {
@@ -57,12 +57,14 @@ int main(int argc, char *argv[]) {
     int SFEM_BLOCK_SIZE = 1;
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     int SFEM_PRINT_VECTORS = 0;
+    int SFEM_SKIP_VERIFICATION = 0;
 
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_USE_GPU, atoi);
     SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
     SFEM_READ_ENV(SFEM_PRINT_VECTORS, atoi);
+    SFEM_READ_ENV(SFEM_SKIP_VERIFICATION, atoi);
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
@@ -181,56 +183,58 @@ int main(int argc, char *argv[]) {
 
     auto error = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), sfem::MEMORY_SPACE_HOST);
 
-    // Compare two results
+    if (!SFEM_SKIP_VERIFICATION) {
+        // Compare two results
 #ifdef SFEM_ENABLE_CUDA
-    auto h_actual = sfem::to_host(restricted);
-    auto h_expected = sfem::to_host(Ax_coarse);
+        auto h_actual = sfem::to_host(restricted);
+        auto h_expected = sfem::to_host(Ax_coarse);
 #else
-    auto h_actual = restricted;
-    auto h_expected = Ax_coarse;
+        auto h_actual = restricted;
+        auto h_expected = Ax_coarse;
 #endif
-    {
-        // printf("dof actual != expected, (diff, actual/expected)\n");
-        auto err = error->data();
-        ptrdiff_t n = fs_coarse->n_dofs();
-        auto actual = h_actual->data();
-        auto expected = h_expected->data();
+        {
+            // printf("dof actual != expected, (diff, actual/expected)\n");
+            auto err = error->data();
+            ptrdiff_t n = fs_coarse->n_dofs();
+            auto actual = h_actual->data();
+            auto expected = h_expected->data();
 
-        real_t largest_diff = 0;
-        real_t largest_diff_factor = 0;
-        ptrdiff_t arg_largest_diff = -1;
-        for (ptrdiff_t i = 0; i < n; i++) {
-            // actual: is composition of operators
-            // expected: is application of coarse operator
-            real_t diff = fabs(actual[i] - expected[i]);
-            err[i] = diff;
-            if (diff > 1e-8) {
-                printf("%ld) %g != %g (%g, %g)\n",
-                       i,
-                       (double)actual[i],
-                       (double)expected[i],
-                       (double)diff,
-                       (double)actual[i] / expected[i]);
+            real_t largest_diff = 0;
+            real_t largest_diff_factor = 0;
+            ptrdiff_t arg_largest_diff = -1;
+            for (ptrdiff_t i = 0; i < n; i++) {
+                // actual: is composition of operators
+                // expected: is application of coarse operator
+                real_t diff = fabs(actual[i] - expected[i]);
+                err[i] = diff;
+                if (diff > 1e-8) {
+                    printf("%ld) %g != %g (%g, %g)\n",
+                           i,
+                           (double)actual[i],
+                           (double)expected[i],
+                           (double)diff,
+                           (double)actual[i] / expected[i]);
+                }
+
+                if (diff > largest_diff) {
+                    largest_diff = diff;
+                    arg_largest_diff = i;
+                    largest_diff_factor = actual[i] / expected[i];
+                }
             }
 
-            if (diff > largest_diff) {
-                largest_diff = diff;
-                arg_largest_diff = i;
-                largest_diff_factor = actual[i] / expected[i];
+            if (arg_largest_diff != -1) {
+                printf("largest_diff(%ld) = %g, %g\n",
+                       arg_largest_diff,
+                       largest_diff,
+                       largest_diff_factor);
             }
         }
 
-        if (arg_largest_diff != -1) {
-            printf("largest_diff(%ld) = %g, %g\n",
-                   arg_largest_diff,
-                   largest_diff,
-                   largest_diff_factor);
-        }
+        f_coarse->set_output_dir(output_path);
+        auto output = f_coarse->output();
+        output->write("error", error->data());
     }
-
-    f_coarse->set_output_dir(output_path);
-    auto output = f_coarse->output();
-    output->write("error", error->data());
 
     return MPI_Finalize();
 }

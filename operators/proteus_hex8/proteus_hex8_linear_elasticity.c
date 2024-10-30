@@ -4,7 +4,8 @@
 
 #include "hex8_inline_cpu.h"
 #include "hex8_linear_elasticity_inline_cpu.h"
-#include "hex8_quadrature.h"
+// #include "hex8_quadrature.h"
+#include "line_quadrature.h"
 #include "proteus_hex8.h"
 
 #ifndef POW3
@@ -78,27 +79,21 @@ int proteus_hex8_linear_elasticity_apply(const int level,
                                                 proteus_hex8_lidx(level, level, level, level),
                                                 proteus_hex8_lidx(level, 0, level, level)};
 
-    int SFEM_HEX8_QUADRATURE_ORDER = 27;
+    int SFEM_HEX8_QUADRATURE_ORDER = 2;
     SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
+    // printf("SFEM_HEX8_QUADRATURE_ORDER = %d\n", SFEM_HEX8_QUADRATURE_ORDER);
 
-    int n_qp = q27_n;
-    const scalar_t *qx = q27_x;
-    const scalar_t *qy = q27_y;
-    const scalar_t *qz = q27_z;
-    const scalar_t *qw = q27_w;
-
-    if (SFEM_HEX8_QUADRATURE_ORDER == 58) {
-        n_qp = q58_n;
-        qx = q58_x;
-        qy = q58_y;
-        qz = q58_z;
-        qw = q58_w;
-    } else if (SFEM_HEX8_QUADRATURE_ORDER == 6) {
-        n_qp = q6_n;
-        qx = q6_x;
-        qy = q6_y;
-        qz = q6_z;
-        qw = q6_w;
+    int n_qp = line_q3_n;
+    const scalar_t *qx = line_q3_x;
+    const scalar_t *qw = line_q3_w;
+    if (SFEM_HEX8_QUADRATURE_ORDER == 1) {
+        n_qp = line_q2_n;
+        qx = line_q2_x;
+        qw = line_q2_w;
+    } else if (SFEM_HEX8_QUADRATURE_ORDER == 5) {
+        n_qp = line_q6_n;
+        qx = line_q6_x;
+        qw = line_q6_w;
     }
 
     int Lm1 = level - 1;
@@ -196,56 +191,66 @@ int proteus_hex8_linear_elasticity_apply(const int level,
                         const scalar_t tz = (scalar_t)zi / level;
 
                         // Quadrature
-                        for (int k = 0; k < n_qp; k++) {
-                            // 1) Compute qp in macro-element coordinates
-                            const scalar_t m_qx = h * qx[k] + tx;
-                            const scalar_t m_qy = h * qy[k] + ty;
-                            const scalar_t m_qz = h * qz[k] + tz;
+                        for (int kz = 0; kz < n_qp; kz++) {
+                            for (int ky = 0; ky < n_qp; ky++) {
+                                for (int kx = 0; kx < n_qp; kx++) {
+                                    // 1) Compute qp in macro-element coordinates
+                                    const scalar_t m_qx = h * qx[kx] + tx;
+                                    const scalar_t m_qy = h * qx[ky] + ty;
+                                    const scalar_t m_qz = h * qx[kz] + tz;
 
-                            // 2) Evaluate Adjugate
-                            scalar_t adjugate[9];
-                            scalar_t jacobian_determinant;
-                            hex8_adjugate_and_det(
-                                    x, y, z, qx[k], qy[k], qz[k], adjugate, &jacobian_determinant);
+                                    // 2) Evaluate Adjugate
+                                    scalar_t adjugate[9];
+                                    scalar_t jacobian_determinant;
+                                    hex8_adjugate_and_det(x,
+                                                          y,
+                                                          z,
+                                                          qx[kx],
+                                                          qx[ky],
+                                                          qx[kz],
+                                                          adjugate,
+                                                          &jacobian_determinant);
 
-                            // 3) Transform to sub-FFF
-                            scalar_t sub_adjugate[9];
-                            scalar_t sub_determinant;
-                            hex8_sub_adj_0(adjugate,
-                                           jacobian_determinant,
-                                           h,
-                                           sub_adjugate,
-                                           &sub_determinant);
+                                    // 3) Transform to sub-FFF
+                                    scalar_t sub_adjugate[9];
+                                    scalar_t sub_determinant;
+                                    hex8_sub_adj_0(adjugate,
+                                                   jacobian_determinant,
+                                                   h,
+                                                   sub_adjugate,
+                                                   &sub_determinant);
 
-                            assert(sub_determinant == sub_determinant);
-                            assert(sub_determinant != 0);
+                                    assert(sub_determinant == sub_determinant);
+                                    assert(sub_determinant != 0);
 
-                            // // Evaluate y = op * x
-                            hex8_linear_elasticity_apply_adj(mu,
-                                                             lambda,
-                                                             sub_adjugate,
-                                                             sub_determinant,
-                                                             qx[k],
-                                                             qy[k],
-                                                             qz[k],
-                                                             qw[k],
-                                                             element_ux,
-                                                             element_uy,
-                                                             element_uz,
-                                                             element_outx,
-                                                             element_outy,
-                                                             element_outz);
-                        }
+                                    // // Evaluate y = op * x
+                                    hex8_linear_elasticity_apply_adj(mu,
+                                                                     lambda,
+                                                                     sub_adjugate,
+                                                                     sub_determinant,
+                                                                     qx[kx],
+                                                                     qx[ky],
+                                                                     qx[kz],
+                                                                     qw[kx] * qw[ky] * qw[kz],
+                                                                     element_ux,
+                                                                     element_uy,
+                                                                     element_uz,
+                                                                     element_outx,
+                                                                     element_outy,
+                                                                     element_outz);
+                                }
 
-                        // Accumulate to macro-element buffer
-                        for (int d = 0; d < 8; d++) {
-                            assert(element_outx[d] == element_outx[d]);
-                            assert(element_outy[d] == element_outy[d]);
-                            assert(element_outz[d] == element_outz[d]);
+                                // Accumulate to macro-element buffer
+                                for (int d = 0; d < 8; d++) {
+                                    assert(element_outx[d] == element_outx[d]);
+                                    assert(element_outy[d] == element_outy[d]);
+                                    assert(element_outz[d] == element_outz[d]);
 
-                            v[0][lev[d]] += element_outx[d];
-                            v[1][lev[d]] += element_outy[d];
-                            v[2][lev[d]] += element_outz[d];
+                                    v[0][lev[d]] += element_outx[d];
+                                    v[1][lev[d]] += element_outy[d];
+                                    v[2][lev[d]] += element_outz[d];
+                                }
+                            }
                         }
                     }
                 }
@@ -305,6 +310,26 @@ int proteus_affine_hex8_linear_elasticity_apply(const int level,
                                                 real_t *const outx,
                                                 real_t *const outy,
                                                 real_t *const outz) {
+#define PROTEUS_HEX8_USE_MV  // assemblying the elemental matrix is much faster
+#ifndef PROTEUS_HEX8_USE_MV
+    int SFEM_HEX8_QUADRATURE_ORDER = 1;
+    SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
+    // printf("SFEM_HEX8_QUADRATURE_ORDER = %d\n", SFEM_HEX8_QUADRATURE_ORDER);
+
+    int n_qp = line_q3_n;
+    const scalar_t *qx = line_q3_x;
+    const scalar_t *qw = line_q3_w;
+    if (SFEM_HEX8_QUADRATURE_ORDER == 1) {
+        n_qp = line_q2_n;
+        qx = line_q2_x;
+        qw = line_q2_w;
+    } else if (SFEM_HEX8_QUADRATURE_ORDER == 5) {
+        n_qp = line_q6_n;
+        qx = line_q6_x;
+        qw = line_q6_w;
+    }
+#endif
+
     const int nxe = proteus_hex8_nxe(level);
     const int txe = proteus_hex8_txe(level);
 
@@ -390,8 +415,10 @@ int proteus_affine_hex8_linear_elasticity_apply(const int level,
             //         mu, lambda, adjugate, jacobian_determinant, element_matrix);
             // print_matrix(8*3, 8*3, element_matrix);
 
+#ifdef PROTEUS_HEX8_USE_MV
             hex8_linear_elasticity_matrix(
                     mu, lambda, sub_adjugate, sub_determinant, element_matrix);
+#endif
 
             // Iterate over sub-elements
             for (int zi = 0; zi < level; zi++) {
@@ -420,6 +447,7 @@ int proteus_affine_hex8_linear_elasticity_apply(const int level,
                             element_out[1][d] = 0;
                             element_out[2][d] = 0;
                         }
+#ifdef PROTEUS_HEX8_USE_MV
 
                         for (int d = 0; d < 3; d++) {
                             const scalar_t *const block = &element_matrix[d * 8 * (3 * 8)];
@@ -444,9 +472,34 @@ int proteus_affine_hex8_linear_elasticity_apply(const int level,
                             }
                         }
 
+#else
+                        for (int kz = 0; kz < n_qp; kz++) {
+                            for (int ky = 0; ky < n_qp; ky++) {
+                                for (int kx = 0; kx < n_qp; kx++) {
+                                    hex8_linear_elasticity_apply_adj(mu,
+                                                                     lambda,
+                                                                     sub_adjugate,
+                                                                     sub_determinant,
+                                                                     qx[kx],
+                                                                     qx[ky],
+                                                                     qx[kz],
+                                                                     qw[kx] * qw[ky] * qw[kz],
+                                                                     element_u[0],
+                                                                     element_u[1],
+                                                                     element_u[2],
+                                                                     element_out[0],
+                                                                     element_out[1],
+                                                                     element_out[2]);
+                                }
+                            }
+                        }
+
+#endif
+
                         // printf("%d, %d, %d)\n", xi, yi, zi);
                         // for (int d = 0; d < 8; d++) {
-                        //     printf("%d) (%d, %d, %d) %g => %g\n", lev[d],  xi, yi, zi, element_u[0][d], element_out[0][d]);
+                        //     printf("%d) (%d, %d, %d) %g => %g\n", lev[d],  xi, yi, zi,
+                        //     element_u[0][d], element_out[0][d]);
                         // }
                         // printf("\n");
 

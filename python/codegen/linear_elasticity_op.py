@@ -13,12 +13,104 @@ from aahex8 import *
 import sys
 from time import perf_counter
 
+
+class LinearElasticityOpTaylor:	
+	def __init__(self, fe):
+		trial = "trial"
+		test = "test"
+		disp_grad_name = 'disp_grad'
+
+		dims = fe.manifold_dim()
+		dV = fe.symbol_jacobian_determinant()
+		J_inv = fe.symbol_jacobian_inverse_as_adjugate()
+
+		point = coeffs('p', dims)
+		c = fe.barycenter()
+		order = -1
+		# order = 1
+	
+		trial_shape_grad = fe.taylor_tgrad_symbolic(trial, c, point, order)
+		test_shape_grad  = fe.taylor_tgrad_symbolic(trial, c, point, order)
+
+		# Elasticity parameters
+		disp_grad = sp.Matrix(dims, dims, coeffs(disp_grad_name, dims * dims))
+		epsu = (disp_grad + disp_grad.T) / 2
+		mu, lmbda = sp.symbols('mu lambda', real=True)
+
+		# Strain energy function
+		e = mu * inner(epsu, epsu) + (lmbda/2) * (tr(epsu) * tr(epsu))
+
+		# Gradient
+		P = sp.zeros(dims, dims)
+		for d1 in range(0, dims):
+			for d2 in range(0, dims):
+				P[d1, d2] = sp.diff(e, disp_grad[d1, d2])
+
+		de = sp.zeros(dims, 1)
+		for i in range(0, dims):
+			de[i] = inner(P * J_inv.T, test_shape_grad[i])
+
+		# Hessian
+		dde = sp.zeros(dims, dims)
+
+		for i in range(0, dims):
+			for j in range(0, dims):
+				S_lin = sp.zeros(dims, dims)
+				for d1 in range(0, dims):
+					for d2 in range(0, dims):
+						S_lin[d1, d2] = sp.diff(de[i], disp_grad[d1, d2])
+				dde[i, j] = inner(S_lin * J_inv.T, trial_shape_grad[j])
+
+
+		# print("// Integrating Gradient")		
+		# expr = []
+		# for i in range(0, dims):
+		# 	print(f"({i+1}) / 3")
+		# 	eval_gradient = de[i] * dV
+		# 	integr = fe.integrate(point, eval_gradient)
+
+		# 	var = sp.symbols(f'element_vector{i}*stride]')
+		# 	expr.append(ast.Assignment(var, integr))
+		# c_code(expr)
+			
+		# -------------------------------------------------
+		print("// Integrating Hessian")
+		H = sp.zeros(dims, dims)
+		for i in range(0, dims):
+			for j in range(0, dims):
+				print(f"// ({i+1}, {j+1}) / (3, 3)")
+				eval_hessian = dde[i, j] * dV
+				integr = fe.integrate(point, eval_hessian)
+				H[i, j] = integr
+
+		# -------------------------------------------------
+		c_log("// Code Hessian * u")
+		u = coeffs('u', dims)
+		expr = []
+		for i in range(0, dims):
+			Hu = 0
+			for j in range(0, dims):
+				Hu += H[i, j] * u[j]
+
+			Hu = sp.simplify(Hu)
+			var = sp.symbols(f'element_vector[{i}*stride]')
+			expr.append(ast.Assignment(var, Hu))
+		c_code(expr)
+
+		# c_log("// Code Hessian")
+		# expr = []
+		# for i in range(0, dims):
+		# 	for j in range(0, dims):
+		# 		var = sp.symbols(f'element_matrix[{i*dims + j}*stride]')
+		# 		expr.append(ast.Assignment(var, H[i, j]))
+		# c_code(expr)
+
 class LinearElasticityOp:
+	
 	def __init__(self, fe):
 		dims = fe.manifold_dim()
+		q = fe.quadrature_point()
 
-		q_temp = [qx, qy, qz]
-		q = sp.Matrix(dims, 1, q_temp[0:dims])
 		shape_grad = fe.physical_tgrad(q)
 		e_jac_inv = fe.jacobian_inverse(q)
 
@@ -327,7 +419,8 @@ def main():
 	"TET20": Tet20(),
 	"HEX8": Hex8(),
 	"AAHEX8": AAHex8(),
-	"AAQUAD4": AxisAlignedQuad4()
+	"AAQUAD4": AxisAlignedQuad4(),
+	"QUAD4": Quad4()
 	}
 
 	if len(sys.argv) >= 2:
@@ -338,7 +431,8 @@ def main():
 
 	fe.use_adjugate = True
 	
-	op = LinearElasticityOp(fe)
+	# op = LinearElasticityOp(fe)
+	op = LinearElasticityOpTaylor(fe)
 	# op.hessian_check()
 
 

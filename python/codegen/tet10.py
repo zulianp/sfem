@@ -11,6 +11,9 @@ class Tet10(FE):
 	def reference_measure(self):
 		return sp.Rational(1, 6)
 
+	def barycenter(self):
+		return vec3(sp.Rational(1, 4), sp.Rational(1, 4), sp.Rational(1, 4))
+
 	def subparam_n_nodes(self):
 		return 4
 

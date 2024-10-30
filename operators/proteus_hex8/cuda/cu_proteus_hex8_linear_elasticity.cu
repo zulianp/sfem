@@ -14,7 +14,7 @@
 #define MIN(a, b) ((a) > (b) ? (b) : (a))
 #endif
 
-#if 1
+#if 0
 
 static const int n_qp = 27;
 
@@ -61,21 +61,57 @@ __constant__ scalar_t qw[27];
 
 #else
 
-static const int n_qp = 6;
-static const scalar_t h_qw[6] = {0.16666666666666666666666666666667,
-                                 0.16666666666666666666666666666667,
-                                 0.16666666666666666666666666666667,
-                                 0.16666666666666666666666666666667,
-                                 0.16666666666666666666666666666667,
-                                 0.16666666666666666666666666666667};
+// static const int n_qp = 6;
+// static const scalar_t h_qw[6] = {0.16666666666666666666666666666667,
+//                                  0.16666666666666666666666666666667,
+//                                  0.16666666666666666666666666666667,
+//                                  0.16666666666666666666666666666667,
+//                                  0.16666666666666666666666666666667,
+//                                  0.16666666666666666666666666666667};
 
-static const scalar_t h_qx[6] = {0.0, 0.5, 0.5, 0.5, 0.5, 1.0};
-static const scalar_t h_qy[6] = {0.5, 0.0, 0.5, 0.5, 1.0, 0.5};
-static const scalar_t h_qz[6] = {0.5, 0.5, 0.0, 1.0, 0.5, 0.5};
-__constant__ scalar_t qx[6];
-__constant__ scalar_t qy[6];
-__constant__ scalar_t qz[6];
-__constant__ scalar_t qw[6];
+// static const scalar_t h_qx[6] = {0.0, 0.5, 0.5, 0.5, 0.5, 1.0};
+// static const scalar_t h_qy[6] = {0.5, 0.0, 0.5, 0.5, 1.0, 0.5};
+// static const scalar_t h_qz[6] = {0.5, 0.5, 0.0, 1.0, 0.5, 0.5};
+// __constant__ scalar_t qx[6];
+// __constant__ scalar_t qy[6];
+// __constant__ scalar_t qz[6];
+// __constant__ scalar_t qw[6];
+
+static const int n_qp = 8;
+
+static const scalar_t h_qw[8] = {1. / 8, 1. / 8, 1. / 8, 1. / 8, 1. / 8, 1. / 8};
+
+static const scalar_t h_qx[8] = {0.2113248654,
+                                 0.7886751346,
+                                 0.2113248654,
+                                 0.7886751346,
+                                 0.2113248654,
+                                 0.7886751346,
+                                 0.2113248654,
+                                 0.7886751346};
+
+static const scalar_t h_qy[8] = {0.2113248654,
+                                 0.2113248654,
+                                 0.7886751346,
+                                 0.7886751346,
+                                 0.2113248654,
+                                 0.2113248654,
+                                 0.7886751346,
+                                 0.7886751346};
+
+static const scalar_t h_qz[8] = {0.2113248654,
+                                 0.2113248654,
+                                 0.2113248654,
+                                 0.2113248654,
+                                 0.7886751346,
+                                 0.7886751346,
+                                 0.7886751346,
+                                 0.7886751346};
+
+__constant__ scalar_t qx[8];
+__constant__ scalar_t qy[8];
+__constant__ scalar_t qz[8];
+__constant__ scalar_t qw[8];
 
 #endif
 
@@ -276,6 +312,44 @@ static __host__ __device__ void apply_micro_loop(const T *const elemental_matrix
 
 // #define HEX8_SEGMENTED_SYMBOLIC
 
+#define HEX8_SEGMENTED_TENSOR_LOOP 
+#ifndef HEX8_SEGMENTED_TENSOR_LOOP
+#define SEGEMENTED_QUADRATURE_LOOP(fun)  \
+    do                                   \
+        for (int k = 0; k < n_qp; k++) { \
+            fun<T, T>(mu,                \
+                      lambda,            \
+                      sub_adjugate,      \
+                      sub_determinant,   \
+                      qx[k],             \
+                      qy[k],             \
+                      qz[k],             \
+                      qw[k],             \
+                      elemental_matrix); \
+        }                                \
+    while (0)
+
+#else
+#define SEGEMENTED_QUADRATURE_LOOP(fun)                 \
+    do                                                  \
+        for (int kz = 0; kz < n_qp; kz++) {             \
+            for (int ky = 0; ky < n_qp; ky++) {         \
+                for (int kx = 0; kx < n_qp; kx++) {     \
+                    fun<T, T>(mu,                       \
+                              lambda,                   \
+                              sub_adjugate,             \
+                              sub_determinant,          \
+                              qx[kx],                   \
+                              qx[ky],                   \
+                              qx[kz],                   \
+                              qw[kx] * qw[ky] * qw[kz], \
+                              elemental_matrix);        \
+                }                                       \
+            }                                           \
+        }                                               \
+    while (0)
+#endif
+
 template <typename T, int LEVEL>
 __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segmented_kernel(
         const ptrdiff_t nelements,
@@ -297,6 +371,12 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
     static const int BLOCK_SIZE = LEVEL + 1;
     static const int BLOCK_SIZE_2 = BLOCK_SIZE * BLOCK_SIZE;
     static const int BLOCK_SIZE_3 = BLOCK_SIZE_2 * BLOCK_SIZE;
+
+#ifdef HEX8_SEGMENTED_TENSOR_LOOP
+    static const int n_qp = 2;
+    static const T qx[2] = {0.2113248654, 0.7886751346};
+    static const T qw[2] = {1. / 2, 1. / 2};
+#endif
 
     // "local" memory
     T u_block[BLOCK_SIZE_3];
@@ -348,17 +428,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
             for (int i = 0; i < 64; i++) {
                 elemental_matrix[i] = 0;
             }
-            for (int k = 0; k < n_qp; k++) {
-                cu_hex8_linear_elasticity_matrix_block_0_0<T, T>(mu,
-                                                                 lambda,
-                                                                 sub_adjugate,
-                                                                 sub_determinant,
-                                                                 qx[k],
-                                                                 qy[k],
-                                                                 qz[k],
-                                                                 qw[k],
-                                                                 elemental_matrix);
-            }
+            SEGEMENTED_QUADRATURE_LOOP(cu_hex8_linear_elasticity_matrix_block_0_0);
 #endif
 
             apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[0]);
@@ -370,17 +440,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
             for (int i = 0; i < 64; i++) {
                 elemental_matrix[i] = 0;
             }
-            for (int k = 0; k < n_qp; k++) {
-                cu_hex8_linear_elasticity_matrix_block_1_0<T, T>(mu,
-                                                                 lambda,
-                                                                 sub_adjugate,
-                                                                 sub_determinant,
-                                                                 qx[k],
-                                                                 qy[k],
-                                                                 qz[k],
-                                                                 qw[k],
-                                                                 elemental_matrix);
-            }
+            SEGEMENTED_QUADRATURE_LOOP(cu_hex8_linear_elasticity_matrix_block_1_0);
 #endif
 
             apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[1]);
@@ -392,17 +452,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
             for (int i = 0; i < 64; i++) {
                 elemental_matrix[i] = 0;
             }
-            for (int k = 0; k < n_qp; k++) {
-                cu_hex8_linear_elasticity_matrix_block_2_0<T, T>(mu,
-                                                                 lambda,
-                                                                 sub_adjugate,
-                                                                 sub_determinant,
-                                                                 qx[k],
-                                                                 qy[k],
-                                                                 qz[k],
-                                                                 qw[k],
-                                                                 elemental_matrix);
-            }
+            SEGEMENTED_QUADRATURE_LOOP(cu_hex8_linear_elasticity_matrix_block_2_0);
 #endif
 
             apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[2]);
@@ -421,17 +471,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
             for (int i = 0; i < 64; i++) {
                 elemental_matrix[i] = 0;
             }
-            for (int k = 0; k < n_qp; k++) {
-                cu_hex8_linear_elasticity_matrix_block_0_1<T, T>(mu,
-                                                                 lambda,
-                                                                 sub_adjugate,
-                                                                 sub_determinant,
-                                                                 qx[k],
-                                                                 qy[k],
-                                                                 qz[k],
-                                                                 qw[k],
-                                                                 elemental_matrix);
-            }
+            SEGEMENTED_QUADRATURE_LOOP(cu_hex8_linear_elasticity_matrix_block_0_1);
 #endif
 
             apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[0]);
@@ -443,17 +483,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
             for (int i = 0; i < 64; i++) {
                 elemental_matrix[i] = 0;
             }
-            for (int k = 0; k < n_qp; k++) {
-                cu_hex8_linear_elasticity_matrix_block_1_1<T, T>(mu,
-                                                                 lambda,
-                                                                 sub_adjugate,
-                                                                 sub_determinant,
-                                                                 qx[k],
-                                                                 qy[k],
-                                                                 qz[k],
-                                                                 qw[k],
-                                                                 elemental_matrix);
-            }
+            SEGEMENTED_QUADRATURE_LOOP(cu_hex8_linear_elasticity_matrix_block_1_1);
 #endif
 
             apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[1]);
@@ -465,17 +495,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
             for (int i = 0; i < 64; i++) {
                 elemental_matrix[i] = 0;
             }
-            for (int k = 0; k < n_qp; k++) {
-                cu_hex8_linear_elasticity_matrix_block_2_1<T, T>(mu,
-                                                                 lambda,
-                                                                 sub_adjugate,
-                                                                 sub_determinant,
-                                                                 qx[k],
-                                                                 qy[k],
-                                                                 qz[k],
-                                                                 qw[k],
-                                                                 elemental_matrix);
-            }
+            SEGEMENTED_QUADRATURE_LOOP(cu_hex8_linear_elasticity_matrix_block_2_1);
 #endif
 
             apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[2]);
@@ -494,17 +514,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
             for (int i = 0; i < 64; i++) {
                 elemental_matrix[i] = 0;
             }
-            for (int k = 0; k < n_qp; k++) {
-                cu_hex8_linear_elasticity_matrix_block_0_2<T, T>(mu,
-                                                                 lambda,
-                                                                 sub_adjugate,
-                                                                 sub_determinant,
-                                                                 qx[k],
-                                                                 qy[k],
-                                                                 qz[k],
-                                                                 qw[k],
-                                                                 elemental_matrix);
-            }
+            SEGEMENTED_QUADRATURE_LOOP(cu_hex8_linear_elasticity_matrix_block_0_2);
 #endif
 
             apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[0]);
@@ -516,17 +526,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
             for (int i = 0; i < 64; i++) {
                 elemental_matrix[i] = 0;
             }
-            for (int k = 0; k < n_qp; k++) {
-                cu_hex8_linear_elasticity_matrix_block_1_2<T, T>(mu,
-                                                                 lambda,
-                                                                 sub_adjugate,
-                                                                 sub_determinant,
-                                                                 qx[k],
-                                                                 qy[k],
-                                                                 qz[k],
-                                                                 qw[k],
-                                                                 elemental_matrix);
-            }
+            SEGEMENTED_QUADRATURE_LOOP(cu_hex8_linear_elasticity_matrix_block_1_2);
 #endif
 
             apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[1]);
@@ -538,17 +538,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
             for (int i = 0; i < 64; i++) {
                 elemental_matrix[i] = 0;
             }
-            for (int k = 0; k < n_qp; k++) {
-                cu_hex8_linear_elasticity_matrix_block_2_2<T, T>(mu,
-                                                                 lambda,
-                                                                 sub_adjugate,
-                                                                 sub_determinant,
-                                                                 qx[k],
-                                                                 qy[k],
-                                                                 qz[k],
-                                                                 qw[k],
-                                                                 elemental_matrix);
-            }
+            SEGEMENTED_QUADRATURE_LOOP(cu_hex8_linear_elasticity_matrix_block_2_2);
 #endif
 
             apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[2]);
@@ -644,9 +634,11 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl(
     return SFEM_SUCCESS;
 }
 
+#if 0
+
 // #define B_(x, y, z) ((z)*BLOCK_SIZE_2 + (y)*BLOCK_SIZE + (x))
 
-// Warp with limited shared mem buffer
+// // Warp with limited shared mem buffer
 // template <typename T, int LEVEL>
 // __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
 //         const ptrdiff_t nelements,
@@ -797,14 +789,15 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl(
 
 //             out_block[lidx] = 0;
 
-//             if (d < 2) {
+//             // if (d < 2) {
 //                 __syncthreads();
-//             }
+//             // }
 //         }
 //     }
 // }
 
-// Read from global mem
+
+// // Read from global mem
 // template <typename T, int LEVEL>
 // __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
 //         const ptrdiff_t nelements,
@@ -951,160 +944,164 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl(
 //     }
 // }
 
-// template <typename T, int LEVEL>
-// __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
-//         const ptrdiff_t nelements,
-//         const ptrdiff_t stride,  // Stride for elements and fff
-//         const ptrdiff_t interior_start,
-//         const idx_t *const SFEM_RESTRICT elements,
-//         const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
-//         const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_determinant,
-//         const T mu,
-//         const T lambda,
-//         const ptrdiff_t u_stride,
-//         const T *const SFEM_RESTRICT g_ux,
-//         const T *const SFEM_RESTRICT g_uy,
-//         const T *const SFEM_RESTRICT g_uz,
-//         const ptrdiff_t out_stride,
-//         T *const SFEM_RESTRICT g_outx,
-//         T *const SFEM_RESTRICT g_outy,
-//         T *const SFEM_RESTRICT g_outz) {
-//     static const int BLOCK_SIZE = LEVEL + 1;
-//     static const int BLOCK_SIZE_2 = BLOCK_SIZE * BLOCK_SIZE;
-//     static const int BLOCK_SIZE_3 = BLOCK_SIZE_2 * BLOCK_SIZE;
 
-//     assert(blockDim.x == BLOCK_SIZE);
-//     assert(blockDim.y == BLOCK_SIZE);
-//     assert(blockDim.z == BLOCK_SIZE);
 
-//     // Global mem
-//     const T *g_u[3] = {g_ux, g_uy, g_uz};
-//     T *g_out[3] = {g_outx, g_outy, g_outz};
+template <typename T, int LEVEL>
+__global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
+        const ptrdiff_t nelements,
+        const ptrdiff_t stride,  // Stride for elements and fff
+        const ptrdiff_t interior_start,
+        const idx_t *const SFEM_RESTRICT elements,
+        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
+        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_determinant,
+        const T mu,
+        const T lambda,
+        const ptrdiff_t u_stride,
+        const T *const SFEM_RESTRICT g_ux,
+        const T *const SFEM_RESTRICT g_uy,
+        const T *const SFEM_RESTRICT g_uz,
+        const ptrdiff_t out_stride,
+        T *const SFEM_RESTRICT g_outx,
+        T *const SFEM_RESTRICT g_outy,
+        T *const SFEM_RESTRICT g_outz) {
+    static const int BLOCK_SIZE = LEVEL + 1;
+    static const int BLOCK_SIZE_2 = BLOCK_SIZE * BLOCK_SIZE;
+    static const int BLOCK_SIZE_3 = BLOCK_SIZE_2 * BLOCK_SIZE;
 
-//     // Shared mem
-//     __shared__ T u_block[3][BLOCK_SIZE_3];
-//     __shared__ T out_block[3][BLOCK_SIZE_3];
+    assert(blockDim.x == BLOCK_SIZE);
+    assert(blockDim.y == BLOCK_SIZE);
+    assert(blockDim.z == BLOCK_SIZE);
 
-//     const T h = 1. / LEVEL;
+    // Global mem
+    const T *g_u[3] = {g_ux, g_uy, g_uz};
+    T *g_out[3] = {g_outx, g_outy, g_outz};
 
-//     const auto xi = threadIdx.x;
-//     const auto yi = threadIdx.y;
-//     const auto zi = threadIdx.z;
-//     const int interior = xi > 0 && yi > 0 && zi > 0 && xi < LEVEL && yi < LEVEL && zi < LEVEL;
-//     const bool is_element = xi < LEVEL && yi < LEVEL && zi < LEVEL;
+    // Shared mem
+    __shared__ T u_block[3][BLOCK_SIZE_3];
+    __shared__ T out_block[3][BLOCK_SIZE_3];
 
-//     assert(xi < BLOCK_SIZE);
-//     assert(yi < BLOCK_SIZE);
-//     assert(zi < BLOCK_SIZE);
+    const T h = 1. / LEVEL;
 
-//     const int lidx = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi);
+    const auto xi = threadIdx.x;
+    const auto yi = threadIdx.y;
+    const auto zi = threadIdx.z;
+    const int interior = xi > 0 && yi > 0 && zi > 0 && xi < LEVEL && yi < LEVEL && zi < LEVEL;
+    const bool is_element = xi < LEVEL && yi < LEVEL && zi < LEVEL;
 
-//     assert(lidx < BLOCK_SIZE_3);
-//     assert(lidx >= 0);
+    assert(xi < BLOCK_SIZE);
+    assert(yi < BLOCK_SIZE);
+    assert(zi < BLOCK_SIZE);
 
-//     int lev[8];
-//     if (is_element) {
-//         lev[0] = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi);
-//         lev[1] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi);
-//         lev[2] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi);
-//         lev[3] = cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi);
-//         lev[4] = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi + 1);
-//         lev[5] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi + 1);
-//         lev[6] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi + 1);
-//         lev[7] = cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi + 1);
-//     }
+    const int lidx = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi);
 
-//     T out[3][8];
-//     T u[3][8];
-//     T sub_adjugate[9];
-//     T sub_determinant;
+    assert(lidx < BLOCK_SIZE_3);
+    assert(lidx >= 0);
 
-//     for (int d = 0; d < 3; d++) {
-//         out_block[d][lidx] = 0;
-//     }
+    int lev[8];
+    if (is_element) {
+        lev[0] = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi);
+        lev[1] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi);
+        lev[2] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi);
+        lev[3] = cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi);
+        lev[4] = cu_proteus_hex8_lidx(LEVEL, xi, yi, zi + 1);
+        lev[5] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi, zi + 1);
+        lev[6] = cu_proteus_hex8_lidx(LEVEL, xi + 1, yi + 1, zi + 1);
+        lev[7] = cu_proteus_hex8_lidx(LEVEL, xi, yi + 1, zi + 1);
+    }
 
-//     for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
-//         const ptrdiff_t idx = elements[lidx * stride + e];
+    T out[3][8];
+    T u[3][8];
+    T sub_adjugate[9];
+    T sub_determinant;
 
-//         // Gather
-//         for (int d = 0; d < 3; d++) {
-//             u_block[d][lidx] = g_u[d][idx * u_stride];
-//             assert(u_block[d][lidx] == u_block[d][lidx]);
-//         }
+    for (int d = 0; d < 3; d++) {
+        out_block[d][lidx] = 0;
+    }
 
-//         if (is_element) {
-//             sub_adjugate[0] = g_jacobian_adjugate[0 * stride + e];
-//             sub_adjugate[1] = g_jacobian_adjugate[1 * stride + e];
-//             sub_adjugate[2] = g_jacobian_adjugate[2 * stride + e];
-//             sub_adjugate[3] = g_jacobian_adjugate[3 * stride + e];
-//             sub_adjugate[4] = g_jacobian_adjugate[4 * stride + e];
-//             sub_adjugate[5] = g_jacobian_adjugate[5 * stride + e];
-//             sub_adjugate[6] = g_jacobian_adjugate[6 * stride + e];
-//             sub_adjugate[7] = g_jacobian_adjugate[7 * stride + e];
-//             sub_adjugate[8] = g_jacobian_adjugate[8 * stride + e];
-//             sub_determinant = g_jacobian_determinant[e];
+    for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
+        const ptrdiff_t idx = elements[lidx * stride + e];
 
-//             cu_hex8_sub_adj_0_in_place(h, sub_adjugate, &sub_determinant);
-//             for (int d = 0; d < 3; d++) {
-//                 for (int v = 0; v < 8; v++) {
-//                     out[d][v] = 0;
-//                 }
-//             }
-//         }
+        // Gather
+        for (int d = 0; d < 3; d++) {
+            u_block[d][lidx] = g_u[d][idx * u_stride];
+            assert(u_block[d][lidx] == u_block[d][lidx]);
+        }
 
-//         __syncthreads();
+        if (is_element) {
+            sub_adjugate[0] = g_jacobian_adjugate[0 * stride + e];
+            sub_adjugate[1] = g_jacobian_adjugate[1 * stride + e];
+            sub_adjugate[2] = g_jacobian_adjugate[2 * stride + e];
+            sub_adjugate[3] = g_jacobian_adjugate[3 * stride + e];
+            sub_adjugate[4] = g_jacobian_adjugate[4 * stride + e];
+            sub_adjugate[5] = g_jacobian_adjugate[5 * stride + e];
+            sub_adjugate[6] = g_jacobian_adjugate[6 * stride + e];
+            sub_adjugate[7] = g_jacobian_adjugate[7 * stride + e];
+            sub_adjugate[8] = g_jacobian_adjugate[8 * stride + e];
+            sub_determinant = g_jacobian_determinant[e];
 
-//         // Compute
-//         if (is_element) {
-//             for (int d = 0; d < 3; d++) {
-//                 for (int v = 0; v < 8; v++) {
-//                     u[d][v] = u_block[d][lev[v]];
-//                 }
-//             }
+            cu_hex8_sub_adj_0_in_place(h, sub_adjugate, &sub_determinant);
+            for (int d = 0; d < 3; d++) {
+                for (int v = 0; v < 8; v++) {
+                    out[d][v] = 0;
+                }
+            }
+        }
 
-//             for (int k = 0; k < n_qp; k++) {
-//                 cu_hex8_linear_elasticity_apply_adj<T, T>(mu,
-//                                                           lambda,
-//                                                           sub_adjugate,
-//                                                           sub_determinant,
-//                                                           qx[k],
-//                                                           qy[k],
-//                                                           qz[k],
-//                                                           qw[k],
-//                                                           u[0],
-//                                                           u[1],
-//                                                           u[2],
-//                                                           out[0],
-//                                                           out[1],
-//                                                           out[2]);
-//             }
-//         }
+        __syncthreads();
 
-//         // Scatter to local mem
-//         for (int d = 0; d < 3; d++) {
-//             if (is_element) {
-//                 for (int v = 0; v < 8; v++) {
-//                     atomicAdd(&out_block[d][lev[v]], out[d][v]);
-//                 }
-//             }
-//         }
+        // Compute
+        if (is_element) {
+            for (int d = 0; d < 3; d++) {
+                for (int v = 0; v < 8; v++) {
+                    u[d][v] = u_block[d][lev[v]];
+                }
+            }
 
-//         __syncthreads();
+            for (int k = 0; k < n_qp; k++) {
+                cu_hex8_linear_elasticity_apply_adj<T, T>(mu,
+                                                          lambda,
+                                                          sub_adjugate,
+                                                          sub_determinant,
+                                                          qx[k],
+                                                          qy[k],
+                                                          qz[k],
+                                                          qw[k],
+                                                          u[0],
+                                                          u[1],
+                                                          u[2],
+                                                          out[0],
+                                                          out[1],
+                                                          out[2]);
+            }
+        }
 
-//         // Scatter to global mem
-//         for (int d = 0; d < 3; d++) {
-//             assert(out_block[d][lidx] == out_block[d][lidx]);
+        // Scatter to local mem
+        for (int d = 0; d < 3; d++) {
+            if (is_element) {
+                for (int v = 0; v < 8; v++) {
+                    atomicAdd(&out_block[d][lev[v]], out[d][v]);
+                }
+            }
+        }
 
-//             if (interior) {
-//                 g_out[d][idx * out_stride] += out_block[d][lidx];
-//             } else {
-//                 atomicAdd(&(g_out[d][idx * out_stride]), out_block[d][lidx]);
-//             }
+        __syncthreads();
 
-//             out_block[d][lidx] = 0;
-//         }
-//     }
-// }
+        // Scatter to global mem
+        for (int d = 0; d < 3; d++) {
+            assert(out_block[d][lidx] == out_block[d][lidx]);
+
+            if (interior) {
+                g_out[d][idx * out_stride] += out_block[d][lidx];
+            } else {
+                atomicAdd(&(g_out[d][idx * out_stride]), out_block[d][lidx]);
+            }
+
+            out_block[d][lidx] = 0;
+        }
+    }
+}
+
+#else
 
 static __device__ inline bool cu_proteus_hex8_is_interior(const int level,
                                                           const int xi,
@@ -1135,6 +1132,18 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
     const auto yi = threadIdx.y;
     const auto zi = threadIdx.z;
     const bool is_element = xi < LEVEL && yi < LEVEL && zi < LEVEL;
+
+#define HEX8_USE_TENSOR_PRODUCT_QUADRATURE
+#ifdef HEX8_USE_TENSOR_PRODUCT_QUADRATURE
+
+    static const int n_qp = 2;
+    static const T qx[2] = {0.2113248654, 0.7886751346};
+    static const T qw[2] = {1. / 2, 1. / 2};
+
+    // static const int n_qp = 3;
+    // static const T qx[3] = {0.1127016654, 1. / 2, 0.8872983346};
+    // static const T qw[3] = {0.2777777778, 0.4444444444, 0.2777777778};
+#endif
 
     assert(is_element);
 
@@ -1221,6 +1230,28 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
                 }
             }
 
+#ifdef HEX8_USE_TENSOR_PRODUCT_QUADRATURE
+            for (int kz = 0; kz < n_qp; kz++) {
+                for (int ky = 0; ky < n_qp; ky++) {
+                    for (int kx = 0; kx < n_qp; kx++) {
+                        cu_hex8_linear_elasticity_apply_adj<T, T>(mu,
+                                                                  lambda,
+                                                                  sub_adjugate,
+                                                                  sub_determinant,
+                                                                  qx[kx],
+                                                                  qx[ky],
+                                                                  qx[kz],
+                                                                  qw[kx] * qw[ky] * qw[kz],
+                                                                  u[0],
+                                                                  u[1],
+                                                                  u[2],
+                                                                  out[0],
+                                                                  out[1],
+                                                                  out[2]);
+                    }
+                }
+            }
+#else
             for (int k = 0; k < n_qp; k++) {
                 cu_hex8_linear_elasticity_apply_adj<T, T>(mu,
                                                           lambda,
@@ -1238,6 +1269,8 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
                                                           out[2]);
             }
 
+#endif
+
             for (int v = 0; v < 8; v++) {
                 const ptrdiff_t idx = ev[v] * out_stride;
                 atomicAdd(&g_outx[idx], out[0][v]);
@@ -1247,6 +1280,8 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
         }
     }
 }
+
+#endif
 
 template <typename T, int LEVEL>
 int cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl(

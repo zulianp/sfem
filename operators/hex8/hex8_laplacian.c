@@ -78,6 +78,7 @@ int hex8_laplacian_apply(const ptrdiff_t nelements,
             // Assume affine here!
             hex8_fff(lx, ly, lz, 0.5, 0.5, 0.5, fff);
             hex8_laplacian_apply_fff_integral(fff, element_u, element_vector);
+            // hex8_laplacian_apply_fff_taylor(fff, element_u, element_vector);
 
             for (int edof_i = 0; edof_i < 8; ++edof_i) {
                 const idx_t dof_i = ev[edof_i];
