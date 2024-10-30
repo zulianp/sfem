@@ -274,10 +274,7 @@ namespace sfem {
         ~Impl() {}
     };
 
-    int SemiStructuredMesh::n_nodes_per_element() const
-    {
-        return proteus_hex8_nxe(impl_->level);
-    }
+    int SemiStructuredMesh::n_nodes_per_element() const { return proteus_hex8_nxe(impl_->level); }
 
     idx_t **SemiStructuredMesh::element_data() { return impl_->elements->data(); }
     geom_t **SemiStructuredMesh::point_data() {
@@ -1085,6 +1082,41 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    std::shared_ptr<Operator<real_t>> Function::linear_op_variant(
+            const  std::vector<std::pair<std::string, int>> &options) {
+        
+        std::vector<std::shared_ptr<Op>> cloned_ops;
+
+        for (auto &op : impl_->ops) {
+            auto c = op->clone();
+
+            for (auto p : options) {
+                c->set_option(p.first, p.second);
+            }
+
+            cloned_ops.push_back(c);
+        }
+
+        return sfem::make_op<real_t>(
+                this->space()->n_dofs(),
+                this->space()->n_dofs(),
+                [=](const real_t *const x, real_t *const y) {
+                    SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.apply);
+
+                    for (auto op : cloned_ops) {
+                        if (op->apply(nullptr, x, y) != SFEM_SUCCESS) {
+                            std::cerr << "Failed apply in op: " << op->name() << "\n";
+                            assert(false);
+                        }
+                    }
+
+                    if (impl_->handle_constraints) {
+                        copy_constrained_dofs(x, y);
+                    }
+                },
+                this->execution_space());
+    }
+
     int Function::value(const real_t *x, real_t *const out) {
         SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.value);
 
@@ -1358,6 +1390,18 @@ namespace sfem {
             SFEM_READ_ENV(SFEM_HEX8_ASSUME_AFFINE, atoi);
             ret->use_affine_approximation = SFEM_HEX8_ASSUME_AFFINE;
 
+            return ret;
+        }
+
+        void set_option(const std::string &name, bool val) override {
+            if (name == "ASSUME_AFFINE") {
+                use_affine_approximation = val;
+            }
+        }
+
+        std::shared_ptr<Op> clone() const override {
+            auto ret = std::make_shared<SemiStructuredLinearElasticity>(space);
+            *ret = *this;
             return ret;
         }
 
@@ -2296,8 +2340,7 @@ namespace sfem {
             instance_.private_register_op("ss:LinearElasticity",
                                           SemiStructuredLinearElasticity::create);
             instance_.private_register_op("Laplacian", Laplacian::create);
-            instance_.private_register_op("ss:Laplacian",
-                                          SemiStructuredLaplacian::create);
+            instance_.private_register_op("ss:Laplacian", SemiStructuredLaplacian::create);
             instance_.private_register_op("CVFEMUpwindConvection", CVFEMUpwindConvection::create);
             instance_.private_register_op("Mass", Mass::create);
             instance_.private_register_op("CVFEMMass", CVFEMMass::create);

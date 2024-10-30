@@ -98,7 +98,7 @@ static const scalar_t h_qy[8] = {0.2113248654,
                                  0.2113248654,
                                  0.7886751346,
                                  0.7886751346};
-                                 
+
 static const scalar_t h_qz[8] = {0.2113248654,
                                  0.2113248654,
                                  0.2113248654,
@@ -312,6 +312,44 @@ static __host__ __device__ void apply_micro_loop(const T *const elemental_matrix
 
 // #define HEX8_SEGMENTED_SYMBOLIC
 
+#define HEX8_SEGMENTED_TENSOR_LOOP 
+#ifndef HEX8_SEGMENTED_TENSOR_LOOP
+#define SEGEMENTED_QUADRATURE_LOOP(fun)  \
+    do                                   \
+        for (int k = 0; k < n_qp; k++) { \
+            fun<T, T>(mu,                \
+                      lambda,            \
+                      sub_adjugate,      \
+                      sub_determinant,   \
+                      qx[k],             \
+                      qy[k],             \
+                      qz[k],             \
+                      qw[k],             \
+                      elemental_matrix); \
+        }                                \
+    while (0)
+
+#else
+#define SEGEMENTED_QUADRATURE_LOOP(fun)                 \
+    do                                                  \
+        for (int kz = 0; kz < n_qp; kz++) {             \
+            for (int ky = 0; ky < n_qp; ky++) {         \
+                for (int kx = 0; kx < n_qp; kx++) {     \
+                    fun<T, T>(mu,                       \
+                              lambda,                   \
+                              sub_adjugate,             \
+                              sub_determinant,          \
+                              qx[kx],                   \
+                              qx[ky],                   \
+                              qx[kz],                   \
+                              qw[kx] * qw[ky] * qw[kz], \
+                              elemental_matrix);        \
+                }                                       \
+            }                                           \
+        }                                               \
+    while (0)
+#endif
+
 template <typename T, int LEVEL>
 __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segmented_kernel(
         const ptrdiff_t nelements,
@@ -333,6 +371,12 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
     static const int BLOCK_SIZE = LEVEL + 1;
     static const int BLOCK_SIZE_2 = BLOCK_SIZE * BLOCK_SIZE;
     static const int BLOCK_SIZE_3 = BLOCK_SIZE_2 * BLOCK_SIZE;
+
+#ifdef HEX8_SEGMENTED_TENSOR_LOOP
+    static const int n_qp = 2;
+    static const T qx[2] = {0.2113248654, 0.7886751346};
+    static const T qw[2] = {1. / 2, 1. / 2};
+#endif
 
     // "local" memory
     T u_block[BLOCK_SIZE_3];
@@ -384,17 +428,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
             for (int i = 0; i < 64; i++) {
                 elemental_matrix[i] = 0;
             }
-            for (int k = 0; k < n_qp; k++) {
-                cu_hex8_linear_elasticity_matrix_block_0_0<T, T>(mu,
-                                                                 lambda,
-                                                                 sub_adjugate,
-                                                                 sub_determinant,
-                                                                 qx[k],
-                                                                 qy[k],
-                                                                 qz[k],
-                                                                 qw[k],
-                                                                 elemental_matrix);
-            }
+            SEGEMENTED_QUADRATURE_LOOP(cu_hex8_linear_elasticity_matrix_block_0_0);
 #endif
 
             apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[0]);
@@ -406,17 +440,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
             for (int i = 0; i < 64; i++) {
                 elemental_matrix[i] = 0;
             }
-            for (int k = 0; k < n_qp; k++) {
-                cu_hex8_linear_elasticity_matrix_block_1_0<T, T>(mu,
-                                                                 lambda,
-                                                                 sub_adjugate,
-                                                                 sub_determinant,
-                                                                 qx[k],
-                                                                 qy[k],
-                                                                 qz[k],
-                                                                 qw[k],
-                                                                 elemental_matrix);
-            }
+            SEGEMENTED_QUADRATURE_LOOP(cu_hex8_linear_elasticity_matrix_block_1_0);
 #endif
 
             apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[1]);
@@ -428,17 +452,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
             for (int i = 0; i < 64; i++) {
                 elemental_matrix[i] = 0;
             }
-            for (int k = 0; k < n_qp; k++) {
-                cu_hex8_linear_elasticity_matrix_block_2_0<T, T>(mu,
-                                                                 lambda,
-                                                                 sub_adjugate,
-                                                                 sub_determinant,
-                                                                 qx[k],
-                                                                 qy[k],
-                                                                 qz[k],
-                                                                 qw[k],
-                                                                 elemental_matrix);
-            }
+            SEGEMENTED_QUADRATURE_LOOP(cu_hex8_linear_elasticity_matrix_block_2_0);
 #endif
 
             apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[2]);
@@ -457,17 +471,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
             for (int i = 0; i < 64; i++) {
                 elemental_matrix[i] = 0;
             }
-            for (int k = 0; k < n_qp; k++) {
-                cu_hex8_linear_elasticity_matrix_block_0_1<T, T>(mu,
-                                                                 lambda,
-                                                                 sub_adjugate,
-                                                                 sub_determinant,
-                                                                 qx[k],
-                                                                 qy[k],
-                                                                 qz[k],
-                                                                 qw[k],
-                                                                 elemental_matrix);
-            }
+            SEGEMENTED_QUADRATURE_LOOP(cu_hex8_linear_elasticity_matrix_block_0_1);
 #endif
 
             apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[0]);
@@ -479,17 +483,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
             for (int i = 0; i < 64; i++) {
                 elemental_matrix[i] = 0;
             }
-            for (int k = 0; k < n_qp; k++) {
-                cu_hex8_linear_elasticity_matrix_block_1_1<T, T>(mu,
-                                                                 lambda,
-                                                                 sub_adjugate,
-                                                                 sub_determinant,
-                                                                 qx[k],
-                                                                 qy[k],
-                                                                 qz[k],
-                                                                 qw[k],
-                                                                 elemental_matrix);
-            }
+            SEGEMENTED_QUADRATURE_LOOP(cu_hex8_linear_elasticity_matrix_block_1_1);
 #endif
 
             apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[1]);
@@ -501,17 +495,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
             for (int i = 0; i < 64; i++) {
                 elemental_matrix[i] = 0;
             }
-            for (int k = 0; k < n_qp; k++) {
-                cu_hex8_linear_elasticity_matrix_block_2_1<T, T>(mu,
-                                                                 lambda,
-                                                                 sub_adjugate,
-                                                                 sub_determinant,
-                                                                 qx[k],
-                                                                 qy[k],
-                                                                 qz[k],
-                                                                 qw[k],
-                                                                 elemental_matrix);
-            }
+            SEGEMENTED_QUADRATURE_LOOP(cu_hex8_linear_elasticity_matrix_block_2_1);
 #endif
 
             apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[2]);
@@ -530,17 +514,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
             for (int i = 0; i < 64; i++) {
                 elemental_matrix[i] = 0;
             }
-            for (int k = 0; k < n_qp; k++) {
-                cu_hex8_linear_elasticity_matrix_block_0_2<T, T>(mu,
-                                                                 lambda,
-                                                                 sub_adjugate,
-                                                                 sub_determinant,
-                                                                 qx[k],
-                                                                 qy[k],
-                                                                 qz[k],
-                                                                 qw[k],
-                                                                 elemental_matrix);
-            }
+            SEGEMENTED_QUADRATURE_LOOP(cu_hex8_linear_elasticity_matrix_block_0_2);
 #endif
 
             apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[0]);
@@ -552,17 +526,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
             for (int i = 0; i < 64; i++) {
                 elemental_matrix[i] = 0;
             }
-            for (int k = 0; k < n_qp; k++) {
-                cu_hex8_linear_elasticity_matrix_block_1_2<T, T>(mu,
-                                                                 lambda,
-                                                                 sub_adjugate,
-                                                                 sub_determinant,
-                                                                 qx[k],
-                                                                 qy[k],
-                                                                 qz[k],
-                                                                 qw[k],
-                                                                 elemental_matrix);
-            }
+            SEGEMENTED_QUADRATURE_LOOP(cu_hex8_linear_elasticity_matrix_block_1_2);
 #endif
 
             apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[1]);
@@ -574,17 +538,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segment
             for (int i = 0; i < 64; i++) {
                 elemental_matrix[i] = 0;
             }
-            for (int k = 0; k < n_qp; k++) {
-                cu_hex8_linear_elasticity_matrix_block_2_2<T, T>(mu,
-                                                                 lambda,
-                                                                 sub_adjugate,
-                                                                 sub_determinant,
-                                                                 qx[k],
-                                                                 qy[k],
-                                                                 qz[k],
-                                                                 qw[k],
-                                                                 elemental_matrix);
-            }
+            SEGEMENTED_QUADRATURE_LOOP(cu_hex8_linear_elasticity_matrix_block_2_2);
 #endif
 
             apply_micro_loop<T, LEVEL>(elemental_matrix, u_block, out_block[2]);
@@ -1179,6 +1133,18 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
     const auto zi = threadIdx.z;
     const bool is_element = xi < LEVEL && yi < LEVEL && zi < LEVEL;
 
+#define HEX8_USE_TENSOR_PRODUCT_QUADRATURE
+#ifdef HEX8_USE_TENSOR_PRODUCT_QUADRATURE
+
+    static const int n_qp = 2;
+    static const T qx[2] = {0.2113248654, 0.7886751346};
+    static const T qw[2] = {1. / 2, 1. / 2};
+
+    // static const int n_qp = 3;
+    // static const T qx[3] = {0.1127016654, 1. / 2, 0.8872983346};
+    // static const T qw[3] = {0.2777777778, 0.4444444444, 0.2777777778};
+#endif
+
     assert(is_element);
 
     if (is_element) {
@@ -1264,6 +1230,28 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
                 }
             }
 
+#ifdef HEX8_USE_TENSOR_PRODUCT_QUADRATURE
+            for (int kz = 0; kz < n_qp; kz++) {
+                for (int ky = 0; ky < n_qp; ky++) {
+                    for (int kx = 0; kx < n_qp; kx++) {
+                        cu_hex8_linear_elasticity_apply_adj<T, T>(mu,
+                                                                  lambda,
+                                                                  sub_adjugate,
+                                                                  sub_determinant,
+                                                                  qx[kx],
+                                                                  qx[ky],
+                                                                  qx[kz],
+                                                                  qw[kx] * qw[ky] * qw[kz],
+                                                                  u[0],
+                                                                  u[1],
+                                                                  u[2],
+                                                                  out[0],
+                                                                  out[1],
+                                                                  out[2]);
+                    }
+                }
+            }
+#else
             for (int k = 0; k < n_qp; k++) {
                 cu_hex8_linear_elasticity_apply_adj<T, T>(mu,
                                                           lambda,
@@ -1280,6 +1268,8 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
                                                           out[1],
                                                           out[2]);
             }
+
+#endif
 
             for (int v = 0; v < 8; v++) {
                 const ptrdiff_t idx = ev[v] * out_stride;
