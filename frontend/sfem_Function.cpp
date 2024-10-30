@@ -417,6 +417,8 @@ namespace sfem {
 
     Mesh &FunctionSpace::mesh() { return *impl_->mesh; }
 
+    std::shared_ptr<Mesh> FunctionSpace::mesh_ptr() const { return impl_->mesh; }
+
     SemiStructuredMesh &FunctionSpace::semi_structured_mesh() {
         return *impl_->semi_structured_mesh;
     }

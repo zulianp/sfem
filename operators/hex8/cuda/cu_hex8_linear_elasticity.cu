@@ -81,7 +81,7 @@ static const scalar_t h_qx[8] = {0.2113248654,
                                  0.7886751346,
                                  0.2113248654,
                                  0.7886751346};
-                                 
+
 static const scalar_t h_qy[8] = {0.2113248654,
                                  0.2113248654,
                                  0.7886751346,
@@ -135,6 +135,15 @@ __global__ void cu_affine_hex8_linear_elasticity_apply_kernel(
         T *const SFEM_RESTRICT g_outx,
         T *const SFEM_RESTRICT g_outy,
         T *const SFEM_RESTRICT g_outz) {
+    
+    static const int n_qp = 2;
+    static const T qx[2] = {0.2113248654, 0.7886751346};
+    static const T qw[2] = {1. / 2, 1. / 2};
+
+    // static const int n_qp = 3;
+    // static const T qx[3] = {0.1127016654, 1. / 2, 0.8872983346};
+    // static const T qw[3] = {0.2777777778, 0.4444444444, 0.2777777778};
+
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
          e += blockDim.x * gridDim.x) {
         idx_t ev[8];
@@ -181,21 +190,25 @@ __global__ void cu_affine_hex8_linear_elasticity_apply_kernel(
             assert(uz[v] == uz[v]);
         }
 
-        for (int k = 0; k < n_qp; k++) {
-            cu_hex8_linear_elasticity_apply_adj<T, T>(mu,
-                                                      lambda,
-                                                      adjugate,
-                                                      jacobian_determinant,
-                                                      qx[k],
-                                                      qy[k],
-                                                      qz[k],
-                                                      qw[k],
-                                                      ux,
-                                                      uy,
-                                                      uz,
-                                                      outx,
-                                                      outy,
-                                                      outz);
+        for (int kz = 0; kz < n_qp; kz++) {
+            for (int ky = 0; ky < n_qp; ky++) {
+                for (int kx = 0; kx < n_qp; kx++) {
+                    cu_hex8_linear_elasticity_apply_adj<T, T>(mu,
+                                                              lambda,
+                                                              adjugate,
+                                                              jacobian_determinant,
+                                                              qx[kx],
+                                                              qx[ky],
+                                                              qx[kz],
+                                                              qw[kx] * qw[ky] * qw[kz],
+                                                              ux,
+                                                              uy,
+                                                              uz,
+                                                              outx,
+                                                              outy,
+                                                              outz);
+                }
+            }
         }
 
         for (int v = 0; v < 8; v++) {

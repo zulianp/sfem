@@ -64,6 +64,7 @@ NB_MODULE(pysfem, m) {
             .def("read", &Mesh::read)
             .def("write", &Mesh::write)
             .def("n_nodes", &Mesh::n_nodes)
+            .def("n_elements", &Mesh::n_elements)
             .def("convert_to_macro_element_mesh", &Mesh::convert_to_macro_element_mesh)
             .def("spatial_dimension", &Mesh::spatial_dimension);
 
@@ -167,7 +168,9 @@ NB_MODULE(pysfem, m) {
             .def(nb::init<std::shared_ptr<Mesh>>())
             .def(nb::init<std::shared_ptr<Mesh>, const int>())
             .def("derefine", &FunctionSpace::derefine)
-            .def("n_dofs", &FunctionSpace::n_dofs);
+            .def("mesh", &FunctionSpace::mesh_ptr)
+            .def("n_dofs", &FunctionSpace::n_dofs)
+            .def("block_size", &FunctionSpace::block_size);
 
     m.def("create_derefined_crs_graph",
           [](const std::shared_ptr<FunctionSpace> &space) -> std::shared_ptr<CRSGraph> {
