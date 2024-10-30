@@ -246,20 +246,20 @@ __global__ void cu_affine_hex8_laplacian_apply_taylor_kernel(
                                                // Trial
                                                hex8_g_0_x[j],
                                                hex8_g_0_y[j],
-                                            hex8_g_0_z[j],
-                                            hex8_H_0_x[j],
-                                            hex8_H_0_y[j],
-                                            hex8_H_0_z[j],
-                                            hex8_diff3_0[j],
-                                            // Test
-                                            hex8_g_0_x[node],
-                                            hex8_g_0_y[node],
-                                            hex8_g_0_z[node],
-                                            hex8_H_0_x[node],
-                                            hex8_H_0_y[node],
-                                            hex8_H_0_z[node],
-                                            hex8_diff3_0[node],
-                                            &row[j]);
+                                               hex8_g_0_z[j],
+                                               hex8_H_0_x[j],
+                                               hex8_H_0_y[j],
+                                               hex8_H_0_z[j],
+                                               hex8_diff3_0[j],
+                                               // Test
+                                               hex8_g_0_x[node],
+                                               hex8_g_0_y[node],
+                                               hex8_g_0_z[node],
+                                               hex8_H_0_x[node],
+                                               hex8_H_0_y[node],
+                                               hex8_H_0_z[node],
+                                               hex8_diff3_0[node],
+                                               &row[j]);
         }
 
         element_u[threadIdx.x] = u[idx];
