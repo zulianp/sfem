@@ -2,7 +2,8 @@
 
 #include "hex8_inline_cpu.h"
 #include "hex8_linear_elasticity_inline_cpu.h"
-#include "hex8_quadrature.h"
+// #include "hex8_quadrature.h"
+#include "line_quadrature.h"
 
 #include <stdio.h>
 
@@ -26,37 +27,22 @@ int hex8_linear_elasticity_apply(const ptrdiff_t nelements,
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
 
-    int SFEM_HEX8_QUADRATURE_ORDER = 8;
+    int SFEM_HEX8_QUADRATURE_ORDER = 2;
     SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
     // printf("SFEM_HEX8_QUADRATURE_ORDER = %d\n", SFEM_HEX8_QUADRATURE_ORDER);
 
-    int n_qp = q27_n;
-    const scalar_t *qx = q27_x;
-    const scalar_t *qy = q27_y;
-    const scalar_t *qz = q27_z;
-    const scalar_t *qw = q27_w;
-
-    if (SFEM_HEX8_QUADRATURE_ORDER == 58) {
-        n_qp = q58_n;
-        qx = q58_x;
-        qy = q58_y;
-        qz = q58_z;
-        qw = q58_w;
-    } else if (SFEM_HEX8_QUADRATURE_ORDER == 6) {
-        n_qp = q6_n;
-        qx = q6_x;
-        qy = q6_y;
-        qz = q6_z;
-        qw = q6_w;
-    } else if (SFEM_HEX8_QUADRATURE_ORDER == 8) {
-        n_qp = q8_n;
-        qx = q8_x;
-        qy = q8_y;
-        qz = q8_z;
-        qw = q8_w;
+    int n_qp = line_q3_n;
+    const scalar_t *qx = line_q3_x;
+    const scalar_t *qw = line_q3_w;
+    if (SFEM_HEX8_QUADRATURE_ORDER == 1) {
+        n_qp = line_q2_n;
+        qx = line_q2_x;
+        qw = line_q2_w;
+    } else if (SFEM_HEX8_QUADRATURE_ORDER == 5) {
+        n_qp = line_q6_n;
+        qx = line_q6_x;
+        qw = line_q6_w;
     }
-
-
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
@@ -99,24 +85,34 @@ int hex8_linear_elasticity_apply(const ptrdiff_t nelements,
             element_outz[d] = 0;
         }
 
-        for (int k = 0; k < n_qp; k++) {
-            hex8_adjugate_and_det(
-                    lx, ly, lz, qx[k], qy[k], qz[k], jacobian_adjugate, &jacobian_determinant);
+        for (int kz = 0; kz < n_qp; kz++) {
+            for (int ky = 0; ky < n_qp; ky++) {
+                for (int kx = 0; kx < n_qp; kx++) {
+                    hex8_adjugate_and_det(lx,
+                                          ly,
+                                          lz,
+                                          qx[kx],
+                                          qx[ky],
+                                          qx[kz],
+                                          jacobian_adjugate,
+                                          &jacobian_determinant);
 
-            hex8_linear_elasticity_apply_adj(mu,
-                                             lambda,
-                                             jacobian_adjugate,
-                                             jacobian_determinant,
-                                             qx[k],
-                                             qy[k],
-                                             qz[k],
-                                             qw[k],
-                                             element_ux,
-                                             element_uy,
-                                             element_uz,
-                                             element_outx,
-                                             element_outy,
-                                             element_outz);
+                    hex8_linear_elasticity_apply_adj(mu,
+                                                     lambda,
+                                                     jacobian_adjugate,
+                                                     jacobian_determinant,
+                                                     qx[kx],
+                                                     qx[ky],
+                                                     qx[kz],
+                                                     qw[kx] * qw[ky] * qw[kz],
+                                                     element_ux,
+                                                     element_uy,
+                                                     element_uz,
+                                                     element_outx,
+                                                     element_outy,
+                                                     element_outz);
+                }
+            }
         }
 
         for (int edof_i = 0; edof_i < 8; edof_i++) {
@@ -156,34 +152,21 @@ int affine_hex8_linear_elasticity_apply(const ptrdiff_t nelements,
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
 
-    int SFEM_HEX8_QUADRATURE_ORDER = 27;
+    int SFEM_HEX8_QUADRATURE_ORDER = 2;
     SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
     // printf("SFEM_HEX8_QUADRATURE_ORDER = %d\n", SFEM_HEX8_QUADRATURE_ORDER);
 
-    int n_qp = q27_n;
-    const scalar_t *qx = q27_x;
-    const scalar_t *qy = q27_y;
-    const scalar_t *qz = q27_z;
-    const scalar_t *qw = q27_w;
-
-    if (SFEM_HEX8_QUADRATURE_ORDER == 58) {
-        n_qp = q58_n;
-        qx = q58_x;
-        qy = q58_y;
-        qz = q58_z;
-        qw = q58_w;
-    } else if (SFEM_HEX8_QUADRATURE_ORDER == 6) {
-        n_qp = q6_n;
-        qx = q6_x;
-        qy = q6_y;
-        qz = q6_z;
-        qw = q6_w;
-    } else if (SFEM_HEX8_QUADRATURE_ORDER == 8) {
-        n_qp = q8_n;
-        qx = q8_x;
-        qy = q8_y;
-        qz = q8_z;
-        qw = q8_w;
+    int n_qp = line_q3_n;
+    const scalar_t *qx = line_q3_x;
+    const scalar_t *qw = line_q3_w;
+    if (SFEM_HEX8_QUADRATURE_ORDER == 1) {
+        n_qp = line_q2_n;
+        qx = line_q2_x;
+        qw = line_q2_w;
+    } else if (SFEM_HEX8_QUADRATURE_ORDER == 5) {
+        n_qp = line_q6_n;
+        qx = line_q6_x;
+        qw = line_q6_w;
     }
 
 #pragma omp parallel for
@@ -229,21 +212,25 @@ int affine_hex8_linear_elasticity_apply(const ptrdiff_t nelements,
 
         hex8_adjugate_and_det(lx, ly, lz, 0.5, 0.5, 0.5, jacobian_adjugate, &jacobian_determinant);
 
-        for (int k = 0; k < n_qp; k++) {
-            hex8_linear_elasticity_apply_adj(mu,
-                                             lambda,
-                                             jacobian_adjugate,
-                                             jacobian_determinant,
-                                             qx[k],
-                                             qy[k],
-                                             qz[k],
-                                             qw[k],
-                                             element_ux,
-                                             element_uy,
-                                             element_uz,
-                                             element_outx,
-                                             element_outy,
-                                             element_outz);
+        for (int kz = 0; kz < n_qp; kz++) {
+            for (int ky = 0; ky < n_qp; ky++) {
+                for (int kx = 0; kx < n_qp; kx++) {
+                    hex8_linear_elasticity_apply_adj(mu,
+                                                     lambda,
+                                                     jacobian_adjugate,
+                                                     jacobian_determinant,
+                                                     qx[kx],
+                                                     qx[ky],
+                                                     qx[kz],
+                                                     qw[kx] * qw[ky] * qw[kz],
+                                                     element_ux,
+                                                     element_uy,
+                                                     element_uz,
+                                                     element_outx,
+                                                     element_outy,
+                                                     element_outz);
+                }
+            }
         }
 
         for (int edof_i = 0; edof_i < 8; edof_i++) {

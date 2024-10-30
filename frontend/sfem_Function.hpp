@@ -142,6 +142,7 @@ namespace sfem {
         std::shared_ptr<sfem::Buffer<idx_t>> device_elements();
 
         Mesh &mesh();
+        std::shared_ptr<Mesh> mesh_ptr() const;
 
         bool has_semi_structured_mesh() const;
         SemiStructuredMesh &semi_structured_mesh();

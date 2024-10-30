@@ -230,51 +230,32 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 	sfem.write(out, "selector", selector)
 	return x
 
-def solve_obstacle(options):
-	path = options.input_mesh
+def solve_obstacle(problem):
+	path = problem.input_mesh
 
-	if not os.path.exists(options.output_dir):
-		os.mkdir(f'{options.output_dir}')
+	if not os.path.exists(problem.output_dir):
+		os.mkdir(f'{problem.output_dir}')
 
 	n = 4
 	h = 1./(n - 1)
 	wall = 0.6 # The obstacle wall is a x = 0.6
 
-	m = sfem.Mesh()		
-	m.read(path)
-	sdirichlet = np.unique(np.fromfile(f'{path}/sidesets_aos/sinlet.raw', dtype=idx_t))
-	sobstacle = np.fromfile(f'{path}/sidesets_aos/soutlet.raw', dtype=idx_t)
+	fun = problem.setup()
+	m = fun.space().mesh()
+	sobstacle = problem.sobstacle
+	contact_surf = problem.contact_surf
 
-	# rigid_body_modes(m)
-	# return
-
-	contact_surf = sfem.mesh_connectivity_from_file(f'{path}/surface/outlet')
-
+	fs = fun.space()
 	dim = m.spatial_dimension()
-	fs = sfem.FunctionSpace(m, dim)
-	fun = sfem.Function(fs)
-	
-	fun.set_output_dir(options.output_dir)
 	out = fun.output()
 
-	elasticity = sfem.create_op(fs, "LinearElasticity")
-	fun.add_operator(elasticity)
-
-	bc = sfem.DirichletConditions(fs)
-	sfem.add_condition(bc, sdirichlet, 0, 0.2);
-	sfem.add_condition(bc, sdirichlet, 1, 0.0);
-
-	if dim > 2:
-		sfem.add_condition(bc, sdirichlet, 2, 0.);
-
-	fun.add_dirichlet_conditions(bc)
 	x = np.zeros(fs.n_dofs(), dtype=real_t)
 
 	# --------------------------------------
 	# Obstacle
 	# --------------------------------------
 	obs = np.ones(fs.n_dofs(), dtype=real_t) * 10000
-	constrained_dofs = sobstacle[:] * dim
+	constrained_dofs = sobstacle[:] * fs.block_size()
 
 	sy = sfem.points(m, 1)
 	sz = sfem.points(m, 2)
@@ -289,8 +270,8 @@ def solve_obstacle(options):
 	sdf = (parabola - sfem.points(m, 0)).astype(real_t)
 	obs[constrained_dofs] = sdf[sobstacle]
 
-	for d in range(1, dim):
-		obs[d::dim] = 10000
+	for d in range(1, fs.block_size()):
+		obs[d::fs.block_size()] = 10000
 
 	# --------------------------------------
 	# Solve obstacle problem
@@ -340,10 +321,59 @@ def solve_obstacle(options):
 	sfem.write(out, "obs", obs)
 	sfem.write(out, "disp", x)
 
-class Opts:
+class Problem:
 	def __init__(self):
 		self.input_mesh = ''
 		self.output_dir = './output'
+
+	def setup(self):
+		path = self.input_mesh
+		
+		m = sfem.Mesh()		
+		m.read(path)
+
+		if self.op == "LinearElasticity":
+			print("Setting up LinearElasticity ...")
+			dim = m.spatial_dimension()
+			fs = sfem.FunctionSpace(m, dim)
+			fun = sfem.Function(fs)
+			elasticity = sfem.create_op(fs, "LinearElasticity")
+			fun.add_operator(elasticity)
+
+			bc = sfem.DirichletConditions(fs)
+
+			sdirichlet = np.unique(np.fromfile(f'{path}/sidesets_aos/sinlet.raw', dtype=idx_t))
+			sfem.add_condition(bc, sdirichlet, 0, 0.2);
+			sfem.add_condition(bc, sdirichlet, 1, 0.0);
+
+			if dim > 2:
+				sfem.add_condition(bc, sdirichlet, 2, 0.);
+
+			fun.add_dirichlet_conditions(bc)
+
+			self.sobstacle = np.fromfile(f'{path}/sidesets_aos/soutlet.raw', dtype=idx_t)
+			self.contact_surf = sfem.mesh_connectivity_from_file(f'{path}/surface/outlet')
+		else:
+			fs = sfem.FunctionSpace(m, 1)
+			laplacian = sfem.create_op(fs, "Laplacian")
+
+			fun = sfem.Function(fs)
+			fun.add_operator(laplacian)
+
+			bc = sfem.DirichletConditions(fs)
+
+			sdirichlet = np.unique(np.fromfile(f'{path}/sidesets_aos/sinlet.raw', dtype=idx_t))
+			sfem.add_condition(bc, sdirichlet, 0, 1);
+			fun.add_dirichlet_conditions(bc)
+
+			self.sobstacle = np.fromfile(f'{path}/sidesets_aos/soutlet.raw', dtype=idx_t)
+			self.contact_surf = sfem.mesh_connectivity_from_file(f'{path}/surface/outlet')
+
+
+		print(f"Mesh #nodes {m.n_nodes()}, #elements {m.n_elements()}")
+		print(f"FunctionSpace #dofs {fs.n_dofs()}")
+		fun.set_output_dir(self.output_dir)
+		return fun
 
 if __name__ == '__main__':
 	print(sys.argv)
@@ -353,14 +383,15 @@ if __name__ == '__main__':
 
 	sfem.init()
 
-	options = Opts()
-	options.input_mesh = sys.argv[1]
-	options.output = sys.argv[2]
+	problem = Problem()
+	problem.input_mesh = sys.argv[1]
+	problem.output = sys.argv[2]
+	problem.op = "LinearElasticity"
 	
 	try:
 	    opts, args = getopt.getopt(
-	        sys.argv[3:], "h",
-	        ["help"])
+	        sys.argv[3:], "hp:",
+	        ["help","problem="])
 
 	except getopt.GetoptError as err:
 	    print(err)
@@ -371,6 +402,9 @@ if __name__ == '__main__':
 	    if opt in ('-h', '--help'):
 	        print(usage)
 	        sys.exit()
+	    elif opt in ('-p', '--problem'):
+	     	problem.op  = arg
 
-	solve_obstacle(options)
+
+	solve_obstacle(problem)
 	sfem.finalize()
