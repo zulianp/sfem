@@ -20,7 +20,7 @@ source $SFEM_DIR/workflows/sfem_config.sh
 export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 export CUDA_LAUNCH_BLOCKING=0
-export SFEM_ELEMENT_REFINE_LEVEL=5
+export SFEM_ELEMENT_REFINE_LEVEL=6
 
 CASE=3
 
@@ -47,7 +47,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			export SFEM_REFINE=1
+			# export SFEM_REFINE=4
 			$SCRIPTPATH/../../data/vtk/joint-hex.sh $SFEM_ELEMENT_REFINE_LEVEL
 		fi
 		sinlet=$mesh/surface/sidesets_aos/base.raw
@@ -102,25 +102,25 @@ esac
 # Parametrize solver
 export SFEM_MG=1
 export SFEM_USE_CHEB=$SFEM_MG
-export SFEM_MAX_IT=30
+export SFEM_MAX_IT=60
 # export SFEM_MAX_IT=4000
 
-export SFEM_HEX8_ASSUME_AFFINE=1
+export SFEM_HEX8_ASSUME_AFFINE=0
 export SFEM_MATRIX_FREE=1
 export SFEM_COARSE_MATRIX_FREE=1
-export SFEM_COARSE_TOL=1e-14
+export SFEM_COARSE_TOL=1e-12
 
 export SFEM_USE_CRS_GRAPH_RESTRICT=0
 export SFEM_CRS_MEM_CONSERVATIVE=1
 
 export SFEM_CHEB_EIG_MAX_SCALE=1.0001
 export SFEM_CHEB_EIG_TOL=1e-3
-export SFEM_SMOOTHER_SWEEPS=40
+export SFEM_SMOOTHER_SWEEPS=10
 
 export SFEM_USE_PRECONDITIONER=0
 
 export SFEM_VERBOSITY_LEVEL=1
-export SFEM_HEX8_QUADRATURE_ORDER=8
+export SFEM_HEX8_QUADRATURE_ORDER=1
 # export SFEM_DEBUG=1
 
 $LAUNCH mgsolve $mesh output 
