@@ -1,4 +1,5 @@
 #include "tet10_resample_field.h"
+#include "tet10_resample_field_V2.h"
 
 #include "quadratures_rule.h"
 #include "tet10_weno.h"
@@ -625,18 +626,22 @@ SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D(const real_t x_,               
 // hex_aa_8_eval_weno4_3D
 ////////////////////////////////////////////////////////////////////////
 #define WENO_DIRECT
-SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D_Unit(  //
-        const real_t x_unit,                            //
-        const real_t y_unit,                            //
-        const real_t z_unit,                            //
-        const real_t ox_unit,                           // Coordinates of the origin of the grid in the unitary space
-        const real_t oy_unit,                           // for the structured grid
-        const real_t oz_unit,                           // X, Y and Z
-        const ptrdiff_t i,                              // it must be the absolute index
-        const ptrdiff_t j,                              // Used to get the data
-        const ptrdiff_t k,                              // From the data array
-        const ptrdiff_t* stride,                        //
-        const real_t* const SFEM_RESTRICT data) {       //
+real_t hex_aa_8_eval_weno4_3D_Unit(  //
+        const real_t x_unit,         //
+        const real_t y_unit,         //
+        const real_t z_unit,         //
+        const real_t ox_unit,        // Coordinates of the origin of the grid in the unitary space
+        const real_t oy_unit,        // for the structured grid
+        const real_t oz_unit,        // X, Y and Z
+        const ptrdiff_t i,           // it must be the absolute index
+        const ptrdiff_t j,           // Used to get the data
+        const ptrdiff_t k,           // From the data array
+        const ptrdiff_t* stride,     //
+        const real_t* const SFEM_RESTRICT data) {  //
+
+    // double ret = 1.0;
+    // // printf("ret = %f\n", ret);
+    // return ret;
 
     // collect the data for the WENO interpolation
 
@@ -1441,15 +1446,15 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
             const real_t y_orig = oy + ((real_t)j_orig) * dy;
             const real_t z_orig = oz + ((real_t)k_orig) * dz;
 
+            // set to zero the element field
+            memset(element_field, 0, 10 * sizeof(real_t));
+
             // Map element to the grid based on unitary spacing
             for (int v = 0; v < 10; ++v) {
                 x_unit[v] = (x[v] - x_orig) / dx;
                 y_unit[v] = (y[v] - y_orig) / dy;
                 z_unit[v] = (z[v] - z_orig) / dz;
             }
-
-            // set to zero the element field
-            memset(element_field, 0, 10 * sizeof(real_t));
 
             // SUBPARAMETRIC (for iso-parametric tassellation of tet10 might be necessary)
             for (int q = 0; q < TET4_NQP; q++) {  // loop over the quadrature points
@@ -1550,9 +1555,9 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
 #ifdef WENO_DIRECT
                     // Calculate the origin of the 4x4x4 cube in the global space
                     // And transform the coordinates to the the unitary space
-                    const real_t x_cube_origin = (ox + ((real_t)i_glob - 1) * dx) / dx;
-                    const real_t y_cube_origin = (oy + ((real_t)j_glob - 1) * dy) / dy;
-                    const real_t z_cube_origin = (oz + ((real_t)k_glob - 1) * dz) / dz;
+                    const real_t x_cube_origin = (ox + ((real_t)i_glob - 1.0) * dx) / dx;
+                    const real_t y_cube_origin = (oy + ((real_t)j_glob - 1.0) * dy) / dy;
+                    const real_t z_cube_origin = (oz + ((real_t)k_glob - 1.0) * dz) / dz;
 #else
                     const real_t x_cube_origin = 0.0;
                     const real_t y_cube_origin = 0.0;

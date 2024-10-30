@@ -22,7 +22,7 @@ vec_double Abs_V(const vec_double __X__) {
     return __R__;
 }
 
-static SFEM_INLINE vec_double Power1p5_V(const vec_double x) {
+vec_double Power1p5_V(const vec_double x) {
     vec_double sqrt_x;
     for (int ii = 0; ii < _VL_; ii++) {
         sqrt_x[ii] = sqrt(x[ii]);
@@ -31,7 +31,7 @@ static SFEM_INLINE vec_double Power1p5_V(const vec_double x) {
     return x * sqrt_x;
 }
 
-static SFEM_INLINE vec_double Power_m1p5_V(const vec_double x) {
+vec_double Power_m1p5_V(const vec_double x) {
     vec_double sqrt_x;
     for (int ii = 0; ii < _VL_; ii++) {
         sqrt_x[ii] = sqrt(x[ii]);
@@ -267,20 +267,37 @@ void hex_aa_8_collect_coeffs_O3_ptr_vec(const ptrdiff_t *const stride,  //
     const vec_indices first_indices = hex_aa_8_indices_O3_first_index_vec(stride, i, j, k);
 
     for (int ii = 0; ii < _VL_; ii++) {
-        (first_ptrs_array)[ii] = &data[first_indices[ii]];
+        first_ptrs_array[ii] = &data[first_indices[ii]];
     }
 }
 
-vec_double copy_f_vec(const real_t *f[], const ptrdiff_t stride_x, const ptrdiff_t stride_y,
-                      const ptrdiff_t stride_z, const int side_x, const int side_y,
-                      const int side_z) {
+/**
+ * @brief Copy a vector of pointers to a vector of pointers
+ * 
+ * @param f 
+ * @param stride_x 
+ * @param stride_y 
+ * @param stride_z 
+ * @param side_x 
+ * @param side_y 
+ * @param side_z 
+ * @return vec_double 
+ */
+vec_double copy_f_vec(const real_t *f[],         //
+                      const ptrdiff_t stride_x,  //
+                      const ptrdiff_t stride_y,  //
+                      const ptrdiff_t stride_z,  //
+                      const int side_x,          //
+                      const int side_y,          //
+                      const int side_z) {        //
     //
-
     vec_double res = CONST_VEC(0);
 
     for (int ii = 0; ii < _VL_; ii++) {
         res[ii] = f[ii][side_x * stride_x + side_y * stride_y + side_z * stride_z];
     }
+
+    return res;
 }
 
 /**

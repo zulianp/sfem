@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "tet10_resample_field.h"
 #include "tet10_weno_V.h"
 
 #if SFEM_VEC_SIZE == 8
@@ -530,14 +531,19 @@ int hex8_to_isoparametric_tet10_resample_field_local_V(
             const int q_next = q + _VL_;
             // printf("q + % d,  qq = %d\n", q, qq);
 
-            if (q_next <= TET4_NQP) {
+            if (q_next < TET4_NQP) {
                 ASSIGN_QUADRATURE_POINT_MACRO(q, tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V);
 
             } else {
                 ASSIGN_QUADRATURE_POINT_MACRO_TAIL(q, tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V);
             }
 
-            const vec_double measure = tet10_measure_V(x, y, z, tet4_qx_V, tet4_qy_V, tet4_qz_V);
+            const vec_double measure = tet10_measure_V(x,  //
+                                                       y,
+                                                       z,
+                                                       tet4_qx_V,
+                                                       tet4_qy_V,
+                                                       tet4_qz_V);
 
             const vec_double dV = measure * tet4_qw_V;
 
@@ -659,15 +665,7 @@ SFEM_INLINE static vec_double hex_aa_8_eval_weno4_3D_Unit_V(  //
     // // printf("delta = %f\n", h);
 
     const vec_double w4 = weno4_3D_HOne_V(stride, x, y, z, (const real_t**)first_ptrs_array);
-    // // (x,  //
-    // //                                 y,
-    // //                                 z,
-    // //                                 out,
-    // //                                 stride_x,
-    // //                                 stride_y,
-    // //                                 stride_z);
 
-    // vec_double w4 = CONST_VEC(1);
     return w4;
 }
 
@@ -781,7 +779,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
 
             const int q_next = q + (_VL_);
 
-            if (q_next <= TET4_NQP) {
+            if (q_next < TET4_NQP) {
                 ASSIGN_QUADRATURE_POINT_MACRO(q, tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V);
             } else {
                 ASSIGN_QUADRATURE_POINT_MACRO_TAIL(q, tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V);
@@ -848,19 +846,39 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
             const vec_double z_cube_origin_V = (oz + ((vec_double)k_glob_V - 1.0) * dz) / dz;
 
             //// Compute the WENO interpolation
-            vec_double eval_field = hex_aa_8_eval_weno4_3D_Unit_V(g_qx_unit_V,      //
-                                                                  g_qy_unit_V,      //
-                                                                  g_qz_unit_V,      //
-                                                                  x_cube_origin_V,  //
-                                                                  y_cube_origin_V,  //
-                                                                  z_cube_origin_V,  //  //
-                                                                  i_glob_V,         //
-                                                                  j_glob_V,         //
-                                                                  k_glob_V,         //
-                                                                  stride,           //
-                                                                  data);            //
+            vec_double eval_field;
+            eval_field = hex_aa_8_eval_weno4_3D_Unit_V(g_qx_unit_V,      //
+                                                       g_qy_unit_V,      //
+                                                       g_qz_unit_V,      //
+                                                       x_cube_origin_V,  //
+                                                       y_cube_origin_V,  //
+                                                       z_cube_origin_V,  //  //
+                                                       i_glob_V,         //
+                                                       j_glob_V,         //
+                                                       k_glob_V,         //
+                                                       stride,           //
+                                                       data);            //
 
-            // vec_double eval_field = CONST_VEC(1.0);
+            // for (int iii = 0; iii < _VL_; iii++) {
+            //     double eval_field_t = hex_aa_8_eval_weno4_3D_Unit(g_qx_unit_V[iii],      //
+            //                                                       g_qy_unit_V[iii],      //
+            //                                                       g_qz_unit_V[iii],      //
+            //                                                       x_cube_origin_V[iii],  //
+            //                                                       y_cube_origin_V[iii],  //
+            //                                                       z_cube_origin_V[iii],  //
+            //                                                       i_glob_V[iii],         //
+            //                                                       j_glob_V[iii],         //
+            //                                                       k_glob_V[iii],         //
+            //                                                       stride,                //
+            //                                                       data);                 //
+
+            //     // double eval_field_t = pinco_p();
+
+            //     // printf("eval_field = %f\n", eval_field_t);
+            //     eval_field[iii] = eval_field_t;
+            // }
+
+            // eval_field = (vec_double)CONST_VEC(1.0);
 
             // TODO: Check if this is correct
             // TODO: Check if this is correct
