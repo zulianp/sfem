@@ -6,7 +6,7 @@
 
 #include <stdio.h>
 
-#if 1
+#if 0
 
 static const int n_qp = 27;
 
@@ -53,21 +53,57 @@ __constant__ scalar_t qw[27];
 
 #else
 
-static const int n_qp = 6;
-static const scalar_t h_qw[6] = {0.16666666666666666666666666666667,
-                                 0.16666666666666666666666666666667,
-                                 0.16666666666666666666666666666667,
-                                 0.16666666666666666666666666666667,
-                                 0.16666666666666666666666666666667,
-                                 0.16666666666666666666666666666667};
+// static const int n_qp = 6;
+// static const scalar_t h_qw[6] = {0.16666666666666666666666666666667,
+//                                  0.16666666666666666666666666666667,
+//                                  0.16666666666666666666666666666667,
+//                                  0.16666666666666666666666666666667,
+//                                  0.16666666666666666666666666666667,
+//                                  0.16666666666666666666666666666667};
 
-static const scalar_t h_qx[6] = {0.0, 0.5, 0.5, 0.5, 0.5, 1.0};
-static const scalar_t h_qy[6] = {0.5, 0.0, 0.5, 0.5, 1.0, 0.5};
-static const scalar_t h_qz[6] = {0.5, 0.5, 0.0, 1.0, 0.5, 0.5};
-__constant__ scalar_t qx[6];
-__constant__ scalar_t qy[6];
-__constant__ scalar_t qz[6];
-__constant__ scalar_t qw[6];
+// static const scalar_t h_qx[6] = {0.0, 0.5, 0.5, 0.5, 0.5, 1.0};
+// static const scalar_t h_qy[6] = {0.5, 0.0, 0.5, 0.5, 1.0, 0.5};
+// static const scalar_t h_qz[6] = {0.5, 0.5, 0.0, 1.0, 0.5, 0.5};
+// __constant__ scalar_t qx[6];
+// __constant__ scalar_t qy[6];
+// __constant__ scalar_t qz[6];
+// __constant__ scalar_t qw[6];
+
+static const int n_qp = 8;
+
+static const scalar_t h_qw[8] = {1. / 8, 1. / 8, 1. / 8, 1. / 8, 1. / 8, 1. / 8};
+
+static const scalar_t h_qx[8] = {0.2113248654,
+                                 0.7886751346,
+                                 0.2113248654,
+                                 0.7886751346,
+                                 0.2113248654,
+                                 0.7886751346,
+                                 0.2113248654,
+                                 0.7886751346};
+
+static const scalar_t h_qy[8] = {0.2113248654,
+                                 0.2113248654,
+                                 0.7886751346,
+                                 0.7886751346,
+                                 0.2113248654,
+                                 0.2113248654,
+                                 0.7886751346,
+                                 0.7886751346};
+
+static const scalar_t h_qz[8] = {0.2113248654,
+                                 0.2113248654,
+                                 0.2113248654,
+                                 0.2113248654,
+                                 0.7886751346,
+                                 0.7886751346,
+                                 0.7886751346,
+                                 0.7886751346};
+
+__constant__ scalar_t qx[8];
+__constant__ scalar_t qy[8];
+__constant__ scalar_t qz[8];
+__constant__ scalar_t qw[8];
 
 #endif
 
@@ -99,6 +135,15 @@ __global__ void cu_affine_hex8_linear_elasticity_apply_kernel(
         T *const SFEM_RESTRICT g_outx,
         T *const SFEM_RESTRICT g_outy,
         T *const SFEM_RESTRICT g_outz) {
+    
+    static const int n_qp = 2;
+    static const T qx[2] = {0.2113248654, 0.7886751346};
+    static const T qw[2] = {1. / 2, 1. / 2};
+
+    // static const int n_qp = 3;
+    // static const T qx[3] = {0.1127016654, 1. / 2, 0.8872983346};
+    // static const T qw[3] = {0.2777777778, 0.4444444444, 0.2777777778};
+
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
          e += blockDim.x * gridDim.x) {
         idx_t ev[8];
@@ -145,21 +190,25 @@ __global__ void cu_affine_hex8_linear_elasticity_apply_kernel(
             assert(uz[v] == uz[v]);
         }
 
-        for (int k = 0; k < n_qp; k++) {
-            cu_hex8_linear_elasticity_apply_adj<T, T>(mu,
-                                                      lambda,
-                                                      adjugate,
-                                                      jacobian_determinant,
-                                                      qx[k],
-                                                      qy[k],
-                                                      qz[k],
-                                                      qw[k],
-                                                      ux,
-                                                      uy,
-                                                      uz,
-                                                      outx,
-                                                      outy,
-                                                      outz);
+        for (int kz = 0; kz < n_qp; kz++) {
+            for (int ky = 0; ky < n_qp; ky++) {
+                for (int kx = 0; kx < n_qp; kx++) {
+                    cu_hex8_linear_elasticity_apply_adj<T, T>(mu,
+                                                              lambda,
+                                                              adjugate,
+                                                              jacobian_determinant,
+                                                              qx[kx],
+                                                              qx[ky],
+                                                              qx[kz],
+                                                              qw[kx] * qw[ky] * qw[kz],
+                                                              ux,
+                                                              uy,
+                                                              uz,
+                                                              outx,
+                                                              outy,
+                                                              outz);
+                }
+            }
         }
 
         for (int v = 0; v < 8; v++) {

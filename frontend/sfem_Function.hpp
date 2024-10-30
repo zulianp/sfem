@@ -142,6 +142,7 @@ namespace sfem {
         std::shared_ptr<sfem::Buffer<idx_t>> device_elements();
 
         Mesh &mesh();
+        std::shared_ptr<Mesh> mesh_ptr() const;
 
         bool has_semi_structured_mesh() const;
         SemiStructuredMesh &semi_structured_mesh();
@@ -202,6 +203,9 @@ namespace sfem {
             assert(false);
             return nullptr;
         }
+
+        virtual void set_option(const std::string &/*name*/, bool /*val*/) {}
+        virtual std::shared_ptr<Op> clone() const {assert(false); return nullptr; }
     };
 
     class NeumannConditions final : public Op {
@@ -382,6 +386,8 @@ namespace sfem {
 
         std::shared_ptr<Output> output();
         ExecutionSpace execution_space() const;
+
+        std::shared_ptr<Operator<real_t>> linear_op_variant(const std::vector<std::pair<std::string, int>> &opts);
 
     private:
         class Impl;

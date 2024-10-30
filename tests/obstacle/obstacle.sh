@@ -21,44 +21,54 @@ rm -rf output
 mkdir -p output
 mesh=mesh
 
-export OMP_NUM_THREADS=4 
+export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 
 if [[ -d "$mesh" ]] 
 then
 	echo "Reusing existing $mesh database"
 else
-	create_cylinder.sh 4
+	create_cylinder.sh 1
 fi
+
+PROBLEM="Laplacian"
+# PROBLEM="LinearElasticity"
 
 echo  "---------------------------------"
 echo "Solving ostacle problem"
 echo  "---------------------------------"
-time ./obstacle.py $mesh output
+time ./obstacle.py $mesh output --problem=$PROBLEM
 echo  "---------------------------------"
 
-files=`ls output/*.raw`
-mkdir -p output/soa
+if [[ "$PROBLEM" == "LinearElasticity" ]]
+then
+	files=`ls output/*.raw`
+	mkdir -p output/soa
 
-for f in ${files[@]}
-do
-	name=`basename $f`
-	var=`echo $name | tr '.' ' ' | awk '{print $1}'`
-	ts=`echo $name  | tr '.' ' ' | awk '{print $2}'`
+	for f in ${files[@]}
+	do
+		name=`basename $f`
+		var=`echo $name | tr '.' ' ' | awk '{print $1}'`
+		ts=`echo $name  | tr '.' ' ' | awk '{print $2}'`
 
-	dims=3
-	aos_to_soa $f $SFEM_REAL_SIZE $dims output/soa/$name
-	mv output/soa/$name".0.raw" output/soa/"$var".0."$ts".raw
-	mv output/soa/$name".1.raw" output/soa/"$var".1."$ts".raw
-	mv output/soa/$name".2.raw" output/soa/"$var".2."$ts".raw
-done
+		dims=3
+		aos_to_soa $f $SFEM_REAL_SIZE $dims output/soa/$name
+		mv output/soa/$name".0.raw" output/soa/"$var".0."$ts".raw
+		mv output/soa/$name".1.raw" output/soa/"$var".1."$ts".raw
+		mv output/soa/$name".2.raw" output/soa/"$var".2."$ts".raw
+	done
 
-set -x
+	set -x
 
-raw_to_db.py $mesh out.vtk  \
- --point_data="output/soa/*.raw" --point_data_type="$SFEM_REAL_T"
+	raw_to_db.py $mesh out.vtk  \
+	 --point_data="output/soa/*.raw" --point_data_type="$SFEM_REAL_T"
 
-raw_to_db.py $mesh/surface/outlet obstacle.vtk  \
-	--coords=$mesh \
-  	--point_data="output/soa/obs.0.raw.raw" \
-  	--point_data_type="$SFEM_REAL_T"
+	raw_to_db.py $mesh/surface/outlet obstacle.vtk  \
+		--coords=$mesh \
+	  	--point_data="output/soa/obs.0.raw.raw" \
+	  	--point_data_type="$SFEM_REAL_T"
+
+else
+	raw_to_db.py $mesh out.vtk  \
+	 --point_data="output/*.raw" --point_data_type="$SFEM_REAL_T"
+fi

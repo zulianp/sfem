@@ -95,7 +95,7 @@ class LaplaceOp:
 	def det_fff(self):
 		return [determinant(self.FFF_symbolic)]
 
-	def hessian_aux(self):
+	def sym_matrix(self):
 		fe = self.fe
 		ref_grad = self.ref_grad
 		FFF_symbolic = self.FFF_symbolic
@@ -123,7 +123,7 @@ class LaplaceOp:
 		return H
 
 	def hessian(self):
-		H = self.hessian_aux()
+		H = self.sym_matrix()
 		rows, cols = H.shape
 		expr = []
 		for i in range(0, rows):
@@ -134,7 +134,7 @@ class LaplaceOp:
 
 	# For block solver (TODO) Box stencil for structured grid
 	# def stencil(self):
-	# 	H = self.hessian_aux()
+	# 	H = self.sym_matrix()
 	# 	rows, cols = H.shape
 
 	# 	assert rows == 8 # Only works for HEX8
