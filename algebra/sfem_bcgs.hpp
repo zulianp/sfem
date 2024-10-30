@@ -37,6 +37,8 @@ namespace sfem {
 
         ptrdiff_t n_dofs{-1};
 
+        bool verbose{true};
+
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
         ExecutionSpace execution_space() const override { return execution_space_; }
@@ -62,6 +64,10 @@ namespace sfem {
         // Solver parameters
         T tol{1e-10};
         int max_it{10000};
+
+        void set_atol(const T val) {
+            tol = val;
+        }
 
         void default_init() {
             allocate = [](const ptrdiff_t n) -> T* { return (T*)calloc(n, sizeof(T)); };
@@ -123,7 +129,7 @@ namespace sfem {
         }
 
         void monitor(const int iter, const T residual) {
-            if (iter == max_it || iter % 100 == 0 || residual < tol) {
+            if (verbose && (iter == max_it || iter % 100 == 0 || residual < tol)) {
                 std::cout << iter << ": " << residual << "\n";
             }
         }
@@ -331,7 +337,7 @@ namespace sfem {
     };
 
     template <typename T>
-    std::shared_ptr<MatrixFreeLinearSolver<T>> h_bcgs() {
+    std::shared_ptr<BiCGStab<T>> h_bcgs() {
         auto cg = std::make_shared<BiCGStab<T>>();
         cg->default_init();
         return cg;

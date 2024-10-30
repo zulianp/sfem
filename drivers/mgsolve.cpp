@@ -195,7 +195,8 @@ int main(int argc, char *argv[]) {
     // auto linear_op_affine = sfem::make_linear_op_variant(f, {{"ASSUME_AFFINE", 1}});
 
     if (SFEM_MATRIX_FREE) {
-        linear_op = sfem::make_linear_op(f);
+        // linear_op = sfem::make_linear_op(f);
+        linear_op = sfem::make_linear_op_variant(f, {{"ASSUME_AFFINE", 1}});
 
         if (SFEM_USE_CHEB) {
             auto cheb = sfem::create_cheb3<real_t>(linear_op, es);
@@ -310,7 +311,7 @@ int main(int argc, char *argv[]) {
             solver_coarse->verbose = SFEM_VERBOSITY_LEVEL >= 2;
             solver_coarse->set_max_it(40000);
             solver_coarse->set_atol(SFEM_COARSE_TOL);
-            solver_coarse->set_rtol(1e-12);
+            solver_coarse->set_rtol(1e-8);
 
             if (SFEM_USE_PRECONDITIONER) {
                 f_coarse->hessian_diag(nullptr, diag_coarse->data());
@@ -373,7 +374,7 @@ int main(int argc, char *argv[]) {
         solve_tick = MPI_Wtime();
 
         if (SFEM_USE_MG_PRECONDITIONER) {
-            // Poor perf (is there a bug?)
+            auto linear_op = sfem::make_linear_op(f);
             auto ksp = sfem::create_cg<real_t>(linear_op, es);
             ksp->check_each = 1;
             ksp->verbose = true;
@@ -398,6 +399,7 @@ int main(int argc, char *argv[]) {
 #else  // CG solver
 
         auto solver = sfem::create_cg<real_t>(linear_op, es);
+        // auto solver = sfem::create_bcgs<real_t>(linear_op, es);
 
         if (smoother) {
             auto preconditioner = smoother;
