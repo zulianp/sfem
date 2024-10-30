@@ -1083,8 +1083,7 @@ namespace sfem {
     }
 
     std::shared_ptr<Operator<real_t>> Function::linear_op_variant(
-            const  std::vector<std::pair<std::string, int>> &options) {
-        
+            const std::vector<std::pair<std::string, int>> &options) {
         std::vector<std::shared_ptr<Op>> cloned_ops;
 
         for (auto &op : impl_->ops) {
@@ -1363,6 +1362,19 @@ namespace sfem {
 
         real_t mu{1}, lambda{1};
         bool use_affine_approximation{false};
+        long calls{0};
+        double total_time{0};
+
+        ~SemiStructuredLinearElasticity() {
+            if (calls) {
+                printf("SemiStructuredLinearElasticity::apply(%s) called %ld times. Total: %g [s], "
+                       "Avg: %g [s]\n",
+                       use_affine_approximation ? "affine" : "isoparametric",
+                       calls,
+                       total_time,
+                       total_time / calls);
+            }
+        }
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             assert(space->has_semi_structured_mesh());
@@ -1451,40 +1463,49 @@ namespace sfem {
 
             auto &ssm = space->semi_structured_mesh();
 
+            calls++;
+
+            double tick = MPI_Wtime();
+            int err;
             if (use_affine_approximation) {
-                return proteus_affine_hex8_linear_elasticity_apply(ssm.level(),
-                                                                   ssm.n_elements(),
-                                                                   ssm.interior_start(),
-                                                                   ssm.element_data(),
-                                                                   ssm.point_data(),
-                                                                   mu,
-                                                                   lambda,
-                                                                   3,
-                                                                   &h[0],
-                                                                   &h[1],
-                                                                   &h[2],
-                                                                   3,
-                                                                   &out[0],
-                                                                   &out[1],
-                                                                   &out[2]);
+                err = proteus_affine_hex8_linear_elasticity_apply(ssm.level(),
+                                                                  ssm.n_elements(),
+                                                                  ssm.interior_start(),
+                                                                  ssm.element_data(),
+                                                                  ssm.point_data(),
+                                                                  mu,
+                                                                  lambda,
+                                                                  3,
+                                                                  &h[0],
+                                                                  &h[1],
+                                                                  &h[2],
+                                                                  3,
+                                                                  &out[0],
+                                                                  &out[1],
+                                                                  &out[2]);
 
             } else {
-                return proteus_hex8_linear_elasticity_apply(ssm.level(),
-                                                            ssm.n_elements(),
-                                                            ssm.interior_start(),
-                                                            ssm.element_data(),
-                                                            ssm.point_data(),
-                                                            mu,
-                                                            lambda,
-                                                            3,
-                                                            &h[0],
-                                                            &h[1],
-                                                            &h[2],
-                                                            3,
-                                                            &out[0],
-                                                            &out[1],
-                                                            &out[2]);
+                err = proteus_hex8_linear_elasticity_apply(ssm.level(),
+                                                           ssm.n_elements(),
+                                                           ssm.interior_start(),
+                                                           ssm.element_data(),
+                                                           ssm.point_data(),
+                                                           mu,
+                                                           lambda,
+                                                           3,
+                                                           &h[0],
+                                                           &h[1],
+                                                           &h[2],
+                                                           3,
+                                                           &out[0],
+                                                           &out[1],
+                                                           &out[2]);
             }
+
+            double tock = MPI_Wtime();
+            total_time += (tock - tick);
+
+            return err;
         }
 
         int value(const real_t *x, real_t *const out) override {
