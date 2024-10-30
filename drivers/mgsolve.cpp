@@ -192,6 +192,8 @@ int main(int argc, char *argv[]) {
     std::shared_ptr<sfem::Operator<real_t>> linear_op;
     std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> smoother;
 
+    // auto linear_op_affine = sfem::make_linear_op_variant(f, {{"ASSUME_AFFINE", 1}});
+
     if (SFEM_MATRIX_FREE) {
         linear_op = sfem::make_linear_op(f);
 
@@ -199,10 +201,7 @@ int main(int argc, char *argv[]) {
             auto cheb = sfem::create_cheb3<real_t>(linear_op, es);
 
             // Power-method
-            auto r = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-            residual(*linear_op, rhs->data(), x->data(), r->data());
             cheb->eigen_solver_tol = SFEM_CHEB_EIG_TOL;
-            // cheb->init(r->data());
             cheb->init_with_ones();
             // cheb->init_with_random();
 
