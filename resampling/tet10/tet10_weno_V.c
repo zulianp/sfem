@@ -6,6 +6,7 @@
  * @param x
  * @return vec_double
  */
+SFEM_INLINE static
 vec_double Power2_V(const vec_double x) { return x * x; }
 
 /**
@@ -14,6 +15,7 @@ vec_double Power2_V(const vec_double x) { return x * x; }
  * @param __X__
  * @return vec_double
  */
+SFEM_INLINE static
 vec_double Abs_V(const vec_double __X__) {
     vec_double __R__;
     for (int ii = 0; ii < _VL_; ii++) {
@@ -22,6 +24,7 @@ vec_double Abs_V(const vec_double __X__) {
     return __R__;
 }
 
+SFEM_INLINE static
 vec_double Power1p5_V(const vec_double x) {
     vec_double sqrt_x;
     for (int ii = 0; ii < _VL_; ii++) {
@@ -31,6 +34,7 @@ vec_double Power1p5_V(const vec_double x) {
     return x * sqrt_x;
 }
 
+SFEM_INLINE static
 vec_double Power_m1p5_V(const vec_double x) {
     vec_double sqrt_x;
     for (int ii = 0; ii < _VL_; ii++) {
@@ -47,6 +51,7 @@ vec_double Power_m1p5_V(const vec_double x) {
  * @param lagrange_poly_0
  * @param lagrange_poly_1
  */
+SFEM_INLINE static
 void LagrangePolyArrayHOne_V(const vec_double x,             //
                              vec_double *lagrange_poly_0,    //
                              vec_double *lagrange_poly_1) {  //
@@ -78,6 +83,7 @@ void LagrangePolyArrayHOne_V(const vec_double x,             //
  * @param non_linear_weights
  * @param eps
  */
+SFEM_INLINE static
 void getNonLinearWeightsHOne_V(const vec_double x,                        //
                                const vec_double y0, const vec_double y1,  //
                                const vec_double y2, const vec_double y3,  //
@@ -122,6 +128,7 @@ void getNonLinearWeightsHOne_V(const vec_double x,                        //
  * @param y3
  * @return vec_double
  */
+SFEM_INLINE static
 vec_double weno4_HOne_V(const vec_double x,                          //
                         const vec_double y0, const vec_double y1,    //
                         const vec_double y2, const vec_double y3) {  //
@@ -171,6 +178,7 @@ vec_double weno4_HOne_V(const vec_double x,                          //
  * @param y33
  * @return vec_double
  */
+SFEM_INLINE static
 vec_double weno4_2D_HOne_V(const vec_double x, const vec_double y,  //
                                                                     //
                            const vec_double y00, const vec_double y10, const vec_double y20,
@@ -195,6 +203,7 @@ vec_double weno4_2D_HOne_V(const vec_double x, const vec_double y,  //
     return yw;
 }
 
+SFEM_INLINE static
 vec_indices copy_strides(const vec_indices stride_x,  //
                          const vec_indices stride_y,  //
                          const vec_indices stride_z,  //
@@ -208,6 +217,7 @@ vec_indices copy_strides(const vec_indices stride_x,  //
     return ret;
 }
 
+SFEM_INLINE static
 vec_double copy_f(const double *f,             //
                   const vec_indices stride_x,  //
                   const vec_indices stride_y,  //
@@ -233,6 +243,7 @@ vec_double copy_f(const double *f,             //
  * @param k
  * @return SFEM_INLINE
  */
+SFEM_INLINE static
 vec_indices hex_aa_8_indices_O3_first_index_vec(const ptrdiff_t *const stride,             //
                                                 const vec_indices i, const vec_indices j,  //
                                                 const vec_indices k) {                     //
@@ -283,6 +294,7 @@ void hex_aa_8_collect_coeffs_O3_ptr_vec(const ptrdiff_t *const stride,  //
  * @param side_z 
  * @return vec_double 
  */
+SFEM_INLINE static
 vec_double copy_f_vec(const real_t *f[],         //
                       const ptrdiff_t stride_x,  //
                       const ptrdiff_t stride_y,  //
