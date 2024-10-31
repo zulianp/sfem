@@ -1760,7 +1760,7 @@ int hex8_to_tet10_resample_field_local(
 #endif
 
     if (1 | SFEM_ENABLE_ISOPARAMETRIC) {
-#if CUBE1 == 1  // EXPERIMENTAL WENO
+#if CUBE1 == 1 && SFEM_VEC_SIZE == 1 // CUBE1
         return hex8_to_isoparametric_tet10_resample_field_local_cube1(
                 nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
 #else

@@ -46,7 +46,7 @@ then
 else
 	# create_sphere.sh 5
 	export SFEM_ORDER_WITH_COORDINATE=2
-	create_sphere.sh 3 # Visibily see the curvy surface <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+	create_sphere.sh 5 # Visibily see the curvy surface <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 	sfc $mesh $mesh_sorted
 	
 	# Project p2 nodes to sphere isosurfaces (to check if nonlinear map are creating errors)
@@ -87,7 +87,7 @@ n_procs=18
 # n_procs=1
 
 PERF="yes"
-PERF="no"
+# PERF="no"
 
 # if [[ -z "$LAUNCH" ]]
 # then
