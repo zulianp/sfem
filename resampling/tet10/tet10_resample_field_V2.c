@@ -954,17 +954,20 @@ int hex8_to_tet10_resample_field_local_V2(
 
     if (SFEM_ENABLE_ISOPARAMETRIC) {
         int a = 0;
-        // a = hex8_to_isoparametric_tet10_resample_field_local_V(nelements,  //
-        //                                                        nnodes,
-        //                                                        elems,
-        //                                                        xyz,
-        //                                                        n,
-        //                                                        stride,
-        //                                                        origin,
-        //                                                        delta,
-        //                                                        data,
-        //                                                        weighted_field);
 
+#if SFEM_TET10_WENO == OFF
+        a = hex8_to_isoparametric_tet10_resample_field_local_V(nelements,  //
+                                                               nnodes,
+                                                               elems,
+                                                               xyz,
+                                                               n,
+                                                               stride,
+                                                               origin,
+                                                               delta,
+                                                               data,
+                                                               weighted_field);
+
+#else
         a = hex8_to_isoparametric_tet10_resample_field_local_cube1_V(nelements,  //
                                                                      nnodes,
                                                                      elems,
@@ -975,7 +978,7 @@ int hex8_to_tet10_resample_field_local_V2(
                                                                      delta,
                                                                      data,
                                                                      weighted_field);
-
+#endif
         return a;
     } else {
         // return hex8_to_subparametric_tet10_resample_field_local(nelements,  //
