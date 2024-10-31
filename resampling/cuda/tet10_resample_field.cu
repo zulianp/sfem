@@ -947,6 +947,48 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(
 
 }  // end kernel hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel
 
+/**
+ * @brief Compute the indices of the field for third order interpolation
+ *
+ * @param stride
+ * @param i
+ * @param j
+ * @param k
+ * @return __device__
+ */
+__device__ ptrdiff_t hex_aa_8_indices_O3_first_index(const ptrdiff_t stride0,               //
+                                                     const ptrdiff_t stride1,               //
+                                                     const ptrdiff_t stride2,               //
+                                                     const ptrdiff_t i, const ptrdiff_t j,  //
+                                                     const ptrdiff_t k) {                   //
+    //
+    return (i - 1) * stride0 + (j - 1) * stride1 + (k - 1) * stride2;
+}
+
+/**
+ * @brief Compute the indices of the field for third order interpolation
+ *
+ * @param stride
+ * @param i
+ * @param j
+ * @param k
+ * @param data
+ * @return __device__*
+ */
+__device__ real_t* hex_aa_8_collect_coeffs_O3_ptr_cu(const ptrdiff_t const stride0,  //
+                                                     const ptrdiff_t const stride1,  //
+                                                     const ptrdiff_t const stride2,  //
+                                                     const ptrdiff_t i,              //
+                                                     const ptrdiff_t j,              //
+                                                     const ptrdiff_t k,              //
+                                                     const real_t* const data) {     //
+
+    const ptrdiff_t first_index =
+            hex_aa_8_indices_O3_first_index(stride0, stride1, stride2, i, j, k);
+
+    return (real_t*)&data[first_index];
+}
+
 ////////////////////////////////////////////////////////////////////////
 // hex_aa_8_eval_weno4_3D
 ////////////////////////////////////////////////////////////////////////
@@ -965,10 +1007,29 @@ __device__ real_t hex_aa_8_eval_weno4_3D_Unit_cuda(  //
         const ptrdiff_t stride2,                     //
         const real_t* const SFEM_RESTRICT data) {    //
 
+#define WENO_DIRECT_CUDA 1
+
+#if WENO_DIRECT_CUDA == 1
+#pragma message "WENO_DIRECT_CUDA is enabled"
+
+    const int stride_x = stride0;
+    const int stride_y = stride1;
+    const int stride_z = stride2;
+
+    real_t* out = NULL;
+    out = hex_aa_8_collect_coeffs_O3_ptr_cu(stride0, stride1, stride2, i, j, k, data);
+
+#else
     // collect the data for the WENO interpolation
+
+    const int stride_x = 1;
+    const int stride_y = 4;
+    const int stride_z = 16;
+
     real_t out[64];
     hex_aa_8_collect_coeffs_O3_cuda(stride0, stride1, stride2, i, j, k, data, out);
 
+#endif
     ////// Compute the local indices
     // ptrdiff_t i_local, j_local, k_local;
 
@@ -990,9 +1051,9 @@ __device__ real_t hex_aa_8_eval_weno4_3D_Unit_cuda(  //
                                          y,
                                          z,
                                          out,
-                                         1,
-                                         4,
-                                         16);
+                                         stride_x,
+                                         stride_y,
+                                         stride_z);
 
     return w4;
 }
@@ -1168,15 +1229,8 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  
         // g_qx_glob, g_qy_glob, g_qz_glob are the coordinates of the quadrature point in
         // the global space
         real_t g_qx_glob, g_qy_glob, g_qz_glob;
-        tet10_transform_cu(x,
-                           y,
-                           z,
-                           tet4_qx_v,
-                           tet4_qy_v,
-                           tet4_qz_v,
-                           &g_qx_glob,
-                           &g_qy_glob,
-                           &g_qz_glob);
+        tet10_transform_cu(
+                x, y, z, tet4_qx_v, tet4_qy_v, tet4_qz_v, &g_qx_glob, &g_qy_glob, &g_qz_glob);
 
         tet10_dual_basis_hrt_cu(tet4_qx_v, tet4_qy_v, tet4_qz_v, tet10_f);
 
@@ -1231,15 +1285,27 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  
         //     nNodesData);
         // }
 
+#if WENO_DIRECT_CUDA == 1
+        // Calculate the origin of the 4x4x4 cube in the global space
+        // And transform the coordinates to the the unitary space
+        const real_t x_cube_origin = (ox + ((real_t)i_glob - 1.0) * dx) / dx;
+        const real_t y_cube_origin = (oy + ((real_t)j_glob - 1.0) * dy) / dy;
+        const real_t z_cube_origin = (oz + ((real_t)k_glob - 1.0) * dz) / dz;
+#else
+        const real_t x_cube_origin = 0.0;
+        const real_t y_cube_origin = 0.0;
+        const real_t z_cube_origin = 0.0;
+#endif
+
         //
         // printf("nSizes_global = %ld\n", nSizes_global);
         // printf("origin = (%f, %f, %f)\n", ox, oy, oz);
         real_t eval_field = hex_aa_8_eval_weno4_3D_Unit_cuda(g_qx_unit,
                                                              g_qy_unit,
                                                              g_qz_unit,  //
-                                                             0.0,
-                                                             0.0,
-                                                             0.0,  //
+                                                             x_cube_origin,
+                                                             y_cube_origin,
+                                                             z_cube_origin,  //
                                                              i_glob,
                                                              j_glob,
                                                              k_glob,
@@ -1249,7 +1315,7 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  
                                                              data);  //
 
         // eval_field = 1.0;  ///////////////////// DEBUG
-#else   // WENO_CUBE == 0
+#else  // WENO_CUBE == 0
 
         // Get the reminder [0, 1]
         real_t l_x = (grid_x - i_glob);
@@ -1476,7 +1542,6 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
                cudaGetErrorString(errwf2));
     }
     weighted_field_device = NULL;
-
 
     RETURN_FROM_FUNCTION(0);
     // return 0;
