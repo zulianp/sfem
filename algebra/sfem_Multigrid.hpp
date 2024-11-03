@@ -21,12 +21,7 @@ namespace sfem {
     template <typename T>
     class Multigrid final : public Operator<T> {
     public:
-        std::function<T*(const std::size_t)> allocate;
-        std::function<void(const std::size_t, T* const x)> zeros;
-        std::function<void(void*)> destroy;
-        // std::function<void(const ptrdiff_t, const T* const, T* const)> copy;
-        std::function<void(const ptrdiff_t, const T, const T* const, const T, T* const)> axpby;
-        std::function<T(const std::size_t, const T* const)> norm2;
+        BLAS_Tpl<T> blas;
         bool verbose{true};
         bool debug{false};
 
@@ -96,33 +91,7 @@ namespace sfem {
         }
 
         void default_init() {
-            allocate = [](const std::ptrdiff_t n) -> T* { return (T*)calloc(n, sizeof(T)); };
-
-            destroy = [](void* a) { free(a); };
-
-            axpby = [](const ptrdiff_t n,
-                       const T alpha,
-                       const T* const x,
-                       const T beta,
-                       T* const y) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    y[i] = alpha * x[i] + beta * y[i];
-                }
-            };
-
-            zeros = [](const std::size_t n, T* const x) { memset(x, 0, n * sizeof(T)); };
-            norm2 = [](const std::size_t n, const T* const x) -> T {
-                T ret = 0;
-
-#pragma omp parallel for reduction(+ : ret)
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    ret += x[i] * x[i];
-                }
-
-                return sqrt(ret);
-            };
-
+            OpenMP_BLAS<T>::build_blas(blas);
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
@@ -175,15 +144,15 @@ namespace sfem {
 
                 size_t n = smoother_[l]->rows();
                 if (l != finest_level() || !wrap_input_) {
-                    auto x = this->allocate(n);
-                    memory_[l]->solution = Buffer<T>::own(n, x, this->destroy);
+                    auto x = this->blas.allocate(n);
+                    memory_[l]->solution = Buffer<T>::own(n, x, this->blas.destroy);
 
-                    auto r = this->allocate(n);
-                    memory_[l]->rhs = Buffer<T>::own(n, r, this->destroy);
+                    auto r = this->blas.allocate(n);
+                    memory_[l]->rhs = Buffer<T>::own(n, r, this->blas.destroy);
                 }
 
-                auto w = this->allocate(n);
-                memory_[l]->work = Buffer<T>::own(n, w, this->destroy);
+                auto w = this->blas.allocate(n);
+                memory_[l]->work = Buffer<T>::own(n, w, this->blas.destroy);
             }
 
             return 0;
@@ -194,7 +163,7 @@ namespace sfem {
             auto smoother = smoother_[level];
 
             if (coarsest_level() == level) {
-                this->zeros(mem->solution->size(), mem->solution->data());
+                this->blas.zeros(mem->solution->size(), mem->solution->data());
                 if (!smoother->apply(mem->rhs->data(), mem->solution->data())) {
                     return CYCLE_CONTINUE;
                 } else {
@@ -212,12 +181,12 @@ namespace sfem {
 
                 {
                     // Compute residual
-                    this->zeros(mem->size(), mem->work->data());
+                    this->blas.zeros(mem->size(), mem->work->data());
                     op->apply(mem->solution->data(), mem->work->data());
-                    this->axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
+                    this->blas.axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
 
                     if (finest_level() == level) {
-                        T norm_residual = this->norm2(mem->work->size(), mem->work->data());
+                        T norm_residual = this->blas.norm2(mem->work->size(), mem->work->data());
 
                         if (iterations_ == 0) {
                             norm_residual_0 = norm_residual;
@@ -250,7 +219,7 @@ namespace sfem {
 
                 {
                     // Restriction
-                    this->zeros(mem_coarse->rhs->size(), mem_coarse->rhs->data());
+                    this->blas.zeros(mem_coarse->rhs->size(), mem_coarse->rhs->data());
                     restriction->apply(mem->work->data(), mem_coarse->rhs->data());
                 }
 
@@ -260,29 +229,28 @@ namespace sfem {
                 {
                     if (debug) {
                         printf("|| c_H || = %g\n",
-                               (double)this->norm2(mem_coarse->solution->size(),
+                               (double)this->blas.norm2(mem_coarse->solution->size(),
                                                    mem_coarse->solution->data()));
                     }
 
                     // Prolongation
-                    this->zeros(mem->work->size(), mem->work->data());
+                    this->blas.zeros(mem->work->size(), mem->work->data());
                     prolongation->apply(mem_coarse->solution->data(), mem->work->data());
 
                     if (debug) {
                         printf("|| c_h || = %g\n",
-                               (double)this->norm2(mem->work->size(), mem->work->data()));
+                               (double)this->blas.norm2(mem->work->size(), mem->work->data()));
                     }
 
                     // Apply coarse space correction
-                    this->axpby(mem->size(), 1, mem->work->data(), 1, mem->solution->data());
+                    this->blas.axpby(mem->size(), 1, mem->work->data(), 1, mem->solution->data());
                 }
 
-
-                if(debug) {
-                    this->zeros(mem->size(), mem->work->data());
+                if (debug) {
+                    this->blas.zeros(mem->size(), mem->work->data());
                     op->apply(mem->solution->data(), mem->work->data());
-                    this->axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
-                    printf("|| r_h || = %g\n", this->norm2(mem->work->size(), mem->work->data()));
+                    this->blas.axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
+                    printf("|| r_h || = %g\n", this->blas.norm2(mem->work->size(), mem->work->data()));
                 }
 
                 smoother->apply(mem->rhs->data(), mem->solution->data());
