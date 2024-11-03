@@ -15,25 +15,14 @@ namespace sfem {
     template <typename T>
     std::shared_ptr<ConjugateGradient<T>> d_cg() {
         auto cg = std::make_shared<ConjugateGradient<T>>();
-        cg->allocate = d_allocate;
-        cg->destroy = d_destroy;
-        cg->copy = d_copy;
-        cg->dot = d_dot;
-        cg->axpby = d_axpby;
-        cg->zeros = [](const std::size_t n, T* const x) { d_memset(x, 0, n * sizeof(T)); };
+        CUDA_BLAS<T>::build_blas(cg->blas);
         return cg;
     }
 
     template <typename T>
     std::shared_ptr<BiCGStab<T>> d_bcgs() {
         auto cg = std::make_shared<BiCGStab<T>>();
-        cg->allocate = d_allocate;
-        cg->destroy = d_destroy;
-        cg->copy = d_copy;
-        cg->dot = d_dot;
-        cg->axpby = d_axpby;
-        cg->zaxpby = d_zaxpby;
-        cg->zeros = [](const std::size_t n, T* const x) { d_memset(x, 0, n * sizeof(T)); };
+        CUDA_BLAS<T>::build_blas(cg->blas);
         return cg;
     }
 

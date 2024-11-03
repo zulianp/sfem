@@ -516,6 +516,7 @@ namespace sfem {
         tpl.axpby = &BLASImpl<T>::axpby;
         tpl.axpy = &BLASImpl<T>::axpy;
         tpl.scal = &BLASImpl<T>::scal;
+        tpl.zaxpby = &BLASImpl<T>::zaxpby;
     }
 
     template struct CUDA_BLAS<double>;
