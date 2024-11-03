@@ -119,6 +119,8 @@ SFEM_INLINE static const char* type_to_string(enum ElemType type) {
             return "TET4";
         case TRI6:
             return "TRI6";
+        case TRISHELL6:
+            return "TRISHELL6";
         case TRI10:
             return "TRI10";
         case MACRO_TRI3:
