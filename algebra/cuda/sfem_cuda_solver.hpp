@@ -40,34 +40,10 @@ namespace sfem {
     template <typename T>
     std::shared_ptr<Multigrid<T>> d_mg() {
         auto mg = std::make_shared<Multigrid<T>>();
-        mg->allocate = d_allocate;
-        mg->destroy = d_destroy;
-        mg->axpby = d_axpby;
-        mg->zeros = [](const std::size_t n, T* const x) { d_memset(x, 0, n * sizeof(T)); };
-        mg->norm2 = d_nrm2;
+        CUDA_BLAS<T>::build_blas(ret->blas);
         return mg;
     }
-
-    // template <typename T>
-    // std::shared_ptr<MatrixFreeLinearSolver<T>> d_solver(const std::string& name) {
-    //     using SP_t = std::shared_ptr<MatrixFreeLinearSolver<T>>;
-    //     static bool initialized = false;
-    //     static std::map<std::string, SP_t> factory;
-
-    //     if (!initialized) {
-    //         factory["BiCGStab"] = &d_bcgs<T>;
-    //         factory["ConjugateGradient"] = &d_cg<T>;
-    //         initialized = true;
-    //     }
-
-    //     auto it = factory.find(name);
-    //     if (it == factory.end()) {
-    //         assert(0);
-    //         return d_cg<T>();
-    //     }
-
-    //     return it->second();
-    // }
+    
 }  // namespace sfem
 
 #endif
