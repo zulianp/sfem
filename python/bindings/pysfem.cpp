@@ -170,7 +170,8 @@ NB_MODULE(pysfem, m) {
             .def("derefine", &FunctionSpace::derefine)
             .def("mesh", &FunctionSpace::mesh_ptr)
             .def("n_dofs", &FunctionSpace::n_dofs)
-            .def("block_size", &FunctionSpace::block_size);
+            .def("block_size", &FunctionSpace::block_size)
+            .def("promote_to_semi_structured", &FunctionSpace::promote_to_semi_structured);
 
     m.def("create_derefined_crs_graph",
           [](const std::shared_ptr<FunctionSpace> &space) -> std::shared_ptr<CRSGraph> {
