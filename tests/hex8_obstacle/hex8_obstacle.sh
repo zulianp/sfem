@@ -21,10 +21,10 @@ export OMP_PROC_BIND=true
 export CUDA_LAUNCH_BLOCKING=0
 
 export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
-export SFEM_ELEMENT_REFINE_LEVEL=8
+export SFEM_ELEMENT_REFINE_LEVEL=2
 export SFEM_MAX_IT=10000
 
-export CASE=3
+export CASE=1
 case $CASE in
 	1 | 2)
 		mesh=mesh
@@ -32,7 +32,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			create_cyclic_ss_mesh.sh 10 $SFEM_ELEMENT_REFINE_LEVEL
+			create_cyclic_ss_mesh.sh 4 $SFEM_ELEMENT_REFINE_LEVEL
 		fi
 
 		sinlet=$mesh/surface/sidesets_aos/inlet.raw
@@ -112,7 +112,8 @@ case $CASE in
 esac
 
 echo "Running: obstacle $mesh output"
-$LAUNCH obstacle $mesh output | tee obs.log.txt
+$LAUNCH obstacle $mesh output 
+# | tee obs.log.txt
 
 if [[ $SFEM_USE_ELASTICITY -eq 1 ]]
 then
