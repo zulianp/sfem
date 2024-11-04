@@ -1334,7 +1334,8 @@ int hex8_to_isoparametric_tet10_resample_field_local(
         }      // end element loop
     }          // end parallel region
 
-    return 0;
+    RETURN_FROM_FUNCTION(0);
+    // return 0;
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -1674,6 +1675,7 @@ int isoparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, con
                                                   idx_t** const SFEM_RESTRICT elems,
                                                   geom_t** const SFEM_RESTRICT xyz,
                                                   real_t* const diag) {
+    PRINT_CURRENT_FUNCTION;
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[10];  // Element indices
@@ -1712,8 +1714,9 @@ int isoparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, con
         }
     }
 
-    return 0;
-}
+    RETURN_FROM_FUNCTION(0);
+    // return 0;
+}  // end isoparametric_tet10_assemble_dual_mass_vector
 
 int tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, const ptrdiff_t nnodes,
                                     idx_t** const SFEM_RESTRICT elems,
@@ -1760,7 +1763,7 @@ int hex8_to_tet10_resample_field_local(
 #endif
 
     if (1 | SFEM_ENABLE_ISOPARAMETRIC) {
-#if CUBE1 == 1 && SFEM_VEC_SIZE == 1 // CUBE1
+#if CUBE1 == 1 && SFEM_VEC_SIZE == 1  // CUBE1
         return hex8_to_isoparametric_tet10_resample_field_local_cube1(
                 nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
 #else

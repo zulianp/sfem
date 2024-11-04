@@ -87,7 +87,7 @@ n_procs=18
 # n_procs=1
 
 PERF="yes"
-# PERF="no"
+PERF="no"
 
 # if [[ -z "$LAUNCH" ]]
 # then
