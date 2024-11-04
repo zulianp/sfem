@@ -11,12 +11,12 @@
 int mesh_block_create(mesh_block_t *block) {
     block->element_type = INVALID;
     block->nelements = 0;
-    block->nnodes = 0;
-    block->nghostnodes = 0;
+    block->nowned = 0;
+    block->nowned_ghosted = 0;
+    block->nshared = 0;
     block->elements = NULL;
     block->element_mapping = NULL;
     block->node_mapping = NULL;
-    block->ghosts = NULL;
     return SFEM_SUCCESS;
 }
 int mesh_block_destroy(mesh_block_t *block) {
@@ -29,8 +29,9 @@ int mesh_block_destroy(mesh_block_t *block) {
 
     block->element_type = INVALID;
     block->nelements = 0;
-    block->nnodes = 0;
-    block->nghostnodes = 0;
+    block->nowned = 0;
+    block->nowned_ghosted = 0;
+    block->nshared = 0;
 
     for (int d = 0; d < nxe; d++) {
         free(block->elements[d]);
@@ -44,9 +45,6 @@ int mesh_block_destroy(mesh_block_t *block) {
 
     free(block->node_mapping);
     block->node_mapping = NULL;
-
-    free(block->ghosts);
-    block->ghosts = NULL;
     return SFEM_SUCCESS;
 }
 
@@ -78,6 +76,7 @@ int create_mesh_blocks(const mesh_t *mesh,
 
     {
         size_t *count = calloc(n_blocks, sizeof(size_t));
+
         for (ptrdiff_t i = 0; i < mesh->nelements; i++) {
             const int b = block_assignment[i];
             blocks[b].element_mapping[count[b]++] = i;
@@ -137,12 +136,16 @@ int create_mesh_blocks(const mesh_t *mesh,
             }
 
             const ptrdiff_t ntotal = nowned + nowned_ghosted + nshared;
+            blocks[b].nowned = nowned;
+            blocks[b].nowned_ghosted = nowned_ghosted;
+            blocks[b].nshared = nshared;
 
             ptrdiff_t offset_owned = 0;
             ptrdiff_t offset_owned_ghosted = nowned;
             ptrdiff_t offset_shared = nowned + nowned_ghosted;
 
             blocks[b].node_mapping = malloc(ntotal * sizeof(idx_t));
+            blocks[b].owner = malloc(nshared * sizeof(int));
 
             for (int d = 0; d < nxe; d++) {
                 for (ptrdiff_t i = 0; i < blocks[b].nelements; i++) {
@@ -157,6 +160,7 @@ int create_mesh_blocks(const mesh_t *mesh,
                             }
                         } else {
                             global_to_local[node] = offset_shared++;
+
                         }
 
                         blocks[b].node_mapping[global_to_local[node]] = node;
@@ -165,6 +169,22 @@ int create_mesh_blocks(const mesh_t *mesh,
                     blocks[b].elements[d][i] = global_to_local[node];
                 }
             }
+
+            for(ptrdiff_t i = 0; i < nshared; i++) {
+            	const ptrdiff_t node = blocks[b].node_mapping[nowned + nowned_ghosted + i];
+            	blocks[b].owner[i] = owner[node];
+            }
+
+// Clean-up mapping
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < ntotal; i++) {
+                global_to_local[blocks[b].node_mapping[i]] = -1;
+            }
+        }
+
+        // Construct ghost gather/scatter index
+        for (int b = 0; b < n_blocks; b++) {
+
         }
 
         free(owner);

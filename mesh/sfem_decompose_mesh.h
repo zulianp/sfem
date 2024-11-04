@@ -14,17 +14,17 @@ extern "C" {
 #endif
 
 typedef struct {
-    int element_type;
-    ptrdiff_t nelements;
-    ptrdiff_t nnodes;
-    ptrdiff_t nghostnodes;
-
+    enum ElemType element_type;
+    ptrdiff_t nelements;    
+    ptrdiff_t nowned;
+    ptrdiff_t nowned_ghosted;
+    ptrdiff_t nshared;
 
     idx_t **elements;
     element_idx_t *element_mapping;
     idx_t *node_mapping;
 
-    idx_t *ghosts;
+    int *owner;
 } mesh_block_t;
 
 int mesh_block_create(mesh_block_t *block);
