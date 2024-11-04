@@ -9,25 +9,25 @@
 
 #include "tet10_vec.h"
 
-#if SFEM_VEC_SIZE == 8
-#define AVX512
-#elif SFEM_VEC_SIZE == 4
-#define AVX2
-#endif
+// #if SFEM_VEC_SIZE == 8
+// #define AVX512
+// #elif SFEM_VEC_SIZE == 4
+// #define AVX2
+// #endif
 
-#ifdef AVX512
-#define _VL_ 8
-#define ZEROS_VEC \
-    { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
-#define CONST_VEC(__X__) \
-    { __X__, __X__, __X__, __X__, __X__, __X__, __X__, __X__ }
-#elif defined(AVX2)
-#define _VL_ 4
-#define ZEROS_VEC \
-    { 0.0, 0.0, 0.0, 0.0 }
-#define CONST_VEC(__X__) \
-    { __X__, __X__, __X__, __X__ }
-#endif
+// #ifdef AVX512
+// #define _VL_ 8
+// #define ZEROS_VEC \
+//     { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
+// #define CONST_VEC(__X__) \
+//     { __X__, __X__, __X__, __X__, __X__, __X__, __X__, __X__ }
+// #elif defined(AVX2)
+// #define _VL_ 4
+// #define ZEROS_VEC \
+//     { 0.0, 0.0, 0.0, 0.0 }
+// #define CONST_VEC(__X__) \
+//     { __X__, __X__, __X__, __X__ }
+// #endif
 
 // #define UNROLL_ZERO _Pragma("GCC unroll(0)")
 #define UNROLL_ZERO _Pragma("unroll(1)")
