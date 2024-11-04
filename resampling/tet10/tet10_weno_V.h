@@ -7,6 +7,8 @@
 #include "sfem_base.h"
 #include "sfem_defs.h"
 
+#include "tet10_vec.h"
+
 #if SFEM_VEC_SIZE == 8
 #define AVX512
 #elif SFEM_VEC_SIZE == 4
@@ -30,11 +32,11 @@
 // #define UNROLL_ZERO _Pragma("GCC unroll(0)")
 #define UNROLL_ZERO _Pragma("unroll(1)")
 
-typedef double vec_double __attribute__((vector_size(_VL_ * sizeof(double)),  //
-                                         aligned(sizeof(double))));
+// typedef double vec_double __attribute__((vector_size(_VL_ * sizeof(double)),  //
+//                                          aligned(sizeof(double))));
 
-typedef ptrdiff_t vec_indices __attribute__((vector_size(_VL_ * sizeof(ptrdiff_t)),  //
-                                             aligned(sizeof(ptrdiff_t))));
+// typedef ptrdiff_t vec_indices __attribute__((vector_size(_VL_ * sizeof(ptrdiff_t)),  //
+//                                              aligned(sizeof(ptrdiff_t))));
 
 #define List2_V(ARRAY, AA, BB) \
     {                          \
@@ -90,8 +92,8 @@ void hex_aa_8_collect_coeffs_O3_ptr_vec(const ptrdiff_t *const stride,  //
 /// @param z
 /// @param f
 /// @return
-vec_double weno4_3D_HOne_V(const ptrdiff_t *const stride,                               //
-                           const vec_double x, const vec_double y, const vec_double z,  //
-                           const real_t *f[]);                                          //
+vec_real weno4_3D_HOne_V(const ptrdiff_t *const stride,                         //
+                         const vec_real x, const vec_real y, const vec_real z,  //
+                         const real_t *f[]);                                    //
 
 #endif  // __TET10_WENO_V_H__
