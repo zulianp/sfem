@@ -3,6 +3,7 @@
 
 #include <mpi.h>
 #include <algorithm>
+#include <vector>
 #include <cstddef>
 #include <functional>
 #include <memory>

@@ -12,6 +12,8 @@
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_crs_SpMV.hpp"
 
+#include "sfem_openmp_blas.hpp"
+
 namespace sfem {
     template <typename T>
     class Smoother final : public MatrixFreeLinearSolver<T> {
@@ -20,21 +22,7 @@ namespace sfem {
         std::function<void(const T* const, T* const)> apply_op;
         std::function<void(const T* const, T* const)> left_preconditioner_op;
         std::function<void(const T* const, T* const)> right_preconditioner_op;
-
-        // Mem management
-        std::function<T*(const std::size_t)> allocate;
-        std::function<void(T*)> destroy;
-
-        std::function<void(const std::size_t, T* const x)> zeros;
-
-        std::function<void(const ptrdiff_t, const T* const, T* const)> copy;
-
-        // blas
-        std::function<T(const ptrdiff_t, const T* const, const T* const)> dot;
-        std::function<void(const ptrdiff_t, const T, const T* const, const T, T* const)> axpby;
-        std::function<
-                void(const ptrdiff_t, const T, const T* const, const T, const T* const, T* const)>
-                zaxpby;
+        BLAS_Tpl<T> blas;
 
         // x[i] += r[i] / d[i];
         std::function<void(const std::size_t, const T* const, T* const)> smooth_;
@@ -71,64 +59,15 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return execution_space_; }
 
         void default_init() {
-            allocate = [](const ptrdiff_t n) -> T* { return (T*)calloc(n, sizeof(T)); };
-
-            destroy = [](T* a) { free(a); };
-
-            copy = [](const ptrdiff_t n, const T* const src, T* const dest) {
-                std::memcpy(dest, src, n * sizeof(T));
-            };
-
-            dot = [](const ptrdiff_t n, const T* const l, const T* const r) -> T {
-                T ret = 0;
-
-#pragma omp parallel for reduction(+ : ret)
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    ret += l[i] * r[i];
-                }
-
-                return ret;
-            };
-
-            axpby = [](const ptrdiff_t n,
-                       const T alpha,
-                       const T* const x,
-                       const T beta,
-                       T* const y) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    y[i] = alpha * x[i] + beta * y[i];
-                }
-            };
-
-            zaxpby = [](const ptrdiff_t n,
-                        const T alpha,
-                        const T* const x,
-                        const T beta,
-                        const T* const y,
-                        T* const z) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    z[i] = alpha * x[i] + beta * y[i];
-                }
-            };
-
-            zeros = [](const std::size_t n, T* const x) { memset(x, 0, n * sizeof(T)); };
-
+            OpenMP_BLAS<T>::build_blas(blas);
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         bool good() const {
-            assert(allocate);
-            assert(destroy);
-            assert(copy);
-            assert(dot);
-            assert(axpby);
-            assert(zaxpby);
             assert(apply_op);
             assert(smooth_);
 
-            return allocate && destroy && copy && dot && axpby && zaxpby && apply_op && smooth_;
+            return blas.good() && apply_op && smooth_;
         }
 
         void monitor(const int iter, const T residual) {
@@ -142,16 +81,16 @@ namespace sfem {
                 return -1;
             }
 
-            T* r = allocate(n);
+            T* r = blas.allocate(n);
 
             // Residual
             apply_op(x, r);
-            axpby(n, 1, b, -1, r);
+            blas.axpby(n, 1, b, -1, r);
 
-            const T norm_r0 = dot(n, r, r);
+            const T norm_r0 = blas.dot(n, r, r);
             T norm_r = norm_r0;
             if (sqrt(norm_r) < tol) {
-                destroy(r);
+                blas.destroy(r);
                 return 0;
             }
 
@@ -160,11 +99,11 @@ namespace sfem {
             for (; k < max_it; k++) {
                 smooth_(n, b, x);
 
-                if (k % check_each == 0) {  
-                    zeros(n, r);
+                if (k % check_each == 0) {
+                    blas.zeros(n, r);
                     apply_op(x, r);
-                    axpby(n, 1, b, -1, r);
-                    const T norm_r = sqrt(dot(n, r, r));
+                    blas.axpby(n, 1, b, -1, r);
+                    const T norm_r = sqrt(blas.dot(n, r, r));
                     monitor(k, norm_r);
 
                     if (norm_r < tol || norm_r != norm_r) {
@@ -175,7 +114,7 @@ namespace sfem {
             }
 
             if (verbose) {
-                const T norm_r = sqrt(dot(n, r, r));
+                const T norm_r = sqrt(blas.dot(n, r, r));
                 std::printf("Finished at iteration %d with |r| = %g, reduction %g\n",
                             k,
                             (double)norm_r,
@@ -183,7 +122,7 @@ namespace sfem {
             }
 
             // clean-up
-            destroy(r);
+            blas.destroy(r);
             return info;
         }
 
@@ -191,12 +130,9 @@ namespace sfem {
         void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
     };
 
-    template <typename R,  typename C, typename T>
-    std::shared_ptr<Smoother<T>> h_gauss_seidel(
-        const std::shared_ptr<CRSSpMV<R, C, T>> &crs,
-        const T*d
-        )
-    {
+    template <typename R, typename C, typename T>
+    std::shared_ptr<Smoother<T>> h_gauss_seidel(const std::shared_ptr<CRSSpMV<R, C, T>>& crs,
+                                                const T* d) {
         auto gs = std::make_shared<Smoother<T>>();
         gs->set_op(crs);
 
