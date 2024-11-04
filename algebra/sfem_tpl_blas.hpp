@@ -1,9 +1,9 @@
 #ifndef SFEM_TPL_BLAS_HPP
 #define SFEM_TPL_BLAS_HPP
 
-#include <functional>
-#include <cstdint>
 #include <cassert>
+#include <cstdint>
+#include <functional>
 
 namespace sfem {
 
@@ -14,7 +14,7 @@ namespace sfem {
 
         std::function<void(const std::size_t, T* const x)> zeros;
         std::function<void(const std::size_t, const T value, T* const x)> values;
-        
+
         std::function<void(const ptrdiff_t, const T* const, T* const)> copy;
 
         std::function<T(const ptrdiff_t, const T* const, const T* const)> dot;
@@ -22,6 +22,9 @@ namespace sfem {
         std::function<void(const ptrdiff_t, const T, const T* const, const T, T* const)> axpby;
         std::function<void(const std::ptrdiff_t, const T, T* const)> scal;
         std::function<T(const ptrdiff_t, const T* const)> norm2;
+        std::function<
+                void(const ptrdiff_t, const T, const T* const, const T, const T* const, T* const)>
+                zaxpby;
 
         bool good() const {
             assert(allocate);
@@ -35,7 +38,8 @@ namespace sfem {
             assert(axpby);
             assert(scal);
 
-            return allocate && destroy && copy && zeros && values && dot && norm2 && axpy && axpby && scal;
+            return allocate && destroy && copy && zeros && values && dot && norm2 && axpy &&
+                   axpby && zaxpby && scal;
         }
     };
 

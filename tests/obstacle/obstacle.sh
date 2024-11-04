@@ -29,7 +29,10 @@ then
 	echo "Reusing existing $mesh database"
 else
 	create_cylinder.sh 1
+	create_cylinder_p2.sh 1
 fi
+
+# export SFEM_USE_MACRO=1
 
 PROBLEM="Laplacian"
 # PROBLEM="LinearElasticity"

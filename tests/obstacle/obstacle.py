@@ -48,12 +48,6 @@ def rigid_body_modes(m):
 	e5[range(0, n*3, 3)] = -y
 	e5[range(1, n*3, 3)] = x
 
-	# print(e0[0:6])
-	# print(e1[0:6])
-	# print(e2[0:6])
-	# print(e3[0:6])
-	# print(e4[0:6])
-	# print(e5[0:6])
 	return e0, e1, e2, e3, e4, e5 
 	
 def create_mg():
@@ -72,7 +66,7 @@ def assemble_scipy_matrix(fun, x):
 	rowptr = sfem.numpy_view(crs_graph.rowptr())
 	colidx = sfem.numpy_view(crs_graph.colidx())
 	values = np.zeros(colidx.shape, dtype=real_t)
-	sfem.hessian_crs(fun,  sfem.view(x), sfem.view(rowptr),  sfem.view(colidx),  sfem.view(values))
+	sfem.hessian_crs(fun, sfem.view(x), sfem.view(rowptr), sfem.view(colidx),  sfem.view(values))
 	M = scipy.sparse.csr_matrix((values, colidx, rowptr), shape=(fs.n_dofs(), fs.n_dofs())) 
 	return M
 
@@ -85,7 +79,6 @@ def assemble_crs_spmv(fun, x):
 	x_buff = sfem.view(x)
 	sfem.hessian_crs(fun, x_buff, rowptr, colidx, values)
 	return sfem.crs_spmv(rowptr, colidx, values)
-
 
 def assemble_crs_and_write(fun, x, path):
 	fs = fun.space()
@@ -104,7 +97,6 @@ def assemble_crs_and_write(fun, x, path):
 	sfem.numpy_view(rowptr).tofile(f'{path}/rowptr.raw')
 	sfem.numpy_view(colidx).tofile(f'{path}/colidx.raw')
 	sfem.numpy_view(values).tofile(f'{path}/values.raw')
-
 
 def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 	fs = fun.space()
@@ -138,8 +130,6 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 	else:
 		# Matrix-based
 		lop = assemble_crs_spmv(fun, x)
-
-	assemble_crs_and_write(fun, x, "crs")
 
 	if use_cheb:
 		solver = sfem.Chebyshev3()
@@ -369,7 +359,6 @@ class Problem:
 			self.sobstacle = np.fromfile(f'{path}/sidesets_aos/soutlet.raw', dtype=idx_t)
 			self.contact_surf = sfem.mesh_connectivity_from_file(f'{path}/surface/outlet')
 
-
 		print(f"Mesh #nodes {m.n_nodes()}, #elements {m.n_elements()}")
 		print(f"FunctionSpace #dofs {fs.n_dofs()}")
 		fun.set_output_dir(self.output_dir)
@@ -404,7 +393,6 @@ if __name__ == '__main__':
 	        sys.exit()
 	    elif opt in ('-p', '--problem'):
 	     	problem.op  = arg
-
 
 	solve_obstacle(problem)
 	sfem.finalize()

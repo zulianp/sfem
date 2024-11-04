@@ -47,6 +47,18 @@ namespace sfem {
             }
         }
 
+        static void zaxpby(const ptrdiff_t n,
+                           const T alpha,
+                           const T* const x,
+                           const T beta,
+                           const T* const y,
+                           T* const z) {
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n; i++) {
+                z[i] = alpha * x[i] + beta * y[i];
+            }
+        }
+
         static void zeros(const std::size_t size, T* const x) {
 #ifdef _OPENMP
 #pragma omp parallel
@@ -104,6 +116,7 @@ namespace sfem {
             };
 
             tpl.axpby = axpby;
+            tpl.zaxpby = zaxpby;
             tpl.zeros = zeros;
             tpl.values = values;
             tpl.scal = scal;

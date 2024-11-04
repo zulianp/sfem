@@ -192,10 +192,7 @@ int main(int argc, char *argv[]) {
     std::shared_ptr<sfem::Operator<real_t>> linear_op;
     std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> smoother;
 
-    // auto linear_op_affine = sfem::make_linear_op_variant(f, {{"ASSUME_AFFINE", 1}});
-
     if (SFEM_MATRIX_FREE) {
-        // linear_op = sfem::make_linear_op(f);
         linear_op = sfem::make_linear_op_variant(f, {{"ASSUME_AFFINE", 1}});
 
         if (SFEM_USE_CHEB) {
