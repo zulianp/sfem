@@ -4,29 +4,26 @@
  * @brief Compute the square of a vector
  *
  * @param x
- * @return vec_double
+ * @return vec_real
  */
-SFEM_INLINE static
-vec_double Power2_V(const vec_double x) { return x * x; }
+SFEM_INLINE static vec_real Power2_V(const vec_real x) { return x * x; }
 
 /**
  * @brief Compute the absolute value of a vector
  *
  * @param __X__
- * @return vec_double
+ * @return vec_real
  */
-SFEM_INLINE static
-vec_double Abs_V(const vec_double __X__) {
-    vec_double __R__;
+SFEM_INLINE static vec_real Abs_V(const vec_real __X__) {
+    vec_real __R__;
     for (int ii = 0; ii < _VL_; ii++) {
         __R__[ii] = fabs(__X__[ii]);
     }
     return __R__;
 }
 
-SFEM_INLINE static
-vec_double Power1p5_V(const vec_double x) {
-    vec_double sqrt_x;
+SFEM_INLINE static vec_real Power1p5_V(const vec_real x) {
+    vec_real sqrt_x;
     for (int ii = 0; ii < _VL_; ii++) {
         sqrt_x[ii] = sqrt(x[ii]);
     }
@@ -34,9 +31,8 @@ vec_double Power1p5_V(const vec_double x) {
     return x * sqrt_x;
 }
 
-SFEM_INLINE static
-vec_double Power_m1p5_V(const vec_double x) {
-    vec_double sqrt_x;
+SFEM_INLINE static vec_real Power_m1p5_V(const vec_real x) {
+    vec_real sqrt_x;
     for (int ii = 0; ii < _VL_; ii++) {
         sqrt_x[ii] = sqrt(x[ii]);
     }
@@ -51,14 +47,13 @@ vec_double Power_m1p5_V(const vec_double x) {
  * @param lagrange_poly_0
  * @param lagrange_poly_1
  */
-SFEM_INLINE static
-void LagrangePolyArrayHOne_V(const vec_double x,             //
-                             vec_double *lagrange_poly_0,    //
-                             vec_double *lagrange_poly_1) {  //
+SFEM_INLINE static void LagrangePolyArrayHOne_V(const vec_real x,             //
+                                                vec_real *lagrange_poly_0,    //
+                                                vec_real *lagrange_poly_1) {  //
 
-    // const vec_double h = 1.0;
+    // const vec_real h = 1.0;
 
-    const vec_double xx = Power2_V(x);
+    const vec_real xx = Power2_V(x);
 
     List3_V(lagrange_poly_0,  //
             (2.0 - 3.0 * x + xx) / 2.,
@@ -83,18 +78,17 @@ void LagrangePolyArrayHOne_V(const vec_double x,             //
  * @param non_linear_weights
  * @param eps
  */
-SFEM_INLINE static
-void getNonLinearWeightsHOne_V(const vec_double x,                        //
-                               const vec_double y0, const vec_double y1,  //
-                               const vec_double y2, const vec_double y3,  //
-                               vec_double *non_linear_weights,            //
-                               const vec_double eps) {                    //
+SFEM_INLINE static void getNonLinearWeightsHOne_V(const vec_real x,                      //
+                                                  const vec_real y0, const vec_real y1,  //
+                                                  const vec_real y2, const vec_real y3,  //
+                                                  vec_real *non_linear_weights,          //
+                                                  const vec_real eps) {                  //
 
-    vec_double alpha[2];
-    // const vec_double h = 1.0;
+    vec_real alpha[2];
+    // const vec_real h = 1.0;
 
-    const vec_double a = Abs_V(3. * y0 - 7. * y1 + 5. * y2 - 1. * y3);
-    const vec_double b = Power2_V(-3. * (a) + Abs_V(y0 - 12. * y1 + 3. * y2 + 2. * y3));
+    const vec_real a = Abs_V(3. * y0 - 7. * y1 + 5. * y2 - 1. * y3);
+    const vec_real b = Power2_V(-3. * (a) + Abs_V(y0 - 12. * y1 + 3. * y2 + 2. * y3));
 
     List2_V(alpha,
             //
@@ -110,7 +104,7 @@ void getNonLinearWeightsHOne_V(const vec_double x,                        //
             //
     );
 
-    vec_double den = alpha[0] + alpha[1];
+    vec_real den = alpha[0] + alpha[1];
 
     // printf("alpha[0]=%f, alpha[1]=%f, den=%f\n", alpha[0], alpha[1], den);
 
@@ -126,29 +120,28 @@ void getNonLinearWeightsHOne_V(const vec_double x,                        //
  * @param y1
  * @param y2
  * @param y3
- * @return vec_double
+ * @return vec_real
  */
-SFEM_INLINE static
-vec_double weno4_HOne_V(const vec_double x,                          //
-                        const vec_double y0, const vec_double y1,    //
-                        const vec_double y2, const vec_double y3) {  //
+SFEM_INLINE static vec_real weno4_HOne_V(const vec_real x,                        //
+                                         const vec_real y0, const vec_real y1,    //
+                                         const vec_real y2, const vec_real y3) {  //
 
-    const vec_double eps = CONST_VEC(1e-6);
+    const vec_real eps = CONST_VEC(1e-6);
 
-    vec_double lagrange_poly_0[3];
-    vec_double lagrange_poly_1[3];
-    vec_double non_linear_weights[2];
+    vec_real lagrange_poly_0[3];
+    vec_real lagrange_poly_1[3];
+    vec_real non_linear_weights[2];
 
     LagrangePolyArrayHOne_V(x, lagrange_poly_0, lagrange_poly_1);
 
     getNonLinearWeightsHOne_V(x, y0, y1, y2, y3, non_linear_weights, eps);
     // getNonLinearWeightsConstH(x, 1.0, y0, y1, y2, y3, non_linear_weights, eps);
 
-    const vec_double weno4_a =
+    const vec_real weno4_a =
             (lagrange_poly_0[0] * y0 + lagrange_poly_0[1] * y1 + lagrange_poly_0[2] * y2) *
             non_linear_weights[0];
 
-    const vec_double weno4_b =
+    const vec_real weno4_b =
             (lagrange_poly_1[0] * y1 + lagrange_poly_1[1] * y2 + lagrange_poly_1[2] * y3) *
             non_linear_weights[1];
 
@@ -176,38 +169,37 @@ vec_double weno4_HOne_V(const vec_double x,                          //
  * @param y13
  * @param y23
  * @param y33
- * @return vec_double
+ * @return vec_real
  */
-SFEM_INLINE static
-vec_double weno4_2D_HOne_V(const vec_double x, const vec_double y,  //
-                                                                    //
-                           const vec_double y00, const vec_double y10, const vec_double y20,
-                           const vec_double y30,  //
-                           //
-                           const vec_double y01, const vec_double y11, const vec_double y21,
-                           const vec_double y31,  //
-                           //
-                           const vec_double y02, const vec_double y12, const vec_double y22,
-                           const vec_double y32,  //
-                           //
-                           const vec_double y03, const vec_double y13, const vec_double y23,
-                           const vec_double y33) {  //
+SFEM_INLINE static vec_real weno4_2D_HOne_V(
+        const vec_real x, const vec_real y,  //
+                                             //
+        const vec_real y00, const vec_real y10, const vec_real y20,
+        const vec_real y30,  //
+        //
+        const vec_real y01, const vec_real y11, const vec_real y21,
+        const vec_real y31,  //
+        //
+        const vec_real y02, const vec_real y12, const vec_real y22,
+        const vec_real y32,  //
+        //
+        const vec_real y03, const vec_real y13, const vec_real y23,
+        const vec_real y33) {  //
 
-    vec_double yw0 = weno4_HOne_V(x, y00, y10, y20, y30);
-    vec_double yw1 = weno4_HOne_V(x, y01, y11, y21, y31);
-    vec_double yw2 = weno4_HOne_V(x, y02, y12, y22, y32);
-    vec_double yw3 = weno4_HOne_V(x, y03, y13, y23, y33);
+    vec_real yw0 = weno4_HOne_V(x, y00, y10, y20, y30);
+    vec_real yw1 = weno4_HOne_V(x, y01, y11, y21, y31);
+    vec_real yw2 = weno4_HOne_V(x, y02, y12, y22, y32);
+    vec_real yw3 = weno4_HOne_V(x, y03, y13, y23, y33);
 
-    vec_double yw = weno4_HOne_V(y, yw0, yw1, yw2, yw3);
+    vec_real yw = weno4_HOne_V(y, yw0, yw1, yw2, yw3);
 
     return yw;
 }
 
-SFEM_INLINE static
-vec_indices copy_strides(const vec_indices stride_x,  //
-                         const vec_indices stride_y,  //
-                         const vec_indices stride_z,  //
-                         const int side_x, const int side_y, const int side_z) {
+SFEM_INLINE static vec_indices copy_strides(const vec_indices stride_x,  //
+                                            const vec_indices stride_y,  //
+                                            const vec_indices stride_z,  //
+                                            const int side_x, const int side_y, const int side_z) {
     vec_indices ret = CONST_VEC(0);
 
     for (int ii = 0; ii < _VL_; ii++) {
@@ -217,14 +209,13 @@ vec_indices copy_strides(const vec_indices stride_x,  //
     return ret;
 }
 
-SFEM_INLINE static
-vec_double copy_f(const double *f,             //
-                  const vec_indices stride_x,  //
-                  const vec_indices stride_y,  //
-                  const vec_indices stride_z,  //
-                  const int side_x, const int side_y, const int side_z) {
+SFEM_INLINE static vec_real copy_f(const double *f,             //
+                                   const vec_indices stride_x,  //
+                                   const vec_indices stride_y,  //
+                                   const vec_indices stride_z,  //
+                                   const int side_x, const int side_y, const int side_z) {
     //
-    vec_double ret;
+    vec_real ret;
     vec_indices indx = stride_x * side_x + stride_y * side_y + stride_z * side_z;
 
     for (int ii = 0; ii < _VL_; ii++) {
@@ -243,10 +234,10 @@ vec_double copy_f(const double *f,             //
  * @param k
  * @return SFEM_INLINE
  */
-SFEM_INLINE static
-vec_indices hex_aa_8_indices_O3_first_index_vec(const ptrdiff_t *const stride,             //
-                                                const vec_indices i, const vec_indices j,  //
-                                                const vec_indices k) {                     //
+SFEM_INLINE static vec_indices hex_aa_8_indices_O3_first_index_vec(
+        const ptrdiff_t *const stride,             //
+        const vec_indices i, const vec_indices j,  //
+        const vec_indices k) {                     //
     //
     vec_indices ret = CONST_VEC(0);
 
@@ -284,26 +275,25 @@ void hex_aa_8_collect_coeffs_O3_ptr_vec(const ptrdiff_t *const stride,  //
 
 /**
  * @brief Copy a vector of pointers to a vector of pointers
- * 
- * @param f 
- * @param stride_x 
- * @param stride_y 
- * @param stride_z 
- * @param side_x 
- * @param side_y 
- * @param side_z 
- * @return vec_double 
+ *
+ * @param f
+ * @param stride_x
+ * @param stride_y
+ * @param stride_z
+ * @param side_x
+ * @param side_y
+ * @param side_z
+ * @return vec_real
  */
-SFEM_INLINE static
-vec_double copy_f_vec(const real_t *f[],         //
-                      const ptrdiff_t stride_x,  //
-                      const ptrdiff_t stride_y,  //
-                      const ptrdiff_t stride_z,  //
-                      const int side_x,          //
-                      const int side_y,          //
-                      const int side_z) {        //
+SFEM_INLINE static vec_real copy_f_vec(const real_t *f[],         //
+                                       const ptrdiff_t stride_x,  //
+                                       const ptrdiff_t stride_y,  //
+                                       const ptrdiff_t stride_z,  //
+                                       const int side_x,          //
+                                       const int side_y,          //
+                                       const int side_z) {        //
     //
-    vec_double res = CONST_VEC(0);
+    vec_real res = CONST_VEC(0);
 
     for (int ii = 0; ii < _VL_; ii++) {
         res[ii] = f[ii][side_x * stride_x + side_y * stride_y + side_z * stride_z];
@@ -322,23 +312,23 @@ vec_double copy_f_vec(const real_t *f[],         //
  * @param stride_x
  * @param stride_y
  * @param stride_z
- * @return vec_double
+ * @return vec_real
  */
-vec_double weno4_3D_HOne_V(const ptrdiff_t *const stride,                               //
-                           const vec_double x, const vec_double y, const vec_double z,  //
-                           const real_t *f[]) {                                         //
+vec_real weno4_3D_HOne_V(const ptrdiff_t *const stride,                         //
+                         const vec_real x, const vec_real y, const vec_real z,  //
+                         const real_t *f[]) {                                   //
 
     const ptrdiff_t stride_x = stride[0];
     const ptrdiff_t stride_y = stride[1];
     const ptrdiff_t stride_z = stride[2];
 
-    vec_double w1, w2, w3, w4;
+    vec_real w1, w2, w3, w4;
 
     {  // begin Z = 0
-        vec_double y00, y10, y20, y30;
-        vec_double y01, y11, y21, y31;
-        vec_double y02, y12, y22, y32;
-        vec_double y03, y13, y23, y33;
+        vec_real y00, y10, y20, y30;
+        vec_real y01, y11, y21, y31;
+        vec_real y02, y12, y22, y32;
+        vec_real y03, y13, y23, y33;
 
         y00 = copy_f_vec(f, stride_x, stride_y, stride_z, 0, 0, 0);
         y10 = copy_f_vec(f, stride_x, stride_y, stride_z, 1, 0, 0);
@@ -382,10 +372,10 @@ vec_double weno4_3D_HOne_V(const ptrdiff_t *const stride,                       
 
     {  // begin Z = 1
 
-        vec_double y00, y10, y20, y30;
-        vec_double y01, y11, y21, y31;
-        vec_double y02, y12, y22, y32;
-        vec_double y03, y13, y23, y33;
+        vec_real y00, y10, y20, y30;
+        vec_real y01, y11, y21, y31;
+        vec_real y02, y12, y22, y32;
+        vec_real y03, y13, y23, y33;
 
         y00 = copy_f_vec(f, stride_x, stride_y, stride_z, 0, 0, 1);
         y10 = copy_f_vec(f, stride_x, stride_y, stride_z, 1, 0, 1);
@@ -429,10 +419,10 @@ vec_double weno4_3D_HOne_V(const ptrdiff_t *const stride,                       
 
     {  // begin Z = 2
 
-        vec_double y00, y10, y20, y30;
-        vec_double y01, y11, y21, y31;
-        vec_double y02, y12, y22, y32;
-        vec_double y03, y13, y23, y33;
+        vec_real y00, y10, y20, y30;
+        vec_real y01, y11, y21, y31;
+        vec_real y02, y12, y22, y32;
+        vec_real y03, y13, y23, y33;
 
         y00 = copy_f_vec(f, stride_x, stride_y, stride_z, 0, 0, 2);
         y10 = copy_f_vec(f, stride_x, stride_y, stride_z, 1, 0, 2);
@@ -477,10 +467,10 @@ vec_double weno4_3D_HOne_V(const ptrdiff_t *const stride,                       
 
     {  // begin Z = 3
 
-        vec_double y00, y10, y20, y30;
-        vec_double y01, y11, y21, y31;
-        vec_double y02, y12, y22, y32;
-        vec_double y03, y13, y23, y33;
+        vec_real y00, y10, y20, y30;
+        vec_real y01, y11, y21, y31;
+        vec_real y02, y12, y22, y32;
+        vec_real y03, y13, y23, y33;
 
         y00 = copy_f_vec(f, stride_x, stride_y, stride_z, 0, 0, 3);
         y10 = copy_f_vec(f, stride_x, stride_y, stride_z, 1, 0, 3);
@@ -523,7 +513,7 @@ vec_double weno4_3D_HOne_V(const ptrdiff_t *const stride,                       
 
     }  // end Z = 3
 
-    const vec_double wz = weno4_HOne_V(z, w1, w2, w3, w4);
+    const vec_real wz = weno4_HOne_V(z, w1, w2, w3, w4);
 
     return wz;
 }

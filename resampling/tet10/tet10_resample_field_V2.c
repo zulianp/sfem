@@ -140,7 +140,7 @@ void assert_vec_double(const vec_double a, const vec_double b) {
 #ifdef AVX512  //// AVX512
 
 //// ZEROS for AVX512
-#define ZEROS_SIMD_MACRO \
+#define ZEROS_VEC \
     (vec_double) { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
 
 //// SIMD_REDUCE_SUM for AVX512
@@ -168,7 +168,7 @@ vec_int64 floor_V(vec_double a) {
 #elif defined(AVX2)  //// AVX2 ////////////////////////////
 
 //// ZEROS for AVX2
-#define ZEROS_SIMD_MACRO \
+#define ZEROS_VEC \
     (vec_double) { 0.0, 0.0, 0.0, 0.0 }
 
 //// SIMD_REDUCE_SUM for AVX2
@@ -520,7 +520,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_V(
 
         // set to zero the element field
         for (int ii = 0; ii < 10; ii++) {
-            element_field[ii] = ZEROS_SIMD_MACRO;
+            element_field[ii] = ZEROS_VEC;
         }
 
         // SUBPARAMETRIC (for iso-parametric tassellation of tet10 might be necessary)
@@ -582,7 +582,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_V(
 
             // Integrate field
             {
-                vec_double eval_field = ZEROS_SIMD_MACRO;
+                vec_double eval_field = ZEROS_VEC;
                 // UNROLL_ZERO
                 for (int edof_j = 0; edof_j < 8; edof_j++) {
                     eval_field += hex8_f[edof_j] * coeffs[edof_j];
@@ -761,7 +761,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
 
         // set to zero the element field
         for (int ii = 0; ii < 10; ii++) {
-            element_field[ii] = ZEROS_SIMD_MACRO;
+            element_field[ii] = ZEROS_VEC;
         }
 
         // Map element to the grid based on unitary spacing
@@ -882,11 +882,11 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
 
             // TODO: Check if this is correct
             // TODO: Check if this is correct
-            // vec_double eval_field = ZEROS_SIMD_MACRO;
+            // vec_double eval_field = ZEROS_VEC;
 
             // Integrate field
             // {
-            //     // vec_double eval_field = ZEROS_SIMD_MACRO;
+            //     // vec_double eval_field = ZEROS_VEC;
             //     // UNROLL_ZERO
             //     for (int edof_j = 0; edof_j < 8; edof_j++) {
             //         eval_field += hex8_f[edof_j] * coeffs[edof_j];
