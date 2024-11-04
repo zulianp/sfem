@@ -4,6 +4,8 @@
 #include "sfem_base.h"
 #include "sfem_defs.h"
 
+#include "sfem_mesh.h"
+
 #include <mpi.h>
 #include <stddef.h>
 
@@ -20,6 +22,7 @@ typedef struct {
 
     idx_t **elements;
     element_idx_t *element_mapping;
+    idx_t *node_mapping;
 
     idx_t *ghosts;
 } mesh_block_t;
