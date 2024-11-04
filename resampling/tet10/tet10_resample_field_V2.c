@@ -27,8 +27,8 @@
 // #define UNROLL_ZERO _Pragma("GCC unroll(0)")
 #define UNROLL_ZERO _Pragma("unroll(1)")
 
-typedef double vec_real __attribute__((vector_size(_VL_ * sizeof(double)),  //
-                                       aligned(sizeof(double))));
+// typedef double vec_real __attribute__((vector_size(_VL_ * sizeof(double)),  //
+//                                        aligned(sizeof(double))));
 
 // typedef ptrdiff_t vec_indices __attribute__((vector_size(_VL_ * sizeof(ptrdiff_t)),  //
 //                                            aligned(sizeof(ptrdiff_t))));
