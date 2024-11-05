@@ -16,6 +16,8 @@ extern "C" {
 typedef struct {
     enum ElemType element_type;
     ptrdiff_t nelements;    
+
+    ptrdiff_t nnodes;
     ptrdiff_t nowned;
     ptrdiff_t nowned_ghosted;
     ptrdiff_t nshared;
@@ -25,6 +27,12 @@ typedef struct {
     idx_t *node_mapping;
 
     int *owner;
+
+    count_t *rowptr_incoming;
+    idx_t *colidx_incoming;
+
+    count_t *rowptr_outgoing;
+    idx_t *colidx_outgoing;
 } mesh_block_t;
 
 int mesh_block_create(mesh_block_t *block);

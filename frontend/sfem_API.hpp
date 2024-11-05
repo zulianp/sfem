@@ -20,20 +20,23 @@
 #include "sfem_ContactConditions_cuda.hpp"
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_blas.h"
-#include "sfem_cuda_crs_SpMV.hpp"
-#include "sfem_cuda_solver.hpp"
-#include "sfem_cuda_mprgp_impl.hpp"
 #include "sfem_cuda_blas.hpp"
+#include "sfem_cuda_crs_SpMV.hpp"
+#include "sfem_cuda_mprgp_impl.hpp"
+#include "sfem_cuda_solver.hpp"
 
 #else
-    namespace sfem {
-        void device_synchronize() {}
-    }
+namespace sfem {
+    void device_synchronize() {}
+}  // namespace sfem
 #endif
 
 #include "proteus_hex8.h"
 #include "proteus_hex8_interpolate.h"
 #include "sfem_prolongation_restriction.h"
+
+#include <sys/stat.h>
+#include "matrixio_crs.h"
 
 namespace sfem {
 
@@ -83,7 +86,7 @@ namespace sfem {
 
     template <typename T>
     std::shared_ptr<BiCGStab<T>> create_bcgs(const std::shared_ptr<Operator<T>> &op,
-                                                           const ExecutionSpace es) {
+                                             const ExecutionSpace es) {
         std::shared_ptr<BiCGStab<T>> bcgs;
 
 #ifdef SFEM_ENABLE_CUDA
@@ -570,7 +573,9 @@ namespace sfem {
                 f->execution_space());
     }
 
-    std::shared_ptr<Operator<real_t>> make_linear_op_variant(const std::shared_ptr<Function> &f, const std::vector<std::pair<std::string, int>> &opts) {
+    std::shared_ptr<Operator<real_t>> make_linear_op_variant(
+            const std::shared_ptr<Function> &f,
+            const std::vector<std::pair<std::string, int>> &opts) {
         auto variant = f->linear_op_variant(opts);
         return sfem::make_op<real_t>(
                 f->space()->n_dofs(),
@@ -638,6 +643,28 @@ namespace sfem {
             }
             return sqrt(ret);
         }
+    }
+
+    int write_crs(const std::string &path, CRSGraph &graph, sfem::Buffer<real_t> &values) {
+        struct stat st = {0};
+        if (stat(path.c_str(), &st) == -1) {
+            mkdir(path.c_str(), 0700);
+        }
+
+        crs_t crs_out;
+        crs_out.rowptr = (char *)graph.rowptr()->data();
+        crs_out.colidx = (char *)graph.colidx()->data();
+        crs_out.values = (char *)values.data();
+        crs_out.grows = graph.rowptr()->size() - 1;
+        crs_out.lrows = graph.rowptr()->size() - 1;
+        crs_out.lnnz = values.size();
+        crs_out.gnnz = values.size();
+        crs_out.start = 0;
+        crs_out.rowoffset = 0;
+        crs_out.rowptr_type = SFEM_MPI_COUNT_T;
+        crs_out.colidx_type = SFEM_MPI_IDX_T;
+        crs_out.values_type = SFEM_MPI_REAL_T;
+        return crs_write_folder(MPI_COMM_SELF, path.c_str(), &crs_out);
     }
 
 }  // namespace sfem

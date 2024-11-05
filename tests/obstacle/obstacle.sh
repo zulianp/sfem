@@ -28,14 +28,19 @@ if [[ -d "$mesh" ]]
 then
 	echo "Reusing existing $mesh database"
 else
-	create_cylinder.sh 1
-	create_cylinder_p2.sh 1
+	create_cylinder.sh 2
+	# create_cylinder_p2.sh 1
 fi
 
 # export SFEM_USE_MACRO=1
 
-PROBLEM="Laplacian"
-# PROBLEM="LinearElasticity"
+# PROBLEM="Laplacian"
+PROBLEM="LinearElasticity"
+# export SFEM_FIRST_LAME_PARAMETER=3.333
+# export SFEM_SHEAR_MODULUS=0.357
+
+export SFEM_FIRST_LAME_PARAMETER=3.333
+export SFEM_SHEAR_MODULUS=0.357
 
 echo  "---------------------------------"
 echo "Solving ostacle problem"

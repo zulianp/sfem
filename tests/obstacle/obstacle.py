@@ -254,7 +254,8 @@ def solve_obstacle(problem):
 
 	radius = ((0.5 - np.sqrt(sy*sy + sz*sz)))
 	f = -0.1*np.cos(np.pi*2*radius) - 0.1
-	# f += -0.05*np.cos(np.pi*8*radius)
+	f += -0.05*np.cos(np.pi*8*radius)
+	f += -0.01*np.cos(np.pi*16*radius)
 	parabola = -indentation * f + wall
 
 	sdf = (parabola - sfem.points(m, 0)).astype(real_t)
