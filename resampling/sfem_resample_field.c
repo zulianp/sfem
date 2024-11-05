@@ -830,16 +830,22 @@ int hex8_to_tet10_resample_field_local_CUDA(
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 
+#include "sfem_resample_field_vec.h"
+
 #define USE_TET4_V4 0
 #define USE_TET4_V8 1
-#define USE_TET4_CUDA 2
+#define USE_TET4_V16 2
+#define USE_TET4_CUDA 10
 
 #if SFEM_TET4_CUDA == ON
 #define USE_TET4_MODEL USE_TET4_CUDA
-#elif SFEM_VEC_SIZE == 8
+
+#elif _VL_ == 8
 #define USE_TET4_MODEL USE_TET4_V8
-#else
+#elif _VL_ == 4
 #define USE_TET4_MODEL USE_TET4_V4
+#elif _VL_ == 16
+#define USE_TET4_MODEL USE_TET4_V16
 #endif
 
 // #if SFEM_TET4_CUDA == ON
