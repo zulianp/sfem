@@ -139,6 +139,7 @@ int create_mesh_blocks(const mesh_t *mesh,
             blocks[b].nowned = nowned;
             blocks[b].nowned_ghosted = nowned_ghosted;
             blocks[b].nshared = nshared;
+            blocks[b].nnodes = ntotal;
 
             ptrdiff_t offset_owned = 0;
             ptrdiff_t offset_owned_ghosted = nowned;
@@ -160,7 +161,6 @@ int create_mesh_blocks(const mesh_t *mesh,
                             }
                         } else {
                             global_to_local[node] = offset_shared++;
-
                         }
 
                         blocks[b].node_mapping[global_to_local[node]] = node;
@@ -170,9 +170,9 @@ int create_mesh_blocks(const mesh_t *mesh,
                 }
             }
 
-            for(ptrdiff_t i = 0; i < nshared; i++) {
-            	const ptrdiff_t node = blocks[b].node_mapping[nowned + nowned_ghosted + i];
-            	blocks[b].owner[i] = owner[node];
+            for (ptrdiff_t i = 0; i < nshared; i++) {
+                const ptrdiff_t node = blocks[b].node_mapping[nowned + nowned_ghosted + i];
+                blocks[b].owner[i] = owner[node];
             }
 
 // Clean-up mapping
@@ -182,9 +182,85 @@ int create_mesh_blocks(const mesh_t *mesh,
             }
         }
 
-        // Construct ghost gather/scatter index
-        for (int b = 0; b < n_blocks; b++) {
+        {  // Construct ghost gather/scatter index
 
+            // Adjacency-matrix
+            count_t *adjaciency_matrix = calloc(n_blocks * n_blocks, sizeof(count_t));
+
+#pragma omp parallel for
+            for (int b = 0; b < n_blocks; b++) {
+                for (ptrdiff_t i = 0; i < blocks[b].nnodes; i++) {
+                    if (blocks[b].owner[i] != b) {
+#pragma omp atomic update
+                        adjaciency_matrix[owner[i] * n_blocks + b]++;
+                    }
+                }
+            }
+
+#pragma omp parallel for
+            for (int b = 0; b < n_blocks; b++) {
+                blocks[b].rowptr_incoming = calloc(n_blocks + 1, sizeof(count_t));
+                blocks[b].rowptr_outgoing = calloc(n_blocks + 1, sizeof(count_t));
+
+                for (int neigh = 0; neigh < n_blocks; neigh++) {
+                    const count_t incoming = adjaciency_matrix[b * n_blocks + neigh];
+                    const count_t outgoing = adjaciency_matrix[neigh * n_blocks + b];
+
+                    blocks[b].rowptr_incoming[neigh + 1] =
+                            incoming + blocks[b].rowptr_incoming[neigh];
+
+                    blocks[b].rowptr_outgoing[neigh + 1] =
+                            outgoing + blocks[b].rowptr_outgoing[neigh];
+                }
+
+                blocks[b].colidx_incoming =
+                        malloc(blocks[b].rowptr_incoming[n_blocks] * sizeof(idx_t));
+
+                blocks[b].colidx_outgoing =
+                        malloc(blocks[b].rowptr_outgoing[n_blocks] * sizeof(idx_t));
+            }
+
+            memset(adjaciency_matrix, 0, n_blocks * n_blocks * sizeof(count_t));
+            for (int b = 0; b < n_blocks; b++) {
+                for (ptrdiff_t i = 0; i < blocks[b].nnodes; i++) {
+                    const int neigh = blocks[b].owner[i];
+                    if (neigh != b) {
+                        const count_t offset = adjaciency_matrix[neigh * n_blocks + b];
+                        const count_t outgoing_offset = offset + blocks[b].rowptr_outgoing[neigh];
+                        const count_t neigh_incoming_offset =
+                                offset + blocks[neigh].rowptr_incoming[b];
+
+                        blocks[b].colidx_outgoing[outgoing_offset] = i;
+
+                        // Assigned with global indexing (global to local is done later)
+                        blocks[neigh].colidx_incoming[neigh_incoming_offset] =
+                                blocks[b].node_mapping[i];
+
+                        adjaciency_matrix[neigh * n_blocks + b]++;
+                    }
+                }
+            }
+
+            for (int b = 0; b < n_blocks; b++) {
+                const ptrdiff_t offset = blocks[b].nowned + blocks[b].nowned_ghosted;
+                for (ptrdiff_t i = 0; i < blocks[b].nshared; i++) {
+                    idx_t node = blocks[b].node_mapping[offset + i];
+                    global_to_local[node] = offset + i;
+                }
+
+                for (int neigh = 0; neigh < n_blocks; neigh++) {
+                	// global to local every index in incoming
+
+                }
+
+                // Clean-up
+                for (ptrdiff_t i = 0; i < blocks[b].nshared; i++) {
+                    idx_t node = blocks[b].node_mapping[offset + i];
+                    global_to_local[node] = -1;
+                }
+            }
+
+            free(adjaciency_matrix);
         }
 
         free(owner);

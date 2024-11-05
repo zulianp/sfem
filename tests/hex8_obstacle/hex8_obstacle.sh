@@ -26,7 +26,7 @@ export SFEM_MAX_IT=10000
 
 export SFEM_HEX8_ASSUME_AFFINE=1
 
-export CASE=1
+export CASE=3
 case $CASE in
 	1 | 2)
 		mesh=mesh

@@ -68,16 +68,19 @@ int main(int argc, char *argv[]) {
     bool SFEM_USE_GPU = true;
     SFEM_READ_ENV(SFEM_USE_GPU, atoi);
 
+    int SFEM_EXPORT_CRS_MATRIX = false;
+    SFEM_READ_ENV(SFEM_EXPORT_CRS_MATRIX, atoi);
+
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
     if (SFEM_USE_GPU) {
         es = sfem::EXECUTION_SPACE_DEVICE;
     }
 
-    if (!SFEM_ELEMENT_REFINE_LEVEL) {
-        fprintf(stderr, "[Error] SFEM_ELEMENT_REFINE_LEVEL must be defined >= 2\n");
-        return EXIT_FAILURE;
-    }
+    // if (!SFEM_ELEMENT_REFINE_LEVEL) {
+    //     fprintf(stderr, "[Error] SFEM_ELEMENT_REFINE_LEVEL must be defined >= 2\n");
+    //     return EXIT_FAILURE;
+    // }
 
     double tick = MPI_Wtime();
 
@@ -124,6 +127,21 @@ int main(int argc, char *argv[]) {
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());
 
+    if (SFEM_EXPORT_CRS_MATRIX) {
+        auto crs_graph = f->crs_graph();
+
+        auto values = sfem::create_buffer<real_t>(crs_graph->colidx()->size(), es);
+
+        f->hessian_crs(x->data(),
+                       crs_graph->rowptr()->data(),
+                       crs_graph->colidx()->data(),
+                       values->data());
+
+        char path[2048];
+        sprintf(path, "%s/crs_matrix", output_path);
+        write_crs(path, *crs_graph, *values);
+    }
+
     std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> solver;
     {
         auto mprgp = sfem::create_mprgp(linear_op, es);
@@ -144,9 +162,9 @@ int main(int argc, char *argv[]) {
         }
 
 #ifdef SFEM_ENABLE_CUDA
-       auto upper_bound = sfem::to_device(h_upper_bound);
+        auto upper_bound = sfem::to_device(h_upper_bound);
 #else
-       auto upper_bound = h_upper_bound;
+        auto upper_bound = h_upper_bound;
 #endif
 
         contact_conds->apply(upper_bound->data());
@@ -192,7 +210,7 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("%s (%s):\n", argv[0], "PROTEUS_HEX8");
+        printf("%s (%s):\n", argv[0], type_to_string(fs->element_type()));
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld #dofs %ld\n", (long)nelements, (long)nnodes, (long)ndofs);
         printf("TTS:\t\t%g [s], solve: %g [s])\n", tock - tick, solve_tock - solve_tick);
