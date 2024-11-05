@@ -619,6 +619,45 @@ namespace sfem {
                                 (real_t)1);
     }
 
+    auto crs_hessian(std::shared_ptr<sfem::Function> &f,
+                     const std::shared_ptr<Buffer<real_t>> &x,
+                     const sfem::ExecutionSpace es) {
+        auto crs_graph = f->crs_graph();
+
+#ifdef SFEM_ENABLE_CUDA
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+            auto d_crs_graph = sfem::to_device(crs_graph);
+            auto values = sfem::create_buffer<real_t>(d_crs_graph->nnz(), es);
+
+            f->hessian_crs(x->data(),
+                           d_crs_graph->rowptr()->data(),
+                           d_crs_graph->colidx()->data(),
+                           values->data());
+
+            return sfem::d_crs_spmv(d_crs_graph->n_nodes(),
+                                    d_crs_graph->n_nodes(),
+                                    d_crs_graph->rowptr(),
+                                    d_crs_graph->colidx(),
+                                    values,
+                                    (real_t)1);
+        }
+#endif
+        auto values = sfem::h_buffer<real_t>(crs_graph->nnz());
+
+        f->hessian_crs(x->data(),
+                       crs_graph->rowptr()->data(),
+                       crs_graph->colidx()->data(),
+                       values->data());
+
+        // Owns the pointers
+        return sfem::h_crs_spmv(crs_graph->n_nodes(),
+                                crs_graph->n_nodes(),
+                                crs_graph->rowptr(),
+                                crs_graph->colidx(),
+                                values,
+                                (real_t)1);
+    }
+
     real_t residual(sfem::Operator<real_t> &op,
                     const real_t *const rhs,
                     const real_t *const x,
@@ -644,6 +683,24 @@ namespace sfem {
             return sqrt(ret);
         }
     }
+
+    //     template <typename R, typename C, typename T>
+    //     std::shared_ptr<CRSSpMV<R, C, T>> create_crs_spmv(const ptrdiff_t rows,
+    //                                                  const ptrdiff_t cols,
+    //                                                  const std::shared_ptr<Buffer<R>> &rowptr,
+    //                                                  const std::shared_ptr<Buffer<C>> &colidx,
+    //                                                  const std::shared_ptr<Buffer<T>> &values,
+    //                                                  const T scale_output, ExecutionSpace es)
+    //     {
+    //         #ifdef SFEM_ENABLE_CUDA
+    //                 if (op.execution_space() == sfem::EXECUTION_SPACE_DEVICE) {
+
+    //                 } else
+    // #endif
+    //                 {
+
+    //                 }
+    //     }
 
     int write_crs(const std::string &path, CRSGraph &graph, sfem::Buffer<real_t> &values) {
         struct stat st = {0};
