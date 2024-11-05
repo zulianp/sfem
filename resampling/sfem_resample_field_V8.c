@@ -15,34 +15,12 @@
 #define SFEM_RESTRICT __restrict__
 
 #define SFEM_RESAMPLE_GAP_DUAL
-#define real_type real_t
+// #define real_type real_t
 
-// #define _VL8_ 8
-// typedef real_t vec8_t __attribute__((vector_size(_VL_ * sizeof(real_t)), aligned(sizeof(real_t))));
-
-typedef ptrdiff_t vec8_int64
-        __attribute__((vector_size(_VL_ * sizeof(ptrdiff_t)), aligned(sizeof(ptrdiff_t))));
-
-SFEM_INLINE vec8_int64 floor_V8(const vec8_t x) {
-    const vec8_int64 res = __builtin_convertvector(x, vec8_int64);
+SFEM_INLINE vec_indices8_t floor_V8(const vec8_t x) {
+    const vec_indices8_t res = __builtin_convertvector(x, vec_indices8_t);
     return res;
 }
-
-int tet4_resample_field_local_v2(
-        // Mesh
-        const ptrdiff_t start_element,      //
-        const ptrdiff_t end_element,        //
-        const ptrdiff_t nnodes,             //
-        idx_t** const SFEM_RESTRICT elems,  //
-        geom_t** const SFEM_RESTRICT xyz,   //
-        // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,       //
-        const ptrdiff_t* const SFEM_RESTRICT stride,  //
-        const geom_t* const SFEM_RESTRICT origin,     //
-        const geom_t* const SFEM_RESTRICT delta,      //
-        const real_type* const SFEM_RESTRICT data,    //
-        // Output
-        real_type* const SFEM_RESTRICT weighted_field);  //
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
@@ -164,8 +142,8 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V8(
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 SFEM_INLINE static void hex_aa_8_collect_coeffs_V8(
-        const vec8_int64 stride0, const vec8_int64 stride1, const vec8_int64 stride2,
-        const vec8_int64 i, const vec8_int64 j, const vec8_int64 k,
+        const vec_indices8_t stride0, const vec_indices8_t stride1, const vec_indices8_t stride2,
+        const vec_indices8_t i, const vec_indices8_t j, const vec_indices8_t k,
         // Attention this is geometric data transformed to solver data!
         const real_t* const SFEM_RESTRICT data,
         //
@@ -174,14 +152,14 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_V8(
         vec8_t* SFEM_RESTRICT out6, vec8_t* SFEM_RESTRICT out7) {
     //
 
-    const vec8_int64 i0 = i * stride0 + j * stride1 + k * stride2;
-    const vec8_int64 i1 = (i + 1) * stride0 + j * stride1 + k * stride2;
-    const vec8_int64 i2 = (i + 1) * stride0 + (j + 1) * stride1 + k * stride2;
-    const vec8_int64 i3 = i * stride0 + (j + 1) * stride1 + k * stride2;
-    const vec8_int64 i4 = i * stride0 + j * stride1 + (k + 1) * stride2;
-    const vec8_int64 i5 = (i + 1) * stride0 + j * stride1 + (k + 1) * stride2;
-    const vec8_int64 i6 = (i + 1) * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
-    const vec8_int64 i7 = i * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
+    const vec_indices8_t i0 = i * stride0 + j * stride1 + k * stride2;
+    const vec_indices8_t i1 = (i + 1) * stride0 + j * stride1 + k * stride2;
+    const vec_indices8_t i2 = (i + 1) * stride0 + (j + 1) * stride1 + k * stride2;
+    const vec_indices8_t i3 = i * stride0 + (j + 1) * stride1 + k * stride2;
+    const vec_indices8_t i4 = i * stride0 + j * stride1 + (k + 1) * stride2;
+    const vec_indices8_t i5 = (i + 1) * stride0 + j * stride1 + (k + 1) * stride2;
+    const vec_indices8_t i6 = (i + 1) * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
+    const vec_indices8_t i7 = i * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
 
     *out0 = (vec8_t){data[i0[0]],
                      data[i0[1]],
@@ -284,72 +262,72 @@ int tet4_resample_field_local_V8_aligned(
     const scalar_t dy = (scalar_t)delta[1];
     const scalar_t dz = (scalar_t)delta[2];
 
-    vec8_int64 stride0 = {stride[0],  //
-                          stride[0],
-                          stride[0],
-                          stride[0],
-                          stride[0],
-                          stride[0],
-                          stride[0],
-                          stride[0]};
+    vec_indices8_t stride0 = {stride[0],  //
+                              stride[0],
+                              stride[0],
+                              stride[0],
+                              stride[0],
+                              stride[0],
+                              stride[0],
+                              stride[0]};
 
-    vec8_int64 stride1 = {stride[1],  //
-                          stride[1],
-                          stride[1],
-                          stride[1],
-                          stride[1],
-                          stride[1],
-                          stride[1],
-                          stride[1]};
+    vec_indices8_t stride1 = {stride[1],  //
+                              stride[1],
+                              stride[1],
+                              stride[1],
+                              stride[1],
+                              stride[1],
+                              stride[1],
+                              stride[1]};
 
-    vec8_int64 stride2 = {stride[2],  //
-                          stride[2],
-                          stride[2],
-                          stride[2],
-                          stride[2],
-                          stride[2],
-                          stride[2],
-                          stride[2]};
+    vec_indices8_t stride2 = {stride[2],  //
+                              stride[2],
+                              stride[2],
+                              stride[2],
+                              stride[2],
+                              stride[2],
+                              stride[2],
+                              stride[2]};
 
     //////////////////////////////////////////////////////////////////////
     // Loop over the elements
     for (ptrdiff_t element_i = start_nelement; element_i < end_nelement; element_i += 8) {
         //
-        vec8_int64 ev0 = {elems[0][element_i + 0],
-                          elems[0][element_i + 1],
-                          elems[0][element_i + 2],
-                          elems[0][element_i + 3],
-                          elems[0][element_i + 4],
-                          elems[0][element_i + 5],
-                          elems[0][element_i + 6],
-                          elems[0][element_i + 7]};
+        vec_indices8_t ev0 = {elems[0][element_i + 0],
+                              elems[0][element_i + 1],
+                              elems[0][element_i + 2],
+                              elems[0][element_i + 3],
+                              elems[0][element_i + 4],
+                              elems[0][element_i + 5],
+                              elems[0][element_i + 6],
+                              elems[0][element_i + 7]};
 
-        vec8_int64 ev1 = {elems[1][element_i + 0],
-                          elems[1][element_i + 1],
-                          elems[1][element_i + 2],
-                          elems[1][element_i + 3],
-                          elems[1][element_i + 4],
-                          elems[1][element_i + 5],
-                          elems[1][element_i + 6],
-                          elems[1][element_i + 7]};
+        vec_indices8_t ev1 = {elems[1][element_i + 0],
+                              elems[1][element_i + 1],
+                              elems[1][element_i + 2],
+                              elems[1][element_i + 3],
+                              elems[1][element_i + 4],
+                              elems[1][element_i + 5],
+                              elems[1][element_i + 6],
+                              elems[1][element_i + 7]};
 
-        vec8_int64 ev2 = {elems[2][element_i + 0],
-                          elems[2][element_i + 1],
-                          elems[2][element_i + 2],
-                          elems[2][element_i + 3],
-                          elems[2][element_i + 4],
-                          elems[2][element_i + 5],
-                          elems[2][element_i + 6],
-                          elems[2][element_i + 7]};
+        vec_indices8_t ev2 = {elems[2][element_i + 0],
+                              elems[2][element_i + 1],
+                              elems[2][element_i + 2],
+                              elems[2][element_i + 3],
+                              elems[2][element_i + 4],
+                              elems[2][element_i + 5],
+                              elems[2][element_i + 6],
+                              elems[2][element_i + 7]};
 
-        vec8_int64 ev3 = {elems[3][element_i + 0],
-                          elems[3][element_i + 1],
-                          elems[3][element_i + 2],
-                          elems[3][element_i + 3],
-                          elems[3][element_i + 4],
-                          elems[3][element_i + 5],
-                          elems[3][element_i + 6],
-                          elems[3][element_i + 7]};
+        vec_indices8_t ev3 = {elems[3][element_i + 0],
+                              elems[3][element_i + 1],
+                              elems[3][element_i + 2],
+                              elems[3][element_i + 3],
+                              elems[3][element_i + 4],
+                              elems[3][element_i + 5],
+                              elems[3][element_i + 6],
+                              elems[3][element_i + 7]};
 
         // real_t x[4], y[4], z[4];
 
@@ -586,9 +564,9 @@ int tet4_resample_field_local_V8_aligned(
             const vec8_t grid_y = (g_qy - oy) / dy;
             const vec8_t grid_z = (g_qz - oz) / dz;
 
-            const vec8_int64 i = floor_V8(grid_x);
-            const vec8_int64 j = floor_V8(grid_y);
-            const vec8_int64 k = floor_V8(grid_z);
+            const vec_indices8_t i = floor_V8(grid_x);
+            const vec_indices8_t j = floor_V8(grid_y);
+            const vec_indices8_t k = floor_V8(grid_z);
 
             //     // If outside
             //     if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >=
@@ -754,8 +732,8 @@ int tet4_resample_field_local_V8(
         // Output
         real_t* const SFEM_RESTRICT weighted_field) {
     //
-    const ptrdiff_t nelements_aligned = nelements - (nelements % 8);
-    const ptrdiff_t nelements_tail = nelements % 8;
+    const ptrdiff_t nelements_aligned = nelements - (nelements % _VL_);
+    const ptrdiff_t nelements_tail = nelements % _VL_;
 
     printf("=============================================\n");
     printf("nelements_aligned = %ld\n", nelements_aligned);

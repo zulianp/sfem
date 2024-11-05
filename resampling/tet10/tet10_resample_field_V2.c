@@ -105,7 +105,7 @@ vec_real vec_indices_to_real(const vec_indices a) {
                            (_q + 7) >= TET4_NQP ? 0.0 : tet4_qw[_q + 7]};        \
     }
 
-#elif __VL__ == 4  //// AVX512
+#elif _VL_ == 4  //// AVX512
 
 #define ASSIGN_QUADRATURE_POINT_MACRO_TAIL(_q, _qx_V, _qy_V, _qz_V, _qw_V)       \
     {                                                                            \
@@ -130,7 +130,7 @@ vec_real vec_indices_to_real(const vec_indices a) {
                            (_q + 3) >= TET4_NQP ? 0.0 : tet4_qw[_q + 3]};        \
     }
 
-#elif __VL__ == 16
+#elif _VL_ == 16
 
 #define _qx_V                                                         \
     (vec_real){(_q + 0) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 0],   \
