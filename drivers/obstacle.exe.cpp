@@ -71,16 +71,19 @@ int main(int argc, char *argv[]) {
     int SFEM_EXPORT_CRS_MATRIX = false;
     SFEM_READ_ENV(SFEM_EXPORT_CRS_MATRIX, atoi);
 
+    int SFEM_MATRIX_FREE = 1;
+    SFEM_READ_ENV(SFEM_MATRIX_FREE, atoi);
+
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
     if (SFEM_USE_GPU) {
         es = sfem::EXECUTION_SPACE_DEVICE;
     }
 
-    // if (!SFEM_ELEMENT_REFINE_LEVEL) {
-    //     fprintf(stderr, "[Error] SFEM_ELEMENT_REFINE_LEVEL must be defined >= 2\n");
-    //     return EXIT_FAILURE;
-    // }
+    struct stat st = {0};
+    if (stat(output_path, &st) == -1) {
+        mkdir(output_path, 0700);
+    }
 
     double tick = MPI_Wtime();
 
@@ -113,19 +116,20 @@ int main(int argc, char *argv[]) {
 
     auto contact_conds = sfem::create_contact_conditions_from_env(fs, es);
 
-    struct stat st = {0};
-    if (stat(output_path, &st) == -1) {
-        mkdir(output_path, 0700);
-    }
-
-    auto linear_op = sfem::make_linear_op(f);
-
     ptrdiff_t ndofs = fs->n_dofs();
     auto x = sfem::create_buffer<real_t>(ndofs, es);
     auto rhs = sfem::create_buffer<real_t>(ndofs, es);
 
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());
+
+    std::shared_ptr<sfem::Operator<real_t>> linear_op;
+
+    if (SFEM_MATRIX_FREE) {
+        linear_op = sfem::make_linear_op(f);
+    } else {
+        linear_op = sfem::crs_hessian(f, x, es);
+    }
 
     if (SFEM_EXPORT_CRS_MATRIX) {
         auto crs_graph = f->crs_graph();

@@ -23,7 +23,8 @@ then
 	echo "Reusing mesh $mesh!"
 else
 	# $SCRIPTPATH/../../data/exodus/LeakageTest_Fluid60K.sh
-	$SCRIPTPATH/../../data/exodus/LeakageTest_Fluid_578K.sh
+	# $SCRIPTPATH/../../data/exodus/LeakageTest_Fluid_578K.sh
+	$SCRIPTPATH/../../data/exodus/LeakageTest_Fluid_4624K.sh
 fi
 
 sinlet=$mesh/sidesets_aos/FLUID_INLET.raw
@@ -36,9 +37,12 @@ export SFEM_DIRICHLET_VALUE="1"
 export SFEM_DIRICHLET_COMPONENT="0"
 
 export SFEM_CONTACT_NODESET="$soutlet1,$soutlet2"
-export SFEM_CONTACT_VALUE="-1,-2"
+export SFEM_CONTACT_VALUE="-10,-2"
 export SFEM_CONTACT_COMPONENT="0"
 export SFEM_USE_ELASTICITY=0
+
+export OMP_NUM_THREADS=8
+export OMP_PROC_BIND=true 
 
 echo "Running: obstacle $mesh output"
 $LAUNCH obstacle $mesh output 
