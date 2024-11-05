@@ -12,30 +12,13 @@
 #include "tet10_vec.h"
 #include "tet10_weno_V.h"
 
-// #if SFEM_VEC_SIZE == 8
-// #define AVX512
-// #elif SFEM_VEC_SIZE == 4
-// #define AVX2
-// #endif
-
-// #ifdef AVX512
-// #define _VL_ 8
-// #elif defined(AVX2)
-// #define _VL_ 4
-// #endif
-
 // #define UNROLL_ZERO _Pragma("GCC unroll(0)")
 #define UNROLL_ZERO _Pragma("unroll(1)")
 
-// typedef double vec_real __attribute__((vector_size(_VL_ * sizeof(double)),  //
-//                                        aligned(sizeof(double))));
-
-// typedef ptrdiff_t vec_indices __attribute__((vector_size(_VL_ * sizeof(ptrdiff_t)),  //
-//                                            aligned(sizeof(ptrdiff_t))));
-
+//////////////////////////////////////////////////////////
 // Casting from int64 to double SIMD vector
-vec_real vec_indices_to_double(const vec_indices a) {
-#if _VL_ == 8  //// AVX512
+vec_real vec_indices_to_real(const vec_indices a) {
+#if _VL_ == 8  //// 512 bits SIMD in double precision or 256 bits SIMD in single precision
     return (vec_real){(real_t)a[0],
                       (real_t)a[1],
                       (real_t)a[2],
@@ -44,10 +27,12 @@ vec_real vec_indices_to_double(const vec_indices a) {
                       (real_t)a[5],
                       (real_t)a[6],
                       (real_t)a[7]};
-#elif _VL_ == 4  //// AVX2
+
+#elif _VL_ == 4  //// 256 bits SIMD in double precision or 128 bits SIMD in single precision
+
     return (vec_real){(real_t)a[0], (real_t)a[1], (real_t)a[2], (real_t)a[3]};
 
-#elif __VL__ == 16
+#elif __VL__ == 16  //// 512 bits SIMD in single precision
 
     return (vec_real){(real_t)a[0],
                       (real_t)a[1],
@@ -714,9 +699,9 @@ int hex8_to_isoparametric_tet10_resample_field_local_V(
             const vec_indices k = floor_V(grid_z);
 
             // Get the reminder [0, 1]
-            vec_real l_x = (grid_x - vec_indices_to_double(i));
-            vec_real l_y = (grid_y - vec_indices_to_double(j));
-            vec_real l_z = (grid_z - vec_indices_to_double(k));
+            vec_real l_x = (grid_x - vec_indices_to_real(i));
+            vec_real l_y = (grid_y - vec_indices_to_real(j));
+            vec_real l_z = (grid_z - vec_indices_to_real(k));
 
             // assert(l_x >= -1e-8); /// Maybe define a macro for the assert in SIMD version
             // assert(l_y >= -1e-8);
@@ -750,7 +735,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_V(
         for (int v = 0; v < 10; ++v) {
             // #pragma omp atomic update
 
-            double element_field_v = 0.0;
+            real_t element_field_v = 0.0;
             SIMD_REDUCE_SUM_MACRO(element_field_v, element_field[v]);
 
             weighted_field[ev[v]] += element_field_v;
@@ -798,13 +783,13 @@ SFEM_INLINE static vec_real hex_aa_8_eval_weno4_3D_Unit_V(  //
     const vec_indices j_local = floor_V(y_unit - oy_unit);
     const vec_indices k_local = floor_V(z_unit - oz_unit);
 
-    const vec_real i_local_vec = vec_indices_to_double(i_local);
+    const vec_real i_local_vec = vec_indices_to_real(i_local);
     const vec_real x = (x_unit - ox_unit) - i_local_vec + ones_vec;
 
-    const vec_real j_local_vec = vec_indices_to_double(j_local);
+    const vec_real j_local_vec = vec_indices_to_real(j_local);
     const vec_real y = (y_unit - oy_unit) - j_local_vec + ones_vec;
 
-    const vec_real k_local_vec = vec_indices_to_double(k_local);
+    const vec_real k_local_vec = vec_indices_to_real(k_local);
     const vec_real z = (z_unit - oz_unit) - k_local_vec + ones_vec;
 
     // // printf("x = %f, x_ = %f, i = %d\n", x, x_, i);
@@ -877,14 +862,14 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
         // search for the vertex with the minimum distance to the origin
 
         int v_orig = 0;
-        double dist_min = 1e14;
+        real_t dist_min = 1e14;
 
         for (int v = 0; v < 10; ++v) {
             x[v] = (real_t)(xyz[0][ev[v]]);  // x-coordinates
             y[v] = (real_t)(xyz[1][ev[v]]);  // y-coordinates
             z[v] = (real_t)(xyz[2][ev[v]]);  // z-coordinates
 
-            const double dist = sqrt((x[v] - ox) * (x[v] - ox) +  //
+            const real_t dist = sqrt((x[v] - ox) * (x[v] - ox) +  //
                                      (y[v] - oy) * (y[v] - oy) +  //
                                      (z[v] - oz) * (z[v] - oz));  //
 
@@ -1054,7 +1039,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
         for (int v = 0; v < 10; ++v) {
             // #pragma omp atomic update
 
-            double element_field_v = 0.0;
+            real_t element_field_v = 0.0;
             SIMD_REDUCE_SUM_MACRO(element_field_v, element_field[v]);
 
             weighted_field[ev[v]] += element_field_v;
