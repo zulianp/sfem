@@ -10,18 +10,18 @@
 #include <string.h>
 
 #include "quadratures_rule.h"
+#include "sfem_resample_field_vec.h"
 
 #define SFEM_RESTRICT __restrict__
 
 #define SFEM_RESAMPLE_GAP_DUAL
 #define real_type real_t
 
-#define _VL8_ 8
-typedef scalar_t vec8_t
-        __attribute__((vector_size(_VL8_ * sizeof(scalar_t)), aligned(sizeof(scalar_t))));
+// #define _VL8_ 8
+// typedef real_t vec8_t __attribute__((vector_size(_VL_ * sizeof(real_t)), aligned(sizeof(real_t))));
 
 typedef ptrdiff_t vec8_int64
-        __attribute__((vector_size(_VL8_ * sizeof(ptrdiff_t)), aligned(sizeof(ptrdiff_t))));
+        __attribute__((vector_size(_VL_ * sizeof(ptrdiff_t)), aligned(sizeof(ptrdiff_t))));
 
 SFEM_INLINE vec8_int64 floor_V8(const vec8_t x) {
     const vec8_int64 res = __builtin_convertvector(x, vec8_int64);
@@ -30,19 +30,19 @@ SFEM_INLINE vec8_int64 floor_V8(const vec8_t x) {
 
 int tet4_resample_field_local_v2(
         // Mesh
-        const ptrdiff_t start_element,
-        const ptrdiff_t end_element,
-        const ptrdiff_t nnodes,
-        idx_t** const SFEM_RESTRICT elems,
-        geom_t** const SFEM_RESTRICT xyz,
+        const ptrdiff_t start_element,      //
+        const ptrdiff_t end_element,        //
+        const ptrdiff_t nnodes,             //
+        idx_t** const SFEM_RESTRICT elems,  //
+        geom_t** const SFEM_RESTRICT xyz,   //
         // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,
-        const ptrdiff_t* const SFEM_RESTRICT stride,
-        const geom_t* const SFEM_RESTRICT origin,
-        const geom_t* const SFEM_RESTRICT delta,
-        const real_type* const SFEM_RESTRICT data,
+        const ptrdiff_t* const SFEM_RESTRICT n,       //
+        const ptrdiff_t* const SFEM_RESTRICT stride,  //
+        const geom_t* const SFEM_RESTRICT origin,     //
+        const geom_t* const SFEM_RESTRICT delta,      //
+        const real_type* const SFEM_RESTRICT data,    //
         // Output
-        real_type* const SFEM_RESTRICT weighted_field);
+        real_type* const SFEM_RESTRICT weighted_field);  //
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
@@ -51,20 +51,11 @@ int tet4_resample_field_local_v2(
 //////////////////////////////////////////////////////////
 SFEM_INLINE static vec8_t tet4_measure_V8(
         // X-coordinates
-        const vec8_t px0,
-        const vec8_t px1,
-        const vec8_t px2,
-        const vec8_t px3,
+        const vec8_t px0, const vec8_t px1, const vec8_t px2, const vec8_t px3,
         // Y-coordinates
-        const vec8_t py0,
-        const vec8_t py1,
-        const vec8_t py2,
-        const vec8_t py3,
+        const vec8_t py0, const vec8_t py1, const vec8_t py2, const vec8_t py3,
         // Z-coordinates
-        const vec8_t pz0,
-        const vec8_t pz1,
-        const vec8_t pz2,
-        const vec8_t pz3) {
+        const vec8_t pz0, const vec8_t pz1, const vec8_t pz2, const vec8_t pz3) {
     //
     // determinant of the Jacobian
     // M = [px0, py0, pz0, 1]
@@ -74,7 +65,7 @@ SFEM_INLINE static vec8_t tet4_measure_V8(
     //
     // V = (1/6) * det(M)
 
-    const real_t ref_vol = 1./6;
+    const real_t ref_vol = 1. / 6;
     const vec8_t x0 = -pz0 + pz3;
     const vec8_t x1 = -py0 + py2;
     const vec8_t x2 = -ref_vol * px0 + ref_vol * px1;
@@ -123,27 +114,15 @@ SFEM_INLINE static void tet4_transform_V8(
 */
 
         // X-coordinates
-        const vec8_t px0,
-        const vec8_t px1,
-        const vec8_t px2,
-        const vec8_t px3,
+        const vec8_t px0, const vec8_t px1, const vec8_t px2, const vec8_t px3,
         // Y-coordinates
-        const vec8_t py0,
-        const vec8_t py1,
-        const vec8_t py2,
-        const vec8_t py3,
+        const vec8_t py0, const vec8_t py1, const vec8_t py2, const vec8_t py3,
         // Z-coordinates
-        const vec8_t pz0,
-        const vec8_t pz1,
-        const vec8_t pz2,
-        const vec8_t pz3,
+        const vec8_t pz0, const vec8_t pz1, const vec8_t pz2, const vec8_t pz3,
         // Quadrature point
-        const vec8_t qx,
-        const vec8_t qy,
-        const vec8_t qz,
+        const vec8_t qx, const vec8_t qy, const vec8_t qz,
         // Output
-        vec8_t* const SFEM_RESTRICT out_x,
-        vec8_t* const SFEM_RESTRICT out_y,
+        vec8_t* const SFEM_RESTRICT out_x, vec8_t* const SFEM_RESTRICT out_y,
         vec8_t* const SFEM_RESTRICT out_z) {
     //
     //
@@ -161,19 +140,13 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V8(
         // Quadrature point (local coordinates)
         // With respect to the hat functions of a cube element
         // In a local coordinate system
-        const vec8_t x,
-        const vec8_t y,
-        const vec8_t z,
+        const vec8_t x, const vec8_t y, const vec8_t z,
 
         // Output
-        vec8_t* const SFEM_RESTRICT f0,
-        vec8_t* const SFEM_RESTRICT f1,
-        vec8_t* const SFEM_RESTRICT f2,
-        vec8_t* const SFEM_RESTRICT f3,
-        vec8_t* const SFEM_RESTRICT f4,
-        vec8_t* const SFEM_RESTRICT f5,
-        vec8_t* const SFEM_RESTRICT f6,
-        vec8_t* const SFEM_RESTRICT f7) {
+        vec8_t* const SFEM_RESTRICT f0, vec8_t* const SFEM_RESTRICT f1,
+        vec8_t* const SFEM_RESTRICT f2, vec8_t* const SFEM_RESTRICT f3,
+        vec8_t* const SFEM_RESTRICT f4, vec8_t* const SFEM_RESTRICT f5,
+        vec8_t* const SFEM_RESTRICT f6, vec8_t* const SFEM_RESTRICT f7) {
     //
     *f0 = (1.0 - x) * (1.0 - y) * (1.0 - z);
     *f1 = x * (1.0 - y) * (1.0 - z);
@@ -191,23 +164,14 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V8(
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 SFEM_INLINE static void hex_aa_8_collect_coeffs_V8(
-        const vec8_int64 stride0,
-        const vec8_int64 stride1,
-        const vec8_int64 stride2,
-        const vec8_int64 i,
-        const vec8_int64 j,
-        const vec8_int64 k,
+        const vec8_int64 stride0, const vec8_int64 stride1, const vec8_int64 stride2,
+        const vec8_int64 i, const vec8_int64 j, const vec8_int64 k,
         // Attention this is geometric data transformed to solver data!
         const real_t* const SFEM_RESTRICT data,
         //
-        vec8_t* SFEM_RESTRICT out0,
-        vec8_t* SFEM_RESTRICT out1,
-        vec8_t* SFEM_RESTRICT out2,
-        vec8_t* SFEM_RESTRICT out3,
-        vec8_t* SFEM_RESTRICT out4,
-        vec8_t* SFEM_RESTRICT out5,
-        vec8_t* SFEM_RESTRICT out6,
-        vec8_t* SFEM_RESTRICT out7) {
+        vec8_t* SFEM_RESTRICT out0, vec8_t* SFEM_RESTRICT out1, vec8_t* SFEM_RESTRICT out2,
+        vec8_t* SFEM_RESTRICT out3, vec8_t* SFEM_RESTRICT out4, vec8_t* SFEM_RESTRICT out5,
+        vec8_t* SFEM_RESTRICT out6, vec8_t* SFEM_RESTRICT out7) {
     //
 
     const vec8_int64 i0 = i * stride0 + j * stride1 + k * stride2;
@@ -220,76 +184,76 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_V8(
     const vec8_int64 i7 = i * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
 
     *out0 = (vec8_t){data[i0[0]],
-                          data[i0[1]],
-                          data[i0[2]],
-                          data[i0[3]],
-                          data[i0[4]],
-                          data[i0[5]],
-                          data[i0[6]],
-                          data[i0[7]]};
+                     data[i0[1]],
+                     data[i0[2]],
+                     data[i0[3]],
+                     data[i0[4]],
+                     data[i0[5]],
+                     data[i0[6]],
+                     data[i0[7]]};
 
     *out1 = (vec8_t){data[i1[0]],
-                          data[i1[1]],
-                          data[i1[2]],
-                          data[i1[3]],
-                          data[i1[4]],
-                          data[i1[5]],
-                          data[i1[6]],
-                          data[i1[7]]};
+                     data[i1[1]],
+                     data[i1[2]],
+                     data[i1[3]],
+                     data[i1[4]],
+                     data[i1[5]],
+                     data[i1[6]],
+                     data[i1[7]]};
 
     *out2 = (vec8_t){data[i2[0]],
-                          data[i2[1]],
-                          data[i2[2]],
-                          data[i2[3]],
-                          data[i2[4]],
-                          data[i2[5]],
-                          data[i2[6]],
-                          data[i2[7]]};
+                     data[i2[1]],
+                     data[i2[2]],
+                     data[i2[3]],
+                     data[i2[4]],
+                     data[i2[5]],
+                     data[i2[6]],
+                     data[i2[7]]};
 
     *out3 = (vec8_t){data[i3[0]],
-                          data[i3[1]],
-                          data[i3[2]],
-                          data[i3[3]],
-                          data[i3[4]],
-                          data[i3[5]],
-                          data[i3[6]],
-                          data[i3[7]]};
+                     data[i3[1]],
+                     data[i3[2]],
+                     data[i3[3]],
+                     data[i3[4]],
+                     data[i3[5]],
+                     data[i3[6]],
+                     data[i3[7]]};
 
     *out4 = (vec8_t){data[i4[0]],
-                          data[i4[1]],
-                          data[i4[2]],
-                          data[i4[3]],
-                          data[i4[4]],
-                          data[i4[5]],
-                          data[i4[6]],
-                          data[i4[7]]};
+                     data[i4[1]],
+                     data[i4[2]],
+                     data[i4[3]],
+                     data[i4[4]],
+                     data[i4[5]],
+                     data[i4[6]],
+                     data[i4[7]]};
 
     *out5 = (vec8_t){data[i5[0]],
-                          data[i5[1]],
-                          data[i5[2]],
-                          data[i5[3]],
-                          data[i5[4]],
-                          data[i5[5]],
-                          data[i5[6]],
-                          data[i5[7]]};
+                     data[i5[1]],
+                     data[i5[2]],
+                     data[i5[3]],
+                     data[i5[4]],
+                     data[i5[5]],
+                     data[i5[6]],
+                     data[i5[7]]};
 
     *out6 = (vec8_t){data[i6[0]],
-                          data[i6[1]],
-                          data[i6[2]],
-                          data[i6[3]],
-                          data[i6[4]],
-                          data[i6[5]],
-                          data[i6[6]],
-                          data[i6[7]]};
+                     data[i6[1]],
+                     data[i6[2]],
+                     data[i6[3]],
+                     data[i6[4]],
+                     data[i6[5]],
+                     data[i6[6]],
+                     data[i6[7]]};
 
     *out7 = (vec8_t){data[i7[0]],
-                          data[i7[1]],
-                          data[i7[2]],
-                          data[i7[3]],
-                          data[i7[4]],
-                          data[i7[5]],
-                          data[i7[6]],
-                          data[i7[7]]};
+                     data[i7[1]],
+                     data[i7[2]],
+                     data[i7[3]],
+                     data[i7[4]],
+                     data[i7[5]],
+                     data[i7[6]],
+                     data[i7[7]]};
 }
 
 //////////////////////////////////////////////////////////
@@ -299,16 +263,11 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_V8(
 //////////////////////////////////////////////////////////
 int tet4_resample_field_local_V8_aligned(
         // Mesh
-        const ptrdiff_t start_nelement,
-        const ptrdiff_t end_nelement,
-        const ptrdiff_t nnodes,
-        idx_t** const SFEM_RESTRICT elems,
-        geom_t** const SFEM_RESTRICT xyz,
+        const ptrdiff_t start_nelement, const ptrdiff_t end_nelement, const ptrdiff_t nnodes,
+        idx_t** const SFEM_RESTRICT elems, geom_t** const SFEM_RESTRICT xyz,
         // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,
-        const ptrdiff_t* const SFEM_RESTRICT stride,
-        const geom_t* const SFEM_RESTRICT origin,
-        const geom_t* const SFEM_RESTRICT delta,
+        const ptrdiff_t* const SFEM_RESTRICT n, const ptrdiff_t* const SFEM_RESTRICT stride,
+        const geom_t* const SFEM_RESTRICT origin, const geom_t* const SFEM_RESTRICT delta,
         const real_t* const SFEM_RESTRICT data,
         // Output
         real_t* const SFEM_RESTRICT weighted_field) {
@@ -403,146 +362,146 @@ int tet4_resample_field_local_V8_aligned(
         vec8_t z0 = zeros, z1 = zeros, z2 = zeros, z3 = zeros;
 
         // real_t hex8_f[8];
-        vec8_t hex8_f0 = zeros, hex8_f1 = zeros, hex8_f2 = zeros, hex8_f3 = zeros,
-                    hex8_f4 = zeros, hex8_f5 = zeros, hex8_f6 = zeros, hex8_f7 = zeros;
+        vec8_t hex8_f0 = zeros, hex8_f1 = zeros, hex8_f2 = zeros, hex8_f3 = zeros, hex8_f4 = zeros,
+               hex8_f5 = zeros, hex8_f6 = zeros, hex8_f7 = zeros;
 
         // real_t coeffs[8];
-        vec8_t coeffs0 = zeros, coeffs1 = zeros, coeffs2 = zeros, coeffs3 = zeros,
-                    coeffs4 = zeros, coeffs5 = zeros, coeffs6 = zeros, coeffs7 = zeros;
+        vec8_t coeffs0 = zeros, coeffs1 = zeros, coeffs2 = zeros, coeffs3 = zeros, coeffs4 = zeros,
+               coeffs5 = zeros, coeffs6 = zeros, coeffs7 = zeros;
 
         // real_t tet4_f[4];
         vec8_t tet4_f0 = zeros, tet4_f1 = zeros, tet4_f2 = zeros, tet4_f3 = zeros;
 
         // real_t element_field[4];
         vec8_t element_field0 = zeros, element_field1 = zeros, element_field2 = zeros,
-                    element_field3 = zeros;
+               element_field3 = zeros;
 
         // copy the coordinates of the vertices
         {
             x0 = (vec8_t){(scalar_t)xyz[0][ev0[0]],
-                               (scalar_t)xyz[0][ev0[1]],
-                               (scalar_t)xyz[0][ev0[2]],
-                               (scalar_t)xyz[0][ev0[3]],
-                               (scalar_t)xyz[0][ev0[4]],
-                               (scalar_t)xyz[0][ev0[5]],
-                               (scalar_t)xyz[0][ev0[6]],
-                               (scalar_t)xyz[0][ev0[7]]};
+                          (scalar_t)xyz[0][ev0[1]],
+                          (scalar_t)xyz[0][ev0[2]],
+                          (scalar_t)xyz[0][ev0[3]],
+                          (scalar_t)xyz[0][ev0[4]],
+                          (scalar_t)xyz[0][ev0[5]],
+                          (scalar_t)xyz[0][ev0[6]],
+                          (scalar_t)xyz[0][ev0[7]]};
 
             x1 = (vec8_t){(scalar_t)xyz[0][ev1[0]],
-                               (scalar_t)xyz[0][ev1[1]],
-                               (scalar_t)xyz[0][ev1[2]],
-                               (scalar_t)xyz[0][ev1[3]],
-                               (scalar_t)xyz[0][ev1[4]],
-                               (scalar_t)xyz[0][ev1[5]],
-                               (scalar_t)xyz[0][ev1[6]],
-                               (scalar_t)xyz[0][ev1[7]]};
+                          (scalar_t)xyz[0][ev1[1]],
+                          (scalar_t)xyz[0][ev1[2]],
+                          (scalar_t)xyz[0][ev1[3]],
+                          (scalar_t)xyz[0][ev1[4]],
+                          (scalar_t)xyz[0][ev1[5]],
+                          (scalar_t)xyz[0][ev1[6]],
+                          (scalar_t)xyz[0][ev1[7]]};
 
             x2 = (vec8_t){(scalar_t)xyz[0][ev2[0]],
-                               (scalar_t)xyz[0][ev2[1]],
-                               (scalar_t)xyz[0][ev2[2]],
-                               (scalar_t)xyz[0][ev2[3]],
-                               (scalar_t)xyz[0][ev2[4]],
-                               (scalar_t)xyz[0][ev2[5]],
-                               (scalar_t)xyz[0][ev2[6]],
-                               (scalar_t)xyz[0][ev2[7]]};
+                          (scalar_t)xyz[0][ev2[1]],
+                          (scalar_t)xyz[0][ev2[2]],
+                          (scalar_t)xyz[0][ev2[3]],
+                          (scalar_t)xyz[0][ev2[4]],
+                          (scalar_t)xyz[0][ev2[5]],
+                          (scalar_t)xyz[0][ev2[6]],
+                          (scalar_t)xyz[0][ev2[7]]};
 
             x3 = (vec8_t){(scalar_t)xyz[0][ev3[0]],
-                               (scalar_t)xyz[0][ev3[1]],
-                               (scalar_t)xyz[0][ev3[2]],
-                               (scalar_t)xyz[0][ev3[3]],
-                               (scalar_t)xyz[0][ev3[4]],
-                               (scalar_t)xyz[0][ev3[5]],
-                               (scalar_t)xyz[0][ev3[6]],
-                               (scalar_t)xyz[0][ev3[7]]};
+                          (scalar_t)xyz[0][ev3[1]],
+                          (scalar_t)xyz[0][ev3[2]],
+                          (scalar_t)xyz[0][ev3[3]],
+                          (scalar_t)xyz[0][ev3[4]],
+                          (scalar_t)xyz[0][ev3[5]],
+                          (scalar_t)xyz[0][ev3[6]],
+                          (scalar_t)xyz[0][ev3[7]]};
 
             y0 = (vec8_t){(scalar_t)xyz[1][ev0[0]],
-                               (scalar_t)xyz[1][ev0[1]],
-                               (scalar_t)xyz[1][ev0[2]],
-                               (scalar_t)xyz[1][ev0[3]],
-                               (scalar_t)xyz[1][ev0[4]],
-                               (scalar_t)xyz[1][ev0[5]],
-                               (scalar_t)xyz[1][ev0[6]],
-                               (scalar_t)xyz[1][ev0[7]]};
+                          (scalar_t)xyz[1][ev0[1]],
+                          (scalar_t)xyz[1][ev0[2]],
+                          (scalar_t)xyz[1][ev0[3]],
+                          (scalar_t)xyz[1][ev0[4]],
+                          (scalar_t)xyz[1][ev0[5]],
+                          (scalar_t)xyz[1][ev0[6]],
+                          (scalar_t)xyz[1][ev0[7]]};
 
             y1 = (vec8_t){(scalar_t)xyz[1][ev1[0]],
-                               (scalar_t)xyz[1][ev1[1]],
-                               (scalar_t)xyz[1][ev1[2]],
-                               (scalar_t)xyz[1][ev1[3]],
-                               (scalar_t)xyz[1][ev1[4]],
-                               (scalar_t)xyz[1][ev1[5]],
-                               (scalar_t)xyz[1][ev1[6]],
-                               (scalar_t)xyz[1][ev1[7]]};
+                          (scalar_t)xyz[1][ev1[1]],
+                          (scalar_t)xyz[1][ev1[2]],
+                          (scalar_t)xyz[1][ev1[3]],
+                          (scalar_t)xyz[1][ev1[4]],
+                          (scalar_t)xyz[1][ev1[5]],
+                          (scalar_t)xyz[1][ev1[6]],
+                          (scalar_t)xyz[1][ev1[7]]};
 
             y2 = (vec8_t){(scalar_t)xyz[1][ev2[0]],
-                               (scalar_t)xyz[1][ev2[1]],
-                               (scalar_t)xyz[1][ev2[2]],
-                               (scalar_t)xyz[1][ev2[3]],
-                               (scalar_t)xyz[1][ev2[4]],
-                               (scalar_t)xyz[1][ev2[5]],
-                               (scalar_t)xyz[1][ev2[6]],
-                               (scalar_t)xyz[1][ev2[7]]};
+                          (scalar_t)xyz[1][ev2[1]],
+                          (scalar_t)xyz[1][ev2[2]],
+                          (scalar_t)xyz[1][ev2[3]],
+                          (scalar_t)xyz[1][ev2[4]],
+                          (scalar_t)xyz[1][ev2[5]],
+                          (scalar_t)xyz[1][ev2[6]],
+                          (scalar_t)xyz[1][ev2[7]]};
 
             y3 = (vec8_t){(scalar_t)xyz[1][ev3[0]],
-                               (scalar_t)xyz[1][ev3[1]],
-                               (scalar_t)xyz[1][ev3[2]],
-                               (scalar_t)xyz[1][ev3[3]],
-                               (scalar_t)xyz[1][ev3[4]],
-                               (scalar_t)xyz[1][ev3[5]],
-                               (scalar_t)xyz[1][ev3[6]],
-                               (scalar_t)xyz[1][ev3[7]]};
+                          (scalar_t)xyz[1][ev3[1]],
+                          (scalar_t)xyz[1][ev3[2]],
+                          (scalar_t)xyz[1][ev3[3]],
+                          (scalar_t)xyz[1][ev3[4]],
+                          (scalar_t)xyz[1][ev3[5]],
+                          (scalar_t)xyz[1][ev3[6]],
+                          (scalar_t)xyz[1][ev3[7]]};
 
             z0 = (vec8_t){(scalar_t)xyz[2][ev0[0]],
-                               (scalar_t)xyz[2][ev0[1]],
-                               (scalar_t)xyz[2][ev0[2]],
-                               (scalar_t)xyz[2][ev0[3]],
-                               (scalar_t)xyz[2][ev0[4]],
-                               (scalar_t)xyz[2][ev0[5]],
-                               (scalar_t)xyz[2][ev0[6]],
-                               (scalar_t)xyz[2][ev0[7]]};
+                          (scalar_t)xyz[2][ev0[1]],
+                          (scalar_t)xyz[2][ev0[2]],
+                          (scalar_t)xyz[2][ev0[3]],
+                          (scalar_t)xyz[2][ev0[4]],
+                          (scalar_t)xyz[2][ev0[5]],
+                          (scalar_t)xyz[2][ev0[6]],
+                          (scalar_t)xyz[2][ev0[7]]};
 
             z1 = (vec8_t){(scalar_t)xyz[2][ev1[0]],
-                               (scalar_t)xyz[2][ev1[1]],
-                               (scalar_t)xyz[2][ev1[2]],
-                               (scalar_t)xyz[2][ev1[3]],
-                               (scalar_t)xyz[2][ev1[4]],
-                               (scalar_t)xyz[2][ev1[5]],
-                               (scalar_t)xyz[2][ev1[6]],
-                               (scalar_t)xyz[2][ev1[7]]};
+                          (scalar_t)xyz[2][ev1[1]],
+                          (scalar_t)xyz[2][ev1[2]],
+                          (scalar_t)xyz[2][ev1[3]],
+                          (scalar_t)xyz[2][ev1[4]],
+                          (scalar_t)xyz[2][ev1[5]],
+                          (scalar_t)xyz[2][ev1[6]],
+                          (scalar_t)xyz[2][ev1[7]]};
 
             z2 = (vec8_t){(scalar_t)xyz[2][ev2[0]],
-                               (scalar_t)xyz[2][ev2[1]],
-                               (scalar_t)xyz[2][ev2[2]],
-                               (scalar_t)xyz[2][ev2[3]],
-                               (scalar_t)xyz[2][ev2[4]],
-                               (scalar_t)xyz[2][ev2[5]],
-                               (scalar_t)xyz[2][ev2[6]],
-                               (scalar_t)xyz[2][ev2[7]]};
+                          (scalar_t)xyz[2][ev2[1]],
+                          (scalar_t)xyz[2][ev2[2]],
+                          (scalar_t)xyz[2][ev2[3]],
+                          (scalar_t)xyz[2][ev2[4]],
+                          (scalar_t)xyz[2][ev2[5]],
+                          (scalar_t)xyz[2][ev2[6]],
+                          (scalar_t)xyz[2][ev2[7]]};
 
             z3 = (vec8_t){(scalar_t)xyz[2][ev3[0]],
-                               (scalar_t)xyz[2][ev3[1]],
-                               (scalar_t)xyz[2][ev3[2]],
-                               (scalar_t)xyz[2][ev3[3]],
-                               (scalar_t)xyz[2][ev3[4]],
-                               (scalar_t)xyz[2][ev3[5]],
-                               (scalar_t)xyz[2][ev3[6]],
-                               (scalar_t)xyz[2][ev3[7]]};
+                          (scalar_t)xyz[2][ev3[1]],
+                          (scalar_t)xyz[2][ev3[2]],
+                          (scalar_t)xyz[2][ev3[3]],
+                          (scalar_t)xyz[2][ev3[4]],
+                          (scalar_t)xyz[2][ev3[5]],
+                          (scalar_t)xyz[2][ev3[6]],
+                          (scalar_t)xyz[2][ev3[7]]};
         }  // end copy the coordinates of the vertices
 
         // Volume of the tetrahedrons (8 at a time)
         const vec8_t theta_volume = tet4_measure_V8(x0,
-                                                         x1,
-                                                         x2,
-                                                         x3,
-                                                         //
-                                                         y0,
-                                                         y1,
-                                                         y2,
-                                                         y3,
-                                                         //
-                                                         z0,
-                                                         z1,
-                                                         z2,
-                                                         z3);
+                                                    x1,
+                                                    x2,
+                                                    x3,
+                                                    //
+                                                    y0,
+                                                    y1,
+                                                    y2,
+                                                    y3,
+                                                    //
+                                                    z0,
+                                                    z1,
+                                                    z2,
+                                                    z3);
 
         //////////////////////////////////////////////////////////////////////
         // loop over the quadrature points
@@ -551,31 +510,31 @@ int tet4_resample_field_local_V8_aligned(
             vec8_t g_qx, g_qy, g_qz;
 
             vec8_t tet4_qx_v = {tet4_qx[quad_i],
-                                     tet4_qx[quad_i],
-                                     tet4_qx[quad_i],
-                                     tet4_qx[quad_i],
-                                     tet4_qx[quad_i],
-                                     tet4_qx[quad_i],
-                                     tet4_qx[quad_i],
-                                     tet4_qx[quad_i]};
+                                tet4_qx[quad_i],
+                                tet4_qx[quad_i],
+                                tet4_qx[quad_i],
+                                tet4_qx[quad_i],
+                                tet4_qx[quad_i],
+                                tet4_qx[quad_i],
+                                tet4_qx[quad_i]};
 
             vec8_t tet4_qy_v = {tet4_qy[quad_i],
-                                     tet4_qy[quad_i],
-                                     tet4_qy[quad_i],
-                                     tet4_qy[quad_i],
-                                     tet4_qy[quad_i],
-                                     tet4_qy[quad_i],
-                                     tet4_qy[quad_i],
-                                     tet4_qy[quad_i]};
+                                tet4_qy[quad_i],
+                                tet4_qy[quad_i],
+                                tet4_qy[quad_i],
+                                tet4_qy[quad_i],
+                                tet4_qy[quad_i],
+                                tet4_qy[quad_i],
+                                tet4_qy[quad_i]};
 
             vec8_t tet4_qz_v = {tet4_qz[quad_i],
-                                     tet4_qz[quad_i],
-                                     tet4_qz[quad_i],
-                                     tet4_qz[quad_i],
-                                     tet4_qz[quad_i],
-                                     tet4_qz[quad_i],
-                                     tet4_qz[quad_i],
-                                     tet4_qz[quad_i]};
+                                tet4_qz[quad_i],
+                                tet4_qz[quad_i],
+                                tet4_qz[quad_i],
+                                tet4_qz[quad_i],
+                                tet4_qz[quad_i],
+                                tet4_qz[quad_i],
+                                tet4_qz[quad_i]};
 
             tet4_transform_V8(x0,
                               x1,
@@ -786,15 +745,11 @@ int tet4_resample_field_local_V8_aligned(
 //////////////////////////////////////////////////////////
 int tet4_resample_field_local_V8(
         // Mesh
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t** const SFEM_RESTRICT elems,
+        const ptrdiff_t nelements, const ptrdiff_t nnodes, idx_t** const SFEM_RESTRICT elems,
         geom_t** const SFEM_RESTRICT xyz,
         // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,
-        const ptrdiff_t* const SFEM_RESTRICT stride,
-        const geom_t* const SFEM_RESTRICT origin,
-        const geom_t* const SFEM_RESTRICT delta,
+        const ptrdiff_t* const SFEM_RESTRICT n, const ptrdiff_t* const SFEM_RESTRICT stride,
+        const geom_t* const SFEM_RESTRICT origin, const geom_t* const SFEM_RESTRICT delta,
         const real_t* const SFEM_RESTRICT data,
         // Output
         real_t* const SFEM_RESTRICT weighted_field) {
