@@ -149,11 +149,24 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V(
                           _data[_indx_V[7]]}; \
     }
 
+#define GET_INDICES(_elems_, _element_i_)                                                     \
+    {                                                                                         \
+        _elems_[_element_i_ + 0], _elems_[_element_i_ + 1], _elems_[_element_i_ + 2],         \
+                _elems_[_element_i_ + 3], _elems_[_element_i_ + 4], _elems_[_element_i_ + 5], \
+                _elems_[_element_i_ + 6], _elems_[_element_i_ + 7]                            \
+    }
+
 #elif _VL_ == 4
 #define GET_OUT_MACRO(_out, _data, _indx_V)                                                  \
     {                                                                                        \
         _out = (vec_real){                                                                   \
                 _data[_indx_V[0]], _data[_indx_V[1]], _data[_indx_V[2]], _data[_indx_V[3]]}; \
+    }
+
+#define GET_INDICES(_elems_, _element_i_)                                             \
+    {                                                                                 \
+        _elems_[_element_i_ + 0], _elems_[_element_i_ + 1], _elems_[_element_i_ + 2], \
+                _elems_[_element_i_ + 3]                                              \
     }
 
 #elif _VL_ == 16
@@ -176,6 +189,17 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V(
                           _data[_indx_V[14]],  \
                           _data[_indx_V[15]]}; \
     }
+
+#define GET_INDICES(_elems_, _element_i_)                                                        \
+    {                                                                                            \
+        _elems_[_element_i_ + 0], _elems_[_element_i_ + 1], _elems_[_element_i_ + 2],            \
+                _elems_[_element_i_ + 3], _elems_[_element_i_ + 4], _elems_[_element_i_ + 5],    \
+                _elems_[_element_i_ + 6], _elems_[_element_i_ + 7], _elems_[_element_i_ + 8],    \
+                _elems_[_element_i_ + 9], _elems_[_element_i_ + 10], _elems_[_element_i_ + 11],  \
+                _elems_[_element_i_ + 12], _elems_[_element_i_ + 13], _elems_[_element_i_ + 14], \
+                _elems_[_element_i_ + 15]                                                        \
+    }
+
 #endif
 
 //////////////////////////////////////////////////////////
@@ -212,3 +236,73 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_V(
     GET_OUT_MACRO(*out6, data, i6);
     GET_OUT_MACRO(*out7, data, i7);
 }
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_resample_field_local_v2 //////////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+int tet4_resample_field_local_V8_aligned(
+        // Mesh
+        const ptrdiff_t start_nelement, const ptrdiff_t end_nelement, const ptrdiff_t nnodes,
+        idx_t** const SFEM_RESTRICT elems, geom_t** const SFEM_RESTRICT xyz,
+        // SDF
+        const ptrdiff_t* const SFEM_RESTRICT n, const ptrdiff_t* const SFEM_RESTRICT stride,
+        const geom_t* const SFEM_RESTRICT origin, const geom_t* const SFEM_RESTRICT delta,
+        const real_t* const SFEM_RESTRICT data,
+        // Output
+        real_t* const SFEM_RESTRICT weighted_field) {
+    //
+    printf("============================================================\n");
+    printf("Start: tet4_resample_field_local_V8_aligned  V8 [%s] \n", __FILE__);
+    printf("============================================================\n");
+    //
+    const scalar_t ox = (scalar_t)origin[0];
+    const scalar_t oy = (scalar_t)origin[1];
+    const scalar_t oz = (scalar_t)origin[2];
+
+    const scalar_t dx = (scalar_t)delta[0];
+    const scalar_t dy = (scalar_t)delta[1];
+    const scalar_t dz = (scalar_t)delta[2];
+
+    vec_indices8_t stride0 = CONST_VEC(stride[0]);
+    vec_indices8_t stride1 = CONST_VEC(stride[1]);
+    vec_indices8_t stride2 = CONST_VEC(stride[2]);
+
+    //////////////////////////////////////////////////////////////////////
+    // Loop over the elements
+    for (ptrdiff_t element_i = start_nelement; element_i < end_nelement; element_i += 8) {
+        //
+
+        vec_indices ev0 = GET_INDICES(elems[0], element_i);
+        vec_indices ev1 = GET_INDICES(elems[1], element_i);
+        vec_indices ev2 = GET_INDICES(elems[2], element_i);
+        vec_indices ev3 = GET_INDICES(elems[3], element_i);
+
+        const vec_real zeros = ZEROS_VEC();
+
+        // Vertices coordinates of the tetrahedron
+        vec_real x0 = zeros, x1 = zeros, x2 = zeros, x3 = zeros;
+
+        vec_real y0 = zeros, y1 = zeros, y2 = zeros, y3 = zeros;
+        vec_real z0 = zeros, z1 = zeros, z2 = zeros, z3 = zeros;
+
+        // real_t hex8_f[8];
+        vec_real hex8_f0 = zeros, hex8_f1 = zeros, hex8_f2 = zeros, hex8_f3 = zeros,
+                 hex8_f4 = zeros, hex8_f5 = zeros, hex8_f6 = zeros, hex8_f7 = zeros;
+
+        // real_t coeffs[8];
+        vec_real coeffs0 = zeros, coeffs1 = zeros, coeffs2 = zeros, coeffs3 = zeros,
+                 coeffs4 = zeros, coeffs5 = zeros, coeffs6 = zeros, coeffs7 = zeros;
+
+        // real_t tet4_f[4];
+        vec_real tet4_f0 = zeros, tet4_f1 = zeros, tet4_f2 = zeros, tet4_f3 = zeros;
+
+        // real_t element_field[4];
+        vec_real element_field0 = zeros, element_field1 = zeros, element_field2 = zeros,
+                 element_field3 = zeros;
+
+    }  // end for over elements
+
+    return 0;
+}  // end tet4_resample_field_local_V8_aligned
