@@ -37,7 +37,7 @@ int linear_elasticity_assemble_value_soa(const enum ElemType element_type,
         }
     }
 
-    return -1;
+    return SFEM_FAILURE;
 }
 
 int linear_elasticity_apply_soa(const enum ElemType element_type,
@@ -124,7 +124,7 @@ int linear_elasticity_apply_soa(const enum ElemType element_type,
         }
     }
 
-    return -1;
+    return SFEM_FAILURE;
 }
 
 int linear_elasticity_assemble_value_aos(const enum ElemType element_type,
@@ -154,7 +154,7 @@ int linear_elasticity_assemble_value_aos(const enum ElemType element_type,
         }
     }
 
-    return -1;
+    return SFEM_FAILURE;
 }
 
 int linear_elasticity_assemble_gradient_aos(const enum ElemType element_type,
@@ -206,7 +206,7 @@ int linear_elasticity_crs_aos(const enum ElemType element_type,
         }
     }
 
-    return -1;
+    return SFEM_FAILURE;
 }
 
 int linear_elasticity_assemble_diag_aos(const enum ElemType element_type,
@@ -268,7 +268,7 @@ int linear_elasticity_assemble_diag_aos(const enum ElemType element_type,
         }
     }
 
-    return -1;
+    return SFEM_FAILURE;
 }
 
 int linear_elasticity_apply_aos(const enum ElemType element_type,
@@ -389,7 +389,7 @@ int linear_elasticity_apply_aos(const enum ElemType element_type,
         }
     }
 
-    return -1;
+    return SFEM_FAILURE;
 }
 
 int linear_elasticity_crs_soa(const enum ElemType element_type,
@@ -416,5 +416,31 @@ int linear_elasticity_crs_soa(const enum ElemType element_type,
         }
     }
 
-    return -1;
+    return SFEM_FAILURE;
+}
+
+int linear_elasticity_bsr(const enum ElemType element_type,
+                          const ptrdiff_t nelements,
+                          const ptrdiff_t nnodes,
+                          idx_t **const SFEM_RESTRICT elements,
+                          geom_t **const SFEM_RESTRICT points,
+                          const real_t mu,
+                          const real_t lambda,
+                          const count_t *const SFEM_RESTRICT rowptr,
+                          const idx_t *const SFEM_RESTRICT colidx,
+                          real_t *const SFEM_RESTRICT values) {
+    switch (element_type) {
+        case TRI3: {
+            return tet4_linear_elasticity_bsr(
+                    nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
+        }
+        default: {
+            fprintf(stderr,
+                    "linear_elasticity_bsr is not implemented for type %s\n",
+                    type_to_string(element_type));
+            assert(0);
+            MPI_Abort(MPI_COMM_WORLD, -1);
+            return SFEM_FAILURE;
+        }
+    }
 }
