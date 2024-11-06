@@ -77,4 +77,75 @@ typedef ptrdiff_t_sfem_tet4 vec_indices                                  //
 // __attribute__((vector_size(_VL_ * sizeof(ptrdiff_t_sfem_tet4)),  //
 //                aligned(sizeof(ptrdiff_t_sfem_tet4))));           //
 
+#if defined(SIMD_512_DOUBLE) || defined(SIMD_256_FLOAT)
+
+#define CONST_VEC(_val_) \
+    { (_val_), (_val_), (_val_), (_val_), (_val_), (_val_), (_val_), (_val_) }
+
+#define INCREMENT_VEC(_val_) \
+    { _val_ + 0, _val_ + 1, _val_ + 2, _val_ + 3, _val_ + 4, _val_ + 5, _val_ + 6, _val_ + 7 }
+
+#define ZEROS_VEC() \
+    { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
+
+// #include <immintrin.h>
+// union vec_union {
+//     vec_real v;
+//     __m512d m;
+// };
+
+// union vec_union_indices {
+//     vec_indices v;
+//     __m512d m;
+// };
+
+// vec_double gather_vec_dbl(const double *ptr, vec_int64 indices) {
+//     vec_union result;
+
+//     __m512i i_index = _mm512_load_epi64(&indices);
+//     result.m = _mm512_i64gather_pd(i_index, (void const *)ptr, sizeof(double));
+
+//     return result.v;
+// }
+
+// vec_indices gather_vec_indices(const int *ptr, vec_int64 indices) {
+//     vec_union_indices result;
+
+//     __m512i i_index = _mm512_load_epi64(&indices);
+//     result.m = _mm512_i64gather_pd(i_index, (void const *)ptr, sizeof(double));
+
+//     return result.v;
+// }
+
+#elif defined(SIMD_256_DOUBLE)
+
+#define CONST_VEC(_val_) \
+    { (_val_), (_val_), (_val_), (_val_) }
+
+#define INCREMENT_VEC(_val_) \
+    { _val_ + 0, _val_ + 1, _val_ + 2, _val_ + 3 }
+
+#define ZEROS_VEC() \
+    { 0.0, 0.0, 0.0, 0.0 }
+
+#elif defined(SIMD_512_FLOAT)
+
+#define CONST_VEC(_val_)                                                                          \
+    {                                                                                             \
+        (_val_), (_val_), (_val_), (_val_), (_val_), (_val_), (_val_), (_val_), (_val_), (_val_), \
+                (_val_), (_val_), (_val_), (_val_), (_val_), (_val_)                              \
+    }
+
+#define INCREMENT_VEC(_val_)                                                                      \
+    {                                                                                             \
+        _val_ + 0, _val_ + 1, _val_ + 2, _val_ + 3, _val_ + 4, _val_ + 5, _val_ + 6, _val_ + 7,   \
+                _val_ + 8, _val_ + 9, _val_ + 10, _val_ + 11, _val_ + 12, _val_ + 13, _val_ + 14, \
+                _val_ + 15                                                                        \
+    }
+
+#define ZEROS_VEC() \
+    { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
+
+#endif
+
 #endif  // __SFEM_RESAMPLE_FIELD_VEC_H__
