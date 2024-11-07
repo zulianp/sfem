@@ -184,6 +184,7 @@ namespace sfem {
         return ret;
     }
 
+#if CUDART_VERSION >= 12000
     class BSRSpMVImpl {
     public:
         cusparseSpMatDescr_t matrix;
@@ -193,11 +194,8 @@ namespace sfem {
         cudaDataType valueType{SFEM_CUSPARSE_REAL_T};
         cusparseOperation_t op_type{CUSPARSE_OPERATION_NON_TRANSPOSE};
 
-#if CUDART_VERSION < 12000
-        cusparseSpMVAlg_t alg{CUSPARSE_MV_ALG_DEFAULT};
-#else
         cusparseSpMVAlg_t alg{CUSPARSE_SPMV_ALG_DEFAULT};
-#endif
+
         cusparseDnVecDescr_t vecX, vecY;
         size_t bufferSize{0};
         bool initialized{false};
@@ -327,6 +325,20 @@ namespace sfem {
         return ret;
     }
 
+#else
+    std::shared_ptr<BSRSpMV<count_t, idx_t, real_t>> d_bsr_spmv(
+            const ptrdiff_t rows,
+            const ptrdiff_t cols,
+            const int block_size,
+            const std::shared_ptr<Buffer<count_t>> &rowptr,
+            const std::shared_ptr<Buffer<idx_t>> &colidx,
+            const std::shared_ptr<Buffer<real_t>> &values,
+            const real_t scale_output) {
+        assert(false);
+        return nullptr;
+    }
+#endif
+
 }  // namespace sfem
 
 #else
@@ -344,13 +356,13 @@ namespace sfem {
         return nullptr;
     }
 
-    std::shared_ptr<CRSSpMV<count_t, idx_t, real_t>> d_bsr_spmv(
+    std::shared_ptr<BSRSpMV<count_t, idx_t, real_t>> d_bsr_spmv(
             const ptrdiff_t rows,
             const ptrdiff_t cols,
             const int block_size,
-            const std::shared_ptr<Buffer<count_t>>& rowptr,
-            const std::shared_ptr<Buffer<idx_t>>& colidx,
-            const std::shared_ptr<Buffer<real_t>>& values,
+            const std::shared_ptr<Buffer<count_t>> &rowptr,
+            const std::shared_ptr<Buffer<idx_t>> &colidx,
+            const std::shared_ptr<Buffer<real_t>> &values,
             const real_t scale_output) {
         assert(false);
         return nullptr;
