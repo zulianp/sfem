@@ -21,8 +21,8 @@ export OMP_PROC_BIND=true
 export CUDA_LAUNCH_BLOCKING=0
 
 export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
-export SFEM_ELEMENT_REFINE_LEVEL=2
-export SFEM_MAX_IT=10000
+export SFEM_ELEMENT_REFINE_LEVEL=4
+export SFEM_MAX_IT=20000
 
 export SFEM_HEX8_ASSUME_AFFINE=1
 
@@ -49,6 +49,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
+			export SFEM_REFINE=3
 			$SCRIPTPATH/../../data/vtk/joint-hex.sh $SFEM_ELEMENT_REFINE_LEVEL
 		fi
 		sinlet=$mesh/surface/sidesets_aos/base.raw
