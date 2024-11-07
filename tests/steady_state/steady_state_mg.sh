@@ -20,7 +20,7 @@ source $SFEM_DIR/workflows/sfem_config.sh
 export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 export CUDA_LAUNCH_BLOCKING=0
-export SFEM_ELEMENT_REFINE_LEVEL=6
+export SFEM_ELEMENT_REFINE_LEVEL=4
 
 CASE=3
 
@@ -47,7 +47,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			# export SFEM_REFINE=4
+			export SFEM_REFINE=4
 			$SCRIPTPATH/../../data/vtk/joint-hex.sh $SFEM_ELEMENT_REFINE_LEVEL
 		fi
 		sinlet=$mesh/surface/sidesets_aos/base.raw
@@ -115,7 +115,7 @@ export SFEM_CRS_MEM_CONSERVATIVE=1
 
 export SFEM_CHEB_EIG_MAX_SCALE=1.0001
 export SFEM_CHEB_EIG_TOL=1e-3
-export SFEM_SMOOTHER_SWEEPS=15
+export SFEM_SMOOTHER_SWEEPS=30
 
 export SFEM_USE_PRECONDITIONER=0
 

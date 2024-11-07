@@ -74,6 +74,9 @@ int main(int argc, char *argv[]) {
     int SFEM_MATRIX_FREE = 1;
     SFEM_READ_ENV(SFEM_MATRIX_FREE, atoi);
 
+    int SFEM_USE_BSR_MATRIX = 1;
+    SFEM_READ_ENV(SFEM_USE_BSR_MATRIX, atoi);
+
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
     if (SFEM_USE_GPU) {
@@ -128,7 +131,11 @@ int main(int argc, char *argv[]) {
     if (SFEM_MATRIX_FREE) {
         linear_op = sfem::make_linear_op(f);
     } else {
-        linear_op = sfem::crs_hessian(f, x, es);
+        if(SFEM_USE_BSR_MATRIX && fs->block_size() != 1) {
+            linear_op = sfem::hessian_bsr(f, x, es);
+        } else {
+            linear_op = sfem::hessian_crs(f, x, es);
+        }
     }
 
     if (SFEM_EXPORT_CRS_MATRIX) {
@@ -184,6 +191,7 @@ int main(int argc, char *argv[]) {
         }
 
         mprgp->verbose = true;
+        mprgp->debug = true;
         mprgp->set_max_it(SFEM_MAX_IT);
         mprgp->set_rtol(1e-12);
         mprgp->set_atol(1e-8);

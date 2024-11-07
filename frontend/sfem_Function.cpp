@@ -809,6 +809,24 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    int DirichletConditions::hessian_bsr(const real_t *const x,
+                                         const count_t *const rowptr,
+                                         const idx_t *const colidx,
+                                         real_t *const values) {
+        for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
+            bsr_constraint_nodes_to_identity_vec(impl_->dirichlet_conditions[i].local_size,
+                                                 impl_->dirichlet_conditions[i].idx,
+                                                 impl_->space->block_size(),
+                                                 impl_->dirichlet_conditions[i].component,
+                                                 1,
+                                                 rowptr,
+                                                 colidx,
+                                                 values);
+        }
+
+        return SFEM_SUCCESS;
+    }
+
     class Timings {
     public:
         static double tick() { return MPI_Wtime(); }
@@ -825,6 +843,7 @@ namespace sfem {
         double create_crs_graph{0};
         double destroy_crs_graph{0};
         double hessian_crs{0};
+        double hessian_bsr{0};
         double hessian_diag{0};
         double gradient{0};
         double apply{0};
@@ -840,6 +859,7 @@ namespace sfem {
             create_crs_graph = 0;
             destroy_crs_graph = 0;
             hessian_crs = 0;
+            hessian_bsr = 0;
             hessian_diag = 0;
             gradient = 0;
             apply = 0;
@@ -857,6 +877,7 @@ namespace sfem {
             os << "create_crs_graph," << create_crs_graph << "\n";
             os << "destroy_crs_graph," << destroy_crs_graph << "\n";
             os << "hessian_crs," << hessian_crs << "\n";
+            os << "hessian_bsr," << hessian_bsr << "\n";
             os << "hessian_diag," << hessian_diag << "\n";
             os << "gradient," << gradient << "\n";
             os << "apply," << apply << "\n";
@@ -1025,6 +1046,28 @@ namespace sfem {
         if (impl_->handle_constraints) {
             for (auto &c : impl_->constraints) {
                 c->hessian_crs(x, rowptr, colidx, values);
+            }
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    int Function::hessian_bsr(const real_t *const x,
+                              const count_t *const rowptr,
+                              const idx_t *const colidx,
+                              real_t *const values) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.hessian_bsr);
+
+        for (auto &op : impl_->ops) {
+            if (op->hessian_bsr(x, rowptr, colidx, values) != SFEM_SUCCESS) {
+                std::cerr << "Failed hessian_bsr in op: " << op->name() << "\n";
+                return SFEM_FAILURE;
+            }
+        }
+
+        if (impl_->handle_constraints) {
+            for (auto &c : impl_->constraints) {
+                c->hessian_bsr(x, rowptr, colidx, values);
             }
         }
 
@@ -1288,6 +1331,28 @@ namespace sfem {
                                       graph->rowptr()->data(),
                                       graph->colidx()->data(),
                                       values);
+
+            return SFEM_SUCCESS;
+        }
+
+        int hessian_bsr(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            auto graph = space->node_to_node_graph();
+
+            linear_elasticity_bsr(element_type,
+                                  mesh->nelements,
+                                  mesh->nnodes,
+                                  mesh->elements,
+                                  mesh->points,
+                                  this->mu,
+                                  this->lambda,
+                                  graph->rowptr()->data(),
+                                  graph->colidx()->data(),
+                                  values);
 
             return SFEM_SUCCESS;
         }

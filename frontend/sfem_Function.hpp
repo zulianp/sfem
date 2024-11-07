@@ -3,11 +3,11 @@
 
 #include <mpi.h>
 #include <algorithm>
-#include <vector>
 #include <cstddef>
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "sfem_base.h"
 #include "sfem_defs.h"
@@ -179,6 +179,14 @@ namespace sfem {
                                 const idx_t *const colidx,
                                 real_t *const values) = 0;
 
+        virtual int hessian_bsr(const real_t *const /*x*/,
+                                const count_t *const /*rowptr*/,
+                                const idx_t *const /*colidx*/,
+                                real_t *const /*values*/) {
+            assert(false);
+            return SFEM_FAILURE;
+        }
+
         virtual int hessian_diag(const real_t *const /*x*/, real_t *const /*values*/) {
             return SFEM_FAILURE;
         }
@@ -205,8 +213,11 @@ namespace sfem {
             return nullptr;
         }
 
-        virtual void set_option(const std::string &/*name*/, bool /*val*/) {}
-        virtual std::shared_ptr<Op> clone() const {assert(false); return nullptr; }
+        virtual void set_option(const std::string & /*name*/, bool /*val*/) {}
+        virtual std::shared_ptr<Op> clone() const {
+            assert(false);
+            return nullptr;
+        }
     };
 
     class NeumannConditions final : public Op {
@@ -266,6 +277,14 @@ namespace sfem {
                                 const idx_t *const colidx,
                                 real_t *const values) = 0;
 
+        virtual int hessian_bsr(const real_t *const /*x*/,
+                                const count_t *const /*rowptr*/,
+                                const idx_t *const /*colidx*/,
+                                real_t *const /*values*/) {
+            assert(false);
+            return SFEM_FAILURE;
+        }
+
         virtual std::shared_ptr<Constraint> derefine(
                 const std::shared_ptr<FunctionSpace> &coarse_space,
                 const bool as_zero) const = 0;
@@ -288,6 +307,11 @@ namespace sfem {
         int gradient(const real_t *const x, real_t *const g) override;
 
         int hessian_crs(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values) override;
+
+        int hessian_bsr(const real_t *const x,
                         const count_t *const rowptr,
                         const idx_t *const colidx,
                         real_t *const values) override;
@@ -369,6 +393,11 @@ namespace sfem {
                         const idx_t *const colidx,
                         real_t *const values);
 
+        int hessian_bsr(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values);
+
         int hessian_diag(const real_t *const x, real_t *const values);
 
         int gradient(const real_t *const x, real_t *const out);
@@ -388,7 +417,8 @@ namespace sfem {
         std::shared_ptr<Output> output();
         ExecutionSpace execution_space() const;
 
-        std::shared_ptr<Operator<real_t>> linear_op_variant(const std::vector<std::pair<std::string, int>> &opts);
+        std::shared_ptr<Operator<real_t>> linear_op_variant(
+                const std::vector<std::pair<std::string, int>> &opts);
 
     private:
         class Impl;
