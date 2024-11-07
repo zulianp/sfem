@@ -412,3 +412,11 @@ With numerical quadrature and with symbolic integration
 | 4 | 473125 | 92463957  | 38.223 | 2.41 |
 | 5 | 473125 | 179958447 | 78.153 |	2.3	 |
 
+
+
+## H200
+
+**Warp level**
+| SFEM_ELEMENT_REFINE_LEVEL | #macro-elems | #dofs | TTS [ms] | TP [GDOF/s] |
+| 4 | 473125 | 92463957  | 9.97 |  9.2 |
+| 5 | 473125 | 179958447 | 51.2 |  3.5 |

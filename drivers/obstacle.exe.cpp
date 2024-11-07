@@ -131,7 +131,7 @@ int main(int argc, char *argv[]) {
     if (SFEM_MATRIX_FREE) {
         linear_op = sfem::make_linear_op(f);
     } else {
-        if(SFEM_USE_BSR_MATRIX && fs->block_size() != 1) {
+        if (SFEM_USE_BSR_MATRIX && fs->block_size() != 1) {
             linear_op = sfem::hessian_bsr(f, x, es);
         } else {
             linear_op = sfem::hessian_crs(f, x, es);
@@ -191,7 +191,7 @@ int main(int argc, char *argv[]) {
         }
 
         mprgp->verbose = true;
-        mprgp->debug = true;
+        // mprgp->debug = true;
         mprgp->set_max_it(SFEM_MAX_IT);
         mprgp->set_rtol(1e-12);
         mprgp->set_atol(1e-8);
@@ -203,14 +203,22 @@ int main(int argc, char *argv[]) {
     solver->apply(rhs->data(), x->data());
     double solve_tock = MPI_Wtime();
 
+#ifdef SFEM_ENABLE_CUDA
+    auto h_x = sfem::to_host(x);
+    auto h_rhs = sfem::to_host(rhs);
+#else
+    auto h_x = x;
+    auto h_rhs = rhs;
+#endif
+
     char path[2048];
     sprintf(path, "%s/u.raw", output_path);
-    if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)x->data(), ndofs, ndofs)) {
+    if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_x->data(), ndofs, ndofs)) {
         return SFEM_FAILURE;
     }
 
     sprintf(path, "%s/rhs.raw", output_path);
-    if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)rhs->data(), ndofs, ndofs)) {
+    if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_rhs->data(), ndofs, ndofs)) {
         return SFEM_FAILURE;
     }
 

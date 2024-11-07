@@ -153,7 +153,7 @@ int tri3_linear_elasticity_crs_aos(const ptrdiff_t nelements,
     const geom_t *const y = points[1];
 
     static const int block_size = 2;
-    static const int mat_block_size = block_size * block_size;
+    static const int mat_block_size = 2 * 2;
 
 #pragma omp parallel for  // nowait
     for (ptrdiff_t i = 0; i < nelements; ++i) {
@@ -234,7 +234,7 @@ int tri3_linear_elasticity_crs_soa(const ptrdiff_t nelements,
     const geom_t *const y = points[1];
 
     static const int block_size = 2;
-    static const int mat_block_size = block_size * block_size;
+    static const int mat_block_size = 2 * 2;
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {

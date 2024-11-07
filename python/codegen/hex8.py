@@ -1,4 +1,4 @@
-#!/ usr / bin / env python3
+#!/usr/bin/env python3
 
 from fe import FE
 from sfem_codegen import *
@@ -315,7 +315,7 @@ def check_op():
 			A[i, j] = hex8.integrate(q, inner(g[i], g[j]))
 		print(A[i, :])
 
-def gen_grads():
+def gen_grads_SoA():
 	g = Hex8().grad(vec3(qx, qy, qz))
 
 	for d in range(0, 3):
@@ -327,6 +327,29 @@ def gen_grads():
 		c_code(expr)
 
 
+def gen_grads_AoS():
+	g = Hex8().grad(vec3(qx, qy, qz))
+
+	expr = []
+	for i in range(0, len(g)):
+		for d in range(0, 3):
+			expr.append(ast.Assignment(sp.symbols(f'val[{i*3+d}]'), g[i][d]))
+
+	print(f"// grads")
+	c_code(expr)
+
+def gen_grads_AoS_separate():
+	g = Hex8().grad(vec3(qx, qy, qz))
+
+	for i in range(0, len(g)):
+		expr = []
+		for d in range(0, 3):
+			expr.append(ast.Assignment(sp.symbols(f'val[{d}]'), g[i][d]))
+		print(f"case {i}: {{")
+		c_code(expr)
+		print(f"return; }}")
+
+
 
 if __name__ == '__main__':
 #Hex8().generate_qp_based_code()
@@ -335,4 +358,6 @@ if __name__ == '__main__':
 #check_op()
 #sub_adj()
 
-	gen_grads()
+	# gen_grads_SoA()
+	# gen_grads_AoS()
+	gen_grads_AoS_separate()
