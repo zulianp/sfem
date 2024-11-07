@@ -12,6 +12,7 @@
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_crs_SpMV.hpp"
+#include "sfem_bsr_SpMV.hpp"
 #include "sfem_mprgp.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
@@ -584,7 +585,7 @@ namespace sfem {
                 f->execution_space());
     }
 
-    auto crs_hessian(sfem::Function &f,
+    auto hessian_crs(sfem::Function &f,
                      const std::shared_ptr<CRSGraph> &crs_graph,
                      const sfem::ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
@@ -619,7 +620,7 @@ namespace sfem {
                                 (real_t)1);
     }
 
-    auto crs_hessian(std::shared_ptr<sfem::Function> &f,
+    auto hessian_crs(std::shared_ptr<sfem::Function> &f,
                      const std::shared_ptr<Buffer<real_t>> &x,
                      const sfem::ExecutionSpace es) {
         auto crs_graph = f->crs_graph();
@@ -652,6 +653,51 @@ namespace sfem {
         // Owns the pointers
         return sfem::h_crs_spmv(crs_graph->n_nodes(),
                                 crs_graph->n_nodes(),
+                                crs_graph->rowptr(),
+                                crs_graph->colidx(),
+                                values,
+                                (real_t)1);
+    }
+
+    auto hessian_bsr(std::shared_ptr<sfem::Function> &f,
+                     const std::shared_ptr<Buffer<real_t>> &x,
+                     const sfem::ExecutionSpace es) {
+        // Get the mesh node-to-node graph instead of the FunctionSpace scalar adapted graph
+        auto crs_graph = f->space()->mesh_ptr()->node_to_node_graph();
+        const int block_size = f->space()->block_size();
+
+#ifdef SFEM_ENABLE_CUDA
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+
+            auto d_crs_graph = sfem::to_device(crs_graph);
+            auto values =
+                    sfem::create_buffer<real_t>(d_crs_graph->nnz() * block_size * block_size, es);
+
+            f->hessian_bsr(x->data(),
+                           d_crs_graph->rowptr()->data(),
+                           d_crs_graph->colidx()->data(),
+                           values->data());
+
+            return sfem::d_bsr_spmv(d_crs_graph->n_nodes(),
+                                    d_crs_graph->n_nodes(),
+                                    block_size,
+                                    d_crs_graph->rowptr(),
+                                    d_crs_graph->colidx(),
+                                    values,
+                                    (real_t)1);
+        }
+#endif
+        auto values = sfem::h_buffer<real_t>(crs_graph->nnz() * block_size * block_size);
+
+        f->hessian_bsr(x->data(),
+                       crs_graph->rowptr()->data(),
+                       crs_graph->colidx()->data(),
+                       values->data());
+
+        // Owns the pointers
+        return sfem::h_bsr_spmv(crs_graph->n_nodes(),
+                                crs_graph->n_nodes(),
+                                block_size,
                                 crs_graph->rowptr(),
                                 crs_graph->colidx(),
                                 values,

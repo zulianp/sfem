@@ -193,7 +193,12 @@ int main(int argc, char *argv[]) {
     std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> smoother;
 
     if (SFEM_MATRIX_FREE) {
+#ifdef SFEM_ENABLE_CUDA
+        // FIXME
+        linear_op = sfem::make_linear_op(f);
+#else
         linear_op = sfem::make_linear_op_variant(f, {{"ASSUME_AFFINE", 1}});
+#endif
 
         if (SFEM_USE_CHEB) {
             auto cheb = sfem::create_cheb3<real_t>(linear_op, es);
@@ -213,7 +218,7 @@ int main(int argc, char *argv[]) {
         }
 
     } else {
-        auto crs = crs_hessian(*f, f->crs_graph(), es);
+        auto crs = hessian_crs(*f, f->crs_graph(), es);
         linear_op = crs;
         int err = f->hessian_diag(nullptr, diag->data());
         assert(!err);
@@ -293,9 +298,9 @@ int main(int argc, char *argv[]) {
             linear_op_coarse = sfem::make_linear_op(f_coarse);
         } else {
             if (f_coarse->space()->block_size() == 1) {
-                linear_op_coarse = crs_hessian(*f_coarse, coarse_graph, es);
+                linear_op_coarse = hessian_crs(*f_coarse, coarse_graph, es);
             } else {
-                linear_op_coarse = crs_hessian(*f_coarse, f_coarse->crs_graph(), es);
+                linear_op_coarse = hessian_crs(*f_coarse, f_coarse->crs_graph(), es);
             }
         }
 

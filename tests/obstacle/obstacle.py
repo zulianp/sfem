@@ -172,7 +172,8 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 		dps = d + s
 		active = selector * (dps <= 0)
 		s = active * dps
-		dps = d + s
+		# dps = d + s
+		dps = s
 
 		H_diag = (penalty_param * mass * active)
 		sfem.apply_zero_constraints(fun, H_diag)

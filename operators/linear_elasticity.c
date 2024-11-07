@@ -430,7 +430,7 @@ int linear_elasticity_bsr(const enum ElemType element_type,
                           const idx_t *const SFEM_RESTRICT colidx,
                           real_t *const SFEM_RESTRICT values) {
     switch (element_type) {
-        case TRI3: {
+        case TET4: {
             return tet4_linear_elasticity_bsr(
                     nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
         }
