@@ -15,7 +15,7 @@ max_linear_iterations = 8
 penalty_param = 1 # Very sensitive to this! If few linear iterations it is less sensitive
 use_cheb = False
 matrix_free = True
-use_penalty = True
+use_penalty = False
 
 def rigid_body_modes(m):
 	x = sfem.points(m, 1)
@@ -113,6 +113,7 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 	mass_op = sfem.create_boundary_op(fs, contact_surf, "BoundaryMass")
 	mass = np.zeros(fs.n_dofs(), dtype=real_t)
 	ones = np.ones(fs.n_dofs(), dtype=real_t)
+	print('#ndofs ', fs.n_dofs())
 	boundary_fun = sfem.Function(fs)
 	boundary_fun.add_operator(mass_op)
 	boundary_op = sfem.make_op(boundary_fun, x)
@@ -172,7 +173,8 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 		dps = d + s
 		active = selector * (dps <= 0)
 		s = active * dps
-		dps = d + s
+		# dps = d + s
+		dps = s
 
 		H_diag = (penalty_param * mass * active)
 		sfem.apply_zero_constraints(fun, H_diag)
@@ -248,16 +250,13 @@ def solve_obstacle(problem):
 	constrained_dofs = sobstacle[:] * fs.block_size()
 
 	sy = sfem.points(m, 1)
-	sz = sfem.points(m, 2)
 
-	indentation = 1
+	if m.spatial_dimension() > 2:
+		sz = sfem.points(m, 2)
+	else:
+		sz = sy * 0
 
-	radius = ((0.5 - np.sqrt(sy*sy + sz*sz)))
-	f = -0.1*np.cos(np.pi*2*radius) - 0.1
-	# f += -0.05*np.cos(np.pi*8*radius)
-	parabola = -indentation * f + wall
-
-	sdf = (parabola - sfem.points(m, 0)).astype(real_t)
+	sdf = problem.sdf(sy, sz)
 	obs[constrained_dofs] = sdf[sobstacle]
 
 	for d in range(1, fs.block_size()):
@@ -311,10 +310,23 @@ def solve_obstacle(problem):
 	sfem.write(out, "obs", obs)
 	sfem.write(out, "disp", x)
 
-class Problem:
+
+class Cylinder:
 	def __init__(self):
-		self.input_mesh = ''
+		self.input_mesh = './Cylinder'
 		self.output_dir = './output'
+		self.op = "LinearElasticity"
+
+	def sdf(self, sy, sz):
+		radius = ((0.5 - np.sqrt(sy*sy + sz*sz)))
+		f = -0.1*np.cos(np.pi*2*radius) - 0.1
+		f += -0.05*np.cos(np.pi*8*radius)
+		f += -0.01*np.cos(np.pi*16*radius)
+		parabola = -indentation * f + wall
+
+		sdf = (parabola - sfem.points(m, 0)).astype(real_t)
+		return sdf
+
 
 	def setup(self):
 		path = self.input_mesh
@@ -364,23 +376,68 @@ class Problem:
 		fun.set_output_dir(self.output_dir)
 		return fun
 
+
+class Box3D:
+	def __init__(self):
+		self.input_mesh = './Box3D'
+		self.output_dir = './output'
+		self.op = "LinearElasticity"
+
+	def sdf(self, sy, sz):
+		sdf = sz * 0 + 0.1
+		return sdf
+	def setup(self):
+		path = self.input_mesh
+		
+		m = sfem.Mesh()		
+		m.read(path)
+
+		if self.op == "LinearElasticity":
+			print("Setting up LinearElasticity ...")
+			dim = m.spatial_dimension()
+			fs = sfem.FunctionSpace(m, dim)
+			fun = sfem.Function(fs)
+			elasticity = sfem.create_op(fs, "LinearElasticity")
+			fun.add_operator(elasticity)
+
+			bc = sfem.DirichletConditions(fs)
+
+			sdirichlet = np.unique(np.fromfile(f'{path}/boundary_nodes/left.int32.raw', dtype=idx_t))
+			sfem.add_condition(bc, sdirichlet, 0, 0.2);
+			sfem.add_condition(bc, sdirichlet, 1, 0.0);
+
+			if dim > 2:
+				sfem.add_condition(bc, sdirichlet, 2, 0.);
+
+			fun.add_dirichlet_conditions(bc)
+
+			self.sobstacle = np.fromfile(f'{path}/boundary_nodes/right.int32.raw', dtype=idx_t)
+			self.contact_surf = sfem.mesh_connectivity_from_file(f'{path}/surface/right')
+		
+		print(f"Mesh #nodes {m.n_nodes()}, #elements {m.n_elements()}")
+		print(f"FunctionSpace #dofs {fs.n_dofs()}")
+		fun.set_output_dir(self.output_dir)
+		return fun
+
 if __name__ == '__main__':
 	print(sys.argv)
 	if len(sys.argv) < 3:
-		print(f'usage: {sys.argv[0]} <input_mesh> <output>')
+		print(f'usage: {sys.argv[0]} <case>')
 		exit(1)
 
 	sfem.init()
 
-	problem = Problem()
-	problem.input_mesh = sys.argv[1]
-	problem.output = sys.argv[2]
-	problem.op = "LinearElasticity"
+	problems = {
+		"Cylinder" : Cylinder(),
+		"Box3D" : Box3D()
+	}
+
+	problem = problems[sys.argv[1]]
 	
 	try:
 	    opts, args = getopt.getopt(
-	        sys.argv[3:], "hp:",
-	        ["help","problem="])
+	        sys.argv[3:], "ho:",
+	        ["help","output="])
 
 	except getopt.GetoptError as err:
 	    print(err)
@@ -393,6 +450,8 @@ if __name__ == '__main__':
 	        sys.exit()
 	    elif opt in ('-p', '--problem'):
 	     	problem.op  = arg
+	    elif opt in ('-o', '--output'):
+	      	problem.output = arg
 
 	solve_obstacle(problem)
 	sfem.finalize()

@@ -6,8 +6,8 @@
 #include "sfem_mesh.h"
 
 #include "cu_boundary_condition.h"
-#include "cu_hex8_fff.h"
 #include "cu_hex8_adjugate.h"
+#include "cu_hex8_fff.h"
 #include "cu_laplacian.h"
 #include "cu_linear_elasticity.h"
 #include "cu_proteus_hex8_laplacian.h"
@@ -72,9 +72,7 @@ namespace sfem {
             init(c_mesh);
         }
 
-        ~FFF() {
-            d_buffer_destroy(fff_);
-        }
+        ~FFF() { d_buffer_destroy(fff_); }
 
         enum ElemType element_type() const { return element_type_; }
         ptrdiff_t n_elements() const { return n_elements_; }
@@ -515,6 +513,25 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
+        int hessian_bsr(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values) override {
+            return cu_linear_elasticity_bsr(element_type,
+                                            adjugate->n_elements(),
+                                            adjugate->n_elements(),
+                                            adjugate->elements(),
+                                            adjugate->jacobian_adjugate(),
+                                            adjugate->jacobian_determinant(),
+                                            mu,
+                                            lambda,
+                                            real_type,
+                                            rowptr,
+                                            colidx,
+                                            values,
+                                            stream);
+        }
+
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
             return cu_linear_elasticity_diag(element_type,
                                              adjugate->n_elements(),
@@ -526,7 +543,7 @@ namespace sfem {
                                              lambda,
                                              real_type,
                                              values,
-                                             SFEM_DEFAULT_STREAM);
+                                             stream);
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
@@ -541,7 +558,7 @@ namespace sfem {
                                               real_type,
                                               x,
                                               out,
-                                              SFEM_DEFAULT_STREAM);
+                                              stream);
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
@@ -556,7 +573,7 @@ namespace sfem {
                                               real_type,
                                               h,
                                               out,
-                                              SFEM_DEFAULT_STREAM);
+                                              stream);
         }
 
         int value(const real_t *x, real_t *const out) override {

@@ -130,6 +130,41 @@ static SFEM_INLINE void tet4_local_to_global_vec3(const idx_t *const SFEM_RESTRI
     }
 }
 
+static SFEM_INLINE void tet4_local_to_global_bsr3(const idx_t *const SFEM_RESTRICT ev,
+                                                  const accumulator_t *const SFEM_RESTRICT
+                                                          element_matrix,
+                                                  const count_t *const SFEM_RESTRICT rowptr,
+                                                  const idx_t *const SFEM_RESTRICT colidx,
+                                                  real_t *const SFEM_RESTRICT values) {
+    idx_t ks[4];
+    for (int edof_i = 0; edof_i < 4; ++edof_i) {
+        const idx_t dof_i = ev[edof_i];
+
+        {
+            const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
+            const idx_t *cols = &colidx[rowptr[dof_i]];
+            tet4_find_cols(ev, cols, lenrow, ks);
+        }
+
+        for (int edof_j = 0; edof_j < 4; ++edof_j) {
+            // extract the i, j block
+            real_t *block = &values[(rowptr[dof_i] + ks[edof_j]) * 9];
+
+            for (int bi = 0; bi < 3; ++bi) {
+                const int ii = bi * 4 + edof_i;
+
+                for (int bj = 0; bj < 3; ++bj) {
+                    const int jj = bj * 4 + edof_j;
+                    const real_t val = element_matrix[ii * 12 + jj];
+
+#pragma omp atomic update
+                    block[bi * 3 + bj] += val;
+                }
+            }
+        }
+    }
+}
+
 static SFEM_INLINE void tet4_fff_s(const scalar_t px0,
                                    const scalar_t px1,
                                    const scalar_t px2,

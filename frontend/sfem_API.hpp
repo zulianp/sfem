@@ -12,6 +12,7 @@
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_crs_SpMV.hpp"
+#include "sfem_bsr_SpMV.hpp"
 #include "sfem_mprgp.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
@@ -20,20 +21,23 @@
 #include "sfem_ContactConditions_cuda.hpp"
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_blas.h"
-#include "sfem_cuda_crs_SpMV.hpp"
-#include "sfem_cuda_solver.hpp"
-#include "sfem_cuda_mprgp_impl.hpp"
 #include "sfem_cuda_blas.hpp"
+#include "sfem_cuda_crs_SpMV.hpp"
+#include "sfem_cuda_mprgp_impl.hpp"
+#include "sfem_cuda_solver.hpp"
 
 #else
-    namespace sfem {
-        void device_synchronize() {}
-    }
+namespace sfem {
+    void device_synchronize() {}
+}  // namespace sfem
 #endif
 
 #include "proteus_hex8.h"
 #include "proteus_hex8_interpolate.h"
 #include "sfem_prolongation_restriction.h"
+
+#include <sys/stat.h>
+#include "matrixio_crs.h"
 
 namespace sfem {
 
@@ -83,7 +87,7 @@ namespace sfem {
 
     template <typename T>
     std::shared_ptr<BiCGStab<T>> create_bcgs(const std::shared_ptr<Operator<T>> &op,
-                                                           const ExecutionSpace es) {
+                                             const ExecutionSpace es) {
         std::shared_ptr<BiCGStab<T>> bcgs;
 
 #ifdef SFEM_ENABLE_CUDA
@@ -570,7 +574,9 @@ namespace sfem {
                 f->execution_space());
     }
 
-    std::shared_ptr<Operator<real_t>> make_linear_op_variant(const std::shared_ptr<Function> &f, const std::vector<std::pair<std::string, int>> &opts) {
+    std::shared_ptr<Operator<real_t>> make_linear_op_variant(
+            const std::shared_ptr<Function> &f,
+            const std::vector<std::pair<std::string, int>> &opts) {
         auto variant = f->linear_op_variant(opts);
         return sfem::make_op<real_t>(
                 f->space()->n_dofs(),
@@ -579,7 +585,7 @@ namespace sfem {
                 f->execution_space());
     }
 
-    auto crs_hessian(sfem::Function &f,
+    auto hessian_crs(sfem::Function &f,
                      const std::shared_ptr<CRSGraph> &crs_graph,
                      const sfem::ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
@@ -614,6 +620,92 @@ namespace sfem {
                                 (real_t)1);
     }
 
+    auto hessian_crs(std::shared_ptr<sfem::Function> &f,
+                     const std::shared_ptr<Buffer<real_t>> &x,
+                     const sfem::ExecutionSpace es) {
+        auto crs_graph = f->crs_graph();
+
+#ifdef SFEM_ENABLE_CUDA
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+            auto d_crs_graph = sfem::to_device(crs_graph);
+            auto values = sfem::create_buffer<real_t>(d_crs_graph->nnz(), es);
+
+            f->hessian_crs(x->data(),
+                           d_crs_graph->rowptr()->data(),
+                           d_crs_graph->colidx()->data(),
+                           values->data());
+
+            return sfem::d_crs_spmv(d_crs_graph->n_nodes(),
+                                    d_crs_graph->n_nodes(),
+                                    d_crs_graph->rowptr(),
+                                    d_crs_graph->colidx(),
+                                    values,
+                                    (real_t)1);
+        }
+#endif
+        auto values = sfem::h_buffer<real_t>(crs_graph->nnz());
+
+        f->hessian_crs(x->data(),
+                       crs_graph->rowptr()->data(),
+                       crs_graph->colidx()->data(),
+                       values->data());
+
+        // Owns the pointers
+        return sfem::h_crs_spmv(crs_graph->n_nodes(),
+                                crs_graph->n_nodes(),
+                                crs_graph->rowptr(),
+                                crs_graph->colidx(),
+                                values,
+                                (real_t)1);
+    }
+
+    auto hessian_bsr(std::shared_ptr<sfem::Function> &f,
+                     const std::shared_ptr<Buffer<real_t>> &x,
+                     const sfem::ExecutionSpace es) {
+        // Get the mesh node-to-node graph instead of the FunctionSpace scalar adapted graph
+        auto crs_graph = f->space()->mesh_ptr()->node_to_node_graph();
+        const int block_size = f->space()->block_size();
+
+#ifdef SFEM_ENABLE_CUDA
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+
+            auto d_crs_graph = sfem::to_device(crs_graph);
+            auto values =
+                    sfem::create_buffer<real_t>(d_crs_graph->nnz() * block_size * block_size, es);
+
+            f->hessian_bsr(x->data(),
+                           d_crs_graph->rowptr()->data(),
+                           d_crs_graph->colidx()->data(),
+                           values->data());
+
+            return sfem::d_bsr_spmv(d_crs_graph->n_nodes(),
+                                    d_crs_graph->n_nodes(),
+                                    block_size,
+                                    d_crs_graph->rowptr(),
+                                    d_crs_graph->colidx(),
+                                    values,
+                                    (real_t)1);
+        }
+#endif
+        auto values = sfem::h_buffer<real_t>(crs_graph->nnz() * block_size * block_size);
+
+        real_t * x_data = (x)? x->data() : nullptr;
+
+        f->hessian_bsr(x_data,
+                       crs_graph->rowptr()->data(),
+                       crs_graph->colidx()->data(),
+                       values->data());
+
+        // Owns the pointers
+        return sfem::h_bsr_spmv(crs_graph->n_nodes(),
+                                crs_graph->n_nodes(),
+                                block_size,
+                                crs_graph->rowptr(),
+                                crs_graph->colidx(),
+                                values,
+                                (real_t)1);
+    }
+
     real_t residual(sfem::Operator<real_t> &op,
                     const real_t *const rhs,
                     const real_t *const x,
@@ -638,6 +730,46 @@ namespace sfem {
             }
             return sqrt(ret);
         }
+    }
+
+    //     template <typename R, typename C, typename T>
+    //     std::shared_ptr<CRSSpMV<R, C, T>> create_crs_spmv(const ptrdiff_t rows,
+    //                                                  const ptrdiff_t cols,
+    //                                                  const std::shared_ptr<Buffer<R>> &rowptr,
+    //                                                  const std::shared_ptr<Buffer<C>> &colidx,
+    //                                                  const std::shared_ptr<Buffer<T>> &values,
+    //                                                  const T scale_output, ExecutionSpace es)
+    //     {
+    //         #ifdef SFEM_ENABLE_CUDA
+    //                 if (op.execution_space() == sfem::EXECUTION_SPACE_DEVICE) {
+
+    //                 } else
+    // #endif
+    //                 {
+
+    //                 }
+    //     }
+
+    int write_crs(const std::string &path, CRSGraph &graph, sfem::Buffer<real_t> &values) {
+        struct stat st = {0};
+        if (stat(path.c_str(), &st) == -1) {
+            mkdir(path.c_str(), 0700);
+        }
+
+        crs_t crs_out;
+        crs_out.rowptr = (char *)graph.rowptr()->data();
+        crs_out.colidx = (char *)graph.colidx()->data();
+        crs_out.values = (char *)values.data();
+        crs_out.grows = graph.rowptr()->size() - 1;
+        crs_out.lrows = graph.rowptr()->size() - 1;
+        crs_out.lnnz = values.size();
+        crs_out.gnnz = values.size();
+        crs_out.start = 0;
+        crs_out.rowoffset = 0;
+        crs_out.rowptr_type = SFEM_MPI_COUNT_T;
+        crs_out.colidx_type = SFEM_MPI_IDX_T;
+        crs_out.values_type = SFEM_MPI_REAL_T;
+        return crs_write_folder(MPI_COMM_SELF, path.c_str(), &crs_out);
     }
 
 }  // namespace sfem

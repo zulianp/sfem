@@ -99,6 +99,15 @@ void crs_constraint_nodes_to_identity_vec(
     real_t *values
     );
 
+void bsr_constraint_nodes_to_identity_vec(const ptrdiff_t n_dirichlet_nodes,
+                                          const idx_t *dirichlet_nodes,
+                                          const int block_size,
+                                          const int component,
+                                          const real_t diag_value,
+                                          const count_t *rowptr,
+                                          const idx_t *colidx,
+                                          real_t *values);
+
 #ifdef __cplusplus
 }
 #endif

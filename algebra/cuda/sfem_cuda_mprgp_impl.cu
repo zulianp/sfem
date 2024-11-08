@@ -73,7 +73,6 @@ namespace sfem {
     template <typename T>
     __device__ void t_warp_reduce(const T val, T* block_accumulator, T* result) {
         T acc = warp_reduce_32(val);
-
         const unsigned int warp_id = threadIdx.x / SFEM_WARP_SIZE;
         const unsigned int lid = lane_id();
         const unsigned int n_warps = (blockDim.x + SFEM_WARP_SIZE - 1) / SFEM_WARP_SIZE;
@@ -90,6 +89,7 @@ namespace sfem {
             acc = warp_reduce_32(acc);
 
             if (!threadIdx.x) {
+                assert(acc == acc);
                 atomicAdd(result, acc);
             }
         }
@@ -115,6 +115,7 @@ namespace sfem {
             acc = warp_min_32(acc);
 
             if (!threadIdx.x) {
+                assert(acc == acc);
                 result[blockIdx.x] = acc;
             }
         }
@@ -407,6 +408,9 @@ namespace sfem {
             acc_gc += val_gc * val_gc;
         }
 
+        assert(acc_gf == acc_gf);
+        assert(acc_gc == acc_gc);
+
         __shared__ T block_accumulator[SFEM_N_WARPS_PER_BLOCK];
         t_warp_reduce(acc_gf, block_accumulator, norm_free_gradient);
         t_warp_reduce(acc_gc, block_accumulator, norm_chopped_gradient);
@@ -421,6 +425,8 @@ namespace sfem {
                                T* const SFEM_RESTRICT norm_free_gradient,
                                T* const SFEM_RESTRICT norm_chopped_gradient,
                                const T eps) {
+        SFEM_DEBUG_SYNCHRONIZE();
+
         int kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks =
                 std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
