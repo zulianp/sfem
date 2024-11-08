@@ -505,7 +505,7 @@ void isotropic_phasefield_for_fracture_assemble_hessian(const ptrdiff_t nelement
     double tick = MPI_Wtime();
 
     static const int block_size = 4;
-    static const int mat_block_size = block_size * block_size;
+    static const int mat_block_size = 4 * 4;
 
     idx_t ev[4];
     idx_t ks[4];

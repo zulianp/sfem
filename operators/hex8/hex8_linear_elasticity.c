@@ -249,3 +249,71 @@ int affine_hex8_linear_elasticity_apply(const ptrdiff_t nelements,
 
     return SFEM_SUCCESS;
 }
+
+int affine_hex8_linear_elasticity_bsr(const ptrdiff_t nelements,
+                                      const ptrdiff_t nnodes,
+                                      idx_t **const SFEM_RESTRICT elements,
+                                      geom_t **const SFEM_RESTRICT points,
+                                      const real_t mu,
+                                      const real_t lambda,
+                                      const count_t *const SFEM_RESTRICT rowptr,
+                                      const idx_t *const SFEM_RESTRICT colidx,
+                                      real_t *const SFEM_RESTRICT values) {
+    SFEM_UNUSED(nnodes);
+
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+    int SFEM_HEX8_QUADRATURE_ORDER = 2;
+    SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
+    // printf("SFEM_HEX8_QUADRATURE_ORDER = %d\n", SFEM_HEX8_QUADRATURE_ORDER);
+
+    int n_qp = line_q3_n;
+    const scalar_t *qx = line_q3_x;
+    const scalar_t *qw = line_q3_w;
+    if (SFEM_HEX8_QUADRATURE_ORDER == 1) {
+        n_qp = line_q2_n;
+        qx = line_q2_x;
+        qw = line_q2_w;
+    } else if (SFEM_HEX8_QUADRATURE_ORDER == 5) {
+        n_qp = line_q6_n;
+        qx = line_q6_x;
+        qw = line_q6_w;
+    }
+
+#pragma omp parallel
+    {
+        scalar_t element_matrix[(3 * 8) * (3 * 8)];
+#pragma omp for
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[8];
+
+            scalar_t lx[8];
+            scalar_t ly[8];
+            scalar_t lz[8];
+
+            for (int v = 0; v < 8; ++v) {
+                ev[v] = elements[v][i];
+            }
+
+            for (int d = 0; d < 8; d++) {
+                lx[d] = x[ev[d]];
+                ly[d] = y[ev[d]];
+                lz[d] = z[ev[d]];
+            }
+
+            scalar_t jacobian_adjugate[9];
+            scalar_t jacobian_determinant;
+            hex8_adjugate_and_det(
+                    lx, ly, lz, 0.5, 0.5, 0.5, jacobian_adjugate, &jacobian_determinant);
+
+            hex8_linear_elasticity_matrix(
+                    mu, lambda, jacobian_adjugate, jacobian_determinant, element_matrix);
+
+            hex8_local_to_global_bsr3(ev, element_matrix, rowptr, colidx, values);
+        }
+    }
+
+    return SFEM_SUCCESS;
+}

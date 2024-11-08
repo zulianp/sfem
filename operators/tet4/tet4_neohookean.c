@@ -939,7 +939,7 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
     double tick = MPI_Wtime();
 
     static const int block_size = 3;
-    static const int mat_block_size = block_size * block_size;
+    static const int mat_block_size = 3 * 3;
 
 #pragma omp parallel
     {
@@ -1548,7 +1548,7 @@ void neohookean_cauchy_stress_aos(const ptrdiff_t nelements,
     SFEM_UNUSED(nnodes);
 
     static const int block_size = 3;
-    static const int mat_block_size = block_size * block_size;
+    static const int mat_block_size = 3 * 3;
 
 #pragma omp parallel
     {
@@ -1618,7 +1618,7 @@ void neohookean_cauchy_stress_soa(const ptrdiff_t nelements,
     SFEM_UNUSED(nnodes);
 
     static const int block_size = 3;
-    static const int mat_block_size = block_size * block_size;
+    static const int mat_block_size = 3 * 3;
 
 #pragma omp parallel
     {
@@ -1688,7 +1688,7 @@ void neohookean_vonmises_soa(const ptrdiff_t nelements,
     SFEM_UNUSED(nnodes);
 
     static const int block_size = 3;
-    static const int mat_block_size = block_size * block_size;
+    static const int mat_block_size = 3 * 3;
 
 #pragma omp parallel
     {
@@ -1760,7 +1760,7 @@ void neohookean_assemble_hessian_soa(const ptrdiff_t nelements,
     const double tick = MPI_Wtime();
 
     static const int block_size = 3;
-    static const int mat_block_size = block_size * block_size;
+    static const int mat_block_size = 3 * 3;
 
 #pragma omp parallel
     {

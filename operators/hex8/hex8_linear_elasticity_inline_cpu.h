@@ -3,6 +3,7 @@
 
 #include "hex8_inline_cpu.h"
 
+
 static SFEM_INLINE void hex8_linear_elasticity_apply_adj(const scalar_t mu,
                                                          const scalar_t lambda,
                                                          const scalar_t *const SFEM_RESTRICT

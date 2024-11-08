@@ -37,6 +37,17 @@ int affine_hex8_linear_elasticity_apply(const ptrdiff_t nelements,
                                         real_t *const outx,
                                         real_t *const outy,
                                         real_t *const outz);
+
+int affine_hex8_linear_elasticity_bsr(const ptrdiff_t nelements,
+                                      const ptrdiff_t nnodes,
+                                      idx_t **const SFEM_RESTRICT elements,
+                                      geom_t **const SFEM_RESTRICT points,
+                                      const real_t mu,
+                                      const real_t lambda,
+                                      const count_t *const SFEM_RESTRICT rowptr,
+                                      const idx_t *const SFEM_RESTRICT colidx,
+                                      real_t *const SFEM_RESTRICT values);
+
 #ifdef __cplusplus
 }
 #endif

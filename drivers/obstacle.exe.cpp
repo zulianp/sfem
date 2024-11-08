@@ -68,15 +68,24 @@ int main(int argc, char *argv[]) {
     bool SFEM_USE_GPU = true;
     SFEM_READ_ENV(SFEM_USE_GPU, atoi);
 
+    int SFEM_EXPORT_CRS_MATRIX = false;
+    SFEM_READ_ENV(SFEM_EXPORT_CRS_MATRIX, atoi);
+
+    int SFEM_MATRIX_FREE = 1;
+    SFEM_READ_ENV(SFEM_MATRIX_FREE, atoi);
+
+    int SFEM_USE_BSR_MATRIX = 1;
+    SFEM_READ_ENV(SFEM_USE_BSR_MATRIX, atoi);
+
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
     if (SFEM_USE_GPU) {
         es = sfem::EXECUTION_SPACE_DEVICE;
     }
 
-    if (!SFEM_ELEMENT_REFINE_LEVEL) {
-        fprintf(stderr, "[Error] SFEM_ELEMENT_REFINE_LEVEL must be defined >= 2\n");
-        return EXIT_FAILURE;
+    struct stat st = {0};
+    if (stat(output_path, &st) == -1) {
+        mkdir(output_path, 0700);
     }
 
     double tick = MPI_Wtime();
@@ -110,19 +119,39 @@ int main(int argc, char *argv[]) {
 
     auto contact_conds = sfem::create_contact_conditions_from_env(fs, es);
 
-    struct stat st = {0};
-    if (stat(output_path, &st) == -1) {
-        mkdir(output_path, 0700);
-    }
-
-    auto linear_op = sfem::make_linear_op(f);
-
     ptrdiff_t ndofs = fs->n_dofs();
     auto x = sfem::create_buffer<real_t>(ndofs, es);
     auto rhs = sfem::create_buffer<real_t>(ndofs, es);
 
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());
+
+    std::shared_ptr<sfem::Operator<real_t>> linear_op;
+
+    if (SFEM_MATRIX_FREE) {
+        linear_op = sfem::make_linear_op(f);
+    } else {
+        if (SFEM_USE_BSR_MATRIX && fs->block_size() != 1) {
+            linear_op = sfem::hessian_bsr(f, x, es);
+        } else {
+            linear_op = sfem::hessian_crs(f, x, es);
+        }
+    }
+
+    if (SFEM_EXPORT_CRS_MATRIX) {
+        auto crs_graph = f->crs_graph();
+
+        auto values = sfem::create_buffer<real_t>(crs_graph->colidx()->size(), es);
+
+        f->hessian_crs(x->data(),
+                       crs_graph->rowptr()->data(),
+                       crs_graph->colidx()->data(),
+                       values->data());
+
+        char path[2048];
+        sprintf(path, "%s/crs_matrix", output_path);
+        write_crs(path, *crs_graph, *values);
+    }
 
     std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> solver;
     {
@@ -144,9 +173,9 @@ int main(int argc, char *argv[]) {
         }
 
 #ifdef SFEM_ENABLE_CUDA
-       auto upper_bound = sfem::to_device(h_upper_bound);
+        auto upper_bound = sfem::to_device(h_upper_bound);
 #else
-       auto upper_bound = h_upper_bound;
+        auto upper_bound = h_upper_bound;
 #endif
 
         contact_conds->apply(upper_bound->data());
@@ -162,6 +191,7 @@ int main(int argc, char *argv[]) {
         }
 
         mprgp->verbose = true;
+        // mprgp->debug = true;
         mprgp->set_max_it(SFEM_MAX_IT);
         mprgp->set_rtol(1e-12);
         mprgp->set_atol(1e-8);
@@ -173,14 +203,22 @@ int main(int argc, char *argv[]) {
     solver->apply(rhs->data(), x->data());
     double solve_tock = MPI_Wtime();
 
+#ifdef SFEM_ENABLE_CUDA
+    auto h_x = sfem::to_host(x);
+    auto h_rhs = sfem::to_host(rhs);
+#else
+    auto h_x = x;
+    auto h_rhs = rhs;
+#endif
+
     char path[2048];
     sprintf(path, "%s/u.raw", output_path);
-    if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)x->data(), ndofs, ndofs)) {
+    if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_x->data(), ndofs, ndofs)) {
         return SFEM_FAILURE;
     }
 
     sprintf(path, "%s/rhs.raw", output_path);
-    if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)rhs->data(), ndofs, ndofs)) {
+    if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_rhs->data(), ndofs, ndofs)) {
         return SFEM_FAILURE;
     }
 
@@ -192,7 +230,7 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("%s (%s):\n", argv[0], "PROTEUS_HEX8");
+        printf("%s (%s):\n", argv[0], type_to_string(fs->element_type()));
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld #dofs %ld\n", (long)nelements, (long)nnodes, (long)ndofs);
         printf("TTS:\t\t%g [s], solve: %g [s])\n", tock - tick, solve_tock - solve_tick);

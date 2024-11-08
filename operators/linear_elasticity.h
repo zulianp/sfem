@@ -60,9 +60,8 @@ int linear_elasticity_apply_soa(const enum ElemType element_type,
                                 geom_t **const SFEM_RESTRICT xyz,
                                 const real_t mu,
                                 const real_t lambda,
-                                 const real_t **const SFEM_RESTRICT u,
-                                 real_t **const SFEM_RESTRICT values);
-
+                                const real_t **const SFEM_RESTRICT u,
+                                real_t **const SFEM_RESTRICT values);
 
 //////////////////////////
 // Array of structures
@@ -108,6 +107,18 @@ int linear_elasticity_apply_aos(const enum ElemType element_type,
                                 const real_t lambda,
                                 const real_t *const SFEM_RESTRICT u,
                                 real_t *const SFEM_RESTRICT values);
+
+// Block sparse row (BSR) https://docs.nvidia.com/cuda/cusparse/index.html#cusparse-storage-formats
+int linear_elasticity_bsr(const enum ElemType element_type,
+                          const ptrdiff_t nelements,
+                          const ptrdiff_t nnodes,
+                          idx_t **const SFEM_RESTRICT elems,
+                          geom_t **const SFEM_RESTRICT xyz,
+                          const real_t mu,
+                          const real_t lambda,
+                          const count_t *const SFEM_RESTRICT rowptr,
+                          const idx_t *const SFEM_RESTRICT colidx,
+                          real_t *const SFEM_RESTRICT values);
 
 #ifdef __cplusplus
 }

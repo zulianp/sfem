@@ -19,6 +19,55 @@
 #define MIN(a, b) ((a) > (b) ? (b) : (a))
 #endif
 
+template <typename idx_t>
+static inline __device__ __host__ int cu_hex8_linear_search(const idx_t target,
+                                                            const idx_t *const arr,
+                                                            const int size) {
+    int i;
+    for (i = 0; i < size - 4; i += 4) {
+        if (arr[i] == target) return i;
+        if (arr[i + 1] == target) return i + 1;
+        if (arr[i + 2] == target) return i + 2;
+        if (arr[i + 3] == target) return i + 3;
+    }
+    for (; i < size; i++) {
+        if (arr[i] == target) return i;
+    }
+    return -1;
+}
+
+template <typename idx_t>
+static inline __device__ __host__ int cu_hex8_find_col(const idx_t key,
+                                                       const idx_t *const row,
+                                                       const int lenrow) {
+    return cu_hex8_linear_search(key, row, lenrow);
+}
+
+template <typename idx_t>
+static inline __device__ __host__ void cu_hex8_find_cols(const idx_t *SFEM_RESTRICT targets,
+                                                         const idx_t *const SFEM_RESTRICT row,
+                                                         const int lenrow,
+                                                         int *SFEM_RESTRICT ks) {
+    if (lenrow > 32) {
+        for (int d = 0; d < 8; ++d) {
+            ks[d] = cu_hex8_find_col(targets[d], row, lenrow);
+        }
+    } else {
+#pragma unroll(8)
+        for (int d = 0; d < 8; ++d) {
+            ks[d] = 0;
+        }
+
+        for (int i = 0; i < lenrow; ++i) {
+#pragma unroll(8)
+            for (int d = 0; d < 8; ++d) {
+                ks[d] += row[i] < targets[d];
+            }
+        }
+    }
+}
+
+
 template <typename geom_t, typename scalar_t, typename jacobian_t>
 static inline __host__ __device__ void cu_hex8_adjugate_and_det(
         const geom_t *const SFEM_RESTRICT x,
