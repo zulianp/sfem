@@ -58,6 +58,8 @@ int main(int argc, char *argv[]) {
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     int SFEM_PRINT_VECTORS = 0;
     int SFEM_SKIP_VERIFICATION = 0;
+    int SFEM_MATRIX_FREE = 1;
+    int SFEM_COARSE_MATRIX_FREE = 1;
 
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_USE_GPU, atoi);
@@ -65,6 +67,8 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
     SFEM_READ_ENV(SFEM_PRINT_VECTORS, atoi);
     SFEM_READ_ENV(SFEM_SKIP_VERIFICATION, atoi);
+    SFEM_READ_ENV(SFEM_MATRIX_FREE, atoi);
+    SFEM_READ_ENV(SFEM_COARSE_MATRIX_FREE, atoi);
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
@@ -101,10 +105,22 @@ int main(int argc, char *argv[]) {
     // f->add_constraint(conds);
     f->add_operator(op);
 
-    auto fine_op = sfem::make_linear_op(f);
+    std::shared_ptr<sfem::Operator<real_t>> fine_op, coarse_op;
+
+    if(SFEM_MATRIX_FREE) {
+        fine_op = sfem::make_linear_op(f);
+    } else {
+        fine_op = sfem::hessian_bsr(f, nullptr, es);
+    }
+
     auto fs_coarse = fs->derefine();
     auto f_coarse = f->derefine(fs_coarse, true);
-    auto coarse_op = sfem::make_linear_op(f_coarse);
+
+    if(SFEM_COARSE_MATRIX_FREE) {
+        coarse_op = sfem::make_linear_op(f_coarse);
+    } else {
+        coarse_op = sfem::hessian_bsr(f_coarse, nullptr, es);
+    }
 
     auto restriction = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
     auto prolong_unconstr = sfem::create_hierarchical_prolongation(fs_coarse, fs, es);

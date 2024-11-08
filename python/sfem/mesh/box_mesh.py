@@ -16,6 +16,118 @@ geom_t = np.float32
 def leading_dim(nx, ny, nz):
     return [nz,  nz*nx, 1]
 
+def create_face_idx(n, nxf):
+    return np.zeros((n,  nxf), dtype=idx_t)
+
+def create_boundary_faces(cell_type, nx, ny, nz):
+    ld = leading_dim(nx, ny, nz)
+
+    fact = 2
+    nxf = 3
+
+    left = create_face_idx(fact*(ny-1)*(nz-1),  nxf)
+    right = create_face_idx(fact*(ny-1)*(nz-1), nxf)
+
+    top = create_face_idx(fact*(nx-1)*(nz-1), nxf)
+    bottom = create_face_idx(fact*(nx-1)*(nz-1), nxf)
+
+    front = create_face_idx(nx*ny, nxf)
+    back = create_face_idx(nx*ny, nxf)
+
+    idx = 0
+    for zi in range(0, nz-1):
+        for yi in range(0, ny-1):
+
+            xl = 0 * ld[0]
+            xr = (nx - 1) * ld[0]
+
+            y0 = yi * ld[1]
+            z0 = zi * ld[2]
+            p0 = y0 + z0
+
+            y1 = (yi + 1) * ld[1]
+            z1 = zi * ld[2]
+            p1 = y1 + z1
+
+            y2 = (yi + 1) * ld[1]
+            z2 = (zi + 1) * ld[2]
+            p2 = y2 + z2
+
+            y3 = yi * ld[1]
+            z3 = (zi+1) * ld[2]
+            p3 = y3 + z3
+
+            quad_left  = [ xl + p0, xl + p1, xl + p2, xl + p3 ]
+            quad_right = [ xr + p0, xr + p1, xr + p2, xr + p3 ]
+
+            left[idx, 0]  = quad_left[0]
+            left[idx, 1]  = quad_left[2]
+            left[idx, 2]  = quad_left[1]
+
+
+            right[idx, 0]  = quad_right[0]
+            right[idx, 1]  = quad_right[1]
+            right[idx, 2]  = quad_right[2]
+
+            idx += 1
+
+            left[idx, 0]  = quad_left[0]
+            left[idx, 1]  = quad_left[3]
+            left[idx, 2]  = quad_left[2]
+
+            right[idx, 0]  = quad_right[0]
+            right[idx, 1]  = quad_right[2]
+            right[idx, 2]  = quad_right[3]
+
+            idx += 1
+        
+            
+
+    # idx = 0 
+    # for zi in range(0, nz):
+    #     for xi in range(0, nx):
+            
+    #         yb = 0 * ld[1]
+    #         yt = (ny - 1) * ld[1]
+
+    #         xp = yi * ld[1]
+    #         zp = zi * ld[2]
+
+    #         p = xp + zp
+
+    #         bottom[idx]  = yb + p
+    #         top[idx]     = yt + p
+
+    #         idx += 1
+
+    # idx = 0 
+    # for yi in range(0, ny):
+    #     for xi in range(0, nx):
+            
+    #         zf = 0 * ld[2]
+    #         zb = (nz - 1) * ld[2]
+
+    #         xp = yi * ld[1]
+    #         yp = yi * ld[1]
+
+    #         p = xp + yp
+
+    #         front[idx] = zf + p
+    #         back[idx]  = zb + p
+
+    #         idx += 1
+
+    # print(left)
+    return {
+        "left"      : left,
+        "right"     : right
+        # ,
+        # "top"       : top,
+        # "bottom"    : bottom,
+        # "front"     : front,
+        # "back"      : back
+    }
+
 def create_boundary_nodes(nx, ny, nz):
     ld = leading_dim(nx, ny, nz)
 
@@ -372,3 +484,21 @@ if __name__ == '__main__':
     for k, v in boundary_nodes.items():
         name = f'{k}.{str(idx_t.__name__)}.raw'
         v.tofile(f'{boundary_nodes_dir}/{name}')
+
+
+    boundary_faces_dir = f'{output_folder}/surface'
+    if not os.path.exists(boundary_faces_dir):
+        os.mkdir(f'{boundary_faces_dir}')
+
+    boundary_faces = create_boundary_faces(cell_type, nx, ny, nz)
+    for k, v in boundary_faces.items():
+        path = f'{boundary_faces_dir}/{k}'
+        if not os.path.exists(path):
+            os.mkdir(f'{path}')
+
+
+        n, nxf = v.shape
+        print(f'{k}: {path} {n} {nxf}')
+        for d in range(0, nxf):
+            idx_path = f'{path}/i{d}.{str(idx_t.__name__)}.raw'
+            v[:, d].flatten().tofile(idx_path)

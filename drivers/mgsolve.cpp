@@ -80,6 +80,7 @@ int main(int argc, char *argv[]) {
     double SFEM_CHEB_EIG_TOL = 1e-5;
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     int SFEM_VERBOSITY_LEVEL = 1;
+    int SFEM_USE_BSR_MATRIX = 0;
 
     SFEM_READ_ENV(SFEM_MATRIX_FREE, atoi);
     SFEM_READ_ENV(SFEM_COARSE_MATRIX_FREE, atoi);
@@ -101,6 +102,7 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_SMOOTHER_SWEEPS, atoi);
     SFEM_READ_ENV(SFEM_CHEB_EIG_TOL, atof);
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
+    SFEM_READ_ENV(SFEM_USE_BSR_MATRIX, atoi);
 
     printf("SFEM_MATRIX_FREE: %d\n"
            "SFEM_COARSE_MATRIX_FREE: %d\n"
@@ -117,7 +119,8 @@ int main(int argc, char *argv[]) {
            "SFEM_SMOOTHER_SWEEPS: %d\n"
            "SFEM_CHEB_EIG_TOL: %g\n"
            "SFEM_USE_CRS_GRAPH_RESTRICT: %d\n"
-           "SFEM_ELEMENT_REFINE_LEVEL: %d\n",
+           "SFEM_ELEMENT_REFINE_LEVEL: %d\n"
+           "SFEM_USE_BSR_MATRIX: %d\n",
            SFEM_MATRIX_FREE,
            SFEM_COARSE_MATRIX_FREE,
            SFEM_OPERATOR,
@@ -133,7 +136,8 @@ int main(int argc, char *argv[]) {
            SFEM_SMOOTHER_SWEEPS,
            SFEM_CHEB_EIG_TOL,
            SFEM_USE_CRS_GRAPH_RESTRICT,
-           SFEM_ELEMENT_REFINE_LEVEL);
+           SFEM_ELEMENT_REFINE_LEVEL,
+           SFEM_USE_BSR_MATRIX);
 
 #ifdef SFEM_ENABLE_CUDA
     sfem::register_device_ops();
@@ -193,12 +197,12 @@ int main(int argc, char *argv[]) {
     std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> smoother;
 
     if (SFEM_MATRIX_FREE) {
-#ifdef SFEM_ENABLE_CUDA
+        // #ifdef SFEM_ENABLE_CUDA
         // FIXME
         linear_op = sfem::make_linear_op(f);
-#else
-        linear_op = sfem::make_linear_op_variant(f, {{"ASSUME_AFFINE", 1}});
-#endif
+        // #else
+        //         linear_op = sfem::make_linear_op_variant(f, {{"ASSUME_AFFINE", 1}});
+        // #endif
 
         if (SFEM_USE_CHEB) {
             auto cheb = sfem::create_cheb3<real_t>(linear_op, es);
@@ -218,37 +222,40 @@ int main(int argc, char *argv[]) {
         }
 
     } else {
-        auto crs = hessian_crs(*f, f->crs_graph(), es);
-        linear_op = crs;
-        int err = f->hessian_diag(nullptr, diag->data());
-        assert(!err);
-
-        if (SFEM_USE_CHEB) {
-            auto cheb = sfem::create_cheb3<real_t>(linear_op, es);
-
-            // Power-method
-            auto r = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-            residual(*linear_op, rhs->data(), x->data(), r->data());
-            cheb->init(r->data());
-
-            cheb->scale_eig_max = SFEM_CHEB_EIG_MAX_SCALE;
-            cheb->set_max_it(SFEM_SMOOTHER_SWEEPS);
-            cheb->set_initial_guess_zero(false);
-            smoother = cheb;
+        if (SFEM_USE_BSR_MATRIX && fs->block_size() != 1) {
+            linear_op = sfem::hessian_bsr(f, x, es);
         } else {
-            if ((!SFEM_USE_PRECONDITIONER || SFEM_MG) && fs->block_size() == 1) {
-                auto gs = sfem::h_gauss_seidel(crs, diag->data());
-                gs->set_max_it(SFEM_SMOOTHER_SWEEPS);
-                // gs->verbose = true;
-                smoother = gs;
-            }
+            auto crs = hessian_crs(*f, f->crs_graph(), es);
+            linear_op = crs;
         }
+
+        // int err = f->hessian_diag(nullptr, diag->data());
+        // assert(!err);
+
+        // if (SFEM_USE_CHEB) {
+        auto cheb = sfem::create_cheb3<real_t>(linear_op, es);
+
+        // Power-method
+        cheb->scale_eig_max = SFEM_CHEB_EIG_MAX_SCALE;
+        cheb->init_with_ones();
+        cheb->set_max_it(SFEM_SMOOTHER_SWEEPS);
+        cheb->set_initial_guess_zero(false);
+        smoother = cheb;
+        // } else {
+        //     if ((!SFEM_USE_PRECONDITIONER || SFEM_MG) && fs->block_size() == 1) {
+        //         auto gs = sfem::h_gauss_seidel(crs, diag->data());
+        //         gs->set_max_it(SFEM_SMOOTHER_SWEEPS);
+        //         // gs->verbose = true;
+        //         smoother = gs;
+        //     }
+        // }
 
         // if (SFEM_DEBUG) {
         //     array_write(
         //             comm, "./rhs.raw", SFEM_MPI_REAL_T, rhs->data(), fs->n_dofs(), fs->n_dofs());
         //     array_write(
-        //             comm, "./diag.raw", SFEM_MPI_REAL_T, diag->data(), fs->n_dofs(), fs->n_dofs());
+        //             comm, "./diag.raw", SFEM_MPI_REAL_T, diag->data(), fs->n_dofs(),
+        //             fs->n_dofs());
         //     array_write(comm,
         //                 "./rowptr.raw",
         //                 SFEM_MPI_COUNT_T,
@@ -300,7 +307,11 @@ int main(int argc, char *argv[]) {
             if (f_coarse->space()->block_size() == 1) {
                 linear_op_coarse = hessian_crs(*f_coarse, coarse_graph, es);
             } else {
-                linear_op_coarse = hessian_crs(*f_coarse, f_coarse->crs_graph(), es);
+                if (SFEM_USE_BSR_MATRIX) {
+                    linear_op_coarse = sfem::hessian_bsr(f_coarse, nullptr, es);
+                } else {
+                    linear_op_coarse = hessian_crs(*f_coarse, f_coarse->crs_graph(), es);
+                }
             }
         }
 

@@ -1515,6 +1515,24 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
+        int hessian_bsr(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values) override {
+            auto &ssm = space->semi_structured_mesh();
+
+            return proteus_affine_hex8_elasticity_bsr(ssm.level(),
+                                                      ssm.n_elements(),
+                                                      ssm.interior_start(),
+                                                      ssm.element_data(),
+                                                      ssm.point_data(),
+                                                      this->mu,
+                                                      this->lambda,
+                                                      rowptr,
+                                                      colidx,
+                                                      values);
+        }
+
         int hessian_diag(const real_t *const, real_t *const out) override {
             assert(false);
             return SFEM_FAILURE;

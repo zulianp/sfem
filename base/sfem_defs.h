@@ -50,6 +50,7 @@ enum ElemType {
     NODE1 = 1,
     EDGE2 = 2,
     EDGE3 = 11,
+    EDGESHELL2 = 101,
     BEAM2 = 100002,
     TRI3 = 3,
     TRI6 = 6,
@@ -105,6 +106,8 @@ SFEM_INLINE static const char* type_to_string(enum ElemType type) {
             return "EDGE2";
         case EDGE3:
             return "EDGE3";
+        case BEAM2:
+            return "BEAM2";
         case TRI3:
             return "TRI3";
         case TRISHELL3:
@@ -193,7 +196,7 @@ SFEM_INLINE static enum ElemType shell_type(const enum ElemType type) {
         case TRISHELL10:
             return TRISHELL10;
         case EDGE2:
-            return BEAM2;
+            return EDGESHELL2;
         case BEAM2:
             return BEAM2;
         case QUAD4:

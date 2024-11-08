@@ -14,7 +14,6 @@ namespace sfem {
             const std::shared_ptr<Buffer<real_t>> &values,
             const real_t scale_output);
 
-
     std::shared_ptr<BSRSpMV<count_t, idx_t, real_t>> d_bsr_spmv(
             const ptrdiff_t rows,
             const ptrdiff_t cols,
@@ -23,7 +22,6 @@ namespace sfem {
             const std::shared_ptr<Buffer<idx_t>> &colidx,
             const std::shared_ptr<Buffer<real_t>> &values,
             const real_t scale_output);
-
 }
 
 #endif  // SFEM_CUDA_CRSSPMV_HPP
