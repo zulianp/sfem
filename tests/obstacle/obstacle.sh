@@ -34,6 +34,8 @@ REFINEMENT=0
 case $CASE in
 	Cylinder)
 		DIMS=3
+		CASE_OBS_SURF=$CASE/surface/outlet
+
 		if [[ -d "$CASE" ]] 
 		then
 			echo "Reusing existing $CASE database"
@@ -48,13 +50,15 @@ case $CASE in
 	;;
 	Box3D)
 		DIMS=3
+		CASE_OBS_SURF=$CASE/surface/right
+
 		if [[ -d "$CASE" ]] 
 		then
 			echo "Reusing existing $CASE database"
 		else
 			mkdir workspace
 			cd workspace
-			N=4
+			N=10
 			box_mesh.py mesh -c tetra -x $N -y $N -z $N --height=1 --width=1 --depth=1
 			cd -
 			mv workspace/mesh $CASE
@@ -105,7 +109,7 @@ then
 	raw_to_db.py $CASE out.vtk  \
 	 --point_data="output/soa/*.raw" --point_data_type="$SFEM_REAL_T"
 
-	raw_to_db.py $CASE/surface/outlet obstacle.vtk  \
+	raw_to_db.py $CASE_OBS_SURF obstacle.vtk  \
 		--coords=$CASE \
 	  	--point_data="output/soa/obs.0.raw.raw" \
 	  	--point_data_type="$SFEM_REAL_T"
