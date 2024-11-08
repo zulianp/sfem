@@ -546,3 +546,100 @@ int proteus_affine_hex8_linear_elasticity_apply(const int level,
 
     return SFEM_SUCCESS;
 }
+
+int proteus_affine_hex8_elasticity_bsr(const int level,
+                                       const ptrdiff_t nelements,
+                                       const ptrdiff_t nnodes,
+                                       idx_t **const SFEM_RESTRICT elements,
+                                       geom_t **const SFEM_RESTRICT points,
+                                       const real_t mu,
+                                       const real_t lambda,
+                                       const count_t *const SFEM_RESTRICT rowptr,
+                                       const idx_t *const SFEM_RESTRICT colidx,
+                                       real_t *const SFEM_RESTRICT values) {
+    const int nxe = proteus_hex8_nxe(level);
+    const int txe = proteus_hex8_txe(level);
+
+    const int proteus_to_std_hex8_corners[8] = {// Bottom
+                                                proteus_hex8_lidx(level, 0, 0, 0),
+                                                proteus_hex8_lidx(level, level, 0, 0),
+                                                proteus_hex8_lidx(level, level, level, 0),
+                                                proteus_hex8_lidx(level, 0, level, 0),
+
+                                                // Top
+                                                proteus_hex8_lidx(level, 0, 0, level),
+                                                proteus_hex8_lidx(level, level, 0, level),
+                                                proteus_hex8_lidx(level, level, level, level),
+                                                proteus_hex8_lidx(level, 0, level, level)};
+    int Lm1 = level - 1;
+    int Lm13 = Lm1 * Lm1 * Lm1;
+
+#pragma omp parallel
+    {
+        idx_t *ev = malloc(nxe * sizeof(idx_t));
+
+        scalar_t x[8];
+        scalar_t y[8];
+        scalar_t z[8];
+
+        scalar_t m_adjugate[9], adjugate[9];
+        scalar_t element_matrix[(3 * 8) * (3 * 8)];
+
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            {
+                // Gather elemental data
+                for (int d = 0; d < nxe; d++) {
+                    ev[d] = elements[d][e];
+                }
+
+                for (int d = 0; d < 8; d++) {
+                    x[d] = points[0][ev[proteus_to_std_hex8_corners[d]]];
+                    y[d] = points[1][ev[proteus_to_std_hex8_corners[d]]];
+                    z[d] = points[2][ev[proteus_to_std_hex8_corners[d]]];
+                }
+            }
+
+            const scalar_t h = 1. / level;
+            
+            // 2) Evaluate Adjugate
+            scalar_t adjugate[9];
+            scalar_t jacobian_determinant;
+            hex8_adjugate_and_det(x, y, z, 0.5, 0.5, 0.5, adjugate, &jacobian_determinant);
+
+            // 3) Transform to sub-FFF
+            scalar_t sub_adjugate[9];
+            scalar_t sub_determinant;
+            hex8_sub_adj_0(adjugate, jacobian_determinant, h, sub_adjugate, &sub_determinant);
+
+            hex8_linear_elasticity_matrix(
+                    mu, lambda, sub_adjugate, sub_determinant, element_matrix);
+
+            // Iterate over sub-elements
+            for (int zi = 0; zi < level; zi++) {
+                for (int yi = 0; yi < level; yi++) {
+                    for (int xi = 0; xi < level; xi++) {
+                        // Convert to standard HEX8 local ordering (see 3-4 and 6-7)
+                        idx_t lev[8] = {// Bottom
+                                        ev[proteus_hex8_lidx(level, xi, yi, zi)],
+                                        ev[proteus_hex8_lidx(level, xi + 1, yi, zi)],
+                                        ev[proteus_hex8_lidx(level, xi + 1, yi + 1, zi)],
+                                        ev[proteus_hex8_lidx(level, xi, yi + 1, zi)],
+                                        // Top
+                                        ev[proteus_hex8_lidx(level, xi, yi, zi + 1)],
+                                        ev[proteus_hex8_lidx(level, xi + 1, yi, zi + 1)],
+                                        ev[proteus_hex8_lidx(level, xi + 1, yi + 1, zi + 1)],
+                                        ev[proteus_hex8_lidx(level, xi, yi + 1, zi + 1)]};
+
+                        hex8_local_to_global_bsr3(lev, element_matrix, rowptr, colidx, values);
+                    }
+                }
+            }
+        }
+
+        // Clean-up
+        free(ev);
+    }
+
+    return SFEM_SUCCESS;
+}

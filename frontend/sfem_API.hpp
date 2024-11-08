@@ -689,7 +689,9 @@ namespace sfem {
 #endif
         auto values = sfem::h_buffer<real_t>(crs_graph->nnz() * block_size * block_size);
 
-        f->hessian_bsr(x->data(),
+        real_t * x_data = (x)? x->data() : nullptr;
+
+        f->hessian_bsr(x_data,
                        crs_graph->rowptr()->data(),
                        crs_graph->colidx()->data(),
                        values->data());

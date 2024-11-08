@@ -71,6 +71,7 @@ export SFEM_MATRIX_FREE=1
 export SFEM_HEX8_ASSUME_AFFINE=1
 export SFEM_HEX8_ASSUME_AXIS_ALIGNED=1
 export SFEM_USE_CHEB=0
+# export SFEM_USE_BSR_MATRIX=1
 
 
 $LAUNCH mgsolve hex8_mesh output

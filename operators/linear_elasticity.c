@@ -218,11 +218,10 @@ int linear_elasticity_assemble_diag_aos(const enum ElemType element_type,
                                         const real_t lambda,
                                         real_t *const SFEM_RESTRICT values) {
     switch (element_type) {
-        // case TRI3: {
-        //     return tri3_linear_elasticity_assemble_diag(
-        //         nelements, nnodes, elements, points, mu, lambda, values);
-        //
-        // }
+        case TRI3: {
+            return tri3_linear_elasticity_diag(
+                    nelements, nnodes, elements, points, mu, lambda, 2, &values[0], &values[1]);
+        }
         case TET4: {
             return tet4_linear_elasticity_diag(nelements,
                                                nnodes,
@@ -432,6 +431,10 @@ int linear_elasticity_bsr(const enum ElemType element_type,
     switch (element_type) {
         case TET4: {
             return tet4_linear_elasticity_bsr(
+                    nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
+        }
+        case HEX8: {
+            return affine_hex8_linear_elasticity_bsr(
                     nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
         }
         default: {
