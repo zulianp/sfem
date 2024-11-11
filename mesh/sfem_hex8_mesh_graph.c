@@ -238,7 +238,6 @@ static SFEM_INLINE void hex8_find_corner_cols(const idx_t *targets,
     }
 }
 
-
 static void index_face(const int L,
                        mesh_t *mesh,
                        const int *const local_side_table,
@@ -787,7 +786,7 @@ int proteus_hex8_mesh_skin(const int L,
                         start[2] = 0;
                         end[2] = 1;
                         A3SET(start, 0, L, 0);
-                        A3SET(end,  L+1, -1, 1);
+                        A3SET(end, L + 1, -1, 1);
                         A3SET(increment, 1, -1, 1);
                         // printf("HEX8_BOTTOM\n");
                         break;
@@ -806,7 +805,7 @@ int proteus_hex8_mesh_skin(const int L,
                     }
                     case HEX8_BACK: {
                         A3SET(start, L, L, 0);
-                        A3SET(end,  -1, L+1, L + 1);
+                        A3SET(end, -1, L + 1, L + 1);
                         A3SET(increment, -1, 1, 1);
                         // printf("HEX8_BACK\n");
                         break;
@@ -837,4 +836,16 @@ int proteus_hex8_mesh_skin(const int L,
 
     free(table);
     return SFEM_SUCCESS;
+}
+
+int proteus_hex8_crs_graph(const int L,
+                           const ptrdiff_t nelements,
+                           const ptrdiff_t nnodes,
+                           idx_t **const elements,
+                           count_t **out_rowptr,
+                           idx_t **out_colidx) {
+    fprintf("[Warning] proteus_hex8_crs_graph generates a very space-inneficient crs graph! "
+            "TOBEFIXED!\n");
+    int nxe = proteus_hex8_nxe(L);
+    return build_crs_graph_from_element(nelements, nnodes, nxe, elements, out_rowptr, out_colidx);
 }

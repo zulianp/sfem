@@ -231,6 +231,7 @@ namespace sfem {
 
         std::shared_ptr<Buffer<idx_t *>> elements;
         ptrdiff_t n_unique_nodes{-1}, interior_start{-1};
+        std::shared_ptr<CRSGraph> node_to_node_graph;
 
         void init(const std::shared_ptr<Mesh> macro_mesh, const int level) {
             this->macro_mesh = macro_mesh;
@@ -274,6 +275,29 @@ namespace sfem {
         ~Impl() {}
     };
 
+    std::shared_ptr<CRSGraph> SemiStructuredMesh::node_to_node_graph() {
+        // printf("SemiStructuredMesh::node_to_node_graph\n");
+        if (impl_->node_to_node_graph) {
+            return impl_->node_to_node_graph;
+        }
+
+        count_t *rowptr{nullptr};
+        idx_t *colidx{nullptr};
+
+        proteus_hex8_crs_graph(impl_->level,
+                               this->n_elements(),
+                               this->n_nodes(),
+                               this->element_data(),
+                               &rowptr,
+                               &colidx);
+
+        impl_->node_to_node_graph = std::make_shared<CRSGraph>(
+                Buffer<count_t>::own(this->n_nodes() + 1, rowptr, free, MEMORY_SPACE_HOST),
+                Buffer<idx_t>::own(rowptr[this->n_nodes()], colidx, free, MEMORY_SPACE_HOST));
+
+        return impl_->node_to_node_graph;
+    }
+
     int SemiStructuredMesh::n_nodes_per_element() const { return proteus_hex8_nxe(impl_->level); }
 
     idx_t **SemiStructuredMesh::element_data() { return impl_->elements->data(); }
@@ -314,6 +338,16 @@ namespace sfem {
         ~Impl() {}
 
         int initialize_dof_to_dof_graph(const int block_size) {
+            if (semi_structured_mesh) {
+                // printf("SemiStructuredMesh::node_to_node_graph (in FunctionSpace)\n");
+                if (!node_to_node_graph) {
+                    node_to_node_graph = semi_structured_mesh->node_to_node_graph();
+                }
+                // FIXME
+                dof_to_dof_graph = node_to_node_graph;
+                return SFEM_SUCCESS;
+            }
+
             // This is for nodal discretizations (CG)
             if (!node_to_node_graph) {
                 node_to_node_graph = mesh->create_node_to_node_graph(element_type);
@@ -327,7 +361,7 @@ namespace sfem {
                 }
             }
 
-            return 0;
+            return SFEM_SUCCESS;
         }
     };
 
@@ -346,6 +380,7 @@ namespace sfem {
 
     std::shared_ptr<CRSGraph> FunctionSpace::node_to_node_graph() {
         impl_->initialize_dof_to_dof_graph(this->block_size());
+
         return impl_->node_to_node_graph;
     }
 
