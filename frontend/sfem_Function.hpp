@@ -106,6 +106,9 @@ namespace sfem {
         SemiStructuredMesh(const std::shared_ptr<Mesh> macro_mesh, const int level);
         ~SemiStructuredMesh();
 
+        std::shared_ptr<CRSGraph> node_to_node_graph();
+        
+
         static std::shared_ptr<SemiStructuredMesh> create(const std::shared_ptr<Mesh> macro_mesh,
                                                           const int level) {
             return std::make_shared<SemiStructuredMesh>(macro_mesh, level);

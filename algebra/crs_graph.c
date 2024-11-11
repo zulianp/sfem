@@ -381,6 +381,22 @@ int build_crs_graph_for_elem_type(const int element_type,
             nelements, nnodes, elem_num_nodes(element_type), elems, out_rowptr, out_colidx);
 }
 
+int build_crs_graph_from_element(const ptrdiff_t nelements,
+                                 const ptrdiff_t nnodes,
+                                 int nxe,
+                                 idx_t **const elems,
+                                 count_t **out_rowptr,
+                                 idx_t **out_colidx) {
+    int SFEM_CRS_FAST_SERIAL = 0;
+    SFEM_READ_ENV(SFEM_CRS_FAST_SERIAL, atoi);
+
+    if (SFEM_CRS_FAST_SERIAL) {
+        return build_crs_graph_faster(nelements, nnodes, nxe, elems, out_rowptr, out_colidx);
+    }
+
+    return build_crs_graph_mem_conservative(nelements, nnodes, nxe, elems, out_rowptr, out_colidx);
+}
+
 int build_crs_graph(const ptrdiff_t nelements,
                     const ptrdiff_t nnodes,
                     idx_t **const elems,

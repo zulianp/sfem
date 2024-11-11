@@ -16,7 +16,6 @@ int build_n2e(const ptrdiff_t nelements,
               count_t **out_n2eptr,
               element_idx_t **out_elindex);
 
-
 int build_crs_graph_for_elem_type(const int element_type,
                                   const ptrdiff_t nelements,
                                   const ptrdiff_t nnodes,
@@ -62,6 +61,13 @@ int crs_graph_block_to_scalar(const ptrdiff_t nnodes,
                               const idx_t *const block_colidx,
                               count_t *const rowptr,
                               idx_t *const colidx);
+
+int build_crs_graph_from_element(const ptrdiff_t nelements,
+                                 const ptrdiff_t nnodes,
+                                 int nxe,
+                                 idx_t **const elems,
+                                 count_t **out_rowptr,
+                                 idx_t **out_colidx);
 
 #ifdef __cplusplus
 }
