@@ -413,9 +413,12 @@ int affine_hex8_linear_elasticity_crs_sym(
                     if (ev[edof_i] < ev[edof_j]) {
                         assert(ks[edof_j] != -1);
 
-                        // We assemble each block (0, 0), (0, 1), (0, 2), (1, 1), (1, 2) ....
                         accumulator_t element_matrix[3 * 3];
                         // Using Taylor expansion technique for symbolic integration for i,j pair
+                        // (2667 * 6)/3953 = 4 X Ops than assemblying the whole element matrix
+                        // 6/576 = 1/96 of the buffer memory used to store the local results or 1/50
+                        // for symmetric storage for whole element matrix.
+                        // Overall smaller code size of the computational kernel.
                         hex8_linear_elasticity_matrix_coord_taylor_sym(mu,
                                                                        lambda,
                                                                        jacobian_adjugate,

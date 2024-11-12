@@ -182,11 +182,12 @@ class LinearElasticityOpTaylor:
 		print("// Integrating Hessian")
 		H = sp.zeros(dims, dims)
 		for i in range(0, dims):
-			for j in range(0, dims):
+			for j in range(i, dims):
 				print(f"// ({i+1}, {j+1}) / (3, 3)")
 				eval_hessian = dde[i, j] * dV
 				integr = fe.integrate(point, eval_hessian)
 				H[i, j] = integr
+				H[j, i] = integr
 
 		# -------------------------------------------------
 		# c_log("// Code Hessian * u")
@@ -202,12 +203,22 @@ class LinearElasticityOpTaylor:
 		# 	expr.append(ast.Assignment(var, Hu))
 		# c_code(expr)
 
-		c_log("// Code Hessian")
+		# c_log("// Code Hessian")
+		# expr = []
+		# for i in range(0, dims):
+		# 	for j in range(0, dims):
+		# 		var = sp.symbols(f'element_matrix[{i*dims + j}*stride]')
+		# 		expr.append(ast.Assignment(var, H[i, j]))
+		# c_code(expr)
+
+		c_log("// Code Hessian_sym")
 		expr = []
+		ii = 0
 		for i in range(0, dims):
-			for j in range(0, dims):
-				var = sp.symbols(f'element_matrix[{i*dims + j}*stride]')
+			for j in range(i, dims):
+				var = sp.symbols(f'element_matrix[{ii}*stride]')
 				expr.append(ast.Assignment(var, H[i, j]))
+				ii += 1
 		c_code(expr)
 
 class LinearElasticityOp:
@@ -389,6 +400,43 @@ class LinearElasticityOp:
 
 		return expr
 
+	def hessian_sym(self):
+		H = self.integr_hessian
+		rows, cols = H.shape
+
+		expr = []
+		idx = 0
+		for i in range(0, rows):
+			for j in range(0, cols):
+				if j > i:
+					continue
+				var = sp.symbols(f'element_matrix[{idx}*stride]')
+				expr.append(ast.Assignment(var, H[i, j]))
+				idx += 1
+
+		return expr
+
+	# def hessian_sym_SoA(self):
+	# 	H = self.integr_hessian
+	# 	rows, cols = H.shape
+
+	# 	expr = []
+	# 	fe = self.fe
+	# 	dim = fe.spatial_dim()
+	# 	n = fe.n_nodes()
+
+	# 	d_idx = 0
+	# 	for d1 in range(0, dim):
+	# 		for d2 in range(d1, dim):
+	# 			idx = 0
+	# 			for i in range(0, n):
+	# 				for j in range(i, n):
+	# 					var = sp.symbols(f'element_matrix_{d_idx}[{idx}]')
+	# 					expr.append(ast.Assignment(var, H[d1*8 + i, d2*8+j]))
+	# 					idx += 1
+	# 			d_idx += 1
+	# 	return expr
+
 	def hessian_blocks(self):
 		H = self.integr_hessian
 		rows, cols = H.shape
@@ -538,8 +586,8 @@ def main():
 	fe.use_adjugate = True
 	
 	# op = LinearElasticityOp(fe)
-	op = LinearElasticityOpSymbolic(fe)
-	# op = LinearElasticityOpTaylor(fe)
+	# op = LinearElasticityOpSymbolic(fe)
+	op = LinearElasticityOpTaylor(fe)
 	# op.hessian_check()
 
 
@@ -577,6 +625,11 @@ def main():
 	# c_log("hessian")	
 	# c_log("--------------------------")
 	# c_code(op.hessian())
+
+	# c_log("--------------------------")
+	# c_log("hessian_sym_SoA")	
+	# c_log("--------------------------")
+	# c_code(op.hessian_sym_SoA())
 
 	# c_log("--------------------------")
 	# c_log("apply")	
