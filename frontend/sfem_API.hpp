@@ -663,7 +663,7 @@ namespace sfem {
                      const std::shared_ptr<Buffer<real_t>> &x,
                      const sfem::ExecutionSpace es) {
         // Get the mesh node-to-node graph instead of the FunctionSpace scalar adapted graph
-        auto crs_graph = f->space()->mesh_ptr()->node_to_node_graph();
+        auto crs_graph = f->space()->node_to_node_graph();
         const int block_size = f->space()->block_size();
 
 #ifdef SFEM_ENABLE_CUDA

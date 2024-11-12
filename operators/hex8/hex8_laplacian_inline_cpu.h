@@ -522,26 +522,6 @@ static SFEM_INLINE void hex8_laplacian_matrix_ij_taylor(const scalar_t *const SF
              x14 * x9 + x8 * x9;
 }
 
-static const scalar_t hex8_g_0[8][3] = {{-1.0 / 4.0, -1.0 / 4.0, -1.0 / 4.0},
-                                        {1.0 / 4.0, -1.0 / 4.0, -1.0 / 4.0},
-                                        {1.0 / 4.0, 1.0 / 4.0, -1.0 / 4.0},
-                                        {-1.0 / 4.0, 1.0 / 4.0, -1.0 / 4.0},
-                                        {-1.0 / 4.0, -1.0 / 4.0, 1.0 / 4.0},
-                                        {1.0 / 4.0, -1.0 / 4.0, 1.0 / 4.0},
-                                        {1.0 / 4.0, 1.0 / 4.0, 1.0 / 4.0},
-                                        {-1.0 / 4.0, 1.0 / 4.0, 1.0 / 4.0}};
-
-static const scalar_t hex8_H_0[8][3] = {{1.0 / 2.0, 1.0 / 2.0, 1.0 / 2.0},
-                                        {-1.0 / 2.0, -1.0 / 2.0, 1.0 / 2.0},
-                                        {1.0 / 2.0, -1.0 / 2.0, -1.0 / 2.0},
-                                        {-1.0 / 2.0, 1.0 / 2.0, -1.0 / 2.0},
-                                        {1.0 / 2.0, -1.0 / 2.0, -1.0 / 2.0},
-                                        {-1.0 / 2.0, 1.0 / 2.0, -1.0 / 2.0},
-                                        {1.0 / 2.0, 1.0 / 2.0, 1.0 / 2.0},
-                                        {-1.0 / 2.0, -1.0 / 2.0, 1.0 / 2.0}};
-
-static const scalar_t hex8_diff3_0[8] = {-1, 1, -1, 1, 1, -1, 1, -1};
-
 static SFEM_INLINE void hex8_laplacian_matrix_fff_taylor(const scalar_t *const SFEM_RESTRICT fff,
                                                          accumulator_t *const SFEM_RESTRICT
                                                                  element_matrix) {
