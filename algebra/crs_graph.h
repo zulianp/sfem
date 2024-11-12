@@ -69,6 +69,13 @@ int build_crs_graph_from_element(const ptrdiff_t nelements,
                                  count_t **out_rowptr,
                                  idx_t **out_colidx);
 
+int build_crs_graph_upper_triangular_from_element(const ptrdiff_t nelements,
+                                                  const ptrdiff_t nnodes,
+                                                  int nxe,
+                                                  idx_t **const elems,
+                                                  count_t **out_rowptr,
+                                                  idx_t **out_colidx);
+
 #ifdef __cplusplus
 }
 #endif

@@ -838,14 +838,226 @@ int proteus_hex8_mesh_skin(const int L,
     return SFEM_SUCCESS;
 }
 
+int proteus_hex8_build_n2e(const int L,
+                           const ptrdiff_t nelements,
+                           const ptrdiff_t nnodes,
+                           idx_t **const elems,
+                           count_t **out_n2eptr,
+                           element_idx_t **out_elindex) {
+    double tick = MPI_Wtime();
+
+#ifdef SFEM_ENABLE_MEM_DIAGNOSTICS
+    printf("build_n2e: allocating %g GB\n", (nnodes + 1) * sizeof(count_t) * 1e-9);
+#endif
+
+    count_t *n2eptr = (count_t *)malloc((nnodes + 1) * sizeof(count_t));
+    memset(n2eptr, 0, (nnodes + 1) * sizeof(count_t));
+
+    int *book_keeping = (int *)malloc((nnodes) * sizeof(int));
+    memset(book_keeping, 0, (nnodes) * sizeof(int));
+
+    const int txe = L * L * L;
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        for (int zi = 0; zi < L; zi++) {
+            for (int yi = 0; yi < L; yi++) {
+                for (int xi = 0; xi < L; xi++) {
+                    const idx_t lev[8] = {proteus_hex8_lidx(L, xi, yi, zi),
+                                          proteus_hex8_lidx(L, xi + 1, yi, zi),
+                                          proteus_hex8_lidx(L, xi, yi + 1, zi),
+                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi),
+                                          proteus_hex8_lidx(L, xi, yi, zi + 1),
+                                          proteus_hex8_lidx(L, xi + 1, yi, zi + 1),
+                                          proteus_hex8_lidx(L, xi, yi + 1, zi + 1),
+                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi + 1)};
+
+                    // const ptrdiff_t e_macro = i * txe + zi * L * L + yi * L + xi;
+
+                    for (int edof_i = 0; edof_i < 8; ++edof_i) {
+                        assert(elems[lev[edof_i]][i] < nnodes);
+                        assert(elems[lev[edof_i]][i] >= 0);
+                        ++n2eptr[elems[lev[edof_i]][i] + 1];
+                    }
+                }
+            }
+        }
+    }
+
+    for (ptrdiff_t i = 0; i < nnodes; ++i) {
+        n2eptr[i + 1] += n2eptr[i];
+    }
+
+#ifdef SFEM_ENABLE_MEM_DIAGNOSTICS
+    printf("build_n2e: allocating %g GB\n", n2eptr[nnodes] * sizeof(element_idx_t) * 1e-9);
+#endif
+    element_idx_t *elindex = (element_idx_t *)malloc(n2eptr[nnodes] * sizeof(element_idx_t));
+
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        for (int zi = 0; zi < L; zi++) {
+            for (int yi = 0; yi < L; yi++) {
+                for (int xi = 0; xi < L; xi++) {
+                    const idx_t lev[8] = {proteus_hex8_lidx(L, xi, yi, zi),
+                                          proteus_hex8_lidx(L, xi + 1, yi, zi),
+                                          proteus_hex8_lidx(L, xi, yi + 1, zi),
+                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi),
+                                          proteus_hex8_lidx(L, xi, yi, zi + 1),
+                                          proteus_hex8_lidx(L, xi + 1, yi, zi + 1),
+                                          proteus_hex8_lidx(L, xi, yi + 1, zi + 1),
+                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi + 1)};
+
+                    const ptrdiff_t elidx = i * txe + zi * L * L + yi * L + xi;
+
+                    for (int edof_i = 0; edof_i < 8; ++edof_i) {
+                        const element_idx_t node = elems[lev[edof_i]][i];
+                        assert(n2eptr[node] + book_keeping[node] < n2eptr[node + 1]);
+                        elindex[n2eptr[node] + book_keeping[node]++] = elidx;
+                    }
+                }
+            }
+        }
+    }
+
+    free(book_keeping);
+
+    *out_n2eptr = n2eptr;
+    *out_elindex = elindex;
+
+    double tock = MPI_Wtime();
+    printf("crs_graph.c: build_n2e\t\t%g seconds\n", tock - tick);
+    return SFEM_SUCCESS;
+}
+
+static int proteus_hex8_build_crs_graph_from_n2e(const int L,
+                                                 const ptrdiff_t nelements,
+                                                 const ptrdiff_t nnodes,
+                                                 idx_t **const SFEM_RESTRICT elems,
+                                                 const count_t *const SFEM_RESTRICT n2eptr,
+                                                 const element_idx_t *const SFEM_RESTRICT elindex,
+                                                 count_t **out_rowptr,
+                                                 idx_t **out_colidx) {
+    count_t *rowptr = (count_t *)malloc((nnodes + 1) * sizeof(count_t));
+    idx_t *colidx = 0;
+
+    const int txe = L * L * L;
+    {
+        rowptr[0] = 0;
+
+#pragma omp parallel
+        {
+            idx_t n2nbuff[4096];
+#pragma omp for
+            for (ptrdiff_t node = 0; node < nnodes; ++node) {
+                const count_t ebegin = n2eptr[node];
+                const count_t eend = n2eptr[node + 1];
+
+                idx_t nneighs = 0;
+
+                for (count_t e = ebegin; e < eend; ++e) {
+                    const element_idx_t eidx = elindex[e];
+                    assert(eidx < nelements * txe);
+
+                    const ptrdiff_t e_macro = eidx / txe;
+                    const ptrdiff_t zi = (eidx - e_macro * txe) / (L * L);
+                    const ptrdiff_t yi = (eidx - e_macro * txe - zi * L * L) / L;
+                    const ptrdiff_t xi = eidx - e_macro * txe - zi * L * L - yi * L;
+
+                    const idx_t lev[8] = {proteus_hex8_lidx(L, xi, yi, zi),
+                                          proteus_hex8_lidx(L, xi + 1, yi, zi),
+                                          proteus_hex8_lidx(L, xi, yi + 1, zi),
+                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi),
+                                          proteus_hex8_lidx(L, xi, yi, zi + 1),
+                                          proteus_hex8_lidx(L, xi + 1, yi, zi + 1),
+                                          proteus_hex8_lidx(L, xi, yi + 1, zi + 1),
+                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi + 1)};
+
+                    for (int edof_i = 0; edof_i < 8; ++edof_i) {
+                        idx_t neighnode = elems[lev[edof_i]][e_macro];
+                        assert(nneighs < 4096);
+                        n2nbuff[nneighs++] = neighnode;
+                    }
+                }
+
+                nneighs = sortreduce(n2nbuff, nneighs);
+                rowptr[node + 1] = nneighs;
+            }
+        }
+
+        // Cumulative sum
+        for (ptrdiff_t node = 0; node < nnodes; ++node) {
+            rowptr[node + 1] += rowptr[node];
+        }
+
+        const ptrdiff_t nnz = rowptr[nnodes];
+        colidx = (idx_t *)malloc(nnz * sizeof(idx_t));
+
+        
+#pragma omp parallel
+        {
+            idx_t n2nbuff[4096];
+#pragma omp for
+            for (ptrdiff_t node = 0; node < nnodes; ++node) {
+                const count_t ebegin = n2eptr[node];
+                const count_t eend = n2eptr[node + 1];
+
+                idx_t nneighs = 0;
+
+                for (count_t e = ebegin; e < eend; ++e) {
+                    const element_idx_t eidx = elindex[e];
+                    assert(eidx < nelements * txe);
+
+                    const ptrdiff_t e_macro = eidx / txe;
+                    const ptrdiff_t zi = (eidx - e_macro * txe) / (L * L);
+                    const ptrdiff_t yi = (eidx - e_macro * txe - zi * L * L) / L;
+                    const ptrdiff_t xi = eidx - e_macro * txe - zi * L * L - yi * L;
+
+                    const idx_t lev[8] = {proteus_hex8_lidx(L, xi, yi, zi),
+                                          proteus_hex8_lidx(L, xi + 1, yi, zi),
+                                          proteus_hex8_lidx(L, xi, yi + 1, zi),
+                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi),
+                                          proteus_hex8_lidx(L, xi, yi, zi + 1),
+                                          proteus_hex8_lidx(L, xi + 1, yi, zi + 1),
+                                          proteus_hex8_lidx(L, xi, yi + 1, zi + 1),
+                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi + 1)};
+
+                    for (int edof_i = 0; edof_i < 8; ++edof_i) {
+                        idx_t neighnode = elems[lev[edof_i]][e_macro];
+                        assert(nneighs < 4096);
+                        n2nbuff[nneighs++] = neighnode;
+                    }
+                }
+
+                nneighs = sortreduce(n2nbuff, nneighs);
+                for (idx_t i = 0; i < nneighs; ++i) {
+                    assert(rowptr[node] + i < nnz);
+                    colidx[rowptr[node] + i] = n2nbuff[i];
+                }
+            }
+        }
+    }
+
+    *out_rowptr = rowptr;
+    *out_colidx = colidx;
+    return SFEM_SUCCESS;
+}
+
 int proteus_hex8_crs_graph(const int L,
                            const ptrdiff_t nelements,
                            const ptrdiff_t nnodes,
                            idx_t **const elements,
                            count_t **out_rowptr,
                            idx_t **out_colidx) {
-    fprintf("[Warning] proteus_hex8_crs_graph generates a very space-inneficient crs graph! "
-            "TOBEFIXED!\n");
-    int nxe = proteus_hex8_nxe(L);
-    return build_crs_graph_from_element(nelements, nnodes, nxe, elements, out_rowptr, out_colidx);
+    double tick = MPI_Wtime();
+
+    count_t *n2eptr;
+    element_idx_t *elindex;
+    proteus_hex8_build_n2e(L, nelements, nnodes, elements, &n2eptr, &elindex);
+
+    int err = proteus_hex8_build_crs_graph_from_n2e(
+            L, nelements, nnodes, elements, n2eptr, elindex, out_rowptr, out_colidx);
+
+    free(n2eptr);
+    free(elindex);
+
+    double tock = MPI_Wtime();
+    printf("proteus_hex8_crs_graph \t%g seconds\n", tock - tick);
+    return err;
 }

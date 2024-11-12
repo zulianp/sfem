@@ -413,7 +413,6 @@ With numerical quadrature and with symbolic integration
 | 5 | 473125 | 179958447 | 78.153 |	2.3	 |
 
 
-
 ## H200
 
 **Warp level**
