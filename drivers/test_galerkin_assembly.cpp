@@ -17,16 +17,27 @@
 
 #include <vector>
 
-#define OP_TIME(op, x, y)                                                                \
-    do {                                                                                 \
-        sfem::device_synchronize();                                                      \
-        double start = MPI_Wtime();                                                      \
-        op->apply(x, y);                                                                 \
-        sfem::device_synchronize();                                                      \
-        double stop = MPI_Wtime();                                                       \
-        double elapsed = stop - start;                                                   \
-        printf("%s %g [s], %g [MDOF/s]\n", #op, elapsed, 1e-6 * (op)->rows() / elapsed); \
-        fflush(stdout);                                                                  \
+#define OP_HEADERS()                                                                            \
+    do {                                                                                        \
+        printf("Op,\t\tTTS [s],\tRTP [MDOF/s],\tBW [MDOF/s],\t(rows, cols)\n");                         \
+    } while (0)
+
+#define OP_TIME(op, x, y)                                                                       \
+    do {                                                                                        \
+        sfem::device_synchronize();                                                             \
+        double start = MPI_Wtime();                                                             \
+        op->apply(x, y);                                                                        \
+        sfem::device_synchronize();                                                             \
+        double stop = MPI_Wtime();                                                              \
+        double elapsed = stop - start;                                                          \
+        printf("%s,\t%.5f,\t%.1f,\t\t%.1f,\t\t(%ld, %ld)\n", \
+               #op,                                                                             \
+               elapsed,                                                                         \
+               1e-6 * (op)->rows() / elapsed,                                                   \
+               1e-6 * ((op)->rows() + (op)->cols()) / elapsed,                                  \
+               (op)->rows(),                                                                    \
+               (op)->cols());                                                                   \
+        fflush(stdout);                                                                         \
     } while (0)
 
 int main(int argc, char *argv[]) {
@@ -107,7 +118,7 @@ int main(int argc, char *argv[]) {
 
     std::shared_ptr<sfem::Operator<real_t>> fine_op, coarse_op;
 
-    if(SFEM_MATRIX_FREE) {
+    if (SFEM_MATRIX_FREE) {
         fine_op = sfem::make_linear_op(f);
     } else {
         fine_op = sfem::hessian_bsr(f, nullptr, es);
@@ -116,7 +127,7 @@ int main(int argc, char *argv[]) {
     auto fs_coarse = fs->derefine();
     auto f_coarse = f->derefine(fs_coarse, true);
 
-    if(SFEM_COARSE_MATRIX_FREE) {
+    if (SFEM_COARSE_MATRIX_FREE) {
         coarse_op = sfem::make_linear_op(f_coarse);
     } else {
         coarse_op = sfem::hessian_bsr(f_coarse, nullptr, es);
@@ -161,6 +172,7 @@ int main(int argc, char *argv[]) {
 
     double tick = MPI_Wtime();
 
+    OP_HEADERS();
     OP_TIME(coarse_op, input->data(), Ax_coarse->data());
     OP_TIME(prolongation, input->data(), prolongated->data());
     OP_TIME(fine_op, prolongated->data(), Ax_fine->data());
