@@ -102,6 +102,17 @@ namespace sfem {
             }
         }
 
+        static void xypaz(const std::ptrdiff_t n,
+                           const T* const x,
+                           const T* const y,
+                           const T alpha,
+                           T* const z) {
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n; i++) {
+                z[i] = x[i] * y[i] + z[i] * alpha;
+            }
+        }
+
         static void build_blas(struct BLAS_Tpl<T>& tpl) {
             tpl.allocate = allocate;
             tpl.destroy = destroy;
@@ -120,6 +131,7 @@ namespace sfem {
             tpl.zeros = zeros;
             tpl.values = values;
             tpl.scal = scal;
+            tpl.xypaz = xypaz;
         }
     };
 
