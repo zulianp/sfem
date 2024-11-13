@@ -1,6 +1,8 @@
 #ifndef SFEM_BCRS_SYM_SPMV_HPP
 #define SFEM_BCRS_SYM_SPMV_HPP
 
+#include <iostream>
+
 namespace sfem {
     template <typename R, typename C, typename T>
     class BCRSSymSpMV : public Operator<T> {
@@ -28,6 +30,60 @@ namespace sfem {
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         ExecutionSpace execution_space() const override { return execution_space_; }
+
+        void print(std::ostream& os) const {
+            os << "BCRSSymSpMV (" << rows() << " x " << cols() << ")\n";
+            os << "Block size: " << block_size_ << "\n";
+            os << "Block rows: " << block_rows_ << "\n";
+            os << "Block cols: " << block_cols_ << "\n";
+            os << "Block stride: " << block_stride_ << "\n";
+
+            // Get raw pointers
+            auto rowptr = this->rowptr->data();
+            auto colidx = this->colidx->data();
+            auto diag_values = this->diag_values->data();
+            auto off_diag_values = this->off_diag_values->data();
+
+            for (ptrdiff_t i = 0; i < block_rows_; i++) {
+                os << "Row: " << i << " (" << (rowptr[i + 1] - rowptr[i]) << "):\n";
+
+                os << i << ")\n";
+                int d_idx = 0;
+                for (int d = 0; d < block_size_; d++) {
+                    os << "\t";
+
+                    for (int d2 = 0; d2 < d; d2++) {
+                        os << "x ";
+                    }
+                    
+                    for (int d2 = d; d2 < block_size_; d2++, d_idx++) {
+                        os << diag_values[d_idx][i * block_stride_] << " ";
+                    }
+
+                    os << "\n";
+                }
+
+                for (count_t j = rowptr[i]; j < rowptr[i + 1]; j++) {
+                    os << colidx[j] << ")\n";
+
+                    int d_idx = 0;
+                    for (int d = 0; d < block_size_; d++) {
+                        os << "\t";
+                        
+                        for (int d2 = 0; d2 < d; d2++) {
+                            os << "x ";
+                        }
+
+                        for (int d2 = d; d2 < block_size_; d2++, d_idx++) {
+                            os << off_diag_values[d_idx][j * block_stride_] << " ";
+                        }
+
+                        os << "\n";
+                    }
+                }
+                os << "\n";
+            }
+        }
     };
 
     template <typename R, typename C, typename T>
