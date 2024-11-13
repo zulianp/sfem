@@ -956,11 +956,11 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(
  * @param k
  * @return __device__
  */
-__device__ ptrdiff_t hex_aa_8_indices_O3_first_index(const ptrdiff_t stride0,               //
-                                                     const ptrdiff_t stride1,               //
-                                                     const ptrdiff_t stride2,               //
-                                                     const ptrdiff_t i, const ptrdiff_t j,  //
-                                                     const ptrdiff_t k) {                   //
+__device__ ptrdiff_t hex_aa_8_indices_O3_first_index_cuda(const ptrdiff_t stride0,               //
+                                                          const ptrdiff_t stride1,               //
+                                                          const ptrdiff_t stride2,               //
+                                                          const ptrdiff_t i, const ptrdiff_t j,  //
+                                                          const ptrdiff_t k) {                   //
     //
     return (i - 1) * stride0 + (j - 1) * stride1 + (k - 1) * stride2;
 }
@@ -975,16 +975,16 @@ __device__ ptrdiff_t hex_aa_8_indices_O3_first_index(const ptrdiff_t stride0,   
  * @param data
  * @return __device__*
  */
-__device__ real_t* hex_aa_8_collect_coeffs_O3_ptr_cu(const ptrdiff_t const stride0,  //
-                                                     const ptrdiff_t const stride1,  //
-                                                     const ptrdiff_t const stride2,  //
-                                                     const ptrdiff_t i,              //
-                                                     const ptrdiff_t j,              //
-                                                     const ptrdiff_t k,              //
-                                                     const real_t* const data) {     //
+__device__ real_t* hex_aa_8_collect_coeffs_O3_ptr_cuda(const ptrdiff_t stride0,     //
+                                                       const ptrdiff_t stride1,     //
+                                                       const ptrdiff_t stride2,     //
+                                                       const ptrdiff_t i,           //
+                                                       const ptrdiff_t j,           //
+                                                       const ptrdiff_t k,           //
+                                                       const real_t* const data) {  //
 
     const ptrdiff_t first_index =
-            hex_aa_8_indices_O3_first_index(stride0, stride1, stride2, i, j, k);
+            hex_aa_8_indices_O3_first_index_cuda(stride0, stride1, stride2, i, j, k);
 
     return (real_t*)&data[first_index];
 }
@@ -1017,7 +1017,7 @@ __device__ real_t hex_aa_8_eval_weno4_3D_Unit_cuda(  //
     const int stride_z = stride2;
 
     real_t* out = NULL;
-    out = hex_aa_8_collect_coeffs_O3_ptr_cu(stride0, stride1, stride2, i, j, k, data);
+    out = hex_aa_8_collect_coeffs_O3_ptr_cuda(stride0, stride1, stride2, i, j, k, data);
 
 #else
     // collect the data for the WENO interpolation
@@ -1090,6 +1090,8 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  
         // Output
         real_t* const MY_RESTRICT weighted_field) {  //
 
+#define WENO_CUBE 1
+
     //
     // printf("============================================================\n");
     // printf("Start: hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel\n");
@@ -1125,8 +1127,10 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  
     real_t x[10], y[10], z[10];
     real_t x_unit[10], y_unit[10], z_unit[10];
 
+#if WENO_CUBE == 0
     real_t hex8_f[8];
     real_t coeffs[8];
+#endif
 
     real_t tet10_f[10];
 
@@ -1277,7 +1281,6 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  
         //     exit(1);
         // }
 
-#define WENO_CUBE 1
 #if WENO_CUBE == 1
 
         // if (nSizes_global != nNodesData) {
@@ -1433,9 +1436,9 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
 #endif
 
 #if CUBE1 == 0  // WENO ..
-    char* kernel_name = "hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel";
+    char kernel_name[] = "hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel";
 #else
-    char* kernel_name = "hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel";
+    char kernel_name[] = "hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel";
 #endif
 
     printf("============================================================================\n");

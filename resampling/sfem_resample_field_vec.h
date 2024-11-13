@@ -8,7 +8,7 @@
 
 #if SFEM_VEC_SIZE == 8 && real_t == double
 
-#pragma message "SIMD 512 double"
+#pragma message "USING SIMD 512 double"
 
 #define SIMD_512_DOUBLE
 #define _VL_ 8
@@ -17,7 +17,7 @@
 
 #elif SFEM_VEC_SIZE == 4 && real_t == double
 
-#pragma message "SIMD 256 double"
+#pragma message "USING SIMD 256 double"
 
 #define SIMD_256_DOUBLE
 #define _VL_ 4
@@ -26,7 +26,7 @@
 
 #elif SFEM_VEC_SIZE == 4 && real_t == float
 
-#pragma message "SIMD 256 float"
+#pragma message "USING SIMD 256 float"
 
 #define SIMD_256_FLOAT
 #define _VL_ 8
@@ -35,7 +35,7 @@
 
 #elif SFEM_VEC_SIZE == 8 && real_t == float
 
-#pragma message "SIMD 512 float"
+#pragma message "USING SIMD 512 float"
 
 #define SIMD_512_FLOAT
 
