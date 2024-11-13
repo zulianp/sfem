@@ -14,7 +14,6 @@ namespace sfem {
     class StationaryIteration final : public MatrixFreeLinearSolver<T> {
     public:
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
-        bool is_initial_guess_zero{false};
         ptrdiff_t n_dofs{-1};
         int max_it{3};
         Buffer<T> workspace;
@@ -32,12 +31,11 @@ namespace sfem {
 
         /* Operator */
         int apply(const T* const b, T* const x) override {
+            T* r = workspace.data();
             for (int i = 0; i < max_it; i++) {
-                T* r = workspace.data();
                 apply_op(x, r);
                 blas.axpby(n_dofs, 1, b, -1, r);
                 preconditioner_op(r, x);
-                blas.axpby(n_dofs, 1, r, 1, x);
             }
             return 0;
         }
@@ -55,7 +53,6 @@ namespace sfem {
         }
         void set_max_it(const int it) override { max_it = it; }
         void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
-        void set_initial_guess_zero(const bool val) override { is_initial_guess_zero = val; }
     };
 
     template <typename T>
