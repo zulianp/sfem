@@ -120,6 +120,19 @@ int linear_elasticity_bsr(const enum ElemType element_type,
                           const idx_t *const SFEM_RESTRICT colidx,
                           real_t *const SFEM_RESTRICT values);
 
+int linear_elasticity_bcrs_sym(const enum ElemType element_type,
+                               const ptrdiff_t nelements,
+                               const ptrdiff_t nnodes,
+                               idx_t **const SFEM_RESTRICT elems,
+                               geom_t **const SFEM_RESTRICT xyz,
+                               const real_t mu,
+                               const real_t lambda,
+                               const count_t *const SFEM_RESTRICT rowptr,
+                               const idx_t *const SFEM_RESTRICT colidx,
+                               const ptrdiff_t block_stride,
+                               real_t **const SFEM_RESTRICT diag_values,
+                               real_t **const SFEM_RESTRICT off_diag_values);
+
 #ifdef __cplusplus
 }
 #endif

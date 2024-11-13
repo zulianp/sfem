@@ -26,6 +26,9 @@ namespace sfem {
                 void(const ptrdiff_t, const T, const T* const, const T, const T* const, T* const)>
                 zaxpby;
 
+        /// $z = x * y + \alpha * z$
+        std::function<void(const ptrdiff_t, const T*const, const T*const, const T, T*const)> xypaz;
+
         bool good() const {
             assert(allocate);
             assert(destroy);

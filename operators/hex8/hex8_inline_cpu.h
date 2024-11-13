@@ -7,6 +7,9 @@
 #define POW2(a) ((a) * (a))
 #endif
 
+#ifndef NDEBUG
+#include <stdio.h>
+#endif
 static SFEM_INLINE void hex8_fff(const scalar_t *const SFEM_RESTRICT x,
                                  const scalar_t *const SFEM_RESTRICT y,
                                  const scalar_t *const SFEM_RESTRICT z,
@@ -195,6 +198,18 @@ static SFEM_INLINE void hex8_find_cols(const idx_t *SFEM_RESTRICT targets,
             }
         }
     }
+
+#ifndef NDEBUG
+    for (int d = 0; d < 8; ++d) {
+        if (!(ks[d] >= 0 && ks[d] < lenrow)) {
+            printf("d: %d, ks[d]: %d, lenrow: %d\n", d, ks[d], lenrow);
+            fflush(stdout);
+        }
+        assert(ks[d] >= 0 && ks[d] < lenrow);
+        assert(ks[d] != -1);
+        assert(targets[d] == row[ks[d]]);
+    }
+#endif
 }
 
 static SFEM_INLINE void hex8_local_to_global_bsr3(const idx_t *const SFEM_RESTRICT ev,
@@ -213,9 +228,11 @@ static SFEM_INLINE void hex8_local_to_global_bsr3(const idx_t *const SFEM_RESTRI
             hex8_find_cols(ev, cols, lenrow, ks);
         }
 
+        real_t *const row = &values[rowptr[dof_i] * 9];
+
         for (int edof_j = 0; edof_j < 8; ++edof_j) {
             // extract the i, j block
-            real_t *block = &values[(rowptr[dof_i] + ks[edof_j]) * 9];
+            real_t *const block = &row[ks[edof_j] * 9];
 
             for (int bi = 0; bi < 3; ++bi) {
                 const int ii = bi * 8 + edof_i;
@@ -231,5 +248,26 @@ static SFEM_INLINE void hex8_local_to_global_bsr3(const idx_t *const SFEM_RESTRI
         }
     }
 }
+
+
+static const scalar_t hex8_g_0[8][3] = {{-1.0 / 4.0, -1.0 / 4.0, -1.0 / 4.0},
+                                        {1.0 / 4.0, -1.0 / 4.0, -1.0 / 4.0},
+                                        {1.0 / 4.0, 1.0 / 4.0, -1.0 / 4.0},
+                                        {-1.0 / 4.0, 1.0 / 4.0, -1.0 / 4.0},
+                                        {-1.0 / 4.0, -1.0 / 4.0, 1.0 / 4.0},
+                                        {1.0 / 4.0, -1.0 / 4.0, 1.0 / 4.0},
+                                        {1.0 / 4.0, 1.0 / 4.0, 1.0 / 4.0},
+                                        {-1.0 / 4.0, 1.0 / 4.0, 1.0 / 4.0}};
+
+static const scalar_t hex8_H_0[8][3] = {{1.0 / 2.0, 1.0 / 2.0, 1.0 / 2.0},
+                                        {-1.0 / 2.0, -1.0 / 2.0, 1.0 / 2.0},
+                                        {1.0 / 2.0, -1.0 / 2.0, -1.0 / 2.0},
+                                        {-1.0 / 2.0, 1.0 / 2.0, -1.0 / 2.0},
+                                        {1.0 / 2.0, -1.0 / 2.0, -1.0 / 2.0},
+                                        {-1.0 / 2.0, 1.0 / 2.0, -1.0 / 2.0},
+                                        {1.0 / 2.0, 1.0 / 2.0, 1.0 / 2.0},
+                                        {-1.0 / 2.0, -1.0 / 2.0, 1.0 / 2.0}};
+
+static const scalar_t hex8_diff3_0[8] = {-1, 1, -1, 1, 1, -1, 1, -1};
 
 #endif  // HEX8_INLINE_CPU_H
