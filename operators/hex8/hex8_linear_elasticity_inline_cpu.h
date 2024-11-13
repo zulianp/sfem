@@ -3283,4 +3283,5 @@ static SFEM_INLINE void hex8_linear_elasticity_matrix_coord_taylor_sym(
                    x527 + x528 + x529 + x530 + x532 + x534 + x536 + x537 + x84);
 }
 
+
 #endif  // HEX8_LINEAR_ELASTICITY_INLINE_CPU_H

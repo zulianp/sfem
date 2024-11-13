@@ -10,9 +10,10 @@
 #include "sfem_Function.hpp"
 #include "sfem_Multigrid.hpp"
 #include "sfem_bcgs.hpp"
+#include "sfem_bcrs_sym_SpMV.hpp"
+#include "sfem_bsr_SpMV.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_crs_SpMV.hpp"
-#include "sfem_bsr_SpMV.hpp"
 #include "sfem_mprgp.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
@@ -668,7 +669,6 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
-
             auto d_crs_graph = sfem::to_device(crs_graph);
             auto values =
                     sfem::create_buffer<real_t>(d_crs_graph->nnz() * block_size * block_size, es);
@@ -689,12 +689,10 @@ namespace sfem {
 #endif
         auto values = sfem::h_buffer<real_t>(crs_graph->nnz() * block_size * block_size);
 
-        real_t * x_data = (x)? x->data() : nullptr;
+        real_t *x_data = (x) ? x->data() : nullptr;
 
-        f->hessian_bsr(x_data,
-                       crs_graph->rowptr()->data(),
-                       crs_graph->colidx()->data(),
-                       values->data());
+        f->hessian_bsr(
+                x_data, crs_graph->rowptr()->data(), crs_graph->colidx()->data(), values->data());
 
         // Owns the pointers
         return sfem::h_bsr_spmv(crs_graph->n_nodes(),
@@ -704,6 +702,47 @@ namespace sfem {
                                 crs_graph->colidx(),
                                 values,
                                 (real_t)1);
+    }
+
+    auto hessian_bcrs_sym(std::shared_ptr<sfem::Function> &f,
+                          const std::shared_ptr<Buffer<real_t>> &x,
+                          const sfem::ExecutionSpace es) {
+        auto crs_graph = f->space()->mesh().node_to_node_graph_upper_triangular();
+        const int block_size = f->space()->block_size();
+
+        int nblock_entries = ((block_size + 1) * block_size) / 2;
+
+        // We build them as AoS for now
+        auto off_diag_values = sfem::h_buffer<real_t>(nblock_entries, crs_graph->nnz());
+        auto diag_values =
+                sfem::h_buffer<real_t>(nblock_entries, f->space()->n_dofs() / block_size);
+
+        real_t *x_data = (x) ? x->data() : nullptr;
+        f->hessian_bcrs_sym(x_data,
+                            crs_graph->rowptr()->data(),
+                            crs_graph->colidx()->data(),
+                            1,
+                            diag_values->data(),
+                            off_diag_values->data());
+
+        auto spmv = sfem::h_bcrs_sym_spmv<count_t, idx_t, real_t>(crs_graph->n_nodes(),
+                                                                  crs_graph->n_nodes(),
+                                                                  block_size,
+                                                                  crs_graph->rowptr(),
+                                                                  crs_graph->colidx(),
+                                                                  1,
+                                                                  diag_values,
+                                                                  off_diag_values,
+                                                                  (real_t)1);
+        // Owns the pointers
+        return sfem::make_op<real_t>(
+                crs_graph->n_nodes(),
+                crs_graph->n_nodes(),
+                [=](const real_t *const x, real_t *const y) {
+                    spmv->apply(x, y);
+                    f->copy_constrained_dofs(x, y);
+                },
+                es);
     }
 
     real_t residual(sfem::Operator<real_t> &op,

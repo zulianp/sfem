@@ -61,6 +61,23 @@ namespace sfem {
         impl_->colidx = colidx;
     }
 
+    void CRSGraph::print(std::ostream &os) const {
+        auto rowptr = this->rowptr()->data();
+        auto colidx = this->colidx()->data();
+        const ptrdiff_t nnodes = this->n_nodes();
+        const ptrdiff_t nnz = this->nnz();
+
+        os << "CRSGraph (" << nnodes << " nodes, " << nnz << " nnz)\n";
+        for (ptrdiff_t i = 0; i < nnodes; i++) {
+            os << i << " (" << (rowptr[i + 1] - rowptr[i]) << "): ";
+            for (int j = rowptr[i]; j < rowptr[i + 1]; j++) {
+                assert(j < nnz);
+                os << colidx[j] << " ";
+            }
+            os << "\n";
+        }
+    }
+
     CRSGraph::CRSGraph() : impl_(std::make_unique<Impl>()) {}
     CRSGraph::~CRSGraph() = default;
 
@@ -90,6 +107,7 @@ namespace sfem {
         mesh_t mesh;
 
         std::shared_ptr<CRSGraph> crs_graph;
+        std::shared_ptr<CRSGraph> crs_graph_upper_triangular;
 
         ~Impl() { mesh_destroy(&mesh); }
     };
@@ -208,6 +226,30 @@ namespace sfem {
                 Buffer<idx_t>::own(rowptr[mesh->nnodes], colidx, free, MEMORY_SPACE_HOST));
 
         return SFEM_SUCCESS;
+    }
+
+    std::shared_ptr<CRSGraph> Mesh::node_to_node_graph_upper_triangular() {
+        if (!impl_->crs_graph_upper_triangular) {
+            auto mesh = &impl_->mesh;
+
+            count_t *rowptr{nullptr};
+            idx_t *colidx{nullptr};
+            build_crs_graph_upper_triangular_from_element(
+                    mesh->nelements,
+                    mesh->nnodes,
+                    elem_num_nodes((enum ElemType)mesh->element_type),
+                    mesh->elements,
+                    &rowptr,
+                    &colidx);
+
+            impl_->crs_graph_upper_triangular = std::make_shared<CRSGraph>(
+                    Buffer<count_t>::own(mesh->nnodes + 1, rowptr, free, MEMORY_SPACE_HOST),
+                    Buffer<idx_t>::own(rowptr[mesh->nnodes], colidx, free, MEMORY_SPACE_HOST));
+
+            // impl_->crs_graph_upper_triangular->print(std::cout);
+        }
+
+        return impl_->crs_graph_upper_triangular;
     }
 
     int Mesh::convert_to_macro_element_mesh() {
@@ -879,6 +921,7 @@ namespace sfem {
         double destroy_crs_graph{0};
         double hessian_crs{0};
         double hessian_bsr{0};
+        double hessian_bcrs_sym{0};
         double hessian_diag{0};
         double gradient{0};
         double apply{0};
@@ -895,6 +938,7 @@ namespace sfem {
             destroy_crs_graph = 0;
             hessian_crs = 0;
             hessian_bsr = 0;
+            hessian_bcrs_sym = 0;
             hessian_diag = 0;
             gradient = 0;
             apply = 0;
@@ -1106,6 +1150,25 @@ namespace sfem {
             }
         }
 
+        return SFEM_SUCCESS;
+    }
+
+    int Function::hessian_bcrs_sym(const real_t *const x,
+                                   const count_t *const rowptr,
+                                   const idx_t *const colidx,
+                                   const ptrdiff_t block_stride,
+                                   real_t **const diag_values,
+                                   real_t **const off_diag_values) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.hessian_bcrs_sym);
+
+        for (auto &op : impl_->ops) {
+            if (op->hessian_bcrs_sym(
+                        x, rowptr, colidx, block_stride, diag_values, off_diag_values) !=
+                SFEM_SUCCESS) {
+                std::cerr << "Failed hessian_bcrs_sym in op: " << op->name() << "\n";
+                return SFEM_FAILURE;
+            }
+        }
         return SFEM_SUCCESS;
     }
 
@@ -1389,6 +1452,29 @@ namespace sfem {
                                   graph->colidx()->data(),
                                   values);
 
+            return SFEM_SUCCESS;
+        }
+
+        int hessian_bcrs_sym(const real_t *const x,
+                             const count_t *const rowptr,
+                             const idx_t *const colidx,
+                             const ptrdiff_t block_stride,
+                             real_t **const diag_values,
+                             real_t **const off_diag_values) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            linear_elasticity_bcrs_sym(element_type,
+                                       mesh->nelements,
+                                       mesh->nnodes,
+                                       mesh->elements,
+                                       mesh->points,
+                                       this->mu,
+                                       this->lambda,
+                                       rowptr,
+                                       colidx,
+                                       block_stride,
+                                       diag_values,
+                                       off_diag_values);
             return SFEM_SUCCESS;
         }
 
