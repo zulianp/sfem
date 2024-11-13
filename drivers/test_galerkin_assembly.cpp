@@ -17,27 +17,27 @@
 
 #include <vector>
 
-#define OP_HEADERS()                                                                            \
-    do {                                                                                        \
-        printf("Op,\t\tTTS [s],\tRTP [MDOF/s],\tBW [MDOF/s],\t(rows, cols)\n");                         \
+#define OP_HEADERS()                                                            \
+    do {                                                                        \
+        printf("Op,\t\tTTS [s],\tRTP [MDOF/s],\tBW [MDOF/s],\t(rows, cols)\n"); \
     } while (0)
 
-#define OP_TIME(op, x, y)                                                                       \
-    do {                                                                                        \
-        sfem::device_synchronize();                                                             \
-        double start = MPI_Wtime();                                                             \
-        op->apply(x, y);                                                                        \
-        sfem::device_synchronize();                                                             \
-        double stop = MPI_Wtime();                                                              \
-        double elapsed = stop - start;                                                          \
-        printf("%s,\t%.5f,\t%.1f,\t\t%.1f,\t\t(%ld, %ld)\n", \
-               #op,                                                                             \
-               elapsed,                                                                         \
-               1e-6 * (op)->rows() / elapsed,                                                   \
-               1e-6 * ((op)->rows() + (op)->cols()) / elapsed,                                  \
-               (op)->rows(),                                                                    \
-               (op)->cols());                                                                   \
-        fflush(stdout);                                                                         \
+#define OP_TIME(op, x, y)                                      \
+    do {                                                       \
+        sfem::device_synchronize();                            \
+        double start = MPI_Wtime();                            \
+        op->apply(x, y);                                       \
+        sfem::device_synchronize();                            \
+        double stop = MPI_Wtime();                             \
+        double elapsed = stop - start;                         \
+        printf("%s,\t%.5f,\t%.1f,\t\t%.1f,\t\t(%ld, %ld)\n",   \
+               #op,                                            \
+               elapsed,                                        \
+               1e-6 * (op)->rows() / elapsed,                  \
+               1e-6 * ((op)->rows() + (op)->cols()) / elapsed, \
+               (op)->rows(),                                   \
+               (op)->cols());                                  \
+        fflush(stdout);                                        \
     } while (0)
 
 int main(int argc, char *argv[]) {
@@ -71,6 +71,7 @@ int main(int argc, char *argv[]) {
     int SFEM_SKIP_VERIFICATION = 0;
     int SFEM_MATRIX_FREE = 1;
     int SFEM_COARSE_MATRIX_FREE = 1;
+    int SFEM_USE_BSR = 1;
 
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_USE_GPU, atoi);
@@ -121,7 +122,15 @@ int main(int argc, char *argv[]) {
     if (SFEM_MATRIX_FREE) {
         fine_op = sfem::make_linear_op(f);
     } else {
-        fine_op = sfem::hessian_bsr(f, nullptr, es);
+        if(fs->block_size() == 1) {
+            fine_op = sfem::hessian_crs(f, nullptr, es);
+        } else {
+            if (SFEM_USE_BSR) {
+                fine_op = sfem::hessian_bsr(f, nullptr, es);
+            } else {
+                fine_op = sfem::hessian_bcrs_sym(f, nullptr, es);
+            }
+        }
     }
 
     auto fs_coarse = fs->derefine();
@@ -130,7 +139,15 @@ int main(int argc, char *argv[]) {
     if (SFEM_COARSE_MATRIX_FREE) {
         coarse_op = sfem::make_linear_op(f_coarse);
     } else {
-        coarse_op = sfem::hessian_bsr(f_coarse, nullptr, es);
+           if(fs->block_size() == 1) {
+            coarse_op = sfem::hessian_crs(f_coarse, nullptr, es);
+        } else {
+            // if (SFEM_USE_BSR) {
+            //     coarse_op = sfem::hessian_bsr(f_coarse, nullptr, es);
+            // } else {
+                coarse_op = sfem::hessian_bcrs_sym(f_coarse, nullptr, es);
+            // }
+        }
     }
 
     auto restriction = sfem::create_hierarchical_restriction(fs, fs_coarse, es);

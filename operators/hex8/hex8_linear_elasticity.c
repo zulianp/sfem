@@ -395,22 +395,24 @@ int affine_hex8_linear_elasticity_crs_sym(
             for (int edof_i = 0; edof_i < 8; edof_i++) {
                 // For each row we find the corresponding entries in the off-diag
                 // We select the entries associated with ev[row] < ev[col]
-                const int lenrow = rowptr[edof_i + 1] - rowptr[edof_i];
-                const idx_t *cols = &colidx[rowptr[edof_i]];
+                const int lenrow = rowptr[ev[edof_i] + 1] - rowptr[ev[edof_i]];
+                const idx_t *cols = &colidx[rowptr[ev[edof_i]]];
                 // Find the columns associated with the current row and mask what is not found with
                 // -1
                 int ks[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
                 for (int i = 0; i < lenrow; i++) {
                     for (int k = 0; k < 8; k++) {
                         if (cols[i] == ev[k]) {
-                            ks[i] = k;
+                            ks[k] = i;
                             break;
                         }
                     }
                 }
 
-                for (int edof_j = edof_i + 1; edof_j < 8; edof_j++) {
-                    if (ev[edof_i] < ev[edof_j]) {
+
+
+                for (int edof_j = 0; edof_j < 8; edof_j++) {
+                    if (ev[edof_j] > ev[edof_i]) {
                         assert(ks[edof_j] != -1);
 
                         accumulator_t element_matrix[3 * 3];
@@ -435,7 +437,7 @@ int affine_hex8_linear_elasticity_crs_sym(
                         for (int d1 = 0; d1 < 3; d1++) {
                             for (int d2 = d1 + 1; d2 < 3; d2++, d_idx++) {
                                 real_t *values =
-                                        &block_offdiag[d_idx][(rowptr[edof_i] + ks[edof_j]) *
+                                        &block_offdiag[d_idx][(rowptr[ev[edof_i]] + ks[edof_j]) *
                                                               block_stride];
 #pragma omp atomic update
                                 *values += element_matrix[d_idx];
