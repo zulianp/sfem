@@ -5,6 +5,9 @@ import sys, getopt
 import os
 import glob
 
+tet4_names = ("tetra", "tetrahedron", "tetra4", "tet4", "TET4")
+hex8_names = ("hexahedron", "hex", "hex8", "HEX8")
+
 try:
     import rectangle_mesh
 except ImportError:
@@ -21,6 +24,7 @@ def create_face_idx(n, nxf):
 
 def create_boundary_faces(cell_type, nx, ny, nz):
     ld = leading_dim(nx, ny, nz)
+
 
     fact = 2
     nxf = 3
@@ -220,7 +224,7 @@ def create(w, h, t, nx, ny, nz, cell_type):
     idx = []
     points = [x, y, z]
 
-    if cell_type == "hexahedron" or cell_type == "hex" or cell_type == "hex8":
+    if cell_type in hex8_names:
         ne = (nx - 1) * (ny - 1) * (nz - 1)
 
         i0 = np.zeros(ne, dtype=idx_t)
@@ -280,7 +284,7 @@ def create(w, h, t, nx, ny, nz, cell_type):
         idx.append(i6)
         idx.append(i7)
 
-    elif cell_type == "tetra" or cell_type == "tetrahedron" or cell_type == "tetra4" or cell_type == "tet4":
+    elif cell_type in tet4_names:
         use_incompatibile_tet = False
         if use_incompatibile_tet:
             ne = 5 * (nx - 1) * (ny - 1) * (nz - 1)

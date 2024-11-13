@@ -601,7 +601,7 @@ int proteus_affine_hex8_elasticity_bsr(const int level,
             }
 
             const scalar_t h = 1. / level;
-            
+
             // 2) Evaluate Adjugate
             scalar_t adjugate[9];
             scalar_t jacobian_determinant;
@@ -642,4 +642,22 @@ int proteus_affine_hex8_elasticity_bsr(const int level,
     }
 
     return SFEM_SUCCESS;
+}
+
+int proteus_affine_hex8_elasticity_crs_sym(const int level,
+                                               const ptrdiff_t nelements,
+                                               const ptrdiff_t nnodes,
+                                               idx_t **const SFEM_RESTRICT elements,
+                                               geom_t **const SFEM_RESTRICT points,
+                                               const real_t mu,
+                                               const real_t lambda,
+                                               const count_t *const SFEM_RESTRICT rowptr,
+                                               const idx_t *const SFEM_RESTRICT colidx,
+                                               // Output in SoA format (6)
+                                               real_t **const SFEM_RESTRICT block_diag,
+                                               real_t **const SFEM_RESTRICT block_offdiag) {
+
+    // TODO Implement
+    assert(0);
+    return SFEM_FAILURE;
 }

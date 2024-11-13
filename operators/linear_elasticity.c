@@ -447,3 +447,41 @@ int linear_elasticity_bsr(const enum ElemType element_type,
         }
     }
 }
+
+int linear_elasticity_bcrs_sym(const enum ElemType element_type,
+                               const ptrdiff_t nelements,
+                               const ptrdiff_t nnodes,
+                               idx_t **const SFEM_RESTRICT elems,
+                               geom_t **const SFEM_RESTRICT xyz,
+                               const real_t mu,
+                               const real_t lambda,
+                               const count_t *const SFEM_RESTRICT rowptr,
+                               const idx_t *const SFEM_RESTRICT colidx,
+                               const ptrdiff_t block_stride,
+                               real_t **const SFEM_RESTRICT diag_values,
+                               real_t **const SFEM_RESTRICT off_diag_values) {
+    switch (element_type) {
+        case HEX8: {
+            return affine_hex8_linear_elasticity_crs_sym(nelements,
+                                                         nnodes,
+                                                         elems,
+                                                         xyz,
+                                                         mu,
+                                                         lambda,
+                                                         rowptr,
+                                                         colidx,
+                                                         block_stride,
+                                                         diag_values,
+                                                         off_diag_values);
+        }
+        default: {
+            fprintf(stderr,
+                    "linear_elasticity_bcrs_sym not implemented for type %s\n",
+                    type_to_string(element_type));
+            assert(0);
+            MPI_Abort(MPI_COMM_WORLD, -1);
+        }
+    }
+
+    return SFEM_SUCCESS;
+}

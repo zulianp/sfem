@@ -43,6 +43,8 @@ namespace sfem {
         std::shared_ptr<Buffer<idx_t>> colidx() const;
         std::shared_ptr<CRSGraph> block_to_scalar(const int block_size);
 
+        void print(std::ostream &os) const;
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;
@@ -76,6 +78,7 @@ namespace sfem {
         ptrdiff_t n_elements() const;
 
         std::shared_ptr<CRSGraph> node_to_node_graph();
+        std::shared_ptr<CRSGraph> node_to_node_graph_upper_triangular();
         std::shared_ptr<CRSGraph> create_node_to_node_graph(const enum ElemType element_type);
 
         std::shared_ptr<Buffer<count_t>> node_to_node_rowptr() const;
@@ -105,6 +108,9 @@ namespace sfem {
 
         SemiStructuredMesh(const std::shared_ptr<Mesh> macro_mesh, const int level);
         ~SemiStructuredMesh();
+
+        std::shared_ptr<CRSGraph> node_to_node_graph();
+        
 
         static std::shared_ptr<SemiStructuredMesh> create(const std::shared_ptr<Mesh> macro_mesh,
                                                           const int level) {
@@ -186,6 +192,16 @@ namespace sfem {
             assert(false);
             return SFEM_FAILURE;
         }
+
+        virtual int hessian_bcrs_sym(const real_t *const /*x*/,
+                                     const count_t *const /*rowidx*/,
+                                     const idx_t *const /*colidx*/,
+                                     const ptrdiff_t /*block_stride*/,
+                                     real_t **const /*diag_values*/,
+                                     real_t **const /*off_diag_values*/) {
+            assert(false);
+            return SFEM_FAILURE;
+        }   
 
         virtual int hessian_diag(const real_t *const /*x*/, real_t *const /*values*/) {
             return SFEM_FAILURE;
@@ -397,6 +413,13 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const colidx,
                         real_t *const values);
+
+        int hessian_bcrs_sym(const real_t *const x,
+                             const count_t *const rowptr,
+                             const idx_t *const colidx,
+                             const ptrdiff_t block_stride,
+                             real_t **const diag_values,
+                             real_t **const off_diag_values);
 
         int hessian_diag(const real_t *const x, real_t *const values);
 
