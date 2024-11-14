@@ -144,7 +144,7 @@ namespace sfem {
     std::shared_ptr<Buffer<T*>> h_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1) {
         T ** data = (T **)malloc(n0 * sizeof(T *));
         for(int i = 0; i < n0; ++i) {
-            data[i] = (T *)malloc(n1 * sizeof(T));
+            data[i] = (T *)calloc(n1, sizeof(T));
         }
 
         auto ret =
