@@ -78,5 +78,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    mask_destroy(m);
+
     return MPI_Finalize();
 }
