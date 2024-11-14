@@ -5,7 +5,7 @@
 #include "sparse.h"
 
 int builder(const real_t coarsening_factor,
-            const idx_t *free_dofs,
+            const mask_t *bdy_dofs,
             SymmCOOMatrix *fine_mat,
             PWCHierarchy *hierarchy) {
     idx_t max_levels = 1;
@@ -56,7 +56,7 @@ int builder(const real_t coarsening_factor,
             prev.offdiag_values[k] = matrices[levels - 1]->offdiag_values[k];
         }
 
-        int failure = partition(near_null, free_dofs, coarsening_factor, &prev, &ws);
+        int failure = partition(near_null, bdy_dofs, coarsening_factor, &prev, &ws);
         if (failure) {
             break;
         }

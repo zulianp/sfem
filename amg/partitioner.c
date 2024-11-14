@@ -1,5 +1,6 @@
 #include "partitioner.h"
 #include <stdlib.h>
+#include "sfem_mask.h"
 #include "sparse.h"
 
 // Helper functions... not public API so I don't think they go in header file?
@@ -15,7 +16,7 @@ int pairwise_aggregation(const real_t coarsening_factor,
 real_t *global_weights;
 
 int partition(const real_t *near_null,
-              const idx_t *free_dofs,
+              const mask_t *bdy_dofs,
               const real_t coarsening_factor,
               SymmCOOMatrix *symm_coo,
               PartitionerWorkspace *ws) {
@@ -26,7 +27,7 @@ int partition(const real_t *near_null,
     // We start with each free DOF in its own aggregate
     idx_t agg_id = 0;
     for (idx_t row = 0; row < nrows; row++) {
-        if (free_dofs[row]) {
+        if (!mask_get(row, bdy_dofs)) {
             ws->partition[row] = agg_id;
         } else {
             ws->partition[row] = -1;
@@ -38,7 +39,7 @@ int partition(const real_t *near_null,
     for (idx_t k = 0; k < nnz; k++) {
         idx_t i = symm_coo->offdiag_row_indices[k];
         idx_t j = symm_coo->offdiag_col_indices[k];
-        if (free_dofs[i] && free_dofs[j]) {
+        if (mask_get(i, bdy_dofs) || mask_get(j, bdy_dofs)) {
             real_t val = symm_coo->offdiag_values[k];
 
             real_t weight = -val * near_null[i] * near_null[j];

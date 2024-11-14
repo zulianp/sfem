@@ -22,7 +22,7 @@ typedef struct {
 } PartitionerWorkspace;
 
 int partition(const real_t *near_null,
-              const idx_t *free_dofs,
+              const mask_t *bdy_dofs,
               const real_t coarsening_factor,
               SymmCOOMatrix *symm_coo,
               PartitionerWorkspace *ws);

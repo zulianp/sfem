@@ -30,6 +30,7 @@ int partition_test() {
     count_t *row_ptr = (count_t *)malloc((nrows + 1) * sizeof(count_t));
     idx_t *col_indices = (idx_t *)malloc(nnz * sizeof(idx_t));
     real_t *values = (real_t *)malloc(nnz * sizeof(real_t));
+    mask_t *bdy_dofs = (mask_t *)malloc(nrows * sizeof(mask_t));
 
     count_t nweights = (nnz - nrows) / 2;
     symm_coo->offdiag_nnz = nweights;
@@ -45,11 +46,12 @@ int partition_test() {
     load_binary_file("../data/cylinder/laplace_values.raw", values, nnz * sizeof(real_t));
 
     csr_to_symmcoo(nrows, nnz, row_ptr, col_indices, values, symm_coo);
-    test_result = builder(coarsening_factor, symm_coo, &hierarchy);
+    test_result = builder(coarsening_factor, bdy_dofs, symm_coo, &hierarchy);
 
     free(row_ptr);
     free(col_indices);
     free(values);
+    free(bdy_dofs);
 
     for (idx_t level = 0; level < hierarchy.levels; level++) {
         SymmCOOMatrix *mat = hierarchy.matrices[level];

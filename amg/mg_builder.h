@@ -12,7 +12,7 @@ typedef struct {
 } PWCHierarchy;
 
 int builder(const real_t coarsening_factor,
-            const idx_t *free_dofs,
+            const mask_t *bdy_dofs,
             SymmCOOMatrix *fine_mat,
             PWCHierarchy *hierarchy);
 
