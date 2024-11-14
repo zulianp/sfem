@@ -656,11 +656,12 @@ static int build_crs_graph_upper_triangular_from_n2e(const ptrdiff_t nelements,
     {
         rowptr[0] = 0;
 
-#pragma omp parallel
+
         {
-            idx_t n2nbuff[4096];
-#pragma omp for
+#pragma omp parallel for
             for (ptrdiff_t node = 0; node < nnodes; ++node) {
+                idx_t n2nbuff[4096];
+
                 count_t ebegin = n2eptr[node];
                 count_t eend = n2eptr[node + 1];
 
@@ -691,11 +692,11 @@ static int build_crs_graph_upper_triangular_from_n2e(const ptrdiff_t nelements,
             const ptrdiff_t nnz = rowptr[nnodes];
             colidx = (idx_t *)malloc(nnz * sizeof(idx_t));
 
-#pragma omp parallel
+
             {
-                idx_t n2nbuff[4096];
-#pragma omp for
+#pragma omp parallel for
                 for (ptrdiff_t node = 0; node < nnodes; ++node) {
+                    idx_t n2nbuff[4096];
                     count_t ebegin = n2eptr[node];
                     count_t eend = n2eptr[node + 1];
 

@@ -72,6 +72,7 @@ int main(int argc, char *argv[]) {
     int SFEM_MATRIX_FREE = 1;
     int SFEM_COARSE_MATRIX_FREE = 1;
     int SFEM_USE_BSR = 1;
+    int SFEM_COARSE_USE_BSR = 1;
 
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_USE_GPU, atoi);
@@ -81,6 +82,7 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_SKIP_VERIFICATION, atoi);
     SFEM_READ_ENV(SFEM_MATRIX_FREE, atoi);
     SFEM_READ_ENV(SFEM_COARSE_MATRIX_FREE, atoi);
+    SFEM_READ_ENV(SFEM_COARSE_USE_BSR, atoi);
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
@@ -122,7 +124,7 @@ int main(int argc, char *argv[]) {
     if (SFEM_MATRIX_FREE) {
         fine_op = sfem::make_linear_op(f);
     } else {
-        if(fs->block_size() == 1) {
+        if (fs->block_size() == 1) {
             fine_op = sfem::hessian_crs(f, nullptr, es);
         } else {
             if (SFEM_USE_BSR) {
@@ -139,14 +141,14 @@ int main(int argc, char *argv[]) {
     if (SFEM_COARSE_MATRIX_FREE) {
         coarse_op = sfem::make_linear_op(f_coarse);
     } else {
-           if(fs->block_size() == 1) {
+        if (fs->block_size() == 1) {
             coarse_op = sfem::hessian_crs(f_coarse, nullptr, es);
         } else {
-            // if (SFEM_USE_BSR) {
-            //     coarse_op = sfem::hessian_bsr(f_coarse, nullptr, es);
-            // } else {
+            if (SFEM_COARSE_USE_BSR) {
+                coarse_op = sfem::hessian_bsr(f_coarse, nullptr, es);
+            } else {
                 coarse_op = sfem::hessian_bcrs_sym(f_coarse, nullptr, es);
-            // }
+            }
         }
     }
 
