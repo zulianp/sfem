@@ -8,6 +8,7 @@
 #include "sfem_Buffer.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_openmp_blas.hpp"
+#include "sfem_LpSmoother.hpp"
 
 namespace sfem {
     template <typename T>
@@ -16,7 +17,7 @@ namespace sfem {
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         ptrdiff_t n_dofs{-1};
         int max_it{3};
-        Buffer<T> workspace;
+        std::shared_ptr<Buffer<T>> workspace;
 
         std::function<void(const T* const, T* const)> apply_op;
         std::function<void(const T* const, T* const)> preconditioner_op;
@@ -31,7 +32,7 @@ namespace sfem {
 
         /* Operator */
         int apply(const T* const b, T* const x) override {
-            T* r = workspace.data();
+            T* r = workspace->data();
             for (int i = 0; i < max_it; i++) {
                 apply_op(x, r);
                 blas.axpby(n_dofs, 1, b, -1, r);

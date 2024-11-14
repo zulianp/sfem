@@ -7,6 +7,7 @@
 #include "sfem_cuda_blas.h"
 #include "sfem_cuda_solver.hpp"
 #endif
+#include "sfem_Stationary.hpp"
 
 #include <vector>
 
@@ -47,6 +48,7 @@ int main(int argc, char *argv[]) {
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     int SFEM_MAX_IT = 1000;
     bool SFEM_USE_GPU = true;
+    bool SFEM_USE_AMG = false;
 
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
@@ -54,6 +56,7 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
     SFEM_READ_ENV(SFEM_MAX_IT, atoi);
     SFEM_READ_ENV(SFEM_USE_GPU, atoi);
+    SFEM_READ_ENV(SFEM_USE_AMG, atoi);
 
     sfem::ExecutionSpace es =
             SFEM_USE_GPU ? sfem::EXECUTION_SPACE_DEVICE : sfem::EXECUTION_SPACE_HOST;
@@ -80,18 +83,32 @@ int main(int argc, char *argv[]) {
     f->add_constraint(conds);
     f->add_operator(op);
 
+    auto x = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    auto rhs = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+
     // -------------------------------
     // Create linear solver
     // -------------------------------
 
-    auto linear_op = sfem::make_linear_op(f);
-    auto solver = sfem::create_cg<real_t>(linear_op, es);
-    solver->verbose = true;
-    solver->set_max_it(SFEM_MAX_IT);
-    solver->set_op(linear_op);
+    std::shared_ptr<sfem::Operator<real_t>> solver;
 
-    auto x = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-    auto rhs = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    if (SFEM_USE_AMG) {
+        auto stat_iter = sfem::h_stationary<real_t>();
+        // stat_iter->set_op(linear_op);
+
+        // auto smoother = sfem::h_lpsmoother<real_t>(diag);
+        // stat_iter->set_preconditioner_op(smoother);
+        solver =  stat_iter;
+    } else {
+        auto linear_op = sfem::make_linear_op(f);
+        auto cg = sfem::create_cg<real_t>(linear_op, es);
+        cg->verbose = true;
+        cg->set_max_it(SFEM_MAX_IT);
+        cg->set_op(linear_op);
+        solver = cg;
+    }
+
+    
 
     // -------------------------------
     // Solve
@@ -102,7 +119,6 @@ int main(int argc, char *argv[]) {
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());
 
-    solver->set_n_dofs(fs->n_dofs());
     solver->apply(rhs->data(), x->data());
 
     double solve_tock = MPI_Wtime();

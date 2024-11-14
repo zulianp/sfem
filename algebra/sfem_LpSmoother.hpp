@@ -24,7 +24,7 @@ namespace sfem {
 
         /* Operator */
         int apply(const T* const b, T* const x) override {
-            blas.xypaz(n_dofs, inv_diag, b, 1, x);
+            blas.xypaz(n_dofs, inv_diag->data(), b, 1, x);
             return 0;
         }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
