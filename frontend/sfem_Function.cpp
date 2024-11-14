@@ -957,6 +957,7 @@ namespace sfem {
             os << "destroy_crs_graph," << destroy_crs_graph << "\n";
             os << "hessian_crs," << hessian_crs << "\n";
             os << "hessian_bsr," << hessian_bsr << "\n";
+            os << "hessian_bcrs_sym," << hessian_bcrs_sym << "\n";
             os << "hessian_diag," << hessian_diag << "\n";
             os << "gradient," << gradient << "\n";
             os << "apply," << apply << "\n";

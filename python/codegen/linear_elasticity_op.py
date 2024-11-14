@@ -97,26 +97,36 @@ class LinearElasticityOpSymbolic:
 		# 	expr.append(ast.Assignment(var, Hu))
 		# c_code(expr)
 
-		c_log("// Code Hessian off diagonal")
+		# c_log("// Code Hessian off diagonal")
+		# expr = []
+		# for i in range(0, dims):
+		# 	for j in range(0, dims):
+		# 		var = sp.symbols(f'element_matrix[{i*dims + j}*stride]')
+		# 		expr.append(ast.Assignment(var, H[i, j]))
+		# c_code(expr)
+
+		c_log("// Code Hessian sym")
 		expr = []
+		d_idx = 0
 		for i in range(0, dims):
-			for j in range(0, dims):
-				var = sp.symbols(f'element_matrix[{i*dims + j}*stride]')
+			for j in range(i, dims):
+				var = sp.symbols(f'element_matrix[{d_idx}*stride]')
 				expr.append(ast.Assignment(var, H[i, j]))
+				d_idx += 1
 		c_code(expr)
 
-		c_log("// Code Hessian diagonal")
-		expr = []
-		for i in range(0, dims):
-			for j in range(0, dims):
-				var = sp.symbols(f'element_matrix[{i*dims + j}*stride]')
+		# c_log("// Code Hessian diagonal")
+		# expr = []
+		# for i in range(0, dims):
+		# 	for j in range(0, dims):
+		# 		var = sp.symbols(f'element_matrix[{i*dims + j}*stride]')
 				
-				for d0 in range(0, dims):
-					for d1 in range(0, dims):
-						for d2 in range(0, dims):
-							H[i, j] = sp.simplify(H[i, j].subs(trial_grad[d0][d1, d2], test_grad[d0][d1, d2]))
-				expr.append(ast.Assignment(var, H[i, j]))
-		c_code(expr)
+		# 		for d0 in range(0, dims):
+		# 			for d1 in range(0, dims):
+		# 				for d2 in range(0, dims):
+		# 					H[i, j] = sp.simplify(H[i, j].subs(trial_grad[d0][d1, d2], test_grad[d0][d1, d2]))
+		# 		expr.append(ast.Assignment(var, H[i, j]))
+		# c_code(expr)
 
 
 class LinearElasticityOpTaylor:	
@@ -586,8 +596,8 @@ def main():
 	fe.use_adjugate = True
 	
 	# op = LinearElasticityOp(fe)
-	# op = LinearElasticityOpSymbolic(fe)
-	op = LinearElasticityOpTaylor(fe)
+	op = LinearElasticityOpSymbolic(SymbolicFE3D())
+	# op = LinearElasticityOpTaylor(fe)
 	# op.hessian_check()
 
 

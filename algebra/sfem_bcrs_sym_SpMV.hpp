@@ -1,6 +1,8 @@
 #ifndef SFEM_BCRS_SYM_SPMV_HPP
 #define SFEM_BCRS_SYM_SPMV_HPP
 
+#include <iostream>
+
 namespace sfem {
     template <typename R, typename C, typename T>
     class BCRSSymSpMV : public Operator<T> {
@@ -28,6 +30,215 @@ namespace sfem {
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         ExecutionSpace execution_space() const override { return execution_space_; }
+
+        void print(std::ostream& os) const {
+            os << "BCRSSymSpMV (" << rows() << " x " << cols() << ")\n";
+            os << "Block size: " << block_size_ << "\n";
+            os << "Block rows: " << block_rows_ << "\n";
+            os << "Block cols: " << block_cols_ << "\n";
+            os << "Block stride: " << block_stride_ << "\n";
+
+            // Get raw pointers
+            auto rowptr = this->rowptr->data();
+            auto colidx = this->colidx->data();
+            auto diag_values = this->diag_values->data();
+            auto off_diag_values = this->off_diag_values->data();
+
+            for (ptrdiff_t i = 0; i < block_rows_; i++) {
+                os << "Row: " << i << " (" << (rowptr[i + 1] - rowptr[i]) << "):\n";
+
+                os << i << ")\n";
+                int d_idx = 0;
+                for (int d = 0; d < block_size_; d++) {
+                    os << "\t";
+
+                    for (int d2 = 0; d2 < d; d2++) {
+                        os << "x ";
+                    }
+
+                    for (int d2 = d; d2 < block_size_; d2++, d_idx++) {
+                        os << diag_values[d_idx][i * block_stride_] << " ";
+                    }
+
+                    os << "\n";
+                }
+
+                for (count_t j = rowptr[i]; j < rowptr[i + 1]; j++) {
+                    os << colidx[j] << ")\n";
+
+                    int d_idx = 0;
+                    for (int d = 0; d < block_size_; d++) {
+                        os << "\t";
+
+                        for (int d2 = 0; d2 < d; d2++) {
+                            os << "x ";
+                        }
+
+                        for (int d2 = d; d2 < block_size_; d2++, d_idx++) {
+                            os << off_diag_values[d_idx][j * block_stride_] << " ";
+                        }
+
+                        os << "\n";
+                    }
+                }
+                os << "\n";
+            }
+        }
+
+        template <int BLOCK_SIZE>
+        void apply_sym_block(const T* const x, const T scale_output, T* const y) const {
+            const ptrdiff_t nnz = this->colidx->size();
+            const ptrdiff_t block_rows = this->block_rows_;
+            const ptrdiff_t block_stride = this->block_stride_;
+
+            // Check preconditions
+            assert(this->colidx->size() == nnz);
+            assert(this->off_diag_values->extent(1) == nnz);
+            assert(this->diag_values->extent(1) == block_rows);
+
+            // Get raw pointers
+            auto rowptr = this->rowptr->data();
+            auto colidx = this->colidx->data();
+            auto diag_values = this->diag_values->data();
+            auto off_diag_values = this->off_diag_values->data();
+
+            if (scale_output != 1) {
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < block_rows * BLOCK_SIZE; ++i) {
+                    y[i] *= scale_output;
+                }
+            }
+
+            // Apply diagonal block
+#pragma omp parallel for
+            for (ptrdiff_t row = 0; row < block_rows; row++) {
+                ptrdiff_t diag_idx = row * block_stride;
+
+                T block_diag[BLOCK_SIZE * BLOCK_SIZE];
+                T x_local[BLOCK_SIZE];
+                T y_local[BLOCK_SIZE];
+
+                for (int d1 = 0; d1 < BLOCK_SIZE; d1++) {
+                    x_local[d1] = x[row * BLOCK_SIZE + d1];
+                    y_local[d1] = 0;
+                }
+
+                {
+                    int d_idx = 0;
+                    for (int d1 = 0; d1 < BLOCK_SIZE; d1++) {
+                        for (int d2 = d1; d2 < BLOCK_SIZE; d2++) {
+                            block_diag[d1 * BLOCK_SIZE + d2] = diag_values[d_idx++][diag_idx];
+                            block_diag[d2 * BLOCK_SIZE + d1] = block_diag[d1 * BLOCK_SIZE + d2];
+                        }
+                    }
+                }
+
+#pragma unroll(BLOCK_SIZE)
+                for (int d1 = 0; d1 < BLOCK_SIZE; d1++) {
+#pragma unroll(BLOCK_SIZE)
+                    for (int d2 = 0; d2 < BLOCK_SIZE; d2++) {
+                        y_local[d1] += block_diag[d1 * BLOCK_SIZE + d2] * x_local[d2];
+                    }
+                }
+
+                for (int d1 = 0; d1 < BLOCK_SIZE; d1++) {
+#pragma omp atomic
+                    y[row * BLOCK_SIZE + d1] += y_local[d1];
+                }
+            }
+
+            // Apply off-diagonal blocks
+#pragma omp parallel for
+            for (ptrdiff_t row = 0; row < block_rows; row++) {
+                const count_t lenrow = rowptr[row + 1] - rowptr[row];
+                const idx_t* cols = &colidx[rowptr[row]];
+
+                T y_local[BLOCK_SIZE];
+                for (int d1 = 0; d1 < BLOCK_SIZE; d1++) {
+                    y_local[d1] = 0;
+                }
+
+                for (count_t k = 0; k < lenrow; k++) {
+                    const auto col = cols[k];
+                    const ptrdiff_t off_diag_idx = (rowptr[row] + k) * block_stride;
+
+                    // Construct block
+                    T block[BLOCK_SIZE * BLOCK_SIZE];
+                    {
+                        int d_idx = 0;
+                        for (int d1 = 0; d1 < BLOCK_SIZE; d1++) {
+                            block[d1 * BLOCK_SIZE + d1] = off_diag_values[d_idx++][off_diag_idx];
+                            for (int d2 = d1 + 1; d2 < BLOCK_SIZE; d2++) {
+                                block[d1 * BLOCK_SIZE + d2] =
+                                        off_diag_values[d_idx++][off_diag_idx];
+                                block[d2 * BLOCK_SIZE + d1] = block[d1 * BLOCK_SIZE + d2];
+                            }
+                        }
+                    }
+
+                    T x_local[BLOCK_SIZE];
+                    for (int d1 = 0; d1 < BLOCK_SIZE; d1++) {
+                        x_local[d1] = x[col * BLOCK_SIZE + d1];
+                    }
+
+#pragma unroll(BLOCK_SIZE)
+                    for (int d1 = 0; d1 < BLOCK_SIZE; d1++) {
+#pragma unroll(BLOCK_SIZE)
+                        for (int d2 = 0; d2 < BLOCK_SIZE; d2++) {
+                            y_local[d1] += block[d1 * BLOCK_SIZE + d2] * x_local[d2];
+                        }
+                    }
+                }
+
+                // Updated outside column loop
+                for (int d1 = 0; d1 < BLOCK_SIZE; d1++) {
+#pragma omp atomic
+                    y[row * BLOCK_SIZE + d1] += y_local[d1];
+                }
+
+                T x_local[BLOCK_SIZE];
+                for (int d1 = 0; d1 < BLOCK_SIZE; d1++) {
+                    x_local[d1] = x[row * BLOCK_SIZE + d1];
+                }
+
+                for (count_t k = 0; k < lenrow; k++) {
+                    const auto col = cols[k];
+                    const ptrdiff_t off_diag_idx = (rowptr[row] + k) * block_stride;
+
+                    // Construct block
+                    T block[BLOCK_SIZE * BLOCK_SIZE];
+                    {
+                        int d_idx = 0;
+                        for (int d1 = 0; d1 < BLOCK_SIZE; d1++) {
+                            block[d1 * BLOCK_SIZE + d1] = off_diag_values[d_idx++][off_diag_idx];
+                            for (int d2 = d1 + 1; d2 < BLOCK_SIZE; d2++) {
+                                block[d1 * BLOCK_SIZE + d2] =
+                                        off_diag_values[d_idx++][off_diag_idx];
+                                block[d2 * BLOCK_SIZE + d1] = block[d1 * BLOCK_SIZE + d2];
+                            }
+                        }
+                    }
+
+                    for (int d1 = 0; d1 < BLOCK_SIZE; d1++) {
+                        y_local[d1] = 0;
+                    }
+
+#pragma unroll(BLOCK_SIZE)
+                    for (int d1 = 0; d1 < BLOCK_SIZE; d1++) {
+#pragma unroll(BLOCK_SIZE)
+                        for (int d2 = 0; d2 < BLOCK_SIZE; d2++) {
+                            y_local[d1] += block[d1 * BLOCK_SIZE + d2] * x_local[d2];
+                        }
+                    }
+
+                    // Updated inside column loop
+                    for (int d1 = 0; d1 < BLOCK_SIZE; d1++) {
+#pragma omp atomic
+                        y[col * BLOCK_SIZE + d1] += y_local[d1];
+                    }
+                }
+            }
+        }
     };
 
     template <typename R, typename C, typename T>
@@ -52,81 +263,22 @@ namespace sfem {
         ret->block_stride_ = block_stride;
         ret->execution_space_ = EXECUTION_SPACE_HOST;
 
-        ret->apply_ = [=](const T* const x, T* const y) {
-            double tick = MPI_Wtime();
-            const ptrdiff_t nnz = ret->colidx->size();
-            const ptrdiff_t block_rows = ret->block_rows_;
-            const ptrdiff_t block_size = ret->block_size_;
-            const ptrdiff_t block_stride = ret->block_stride_;
-
-            // Check preconditions
-            assert(ret->colidx->size() == nnz);
-            assert(ret->off_diag_values->extent(1) == nnz);
-            assert(ret->diag_values->extent(1) == block_rows);
-
-            // Get raw pointers
-            auto rowptr = ret->rowptr->data();
-            auto colidx = ret->colidx->data();
-            auto diag_values = ret->diag_values->data();
-            auto off_diag_values = ret->off_diag_values->data();
-
-            if (scale_output != 1) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < block_rows * block_size; ++i) {
-                    y[i] *= scale_output;
-                }
-            }   
-
-            // Apply diagonal block
-#pragma omp parallel for
-            for (ptrdiff_t row = 0; row < block_rows; row++) {
-                ptrdiff_t diag_idx = row * block_stride;
-                int d_idx = 0;
-                for (int d1 = 0; d1 < block_size; d1++) {
-                    y[row * block_size + d1] += diag_values[d_idx][row] * x[row * block_size + d1];
-
-                    for (int d2 = d1 + 1; d2 < block_size; d2++, d_idx++) {
-                        y[row * block_size + d1] +=
-                                diag_values[d_idx][diag_idx] * x[row * block_size + d2];
-
-                        y[row * block_size + d2] +=
-                                diag_values[d_idx][diag_idx] * x[row * block_size + d1];
-                    }
-                }
+        switch (block_size) {
+            case 2: {
+                ret->apply_ = [=](const T* const x, T* const y) {
+                    ret->template apply_sym_block<2>(x, scale_output, y);
+                };
+                break;
             }
-
-            // Apply off-diagonal blocks
-#pragma omp parallel for
-            for (ptrdiff_t row = 0; row < block_rows; row++) {
-                const count_t lenrow = rowptr[row + 1] - rowptr[row];
-                const idx_t* cols = &colidx[rowptr[row]];
-
-                for (count_t k = 0; k < lenrow; k++) {
-                    const auto col = cols[k];
-                    const ptrdiff_t off_diag_idx = (rowptr[row] + k) * block_stride;
-
-                    int d_idx = 0;
-                    for (int d1 = 0; d1 < block_size; d1++) {
-#pragma omp atomic
-                        y[row * block_size + d1] +=
-                                off_diag_values[d_idx][off_diag_idx] * x[col * block_size + d1];
-
-                        for (int d2 = d1 + 1; d2 < block_size; d2++, d_idx++) {
-#pragma omp atomic
-                            y[row * block_size + d1] +=
-                                    off_diag_values[d_idx][off_diag_idx] * x[col * block_size + d2];
-
-#pragma omp atomic
-                            y[col * block_size + d2] +=
-                                    off_diag_values[d_idx][off_diag_idx] * x[row * block_size + d1];
-                        }
-                    }
-                }
+            case 3: {
+                ret->apply_ = [=](const T* const x, T* const y) {
+                    ret->template apply_sym_block<3>(x, scale_output, y);
+                };
+                break;
             }
-
-            double tock = MPI_Wtime();
-            printf("Time BCRS_sym: %f\n", tock - tick);
-        };
+            default:
+                break;
+        }
 
         return ret;
     }

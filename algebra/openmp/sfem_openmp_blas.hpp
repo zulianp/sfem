@@ -109,7 +109,7 @@ namespace sfem {
                            T* const z) {
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n; i++) {
-                z[i] = x[i] * y[i] + z[i] * alpha;
+                z[i] = x[i] * y[i] + alpha * z[i];
             }
         }
 

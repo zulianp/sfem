@@ -3283,5 +3283,64 @@ static SFEM_INLINE void hex8_linear_elasticity_matrix_coord_taylor_sym(
                    x527 + x528 + x529 + x530 + x532 + x534 + x536 + x537 + x84);
 }
 
+static SFEM_INLINE void linear_elasticity_matrix_sym(const scalar_t mu,
+                                                     const scalar_t lambda,
+                                                     const scalar_t *SFEM_RESTRICT adjugate,
+                                                     const scalar_t jacobian_determinant,
+                                                     const scalar_t *SFEM_RESTRICT trial_grad,
+                                                     const scalar_t *SFEM_RESTRICT test_grad,
+                                                     const scalar_t qw,
+                                                     scalar_t *const SFEM_RESTRICT element_matrix) {
+    const scalar_t x0 = 1.0 / jacobian_determinant;
+    const scalar_t x1 = mu * x0;
+    const scalar_t x2 = adjugate[1] * test_grad[0];
+    const scalar_t x3 = test_grad[1] * x1;
+    const scalar_t x4 = test_grad[2] * x1;
+    const scalar_t x5 = x0 * (adjugate[4] * x3 + adjugate[7] * x4 + x1 * x2);
+    const scalar_t x6 = adjugate[1] * x5;
+    const scalar_t x7 = adjugate[2] * test_grad[0];
+    const scalar_t x8 = x0 * (adjugate[5] * x3 + adjugate[8] * x4 + x1 * x7);
+    const scalar_t x9 = adjugate[2] * x8;
+    const scalar_t x10 = x0 * (lambda + 2 * mu);
+    const scalar_t x11 = adjugate[0] * test_grad[0];
+    const scalar_t x12 = adjugate[3] * test_grad[1];
+    const scalar_t x13 = adjugate[6] * test_grad[2];
+    const scalar_t x14 = x0 * (x10 * x11 + x10 * x12 + x10 * x13);
+    const scalar_t x15 = adjugate[4] * x5;
+    const scalar_t x16 = adjugate[5] * x8;
+    const scalar_t x17 = adjugate[7] * x5;
+    const scalar_t x18 = adjugate[8] * x8;
+    const scalar_t x19 = jacobian_determinant * qw;
+    const scalar_t x20 = lambda * x0;
+    const scalar_t x21 = x0 * (x11 * x20 + x12 * x20 + x13 * x20);
+    const scalar_t x22 = x0 * (x1 * x11 + x1 * x12 + x1 * x13);
+    const scalar_t x23 = adjugate[0] * x22;
+    const scalar_t x24 = adjugate[4] * test_grad[1];
+    const scalar_t x25 = adjugate[7] * test_grad[2];
+    const scalar_t x26 = x0 * (x10 * x2 + x10 * x24 + x10 * x25);
+    const scalar_t x27 = adjugate[3] * x22;
+    const scalar_t x28 = adjugate[6] * x22;
+    const scalar_t x29 = x0 * (x2 * x20 + x20 * x24 + x20 * x25);
+    const scalar_t x30 =
+            x0 * (adjugate[5] * test_grad[1] * x10 + adjugate[8] * test_grad[2] * x10 + x10 * x7);
+    element_matrix[0] += x19 * (trial_grad[0] * (adjugate[0] * x14 + x6 + x9) +
+                                trial_grad[1] * (adjugate[3] * x14 + x15 + x16) +
+                                trial_grad[2] * (adjugate[6] * x14 + x17 + x18));
+    element_matrix[1] += x19 * (trial_grad[0] * (adjugate[0] * x5 + adjugate[1] * x21) +
+                                trial_grad[1] * (adjugate[3] * x5 + adjugate[4] * x21) +
+                                trial_grad[2] * (adjugate[6] * x5 + adjugate[7] * x21));
+    element_matrix[2] += x19 * (trial_grad[0] * (adjugate[0] * x8 + adjugate[2] * x21) +
+                                trial_grad[1] * (adjugate[3] * x8 + adjugate[5] * x21) +
+                                trial_grad[2] * (adjugate[6] * x8 + adjugate[8] * x21));
+    element_matrix[3] += x19 * (trial_grad[0] * (adjugate[1] * x26 + x23 + x9) +
+                                trial_grad[1] * (adjugate[4] * x26 + x16 + x27) +
+                                trial_grad[2] * (adjugate[7] * x26 + x18 + x28));
+    element_matrix[4] += x19 * (trial_grad[0] * (adjugate[1] * x8 + adjugate[2] * x29) +
+                                trial_grad[1] * (adjugate[4] * x8 + adjugate[5] * x29) +
+                                trial_grad[2] * (adjugate[7] * x8 + adjugate[8] * x29));
+    element_matrix[5] += x19 * (trial_grad[0] * (adjugate[2] * x30 + x23 + x6) +
+                                trial_grad[1] * (adjugate[5] * x30 + x15 + x27) +
+                                trial_grad[2] * (adjugate[8] * x30 + x17 + x28));
+}
 
 #endif  // HEX8_LINEAR_ELASTICITY_INLINE_CPU_H
