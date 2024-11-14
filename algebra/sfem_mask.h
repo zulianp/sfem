@@ -42,6 +42,17 @@ static SFEM_INLINE void mask_set(ptrdiff_t i, mask_t *const mask)
 	mask[idx] |= q;
 }
 
+static SFEM_INLINE void mask_unset(ptrdiff_t i, mask_t *const mask) 
+{
+	const static size_t nbits = (sizeof(mask_t) * 8);
+	const ptrdiff_t idx = i/nbits;
+	mask_t shift = i - idx * nbits;
+	mask_t q = 1 << shift;
+
+#pragma omp atomic update
+	mask[idx] = q ^ mask[idx];
+}
+
 #ifdef __cplusplus
 }
 #endif

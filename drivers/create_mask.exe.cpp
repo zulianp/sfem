@@ -78,6 +78,14 @@ int main(int argc, char *argv[]) {
         }
     }
 
+#ifndef NDEBUG
+    for (ptrdiff_t i = 0; i < nlocal; i++) {
+        mask_unset(data[i], m);
+        int must_be_false = !mask_get(data[i], m);
+        assert(must_be_false);
+    }
+#endif
+
     mask_destroy(m);
 
     return MPI_Finalize();
