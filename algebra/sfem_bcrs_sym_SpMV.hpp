@@ -190,9 +190,15 @@ namespace sfem {
                     }
                 }
 
+                // Updated outside column loop
                 for (int d1 = 0; d1 < BLOCK_SIZE; d1++) {
 #pragma omp atomic
                     y[row * BLOCK_SIZE + d1] += y_local[d1];
+                }
+
+                T x_local[BLOCK_SIZE];
+                for (int d1 = 0; d1 < BLOCK_SIZE; d1++) {
+                    x_local[d1] = x[row * BLOCK_SIZE + d1];
                 }
 
                 for (count_t k = 0; k < lenrow; k++) {
@@ -213,10 +219,6 @@ namespace sfem {
                         }
                     }
 
-                    T x_local[BLOCK_SIZE];
-                    for (int d1 = 0; d1 < BLOCK_SIZE; d1++) {
-                        x_local[d1] = x[row * BLOCK_SIZE + d1];
-                    }
                     for (int d1 = 0; d1 < BLOCK_SIZE; d1++) {
                         y_local[d1] = 0;
                     }
@@ -229,6 +231,7 @@ namespace sfem {
                         }
                     }
 
+                    // Updated inside column loop
                     for (int d1 = 0; d1 < BLOCK_SIZE; d1++) {
 #pragma omp atomic
                         y[col * BLOCK_SIZE + d1] += y_local[d1];
