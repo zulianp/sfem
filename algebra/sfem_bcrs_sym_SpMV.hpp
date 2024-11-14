@@ -108,8 +108,10 @@ namespace sfem {
         ret->block_stride_ = block_stride;
         ret->execution_space_ = EXECUTION_SPACE_HOST;
 
+        // ret->print(std::cout);
+
         ret->apply_ = [=](const T* const x, T* const y) {
-            double tick = MPI_Wtime();
+            // double tick = MPI_Wtime();
             const ptrdiff_t nnz = ret->colidx->size();
             const ptrdiff_t block_rows = ret->block_rows_;
             const ptrdiff_t block_size = ret->block_size_;
@@ -131,7 +133,7 @@ namespace sfem {
                 for (ptrdiff_t i = 0; i < block_rows * block_size; ++i) {
                     y[i] *= scale_output;
                 }
-            }   
+            }
 
             // Apply diagonal block
 #pragma omp parallel for
@@ -139,12 +141,14 @@ namespace sfem {
                 ptrdiff_t diag_idx = row * block_stride;
                 int d_idx = 0;
                 for (int d1 = 0; d1 < block_size; d1++) {
-                    y[row * block_size + d1] += diag_values[d_idx][row] * x[row * block_size + d1];
+#pragma omp atomic
+                    y[row * block_size + d1] += diag_values[d_idx++][row] * x[row * block_size + d1];
 
                     for (int d2 = d1 + 1; d2 < block_size; d2++, d_idx++) {
+#pragma omp atomic
                         y[row * block_size + d1] +=
                                 diag_values[d_idx][diag_idx] * x[row * block_size + d2];
-
+#pragma omp atomic
                         y[row * block_size + d2] +=
                                 diag_values[d_idx][diag_idx] * x[row * block_size + d1];
                     }
@@ -167,21 +171,32 @@ namespace sfem {
                         y[row * block_size + d1] +=
                                 off_diag_values[d_idx][off_diag_idx] * x[col * block_size + d1];
 
+#pragma omp atomic
+                        y[col * block_size + d1] +=
+                                off_diag_values[d_idx][off_diag_idx] * x[row * block_size + d1];
+                        
+                        // Go to the next entry
+                        d_idx++;
                         for (int d2 = d1 + 1; d2 < block_size; d2++, d_idx++) {
 #pragma omp atomic
                             y[row * block_size + d1] +=
                                     off_diag_values[d_idx][off_diag_idx] * x[col * block_size + d2];
-
+#pragma omp atomic
+                            y[row * block_size + d2] +=
+                                    off_diag_values[d_idx][off_diag_idx] * x[col * block_size + d1];
 #pragma omp atomic
                             y[col * block_size + d2] +=
                                     off_diag_values[d_idx][off_diag_idx] * x[row * block_size + d1];
+#pragma omp atomic
+                            y[col * block_size + d1] +=
+                                    off_diag_values[d_idx][off_diag_idx] * x[row * block_size + d2];
                         }
                     }
                 }
             }
 
-            double tock = MPI_Wtime();
-            printf("Time BCRS_sym: %f\n", tock - tick);
+            // double tock = MPI_Wtime();
+            // printf("Time BCRS_sym: %f\n", tock - tick);
         };
 
         return ret;

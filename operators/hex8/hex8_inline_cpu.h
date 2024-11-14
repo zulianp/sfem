@@ -249,6 +249,81 @@ static SFEM_INLINE void hex8_local_to_global_bsr3(const idx_t *const SFEM_RESTRI
     }
 }
 
+static SFEM_INLINE void hex8_ref_shape_grad(const int i,
+                                            const scalar_t qx,
+                                            const scalar_t qy,
+                                            const scalar_t qz,
+                                            scalar_t *const SFEM_RESTRICT val) {
+    switch (i) {
+        case 0: {
+            const scalar_t x0 = 1 - qy;
+            const scalar_t x1 = 1 - qz;
+            const scalar_t x2 = 1 - qx;
+            val[0] = -x0 * x1;
+            val[1] = -x1 * x2;
+            val[2] = -x0 * x2;
+            return;
+        }
+        case 1: {
+            const scalar_t x0 = 1 - qy;
+            const scalar_t x1 = 1 - qz;
+            val[0] = x0 * x1;
+            val[1] = -qx * x1;
+            val[2] = -qx * x0;
+            return;
+        }
+        case 2: {
+            const scalar_t x0 = 1 - qz;
+            val[0] = qy * x0;
+            val[1] = qx * x0;
+            val[2] = -qx * qy;
+            return;
+        }
+        case 3: {
+            const scalar_t x0 = 1 - qz;
+            const scalar_t x1 = 1 - qx;
+            val[0] = -qy * x0;
+            val[1] = x0 * x1;
+            val[2] = -qy * x1;
+            return;
+        }
+        case 4: {
+            const scalar_t x0 = 1 - qy;
+            const scalar_t x1 = 1 - qx;
+            val[0] = -qz * x0;
+            val[1] = -qz * x1;
+            val[2] = x0 * x1;
+            return;
+        }
+        case 5: {
+            const scalar_t x0 = 1 - qy;
+            val[0] = qz * x0;
+            val[1] = -qx * qz;
+            val[2] = qx * x0;
+            return;
+        }
+        case 6: {
+            val[0] = qy * qz;
+            val[1] = qx * qz;
+            val[2] = qx * qy;
+            return;
+        }
+        case 7: {
+            const scalar_t x0 = 1 - qx;
+            val[0] = -qy * qz;
+            val[1] = qz * x0;
+            val[2] = qy * x0;
+            return;
+        }
+        default: {
+            val[0] = 0;
+            val[1] = 0;
+            val[2] = 0;
+            assert(0);
+            return;
+        }
+    }
+}
 
 static const scalar_t hex8_g_0[8][3] = {{-1.0 / 4.0, -1.0 / 4.0, -1.0 / 4.0},
                                         {1.0 / 4.0, -1.0 / 4.0, -1.0 / 4.0},
