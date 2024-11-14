@@ -711,26 +711,40 @@ namespace sfem {
         const int block_size = f->space()->block_size();
 
         int nblock_entries = ((block_size + 1) * block_size) / 2;
+        ptrdiff_t block_stride = 1;
 
-        // We build them as AoS for now
-        auto off_diag_values = sfem::h_buffer<real_t>(nblock_entries, crs_graph->nnz());
-        auto diag_values =
+        bool SFEM_BCRS_SYM_USE_AOS = false;
+        SFEM_READ_ENV(SFEM_BCRS_SYM_USE_AOS, atoi);
+
+        std::shared_ptr<Buffer<real_t*>> diag_values;
+        std::shared_ptr<Buffer<real_t*>> off_diag_values;
+        
+        if(SFEM_BCRS_SYM_USE_AOS) {
+            block_stride = nblock_entries;
+            off_diag_values = sfem::h_buffer_fake_SoA<real_t>(nblock_entries, crs_graph->nnz());
+            diag_values =
+                sfem::h_buffer_fake_SoA<real_t>(nblock_entries, f->space()->n_dofs() / block_size);
+        } else {
+            off_diag_values = sfem::h_buffer<real_t>(nblock_entries, crs_graph->nnz());
+            diag_values =
                 sfem::h_buffer<real_t>(nblock_entries, f->space()->n_dofs() / block_size);
+        }
 
         real_t *x_data = (x) ? x->data() : nullptr;
         f->hessian_bcrs_sym(x_data,
                             crs_graph->rowptr()->data(),
                             crs_graph->colidx()->data(),
-                            1,
+                            block_stride,
                             diag_values->data(),
                             off_diag_values->data());
+                            
 
         auto spmv = sfem::h_bcrs_sym_spmv<count_t, idx_t, real_t>(crs_graph->n_nodes(),
                                                                   crs_graph->n_nodes(),
                                                                   block_size,
                                                                   crs_graph->rowptr(),
                                                                   crs_graph->colidx(),
-                                                                  1,
+                                                                  block_stride,
                                                                   diag_values,
                                                                   off_diag_values,
                                                                   (real_t)1);
