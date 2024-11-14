@@ -142,7 +142,7 @@ namespace sfem {
                 int d_idx = 0;
                 for (int d1 = 0; d1 < block_size; d1++) {
 #pragma omp atomic
-                    y[row * block_size + d1] += diag_values[d_idx++][row] * x[row * block_size + d1];
+                    y[row * block_size + d1] += diag_values[d_idx++][diag_idx] * x[row * block_size + d1];
 
                     for (int d2 = d1 + 1; d2 < block_size; d2++, d_idx++) {
 #pragma omp atomic
