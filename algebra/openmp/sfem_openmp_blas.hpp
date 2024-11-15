@@ -4,6 +4,7 @@
 #include "sfem_tpl_blas.hpp"
 
 #include <cstdlib>
+#include <cstring>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -22,7 +23,7 @@ namespace sfem {
         static void destroy(void* a) { free(a); }
 
         static void copy(const ptrdiff_t n, const T* const src, T* const dest) {
-            std::memcpy(dest, src, n * sizeof(T));
+            memcpy(dest, src, n * sizeof(T));
         }
 
         static auto dot(const ptrdiff_t n, const T* const l, const T* const r) -> T {
