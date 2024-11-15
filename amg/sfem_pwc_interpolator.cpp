@@ -1,4 +1,5 @@
 #include "sfem_pwc_interpolator.hpp"
+#include "sparse.h"
 
 /*
 void piecewise_constant(const idx_t *partition, const real_t *near_null,

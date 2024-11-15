@@ -28,6 +28,8 @@ namespace sfem {
 
         void transpose() { transposed = !transposed; }
         bool is_transposed() { return transposed; }
+        void set_weights(const std::shared_ptr<Buffer<T>>& weights) { weights_ = weights; }
+        void set_partition(const std::shared_ptr<Buffer<R>>& partition) { partition_ = partition; }
 
         // Internally allocates a workspace with same memory requirement as `a`
         // (this could be passed in as arg...)
@@ -87,8 +89,8 @@ namespace sfem {
         auto ret = std::make_shared<PiecewiseConstantInterpolator<R, T>>();
         ret->coarse_dim = coarse_dim;
         ret->fine_dim = weights->size();
-        ret->weights = weights;
-        ret->partition = partition;
+        ret->set_weights(weights);
+        ret->set_partition(partition);
         ret->default_init();
         return ret;
     }
