@@ -1,6 +1,5 @@
 #include "sparse.h"
 #include <assert.h>
-#include <stdio.h>
 
 idx_t *row_indices;
 idx_t *col_indices;
@@ -31,33 +30,6 @@ void csr_to_symmcoo(const ptrdiff_t nrows,
             }
         }
     }
-}
-
-/* Sparse Matrix-Vector Multiplication using SymmCOO format */
-void coo_symm_spmv(const SymmCOOMatrix *a, const real_t *x, real_t *y) {
-#pragma omp parallel for
-    for (idx_t k = 0; k < a->dim; k++) {
-        y[k] = a->diag[k] * x[k];
-    }
-
-    for (idx_t k = 0; k < a->offdiag_nnz; k++) {
-        idx_t i = a->offdiag_row_indices[k];
-        idx_t j = a->offdiag_col_indices[k];
-        real_t val = a->offdiag_values[k];
-        y[i] += x[j] * val;
-        y[j] += x[i] * val;
-    }
-}
-
-// Function to load binary data from file
-void load_binary_file(const char *filename, void *buffer, size_t size) {
-    FILE *file = fopen(filename, "rb");
-    if (!file) {
-        fprintf(stderr, "Error opening file %s\n", filename);
-        exit(EXIT_FAILURE);
-    }
-    fread(buffer, size, 1, file);
-    fclose(file);
 }
 
 int compare_indices_coo(const void *a, const void *b) {
