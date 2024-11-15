@@ -93,12 +93,25 @@ int main(int argc, char *argv[]) {
     std::shared_ptr<sfem::Operator<real_t>> solver;
 
     if (SFEM_USE_AMG) {
-        auto stat_iter = sfem::h_stationary<real_t>();
-        // stat_iter->set_op(linear_op);
+        auto crs_graph = f->space()->mesh_ptr()->node_to_node_graph_upper_triangular();
 
-        // auto smoother = sfem::h_lpsmoother<real_t>(diag);
-        // stat_iter->set_preconditioner_op(smoother);
-        solver =  stat_iter;
+        auto diag_values = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+        auto off_diag_values = sfem::create_buffer<real_t>(crs_graph->nnz(), es);
+
+        f->hessian_crs_sym(x->data(),
+                           crs_graph->rowptr()->data(),
+                           crs_graph->colidx()->data(),
+                           diag_values->data(),
+                           off_diag_values->data());
+
+
+        auto mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
+        f->constaints_mask(mask->data());
+
+        exit(1);
+// 
+        auto stat_iter = sfem::h_stationary<real_t>();
+        solver = stat_iter;
     } else {
         auto linear_op = sfem::make_linear_op(f);
         auto cg = sfem::create_cg<real_t>(linear_op, es);
