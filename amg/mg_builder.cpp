@@ -80,6 +80,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
         l2_smoother(fine_dim,
                     prev_mat->values->size(),
                     prev_mat->diag_values->data(),
+                    prev_mat->values->data(),
                     prev_mat->offdiag_rowidx->data(),
                     prev_mat->offdiag_colidx->data(),
                     inv_diag);
