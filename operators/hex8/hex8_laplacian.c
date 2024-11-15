@@ -2,9 +2,9 @@
 
 #include "sfem_defs.h"
 
-#include "tet4_inline_cpu.h"
-#include "hex8_quadrature.h"
 #include "hex8_laplacian_inline_cpu.h"
+#include "hex8_quadrature.h"
+#include "tet4_inline_cpu.h"
 
 int hex8_laplacian_apply(const ptrdiff_t nelements,
                          const ptrdiff_t nnodes,
@@ -145,6 +145,82 @@ int hex8_laplacian_apply(const ptrdiff_t nelements,
 
 #pragma omp atomic update
                 values[dof_i] += element_vector[edof_i];
+            }
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int hex8_laplacian_crs_sym(const ptrdiff_t nelements,
+                           const ptrdiff_t nnodes,
+                           idx_t **const SFEM_RESTRICT elements,
+                           geom_t **const SFEM_RESTRICT points,
+                           const count_t *const SFEM_RESTRICT rowptr,
+                           const idx_t *const SFEM_RESTRICT colidx,
+                           real_t *const SFEM_RESTRICT diag,
+                           real_t *const SFEM_RESTRICT offdiag) {
+                            
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[8];
+
+        scalar_t lx[8];
+        scalar_t ly[8];
+        scalar_t lz[8];
+        scalar_t fff[6];
+
+        for (int v = 0; v < 8; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        for (int v = 0; v < 8; v++) {
+            lx[v] = x[ev[v]];
+            ly[v] = y[ev[v]];
+            lz[v] = z[ev[v]];
+        }
+
+        hex8_fff(lx, ly, lz, 0.5, 0.5, 0.5, fff);
+        accumulator_t element_matrix[8 * 8];
+        hex8_laplacian_matrix_fff_integral(fff, element_matrix);
+
+        // Assemble the diagonal part of the matrix
+        {
+            // local to global
+            for (int edof_i = 0; edof_i < 8; edof_i++) {
+#pragma omp atomic update
+                diag[ev[edof_i]] += element_matrix[edof_i * 8 + edof_i];
+            }
+        }
+
+        // Assemble the upper-triangular part of the matrix
+        for (int edof_i = 0; edof_i < 8; edof_i++) {
+            // For each row we find the corresponding entries in the off-diag
+            // We select the entries associated with ev[row] < ev[col]
+            const int lenrow = rowptr[ev[edof_i] + 1] - rowptr[ev[edof_i]];
+            const idx_t *cols = &colidx[rowptr[ev[edof_i]]];
+            // Find the columns associated with the current row and mask what is not found with
+            // -1
+            int ks[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
+            for (int i = 0; i < lenrow; i++) {
+                for (int k = 0; k < 8; k++) {
+                    if (cols[i] == ev[k]) {
+                        ks[k] = i;
+                        break;
+                    }
+                }
+            }
+
+            for (int edof_j = 0; edof_j < 8; edof_j++) {
+                if (ev[edof_j] > ev[edof_i]) {
+                    assert(ks[edof_j] != -1);
+#pragma omp atomic update
+                    offdiag[rowptr[ev[edof_i]] + ks[edof_j]] += element_matrix[edof_i * 8 + edof_j];
+                }
             }
         }
     }
