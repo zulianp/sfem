@@ -20,7 +20,7 @@ source $SFEM_DIR/workflows/sfem_config.sh
 export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 export CUDA_LAUNCH_BLOCKING=0
-export SFEM_ELEMENT_REFINE_LEVEL=8
+export SFEM_ELEMENT_REFINE_LEVEL=0
 
 mesh=mesh
 
@@ -28,12 +28,25 @@ if [[ -d "$mesh" ]]
 then
 	echo "Reusing mesh"
 else
-	create_box_ss_mesh.sh 3 $SFEM_ELEMENT_REFINE_LEVEL
+	if [[ $SFEM_ELEMENT_REFINE_LEVEL -gt 1 ]]
+	then
+		create_box_ss_mesh.sh 3 $SFEM_ELEMENT_REFINE_LEVEL
+	else
+
+		N=3
+		box_mesh.py $mesh -c hex8 -x $N -y $N -z $N --height=1 --width=1 --depth=1
+	fi
 fi
 
 # Box mesh for testing
-sinlet=$mesh/surface/sidesets_aos/left.raw 
-soutlet=$mesh/surface/sidesets_aos/right.raw 
+if [[ $SFEM_ELEMENT_REFINE_LEVEL -gt 1 ]]
+then
+	sinlet=$mesh/surface/sidesets_aos/left.raw 
+	soutlet=$mesh/surface/sidesets_aos/right.raw 
+else
+	sinlet=mesh/boundary_nodes/left.int32.raw
+	soutlet=mesh/boundary_nodes/right.int32.raw
+fi
 
 export SFEM_USE_ELASTICITY=0
 

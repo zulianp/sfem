@@ -12,6 +12,8 @@
 #include "sfem_base.h"
 #include "sfem_defs.h"
 
+#include "sfem_mask.h"
+
 // #include "isolver_function.h"
 
 #include "sfem_Buffer.hpp"
@@ -294,6 +296,7 @@ namespace sfem {
         virtual int apply_zero(real_t *const x);
         virtual int gradient(const real_t *const x, real_t *const g) = 0;
         virtual int copy_constrained_dofs(const real_t *const src, real_t *const dest) = 0;
+        virtual int mask(mask_t *mask) = 0;
 
         virtual int hessian_crs(const real_t *const x,
                                 const count_t *const rowptr,
@@ -326,6 +329,7 @@ namespace sfem {
         int apply(real_t *const x) override;
         int apply_value(const real_t value, real_t *const x) override;
         int copy_constrained_dofs(const real_t *const src, real_t *const dest) override;
+        int mask(mask_t *mask) override;
 
         int gradient(const real_t *const x, real_t *const g) override;
 
@@ -447,6 +451,7 @@ namespace sfem {
         int copy_constrained_dofs(const real_t *const src, real_t *const dest);
         int report_solution(const real_t *const x);
         int initial_guess(real_t *const x);
+        int constaints_mask(mask_t *mask);
 
         int set_output_dir(const char *path);
 

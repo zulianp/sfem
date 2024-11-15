@@ -904,6 +904,16 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    int DirichletConditions::mask(mask_t *mask) 
+    {
+        for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
+            for(ptrdiff_t node = 0; node < impl_->dirichlet_conditions[i].local_size; node++) {
+                mask_set(node * impl_->space->block_size() + impl_->dirichlet_conditions[i].component, mask);
+            }
+        }
+        return SFEM_SUCCESS;
+    }
+
     class Timings {
     public:
         static double tick() { return MPI_Wtime(); }
@@ -1107,6 +1117,15 @@ namespace sfem {
 
     void Function::add_dirichlet_conditions(const std::shared_ptr<DirichletConditions> &c) {
         add_constraint(c);
+    }
+
+    int Function::constaints_mask(mask_t *mask)
+    {
+        for (auto &c : impl_->constraints) {
+            c->mask(mask);
+        }
+        
+        return SFEM_FAILURE;
     }
 
     std::shared_ptr<CRSGraph> Function::crs_graph() const {
