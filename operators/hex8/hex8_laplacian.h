@@ -24,6 +24,8 @@ int hex8_laplacian_crs_sym(const ptrdiff_t nelements,
                            real_t *const SFEM_RESTRICT diag,
                            real_t *const SFEM_RESTRICT offdiag);
 
+
+
 #ifdef __cplusplus
 }
 #endif
