@@ -25,11 +25,9 @@ void csr_to_symmcoo(const ptrdiff_t nrows,
                     const idx_t *col_indices,
                     const real_t *values,
                     SymmCOOMatrix *coo);
-void coo_symm_spmv(const SymmCOOMatrix *a, const real_t *x, real_t *y);
 
 /* Helper Functions */
 // Ignores elements with negative row or column indices as way to filter
 void sum_duplicates(idx_t *rows, idx_t *cols, real_t *values, idx_t *indices, count_t *N_ptr);
 void cycle_leader_swap(idx_t *rows, idx_t *cols, real_t *values, idx_t *indices, count_t N);
-void load_binary_file(const char *filename, void *buffer, size_t size);
 #endif  // SPARSE_H
