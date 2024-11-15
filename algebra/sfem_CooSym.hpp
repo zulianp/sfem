@@ -32,7 +32,7 @@ namespace sfem {
 
         /* Operator */
         int apply(const T* const x, T* const y) override {
-            coo_symm_spmv(x, y);
+            coo_symm_spmv_(x, y);
             return 0;
         }
         inline std::ptrdiff_t rows() const override { return ndofs; }
@@ -59,6 +59,7 @@ namespace sfem {
                 y[i] += x[j] * val;
                 y[j] += x[i] * val;
             }
+            return 0;
         }
     };
 

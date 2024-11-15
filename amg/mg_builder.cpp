@@ -43,7 +43,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
 
     auto prev_mat = fine_mat;
 
-    while (current_dim > 100) {
+    while (current_dim > 10) {
         a_bar.dim = current_dim;
         a_bar.offdiag_nnz = prev_mat->values->size();
         for (idx_t k = 0; k < a_bar.offdiag_nnz; k++) {

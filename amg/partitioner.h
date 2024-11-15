@@ -3,6 +3,10 @@
 
 #include "sparse.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
     // Array with length of fine mat.nrows
     // This is where the resulting partition is stored
@@ -27,4 +31,7 @@ int partition(const real_t *near_null,
               SymmCOOMatrix *symm_coo,
               PartitionerWorkspace *ws);
 
+#ifdef __cplusplus
+}
+#endif
 #endif  // PARTITIONER_H
