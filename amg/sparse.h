@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include "sfem_base.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
     ptrdiff_t dim;  // Number of rows / columns
 
@@ -30,4 +34,8 @@ void csr_to_symmcoo(const ptrdiff_t nrows,
 // Ignores elements with negative row or column indices as way to filter
 void sum_duplicates(idx_t *rows, idx_t *cols, real_t *values, idx_t *indices, count_t *N_ptr);
 void cycle_leader_swap(idx_t *rows, idx_t *cols, real_t *values, idx_t *indices, count_t N);
+
+#ifdef __cplusplus
+}
+#endif
 #endif  // SPARSE_H
