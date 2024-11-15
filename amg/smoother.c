@@ -1,6 +1,5 @@
 #include "smoother.h"
 #include <math.h>
-#include <cstddef>
 
 int l2_smoother(const ptrdiff_t dim,
                 const count_t offdiag_nnz,
