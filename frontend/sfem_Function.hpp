@@ -110,7 +110,6 @@ namespace sfem {
         ~SemiStructuredMesh();
 
         std::shared_ptr<CRSGraph> node_to_node_graph();
-        
 
         static std::shared_ptr<SemiStructuredMesh> create(const std::shared_ptr<Mesh> macro_mesh,
                                                           const int level) {
@@ -201,7 +200,15 @@ namespace sfem {
                                      real_t **const /*off_diag_values*/) {
             assert(false);
             return SFEM_FAILURE;
-        }   
+        }
+
+        virtual int hessian_crs_sym(const real_t *const x,
+                                    const count_t *const rowptr,
+                                    const idx_t *const colidx,
+                                    real_t *const diag_values,
+                                    real_t *const off_diag_values) {
+            return SFEM_FAILURE;
+        }
 
         virtual int hessian_diag(const real_t *const /*x*/, real_t *const /*values*/) {
             return SFEM_FAILURE;
@@ -420,6 +427,12 @@ namespace sfem {
                              const ptrdiff_t block_stride,
                              real_t **const diag_values,
                              real_t **const off_diag_values);
+
+        int hessian_crs_sym(const real_t *const x,
+                            const count_t *const rowptr,
+                            const idx_t *const colidx,
+                            real_t *const diag_values,
+                            real_t *const off_diag_values);
 
         int hessian_diag(const real_t *const x, real_t *const values);
 
