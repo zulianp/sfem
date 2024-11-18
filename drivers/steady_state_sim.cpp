@@ -126,6 +126,7 @@ int main(int argc, char *argv[]) {
         //
         // auto stat_iter = sfem::h_stationary<real_t>();
         solver = amg;
+
     } else {
         auto linear_op = sfem::make_linear_op(f);
         auto cg = sfem::create_cg<real_t>(linear_op, es);

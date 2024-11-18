@@ -24,6 +24,7 @@ static SFEM_INLINE int mask_get(ptrdiff_t i, const mask_t *const mask)
 	
 	assert(shift < nbits);
 	assert(shift >= 0);
+	
 
 	mask_t m;
 #pragma omp atomic read
@@ -53,6 +54,8 @@ static SFEM_INLINE void mask_unset(ptrdiff_t i, mask_t *const mask)
 #pragma omp atomic update
 	mask[idx] = q ^ mask[idx];
 }
+
+void mask_print(const ptrdiff_t n, mask_t * const mask);
 
 #ifdef __cplusplus
 }

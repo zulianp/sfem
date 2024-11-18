@@ -755,6 +755,7 @@ int build_crs_graph_upper_triangular_from_element(const ptrdiff_t nelements,
 
 int crs_to_coo(const ptrdiff_t n, const count_t *const rowptr, idx_t *const row_idx)
 {
+#pragma omp parallel for
     for(ptrdiff_t row = 0; row < n; row++) {
         for(count_t k = rowptr[row]; k < rowptr[row+1]; k++) {
             row_idx[k] = row;
