@@ -904,12 +904,16 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int DirichletConditions::mask(mask_t *mask) 
-    {
+    int DirichletConditions::mask(mask_t *mask) {
         for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
-            for(ptrdiff_t node = 0; node < impl_->dirichlet_conditions[i].local_size; node++) {
-                mask_set(node * impl_->space->block_size() + impl_->dirichlet_conditions[i].component, mask);
+            for (ptrdiff_t node = 0; node < impl_->dirichlet_conditions[i].local_size; node++) {
+                const ptrdiff_t idx =
+                        impl_->dirichlet_conditions[i].idx[node] * impl_->space->block_size() +
+                        impl_->dirichlet_conditions[i].component;
+                mask_set(idx, mask);
+                // printf("%ld ", idx);
             }
+            // printf("\n");
         }
         return SFEM_SUCCESS;
     }
@@ -1119,12 +1123,11 @@ namespace sfem {
         add_constraint(c);
     }
 
-    int Function::constaints_mask(mask_t *mask)
-    {
+    int Function::constaints_mask(mask_t *mask) {
         for (auto &c : impl_->constraints) {
             c->mask(mask);
         }
-        
+
         return SFEM_FAILURE;
     }
 
@@ -1203,8 +1206,7 @@ namespace sfem {
         SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.hessian_crs_sym);
 
         for (auto &op : impl_->ops) {
-            if (op->hessian_crs_sym(
-                        x, rowptr, colidx, diag_values, off_diag_values) !=
+            if (op->hessian_crs_sym(x, rowptr, colidx, diag_values, off_diag_values) !=
                 SFEM_SUCCESS) {
                 std::cerr << "Failed hessian_crs_sym in op: " << op->name() << "\n";
                 return SFEM_FAILURE;
