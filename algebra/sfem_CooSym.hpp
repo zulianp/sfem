@@ -52,12 +52,17 @@ namespace sfem {
                 y[k] = diag[k] * x[k];
             }
 
+#pragma omp parallel for
             for (R k = 0; k < offdiag_nnz; k++) {
                 R i = offdiag_row_indices[k];
                 R j = offdiag_col_indices[k];
                 T val = offdiag_values[k];
-                y[i] += x[j] * val;
+
+#pragma omp atomic update
                 y[j] += x[i] * val;
+
+#pragma omp atomic update
+                y[i] += x[j] * val;
             }
             
             return SFEM_SUCCESS;

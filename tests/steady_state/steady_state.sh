@@ -32,9 +32,10 @@ else
 	then
 		create_box_ss_mesh.sh 3 $SFEM_ELEMENT_REFINE_LEVEL
 	else
-
-		N=3
+		N=9
 		box_mesh.py $mesh -c hex8 -x $N -y $N -z $N --height=1 --width=1 --depth=1
+
+
 	fi
 fi
 
@@ -46,6 +47,14 @@ then
 else
 	sinlet=mesh/boundary_nodes/left.int32.raw
 	soutlet=mesh/boundary_nodes/right.int32.raw
+
+	sides=$mesh/dirichlet.raw
+	python3 -c "import numpy as np; a=np.fromfile(\"$mesh/x.raw\", dtype=np.float32); a.fill(0); a.astype(np.float64).tofile(\"$sides\")"
+
+	$LAUNCH smask $sinlet  $sides $sides 1
+	$LAUNCH smask $soutlet $sides $sides 2
+
+	raw_to_db.py $mesh $mesh/dirichlet.vtk --point_data="$sides"
 fi
 
 export SFEM_USE_ELASTICITY=0
