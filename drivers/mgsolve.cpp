@@ -71,7 +71,6 @@ int main(int argc, char *argv[]) {
     int SFEM_DEBUG = 0;
     int SFEM_MG = 0;
     int SFEM_MAX_IT = 4000;
-    int SFEM_USE_CRS_GRAPH_RESTRICT = 0;
     int SFEM_SMOOTHER_SWEEPS = 3;
     int SFEM_USE_MG_PRECONDITIONER = 0;
     int SFEM_WRITE_OUTPUT = 1;
@@ -92,7 +91,6 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_DEBUG, atoi);
     SFEM_READ_ENV(SFEM_MG, atoi);
     SFEM_READ_ENV(SFEM_MAX_IT, atoi);
-    SFEM_READ_ENV(SFEM_USE_CRS_GRAPH_RESTRICT, atoi);
     SFEM_READ_ENV(SFEM_USE_MG_PRECONDITIONER, atoi);
     SFEM_READ_ENV(SFEM_WRITE_OUTPUT, atoi);
     SFEM_READ_ENV(SFEM_CHEB_EIG_MAX_SCALE, atof);
@@ -119,7 +117,6 @@ int main(int argc, char *argv[]) {
            "SFEM_TOL: %f\n"
            "SFEM_SMOOTHER_SWEEPS: %d\n"
            "SFEM_CHEB_EIG_TOL: %g\n"
-           "SFEM_USE_CRS_GRAPH_RESTRICT: %d\n"
            "SFEM_ELEMENT_REFINE_LEVEL: %d\n",
            SFEM_OPERATOR,
            SFEM_FINE_OP_TYPE,
@@ -135,7 +132,6 @@ int main(int argc, char *argv[]) {
            SFEM_TOL,
            SFEM_SMOOTHER_SWEEPS,
            SFEM_CHEB_EIG_TOL,
-           SFEM_USE_CRS_GRAPH_RESTRICT,
            SFEM_ELEMENT_REFINE_LEVEL);
 
 #ifdef SFEM_ENABLE_CUDA
