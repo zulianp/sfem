@@ -44,6 +44,9 @@ int block_crs_to_crs(const ptrdiff_t nnodes,
                      idx_t *const colidx,
                      real_t *const values);
 
+int crs_to_coo(const ptrdiff_t n, const count_t *const rowptr, idx_t *const row_idx);
+
+
 // for crs insertion
 idx_t find_idx(const idx_t key, const idx_t *arr, idx_t size);
 // idx_t find_idx_binary_search(const idx_t key, const idx_t *arr, idx_t size);

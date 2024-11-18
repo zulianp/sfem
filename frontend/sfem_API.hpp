@@ -1,12 +1,14 @@
 #ifndef SFEM_API_HPP
 #define SFEM_API_HPP
 
+#include "crs_graph.h"
 #include "sfem_Buffer.hpp"
 #include "sfem_base.h"
 #include "sfem_mesh.h"
 
 #include "sfem_Chebyshev3.hpp"
 #include "sfem_ContactConditions.hpp"
+#include "sfem_CooSym.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_Multigrid.hpp"
 #include "sfem_bcgs.hpp"
@@ -14,6 +16,7 @@
 #include "sfem_bsr_SpMV.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_crs_SpMV.hpp"
+#include "sfem_crs_sym_SpMV.hpp"
 #include "sfem_mprgp.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
@@ -646,10 +649,9 @@ namespace sfem {
 #endif
         auto values = sfem::h_buffer<real_t>(crs_graph->nnz());
 
-        f->hessian_crs(x->data(),
-                       crs_graph->rowptr()->data(),
-                       crs_graph->colidx()->data(),
-                       values->data());
+        const real_t *const x_data = (x) ? x->data() : nullptr;
+        f->hessian_crs(
+                x_data, crs_graph->rowptr()->data(), crs_graph->colidx()->data(), values->data());
 
         // Owns the pointers
         return sfem::h_crs_spmv(crs_graph->n_nodes(),
@@ -716,18 +718,17 @@ namespace sfem {
         bool SFEM_BCRS_SYM_USE_AOS = false;
         SFEM_READ_ENV(SFEM_BCRS_SYM_USE_AOS, atoi);
 
-        std::shared_ptr<Buffer<real_t*>> diag_values;
-        std::shared_ptr<Buffer<real_t*>> off_diag_values;
-        
-        if(SFEM_BCRS_SYM_USE_AOS) {
+        std::shared_ptr<Buffer<real_t *>> diag_values;
+        std::shared_ptr<Buffer<real_t *>> off_diag_values;
+
+        if (SFEM_BCRS_SYM_USE_AOS) {
             block_stride = nblock_entries;
             off_diag_values = sfem::h_buffer_fake_SoA<real_t>(nblock_entries, crs_graph->nnz());
-            diag_values =
-                sfem::h_buffer_fake_SoA<real_t>(nblock_entries, f->space()->n_dofs() / block_size);
+            diag_values = sfem::h_buffer_fake_SoA<real_t>(nblock_entries,
+                                                          f->space()->n_dofs() / block_size);
         } else {
             off_diag_values = sfem::h_buffer<real_t>(nblock_entries, crs_graph->nnz());
-            diag_values =
-                sfem::h_buffer<real_t>(nblock_entries, f->space()->n_dofs() / block_size);
+            diag_values = sfem::h_buffer<real_t>(nblock_entries, f->space()->n_dofs() / block_size);
         }
 
         real_t *x_data = (x) ? x->data() : nullptr;
@@ -737,7 +738,6 @@ namespace sfem {
                             block_stride,
                             diag_values->data(),
                             off_diag_values->data());
-                            
 
         auto spmv = sfem::h_bcrs_sym_spmv<count_t, idx_t, real_t>(crs_graph->n_nodes(),
                                                                   crs_graph->n_nodes(),
@@ -757,6 +757,61 @@ namespace sfem {
                     f->copy_constrained_dofs(x, y);
                 },
                 es);
+    }
+
+    auto hessian_coo_sym(std::shared_ptr<sfem::Function> &f,
+                         const std::shared_ptr<Buffer<real_t>> &x,
+                         const sfem::ExecutionSpace es) {
+        auto fs = f->space();
+        auto crs_graph = fs->mesh_ptr()->node_to_node_graph_upper_triangular();
+
+        auto diag_values = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+        auto off_diag_values = sfem::create_buffer<real_t>(crs_graph->nnz(), es);
+        auto row_idx = sfem::create_buffer<idx_t>(crs_graph->nnz(), es);
+
+        real_t *x_data = nullptr;
+        if (x) {
+            x_data = x->data();
+        }
+
+        f->hessian_crs_sym(x_data,
+                           crs_graph->rowptr()->data(),
+                           crs_graph->colidx()->data(),
+                           diag_values->data(),
+                           off_diag_values->data());
+
+        crs_to_coo(fs->n_dofs(), crs_graph->rowptr()->data(), row_idx->data());
+        return sfem::h_coosym<idx_t, real_t>(
+                row_idx, crs_graph->colidx(), off_diag_values, diag_values);
+    }
+
+    auto hessian_crs_sym(std::shared_ptr<sfem::Function> &f,
+                         const std::shared_ptr<Buffer<real_t>> &x,
+                         const sfem::ExecutionSpace es) {
+        auto fs = f->space();
+        auto crs_graph = fs->mesh_ptr()->node_to_node_graph_upper_triangular();
+
+        auto diag_values = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+        auto off_diag_values = sfem::create_buffer<real_t>(crs_graph->nnz(), es);
+
+        real_t *x_data = nullptr;
+        if (x) {
+            x_data = x->data();
+        }
+
+        f->hessian_crs_sym(x_data,
+                           crs_graph->rowptr()->data(),
+                           crs_graph->colidx()->data(),
+                           diag_values->data(),
+                           off_diag_values->data());
+
+        return sfem::h_crs_sym_spmv<count_t, idx_t, real_t>(fs->n_dofs(),
+                                                   fs->n_dofs(),
+                                                   crs_graph->rowptr(),
+                                                   crs_graph->colidx(),
+                                                   diag_values,
+                                                   off_diag_values,
+                                                   (real_t)1);
     }
 
     real_t residual(sfem::Operator<real_t> &op,

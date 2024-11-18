@@ -1,7 +1,7 @@
 #ifndef SPARSE_H
 #define SPARSE_H
 
-#include <omp.h>
+// #include <omp.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include "sfem_base.h"
