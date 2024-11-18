@@ -32,10 +32,8 @@ else
 	then
 		create_box_ss_mesh.sh 3 $SFEM_ELEMENT_REFINE_LEVEL
 	else
-		N=9
+		N=10
 		box_mesh.py $mesh -c hex8 -x $N -y $N -z $N --height=1 --width=1 --depth=1
-
-
 	fi
 fi
 

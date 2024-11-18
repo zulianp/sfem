@@ -7,6 +7,7 @@
 #include "sfem_Buffer.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_config.h"
+#include "sfem_mask.h"
 #include "sfem_openmp_blas.hpp"
 #include "sparse.h"
 
@@ -20,6 +21,7 @@ namespace sfem {
         ptrdiff_t ndofs{-1};
         BLAS_Tpl<T> blas;
 
+        std::shared_ptr<Buffer<mask_t>> bdy_dofs;
         std::shared_ptr<Buffer<R>> offdiag_rowidx;
         std::shared_ptr<Buffer<R>> offdiag_colidx;
         std::shared_ptr<Buffer<T>> values;
@@ -49,32 +51,41 @@ namespace sfem {
 
 #pragma omp parallel for
             for (R k = 0; k < ndofs; k++) {
-                y[k] = diag[k] * x[k];
+                if ((!bdy_dofs) || !mask_get(k, bdy_dofs->data())) {
+                    y[k] = diag[k] * x[k];
+                } else {
+                    y[k] = x[k];
+                }
             }
 
 #pragma omp parallel for
             for (R k = 0; k < offdiag_nnz; k++) {
                 R i = offdiag_row_indices[k];
                 R j = offdiag_col_indices[k];
-                T val = offdiag_values[k];
+                if ((!bdy_dofs) ||
+                    !(mask_get(i, bdy_dofs->data()) || mask_get(j, bdy_dofs->data()))) {
+                    T val = offdiag_values[k];
 
 #pragma omp atomic update
-                y[j] += x[i] * val;
+                    y[j] += x[i] * val;
 
 #pragma omp atomic update
-                y[i] += x[j] * val;
+                    y[i] += x[j] * val;
+                }
             }
-            
+
             return SFEM_SUCCESS;
         }
     };
 
     template <typename R, typename T>
-    std::shared_ptr<CooSymSpMV<R, T>> h_coosym(const std::shared_ptr<Buffer<R>>& offdiag_rowidx,
+    std::shared_ptr<CooSymSpMV<R, T>> h_coosym(const std::shared_ptr<Buffer<mask_t>>& bdy_dofs,
+                                               const std::shared_ptr<Buffer<R>>& offdiag_rowidx,
                                                const std::shared_ptr<Buffer<R>>& offdiag_colidx,
                                                const std::shared_ptr<Buffer<T>>& values,
                                                const std::shared_ptr<Buffer<T>>& diag_values) {
         auto ret = std::make_shared<CooSymSpMV<R, T>>();
+        ret->bdy_dofs = bdy_dofs;
         ret->offdiag_rowidx = offdiag_rowidx;
         ret->offdiag_colidx = offdiag_colidx;
         ret->values = values;

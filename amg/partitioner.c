@@ -1,4 +1,5 @@
 #include "partitioner.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include "sfem_mask.h"
 #include "sparse.h"
@@ -15,7 +16,7 @@ int pairwise_aggregation(const real_t coarsening_factor,
 // Global variables needed for qsort...
 real_t *global_weights;
 
-int partition(const real_t *near_null,
+int partition(real_t *near_null,
               const mask_t *bdy_dofs,
               const real_t coarsening_factor,
               SymmCOOMatrix *symm_coo,
@@ -25,13 +26,34 @@ int partition(const real_t *near_null,
     real_t current_cf = 1.0;
 
     // We start with each free DOF in its own aggregate
-    idx_t agg_id = 0;
+    idx_t aggs = 0;
     for (idx_t row = 0; row < nrows; row++) {
-        if (!mask_get(row, bdy_dofs)) {
-            ws->partition[row] = agg_id;
+        if ((!bdy_dofs) || !mask_get(row, bdy_dofs)) {
+            ws->partition[row] = aggs;
+            near_null[aggs] = near_null[row];
+            aggs += 1;
         } else {
             ws->partition[row] = -1;
         }
+    }
+    symm_coo->dim = aggs;
+
+    // If we have boundary restriction shift everything
+    if (bdy_dofs) {
+        count_t restricted_nnz = 0;
+        for (idx_t k = 0; k < nnz; k++) {
+            idx_t i = symm_coo->offdiag_row_indices[k];
+            idx_t j = symm_coo->offdiag_col_indices[k];
+            real_t val = symm_coo->offdiag_values[k];
+            if (ws->partition[i] >= 0 && ws->partition[j] >= 0) {
+                symm_coo->offdiag_row_indices[restricted_nnz] = ws->partition[i];
+                symm_coo->offdiag_col_indices[restricted_nnz] = ws->partition[j];
+                symm_coo->offdiag_values[restricted_nnz] = val;
+                restricted_nnz++;
+            }
+        }
+        nnz = restricted_nnz;
+        symm_coo->offdiag_nnz = nnz;
     }
 
     // Calculate the row sums of the augmented matrix and the weights for the
@@ -39,15 +61,14 @@ int partition(const real_t *near_null,
     for (idx_t k = 0; k < nnz; k++) {
         idx_t i = symm_coo->offdiag_row_indices[k];
         idx_t j = symm_coo->offdiag_col_indices[k];
-        if (mask_get(i, bdy_dofs) || mask_get(j, bdy_dofs)) {
-            real_t val = symm_coo->offdiag_values[k];
+        real_t val = symm_coo->offdiag_values[k];
 
-            real_t weight = -val * near_null[i] * near_null[j];
-            // only not thread safe part here, could parallel this...
-            ws->rowsums[i] += weight;
-            ws->rowsums[j] += weight;
-            symm_coo->offdiag_values[k] = weight;
-        }
+        // printf("%d, %d\n", i, j);
+        real_t weight = -val * near_null[i] * near_null[j];
+        // only not thread safe part here, could parallel this...
+        ws->rowsums[i] += weight;
+        ws->rowsums[j] += weight;
+        symm_coo->offdiag_values[k] = weight;
     }
 
     // Calculate the total sum of the augmented matrix and fix any negative
@@ -96,17 +117,14 @@ int pairwise_aggregation(const real_t coarsening_factor,
     for (idx_t k = 0; k < nnz; k++) {
         idx_t i = a_bar->offdiag_row_indices[k];
         idx_t j = a_bar->offdiag_col_indices[k];
+        real_t val = a_bar->offdiag_values[k];
+        real_t mod_weight = val - inv_total * ws->rowsums[i] * ws->rowsums[j];
 
-        if (ws->partition[i] >= 0 && ws->partition[j] >= 0) {
-            real_t val = a_bar->offdiag_values[k];
-            real_t mod_weight = val - inv_total * ws->rowsums[i] * ws->rowsums[j];
-
-            if (mod_weight > 0.0) {
-                ws->weights[n_mod_weights] = mod_weight;
-                ws->ptr_i[n_mod_weights] = i;
-                ws->ptr_j[n_mod_weights] = j;
-                n_mod_weights += 1;
-            }
+        if (mod_weight > 0.0) {
+            ws->weights[n_mod_weights] = mod_weight;
+            ws->ptr_i[n_mod_weights] = i;
+            ws->ptr_j[n_mod_weights] = j;
+            n_mod_weights += 1;
         }
     }
 
@@ -140,7 +158,7 @@ int pairwise_aggregation(const real_t coarsening_factor,
 
     // Assign any unmatched DOF to singleton on coarse grid
     for (idx_t row = 0; row < nrows; row++) {
-        if (alive[row] < 0 && ws->partition[row] >= 0) {
+        if (alive[row] < 0) {
             alive[row] = coarse_counter;
             coarse_counter += 1;
         }

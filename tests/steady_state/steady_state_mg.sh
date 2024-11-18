@@ -20,7 +20,7 @@ source $SFEM_DIR/workflows/sfem_config.sh
 export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 export CUDA_LAUNCH_BLOCKING=0
-export SFEM_ELEMENT_REFINE_LEVEL=4
+export SFEM_ELEMENT_REFINE_LEVEL=6
 
 CASE=3
 

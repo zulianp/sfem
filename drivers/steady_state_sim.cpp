@@ -1,8 +1,11 @@
+#include <iostream>
 #include "mg_builder.hpp"
 #include "sfem_CooSym.hpp"
 #include "sfem_Function.hpp"
 
 #include "sfem_API.hpp"
+#include "sfem_mask.h"
+#include "smoother.h"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
@@ -116,17 +119,29 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        auto fine_mat = sfem::h_coosym<idx_t, real_t>(
-                off_diag_rows, crs_graph->colidx(), off_diag_values, diag_values);
         auto mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
         f->constaints_mask(mask->data());
+        auto fine_mat = sfem::h_coosym<idx_t, real_t>(
+                mask, off_diag_rows, crs_graph->colidx(), off_diag_values, diag_values);
 
-        auto amg = builder(2.0, mask->data(), fine_mat);
+        auto near_null = sfem::create_buffer<real_t>(mask_count(fs->n_dofs()), es);
 
-        //
-        // auto stat_iter = sfem::h_stationary<real_t>();
+        auto amg = builder(2.0, mask->data(), near_null->data(), fine_mat);
+        /*
+        amg->set_max_it(SFEM_MAX_IT);
+        amg->verbose = true;
         solver = amg;
+        */
 
+        amg->set_max_it(1);
+        amg->verbose = false;
+        auto cg = sfem::create_cg<real_t>(fine_mat, es);
+        cg->verbose = true;
+        cg->check_each = 1;
+        cg->set_max_it(SFEM_MAX_IT);
+        cg->set_op(fine_mat);
+        cg->set_preconditioner_op(amg);
+        solver = cg;
     } else {
         auto linear_op = sfem::make_linear_op(f);
         auto cg = sfem::create_cg<real_t>(linear_op, es);
@@ -141,6 +156,10 @@ int main(int argc, char *argv[]) {
     // -------------------------------
 
     double solve_tick = MPI_Wtime();
+
+    for (int i = 0; i < fs->n_dofs(); i++) {
+        x->data()[i] = 1.0;
+    }
 
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());

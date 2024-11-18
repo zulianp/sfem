@@ -25,7 +25,6 @@ namespace sfem {
         T *acoarse_diag = (T *)calloc(coarse_dim, sizeof(T));
 
         R *sort_indices = (R *)malloc(fine_nnz * sizeof(R));
-        count_t new_nnz = fine_nnz;
 
         pwc_restrict(a->diag_values->data(), acoarse_diag);
 
@@ -37,24 +36,25 @@ namespace sfem {
 
             R coarse_i = partition[i];
             R coarse_j = partition[j];
-            T coarse_val = weights[i] * val * weights[j];
-            if (coarse_j > coarse_i) {
-                row_indices[write_pos] = coarse_i;
-                col_indices[write_pos] = coarse_j;
-                values[write_pos] = coarse_val;
-                write_pos++;
-            } else if (coarse_i > coarse_j) {
-                row_indices[write_pos] = coarse_j;
-                col_indices[write_pos] = coarse_i;
-                values[write_pos] = coarse_val;
-                write_pos++;
-            } else {
-                if (coarse_i >= 0) {
+            if (coarse_i >= 0 && coarse_j >= 0) {
+                T coarse_val = weights[i] * val * weights[j];
+                if (coarse_j > coarse_i) {
+                    row_indices[write_pos] = coarse_i;
+                    col_indices[write_pos] = coarse_j;
+                    values[write_pos] = coarse_val;
+                    write_pos += 1;
+                } else if (coarse_i > coarse_j) {
+                    row_indices[write_pos] = coarse_j;
+                    col_indices[write_pos] = coarse_i;
+                    values[write_pos] = coarse_val;
+                    write_pos += 1;
+                } else {
                     acoarse_diag[coarse_i] += coarse_val;
                 }
             }
         }
 
+        count_t new_nnz = (count_t)write_pos;
         sum_duplicates(row_indices, col_indices, values, sort_indices, &new_nnz);
 
         R *offdiag_row_indices = (R *)malloc(new_nnz * sizeof(R));
@@ -73,7 +73,8 @@ namespace sfem {
         free(row_indices);
         free(sort_indices);
 
-        return h_coosym(Buffer<R>::own(new_nnz, offdiag_row_indices, free, MEMORY_SPACE_HOST),
+        return h_coosym(nullptr,
+                        Buffer<R>::own(new_nnz, offdiag_row_indices, free, MEMORY_SPACE_HOST),
                         Buffer<R>::own(new_nnz, offdiag_col_indices, free, MEMORY_SPACE_HOST),
                         Buffer<T>::own(new_nnz, offdiag_values, free, MEMORY_SPACE_HOST),
                         Buffer<T>::own(coarse_dim, acoarse_diag, free, MEMORY_SPACE_HOST)

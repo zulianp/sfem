@@ -25,7 +25,7 @@ typedef struct {
     real_t *weights;      // Non-zero values
 } PartitionerWorkspace;
 
-int partition(const real_t *near_null,
+int partition(real_t *near_null,
               const mask_t *bdy_dofs,
               const real_t coarsening_factor,
               SymmCOOMatrix *symm_coo,
