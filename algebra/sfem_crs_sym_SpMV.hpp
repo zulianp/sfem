@@ -36,8 +36,8 @@ namespace sfem {
 
             // Check preconditions
             assert(this->colidx->size() == nnz);
-            assert(this->off_diag_values->extent(1) == nnz);
-            assert(this->diag_values->extent(1) == rows);
+            assert(this->off_diag_values->size() == nnz);
+            assert(this->diag_values->size() == rows);
 
             // Get raw pointers
             auto rowptr = this->rowptr->data();
