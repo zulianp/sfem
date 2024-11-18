@@ -1,3 +1,5 @@
+#include "mg_builder.hpp"
+#include "sfem_CooSym.hpp"
 #include "sfem_Function.hpp"
 
 #include "sfem_API.hpp"
@@ -97,6 +99,7 @@ int main(int argc, char *argv[]) {
 
         auto diag_values = sfem::create_buffer<real_t>(fs->n_dofs(), es);
         auto off_diag_values = sfem::create_buffer<real_t>(crs_graph->nnz(), es);
+        auto off_diag_rows = sfem::create_buffer<idx_t>(crs_graph->nnz(), es);
 
         f->hessian_crs_sym(x->data(),
                            crs_graph->rowptr()->data(),
@@ -104,14 +107,25 @@ int main(int argc, char *argv[]) {
                            diag_values->data(),
                            off_diag_values->data());
 
+        count_t *row_ptr = crs_graph->rowptr()->data();
+        idx_t *col_indices = crs_graph->colidx()->data();
+        for (idx_t i = 0; i < fs->n_dofs(); i++) {
+            for (idx_t idx = row_ptr[i]; idx < row_ptr[i + 1]; idx++) {
+                off_diag_rows->data()[idx] = i;
+                assert(col_indices[idx] > i);
+            }
+        }
 
+        auto fine_mat = sfem::h_coosym<idx_t, real_t>(
+                off_diag_rows, crs_graph->colidx(), off_diag_values, diag_values);
         auto mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
         f->constaints_mask(mask->data());
 
-        exit(1);
-// 
-        auto stat_iter = sfem::h_stationary<real_t>();
-        solver = stat_iter;
+        auto amg = builder(2.0, mask->data(), fine_mat);
+
+        //
+        // auto stat_iter = sfem::h_stationary<real_t>();
+        solver = amg;
     } else {
         auto linear_op = sfem::make_linear_op(f);
         auto cg = sfem::create_cg<real_t>(linear_op, es);

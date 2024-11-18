@@ -1,6 +1,9 @@
 #ifndef SMOOTHER_H
 #define SMOOTHER_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include "sparse.h"
 
 int l2_smoother(const ptrdiff_t dim,
@@ -18,4 +21,7 @@ int l1_smoother(const ptrdiff_t dim,
                 const idx_t *const offdiag_row_indices,
                 const idx_t *const offdiag_col_indices,
                 real_t *smoother);
+#ifdef __cplusplus
+}
+#endif
 #endif  // SMOOTHER_H

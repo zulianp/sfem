@@ -59,7 +59,7 @@ namespace sfem {
                 y[i] += x[j] * val;
                 y[j] += x[i] * val;
             }
-
+            
             return SFEM_SUCCESS;
         }
     };
