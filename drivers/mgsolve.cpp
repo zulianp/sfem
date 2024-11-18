@@ -62,10 +62,11 @@ int main(int argc, char *argv[]) {
     auto m = sfem::Mesh::create_from_file(comm, folder);
 
     const char *SFEM_OPERATOR = "Laplacian";
+    const char *SFEM_FINE_OP_TYPE = "MF";
+    const char *SFEM_COARSE_OP_TYPE = "MF";
+
     int SFEM_BLOCK_SIZE = 1;
     int SFEM_USE_PRECONDITIONER = 0;
-    int SFEM_MATRIX_FREE = 0;
-    int SFEM_COARSE_MATRIX_FREE = 0;
     int SFEM_USE_CHEB = 0;
     int SFEM_DEBUG = 0;
     int SFEM_MG = 0;
@@ -80,11 +81,11 @@ int main(int argc, char *argv[]) {
     double SFEM_CHEB_EIG_TOL = 1e-5;
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     int SFEM_VERBOSITY_LEVEL = 1;
-    int SFEM_USE_BSR_MATRIX = 0;
 
-    SFEM_READ_ENV(SFEM_MATRIX_FREE, atoi);
-    SFEM_READ_ENV(SFEM_COARSE_MATRIX_FREE, atoi);
     SFEM_READ_ENV(SFEM_OPERATOR, );
+    SFEM_READ_ENV(SFEM_FINE_OP_TYPE, );
+    SFEM_READ_ENV(SFEM_COARSE_OP_TYPE, );
+
     SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
     SFEM_READ_ENV(SFEM_USE_PRECONDITIONER, atoi);
     SFEM_READ_ENV(SFEM_USE_CHEB, atoi);
@@ -102,11 +103,11 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_SMOOTHER_SWEEPS, atoi);
     SFEM_READ_ENV(SFEM_CHEB_EIG_TOL, atof);
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
-    SFEM_READ_ENV(SFEM_USE_BSR_MATRIX, atoi);
+    
 
-    printf("SFEM_MATRIX_FREE: %d\n"
-           "SFEM_COARSE_MATRIX_FREE: %d\n"
-           "SFEM_OPERATOR: %s\n"
+    printf("SFEM_OPERATOR: %s\n"
+           "SFEM_FINE_OP_TYPE: %s\n"
+           "SFEM_COARSE_OP_TYPE: %s\n"
            "SFEM_BLOCK_SIZE: %d\n"
            "SFEM_USE_PRECONDITIONER: %d\n"
            "SFEM_USE_CHEB: %d\n"
@@ -119,11 +120,10 @@ int main(int argc, char *argv[]) {
            "SFEM_SMOOTHER_SWEEPS: %d\n"
            "SFEM_CHEB_EIG_TOL: %g\n"
            "SFEM_USE_CRS_GRAPH_RESTRICT: %d\n"
-           "SFEM_ELEMENT_REFINE_LEVEL: %d\n"
-           "SFEM_USE_BSR_MATRIX: %d\n",
-           SFEM_MATRIX_FREE,
-           SFEM_COARSE_MATRIX_FREE,
+           "SFEM_ELEMENT_REFINE_LEVEL: %d\n",
            SFEM_OPERATOR,
+           SFEM_FINE_OP_TYPE,
+           SFEM_COARSE_OP_TYPE,
            SFEM_BLOCK_SIZE,
            SFEM_USE_PRECONDITIONER,
            SFEM_USE_CHEB,
@@ -136,8 +136,7 @@ int main(int argc, char *argv[]) {
            SFEM_SMOOTHER_SWEEPS,
            SFEM_CHEB_EIG_TOL,
            SFEM_USE_CRS_GRAPH_RESTRICT,
-           SFEM_ELEMENT_REFINE_LEVEL,
-           SFEM_USE_BSR_MATRIX);
+           SFEM_ELEMENT_REFINE_LEVEL);
 
 #ifdef SFEM_ENABLE_CUDA
     sfem::register_device_ops();
@@ -180,11 +179,6 @@ int main(int argc, char *argv[]) {
     f->add_constraint(conds);
     f->add_operator(op);
 
-    // #ifdef SFEM_ENABLE_CUDA
-    //     op->hessian_diag(nullptr, diag->data());
-    //     sfem::to_host(diag)->print(std::cout);
-    // #endif
-
     double compute_tick = MPI_Wtime();
     double init_tick = MPI_Wtime();
     double init_tock;
@@ -196,85 +190,23 @@ int main(int argc, char *argv[]) {
     std::shared_ptr<sfem::Operator<real_t>> linear_op;
     std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> smoother;
 
-    if (SFEM_MATRIX_FREE) {
-        // #ifdef SFEM_ENABLE_CUDA
-        // FIXME
-        linear_op = sfem::make_linear_op(f);
-        // #else
-        //         linear_op = sfem::make_linear_op_variant(f, {{"ASSUME_AFFINE", 1}});
-        // #endif
+    linear_op = sfem::create_linear_operator(SFEM_FINE_OP_TYPE, f, x, es);
 
-        if (SFEM_USE_CHEB) {
-            auto cheb = sfem::create_cheb3<real_t>(linear_op, es);
-
-            // Power-method
-            cheb->eigen_solver_tol = SFEM_CHEB_EIG_TOL;
-            cheb->init_with_ones();
-            // cheb->init_with_random();
-
-            cheb->scale_eig_max = SFEM_CHEB_EIG_MAX_SCALE;
-            cheb->set_max_it(SFEM_SMOOTHER_SWEEPS);
-            cheb->set_initial_guess_zero(false);
-            smoother = cheb;
-        } else if (SFEM_USE_PRECONDITIONER) {
-            int err = f->hessian_diag(nullptr, diag->data());
-            assert(!err);
-        }
-
-    } else {
-        if (SFEM_USE_BSR_MATRIX && fs->block_size() != 1) {
-            linear_op = sfem::hessian_bsr(f, x, es);
-        } else {
-            auto crs = hessian_crs(*f, f->crs_graph(), es);
-            linear_op = crs;
-        }
-
-        // int err = f->hessian_diag(nullptr, diag->data());
-        // assert(!err);
-
-        // if (SFEM_USE_CHEB) {
+    if (SFEM_USE_CHEB) {
         auto cheb = sfem::create_cheb3<real_t>(linear_op, es);
 
         // Power-method
-        cheb->scale_eig_max = SFEM_CHEB_EIG_MAX_SCALE;
+        cheb->eigen_solver_tol = SFEM_CHEB_EIG_TOL;
         cheb->init_with_ones();
+        // cheb->init_with_random();
+
+        cheb->scale_eig_max = SFEM_CHEB_EIG_MAX_SCALE;
         cheb->set_max_it(SFEM_SMOOTHER_SWEEPS);
         cheb->set_initial_guess_zero(false);
         smoother = cheb;
-        // } else {
-        //     if ((!SFEM_USE_PRECONDITIONER || SFEM_MG) && fs->block_size() == 1) {
-        //         auto gs = sfem::h_gauss_seidel(crs, diag->data());
-        //         gs->set_max_it(SFEM_SMOOTHER_SWEEPS);
-        //         // gs->verbose = true;
-        //         smoother = gs;
-        //     }
-        // }
-
-        // if (SFEM_DEBUG) {
-        //     array_write(
-        //             comm, "./rhs.raw", SFEM_MPI_REAL_T, rhs->data(), fs->n_dofs(), fs->n_dofs());
-        //     array_write(
-        //             comm, "./diag.raw", SFEM_MPI_REAL_T, diag->data(), fs->n_dofs(),
-        //             fs->n_dofs());
-        //     array_write(comm,
-        //                 "./rowptr.raw",
-        //                 SFEM_MPI_COUNT_T,
-        //                 crs->row_ptr->data(),
-        //                 fs->n_dofs() + 1,
-        //                 fs->n_dofs() + 1);
-        //     array_write(comm,
-        //                 "./colidx.raw",
-        //                 SFEM_MPI_IDX_T,
-        //                 crs->col_idx->data(),
-        //                 crs->row_ptr->data()[fs->n_dofs()],
-        //                 crs->row_ptr->data()[fs->n_dofs()]);
-        //     array_write(comm,
-        //                 "./values.raw",
-        //                 SFEM_MPI_REAL_T,
-        //                 crs->values->data(),
-        //                 crs->row_ptr->data()[fs->n_dofs()],
-        //                 crs->row_ptr->data()[fs->n_dofs()]);
-        // }
+    } else if (SFEM_USE_PRECONDITIONER) {
+        int err = f->hessian_diag(nullptr, diag->data());
+        assert(!err);
     }
 
     f->set_output_dir(output_path);
@@ -288,32 +220,8 @@ int main(int argc, char *argv[]) {
         auto fs_coarse = fs->derefine();
         auto f_coarse = f->derefine(fs_coarse, true);
 
-        std::shared_ptr<sfem::CRSGraph> coarse_graph;
-
-        if (!SFEM_COARSE_MATRIX_FREE || SFEM_USE_CRS_GRAPH_RESTRICT) {
-            coarse_graph = sfem::create_derefined_crs_graph(*f->space());
-
-#ifdef SFEM_ENABLE_CUDA
-            if (es == sfem::EXECUTION_SPACE_DEVICE) {
-                coarse_graph = sfem::to_device(coarse_graph);
-            }
-#endif
-        }
-
         std::shared_ptr<sfem::Operator<real_t>> linear_op_coarse;
-        if (SFEM_COARSE_MATRIX_FREE) {
-            linear_op_coarse = sfem::make_linear_op(f_coarse);
-        } else {
-            if (f_coarse->space()->block_size() == 1) {
-                linear_op_coarse = hessian_crs(*f_coarse, coarse_graph, es);
-            } else {
-                if (SFEM_USE_BSR_MATRIX) {
-                    linear_op_coarse = sfem::hessian_bsr(f_coarse, nullptr, es);
-                } else {
-                    linear_op_coarse = hessian_crs(*f_coarse, f_coarse->crs_graph(), es);
-                }
-            }
-        }
+        linear_op_coarse = sfem::create_linear_operator(SFEM_COARSE_OP_TYPE, f_coarse, nullptr, es);
 
         auto c_coarse = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
         auto r_coarse = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
@@ -336,30 +244,9 @@ int main(int argc, char *argv[]) {
 
         smoother->set_initial_guess_zero(false);
 
-        std::shared_ptr<sfem::Operator<real_t>> restriction, prolongation, prolong_unconstr;
-
-        if (SFEM_USE_CRS_GRAPH_RESTRICT) {
-            auto edges = sfem::create_edge_idx(*coarse_graph);
-#ifdef SFEM_ENABLE_CUDA
-            if (es == sfem::EXECUTION_SPACE_DEVICE) {
-                edges = sfem::to_device(edges);
-            }
-#endif
-
-            restriction =
-                    sfem::create_hierarchical_restriction_from_graph(f->space()->mesh().n_nodes(),
-                                                                     f->space()->block_size(),
-                                                                     coarse_graph,
-                                                                     edges,
-                                                                     es);
-            prolong_unconstr =
-                    sfem::create_hierarchical_prolongation_from_graph(f, coarse_graph, edges, es);
-        } else {
-            restriction = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
-            prolong_unconstr = sfem::create_hierarchical_prolongation(fs_coarse, fs, es);
-        }
-
-        prolongation = sfem::make_op<real_t>(
+        auto restriction = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
+        auto prolong_unconstr = sfem::create_hierarchical_prolongation(fs_coarse, fs, es);
+        auto prolongation = sfem::make_op<real_t>(
                 prolong_unconstr->rows(),
                 prolong_unconstr->cols(),
                 [=](const real_t *const from, real_t *const to) {
@@ -404,13 +291,6 @@ int main(int argc, char *argv[]) {
         solve_tock = MPI_Wtime();
 
     } else {
-#if 0
-    auto solver = smoother;
-    solver->set_max_it(100);
-    solver->set_op(linear_op);
-
-#else  // CG solver
-
         auto solver = sfem::create_cg<real_t>(linear_op, es);
         // auto solver = sfem::create_bcgs<real_t>(linear_op, es);
 
@@ -427,7 +307,6 @@ int main(int argc, char *argv[]) {
         solver->set_atol(SFEM_TOL);
         solver->set_max_it(SFEM_MAX_IT);
 
-#endif
         solver->set_op(linear_op);
 
         init_tock = MPI_Wtime();
