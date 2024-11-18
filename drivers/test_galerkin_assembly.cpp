@@ -73,6 +73,8 @@ int main(int argc, char *argv[]) {
     int SFEM_COARSE_MATRIX_FREE = 1;
     int SFEM_USE_BSR = 1;
     int SFEM_COARSE_USE_BSR = 1;
+    int SFEM_USE_COO_SYM = 0;
+    int SFEM_USE_CRS_SYM = 0;
 
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_USE_GPU, atoi);
@@ -83,6 +85,8 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_MATRIX_FREE, atoi);
     SFEM_READ_ENV(SFEM_COARSE_MATRIX_FREE, atoi);
     SFEM_READ_ENV(SFEM_COARSE_USE_BSR, atoi);
+    SFEM_READ_ENV(SFEM_USE_COO_SYM, atoi);
+    SFEM_READ_ENV(SFEM_USE_CRS_SYM, atoi);
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
@@ -122,14 +126,26 @@ int main(int argc, char *argv[]) {
     std::shared_ptr<sfem::Operator<real_t>> fine_op, coarse_op;
 
     if (SFEM_MATRIX_FREE) {
+        printf("fine_op: Using COO\n");
         fine_op = sfem::make_linear_op(f);
     } else {
         if (fs->block_size() == 1) {
-            fine_op = sfem::hessian_crs(f, nullptr, es);
+            if (SFEM_USE_CRS_SYM) {
+                printf("fine_op: Using CRS_SYM\n");
+                coarse_op = sfem::hessian_crs_sym(f, nullptr, es);
+            } else if (SFEM_USE_COO_SYM) {
+                printf("fine_op: Using COO_SYM\n");
+                fine_op = sfem::hessian_coo_sym(f, nullptr, es);
+            } else {
+                printf("fine_op: Using CRS\n");
+                fine_op = sfem::hessian_crs(f, nullptr, es);
+            }
         } else {
             if (SFEM_USE_BSR) {
+                printf("fine_op: Using BSR\n");
                 fine_op = sfem::hessian_bsr(f, nullptr, es);
             } else {
+                printf("fine_op: Using CRS_SYM\n");
                 fine_op = sfem::hessian_bcrs_sym(f, nullptr, es);
             }
         }
@@ -139,14 +155,28 @@ int main(int argc, char *argv[]) {
     auto f_coarse = f->derefine(fs_coarse, true);
 
     if (SFEM_COARSE_MATRIX_FREE) {
+        printf("coarse_op: Using MF\n");
         coarse_op = sfem::make_linear_op(f_coarse);
     } else {
         if (fs->block_size() == 1) {
-            coarse_op = sfem::hessian_crs(f_coarse, nullptr, es);
+            if (SFEM_USE_CRS_SYM) {
+                printf("coarse_op: Using CRS_SYM\n");
+                coarse_op = sfem::hessian_crs_sym(f_coarse, nullptr, es);
+            } else
+
+                    if (SFEM_USE_COO_SYM) {
+                printf("coarse_op: Using COO_SYM\n");
+                coarse_op = sfem::hessian_coo_sym(f_coarse, nullptr, es);
+            } else {
+                printf("coarse_op: Using CRS\n");
+                coarse_op = sfem::hessian_crs(f_coarse, nullptr, es);
+            }
         } else {
             if (SFEM_COARSE_USE_BSR) {
+                printf("coarse_op: Using BSR\n");
                 coarse_op = sfem::hessian_bsr(f_coarse, nullptr, es);
             } else {
+                printf("coarse_op: Using BCRS_SYM\n");
                 coarse_op = sfem::hessian_bcrs_sym(f_coarse, nullptr, es);
             }
         }
