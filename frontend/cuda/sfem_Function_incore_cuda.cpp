@@ -235,6 +235,12 @@ namespace sfem {
             return std::make_shared<GPUDirichletConditions>(h_derefined);
         }
 
+        int mask(mask_t *mask) override
+        {
+            assert(false);
+            return SFEM_FAILURE;
+        }
+
         ~GPUDirichletConditions() {
             d_destroy_conditions(n_dirichlet_conditions, dirichlet_conditions);
         }

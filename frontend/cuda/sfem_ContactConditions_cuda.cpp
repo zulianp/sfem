@@ -122,11 +122,19 @@ namespace sfem {
             return std::make_shared<GPUContactConditions>(h_derefined);
         }
 
+        int mask(mask_t *mask) override
+        {
+            assert(false);
+            return SFEM_FAILURE;
+        }
+
         ~GPUContactConditions() { d_destroy_conditions(n_conditions, conditions); }
     };
 
     std::shared_ptr<Constraint> to_device(const std::shared_ptr<ContactConditions> &dc) {
         return std::make_shared<GPUContactConditions>(dc);
     }
+
+
 
 }  // namespace sfem
