@@ -697,13 +697,14 @@ namespace sfem {
                 x_data, crs_graph->rowptr()->data(), crs_graph->colidx()->data(), values->data());
 
         // Owns the pointers
-        return sfem::h_bsr_spmv(crs_graph->n_nodes(),
-                                crs_graph->n_nodes(),
-                                block_size,
-                                crs_graph->rowptr(),
-                                crs_graph->colidx(),
-                                values,
-                                (real_t)1);
+        auto spmv = sfem::h_bsr_spmv(crs_graph->n_nodes(),
+                                     crs_graph->n_nodes(),
+                                     block_size,
+                                     crs_graph->rowptr(),
+                                     crs_graph->colidx(),
+                                     values,
+                                     (real_t)1);
+        return spmv;
     }
 
     auto hessian_bcrs_sym(const std::shared_ptr<sfem::Function> &f,
@@ -781,8 +782,18 @@ namespace sfem {
                            off_diag_values->data());
 
         crs_to_coo(fs->n_dofs(), crs_graph->rowptr()->data(), row_idx->data());
-        return sfem::h_coosym<idx_t, real_t>(
+        auto spmv = sfem::h_coosym<idx_t, real_t>(
                 row_idx, crs_graph->colidx(), off_diag_values, diag_values);
+
+        // Owns the pointers
+        return sfem::make_op<real_t>(
+                f->space()->n_dofs(),
+                f->space()->n_dofs(),
+                [=](const real_t *const x, real_t *const y) {
+                    spmv->apply(x, y);
+                    f->copy_constrained_dofs(x, y);
+                },
+                es);
     }
 
     auto hessian_crs_sym(const std::shared_ptr<sfem::Function> &f,
@@ -805,13 +816,23 @@ namespace sfem {
                            diag_values->data(),
                            off_diag_values->data());
 
-        return sfem::h_crs_sym_spmv<count_t, idx_t, real_t>(fs->n_dofs(),
-                                                   fs->n_dofs(),
-                                                   crs_graph->rowptr(),
-                                                   crs_graph->colidx(),
-                                                   diag_values,
-                                                   off_diag_values,
-                                                   (real_t)1);
+        auto spmv = sfem::h_crs_sym_spmv<count_t, idx_t, real_t>(fs->n_dofs(),
+                                                                 fs->n_dofs(),
+                                                                 crs_graph->rowptr(),
+                                                                 crs_graph->colidx(),
+                                                                 diag_values,
+                                                                 off_diag_values,
+                                                                 (real_t)1);
+
+        // Owns the pointers
+        return sfem::make_op<real_t>(
+                f->space()->n_dofs(),
+                f->space()->n_dofs(),
+                [=](const real_t *const x, real_t *const y) {
+                    spmv->apply(x, y);
+                    f->copy_constrained_dofs(x, y);
+                },
+                es);
     }
 
     real_t residual(sfem::Operator<real_t> &op,
@@ -894,10 +915,23 @@ namespace sfem {
                 return sfem::hessian_crs_sym(f, nullptr, es);
             else if (format == "COO_SYM")
                 return sfem::hessian_coo_sym(f, nullptr, es);
+
+            if (format != "CRS") {
+                fprintf(stderr,
+                        "[Warning] fallback to CRS format as \"%s\" is not supported!\n",
+                        format.c_str());
+            }
+
             return sfem::hessian_crs(f, nullptr, es);
         }
 
         if (format == "BSR") return sfem::hessian_bsr(f, nullptr, es);
+        if (format != "BCRS_SYM") {
+            fprintf(stderr,
+                    "[Warning] fallback to BCRS_SYM format as \"%s\" is not supported!\n",
+                    format.c_str());
+        }
+
         return sfem::hessian_bcrs_sym(f, nullptr, es);
     }
 

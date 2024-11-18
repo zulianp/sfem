@@ -191,6 +191,7 @@ namespace sfem {
 
                 // Updated outside column loop
                 for (int d1 = 0; d1 < BLOCK_SIZE; d1++) {
+#pragma omp atomic update
                     y[row * BLOCK_SIZE + d1] += y_local[d1];
                 }
 
@@ -231,6 +232,7 @@ namespace sfem {
 
                     // Updated inside column loop
                     for (int d1 = 0; d1 < BLOCK_SIZE; d1++) {
+#pragma omp atomic update
                         y[col * BLOCK_SIZE + d1] += y_local[d1];
                     }
                 }
