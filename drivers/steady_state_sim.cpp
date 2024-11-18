@@ -108,6 +108,8 @@ int main(int argc, char *argv[]) {
         auto mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
         f->constaints_mask(mask->data());
 
+        mask_print(fs->n_dofs(), mask->data());
+
         exit(1);
 // 
         auto stat_iter = sfem::h_stationary<real_t>();
