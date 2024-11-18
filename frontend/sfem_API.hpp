@@ -624,7 +624,7 @@ namespace sfem {
                                 (real_t)1);
     }
 
-    auto hessian_crs(std::shared_ptr<sfem::Function> &f,
+    auto hessian_crs(const std::shared_ptr<sfem::Function> &f,
                      const std::shared_ptr<Buffer<real_t>> &x,
                      const sfem::ExecutionSpace es) {
         auto crs_graph = f->crs_graph();
@@ -662,7 +662,7 @@ namespace sfem {
                                 (real_t)1);
     }
 
-    auto hessian_bsr(std::shared_ptr<sfem::Function> &f,
+    auto hessian_bsr(const std::shared_ptr<sfem::Function> &f,
                      const std::shared_ptr<Buffer<real_t>> &x,
                      const sfem::ExecutionSpace es) {
         // Get the mesh node-to-node graph instead of the FunctionSpace scalar adapted graph
@@ -706,7 +706,7 @@ namespace sfem {
                                 (real_t)1);
     }
 
-    auto hessian_bcrs_sym(std::shared_ptr<sfem::Function> &f,
+    auto hessian_bcrs_sym(const std::shared_ptr<sfem::Function> &f,
                           const std::shared_ptr<Buffer<real_t>> &x,
                           const sfem::ExecutionSpace es) {
         auto crs_graph = f->space()->mesh().node_to_node_graph_upper_triangular();
@@ -759,7 +759,7 @@ namespace sfem {
                 es);
     }
 
-    auto hessian_coo_sym(std::shared_ptr<sfem::Function> &f,
+    auto hessian_coo_sym(const std::shared_ptr<sfem::Function> &f,
                          const std::shared_ptr<Buffer<real_t>> &x,
                          const sfem::ExecutionSpace es) {
         auto fs = f->space();
@@ -785,7 +785,7 @@ namespace sfem {
                 row_idx, crs_graph->colidx(), off_diag_values, diag_values);
     }
 
-    auto hessian_crs_sym(std::shared_ptr<sfem::Function> &f,
+    auto hessian_crs_sym(const std::shared_ptr<sfem::Function> &f,
                          const std::shared_ptr<Buffer<real_t>> &x,
                          const sfem::ExecutionSpace es) {
         auto fs = f->space();
@@ -878,6 +878,27 @@ namespace sfem {
         crs_out.colidx_type = SFEM_MPI_IDX_T;
         crs_out.values_type = SFEM_MPI_REAL_T;
         return crs_write_folder(MPI_COMM_SELF, path.c_str(), &crs_out);
+    }
+
+    std::shared_ptr<sfem::Operator<real_t>> create_linear_operator(
+            const std::string &format,
+            const std::shared_ptr<sfem::Function> &f,
+            const std::shared_ptr<sfem::Buffer<real_t>> &x,
+            enum sfem::ExecutionSpace es) {
+        if (format == "MF") {
+            return sfem::make_linear_op(f);
+        }
+
+        if (f->space()->block_size() == 1) {
+            if (format == "CRS_SYM")
+                return sfem::hessian_crs_sym(f, nullptr, es);
+            else if (format == "COO_SYM")
+                return sfem::hessian_coo_sym(f, nullptr, es);
+            return sfem::hessian_crs(f, nullptr, es);
+        }
+
+        if (format == "BSR") return sfem::hessian_bsr(f, nullptr, es);
+        return sfem::hessian_bcrs_sym(f, nullptr, es);
     }
 
 }  // namespace sfem
