@@ -4,6 +4,7 @@
 #include "crs_graph.h"
 #include "sfem_Buffer.hpp"
 #include "sfem_base.h"
+#include "sfem_mask.h"
 #include "sfem_mesh.h"
 
 #include "sfem_Chebyshev3.hpp"
@@ -782,8 +783,10 @@ namespace sfem {
                            off_diag_values->data());
 
         crs_to_coo(fs->n_dofs(), crs_graph->rowptr()->data(), row_idx->data());
+        auto mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
+        f->constaints_mask(mask->data());
         auto spmv = sfem::h_coosym<idx_t, real_t>(
-                row_idx, crs_graph->colidx(), off_diag_values, diag_values);
+                mask, row_idx, crs_graph->colidx(), off_diag_values, diag_values);
 
         // Owns the pointers
         return sfem::make_op<real_t>(
