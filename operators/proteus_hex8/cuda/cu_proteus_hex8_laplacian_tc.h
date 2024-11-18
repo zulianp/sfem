@@ -20,7 +20,7 @@ int cu_proteus_affine_hex8_laplacian_tc_fill_ops(const int level,
                                                  const idx_t *const SFEM_RESTRICT elements,
                                                  const void *const SFEM_RESTRICT fff,
                                                  const enum RealType real_type,
-                                                 void *const SFEM_RESTRICT macro_element_ops);
+                                                 void *const SFEM_RESTRICT macro_element_ops, void *stream);
 
 int cu_proteus_affine_hex8_laplacian_tc_apply(
         const int level,
