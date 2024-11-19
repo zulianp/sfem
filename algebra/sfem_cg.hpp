@@ -65,9 +65,7 @@ namespace sfem {
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
-        bool good() const {
-            return blas.good() && apply_op;
-        }
+        bool good() const { return blas.good() && apply_op; }
 
         void monitor(const int iter, const T residual, const T relative_residual) {
             if (!verbose) return;
@@ -172,10 +170,10 @@ namespace sfem {
             apply_op(x, r);
             blas.axpby(n, 1, b, -1, r);
 
-            const T rtr0 = blas.dot(n, r, r);
-            T rtr = rtr0;
+            // const T rtr0 = blas.dot(n, r, r);
+            // T rtr = rtr0;
 
-            monitor(0, sqrt(rtr), 1);
+            // monitor(0, sqrt(rtr), 1);
 
             // if (sqrt(rtr) < rtol) {
             //     blas.destroy(r);
@@ -193,13 +191,16 @@ namespace sfem {
             blas.zeros(n, Ap);
             apply_op(p, Ap);
 
-            T rtz = blas.dot(n, r, z);
+            const T rtz0 = blas.dot(n, r, z);
+            T rtz = rtz0;
+
+            monitor(0, sqrt(rtz), 1);
 
             {
                 const T ptAp = blas.dot(n, p, Ap);
 
                 assert(ptAp != 0);
-                const T alpha = rtr / ptAp;
+                const T alpha = rtz / ptAp;
 
                 blas.axpby(n, alpha, p, 1, x);
                 blas.axpby(n, -alpha, Ap, 1, r);
@@ -228,7 +229,7 @@ namespace sfem {
                 blas.axpby(n, -alpha, Ap, 1, r);
 
                 auto anorm = sqrt(rtz);
-                auto rnorm = anorm / sqrt(rtr0);
+                auto rnorm = anorm / sqrt(rtz0);
 
                 monitor(k + 1, anorm, rnorm);
                 if (anorm < atol || rnorm < rtol) {

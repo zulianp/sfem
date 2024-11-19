@@ -6,6 +6,32 @@ MARCH ?= native
 VECTOR_SIZE ?= 512
 
 GPU_ARCH ?= sm_75
+DISABLE_CUDA ?= 0
+
+ARM ?= 0  # 1 for ARM architecture
+CUDA_HOST_COMPILER ?=
+
+VECTOR_WIDTH_OPT = -mprefer-vector-width
+
+ifeq ($(ARM), 1)
+	VECTOR_WIDTH_OPT = -msve-vector-bits
+	VECTOR_SIZE = 128
+	# MPICXX = mpicxx
+	# MPICC = mpicc
+endif
+
+
+# autodetect and set the CUDA home directory
+ifeq ($(DISABLE_CUDA), 0)
+	CUDA_HOME=$(shell dirname $(shell dirname $(shell which nvcc)))
+else
+	CUDA_HOME=
+endif
+
+$(info $$DISABLE_CUDA is [${DISABLE_CUDA}])
+$(info $$GPU_ARCH     is [${GPU_ARCH}])
+$(info $$CUDA_HOME    is [${CUDA_HOME}])
+
 
 ifeq ($(debug),1)
 	CFLAGS += -O0 -g
@@ -24,8 +50,8 @@ else ifeq ($(asan), 1)
 # 	DEPS += -static-libsan
 # 	DEPS += -static
 else
-	CFLAGS += -Ofast -DNDEBUG -march=${MARCH} -fno-signed-zeros -fno-trapping-math -fassociative-math -mprefer-vector-width=${VECTOR_SIZE}  -fPIC
-	CXXFLAGS += -Ofast -DNDEBUG -march=${MARCH} -fno-signed-zeros -fno-trapping-math -fassociative-math -mprefer-vector-width=${VECTOR_SIZE} -fPIC
+	CFLAGS += -Ofast -DNDEBUG -march=${MARCH} -fno-signed-zeros -fno-trapping-math -fassociative-math ${VECTOR_WIDTH_OPT}=${VECTOR_SIZE}  -fPIC -no-pie  
+	CXXFLAGS += -Ofast -DNDEBUG -march=${MARCH} -fno-signed-zeros -fno-trapping-math -fassociative-math ${VECTOR_WIDTH_OPT}=${VECTOR_SIZE} -fPIC -no-pie  
 	CUFLAGS += -O3 -DNDEBUG
 endif
 
@@ -244,14 +270,14 @@ OBJS += tet10_grad.o \
 	tet10_laplacian.o \
 	tet10_l2_projection_p1_p2.o \
 	tet10_navier_stokes.o \
-	tet10_linear_elasticity.o
-
+	tet10_linear_elasticity.o 
+	
 # Multilevel
 OBJS += sfem_prolongation_restriction.o
 
 # Resampling
 OBJS += sfem_resample_gap.o sfem_resample_field.o sfem_resample_field_v2.o sfem_resample_field_V8.o sfem_resample_field_V4.o
-OBJS += tet10_resample_field.o
+OBJS += tet10_weno.o tet10_resample_field.o tet10_resample_field_V2.o
 
 # CVFEM
 OBJS += cvfem_tri3_diffusion.o cvfem_tet4_convection.o cvfem_tri3_convection.o cvfem_quad4_convection.o cvfem_quad4_laplacian.o
@@ -418,20 +444,36 @@ gap_from_sdf : gap_from_sdf.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \
 
 # Resampling
-ifeq ($(cuda), 1)
-CUDA_LIBS_PATH = /usr/local/cuda-12.3/targets/x86_64-linux/lib
-grid_to_mesh: grid_to_mesh.c libsfem.a ${PWD}/resampling/cuda/libsfem_resample_field_cuda.a ${PWD}/resampling/quadratures_rule.h
-	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) -L${PWD}/resampling/cuda -lsfem_resample_field_cuda -L${CUDA_LIBS_PATH} -lcudart ; \
 
-${PWD}/resampling/cuda/libsfem_resample_field_cuda.a: ${PWD}/resampling/cuda/sfem_resample_field_cuda.cu ${PWD}/resampling/cuda/quadratures_rule_cuda.h
-	${MAKE} -C ${PWD}/resampling/cuda GPU_ARCH=${GPU_ARCH}
 
+ifeq ($(DISABLE_CUDA), 1)
+    CUDA_LIBS_PATH = 
+    CUDART_LINK =
+    SFEM_CUDA_A = 
+    LINK_SFEM_CUDA =
 else
-# CPU version
-grid_to_mesh: grid_to_mesh.c libsfem.a
-	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
-
+    CUDA_LIBS_PATH = -L${CUDA_HOME}/lib64
+    
+    CUDART_LINK =  -lcudart
+    SFEM_CUDA_A = ${PWD}/resampling/cuda/libsfem_resample_field_cuda.a
+    LINK_SFEM_CUDA = -L${PWD}/resampling/cuda -lsfem_resample_field_cuda
 endif
+
+$(info $$SFEM_CUDA_A     is [${SFEM_CUDA_A}])
+$(info $$CUDA_LIBS_PATH  is [${CUDA_LIBS_PATH}])
+
+grid_to_mesh: grid_to_mesh.c libsfem.a ${SFEM_CUDA_A} ${PWD}/resampling/quadratures_rule.h
+	$(MPICC) -o $@ drivers/grid_to_mesh.c libsfem.a $(CFLAGS) $(INCLUDES)  $(LDFLAGS) ${LINK_SFEM_CUDA} ${CUDA_LIBS_PATH} ${CUDART_LINK}  ${SFEM_CUDA_A}
+
+${PWD}/resampling/cuda/libsfem_resample_field_cuda.a: ${PWD}/resampling/cuda/sfem_resample_field_cuda.cu ${PWD}/resampling/cuda/tet10_resample_field.cu ${PWD}/resampling/cuda/quadratures_rule_cuda.h ${PWD}/resampling/cuda/tet10_weno_cuda.cu ${PWD}/resampling/cuda/tet10_weno_cuda.cuh
+	${MAKE} -C ${PWD}/resampling/cuda GPU_ARCH=${GPU_ARCH} ARM=${ARM} CUDA_HOST_COMPILER=${CUDA_HOST_COMPILER} 
+
+# else
+# # CPU version
+# grid_to_mesh: grid_to_mesh.c libsfem.a
+# 	$(MPICC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) ; \
+
+# endif
 
 geometry_aware_gap_from_sdf : geometry_aware_gap_from_sdf.c libsfem.a
 	$(MPICC) $(CFLAGS) $(INCLUDES)  -o $@ $^ $(LDFLAGS) ; \

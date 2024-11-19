@@ -1,4 +1,5 @@
 #include <math.h>
+#include <mpi.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,16 +29,19 @@ int main(int argc, char* argv[]) {
     // printf("========================================\n");
     // printf("Starting grid_to_mesh\n");
     // printf("========================================\n\n");
+    PRINT_CURRENT_FUNCTION;
 
     sfem_resample_field_info info;
+
+    info.element_type = TET10;
 
     MPI_Init(&argc, &argv);
 
     MPI_Comm comm = MPI_COMM_WORLD;
 
-    int rank, size;
+    int rank, mpi_size;
     MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
+    MPI_Comm_size(comm, &mpi_size);
 
     // print argv
     // if (!rank) {
@@ -49,7 +53,7 @@ int main(int argc, char* argv[]) {
     //     printf("\n");
     // }
 
-    if (argc != 13) {
+    if (argc < 13 && argc > 14) {
         fprintf(stderr, "Error: Invalid number of arguments\n\n");
 
         fprintf(stderr,
@@ -71,34 +75,89 @@ int main(int argc, char* argv[]) {
     const char* folder = argv[11];
     const char* output_path = argv[12];
 
+    if (argc == 14) {
+        if (strcmp(argv[13], "TET4") == 0) {
+            info.element_type = TET4;
+        } else if (strcmp(argv[13], "TET10") == 0) {
+            info.element_type = TET10;
+        } else {
+            fprintf(stderr, "Error: Invalid element type\n\n");
+            fprintf(stderr,
+                    "usage: %s <nx> <ny> <nz> <ox> <oy> <oz> <dx> <dy> <dz> "
+                    "<data.float32.raw> <folder> <output_path> <element_type>\n",
+                    argv[0]);
+            return EXIT_FAILURE;
+        }
+    }
+
+    if (info.element_type == TET4) {
+        printf("info.element_type = TET4,  %s:%d\n", __FILE__, __LINE__);
+    } else if (info.element_type == TET10) {
+        printf("info.element_type = TET10, %s:%d\n", __FILE__, __LINE__);
+    } else {
+        printf("info.element_type = UNKNOWN, %s:%d\n", __FILE__, __LINE__);
+    }
+
     mesh_t mesh;
     if (mesh_read(comm, folder, &mesh)) {
         return EXIT_FAILURE;
     }
 
-    ptrdiff_t n = nglobal[0] * nglobal[1] * nglobal[2];
-    real_t* field = 0;
+    // ptrdiff_t n = nglobal[0] * nglobal[1] * nglobal[2];
+    real_t* field = NULL;
     ptrdiff_t nlocal[3];
 
-    int SFEM_READ_FP32 = 0;
+    int SFEM_READ_FP32 = 1;
     SFEM_READ_ENV(SFEM_READ_FP32, atoi);
+
+    printf("SFEM_READ_FP32 = %d, %s:%d\n", SFEM_READ_FP32, __FILE__, __LINE__);
 
     {
         double ndarray_read_tick = MPI_Wtime();
 
         if (SFEM_READ_FP32) {
-            geom_t* temp = 0;
+            float* temp = NULL;
+
             if (ndarray_create_from_file(
-                        comm, data_path, SFEM_MPI_GEOM_T, 3, (void**)&temp, nlocal, nglobal)) {
-                return EXIT_FAILURE;
+                        comm, data_path, MPI_FLOAT, 3, (void**)&temp, nlocal, nglobal)) {
+                exit(EXIT_FAILURE);
             }
+
+            // {  /// DEBUG ///
+            // printf("temp (ptr): %p, %s:%d\n", (void *)temp, __FILE__, __LINE__);
+
+            // double norm_temp = 0.0;
+            // double max_temp = temp[0];
+            // double min_temp = temp[0];
 
             ptrdiff_t n_zyx = nlocal[0] * nlocal[1] * nlocal[2];
             field = malloc(n_zyx * sizeof(real_t));
+
+            // if (field == NULL) {
+            //     fprintf(stderr, "Error: malloc failed\n");
+            //     exit(EXIT_FAILURE);
+            // }
+
             for (ptrdiff_t i = 0; i < n_zyx; i++) {
-                field[i] = temp[i];
+                field[i] = (real_t)(temp[i]);
+
+                // norm_temp += (double)(temp[i] * temp[i]);
+                // max_temp = (double)(fmax(max_temp, temp[i]));
+                // min_temp = (double)(fmin(min_temp, temp[i]));
             }
 
+            // norm_temp = sqrt(norm_temp);
+
+            // printf("\n");
+            // printf("norm_temp = %1.14e , %s:%d\n", norm_temp, __FILE__, __LINE__);
+            // printf("max_temp  = %1.14e , %s:%d\n", max_temp, __FILE__, __LINE__);
+            // printf("min_temp  = %1.14e , %s:%d\n", min_temp, __FILE__, __LINE__);
+            // printf("n_zyx     = %ld , %s:%d\n", n_zyx, __FILE__, __LINE__);
+            // printf("field == NULL: %s, %s:%d\n", field == NULL ? "true" : "false", __FILE__,
+            // __LINE__); printf("size field = %ld MB , %s:%d\n", (n_zyx * sizeof(real_t) / 1024 /
+            // 1024), __FILE__, __LINE__);
+
+            // } /// end DEBUG ///
             free(temp);
 
         } else {
@@ -107,6 +166,26 @@ int main(int argc, char* argv[]) {
                 return EXIT_FAILURE;
             }
         }
+
+        // { /// DEBUG ///
+        //     double filed_norm = 0.0;
+        //     double filed_max = field[0];
+        //     double filed_min = field[0];
+
+        //     ptrdiff_t n_zyx_private = nlocal[0] * nlocal[1] * nlocal[2];
+        //     for(ptrdiff_t i = 0; i < n_zyx_private; i++) {
+        //         // field[i] = sin((double)(i) / 10000.0);
+        //         filed_norm += field[i] * field[i];
+        //         filed_max = fmax(filed_max, field[i]);
+        //         filed_min = fmin(filed_min, field[i]);
+        //     }
+
+        //     filed_norm = sqrt(filed_norm);
+        //     printf("filed_norm = %1.14e , %s:%d\n", filed_norm, __FILE__, __LINE__);
+        //     printf("filed_max  = %1.14e , %s:%d\n", filed_max, __FILE__, __LINE__);
+        //     printf("filed_min  = %1.14e , %s:%d\n", filed_min, __FILE__, __LINE__);
+        //     printf("n_zyx_private     = %ld , %s:%d\n", n_zyx_private, __FILE__, __LINE__);
+        // }
 
         double ndarray_read_tock = MPI_Wtime();
 
@@ -120,7 +199,7 @@ int main(int argc, char* argv[]) {
     // X is contiguous
     ptrdiff_t stride[3] = {1, nlocal[0], nlocal[0] * nlocal[1]};
 
-    if (size > 1) {
+    if (mpi_size > 1) {
         real_t* pfield;
         field_view(comm,
                    mesh.nnodes,
@@ -142,6 +221,7 @@ int main(int argc, char* argv[]) {
     real_t* g = calloc(mesh.nnodes, sizeof(real_t));
 
     {
+        MPI_Barrier(MPI_COMM_WORLD);
         double resample_tick = MPI_Wtime();
 
         if (SFEM_INTERPOLATE) {
@@ -158,7 +238,36 @@ int main(int argc, char* argv[]) {
                     // Output
                     g);
         } else {
-            if (size == 1) {
+            if (mpi_size == 1) {
+                // { /// DEBUG ///
+                //     printf("\nFunction: %s\n", __FUNCTION__);
+                //     printf("\nMPI size = 1 DEBUG: %s:%d\n", __FILE__, __LINE__);
+                //     printf("field (ptr): %p, %s:%d\n", (void *)field, __FILE__, __LINE__);
+                //     printf("nlocal[0] = %ld, nlocal[1] = %ld, nlocal[2] = %ld, %s:%d\n",
+                //            nlocal[0],
+                //            nlocal[1],
+                //            nlocal[2],
+                //            __FILE__,
+                //            __LINE__);
+
+                //     double norm_data = 0.0;
+                //     for (ptrdiff_t i = 0; i < nlocal[0] * nlocal[1] * nlocal[2]; i++) {
+                //         norm_data += field[i] * field[i];
+                //     }
+                //     norm_data = sqrt(norm_data);
+                //     printf("norm_data input = %g   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< %s:%d\n\n",
+                //            norm_data,
+                //            __FILE__,
+                //            __LINE__);
+
+                //     int indices[3] = {22, 55, 111};
+                //     printf("field[%d] = %g, %s:%d\n", indices[0], field[indices[0]], __FILE__,
+                //     __LINE__); printf("field[%d] = %g, %s:%d\n", indices[1], field[indices[1]],
+                //     __FILE__, __LINE__); printf("field[%d] = %g, %s:%d\n", indices[2],
+                //     field[indices[2]], __FILE__, __LINE__);
+
+                // } /// end DEBUG ///
+
                 resample_field(
                         // Mesh
                         mesh.element_type,
@@ -222,7 +331,7 @@ int main(int argc, char* argv[]) {
                 }
 
                 // exchange ghost nodes and add contribution
-                if (size > 1) {
+                if (mpi_size > 1) {
                     send_recv_t slave_to_master;
                     mesh_create_nodal_send_recv(&mesh, &slave_to_master);
 
@@ -253,6 +362,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        MPI_Barrier(MPI_COMM_WORLD);
         double resample_tock = MPI_Wtime();
 
         // get MPI world size
@@ -290,6 +400,7 @@ int main(int argc, char* argv[]) {
 
         free(flops_v);
 
+        MPI_Barrier(MPI_COMM_WORLD);
         if (!rank) {
             const int nelements = mesh.nelements;
             const double elements_second =
@@ -327,6 +438,28 @@ int main(int argc, char* argv[]) {
 
         double io_tick = MPI_Wtime();
 
+        /// DEBUG ///
+        // double norm = 1.0;
+        // double max_g = g[0];
+        // double min_g = g[0];
+
+        // for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+        //     norm += g[i] * g[i];
+        //     if (g[i] > max_g) {
+        //         max_g = g[i];
+        //     }
+        //     if (g[i] < min_g) {
+        //         min_g = g[i];
+        //     }
+        // }
+
+        // printf("\nNorm: %1.14e  <<<< TEST NORM <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n", norm);
+        // printf("Max: %1.14e  <<<< TEST MAX <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n", max_g);
+        // printf("Min: %1.14e  <<<< TEST MIN <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n", min_g);
+        // printf("Mesh nnodes: %ld\n", mesh.nnodes);
+        // printf("SFEM_INTERPOLATE: %d\n\n", SFEM_INTERPOLATE);
+        /// end DEBUG ///
+
         mesh_write_nodal_field(&mesh, output_path, SFEM_MPI_REAL_T, g);
 
         double io_tock = MPI_Wtime();
@@ -359,5 +492,6 @@ int main(int argc, char* argv[]) {
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
-    return MPI_Finalize();
+    const int return_value = MPI_Finalize();
+    RETURN_FROM_FUNCTION(return_value);
 }

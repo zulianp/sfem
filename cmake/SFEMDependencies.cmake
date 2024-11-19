@@ -55,7 +55,7 @@ endif()
 
 # ##############################################################################
 
-find_package(MPIExtended REQUIRED)
+find_package(MPI REQUIRED)
 
 if(MPI_FOUND)
     set(SFEM_HAVE_MPI TRUE)
@@ -84,6 +84,7 @@ if(MPI_FOUND)
         set(SFEM_DEP_LIBRARIES
             "${SFEM_DEP_LIBRARIES};${MPI_CXX_LIBRARIES}")
     endif()
+    
 else()
     message(
         FATAL_ERROR

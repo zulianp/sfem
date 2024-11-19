@@ -904,6 +904,20 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    int DirichletConditions::mask(mask_t *mask) {
+        for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
+            for (ptrdiff_t node = 0; node < impl_->dirichlet_conditions[i].local_size; node++) {
+                const ptrdiff_t idx =
+                        impl_->dirichlet_conditions[i].idx[node] * impl_->space->block_size() +
+                        impl_->dirichlet_conditions[i].component;
+                mask_set(idx, mask);
+                // printf("%ld ", idx);
+            }
+            // printf("\n");
+        }
+        return SFEM_SUCCESS;
+    }
+
     class Timings {
     public:
         static double tick() { return MPI_Wtime(); }
@@ -922,6 +936,7 @@ namespace sfem {
         double hessian_crs{0};
         double hessian_bsr{0};
         double hessian_bcrs_sym{0};
+        double hessian_crs_sym{0};
         double hessian_diag{0};
         double gradient{0};
         double apply{0};
@@ -939,6 +954,7 @@ namespace sfem {
             hessian_crs = 0;
             hessian_bsr = 0;
             hessian_bcrs_sym = 0;
+            hessian_crs_sym = 0;
             hessian_diag = 0;
             gradient = 0;
             apply = 0;
@@ -958,6 +974,7 @@ namespace sfem {
             os << "hessian_crs," << hessian_crs << "\n";
             os << "hessian_bsr," << hessian_bsr << "\n";
             os << "hessian_bcrs_sym," << hessian_bcrs_sym << "\n";
+            os << "hessian_crs_sym," << hessian_crs_sym << "\n";
             os << "hessian_diag," << hessian_diag << "\n";
             os << "gradient," << gradient << "\n";
             os << "apply," << apply << "\n";
@@ -1106,6 +1123,14 @@ namespace sfem {
         add_constraint(c);
     }
 
+    int Function::constaints_mask(mask_t *mask) {
+        for (auto &c : impl_->constraints) {
+            c->mask(mask);
+        }
+
+        return SFEM_FAILURE;
+    }
+
     std::shared_ptr<CRSGraph> Function::crs_graph() const {
         return impl_->space->dof_to_dof_graph();
     }
@@ -1167,6 +1192,23 @@ namespace sfem {
                         x, rowptr, colidx, block_stride, diag_values, off_diag_values) !=
                 SFEM_SUCCESS) {
                 std::cerr << "Failed hessian_bcrs_sym in op: " << op->name() << "\n";
+                return SFEM_FAILURE;
+            }
+        }
+        return SFEM_SUCCESS;
+    }
+
+    int Function::hessian_crs_sym(const real_t *const x,
+                                  const count_t *const rowptr,
+                                  const idx_t *const colidx,
+                                  real_t *const diag_values,
+                                  real_t *const off_diag_values) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.hessian_crs_sym);
+
+        for (auto &op : impl_->ops) {
+            if (op->hessian_crs_sym(x, rowptr, colidx, diag_values, off_diag_values) !=
+                SFEM_SUCCESS) {
+                std::cerr << "Failed hessian_crs_sym in op: " << op->name() << "\n";
                 return SFEM_FAILURE;
             }
         }
@@ -1773,6 +1815,26 @@ namespace sfem {
                                  graph->rowptr()->data(),
                                  graph->colidx()->data(),
                                  values);
+        }
+
+        int hessian_crs_sym(const real_t *const x,
+                            const count_t *const rowptr,
+                            const idx_t *const colidx,
+                            real_t *const diag_values,
+                            real_t *const off_diag_values) override {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+
+            // auto graph = space->node_to_node_graph_upper_triangular();
+
+            return laplacian_crs_sym(element_type,
+                                     mesh->nelements,
+                                     mesh->nnodes,
+                                     mesh->elements,
+                                     mesh->points,
+                                     rowptr,
+                                     colidx,
+                                     diag_values,
+                                     off_diag_values);
         }
 
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {

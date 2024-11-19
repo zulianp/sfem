@@ -246,4 +246,11 @@ namespace sfem {
 
         return SFEM_SUCCESS;
     }
+
+    int ContactConditions::mask(mask_t *mask) 
+    {
+        assert(false);
+        return SFEM_FAILURE;
+    }
+    
 }  // namespace sfem

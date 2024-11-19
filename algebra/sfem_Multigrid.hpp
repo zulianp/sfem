@@ -173,7 +173,7 @@ namespace sfem {
 
             auto op = operator_[level];
             auto restriction = restriction_[level];
-            auto prolongation = prolongation_[coarser_level(level)];
+            auto prolongation = prolongation_[level];
             auto mem_coarse = memory_[coarser_level(level)];
 
             for (int k = 0; k < this->cycle_type_; k++) {
@@ -221,6 +221,7 @@ namespace sfem {
                     // Restriction
                     this->blas.zeros(mem_coarse->rhs->size(), mem_coarse->rhs->data());
                     restriction->apply(mem->work->data(), mem_coarse->rhs->data());
+                    this->blas.zeros(mem_coarse->solution->size(), mem_coarse->solution->data());
                 }
 
                 CycleReturnCode ret = cycle(coarser_level(level));
@@ -230,7 +231,7 @@ namespace sfem {
                     if (debug) {
                         printf("|| c_H || = %g\n",
                                (double)this->blas.norm2(mem_coarse->solution->size(),
-                                                   mem_coarse->solution->data()));
+                                                        mem_coarse->solution->data()));
                     }
 
                     // Prolongation
@@ -250,7 +251,8 @@ namespace sfem {
                     this->blas.zeros(mem->size(), mem->work->data());
                     op->apply(mem->solution->data(), mem->work->data());
                     this->blas.axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
-                    printf("|| r_h || = %g\n", this->blas.norm2(mem->work->size(), mem->work->data()));
+                    printf("|| r_h || = %g\n",
+                           this->blas.norm2(mem->work->size(), mem->work->data()));
                 }
 
                 smoother->apply(mem->rhs->data(), mem->solution->data());

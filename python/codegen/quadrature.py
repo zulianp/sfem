@@ -61,3 +61,4 @@ print(*z3, sep=', ', end='};\n')
 
 print(f'static const scalar_t hex_q{n}_w[hex_q{n}_n] = ', end='{')
 print(*w3, sep=', ', end='};\n')
+

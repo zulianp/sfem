@@ -38,6 +38,7 @@ find_package(ISolver REQUIRED)
 set(SFEM_MODULES
     algebra base matrix mesh pizzastack solver
     algebra/openmp
+    amg
     operators 
     operators/beam2 
     operators/cvfem 
@@ -87,6 +88,7 @@ if(SFEM_ENABLE_CUDA)
         operators/hex8/cuda
         operators/proteus_hex8/cuda
         operators/hierarchical/cuda
+        resampling/cuda
         )
 endif()
 
@@ -112,9 +114,27 @@ endif()
 # message(STATUS "SFEM_HEADERS: ${SFEM_HEADERS}") 
 # message(STATUS "SFEM_SOURCES: ${SFEM_SOURCES}")
 # message(STATUS "SFEM_KERNEL_SOURCES: ${SFEM_KERNEL_SOURCES}")
+
+if (SFEM_VEC_SIZE STREQUAL "4" OR SFEM_CPU_ARCH STREQUAL "aaarch64")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_AVX2}")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS_AVX2}")
+elseif (SFEM_VEC_SIZE STREQUAL "8")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_AVX512}")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS_AVX512}")
+endif()
+
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 message(STATUS "CMAKE_C_FLAGS: ${CMAKE_C_FLAGS}")
 
+
+option(SFEM_TET4_CUDA "Use CUDA for TET4" OFF)
+message(STATUS "SFEM_TET4_CUDA: ${SFEM_TET4_CUDA}")
+
+option(SFEM_TET10_CUDA "Use CUDA for TET10" OFF)
+message(STATUS "SFEM_TET10_CUDA: ${SFEM_TET10_CUDA}")
+
+option(SFEM_TET10_WENO "Use WENO for TET10" ON)
+message(STATUS "SFEM_TET10_WENO: ${SFEM_TET10_WENO}")
 
 add_library(sfem ${SFEM_SOURCES} ${SFEM_HEADERS})
 
@@ -154,10 +174,14 @@ set_target_properties(
 
 set(SFEM_TARGETS sfem)
 
+# option(SFEM_CUDA_ARCH "Use CUDA architecture" OFF)
+
+message(STATUS "SFEM_CUDA_ARCH: ${SFEM_CUDA_ARCH}")
+
 if(SFEM_ENABLE_CUDA)
 # set_target_properties(sfem PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 # https://gt3rs.medium.com/compile-with-nvcc-3566fbdfdbf
-      set_property(TARGET sfem PROPERTY CUDA_ARCHITECTURES 60)
+      set_property(TARGET sfem PROPERTY SFEM_CUDA_ARCHITECTURES ${SFEM_CUDA_ARCH})
 endif()
 
 ######################################################

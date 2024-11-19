@@ -8,6 +8,9 @@
 #include "sfem_config.h"
 #endif
 
+#define PRINT_CURRENT_FUNCTION printf("\033[32m\nEnter Function\033[0m: \033[33m%s\033[0m, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__);
+#define RETURN_FROM_FUNCTION(__RET_VAL__) printf("\033[31m\nReturn from function\033[0m: \033[33m%s\033[0m, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__); return (__RET_VAL__);
+
 #define SFEM_READ_ENV(name, conversion) \
     do {                                \
         char *var = getenv(#name);      \
@@ -28,6 +31,9 @@
 #define SFEM_OK 0
 #define SFEM_SUCCESS 0
 #define SFEM_FAILURE 1
+
+#define ON 1
+#define OFF 0
 
 #ifndef SFEM_ENABLE_CUSTOM_NUMBERS
 
@@ -64,6 +70,19 @@ typedef int element_idx_t;
 typedef int16_t local_idx_t;
 #define d_LOCAL_IDX_T "hd"
 
+// #define SFEM_RESTRICT __restrict__
+#define SFEM_RESTRICT
+
+#define SFEM_MAX_PATH_LENGTH 2056
+#define SFEM_OK 0
+
+// typedef  __half2 jacobian_t;
+// typedef __fp16 jacobian_t;
+typedef geom_t jacobian_t;
+// typedef geom_t jacobian_t;
+
+typedef int16_t lidx_t;
+#define d_ELEMENT_LIDX_T "hd"
 typedef real_t scalar_t;
 typedef real_t accumulator_t;
 #define SFEM_VEC_SIZE 4

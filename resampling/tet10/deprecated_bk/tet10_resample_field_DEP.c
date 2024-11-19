@@ -1,0 +1,517 @@
+#include "tet10_resample_field_V2.h"
+
+#include "quadratures_rule.h"
+
+#include <math.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define AVX512
+#undef AVX2
+
+#ifdef AVX512
+#define _VL_ 8
+#elif defined(AVX2)
+#define _VL_ 4
+#endif
+
+typedef double vec_double __attribute__((vector_size(_VL_ * sizeof(double)),  //
+                                         aligned(sizeof(double))));
+
+typedef ptrdiff_t vec_int64 __attribute__((vector_size(_VL_ * sizeof(ptrdiff_t)),  //
+                                           aligned(sizeof(ptrdiff_t))));
+
+#ifdef AVX512  //// macro to fill the vector with the elements of the array for AVX512 (of SIMD
+               /// width 8)
+
+#define FILL_EV_MACRO(ev_, element_i_, elemes_, elems_index_) \
+    {                                                         \
+        ev_ = vec_int64{elems[elems_index_][element_i_ + 0],  \
+                        elems[elems_index_][element_i_ + 1],  \
+                        elems[elems_index_][element_i_ + 2],  \
+                        elems[elems_index_][element_i_ + 3],  \
+                        elems[elems_index_][element_i_ + 4],  \
+                        elems[elems_index_][element_i_ + 5],  \
+                        elems[elems_index_][element_i_ + 6],  \
+                        elems[elems_index_][element_i_ + 7]}; \
+    }
+
+#define FILL_XYZ_MACRO(Vxyz_, xyz_index_, ev_)                \
+    {                                                         \
+        V_xyz_ = vec_double{(double)xyz[xyz_index_][ev_[0]],  \
+                            (double)xyz[xyz_index_][ev_[1]],  \
+                            (double)xyz[xyz_index_][ev_[2]],  \
+                            (double)xyz[xyz_index_][ev_[3]],  \
+                            (double)xyz[xyz_index_][ev_[4]],  \
+                            (double)xyz[xyz_index_][ev_[5]],  \
+                            (double)xyz[xyz_index_][ev_[6]],  \
+                            (double)xyz[xyz_index_][ev_[7]]}; \
+    }
+
+#elif defined(AVX2)  //// macro to fill the vector with the elements of the array for AVX2 (of SIMD
+                     /// width 4)
+
+#define FILL_EV_MACRO(ev_, element_i_, elemes_, elems_index_) \
+    {                                                         \
+        ev_ = vec_int64{elems[elems_index_][element_i_ + 0],  \
+                        elems[elems_index_][element_i_ + 1],  \
+                        elems[elems_index_][element_i_ + 2],  \
+                        elems[elems_index_][element_i_ + 3]}; \
+    }
+
+#define FILL_XYZ_MACRO(Vxyz_, xyz_index_, ev_)                \
+    {                                                         \
+        V_xyz_ = vec_double{(double)xyz[xyz_index_][ev_[0]],  \
+                            (double)xyz[xyz_index_][ev_[1]],  \
+                            (double)xyz[xyz_index_][ev_[2]],  \
+                            (double)xyz[xyz_index_][ev_[3]]}; \
+    }
+
+#endif
+
+/**
+ * @brief Compute the measure of a tetrahedron with 10 nodes
+ *
+ * @param x
+ * @param y
+ * @param z
+ * @param qx
+ * @param qy
+ * @param qz
+ * @return SFEM_INLINE
+ */
+SFEM_INLINE static vec_double tet10_measure_V(const vec_double& _x0,
+                                              const vec_double& _x1,  //
+                                              const vec_double& _x2,
+                                              const vec_double& _x3,  //
+                                              const vec_double& _x4,
+                                              const vec_double& _x5,  //
+                                              const vec_double& _x6,
+                                              const vec_double& _x7,  //
+                                              const vec_double& _x8,
+                                              const vec_double& _x9,  //
+
+                                              const vec_double& _y0,
+                                              const vec_double& _y1,  //
+                                              const vec_double& _y2,
+                                              const vec_double& _y3,  //
+                                              const vec_double& _y4,
+                                              const vec_double& _y5,  //
+                                              const vec_double& _y6,
+                                              const vec_double& _y7,  //
+                                              const vec_double& _y8,
+                                              const vec_double& _y9,  //
+
+                                              const vec_double& _z0,
+                                              const vec_double& _z1,  //
+                                              const vec_double& _z2,
+                                              const vec_double& _z3,  //
+                                              const vec_double& _z4,
+                                              const vec_double& _z5,  //
+                                              const vec_double& _z6,
+                                              const vec_double& _z7,  //
+                                              const vec_double& _z8,
+                                              const vec_double& _z9,  //
+
+                                              // Quadrature point
+                                              const double& qx,
+                                              const double& qy,
+                                              const double& qz) {
+    const real_t x0 = 4 * qz;
+    const real_t x1 = x0 - 1;
+    const real_t x2 = 4 * qy;
+    const real_t x3 = 4 * qx;
+    const real_t x4 = x3 - 4;
+    const real_t x5 = -8 * qz - x2 - x4;
+    const real_t x6 = -x3 * y4;
+    const real_t x7 = x0 + x2;
+    const real_t x8 = x3 + x7 - 3;
+    const real_t x9 = x8 * _y0;
+    const real_t x10 = -x2 * _y6 + x9;
+    const real_t x11 = x1 * _y3 + x10 + x2 * _y9 + x3 * _y8 + x5 * _y7 + x6;
+    const real_t x12 = -x2 * _z6;
+    const real_t x13 = -x0 * _z7;
+    const real_t x14 = x3 - 1;
+    const real_t x15 = x8 * _z0;
+    const real_t x16 = -8 * qx - x7 + 4;
+    const real_t x17 = x0 * _z8 + x12 + x13 + x14 * _z1 + x15 + x16 * _z4 + x2 * _z5;
+    const real_t x18 = x2 - 1;
+    const real_t x19 = -8 * qy - x0 - x4;
+    const real_t x20 = -x3 * _x4;
+    const real_t x21 = x8 * _x0;
+    const real_t x22 = -x0 * _x7 + x21;
+    const real_t x23 = (1.0 / 6.0) * x0 * _x9 + (1.0 / 6.0) * x18 * _x2 + (1.0 / 6.0) * x19 * _x6 +
+                       (1.0 / 6.0) * x20 + (1.0 / 6.0) * x22 + (1.0 / 6.0) * x3 * _x5;
+    const real_t x24 = -x0 * _y7;
+    const real_t x25 = x0 * _y8 + x10 + x14 * _y1 + x16 * _y4 + x2 * _y5 + x24;
+    const real_t x26 = x15 - x3 * _z4;
+    const real_t x27 = x1 * _z3 + x12 + x2 * _z9 + x26 + x3 * _z8 + x5 * _z7;
+    const real_t x28 = x0 * _y9 + x18 * _y2 + x19 * _y6 + x24 + x3 * _y5 + x6 + x9;
+    const real_t x29 = -x2 * _x6;
+    const real_t x30 = (1.0 / 6.0) * x1 * _x3 + (1.0 / 6.0) * x2 * _x9 + (1.0 / 6.0) * x20 +
+                       (1.0 / 6.0) * x21 + (1.0 / 6.0) * x29 + (1.0 / 6.0) * x3 * _x8 +
+                       (1.0 / 6.0) * x5 * _x7;
+    const real_t x31 = x0 * _z9 + x13 + x18 * _z2 + x19 * _z6 + x26 + x3 * _z5;
+    const real_t x32 = (1.0 / 6.0) * x0 * _x8 + (1.0 / 6.0) * x14 * _x1 + (1.0 / 6.0) * x16 * _x4 +
+                       (1.0 / 6.0) * x2 * _x5 + (1.0 / 6.0) * x22 + (1.0 / 6.0) * x29;
+
+    return x11 * x17 * x23 - x11 * x31 * x32 - x17 * x28 * x30 - x23 * x25 * x27 + x25 * x30 * x31 +
+           x27 * x28 * x32;
+}
+
+SFEM_INLINE static void tet10_transform(const vec_double& _x0,
+                                        const vec_double& _x1,  //
+                                        const vec_double& _x2,
+                                        const vec_double& _x3,  //
+                                        const vec_double& _x4,
+                                        const vec_double& _x5,  //
+                                        const vec_double& _x6,
+                                        const vec_double& _x7,  //
+                                        const vec_double& _x8,
+                                        const vec_double& _x9,  //
+
+                                        const vec_double& _y0,
+                                        const vec_double& _y1,  //
+                                        const vec_double& _y2,
+                                        const vec_double& _y3,  //
+                                        const vec_double& _y4,
+                                        const vec_double& _y5,  //
+                                        const vec_double& _y6,
+                                        const vec_double& _y7,  //
+                                        const vec_double& _y8,
+                                        const vec_double& _y9,  //
+
+                                        const vec_double& _z0,
+                                        const vec_double& _z1,  //
+                                        const vec_double& _z2,
+                                        const vec_double& _z3,  //
+                                        const vec_double& _z4,
+                                        const vec_double& _z5,  //
+                                        const vec_double& _z6,
+                                        const vec_double& _z7,  //
+                                        const vec_double& _z8,
+                                        const vec_double& _z9,  //
+
+                                        // Quadrature point
+                                        const real_t &qx,
+                                        const real_t &qy,
+                                        const real_t &qz,
+
+                                        // Output
+                                        real_t* const SFEM_RESTRICT out_x,
+                                        real_t* const SFEM_RESTRICT out_y,
+                                        real_t* const SFEM_RESTRICT out_z) {
+    const real_t x0 = 4 * qx;
+    const real_t x1 = qy * x0;
+    const real_t x2 = qz * x0;
+    const real_t x3 = 4 * qy;
+    const real_t x4 = qz * x3;
+    const real_t x5 = 2 * qx - 1;
+    const real_t x6 = qx * x5;
+    const real_t x7 = 2 * qy;
+    const real_t x8 = qy * (x7 - 1);
+    const real_t x9 = 2 * qz;
+    const real_t x10 = qz * (x9 - 1);
+    const real_t x11 = -4 * qz - x0 - x3 + 4;
+    const real_t x12 = qx * x11;
+    const real_t x13 = qy * x11;
+    const real_t x14 = qz * x11;
+    const real_t x15 = (-x5 - x7 - x9) * (-qx - qy - qz + 1);
+
+    *out_x = x[0] * x15 + x[1] * x6 + x[2] * x8 + x[3] * x10 + x[4] * x12 + x[5] * x1 + x[6] * x13 +
+             x[7] * x14 + x[8] * x2 + x[9] * x4;
+    *out_y = y[0] * x15 + y[1] * x6 + y[2] * x8 + y[3] * x10 + y[4] * x12 + y[5] * x1 + y[6] * x13 +
+             y[7] * x14 + y[8] * x2 + y[9] * x4;
+    *out_z = z[0] * x15 + z[1] * x6 + z[2] * x8 + z[3] * x10 + z[4] * x12 + z[5] * x1 + z[6] * x13 +
+             z[7] * x14 + z[8] * x2 + z[9] * x4;
+}
+
+/**
+ * @brief Perform the quadrature resamplig
+ *
+ * @param nelements
+ * @param nnodes
+ * @param elems
+ * @param xyz
+ * @param n
+ * @param stride
+ * @param origin
+ * @param delta
+ * @param data
+ * @param weighted_field
+ * @return int
+ */
+int hex8_to_isoparametric_tet10_resample_field_local_V_aligned(
+        // Mesh
+        const ptrdiff_t nelements,          // number of elements
+        const ptrdiff_t nnodes,             // number of nodes
+        idx_t** const SFEM_RESTRICT elems,  // connectivity
+        geom_t** const SFEM_RESTRICT xyz,   // coordinates
+        // SDF
+        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
+        const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
+        const geom_t* const SFEM_RESTRICT origin,     // origin of the domain
+        const geom_t* const SFEM_RESTRICT delta,      // delta of the domain
+        const real_t* const SFEM_RESTRICT data,       // SDF
+        // Output
+        real_t* const SFEM_RESTRICT weighted_field) {
+    //
+    // printf("============================================================\n");
+    // printf("Start: hex8_to_tet10_resample_field_local\n");
+    // printf("============================================================\n");
+    //
+    const real_t ox = (real_t)origin[0];
+    const real_t oy = (real_t)origin[1];
+    const real_t oz = (real_t)origin[2];
+
+    const real_t dx = (real_t)delta[0];
+    const real_t dy = (real_t)delta[1];
+    const real_t dz = (real_t)delta[2];
+
+    // #pragma omp parallel
+    //     {
+    /// Loop over the elements of the mesh
+
+    for (ptrdiff_t i = 0; i < nelements += (_VL_); ++i) {
+        // idx_t ev0, ev1, ev2, ev3, ev4, ev5, ev6, ev7, ev8, ev9;
+        vec_int64 ev0, ev1, ev2, ev3, ev4, ev5, ev6, ev7, ev8, ev9;
+
+        // ISOPARAMETRIC
+        // geom_t x[10], y[10], z[10];
+        vec_double x0, x1, x2, x3, x4, x5, x6, x7, x8, x9;
+        vec_double y0, y1, y2, y3, y4, y5, y6, y7, y8, y9;
+        vec_double z0, z1, z2, z3, z4, z5, z6, z7, z8, z9;
+
+        real_t hex8_f[8];
+        real_t coeffs[8];
+
+        real_t tet10_f[10];
+        real_t element_field[10];
+
+        // // loop over the 4 vertices of the tetrahedron
+        // // UNROLL_ZERO ?
+        // for (int v = 0; v < 10; ++v) {
+        //     ev[v] = elems[v][i];
+        // }
+
+        FILL_EV_MACRO(ev0, i, elems, 0);
+        FILL_EV_MACRO(ev1, i, elems, 1);
+        FILL_EV_MACRO(ev2, i, elems, 2);
+        FILL_EV_MACRO(ev3, i, elems, 3);
+        FILL_EV_MACRO(ev4, i, elems, 4);
+        FILL_EV_MACRO(ev5, i, elems, 5);
+        FILL_EV_MACRO(ev6, i, elems, 6);
+        FILL_EV_MACRO(ev7, i, elems, 7);
+        FILL_EV_MACRO(ev8, i, elems, 8);
+        FILL_EV_MACRO(ev9, i, elems, 9);
+
+        // ISOPARAMETRIC
+        // for (int v = 0; v < 10; ++v) {
+        //     x[v] = xyz[0][ev[v]];  // x-coordinates
+        //     y[v] = xyz[1][ev[v]];  // y-coordinates
+        //     z[v] = xyz[2][ev[v]];  // z-coordinates
+        // }
+
+        FILL_XYZ_MACRO(x0, 0, ev0);
+        FILL_XYZ_MACRO(x1, 0, ev1);
+        FILL_XYZ_MACRO(x2, 0, ev2);
+        FILL_XYZ_MACRO(x3, 0, ev3);
+        FILL_XYZ_MACRO(x4, 0, ev4);
+        FILL_XYZ_MACRO(x5, 0, ev5);
+        FILL_XYZ_MACRO(x6, 0, ev6);
+        FILL_XYZ_MACRO(x7, 0, ev7);
+        FILL_XYZ_MACRO(x8, 0, ev8);
+        FILL_XYZ_MACRO(x9, 0, ev9);
+
+        FILL_XYZ_MACRO(y0, 1, ev0);
+        FILL_XYZ_MACRO(y1, 1, ev1);
+        FILL_XYZ_MACRO(y2, 1, ev2);
+        FILL_XYZ_MACRO(y3, 1, ev3);
+        FILL_XYZ_MACRO(y4, 1, ev4);
+        FILL_XYZ_MACRO(y5, 1, ev5);
+        FILL_XYZ_MACRO(y6, 1, ev6);
+        FILL_XYZ_MACRO(y7, 1, ev7);
+        FILL_XYZ_MACRO(y8, 1, ev8);
+        FILL_XYZ_MACRO(y9, 1, ev9);
+
+        FILL_XYZ_MACRO(z0, 2, ev0);
+        FILL_XYZ_MACRO(z1, 2, ev1);
+        FILL_XYZ_MACRO(z2, 2, ev2);
+        FILL_XYZ_MACRO(z3, 2, ev3);
+        FILL_XYZ_MACRO(z4, 2, ev4);
+        FILL_XYZ_MACRO(z5, 2, ev5);
+        FILL_XYZ_MACRO(z6, 2, ev6);
+        FILL_XYZ_MACRO(z7, 2, ev7);
+        FILL_XYZ_MACRO(z8, 2, ev8);
+        FILL_XYZ_MACRO(z9, 2, ev9);
+
+        memset(element_field, 0,
+               10 * sizeof(real_t));  // set to zero the element field
+
+        // SUBPARAMETRIC (for iso-parametric tassellation of tet10 might be necessary)
+        for (int q = 0; q < TET4_NQP; q++) {  // loop over the quadrature points
+
+            const vec_double measure = tet10_measure_V(x0,
+                                                       x1,
+                                                       x2,
+                                                       x3,
+                                                       x4,
+                                                       x5,
+                                                       x6,
+                                                       x7,
+                                                       x8,
+                                                       x9,
+                                                       y0,
+                                                       y1,
+                                                       y2,
+                                                       y3,
+                                                       y4,
+                                                       y5,
+                                                       y6,
+                                                       y7,
+                                                       y8,
+                                                       y9,
+                                                       z0,
+                                                       z1,
+                                                       z2,
+                                                       z3,
+                                                       z4,
+                                                       z5,
+                                                       z6,
+                                                       z7,
+                                                       z8,
+                                                       z9,
+                                                       tet4_qx[q],
+                                                       tet4_qy[q],
+                                                       tet4_qz[q]);
+
+            // assert(measure > 0);
+            const vec_double dV = measure * tet4_qw[q];
+
+            vec_double g_qx, g_qy, g_qz;
+            // Transform quadrature point to physical space
+            // g_qx, g_qy, g_qz are the coordinates of the quadrature point in the physical
+            // space
+            tet10_transform(x, y, z, tet4_qx[q], tet4_qy[q], tet4_qz[q], &g_qx, &g_qy, &g_qz);
+            tet10_dual_basis_hrt(tet4_qx[q], tet4_qy[q], tet4_qz[q], tet10_f);
+
+            //// TODO ..... continue here
+
+            const real_t grid_x = (g_qx - ox) / dx;
+            const real_t grid_y = (g_qy - oy) / dy;
+            const real_t grid_z = (g_qz - oz) / dz;
+
+            const ptrdiff_t i = floor(grid_x);
+            const ptrdiff_t j = floor(grid_y);
+            const ptrdiff_t k = floor(grid_z);
+
+            // If outside
+            if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
+                fprintf(stderr,
+                        "warning (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
+                        "%ld)!\n",
+                        g_qx,
+                        g_qy,
+                        g_qz,
+                        i,
+                        j,
+                        k,
+                        n[0],
+                        n[1],
+                        n[2]);
+                continue;
+            }
+
+            // Get the reminder [0, 1]
+            real_t l_x = (grid_x - i);
+            real_t l_y = (grid_y - j);
+            real_t l_z = (grid_z - k);
+
+            assert(l_x >= -1e-8);
+            assert(l_y >= -1e-8);
+            assert(l_z >= -1e-8);
+
+            assert(l_x <= 1 + 1e-8);
+            assert(l_y <= 1 + 1e-8);
+            assert(l_z <= 1 + 1e-8);
+
+            hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
+            hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
+
+            // Integrate field
+            {
+                real_t eval_field = 0;
+                // UNROLL_ZERO?
+                for (int edof_j = 0; edof_j < 8; edof_j++) {
+                    eval_field += hex8_f[edof_j] * coeffs[edof_j];
+                }
+
+                // UNROLL_ZERO?
+                for (int edof_i = 0; edof_i < 10; edof_i++) {
+                    element_field[edof_i] += eval_field * tet10_f[edof_i] * dV;
+                }  // end edof_i loop
+            }
+        }  // end quadrature loop
+
+        // UNROLL_ZERO?
+        for (int v = 0; v < 10; ++v) {
+            // #pragma omp atomic update
+            weighted_field[ev[v]] += element_field[v];
+
+        }  // end vertex loop
+    }      // end element loop
+    // }          // end parallel region
+
+    return 0;
+}
+
+int hex8_to_tet10_resample_field_local_V2(
+        // Mesh
+        const ptrdiff_t nelements,          // number of elements
+        const ptrdiff_t nnodes,             // number of nodes
+        idx_t** const SFEM_RESTRICT elems,  // connectivity
+        geom_t** const SFEM_RESTRICT xyz,   // coordinates
+        // SDF
+        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
+        const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
+        const geom_t* const SFEM_RESTRICT origin,     // origin of the domain
+        const geom_t* const SFEM_RESTRICT delta,      // delta of the domain
+        const real_t* const SFEM_RESTRICT data,       // SDF
+        // Output
+        real_t* const SFEM_RESTRICT weighted_field) {
+    int SFEM_ENABLE_ISOPARAMETRIC = 0;
+    SFEM_READ_ENV(SFEM_ENABLE_ISOPARAMETRIC, atoi);
+
+    const ptrdiff_t nelements_aligned = nelements - (nelements % (_VL_));
+    const ptrdiff_t nelements_tail = nelements % (_VL_);
+
+    if (SFEM_ENABLE_ISOPARAMETRIC) {
+        int a1 = 0, a2 = 0;
+        a1 = hex8_to_isoparametric_tet10_resample_field_local_V_aligned(nelements,  //
+                                                                        nnodes,
+                                                                        elems,
+                                                                        xyz,
+                                                                        n,
+                                                                        stride,
+                                                                        origin,
+                                                                        delta,
+                                                                        data,
+                                                                        weighted_field);
+
+        if (nelements_tail > 0) {
+        }
+    } else {
+        // return hex8_to_subparametric_tet10_resample_field_local(nelements,  //
+        //                                                         nnodes,
+        //                                                         elems,
+        //                                                         xyz,
+        //                                                         n,
+        //                                                         stride,
+        //                                                         origin,
+        //                                                         delta,
+        //                                                         data,
+        //                                                         weighted_field);
+    }
+}
