@@ -69,7 +69,7 @@ def run(path_mesh, name_op):
 	sfem.apply(linear_op, x, r)
 	sfem.apply(restriction, r, coarse_r_galerkin)
 	
-	print(f'diff = {np.sum(np.abs(coarse_r-coarse_r_galerkin))}')
+	print(f'Diff = {np.sum(np.abs(coarse_r-coarse_r_galerkin))}')
 
 	# A = assemble_scipy_matrix(coarse_function, coarse_x)
 	# print(A)
