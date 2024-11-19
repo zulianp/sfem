@@ -1,5 +1,6 @@
 #include "cu_laplacian.h"
 
+#include "cu_hex8_laplacian.h"
 #include "cu_macro_tet4_laplacian.h"
 #include "cu_tet10_laplacian.h"
 #include "cu_tet4_laplacian.h"
@@ -27,6 +28,10 @@ int cu_laplacian_apply(const enum ElemType element_type,
         }
         case MACRO_TET4: {
             return cu_macro_tet4_laplacian_apply(
+                    nelements, stride, elements, fff, real_type_xy, x, y, stream);
+        }
+        case HEX8: {
+            return cu_affine_hex8_laplacian_apply(
                     nelements, stride, elements, fff, real_type_xy, x, y, stream);
         }
         default: {

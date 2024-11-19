@@ -13,7 +13,24 @@ extern "C" {
 enum RealType { SFEM_FLOAT16 = 2, SFEM_FLOAT32 = 4, SFEM_FLOAT64 = 8, SFEM_REAL_DEFAULT = 0 };
 enum IntegerType { SFEM_INT16 = 20, SFEM_INT32 = 40, SFEM_INT64 = 80, SFEM_INT_DEFAULT = 0 };
 
-static void * SFEM_DEFAULT_STREAM = 0;
+static void* SFEM_DEFAULT_STREAM = 0;
+
+SFEM_INLINE static int real_type_size(enum RealType type) {
+    switch (type) {
+        case SFEM_FLOAT16:
+            return 2;
+        case SFEM_FLOAT32:
+            return 4;
+        case SFEM_FLOAT64:
+            return 8;
+        case SFEM_REAL_DEFAULT:
+            return sizeof(real_t);
+        default: {
+            assert(0);
+            return -1;
+        }
+    }
+}
 
 SFEM_INLINE static const char* real_type_to_string(enum RealType type) {
     switch (type) {
@@ -50,6 +67,7 @@ enum ElemType {
     NODE1 = 1,
     EDGE2 = 2,
     EDGE3 = 11,
+    EDGESHELL2 = 101,
     BEAM2 = 100002,
     TRI3 = 3,
     TRI6 = 6,
@@ -66,6 +84,7 @@ enum ElemType {
     WEDGE6 = 1006,
     MACRO = 200,
     MACRO_TRI3 = (MACRO + TRI3),
+    MACRO_TRISHELL3 = (MACRO + TRISHELL3),
     MACRO_TET4 = (MACRO + TET4),
     PROTEUS_TET4 = 4000,
     PROTEUS_QUAD4 = 40000,
@@ -104,6 +123,8 @@ SFEM_INLINE static const char* type_to_string(enum ElemType type) {
             return "EDGE2";
         case EDGE3:
             return "EDGE3";
+        case BEAM2:
+            return "BEAM2";
         case TRI3:
             return "TRI3";
         case TRISHELL3:
@@ -118,10 +139,14 @@ SFEM_INLINE static const char* type_to_string(enum ElemType type) {
             return "TET4";
         case TRI6:
             return "TRI6";
+        case TRISHELL6:
+            return "TRISHELL6";
         case TRI10:
             return "TRI10";
         case MACRO_TRI3:
             return "MACRO_TRI3";
+        case MACRO_TRISHELL3:
+            return "MACRO_TRISHELL3";
         case MACRO_TET4:
             return "MACRO_TET4";
         case HEX8:
@@ -159,7 +184,7 @@ SFEM_INLINE static enum ElemType side_type(const enum ElemType type) {
         case QUADSHELL4:
             return BEAM2;
         case MACRO_TET4:
-            return TRI6;  // FIXME
+            return MACRO_TRI3;
         case HEX8:
             return QUAD4;
         case PROTEUS_HEX8:
@@ -175,6 +200,8 @@ SFEM_INLINE static enum ElemType shell_type(const enum ElemType type) {
     switch (type) {
         case TRI3:
             return TRISHELL3;
+        case MACRO_TRI3:
+            return MACRO_TRISHELL3;
         case TRI6:
             return TRISHELL6;
         case TRI10:
@@ -186,7 +213,7 @@ SFEM_INLINE static enum ElemType shell_type(const enum ElemType type) {
         case TRISHELL10:
             return TRISHELL10;
         case EDGE2:
-            return BEAM2;
+            return EDGESHELL2;
         case BEAM2:
             return BEAM2;
         case QUAD4:
@@ -355,6 +382,8 @@ SFEM_INLINE static enum ElemType macro_base_elem(const enum ElemType macro_type)
             return TET4;
         case TRI6:
             return TRI3;
+        case PROTEUS_HEX8:
+            return HEX8;
         default: {
             assert(0);
             return macro_type;

@@ -38,6 +38,7 @@ find_package(ISolver REQUIRED)
 set(SFEM_MODULES
     algebra base matrix mesh pizzastack solver
     algebra/openmp
+    amg
     operators 
     operators/beam2 
     operators/cvfem 
@@ -84,6 +85,7 @@ if(SFEM_ENABLE_CUDA)
         operators/macro_tet4/cuda
         operators/tet10/cuda
         operators/proteus_tet4/cuda
+        operators/hex8/cuda
         operators/proteus_hex8/cuda
         operators/hierarchical/cuda
         resampling/cuda

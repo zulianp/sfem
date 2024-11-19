@@ -168,6 +168,10 @@ void apply_mass(const int element_type,
     if (!nelements) return;
 
     switch (element_type) {
+        case BEAM2: {
+            beam2_apply_mass(nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
+            break;
+        }
         case TRI3: {
             tri3_apply_mass(nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
             break;

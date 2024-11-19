@@ -1,7 +1,11 @@
 #ifndef SFEM_OPENMP_BLAS_HPP
 #define SFEM_OPENMP_BLAS_HPP
 
+#include "sfem_tpl_blas.hpp"
+
 #include <cstdlib>
+#include <cstring>
+#include <cmath>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -12,32 +16,6 @@
 #endif
 
 namespace sfem {
-    template <typename T>
-    struct BLAS_Tpl {
-        std::function<T*(const std::size_t)> allocate;
-        std::function<void(const std::size_t, T* const x)> zeros;
-        std::function<void(const std::size_t, const T value, T* const x)> values;
-        std::function<void(void*)> destroy;
-        std::function<void(const ptrdiff_t, const T* const, T* const)> copy;
-        std::function<T(const ptrdiff_t, const T* const, const T* const)> dot;
-        std::function<void(const ptrdiff_t, const T, const T* const, const T, T* const)> axpby;
-        std::function<void(const std::ptrdiff_t, const T, T* const)> scal;
-        std::function<T(const ptrdiff_t, const T* const)> norm2;
-
-        bool good() const {
-            assert(allocate);
-            assert(destroy);
-            assert(copy);
-            assert(zeros);
-            assert(values);
-            assert(dot);
-            assert(norm2);
-            assert(axpby);
-            assert(scal);
-
-            return allocate && destroy && copy && zeros && values && dot && norm2 && axpby && scal;
-        }
-    };
 
     template <typename T>
     struct OpenMP_BLAS {
@@ -46,7 +24,7 @@ namespace sfem {
         static void destroy(void* a) { free(a); }
 
         static void copy(const ptrdiff_t n, const T* const src, T* const dest) {
-            std::memcpy(dest, src, n * sizeof(T));
+            memcpy(dest, src, n * sizeof(T));
         }
 
         static auto dot(const ptrdiff_t n, const T* const l, const T* const r) -> T {
@@ -68,6 +46,18 @@ namespace sfem {
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n; i++) {
                 y[i] = alpha * x[i] + beta * y[i];
+            }
+        }
+
+        static void zaxpby(const ptrdiff_t n,
+                           const T alpha,
+                           const T* const x,
+                           const T beta,
+                           const T* const y,
+                           T* const z) {
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n; i++) {
+                z[i] = alpha * x[i] + beta * y[i];
             }
         }
 
@@ -114,16 +104,36 @@ namespace sfem {
             }
         }
 
+        static void xypaz(const std::ptrdiff_t n,
+                           const T* const x,
+                           const T* const y,
+                           const T alpha,
+                           T* const z) {
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n; i++) {
+                z[i] = x[i] * y[i] + alpha * z[i];
+            }
+        }
+
         static void build_blas(struct BLAS_Tpl<T>& tpl) {
             tpl.allocate = allocate;
             tpl.destroy = destroy;
             tpl.copy = copy;
             tpl.dot = dot;
             tpl.norm2 = norm2;
+            tpl.axpy = [](const ptrdiff_t n, const T alpha, const T* const x, T* const y) {
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; i++) {
+                    y[i] += alpha * x[i];
+                }
+            };
+
             tpl.axpby = axpby;
+            tpl.zaxpby = zaxpby;
             tpl.zeros = zeros;
             tpl.values = values;
             tpl.scal = scal;
+            tpl.xypaz = xypaz;
         }
     };
 

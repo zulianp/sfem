@@ -27,6 +27,19 @@ endif()
 
 # ##############################################################################
 
+if(SFEM_ENABLE_METIS)
+  find_package(METIS REQUIRED)
+  if(METIS_FOUND)
+    list(APPEND SFEM_BUILD_INCLUDES ${METIS_INCLUDES})
+    list(APPEND SFEM_DEP_LIBRARIES ${METIS_LIBRARIES})
+    set(SFEM_ENABLE_METIS ON)
+  else()
+    message(FATAL_ERROR "[Warning] Metis not found")
+  endif()
+endif()
+
+# ##############################################################################
+
 if(SFEM_ENABLE_LAPACK OR TPL_ENABLE_LAPACK)
     if(TPL_LAPACK_LIBRARIES)
         list(APPEND SFEM_DEP_LIBRARIES ${TPL_LAPACK_LIBRARIES})

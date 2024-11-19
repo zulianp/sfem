@@ -34,6 +34,12 @@ fi
 
 resolution=$1
 
+if [[ $2 -lt 2 ]]
+then
+	echo "tassellation_level must be larger than 1"
+	exit -1
+fi
+
 export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
 export SFEM_ELEMENT_REFINE_LEVEL=$2
 
