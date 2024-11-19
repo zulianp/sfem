@@ -18,7 +18,7 @@ source $SFEM_DIR/workflows/sfem_config.sh
 
 mesh=mesh
 N=10
-box_mesh.py $mesh -c tetra -x $N -y $N -z $N --height=1 --width=1 --depth=1
+box_mesh.py $mesh -c hex8 -x $N -y $N -z $N --height=1 --width=1 --depth=1
 
 
 # OP=LinearElasticity
