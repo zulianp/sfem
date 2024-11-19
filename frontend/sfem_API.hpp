@@ -711,6 +711,8 @@ namespace sfem {
     static auto hessian_bcrs_sym(const std::shared_ptr<sfem::Function> &f,
                           const std::shared_ptr<Buffer<real_t>> &x,
                           const sfem::ExecutionSpace es) {
+        assert(es == sfem::EXECUTION_SPACE_HOST);
+
         auto crs_graph = f->space()->mesh().node_to_node_graph_upper_triangular();
         const int block_size = f->space()->block_size();
 
@@ -764,6 +766,8 @@ namespace sfem {
     static auto hessian_coo_sym(const std::shared_ptr<sfem::Function> &f,
                          const std::shared_ptr<Buffer<real_t>> &x,
                          const sfem::ExecutionSpace es) {
+        assert(es == sfem::EXECUTION_SPACE_HOST);
+
         auto fs = f->space();
         auto crs_graph = fs->mesh_ptr()->node_to_node_graph_upper_triangular();
 
@@ -802,6 +806,7 @@ namespace sfem {
     static auto hessian_crs_sym(const std::shared_ptr<sfem::Function> &f,
                          const std::shared_ptr<Buffer<real_t>> &x,
                          const sfem::ExecutionSpace es) {
+        assert(es == sfem::EXECUTION_SPACE_HOST);
         auto fs = f->space();
         auto crs_graph = fs->mesh_ptr()->node_to_node_graph_upper_triangular();
 
