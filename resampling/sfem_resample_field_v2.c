@@ -1,5 +1,7 @@
 #include "sfem_resample_field.h"
 
+
+
 #include "mass.h"
 // #include "read_mesh.h"
 #include "matrixio_array.h"
@@ -9,7 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define real_t double
+// #define real_t double
 
 #include "quadratures_rule.h"
 

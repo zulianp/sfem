@@ -12,6 +12,8 @@
 #include "sfem_base.h"
 #include "sfem_defs.h"
 
+#include "sfem_mask.h"
+
 // #include "isolver_function.h"
 
 #include "sfem_Buffer.hpp"
@@ -110,7 +112,6 @@ namespace sfem {
         ~SemiStructuredMesh();
 
         std::shared_ptr<CRSGraph> node_to_node_graph();
-        
 
         static std::shared_ptr<SemiStructuredMesh> create(const std::shared_ptr<Mesh> macro_mesh,
                                                           const int level) {
@@ -201,7 +202,15 @@ namespace sfem {
                                      real_t **const /*off_diag_values*/) {
             assert(false);
             return SFEM_FAILURE;
-        }   
+        }
+
+        virtual int hessian_crs_sym(const real_t *const x,
+                                    const count_t *const rowptr,
+                                    const idx_t *const colidx,
+                                    real_t *const diag_values,
+                                    real_t *const off_diag_values) {
+            return SFEM_FAILURE;
+        }
 
         virtual int hessian_diag(const real_t *const /*x*/, real_t *const /*values*/) {
             return SFEM_FAILURE;
@@ -287,6 +296,7 @@ namespace sfem {
         virtual int apply_zero(real_t *const x);
         virtual int gradient(const real_t *const x, real_t *const g) = 0;
         virtual int copy_constrained_dofs(const real_t *const src, real_t *const dest) = 0;
+        virtual int mask(mask_t *mask) = 0;
 
         virtual int hessian_crs(const real_t *const x,
                                 const count_t *const rowptr,
@@ -319,6 +329,7 @@ namespace sfem {
         int apply(real_t *const x) override;
         int apply_value(const real_t value, real_t *const x) override;
         int copy_constrained_dofs(const real_t *const src, real_t *const dest) override;
+        int mask(mask_t *mask) override;
 
         int gradient(const real_t *const x, real_t *const g) override;
 
@@ -421,6 +432,12 @@ namespace sfem {
                              real_t **const diag_values,
                              real_t **const off_diag_values);
 
+        int hessian_crs_sym(const real_t *const x,
+                            const count_t *const rowptr,
+                            const idx_t *const colidx,
+                            real_t *const diag_values,
+                            real_t *const off_diag_values);
+
         int hessian_diag(const real_t *const x, real_t *const values);
 
         int gradient(const real_t *const x, real_t *const out);
@@ -434,6 +451,7 @@ namespace sfem {
         int copy_constrained_dofs(const real_t *const src, real_t *const dest);
         int report_solution(const real_t *const x);
         int initial_guess(real_t *const x);
+        int constaints_mask(mask_t *mask);
 
         int set_output_dir(const char *path);
 

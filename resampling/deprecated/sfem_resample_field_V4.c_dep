@@ -5,6 +5,7 @@
 #include "mass.h"
 // #include "read_mesh.h"
 #include "matrixio_array.h"
+#include "sfem_resample_field_vec.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -13,20 +14,20 @@
 
 #include "quadratures_rule.h"
 
-
 #define SFEM_RESTRICT __restrict__
 
 #define SFEM_RESAMPLE_GAP_DUAL
+#define real_type real_t
 
 #define _VL4_ 4
-typedef scalar_t vec4_t
-        __attribute__((vector_size(_VL4_ * sizeof(scalar_t)), aligned(sizeof(scalar_t))));
+// typedef real_t vec4_t
+//         __attribute__((vector_size(_VL4_ * sizeof(real_t)), aligned(sizeof(real_t))));
 
-typedef ptrdiff_t vec4_int64
-        __attribute__((vector_size(_VL4_ * sizeof(ptrdiff_t)), aligned(sizeof(ptrdiff_t))));
+// typedef ptrdiff_t vec_indices4_t
+//         __attribute__((vector_size(_VL4_ * sizeof(ptrdiff_t)), aligned(sizeof(ptrdiff_t))));
 
-SFEM_INLINE vec4_int64 floor_V4(const vec4_t x) {
-    const vec4_int64 res = __builtin_convertvector(x, vec4_int64);
+SFEM_INLINE vec_indices4_t floor_V4(const vec4_t x) {
+    const vec_indices4_t res = __builtin_convertvector(x, vec_indices4_t);
     return res;
 }
 
@@ -37,20 +38,11 @@ SFEM_INLINE vec4_int64 floor_V4(const vec4_t x) {
 //////////////////////////////////////////////////////////
 SFEM_INLINE static vec4_t tet4_measure_V4(
         // X-coordinates
-        const vec4_t px0,
-        const vec4_t px1,
-        const vec4_t px2,
-        const vec4_t px3,
+        const vec4_t px0, const vec4_t px1, const vec4_t px2, const vec4_t px3,
         // Y-coordinates
-        const vec4_t py0,
-        const vec4_t py1,
-        const vec4_t py2,
-        const vec4_t py3,
+        const vec4_t py0, const vec4_t py1, const vec4_t py2, const vec4_t py3,
         // Z-coordinates
-        const vec4_t pz0,
-        const vec4_t pz1,
-        const vec4_t pz2,
-        const vec4_t pz3) {
+        const vec4_t pz0, const vec4_t pz1, const vec4_t pz2, const vec4_t pz3) {
     //
     // determinant of the Jacobian
     // M = [px0, py0, pz0, 1]
@@ -60,7 +52,7 @@ SFEM_INLINE static vec4_t tet4_measure_V4(
     //
     // V = (1/6) * det(M)
 
-    const scalar_t ref_vol = 1./6;
+    const scalar_t ref_vol = 1. / 6;
     const vec4_t x0 = -pz0 + pz3;
     const vec4_t x1 = -py0 + py2;
     const vec4_t x2 = -ref_vol * px0 + ref_vol * px1;
@@ -109,27 +101,15 @@ SFEM_INLINE static void tet4_transform_V4(
 */
 
         // X-coordinates
-        const vec4_t px0,
-        const vec4_t px1,
-        const vec4_t px2,
-        const vec4_t px3,
+        const vec4_t px0, const vec4_t px1, const vec4_t px2, const vec4_t px3,
         // Y-coordinates
-        const vec4_t py0,
-        const vec4_t py1,
-        const vec4_t py2,
-        const vec4_t py3,
+        const vec4_t py0, const vec4_t py1, const vec4_t py2, const vec4_t py3,
         // Z-coordinates
-        const vec4_t pz0,
-        const vec4_t pz1,
-        const vec4_t pz2,
-        const vec4_t pz3,
+        const vec4_t pz0, const vec4_t pz1, const vec4_t pz2, const vec4_t pz3,
         // Quadra4ure point
-        const vec4_t qx,
-        const vec4_t qy,
-        const vec4_t qz,
+        const vec4_t qx, const vec4_t qy, const vec4_t qz,
         // Output
-        vec4_t* const SFEM_RESTRICT out_x,
-        vec4_t* const SFEM_RESTRICT out_y,
+        vec4_t* const SFEM_RESTRICT out_x, vec4_t* const SFEM_RESTRICT out_y,
         vec4_t* const SFEM_RESTRICT out_z) {
     //
     //
@@ -147,19 +127,13 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V4(
         // Quadrature point (local coordinates)
         // With respect to the hat functions of a cube element
         // In a local coordinate system
-        const vec4_t x,
-        const vec4_t y,
-        const vec4_t z,
+        const vec4_t x, const vec4_t y, const vec4_t z,
 
         // Output
-        vec4_t* const SFEM_RESTRICT f0,
-        vec4_t* const SFEM_RESTRICT f1,
-        vec4_t* const SFEM_RESTRICT f2,
-        vec4_t* const SFEM_RESTRICT f3,
-        vec4_t* const SFEM_RESTRICT f4,
-        vec4_t* const SFEM_RESTRICT f5,
-        vec4_t* const SFEM_RESTRICT f6,
-        vec4_t* const SFEM_RESTRICT f7) {
+        vec4_t* const SFEM_RESTRICT f0, vec4_t* const SFEM_RESTRICT f1,
+        vec4_t* const SFEM_RESTRICT f2, vec4_t* const SFEM_RESTRICT f3,
+        vec4_t* const SFEM_RESTRICT f4, vec4_t* const SFEM_RESTRICT f5,
+        vec4_t* const SFEM_RESTRICT f6, vec4_t* const SFEM_RESTRICT f7) {
     //
     *f0 = (1.0 - x) * (1.0 - y) * (1.0 - z);
     *f1 = x * (1.0 - y) * (1.0 - z);
@@ -177,33 +151,24 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V4(
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 SFEM_INLINE static void hex_aa_8_collect_coeffs_V4(
-        const vec4_int64 stride0,
-        const vec4_int64 stride1,
-        const vec4_int64 stride2,
-        const vec4_int64 i,
-        const vec4_int64 j,
-        const vec4_int64 k,
+        const vec_indices4_t stride0, const vec_indices4_t stride1, const vec_indices4_t stride2,
+        const vec_indices4_t i, const vec_indices4_t j, const vec_indices4_t k,
         // Attention this is geometric data transformed to solver data!
         const real_t* const SFEM_RESTRICT data,
         //
-        vec4_t* SFEM_RESTRICT out0,
-        vec4_t* SFEM_RESTRICT out1,
-        vec4_t* SFEM_RESTRICT out2,
-        vec4_t* SFEM_RESTRICT out3,
-        vec4_t* SFEM_RESTRICT out4,
-        vec4_t* SFEM_RESTRICT out5,
-        vec4_t* SFEM_RESTRICT out6,
-        vec4_t* SFEM_RESTRICT out7) {
+        vec4_t* SFEM_RESTRICT out0, vec4_t* SFEM_RESTRICT out1, vec4_t* SFEM_RESTRICT out2,
+        vec4_t* SFEM_RESTRICT out3, vec4_t* SFEM_RESTRICT out4, vec4_t* SFEM_RESTRICT out5,
+        vec4_t* SFEM_RESTRICT out6, vec4_t* SFEM_RESTRICT out7) {
     //
 
-    const vec4_int64 i0 = i * stride0 + j * stride1 + k * stride2;
-    const vec4_int64 i1 = (i + 1) * stride0 + j * stride1 + k * stride2;
-    const vec4_int64 i2 = (i + 1) * stride0 + (j + 1) * stride1 + k * stride2;
-    const vec4_int64 i3 = i * stride0 + (j + 1) * stride1 + k * stride2;
-    const vec4_int64 i4 = i * stride0 + j * stride1 + (k + 1) * stride2;
-    const vec4_int64 i5 = (i + 1) * stride0 + j * stride1 + (k + 1) * stride2;
-    const vec4_int64 i6 = (i + 1) * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
-    const vec4_int64 i7 = i * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
+    const vec_indices4_t i0 = i * stride0 + j * stride1 + k * stride2;
+    const vec_indices4_t i1 = (i + 1) * stride0 + j * stride1 + k * stride2;
+    const vec_indices4_t i2 = (i + 1) * stride0 + (j + 1) * stride1 + k * stride2;
+    const vec_indices4_t i3 = i * stride0 + (j + 1) * stride1 + k * stride2;
+    const vec_indices4_t i4 = i * stride0 + j * stride1 + (k + 1) * stride2;
+    const vec_indices4_t i5 = (i + 1) * stride0 + j * stride1 + (k + 1) * stride2;
+    const vec_indices4_t i6 = (i + 1) * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
+    const vec_indices4_t i7 = i * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
 
     *out0 = (vec4_t){data[i0[0]], data[i0[1]], data[i0[2]], data[i0[3]]};
 
@@ -229,16 +194,11 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_V4(
 //////////////////////////////////////////////////////////
 int tet4_resample_field_local_V4_aligned(
         // Mesh
-        const ptrdiff_t start_nelement,
-        const ptrdiff_t end_nelement,
-        const ptrdiff_t nnodes,
-        idx_t** const SFEM_RESTRICT elems,
-        geom_t** const SFEM_RESTRICT xyz,
+        const ptrdiff_t start_nelement, const ptrdiff_t end_nelement, const ptrdiff_t nnodes,
+        idx_t** const SFEM_RESTRICT elems, geom_t** const SFEM_RESTRICT xyz,
         // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,
-        const ptrdiff_t* const SFEM_RESTRICT stride,
-        const geom_t* const SFEM_RESTRICT origin,
-        const geom_t* const SFEM_RESTRICT delta,
+        const ptrdiff_t* const SFEM_RESTRICT n, const ptrdiff_t* const SFEM_RESTRICT stride,
+        const geom_t* const SFEM_RESTRICT origin, const geom_t* const SFEM_RESTRICT delta,
         const real_t* const SFEM_RESTRICT data,
         // Output
         real_t* const SFEM_RESTRICT weighted_field) {
@@ -255,29 +215,29 @@ int tet4_resample_field_local_V4_aligned(
     const scalar_t dy = (scalar_t)delta[1];
     const scalar_t dz = (scalar_t)delta[2];
 
-    vec4_int64 stride0 = {stride[0], stride[0], stride[0], stride[0]};
-    vec4_int64 stride1 = {stride[1], stride[1], stride[1], stride[1]};
-    vec4_int64 stride2 = {stride[2], stride[2], stride[2], stride[2]};
+    vec_indices4_t stride0 = {stride[0], stride[0], stride[0], stride[0]};
+    vec_indices4_t stride1 = {stride[1], stride[1], stride[1], stride[1]};
+    vec_indices4_t stride2 = {stride[2], stride[2], stride[2], stride[2]};
 
     //////////////////////////////////////////////////////////////////////
     // Loop over the elements
     for (ptrdiff_t element_i = start_nelement; element_i < end_nelement; element_i += 4) {
-        vec4_int64 ev0 = {elems[0][element_i + 0],
+        vec_indices4_t ev0 = {elems[0][element_i + 0],
                           elems[0][element_i + 1],
                           elems[0][element_i + 2],
                           elems[0][element_i + 3]};
 
-        vec4_int64 ev1 = {elems[1][element_i + 0],
+        vec_indices4_t ev1 = {elems[1][element_i + 0],
                           elems[1][element_i + 1],
                           elems[1][element_i + 2],
                           elems[1][element_i + 3]};
 
-        vec4_int64 ev2 = {elems[2][element_i + 0],
+        vec_indices4_t ev2 = {elems[2][element_i + 0],
                           elems[2][element_i + 1],
                           elems[2][element_i + 2],
                           elems[2][element_i + 3]};
 
-        vec4_int64 ev3 = {elems[3][element_i + 0],
+        vec_indices4_t ev3 = {elems[3][element_i + 0],
                           elems[3][element_i + 1],
                           elems[3][element_i + 2],
                           elems[3][element_i + 3]};
@@ -285,109 +245,109 @@ int tet4_resample_field_local_V4_aligned(
         const vec4_t zeros = {0.0, 0.0, 0.0, 0.0};
 
         // Vertices coordinates of the tetrahedron
-        vec4_t x0 = zeros,  //
-                x1 = zeros,      //
-                x2 = zeros,      //
-                x3 = zeros;      //
+        vec4_t x0 = zeros,   //
+                x1 = zeros,  //
+                x2 = zeros,  //
+                x3 = zeros;  //
 
         vec4_t y0 = zeros, y1 = zeros, y2 = zeros, y3 = zeros;
         vec4_t z0 = zeros, z1 = zeros, z2 = zeros, z3 = zeros;
 
         // real_t hex8_f[8];
-        vec4_t hex8_f0 = zeros, hex8_f1 = zeros, hex8_f2 = zeros, hex8_f3 = zeros,
-                    hex8_f4 = zeros, hex8_f5 = zeros, hex8_f6 = zeros, hex8_f7 = zeros;
+        vec4_t hex8_f0 = zeros, hex8_f1 = zeros, hex8_f2 = zeros, hex8_f3 = zeros, hex8_f4 = zeros,
+               hex8_f5 = zeros, hex8_f6 = zeros, hex8_f7 = zeros;
 
         // real_t coeffs[8];
-        vec4_t coeffs0 = zeros, coeffs1 = zeros, coeffs2 = zeros, coeffs3 = zeros,
-                    coeffs4 = zeros, coeffs5 = zeros, coeffs6 = zeros, coeffs7 = zeros;
+        vec4_t coeffs0 = zeros, coeffs1 = zeros, coeffs2 = zeros, coeffs3 = zeros, coeffs4 = zeros,
+               coeffs5 = zeros, coeffs6 = zeros, coeffs7 = zeros;
 
         // real_t tet4_f[4];
         vec4_t tet4_f0 = zeros, tet4_f1 = zeros, tet4_f2 = zeros, tet4_f3 = zeros;
 
         // real_t element_field[4];
         vec4_t element_field0 = zeros, element_field1 = zeros, element_field2 = zeros,
-                    element_field3 = zeros;
+               element_field3 = zeros;
 
         // copy the coordinates of the vertices
         {
             x0 = (vec4_t){(scalar_t)xyz[0][ev0[0]],
-                               (scalar_t)xyz[0][ev0[1]],
-                               (scalar_t)xyz[0][ev0[2]],
-                               (scalar_t)xyz[0][ev0[3]]};
+                          (scalar_t)xyz[0][ev0[1]],
+                          (scalar_t)xyz[0][ev0[2]],
+                          (scalar_t)xyz[0][ev0[3]]};
 
             x1 = (vec4_t){(scalar_t)xyz[0][ev1[0]],
-                               (scalar_t)xyz[0][ev1[1]],
-                               (scalar_t)xyz[0][ev1[2]],
-                               (scalar_t)xyz[0][ev1[3]]};
+                          (scalar_t)xyz[0][ev1[1]],
+                          (scalar_t)xyz[0][ev1[2]],
+                          (scalar_t)xyz[0][ev1[3]]};
 
             x2 = (vec4_t){(scalar_t)xyz[0][ev2[0]],
-                               (scalar_t)xyz[0][ev2[1]],
-                               (scalar_t)xyz[0][ev2[2]],
-                               (scalar_t)xyz[0][ev2[3]]};
+                          (scalar_t)xyz[0][ev2[1]],
+                          (scalar_t)xyz[0][ev2[2]],
+                          (scalar_t)xyz[0][ev2[3]]};
 
             x3 = (vec4_t){(scalar_t)xyz[0][ev3[0]],
-                               (scalar_t)xyz[0][ev3[1]],
-                               (scalar_t)xyz[0][ev3[2]],
-                               (scalar_t)xyz[0][ev3[3]]};
+                          (scalar_t)xyz[0][ev3[1]],
+                          (scalar_t)xyz[0][ev3[2]],
+                          (scalar_t)xyz[0][ev3[3]]};
 
             y0 = (vec4_t){(scalar_t)xyz[1][ev0[0]],
-                               (scalar_t)xyz[1][ev0[1]],
-                               (scalar_t)xyz[1][ev0[2]],
-                               (scalar_t)xyz[1][ev0[3]]};
+                          (scalar_t)xyz[1][ev0[1]],
+                          (scalar_t)xyz[1][ev0[2]],
+                          (scalar_t)xyz[1][ev0[3]]};
 
             y1 = (vec4_t){(scalar_t)xyz[1][ev1[0]],
-                               (scalar_t)xyz[1][ev1[1]],
-                               (scalar_t)xyz[1][ev1[2]],
-                               (scalar_t)xyz[1][ev1[3]]};
+                          (scalar_t)xyz[1][ev1[1]],
+                          (scalar_t)xyz[1][ev1[2]],
+                          (scalar_t)xyz[1][ev1[3]]};
 
             y2 = (vec4_t){(scalar_t)xyz[1][ev2[0]],
-                               (scalar_t)xyz[1][ev2[1]],
-                               (scalar_t)xyz[1][ev2[2]],
-                               (scalar_t)xyz[1][ev2[3]]};
+                          (scalar_t)xyz[1][ev2[1]],
+                          (scalar_t)xyz[1][ev2[2]],
+                          (scalar_t)xyz[1][ev2[3]]};
 
             y3 = (vec4_t){(scalar_t)xyz[1][ev3[0]],
-                               (scalar_t)xyz[1][ev3[1]],
-                               (scalar_t)xyz[1][ev3[2]],
-                               (scalar_t)xyz[1][ev3[3]]};
+                          (scalar_t)xyz[1][ev3[1]],
+                          (scalar_t)xyz[1][ev3[2]],
+                          (scalar_t)xyz[1][ev3[3]]};
 
             z0 = (vec4_t){(scalar_t)xyz[2][ev0[0]],
-                               (scalar_t)xyz[2][ev0[1]],
-                               (scalar_t)xyz[2][ev0[2]],
-                               (scalar_t)xyz[2][ev0[3]]};
+                          (scalar_t)xyz[2][ev0[1]],
+                          (scalar_t)xyz[2][ev0[2]],
+                          (scalar_t)xyz[2][ev0[3]]};
 
             z1 = (vec4_t){(scalar_t)xyz[2][ev1[0]],
-                               (scalar_t)xyz[2][ev1[1]],
-                               (scalar_t)xyz[2][ev1[2]],
-                               (scalar_t)xyz[2][ev1[3]]};
+                          (scalar_t)xyz[2][ev1[1]],
+                          (scalar_t)xyz[2][ev1[2]],
+                          (scalar_t)xyz[2][ev1[3]]};
 
             z2 = (vec4_t){(scalar_t)xyz[2][ev2[0]],
-                               (scalar_t)xyz[2][ev2[1]],
-                               (scalar_t)xyz[2][ev2[2]],
-                               (scalar_t)xyz[2][ev2[3]]};
+                          (scalar_t)xyz[2][ev2[1]],
+                          (scalar_t)xyz[2][ev2[2]],
+                          (scalar_t)xyz[2][ev2[3]]};
 
             z3 = (vec4_t){(scalar_t)xyz[2][ev3[0]],
-                               (scalar_t)xyz[2][ev3[1]],
-                               (scalar_t)xyz[2][ev3[2]],
-                               (scalar_t)xyz[2][ev3[3]]};
+                          (scalar_t)xyz[2][ev3[1]],
+                          (scalar_t)xyz[2][ev3[2]],
+                          (scalar_t)xyz[2][ev3[3]]};
 
             //////////////////////////////////////////////////////////////////////
         }  // end copy the coordinates of the vertices
 
         // Volume of the tetrahedrons (8 at a time)
         const vec4_t theta_volume = tet4_measure_V4(x0,
-                                                         x1,
-                                                         x2,
-                                                         x3,
-                                                         //
-                                                         y0,
-                                                         y1,
-                                                         y2,
-                                                         y3,
-                                                         //
-                                                         z0,
-                                                         z1,
-                                                         z2,
-                                                         z3);
+                                                    x1,
+                                                    x2,
+                                                    x3,
+                                                    //
+                                                    y0,
+                                                    y1,
+                                                    y2,
+                                                    y3,
+                                                    //
+                                                    z0,
+                                                    z1,
+                                                    z2,
+                                                    z3);
 
         //////////////////////////////////////////////////////////////////////
         // loop over the quadrature points
@@ -396,19 +356,19 @@ int tet4_resample_field_local_V4_aligned(
             vec4_t g_qx, g_qy, g_qz;
 
             vec4_t tet4_qx_v = {tet4_qx[quad_i],  //
-                                     tet4_qx[quad_i],
-                                     tet4_qx[quad_i],
-                                     tet4_qx[quad_i]};
+                                tet4_qx[quad_i],
+                                tet4_qx[quad_i],
+                                tet4_qx[quad_i]};
 
             vec4_t tet4_qy_v = {tet4_qy[quad_i],  //
-                                     tet4_qy[quad_i],
-                                     tet4_qy[quad_i],
-                                     tet4_qy[quad_i]};
+                                tet4_qy[quad_i],
+                                tet4_qy[quad_i],
+                                tet4_qy[quad_i]};
 
             vec4_t tet4_qz_v = {tet4_qz[quad_i],  //
-                                     tet4_qz[quad_i],
-                                     tet4_qz[quad_i],
-                                     tet4_qz[quad_i]};
+                                tet4_qz[quad_i],
+                                tet4_qz[quad_i],
+                                tet4_qz[quad_i]};
 
             tet4_transform_V4(x0,
                               x1,
@@ -460,9 +420,9 @@ int tet4_resample_field_local_V4_aligned(
             const vec4_t grid_y = (g_qy - oy) / dy;
             const vec4_t grid_z = (g_qz - oz) / dz;
 
-            const vec4_int64 i = floor_V4(grid_x);
-            const vec4_int64 j = floor_V4(grid_y);
-            const vec4_int64 k = floor_V4(grid_z);
+            const vec_indices4_t i = floor_V4(grid_x);
+            const vec_indices4_t j = floor_V4(grid_y);
+            const vec_indices4_t k = floor_V4(grid_z);
 
             // Get the reminder [0, 1]
             vec4_t l_x = (grid_x - __builtin_convertvector(i, vec4_t));
@@ -566,15 +526,11 @@ int tet4_resample_field_local_V4_aligned(
 //////////////////////////////////////////////////////////
 int tet4_resample_field_local_V4(
         // Mesh
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t** const SFEM_RESTRICT elems,
+        const ptrdiff_t nelements, const ptrdiff_t nnodes, idx_t** const SFEM_RESTRICT elems,
         geom_t** const SFEM_RESTRICT xyz,
         // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,
-        const ptrdiff_t* const SFEM_RESTRICT stride,
-        const geom_t* const SFEM_RESTRICT origin,
-        const geom_t* const SFEM_RESTRICT delta,
+        const ptrdiff_t* const SFEM_RESTRICT n, const ptrdiff_t* const SFEM_RESTRICT stride,
+        const geom_t* const SFEM_RESTRICT origin, const geom_t* const SFEM_RESTRICT delta,
         const real_t* const SFEM_RESTRICT data,
         // Output
         real_t* const SFEM_RESTRICT weighted_field) {

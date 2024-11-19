@@ -4,6 +4,7 @@
 #include "sfem_base.h"
 #include "sfem_crs_SpMV.hpp"
 #include "spmv.h"
+#include "sfem_Buffer.hpp"
 
 #include "matrixio_array.h"
 
@@ -40,6 +41,8 @@
         fflush(stdout);                                        \
     } while (0)
 
+
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -69,10 +72,8 @@ int main(int argc, char *argv[]) {
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     int SFEM_PRINT_VECTORS = 0;
     int SFEM_SKIP_VERIFICATION = 0;
-    int SFEM_MATRIX_FREE = 1;
-    int SFEM_COARSE_MATRIX_FREE = 1;
-    int SFEM_USE_BSR = 1;
-    int SFEM_COARSE_USE_BSR = 1;
+    const char * SFEM_FINE_OP_TYPE = "MF";
+    const char * SFEM_COARSE_OP_TYPE = "MF";
 
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_USE_GPU, atoi);
@@ -80,9 +81,8 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
     SFEM_READ_ENV(SFEM_PRINT_VECTORS, atoi);
     SFEM_READ_ENV(SFEM_SKIP_VERIFICATION, atoi);
-    SFEM_READ_ENV(SFEM_MATRIX_FREE, atoi);
-    SFEM_READ_ENV(SFEM_COARSE_MATRIX_FREE, atoi);
-    SFEM_READ_ENV(SFEM_COARSE_USE_BSR, atoi);
+    SFEM_READ_ENV(SFEM_FINE_OP_TYPE, );
+    SFEM_READ_ENV(SFEM_COARSE_OP_TYPE, );
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
@@ -121,36 +121,14 @@ int main(int argc, char *argv[]) {
 
     std::shared_ptr<sfem::Operator<real_t>> fine_op, coarse_op;
 
-    if (SFEM_MATRIX_FREE) {
-        fine_op = sfem::make_linear_op(f);
-    } else {
-        if (fs->block_size() == 1) {
-            fine_op = sfem::hessian_crs(f, nullptr, es);
-        } else {
-            if (SFEM_USE_BSR) {
-                fine_op = sfem::hessian_bsr(f, nullptr, es);
-            } else {
-                fine_op = sfem::hessian_bcrs_sym(f, nullptr, es);
-            }
-        }
-    }
+    printf("Fine op:\t%s\n", SFEM_FINE_OP_TYPE);
+    fine_op = sfem::create_linear_operator(SFEM_FINE_OP_TYPE, f, nullptr, es);
 
     auto fs_coarse = fs->derefine();
     auto f_coarse = f->derefine(fs_coarse, true);
 
-    if (SFEM_COARSE_MATRIX_FREE) {
-        coarse_op = sfem::make_linear_op(f_coarse);
-    } else {
-        if (fs->block_size() == 1) {
-            coarse_op = sfem::hessian_crs(f_coarse, nullptr, es);
-        } else {
-            if (SFEM_COARSE_USE_BSR) {
-                coarse_op = sfem::hessian_bsr(f_coarse, nullptr, es);
-            } else {
-                coarse_op = sfem::hessian_bcrs_sym(f_coarse, nullptr, es);
-            }
-        }
-    }
+    printf("Coarse op:\t%s\n", SFEM_COARSE_OP_TYPE);
+    coarse_op  = sfem::create_linear_operator(SFEM_COARSE_OP_TYPE, f_coarse, nullptr, es);
 
     auto restriction = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
     auto prolong_unconstr = sfem::create_hierarchical_prolongation(fs_coarse, fs, es);

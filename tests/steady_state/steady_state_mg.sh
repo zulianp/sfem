@@ -20,7 +20,7 @@ source $SFEM_DIR/workflows/sfem_config.sh
 export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 export CUDA_LAUNCH_BLOCKING=0
-export SFEM_ELEMENT_REFINE_LEVEL=4
+export SFEM_ELEMENT_REFINE_LEVEL=6
 
 CASE=3
 
@@ -106,11 +106,6 @@ export SFEM_MAX_IT=60
 # export SFEM_MAX_IT=4000
 
 export SFEM_HEX8_ASSUME_AFFINE=1
-export SFEM_MATRIX_FREE=1
-
-export SFEM_COARSE_MATRIX_FREE=0
-export SFEM_USE_BSR_MATRIX=1
-
 export SFEM_COARSE_TOL=1e-12
 
 export SFEM_USE_CRS_GRAPH_RESTRICT=0
@@ -124,7 +119,6 @@ export SFEM_USE_PRECONDITIONER=0
 
 export SFEM_VERBOSITY_LEVEL=1
 export SFEM_HEX8_QUADRATURE_ORDER=1
-# export SFEM_DEBUG=1
 
 $LAUNCH mgsolve $mesh output 
 # | tee log.txt

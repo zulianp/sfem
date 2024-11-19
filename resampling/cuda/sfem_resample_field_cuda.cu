@@ -4,7 +4,7 @@
 #include <cuda_profiler_api.h>
 #include <stdio.h>
 
-#define real_t double
+// #define real_t double
 #define real_type real_t
 
 #define MY_RESTRICT __restrict__
@@ -14,8 +14,8 @@
 ////////////////////////////////////////////////////////
 // tet4_transform_v2
 ////////////////////////////////////////////////////////
-__device__ void tet4_transform_cu(
-        /**
+__device__ void tet4_transform_cu( 
+        /****************************************************************************************
          ****************************************************************************************
         \begin{bmatrix}
         out_x \\
@@ -1034,7 +1034,7 @@ extern "C" int tet4_resample_field_local_reduce_CUDA(
     cudaEvent_t start, stop;
 
     // Number of threads
-    const ptrdiff_t warp_per_block = 2;
+    const ptrdiff_t warp_per_block = 8;
     const ptrdiff_t threadsPerBlock = warp_per_block * __WARP_SIZE__;
 
     // Number of blocks
@@ -1091,7 +1091,7 @@ extern "C" int tet4_resample_field_local_reduce_CUDA(
     // get cuda error
     cudaError_t error = cudaGetLastError();
     if (error != cudaSuccess) {
-        printf("ERROR: %s\n", cudaGetErrorString(error));
+        printf("!!!!!!!! ERROR: %s  !!!!!!!!!!!!!!!!!!!!!!!!!\n", cudaGetErrorString(error));
     }
 
     // end kernel

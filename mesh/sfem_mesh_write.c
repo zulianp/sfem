@@ -98,6 +98,12 @@ int mesh_write_nodal_field(const mesh_t *const mesh,
                            const char *path,
                            MPI_Datatype data_type,
                            const void *const data) {
+
+
+                            // get MPI rank 
+    int mpi_rank;
+    MPI_Comm_rank(mesh->comm, &mpi_rank);
+
     count_t n_global_nodes = mesh->n_owned_nodes;
     MPI_CATCH_ERROR(
         MPI_Allreduce(MPI_IN_PLACE, &n_global_nodes, 1, SFEM_MPI_COUNT_T, MPI_SUM, mesh->comm));
@@ -108,9 +114,15 @@ int mesh_write_nodal_field(const mesh_t *const mesh,
         MPI_Comm_size(mesh->comm, &size);
         assert(size == 1);
 #endif
+
+        if(mpi_rank == 0) printf("%s:%d: Writing using array_write\n", __FILE__, __LINE__);
+        
         return array_write(mesh->comm, path, data_type, data, mesh->n_owned_nodes, n_global_nodes);
 
     } else {
+
+        if (mpi_rank == 0) printf("%s:%d: Writing using write_mapped_field\n", __FILE__, __LINE__);
+        
         return write_mapped_field(mesh->comm,
                                   path,
                                   mesh->n_owned_nodes,

@@ -15,6 +15,23 @@ enum IntegerType { SFEM_INT16 = 20, SFEM_INT32 = 40, SFEM_INT64 = 80, SFEM_INT_D
 
 static void* SFEM_DEFAULT_STREAM = 0;
 
+SFEM_INLINE static int real_type_size(enum RealType type) {
+    switch (type) {
+        case SFEM_FLOAT16:
+            return 2;
+        case SFEM_FLOAT32:
+            return 4;
+        case SFEM_FLOAT64:
+            return 8;
+        case SFEM_REAL_DEFAULT:
+            return sizeof(real_t);
+        default: {
+            assert(0);
+            return -1;
+        }
+    }
+}
+
 SFEM_INLINE static const char* real_type_to_string(enum RealType type) {
     switch (type) {
         case SFEM_FLOAT16:

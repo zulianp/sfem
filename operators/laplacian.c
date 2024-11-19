@@ -221,3 +221,30 @@ int laplacian_apply_opt(int element_type,
 
     return -1;
 }
+
+int laplacian_crs_sym(int element_type,
+                      const ptrdiff_t nelements,
+                      const ptrdiff_t nnodes,
+                      idx_t **const SFEM_RESTRICT elements,
+                      geom_t **const SFEM_RESTRICT points,
+                      const count_t *const SFEM_RESTRICT rowptr,
+                      const idx_t *const SFEM_RESTRICT colidx,
+                      real_t *const SFEM_RESTRICT diag,
+                      real_t *const SFEM_RESTRICT offdiag) {
+    switch (element_type) {
+        case HEX8: {
+            return hex8_laplacian_crs_sym(
+                    nelements, nnodes, elements, points, rowptr, colidx, diag, offdiag);
+        }
+        ult: {
+            fprintf(stderr,
+                    "laplacian_crs_sym not implemented for type %s\n",
+                    type_to_string(element_type));
+            assert(0);
+            MPI_Abort(MPI_COMM_WORLD, -1);
+        }
+    }
+
+    return SFEM_FAILURE;
+}
+

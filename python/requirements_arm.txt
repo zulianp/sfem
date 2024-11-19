@@ -1,0 +1,9 @@
+matplotlib
+matplotlib-inline
+meshio
+numba
+numpy
+rich
+scipy
+sympy
+nanobind
