@@ -9,6 +9,9 @@ void piecewise_constant(const idx_t *partition, const real_t *near_null,
     p->values[i] = near_null[i];
   }
 }
+
+TODO verify coarsen with (also can do this in partition function)
+Ac vc == pt (A (p vc))
 */
 
 namespace sfem {

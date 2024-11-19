@@ -37,8 +37,8 @@ namespace sfem {
                 blas.zeros(workspace->size(), r);
                 op->apply(x, r);
                 blas.axpby(n_dofs, 1.0, b, -1.0, r);
-                T norm_residual = this->blas.norm2(workspace->size(), r);
                 if (verbose) {
+                    T norm_residual = this->blas.norm2(workspace->size(), r);
                     printf("%d : %f\n", i, (double)norm_residual);
                 }
                 preconditioner->apply(r, x);

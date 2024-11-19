@@ -133,6 +133,19 @@ int main(int argc, char *argv[]) {
         solver = amg;
         */
 
+        /*
+        auto inv_diag = sfem::create_buffer<real_t>(mask_count(fs->n_dofs()), es);
+        l2_smoother(fs->n_dofs(),
+                    mask->data(),
+                    fine_mat->values->size(),
+                    fine_mat->diag_values->data(),
+                    fine_mat->values->data(),
+                    fine_mat->offdiag_rowidx->data(),
+                    fine_mat->offdiag_colidx->data(),
+                    inv_diag->data());
+        auto l2_smoother = sfem::h_lpsmoother(inv_diag);
+        */
+
         amg->set_max_it(1);
         amg->verbose = false;
         auto cg = sfem::create_cg<real_t>(fine_mat, es);
@@ -141,7 +154,15 @@ int main(int argc, char *argv[]) {
         cg->set_max_it(SFEM_MAX_IT);
         cg->set_op(fine_mat);
         cg->set_preconditioner_op(amg);
+        // cg->set_preconditioner_op(l2_smoother);
         solver = cg;
+
+        /*
+        auto stat_iter = sfem::h_stationary<real_t>(fine_mat, l2_smoother);
+        stat_iter->set_max_it(100);
+        stat_iter->verbose = true;
+        solver = stat_iter;
+        */
     } else {
         auto linear_op = sfem::make_linear_op(f);
         auto cg = sfem::create_cg<real_t>(linear_op, es);
