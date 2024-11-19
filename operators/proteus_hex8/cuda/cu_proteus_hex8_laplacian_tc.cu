@@ -1,14 +1,33 @@
+#if 0
 #include "cu_proteus_hex8_laplacian_tc.h"
 
+#include "cu_proteus_hex8_inline.hpp"
+
 #include <assert.h>
+#include <cuda.h>
+#include <mma.h>
 #include <stdio.h>
+
+using namespace nvcuda;
+
+#define CHECK_CUDA(func)                                               \
+    do {                                                               \
+        cudaError_t status = (func);                                   \
+        if (status != cudaSuccess) {                                   \
+            printf("CUDA API failed at line %d with error: %s (%d)\n", \
+                   __LINE__,                                           \
+                   cudaGetErrorString(status),                         \
+                   status);                                            \
+            assert(false);                                             \
+            exit(EXIT_FAILURE);                                        \
+        }                                                              \
+    } while (0)
 
 // REFERENCES:
 // https://docs.nvidia.com/cuda/hopper-tuning-guide/index.html
 // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#distributed-shared-memory
 // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#asynchronous-data-copies-using-the-tensor-memory-accelerator-tma
 // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#wmma
-
 
 // NOTES
 // 1) memcpy_async
@@ -183,7 +202,8 @@ static int cu_proteus_affine_hex8_laplacian_tc_fill_ops_tpl(
         const ptrdiff_t stride,
         const idx_t *const SFEM_RESTRICT elements,
         const cu_jacobian_t *const SFEM_RESTRICT fff,
-        T *const SFEM_RESTRICT macro_element_ops) {
+        T *const SFEM_RESTRICT macro_element_ops,
+        void *stream) {
     // Hand tuned
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
@@ -202,10 +222,10 @@ static int cu_proteus_affine_hex8_laplacian_tc_fill_ops_tpl(
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
         cu_proteus_affine_hex8_laplacian_tc_fill_ops_kernel<<<n_blocks, block_size, 0, s>>>(
-                level, nelements, stride, elements, fff, x, y);
+                nelements, stride, elements, fff, macro_element_ops);
     } else {
         cu_proteus_affine_hex8_laplacian_tc_fill_ops_kernel<<<n_blocks, block_size, 0>>>(
-                level, nelements, stride, elements, fff, x, y);
+                nelements, stride, elements, fff, macro_element_ops);
     }
 }
 
@@ -214,8 +234,8 @@ extern int cu_proteus_affine_hex8_laplacian_tc_fill_ops(const ptrdiff_t nelement
                                                         const idx_t *const SFEM_RESTRICT elements,
                                                         const void *const SFEM_RESTRICT fff,
                                                         const enum RealType real_type,
-                                                        void *const SFEM_RESTRICT
-                                                                macro_element_ops) {
+                                                        void *const SFEM_RESTRICT macro_element_ops,
+                                                        void *stream) {
     switch (real_type) {
         case SFEM_FLOAT64:
             return cu_proteus_affine_hex8_laplacian_tc_fill_ops_tpl<double>(
@@ -223,21 +243,24 @@ extern int cu_proteus_affine_hex8_laplacian_tc_fill_ops(const ptrdiff_t nelement
                     stride,
                     elements,
                     (const cu_jacobian_t *)fff,
-                    (double *)macro_element_ops);
+                    (double *)macro_element_ops,
+                    stream);
         case SFEM_FLOAT32:
             return cu_proteus_affine_hex8_laplacian_tc_fill_ops_tpl<float>(
                     nelements,
                     stride,
                     elements,
                     (const cu_jacobian_t *)fff,
-                    (float *)macro_element_ops);
+                    (float *)macro_element_ops,
+                    stream);
         case SFEM_REAL_DEFAULT:
             return cu_proteus_affine_hex8_laplacian_tc_fill_ops_tpl<real_t>(
                     nelements,
                     stride,
                     elements,
                     (const cu_jacobian_t *)fff,
-                    (real_t *)macro_element_ops);
+                    (real_t *)macro_element_ops,
+                    stream);
         default: {
             fprintf(stderr,
                     "[Error] cu_proteus_affine_hex8_laplacian_tc_fill_ops: not implemented for "
@@ -251,18 +274,142 @@ extern int cu_proteus_affine_hex8_laplacian_tc_fill_ops(const ptrdiff_t nelement
     return SFEM_FAILURE;
 }
 
-template <typename T>
-__global__ int cu_proteus_affine_hex8_laplacian_tc_apply_kernel(
+__global__ void cu_proteus_affine_hex8_laplacian_tc_apply_kernel(
         const int level,
         const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
         const ptrdiff_t interior_start,
         const idx_t *const SFEM_RESTRICT elements,
-        const T *const SFEM_RESTRICT macro_element_ops,
-        const T *const SFEM_RESTRICT x,
-        T *const SFEM_RESTRICT y) {
-    // Your kernel implementation here
-    // TODO
+        const double *const SFEM_RESTRICT macro_element_ops,
+        const double *const SFEM_RESTRICT x,
+        double *const SFEM_RESTRICT y) {
+
+    extern __shared__ double read_buffer[];
+    extern __shared__ double write_buffer[];
+    extern __shared__ double B[];  // 2 x (4 x 8)
+    extern __shared__ double C[];  // 2 x (4 x 8)
+
+    static const int mops_stride = 8 * 8;
+    static const int K = 4;
+    static const int N = 8;
+    wmma::fragment<wmma::matrix_a, 8, 8, K, double, wmma::row_major> A_frag;
+    wmma::fragment<wmma::accumulator, 8, 8, K, double> C_frag;
+
+    // Number of micro-elements
+    const int txe = level * level * level;
+    const ptrdiff_t elements_per_block = blockDim.z;
+    const int l_macro_e = threadIdx.z;
+
+    // Thread X/Y dimension
+    const int thSize = blockDim.x * blockDim.y;
+    const int threadIdx_xy = threadIdx.y * blockDim.x + threadIdx.x;
+
+    // Node sizes
+    const int block_size = level + 1;
+    const int block_size_2 = block_size * block_size;
+    const int block_size_3 = block_size_2 * block_size;
+
+    // B-matrix packing
+    const int pack = threadIdx_xy / 32;
+    const int pack_xy = threadIdx_xy - pack * 32;
+
+    const int batch = threadIdx_xy / 32;             // [0, 2) Also warpid
+    const int batch_xy = threadIdx_xy - batch * 32;  // [0, 32) Also laneid
+
+    const int quad_offset_x[4] = {0, 1, 1, 0};
+    const int quad_offset_y[4] = {0, 0, 1, 1};
+
+    for (ptrdiff_t macro_e = blockIdx.x * elements_per_block + l_macro_e; macro_e < nelements;
+         macro_e += elements_per_block) {
+        // X-Y workload expected to be 8x8
+        assert(blockDim.x == 8);
+        assert(blockDim.y == 8);
+
+        // A-matrix packing A = (A0, A1)
+        const double *const A = &macro_element_ops[macro_e * mops_stride];  // 2 x (8 x 4)
+        wmma::load_matrix_sync(A_frag, A, K);
+
+        for (int lidx = threadIdx_xy; lidx < block_size_3; lidx += thSize) {
+            const int zi = lidx / block_size;
+            const int yi = (lidx - zi * block_size) / block_size;
+            const int xi = lidx - zi * block_size - yi * block_size;
+            const ptrdiff_t idx = elements[lidx * stride + macro_e];
+            read_buffer[l_macro_e * block_size_3 + lidx] = x[idx];
+            write_buffer[l_macro_e * block_size_3 + lidx] = 0.0;
+        }
+
+        // Loop over micro-elements Bottom, Top (reshuffle from node grid to element list)
+        for (int top = 0; top < 2; top++) {
+            for (int offset = 0; offset < txe; offset += 64) {
+                // Find element coordinates from index
+                int zi = offset / level;
+                int yi = (offset - zi * level) / level;
+                int xi = offset - zi * level - yi * level;
+
+                // Shift element index based on batch number (8 elements per batch)
+                xi += batch * 8;
+                yi += xi / level;
+                xi = xi % level;
+                zi += yi / level;
+                yi = yi % level;
+
+                const int xp = batch_xy / 2;
+                const int yp = batch_xy - xp * 2;
+
+                xi += quad_offset_x[xp];
+                yi += quad_offset_y[yp];
+                zi += top;
+
+                __syncthreads();
+
+                // Find element index
+                if (xi < block_size && yi < block_size && zi < block_size) {
+                    const int ii = cu_proteus_hex8_lidx(level, xi, yi, zi);
+                    B[batch * 32 + batch_xy] = read_buffer[l_macro_e * block_size_3 + ii];
+                } else {
+                    // Pad with zeros
+                    B[batch * 32 + batch_xy] = 0.0;
+                }
+
+                __syncthreads();
+
+                // Eval C = A0 * B + C
+                wmma::fragment<wmma::matrix_b, 8, 8, K, double, wmma::col_major> B_frag;
+
+                wmma::load_matrix_sync(B_frag, &B[batch * 32], K);
+                wmma::fill_fragment(C_frag, 0.0);
+                wmma::mma_sync(C_frag, A_frag, B_frag, C_frag);
+                wmma::store_matrix_sync(&C[batch * 32], C_frag, N, wmma::mem_row_major);
+
+                // 4 reads per element and 8 writes per element
+                if (xi < block_size && yi < block_size && zi < block_size) {
+                    const int ii_bottom = cu_proteus_hex8_lidx(level, xi, yi, zi);
+                    atomicAdd(&write_buffer[l_macro_e * block_size_3 + ii_bottom],
+                              C[batch * 32 + batch_xy]);
+
+                    const int ii_top = cu_proteus_hex8_lidx(level, xi, yi, zi + 1);
+                    atomicAdd(&write_buffer[l_macro_e * block_size_3 + ii_top],
+                              C[batch * 32 + batch_xy]);
+                }
+            }
+
+            if (top == 0) {
+                const double *const A =
+                        &macro_element_ops[macro_e * mops_stride + 8 * K];  // 2 x (8 x 4)
+                wmma::load_matrix_sync(A_frag, A, K);
+            }
+        }
+
+        __syncthreads();
+
+        for (int lidx = threadIdx_xy; lidx < block_size_3; lidx += thSize) {
+            const int zi = lidx / block_size;
+            const int yi = (lidx - zi * block_size) / block_size;
+            const int xi = lidx - zi * block_size - yi * block_size;
+            const ptrdiff_t idx = elements[lidx * stride + macro_e];
+            atomicAdd(&y[idx], write_buffer[l_macro_e * block_size_3 + lidx]);
+        }
+    }
 }
 
 template <typename T>
@@ -276,21 +423,9 @@ static int cu_proteus_affine_hex8_laplacian_tc_apply_tpl(
         const T *const SFEM_RESTRICT x,
         T *const SFEM_RESTRICT y,
         void *stream) {
-
-              // Hand tuned
-    int block_size = 128;
-#ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
-    {
-        int min_grid_size;
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size,
-                                           &block_size,
-                                           cu_proteus_affine_hex8_laplacian_tc_apply_kernel<T>,
-                                           0,
-                                           0);
-    }
-#endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
-
-    const ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
+    // Hand tuned
+    dim3 block_size(8, 8, 1);
+    dim3 n_blocks(MIN(nelements, 65535), 1, 1);
 
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
@@ -313,17 +448,40 @@ extern int cu_proteus_affine_hex8_laplacian_tc_apply(
         const void *const SFEM_RESTRICT x,
         void *const SFEM_RESTRICT y,
         void *stream) {
-
     switch (real_type) {
         case SFEM_FLOAT64:
             return cu_proteus_affine_hex8_laplacian_tc_apply_tpl<double>(
-                    level, nelements, stride, interior_start, elements, (const double *)macro_element_ops, (const double *)x, (double *)y, stream);
-        case SFEM_FLOAT32:
-            return cu_proteus_affine_hex8_laplacian_tc_apply_tpl<float>(
-                    level, nelements, stride, interior_start, elements, (const float *)macro_element_ops, (const float *)x, (float *)y, stream);
-        case SFEM_REAL_DEFAULT:
-            return cu_proteus_affine_hex8_laplacian_tc_apply_tpl<real_t>(
-                    level, nelements, stride, interior_start, elements, (const real_t *)macro_element_ops, (const real_t *)x, (real_t *)y, stream);
+                    level,
+                    nelements,
+                    stride,
+                    interior_start,
+                    elements,
+                    (const double *)macro_element_ops,
+                    (const double *)x,
+                    (double *)y,
+                    stream);
+        // case SFEM_FLOAT32:
+        //     return cu_proteus_affine_hex8_laplacian_tc_apply_tpl<float>(
+        //             level,
+        //             nelements,
+        //             stride,
+        //             interior_start,
+        //             elements,
+        //             (const float *)macro_element_ops,
+        //             (const float *)x,
+        //             (float *)y,
+        //             stream);
+        // case SFEM_REAL_DEFAULT:
+        //     return cu_proteus_affine_hex8_laplacian_tc_apply_tpl<real_t>(
+        //             level,
+        //             nelements,
+        //             stride,
+        //             interior_start,
+        //             elements,
+        //             (const real_t *)macro_element_ops,
+        //             (const real_t *)x,
+        //             (real_t *)y,
+        //             stream);
         default: {
             fprintf(stderr,
                     "[Error] cu_proteus_affine_hex8_laplacian_tc_apply: not implemented for "
@@ -335,3 +493,4 @@ extern int cu_proteus_affine_hex8_laplacian_tc_apply(
         }
     }
 }
+#endif
