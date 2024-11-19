@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+if [[ "$1" == "mpi" ]]
+then
+	export USE_MPI=1
+fi
+
+# launcher
+
 set -e
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
@@ -37,9 +44,11 @@ if [[ -d "$p2_mesh" ]]
 then
 	echo "Reusing existing mesh $p2_mesh!"
 else
-	create_sphere.sh 3
-	# create_sphere.sh 0 # Visibily see the curvy surface
+	# create_sphere.sh 5
+	export SFEM_ORDER_WITH_COORDINATE=2
+	create_sphere.sh 5 # Visibily see the curvy surface <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 	sfc $mesh $mesh_sorted
+	
 	# Project p2 nodes to sphere isosurfaces (to check if nonlinear map are creating errors)
 	SFEM_SPERE_TOL=1e-5 SFEM_MAP_TO_SPHERE=1 mesh_p1_to_p2 $mesh_sorted $p2_mesh
 
@@ -57,6 +66,9 @@ else
 	raw_to_xdmf.py $sdf
 fi
 
+sdf_test.py $sdf
+# raw_to_xdmf.py $sdf
+
 sizes=`head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' '`
 origins=`head -8 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' '`
 scaling=`head -11 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' '`
@@ -69,17 +81,38 @@ echo $scaling
 # export OMP_PROC_BIND=true
 # export OMP_NUM_THREADS=8
 
-# n_procs=18
-n_procs=8
+n_procs=18
+# n_procs=1
 # n_procs=2
 # n_procs=1
 
-if [[ -z "$LAUNCH" ]]
+PERF="yes"
+PERF="no"
+
+# if [[ -z "$LAUNCH" ]]
+# then
+# 	LAUNCH="mpiexec -np $n_procs"
+# 	LAUNCH=""
+# fi
+
+if [[ "$USE_MPI" == "1" ]]
 then
 	LAUNCH="mpiexec -np $n_procs"
+else
+	LAUNCH="srun -n 288 -p debug "
+	LAUNCH=" "
 fi
 
+# GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
 GRID_TO_MESH="grid_to_mesh"
+
+# chack if PERF == yes
+if [[ "$PERF" == "yes" ]]
+then
+	GRID_TO_MESH="perf record -o /tmp/out.perf $GRID_TO_MESH"
+	LAUNCH=""
+fi
+
 
 # To enable iso-parametric transformation of p2 meshes
 # for the resampling
@@ -88,5 +121,5 @@ GRID_TO_MESH="grid_to_mesh"
 export SFEM_ENABLE_ISOPARAMETRIC=1
 
 set -x
-time SFEM_INTERPOLATE=0 SFEM_READ_FP32=1 $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field
+time SFEM_INTERPOLATE=0 SFEM_READ_FP32=1 $LAUNCH  $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET10
 raw_to_db.py $resample_target out.vtk --point_data=$field
