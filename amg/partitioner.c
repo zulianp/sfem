@@ -173,6 +173,7 @@ int pairwise_aggregation(const real_t coarsening_factor,
     }
 
     // Update the augmented matrix
+    // TODO verify this with a spmm implementation
     idx_t new_nnz = 0;
     for (idx_t k = 0; k < nnz; k++) {
         idx_t i = alive[a_bar->offdiag_row_indices[k]];

@@ -73,6 +73,8 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
 
         int failure = partition(near_null, bdy_dofs, coarsening_factor, &a_bar, &ws);
         if (failure) {
+            stat_iter->set_max_it(5);
+            // stat_iter->verbose = true;
             amg->add_level(prev_mat, stat_iter, nullptr, nullptr);
 
             printf("Failed to add new level, levels: %d\n", levels);
