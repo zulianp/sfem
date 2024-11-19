@@ -3,7 +3,7 @@
 #include <sfem_base.h>
 #include <stdio.h>
 
-#define real_type real_t
+// #define real_type real_t
 
 #include "tet10_weno_cuda.cuh"
 
@@ -195,14 +195,14 @@ void free_elems_tet10_device(elems_tet10_device elems) {
  * @param qz
  * @return __device__
  */
-__device__ real_t tet10_measure_cu(const double* const MY_RESTRICT x,  //
-                                   const double* const MY_RESTRICT y,  //
-                                   const double* const MY_RESTRICT z,  //
+__device__ real_t tet10_measure_cu(const real_t* const MY_RESTRICT x,  //
+                                   const real_t* const MY_RESTRICT y,  //
+                                   const real_t* const MY_RESTRICT z,  //
 
                                    // Quadrature point //
-                                   const double qx,    //
-                                   const double qy,    //
-                                   const double qz) {  //
+                                   const real_t qx,    //
+                                   const real_t qy,    //
+                                   const real_t qz) {  //
     //
     const real_t x0 = 4 * qz;
     const real_t x1 = x0 - 1;
@@ -804,10 +804,10 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(
         //
         const size_t q_i = warp_i * size_t(__WARP_SIZE__) + tile_rank;
 
-        const real_type tet4_qx_v = (q_i < TET4_NQP) ? tet4_qx[q_i] : tet4_qx[0];
-        const real_type tet4_qy_v = (q_i < TET4_NQP) ? tet4_qy[q_i] : tet4_qy[0];
-        const real_type tet4_qz_v = (q_i < TET4_NQP) ? tet4_qz[q_i] : tet4_qz[0];
-        const real_type tet4_qw_v = (q_i < TET4_NQP) ? tet4_qw[q_i] : 0.0;
+        const real_t tet4_qx_v = (q_i < TET4_NQP) ? tet4_qx[q_i] : tet4_qx[0];
+        const real_t tet4_qy_v = (q_i < TET4_NQP) ? tet4_qy[q_i] : tet4_qy[0];
+        const real_t tet4_qz_v = (q_i < TET4_NQP) ? tet4_qz[q_i] : tet4_qz[0];
+        const real_t tet4_qw_v = (q_i < TET4_NQP) ? tet4_qw[q_i] : 0.0;
 
         const real_t measure = tet10_measure_cu(x, y, z, tet4_qx_v, tet4_qy_v, tet4_qz_v);
 
@@ -1213,10 +1213,10 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  
     for (size_t warp_i = 0; warp_i < nr_warp_loop; warp_i++) {
         const size_t q_i = warp_i * size_t(__WARP_SIZE__) + tile_rank;
 
-        const real_type tet4_qx_v = (q_i < TET4_NQP) ? tet4_qx[q_i] : tet4_qx[0];
-        const real_type tet4_qy_v = (q_i < TET4_NQP) ? tet4_qy[q_i] : tet4_qy[0];
-        const real_type tet4_qz_v = (q_i < TET4_NQP) ? tet4_qz[q_i] : tet4_qz[0];
-        const real_type tet4_qw_v = (q_i < TET4_NQP) ? tet4_qw[q_i] : 0.0;
+        const real_t tet4_qx_v = (q_i < TET4_NQP) ? tet4_qx[q_i] : tet4_qx[0];
+        const real_t tet4_qy_v = (q_i < TET4_NQP) ? tet4_qy[q_i] : tet4_qy[0];
+        const real_t tet4_qz_v = (q_i < TET4_NQP) ? tet4_qz[q_i] : tet4_qz[0];
+        const real_t tet4_qw_v = (q_i < TET4_NQP) ? tet4_qw[q_i] : 0.0;
 
         const real_t measure = tet10_measure_cu(x_unit,
                                                 y_unit,

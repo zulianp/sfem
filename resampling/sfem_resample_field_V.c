@@ -245,7 +245,8 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V(
                     (real_t)xyz[__xyz_ind__][__ev__[10]], (real_t)xyz[__xyz_ind__][__ev__[11]], \
                     (real_t)xyz[__xyz_ind__][__ev__[12]], (real_t)xyz[__xyz_ind__][__ev__[13]], \
                     (real_t)xyz[__xyz_ind__][__ev__[14]], (real_t)xyz[__xyz_ind__][__ev__[15]]  \
-        }
+        }                                                                                       \
+    }
 
 #define ACCUMULATE_WFIELD(_indx_, _element_fieldN_)                            \
     {                                                                          \
