@@ -172,14 +172,14 @@ set_target_properties(
 
 set(SFEM_TARGETS sfem)
 
-# option(CUDA_ARCH "Use CUDA architecture" OFF)
+# option(SFEM_CUDA_ARCH "Use CUDA architecture" OFF)
 
-message(STATUS "CUDA_ARCH: ${CUDA_ARCH}")
+message(STATUS "SFEM_CUDA_ARCH: ${SFEM_CUDA_ARCH}")
 
 if(SFEM_ENABLE_CUDA)
 # set_target_properties(sfem PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 # https://gt3rs.medium.com/compile-with-nvcc-3566fbdfdbf
-      set_property(TARGET sfem PROPERTY CUDA_ARCHITECTURES ${CUDA_ARCH})
+      set_property(TARGET sfem PROPERTY SFEM_CUDA_ARCHITECTURES ${SFEM_CUDA_ARCH})
 endif()
 
 ######################################################
