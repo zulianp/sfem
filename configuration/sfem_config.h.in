@@ -38,6 +38,10 @@ typedef @SFEM_REAL_C_TYPE@ real_t;
 #define SFEM_CUSPARSE_REAL_T @SFEM_REAL_CUSPARSE_TYPE@
 #define d_REAL_T "@SFEM_REAL_PRINT_TYPE@"
 #define dtype_REAL_T "@SFEM_REAL_TYPE@"
+#define SIZEOF_REAL_T @SFEM_SIZEOF_REAL_T@
+
+#define SFEM_REAL_T_IS_FLOAT64 (SIZEOF_REAL_T == 8)
+#define SFEM_REAL_T_IS_FLOAT32 (SIZEOF_REAL_T == 4)
 
 // computation real numbers and explicit vectorized types
 typedef @SFEM_SCALAR_C_TYPE@ scalar_t;
