@@ -334,22 +334,23 @@ SFEM_INLINE static vec_real tet10_measure_V(const real_t* const SFEM_RESTRICT x,
     const vec_real x20 = -x3 * x[4];
     const vec_real x21 = x8 * x[0];
     const vec_real x22 = -x0 * x[7] + x21;
-    const vec_real x23 = (1.0 / 6.0) * x0 * x[9] + (1.0 / 6.0) * x18 * x[2] +
-                         (1.0 / 6.0) * x19 * x[6] + (1.0 / 6.0) * x20 + (1.0 / 6.0) * x22 +
-                         (1.0 / 6.0) * x3 * x[5];
+    const real_t sixth = 1.0/6.0;
+    const vec_real x23 = sixth * x0 * x[9] + sixth * x18 * x[2] +
+                         sixth * x19 * x[6] + sixth * x20 + sixth * x22 +
+                         sixth * x3 * x[5];
     const vec_real x24 = -x0 * y[7];
     const vec_real x25 = x0 * y[8] + x10 + x14 * y[1] + x16 * y[4] + x2 * y[5] + x24;
     const vec_real x26 = x15 - x3 * z[4];
     const vec_real x27 = x1 * z[3] + x12 + x2 * z[9] + x26 + x3 * z[8] + x5 * z[7];
     const vec_real x28 = x0 * y[9] + x18 * y[2] + x19 * y[6] + x24 + x3 * y[5] + x6 + x9;
     const vec_real x29 = -x2 * x[6];
-    const vec_real x30 = (1.0 / 6.0) * x1 * x[3] + (1.0 / 6.0) * x2 * x[9] + (1.0 / 6.0) * x20 +
-                         (1.0 / 6.0) * x21 + (1.0 / 6.0) * x29 + (1.0 / 6.0) * x3 * x[8] +
-                         (1.0 / 6.0) * x5 * x[7];
+    const vec_real x30 = sixth * x1 * x[3] + sixth * x2 * x[9] + sixth * x20 +
+                         sixth * x21 + sixth * x29 + sixth * x3 * x[8] +
+                         sixth * x5 * x[7];
     const vec_real x31 = x0 * z[9] + x13 + x18 * z[2] + x19 * z[6] + x26 + x3 * z[5];
-    const vec_real x32 = (1.0 / 6.0) * x0 * x[8] + (1.0 / 6.0) * x14 * x[1] +
-                         (1.0 / 6.0) * x16 * x[4] + (1.0 / 6.0) * x2 * x[5] + (1.0 / 6.0) * x22 +
-                         (1.0 / 6.0) * x29;
+    const vec_real x32 = sixth * x0 * x[8] + sixth * x14 * x[1] +
+                         sixth * x16 * x[4] + sixth * x2 * x[5] + sixth * x22 +
+                         sixth * x29;
 
     return x11 * x17 * x23 - x11 * x31 * x32 - x17 * x28 * x30 - x23 * x25 * x27 + x25 * x30 * x31 +
            x27 * x28 * x32;
@@ -391,69 +392,81 @@ SFEM_INLINE static void tet10_transform_V(const real_t* const SFEM_RESTRICT x,
 
 SFEM_INLINE static void tet10_dual_basis_hrt_V(const vec_real qx, const vec_real qy,
                                                const vec_real qz, vec_real* const f) {
+    static const real_t c5_18 = 5.0/18.0;
+    static const real_t c5_72 = 5.0/72.0;
+    static const real_t c10_9 = 10.0/9.0;
+    static const real_t c25_9 = 25.0/9.0;
+    static const real_t c40_27 = 40.0/27.0;
+    static const real_t c115_27 = 115.0/27.0;
+    static const real_t c110_27 = 110.0/27.0;
+    static const real_t c55_54 = 55.0/54.0;
+    static const real_t c10_27 = 10.0/27.0;
+    static const real_t c160_27 = 160.0/27.0;
+    static const real_t c460_27 = 460.0/27.0;
+
     const vec_real x0 = 2 * qy;
     const vec_real x1 = 2 * qz;
     const vec_real x2 = 2 * qx - 1;
     const vec_real x3 = (-x0 - x1 - x2) * (-qx - qy - qz + 1);
     const vec_real x4 = x0 - 1;
-    const vec_real x5 = (5.0 / 18.0) * qy;
+    const vec_real x5 = c5_18 * qy;
     const vec_real x6 = x4 * x5;
     const vec_real x7 = x1 - 1;
-    const vec_real x8 = (5.0 / 18.0) * qz;
+    const vec_real x8 = c5_18 * qz;
     const vec_real x9 = x7 * x8;
     const vec_real x10 = -4 * qx - 4 * qy - 4 * qz + 4;
-    const vec_real x11 = (5.0 / 72.0) * x10;
+    const vec_real x11 = c5_72 * x10;
     const vec_real x12 = qy * qz;
-    const vec_real x13 = qx * x11 + (10.0 / 9.0) * x12 + x6 + x9;
-    const vec_real x14 = (5.0 / 18.0) * qx;
+    const vec_real x13 = qx * x11 + c10_9 * x12 + x6 + x9;
+    const vec_real x14 = c5_18 * qx;
     const vec_real x15 = x14 * x2;
-    const vec_real x16 = (10.0 / 9.0) * qx;
+    const vec_real x16 = c10_9 * qx;
     const vec_real x17 = qy * x11 + qz * x16 + x15;
     const vec_real x18 = qy * x16 + qz * x11;
     const vec_real x19 = qx * x2;
-    const vec_real x20 = (5.0 / 18.0) * x3;
+    const vec_real x20 = c5_18 * x3;
     const vec_real x21 = qy * x14 + x10 * x8 + x20;
     const vec_real x22 = qz * x14 + x10 * x5;
     const vec_real x23 = qy * x4;
     const vec_real x24 = qz * x5 + x10 * x14;
     const vec_real x25 = qz * x7;
-    const vec_real x26 = (40.0 / 27.0) * x23;
-    const vec_real x27 = (115.0 / 27.0) * x10;
-    const vec_real x28 = (110.0 / 27.0) * qx;
+    const vec_real x26 = c40_27 * x23;
+    const vec_real x27 = c115_27 * x10;
+    const vec_real x28 = c110_27 * qx;
     const vec_real x29 = -qz * x28;
-    const vec_real x30 = (55.0 / 54.0) * x10;
+    const vec_real x30 = c55_54 * x10;
     const vec_real x31 = -qy * x30;
-    const vec_real x32 = (10.0 / 27.0) * x19;
-    const vec_real x33 = (40.0 / 27.0) * x25;
+    const vec_real x32 = c10_27 * x19;
+    const vec_real x33 = c40_27 * x25;
     const vec_real x34 = x29 + x31 + x32 + x33;
     const vec_real x35 = -qy * x28;
     const vec_real x36 = -qz * x30;
-    const vec_real x37 = (10.0 / 27.0) * x3;
+    const vec_real x37 = c10_27 * x3;
     const vec_real x38 = x35 + x36 + x37;
-    const vec_real x39 = (40.0 / 27.0) * x10;
+    const vec_real x39 = c40_27 * x10;
     const vec_real x40 = qx * qy;
-    const vec_real x41 = -qx * x30 - 110.0 / 27.0 * x12;
-    const vec_real x42 = (10.0 / 27.0) * x23;
-    const vec_real x43 = (40.0 / 27.0) * x3;
+    const vec_real x41 = -qx * x30 - c110_27 * x12;
+    const vec_real x42 = c10_27 * x23;
+    const vec_real x43 = c40_27 * x3;
     const vec_real x44 = x42 + x43;
     const vec_real x45 = qx * qz;
-    const vec_real x46 = (40.0 / 27.0) * x19;
+    const vec_real x46 = c40_27 * x19;
     const vec_real x47 = x41 + x46;
-    const vec_real x48 = (10.0 / 27.0) * x25;
+    const vec_real x48 = c10_27 * x25;
     const vec_real x49 = x26 + x48;
     const vec_real x50 = x29 + x31;
     const vec_real x51 = x35 + x36;
 
-    f[0] = x13 + x17 + x18 + (25.0 / 9.0) * x3;
-    f[1] = x13 + (25.0 / 9.0) * x19 + x21 + x22;
-    f[2] = x17 + x21 + (25.0 / 9.0) * x23 + x24 + x9;
-    f[3] = x15 + x18 + x20 + x22 + x24 + (25.0 / 9.0) * x25 + x6;
-    f[4] = qx * x27 + (160.0 / 27.0) * x12 + x26 + x34 + x38;
-    f[5] = qz * x39 + x34 + (460.0 / 27.0) * x40 + x41 + x44;
-    f[6] = qy * x27 + x33 + x38 + x42 + (160.0 / 27.0) * x45 + x47;
-    f[7] = qz * x27 + x37 + (160.0 / 27.0) * x40 + x47 + x49 + x50;
-    f[8] = qy * x39 + x32 + x41 + x43 + (460.0 / 27.0) * x45 + x49 + x51;
-    f[9] = qx * x39 + (460.0 / 27.0) * x12 + x44 + x46 + x48 + x50 + x51;
+    f[0] = x13 + x17 + x18 + c25_9 * x3;
+    f[1] = x13 + c25_9 * x19 + x21 + x22;
+    f[2] = x17 + x21 + c25_9 * x23 + x24 + x9;
+    f[3] = x15 + x18 + x20 + x22 + x24 + c25_9 * x25 + x6;
+    f[4] = qx * x27 + c160_27 * x12 + x26 + x34 + x38;
+    f[5] = qz * x39 + x34 + c460_27 * x40 + x41 + x44;
+    f[6] = qy * x27 + x33 + x38 + x42 + c160_27 * x45 + x47;
+    f[7] = qz * x27 + x37 + c160_27 * x40 + x47 + x49 + x50;
+    f[8] = qy * x39 + x32 + x41 + x43 + c460_27 * x45 + x49 + x51;
+    f[9] = qx * x39 + c460_27 * x12 + x44 + x46 + x48 + x50 + x51;
 }
 
 /**
@@ -975,9 +988,9 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
 
             // Calculate the origin of the 4x4x4 cube in the global space
             // And transform the coordinates to the the unitary space
-            const vec_real x_cube_origin_V = (ox + ((vec_real)i_glob_V - 1.0) * dx) / dx;
-            const vec_real y_cube_origin_V = (oy + ((vec_real)j_glob_V - 1.0) * dy) / dy;
-            const vec_real z_cube_origin_V = (oz + ((vec_real)k_glob_V - 1.0) * dz) / dz;
+            const vec_real x_cube_origin_V = (ox + ((vec_real)i_glob_V - (real_t)1.0) * dx) / dx;
+            const vec_real y_cube_origin_V = (oy + ((vec_real)j_glob_V - (real_t)1.0) * dy) / dy;
+            const vec_real z_cube_origin_V = (oz + ((vec_real)k_glob_V - (real_t)1.0) * dz) / dz;
 
             //// Compute the WENO interpolation
             vec_real eval_field;
