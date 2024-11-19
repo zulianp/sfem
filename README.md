@@ -5,9 +5,12 @@
 SFEM depends on the following base technologies
 
 - C/C++ Compiler
-- CMake
-- MPI
-- Python 3
+- CMake				(e.g., `brew install cmake`)
+- MPI 				(e.g., `brew install open-mpi`)
+- Python 3 			(e.g., `brew install python@3.12`)
+
+The following technologies are also supported
+- OpenMP 			(e.g., `brew install libomp`)
 
 # Installation guide
 

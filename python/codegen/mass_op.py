@@ -33,45 +33,55 @@ class MassOp:
 		# Ref element dims
 		dims = fe_test.manifold_dim()
 
-		if dims == 1:
-			q = [qx]
-		elif dims == 2:
-			q = [qx, qy]
-		else:
-			q = [qx, qy, qz]
-
 		# Quadrature point
-		q = sp.Matrix(dims, 1, q)
+		q = fe_test.quadrature_point()
 
 		self.field = field
 		self.fe_trial = field.fe
 		self.fe_test = fe_test
 		self.q = q
-		self.qw = sp.symbols('qw')
+		self.qw = fe_test.quadrature_weight()
 		self.symbolic_integration = symbolic_integration
 
-	def matrix(self):
+	def sym_matrix(self):
 		fe_trial = self.fe_trial
 		fe_test = self.fe_test
 		q = self.q
 
 		fun_trial = fe_trial.fun(q)
 		fun_test  = fe_test.fun(q)
-		dV = fe_test.jacobian_determinant(q)
+
+		if fe_test.is_isoparametric():
+			dV = fe_test.jacobian_determinant(q)
+		else:
+			dV = fe_test.symbol_jacobian_determinant()
 
 		if not self.symbolic_integration:
 			dV *= fe_test.reference_measure() * self.qw
 
-		expr = []
+		M = sp.zeros(fe_test.n_nodes(), fe_trial.n_nodes())
 		for i in range(0, fe_test.n_nodes()):
 			for j in range(0, fe_trial.n_nodes()):
 				if not self.symbolic_integration:
 					integr = fun_test[i] * fun_trial[j] * dV
 				else:
-					integr = fe_test.integrate(q, fun_test[i] * fun_trial[j]) * dV
-				var = sp.symbols(f'element_matrix[{i*fe_trial.n_nodes()+j}]')
-				
-				expr.append(self.assign_op(var, integr))
+					if fe_test.is_isoparametric():
+						integr = fe_test.integrate(q, fun_test[i] * fun_trial[j] * dV) 
+					else:
+						integr = fe_test.integrate(q, fun_test[i] * fun_trial[j]) * dV
+				M[i, j] = integr
+
+		return M
+
+	def matrix(self):
+		M = self.sym_matrix()
+		rows, cols = M.shape
+
+		expr = []
+		for i in range(0, rows):
+			for j in range(0, cols):
+				var = sp.symbols(f'element_matrix[{i*cols+j}]')
+				expr.append(self.assign_op(var, M[i, j]))
 
 		return expr
 

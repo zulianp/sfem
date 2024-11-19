@@ -5,11 +5,18 @@ import sympy as sp
 from sfem_codegen import *
 
 class Quad4(FE):
-	def __init__(self):
+	def __init__(self, isoparam=False):
 		super().__init__()
+		self.isoparam = isoparam
+
+	def is_isoparametric(self):
+		return self.isoparam
 
 	def reference_measure(self):
 		return 1
+
+	def barycenter(self):
+		return vec2(sp.Rational(1, 2), sp.Rational(1, 2))
 
 	def coords_sub_parametric(self):
 		return [[x0, x2], [y0, y2]]
@@ -51,9 +58,6 @@ class Quad4(FE):
 
 	def spatial_dim(self):
 		return 2
-
-	def is_isoparametric(self):
-		return True
 
 	def integrate(self, q, expr):
 		return sp.integrate(expr, (q[1], 0, 1), (q[0], 0, 1)) 

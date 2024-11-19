@@ -7,9 +7,12 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "sfem_base.h"
 #include "sfem_defs.h"
+
+#include "sfem_mask.h"
 
 // #include "isolver_function.h"
 
@@ -41,6 +44,8 @@ namespace sfem {
         std::shared_ptr<Buffer<count_t>> rowptr() const;
         std::shared_ptr<Buffer<idx_t>> colidx() const;
         std::shared_ptr<CRSGraph> block_to_scalar(const int block_size);
+
+        void print(std::ostream &os) const;
 
     private:
         class Impl;
@@ -75,6 +80,7 @@ namespace sfem {
         ptrdiff_t n_elements() const;
 
         std::shared_ptr<CRSGraph> node_to_node_graph();
+        std::shared_ptr<CRSGraph> node_to_node_graph_upper_triangular();
         std::shared_ptr<CRSGraph> create_node_to_node_graph(const enum ElemType element_type);
 
         std::shared_ptr<Buffer<count_t>> node_to_node_rowptr() const;
@@ -96,12 +102,40 @@ namespace sfem {
         std::unique_ptr<Impl> impl_;
     };
 
+    class SemiStructuredMesh {
+    public:
+        idx_t **element_data();
+        geom_t **point_data();
+        ptrdiff_t interior_start() const;
+
+        SemiStructuredMesh(const std::shared_ptr<Mesh> macro_mesh, const int level);
+        ~SemiStructuredMesh();
+
+        std::shared_ptr<CRSGraph> node_to_node_graph();
+
+        static std::shared_ptr<SemiStructuredMesh> create(const std::shared_ptr<Mesh> macro_mesh,
+                                                          const int level) {
+            return std::make_shared<SemiStructuredMesh>(macro_mesh, level);
+        }
+
+        int n_nodes_per_element() const;
+        ptrdiff_t n_nodes() const;
+        int level() const;
+        ptrdiff_t n_elements() const;
+
+    private:
+        class Impl;
+        std::unique_ptr<Impl> impl_;
+    };
+
     class FunctionSpace final {
     public:
         FunctionSpace(const std::shared_ptr<Mesh> &mesh,
                       const int block_size = 1,
                       const enum ElemType element_type = INVALID);
         ~FunctionSpace();
+
+        int promote_to_semi_structured(const int level);
 
         static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<Mesh> &mesh,
                                                      const int block_size = 1,
@@ -116,6 +150,11 @@ namespace sfem {
         std::shared_ptr<sfem::Buffer<idx_t>> device_elements();
 
         Mesh &mesh();
+        std::shared_ptr<Mesh> mesh_ptr() const;
+
+        bool has_semi_structured_mesh() const;
+        SemiStructuredMesh &semi_structured_mesh();
+
         int block_size() const;
         ptrdiff_t n_dofs() const;
 
@@ -147,6 +186,32 @@ namespace sfem {
                                 const idx_t *const colidx,
                                 real_t *const values) = 0;
 
+        virtual int hessian_bsr(const real_t *const /*x*/,
+                                const count_t *const /*rowptr*/,
+                                const idx_t *const /*colidx*/,
+                                real_t *const /*values*/) {
+            assert(false);
+            return SFEM_FAILURE;
+        }
+
+        virtual int hessian_bcrs_sym(const real_t *const /*x*/,
+                                     const count_t *const /*rowidx*/,
+                                     const idx_t *const /*colidx*/,
+                                     const ptrdiff_t /*block_stride*/,
+                                     real_t **const /*diag_values*/,
+                                     real_t **const /*off_diag_values*/) {
+            assert(false);
+            return SFEM_FAILURE;
+        }
+
+        virtual int hessian_crs_sym(const real_t *const x,
+                                    const count_t *const rowptr,
+                                    const idx_t *const colidx,
+                                    real_t *const diag_values,
+                                    real_t *const off_diag_values) {
+            return SFEM_FAILURE;
+        }
+
         virtual int hessian_diag(const real_t *const /*x*/, real_t *const /*values*/) {
             return SFEM_FAILURE;
         }
@@ -169,6 +234,12 @@ namespace sfem {
         }
 
         virtual std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &) {
+            assert(false);
+            return nullptr;
+        }
+
+        virtual void set_option(const std::string & /*name*/, bool /*val*/) {}
+        virtual std::shared_ptr<Op> clone() const {
             assert(false);
             return nullptr;
         }
@@ -225,11 +296,20 @@ namespace sfem {
         virtual int apply_zero(real_t *const x);
         virtual int gradient(const real_t *const x, real_t *const g) = 0;
         virtual int copy_constrained_dofs(const real_t *const src, real_t *const dest) = 0;
+        virtual int mask(mask_t *mask) = 0;
 
         virtual int hessian_crs(const real_t *const x,
                                 const count_t *const rowptr,
                                 const idx_t *const colidx,
                                 real_t *const values) = 0;
+
+        virtual int hessian_bsr(const real_t *const /*x*/,
+                                const count_t *const /*rowptr*/,
+                                const idx_t *const /*colidx*/,
+                                real_t *const /*values*/) {
+            assert(false);
+            return SFEM_FAILURE;
+        }
 
         virtual std::shared_ptr<Constraint> derefine(
                 const std::shared_ptr<FunctionSpace> &coarse_space,
@@ -249,10 +329,16 @@ namespace sfem {
         int apply(real_t *const x) override;
         int apply_value(const real_t value, real_t *const x) override;
         int copy_constrained_dofs(const real_t *const src, real_t *const dest) override;
+        int mask(mask_t *mask) override;
 
         int gradient(const real_t *const x, real_t *const g) override;
 
         int hessian_crs(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values) override;
+
+        int hessian_bsr(const real_t *const x,
                         const count_t *const rowptr,
                         const idx_t *const colidx,
                         real_t *const values) override;
@@ -334,6 +420,24 @@ namespace sfem {
                         const idx_t *const colidx,
                         real_t *const values);
 
+        int hessian_bsr(const real_t *const x,
+                        const count_t *const rowptr,
+                        const idx_t *const colidx,
+                        real_t *const values);
+
+        int hessian_bcrs_sym(const real_t *const x,
+                             const count_t *const rowptr,
+                             const idx_t *const colidx,
+                             const ptrdiff_t block_stride,
+                             real_t **const diag_values,
+                             real_t **const off_diag_values);
+
+        int hessian_crs_sym(const real_t *const x,
+                            const count_t *const rowptr,
+                            const idx_t *const colidx,
+                            real_t *const diag_values,
+                            real_t *const off_diag_values);
+
         int hessian_diag(const real_t *const x, real_t *const values);
 
         int gradient(const real_t *const x, real_t *const out);
@@ -347,15 +451,15 @@ namespace sfem {
         int copy_constrained_dofs(const real_t *const src, real_t *const dest);
         int report_solution(const real_t *const x);
         int initial_guess(real_t *const x);
+        int constaints_mask(mask_t *mask);
 
         int set_output_dir(const char *path);
 
         std::shared_ptr<Output> output();
-
-        std::shared_ptr<Operator<real_t>> hierarchical_restriction();
-        std::shared_ptr<Operator<real_t>> hierarchical_prolongation();
-
         ExecutionSpace execution_space() const;
+
+        std::shared_ptr<Operator<real_t>> linear_op_variant(
+                const std::vector<std::pair<std::string, int>> &opts);
 
     private:
         class Impl;
@@ -368,7 +472,8 @@ namespace sfem {
                 std::function<std::unique_ptr<Op>(const std::shared_ptr<FunctionSpace> &)>;
 
         using FactoryFunctionBoundary =
-                std::function<std::unique_ptr<Op>(const std::shared_ptr<FunctionSpace> &, const std::shared_ptr<Buffer<idx_t *>> &)>;
+                std::function<std::unique_ptr<Op>(const std::shared_ptr<FunctionSpace> &,
+                                                  const std::shared_ptr<Buffer<idx_t *>> &)>;
 
         static void register_op(const std::string &name, FactoryFunction factory_function);
         static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,
@@ -395,8 +500,7 @@ namespace sfem {
     };
 
     std::string d_op_str(const std::string &name);
-    std::shared_ptr<Buffer<idx_t *>> mesh_connectivity_from_file(MPI_Comm comm,
-                                                                 const char *folder);
+    std::shared_ptr<Buffer<idx_t *>> mesh_connectivity_from_file(MPI_Comm comm, const char *folder);
 }  // namespace sfem
 
 #endif  // SFEM_FUNCTION_HPP

@@ -199,28 +199,30 @@ static int build_crs_graph_from_n2e(const ptrdiff_t nelements,
     {
         rowptr[0] = 0;
 
-#pragma omp parallel for
-        for (ptrdiff_t node = 0; node < nnodes; ++node) {
-            idx_t n2nbuff[2048];
+#pragma omp parallel
+        {
+            idx_t n2nbuff[4096];
+#pragma omp for
+            for (ptrdiff_t node = 0; node < nnodes; ++node) {
+                count_t ebegin = n2eptr[node];
+                count_t eend = n2eptr[node + 1];
 
-            count_t ebegin = n2eptr[node];
-            count_t eend = n2eptr[node + 1];
+                idx_t nneighs = 0;
 
-            idx_t nneighs = 0;
+                for (count_t e = ebegin; e < eend; ++e) {
+                    element_idx_t eidx = elindex[e];
+                    assert(eidx < nelements);
 
-            for (count_t e = ebegin; e < eend; ++e) {
-                element_idx_t eidx = elindex[e];
-                assert(eidx < nelements);
-
-                for (int edof_i = 0; edof_i < nnodesxelem; ++edof_i) {
-                    idx_t neighnode = elems[edof_i][eidx];
-                    assert(nneighs < 2048);
-                    n2nbuff[nneighs++] = neighnode;
+                    for (int edof_i = 0; edof_i < nnodesxelem; ++edof_i) {
+                        idx_t neighnode = elems[edof_i][eidx];
+                        assert(nneighs < 4096);
+                        n2nbuff[nneighs++] = neighnode;
+                    }
                 }
-            }
 
-            nneighs = sortreduce(n2nbuff, nneighs);
-            rowptr[node + 1] = nneighs;
+                nneighs = sortreduce(n2nbuff, nneighs);
+                rowptr[node + 1] = nneighs;
+            }
         }
 
         // Cumulative sum
@@ -231,30 +233,32 @@ static int build_crs_graph_from_n2e(const ptrdiff_t nelements,
         const ptrdiff_t nnz = rowptr[nnodes];
         colidx = (idx_t *)malloc(nnz * sizeof(idx_t));
 
-#pragma omp parallel for
-        for (ptrdiff_t node = 0; node < nnodes; ++node) {
-            idx_t n2nbuff[2048];
+#pragma omp parallel
+        {
+            idx_t n2nbuff[4096];
+#pragma omp for
+            for (ptrdiff_t node = 0; node < nnodes; ++node) {
+                count_t ebegin = n2eptr[node];
+                count_t eend = n2eptr[node + 1];
 
-            count_t ebegin = n2eptr[node];
-            count_t eend = n2eptr[node + 1];
+                idx_t nneighs = 0;
 
-            idx_t nneighs = 0;
+                for (count_t e = ebegin; e < eend; ++e) {
+                    element_idx_t eidx = elindex[e];
+                    assert(eidx < nelements);
 
-            for (count_t e = ebegin; e < eend; ++e) {
-                element_idx_t eidx = elindex[e];
-                assert(eidx < nelements);
-
-                for (int edof_i = 0; edof_i < nnodesxelem; ++edof_i) {
-                    idx_t neighnode = elems[edof_i][eidx];
-                    assert(nneighs < 2048);
-                    n2nbuff[nneighs++] = neighnode;
+                    for (int edof_i = 0; edof_i < nnodesxelem; ++edof_i) {
+                        idx_t neighnode = elems[edof_i][eidx];
+                        assert(nneighs < 4096);
+                        n2nbuff[nneighs++] = neighnode;
+                    }
                 }
-            }
 
-            nneighs = sortreduce(n2nbuff, nneighs);
+                nneighs = sortreduce(n2nbuff, nneighs);
 
-            for (idx_t i = 0; i < nneighs; ++i) {
-                colidx[rowptr[node] + i] = n2nbuff[i];
+                for (idx_t i = 0; i < nneighs; ++i) {
+                    colidx[rowptr[node] + i] = n2nbuff[i];
+                }
             }
         }
     }
@@ -379,6 +383,22 @@ int build_crs_graph_for_elem_type(const int element_type,
 
     return build_crs_graph_mem_conservative(
             nelements, nnodes, elem_num_nodes(element_type), elems, out_rowptr, out_colidx);
+}
+
+int build_crs_graph_from_element(const ptrdiff_t nelements,
+                                 const ptrdiff_t nnodes,
+                                 int nxe,
+                                 idx_t **const elems,
+                                 count_t **out_rowptr,
+                                 idx_t **out_colidx) {
+    int SFEM_CRS_FAST_SERIAL = 0;
+    SFEM_READ_ENV(SFEM_CRS_FAST_SERIAL, atoi);
+
+    if (SFEM_CRS_FAST_SERIAL) {
+        return build_crs_graph_faster(nelements, nnodes, nxe, elems, out_rowptr, out_colidx);
+    }
+
+    return build_crs_graph_mem_conservative(nelements, nnodes, nxe, elems, out_rowptr, out_colidx);
 }
 
 int build_crs_graph(const ptrdiff_t nelements,
@@ -619,4 +639,128 @@ int create_dual_graph(const ptrdiff_t n_elements,
     printf("crs_graph.c: create_dual_graph\t%g seconds\n", tock - tick);
 
     return ret;
+}
+
+static int build_crs_graph_upper_triangular_from_n2e(const ptrdiff_t nelements,
+                                                     const ptrdiff_t nnodes,
+                                                     const int nnodesxelem,
+                                                     idx_t **const SFEM_RESTRICT elems,
+                                                     const count_t *const SFEM_RESTRICT n2eptr,
+                                                     const element_idx_t *const SFEM_RESTRICT
+                                                             elindex,
+                                                     count_t **out_rowptr,
+                                                     idx_t **out_colidx) {
+    count_t *rowptr = (count_t *)malloc((nnodes + 1) * sizeof(count_t));
+    idx_t *colidx = 0;
+
+    {
+        rowptr[0] = 0;
+
+
+        {
+#pragma omp parallel for
+            for (ptrdiff_t node = 0; node < nnodes; ++node) {
+                idx_t n2nbuff[4096];
+
+                count_t ebegin = n2eptr[node];
+                count_t eend = n2eptr[node + 1];
+
+                idx_t nneighs = 0;
+
+                for (count_t e = ebegin; e < eend; ++e) {
+                    element_idx_t eidx = elindex[e];
+                    assert(eidx < nelements);
+
+                    for (int edof_i = 0; edof_i < nnodesxelem; ++edof_i) {
+                        idx_t neighnode = elems[edof_i][eidx];
+                        if (neighnode > node) {
+                            assert(nneighs < 4096);
+                            n2nbuff[nneighs++] = neighnode;
+                        }
+                    }
+
+                    nneighs = sortreduce(n2nbuff, nneighs);
+                    rowptr[node + 1] = nneighs;
+                }
+            }
+
+            // Cumulative sum
+            for (ptrdiff_t node = 0; node < nnodes; ++node) {
+                rowptr[node + 1] += rowptr[node];
+            }
+
+            const ptrdiff_t nnz = rowptr[nnodes];
+            colidx = (idx_t *)malloc(nnz * sizeof(idx_t));
+
+
+            {
+#pragma omp parallel for
+                for (ptrdiff_t node = 0; node < nnodes; ++node) {
+                    idx_t n2nbuff[4096];
+                    count_t ebegin = n2eptr[node];
+                    count_t eend = n2eptr[node + 1];
+
+                    idx_t nneighs = 0;
+
+                    for (count_t e = ebegin; e < eend; ++e) {
+                        element_idx_t eidx = elindex[e];
+                        assert(eidx < nelements);
+
+                        for (int edof_i = 0; edof_i < nnodesxelem; ++edof_i) {
+                            idx_t neighnode = elems[edof_i][eidx];
+                            if (neighnode > node) {
+                                assert(nneighs < 4096);
+                                n2nbuff[nneighs++] = neighnode;
+                            }
+                        }
+
+                        nneighs = sortreduce(n2nbuff, nneighs);
+
+                        for (idx_t i = 0; i < nneighs; ++i) {
+                            colidx[rowptr[node] + i] = n2nbuff[i];
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    *out_rowptr = rowptr;
+    *out_colidx = colidx;
+    return 0;
+}
+
+int build_crs_graph_upper_triangular_from_element(const ptrdiff_t nelements,
+                                                  const ptrdiff_t nnodes,
+                                                  int nxe,
+                                                  idx_t **const elems,
+                                                  count_t **out_rowptr,
+                                                  idx_t **out_colidx) {
+    double tick = MPI_Wtime();
+
+    count_t *n2eptr;
+    element_idx_t *elindex;
+    build_n2e(nelements, nnodes, nxe, elems, &n2eptr, &elindex);
+
+    int err = build_crs_graph_upper_triangular_from_n2e(
+            nelements, nnodes, nxe, elems, n2eptr, elindex, out_rowptr, out_colidx);
+
+    free(n2eptr);
+    free(elindex);
+
+    double tock = MPI_Wtime();
+    printf("crs_graph.c: build nz (mem conservative) structure\t%g seconds\n", tock - tick);
+    return err;
+}
+
+int crs_to_coo(const ptrdiff_t n, const count_t *const rowptr, idx_t *const row_idx)
+{
+#pragma omp parallel for
+    for(ptrdiff_t row = 0; row < n; row++) {
+        for(count_t k = rowptr[row]; k < rowptr[row+1]; k++) {
+            row_idx[k] = row;
+        }
+    }
+
+    return SFEM_SUCCESS;
 }

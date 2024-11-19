@@ -13,6 +13,9 @@ class Tet4(FE):
 	def coords_sub_parametric(self):
 		return [[x0, x1, x2, x3], [y0, y1, y2, y3], [z0, z1, z2, z3]]
 
+	def barycenter(self):
+		return vec3(sp.Rational(1, 4), sp.Rational(1, 4), sp.Rational(1, 4))
+
 	def name(self):
 		return "Tet4"
 

@@ -46,25 +46,25 @@ NB_MODULE(pysfem, m) {
     using IdxBuffer = sfem::Buffer<idx_t>;
     using CountBuffer = sfem::Buffer<count_t>;
 
-
     m.def("init", &SFEM_init);
     m.def("finalize", &SFEM_finalize);
 
     nb::enum_<ExecutionSpace>(m, "ExecutionSpace")
-    .value("EXECUTION_SPACE_HOST", EXECUTION_SPACE_HOST)
-    .value("EXECUTION_SPACE_DEVICE", EXECUTION_SPACE_DEVICE)
-    .value("EXECUTION_SPACE_INVALID", EXECUTION_SPACE_INVALID);
+            .value("EXECUTION_SPACE_HOST", EXECUTION_SPACE_HOST)
+            .value("EXECUTION_SPACE_DEVICE", EXECUTION_SPACE_DEVICE)
+            .value("EXECUTION_SPACE_INVALID", EXECUTION_SPACE_INVALID);
 
     nb::enum_<MemorySpace>(m, "MemorySpace")
-    .value("MEMORY_SPACE_HOST", MEMORY_SPACE_HOST)
-    .value("MEMORY_SPACE_DEVICE", MEMORY_SPACE_DEVICE)
-    .value("MEMORY_SPACE_INVALID", MEMORY_SPACE_INVALID);
+            .value("MEMORY_SPACE_HOST", MEMORY_SPACE_HOST)
+            .value("MEMORY_SPACE_DEVICE", MEMORY_SPACE_DEVICE)
+            .value("MEMORY_SPACE_INVALID", MEMORY_SPACE_INVALID);
 
     nb::class_<Mesh>(m, "Mesh")  //
             .def(nb::init<>())
             .def("read", &Mesh::read)
             .def("write", &Mesh::write)
             .def("n_nodes", &Mesh::n_nodes)
+            .def("n_elements", &Mesh::n_elements)
             .def("convert_to_macro_element_mesh", &Mesh::convert_to_macro_element_mesh)
             .def("spatial_dimension", &Mesh::spatial_dimension);
 
@@ -77,6 +77,11 @@ NB_MODULE(pysfem, m) {
     nb::class_<sfem::Buffer<long>>(m, "Buffer<long>").def(nb::init<>());
     nb::class_<sfem::Buffer<float>>(m, "Buffer<float>").def(nb::init<>());
     nb::class_<sfem::Buffer<double>>(m, "Buffer<double>").def(nb::init<>());
+
+    m.def("len", [](const std::shared_ptr<sfem::Buffer<int>> &b) -> size_t { return b->size(); });
+
+    m.def("len",
+          [](const std::shared_ptr<sfem::Buffer<double>> &b) -> size_t { return b->size(); });
 
     m.def("create_real_buffer", [](const ptrdiff_t n) -> std::shared_ptr<sfem::Buffer<real_t>> {
         return sfem::h_buffer<real_t>(n);
@@ -108,6 +113,14 @@ NB_MODULE(pysfem, m) {
 
     m.def("view", [](nb::ndarray<nb::numpy, double> &v) -> std::shared_ptr<sfem::Buffer<double>> {
         return sfem::Buffer<double>::wrap(v.size(), v.data(), sfem::MEMORY_SPACE_HOST);
+    });
+
+    m.def("view", [](nb::ndarray<nb::numpy, int> &v) -> std::shared_ptr<sfem::Buffer<int>> {
+        return sfem::Buffer<int>::wrap(v.size(), v.data(), sfem::MEMORY_SPACE_HOST);
+    });
+
+    m.def("view", [](nb::ndarray<nb::numpy, long> &v) -> std::shared_ptr<sfem::Buffer<long>> {
+        return sfem::Buffer<long>::wrap(v.size(), v.data(), sfem::MEMORY_SPACE_HOST);
     });
 
     m.def("create_mesh",
@@ -155,16 +168,20 @@ NB_MODULE(pysfem, m) {
             .def(nb::init<std::shared_ptr<Mesh>>())
             .def(nb::init<std::shared_ptr<Mesh>, const int>())
             .def("derefine", &FunctionSpace::derefine)
-            .def("n_dofs", &FunctionSpace::n_dofs);
+            .def("mesh", &FunctionSpace::mesh_ptr)
+            .def("n_dofs", &FunctionSpace::n_dofs)
+            .def("block_size", &FunctionSpace::block_size)
+            .def("promote_to_semi_structured", &FunctionSpace::promote_to_semi_structured);
 
     m.def("create_derefined_crs_graph",
           [](const std::shared_ptr<FunctionSpace> &space) -> std::shared_ptr<CRSGraph> {
               return sfem::create_derefined_crs_graph(*space);
           });
 
-    m.def("create_edge_idx", [](const std::shared_ptr<CRSGraph> &crs_graph) -> std::shared_ptr<Buffer<idx_t>> {
-        return sfem::create_edge_idx(*crs_graph);
-    });
+    m.def("create_edge_idx",
+          [](const std::shared_ptr<CRSGraph> &crs_graph) -> std::shared_ptr<Buffer<idx_t>> {
+              return sfem::create_edge_idx(*crs_graph);
+          });
 
     m.def("create_hierarchical_restriction", &sfem::create_hierarchical_restriction);
     m.def("create_hierarchical_prolongation", &sfem::create_hierarchical_prolongation);

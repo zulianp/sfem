@@ -484,7 +484,7 @@ void tri3_stokes_mini_assemble_hessian_aos(const ptrdiff_t nelements,
     const double tick = MPI_Wtime();
 
     static const int block_size = 3;
-    static const int mat_block_size = block_size * block_size;
+    static const int mat_block_size = 3 * 3;
 
 #pragma omp parallel
     {
