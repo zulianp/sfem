@@ -775,7 +775,7 @@ int beam2_resample_field_local(const ptrdiff_t nelements, const ptrdiff_t nnodes
 ////////////////////////////////////////////////////////////////////////////
 
 #define MY_RESTRICT __restrict__
-#define real_type double
+#define real_type real_t
 
 int tet4_resample_field_local_CUDA(  // Mesh
         const ptrdiff_t nelements, const ptrdiff_t nnodes, int** const MY_RESTRICT elems,

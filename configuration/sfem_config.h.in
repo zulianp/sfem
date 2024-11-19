@@ -9,6 +9,10 @@
 #cmakedefine SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 #cmakedefine SFEM_ENABLE_MEM_DIAGNOSTICS
 
+#ifdef SFEM_ENABLE_CUDA
+#define SFEM_CUDA_ARCH @SFEM_CUDA_ARCH@
+#endif
+
 // It will be removed in the future (i.e., always true)
 #cmakedefine SFEM_ENABLE_CUSTOM_NUMBERS
 
