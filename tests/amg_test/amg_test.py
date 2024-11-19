@@ -8,6 +8,9 @@ import numpy as np
 from numpy import linalg
 import sys, getopt, os
 
+# Device not yet supported
+execution_space = sfem.ExecutionSpace.EXECUTION_SPACE_HOST
+
 def assemble_scipy_matrix(fun, x):
 	import scipy
 
@@ -31,14 +34,45 @@ def run(path_mesh, name_op):
 		block_size = dim
 
 	space = sfem.FunctionSpace(mesh, block_size)
+	print(f'COARSE: #dofs {space.n_dofs()}')
+	# Semi-structured discretization enabled here (param=levels)
+	space.promote_to_semi_structured(8) 
+	print(f'FINE: #dofs {space.n_dofs()}')
+
+	coarse_space = space.derefine()
+	prolongation = sfem.create_hierarchical_prolongation(coarse_space, space, execution_space)
+	restriction =  sfem.create_hierarchical_restriction(space, coarse_space, execution_space)
+
+	# Fine operator
 	function = sfem.Function(space)
 	function.add_operator(sfem.create_op(space, name_op))
 
+	# Coarse operator
+	coarse_function = sfem.Function(coarse_space)
+	coarse_function.add_operator(sfem.create_op(coarse_space, name_op))
+
 	x = np.zeros(space.n_dofs(), dtype=real_t)
-	A = assemble_scipy_matrix(function, x)
+	r = np.zeros(space.n_dofs(), dtype=real_t)
+	
+	coarse_x = np.ones(coarse_space.n_dofs(), dtype=real_t)
+	coarse_r = np.zeros(coarse_space.n_dofs(), dtype=real_t)
+	coarse_r_galerkin = np.zeros(coarse_space.n_dofs(), dtype=real_t)
 
-	print(A)
+	linear_op = sfem.make_op(function, x)
+	coarse_linear_op = sfem.make_op(coarse_function, coarse_x)
 
+	# Coarse operator
+	sfem.apply(coarse_linear_op, coarse_x, coarse_r)
+
+	# Galerkin products
+	sfem.apply(prolongation, coarse_x, x)
+	sfem.apply(linear_op, x, r)
+	sfem.apply(restriction, r, coarse_r_galerkin)
+	
+	print(f'diff = {np.sum(np.abs(coarse_r-coarse_r_galerkin))}')
+
+	# A = assemble_scipy_matrix(coarse_function, coarse_x)
+	# print(A)
 
 if __name__ == '__main__':
 	sfem.init()

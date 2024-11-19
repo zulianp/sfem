@@ -402,7 +402,7 @@ NB_MODULE(pysfem, m) {
                  });
 
     m.def("make_op",
-          [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> u) -> std::shared_ptr<Operator_t> {
+          [](const std::shared_ptr<Function> &fun, nb::ndarray<real_t> u) -> std::shared_ptr<Operator_t> {
               return sfem::make_op<real_t>(
                       u.size(),
                       u.size(),
