@@ -57,9 +57,11 @@ namespace sfem {
                 v_coarse[k] = 0.0;
             }
 
+#pragma omp parallel for
             for (R k = 0; k < fine_dim; k++) {
                 R coarse_idx = partition[k];
                 if (coarse_idx >= 0) {
+#pragma omp atomic update
                     v_coarse[coarse_idx] += v[k] * weights[k];
                 }
             }

@@ -33,7 +33,7 @@
 
 #else
 namespace sfem {
-    void device_synchronize() {}
+    static void device_synchronize() {}
 }  // namespace sfem
 #endif
 
@@ -55,7 +55,8 @@ namespace sfem {
     }
 
     template <typename T>
-    static std::shared_ptr<Buffer<T>> create_buffer(const std::ptrdiff_t n, const ExecutionSpace es) {
+    static std::shared_ptr<Buffer<T>> create_buffer(const std::ptrdiff_t n,
+                                                    const ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) return sfem::d_buffer<T>(n);
 #endif  // SFEM_ENABLE_CUDA
@@ -63,8 +64,7 @@ namespace sfem {
     }
 
     static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,
-                                  const char *name,
-                                  const ExecutionSpace es) {
+                                         const char *name, const ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) return sfem::Factory::create_op_gpu(space, name);
 #endif  // SFEM_ENABLE_CUDA
@@ -73,7 +73,7 @@ namespace sfem {
 
     template <typename T>
     static std::shared_ptr<ConjugateGradient<T>> create_cg(const std::shared_ptr<Operator<T>> &op,
-                                                    const ExecutionSpace es) {
+                                                           const ExecutionSpace es) {
         std::shared_ptr<ConjugateGradient<T>> cg;
 
 #ifdef SFEM_ENABLE_CUDA
@@ -92,7 +92,7 @@ namespace sfem {
 
     template <typename T>
     static std::shared_ptr<BiCGStab<T>> create_bcgs(const std::shared_ptr<Operator<T>> &op,
-                                             const ExecutionSpace es) {
+                                                    const ExecutionSpace es) {
         std::shared_ptr<BiCGStab<T>> bcgs;
 
 #ifdef SFEM_ENABLE_CUDA
@@ -111,7 +111,7 @@ namespace sfem {
 
     template <typename T>
     static std::shared_ptr<Chebyshev3<T>> create_cheb3(const std::shared_ptr<Operator<T>> &op,
-                                                const ExecutionSpace es) {
+                                                       const ExecutionSpace es) {
         std::shared_ptr<Chebyshev3<T>> cheb;
 
 #ifdef SFEM_ENABLE_CUDA
@@ -128,7 +128,7 @@ namespace sfem {
 
     template <typename T>
     static std::shared_ptr<MPRGP<T>> create_mprgp(const std::shared_ptr<Operator<T>> &op,
-                                           const ExecutionSpace es) {
+                                                  const ExecutionSpace es) {
         auto mprgp = std::make_shared<sfem::MPRGP<real_t>>();
         mprgp->set_op(op);
 
@@ -165,8 +165,7 @@ namespace sfem {
     }
 
     static std::shared_ptr<Constraint> create_dirichlet_conditions_from_env(
-            const std::shared_ptr<FunctionSpace> &space,
-            const ExecutionSpace es) {
+            const std::shared_ptr<FunctionSpace> &space, const ExecutionSpace es) {
         auto conds = sfem::DirichletConditions::create_from_env(space);
 
 #ifdef SFEM_ENABLE_CUDA
@@ -179,8 +178,7 @@ namespace sfem {
     }
 
     static std::shared_ptr<Constraint> create_contact_conditions_from_env(
-            const std::shared_ptr<FunctionSpace> &space,
-            const ExecutionSpace es) {
+            const std::shared_ptr<FunctionSpace> &space, const ExecutionSpace es) {
         auto conds = sfem::ContactConditions::create_from_env(space);
 
 #ifdef SFEM_ENABLE_CUDA
@@ -211,8 +209,7 @@ namespace sfem {
 
     static std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation(
             const std::shared_ptr<FunctionSpace> &from_space,
-            const std::shared_ptr<FunctionSpace> &to_space,
-            const ExecutionSpace es) {
+            const std::shared_ptr<FunctionSpace> &to_space, const ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == es) {
             auto elements = to_space->device_elements();
@@ -301,8 +298,7 @@ namespace sfem {
 
     static std::shared_ptr<Operator<real_t>> create_hierarchical_restriction(
             const std::shared_ptr<FunctionSpace> &from_space,
-            const std::shared_ptr<FunctionSpace> &to_space,
-            const ExecutionSpace es) {
+            const std::shared_ptr<FunctionSpace> &to_space, const ExecutionSpace es) {
         auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
         auto from_element = (enum ElemType)from_space->element_type();
         auto to_element = (enum ElemType)to_space->element_type();
@@ -431,10 +427,8 @@ namespace sfem {
     }
 
     static std::shared_ptr<Operator<real_t>> create_hierarchical_restriction_from_graph(
-            const ptrdiff_t n_fine_nodes,
-            const int block_size,
-            const std::shared_ptr<CRSGraph> &crs_graph,
-            const std::shared_ptr<Buffer<idx_t>> &edges,
+            const ptrdiff_t n_fine_nodes, const int block_size,
+            const std::shared_ptr<CRSGraph> &crs_graph, const std::shared_ptr<Buffer<idx_t>> &edges,
             const ExecutionSpace es) {
         const ptrdiff_t n_coarse_nodes = crs_graph->n_nodes();
 
@@ -482,10 +476,8 @@ namespace sfem {
     }
 
     static std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation_from_graph(
-            const std::shared_ptr<Function> &function,
-            const std::shared_ptr<CRSGraph> &crs_graph,
-            const std::shared_ptr<Buffer<idx_t>> &edges,
-            const ExecutionSpace es) {
+            const std::shared_ptr<Function> &function, const std::shared_ptr<CRSGraph> &crs_graph,
+            const std::shared_ptr<Buffer<idx_t>> &edges, const ExecutionSpace es) {
         const ptrdiff_t n_fine_nodes = function->space()->mesh().n_nodes();
         int block_size = function->space()->block_size();
         const ptrdiff_t n_coarse_nodes = crs_graph->n_nodes();
@@ -540,8 +532,7 @@ namespace sfem {
 
     template <typename T>
     static std::shared_ptr<Operator<T>> create_inverse_diagonal_scaling(
-            const std::shared_ptr<Buffer<T>> &diag,
-            const ExecutionSpace es) {
+            const std::shared_ptr<Buffer<T>> &diag, const ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
             auto d_diag = to_device(diag);
@@ -590,9 +581,8 @@ namespace sfem {
                 f->execution_space());
     }
 
-    static auto hessian_crs(sfem::Function &f,
-                     const std::shared_ptr<CRSGraph> &crs_graph,
-                     const sfem::ExecutionSpace es) {
+    static auto hessian_crs(sfem::Function &f, const std::shared_ptr<CRSGraph> &crs_graph,
+                            const sfem::ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
             auto d_crs_graph = sfem::to_device(crs_graph);
@@ -626,8 +616,8 @@ namespace sfem {
     }
 
     static auto hessian_crs(const std::shared_ptr<sfem::Function> &f,
-                     const std::shared_ptr<Buffer<real_t>> &x,
-                     const sfem::ExecutionSpace es) {
+                            const std::shared_ptr<Buffer<real_t>> &x,
+                            const sfem::ExecutionSpace es) {
         auto crs_graph = f->crs_graph();
 
 #ifdef SFEM_ENABLE_CUDA
@@ -664,8 +654,8 @@ namespace sfem {
     }
 
     static auto hessian_bsr(const std::shared_ptr<sfem::Function> &f,
-                     const std::shared_ptr<Buffer<real_t>> &x,
-                     const sfem::ExecutionSpace es) {
+                            const std::shared_ptr<Buffer<real_t>> &x,
+                            const sfem::ExecutionSpace es) {
         // Get the mesh node-to-node graph instead of the FunctionSpace scalar adapted graph
         auto crs_graph = f->space()->node_to_node_graph();
         const int block_size = f->space()->block_size();
@@ -709,8 +699,8 @@ namespace sfem {
     }
 
     static auto hessian_bcrs_sym(const std::shared_ptr<sfem::Function> &f,
-                          const std::shared_ptr<Buffer<real_t>> &x,
-                          const sfem::ExecutionSpace es) {
+                                 const std::shared_ptr<Buffer<real_t>> &x,
+                                 const sfem::ExecutionSpace es) {
         assert(es == sfem::EXECUTION_SPACE_HOST);
 
         auto crs_graph = f->space()->mesh().node_to_node_graph_upper_triangular();
@@ -764,8 +754,8 @@ namespace sfem {
     }
 
     static auto hessian_coo_sym(const std::shared_ptr<sfem::Function> &f,
-                         const std::shared_ptr<Buffer<real_t>> &x,
-                         const sfem::ExecutionSpace es) {
+                                const std::shared_ptr<Buffer<real_t>> &x,
+                                const sfem::ExecutionSpace es) {
         assert(es == sfem::EXECUTION_SPACE_HOST);
 
         auto fs = f->space();
@@ -804,8 +794,8 @@ namespace sfem {
     }
 
     static auto hessian_crs_sym(const std::shared_ptr<sfem::Function> &f,
-                         const std::shared_ptr<Buffer<real_t>> &x,
-                         const sfem::ExecutionSpace es) {
+                                const std::shared_ptr<Buffer<real_t>> &x,
+                                const sfem::ExecutionSpace es) {
         assert(es == sfem::EXECUTION_SPACE_HOST);
         auto fs = f->space();
         auto crs_graph = fs->mesh_ptr()->node_to_node_graph_upper_triangular();
@@ -843,10 +833,8 @@ namespace sfem {
                 es);
     }
 
-    static real_t residual(sfem::Operator<real_t> &op,
-                    const real_t *const rhs,
-                    const real_t *const x,
-                    real_t *const r) {
+    static real_t residual(sfem::Operator<real_t> &op, const real_t *const rhs,
+                           const real_t *const x, real_t *const r) {
 #ifdef SFEM_ENABLE_CUDA
         if (op.execution_space() == sfem::EXECUTION_SPACE_DEVICE) {
             d_memset(r, 0, op.rows() * sizeof(real_t));
@@ -910,10 +898,8 @@ namespace sfem {
     }
 
     static std::shared_ptr<sfem::Operator<real_t>> create_linear_operator(
-            const std::string &format,
-            const std::shared_ptr<sfem::Function> &f,
-            const std::shared_ptr<sfem::Buffer<real_t>> &x,
-            enum sfem::ExecutionSpace es) {
+            const std::string &format, const std::shared_ptr<sfem::Function> &f,
+            const std::shared_ptr<sfem::Buffer<real_t>> &x, enum sfem::ExecutionSpace es) {
         if (format == "MF") {
             return sfem::make_linear_op(f);
         }

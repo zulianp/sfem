@@ -18,6 +18,7 @@ namespace sfem {
     class CooSymSpMV final : public Operator<T> {
     public:
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
+        std::function<void(const T* const, T* const)> apply_;
         ptrdiff_t ndofs{-1};
         BLAS_Tpl<T> blas;
 
@@ -30,11 +31,12 @@ namespace sfem {
         void default_init() {
             OpenMP_BLAS<T>::build_blas(blas);
             execution_space_ = EXECUTION_SPACE_HOST;
+            apply_ = [=](const T* const x, T* const y) { return coo_sym_spmv_(x, y); };
         }
 
         /* Operator */
         int apply(const T* const x, T* const y) override {
-            coo_symm_spmv_(x, y);
+            apply_(x, y);
             return 0;
         }
         inline std::ptrdiff_t rows() const override { return ndofs; }
@@ -42,7 +44,7 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return execution_space_; }
 
         /* Sparse Matrix-Vector Multiplication using SymmCOO format */
-        int coo_symm_spmv_(const T* const x, T* const y) {
+        int coo_sym_spmv_(const T* const x, T* const y) {
             R* offdiag_row_indices = offdiag_rowidx->data();
             R* offdiag_col_indices = offdiag_colidx->data();
             T* offdiag_values = values->data();

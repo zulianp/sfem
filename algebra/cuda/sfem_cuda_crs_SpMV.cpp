@@ -4,7 +4,9 @@
 #include <cstdlib>
 #include <memory>
 #include "sfem_Buffer.hpp"
+#include "sfem_CooSym.hpp"
 #include "sfem_config.h"
+#include "sfem_cuda_blas.hpp"
 
 #ifdef SFEM_ENABLE_CUSPARSE
 
@@ -85,12 +87,10 @@ namespace sfem {
 
         std::shared_ptr<Buffer<cu_compat_count_t>> rowptr_compat;
 
-        CRSSpMVImpl(const ptrdiff_t rows,
-                    const ptrdiff_t cols,
+        CRSSpMVImpl(const ptrdiff_t rows, const ptrdiff_t cols,
                     const std::shared_ptr<Buffer<count_t>>& rowptr,
                     const std::shared_ptr<Buffer<idx_t>>& colidx,
-                    const std::shared_ptr<Buffer<real_t>>& values,
-                    const real_t scale_output)
+                    const std::shared_ptr<Buffer<real_t>>& values, const real_t scale_output)
             : rows(rows), cols(cols), colidx(colidx), values(values), beta(scale_output) {
             sfem_cusparse_init();
             assign_rowptr(rowptr, this->rowptr);
@@ -166,12 +166,10 @@ namespace sfem {
     };
 
     std::shared_ptr<CRSSpMV<count_t, idx_t, real_t>> d_crs_spmv(
-            const ptrdiff_t rows,
-            const ptrdiff_t cols,
+            const ptrdiff_t rows, const ptrdiff_t cols,
             const std::shared_ptr<Buffer<count_t>>& rowptr,
             const std::shared_ptr<Buffer<idx_t>>& colidx,
-            const std::shared_ptr<Buffer<real_t>>& values,
-            const real_t scale_output) {
+            const std::shared_ptr<Buffer<real_t>>& values, const real_t scale_output) {
         auto ret = std::make_shared<CRSSpMV<count_t, idx_t, real_t>>();
         ret->row_ptr = rowptr;
         ret->col_idx = colidx;
@@ -181,6 +179,137 @@ namespace sfem {
 
         auto impl = std::make_shared<CRSSpMVImpl>(rows, cols, rowptr, colidx, values, scale_output);
         ret->apply_ = [=](const real_t* const x, real_t* const y) { impl->apply(x, y); };
+        return ret;
+    }
+
+    class SymCooSpMVImpl {
+    public:
+        cusparseSpMatDescr_t matrix;
+        cusparseIndexType_t cooIndType{SFEM_CUSPARSE_IDX_T};
+        cusparseIndexBase_t idxBase{CUSPARSE_INDEX_BASE_ZERO};
+        cudaDataType valueType{SFEM_CUSPARSE_REAL_T};
+        cusparseOperation_t op_type{CUSPARSE_OPERATION_NON_TRANSPOSE};
+
+#if CUDART_VERSION < 12000
+        cusparseSpMVAlg_t alg{CUSPARSE_MV_ALG_DEFAULT};
+#else
+        cusparseSpMVAlg_t alg{CUSPARSE_SPMV_ALG_DEFAULT};
+#endif
+        cusparseDnVecDescr_t vecX, vecY;
+        size_t bufferSize{0};
+        bool initialized{false};
+        ptrdiff_t ndofs;
+        count_t nnz;
+        void* dBuffer{NULL};
+        double alpha{1};
+        double beta{1};
+        double one{1};
+        BLAS_Tpl<real_t> blas;
+
+        std::shared_ptr<Buffer<count_t>> rowidx;
+        std::shared_ptr<Buffer<idx_t>> colidx;
+        std::shared_ptr<Buffer<real_t>> values;
+
+        SymCooSpMVImpl(const ptrdiff_t ndofs, const count_t nnz,
+                       const std::shared_ptr<Buffer<idx_t>>& rowidx,
+                       const std::shared_ptr<Buffer<idx_t>>& colidx,
+                       const std::shared_ptr<Buffer<real_t>>& values, const real_t scale_output)
+            : ndofs(ndofs), rowidx(rowidx), colidx(colidx), values(values), beta(scale_output) {
+            sfem_cusparse_init();
+        }
+
+        void initialize(const real_t* const x, real_t* const y) {
+            CHECK_CUSPARSE(cusparseCreateDnVec(&vecX, ndofs, (void*)x, valueType));
+            CHECK_CUSPARSE(cusparseCreateDnVec(&vecY, ndofs, (void*)y, valueType));
+
+            CHECK_CUSPARSE(cusparseCreateCoo(&matrix,
+                                             ndofs,
+                                             ndofs,
+                                             nnz,
+                                             colidx->data(),
+                                             rowidx->data(),
+                                             values->data(),
+                                             cooIndType,
+                                             idxBase,
+                                             valueType));
+
+            CHECK_CUSPARSE(cusparseSpMV_bufferSize(cusparse_handle,
+                                                   CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                                   &alpha,
+                                                   matrix,
+                                                   vecX,
+                                                   &beta,
+                                                   vecY,
+                                                   valueType,
+                                                   alg,
+                                                   &bufferSize));
+
+            CHECK_CUDA(cudaMalloc(&dBuffer, bufferSize));
+
+            CHECK_CUDA(cudaPeekAtLastError());
+        }
+
+        ~SymCooSpMVImpl() {
+            CHECK_CUDA(cudaFree(dBuffer));
+            CHECK_CUSPARSE(cusparseDestroySpMat(matrix));
+            CHECK_CUSPARSE(cusparseDestroyDnVec(vecX));
+            CHECK_CUSPARSE(cusparseDestroyDnVec(vecY));
+        }
+
+        void apply(const real_t* const x, real_t* const y) {
+            if (!initialized) {
+                initialize(x, y);
+                initialized = true;
+            } else {
+                CHECK_CUSPARSE(cusparseDnVecSetValues(vecX, (void*)x));
+                CHECK_CUSPARSE(cusparseDnVecSetValues(vecY, (void*)y));
+            }
+
+            CHECK_CUSPARSE(cusparseSpMV(cusparse_handle,
+                                        CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                        &alpha,
+                                        matrix,
+                                        vecX,
+                                        &beta,
+                                        vecY,
+                                        valueType,
+                                        alg,
+                                        dBuffer));
+
+            CHECK_CUSPARSE(cusparseSpMV(cusparse_handle,
+                                        CUSPARSE_OPERATION_TRANSPOSE,
+                                        &alpha,
+                                        matrix,
+                                        vecX,
+                                        &one,
+                                        vecY,
+                                        valueType,
+                                        alg,
+                                        dBuffer));
+        }
+    };
+
+    // Boundary conditions should be imposed before by hand... (if any) so cusparse API is valid
+    std::shared_ptr<CooSymSpMV<idx_t, real_t>> d_sym_coo_spmv(
+            const ptrdiff_t ndofs, const count_t nnz, const std::shared_ptr<Buffer<idx_t>>& rowidx,
+            const std::shared_ptr<Buffer<idx_t>>& colidx,
+            const std::shared_ptr<Buffer<real_t>>& values,
+            const std::shared_ptr<Buffer<real_t>>& diag_values, const real_t scale_output) {
+        auto ret = std::make_shared<CooSymSpMV<idx_t, real_t>>();
+        ret->offdiag_colidx = colidx;
+        ret->offdiag_rowidx = rowidx;
+        ret->values = values;
+        ret->diag_values = diag_values;
+        ret->ndofs = ndofs;
+        ret->execution_space_ = EXECUTION_SPACE_DEVICE;
+
+        CUDA_BLAS<real_t>::build_blas(ret->blas);
+        auto impl =
+                std::make_shared<SymCooSpMVImpl>(ndofs, nnz, rowidx, colidx, values, scale_output);
+        ret->apply_ = [=](const real_t* const x, real_t* const y) {
+            impl->apply(x, y);
+            ret->blas.xypaz(ndofs, diag_values->data(), diag_values->data(), 1, y);
+        };
         return ret;
     }
 
@@ -213,13 +342,10 @@ namespace sfem {
 
         std::shared_ptr<Buffer<cu_compat_count_t>> rowptr_compat;
 
-        BSRSpMVImpl(const ptrdiff_t block_rows,
-                    const ptrdiff_t block_cols,
-                    const int block_size,
+        BSRSpMVImpl(const ptrdiff_t block_rows, const ptrdiff_t block_cols, const int block_size,
                     const std::shared_ptr<Buffer<count_t>>& rowptr,
                     const std::shared_ptr<Buffer<idx_t>>& colidx,
-                    const std::shared_ptr<Buffer<real_t>>& values,
-                    const real_t scale_output)
+                    const std::shared_ptr<Buffer<real_t>>& values, const real_t scale_output)
             : block_rows(block_rows),
               block_cols(block_cols),
               block_size(block_size),
@@ -305,13 +431,10 @@ namespace sfem {
     };
 
     std::shared_ptr<BSRSpMV<count_t, idx_t, real_t>> d_bsr_spmv(
-            const ptrdiff_t block_rows,
-            const ptrdiff_t block_cols,
-            const int block_size,
+            const ptrdiff_t block_rows, const ptrdiff_t block_cols, const int block_size,
             const std::shared_ptr<Buffer<count_t>>& rowptr,
             const std::shared_ptr<Buffer<idx_t>>& colidx,
-            const std::shared_ptr<Buffer<real_t>>& values,
-            const real_t scale_output) {
+            const std::shared_ptr<Buffer<real_t>>& values, const real_t scale_output) {
         auto ret = std::make_shared<BSRSpMV<count_t, idx_t, real_t>>();
         ret->row_ptr = rowptr;
         ret->col_idx = colidx;
@@ -327,13 +450,10 @@ namespace sfem {
 
 #else
     std::shared_ptr<BSRSpMV<count_t, idx_t, real_t>> d_bsr_spmv(
-            const ptrdiff_t rows,
-            const ptrdiff_t cols,
-            const int block_size,
-            const std::shared_ptr<Buffer<count_t>> &rowptr,
-            const std::shared_ptr<Buffer<idx_t>> &colidx,
-            const std::shared_ptr<Buffer<real_t>> &values,
-            const real_t scale_output) {
+            const ptrdiff_t rows, const ptrdiff_t cols, const int block_size,
+            const std::shared_ptr<Buffer<count_t>>& rowptr,
+            const std::shared_ptr<Buffer<idx_t>>& colidx,
+            const std::shared_ptr<Buffer<real_t>>& values, const real_t scale_output) {
         assert(false);
         return nullptr;
     }
@@ -346,24 +466,19 @@ namespace sfem {
 
 namespace sfem {
     std::shared_ptr<CRSSpMV<count_t, idx_t, real_t>> d_crs_spmv(
-            const ptrdiff_t rows,
-            const ptrdiff_t cols,
+            const ptrdiff_t rows, const ptrdiff_t cols,
             const std::shared_ptr<Buffer<count_t>>& rowptr,
             const std::shared_ptr<Buffer<idx_t>>& colidx,
-            const std::shared_ptr<Buffer<real_t>>& values,
-            const real_t scale_output) {
+            const std::shared_ptr<Buffer<real_t>>& values, const real_t scale_output) {
         assert(false);
         return nullptr;
     }
 
     std::shared_ptr<BSRSpMV<count_t, idx_t, real_t>> d_bsr_spmv(
-            const ptrdiff_t rows,
-            const ptrdiff_t cols,
-            const int block_size,
-            const std::shared_ptr<Buffer<count_t>> &rowptr,
-            const std::shared_ptr<Buffer<idx_t>> &colidx,
-            const std::shared_ptr<Buffer<real_t>> &values,
-            const real_t scale_output) {
+            const ptrdiff_t rows, const ptrdiff_t cols, const int block_size,
+            const std::shared_ptr<Buffer<count_t>>& rowptr,
+            const std::shared_ptr<Buffer<idx_t>>& colidx,
+            const std::shared_ptr<Buffer<real_t>>& values, const real_t scale_output) {
         assert(false);
         return nullptr;
     }
