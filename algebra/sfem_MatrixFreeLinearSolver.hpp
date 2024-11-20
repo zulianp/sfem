@@ -51,7 +51,7 @@ namespace sfem {
 
     template <typename T>
     inline std::shared_ptr<Operator<T>> diag_op(const std::ptrdiff_t n, const std::shared_ptr<Buffer<T>> &diagonal_scaling, const ExecutionSpace es) {
-        assert(es == SFEM_EXECUTION_SPACE_HOST);
+        assert(es == EXECUTION_SPACE_HOST);
         return std::make_shared<LambdaOperator<T>>(n, n, [n, diagonal_scaling](const T* const x, T* const y) {
 
             auto d = diagonal_scaling->data();
