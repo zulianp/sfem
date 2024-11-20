@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
-
+#include <cassert>
 #include "sfem_Buffer.hpp"
 
 namespace sfem {
@@ -27,10 +27,8 @@ namespace sfem {
         std::function<void(const T* const, T* const)> apply_;
         ExecutionSpace execution_space_;
 
-        LambdaOperator(const std::ptrdiff_t rows,
-                       const std::ptrdiff_t cols,
-                       std::function<void(const T* const, T* const)> apply,
-                       const ExecutionSpace es)
+        LambdaOperator(const std::ptrdiff_t rows, const std::ptrdiff_t cols,
+                       std::function<void(const T* const, T* const)> apply, const ExecutionSpace es)
             : rows_(rows), cols_(cols), apply_(apply), execution_space_(es) {}
 
         inline std::ptrdiff_t rows() const override { return rows_; }
@@ -49,6 +47,31 @@ namespace sfem {
                                                 std::function<void(const T* const, T* const)> op,
                                                 const ExecutionSpace es) {
         return std::make_shared<LambdaOperator<T>>(rows, cols, op, es);
+    }
+
+    template <typename T>
+    inline std::shared_ptr<Operator<T>> diag_op(const std::ptrdiff_t n, const std::shared_ptr<Buffer<T>> &diagonal_scaling, const ExecutionSpace es) {
+        assert(es == EXECUTION_SPACE_HOST);
+        return std::make_shared<LambdaOperator<T>>(n, n, [n, diagonal_scaling](const T* const x, T* const y) {
+
+            auto d = diagonal_scaling->data();
+            for (std::ptrdiff_t i = 0; i < n; i++) {
+                y[i] = x[i] * d[i];
+            }
+        }, es);
+    }
+
+    template <typename T>
+    inline std::shared_ptr<Operator<T>> operator+(const std::shared_ptr<Operator<T>>& left,
+                                                  const std::shared_ptr<Operator<T>>& right) {
+        return std::make_shared<LambdaOperator<T>>(
+                left->rows(),
+                left->cols(),
+                [left, right](const T* const x, T* const y) {
+                    right->apply(x, y);
+                    left->apply(x, y);
+                },
+                left->execution_space());
     }
 
     template <typename T>

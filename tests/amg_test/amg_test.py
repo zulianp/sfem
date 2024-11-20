@@ -40,6 +40,8 @@ def run(path_mesh, name_op):
 	print(f'FINE: #dofs {space.n_dofs()}')
 
 	coarse_space = space.derefine()
+
+	# Geometric P/R
 	prolongation = sfem.create_hierarchical_prolongation(coarse_space, space, execution_space)
 	restriction =  sfem.create_hierarchical_restriction(space, coarse_space, execution_space)
 
@@ -54,7 +56,9 @@ def run(path_mesh, name_op):
 	x = np.zeros(space.n_dofs(), dtype=real_t)
 	r = np.zeros(space.n_dofs(), dtype=real_t)
 	
-	coarse_x = np.ones(coarse_space.n_dofs(), dtype=real_t)
+	rng = np.random.default_rng()
+	coarse_x = rng.standard_normal(coarse_space.n_dofs(), dtype=real_t)
+	coarse_x /= np.max(coarse_x)
 	coarse_r = np.zeros(coarse_space.n_dofs(), dtype=real_t)
 	coarse_r_galerkin = np.zeros(coarse_space.n_dofs(), dtype=real_t)
 
@@ -69,8 +73,13 @@ def run(path_mesh, name_op):
 	sfem.apply(linear_op, x, r)
 	sfem.apply(restriction, r, coarse_r_galerkin)
 	
-	print(f'Diff = {np.sum(np.abs(coarse_r-coarse_r_galerkin))}')
+	print(f'Diff = {np.sum(np.abs(coarse_r - coarse_r_galerkin))}')
 
+	# TODO 
+	# - coarse matrix (crs|coo)
+	# - CRS_SYM D, U; y = C(x, u) * x + B(x) * (D*x + U*x + U^T*x) (Neumann operator)
+	# - Smoother
+	# - MG
 	# A = assemble_scipy_matrix(coarse_function, coarse_x)
 	# print(A)
 
