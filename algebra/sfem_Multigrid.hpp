@@ -112,7 +112,7 @@ namespace sfem {
 
         int max_it_{10};
         int iterations_{0};
-        int cycle_type_{V_CYCLE};
+        int cycle_type_{W_CYCLE};
         T atol_{1e-10};
 
         T norm_residual_0{1};

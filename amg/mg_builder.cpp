@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <cstddef>
 #include "partitioner.h"
+#include "sfem_API.hpp"
 #include "sfem_Buffer.hpp"
 #include "sfem_CooSym.hpp"
 #include "sfem_LpSmoother.hpp"
@@ -12,14 +13,11 @@
 #include "sparse.h"
 
 std::shared_ptr<sfem::Multigrid<real_t>> builder(
-        const real_t coarsening_factor,
-        const mask_t *bdy_dofs,
-        real_t *near_null,
+        const real_t coarsening_factor, const mask_t *bdy_dofs, real_t *near_null,
         std::shared_ptr<sfem::CooSymSpMV<idx_t, real_t>> &fine_mat) {
     std::shared_ptr<sfem::Multigrid<real_t>> amg = sfem::h_mg<real_t>();
 
     ptrdiff_t dim = fine_mat->rows();
-
     idx_t current_dim = dim;
     idx_t levels = 1;
 
@@ -62,20 +60,25 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
                     inv_diag);
         auto ptr_lp =
                 sfem::Buffer<real_t>::own(current_dim, inv_diag, free, sfem::MEMORY_SPACE_HOST);
-        auto l2_smoother = sfem::h_lpsmoother(ptr_lp);
+        auto l2_smoother_op = sfem::h_lpsmoother(ptr_lp);
 
         for (idx_t i = 0; i < current_dim; i++) {
             near_null[i] = 1.0;
         }
-        auto stat_iter = sfem::h_stationary<real_t>(prev_mat, l2_smoother);
-        stat_iter->set_max_it(3);
-        stat_iter->apply(zeros, near_null);
+        auto stat_iter = sfem::h_stationary<real_t>(prev_mat, l2_smoother_op);
+        stat_iter->set_max_it(1);
+        // stat_iter->apply(zeros, near_null);
 
         int failure = partition(near_null, bdy_dofs, coarsening_factor, &a_bar, &ws);
         if (failure) {
-            stat_iter->set_max_it(5);
-            // stat_iter->verbose = true;
-            amg->add_level(prev_mat, stat_iter, nullptr, nullptr);
+            auto cg = sfem::create_cg<real_t>(prev_mat, sfem::EXECUTION_SPACE_HOST);
+            cg->verbose = false;
+            cg->set_max_it(100);
+            cg->set_op(prev_mat);
+            cg->set_rtol(1e-6);
+            cg->set_preconditioner_op(l2_smoother_op);
+            amg->add_level(prev_mat, cg, nullptr, nullptr);
+            // amg->add_level(prev_mat, stat_iter, nullptr, nullptr);
 
             printf("Failed to add new level, levels: %d\n", levels);
             break;
@@ -100,6 +103,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
         auto pt = h_pwc_interp(ptr_weights, ptr_partition, coarse_dim);
         pt->transpose();
 
+        stat_iter->set_max_it(1);
         amg->add_level(prev_mat, stat_iter, p, pt);
 
         real_t resulting_cf = ((real_t)current_dim) / ((real_t)p->coarse_dim);
