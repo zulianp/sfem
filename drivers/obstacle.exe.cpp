@@ -1,5 +1,7 @@
 #include "sfem_Function.hpp"
 
+#include "sfem_ShiftedPenalty.hpp"
+#include "sfem_ShiftedPenaltyMultigrid.hpp"
 #include "sfem_base.h"
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
@@ -153,19 +155,9 @@ int main(int argc, char *argv[]) {
         write_crs(path, *crs_graph, *values);
     }
 
-    std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> solver;
-    {
-        auto mprgp = sfem::create_mprgp(linear_op, es);
+    auto h_upper_bound = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
 
-        if (SFEM_USE_PROJECTED_CG) {
-            mprgp->set_expansion_type(sfem::MPRGP<real_t>::EXPANSION_TYPE_PROJECTED_CG);
-        }
-
-        mprgp->set_op(linear_op);
-
-        auto h_upper_bound = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
-
-        {  // Fill default upper-bound value
+    {  // Fill default upper-bound value
             auto ub = h_upper_bound->data();
             for (ptrdiff_t i = 0; i < ndofs; i++) {
                 ub[i] = 1000;
@@ -187,8 +179,47 @@ int main(int argc, char *argv[]) {
         char path[2048];
         sprintf(path, "%s/upper_bound.raw", output_path);
         if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_upper_bound->data(), ndofs, ndofs)) {
-            return SFEM_FAILURE;
+        return SFEM_FAILURE;
+    }
+
+    // std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> solver;
+    std::shared_ptr<sfem::Operator<real_t>> solver;
+    if (true) 
+    // if (false) 
+    {
+        auto sp = std::make_shared<sfem::ShiftedPenalty<real_t>>();
+        sp->set_op(linear_op);
+        sp->default_init();
+        sp->set_atol(1e-16);
+        sp->set_max_it(SFEM_MAX_IT);
+
+        auto cg = sfem::create_cg(linear_op, es);   
+        cg->set_atol(1e-10);
+        cg->set_rtol(1e-10);
+        cg->set_max_it(100000);
+        sp->linear_solver_ = cg;
+
+        sp->verbose = true;
+        sp->set_upper_bound(upper_bound);
+        
+        solver = sp;
+    } else 
+    // if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+    //     auto spmg = sfem::h_spmg<real_t>();
+    //     spmg->add_level(nullptr, nullptr, nullptr, nullptr);
+    //     spmg->set_max_it(SFEM_MAX_IT);
+    //     spmg->set_atol(1e-8);
+
+    //     solver = spmg;
+    // } else 
+    {
+        auto mprgp = sfem::create_mprgp(linear_op, es);
+
+        if (SFEM_USE_PROJECTED_CG) {
+            mprgp->set_expansion_type(sfem::MPRGP<real_t>::EXPANSION_TYPE_PROJECTED_CG);
         }
+
+        mprgp->set_op(linear_op);
 
         mprgp->verbose = true;
         // mprgp->debug = true;
@@ -211,7 +242,6 @@ int main(int argc, char *argv[]) {
     auto h_rhs = rhs;
 #endif
 
-    char path[2048];
     sprintf(path, "%s/u.raw", output_path);
     if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_x->data(), ndofs, ndofs)) {
         return SFEM_FAILURE;

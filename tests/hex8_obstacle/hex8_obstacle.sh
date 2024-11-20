@@ -26,7 +26,7 @@ export SFEM_MAX_IT=20000
 
 export SFEM_HEX8_ASSUME_AFFINE=1
 
-export CASE=3
+export CASE=1
 case $CASE in
 	1 | 2)
 		mesh=mesh
@@ -34,7 +34,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			create_cyclic_ss_mesh.sh 4 $SFEM_ELEMENT_REFINE_LEVEL
+			create_cyclic_ss_mesh.sh 1 $SFEM_ELEMENT_REFINE_LEVEL
 		fi
 
 		sinlet=$mesh/surface/sidesets_aos/inlet.raw
@@ -49,7 +49,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			export SFEM_REFINE=3
+			# export SFEM_REFINE=3
 			$SCRIPTPATH/../../data/vtk/joint-hex.sh $SFEM_ELEMENT_REFINE_LEVEL
 		fi
 		sinlet=$mesh/surface/sidesets_aos/base.raw

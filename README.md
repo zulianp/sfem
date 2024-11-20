@@ -1,5 +1,8 @@
 # Simple FEM #
 
+This libary is not meant for exteral use. For the moment it is my personal sketch pad!
+Use at your own risk. Selected functionalities will be made available through utopia (https://github.com/zulianp/utopia).
+
 # Requirements
 
 SFEM depends on the following base technologies
