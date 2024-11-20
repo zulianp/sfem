@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
-
+#include <cassert>
 #include "sfem_Buffer.hpp"
 
 namespace sfem {
