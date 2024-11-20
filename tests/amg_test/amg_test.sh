@@ -17,11 +17,11 @@ export PYTHONPATH=$SFEM_DIR/lib:$SFEM_DIR/scripts:$PYTHONPATH
 source $SFEM_DIR/workflows/sfem_config.sh
 
 mesh=mesh
-N=10
+N=80
 box_mesh.py $mesh -c hex8 -x $N -y $N -z $N --height=1 --width=1 --depth=1
-
 
 # OP=LinearElasticity
 OP=Laplacian
 
+export SFEM_HEX8_ASSUME_AFFINE=1
 ./amg_test.py $mesh $OP
