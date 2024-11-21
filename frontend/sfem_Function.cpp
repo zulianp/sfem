@@ -2520,7 +2520,12 @@ namespace sfem {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             auto ret = std::make_unique<BoundaryMass>(space);
-            ret->element_type = shell_type(side_type((enum ElemType)space->element_type()));
+            auto element_type = (enum ElemType)space->element_type();
+            ret->element_type = shell_type(side_type(element_type));
+            if (ret->element_type == INVALID) {
+                std::cerr << "Invalid element type for BoundaryMass, Bulk element type: " << type_to_string(element_type) << "\n";
+                return nullptr;
+            }
             ret->boundary_elements = boundary_elements;
             return ret;
         }

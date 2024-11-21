@@ -158,52 +158,74 @@ int main(int argc, char *argv[]) {
     auto h_upper_bound = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
 
     {  // Fill default upper-bound value
-            auto ub = h_upper_bound->data();
-            for (ptrdiff_t i = 0; i < ndofs; i++) {
-                ub[i] = 1000;
-            }
+        auto ub = h_upper_bound->data();
+        for (ptrdiff_t i = 0; i < ndofs; i++) {
+            ub[i] = 1000;
         }
+    }
 
 #ifdef SFEM_ENABLE_CUDA
-        auto upper_bound = sfem::to_device(h_upper_bound);
+    auto upper_bound = sfem::to_device(h_upper_bound);
 #else
-        auto upper_bound = h_upper_bound;
+    auto upper_bound = h_upper_bound;
 #endif
 
-        contact_conds->apply(upper_bound->data());
+    contact_conds->apply(upper_bound->data());
 
 #ifdef SFEM_ENABLE_CUDA
-        h_upper_bound = sfem::to_host(upper_bound);
+    h_upper_bound = sfem::to_host(upper_bound);
 #endif
 
-        char path[2048];
-        sprintf(path, "%s/upper_bound.raw", output_path);
-        if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_upper_bound->data(), ndofs, ndofs)) {
+    char path[2048];
+    sprintf(path, "%s/upper_bound.raw", output_path);
+    if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_upper_bound->data(), ndofs, ndofs)) {
         return SFEM_FAILURE;
     }
 
     // std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> solver;
     std::shared_ptr<sfem::Operator<real_t>> solver;
-    if (true) 
-    // if (false) 
+    if (true)
+    // if (false)
     {
         auto sp = std::make_shared<sfem::ShiftedPenalty<real_t>>();
         sp->set_op(linear_op);
         sp->default_init();
+
         sp->set_atol(1e-16);
         sp->set_max_it(SFEM_MAX_IT);
 
-        auto cg = sfem::create_cg(linear_op, es);   
+        auto cg = sfem::create_cg(linear_op, es);
         cg->set_atol(1e-10);
         cg->set_rtol(1e-10);
-        cg->set_max_it(100000);
+        cg->set_max_it(1000);
+        cg->verbose = false;
         sp->linear_solver_ = cg;
 
         sp->verbose = true;
         sp->set_upper_bound(upper_bound);
-        
+
+        if (false) {
+            const char *SFEM_OBSTACLE_SURF = nullptr;
+            SFEM_READ_ENV(SFEM_OBSTACLE_SURF, );
+
+            if (!SFEM_OBSTACLE_SURF) {
+                fprintf(stderr, "SFEM_OBSTACLE_SURF not set!\n");
+                return SFEM_FAILURE;
+            }
+
+            auto blas = sfem::blas<real_t>(es);
+            auto contact_surf = sfem::mesh_connectivity_from_file(comm, SFEM_OBSTACLE_SURF);
+            auto bop = sfem::Factory::create_boundary_op(fs, contact_surf, "BoundaryMass");
+            auto ones = sfem::create_buffer<real_t>(ndofs, es);
+            auto diag_bop = sfem::create_buffer<real_t>(ndofs, es);
+            blas->values(ndofs, 1, ones->data());
+            bop->apply(nullptr, ones->data(), diag_bop->data());
+            auto diag_bop_op = sfem::diag_op(ndofs, diag_bop, es);
+            sp->constraint_scaling_op_ = diag_bop_op;
+        }
+
         solver = sp;
-    } else 
+    } else
     // if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
     //     auto spmg = sfem::h_spmg<real_t>();
     //     spmg->add_level(nullptr, nullptr, nullptr, nullptr);
@@ -211,7 +233,7 @@ int main(int argc, char *argv[]) {
     //     spmg->set_atol(1e-8);
 
     //     solver = spmg;
-    // } else 
+    // } else
     {
         auto mprgp = sfem::create_mprgp(linear_op, es);
 
