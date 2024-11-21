@@ -1,22 +1,9 @@
 # Troubleshooting on new Alps Piz Daint
 
-In order to work with cupy we need the following
-
-
-```sh
-module load cray 
-module load PrgEnv-cray cray-python craype-arm-grace cray-hdf5-parallel
-
-# In the sfem dir
-python -mvenv venv
-source venv/bin/activate
-python -m pip install -U setuptools pip
-pip install cupy-cuda12x
-```
-
-This environment also supports
-```sh
-pip install matplotlib numpy rich scipy sympy nanobind meshio netCDF4
+```bash
+uenv image pull prgenv-gnu/24.7:v3
+uenv start prgenv-gnu/24.7:v3
+uenv view default
 ```
 
 # Unsupported python packages
@@ -28,7 +15,7 @@ pip install matplotlib numpy rich scipy sympy nanobind meshio netCDF4
 - h5py
 
 
-# Confiuring SFEM
+# Configuring SFEM
 
 ```sh
 # In the sfem dir

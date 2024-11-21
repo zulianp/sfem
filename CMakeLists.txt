@@ -38,6 +38,7 @@ find_package(ISolver REQUIRED)
 set(SFEM_MODULES
     algebra base matrix mesh pizzastack solver
     algebra/openmp
+    amg
     operators 
     operators/beam2 
     operators/cvfem 
@@ -84,6 +85,7 @@ if(SFEM_ENABLE_CUDA)
         operators/macro_tet4/cuda
         operators/tet10/cuda
         operators/proteus_tet4/cuda
+        operators/hex8/cuda
         operators/proteus_hex8/cuda
         operators/hierarchical/cuda
         resampling/cuda
@@ -196,6 +198,11 @@ set(DRIVERS "${C_DRIVERS};${CPP_DRIVERS};${C_EXAMPLES}")
 # list(APPEND SFEM_EXCLUDED_EXEC "grad_and_project;heat_equation;integrate_divergence;partition_mesh_based_on_operator;taylor_hood_navier_stokes;ssolve")
 
 list(APPEND SFEM_EXCLUDED_EXEC "ssolve")
+
+if(${SFEM_SCALAR_TYPE} STREQUAL "float32")
+    # FIXME these executables need to be fixed when compiling with real_t=float32
+    list (APPEND SFEM_EXCLUDED_EXEC assemble;assemble3;assemble4;cvfem_assemble;heat_equation;heat_equation;linear_elasticity_assemble;neohookean_assemble;taylor_hood_navier_stokes)
+endif()
 
 if(SFEM_ENABLE_RESAMPLING)
     file(GLOB RESAMPLING_C_EXAMPLES CONFIGURE_DEPENDS "drivers/resampling/*.c")

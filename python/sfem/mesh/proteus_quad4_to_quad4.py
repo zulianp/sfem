@@ -51,8 +51,6 @@ if __name__ == '__main__':
 			i3[offset:(offset + N)] = elements[(j+1) * ld[1] + i * ld[0]]
 			offset += N
 
-	print("STAS: ", len(x), np.max(elements[0]))
-
 	refined_n_nodes = 0
 	for d in range(0, nnodesxelem):
 		refined_n_nodes = max(refined_n_nodes, np.max(elements[d]))
@@ -126,4 +124,6 @@ if __name__ == '__main__':
 	mx.tofile(f'{output_folder}/x.raw')
 	my.tofile(f'{output_folder}/y.raw')
 	mz.tofile(f'{output_folder}/z.raw')
+
+	# print("STATS: #micro-nodes", len(mx), ", #micro-elements " np.max(elements[0]))
 

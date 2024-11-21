@@ -4,6 +4,7 @@
 #cmakedefine SFEM_ENABLE_CUBLAS
 #cmakedefine SFEM_ENABLE_CUSPARSE
 #cmakedefine SFEM_ENABLE_OPENMP
+#cmakedefine SFEM_ENABLE_METIS
 #cmakedefine SFEM_ENABLE_AVX2
 #cmakedefine SFEM_ENABLE_AVX512
 #cmakedefine SFEM_USE_OCCUPANCY_MAX_POTENTIAL
@@ -114,6 +115,12 @@ typedef @SFEM_LOCAL_IDX_C_TYPE@ local_idx_t;
 #define INVALID_IDX (-1)
 
 #define SFEM_WARP_SIZE 32
-#define SFEM_WARP_FULL_MASK 0xfffffff
+#define SFEM_WARP_FULL_MASK 0xffffffff
+
+typedef char mask_t;
+#define SFEM_MPI_MASK_T MPI_CHAR
+
+// typedef long mask_t;
+// #define SFEM_MPI_MASK_T MPI_LONG
 
 #endif  // SFEM_CONFIG_HPP

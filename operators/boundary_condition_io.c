@@ -90,15 +90,20 @@ void read_boundary_conditions(MPI_Comm comm,
                     MPI_Abort(comm, -1);
                 }
 
-                assert(local_check_size == conds[i].local_size);
-                assert(check_size == conds[i].global_size);
                 if (local_check_size != conds[i].local_size) {
                     if (!rank) {
                         fprintf(stderr,
-                                "Wrong size for boundary condition with values %s\n",
+                                "read_boundary_conditions: len(idx) != len(values) (%ld != "
+                                "%ld)\nfile:%s\n",
+                                (long)conds[i].local_size,
+                                (long)local_check_size,
                                 pch + path_key_len);
                     }
                 }
+
+                assert(local_check_size == conds[i].local_size);
+                assert(check_size == conds[i].global_size);
+
             } else {
                 conds[i].value = atof(pch);
                 conds[i].values = 0;
@@ -150,4 +155,3 @@ void read_neumann_conditions(const mesh_t *const mesh,
         (*bcs)[i].local_size /= nns;
     }
 }
-

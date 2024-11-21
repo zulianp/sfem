@@ -10,6 +10,9 @@ class Tet20(FE):
 	def __init__(self):
 		super().__init__()
 
+	def barycenter(self):
+		return vec3(sp.Rational(1, 4), sp.Rational(1, 4), sp.Rational(1, 4))
+
 	def reference_measure(self):
 		return sp.Rational(1, 6)
 

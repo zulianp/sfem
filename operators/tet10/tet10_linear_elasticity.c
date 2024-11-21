@@ -371,7 +371,7 @@ int tet10_linear_elasticity_crs(const ptrdiff_t nelements,
     const geom_t *const z = points[2];
 
     static const int block_size = 3;
-    static const int mat_block_size = block_size * block_size;
+    static const int mat_block_size = 3 * 3;
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
