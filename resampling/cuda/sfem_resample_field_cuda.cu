@@ -3,6 +3,7 @@
 #include <cooperative_groups.h>
 #include <cuda_profiler_api.h>
 #include <stdio.h>
+#include "sfem_base.h"
 
 // #define real_t double
 #define real_type real_t
@@ -14,7 +15,7 @@
 ////////////////////////////////////////////////////////
 // tet4_transform_v2
 ////////////////////////////////////////////////////////
-__device__ void tet4_transform_cu( 
+__device__ void tet4_transform_cu(
         /****************************************************************************************
          ****************************************************************************************
         \begin{bmatrix}
@@ -44,28 +45,15 @@ __device__ void tet4_transform_cu(
       */
 
         // X-coordinates
-        const real_type px0,
-        const real_type px1,
-        const real_type px2,
-        const real_type px3,
+        const real_type px0, const real_type px1, const real_type px2, const real_type px3,
         // Y-coordinates
-        const real_type py0,
-        const real_type py1,
-        const real_type py2,
-        const real_type py3,
+        const real_type py0, const real_type py1, const real_type py2, const real_type py3,
         // Z-coordinates
-        const real_type pz0,
-        const real_type pz1,
-        const real_type pz2,
-        const real_type pz3,
+        const real_type pz0, const real_type pz1, const real_type pz2, const real_type pz3,
         // Quadrature point
-        const real_type qx,
-        const real_type qy,
-        const real_type qz,
+        const real_type qx, const real_type qy, const real_type qz,
         // Output
-        real_type* const out_x,
-        real_type* const out_y,
-        real_type* const out_z) {
+        real_type* const out_x, real_type* const out_y, real_type* const out_z) {
     //
     //
     *out_x = px0 + qx * (-px0 + px1) + qy * (-px0 + px2) + qz * (-px0 + px3);
@@ -78,20 +66,11 @@ __device__ void tet4_transform_cu(
 ////////////////////////////////////////////////////////
 __device__ real_type tet4_measure_cu(
         // X-coordinates
-        const real_type px0,
-        const real_type px1,
-        const real_type px2,
-        const real_type px3,
+        const real_type px0, const real_type px1, const real_type px2, const real_type px3,
         // Y-coordinates
-        const real_type py0,
-        const real_type py1,
-        const real_type py2,
-        const real_type py3,
+        const real_type py0, const real_type py1, const real_type py2, const real_type py3,
         // Z-coordinates
-        const real_type pz0,
-        const real_type pz1,
-        const real_type pz2,
-        const real_type pz3) {
+        const real_type pz0, const real_type pz1, const real_type pz2, const real_type pz3) {
     //
     // determinant of the Jacobian
     // M = [px0, py0, pz0, 1]
@@ -151,24 +130,16 @@ __device__ void hex_aa_8_eval_fun_cu(
 ////////////////////////////////////////////////////////
 __device__ void hex_aa_8_collect_coeffs_cu(
         //
-        const ptrdiff_t MY_RESTRICT stride0,
-        const ptrdiff_t MY_RESTRICT stride1,
+        const ptrdiff_t MY_RESTRICT stride0, const ptrdiff_t MY_RESTRICT stride1,
         const ptrdiff_t MY_RESTRICT stride2,
         //
-        const ptrdiff_t i,
-        const ptrdiff_t j,
-        const ptrdiff_t k,
+        const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k,
         // Attention this is geometric data transformed to solver data!
         const real_t* const MY_RESTRICT data,  //
         //
-        real_t* MY_RESTRICT out0,
-        real_t* MY_RESTRICT out1,
-        real_t* MY_RESTRICT out2,
-        real_t* MY_RESTRICT out3,
-        real_t* MY_RESTRICT out4,
-        real_t* MY_RESTRICT out5,
-        real_t* MY_RESTRICT out6,
-        real_t* MY_RESTRICT out7) {
+        real_t* MY_RESTRICT out0, real_t* MY_RESTRICT out1, real_t* MY_RESTRICT out2,
+        real_t* MY_RESTRICT out3, real_t* MY_RESTRICT out4, real_t* MY_RESTRICT out5,
+        real_t* MY_RESTRICT out6, real_t* MY_RESTRICT out7) {
     //
     const ptrdiff_t i0 = i * stride0 + j * stride1 + k * stride2;
     const ptrdiff_t i1 = (i + 1) * stride0 + j * stride1 + k * stride2;
@@ -239,24 +210,16 @@ void free_xyz_tet4_device(xyz_tet4_device* xyz_device) {
 //////////////////////////////////////////////////////////
 __global__ void tet4_resample_field_local_kernel(
         // Mesh
-        const ptrdiff_t start_element,
-        const ptrdiff_t end_element,
-        const ptrdiff_t nnodes,
-        const elems_tet4_device MY_RESTRICT elems,
-        const xyz_tet4_device MY_RESTRICT xyz,
+        const ptrdiff_t start_element, const ptrdiff_t end_element, const ptrdiff_t nnodes,
+        const elems_tet4_device MY_RESTRICT elems, const xyz_tet4_device MY_RESTRICT xyz,
         // SDF
         // const ptrdiff_t* const MY_RESTRICT n,
-        const ptrdiff_t MY_RESTRICT stride0,
-        const ptrdiff_t MY_RESTRICT stride1,
+        const ptrdiff_t MY_RESTRICT stride0, const ptrdiff_t MY_RESTRICT stride1,
         const ptrdiff_t MY_RESTRICT stride2,
 
-        const float origin_x,
-        const float origin_y,
-        const float origin_z,
+        const float origin_x, const float origin_y, const float origin_z,
 
-        const float delta_x,
-        const float delta_y,
-        const float delta_z,
+        const float delta_x, const float delta_y, const float delta_z,
 
         const real_type* const MY_RESTRICT data,
         // Output
@@ -493,37 +456,16 @@ double calculate_flops(const ptrdiff_t nelements, const ptrdiff_t quad_nodes, do
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 template <typename Real_Type>
-__device__ void quadrature_node(const Real_Type tet4_qx_v,
-                                const Real_Type tet4_qy_v,
-                                const Real_Type tet4_qz_v,
-                                const Real_Type tet4_qw_v,
-                                const Real_Type theta_volume,
-                                const Real_Type x0,
-                                const Real_Type x1,
-                                const Real_Type x2,
-                                const Real_Type x3,
-                                const Real_Type y0,
-                                const Real_Type y1,
-                                const Real_Type y2,
-                                const Real_Type y3,
-                                const Real_Type z0,
-                                const Real_Type z1,
-                                const Real_Type z2,
-                                const Real_Type z3,
-                                const Real_Type dx,
-                                const Real_Type dy,
-                                const Real_Type dz,
-                                const Real_Type ox,
-                                const Real_Type oy,
-                                const Real_Type oz,
-                                const ptrdiff_t stride0,
-                                const ptrdiff_t stride1,
-                                const ptrdiff_t stride2,
-                                const real_type* const MY_RESTRICT data,
-                                Real_Type& element_field0,
-                                Real_Type& element_field1,
-                                Real_Type& element_field2,
-                                Real_Type& element_field3) {
+__device__ void quadrature_node(
+        const Real_Type tet4_qx_v, const Real_Type tet4_qy_v, const Real_Type tet4_qz_v,
+        const Real_Type tet4_qw_v, const Real_Type theta_volume, const Real_Type x0,
+        const Real_Type x1, const Real_Type x2, const Real_Type x3, const Real_Type y0,
+        const Real_Type y1, const Real_Type y2, const Real_Type y3, const Real_Type z0,
+        const Real_Type z1, const Real_Type z2, const Real_Type z3, const Real_Type dx,
+        const Real_Type dy, const Real_Type dz, const Real_Type ox, const Real_Type oy,
+        const Real_Type oz, const ptrdiff_t stride0, const ptrdiff_t stride1,
+        const ptrdiff_t stride2, const real_type* const MY_RESTRICT data, Real_Type& element_field0,
+        Real_Type& element_field1, Real_Type& element_field2, Real_Type& element_field3) {
     //
     Real_Type g_qx = 0.0, g_qy = 0.0, g_qz = 0.0;
 
@@ -588,9 +530,9 @@ __device__ void quadrature_node(const Real_Type tet4_qx_v,
     const ptrdiff_t k = floor(grid_z);
 
     // Get the reminder [0, 1]
-    Real_Type l_x = (grid_x - (double)i);
-    Real_Type l_y = (grid_y - (double)j);
-    Real_Type l_z = (grid_z - (double)k);
+    Real_Type l_x = (grid_x - (Real_Type)i);
+    Real_Type l_y = (grid_y - (Real_Type)j);
+    Real_Type l_z = (grid_z - (Real_Type)k);
 
     // Critical point
     hex_aa_8_eval_fun_cu(l_x,
@@ -663,24 +605,16 @@ __device__ void quadrature_node(const Real_Type tet4_qx_v,
 //////////////////////////////////////////////////////////
 __global__ void tet4_resample_field_reduce_local_kernel(
         // Mesh
-        const ptrdiff_t start_element,
-        const ptrdiff_t end_element,
-        const ptrdiff_t nnodes,
-        const elems_tet4_device MY_RESTRICT elems,
-        const xyz_tet4_device MY_RESTRICT xyz,
+        const ptrdiff_t start_element, const ptrdiff_t end_element, const ptrdiff_t nnodes,
+        const elems_tet4_device MY_RESTRICT elems, const xyz_tet4_device MY_RESTRICT xyz,
         // SDF
         // const ptrdiff_t* const MY_RESTRICT n,
-        const ptrdiff_t MY_RESTRICT stride0,
-        const ptrdiff_t MY_RESTRICT stride1,
+        const ptrdiff_t MY_RESTRICT stride0, const ptrdiff_t MY_RESTRICT stride1,
         const ptrdiff_t MY_RESTRICT stride2,
 
-        const float origin_x,
-        const float origin_y,
-        const float origin_z,
+        const float origin_x, const float origin_y, const float origin_z,
 
-        const float delta_x,
-        const float delta_y,
-        const float delta_z,
+        const float delta_x, const float delta_y, const float delta_z,
 
         const real_type* const MY_RESTRICT data,
         // Output
@@ -828,15 +762,11 @@ __global__ void tet4_resample_field_reduce_local_kernel(
 //////////////////////////////////////////////////////////
 extern "C" int tet4_resample_field_local_CUDA(
         // Mesh
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        int** const MY_RESTRICT elems,
+        const ptrdiff_t nelements, const ptrdiff_t nnodes, int** const MY_RESTRICT elems,
         float** const MY_RESTRICT xyz,
         // SDF
-        const ptrdiff_t* const MY_RESTRICT n,
-        const ptrdiff_t* const MY_RESTRICT stride,
-        const float* const MY_RESTRICT origin,
-        const float* const MY_RESTRICT delta,
+        const ptrdiff_t* const MY_RESTRICT n, const ptrdiff_t* const MY_RESTRICT stride,
+        const float* const MY_RESTRICT origin, const float* const MY_RESTRICT delta,
         const real_type* const MY_RESTRICT data,
         // Output
         real_type* const MY_RESTRICT weighted_field) {
@@ -849,9 +779,9 @@ extern "C" int tet4_resample_field_local_CUDA(
     // Allocate memory on the device
 
     // Allocate weighted_field on the device
-    double* weighted_field_device;
-    cudaMalloc((void**)&weighted_field_device, nnodes * sizeof(double));
-    cudaMemset(weighted_field_device, 0, sizeof(double) * nnodes);
+    real_type* weighted_field_device;
+    cudaMalloc((void**)&weighted_field_device, nnodes * sizeof(real_type));
+    cudaMemset(weighted_field_device, 0, sizeof(real_type) * nnodes);
 
     // copy the elements to the device
     elems_tet4_device elems_device;
@@ -870,10 +800,10 @@ extern "C" int tet4_resample_field_local_CUDA(
     cudaMemcpy(xyz_device.y, xyz[1], nnodes * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(xyz_device.z, xyz[2], nnodes * sizeof(float), cudaMemcpyHostToDevice);
 
-    double* data_device;
+    real_type* data_device;
     const ptrdiff_t size_data = n[0] * n[1] * n[2];
-    cudaMalloc((void**)&data_device, size_data * sizeof(double));
-    cudaMemcpy(data_device, data, size_data * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMalloc((void**)&data_device, size_data * sizeof(real_type));
+    cudaMemcpy(data_device, data, size_data * sizeof(real_type), cudaMemcpyHostToDevice);
 
     cudaDeviceSynchronize();
     ///////////////////////////////////////////////////////////////////////////////
@@ -957,10 +887,10 @@ extern "C" int tet4_resample_field_local_CUDA(
     free_xyz_tet4_device(&xyz_device);
 
     // Copy the result back to the host
-    cudaMemcpy(weighted_field,           //
-               weighted_field_device,    //
-               nnodes * sizeof(double),  //
-               cudaMemcpyDeviceToHost);  //
+    cudaMemcpy(weighted_field,              //
+               weighted_field_device,       //
+               nnodes * sizeof(real_type),  //
+               cudaMemcpyDeviceToHost);     //
 
     cudaFree(weighted_field_device);
 
@@ -976,18 +906,17 @@ extern "C" int tet4_resample_field_local_CUDA(
 //////////////////////////////////////////////////////////
 extern "C" int tet4_resample_field_local_reduce_CUDA(
         // Mesh
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        int** const MY_RESTRICT elems,
+        const ptrdiff_t nelements, const ptrdiff_t nnodes, int** const MY_RESTRICT elems,
         float** const MY_RESTRICT xyz,
         // SDF
-        const ptrdiff_t* const MY_RESTRICT n,
-        const ptrdiff_t* const MY_RESTRICT stride,
-        const float* const MY_RESTRICT origin,
-        const float* const MY_RESTRICT delta,
+        const ptrdiff_t* const MY_RESTRICT n, const ptrdiff_t* const MY_RESTRICT stride,
+        const float* const MY_RESTRICT origin, const float* const MY_RESTRICT delta,
         const real_type* const MY_RESTRICT data,
         // Output
         real_type* const MY_RESTRICT weighted_field) {
+    //
+    PRINT_CURRENT_FUNCTION;
+
     //
     //
     printf("=============================================\n");
@@ -1000,9 +929,9 @@ extern "C" int tet4_resample_field_local_reduce_CUDA(
     // Allocate memory on the device
 
     // Allocate weighted_field on the device
-    double* weighted_field_device;
-    cudaMalloc((void**)&weighted_field_device, nnodes * sizeof(double));
-    cudaMemset(weighted_field_device, 0, sizeof(double) * nnodes);
+    real_type* weighted_field_device;
+    cudaMalloc((void**)&weighted_field_device, nnodes * sizeof(real_type));
+    cudaMemset(weighted_field_device, 0, sizeof(real_type) * nnodes);
 
     // copy the elements to the device
     elems_tet4_device elems_device;
@@ -1021,10 +950,10 @@ extern "C" int tet4_resample_field_local_reduce_CUDA(
     cudaMemcpy(xyz_device.y, xyz[1], nnodes * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(xyz_device.z, xyz[2], nnodes * sizeof(float), cudaMemcpyHostToDevice);
 
-    double* data_device;
+    real_type* data_device;
     const ptrdiff_t size_data = n[0] * n[1] * n[2];
-    cudaMalloc((void**)&data_device, size_data * sizeof(double));
-    cudaMemcpy(data_device, data, size_data * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMalloc((void**)&data_device, size_data * sizeof(real_type));
+    cudaMemcpy(data_device, data, size_data * sizeof(real_type), cudaMemcpyHostToDevice);
 
     cudaDeviceSynchronize();
     ///////////////////////////////////////////////////////////////////////////////
@@ -1072,7 +1001,7 @@ extern "C" int tet4_resample_field_local_reduce_CUDA(
 
                 delta[0],
                 delta[1],
-                delta[2], 
+                delta[2],
 
                 data_device,
                 weighted_field_device);
@@ -1118,14 +1047,15 @@ extern "C" int tet4_resample_field_local_reduce_CUDA(
     free_xyz_tet4_device(&xyz_device);
 
     // Copy the result back to the host
-    cudaMemcpy(weighted_field,           //
-               weighted_field_device,    //
-               nnodes * sizeof(double),  //
-               cudaMemcpyDeviceToHost);  //
+    cudaMemcpy(weighted_field,              //
+               weighted_field_device,       //
+               nnodes * sizeof(real_type),  //
+               cudaMemcpyDeviceToHost);     //
 
     cudaFree(weighted_field_device);
 
     cudaFree(data_device);
 
-    return 0;
+    RETURN_FROM_FUNCTION(0);
+    // return 0;
 }

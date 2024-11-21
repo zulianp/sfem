@@ -204,6 +204,77 @@ vec_real vec_indices_to_real(const vec_indices a) {
                (_q + 14) >= TET4_NQP ? 0.0 : tet4_qw[_q + 14], \
                (_q + 15) >= TET4_NQP ? 0.0 : tet4_qw[_q + 15]};
 
+#define ASSIGN_QUADRATURE_POINT_MACRO_TAIL(_q, _qx_V, _qy_V, _qz_V, _qw_V)         \
+    {                                                                              \
+        _qx_V = (vec_real){(_q + 0) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 0],    \
+                           (_q + 1) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 1],    \
+                           (_q + 2) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 2],    \
+                           (_q + 3) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 3],    \
+                           (_q + 4) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 4],    \
+                           (_q + 5) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 5],    \
+                           (_q + 6) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 6],    \
+                           (_q + 7) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 7],    \
+                           (_q + 8) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 8],    \
+                           (_q + 9) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 9],    \
+                           (_q + 10) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 10],  \
+                           (_q + 11) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 11],  \
+                           (_q + 12) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 12],  \
+                           (_q + 13) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 13],  \
+                           (_q + 14) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 14],  \
+                           (_q + 15) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 15]}; \
+                                                                                   \
+        _qy_V = (vec_real){(_q + 0) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 0],    \
+                           (_q + 1) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 1],    \
+                           (_q + 2) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 2],    \
+                           (_q + 3) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 3],    \
+                           (_q + 4) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 4],    \
+                           (_q + 5) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 5],    \
+                           (_q + 6) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 6],    \
+                           (_q + 7) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 7],    \
+                           (_q + 8) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 8],    \
+                           (_q + 9) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 9],    \
+                           (_q + 10) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 10],  \
+                           (_q + 11) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 11],  \
+                           (_q + 12) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 12],  \
+                           (_q + 13) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 13],  \
+                           (_q + 14) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 14],  \
+                           (_q + 15) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 15]}; \
+                                                                                   \
+        _qz_V = (vec_real){(_q + 0) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 0],    \
+                           (_q + 1) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 1],    \
+                           (_q + 2) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 2],    \
+                           (_q + 3) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 3],    \
+                           (_q + 4) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 4],    \
+                           (_q + 5) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 5],    \
+                           (_q + 6) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 6],    \
+                           (_q + 7) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 7],    \
+                           (_q + 8) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 8],    \
+                           (_q + 9) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 9],    \
+                           (_q + 10) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 10],  \
+                           (_q + 11) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 11],  \
+                           (_q + 12) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 12],  \
+                           (_q + 13) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 13],  \
+                           (_q + 14) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 14],  \
+                           (_q + 15) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 15]}; \
+                                                                                   \
+        _qw_V = (vec_real){(_q + 0) >= TET4_NQP ? 0.0 : tet4_qw[_q + 0],           \
+                           (_q + 1) >= TET4_NQP ? 0.0 : tet4_qw[_q + 1],           \
+                           (_q + 2) >= TET4_NQP ? 0.0 : tet4_qw[_q + 2],           \
+                           (_q + 3) >= TET4_NQP ? 0.0 : tet4_qw[_q + 3],           \
+                           (_q + 4) >= TET4_NQP ? 0.0 : tet4_qw[_q + 4],           \
+                           (_q + 5) >= TET4_NQP ? 0.0 : tet4_qw[_q + 5],           \
+                           (_q + 6) >= TET4_NQP ? 0.0 : tet4_qw[_q + 6],           \
+                           (_q + 7) >= TET4_NQP ? 0.0 : tet4_qw[_q + 7],           \
+                           (_q + 8) >= TET4_NQP ? 0.0 : tet4_qw[_q + 8],           \
+                           (_q + 9) >= TET4_NQP ? 0.0 : tet4_qw[_q + 9],           \
+                           (_q + 10) >= TET4_NQP ? 0.0 : tet4_qw[_q + 10],         \
+                           (_q + 11) >= TET4_NQP ? 0.0 : tet4_qw[_q + 11],         \
+                           (_q + 12) >= TET4_NQP ? 0.0 : tet4_qw[_q + 12],         \
+                           (_q + 13) >= TET4_NQP ? 0.0 : tet4_qw[_q + 13],         \
+                           (_q + 14) >= TET4_NQP ? 0.0 : tet4_qw[_q + 14],         \
+                           (_q + 15) >= TET4_NQP ? 0.0 : tet4_qw[_q + 15]};        \
+    }
+
 #endif  //// end SIMD implementation
 
 void assert_vec_real(const vec_real a, const vec_real b) {
@@ -260,7 +331,7 @@ vec_indices floor_V(vec_real a) {
     return (vec_indices){(ptrdiff_t)a[0], (ptrdiff_t)a[1], (ptrdiff_t)a[2], (ptrdiff_t)a[3]};
 }
 
-#elif __VL__ == 16
+#elif _VL_ == 16
 
 //// ZEROS for AVX512
 #define ZEROS_VEC \
@@ -334,23 +405,20 @@ SFEM_INLINE static vec_real tet10_measure_V(const real_t* const SFEM_RESTRICT x,
     const vec_real x20 = -x3 * x[4];
     const vec_real x21 = x8 * x[0];
     const vec_real x22 = -x0 * x[7] + x21;
-    const real_t sixth = 1.0/6.0;
-    const vec_real x23 = sixth * x0 * x[9] + sixth * x18 * x[2] +
-                         sixth * x19 * x[6] + sixth * x20 + sixth * x22 +
-                         sixth * x3 * x[5];
+    const real_t sixth = 1.0 / 6.0;
+    const vec_real x23 = sixth * x0 * x[9] + sixth * x18 * x[2] + sixth * x19 * x[6] + sixth * x20 +
+                         sixth * x22 + sixth * x3 * x[5];
     const vec_real x24 = -x0 * y[7];
     const vec_real x25 = x0 * y[8] + x10 + x14 * y[1] + x16 * y[4] + x2 * y[5] + x24;
     const vec_real x26 = x15 - x3 * z[4];
     const vec_real x27 = x1 * z[3] + x12 + x2 * z[9] + x26 + x3 * z[8] + x5 * z[7];
     const vec_real x28 = x0 * y[9] + x18 * y[2] + x19 * y[6] + x24 + x3 * y[5] + x6 + x9;
     const vec_real x29 = -x2 * x[6];
-    const vec_real x30 = sixth * x1 * x[3] + sixth * x2 * x[9] + sixth * x20 +
-                         sixth * x21 + sixth * x29 + sixth * x3 * x[8] +
-                         sixth * x5 * x[7];
+    const vec_real x30 = sixth * x1 * x[3] + sixth * x2 * x[9] + sixth * x20 + sixth * x21 +
+                         sixth * x29 + sixth * x3 * x[8] + sixth * x5 * x[7];
     const vec_real x31 = x0 * z[9] + x13 + x18 * z[2] + x19 * z[6] + x26 + x3 * z[5];
-    const vec_real x32 = sixth * x0 * x[8] + sixth * x14 * x[1] +
-                         sixth * x16 * x[4] + sixth * x2 * x[5] + sixth * x22 +
-                         sixth * x29;
+    const vec_real x32 = sixth * x0 * x[8] + sixth * x14 * x[1] + sixth * x16 * x[4] +
+                         sixth * x2 * x[5] + sixth * x22 + sixth * x29;
 
     return x11 * x17 * x23 - x11 * x31 * x32 - x17 * x28 * x30 - x23 * x25 * x27 + x25 * x30 * x31 +
            x27 * x28 * x32;
@@ -392,17 +460,17 @@ SFEM_INLINE static void tet10_transform_V(const real_t* const SFEM_RESTRICT x,
 
 SFEM_INLINE static void tet10_dual_basis_hrt_V(const vec_real qx, const vec_real qy,
                                                const vec_real qz, vec_real* const f) {
-    static const real_t c5_18 = 5.0/18.0;
-    static const real_t c5_72 = 5.0/72.0;
-    static const real_t c10_9 = 10.0/9.0;
-    static const real_t c25_9 = 25.0/9.0;
-    static const real_t c40_27 = 40.0/27.0;
-    static const real_t c115_27 = 115.0/27.0;
-    static const real_t c110_27 = 110.0/27.0;
-    static const real_t c55_54 = 55.0/54.0;
-    static const real_t c10_27 = 10.0/27.0;
-    static const real_t c160_27 = 160.0/27.0;
-    static const real_t c460_27 = 460.0/27.0;
+    static const real_t c5_18 = 5.0 / 18.0;
+    static const real_t c5_72 = 5.0 / 72.0;
+    static const real_t c10_9 = 10.0 / 9.0;
+    static const real_t c25_9 = 25.0 / 9.0;
+    static const real_t c40_27 = 40.0 / 27.0;
+    static const real_t c115_27 = 115.0 / 27.0;
+    static const real_t c110_27 = 110.0 / 27.0;
+    static const real_t c55_54 = 55.0 / 54.0;
+    static const real_t c10_27 = 10.0 / 27.0;
+    static const real_t c160_27 = 160.0 / 27.0;
+    static const real_t c460_27 = 460.0 / 27.0;
 
     const vec_real x0 = 2 * qy;
     const vec_real x1 = 2 * qz;
@@ -522,24 +590,24 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V(
 
 #elif _VL_ == 16
 
-#define GET_DATA_MACRO(_out, _data, _indx_V)  \
-    {                                         \
-        _out = (vec_real){_data[_indx_V[0]],  \
-                          _data[_indx_V[1]],  \
-                          _data[_indx_V[2]],  \
-                          _data[_indx_V[3]],  \
-                          _data[_indx_V[4]],  \
-                          _data[_indx_V[5]],  \
-                          _data[_indx_V[6]],  \
-                          _data[_indx_V[7]],  \
-                          _data[_indx_V[8],  \
-                          _data[_indx_V[9],  \
-                          _data[_indx_V[10], \
-                          _data[_indx_V[11], \
-                          _data[_indx_V[12], \
-                          _data[_indx_V[13], \
-                          _data[_indx_V[14], \
-                          _data[_indx_V[15]}; \
+#define GET_DATA_MACRO(_out, _data, _indx_V)   \
+    {                                          \
+        _out = (vec_real){_data[_indx_V[0]],   \
+                          _data[_indx_V[1]],   \
+                          _data[_indx_V[2]],   \
+                          _data[_indx_V[3]],   \
+                          _data[_indx_V[4]],   \
+                          _data[_indx_V[5]],   \
+                          _data[_indx_V[6]],   \
+                          _data[_indx_V[7]],   \
+                          _data[_indx_V[8]],   \
+                          _data[_indx_V[9]],   \
+                          _data[_indx_V[10]],  \
+                          _data[_indx_V[11]],  \
+                          _data[_indx_V[12]],  \
+                          _data[_indx_V[13]],  \
+                          _data[_indx_V[14]],  \
+                          _data[_indx_V[15]]}; \
     }
 
 #endif
@@ -564,14 +632,19 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_V(
         // Attention this is geometric data transformed to solver data!
         const real_t* const SFEM_RESTRICT data, vec_real* const SFEM_RESTRICT out) {
     //
-    const vec_indices i0 = i * stride0 + j * stride1 + k * stride2;
-    const vec_indices i1 = (i + 1) * stride0 + j * stride1 + k * stride2;
-    const vec_indices i2 = (i + 1) * stride0 + (j + 1) * stride1 + k * stride2;
-    const vec_indices i3 = i * stride0 + (j + 1) * stride1 + k * stride2;
-    const vec_indices i4 = i * stride0 + j * stride1 + (k + 1) * stride2;
-    const vec_indices i5 = (i + 1) * stride0 + j * stride1 + (k + 1) * stride2;
-    const vec_indices i6 = (i + 1) * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
-    const vec_indices i7 = i * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
+
+    ptrdiff_t_sfem stride0_sfem = (ptrdiff_t_sfem)stride0;
+    ptrdiff_t_sfem stride1_sfem = (ptrdiff_t_sfem)stride1;
+    ptrdiff_t_sfem stride2_sfem = (ptrdiff_t_sfem)stride2;
+
+    const vec_indices i0 = i * stride0_sfem + j * stride1_sfem + k * stride2_sfem;
+    const vec_indices i1 = (i + 1) * stride0_sfem + j * stride1_sfem + k * stride2_sfem;
+    const vec_indices i2 = (i + 1) * stride0_sfem + (j + 1) * stride1_sfem + k * stride2_sfem;
+    const vec_indices i3 = i * stride0_sfem + (j + 1) * stride1_sfem + k * stride2_sfem;
+    const vec_indices i4 = i * stride0_sfem + j * stride1_sfem + (k + 1) * stride2_sfem;
+    const vec_indices i5 = (i + 1) * stride0_sfem + j * stride1_sfem + (k + 1) * stride2_sfem;
+    const vec_indices i6 = (i + 1) * stride0_sfem + (j + 1) * stride1_sfem + (k + 1) * stride2_sfem;
+    const vec_indices i7 = i * stride0_sfem + (j + 1) * stride1_sfem + (k + 1) * stride2_sfem;
 
     GET_DATA_MACRO(out[0], data, i0);
     GET_DATA_MACRO(out[1], data, i1);
