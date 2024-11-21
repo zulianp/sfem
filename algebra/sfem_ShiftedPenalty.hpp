@@ -22,7 +22,7 @@ namespace sfem {
 
         ExpansionType expansion_type_{EXPANSION_TYPE_ORGINAL};
         T rtol{1e-8};
-        T atol{1e-16};
+        T atol{1e-14};
         T gamma{1};  // gamma > 0
         T eps{1e-14};
         T infty{1e15};
@@ -33,7 +33,7 @@ namespace sfem {
         ptrdiff_t n_dofs{-1};
         bool verbose{true};
         bool debug{false};
-        T penalty_param_{1.1};
+        T penalty_param_{10};
         T max_penalty_param_{1000};
         bool use_gradient_descent{false};
 
