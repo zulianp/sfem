@@ -191,6 +191,8 @@ int main(int argc, char *argv[]) {
 }
 
 void time_operator(const std::shared_ptr<sfem::Operator<real_t>> op, const char* const name, const real_t* const x, real_t* const y) {
+    
+    sfem::device_synchronize();     
     double spmv_tick = MPI_Wtime();
 
     for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
@@ -198,6 +200,8 @@ void time_operator(const std::shared_ptr<sfem::Operator<real_t>> op, const char*
     }
 
     double spmv_tock = MPI_Wtime();
+    sfem::device_synchronize();     
+    
     double avg_time = (spmv_tock - spmv_tick) / SFEM_REPEAT;
     double avg_throughput = (op->rows() / avg_time) * (sizeof(real_t) * 1e-9);
     printf("|%-13s|%-13f|%-13f|\n", name, avg_time, avg_throughput);
