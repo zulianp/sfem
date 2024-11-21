@@ -34,12 +34,12 @@ namespace sfem {
         bool verbose{true};
         bool debug{false};
         T penalty_param_{1.1};
-        T max_penalty_param_{10};
+        T max_penalty_param_{1000};
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         std::shared_ptr<Buffer<T>> upper_bound_;
         std::shared_ptr<Buffer<T>> lower_bound_;
-        std::shared_ptr<Operator<T>> constraint_scalaring_matrix_;
+        std::shared_ptr<Operator<T>> constraint_scaling_matrix_;
         std::shared_ptr<Operator<T>> apply_op;
 
         BLAS_Tpl<T> blas;
@@ -84,6 +84,11 @@ namespace sfem {
             }
         }
 
+        std::shared_ptr<Buffer<T>> make_buffer(const ptrdiff_t n) const {
+            return Buffer<T>::own(
+                    n, blas.allocate(n), blas.destroy, (enum MemorySpace)execution_space());
+        }
+
         int apply(const T* const b, T* const x) override {
             assert(good());
             if (!good()) {
@@ -96,32 +101,15 @@ namespace sfem {
             T* lb = (lower_bound_) ? lower_bound_->data() : nullptr;
             T* ub = (upper_bound_) ? upper_bound_->data() : nullptr;
 
-            auto c = Buffer<T>::own(n_dofs,
-                                    blas.allocate(n_dofs),
-                                    blas.destroy,
-                                    (enum MemorySpace)execution_space());
+            auto c = make_buffer(n_dofs);
 
             // Penalty term: -gradient/residual and Hessian/Jacobian
-            auto r_pen = Buffer<T>::own(n_dofs,
-                                        blas.allocate(n_dofs),
-                                        blas.destroy,
-                                        (enum MemorySpace)execution_space());
-
-            auto J_pen = Buffer<T>::own(n_dofs,
-                                        blas.allocate(n_dofs),
-                                        blas.destroy,
-                                        (enum MemorySpace)execution_space());
+            auto r_pen = make_buffer(n_dofs);
+            auto J_pen = make_buffer(n_dofs);
 
             // FIXME: This is not needed if lower_bound_ is not set...
-            auto lagr_lb = Buffer<T>::own(n_dofs,
-                                          blas.allocate(n_dofs),
-                                          blas.destroy,
-                                          (enum MemorySpace)execution_space());
-
-            auto lagr_ub = Buffer<T>::own(n_dofs,
-                                          blas.allocate(n_dofs),
-                                          blas.destroy,
-                                          (enum MemorySpace)execution_space());
+            auto lagr_lb = make_buffer(n_dofs);
+            auto lagr_ub = make_buffer(n_dofs);
 
             T penetration_norm = 0;
             T penetration_tol = 1 / (penalty_param_ * 0.1);
@@ -147,10 +135,10 @@ namespace sfem {
             };
 
             // Adds to negative gradient (i.e., residual)
-            auto ramp_p = [this](const ptrdiff_t n,
-                                 const T penalty_param,
-                                 const T* const x,
-                                 const T* const ub,
+            auto ramp_p = [](const ptrdiff_t n,
+                             const T penalty_param,
+                             const T* const x,
+                             const T* const ub,
                                  const T* const lagr_ub,
                                  T* const out) {
 #pragma omp parallel for
@@ -160,10 +148,10 @@ namespace sfem {
                 }
             };
 
-            auto ramp_m = [this](const ptrdiff_t n,
-                                 const T penalty_param,
-                                 const T* const x,
-                                 const T* const lb,
+            auto ramp_m = [](const ptrdiff_t n,
+                             const T penalty_param,
+                             const T* const x,
+                             const T* const lb,
                                  const T* const lagr_lb,
                                  T* const out) {
 #pragma omp parallel for
@@ -173,10 +161,10 @@ namespace sfem {
                 }
             };
 
-            auto update_lagr_p = [this](const ptrdiff_t n,
-                                        const T penalty_param,
-                                        const T* const x,
-                                        const T* const ub,
+            auto update_lagr_p = [](const ptrdiff_t n,
+                                    const T penalty_param,
+                                    const T* const x,
+                                    const T* const ub,
                                         T* const lagr_ub) {
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n; i++) {
@@ -184,10 +172,10 @@ namespace sfem {
                 }
             };
 
-            auto update_lagr_m = [this](const ptrdiff_t n,
-                                        const T penalty_param,
-                                        const T* const x,
-                                        const T* const lb,
+            auto update_lagr_m = [](const ptrdiff_t n,
+                                    const T penalty_param,
+                                    const T* const x,
+                                    const T* const lb,
                                         T* const lagr_lb) {
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n; i++) {
@@ -195,54 +183,42 @@ namespace sfem {
                 }
             };
 
-            auto calc_r_pen = [this, b, ramp_p, ramp_m](const ptrdiff_t n,
-                                                        T* const x,
-                                                        const T penalty_param,
-                                                        const T* const lb,
-                                                        const T* const ub,
-                                                        const T* const lagr_lb,
-                                                        const T* const lagr_ub,
-                                                        T* result) {
-                blas.zeros(n, result);
-                // Compute residual
-                apply_op->apply(x, result);
-                blas.axpby(n, 1, b, -1, result);
-
-                // printf("material residual: %e\n", blas.norm2(n, result));
-
+            auto calc_r_pen = [ramp_p, ramp_m](const ptrdiff_t n,
+                                               T* const x,
+                                               const T penalty_param,
+                                               const T* const lb,
+                                               const T* const ub,
+                                               const T* const lagr_lb,
+                                               const T* const lagr_ub,
+                                               T* result) {
                 // Ramp negative and positive parts
                 if (lb) ramp_m(n, penalty_param, x, lb, lagr_lb, result);
-
                 if (ub) ramp_p(n, penalty_param, x, ub, lagr_ub, result);
             };
 
-            auto calc_J_pen = [this](const ptrdiff_t n,
-                                     const T* const x,
-                                     const T* const lb,
-                                     const T* const ub,
-                                     const T* const lagr_lb,
-                                     const T* const lagr_ub,
-                                     T* const result) {
-                blas.zeros(n, result);
-
+            auto calc_J_pen = [](const ptrdiff_t n,
+                                 const T* const x,
+                                 const T penalty_param,
+                                 const T* const lb,
+                                 const T* const ub,
+                                 const T* const lagr_lb,
+                                 const T* const lagr_ub,
+                                 T* const result) {
                 if (lb) {
 #pragma omp parallel for
                     for (ptrdiff_t i = 0; i < n; i++) {
-                        result[i] += ((x[i] - lb[i] + lagr_lb[i] / penalty_param_) <= 0) *
-                                     penalty_param_;
+                        result[i] +=
+                                ((x[i] - lb[i] + lagr_lb[i] / penalty_param) <= 0) * penalty_param;
                     }
                 }
 
                 if (ub) {
 #pragma omp parallel for
                     for (ptrdiff_t i = 0; i < n; i++) {
-                        result[i] += ((x[i] - ub[i] + lagr_ub[i] / penalty_param_) >= 0) *
-                                     penalty_param_;
+                        result[i] +=
+                                ((x[i] - ub[i] + lagr_ub[i] / penalty_param) >= 0) * penalty_param;
                     }
                 }
-
-                if (this->constraint_scalaring_matrix_)
-                    this->constraint_scalaring_matrix_->apply(result, result);
             };
 
             T omega = 1 / penalty_param_;
@@ -250,6 +226,13 @@ namespace sfem {
             for (int iter = 0; iter < max_it; iter++) {
                 // Inner loop
                 for (int inner_iter = 0; inner_iter < max_inner_it; inner_iter++) {
+                    blas.zeros(n_dofs, r_pen->data());
+
+                    // Compute residual
+                    apply_op->apply(x, r_pen->data());
+                    blas.axpby(n_dofs, 1, b, -1, r_pen->data());
+
+                    // Compute penalty residual
                     calc_r_pen(n_dofs,
                                x,
                                penalty_param_,
@@ -269,8 +252,20 @@ namespace sfem {
                     if (true) {
                         blas.axpby(n_dofs, 1e-1, r_pen->data(), 0, c->data());
                     } else {
-                        calc_J_pen(
-                                n_dofs, x, lb, lb, lagr_lb->data(), lagr_ub->data(), J_pen->data());
+                        blas.zeros(n_dofs, J_pen->data());
+
+                        calc_J_pen(n_dofs,
+                                   x,
+                                   penalty_param_,
+                                   lb,
+                                   lb,
+                                   lagr_lb->data(),
+                                   lagr_ub->data(),
+                                   J_pen->data());
+
+                        if (this->constraint_scaling_matrix_) {
+                            this->constraint_scaling_matrix_->apply(J_pen->data(), J_pen->data());
+                        }
 
                         auto J = apply_op + sfem::diag_op(n_dofs, J_pen, execution_space_);
                         linear_solver_->set_op(J);
@@ -282,8 +277,8 @@ namespace sfem {
                     blas.axpy(n_dofs, 1, c->data(), x);
                 }
 
-                const T e_pen = ((lb) ? sq_norm_ramp_p(n_dofs, x, lb) : T(0)) +
-                                ((ub) ? sq_norm_ramp_m(n_dofs, x, ub) : T(0));
+                const T e_pen = ((ub) ? sq_norm_ramp_p(n_dofs, x, ub) : T(0)) +
+                                ((lb) ? sq_norm_ramp_m(n_dofs, x, lb) : T(0));
 
                 const T norm_pen = std::sqrt(e_pen);
                 const T norm_rpen = blas.norm2(n_dofs, r_pen->data());
@@ -304,7 +299,11 @@ namespace sfem {
                     printf("lagr_ub: %e\n", blas.norm2(n_dofs, lagr_ub->data()));
                 }
 
-                printf("norm_pen %e, norm_rpen %e!\n", norm_pen, norm_rpen);
+                printf("norm_pen %e, norm_rpen %e, penetration_tol %e, penalty_param %e\n",
+                       norm_pen,
+                       norm_rpen,
+                       penetration_tol,
+                       penalty_param_);
 
                 if (norm_pen < atol && norm_rpen < atol) {
                     converged = true;
