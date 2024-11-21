@@ -210,6 +210,7 @@ namespace sfem {
         std::shared_ptr<Buffer<idx_t>> colidx;
         std::shared_ptr<Buffer<real_t>> values;
 
+        // probably should have alpha / beta args?
         SymCooSpMVImpl(const ptrdiff_t ndofs, const std::shared_ptr<Buffer<idx_t>>& rowidx,
                        const std::shared_ptr<Buffer<idx_t>>& colidx,
                        const std::shared_ptr<Buffer<real_t>>& values, const real_t scale_output)
@@ -249,6 +250,18 @@ namespace sfem {
                                                    alg,
                                                    &bufferSize));
 
+            size_t bufferSize_transpose = 0;
+            CHECK_CUSPARSE(cusparseSpMV_bufferSize(cusparse_handle,
+                                                   CUSPARSE_OPERATION_TRANSPOSE,
+                                                   &alpha,
+                                                   matrix,
+                                                   vecX,
+                                                   &beta,
+                                                   vecY,
+                                                   valueType,
+                                                   alg,
+                                                   &bufferSize_transpose));
+            bufferSize = (bufferSize > bufferSize_transpose) ? bufferSize : bufferSize_transpose;
             CHECK_CUDA(cudaMalloc(&dBuffer, bufferSize));
 
             CHECK_CUDA(cudaPeekAtLastError());
@@ -315,7 +328,7 @@ namespace sfem {
         auto impl = std::make_shared<SymCooSpMVImpl>(ndofs, rowidx, colidx, values, scale_output);
         ret->apply_ = [=](const real_t* const x, real_t* const y) {
             impl->apply(x, y);
-            ret->blas.xypaz(ndofs, diag_values->data(), diag_values->data(), 1, y);
+            ret->blas.xypaz(ndofs, diag_values->data(), x, 1, y);
         };
         return ret;
     }

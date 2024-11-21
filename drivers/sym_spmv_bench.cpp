@@ -18,7 +18,7 @@
 
 #include "sfem_base.h"
 
-int SFEM_REPEAT = 1;
+int SFEM_REPEAT = 10;
 void time_operator_cpu(const std::shared_ptr<sfem::Operator<real_t>> op, const char* const name,
                        const real_t* const x, real_t* const y);
 void time_operator_gpu(const std::shared_ptr<sfem::Operator<real_t>> op, const char* const name,
@@ -145,8 +145,7 @@ int main(int argc, char* argv[]) {
 
         auto y1 = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_DEVICE);
         auto y2 = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_DEVICE);
-        auto x1 = sfem::to_device(x_host);
-        auto x2 = sfem::to_device(x_host);
+        auto x = sfem::to_device(x_host);
 
         // CSR buffers device
         auto colidx = sfem::to_device(colidx_host);
@@ -199,9 +198,13 @@ int main(int argc, char* argv[]) {
 
         gpu_blas->values(ndofs, 0, y2->data());
         gpu_blas->values(ndofs, 0, y1->data());
+        time_operator_gpu(crs_gpu, "csr", x->data(), y2->data());
+        time_operator_gpu(coo_sym_gpu, "coo sym", x->data(), y1->data());
 
-        time_operator_gpu(crs_gpu, "csr", x2->data(), y2->data());
-        time_operator_gpu(coo_sym_gpu, "coo sym", x1->data(), y1->data());
+        gpu_blas->values(ndofs, 0, y2->data());
+        gpu_blas->values(ndofs, 0, y1->data());
+        time_operator_gpu(crs_gpu, "csr", x->data(), y2->data());
+        time_operator_gpu(coo_sym_gpu, "coo sym", x->data(), y1->data());
 
         auto y1_tocpu = sfem::to_host(y1);
         auto y2_tocpu = sfem::to_host(y2);
@@ -213,23 +216,24 @@ int main(int argc, char* argv[]) {
 
         /*
         time_operator_gpu(crs_gpu, "csr", x2->data(), y2->data());
-        time_operator_gpu(coo_sym_gpu, "coo sym", x1->data(), y1->data());
-
-        time_operator_gpu(crs_gpu, "csr", x2->data(), y2->data());
-        time_operator_gpu(coo_sym_gpu, "coo sym", x1->data(), y1->data());
+        time_operator_gpu(coo_sym_gpu, "coo sym", 1->data(), y1->data());
         */
 
         // TODO: verify y1 == y2
 
+        auto cpu_blas = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
         printf("\n-----------\n");
         printf("|CPU tests|\n");
         printf("-----------\n\n");
         printf(" operator      avg time      giga dofs\n");
+
+        cpu_blas->values(ndofs, 0, y1_host->data());
+        cpu_blas->values(ndofs, 0, y2_host->data());
+        cpu_blas->values(ndofs, 0, y3_host->data());
         time_operator_cpu(coo_sym_host, "coo sym", x_host->data(), y1_host->data());
         time_operator_cpu(csr_sym_host, "csr sym", x_host->data(), y2_host->data());
         time_operator_cpu(csr_host, "csr", x_host->data(), y3_host->data());
 
-        auto cpu_blas = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
         cpu_blas->axpy(ndofs, -1, y2_host->data(), y1_host->data());
         auto norm_y1_host = cpu_blas->norm2(ndofs, y1_host->data());
         printf("norm (cpu) coo sym out - (cpu) csr sym out: %g\n", norm_y1_host);
