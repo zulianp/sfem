@@ -34,8 +34,8 @@ set(ARM64_VECTOR_BITS 128) ## Default value for ARM64 (at the moment)
 ## and verify whath the best simd size for Apple Silicon M CPU V8 or V4?
 
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-    set (VECTOR_OPT "-msve-vector-bits=${ARM64_VECTOR_BITS}")
-    set (VECTOR_OPT_v8 "-msve-vector-bits=${ARM64_VECTOR_BITS}")
+    # set (VECTOR_OPT "-msve-vector-bits=${ARM64_VECTOR_BITS}")
+    # set (VECTOR_OPT_v8 "-msve-vector-bits=${ARM64_VECTOR_BITS}")
 elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
     set (VECTOR_OPT "-mavx2 -DSFEM_ENABLE_AVX2_SORT ")
     set (VECTOR_OPT_v8 "-mavx512f")
