@@ -1,4 +1,3 @@
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,21 +10,20 @@
 #include "sfem_Buffer.hpp"
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
+#include "sfem_crs_sym_SpMV.hpp"
 #include "sfem_cuda_blas.h"
 #include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_crs_SpMV.hpp"
-#include "sfem_tpl_blas.hpp"
-#include "utils.h"
-
-#include "dirichlet.h"
 
 #include "sfem_base.h"
-#include "spmv.h"
 
 int SFEM_REPEAT = 10;
-void time_operator(const std::shared_ptr<sfem::Operator<real_t>> op, const char* const name, const real_t* const x, real_t* const y);
+void time_operator_cpu(const std::shared_ptr<sfem::Operator<real_t>> op, const char* const name,
+                       const real_t* const x, real_t* const y);
+void time_operator_gpu(const std::shared_ptr<sfem::Operator<real_t>> op, const char* const name,
+                       const real_t* const x, real_t* const y);
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     MPI_Init(&argc, &argv);
 
     MPI_Comm comm = MPI_COMM_WORLD;
@@ -40,17 +38,16 @@ int main(int argc, char *argv[]) {
     }
 
     if (argc != 5) {
-        fprintf(
-            stderr, "usage: %s <alpha> <crs_folder> <x.raw> <output.raw>\n", argv[0]);
+        fprintf(stderr, "usage: %s <alpha> <crs_folder> <x.raw> <output.raw>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
     SFEM_READ_ENV(SFEM_REPEAT, atoi);
 
     const real_t alpha = atof(argv[1]);
-    const char *crs_folder = argv[2];
-    const char *x_path = argv[3];
-    const char *output_path = argv[4];
+    const char* crs_folder = argv[2];
+    const char* x_path = argv[3];
+    const char* output_path = argv[4];
 
     double tick = MPI_Wtime();
 
@@ -72,32 +69,33 @@ int main(int argc, char *argv[]) {
              SFEM_MPI_REAL_T,
              &crs);
 
-    real_t *x_host = 0;
+    real_t* x_host_data = 0;
     if (strcmp("gen:ones", x_path) == 0) {
         ptrdiff_t ndofs = crs.lrows;
-        x_host = (real_t*) malloc(ndofs * sizeof(real_t));
+        x_host_data = (real_t*)malloc(ndofs * sizeof(real_t));
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < ndofs; ++i) {
-            x_host[i] = 1;
+            x_host_data[i] = 1;
         }
 
     } else {
         ptrdiff_t _nope_, x_n;
-        array_create_from_file(comm, x_path, SFEM_MPI_REAL_T, (void **)&x_host, &_nope_, &x_n);
+        array_create_from_file(comm, x_path, SFEM_MPI_REAL_T, (void**)&x_host_data, &_nope_, &x_n);
     }
     printf("Loaded matrix...\n");
 
     ptrdiff_t ndofs = crs.grows;
     count_t nnz = crs.gnnz;
-    auto x_host_buff = sfem::Buffer<real_t>::own(ndofs, x_host, free);
+    auto x_host = sfem::Buffer<real_t>::own(ndofs, x_host_data, free);
+    auto y_host = sfem::h_buffer<real_t>(ndofs);
 
     // CSR buffers
-    auto colidx_host =  sfem::Buffer<idx_t>::wrap(nnz, (idx_t*) crs.colidx);
+    auto colidx_host = sfem::Buffer<idx_t>::wrap(nnz, (idx_t*)crs.colidx);
     auto rowidx_host = sfem::h_buffer<idx_t>(nnz);
-    auto rowptr_host =  sfem::Buffer<count_t>::wrap(ndofs + 1, (count_t*) crs.rowptr);
-    auto values_host = sfem::Buffer<real_t>::wrap(nnz, (real_t*) crs.values);
+    auto rowptr_host = sfem::Buffer<count_t>::wrap(ndofs + 1, (count_t*)crs.rowptr);
+    auto values_host = sfem::Buffer<real_t>::wrap(nnz, (real_t*)crs.values);
 
-    // Diagonal sparse matrix buffers
+    // Triangle sparse matrix buffers
     count_t offdiag_nnz = (crs.gnnz - ndofs) / 2;
     auto diag_values_host = sfem::h_buffer<real_t>(ndofs);
     auto offdiag_values_host = sfem::h_buffer<real_t>(offdiag_nnz);
@@ -105,11 +103,17 @@ int main(int argc, char *argv[]) {
     auto offdiag_rowidx_host = sfem::h_buffer<idx_t>(offdiag_nnz);
     auto offdiag_rowptr_host = sfem::h_buffer<count_t>(ndofs + 1);
 
+    printf("-----------\n");
+    printf("|matrix info|\n");
+    printf("-----------\n");
+    printf("ndofs: %d\n", (int)ndofs);
+    printf("nnz: %d\n", nnz);
+
     count_t write_pos = 0;
     for (ptrdiff_t i = 0; i < ndofs; i++) {
-        for (idx_t idx = crs.rowptr[i]; idx < crs.rowptr[i+1]; idx++) {
-            ptrdiff_t j = crs.colidx[idx];
-            real_t val = crs.values[idx];
+        for (idx_t idx = rowptr_host->data()[i]; idx < rowptr_host->data()[i + 1]; idx++) {
+            ptrdiff_t j = colidx_host->data()[idx];
+            real_t val = values_host->data()[idx];
             rowidx_host->data()[idx] = i;
 
             if (j > i) {
@@ -123,15 +127,16 @@ int main(int argc, char *argv[]) {
         }
         offdiag_rowptr_host->data()[i + 1] = write_pos;
     }
-    // Matrix should be standard crs input 
+    // Matrix should be standard crs input
     assert(write_pos == offdiag_nnz);
 
-    real_t* y1_device = d_allocate(ndofs); 
-    real_t* y2_device = d_allocate(ndofs); 
+    real_t* y1_device = d_allocate(ndofs);
+    real_t* y2_device = d_allocate(ndofs);
 
     auto y1 = sfem::Buffer(ndofs, y1_device, d_destroy, sfem::MEMORY_SPACE_DEVICE);
     auto y2 = sfem::Buffer(ndofs, y2_device, d_destroy, sfem::MEMORY_SPACE_DEVICE);
-    auto x = sfem::to_device(x_host_buff);
+    auto x1 = sfem::to_device(x_host);
+    auto x2 = sfem::to_device(x_host);
 
     // CSR buffers device
     auto colidx = sfem::to_device(colidx_host);
@@ -146,37 +151,56 @@ int main(int argc, char *argv[]) {
     auto offdiag_rowidx = sfem::to_device(offdiag_rowidx_host);
     auto offdiag_rowptr = sfem::to_device(offdiag_rowptr_host);
 
+    // TODO
+    // GPU: coo, csr sym, bsr, bsr sym
+
     auto coo_sym_gpu = sfem::d_sym_coo_spmv(
-        ndofs, 
-        offdiag_nnz, 
-        offdiag_rowidx, 
-        offdiag_colidx, 
-        offdiag_values,
-        diag_values, 
-        alpha
-    );
+            ndofs, offdiag_nnz, offdiag_rowidx, offdiag_colidx, offdiag_values, diag_values, alpha);
 
-    auto crs_gpu = sfem::d_crs_spmv(
-            ndofs, ndofs,
-            rowptr,
-            colidx,
-            values, alpha);
+    auto crs_gpu = sfem::d_crs_spmv(ndofs, ndofs, rowptr, colidx, values, alpha);
 
-    // TODO:
-    // GPU: coo not sym, csr sym, bsr not sym, bsr sym
-    // CPU: (all) coo, csr, bsr / sym, not sym
+    // TODO
+    // CPU: coo, bsr, bsr sym
 
+    // also this api should probably have alpha to match others...
+    auto coo_sym_host = sfem::h_coosym(nullptr,
+                                       offdiag_rowidx_host,
+                                       offdiag_colidx_host,
+                                       offdiag_values_host,
+                                       diag_values_host);
+
+    auto csr_sym_host = sfem::h_crs_sym_spmv(ndofs,
+                                             ndofs,
+                                             offdiag_rowptr_host,
+                                             offdiag_colidx_host,
+                                             diag_values_host,
+                                             offdiag_values_host,
+                                             alpha);
+
+    auto csr_host = sfem::h_crs_spmv(ndofs, ndofs, rowptr_host, colidx_host, values_host, alpha);
+
+    printf("\n-----------\n");
+    printf("|GPU tests|\n");
+    printf("-----------\n\n");
     printf(" operator      avg time      giga dofs\n");
-    time_operator(crs_gpu, "csr", x->data(), y2.data());
-    time_operator(coo_sym_gpu, "coo sym", x->data(), y1.data());
+    time_operator_gpu(crs_gpu, "csr", x2->data(), y2.data());
+    time_operator_gpu(coo_sym_gpu, "coo sym", x1->data(), y1.data());
 
-    time_operator(crs_gpu, "csr", x->data(), y2.data());
-    time_operator(coo_sym_gpu, "coo sym", x->data(), y1.data());
+    time_operator_gpu(crs_gpu, "csr", x2->data(), y2.data());
+    time_operator_gpu(coo_sym_gpu, "coo sym", x1->data(), y1.data());
 
-    time_operator(crs_gpu, "csr", x->data(), y2.data());
-    time_operator(coo_sym_gpu, "coo sym", x->data(), y1.data());
+    time_operator_gpu(crs_gpu, "csr", x2->data(), y2.data());
+    time_operator_gpu(coo_sym_gpu, "coo sym", x1->data(), y1.data());
 
     // TODO: verify y1 == y2
+
+    printf("\n-----------\n");
+    printf("|CPU tests|\n");
+    printf("-----------\n\n");
+    printf(" operator      avg time      giga dofs\n");
+    time_operator_cpu(coo_sym_host, "coo sym", x_host->data(), y_host->data());
+    time_operator_cpu(csr_sym_host, "csr sym", x_host->data(), y_host->data());
+    time_operator_cpu(csr_host, "csr", x_host->data(), y_host->data());
 
     crs_free(&crs);
 
@@ -190,9 +214,9 @@ int main(int argc, char *argv[]) {
     return EXIT_SUCCESS;
 }
 
-void time_operator(const std::shared_ptr<sfem::Operator<real_t>> op, const char* const name, const real_t* const x, real_t* const y) {
-    
-    sfem::device_synchronize();     
+void time_operator_gpu(const std::shared_ptr<sfem::Operator<real_t>> op, const char* const name,
+                       const real_t* const x, real_t* const y) {
+    sfem::device_synchronize();
     double spmv_tick = MPI_Wtime();
 
     for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
@@ -200,9 +224,24 @@ void time_operator(const std::shared_ptr<sfem::Operator<real_t>> op, const char*
     }
 
     double spmv_tock = MPI_Wtime();
-    sfem::device_synchronize();     
-    
+    sfem::device_synchronize();
+
     double avg_time = (spmv_tock - spmv_tick) / SFEM_REPEAT;
-    double avg_throughput = (op->rows() / avg_time) * (sizeof(real_t) * 1e-9);
+    double avg_throughput = (op->rows() / avg_time) * 1e-9;
+    printf("|%-13s|%-13f|%-13f|\n", name, avg_time, avg_throughput);
+}
+
+void time_operator_cpu(const std::shared_ptr<sfem::Operator<real_t>> op, const char* const name,
+                       const real_t* const x, real_t* const y) {
+    double spmv_tick = MPI_Wtime();
+
+    for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
+        op->apply(x, y);
+    }
+
+    double spmv_tock = MPI_Wtime();
+
+    double avg_time = (spmv_tock - spmv_tick) / SFEM_REPEAT;
+    double avg_throughput = (op->rows() / avg_time) * 1e-9;
     printf("|%-13s|%-13f|%-13f|\n", name, avg_time, avg_throughput);
 }

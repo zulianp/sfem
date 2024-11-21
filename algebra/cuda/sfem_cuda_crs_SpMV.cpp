@@ -6,6 +6,7 @@
 #include "sfem_Buffer.hpp"
 #include "sfem_CooSym.hpp"
 #include "sfem_config.h"
+#include "sfem_cuda_base.h"
 #include "sfem_cuda_blas.hpp"
 
 #ifdef SFEM_ENABLE_CUSPARSE
@@ -257,6 +258,7 @@ namespace sfem {
         }
 
         void apply(const real_t* const x, real_t* const y) {
+            SFEM_DEBUG_SYNCHRONIZE();
             if (!initialized) {
                 initialize(x, y);
                 initialized = true;
@@ -286,6 +288,7 @@ namespace sfem {
                                         valueType,
                                         alg,
                                         dBuffer));
+            SFEM_DEBUG_SYNCHRONIZE();
         }
     };
 
@@ -307,7 +310,7 @@ namespace sfem {
         auto impl =
                 std::make_shared<SymCooSpMVImpl>(ndofs, nnz, rowidx, colidx, values, scale_output);
         ret->apply_ = [=](const real_t* const x, real_t* const y) {
-            impl->apply(x, y);
+            // impl->apply(x, y);
             ret->blas.xypaz(ndofs, diag_values->data(), diag_values->data(), 1, y);
         };
         return ret;
