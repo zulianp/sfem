@@ -83,4 +83,8 @@ int vec_real_check_nan(const vec_real a);
 
 #endif
 
+#define POW2_VEC(__X__) ((__X__) * (__X__))
+
+#define POW3_VEC(__X__) ((__X__) * (__X__) * (__X__))
+
 #endif  // __TET10_VEC_H__
