@@ -7,6 +7,11 @@ import os
 import glob
 import pdb
 
+import inspect
+
+# Get the current frame
+frame = inspect.currentframe()
+
 try: geom_t
 except NameError: 
     print('raw_to_db: self contained mode')
@@ -82,7 +87,8 @@ def write_transient_data(
                     name_to_point_data[name] = data
 
                     if(len(data) != len(data)):
-                        print(f"Error: data lenght is different from number of nodes {len(data)} != {len(data)}")
+                        frame = inspect.currentframe()
+                        print(f"Error in {__file__} at line {frame.f_lineno}:\n .... data length is different from number of nodes {len(data)} != {len(data)}")
                         exit(1)
 
             cds = cell_data_steps[t];
@@ -97,7 +103,8 @@ def write_transient_data(
                     name_to_cell_data[name] = data
 
                     if(len(data) != len(data)):
-                        print(f"Error: data lenght is different from number of nodes {len(data)} != {len(data)}")
+                        frame = inspect.currentframe()
+                        print(f"Error in {__file__} at line {frame.f_lineno}:\n .... data length is different from number of nodes {len(data)} != {len(data)}")
                         exit(1)
 
             if has_point_data and not has_cell_data:
@@ -136,7 +143,8 @@ def add_fields(field_data, field_data_type, storage, check_len):
                 name = os.path.splitext(os.path.basename(f))[0]
 
                 if(len(data) != check_len):
-                    print(f"Error: data lenght is different from number of nodes {len(data)} != {check_len}")
+                    frame = inspect.currentframe()
+                    print(f"Error in {__file__} at line {frame.f_lineno}:\n .... data length is different from number of nodes {len(data)} != {check_len}")
                     sys.exit(1)
 
                 print(f"field: {name}, min={np.min(data)}, max={np.max(data)}, sum={np.sum(data)} type={t}")
