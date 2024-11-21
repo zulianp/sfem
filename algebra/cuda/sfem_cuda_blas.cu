@@ -396,6 +396,7 @@ static void txypaz(const ptrdiff_t n, const T *const x, const T *const y, const 
     ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
     txypaz_kernel<<<n_blocks, kernel_block_size>>>(n, x, y, alpha, z);
+    SFEM_DEBUG_SYNCHRONIZE();
 }
 
 extern real_t *d_allocate(const std::size_t n) {
