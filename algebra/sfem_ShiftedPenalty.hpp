@@ -271,8 +271,6 @@ namespace sfem {
                         }
 
                         auto J = apply_op + sfem::diag_op(n_dofs, J_pen, execution_space());
-                        // auto J = sfem::diag_op(n_dofs, J_pen, execution_space()) + apply_op;
-                        // auto J = apply_op;
                         linear_solver_->set_op(J);
 
                         blas.zeros(n_dofs, c->data());
