@@ -87,7 +87,7 @@ n_procs=18
 # n_procs=1
 
 PERF="yes"
-PERF="no"
+# PERF="no"
 
 # if [[ -z "$LAUNCH" ]]
 # then
@@ -124,4 +124,4 @@ set -x
 time SFEM_INTERPOLATE=0 SFEM_READ_FP32=1 $LAUNCH  $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET10
 
 
-raw_to_db.py $resample_target out.vtk --point_data=$field --point_data_type=float32
+raw_to_db.py $resample_target out.vtk --point_data=$field --point_data_type=float64

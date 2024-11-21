@@ -878,7 +878,8 @@ int resample_field_local(
                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
 // #elif USE_TET4_MODEL == USE_TET4_V8
 //             return tet4_resample_field_local_V(
-//                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+//                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data,
+//                     weighted_field);
 #elif USE_TET4_MODEL == USE_TET4_CUDA
             return tet4_resample_field_local_reduce_CUDA(
                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
@@ -905,10 +906,12 @@ int resample_field_local(
 #if SFEM_TET10_CUDA == ON
             const int ret = hex8_to_tet10_resample_field_local_CUDA(
                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+
             RETURN_FROM_FUNCTION(ret);
 #else
             const int ret = hex8_to_tet10_resample_field_local(
                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+
             RETURN_FROM_FUNCTION(ret);
 #endif
         }

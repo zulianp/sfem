@@ -15,6 +15,12 @@ int tet10_assemble_dual_mass_vector_V2(const ptrdiff_t nelements, const ptrdiff_
                                        idx_t** const SFEM_RESTRICT elems,
                                        geom_t** const SFEM_RESTRICT xyz, real_t* const values);
 
+int isoparametric_tet10_assemble_dual_mass_vector_V(const ptrdiff_t nelements,
+                                                    const ptrdiff_t nnodes,
+                                                    idx_t** const SFEM_RESTRICT elems,
+                                                    geom_t** const SFEM_RESTRICT xyz,
+                                                    real_t* const diag);
+
 /**
  * @brief Compute the indices of the field for third order interpolation
  *

@@ -365,6 +365,56 @@ vec_indices floor_V(vec_real a) {
 
 #endif  //// end SIMD implementation
 
+///////////////////////////////////////////////////////////////////////
+// isoparametric_lumped_mass_kernel_hrt
+///////////////////////////////////////////////////////////////////////
+SFEM_INLINE static void isoparametric_lumped_mass_kernel_hrt_V(
+        const vec_real dV,
+        // Quadrature
+        const vec_real qx, const vec_real qy, const vec_real qz,
+        vec_real* const SFEM_RESTRICT element_diag) {
+    //
+    const vec_real x0 = 4 * qx;
+    const vec_real x1 = qy * qz;
+    const vec_real x2 = 2 * qx - 1;
+    const vec_real x3 = qx * x2;
+    const vec_real x4 = 2 * qy;
+    const vec_real x5 = qy * (x4 - 1);
+    const vec_real x6 = 2 * qz;
+    const vec_real x7 = qz * (x6 - 1);
+    const vec_real x8 = qx + qy + qz - 1;
+    const vec_real x9 = qx * x8;
+    const vec_real x10 = qy * x8;
+    const vec_real x11 = qz * x8;
+    const vec_real x12 = x8 * (x2 + x4 + x6);
+    const vec_real x13 = (real_t)(5.0 / 18.0) * dV;
+    const vec_real x14 = POW2_VEC(qx);
+    const vec_real x15 = POW2_VEC(qy);
+    const vec_real x16 = POW2_VEC(qz);
+    const vec_real x17 = 11 * qx;
+    const vec_real x18 = -qy * x17 + 11 * x11 + x12 + 4 * x7;
+    const vec_real x19 = -qz * x17 + 11 * x10 + 4 * x5;
+    const vec_real x20 = (real_t)(40.0 / 27.0) * dV;
+    const vec_real x21 = qx * qy;
+    const vec_real x22 = -24 * qx + 21 * x14 + 4;
+    const vec_real x23 = -24 * qy + 21 * x15;
+    const vec_real x24 = qx * qz;
+    const vec_real x25 = -11 * x1 + 4 * x3 + 11 * x9;
+    const vec_real x26 = -24 * qz + 21 * x16;
+
+    element_diag[0] +=
+            x12 * x13 * (qy * x0 + qz * x0 + 4 * x1 - x10 - x11 + 10 * x12 + x3 + x5 + x7 - x9);
+    element_diag[1] += qx * x13 * (42 * (POW3_VEC(qx)) + 14 * qx - 45 * x14 - 1);
+    element_diag[2] += qy * x13 * (42 * (POW3_VEC(qy)) + 14 * qy - 45 * x15 - 1);
+    element_diag[3] += qz * x13 * (42 * (POW3_VEC(qz)) + 14 * qz - 45 * x16 - 1);
+    element_diag[4] += -x20 * x9 * (16 * x1 + x18 + x19 + x3 - 46 * x9);
+    element_diag[5] += x20 * x21 * (84 * x21 + x22 + x23);
+    element_diag[6] += -x10 * x20 * (-46 * x10 + x18 + 16 * x24 + x25 + x5);
+    element_diag[7] += -x11 * x20 * (-46 * x11 + x12 + x19 + 16 * x21 + x25 + x7);
+    element_diag[8] += x20 * x24 * (x22 + 84 * x24 + x26);
+    element_diag[9] += x1 * x20 * (84 * x1 + x23 + x26 + 4);
+}
+
 /**
  * @brief iso-parametric version
  *
@@ -849,7 +899,8 @@ int hex8_to_isoparametric_tet10_resample_field_local_V(
 
             // for (int ii = 0; ii < _VL_; ii++) {
             //     if (isnan(element_field[v][ii])) {
-            //         printf("ERROR: element_field[v][ii] is NaN %f, v = %d, ii = %d file: %s:%d\n",
+            //         printf("ERROR: element_field[v][ii] is NaN %f, v = %d, ii = %d file:
+            //         %s:%d\n",
             //                element_field[v][ii],
             //                v,
             //                ii,
@@ -1169,6 +1220,71 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
 
     RETURN_FROM_FUNCTION(0);
 }  // end function hex8_to_tet10_resample_field_local_cube1_V2
+
+int isoparametric_tet10_assemble_dual_mass_vector_V(const ptrdiff_t nelements,
+                                                    const ptrdiff_t nnodes,
+                                                    idx_t** const SFEM_RESTRICT elems,
+                                                    geom_t** const SFEM_RESTRICT xyz,
+                                                    real_t* const diag) {
+    PRINT_CURRENT_FUNCTION;
+
+    idx_t ev[10];  // Element indices
+    vec_real element_diag[10];
+    real_t x[10], y[10], z[10];
+
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        //
+
+        for (int v = 0; v < 10; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        for (int v = 0; v < 10; ++v) {
+            x[v] = xyz[0][ev[v]];  // x-coordinates
+            y[v] = xyz[1][ev[v]];  // y-coordinates
+            z[v] = xyz[2][ev[v]];  // z-coordinates
+        }
+
+        for (int v = 0; v < 10; ++v) {
+            element_diag[v] = (vec_real)ZEROS_VEC;
+        }
+
+        // We do this numerical integration due to the det J
+        for (int q = 0; q < TET4_NQP; q += _VL_) {  // loop over the quadrature points
+                                                    //
+            vec_real tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V;
+
+            const int q_next = q + (_VL_);
+
+            if (q_next < TET4_NQP) {
+                ASSIGN_QUADRATURE_POINT_MACRO(q, tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V);
+            } else {
+                ASSIGN_QUADRATURE_POINT_MACRO_TAIL(q, tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V);
+            }
+
+            vec_real dV = tet10_measure_V(x, y, z, tet4_qx_V, tet4_qy_V, tet4_qz_V) * tet4_qw_V;
+
+            isoparametric_lumped_mass_kernel_hrt_V(dV,
+                                                   // Quadrature
+                                                   tet4_qx_V,
+                                                   tet4_qy_V,
+                                                   tet4_qz_V,
+                                                   element_diag);
+        }  // end quadrature loop
+
+        for (int v = 0; v < 10; ++v) {
+            const idx_t idx = ev[v];
+
+            float_t diag_v = 0.0;
+            SIMD_REDUCE_SUM_MACRO(diag_v, element_diag[v]);
+
+            diag[idx] += diag_v;
+
+        }  // end vertex loop
+    }      // end element loop
+
+    RETURN_FROM_FUNCTION(0);
+}  // end isoparametric_tet10_assemble_dual_mass_vector
 
 /**
  * @brief
