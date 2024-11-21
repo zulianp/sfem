@@ -28,7 +28,7 @@ namespace sfem {
         T infty{1e15};
         T eigen_solver_tol{1e-1};
         int max_it{10};
-        int max_inner_it{10000};
+        int max_inner_it{10};
         int check_each{10};
         ptrdiff_t n_dofs{-1};
         bool verbose{true};
@@ -39,7 +39,7 @@ namespace sfem {
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         std::shared_ptr<Buffer<T>> upper_bound_;
         std::shared_ptr<Buffer<T>> lower_bound_;
-        std::shared_ptr<Operator<T>> constraint_scaling_matrix_;
+        std::shared_ptr<Operator<T>> constraint_scaling_op_;
         std::shared_ptr<Operator<T>> apply_op;
 
         BLAS_Tpl<T> blas;
@@ -139,8 +139,8 @@ namespace sfem {
                              const T penalty_param,
                              const T* const x,
                              const T* const ub,
-                                 const T* const lagr_ub,
-                                 T* const out) {
+                             const T* const lagr_ub,
+                             T* const out) {
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n; i++) {
                     out[i] -= penalty_param *
@@ -152,8 +152,8 @@ namespace sfem {
                              const T penalty_param,
                              const T* const x,
                              const T* const lb,
-                                 const T* const lagr_lb,
-                                 T* const out) {
+                             const T* const lagr_lb,
+                             T* const out) {
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n; i++) {
                     out[i] -= penalty_param *
@@ -165,7 +165,7 @@ namespace sfem {
                                     const T penalty_param,
                                     const T* const x,
                                     const T* const ub,
-                                        T* const lagr_ub) {
+                                    T* const lagr_ub) {
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n; i++) {
                     lagr_ub[i] = std::max(T(0), lagr_ub[i] + penalty_param * (x[i] - ub[i]));
@@ -176,7 +176,7 @@ namespace sfem {
                                     const T penalty_param,
                                     const T* const x,
                                     const T* const lb,
-                                        T* const lagr_lb) {
+                                    T* const lagr_lb) {
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n; i++) {
                     lagr_lb[i] = std::min(T(0), lagr_lb[i] + penalty_param * (x[i] - lb[i]));
@@ -228,7 +228,7 @@ namespace sfem {
                 for (int inner_iter = 0; inner_iter < max_inner_it; inner_iter++) {
                     blas.zeros(n_dofs, r_pen->data());
 
-                    // Compute residual
+                    // Compute material residual
                     apply_op->apply(x, r_pen->data());
                     blas.axpby(n_dofs, 1, b, -1, r_pen->data());
 
@@ -242,8 +242,13 @@ namespace sfem {
                                lagr_ub->data(),
                                r_pen->data());
 
+                    if (this->constraint_scaling_op_) {
+                        // TODO: Implement this
+                        assert(false);
+                    }
+
                     const T r_pen_norm = blas.norm2(n_dofs, r_pen->data());
-                    // printf("r_pen_norm: %e\n", r_pen_norm);
+
                     if (r_pen_norm < std::max(atol, omega) && inner_iter != 0) {
                         converged = true;
                         break;
@@ -263,12 +268,14 @@ namespace sfem {
                                    lagr_ub->data(),
                                    J_pen->data());
 
-                        if (this->constraint_scaling_matrix_) {
-                            this->constraint_scaling_matrix_->apply(J_pen->data(), J_pen->data());
+                        if (this->constraint_scaling_op_) {
+                            this->constraint_scaling_op_->apply(J_pen->data(), J_pen->data());
                         }
 
                         auto J = apply_op + sfem::diag_op(n_dofs, J_pen, execution_space_);
+                        // auto J = apply_op;
                         linear_solver_->set_op(J);
+                        
 
                         blas.zeros(n_dofs, c->data());
                         linear_solver_->apply(r_pen->data(), c->data());

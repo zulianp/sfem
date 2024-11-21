@@ -46,6 +46,20 @@ namespace sfem {
 
 namespace sfem {
 
+    template<typename T>
+    auto blas(const ExecutionSpace es) {
+        auto blas = std::make_shared<BLAS_Tpl<T>>();
+        
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) CUDA_BLAS<T>::build_blas(*blas);
+        else
+#endif  // SFEM_ENABLE_CUDA
+        {
+            OpenMP_BLAS<T>::build_blas(*blas);
+        }
+        return blas;
+    }
+
     template <typename T>
     static std::shared_ptr<Buffer<T>> create_buffer(const std::ptrdiff_t n, const MemorySpace es) {
 #ifdef SFEM_ENABLE_CUDA

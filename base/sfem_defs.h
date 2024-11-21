@@ -88,6 +88,7 @@ enum ElemType {
     MACRO_TET4 = (MACRO + TET4),
     PROTEUS_TET4 = 4000,
     PROTEUS_QUAD4 = 40000,
+    PROTEUS_QUADSHELL4 = 140000,
     PROTEUS_HEX8 = 8000,
     INVALID = -1
 };
@@ -103,6 +104,8 @@ SFEM_INLINE static enum ElemType type_from_string(const char* str) {
     if (!strcmp(str, "WEDGE6")) return WEDGE6;
     if (!strcmp(str, "QUAD4")) return QUAD4;
     if (!strcmp(str, "QUADSHELL4")) return QUADSHELL4;
+    if (!strcmp(str, "PROTEUS_QUAD4")) return PROTEUS_QUAD4;
+    if (!strcmp(str, "PROTEUS_QUADSHELL4")) return PROTEUS_QUADSHELL4;
     if (!strcmp(str, "TET4")) return TET4;
     if (!strcmp(str, "TET10")) return TET10;
     if (!strcmp(str, "TET20")) return TET20;
@@ -135,6 +138,10 @@ SFEM_INLINE static const char* type_to_string(enum ElemType type) {
             return "QUAD4";
         case QUADSHELL4:
             return "QUADSHELL4";
+        case PROTEUS_QUAD4:
+            return "PROTEUS_QUAD4";
+        case PROTEUS_QUADSHELL4:
+            return "PROTEUS_QUADSHELL4";
         case TET4:
             return "TET4";
         case TRI6:
@@ -220,6 +227,10 @@ SFEM_INLINE static enum ElemType shell_type(const enum ElemType type) {
             return QUADSHELL4;
         case QUADSHELL4:
             return QUADSHELL4;
+        case PROTEUS_QUAD4:
+            return PROTEUS_QUADSHELL4;
+        case PROTEUS_QUADSHELL4:
+            return PROTEUS_QUADSHELL4;
         default: {
             // assert(0);
             return INVALID;

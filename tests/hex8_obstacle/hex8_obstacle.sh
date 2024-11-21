@@ -41,7 +41,7 @@ case $CASE in
 		soutlet=$mesh/surface/sidesets_aos/outlet.raw
 		sobstacle=$mesh/surface/sidesets_aos/wall1.raw
 		./compute_distance.py mesh/viz/ $sobstacle ub.raw
-		obstacle_surface=$mesh/surface/wall1/
+		export SFEM_OBSTACLE_SURF=$mesh/surface/wall1/
 	;;
 	3)
 		mesh=joint_hex_db
@@ -55,7 +55,7 @@ case $CASE in
 		sinlet=$mesh/surface/sidesets_aos/base.raw
 		sobstacle=$mesh/surface/sidesets_aos/top.raw
 		./compute_distance_joint.py $mesh/viz/ $sobstacle ub.raw
-		obstacle_surface=$mesh/surface/top/
+		export SFEM_OBSTACLE_SURF=$mesh/surface/top/
 	;;
 	10 | 20)
 		mesh=mesh
@@ -138,9 +138,9 @@ then
 
 	raw_to_db.py $mesh/viz output/hex8.vtk  --point_data="output/soa/*.raw" --point_data_type="$SFEM_REAL_T"
 
-	if [[ -d $obstacle_surface ]]
+	if [[ -d $SFEM_OBSTACLE_SURF ]]
 	then
-		raw_to_db.py $obstacle_surface output/obstacle.vtk --coords=$mesh/viz --cell_type=quad --point_data="output/soa/upper_bound.1.*" --point_data_type="$SFEM_REAL_T"
+		raw_to_db.py $SFEM_OBSTACLE_SURF output/obstacle.vtk --coords=$mesh/viz --cell_type=quad --point_data="output/soa/upper_bound.1.*" --point_data_type="$SFEM_REAL_T"
 	fi
 else
 	raw_to_db.py $mesh/viz output/hex8.vtk --point_data=output/u.raw,output/rhs.raw,output/upper_bound.raw --point_data_type="$SFEM_REAL_T,$SFEM_REAL_T,$SFEM_REAL_T"
