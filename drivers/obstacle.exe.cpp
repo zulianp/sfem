@@ -182,11 +182,13 @@ int main(int argc, char *argv[]) {
         return SFEM_FAILURE;
     }
 
-    // std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> solver;
     std::shared_ptr<sfem::Operator<real_t>> solver;
     if (true)
     // if (false)
     {
+        int SFEM_USE_GRADIENT_DESCENT = 1;
+        SFEM_READ_ENV(SFEM_USE_GRADIENT_DESCENT, atoi);
+
         auto sp = std::make_shared<sfem::ShiftedPenalty<real_t>>();
         sp->set_op(linear_op);
         sp->default_init();
@@ -195,11 +197,12 @@ int main(int argc, char *argv[]) {
         sp->set_max_it(SFEM_MAX_IT);
 
         auto cg = sfem::create_cg(linear_op, es);
-        cg->set_atol(1e-10);
-        cg->set_rtol(1e-10);
+        cg->set_atol(1e-12);
+        cg->set_rtol(1e-4);
         cg->set_max_it(1000);
-        cg->verbose = false;
+        cg->verbose = true;
         sp->linear_solver_ = cg;
+        sp->use_gradient_descent = SFEM_USE_GRADIENT_DESCENT;
 
         sp->verbose = true;
         sp->set_upper_bound(upper_bound);
