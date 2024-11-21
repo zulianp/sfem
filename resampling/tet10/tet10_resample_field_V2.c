@@ -32,7 +32,7 @@ vec_real vec_indices_to_real(const vec_indices a) {
 
     return (vec_real){(real_t)a[0], (real_t)a[1], (real_t)a[2], (real_t)a[3]};
 
-#elif __VL__ == 16  //// 512 bits SIMD in single precision
+#elif _VL_ == 16  //// 512 bits SIMD in single precision
 
     return (vec_real){(real_t)a[0],
                       (real_t)a[1],
@@ -656,6 +656,15 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_V(
     GET_DATA_MACRO(out[7], data, i7);
 }
 
+int vec_real_check_nan(const vec_real a) {
+    for (int i = 0; i < _VL_; i++) {
+        if (isnan(a[i])) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /**
  * @brief
  *
@@ -739,8 +748,8 @@ int hex8_to_isoparametric_tet10_resample_field_local_V(
         // memset(element_field, 0, 10 * sizeof(real_t));
 
         // set to zero the element field
-        for (int ii = 0; ii < 10; ii++) {
-            element_field[ii] = (vec_real)ZEROS_VEC;
+        for (int v = 0; v < 10; v++) {
+            element_field[v] = (vec_real)ZEROS_VEC;
         }
 
         // SUBPARAMETRIC (for iso-parametric tassellation of tet10 might be necessary)
@@ -756,6 +765,17 @@ int hex8_to_isoparametric_tet10_resample_field_local_V(
 
             } else {
                 ASSIGN_QUADRATURE_POINT_MACRO_TAIL(q, tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V);
+
+                // printf("tail\n");
+                // for (int ii = 0; ii < _VL_; ii++) {
+                //     printf("tet4_qw_V[%d] = %f\n", ii, tet4_qw_V[ii]);
+                // }
+
+                // if (vec_real_check_nan(tet4_qx_V) || vec_real_check_nan(tet4_qy_V) ||
+                //     vec_real_check_nan(tet4_qz_V) || vec_real_check_nan(tet4_qw_V)) {
+                //     printf("ERROR: tet4_qx_V file: %s:%d\n", __FILE__, __LINE__);
+                //     exit(1);
+                // }
             }
 
             const vec_real measure = tet10_measure_V(x,  //
@@ -802,10 +822,11 @@ int hex8_to_isoparametric_tet10_resample_field_local_V(
 
             // Integrate field
             {
-                vec_real eval_field = ZEROS_VEC;
+                vec_real eval_field = (vec_real)ZEROS_VEC;
                 // UNROLL_ZERO
                 for (int edof_j = 0; edof_j < 8; edof_j++) {
                     eval_field += hex8_f[edof_j] * coeffs[edof_j];
+                    // eval_field += coeffs[edof_j];
                 }
 
                 // UNROLL_ZERO
@@ -825,6 +846,19 @@ int hex8_to_isoparametric_tet10_resample_field_local_V(
             SIMD_REDUCE_SUM_MACRO(element_field_v, element_field[v]);
 
             weighted_field[ev[v]] += element_field_v;
+
+            // for (int ii = 0; ii < _VL_; ii++) {
+            //     if (isnan(element_field[v][ii])) {
+            //         printf("ERROR: element_field[v][ii] is NaN %f, v = %d, ii = %d file: %s:%d\n",
+            //                element_field[v][ii],
+            //                v,
+            //                ii,
+            //                __FILE__,
+            //                __LINE__);
+
+            //         exit(1);
+            //     }
+            // }
 
         }  // end vertex loop
     }      // end element loop
