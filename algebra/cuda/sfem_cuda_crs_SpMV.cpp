@@ -210,8 +210,8 @@ namespace sfem {
         std::shared_ptr<Buffer<idx_t>> colidx;
         std::shared_ptr<Buffer<real_t>> values;
 
-        SymCooSpMVImpl(const ptrdiff_t ndofs,
-                       const std::shared_ptr<Buffer<idx_t>>& rowidx,
+        // probably should have alpha / beta args?
+        SymCooSpMVImpl(const ptrdiff_t ndofs, const std::shared_ptr<Buffer<idx_t>>& rowidx,
                        const std::shared_ptr<Buffer<idx_t>>& colidx,
                        const std::shared_ptr<Buffer<real_t>>& values, const real_t scale_output)
             : ndofs(ndofs), rowidx(rowidx), colidx(colidx), values(values), beta(scale_output) {
@@ -225,8 +225,8 @@ namespace sfem {
             CHECK_CUSPARSE(cusparseCreateDnVec(&vecX, ndofs, (void*)x, valueType));
             CHECK_CUSPARSE(cusparseCreateDnVec(&vecY, ndofs, (void*)y, valueType));
 
-            printf("SymCooSpMVImpl::initialize: %ld %ld\n", (long)ndofs, (long)rowidx->size());
-            fflush(stdout);
+            // printf("SymCooSpMVImpl::initialize: %ld %ld\n", (long)ndofs, (long)rowidx->size());
+            // fflush(stdout);
 
             CHECK_CUSPARSE(cusparseCreateCoo(&matrix,
                                              ndofs,
@@ -250,6 +250,18 @@ namespace sfem {
                                                    alg,
                                                    &bufferSize));
 
+            size_t bufferSize_transpose = 0;
+            CHECK_CUSPARSE(cusparseSpMV_bufferSize(cusparse_handle,
+                                                   CUSPARSE_OPERATION_TRANSPOSE,
+                                                   &alpha,
+                                                   matrix,
+                                                   vecX,
+                                                   &beta,
+                                                   vecY,
+                                                   valueType,
+                                                   alg,
+                                                   &bufferSize_transpose));
+            bufferSize = (bufferSize > bufferSize_transpose) ? bufferSize : bufferSize_transpose;
             CHECK_CUDA(cudaMalloc(&dBuffer, bufferSize));
 
             CHECK_CUDA(cudaPeekAtLastError());
@@ -258,7 +270,7 @@ namespace sfem {
         ~SymCooSpMVImpl() {
             CHECK_CUSPARSE(cusparseDestroySpMat(matrix));
             CHECK_CUDA(cudaFree(dBuffer));
-            
+
             CHECK_CUSPARSE(cusparseDestroyDnVec(vecX));
             CHECK_CUSPARSE(cusparseDestroyDnVec(vecY));
         }
@@ -300,8 +312,7 @@ namespace sfem {
 
     // Boundary conditions should be imposed before by hand... (if any) so cusparse API is valid
     std::shared_ptr<CooSymSpMV<idx_t, real_t>> d_sym_coo_spmv(
-            const ptrdiff_t ndofs, 
-            const std::shared_ptr<Buffer<idx_t>>& rowidx,
+            const ptrdiff_t ndofs, const std::shared_ptr<Buffer<idx_t>>& rowidx,
             const std::shared_ptr<Buffer<idx_t>>& colidx,
             const std::shared_ptr<Buffer<real_t>>& values,
             const std::shared_ptr<Buffer<real_t>>& diag_values, const real_t scale_output) {
@@ -314,11 +325,10 @@ namespace sfem {
         ret->execution_space_ = EXECUTION_SPACE_DEVICE;
 
         CUDA_BLAS<real_t>::build_blas(ret->blas);
-        auto impl =
-                std::make_shared<SymCooSpMVImpl>(ndofs, rowidx, colidx, values, scale_output);
+        auto impl = std::make_shared<SymCooSpMVImpl>(ndofs, rowidx, colidx, values, scale_output);
         ret->apply_ = [=](const real_t* const x, real_t* const y) {
             impl->apply(x, y);
-            ret->blas.xypaz(ndofs, diag_values->data(), diag_values->data(), 1, y);
+            ret->blas.xypaz(ndofs, diag_values->data(), x, 1, y);
         };
         return ret;
     }
