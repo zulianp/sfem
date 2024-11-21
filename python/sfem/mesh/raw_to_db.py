@@ -145,6 +145,7 @@ def add_fields(field_data, field_data_type, storage, check_len):
                 if(len(data) != check_len):
                     frame = inspect.currentframe()
                     print(f"Error in {__file__} at line {frame.f_lineno}:\n .... data length is different from number of nodes {len(data)} != {check_len}")
+
                     sys.exit(1)
 
                 print(f"field: {name}, min={np.min(data)}, max={np.max(data)}, sum={np.sum(data)} type={t}")
@@ -173,11 +174,12 @@ def raw_to_db(argv):
     time_whole=[]
 
     cell_type = None
+    verbose = False
 
     try:
         opts, args = getopt.getopt(
-            argv[3:], "p:d:c:t:h",
-            ["coords=", "point_data=", "point_data_type=", "cell_type=", "cell_data=", "cell_data_type=", "transient", "time_step_format", "n_time_steps=", "time_whole=", "time_whole_txt=", "help"])
+            argv[3:], "p:d:c:t:hv",
+            ["coords=", "point_data=", "point_data_type=", "cell_type=", "cell_data=", "cell_data_type=", "transient", "time_step_format", "n_time_steps=", "time_whole=", "time_whole_txt=", "help", "verbose"])
 
     except getopt.GetoptError as err:
         print(err)
@@ -188,6 +190,8 @@ def raw_to_db(argv):
         if opt in ('-h', '--help'):
             print(usage)
             sys.exit()
+        if opt in ('-v', '--verbose'):
+            verbose = True
         elif opt in ("-p", "--point_data"):
             point_data = arg
         elif opt in ("-d", "--point_data_type"):
@@ -210,6 +214,8 @@ def raw_to_db(argv):
             cell_type = arg
         elif opt in ("--coords"):
             raw_xyz_folder = arg
+            if verbose:
+                print(f"Using coords={arg}")
 
     if transient:
         if len(time_whole) == 0:
@@ -222,6 +228,8 @@ def raw_to_db(argv):
     for pfn in ['x.raw', 'y.raw', 'z.raw']:
         path = f'{raw_xyz_folder}/{pfn}'
         if os.path.exists(path):
+            if verbose:
+                print(f'Reading {path}...')
             x = np.fromfile(path, dtype=geom_t)
             points.append(x)
             
@@ -229,11 +237,20 @@ def raw_to_db(argv):
     for i in range(0, max_nodes_x_element):
         path = f'{raw_mesh_folder}/i{i}.raw'
         if os.path.exists(path):
+            if verbose:
+                print(f'Reading {path}...')
             ii = np.fromfile(path, dtype=idx_t)
             idx.append(ii)
         else:
-            # No more indices to read!
-            break
+            path = f'{raw_mesh_folder}/i{i}.int32.raw'
+            if os.path.exists(path):
+                if verbose:
+                    print(f'Reading {path}...')
+                ii = np.fromfile(path, dtype=idx_t)
+                idx.append(ii)
+            else:    
+                # No more indices to read!
+                break
     
     if cell_type == None:
         if len(idx) == 3:

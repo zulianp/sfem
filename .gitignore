@@ -75,6 +75,7 @@ Thumbs.db
 CMakeCache.txt
 api/
 build/
+build_debug/
 .cache/
 CMakeFiles/
 venv/
