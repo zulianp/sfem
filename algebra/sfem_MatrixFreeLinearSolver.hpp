@@ -1,11 +1,14 @@
 #ifndef SFEM_MATRIX_FREE_LINEAR_SOLVER_HPP
 #define SFEM_MATRIX_FREE_LINEAR_SOLVER_HPP
 
+#include <cassert>
 #include <cstddef>
 #include <functional>
+#include <iostream>
 #include <memory>
-#include <cassert>
+
 #include "sfem_Buffer.hpp"
+#include "sfem_base.h"
 
 namespace sfem {
 
@@ -50,15 +53,20 @@ namespace sfem {
     }
 
     template <typename T>
-    inline std::shared_ptr<Operator<T>> diag_op(const std::ptrdiff_t n, const std::shared_ptr<Buffer<T>> &diagonal_scaling, const ExecutionSpace es) {
+    inline std::shared_ptr<Operator<T>> diag_op(const std::ptrdiff_t n,
+                                                const std::shared_ptr<Buffer<T>>& diagonal_scaling,
+                                                const ExecutionSpace es) {
         assert(es == EXECUTION_SPACE_HOST);
-        return std::make_shared<LambdaOperator<T>>(n, n, [n, diagonal_scaling](const T* const x, T* const y) {
-
-            auto d = diagonal_scaling->data();
-            for (std::ptrdiff_t i = 0; i < n; i++) {
-                y[i] = x[i] * d[i];
-            }
-        }, es);
+        return std::make_shared<LambdaOperator<T>>(
+                n,
+                n,
+                [n, diagonal_scaling](const T* const x, T* const y) {
+                    auto d = diagonal_scaling->data();
+                    for (std::ptrdiff_t i = 0; i < n; i++) {
+                        y[i] = x[i] * d[i];
+                    }
+                },
+                es);
     }
 
     template <typename T>
@@ -84,6 +92,15 @@ namespace sfem {
         virtual void set_n_dofs(const ptrdiff_t n) = 0;
         virtual void set_initial_guess_zero(const bool /*val*/) {}
         virtual int iterations() const = 0;
+        virtual int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op,
+                                          const std::shared_ptr<Buffer<T>>& diag,
+                                          const bool diag_pass_ownership) {
+            fprintf(stderr,
+                    "set_op_and_diag_shift: not implemented for subclass of "
+                    "MatrixFreeLinearSolver!\n");
+            assert(false);
+            return SFEM_FAILURE;
+        }
     };
 }  // namespace sfem
 
