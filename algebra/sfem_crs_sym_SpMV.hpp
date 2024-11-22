@@ -46,10 +46,9 @@ namespace sfem {
             auto off_diag_values = this->off_diag_values->data();
 
 #pragma omp parallel for
-            for (ptrdiff_t i = 0; i < rows; ++i) {
+            for (ptrdiff_t i = 0; i < rows; i++) {
                 y[i] = scale_output * y[i] + (diag_values[i] * x[i]);
             }
-
             // Apply off-diagonal blocks
 #pragma omp parallel for
             for (ptrdiff_t row = 0; row < rows; row++) {
@@ -62,11 +61,13 @@ namespace sfem {
                     const auto col = cols[k];
                     y_local += values[k] * x[col];
                 }
+#pragma omp atomic update
                 y[row] += y_local;
 
                 const T x_local = x[row];
                 for (count_t k = 0; k < lenrow; k++) {
                     const idx_t col = cols[k];
+#pragma omp atomic update
                     y[col] += values[k] * x_local;
                 }
             }
@@ -75,13 +76,9 @@ namespace sfem {
 
     template <typename R, typename C, typename T>
     std::shared_ptr<CRSSymSpMV<R, C, T>> h_crs_sym_spmv(
-            const ptrdiff_t rows,
-            const ptrdiff_t cols,
-            const std::shared_ptr<Buffer<R>>& rowptr,
-            const std::shared_ptr<Buffer<C>>& colidx,
-            const std::shared_ptr<Buffer<T>>& diag_values,
-            const std::shared_ptr<Buffer<T>>& off_diag_values,
-            const T scale_output) {
+            const ptrdiff_t rows, const ptrdiff_t cols, const std::shared_ptr<Buffer<R>>& rowptr,
+            const std::shared_ptr<Buffer<C>>& colidx, const std::shared_ptr<Buffer<T>>& diag_values,
+            const std::shared_ptr<Buffer<T>>& off_diag_values, const T scale_output) {
         auto ret = std::make_shared<CRSSymSpMV<R, C, T>>();
         ret->rowptr = rowptr;
         ret->colidx = colidx;
