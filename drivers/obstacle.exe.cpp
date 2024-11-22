@@ -229,14 +229,14 @@ int main(int argc, char *argv[]) {
 
         solver = sp;
     } else
-    // if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
-    //     auto spmg = sfem::h_spmg<real_t>();
-    //     spmg->add_level(nullptr, nullptr, nullptr, nullptr);
-    //     spmg->set_max_it(SFEM_MAX_IT);
-    //     spmg->set_atol(1e-8);
+    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+        auto spmg = sfem::h_spmg<real_t>();
+        spmg->add_level(nullptr, nullptr, nullptr, nullptr);
+        spmg->set_max_it(SFEM_MAX_IT);
+        spmg->set_atol(1e-8);
 
-    //     solver = spmg;
-    // } else
+        solver = spmg;
+    } else
     {
         auto mprgp = sfem::create_mprgp(linear_op, es);
 
