@@ -54,7 +54,7 @@ namespace sfem {
 #pragma omp parallel for
             for (R k = 0; k < ndofs; k++) {
                 if ((!bdy_dofs) || !mask_get(k, bdy_dofs->data())) {
-                    y[k] = diag[k] * x[k];
+                    y[k] += diag[k] * x[k];
                 } else {
                     y[k] = x[k];
                 }
