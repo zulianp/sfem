@@ -186,8 +186,8 @@ int main(int argc, char *argv[]) {
     if (true)
     // if (false)
     {
-        int SFEM_USE_GRADIENT_DESCENT = 0;
-        SFEM_READ_ENV(SFEM_USE_GRADIENT_DESCENT, atoi);
+        int SFEM_USE_STEEPEST_DESCENT = 0;
+        SFEM_READ_ENV(SFEM_USE_STEEPEST_DESCENT, atoi);
 
         auto sp = std::make_shared<sfem::ShiftedPenalty<real_t>>();
         sp->set_op(linear_op);
@@ -202,7 +202,7 @@ int main(int argc, char *argv[]) {
         cg->set_max_it(8000);
         cg->verbose = false;
         sp->linear_solver_ = cg;
-        sp->use_gradient_descent = SFEM_USE_GRADIENT_DESCENT;
+        sp->use_steepest_descent = SFEM_USE_STEEPEST_DESCENT;
 
         sp->verbose = true;
         sp->set_upper_bound(upper_bound);
