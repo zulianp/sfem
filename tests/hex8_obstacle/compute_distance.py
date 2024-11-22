@@ -25,10 +25,13 @@ if __name__ == '__main__':
 	sideset = np.fromfile(f'{path_sideset}', dtype=idx_t)
 
 	# obs = 0*x - 0.001
-	obs = -0.03 * (2 - x)**2 * (x + 2)**2
-	obs += 0.1 * np.cos(x*2*np.pi)
-	obs += 0.06 * np.cos(x*4*np.pi)
-	obs  = 2 + obs[sideset]
+	obs = 0.03 * (2 - x)**2 * (x + 2)**2
+	obs += 0.01 * np.cos(x*2*np.pi)
+	obs += 0.03 * np.cos(x*4*np.pi)
+	obs += 0.02 * np.cos(x*8*np.pi)
+	obs += 0.02 * np.cos(z*16*np.pi)
+	obs += 0.01 * np.cos(x*32*np.pi)
+	obs  = 0.97 + obs[sideset]
 	# print(obs)
 
 	y = y[sideset]

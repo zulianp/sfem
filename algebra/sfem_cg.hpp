@@ -31,8 +31,13 @@ namespace sfem {
         int max_it{10000};
         int check_each{100};
         ptrdiff_t n_dofs{-1};
+        int iterations_{0};
         bool verbose{true};
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
+
+        int iterations() const override {
+            return iterations_;
+        }
 
         ExecutionSpace execution_space() const override { return execution_space_; }
 
@@ -76,6 +81,8 @@ namespace sfem {
                           << ", atol = " << atol << ")\n";
             }
         }
+
+
 
         int apply(const ptrdiff_t n, const T* const b, T* const x) {
             if (preconditioner_op) {
@@ -127,7 +134,7 @@ namespace sfem {
             blas.copy(n, r, p);
 
             int info = -1;
-            for (int k = 0; k < max_it; k++) {
+            for (iterations_ = 0; iterations_ < max_it; iterations_++) {
                 blas.zeros(n, Ap);
                 apply_op(p, Ap);
 
@@ -146,7 +153,7 @@ namespace sfem {
 
                 T r_norm = sqrt(rtr_new);
 
-                monitor(k + 1, r_norm, r_norm / r_norm0);
+                monitor(iterations_ + 1, r_norm, r_norm / r_norm0);
                 if (r_norm < atol || rtr_new == 0 || r_norm / r_norm0 < rtol) {
                     info = 0;
                     break;
@@ -207,7 +214,7 @@ namespace sfem {
             }
 
             int info = -1;
-            for (int k = 0; k < max_it; k++) {
+            for (iterations_ = 0; iterations_ < max_it; iterations_++) {
                 blas.zeros(n, z);
                 preconditioner_op(r, z);
 
@@ -231,7 +238,7 @@ namespace sfem {
                 auto anorm = sqrt(rtz);
                 auto rnorm = anorm / sqrt(rtz0);
 
-                monitor(k + 1, anorm, rnorm);
+                monitor(iterations_ + 1, anorm, rnorm);
                 if (anorm < atol || rnorm < rtol) {
                     info = 0;
                     break;
