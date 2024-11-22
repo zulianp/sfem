@@ -1,4 +1,5 @@
 #include "sfem_logger.h"
+#include "sfem_base.h"
 
 void log_init(logger_t *l) {
     l->stream = 0;
@@ -6,10 +7,7 @@ void log_init(logger_t *l) {
     l->len = 0;
 }
 
-int log_is_empty(logger_t *l)
-{
-    return l->stream == 0;
-}
+int log_is_empty(logger_t *l) { return l->stream == 0; }
 
 int log_create_memstream(logger_t *l) {
     l->buffer = 0;
