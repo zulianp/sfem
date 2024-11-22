@@ -39,6 +39,8 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
     a_bar.offdiag_values = (real_t *)malloc(nweights * sizeof(real_t));
 
     auto prev_mat = fine_mat;
+    std::shared_ptr<sfem::PiecewiseConstantInterpolator<idx_t, real_t>> p;
+    std::shared_ptr<sfem::PiecewiseConstantInterpolator<idx_t, real_t>> pt;
 
     while (current_dim > 10) {
         a_bar.dim = current_dim;
@@ -77,7 +79,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
             cg->set_op(prev_mat);
             cg->set_rtol(1e-6);
             cg->set_preconditioner_op(l2_smoother_op);
-            amg->add_level(prev_mat, cg, nullptr, nullptr);
+            amg->add_level(prev_mat, cg, p, nullptr);
             // amg->add_level(prev_mat, stat_iter, nullptr, nullptr);
 
             printf("Failed to add new level, levels: %d\n", levels);
@@ -104,7 +106,11 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
         pt->transpose();
 
         stat_iter->set_max_it(1);
-        amg->add_level(prev_mat, stat_iter, p, pt);
+        if (levels == 1) {
+            amg->add_level(prev_mat, stat_iter, nullptr, pt);
+        } else {
+            amg->add_level(prev_mat, stat_iter, p, pt);
+        }
 
         real_t resulting_cf = ((real_t)current_dim) / ((real_t)p->coarse_dim);
         levels++;
