@@ -34,7 +34,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			create_cyclic_ss_mesh.sh 1 $SFEM_ELEMENT_REFINE_LEVEL
+			create_cyclic_ss_mesh.sh 2 $SFEM_ELEMENT_REFINE_LEVEL
 		fi
 
 		sinlet=$mesh/surface/sidesets_aos/inlet.raw

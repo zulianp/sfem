@@ -28,10 +28,11 @@ if __name__ == '__main__':
 	obs = 0.03 * (2 - x)**2 * (x + 2)**2
 	obs += 0.01 * np.cos(x*2*np.pi)
 	obs += 0.03 * np.cos(x*4*np.pi)
+	obs += 0.03 * np.cos(z*4*np.pi)
 	obs += 0.02 * np.cos(x*8*np.pi)
 	obs += 0.02 * np.cos(z*16*np.pi)
-	obs += 0.01 * np.cos(x*32*np.pi)
-	obs  = 0.97 + obs[sideset]
+	obs += 0.04 * np.cos(x*32*np.pi)
+	obs  = 1.37 + obs[sideset]
 	# print(obs)
 
 	y = y[sideset]
