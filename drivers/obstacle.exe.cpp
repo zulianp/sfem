@@ -23,6 +23,8 @@
 
 #include "matrixio_array.h"
 
+#include "sfem_SSMultigrid.hpp"
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -78,6 +80,9 @@ int main(int argc, char *argv[]) {
 
     int SFEM_USE_BSR_MATRIX = 1;
     SFEM_READ_ENV(SFEM_USE_BSR_MATRIX, atoi);
+
+    int SFEM_USE_SHIFTED_PENALTY = 0;
+    SFEM_READ_ENV(SFEM_USE_SHIFTED_PENALTY, atoi);
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
@@ -183,11 +188,10 @@ int main(int argc, char *argv[]) {
     }
 
     std::shared_ptr<sfem::Operator<real_t>> solver;
-    if (true)
-    // if (false)
+    if (SFEM_USE_SHIFTED_PENALTY)
     {
-        int SFEM_USE_GRADIENT_DESCENT = 0;
-        SFEM_READ_ENV(SFEM_USE_GRADIENT_DESCENT, atoi);
+        int SFEM_USE_STEEPEST_DESCENT = 0;
+        SFEM_READ_ENV(SFEM_USE_STEEPEST_DESCENT, atoi);
 
         auto sp = std::make_shared<sfem::ShiftedPenalty<real_t>>();
         sp->set_op(linear_op);
@@ -202,42 +206,39 @@ int main(int argc, char *argv[]) {
         cg->set_max_it(8000);
         cg->verbose = false;
         sp->linear_solver_ = cg;
-        sp->use_gradient_descent = SFEM_USE_GRADIENT_DESCENT;
+        sp->use_steepest_descent = SFEM_USE_STEEPEST_DESCENT;
 
         sp->verbose = true;
         sp->set_upper_bound(upper_bound);
 
-        if (false) {
-            const char *SFEM_OBSTACLE_SURF = nullptr;
-            SFEM_READ_ENV(SFEM_OBSTACLE_SURF, );
+        // if (false) {
+        //     const char *SFEM_OBSTACLE_SURF = nullptr;
+        //     SFEM_READ_ENV(SFEM_OBSTACLE_SURF, );
 
-            if (!SFEM_OBSTACLE_SURF) {
-                fprintf(stderr, "SFEM_OBSTACLE_SURF not set!\n");
-                return SFEM_FAILURE;
-            }
+        //     if (!SFEM_OBSTACLE_SURF) {
+        //         fprintf(stderr, "SFEM_OBSTACLE_SURF not set!\n");
+        //         return SFEM_FAILURE;
+        //     }
 
-            auto blas = sfem::blas<real_t>(es);
-            auto contact_surf = sfem::mesh_connectivity_from_file(comm, SFEM_OBSTACLE_SURF);
-            auto bop = sfem::Factory::create_boundary_op(fs, contact_surf, "BoundaryMass");
-            auto ones = sfem::create_buffer<real_t>(ndofs, es);
-            auto diag_bop = sfem::create_buffer<real_t>(ndofs, es);
-            blas->values(ndofs, 1, ones->data());
-            bop->apply(nullptr, ones->data(), diag_bop->data());
-            auto diag_bop_op = sfem::diag_op(ndofs, diag_bop, es);
-            sp->constraint_scaling_op_ = diag_bop_op;
-        }
+        //     auto blas = sfem::blas<real_t>(es);
+        //     auto contact_surf = sfem::mesh_connectivity_from_file(comm, SFEM_OBSTACLE_SURF);
+        //     auto bop = sfem::Factory::create_boundary_op(fs, contact_surf, "BoundaryMass");
+        //     auto ones = sfem::create_buffer<real_t>(ndofs, es);
+        //     auto diag_bop = sfem::create_buffer<real_t>(ndofs, es);
+        //     blas->values(ndofs, 1, ones->data());
+        //     bop->apply(nullptr, ones->data(), diag_bop->data());
+        //     auto diag_bop_op = sfem::diag_op(ndofs, diag_bop, es);
+        //     sp->constraint_scaling_op_ = diag_bop_op;
+        // }
 
         solver = sp;
-    } else
-    // if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
-    //     auto spmg = sfem::h_spmg<real_t>();
-    //     spmg->add_level(nullptr, nullptr, nullptr, nullptr);
-    //     spmg->set_max_it(SFEM_MAX_IT);
-    //     spmg->set_atol(1e-8);
-
-    //     solver = spmg;
-    // } else
-    {
+    } else if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+        auto spmg = sfem::create_ssmg<sfem::ShiftedPenaltyMultigrid<real_t>>(f, es);
+        spmg->set_max_it(SFEM_MAX_IT);
+        spmg->set_atol(1e-8);
+        spmg->set_upper_bound(upper_bound);
+        solver = spmg;
+    } else {
         auto mprgp = sfem::create_mprgp(linear_op, es);
 
         if (SFEM_USE_PROJECTED_CG) {
