@@ -32,6 +32,7 @@ namespace sfem {
         T eigen_solver_tol{1e-6};
         int eigen_solver_max_it{1000};
         int max_it{3};
+        int iterations_{0};
 
         T eig_max{0};
         T scale_eig_max{1};
@@ -41,6 +42,11 @@ namespace sfem {
         bool verbose{true};
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
+
+        int iterations() const override {
+            return iterations_;
+        }
+
 
         void set_atol(const T val) { atol = val; }
         void set_rtol(const T val) { rtol = val; }
@@ -189,7 +195,7 @@ namespace sfem {
             blas.axpy(n, -alpha, p, x);
 
             // Iteration i>=2
-            for (int i = 2; i < max_it; i++) {
+            for (iterations_ = 2; iterations_ < max_it; iterations_++) {
                 dea = eig_diff * alpha;
                 beta = 0.25 * dea * dea;
                 alpha = 1 / (eig_avg - (beta / alpha));

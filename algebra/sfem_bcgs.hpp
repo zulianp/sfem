@@ -23,10 +23,13 @@ namespace sfem {
         BLAS_Tpl<T> blas;
 
         ptrdiff_t n_dofs{-1};
+        int iterations_{0};
 
         bool verbose{true};
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
+
+        int iterations() const override { return iterations_; }
 
         ExecutionSpace execution_space() const override { return execution_space_; }
 
@@ -52,9 +55,7 @@ namespace sfem {
         T tol{1e-10};
         int max_it{10000};
 
-        void set_atol(const T val) {
-            tol = val;
-        }
+        void set_atol(const T val) { tol = val; }
 
         void default_init() {
             OpenMP_BLAS<T>::build_blas(blas);
@@ -84,7 +85,7 @@ namespace sfem {
             assert(n_dofs >= 0);
             if (this->n_dofs < 0) {
                 std::cerr
-                    << "Error uninitiaized n_dofs. Set set_n_dofs to set the number of dofs\n";
+                        << "Error uninitiaized n_dofs. Set set_n_dofs to set the number of dofs\n";
                 return 1;
             }
 
@@ -123,7 +124,7 @@ namespace sfem {
             blas.copy(n, r0, p);
 
             int info = -1;
-            for (int k = 0; k < max_it; k++) {
+            for (iterations_ = 0; iterations_ < max_it; iterations_++) {
                 blas.zeros(n, v);
                 apply_op(p, v);
 
@@ -136,7 +137,7 @@ namespace sfem {
                 const T sts = blas.dot(n, s, s);
 
                 if (sqrt(sts) < tol) {
-                    monitor(k, sqrt(sts));
+                    monitor(iterations_, sqrt(sts));
                     blas.copy(n, h, x);
                     info = 0;
                     break;
@@ -154,7 +155,7 @@ namespace sfem {
 
                 const T rtr = blas.dot(n, r, r);
 
-                monitor(k, sqrt(rtr));
+                monitor(iterations_, sqrt(rtr));
                 if (sqrt(rtr) < tol) {
                     info = 0;
                     break;
@@ -208,7 +209,7 @@ namespace sfem {
             blas.copy(n, r0, p);
 
             int info = -1;
-            for (int k = 0; k < max_it; k++) {
+            for (int iterations_ = 0; iterations_ < max_it; iterations_++) {
                 auto y = t;  // reuse t as a temp for y
                 blas.zeros(n, y);
                 right_preconditioner_op(p, y);
@@ -225,7 +226,7 @@ namespace sfem {
                 const T sts = blas.dot(n, s, s);
 
                 if (sqrt(sts) < tol) {
-                    monitor(k, sqrt(sts));
+                    monitor(iterations_, sqrt(sts));
                     blas.copy(n, h, x);
                     info = 0;
                     break;
@@ -248,7 +249,7 @@ namespace sfem {
 
                 const T rtr = blas.dot(n, r, r);
 
-                monitor(k, sqrt(rtr));
+                monitor(iterations_, sqrt(rtr));
                 if (sqrt(rtr) < tol) {
                     info = 0;
                     break;

@@ -23,6 +23,12 @@ namespace sfem {
         bool verbose{false};
         BLAS_Tpl<T> blas;
 
+        int iterations_{0};
+
+        int iterations() const override {
+            return iterations_;
+        }
+
         void default_init() {
             OpenMP_BLAS<T>::build_blas(blas);
             execution_space_ = EXECUTION_SPACE_HOST;
@@ -33,13 +39,13 @@ namespace sfem {
         /* Operator */
         int apply(const T* const b, T* const x) override {
             T* r = workspace->data();
-            for (int i = 0; i < max_it; i++) {
+            for (iterations_ = 0; iterations_ < max_it; iterations_++) {
                 blas.zeros(workspace->size(), r);
                 op->apply(x, r);
                 blas.axpby(n_dofs, 1.0, b, -1.0, r);
                 if (verbose) {
                     T norm_residual = this->blas.norm2(workspace->size(), r);
-                    printf("%d : %f\n", i, (double)norm_residual);
+                    printf("%d : %f\n", iterations_, (double)norm_residual);
                 }
                 preconditioner->apply(r, x);
             }

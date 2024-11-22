@@ -20,19 +20,17 @@ namespace sfem {
     public:
         T rtol{1e-8};
         T atol{1e-14};
-        T gamma{1};  // gamma > 0
-        T eps{1e-14};
-        T infty{1e15};
-        T eigen_solver_tol{1e-1};
         int max_it{10};
         int max_inner_it{10};
-        int check_each{10};
+        int check_each{1};
         ptrdiff_t n_dofs{-1};
         bool verbose{true};
         bool debug{false};
         T penalty_param_{10};
         T max_penalty_param_{1000};
         bool use_gradient_descent{false};
+        int iterations_{0};
+        int iterations() const override { return iterations_; }
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         std::shared_ptr<Buffer<T>> upper_bound_;
@@ -75,13 +73,6 @@ namespace sfem {
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
-        void monitor(const int iter, const T residual, const T rel_residual) {
-            if (iter == max_it || iter % check_each == 0 || residual < atol ||
-                rel_residual < rtol) {
-                std::cout << iter << ": " << residual << " " << rel_residual << "\n";
-            }
-        }
-
         std::shared_ptr<Buffer<T>> make_buffer(const ptrdiff_t n) const {
             return Buffer<T>::own(
                     n, blas.allocate(n), blas.destroy, (enum MemorySpace)execution_space());
@@ -112,7 +103,7 @@ namespace sfem {
             T penetration_norm = 0;
             T penetration_tol = 1 / (penalty_param_ * 0.1);
 
-            auto sq_norm_ramp_p = [this](const ptrdiff_t n, const T* const x, T* const ub) -> T {
+            auto sq_norm_ramp_p = [](const ptrdiff_t n, const T* const x, T* const ub) -> T {
                 T ret = 0;
 #pragma omp parallel for reduction(+ : ret)
                 for (ptrdiff_t i = 0; i < n; i++) {
@@ -122,7 +113,7 @@ namespace sfem {
                 return ret;
             };
 
-            auto sq_norm_ramp_m = [this](const ptrdiff_t n, const T* const x, T* const lb) -> T {
+            auto sq_norm_ramp_m = [](const ptrdiff_t n, const T* const x, T* const lb) -> T {
                 T ret = 0;
 #pragma omp parallel for reduction(+ : ret)
                 for (ptrdiff_t i = 0; i < n; i++) {
@@ -219,11 +210,15 @@ namespace sfem {
                 }
             };
 
+            int count_inner_iter = 0;
+            int count_linear_solver_iter = 0;
+
             T omega = 1 / penalty_param_;
             bool converged = false;
-            for (int iter = 0; iter < max_it; iter++) {
+            for (iterations_ = 0; iterations_ < max_it; iterations_++) {
                 // Inner loop
-                for (int inner_iter = 0; inner_iter < max_inner_it; inner_iter++) {
+                for (int inner_iter = 0; inner_iter < max_inner_it;
+                     inner_iter++, count_inner_iter++) {
                     blas.zeros(n_dofs, r_pen->data());
 
                     // Compute material residual
@@ -275,6 +270,8 @@ namespace sfem {
 
                         blas.zeros(n_dofs, c->data());
                         linear_solver_->apply(r_pen->data(), c->data());
+
+                        count_linear_solver_iter += linear_solver_->iterations();
                     }
 
                     blas.axpy(n_dofs, 1, c->data(), x);
@@ -298,16 +295,21 @@ namespace sfem {
                     omega = 1 / penalty_param_;
                 }
 
-                if (ub) {
+                if (debug && ub) {
                     printf("lagr_ub: %e\n", blas.norm2(n_dofs, lagr_ub->data()));
                 }
 
-                printf("%d) norm_pen %e, norm_rpen %e, penetration_tol %e, penalty_param %e\n",
-                       iter,
-                       norm_pen,
-                       norm_rpen,
-                       penetration_tol,
-                       penalty_param_);
+                if (debug && lb) {
+                    printf("lagr_lb: %e\n", blas.norm2(n_dofs, lagr_lb->data()));
+                }
+
+                monitor(iterations_,
+                        count_inner_iter,
+                        count_linear_solver_iter,
+                        norm_pen,
+                        norm_rpen,
+                        penetration_tol,
+                        penalty_param_);
 
                 if (norm_pen < atol && norm_rpen < atol) {
                     converged = true;
@@ -315,11 +317,27 @@ namespace sfem {
                 }
             }
 
-            if (!converged) {
+            if (!converged && debug) {
                 printf("Not Converged!\n");
             }
 
             return converged ? SFEM_SUCCESS : SFEM_FAILURE;
+        }
+
+        void monitor(const int iter, const int count_inner_iter, const int count_linear_solver_iter,
+                     const T norm_pen, const T norm_rpen, const T penetration_tol,
+                     const T penalty_param) {
+            if (iter == max_it || iter % check_each == 0 || (norm_pen < atol && norm_rpen < atol)) {
+                printf("%d|%d|%d) norm_pen %e, norm_rpen %e, penetration_tol %e, penalty_param "
+                       "%e\n",
+                       iter,
+                       count_inner_iter,
+                       count_linear_solver_iter,
+                       norm_pen,
+                       norm_rpen,
+                       penetration_tol,
+                       penalty_param);
+            }
         }
     };
 }  // namespace sfem

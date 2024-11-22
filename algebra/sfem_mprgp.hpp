@@ -38,6 +38,9 @@ namespace sfem {
         T max_eig_{0};
         bool debug{false};
 
+        int iterations_{0};
+        int iterations() const override { return iterations_; }
+
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         std::shared_ptr<Buffer<T>> upper_bound_;
         std::shared_ptr<Buffer<T>> lower_bound_;
@@ -103,9 +106,7 @@ namespace sfem {
             return ret;
         }
 
-        void norm_gradients(const T* const x,
-                            const T* const g,
-                            T* const norm_free_gradient,
+        void norm_gradients(const T* const x, const T* const g, T* const norm_free_gradient,
                             T* const norm_chopped_gradient) const {
             const T* const lb = lower_bound_ ? lower_bound_->data() : nullptr;
             const T* const ub = upper_bound_ ? upper_bound_->data() : nullptr;
@@ -160,13 +161,8 @@ namespace sfem {
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
-        void cg_step(const T alpha_cg,
-                     const T dot_pAp,
-                     const T* const Ap,
-                     T* const p,
-                     T* const g,
-                     T* const gf,
-                     T* const x) {
+        void cg_step(const T alpha_cg, const T dot_pAp, const T* const Ap, T* const p, T* const g,
+                     T* const gf, T* const x) {
             this->blas.axpby(n_dofs, -alpha_cg, p, 1, x);
 
             this->blas.axpby(n_dofs, -alpha_cg, Ap, 1, g);
@@ -178,16 +174,9 @@ namespace sfem {
             this->blas.axpby(n_dofs, 1, gf, -beta, p);
         }
 
-        void expansion_step(const T alpha_feas,
-                            const T alpha_bar,
-                            const T alpha_cg,
-                            const T dot_pAp,
-                            const T* const b,
-                            T* const p,
-                            const T* const Ap,
-                            T* const g,
-                            T* const gf,
-                            T* const x) {
+        void expansion_step(const T alpha_feas, const T alpha_bar, const T alpha_cg,
+                            const T dot_pAp, const T* const b, T* const p, const T* const Ap,
+                            T* const g, T* const gf, T* const x) {
             this->blas.axpby(n_dofs, -alpha_feas, p, 1, x);
 
             this->blas.axpby(n_dofs, -alpha_feas, Ap, 1, g);
@@ -222,10 +211,7 @@ namespace sfem {
             }
         }
 
-        void proportioning_step(T* const p,
-                                T* const Agc,
-                                T* const g,
-                                T* const gf_or_gc,
+        void proportioning_step(T* const p, T* const Agc, T* const g, T* const gf_or_gc,
                                 T* const x) {
             // Attention!
             T* gc = gf_or_gc;
@@ -309,7 +295,7 @@ namespace sfem {
             int count_expansion_steps = 0;
             int count_proportioning_steps = 0;
 
-            int it = 0;
+            int iterations_ = 0;
 
             while (!converged) {
                 norm_gradients(x, g, &norm_gf, &norm_gc);
@@ -357,8 +343,8 @@ namespace sfem {
                 const T rel_norm_gp = norm_gp / norm_gp0;
                 converged = norm_gp < atol || rel_norm_gp < rtol;
 
-                monitor(it, norm_gp, rel_norm_gp);
-                if (++it >= max_it) {
+                monitor(iterations_, norm_gp, rel_norm_gp);
+                if (++iterations_ >= max_it) {
                     break;
                 }
             }
