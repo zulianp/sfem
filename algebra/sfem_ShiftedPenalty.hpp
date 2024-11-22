@@ -11,8 +11,8 @@
 #include <memory>
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
-#include "sfem_openmp_blas.hpp"
 #include "sfem_ShiftedPenalty_impl.hpp"
+#include "sfem_openmp_blas.hpp"
 
 namespace sfem {
     // From Active set expansion strategies in ShiftedPenalty algorithm, Kruzik et al. 2020
@@ -29,7 +29,7 @@ namespace sfem {
         bool debug{false};
         T penalty_param_{10};
         T max_penalty_param_{1000};
-        bool use_gradient_descent{false};
+        bool use_steepest_descent{false};
         int iterations_{0};
         int iterations() const override { return iterations_; }
 
@@ -101,8 +101,8 @@ namespace sfem {
             auto J_pen = make_buffer(n_dofs);
 
             std::shared_ptr<Buffer<T>> lagr_lb, lagr_ub;
-            if(lb) lagr_lb = make_buffer(n_dofs);
-            if(ub) lagr_ub = make_buffer(n_dofs);
+            if (lb) lagr_lb = make_buffer(n_dofs);
+            if (ub) lagr_ub = make_buffer(n_dofs);
 
             T penetration_norm = 0;
             T penetration_tol = 1 / (penalty_param_ * 0.1);
@@ -125,19 +125,19 @@ namespace sfem {
 
                     // Compute penalty residual
                     impl.calc_r_pen(n_dofs,
-                               x,
-                               penalty_param_,
-                               lb,
-                               ub,
-                               lagr_lb->data(),
-                               lagr_ub->data(),
-                               r_pen->data());
+                                    x,
+                                    penalty_param_,
+                                    lb,
+                                    ub,
+                                    lagr_lb->data(),
+                                    lagr_ub->data(),
+                                    r_pen->data());
 
                     if (this->constraint_scaling_op_) {
                         // TODO: Implement this
                         assert(false);
                     }
-
+                    
                     const T r_pen_norm = blas.norm2(n_dofs, r_pen->data());
 
                     if (r_pen_norm < std::max(atol, omega) && inner_iter != 0) {
@@ -145,19 +145,26 @@ namespace sfem {
                         break;
                     }
 
-                    if (use_gradient_descent) {
-                        blas.axpby(n_dofs, 1e-1, r_pen->data(), 0, c->data());
+                    if (use_steepest_descent) {
+                        // alpha = <r, r>/<A r, r>
+                        blas.zeros(n_dofs, c->data());
+                        apply_op->apply(r_pen->data(), c->data());
+                        
+                        const T alpha = blas.dot(n_dofs, r_pen->data(), r_pen->data()) /
+                                        blas.dot(n_dofs, r_pen->data(), c->data());
+
+                        blas.axpby(n_dofs, alpha, r_pen->data(), 0, c->data());
                     } else {
                         blas.zeros(n_dofs, J_pen->data());
 
                         impl.calc_J_pen(n_dofs,
-                                   x,
-                                   penalty_param_,
-                                   lb,
-                                   ub,
-                                   lagr_lb->data(),
-                                   lagr_ub->data(),
-                                   J_pen->data());
+                                        x,
+                                        penalty_param_,
+                                        lb,
+                                        ub,
+                                        lagr_lb->data(),
+                                        lagr_ub->data(),
+                                        J_pen->data());
 
                         if (this->constraint_scaling_op_) {
                             this->constraint_scaling_op_->apply(J_pen->data(), J_pen->data());
@@ -225,11 +232,12 @@ namespace sfem {
             return converged ? SFEM_SUCCESS : SFEM_FAILURE;
         }
 
-        void monitor(const int iter, const int count_inner_iter, const int count_linear_solver_iter, const int count_lagr_mult_updates,
-                     const T norm_pen, const T norm_rpen, const T penetration_tol,
-                     const T penalty_param) {
+        void monitor(const int iter, const int count_inner_iter, const int count_linear_solver_iter,
+                     const int count_lagr_mult_updates, const T norm_pen, const T norm_rpen,
+                     const T penetration_tol, const T penalty_param) {
             if (iter == max_it || iter % check_each == 0 || (norm_pen < atol && norm_rpen < atol)) {
-                printf("%d|%d|%d) [lagr++ %d] norm_pen %e, norm_rpen %e, penetration_tol %e, penalty_param "
+                printf("%d|%d|%d) [lagr++ %d] norm_pen %e, norm_rpen %e, penetration_tol %e, "
+                       "penalty_param "
                        "%e\n",
                        iter,
                        count_inner_iter,
