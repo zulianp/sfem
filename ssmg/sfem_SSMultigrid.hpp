@@ -28,7 +28,8 @@ namespace sfem {
         // smoother->set_initial_guess_zero(false);
 
         auto smoother = sfem::create_cg<real_t>(linear_op, es);
-        smoother->set_max_it(20);
+        smoother->set_max_it(10);
+        smoother->verbose = false;
 
         auto solver_coarse = sfem::create_cg<real_t>(linear_op_coarse, es);
         solver_coarse->verbose = false;

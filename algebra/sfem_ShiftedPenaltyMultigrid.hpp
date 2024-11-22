@@ -51,6 +51,8 @@ namespace sfem {
         int apply(const T* const rhs, T* const x) override {
             ensure_init();
 
+            count_smoothing_steps = 0;
+
             // Wrap input arrays into fine level of mg
             if (wrap_input_) {
                 memory_[finest_level()]->solution =
@@ -76,13 +78,12 @@ namespace sfem {
             T penetration_tol = 1 / (penalty_param_ * 0.1);
 
             int count_inner_iter = 0;
-            int count_linear_solver_iter = 0;
             int count_lagr_mult_updates = 0;
             T omega = 1 / penalty_param_;
 
             bool converged = false;
             for (iterations_ = 0; iterations_ < max_it_; iterations_++) {
-                for (int inner_iter = 0; inner_iter < max_inner_it; inner_iter++) {
+                for (int inner_iter = 0; inner_iter < max_inner_it; inner_iter++, count_inner_iter++) {
                     CycleReturnCode ret = nonlinear_cycle();
                     if (ret == CYCLE_CONVERGED) {
                         break;
@@ -147,7 +148,7 @@ namespace sfem {
 
                 monitor(iterations_,
                         count_inner_iter,
-                        count_linear_solver_iter,
+                        count_smoothing_steps,
                         count_lagr_mult_updates,
                         norm_pen,
                         norm_rpen,
@@ -163,22 +164,22 @@ namespace sfem {
             return 0;
         }
 
-        void monitor(const int iter, const int count_inner_iter, const int count_linear_solver_iter,
+        void monitor(const int iter, const int count_inner_iter, const int count_smoothing_steps,
                      const int count_lagr_mult_updates, const T norm_pen, const T norm_rpen,
                      const T penetration_tol, const T penalty_param) {
-            if (iter == max_it_ || (norm_pen < atol_ && norm_rpen < atol_)) {
+            // if (iter == max_it_ || (norm_pen < atol_ && norm_rpen < atol_)) {
                 printf("%d|%d|%d) [lagr++ %d] norm_pen %e, norm_rpen %e, penetration_tol %e, "
                        "penalty_param "
                        "%e\n",
                        iter,
                        count_inner_iter,
-                       count_linear_solver_iter,
+                       count_smoothing_steps,
                        count_lagr_mult_updates,
                        norm_pen,
                        norm_rpen,
                        penetration_tol,
                        penalty_param);
-            }
+            // }
         }
 
         void clear() {
@@ -233,7 +234,7 @@ namespace sfem {
         BLAS_Tpl<T> blas;
         ShiftedPenalty_Tpl<T> impl;
         bool verbose{true};
-        bool debug{true};
+        bool debug{false};
 
         std::shared_ptr<Buffer<T>> make_buffer(const ptrdiff_t n) const {
             return Buffer<T>::own(
@@ -246,8 +247,10 @@ namespace sfem {
 
         T penalty_param_{10};  // mu
         T max_penalty_param_{1000};
-        int nlsmooth_steps{1};
-        int max_inner_it{1};
+        int nlsmooth_steps{3};
+        int max_inner_it{10};
+
+        ptrdiff_t count_smoothing_steps{0};
 
         inline int finest_level() const { return 0; }
         inline int coarsest_level() const { return n_levels() - 1; }
@@ -345,6 +348,8 @@ namespace sfem {
                 blas.zeros(n_dofs, correction->data());
                 smoother->apply(mem->work->data(), correction->data());
                 blas.axpy(n_dofs, 1, correction->data(), mem->solution->data());
+
+                count_smoothing_steps += smoother->iterations();
             }
         }
 
