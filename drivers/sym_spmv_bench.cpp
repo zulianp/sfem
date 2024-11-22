@@ -122,6 +122,7 @@ int main(int argc, char* argv[]) {
         printf("offdiag_nnz: %d\n", offdiag_nnz);
         fflush(stdout);
 
+        offdiag_rowptr_host->data()[0] = 0;
         count_t write_pos = 0;
         for (ptrdiff_t i = 0; i < ndofs; i++) {
             for (idx_t idx = rowptr_host->data()[i]; idx < rowptr_host->data()[i + 1]; idx++) {
