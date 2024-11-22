@@ -24,10 +24,12 @@ if __name__ == '__main__':
 	z = np.fromfile(f'{path_mesh}/z.raw', dtype=geom_t) - 0.5;
 	sideset = np.fromfile(f'{path_sideset}', dtype=idx_t)
 
+	# obs = 0*x - 0.001
 	obs = -0.03 * (2 - x)**2 * (x + 2)**2
 	obs += 0.1 * np.cos(x*2*np.pi)
 	obs += 0.06 * np.cos(x*4*np.pi)
 	obs  = 2 + obs[sideset]
+	# print(obs)
 
 	y = y[sideset]
 	f = obs - y

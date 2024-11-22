@@ -18,11 +18,8 @@ namespace sfem {
     template <typename T>
     class ShiftedPenalty final : public MatrixFreeLinearSolver<T> {
     public:
-        enum ExpansionType { EXPANSION_TYPE_ORGINAL = 0, EXPANSION_TYPE_PROJECTED_CG = 1 };
-
-        ExpansionType expansion_type_{EXPANSION_TYPE_ORGINAL};
-        T rtol{1e-10};
-        T atol{1e-16};
+        T rtol{1e-8};
+        T atol{1e-14};
         T gamma{1};  // gamma > 0
         T eps{1e-14};
         T infty{1e15};
@@ -33,8 +30,9 @@ namespace sfem {
         ptrdiff_t n_dofs{-1};
         bool verbose{true};
         bool debug{false};
-        T penalty_param_{1.1};
+        T penalty_param_{10};
         T max_penalty_param_{1000};
+        bool use_gradient_descent{false};
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         std::shared_ptr<Buffer<T>> upper_bound_;
@@ -254,7 +252,7 @@ namespace sfem {
                         break;
                     }
 
-                    if (true) {
+                    if (use_gradient_descent) {
                         blas.axpby(n_dofs, 1e-1, r_pen->data(), 0, c->data());
                     } else {
                         blas.zeros(n_dofs, J_pen->data());
@@ -263,7 +261,7 @@ namespace sfem {
                                    x,
                                    penalty_param_,
                                    lb,
-                                   lb,
+                                   ub,
                                    lagr_lb->data(),
                                    lagr_ub->data(),
                                    J_pen->data());
@@ -272,10 +270,8 @@ namespace sfem {
                             this->constraint_scaling_op_->apply(J_pen->data(), J_pen->data());
                         }
 
-                        auto J = apply_op + sfem::diag_op(n_dofs, J_pen, execution_space_);
-                        // auto J = apply_op;
+                        auto J = apply_op + sfem::diag_op(n_dofs, J_pen, execution_space());
                         linear_solver_->set_op(J);
-                        
 
                         blas.zeros(n_dofs, c->data());
                         linear_solver_->apply(r_pen->data(), c->data());
@@ -306,7 +302,8 @@ namespace sfem {
                     printf("lagr_ub: %e\n", blas.norm2(n_dofs, lagr_ub->data()));
                 }
 
-                printf("norm_pen %e, norm_rpen %e, penetration_tol %e, penalty_param %e\n",
+                printf("%d) norm_pen %e, norm_rpen %e, penetration_tol %e, penalty_param %e\n",
+                       iter,
                        norm_pen,
                        norm_rpen,
                        penetration_tol,
