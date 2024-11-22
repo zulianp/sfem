@@ -100,15 +100,16 @@ namespace sfem {
             auto r_pen = make_buffer(n_dofs);
             auto J_pen = make_buffer(n_dofs);
 
-            // FIXME: This is not needed if lower_bound_ is not set...
-            auto lagr_lb = make_buffer(n_dofs);
-            auto lagr_ub = make_buffer(n_dofs);
+            std::shared_ptr<Buffer<T>> lagr_lb, lagr_ub;
+            if(lb) lagr_lb = make_buffer(n_dofs);
+            if(ub) lagr_ub = make_buffer(n_dofs);
 
             T penetration_norm = 0;
             T penetration_tol = 1 / (penalty_param_ * 0.1);
 
             int count_inner_iter = 0;
             int count_linear_solver_iter = 0;
+            int count_lagr_mult_updates = 0;
 
             T omega = 1 / penalty_param_;
             bool converged = false;
@@ -186,6 +187,8 @@ namespace sfem {
 
                     penetration_tol = penetration_tol / pow(penalty_param_, 0.9);
                     omega = omega / penalty_param_;
+
+                    count_lagr_mult_updates++;
                 } else {
                     penalty_param_ = std::min(penalty_param_ * 10, max_penalty_param_);
                     penetration_tol = 1 / pow(penalty_param_, 0.1);
@@ -203,6 +206,7 @@ namespace sfem {
                 monitor(iterations_,
                         count_inner_iter,
                         count_linear_solver_iter,
+                        count_lagr_mult_updates,
                         norm_pen,
                         norm_rpen,
                         penetration_tol,
@@ -221,15 +225,16 @@ namespace sfem {
             return converged ? SFEM_SUCCESS : SFEM_FAILURE;
         }
 
-        void monitor(const int iter, const int count_inner_iter, const int count_linear_solver_iter,
+        void monitor(const int iter, const int count_inner_iter, const int count_linear_solver_iter, const int count_lagr_mult_updates,
                      const T norm_pen, const T norm_rpen, const T penetration_tol,
                      const T penalty_param) {
             if (iter == max_it || iter % check_each == 0 || (norm_pen < atol && norm_rpen < atol)) {
-                printf("%d|%d|%d) norm_pen %e, norm_rpen %e, penetration_tol %e, penalty_param "
+                printf("%d|%d|%d) [lagr++ %d] norm_pen %e, norm_rpen %e, penetration_tol %e, penalty_param "
                        "%e\n",
                        iter,
                        count_inner_iter,
                        count_linear_solver_iter,
+                       count_lagr_mult_updates,
                        norm_pen,
                        norm_rpen,
                        penetration_tol,
