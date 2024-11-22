@@ -12,6 +12,7 @@
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_openmp_blas.hpp"
+#include "sfem_ShiftedPenalty_impl.hpp"
 
 namespace sfem {
     // From Active set expansion strategies in ShiftedPenalty algorithm, Kruzik et al. 2020
@@ -39,6 +40,8 @@ namespace sfem {
         std::shared_ptr<Operator<T>> apply_op;
 
         BLAS_Tpl<T> blas;
+        ShiftedPenalty_Tpl<T> impl;
+
         std::shared_ptr<MatrixFreeLinearSolver<T>> linear_solver_;
 
         ExecutionSpace execution_space() const override { return execution_space_; }
@@ -70,6 +73,7 @@ namespace sfem {
 
         void default_init() {
             OpenMP_BLAS<T>::build_blas(blas);
+            OpenMP_ShiftedPenalty<T>::build_shifted_penalty(impl);
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
@@ -103,113 +107,6 @@ namespace sfem {
             T penetration_norm = 0;
             T penetration_tol = 1 / (penalty_param_ * 0.1);
 
-            auto sq_norm_ramp_p = [](const ptrdiff_t n, const T* const x, T* const ub) -> T {
-                T ret = 0;
-#pragma omp parallel for reduction(+ : ret)
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    const T diff = std::max(T(0), x[i] - ub[i]);
-                    ret += diff * diff;
-                }
-                return ret;
-            };
-
-            auto sq_norm_ramp_m = [](const ptrdiff_t n, const T* const x, T* const lb) -> T {
-                T ret = 0;
-#pragma omp parallel for reduction(+ : ret)
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    const T diff = std::min(T(0), x[i] - lb[i]);
-                    ret += diff * diff;
-                }
-                return ret;
-            };
-
-            // Adds to negative gradient (i.e., residual)
-            auto ramp_p = [](const ptrdiff_t n,
-                             const T penalty_param,
-                             const T* const x,
-                             const T* const ub,
-                             const T* const lagr_ub,
-                             T* const out) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    out[i] -= penalty_param *
-                              std::max(T(0), x[i] - ub[i] + lagr_ub[i] / penalty_param);
-                }
-            };
-
-            auto ramp_m = [](const ptrdiff_t n,
-                             const T penalty_param,
-                             const T* const x,
-                             const T* const lb,
-                             const T* const lagr_lb,
-                             T* const out) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    out[i] -= penalty_param *
-                              std::min(T(0), x[i] - lb[i] + lagr_lb[i] / penalty_param);
-                }
-            };
-
-            auto update_lagr_p = [](const ptrdiff_t n,
-                                    const T penalty_param,
-                                    const T* const x,
-                                    const T* const ub,
-                                    T* const lagr_ub) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    lagr_ub[i] = std::max(T(0), lagr_ub[i] + penalty_param * (x[i] - ub[i]));
-                }
-            };
-
-            auto update_lagr_m = [](const ptrdiff_t n,
-                                    const T penalty_param,
-                                    const T* const x,
-                                    const T* const lb,
-                                    T* const lagr_lb) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    lagr_lb[i] = std::min(T(0), lagr_lb[i] + penalty_param * (x[i] - lb[i]));
-                }
-            };
-
-            auto calc_r_pen = [ramp_p, ramp_m](const ptrdiff_t n,
-                                               T* const x,
-                                               const T penalty_param,
-                                               const T* const lb,
-                                               const T* const ub,
-                                               const T* const lagr_lb,
-                                               const T* const lagr_ub,
-                                               T* result) {
-                // Ramp negative and positive parts
-                if (lb) ramp_m(n, penalty_param, x, lb, lagr_lb, result);
-                if (ub) ramp_p(n, penalty_param, x, ub, lagr_ub, result);
-            };
-
-            auto calc_J_pen = [](const ptrdiff_t n,
-                                 const T* const x,
-                                 const T penalty_param,
-                                 const T* const lb,
-                                 const T* const ub,
-                                 const T* const lagr_lb,
-                                 const T* const lagr_ub,
-                                 T* const result) {
-                if (lb) {
-#pragma omp parallel for
-                    for (ptrdiff_t i = 0; i < n; i++) {
-                        result[i] +=
-                                ((x[i] - lb[i] + lagr_lb[i] / penalty_param) <= 0) * penalty_param;
-                    }
-                }
-
-                if (ub) {
-#pragma omp parallel for
-                    for (ptrdiff_t i = 0; i < n; i++) {
-                        result[i] +=
-                                ((x[i] - ub[i] + lagr_ub[i] / penalty_param) >= 0) * penalty_param;
-                    }
-                }
-            };
-
             int count_inner_iter = 0;
             int count_linear_solver_iter = 0;
 
@@ -226,7 +123,7 @@ namespace sfem {
                     blas.axpby(n_dofs, 1, b, -1, r_pen->data());
 
                     // Compute penalty residual
-                    calc_r_pen(n_dofs,
+                    impl.calc_r_pen(n_dofs,
                                x,
                                penalty_param_,
                                lb,
@@ -252,7 +149,7 @@ namespace sfem {
                     } else {
                         blas.zeros(n_dofs, J_pen->data());
 
-                        calc_J_pen(n_dofs,
+                        impl.calc_J_pen(n_dofs,
                                    x,
                                    penalty_param_,
                                    lb,
@@ -277,15 +174,15 @@ namespace sfem {
                     blas.axpy(n_dofs, 1, c->data(), x);
                 }
 
-                const T e_pen = ((ub) ? sq_norm_ramp_p(n_dofs, x, ub) : T(0)) +
-                                ((lb) ? sq_norm_ramp_m(n_dofs, x, lb) : T(0));
+                const T e_pen = ((ub) ? impl.sq_norm_ramp_p(n_dofs, x, ub) : T(0)) +
+                                ((lb) ? impl.sq_norm_ramp_m(n_dofs, x, lb) : T(0));
 
                 const T norm_pen = std::sqrt(e_pen);
                 const T norm_rpen = blas.norm2(n_dofs, r_pen->data());
 
                 if (norm_pen < penetration_tol) {
-                    if (ub) update_lagr_p(n_dofs, penalty_param_, x, ub, lagr_ub->data());
-                    if (lb) update_lagr_m(n_dofs, penalty_param_, x, lb, lagr_lb->data());
+                    if (ub) impl.update_lagr_p(n_dofs, penalty_param_, x, ub, lagr_ub->data());
+                    if (lb) impl.update_lagr_m(n_dofs, penalty_param_, x, lb, lagr_lb->data());
 
                     penetration_tol = penetration_tol / pow(penalty_param_, 0.9);
                     omega = omega / penalty_param_;
