@@ -20,14 +20,18 @@ namespace sfem {
         auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
         auto linear_op_coarse = sfem::create_linear_operator("MF", f_coarse, nullptr, es);
 
-        auto smoother = sfem::create_cheb3<real_t>(linear_op, es);
-        smoother->eigen_solver_tol = 1e-2;
-        smoother->init_with_ones();
-        smoother->scale_eig_max = 1.02;
-        smoother->set_max_it(5);
-        smoother->set_initial_guess_zero(false);
+        // auto smoother = sfem::create_cheb3<real_t>(linear_op, es);
+        // smoother->eigen_solver_tol = 1e-2;
+        // smoother->init_with_ones();
+        // smoother->scale_eig_max = 1.02;
+        // smoother->set_max_it(5);
+        // smoother->set_initial_guess_zero(false);
+
+        auto smoother = sfem::create_cg<real_t>(linear_op, es);
+        smoother->set_max_it(20);
 
         auto solver_coarse = sfem::create_cg<real_t>(linear_op_coarse, es);
+        solver_coarse->verbose = false;
 
         auto restriction = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
         auto prolong_unconstr = sfem::create_hierarchical_prolongation(fs_coarse, fs, es);
@@ -45,10 +49,11 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
             CUDA_BLAS<real_t>::build_blas(mg->blas);
+            // TODO cuda_init()
         } else
 #endif
         {
-            OpenMP_BLAS<real_t>::build_blas(mg->blas);
+            mg->default_init();
         }
 
         mg->add_level(linear_op, smoother, nullptr, restriction);
