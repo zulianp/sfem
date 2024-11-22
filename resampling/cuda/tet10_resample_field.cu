@@ -248,6 +248,67 @@ __device__ real_t tet10_measure_cu(const real_t* const MY_RESTRICT x,  //
            x27 * x28 * x32;
 }  // end tet10_measure_cu
 
+#define POW2_D(x) ((x) * (x))
+#define POW3_D(x) ((x) * (x) * (x))
+
+/**
+ * @brief Compute the measure of a tet10 element
+ *
+ * @param x
+ * @param y
+ * @param z
+ * @param qx
+ * @param qy
+ * @param qz
+ * @return __device__
+ */
+__device__ void isoparametric_lumped_mass_kernel_hrt_cu(const real_t dV,
+                                                        // Quadrature
+                                                        const real_t qx, const real_t qy,
+                                                        const real_t qz,
+                                                        real_t* const element_diag) {
+    //
+    const real_t x0 = 4 * qx;
+    const real_t x1 = qy * qz;
+    const real_t x2 = 2 * qx - 1;
+    const real_t x3 = qx * x2;
+    const real_t x4 = 2 * qy;
+    const real_t x5 = qy * (x4 - 1);
+    const real_t x6 = 2 * qz;
+    const real_t x7 = qz * (x6 - 1);
+    const real_t x8 = qx + qy + qz - 1;
+    const real_t x9 = qx * x8;
+    const real_t x10 = qy * x8;
+    const real_t x11 = qz * x8;
+    const real_t x12 = x8 * (x2 + x4 + x6);
+    const real_t x13 = (5.0 / 18.0) * dV;
+    const real_t x14 = POW2_D(qx);
+    const real_t x15 = POW2_D(qy);
+    const real_t x16 = POW2_D(qz);
+    const real_t x17 = 11 * qx;
+    const real_t x18 = -qy * x17 + 11 * x11 + x12 + 4 * x7;
+    const real_t x19 = -qz * x17 + 11 * x10 + 4 * x5;
+    const real_t x20 = (40.0 / 27.0) * dV;
+    const real_t x21 = qx * qy;
+    const real_t x22 = -24 * qx + 21 * x14 + 4;
+    const real_t x23 = -24 * qy + 21 * x15;
+    const real_t x24 = qx * qz;
+    const real_t x25 = -11 * x1 + 4 * x3 + 11 * x9;
+    const real_t x26 = -24 * qz + 21 * x16;
+
+    element_diag[0] +=
+            x12 * x13 * (qy * x0 + qz * x0 + 4 * x1 - x10 - x11 + 10 * x12 + x3 + x5 + x7 - x9);
+    element_diag[1] += qx * x13 * (42 * (POW3_D(qx)) + 14 * qx - 45 * x14 - 1);
+    element_diag[2] += qy * x13 * (42 * (POW3_D(qy)) + 14 * qy - 45 * x15 - 1);
+    element_diag[3] += qz * x13 * (42 * (POW3_D(qz)) + 14 * qz - 45 * x16 - 1);
+    element_diag[4] += -x20 * x9 * (16 * x1 + x18 + x19 + x3 - 46 * x9);
+    element_diag[5] += x20 * x21 * (84 * x21 + x22 + x23);
+    element_diag[6] += -x10 * x20 * (-46 * x10 + x18 + 16 * x24 + x25 + x5);
+    element_diag[7] += -x11 * x20 * (-46 * x11 + x12 + x19 + 16 * x21 + x25 + x7);
+    element_diag[8] += x20 * x24 * (x22 + 84 * x24 + x26);
+    element_diag[9] += x1 * x20 * (84 * x1 + x23 + x26 + 4);
+}  // end isoparametric_lumped_mass_kernel_hrt_cu
+
 /**
  * @brief Transform a quadrature point from the reference tet10 element to the physical space
  *
@@ -946,6 +1007,70 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(
     }
 
 }  // end kernel hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel
+
+///////////////////////////////////////////////////////////////////////
+// subparametric_tet10_assemble_dual_mass_vector
+///////////////////////////////////////////////////////////////////////
+__global__ void isoparametric_tet10_assemble_dual_mass_vector_kernel(  /// TODO TODO TODO
+        const ptrdiff_t start_element,      // start element
+        const ptrdiff_t end_element,        // end element
+        const ptrdiff_t nnodes,             // number of nodes
+        idx_t** const SFEM_RESTRICT elems,  //
+        geom_t** const SFEM_RESTRICT xyz,   //
+        real_t* const diag) {
+    //
+
+    // for (ptrdiff_t i = 0; i < nelements; ++i)
+
+    ////////////////////////////////////////
+    // Kernel specific variables
+    namespace cg = cooperative_groups;
+
+    cg::thread_block g = cg::this_thread_block();
+
+    const ptrdiff_t element_i = (blockIdx.x * blockDim.x + threadIdx.x) / __WARP_SIZE__;
+
+    if (element_i < start_element or element_i >= end_element) return;
+
+    auto tile = cg::tiled_partition<__WARP_SIZE__>(g);
+    const unsigned tile_rank = tile.thread_rank();
+
+    {
+        idx_t ev[10];  // Element indices
+        real_t element_diag[10];
+        geom_t x[10], y[10], z[10];
+
+        for (int v = 0; v < 10; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        for (int v = 0; v < 10; ++v) {
+            x[v] = xyz[0][ev[v]];  // x-coordinates
+            y[v] = xyz[1][ev[v]];  // y-coordinates
+            z[v] = xyz[2][ev[v]];  // z-coordinates
+        }
+
+        memset(element_diag, 0, 10 * sizeof(real_t));
+
+        // We do this numerical integration due to the det J
+        for (int q = 0; q < TET4_NQP; q++) {  // loop over the quadrature points
+            real_t dV = tet10_measure_cu(x, y, z, tet4_qx[q], tet4_qy[q], tet4_qz[q]) * tet4_qw[q];
+            isoparametric_lumped_mass_kernel_hrt_cu(dV,
+                                                    // Quadrature
+                                                    tet4_qx[q],
+                                                    tet4_qy[q],
+                                                    tet4_qz[q],
+                                                    element_diag);
+        }
+
+        for (int v = 0; v < 10; ++v) {
+            const idx_t idx = ev[v];
+
+            diag[idx] += element_diag[v];
+        }
+    }
+
+}  // end isoparametric_tet10_assemble_dual_mass_vector
 
 /**
  * @brief Compute the indices of the field for third order interpolation
