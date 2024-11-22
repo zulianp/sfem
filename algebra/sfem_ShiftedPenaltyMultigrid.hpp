@@ -23,29 +23,8 @@ namespace sfem {
     template <typename T>
     class ShiftedPenaltyMultigrid final : public Operator<T> {
     public:
-        BLAS_Tpl<T> blas;
-        ShiftedPenalty_Tpl<T> impl;
-        bool verbose{true};
-        bool debug{false};
-
         void set_upper_bound(const std::shared_ptr<Buffer<T>>& ub) { upper_bound_ = ub; }
         void set_lower_bound(const std::shared_ptr<Buffer<T>>& lb) { lower_bound_ = lb; }
-
-        std::shared_ptr<Buffer<T>> make_buffer(const ptrdiff_t n) const {
-            return Buffer<T>::own(
-                    n, blas.allocate(n), blas.destroy, (enum MemorySpace)execution_space());
-        }
-
-        std::shared_ptr<Buffer<T>> upper_bound_;
-        std::shared_ptr<Buffer<T>> lower_bound_;
-        std::shared_ptr<Buffer<T>> correction, lagr_lb, lagr_ub;
-
-        T penalty_param_{10};  // mu
-        T max_penalty_param_{1000};
-        int nlsmooth_steps{1};
-        int max_inner_it{10};
-
-
         void set_penalty_parameter(const T val) { penalty_param_ = val; }
 
         enum CycleType {
@@ -90,8 +69,8 @@ namespace sfem {
 
             T* lb = (lower_bound_) ? lower_bound_->data() : nullptr;
             T* ub = (upper_bound_) ? upper_bound_->data() : nullptr;
-            lagr_lb = lb? make_buffer(n_dofs) : nullptr;
-            lagr_ub = ub? make_buffer(n_dofs) : nullptr;
+            lagr_lb = lb ? make_buffer(n_dofs) : nullptr;
+            lagr_ub = ub ? make_buffer(n_dofs) : nullptr;
 
             T penetration_norm = 0;
             T penetration_tol = 1 / (penalty_param_ * 0.1);
@@ -121,8 +100,8 @@ namespace sfem {
                                     penalty_param_,
                                     lb,
                                     ub,
-                                    lagr_lb->data(),
-                                    lagr_ub->data(),
+                                    lagr_lb ? lagr_lb->data() : nullptr,
+                                    lagr_ub ? lagr_ub->data() : nullptr,
                                     mem->work->data());
 
                     const T r_pen_norm = blas.norm2(n_dofs, mem->work->data());
@@ -251,15 +230,28 @@ namespace sfem {
         int cycle_type_{V_CYCLE};
         T atol_{1e-10};
 
-        T norm_residual_0{1};
-        T norm_residual_previous{1};
+        BLAS_Tpl<T> blas;
+        ShiftedPenalty_Tpl<T> impl;
+        bool verbose{true};
+        bool debug{true};
+
+        std::shared_ptr<Buffer<T>> make_buffer(const ptrdiff_t n) const {
+            return Buffer<T>::own(
+                    n, blas.allocate(n), blas.destroy, (enum MemorySpace)execution_space());
+        }
+
+        std::shared_ptr<Buffer<T>> upper_bound_;
+        std::shared_ptr<Buffer<T>> lower_bound_;
+        std::shared_ptr<Buffer<T>> correction, lagr_lb, lagr_ub;
+
+        T penalty_param_{10};  // mu
+        T max_penalty_param_{1000};
+        int nlsmooth_steps{1};
+        int max_inner_it{1};
 
         inline int finest_level() const { return 0; }
-
         inline int coarsest_level() const { return n_levels() - 1; }
-
         inline int coarser_level(int level) const { return level + 1; }
-
         inline int finer_level(int level) const { return level - 1; }
 
         void ensure_init() {
@@ -275,21 +267,18 @@ namespace sfem {
             memory_.clear();
             memory_.resize(this->n_levels());
 
+            correction = make_buffer(rows());
             for (int l = 0; l < n_levels(); l++) {
                 memory_[l] = std::make_shared<Memory>();
 
-                size_t n = smoother_[l]->rows();
+                const ptrdiff_t n = smoother_[l]->rows();
                 if (l != finest_level() || !wrap_input_) {
-                    auto x = blas.allocate(n);
-                    memory_[l]->solution = Buffer<T>::own(n, x, blas.destroy);
-
-                    auto r = blas.allocate(n);
-                    memory_[l]->rhs = Buffer<T>::own(n, r, blas.destroy);
+                    memory_[l]->solution = make_buffer(n);
+                    memory_[l]->rhs = make_buffer(n);
                 }
 
-                auto w = blas.allocate(n);
-                memory_[l]->work = Buffer<T>::own(n, w, blas.destroy);
-                memory_[l]->diag = Buffer<T>::own(n, w, blas.destroy);
+                memory_[l]->work = make_buffer(n);
+                memory_[l]->diag = make_buffer(n);
             }
 
             return 0;
@@ -303,10 +292,10 @@ namespace sfem {
 
             const ptrdiff_t n_dofs = op->rows();
 
-            T* lb = (lower_bound_) ? lower_bound_->data() : nullptr;
-            T* ub = (upper_bound_) ? upper_bound_->data() : nullptr;
-
-            // ---
+            const T* const lb = (lower_bound_) ? lower_bound_->data() : nullptr;
+            const T* const ub = (upper_bound_) ? upper_bound_->data() : nullptr;
+            const T* const l_lb = lagr_lb ? lagr_lb->data() : nullptr;
+            const T* const l_ub = lagr_ub ? lagr_ub->data() : nullptr;
 
             blas.zeros(n_dofs, mem->work->data());
 
@@ -320,8 +309,8 @@ namespace sfem {
                             penalty_param_,
                             lb,
                             ub,
-                            lagr_lb->data(),
-                            lagr_ub->data(),
+                            l_lb,
+                            l_ub,
                             mem->work->data());
 
             blas.zeros(n_dofs, mem->diag->data());
@@ -330,9 +319,14 @@ namespace sfem {
                             penalty_param_,
                             lb,
                             ub,
-                            lagr_lb->data(),
-                            lagr_ub->data(),
+                            l_lb,
+                            l_ub,
                             mem->diag->data());
+
+            if (debug) {
+                printf("eval_residual_and_jacobian: ||r|| %e\n",
+                       blas.norm2(n_dofs, mem->work->data()));
+            }
         }
 
         void nonlinear_smooth() {
@@ -349,9 +343,7 @@ namespace sfem {
                 smoother->set_op(J);
 
                 blas.zeros(n_dofs, correction->data());
-                // TODO Is there a way to remove correction?
                 smoother->apply(mem->work->data(), correction->data());
-
                 blas.axpy(n_dofs, 1, correction->data(), mem->solution->data());
             }
         }
@@ -362,7 +354,7 @@ namespace sfem {
             auto smoother = smoother_[level];
             auto op = operator_[level];
             auto restriction = restriction_[level];
-            auto prolongation = prolongation_[level];
+            auto prolongation = prolongation_[coarser_level(level)];
             auto mem_coarse = memory_[coarser_level(level)];
 
             nonlinear_smooth();

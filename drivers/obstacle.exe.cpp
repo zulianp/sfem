@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
     int SFEM_USE_BSR_MATRIX = 1;
     SFEM_READ_ENV(SFEM_USE_BSR_MATRIX, atoi);
 
-    int SFEM_USE_SHIFTED_PENALTY = 1;
+    int SFEM_USE_SHIFTED_PENALTY = 0;
     SFEM_READ_ENV(SFEM_USE_SHIFTED_PENALTY, atoi);
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
