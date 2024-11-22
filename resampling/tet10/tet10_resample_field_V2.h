@@ -132,6 +132,8 @@ int hex8_to_subparametric_tet10_resample_field_local_V(
         // Output
         real_t* const SFEM_RESTRICT weighted_field);
 
+//////////////////////////////////////////////////////////////////////////
+
 #ifdef __cplusplus
 }
 #endif

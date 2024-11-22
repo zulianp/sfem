@@ -919,6 +919,393 @@ int hex8_to_isoparametric_tet10_resample_field_local_V(
 }  // end function hex8_to_tet10_resample_field_local
 //////////////////////////////////////////////////////////
 
+// ////////////////////////////////////////////////////////////////////////
+// // hex_aa_8_eval_fun_V
+// ////////////////////////////////////////////////////////////////////////
+// SFEM_INLINE static void hex_aa_8_eval_fun_V(
+//         // Quadrature point (local coordinates)
+//         // With respect to the hat functions of a cube element
+//         // In a local coordinate system
+//         const vec_real x, const vec_real y, const vec_real z,
+//         // Output
+//         vec_real* const SFEM_RESTRICT f) {
+//     //
+//     f[0] = (1.0 - x) * (1.0 - y) * (1.0 - z);
+//     f[1] = x * (1.0 - y) * (1.0 - z);
+//     f[2] = x * y * (1.0 - z);
+//     f[3] = (1.0 - x) * y * (1.0 - z);
+//     f[4] = (1.0 - x) * (1.0 - y) * z;
+//     f[5] = x * (1.0 - y) * z;
+//     f[6] = x * y * z;
+//     f[7] = (1.0 - x) * y * z;
+// }
+
+SFEM_INLINE static real_t tet4_measure_V(
+        // X-coordinates
+        const real_t px0, const real_t px1, const real_t px2, const real_t px3,
+        // Y-coordinates
+        const real_t py0, const real_t py1, const real_t py2, const real_t py3,
+        // Z-coordinates
+        const real_t pz0, const real_t pz1, const real_t pz2, const real_t pz3) {
+    //
+    // determinant of the Jacobian
+    // M = [px0, py0, pz0, 1]
+    //     [px1, py1, pz1, 1]
+    //     [px2, py2, pz2, 1]
+    //     [px3, py3, pz3, 1]
+    //
+    // V = (1/6) * det(M)
+
+    const real_t x0 = -pz0 + pz3;
+    const real_t x1 = -py0 + py2;
+    const real_t x2 = -1.0 / 6.0 * px0 + (1.0 / 6.0) * px1;
+    const real_t x3 = -py0 + py3;
+    const real_t x4 = -pz0 + pz2;
+    const real_t x5 = -py0 + py1;
+    const real_t x6 = -1.0 / 6.0 * px0 + (1.0 / 6.0) * px2;
+    const real_t x7 = -pz0 + pz1;
+    const real_t x8 = -1.0 / 6.0 * px0 + (1.0 / 6.0) * px3;
+
+    return x0 * x1 * x2 - x0 * x5 * x6 - x1 * x7 * x8 - x2 * x3 * x4 + x3 * x6 * x7 + x4 * x5 * x8;
+}
+
+SFEM_INLINE static void tet4_transform_VV(
+        /**
+         ****************************************************************************************
+        \begin{bmatrix}
+        out_x \\
+        out_y \\
+        out_z
+        \end{bmatrix}
+        =
+        \begin{bmatrix}
+        px_0 \\
+        py_0 \\
+        pz_0
+        \end{bmatrix}
+        +
+        \begin{bmatrix}
+        px_1 - px_0 & px_2 - px_0 & px_3 - px_0 \\
+        py_1 - py_0 & py_2 - py_0 & py_3 - py_0 \\
+        pz_1 - pz_0 & pz_2 - pz_0 & pz_3 - pz_0
+        \end{bmatrix}
+        \cdot
+        \begin{bmatrix}
+        qx \\
+        qy \\
+        qz
+        \end{bmatrix}
+        *************************************************************************************************
+*/
+
+        // X-coordinates
+        const real_t px0, const real_t px1, const real_t px2, const real_t px3,
+        // Y-coordinates
+        const real_t py0, const real_t py1, const real_t py2, const real_t py3,
+        // Z-coordinates
+        const real_t pz0, const real_t pz1, const real_t pz2, const real_t pz3,
+        // Quadrature point
+        const vec_real qx, const vec_real qy, const vec_real qz,
+        // Output
+        vec_real* const SFEM_RESTRICT out_x,    //
+        vec_real* const SFEM_RESTRICT out_y,    //
+        vec_real* const SFEM_RESTRICT out_z) {  //
+    //
+    //
+    *out_x = px0 + qx * (-px0 + px1) + qy * (-px0 + px2) + qz * (-px0 + px3);
+    *out_y = py0 + qx * (-py0 + py1) + qy * (-py0 + py2) + qz * (-py0 + py3);
+    *out_z = pz0 + qx * (-pz0 + pz1) + qy * (-pz0 + pz2) + qz * (-pz0 + pz3);
+}  // end tet4_transform_v2
+
+/**
+ * @brief Compute the dual basis of the tet10 element
+ *
+ * @param qx
+ * @param qy
+ * @param qz
+ * @param f
+ * @return SFEM_INLINE
+ */
+SFEM_INLINE static void tet10_dual_basis_hrt_VV(const vec_real qx,    //
+                                                const vec_real qy,    //
+                                                const vec_real qz,    //
+                                                vec_real* const f) {  //
+    const vec_real x0 = 2 * qy;
+    const vec_real x1 = 2 * qz;
+    const vec_real x2 = 2 * qx - 1;
+    const vec_real x3 = (-x0 - x1 - x2) * (-qx - qy - qz + 1);
+    const vec_real x4 = x0 - 1;
+    const vec_real x5 = (5.0 / 18.0) * qy;
+    const vec_real x6 = x4 * x5;
+    const vec_real x7 = x1 - 1;
+    const vec_real x8 = (5.0 / 18.0) * qz;
+    const vec_real x9 = x7 * x8;
+    const vec_real x10 = -4 * qx - 4 * qy - 4 * qz + 4;
+    const vec_real x11 = (5.0 / 72.0) * x10;
+    const vec_real x12 = qy * qz;
+    const vec_real x13 = qx * x11 + (10.0 / 9.0) * x12 + x6 + x9;
+    const vec_real x14 = (5.0 / 18.0) * qx;
+    const vec_real x15 = x14 * x2;
+    const vec_real x16 = (10.0 / 9.0) * qx;
+    const vec_real x17 = qy * x11 + qz * x16 + x15;
+    const vec_real x18 = qy * x16 + qz * x11;
+    const vec_real x19 = qx * x2;
+    const vec_real x20 = (5.0 / 18.0) * x3;
+    const vec_real x21 = qy * x14 + x10 * x8 + x20;
+    const vec_real x22 = qz * x14 + x10 * x5;
+    const vec_real x23 = qy * x4;
+    const vec_real x24 = qz * x5 + x10 * x14;
+    const vec_real x25 = qz * x7;
+    const vec_real x26 = (40.0 / 27.0) * x23;
+    const vec_real x27 = (115.0 / 27.0) * x10;
+    const vec_real x28 = (110.0 / 27.0) * qx;
+    const vec_real x29 = -qz * x28;
+    const vec_real x30 = (55.0 / 54.0) * x10;
+    const vec_real x31 = -qy * x30;
+    const vec_real x32 = (10.0 / 27.0) * x19;
+    const vec_real x33 = (40.0 / 27.0) * x25;
+    const vec_real x34 = x29 + x31 + x32 + x33;
+    const vec_real x35 = -qy * x28;
+    const vec_real x36 = -qz * x30;
+    const vec_real x37 = (10.0 / 27.0) * x3;
+    const vec_real x38 = x35 + x36 + x37;
+    const vec_real x39 = (40.0 / 27.0) * x10;
+    const vec_real x40 = qx * qy;
+    const vec_real x41 = -qx * x30 - 110.0 / 27.0 * x12;
+    const vec_real x42 = (10.0 / 27.0) * x23;
+    const vec_real x43 = (40.0 / 27.0) * x3;
+    const vec_real x44 = x42 + x43;
+    const vec_real x45 = qx * qz;
+    const vec_real x46 = (40.0 / 27.0) * x19;
+    const vec_real x47 = x41 + x46;
+    const vec_real x48 = (10.0 / 27.0) * x25;
+    const vec_real x49 = x26 + x48;
+    const vec_real x50 = x29 + x31;
+    const vec_real x51 = x35 + x36;
+
+    f[0] = x13 + x17 + x18 + (25.0 / 9.0) * x3;
+    f[1] = x13 + (25.0 / 9.0) * x19 + x21 + x22;
+    f[2] = x17 + x21 + (25.0 / 9.0) * x23 + x24 + x9;
+    f[3] = x15 + x18 + x20 + x22 + x24 + (25.0 / 9.0) * x25 + x6;
+    f[4] = qx * x27 + (160.0 / 27.0) * x12 + x26 + x34 + x38;
+    f[5] = qz * x39 + x34 + (460.0 / 27.0) * x40 + x41 + x44;
+    f[6] = qy * x27 + x33 + x38 + x42 + (160.0 / 27.0) * x45 + x47;
+    f[7] = qz * x27 + x37 + (160.0 / 27.0) * x40 + x47 + x49 + x50;
+    f[8] = qy * x39 + x32 + x41 + x43 + (460.0 / 27.0) * x45 + x49 + x51;
+    f[9] = qx * x39 + (460.0 / 27.0) * x12 + x44 + x46 + x48 + x50 + x51;
+}
+
+////////////////////////////////////////////////////////////////////////
+// hex8_to_tet10_resample_field_local_cube1_V
+////////////////////////////////////////////////////////////////////////
+int hex8_to_subparametric_tet10_resample_field_local_V(
+        // Mesh
+        const ptrdiff_t nelements,          // number of elements
+        const ptrdiff_t nnodes,             // number of nodes
+        idx_t** const SFEM_RESTRICT elems,  // connectivity
+        geom_t** const SFEM_RESTRICT xyz,   // coordinates
+        // SDF
+        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
+        const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
+        const geom_t* const SFEM_RESTRICT origin,     // origin of the domain
+        const geom_t* const SFEM_RESTRICT delta,      // delta of the domain
+        const real_t* const SFEM_RESTRICT data,       // SDF
+        // Output
+        real_t* const SFEM_RESTRICT weighted_field) {
+    //
+    PRINT_CURRENT_FUNCTION;
+    // printf("============================================================\n");
+    // printf("Start: hex8_to_tet10_resample_field_local\n");
+    // printf("============================================================\n");
+    //
+    const real_t ox = (real_t)origin[0];
+    const real_t oy = (real_t)origin[1];
+    const real_t oz = (real_t)origin[2];
+
+    const real_t dx = (real_t)delta[0];
+    const real_t dy = (real_t)delta[1];
+    const real_t dz = (real_t)delta[2];
+
+    const ptrdiff_t stride0 = stride[0];
+    const ptrdiff_t stride1 = stride[1];
+    const ptrdiff_t stride2 = stride[2];
+
+    /// Loop over the elements of the mesh
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        //
+        idx_t ev[10];
+
+        // SUBPARAMETRIC
+        real_t x[4], y[4], z[4];
+
+        vec_real hex8_f[8];
+        vec_real coeffs[8];
+
+        vec_real tet10_f[10];
+        vec_real element_field[10];
+
+        // loop over the 4 vertices of the tetrahedron
+        // UNROLL_ZERO?
+        for (int v = 0; v < 10; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        // SUBPARAMETRIC (for isoparametric we collect all 10 points instead of 4)
+        // copy the coordinates of the vertices
+        for (int v = 0; v < 4; ++v) {
+            x[v] = (real_t)xyz[0][ev[v]];  // x-coordinates
+            y[v] = (real_t)xyz[1][ev[v]];  // y-coordinates
+            z[v] = (real_t)xyz[2][ev[v]];  // z-coordinates
+        }
+
+        // set to zero the element field
+        for (int v = 0; v < 10; v++) {
+            element_field[v] = (vec_real)ZEROS_VEC;
+        }
+
+        // SUBPARAMETRIC (for isoparametric this is a nonlinear map computed for each qp)
+        const real_t measure = tet4_measure_V(x[0],
+                                              x[1],
+                                              x[2],
+                                              x[3],
+                                              //
+                                              y[0],
+                                              y[1],
+                                              y[2],
+                                              y[3],
+                                              //
+                                              z[0],
+                                              z[1],
+                                              z[2],
+                                              z[3]);
+
+        assert(measure > 0);
+
+        // SUBPARAMETRIC (for iso-parametric tassellation of tet10 might be necessary)
+        for (int q = 0; q < TET4_NQP; q += _VL_) {  // loop over the quadrature points
+
+            vec_real qx_V, qy_V, qz_V, qw_V;
+            const int q_next = q + _VL_;
+            if (q_next < TET4_NQP) {
+                ASSIGN_QUADRATURE_POINT_MACRO(q, qx_V, qy_V, qz_V, qw_V);
+            } else {
+                ASSIGN_QUADRATURE_POINT_MACRO_TAIL(q, qx_V, qy_V, qz_V, qw_V);
+            }
+
+            // det of jacobian
+            vec_real g_qx_V, g_qy_V, g_qz_V;
+            // Transform quadrature point to physical space
+            // g_qx, g_qy, g_qz are the coordinates of the quadrature point in the physical
+            // space
+
+            // SUBPARAMETRIC (for isoparametric this is a nonlinear map)
+            tet4_transform_VV(x[0],
+                              x[1],
+                              x[2],
+                              x[3],
+                              //
+                              y[0],
+                              y[1],
+                              y[2],
+                              y[3],
+                              //
+                              z[0],
+                              z[1],
+                              z[2],
+                              z[3],
+                              //
+                              qx_V,  //
+                              qy_V,  //
+                              qz_V,  //
+                              //
+                              &g_qx_V,
+                              &g_qy_V,
+                              &g_qz_V);
+
+            // No standard basis function (tet10 cannot lump as for tet4, needs special
+            // treatment)
+            // tet10_dual_basis_popp(tet4_qx[q], tet4_qy[q], tet4_qz[q], tet10_f);
+            tet10_dual_basis_hrt_VV(qx_V, qy_V, qz_V, tet10_f);
+
+            const vec_real dV = measure * qw_V;
+
+            const vec_real grid_x_V = (g_qx_V - ox) / dx;
+            const vec_real grid_y_V = (g_qy_V - oy) / dy;
+            const vec_real grid_z_V = (g_qz_V - oz) / dz;
+
+            const vec_indices i_V = floor_V(grid_x_V);
+            const vec_indices j_V = floor_V(grid_y_V);
+            const vec_indices k_V = floor_V(grid_z_V);
+
+            // // If outside
+            // if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2]))
+            // {
+            //     fprintf(stderr,
+            //             "warning (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
+            //             "%ld)!\n",
+            //             g_qx,
+            //             g_qy,
+            //             g_qz,
+            //             i,
+            //             j,
+            //             k,
+            //             n[0],
+            //             n[1],
+            //             n[2]);
+            //     continue;
+            // }
+
+            // Get the reminder [0, 1]
+            vec_real l_x_V = (grid_x_V - (vec_real)i_V);
+            vec_real l_y_V = (grid_y_V - (vec_real)j_V);
+            vec_real l_z_V = (grid_z_V - (vec_real)k_V);
+
+            // assert(l_x >= -1e-8);
+            // assert(l_y >= -1e-8);
+            // assert(l_z >= -1e-8);
+
+            // assert(l_x <= 1 + 1e-8);
+            // assert(l_y <= 1 + 1e-8);
+            // assert(l_z <= 1 + 1e-8);
+
+            hex_aa_8_eval_fun_V(l_x_V, l_y_V, l_z_V, hex8_f);
+            hex_aa_8_collect_coeffs_V(stride0,
+                                      stride1,
+                                      stride2,  //
+                                      i_V,
+                                      j_V,
+                                      k_V,
+                                      data,
+                                      coeffs);
+
+            // Integrate field
+            {
+                vec_real eval_field = (vec_real)ZEROS_VEC;
+                // UNROLL_ZERO?
+                for (int edof_j = 0; edof_j < 8; edof_j++) {
+                    eval_field += hex8_f[edof_j] * coeffs[edof_j];
+                }
+
+                // UNROLL_ZERO?
+                for (int edof_i = 0; edof_i < 10; edof_i++) {
+                    element_field[edof_i] += eval_field * tet10_f[edof_i] * dV;
+                }  // end edof_i loop
+            }
+        }  // end quadrature loop
+
+        // UNROLL_ZERO?
+        for (int v = 0; v < 10; ++v) {
+            real_t element_field_v = 0.0;
+
+            SIMD_REDUCE_SUM_MACRO(element_field_v, element_field[v]);
+            weighted_field[ev[v]] += element_field_v;
+
+        }  // end vertex loop
+    }      // end element loop
+
+    return 0;
+}  // end function hex8_to_subparametric_tet10_resample_field_local_V
+
 ////////////////////////////////////////////////////////////////////////
 // hex_aa_8_eval_weno4_3D
 ////////////////////////////////////////////////////////////////////////
@@ -1221,6 +1608,9 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
     RETURN_FROM_FUNCTION(0);
 }  // end function hex8_to_tet10_resample_field_local_cube1_V2
 
+////////////////////////////////////////////////////////////////////////
+// hex8_to_tet10_resample_field_local_cube1_V
+////////////////////////////////////////////////////////////////////////
 int isoparametric_tet10_assemble_dual_mass_vector_V(const ptrdiff_t nelements,
                                                     const ptrdiff_t nnodes,
                                                     idx_t** const SFEM_RESTRICT elems,
