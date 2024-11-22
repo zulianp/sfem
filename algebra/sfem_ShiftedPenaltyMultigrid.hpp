@@ -15,7 +15,8 @@
 
 #include "sfem_Buffer.hpp"
 
-// https://en.wikipedia.org/wiki/Conjugate_gradient_method
+// MATLAB version
+// https://bitbucket.org/hkothari/matsci/src/ab637a0655512c4ddf299914dd45fdb563ac7b34/Solvers/%2BBoxConstraints/%40PenaltyMG/PenaltyMG.m?at=restructuring
 namespace sfem {
 
     /// level 0 is the finest

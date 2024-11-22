@@ -61,6 +61,7 @@ set(SFEM_MODULES
     operators/proteus_hex8
     operators/hierarchical
     operators/hex8
+    ssmg
 )
 
 if(SFEM_ENABLE_RESAMPLING)

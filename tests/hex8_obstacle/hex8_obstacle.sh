@@ -21,7 +21,7 @@ export OMP_PROC_BIND=true
 export CUDA_LAUNCH_BLOCKING=0
 
 export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
-export SFEM_ELEMENT_REFINE_LEVEL=8
+export SFEM_ELEMENT_REFINE_LEVEL=2
 export SFEM_MAX_IT=200
 
 export SFEM_HEX8_ASSUME_AFFINE=1
@@ -34,7 +34,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			create_cyclic_ss_mesh.sh 3 $SFEM_ELEMENT_REFINE_LEVEL
+			create_cyclic_ss_mesh.sh 1 $SFEM_ELEMENT_REFINE_LEVEL
 		fi
 
 		sinlet=$mesh/surface/sidesets_aos/inlet.raw

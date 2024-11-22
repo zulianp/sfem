@@ -129,15 +129,15 @@ namespace sfem {
                                     penalty_param_,
                                     lb,
                                     ub,
-                                    lagr_lb->data(),
-                                    lagr_ub->data(),
+                                    lagr_lb ? lagr_lb->data() : nullptr,
+                                    lagr_ub ? lagr_ub->data() : nullptr,
                                     r_pen->data());
 
                     if (this->constraint_scaling_op_) {
                         // TODO: Implement this
                         assert(false);
                     }
-                    
+
                     const T r_pen_norm = blas.norm2(n_dofs, r_pen->data());
 
                     if (r_pen_norm < std::max(atol, omega) && inner_iter != 0) {
@@ -149,7 +149,7 @@ namespace sfem {
                         // alpha = <r, r>/<A r, r>
                         blas.zeros(n_dofs, c->data());
                         apply_op->apply(r_pen->data(), c->data());
-                        
+
                         const T alpha = blas.dot(n_dofs, r_pen->data(), r_pen->data()) /
                                         blas.dot(n_dofs, r_pen->data(), c->data());
 
@@ -162,8 +162,8 @@ namespace sfem {
                                         penalty_param_,
                                         lb,
                                         ub,
-                                        lagr_lb->data(),
-                                        lagr_ub->data(),
+                                        lagr_lb ? lagr_lb->data() : nullptr,
+                                        lagr_ub ? lagr_ub->data() : nullptr,
                                         J_pen->data());
 
                         if (this->constraint_scaling_op_) {
