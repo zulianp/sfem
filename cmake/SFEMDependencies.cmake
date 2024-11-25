@@ -155,4 +155,13 @@ if(SFEM_ENABLE_CUDA)
         list(APPEND SFEM_DEP_LIBRARIES "$ENV{CRAY_CUDATOOLKIT_POST_LINK_OPTS} -lcublas -lcusparse")
         include_directories($ENV{CRAY_CUDATOOLKIT_INCLUDE_OPTS})
     endif()
+
+    #https://github.com/NVIDIA/thrust/blob/main/thrust/cmake/README.md
+    find_package(Thrust CONFIG)
+    if(Thrust_FOUND)
+        thrust_create_target(Thrust)
+        list(APPEND SFEM_DEP_LIBRARIES Thrust)
+    else()
+        message(WARNING "Thrust not found!")
+    endif()
 endif()
