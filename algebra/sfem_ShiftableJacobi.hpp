@@ -8,7 +8,12 @@
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_openmp_blas.hpp"
 
+#include "sfem_Buffer.hpp"
+
 namespace sfem {
+    template <typename T>
+    static std::shared_ptr<Buffer<T>> create_buffer(const std::ptrdiff_t n, const MemorySpace es);
+    
     template <typename T>
     class ShiftableJacobi final : public ShiftableOperator<T> {
     public:

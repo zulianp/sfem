@@ -11,6 +11,20 @@
 #define MIN(a, b) ((a) <= (b) ? (a) : (b))
 #endif
 
+template<typename scalar_t>
+static inline __device__ __host__ void cu_hex8_sub_fff_0(const ptrdiff_t stride,
+                                                         const cu_jacobian_t *const SFEM_RESTRICT
+                                                                 fff,
+                                                         const scalar_t h,
+                                                         scalar_t *const SFEM_RESTRICT sub_fff) {
+    sub_fff[0] = (scalar_t)fff[0 * stride] * h;
+    sub_fff[1] = (scalar_t)fff[1 * stride] * h;
+    sub_fff[2] = (scalar_t)fff[2 * stride] * h;
+    sub_fff[3] = (scalar_t)fff[3 * stride] * h;
+    sub_fff[4] = (scalar_t)fff[4 * stride] * h;
+    sub_fff[5] = (scalar_t)fff[5 * stride] * h;
+}
+
 static inline __device__ __host__ int cu_proteus_hex8_nxe(int level) {
     const int corners = 8;
     const int edge_nodes = 12 * (level - 1);

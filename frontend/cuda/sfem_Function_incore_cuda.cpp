@@ -18,8 +18,7 @@
 namespace sfem {
 
     std::shared_ptr<Buffer<idx_t>> create_device_elements(
-            const std::shared_ptr<FunctionSpace> &space,
-            const enum ElemType element_type) {
+            const std::shared_ptr<FunctionSpace> &space, const enum ElemType element_type) {
         if (space->has_semi_structured_mesh()) {
             auto &ssm = space->semi_structured_mesh();
 
@@ -62,8 +61,7 @@ namespace sfem {
             }
         }
 
-        FFF(Mesh &mesh,
-            const enum ElemType element_type,
+        FFF(Mesh &mesh, const enum ElemType element_type,
             const std::shared_ptr<Buffer<idx_t>> &elements)
             : element_type_(element_type), n_elements_(mesh.n_elements()) {
             auto c_mesh = (mesh_t *)mesh.impl_mesh();
@@ -107,8 +105,7 @@ namespace sfem {
             }
         }
 
-        Adjugate(Mesh &mesh,
-                 const enum ElemType element_type,
+        Adjugate(Mesh &mesh, const enum ElemType element_type,
                  const std::shared_ptr<Buffer<idx_t>> &elements)
             : element_type_(element_type), n_elements_(mesh.n_elements()) {
             auto c_mesh = (mesh_t *)mesh.impl_mesh();
@@ -205,10 +202,8 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        int hessian_crs(const real_t *const x,
-                        const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override {
+        int hessian_crs(const real_t *const x, const count_t *const rowptr,
+                        const idx_t *const colidx, real_t *const values) override {
             for (int i = 0; i < n_dirichlet_conditions; i++) {
                 cu_crs_constraint_nodes_to_identity_vec(dirichlet_conditions[i].local_size,
                                                         dirichlet_conditions[i].idx,
@@ -235,8 +230,7 @@ namespace sfem {
             return std::make_shared<GPUDirichletConditions>(h_derefined);
         }
 
-        int mask(mask_t *mask) override
-        {
+        int mask(mask_t *mask) override {
             assert(false);
             return SFEM_FAILURE;
         }
@@ -299,10 +293,8 @@ namespace sfem {
             return ret;
         }
 
-        int hessian_crs(const real_t *const x,
-                        const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override {
+        int hessian_crs(const real_t *const x, const count_t *const rowptr,
+                        const idx_t *const colidx, real_t *const values) override {
             return cu_laplacian_crs(element_type,
                                     fff->n_elements(),
                                     fff->n_elements(),  // stride
@@ -348,6 +340,21 @@ namespace sfem {
                                       h,
                                       out,
                                       stream);
+        }
+
+        int hessian_crs_sym(const real_t *const /*x*/, const count_t *const rowptr,
+                            const idx_t *const colidx, real_t *const diag_values,
+                            real_t *const off_diag_values) override {
+            cu_laplacian_crs_sym(element_type,
+                                 fff->n_elements(),
+                                 fff->n_elements(),  // stride
+                                 fff->elements(),
+                                 fff->fff(),
+                                 rowptr,
+                                 colidx,
+                                 real_type,
+                                 diag_values,
+                                 off_diag_values, stream);
         }
 
         int value(const real_t *x, real_t *const out) override {
@@ -403,19 +410,24 @@ namespace sfem {
             return ret;
         }
 
-        int hessian_crs(const real_t *const x,
-                        const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override {
+        int hessian_crs(const real_t *const x, const count_t *const rowptr,
+                        const idx_t *const colidx, real_t *const values) override {
             std::cerr << "Unimplemented function ---> hessian_crs in GPULaplacian\n";
             assert(false);
             return SFEM_FAILURE;
         }
 
-        int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
-            std::cerr << "Unimplemented function ---> hessian_diag in GPULaplacian\n";
-            assert(false);
-            return SFEM_FAILURE;
+        int hessian_diag(const real_t *const /*x*/, real_t *const out) override {
+            auto &ssm = space->semi_structured_mesh();
+            return cu_proteus_affine_hex8_laplacian_diag(ssm.level(),
+                                                         fff->n_elements(),
+                                                         fff->n_elements(),  // stride
+                                                         ssm.interior_start(),
+                                                         fff->elements(),
+                                                         fff->fff(),
+                                                         real_type,
+                                                         out,
+                                                         stream);
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
@@ -456,110 +468,106 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
     };
 
-
     class SemiStructuredGPULaplacian_TensorCore final : public Op {
-        public:
-            std::shared_ptr<FunctionSpace> space;
-            enum RealType real_type { SFEM_REAL_DEFAULT };
-            void *stream{SFEM_DEFAULT_STREAM};
-            enum ElemType element_type { INVALID };
-            std::shared_ptr<Buffer<real_t>> macro_elem_ops;
+    public:
+        std::shared_ptr<FunctionSpace> space;
+        enum RealType real_type { SFEM_REAL_DEFAULT };
+        void *stream{SFEM_DEFAULT_STREAM};
+        enum ElemType element_type { INVALID };
+        std::shared_ptr<Buffer<real_t>> macro_elem_ops;
 
-            static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
-                auto mesh = (mesh_t *)space->mesh().impl_mesh();
-                assert(1 == space->block_size());
-                return std::make_unique<SemiStructuredGPULaplacian_TensorCore>(space);
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+            assert(1 == space->block_size());
+            return std::make_unique<SemiStructuredGPULaplacian_TensorCore>(space);
+        }
+
+        const char *name() const override { return "ss:gpu::tc:Laplacian"; }
+        inline bool is_linear() const override { return true; }
+
+        int initialize() override {
+            auto elements = space->device_elements();
+            if (!elements) {
+                elements = create_device_elements(space, space->element_type());
+                space->set_device_elements(elements);
             }
 
-            const char *name() const override { return "ss:gpu::tc:Laplacian"; }
-            inline bool is_linear() const override { return true; }
+            // TODO init macro_elem_ops
+            assert(false);
 
-            int initialize() override {
-                auto elements = space->device_elements();
-                if (!elements) {
-                    elements = create_device_elements(space, space->element_type());
-                    space->set_device_elements(elements);
-                }
+            return SFEM_SUCCESS;
+        }
 
-                // TODO init macro_elem_ops
-                assert(false);
+        SemiStructuredGPULaplacian_TensorCore(const std::shared_ptr<FunctionSpace> &space)
+            : space(space), element_type(space->element_type()) {}
 
-                return SFEM_SUCCESS;
-            }
+        std::shared_ptr<Op> derefine_op(
+                const std::shared_ptr<FunctionSpace> &derefined_space) override {
+            auto mesh = (mesh_t *)derefined_space->mesh().impl_mesh();
 
-            SemiStructuredGPULaplacian_TensorCore(const std::shared_ptr<FunctionSpace> &space)
-                : space(space), element_type(space->element_type()) {}
+            auto ret = std::make_shared<GPULaplacian>(derefined_space);
+            assert(derefined_space->element_type() == macro_base_elem(space->element_type()));
+            ret->initialize();
+            return ret;
+        }
 
-            std::shared_ptr<Op> derefine_op(
-                    const std::shared_ptr<FunctionSpace> &derefined_space) override {
-                auto mesh = (mesh_t *)derefined_space->mesh().impl_mesh();
+        int hessian_crs(const real_t *const x, const count_t *const rowptr,
+                        const idx_t *const colidx, real_t *const values) override {
+            std::cerr << "Unimplemented function ---> hessian_crs in GPULaplacian\n";
+            assert(false);
+            return SFEM_FAILURE;
+        }
 
-                auto ret = std::make_shared<GPULaplacian>(derefined_space);
-                assert(derefined_space->element_type() == macro_base_elem(space->element_type()));
-                ret->initialize();
-                return ret;
-            }
+        int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
+            std::cerr << "Unimplemented function ---> hessian_diag in GPULaplacian\n";
+            assert(false);
+            return SFEM_FAILURE;
+        }
 
-            int hessian_crs(const real_t *const x,
-                            const count_t *const rowptr,
-                            const idx_t *const colidx,
-                            real_t *const values) override {
-                std::cerr << "Unimplemented function ---> hessian_crs in GPULaplacian\n";
-                assert(false);
-                return SFEM_FAILURE;
-            }
+        int gradient(const real_t *const x, real_t *const out) override {
+            // TODO
+            assert(false);
+            return SFEM_FAILURE;
 
-            int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
-                std::cerr << "Unimplemented function ---> hessian_diag in GPULaplacian\n";
-                assert(false);
-                return SFEM_FAILURE;
-            }
+            // auto &ssm = space->semi_structured_mesh();
+            // return cu_proteus_affine_hex8_laplacian_apply(ssm.level(),
+            //                                               fff->n_elements(),
+            //                                               fff->n_elements(),  // stride
+            //                                               ssm.interior_start(),
+            //                                               fff->elements(),
+            //                                               fff->fff(),
+            //                                               real_type,
+            //                                               x,
+            //                                               out,
+            //                                               stream);
+        }
 
-            int gradient(const real_t *const x, real_t *const out) override {
-                // TODO
-                assert(false);
-                return SFEM_FAILURE;
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+            // TODO
+            assert(false);
+            return SFEM_FAILURE;
 
-                // auto &ssm = space->semi_structured_mesh();
-                // return cu_proteus_affine_hex8_laplacian_apply(ssm.level(),
-                //                                               fff->n_elements(),
-                //                                               fff->n_elements(),  // stride
-                //                                               ssm.interior_start(),
-                //                                               fff->elements(),
-                //                                               fff->fff(),
-                //                                               real_type,
-                //                                               x,
-                //                                               out,
-                //                                               stream);
-            }
+            // auto &ssm = space->semi_structured_mesh();
+            // return cu_proteus_affine_hex8_laplacian_apply(ssm.level(),
+            //                                               fff->n_elements(),
+            //                                               fff->n_elements(),  // stride
+            //                                               ssm.interior_start(),
+            //                                               fff->elements(),
+            //                                               fff->fff(),
+            //                                               real_type,
+            //                                               h,
+            //                                               out,
+            //                                               stream);
+        }
 
-            int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
-                // TODO
-                assert(false);
-                return SFEM_FAILURE;
+        int value(const real_t *x, real_t *const out) override {
+            std::cerr << "Unimplemented function ---> value in GPULaplacian\n";
+            assert(0);
+            return SFEM_FAILURE;
+        }
 
-                // auto &ssm = space->semi_structured_mesh();
-                // return cu_proteus_affine_hex8_laplacian_apply(ssm.level(),
-                //                                               fff->n_elements(),
-                //                                               fff->n_elements(),  // stride
-                //                                               ssm.interior_start(),
-                //                                               fff->elements(),
-                //                                               fff->fff(),
-                //                                               real_type,
-                //                                               h,
-                //                                               out,
-                //                                               stream);
-            }
-
-            int value(const real_t *x, real_t *const out) override {
-                std::cerr << "Unimplemented function ---> value in GPULaplacian\n";
-                assert(0);
-                return SFEM_FAILURE;
-            }
-
-            int report(const real_t *const) override { return SFEM_SUCCESS; }
-            ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
-
+        int report(const real_t *const) override { return SFEM_SUCCESS; }
+        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
     };
 
     class GPULinearElasticity final : public Op {
@@ -616,19 +624,15 @@ namespace sfem {
         GPULinearElasticity(const std::shared_ptr<FunctionSpace> &space)
             : space(space), element_type(space->element_type()) {}
 
-        int hessian_crs(const real_t *const x,
-                        const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override {
+        int hessian_crs(const real_t *const x, const count_t *const rowptr,
+                        const idx_t *const colidx, real_t *const values) override {
             std::cerr << "Unimplemented function ---> hessian_crs in GPULinearElasticity\n";
             assert(0);
             return SFEM_FAILURE;
         }
 
-        int hessian_bsr(const real_t *const x,
-                        const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override {
+        int hessian_bsr(const real_t *const x, const count_t *const rowptr,
+                        const idx_t *const colidx, real_t *const values) override {
             return cu_linear_elasticity_bsr(element_type,
                                             adjugate->n_elements(),
                                             adjugate->n_elements(),
@@ -752,10 +756,8 @@ namespace sfem {
         SemiStructuredGPULinearElasticity(const std::shared_ptr<FunctionSpace> &space)
             : space(space), element_type(space->element_type()) {}
 
-        int hessian_crs(const real_t *const x,
-                        const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override {
+        int hessian_crs(const real_t *const x, const count_t *const rowptr,
+                        const idx_t *const colidx, real_t *const values) override {
             std::cerr << "Unimplemented function ---> hessian_crs in GPULinearElasticity\n";
             assert(0);
             return SFEM_FAILURE;
