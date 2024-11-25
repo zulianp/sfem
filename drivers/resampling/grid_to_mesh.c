@@ -239,35 +239,6 @@ int main(int argc, char* argv[]) {
                     g);
         } else {
             if (mpi_size == 1) {
-                // { /// DEBUG ///
-                //     printf("\nFunction: %s\n", __FUNCTION__);
-                //     printf("\nMPI size = 1 DEBUG: %s:%d\n", __FILE__, __LINE__);
-                //     printf("field (ptr): %p, %s:%d\n", (void *)field, __FILE__, __LINE__);
-                //     printf("nlocal[0] = %ld, nlocal[1] = %ld, nlocal[2] = %ld, %s:%d\n",
-                //            nlocal[0],
-                //            nlocal[1],
-                //            nlocal[2],
-                //            __FILE__,
-                //            __LINE__);
-
-                //     double norm_data = 0.0;
-                //     for (ptrdiff_t i = 0; i < nlocal[0] * nlocal[1] * nlocal[2]; i++) {
-                //         norm_data += field[i] * field[i];
-                //     }
-                //     norm_data = sqrt(norm_data);
-                //     printf("norm_data input = %g   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< %s:%d\n\n",
-                //            norm_data,
-                //            __FILE__,
-                //            __LINE__);
-
-                //     int indices[3] = {22, 55, 111};
-                //     printf("field[%d] = %g, %s:%d\n", indices[0], field[indices[0]], __FILE__,
-                //     __LINE__); printf("field[%d] = %g, %s:%d\n", indices[1], field[indices[1]],
-                //     __FILE__, __LINE__); printf("field[%d] = %g, %s:%d\n", indices[2],
-                //     field[indices[2]], __FILE__, __LINE__);
-
-                // } /// end DEBUG ///
-
                 resample_field(
                         // Mesh
                         mesh.element_type,
@@ -285,7 +256,26 @@ int main(int argc, char* argv[]) {
                         g,
                         &info);
 
+                // end if mpi_size == 1
+
             } else {
+                // mpi_size > 1
+
+                if (info.element_type == TET10 && SFEM_TET10_CUDA == ON) {
+                    const int ret = hex8_to_tet10_resample_field_local_CUDA(mesh.nelements,
+                                                                            mesh.nnodes,
+                                                                            mesh.elements,
+                                                                            mesh.points,
+                                                                            nlocal,
+                                                                            stride,
+                                                                            origin,
+                                                                            delta,
+                                                                            field,
+                                                                            g);
+
+                    RETURN_FROM_FUNCTION(ret);
+                }
+
                 resample_field_local(
                         // Mesh
                         mesh.element_type,
@@ -359,7 +349,7 @@ int main(int argc, char* argv[]) {
                 }
 
                 free(mass_vector);
-            }
+            }  // end if mpi_size > 1
         }
 
         MPI_Barrier(MPI_COMM_WORLD);

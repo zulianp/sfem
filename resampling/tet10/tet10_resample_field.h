@@ -84,6 +84,22 @@ real_t hex_aa_8_eval_weno4_3D_Unit(  //
         const ptrdiff_t* stride,     //
         const real_t* const SFEM_RESTRICT data);
 
+int hex8_to_tet10_resample_field_local_CUDA(
+        // Mesh
+        const ptrdiff_t nelements,  // number of elements
+        const ptrdiff_t nnodes,     // number of nodes
+        const idx_t** const elems,  // connectivity
+        const geom_t** const xyz,   // coordinates
+        // SDF
+        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
+        const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
+
+        const geom_t* const SFEM_RESTRICT origin,  // origin of the domain
+        const geom_t* const SFEM_RESTRICT delta,   // delta of the domain
+        const real_t* const SFEM_RESTRICT data,    // SDF
+        // Output //
+        real_t* const SFEM_RESTRICT g_host);
+
 #ifdef __cplusplus
 }
 #endif
