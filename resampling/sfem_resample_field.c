@@ -953,10 +953,10 @@ int resample_field(
         if (element_type == TET10) {
             real_t* mass_vector = calloc(nnodes, sizeof(real_t));
 
-            // set the mass vector to zeros
-            for (ptrdiff_t i = 0; i < nnodes; i++) {
-                mass_vector[i] = 0;
-            }
+            // // set the mass vector to zeros
+            // for (ptrdiff_t i = 0; i < nnodes; i++) {
+            //     mass_vector[i] = 0;
+            // }
 
             tet10_assemble_dual_mass_vector(nelements, nnodes, elems, xyz, mass_vector);
 
