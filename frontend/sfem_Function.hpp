@@ -448,6 +448,7 @@ namespace sfem {
         int apply_constraints(real_t *const x);
         int constraints_gradient(const real_t *const x, real_t *const g);
         int apply_zero_constraints(real_t *const x);
+        int set_value_to_constrained_dofs(const real_t val, real_t *const x);
         int copy_constrained_dofs(const real_t *const src, real_t *const dest);
         int report_solution(const real_t *const x);
         int initial_guess(real_t *const x);

@@ -25,9 +25,7 @@ namespace sfem {
 
         int iterations_{0};
 
-        int iterations() const override {
-            return iterations_;
-        }
+        int iterations() const override { return iterations_; }
 
         void default_init() {
             OpenMP_BLAS<T>::build_blas(blas);
@@ -65,6 +63,31 @@ namespace sfem {
         }
         void set_max_it(const int it) override { max_it = it; }
         void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
+
+        int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op,
+                                  const std::shared_ptr<Buffer<T>>& diag) override {
+            this->op = op + sfem::diag_op(diag, execution_space());
+            auto shiftable = std::dynamic_pointer_cast<ShiftableOperator<T>>(preconditioner); 
+            if(shiftable) {
+                return shiftable->shift(diag);
+            } else {
+                    fprintf(stderr,
+                            "Tried to call shift on object that is not subclass of ShiftableOperator!\n");
+                    assert(false);
+                    return SFEM_FAILURE;
+            }
+
+            // auto prec = std::dynamic_pointer_cast<MatrixFreeLinearSolver<T>>(preconditioner);
+            // if (prec) {
+            //     return prec->set_op_and_diag_shift(op, diag, can_modify_diag_buffer);
+            // } else {
+            //     fprintf(stderr,
+            //             "Tried to call set_op_and_diag_shift on non MatrixFreeLinearSolver "
+            //             "object\n");
+            //     assert(false);
+            //     return SFEM_FAILURE;
+            // }
+        }
     };
 
     template <typename T>

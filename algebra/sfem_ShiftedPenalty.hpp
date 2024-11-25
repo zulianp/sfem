@@ -141,7 +141,6 @@ namespace sfem {
                     const T r_pen_norm = blas.norm2(n_dofs, r_pen->data());
 
                     if (r_pen_norm < std::max(atol, omega) && inner_iter != 0) {
-                        converged = true;
                         break;
                     }
 
@@ -170,7 +169,7 @@ namespace sfem {
                             this->constraint_scaling_op_->apply(J_pen->data(), J_pen->data());
                         }
 
-                        auto J = apply_op + sfem::diag_op(n_dofs, J_pen, execution_space());
+                        auto J = apply_op + sfem::diag_op(J_pen, execution_space());
                         linear_solver_->set_op(J);
 
                         blas.zeros(n_dofs, c->data());

@@ -2,6 +2,8 @@
 #define SFEM_SS_MULTIGRID_HPP
 
 #include "sfem_API.hpp"
+#include "sfem_Stationary.hpp"
+#include "sfem_ShiftableJacobi.hpp"
 
 namespace sfem {
 
@@ -27,9 +29,19 @@ namespace sfem {
         // smoother->set_max_it(5);
         // smoother->set_initial_guess_zero(false);
 
-        auto smoother = sfem::create_cg<real_t>(linear_op, es);
+        // auto smoother = sfem::create_cg<real_t>(linear_op, es);
+        // smoother->set_max_it(10);
+        // smoother->verbose = false;
+
+        auto d = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+        f->hessian_diag(nullptr, d->data());
+        f->set_value_to_constrained_dofs(1, d->data());
+
+        auto sj = sfem::h_shiftable_jacobi(d);
+        sj->relaxation_parameter = 0.4;
+        auto smoother = sfem::h_stationary<real_t>(linear_op, sj);
         smoother->set_max_it(10);
-        smoother->verbose = false;
+        // smoother->verbose = true;
 
         auto solver_coarse = sfem::create_cg<real_t>(linear_op_coarse, es);
         solver_coarse->verbose = false;

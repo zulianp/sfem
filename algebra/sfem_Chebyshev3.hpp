@@ -46,12 +46,11 @@ namespace sfem {
 
         int iterations() const override { return iterations_; }
 
-        int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op,
-                                  const std::shared_ptr<Buffer<T>>& diag,
-                                  const bool diag_pass_ownership) override {
-            // TODO
-            return SFEM_SUCCESS;
-        }
+        // int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op,
+        //                           const std::shared_ptr<Buffer<T>>& diag) override {
+        //     // TODO
+        //     return SFEM_SUCCESS;
+        // }
 
         void set_atol(const T val) { atol = val; }
         void set_rtol(const T val) { rtol = val; }

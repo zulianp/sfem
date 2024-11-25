@@ -3,9 +3,9 @@
 
 #include "sfem_tpl_blas.hpp"
 
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
-#include <cmath>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -38,10 +38,7 @@ namespace sfem {
             return ret;
         }
 
-        static void axpby(const ptrdiff_t n,
-                          const T alpha,
-                          const T* const x,
-                          const T beta,
+        static void axpby(const ptrdiff_t n, const T alpha, const T* const x, const T beta,
                           T* const y) {
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n; i++) {
@@ -49,12 +46,8 @@ namespace sfem {
             }
         }
 
-        static void zaxpby(const ptrdiff_t n,
-                           const T alpha,
-                           const T* const x,
-                           const T beta,
-                           const T* const y,
-                           T* const z) {
+        static void zaxpby(const ptrdiff_t n, const T alpha, const T* const x, const T beta,
+                           const T* const y, T* const z) {
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n; i++) {
                 z[i] = alpha * x[i] + beta * y[i];
@@ -104,11 +97,15 @@ namespace sfem {
             }
         }
 
-        static void xypaz(const std::ptrdiff_t n,
-                           const T* const x,
-                           const T* const y,
-                           const T alpha,
-                           T* const z) {
+        static void reciprocal(const std::ptrdiff_t n, const T alpha, T* const x) {
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n; i++) {
+                if (x[i]) x[i] = alpha / x[i];
+            }
+        }
+
+        static void xypaz(const std::ptrdiff_t n, const T* const x, const T* const y, const T alpha,
+                          T* const z) {
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n; i++) {
                 z[i] = x[i] * y[i] + alpha * z[i];
@@ -133,6 +130,7 @@ namespace sfem {
             tpl.zeros = zeros;
             tpl.values = values;
             tpl.scal = scal;
+            tpl.reciprocal = reciprocal;
             tpl.xypaz = xypaz;
         }
     };

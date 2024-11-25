@@ -35,9 +35,7 @@ namespace sfem {
         bool verbose{true};
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
-        int iterations() const override {
-            return iterations_;
-        }
+        int iterations() const override { return iterations_; }
 
         ExecutionSpace execution_space() const override { return execution_space_; }
 
@@ -53,6 +51,14 @@ namespace sfem {
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
             this->apply_op = [=](const T* const x, T* const y) { op->apply(x, y); };
             n_dofs = op->rows();
+        }
+
+        int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op,
+                                  const std::shared_ptr<Buffer<T>>& diag) override {
+            auto J = op + sfem::diag_op(diag, execution_space());
+            this->apply_op = [=](const T* const x, T* const y) { J->apply(x, y); };
+            n_dofs = op->rows();
+            return SFEM_SUCCESS;
         }
 
         void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) override {
@@ -81,8 +87,6 @@ namespace sfem {
                           << ", atol = " << atol << ")\n";
             }
         }
-
-
 
         int apply(const ptrdiff_t n, const T* const b, T* const x) {
             if (preconditioner_op) {
