@@ -83,7 +83,6 @@ endif()
 if(SFEM_ENABLE_CUDA)
      list(APPEND SFEM_MODULES 
         algebra/cuda
-        amg/cuda
         operators/cuda
         frontend/cuda
         operators/tet4/cuda
