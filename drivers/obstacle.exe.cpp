@@ -237,7 +237,7 @@ int main(int argc, char *argv[]) {
         solver = sp;
     } else if (SFEM_ELEMENT_REFINE_LEVEL > 0 && !SFEM_USE_MPRGP) {
         auto spmg = sfem::create_ssmg<sfem::ShiftedPenaltyMultigrid<real_t>>(f, es);
-        spmg->set_max_it(15);
+        spmg->set_max_it(30);
         spmg->set_atol(1e-8);
         spmg->set_upper_bound(upper_bound);
         solver = spmg;

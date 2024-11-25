@@ -19,8 +19,11 @@ namespace sfem {
         auto fs = f->space();
         auto fs_coarse = fs->derefine();
         auto f_coarse = f->derefine(fs_coarse, true);
+        // auto linear_op = sfem::create_linear_operator("BSR", f, nullptr, es);
+        // auto linear_op_coarse = sfem::create_linear_operator("BCRS_SYM", f_coarse, nullptr, es);
+
         auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
-        auto linear_op_coarse = sfem::create_linear_operator("MF", f_coarse, nullptr, es);
+        auto linear_op_coarse = sfem::create_linear_operator(fs->block_size() == 1? "CRS_SYM" : "BCRS_SYM", f_coarse, nullptr, es);
 
         // auto smoother = sfem::create_cheb3<real_t>(linear_op, es);
         // smoother->eigen_solver_tol = 1e-2;
@@ -40,7 +43,7 @@ namespace sfem {
         auto sj = sfem::h_shiftable_jacobi(d);
         sj->relaxation_parameter = 0.4;
         auto smoother = sfem::h_stationary<real_t>(linear_op, sj);
-        smoother->set_max_it(10);
+        smoother->set_max_it(3);
         // smoother->verbose = true;
 
         auto solver_coarse = sfem::create_cg<real_t>(linear_op_coarse, es);
@@ -58,10 +61,11 @@ namespace sfem {
                 es);
 
         auto mg = std::make_shared<MG>();
+        mg->set_nlsmooth_steps(5);
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            CUDA_BLAS<real_t>::build_blas(mg->blas);
+            CUDA_BLAS<real_t>::build_blas(mg->blas());
             // TODO cuda_init()
         } else
 #endif
@@ -71,6 +75,9 @@ namespace sfem {
 
         mg->add_level(linear_op, smoother, nullptr, restriction);
         mg->add_level(linear_op_coarse, solver_coarse, prolongation, nullptr);
+
+        // TODO Add algebraic levels
+        // TODO all on CPU
         return mg;
     }
 

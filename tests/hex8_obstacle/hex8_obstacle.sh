@@ -22,11 +22,11 @@ export CUDA_LAUNCH_BLOCKING=0
 
 export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
 export SFEM_ELEMENT_REFINE_LEVEL=8
-export SFEM_MAX_IT=200
+export SFEM_MAX_IT=10000
 
 export SFEM_HEX8_ASSUME_AFFINE=1
 
-export CASE=1
+export CASE=2
 case $CASE in
 	1 | 2)
 		mesh=mesh

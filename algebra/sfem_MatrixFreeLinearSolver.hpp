@@ -26,7 +26,7 @@ namespace sfem {
     class ShiftableOperator : public Operator<T> {
     public:
         virtual ~ShiftableOperator() = default;
-        virtual int shift(const std::shared_ptr<Buffer<T>>& diag);
+        virtual int shift(const std::shared_ptr<Buffer<T>>& diag) = 0;
     };
 
     template <typename T>

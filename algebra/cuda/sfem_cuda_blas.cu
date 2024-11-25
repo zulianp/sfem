@@ -399,6 +399,23 @@ static void txypaz(const ptrdiff_t n, const T *const x, const T *const y, const 
     SFEM_DEBUG_SYNCHRONIZE();
 }
 
+
+template <typename T>
+__global__ void reciprocal_kernel(const ptrdiff_t n, const T alpha, T *const x) {
+    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
+        if(x[i]) x[i] = alpha / x[i];
+    }
+}
+
+template <typename T>
+static void reciprocal(const ptrdiff_t n, const T alpha, T *const x) {
+    int kernel_block_size = 128;
+    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
+
+    reciprocal_kernel<<<n_blocks, kernel_block_size>>>(n, alpha, x);
+    SFEM_DEBUG_SYNCHRONIZE();
+}
+
 extern real_t *d_allocate(const std::size_t n) {
     real_t *ptr = nullptr;
     cudaMalloc((void **)&ptr, n * sizeof(real_t));
@@ -527,6 +544,7 @@ namespace sfem {
         };
 
         tpl.xypaz = txypaz<T>;
+        tpl.reciprocal = reciprocal<T>;
 
         tpl.destroy = &d_destroy;
         tpl.values = &tvalues<T>;
