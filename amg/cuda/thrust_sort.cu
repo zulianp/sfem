@@ -5,38 +5,64 @@
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/sort.h>
 #include <thrust/tuple.h>
-#include "coo_weight_sort.h"
+#include "coo_sort.h"
 
-void sort_weights(PartitionerWorkspace* ws, count_t nweights) {
-    sort_sparse_matrix_cuda(ws->ptr_j, ws->ptr_i, ws->weights, nweights);
-}
-
-struct CompareTuples {
-    __host__ __device__ bool operator()(const thrust::tuple<idx_t, idx_t, real_t>& a,
-                                        const thrust::tuple<idx_t, idx_t, real_t>& b) const {
+struct CompareTuplesWeights {
+    __host__ __device__ bool operator()(const thrust::tuple<idx_t, idx_t, real_t> &a,
+                                        const thrust::tuple<idx_t, idx_t, real_t> &b) const {
         return thrust::get<2>(a) > thrust::get<2>(b);  // Descending order
     }
 };
 
-void sort_sparse_matrix_cuda(idx_t* col_indices, idx_t* row_indices, real_t* values, count_t N) {
-    printf("Hi from thrust sort\n");
-    // Create device_vectors from your host arrays
+struct CompareTuplesIndices {
+    __host__ __device__ bool operator()(const thrust::tuple<idx_t, idx_t, real_t> &a,
+                                        const thrust::tuple<idx_t, idx_t, real_t> &b) const {
+        idx_t a_row = thrust::get<0>(a);
+        idx_t b_row = thrust::get<0>(b);
+
+        if (a_row != b_row) {
+            return a_row < b_row;
+        } else {
+            idx_t a_col = thrust::get<1>(a);
+            idx_t b_col = thrust::get<1>(b);
+            return a_col < b_col;
+        }
+    }
+};
+
+void sort_weights(count_t *sort_indices, idx_t *row_indices, idx_t *col_indices, real_t *weights,
+                  const count_t N) {
     thrust::device_vector<idx_t> d_col_indices(col_indices, col_indices + N);
     thrust::device_vector<idx_t> d_row_indices(row_indices, row_indices + N);
-    thrust::device_vector<real_t> d_values(values, values + N);
+    thrust::device_vector<real_t> d_values(weights, weights + N);
 
-    // Create zip iterators over the device_vectors
     auto first = thrust::make_zip_iterator(
-            thrust::make_tuple(d_col_indices.begin(), d_row_indices.begin(), d_values.begin()));
+            thrust::make_tuple(d_row_indices.begin(), d_col_indices.begin(), d_values.begin()));
     auto last = thrust::make_zip_iterator(
-            thrust::make_tuple(d_col_indices.end(), d_row_indices.end(), d_values.end()));
+            thrust::make_tuple(d_row_indices.end(), d_col_indices.end(), d_values.end()));
 
-    // Perform the sort on the device
-    thrust::sort(first, last, CompareTuples());
+    thrust::stable_sort(first, last, CompareTuplesWeights());
 
-    // Copy the sorted data back to the host arrays
-    thrust::copy(d_col_indices.begin(), d_col_indices.end(), col_indices);
     thrust::copy(d_row_indices.begin(), d_row_indices.end(), row_indices);
-    thrust::copy(d_values.begin(), d_values.end(), values);
+    thrust::copy(d_col_indices.begin(), d_col_indices.end(), col_indices);
+    thrust::copy(d_values.begin(), d_values.end(), weights);
+}
+
+void sort_rows_cols(count_t *sort_indices, idx_t *row_indices, idx_t *col_indices, real_t *weights,
+                    const count_t N) {
+    thrust::device_vector<idx_t> d_col_indices(col_indices, col_indices + N);
+    thrust::device_vector<idx_t> d_row_indices(row_indices, row_indices + N);
+    thrust::device_vector<real_t> d_values(weights, weights + N);
+
+    auto first = thrust::make_zip_iterator(
+            thrust::make_tuple(d_row_indices.begin(), d_col_indices.begin(), d_values.begin()));
+    auto last = thrust::make_zip_iterator(
+            thrust::make_tuple(d_row_indices.end(), d_col_indices.end(), d_values.end()));
+
+    thrust::stable_sort(first, last, CompareTuplesIndices());
+
+    thrust::copy(d_row_indices.begin(), d_row_indices.end(), row_indices);
+    thrust::copy(d_col_indices.begin(), d_col_indices.end(), col_indices);
+    thrust::copy(d_values.begin(), d_values.end(), weights);
 }
 #endif
