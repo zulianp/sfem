@@ -23,6 +23,7 @@ export CUDA_LAUNCH_BLOCKING=0
 export SFEM_ELEMENT_REFINE_LEVEL=0
 
 mesh=mesh
+mesh_viz=mesh
 
 if [[ -d "$mesh" ]]
 then
@@ -31,6 +32,7 @@ else
 	if [[ $SFEM_ELEMENT_REFINE_LEVEL -gt 1 ]]
 	then
 		create_box_ss_mesh.sh 3 $SFEM_ELEMENT_REFINE_LEVEL
+		mesh_viz=$mesh/viz
 	else
 		N=10
 		box_mesh.py $mesh -c hex8 -x $N -y $N -z $N --height=1 --width=1 --depth=1
@@ -94,7 +96,7 @@ then
 		mv output/soa/$name".2.raw" output/soa/"$var".2."$ts".raw
 	done
 
-	raw_to_db.py $mesh/viz output/out.vtk  --point_data="output/soa/*.raw" --point_data_type="$SFEM_REAL_T"
+	raw_to_db.py $mesh_viz output/out.vtk  --point_data="output/soa/*.raw" --point_data_type="$SFEM_REAL_T"
 else
-	raw_to_db.py $mesh/viz output/out.vtk --point_data=output/x.raw,output/rhs.raw --point_data_type="$SFEM_REAL_T,$SFEM_REAL_T"
+	raw_to_db.py $mesh_viz output/out.vtk --point_data=output/x.raw--point_data_type="$SFEM_REAL_T"
 fi
