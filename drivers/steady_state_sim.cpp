@@ -1,11 +1,11 @@
 #include <iostream>
-#include "mg_builder.hpp"
+
 #include "sfem_CooSym.hpp"
 #include "sfem_Function.hpp"
 
 #include "sfem_API.hpp"
 #include "sfem_mask.h"
-#include "smoother.h"
+
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
@@ -13,6 +13,11 @@
 #include "sfem_cuda_solver.hpp"
 #endif
 #include "sfem_Stationary.hpp"
+
+#ifdef SFEM_ENABLE_AMG
+#include "mg_builder.hpp"
+#include "smoother.h"
+#endif
 
 #include <vector>
 
@@ -97,6 +102,7 @@ int main(int argc, char *argv[]) {
 
     std::shared_ptr<sfem::Operator<real_t>> solver;
 
+#ifdef SFEM_ENABLE_AMG
     if (SFEM_USE_AMG) {
         auto crs_graph = f->space()->mesh_ptr()->node_to_node_graph_upper_triangular();
 
@@ -163,7 +169,9 @@ int main(int argc, char *argv[]) {
         stat_iter->verbose = true;
         solver = stat_iter;
         */
-    } else {
+    } else 
+#endif // SFEM_ENABLE_AMG
+    {
         auto linear_op = sfem::make_linear_op(f);
         auto cg = sfem::create_cg<real_t>(linear_op, es);
         cg->verbose = true;
