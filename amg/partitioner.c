@@ -1,26 +1,16 @@
 #include "partitioner.h"
-#include <stdio.h>
-#include <stdlib.h>
+#include "coo_weight_sort.h"
 #include "sfem_mask.h"
 #include "sparse.h"
 
 // Helper functions... not public API so I don't think they go in header file?
 // idk I don't code in C.
-void sort_weights(PartitionerWorkspace *ws, count_t nweights);
-int pairwise_aggregation(const real_t coarsening_factor,
-                         const real_t inv_total,
-                         const ptrdiff_t fine_nrows,
-                         SymmCOOMatrix *a_bar,
+int pairwise_aggregation(const real_t coarsening_factor, const real_t inv_total,
+                         const ptrdiff_t fine_nrows, SymmCOOMatrix *a_bar,
                          PartitionerWorkspace *ws);
 
-// Global variables needed for qsort...
-real_t *global_weights;
-
-int partition(real_t *near_null,
-              const mask_t *bdy_dofs,
-              const real_t coarsening_factor,
-              SymmCOOMatrix *symm_coo,
-              PartitionerWorkspace *ws) {
+int partition(real_t *near_null, const mask_t *bdy_dofs, const real_t coarsening_factor,
+              SymmCOOMatrix *symm_coo, PartitionerWorkspace *ws) {
     ptrdiff_t nrows = symm_coo->dim;
     count_t nnz = symm_coo->offdiag_nnz;
     real_t current_cf = 1.0;
@@ -103,10 +93,8 @@ int partition(real_t *near_null,
     return 0;
 }
 
-int pairwise_aggregation(const real_t coarsening_factor,
-                         const real_t inv_total,
-                         const ptrdiff_t fine_nrows,
-                         SymmCOOMatrix *a_bar,
+int pairwise_aggregation(const real_t coarsening_factor, const real_t inv_total,
+                         const ptrdiff_t fine_nrows, SymmCOOMatrix *a_bar,
                          PartitionerWorkspace *ws) {
     count_t nnz = a_bar->offdiag_nnz;
     ptrdiff_t nrows = a_bar->dim;
@@ -134,6 +122,7 @@ int pairwise_aggregation(const real_t coarsening_factor,
     }
 
     // Sorting modularity weights makes greedy matching efficient
+
     sort_weights(ws, n_mod_weights);
 
     // Repurpose sorting array to track which DOFs have been assigned coarse
@@ -216,28 +205,4 @@ int pairwise_aggregation(const real_t coarsening_factor,
     }
 
     return 0;
-}
-
-int compare_indices(const void *a, const void *b) {
-    idx_t idx_a = *(const idx_t *)a;
-    idx_t idx_b = *(const idx_t *)b;
-    if (global_weights[idx_a] < global_weights[idx_b]) return 1;
-    if (global_weights[idx_a] > global_weights[idx_b]) return -1;
-    return 0;
-}
-
-void sort_weights(PartitionerWorkspace *ws, count_t nweights) {
-    idx_t *indices = ws->sort_indices;
-    idx_t *ptr_i = ws->ptr_i;
-    idx_t *ptr_j = ws->ptr_j;
-    real_t *weights = ws->weights;
-    global_weights = weights;
-
-    for (idx_t i = 0; i < nweights; i++) {
-        indices[i] = i;
-    }
-
-    // TODO parallel sort is must here
-    qsort(indices, nweights, sizeof(idx_t), compare_indices);
-    cycle_leader_swap(ptr_i, ptr_j, weights, indices, nweights);
 }
