@@ -23,7 +23,7 @@ namespace sfem {
         // auto linear_op_coarse = sfem::create_linear_operator("BCRS_SYM", f_coarse, nullptr, es);
 
         auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
-        auto linear_op_coarse = sfem::create_linear_operator(fs->block_size() == 1? "CRS_SYM" : "BCRS_SYM", f_coarse, nullptr, es);
+        auto linear_op_coarse = sfem::create_linear_operator(fs->block_size() == 1? "COO_SYM" : "BCRS_SYM", f_coarse, nullptr, es);
 
         // auto smoother = sfem::create_cheb3<real_t>(linear_op, es);
         // smoother->eigen_solver_tol = 1e-2;
@@ -40,11 +40,10 @@ namespace sfem {
         f->hessian_diag(nullptr, d->data());
         f->set_value_to_constrained_dofs(1, d->data());
 
-        auto sj = sfem::h_shiftable_jacobi(d);
+        auto sj = sfem::create_shiftable_jacobi(d, es);
         sj->relaxation_parameter = 0.4;
-        auto smoother = sfem::h_stationary<real_t>(linear_op, sj);
+        auto smoother = sfem::create_stationary<real_t>(linear_op, sj, es);
         smoother->set_max_it(3);
-        // smoother->verbose = true;
 
         auto solver_coarse = sfem::create_cg<real_t>(linear_op_coarse, es);
         solver_coarse->verbose = false;

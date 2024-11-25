@@ -63,6 +63,7 @@ namespace sfem {
             for (R k = 0; k < offdiag_nnz; k++) {
                 R i = offdiag_row_indices[k];
                 R j = offdiag_col_indices[k];
+                // TOBEREMOVED
                 if ((!bdy_dofs) ||
                     !(mask_get(i, bdy_dofs->data()) || mask_get(j, bdy_dofs->data()))) {
                     T val = offdiag_values[k];
