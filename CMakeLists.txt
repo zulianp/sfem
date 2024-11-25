@@ -177,12 +177,15 @@ set(SFEM_TARGETS sfem)
 
 # option(SFEM_CUDA_ARCH "Use CUDA architecture" OFF)
 
-message(STATUS "SFEM_CUDA_ARCH: ${SFEM_CUDA_ARCH}")
 
 if(SFEM_ENABLE_CUDA)
 # set_target_properties(sfem PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 # https://gt3rs.medium.com/compile-with-nvcc-3566fbdfdbf
-      set_property(TARGET sfem PROPERTY SFEM_CUDA_ARCHITECTURES ${SFEM_CUDA_ARCH})
+      set(CMAKE_CUDA_ARCHITECTURES ${SFEM_CUDA_ARCH})
+      set_property(TARGET sfem PROPERTY CMAKE_CUDA_ARCHITECTURES ${SFEM_CUDA_ARCH})
+      # get_property(${TEST_CUDA_ARCH} TARGET sfem PROPERTY CMAKE_CUDA_ARCHITECTURES)
+
+      message(STATUS "SFEM_CUDA_ARCH: ${SFEM_CUDA_ARCH}")
 endif()
 
 ######################################################

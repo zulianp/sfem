@@ -1915,8 +1915,13 @@ namespace sfem {
         }
 
         int hessian_diag(const real_t *const, real_t *const out) override {
-            assert(false);
-            return SFEM_FAILURE;
+            auto &ssm = space->semi_structured_mesh();
+            return proteus_affine_hex8_laplacian_diag(ssm.level(),
+                                                           ssm.n_elements(),
+                                                           ssm.interior_start(),
+                                                           ssm.element_data(),
+                                                           ssm.point_data(),
+                                                           out);
         }
 
         int gradient(const real_t *const x, real_t *const out) override {

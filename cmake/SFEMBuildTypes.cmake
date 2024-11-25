@@ -21,10 +21,8 @@ else()
     set(SFEM_CPU_ARCH "${SFEM_CPU_ARCH}")
 endif()
 
-option(SFEM_CUDA_ARCH "Use CUDA architecture" OFF)
-
 if(NOT SFEM_CUDA_ARCH)
-    set(SFEM_CUDA_ARCH "60") ## default SFEM_CUDA_ARCH
+    set(SFEM_CUDA_ARCH 60 CACHE STRING "Choose the CUDA device capabilities." FORCE)
 endif()
 
 set(ARM64_VECTOR_BITS 128) ## Default value for ARM64 (at the moment)
