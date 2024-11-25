@@ -23,6 +23,13 @@ namespace sfem {
     };
 
     template <typename T>
+    class ShiftableOperator : public Operator<T> {
+    public:
+        virtual ~ShiftableOperator() = default;
+        virtual int shift(const std::shared_ptr<Buffer<T>>& diag);
+    };
+
+    template <typename T>
     class LambdaOperator final : public Operator<T> {
     public:
         std::ptrdiff_t rows_{0};
@@ -53,10 +60,10 @@ namespace sfem {
     }
 
     template <typename T>
-    inline std::shared_ptr<Operator<T>> diag_op(const std::ptrdiff_t n,
-                                                const std::shared_ptr<Buffer<T>>& diagonal_scaling,
+    inline std::shared_ptr<Operator<T>> diag_op(const std::shared_ptr<Buffer<T>>& diagonal_scaling,
                                                 const ExecutionSpace es) {
         assert(es == EXECUTION_SPACE_HOST);
+        const std::ptrdiff_t n = diagonal_scaling->size();
         return std::make_shared<LambdaOperator<T>>(
                 n,
                 n,
@@ -93,8 +100,7 @@ namespace sfem {
         virtual void set_initial_guess_zero(const bool /*val*/) {}
         virtual int iterations() const = 0;
         virtual int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op,
-                                          const std::shared_ptr<Buffer<T>>& diag,
-                                          const bool diag_pass_ownership) {
+                                          const std::shared_ptr<Buffer<T>>& diag) {
             fprintf(stderr,
                     "set_op_and_diag_shift: not implemented for subclass of "
                     "MatrixFreeLinearSolver!\n");

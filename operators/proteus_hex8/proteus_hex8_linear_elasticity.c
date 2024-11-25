@@ -32,8 +32,7 @@ static void print_matrix(int r, int c, const scalar_t *const m) {
 }
 
 static SFEM_INLINE void hex8_sub_adj_0(const scalar_t *const SFEM_RESTRICT adjugate,
-                                       const scalar_t determinant,
-                                       const scalar_t h,
+                                       const scalar_t determinant, const scalar_t h,
                                        scalar_t *const SFEM_RESTRICT sub_adjugate,
                                        scalar_t *const SFEM_RESTRICT sub_determinant) {
     const scalar_t x0 = POW2(h);
@@ -49,21 +48,12 @@ static SFEM_INLINE void hex8_sub_adj_0(const scalar_t *const SFEM_RESTRICT adjug
     sub_determinant[0] = determinant * (POW3(h));
 }
 
-int proteus_hex8_linear_elasticity_apply(const int level,
-                                         const ptrdiff_t nelements,
-                                         const ptrdiff_t nnodes,
-                                         idx_t **const SFEM_RESTRICT elements,
-                                         geom_t **const SFEM_RESTRICT points,
-                                         const real_t mu,
-                                         const real_t lambda,
-                                         const ptrdiff_t u_stride,
-                                         const real_t *const ux,
-                                         const real_t *const uy,
-                                         const real_t *const uz,
-                                         const ptrdiff_t out_stride,
-                                         real_t *const outx,
-                                         real_t *const outy,
-                                         real_t *const outz) {
+int proteus_hex8_linear_elasticity_apply(
+        const int level, const ptrdiff_t nelements, const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements, geom_t **const SFEM_RESTRICT points, const real_t mu,
+        const real_t lambda, const ptrdiff_t u_stride, const real_t *const ux,
+        const real_t *const uy, const real_t *const uz, const ptrdiff_t out_stride,
+        real_t *const outx, real_t *const outy, real_t *const outz) {
     const int nxe = proteus_hex8_nxe(level);
     const int txe = proteus_hex8_txe(level);
 
@@ -295,21 +285,12 @@ int proteus_hex8_linear_elasticity_apply(const int level,
 
 // ---------------
 
-int proteus_affine_hex8_linear_elasticity_apply(const int level,
-                                                const ptrdiff_t nelements,
-                                                const ptrdiff_t nnodes,
-                                                idx_t **const SFEM_RESTRICT elements,
-                                                geom_t **const SFEM_RESTRICT points,
-                                                const real_t mu,
-                                                const real_t lambda,
-                                                const ptrdiff_t u_stride,
-                                                const real_t *const ux,
-                                                const real_t *const uy,
-                                                const real_t *const uz,
-                                                const ptrdiff_t out_stride,
-                                                real_t *const outx,
-                                                real_t *const outy,
-                                                real_t *const outz) {
+int proteus_affine_hex8_linear_elasticity_apply(
+        const int level, const ptrdiff_t nelements, const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements, geom_t **const SFEM_RESTRICT points, const real_t mu,
+        const real_t lambda, const ptrdiff_t u_stride, const real_t *const ux,
+        const real_t *const uy, const real_t *const uz, const ptrdiff_t out_stride,
+        real_t *const outx, real_t *const outy, real_t *const outz) {
 #define PROTEUS_HEX8_USE_MV  // assemblying the elemental matrix is much faster
 #ifndef PROTEUS_HEX8_USE_MV
     int SFEM_HEX8_QUADRATURE_ORDER = 1;
@@ -547,12 +528,9 @@ int proteus_affine_hex8_linear_elasticity_apply(const int level,
     return SFEM_SUCCESS;
 }
 
-int proteus_affine_hex8_elasticity_bsr(const int level,
-                                       const ptrdiff_t nelements,
-                                       const ptrdiff_t nnodes,
-                                       idx_t **const SFEM_RESTRICT elements,
-                                       geom_t **const SFEM_RESTRICT points,
-                                       const real_t mu,
+int proteus_affine_hex8_elasticity_bsr(const int level, const ptrdiff_t nelements,
+                                       const ptrdiff_t nnodes, idx_t **const SFEM_RESTRICT elements,
+                                       geom_t **const SFEM_RESTRICT points, const real_t mu,
                                        const real_t lambda,
                                        const count_t *const SFEM_RESTRICT rowptr,
                                        const idx_t *const SFEM_RESTRICT colidx,
@@ -644,20 +622,141 @@ int proteus_affine_hex8_elasticity_bsr(const int level,
     return SFEM_SUCCESS;
 }
 
-int proteus_affine_hex8_elasticity_crs_sym(const int level,
-                                               const ptrdiff_t nelements,
-                                               const ptrdiff_t nnodes,
-                                               idx_t **const SFEM_RESTRICT elements,
-                                               geom_t **const SFEM_RESTRICT points,
-                                               const real_t mu,
-                                               const real_t lambda,
-                                               const count_t *const SFEM_RESTRICT rowptr,
-                                               const idx_t *const SFEM_RESTRICT colidx,
-                                               // Output in SoA format (6)
-                                               real_t **const SFEM_RESTRICT block_diag,
-                                               real_t **const SFEM_RESTRICT block_offdiag) {
-
+int proteus_affine_hex8_elasticity_crs_sym(
+        const int level, const ptrdiff_t nelements, const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements, geom_t **const SFEM_RESTRICT points, const real_t mu,
+        const real_t lambda, const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        // Output in SoA format (6)
+        real_t **const SFEM_RESTRICT block_diag, real_t **const SFEM_RESTRICT block_offdiag) {
     // TODO Implement
     assert(0);
     return SFEM_FAILURE;
+}
+
+int proteus_affine_hex8_linear_elasticity_diag(const int level, const ptrdiff_t nelements,
+                                               const ptrdiff_t nnodes,
+                                               idx_t **const SFEM_RESTRICT elements,
+                                               geom_t **const SFEM_RESTRICT points, const real_t mu,
+                                               const real_t lambda, const ptrdiff_t out_stride,
+                                               real_t *const outx, real_t *const outy,
+                                               real_t *const outz) {
+    const int nxe = proteus_hex8_nxe(level);
+    const int txe = proteus_hex8_txe(level);
+
+    const int proteus_to_std_hex8_corners[8] = {// Bottom
+                                                proteus_hex8_lidx(level, 0, 0, 0),
+                                                proteus_hex8_lidx(level, level, 0, 0),
+                                                proteus_hex8_lidx(level, level, level, 0),
+                                                proteus_hex8_lidx(level, 0, level, 0),
+
+                                                // Top
+                                                proteus_hex8_lidx(level, 0, 0, level),
+                                                proteus_hex8_lidx(level, level, 0, level),
+                                                proteus_hex8_lidx(level, level, level, level),
+                                                proteus_hex8_lidx(level, 0, level, level)};
+    int Lm1 = level - 1;
+    int Lm13 = Lm1 * Lm1 * Lm1;
+
+#pragma omp parallel
+    {
+        // Allocation per thread
+        accumulator_t *v[3];
+
+        for (int d = 0; d < 3; d++) {
+            v[d] = malloc(nxe * sizeof(accumulator_t));
+        }
+
+        idx_t *ev = malloc(nxe * sizeof(idx_t));
+
+        scalar_t x[8];
+        scalar_t y[8];
+        scalar_t z[8];
+
+        scalar_t m_adjugate[9], adjugate[9];
+        scalar_t element_diag[(3 * 8)];
+
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            {
+                // Gather elemental data
+                for (int d = 0; d < nxe; d++) {
+                    ev[d] = elements[d][e];
+                }
+
+                for (int d = 0; d < 8; d++) {
+                    x[d] = points[0][ev[proteus_to_std_hex8_corners[d]]];
+                    y[d] = points[1][ev[proteus_to_std_hex8_corners[d]]];
+                    z[d] = points[2][ev[proteus_to_std_hex8_corners[d]]];
+                }
+
+                for (int d = 0; d < 3; d++) {
+                    memset(v[d], 0, nxe * sizeof(accumulator_t));
+                }
+            }
+
+            const scalar_t h = 1. / level;
+
+            // 2) Evaluate Adjugate
+            scalar_t adjugate[9];
+            scalar_t jacobian_determinant;
+            hex8_adjugate_and_det(x, y, z, 0.5, 0.5, 0.5, adjugate, &jacobian_determinant);
+
+            // 3) Transform to sub-FFF
+            scalar_t sub_adjugate[9];
+            scalar_t sub_determinant;
+            hex8_sub_adj_0(adjugate, jacobian_determinant, h, sub_adjugate, &sub_determinant);
+
+            hex8_linear_elasticity_diag(mu, lambda, sub_adjugate, sub_determinant, element_diag);
+
+            // Iterate over sub-elements
+            for (int zi = 0; zi < level; zi++) {
+                for (int yi = 0; yi < level; yi++) {
+                    for (int xi = 0; xi < level; xi++) {
+                        // Convert to standard HEX8 local ordering (see 3-4 and 6-7)
+                        int lev[8] = {// Bottom
+                                      proteus_hex8_lidx(level, xi, yi, zi),
+                                      proteus_hex8_lidx(level, xi + 1, yi, zi),
+                                      proteus_hex8_lidx(level, xi + 1, yi + 1, zi),
+                                      proteus_hex8_lidx(level, xi, yi + 1, zi),
+                                      // Top
+                                      proteus_hex8_lidx(level, xi, yi, zi + 1),
+                                      proteus_hex8_lidx(level, xi + 1, yi, zi + 1),
+                                      proteus_hex8_lidx(level, xi + 1, yi + 1, zi + 1),
+                                      proteus_hex8_lidx(level, xi, yi + 1, zi + 1)};
+
+                        // Accumulate to macro-element buffer
+                        for (int d = 0; d < 8; d++) {
+                            v[0][lev[d]] += element_diag[0 * 8 + d];
+                            v[1][lev[d]] += element_diag[1 * 8 + d];
+                            v[2][lev[d]] += element_diag[2 * 8 + d];
+                        }
+                    }
+                }
+            }
+
+            {
+                // Scatter elemental data
+                for (int d = 0; d < nxe; d++) {
+                    const ptrdiff_t idx = ev[d] * out_stride;
+#pragma omp atomic update
+                    outx[idx] += v[0][d];
+
+#pragma omp atomic update
+                    outy[idx] += v[1][d];
+
+#pragma omp atomic update
+                    outz[idx] += v[2][d];
+                }
+            }
+        }
+
+        // Clean-up
+        free(ev);
+        for (int d = 0; d < 3; d++) {
+            free(v[d]);
+        }
+    }
+
+    return SFEM_SUCCESS;
 }

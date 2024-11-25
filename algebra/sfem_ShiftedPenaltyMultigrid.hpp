@@ -108,7 +108,6 @@ namespace sfem {
                     const T r_pen_norm = blas.norm2(n_dofs, mem->work->data());
 
                     if (r_pen_norm < std::max(atol_, omega) && inner_iter != 0) {
-                        converged = true;
                         break;
                     }
                 }
@@ -248,7 +247,7 @@ namespace sfem {
         T penalty_param_{10};  // mu
         T max_penalty_param_{1000};
         int nlsmooth_steps{3};
-        int max_inner_it{10};
+        int max_inner_it{3};
 
         ptrdiff_t count_smoothing_steps{0};
 
@@ -342,8 +341,7 @@ namespace sfem {
             for (int ns = 0; ns < nlsmooth_steps; ns++) {
                 eval_residual_and_jacobian();
 
-                auto J = op + sfem::diag_op(n_dofs, mem->diag, execution_space());
-                smoother->set_op(J);
+                smoother->set_op_and_diag_shift(op, mem->diag);
 
                 blas.zeros(n_dofs, correction->data());
                 smoother->apply(mem->work->data(), correction->data());
@@ -402,8 +400,7 @@ namespace sfem {
 
             ptrdiff_t n_dofs = op->rows();
             if (coarsest_level() == level) {
-                auto J = op + sfem::diag_op(n_dofs, mem->diag, execution_space());
-                smoother->set_op(J);
+                smoother->set_op_and_diag_shift(op, mem->diag);
 
                 blas.zeros(mem->solution->size(), mem->solution->data());
                 if (!smoother->apply(mem->rhs->data(), mem->solution->data())) {
@@ -418,12 +415,12 @@ namespace sfem {
             auto mem_coarse = memory_[coarser_level(level)];
 
             for (int k = 0; k < this->cycle_type_; k++) {
-                auto J = op + sfem::diag_op(n_dofs, mem->diag, execution_space());
-                smoother->set_op(J);
+                smoother->set_op_and_diag_shift(op, mem->diag);
                 smoother->apply(mem->rhs->data(), mem->solution->data());
 
                 {
                     // Compute residual
+                    auto J = op + sfem::diag_op(mem->diag, execution_space());
                     blas.zeros(mem->size(), mem->work->data());
                     J->apply(mem->solution->data(), mem->work->data());
                     blas.axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
