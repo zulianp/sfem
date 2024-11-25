@@ -11,10 +11,8 @@ template <typename real_t>
 __global__ void cu_affine_hex8_laplacian_apply_kernel(
         const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
-        const idx_t *const SFEM_RESTRICT elements,
-        const cu_jacobian_t *const SFEM_RESTRICT g_fff,
-        const real_t *const SFEM_RESTRICT u,
-        real_t *const SFEM_RESTRICT values) {
+        const idx_t *const SFEM_RESTRICT elements, const cu_jacobian_t *const SFEM_RESTRICT g_fff,
+        const real_t *const SFEM_RESTRICT u, real_t *const SFEM_RESTRICT values) {
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
          e += blockDim.x * gridDim.x) {
         idx_t ev[8];
@@ -47,11 +45,8 @@ template <typename T>
 static int cu_affine_hex8_laplacian_apply_tpl(
         const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
-        const idx_t *const SFEM_RESTRICT elements,
-        const cu_jacobian_t *const SFEM_RESTRICT fff,
-        const T *const x,
-        T *const y,
-        void *stream) {
+        const idx_t *const SFEM_RESTRICT elements, const cu_jacobian_t *const SFEM_RESTRICT fff,
+        const T *const x, T *const y, void *stream) {
     SFEM_DEBUG_SYNCHRONIZE();
 
     // Hand tuned
@@ -84,10 +79,8 @@ extern int cu_affine_hex8_laplacian_apply(const ptrdiff_t nelements,
                                           const ptrdiff_t stride,  // Stride for elements and fff
                                           const idx_t *const SFEM_RESTRICT elements,
                                           const void *const SFEM_RESTRICT fff,
-                                          const enum RealType real_type_xy,
-                                          const void *const x,
-                                          void *const y,
-                                          void *stream) {
+                                          const enum RealType real_type_xy, const void *const x,
+                                          void *const y, void *stream) {
     int SFEM_ENABLE_TAYLOR_EXPANSION = 0;
     SFEM_READ_ENV(SFEM_ENABLE_TAYLOR_EXPANSION, atoi);
 
@@ -141,10 +134,8 @@ template <typename real_t>
 __global__ void cu_affine_hex8_laplacian_apply_taylor_kernel(
         const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
-        const idx_t *const SFEM_RESTRICT elements,
-        const cu_jacobian_t *const SFEM_RESTRICT g_fff,
-        const real_t *const SFEM_RESTRICT u,
-        real_t *const SFEM_RESTRICT values) {
+        const idx_t *const SFEM_RESTRICT elements, const cu_jacobian_t *const SFEM_RESTRICT g_fff,
+        const real_t *const SFEM_RESTRICT u, real_t *const SFEM_RESTRICT values) {
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
          e += blockDim.x * gridDim.x) {
         idx_t ev[8];
@@ -177,11 +168,8 @@ template <typename T>
 static int cu_affine_hex8_laplacian_apply_taylor_tpl(
         const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
-        const idx_t *const SFEM_RESTRICT elements,
-        const cu_jacobian_t *const SFEM_RESTRICT fff,
-        const T *const x,
-        T *const y,
-        void *stream) {
+        const idx_t *const SFEM_RESTRICT elements, const cu_jacobian_t *const SFEM_RESTRICT fff,
+        const T *const x, T *const y, void *stream) {
     SFEM_DEBUG_SYNCHRONIZE();
 
     cu_hex8_taylor_expansion_init();
@@ -220,10 +208,8 @@ template <typename real_t>
 __global__ void cu_affine_hex8_laplacian_apply_taylor_kernel(
         const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
-        const idx_t *const SFEM_RESTRICT elements,
-        const cu_jacobian_t *const SFEM_RESTRICT g_fff,
-        const real_t *const SFEM_RESTRICT u,
-        real_t *const SFEM_RESTRICT values) {
+        const idx_t *const SFEM_RESTRICT elements, const cu_jacobian_t *const SFEM_RESTRICT g_fff,
+        const real_t *const SFEM_RESTRICT u, real_t *const SFEM_RESTRICT values) {
     const int elements_per_block = blockDim.x / 8;
     const int node = threadIdx.x % 8;
     const int e_block = threadIdx.x / 8;
@@ -288,11 +274,8 @@ template <typename T>
 static int cu_affine_hex8_laplacian_apply_taylor_tpl(
         const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
-        const idx_t *const SFEM_RESTRICT elements,
-        const cu_jacobian_t *const SFEM_RESTRICT fff,
-        const T *const x,
-        T *const y,
-        void *stream) {
+        const idx_t *const SFEM_RESTRICT elements, const cu_jacobian_t *const SFEM_RESTRICT fff,
+        const T *const x, T *const y, void *stream) {
     SFEM_DEBUG_SYNCHRONIZE();
 
     cu_hex8_taylor_expansion_init();
@@ -320,12 +303,8 @@ static int cu_affine_hex8_laplacian_apply_taylor_tpl(
 extern int cu_affine_hex8_laplacian_taylor_apply(
         const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
-        const idx_t *const SFEM_RESTRICT elements,
-        const void *const SFEM_RESTRICT fff,
-        const enum RealType real_type_xy,
-        const void *const x,
-        void *const y,
-        void *stream) {
+        const idx_t *const SFEM_RESTRICT elements, const void *const SFEM_RESTRICT fff,
+        const enum RealType real_type_xy, const void *const x, void *const y, void *stream) {
     switch (real_type_xy) {
         case SFEM_REAL_DEFAULT: {
             return cu_affine_hex8_laplacian_apply_taylor_tpl(nelements,
@@ -360,6 +339,150 @@ extern int cu_affine_hex8_laplacian_taylor_apply(
                     "%d)\n",
                     real_type_to_string(real_type_xy),
                     real_type_xy);
+            assert(0);
+            return SFEM_FAILURE;
+        }
+    }
+}
+
+template <typename T>
+__global__ void cu_affine_hex8_laplacian_crs_sym_kernel(
+        const ptrdiff_t nelements,
+        const ptrdiff_t stride,  // Stride for elements and fff
+        const idx_t *const SFEM_RESTRICT elements, const cu_jacobian_t *const SFEM_RESTRICT g_fff,
+        const count_t *const SFEM_RESTRICT rowptr, const idx_t *const SFEM_RESTRICT colidx,
+        T *const SFEM_RESTRICT diag, T *const SFEM_RESTRICT offdiag) {
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
+         e += blockDim.x * gridDim.x) {
+        idx_t ev[8];
+        scalar_t fff[6];
+
+        for (int v = 0; v < 8; ++v) {
+            ev[v] = elements[v * stride + e];
+        }
+
+        for (int d = 0; d < 6; d++) {
+            fff[d] = g_fff[d * stride];
+        }
+
+        T element_matrix[8 * 8];
+        cu_hex8_laplacian_matrix_fff_integral(fff, element_matrix);
+
+        for (int edof_i = 0; edof_i < 8; ++edof_i) {
+            atomicAdd(&diag[ev[edof_i]], element_matrix[edof_i * 8 + edof_i]);
+        }
+
+        // Assemble the upper-triangular part of the matrix
+        for (int edof_i = 0; edof_i < 8; edof_i++) {
+            // For each row we find the corresponding entries in the off-diag
+            // We select the entries associated with ev[row] < ev[col]
+            const int lenrow = rowptr[ev[edof_i] + 1] - rowptr[ev[edof_i]];
+            const idx_t *cols = &colidx[rowptr[ev[edof_i]]];
+            // Find the columns associated with the current row and mask what is not found with
+            // -1
+            int ks[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
+            for (int i = 0; i < lenrow; i++) {
+                for (int k = 0; k < 8; k++) {
+                    if (cols[i] == ev[k]) {
+                        ks[k] = i;
+                        break;
+                    }
+                }
+            }
+
+            for (int edof_j = 0; edof_j < 8; edof_j++) {
+                if (ev[edof_j] > ev[edof_i]) {
+                    assert(ks[edof_j] != -1);
+                    atomicAdd(&offdiag[rowptr[ev[edof_i]] + ks[edof_j]],
+                              element_matrix[edof_i * 8 + edof_j]);
+                }
+            }
+        }
+    }
+}
+
+template <typename T>
+static int cu_affine_hex8_laplacian_crs_sym_tpl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t stride,  // Stride for elements and fff
+        const idx_t *const SFEM_RESTRICT elements, const cu_jacobian_t *const SFEM_RESTRICT fff,
+        const count_t *const SFEM_RESTRICT rowptr, const idx_t *const SFEM_RESTRICT colidx,
+        T *const SFEM_RESTRICT diag, T *const SFEM_RESTRICT offdiag, void *stream) {
+    // Hand tuned
+    int block_size = 128;
+#ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+    {
+        int min_grid_size;
+        cudaOccupancyMaxPotentialBlockSize(
+                &min_grid_size, &block_size, cu_affine_hex8_laplacian_crs_sym_kernel<T>, 0, 0);
+    }
+#endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+
+    const ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
+
+    if (stream) {
+        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
+        cu_affine_hex8_laplacian_crs_sym_kernel<<<n_blocks, block_size, 0, s>>>(
+                nelements, stride, elements, fff, rowptr, colidx, diag, offdiag);
+    } else {
+        cu_affine_hex8_laplacian_crs_sym_kernel<<<n_blocks, block_size, 0>>>(
+                nelements, stride, elements, fff, rowptr, colidx, diag, offdiag);
+    }
+
+    SFEM_DEBUG_SYNCHRONIZE();
+
+    return SFEM_SUCCESS;
+}
+
+extern int cu_affine_hex8_laplacian_crs_sym(const ptrdiff_t nelements,
+                                            const ptrdiff_t stride,  // Stride for elements and fff
+                                            const idx_t *const SFEM_RESTRICT elements,
+                                            const void *const SFEM_RESTRICT fff,
+                                            const count_t *const SFEM_RESTRICT rowptr,
+                                            const idx_t *const SFEM_RESTRICT colidx,
+                                            const enum RealType real_type,
+                                            void *const SFEM_RESTRICT diag,
+                                            void *const SFEM_RESTRICT offdiag, void *stream) {
+    switch (real_type) {
+        case SFEM_REAL_DEFAULT: {
+            return cu_affine_hex8_laplacian_crs_sym_tpl(nelements,
+                                                        stride,
+                                                        elements,
+                                                        (cu_jacobian_t *)fff,
+                                                        rowptr,
+                                                        colidx,
+                                                        (real_t *)diag,
+                                                        (real_t *)offdiag,
+                                                        stream);
+        }
+        case SFEM_FLOAT32: {
+            return cu_affine_hex8_laplacian_crs_sym_tpl(nelements,
+                                                        stride,
+                                                        elements,
+                                                        (cu_jacobian_t *)fff,
+                                                        rowptr,
+                                                        colidx,
+                                                        (float *)diag,
+                                                        (float *)offdiag,
+                                                        stream);
+        }
+        case SFEM_FLOAT64: {
+            return cu_affine_hex8_laplacian_crs_sym_tpl(nelements,
+                                                        stride,
+                                                        elements,
+                                                        (cu_jacobian_t *)fff,
+                                                        rowptr,
+                                                        colidx,
+                                                        (double *)diag,
+                                                        (double *)offdiag,
+                                                        stream);
+        }
+        default: {
+            fprintf(stderr,
+                    "[Error] cu_hex8_laplacian_apply: not implemented for type %s (code "
+                    "%d)\n",
+                    real_type_to_string(real_type),
+                    real_type);
             assert(0);
             return SFEM_FAILURE;
         }

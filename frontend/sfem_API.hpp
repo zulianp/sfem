@@ -39,6 +39,8 @@ namespace sfem {
 
 #include "proteus_hex8.h"
 #include "proteus_hex8_interpolate.h"
+#include "sfem_ShiftableJacobi.hpp"
+#include "sfem_Stationary.hpp"
 #include "sfem_prolongation_restriction.h"
 
 #include <sys/stat.h>
@@ -46,12 +48,13 @@ namespace sfem {
 
 namespace sfem {
 
-    template<typename T>
+    template <typename T>
     auto blas(const ExecutionSpace es) {
         auto blas = std::make_shared<BLAS_Tpl<T>>();
-        
+
 #ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) CUDA_BLAS<T>::build_blas(*blas);
+        if (es == EXECUTION_SPACE_DEVICE)
+            CUDA_BLAS<T>::build_blas(*blas);
         else
 #endif  // SFEM_ENABLE_CUDA
         {
@@ -102,6 +105,45 @@ namespace sfem {
         cg->set_n_dofs(op->rows());
         cg->set_op(op);
         return cg;
+    }
+
+    template <typename T>
+    static std::shared_ptr<ShiftableJacobi<T>> create_shiftable_jacobi(
+            const std::shared_ptr<Buffer<T>> &diag, const ExecutionSpace es) {
+        auto ret = std::make_shared<sfem::ShiftableJacobi<T>>();
+
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            CUDA_BLAS<T>::build_blas(ret->blas);
+        } else
+#endif  // SFEM_ENABLE_CUDA
+        {
+            ret->default_init();
+        }
+
+        ret->set_diag(diag);
+        return ret;
+    }
+
+    template <typename T>
+    static std::shared_ptr<StationaryIteration<T>> create_stationary(
+            const std::shared_ptr<Operator<T>> &op,
+            const std::shared_ptr<Operator<T>> &preconditioner, const ExecutionSpace es) {
+        auto ret = std::make_shared<StationaryIteration<T>>();
+        ret->op = op;
+        ret->preconditioner = preconditioner;
+        ret->n_dofs = op->cols();
+
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            CUDA_BLAS<T>::build_blas(ret->blas);
+        } else
+#endif  // SFEM_ENABLE_CUDA
+        {
+            ret->default_init();
+        }
+
+        return ret;
     }
 
     template <typename T>
@@ -777,24 +819,48 @@ namespace sfem {
 
         auto diag_values = sfem::create_buffer<real_t>(fs->n_dofs(), es);
         auto off_diag_values = sfem::create_buffer<real_t>(crs_graph->nnz(), es);
-        auto row_idx = sfem::create_buffer<idx_t>(crs_graph->nnz(), es);
 
         real_t *x_data = nullptr;
         if (x) {
             x_data = x->data();
         }
 
-        f->hessian_crs_sym(x_data,
-                           crs_graph->rowptr()->data(),
-                           crs_graph->colidx()->data(),
-                           diag_values->data(),
-                           off_diag_values->data());
+        std::shared_ptr<sfem::Operator<real_t>> spmv;
+#ifdef SFEM_ENABLE_CUDA
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+            auto d_crs_graph = sfem::to_device(crs_graph);
 
-        crs_to_coo(fs->n_dofs(), crs_graph->rowptr()->data(), row_idx->data());
-        auto mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
-        f->constaints_mask(mask->data());
-        auto spmv = sfem::h_coosym<idx_t, real_t>(
-                mask, row_idx, crs_graph->colidx(), off_diag_values, diag_values);
+            f->hessian_crs_sym(x_data,
+                               d_crs_graph->rowptr()->data(),
+                               d_crs_graph->colidx()->data(),
+                               diag_values->data(),
+                               off_diag_values->data());
+
+            auto h_row_idx =
+                    sfem::create_buffer<idx_t>(crs_graph->nnz(), sfem::EXECUTION_SPACE_HOST);
+            crs_to_coo(fs->n_dofs(), crs_graph->rowptr()->data(), h_row_idx->data());
+            auto row_idx = sfem::to_device(h_row_idx);
+
+            spmv = sfem::d_sym_coo_spmv(
+                    fs->n_dofs(), row_idx, crs_graph->colidx(), off_diag_values, diag_values, 1);
+
+        } else
+#endif
+        {
+            f->hessian_crs_sym(x_data,
+                               crs_graph->rowptr()->data(),
+                               crs_graph->colidx()->data(),
+                               diag_values->data(),
+                               off_diag_values->data());
+
+            auto row_idx = sfem::create_buffer<idx_t>(crs_graph->nnz(), es);
+            crs_to_coo(fs->n_dofs(), crs_graph->rowptr()->data(), row_idx->data());
+            // auto mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
+            // f->constaints_mask(mask->data());
+
+            spmv = sfem::h_coosym<idx_t, real_t>(
+                    nullptr, row_idx, crs_graph->colidx(), off_diag_values, diag_values);
+        }
 
         // Owns the pointers
         return sfem::make_op<real_t>(
@@ -810,10 +876,8 @@ namespace sfem {
     static auto hessian_crs_sym(const std::shared_ptr<sfem::Function> &f,
                                 const std::shared_ptr<Buffer<real_t>> &x,
                                 const sfem::ExecutionSpace es) {
-        assert(es == sfem::EXECUTION_SPACE_HOST);
         auto fs = f->space();
         auto crs_graph = fs->mesh_ptr()->node_to_node_graph_upper_triangular();
-
         auto diag_values = sfem::create_buffer<real_t>(fs->n_dofs(), es);
         auto off_diag_values = sfem::create_buffer<real_t>(crs_graph->nnz(), es);
 
@@ -822,19 +886,35 @@ namespace sfem {
             x_data = x->data();
         }
 
-        f->hessian_crs_sym(x_data,
-                           crs_graph->rowptr()->data(),
-                           crs_graph->colidx()->data(),
-                           diag_values->data(),
-                           off_diag_values->data());
+        std::shared_ptr<sfem::Operator<real_t>> spmv;
+#ifdef SFEM_ENABLE_CUDA
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+            // TODO
+            // spmv = sfem::d_crs_sym_spmv<count_t, idx_t, real_t>(fs->n_dofs(),
+            //                                                          fs->n_dofs(),
+            //                                                          crs_graph->rowptr(),
+            //                                                          crs_graph->colidx(),
+            //                                                          diag_values,
+            //                                                          off_diag_values,
+            //                                                          (real_t)1);
+            assert(false);
+        } else
+#endif
+        {
+            f->hessian_crs_sym(x_data,
+                               crs_graph->rowptr()->data(),
+                               crs_graph->colidx()->data(),
+                               diag_values->data(),
+                               off_diag_values->data());
 
-        auto spmv = sfem::h_crs_sym_spmv<count_t, idx_t, real_t>(fs->n_dofs(),
-                                                                 fs->n_dofs(),
-                                                                 crs_graph->rowptr(),
-                                                                 crs_graph->colidx(),
-                                                                 diag_values,
-                                                                 off_diag_values,
-                                                                 (real_t)1);
+            spmv = sfem::h_crs_sym_spmv<count_t, idx_t, real_t>(fs->n_dofs(),
+                                                                     fs->n_dofs(),
+                                                                     crs_graph->rowptr(),
+                                                                     crs_graph->colidx(),
+                                                                     diag_values,
+                                                                     off_diag_values,
+                                                                     (real_t)1);
+        }
 
         // Owns the pointers
         return sfem::make_op<real_t>(

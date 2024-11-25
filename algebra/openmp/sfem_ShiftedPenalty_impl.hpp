@@ -42,7 +42,7 @@ namespace sfem {
 
     template <typename T>
     struct OpenMP_ShiftedPenalty {
-        static void build_shifted_penalty(struct ShiftedPenalty_Tpl<T>& tpl) {
+        static void build(struct ShiftedPenalty_Tpl<T>& tpl) {
             tpl.sq_norm_ramp_p = [](const ptrdiff_t n, const T* const x, T* const ub) -> T {
                 T ret = 0;
 #pragma omp parallel for reduction(+ : ret)

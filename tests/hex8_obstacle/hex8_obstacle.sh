@@ -21,7 +21,7 @@ export OMP_PROC_BIND=true
 export CUDA_LAUNCH_BLOCKING=0
 
 export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
-export SFEM_ELEMENT_REFINE_LEVEL=8
+export SFEM_ELEMENT_REFINE_LEVEL=4
 export SFEM_MAX_IT=10000
 
 export SFEM_HEX8_ASSUME_AFFINE=1
@@ -35,6 +35,7 @@ case $CASE in
 			echo "Reusing mesh"
 		else
 			create_cyclic_ss_mesh.sh 1 $SFEM_ELEMENT_REFINE_LEVEL
+			echo "SFEM_ELEMENT_REFINE_LEVEL: $SFEM_ELEMENT_REFINE_LEVEL" > $mesh/meta.yaml
 		fi
 
 		sinlet=$mesh/surface/sidesets_aos/inlet.raw
@@ -75,6 +76,9 @@ case $CASE in
 		echo "Error wrong case"
 	;;
 esac
+
+echo "Checking SFEM_ELEMENT_REFINE_LEVEL..."
+grep "SFEM_ELEMENT_REFINE_LEVEL: $SFEM_ELEMENT_REFINE_LEVEL" $mesh/meta.yaml
 
 case $CASE in
 	1 | 10)

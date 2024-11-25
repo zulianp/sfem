@@ -207,7 +207,7 @@ namespace sfem {
 
         void default_init() {
             OpenMP_BLAS<T>::build_blas(blas_);
-            OpenMP_ShiftedPenalty<T>::build_shifted_penalty(impl);
+            OpenMP_ShiftedPenalty<T>::build(impl);
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
