@@ -26,8 +26,7 @@ ptrdiff_t mesh_exchange_master_buffer_count(const send_recv_t *const slave_to_ma
     return slave_to_master->recv_count[size - 1] + slave_to_master->recv_displs[size - 1];
 }
 
-void mesh_exchange_nodal_slave_to_master(const mesh_t *mesh,
-                                         send_recv_t *const slave_to_master,
+void mesh_exchange_nodal_slave_to_master(const mesh_t *mesh, send_recv_t *const slave_to_master,
                                          MPI_Datatype data_type,
                                          void *const SFEM_RESTRICT ghost_data,
                                          void *const SFEM_RESTRICT buffer) {
@@ -43,10 +42,8 @@ void mesh_exchange_nodal_slave_to_master(const mesh_t *mesh,
                                   mesh->comm));
 }
 
-void mesh_exchange_nodal_master_to_slave(const mesh_t *mesh,
-                                         send_recv_t *const slave_to_master,
-                                         MPI_Datatype data_type,
-                                         void *const inout) {
+void mesh_exchange_nodal_master_to_slave(const mesh_t *mesh, send_recv_t *const slave_to_master,
+                                         MPI_Datatype data_type, void *const inout) {
     int rank, size;
     MPI_Comm_rank(slave_to_master->comm, &rank);
     MPI_Comm_size(slave_to_master->comm, &size);
@@ -673,9 +670,7 @@ void mesh_create_nodal_send_recv(const mesh_t *mesh, send_recv_t *const slave_to
 
 // void mesh_shared_node_contiguous_idx(const mesh_t *mesh, idx_t *share_nodes_contiguou)
 
-void mesh_remote_connectivity_graph(const mesh_t *mesh,
-                                    count_t **out_rowptr,
-                                    idx_t **out_colidx,
+void mesh_remote_connectivity_graph(const mesh_t *mesh, count_t **out_rowptr, idx_t **out_colidx,
                                     send_recv_t *const exchange) {
     double tick = MPI_Wtime();
 
@@ -699,7 +694,7 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
     }
 
     build_crs_graph_for_elem_type(
-        mesh->element_type, n_elems, mesh->nnodes, elems, &selection_rowptr, &selection_colidx);
+            mesh->element_type, n_elems, mesh->nnodes, elems, &selection_rowptr, &selection_colidx);
 
     count_t *shared_rowptr = (count_t *)calloc(mesh->nnodes + 1, sizeof(count_t));
     ptrdiff_t node_begin = mesh->n_owned_nodes;
@@ -920,16 +915,15 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh,
     }
 }
 
-void exchange_add(mesh_t *mesh,
-                  send_recv_t *slave_to_master,
-                  real_t *const SFEM_RESTRICT inout,
+void exchange_add(mesh_t *mesh, send_recv_t *slave_to_master, real_t *const SFEM_RESTRICT inout,
                   real_t *const SFEM_RESTRICT real_buffer) {
+    //
     ptrdiff_t n_ghosts = (mesh->nnodes - mesh->n_owned_nodes);
     ptrdiff_t count = mesh_exchange_master_buffer_count(slave_to_master);
 
     // Exchange mass_vector ghosts
     mesh_exchange_nodal_slave_to_master(
-        mesh, slave_to_master, SFEM_MPI_REAL_T, &inout[mesh->n_owned_nodes], real_buffer);
+            mesh, slave_to_master, SFEM_MPI_REAL_T, &inout[mesh->n_owned_nodes], real_buffer);
 
     for (ptrdiff_t i = 0; i < count; i++) {
         assert(real_buffer[i] == real_buffer[i]);

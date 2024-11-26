@@ -1182,6 +1182,24 @@ compute_g_kernel(ptrdiff_t nnodes, const real_t* weighted_field,  //
 }
 
 /**
+ * @brief Cuda kernel to compute the mass vector
+ *
+ * @param nnodes
+ * @param mass_vector
+ * @param g_wf
+ * @return __global__
+ */
+__global__ void                                                                   //
+compute_g_kernel_v2(ptrdiff_t nnodes, const real_t* mass_vector, real_t* g_wf) {  //
+    ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < nnodes) {
+        assert(mass_vector[i] != 0);
+        g_wf[i] /= mass_vector[i];
+        // g[i] = mass_vector[i]
+    }
+}
+
+/**
  * @brief Set the array to zero
  *
  * @param n
@@ -1634,8 +1652,8 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  
 #endif
 
 /**
- * @brief launch_kernels_hex8_to_tet10_resample_field_local_CUDA lanches the kernels sequentially to
- * resample the field from hex8 to tet10
+ * @brief lanches the kernels sequentially to
+ * resample the field from hex8 to tet10 by applying all the necessary steps
  *
  * @param numBlocks
  * @param threadsPerBlock
@@ -1653,29 +1671,27 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  
  * @param g_device
  * @return int
  */
-int                                                                                             //
-launch_kernels_hex8_to_tet10_resample_field_local_CUDA(int numBlocks,                           //
-                                                       int threadsPerBlock,                     //
-                                                       int nelements, ptrdiff_t nnodes,         //
-                                                       elems_tet10_device elems_device,         //
-                                                       xyz_tet10_device xyz_device,             //
-                                                       const ptrdiff_t* const SFEM_RESTRICT n,  //
-                                                       const ptrdiff_t* const SFEM_RESTRICT
-                                                               stride,                            //
-                                                       const geom_t* const SFEM_RESTRICT origin,  //
-                                                       const geom_t* const SFEM_RESTRICT delta,   //
-                                                       real_t* data_device,                       //
-                                                       real_t* weighted_field_device,             //
-                                                       real_t* mass_vector,                       //
-                                                       real_t* g_device) {                        //
+int  //
+launch_kernels_hex8_to_tet10_resample_field_local_CUDA(
+        const int numBlocks,                          //
+        const int threadsPerBlock,                    //
+        const int bool_assemble_dual_mass_vector,     // assemble dual mass vector
+        int nelements, ptrdiff_t nnodes,              //
+        elems_tet10_device elems_device,              //
+        xyz_tet10_device xyz_device,                  //
+        const ptrdiff_t* const SFEM_RESTRICT n,       //
+        const ptrdiff_t* const SFEM_RESTRICT stride,  //
+        const geom_t* const SFEM_RESTRICT origin,     //
+        const geom_t* const SFEM_RESTRICT delta,      //
+        real_t* data_device,                          //
+        //    real_t* weighted_field_device, //
+        real_t* mass_vector,  //
+        real_t* g_device) {   //
     //
     PRINT_CURRENT_FUNCTION;
 
-    // Launch zeros_kernel
-    zeros_kernel<<<numBlocks, threadsPerBlock>>>(nnodes, mass_vector);
-
-    // Synchronize device
-    cudaDeviceSynchronize();
+    // Set to zero the mass vector
+    cudaMemset(mass_vector, 0, nnodes * sizeof(real_t));
 
     // Launch the appropriate resample field kernel based on CUBE1
 #if CUBE1 == 1  // WENO
@@ -1701,24 +1717,29 @@ launch_kernels_hex8_to_tet10_resample_field_local_CUDA(int numBlocks,           
                                              delta[1],
                                              delta[2],
                                              data_device,
-                                             weighted_field_device);
+                                             g_device);
 
     // Synchronize device
     cudaDeviceSynchronize();
 
-    // Launch isoparametric_tet10_assemble_dual_mass_vector_kernel
-    isoparametric_tet10_assemble_dual_mass_vector_kernel<<<numBlocks, threadsPerBlock>>>(
-            0, nelements, nnodes, elems_device, xyz_device, mass_vector);
+    if (bool_assemble_dual_mass_vector == 1) {
+        // Launch isoparametric_tet10_assemble_dual_mass_vector_kernel
+        isoparametric_tet10_assemble_dual_mass_vector_kernel<<<numBlocks, threadsPerBlock>>>(
+                0, nelements, nnodes, elems_device, xyz_device, mass_vector);
 
-    // Synchronize device
-    cudaDeviceSynchronize();
+        // Synchronize device
+        cudaDeviceSynchronize();
 
-    // Launch compute_g_kernel
-    compute_g_kernel<<<(nnodes / threadsPerBlock) + 1, threadsPerBlock>>>(
-            nnodes, weighted_field_device, mass_vector, g_device);
+        // // Launch compute_g_kernel
+        // compute_g_kernel<<<(nnodes / threadsPerBlock) + 1, threadsPerBlock>>>(
+        //         nnodes, weighted_field_device, mass_vector, g_device);
 
-    // Synchronize device
-    cudaDeviceSynchronize();
+        compute_g_kernel_v2<<<(nnodes / threadsPerBlock) + 1, threadsPerBlock>>>(
+                nnodes, mass_vector, g_device);
+
+        // Synchronize device
+        cudaDeviceSynchronize();
+    }
 
     RETURN_FROM_FUNCTION(0);
 }
@@ -1726,12 +1747,14 @@ launch_kernels_hex8_to_tet10_resample_field_local_CUDA(int numBlocks,           
 ////////////////////////////////////////////////////////////////////////
 // hex8_to_tet10_resample_field_local_CUDA
 ////////////////////////////////////////////////////////////////////////
-extern "C" int hex8_to_tet10_resample_field_local_CUDA(
-        // Mesh
-        const ptrdiff_t nelements,  // number of elements
-        const ptrdiff_t nnodes,     // number of nodes
-        const idx_t** const elems,  // connectivity
-        const geom_t** const xyz,   // coordinates
+extern "C" int                                     //
+hex8_to_tet10_resample_field_local_CUDA(           //
+                                                   // Mesh
+        const ptrdiff_t nelements,                 // number of elements
+        const ptrdiff_t nnodes,                    // number of nodes
+        const int bool_assemble_dual_mass_vector,  // assemble dual mass vector
+        idx_t** const SFEM_RESTRICT elems,         // connectivity
+        geom_t** const SFEM_RESTRICT xyz,          // coordinates
         // SDF
         const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
         const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
@@ -1741,7 +1764,7 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
         const real_t* const SFEM_RESTRICT data,    // SDF
         // Output //
         real_t* const SFEM_RESTRICT g_host) {  //
-
+                                               // geom_t** const SFEM_RESTRICT xyz
     PRINT_CURRENT_FUNCTION;
 
     // Device memory
@@ -1755,10 +1778,10 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
     cudaMemcpy(data_device, data, size_data * sizeof(real_t), cudaMemcpyHostToDevice);
 
     elems_tet10_device elems_device = make_elems_tet10_device(nelements);
-    copy_elems_tet10_device(nelements, &elems_device, elems);
+    copy_elems_tet10_device(nelements, &elems_device, (const idx_t**)elems);
 
     xyz_tet10_device xyz_device = make_xyz_tet10_device(nnodes);
-    copy_xyz_tet10_device(nnodes, &xyz_device, xyz);
+    copy_xyz_tet10_device(nnodes, &xyz_device, (const float**)xyz);
 
     // Number of threads
     const ptrdiff_t warp_per_block = 8;
@@ -1767,12 +1790,12 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
     // Number of blocks
     const ptrdiff_t numBlocks = (nelements / warp_per_block) + (nelements % warp_per_block) + 1;
 
-    real_t* weighted_field_device = NULL;
-    cudaError_t errwf = cudaMalloc(&weighted_field_device, nnodes * sizeof(real_t));
-    if (errwf != cudaSuccess) {
-        printf("Error allocating device memory for weighted_field_device: %s\n",
-               cudaGetErrorString(errwf));
-    }
+    // real_t* weighted_field_device = NULL;
+    // cudaError_t errwf = cudaMalloc(&weighted_field_device, nnodes * sizeof(real_t));
+    // if (errwf != cudaSuccess) {
+    //     printf("Error allocating device memory for weighted_field_device: %s\n",
+    //            cudaGetErrorString(errwf));
+    // }
 
     cudaMalloc(&mass_vector, nnodes * sizeof(real_t));
     cudaMalloc(&g_device, nnodes * sizeof(real_t));
@@ -1804,6 +1827,7 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
     // Launch the kernels
     launch_kernels_hex8_to_tet10_resample_field_local_CUDA(numBlocks,
                                                            threadsPerBlock,
+                                                           bool_assemble_dual_mass_vector,
                                                            nelements,
                                                            nnodes,
                                                            elems_device,
@@ -1813,7 +1837,7 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
                                                            origin,
                                                            delta,
                                                            data_device,
-                                                           weighted_field_device,
+                                                           //    weighted_field_device,
                                                            mass_vector,
                                                            g_device);
 
@@ -1858,34 +1882,33 @@ extern "C" int hex8_to_tet10_resample_field_local_CUDA(
 
     free_elems_tet10_device(elems_device);
 
-    // cudaMemcpy(weighted_field,
-    //            weighted_field_device,  //
-    //            nnodes * sizeof(real_t),
-    //            cudaMemcpyDeviceToHost);
-
     cudaMemcpy(g_host,                   //
                g_device,                 //
                nnodes * sizeof(real_t),  //
                cudaMemcpyDeviceToHost);  //
-
-    cudaError_t errwf2 = cudaFree(weighted_field_device);
-    if (errwf2 != cudaSuccess) {
-        printf("Error freeing device memory for weighted_field_device: %s\n",
-               cudaGetErrorString(errwf2));
-    }
-    weighted_field_device = NULL;
-
-    cudaError_t errmv = cudaFree(mass_vector);
-    if (errmv != cudaSuccess) {
-        printf("Error freeing device memory for mass_vector: %s\n", cudaGetErrorString(errmv));
-    }
-    mass_vector = NULL;
 
     cudaError_t errg = cudaFree(g_device);
     if (errg != cudaSuccess) {
         printf("Error freeing device memory for g_device: %s\n", cudaGetErrorString(errg));
     }
     g_device = NULL;
+
+    // cudaMemcpy(weighted_field,
+    //            weighted_field_device,  //
+    //            nnodes * sizeof(real_t),
+    //            cudaMemcpyDeviceToHost);
+    // cudaError_t errwf2 = cudaFree(weighted_field_device);
+    // if (errwf2 != cudaSuccess) {
+    //     printf("Error freeing device memory for weighted_field_device: %s\n",
+    //            cudaGetErrorString(errwf2));
+    // }
+    // weighted_field_device = NULL;
+
+    cudaError_t errmv = cudaFree(mass_vector);
+    if (errmv != cudaSuccess) {
+        printf("Error freeing device memory for mass_vector: %s\n", cudaGetErrorString(errmv));
+    }
+    mass_vector = NULL;
 
     RETURN_FROM_FUNCTION(0);
     // return 0;
