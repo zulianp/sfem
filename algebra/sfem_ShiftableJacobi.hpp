@@ -21,7 +21,7 @@ namespace sfem {
         BLAS_Tpl<T> blas;
         std::shared_ptr<Buffer<T>> diag;
         std::shared_ptr<Buffer<T>> inv_diag;
-        T relaxation_parameter{0.6};
+        T relaxation_parameter{0.3};
 
         void default_init() {
             OpenMP_BLAS<T>::build_blas(blas);

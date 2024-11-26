@@ -97,7 +97,7 @@ namespace sfem {
                     blas_.axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
 
                     // Compute penalty residual
-                    impl.calc_r_pen(n_dofs,
+                    impl_.calc_r_pen(n_dofs,
                                     mem->solution->data(),
                                     penalty_param_,
                                     lb,
@@ -114,18 +114,18 @@ namespace sfem {
                 }
 
                 const T e_pen =
-                        ((ub) ? impl.sq_norm_ramp_p(n_dofs, mem->solution->data(), ub) : T(0)) +
-                        ((lb) ? impl.sq_norm_ramp_m(n_dofs, mem->solution->data(), lb) : T(0));
+                        ((ub) ? impl_.sq_norm_ramp_p(n_dofs, mem->solution->data(), ub) : T(0)) +
+                        ((lb) ? impl_.sq_norm_ramp_m(n_dofs, mem->solution->data(), lb) : T(0));
 
                 const T norm_pen = std::sqrt(e_pen);
                 const T norm_rpen = blas_.norm2(n_dofs, mem->work->data());
 
                 if (norm_pen < penetration_tol) {
                     if (ub)
-                        impl.update_lagr_p(
+                        impl_.update_lagr_p(
                                 n_dofs, penalty_param_, mem->solution->data(), ub, lagr_ub->data());
                     if (lb)
-                        impl.update_lagr_m(
+                        impl_.update_lagr_m(
                                 n_dofs, penalty_param_, mem->solution->data(), lb, lagr_lb->data());
 
                     penetration_tol = penetration_tol / pow(penalty_param_, 0.9);
@@ -207,7 +207,7 @@ namespace sfem {
 
         void default_init() {
             OpenMP_BLAS<T>::build_blas(blas_);
-            OpenMP_ShiftedPenalty<T>::build(impl);
+            OpenMP_ShiftedPenalty<T>::build(impl_);
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
@@ -217,6 +217,7 @@ namespace sfem {
 
         void set_nlsmooth_steps(const int steps) { nlsmooth_steps = steps; }
         BLAS_Tpl<T> &blas() {return blas_; }
+        ShiftedPenalty_Tpl<T> &impl() {return impl_; }
 
     private:
         std::vector<std::shared_ptr<Operator<T>>> operator_;
@@ -235,12 +236,9 @@ namespace sfem {
         T atol_{1e-10};
 
         BLAS_Tpl<T> blas_;
-        ShiftedPenalty_Tpl<T> impl;
+        ShiftedPenalty_Tpl<T> impl_;
         bool verbose{true};
         bool debug{false};
-
-
-
 
         std::shared_ptr<Buffer<T>> make_buffer(const ptrdiff_t n) const {
             return Buffer<T>::own(
@@ -313,7 +311,7 @@ namespace sfem {
             blas_.axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
 
             // Compute penalty residual
-            impl.calc_r_pen(n_dofs,
+            impl_.calc_r_pen(n_dofs,
                             mem->solution->data(),
                             penalty_param_,
                             lb,
@@ -323,7 +321,7 @@ namespace sfem {
                             mem->work->data());
 
             blas_.zeros(n_dofs, mem->diag->data());
-            impl.calc_J_pen(n_dofs,
+            impl_.calc_J_pen(n_dofs,
                             mem->solution->data(),
                             penalty_param_,
                             lb,

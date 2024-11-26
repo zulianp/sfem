@@ -230,7 +230,7 @@ def solve_obstacle(problem):
 
 	n = 4
 	h = 1./(n - 1)
-	wall = 0.6 # The obstacle wall is a x = 0.6
+	
 
 	fun = problem.setup()
 	m = fun.space().mesh()
@@ -322,6 +322,8 @@ class Cylinder:
 		f = -0.1*np.cos(np.pi*2*radius) - 0.1
 		f += -0.05*np.cos(np.pi*8*radius)
 		f += -0.01*np.cos(np.pi*16*radius)
+		indentation = 0.1
+		wall = 0.6 # The obstacle wall is a x = 0.6
 		parabola = -indentation * f + wall
 
 		sdf = (parabola - sfem.points(m, 0)).astype(real_t)
