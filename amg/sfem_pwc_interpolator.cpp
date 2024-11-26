@@ -1,4 +1,5 @@
 #include "sfem_pwc_interpolator.hpp"
+#include "coo_sort.h"
 
 /*
 void piecewise_constant(const idx_t *partition, const real_t *near_null,
@@ -58,7 +59,9 @@ namespace sfem {
         }
 
         count_t new_nnz = (count_t)write_pos;
-        sum_duplicates(row_indices, col_indices, values, sort_indices, &new_nnz);
+        printf("NEW NNZ: %d\n", new_nnz);
+        sum_duplicates(sort_indices, row_indices, col_indices, values, &new_nnz);
+        printf("NEW NNZ after sum dup: %d\n", new_nnz);
 
         R *offdiag_row_indices = (R *)malloc(new_nnz * sizeof(R));
         R *offdiag_col_indices = (R *)malloc(new_nnz * sizeof(R));

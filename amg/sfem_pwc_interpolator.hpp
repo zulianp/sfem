@@ -43,7 +43,7 @@ namespace sfem {
             for (R k = 0; k < fine_dim; k++) {
                 R coarse_idx = partition[k];
                 if (coarse_idx >= 0) {
-                    v[k] = v_coarse[coarse_idx] * weights[k];
+                    v[k] += v_coarse[coarse_idx] * weights[k];
                 }
             }
         }
@@ -51,11 +51,6 @@ namespace sfem {
         void pwc_restrict(const T* const v, T* const v_coarse) {
             R* partition = partition_->data();
             T* weights = weights_->data();
-            // Only OMP impl for now
-#pragma omp parallel for
-            for (R k = 0; k < coarse_dim; k++) {
-                v_coarse[k] = 0.0;
-            }
 
 #pragma omp parallel for
             for (R k = 0; k < fine_dim; k++) {
@@ -85,8 +80,7 @@ namespace sfem {
 
     template <typename R, typename T>
     std::shared_ptr<PiecewiseConstantInterpolator<R, T>> h_pwc_interp(
-            const std::shared_ptr<Buffer<T>>& weights,
-            const std::shared_ptr<Buffer<R>>& partition,
+            const std::shared_ptr<Buffer<T>>& weights, const std::shared_ptr<Buffer<R>>& partition,
             const ptrdiff_t coarse_dim) {
         auto ret = std::make_shared<PiecewiseConstantInterpolator<R, T>>();
         ret->coarse_dim = coarse_dim;

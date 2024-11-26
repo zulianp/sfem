@@ -9,7 +9,6 @@
 #include "sfem_config.h"
 #include "sfem_mask.h"
 #include "sfem_openmp_blas.hpp"
-// #include "sparse.h"
 
 // This class might be better off as just a sparse matrix, but the coarsen method is an optimized
 // version of the matrix triple product ptap and transposing is basically a NOP
@@ -98,6 +97,31 @@ namespace sfem {
         return ret;
     }
 
+    /* TODO refactor this conversion code to create CooSym object.
+    void csr_to_symmcoo(const ptrdiff_t nrows, const count_t nnz, const count_t *row_ptr,
+                        const idx_t *col_indices, const real_t *values, SymmCOOMatrix *coo) {
+        assert(nnz % 2 == 0);
+
+        count_t nweights = (nnz - nrows) / 2;
+        coo->offdiag_nnz = nweights;
+        coo->dim = nrows;
+
+        idx_t k = 0;
+        for (idx_t i = 0; i < nrows; i++) {
+            for (idx_t idx = row_ptr[i]; idx < row_ptr[i + 1]; idx++) {
+                idx_t j = col_indices[idx];
+                if (j > i) {
+                    coo->offdiag_row_indices[k] = i;
+                    coo->offdiag_col_indices[k] = j;
+                    coo->offdiag_values[k] = values[idx];
+                    k += 1;
+                } else if (i == j) {
+                    coo->diag[i] = values[idx];
+                }
+            }
+        }
+    }
+    */
 }  // namespace sfem
 
 #endif  // SFEM_COO_SYM_HPP
