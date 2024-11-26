@@ -26,7 +26,7 @@ export SFEM_MAX_IT=10000
 
 export SFEM_HEX8_ASSUME_AFFINE=1
 
-export CASE=1
+export CASE=2
 case $CASE in
 	1 | 2)
 		mesh=mesh
@@ -34,7 +34,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			create_cyclic_ss_mesh.sh 6 $SFEM_ELEMENT_REFINE_LEVEL
+			create_cyclic_ss_mesh.sh 1 $SFEM_ELEMENT_REFINE_LEVEL
 			echo "SFEM_ELEMENT_REFINE_LEVEL: $SFEM_ELEMENT_REFINE_LEVEL" > $mesh/meta.yaml
 		fi
 
