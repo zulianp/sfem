@@ -102,13 +102,13 @@ namespace sfem {
 
                     // Compute penalty residual
                     impl_.calc_r_pen(n_dofs,
-                                    mem->solution->data(),
-                                    penalty_param_,
-                                    lb,
-                                    ub,
-                                    lagr_lb ? lagr_lb->data() : nullptr,
-                                    lagr_ub ? lagr_ub->data() : nullptr,
-                                    mem->work->data());
+                                     mem->solution->data(),
+                                     penalty_param_,
+                                     lb,
+                                     ub,
+                                     lagr_lb ? lagr_lb->data() : nullptr,
+                                     lagr_ub ? lagr_ub->data() : nullptr,
+                                     mem->work->data());
 
                     const T r_pen_norm = blas_.norm2(n_dofs, mem->work->data());
 
@@ -220,8 +220,10 @@ namespace sfem {
         void set_atol(const T val) { atol_ = val; }
 
         void set_nlsmooth_steps(const int steps) { nlsmooth_steps = steps; }
-        BLAS_Tpl<T> &blas() {return blas_; }
-        ShiftedPenalty_Tpl<T> &impl() {return impl_; }
+        BLAS_Tpl<T>& blas() { return blas_; }
+        ShiftedPenalty_Tpl<T>& impl() { return impl_; }
+
+        bool debug{false};
 
     private:
         std::vector<std::shared_ptr<Operator<T>>> operator_;
@@ -236,13 +238,12 @@ namespace sfem {
 
         int max_it_{10};
         int iterations_{0};
-        int cycle_type_{V_CYCLE};
+        int cycle_type_{4};
         T atol_{1e-10};
 
         BLAS_Tpl<T> blas_;
         ShiftedPenalty_Tpl<T> impl_;
         bool verbose{true};
-        bool debug{false};
 
         std::shared_ptr<Buffer<T>> make_buffer(const ptrdiff_t n) const {
             return Buffer<T>::own(
@@ -316,28 +317,28 @@ namespace sfem {
 
             // Compute penalty residual
             impl_.calc_r_pen(n_dofs,
-                            mem->solution->data(),
-                            penalty_param_,
-                            lb,
-                            ub,
-                            l_lb,
-                            l_ub,
-                            mem->work->data());
+                             mem->solution->data(),
+                             penalty_param_,
+                             lb,
+                             ub,
+                             l_lb,
+                             l_ub,
+                             mem->work->data());
 
             blas_.zeros(n_dofs, mem->diag->data());
             impl_.calc_J_pen(n_dofs,
-                            mem->solution->data(),
-                            penalty_param_,
-                            lb,
-                            ub,
-                            l_lb,
-                            l_ub,
-                            mem->diag->data());
+                             mem->solution->data(),
+                             penalty_param_,
+                             lb,
+                             ub,
+                             l_lb,
+                             l_ub,
+                             mem->diag->data());
 
-            if (debug) {
-                printf("eval_residual_and_jacobian: ||r|| %e\n",
-                       blas_.norm2(n_dofs, mem->work->data()));
-            }
+            // if (debug) {
+            //     printf("eval_residual_and_jacobian: ||r|| %e\n",
+            //            blas_.norm2(n_dofs, mem->work->data()));
+            // }
         }
 
         void nonlinear_smooth() {
