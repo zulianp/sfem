@@ -13,7 +13,7 @@
 namespace sfem {
     template <typename T>
     static std::shared_ptr<Buffer<T>> create_buffer(const std::ptrdiff_t n, const MemorySpace es);
-    
+
     template <typename T>
     class ShiftableJacobi final : public ShiftableOperator<T> {
     public:
@@ -35,7 +35,7 @@ namespace sfem {
             blas.reciprocal(inv_diag->size(), relaxation_parameter, inv_diag->data());
         }
 
-        int shift(const std::shared_ptr<Buffer<T>>&d) override {
+        int shift(const std::shared_ptr<Buffer<T>>& d) override {
             assert(d->size() == diag->size());
 
             blas.copy(diag->size(), diag->data(), inv_diag->data());

@@ -18,6 +18,10 @@
 namespace sfem {
 
     template <typename T>
+    static std::shared_ptr<Operator<T>> diag_op(const std::shared_ptr<Buffer<T>>& diagonal_scaling,
+                                                const ExecutionSpace es);
+
+    template <typename T>
     class ConjugateGradient final : public MatrixFreeLinearSolver<T> {
     public:
         // Operator
