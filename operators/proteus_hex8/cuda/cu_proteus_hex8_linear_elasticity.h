@@ -30,6 +30,23 @@ int cu_proteus_affine_hex8_linear_elasticity_apply(
         void *const SFEM_RESTRICT outz,
         void *stream);
 
+int cu_proteus_affine_hex8_linear_elasticity_diag(
+        const int level,
+        const ptrdiff_t nelements,
+        const ptrdiff_t stride,  // Stride for elements and fff
+        const ptrdiff_t interior_start,
+        const idx_t *const SFEM_RESTRICT elements,
+        const void *const SFEM_RESTRICT jacobian_adjugate,
+        const void *const SFEM_RESTRICT jacobian_determinant,
+        const real_t mu,
+        const real_t lambda,
+        const enum RealType real_type,
+        const ptrdiff_t out_stride,
+        void *const SFEM_RESTRICT outx,
+        void *const SFEM_RESTRICT outy,
+        void *const SFEM_RESTRICT outz,
+        void *stream);
+
 #ifdef __cplusplus
 }
 #endif

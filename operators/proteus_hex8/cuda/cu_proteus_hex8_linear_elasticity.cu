@@ -130,19 +130,12 @@ template <typename T, int LEVEL>
 __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel(
         const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
-        const ptrdiff_t interior_start,
-        const idx_t *const SFEM_RESTRICT elements,
+        const ptrdiff_t interior_start, const idx_t *const SFEM_RESTRICT elements,
         const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
-        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_determinant,
-        const T mu,
-        const T lambda,
-        const ptrdiff_t u_stride,
-        const T *const SFEM_RESTRICT g_ux,
-        const T *const SFEM_RESTRICT g_uy,
-        const T *const SFEM_RESTRICT g_uz,
-        const ptrdiff_t out_stride,
-        T *const SFEM_RESTRICT g_outx,
-        T *const SFEM_RESTRICT g_outy,
+        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_determinant, const T mu, const T lambda,
+        const ptrdiff_t u_stride, const T *const SFEM_RESTRICT g_ux,
+        const T *const SFEM_RESTRICT g_uy, const T *const SFEM_RESTRICT g_uz,
+        const ptrdiff_t out_stride, T *const SFEM_RESTRICT g_outx, T *const SFEM_RESTRICT g_outy,
         T *const SFEM_RESTRICT g_outz) {
     static const int BLOCK_SIZE = LEVEL + 1;
     static const int BLOCK_SIZE_2 = BLOCK_SIZE * BLOCK_SIZE;
@@ -262,8 +255,7 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_kernel(
 
 template <typename T, int LEVEL>
 static __host__ __device__ void apply_micro_loop(const T *const elemental_matrix,
-                                                 const T *const u_block,
-                                                 T *const out_block) {
+                                                 const T *const u_block, T *const out_block) {
     // Micro-loop
     for (int zi = 0; zi < LEVEL; zi++) {
         for (int yi = 0; yi < LEVEL; yi++) {
@@ -312,7 +304,7 @@ static __host__ __device__ void apply_micro_loop(const T *const elemental_matrix
 
 // #define HEX8_SEGMENTED_SYMBOLIC
 
-#define HEX8_SEGMENTED_TENSOR_LOOP 
+#define HEX8_SEGMENTED_TENSOR_LOOP
 #ifndef HEX8_SEGMENTED_TENSOR_LOOP
 #define SEGEMENTED_QUADRATURE_LOOP(fun)  \
     do                                   \
@@ -354,19 +346,12 @@ template <typename T, int LEVEL>
 __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_segmented_kernel(
         const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
-        const ptrdiff_t interior_start,
-        const idx_t *const SFEM_RESTRICT elements,
+        const ptrdiff_t interior_start, const idx_t *const SFEM_RESTRICT elements,
         const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
-        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_determinant,
-        const T mu,
-        const T lambda,
-        const ptrdiff_t u_stride,
-        const T *const SFEM_RESTRICT g_ux,
-        const T *const SFEM_RESTRICT g_uy,
-        const T *const SFEM_RESTRICT g_uz,
-        const ptrdiff_t out_stride,
-        T *const SFEM_RESTRICT g_outx,
-        T *const SFEM_RESTRICT g_outy,
+        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_determinant, const T mu, const T lambda,
+        const ptrdiff_t u_stride, const T *const SFEM_RESTRICT g_ux,
+        const T *const SFEM_RESTRICT g_uy, const T *const SFEM_RESTRICT g_uz,
+        const ptrdiff_t out_stride, T *const SFEM_RESTRICT g_outx, T *const SFEM_RESTRICT g_outy,
         T *const SFEM_RESTRICT g_outz) {
     static const int BLOCK_SIZE = LEVEL + 1;
     static const int BLOCK_SIZE_2 = BLOCK_SIZE * BLOCK_SIZE;
@@ -565,21 +550,12 @@ template <typename T, int LEVEL>
 int cu_proteus_affine_hex8_linear_elasticity_apply_local_mem_tpl(
         const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
-        const ptrdiff_t interior_start,
-        const idx_t *const SFEM_RESTRICT elements,
+        const ptrdiff_t interior_start, const idx_t *const SFEM_RESTRICT elements,
         const cu_jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
-        const cu_jacobian_t *const SFEM_RESTRICT jacobian_determinant,
-        const T mu,
-        const T lambda,
-        const ptrdiff_t u_stride,
-        const T *const SFEM_RESTRICT ux,
-        const T *const SFEM_RESTRICT uy,
-        const T *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        T *const SFEM_RESTRICT outx,
-        T *const SFEM_RESTRICT outy,
-        T *const SFEM_RESTRICT outz,
-        void *stream) {
+        const cu_jacobian_t *const SFEM_RESTRICT jacobian_determinant, const T mu, const T lambda,
+        const ptrdiff_t u_stride, const T *const SFEM_RESTRICT ux, const T *const SFEM_RESTRICT uy,
+        const T *const SFEM_RESTRICT uz, const ptrdiff_t out_stride, T *const SFEM_RESTRICT outx,
+        T *const SFEM_RESTRICT outy, T *const SFEM_RESTRICT outz, void *stream) {
     SFEM_DEBUG_SYNCHRONIZE();
 
     int block_size = 128;
@@ -1103,10 +1079,8 @@ __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
 
 #else
 
-static __device__ inline bool cu_proteus_hex8_is_interior(const int level,
-                                                          const int xi,
-                                                          const int yi,
-                                                          const int zi) {
+static __device__ inline bool cu_proteus_hex8_is_interior(const int level, const int xi,
+                                                          const int yi, const int zi) {
     return xi > 0 && yi > 0 && zi > 0 && xi < level && yi < level && zi < level;
 }
 
@@ -1114,19 +1088,12 @@ template <typename T, int LEVEL>
 __global__ void cu_proteus_affine_hex8_linear_elasticity_apply_warp_kernel(
         const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
-        const ptrdiff_t interior_start,
-        const idx_t *const SFEM_RESTRICT elements,
+        const ptrdiff_t interior_start, const idx_t *const SFEM_RESTRICT elements,
         const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
-        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_determinant,
-        const T mu,
-        const T lambda,
-        const ptrdiff_t u_stride,
-        const T *const SFEM_RESTRICT g_ux,
-        const T *const SFEM_RESTRICT g_uy,
-        const T *const SFEM_RESTRICT g_uz,
-        const ptrdiff_t out_stride,
-        T *const SFEM_RESTRICT g_outx,
-        T *const SFEM_RESTRICT g_outy,
+        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_determinant, const T mu, const T lambda,
+        const ptrdiff_t u_stride, const T *const SFEM_RESTRICT g_ux,
+        const T *const SFEM_RESTRICT g_uy, const T *const SFEM_RESTRICT g_uz,
+        const ptrdiff_t out_stride, T *const SFEM_RESTRICT g_outx, T *const SFEM_RESTRICT g_outy,
         T *const SFEM_RESTRICT g_outz) {
     const auto xi = threadIdx.x;
     const auto yi = threadIdx.y;
@@ -1287,21 +1254,12 @@ template <typename T, int LEVEL>
 int cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl(
         const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
-        const ptrdiff_t interior_start,
-        const idx_t *const SFEM_RESTRICT elements,
+        const ptrdiff_t interior_start, const idx_t *const SFEM_RESTRICT elements,
         const cu_jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
-        const cu_jacobian_t *const SFEM_RESTRICT jacobian_determinant,
-        const T mu,
-        const T lambda,
-        const ptrdiff_t u_stride,
-        const T *const SFEM_RESTRICT ux,
-        const T *const SFEM_RESTRICT uy,
-        const T *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        T *const SFEM_RESTRICT outx,
-        T *const SFEM_RESTRICT outy,
-        T *const SFEM_RESTRICT outz,
-        void *stream) {
+        const cu_jacobian_t *const SFEM_RESTRICT jacobian_determinant, const T mu, const T lambda,
+        const ptrdiff_t u_stride, const T *const SFEM_RESTRICT ux, const T *const SFEM_RESTRICT uy,
+        const T *const SFEM_RESTRICT uz, const ptrdiff_t out_stride, T *const SFEM_RESTRICT outx,
+        T *const SFEM_RESTRICT outy, T *const SFEM_RESTRICT outz, void *stream) {
     SFEM_DEBUG_SYNCHRONIZE();
 
     // static const int BLOCK_SIZE = LEVEL + 1;
@@ -1363,24 +1321,15 @@ int cu_proteus_affine_hex8_linear_elasticity_apply_warp_tpl(
 // Dispatch based on the level
 template <typename real_t>
 static int cu_proteus_affine_hex8_linear_elasticity_apply_tpl(
-        const int level,
-        const ptrdiff_t nelements,
+        const int level, const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
-        const ptrdiff_t interior_start,
-        const idx_t *const SFEM_RESTRICT elements,
+        const ptrdiff_t interior_start, const idx_t *const SFEM_RESTRICT elements,
         const cu_jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
-        const cu_jacobian_t *const SFEM_RESTRICT jacobian_determinant,
-        const real_t mu,
-        const real_t lambda,
-        const ptrdiff_t u_stride,
-        const real_t *const SFEM_RESTRICT ux,
-        const real_t *const SFEM_RESTRICT uy,
-        const real_t *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        real_t *const SFEM_RESTRICT outx,
-        real_t *const SFEM_RESTRICT outy,
-        real_t *const SFEM_RESTRICT outz,
-        void *stream) {
+        const cu_jacobian_t *const SFEM_RESTRICT jacobian_determinant, const real_t mu,
+        const real_t lambda, const ptrdiff_t u_stride, const real_t *const SFEM_RESTRICT ux,
+        const real_t *const SFEM_RESTRICT uy, const real_t *const SFEM_RESTRICT uz,
+        const ptrdiff_t out_stride, real_t *const SFEM_RESTRICT outx,
+        real_t *const SFEM_RESTRICT outy, real_t *const SFEM_RESTRICT outz, void *stream) {
     switch (level) {
         // case 2: {
         //     return my_kernel<real_t, 2>(nelements,
@@ -1527,25 +1476,15 @@ static int cu_proteus_affine_hex8_linear_elasticity_apply_tpl(
 }
 
 extern int cu_proteus_affine_hex8_linear_elasticity_apply(
-        const int level,
-        const ptrdiff_t nelements,
+        const int level, const ptrdiff_t nelements,
         const ptrdiff_t stride,  // Stride for elements and fff
-        const ptrdiff_t interior_start,
-        const idx_t *const SFEM_RESTRICT elements,
+        const ptrdiff_t interior_start, const idx_t *const SFEM_RESTRICT elements,
         const void *const SFEM_RESTRICT jacobian_adjugate,
-        const void *const SFEM_RESTRICT jacobian_determinant,
-        const real_t mu,
-        const real_t lambda,
-        const enum RealType real_type,
-        const ptrdiff_t u_stride,
-        const void *const SFEM_RESTRICT ux,
-        const void *const SFEM_RESTRICT uy,
-        const void *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT outx,
-        void *const SFEM_RESTRICT outy,
-        void *const SFEM_RESTRICT outz,
-        void *stream) {
+        const void *const SFEM_RESTRICT jacobian_determinant, const real_t mu, const real_t lambda,
+        const enum RealType real_type, const ptrdiff_t u_stride, const void *const SFEM_RESTRICT ux,
+        const void *const SFEM_RESTRICT uy, const void *const SFEM_RESTRICT uz,
+        const ptrdiff_t out_stride, void *const SFEM_RESTRICT outx, void *const SFEM_RESTRICT outy,
+        void *const SFEM_RESTRICT outz, void *stream) {
     init_quadrature();
 
     switch (real_type) {
@@ -1615,6 +1554,200 @@ extern int cu_proteus_affine_hex8_linear_elasticity_apply(
         default: {
             fprintf(stderr,
                     "[Error] cu_proteus_affine_hex8_linear_elasticity_apply: not implemented "
+                    "for "
+                    "type %s "
+                    "(code %d)\n",
+                    real_type_to_string(real_type),
+                    real_type);
+            assert(0);
+            return SFEM_FAILURE;
+        }
+    }
+}
+
+template <typename T>
+__global__ void cu_proteus_affine_hex8_linear_elasticity_diag_kernel(
+        const int level, const ptrdiff_t nelements,
+        const ptrdiff_t stride,  // Stride for elements and fff
+        const ptrdiff_t interior_start, const idx_t *const SFEM_RESTRICT elements,
+        const cu_jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+        const cu_jacobian_t *const SFEM_RESTRICT jacobian_determinant, const T mu,
+        const T lambda, const ptrdiff_t out_stride, T *const SFEM_RESTRICT outx,
+        T *const SFEM_RESTRICT outy, T *const SFEM_RESTRICT outz) {
+    T *const out[3] = {outx, outy, outz};
+
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
+         e += blockDim.x * gridDim.x) {
+        T linear_elasticity_diag[3 * 8];
+        // Build operator
+        {
+            T sub_adjugate[9];
+            T sub_determinant = jacobian_determinant[e];
+
+            for (int d = 0; d < 9; d++) {
+                sub_adjugate[d] = jacobian_adjugate[d * stride + e];
+            }
+
+            const T h = 1. / level;
+            cu_hex8_sub_adj_0_in_place(h, sub_adjugate, &sub_determinant);
+
+            cu_hex8_linear_elasticity_diag<T>(
+                    mu, lambda, sub_adjugate, sub_determinant, linear_elasticity_diag);
+        }
+
+        // Iterate over sub-elements
+        for (int zi = 0; zi < level; zi++) {
+            for (int yi = 0; yi < level; yi++) {
+                for (int xi = 0; xi < level; xi++) {
+
+                    int ev[8] = {
+                            // Bottom
+                            elements[cu_proteus_hex8_lidx(level, xi, yi, zi) * stride + e],
+                            elements[cu_proteus_hex8_lidx(level, xi + 1, yi, zi) * stride + e],
+                            elements[cu_proteus_hex8_lidx(level, xi + 1, yi + 1, zi) * stride + e],
+                            elements[cu_proteus_hex8_lidx(level, xi, yi + 1, zi) * stride + e],
+                            // Top
+                            elements[cu_proteus_hex8_lidx(level, xi, yi, zi + 1) * stride + e],
+                            elements[cu_proteus_hex8_lidx(level, xi + 1, yi, zi + 1) * stride + e],
+                            elements[cu_proteus_hex8_lidx(level, xi + 1, yi + 1, zi + 1) * stride +
+                                     e],
+                            elements[cu_proteus_hex8_lidx(level, xi, yi + 1, zi + 1) * stride + e]};
+
+                    for (int d = 0; d < 3; d++) {
+                        for (int v = 0; v < 8; v++) {
+                            assert(linear_elasticity_diag[d * 8 + v] ==
+                                   linear_elasticity_diag[d * 8 + v]);
+                            
+                            atomicAdd(&out[d][ev[v] * out_stride],
+                                      linear_elasticity_diag[d * 8 + v]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+template <typename T>
+static int cu_proteus_affine_hex8_linear_elasticity_diag_tpl(
+        const int level, const ptrdiff_t nelements,
+        const ptrdiff_t stride,  // Stride for elements and fff
+        const ptrdiff_t interior_start, const idx_t *const SFEM_RESTRICT elements,
+        const cu_jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+        const cu_jacobian_t *const SFEM_RESTRICT jacobian_determinant, const T mu, const T lambda,
+        const ptrdiff_t out_stride, T *const SFEM_RESTRICT outx, T *const SFEM_RESTRICT outy,
+        T *const SFEM_RESTRICT outz, void *stream) {
+    int block_size = 128;
+#ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+    {
+        int min_grid_size;
+        cudaOccupancyMaxPotentialBlockSize(
+                &min_grid_size, &block_size, local_mem_kernel<T, LEVEL>, 0, 0);
+    }
+#endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+
+    const ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
+
+    if (stream) {
+        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
+        cu_proteus_affine_hex8_linear_elasticity_diag_kernel<T>
+                <<<n_blocks, block_size, 0, s>>>(level,
+                                                 nelements,
+                                                 stride,
+                                                 interior_start,
+                                                 elements,
+                                                 jacobian_adjugate,
+                                                 jacobian_determinant,
+                                                 mu,
+                                                 lambda,
+                                                 out_stride,
+                                                 outx,
+                                                 outy,
+                                                 outz);
+    } else {
+        cu_proteus_affine_hex8_linear_elasticity_diag_kernel<T>
+                <<<n_blocks, block_size, 0>>>(level,
+                                              nelements,
+                                              stride,
+                                              interior_start,
+                                              elements,
+                                              jacobian_adjugate,
+                                              jacobian_determinant,
+                                              mu,
+                                              lambda,
+                                              out_stride,
+                                              outx,
+                                              outy,
+                                              outz);
+    }
+
+    SFEM_DEBUG_SYNCHRONIZE();
+    return SFEM_SUCCESS;
+}
+
+extern int cu_proteus_affine_hex8_linear_elasticity_diag(
+        const int level, const ptrdiff_t nelements,
+        const ptrdiff_t stride,  // Stride for elements and fff
+        const ptrdiff_t interior_start, const idx_t *const SFEM_RESTRICT elements,
+        const void *const SFEM_RESTRICT jacobian_adjugate,
+        const void *const SFEM_RESTRICT jacobian_determinant, const real_t mu, const real_t lambda,
+        const enum RealType real_type, const ptrdiff_t out_stride, void *const SFEM_RESTRICT outx,
+        void *const SFEM_RESTRICT outy, void *const SFEM_RESTRICT outz, void *stream) {
+    switch (real_type) {
+        case SFEM_REAL_DEFAULT: {
+            return cu_proteus_affine_hex8_linear_elasticity_diag_tpl<real_t>(
+                    level,
+                    nelements,
+                    stride,
+                    interior_start,
+                    elements,
+                    (cu_jacobian_t *)jacobian_adjugate,
+                    (cu_jacobian_t *)jacobian_determinant,
+                    mu,
+                    lambda,
+                    out_stride,
+                    (real_t *)outx,
+                    (real_t *)outy,
+                    (real_t *)outz,
+                    stream);
+        }
+        case SFEM_FLOAT32: {
+            return cu_proteus_affine_hex8_linear_elasticity_diag_tpl<float>(
+                    level,
+                    nelements,
+                    stride,
+                    interior_start,
+                    elements,
+                    (cu_jacobian_t *)jacobian_adjugate,
+                    (cu_jacobian_t *)jacobian_determinant,
+                    mu,
+                    lambda,
+                    out_stride,
+                    (float *)outx,
+                    (float *)outy,
+                    (float *)outz,
+                    stream);
+        }
+        case SFEM_FLOAT64: {
+            return cu_proteus_affine_hex8_linear_elasticity_diag_tpl<double>(
+                    level,
+                    nelements,
+                    stride,
+                    interior_start,
+                    elements,
+                    (cu_jacobian_t *)jacobian_adjugate,
+                    (cu_jacobian_t *)jacobian_determinant,
+                    mu,
+                    lambda,
+                    out_stride,
+                    (double *)outx,
+                    (double *)outy,
+                    (double *)outz,
+                    stream);
+        }
+        default: {
+            fprintf(stderr,
+                    "[Error] cu_proteus_affine_hex8_linear_elasticity_diag: not implemented "
                     "for "
                     "type %s "
                     "(code %d)\n",

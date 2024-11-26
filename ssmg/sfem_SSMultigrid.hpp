@@ -5,6 +5,12 @@
 #include "sfem_Stationary.hpp"
 #include "sfem_ShiftableJacobi.hpp"
 
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_cuda_ShiftedPenalty_impl.hpp"
+#else
+#include "sfem_ShiftedPenalty_impl.hpp"
+#endif
+
 namespace sfem {
 
     template <class MG>
@@ -60,12 +66,14 @@ namespace sfem {
                 es);
 
         auto mg = std::make_shared<MG>();
-        mg->set_nlsmooth_steps(5);
+        mg->set_nlsmooth_steps(10);
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
+            // FIXME this should not be here!
             CUDA_BLAS<real_t>::build_blas(mg->blas());
-            // TODO cuda_init()
+            CUDA_ShiftedPenalty<real_t>::build(mg->impl());
+            mg->execution_space_ = EXECUTION_SPACE_DEVICE;
         } else
 #endif
         {

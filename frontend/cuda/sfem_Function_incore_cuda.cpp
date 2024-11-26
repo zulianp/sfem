@@ -354,7 +354,8 @@ namespace sfem {
                                  colidx,
                                  real_type,
                                  diag_values,
-                                 off_diag_values, stream);
+                                 off_diag_values,
+                                 stream);
         }
 
         int value(const real_t *x, real_t *const out) override {
@@ -764,9 +765,22 @@ namespace sfem {
         }
 
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
-            std::cerr << "Unimplemented function ---> hessian_diag in GPULinearElasticity\n";
-            assert(0);
-            return SFEM_FAILURE;
+            auto &ssm = space->semi_structured_mesh();
+            return cu_proteus_affine_hex8_linear_elasticity_diag(ssm.level(),
+                                                                 adjugate->n_elements(),
+                                                                 adjugate->n_elements(),
+                                                                 ssm.interior_start(),
+                                                                 adjugate->elements(),
+                                                                 adjugate->jacobian_adjugate(),
+                                                                 adjugate->jacobian_determinant(),
+                                                                 mu,
+                                                                 lambda,
+                                                                 real_type,
+                                                                 3,
+                                                                 &values[0],
+                                                                 &values[1],
+                                                                 &values[2],
+                                                                 SFEM_DEFAULT_STREAM);
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
