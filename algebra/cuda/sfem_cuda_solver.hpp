@@ -16,6 +16,7 @@ namespace sfem {
     std::shared_ptr<ConjugateGradient<T>> d_cg() {
         auto cg = std::make_shared<ConjugateGradient<T>>();
         CUDA_BLAS<T>::build_blas(cg->blas);
+        cg->execution_space_ = EXECUTION_SPACE_DEVICE;
         return cg;
     }
 
@@ -23,6 +24,7 @@ namespace sfem {
     std::shared_ptr<BiCGStab<T>> d_bcgs() {
         auto cg = std::make_shared<BiCGStab<T>>();
         CUDA_BLAS<T>::build_blas(cg->blas);
+        cg->execution_space_ = EXECUTION_SPACE_DEVICE;
         return cg;
     }
 
@@ -34,6 +36,7 @@ namespace sfem {
 
         CUDA_BLAS<T>::build_blas(ret->blas);
         ret->ensure_power_method();
+        ret->execution_space_ = EXECUTION_SPACE_DEVICE;
         return ret;
     }
 
@@ -41,6 +44,7 @@ namespace sfem {
     std::shared_ptr<Multigrid<T>> d_mg() {
         auto mg = std::make_shared<Multigrid<T>>();
         CUDA_BLAS<T>::build_blas(mg->blas);
+        mg->execution_space_ = EXECUTION_SPACE_DEVICE;
         return mg;
     }
     

@@ -69,13 +69,14 @@ namespace sfem {
                                                 const ExecutionSpace es) {
         const std::ptrdiff_t n = diagonal_scaling->size();
 
-        // FIXME make simpler version
+        // // FIXME make simpler version
         auto impl = sfem::blas<T>(es)->xypaz;
         return std::make_shared<LambdaOperator<T>>(
                 n,
                 n,
                 [n, diagonal_scaling, impl](const T* const x, T* const y) {
-                    impl(n, x, y, 0, y);
+                    auto d = diagonal_scaling->data();
+                    impl(n, x, d, 0, y);
                 },
                 es);
     }
