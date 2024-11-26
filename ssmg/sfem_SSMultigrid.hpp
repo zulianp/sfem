@@ -36,6 +36,8 @@ namespace sfem {
         auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
         auto linear_op_coarse = sfem::create_linear_operator(
                 fs->block_size() == 1 ? "COO_SYM" : "BCRS_SYM", f_coarse, nullptr, es);
+        // auto linear_op_coarse = sfem::create_linear_operator("MF", f_coarse, nullptr, es);
+
 
         // auto smoother = sfem::create_cheb3<real_t>(linear_op, es);
         // smoother->eigen_solver_tol = 1e-2;
@@ -53,7 +55,7 @@ namespace sfem {
         f->set_value_to_constrained_dofs(1, d->data());
 
         auto sj = sfem::create_shiftable_jacobi(d, es);
-        sj->relaxation_parameter = 0.4;
+        sj->relaxation_parameter = 1./fs->block_size();
         auto smoother = sfem::create_stationary<real_t>(linear_op, sj, es);
         smoother->set_max_it(3);
 
@@ -69,7 +71,7 @@ namespace sfem {
                 es);
 
         auto mg = std::make_shared<MG>();
-        mg->set_nlsmooth_steps(10);
+        // mg->set_nlsmooth_steps(10);
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
