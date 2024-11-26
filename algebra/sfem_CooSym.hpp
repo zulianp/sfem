@@ -52,28 +52,20 @@ namespace sfem {
 
 #pragma omp parallel for
             for (R k = 0; k < ndofs; k++) {
-                if ((!bdy_dofs) || !mask_get(k, bdy_dofs->data())) {
-                    y[k] += diag[k] * x[k];
-                } else {
-                    y[k] = x[k];
-                }
+                y[k] += diag[k] * x[k];
             }
 
-#pragma omp parallel for
+            // #pragma omp parallel for
             for (R k = 0; k < offdiag_nnz; k++) {
                 R i = offdiag_row_indices[k];
                 R j = offdiag_col_indices[k];
-                // TOBEREMOVED
-                if ((!bdy_dofs) ||
-                    !(mask_get(i, bdy_dofs->data()) || mask_get(j, bdy_dofs->data()))) {
-                    T val = offdiag_values[k];
+                T val = offdiag_values[k];
 
-#pragma omp atomic update
-                    y[j] += x[i] * val;
+                // #pragma omp atomic update
+                y[j] += x[i] * val;
 
-#pragma omp atomic update
-                    y[i] += x[j] * val;
-                }
+                // #pragma omp atomic update
+                y[i] += x[j] * val;
             }
 
             return SFEM_SUCCESS;

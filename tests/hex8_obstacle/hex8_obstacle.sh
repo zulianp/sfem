@@ -16,7 +16,7 @@ export PATH=$SFEM_DIR/scripts/sfem/mesh:$PATH
 export PYTHONPATH=$SFEM_DIR/lib:$SFEM_DIR/scripts:$PYTHONPATH
 source $SFEM_DIR/workflows/sfem_config.sh
 
-export OMP_NUM_THREADS=8
+export OMP_NUM_THREADS=4
 export OMP_PROC_BIND=true 
 export CUDA_LAUNCH_BLOCKING=0
 
@@ -34,7 +34,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			create_cyclic_ss_mesh.sh 1 $SFEM_ELEMENT_REFINE_LEVEL
+			create_cyclic_ss_mesh.sh 2 $SFEM_ELEMENT_REFINE_LEVEL
 			echo "SFEM_ELEMENT_REFINE_LEVEL: $SFEM_ELEMENT_REFINE_LEVEL" > $mesh/meta.yaml
 		fi
 

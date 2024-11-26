@@ -3,12 +3,18 @@
 
 #include <cassert>
 #include <csignal>
-#include "partitioner.h"
+
 #include "sfem_API.hpp"
 #include "sfem_ShiftableJacobi.hpp"
 #include "sfem_Stationary.hpp"
+
+#ifdef SFEM_ENABLE_AMG
+
+#include "partitioner.h"
 #include "sfem_pwc_interpolator.hpp"
 #include "smoother.h"
+
+#endif
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
@@ -71,7 +77,7 @@ namespace sfem {
                 es);
 
         auto mg = std::make_shared<MG>();
-        // mg->set_nlsmooth_steps(10);
+        mg->set_nlsmooth_steps(20);
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
@@ -86,6 +92,8 @@ namespace sfem {
         }
 
         mg->add_level(linear_op, smoother, nullptr, restriction);
+
+#ifdef SFEM_ENABLE_AMG
 
         auto crs_graph = f_coarse->space()->mesh_ptr()->node_to_node_graph_upper_triangular();
         auto diag_values = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
@@ -130,9 +138,9 @@ namespace sfem {
 
         // AMG tunable paramaters
         real_t coarsening_factor = 2.0;
-        count_t smoothing_steps = 2;
+        count_t smoothing_steps = 3;
         count_t coarsest_ndofs = 50;
-        count_t max_levels = 2;
+        count_t max_levels = 20;
 
         auto prev_mat = fine_mat;
         std::shared_ptr<sfem::PiecewiseConstantInterpolator<idx_t, real_t>> p, pt = nullptr;
@@ -145,7 +153,8 @@ namespace sfem {
                 offdiag_values[k] = prev_mat->values->data()[k];
             }
 
-            real_t *diag = (real_t *)malloc(ndofs * sizeof(real_t));
+            auto ptr_lp = sfem::create_buffer<real_t>(ndofs, es);
+            
             l2_smoother(ndofs,
                         bdy_dofs,
                         prev_mat->values->size(),
@@ -153,10 +162,10 @@ namespace sfem {
                         prev_mat->values->data(),
                         prev_mat->offdiag_rowidx->data(),
                         prev_mat->offdiag_colidx->data(),
-                        diag);
-            auto ptr_lp = sfem::Buffer<real_t>::own(ndofs, diag, free, sfem::MEMORY_SPACE_HOST);
+                        ptr_lp->data());
 
             auto l2_smoother_op = sfem::create_shiftable_jacobi(ptr_lp, es);
+
             l2_smoother_op->relaxation_parameter = 1.0;
             auto stat_iter = sfem::create_stationary<real_t>(prev_mat, l2_smoother_op, es);
 
@@ -170,6 +179,7 @@ namespace sfem {
                                     &offdiag_nnz,
                                     &ndofs,
                                     ws);
+
             if (failure || ndofs < coarsest_ndofs || amg_levels == max_levels) {
                 auto cg = sfem::create_cg<real_t>(prev_mat, es);
                 cg->verbose = false;
@@ -234,6 +244,12 @@ namespace sfem {
         free(offdiag_row_indices);
         free(offdiag_col_indices);
         free(offdiag_values);
+
+#else
+        auto solver_coarse = sfem::create_cg<real_t>(linear_op_coarse, es);
+        solver_coarse->verbose = false;
+         mg->add_level(linear_op_coarse, solver_coarse, prolongation, nullptr);
+#endif
         return mg;
     }
 
