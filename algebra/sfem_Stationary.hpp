@@ -27,15 +27,22 @@ namespace sfem {
 
         int iterations() const override { return iterations_; }
 
+        void ensure_workspace()
+        {
+            if(!workspace || workspace->size() != n_dofs) {
+                workspace = Buffer<T>::own(n_dofs, blas.allocate(n_dofs), this->blas.destroy);
+            }
+        }
+
         void default_init() {
             OpenMP_BLAS<T>::build_blas(blas);
             execution_space_ = EXECUTION_SPACE_HOST;
-            auto x = this->blas.allocate(n_dofs);
-            workspace = Buffer<T>::own(n_dofs, x, this->blas.destroy);
         }
 
         /* Operator */
         int apply(const T* const b, T* const x) override {
+            ensure_workspace();
+
             T* r = workspace->data();
             for (iterations_ = 0; iterations_ < max_it; iterations_++) {
                 blas.zeros(workspace->size(), r);

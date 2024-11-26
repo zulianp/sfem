@@ -63,6 +63,23 @@ namespace sfem {
         return blas;
     }
 
+
+    template <typename T>
+    static std::shared_ptr<Operator<T>> diag_op(const std::shared_ptr<Buffer<T>>& diagonal_scaling,
+                                                const ExecutionSpace es) {
+        const std::ptrdiff_t n = diagonal_scaling->size();
+
+        // FIXME make simpler version
+        auto impl = sfem::blas<T>(es)->xypaz;
+        return std::make_shared<LambdaOperator<T>>(
+                n,
+                n,
+                [n, diagonal_scaling, impl](const T* const x, T* const y) {
+                    impl(n, x, y, 0, y);
+                },
+                es);
+    }
+
     template <typename T>
     static std::shared_ptr<Buffer<T>> create_buffer(const std::ptrdiff_t n, const MemorySpace es) {
 #ifdef SFEM_ENABLE_CUDA
@@ -115,6 +132,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
             CUDA_BLAS<T>::build_blas(ret->blas);
+            ret->execution_space_ = es;
         } else
 #endif  // SFEM_ENABLE_CUDA
         {
@@ -137,6 +155,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
             CUDA_BLAS<T>::build_blas(ret->blas);
+            ret->execution_space_ = es;
         } else
 #endif  // SFEM_ENABLE_CUDA
         {

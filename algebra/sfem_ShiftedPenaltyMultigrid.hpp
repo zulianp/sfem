@@ -19,6 +19,10 @@
 // https://bitbucket.org/hkothari/matsci/src/ab637a0655512c4ddf299914dd45fdb563ac7b34/Solvers/%2BBoxConstraints/%40PenaltyMG/PenaltyMG.m?at=restructuring
 namespace sfem {
 
+    template <typename T>
+    static std::shared_ptr<Operator<T>> diag_op(const std::shared_ptr<Buffer<T>>& diagonal_scaling,
+                                                const ExecutionSpace es);
+
     /// level 0 is the finest
     template <typename T>
     class ShiftedPenaltyMultigrid final : public Operator<T> {
@@ -251,7 +255,7 @@ namespace sfem {
 
         T penalty_param_{10};  // mu
         T max_penalty_param_{1000};
-        int nlsmooth_steps{3};
+        int nlsmooth_steps{10};
         int max_inner_it{3};
 
         ptrdiff_t count_smoothing_steps{0};
