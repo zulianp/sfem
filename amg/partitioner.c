@@ -1,6 +1,7 @@
 #include "partitioner.h"
 #include <stdio.h>
 #include "coo_sort.h"
+#include "sfem_base.h"
 #include "sfem_mask.h"
 
 int pairwise_aggregation(const real_t inv_total, const ptrdiff_t fine_ndofs, count_t *offdiag_nnz,
@@ -211,4 +212,27 @@ int pairwise_aggregation(const real_t inv_total, const ptrdiff_t fine_ndofs, cou
     }
 
     return 0;
+}
+
+PartitionerWorkspace *create_partition_ws(const ptrdiff_t fine_ndofs, const count_t offdiag_nnz) {
+    PartitionerWorkspace *ws = malloc(sizeof(PartitionerWorkspace));
+    ws->partition = (idx_t *)malloc((fine_ndofs) * sizeof(idx_t));
+    ws->rowsums = (real_t *)calloc((fine_ndofs), sizeof(real_t));
+    ws->ptr_i = (idx_t *)malloc(offdiag_nnz * sizeof(idx_t));
+    ws->ptr_j = (idx_t *)malloc(offdiag_nnz * sizeof(idx_t));
+    ws->weights = (real_t *)malloc(offdiag_nnz * sizeof(real_t));
+    ws->sort_indices = (count_t *)malloc(offdiag_nnz * sizeof(count_t));
+    return ws;
+}
+
+error_t free_partition_ws(PartitionerWorkspace *ws) {
+    free(ws->partition);
+    free(ws->rowsums);
+    free(ws->ptr_i);
+    free(ws->ptr_j);
+    free(ws->weights);
+    free(ws->sort_indices);
+    free(ws);
+
+    return SFEM_SUCCESS;
 }

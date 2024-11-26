@@ -6,7 +6,6 @@
 #include "sfem_API.hpp"
 #include "sfem_mask.h"
 
-
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_blas.h"
@@ -130,7 +129,7 @@ int main(int argc, char *argv[]) {
         auto fine_mat = sfem::h_coosym<idx_t, real_t>(
                 mask, off_diag_rows, crs_graph->colidx(), off_diag_values, diag_values);
 
-        auto near_null = sfem::create_buffer<real_t>(mask_count(fs->n_dofs()), es);
+        auto near_null = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
         auto amg = builder(2.0, mask->data(), near_null->data(), fine_mat);
         /*
@@ -169,8 +168,8 @@ int main(int argc, char *argv[]) {
         stat_iter->verbose = true;
         solver = stat_iter;
         */
-    } else 
-#endif // SFEM_ENABLE_AMG
+    } else
+#endif  // SFEM_ENABLE_AMG
     {
         auto linear_op = sfem::make_linear_op(f);
         auto cg = sfem::create_cg<real_t>(linear_op, es);
