@@ -874,8 +874,17 @@ int resample_field_local(
 #define TET10_V2
 
 #if SFEM_TET10_CUDA == ON
-            const int ret = hex8_to_tet10_resample_field_local_CUDA(
-                    nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+            const int ret = hex8_to_tet10_resample_field_local_CUDA(nelements,
+                                                                    nnodes,
+                                                                    1,
+                                                                    elems,
+                                                                    xyz,
+                                                                    n,
+                                                                    stride,
+                                                                    origin,
+                                                                    delta,
+                                                                    data,
+                                                                    weighted_field);
 
             RETURN_FROM_FUNCTION(ret);
 #else
@@ -927,10 +936,12 @@ int resample_field(
     real_t* weighted_field = calloc(nnodes, sizeof(real_t));
 
     if (element_type == TET10 && SFEM_TET10_CUDA == ON) {
+#if SFEM_TET10_CUDA == ON
         const int ret = hex8_to_tet10_resample_field_local_CUDA(
-                nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g);
+                nelements, nnodes, 1, elems, xyz, n, stride, origin, delta, data, g);
 
         RETURN_FROM_FUNCTION(ret);
+#endif
     }
 
     resample_field_local(element_type,

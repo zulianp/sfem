@@ -262,8 +262,10 @@ int main(int argc, char* argv[]) {
                 // mpi_size > 1
 
                 if (info.element_type == TET10 && SFEM_TET10_CUDA == ON) {
+#if SFEM_TET10_CUDA == ON
                     const int ret = hex8_to_tet10_resample_field_local_CUDA(mesh.nelements,
                                                                             mesh.nnodes,
+                                                                            0,
                                                                             mesh.elements,
                                                                             mesh.points,
                                                                             nlocal,
@@ -273,33 +275,36 @@ int main(int argc, char* argv[]) {
                                                                             field,
                                                                             g);
 
-                    RETURN_FROM_FUNCTION(ret);
-                }
-
-                resample_field_local(
-                        // Mesh
-                        mesh.element_type,
-                        mesh.nelements,
-                        mesh.nnodes,
-                        mesh.elements,
-                        mesh.points,
-                        // discrete field
-                        nlocal,
-                        stride,
-                        origin,
-                        delta,
-                        field,
-                        // Output
-                        g,
-                        &info);
+#endif
+                } else {  // Other cases and CPU
+                    resample_field_local(
+                            // Mesh
+                            mesh.element_type,
+                            mesh.nelements,
+                            mesh.nnodes,
+                            mesh.elements,
+                            mesh.points,
+                            // discrete field
+                            nlocal,
+                            stride,
+                            origin,
+                            delta,
+                            field,
+                            // Output
+                            g,
+                            &info);
+                }  // end if info.element_type == TET10 && SFEM_TET10_CUDA == ON
 
                 real_t* mass_vector = calloc(mesh.nnodes, sizeof(real_t));
 
                 if (mesh.element_type == TET10) {
-                    // FIXME (we should wrap mass vector assembly in sfem_resample_field.c)
+// FIXME (we should wrap mass vector assembly in sfem_resample_field.c)
+// #if SFEM_TET10_CUDA == OFF
+                    // In case of CUDA == ON this is calculated ia a CUDA kernel
                     tet10_assemble_dual_mass_vector(
                             mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mass_vector);
-                } else {
+// #endif
+                } else {  // mesh.element_type == TET4
                     enum ElemType st = shell_type(mesh.element_type);
 
                     if (st == INVALID) {
@@ -318,8 +323,9 @@ int main(int argc, char* argv[]) {
                                              mesh.points,
                                              mass_vector);
                     }
-                }
+                }  // end if mesh.element_type == TET10
 
+// #if SFEM_TET10_CUDA == OFF
                 // exchange ghost nodes and add contribution
                 if (mpi_size > 1) {
                     send_recv_t slave_to_master;
@@ -335,6 +341,7 @@ int main(int argc, char* argv[]) {
                 }
 
                 // divide by the mass vector
+
                 for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
                     if (mass_vector[i] == 0) {
                         fprintf(stderr,
@@ -347,6 +354,7 @@ int main(int argc, char* argv[]) {
                     assert(mass_vector[i] != 0);
                     g[i] /= mass_vector[i];
                 }
+// #endif
 
                 free(mass_vector);
             }  // end if mpi_size > 1
