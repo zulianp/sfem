@@ -32,7 +32,7 @@ namespace sfem {
             MPI_Abort(MPI_COMM_WORLD, -1);
             return nullptr;
         }
-
+        
         auto fs = f->space();
         auto fs_coarse = fs->derefine();
         auto f_coarse = f->derefine(fs_coarse, true);
@@ -43,7 +43,6 @@ namespace sfem {
         auto linear_op_coarse = sfem::create_linear_operator(
                 fs->block_size() == 1 ? "COO_SYM" : "BCRS_SYM", f_coarse, nullptr, es);
         // auto linear_op_coarse = sfem::create_linear_operator("MF", f_coarse, nullptr, es);
-
 
         // auto smoother = sfem::create_cheb3<real_t>(linear_op, es);
         // smoother->eigen_solver_tol = 1e-2;
@@ -61,7 +60,7 @@ namespace sfem {
         f->set_value_to_constrained_dofs(1, d->data());
 
         auto sj = sfem::create_shiftable_jacobi(d, es);
-        sj->relaxation_parameter = 1./fs->block_size();
+        sj->relaxation_parameter = 1. / fs->block_size();
         auto smoother = sfem::create_stationary<real_t>(linear_op, sj, es);
         smoother->set_max_it(3);
 
@@ -77,7 +76,7 @@ namespace sfem {
                 es);
 
         auto mg = std::make_shared<MG>();
-        mg->set_nlsmooth_steps(20);
+        // mg->set_nlsmooth_steps(20);
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
@@ -94,7 +93,6 @@ namespace sfem {
         mg->add_level(linear_op, smoother, nullptr, restriction);
 
 #ifdef SFEM_ENABLE_AMG
-
         auto crs_graph = f_coarse->space()->mesh_ptr()->node_to_node_graph_upper_triangular();
         auto diag_values = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
         auto off_diag_values = sfem::create_buffer<real_t>(crs_graph->nnz(), es);
@@ -154,7 +152,7 @@ namespace sfem {
             }
 
             auto ptr_lp = sfem::create_buffer<real_t>(ndofs, es);
-            
+
             l2_smoother(ndofs,
                         bdy_dofs,
                         prev_mat->values->size(),
@@ -248,7 +246,7 @@ namespace sfem {
 #else
         auto solver_coarse = sfem::create_cg<real_t>(linear_op_coarse, es);
         solver_coarse->verbose = false;
-         mg->add_level(linear_op_coarse, solver_coarse, prolongation, nullptr);
+        mg->add_level(linear_op_coarse, solver_coarse, prolongation, nullptr);
 #endif
         return mg;
     }
