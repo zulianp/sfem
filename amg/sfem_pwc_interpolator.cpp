@@ -62,6 +62,7 @@ namespace sfem {
         printf("NEW NNZ: %d\n", new_nnz);
         sum_duplicates(sort_indices, row_indices, col_indices, values, &new_nnz);
         printf("NEW NNZ after sum dup: %d\n", new_nnz);
+        printf("COARSE DIM: %d\n", (int)coarse_dim);
 
         R *offdiag_row_indices = (R *)malloc(new_nnz * sizeof(R));
         R *offdiag_col_indices = (R *)malloc(new_nnz * sizeof(R));

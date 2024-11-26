@@ -1,6 +1,8 @@
 #ifndef PARTITIONER_H
 #define PARTITIONER_H
 
+#include <bits/types/error_t.h>
+#include "sfem_base.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -29,6 +31,10 @@ typedef struct {
 int partition(const mask_t *bdy_dofs, const real_t coarsening_factor, real_t *near_null,
               idx_t *offdiag_row_indices, idx_t *offdiag_col_indices, real_t *offdiag_values,
               count_t *offdiag_nnz, ptrdiff_t *ndofs, PartitionerWorkspace *ws);
+
+PartitionerWorkspace *create_partition_ws(const ptrdiff_t fine_ndofs, const count_t offdiag_nnz);
+error_t free_partition_ws(PartitionerWorkspace *ws);
+
 #ifdef __cplusplus
 }
 #endif
