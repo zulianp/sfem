@@ -68,6 +68,15 @@ namespace sfem {
                 y[i] += x[j] * val;
             }
 
+            if (bdy_dofs) {
+#pragma omp parallel for
+                for (R k = 0; k < ndofs; k++) {
+                    if (mask_get(k, bdy_dofs->data())) {
+                        y[k] = x[k];
+                    }
+                }
+            }
+
             return SFEM_SUCCESS;
         }
     };

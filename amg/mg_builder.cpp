@@ -51,7 +51,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
             offdiag_values[k] = prev_mat->values->data()[k];
         }
 
-        real_t *inv_diag = (real_t *)malloc(ndofs * sizeof(real_t));
+        real_t *diag = (real_t *)malloc(ndofs * sizeof(real_t));
         l2_smoother(ndofs,
                     bdy_dofs,
                     prev_mat->values->size(),
@@ -59,16 +59,31 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
                     prev_mat->values->data(),
                     prev_mat->offdiag_rowidx->data(),
                     prev_mat->offdiag_colidx->data(),
-                    inv_diag);
-        auto ptr_lp = sfem::Buffer<real_t>::own(ndofs, inv_diag, free, sfem::MEMORY_SPACE_HOST);
+                    diag);
+        auto ptr_lp = sfem::Buffer<real_t>::own(ndofs, diag, free, sfem::MEMORY_SPACE_HOST);
+
+        sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST)
+                ->reciprocal(ptr_lp->size(), 1., ptr_lp->data());
+
         auto l2_smoother_op = sfem::h_lpsmoother(ptr_lp);
 
         for (idx_t i = 0; i < ndofs; i++) {
             near_null[i] = 1.0;
         }
+
         auto stat_iter = sfem::h_stationary<real_t>(prev_mat, l2_smoother_op);
-        stat_iter->set_max_it(1);
-        // stat_iter->apply(zeros, near_null);
+
+        if(bdy_dofs) {
+    #pragma omp parallel for
+            for (idx_t k = 0; k < ndofs; k++) {
+                if (mask_get(k, bdy_dofs)) {
+                    near_null[k] = 0;
+                }
+            }
+
+            stat_iter->set_max_it(10);
+            stat_iter->apply(zeros, near_null);
+        }
 
         ptrdiff_t finer_dim = ndofs;
         int failure = partition(bdy_dofs,
@@ -115,7 +130,9 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
         auto pt = h_pwc_interp(ptr_weights, ptr_partition, coarser_dim);
         pt->transpose();
 
+        // stat_iter->set_max_it(1);
         stat_iter->set_max_it(3);
+        // stat_iter->set_max_it(30);
         amg->add_level(prev_mat, stat_iter, p, pt);
         p = h_pwc_interp(ptr_weights, ptr_partition, coarser_dim);
 

@@ -94,6 +94,8 @@ boundary_nodes()
 	done	
 
 	$LAUNCH soa_to_aos "$mesh/"$name"/i*.raw" $SFEM_IDX_SIZE $sideset_raw
+
+	# od -i $sideset_raw
 	rm -r $workspace
 }
 
