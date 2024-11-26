@@ -225,7 +225,7 @@ PartitionerWorkspace *create_partition_ws(const ptrdiff_t fine_ndofs, const coun
     return ws;
 }
 
-error_t free_partition_ws(PartitionerWorkspace *ws) {
+int free_partition_ws(PartitionerWorkspace *ws) {
     free(ws->partition);
     free(ws->rowsums);
     free(ws->ptr_i);

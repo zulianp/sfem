@@ -75,13 +75,8 @@ namespace sfem {
         if (es == EXECUTION_SPACE_DEVICE) {
             // FIXME this should not be here!
             CUDA_BLAS<real_t>::build_blas(mg->blas());
-<<<<<<< Updated upstream
             CUDA_ShiftedPenalty<real_t>::build(mg->impl());
             mg->execution_space_ = EXECUTION_SPACE_DEVICE;
-=======
-            // TODO cuda_init(), unimplemented
-            assert(false);
->>>>>>> Stashed changes
         } else
 #endif
         {
