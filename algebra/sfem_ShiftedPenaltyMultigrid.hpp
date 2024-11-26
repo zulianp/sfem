@@ -420,7 +420,7 @@ namespace sfem {
             }
 
             auto restriction = restriction_[level];
-            auto prolongation = prolongation_[level];
+            auto prolongation = prolongation_[coarser_level(level)];
             auto mem_coarse = memory_[coarser_level(level)];
 
             for (int k = 0; k < this->cycle_type_; k++) {
