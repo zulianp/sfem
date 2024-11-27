@@ -42,13 +42,16 @@ namespace sfem {
         auto fs = f->space();
         auto fs_coarse = fs->derefine();
         auto f_coarse = f->derefine(fs_coarse, true);
-        // auto linear_op = sfem::create_linear_operator("BSR", f, nullptr, es);
-        // auto linear_op_coarse = sfem::create_linear_operator("BCRS_SYM", f_coarse, nullptr, es);
 
-        auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
+        const char * SFEM_FINE_OP_TYPE = "MF";
+        const char * SFEM_COARSE_OP_TYPE = fs->block_size() == 1 ? "COO_SYM" : "BCRS_SYM";
+        
+        SFEM_READ_ENV(SFEM_FINE_OP_TYPE, );
+        SFEM_READ_ENV(SFEM_COARSE_OP_TYPE, );
+
+        auto linear_op = sfem::create_linear_operator(SFEM_FINE_OP_TYPE, f, nullptr, es);
         auto linear_op_coarse = sfem::create_linear_operator(
-                fs->block_size() == 1 ? "COO_SYM" : "BCRS_SYM", f_coarse, nullptr, es);
-        // auto linear_op_coarse = sfem::create_linear_operator("MF", f_coarse, nullptr, es);
+                SFEM_COARSE_OP_TYPE, f_coarse, nullptr, es);
 
         // auto smoother = sfem::create_cheb3<real_t>(linear_op, es);
         // smoother->eigen_solver_tol = 1e-2;
