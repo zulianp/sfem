@@ -832,8 +832,6 @@ namespace sfem {
     static auto hessian_coo_sym(const std::shared_ptr<sfem::Function> &f,
                                 const std::shared_ptr<Buffer<real_t>> &x,
                                 const sfem::ExecutionSpace es) {
-        assert(es == sfem::EXECUTION_SPACE_HOST);
-
         auto fs = f->space();
         auto crs_graph = fs->mesh_ptr()->node_to_node_graph_upper_triangular();
 
@@ -970,24 +968,6 @@ namespace sfem {
             return sqrt(ret);
         }
     }
-
-    //     template <typename R, typename C, typename T>
-    //     std::shared_ptr<CRSSpMV<R, C, T>> create_crs_spmv(const ptrdiff_t rows,
-    //                                                  const ptrdiff_t cols,
-    //                                                  const std::shared_ptr<Buffer<R>> &rowptr,
-    //                                                  const std::shared_ptr<Buffer<C>> &colidx,
-    //                                                  const std::shared_ptr<Buffer<T>> &values,
-    //                                                  const T scale_output, ExecutionSpace es)
-    //     {
-    //         #ifdef SFEM_ENABLE_CUDA
-    //                 if (op.execution_space() == sfem::EXECUTION_SPACE_DEVICE) {
-
-    //                 } else
-    // #endif
-    //                 {
-
-    //                 }
-    //     }
 
     static int write_crs(const std::string &path, CRSGraph &graph, sfem::Buffer<real_t> &values) {
         struct stat st = {0};

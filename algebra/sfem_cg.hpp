@@ -59,7 +59,7 @@ namespace sfem {
 
         int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op,
                                   const std::shared_ptr<Buffer<T>>& diag) override {
-            assert(execution_space() = (enum ExecutionSpace)diag->mem_space());
+            assert(execution_space() == (enum ExecutionSpace)diag->mem_space());
             auto J = op + sfem::diag_op(diag, execution_space());
             this->apply_op = [=](const T* const x, T* const y) { J->apply(x, y); };
             n_dofs = op->rows();
