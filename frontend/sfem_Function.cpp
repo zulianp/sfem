@@ -1576,7 +1576,7 @@ namespace sfem {
                        calls,
                        total_time,
                        total_time / calls,
-                       space->n_dofs() / (total_time / calls));
+                       1e-6 * space->n_dofs() / (total_time / calls));
             }
         }
 
@@ -1880,7 +1880,7 @@ namespace sfem {
                        calls,
                        total_time,
                        total_time / calls,
-                       space->n_dofs() / (total_time / calls));
+                       1e-6 * space->n_dofs() / (total_time / calls));
             }
         }
         
