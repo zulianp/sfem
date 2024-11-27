@@ -88,7 +88,8 @@ namespace sfem {
             bool converged = false;
             for (iterations_ = 0; iterations_ < max_it_; iterations_++) {
                 for (int inner_iter = 0; inner_iter < max_inner_it;
-                     inner_iter++, count_inner_iter++) {
+                     inner_iter++) {
+                     count_inner_iter++;
                     CycleReturnCode ret = nonlinear_cycle();
                     if (ret == CYCLE_CONVERGED) {
                         break;
@@ -256,7 +257,7 @@ namespace sfem {
 
         T penalty_param_{10};  // mu
         T max_penalty_param_{1000};
-        int nlsmooth_steps{10};
+        int nlsmooth_steps{3};
         int max_inner_it{3};
 
         ptrdiff_t count_smoothing_steps{0};
@@ -359,6 +360,8 @@ namespace sfem {
 
                 count_smoothing_steps += smoother->iterations();
             }
+
+            // printf("count_smoothing_steps=%d\n", count_smoothing_steps);
         }
 
         CycleReturnCode nonlinear_cycle() {
