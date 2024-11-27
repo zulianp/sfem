@@ -57,9 +57,9 @@ namespace sfem {
 
             // #pragma omp parallel for
             for (R k = 0; k < offdiag_nnz; k++) {
-                R i = offdiag_row_indices[k];
-                R j = offdiag_col_indices[k];
-                T val = offdiag_values[k];
+                const R i = offdiag_row_indices[k];
+                const R j = offdiag_col_indices[k];
+                const T val = offdiag_values[k];
 
                 // #pragma omp atomic update
                 y[j] += x[i] * val;

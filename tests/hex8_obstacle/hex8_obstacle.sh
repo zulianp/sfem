@@ -34,7 +34,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			create_cyclic_ss_mesh.sh 2 $SFEM_ELEMENT_REFINE_LEVEL
+			create_cyclic_ss_mesh.sh 4 $SFEM_ELEMENT_REFINE_LEVEL
 			echo "SFEM_ELEMENT_REFINE_LEVEL: $SFEM_ELEMENT_REFINE_LEVEL" > $mesh/meta.yaml
 		fi
 
@@ -119,7 +119,9 @@ case $CASE in
 esac
 
 echo "Running: obstacle $mesh output"
-$LAUNCH obstacle $mesh output 
+
+FULL_EXEC_PATH=`which obstacle`
+$LAUNCH $FULL_EXEC_PATH $mesh output 
 # | tee obs.log.txt
 
 if [[ $SFEM_USE_ELASTICITY -eq 1 ]]
