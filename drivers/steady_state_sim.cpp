@@ -140,14 +140,18 @@ int main(int argc, char *argv[]) {
 
         auto near_null = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
-        auto amg = builder(2.0, mask->data(), near_null->data(), fine_mat);
-
+        auto amg = builder(1.5, mask->data(), near_null->data(), fine_mat);
+        if (!amg->test_interp()) {
+            printf("tests passed\n");
+        } else {
+            printf("FAILEDDDDDD\n");
+        }
 
 #if 1
-        amg->set_max_it(SFEM_MAX_IT);
+        amg->set_max_it(10);
         amg->verbose = true;
+        amg->debug = true;
         solver = amg;
-
 
         /*
         auto inv_diag = sfem::create_buffer<real_t>(mask_count(fs->n_dofs()), es);

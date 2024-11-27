@@ -1,6 +1,7 @@
 #ifndef SFEM_MULTIGRID_HPP
 #define SFEM_MULTIGRID_HPP
 
+#include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <cstdlib>
@@ -99,6 +100,48 @@ namespace sfem {
 
         void set_atol(const T val) { atol_ = val; }
 
+        int test_interp() {
+            ensure_init();
+
+            int failure = 0;
+            for (int level = 0; level < n_levels() - 1; level++) {
+                auto pt = restriction_[level];
+                auto p = prolongation_[level + 1];
+                auto A = operator_[level];
+                auto Ac = operator_[level + 1];
+                int coarse_dim = Ac->rows();
+                int fine_dim = A->rows();
+
+                assert(p.rows() == coarse_dim);
+                assert(p.cols() == fine_dim);
+                assert(pt.rows() == fine_dim);
+                assert(pt.cols() == coarse_dim);
+
+                auto coarse_vec = h_buffer<T>(coarse_dim);
+                for (int i = 0; i < coarse_dim; i++) {
+                    coarse_vec->data()[i] = i;
+                }
+
+                auto out1 = h_buffer<T>(coarse_dim);
+                Ac->apply(coarse_vec->data(), out1->data());
+
+                auto temp = h_buffer<T>(fine_dim);
+                auto temp2 = h_buffer<T>(fine_dim);
+                auto out2 = h_buffer<T>(coarse_dim);
+                p->apply(coarse_vec->data(), temp->data());
+                A->apply(temp->data(), temp2->data());
+                pt->apply(temp2->data(), out2->data());
+
+                this->blas.axpby(coarse_dim, 1, out1->data(), -1, out2->data());
+                T err_norm = this->blas.norm2(coarse_dim, out2->data());
+                printf("Level %d: ||Ac 1 - pt A p 1|| = %f\n", level, err_norm);
+                if (err_norm > 1e-8) {
+                    failure++;
+                }
+            }
+            return failure;
+        }
+
     private:
         std::vector<std::shared_ptr<Operator<T>>> operator_;
         std::vector<std::shared_ptr<Operator<T>>> smoother_;
@@ -165,6 +208,13 @@ namespace sfem {
             if (coarsest_level() == level) {
                 this->blas.zeros(mem->solution->size(), mem->solution->data());
                 if (!smoother->apply(mem->rhs->data(), mem->solution->data())) {
+                    if (debug) {
+                        this->blas.zeros(mem->size(), mem->work->data());
+                        operator_[level]->apply(mem->solution->data(), mem->work->data());
+                        this->blas.axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
+                        printf("|| r_H || = %g\n",
+                               this->blas.norm2(mem->work->size(), mem->work->data()));
+                    }
                     return CYCLE_CONTINUE;
                 } else {
                     return CYCLE_FAILURE;

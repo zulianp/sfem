@@ -90,10 +90,12 @@ int partition(const mask_t *bdy_dofs, const real_t coarsening_factor, real_t *ne
 
         real_t coarse_nrows = (real_t)*ndofs;
         current_cf = fine_ndofs_float / coarse_nrows;
+        /*
         printf("Matching step completed, cf: %.2f nrows: %d offdiag nnz: %d\n",
                current_cf,
                (int)*ndofs,
                (int)*offdiag_nnz);
+        */
     }
 
     return 0;
