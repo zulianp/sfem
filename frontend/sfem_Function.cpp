@@ -1571,11 +1571,12 @@ namespace sfem {
         ~SemiStructuredLinearElasticity() {
             if (calls) {
                 printf("SemiStructuredLinearElasticity::apply(%s) called %ld times. Total: %g [s], "
-                       "Avg: %g [s]\n",
+                       "Avg: %g [s], TP %g [MDOF/s]\n",
                        use_affine_approximation ? "affine" : "isoparametric",
                        calls,
                        total_time,
-                       total_time / calls);
+                       total_time / calls,
+                       space->n_dofs() / (total_time / calls));
             }
         }
 
@@ -1874,13 +1875,15 @@ namespace sfem {
         {
             if (calls) {
                 printf("SemiStructuredLaplacian::apply(%s) called %ld times. Total: %g [s], "
-                       "Avg: %g [s]\n",
+                       "Avg: %g [s], TP %g [MDOF/s]\n",
                        use_affine_approximation ? "affine" : "isoparametric",
                        calls,
                        total_time,
-                       total_time / calls);
+                       total_time / calls,
+                       space->n_dofs() / (total_time / calls));
             }
         }
+        
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             assert(space->has_semi_structured_mesh());

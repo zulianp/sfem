@@ -85,7 +85,7 @@ namespace sfem {
         
         auto spmg = std::dynamic_pointer_cast<ShiftedPenaltyMultigrid<real_t>>(mg);
         if(spmg) {
-            spmg->set_nlsmooth_steps(1);
+            spmg->set_nlsmooth_steps(10);
         }
 
 #ifdef SFEM_ENABLE_CUDA
@@ -229,13 +229,16 @@ namespace sfem {
 
             auto pt = h_pwc_interp(weights_buff, partition_buff, coarser_dim);
             pt->transpose();
-            auto stat_iter = sfem::create_stationary<real_t>(prev_mat, amg_smoother, es);
+
+            // Convert matrix?
+            std::shared_ptr<sfem::Operator<real_t>> coarse_op = prev_mat;
+            auto stat_iter = sfem::create_stationary<real_t>(coarse_op, amg_smoother, es);
 
             if (amg_levels == 1) {
                 mg->add_level(linear_op_coarse, stat_iter, prolongation, pt);
             } else {
                 stat_iter->set_max_it(smoothing_steps);
-                mg->add_level(prev_mat, stat_iter, p, pt);
+                mg->add_level(coarse_op, stat_iter, p, pt);
             }
             p = h_pwc_interp(weights_buff, partition_buff, coarser_dim);
 
