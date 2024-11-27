@@ -20,6 +20,8 @@
 
 #endif
 
+#include "sfem_ShiftedPenaltyMultigrid.hpp"
+
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
 #else
@@ -80,13 +82,21 @@ namespace sfem {
                 es);
 
         auto mg = std::make_shared<MG>();
-        // mg->set_nlsmooth_steps(20);
+        
+        auto spmg = std::dynamic_pointer_cast<ShiftedPenaltyMultigrid<real_t>>(mg);
+        if(spmg) {
+            spmg->set_nlsmooth_steps(1);
+        }
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
             // FIXME this should not be here!
             CUDA_BLAS<real_t>::build_blas(mg->blas());
-            CUDA_ShiftedPenalty<real_t>::build(mg->impl());
+
+            if(spmg) {
+                CUDA_ShiftedPenalty<real_t>::build(spmg->impl());
+            }
+
             mg->execution_space_ = EXECUTION_SPACE_DEVICE;
         } else
 #endif
