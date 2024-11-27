@@ -258,7 +258,7 @@ namespace sfem {
         T penalty_param_{10};  // mu
         T max_penalty_param_{1000};
         int nlsmooth_steps{3};
-        int max_inner_it{3};
+        int max_inner_it{10};
 
         ptrdiff_t count_smoothing_steps{0};
 
