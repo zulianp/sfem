@@ -98,6 +98,12 @@ int partition(const mask_t *bdy_dofs, const real_t coarsening_factor, real_t *ne
         */
     }
 
+    /* only nuemann
+    for (int i = 0; i < fine_ndofs; i++) {
+        assert(ws->partition[i] >= 0);
+    }
+    */
+
     return 0;
 }
 
@@ -152,6 +158,7 @@ int pairwise_aggregation(const real_t inv_total, const ptrdiff_t fine_ndofs, cou
             coarse_counter += 1;
         }
     }
+    printf("Pairs found: %d\n", coarse_counter);
 
     // Assign any unmatched DOF to singleton on coarse grid
     for (idx_t row = 0; row < *ndofs; row++) {

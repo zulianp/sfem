@@ -136,14 +136,18 @@ namespace sfem {
 
                 auto out1 = h_buffer<T>(coarse_dim);
                 Ac->apply(coarse_vec->data(), out1->data());
+                T ac1 = this->blas.norm2(coarse_dim, out1->data());
+                printf("Level %d: ||Ac 1|| = %f\n", level, ac1);
 
                 auto temp = h_buffer<T>(fine_dim);
                 auto temp2 = h_buffer<T>(fine_dim);
                 auto out2 = h_buffer<T>(coarse_dim);
                 p->apply(coarse_vec->data(), temp->data());
-                for (int i = 0; i < fine_dim; i++) {
-                    assert(fabs(temp->data()[i] - 1) < 1e-8);
-                }
+                /* only nueman
+                    for (int i = 0; i < fine_dim; i++) {
+                        assert(fabs(temp->data()[i] - 1) < 1e-8);
+                    }
+                    */
 
                 A->apply(temp->data(), temp2->data());
                 real_t should_be_zero = this->blas.norm2(fine_dim, temp2->data());
@@ -173,7 +177,7 @@ namespace sfem {
 
         int max_it_{10};
         int iterations_{0};
-        int cycle_type_{V_CYCLE};
+        int cycle_type_{4};
         T atol_{1e-10};
 
         T norm_residual_0{1};

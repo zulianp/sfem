@@ -148,9 +148,9 @@ int main(int argc, char *argv[]) {
         }
 
 #if 1
-        amg->set_max_it(10);
+        amg->set_max_it(100);
         amg->verbose = true;
-        amg->debug = true;
+        // amg->debug = true;
         solver = amg;
 
         /*

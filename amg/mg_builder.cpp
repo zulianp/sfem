@@ -19,7 +19,6 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
     ptrdiff_t fine_ndofs = fine_mat->rows();
     idx_t levels = 1;
     idx_t max_level = 20;
-    bdy_dofs = nullptr;
 
     PartitionerWorkspace ws;
     count_t offdiag_nnz = fine_mat->values->size();
@@ -134,7 +133,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
         auto pt = h_pwc_interp(ptr_weights, ptr_partition, coarser_dim);
         pt->transpose();
 
-        stat_iter->set_max_it(1);
+        stat_iter->set_max_it(3);
         // stat_iter->set_max_it(3);
         //  stat_iter->set_max_it(30);
         amg->add_level(prev_mat, stat_iter, p, pt);

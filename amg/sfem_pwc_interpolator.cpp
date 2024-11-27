@@ -36,6 +36,7 @@ namespace sfem {
         for (R k = 0; k < fine_nnz; k++) {
             R i = a->offdiag_rowidx->data()[k];
             R j = a->offdiag_colidx->data()[k];
+            assert(j > i);
             T val = a->values->data()[k];
 
             R coarse_i = partition[i];
@@ -53,7 +54,7 @@ namespace sfem {
                     values[write_pos] = coarse_val;
                     write_pos += 1;
                 } else {
-                    acoarse_diag[coarse_i] += coarse_val;
+                    acoarse_diag[coarse_i] += 2. * coarse_val;
                 }
             }
         }
