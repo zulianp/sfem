@@ -1,6 +1,7 @@
 #ifndef SFEM_MULTIGRID_HPP
 #define SFEM_MULTIGRID_HPP
 
+#include <math.h>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
@@ -103,6 +104,17 @@ namespace sfem {
         int test_interp() {
             ensure_init();
 
+            auto finest_A = operator_[0];
+            int finest_dim = finest_A->rows();
+            auto finest_vec = h_buffer<T>(finest_dim);
+            auto finest_out = h_buffer<T>(finest_dim);
+            for (int i = 0; i < finest_dim; i++) {
+                finest_vec->data()[i] = 1;
+            }
+            finest_A->apply(finest_vec->data(), finest_out->data());
+            real_t should_be_zero = this->blas.norm2(finest_dim, finest_out->data());
+            printf("||A 1|| = %f\n", should_be_zero);
+
             int failure = 0;
             for (int level = 0; level < n_levels() - 1; level++) {
                 auto pt = restriction_[level];
@@ -119,7 +131,7 @@ namespace sfem {
 
                 auto coarse_vec = h_buffer<T>(coarse_dim);
                 for (int i = 0; i < coarse_dim; i++) {
-                    coarse_vec->data()[i] = i;
+                    coarse_vec->data()[i] = 1;
                 }
 
                 auto out1 = h_buffer<T>(coarse_dim);
@@ -129,7 +141,13 @@ namespace sfem {
                 auto temp2 = h_buffer<T>(fine_dim);
                 auto out2 = h_buffer<T>(coarse_dim);
                 p->apply(coarse_vec->data(), temp->data());
+                for (int i = 0; i < fine_dim; i++) {
+                    assert(fabs(temp->data()[i] - 1) < 1e-8);
+                }
+
                 A->apply(temp->data(), temp2->data());
+                real_t should_be_zero = this->blas.norm2(fine_dim, temp2->data());
+                printf("level: %d ||A p 1|| = %f\n", level, should_be_zero);
                 pt->apply(temp2->data(), out2->data());
 
                 this->blas.axpby(coarse_dim, 1, out1->data(), -1, out2->data());
