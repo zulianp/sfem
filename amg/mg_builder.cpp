@@ -18,6 +18,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
 
     ptrdiff_t fine_ndofs = fine_mat->rows();
     idx_t levels = 1;
+    idx_t max_level = 20;
 
     PartitionerWorkspace ws;
     count_t offdiag_nnz = fine_mat->values->size();
@@ -73,8 +74,9 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
 
         auto stat_iter = sfem::h_stationary<real_t>(prev_mat, l2_smoother_op);
 
-        if(bdy_dofs) {
-    #pragma omp parallel for
+        /*
+        if (bdy_dofs) {
+#pragma omp parallel for
             for (idx_t k = 0; k < ndofs; k++) {
                 if (mask_get(k, bdy_dofs)) {
                     near_null[k] = 0;
@@ -84,6 +86,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
             stat_iter->set_max_it(10);
             stat_iter->apply(zeros, near_null);
         }
+        */
 
         ptrdiff_t finer_dim = ndofs;
         int failure = partition(bdy_dofs,
@@ -95,12 +98,12 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
                                 &offdiag_nnz,
                                 &ndofs,
                                 &ws);
-        if (failure || ndofs < 10) {
+        if (failure || ndofs < 500 || levels == max_level) {
             auto cg = sfem::create_cg<real_t>(prev_mat, sfem::EXECUTION_SPACE_HOST);
             cg->verbose = false;
-            cg->set_max_it(100);
+            cg->set_max_it(10000);
             cg->set_op(prev_mat);
-            cg->set_rtol(1e-6);
+            cg->set_rtol(1e-12);
             cg->set_preconditioner_op(l2_smoother_op);
             amg->add_level(prev_mat, cg, p, nullptr);
             // amg->add_level(prev_mat, stat_iter, p, nullptr);
@@ -130,9 +133,9 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
         auto pt = h_pwc_interp(ptr_weights, ptr_partition, coarser_dim);
         pt->transpose();
 
-        // stat_iter->set_max_it(1);
-        stat_iter->set_max_it(3);
-        // stat_iter->set_max_it(30);
+        stat_iter->set_max_it(1);
+        // stat_iter->set_max_it(3);
+        //  stat_iter->set_max_it(30);
         amg->add_level(prev_mat, stat_iter, p, pt);
         p = h_pwc_interp(ptr_weights, ptr_partition, coarser_dim);
 
