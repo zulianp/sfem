@@ -1867,6 +1867,21 @@ namespace sfem {
         enum ElemType element_type { INVALID };
         bool use_affine_approximation{false};
 
+        long calls{0};
+        double total_time{0};
+
+        ~SemiStructuredLaplacian()
+        {
+            if (calls) {
+                printf("SemiStructuredLaplacian::apply(%s) called %ld times. Total: %g [s], "
+                       "Avg: %g [s]\n",
+                       use_affine_approximation ? "affine" : "isoparametric",
+                       calls,
+                       total_time,
+                       total_time / calls);
+            }
+        }
+
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             assert(space->has_semi_structured_mesh());
             if (!space->has_semi_structured_mesh()) {
@@ -1936,8 +1951,11 @@ namespace sfem {
 
             auto &ssm = space->semi_structured_mesh();
 
+            double tick = MPI_Wtime();
+
+            int err = 0;
             if (use_affine_approximation) {
-                return proteus_affine_hex8_laplacian_apply(ssm.level(),
+                err = proteus_affine_hex8_laplacian_apply(ssm.level(),
                                                            ssm.n_elements(),
                                                            ssm.interior_start(),
                                                            ssm.element_data(),
@@ -1946,7 +1964,7 @@ namespace sfem {
                                                            out);
 
             } else {
-                return proteus_hex8_laplacian_apply(ssm.level(),
+                err = proteus_hex8_laplacian_apply(ssm.level(),
                                                     ssm.n_elements(),
                                                     ssm.interior_start(),
                                                     ssm.element_data(),
@@ -1954,6 +1972,11 @@ namespace sfem {
                                                     h,
                                                     out);
             }
+
+            double tock = MPI_Wtime();
+            total_time += (tock - tick);
+            calls++;
+            return err;
         }
 
         int value(const real_t *x, real_t *const out) override {

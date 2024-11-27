@@ -59,7 +59,9 @@ export SFEM_HEX8_ASSUME_AXIS_ALIGNED=0
 export SFEM_HEX8_QUADRATURE_ORDER=2
 
 echo "Testing SFEM_OPERATOR=$SFEM_OPERATOR"
-$LAUNCH test_galerkin_assembly $mesh test_output 
+
+FULL_EXEC_PATH=`which test_galerkin_assembly`
+$LAUNCH $FULL_EXEC_PATH $mesh test_output 
 # | tee test_mg_log.txt
 
 # raw_to_db.py $mesh error.vtk -p output/error.raw -d $SFEM_REAL_T
