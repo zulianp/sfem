@@ -54,6 +54,7 @@ namespace sfem {
                 }
                 preconditioner->apply(r, x);
             }
+            
             return 0;
         }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
