@@ -26,10 +26,22 @@ ptrdiff_t mesh_exchange_master_buffer_count(const send_recv_t *const slave_to_ma
     return slave_to_master->recv_count[size - 1] + slave_to_master->recv_displs[size - 1];
 }
 
-void mesh_exchange_nodal_slave_to_master(const mesh_t *mesh, send_recv_t *const slave_to_master,
-                                         MPI_Datatype data_type,
-                                         void *const SFEM_RESTRICT ghost_data,
-                                         void *const SFEM_RESTRICT buffer) {
+/**
+ * @brief
+ *
+ * @param mesh
+ * @param slave_to_master
+ * @param data_type
+ * @param ghost_data
+ * @param buffer
+ */
+void                                                                       //
+mesh_exchange_nodal_slave_to_master(const mesh_t *mesh,                    //
+                                    send_recv_t *const slave_to_master,    //
+                                    MPI_Datatype data_type,                //
+                                    void *const SFEM_RESTRICT ghost_data,  //
+                                    void *const SFEM_RESTRICT buffer) {    //
+    //
     // send slave nodes to process with master nodes
     MPI_CATCH_ERROR(MPI_Alltoallv(ghost_data,
                                   slave_to_master->send_count,
@@ -915,15 +927,29 @@ void mesh_remote_connectivity_graph(const mesh_t *mesh, count_t **out_rowptr, id
     }
 }
 
-void exchange_add(mesh_t *mesh, send_recv_t *slave_to_master, real_t *const SFEM_RESTRICT inout,
-                  real_t *const SFEM_RESTRICT real_buffer) {
+/**
+ * @brief
+ *
+ * @param mesh
+ * @param slave_to_master
+ * @param inout
+ * @param real_buffer
+ */
+void                                                     //
+exchange_add(mesh_t *mesh,                               //
+             send_recv_t *slave_to_master,               //
+             real_t *const SFEM_RESTRICT inout,          //
+             real_t *const SFEM_RESTRICT real_buffer) {  //
     //
     ptrdiff_t n_ghosts = (mesh->nnodes - mesh->n_owned_nodes);
     ptrdiff_t count = mesh_exchange_master_buffer_count(slave_to_master);
 
     // Exchange mass_vector ghosts
-    mesh_exchange_nodal_slave_to_master(
-            mesh, slave_to_master, SFEM_MPI_REAL_T, &inout[mesh->n_owned_nodes], real_buffer);
+    mesh_exchange_nodal_slave_to_master(mesh,  //
+                                        slave_to_master,
+                                        SFEM_MPI_REAL_T,
+                                        &inout[mesh->n_owned_nodes],
+                                        real_buffer);
 
     for (ptrdiff_t i = 0; i < count; i++) {
         assert(real_buffer[i] == real_buffer[i]);
