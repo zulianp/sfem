@@ -692,7 +692,6 @@ static int build_crs_graph_upper_triangular_from_n2e(const ptrdiff_t nelements,
             const ptrdiff_t nnz = rowptr[nnodes];
             colidx = (idx_t *)malloc(nnz * sizeof(idx_t));
 
-
             {
 #pragma omp parallel for
                 for (ptrdiff_t node = 0; node < nnodes; ++node) {
@@ -753,13 +752,32 @@ int build_crs_graph_upper_triangular_from_element(const ptrdiff_t nelements,
     return err;
 }
 
-int crs_to_coo(const ptrdiff_t n, const count_t *const rowptr, idx_t *const row_idx)
-{
+int crs_to_coo(const ptrdiff_t n, const count_t *const rowptr, idx_t *const row_idx) {
 #pragma omp parallel for
-    for(ptrdiff_t row = 0; row < n; row++) {
-        for(count_t k = rowptr[row]; k < rowptr[row+1]; k++) {
+    for (ptrdiff_t row = 0; row < n; row++) {
+        for (count_t k = rowptr[row]; k < rowptr[row + 1]; k++) {
             row_idx[k] = row;
         }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int sorted_coo_to_crs(const count_t nnz, const idx_t *const row_idx, const ptrdiff_t n, count_t *const rowptr) {
+    memset(rowptr, 0, (n+1) * sizeof(count_t));
+
+#pragma omp parallel for
+    for (count_t i = 0; i < nnz; i++) {
+        // Check sorted
+        assert(i == 0 || row_idx[i - 1] <= row_idx[i]);
+
+#pragma omp atomic update
+        rowptr[row_idx[i] + 1]++;
+    }
+
+    // Cumulative sum
+    for(ptrdiff_t i = 0; i < n; i++) {
+        rowptr[i+1] += rowptr[i];
     }
 
     return SFEM_SUCCESS;
