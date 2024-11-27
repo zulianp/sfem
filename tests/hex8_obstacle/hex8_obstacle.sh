@@ -34,7 +34,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			create_cyclic_ss_mesh.sh 4 $SFEM_ELEMENT_REFINE_LEVEL
+			create_cyclic_ss_mesh.sh 8 $SFEM_ELEMENT_REFINE_LEVEL
 			echo "SFEM_ELEMENT_REFINE_LEVEL: $SFEM_ELEMENT_REFINE_LEVEL" > $mesh/meta.yaml
 		fi
 

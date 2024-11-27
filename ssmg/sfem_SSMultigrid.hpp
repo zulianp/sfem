@@ -274,7 +274,7 @@ namespace sfem {
         // small enough to solve exactly. Direct solver by cholesky is also probably better here
         auto cg = sfem::create_cg<real_t>(prev_mat, es);
         cg->verbose = false;
-        cg->set_max_it(300);
+        cg->set_max_it(10000); // Keep it large just to be sure!
         cg->set_rtol(1e-12);
         cg->set_preconditioner_op(amg_smoother);
         mg->add_level(prev_mat, cg, p, nullptr);
