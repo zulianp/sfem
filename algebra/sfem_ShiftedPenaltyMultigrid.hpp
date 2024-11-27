@@ -386,7 +386,7 @@ namespace sfem {
                 blas_.zeros(mem_coarse->solution->size(), mem_coarse->solution->data());
             }
 
-            cycle(coarser_level(finest_level()));
+            int ret = cycle(coarser_level(finest_level()));
             assert(ret != CYCLE_FAILURE);
 
             {

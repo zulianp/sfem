@@ -1889,8 +1889,8 @@ namespace sfem {
         }
 
         std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
-            assert(false);
             fprintf(stderr, "[Error] ss:Laplacian::lor_op NOT IMPLEMENTED!\n");
+            assert(false);
             return nullptr;
         }
 
@@ -1910,6 +1910,7 @@ namespace sfem {
 
         int hessian_crs(const real_t *const x, const count_t *const rowptr,
                         const idx_t *const colidx, real_t *const values) override {
+            fprintf(stderr, "[Error] ss:Laplacian::hessian_crs NOT IMPLEMENTED!\n");
             assert(false);
             return SFEM_FAILURE;
         }
@@ -1925,6 +1926,7 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
+            fprintf(stderr, "[Error] ss:Laplacian::gradient NOT IMPLEMENTED!\n");
             assert(false);
             return SFEM_FAILURE;
         }
@@ -1955,6 +1957,7 @@ namespace sfem {
         }
 
         int value(const real_t *x, real_t *const out) override {
+            fprintf(stderr, "[Error] ss:Laplacian::value NOT IMPLEMENTED!\n");
             assert(false);
             return SFEM_FAILURE;
         }

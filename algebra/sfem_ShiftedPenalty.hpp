@@ -94,7 +94,7 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            assert(penalty_param > 1);
+            assert(penalty_param_ > 1);
 
             T* lb = (lower_bound_) ? lower_bound_->data() : nullptr;
             T* ub = (upper_bound_) ? upper_bound_->data() : nullptr;
