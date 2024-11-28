@@ -133,7 +133,7 @@ MS 2:
    - [ ] Finalizing P1
 
 MS 3:
-   - [ ] Conceptualizing and Running verification experiments for P2/P2
+   - [ ] Conceptualizing and Running verification experiments for P2/P3
    - [ ] Help drafting P2
 
 MS 4:
