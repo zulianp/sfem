@@ -225,9 +225,13 @@ namespace sfem {
 
         bool debug{false};
 
-        void set_cycle_type(const int val) 
-        {
-            cycle_type_ = val;
+        void set_cycle_type(const int val) { cycle_type_ = val; }
+        void set_project_coarse_grid_correction(const bool val) {
+            project_coarse_grid_correction_ = val;
+        }
+
+        void enable_line_search(const bool val) {
+            line_search_enabled_ = val;
         }
 
     private:
@@ -250,7 +254,8 @@ namespace sfem {
         ShiftedPenalty_Tpl<T> impl_;
         bool verbose{true};
 
-
+        bool project_coarse_grid_correction_{false};
+        bool line_search_enabled_{true};
 
         std::shared_ptr<Buffer<T>> make_buffer(const ptrdiff_t n) const {
             return Buffer<T>::own(
@@ -366,8 +371,6 @@ namespace sfem {
 
                 count_smoothing_steps += smoother->iterations();
             }
-
-            // printf("count_smoothing_steps=%d\n", count_smoothing_steps);
         }
 
         CycleReturnCode nonlinear_cycle() {
@@ -400,11 +403,35 @@ namespace sfem {
 
             {
                 // Prolongation
-                blas_.zeros(mem->work->size(), mem->work->data());
-                prolongation->apply(mem_coarse->solution->data(), mem->work->data());
+                blas_.zeros(correction->size(), correction->data());
+                prolongation->apply(mem_coarse->solution->data(), correction->data());
 
-                // Apply coarse space correction
-                blas_.axpby(mem->size(), 1, mem->work->data(), 1, mem->solution->data());
+                if (line_search_enabled_) {
+                    T alpha = blas_.dot(correction->size(), correction->data(), mem->work->data());
+                    blas_.zeros(mem->work->size(), mem->work->data());
+
+                    auto J = op + sfem::diag_op(mem->diag, execution_space());
+                    J->apply(correction->data(), mem->work->data());
+
+                    alpha /= std::max(T(1e-16), blas_.dot(correction->size(), correction->data(), mem->work->data()));
+                    blas_.scal(correction->size(), alpha, correction->data());
+                }
+
+                if (project_coarse_grid_correction_ && execution_space() == EXECUTION_SPACE_HOST) {
+                    auto c = correction->data();
+                    auto ub = upper_bound_->data();
+                    auto x = mem->solution->data();
+                    const ptrdiff_t n = correction->size();
+
+#pragma omp parallel for
+                    for (ptrdiff_t i = 0; i < n; i++) {
+                        x[i] = std::min(x[i] + c[i], ub[i] + std::max(T(0), x[i] - ub[i]));
+                    }
+
+                } else {
+                    // Apply coarse space correction
+                    blas_.axpby(mem->size(), 1, correction->data(), 1, mem->solution->data());
+                }
             }
 
             nonlinear_smooth();
@@ -426,8 +453,8 @@ namespace sfem {
                     return CYCLE_CONTINUE;
                 } else {
                     fprintf(stderr,
-                           "Coarse grid solver did not reach desired tol in %d\n",
-                           smoother->iterations());
+                            "Coarse grid solver did not reach desired tol in %d\n",
+                            smoother->iterations());
                     return CYCLE_FAILURE;
                 }
             }

@@ -88,7 +88,19 @@ namespace sfem {
 
         auto spmg = std::dynamic_pointer_cast<ShiftedPenaltyMultigrid<real_t>>(mg);
         if (spmg) {
-            spmg->set_nlsmooth_steps(30);
+            // spmg->set_nlsmooth_steps(30);
+            int SFEM_MG_NL_SMOOTH_STEPS = 3;
+            SFEM_READ_ENV(SFEM_MG_NL_SMOOTH_STEPS, atoi);
+            spmg->set_nlsmooth_steps(SFEM_MG_NL_SMOOTH_STEPS);
+
+            int SFEM_MG_PROJECT_COARSE_CORRECTION = 0;
+            SFEM_READ_ENV(SFEM_MG_PROJECT_COARSE_CORRECTION, atoi);
+            spmg->set_project_coarse_grid_correction(SFEM_MG_PROJECT_COARSE_CORRECTION);
+            printf("SFEM_MG_PROJECT_COARSE_CORRECTION=%d\n", SFEM_MG_PROJECT_COARSE_CORRECTION);
+
+            int SFEM_MG_ENABLE_LINESEARCH = 0;
+            SFEM_READ_ENV(SFEM_MG_ENABLE_LINESEARCH, atoi);
+            spmg->enable_line_search(SFEM_MG_ENABLE_LINESEARCH);
         }
 
 #ifdef SFEM_ENABLE_CUDA
@@ -159,23 +171,31 @@ namespace sfem {
         // AMG tunable paramaters
 
         float SFEM_MG_COARSENING_FACTOR = 1.7;
+        float SFEM_MG_RELAXATION = 1;
         int SFEM_MG_CYCLE_TYPE = 4;
         int SFEM_MG_MAX_LEVELS = 20;
+        int SFEM_MG_PROJECT_COARSE_CORRECTION = 0;
+        int SFEM_MG_COARSE_SMOOTH_STEPS = 3;
 
         SFEM_READ_ENV(SFEM_MG_COARSENING_FACTOR, atof);
+        SFEM_READ_ENV(SFEM_MG_RELAXATION, atof);
         SFEM_READ_ENV(SFEM_MG_CYCLE_TYPE, atoi);
         SFEM_READ_ENV(SFEM_MG_MAX_LEVELS, atoi);
+        SFEM_READ_ENV(SFEM_MG_COARSE_SMOOTH_STEPS, atoi);
 
         printf("SFEM_MG_COARSENING_FACTOR=%f\n"
+               "SFEM_MG_RELAXATION=%f\n"
                "SFEM_MG_MAX_LEVELS=%d\n"
-               "SFEM_MG_CYCLE_TYPE=%d\n",
+               "SFEM_MG_CYCLE_TYPE=%d\n"
+               "SFEM_MG_COARSE_SMOOTH_STEPS=%d\n",
                SFEM_MG_COARSENING_FACTOR,
+               SFEM_MG_RELAXATION,
                SFEM_MG_MAX_LEVELS,
-               SFEM_MG_CYCLE_TYPE);
+               SFEM_MG_CYCLE_TYPE,
+               SFEM_MG_COARSE_SMOOTH_STEPS);
 
         mg->set_cycle_type(SFEM_MG_CYCLE_TYPE);
 
-        count_t smoothing_steps = 3;
         count_t coarsest_ndofs = 500;
 
         auto prev_mat = fine_mat;
@@ -191,7 +211,7 @@ namespace sfem {
                     prev_mat->offdiag_colidx->data(),
                     diag_smoother->data());
         auto amg_smoother = sfem::create_shiftable_jacobi(diag_smoother, es);
-        amg_smoother->relaxation_parameter = 1.0;
+        amg_smoother->relaxation_parameter = SFEM_MG_RELAXATION;
 
         ptrdiff_t ndofs = fine_ndofs;
         count_t fine_memory = fine_ndofs + offdiag_nnz;
@@ -256,7 +276,7 @@ namespace sfem {
             if (amg_levels == 1) {
                 mg->add_level(linear_op_coarse, stat_iter, prolongation, pt);
             } else {
-                stat_iter->set_max_it(smoothing_steps);
+                stat_iter->set_max_it(SFEM_MG_COARSE_SMOOTH_STEPS);
                 mg->add_level(coarse_op, stat_iter, p, pt);
             }
             p = h_pwc_interp(weights_buff, partition_buff, coarser_dim);
@@ -289,7 +309,7 @@ namespace sfem {
                         prev_mat->offdiag_colidx->data(),
                         diag_smoother->data());
             amg_smoother = sfem::create_shiftable_jacobi(diag_smoother, es);
-            amg_smoother->relaxation_parameter = 1.0;
+            amg_smoother->relaxation_parameter = SFEM_MG_RELAXATION;
         }
 
         // Create a coarsest level solver, could also just smooth here if coarsest problem isn't
