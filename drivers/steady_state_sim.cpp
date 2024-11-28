@@ -140,7 +140,8 @@ int main(int argc, char *argv[]) {
 
         auto near_null = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
-        auto amg = builder(1.5, mask->data(), near_null->data(), fine_mat);
+        real_t coarsening_factor = 7.5;
+        auto amg = builder(coarsening_factor, mask, near_null, fine_mat);
         if (!amg->test_interp()) {
             printf("tests passed\n");
         } else {
