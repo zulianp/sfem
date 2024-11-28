@@ -157,6 +157,7 @@ MS := Milestone
 
 ## Paper 1: Shifted--Penalty Multigrid for Variational Inequalities
 
+- [ ] Authorship: Hardik, Austen, Rolf, Panayot, Patrick
 - [ ] GMG for solving A x = b, B * x <= g, A in R^{n x n}, B in R^{m x n}
 - [ ] Details of optimization algorithm
 - [ ] Examples in 2D and 3D including constrained Poisson problem, linear elasticity
@@ -164,7 +165,7 @@ MS := Milestone
 - [ ] Convergence of the method on toy problems (no Perf)
 - [ ] If Hypre AMG ops work involve also Rui Peng Li
 
-Authorship: Hardik, Austen, Rolf, Panayot, Patrick
+
 If rejected content goes to **P2**
 
 ## Paper 2: A GPU Accelerated Shifted--Penalty Multigrid for Contact in Elasticity
