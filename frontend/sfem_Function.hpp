@@ -91,6 +91,8 @@ namespace sfem {
 
         void *impl_mesh();
 
+        MPI_Comm comm() const;
+
         inline static std::shared_ptr<Mesh> create_from_file(MPI_Comm comm, const char *path) {
             auto ret = std::make_shared<Mesh>(comm);
             ret->read(path);

@@ -8,14 +8,14 @@ namespace sfem {
 
 	// This is for now just a copy and past of dirichlet conditions
 	// it will change in the near future
-	class ContactConditions final : public Constraint {
+	class AxisAlignedContactConditions final : public Constraint {
 	public:
-	    ContactConditions(const std::shared_ptr<FunctionSpace> &space);
-	    ~ContactConditions();
+	    AxisAlignedContactConditions(const std::shared_ptr<FunctionSpace> &space);
+	    ~AxisAlignedContactConditions();
 
 	    std::shared_ptr<FunctionSpace> space();
 
-	    static std::shared_ptr<ContactConditions> create_from_env(
+	    static std::shared_ptr<AxisAlignedContactConditions> create_from_env(
 	            const std::shared_ptr<FunctionSpace> &space);
 	    int apply(real_t *const x) override;
 	    int apply_value(const real_t value, real_t *const x) override;
@@ -47,6 +47,39 @@ namespace sfem {
 	    std::shared_ptr<Constraint> derefine(const std::shared_ptr<FunctionSpace> &coarse_space,
 	                                         const bool as_zero) const override;
 	    std::shared_ptr<Constraint> lor() const override;
+
+	private:
+	    class Impl;
+	    std::unique_ptr<Impl> impl_;
+	};
+
+	class ContactConditions final : public Constraint {
+	public:
+	    ContactConditions(const std::shared_ptr<FunctionSpace> &space);
+	    ~ContactConditions();
+
+	    std::shared_ptr<FunctionSpace> space();
+
+	    static std::shared_ptr<ContactConditions> create_from_env(
+	            const std::shared_ptr<FunctionSpace> &space);
+
+	    int apply(real_t *const x) override;
+	    int apply_value(const real_t value, real_t *const x) override;
+	    int copy_constrained_dofs(const real_t *const src, real_t *const dest) override;
+	    int mask(mask_t *mask) override;
+
+	    int gradient(const real_t *const x, real_t *const g) override;
+
+	    int hessian_crs(const real_t *const x,
+	                    const count_t *const rowptr,
+	                    const idx_t *const colidx,
+	                    real_t *const values) override;
+
+	    std::shared_ptr<Constraint> derefine(const std::shared_ptr<FunctionSpace> &coarse_space,
+	                                         const bool as_zero) const override;
+	    std::shared_ptr<Constraint> lor() const override;
+
+	    ptrdiff_t n_constrained_dofs() const;
 
 	private:
 	    class Impl;

@@ -123,7 +123,7 @@ namespace sfem {
                                                 T **x,
                                                 std::function<void(int n, void **)> destroy,
                                                 enum MemorySpace mem_space = MEMORY_SPACE_INVALID) {
-            return std::make_shared<Buffer<T>>(n0, n1, x, destroy, mem_space);
+            return std::make_shared<Buffer<T *>>(n0, n1, x, destroy, mem_space);
         }
 
     private:

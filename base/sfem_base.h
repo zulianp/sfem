@@ -8,8 +8,17 @@
 #include "sfem_config.h"
 #endif
 
-#define PRINT_CURRENT_FUNCTION printf("\033[32m\nEnter Function\033[0m: \033[33m%s\033[0m, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__);
-#define RETURN_FROM_FUNCTION(__RET_VAL__) printf("\033[31m\nReturn from function\033[0m: \033[33m%s\033[0m, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__); return (__RET_VAL__);
+#define PRINT_CURRENT_FUNCTION                                                  \
+    printf("\033[32m\nEnter Function\033[0m: \033[33m%s\033[0m, file: %s:%d\n", \
+           __FUNCTION__,                                                        \
+           __FILE__,                                                            \
+           __LINE__);
+#define RETURN_FROM_FUNCTION(__RET_VAL__)                                             \
+    printf("\033[31m\nReturn from function\033[0m: \033[33m%s\033[0m, file: %s:%d\n", \
+           __FUNCTION__,                                                              \
+           __FILE__,                                                                  \
+           __LINE__);                                                                 \
+    return (__RET_VAL__);
 
 #define SFEM_READ_ENV(name, conversion) \
     do {                                \
@@ -17,6 +26,25 @@
         if (var) {                      \
             name = conversion(var);     \
         }                               \
+    } while (0)
+
+#define SFEM_REQUIRE_ENV(name, conversion)                                                \
+    do {                                                                                  \
+        char *var = getenv(#name);                                                        \
+        if (var) {                                                                        \
+            name = conversion(var);                                                       \
+        } else {                                                                          \
+            fprintf(stderr, "[Error] %s is required (%s:%d)", #name, __FILE__, __LINE__); \
+            assert(false);                                                                \
+            MPI_Abort(MPI_COMM_WORLD, -1);                                                \
+        }                                                                                 \
+    } while (0)
+
+#define SFEM_ERROR(...)                \
+    do {                               \
+        fprintf(stderr, __VA_ARGS__);   \
+        assert(false);                 \
+        MPI_Abort(MPI_COMM_WORLD, -1); \
     } while (0)
 
 #ifdef NDEBUG
@@ -86,8 +114,8 @@ typedef int16_t lidx_t;
 typedef real_t scalar_t;
 typedef real_t accumulator_t;
 #define SFEM_VEC_SIZE 4
-typedef scalar_t vec_t
-        __attribute__((vector_size(SFEM_VEC_SIZE * sizeof(scalar_t)), aligned(SFEM_VEC_SIZE * sizeof(scalar_t))));
+typedef scalar_t vec_t __attribute__((vector_size(SFEM_VEC_SIZE * sizeof(scalar_t)),
+                                      aligned(SFEM_VEC_SIZE * sizeof(scalar_t))));
 
 #endif
 #endif  // SFEM_BASE_H

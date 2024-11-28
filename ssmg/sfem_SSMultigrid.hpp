@@ -43,15 +43,15 @@ namespace sfem {
         auto fs_coarse = fs->derefine();
         auto f_coarse = f->derefine(fs_coarse, true);
 
-        const char * SFEM_FINE_OP_TYPE = "MF";
-        const char * SFEM_COARSE_OP_TYPE = fs->block_size() == 1 ? "COO_SYM" : "BCRS_SYM";
-        
+        const char *SFEM_FINE_OP_TYPE = "MF";
+        const char *SFEM_COARSE_OP_TYPE = fs->block_size() == 1 ? "COO_SYM" : "BCRS_SYM";
+
         SFEM_READ_ENV(SFEM_FINE_OP_TYPE, );
         SFEM_READ_ENV(SFEM_COARSE_OP_TYPE, );
 
         auto linear_op = sfem::create_linear_operator(SFEM_FINE_OP_TYPE, f, nullptr, es);
-        auto linear_op_coarse = sfem::create_linear_operator(
-                SFEM_COARSE_OP_TYPE, f_coarse, nullptr, es);
+        auto linear_op_coarse =
+                sfem::create_linear_operator(SFEM_COARSE_OP_TYPE, f_coarse, nullptr, es);
 
         // auto smoother = sfem::create_cheb3<real_t>(linear_op, es);
         // smoother->eigen_solver_tol = 1e-2;
@@ -85,10 +85,10 @@ namespace sfem {
                 es);
 
         auto mg = std::make_shared<MG>();
-        
+
         auto spmg = std::dynamic_pointer_cast<ShiftedPenaltyMultigrid<real_t>>(mg);
-        if(spmg) {
-            spmg->set_nlsmooth_steps(10);
+        if (spmg) {
+            spmg->set_nlsmooth_steps(30);
         }
 
 #ifdef SFEM_ENABLE_CUDA
@@ -96,7 +96,7 @@ namespace sfem {
             // FIXME this should not be here!
             CUDA_BLAS<real_t>::build_blas(mg->blas());
 
-            if(spmg) {
+            if (spmg) {
                 CUDA_ShiftedPenalty<real_t>::build(spmg->impl());
             }
 
@@ -157,10 +157,26 @@ namespace sfem {
         idx_t amg_levels = 1;
 
         // AMG tunable paramaters
-        real_t coarsening_factor = 1.7;
+
+        float SFEM_MG_COARSENING_FACTOR = 1.7;
+        int SFEM_MG_CYCLE_TYPE = 4;
+        int SFEM_MG_MAX_LEVELS = 20;
+
+        SFEM_READ_ENV(SFEM_MG_COARSENING_FACTOR, atof);
+        SFEM_READ_ENV(SFEM_MG_CYCLE_TYPE, atoi);
+        SFEM_READ_ENV(SFEM_MG_MAX_LEVELS, atoi);
+
+        printf("SFEM_MG_COARSENING_FACTOR=%f\n"
+               "SFEM_MG_MAX_LEVELS=%d\n"
+               "SFEM_MG_CYCLE_TYPE=%d\n",
+               SFEM_MG_COARSENING_FACTOR,
+               SFEM_MG_MAX_LEVELS,
+               SFEM_MG_CYCLE_TYPE);
+
+        mg->set_cycle_type(SFEM_MG_CYCLE_TYPE);
+
         count_t smoothing_steps = 3;
         count_t coarsest_ndofs = 500;
-        count_t max_levels = 20;
 
         auto prev_mat = fine_mat;
         std::shared_ptr<sfem::PiecewiseConstantInterpolator<idx_t, real_t>> p, pt = nullptr;
@@ -196,7 +212,7 @@ namespace sfem {
                fine_nnz,
                1.0);
 
-        while (amg_levels < max_levels && ndofs > coarsest_ndofs) {
+        while (amg_levels < SFEM_MG_MAX_LEVELS && ndofs > coarsest_ndofs) {
             for (idx_t k = 0; k < offdiag_nnz; k++) {
                 offdiag_row_indices->data()[k] = prev_mat->offdiag_rowidx->data()[k];
                 offdiag_col_indices->data()[k] = prev_mat->offdiag_colidx->data()[k];
@@ -205,7 +221,7 @@ namespace sfem {
 
             ptrdiff_t finer_dim = ndofs;
             int failure = partition(bdy_dofs,
-                                    coarsening_factor,
+                                    SFEM_MG_COARSENING_FACTOR,
                                     near_null->data(),
                                     offdiag_row_indices->data(),
                                     offdiag_col_indices->data(),
@@ -280,12 +296,13 @@ namespace sfem {
         // small enough to solve exactly. Direct solver by cholesky is also probably better here
         auto cg = sfem::create_cg<real_t>(prev_mat, es);
         cg->verbose = false;
-        cg->set_max_it(10000); // Keep it large just to be sure!
+        cg->set_max_it(40000);  // Keep it large just to be sure!
         cg->set_rtol(1e-12);
+        cg->set_atol(1e-20);
         cg->set_preconditioner_op(amg_smoother);
         mg->add_level(prev_mat, cg, p, nullptr);
 
-        if (amg_levels == max_levels) {
+        if (amg_levels == SFEM_MG_MAX_LEVELS) {
             printf("AMG constructed successfully with max levels hit (%d levels)\n", amg_levels);
         } else if (ndofs <= coarsest_ndofs) {
             printf("AMG constructed successfully with coarsest target hit (%d dofs on coarsest)\n",
