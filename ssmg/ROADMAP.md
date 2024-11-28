@@ -161,12 +161,14 @@ Authorship: Hardik, Austen, Rolf, Panayot, Patrick
 If rejected content goes to **P2**
 
 ## Paper 2: A GPU Accelerated Shifted--Penalty Multigrid for Contact in Elasticity 
-Authorship: Patrick, Austen, Hardik, Panayot, Rolf
+    
+    - [ ] Authorship: Patrick, Austen, Hardik, Panayot, Rolf
     - [ ] Full paper as described in the abstract above with the best working set-up (if multiple well working set-up, maybe more than 1 paper?)
 
 ## Paper 3: Either SPAMG or Performance-based paper
-Authorship: Austen, Patrick, Hardik, Rolf, Panayot
-Options:
+
+- [ ] Authorship: Austen, Patrick, Hardik, Rolf, Panayot
+- [ ] Options:
    1) SPAMG 
    2) Comparing matrix-based (different formats) and matrix-free operator in the context of **P2** (Either Conference Proceeding or CCF Transactions on High Performance Computing): 
 
