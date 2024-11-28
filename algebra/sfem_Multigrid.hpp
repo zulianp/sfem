@@ -75,10 +75,7 @@ namespace sfem {
             smoother_.clear();
         }
 
-        void set_cycle_type(const int val) 
-        {
-            cycle_type_ = val;
-        }
+        void set_cycle_type(const int val) { cycle_type_ = val; }
 
         inline int n_levels() const { return smoother_.size(); }
 
@@ -168,6 +165,10 @@ namespace sfem {
             }
             return failure;
         }
+
+        std::vector<std::shared_ptr<Operator<T>>>& operators() { return operator_; }
+        std::vector<std::shared_ptr<Operator<T>>>& restrictions() { return restriction_; }
+        std::vector<std::shared_ptr<Operator<T>>> smoothers() { return smoother_; }
 
     private:
         std::vector<std::shared_ptr<Operator<T>>> operator_;
