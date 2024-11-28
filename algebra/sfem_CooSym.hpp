@@ -43,12 +43,12 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return execution_space_; }
 
         /* Sparse Matrix-Vector Multiplication using SymmCOO format */
-        int coo_sym_spmv_(const T* const x, T* const y) {
-            R* offdiag_row_indices = offdiag_rowidx->data();
-            R* offdiag_col_indices = offdiag_colidx->data();
-            T* offdiag_values = values->data();
-            T* diag = diag_values->data();
-            count_t offdiag_nnz = values->size();
+        int coo_sym_spmv_(const T* const SFEM_RESTRICT x, T* const SFEM_RESTRICT y) {
+            const R* const offdiag_row_indices = offdiag_rowidx->data();
+            const R* const offdiag_col_indices = offdiag_colidx->data();
+            const T* const offdiag_values = values->data();
+            const T* const diag = diag_values->data();
+            const count_t offdiag_nnz = values->size();
 
 #pragma omp parallel for
             for (R k = 0; k < ndofs; k++) {

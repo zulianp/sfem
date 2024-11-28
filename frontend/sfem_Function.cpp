@@ -112,6 +112,8 @@ namespace sfem {
         ~Impl() { mesh_destroy(&mesh); }
     };
 
+    MPI_Comm Mesh::comm() const { return impl_->comm; }
+
     Mesh::Mesh(int spatial_dim, enum ElemType element_type, ptrdiff_t nelements, idx_t **elements,
                ptrdiff_t nnodes, geom_t **points)
         : impl_(std::make_unique<Impl>()) {

@@ -225,6 +225,11 @@ namespace sfem {
 
         bool debug{false};
 
+        void set_cycle_type(const int val) 
+        {
+            cycle_type_ = val;
+        }
+
     private:
         std::vector<std::shared_ptr<Operator<T>>> operator_;
         std::vector<std::shared_ptr<MatrixFreeLinearSolver<T>>> smoother_;
@@ -238,12 +243,14 @@ namespace sfem {
 
         int max_it_{10};
         int iterations_{0};
-        int cycle_type_{4};
+        int cycle_type_{V_CYCLE};
         T atol_{1e-10};
 
         BLAS_Tpl<T> blas_;
         ShiftedPenalty_Tpl<T> impl_;
         bool verbose{true};
+
+
 
         std::shared_ptr<Buffer<T>> make_buffer(const ptrdiff_t n) const {
             return Buffer<T>::own(

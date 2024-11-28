@@ -75,6 +75,11 @@ namespace sfem {
             smoother_.clear();
         }
 
+        void set_cycle_type(const int val) 
+        {
+            cycle_type_ = val;
+        }
+
         inline int n_levels() const { return smoother_.size(); }
 
         inline std::ptrdiff_t rows() const override { return operator_[finest_level()]->rows(); }
