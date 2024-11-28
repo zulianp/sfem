@@ -125,7 +125,7 @@ MS (optional):
 ### Hardik
 
 MS 1: ()
-   - [:heavy_check_mark:] MatLab implementation of SPGMG in 2D (scalar problem)
+   - [x] MatLab implementation of SPGMG in 2D (scalar problem)
    - [ ] MatLab implementations for Paper 1 (P1)
    - [ ] Drafting P1
 
