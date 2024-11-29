@@ -30,6 +30,11 @@
 
 namespace sfem {
 
+    // TODO improve contact integration in SSMG
+    // auto coarse_contact_conditions = contact_conds->derefine(fs_coarse, true);
+    // auto coarse_contact_mask = sfem::create_buffer<mask_t>(fs_coarse->n_dofs(), es);
+    // coarse_contact_conditions->mask(coarse_contact_mask->data());
+
     template <class MG>
     std::shared_ptr<MG> create_ssmg(const std::shared_ptr<Function> &f,
                                     const enum ExecutionSpace es) {
@@ -224,12 +229,12 @@ namespace sfem {
         printf("\nAMG info:\n level      cf         dofs       offdiag nnz    true nnz   "
                "sparsity "
                "factor\n");
-        printf("|%-10d|%-10.2f|%-10td|%-14d|%-10td|%-16.2f|\n",
+        printf("|%-10d|%-10.2f|%-10td|%-14d|%-10ld|%-16.2f|\n",
                1,
                1.0,
                fine_ndofs,
                offdiag_nnz,
-               fine_nnz,
+               (long)fine_nnz,
                1.0);
 
         while (amg_levels < SFEM_MG_MAX_LEVELS && ndofs > coarsest_ndofs) {
@@ -286,12 +291,12 @@ namespace sfem {
             auto a_coarse = p->coarsen(prev_mat);
             offdiag_nnz = a_coarse->values->size();
             count_t coarse_nnz = ndofs + (offdiag_nnz * 2);
-            printf("|%-10d|%-10.2f|%-10td|%-14d|%-10td|%-16.2f|\n",
+            printf("|%-10d|%-10.2f|%-10td|%-14d|%-10ld|%-16.2f|\n",
                    amg_levels,
                    (real_t)finer_dim / (real_t)coarser_dim,
                    ndofs,
                    offdiag_nnz,
-                   coarse_nnz,
+                   (long)coarse_nnz,
                    (real_t)coarse_nnz / (real_t)prev_nnz);
             total_memory += ndofs + offdiag_nnz;
             total_complexity += ndofs + (offdiag_nnz * 2);
@@ -325,8 +330,8 @@ namespace sfem {
         if (amg_levels == SFEM_MG_MAX_LEVELS) {
             printf("AMG constructed successfully with max levels hit (%d levels)\n", amg_levels);
         } else if (ndofs <= coarsest_ndofs) {
-            printf("AMG constructed successfully with coarsest target hit (%d dofs on coarsest)\n",
-                   ndofs);
+            printf("AMG constructed successfully with coarsest target hit (%ld dofs on coarsest)\n",
+                   (long)ndofs);
         }
         printf("Memory complexity: %.2f\n", (real_t)total_memory / (real_t)fine_memory);
         printf("Operator complexity: %.2f\n\n", (real_t)total_complexity / (real_t)fine_nnz);
