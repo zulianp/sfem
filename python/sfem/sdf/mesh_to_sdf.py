@@ -402,7 +402,8 @@ if __name__ == '__main__':
     nedt, dims = mesh_to_sdf(submesh, pmin, pmax, hmax, export_normals)
     nedt.tofile(output_path)
 
-    header =    f'nx: {dims[0]}\n'
+    header =    f'spatial_dimension: 3\n'
+    header +=   f'nx: {dims[0]}\n'
     header +=   f'ny: {dims[1]}\n'
     header +=   f'nz: {dims[2]}\n'
     header +=   f'block_size: 1\n'

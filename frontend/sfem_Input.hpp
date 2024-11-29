@@ -14,13 +14,18 @@ namespace sfem {
         virtual int get(const std::string &key, int &val) = 0;
         virtual int get(const std::string &key, float &val) = 0;
         virtual int get(const std::string &key, double &val) = 0;
+        virtual int get(const std::string &key, bool &val) = 0;
         virtual int get(const std::string &key, std::string &val) = 0;
 
         virtual int require(const std::string &key, ptrdiff_t &val) = 0;
         virtual int require(const std::string &key, int &val) = 0;
         virtual int require(const std::string &key, float &val) = 0;
         virtual int require(const std::string &key, double &val) = 0;
+        virtual int require(const std::string &key, bool &val) = 0;
         virtual int require(const std::string &key, std::string &val) = 0;
+
+        virtual int array_require_keys(const std::string &key, std::vector<std::string> &ret) = 0;
+        virtual int array_require_values(const std::string &key, std::vector<std::string> &ret) = 0;
     };
     /**
      * @brief A class that reads YAML input without indentation.
@@ -94,6 +99,13 @@ namespace sfem {
         /// @param val Reference to store the value
         /// @return 0 on success, non-zero if key not found
         int require(const std::string &key, std::string &val) override;
+
+        int get(const std::string &key, bool &val) override;
+        int require(const std::string &key, bool &val) override;
+
+
+        int array_require_keys(const std::string &key, std::vector<std::string> &ret) override;
+        int array_require_values(const std::string &key, std::vector<std::string> &ret) override;
 
         /// Add a new key-value setting
         /// @tparam T Type of the value to add

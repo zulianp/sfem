@@ -21,9 +21,46 @@ def run(case):
 	m.read(case['mesh'])
 
 	dim = m.spatial_dimension()
-	fs = sfem.FunctionSpace(m, dim)
+	block_size = case['block_size']
+
+	fs = sfem.FunctionSpace(m, block_size)
 	cc = sfem.contact_conditions_from_file(fs, str(config['obstacle']))
+
+	fun = sfem.Function(fs)
+	op = sfem.create_op(fs, case["operator"])
+	fun.add_operator(op)
+
+	dirichlet_conditions = sfem.DirichletConditions(fs)
+	for c in case['dirichlet_conditions']:
+		name = c['name']
+		nodeset = c['nodeset']
+		component = c['component']
+		value = c['value']
+
+		idx = np.unique(np.fromfile(nodeset, dtype=idx_t))
+		sfem.add_condition(dirichlet_conditions, idx, component, value);
+
+	fun.add_dirichlet_conditions(dirichlet_conditions)
+	fun.set_output_dir(config['output'])
+
+	x = np.zeros(fs.n_dofs())
+	g = np.zeros(fs.n_dofs())
+	c = np.zeros(fs.n_dofs())
 	
+	cg = sfem.ConjugateGradient()
+	cg.default_init()
+	cg.set_max_it(400)
+
+	lop = sfem.make_op(fun, x)
+	cg.set_op(lop)
+
+	sfem.apply_constraints(fun, x)
+	sfem.gradient(fun, x, g)
+	sfem.apply(cg, g, c)
+
+	x -= c
+
+	sfem.report_solution(fun, x)
 
 if __name__ == '__main__':
 	if len(sys.argv) < 2:
