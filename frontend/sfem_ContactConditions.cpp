@@ -9,6 +9,11 @@
 #include "matrixio_array.h"
 #include "matrixio_ndarray.h"
 
+#include "sfem_Grid.hpp"
+#include "sfem_Input.hpp"
+
+#include "sfem_resample_gap.h"
+
 namespace sfem {
     class AxisAlignedContactConditions::Impl {
     public:
@@ -261,22 +266,17 @@ namespace sfem {
 
     class ContactConditions::Impl {
     public:
-        std::shared_ptr<Buffer<geom_t>> sdf;
+        std::shared_ptr<FunctionSpace> space;
+        std::shared_ptr<Grid<geom_t>> sdf;
+
         std::shared_ptr<Buffer<idx_t *>> sides;
         std::shared_ptr<Buffer<idx_t>> node_mapping;
         std::shared_ptr<Buffer<geom_t *>> surface_points;
-        
+
         std::shared_ptr<Buffer<real_t>> gap_xnormal;
         std::shared_ptr<Buffer<real_t>> gap_ynormal;
         std::shared_ptr<Buffer<real_t>> gap_znormal;
 
-        ptrdiff_t nlocal[3];
-        ptrdiff_t nglobal[3];
-        ptrdiff_t stride[3];
-        geom_t origin[3];
-        geom_t delta[3];
-
-        std::shared_ptr<FunctionSpace> space;
         ~Impl() {}
 
         void update_displaced_points(const real_t *disp) {
@@ -297,7 +297,7 @@ namespace sfem {
         }
     };
 
-    ptrdiff_t ContactConditions::n_constrained_dofs() const {}
+    ptrdiff_t ContactConditions::n_constrained_dofs() const { return impl_->node_mapping->size(); }
 
     std::shared_ptr<FunctionSpace> ContactConditions::space() { return impl_->space; }
 
@@ -319,30 +319,39 @@ namespace sfem {
 
     ContactConditions::~ContactConditions() = default;
 
-    std::shared_ptr<ContactConditions> ContactConditions::create_from_env(
-            const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<ContactConditions> ContactConditions::create_from_file(
+            const std::shared_ptr<FunctionSpace> &space, const std::string &path) {
+        auto in = YAMLNoIndent::create_from_file(path + "/meta.yaml");
+
         auto cc = std::make_unique<ContactConditions>(space);
         auto mesh = space->mesh_ptr();
         auto c_mesh = (mesh_t *)mesh->impl_mesh();
 
-        char *SFEM_CONTACT_SURFACE = nullptr;
-        char *SFEM_CONTACT_SURFACE_NODE_MAPPING = nullptr;
-        char *SFEM_CONTACT_SDF = nullptr;
-        SFEM_REQUIRE_ENV(SFEM_CONTACT_SURFACE, );
-        SFEM_REQUIRE_ENV(SFEM_CONTACT_SURFACE_NODE_MAPPING, );
+        std::string path_surface;
+        in->require("surface", path_surface);
+
+        std::string path_node_mapping = path_surface + "/node_mapping.raw";
+        in->get("node_mapping", path_node_mapping);
+
+        std::string surface_elem_type;
+        in->require("element_type", surface_elem_type);
+
+        std::string path_sdf;
+        in->require("sdf", path_sdf);
 
         {
             // Read mesh surface information
-
             const enum ElemType element_type = space->element_type();
             const enum ElemType side_element_type = shell_type(side_type(element_type));
             const int nxe = elem_num_nodes(side_element_type);
+
+            assert(type_from_string(surface_elem_type.c_str()) == side_element_type);
 
             idx_t **sides = (idx_t **)malloc(nxe * sizeof(idx_t *));
             ptrdiff_t _nope_ = -1, len = -1;
             char path[SFEM_MAX_PATH_LENGTH];
             for (int d = 0; d < nxe; d++) {
-                sprintf(path, "%s.%d.raw", SFEM_CONTACT_SURFACE, d);
+                sprintf(path, "%s.%d.raw", path_surface.c_str(), d);
 
                 idx_t *idx = nullptr;
                 if (!array_create_from_file(
@@ -363,12 +372,14 @@ namespace sfem {
                     },
                     sfem::MEMORY_SPACE_HOST);
 
-            sprintf(path, "%s.node_mapping.raw", SFEM_CONTACT_SURFACE);
-
             idx_t *idx = nullptr;
-            if (!array_create_from_file(
-                        mesh->comm(), path, SFEM_MPI_IDX_T, (void **)&idx, &_nope_, &len)) {
-                SFEM_ERROR("Unable to read path %s\n", path);
+            if (!array_create_from_file(mesh->comm(),
+                                        path_node_mapping.c_str(),
+                                        SFEM_MPI_IDX_T,
+                                        (void **)&idx,
+                                        &_nope_,
+                                        &len)) {
+                SFEM_ERROR("Unable to read path %s\n", path_node_mapping.c_str());
             }
 
             cc->impl_->node_mapping = Buffer<idx_t>::own(len, idx, &free, sfem::MEMORY_SPACE_HOST);
@@ -377,50 +388,15 @@ namespace sfem {
             cc->impl_->surface_points = h_buffer<geom_t>(mesh->spatial_dimension(), len);
         }
 
-        {
-            // Read SDF
-            SFEM_REQUIRE_ENV(SFEM_CONTACT_SDF, );
-
-            ptrdiff_t SFEM_CONTACT_SDF_XDIM = 0;
-            ptrdiff_t SFEM_CONTACT_SDF_YDIM = 0;
-            ptrdiff_t SFEM_CONTACT_SDF_ZDIM = 0;
-
-            SFEM_REQUIRE_ENV(SFEM_CONTACT_SDF_XDIM, atol);
-            SFEM_REQUIRE_ENV(SFEM_CONTACT_SDF_YDIM, atol);
-            SFEM_REQUIRE_ENV(SFEM_CONTACT_SDF_ZDIM, atol);
-
-            cc->impl_->nglobal[0] = SFEM_CONTACT_SDF_XDIM;
-            cc->impl_->nglobal[1] = SFEM_CONTACT_SDF_YDIM;
-            cc->impl_->nglobal[2] = SFEM_CONTACT_SDF_ZDIM;
-
-            ptrdiff_t n = cc->impl_->nglobal[0] * cc->impl_->nglobal[1] * cc->impl_->nglobal[2];
-
-            geom_t *sdf = 0;
-            ptrdiff_t nlocal[3];
-            if (ndarray_create_from_file(mesh->comm(),
-                                         SFEM_CONTACT_SDF,
-                                         SFEM_MPI_GEOM_T,
-                                         3,
-                                         (void **)&sdf,
-                                         nlocal,
-                                         cc->impl_->nglobal) != SFEM_SUCCESS) {
-                SFEM_ERROR("Unable to read SFEM_CONTACT_SDF=%s\n", SFEM_CONTACT_SDF);
-                return nullptr;
-            }
-
-            cc->impl_->stride[0] = 1;
-            cc->impl_->stride[1] = nlocal[0];
-            cc->impl_->stride[2] = nlocal[0] * nlocal[1];
-
-            cc->impl_->nlocal[0] = nlocal[0];
-            cc->impl_->nlocal[1] = nlocal[1];
-            cc->impl_->nlocal[2] = nlocal[2];
-
-            cc->impl_->sdf = Buffer<geom_t>::own(
-                    nlocal[0] * nlocal[1] * nlocal[2], sdf, &free, sfem::MEMORY_SPACE_HOST);
-        }
-
+        cc->impl_->sdf = Grid<geom_t>::create_from_file(mesh->comm(), path_sdf.c_str());
         return cc;
+    }
+
+    std::shared_ptr<ContactConditions> ContactConditions::create_from_env(
+            const std::shared_ptr<FunctionSpace> &space) {
+        char *SFEM_CONTACT = nullptr;
+        SFEM_REQUIRE_ENV(SFEM_CONTACT, );
+        return create_from_file(space, SFEM_CONTACT);
     }
 
     int ContactConditions::apply(real_t *const x) { return apply_value(0, x); }
@@ -428,49 +404,65 @@ namespace sfem {
     int ContactConditions::gradient(const real_t *const x, real_t *const g) {
         impl_->update_displaced_points(x);
 
-        // FIXME for MPI
+        auto sdf = impl_->sdf;
 
-        // interpolate_gap(
-        //         // Mesh
-        //         impl_->surface_points->extent(1),
-        //         impl_->surface_points->data(),
-        //         // SDF
-        //         impl_->nlocal,
-        //         impl_->stride,
-        //         impl_->origin,
-        //         impl_->delta,
-        //         impl_->sdf->data(),
-        //         // Output
-        //         g,
-        //         impl_->gap_xnormal->data(),
-        //         impl_->gap_ynormal->data(),
-        //         impl_->gap_znormal->data());
+        interpolate_gap(
+                // Mesh
+                impl_->surface_points->extent(1),
+                impl_->surface_points->data(),
+                // SDF
+                sdf->nlocal(),
+                sdf->stride(),
+                sdf->origin(),
+                sdf->delta(),
+                sdf->data(),
+                // Output
+                g,
+                impl_->gap_xnormal->data(),
+                impl_->gap_ynormal->data(),
+                impl_->gap_znormal->data());
 
         return SFEM_SUCCESS;
     }
 
     int ContactConditions::apply_value(const real_t value, real_t *const x) {
-        // TODO Project to value
-        assert(false);
+        const ptrdiff_t n = impl_->node_mapping->size();
+        const idx_t *const idx = impl_->node_mapping->data();
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            x[idx[i]] = value;
+        }
+
         return SFEM_FAILURE;
     }
 
     int ContactConditions::copy_constrained_dofs(const real_t *const src, real_t *const dest) {
-        // TODO Project to src values
-        assert(false);
+        const ptrdiff_t n = impl_->node_mapping->size();
+        const idx_t *const idx = impl_->node_mapping->data();
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            dest[idx[i]] = src[idx[i]];
+        }
+
         return SFEM_FAILURE;
     }
 
     int ContactConditions::hessian_crs(const real_t *const x, const count_t *const rowptr,
                                        const idx_t *const colidx, real_t *const values) {
-        // TODO House-holder matrix
+        // TODO Householder matrix
         assert(false);
         return SFEM_FAILURE;
     }
 
     int ContactConditions::mask(mask_t *mask) {
-        assert(false);
-        return SFEM_FAILURE;
+        const ptrdiff_t n = impl_->node_mapping->size();
+        const idx_t *const idx = impl_->node_mapping->data();
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            mask_set(idx[i], mask);
+        }
+
+        return SFEM_SUCCESS;
     }
 
 }  // namespace sfem

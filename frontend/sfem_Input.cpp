@@ -64,6 +64,16 @@ namespace sfem {
         std::map<std::string, std::string> kv;
     };
 
+    std::unique_ptr<YAMLNoIndent> YAMLNoIndent::create_from_file(const std::string &path) {
+        std::ifstream file(path.c_str());
+        if (!file.good()) SFEM_ERROR("Unable to open file %s", path.c_str());
+
+        auto ret = std::make_unique<YAMLNoIndent>();
+        ret->parse(file);
+        file.close();
+        return ret;
+    }
+
     int YAMLNoIndent::add_setting_aux(const std::string &key, const std::string &value) {
         impl_->kv[key] = value;
         return SFEM_SUCCESS;

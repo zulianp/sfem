@@ -313,6 +313,7 @@ if __name__ == '__main__':
 
     if(len(sys.argv) < 3):
         print(usage)
+        exit(1)
     try:
         opts, args = getopt.getopt(
             sys.argv[3:len(sys.argv)], "h",

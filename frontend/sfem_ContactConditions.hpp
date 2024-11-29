@@ -63,11 +63,23 @@ namespace sfem {
 	    static std::shared_ptr<ContactConditions> create_from_env(
 	            const std::shared_ptr<FunctionSpace> &space);
 
+	    static std::shared_ptr<ContactConditions> create_from_file(
+	            const std::shared_ptr<FunctionSpace> &space, const std::string &path);
+
+	    /// $x \in R^{n}$
 	    int apply(real_t *const x) override;
+
+	    /// $x \in R^{n}$
 	    int apply_value(const real_t value, real_t *const x) override;
+
+	    /// $\text{src} \in R^{n}, \text{dest} \in R^{n}$
 	    int copy_constrained_dofs(const real_t *const src, real_t *const dest) override;
+
+	    /// $\text{mask} \in R^{n}$
 	    int mask(mask_t *mask) override;
 
+
+	    /// $x \in R^{n}, g \in R^{m}$
 	    int gradient(const real_t *const x, real_t *const g) override;
 
 	    int hessian_crs(const real_t *const x,
