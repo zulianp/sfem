@@ -158,27 +158,27 @@ int main(int argc, char *argv[]) {
     auto h_upper_bound = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
 
     {  // Fill default upper-bound value
-            auto ub = h_upper_bound->data();
-            for (ptrdiff_t i = 0; i < ndofs; i++) {
-                ub[i] = 1000;
-            }
+        auto ub = h_upper_bound->data();
+        for (ptrdiff_t i = 0; i < ndofs; i++) {
+            ub[i] = 1000;
         }
+    }
 
 #ifdef SFEM_ENABLE_CUDA
-        auto upper_bound = sfem::to_device(h_upper_bound);
+    auto upper_bound = sfem::to_device(h_upper_bound);
 #else
-        auto upper_bound = h_upper_bound;
+    auto upper_bound = h_upper_bound;
 #endif
 
-        contact_conds->apply(upper_bound->data());
+    contact_conds->apply(upper_bound->data());
 
 #ifdef SFEM_ENABLE_CUDA
-        h_upper_bound = sfem::to_host(upper_bound);
+    h_upper_bound = sfem::to_host(upper_bound);
 #endif
 
-        char path[2048];
-        sprintf(path, "%s/upper_bound.raw", output_path);
-        if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_upper_bound->data(), ndofs, ndofs)) {
+    char path[2048];
+    sprintf(path, "%s/upper_bound.raw", output_path);
+    if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_upper_bound->data(), ndofs, ndofs)) {
         return SFEM_FAILURE;
     }
 
