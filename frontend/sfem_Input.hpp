@@ -32,6 +32,8 @@ namespace sfem {
         /// Default destructor
         ~YAMLNoIndent();
 
+        static std::unique_ptr<YAMLNoIndent> create_from_file(const std::string &path);
+
         /// Parse YAML from a string input
         /// @param input String containing YAML content
         /// @return 0 on success, non-zero on failure

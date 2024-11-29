@@ -124,9 +124,8 @@ NB_MODULE(pysfem, m) {
     });
 
     m.def("create_mesh",
-          [](const char *elem_type_name,
-             nb::ndarray<idx_t> idx,
-             nb::ndarray<geom_t> p) -> std::shared_ptr<Mesh> {
+          [](const char *elem_type_name, nb::ndarray<idx_t> idx, nb::ndarray<geom_t> p)
+                  -> std::shared_ptr<Mesh> {
               size_t n = idx.shape(0);
               enum ElemType element_type = type_from_string(elem_type_name);
 
@@ -199,7 +198,8 @@ NB_MODULE(pysfem, m) {
           [](std::shared_ptr<Output> &out,
              const char *name,
              const real_t t,
-             nb::ndarray<real_t> x) { out->write_time_step(name, t, x.data()); });
+             nb::ndarray<real_t>
+                     x) { out->write_time_step(name, t, x.data()); });
 
     m.def("write", [](std::shared_ptr<Output> &out, const char *name, nb::ndarray<real_t> x) {
         out->write(name, x.data());
@@ -209,7 +209,8 @@ NB_MODULE(pysfem, m) {
           [](std::shared_ptr<Op> &op,
              const char *name,
              const int component,
-             nb::ndarray<real_t> v) {
+             nb::ndarray<real_t>
+                     v) {
               size_t n = v.size();
               auto c_v = (real_t *)malloc(n * sizeof(real_t));
               memcpy(c_v, v.data(), n * sizeof(real_t));
@@ -228,10 +229,14 @@ NB_MODULE(pysfem, m) {
 
     m.def("hessian_crs",
           [](std::shared_ptr<Function> fun,
-             std::shared_ptr<sfem::Buffer<real_t>> x,
-             std::shared_ptr<sfem::Buffer<count_t>> rowptr,
-             std::shared_ptr<sfem::Buffer<idx_t>> colidx,
-             std::shared_ptr<sfem::Buffer<real_t>> values) {
+             std::shared_ptr<sfem::Buffer<real_t>>
+                     x,
+             std::shared_ptr<sfem::Buffer<count_t>>
+                     rowptr,
+             std::shared_ptr<sfem::Buffer<idx_t>>
+                     colidx,
+             std::shared_ptr<sfem::Buffer<real_t>>
+                     values) {
               fun->hessian_crs(x->data(), rowptr->data(), colidx->data(), values->data());
           });
 
@@ -253,8 +258,10 @@ NB_MODULE(pysfem, m) {
 
     m.def("crs_spmv",
           [](std::shared_ptr<sfem::Buffer<count_t>> rowptr,
-             std::shared_ptr<sfem::Buffer<idx_t>> colidx,
-             std::shared_ptr<sfem::Buffer<real_t>> values) -> std::shared_ptr<Operator_t> {
+             std::shared_ptr<sfem::Buffer<idx_t>>
+                     colidx,
+             std::shared_ptr<sfem::Buffer<real_t>>
+                     values) -> std::shared_ptr<Operator_t> {
               return sfem::h_crs_spmv(
                       rowptr->size() - 1, rowptr->size() - 1, rowptr, colidx, values, real_t(0));
           });
@@ -294,9 +301,12 @@ NB_MODULE(pysfem, m) {
 
     m.def("apply",
           [](std::shared_ptr<Function> &fun,
-             nb::ndarray<real_t> x,
-             nb::ndarray<real_t> h,
-             nb::ndarray<real_t> y) { fun->apply(x.data(), h.data(), y.data()); });
+             nb::ndarray<real_t>
+                     x,
+             nb::ndarray<real_t>
+                     h,
+             nb::ndarray<real_t>
+                     y) { fun->apply(x.data(), h.data(), y.data()); });
 
     m.def("value", [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x) -> real_t {
         real_t value = 0;
@@ -334,12 +344,22 @@ NB_MODULE(pysfem, m) {
     nb::class_<DirichletConditions>(m, "DirichletConditions")
             .def(nb::init<std::shared_ptr<FunctionSpace>>());
 
+    nb::class_<ContactConditions>(m, "ContactConditions")
+            .def(nb::init<std::shared_ptr<FunctionSpace>>());
+
+    m.def("contact_conditions_from_file",
+          [](const std::shared_ptr<FunctionSpace> &space,
+             const char *path) -> std::shared_ptr<ContactConditions> {
+              return ContactConditions::create_from_file(space, path);
+          });
+
     nb::class_<NeumannConditions, Op>(m, "NeumannConditions")
             .def(nb::init<std::shared_ptr<FunctionSpace>>());
 
     m.def("add_condition",
           [](std::shared_ptr<DirichletConditions> &dc,
-             nb::ndarray<idx_t> idx,
+             nb::ndarray<idx_t>
+                     idx,
              const int component,
              const real_t value) {
               size_t n = idx.size();
@@ -356,7 +376,8 @@ NB_MODULE(pysfem, m) {
 
     m.def("add_condition",
           [](std::shared_ptr<NeumannConditions> &nc,
-             nb::ndarray<idx_t> idx,
+             nb::ndarray<idx_t>
+                     idx,
              const int component,
              const real_t value) {
               size_t n = idx.size();
@@ -402,7 +423,8 @@ NB_MODULE(pysfem, m) {
                  });
 
     m.def("make_op",
-          [](const std::shared_ptr<Function> &fun, nb::ndarray<real_t> u) -> std::shared_ptr<Operator_t> {
+          [](const std::shared_ptr<Function> &fun, nb::ndarray<real_t> u)
+                  -> std::shared_ptr<Operator_t> {
               return sfem::make_op<real_t>(
                       u.size(),
                       u.size(),
@@ -430,8 +452,10 @@ NB_MODULE(pysfem, m) {
 
     m.def("apply",
           [](std::shared_ptr<ConjugateGradient_t> &cg,
-             nb::ndarray<real_t> x,
-             nb::ndarray<real_t> y) { cg->apply(x.data(), y.data()); });
+             nb::ndarray<real_t>
+                     x,
+             nb::ndarray<real_t>
+                     y) { cg->apply(x.data(), y.data()); });
 
     nb::class_<BiCGStab_t>(m, "BiCGStab")
             .def(nb::init<>())
