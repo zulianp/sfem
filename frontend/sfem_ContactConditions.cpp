@@ -330,8 +330,6 @@ namespace sfem {
         bool rpath = false;
         in->get("rpath", rpath);
 
-        in->print(std::cout);
-
         std::string path_surface;
         in->require("surface", path_surface);
 
@@ -341,11 +339,19 @@ namespace sfem {
 
         auto in_surface = YAMLNoIndent::create_from_file(path_surface + "/meta.yaml");
 
-        // std::string path_node_mapping = path + "/" + path_surface + "/node_mapping.raw";
-        // in->get("node_mapping", path_node_mapping);
+        std::string points;
+        in_surface->require("points", points);
 
-        // std::string surface_elem_type;
-        // in->require("element_type", surface_elem_type);
+        if(points == "parent") {
+            printf("Will get the points from parent mesh!\n");
+
+        } else {
+            std::string path_node_mapping = path_surface + "/node_mapping.raw";
+            in_surface->get("node_mapping", path_node_mapping);
+        }
+
+        std::string surface_elem_type;
+        in_surface->require("element_type", surface_elem_type);
 
         std::string path_sdf;
         in->require("sdf", path_sdf);

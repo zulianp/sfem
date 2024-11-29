@@ -1,6 +1,6 @@
 # constrained_poisson.yaml
 
-rpath: true # Use to communicate that all paths are relative to this folder
+rpath: true # true if paths are relative to this folder, false if absolute
 mesh: box
 obstacle: obstacle
 block_size: 1

@@ -67,7 +67,7 @@ namespace sfem {
         }
 
         static int convert(const std::string &str, bool &value) {
-            value = atoi(str.c_str());
+            value = str == "true" || atoi(str.c_str());
             return SFEM_SUCCESS;
         }
 
@@ -151,6 +151,7 @@ namespace sfem {
         }
 
         std::map<std::string, std::shared_ptr<Node>> kv;
+        bool debug{false};
     };
 
     int YAMLNoIndent::array_require_keys(const std::string &key, std::vector<std::string> &ret) {
@@ -234,7 +235,7 @@ namespace sfem {
             if (ncomp == 1) {
                 // Assuming relational array of - key: val
 
-                printf("Reading list %s\n", key.c_str());
+                if(impl_->debug) printf("Reading list %s\n", key.c_str());
 
                 auto map_node = std::make_shared<Impl::MapNode>();
                 impl_->kv[key] = map_node;
@@ -269,7 +270,7 @@ namespace sfem {
                     } else {
                         in_list = false;
 
-                        printf("Exited list and encouted %s: %s\n", key.c_str(), value.c_str());
+                        if(impl_->debug) printf("Exited list and encouted %s: %s\n", key.c_str(), value.c_str());
                         auto node = std::make_shared<Impl::StringNode>();
                         node->value = value;
                         impl_->kv[key] = node;
@@ -278,7 +279,7 @@ namespace sfem {
                 } while (in_list);
 
             } else {
-                printf("%s: %s\n", key.c_str(), value.c_str());
+                if(impl_->debug) printf("%s: %s\n", key.c_str(), value.c_str());
                 auto node = std::make_shared<Impl::StringNode>();
                 node->value = value;
                 impl_->kv[key] = node;
