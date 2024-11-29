@@ -12,7 +12,7 @@ dirichlet_conditions:
     component: [0, 1, 2]
   - name: right
     nodeset: box/boundary_nodes/right.int32.raw
-    value: [1, 0, 0]
-    component: [0, 1, 2]
+    value: 1
+    component: 0
 
 output: output

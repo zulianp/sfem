@@ -51,29 +51,29 @@ def run(case):
 	fun.add_dirichlet_conditions(dirichlet_conditions)
 	fun.set_output_dir(config['output'])
 
-	x = np.zeros(fs.n_dofs())
-	g = np.zeros(fs.n_dofs())
-	c = np.zeros(fs.n_dofs())
+	# x = np.zeros(fs.n_dofs())
+	# g = np.zeros(fs.n_dofs())
+	# c = np.zeros(fs.n_dofs())
 	
-	cg = sfem.ConjugateGradient()
-	cg.default_init()
-	cg.set_max_it(400)
+	# cg = sfem.ConjugateGradient()
+	# cg.default_init()
+	# cg.set_max_it(400)
 
-	lop = sfem.make_op(fun, x)
-	cg.set_op(lop)
+	# lop = sfem.make_op(fun, x)
+	# cg.set_op(lop)
 
-	sfem.apply_constraints(fun, x)
-	sfem.gradient(fun, x, g)
+	# sfem.apply_constraints(fun, x)
+	# sfem.gradient(fun, x, g)
 
-	print(f'Solving system with {fs.n_dofs()} dofs')
-	sfem.apply(cg, g, c)
+	# print(f'Solving system with {fs.n_dofs()} dofs')
+	# sfem.apply(cg, g, c)
 
-	x -= c
+	# x -= c
 
-	sfem.report_solution(fun, x)
+	# sfem.report_solution(fun, x)
 
 	# TODO
-	# cc = sfem.contact_conditions_from_file(fs, str(config['obstacle']))
+	cc = sfem.contact_conditions_from_file(fs, str(config['obstacle']))
 
 if __name__ == '__main__':
 	if len(sys.argv) < 2:
