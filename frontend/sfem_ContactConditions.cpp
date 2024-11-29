@@ -327,66 +327,81 @@ namespace sfem {
         auto mesh = space->mesh_ptr();
         auto c_mesh = (mesh_t *)mesh->impl_mesh();
 
+        bool rpath = false;
+        in->get("rpath", rpath);
+
+        in->print(std::cout);
+
         std::string path_surface;
         in->require("surface", path_surface);
 
-        std::string path_node_mapping = path_surface + "/node_mapping.raw";
-        in->get("node_mapping", path_node_mapping);
+        if(rpath) {
+            path_surface = path + "/" + path_surface;
+        }
 
-        std::string surface_elem_type;
-        in->require("element_type", surface_elem_type);
+        auto in_surface = YAMLNoIndent::create_from_file(path_surface + "/meta.yaml");
+
+        // std::string path_node_mapping = path + "/" + path_surface + "/node_mapping.raw";
+        // in->get("node_mapping", path_node_mapping);
+
+        // std::string surface_elem_type;
+        // in->require("element_type", surface_elem_type);
 
         std::string path_sdf;
         in->require("sdf", path_sdf);
 
-        {
-            // Read mesh surface information
-            const enum ElemType element_type = space->element_type();
-            const enum ElemType side_element_type = shell_type(side_type(element_type));
-            const int nxe = elem_num_nodes(side_element_type);
-
-            assert(type_from_string(surface_elem_type.c_str()) == side_element_type);
-
-            idx_t **sides = (idx_t **)malloc(nxe * sizeof(idx_t *));
-            ptrdiff_t _nope_ = -1, len = -1;
-            char path[SFEM_MAX_PATH_LENGTH];
-            for (int d = 0; d < nxe; d++) {
-                sprintf(path, "%s.%d.raw", path_surface.c_str(), d);
-
-                idx_t *idx = nullptr;
-                if (!array_create_from_file(
-                            mesh->comm(), path, SFEM_MPI_IDX_T, (void **)&idx, &_nope_, &len)) {
-                    SFEM_ERROR("Unable to read path %s\n", path);
-                }
-            }
-
-            cc->impl_->sides = Buffer<idx_t *>::own(
-                    nxe,
-                    len,
-                    sides,
-                    [=](int n, void **x) {
-                        for (int i = 0; i < n; ++i) {
-                            free(x[i]);
-                        }
-                        free(x);
-                    },
-                    sfem::MEMORY_SPACE_HOST);
-
-            idx_t *idx = nullptr;
-            if (!array_create_from_file(mesh->comm(),
-                                        path_node_mapping.c_str(),
-                                        SFEM_MPI_IDX_T,
-                                        (void **)&idx,
-                                        &_nope_,
-                                        &len)) {
-                SFEM_ERROR("Unable to read path %s\n", path_node_mapping.c_str());
-            }
-
-            cc->impl_->node_mapping = Buffer<idx_t>::own(len, idx, &free, sfem::MEMORY_SPACE_HOST);
-
-            // Allocate buffer for point information
-            cc->impl_->surface_points = h_buffer<geom_t>(mesh->spatial_dimension(), len);
+        if(rpath) {
+            path_sdf = path + "/" + path_sdf;
         }
+
+        // {
+        //     // Read mesh surface information
+        //     const enum ElemType element_type = space->element_type();
+        //     const enum ElemType side_element_type = shell_type(side_type(element_type));
+        //     const int nxe = elem_num_nodes(side_element_type);
+
+        //     assert(type_from_string(surface_elem_type.c_str()) == side_element_type);
+
+        //     idx_t **sides = (idx_t **)malloc(nxe * sizeof(idx_t *));
+        //     ptrdiff_t _nope_ = -1, len = -1;
+        //     char path[SFEM_MAX_PATH_LENGTH];
+        //     for (int d = 0; d < nxe; d++) {
+        //         sprintf(path, "%s.%d.raw", path_surface.c_str(), d);
+
+        //         idx_t *idx = nullptr;
+        //         if (!array_create_from_file(
+        //                     mesh->comm(), path, SFEM_MPI_IDX_T, (void **)&idx, &_nope_, &len)) {
+        //             SFEM_ERROR("Unable to read path %s\n", path);
+        //         }
+        //     }
+
+        //     cc->impl_->sides = Buffer<idx_t *>::own(
+        //             nxe,
+        //             len,
+        //             sides,
+        //             [=](int n, void **x) {
+        //                 for (int i = 0; i < n; ++i) {
+        //                     free(x[i]);
+        //                 }
+        //                 free(x);
+        //             },
+        //             sfem::MEMORY_SPACE_HOST);
+
+        //     idx_t *idx = nullptr;
+        //     if (!array_create_from_file(mesh->comm(),
+        //                                 path_node_mapping.c_str(),
+        //                                 SFEM_MPI_IDX_T,
+        //                                 (void **)&idx,
+        //                                 &_nope_,
+        //                                 &len)) {
+        //         SFEM_ERROR("Unable to read path %s\n", path_node_mapping.c_str());
+        //     }
+
+        //     cc->impl_->node_mapping = Buffer<idx_t>::own(len, idx, &free, sfem::MEMORY_SPACE_HOST);
+
+        //     // Allocate buffer for point information
+        //     cc->impl_->surface_points = h_buffer<geom_t>(mesh->spatial_dimension(), len);
+        // }
 
         cc->impl_->sdf = Grid<geom_t>::create_from_file(mesh->comm(), path_sdf.c_str());
         return cc;
