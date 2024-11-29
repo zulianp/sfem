@@ -25,6 +25,8 @@ def create_dirichlet_conditions(fs, config):
 		component = c['component']
 		value = c['value']
 
+		print(f"reading \"{name}\"")
+
 		idx = np.unique(np.fromfile(nodeset, dtype=idx_t))
 		if isinstance(component, list):
 			for k in range(0, len(component)):
