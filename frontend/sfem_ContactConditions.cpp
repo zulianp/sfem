@@ -247,8 +247,14 @@ namespace sfem {
     }
 
     int AxisAlignedContactConditions::mask(mask_t *mask) {
-        assert(false);
-        return SFEM_FAILURE;
+        for (int i = 0; i < impl_->n_conditions; i++) {
+            for (ptrdiff_t node = 0; node < impl_->conditions[i].local_size; node++) {
+                const ptrdiff_t idx = impl_->conditions[i].idx[node] * impl_->space->block_size() +
+                                      impl_->conditions[i].component;
+                mask_set(idx, mask);
+            }
+        }
+        return SFEM_SUCCESS;
     }
 
     // ===
@@ -423,7 +429,6 @@ namespace sfem {
         impl_->update_displaced_points(x);
 
         // FIXME for MPI
-
 
         // interpolate_gap(
         //         // Mesh
