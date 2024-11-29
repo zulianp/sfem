@@ -359,7 +359,7 @@ if __name__ == '__main__':
             export_normals = True
 
     if box_from_mesh != None:
-        aux_mesh = read_mesh(arg)
+        aux_mesh = read_mesh(box_from_mesh)
         pmin, pmax = compute_aabb(aux_mesh, margin)
         defined_bounds = True
         aux_mesh = None
