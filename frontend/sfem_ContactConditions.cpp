@@ -544,7 +544,7 @@ namespace sfem {
             }
         }
 
-        return SFEM_FAILURE;
+        return SFEM_SUCCESS;
     }
 
     int ContactConditions::gradient(const real_t *const x, real_t *const g) {
