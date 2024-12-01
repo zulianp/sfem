@@ -853,7 +853,126 @@ int interpolate_gap(const ptrdiff_t nnodes, geom_t** const SFEM_RESTRICT xyz,
                 g[node] = -eval_gap;
             }
 
-            // Interpolate gap function
+            // Interpolate normals
+            {
+                real_t eval_xnormal = 0;
+                real_t eval_ynormal = 0;
+                real_t eval_znormal = 0;
+
+#pragma unroll(8)
+                for (int edof_j = 0; edof_j < 8; edof_j++) {
+                    eval_xnormal += hex8_grad_x[edof_j] * coeffs[edof_j];
+                    eval_ynormal += hex8_grad_y[edof_j] * coeffs[edof_j];
+                    eval_znormal += hex8_grad_z[edof_j] * coeffs[edof_j];
+                }
+
+                {
+                    // Normalize
+                    real_t denom = sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal +
+                                        eval_znormal * eval_znormal);
+
+                    assert(denom != 0);
+
+                    eval_xnormal /= denom;
+                    eval_ynormal /= denom;
+                    eval_znormal /= denom;
+                }
+
+                xnormal[node] = eval_xnormal;
+                ynormal[node] = eval_ynormal;
+                znormal[node] = eval_znormal;
+            }
+        }
+    }
+
+    return 0;
+}
+
+int interpolate_gap_normals(const ptrdiff_t nnodes, geom_t** const SFEM_RESTRICT xyz,
+                    // SDF
+                    const ptrdiff_t* const SFEM_RESTRICT n,
+                    const ptrdiff_t* const SFEM_RESTRICT stride,
+                    const geom_t* const SFEM_RESTRICT origin,
+                    const geom_t* const SFEM_RESTRICT delta, const geom_t* const SFEM_RESTRICT data,
+                    // Output
+                    real_t* const SFEM_RESTRICT xnormal,
+                    real_t* const SFEM_RESTRICT ynormal, real_t* const SFEM_RESTRICT znormal) {
+    if (!nnodes) return 0;
+
+    const real_t ox = (real_t)origin[0];
+    const real_t oy = (real_t)origin[1];
+    const real_t oz = (real_t)origin[2];
+
+    const real_t dx = (real_t)delta[0];
+    const real_t dy = (real_t)delta[1];
+    const real_t dz = (real_t)delta[2];
+
+#pragma omp parallel
+    {
+#pragma omp for  // nowait
+        for (ptrdiff_t node = 0; node < nnodes; ++node) {
+            real_t hex8_f[8];
+            real_t hex8_grad_x[8];
+            real_t hex8_grad_y[8];
+            real_t hex8_grad_z[8];
+            real_t coeffs[8];
+
+            const real_t x = xyz[0][node];
+            const real_t y = xyz[1][node];
+            const real_t z = xyz[2][node];
+
+            const real_t grid_x = (x - ox) / dx;
+            const real_t grid_y = (y - oy) / dy;
+            const real_t grid_z = (z - oz) / dz;
+
+            const ptrdiff_t i = floor(grid_x);
+            const ptrdiff_t j = floor(grid_y);
+            const ptrdiff_t k = floor(grid_z);
+
+            // If outside
+            if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
+                int rank;
+                MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+                fprintf(stderr,
+                        "[%d] warning (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
+                        "%ld)!\n",
+                        rank,
+                        x,
+                        y,
+                        z,
+                        i,
+                        j,
+                        k,
+                        n[0],
+                        n[1],
+                        n[2]);
+                continue;
+            }
+
+            // Get the reminder [0, 1]
+            real_t l_x = (grid_x - i);
+            real_t l_y = (grid_y - j);
+            real_t l_z = (grid_z - k);
+
+            assert(l_x >= -1e-8);
+            assert(l_y >= -1e-8);
+            assert(l_z >= -1e-8);
+
+            assert(l_x <= 1 + 1e-8);
+            assert(l_y <= 1 + 1e-8);
+            assert(l_z <= 1 + 1e-8);
+
+            hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
+            hex_aa_8_eval_grad(put_inside(l_x),
+                               put_inside(l_y),
+                               put_inside(l_z),
+                               hex8_grad_x,
+                               hex8_grad_y,
+                               hex8_grad_z);
+
+            hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
+
+            // Interpolate normals
             {
                 real_t eval_xnormal = 0;
                 real_t eval_ynormal = 0;
