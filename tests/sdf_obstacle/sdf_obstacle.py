@@ -8,7 +8,6 @@ import sys, getopt, os
 from sfem.sfem_config import *
 
 import yaml
-
 try:
     from yaml import SafeLoader as Loader, CDumper as Dumper
 except ImportError:
@@ -51,11 +50,14 @@ def run(case):
 	dirichlet_conditions = create_dirichlet_conditions(fs, case['dirichlet_conditions'])
 
 	fun.add_dirichlet_conditions(dirichlet_conditions)
-	fun.set_output_dir(config['output'])
 
-	# x = np.zeros(fs.n_dofs())
-	# g = np.zeros(fs.n_dofs())
-	# c = np.zeros(fs.n_dofs())
+	out = fun.output()
+	out.set_output_dir(config['output'])
+	out.enable_AoS_to_SoA(True)
+
+	x = np.zeros(fs.n_dofs(), dtype=real_t)
+	g = np.zeros(fs.n_dofs(), dtype=real_t)
+	c = np.zeros(fs.n_dofs(), dtype=real_t)
 	
 	# cg = sfem.ConjugateGradient()
 	# cg.default_init()
@@ -72,10 +74,18 @@ def run(case):
 
 	# x -= c
 
-	# sfem.report_solution(fun, x)
+	# 
 
 	# TODO
 	cc = sfem.contact_conditions_from_file(fs, str(config['obstacle']))
+	cc_gradient = np.zeros(cc.n_constrained_dofs(), dtype=real_t)
+	sfem.gradient(cc, x, cc_gradient)
+
+	sfem.gradient_for_mesh_viz(cc, x, g)
+	sfem.write(out, "g", g)
+
+	print(f'Constrained dofs {cc.n_constrained_dofs()}/{fs.n_dofs()}')
+	print(cc_gradient)
 
 if __name__ == '__main__':
 	if len(sys.argv) < 2:

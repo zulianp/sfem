@@ -93,6 +93,8 @@ namespace sfem {
 
 	    ptrdiff_t n_constrained_dofs() const;
 
+	    int gradient_for_mesh_viz(const real_t *const x, real_t *const g) const;
+
 	private:
 	    class Impl;
 	    std::unique_ptr<Impl> impl_;

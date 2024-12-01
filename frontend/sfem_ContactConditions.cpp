@@ -14,6 +14,9 @@
 
 #include "sfem_resample_gap.h"
 
+#include <glob.h>
+#include <vector>
+
 namespace sfem {
     class AxisAlignedContactConditions::Impl {
     public:
@@ -319,6 +322,19 @@ namespace sfem {
 
     ContactConditions::~ContactConditions() = default;
 
+    static void find_files(const char *pattern, std::vector<std::string> &paths) {
+        paths.clear();
+
+        glob_t gl;
+        glob(pattern, GLOB_MARK, NULL, &gl);
+
+        int n_files = gl.gl_pathc;
+
+        for (int np = 0; np < n_files; np++) {
+            paths.push_back(gl.gl_pathv[np]);
+        }
+    }
+
     std::shared_ptr<ContactConditions> ContactConditions::create_from_file(
             const std::shared_ptr<FunctionSpace> &space, const std::string &path) {
         auto in = YAMLNoIndent::create_from_file(path + "/meta.yaml");
@@ -333,7 +349,7 @@ namespace sfem {
         std::string path_surface;
         in->require("surface", path_surface);
 
-        if(rpath) {
+        if (rpath) {
             path_surface = path + "/" + path_surface;
         }
 
@@ -342,74 +358,109 @@ namespace sfem {
         std::string points;
         in_surface->require("points", points);
 
-        if(points == "parent") {
-            printf("Will get the points from parent mesh!\n");
-
-        } else {
-            std::string path_node_mapping = path_surface + "/node_mapping.raw";
-            in_surface->get("node_mapping", path_node_mapping);
-        }
-
         std::string surface_elem_type;
         in_surface->require("element_type", surface_elem_type);
 
-        std::string path_sdf;
-        in->require("sdf", path_sdf);
+        {
+            // Read mesh surface information
+            const enum ElemType element_type = space->element_type();
+            const enum ElemType side_element_type = shell_type(side_type(element_type));
+            const int nxe = elem_num_nodes(side_element_type);
 
-        if(rpath) {
-            path_sdf = path + "/" + path_sdf;
+            assert(type_from_string(surface_elem_type.c_str()) == side_element_type);
+
+            idx_t **sides = (idx_t **)malloc(nxe * sizeof(idx_t *));
+            ptrdiff_t _nope_ = -1, len = -1;
+
+            char pattern[SFEM_MAX_PATH_LENGTH];
+            sprintf(pattern, "%s/i*.*raw", path_surface.c_str());
+
+            std::vector<std::string> paths;
+            find_files(pattern, paths);
+
+            assert((int)paths.size() == nxe);
+
+            for (int d = 0; d < nxe; d++) {
+                idx_t *idx = nullptr;
+                ptrdiff_t len_d = -1;
+                if (array_create_from_file(mesh->comm(),
+                                           paths[d].c_str(),
+                                           SFEM_MPI_IDX_T,
+                                           (void **)&idx,
+                                           &_nope_,
+                                           &len_d)) {
+                    SFEM_ERROR("Unable to read path %s\n", paths[d].c_str());
+                }
+
+                sides[d] = idx;
+
+                assert(len == -1 || len_d == len);
+                len = len_d;
+            }
+
+            cc->impl_->sides = Buffer<idx_t *>::own(
+                    nxe,
+                    len,
+                    sides,
+                    [=](int n, void **x) {
+                        for (int i = 0; i < n; ++i) {
+                            free(x[i]);
+                        }
+                        free(x);
+                    },
+                    sfem::MEMORY_SPACE_HOST);
+
+            bool has_parent_indexing = points == "parent";
+            if (has_parent_indexing) {
+                idx_t *idx = nullptr;
+                ptrdiff_t n_contiguous = -1;
+                remap_elements_to_contiguous_index(cc->impl_->sides->extent(1),
+                                                   cc->impl_->sides->extent(0),
+                                                   cc->impl_->sides->data(),
+                                                   &n_contiguous,
+                                                   &idx);
+                cc->impl_->node_mapping =
+                        Buffer<idx_t>::own(n_contiguous, idx, &free, sfem::MEMORY_SPACE_HOST);
+
+            } else {
+                std::string path_node_mapping = path_surface + "/node_mapping.raw";
+                in_surface->get("node_mapping", path_node_mapping);
+
+                idx_t *idx = nullptr;
+                if (array_create_from_file(mesh->comm(),
+                                            path_node_mapping.c_str(),
+                                            SFEM_MPI_IDX_T,
+                                            (void **)&idx,
+                                            &_nope_,
+                                            &len)) {
+                    SFEM_ERROR("Unable to read path %s\n", path_node_mapping.c_str());
+                }
+
+                cc->impl_->node_mapping =
+                        Buffer<idx_t>::own(len, idx, &free, sfem::MEMORY_SPACE_HOST);
+            }
+
+            // Allocate buffer for point information
+            cc->impl_->surface_points =
+                    h_buffer<geom_t>(mesh->spatial_dimension(), cc->impl_->node_mapping->size());
         }
 
-        // {
-        //     // Read mesh surface information
-        //     const enum ElemType element_type = space->element_type();
-        //     const enum ElemType side_element_type = shell_type(side_type(element_type));
-        //     const int nxe = elem_num_nodes(side_element_type);
+        {  // SDF
 
-        //     assert(type_from_string(surface_elem_type.c_str()) == side_element_type);
+            std::string path_sdf;
+            in->require("sdf", path_sdf);
 
-        //     idx_t **sides = (idx_t **)malloc(nxe * sizeof(idx_t *));
-        //     ptrdiff_t _nope_ = -1, len = -1;
-        //     char path[SFEM_MAX_PATH_LENGTH];
-        //     for (int d = 0; d < nxe; d++) {
-        //         sprintf(path, "%s.%d.raw", path_surface.c_str(), d);
+            if (rpath) {
+                path_sdf = path + "/" + path_sdf;
+            }
 
-        //         idx_t *idx = nullptr;
-        //         if (!array_create_from_file(
-        //                     mesh->comm(), path, SFEM_MPI_IDX_T, (void **)&idx, &_nope_, &len)) {
-        //             SFEM_ERROR("Unable to read path %s\n", path);
-        //         }
-        //     }
+            cc->impl_->sdf = Grid<geom_t>::create_from_file(mesh->comm(), path_sdf.c_str());
+        }
 
-        //     cc->impl_->sides = Buffer<idx_t *>::own(
-        //             nxe,
-        //             len,
-        //             sides,
-        //             [=](int n, void **x) {
-        //                 for (int i = 0; i < n; ++i) {
-        //                     free(x[i]);
-        //                 }
-        //                 free(x);
-        //             },
-        //             sfem::MEMORY_SPACE_HOST);
+        cc->impl_->gap_xnormal = h_buffer<real_t>(cc->n_constrained_dofs());
+        cc->impl_->gap_ynormal = h_buffer<real_t>(cc->n_constrained_dofs());
+        cc->impl_->gap_znormal = h_buffer<real_t>(cc->n_constrained_dofs());
 
-        //     idx_t *idx = nullptr;
-        //     if (!array_create_from_file(mesh->comm(),
-        //                                 path_node_mapping.c_str(),
-        //                                 SFEM_MPI_IDX_T,
-        //                                 (void **)&idx,
-        //                                 &_nope_,
-        //                                 &len)) {
-        //         SFEM_ERROR("Unable to read path %s\n", path_node_mapping.c_str());
-        //     }
-
-        //     cc->impl_->node_mapping = Buffer<idx_t>::own(len, idx, &free, sfem::MEMORY_SPACE_HOST);
-
-        //     // Allocate buffer for point information
-        //     cc->impl_->surface_points = h_buffer<geom_t>(mesh->spatial_dimension(), len);
-        // }
-
-        cc->impl_->sdf = Grid<geom_t>::create_from_file(mesh->comm(), path_sdf.c_str());
         return cc;
     }
 
@@ -421,6 +472,42 @@ namespace sfem {
     }
 
     int ContactConditions::apply(real_t *const x) { return apply_value(0, x); }
+
+    int ContactConditions::gradient_for_mesh_viz(const real_t *const x, real_t *const g) const {
+        impl_->update_displaced_points(x);
+
+        auto sdf = impl_->sdf;
+
+        auto temp = h_buffer<real_t>(n_constrained_dofs());
+
+        auto tt = temp->data();
+
+        interpolate_gap(
+                // Mesh
+                impl_->surface_points->extent(1),
+                impl_->surface_points->data(),
+                // SDF
+                sdf->nlocal(),
+                sdf->stride(),
+                sdf->origin(),
+                sdf->delta(),
+                sdf->data(),
+                // Output
+                tt,
+                impl_->gap_xnormal->data(),
+                impl_->gap_ynormal->data(),
+                impl_->gap_znormal->data());
+
+        const ptrdiff_t n = impl_->node_mapping->size();
+        const idx_t *const idx = impl_->node_mapping->data();
+        int dim = impl_->space->mesh_ptr()->spatial_dimension();
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            g[idx[i] * dim] = tt[i];
+        }
+
+        return SFEM_SUCCESS;
+    }
 
     int ContactConditions::gradient(const real_t *const x, real_t *const g) {
         impl_->update_displaced_points(x);
@@ -454,7 +541,7 @@ namespace sfem {
             x[idx[i]] = value;
         }
 
-        return SFEM_FAILURE;
+        return SFEM_SUCCESS;
     }
 
     int ContactConditions::copy_constrained_dofs(const real_t *const src, real_t *const dest) {
@@ -465,7 +552,7 @@ namespace sfem {
             dest[idx[i]] = src[idx[i]];
         }
 
-        return SFEM_FAILURE;
+        return SFEM_SUCCESS;
     }
 
     int ContactConditions::hessian_crs(const real_t *const x, const count_t *const rowptr,

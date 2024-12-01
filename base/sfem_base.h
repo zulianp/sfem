@@ -35,7 +35,7 @@
             name = conversion(var);                                                       \
         } else {                                                                          \
             fprintf(stderr, "[Error] %s is required (%s:%d)", #name, __FILE__, __LINE__); \
-            assert(false);                                                                \
+            assert(0);                                                                \
             MPI_Abort(MPI_COMM_WORLD, -1);                                                \
         }                                                                                 \
     } while (0)
@@ -43,7 +43,7 @@
 #define SFEM_ERROR(...)                \
     do {                               \
         fprintf(stderr, __VA_ARGS__);   \
-        assert(false);                 \
+        assert(0);                 \
         MPI_Abort(MPI_COMM_WORLD, -1); \
     } while (0)
 

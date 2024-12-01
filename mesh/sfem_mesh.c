@@ -35,16 +35,8 @@ void mesh_init(mesh_t *mesh) {
     mesh->ghosts = 0;
 }
 
-void mesh_create_serial(
-    mesh_t *mesh,
-    int spatial_dim,
-    enum ElemType element_type,
-    ptrdiff_t nelements,
-    idx_t **elements,
-    ptrdiff_t nnodes,
-    geom_t **points
-    )
-{
+void mesh_create_serial(mesh_t *mesh, int spatial_dim, enum ElemType element_type,
+                        ptrdiff_t nelements, idx_t **elements, ptrdiff_t nnodes, geom_t **points) {
     mesh_init(mesh);
     mesh->comm = MPI_COMM_SELF;
     mesh->spatial_dim = spatial_dim;
@@ -111,7 +103,7 @@ void mesh_destroy(mesh_t *mesh) {
         free(mesh->elements[d]);
         mesh->elements[d] = 0;
     }
-    if(nxe) {
+    if (nxe) {
         free(mesh->elements);
     }
 
@@ -162,4 +154,51 @@ void mesh_destroy_shared_elements_block(mesh_t *mesh, element_block_t *block) {
     free(block->elements);
     block->elements = 0;
     block->elements = 0;
+}
+
+#include <stdio.h>
+
+void remap_elements_to_contiguous_index(const ptrdiff_t n_elements, const int nxe,
+                                        idx_t **const elements, ptrdiff_t *const out_n_contiguous,
+                                        idx_t **const out_node_mapping) {
+    idx_t n = 0;
+    for (int d = 0; d < nxe; d++) {
+        for (ptrdiff_t i = 0; i < n_elements; i++) {
+            n = MAX(elements[d][i], n);
+        }
+    }
+
+    n += 1;
+
+    idx_t *remap = (idx_t *)malloc(n * sizeof(idx_t));
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        remap[i] = -1;
+    }
+
+    ptrdiff_t n_contiguous = 0;
+    for (ptrdiff_t i = 0; i < n_elements; ++i) {
+        for (int d = 0; d < nxe; ++d) {
+            idx_t idx = elements[d][i];
+            if (remap[idx] < 0) {
+                remap[idx] = n_contiguous++;
+            }
+        }
+    }
+
+    for (int d = 0; d < nxe; d++) {
+        for (ptrdiff_t i = 0; i < n_elements; i++) {
+            elements[d][i] = remap[elements[d][i]];
+        }
+    }
+
+    idx_t *node_mapping = malloc(n_contiguous * sizeof(idx_t));
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        if (remap[i] != -1) {
+            node_mapping[remap[i]] = i;
+        }
+    }
+
+    free(remap);
+    *out_n_contiguous = n_contiguous;
+    *out_node_mapping = node_mapping;
 }

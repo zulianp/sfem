@@ -284,7 +284,7 @@ int main(int argc, char *argv[]) {
     surf.mem_space = mesh.mem_space;
 
     surf.spatial_dim = mesh.spatial_dim;
-    surf.element_type = side_type(mesh.element_type);
+    surf.element_type = shell_type(side_type(mesh.element_type));
 
     surf.nelements = n_surf_elements;
     surf.nnodes = n_surf_nodes;

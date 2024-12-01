@@ -376,7 +376,7 @@ namespace sfem {
         void set_output_dir(const char *path);
         int write(const char *name, const real_t *const x);
         int write_time_step(const char *name, const real_t t, const real_t *const x);
-
+        void enable_AoS_to_SoA(const bool val);
         void clear();
 
     private:
