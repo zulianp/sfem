@@ -428,11 +428,11 @@ namespace sfem {
 
                 idx_t *idx = nullptr;
                 if (array_create_from_file(mesh->comm(),
-                                            path_node_mapping.c_str(),
-                                            SFEM_MPI_IDX_T,
-                                            (void **)&idx,
-                                            &_nope_,
-                                            &len)) {
+                                           path_node_mapping.c_str(),
+                                           SFEM_MPI_IDX_T,
+                                           (void **)&idx,
+                                           &_nope_,
+                                           &len)) {
                     SFEM_ERROR("Unable to read path %s\n", path_node_mapping.c_str());
                 }
 
@@ -509,12 +509,11 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int ContactConditions::gradient(const real_t *const x, real_t *const g) {
-        impl_->update_displaced_points(x);
-
+    int ContactConditions::apply(const real_t *const x, const real_t *const h,
+                                 real_t *const out) {
         auto sdf = impl_->sdf;
-
-        interpolate_gap(
+        
+        interpolate_gap_normals(
                 // Mesh
                 impl_->surface_points->extent(1),
                 impl_->surface_points->data(),
@@ -525,10 +524,46 @@ namespace sfem {
                 sdf->delta(),
                 sdf->data(),
                 // Output
-                g,
                 impl_->gap_xnormal->data(),
                 impl_->gap_ynormal->data(),
                 impl_->gap_znormal->data());
+
+        const ptrdiff_t n = impl_->node_mapping->size();
+        const idx_t *const idx = impl_->node_mapping->data();
+
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+        assert(dim == 3); // FIXME 2D not supported
+
+        const real_t *const normals[3] = {
+                impl_->gap_xnormal->data(), impl_->gap_ynormal->data(), impl_->gap_znormal->data()};
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            for (int d = 0; d < dim; d++) {
+                out[i] += h[idx[i] * dim + d] * normals[d][i];
+            }
+        }
+
+        return SFEM_FAILURE;
+    }
+
+    int ContactConditions::gradient(const real_t *const x, real_t *const g) {
+        impl_->update_displaced_points(x);
+
+        auto sdf = impl_->sdf;
+
+        interpolate_gap_value(
+                // Mesh
+                impl_->surface_points->extent(1),
+                impl_->surface_points->data(),
+                // SDF
+                sdf->nlocal(),
+                sdf->stride(),
+                sdf->origin(),
+                sdf->delta(),
+                sdf->data(),
+                // Output
+                g);
 
         return SFEM_SUCCESS;
     }
