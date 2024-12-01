@@ -974,6 +974,7 @@ namespace sfem {
     class Output::Impl {
     public:
         std::shared_ptr<FunctionSpace> space;
+        bool AoS_to_SoA{false};
         std::string output_dir{"."};
         std::string file_format{"%s/%s.raw"};
         std::string time_dependent_file_format{"%s/%s.%09d.raw"};
@@ -982,6 +983,10 @@ namespace sfem {
         Impl() { log_init(&time_logger); }
         ~Impl() { log_destroy(&time_logger); }
     };
+
+    void Output::enable_AoS_to_SoA(const bool val) {
+        impl_->AoS_to_SoA = val;
+    }
 
     Output::Output(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>()) {
         impl_->space = space;
@@ -1007,15 +1012,43 @@ namespace sfem {
             }
         }
 
-        char path[2048];
-        sprintf(path, impl_->file_format.c_str(), impl_->output_dir.c_str(), name);
-        if (array_write(mesh->comm,
-                        path,
-                        SFEM_MPI_REAL_T,
-                        x,
-                        impl_->space->n_dofs(),
-                        impl_->space->n_dofs())) {
-            return SFEM_FAILURE;
+        const int block_size = impl_->space->block_size();
+        if (impl_->AoS_to_SoA && block_size > 1) {
+            ptrdiff_t n_blocks = impl_->space->n_dofs() / block_size;
+
+            auto buff = h_buffer<real_t>(n_blocks);
+            auto bb = buff->data();
+
+            char path[2048];
+            for(int b = 0; b < block_size; b++) {
+                for(ptrdiff_t i = 0; i < n_blocks; i++) {
+                    bb[i] = x[i * block_size + b];
+                }
+                
+                char b_name[1024];
+                sprintf(b_name, "%s.%d", name, b);
+                sprintf(path, impl_->file_format.c_str(), impl_->output_dir.c_str(), b_name);
+                if (array_write(mesh->comm,
+                                path,
+                                SFEM_MPI_REAL_T,
+                                buff->data(),
+                                n_blocks,
+                                n_blocks)) {
+                    return SFEM_FAILURE;
+                }
+            }
+
+        } else {
+            char path[2048];
+            sprintf(path, impl_->file_format.c_str(), impl_->output_dir.c_str(), name);
+            if (array_write(mesh->comm,
+                            path,
+                            SFEM_MPI_REAL_T,
+                            x,
+                            impl_->space->n_dofs(),
+                            impl_->space->n_dofs())) {
+                return SFEM_FAILURE;
+            }
         }
 
         return SFEM_SUCCESS;
@@ -1873,8 +1906,7 @@ namespace sfem {
         long calls{0};
         double total_time{0};
 
-        ~SemiStructuredLaplacian()
-        {
+        ~SemiStructuredLaplacian() {
             if (calls) {
                 printf("SemiStructuredLaplacian::apply(%s) called %ld times. Total: %g [s], "
                        "Avg: %g [s], TP %g [MDOF/s]\n",
@@ -1885,7 +1917,6 @@ namespace sfem {
                        1e-6 * space->n_dofs() / (total_time / calls));
             }
         }
-        
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             assert(space->has_semi_structured_mesh());
@@ -1938,11 +1969,11 @@ namespace sfem {
         int hessian_diag(const real_t *const, real_t *const out) override {
             auto &ssm = space->semi_structured_mesh();
             return proteus_affine_hex8_laplacian_diag(ssm.level(),
-                                                           ssm.n_elements(),
-                                                           ssm.interior_start(),
-                                                           ssm.element_data(),
-                                                           ssm.point_data(),
-                                                           out);
+                                                      ssm.n_elements(),
+                                                      ssm.interior_start(),
+                                                      ssm.element_data(),
+                                                      ssm.point_data(),
+                                                      out);
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
@@ -1961,21 +1992,21 @@ namespace sfem {
             int err = 0;
             if (use_affine_approximation) {
                 err = proteus_affine_hex8_laplacian_apply(ssm.level(),
-                                                           ssm.n_elements(),
-                                                           ssm.interior_start(),
-                                                           ssm.element_data(),
-                                                           ssm.point_data(),
-                                                           h,
-                                                           out);
+                                                          ssm.n_elements(),
+                                                          ssm.interior_start(),
+                                                          ssm.element_data(),
+                                                          ssm.point_data(),
+                                                          h,
+                                                          out);
 
             } else {
                 err = proteus_hex8_laplacian_apply(ssm.level(),
-                                                    ssm.n_elements(),
-                                                    ssm.interior_start(),
-                                                    ssm.element_data(),
-                                                    ssm.point_data(),
-                                                    h,
-                                                    out);
+                                                   ssm.n_elements(),
+                                                   ssm.interior_start(),
+                                                   ssm.element_data(),
+                                                   ssm.point_data(),
+                                                   h,
+                                                   out);
             }
 
             double tock = MPI_Wtime();

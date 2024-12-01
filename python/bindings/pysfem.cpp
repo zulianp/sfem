@@ -192,7 +192,8 @@ NB_MODULE(pysfem, m) {
     nb::class_<Output>(m, "Output")
             .def("set_output_dir", &Output::set_output_dir)
             .def("write", &Output::write)
-            .def("write_time_step", &Output::write_time_step);
+            .def("write_time_step", &Output::write_time_step)
+            .def("enable_AoS_to_SoA", &Output::enable_AoS_to_SoA);
 
     m.def("write_time_step",
           [](std::shared_ptr<Output> &out,
@@ -345,8 +346,17 @@ NB_MODULE(pysfem, m) {
             .def(nb::init<std::shared_ptr<FunctionSpace>>());
 
     nb::class_<ContactConditions>(m, "ContactConditions")
-            .def(nb::init<std::shared_ptr<FunctionSpace>>());
+            .def(nb::init<std::shared_ptr<FunctionSpace>>())
+            .def("n_constrained_dofs", &ContactConditions::n_constrained_dofs);
 
+    m.def("gradient", [](const std::shared_ptr<ContactConditions> &cc, nb::ndarray<real_t> x, nb::ndarray<real_t> y) {
+        cc->gradient(x.data(), y.data());
+    });
+
+    m.def("gradient_for_mesh_viz", [](const std::shared_ptr<ContactConditions> &cc, nb::ndarray<real_t> x, nb::ndarray<real_t> y) {
+        cc->gradient_for_mesh_viz(x.data(), y.data());
+    });          
+          
     m.def("contact_conditions_from_file",
           [](const std::shared_ptr<FunctionSpace> &space,
              const char *path) -> std::shared_ptr<ContactConditions> {

@@ -92,6 +92,12 @@ typedef struct {
 void mesh_create_shared_elements_block(mesh_t *mesh, element_block_t *block);
 void mesh_destroy_shared_elements_block(mesh_t *mesh, element_block_t *block);
 
+void remap_elements_to_contiguous_index(
+    const ptrdiff_t n_elements, 
+    const int nxe, idx_t **elements,
+    ptrdiff_t *const out_n_contiguous,
+    idx_t **const out_node_mapping);
+
 #ifdef __cplusplus
 }
 #endif
