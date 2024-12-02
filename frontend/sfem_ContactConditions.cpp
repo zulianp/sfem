@@ -501,19 +501,69 @@ namespace sfem {
         const ptrdiff_t n = impl_->node_mapping->size();
         const idx_t *const idx = impl_->node_mapping->data();
         int dim = impl_->space->mesh_ptr()->spatial_dimension();
+
+        const real_t *const normals[3] = {
+                impl_->gap_xnormal->data(), impl_->gap_ynormal->data(), impl_->gap_znormal->data()};
+
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n; ++i) {
-            g[idx[i] * dim] = tt[i];
+            for(int d= 0; d < dim; d++) {
+                g[idx[i] * dim + d] = tt[i] * normals[d][i];
+            }
         }
 
         return SFEM_SUCCESS;
     }
 
-    int ContactConditions::apply(const real_t *const x, const real_t *const h,
-                                 real_t *const out) {
+    int ContactConditions::normal_project(const real_t *const h, real_t *const out) {
+        const ptrdiff_t n = impl_->node_mapping->size();
+        const idx_t *const idx = impl_->node_mapping->data();
+
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+        assert(dim == 3);  // FIXME 2D not supported
+
+        const real_t *const normals[3] = {
+                impl_->gap_xnormal->data(), impl_->gap_ynormal->data(), impl_->gap_znormal->data()};
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            for (int d = 0; d < dim; d++) {
+                out[i] += h[idx[i] * dim + d] * normals[d][i];
+            }
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    int ContactConditions::distribute_contact_forces(const real_t *const f, real_t *const out) {
+        const ptrdiff_t n = impl_->node_mapping->size();
+        const idx_t *const idx = impl_->node_mapping->data();
+
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+        assert(dim == 3);  // FIXME 2D not supported
+
+        const real_t *const normals[3] = {
+                impl_->gap_xnormal->data(), impl_->gap_ynormal->data(), impl_->gap_znormal->data()};
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            for (int d = 0; d < dim; d++) {
+                out[idx[i] * dim + d] += f[i] * normals[d][i];
+            }
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    int ContactConditions::apply(const real_t *const x, const real_t *const h, real_t *const out) {
+        return update(x) || normal_project(h, out);
+    }
+
+    int ContactConditions::update(const real_t *const x) {
+        impl_->update_displaced_points(x);
         auto sdf = impl_->sdf;
-        
-        interpolate_gap_normals(
+
+        return interpolate_gap_normals(
                 // Mesh
                 impl_->surface_points->extent(1),
                 impl_->surface_points->data(),
@@ -527,24 +577,26 @@ namespace sfem {
                 impl_->gap_xnormal->data(),
                 impl_->gap_ynormal->data(),
                 impl_->gap_znormal->data());
+    }
 
-        const ptrdiff_t n = impl_->node_mapping->size();
-        const idx_t *const idx = impl_->node_mapping->data();
+    std::shared_ptr<Operator<real_t>> ContactConditions::linear_constraints_op() {
+        auto space = impl_->space;
+        return make_op<real_t>(
+                this->n_constrained_dofs(),
+                space->n_dofs(),
+                [=](const real_t *const h, real_t *const out) { normal_project(h, out); },
+                EXECUTION_SPACE_HOST);
+    }
 
-        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
-        assert(dim == 3); // FIXME 2D not supported
-
-        const real_t *const normals[3] = {
-                impl_->gap_xnormal->data(), impl_->gap_ynormal->data(), impl_->gap_znormal->data()};
-
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            for (int d = 0; d < dim; d++) {
-                out[i] += h[idx[i] * dim + d] * normals[d][i];
-            }
-        }
-
-        return SFEM_SUCCESS;
+    std::shared_ptr<Operator<real_t>> ContactConditions::linear_constraints_op_transpose() {
+        auto space = impl_->space;
+        return make_op<real_t>(
+                space->n_dofs(),
+                this->n_constrained_dofs(),
+                [=](const real_t *const f, real_t *const out) {
+                    distribute_contact_forces(f, out);
+                },
+                EXECUTION_SPACE_HOST);
     }
 
     int ContactConditions::gradient(const real_t *const x, real_t *const g) {
@@ -592,7 +644,7 @@ namespace sfem {
 
     int ContactConditions::hessian_crs(const real_t *const x, const count_t *const rowptr,
                                        const idx_t *const colidx, real_t *const values) {
-        // TODO Householder matrix
+        // TODO Householder matrix?
         assert(false);
         return SFEM_FAILURE;
     }

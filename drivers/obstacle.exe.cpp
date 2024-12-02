@@ -209,7 +209,7 @@ int main(int argc, char *argv[]) {
         cg->set_max_it(8000);
         cg->verbose = false;
         sp->linear_solver_ = cg;
-        sp->use_steepest_descent = SFEM_USE_STEEPEST_DESCENT;
+        sp->enable_steepest_descent(SFEM_USE_STEEPEST_DESCENT);
 
         sp->verbose = true;
         sp->set_upper_bound(upper_bound);

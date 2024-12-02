@@ -16,6 +16,7 @@
 
 #include "sfem_API.hpp"
 #include "sfem_Multigrid.hpp"
+#include "sfem_ShiftedPenalty.hpp"
 
 namespace nb = nanobind;
 
@@ -36,8 +37,10 @@ NB_MODULE(pysfem, m) {
     using namespace sfem;
 
     using LambdaOperator_t = sfem::LambdaOperator<real_t>;
+    using MatrixFreeLinearSolver_t = sfem::MatrixFreeLinearSolver<real_t>;
     using Operator_t = sfem::Operator<real_t>;
     using Multigrid_t = sfem::Multigrid<real_t>;
+    using ShiftedPenalty_t = sfem::ShiftedPenalty<real_t>;
     using ConjugateGradient_t = sfem::ConjugateGradient<real_t>;
     using BiCGStab_t = sfem::BiCGStab<real_t>;
     using Chebyshev3_t = sfem::Chebyshev3<real_t>;
@@ -347,16 +350,29 @@ NB_MODULE(pysfem, m) {
 
     nb::class_<ContactConditions>(m, "ContactConditions")
             .def(nb::init<std::shared_ptr<FunctionSpace>>())
-            .def("n_constrained_dofs", &ContactConditions::n_constrained_dofs);
+            .def("n_constrained_dofs", &ContactConditions::n_constrained_dofs)
+            .def("linear_constraints_op", &ContactConditions::linear_constraints_op)
+            .def("linear_constraints_op_transpose",
+                 &ContactConditions::linear_constraints_op_transpose);
 
-    m.def("gradient", [](const std::shared_ptr<ContactConditions> &cc, nb::ndarray<real_t> x, nb::ndarray<real_t> y) {
-        cc->gradient(x.data(), y.data());
+    m.def("gradient",
+          [](const std::shared_ptr<ContactConditions> &cc,
+             nb::ndarray<real_t>
+                     x,
+             nb::ndarray<real_t>
+                     y) { cc->gradient(x.data(), y.data()); });
+
+    m.def("update", [](const std::shared_ptr<ContactConditions> &cc, nb::ndarray<real_t> x) {
+        cc->update(x.data());
     });
 
-    m.def("gradient_for_mesh_viz", [](const std::shared_ptr<ContactConditions> &cc, nb::ndarray<real_t> x, nb::ndarray<real_t> y) {
-        cc->gradient_for_mesh_viz(x.data(), y.data());
-    });          
-          
+    m.def("gradient_for_mesh_viz",
+          [](const std::shared_ptr<ContactConditions> &cc,
+             nb::ndarray<real_t>
+                     x,
+             nb::ndarray<real_t>
+                     y) { cc->gradient_for_mesh_viz(x.data(), y.data()); });
+
     m.def("contact_conditions_from_file",
           [](const std::shared_ptr<FunctionSpace> &space,
              const char *path) -> std::shared_ptr<ContactConditions> {
@@ -397,6 +413,8 @@ NB_MODULE(pysfem, m) {
               nc->add_condition(n, n, c_idx, component, value);
           });
 
+
+
     nb::class_<Operator_t>(m, "Operator")
             .def("__add__",
                  [](const std::shared_ptr<Operator_t> &l, const std::shared_ptr<Operator_t> &r) {
@@ -432,6 +450,8 @@ NB_MODULE(pysfem, m) {
                              l->execution_space());
                  });
 
+
+
     m.def("make_op",
           [](const std::shared_ptr<Function> &fun, nb::ndarray<real_t> u)
                   -> std::shared_ptr<Operator_t> {
@@ -450,7 +470,9 @@ NB_MODULE(pysfem, m) {
               op->apply(x.data(), y.data());
           });
 
-    nb::class_<ConjugateGradient_t>(m, "ConjugateGradient")
+    nb::class_<MatrixFreeLinearSolver_t, Operator_t>(m, "MatrixFreeLinearSolver");
+
+    nb::class_<ConjugateGradient_t, MatrixFreeLinearSolver_t>(m, "ConjugateGradient")
             .def(nb::init<>())
             .def("default_init", &ConjugateGradient_t::default_init)
             .def("set_op", &ConjugateGradient_t::set_op)
@@ -525,6 +547,29 @@ NB_MODULE(pysfem, m) {
 
     m.def("apply",
           [](std::shared_ptr<Multigrid_t> &op, nb::ndarray<real_t> x, nb::ndarray<real_t> y) {
+              op->apply(x.data(), y.data());
+          });
+
+    
+
+    nb::class_<ShiftedPenalty_t>(m, "ShiftedPenalty")
+            .def(nb::init<>())
+            .def("default_init", &ShiftedPenalty_t::default_init)
+            .def("set_max_it", &ShiftedPenalty_t::set_max_it)
+            .def("set_atol", &ShiftedPenalty_t::set_atol)
+            .def("set_max_it", &ShiftedPenalty_t::set_max_it)
+            .def("set_penalty_param", &ShiftedPenalty_t::set_penalty_param)
+            .def("set_linear_solver", &ShiftedPenalty_t::set_linear_solver)
+            .def("set_upper_bound", &ShiftedPenalty_t::set_upper_bound)
+            .def("set_lower_bound", &ShiftedPenalty_t::set_lower_bound)
+            .def("set_constraints_op", &ShiftedPenalty_t::set_constraints_op)
+            .def("set_max_inner_it", &ShiftedPenalty_t::set_max_inner_it)
+            .def("enable_steepest_descent", &ShiftedPenalty_t::enable_steepest_descent)
+            .def("set_damping", &ShiftedPenalty_t::set_damping)
+            .def("set_op", &ShiftedPenalty_t::set_op);
+
+    m.def("apply",
+          [](std::shared_ptr<ShiftedPenalty_t> &op, nb::ndarray<real_t> x, nb::ndarray<real_t> y) {
               op->apply(x.data(), y.data());
           });
 }

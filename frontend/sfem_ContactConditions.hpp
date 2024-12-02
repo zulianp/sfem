@@ -89,6 +89,13 @@ namespace sfem {
 	                    const idx_t *const colidx,
 	                    real_t *const values) override;
 
+	    int update(const real_t *const x);
+	    std::shared_ptr<Operator<real_t>> linear_constraints_op();
+	    std::shared_ptr<Operator<real_t>> linear_constraints_op_transpose();
+
+	    int normal_project(const real_t *const h, real_t *const out);
+	    int distribute_contact_forces(const real_t *const f, real_t *const out);
+
 	    std::shared_ptr<Constraint> derefine(const std::shared_ptr<FunctionSpace> &coarse_space,
 	                                         const bool as_zero) const override;
 	    std::shared_ptr<Constraint> lor() const override;

@@ -29,9 +29,12 @@ def create_dirichlet_conditions(fs, config):
 		idx = np.unique(np.fromfile(nodeset, dtype=idx_t))
 		if isinstance(component, list):
 			for k in range(0, len(component)):
+				print(f'{name}: {component[k]}, {value[k]}')
 				sfem.add_condition(dirichlet_conditions, idx, component[k], value[k])
 		else:
+			print(f'{name}: {component}, {value}')
 			sfem.add_condition(dirichlet_conditions, idx, component, value)
+
 	return dirichlet_conditions
 
 def run(case):
@@ -56,36 +59,61 @@ def run(case):
 	out.enable_AoS_to_SoA(True)
 
 	x = np.zeros(fs.n_dofs(), dtype=real_t)
-	g = np.zeros(fs.n_dofs(), dtype=real_t)
+	rhs = np.zeros(fs.n_dofs(), dtype=real_t)
 	c = np.zeros(fs.n_dofs(), dtype=real_t)
 	
-	# cg = sfem.ConjugateGradient()
-	# cg.default_init()
-	# cg.set_max_it(400)
-
-	# lop = sfem.make_op(fun, x)
-	# cg.set_op(lop)
-
-	# sfem.apply_constraints(fun, x)
-	# sfem.gradient(fun, x, g)
-
-	# print(f'Solving system with {fs.n_dofs()} dofs')
-	# sfem.apply(cg, g, c)
-
-	# x -= c
-
-	# 
-
-	# TODO
 	cc = sfem.contact_conditions_from_file(fs, str(config['obstacle']))
-	cc_gradient = np.zeros(cc.n_constrained_dofs(), dtype=real_t)
-	sfem.gradient(cc, x, cc_gradient)
+	upper_bound = np.zeros(cc.n_constrained_dofs(), dtype=real_t)
 
-	sfem.gradient_for_mesh_viz(cc, x, g)
-	sfem.write(out, "g", g)
+	
+	# Update problem with current solution and linearize
+	sfem.update(cc, x)
+	sfem.gradient(cc, x, upper_bound)
+	# upper_bound *= -1
+	cc_op = cc.linear_constraints_op()
+	cc_op_t = cc.linear_constraints_op_transpose()
 
 	print(f'Constrained dofs {cc.n_constrained_dofs()}/{fs.n_dofs()}')
-	print(cc_gradient)
+	
+
+
+	op = sfem.make_op(fun, x)
+	linear_solver = sfem.ConjugateGradient()
+	linear_solver.default_init()
+	linear_solver.set_verbose(False)
+	linear_solver.set_max_it(10000)
+
+	g = np.zeros(fs.n_dofs(), dtype=real_t)
+	sfem.gradient_for_mesh_viz(cc, x, g)
+	sfem.write(out, "gap", g)
+
+	sp = sfem.ShiftedPenalty()
+	sp.set_op(op)
+	sp.default_init()
+	sp.set_linear_solver(linear_solver)
+	sp.set_upper_bound(sfem.view(upper_bound))
+	sp.set_constraints_op(cc_op, cc_op_t)
+	sp.set_max_it(6)
+	sp.set_max_inner_it(10)
+	sp.set_penalty_param(1.1)
+	sp.set_damping(0.3)
+	# sp.enable_steepest_descent(True)
+
+	sfem.apply_constraints(fun, x)
+	sfem.apply_constraints(fun, rhs)
+
+	# print(g)
+	# print(rhs)
+
+	linear_solver.set_op(op)
+	sfem.apply(linear_solver, rhs, x)
+
+	sfem.apply(sp, rhs, x)	
+
+
+	sfem.write(out, "disp", x)
+	sfem.write(out, "rhs", rhs)
+
 
 if __name__ == '__main__':
 	if len(sys.argv) < 2:
