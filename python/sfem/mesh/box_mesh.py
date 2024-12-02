@@ -480,11 +480,14 @@ if __name__ == '__main__':
     w = 1
     h = 1
     t = 1
+    tx = 0
+    ty = 0
+    tz = 0
 
     try:
         opts, args = getopt.getopt(
             argv[2:], "c:x:y:z:",
-            ["cell_type=", "width=", "height=", "depth="])
+            ["cell_type=", "width=", "height=", "depth=", "tx=", "ty=", "tz="])
     except getopt.GetoptError as err:
         print(err)
         print(usage)
@@ -508,6 +511,12 @@ if __name__ == '__main__':
             w = float(arg)
         elif opt in ('--depth'):
             t = float(arg)
+        elif opt in ('--tx'):
+            tx = float(arg)
+        elif opt in ('--ty'):
+            ty = float(arg)
+        elif opt in ('--tz'):
+            tz = float(arg)
         else:
             print(f'Unused option {opt} = {arg}')
             sys.exit(1)
@@ -521,6 +530,10 @@ if __name__ == '__main__':
         idx, points = rectangle_mesh.create(w, h, nx, ny, cell_type)
     else:
         idx, points = create(w, h, t, nx, ny, nz, cell_type)
+
+    points[0] += tx
+    points[1] += ty
+    points[2] += tz
 
     meta = {}
     meta['element_type'] = to_sfem_element_type(cell_type)
