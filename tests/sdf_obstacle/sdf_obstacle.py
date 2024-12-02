@@ -61,55 +61,66 @@ def run(case):
 	x = np.zeros(fs.n_dofs(), dtype=real_t)
 	rhs = np.zeros(fs.n_dofs(), dtype=real_t)
 	c = np.zeros(fs.n_dofs(), dtype=real_t)
-	
+
 	cc = sfem.contact_conditions_from_file(fs, str(config['obstacle']))
 	upper_bound = np.zeros(cc.n_constrained_dofs(), dtype=real_t)
 
-	
 	# Update problem with current solution and linearize
 	sfem.update(cc, x)
 	sfem.gradient(cc, x, upper_bound)
-	# upper_bound *= -1
 	cc_op = cc.linear_constraints_op()
 	cc_op_t = cc.linear_constraints_op_transpose()
 
 	print(f'Constrained dofs {cc.n_constrained_dofs()}/{fs.n_dofs()}')
-	
-
 
 	op = sfem.make_op(fun, x)
-	linear_solver = sfem.ConjugateGradient()
-	linear_solver.default_init()
-	linear_solver.set_verbose(False)
-	linear_solver.set_max_it(10000)
-
 	g = np.zeros(fs.n_dofs(), dtype=real_t)
 	sfem.gradient_for_mesh_viz(cc, x, g)
 	sfem.write(out, "gap", g)
 
-	sp = sfem.ShiftedPenalty()
-	sp.set_op(op)
-	sp.default_init()
-	sp.set_linear_solver(linear_solver)
-	sp.set_upper_bound(sfem.view(upper_bound))
-	sp.set_constraints_op(cc_op, cc_op_t)
-	sp.set_max_it(20)
-	sp.set_max_inner_it(10)
-	sp.set_penalty_param(1.1)
-	sp.set_damping(0.3)
-	# sp.enable_steepest_descent(True)
+	# use_MPRGP = True
+	use_MPRGP = False
+	if use_MPRGP:
+		upper_bound = np.ones(fs.n_dofs(), dtype=real_t) * 1000
+		sfem.gradient_for_mesh_viz(cc, x, upper_bound)
+		solver = sfem.MPRGP()
+		solver.default_init()
+		solver.set_atol(1e-12)
+		solver.set_rtol(1e-6);
+		solver.set_max_it(2000)
+		solver.set_op(op)
+		sfem.set_upper_bound(solver, upper_bound)
+	else:
+		sp = sfem.ShiftedPenalty()
+		sp.set_op(op)
+		sp.default_init()
+
+		linear_solver = sfem.ConjugateGradient()
+		linear_solver.default_init()
+		linear_solver.set_rtol(1e-4)
+		linear_solver.set_verbose(False)
+		linear_solver.set_max_it(400)
+
+		sp.set_linear_solver(linear_solver)
+		sfem.set_upper_bound(sp, upper_bound)
+		sp.set_constraints_op(cc_op, cc_op_t)
+		sp.set_max_it(500)
+		sp.set_max_inner_it(100)
+		sp.set_penalty_param(2)
+		sp.set_atol(1e-8)
+		# sp.set_damping(0.01)
+		sp.set_damping(0.005)
+		# sp.enable_steepest_descent(True)
+		solver = sp
 
 	sfem.apply_constraints(fun, x)
 	sfem.apply_constraints(fun, rhs)
 
-	# print(g)
-	# print(rhs)
+	# if not use_MPRGP:
+	# 	linear_solver.set_op(op)
+	# 	sfem.apply(linear_solver, rhs, x)
 
-	linear_solver.set_op(op)
-	sfem.apply(linear_solver, rhs, x)
-
-	sfem.apply(sp, rhs, x)	
-
+	sfem.apply(solver, rhs, x)
 
 	sfem.write(out, "disp", x)
 	sfem.write(out, "rhs", rhs)
