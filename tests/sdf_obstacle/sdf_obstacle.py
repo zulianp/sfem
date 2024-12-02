@@ -93,7 +93,7 @@ def run(case):
 	sp.set_linear_solver(linear_solver)
 	sp.set_upper_bound(sfem.view(upper_bound))
 	sp.set_constraints_op(cc_op, cc_op_t)
-	sp.set_max_it(6)
+	sp.set_max_it(20)
 	sp.set_max_inner_it(10)
 	sp.set_penalty_param(1.1)
 	sp.set_damping(0.3)
