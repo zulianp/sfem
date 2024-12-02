@@ -31,7 +31,7 @@ namespace sfem {
         int check_each{1};
         ptrdiff_t n_dofs{-1};
         bool verbose{true};
-        bool debug{true};
+        bool debug{false};
         T penalty_param_{10};
         T max_penalty_param_{1000};
         T damping_{1};
@@ -171,14 +171,9 @@ namespace sfem {
                                         lagr_ub ? lagr_ub->data() : nullptr,
                                         c->data());
 
-
-
                         if(debug) {
                             const T norm_pen = blas.norm2(n_constrained_dofs, c->data());
                             printf("norm_pen (pre): %g\n", (double)norm_pen);
-
-                            // printf("c\n");
-                            // c->print(std::cout);
                         }
 
                         blas.zeros(n_dofs, r_pen->data());
@@ -187,20 +182,11 @@ namespace sfem {
 
                         constraints_op_transpose_->apply(c->data(), r_pen->data());
 
-                        // auto temp = make_buffer(n_dofs);
-                        // constraints_op_transpose_->apply(c->data(), temp->data());
-                        // blas.axpy(n_dofs, 1, temp->data(), r_pen->data());
-
-
                         if(debug) {
                             const T norm_pen = blas.norm2(n_dofs, r_pen->data());
                             printf("norm_pen: %g\n", (double)norm_pen);
-
-                        //     // printf("c\n");
-                        //     // c->print(std::cout);
                         }
 
-                        
                     } else {
                         blas.zeros(n_dofs, r_pen->data());
 
@@ -253,19 +239,9 @@ namespace sfem {
                                             lagr_ub ? lagr_ub->data() : nullptr,
                                             c->data());
 
-
-                            // printf("J_pen\n");
-                            // c->print(std::cout);
-
                             blas.zeros(n_dofs, J_pen->data());
                             constraints_op_transpose_->apply(c->data(), J_pen->data());
 
-                            // if(debug) {
-                            //     const T norm_J_pen = blas.norm2(n_dofs, J_pen->data());
-                            //     printf("norm_J_pen: %g\n", (double)norm_J_pen);
-                            // }
-
-                          
                         } else {
                             blas.zeros(n_dofs, J_pen->data());
 
@@ -328,7 +304,6 @@ namespace sfem {
                     omega = 1 / penalty_param_;
                 }
 
-         
                 monitor(iterations_,
                         count_inner_iter,
                         count_linear_solver_iter,
