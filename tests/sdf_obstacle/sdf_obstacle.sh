@@ -4,7 +4,7 @@ set -e
 
 elem_type=HEX8
 
-N=3
+N=8
 box_mesh.py box -x $N -y $N -z $N --cell_type=$elem_type --tx=-0.5 --ty=-0.5 --tz=-0.5
 box_mesh.py obstacle_mesh -x 2 -y 4 -z 4 --cell_type=TET4 --width=2 --height=4 --depth=4 --tx=-1 --ty=-2 --tz=-2
 

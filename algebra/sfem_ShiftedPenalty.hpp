@@ -181,12 +181,15 @@ namespace sfem {
                             // c->print(std::cout);
                         }
 
+                        blas.zeros(n_dofs, r_pen->data());
                         apply_op->apply(x, r_pen->data());
                         blas.axpby(n_dofs, 1, b, -1, r_pen->data());
 
-
-                        blas.zeros(n_dofs, r_pen->data());
                         constraints_op_transpose_->apply(c->data(), r_pen->data());
+
+                        // auto temp = make_buffer(n_dofs);
+                        // constraints_op_transpose_->apply(c->data(), temp->data());
+                        // blas.axpy(n_dofs, 1, temp->data(), r_pen->data());
 
 
                         if(debug) {
