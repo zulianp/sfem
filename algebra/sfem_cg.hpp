@@ -25,8 +25,9 @@ namespace sfem {
     class ConjugateGradient final : public MatrixFreeLinearSolver<T> {
     public:
         // Operator
-        std::function<void(const T* const, T* const)> apply_op;
-        std::function<void(const T* const, T* const)> preconditioner_op;
+        std::shared_ptr<Operator<T>> apply_op;
+        std::shared_ptr<Operator<T>> preconditioner_op;
+
         BLAS_Tpl<T> blas;
 
         // Solver parameters
@@ -53,7 +54,7 @@ namespace sfem {
         inline std::ptrdiff_t cols() const override { return n_dofs; }
 
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
-            this->apply_op = [=](const T* const x, T* const y) { op->apply(x, y); };
+            apply_op = op;
             n_dofs = op->rows();
         }
 
@@ -61,13 +62,27 @@ namespace sfem {
                                   const std::shared_ptr<Buffer<T>>& diag) override {
             assert(execution_space() == (enum ExecutionSpace)diag->mem_space());
             auto J = op + sfem::diag_op(diag, execution_space());
-            this->apply_op = [=](const T* const x, T* const y) { J->apply(x, y); };
+            this->apply_op = J;
             n_dofs = op->rows();
+
+            if (preconditioner_op) {
+                auto shiftable = std::dynamic_pointer_cast<ShiftableOperator<T>>(preconditioner_op);
+                if (shiftable) {
+                    return shiftable->shift(diag);
+                } else {
+                    fprintf(stderr,
+                            "Tried to call shift on object that is not subclass of "
+                            "ShiftableOperator!\n");
+                    assert(false);
+                    return SFEM_FAILURE;
+                }
+            }
+
             return SFEM_SUCCESS;
         }
 
         void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) override {
-            this->preconditioner_op = [=](const T* const x, T* const y) { op->apply(x, y); };
+            preconditioner_op = op;
         }
 
         void set_max_it(const int it) override { max_it = it; }
@@ -123,7 +138,7 @@ namespace sfem {
 
             T* r = blas.allocate(n);
 
-            apply_op(x, r);
+            apply_op->apply(x, r);
 
             blas.axpby(n, 1, b, -1, r);
 
@@ -145,7 +160,7 @@ namespace sfem {
             int info = -1;
             for (iterations_ = 0; iterations_ < max_it; iterations_++) {
                 blas.zeros(n, Ap);
-                apply_op(p, Ap);
+                apply_op->apply(p, Ap);
 
                 const T ptAp = blas.dot(n, p, Ap);
                 const T alpha = rtr / ptAp;
@@ -183,7 +198,7 @@ namespace sfem {
 
             T* r = blas.allocate(n);
 
-            apply_op(x, r);
+            apply_op->apply(x, r);
             blas.axpby(n, 1, b, -1, r);
 
             // const T rtr0 = blas.dot(n, r, r);
@@ -201,11 +216,11 @@ namespace sfem {
             T* p = blas.allocate(n);
             T* Ap = blas.allocate(n);
 
-            preconditioner_op(r, z);
+            preconditioner_op->apply(r, z);
             blas.copy(n, z, p);
 
             blas.zeros(n, Ap);
-            apply_op(p, Ap);
+            apply_op->apply(p, Ap);
 
             const T rtz0 = blas.dot(n, r, z);
             T rtz = rtz0;
@@ -225,7 +240,7 @@ namespace sfem {
             int info = -1;
             for (iterations_ = 0; iterations_ < max_it; iterations_++) {
                 blas.zeros(n, z);
-                preconditioner_op(r, z);
+                preconditioner_op->apply(r, z);
 
                 const T rtz_new = blas.dot(n, r, z);
 
@@ -236,7 +251,7 @@ namespace sfem {
                 blas.axpby(n, 1, z, beta, p);
 
                 blas.zeros(n, Ap);
-                apply_op(p, Ap);
+                apply_op->apply(p, Ap);
 
                 const T ptAp = blas.dot(n, p, Ap);
                 const T alpha = rtz / ptAp;
