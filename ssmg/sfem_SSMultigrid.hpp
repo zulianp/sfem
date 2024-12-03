@@ -94,7 +94,7 @@ namespace sfem {
         auto spmg = std::dynamic_pointer_cast<ShiftedPenaltyMultigrid<real_t>>(mg);
         if (spmg) {
             // spmg->set_nlsmooth_steps(30);
-            int SFEM_MG_NL_SMOOTH_STEPS = 3;
+            int SFEM_MG_NL_SMOOTH_STEPS = 10;
             SFEM_READ_ENV(SFEM_MG_NL_SMOOTH_STEPS, atoi);
             spmg->set_nlsmooth_steps(SFEM_MG_NL_SMOOTH_STEPS);
 
@@ -340,7 +340,19 @@ namespace sfem {
 
 #else
         auto solver_coarse = sfem::create_cg<real_t>(linear_op_coarse, es);
-        solver_coarse->verbose = false;
+        // solver_coarse->verbose = false;
+        solver_coarse->verbose = true;
+
+        int SFEM_MG_ENABLE_COARSE_GRID_PRECONDITIONER = 0;
+        SFEM_READ_ENV(SFEM_MG_ENABLE_COARSE_GRID_PRECONDITIONER, atoi);
+
+        if (SFEM_MG_ENABLE_COARSE_GRID_PRECONDITIONER) {
+            auto diag = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
+            f_coarse->hessian_diag(nullptr, diag->data());
+            auto sj_coarse = sfem::create_shiftable_jacobi(diag, es);
+            solver_coarse->set_preconditioner_op(sj_coarse);
+        }
+
         mg->add_level(linear_op_coarse, solver_coarse, prolongation, nullptr);
 #endif
         return mg;

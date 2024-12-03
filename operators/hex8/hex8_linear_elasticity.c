@@ -407,7 +407,6 @@ int affine_hex8_linear_elasticity_crs_sym(
                 //                                                hex8_diff3_0,
                 //                                                hex8_diff3_0,
                 //                                                element_matrix);
-                
 
                 for (int zi = 0; zi < n_qp; zi++) {
                     for (int yi = 0; yi < n_qp; yi++) {
@@ -517,6 +516,67 @@ int affine_hex8_linear_elasticity_crs_sym(
                     }
                 }
             }
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int affine_hex8_linear_elasticity_diag(const ptrdiff_t nelements,
+                                       const ptrdiff_t nnodes,
+                                       idx_t **const SFEM_RESTRICT elements,
+                                       geom_t **const SFEM_RESTRICT points,
+                                       const real_t mu,
+                                       const real_t lambda,
+                                       const ptrdiff_t out_stride,
+                                       real_t *const outx,
+                                       real_t *const outy,
+                                       real_t *const outz) {
+    SFEM_UNUSED(nnodes);
+
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[8];
+
+        scalar_t lx[8];
+        scalar_t ly[8];
+        scalar_t lz[8];
+
+        accumulator_t element_diag[3 * 8];
+
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant = 0;
+
+        for (int v = 0; v < 8; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        for (int d = 0; d < 8; d++) {
+            lx[d] = x[ev[d]];
+            ly[d] = y[ev[d]];
+            lz[d] = z[ev[d]];
+        }
+
+        hex8_adjugate_and_det(lx, ly, lz, 0.5, 0.5, 0.5, jacobian_adjugate, &jacobian_determinant);
+
+        hex8_linear_elasticity_diag(
+                mu, lambda, jacobian_adjugate, jacobian_determinant, element_diag);
+
+        for (int edof_i = 0; edof_i < 8; edof_i++) {
+            const ptrdiff_t idx = ev[edof_i] * out_stride;
+
+#pragma omp atomic update
+            outx[idx] += element_diag[0 * 8 + edof_i];
+
+#pragma omp atomic update
+            outy[idx] += element_diag[1 * 8 + edof_i];
+
+#pragma omp atomic update
+            outz[idx] += element_diag[2 * 8 + edof_i];
         }
     }
 
