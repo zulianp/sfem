@@ -31,6 +31,12 @@ namespace sfem {
         void set_lower_bound(const std::shared_ptr<Buffer<T>>& lb) { lower_bound_ = lb; }
         void set_penalty_parameter(const T val) { penalty_param_ = val; }
 
+        void set_constraints_op(const std::shared_ptr<Operator<T>>& op,
+                                const std::shared_ptr<Operator<T>>& op_t) {
+            constraints_op_ = op;
+            constraints_op_transpose_ = op_t;
+        }
+
         enum CycleType {
             V_CYCLE = 1,
             W_CYCLE = 2,
@@ -72,11 +78,15 @@ namespace sfem {
             auto op = operator_[level];
 
             const ptrdiff_t n_dofs = op->rows();
+            const ptrdiff_t n_constrained_dofs =
+                    (constraints_op_ ? constraints_op_->rows() : n_dofs);
 
             T* lb = (lower_bound_) ? lower_bound_->data() : nullptr;
             T* ub = (upper_bound_) ? upper_bound_->data() : nullptr;
-            lagr_lb = lb ? make_buffer(n_dofs) : nullptr;
-            lagr_ub = ub ? make_buffer(n_dofs) : nullptr;
+            lagr_lb = lb ? make_buffer(n_constrained_dofs) : nullptr;
+            lagr_ub = ub ? make_buffer(n_constrained_dofs) : nullptr;
+            const T* const l_lb = lagr_lb ? lagr_lb->data() : nullptr;
+            const T* const l_ub = lagr_ub ? lagr_ub->data() : nullptr;
 
             T penetration_norm = 0;
             T penetration_tol = 1 / (penalty_param_ * 0.1);
@@ -94,21 +104,50 @@ namespace sfem {
                         break;
                     }
 
-                    blas_.zeros(n_dofs, mem->work->data());
+                    if(constraints_op_) {
+                        blas_.zeros(n_constrained_dofs, correction->data());
 
-                    // Compute material residual
-                    op->apply(x, mem->work->data());
-                    blas_.axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
+                        // Solution space to constraints space
+                        constraints_op_->apply(mem->solution->data(), correction->data());
 
-                    // Compute penalty residual
-                    impl_.calc_r_pen(n_dofs,
-                                     mem->solution->data(),
-                                     penalty_param_,
-                                     lb,
-                                     ub,
-                                     lagr_lb ? lagr_lb->data() : nullptr,
-                                     lagr_ub ? lagr_ub->data() : nullptr,
-                                     mem->work->data());
+                        // Constraints space to solution space
+                        blas_.zeros(n_constrained_dofs, mem->work->data());
+                        impl_.calc_r_pen(n_constrained_dofs,
+                                        correction->data(),
+                                        penalty_param_,
+                                        lb,
+                                        ub,
+                                        l_lb,
+                                        l_ub,
+                                        mem->work->data());
+
+                        blas_.zeros(n_dofs, correction->data());
+
+                        // Constraints space to solution space
+                        constraints_op_transpose_->apply(mem->work->data(), correction->data());
+
+                        blas_.zeros(n_dofs, mem->work->data());
+                        op->apply(mem->solution->data(), mem->work->data());
+                        blas_.axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
+                        blas_.axpy(n_dofs, 1, correction->data(), mem->work->data());
+
+                    } else {
+                        blas_.zeros(n_dofs, mem->work->data());
+
+                        // Compute material residual
+                        op->apply(x, mem->work->data());
+                        blas_.axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
+
+                        // Compute penalty residual
+                        impl_.calc_r_pen(n_dofs,
+                                         mem->solution->data(),
+                                         penalty_param_,
+                                         lb,
+                                         ub,
+                                         lagr_lb ? lagr_lb->data() : nullptr,
+                                         lagr_ub ? lagr_ub->data() : nullptr,
+                                         mem->work->data());
+                    }
 
                     const T r_pen_norm = blas_.norm2(n_dofs, mem->work->data());
 
@@ -226,13 +265,11 @@ namespace sfem {
         bool debug{false};
 
         void set_cycle_type(const int val) { cycle_type_ = val; }
-        void set_project_coarse_grid_correction(const bool val) {
-            project_coarse_grid_correction_ = val;
+        void set_project_coarse_space_correction(const bool val) {
+            project_coarse_space_correction_ = val;
         }
 
-        void enable_line_search(const bool val) {
-            line_search_enabled_ = val;
-        }
+        void enable_line_search(const bool val) { line_search_enabled_ = val; }
 
     private:
         std::vector<std::shared_ptr<Operator<T>>> operator_;
@@ -240,6 +277,9 @@ namespace sfem {
 
         std::vector<std::shared_ptr<Operator<T>>> prolongation_;
         std::vector<std::shared_ptr<Operator<T>>> restriction_;
+
+        std::shared_ptr<Operator<T>> constraints_op_;
+        std::shared_ptr<Operator<T>> constraints_op_transpose_;
 
         // Internals
         std::vector<std::shared_ptr<Memory>> memory_;
@@ -254,7 +294,7 @@ namespace sfem {
         ShiftedPenalty_Tpl<T> impl_;
         bool verbose{true};
 
-        bool project_coarse_grid_correction_{false};
+        bool project_coarse_space_correction_{false};
         bool line_search_enabled_{true};
 
         std::shared_ptr<Buffer<T>> make_buffer(const ptrdiff_t n) const {
@@ -315,42 +355,95 @@ namespace sfem {
             auto op = operator_[level];
 
             const ptrdiff_t n_dofs = op->rows();
+            const ptrdiff_t n_constrained_dofs =
+                    (constraints_op_ ? constraints_op_->rows() : n_dofs);
 
             const T* const lb = (lower_bound_) ? lower_bound_->data() : nullptr;
             const T* const ub = (upper_bound_) ? upper_bound_->data() : nullptr;
             const T* const l_lb = lagr_lb ? lagr_lb->data() : nullptr;
             const T* const l_ub = lagr_ub ? lagr_ub->data() : nullptr;
 
-            blas_.zeros(n_dofs, mem->work->data());
+            if (constraints_op_) {
+                blas_.zeros(n_constrained_dofs, correction->data());
 
-            // Compute material residual
-            op->apply(mem->solution->data(), mem->work->data());
-            blas_.axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
+                // Solution space to constraints space
+                constraints_op_->apply(mem->solution->data(), correction->data());
 
-            // Compute penalty residual
-            impl_.calc_r_pen(n_dofs,
-                             mem->solution->data(),
-                             penalty_param_,
-                             lb,
-                             ub,
-                             l_lb,
-                             l_ub,
-                             mem->work->data());
+                blas_.zeros(n_constrained_dofs, mem->work->data());
+                impl_.calc_J_pen(n_constrained_dofs,
+                                correction->data(),
+                                penalty_param_,
+                                lb,
+                                ub,
+                                l_lb,
+                                l_ub,
+                                mem->work->data());
 
-            blas_.zeros(n_dofs, mem->diag->data());
-            impl_.calc_J_pen(n_dofs,
-                             mem->solution->data(),
-                             penalty_param_,
-                             lb,
-                             ub,
-                             l_lb,
-                             l_ub,
-                             mem->diag->data());
+                blas_.zeros(n_dofs, mem->diag->data());
+
+                // Constraints space to solution space
+                constraints_op_transpose_->apply(mem->work->data(), mem->diag->data());
+
+                blas_.zeros(n_constrained_dofs, mem->work->data());
+                impl_.calc_r_pen(n_constrained_dofs,
+                                correction->data(),
+                                penalty_param_,
+                                lb,
+                                ub,
+                                l_lb,
+                                l_ub,
+                                mem->work->data());
+
+                blas_.zeros(n_dofs, correction->data());
+
+                // Constraints space to solution space
+                constraints_op_transpose_->apply(mem->work->data(), correction->data());
+                
+                blas_.zeros(n_dofs, mem->work->data());
+                op->apply(mem->solution->data(), mem->work->data());
+                blas_.axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
+                blas_.axpy(n_dofs, 1, correction->data(), mem->work->data());
+
+            } else {
+                blas_.zeros(n_dofs, mem->work->data());
+
+                // Compute material residual
+                op->apply(mem->solution->data(), mem->work->data());
+                blas_.axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
+
+                // Compute penalty residual
+                impl_.calc_r_pen(n_dofs,
+                                 mem->solution->data(),
+                                 penalty_param_,
+                                 lb,
+                                 ub,
+                                 l_lb,
+                                 l_ub,
+                                 mem->work->data());
+
+                blas_.zeros(n_dofs, mem->diag->data());
+                impl_.calc_J_pen(n_dofs,
+                                 mem->solution->data(),
+                                 penalty_param_,
+                                 lb,
+                                 ub,
+                                 l_lb,
+                                 l_ub,
+                                 mem->diag->data());
+            }
 
             // if (debug) {
             //     printf("eval_residual_and_jacobian: ||r|| %e\n",
             //            blas_.norm2(n_dofs, mem->work->data()));
             // }
+        }
+
+        void penalty_pseudo_galerkin_assembly() {
+            for(int  l = finest_level(); l != coarsest_level(); l = coarser_level(l)) {
+                auto mem_coarse = memory_[coarser_level(l)];
+                blas_.zeros(mem_coarse->diag->size(), mem_coarse->diag->data());
+                restriction_[l]->apply(memory_[l]->diag->data(), mem_coarse->diag->data());
+            }
         }
 
         void nonlinear_smooth() {
@@ -391,12 +484,10 @@ namespace sfem {
                 // Restriction
                 blas_.zeros(mem_coarse->rhs->size(), mem_coarse->rhs->data());
                 restriction->apply(mem->work->data(), mem_coarse->rhs->data());
-
-                blas_.zeros(mem_coarse->diag->size(), mem_coarse->diag->data());
-                restriction->apply(mem->diag->data(), mem_coarse->diag->data());
-
                 blas_.zeros(mem_coarse->solution->size(), mem_coarse->solution->data());
             }
+
+            penalty_pseudo_galerkin_assembly();
 
             int ret = cycle(coarser_level(finest_level()));
             assert(ret != CYCLE_FAILURE);
@@ -413,11 +504,16 @@ namespace sfem {
                     auto J = op + sfem::diag_op(mem->diag, execution_space());
                     J->apply(correction->data(), mem->work->data());
 
-                    alpha /= std::max(T(1e-16), blas_.dot(correction->size(), correction->data(), mem->work->data()));
+                    alpha /= std::max(
+                            T(1e-16),
+                            blas_.dot(correction->size(), correction->data(), mem->work->data()));
                     blas_.scal(correction->size(), alpha, correction->data());
                 }
 
-                if (project_coarse_grid_correction_ && execution_space() == EXECUTION_SPACE_HOST) {
+                // FIXME if we find a good reason for this add GPU support here
+                if (project_coarse_space_correction_ && execution_space() == EXECUTION_SPACE_HOST) {
+                    assert(!constraints_op_); // FIXME not supported yet!!!
+
                     auto c = correction->data();
                     auto ub = upper_bound_->data();
                     auto x = mem->solution->data();
@@ -480,10 +576,6 @@ namespace sfem {
                     blas_.zeros(mem_coarse->rhs->size(), mem_coarse->rhs->data());
                     restriction->apply(mem->work->data(), mem_coarse->rhs->data());
                     blas_.zeros(mem_coarse->solution->size(), mem_coarse->solution->data());
-
-                    // FIXME do the restiction only after the nonlinear smoothing
-                    blas_.zeros(mem_coarse->diag->size(), mem_coarse->diag->data());
-                    restriction->apply(mem->diag->data(), mem_coarse->diag->data());
                 }
 
                 CycleReturnCode ret = cycle(coarser_level(level));

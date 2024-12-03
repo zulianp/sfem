@@ -100,7 +100,7 @@ namespace sfem {
 
             int SFEM_MG_PROJECT_COARSE_CORRECTION = 0;
             SFEM_READ_ENV(SFEM_MG_PROJECT_COARSE_CORRECTION, atoi);
-            spmg->set_project_coarse_grid_correction(SFEM_MG_PROJECT_COARSE_CORRECTION);
+            spmg->set_project_coarse_space_correction(SFEM_MG_PROJECT_COARSE_CORRECTION);
             printf("SFEM_MG_PROJECT_COARSE_CORRECTION=%d\n", SFEM_MG_PROJECT_COARSE_CORRECTION);
 
             int SFEM_MG_ENABLE_LINESEARCH = 0;
