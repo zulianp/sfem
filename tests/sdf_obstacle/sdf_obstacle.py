@@ -63,16 +63,10 @@ def run(case):
 	c = np.zeros(fs.n_dofs(), dtype=real_t)
 
 	cc = sfem.contact_conditions_from_file(fs, str(config['obstacle']))
-	upper_bound = np.zeros(cc.n_constrained_dofs(), dtype=real_t)
-
+	
 	# Update problem with current solution and linearize
 	sfem.update(cc, x)
-	sfem.gradient(cc, x, upper_bound)
-	cc_op = cc.linear_constraints_op()
-	cc_op_t = cc.linear_constraints_op_transpose()
-
-	print(f'Constrained dofs {cc.n_constrained_dofs()}/{fs.n_dofs()}')
-
+	
 	op = sfem.make_op(fun, x)
 	g = np.zeros(fs.n_dofs(), dtype=real_t)
 	sfem.gradient_for_mesh_viz(cc, x, g)
@@ -97,28 +91,33 @@ def run(case):
 
 		linear_solver = sfem.ConjugateGradient()
 		linear_solver.default_init()
-		linear_solver.set_rtol(1e-4)
+		linear_solver.set_rtol(1e-3)
 		linear_solver.set_verbose(False)
-		linear_solver.set_max_it(400)
-
+		linear_solver.set_max_it(100)
 		sp.set_linear_solver(linear_solver)
-		sfem.set_upper_bound(sp, upper_bound)
+
+		upper_bound = np.zeros(cc.n_constrained_dofs(), dtype=real_t)
+		sfem.gradient(cc, x, upper_bound)
+		cc_op = cc.linear_constraints_op()
+		cc_op_t = cc.linear_constraints_op_transpose()
+		print(f'Constrained dofs {cc.n_constrained_dofs()}/{fs.n_dofs()}')
 		sp.set_constraints_op(cc_op, cc_op_t)
-		sp.set_max_it(500)
-		sp.set_max_inner_it(100)
+		sfem.set_upper_bound(sp, upper_bound)
+
+		sp.set_max_it(40)
+		sp.set_max_inner_it(10)
 		sp.set_penalty_param(2)
 		sp.set_atol(1e-8)
-		# sp.set_damping(0.01)
-		sp.set_damping(0.005)
+		sp.set_damping(0.01)
 		# sp.enable_steepest_descent(True)
 		solver = sp
 
 	sfem.apply_constraints(fun, x)
 	sfem.apply_constraints(fun, rhs)
 
-	# if not use_MPRGP:
-	# 	linear_solver.set_op(op)
-	# 	sfem.apply(linear_solver, rhs, x)
+	if not use_MPRGP:
+		linear_solver.set_op(op)
+		sfem.apply(linear_solver, rhs, x)
 
 	sfem.apply(solver, rhs, x)
 

@@ -54,19 +54,13 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return execution_space_; }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
-        void set_linear_solver(const std::shared_ptr<MatrixFreeLinearSolver<T>> &solver)
-        {
+        void set_linear_solver(const std::shared_ptr<MatrixFreeLinearSolver<T>>& solver) {
             linear_solver_ = solver;
         }
 
-        void set_damping(const T damping)
-        {
-            damping_ = damping;
-        }
+        void set_damping(const T damping) { damping_ = damping; }
 
-        void enable_steepest_descent(const bool val) {
-            enable_steepest_descent_ = val;
-        }
+        void enable_steepest_descent(const bool val) { enable_steepest_descent_ = val; }
 
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
             this->apply_op = op;
@@ -88,10 +82,7 @@ namespace sfem {
         void set_max_it(const int it) override { max_it = it; }
         void set_max_inner_it(const int it) { max_inner_it = it; }
         void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
-        void set_penalty_param(const T penalty_param)
-        {
-            penalty_param_ = penalty_param;
-        }
+        void set_penalty_param(const T penalty_param) { penalty_param_ = penalty_param; }
 
         void set_upper_bound(const std::shared_ptr<Buffer<T>>& ub) { upper_bound_ = ub; }
         void set_lower_bound(const std::shared_ptr<Buffer<T>>& lb) { lower_bound_ = lb; }
@@ -171,7 +162,7 @@ namespace sfem {
                                         lagr_ub ? lagr_ub->data() : nullptr,
                                         c->data());
 
-                        if(debug) {
+                        if (debug) {
                             const T norm_pen = blas.norm2(n_constrained_dofs, c->data());
                             printf("norm_pen (pre): %g\n", (double)norm_pen);
                         }
@@ -182,7 +173,7 @@ namespace sfem {
 
                         constraints_op_transpose_->apply(c->data(), r_pen->data());
 
-                        if(debug) {
+                        if (debug) {
                             const T norm_pen = blas.norm2(n_dofs, r_pen->data());
                             printf("norm_pen: %g\n", (double)norm_pen);
                         }
@@ -219,7 +210,7 @@ namespace sfem {
                         const T alpha = blas.dot(n_dofs, r_pen->data(), r_pen->data()) /
                                         blas.dot(n_dofs, r_pen->data(), c->data());
 
-                        blas.axpby(n_dofs, alpha, r_pen->data(), 0, c->data());
+                        blas.axpby(n_dofs, alpha, r_pen->data(), 1, x);
                     } else {
                         if (constraints_op_) {
                             // Use J_pen as temp buffer
@@ -262,14 +253,27 @@ namespace sfem {
                         linear_solver_->apply(r_pen->data(), c->data());
 
                         count_linear_solver_iter += linear_solver_->iterations();
-                    }
 
-                    blas.axpy(n_dofs, damping_, c->data(), x);
+                        if (false) {
+                            // IMPLEMENT ME!
+                            T alpha = line_search(x,
+                                                  b,
+                                                  c->data(),
+                                                  lb,
+                                                  ub,
+                                                  lagr_lb ? lagr_lb->data() : nullptr,
+                                                  lagr_ub ? lagr_ub->data() : nullptr);
+
+                            blas.axpy(n_dofs, alpha, c->data(), x);
+                        } else {
+                            blas.axpy(n_dofs, damping_, c->data(), x);
+                        }
+                    }
                 }
 
                 auto Tx = x;
 
-                if(constraints_op_) {
+                if (constraints_op_) {
                     blas.zeros(n_constrained_dofs, c->data());
                     constraints_op_->apply(x, c->data());
                     Tx = c->data();
@@ -282,8 +286,12 @@ namespace sfem {
                 const T norm_rpen = blas.norm2(n_dofs, r_pen->data());
 
                 if (norm_pen < penetration_tol) {
-                    if (ub) impl.update_lagr_p(n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
-                    if (lb) impl.update_lagr_m(n_constrained_dofs, penalty_param_, Tx, lb, lagr_lb->data());
+                    if (ub)
+                        impl.update_lagr_p(
+                                n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
+                    if (lb)
+                        impl.update_lagr_m(
+                                n_constrained_dofs, penalty_param_, Tx, lb, lagr_lb->data());
 
                     penetration_tol = penetration_tol / pow(penalty_param_, 0.9);
                     omega = omega / penalty_param_;
@@ -325,6 +333,24 @@ namespace sfem {
 
             return converged ? SFEM_SUCCESS : SFEM_FAILURE;
         }
+
+        T line_search(const T* const x, const T* const b, const T* const c, const T* const lb,
+                      const T* const ub, const T* const lagr_lb, const T* const lagr_ub) {
+
+            auto temp = make_buffer(n_dofs);
+            apply_op->apply(x, temp->data());
+
+            const T xtAx = blas.dot(n_dofs, x, temp->data());
+            const T xtb = blas.dot(n_dofs, x, b);
+            
+            T alpha = 2;
+            T energy = 0;
+
+
+            SFEM_ERROR("IMPLEMENT ME!\n");
+            return -1;
+        }
+
 
         void monitor(const int iter, const int count_inner_iter, const int count_linear_solver_iter,
                      const int count_lagr_mult_updates, const T norm_pen, const T norm_rpen,
