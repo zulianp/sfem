@@ -343,10 +343,10 @@ namespace sfem {
         // solver_coarse->verbose = false;
         solver_coarse->verbose = true;
 
-        int SFEM_MG_ENABLE_COARSE_GRID_PRECONDITIONER = 0;
-        SFEM_READ_ENV(SFEM_MG_ENABLE_COARSE_GRID_PRECONDITIONER, atoi);
+        int SFEM_MG_ENABLE_COARSE_SPACE_PRECONDITIONER = 0;
+        SFEM_READ_ENV(SFEM_MG_ENABLE_COARSE_SPACE_PRECONDITIONER, atoi);
 
-        if (SFEM_MG_ENABLE_COARSE_GRID_PRECONDITIONER) {
+        if (SFEM_MG_ENABLE_COARSE_SPACE_PRECONDITIONER) {
             auto diag = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
             f_coarse->hessian_diag(nullptr, diag->data());
             auto sj_coarse = sfem::create_shiftable_jacobi(diag, es);
