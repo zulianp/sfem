@@ -47,6 +47,9 @@ def run(config):
 
 	fs = sfem.FunctionSpace(m, block_size)
 
+	if config['refine_level']:
+		fs.promote_to_semi_structured(config['refine_level']) 
+
 	fun = sfem.Function(fs)
 	op = sfem.create_op(fs, config["operator"])
 	fun.add_operator(op)
@@ -83,17 +86,29 @@ def run(config):
 		solver.set_max_it(2000)
 		solver.set_op(op)
 		sfem.set_upper_bound(solver, upper_bound)
+		sfem.apply(solver, rhs, x)
+		
 	elif config['solver'] == "SPMG":
 		spmg = sfem.create_spmg(fun, execution_space)
+		spmg.set_max_it(2)
+		
+		# upper_bound = np.zeros(cc.n_constrained_dofs(), dtype=real_t)
+		# sfem.gradient(cc, x, upper_bound)
+		# cc_op = cc.linear_constraints_op()
+		# cc_op_t = cc.linear_constraints_op_transpose()
+		# spmg.set_constraints_op(cc_op, cc_op_t)
 
-		upper_bound = np.zeros(cc.n_constrained_dofs(), dtype=real_t)
-		sfem.gradient(cc, x, upper_bound)
-		cc_op = cc.linear_constraints_op()
-		cc_op_t = cc.linear_constraints_op_transpose()
-		sp.set_constraints_op(cc_op, cc_op_t)
-		sfem.set_upper_bound(sp, upper_bound)
+		upper_bound = np.ones(fs.n_dofs(), dtype=real_t) * 1000
+		sfem.gradient_for_mesh_viz(cc, x, upper_bound)
 
-	else:
+		sfem.set_upper_bound(spmg, upper_bound)
+		
+
+		sfem.apply_constraints(fun, x)
+		sfem.apply_constraints(fun, rhs)
+		sfem.apply(spmg, rhs, x)
+
+	elif config['solver'] == "SP":
 		sp = sfem.ShiftedPenalty()
 		sp.set_op(op)
 		sp.default_init()
@@ -119,16 +134,15 @@ def run(config):
 		sp.set_atol(1e-8)
 		sp.set_damping(0.01)
 		# sp.enable_steepest_descent(True)
-		solver = sp
+		sfem.apply_constraints(fun, x)
+		sfem.apply_constraints(fun, rhs)
 
-	sfem.apply_constraints(fun, x)
-	sfem.apply_constraints(fun, rhs)
 
-	# if not use_MPRGP:
-	# 	linear_solver.set_op(op)
-	# 	sfem.apply(linear_solver, rhs, x)
+		linear_solver.set_op(op)
+		sfem.apply(linear_solver, rhs, x)
+		sfem.apply(sp, rhs, x)
 
-	sfem.apply(solver, rhs, x)
+
 
 	sfem.write(out, "disp", x)
 	sfem.write(out, "rhs", rhs)

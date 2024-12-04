@@ -592,8 +592,9 @@ NB_MODULE(pysfem, m) {
           });
 
 
-    nb::class_<ShiftedPenaltyMultigrid_t>(m, "ShiftedPenaltyMultigrid")
+    nb::class_<ShiftedPenaltyMultigrid_t, Operator_t>(m, "ShiftedPenaltyMultigrid")
     .def(nb::init<>())
+    .def("set_max_it", &ShiftedPenaltyMultigrid_t::set_max_it)
     .def("set_upper_bound", &ShiftedPenaltyMultigrid_t::set_upper_bound)
     .def("set_lower_bound", &ShiftedPenaltyMultigrid_t::set_lower_bound)
     .def("set_constraints_op", &ShiftedPenaltyMultigrid_t::set_constraints_op);
@@ -601,5 +602,9 @@ NB_MODULE(pysfem, m) {
     m.def("create_spmg", [](const std::shared_ptr<Function> &f, const enum ExecutionSpace es) ->  auto {
         auto spmg = sfem::create_ssmg<ShiftedPenaltyMultigrid_t>(f, es);
         return spmg;
+    });
+
+    m.def("set_upper_bound", [](std::shared_ptr<ShiftedPenaltyMultigrid_t> &op, nb::ndarray<real_t> &x) {
+        op->set_upper_bound(sfem::Buffer<real_t>::wrap(x.size(), x.data()));
     });
 }
