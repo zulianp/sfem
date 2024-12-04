@@ -47,7 +47,7 @@ def run(config):
 
 	fs = sfem.FunctionSpace(m, block_size)
 
-	if config['refine_level']:
+	if 'refine_level' in config:
 		fs.promote_to_semi_structured(config['refine_level']) 
 
 	fun = sfem.Function(fs)
