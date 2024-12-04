@@ -4,7 +4,6 @@ import pysfem as sfem
 import numpy as np
 from numpy import linalg
 import sys, getopt, os
-
 from sfem.sfem_config import *
 
 import yaml
@@ -13,6 +12,7 @@ try:
 except ImportError:
     from yaml import Loader, Dumper
 
+execution_space = sfem.ExecutionSpace.EXECUTION_SPACE_HOST
 # -----------------------
 
 # TODO move to pysfem
@@ -37,20 +37,21 @@ def create_dirichlet_conditions(fs, config):
 
 	return dirichlet_conditions
 
-def run(case):
+def run(config):
 	m = sfem.Mesh()
-	m.read(case['mesh'])
+	m.read(config['mesh'])
+
 
 	dim = m.spatial_dimension()
-	block_size = case['block_size']
+	block_size = config['block_size']
 
 	fs = sfem.FunctionSpace(m, block_size)
 
 	fun = sfem.Function(fs)
-	op = sfem.create_op(fs, case["operator"])
+	op = sfem.create_op(fs, config["operator"])
 	fun.add_operator(op)
 
-	dirichlet_conditions = create_dirichlet_conditions(fs, case['dirichlet_conditions'])
+	dirichlet_conditions = create_dirichlet_conditions(fs, config['dirichlet_conditions'])
 
 	fun.add_dirichlet_conditions(dirichlet_conditions)
 
@@ -71,10 +72,8 @@ def run(case):
 	g = np.zeros(fs.n_dofs(), dtype=real_t)
 	sfem.gradient_for_mesh_viz(cc, x, g)
 	sfem.write(out, "gap", g)
-
-	# use_MPRGP = True
-	use_MPRGP = False
-	if use_MPRGP:
+	
+	if config['solver'] == 'MPRGP':
 		upper_bound = np.ones(fs.n_dofs(), dtype=real_t) * 1000
 		sfem.gradient_for_mesh_viz(cc, x, upper_bound)
 		solver = sfem.MPRGP()
@@ -84,6 +83,16 @@ def run(case):
 		solver.set_max_it(2000)
 		solver.set_op(op)
 		sfem.set_upper_bound(solver, upper_bound)
+	elif config['solver'] == "SPMG":
+		spmg = sfem.create_spmg(fun, execution_space)
+
+		upper_bound = np.zeros(cc.n_constrained_dofs(), dtype=real_t)
+		sfem.gradient(cc, x, upper_bound)
+		cc_op = cc.linear_constraints_op()
+		cc_op_t = cc.linear_constraints_op_transpose()
+		sp.set_constraints_op(cc_op, cc_op_t)
+		sfem.set_upper_bound(sp, upper_bound)
+
 	else:
 		sp = sfem.ShiftedPenalty()
 		sp.set_op(op)
@@ -115,9 +124,9 @@ def run(case):
 	sfem.apply_constraints(fun, x)
 	sfem.apply_constraints(fun, rhs)
 
-	if not use_MPRGP:
-		linear_solver.set_op(op)
-		sfem.apply(linear_solver, rhs, x)
+	# if not use_MPRGP:
+	# 	linear_solver.set_op(op)
+	# 	sfem.apply(linear_solver, rhs, x)
 
 	sfem.apply(solver, rhs, x)
 

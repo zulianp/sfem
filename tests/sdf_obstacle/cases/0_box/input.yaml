@@ -1,18 +1,19 @@
 # contact_elasticity.yaml
-
+solver: MPRGP
+# solver: SPMG
 rpath: true # true if paths are relative to this folder, false if absolute
-mesh: box
+mesh: mesh
 obstacle: obstacle
 block_size: 3
 operator: LinearElasticity
 
 dirichlet_conditions:
 - name: right
-  nodeset: box/boundary_nodes/right.int32.raw
+  nodeset: mesh/boundary_nodes/right.int32.raw
   value: [-0.6, 0, 0]
   component: [0, 1, 2]
 # - name: left
-#   nodeset: box/boundary_nodes/left.int32.raw
+#   nodeset: mesh/boundary_nodes/left.int32.raw
 #   value: [0.6, 0, 0]
 #   component: [0, 1, 2]
 
