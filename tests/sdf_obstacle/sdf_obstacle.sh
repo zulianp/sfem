@@ -12,6 +12,10 @@ HERE=$PWD
 CASE_DIR=$1
 cd $CASE_DIR
 
+export SFEM_HEX8_ASSUME_AFFINE=1
+# export SFEM_FIRST_LAME_PARAMETER=3.333
+# export SFEM_SHEAR_MODULUS=0.357
+
 $LAUNCH $HERE/sdf_obstacle.py input.yaml
 
 cd -
