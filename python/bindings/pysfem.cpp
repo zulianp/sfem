@@ -17,6 +17,9 @@
 #include "sfem_API.hpp"
 #include "sfem_Multigrid.hpp"
 #include "sfem_ShiftedPenalty.hpp"
+#include "sfem_ShiftedPenaltyMultigrid.hpp"
+#include "sfem_SSMultigrid.hpp"
+
 
 namespace nb = nanobind;
 
@@ -41,6 +44,7 @@ NB_MODULE(pysfem, m) {
     using Operator_t = sfem::Operator<real_t>;
     using Multigrid_t = sfem::Multigrid<real_t>;
     using ShiftedPenalty_t = sfem::ShiftedPenalty<real_t>;
+    using ShiftedPenaltyMultigrid_t = sfem::ShiftedPenaltyMultigrid<real_t>;
     using ConjugateGradient_t = sfem::ConjugateGradient<real_t>;
     using BiCGStab_t = sfem::BiCGStab<real_t>;
     using Chebyshev3_t = sfem::Chebyshev3<real_t>;
@@ -586,4 +590,16 @@ NB_MODULE(pysfem, m) {
           [](std::shared_ptr<ShiftedPenalty_t> &op, nb::ndarray<real_t> x, nb::ndarray<real_t> y) {
               op->apply(x.data(), y.data());
           });
+
+
+    nb::class_<ShiftedPenaltyMultigrid_t>(m, "ShiftedPenaltyMultigrid")
+    .def(nb::init<>())
+    .def("set_upper_bound", &ShiftedPenaltyMultigrid_t::set_upper_bound)
+    .def("set_lower_bound", &ShiftedPenaltyMultigrid_t::set_lower_bound)
+    .def("set_constraints_op", &ShiftedPenaltyMultigrid_t::set_constraints_op);
+
+    m.def("create_spmg", [](const std::shared_ptr<Function> &f, const enum ExecutionSpace es) ->  auto {
+        auto spmg = sfem::create_ssmg<ShiftedPenaltyMultigrid_t>(f, es);
+        return spmg;
+    });
 }
