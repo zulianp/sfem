@@ -24,4 +24,3 @@ mkdir -p obstacle/sdf
 mesh_to_sdf.py obstacle_mesh/skin obstacle/sdf/sdf.float32.raw --hmax=$hmax --margin=$margin
 raw_to_xdmf.py obstacle/sdf/sdf.float32.raw
 cp obstacle/sdf/metadata_sdf.float32.yml obstacle/sdf/meta.yaml 
-

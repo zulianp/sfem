@@ -79,6 +79,7 @@ def run(config):
 	if config['solver'] == 'MPRGP':
 		upper_bound = np.ones(fs.n_dofs(), dtype=real_t) * 1000
 		sfem.gradient_for_mesh_viz(cc, x, upper_bound)
+
 		solver = sfem.MPRGP()
 		solver.default_init()
 		solver.set_atol(1e-12)
@@ -86,11 +87,13 @@ def run(config):
 		solver.set_max_it(2000)
 		solver.set_op(op)
 		sfem.set_upper_bound(solver, upper_bound)
+		sfem.apply_constraints(fun, x)
+		sfem.apply_constraints(fun, rhs)
 		sfem.apply(solver, rhs, x)
 		
 	elif config['solver'] == "SPMG":
 		spmg = sfem.create_spmg(fun, execution_space)
-		spmg.set_max_it(2)
+		spmg.set_max_it(1)
 		
 		# upper_bound = np.zeros(cc.n_constrained_dofs(), dtype=real_t)
 		# sfem.gradient(cc, x, upper_bound)
@@ -100,13 +103,13 @@ def run(config):
 
 		upper_bound = np.ones(fs.n_dofs(), dtype=real_t) * 1000
 		sfem.gradient_for_mesh_viz(cc, x, upper_bound)
+		print(np.min(upper_bound))
 
 		sfem.set_upper_bound(spmg, upper_bound)
 		
-
 		sfem.apply_constraints(fun, x)
 		sfem.apply_constraints(fun, rhs)
-		sfem.apply(spmg, rhs, x)
+		# sfem.apply(spmg, rhs, x)
 
 	elif config['solver'] == "SP":
 		sp = sfem.ShiftedPenalty()
@@ -137,12 +140,9 @@ def run(config):
 		sfem.apply_constraints(fun, x)
 		sfem.apply_constraints(fun, rhs)
 
-
 		linear_solver.set_op(op)
 		sfem.apply(linear_solver, rhs, x)
 		sfem.apply(sp, rhs, x)
-
-
 
 	sfem.write(out, "disp", x)
 	sfem.write(out, "rhs", rhs)

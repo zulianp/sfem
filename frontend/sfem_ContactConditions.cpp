@@ -48,7 +48,8 @@ namespace sfem {
     }
 
     std::shared_ptr<Constraint> AxisAlignedContactConditions::derefine(
-            const std::shared_ptr<FunctionSpace> &coarse_space, const bool as_zero) const {
+            const std::shared_ptr<FunctionSpace> &coarse_space,
+            const bool as_zero) const {
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
         auto et = (enum ElemType)impl_->space->element_type();
 
@@ -117,8 +118,10 @@ namespace sfem {
     AxisAlignedContactConditions::~AxisAlignedContactConditions() = default;
 
     void AxisAlignedContactConditions::add_condition(const ptrdiff_t local_size,
-                                                     const ptrdiff_t global_size, idx_t *const idx,
-                                                     const int component, const real_t value) {
+                                                     const ptrdiff_t global_size,
+                                                     idx_t *const idx,
+                                                     const int component,
+                                                     const real_t value) {
         impl_->conditions = (boundary_condition_t *)realloc(
                 impl_->conditions, (impl_->n_conditions + 1) * sizeof(boundary_condition_t));
 
@@ -134,8 +137,10 @@ namespace sfem {
     }
 
     void AxisAlignedContactConditions::add_condition(const ptrdiff_t local_size,
-                                                     const ptrdiff_t global_size, idx_t *const idx,
-                                                     const int component, real_t *const values) {
+                                                     const ptrdiff_t global_size,
+                                                     idx_t *const idx,
+                                                     const int component,
+                                                     real_t *const values) {
         impl_->conditions = (boundary_condition_t *)realloc(
                 impl_->conditions, (impl_->n_conditions + 1) * sizeof(boundary_condition_t));
 
@@ -239,7 +244,8 @@ namespace sfem {
 
     int AxisAlignedContactConditions::hessian_crs(const real_t *const x,
                                                   const count_t *const rowptr,
-                                                  const idx_t *const colidx, real_t *const values) {
+                                                  const idx_t *const colidx,
+                                                  real_t *const values) {
         for (int i = 0; i < impl_->n_conditions; i++) {
             crs_constraint_nodes_to_identity_vec(impl_->conditions[i].local_size,
                                                  impl_->conditions[i].idx,
@@ -310,7 +316,8 @@ namespace sfem {
     }
 
     std::shared_ptr<Constraint> ContactConditions::derefine(
-            const std::shared_ptr<FunctionSpace> &coarse_space, const bool as_zero) const {
+            const std::shared_ptr<FunctionSpace> &coarse_space,
+            const bool as_zero) const {
         assert(false);
         return nullptr;
     }
@@ -336,7 +343,8 @@ namespace sfem {
     }
 
     std::shared_ptr<ContactConditions> ContactConditions::create_from_file(
-            const std::shared_ptr<FunctionSpace> &space, const std::string &path) {
+            const std::shared_ptr<FunctionSpace> &space,
+            const std::string &path) {
         auto in = YAMLNoIndent::create_from_file(path + "/meta.yaml");
 
         auto cc = std::make_unique<ContactConditions>(space);
@@ -365,9 +373,12 @@ namespace sfem {
             // Read mesh surface information
             const enum ElemType element_type = space->element_type();
             const enum ElemType side_element_type = shell_type(side_type(element_type));
-            const int nxe = elem_num_nodes(side_element_type);
+            const int nxe = space->has_semi_structured_mesh()
+                                    ? elem_num_nodes(type_from_string(surface_elem_type.c_str()))
+                                    : elem_num_nodes(side_element_type);
 
-            assert(type_from_string(surface_elem_type.c_str()) == side_element_type);
+            assert(space->has_semi_structured_mesh() ||
+                   type_from_string(surface_elem_type.c_str()) == side_element_type);
 
             idx_t **sides = (idx_t **)malloc(nxe * sizeof(idx_t *));
             ptrdiff_t _nope_ = -1, len = -1;
@@ -507,7 +518,7 @@ namespace sfem {
 
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n; ++i) {
-            for(int d= 0; d < dim; d++) {
+            for (int d = 0; d < dim; d++) {
                 g[idx[i] * dim + d] = tt[i] * normals[d][i];
             }
         }
@@ -642,8 +653,10 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int ContactConditions::hessian_crs(const real_t *const x, const count_t *const rowptr,
-                                       const idx_t *const colidx, real_t *const values) {
+    int ContactConditions::hessian_crs(const real_t *const x,
+                                       const count_t *const rowptr,
+                                       const idx_t *const colidx,
+                                       real_t *const values) {
         // TODO Householder matrix?
         assert(false);
         return SFEM_FAILURE;

@@ -14,7 +14,8 @@ dirichlet_conditions:
   # value: [-0.6, 0, 0]
   # component: [0, 1, 2]
 - name: left
-  nodeset: mesh/boundary_nodes/left.int32.raw
+  nodeset: mesh/surface/sideset_aos/left.raw
+  # nodeset: mesh/surface/sidesets_aos/left.raw 
   value: [0.6, 0, 0]
   component: [0, 1, 2]
 
