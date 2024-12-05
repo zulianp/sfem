@@ -99,8 +99,8 @@ if [[ "$USE_MPI" == "1" ]]
 then
 	LAUNCH="mpiexec -np $n_procs"
 else
-	LAUNCH="srun -n 288 -p debug "
-	LAUNCH=" "
+	LAUNCH="srun -n 1 -p normal "
+#	LAUNCH=" "
 fi
 
 # GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
