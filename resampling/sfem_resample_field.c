@@ -775,7 +775,7 @@ int beam2_resample_field_local(const ptrdiff_t nelements, const ptrdiff_t nnodes
 ////////////////////////////////////////////////////////////////////////////
 
 #define MY_RESTRICT __restrict__
-#define real_type double
+#define real_type real_t
 
 int tet4_resample_field_local_CUDA(  // Mesh
         const ptrdiff_t nelements, const ptrdiff_t nnodes, int** const MY_RESTRICT elems,
@@ -807,22 +807,6 @@ int tet4_resample_field_local_V8(
         const real_type* const MY_RESTRICT data,
         // Output
         real_type* const MY_RESTRICT weighted_field);
-
-int hex8_to_tet10_resample_field_local_CUDA(
-        // Mesh
-        const ptrdiff_t nelements,  // number of elements
-        const ptrdiff_t nnodes,     // number of nodes
-        const idx_t** const elems,  // connectivity
-        const geom_t** const xyz,   // coordinates
-        // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
-        const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
-
-        const geom_t* const SFEM_RESTRICT origin,  // origin of the domain
-        const geom_t* const SFEM_RESTRICT delta,   // delta of the domain
-        const real_t* const SFEM_RESTRICT data,    // SDF
-        // Output //
-        real_t* const SFEM_RESTRICT weighted_field);
 
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
@@ -878,7 +862,8 @@ int resample_field_local(
                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
 // #elif USE_TET4_MODEL == USE_TET4_V8
 //             return tet4_resample_field_local_V(
-//                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+//                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data,
+//                     weighted_field);
 #elif USE_TET4_MODEL == USE_TET4_CUDA
             return tet4_resample_field_local_reduce_CUDA(
                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
@@ -888,27 +873,24 @@ int resample_field_local(
         case TET10: {
 #define TET10_V2
 
-            // { /// DEBUG ///
-            // double norm_data = 0.0;
-            // for (ptrdiff_t i = 0; i < n[0] * n[1] * n[2]; i++) {
-            //     norm_data += data[i] * data[i];
-            //     if(i % 50000 == 0) {
-            //         printf("norm_data[%ld] = %g, %s:%d\n", i, norm_data, __FILE__, __LINE__);
-            //     }
-            // }
-
-            // norm_data = sqrt(norm_data);
-            // printf("\nFunction: %s\n", __FUNCTION__);
-            // printf("\nnorm_data input = %g   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< %s:%d\n\n",
-            // norm_data, __FILE__, __LINE__); } /// end DEBUG ///
-
 #if SFEM_TET10_CUDA == ON
-            const int ret = hex8_to_tet10_resample_field_local_CUDA(
-                    nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+            const int ret = hex8_to_tet10_resample_field_local_CUDA(nelements,
+                                                                    nnodes,
+                                                                    1,
+                                                                    elems,
+                                                                    xyz,
+                                                                    n,
+                                                                    stride,
+                                                                    origin,
+                                                                    delta,
+                                                                    data,
+                                                                    weighted_field);
+
             RETURN_FROM_FUNCTION(ret);
 #else
             const int ret = hex8_to_tet10_resample_field_local(
                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+
             RETURN_FROM_FUNCTION(ret);
 #endif
         }
@@ -953,34 +935,14 @@ int resample_field(
 
     real_t* weighted_field = calloc(nnodes, sizeof(real_t));
 
-    // { /// DEBUG ///
+    if (element_type == TET10 && SFEM_TET10_CUDA == ON) {
+#if SFEM_TET10_CUDA == ON
+        const int ret = hex8_to_tet10_resample_field_local_CUDA(
+                nelements, nnodes, 1, elems, xyz, n, stride, origin, delta, data, g);
 
-    //     double norm_data = 0.0;
-
-    //     printf("\nFunction: %s\n", __FUNCTION__);
-    //     printf("data (ptr): %p, %s:%d\n", (void *)data, __FILE__, __LINE__);
-    //     printf("n[0] = %ld, n[1] = %ld, n[2] = %ld, %s:%d\n", n[0], n[1], n[2], __FILE__,
-    //     __LINE__);
-
-    //     for (ptrdiff_t i = 0; i < (n[0] * n[1] * n[2]); i++) {
-    //         norm_data += (data[i] * data[i]);
-    //     //     // search a nan value in the data
-    //         if ( i % 50000 == 0 ) {
-    //             printf("norm_data[%ld] = %g, %s:%d\n", i,norm_data, __FILE__, __LINE__);
-    //         }
-    //     }
-    //     const double sqrt_norm_data = sqrt(norm_data);
-    //     printf("\nnorm_data input = %e   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< %s:%d\n\n",
-    //     sqrt_norm_data,
-    //            __FILE__,
-    //            __LINE__);
-
-    //     int indices[3] = {22, 55, 111};
-    //                 printf("data[%d] = %g, %s:%d\n", indices[0], data[indices[0]], __FILE__,
-    //                 __LINE__); printf("data[%d] = %g, %s:%d\n", indices[1], data[indices[1]],
-    //                 __FILE__, __LINE__); printf("data[%d] = %g, %s:%d\n", indices[2],
-    //                 data[indices[2]], __FILE__, __LINE__);
-    // } /// end DEBUG ///
+        RETURN_FROM_FUNCTION(ret);
+#endif
+    }
 
     resample_field_local(element_type,
                          nelements,
@@ -1001,6 +963,12 @@ int resample_field(
         // FIXME
         if (element_type == TET10) {
             real_t* mass_vector = calloc(nnodes, sizeof(real_t));
+
+            // // set the mass vector to zeros
+            // for (ptrdiff_t i = 0; i < nnodes; i++) {
+            //     mass_vector[i] = 0;
+            // }
+
             tet10_assemble_dual_mass_vector(nelements, nnodes, elems, xyz, mass_vector);
 
             for (ptrdiff_t i = 0; i < nnodes; i++) {

@@ -1,5 +1,6 @@
 
 #include "sfem_cuda_blas.h"
+#include "sfem_cuda_blas.hpp"
 
 #include "sfem_cuda_base.h"
 
@@ -367,6 +368,36 @@ public:
 
 #endif
 
+template <typename T>
+__global__ void tvalues_kernel(const ptrdiff_t n, const T value, T *const x) {
+    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
+        x[i] = value;
+    }
+}
+
+template <typename T>
+static void tvalues(const ptrdiff_t n, const T value, T *const x) {
+    int kernel_block_size = 128;
+    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
+
+    tvalues_kernel<<<n_blocks, kernel_block_size>>>(n, value, x);
+}
+
+template <typename T>
+__global__ void txypaz_kernel(const ptrdiff_t n, const T *const x, const T *const y, const T alpha, T *const z) {
+    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
+        z[i] = x[i] * y[i] + alpha * z[i];
+    }
+}
+
+template <typename T>
+static void txypaz(const ptrdiff_t n, const T *const x, const T *const y, const T alpha, T *const z) {
+    int kernel_block_size = 128;
+    ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
+
+    txypaz_kernel<<<n_blocks, kernel_block_size>>>(n, x, y, alpha, z);
+}
+
 extern real_t *d_allocate(const std::size_t n) {
     real_t *ptr = nullptr;
     cudaMalloc((void **)&ptr, n * sizeof(real_t));
@@ -467,3 +498,51 @@ extern void d_ediv(const ptrdiff_t n,
 
     SFEM_DEBUG_SYNCHRONIZE();
 }
+
+namespace sfem {
+
+    template <typename T>
+    void CUDA_BLAS<T>::build_blas(struct BLAS_Tpl<T> &tpl) {
+        tpl.allocate = [](const std::ptrdiff_t n) -> T * {
+            T *ptr = nullptr;
+            cudaMalloc((void **)&ptr, n * sizeof(T));
+            cudaMemset(ptr, 0, n * sizeof(T));
+            assert(ptr);
+            return ptr;
+        };
+
+        tpl.copy = [](const ptrdiff_t n, const T *const src, T *const dest) {
+            CHECK_CUDA(cudaMemcpy(dest, src, n * sizeof(T), cudaMemcpyDeviceToDevice));
+        };
+
+        tpl.zeros = [](const std::size_t size, T *const x) {
+            CHECK_CUDA(cudaMemset(x, 0, size * sizeof(T)));
+        };
+
+        tpl.norm2 = [](const ptrdiff_t n, const T *const x) -> T {
+            T ret = 0;
+            BLASImpl<T>::nrm2(n, x, &ret);
+            return ret;
+        };
+
+        tpl.xypaz = txypaz<T>;
+
+        tpl.destroy = &d_destroy;
+        tpl.values = &tvalues<T>;
+        tpl.dot = &BLASImpl<T>::dot;
+        tpl.axpby = &BLASImpl<T>::axpby;
+        tpl.axpy = &BLASImpl<T>::axpy;
+        tpl.scal = &BLASImpl<T>::scal;
+        tpl.zaxpby = &BLASImpl<T>::zaxpby;
+    }
+
+    template struct CUDA_BLAS<double>;
+    template struct CUDA_BLAS<float>;
+
+    void device_synchronize() {
+        CHECK_CUDA(cudaDeviceSynchronize());
+    }
+
+}  // namespace sfem
+
+

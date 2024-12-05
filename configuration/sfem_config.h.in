@@ -4,10 +4,15 @@
 #cmakedefine SFEM_ENABLE_CUBLAS
 #cmakedefine SFEM_ENABLE_CUSPARSE
 #cmakedefine SFEM_ENABLE_OPENMP
+#cmakedefine SFEM_ENABLE_METIS
 #cmakedefine SFEM_ENABLE_AVX2
 #cmakedefine SFEM_ENABLE_AVX512
 #cmakedefine SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 #cmakedefine SFEM_ENABLE_MEM_DIAGNOSTICS
+
+#ifdef SFEM_ENABLE_CUDA
+#define SFEM_CUDA_ARCH @SFEM_CUDA_ARCH@
+#endif
 
 // It will be removed in the future (i.e., always true)
 #cmakedefine SFEM_ENABLE_CUSTOM_NUMBERS
@@ -34,6 +39,10 @@ typedef @SFEM_REAL_C_TYPE@ real_t;
 #define SFEM_CUSPARSE_REAL_T @SFEM_REAL_CUSPARSE_TYPE@
 #define d_REAL_T "@SFEM_REAL_PRINT_TYPE@"
 #define dtype_REAL_T "@SFEM_REAL_TYPE@"
+#define SIZEOF_REAL_T @SFEM_SIZEOF_REAL_T@
+
+#define SFEM_REAL_T_IS_FLOAT64 (SIZEOF_REAL_T == 8)
+#define SFEM_REAL_T_IS_FLOAT32 (SIZEOF_REAL_T == 4)
 
 // computation real numbers and explicit vectorized types
 typedef @SFEM_SCALAR_C_TYPE@ scalar_t;
@@ -106,6 +115,12 @@ typedef @SFEM_LOCAL_IDX_C_TYPE@ local_idx_t;
 #define INVALID_IDX (-1)
 
 #define SFEM_WARP_SIZE 32
-#define SFEM_WARP_FULL_MASK 0xfffffff
+#define SFEM_WARP_FULL_MASK 0xffffffff
+
+typedef char mask_t;
+#define SFEM_MPI_MASK_T MPI_CHAR
+
+// typedef long mask_t;
+// #define SFEM_MPI_MASK_T MPI_LONG
 
 #endif  // SFEM_CONFIG_HPP

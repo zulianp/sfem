@@ -51,7 +51,8 @@ echo "Sphere benchmark database"
 cd sphere
 export SPHERE_FOLDER=$PWD
 
-refs=(0 1 2 3 4 5)
+# refs=(0 1 2 3 4 5)
+refs=(0 1 2 3)
 n_refs=${#refs[@]}
 largest_matrix=4
 

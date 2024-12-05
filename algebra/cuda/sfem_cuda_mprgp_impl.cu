@@ -73,9 +73,9 @@ namespace sfem {
     template <typename T>
     __device__ void t_warp_reduce(const T val, T* block_accumulator, T* result) {
         T acc = warp_reduce_32(val);
-
         const unsigned int warp_id = threadIdx.x / SFEM_WARP_SIZE;
         const unsigned int lid = lane_id();
+        const unsigned int n_warps = (blockDim.x + SFEM_WARP_SIZE - 1) / SFEM_WARP_SIZE;
 
         if (!lid) {
             block_accumulator[warp_id] = acc;
@@ -85,10 +85,11 @@ namespace sfem {
 
         if (!warp_id) {
             assert(warp_id < SFEM_N_WARPS_PER_BLOCK);
-            acc = block_accumulator[lid];
+            acc = lid < n_warps ? block_accumulator[lid] : 0;
             acc = warp_reduce_32(acc);
 
             if (!threadIdx.x) {
+                assert(acc == acc);
                 atomicAdd(result, acc);
             }
         }
@@ -100,6 +101,7 @@ namespace sfem {
 
         const unsigned int warp_id = threadIdx.x / SFEM_WARP_SIZE;
         const unsigned int lid = lane_id();
+        const unsigned int n_warps = (blockDim.x + SFEM_WARP_SIZE - 1) / SFEM_WARP_SIZE;
 
         if (!lid) {
             block_accumulator[warp_id] = acc;
@@ -109,10 +111,11 @@ namespace sfem {
 
         if (!warp_id) {
             assert(warp_id < SFEM_N_WARPS_PER_BLOCK);
-            acc = block_accumulator[lid];
+            acc = lid < n_warps ? block_accumulator[lid] : block_accumulator[0];
             acc = warp_min_32(acc);
 
             if (!threadIdx.x) {
+                assert(acc == acc);
                 result[blockIdx.x] = acc;
             }
         }
@@ -405,6 +408,9 @@ namespace sfem {
             acc_gc += val_gc * val_gc;
         }
 
+        assert(acc_gf == acc_gf);
+        assert(acc_gc == acc_gc);
+
         __shared__ T block_accumulator[SFEM_N_WARPS_PER_BLOCK];
         t_warp_reduce(acc_gf, block_accumulator, norm_free_gradient);
         t_warp_reduce(acc_gc, block_accumulator, norm_chopped_gradient);
@@ -419,6 +425,8 @@ namespace sfem {
                                T* const SFEM_RESTRICT norm_free_gradient,
                                T* const SFEM_RESTRICT norm_chopped_gradient,
                                const T eps) {
+        SFEM_DEBUG_SYNCHRONIZE();
+
         int kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks =
                 std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
@@ -634,7 +642,7 @@ namespace sfem {
         T acc = infty;
         for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n;
              i += blockDim.x * gridDim.x) {
-            const T alpha = (p[i] > 0) ? ((x[i] - ub[i]) / p[i]) : infty;
+            const T alpha = (p[i] < 0) ? ((x[i] - ub[i]) / p[i]) : infty;
             acc = tmin(alpha, acc);
         }
 
@@ -672,7 +680,7 @@ namespace sfem {
 
         T* host_value = (T*)malloc(n_blocks * sizeof(T));
 
-        cudaMemcpy(&host_value, device_value, n_blocks * sizeof(T), cudaMemcpyDeviceToHost);
+        cudaMemcpy(host_value, device_value, n_blocks * sizeof(T), cudaMemcpyDeviceToHost);
         cudaFree(device_value);
 
         T ret = host_value[0];

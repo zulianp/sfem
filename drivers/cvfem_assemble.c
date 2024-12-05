@@ -20,8 +20,8 @@
 
 #include "read_mesh.h"
 
-#include "tet4_laplacian.h"
 #include "cvfem_tri3_diffusion.h"
+#include "tet4_laplacian.h"
 
 ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
     MPI_Status status;
@@ -71,14 +71,13 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_HANDLE_RHS, atoi);
 
     printf("----------------------------------------\n");
-    printf(
-        "Environment variables:\n- SFEM_LAPLACIAN=%d\n- SFEM_HANDLE_DIRICHLET=%d\n- "
-        "SFEM_HANDLE_NEUMANN=%d\n- SFEM_HANDLE_RHS=%d\n- SFEM_EXPORT_FP32=%d\n",
-        SFEM_LAPLACIAN,
-        SFEM_HANDLE_DIRICHLET,
-        SFEM_HANDLE_NEUMANN,
-        SFEM_HANDLE_RHS,
-        SFEM_EXPORT_FP32);
+    printf("Environment variables:\n- SFEM_LAPLACIAN=%d\n- SFEM_HANDLE_DIRICHLET=%d\n- "
+           "SFEM_HANDLE_NEUMANN=%d\n- SFEM_HANDLE_RHS=%d\n- SFEM_EXPORT_FP32=%d\n",
+           SFEM_LAPLACIAN,
+           SFEM_HANDLE_DIRICHLET,
+           SFEM_HANDLE_NEUMANN,
+           SFEM_HANDLE_RHS,
+           SFEM_EXPORT_FP32);
     printf("----------------------------------------\n");
 
     MPI_Datatype value_type = SFEM_EXPORT_FP32 ? MPI_FLOAT : MPI_DOUBLE;
@@ -109,7 +108,7 @@ int main(int argc, char *argv[]) {
     real_t *values = 0;
 
     build_crs_graph_for_elem_type(
-        mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
+            mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
 
     nnz = rowptr[mesh.nnodes];
     values = (real_t *)malloc(nnz * sizeof(real_t));
@@ -136,12 +135,12 @@ int main(int argc, char *argv[]) {
             }
             case TET4: {
                 tet4_laplacian_crs(mesh.nelements,
-                                                      mesh.nnodes,
-                                                      mesh.elements,
-                                                      mesh.points,
-                                                      rowptr,
-                                                      colidx,
-                                                      values);
+                                   mesh.nnodes,
+                                   mesh.elements,
+                                   mesh.points,
+                                   rowptr,
+                                   colidx,
+                                   values);
                 break;
             }
             default:
@@ -208,9 +207,11 @@ int main(int argc, char *argv[]) {
     }
 
     if (SFEM_HANDLE_RHS) {
+#if SFEM_REAL_T_IS_DOUBLE
         if (SFEM_EXPORT_FP32) {
             array_dtof(mesh.nnodes, (const real_t *)rhs, (float *)rhs);
         }
+#endif
 
         {
             char path[1024 * 10];

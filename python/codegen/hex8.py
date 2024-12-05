@@ -5,14 +5,21 @@ from sfem_codegen import *
 from weighted_fe import *
 
 class Hex8(FE):
-	def __init__(self):
+	def __init__(self, isoparam=False):
 		super().__init__()
+		self.isoparam = isoparam
+
+	def is_isoparametric(self):
+		return self.isoparam
 
 	def reference_measure(self):
 		return 1
 
 	def subparam_n_nodes(self):
 		return 4
+
+	def barycenter(self):
+		return vec3(sp.Rational(1, 2), sp.Rational(1, 2), sp.Rational(1, 2))
 
 	def coords_sub_parametric(self):
 		xyz = self.coords()
@@ -91,6 +98,98 @@ class Hex8(FE):
 
 	def measure(self, q):
 		return self.jacobian_determinant(q)
+
+	def to_stencil(self, M):
+		G = sp.zeros(27, 27)
+		ld = [1, 3, 9]
+		ii = [-1] * 8
+
+		left = 0
+		right = 2
+		for k in range(left, right):
+			for j in range(left, right):
+				for i in range(left, right):
+					
+					ii[0] = (i + 0) * ld[0] + (j + 0) * ld[1] + (k + 0) * ld[2]
+					ii[1] = (i + 1) * ld[0] + (j + 0) * ld[1] + (k + 0) * ld[2]
+					ii[2] = (i + 1) * ld[0] + (j + 1) * ld[1] + (k + 0) * ld[2]
+					ii[3] = (i + 0) * ld[0] + (j + 1) * ld[1] + (k + 0) * ld[2]
+					ii[4] = (i + 0) * ld[0] + (j + 0) * ld[1] + (k + 1) * ld[2]
+					ii[5] = (i + 1) * ld[0] + (j + 0) * ld[1] + (k + 1) * ld[2]
+					ii[6] = (i + 1) * ld[0] + (j + 1) * ld[1] + (k + 1) * ld[2]
+					ii[7] = (i + 0) * ld[0] + (j + 1) * ld[1] + (k + 1) * ld[2]
+
+					for l in range(0, 8):
+						for s in range(0, 8):
+							ll = ii[l]
+							ss = ii[s]
+							G[ll, ss] += M[l, s]
+
+		ii_center = 1 * ld[0] + 1 * ld[1] + 1 * ld[2]
+		stencil = G[ii_center, :]
+		return stencil
+
+	def to_masked_stencil(self, M):
+		xi, yi, zi, level = sp.symbols('xi yi zi level', integer=True)
+
+		G = sp.zeros(27, 27)
+		ld = [1, 3, 9]
+		ii = [-1] * 8
+
+		mask = [True] * 8
+
+		left = 0
+		right = 2
+		for k in range(left, right):
+			for j in range(left, right):
+				for i in range(left, right):
+					
+					ii[0] = (i + 0) * ld[0] + (j + 0) * ld[1] + (k + 0) * ld[2]
+					ii[1] = (i + 1) * ld[0] + (j + 0) * ld[1] + (k + 0) * ld[2]
+					ii[2] = (i + 1) * ld[0] + (j + 1) * ld[1] + (k + 0) * ld[2]
+					ii[3] = (i + 0) * ld[0] + (j + 1) * ld[1] + (k + 0) * ld[2]
+					ii[4] = (i + 0) * ld[0] + (j + 0) * ld[1] + (k + 1) * ld[2]
+					ii[5] = (i + 1) * ld[0] + (j + 0) * ld[1] + (k + 1) * ld[2]
+					ii[6] = (i + 1) * ld[0] + (j + 1) * ld[1] + (k + 1) * ld[2]
+					ii[7] = (i + 0) * ld[0] + (j + 1) * ld[1] + (k + 1) * ld[2]
+
+					# NEIGH STENCIL
+					km1 = k - 1
+					kp1 = k + 1
+					jm1 = j - 1
+					jp1 = j + 1
+					im1 = i - 1
+					ip1 = i + 1
+
+					lb  = [xi + im1, yi + jm1, zi + km1 ]
+					rb = [xi + ip1, yi + jp1, zi + kp1 ]
+
+					mask[0] = (lb[0] >= 0) & (lb[1] >= 0) & (lb[2] >= 0)
+					mask[1] = (lb[0] < level) & (lb[1] >= 0) & (lb[2] >= 0)
+					mask[2] = (lb[0] < level) & (rb[1] < level) & (lb[2] >= 0)
+					mask[3] = (lb[0] >= 0) & (rb[1] < level) & (lb[2] >= 0)
+					
+					mask[4] = (lb[0] >= 0) & (lb[1] >= 0) & (rb[2] < level)
+					mask[5] = (rb[0] < level) & (lb[1] >= 0) & (rb[2] < level)
+					mask[6] = (rb[0] < level) & (rb[1] < level) & (rb[2] < level)
+					mask[7] = (lb[0] >= 0) & (rb[1] < level) & (rb[2] < level)
+
+					for l in range(0, 8):
+						for s in range(0, 8):
+							ll = ii[l]
+							ss = ii[s]
+
+							nonz = sp.simplify(mask[l] & mask[s])
+							G[ll, ss] += M[l, s] * sp.Piecewise((1, nonz), (0, True))
+
+		ii_center = 1 * ld[0] + 1 * ld[1] + 1 * ld[2]
+		stencil = G[ii_center, :]
+		return stencil
+
+
+
+
+			
 
 
 def assign_matrix(name, mat):
@@ -193,11 +292,11 @@ def sub_adj():
 	])
 	
 	detAm = determinant(A)
-	Aminv = inverse(A)
+	Aadj = adjugate(A)
 
-	sub_adj = Aminv * adj
+	sub_adj = Aadj * adj
 	expr = assign_matrix('sub_adjugate', sub_adj)
-	# expr.extend([ast.Assignment('determinant', detAm)])
+#expr.extend([ast.Assignment('determinant', detAm)])
 
 	c_code(expr)
 
@@ -216,11 +315,49 @@ def check_op():
 			A[i, j] = hex8.integrate(q, inner(g[i], g[j]))
 		print(A[i, :])
 
-if __name__ == '__main__':
-	# Hex8().generate_qp_based_code()
-	# points_from_sub_ref_hex8()
-	# sub_fff()
-	# check_op()
-	sub_adj()
+def gen_grads_SoA():
+	g = Hex8().grad(vec3(qx, qy, qz))
 
-	
+	for d in range(0, 3):
+		expr = []
+		for i in range(0, len(g)):
+			expr.append(ast.Assignment(sp.symbols(f'val[{i}]'), g[i][d]))
+
+		print(f"// grad({d})")
+		c_code(expr)
+
+
+def gen_grads_AoS():
+	g = Hex8().grad(vec3(qx, qy, qz))
+
+	expr = []
+	for i in range(0, len(g)):
+		for d in range(0, 3):
+			expr.append(ast.Assignment(sp.symbols(f'val[{i*3+d}]'), g[i][d]))
+
+	print(f"// grads")
+	c_code(expr)
+
+def gen_grads_AoS_separate():
+	g = Hex8().grad(vec3(qx, qy, qz))
+
+	for i in range(0, len(g)):
+		expr = []
+		for d in range(0, 3):
+			expr.append(ast.Assignment(sp.symbols(f'val[{d}]'), g[i][d]))
+		print(f"case {i}: {{")
+		c_code(expr)
+		print(f"return; }}")
+
+
+
+if __name__ == '__main__':
+#Hex8().generate_qp_based_code()
+#points_from_sub_ref_hex8()
+#sub_fff()
+#check_op()
+#sub_adj()
+
+	# gen_grads_SoA()
+	# gen_grads_AoS()
+	gen_grads_AoS_separate()

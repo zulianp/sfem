@@ -402,6 +402,16 @@ def strided_matrix_coeff(name, rows, cols, stride):
     return ret
 
 
+def matrix_sum(M):
+    ret = 0.0;
+    rows, cols = M.shape
+
+    for d1 in range(0, rows):
+        for d2 in range(0, cols):
+            ret += M[d1, d2]
+    return ret
+
+
 def norm2(v):
     ret = 0.0;
 
@@ -452,3 +462,27 @@ def eigenvalues(A):
 
     return ret
 
+def assign_nnz_matrix(names, mat):
+    rows, cols = mat.shape
+    expr = []
+    check = set()
+    for i in range(0, rows):
+        for j in range(0, cols):
+            name = names[i, j]
+            if name and name not in check:
+                expr.append(ast.Assignment(name, mat[i, j]))
+                check.add(name)
+    return expr
+
+def compress_nnz(names, mat):
+    rows, cols = mat.shape
+    vals = []
+
+    check = set()
+    for i in range(0, rows):
+        for j in range(0, cols):
+            name = names[i, j]
+            if name and name not in check:
+                vals.append(mat[i, j])
+                check.add(name)
+    return sp.Matrix(len(vals), 1, vals)
