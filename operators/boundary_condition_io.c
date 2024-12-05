@@ -76,6 +76,7 @@ void read_boundary_conditions(MPI_Comm comm,
         int i = 0;
         while (pch != NULL) {
             printf("Parsing  values (%d/%d): %s\n", i + 1, count, pch);
+            assert(i < count);
 
             if (strncmp(pch, path_key, path_key_len) == 0) {
                 conds[i].value = 0;

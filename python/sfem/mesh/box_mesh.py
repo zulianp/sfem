@@ -483,11 +483,12 @@ if __name__ == '__main__':
     tx = 0
     ty = 0
     tz = 0
+    skip_boundary = False;
 
     try:
         opts, args = getopt.getopt(
             argv[2:], "c:x:y:z:",
-            ["cell_type=", "width=", "height=", "depth=", "tx=", "ty=", "tz="])
+            ["cell_type=", "width=", "height=", "depth=", "tx=", "ty=", "tz=", "skip_boundary="])
     except getopt.GetoptError as err:
         print(err)
         print(usage)
@@ -517,6 +518,8 @@ if __name__ == '__main__':
             ty = float(arg)
         elif opt in ('--tz'):
             tz = float(arg)
+        elif opt in ('--skip_boundary'):
+            skip_boundary = int(arg)
         else:
             print(f'Unused option {opt} = {arg}')
             sys.exit(1)
@@ -560,49 +563,51 @@ if __name__ == '__main__':
         path = f'{output_folder}/i{d}.raw'
         idx[d].tofile(path)
 
-    boundary_nodes_dir = f'{output_folder}/boundary_nodes'
-    if not os.path.exists(boundary_nodes_dir):
-        os.mkdir(f'{boundary_nodes_dir}')
+    if not skip_boundary:
 
-    meta['boundary_nodes'] = []
+        boundary_nodes_dir = f'{output_folder}/boundary_nodes'
+        if not os.path.exists(boundary_nodes_dir):
+            os.mkdir(f'{boundary_nodes_dir}')
 
-    boundary_nodes = create_boundary_nodes(nx, ny, nz)
-    for k, v in boundary_nodes.items():
-        name = f'{k}.{str(idx_t.__name__)}.raw'
-        
-        meta['boundary_nodes'].append({k: name})
-        path = f'{boundary_nodes_dir}/{name}'
-        v.tofile(path)
-        
-    boundary_faces_dir = f'{output_folder}/surface'
-    if not os.path.exists(boundary_faces_dir):
-        os.mkdir(f'{boundary_faces_dir}')
+        meta['boundary_nodes'] = []
 
-    meta['boundary_faces'] = []
-    boundary_faces = create_boundary_faces(cell_type, nx, ny, nz)
-    for k, v in boundary_faces.items():
-        path = f'{boundary_faces_dir}/{k}'
+        boundary_nodes = create_boundary_nodes(nx, ny, nz)
+        for k, v in boundary_nodes.items():
+            name = f'{k}.{str(idx_t.__name__)}.raw'
+            
+            meta['boundary_nodes'].append({k: name})
+            path = f'{boundary_nodes_dir}/{name}'
+            v.tofile(path)
+            
+        boundary_faces_dir = f'{output_folder}/surface'
+        if not os.path.exists(boundary_faces_dir):
+            os.mkdir(f'{boundary_faces_dir}')
 
-        meta['boundary_faces'].append({k:f'surface/{k}'}) 
-        if not os.path.exists(path):
-            os.mkdir(f'{path}')
+        meta['boundary_faces'] = []
+        boundary_faces = create_boundary_faces(cell_type, nx, ny, nz)
+        for k, v in boundary_faces.items():
+            path = f'{boundary_faces_dir}/{k}'
 
-        n, nxf = v.shape
-        print(f'{k}: {path} {n} {nxf}')
+            meta['boundary_faces'].append({k:f'surface/{k}'}) 
+            if not os.path.exists(path):
+                os.mkdir(f'{path}')
 
-        surf_meta = {}
-        surf_meta['element_type'] = side_type(to_sfem_element_type(cell_type))
-        surf_meta['elem_num_nodes'] = nxf
-        surf_meta['elements'] = []
-        surf_meta['rpath'] = True
-        surf_meta['points'] = "parent"
+            n, nxf = v.shape
+            print(f'{k}: {path} {n} {nxf}')
 
-        for d in range(0, nxf):
-            idx_path = f'{path}/i{d}.{str(idx_t.__name__)}.raw'
-            v[:, d].flatten().tofile(idx_path)
-            # print(v[:, d])
+            surf_meta = {}
+            surf_meta['element_type'] = side_type(to_sfem_element_type(cell_type))
+            surf_meta['elem_num_nodes'] = nxf
+            surf_meta['elements'] = []
+            surf_meta['rpath'] = True
+            surf_meta['points'] = "parent"
 
-            surf_meta['elements'].append({f'i{d}' : f'i{d}.{str(idx_t.__name__)}.raw'})
+            for d in range(0, nxf):
+                idx_path = f'{path}/i{d}.{str(idx_t.__name__)}.raw'
+                v[:, d].flatten().tofile(idx_path)
+                # print(v[:, d])
+
+                surf_meta['elements'].append({f'i{d}' : f'i{d}.{str(idx_t.__name__)}.raw'})
 
         write_meta(path, surf_meta)
 
