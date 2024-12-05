@@ -24,6 +24,9 @@ typedef struct {
 } xyz_tet10_device;
 // end struct xyz_tet10_device
 
+//////////////////////////////////////////////////////////
+// make_xyz_tet10_device
+//////////////////////////////////////////////////////////
 xyz_tet10_device make_xyz_tet10_device(const ptrdiff_t nnodes) {
     xyz_tet10_device xyz;
     cudaMalloc(&xyz.x, nnodes * sizeof(float));
@@ -34,7 +37,7 @@ xyz_tet10_device make_xyz_tet10_device(const ptrdiff_t nnodes) {
 // end make_xyz_tet10_device
 
 //////////////////////////////////////////////////////////
-// coy_xyz_tet10_device
+// copy_xyz_tet10_device
 //////////////////////////////////////////////////////////
 void copy_xyz_tet10_device(const ptrdiff_t nnodes,    //
                            xyz_tet10_device* xyz,     //
@@ -65,6 +68,22 @@ void free_xyz_tet10_device(xyz_tet10_device xyz) {
     xyz.z = NULL;
 }
 // end free_xyz_tet10_device
+
+xyz_tet10_device make_xyz_tet10_device_unified(const ptrdiff_t nnodes) {
+    xyz_tet10_device xyz;
+    xyz.x = NULL;
+    xyz.y = NULL;
+    xyz.z = NULL;
+    return xyz;
+}
+
+void copy_xyz_tet10_device_unified(const ptrdiff_t nnodes,  //
+                                   xyz_tet10_device* xyz,   //
+                                   const float** xyz_host) {
+    xyz->x = (float*)xyz_host[0];
+    xyz->y = (float*)xyz_host[1];
+    xyz->z = (float*)xyz_host[2];
+}
 
 /////////////////////////////////////////////////////////////////
 // Struct for elems
@@ -1056,7 +1075,7 @@ isoparametric_tet10_assemble_dual_mass_vector_kernel(  /// TODO TODO TODO
         real_t element_diag_8;
         real_t element_diag_9;
 
-        geom_t x[10], y[10], z[10];
+        real_t x[10], y[10], z[10];
 
         // for (int v = 0; v < 10; ++v) {
         //     ev[v] = elems[v][element_i];
@@ -1072,12 +1091,6 @@ isoparametric_tet10_assemble_dual_mass_vector_kernel(  /// TODO TODO TODO
         ev[7] = elems.elems_v7[element_i];
         ev[8] = elems.elems_v8[element_i];
         ev[9] = elems.elems_v9[element_i];
-
-        // for (int v = 0; v < 10; ++v) {
-        //     x[v] = xyz[0][ev[v]];  // x-coordinates
-        //     y[v] = xyz[1][ev[v]];  // y-coordinates
-        //     z[v] = xyz[2][ev[v]];  // z-coordinates
-        // }
 
         for (int v = 0; v < 10; ++v) {
             x[v] = xyz.x[ev[v]];  // x-coordinates
@@ -1745,6 +1758,33 @@ launch_kernels_hex8_to_tet10_resample_field_local_CUDA(
 }
 
 ////////////////////////////////////////////////////////////////////////
+// hex8_to_tet10_resample_field_local_CUDA_unified
+////////////////////////////////////////////////////////////////////////
+extern "C" int                                    //
+hex8_to_tet10_resample_field_local_CUDA_unified(  //
+
+        // Mesh
+        const ptrdiff_t nelements,                 // number of elements
+        const ptrdiff_t nnodes,                    // number of nodes
+        const int bool_assemble_dual_mass_vector,  // assemble dual mass vector
+        idx_t** const SFEM_RESTRICT elems,         // connectivity
+        geom_t** const SFEM_RESTRICT xyz,          // coordinates
+        // SDF
+        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
+        const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
+
+        const geom_t* const SFEM_RESTRICT origin,  // origin of the domain
+        const geom_t* const SFEM_RESTRICT delta,   // delta of the domain
+        const real_t* const SFEM_RESTRICT data,    // SDF
+        // Output //
+        real_t* const SFEM_RESTRICT g_host) {  //
+                                               //
+    PRINT_CURRENT_FUNCTION;
+
+    RETURN_FROM_FUNCTION(0);
+}
+
+////////////////////////////////////////////////////////////////////////
 // hex8_to_tet10_resample_field_local_CUDA
 ////////////////////////////////////////////////////////////////////////
 extern "C" int                                     //
@@ -1765,6 +1805,23 @@ hex8_to_tet10_resample_field_local_CUDA(           //
         // Output //
         real_t* const SFEM_RESTRICT g_host) {  //
                                                // geom_t** const SFEM_RESTRICT xyz
+
+#if SFEM_CUDA_MEMOMORY_MODEL == CUDA_UNIFIED_MEMORY
+    return hex8_to_tet10_resample_field_local_CUDA_unified(nelements,
+                                                           nnodes,
+                                                           bool_assemble_dual_mass_vector,
+                                                           elems,
+                                                           xyz,
+                                                           n,
+                                                           stride,
+                                                           origin,
+                                                           delta,
+                                                           data,
+                                                           g_host);
+#elif SFEM_CUDA_MEMOMORY_MODEL == CUDA_MEMORY_MANAGED
+
+#endif
+
     PRINT_CURRENT_FUNCTION;
 
     // Device memory
