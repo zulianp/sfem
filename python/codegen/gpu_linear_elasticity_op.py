@@ -8,7 +8,9 @@ from tet4 import *
 from tet10 import *
 from tet20 import *
 from hex8 import *
-from symbolic_fe import *
+from aahex8 import *
+
+import sys
 
 from time import perf_counter
 
@@ -28,91 +30,16 @@ def assign_matrix(name, mat):
 
 class GPULinearElasticityOp:
 	SoA_IO = True
+	# use_taylor = True
 
-	def __init__(self, fe, q):
+	def __init__(self, fe):
+		dims = fe.manifold_dim()
+
+		q_temp = [qx, qy, qz]
+		q = sp.Matrix(dims, 1, q_temp[0:dims])
+
 		self.init_opt(fe, q)
-		# self.init_basic(fe, q)
-
-	# def init_basic(self, fe, q):
-	# 	fe.use_adjugate = True
-	# 	dims = fe.manifold_dim()
-	# 	q = sp.Matrix(dims, 1, q)
-	# 	shape_grad = fe.physical_tgrad(q)
-	# 	shape_grad_ref = fe.tgrad(q)
-	# 	# jac_inv = fe.symbol_jacobian_inverse()
-	# 	jac_inv = fe.symbol_jacobian_inverse_as_adjugate()
-
-	# 	if self.SoA_IO:
-	# 		disp = coeffs_SoA('u', dims, fe.n_nodes())
-	# 	else:
-	# 		disp = coeffs('u', dims * fe.n_nodes())
-		
-	# 	self.jac = fe.jacobian(q)
-	# 	rows = fe.n_nodes() * dims
-	# 	cols = rows
-
-	# 	###################################################################
-	# 	# Material law
-	# 	###################################################################
-	# 	c_log("Material law")
-
-	# 	self.disp_grad_name = 'disp_grad'
-
-	# 	mu, lmbda = sp.symbols('mu lambda', real=True)
-	# 	disp_grad = sp.Matrix(dims, dims, coeffs(self.disp_grad_name, dims * dims))
-
-	# 	self.eval_disp_grad  = sp.zeros(dims, dims)
-	# 	for i in range(0, dims * fe.n_nodes()):
-	# 		self.eval_disp_grad += disp[i] * shape_grad_ref[i]
-	# 	self.eval_disp_grad = self.eval_disp_grad * jac_inv
-
-	# 	# strain energy function
-	# 	epsu = (disp_grad + disp_grad.T) / 2
-	# 	e = mu * inner(epsu, epsu) + (lmbda/2) * (tr(epsu) * tr(epsu))
-
-	# 	dV = (fe.reference_measure() * fe.quadrature_weight()) * fe.symbol_jacobian_determinant() 
-
-	# 	# Objective
-	# 	self.eval_value = e * dV
-	# 	self.eval_value = simplify(self.eval_value)
-
-	# 	# Gradient
-	# 	P = sp.Matrix(dims, dims, [0]*(dims*dims))
-	# 	for d1 in range(0, dims):
-	# 		for d2 in range(0, dims):
-	# 			P[d1, d2] = sp.diff(e, disp_grad[d1, d2])
-		
-	# 	self.eval_grad = sp.zeros(rows, 1)
-
-	# 	# Reference measure scaled here for reducing register usage
-	# 	self.P = P 
-	# 	P_sym = matrix_coeff('P', dims, dims)
-		
-	# 	for i in range(0, rows):
-	# 		self.eval_grad[i] = inner(P, shape_grad[i]) * dV
-		
-	# 	self.eval_hessian =  sp.zeros(rows, cols)
-
-	# 	for j in range(0, rows):
-	# 		# Construct gradient for row j
-	# 		dde = sp.zeros(dims, dims)
-	# 		for d1 in range(0, dims):
-	# 			for d2 in range(0, dims):
-	# 				dde[d1, d2] = simplify(sp.diff(self.eval_grad[j], disp_grad[d1, d2]))
-
-	# 		for i in range(0, cols):
-	# 			actual = inner(dde, shape_grad[i])
-	# 			self.eval_hessian[i, j] = actual
-
-	# 	self.e = e
-	# 	self.de = P
-	# 	self.mu = mu
-	# 	self.lmbda = lmbda
-
-	# 	self.fe = fe
-	# 	self.increment = coeffs('u', fe.n_nodes() * dims)
-
-
+	
 	def init_opt(self, fe, q):
 		fe.use_adjugate = True
 		dims = fe.manifold_dim()
@@ -135,8 +62,6 @@ class GPULinearElasticityOp:
 		###################################################################
 		# Material law
 		###################################################################
-		c_log("Material law")
-
 		self.disp_grad_name = 'disp_grad'
 
 		mu, lmbda = sp.symbols('mu lambda', real=True)
@@ -233,8 +158,6 @@ class GPULinearElasticityOp:
 		###################################################################
 		# Integrate and substitute
 		###################################################################
-		c_log("Integrate")
-
 		###################################################################
 
 		self.e = e
@@ -447,6 +370,48 @@ class GPULinearElasticityOp:
 
 		return expr
 
+	def hessian_blocks(self):
+		H = self.eval_hessian
+		rows, cols = H.shape
+		fe = self.fe
+
+		n = fe.n_nodes()
+		dims = fe.spatial_dim()
+
+		blocks = []
+
+		for d1 in range(0, dims):
+			for d2 in range(0, dims):
+				expr = []
+				for i in range(0, n):
+					for j in range(0, n):
+						var = sp.symbols(f'element_matrix[{i*n + j}]')
+						expr.append(ast.AddAugmentedAssignment(var, H[d1 * n + i, d2 * n + j]))
+				blocks.append((f'block_{d1}_{d2}', expr))
+
+		return blocks
+
+
+	def hessian_blocks_tpl(self):
+		tpl="""
+template<typename scalar_t, typename accumulator_t>
+static inline __host__ __device__ void  cu_hex8_linear_elasticity_matrix_{BLOCK_NAME}(
+const scalar_t mu,
+const scalar_t lambda,
+const scalar_t *const SFEM_RESTRICT adjugate,
+const scalar_t jacobian_determinant,
+const scalar_t qx,
+const scalar_t qy,
+const scalar_t qz,
+const scalar_t qw,
+accumulator_t *const SFEM_RESTRICT
+element_matrix) 
+{{
+	{CODE}
+}}
+"""
+
+
 	def hessian_diag(self):
 		H = self.eval_hessian
 		rows, cols = H.shape
@@ -507,7 +472,7 @@ class GPULinearElasticityOp:
 			expr.extend(assign_matrix('jacobian_inverse', jac_inv))
 
 		J_det = determinant(J)
-		expr.append(ast.Assignment(sp.symbols('jacobian_determinant'), J_det))
+		expr.append(ast.AddAssignment(sp.symbols('jacobian_determinant'), J_det))
 		return expr
 
 	def gradient(self):
@@ -568,114 +533,131 @@ class GPULinearElasticityOp:
 def main():
 	start = perf_counter()
 
-	# fe = AxisAlignedQuad4()
-	# fe = Tri3()
-	# fe = Tri6()
-	# q = sp.Matrix(2, 1, [qx, qy])
+	fes = {
+	"TRI6": Tri6(),
+	"TRI3": Tri3(),
+	"TET4": Tet4(),
+	"TET10": Tet10(),
+	"TET20": Tet20(),
+	"HEX8": Hex8(),
+	"AAHEX8": AAHex8(),
+	"AAQUAD4": AxisAlignedQuad4()
+	}
 
-	fe = Hex8()
-	# fe = Tet4()
-	# fe = Tet20()
-	# fe = Tet10()
-	# fe = SymbolicFE3D()	
-	q = sp.Matrix(3, 1, [qx, qy, qz])
+	if len(sys.argv) >= 2:
+		fe = fes[sys.argv[1]]
+	else:
+		print("Fallback with TET10")
+		fe = Tet10()	
 
-	op = GPULinearElasticityOp(fe, q)
+	op = GPULinearElasticityOp(fe)
 	# op.hessian_check()
 
-	if False:
-		c_log("//--------------------------")
-		c_log("// New hessian")	
-		c_log("//--------------------------")
+	# tpl = op.hessian_blocks_tpl()
+	# blocks = op.hessian_blocks()
+	# for k,v in blocks:
+	# 	c_log("//--------------------------")
+	# 	c_log(f"// hessian {k}")	
+	# 	c_log("//--------------------------")
+	# 	code = c_gen(v)
+	# 	c_log(tpl.format(BLOCK_NAME=k, CODE=code))
+
+
+
+
+	# if False:
+	# 	c_log("//--------------------------")
+	# 	c_log("// New hessian")	
+	# 	c_log("//--------------------------")
 			
-		kv = op.hessian_less_registers()
-		for k, v in kv.items():
+	# 	kv = op.hessian_less_registers()
+	# 	for k, v in kv.items():
 
-			print("---------------------")
-			print(f"{k}")
-			print("---------------------")
-			c_code(v)
+	# 		print("---------------------")
+	# 		print(f"{k}")
+	# 		print("---------------------")
+	# 		c_code(v)
 
-		# c_log("//--------------------------")
-		# c_log("// New hessian apply")	
-		# c_log("//--------------------------")
+	# 	# c_log("//--------------------------")
+	# 	# c_log("// New hessian apply")	
+	# 	# c_log("//--------------------------")
 
-		# kv = op.hessian_apply()
-		# for k, v in kv.items():
+	# 	# kv = op.hessian_apply()
+	# 	# for k, v in kv.items():
 
-		# 	print("---------------------")
-		# 	print(f"{k}")
-		# 	print("---------------------")
-		# 	c_code(v)
+	# 	# 	print("---------------------")
+	# 	# 	print(f"{k}")
+	# 	# 	print("---------------------")
+	# 	# 	c_code(v)
 
-	else:
-		c_log("//--------------------------")
-		c_log("// geometry")	
-		c_log("//--------------------------")
+	# else:
+	# 	c_log("//--------------------------")
+	# 	c_log("// geometry")	
+	# 	c_log("//--------------------------")
 		
-		c_code(op.jacobian())
-		c_code(op.geometry())
+	# 	c_code(op.jacobian())
+	# 	c_code(op.geometry())
 
 
-		c_log("//--------------------------")
-		c_log("// displacement_gradient")	
-		c_log("//--------------------------")
-		c_code(op.displacement_gradient())
+	c_log("//--------------------------")
+	c_log("// displacement_gradient")	
+	c_log("//--------------------------")
+	c_code(op.displacement_gradient())
 
-		c_log("//--------------------------")
-		c_log("// Piola")	
-		c_log("//--------------------------")
-		c_code(op.first_piola())
+	c_log("//--------------------------")
+	c_log("// Piola")	
+	c_log("//--------------------------")
+	c_code(op.first_piola())
 
-		# c_log("//--------------------------")
-		# c_log("// gradient")
-		# c_log("//--------------------------")
-		# c_code(op.gradient())
+	# c_log("//--------------------------")
+	# c_log("// gradient")
+	# c_log("//--------------------------")
+	# c_code(op.gradient())
 
-		c_log("//--------------------------")
-		c_log("// loperand")	
-		c_log("//--------------------------")
-		c_code(op.loperand())
+	c_log("//--------------------------")
+	c_log("// loperand")	
+	c_log("//--------------------------")
+	c_code(op.loperand())
 
-		c_log("//--------------------------")
-		c_log("// gradient_opt")
-		c_log("//--------------------------")
-		c_code(op.gradient_opt())
+	c_log("//--------------------------")
+	c_log("// gradient_opt")
+	c_log("//--------------------------")
+	c_code(op.gradient_opt())
 
-		# c_log("//--------------------------")
-		# c_log("// value")
-		# c_log("//--------------------------")
-		# c_code(op.value())
+	# 	# c_log("//--------------------------")
+	# 	# c_log("// value")
+	# 	# c_log("//--------------------------")
+	# 	# c_code(op.value())
 
-		c_log("--------------------------")
-		c_log("hessian")	
-		c_log("--------------------------")
-		c_code(op.hessian())
+	# c_log("--------------------------")
+	# c_log("hessian")	
+	# c_log("--------------------------")
+	# c_code(op.hessian())
 
-		c_log("--------------------------")
-		c_log("hessian_diag")	
-		c_log("--------------------------")
-		c_code(op.hessian_diag())
+	# 	c_log("--------------------------")
+	# 	c_log("hessian_diag")	
+	# 	c_log("--------------------------")
+	# 	c_code(op.hessian_diag())
 
-		# c_log("--------------------------")
-		# c_log("lin stress")	
-		# c_log("--------------------------")
+	# 	# c_log("--------------------------")
+	# 	# c_log("lin stress")	
+	# 	# c_log("--------------------------")
 
-		# print(fe.n_nodes() * fe.spatial_dim())
+	# 	# print(fe.n_nodes() * fe.spatial_dim())
 
-		# for i in range(0, fe.n_nodes() * fe.spatial_dim()):
-		# 	c_code(op.linearized_stress(i))
+	# 	# for i in range(0, fe.n_nodes() * fe.spatial_dim()):
+	# 	# 	c_code(op.linearized_stress(i))
 
 
-		# c_log("--------------------------")
-		# c_log("apply")	
-		# c_log("--------------------------")
-		# c_code(op.apply())
+	# 	# c_log("--------------------------")
+	# 	# c_log("apply")	
+	# 	# c_log("--------------------------")
+	# 	# c_code(op.apply())
 
 	
 
 	stop = perf_counter()
-	console.print(f'Overall: {stop - start} seconds')
+	console.print(f'// Overall: {stop - start} seconds')
 
 
 if __name__ == '__main__':

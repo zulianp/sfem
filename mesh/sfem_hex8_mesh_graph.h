@@ -33,6 +33,13 @@ int proteus_hex8_mesh_skin(const int L,
                            idx_t **const surf_elements,
                            element_idx_t **parent_element);
 
+int proteus_hex8_crs_graph(const int L,
+                           const ptrdiff_t nelements,
+                           const ptrdiff_t nnodes,
+                           idx_t **const elements,
+                           count_t **out_rowptr,
+                           idx_t **out_colidx);
+
 #ifdef __cplusplus
 }
 #endif

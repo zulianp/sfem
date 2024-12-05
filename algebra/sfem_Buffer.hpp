@@ -140,6 +140,41 @@ namespace sfem {
         return ret;
     }
 
+    template <typename T>
+    std::shared_ptr<Buffer<T*>> h_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1) {
+        T ** data = (T **)malloc(n0 * sizeof(T *));
+        for(int i = 0; i < n0; ++i) {
+            data[i] = (T *)calloc(n1, sizeof(T));
+        }
+
+        auto ret =
+                std::make_shared<Buffer<T*>>(n0, n1, data, [=](int n, void **x) { 
+                    for(int i = 0; i < n; ++i) {
+                        free(x[i]);
+                    }
+                    free(x);
+                }, MEMORY_SPACE_HOST);
+        return ret;
+    }
+
+    template <typename T>
+    std::shared_ptr<Buffer<T*>> h_buffer_fake_SoA(const std::ptrdiff_t n0, const std::ptrdiff_t n1) {
+        T * allocated = (T *)calloc(n0 * n1, sizeof(T));
+
+        T ** data = (T **)malloc(n0 * sizeof(T *));
+        for(int i = 0; i < n0; ++i) {
+            data[i] = &allocated[i];
+        }
+
+        auto ret =
+                std::make_shared<Buffer<T*>>(n0, n1, data, [=](int n, void **x) { 
+                    free(x[0]);
+                    free(x);
+                }, MEMORY_SPACE_HOST);
+        return ret;
+        
+    }
+
 }  // namespace sfem
 
 #endif  // SFEM_BUFFER_HPP

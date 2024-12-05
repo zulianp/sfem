@@ -3,11 +3,10 @@
 import numpy as np
 import sys
 
-from sfem_config import *
+from sfem.sfem_config import *
 
-# geom_t=np.float32
-# idx_t=np.int32
-# real_t=np.float64
+# import sfem.sfem_config as sc
+# print(f'sfem.sfem_config {sc.__file__}')
 
 if __name__ == '__main__':
 	usage = f'{sys.argv[0]} <mesh> <sideset> <output>'
@@ -33,4 +32,5 @@ if __name__ == '__main__':
 	y = y[sideset]
 	f = obs - y
 	f.astype(dtype=real_t).tofile(path_output)
+	print(f'n: {len(f)} real_t: {real_t}')
 	print(f'minmax {np.min(f)} {np.max(f)}')

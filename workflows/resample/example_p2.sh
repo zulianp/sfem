@@ -81,13 +81,13 @@ echo $scaling
 # export OMP_PROC_BIND=true
 # export OMP_NUM_THREADS=8
 
-n_procs=18
+n_procs=1
 # n_procs=1
 # n_procs=2
 # n_procs=1
 
-PERF="yes"
-PERF="no"
+# PERF="yes"
+# PERF="no"
 
 # if [[ -z "$LAUNCH" ]]
 # then
@@ -122,4 +122,6 @@ export SFEM_ENABLE_ISOPARAMETRIC=1
 
 set -x
 time SFEM_INTERPOLATE=0 SFEM_READ_FP32=1 $LAUNCH  $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET10
-raw_to_db.py $resample_target out.vtk --point_data=$field
+
+
+raw_to_db.py $resample_target out.vtk --point_data=$field --point_data_type=float32

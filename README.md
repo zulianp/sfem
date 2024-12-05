@@ -1,13 +1,19 @@
 # Simple FEM #
 
+This libary is not meant for exteral use. For the moment it is my personal sketch pad!
+Use at your own risk. Selected functionalities will be made available through utopia (https://github.com/zulianp/utopia).
+
 # Requirements
 
 SFEM depends on the following base technologies
 
 - C/C++ Compiler
-- CMake
-- MPI
-- Python 3
+- CMake				(e.g., `brew install cmake`)
+- MPI 				(e.g., `brew install open-mpi`)
+- Python 3 			(e.g., `brew install python@3.12`)
+
+The following technologies are also supported
+- OpenMP 			(e.g., `brew install libomp`)
 
 # Installation guide
 

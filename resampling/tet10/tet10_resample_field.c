@@ -1631,6 +1631,7 @@ SFEM_INLINE static void isoparametric_lumped_mass_kernel_hrt(
         // Quadrature
         const real_t qx, const real_t qy, const real_t qz,
         real_t* const SFEM_RESTRICT element_diag) {
+    //
     const real_t x0 = 4 * qx;
     const real_t x1 = qy * qz;
     const real_t x2 = 2 * qx - 1;
@@ -1658,6 +1659,7 @@ SFEM_INLINE static void isoparametric_lumped_mass_kernel_hrt(
     const real_t x24 = qx * qz;
     const real_t x25 = -11 * x1 + 4 * x3 + 11 * x9;
     const real_t x26 = -24 * qz + 21 * x16;
+
     element_diag[0] +=
             x12 * x13 * (qy * x0 + qz * x0 + 4 * x1 - x10 - x11 + 10 * x12 + x3 + x5 + x7 - x9);
     element_diag[1] += qx * x13 * (42 * (POW3(qx)) + 14 * qx - 45 * x14 - 1);
@@ -1671,6 +1673,9 @@ SFEM_INLINE static void isoparametric_lumped_mass_kernel_hrt(
     element_diag[9] += x1 * x20 * (84 * x1 + x23 + x26 + 4);
 }
 
+///////////////////////////////////////////////////////////////////////
+// subparametric_tet10_assemble_dual_mass_vector
+///////////////////////////////////////////////////////////////////////
 int isoparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, const ptrdiff_t nnodes,
                                                   idx_t** const SFEM_RESTRICT elems,
                                                   geom_t** const SFEM_RESTRICT xyz,
@@ -1715,21 +1720,29 @@ int isoparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, con
     }
 
     RETURN_FROM_FUNCTION(0);
-    // return 0;
 }  // end isoparametric_tet10_assemble_dual_mass_vector
 
+///////////////////////////////////////////////////////////////////////
+// subparametric_tet10_assemble_dual_mass_vector
+///////////////////////////////////////////////////////////////////////
 int tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, const ptrdiff_t nnodes,
                                     idx_t** const SFEM_RESTRICT elems,
                                     geom_t** const SFEM_RESTRICT xyz, real_t* const mass_vector) {
+    PRINT_CURRENT_FUNCTION;
+
     int SFEM_ENABLE_ISOPARAMETRIC = 0;
     SFEM_READ_ENV(SFEM_ENABLE_ISOPARAMETRIC, atoi);
 
+    int ret = 0;
+
     if (SFEM_ENABLE_ISOPARAMETRIC) {
-        return isoparametric_tet10_assemble_dual_mass_vector(
+        ret = isoparametric_tet10_assemble_dual_mass_vector_V(
                 nelements, nnodes, elems, xyz, mass_vector);
+        RETURN_FROM_FUNCTION(ret);
     } else {
-        return subparametric_tet10_assemble_dual_mass_vector(
+        ret = subparametric_tet10_assemble_dual_mass_vector(
                 nelements, nnodes, elems, xyz, mass_vector);
+        RETURN_FROM_FUNCTION(ret);
     }
 }
 

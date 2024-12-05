@@ -38,11 +38,19 @@ N=$(( resolution * 2 ))
 export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
 export SFEM_ELEMENT_REFINE_LEVEL=$2
 
+if [[ -z $SFEM_BOX_SIZE ]]
+then
+	SFEM_BOX_SIZE=1
+else
+	echo "SFEM_BOX_SIZE=$SFEM_BOX_SIZE"
+fi
+
 mesh=mesh
 
 mkdir -p $mesh
 
-box_mesh.py $mesh -c hex8 -x $N -y $N -z $N --height=1 --width=1 --depth=1
+box_mesh.py $mesh -c hex8 -x $N -y $N -z $N --height=$SFEM_BOX_SIZE --width=$SFEM_BOX_SIZE --depth=$SFEM_BOX_SIZE
+raw_to_db.py $mesh model.vtk
 
 skin $mesh $mesh/macro_quad_surface
 cp $mesh/{x,y,z}.raw $mesh/macro_quad_surface
@@ -99,16 +107,16 @@ boundary_nodes $mesh/surface back  	$mesh/surface/sidesets_aos/back.raw
 
 
 
-sides=$mesh/dirichlet.raw
-python3 -c "import numpy as np; a=np.fromfile(\"$mesh/surface/x.raw\", dtype=np.float32); a.fill(0); a.astype(np.float64).tofile(\"$sides\")"
+# sides=$mesh/dirichlet.raw
+# python3 -c "import numpy as np; a=np.fromfile(\"$mesh/surface/x.raw\", dtype=np.float32); a.fill(0); a.astype(np.float64).tofile(\"$sides\")"
 
-smask $mesh/surface/sidesets_aos/left.raw $sides $sides 1
-smask $mesh/surface/sidesets_aos/right.raw $sides $sides 2
+# smask $mesh/surface/sidesets_aos/left.raw $sides $sides 1
+# smask $mesh/surface/sidesets_aos/right.raw $sides $sides 2
 # smask $mesh/surface/sidesets_aos/bottom.raw $sides $sides 3
 # smask $mesh/surface/sidesets_aos/top.raw $sides $sides 4
 # smask $mesh/surface/sidesets_aos/front.raw $sides $sides 5
 # smask $mesh/surface/sidesets_aos/back.raw $sides $sides 6
 
-raw_to_db.py $mesh/surface $mesh/dirichlet.vtk --point_data="$sides" --cell_type=quad
+# raw_to_db.py $mesh/surface $mesh/dirichlet.vtk --point_data="$sides" --cell_type=quad
 
 

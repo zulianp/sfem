@@ -95,12 +95,14 @@ class LaplaceOp:
 	def det_fff(self):
 		return [determinant(self.FFF_symbolic)]
 
-	def hessian(self):
+	def sym_matrix(self):
 		fe = self.fe
 		ref_grad = self.ref_grad
 		FFF_symbolic = self.FFF_symbolic
 		fe = self.fe
 		q = self.q
+
+		H = sp.zeros(fe.n_nodes(), fe.n_nodes())
 
 		expr = []
 		for i in range(0, fe.n_nodes()):
@@ -117,10 +119,112 @@ class LaplaceOp:
 					else:
 						integr += gdotg * self.qw
 
-				var = sp.symbols(f'element_matrix[{i*fe.n_nodes() + j}*stride]')
-				expr.append(ast.Assignment(var, integr))
+					H[i, j] = integr
+		return H
 
+	def hessian(self):
+		H = self.sym_matrix()
+		rows, cols = H.shape
+		expr = []
+		for i in range(0, rows):
+			for j in range(0, cols):
+				var = sp.symbols(f'element_matrix[{i*cols + j}*stride]')
+				expr.append(ast.Assignment(var, H[i, j]))
 		return expr
+
+	# For block solver (TODO) Box stencil for structured grid
+	# def stencil(self):
+	# 	H = self.sym_matrix()
+	# 	rows, cols = H.shape
+
+	# 	assert rows == 8 # Only works for HEX8
+	# 	S = sp.zeros(27, 1)
+
+	# # 	idx3coord = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]]
+
+
+	# 	def hg(x,y,z):
+	# 		vx = abs(x - 1)
+	# 		vy = abs(y - 1)
+	# 		vz = abs(z - 1)
+
+	# 		ret = vz * 4
+
+	# 		if vx == 0 and vy == 0:
+	# 			return ret
+	# 		if vx == 1 and vy == 0:
+	# 			return ret + 1
+	# 		if vx == 0 and vy == 1:
+	# 			return ret + 3
+	# 		if vx == 1 and vy == 1:
+	# 			return ret + 2
+	# 		assert False
+
+
+	# 	def g(x, y, z):
+	# 		return z*9 + y*3 + x
+
+	# 	# Stencil corners contrib
+	# 	S[g(0,0,0)] += H[6, 0] # (0, 0, 0)
+	# 	S[g(2,0,0)] += H[7, 1] # (0, 1, 0)
+	# 	S[g(2,2,0)] += H[4, 2] # (1, 1, 0)
+	# 	S[g(0,2,0)] += H[5, 3] # (0, 1, 0)
+	# 	S[g(0,0,2)] += H[2, 4] # (0, 0, 1)
+	# 	S[g(2,0,2)] += H[3, 5] # (0, 1, 1)
+	# 	S[g(2,2,2)] += H[0, 6] # (1, 1, 1)
+	# 	S[g(0,2,2)] += H[1, 7] # (0, 1, 1)
+
+	# 	# Stencil face/edge contrib
+	# 	# BOTTOM
+	# 	S[g(0,1,0)] += H[,]
+	# 	S[g(1,0,0)] += H[,]
+	# 	S[g(2,1,0)] += H[,]
+	# 	S[g(1,2,0)] += H[,]
+
+	# 	S[g(1,1,0)] += H[,]
+		
+	# 	# MIDDLE
+	# 	S[g(0,1,1)] += H[,]
+	# 	S[g(1,0,1)] += H[,]
+	# 	S[g(2,1,1)] += H[,]
+	# 	S[g(1,2,1)] += H[,]
+
+	# 	S[g(0,0,1)] += H[,]		
+	# 	S[g(2,0,1)] += H[,]
+	# 	S[g(2,2,1)] += H[,]
+	# 	S[g(0,2,1)] += H[,]
+
+	# 	# TOP
+	# 	S[g(0,1,2)] += H[,]
+	# 	S[g(1,0,2)] += H[,]
+	# 	S[g(2,1,2)] += H[,]
+	# 	S[g(1,2,2)] += H[,]
+
+	# 	S[g(1,1,2)] += H[,]
+
+	# 	# Stencil edge/edge-contrib
+	# 	S[g(1,1,1)] += H[,] #?
+	
+
+	# 	def ref_hex8_coord2idx(x,y,z);
+	# 		assert x == 0 || x == 1
+	# 		assert y == 0 || y == 1
+	# 		assert z == 0 || z == 1
+
+	# 		if y == 1 and x == 1
+	# 			return z*4 + 2
+			
+	# 		if y == 1 and x == 0
+	# 			return z*4 + 3
+		
+	# 		return z*4 + x
+
+	# 	I = sp.zeros(8, 1)
+	# 	for i in range(0, 8):
+	# 		I[i] = H[i, i]
+
+	# 	S[grid(1, 1, 1)] = 
+	# 	# Octant 0 (-1, -1, -1)-(0, 0, 0)
 
 	def hessian_diag(self):
 		fe = self.fe

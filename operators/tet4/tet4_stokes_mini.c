@@ -936,7 +936,7 @@ void tet4_stokes_mini_assemble_hessian_aos(const ptrdiff_t nelements,
     const double tick = MPI_Wtime();
 
     static const int block_size = 4;
-    static const int mat_block_size = block_size * block_size;
+    static const int mat_block_size = 4 * 4;
 
 #pragma omp parallel
     {

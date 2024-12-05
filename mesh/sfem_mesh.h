@@ -1,7 +1,6 @@
 #ifndef SFEM_MESH_H
 #define SFEM_MESH_H
 
-#include <stddef.h>
 #include "sfem_base.h"
 #include "sfem_defs.h"
 

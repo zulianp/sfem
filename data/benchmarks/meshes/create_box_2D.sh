@@ -21,7 +21,7 @@ fi
 set -x
 
 nrefs=$1
-width=2
+width=1
 height=1
 
 if [[ $# -eq 3 ]]
@@ -57,7 +57,7 @@ mkdir -p $folder
 idx_type_size=4
 
 pnrefs=$(( nrefs + 1 ))
-pnrefs=$(( pnrefs * 10 ))
+pnrefs=$(( pnrefs * 2 ))
 rectangle_mesh.py $mesh_raw -x $(( 2 * width * pnrefs)) -y $(( 2 * height * pnrefs)) --width=$width --height=$height --cell_type=$elem_type
 mesh_original=$mesh_raw
 
