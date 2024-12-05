@@ -8,197 +8,12 @@
 #include "tet10_weno_cuda.cuh"
 
 #include "quadratures_rule_cuda.h"
+#include "tet10_resample_field.cuh"
 
 #define MY_RESTRICT __restrict__
 
 #define __WARP_SIZE__ 32
 #define WENO_CUDA 1
-
-/////////////////////////////////////////////////////////////////
-// Struct for xyz
-/////////////////////////////////////////////////////////////////
-typedef struct {
-    float* x = NULL;
-    float* y = NULL;
-    float* z = NULL;
-} xyz_tet10_device;
-// end struct xyz_tet10_device
-
-//////////////////////////////////////////////////////////
-// make_xyz_tet10_device
-//////////////////////////////////////////////////////////
-xyz_tet10_device make_xyz_tet10_device(const ptrdiff_t nnodes) {
-    xyz_tet10_device xyz;
-    cudaMalloc(&xyz.x, nnodes * sizeof(float));
-    cudaMalloc(&xyz.y, nnodes * sizeof(float));
-    cudaMalloc(&xyz.z, nnodes * sizeof(float));
-    return xyz;
-}
-// end make_xyz_tet10_device
-
-//////////////////////////////////////////////////////////
-// copy_xyz_tet10_device
-//////////////////////////////////////////////////////////
-void copy_xyz_tet10_device(const ptrdiff_t nnodes,    //
-                           xyz_tet10_device* xyz,     //
-                           const float** xyz_host) {  //
-    cudaError_t err0 =
-            cudaMemcpy(xyz->x, xyz_host[0], nnodes * sizeof(float), cudaMemcpyHostToDevice);
-    cudaError_t err1 =
-            cudaMemcpy(xyz->y, xyz_host[1], nnodes * sizeof(float), cudaMemcpyHostToDevice);
-    cudaError_t err2 =
-            cudaMemcpy(xyz->z, xyz_host[2], nnodes * sizeof(float), cudaMemcpyHostToDevice);
-
-    if (err0 != cudaSuccess || err1 != cudaSuccess || err2 != cudaSuccess) {
-        printf("Error copying xyz_tet10_device to device: %s\n", cudaGetErrorString(err0));
-        // Handle the error or exit the program
-    }
-}  // end copy_xyz_tet10_device
-
-//////////////////////////////////////////////////////////
-// free_xyz_tet10_device
-//////////////////////////////////////////////////////////
-void free_xyz_tet10_device(xyz_tet10_device xyz) {
-    cudaFree(xyz.x);
-    cudaFree(xyz.y);
-    cudaFree(xyz.z);
-
-    xyz.x = NULL;
-    xyz.y = NULL;
-    xyz.z = NULL;
-}
-// end free_xyz_tet10_device
-
-xyz_tet10_device make_xyz_tet10_device_unified(const ptrdiff_t nnodes) {
-    xyz_tet10_device xyz;
-    xyz.x = NULL;
-    xyz.y = NULL;
-    xyz.z = NULL;
-    return xyz;
-}
-
-void copy_xyz_tet10_device_unified(const ptrdiff_t nnodes,  //
-                                   xyz_tet10_device* xyz,   //
-                                   const float** xyz_host) {
-    xyz->x = (float*)xyz_host[0];
-    xyz->y = (float*)xyz_host[1];
-    xyz->z = (float*)xyz_host[2];
-}
-
-/////////////////////////////////////////////////////////////////
-// Struct for elems
-/////////////////////////////////////////////////////////////////
-typedef struct {
-    int* elems_v0 = NULL;
-    int* elems_v1 = NULL;
-    int* elems_v2 = NULL;
-    int* elems_v3 = NULL;
-    int* elems_v4 = NULL;
-    int* elems_v5 = NULL;
-    int* elems_v6 = NULL;
-    int* elems_v7 = NULL;
-    int* elems_v8 = NULL;
-    int* elems_v9 = NULL;
-} elems_tet10_device;
-// end struct elems_tet10_device
-
-//////////////////////////////////////////////////////////
-// make_elems_tet10_device
-//////////////////////////////////////////////////////////
-elems_tet10_device make_elems_tet10_device(const ptrdiff_t nelements) {
-    elems_tet10_device elems;
-
-    cudaError_t err0 = cudaMalloc(&elems.elems_v0, nelements * sizeof(int));
-    cudaError_t err1 = cudaMalloc(&elems.elems_v1, nelements * sizeof(int));
-    cudaError_t err2 = cudaMalloc(&elems.elems_v2, nelements * sizeof(int));
-    cudaError_t err3 = cudaMalloc(&elems.elems_v3, nelements * sizeof(int));
-    cudaError_t err4 = cudaMalloc(&elems.elems_v4, nelements * sizeof(int));
-    cudaError_t err5 = cudaMalloc(&elems.elems_v5, nelements * sizeof(int));
-    cudaError_t err6 = cudaMalloc(&elems.elems_v6, nelements * sizeof(int));
-    cudaError_t err7 = cudaMalloc(&elems.elems_v7, nelements * sizeof(int));
-    cudaError_t err8 = cudaMalloc(&elems.elems_v8, nelements * sizeof(int));
-    cudaError_t err9 = cudaMalloc(&elems.elems_v9, nelements * sizeof(int));
-
-    if (err0 != cudaSuccess || err1 != cudaSuccess || err2 != cudaSuccess || err3 != cudaSuccess ||
-        err4 != cudaSuccess || err5 != cudaSuccess || err6 != cudaSuccess || err7 != cudaSuccess ||
-        err8 != cudaSuccess || err9 != cudaSuccess) {
-        printf("Error allocating memory for elems_tet10_device\n");
-        // Handle error
-    }
-
-    return elems;
-}  // end make_elems_tet10_device
-
-//////////////////////////////////////////////////////////
-// copy_elems_tet10_device
-//////////////////////////////////////////////////////////
-cudaError_t copy_elems_tet10_device(const ptrdiff_t nelements,   //
-                                    elems_tet10_device* elems,   //
-                                    const idx_t** elems_host) {  //
-    cudaError_t err0 = cudaMemcpy(
-            elems->elems_v0, elems_host[0], nelements * sizeof(int), cudaMemcpyHostToDevice);
-    cudaError_t err1 = cudaMemcpy(
-            elems->elems_v1, elems_host[1], nelements * sizeof(int), cudaMemcpyHostToDevice);
-    cudaError_t err2 = cudaMemcpy(
-            elems->elems_v2, elems_host[2], nelements * sizeof(int), cudaMemcpyHostToDevice);
-    cudaError_t err3 = cudaMemcpy(
-            elems->elems_v3, elems_host[3], nelements * sizeof(int), cudaMemcpyHostToDevice);
-    cudaError_t err4 = cudaMemcpy(
-            elems->elems_v4, elems_host[4], nelements * sizeof(int), cudaMemcpyHostToDevice);
-    cudaError_t err5 = cudaMemcpy(
-            elems->elems_v5, elems_host[5], nelements * sizeof(int), cudaMemcpyHostToDevice);
-    cudaError_t err6 = cudaMemcpy(
-            elems->elems_v6, elems_host[6], nelements * sizeof(int), cudaMemcpyHostToDevice);
-    cudaError_t err7 = cudaMemcpy(
-            elems->elems_v7, elems_host[7], nelements * sizeof(int), cudaMemcpyHostToDevice);
-    cudaError_t err8 = cudaMemcpy(
-            elems->elems_v8, elems_host[8], nelements * sizeof(int), cudaMemcpyHostToDevice);
-    cudaError_t err9 = cudaMemcpy(
-            elems->elems_v9, elems_host[9], nelements * sizeof(int), cudaMemcpyHostToDevice);
-
-    if (err0 != cudaSuccess || err1 != cudaSuccess || err2 != cudaSuccess || err3 != cudaSuccess ||
-        err4 != cudaSuccess || err5 != cudaSuccess || err6 != cudaSuccess || err7 != cudaSuccess ||
-        err8 != cudaSuccess || err9 != cudaSuccess) {
-        printf("Error copying elements to device: %s\n", cudaGetErrorString(cudaGetLastError()));
-        return cudaGetLastError();
-    }
-
-    return cudaSuccess;
-}  // end copy_elems_tet10_device
-
-//////////////////////////////////////////////////////////
-// free_elems_tet10_device
-//////////////////////////////////////////////////////////
-void free_elems_tet10_device(elems_tet10_device elems) {
-    cudaError_t err0 = cudaFree(elems.elems_v0);
-    cudaError_t err1 = cudaFree(elems.elems_v1);
-    cudaError_t err2 = cudaFree(elems.elems_v2);
-    cudaError_t err3 = cudaFree(elems.elems_v3);
-    cudaError_t err4 = cudaFree(elems.elems_v4);
-    cudaError_t err5 = cudaFree(elems.elems_v5);
-    cudaError_t err6 = cudaFree(elems.elems_v6);
-    cudaError_t err7 = cudaFree(elems.elems_v7);
-    cudaError_t err8 = cudaFree(elems.elems_v8);
-    cudaError_t err9 = cudaFree(elems.elems_v9);
-
-    if (err0 != cudaSuccess || err1 != cudaSuccess || err2 != cudaSuccess || err3 != cudaSuccess ||
-        err4 != cudaSuccess || err5 != cudaSuccess || err6 != cudaSuccess || err7 != cudaSuccess ||
-        err8 != cudaSuccess || err9 != cudaSuccess) {
-        printf("Error freeing device memory for elems: %s\n",
-               cudaGetErrorString(cudaGetLastError()));
-    }
-
-    elems.elems_v0 = NULL;
-    elems.elems_v1 = NULL;
-    elems.elems_v2 = NULL;
-    elems.elems_v3 = NULL;
-    elems.elems_v4 = NULL;
-    elems.elems_v5 = NULL;
-    elems.elems_v6 = NULL;
-    elems.elems_v7 = NULL;
-    elems.elems_v8 = NULL;
-    elems.elems_v9 = NULL;
-}  // end free_elems_tet10_device
 
 //-------------------------------------------
 /// iso-parametric version
@@ -223,16 +38,16 @@ __device__ real_t tet10_measure_cu(const real_t* const MY_RESTRICT x,  //
                                    const real_t qy,    //
                                    const real_t qz) {  //
     //
-    const real_t x0 = 4 * qz;
-    const real_t x1 = x0 - 1;
-    const real_t x2 = 4 * qy;
-    const real_t x3 = 4 * qx;
-    const real_t x4 = x3 - 4;
-    const real_t x5 = -8 * qz - x2 - x4;
-    const real_t x6 = -x3 * y[4];
-    const real_t x7 = x0 + x2;
-    const real_t x8 = x3 + x7 - 3;
-    const real_t x9 = x8 * y[0];
+    const real_t x0  = 4 * qz;
+    const real_t x1  = x0 - 1;
+    const real_t x2  = 4 * qy;
+    const real_t x3  = 4 * qx;
+    const real_t x4  = x3 - 4;
+    const real_t x5  = -8 * qz - x2 - x4;
+    const real_t x6  = -x3 * y[4];
+    const real_t x7  = x0 + x2;
+    const real_t x8  = x3 + x7 - 3;
+    const real_t x9  = x8 * y[0];
     const real_t x10 = -x2 * y[6] + x9;
     const real_t x11 = x1 * y[3] + x10 + x2 * y[9] + x3 * y[8] + x5 * y[7] + x6;
     const real_t x12 = -x2 * z[6];
@@ -246,25 +61,21 @@ __device__ real_t tet10_measure_cu(const real_t* const MY_RESTRICT x,  //
     const real_t x20 = -x3 * x[4];
     const real_t x21 = x8 * x[0];
     const real_t x22 = -x0 * x[7] + x21;
-    const real_t x23 = (1.0 / 6.0) * x0 * x[9] + (1.0 / 6.0) * x18 * x[2] +
-                       (1.0 / 6.0) * x19 * x[6] + (1.0 / 6.0) * x20 + (1.0 / 6.0) * x22 +
-                       (1.0 / 6.0) * x3 * x[5];
+    const real_t x23 = (1.0 / 6.0) * x0 * x[9] + (1.0 / 6.0) * x18 * x[2] + (1.0 / 6.0) * x19 * x[6] + (1.0 / 6.0) * x20 +
+                       (1.0 / 6.0) * x22 + (1.0 / 6.0) * x3 * x[5];
     const real_t x24 = -x0 * y[7];
     const real_t x25 = x0 * y[8] + x10 + x14 * y[1] + x16 * y[4] + x2 * y[5] + x24;
     const real_t x26 = x15 - x3 * z[4];
     const real_t x27 = x1 * z[3] + x12 + x2 * z[9] + x26 + x3 * z[8] + x5 * z[7];
     const real_t x28 = x0 * y[9] + x18 * y[2] + x19 * y[6] + x24 + x3 * y[5] + x6 + x9;
     const real_t x29 = -x2 * x[6];
-    const real_t x30 = (1.0 / 6.0) * x1 * x[3] + (1.0 / 6.0) * x2 * x[9] + (1.0 / 6.0) * x20 +
-                       (1.0 / 6.0) * x21 + (1.0 / 6.0) * x29 + (1.0 / 6.0) * x3 * x[8] +
-                       (1.0 / 6.0) * x5 * x[7];
+    const real_t x30 = (1.0 / 6.0) * x1 * x[3] + (1.0 / 6.0) * x2 * x[9] + (1.0 / 6.0) * x20 + (1.0 / 6.0) * x21 +
+                       (1.0 / 6.0) * x29 + (1.0 / 6.0) * x3 * x[8] + (1.0 / 6.0) * x5 * x[7];
     const real_t x31 = x0 * z[9] + x13 + x18 * z[2] + x19 * z[6] + x26 + x3 * z[5];
-    const real_t x32 = (1.0 / 6.0) * x0 * x[8] + (1.0 / 6.0) * x14 * x[1] +
-                       (1.0 / 6.0) * x16 * x[4] + (1.0 / 6.0) * x2 * x[5] + (1.0 / 6.0) * x22 +
-                       (1.0 / 6.0) * x29;
+    const real_t x32 = (1.0 / 6.0) * x0 * x[8] + (1.0 / 6.0) * x14 * x[1] + (1.0 / 6.0) * x16 * x[4] + (1.0 / 6.0) * x2 * x[5] +
+                       (1.0 / 6.0) * x22 + (1.0 / 6.0) * x29;
     //
-    return x11 * x17 * x23 - x11 * x31 * x32 - x17 * x28 * x30 - x23 * x25 * x27 + x25 * x30 * x31 +
-           x27 * x28 * x32;
+    return x11 * x17 * x23 - x11 * x31 * x32 - x17 * x28 * x30 - x23 * x25 * x27 + x25 * x30 * x31 + x27 * x28 * x32;
 }  // end tet10_measure_cu
 
 #define POW2_D(x) ((x) * (x))
@@ -281,26 +92,25 @@ __device__ real_t tet10_measure_cu(const real_t* const MY_RESTRICT x,  //
  * @param qz
  * @return __device__
  */
-__device__ void isoparametric_lumped_mass_kernel_hrt_cu(
-        const real_t dV,
-        // Quadrature
-        const real_t qx, const real_t qy, const real_t qz,  //
-        real_t* element_diag_0, real_t* element_diag_1,     //
-        real_t* element_diag_2, real_t* element_diag_3,     //
-        real_t* element_diag_4, real_t* element_diag_5,     //
-        real_t* element_diag_6, real_t* element_diag_7,     //
-        real_t* element_diag_8, real_t* element_diag_9) {
+__device__ void isoparametric_lumped_mass_kernel_hrt_cu(const real_t dV,
+                                                        // Quadrature
+                                                        const real_t qx, const real_t qy, const real_t qz,  //
+                                                        real_t* element_diag_0, real_t* element_diag_1,     //
+                                                        real_t* element_diag_2, real_t* element_diag_3,     //
+                                                        real_t* element_diag_4, real_t* element_diag_5,     //
+                                                        real_t* element_diag_6, real_t* element_diag_7,     //
+                                                        real_t* element_diag_8, real_t* element_diag_9) {
     //
-    const real_t x0 = 4 * qx;
-    const real_t x1 = qy * qz;
-    const real_t x2 = 2 * qx - 1;
-    const real_t x3 = qx * x2;
-    const real_t x4 = 2 * qy;
-    const real_t x5 = qy * (x4 - 1);
-    const real_t x6 = 2 * qz;
-    const real_t x7 = qz * (x6 - 1);
-    const real_t x8 = qx + qy + qz - 1;
-    const real_t x9 = qx * x8;
+    const real_t x0  = 4 * qx;
+    const real_t x1  = qy * qz;
+    const real_t x2  = 2 * qx - 1;
+    const real_t x3  = qx * x2;
+    const real_t x4  = 2 * qy;
+    const real_t x5  = qy * (x4 - 1);
+    const real_t x6  = 2 * qz;
+    const real_t x7  = qz * (x6 - 1);
+    const real_t x8  = qx + qy + qz - 1;
+    const real_t x9  = qx * x8;
     const real_t x10 = qy * x8;
     const real_t x11 = qz * x8;
     const real_t x12 = x8 * (x2 + x4 + x6);
@@ -319,8 +129,7 @@ __device__ void isoparametric_lumped_mass_kernel_hrt_cu(
     const real_t x25 = -11 * x1 + 4 * x3 + 11 * x9;
     const real_t x26 = -24 * qz + 21 * x16;
 
-    *element_diag_0 +=
-            x12 * x13 * (qy * x0 + qz * x0 + 4 * x1 - x10 - x11 + 10 * x12 + x3 + x5 + x7 - x9);
+    *element_diag_0 += x12 * x13 * (qy * x0 + qz * x0 + 4 * x1 - x10 - x11 + 10 * x12 + x3 + x5 + x7 - x9);
     *element_diag_1 += qx * x13 * (42 * (POW3_D(qx)) + 14 * qx - 45 * x14 - 1);
     *element_diag_2 += qy * x13 * (42 * (POW3_D(qy)) + 14 * qy - 45 * x15 - 1);
     *element_diag_3 += qz * x13 * (42 * (POW3_D(qz)) + 14 * qz - 45 * x16 - 1);
@@ -347,24 +156,23 @@ __device__ void isoparametric_lumped_mass_kernel_hrt_cu(
  * @param out_z
  * @return __device__
  */
-__device__ void tet10_transform_cu(const real_t* const MY_RESTRICT x,
-                                   const real_t* const MY_RESTRICT y,
+__device__ void tet10_transform_cu(const real_t* const MY_RESTRICT x, const real_t* const MY_RESTRICT y,
                                    const real_t* const MY_RESTRICT z,
                                    // Quadrature point
                                    const real_t qx, const real_t qy, const real_t qz,
                                    // Output
                                    real_t* const MY_RESTRICT out_x, real_t* const MY_RESTRICT out_y,
                                    real_t* const MY_RESTRICT out_z) {
-    const real_t x0 = 4 * qx;
-    const real_t x1 = qy * x0;
-    const real_t x2 = qz * x0;
-    const real_t x3 = 4 * qy;
-    const real_t x4 = qz * x3;
-    const real_t x5 = 2 * qx - 1;
-    const real_t x6 = qx * x5;
-    const real_t x7 = 2 * qy;
-    const real_t x8 = qy * (x7 - 1);
-    const real_t x9 = 2 * qz;
+    const real_t x0  = 4 * qx;
+    const real_t x1  = qy * x0;
+    const real_t x2  = qz * x0;
+    const real_t x3  = 4 * qy;
+    const real_t x4  = qz * x3;
+    const real_t x5  = 2 * qx - 1;
+    const real_t x6  = qx * x5;
+    const real_t x7  = 2 * qy;
+    const real_t x8  = qy * (x7 - 1);
+    const real_t x9  = 2 * qz;
     const real_t x10 = qz * (x9 - 1);
     const real_t x11 = -4 * qz - x0 - x3 + 4;
     const real_t x12 = qx * x11;
@@ -372,12 +180,12 @@ __device__ void tet10_transform_cu(const real_t* const MY_RESTRICT x,
     const real_t x14 = qz * x11;
     const real_t x15 = (-x5 - x7 - x9) * (-qx - qy - qz + 1);
 
-    *out_x = x[0] * x15 + x[1] * x6 + x[2] * x8 + x[3] * x10 + x[4] * x12 + x[5] * x1 + x[6] * x13 +
-             x[7] * x14 + x[8] * x2 + x[9] * x4;
-    *out_y = y[0] * x15 + y[1] * x6 + y[2] * x8 + y[3] * x10 + y[4] * x12 + y[5] * x1 + y[6] * x13 +
-             y[7] * x14 + y[8] * x2 + y[9] * x4;
-    *out_z = z[0] * x15 + z[1] * x6 + z[2] * x8 + z[3] * x10 + z[4] * x12 + z[5] * x1 + z[6] * x13 +
-             z[7] * x14 + z[8] * x2 + z[9] * x4;
+    *out_x = x[0] * x15 + x[1] * x6 + x[2] * x8 + x[3] * x10 + x[4] * x12 + x[5] * x1 + x[6] * x13 + x[7] * x14 + x[8] * x2 +
+             x[9] * x4;
+    *out_y = y[0] * x15 + y[1] * x6 + y[2] * x8 + y[3] * x10 + y[4] * x12 + y[5] * x1 + y[6] * x13 + y[7] * x14 + y[8] * x2 +
+             y[9] * x4;
+    *out_z = z[0] * x15 + z[1] * x6 + z[2] * x8 + z[3] * x10 + z[4] * x12 + z[5] * x1 + z[6] * x13 + z[7] * x14 + z[8] * x2 +
+             z[9] * x4;
 }  // end tet10_transform_cu
 
 /**
@@ -389,18 +197,17 @@ __device__ void tet10_transform_cu(const real_t* const MY_RESTRICT x,
  * @param f
  * @return __device__
  */
-__device__ void tet10_dual_basis_hrt_cu(const real_t qx, const real_t qy, const real_t qz,
-                                        real_t* const f) {
-    const real_t x0 = 2 * qy;
-    const real_t x1 = 2 * qz;
-    const real_t x2 = 2 * qx - 1;
-    const real_t x3 = (-x0 - x1 - x2) * (-qx - qy - qz + 1);
-    const real_t x4 = x0 - 1;
-    const real_t x5 = (5.0 / 18.0) * qy;
-    const real_t x6 = x4 * x5;
-    const real_t x7 = x1 - 1;
-    const real_t x8 = (5.0 / 18.0) * qz;
-    const real_t x9 = x7 * x8;
+__device__ void tet10_dual_basis_hrt_cu(const real_t qx, const real_t qy, const real_t qz, real_t* const f) {
+    const real_t x0  = 2 * qy;
+    const real_t x1  = 2 * qz;
+    const real_t x2  = 2 * qx - 1;
+    const real_t x3  = (-x0 - x1 - x2) * (-qx - qy - qz + 1);
+    const real_t x4  = x0 - 1;
+    const real_t x5  = (5.0 / 18.0) * qy;
+    const real_t x6  = x4 * x5;
+    const real_t x7  = x1 - 1;
+    const real_t x8  = (5.0 / 18.0) * qz;
+    const real_t x9  = x7 * x8;
     const real_t x10 = -4 * qx - 4 * qy - 4 * qz + 4;
     const real_t x11 = (5.0 / 72.0) * x10;
     const real_t x12 = qy * qz;
@@ -480,12 +287,11 @@ __device__ void hex_aa_8_eval_fun_cu(
 /////////////////////////////////////////////////////////////////
 // hex_aa_8_eval_grad_cu
 /////////////////////////////////////////////////////////////////
-__device__ void hex_aa_8_collect_coeffs_cu(
-        const ptrdiff_t stride0, const ptrdiff_t stride1, const ptrdiff_t stride2,
+__device__ void hex_aa_8_collect_coeffs_cu(const ptrdiff_t stride0, const ptrdiff_t stride1, const ptrdiff_t stride2,
 
-        const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k,
-        // Attention this is geometric data transformed to solver data!
-        const real_t* MY_RESTRICT data, real_t* MY_RESTRICT out) {
+                                           const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k,
+                                           // Attention this is geometric data transformed to solver data!
+                                           const real_t* MY_RESTRICT data, real_t* MY_RESTRICT out) {
     //
     const ptrdiff_t i0 = i * stride0 + j * stride1 + k * stride2;
     const ptrdiff_t i1 = (i + 1) * stride0 + j * stride1 + k * stride2;
@@ -519,14 +325,11 @@ __device__ void hex_aa_8_collect_coeffs_cu(
 __device__ void hex_aa_8_indices_O3_cuda(const ptrdiff_t SFEM_RESTRICT stride0,  //
                                          const ptrdiff_t SFEM_RESTRICT stride1,  //
                                          const ptrdiff_t SFEM_RESTRICT stride2,  //
-                                         const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k,
-                                         const ptrdiff_t k_diff,
+                                         const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k, const ptrdiff_t k_diff,
                                          // Output
-                                         ptrdiff_t* i0, ptrdiff_t* i1, ptrdiff_t* i2, ptrdiff_t* i3,
-                                         ptrdiff_t* i4, ptrdiff_t* i5, ptrdiff_t* i6, ptrdiff_t* i7,
-                                         ptrdiff_t* i8, ptrdiff_t* i9, ptrdiff_t* i10,
-                                         ptrdiff_t* i11, ptrdiff_t* i12, ptrdiff_t* i13,
-                                         ptrdiff_t* i14, ptrdiff_t* i15) {
+                                         ptrdiff_t* i0, ptrdiff_t* i1, ptrdiff_t* i2, ptrdiff_t* i3, ptrdiff_t* i4, ptrdiff_t* i5,
+                                         ptrdiff_t* i6, ptrdiff_t* i7, ptrdiff_t* i8, ptrdiff_t* i9, ptrdiff_t* i10,
+                                         ptrdiff_t* i11, ptrdiff_t* i12, ptrdiff_t* i13, ptrdiff_t* i14, ptrdiff_t* i15) {
     //
     const ptrdiff_t stride_x = stride0;
     const ptrdiff_t stride_y = stride1;
@@ -542,8 +345,8 @@ __device__ void hex_aa_8_indices_O3_cuda(const ptrdiff_t SFEM_RESTRICT stride0, 
     *i6 = (i + 1) * stride_x + (j + 0) * stride_y + (k + k_diff) * stride_z;
     *i7 = (i + 2) * stride_x + (j + 0) * stride_y + (k + k_diff) * stride_z;
 
-    *i8 = (i - 1) * stride_x + (j + 1) * stride_y + (k + k_diff) * stride_z;
-    *i9 = (i + 0) * stride_x + (j + 1) * stride_y + (k + k_diff) * stride_z;
+    *i8  = (i - 1) * stride_x + (j + 1) * stride_y + (k + k_diff) * stride_z;
+    *i9  = (i + 0) * stride_x + (j + 1) * stride_y + (k + k_diff) * stride_z;
     *i10 = (i + 1) * stride_x + (j + 1) * stride_y + (k + k_diff) * stride_z;
     *i11 = (i + 2) * stride_x + (j + 1) * stride_y + (k + k_diff) * stride_z;
 
@@ -676,16 +479,16 @@ __device__ void hex_aa_8_collect_coeffs_O3_cuda(  //
                              &i62,
                              &i63);
 
-    out[0] = data[i0];
-    out[1] = data[i1];
-    out[2] = data[i2];
-    out[3] = data[i3];
-    out[4] = data[i4];
-    out[5] = data[i5];
-    out[6] = data[i6];
-    out[7] = data[i7];
-    out[8] = data[i8];
-    out[9] = data[i9];
+    out[0]  = data[i0];
+    out[1]  = data[i1];
+    out[2]  = data[i2];
+    out[3]  = data[i3];
+    out[4]  = data[i4];
+    out[5]  = data[i5];
+    out[6]  = data[i6];
+    out[7]  = data[i7];
+    out[8]  = data[i8];
+    out[9]  = data[i9];
     out[10] = data[i10];
     out[11] = data[i11];
     out[12] = data[i12];
@@ -745,20 +548,20 @@ __device__ void hex_aa_8_collect_coeffs_O3_cuda(  //
 ////////////////////////////////////////////////////////////////////////
 // hex_aa_8_eval_weno4_3D
 ////////////////////////////////////////////////////////////////////////
-__device__ real_t hex_aa_8_eval_weno4_3D_cuda(const real_t x_,                           //
-                                              const real_t y_,                           //
-                                              const real_t z_,                           //
-                                              const real_t ox,                           //
-                                              const real_t oy,                           //
-                                              const real_t oz,                           //
-                                              const real_t h,                            //
-                                              const ptrdiff_t i,                         //
-                                              const ptrdiff_t j,                         //
-                                              const ptrdiff_t k,                         //
-                                              const ptrdiff_t stride0,                   //
-                                              const ptrdiff_t stride1,                   //
-                                              const ptrdiff_t stride2,                   //
-                                              const real_t* const SFEM_RESTRICT data) {  //
+__device__ real_t hex_aa_8_eval_weno4_3D_cuda(const real_t                      x_,       //
+                                              const real_t                      y_,       //
+                                              const real_t                      z_,       //
+                                              const real_t                      ox,       //
+                                              const real_t                      oy,       //
+                                              const real_t                      oz,       //
+                                              const real_t                      h,        //
+                                              const ptrdiff_t                   i,        //
+                                              const ptrdiff_t                   j,        //
+                                              const ptrdiff_t                   k,        //
+                                              const ptrdiff_t                   stride0,  //
+                                              const ptrdiff_t                   stride1,  //
+                                              const ptrdiff_t                   stride2,  //
+                                              const real_t* const SFEM_RESTRICT data) {   //
 
     real_t out[64];
     hex_aa_8_collect_coeffs_O3_cuda(stride0, stride1, stride2, i, j, k, data, out);
@@ -790,7 +593,7 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(
         const ptrdiff_t nnodes,         // number of nodes
 
         elems_tet10_device elems,  // connectivity
-        xyz_tet10_device xyz,      // coordinates
+        xyz_tet10_device   xyz,    // coordinates
         // SDF
         const ptrdiff_t nx,  // number of nodes in each direction x
         const ptrdiff_t ny,  // number of nodes in each direction y
@@ -835,7 +638,7 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(
 
     if (element_i < start_element or element_i >= end_element) return;
 
-    auto tile = cg::tiled_partition<__WARP_SIZE__>(g);
+    auto           tile      = cg::tiled_partition<__WARP_SIZE__>(g);
     const unsigned tile_rank = tile.thread_rank();
 
     ////////////////////////////////////////
@@ -1042,8 +845,8 @@ isoparametric_tet10_assemble_dual_mass_vector_kernel(  /// TODO TODO TODO
         const ptrdiff_t nnodes,                        // number of nodes
         //
         elems_tet10_device elems,  // connectivity
-        xyz_tet10_device xyz,      // coordinates
-        real_t* diag) {
+        xyz_tet10_device   xyz,    // coordinates
+        real_t*            diag) {
     //
 
     // for (ptrdiff_t i = 0; i < nelements; ++i)
@@ -1058,7 +861,7 @@ isoparametric_tet10_assemble_dual_mass_vector_kernel(  /// TODO TODO TODO
 
     if (element_i < start_element or element_i >= end_element) return;
 
-    auto tile = cg::tiled_partition<__WARP_SIZE__>(g);
+    auto           tile      = cg::tiled_partition<__WARP_SIZE__>(g);
     const unsigned tile_rank = tile.thread_rank();
 
     {
@@ -1124,8 +927,7 @@ isoparametric_tet10_assemble_dual_mass_vector_kernel(  /// TODO TODO TODO
             const real_t tet4_qz_v = (q_i < TET4_NQP) ? tet4_qz[q_i] : tet4_qz[0];
             const real_t tet4_qw_v = (q_i < TET4_NQP) ? tet4_qw[q_i] : 0.0;
 
-            const real_t dV =
-                    tet10_measure_cu(x, y, z, tet4_qx_v, tet4_qy_v, tet4_qz_v) * tet4_qw_v;
+            const real_t dV = tet10_measure_cu(x, y, z, tet4_qx_v, tet4_qy_v, tet4_qz_v) * tet4_qw_v;
 
             isoparametric_lumped_mass_kernel_hrt_cu(dV,
                                                     // Quadrature
@@ -1251,16 +1053,15 @@ __device__ ptrdiff_t hex_aa_8_indices_O3_first_index_cuda(const ptrdiff_t stride
  * @param data
  * @return __device__*
  */
-__device__ real_t* hex_aa_8_collect_coeffs_O3_ptr_cuda(const ptrdiff_t stride0,     //
-                                                       const ptrdiff_t stride1,     //
-                                                       const ptrdiff_t stride2,     //
-                                                       const ptrdiff_t i,           //
-                                                       const ptrdiff_t j,           //
-                                                       const ptrdiff_t k,           //
-                                                       const real_t* const data) {  //
+__device__ real_t* hex_aa_8_collect_coeffs_O3_ptr_cuda(const ptrdiff_t     stride0,  //
+                                                       const ptrdiff_t     stride1,  //
+                                                       const ptrdiff_t     stride2,  //
+                                                       const ptrdiff_t     i,        //
+                                                       const ptrdiff_t     j,        //
+                                                       const ptrdiff_t     k,        //
+                                                       const real_t* const data) {   //
 
-    const ptrdiff_t first_index =
-            hex_aa_8_indices_O3_first_index_cuda(stride0, stride1, stride2, i, j, k);
+    const ptrdiff_t first_index = hex_aa_8_indices_O3_first_index_cuda(stride0, stride1, stride2, i, j, k);
 
     return (real_t*)&data[first_index];
 }
@@ -1269,18 +1070,18 @@ __device__ real_t* hex_aa_8_collect_coeffs_O3_ptr_cuda(const ptrdiff_t stride0, 
 // hex_aa_8_eval_weno4_3D
 ////////////////////////////////////////////////////////////////////////
 __device__ real_t hex_aa_8_eval_weno4_3D_Unit_cuda(  //
-        const real_t x_unit,                         //
-        const real_t y_unit,                         //
-        const real_t z_unit,                         //
-        const real_t ox_unit,                        //
-        const real_t oy_unit,                        //
-        const real_t oz_unit,                        //
-        const ptrdiff_t i,                           // it must be the absulte index
-        const ptrdiff_t j,                           // Used to retrive the data
-        const ptrdiff_t k,                           // From the data array
-        const ptrdiff_t stride0,                     //
-        const ptrdiff_t stride1,                     //
-        const ptrdiff_t stride2,                     //
+        const real_t                      x_unit,    //
+        const real_t                      y_unit,    //
+        const real_t                      z_unit,    //
+        const real_t                      ox_unit,   //
+        const real_t                      oy_unit,   //
+        const real_t                      oz_unit,   //
+        const ptrdiff_t                   i,         // it must be the absulte index
+        const ptrdiff_t                   j,         // Used to retrive the data
+        const ptrdiff_t                   k,         // From the data array
+        const ptrdiff_t                   stride0,   //
+        const ptrdiff_t                   stride1,   //
+        const ptrdiff_t                   stride2,   //
         const real_t* const SFEM_RESTRICT data) {    //
 
 #define WENO_DIRECT_CUDA 1
@@ -1293,7 +1094,7 @@ __device__ real_t hex_aa_8_eval_weno4_3D_Unit_cuda(  //
     const int stride_z = stride2;
 
     real_t* out = NULL;
-    out = hex_aa_8_collect_coeffs_O3_ptr_cuda(stride0, stride1, stride2, i, j, k, data);
+    out         = hex_aa_8_collect_coeffs_O3_ptr_cuda(stride0, stride1, stride2, i, j, k, data);
 
 #else
     // collect the data for the WENO interpolation
@@ -1344,7 +1145,7 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  
         const ptrdiff_t nnodes,                                                 // number of nodes
 
         elems_tet10_device elems,  // connectivity
-        xyz_tet10_device xyz,      // coordinates
+        xyz_tet10_device   xyz,    // coordinates
         // SDF
         const ptrdiff_t nx,  // number of nodes in each direction x
         const ptrdiff_t ny,  // number of nodes in each direction y
@@ -1392,7 +1193,7 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  
 
     if (element_i < start_element or element_i >= end_element) return;
 
-    auto tile = cg::tiled_partition<__WARP_SIZE__>(g);
+    auto           tile      = cg::tiled_partition<__WARP_SIZE__>(g);
     const unsigned tile_rank = tile.thread_rank();
 
     ////////////////////////////////////////
@@ -1444,7 +1245,7 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  
 
     // ISOPARAMETRIC
     // and search the node closest to the origin
-    int v_orig = 0;
+    int    v_orig   = 0;
     double dist_min = 1e14;
 
     for (int v = 0; v < 10; ++v) {
@@ -1458,7 +1259,7 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  
 
         if (dist < dist_min) {
             dist_min = dist;
-            v_orig = v;
+            v_orig   = v;
         }
     }
 
@@ -1509,8 +1310,7 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  
         // g_qx_glob, g_qy_glob, g_qz_glob are the coordinates of the quadrature point in
         // the global space
         real_t g_qx_glob, g_qy_glob, g_qz_glob;
-        tet10_transform_cu(
-                x, y, z, tet4_qx_v, tet4_qy_v, tet4_qz_v, &g_qx_glob, &g_qy_glob, &g_qz_glob);
+        tet10_transform_cu(x, y, z, tet4_qx_v, tet4_qy_v, tet4_qz_v, &g_qx_glob, &g_qy_glob, &g_qz_glob);
 
         tet10_dual_basis_hrt_cu(tet4_qx_v, tet4_qy_v, tet4_qz_v, tet10_f);
 
@@ -1518,15 +1318,7 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  
         // g_qx_unit, g_qy_unit, g_qz_unit are the coordinates of the quadrature point in
         // the unitary space
         real_t g_qx_unit, g_qy_unit, g_qz_unit;
-        tet10_transform_cu(x_unit,
-                           y_unit,
-                           z_unit,
-                           tet4_qx_v,
-                           tet4_qy_v,
-                           tet4_qz_v,
-                           &g_qx_unit,
-                           &g_qy_unit,
-                           &g_qz_unit);
+        tet10_transform_cu(x_unit, y_unit, z_unit, tet4_qx_v, tet4_qy_v, tet4_qz_v, &g_qx_unit, &g_qy_unit, &g_qz_unit);
 
         ///// ======================================================
 
@@ -1684,22 +1476,21 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  
  * @param g_device
  * @return int
  */
-int  //
-launch_kernels_hex8_to_tet10_resample_field_local_CUDA(
-        const int numBlocks,                          //
-        const int threadsPerBlock,                    //
-        const int bool_assemble_dual_mass_vector,     // assemble dual mass vector
-        int nelements, ptrdiff_t nnodes,              //
-        elems_tet10_device elems_device,              //
-        xyz_tet10_device xyz_device,                  //
-        const ptrdiff_t* const SFEM_RESTRICT n,       //
-        const ptrdiff_t* const SFEM_RESTRICT stride,  //
-        const geom_t* const SFEM_RESTRICT origin,     //
-        const geom_t* const SFEM_RESTRICT delta,      //
-        real_t* data_device,                          //
-        //    real_t* weighted_field_device, //
-        real_t* mass_vector,  //
-        real_t* g_device) {   //
+int                                                                                               //
+launch_kernels_hex8_to_tet10_resample_field_local_CUDA(const int numBlocks,                       //
+                                                       const int threadsPerBlock,                 //
+                                                       const int bool_assemble_dual_mass_vector,  // assemble dual mass vector
+                                                       int nelements, ptrdiff_t nnodes,           //
+                                                       elems_tet10_device                   elems_device,  //
+                                                       xyz_tet10_device                     xyz_device,    //
+                                                       const ptrdiff_t* const SFEM_RESTRICT n,             //
+                                                       const ptrdiff_t* const SFEM_RESTRICT stride,        //
+                                                       const geom_t* const SFEM_RESTRICT    origin,        //
+                                                       const geom_t* const SFEM_RESTRICT    delta,         //
+                                                       const real_t*                        data_device,   //
+                                                       //    real_t* weighted_field_device, //
+                                                       real_t* mass_vector,  //
+                                                       real_t* g_device) {   //
     //
     PRINT_CURRENT_FUNCTION;
 
@@ -1747,8 +1538,7 @@ launch_kernels_hex8_to_tet10_resample_field_local_CUDA(
         // compute_g_kernel<<<(nnodes / threadsPerBlock) + 1, threadsPerBlock>>>(
         //         nnodes, weighted_field_device, mass_vector, g_device);
 
-        compute_g_kernel_v2<<<(nnodes / threadsPerBlock) + 1, threadsPerBlock>>>(
-                nnodes, mass_vector, g_device);
+        compute_g_kernel_v2<<<(nnodes / threadsPerBlock) + 1, threadsPerBlock>>>(nnodes, mass_vector, g_device);
 
         // Synchronize device
         cudaDeviceSynchronize();
@@ -1757,18 +1547,26 @@ launch_kernels_hex8_to_tet10_resample_field_local_CUDA(
     RETURN_FROM_FUNCTION(0);
 }
 
+// Function to calculate the number of threads and blocks
+void calculate_threads_and_blocks(ptrdiff_t  nelements,        //
+                                  ptrdiff_t  warp_per_block,   //
+                                  ptrdiff_t* threadsPerBlock,  //
+                                  ptrdiff_t* numBlocks) {      //
+    *threadsPerBlock = warp_per_block * __WARP_SIZE__;
+    *numBlocks       = (nelements / warp_per_block) + (nelements % warp_per_block) + 1;
+}
+
 ////////////////////////////////////////////////////////////////////////
 // hex8_to_tet10_resample_field_local_CUDA_unified
 ////////////////////////////////////////////////////////////////////////
-extern "C" int                                    //
-hex8_to_tet10_resample_field_local_CUDA_unified(  //
-
-        // Mesh
-        const ptrdiff_t nelements,                 // number of elements
-        const ptrdiff_t nnodes,                    // number of nodes
-        const int bool_assemble_dual_mass_vector,  // assemble dual mass vector
-        idx_t** const SFEM_RESTRICT elems,         // connectivity
-        geom_t** const SFEM_RESTRICT xyz,          // coordinates
+extern "C" int                                                        //
+hex8_to_tet10_resample_field_local_CUDA_unified(                      //
+                                                                      // Mesh
+        const ptrdiff_t              nelements,                       // number of elements
+        const ptrdiff_t              nnodes,                          // number of nodes
+        const int                    bool_assemble_dual_mass_vector,  // assemble dual mass vector
+        idx_t** const SFEM_RESTRICT  elems,                           // connectivity
+        geom_t** const SFEM_RESTRICT xyz,                             // coordinates
         // SDF
         const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
         const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
@@ -1781,20 +1579,124 @@ hex8_to_tet10_resample_field_local_CUDA_unified(  //
                                                //
     PRINT_CURRENT_FUNCTION;
 
+    int size_data = n[0] * n[1] * n[2];
+
+    // Device memory
+    const real_t* data_device = data;
+    real_t*       mass_vector = NULL;
+    real_t*       g_device    = g_host;
+
+    memory_hint_write_mostly(nelements, sizeof(real_t), (void*)g_device);
+    memory_hint_read_mostly(size_data, sizeof(real_t), (void*)data_device);
+
+    mass_vector = (real_t*)malloc(nnodes * sizeof(real_t));
+
+    memory_hint_write_mostly(nnodes, sizeof(real_t), (void*)mass_vector);
+
+    //// Initialize the data on the device
+    elems_tet10_device elems_device =                    //
+            make_elems_tet10_device_unified(nelements);  //
+
+    copy_elems_tet10_device_unified(nelements, &elems_device, (const idx_t**)elems);
+    memory_hint_elems_tet10_device_unified(nelements, &elems_device);
+
+    xyz_tet10_device xyz_device =                   //
+            make_xyz_tet10_device_unified(nnodes);  //
+
+    copy_xyz_tet10_device_unified(nnodes, &xyz_device, (const float**)xyz);
+    memory_hint_xyz_tet10_device_unified(nnodes, &xyz_device);
+
+    const ptrdiff_t warp_per_block  = 8;  /// 8 warps per block /////
+    ptrdiff_t       threadsPerBlock = 0;
+    ptrdiff_t       numBlocks       = 0;
+
+    calculate_threads_and_blocks(nelements, warp_per_block, &threadsPerBlock, &numBlocks);
+
+#if CUBE1 == 0  // WENO ..
+    char kernel_name[] = "hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel";
+#else
+    char kernel_name[] = "hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel";
+#endif
+
+    printf("============================================================================\n");
+    printf("GPU:    Unified Memory Model\n");
+    printf("GPU:    Launching the kernel %s \n", kernel_name);
+    printf("GPU:    Number of blocks:            %ld\n", numBlocks);
+    printf("GPU:    Number of threads per block: %ld\n", threadsPerBlock);
+    printf("GPU:    Total number of threads:     %ld\n", (numBlocks * threadsPerBlock));
+    printf("GPU:    Number of elements:          %ld\n", nelements);
+    printf("GPU:    Use WENO:                    %s\n", (WENO_CUDA == 1 & CUBE1 == 1) ? "Yes" : "No");
+    printf("============================================================================\n");
+
+    cudaDeviceSynchronize();
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    cudaEventRecord(start);
+
+    // Launch the kernels
+    launch_kernels_hex8_to_tet10_resample_field_local_CUDA(numBlocks,
+                                                           threadsPerBlock,
+                                                           bool_assemble_dual_mass_vector,
+                                                           nelements,
+                                                           nnodes,
+                                                           elems_device,
+                                                           xyz_device,
+                                                           n,
+                                                           stride,
+                                                           origin,
+                                                           delta,
+                                                           data_device,
+                                                           mass_vector,
+                                                           g_device);
+
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+
+    const double seconds = milliseconds / 1000.0;
+
+    printf("============================================================================\n");
+    printf("GPU:    Time for the kernel (%s):\n"  //
+           "GPU:    %f seconds\n",                //
+           kernel_name,
+           seconds);
+    const double elements_per_second = (double)(nelements) / seconds;
+    printf("GPU:    Number of elements: %d.\n", nelements);
+    printf("GPU:    Throughput for the kernel: %e elements/second\n", elements_per_second);
+    printf("GPU:    %d, %f   (CSV friendly) \n", nelements, elements_per_second);
+    printf("============================================================================\n");
+
+    ////////////////////////////////////////
+    /// Finalize the memory allocation
+    free(mass_vector);
+    mass_vector = NULL;  // free the memory allocated for mass_vector
+
+    // The g device is already allocated in the unified memory
+    // and managed by the main program
+    g_device = NULL;
+
+    free_elems_tet10_device_unified(&elems_device);
+    free_xyz_tet10_device_unified(&xyz_device);
+
     RETURN_FROM_FUNCTION(0);
 }
 
 ////////////////////////////////////////////////////////////////////////
 // hex8_to_tet10_resample_field_local_CUDA
 ////////////////////////////////////////////////////////////////////////
-extern "C" int                                     //
-hex8_to_tet10_resample_field_local_CUDA(           //
-                                                   // Mesh
-        const ptrdiff_t nelements,                 // number of elements
-        const ptrdiff_t nnodes,                    // number of nodes
-        const int bool_assemble_dual_mass_vector,  // assemble dual mass vector
-        idx_t** const SFEM_RESTRICT elems,         // connectivity
-        geom_t** const SFEM_RESTRICT xyz,          // coordinates
+extern "C" int                                                        //
+hex8_to_tet10_resample_field_local_CUDA(                              //
+                                                                      // Mesh
+        const ptrdiff_t              nelements,                       // number of elements
+        const ptrdiff_t              nnodes,                          // number of nodes
+        const int                    bool_assemble_dual_mass_vector,  // assemble dual mass vector
+        idx_t** const SFEM_RESTRICT  elems,                           // connectivity
+        geom_t** const SFEM_RESTRICT xyz,                             // coordinates
         // SDF
         const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
         const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
@@ -1806,8 +1708,8 @@ hex8_to_tet10_resample_field_local_CUDA(           //
         real_t* const SFEM_RESTRICT g_host) {  //
                                                // geom_t** const SFEM_RESTRICT xyz
 
-#if SFEM_CUDA_MEMOMORY_MODEL == CUDA_UNIFIED_MEMORY
-    return hex8_to_tet10_resample_field_local_CUDA_unified(nelements,
+#if SFEM_CUDA_MEMORY_MODEL == CUDA_UNIFIED_MEMORY
+    return hex8_to_tet10_resample_field_local_CUDA_unified(nelements,  //
                                                            nnodes,
                                                            bool_assemble_dual_mass_vector,
                                                            elems,
@@ -1818,7 +1720,7 @@ hex8_to_tet10_resample_field_local_CUDA(           //
                                                            delta,
                                                            data,
                                                            g_host);
-#elif SFEM_CUDA_MEMOMORY_MODEL == CUDA_MEMORY_MANAGED
+#elif SFEM_CUDA_MEMORY_MODEL == CUDA_MEMORY_MANAGED
 
 #endif
 
@@ -1826,9 +1728,8 @@ hex8_to_tet10_resample_field_local_CUDA(           //
 
     // Device memory
     real_t* data_device = NULL;
-
     real_t* mass_vector = NULL;
-    real_t* g_device = NULL;
+    real_t* g_device    = NULL;
 
     int size_data = n[0] * n[1] * n[2];
     cudaMalloc(&data_device, size_data * sizeof(real_t));
@@ -1841,18 +1742,11 @@ hex8_to_tet10_resample_field_local_CUDA(           //
     copy_xyz_tet10_device(nnodes, &xyz_device, (const float**)xyz);
 
     // Number of threads
-    const ptrdiff_t warp_per_block = 8;
+    const ptrdiff_t warp_per_block  = 8;
     const ptrdiff_t threadsPerBlock = warp_per_block * __WARP_SIZE__;
 
     // Number of blocks
     const ptrdiff_t numBlocks = (nelements / warp_per_block) + (nelements % warp_per_block) + 1;
-
-    // real_t* weighted_field_device = NULL;
-    // cudaError_t errwf = cudaMalloc(&weighted_field_device, nnodes * sizeof(real_t));
-    // if (errwf != cudaSuccess) {
-    //     printf("Error allocating device memory for weighted_field_device: %s\n",
-    //            cudaGetErrorString(errwf));
-    // }
 
     cudaMalloc(&mass_vector, nnodes * sizeof(real_t));
     cudaMalloc(&g_device, nnodes * sizeof(real_t));
@@ -1864,13 +1758,13 @@ hex8_to_tet10_resample_field_local_CUDA(           //
 #endif
 
     printf("============================================================================\n");
+    printf("GPU:    Host Memory Model [Default] \n");
     printf("GPU:    Launching the kernel %s \n", kernel_name);
     printf("GPU:    Number of blocks:            %ld\n", numBlocks);
     printf("GPU:    Number of threads per block: %ld\n", threadsPerBlock);
     printf("GPU:    Total number of threads:     %ld\n", (numBlocks * threadsPerBlock));
     printf("GPU:    Number of elements:          %ld\n", nelements);
-    printf("GPU:    Use WENO:                    %s\n",
-           (WENO_CUDA == 1 & CUBE1 == 1) ? "Yes" : "No");
+    printf("GPU:    Use WENO:                    %s\n", (WENO_CUDA == 1 & CUBE1 == 1) ? "Yes" : "No");
     printf("============================================================================\n");
 
     cudaDeviceSynchronize();
@@ -1898,20 +1792,6 @@ hex8_to_tet10_resample_field_local_CUDA(           //
                                                            mass_vector,
                                                            g_device);
 
-    // get cuda error
-    cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-#if CUBE1 == 1  // WENO ..
-        printf("!!!!!! Error in hex8_to_isoparametric_tet10_resample_field_local_cube1_CUDA: %s\n",
-               cudaGetErrorString(err));
-#else
-        printf("!!!!!! Error in hex8_to_tet10_resample_field_local_CUDA: %s\n",
-               cudaGetErrorString(err));
-#endif
-        printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-    }
-
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
 
@@ -1933,11 +1813,11 @@ hex8_to_tet10_resample_field_local_CUDA(           //
 
     {
         cudaError_t errdd = cudaFree(data_device);
-        if (errdd != cudaSuccess)
-            printf("Error freeing device memory for data_device: %s\n", cudaGetErrorString(errdd));
+        if (errdd != cudaSuccess) printf("Error freeing device memory for data_device: %s\n", cudaGetErrorString(errdd));
     }
 
-    free_elems_tet10_device(elems_device);
+    free_elems_tet10_device(&elems_device);
+    free_xyz_tet10_device(&xyz_device);
 
     cudaMemcpy(g_host,                   //
                g_device,                 //
