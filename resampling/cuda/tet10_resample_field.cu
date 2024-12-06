@@ -1709,6 +1709,7 @@ hex8_to_tet10_resample_field_local_CUDA(                              //
                                                // geom_t** const SFEM_RESTRICT xyz
 
 #if SFEM_CUDA_MEMORY_MODEL == CUDA_UNIFIED_MEMORY
+#pragma message "CUDA_UNIFIED_MEMORY is enabled"
     return hex8_to_tet10_resample_field_local_CUDA_unified(nelements,  //
                                                            nnodes,
                                                            bool_assemble_dual_mass_vector,
@@ -1721,7 +1722,8 @@ hex8_to_tet10_resample_field_local_CUDA(                              //
                                                            data,
                                                            g_host);
 #elif SFEM_CUDA_MEMORY_MODEL == CUDA_MEMORY_MANAGED
-
+#pragma message "CUDA_MEMORY_MANAGED is enabled: Not implemented yet"
+    return -1;
 #endif
 
     PRINT_CURRENT_FUNCTION;

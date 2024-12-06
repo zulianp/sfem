@@ -44,11 +44,15 @@ if (${_index} EQUAL -1)
     set(SFEM_CUDA_MEMORY "host")
 endif()
 
+# define CUDA_UNIFIED_MEMORY 0
+# define CUDA_MANAGED_MEMORY 1
+# define CUDA_HOST_MEMORY 2
+
 if(SFEM_CUDA_MEMORY MATCHES "managed")
-    set(SFEM_CUDA_MEMORY_MODEL 0)
+    set(SFEM_CUDA_MEMORY_MODEL 1)
     
 elseif(SFEM_CUDA_MEMORY MATCHES "unified")
-    set(SFEM_CUDA_MEMORY_MODEL 1)
+    set(SFEM_CUDA_MEMORY_MODEL 0)
 
 else() ## default host
     set(SFEM_CUDA_MEMORY_MODEL 2)
