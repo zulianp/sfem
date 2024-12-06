@@ -103,7 +103,7 @@ def run(config):
 
 		upper_bound = np.ones(fs.n_dofs(), dtype=real_t) * 1000
 		sfem.gradient_for_mesh_viz(cc, x, upper_bound)
-		print(np.min(upper_bound))
+		# print(np.min(upper_bound))
 
 		sfem.set_upper_bound(spmg, upper_bound)
 		
