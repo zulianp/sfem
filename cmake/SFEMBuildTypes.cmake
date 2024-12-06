@@ -25,7 +25,40 @@ if(NOT SFEM_CUDA_ARCH)
     set(SFEM_CUDA_ARCH 60 CACHE STRING "Choose the CUDA device capabilities." FORCE)
 endif()
 
-set(ARM64_VECTOR_BITS 128) ## Default value for ARM64 (at the moment)
+option(SFEM_CUDA_MEMORY "Use CUDA memory model" OFF) ## default OFF is the host memory model
+
+# set a list 
+set (SFEM_ALLOWED_MEMORY_MODELS "host" "managed" "unified")
+
+if (NOT SFEM_CUDA_MEMORY)
+    set(SFEM_CUDA_MEMORY "host")
+endif()
+
+# check if the value is in the list
+list(FIND SFEM_ALLOWED_MEMORY_MODELS "${SFEM_CUDA_MEMORY}" _index)
+if (${_index} EQUAL -1)
+    message(WARNING "SFEM_CUDA_MEMORY must be one of the following values: ${SFEM_ALLOWED_MEMORY_MODELS}")
+    message(WARNING "Setting SFEM_CUDA_MEMORY to host")
+    set(SFEM_CUDA_MEMORY "host")
+endif()
+
+# define CUDA_UNIFIED_MEMORY 0
+# define CUDA_MANAGED_MEMORY 1
+# define CUDA_HOST_MEMORY 2
+
+if(SFEM_CUDA_MEMORY MATCHES "managed")
+    set(SFEM_CUDA_MEMORY_MODEL 1)
+    
+elseif(SFEM_CUDA_MEMORY MATCHES "unified")
+    set(SFEM_CUDA_MEMORY_MODEL 0)
+
+else() ## default host
+    set(SFEM_CUDA_MEMORY_MODEL 2)
+endif()
+
+message(STATUS "SFEM_CUDA_MEMORY: ${SFEM_CUDA_MEMORY}")
+
+set(ARM64_VECTOR_BITS scalable) ## Default value for ARM64 (at the moment)
 
 ## TODO:
 ## Verify if the aarm64 option -msve-vector-bits is supported also by the Apple Silicon M CPU

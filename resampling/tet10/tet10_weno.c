@@ -3,19 +3,19 @@
 #include "tet10_weno.h"
 #include "sfem_base.h"
 
-// double Power(const double x, const double y) { return exp(y * log(x)); }
-static SFEM_INLINE double Power(const double x, const double y) { return pow(x, y); }
+// real_t Power(const real_t x, const real_t y) { return exp(y * log(x)); }
+static SFEM_INLINE real_t Power(const real_t x, const real_t y) { return pow(x, y); }
 
-static SFEM_INLINE double Power2(const double x) { return x * x; }
+static SFEM_INLINE real_t Power2(const real_t x) { return x * x; }
 
-// double Power1p5(const double x) { return exp(1.5 * log(x)); }
-static SFEM_INLINE double Power1p5(const double x) { return x * sqrt(x); }
+// real_t Power1p5(const real_t x) { return exp(1.5 * log(x)); }
+static SFEM_INLINE real_t Power1p5(const real_t x) { return x * sqrt(x); }
 
-static SFEM_INLINE double Power_m1p5(const double x) { return 1.0 / (x * sqrt(x)); }
+static SFEM_INLINE real_t Power_m1p5(const real_t x) { return 1.0 / (x * sqrt(x)); }
 
-void LagrangePolyArrayConstH(const double x, const double h,  //
-                             double *lagrange_poly_0,
-                             double *lagrange_poly_1) {  //
+void LagrangePolyArrayConstH(const real_t x, const real_t h,  //
+                             real_t *lagrange_poly_0,
+                             real_t *lagrange_poly_1) {  //
 
     List3(lagrange_poly_0,                               //
           ((-2 * h + x) * (-h + x)) / (2. * Power2(h)),  //
@@ -36,7 +36,7 @@ void LagrangePolyArrayConstH(const double x, const double h,  //
  * @param h : grid spacing
  * @param linear_weights : array to store the linear weights of size 2
  */
-void getLinearWeightsConstH(const double x, const double h, double *linear_weights) {
+void getLinearWeightsConstH(const real_t x, const real_t h, real_t *linear_weights) {
     //
     linear_weights[0] = (3 * h - x) / (3. * h);
     linear_weights[1] = x / (3. * h);
@@ -54,18 +54,18 @@ void getLinearWeightsConstH(const double x, const double h, double *linear_weigh
  * @param non_linear_weights
  * @param eps
  */
-void getNonLinearWeightsConstH(const double x, const double h,    //
-                               const double y0, const double y1,  //
-                               const double y2, const double y3,  //
-                               double *non_linear_weights,        //
-                               const double eps) {                //
+void getNonLinearWeightsConstH(const real_t x, const real_t h,    //
+                               const real_t y0, const real_t y1,  //
+                               const real_t y2, const real_t y3,  //
+                               real_t *non_linear_weights,        //
+                               const real_t eps) {                //
 
-    double alpha[2];
+    real_t alpha[2];
 
-    const double inv_h = 1. / h;
+    const real_t inv_h = 1. / h;
 
-    const double a = -3. * y0 + 7. * y1 - 5. * y2 + y3;
-    const double b = y0 - 6. * (1. + h) * y1 + 3. * y2 + 2. * y3;
+    const real_t a = -3. * y0 + 7. * y1 - 5. * y2 + y3;
+    const real_t b = y0 - 6. * (1. + h) * y1 + 3. * y2 + 2. * y3;
 
     List2(alpha,
           // alpha[0]
@@ -85,51 +85,51 @@ void getNonLinearWeightsConstH(const double x, const double h,    //
                                                      )                // end of Power2
                                 )));
 
-    double den = alpha[0] + alpha[1];
+    real_t den = alpha[0] + alpha[1];
 
     non_linear_weights[0] = alpha[0] / den;
     non_linear_weights[1] = alpha[1] / den;
 }
 
-double weno4ConstH(const double x, const double h,                                        //
-                   const double y0, const double y1, const double y2, const double y3) {  //
-    const double eps = 1e-6;
+real_t weno4ConstH(const real_t x, const real_t h,                                        //
+                   const real_t y0, const real_t y1, const real_t y2, const real_t y3) {  //
+    const real_t eps = 1e-6;
 
-    double lagrange_poly_0[3];
-    double lagrange_poly_1[3];
-    double non_linear_weights[2];
+    real_t lagrange_poly_0[3];
+    real_t lagrange_poly_1[3];
+    real_t non_linear_weights[2];
 
     LagrangePolyArrayConstH(x, h, lagrange_poly_0, lagrange_poly_1);
 
     getNonLinearWeightsConstH(x, h, y0, y1, y2, y3, non_linear_weights, eps);
 
-    const double weno4_a =
+    const real_t weno4_a =
             (lagrange_poly_0[0] * y0 + lagrange_poly_0[1] * y1 + lagrange_poly_0[2] * y2) *
             non_linear_weights[0];
 
-    const double weno4_b =
+    const real_t weno4_b =
             (lagrange_poly_1[0] * y1 + lagrange_poly_1[1] * y2 + lagrange_poly_1[2] * y3) *
             non_linear_weights[1];
 
     return weno4_a + weno4_b;
 }
 
-double weno4_2D_ConstH(const double x, const double y, const double h,                          //
+real_t weno4_2D_ConstH(const real_t x, const real_t y, const real_t h,                          //
                                                                                                 //
-                       const double y00, const double y10, const double y20, const double y30,  //
+                       const real_t y00, const real_t y10, const real_t y20, const real_t y30,  //
                        //
-                       const double y01, const double y11, const double y21, const double y31,  //
+                       const real_t y01, const real_t y11, const real_t y21, const real_t y31,  //
                        //
-                       const double y02, const double y12, const double y22, const double y32,  //
+                       const real_t y02, const real_t y12, const real_t y22, const real_t y32,  //
                        //
-                       const double y03, const double y13, const double y23, const double y33) {  //
+                       const real_t y03, const real_t y13, const real_t y23, const real_t y33) {  //
                                                                                                   //
-    double yw0 = weno4ConstH(x, h, y00, y10, y20, y30);
-    double yw1 = weno4ConstH(x, h, y01, y11, y21, y31);
-    double yw2 = weno4ConstH(x, h, y02, y12, y22, y32);
-    double yw3 = weno4ConstH(x, h, y03, y13, y23, y33);
+    real_t yw0 = weno4ConstH(x, h, y00, y10, y20, y30);
+    real_t yw1 = weno4ConstH(x, h, y01, y11, y21, y31);
+    real_t yw2 = weno4ConstH(x, h, y02, y12, y22, y32);
+    real_t yw3 = weno4ConstH(x, h, y03, y13, y23, y33);
 
-    double yw = weno4ConstH(y, h, yw0, yw1, yw2, yw3);
+    real_t yw = weno4ConstH(y, h, yw0, yw1, yw2, yw3);
 
     return yw;
 }
@@ -144,15 +144,15 @@ double weno4_2D_ConstH(const double x, const double y, const double h,          
  * @param f
  * @param stride_y
  * @param stride_z
- * @return double
+ * @return real_t
  */
-double weno4_3D_ConstH(const double x, const double y, const double z,  //
-                       const double h, const double *f,                 //
+real_t weno4_3D_ConstH(const real_t x, const real_t y, const real_t z,  //
+                       const real_t h, const real_t *f,                 //
                        const int stride_x,                              //
                        const int stride_y,                              //
                        const int stride_z) {                            //
 
-    double w1 = weno4_2D_ConstH(x,
+    real_t w1 = weno4_2D_ConstH(x,
                                 y,
                                 h,  //
                                 f[0 * stride_x + 0 * stride_y + 0 * stride_z],
@@ -175,7 +175,7 @@ double weno4_3D_ConstH(const double x, const double y, const double z,  //
                                 f[2 * stride_x + 3 * stride_y + 0 * stride_z],
                                 f[3 * stride_x + 3 * stride_y + 0 * stride_z]);
 
-    double w2 = weno4_2D_ConstH(x,
+    real_t w2 = weno4_2D_ConstH(x,
                                 y,
                                 h,  //
                                 f[0 * stride_x + 0 * stride_y + 1 * stride_z],
@@ -198,7 +198,7 @@ double weno4_3D_ConstH(const double x, const double y, const double z,  //
                                 f[2 * stride_x + 3 * stride_y + 1 * stride_z],
                                 f[3 * stride_x + 3 * stride_y + 1 * stride_z]);
 
-    double w3 = weno4_2D_ConstH(x,
+    real_t w3 = weno4_2D_ConstH(x,
                                 y,
                                 h,  //
                                 f[0 * stride_x + 0 * stride_y + 2 * stride_z],
@@ -221,7 +221,7 @@ double weno4_3D_ConstH(const double x, const double y, const double z,  //
                                 f[2 * stride_x + 3 * stride_y + 2 * stride_z],
                                 f[3 * stride_x + 3 * stride_y + 2 * stride_z]);
 
-    double w4 = weno4_2D_ConstH(x,
+    real_t w4 = weno4_2D_ConstH(x,
                                 y,
                                 h,  //
                                 f[0 * stride_x + 0 * stride_y + 3 * stride_z],
@@ -244,7 +244,7 @@ double weno4_3D_ConstH(const double x, const double y, const double z,  //
                                 f[2 * stride_x + 3 * stride_y + 3 * stride_z],
                                 f[3 * stride_x + 3 * stride_y + 3 * stride_z]);
 
-    double wz = weno4ConstH(z, h, w1, w2, w3, w4);
+    real_t wz = weno4ConstH(z, h, w1, w2, w3, w4);
 
     return wz;
 }
@@ -262,13 +262,13 @@ double weno4_3D_ConstH(const double x, const double y, const double z,  //
  * @param lagrange_poly_0
  * @param lagrange_poly_1
  */
-void LagrangePolyArrayHOne(const double x,             //
-                           double *lagrange_poly_0,    //
-                           double *lagrange_poly_1) {  //
+void LagrangePolyArrayHOne(const real_t x,             //
+                           real_t *lagrange_poly_0,    //
+                           real_t *lagrange_poly_1) {  //
 
-    // const double h = 1.0;
+    // const real_t h = 1.0;
 
-    const double xx = Power2(x);
+    const real_t xx = Power2(x);
 
     List3(lagrange_poly_0,  //
           (2.0 - 3.0 * x + xx) / 2.,
@@ -294,17 +294,17 @@ void LagrangePolyArrayHOne(const double x,             //
  * @param non_linear_weights
  * @param eps
  */
-void getNonLinearWeightsHOne(const double x,                    //
-                             const double y0, const double y1,  //
-                             const double y2, const double y3,  //
-                             double *non_linear_weights,        //
-                             const double eps) {                //
+void getNonLinearWeightsHOne(const real_t x,                    //
+                             const real_t y0, const real_t y1,  //
+                             const real_t y2, const real_t y3,  //
+                             real_t *non_linear_weights,        //
+                             const real_t eps) {                //
 
-    double alpha[2];
-    // const double h = 1.0;
+    real_t alpha[2];
+    // const real_t h = 1.0;
 
-    const double a = Abs(3. * y0 - 7. * y1 + 5. * y2 - 1. * y3);
-    const double b = Power2(-3. * (a) + Abs(y0 - 12. * y1 + 3. * y2 + 2. * y3));
+    const real_t a = Abs(3. * y0 - 7. * y1 + 5. * y2 - 1. * y3);
+    const real_t b = Power2(-3. * (a) + Abs(y0 - 12. * y1 + 3. * y2 + 2. * y3));
 
     List2(alpha,
           //
@@ -319,7 +319,7 @@ void getNonLinearWeightsHOne(const double x,                    //
           //
     );
 
-    double den = alpha[0] + alpha[1];
+    real_t den = alpha[0] + alpha[1];
 
     // printf("alpha[0]=%f, alpha[1]=%f, den=%f\n", alpha[0], alpha[1], den);
 
@@ -335,28 +335,28 @@ void getNonLinearWeightsHOne(const double x,                    //
  * @param y1
  * @param y2
  * @param y3
- * @return double
+ * @return real_t
  */
-double weno4_HOne(const double x,                      //
-                  const double y0, const double y1,    //
-                  const double y2, const double y3) {  //
+real_t weno4_HOne(const real_t x,                      //
+                  const real_t y0, const real_t y1,    //
+                  const real_t y2, const real_t y3) {  //
 
-    const double eps = 1e-6;
+    const real_t eps = 1e-6;
 
-    double lagrange_poly_0[3];
-    double lagrange_poly_1[3];
-    double non_linear_weights[2];
+    real_t lagrange_poly_0[3];
+    real_t lagrange_poly_1[3];
+    real_t non_linear_weights[2];
 
     LagrangePolyArrayHOne(x, lagrange_poly_0, lagrange_poly_1);
 
     getNonLinearWeightsHOne(x, y0, y1, y2, y3, non_linear_weights, eps);
     // getNonLinearWeightsConstH(x, 1.0, y0, y1, y2, y3, non_linear_weights, eps);
 
-    const double weno4_a =
+    const real_t weno4_a =
             (lagrange_poly_0[0] * y0 + lagrange_poly_0[1] * y1 + lagrange_poly_0[2] * y2) *
             non_linear_weights[0];
 
-    const double weno4_b =
+    const real_t weno4_b =
             (lagrange_poly_1[0] * y1 + lagrange_poly_1[1] * y2 + lagrange_poly_1[2] * y3) *
             non_linear_weights[1];
 
@@ -384,24 +384,24 @@ double weno4_HOne(const double x,                      //
  * @param y13
  * @param y23
  * @param y33
- * @return double
+ * @return real_t
  */
-double weno4_2D_HOne(const double x, const double y,                                          //
+real_t weno4_2D_HOne(const real_t x, const real_t y,                                          //
                                                                                               //
-                     const double y00, const double y10, const double y20, const double y30,  //
+                     const real_t y00, const real_t y10, const real_t y20, const real_t y30,  //
                      //
-                     const double y01, const double y11, const double y21, const double y31,  //
+                     const real_t y01, const real_t y11, const real_t y21, const real_t y31,  //
                      //
-                     const double y02, const double y12, const double y22, const double y32,  //
+                     const real_t y02, const real_t y12, const real_t y22, const real_t y32,  //
                      //
-                     const double y03, const double y13, const double y23, const double y33) {  //
+                     const real_t y03, const real_t y13, const real_t y23, const real_t y33) {  //
 
-    double yw0 = weno4_HOne(x, y00, y10, y20, y30);
-    double yw1 = weno4_HOne(x, y01, y11, y21, y31);
-    double yw2 = weno4_HOne(x, y02, y12, y22, y32);
-    double yw3 = weno4_HOne(x, y03, y13, y23, y33);
+    real_t yw0 = weno4_HOne(x, y00, y10, y20, y30);
+    real_t yw1 = weno4_HOne(x, y01, y11, y21, y31);
+    real_t yw2 = weno4_HOne(x, y02, y12, y22, y32);
+    real_t yw3 = weno4_HOne(x, y03, y13, y23, y33);
 
-    double yw = weno4_HOne(y, yw0, yw1, yw2, yw3);
+    real_t yw = weno4_HOne(y, yw0, yw1, yw2, yw3);
 
     return yw;
 }
@@ -416,15 +416,15 @@ double weno4_2D_HOne(const double x, const double y,                            
  * @param stride_x
  * @param stride_y
  * @param stride_z
- * @return double
+ * @return real_t
  */
-double weno4_3D_HOne(const double x, const double y, const double z,  //
-                     const double *f,                                 //
+real_t weno4_3D_HOne(const real_t x, const real_t y, const real_t z,  //
+                     const real_t *f,                                 //
                      const int stride_x,                              //
                      const int stride_y,                              //
                      const int stride_z) {                            //
 
-    double w1 = weno4_2D_HOne(x,
+    real_t w1 = weno4_2D_HOne(x,
                               y,  //
                               f[0 * stride_x + 0 * stride_y + 0 * stride_z],
                               f[1 * stride_x + 0 * stride_y + 0 * stride_z],
@@ -446,7 +446,7 @@ double weno4_3D_HOne(const double x, const double y, const double z,  //
                               f[2 * stride_x + 3 * stride_y + 0 * stride_z],
                               f[3 * stride_x + 3 * stride_y + 0 * stride_z]);
 
-    double w2 = weno4_2D_HOne(x,
+    real_t w2 = weno4_2D_HOne(x,
                               y,  //
                               f[0 * stride_x + 0 * stride_y + 1 * stride_z],
                               f[1 * stride_x + 0 * stride_y + 1 * stride_z],
@@ -468,7 +468,7 @@ double weno4_3D_HOne(const double x, const double y, const double z,  //
                               f[2 * stride_x + 3 * stride_y + 1 * stride_z],
                               f[3 * stride_x + 3 * stride_y + 1 * stride_z]);
 
-    double w3 = weno4_2D_HOne(x,
+    real_t w3 = weno4_2D_HOne(x,
                               y,  //
                               f[0 * stride_x + 0 * stride_y + 2 * stride_z],
                               f[1 * stride_x + 0 * stride_y + 2 * stride_z],
@@ -490,7 +490,7 @@ double weno4_3D_HOne(const double x, const double y, const double z,  //
                               f[2 * stride_x + 3 * stride_y + 2 * stride_z],
                               f[3 * stride_x + 3 * stride_y + 2 * stride_z]);
 
-    double w4 = weno4_2D_HOne(x,
+    real_t w4 = weno4_2D_HOne(x,
                               y,  //
                               f[0 * stride_x + 0 * stride_y + 3 * stride_z],
                               f[1 * stride_x + 0 * stride_y + 3 * stride_z],
@@ -512,7 +512,7 @@ double weno4_3D_HOne(const double x, const double y, const double z,  //
                               f[2 * stride_x + 3 * stride_y + 3 * stride_z],
                               f[3 * stride_x + 3 * stride_y + 3 * stride_z]);
 
-    double wz = weno4_HOne(z, w1, w2, w3, w4);
+    real_t wz = weno4_HOne(z, w1, w2, w3, w4);
 
     return wz;
 }
