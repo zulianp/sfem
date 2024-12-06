@@ -104,6 +104,43 @@ namespace sfem {
                     n, blas.allocate(n), blas.destroy, (enum MemorySpace)execution_space());
         }
 
+        // void plot_debug(T*const x) {
+            // static int count_exp = 0;
+            // if (norm_pen > 1e-16) {
+            //     auto buff = make_buffer(r_pen->size() / 3);
+            //     for (ptrdiff_t i = 0; i < r_pen->size() / 3; i++) {
+            //         buff->data()[i] = r_pen->data()[i * 3];
+            //     }
+
+            //     std::string path =
+            //             "output/pen_" + std::to_string(count_exp) + ".raw";
+            //     array_write(MPI_COMM_SELF,
+            //                 path.c_str(),
+            //                 SFEM_MPI_REAL_T,
+            //                 buff->data(),
+            //                 buff->size(),
+            //                 buff->size());
+
+            //     for (int d = 0; d < 3; d++) {
+            //         for (ptrdiff_t i = 0; i < r_pen->size() / 3; i++) {
+            //             buff->data()[i] = x[i * 3 + d];
+            //         }
+
+            //         std::string path = "output/dbg_disp_" +
+            //                            std::to_string(count_exp) + "." +
+            //                            std::to_string(d) + ".raw";
+            //         array_write(MPI_COMM_SELF,
+            //                     path.c_str(),
+            //                     SFEM_MPI_REAL_T,
+            //                     buff->data(),
+            //                     buff->size(),
+            //                     buff->size());
+            //     }
+            // }
+
+            // count_exp++;
+        // }
+
         int apply(const T* const b, T* const x) override {
             assert(good());
             if (!good()) {
@@ -334,9 +371,13 @@ namespace sfem {
             return converged ? SFEM_SUCCESS : SFEM_FAILURE;
         }
 
-        T line_search(const T* const x, const T* const b, const T* const c, const T* const lb,
-                      const T* const ub, const T* const lagr_lb, const T* const lagr_ub) {
-
+        T line_search(const T* const x,
+                      const T* const b,
+                      const T* const c,
+                      const T* const lb,
+                      const T* const ub,
+                      const T* const lagr_lb,
+                      const T* const lagr_ub) {
             auto temp = make_buffer(n_dofs);
             apply_op->apply(x, temp->data());
 
@@ -346,15 +387,18 @@ namespace sfem {
             T alpha = 2;
             T energy = 0;
 
-
             SFEM_ERROR("IMPLEMENT ME!\n");
             return -1;
         }
 
-
-        void monitor(const int iter, const int count_inner_iter, const int count_linear_solver_iter,
-                     const int count_lagr_mult_updates, const T norm_pen, const T norm_rpen,
-                     const T penetration_tol, const T penalty_param) {
+        void monitor(const int iter,
+                     const int count_inner_iter,
+                     const int count_linear_solver_iter,
+                     const int count_lagr_mult_updates,
+                     const T norm_pen,
+                     const T norm_rpen,
+                     const T penetration_tol,
+                     const T penalty_param) {
             if (iter == max_it || iter % check_each == 0 || (norm_pen < atol && norm_rpen < atol)) {
                 printf("%d|%d|%d) [lagr++ %d] norm_pen %e, norm_rpen %e, penetration_tol %e, "
                        "penalty_param "
