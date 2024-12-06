@@ -14,6 +14,9 @@
 
 #include "sfem_resample_gap.h"
 
+
+#include "sfem_API.hpp"
+
 #include <glob.h>
 #include <vector>
 
@@ -286,6 +289,8 @@ namespace sfem {
         std::shared_ptr<Buffer<real_t>> gap_ynormal;
         std::shared_ptr<Buffer<real_t>> gap_znormal;
 
+        std::shared_ptr<Buffer<real_t>> mass_vector;
+
         ~Impl() {}
 
         void update_displaced_points(const real_t *disp) {
@@ -303,6 +308,52 @@ namespace sfem {
                     x_s[i] = x[idx[i]] + disp[idx[i] * dim + d];
                 }
             }
+        }
+
+        void collect_points() {
+            auto mesh = space->mesh_ptr();
+            const ptrdiff_t n = node_mapping->size();
+            const idx_t *const idx = node_mapping->data();
+            const int dim = mesh->spatial_dimension();
+
+            for (int d = 0; d < dim; d++) {
+                const geom_t *const x = mesh->points(d);
+                geom_t *const x_s = surface_points->data()[d];
+
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    x_s[i] = x[idx[i]];
+                }
+            }
+        }
+
+        void assemble_mass_vector() {
+            collect_points();
+
+            auto surface_mesh = std::make_shared<Mesh>(space->mesh_ptr()->spatial_dimension(),
+                                               shell_type(side_type(space->element_type())),
+                                               sides->extent(1),
+                                               sides->data(),
+                                               surface_points->extent(1),
+                                               surface_points->data(),
+                                               [](const void *) {});
+
+            auto trace_space = std::make_shared<FunctionSpace>(surface_mesh, 1);
+            auto bop = sfem::Factory::create_op(trace_space, "Mass");
+
+            auto ones = h_buffer<real_t>(trace_space->n_dofs());
+            mass_vector = h_buffer<real_t>(trace_space->n_dofs());
+            sfem::blas<real_t>(EXECUTION_SPACE_HOST)->values(trace_space->n_dofs(), 1, ones->data());
+            bop->apply(nullptr, ones->data(), mass_vector->data());
+
+            auto m = mass_vector->data();
+
+            real_t area = 0;
+            for(ptrdiff_t i = 0; i < mass_vector->size(); i++) {
+                area += m[i];
+            }
+
+            printf("AREA: %g\n", (double)area);
         }
     };
 
@@ -472,6 +523,7 @@ namespace sfem {
         cc->impl_->gap_ynormal = h_buffer<real_t>(cc->n_constrained_dofs());
         cc->impl_->gap_znormal = h_buffer<real_t>(cc->n_constrained_dofs());
 
+        cc->impl_->assemble_mass_vector();
         return cc;
     }
 
@@ -556,10 +608,11 @@ namespace sfem {
         const real_t *const normals[3] = {
                 impl_->gap_xnormal->data(), impl_->gap_ynormal->data(), impl_->gap_znormal->data()};
 
+        auto m = impl_->mass_vector->data();
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n; ++i) {
             for (int d = 0; d < dim; d++) {
-                out[idx[i] * dim + d] += f[i] * normals[d][i];
+                out[idx[i] * dim + d] += f[i] * normals[d][i] * m[i];
             }
         }
 

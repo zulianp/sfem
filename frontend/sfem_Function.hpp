@@ -63,7 +63,8 @@ namespace sfem {
              ptrdiff_t nelements,
              idx_t **elements,
              ptrdiff_t nnodes,
-             geom_t **points);
+             geom_t **points,
+             std::function<void(void *)> destroy = nullptr);
 
         friend class FunctionSpace;
         friend class Op;

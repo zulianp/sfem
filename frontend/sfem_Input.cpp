@@ -8,6 +8,7 @@
 #include <iostream>
 #include <map>
 #include <sstream>
+#include <cassert>
 
 #include <mpi.h>
 
