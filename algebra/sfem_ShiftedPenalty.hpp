@@ -184,6 +184,7 @@ namespace sfem {
                 for (int inner_iter = 0; inner_iter < max_inner_it;
                      inner_iter++, count_inner_iter++) {
                     if (constraints_op_) {
+                        if (debug) printf("Residual\n");
                         // Use r_pen as temp buffer
                         blas.zeros(n_constrained_dofs, r_pen->data());
                         constraints_op_->apply(x, r_pen->data());
@@ -208,6 +209,7 @@ namespace sfem {
                         apply_op->apply(x, r_pen->data());
                         blas.axpby(n_dofs, 1, b, -1, r_pen->data());
 
+                        if (debug) printf("Convergence\n");
                         constraints_op_transpose_->apply(c->data(), r_pen->data());
 
                         if (debug) {
@@ -253,6 +255,7 @@ namespace sfem {
                             // Use J_pen as temp buffer
                             blas.zeros(n_constrained_dofs, J_pen->data());
 
+                            if (debug) printf("Jacobian\n");
                             // TODO: check if it is worth storing this as we are computing it twice?
                             constraints_op_->apply(x, J_pen->data());
 
@@ -269,6 +272,12 @@ namespace sfem {
 
                             blas.zeros(n_dofs, J_pen->data());
                             constraints_op_transpose_->apply(c->data(), J_pen->data());
+
+// FIXME (for non axis aligned contact we need a block diagonal matrix)
+#pragma omp parallel for
+                            for (ptrdiff_t i = 0; i < n_dofs; i++) {
+                                J_pen->data()[i] = std::abs(J_pen->data()[i]);
+                            }
 
                         } else {
                             blas.zeros(n_dofs, J_pen->data());
@@ -345,7 +354,7 @@ namespace sfem {
 
                 } else {
                     penalty_param_ = std::min(penalty_param_ * 10, max_penalty_param_);
-                    penetration_tol = 1 / pow(penalty_param_, 0.1);
+                    penetration_tol = std::max(1e-20, 1 / pow(penalty_param_, 0.1));
                     omega = 1 / penalty_param_;
                 }
 
