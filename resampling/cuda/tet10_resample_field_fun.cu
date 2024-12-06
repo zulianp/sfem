@@ -29,7 +29,7 @@ void copy_xyz_tet10_device(const ptrdiff_t   nnodes,  //
     cudaError_t err2 = cudaMemcpy(xyz->z, xyz_host[2], nnodes * sizeof(float), cudaMemcpyHostToDevice);
 
     if (err0 != cudaSuccess || err1 != cudaSuccess || err2 != cudaSuccess) {
-        printf("Error copying xyz_tet10_device to device: %s\n", cudaGetErrorString(err0));
+        printf("ERROR: copying xyz_tet10_device to device: %s\n", cudaGetErrorString(err0));
         // Handle the error or exit the program
     }
 }  // end copy_xyz_tet10_device
@@ -83,7 +83,7 @@ memory_hint_xyz_tet10_device_unified(const ptrdiff_t nnodes, xyz_tet10_device* x
     cudaError_t err2 = cudaMemAdvise(xyz->z, nnodes * sizeof(float), cudaMemAdviseSetReadMostly, 0);
 
     if (err0 != cudaSuccess || err1 != cudaSuccess || err2 != cudaSuccess) {
-        printf("Error setting memory hint for xyz_tet10_device: %s at %s:%d\n", cudaGetErrorString(err0), __FILE__, __LINE__);
+        printf("ERROR: setting memory hint for xyz_tet10_device: %s at %s:%d\n", cudaGetErrorString(err0), __FILE__, __LINE__);
         // Handle the error or exit the program
     }
 
@@ -93,7 +93,7 @@ memory_hint_xyz_tet10_device_unified(const ptrdiff_t nnodes, xyz_tet10_device* x
     cudaError_t err5 = cudaMemPrefetchAsync(xyz->z, nnodes * sizeof(float), 0, 0);
 
     if (err3 != cudaSuccess || err4 != cudaSuccess || err5 != cudaSuccess) {
-        printf("Error prefetching data for xyz_tet10_device: %s at %s:%d\n", cudaGetErrorString(err3), __FILE__, __LINE__);
+        printf("ERROR: prefetching data for xyz_tet10_device: %s at %s:%d\n", cudaGetErrorString(err3), __FILE__, __LINE__);
         // Handle the error or exit the program
     }
 }
@@ -127,7 +127,7 @@ elems_tet10_device make_elems_tet10_device(const ptrdiff_t nelements) {
 
     if (err0 != cudaSuccess || err1 != cudaSuccess || err2 != cudaSuccess || err3 != cudaSuccess || err4 != cudaSuccess ||
         err5 != cudaSuccess || err6 != cudaSuccess || err7 != cudaSuccess || err8 != cudaSuccess || err9 != cudaSuccess) {
-        printf("Error allocating memory for elems_tet10_device\n");
+        printf("ERROR: allocating memory for elems_tet10_device\n");
         // Handle error
     }
 
@@ -153,7 +153,7 @@ cudaError_t copy_elems_tet10_device(const ptrdiff_t     nelements,  //
 
     if (err0 != cudaSuccess || err1 != cudaSuccess || err2 != cudaSuccess || err3 != cudaSuccess || err4 != cudaSuccess ||
         err5 != cudaSuccess || err6 != cudaSuccess || err7 != cudaSuccess || err8 != cudaSuccess || err9 != cudaSuccess) {
-        printf("Error copying elements to device: %s\n", cudaGetErrorString(cudaGetLastError()));
+        printf("ERROR: copying elements to device: %s\n", cudaGetErrorString(cudaGetLastError()));
         return cudaGetLastError();
     }
 
@@ -177,7 +177,7 @@ void free_elems_tet10_device(elems_tet10_device* elems) {
 
     if (err0 != cudaSuccess || err1 != cudaSuccess || err2 != cudaSuccess || err3 != cudaSuccess || err4 != cudaSuccess ||
         err5 != cudaSuccess || err6 != cudaSuccess || err7 != cudaSuccess || err8 != cudaSuccess || err9 != cudaSuccess) {
-        printf("Error freeing device memory for elems: %s\n", cudaGetErrorString(cudaGetLastError()));
+        printf("ERROR: freeing device memory for elems: %s\n", cudaGetErrorString(cudaGetLastError()));
     }
 
     elems->elems_v0 = NULL;
@@ -240,6 +240,8 @@ copy_elems_tet10_device_unified(const ptrdiff_t     nelements,  //
     elems->elems_v7 = (int*)elems_host[7];
     elems->elems_v8 = (int*)elems_host[8];
     elems->elems_v9 = (int*)elems_host[9];
+
+    return cudaSuccess;
 }
 
 /**
@@ -287,7 +289,7 @@ memory_hint_elems_tet10_device_unified(ptrdiff_t nelements, elems_tet10_device* 
 
     if (err0 != cudaSuccess || err1 != cudaSuccess || err2 != cudaSuccess || err3 != cudaSuccess || err4 != cudaSuccess ||
         err5 != cudaSuccess || err6 != cudaSuccess || err7 != cudaSuccess || err8 != cudaSuccess || err9 != cudaSuccess) {
-        printf("Error setting memory hint for elems_tet10_device: %s at %s:%d\n", cudaGetErrorString(err0), __FILE__, __LINE__);
+        printf("ERROR: setting memory hint for elems_tet10_device: %s at %s:%d\n", cudaGetErrorString(err0), __FILE__, __LINE__);
         // Handle the error or exit the program
     }
 
@@ -305,7 +307,7 @@ memory_hint_elems_tet10_device_unified(ptrdiff_t nelements, elems_tet10_device* 
 
     if (err10 != cudaSuccess || err11 != cudaSuccess || err12 != cudaSuccess || err13 != cudaSuccess || err14 != cudaSuccess ||
         err15 != cudaSuccess || err16 != cudaSuccess || err17 != cudaSuccess || err18 != cudaSuccess || err19 != cudaSuccess) {
-        printf("Error prefetching data for elems_tet10_device: %s at %s:%d\n", cudaGetErrorString(err10), __FILE__, __LINE__);
+        printf("ERROR: prefetching data for elems_tet10_device: %s at %s:%d\n", cudaGetErrorString(err10), __FILE__, __LINE__);
         // Handle the error or exit the program
     }
 }
@@ -322,7 +324,7 @@ memory_hint_read_mostly(const ptrdiff_t array_size, const ptrdiff_t element_size
     cudaError_t err = cudaMemAdvise(ptr, array_size * element_size, cudaMemAdviseSetReadMostly, device_id);
 
     if (err != cudaSuccess) {
-        printf("Error setting memory hint for elems_tet10_device: %s at %s:%d\n", cudaGetErrorString(err), __FILE__, __LINE__);
+        printf("ERROR: setting memory hint for elems_tet10_device: %s at %s:%d\n", cudaGetErrorString(err), __FILE__, __LINE__);
         // Handle the error or exit the program
     }
 
@@ -330,7 +332,7 @@ memory_hint_read_mostly(const ptrdiff_t array_size, const ptrdiff_t element_size
     cudaError_t err2 = cudaMemPrefetchAsync(ptr, array_size * element_size, device_id);
 
     if (err2 != cudaSuccess) {
-        printf("Error prefetching data for elems_tet10_device: %s at %s:%d\n", cudaGetErrorString(err2), __FILE__, __LINE__);
+        printf("ERROR: prefetching data for elems_tet10_device: %s at %s:%d\n", cudaGetErrorString(err2), __FILE__, __LINE__);
         // Handle the error or exit the program
     }
 }
@@ -347,7 +349,7 @@ memory_hint_write_mostly(const ptrdiff_t array_size, const ptrdiff_t element_siz
     cudaError_t err = cudaMemAdvise(ptr, array_size * element_size, cudaMemAdviseSetAccessedBy, device_id);
 
     if (err != cudaSuccess) {
-        printf("Error setting memory hint for elems_tet10_device: %s at %s:%d\n", cudaGetErrorString(err), __FILE__, __LINE__);
+        printf("ERROR: setting memory hint for elems_tet10_device: %s at %s:%d\n", cudaGetErrorString(err), __FILE__, __LINE__);
         // Handle the error or exit the program
     }
 
@@ -355,7 +357,7 @@ memory_hint_write_mostly(const ptrdiff_t array_size, const ptrdiff_t element_siz
     cudaError_t err2 = cudaMemPrefetchAsync(ptr, array_size * element_size, device_id);
 
     if (err2 != cudaSuccess) {
-        printf("Error prefetching data for elems_tet10_device: %s at %s:%d\n", cudaGetErrorString(err2), __FILE__, __LINE__);
+        printf("ERROR: prefetching data for elems_tet10_device: %s at %s:%d\n", cudaGetErrorString(err2), __FILE__, __LINE__);
         // Handle the error or exit the program
     }
 }

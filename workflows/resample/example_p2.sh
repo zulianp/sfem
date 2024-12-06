@@ -28,7 +28,7 @@ search_string_in_args() {
     return 1
 }
 
-n_procs=1
+n_procs=4
 
 export USE_MPI=0
 export USE_MPI_GH200=0
@@ -138,7 +138,7 @@ then
 	LAUNCH="mpiexec -np $n_procs"
 elif [[ "$USE_MPI_NORMAL" == "1" ]]
 then
-	LAUNCH="srun -n $n_procs -p normal "
+	LAUNCH="srun -n $n_procs -p debug "
 elif [[ "$USE_MPI_GH200" == "1" ]]
 then
 	LAUNCH="srun -n $n_procs -p gh200 "
@@ -167,4 +167,4 @@ set -x
 time SFEM_INTERPOLATE=0 SFEM_READ_FP32=1 $LAUNCH  $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET10
 
 
-raw_to_db.py $resample_target out.vtk --point_data=$field --point_data_type=float32
+raw_to_db.py $resample_target out.vtk --point_data=$field --point_data_type=float64
