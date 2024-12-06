@@ -8,21 +8,34 @@
 #include "sfem_config.h"
 #endif
 
+
+// static int DEPTH_LEVEL = 0;
+
+// inline char* depth_call(int depth) {
+//     static char buffer[256];
+//     for (int i = 0; i < depth; i++) {
+//         buffer[i] = '.';
+//     }
+//     buffer[depth] = '\0';
+//     return buffer;
+// }
+
 #define PRINT_CURRENT_FUNCTION                                                  \
     printf("\033[32m\nEnter Function\033[0m: \033[33m%s\033[0m, file: %s:%d\n", \
            __FUNCTION__,                                                        \
            __FILE__,                                                            \
            __LINE__);
+
 #define RETURN_FROM_FUNCTION(__RET_VAL__)                                             \
     printf("\033[31m\nReturn from function\033[0m: \033[33m%s\033[0m, file: %s:%d\n", \
            __FUNCTION__,                                                              \
            __FILE__,                                                                  \
            __LINE__);                                                                 \
-    return (__RET_VAL__);
+    return __RET_VAL__;
 
 #define SFEM_READ_ENV(name, conversion) \
     do {                                \
-        char *var = getenv(#name);      \
+        char* var = getenv(#name);      \
         if (var) {                      \
             name = conversion(var);     \
         }                               \
