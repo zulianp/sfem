@@ -19,20 +19,20 @@ static void print_matrix(int r, int c, const accumulator_t *const m) {
     printf("-------------------\n");
 }
 
-int hex8_linear_elasticity_apply(const ptrdiff_t nelements,
-                                 const ptrdiff_t nnodes,
-                                 idx_t **const SFEM_RESTRICT elements,
+int hex8_linear_elasticity_apply(const ptrdiff_t              nelements,
+                                 const ptrdiff_t              nnodes,
+                                 idx_t **const SFEM_RESTRICT  elements,
                                  geom_t **const SFEM_RESTRICT points,
-                                 const real_t mu,
-                                 const real_t lambda,
-                                 const ptrdiff_t u_stride,
-                                 const real_t *const ux,
-                                 const real_t *const uy,
-                                 const real_t *const uz,
-                                 const ptrdiff_t out_stride,
-                                 real_t *const outx,
-                                 real_t *const outy,
-                                 real_t *const outz) {
+                                 const real_t                 mu,
+                                 const real_t                 lambda,
+                                 const ptrdiff_t              u_stride,
+                                 const real_t *const          ux,
+                                 const real_t *const          uy,
+                                 const real_t *const          uz,
+                                 const ptrdiff_t              out_stride,
+                                 real_t *const                outx,
+                                 real_t *const                outy,
+                                 real_t *const                outz) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
@@ -43,22 +43,22 @@ int hex8_linear_elasticity_apply(const ptrdiff_t nelements,
     SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
     // printf("SFEM_HEX8_QUADRATURE_ORDER = %d\n", SFEM_HEX8_QUADRATURE_ORDER);
 
-    int n_qp = line_q3_n;
-    const scalar_t *qx = line_q3_x;
-    const scalar_t *qw = line_q3_w;
+    int             n_qp = line_q3_n;
+    const scalar_t *qx   = line_q3_x;
+    const scalar_t *qw   = line_q3_w;
     if (SFEM_HEX8_QUADRATURE_ORDER == 1) {
         n_qp = line_q2_n;
-        qx = line_q2_x;
-        qw = line_q2_w;
+        qx   = line_q2_x;
+        qw   = line_q2_w;
     } else if (SFEM_HEX8_QUADRATURE_ORDER == 5) {
         n_qp = line_q6_n;
-        qx = line_q6_x;
-        qw = line_q6_w;
+        qx   = line_q6_x;
+        qw   = line_q6_w;
     }
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-        idx_t ev[8];
+        idx_t    ev[8];
         scalar_t element_ux[8];
         scalar_t element_uy[8];
         scalar_t element_uz[8];
@@ -80,9 +80,9 @@ int hex8_linear_elasticity_apply(const ptrdiff_t nelements,
 
         for (int v = 0; v < 8; ++v) {
             const ptrdiff_t idx = ev[v] * u_stride;
-            element_ux[v] = ux[idx];
-            element_uy[v] = uy[idx];
-            element_uz[v] = uz[idx];
+            element_ux[v]       = ux[idx];
+            element_uy[v]       = uy[idx];
+            element_uz[v]       = uz[idx];
         }
 
         for (int d = 0; d < 8; d++) {
@@ -100,14 +100,7 @@ int hex8_linear_elasticity_apply(const ptrdiff_t nelements,
         for (int kz = 0; kz < n_qp; kz++) {
             for (int ky = 0; ky < n_qp; ky++) {
                 for (int kx = 0; kx < n_qp; kx++) {
-                    hex8_adjugate_and_det(lx,
-                                          ly,
-                                          lz,
-                                          qx[kx],
-                                          qx[ky],
-                                          qx[kz],
-                                          jacobian_adjugate,
-                                          &jacobian_determinant);
+                    hex8_adjugate_and_det(lx, ly, lz, qx[kx], qx[ky], qx[kz], jacobian_adjugate, &jacobian_determinant);
 
                     hex8_linear_elasticity_apply_adj(mu,
                                                      lambda,
@@ -144,20 +137,20 @@ int hex8_linear_elasticity_apply(const ptrdiff_t nelements,
     return SFEM_SUCCESS;
 }
 
-int affine_hex8_linear_elasticity_apply(const ptrdiff_t nelements,
-                                        const ptrdiff_t nnodes,
-                                        idx_t **const SFEM_RESTRICT elements,
+int affine_hex8_linear_elasticity_apply(const ptrdiff_t              nelements,
+                                        const ptrdiff_t              nnodes,
+                                        idx_t **const SFEM_RESTRICT  elements,
                                         geom_t **const SFEM_RESTRICT points,
-                                        const real_t mu,
-                                        const real_t lambda,
-                                        const ptrdiff_t u_stride,
-                                        const real_t *const ux,
-                                        const real_t *const uy,
-                                        const real_t *const uz,
-                                        const ptrdiff_t out_stride,
-                                        real_t *const outx,
-                                        real_t *const outy,
-                                        real_t *const outz) {
+                                        const real_t                 mu,
+                                        const real_t                 lambda,
+                                        const ptrdiff_t              u_stride,
+                                        const real_t *const          ux,
+                                        const real_t *const          uy,
+                                        const real_t *const          uz,
+                                        const ptrdiff_t              out_stride,
+                                        real_t *const                outx,
+                                        real_t *const                outy,
+                                        real_t *const                outz) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
@@ -168,22 +161,22 @@ int affine_hex8_linear_elasticity_apply(const ptrdiff_t nelements,
     SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
     // printf("SFEM_HEX8_QUADRATURE_ORDER = %d\n", SFEM_HEX8_QUADRATURE_ORDER);
 
-    int n_qp = line_q3_n;
-    const scalar_t *qx = line_q3_x;
-    const scalar_t *qw = line_q3_w;
+    int             n_qp = line_q3_n;
+    const scalar_t *qx   = line_q3_x;
+    const scalar_t *qw   = line_q3_w;
     if (SFEM_HEX8_QUADRATURE_ORDER == 1) {
         n_qp = line_q2_n;
-        qx = line_q2_x;
-        qw = line_q2_w;
+        qx   = line_q2_x;
+        qw   = line_q2_w;
     } else if (SFEM_HEX8_QUADRATURE_ORDER == 5) {
         n_qp = line_q6_n;
-        qx = line_q6_x;
-        qw = line_q6_w;
+        qx   = line_q6_x;
+        qw   = line_q6_w;
     }
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-        idx_t ev[8];
+        idx_t    ev[8];
         scalar_t element_ux[8];
         scalar_t element_uy[8];
         scalar_t element_uz[8];
@@ -205,9 +198,9 @@ int affine_hex8_linear_elasticity_apply(const ptrdiff_t nelements,
 
         for (int v = 0; v < 8; ++v) {
             const ptrdiff_t idx = ev[v] * u_stride;
-            element_ux[v] = ux[idx];
-            element_uy[v] = uy[idx];
-            element_uz[v] = uz[idx];
+            element_ux[v]       = ux[idx];
+            element_uy[v]       = uy[idx];
+            element_uz[v]       = uz[idx];
         }
 
         for (int d = 0; d < 8; d++) {
@@ -262,15 +255,15 @@ int affine_hex8_linear_elasticity_apply(const ptrdiff_t nelements,
     return SFEM_SUCCESS;
 }
 
-int affine_hex8_linear_elasticity_bsr(const ptrdiff_t nelements,
-                                      const ptrdiff_t nnodes,
-                                      idx_t **const SFEM_RESTRICT elements,
-                                      geom_t **const SFEM_RESTRICT points,
-                                      const real_t mu,
-                                      const real_t lambda,
+int affine_hex8_linear_elasticity_bsr(const ptrdiff_t                    nelements,
+                                      const ptrdiff_t                    nnodes,
+                                      idx_t **const SFEM_RESTRICT        elements,
+                                      geom_t **const SFEM_RESTRICT       points,
+                                      const real_t                       mu,
+                                      const real_t                       lambda,
                                       const count_t *const SFEM_RESTRICT rowptr,
-                                      const idx_t *const SFEM_RESTRICT colidx,
-                                      real_t *const SFEM_RESTRICT values) {
+                                      const idx_t *const SFEM_RESTRICT   colidx,
+                                      real_t *const SFEM_RESTRICT        values) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
@@ -317,11 +310,9 @@ int affine_hex8_linear_elasticity_bsr(const ptrdiff_t nelements,
 
             scalar_t jacobian_adjugate[9];
             scalar_t jacobian_determinant;
-            hex8_adjugate_and_det(
-                    lx, ly, lz, 0.5, 0.5, 0.5, jacobian_adjugate, &jacobian_determinant);
+            hex8_adjugate_and_det(lx, ly, lz, 0.5, 0.5, 0.5, jacobian_adjugate, &jacobian_determinant);
 
-            hex8_linear_elasticity_matrix(
-                    mu, lambda, jacobian_adjugate, jacobian_determinant, element_matrix);
+            hex8_linear_elasticity_matrix(mu, lambda, jacobian_adjugate, jacobian_determinant, element_matrix);
 
             hex8_local_to_global_bsr3(ev, element_matrix, rowptr, colidx, values);
         }
@@ -332,18 +323,17 @@ int affine_hex8_linear_elasticity_bsr(const ptrdiff_t nelements,
 
 // The input CRS is created only for the upper-triangular part of the matrix
 // And the diagonal is stored with for each node with a stride of 6
-int affine_hex8_linear_elasticity_crs_sym(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        geom_t **const SFEM_RESTRICT points,
-        const real_t mu,
-        const real_t lambda,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        const ptrdiff_t block_stride,  // stride of the block matrix to interchange SoA and AoS.
-        real_t **const SFEM_RESTRICT block_diag,
-        real_t **const SFEM_RESTRICT block_offdiag) {
+int affine_hex8_linear_elasticity_crs_sym(const ptrdiff_t                    nelements,
+                                          const ptrdiff_t                    nnodes,
+                                          idx_t **const SFEM_RESTRICT        elements,
+                                          geom_t **const SFEM_RESTRICT       points,
+                                          const real_t                       mu,
+                                          const real_t                       lambda,
+                                          const count_t *const SFEM_RESTRICT rowptr,
+                                          const idx_t *const SFEM_RESTRICT   colidx,
+                                          const ptrdiff_t block_stride,  // stride of the block matrix to interchange SoA and AoS.
+                                          real_t **const SFEM_RESTRICT block_diag,
+                                          real_t **const SFEM_RESTRICT block_offdiag) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
@@ -354,17 +344,17 @@ int affine_hex8_linear_elasticity_crs_sym(
     SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
     // printf("SFEM_HEX8_QUADRATURE_ORDER = %d\n", SFEM_HEX8_QUADRATURE_ORDER);
 
-    int n_qp = line_q3_n;
-    const scalar_t *qx = line_q3_x;
-    const scalar_t *qw = line_q3_w;
+    int             n_qp = line_q3_n;
+    const scalar_t *qx   = line_q3_x;
+    const scalar_t *qw   = line_q3_w;
     if (SFEM_HEX8_QUADRATURE_ORDER == 1) {
         n_qp = line_q2_n;
-        qx = line_q2_x;
-        qw = line_q2_w;
+        qx   = line_q2_x;
+        qw   = line_q2_w;
     } else if (SFEM_HEX8_QUADRATURE_ORDER == 5) {
         n_qp = line_q6_n;
-        qx = line_q6_x;
-        qw = line_q6_w;
+        qx   = line_q6_x;
+        qw   = line_q6_w;
     }
 
 #pragma omp parallel
@@ -389,8 +379,7 @@ int affine_hex8_linear_elasticity_crs_sym(
 
             scalar_t jacobian_adjugate[9];
             scalar_t jacobian_determinant;
-            hex8_adjugate_and_det(
-                    lx, ly, lz, 0.5, 0.5, 0.5, jacobian_adjugate, &jacobian_determinant);
+            hex8_adjugate_and_det(lx, ly, lz, 0.5, 0.5, 0.5, jacobian_adjugate, &jacobian_determinant);
 
             // Assemble the diagonal part of the matrix
             for (int edof_i = 0; edof_i < 8; edof_i++) {
@@ -444,8 +433,8 @@ int affine_hex8_linear_elasticity_crs_sym(
             for (int edof_i = 0; edof_i < 8; edof_i++) {
                 // For each row we find the corresponding entries in the off-diag
                 // We select the entries associated with ev[row] < ev[col]
-                const int lenrow = rowptr[ev[edof_i] + 1] - rowptr[ev[edof_i]];
-                const idx_t *cols = &colidx[rowptr[ev[edof_i]]];
+                const int    lenrow = rowptr[ev[edof_i] + 1] - rowptr[ev[edof_i]];
+                const idx_t *cols   = &colidx[rowptr[ev[edof_i]]];
                 // Find the columns associated with the current row and mask what is not found with
                 // -1
                 int ks[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
@@ -506,9 +495,7 @@ int affine_hex8_linear_elasticity_crs_sym(
                         int d_idx = 0;
                         for (int d1 = 0; d1 < 3; d1++) {
                             for (int d2 = d1; d2 < 3; d2++, d_idx++) {
-                                real_t *values =
-                                        &block_offdiag[d_idx][(rowptr[ev[edof_i]] + ks[edof_j]) *
-                                                              block_stride];
+                                real_t *values = &block_offdiag[d_idx][(rowptr[ev[edof_i]] + ks[edof_j]) * block_stride];
 #pragma omp atomic update
                                 *values += element_matrix[d_idx];
                             }
@@ -522,16 +509,16 @@ int affine_hex8_linear_elasticity_crs_sym(
     return SFEM_SUCCESS;
 }
 
-int affine_hex8_linear_elasticity_diag(const ptrdiff_t nelements,
-                                       const ptrdiff_t nnodes,
-                                       idx_t **const SFEM_RESTRICT elements,
+int affine_hex8_linear_elasticity_diag(const ptrdiff_t              nelements,
+                                       const ptrdiff_t              nnodes,
+                                       idx_t **const SFEM_RESTRICT  elements,
                                        geom_t **const SFEM_RESTRICT points,
-                                       const real_t mu,
-                                       const real_t lambda,
-                                       const ptrdiff_t out_stride,
-                                       real_t *const outx,
-                                       real_t *const outy,
-                                       real_t *const outz) {
+                                       const real_t                 mu,
+                                       const real_t                 lambda,
+                                       const ptrdiff_t              out_stride,
+                                       real_t *const                outx,
+                                       real_t *const                outy,
+                                       real_t *const                outz) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
@@ -563,8 +550,7 @@ int affine_hex8_linear_elasticity_diag(const ptrdiff_t nelements,
 
         hex8_adjugate_and_det(lx, ly, lz, 0.5, 0.5, 0.5, jacobian_adjugate, &jacobian_determinant);
 
-        hex8_linear_elasticity_diag(
-                mu, lambda, jacobian_adjugate, jacobian_determinant, element_diag);
+        hex8_linear_elasticity_diag(mu, lambda, jacobian_adjugate, jacobian_determinant, element_diag);
 
         for (int edof_i = 0; edof_i < 8; edof_i++) {
             const ptrdiff_t idx = ev[edof_i] * out_stride;
@@ -577,6 +563,104 @@ int affine_hex8_linear_elasticity_diag(const ptrdiff_t nelements,
 
 #pragma omp atomic update
             outz[idx] += element_diag[2 * 8 + edof_i];
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int affine_hex8_linear_elasticity_block_diag_sym(const ptrdiff_t              nelements,
+                                             const ptrdiff_t              nnodes,
+                                             idx_t **const SFEM_RESTRICT  elements,
+                                             geom_t **const SFEM_RESTRICT points,
+                                             const real_t                 mu,
+                                             const real_t                 lambda,
+                                             const ptrdiff_t              out_stride,
+                                             real_t *const                out0,
+                                             real_t *const                out1,
+                                             real_t *const                out2,
+                                             real_t *const                out3,
+                                             real_t *const                out4,
+                                             real_t *const                out5) {
+    SFEM_UNUSED(nnodes);
+
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+    int SFEM_HEX8_QUADRATURE_ORDER = 2;
+    SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
+    // printf("SFEM_HEX8_QUADRATURE_ORDER = %d\n", SFEM_HEX8_QUADRATURE_ORDER);
+
+    int             n_qp = line_q3_n;
+    const scalar_t *qx   = line_q3_x;
+    const scalar_t *qw   = line_q3_w;
+
+    if (SFEM_HEX8_QUADRATURE_ORDER == 1) {
+        n_qp = line_q2_n;
+        qx   = line_q2_x;
+        qw   = line_q2_w;
+    } else if (SFEM_HEX8_QUADRATURE_ORDER == 5) {
+        n_qp = line_q6_n;
+        qx   = line_q6_x;
+        qw   = line_q6_w;
+    }
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[8];
+
+        scalar_t lx[8];
+        scalar_t ly[8];
+        scalar_t lz[8];
+
+        for (int v = 0; v < 8; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        for (int v = 0; v < 8; v++) {
+            lx[v] = x[ev[v]];
+            ly[v] = y[ev[v]];
+            lz[v] = z[ev[v]];
+        }
+
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant;
+        hex8_adjugate_and_det(lx, ly, lz, 0.5, 0.5, 0.5, jacobian_adjugate, &jacobian_determinant);
+
+        // Assemble the diagonal part of the matrix
+        for (int edof_i = 0; edof_i < 8; edof_i++) {
+            accumulator_t element_matrix[6] = {0, 0, 0, 0, 0, 0};
+            for (int zi = 0; zi < n_qp; zi++) {
+                for (int yi = 0; yi < n_qp; yi++) {
+                    for (int xi = 0; xi < n_qp; xi++) {
+                        scalar_t test_grad[3];
+                        hex8_ref_shape_grad(edof_i, qx[xi], qx[yi], qx[zi], test_grad);
+                        linear_elasticity_matrix_sym(mu,
+                                                     lambda,
+                                                     jacobian_adjugate,
+                                                     jacobian_determinant,
+                                                     test_grad,
+                                                     test_grad,
+                                                     qw[xi] * qw[yi] * qw[zi],
+                                                     element_matrix);
+                    }
+                }
+            }
+
+            // local to global
+#pragma omp atomic update
+            out0[edof_i * out_stride] += element_matrix[0];
+#pragma omp atomic update
+            out1[edof_i * out_stride] += element_matrix[1];
+#pragma omp atomic update
+            out2[edof_i * out_stride] += element_matrix[2];
+#pragma omp atomic update
+            out3[edof_i * out_stride] += element_matrix[3];
+#pragma omp atomic update
+            out4[edof_i * out_stride] += element_matrix[4];
+#pragma omp atomic update
+            out5[edof_i * out_stride] += element_matrix[5];
         }
     }
 
