@@ -50,22 +50,21 @@ namespace sfem {
     class CRSGraph::Impl {
     public:
         std::shared_ptr<Buffer<count_t>> rowptr;
-        std::shared_ptr<Buffer<idx_t>> colidx;
+        std::shared_ptr<Buffer<idx_t>>   colidx;
         ~Impl() {}
     };
 
-    CRSGraph::CRSGraph(const std::shared_ptr<Buffer<count_t>> &rowptr,
-                       const std::shared_ptr<Buffer<idx_t>> &colidx)
+    CRSGraph::CRSGraph(const std::shared_ptr<Buffer<count_t>> &rowptr, const std::shared_ptr<Buffer<idx_t>> &colidx)
         : impl_(std::make_unique<Impl>()) {
         impl_->rowptr = rowptr;
         impl_->colidx = colidx;
     }
 
     void CRSGraph::print(std::ostream &os) const {
-        auto rowptr = this->rowptr()->data();
-        auto colidx = this->colidx()->data();
+        auto            rowptr = this->rowptr()->data();
+        auto            colidx = this->colidx()->data();
         const ptrdiff_t nnodes = this->n_nodes();
-        const ptrdiff_t nnz = this->nnz();
+        const ptrdiff_t nnz    = this->nnz();
 
         os << "CRSGraph (" << nnodes << " nodes, " << nnz << " nnz)\n";
         for (ptrdiff_t i = 0; i < nnodes; i++) {
@@ -85,18 +84,14 @@ namespace sfem {
     ptrdiff_t CRSGraph::nnz() const { return colidx()->size(); }
 
     std::shared_ptr<Buffer<count_t>> CRSGraph::rowptr() const { return impl_->rowptr; }
-    std::shared_ptr<Buffer<idx_t>> CRSGraph::colidx() const { return impl_->colidx; }
+    std::shared_ptr<Buffer<idx_t>>   CRSGraph::colidx() const { return impl_->colidx; }
 
     std::shared_ptr<CRSGraph> CRSGraph::block_to_scalar(const int block_size) {
         auto rowptr = h_buffer<count_t>(this->n_nodes() * block_size + 1);
         auto colidx = h_buffer<idx_t>(this->nnz() * block_size * block_size);
 
-        crs_graph_block_to_scalar(this->n_nodes(),
-                                  block_size,
-                                  this->rowptr()->data(),
-                                  this->colidx()->data(),
-                                  rowptr->data(),
-                                  colidx->data());
+        crs_graph_block_to_scalar(
+                this->n_nodes(), block_size, this->rowptr()->data(), this->colidx()->data(), rowptr->data(), colidx->data());
 
         return std::make_shared<CRSGraph>(rowptr, colidx);
     }
@@ -104,10 +99,10 @@ namespace sfem {
     class Mesh::Impl {
     public:
         MPI_Comm comm;
-        mesh_t mesh;
+        mesh_t   mesh;
 
-        std::shared_ptr<CRSGraph> crs_graph;
-        std::shared_ptr<CRSGraph> crs_graph_upper_triangular;
+        std::shared_ptr<CRSGraph>   crs_graph;
+        std::shared_ptr<CRSGraph>   crs_graph_upper_triangular;
         std::function<void(void *)> destroy;
 
         ~Impl() { destroy(&mesh); }
@@ -115,12 +110,12 @@ namespace sfem {
 
     MPI_Comm Mesh::comm() const { return impl_->comm; }
 
-    Mesh::Mesh(int spatial_dim,
-               enum ElemType element_type,
-               ptrdiff_t nelements,
-               idx_t **elements,
-               ptrdiff_t nnodes,
-               geom_t **points,
+    Mesh::Mesh(int                         spatial_dim,
+               enum ElemType               element_type,
+               ptrdiff_t                   nelements,
+               idx_t                     **elements,
+               ptrdiff_t                   nnodes,
+               geom_t                    **points,
                std::function<void(void *)> destroy)
         : impl_(std::make_unique<Impl>()) {
         if (!destroy) {
@@ -129,14 +124,11 @@ namespace sfem {
             impl_->destroy = destroy;
         }
 
-        mesh_create_serial(
-                &impl_->mesh, spatial_dim, element_type, nelements, elements, nnodes, points);
+        mesh_create_serial(&impl_->mesh, spatial_dim, element_type, nelements, elements, nnodes, points);
     }
 
     int Mesh::spatial_dimension() const { return impl_->mesh.spatial_dim; }
-    int Mesh::n_nodes_per_elem() const {
-        return elem_num_nodes((enum ElemType)impl_->mesh.element_type);
-    }
+    int Mesh::n_nodes_per_elem() const { return elem_num_nodes((enum ElemType)impl_->mesh.element_type); }
 
     ptrdiff_t Mesh::n_nodes() const { return impl_->mesh.nnodes; }
     ptrdiff_t Mesh::n_elements() const { return impl_->mesh.nelements; }
@@ -204,13 +196,11 @@ namespace sfem {
         const ptrdiff_t n_nodes = max_node_id(element_type, mesh->nelements, mesh->elements) + 1;
 
         count_t *rowptr{nullptr};
-        idx_t *colidx{nullptr};
-        build_crs_graph_for_elem_type(
-                element_type, mesh->nelements, n_nodes, mesh->elements, &rowptr, &colidx);
+        idx_t   *colidx{nullptr};
+        build_crs_graph_for_elem_type(element_type, mesh->nelements, n_nodes, mesh->elements, &rowptr, &colidx);
 
-        auto crs_graph = std::make_shared<CRSGraph>(
-                Buffer<count_t>::own(n_nodes + 1, rowptr, free, MEMORY_SPACE_HOST),
-                Buffer<idx_t>::own(rowptr[n_nodes], colidx, free, MEMORY_SPACE_HOST));
+        auto crs_graph = std::make_shared<CRSGraph>(Buffer<count_t>::own(n_nodes + 1, rowptr, free, MEMORY_SPACE_HOST),
+                                                    Buffer<idx_t>::own(rowptr[n_nodes], colidx, free, MEMORY_SPACE_HOST));
 
         return crs_graph;
     }
@@ -225,17 +215,11 @@ namespace sfem {
         auto mesh = &impl_->mesh;
 
         count_t *rowptr{nullptr};
-        idx_t *colidx{nullptr};
-        build_crs_graph_for_elem_type(mesh->element_type,
-                                      mesh->nelements,
-                                      mesh->nnodes,
-                                      mesh->elements,
-                                      &rowptr,
-                                      &colidx);
+        idx_t   *colidx{nullptr};
+        build_crs_graph_for_elem_type(mesh->element_type, mesh->nelements, mesh->nnodes, mesh->elements, &rowptr, &colidx);
 
-        impl_->crs_graph = std::make_shared<CRSGraph>(
-                Buffer<count_t>::own(mesh->nnodes + 1, rowptr, free, MEMORY_SPACE_HOST),
-                Buffer<idx_t>::own(rowptr[mesh->nnodes], colidx, free, MEMORY_SPACE_HOST));
+        impl_->crs_graph = std::make_shared<CRSGraph>(Buffer<count_t>::own(mesh->nnodes + 1, rowptr, free, MEMORY_SPACE_HOST),
+                                                      Buffer<idx_t>::own(rowptr[mesh->nnodes], colidx, free, MEMORY_SPACE_HOST));
 
         return SFEM_SUCCESS;
     }
@@ -245,18 +229,17 @@ namespace sfem {
             auto mesh = &impl_->mesh;
 
             count_t *rowptr{nullptr};
-            idx_t *colidx{nullptr};
-            build_crs_graph_upper_triangular_from_element(
-                    mesh->nelements,
-                    mesh->nnodes,
-                    elem_num_nodes((enum ElemType)mesh->element_type),
-                    mesh->elements,
-                    &rowptr,
-                    &colidx);
+            idx_t   *colidx{nullptr};
+            build_crs_graph_upper_triangular_from_element(mesh->nelements,
+                                                          mesh->nnodes,
+                                                          elem_num_nodes((enum ElemType)mesh->element_type),
+                                                          mesh->elements,
+                                                          &rowptr,
+                                                          &colidx);
 
-            impl_->crs_graph_upper_triangular = std::make_shared<CRSGraph>(
-                    Buffer<count_t>::own(mesh->nnodes + 1, rowptr, free, MEMORY_SPACE_HOST),
-                    Buffer<idx_t>::own(rowptr[mesh->nnodes], colidx, free, MEMORY_SPACE_HOST));
+            impl_->crs_graph_upper_triangular =
+                    std::make_shared<CRSGraph>(Buffer<count_t>::own(mesh->nnodes + 1, rowptr, free, MEMORY_SPACE_HOST),
+                                               Buffer<idx_t>::own(rowptr[mesh->nnodes], colidx, free, MEMORY_SPACE_HOST));
 
             // impl_->crs_graph_upper_triangular->print(std::cout);
         }
@@ -271,28 +254,24 @@ namespace sfem {
 
     void *Mesh::impl_mesh() { return (void *)&impl_->mesh; }
 
-    std::shared_ptr<Buffer<count_t>> Mesh::node_to_node_rowptr() const {
-        return impl_->crs_graph->rowptr();
-    }
-    std::shared_ptr<Buffer<idx_t>> Mesh::node_to_node_colidx() const {
-        return impl_->crs_graph->colidx();
-    }
+    std::shared_ptr<Buffer<count_t>> Mesh::node_to_node_rowptr() const { return impl_->crs_graph->rowptr(); }
+    std::shared_ptr<Buffer<idx_t>>   Mesh::node_to_node_colidx() const { return impl_->crs_graph->colidx(); }
 
     class SemiStructuredMesh::Impl {
     public:
         std::shared_ptr<Mesh> macro_mesh;
-        int level;
+        int                   level;
 
         std::shared_ptr<Buffer<idx_t *>> elements;
-        ptrdiff_t n_unique_nodes{-1}, interior_start{-1};
-        std::shared_ptr<CRSGraph> node_to_node_graph;
+        ptrdiff_t                        n_unique_nodes{-1}, interior_start{-1};
+        std::shared_ptr<CRSGraph>        node_to_node_graph;
 
         void init(const std::shared_ptr<Mesh> macro_mesh, const int level) {
             this->macro_mesh = macro_mesh;
-            this->level = level;
+            this->level      = level;
 
-            const int nxe = proteus_hex8_nxe(level);
-            auto elements = (idx_t **)malloc(nxe * sizeof(idx_t *));
+            const int nxe      = proteus_hex8_nxe(level);
+            auto      elements = (idx_t **)malloc(nxe * sizeof(idx_t *));
             for (int d = 0; d < nxe; d++) {
                 elements[d] = (idx_t *)malloc(macro_mesh->n_elements() * sizeof(idx_t));
             }
@@ -305,11 +284,8 @@ namespace sfem {
             }
 #endif
 
-            proteus_hex8_create_full_idx(level,
-                                         (mesh_t *)macro_mesh->impl_mesh(),
-                                         elements,
-                                         &this->n_unique_nodes,
-                                         &this->interior_start);
+            proteus_hex8_create_full_idx(
+                    level, (mesh_t *)macro_mesh->impl_mesh(), elements, &this->n_unique_nodes, &this->interior_start);
 
             this->elements = std::make_shared<Buffer<idx_t *>>(
                     nxe,
@@ -336,28 +312,21 @@ namespace sfem {
         }
 
         count_t *rowptr{nullptr};
-        idx_t *colidx{nullptr};
+        idx_t   *colidx{nullptr};
 
-        proteus_hex8_crs_graph(impl_->level,
-                               this->n_elements(),
-                               this->n_nodes(),
-                               this->element_data(),
-                               &rowptr,
-                               &colidx);
+        proteus_hex8_crs_graph(impl_->level, this->n_elements(), this->n_nodes(), this->element_data(), &rowptr, &colidx);
 
-        impl_->node_to_node_graph = std::make_shared<CRSGraph>(
-                Buffer<count_t>::own(this->n_nodes() + 1, rowptr, free, MEMORY_SPACE_HOST),
-                Buffer<idx_t>::own(rowptr[this->n_nodes()], colidx, free, MEMORY_SPACE_HOST));
+        impl_->node_to_node_graph =
+                std::make_shared<CRSGraph>(Buffer<count_t>::own(this->n_nodes() + 1, rowptr, free, MEMORY_SPACE_HOST),
+                                           Buffer<idx_t>::own(rowptr[this->n_nodes()], colidx, free, MEMORY_SPACE_HOST));
 
         return impl_->node_to_node_graph;
     }
 
     int SemiStructuredMesh::n_nodes_per_element() const { return proteus_hex8_nxe(impl_->level); }
 
-    idx_t **SemiStructuredMesh::element_data() { return impl_->elements->data(); }
-    geom_t **SemiStructuredMesh::point_data() {
-        return ((mesh_t *)(impl_->macro_mesh->impl_mesh()))->points;
-    }
+    idx_t   **SemiStructuredMesh::element_data() { return impl_->elements->data(); }
+    geom_t  **SemiStructuredMesh::point_data() { return ((mesh_t *)(impl_->macro_mesh->impl_mesh()))->points; }
     ptrdiff_t SemiStructuredMesh::interior_start() const { return impl_->interior_start; }
 
     SemiStructuredMesh::SemiStructuredMesh(const std::shared_ptr<Mesh> macro_mesh, const int level)
@@ -368,22 +337,22 @@ namespace sfem {
     SemiStructuredMesh::~SemiStructuredMesh() {}
 
     ptrdiff_t SemiStructuredMesh::n_nodes() const { return impl_->n_unique_nodes; }
-    int SemiStructuredMesh::level() const { return impl_->level; }
+    int       SemiStructuredMesh::level() const { return impl_->level; }
     ptrdiff_t SemiStructuredMesh::n_elements() const { return impl_->macro_mesh->n_elements(); }
 
     class FunctionSpace::Impl {
     public:
         std::shared_ptr<Mesh> mesh;
-        int block_size{1};
-        enum ElemType element_type { INVALID };
+        int                   block_size{1};
+        enum ElemType         element_type { INVALID };
 
         // Number of nodes of function-space (TODO)
         ptrdiff_t nlocal{0};
         ptrdiff_t nglobal{0};
 
         // CRS graph
-        std::shared_ptr<CRSGraph> node_to_node_graph;
-        std::shared_ptr<CRSGraph> dof_to_dof_graph;
+        std::shared_ptr<CRSGraph>            node_to_node_graph;
+        std::shared_ptr<CRSGraph>            dof_to_dof_graph;
         std::shared_ptr<sfem::Buffer<idx_t>> device_elements;
 
         // Data-structures for semistructured mesh
@@ -419,13 +388,9 @@ namespace sfem {
         }
     };
 
-    void FunctionSpace::set_device_elements(const std::shared_ptr<sfem::Buffer<idx_t>> &elems) {
-        impl_->device_elements = elems;
-    }
+    void FunctionSpace::set_device_elements(const std::shared_ptr<sfem::Buffer<idx_t>> &elems) { impl_->device_elements = elems; }
 
-    std::shared_ptr<sfem::Buffer<idx_t>> FunctionSpace::device_elements() {
-        return impl_->device_elements;
-    }
+    std::shared_ptr<sfem::Buffer<idx_t>> FunctionSpace::device_elements() { return impl_->device_elements; }
 
     std::shared_ptr<CRSGraph> FunctionSpace::dof_to_dof_graph() {
         impl_->initialize_dof_to_dof_graph(this->block_size());
@@ -450,16 +415,13 @@ namespace sfem {
 
         {
             // FIXME the number of nodes in mesh does not change, will lead to bugs
-            return std::make_shared<FunctionSpace>(
-                    impl_->mesh, impl_->block_size, macro_base_elem(impl_->element_type));
+            return std::make_shared<FunctionSpace>(impl_->mesh, impl_->block_size, macro_base_elem(impl_->element_type));
         }
     }
 
-    FunctionSpace::FunctionSpace(const std::shared_ptr<Mesh> &mesh,
-                                 const int block_size,
-                                 const enum ElemType element_type)
+    FunctionSpace::FunctionSpace(const std::shared_ptr<Mesh> &mesh, const int block_size, const enum ElemType element_type)
         : impl_(std::make_unique<Impl>()) {
-        impl_->mesh = mesh;
+        impl_->mesh       = mesh;
         impl_->block_size = block_size;
         assert(block_size > 0);
 
@@ -471,13 +433,11 @@ namespace sfem {
 
         auto c_mesh = &mesh->impl_->mesh;
         if (impl_->element_type == c_mesh->element_type) {
-            impl_->nlocal = c_mesh->nnodes * block_size;
+            impl_->nlocal  = c_mesh->nnodes * block_size;
             impl_->nglobal = c_mesh->nnodes * block_size;
         } else {
             // FIXME in parallel it will not work
-            impl_->nlocal =
-                    (max_node_id(impl_->element_type, c_mesh->nelements, c_mesh->elements) + 1) *
-                    block_size;
+            impl_->nlocal  = (max_node_id(impl_->element_type, c_mesh->nelements, c_mesh->elements) + 1) * block_size;
             impl_->nglobal = impl_->nlocal;
 
             // MPI_CATCH_ERROR(
@@ -489,9 +449,9 @@ namespace sfem {
     int FunctionSpace::promote_to_semi_structured(const int level) {
         if (impl_->element_type == HEX8) {
             impl_->semi_structured_mesh = std::make_shared<SemiStructuredMesh>(impl_->mesh, level);
-            impl_->element_type = PROTEUS_HEX8;
-            impl_->nlocal = impl_->semi_structured_mesh->n_nodes() * impl_->block_size;
-            impl_->nglobal = impl_->nlocal;
+            impl_->element_type         = PROTEUS_HEX8;
+            impl_->nlocal               = impl_->semi_structured_mesh->n_nodes() * impl_->block_size;
+            impl_->nglobal              = impl_->nlocal;
             return SFEM_SUCCESS;
         }
 
@@ -500,25 +460,20 @@ namespace sfem {
 
     FunctionSpace::~FunctionSpace() = default;
 
-    bool FunctionSpace::has_semi_structured_mesh() const {
-        return static_cast<bool>(impl_->semi_structured_mesh);
-    }
+    bool FunctionSpace::has_semi_structured_mesh() const { return static_cast<bool>(impl_->semi_structured_mesh); }
 
     Mesh &FunctionSpace::mesh() { return *impl_->mesh; }
 
     std::shared_ptr<Mesh> FunctionSpace::mesh_ptr() const { return impl_->mesh; }
 
-    SemiStructuredMesh &FunctionSpace::semi_structured_mesh() {
-        return *impl_->semi_structured_mesh;
-    }
+    SemiStructuredMesh &FunctionSpace::semi_structured_mesh() { return *impl_->semi_structured_mesh; }
 
     int FunctionSpace::block_size() const { return impl_->block_size; }
 
     ptrdiff_t FunctionSpace::n_dofs() const { return impl_->nlocal; }
 
     std::shared_ptr<FunctionSpace> FunctionSpace::lor() const {
-        return std::make_shared<FunctionSpace>(
-                impl_->mesh, impl_->block_size, macro_type_variant(impl_->element_type));
+        return std::make_shared<FunctionSpace>(impl_->mesh, impl_->block_size, macro_type_variant(impl_->element_type));
     }
 
     class NeumannConditions::Impl {
@@ -535,27 +490,25 @@ namespace sfem {
             }
         }
 
-        int n_neumann_conditions{0};
+        int                   n_neumann_conditions{0};
         boundary_condition_t *neumann_conditions{nullptr};
     };
 
-    int NeumannConditions::n_conditions() const { return impl_->n_neumann_conditions; }
+    int   NeumannConditions::n_conditions() const { return impl_->n_neumann_conditions; }
     void *NeumannConditions::impl_conditions() { return (void *)impl_->neumann_conditions; }
 
     const char *NeumannConditions::name() const { return "NeumannConditions"; }
 
-    NeumannConditions::NeumannConditions(const std::shared_ptr<FunctionSpace> &space)
-        : impl_(std::make_unique<Impl>()) {
+    NeumannConditions::NeumannConditions(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>()) {
         impl_->space = space;
     }
 
-    std::shared_ptr<NeumannConditions> NeumannConditions::create_from_env(
-            const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<NeumannConditions> NeumannConditions::create_from_env(const std::shared_ptr<FunctionSpace> &space) {
         //
         auto nc = std::make_unique<NeumannConditions>(space);
 
-        char *SFEM_NEUMANN_SIDESET = 0;
-        char *SFEM_NEUMANN_VALUE = 0;
+        char *SFEM_NEUMANN_SIDESET   = 0;
+        char *SFEM_NEUMANN_VALUE     = 0;
         char *SFEM_NEUMANN_COMPONENT = 0;
         SFEM_READ_ENV(SFEM_NEUMANN_SIDESET, );
         SFEM_READ_ENV(SFEM_NEUMANN_VALUE, );
@@ -598,9 +551,7 @@ namespace sfem {
 
         return SFEM_SUCCESS;
     }
-    int NeumannConditions::apply(const real_t *const /*x*/,
-                                 const real_t *const /*h*/,
-                                 real_t *const /*out*/) {
+    int NeumannConditions::apply(const real_t *const /*x*/, const real_t *const /*h*/, real_t *const /*out*/) {
         return SFEM_SUCCESS;
     }
 
@@ -611,16 +562,15 @@ namespace sfem {
 
     void NeumannConditions::add_condition(const ptrdiff_t local_size,
                                           const ptrdiff_t global_size,
-                                          idx_t *const idx,
-                                          const int component,
-                                          const real_t value) {
+                                          idx_t *const    idx,
+                                          const int       component,
+                                          const real_t    value) {
         impl_->neumann_conditions = (boundary_condition_t *)realloc(
-                impl_->neumann_conditions,
-                (impl_->n_neumann_conditions + 1) * sizeof(boundary_condition_t));
+                impl_->neumann_conditions, (impl_->n_neumann_conditions + 1) * sizeof(boundary_condition_t));
 
-        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
+        auto          mesh  = (mesh_t *)impl_->space->mesh().impl_mesh();
         enum ElemType stype = side_type((enum ElemType)impl_->space->element_type());
-        int nns = elem_num_nodes(stype);
+        int           nns   = elem_num_nodes(stype);
 
         assert((local_size / nns) * nns == local_size);
         assert((global_size / nns) * nns == global_size);
@@ -638,16 +588,15 @@ namespace sfem {
 
     void NeumannConditions::add_condition(const ptrdiff_t local_size,
                                           const ptrdiff_t global_size,
-                                          idx_t *const idx,
-                                          const int component,
-                                          real_t *const values) {
+                                          idx_t *const    idx,
+                                          const int       component,
+                                          real_t *const   values) {
         impl_->neumann_conditions = (boundary_condition_t *)realloc(
-                impl_->neumann_conditions,
-                (impl_->n_neumann_conditions + 1) * sizeof(boundary_condition_t));
+                impl_->neumann_conditions, (impl_->n_neumann_conditions + 1) * sizeof(boundary_condition_t));
 
-        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
+        auto          mesh  = (mesh_t *)impl_->space->mesh().impl_mesh();
         enum ElemType stype = side_type((enum ElemType)impl_->space->element_type());
-        int nns = elem_num_sides(stype);
+        int           nns   = elem_num_sides(stype);
 
         boundary_condition_create(&impl_->neumann_conditions[impl_->n_neumann_conditions],
                                   local_size / nns,
@@ -676,39 +625,36 @@ namespace sfem {
             }
         }
 
-        int n_dirichlet_conditions{0};
+        int                   n_dirichlet_conditions{0};
         boundary_condition_t *dirichlet_conditions{nullptr};
     };
 
     std::shared_ptr<FunctionSpace> DirichletConditions::space() { return impl_->space; }
 
-    int DirichletConditions::n_conditions() const { return impl_->n_dirichlet_conditions; }
+    int   DirichletConditions::n_conditions() const { return impl_->n_dirichlet_conditions; }
     void *DirichletConditions::impl_conditions() { return (void *)impl_->dirichlet_conditions; }
 
-    DirichletConditions::DirichletConditions(const std::shared_ptr<FunctionSpace> &space)
-        : impl_(std::make_unique<Impl>()) {
+    DirichletConditions::DirichletConditions(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>()) {
         impl_->space = space;
     }
 
-    std::shared_ptr<Constraint> DirichletConditions::derefine(
-            const std::shared_ptr<FunctionSpace> &coarse_space,
-            const bool as_zero) const {
+    std::shared_ptr<Constraint> DirichletConditions::derefine(const std::shared_ptr<FunctionSpace> &coarse_space,
+                                                              const bool                            as_zero) const {
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
-        auto et = (enum ElemType)impl_->space->element_type();
+        auto et   = (enum ElemType)impl_->space->element_type();
 
-        const ptrdiff_t max_coarse_idx =
-                max_node_id(coarse_space->element_type(), mesh->nelements, mesh->elements);
+        const ptrdiff_t max_coarse_idx = max_node_id(coarse_space->element_type(), mesh->nelements, mesh->elements);
 
         auto coarse = std::make_shared<DirichletConditions>(coarse_space);
 
-        coarse->impl_->dirichlet_conditions = (boundary_condition_t *)malloc(
-                impl_->n_dirichlet_conditions * sizeof(boundary_condition_t));
+        coarse->impl_->dirichlet_conditions =
+                (boundary_condition_t *)malloc(impl_->n_dirichlet_conditions * sizeof(boundary_condition_t));
         coarse->impl_->n_dirichlet_conditions = 0;
 
         for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
             ptrdiff_t coarse_local_size = 0;
-            idx_t *coarse_indices = nullptr;
-            real_t *coarse_values = nullptr;
+            idx_t    *coarse_indices    = nullptr;
+            real_t   *coarse_values     = nullptr;
             hierarchical_create_coarse_indices(max_coarse_idx,
                                                impl_->dirichlet_conditions[i].local_size,
                                                impl_->dirichlet_conditions[i].idx,
@@ -731,26 +677,22 @@ namespace sfem {
             // MPI_Allreduce(MPI_IN_PLACE, &coarse_global_size, 1, MPI_LONG, MPI_SUM, mesh->comm));
 
             if (as_zero) {
-                boundary_condition_create(
-                        &coarse->impl_
-                                 ->dirichlet_conditions[coarse->impl_->n_dirichlet_conditions++],
-                        coarse_local_size,
-                        coarse_global_size,
-                        coarse_indices,
-                        impl_->dirichlet_conditions[i].component,
-                        0,
-                        nullptr);
+                boundary_condition_create(&coarse->impl_->dirichlet_conditions[coarse->impl_->n_dirichlet_conditions++],
+                                          coarse_local_size,
+                                          coarse_global_size,
+                                          coarse_indices,
+                                          impl_->dirichlet_conditions[i].component,
+                                          0,
+                                          nullptr);
 
             } else {
-                boundary_condition_create(
-                        &coarse->impl_
-                                 ->dirichlet_conditions[coarse->impl_->n_dirichlet_conditions++],
-                        coarse_local_size,
-                        coarse_global_size,
-                        coarse_indices,
-                        impl_->dirichlet_conditions[i].component,
-                        impl_->dirichlet_conditions[i].value,
-                        coarse_values);
+                boundary_condition_create(&coarse->impl_->dirichlet_conditions[coarse->impl_->n_dirichlet_conditions++],
+                                          coarse_local_size,
+                                          coarse_global_size,
+                                          coarse_indices,
+                                          impl_->dirichlet_conditions[i].component,
+                                          impl_->dirichlet_conditions[i].value,
+                                          coarse_values);
             }
         }
 
@@ -766,12 +708,11 @@ namespace sfem {
 
     void DirichletConditions::add_condition(const ptrdiff_t local_size,
                                             const ptrdiff_t global_size,
-                                            idx_t *const idx,
-                                            const int component,
-                                            const real_t value) {
+                                            idx_t *const    idx,
+                                            const int       component,
+                                            const real_t    value) {
         impl_->dirichlet_conditions = (boundary_condition_t *)realloc(
-                impl_->dirichlet_conditions,
-                (impl_->n_dirichlet_conditions + 1) * sizeof(boundary_condition_t));
+                impl_->dirichlet_conditions, (impl_->n_dirichlet_conditions + 1) * sizeof(boundary_condition_t));
 
         boundary_condition_create(&impl_->dirichlet_conditions[impl_->n_dirichlet_conditions],
                                   local_size,
@@ -786,31 +727,24 @@ namespace sfem {
 
     void DirichletConditions::add_condition(const ptrdiff_t local_size,
                                             const ptrdiff_t global_size,
-                                            idx_t *const idx,
-                                            const int component,
-                                            real_t *const values) {
+                                            idx_t *const    idx,
+                                            const int       component,
+                                            real_t *const   values) {
         impl_->dirichlet_conditions = (boundary_condition_t *)realloc(
-                impl_->dirichlet_conditions,
-                (impl_->n_dirichlet_conditions + 1) * sizeof(boundary_condition_t));
+                impl_->dirichlet_conditions, (impl_->n_dirichlet_conditions + 1) * sizeof(boundary_condition_t));
 
-        boundary_condition_create(&impl_->dirichlet_conditions[impl_->n_dirichlet_conditions],
-                                  local_size,
-                                  global_size,
-                                  idx,
-                                  component,
-                                  0,
-                                  values);
+        boundary_condition_create(
+                &impl_->dirichlet_conditions[impl_->n_dirichlet_conditions], local_size, global_size, idx, component, 0, values);
 
         impl_->n_dirichlet_conditions++;
     }
 
-    std::shared_ptr<DirichletConditions> DirichletConditions::create_from_env(
-            const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<DirichletConditions> DirichletConditions::create_from_env(const std::shared_ptr<FunctionSpace> &space) {
         //
         auto dc = std::make_unique<DirichletConditions>(space);
 
-        char *SFEM_DIRICHLET_NODESET = 0;
-        char *SFEM_DIRICHLET_VALUE = 0;
+        char *SFEM_DIRICHLET_NODESET   = 0;
+        char *SFEM_DIRICHLET_VALUE     = 0;
         char *SFEM_DIRICHLET_COMPONENT = 0;
         SFEM_READ_ENV(SFEM_DIRICHLET_NODESET, );
         SFEM_READ_ENV(SFEM_DIRICHLET_VALUE, );
@@ -880,10 +814,10 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int DirichletConditions::hessian_crs(const real_t *const x,
+    int DirichletConditions::hessian_crs(const real_t *const  x,
                                          const count_t *const rowptr,
-                                         const idx_t *const colidx,
-                                         real_t *const values) {
+                                         const idx_t *const   colidx,
+                                         real_t *const        values) {
         for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
             crs_constraint_nodes_to_identity_vec(impl_->dirichlet_conditions[i].local_size,
                                                  impl_->dirichlet_conditions[i].idx,
@@ -898,10 +832,10 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int DirichletConditions::hessian_bsr(const real_t *const x,
+    int DirichletConditions::hessian_bsr(const real_t *const  x,
                                          const count_t *const rowptr,
-                                         const idx_t *const colidx,
-                                         real_t *const values) {
+                                         const idx_t *const   colidx,
+                                         real_t *const        values) {
         for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
             bsr_constraint_nodes_to_identity_vec(impl_->dirichlet_conditions[i].local_size,
                                                  impl_->dirichlet_conditions[i].idx,
@@ -919,9 +853,8 @@ namespace sfem {
     int DirichletConditions::mask(mask_t *mask) {
         for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
             for (ptrdiff_t node = 0; node < impl_->dirichlet_conditions[i].local_size; node++) {
-                const ptrdiff_t idx =
-                        impl_->dirichlet_conditions[i].idx[node] * impl_->space->block_size() +
-                        impl_->dirichlet_conditions[i].component;
+                const ptrdiff_t idx = impl_->dirichlet_conditions[i].idx[node] * impl_->space->block_size() +
+                                      impl_->dirichlet_conditions[i].component;
                 mask_set(idx, mask);
                 // printf("%ld ", idx);
             }
@@ -936,7 +869,7 @@ namespace sfem {
 
         class Scoped {
         public:
-            double tick_{0};
+            double  tick_{0};
             double *value_;
             Scoped(double *value) : value_(value) { tick_ = tick(); }
 
@@ -950,6 +883,7 @@ namespace sfem {
         double hessian_bcrs_sym{0};
         double hessian_crs_sym{0};
         double hessian_diag{0};
+        double hessian_block_diag_sym{0};
         double gradient{0};
         double apply{0};
         double value{0};
@@ -961,22 +895,23 @@ namespace sfem {
         double initial_guess{0};
 
         void clear() {
-            create_crs_graph = 0;
-            destroy_crs_graph = 0;
-            hessian_crs = 0;
-            hessian_bsr = 0;
-            hessian_bcrs_sym = 0;
-            hessian_crs_sym = 0;
-            hessian_diag = 0;
-            gradient = 0;
-            apply = 0;
-            value = 0;
-            apply_constraints = 0;
-            constraints_gradient = 0;
+            create_crs_graph       = 0;
+            destroy_crs_graph      = 0;
+            hessian_crs            = 0;
+            hessian_bsr            = 0;
+            hessian_bcrs_sym       = 0;
+            hessian_crs_sym        = 0;
+            hessian_diag           = 0;
+            hessian_block_diag_sym = 0;
+            gradient               = 0;
+            apply                  = 0;
+            value                  = 0;
+            apply_constraints      = 0;
+            constraints_gradient   = 0;
             apply_zero_constraints = 0;
-            copy_constrained_dofs = 0;
-            report_solution = 0;
-            initial_guess = 0;
+            copy_constrained_dofs  = 0;
+            report_solution        = 0;
+            initial_guess          = 0;
         }
 
         void describe(std::ostream &os) const {
@@ -988,6 +923,7 @@ namespace sfem {
             os << "hessian_bcrs_sym," << hessian_bcrs_sym << "\n";
             os << "hessian_crs_sym," << hessian_crs_sym << "\n";
             os << "hessian_diag," << hessian_diag << "\n";
+            os << "hessian_block_diag_sym," << hessian_block_diag_sym << "\n";
             os << "gradient," << gradient << "\n";
             os << "apply," << apply << "\n";
             os << "value," << value << "\n";
@@ -1005,12 +941,12 @@ namespace sfem {
     class Output::Impl {
     public:
         std::shared_ptr<FunctionSpace> space;
-        bool AoS_to_SoA{false};
-        std::string output_dir{"."};
-        std::string file_format{"%s/%s.raw"};
-        std::string time_dependent_file_format{"%s/%s.%09d.raw"};
-        size_t export_counter{0};
-        logger_t time_logger;
+        bool                           AoS_to_SoA{false};
+        std::string                    output_dir{"."};
+        std::string                    file_format{"%s/%s.raw"};
+        std::string                    time_dependent_file_format{"%s/%s.%09d.raw"};
+        size_t                         export_counter{0};
+        logger_t                       time_logger;
         Impl() { log_init(&time_logger); }
         ~Impl() { log_destroy(&time_logger); }
     };
@@ -1046,7 +982,7 @@ namespace sfem {
             ptrdiff_t n_blocks = impl_->space->n_dofs() / block_size;
 
             auto buff = h_buffer<real_t>(n_blocks);
-            auto bb = buff->data();
+            auto bb   = buff->data();
 
             char path[2048];
             for (int b = 0; b < block_size; b++) {
@@ -1057,8 +993,7 @@ namespace sfem {
                 char b_name[1024];
                 sprintf(b_name, "%s.%d", name, b);
                 sprintf(path, impl_->file_format.c_str(), impl_->output_dir.c_str(), b_name);
-                if (array_write(
-                            mesh->comm, path, SFEM_MPI_REAL_T, buff->data(), n_blocks, n_blocks)) {
+                if (array_write(mesh->comm, path, SFEM_MPI_REAL_T, buff->data(), n_blocks, n_blocks)) {
                     return SFEM_FAILURE;
                 }
             }
@@ -1066,12 +1001,7 @@ namespace sfem {
         } else {
             char path[2048];
             sprintf(path, impl_->file_format.c_str(), impl_->output_dir.c_str(), name);
-            if (array_write(mesh->comm,
-                            path,
-                            SFEM_MPI_REAL_T,
-                            x,
-                            impl_->space->n_dofs(),
-                            impl_->space->n_dofs())) {
+            if (array_write(mesh->comm, path, SFEM_MPI_REAL_T, x, impl_->space->n_dofs(), impl_->space->n_dofs())) {
                 return SFEM_FAILURE;
             }
         }
@@ -1090,18 +1020,9 @@ namespace sfem {
         }
 
         char path[2048];
-        sprintf(path,
-                impl_->time_dependent_file_format.c_str(),
-                impl_->output_dir.c_str(),
-                name,
-                impl_->export_counter++);
+        sprintf(path, impl_->time_dependent_file_format.c_str(), impl_->output_dir.c_str(), name, impl_->export_counter++);
 
-        if (array_write(mesh->comm,
-                        path,
-                        SFEM_MPI_REAL_T,
-                        x,
-                        impl_->space->n_dofs(),
-                        impl_->space->n_dofs())) {
+        if (array_write(mesh->comm, path, SFEM_MPI_REAL_T, x, impl_->space->n_dofs(), impl_->space->n_dofs())) {
             return SFEM_FAILURE;
         }
 
@@ -1116,13 +1037,13 @@ namespace sfem {
 
     class Function::Impl {
     public:
-        std::shared_ptr<FunctionSpace> space;
-        std::vector<std::shared_ptr<Op>> ops;
+        std::shared_ptr<FunctionSpace>           space;
+        std::vector<std::shared_ptr<Op>>         ops;
         std::vector<std::shared_ptr<Constraint>> constraints;
-        Timings timings;
+        Timings                                  timings;
 
         std::shared_ptr<Output> output;
-        bool handle_constraints{true};
+        bool                    handle_constraints{true};
     };
 
     ExecutionSpace Function::execution_space() const {
@@ -1136,9 +1057,8 @@ namespace sfem {
         return ret;
     }
 
-    Function::Function(const std::shared_ptr<FunctionSpace> &space)
-        : impl_(std::make_unique<Impl>()) {
-        impl_->space = space;
+    Function::Function(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>()) {
+        impl_->space  = space;
         impl_->output = std::make_shared<Output>(space);
     }
 
@@ -1154,13 +1074,9 @@ namespace sfem {
     }
 
     void Function::add_operator(const std::shared_ptr<Op> &op) { impl_->ops.push_back(op); }
-    void Function::add_constraint(const std::shared_ptr<Constraint> &c) {
-        impl_->constraints.push_back(c);
-    }
+    void Function::add_constraint(const std::shared_ptr<Constraint> &c) { impl_->constraints.push_back(c); }
 
-    void Function::add_dirichlet_conditions(const std::shared_ptr<DirichletConditions> &c) {
-        add_constraint(c);
-    }
+    void Function::add_dirichlet_conditions(const std::shared_ptr<DirichletConditions> &c) { add_constraint(c); }
 
     int Function::constaints_mask(mask_t *mask) {
         for (auto &c : impl_->constraints) {
@@ -1170,14 +1086,12 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    std::shared_ptr<CRSGraph> Function::crs_graph() const {
-        return impl_->space->dof_to_dof_graph();
-    }
+    std::shared_ptr<CRSGraph> Function::crs_graph() const { return impl_->space->dof_to_dof_graph(); }
 
-    int Function::hessian_crs(const real_t *const x,
+    int Function::hessian_crs(const real_t *const  x,
                               const count_t *const rowptr,
-                              const idx_t *const colidx,
-                              real_t *const values) {
+                              const idx_t *const   colidx,
+                              real_t *const        values) {
         SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.hessian_crs);
 
         for (auto &op : impl_->ops) {
@@ -1196,10 +1110,10 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int Function::hessian_bsr(const real_t *const x,
+    int Function::hessian_bsr(const real_t *const  x,
                               const count_t *const rowptr,
-                              const idx_t *const colidx,
-                              real_t *const values) {
+                              const idx_t *const   colidx,
+                              real_t *const        values) {
         SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.hessian_bsr);
 
         for (auto &op : impl_->ops) {
@@ -1218,18 +1132,16 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int Function::hessian_bcrs_sym(const real_t *const x,
+    int Function::hessian_bcrs_sym(const real_t *const  x,
                                    const count_t *const rowptr,
-                                   const idx_t *const colidx,
-                                   const ptrdiff_t block_stride,
-                                   real_t **const diag_values,
-                                   real_t **const off_diag_values) {
+                                   const idx_t *const   colidx,
+                                   const ptrdiff_t      block_stride,
+                                   real_t **const       diag_values,
+                                   real_t **const       off_diag_values) {
         SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.hessian_bcrs_sym);
 
         for (auto &op : impl_->ops) {
-            if (op->hessian_bcrs_sym(
-                        x, rowptr, colidx, block_stride, diag_values, off_diag_values) !=
-                SFEM_SUCCESS) {
+            if (op->hessian_bcrs_sym(x, rowptr, colidx, block_stride, diag_values, off_diag_values) != SFEM_SUCCESS) {
                 std::cerr << "Failed hessian_bcrs_sym in op: " << op->name() << "\n";
                 return SFEM_FAILURE;
             }
@@ -1237,16 +1149,15 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int Function::hessian_crs_sym(const real_t *const x,
+    int Function::hessian_crs_sym(const real_t *const  x,
                                   const count_t *const rowptr,
-                                  const idx_t *const colidx,
-                                  real_t *const diag_values,
-                                  real_t *const off_diag_values) {
+                                  const idx_t *const   colidx,
+                                  real_t *const        diag_values,
+                                  real_t *const        off_diag_values) {
         SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.hessian_crs_sym);
 
         for (auto &op : impl_->ops) {
-            if (op->hessian_crs_sym(x, rowptr, colidx, diag_values, off_diag_values) !=
-                SFEM_SUCCESS) {
+            if (op->hessian_crs_sym(x, rowptr, colidx, diag_values, off_diag_values) != SFEM_SUCCESS) {
                 std::cerr << "Failed hessian_crs_sym in op: " << op->name() << "\n";
                 return SFEM_FAILURE;
             }
@@ -1267,6 +1178,19 @@ namespace sfem {
         if (impl_->handle_constraints) {
             for (auto &c : impl_->constraints) {
                 c->apply_value(1, values);
+            }
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    int Function::hessian_block_diag_sym(const real_t *const x, real_t *const values) {
+        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.hessian_block_diag_sym);
+
+        for (auto &op : impl_->ops) {
+            if (op->hessian_block_diag_sym(x, values) != SFEM_SUCCESS) {
+                std::cerr << "Failed hessian_diag in op: " << op->name() << "\n";
+                return SFEM_FAILURE;
             }
         }
 
@@ -1307,8 +1231,7 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    std::shared_ptr<Operator<real_t>> Function::linear_op_variant(
-            const std::vector<std::pair<std::string, int>> &options) {
+    std::shared_ptr<Operator<real_t>> Function::linear_op_variant(const std::vector<std::pair<std::string, int>> &options) {
         std::vector<std::shared_ptr<Op>> cloned_ops;
 
         for (auto &op : impl_->ops) {
@@ -1419,8 +1342,7 @@ namespace sfem {
         return derefine(impl_->space->derefine(), dirichlet_as_zero);
     }
 
-    std::shared_ptr<Function> Function::derefine(const std::shared_ptr<FunctionSpace> &space,
-                                                 const bool dirichlet_as_zero) {
+    std::shared_ptr<Function> Function::derefine(const std::shared_ptr<FunctionSpace> &space, const bool dirichlet_as_zero) {
         auto ret = std::make_shared<Function>(space);
 
         for (auto &o : impl_->ops) {
@@ -1456,7 +1378,7 @@ namespace sfem {
     class LinearElasticity final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        enum ElemType element_type { INVALID };
+        enum ElemType                  element_type { INVALID };
 
         real_t mu{1}, lambda{1};
 
@@ -1467,31 +1389,31 @@ namespace sfem {
 
             auto ret = std::make_unique<LinearElasticity>(space);
 
-            real_t SFEM_SHEAR_MODULUS = 1;
+            real_t SFEM_SHEAR_MODULUS        = 1;
             real_t SFEM_FIRST_LAME_PARAMETER = 1;
 
             SFEM_READ_ENV(SFEM_SHEAR_MODULUS, atof);
             SFEM_READ_ENV(SFEM_FIRST_LAME_PARAMETER, atof);
 
-            ret->mu = SFEM_SHEAR_MODULUS;
-            ret->lambda = SFEM_FIRST_LAME_PARAMETER;
+            ret->mu           = SFEM_SHEAR_MODULUS;
+            ret->lambda       = SFEM_FIRST_LAME_PARAMETER;
             ret->element_type = (enum ElemType)space->element_type();
             return ret;
         }
 
         std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
-            auto ret = std::make_shared<LinearElasticity>(space);
+            auto ret          = std::make_shared<LinearElasticity>(space);
             ret->element_type = macro_type_variant(element_type);
-            ret->mu = mu;
-            ret->lambda = lambda;
+            ret->mu           = mu;
+            ret->lambda       = lambda;
             return ret;
         }
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
-            auto ret = std::make_shared<LinearElasticity>(space);
+            auto ret          = std::make_shared<LinearElasticity>(space);
             ret->element_type = macro_base_elem(element_type);
-            ret->mu = mu;
-            ret->lambda = lambda;
+            ret->mu           = mu;
+            ret->lambda       = lambda;
             return ret;
         }
 
@@ -1502,10 +1424,10 @@ namespace sfem {
 
         LinearElasticity(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
-        int hessian_crs(const real_t *const x,
+        int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override {
+                        const idx_t *const   colidx,
+                        real_t *const        values) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             auto graph = space->node_to_node_graph();
@@ -1524,10 +1446,10 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        int hessian_bsr(const real_t *const x,
+        int hessian_bsr(const real_t *const  x,
                         const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override {
+                        const idx_t *const   colidx,
+                        real_t *const        values) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             auto graph = space->node_to_node_graph();
@@ -1546,12 +1468,12 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        int hessian_bcrs_sym(const real_t *const x,
+        int hessian_bcrs_sym(const real_t *const  x,
                              const count_t *const rowptr,
-                             const idx_t *const colidx,
-                             const ptrdiff_t block_stride,
-                             real_t **const diag_values,
-                             real_t **const off_diag_values) override {
+                             const idx_t *const   colidx,
+                             const ptrdiff_t      block_stride,
+                             real_t **const       diag_values,
+                             real_t **const       off_diag_values) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             linear_elasticity_bcrs_sym(element_type,
@@ -1572,29 +1494,16 @@ namespace sfem {
         int hessian_diag(const real_t *const, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            linear_elasticity_assemble_diag_aos(element_type,
-                                                mesh->nelements,
-                                                mesh->nnodes,
-                                                mesh->elements,
-                                                mesh->points,
-                                                this->mu,
-                                                this->lambda,
-                                                out);
+            linear_elasticity_assemble_diag_aos(
+                    element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, this->mu, this->lambda, out);
             return SFEM_SUCCESS;
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            linear_elasticity_assemble_gradient_aos(element_type,
-                                                    mesh->nelements,
-                                                    mesh->nnodes,
-                                                    mesh->elements,
-                                                    mesh->points,
-                                                    this->mu,
-                                                    this->lambda,
-                                                    x,
-                                                    out);
+            linear_elasticity_assemble_gradient_aos(
+                    element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, this->mu, this->lambda, x, out);
 
             return SFEM_SUCCESS;
         }
@@ -1602,15 +1511,8 @@ namespace sfem {
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            linear_elasticity_apply_aos(element_type,
-                                        mesh->nelements,
-                                        mesh->nnodes,
-                                        mesh->elements,
-                                        mesh->points,
-                                        this->mu,
-                                        this->lambda,
-                                        h,
-                                        out);
+            linear_elasticity_apply_aos(
+                    element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, this->mu, this->lambda, h, out);
 
             return SFEM_SUCCESS;
         }
@@ -1618,15 +1520,8 @@ namespace sfem {
         int value(const real_t *x, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            linear_elasticity_assemble_value_aos(element_type,
-                                                 mesh->nelements,
-                                                 mesh->nnodes,
-                                                 mesh->elements,
-                                                 mesh->points,
-                                                 this->mu,
-                                                 this->lambda,
-                                                 x,
-                                                 out);
+            linear_elasticity_assemble_value_aos(
+                    element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, this->mu, this->lambda, x, out);
 
             return SFEM_SUCCESS;
         }
@@ -1637,11 +1532,11 @@ namespace sfem {
     class SemiStructuredLinearElasticity : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        enum ElemType element_type { INVALID };
+        enum ElemType                  element_type { INVALID };
 
         real_t mu{1}, lambda{1};
-        bool use_affine_approximation{false};
-        long calls{0};
+        bool   use_affine_approximation{false};
+        long   calls{0};
         double total_time{0};
 
         ~SemiStructuredLinearElasticity() {
@@ -1668,14 +1563,14 @@ namespace sfem {
             assert(space->element_type() == PROTEUS_HEX8);  // REMOVEME once generalized approach
             auto ret = std::make_unique<SemiStructuredLinearElasticity>(space);
 
-            real_t SFEM_SHEAR_MODULUS = 1;
+            real_t SFEM_SHEAR_MODULUS        = 1;
             real_t SFEM_FIRST_LAME_PARAMETER = 1;
 
             SFEM_READ_ENV(SFEM_SHEAR_MODULUS, atof);
             SFEM_READ_ENV(SFEM_FIRST_LAME_PARAMETER, atof);
 
-            ret->mu = SFEM_SHEAR_MODULUS;
-            ret->lambda = SFEM_FIRST_LAME_PARAMETER;
+            ret->mu           = SFEM_SHEAR_MODULUS;
+            ret->lambda       = SFEM_FIRST_LAME_PARAMETER;
             ret->element_type = (enum ElemType)space->element_type();
 
             int SFEM_HEX8_ASSUME_AFFINE = ret->use_affine_approximation;
@@ -1693,7 +1588,7 @@ namespace sfem {
 
         std::shared_ptr<Op> clone() const override {
             auto ret = std::make_shared<SemiStructuredLinearElasticity>(space);
-            *ret = *this;
+            *ret     = *this;
             return ret;
         }
 
@@ -1705,10 +1600,10 @@ namespace sfem {
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
             assert(space->element_type() == macro_base_elem(element_type));
-            auto ret = std::make_shared<LinearElasticity>(space);
+            auto ret          = std::make_shared<LinearElasticity>(space);
             ret->element_type = macro_base_elem(element_type);
-            ret->mu = mu;
-            ret->lambda = lambda;
+            ret->mu           = mu;
+            ret->lambda       = lambda;
             return ret;
         }
 
@@ -1717,21 +1612,20 @@ namespace sfem {
 
         int initialize() override { return SFEM_SUCCESS; }
 
-        SemiStructuredLinearElasticity(const std::shared_ptr<FunctionSpace> &space)
-            : space(space) {}
+        SemiStructuredLinearElasticity(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
-        int hessian_crs(const real_t *const x,
+        int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override {
+                        const idx_t *const   colidx,
+                        real_t *const        values) override {
             assert(false);
             return SFEM_FAILURE;
         }
 
-        int hessian_bsr(const real_t *const x,
+        int hessian_bsr(const real_t *const  x,
                         const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override {
+                        const idx_t *const   colidx,
+                        real_t *const        values) override {
             auto &ssm = space->semi_structured_mesh();
 
             return proteus_affine_hex8_elasticity_bsr(ssm.level(),
@@ -1774,7 +1668,7 @@ namespace sfem {
             calls++;
 
             double tick = MPI_Wtime();
-            int err;
+            int    err;
             if (use_affine_approximation) {
                 err = proteus_affine_hex8_linear_elasticity_apply(ssm.level(),
                                                                   ssm.n_elements(),
@@ -1827,7 +1721,7 @@ namespace sfem {
     class Laplacian final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        enum ElemType element_type { INVALID };
+        enum ElemType                  element_type { INVALID };
 
         const char *name() const override { return "Laplacian"; }
         inline bool is_linear() const override { return true; }
@@ -1837,19 +1731,19 @@ namespace sfem {
 
             assert(1 == space->block_size());
 
-            auto ret = std::make_unique<Laplacian>(space);
+            auto ret          = std::make_unique<Laplacian>(space);
             ret->element_type = (enum ElemType)space->element_type();
             return ret;
         }
 
         std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
-            auto ret = std::make_shared<Laplacian>(space);
+            auto ret          = std::make_shared<Laplacian>(space);
             ret->element_type = macro_type_variant(element_type);
             return ret;
         }
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
-            auto ret = std::make_shared<Laplacian>(space);
+            auto ret          = std::make_shared<Laplacian>(space);
             ret->element_type = macro_base_elem(element_type);
             return ret;
         }
@@ -1858,10 +1752,10 @@ namespace sfem {
 
         Laplacian(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
-        int hessian_crs(const real_t *const x,
+        int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override {
+                        const idx_t *const   colidx,
+                        real_t *const        values) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             auto graph = space->dof_to_dof_graph();
@@ -1876,11 +1770,11 @@ namespace sfem {
                                  values);
         }
 
-        int hessian_crs_sym(const real_t *const x,
+        int hessian_crs_sym(const real_t *const  x,
                             const count_t *const rowptr,
-                            const idx_t *const colidx,
-                            real_t *const diag_values,
-                            real_t *const off_diag_values) override {
+                            const idx_t *const   colidx,
+                            real_t *const        diag_values,
+                            real_t *const        off_diag_values) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             // auto graph = space->node_to_node_graph_upper_triangular();
@@ -1899,48 +1793,25 @@ namespace sfem {
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            return laplacian_diag(element_type,
-                                  mesh->nelements,
-                                  mesh->nnodes,
-                                  mesh->elements,
-                                  mesh->points,
-                                  values);
+            return laplacian_diag(element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, values);
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            return laplacian_assemble_gradient(element_type,
-                                               mesh->nelements,
-                                               mesh->nnodes,
-                                               mesh->elements,
-                                               mesh->points,
-                                               x,
-                                               out);
+            return laplacian_assemble_gradient(element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            return laplacian_apply(element_type,
-                                   mesh->nelements,
-                                   mesh->nnodes,
-                                   mesh->elements,
-                                   mesh->points,
-                                   h,
-                                   out);
+            return laplacian_apply(element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, h, out);
         }
 
         int value(const real_t *x, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            return laplacian_assemble_value(element_type,
-                                            mesh->nelements,
-                                            mesh->nnodes,
-                                            mesh->elements,
-                                            mesh->points,
-                                            x,
-                                            out);
+            return laplacian_assemble_value(element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
         }
 
         int report(const real_t *const) override { return SFEM_SUCCESS; }
@@ -1949,10 +1820,10 @@ namespace sfem {
     class SemiStructuredLaplacian : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        enum ElemType element_type { INVALID };
-        bool use_affine_approximation{false};
+        enum ElemType                  element_type { INVALID };
+        bool                           use_affine_approximation{false};
 
-        long calls{0};
+        long   calls{0};
         double total_time{0};
 
         ~SemiStructuredLaplacian() {
@@ -1996,7 +1867,7 @@ namespace sfem {
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
             assert(space->element_type() == macro_base_elem(element_type));
-            auto ret = std::make_shared<Laplacian>(space);
+            auto ret          = std::make_shared<Laplacian>(space);
             ret->element_type = macro_base_elem(element_type);
             return ret;
         }
@@ -2008,10 +1879,10 @@ namespace sfem {
 
         SemiStructuredLaplacian(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
-        int hessian_crs(const real_t *const x,
+        int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override {
+                        const idx_t *const   colidx,
+                        real_t *const        values) override {
             fprintf(stderr, "[Error] ss:Laplacian::hessian_crs NOT IMPLEMENTED!\n");
             assert(false);
             return SFEM_FAILURE;
@@ -2019,12 +1890,8 @@ namespace sfem {
 
         int hessian_diag(const real_t *const, real_t *const out) override {
             auto &ssm = space->semi_structured_mesh();
-            return proteus_affine_hex8_laplacian_diag(ssm.level(),
-                                                      ssm.n_elements(),
-                                                      ssm.interior_start(),
-                                                      ssm.element_data(),
-                                                      ssm.point_data(),
-                                                      out);
+            return proteus_affine_hex8_laplacian_diag(
+                    ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), out);
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
@@ -2042,22 +1909,12 @@ namespace sfem {
 
             int err = 0;
             if (use_affine_approximation) {
-                err = proteus_affine_hex8_laplacian_apply(ssm.level(),
-                                                          ssm.n_elements(),
-                                                          ssm.interior_start(),
-                                                          ssm.element_data(),
-                                                          ssm.point_data(),
-                                                          h,
-                                                          out);
+                err = proteus_affine_hex8_laplacian_apply(
+                        ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), h, out);
 
             } else {
-                err = proteus_hex8_laplacian_apply(ssm.level(),
-                                                   ssm.n_elements(),
-                                                   ssm.interior_start(),
-                                                   ssm.element_data(),
-                                                   ssm.point_data(),
-                                                   h,
-                                                   out);
+                err = proteus_hex8_laplacian_apply(
+                        ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), h, out);
             }
 
             double tock = MPI_Wtime();
@@ -2078,7 +1935,7 @@ namespace sfem {
     class Mass final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        enum ElemType element_type { INVALID };
+        enum ElemType                  element_type { INVALID };
 
         const char *name() const override { return "Mass"; }
         inline bool is_linear() const override { return true; }
@@ -2087,7 +1944,7 @@ namespace sfem {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
             assert(1 == space->block_size());
 
-            auto ret = std::make_unique<Mass>(space);
+            auto ret          = std::make_unique<Mass>(space);
             ret->element_type = (enum ElemType)space->element_type();
             return ret;
         }
@@ -2096,10 +1953,10 @@ namespace sfem {
 
         Mass(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
-        int hessian_crs(const real_t *const x,
+        int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override {
+                        const idx_t *const   colidx,
+                        real_t *const        values) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             auto graph = space->dof_to_dof_graph();
@@ -2119,15 +1976,7 @@ namespace sfem {
         int gradient(const real_t *const x, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            apply_mass(element_type,
-                       mesh->nelements,
-                       mesh->nnodes,
-                       mesh->elements,
-                       mesh->points,
-                       1,
-                       x,
-                       1,
-                       out);
+            apply_mass(element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, 1, x, 1, out);
 
             return SFEM_SUCCESS;
         }
@@ -2135,15 +1984,7 @@ namespace sfem {
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            apply_mass(element_type,
-                       mesh->nelements,
-                       mesh->nnodes,
-                       mesh->elements,
-                       mesh->points,
-                       1,
-                       h,
-                       1,
-                       out);
+            apply_mass(element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, 1, h, 1, out);
 
             return SFEM_SUCCESS;
         }
@@ -2171,14 +2012,14 @@ namespace sfem {
     class LumpedMass final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        enum ElemType element_type { INVALID };
+        enum ElemType                  element_type { INVALID };
 
         const char *name() const override { return "LumpedMass"; }
         inline bool is_linear() const override { return true; }
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
-            auto mesh = (mesh_t *)space->mesh().impl_mesh();
-            auto ret = std::make_unique<LumpedMass>(space);
+            auto mesh         = (mesh_t *)space->mesh().impl_mesh();
+            auto ret          = std::make_unique<LumpedMass>(space);
             ret->element_type = (enum ElemType)space->element_type();
             return ret;
         }
@@ -2191,20 +2032,10 @@ namespace sfem {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             if (space->block_size() == 1) {
-                assemble_lumped_mass(element_type,
-                                     mesh->nelements,
-                                     mesh->nnodes,
-                                     mesh->elements,
-                                     mesh->points,
-                                     values);
+                assemble_lumped_mass(element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, values);
             } else {
                 real_t *temp = (real_t *)calloc(mesh->nnodes, sizeof(real_t));
-                assemble_lumped_mass(element_type,
-                                     mesh->nelements,
-                                     mesh->nnodes,
-                                     mesh->elements,
-                                     mesh->points,
-                                     temp);
+                assemble_lumped_mass(element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, temp);
 
                 int bs = space->block_size();
 #pragma omp parallel for
@@ -2220,10 +2051,10 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        int hessian_crs(const real_t *const x,
+        int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override {
+                        const idx_t *const   colidx,
+                        real_t *const        values) override {
             assert(0);
             return SFEM_FAILURE;
         }
@@ -2249,7 +2080,7 @@ namespace sfem {
     class CVFEMMass final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        enum ElemType element_type { INVALID };
+        enum ElemType                  element_type { INVALID };
 
         const char *name() const override { return "CVFEMMass"; }
         inline bool is_linear() const override { return true; }
@@ -2258,7 +2089,7 @@ namespace sfem {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
             assert(1 == space->block_size());
 
-            auto ret = std::make_unique<CVFEMMass>(space);
+            auto ret          = std::make_unique<CVFEMMass>(space);
             ret->element_type = (enum ElemType)space->element_type();
             return ret;
         }
@@ -2270,20 +2101,15 @@ namespace sfem {
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            cvfem_cv_volumes(element_type,
-                             mesh->nelements,
-                             mesh->nnodes,
-                             mesh->elements,
-                             mesh->points,
-                             values);
+            cvfem_cv_volumes(element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, values);
 
             return SFEM_SUCCESS;
         }
 
-        int hessian_crs(const real_t *const x,
+        int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override {
+                        const idx_t *const   colidx,
+                        real_t *const        values) override {
             assert(0);
             return SFEM_FAILURE;
         }
@@ -2309,15 +2135,13 @@ namespace sfem {
     class CVFEMUpwindConvection final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        real_t *vel[3];
-        enum ElemType element_type { INVALID };
+        real_t                        *vel[3];
+        enum ElemType                  element_type { INVALID };
 
         const char *name() const override { return "CVFEMUpwindConvection"; }
         inline bool is_linear() const override { return true; }
 
-        void set_field(const char * /* name  = velocity */,
-                       const int component,
-                       real_t *v) override {
+        void set_field(const char * /* name  = velocity */, const int component, real_t *v) override {
             if (vel[component]) {
                 free(vel[component]);
             }
@@ -2330,7 +2154,7 @@ namespace sfem {
 
             assert(1 == space->block_size());
 
-            auto ret = std::make_unique<CVFEMUpwindConvection>(space);
+            auto ret    = std::make_unique<CVFEMUpwindConvection>(space);
             ret->vel[0] = nullptr;
             ret->vel[1] = nullptr;
             ret->vel[2] = nullptr;
@@ -2354,24 +2178,9 @@ namespace sfem {
             }
 
             ptrdiff_t nlocal, nglobal;
-            if (array_create_from_file(mesh->comm,
-                                       SFEM_VELX,
-                                       SFEM_MPI_REAL_T,
-                                       (void **)&ret->vel[0],
-                                       &nlocal,
-                                       &nglobal) ||
-                array_create_from_file(mesh->comm,
-                                       SFEM_VELY,
-                                       SFEM_MPI_REAL_T,
-                                       (void **)&ret->vel[1],
-                                       &nlocal,
-                                       &nglobal) ||
-                array_create_from_file(mesh->comm,
-                                       SFEM_VELZ,
-                                       SFEM_MPI_REAL_T,
-                                       (void **)&ret->vel[2],
-                                       &nlocal,
-                                       &nglobal)) {
+            if (array_create_from_file(mesh->comm, SFEM_VELX, SFEM_MPI_REAL_T, (void **)&ret->vel[0], &nlocal, &nglobal) ||
+                array_create_from_file(mesh->comm, SFEM_VELY, SFEM_MPI_REAL_T, (void **)&ret->vel[1], &nlocal, &nglobal) ||
+                array_create_from_file(mesh->comm, SFEM_VELZ, SFEM_MPI_REAL_T, (void **)&ret->vel[2], &nlocal, &nglobal)) {
                 fprintf(stderr, "Unable to read input velocity\n");
                 assert(0);
                 return nullptr;
@@ -2390,10 +2199,10 @@ namespace sfem {
 
         ~CVFEMUpwindConvection() {}
 
-        int hessian_crs(const real_t *const x,
+        int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override {
+                        const idx_t *const   colidx,
+                        real_t *const        values) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             // auto graph = space->dof_to_dof_graph();
@@ -2416,14 +2225,7 @@ namespace sfem {
         int gradient(const real_t *const x, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            cvfem_convection_apply(element_type,
-                                   mesh->nelements,
-                                   mesh->nnodes,
-                                   mesh->elements,
-                                   mesh->points,
-                                   vel,
-                                   x,
-                                   out);
+            cvfem_convection_apply(element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, vel, x, out);
 
             return SFEM_SUCCESS;
         }
@@ -2431,14 +2233,7 @@ namespace sfem {
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            cvfem_convection_apply(element_type,
-                                   mesh->nelements,
-                                   mesh->nnodes,
-                                   mesh->elements,
-                                   mesh->points,
-                                   vel,
-                                   h,
-                                   out);
+            cvfem_convection_apply(element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, vel, h, out);
 
             return SFEM_SUCCESS;
         }
@@ -2468,7 +2263,7 @@ namespace sfem {
     class NeoHookeanOgden final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        enum ElemType element_type { INVALID };
+        enum ElemType                  element_type { INVALID };
 
         real_t mu{1}, lambda{1};
 
@@ -2479,31 +2274,31 @@ namespace sfem {
 
             auto ret = std::make_unique<NeoHookeanOgden>(space);
 
-            real_t SFEM_SHEAR_MODULUS = 1;
+            real_t SFEM_SHEAR_MODULUS        = 1;
             real_t SFEM_FIRST_LAME_PARAMETER = 1;
 
             SFEM_READ_ENV(SFEM_SHEAR_MODULUS, atof);
             SFEM_READ_ENV(SFEM_FIRST_LAME_PARAMETER, atof);
 
-            ret->mu = SFEM_SHEAR_MODULUS;
-            ret->lambda = SFEM_FIRST_LAME_PARAMETER;
+            ret->mu           = SFEM_SHEAR_MODULUS;
+            ret->lambda       = SFEM_FIRST_LAME_PARAMETER;
             ret->element_type = (enum ElemType)space->element_type();
             return ret;
         }
 
         std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
-            auto ret = std::make_shared<NeoHookeanOgden>(space);
+            auto ret          = std::make_shared<NeoHookeanOgden>(space);
             ret->element_type = macro_type_variant(element_type);
-            ret->mu = mu;
-            ret->lambda = lambda;
+            ret->mu           = mu;
+            ret->lambda       = lambda;
             return ret;
         }
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
-            auto ret = std::make_shared<NeoHookeanOgden>(space);
+            auto ret          = std::make_shared<NeoHookeanOgden>(space);
             ret->element_type = macro_base_elem(element_type);
-            ret->mu = mu;
-            ret->lambda = lambda;
+            ret->mu           = mu;
+            ret->lambda       = lambda;
             return ret;
         }
 
@@ -2514,10 +2309,10 @@ namespace sfem {
 
         NeoHookeanOgden(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
-        int hessian_crs(const real_t *const x,
+        int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override {
+                        const idx_t *const   colidx,
+                        real_t *const        values) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             auto graph = space->node_to_node_graph();
@@ -2538,58 +2333,29 @@ namespace sfem {
         int hessian_diag(const real_t *const x, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            return neohookean_ogden_diag_aos(element_type,
-                                             mesh->nelements,
-                                             mesh->nnodes,
-                                             mesh->elements,
-                                             mesh->points,
-                                             this->mu,
-                                             this->lambda,
-                                             x,
-                                             out);
+            return neohookean_ogden_diag_aos(
+                    element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, this->mu, this->lambda, x, out);
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            return neohookean_ogden_gradient_aos(element_type,
-                                                 mesh->nelements,
-                                                 mesh->nnodes,
-                                                 mesh->elements,
-                                                 mesh->points,
-                                                 this->mu,
-                                                 this->lambda,
-                                                 x,
-                                                 out);
+            return neohookean_ogden_gradient_aos(
+                    element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, this->mu, this->lambda, x, out);
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            return neohookean_ogden_apply_aos(element_type,
-                                              mesh->nelements,
-                                              mesh->nnodes,
-                                              mesh->elements,
-                                              mesh->points,
-                                              this->mu,
-                                              this->lambda,
-                                              x,
-                                              h,
-                                              out);
+            return neohookean_ogden_apply_aos(
+                    element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, this->mu, this->lambda, x, h, out);
         }
 
         int value(const real_t *x, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            return neohookean_ogden_value_aos(element_type,
-                                              mesh->nelements,
-                                              mesh->nnodes,
-                                              mesh->elements,
-                                              mesh->points,
-                                              this->mu,
-                                              this->lambda,
-                                              x,
-                                              out);
+            return neohookean_ogden_value_aos(
+                    element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, this->mu, this->lambda, x, out);
         }
 
         int report(const real_t *const) override { return SFEM_SUCCESS; }
@@ -2597,24 +2363,22 @@ namespace sfem {
 
     class BoundaryMass final : public Op {
     public:
-        std::shared_ptr<FunctionSpace> space;
+        std::shared_ptr<FunctionSpace>   space;
         std::shared_ptr<Buffer<idx_t *>> boundary_elements;
-        enum ElemType element_type { INVALID };
+        enum ElemType                    element_type { INVALID };
 
         const char *name() const override { return "BoundaryMass"; }
         inline bool is_linear() const override { return true; }
 
-        static std::unique_ptr<Op> create(
-                const std::shared_ptr<FunctionSpace> &space,
-                const std::shared_ptr<Buffer<idx_t *>> &boundary_elements) {
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace>   &space,
+                                          const std::shared_ptr<Buffer<idx_t *>> &boundary_elements) {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            auto ret = std::make_unique<BoundaryMass>(space);
+            auto ret          = std::make_unique<BoundaryMass>(space);
             auto element_type = (enum ElemType)space->element_type();
             ret->element_type = shell_type(side_type(element_type));
             if (ret->element_type == INVALID) {
-                std::cerr << "Invalid element type for BoundaryMass, Bulk element type: "
-                          << type_to_string(element_type) << "\n";
+                std::cerr << "Invalid element type for BoundaryMass, Bulk element type: " << type_to_string(element_type) << "\n";
                 return nullptr;
             }
             ret->boundary_elements = boundary_elements;
@@ -2625,10 +2389,10 @@ namespace sfem {
 
         BoundaryMass(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
-        int hessian_crs(const real_t *const x,
+        int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override {
+                        const idx_t *const   colidx,
+                        real_t *const        values) override {
             // auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             // auto graph = space->dof_to_dof_graph();
@@ -2670,8 +2434,8 @@ namespace sfem {
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            int block_size = space->block_size();
-            auto data = boundary_elements->data();
+            int  block_size = space->block_size();
+            auto data       = boundary_elements->data();
 
             for (int d = 0; d < block_size; d++) {
                 apply_mass(element_type,
@@ -2710,7 +2474,7 @@ namespace sfem {
 
     class Factory::Impl {
     public:
-        std::map<std::string, FactoryFunction> name_to_create;
+        std::map<std::string, FactoryFunction>         name_to_create;
         std::map<std::string, FactoryFunctionBoundary> name_to_create_boundary;
     };
 
@@ -2723,8 +2487,7 @@ namespace sfem {
 
         if (instance_.impl_->name_to_create.empty()) {
             instance_.private_register_op("LinearElasticity", LinearElasticity::create);
-            instance_.private_register_op("ss:LinearElasticity",
-                                          SemiStructuredLinearElasticity::create);
+            instance_.private_register_op("ss:LinearElasticity", SemiStructuredLinearElasticity::create);
             instance_.private_register_op("Laplacian", Laplacian::create);
             instance_.private_register_op("ss:Laplacian", SemiStructuredLaplacian::create);
             instance_.private_register_op("CVFEMUpwindConvection", CVFEMUpwindConvection::create);
@@ -2747,13 +2510,11 @@ namespace sfem {
         instance().private_register_op(name, factory_function);
     }
 
-    std::shared_ptr<Op> Factory::create_op_gpu(const std::shared_ptr<FunctionSpace> &space,
-                                               const char *name) {
+    std::shared_ptr<Op> Factory::create_op_gpu(const std::shared_ptr<FunctionSpace> &space, const char *name) {
         return Factory::create_op(space, d_op_str(name).c_str());
     }
 
-    std::shared_ptr<Op> Factory::create_op(const std::shared_ptr<FunctionSpace> &space,
-                                           const char *name) {
+    std::shared_ptr<Op> Factory::create_op(const std::shared_ptr<FunctionSpace> &space, const char *name) {
         assert(instance().impl_);
 
         std::string m_name = name;
@@ -2763,7 +2524,7 @@ namespace sfem {
         }
 
         auto &ntc = instance().impl_->name_to_create;
-        auto it = ntc.find(m_name);
+        auto  it  = ntc.find(m_name);
 
         if (it == ntc.end()) {
             std::cerr << "Unable to find op " << m_name << "\n";
@@ -2773,14 +2534,13 @@ namespace sfem {
         return it->second(space);
     }
 
-    std::shared_ptr<Op> Factory::create_boundary_op(
-            const std::shared_ptr<FunctionSpace> &space,
-            const std::shared_ptr<Buffer<idx_t *>> &boundary_elements,
-            const char *name) {
+    std::shared_ptr<Op> Factory::create_boundary_op(const std::shared_ptr<FunctionSpace>   &space,
+                                                    const std::shared_ptr<Buffer<idx_t *>> &boundary_elements,
+                                                    const char                             *name) {
         assert(instance().impl_);
 
         auto &ntc = instance().impl_->name_to_create_boundary;
-        auto it = ntc.find(name);
+        auto  it  = ntc.find(name);
 
         if (it == ntc.end()) {
             std::cerr << "Unable to find op " << name << "\n";
@@ -2792,8 +2552,7 @@ namespace sfem {
 
     std::string d_op_str(const std::string &name) { return "gpu:" + name; }
 
-    std::shared_ptr<Buffer<idx_t *>> mesh_connectivity_from_file(MPI_Comm comm,
-                                                                 const char *folder) {
+    std::shared_ptr<Buffer<idx_t *>> mesh_connectivity_from_file(MPI_Comm comm, const char *folder) {
         char pattern[1024 * 10];
         sprintf(pattern, "%s/i*.raw", folder);
 
@@ -2807,7 +2566,7 @@ namespace sfem {
         idx_t **data = (idx_t **)malloc(n_files * sizeof(idx_t *));
 
         ptrdiff_t local_size = -1;
-        ptrdiff_t size = -1;
+        ptrdiff_t size       = -1;
 
         printf("n_files (%d):\n", n_files);
         int err = 0;
@@ -2815,8 +2574,7 @@ namespace sfem {
             printf("%s\n", gl.gl_pathv[np]);
 
             idx_t *idx = 0;
-            err |= array_create_from_file(
-                    comm, gl.gl_pathv[np], SFEM_MPI_IDX_T, (void **)&idx, &local_size, &size);
+            err |= array_create_from_file(comm, gl.gl_pathv[np], SFEM_MPI_IDX_T, (void **)&idx, &local_size, &size);
 
             data[np] = idx;
         }
