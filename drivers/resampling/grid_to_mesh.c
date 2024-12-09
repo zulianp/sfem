@@ -391,13 +391,16 @@ int main(int argc, char* argv[]) {
 
         free(flops_v);
 
+        fflush(stdout);
         MPI_Barrier(MPI_COMM_WORLD);
+
         if (!rank) {
             const int    nelements       = mesh.nelements;
             const double elements_second = (double)tot_nelements / (double)(resample_tock - resample_tick);
 
             printf("\n");
             printf("===========================================\n");
+            printf("Rank: [%d]  file: %s: %d\n", rank, __FILE__, __LINE__);
 
             printf("Rank: [%d]  Nr of elements  %d\n",                    //
                    rank,                                                  //
