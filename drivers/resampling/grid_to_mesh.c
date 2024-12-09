@@ -259,18 +259,17 @@ int main(int argc, char* argv[]) {
 
                 if (info.element_type == TET10 && SFEM_TET10_CUDA == ON) {
 #if SFEM_TET10_CUDA == ON
-                    const int ret =
-                            hex8_to_tet10_resample_field_local_CUDA(mesh.nelements,  // number of elements
-                                                                    mesh.nnodes,     // number of nodes
-                                                                    1,  // assemble dual mass vector (0/1) only one MPI rank
-                                                                    mesh.elements,  // elements
-                                                                    mesh.points,    // coordinates
-                                                                    nlocal,         // number of nodes in each direction
-                                                                    stride,         // stride of the data
-                                                                    origin,         // origin of the domain
-                                                                    delta,          // delta of the domain
-                                                                    field,          // filed
-                                                                    g);             // output
+                    const int ret = hex8_to_tet10_resample_field_local_CUDA_wrapper(
+                            mpi_size,  // MPI size
+                            rank,      // MPI rank
+                            &mesh,     // Mesh
+                            1,         // assemble dual mass vector (0/1) only one MPI rank
+                            nlocal,    // number of nodes in each direction
+                            stride,    // stride of the data
+                            origin,    // origin of the domain
+                            delta,     // delta of the domain
+                            field,     // filed
+                            g);        // output
 
 #endif
                 } else {  // Other cases and CPU
@@ -306,7 +305,7 @@ int main(int argc, char* argv[]) {
                                                     mesh.points,
                                                     mass_vector);
 
-                } else {  // mesh.element_type == TET4
+                } else if (mesh.element_type == TET4) {  // mesh.element_type == TET4
                     enum ElemType st = shell_type(mesh.element_type);
 
                     if (st == INVALID) {
@@ -400,7 +399,7 @@ int main(int argc, char* argv[]) {
 
             printf("\n");
             printf("===========================================\n");
-            printf("Rank: [%d]  file: %s: %d\n", rank, __FILE__, __LINE__);
+            printf("Rank: [%d]  file: %s:%d\n", rank, __FILE__, __LINE__);
 
             printf("Rank: [%d]  Nr of elements  %d\n",                    //
                    rank,                                                  //
