@@ -6,6 +6,7 @@
 
 #include "sfem_base.h"
 #include "sfem_defs.h"
+#include "sfem_mesh.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,16 +19,16 @@ extern "C" {
  */
 int hex8_to_subparametric_tet10_resample_field_local(
         // Mesh
-        const ptrdiff_t nelements,          // number of elements
-        const ptrdiff_t nnodes,             // number of nodes
-        idx_t** const SFEM_RESTRICT elems,  // connectivity
-        geom_t** const SFEM_RESTRICT xyz,   // coordinates
+        const ptrdiff_t              nelements,  // number of elements
+        const ptrdiff_t              nnodes,     // number of nodes
+        idx_t** const SFEM_RESTRICT  elems,      // connectivity
+        geom_t** const SFEM_RESTRICT xyz,        // coordinates
         // SDF
         const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
         const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
-        const geom_t* const SFEM_RESTRICT origin,     // origin of the domain
-        const geom_t* const SFEM_RESTRICT delta,      // delta of the domain
-        const real_t* const SFEM_RESTRICT data,       // SDF
+        const geom_t* const SFEM_RESTRICT    origin,  // origin of the domain
+        const geom_t* const SFEM_RESTRICT    delta,   // delta of the domain
+        const real_t* const SFEM_RESTRICT    data,    // SDF
         // Output
         real_t* const SFEM_RESTRICT weighted_field);
 
@@ -37,60 +38,75 @@ int hex8_to_subparametric_tet10_resample_field_local(
 //                                                   geom_t** const SFEM_RESTRICT xyz,
 //                                                   real_t* const values);
 
-int tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, const ptrdiff_t nnodes,
-                                    idx_t** const SFEM_RESTRICT elems,
+int tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, const ptrdiff_t nnodes, idx_t** const SFEM_RESTRICT elems,
                                     geom_t** const SFEM_RESTRICT xyz, real_t* const values);
 
 int hex8_to_tet10_resample_field_local(
         // Mesh
-        const ptrdiff_t nelements,          // number of elements
-        const ptrdiff_t nnodes,             // number of nodes
-        idx_t** const SFEM_RESTRICT elems,  // connectivity
-        geom_t** const SFEM_RESTRICT xyz,   // coordinates
+        const ptrdiff_t              nelements,  // number of elements
+        const ptrdiff_t              nnodes,     // number of nodes
+        idx_t** const SFEM_RESTRICT  elems,      // connectivity
+        geom_t** const SFEM_RESTRICT xyz,        // coordinates
         // SDF
         const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
         const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
-        const geom_t* const SFEM_RESTRICT origin,     // origin of the domain
-        const geom_t* const SFEM_RESTRICT delta,      // delta of the domain
-        const real_t* const SFEM_RESTRICT data,       // SDF
+        const geom_t* const SFEM_RESTRICT    origin,  // origin of the domain
+        const geom_t* const SFEM_RESTRICT    delta,   // delta of the domain
+        const real_t* const SFEM_RESTRICT    data,    // SDF
         // Output
         real_t* const SFEM_RESTRICT weighted_field);
 
 int hex8_to_isoparametric_tet10_resample_field_local_cube1(
         /// Mesh
-        const ptrdiff_t nelements,          // number of elements
-        const ptrdiff_t nnodes,             // number of nodes
-        idx_t** const SFEM_RESTRICT elems,  // connectivity
-        geom_t** const SFEM_RESTRICT xyz,   // coordinates
+        const ptrdiff_t              nelements,  // number of elements
+        const ptrdiff_t              nnodes,     // number of nodes
+        idx_t** const SFEM_RESTRICT  elems,      // connectivity
+        geom_t** const SFEM_RESTRICT xyz,        // coordinates
         /// SDF
         const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
         const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
-        const geom_t* const SFEM_RESTRICT origin,     // origin of the domain
-        const geom_t* const SFEM_RESTRICT delta,      // delta of the domain
-        const real_t* const SFEM_RESTRICT data,       // SDF
+        const geom_t* const SFEM_RESTRICT    origin,  // origin of the domain
+        const geom_t* const SFEM_RESTRICT    delta,   // delta of the domain
+        const real_t* const SFEM_RESTRICT    data,    // SDF
         // Output
         real_t* const SFEM_RESTRICT weighted_field);
 
-real_t hex_aa_8_eval_weno4_3D_Unit(  //
-        const real_t x_unit,         //
-        const real_t y_unit,         //
-        const real_t z_unit,         //
-        const real_t ox_unit,        // Coordinates of the origin of the grid in the unitary space
-        const real_t oy_unit,        // for the structured grid
-        const real_t oz_unit,        // X, Y and Z
-        const ptrdiff_t i,           // it must be the absolute index
-        const ptrdiff_t j,           // Used to get the data
-        const ptrdiff_t k,           // From the data array
-        const ptrdiff_t* stride,     //
+real_t hex_aa_8_eval_weno4_3D_Unit(                 //
+        const real_t                      x_unit,   //
+        const real_t                      y_unit,   //
+        const real_t                      z_unit,   //
+        const real_t                      ox_unit,  // Coordinates of the origin of the grid in the unitary space
+        const real_t                      oy_unit,  // for the structured grid
+        const real_t                      oz_unit,  // X, Y and Z
+        const ptrdiff_t                   i,        // it must be the absolute index
+        const ptrdiff_t                   j,        // Used to get the data
+        const ptrdiff_t                   k,        // From the data array
+        const ptrdiff_t*                  stride,   //
         const real_t* const SFEM_RESTRICT data);
 
-int hex8_to_tet10_resample_field_local_CUDA(
-        // Mesh
-        const ptrdiff_t nelements,                 // number of elements
-        const ptrdiff_t nnodes,                    // number of nodes
-        const int bool_assemble_dual_mass_vector,  // assemble dual mass vector
-        idx_t** const SFEM_RESTRICT elems,         // connectivity
-        geom_t** const SFEM_RESTRICT xyz,          // coordinates
+int hex8_to_tet10_resample_field_local_CUDA_wrapper(  //
+        const int mpi_size,                           // MPI size
+        const int mpi_rank,                           // MPI rank
+                                                      // Mesh
+        mesh_t*   mesh,                               // Mesh
+        const int bool_assemble_dual_mass_vector,     // assemble dual mass vector
+        // SDF
+        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
+        const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
+
+        const geom_t* const SFEM_RESTRICT origin,  // origin of the domain
+        const geom_t* const SFEM_RESTRICT delta,   // delta of the domain
+        const real_t* const SFEM_RESTRICT data,    // SDF
+        // Output //
+        real_t* const SFEM_RESTRICT g_host);
+
+int hex8_to_tet10_resample_field_local_CUDA(                          // it is for the host memory
+                                                                      // Mesh
+        const ptrdiff_t              nelements,                       // number of elements
+        const ptrdiff_t              nnodes,                          // number of nodes
+        const int                    bool_assemble_dual_mass_vector,  // assemble dual mass vector
+        idx_t** const SFEM_RESTRICT  elems,                           // connectivity
+        geom_t** const SFEM_RESTRICT xyz,                             // coordinates
         // SDF
         const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
         const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
@@ -103,11 +119,11 @@ int hex8_to_tet10_resample_field_local_CUDA(
 
 int hex8_to_tet10_resample_field_local_CUDA_Unified(
         // Mesh
-        const ptrdiff_t nelements,                 // number of elements
-        const ptrdiff_t nnodes,                    // number of nodes
-        const int bool_assemble_dual_mass_vector,  // assemble dual mass vector
-        idx_t** const SFEM_RESTRICT elems,         // connectivity
-        geom_t** const SFEM_RESTRICT xyz,          // coordinates
+        const ptrdiff_t              nelements,                       // number of elements
+        const ptrdiff_t              nnodes,                          // number of nodes
+        const int                    bool_assemble_dual_mass_vector,  // assemble dual mass vector
+        idx_t** const SFEM_RESTRICT  elems,                           // connectivity
+        geom_t** const SFEM_RESTRICT xyz,                             // coordinates
         // SDF
         const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
         const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
@@ -120,11 +136,11 @@ int hex8_to_tet10_resample_field_local_CUDA_Unified(
 
 int hex8_to_tet10_resample_field_local_CUDA_Managed(
         // Mesh
-        const ptrdiff_t nelements,                 // number of elements
-        const ptrdiff_t nnodes,                    // number of nodes
-        const int bool_assemble_dual_mass_vector,  // assemble dual mass vector
-        idx_t** const SFEM_RESTRICT elems,         // connectivity
-        geom_t** const SFEM_RESTRICT xyz,          // coordinates
+        const ptrdiff_t              nelements,                       // number of elements
+        const ptrdiff_t              nnodes,                          // number of nodes
+        const int                    bool_assemble_dual_mass_vector,  // assemble dual mass vector
+        idx_t** const SFEM_RESTRICT  elems,                           // connectivity
+        geom_t** const SFEM_RESTRICT xyz,                             // coordinates
         // SDF
         const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
         const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
