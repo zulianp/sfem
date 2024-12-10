@@ -2129,7 +2129,7 @@ hex8_to_tet10_resample_field_local_CUDA_wrapper(   //
     return hex8_to_tet10_resample_field_local_CUDA_unified(mesh->nelements,  //
                                                            mesh->nnodes,
                                                            bool_assemble_dual_mass_vector,
-                                                           mesh->elems,
+                                                           mesh->elements,
                                                            mesh->points,
                                                            n,
                                                            stride,
