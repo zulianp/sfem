@@ -7,6 +7,7 @@ import time
 
 
 output_path = os.path.join(os.environ['HOME'], 'git/sfem/workflows/resample/sdf.float32.raw')
+output_path = os.path.join(os.environ['SCRATCH'], 'prj/sfem/workflows/resample/sdf.float32.raw')
 
 print("sdf_test.py: ==========================================")
 
@@ -49,7 +50,7 @@ zv[:] = np.linspace(pmin[2], pmax[2], dims[2])
 
 X, Y, Z = np.meshgrid(xv, yv, zv)
 
-ff = 1 
+ff = 0
 
 if ff == 0:
     print("sdf_test.py: Using field: sin(4.0 * pi * X) + cos(4.0 * pi * Y + 4.0 * pi * Z)**2")
