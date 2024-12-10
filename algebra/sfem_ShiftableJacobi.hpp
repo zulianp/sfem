@@ -281,7 +281,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        int shift(const std::shared_ptr<SparseBlockVector<T>> block_diag, const std::shared_ptr<Buffer<T>>& scaling) override {
+        int shift(const std::shared_ptr<SparseBlockVector<T>> &block_diag, const std::shared_ptr<Buffer<T>>& scaling) override {
             sym_diag_to_diag(diag, inv_diag);
             sym_diag_to_diag(diag, inv_diag);
             add_spars_sym_diag_to_diag(block_diag, scaling, inv_diag);
