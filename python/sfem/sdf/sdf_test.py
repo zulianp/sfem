@@ -7,6 +7,7 @@ import time
 
 
 output_path = os.path.join(os.environ['HOME'], 'git/sfem/workflows/resample/sdf.float32.raw')
+output_path = os.path.join(os.environ['SCRATCH'], 'prj/sfem/workflows/resample/sdf.float32.raw')
 
 print("sdf_test.py: ==========================================")
 
