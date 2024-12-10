@@ -1634,6 +1634,7 @@ launch_kernels_hex8_to_tet10_resample_field_local_CUDA_unified(               //
         cudaDeviceSynchronize();
 
         if (mpi_size > 1) {
+            printf("MPI:    Launching the exchange, %s:%d\n", __FILE__, __LINE__);
             send_recv_t slave_to_master;
             mesh_create_nodal_send_recv(mesh, &slave_to_master);
 
@@ -1867,6 +1868,8 @@ hex8_to_tet10_resample_field_local_CUDA_unified_v2(  //
 
     printf("============================================================================\n");
     printf("GPU:    Unified Memory Model V2 %s:%d \n", __FILE__, __LINE__);
+    printf("GPU:    Mpi size:                    %d\n", mpi_size);
+    printf("GPU:    Mpi rank:                    %d\n", mpi_rank);
     printf("GPU:    Launching the kernel %s \n", kernel_name);
     printf("GPU:    Number of blocks:            %ld\n", numBlocks);
     printf("GPU:    Number of threads per block: %ld\n", threadsPerBlock);
@@ -2126,17 +2129,16 @@ hex8_to_tet10_resample_field_local_CUDA_wrapper(   //
 #if SFEM_CUDA_MEMORY_MODEL == CUDA_UNIFIED_MEMORY
 
 #pragma message "CUDA_UNIFIED_MEMORY is enabled"
-    return hex8_to_tet10_resample_field_local_CUDA_unified(mesh->nelements,  //
-                                                           mesh->nnodes,
-                                                           bool_assemble_dual_mass_vector,
-                                                           mesh->elements,
-                                                           mesh->points,
-                                                           n,
-                                                           stride,
-                                                           origin,
-                                                           delta,
-                                                           data,
-                                                           g_host);
+    return hex8_to_tet10_resample_field_local_CUDA_unified_v2(mpi_size,                        //
+                                                              mpi_rank,                        //
+                                                              mesh,                            //
+                                                              bool_assemble_dual_mass_vector,  //
+                                                              n,
+                                                              stride,
+                                                              origin,
+                                                              delta,
+                                                              data,
+                                                              g_host);
 #elif SFEM_CUDA_MEMORY_MODEL == CUDA_MANAGED_MEMORY
 
 #pragma message "CUDA_MEMORY_MANAGED is enabled: Not implemented yet"

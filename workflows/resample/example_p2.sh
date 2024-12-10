@@ -29,10 +29,13 @@ search_string_in_args() {
 }
 
 n_procs=4
+echo "example_p2.sh: n_procs=$n_procs"
 
 export USE_MPI=0
 export USE_MPI_GH200=0
 export USE_MPI_NORMAL=0
+export FLOAT_64=0
+
 export PERF="no"
 
 if search_string_in_args "mpi" "$@"
@@ -53,6 +56,12 @@ fi
 if search_string_in_args "perf" "$@"
 then
 	export PERF="yes"
+fi
+
+if search_string_in_args "f64" "$@"
+then
+	export FLOAT_64=1
+	echo "example_p2.sh: Using float64"
 fi
 
 # launcher
@@ -131,8 +140,6 @@ echo $scaling
 # export OMP_PROC_BIND=true
 # export OMP_NUM_THREADS=8
 
-
-
 if [[ "$USE_MPI" == "1" ]]
 then
 	LAUNCH="mpiexec -np $n_procs"
@@ -166,5 +173,11 @@ export SFEM_ENABLE_ISOPARAMETRIC=1
 set -x
 time SFEM_INTERPOLATE=0 SFEM_READ_FP32=1 $LAUNCH  $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET10
 
+if [[ "$FLOAT_64" == "1" ]]
+then
+	raw_to_db.py $resample_target out.vtk --point_data=$field --point_data_type=float64
+else
+	raw_to_db.py $resample_target out.vtk --point_data=$field --point_data_type=float32
+fi
 
-raw_to_db.py $resample_target out.vtk --point_data=$field --point_data_type=float32
+# raw_to_db.py $resample_target out.vtk --point_data=$field --point_data_type=float64

@@ -260,7 +260,7 @@ int main(int argc, char* argv[]) {
                 if (info.element_type == TET10 && SFEM_TET10_CUDA == ON) {
                     int asseble_dual_mass_vector = 1;
 
-                    if (SFEM_CUDA_MEMORY_MODEL == UNIFIED) {
+                    if (SFEM_CUDA_MEMORY_MODEL == CUDA_HOST_MEMORY) {
                         asseble_dual_mass_vector = 0;
                     }
 
@@ -323,7 +323,7 @@ int main(int argc, char* argv[]) {
                     }
                 }  // end if mesh.element_type == TET10
 
-                if ((SFEM_TET10_CUDA == OFF) || SFEM_CUDA_MEMORY_MODEL == HOST) {
+                if ((SFEM_TET10_CUDA == OFF) || SFEM_CUDA_MEMORY_MODEL == CUDA_HOST_MEMORY) {
                     //// TODO In CPU must be called.
                     //// TODO In GPU should be calculated in the kernel calls in case of unified and Managed memory
                     //// TODO In GPU is calculated here in case of host memory and more than one MPI rank (at the moment)
