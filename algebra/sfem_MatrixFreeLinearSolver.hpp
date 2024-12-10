@@ -23,7 +23,7 @@ namespace sfem {
     };
 
     template <typename T>
-    class SparseBlockVector {
+    class SparseBlockVector /*: public Operator<T>*/ {
     public:
         int                            block_size_{0};
         std::shared_ptr<Buffer<idx_t>> idx_;
@@ -32,19 +32,17 @@ namespace sfem {
         inline int                            block_size() const { return block_size_; }
         const std::shared_ptr<Buffer<idx_t>>& idx() const { return idx_; }
         const std::shared_ptr<Buffer<T>>&     data() const { return data_; }
-    };
+        ptrdiff_t                             n_blocks() const { return idx_->size(); }
 
-    template <typename T>
-    class ShiftableOperator : public Operator<T> {
-    public:
-        virtual ~ShiftableOperator()                              = default;
-        virtual int shift(const std::shared_ptr<Buffer<T>>& diag) = 0;
-        virtual int shift(const std::shared_ptr<SparseBlockVector<T>> block_diag, const std::shared_ptr<Buffer<T>>& scaling) 
-        {
-            assert(false);
-            SFEM_ERROR("[Error] ShiftableOperator::shift(block_diag, scaling) not implemented!\n");
-            return SFEM_FAILURE;
-        }
+        // TODO maybe
+        // int apply(const T* const x, T* const y) override {
+
+        //     return SFEM_SUCCESS;
+        // }
+
+        // std::ptrdiff_t rows() const override { return data_->size(); }
+        // std::ptrdiff_t cols() const override { return data_->size(); }
+        // ExecutionSpace execution_space() const override { return data_->mem_space(); }
     };
 
     template <typename T>
@@ -56,6 +54,68 @@ namespace sfem {
         ret->data_       = data;
         return ret;
     }
+
+    template <typename T>
+    class ScaledBlockVectorMult : public Operator<T> {
+    public:
+        std::shared_ptr<SparseBlockVector<T>> sbv;
+        std::shared_ptr<Buffer<T>>            scaling;
+
+        int apply(const T* const x, T* const y) override {
+            const ptrdiff_t    n_blocks   = sbv->n_blocks();
+            const idx_t* const idx        = sbv->idx()->data();
+            const T* const     dd         = sbv->data()->data();
+            const T* const     s          = scaling->data();
+            const int          block_size = sbv->block_size();
+
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n_blocks; i++) {
+                const idx_t b  = idx[i];
+                auto        xi = &x[b * block_size];
+                auto        yi = &y[b * block_size];
+
+                auto di = &dd[i * 6];
+                auto si = s[i];
+
+                int d_idx = 0;
+                for (int d1 = 0; d1 < block_size; d1++) {
+                    yi[d1] += dd[d_idx++];
+                    for (int d2 = d1 + 1; d2 < block_size; d2++) {
+                        yi[d1] += xi[d2] * dd[d_idx];
+                        yi[d2] += xi[d1] * dd[d_idx];
+                        d_idx++;
+                    }
+                }
+            }
+
+            return SFEM_SUCCESS;
+        }
+
+        std::ptrdiff_t rows() const override { return sbv->data()->size(); }
+        std::ptrdiff_t cols() const override { return sbv->data()->size(); }
+        ExecutionSpace execution_space() const override { return sbv->data()->mem_space(); }
+    };
+
+    template <typename T>
+    std::shared_ptr<SparseBlockVector<T>> create_sparse_block_vector_mult(const std::shared_ptr<SparseBlockVector<T>>& sbv,
+                                                                          const std::shared_ptr<Buffer<T>>&            scaling) {
+        auto ret     = std::make_shared<ScaledBlockVectorMult<T>>();
+        ret->sbv     = sbv;
+        ret->scaling = scaling;
+        return ret;
+    }
+
+    template <typename T>
+    class ShiftableOperator : public Operator<T> {
+    public:
+        virtual ~ShiftableOperator()                              = default;
+        virtual int shift(const std::shared_ptr<Buffer<T>>& diag) = 0;
+        virtual int shift(const std::shared_ptr<SparseBlockVector<T>> block_diag, const std::shared_ptr<Buffer<T>>& scaling) {
+            assert(false);
+            SFEM_ERROR("[Error] ShiftableOperator::shift(block_diag, scaling) not implemented!\n");
+            return SFEM_FAILURE;
+        }
+    };
 
     template <typename T>
     class LambdaOperator final : public Operator<T> {

@@ -114,7 +114,7 @@ namespace sfem {
             const ptrdiff_t nblocks = sbv->idx()->size();
             const idx_t* const idx = sbv->idx()->data();
             const T* const     dd  = sbv->data()->data();
-            const T* const     s   = out->data();
+            const T* const     s   = scaling->data();
             auto            ivd     = out->data();
 
 #pragma omp parallel for
@@ -126,19 +126,19 @@ namespace sfem {
                 auto si  = s[i];
 
                 // row 0
-                ivi[0] += di[0];
-                ivi[1] += di[1];
-                ivi[2] += di[2];
+                ivi[0] += si * di[0];
+                ivi[1] += si * di[1];
+                ivi[2] += si * di[2];
 
                 // row 1
-                ivi[3] += di[1];
-                ivi[4] += di[3];
-                ivi[5] += di[4];
+                ivi[3] += si * di[1];
+                ivi[4] += si * di[3];
+                ivi[5] += si * di[4];
 
                 // row 2
-                ivi[6] += di[2];
-                ivi[7] += di[4];
-                ivi[8] += di[5];
+                ivi[6] += si * di[2];
+                ivi[7] += si * di[4];
+                ivi[8] += si * di[5];
             }
         }
 
