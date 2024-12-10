@@ -258,25 +258,25 @@ int main(int argc, char* argv[]) {
                 // mpi_size > 1
 
                 if (info.element_type == TET10 && SFEM_TET10_CUDA == ON) {
-                    int asseble_dual_mass_vector = 1;
+                    int assemble_dual_mass_vector = 1;
 
                     if (SFEM_CUDA_MEMORY_MODEL == CUDA_HOST_MEMORY) {
-                        asseble_dual_mass_vector = 0;
+                        assemble_dual_mass_vector = 0;
                     }
 
 #if SFEM_TET10_CUDA == ON
-                    const int ret =                                                    //
-                            hex8_to_tet10_resample_field_local_CUDA_wrapper(mpi_size,  // MPI size
-                                                                            rank,      // MPI rank
-                                                                            &mesh,     // Mesh
-                                                                            1,         // assemble dual mass vector in the kernel
-                                                                            nlocal,    // number of nodes in each direction
-                                                                            stride,    // stride of the data
-                                                                            origin,    // origin of the domain
-                                                                            delta,     // delta of the domain
-                                                                            field,     // filed
-                                                                            g);        // output
-
+                    const int ret =                                           //
+                            hex8_to_tet10_resample_field_local_CUDA_wrapper(  //
+                                    mpi_size,                                 // MPI size
+                                    rank,                                     // MPI rank
+                                    &mesh,                                    // Mesh
+                                    assemble_dual_mass_vector,                // assemble dual mass vector in the kernel
+                                    nlocal,                                   // number of nodes in each direction
+                                    stride,                                   // stride of the data
+                                    origin,                                   // origin of the domain
+                                    delta,                                    // delta of the domain
+                                    field,                                    // filed
+                                    g);                                       // output
 #endif
                 } else {  // Other cases and CPU
                     resample_field_local(

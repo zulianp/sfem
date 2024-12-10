@@ -1552,7 +1552,8 @@ launch_kernels_hex8_to_tet10_resample_field_local_CUDA(const int numBlocks,     
 
 /**
  * @brief lanches the kernels sequentially to
- * resample the field from hex8 to tet10 by applying all the necessary steps
+ * resample the field from hex8 to tet10 by applying all the necessary steps for the cases where unified and Managed memory is
+ * used so that the MPI communication is handled directely from / to the device.
  *
  * @param numBlocks
  * @param threadsPerBlock
@@ -1571,7 +1572,7 @@ launch_kernels_hex8_to_tet10_resample_field_local_CUDA(const int numBlocks,     
  * @return int
  */
 int                                                                           //
-launch_kernels_hex8_to_tet10_resample_field_local_CUDA_unified(               // TODO MPI all-to-all here
+launch_kernels_hex8_to_tet10_resample_field_local_CUDA_unified(               //
         const int                            mpi_size,                        //
         const int                            mpi_rank,                        //
         const int                            numBlocks,                       //
@@ -1587,9 +1588,8 @@ launch_kernels_hex8_to_tet10_resample_field_local_CUDA_unified(               //
         const geom_t* const SFEM_RESTRICT    origin,                          //
         const geom_t* const SFEM_RESTRICT    delta,                           //
         const real_t*                        data_device,                     //
-        //    real_t* weighted_field_device, //
-        real_t* mass_vector,  //
-        real_t* g_device) {   //
+        real_t*                              mass_vector,                     //
+        real_t*                              g_device) {
     //
     PRINT_CURRENT_FUNCTION;
 
@@ -2085,17 +2085,6 @@ hex8_to_tet10_resample_field_local_CUDA(                              //
     }
     g_device = NULL;
 
-    // cudaMemcpy(weighted_field,
-    //            weighted_field_device,  //
-    //            nnodes * sizeof(real_t),
-    //            cudaMemcpyDeviceToHost);
-    // cudaError_t errwf2 = cudaFree(weighted_field_device);
-    // if (errwf2 != cudaSuccess) {
-    //     printf("Error freeing device memory for weighted_field_device: %s\n",
-    //            cudaGetErrorString(errwf2));
-    // }
-    // weighted_field_device = NULL;
-
     cudaError_t errmv = cudaFree(mass_vector);
     if (errmv != cudaSuccess) {
         printf("Error freeing device memory for mass_vector: %s\n", cudaGetErrorString(errmv));
@@ -2148,17 +2137,17 @@ hex8_to_tet10_resample_field_local_CUDA_wrapper(   //
 
     // Default memory model is CUDA_HOST_MEMORY.
 
-    return hex8_to_tet10_resample_field_local_CUDA(mesh->nelements,  //
-                                                   mesh->nnodes,
-                                                   bool_assemble_dual_mass_vector,
-                                                   mesh->elements,
-                                                   mesh->points,
-                                                   n,
-                                                   stride,
-                                                   origin,
-                                                   delta,
-                                                   data,
-                                                   g_host);
+    return hex8_to_tet10_resample_field_local_CUDA(mesh->nelements,                 //
+                                                   mesh->nnodes,                    //
+                                                   bool_assemble_dual_mass_vector,  //
+                                                   mesh->elements,                  //
+                                                   mesh->points,                    //
+                                                   n,                               //
+                                                   stride,                          //
+                                                   origin,                          //
+                                                   delta,                           //
+                                                   data,                            //
+                                                   g_host);                         //
 
 #endif
 }
