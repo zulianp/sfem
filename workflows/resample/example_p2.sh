@@ -28,7 +28,7 @@ search_string_in_args() {
     return 1
 }
 
-n_procs=4
+n_procs=1
 
 export USE_MPI=0
 export USE_MPI_GH200=0
