@@ -110,7 +110,7 @@ namespace sfem {
     public:
         virtual ~ShiftableOperator()                              = default;
         virtual int shift(const std::shared_ptr<Buffer<T>>& diag) = 0;
-        virtual int shift(const std::shared_ptr<SparseBlockVector<T>> block_diag, const std::shared_ptr<Buffer<T>>& scaling) {
+        virtual int shift(const std::shared_ptr<SparseBlockVector<T>> &block_diag, const std::shared_ptr<Buffer<T>>& scaling) {
             assert(false);
             SFEM_ERROR("[Error] ShiftableOperator::shift(block_diag, scaling) not implemented!\n");
             return SFEM_FAILURE;
