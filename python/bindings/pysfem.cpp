@@ -382,16 +382,23 @@ NB_MODULE(pysfem, m) {
              nb::ndarray<real_t>
                      y) { cc->gradient(x.data(), y.data()); });
 
-    m.def("update", [](const std::shared_ptr<ContactConditions> &cc, nb::ndarray<real_t> x) {
-        cc->update(x.data());
-    });
-
-    m.def("gradient_for_mesh_viz",
+    m.def("signed_distance",
           [](const std::shared_ptr<ContactConditions> &cc,
              nb::ndarray<real_t>
                      x,
              nb::ndarray<real_t>
-                     y) { cc->gradient_for_mesh_viz(x.data(), y.data()); });
+                     y) { cc->signed_distance(x.data(), y.data()); });
+
+    m.def("update", [](const std::shared_ptr<ContactConditions> &cc, nb::ndarray<real_t> x) {
+        cc->update(x.data());
+    });
+
+    m.def("signed_distance_for_mesh_viz",
+          [](const std::shared_ptr<ContactConditions> &cc,
+             nb::ndarray<real_t>
+                     x,
+             nb::ndarray<real_t>
+                     y) { cc->signed_distance_for_mesh_viz(x.data(), y.data()); });
 
     m.def("contact_conditions_from_file",
           [](const std::shared_ptr<FunctionSpace> &space,

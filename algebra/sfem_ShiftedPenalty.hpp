@@ -71,7 +71,8 @@ namespace sfem {
         }
 
         void set_constraints_op(const std::shared_ptr<Operator<T>>& op,
-                                const std::shared_ptr<Operator<T>>& op_t) {
+                                const std::shared_ptr<Operator<T>>& op_t,
+                                const std::shared_ptr<SparseBlockVector<T>> &op_x_op) {
             constraints_op_ = op;
             constraints_op_transpose_ = op_t;
         }

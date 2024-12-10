@@ -73,12 +73,12 @@ def run(config):
 	
 	op = sfem.make_op(fun, x)
 	g = np.zeros(fs.n_dofs(), dtype=real_t)
-	sfem.gradient_for_mesh_viz(cc, x, g)
+	sfem.signed_distance_for_mesh_viz(cc, x, g)
 	sfem.write(out, "gap", g)
 	
 	if config['solver'] == 'MPRGP':
 		upper_bound = np.ones(fs.n_dofs(), dtype=real_t) * 1000
-		sfem.gradient_for_mesh_viz(cc, x, upper_bound)
+		sfem.signed_distance_for_mesh_viz(cc, x, upper_bound)
 
 		solver = sfem.MPRGP()
 		solver.default_init()
@@ -102,7 +102,7 @@ def run(config):
 		# spmg.set_constraints_op(cc_op, cc_op_t)
 
 		upper_bound = np.ones(fs.n_dofs(), dtype=real_t) * 1000
-		sfem.gradient_for_mesh_viz(cc, x, upper_bound)
+		sfem.signed_distance_for_mesh_viz(cc, x, upper_bound)
 		# print(np.min(upper_bound))
 
 		sfem.set_upper_bound(spmg, upper_bound)
@@ -124,7 +124,7 @@ def run(config):
 		sp.set_linear_solver(linear_solver)
 
 		upper_bound = np.zeros(cc.n_constrained_dofs(), dtype=real_t)
-		sfem.gradient(cc, x, upper_bound)
+		sfem.signed_distance(cc, x, upper_bound)
 		cc_op = cc.linear_constraints_op()
 		cc_op_t = cc.linear_constraints_op_transpose()
 		print(f'Constrained dofs {cc.n_constrained_dofs()}/{fs.n_dofs()}')

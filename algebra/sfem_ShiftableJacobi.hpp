@@ -83,7 +83,6 @@ namespace sfem {
         void add_sym_diag_to_diag(const std::shared_ptr<Buffer<T>>& in, const std::shared_ptr<Buffer<T>>& out) {
             auto dd  = in->data();
             auto ivd = out->data();
-            auto md  = boundary_mask->data();
 
             const ptrdiff_t nblocks = in->size() / 6;
 
@@ -91,6 +90,40 @@ namespace sfem {
             for (ptrdiff_t b = 0; b < nblocks; b++) {
                 auto ivi = &ivd[b * 9];
                 auto di  = &dd[b * 6];
+
+                // row 0
+                ivi[0] += di[0];
+                ivi[1] += di[1];
+                ivi[2] += di[2];
+
+                // row 1
+                ivi[3] += di[1];
+                ivi[4] += di[3];
+                ivi[5] += di[4];
+
+                // row 2
+                ivi[6] += di[2];
+                ivi[7] += di[4];
+                ivi[8] += di[5];
+            }
+        }
+
+        void add_sparse_sym_diag_to_diag(const std::shared_ptr<SparseBlockVector<T>>& sbv,
+                                         const std::shared_ptr<Buffer<T>>&            scaling,
+                                         const std::shared_ptr<Buffer<T>>&            out) {
+            const ptrdiff_t nblocks = sbv->idx()->size();
+            const idx_t* const idx = sbv->idx()->data();
+            const T* const     dd  = sbv->data()->data();
+            const T* const     s   = out->data();
+            auto            ivd     = out->data();
+
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < nblocks; i++) {
+                const idx_t b = idx[i];
+
+                auto ivi = &ivd[b * 9];
+                auto di  = &dd[i * 6];
+                auto si  = s[i];
 
                 // row 0
                 ivi[0] += di[0];
@@ -248,11 +281,19 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
+        int shift(const std::shared_ptr<SparseBlockVector<T>> block_diag, const std::shared_ptr<Buffer<T>>& scaling) override {
+            sym_diag_to_diag(diag, inv_diag);
+            sym_diag_to_diag(diag, inv_diag);
+            add_spars_sym_diag_to_diag(block_diag, scaling, inv_diag);
+            inplace_invert(inv_diag);
+            blas.scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
+        }
+
         /* Operator */
         int apply(const T* const x, T* const y) override {
             const ptrdiff_t nblocks = inv_diag->size() / (block_size * block_size);
 
-            const T * const dd = inv_diag->data();
+            const T* const dd = inv_diag->data();
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < nblocks; i++) {
                 const T* const xi = &x[i * block_size];
