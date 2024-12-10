@@ -5,6 +5,7 @@
 
 // #define real_type real_t
 
+#include "mesh_aura.h"
 #include "sfem_mesh.h"
 
 #include "tet10_weno_cuda.cuh"
@@ -1570,7 +1571,7 @@ launch_kernels_hex8_to_tet10_resample_field_local_CUDA(const int numBlocks,     
  * @return int
  */
 int                                                                           //
-launch_kernels_hex8_to_tet10_resample_field_local_CUDA_unified(               // TODO MPI all to all here
+launch_kernels_hex8_to_tet10_resample_field_local_CUDA_unified(               // TODO MPI all-to-all here
         const int                            mpi_size,                        //
         const int                            mpi_rank,                        //
         const int                            numBlocks,                       //
@@ -1631,6 +1632,20 @@ launch_kernels_hex8_to_tet10_resample_field_local_CUDA_unified(               //
 
         // Synchronize device
         cudaDeviceSynchronize();
+
+        if (mpi_size > 1) {
+            send_recv_t slave_to_master;
+            mesh_create_nodal_send_recv(mesh, &slave_to_master);
+
+            ptrdiff_t count       = mesh_exchange_master_buffer_count(&slave_to_master);
+            real_t*   real_buffer = (real_t*)malloc(count * sizeof(real_t));
+
+            exchange_add(mesh, &slave_to_master, mass_vector, real_buffer);
+            exchange_add(mesh, &slave_to_master, g_device, real_buffer);
+
+            free(real_buffer);
+            send_recv_destroy(&slave_to_master);
+        }
 
         // // Launch compute_g_kernel
         // compute_g_kernel<<<(nnodes / threadsPerBlock) + 1, threadsPerBlock>>>(

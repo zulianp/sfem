@@ -258,18 +258,24 @@ int main(int argc, char* argv[]) {
                 // mpi_size > 1
 
                 if (info.element_type == TET10 && SFEM_TET10_CUDA == ON) {
+                    int asseble_dual_mass_vector = 1;
+
+                    if (SFEM_CUDA_MEMORY_MODEL == UNIFIED) {
+                        asseble_dual_mass_vector = 0;
+                    }
+
 #if SFEM_TET10_CUDA == ON
-                    const int ret = hex8_to_tet10_resample_field_local_CUDA_wrapper(
-                            mpi_size,  // MPI size
-                            rank,      // MPI rank
-                            &mesh,     // Mesh
-                            1,         // assemble dual mass vector (0/1) only one MPI rank
-                            nlocal,    // number of nodes in each direction
-                            stride,    // stride of the data
-                            origin,    // origin of the domain
-                            delta,     // delta of the domain
-                            field,     // filed
-                            g);        // output
+                    const int ret =                                                    //
+                            hex8_to_tet10_resample_field_local_CUDA_wrapper(mpi_size,  // MPI size
+                                                                            rank,      // MPI rank
+                                                                            &mesh,     // Mesh
+                                                                            1,         // assemble dual mass vector in the kernel
+                                                                            nlocal,    // number of nodes in each direction
+                                                                            stride,    // stride of the data
+                                                                            origin,    // origin of the domain
+                                                                            delta,     // delta of the domain
+                                                                            field,     // filed
+                                                                            g);        // output
 
 #endif
                 } else {  // Other cases and CPU
@@ -317,7 +323,7 @@ int main(int argc, char* argv[]) {
                     }
                 }  // end if mesh.element_type == TET10
 
-                if ((SFEM_TET10_CUDA == OFF)) {
+                if ((SFEM_TET10_CUDA == OFF) || SFEM_CUDA_MEMORY_MODEL == HOST) {
                     //// TODO In CPU must be called.
                     //// TODO In GPU should be calculated in the kernel calls in case of unified and Managed memory
                     //// TODO In GPU is calculated here in case of host memory and more than one MPI rank (at the moment)
@@ -335,7 +341,7 @@ int main(int argc, char* argv[]) {
 
                         free(real_buffer);
                         send_recv_destroy(&slave_to_master);
-                    }
+                    }  // end if mpi_size > 1
 
                     // divide by the mass vector
                     for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
@@ -345,8 +351,8 @@ int main(int argc, char* argv[]) {
 
                         assert(mass_vector[i] != 0);
                         g[i] /= mass_vector[i];
-                    }
-                }
+                    }  // end for i < mesh.n_owned_nodes
+                }      // end if SFEM_TET10_CUDA == OFF || SFEM_CUDA_MEMORY_MODEL == UNIFIED
 
                 free(mass_vector);
             }  // end if mpi_size > 1
