@@ -34,40 +34,36 @@ namespace sfem {
             }
         }
 
-        int n_conditions{0};
+        int                   n_conditions{0};
         boundary_condition_t *conditions{nullptr};
     };
 
     std::shared_ptr<FunctionSpace> AxisAlignedContactConditions::space() { return impl_->space; }
 
-    int AxisAlignedContactConditions::n_conditions() const { return impl_->n_conditions; }
+    int   AxisAlignedContactConditions::n_conditions() const { return impl_->n_conditions; }
     void *AxisAlignedContactConditions::impl_conditions() { return (void *)impl_->conditions; }
 
-    AxisAlignedContactConditions::AxisAlignedContactConditions(
-            const std::shared_ptr<FunctionSpace> &space)
+    AxisAlignedContactConditions::AxisAlignedContactConditions(const std::shared_ptr<FunctionSpace> &space)
         : impl_(std::make_unique<Impl>()) {
         impl_->space = space;
     }
 
-    std::shared_ptr<Constraint> AxisAlignedContactConditions::derefine(
-            const std::shared_ptr<FunctionSpace> &coarse_space,
-            const bool as_zero) const {
+    std::shared_ptr<Constraint> AxisAlignedContactConditions::derefine(const std::shared_ptr<FunctionSpace> &coarse_space,
+                                                                       const bool                            as_zero) const {
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
-        auto et = (enum ElemType)impl_->space->element_type();
+        auto et   = (enum ElemType)impl_->space->element_type();
 
-        const ptrdiff_t max_coarse_idx =
-                max_node_id(coarse_space->element_type(), mesh->nelements, mesh->elements);
+        const ptrdiff_t max_coarse_idx = max_node_id(coarse_space->element_type(), mesh->nelements, mesh->elements);
 
         auto coarse = std::make_shared<AxisAlignedContactConditions>(coarse_space);
 
-        coarse->impl_->conditions =
-                (boundary_condition_t *)malloc(impl_->n_conditions * sizeof(boundary_condition_t));
+        coarse->impl_->conditions   = (boundary_condition_t *)malloc(impl_->n_conditions * sizeof(boundary_condition_t));
         coarse->impl_->n_conditions = 0;
 
         for (int i = 0; i < impl_->n_conditions; i++) {
             ptrdiff_t coarse_local_size = 0;
-            idx_t *coarse_indices = nullptr;
-            real_t *coarse_values = nullptr;
+            idx_t    *coarse_indices    = nullptr;
+            real_t   *coarse_values     = nullptr;
             hierarchical_create_coarse_indices(max_coarse_idx,
                                                impl_->conditions[i].local_size,
                                                impl_->conditions[i].idx,
@@ -121,38 +117,27 @@ namespace sfem {
 
     void AxisAlignedContactConditions::add_condition(const ptrdiff_t local_size,
                                                      const ptrdiff_t global_size,
-                                                     idx_t *const idx,
-                                                     const int component,
-                                                     const real_t value) {
-        impl_->conditions = (boundary_condition_t *)realloc(
-                impl_->conditions, (impl_->n_conditions + 1) * sizeof(boundary_condition_t));
+                                                     idx_t *const    idx,
+                                                     const int       component,
+                                                     const real_t    value) {
+        impl_->conditions =
+                (boundary_condition_t *)realloc(impl_->conditions, (impl_->n_conditions + 1) * sizeof(boundary_condition_t));
 
-        boundary_condition_create(&impl_->conditions[impl_->n_conditions],
-                                  local_size,
-                                  global_size,
-                                  idx,
-                                  component,
-                                  value,
-                                  nullptr);
+        boundary_condition_create(
+                &impl_->conditions[impl_->n_conditions], local_size, global_size, idx, component, value, nullptr);
 
         impl_->n_conditions++;
     }
 
     void AxisAlignedContactConditions::add_condition(const ptrdiff_t local_size,
                                                      const ptrdiff_t global_size,
-                                                     idx_t *const idx,
-                                                     const int component,
-                                                     real_t *const values) {
-        impl_->conditions = (boundary_condition_t *)realloc(
-                impl_->conditions, (impl_->n_conditions + 1) * sizeof(boundary_condition_t));
+                                                     idx_t *const    idx,
+                                                     const int       component,
+                                                     real_t *const   values) {
+        impl_->conditions =
+                (boundary_condition_t *)realloc(impl_->conditions, (impl_->n_conditions + 1) * sizeof(boundary_condition_t));
 
-        boundary_condition_create(&impl_->conditions[impl_->n_conditions],
-                                  local_size,
-                                  global_size,
-                                  idx,
-                                  component,
-                                  0,
-                                  values);
+        boundary_condition_create(&impl_->conditions[impl_->n_conditions], local_size, global_size, idx, component, 0, values);
 
         impl_->n_conditions++;
     }
@@ -162,8 +147,8 @@ namespace sfem {
         //
         auto dc = std::make_unique<AxisAlignedContactConditions>(space);
 
-        char *SFEM_CONTACT_NODESET = 0;
-        char *SFEM_CONTACT_VALUE = 0;
+        char *SFEM_CONTACT_NODESET   = 0;
+        char *SFEM_CONTACT_VALUE     = 0;
         char *SFEM_CONTACT_COMPONENT = 0;
         SFEM_READ_ENV(SFEM_CONTACT_NODESET, );
         SFEM_READ_ENV(SFEM_CONTACT_VALUE, );
@@ -230,8 +215,7 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int AxisAlignedContactConditions::copy_constrained_dofs(const real_t *const src,
-                                                            real_t *const dest) {
+    int AxisAlignedContactConditions::copy_constrained_dofs(const real_t *const src, real_t *const dest) {
         for (int i = 0; i < impl_->n_conditions; i++) {
             constraint_nodes_copy_vec(impl_->conditions[i].local_size,
                                       impl_->conditions[i].idx,
@@ -244,10 +228,10 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int AxisAlignedContactConditions::hessian_crs(const real_t *const x,
+    int AxisAlignedContactConditions::hessian_crs(const real_t *const  x,
                                                   const count_t *const rowptr,
-                                                  const idx_t *const colidx,
-                                                  real_t *const values) {
+                                                  const idx_t *const   colidx,
+                                                  real_t *const        values) {
         for (int i = 0; i < impl_->n_conditions; i++) {
             crs_constraint_nodes_to_identity_vec(impl_->conditions[i].local_size,
                                                  impl_->conditions[i].idx,
@@ -265,8 +249,8 @@ namespace sfem {
     int AxisAlignedContactConditions::mask(mask_t *mask) {
         for (int i = 0; i < impl_->n_conditions; i++) {
             for (ptrdiff_t node = 0; node < impl_->conditions[i].local_size; node++) {
-                const ptrdiff_t idx = impl_->conditions[i].idx[node] * impl_->space->block_size() +
-                                      impl_->conditions[i].component;
+                const ptrdiff_t idx =
+                        impl_->conditions[i].idx[node] * impl_->space->block_size() + impl_->conditions[i].component;
                 mask_set(idx, mask);
             }
         }
@@ -278,10 +262,10 @@ namespace sfem {
     class ContactConditions::Impl {
     public:
         std::shared_ptr<FunctionSpace> space;
-        std::shared_ptr<Grid<geom_t>> sdf;
+        std::shared_ptr<Grid<geom_t>>  sdf;
 
-        std::shared_ptr<Buffer<idx_t *>> sides;
-        std::shared_ptr<Buffer<idx_t>> node_mapping;
+        std::shared_ptr<Buffer<idx_t *>>  sides;
+        std::shared_ptr<Buffer<idx_t>>    node_mapping;
         std::shared_ptr<Buffer<geom_t *>> surface_points;
 
         std::shared_ptr<Buffer<real_t>> gap_xnormal;
@@ -289,19 +273,19 @@ namespace sfem {
         std::shared_ptr<Buffer<real_t>> gap_znormal;
 
         std::shared_ptr<Buffer<real_t>> mass_vector;
-        bool debug{false};
+        bool                            debug{false};
 
         ~Impl() {}
 
         void update_displaced_points(const real_t *disp) {
-            auto mesh = space->mesh_ptr();
-            const ptrdiff_t n = node_mapping->size();
-            const idx_t *const idx = node_mapping->data();
-            const int dim = mesh->spatial_dimension();
+            auto               mesh = space->mesh_ptr();
+            const ptrdiff_t    n    = node_mapping->size();
+            const idx_t *const idx  = node_mapping->data();
+            const int          dim  = mesh->spatial_dimension();
 
             for (int d = 0; d < dim; d++) {
-                const geom_t *const x = mesh->points(d);
-                geom_t *const x_s = surface_points->data()[d];
+                const geom_t *const x   = mesh->points(d);
+                geom_t *const       x_s = surface_points->data()[d];
 
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n; ++i) {
@@ -311,14 +295,14 @@ namespace sfem {
         }
 
         void collect_points() {
-            auto mesh = space->mesh_ptr();
-            const ptrdiff_t n = node_mapping->size();
-            const idx_t *const idx = node_mapping->data();
-            const int dim = mesh->spatial_dimension();
+            auto               mesh = space->mesh_ptr();
+            const ptrdiff_t    n    = node_mapping->size();
+            const idx_t *const idx  = node_mapping->data();
+            const int          dim  = mesh->spatial_dimension();
 
             for (int d = 0; d < dim; d++) {
-                const geom_t *const x = mesh->points(d);
-                geom_t *const x_s = surface_points->data()[d];
+                const geom_t *const x   = mesh->points(d);
+                geom_t *const       x_s = surface_points->data()[d];
 
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n; ++i) {
@@ -339,12 +323,11 @@ namespace sfem {
                                                        [](const void *) {});
 
             auto trace_space = std::make_shared<FunctionSpace>(surface_mesh, 1);
-            auto bop = sfem::Factory::create_op(trace_space, "Mass");
+            auto bop         = sfem::Factory::create_op(trace_space, "Mass");
 
-            auto ones = h_buffer<real_t>(trace_space->n_dofs());
+            auto ones   = h_buffer<real_t>(trace_space->n_dofs());
             mass_vector = h_buffer<real_t>(trace_space->n_dofs());
-            sfem::blas<real_t>(EXECUTION_SPACE_HOST)
-                    ->values(trace_space->n_dofs(), 1, ones->data());
+            sfem::blas<real_t>(EXECUTION_SPACE_HOST)->values(trace_space->n_dofs(), 1, ones->data());
             bop->apply(nullptr, ones->data(), mass_vector->data());
 
             auto m = mass_vector->data();
@@ -360,16 +343,19 @@ namespace sfem {
 
     ptrdiff_t ContactConditions::n_constrained_dofs() const { return impl_->node_mapping->size(); }
 
+    const std::shared_ptr<Buffer<idx_t>> &ContactConditions::node_mapping()
+    {
+        return impl_->node_mapping;
+    }
+
     std::shared_ptr<FunctionSpace> ContactConditions::space() { return impl_->space; }
 
-    ContactConditions::ContactConditions(const std::shared_ptr<FunctionSpace> &space)
-        : impl_(std::make_unique<Impl>()) {
+    ContactConditions::ContactConditions(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>()) {
         impl_->space = space;
     }
 
-    std::shared_ptr<Constraint> ContactConditions::derefine(
-            const std::shared_ptr<FunctionSpace> &coarse_space,
-            const bool as_zero) const {
+    std::shared_ptr<Constraint> ContactConditions::derefine(const std::shared_ptr<FunctionSpace> &coarse_space,
+                                                            const bool                            as_zero) const {
         assert(false);
         return nullptr;
     }
@@ -394,13 +380,12 @@ namespace sfem {
         }
     }
 
-    std::shared_ptr<ContactConditions> ContactConditions::create_from_file(
-            const std::shared_ptr<FunctionSpace> &space,
-            const std::string &path) {
+    std::shared_ptr<ContactConditions> ContactConditions::create_from_file(const std::shared_ptr<FunctionSpace> &space,
+                                                                           const std::string                    &path) {
         auto in = YAMLNoIndent::create_from_file(path + "/meta.yaml");
 
-        auto cc = std::make_unique<ContactConditions>(space);
-        auto mesh = space->mesh_ptr();
+        auto cc     = std::make_unique<ContactConditions>(space);
+        auto mesh   = space->mesh_ptr();
         auto c_mesh = (mesh_t *)mesh->impl_mesh();
 
         bool rpath = false;
@@ -423,16 +408,14 @@ namespace sfem {
 
         {
             // Read mesh surface information
-            const enum ElemType element_type = space->element_type();
+            const enum ElemType element_type      = space->element_type();
             const enum ElemType side_element_type = shell_type(side_type(element_type));
-            const int nxe = space->has_semi_structured_mesh()
-                                    ? elem_num_nodes(type_from_string(surface_elem_type.c_str()))
-                                    : elem_num_nodes(side_element_type);
+            const int nxe = space->has_semi_structured_mesh() ? elem_num_nodes(type_from_string(surface_elem_type.c_str()))
+                                                              : elem_num_nodes(side_element_type);
 
-            assert(space->has_semi_structured_mesh() ||
-                   type_from_string(surface_elem_type.c_str()) == side_element_type);
+            assert(space->has_semi_structured_mesh() || type_from_string(surface_elem_type.c_str()) == side_element_type);
 
-            idx_t **sides = (idx_t **)malloc(nxe * sizeof(idx_t *));
+            idx_t   **sides  = (idx_t **)malloc(nxe * sizeof(idx_t *));
             ptrdiff_t _nope_ = -1, len = -1;
 
             char pattern[SFEM_MAX_PATH_LENGTH];
@@ -444,14 +427,9 @@ namespace sfem {
             assert((int)paths.size() == nxe);
 
             for (int d = 0; d < nxe; d++) {
-                idx_t *idx = nullptr;
+                idx_t    *idx   = nullptr;
                 ptrdiff_t len_d = -1;
-                if (array_create_from_file(mesh->comm(),
-                                           paths[d].c_str(),
-                                           SFEM_MPI_IDX_T,
-                                           (void **)&idx,
-                                           &_nope_,
-                                           &len_d)) {
+                if (array_create_from_file(mesh->comm(), paths[d].c_str(), SFEM_MPI_IDX_T, (void **)&idx, &_nope_, &len_d)) {
                     SFEM_ERROR("Unable to read path %s\n", paths[d].c_str());
                 }
 
@@ -475,37 +453,27 @@ namespace sfem {
 
             bool has_parent_indexing = points == "parent";
             if (has_parent_indexing) {
-                idx_t *idx = nullptr;
+                idx_t    *idx          = nullptr;
                 ptrdiff_t n_contiguous = -1;
-                remap_elements_to_contiguous_index(cc->impl_->sides->extent(1),
-                                                   cc->impl_->sides->extent(0),
-                                                   cc->impl_->sides->data(),
-                                                   &n_contiguous,
-                                                   &idx);
-                cc->impl_->node_mapping =
-                        Buffer<idx_t>::own(n_contiguous, idx, &free, sfem::MEMORY_SPACE_HOST);
+                remap_elements_to_contiguous_index(
+                        cc->impl_->sides->extent(1), cc->impl_->sides->extent(0), cc->impl_->sides->data(), &n_contiguous, &idx);
+                cc->impl_->node_mapping = Buffer<idx_t>::own(n_contiguous, idx, &free, sfem::MEMORY_SPACE_HOST);
 
             } else {
                 std::string path_node_mapping = path_surface + "/node_mapping.raw";
                 in_surface->get("node_mapping", path_node_mapping);
 
                 idx_t *idx = nullptr;
-                if (array_create_from_file(mesh->comm(),
-                                           path_node_mapping.c_str(),
-                                           SFEM_MPI_IDX_T,
-                                           (void **)&idx,
-                                           &_nope_,
-                                           &len)) {
+                if (array_create_from_file(
+                            mesh->comm(), path_node_mapping.c_str(), SFEM_MPI_IDX_T, (void **)&idx, &_nope_, &len)) {
                     SFEM_ERROR("Unable to read path %s\n", path_node_mapping.c_str());
                 }
 
-                cc->impl_->node_mapping =
-                        Buffer<idx_t>::own(len, idx, &free, sfem::MEMORY_SPACE_HOST);
+                cc->impl_->node_mapping = Buffer<idx_t>::own(len, idx, &free, sfem::MEMORY_SPACE_HOST);
             }
 
             // Allocate buffer for point information
-            cc->impl_->surface_points =
-                    h_buffer<geom_t>(mesh->spatial_dimension(), cc->impl_->node_mapping->size());
+            cc->impl_->surface_points = h_buffer<geom_t>(mesh->spatial_dimension(), cc->impl_->node_mapping->size());
         }
 
         {  // SDF
@@ -528,8 +496,7 @@ namespace sfem {
         return cc;
     }
 
-    std::shared_ptr<ContactConditions> ContactConditions::create_from_env(
-            const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<ContactConditions> ContactConditions::create_from_env(const std::shared_ptr<FunctionSpace> &space) {
         char *SFEM_CONTACT = nullptr;
         SFEM_REQUIRE_ENV(SFEM_CONTACT, );
         return create_from_file(space, SFEM_CONTACT);
@@ -537,7 +504,7 @@ namespace sfem {
 
     int ContactConditions::apply(real_t *const x) { return apply_value(0, x); }
 
-    int ContactConditions::gradient_for_mesh_viz(const real_t *const x, real_t *const g) const {
+    int ContactConditions::signed_distance_for_mesh_viz(const real_t *const x, real_t *const g) const {
         impl_->update_displaced_points(x);
 
         auto sdf = impl_->sdf;
@@ -562,12 +529,11 @@ namespace sfem {
                 impl_->gap_ynormal->data(),
                 impl_->gap_znormal->data());
 
-        const ptrdiff_t n = impl_->node_mapping->size();
+        const ptrdiff_t    n   = impl_->node_mapping->size();
         const idx_t *const idx = impl_->node_mapping->data();
-        int dim = impl_->space->mesh_ptr()->spatial_dimension();
+        int                dim = impl_->space->mesh_ptr()->spatial_dimension();
 
-        const real_t *const normals[3] = {
-                impl_->gap_xnormal->data(), impl_->gap_ynormal->data(), impl_->gap_znormal->data()};
+        const real_t *const normals[3] = {impl_->gap_xnormal->data(), impl_->gap_ynormal->data(), impl_->gap_znormal->data()};
 
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n; ++i) {
@@ -580,14 +546,13 @@ namespace sfem {
     }
 
     int ContactConditions::normal_project(const real_t *const h, real_t *const out) {
-        const ptrdiff_t n = impl_->node_mapping->size();
+        const ptrdiff_t    n   = impl_->node_mapping->size();
         const idx_t *const idx = impl_->node_mapping->data();
 
         const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         assert(dim == 3);  // FIXME 2D not supported
 
-        const real_t *const normals[3] = {
-                impl_->gap_xnormal->data(), impl_->gap_ynormal->data(), impl_->gap_znormal->data()};
+        const real_t *const normals[3] = {impl_->gap_xnormal->data(), impl_->gap_ynormal->data(), impl_->gap_znormal->data()};
 
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n; ++i) {
@@ -606,14 +571,13 @@ namespace sfem {
     }
 
     int ContactConditions::distribute_contact_forces(const real_t *const f, real_t *const out) {
-        const ptrdiff_t n = impl_->node_mapping->size();
+        const ptrdiff_t    n   = impl_->node_mapping->size();
         const idx_t *const idx = impl_->node_mapping->data();
 
         const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         assert(dim == 3);  // FIXME 2D not supported
 
-        const real_t *const normals[3] = {
-                impl_->gap_xnormal->data(), impl_->gap_ynormal->data(), impl_->gap_znormal->data()};
+        const real_t *const normals[3] = {impl_->gap_xnormal->data(), impl_->gap_ynormal->data(), impl_->gap_znormal->data()};
 
         auto m = impl_->mass_vector->data();
 #pragma omp parallel for
@@ -626,11 +590,7 @@ namespace sfem {
 
         if (impl_->debug) {
             for (ptrdiff_t i = 0; i < n; ++i) {
-                printf("CC_t: %g = %g  * %g * %g\n",
-                       out[idx[i] * dim + 0],
-                       normals[0][i],
-                       f[i],
-                       m[i]);
+                printf("CC_t: %g = %g  * %g * %g\n", out[idx[i] * dim + 0], normals[0][i], f[i], m[i]);
             }
         }
 
@@ -675,13 +635,11 @@ namespace sfem {
         return make_op<real_t>(
                 space->n_dofs(),
                 this->n_constrained_dofs(),
-                [=](const real_t *const f, real_t *const out) {
-                    distribute_contact_forces(f, out);
-                },
+                [=](const real_t *const f, real_t *const out) { distribute_contact_forces(f, out); },
                 EXECUTION_SPACE_HOST);
     }
 
-    int ContactConditions::gradient(const real_t *const x, real_t *const g) {
+    int ContactConditions::signed_distance(const real_t *const x, real_t *const g) {
         impl_->update_displaced_points(x);
 
         auto sdf = impl_->sdf;
@@ -702,8 +660,21 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    int ContactConditions::gradient(const real_t *const x, real_t *const g) {
+        int err = signed_distance(x, g);
+        assert(err == SFEM_SUCCESS);
+
+        ptrdiff_t n = impl_->mass_vector->size();
+        auto      m = impl_->mass_vector->data();
+        for (ptrdiff_t i = 0; i < n; i++) {
+            g[i] *= m[i];
+        }
+
+        return SFEM_SUCCESS;
+    }
+
     int ContactConditions::apply_value(const real_t value, real_t *const x) {
-        const ptrdiff_t n = impl_->node_mapping->size();
+        const ptrdiff_t    n   = impl_->node_mapping->size();
         const idx_t *const idx = impl_->node_mapping->data();
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n; ++i) {
@@ -714,7 +685,7 @@ namespace sfem {
     }
 
     int ContactConditions::copy_constrained_dofs(const real_t *const src, real_t *const dest) {
-        const ptrdiff_t n = impl_->node_mapping->size();
+        const ptrdiff_t    n   = impl_->node_mapping->size();
         const idx_t *const idx = impl_->node_mapping->data();
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n; ++i) {
@@ -724,21 +695,48 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int ContactConditions::hessian_crs(const real_t *const x,
+    int ContactConditions::hessian_crs(const real_t *const  x,
                                        const count_t *const rowptr,
-                                       const idx_t *const colidx,
-                                       real_t *const values) {
+                                       const idx_t *const   colidx,
+                                       real_t *const        values) {
         // TODO Householder matrix?
         assert(false);
         return SFEM_FAILURE;
     }
 
     int ContactConditions::mask(mask_t *mask) {
-        const ptrdiff_t n = impl_->node_mapping->size();
+        const ptrdiff_t    n   = impl_->node_mapping->size();
         const idx_t *const idx = impl_->node_mapping->data();
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n; ++i) {
             mask_set(idx[i], mask);
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    int ContactConditions::hessian_block_diag_sym(const real_t *const x, real_t *const values) {
+        impl_->update_displaced_points(x);
+
+        const ptrdiff_t    n   = impl_->node_mapping->size();
+        const idx_t *const idx = impl_->node_mapping->data();
+
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+        assert(dim == 3);  // FIXME 2D not supported
+
+        const real_t *const normals[3] = {impl_->gap_xnormal->data(), impl_->gap_ynormal->data(), impl_->gap_znormal->data()};
+
+        auto m = impl_->mass_vector->data();
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            real_t *const v = &values[i * 6];
+
+            int d_idx = 0;
+            for (int d1 = 0; d1 < dim; d1++) {
+                for (int d2 = d1; d2 < dim; d2++) {
+                    v[d_idx++] += m[i] * normals[d1][i] * normals[d2][i];
+                }
+            }
         }
 
         return SFEM_SUCCESS;

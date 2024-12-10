@@ -8,7 +8,6 @@
 #include "sfem_config.h"
 #endif
 
-
 // static int DEPTH_LEVEL = 0;
 
 // inline char* depth_call(int depth) {
@@ -20,17 +19,11 @@
 //     return buffer;
 // }
 
-#define PRINT_CURRENT_FUNCTION                                                  \
-    printf("\033[32m\nEnter Function\033[0m: \033[33m%s\033[0m, file: %s:%d\n", \
-           __FUNCTION__,                                                        \
-           __FILE__,                                                            \
-           __LINE__);
+#define PRINT_CURRENT_FUNCTION \
+    printf("\033[32m\nEnter Function\033[0m: \033[33m%s\033[0m, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__);
 
-#define RETURN_FROM_FUNCTION(__RET_VAL__)                                             \
-    printf("\033[31m\nReturn from function\033[0m: \033[33m%s\033[0m, file: %s:%d\n", \
-           __FUNCTION__,                                                              \
-           __FILE__,                                                                  \
-           __LINE__);                                                                 \
+#define RETURN_FROM_FUNCTION(__RET_VAL__)                                                                                \
+    printf("\033[31m\nReturn from function\033[0m: \033[33m%s\033[0m, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__); \
     return __RET_VAL__;
 
 #define SFEM_READ_ENV(name, conversion) \
@@ -43,21 +36,25 @@
 
 #define SFEM_REQUIRE_ENV(name, conversion)                                                \
     do {                                                                                  \
-        char *var = getenv(#name);                                                        \
+        char* var = getenv(#name);                                                        \
         if (var) {                                                                        \
             name = conversion(var);                                                       \
         } else {                                                                          \
             fprintf(stderr, "[Error] %s is required (%s:%d)", #name, __FILE__, __LINE__); \
-            assert(0);                                                                \
+            assert(0);                                                                    \
             MPI_Abort(MPI_COMM_WORLD, -1);                                                \
         }                                                                                 \
     } while (0)
 
-#define SFEM_ERROR(...)                \
-    do {                               \
-        fprintf(stderr, __VA_ARGS__);   \
-        assert(0);                 \
-        MPI_Abort(MPI_COMM_WORLD, -1); \
+void sfem_abort();
+
+#define SFEM_ERROR(...)                                             \
+    do {                                                            \
+        fprintf(stderr, __VA_ARGS__);                               \
+        fprintf(stderr, "Aborting at %s:%d\n", __FILE__, __LINE__); \
+        fflush(stderr);                                             \
+        assert(0);                                                  \
+        sfem_abort();                                               \
     } while (0)
 
 #ifdef NDEBUG
@@ -127,8 +124,7 @@ typedef int16_t lidx_t;
 typedef real_t scalar_t;
 typedef real_t accumulator_t;
 #define SFEM_VEC_SIZE 4
-typedef scalar_t vec_t __attribute__((vector_size(SFEM_VEC_SIZE * sizeof(scalar_t)),
-                                      aligned(SFEM_VEC_SIZE * sizeof(scalar_t))));
+typedef scalar_t vec_t __attribute__((vector_size(SFEM_VEC_SIZE * sizeof(scalar_t)), aligned(SFEM_VEC_SIZE * sizeof(scalar_t))));
 
 #endif
 #endif  // SFEM_BASE_H

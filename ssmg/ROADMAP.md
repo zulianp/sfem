@@ -106,12 +106,11 @@ MS := Milestone
    - [ ] Boundary mass-matrix
    - [ ] Support non-axis aligned normal fields for contact
    - [ ] Actual obstacle problem with SDF (recuced size of constrained dofs and quanties, normal field, nonlinear obstacle)
+   - [ ] Chebyshev smoother
    - [ ] Export facilities for Paper 1
 
 **MS 2: ()**
-
    - [ ] Drafting/Finalizing P1
-   - [ ] Chebyshev smoother
 
 **MS 3: ()**
 
@@ -160,11 +159,10 @@ MS := Milestone
 - [ ] Authorship: Hardik, Austen, Rolf, Panayot, Patrick
 - [ ] GMG for solving A x = b, B * x <= g, A in R^{n x n}, B in R^{m x n}
 - [ ] Details of optimization algorithm
+- [ ] Fully geometric MG
 - [ ] Examples in 2D and 3D including constrained Poisson problem, linear elasticity
 - [ ] Matlab Implementation
 - [ ] Convergence of the method on toy problems (no Perf)
-- [ ] If Hypre AMG ops work involve also Rui Peng Li
-
 
 If rejected content goes to **P2**
 
@@ -181,3 +179,6 @@ If rejected content goes to **P2**
    2) Comparing matrix-based (different formats) and matrix-free operator in the context of **P2** (Either Conference Proceeding or CCF Transactions on High Performance Computing):
 
 
+## Maybes
+
+- [ ] If Hypre AMG transfer ops work involve also Rui Peng Li?
