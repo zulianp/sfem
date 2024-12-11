@@ -193,6 +193,7 @@ int main(int argc, char *argv[]) {
 
         auto cg     = sfem::create_cg(linear_op, es);
         cg->verbose = false;
+        // cg->verbose = true;
         // auto diag   = sfem::create_buffer<real_t>(fs->mesh_ptr()->n_nodes() * (block_size == 3 ? 6 : 3), es);
         // auto mask   = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
         // f->hessian_block_diag_sym(nullptr, diag->data());

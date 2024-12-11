@@ -266,8 +266,6 @@ namespace sfem {
                                             lagr_ub ? lagr_ub->data() : nullptr,
                                             J_pen->data());
 
-                            // J_pen->print(std::cout);
-
                             linear_solver_->set_op_and_diag_shift(apply_op, constraints_op_x_op_, J_pen);
 
                         } else {
