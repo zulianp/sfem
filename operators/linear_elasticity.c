@@ -377,7 +377,6 @@ int linear_elasticity_block_diag_sym_aos(const enum ElemType          element_ty
                                      geom_t **const SFEM_RESTRICT points,
                                      const real_t                 mu,
                                      const real_t                 lambda,
-                                     const ptrdiff_t              out_stride,
                                      real_t *const                out) {
     switch (element_type) {
         case HEX8: {
