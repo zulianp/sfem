@@ -18,8 +18,7 @@
 namespace sfem {
 
     template <typename T>
-    static std::shared_ptr<Operator<T>> diag_op(const std::shared_ptr<Buffer<T>>& diagonal_scaling,
-                                                const ExecutionSpace es);
+    static std::shared_ptr<Operator<T>> diag_op(const std::shared_ptr<Buffer<T>>& diagonal_scaling, const ExecutionSpace es);
 
     template <typename T>
     class ConjugateGradient final : public MatrixFreeLinearSolver<T> {
@@ -31,13 +30,13 @@ namespace sfem {
         BLAS_Tpl<T> blas;
 
         // Solver parameters
-        T rtol{1e-10};
-        T atol{1e-16};
-        int max_it{10000};
-        int check_each{100};
-        ptrdiff_t n_dofs{-1};
-        int iterations_{0};
-        bool verbose{true};
+        T              rtol{1e-10};
+        T              atol{1e-16};
+        int            max_it{10000};
+        int            check_each{100};
+        ptrdiff_t      n_dofs{-1};
+        int            iterations_{0};
+        bool           verbose{true};
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
         int iterations() const override { return iterations_; }
@@ -55,25 +54,23 @@ namespace sfem {
 
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
             apply_op = op;
-            n_dofs = op->rows();
+            n_dofs   = op->rows();
         }
 
-        int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op,
-                                  const std::shared_ptr<Buffer<T>>& diag) override {
+        int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op, const std::shared_ptr<Buffer<T>>& diag) override {
             assert(execution_space() == (enum ExecutionSpace)diag->mem_space());
-            auto J = op + sfem::diag_op(diag, execution_space());
+            auto J         = op + sfem::diag_op(diag, execution_space());
             this->apply_op = J;
-            n_dofs = op->rows();
+            n_dofs         = op->rows();
 
             if (preconditioner_op) {
                 auto shiftable = std::dynamic_pointer_cast<ShiftableOperator<T>>(preconditioner_op);
                 if (shiftable) {
                     return shiftable->shift(diag);
                 } else {
-                    fprintf(stderr,
+                    SFEM_ERROR(
                             "Tried to call shift on object that is not subclass of "
                             "ShiftableOperator!\n");
-                    assert(false);
                     return SFEM_FAILURE;
                 }
             }
@@ -81,15 +78,34 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) override {
-            preconditioner_op = op;
+        int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>&          op,
+                                  const std::shared_ptr<SparseBlockVector<T>>& sbv,
+                                  const std::shared_ptr<Buffer<T>>&            diag) override {
+            assert(execution_space() == (enum ExecutionSpace)diag->mem_space());
+            this->apply_op = op + sfem::create_sparse_block_vector_mult(sbv, diag);
+
+            if (preconditioner_op) {
+                auto shiftable = std::dynamic_pointer_cast<ShiftableOperator<T>>(preconditioner_op);
+
+                if (shiftable) {
+                    return shiftable->shift(sbv, diag);
+                } else {
+                    SFEM_ERROR(
+                            "Tried to call shift on object that is not subclass of "
+                            "ShiftableOperator!\n");
+                    assert(false);
+                    return SFEM_FAILURE;
+                }
+            }
+
+            return SFEM_SUCCESS; 
         }
+
+        void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) override { preconditioner_op = op; }
 
         void set_max_it(const int it) override { max_it = it; }
 
-        void set_preconditioner(std::function<void(const T* const, T* const)>&& in) {
-            preconditioner_op = in;
-        }
+        void set_preconditioner(std::function<void(const T* const, T* const)>&& in) { preconditioner_op = in; }
 
         void default_init() {
             OpenMP_BLAS<T>::build_blas(blas);
@@ -102,8 +118,7 @@ namespace sfem {
             if (!verbose) return;
 
             if (iter == max_it || iter == 0 || iter % check_each == 0 || relative_residual < rtol) {
-                std::cout << iter << ": residual abs: " << residual
-                          << ", rel: " << relative_residual << " (rtol = " << rtol
+                std::cout << iter << ": residual abs: " << residual << ", rel: " << relative_residual << " (rtol = " << rtol
                           << ", atol = " << atol << ")\n";
             }
         }
@@ -119,8 +134,7 @@ namespace sfem {
         int apply(const T* const b, T* const x) override {
             assert(n_dofs >= 0);
             if (this->n_dofs < 0) {
-                std::cerr
-                        << "Error uninitiaized n_dofs. Set set_n_dofs to set the number of dofs\n";
+                std::cerr << "Error uninitiaized n_dofs. Set set_n_dofs to set the number of dofs\n";
                 return 1;
             }
 
@@ -142,7 +156,7 @@ namespace sfem {
 
             blas.axpby(n, 1, b, -1, r);
 
-            const T rtr0 = blas.dot(n, r, r);
+            const T rtr0    = blas.dot(n, r, r);
             const T r_norm0 = sqrt(rtr0);
             monitor(0, r_norm0, 1);
 
@@ -152,7 +166,7 @@ namespace sfem {
                 return 0;
             }
 
-            T* p = blas.allocate(n);
+            T* p  = blas.allocate(n);
             T* Ap = blas.allocate(n);
 
             blas.copy(n, r, p);
@@ -162,7 +176,7 @@ namespace sfem {
                 blas.zeros(n, Ap);
                 apply_op->apply(p, Ap);
 
-                const T ptAp = blas.dot(n, p, Ap);
+                const T ptAp  = blas.dot(n, p, Ap);
                 const T alpha = rtr / ptAp;
 
                 blas.axpby(n, alpha, p, 1, x);
@@ -171,8 +185,8 @@ namespace sfem {
                 assert(rtr != 0);
 
                 const T rtr_new = blas.dot(n, r, r);
-                const T beta = rtr_new / rtr;
-                rtr = rtr_new;
+                const T beta    = rtr_new / rtr;
+                rtr             = rtr_new;
                 blas.axpby(n, 1, r, beta, p);
 
                 T r_norm = sqrt(rtr_new);
@@ -211,9 +225,9 @@ namespace sfem {
             //     return 0;
             // }
 
-            T* z = blas.allocate(n);
+            T* z  = blas.allocate(n);
             T* Mz = blas.allocate(n);
-            T* p = blas.allocate(n);
+            T* p  = blas.allocate(n);
             T* Ap = blas.allocate(n);
 
             preconditioner_op->apply(r, z);
@@ -223,7 +237,7 @@ namespace sfem {
             apply_op->apply(p, Ap);
 
             const T rtz0 = blas.dot(n, r, z);
-            T rtz = rtz0;
+            T       rtz  = rtz0;
 
             monitor(0, sqrt(rtz), 1);
 
@@ -246,14 +260,14 @@ namespace sfem {
 
                 assert(rtz != 0);
                 const T beta = rtz_new / rtz;
-                rtz = rtz_new;
+                rtz          = rtz_new;
 
                 blas.axpby(n, 1, z, beta, p);
 
                 blas.zeros(n, Ap);
                 apply_op->apply(p, Ap);
 
-                const T ptAp = blas.dot(n, p, Ap);
+                const T ptAp  = blas.dot(n, p, Ap);
                 const T alpha = rtz / ptAp;
 
                 blas.axpby(n, alpha, p, 1, x);

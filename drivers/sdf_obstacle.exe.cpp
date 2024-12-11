@@ -193,11 +193,12 @@ int main(int argc, char *argv[]) {
         sp->set_penalty_param(10);
 
         auto cg     = sfem::create_cg(linear_op, es);
-        cg->verbose = false;
-        auto diag   = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-        f->hessian_diag(nullptr, diag->data());
-        auto sj = sfem::create_shiftable_jacobi(diag, es);
-        cg->set_preconditioner_op(sj);
+        cg->verbose = true;
+        auto diag   = sfem::create_buffer<real_t>(fs->mesh_ptr()->n_nodes() * (block_size == 3 ? 6 : 3), es);
+        auto mask   = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
+        f->hessian_block_diag_sym(nullptr, diag->data());
+        auto sj = sfem::h_shiftable_block_sym_jacobi(diag, mask);
+        // cg->set_preconditioner_op(sj);
 
         cg->set_atol(1e-12);
         cg->set_rtol(1e-3);

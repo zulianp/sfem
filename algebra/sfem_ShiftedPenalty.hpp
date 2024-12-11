@@ -17,8 +17,7 @@
 namespace sfem {
 
     template <typename T>
-    static std::shared_ptr<Operator<T>> diag_op(const std::shared_ptr<Buffer<T>>& diagonal_scaling,
-                                                const ExecutionSpace es);
+    static std::shared_ptr<Operator<T>> diag_op(const std::shared_ptr<Buffer<T>>& diagonal_scaling, const ExecutionSpace es);
 
     // From Active set expansion strategies in ShiftedPenalty algorithm, Kruzik et al. 2020
     template <typename T>
@@ -41,22 +40,21 @@ namespace sfem {
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         std::shared_ptr<Buffer<T>> upper_bound_;
-        std::shared_ptr<Buffer<T>> lower_bound_;
-        std::shared_ptr<Operator<T>> constraints_op_;
-        std::shared_ptr<Operator<T>> constraints_op_transpose_;
-        std::shared_ptr<Operator<T>> apply_op;
+        std::shared_ptr<Buffer<T>>            lower_bound_;
+        std::shared_ptr<Operator<T>>          constraints_op_;
+        std::shared_ptr<Operator<T>>          constraints_op_transpose_;
+        std::shared_ptr<SparseBlockVector<T>> constraints_op_x_op_;
+        std::shared_ptr<Operator<T>>          apply_op;
 
-        BLAS_Tpl<T> blas;
+        BLAS_Tpl<T>           blas;
         ShiftedPenalty_Tpl<T> impl;
 
         std::shared_ptr<MatrixFreeLinearSolver<T>> linear_solver_;
 
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionSpace        execution_space() const override { return execution_space_; }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
-        void set_linear_solver(const std::shared_ptr<MatrixFreeLinearSolver<T>>& solver) {
-            linear_solver_ = solver;
-        }
+        void set_linear_solver(const std::shared_ptr<MatrixFreeLinearSolver<T>>& solver) { linear_solver_ = solver; }
 
         void set_damping(const T damping) { damping_ = damping; }
 
@@ -72,9 +70,10 @@ namespace sfem {
 
         void set_constraints_op(const std::shared_ptr<Operator<T>>& op,
                                 const std::shared_ptr<Operator<T>>& op_t,
-                                const std::shared_ptr<SparseBlockVector<T>> &op_x_op) {
-            constraints_op_ = op;
+                                const std::shared_ptr<SparseBlockVector<T>>& op_x_op) {
+            constraints_op_           = op;
             constraints_op_transpose_ = op_t;
+            constraints_op_x_op_      = op_x_op;
         }
 
         void set_atol(const T val) { atol = val; }
@@ -101,8 +100,7 @@ namespace sfem {
         }
 
         std::shared_ptr<Buffer<T>> make_buffer(const ptrdiff_t n) const {
-            return Buffer<T>::own(
-                    n, blas.allocate(n), blas.destroy, (enum MemorySpace)execution_space());
+            return Buffer<T>::own(n, blas.allocate(n), blas.destroy, (enum MemorySpace)execution_space());
         }
 
         // void plot_debug(T*const x) {
@@ -333,15 +331,11 @@ namespace sfem {
                 const T norm_rpen = blas.norm2(n_dofs, r_pen->data());
 
                 if (norm_pen < penetration_tol) {
-                    if (ub)
-                        impl.update_lagr_p(
-                                n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
-                    if (lb)
-                        impl.update_lagr_m(
-                                n_constrained_dofs, penalty_param_, Tx, lb, lagr_lb->data());
+                    if (ub) impl.update_lagr_p(n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
+                    if (lb) impl.update_lagr_m(n_constrained_dofs, penalty_param_, Tx, lb, lagr_lb->data());
 
                     penetration_tol = penetration_tol / pow(penalty_param_, 0.9);
-                    omega = omega / penalty_param_;
+                    omega           = omega / penalty_param_;
 
                     count_lagr_mult_updates++;
 
