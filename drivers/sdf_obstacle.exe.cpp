@@ -163,9 +163,8 @@ int main(int argc, char *argv[]) {
 
     int sym_block_size = (block_size == 3 ? 6 : 3);
     auto normal_prod = sfem::create_buffer<real_t>(sym_block_size * contact_conds->n_constrained_dofs(), es);
-    auto sbv         = sfem::create_sparse_block_vector(contact_conds->node_mapping(), normal_prod);
-
     contact_conds->hessian_block_diag_sym(x->data(), normal_prod->data());
+    auto sbv         = sfem::create_sparse_block_vector(contact_conds->node_mapping(), normal_prod);
 
     std::shared_ptr<sfem::Operator<real_t>> solver;
     if (SFEM_ELEMENT_REFINE_LEVEL > 0 && !SFEM_USE_SHIFTED_PENALTY) {
@@ -193,15 +192,15 @@ int main(int argc, char *argv[]) {
         sp->set_penalty_param(10);
 
         auto cg     = sfem::create_cg(linear_op, es);
-        cg->verbose = true;
-        auto diag   = sfem::create_buffer<real_t>(fs->mesh_ptr()->n_nodes() * (block_size == 3 ? 6 : 3), es);
-        auto mask   = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
-        f->hessian_block_diag_sym(nullptr, diag->data());
-        auto sj = sfem::h_shiftable_block_sym_jacobi(diag, mask);
+        cg->verbose = false;
+        // auto diag   = sfem::create_buffer<real_t>(fs->mesh_ptr()->n_nodes() * (block_size == 3 ? 6 : 3), es);
+        // auto mask   = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
+        // f->hessian_block_diag_sym(nullptr, diag->data());
+        // auto sj = sfem::h_shiftable_block_sym_jacobi(diag, mask);
         // cg->set_preconditioner_op(sj);
 
         cg->set_atol(1e-12);
-        cg->set_rtol(1e-3);
+        cg->set_rtol(1e-4);
         cg->set_max_it(20000);
 
         sp->linear_solver_ = cg;

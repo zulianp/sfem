@@ -739,6 +739,19 @@ namespace sfem {
             }
         }
 
+        if(false) {
+            const idx_t *const idx = impl_->node_mapping->data();
+
+            for (ptrdiff_t i = 0; i < n; ++i) {
+                printf("%d) ", idx[i]);
+                real_t *const v = &values[i * 6];
+                for(int d = 0; d < 6; d++) {
+                    printf("%g\t", (double)v[d]);
+                }
+                printf("\n");
+            }
+        }
+
         return SFEM_SUCCESS;
     }
 

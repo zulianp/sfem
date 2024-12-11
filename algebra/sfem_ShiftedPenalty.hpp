@@ -250,15 +250,13 @@ namespace sfem {
                         blas.axpby(n_dofs, alpha, r_pen->data(), 1, x);
                     } else {
                         if (constraints_op_) {
-                            // Use J_pen as temp buffer
-                            blas.zeros(n_constrained_dofs, c->data());
-
                             if (debug) printf("Jacobian\n");
-                            // TODO: check if it is worth storing this as we are computing it twice?
+
+                            // Use c as a temp buffer
+                            blas.zeros(n_constrained_dofs, c->data());
                             constraints_op_->apply(x, c->data());
 
-                            // Use c as temp buffer
-                            blas.zeros(n_constrained_dofs, c->data());
+                            blas.zeros(n_constrained_dofs, J_pen->data());
                             impl.calc_J_pen(n_constrained_dofs,
                                             c->data(),
                                             penalty_param_,
@@ -268,7 +266,8 @@ namespace sfem {
                                             lagr_ub ? lagr_ub->data() : nullptr,
                                             J_pen->data());
 
-                            blas.zeros(n_dofs, J_pen->data());
+                            // J_pen->print(std::cout);
+
                             linear_solver_->set_op_and_diag_shift(apply_op, constraints_op_x_op_, J_pen);
 
                         } else {
