@@ -1491,6 +1491,12 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
+        int hessian_block_diag_sym(const real_t *const x, real_t *const values) {
+            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+            return linear_elasticity_block_diag_sym_aos(
+                    element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, this->mu, this->lambda, values);
+        }
+
         int hessian_diag(const real_t *const, real_t *const out) override {
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
