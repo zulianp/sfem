@@ -277,6 +277,9 @@ namespace sfem {
                                 J_pen->data()[i] = std::abs(J_pen->data()[i]);
                             }
 
+                            auto J = apply_op + sfem::diag_op(J_pen, execution_space());
+                            linear_solver_->set_op(J);
+
                         } else {
                             blas.zeros(n_dofs, J_pen->data());
 
