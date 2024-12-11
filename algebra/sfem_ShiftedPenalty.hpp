@@ -283,10 +283,10 @@ namespace sfem {
                                             lagr_lb ? lagr_lb->data() : nullptr,
                                             lagr_ub ? lagr_ub->data() : nullptr,
                                             J_pen->data());
-                        }
 
-                        auto J = apply_op + sfem::diag_op(J_pen, execution_space());
-                        linear_solver_->set_op(J);
+                            auto J = apply_op + sfem::diag_op(J_pen, execution_space());
+                            linear_solver_->set_op(J);
+                        }
 
                         blas.zeros(n_dofs, c->data());
                         linear_solver_->apply(r_pen->data(), c->data());
