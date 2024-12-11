@@ -23,23 +23,23 @@ namespace sfem {
     template <typename T>
     class ShiftedPenalty final : public MatrixFreeLinearSolver<T> {
     public:
-        T rtol{1e-8};
-        T atol{1e-14};
-        int max_it{10};
-        int max_inner_it{10};
-        int check_each{1};
+        T         rtol{1e-8};
+        T         atol{1e-14};
+        int       max_it{10};
+        int       max_inner_it{10};
+        int       check_each{1};
         ptrdiff_t n_dofs{-1};
-        bool verbose{true};
-        bool debug{false};
-        T penalty_param_{10};
-        T max_penalty_param_{1000};
-        T damping_{1};
-        bool enable_steepest_descent_{false};
-        int iterations_{0};
-        int iterations() const override { return iterations_; }
+        bool      verbose{true};
+        bool      debug{false};
+        T         penalty_param_{10};
+        T         max_penalty_param_{1000};
+        T         damping_{1};
+        bool      enable_steepest_descent_{false};
+        int       iterations_{0};
+        int       iterations() const override { return iterations_; }
 
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
-        std::shared_ptr<Buffer<T>> upper_bound_;
+        ExecutionSpace                        execution_space_{EXECUTION_SPACE_INVALID};
+        std::shared_ptr<Buffer<T>>            upper_bound_;
         std::shared_ptr<Buffer<T>>            lower_bound_;
         std::shared_ptr<Operator<T>>          constraints_op_;
         std::shared_ptr<Operator<T>>          constraints_op_transpose_;
@@ -62,14 +62,14 @@ namespace sfem {
 
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
             this->apply_op = op;
-            n_dofs = op->rows();
+            n_dofs         = op->rows();
         }
         void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) override {
             // Ignoring op!
         }
 
-        void set_constraints_op(const std::shared_ptr<Operator<T>>& op,
-                                const std::shared_ptr<Operator<T>>& op_t,
+        void set_constraints_op(const std::shared_ptr<Operator<T>>&          op,
+                                const std::shared_ptr<Operator<T>>&          op_t,
                                 const std::shared_ptr<SparseBlockVector<T>>& op_x_op) {
             constraints_op_           = op;
             constraints_op_transpose_ = op_t;
@@ -104,40 +104,40 @@ namespace sfem {
         }
 
         // void plot_debug(T*const x) {
-            // static int count_exp = 0;
-            // if (norm_pen > 1e-16) {
-            //     auto buff = make_buffer(r_pen->size() / 3);
-            //     for (ptrdiff_t i = 0; i < r_pen->size() / 3; i++) {
-            //         buff->data()[i] = r_pen->data()[i * 3];
-            //     }
+        // static int count_exp = 0;
+        // if (norm_pen > 1e-16) {
+        //     auto buff = make_buffer(r_pen->size() / 3);
+        //     for (ptrdiff_t i = 0; i < r_pen->size() / 3; i++) {
+        //         buff->data()[i] = r_pen->data()[i * 3];
+        //     }
 
-            //     std::string path =
-            //             "output/pen_" + std::to_string(count_exp) + ".raw";
-            //     array_write(MPI_COMM_SELF,
-            //                 path.c_str(),
-            //                 SFEM_MPI_REAL_T,
-            //                 buff->data(),
-            //                 buff->size(),
-            //                 buff->size());
+        //     std::string path =
+        //             "output/pen_" + std::to_string(count_exp) + ".raw";
+        //     array_write(MPI_COMM_SELF,
+        //                 path.c_str(),
+        //                 SFEM_MPI_REAL_T,
+        //                 buff->data(),
+        //                 buff->size(),
+        //                 buff->size());
 
-            //     for (int d = 0; d < 3; d++) {
-            //         for (ptrdiff_t i = 0; i < r_pen->size() / 3; i++) {
-            //             buff->data()[i] = x[i * 3 + d];
-            //         }
+        //     for (int d = 0; d < 3; d++) {
+        //         for (ptrdiff_t i = 0; i < r_pen->size() / 3; i++) {
+        //             buff->data()[i] = x[i * 3 + d];
+        //         }
 
-            //         std::string path = "output/dbg_disp_" +
-            //                            std::to_string(count_exp) + "." +
-            //                            std::to_string(d) + ".raw";
-            //         array_write(MPI_COMM_SELF,
-            //                     path.c_str(),
-            //                     SFEM_MPI_REAL_T,
-            //                     buff->data(),
-            //                     buff->size(),
-            //                     buff->size());
-            //     }
-            // }
+        //         std::string path = "output/dbg_disp_" +
+        //                            std::to_string(count_exp) + "." +
+        //                            std::to_string(d) + ".raw";
+        //         array_write(MPI_COMM_SELF,
+        //                     path.c_str(),
+        //                     SFEM_MPI_REAL_T,
+        //                     buff->data(),
+        //                     buff->size(),
+        //                     buff->size());
+        //     }
+        // }
 
-            // count_exp++;
+        // count_exp++;
         // }
 
         int apply(const T* const b, T* const x) override {
@@ -170,18 +170,17 @@ namespace sfem {
             if (ub) lagr_ub = make_buffer(n_constrained_dofs);
 
             T penetration_norm = 0;
-            T penetration_tol = 1 / (penalty_param_ * 0.1);
+            T penetration_tol  = 1 / (penalty_param_ * 0.1);
 
-            int count_inner_iter = 0;
+            int count_inner_iter         = 0;
             int count_linear_solver_iter = 0;
-            int count_lagr_mult_updates = 0;
+            int count_lagr_mult_updates  = 0;
 
-            T omega = 1 / penalty_param_;
+            T    omega     = 1 / penalty_param_;
             bool converged = false;
             for (iterations_ = 0; iterations_ < max_it; iterations_++) {
                 // Inner loop
-                for (int inner_iter = 0; inner_iter < max_inner_it;
-                     inner_iter++, count_inner_iter++) {
+                for (int inner_iter = 0; inner_iter < max_inner_it; inner_iter++, count_inner_iter++) {
                     if (constraints_op_) {
                         if (debug) printf("Residual\n");
                         // Use r_pen as temp buffer
@@ -271,7 +270,6 @@ namespace sfem {
 
                             blas.zeros(n_dofs, J_pen->data());
                             linear_solver_->set_op_and_diag_shift(apply_op, constraints_op_x_op_, J_pen);
-
                         } else {
                             blas.zeros(n_dofs, J_pen->data());
 
@@ -321,7 +319,7 @@ namespace sfem {
                 const T e_pen = ((ub) ? impl.sq_norm_ramp_p(n_constrained_dofs, Tx, ub) : T(0)) +
                                 ((lb) ? impl.sq_norm_ramp_m(n_constrained_dofs, Tx, lb) : T(0));
 
-                const T norm_pen = std::sqrt(e_pen);
+                const T norm_pen  = std::sqrt(e_pen);
                 const T norm_rpen = blas.norm2(n_dofs, r_pen->data());
 
                 if (norm_pen < penetration_tol) {
@@ -342,9 +340,9 @@ namespace sfem {
                     }
 
                 } else {
-                    penalty_param_ = std::min(penalty_param_ * 10, max_penalty_param_);
+                    penalty_param_  = std::min(penalty_param_ * 10, max_penalty_param_);
                     penetration_tol = std::max(1e-20, 1 / pow(penalty_param_, 0.1));
-                    omega = 1 / penalty_param_;
+                    omega           = 1 / penalty_param_;
                 }
 
                 monitor(iterations_,
@@ -380,9 +378,9 @@ namespace sfem {
             apply_op->apply(x, temp->data());
 
             const T xtAx = blas.dot(n_dofs, x, temp->data());
-            const T xtb = blas.dot(n_dofs, x, b);
-            
-            T alpha = 2;
+            const T xtb  = blas.dot(n_dofs, x, b);
+
+            T alpha  = 2;
             T energy = 0;
 
             SFEM_ERROR("IMPLEMENT ME!\n");
@@ -393,10 +391,10 @@ namespace sfem {
                      const int count_inner_iter,
                      const int count_linear_solver_iter,
                      const int count_lagr_mult_updates,
-                     const T norm_pen,
-                     const T norm_rpen,
-                     const T penetration_tol,
-                     const T penalty_param) {
+                     const T   norm_pen,
+                     const T   norm_rpen,
+                     const T   penetration_tol,
+                     const T   penalty_param) {
             if (iter == max_it || iter % check_each == 0 || (norm_pen < atol && norm_rpen < atol)) {
                 printf("%d|%d|%d) [lagr++ %d] norm_pen %e, norm_rpen %e, penetration_tol %e, "
                        "penalty_param "

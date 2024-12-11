@@ -209,7 +209,6 @@ int main(int argc, char *argv[]) {
 
         sp->verbose = true;
 
-        // auto viz_upper_bound = sfem::create_buffer<real_t>(fs->n_dofs(), es);
         sp->set_upper_bound(upper_bound);
         sp->set_constraints_op(cc_op, cc_op_t, sbv);
         solver = sp;

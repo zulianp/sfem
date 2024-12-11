@@ -165,7 +165,7 @@ namespace sfem {
 
     std::unique_ptr<YAMLNoIndent> YAMLNoIndent::create_from_file(const std::string &path) {
         std::ifstream file(path.c_str());
-        if (!file.good()) SFEM_ERROR("Unable to open file %s", path.c_str());
+        if (!file.good()) SFEM_ERROR("Unable to open file %s\n", path.c_str());
 
         auto ret = std::make_unique<YAMLNoIndent>();
         ret->parse(file);
