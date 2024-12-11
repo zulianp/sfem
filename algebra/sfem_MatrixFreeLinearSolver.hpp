@@ -84,24 +84,35 @@ namespace sfem {
             const int          block_size = 3;
             assert(sbv->block_size() == 6);
 
+            for (ptrdiff_t i = 0; i < scaling->size(); i++) {
+                y[i] = 0;
+            }
+
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n_blocks; i++) {
+                auto di = &dd[i * 6];
+                auto si = s[i];
+
                 const idx_t b  = idx[i];
                 auto        xi = &x[b * block_size];
                 auto        yi = &y[b * block_size];
 
-                auto di = &dd[i * 6];
-                auto si = s[i];
+                T buff[3] = {0, 0, 0};
 
                 int d_idx = 0;
                 for (int d1 = 0; d1 < block_size; d1++) {
-                    yi[d1] += si * xi[d1] * dd[d_idx++];
+                    const auto m = si * di[d_idx++];
+                    buff[d1] += m * xi[d1];
                     for (int d2 = d1 + 1; d2 < block_size; d2++) {
-                        const auto m = si * dd[d_idx++];
-                        yi[d1] += m * xi[d2];
-                        yi[d2] += m * xi[d1];
+                        const auto m = si * di[d_idx++];
+                        buff[d1] += m * xi[d2];
+                        buff[d2] += m * xi[d1];
                     }
                 }
+
+                yi[0] += buff[0];
+                yi[1] += buff[1];
+                yi[2] += buff[2];
             }
 
             return SFEM_SUCCESS;
@@ -118,6 +129,13 @@ namespace sfem {
         auto ret     = std::make_shared<ScaledBlockVectorMult<T>>();
         ret->sbv     = sbv;
         ret->scaling = scaling;
+
+        const ptrdiff_t    n_blocks   = sbv->n_blocks();
+        const idx_t* const idx        = sbv->idx()->data();
+        const T* const     dd         = sbv->data()->data();
+        const T* const     s          = scaling->data();
+        const int          block_size = 3;
+        assert(sbv->block_size() == 6);
         return ret;
     }
 
