@@ -942,18 +942,18 @@ int resample_field(
 // resample_field_mesh ////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
-int                                                                 //
-resample_field_mesh(const int                            mpi_size,  // MPI size
-                    const int                            mpi_rank,  // MPI rank
-                    const mesh_t* const SFEM_RESTRICT    mesh,      // Mesh
-                    const ptrdiff_t* const SFEM_RESTRICT n,         // // SDF
-                    const ptrdiff_t* const SFEM_RESTRICT stride,    //
-                    const geom_t* const SFEM_RESTRICT    origin,    //
-                    const geom_t* const SFEM_RESTRICT    delta,     //
-                    const real_t* const SFEM_RESTRICT    data,      //
-                    const real_t* const SFEM_RESTRICT    field,     // // Output
-                    real_t* const SFEM_RESTRICT          g,         //
-                    sfem_resample_field_info*            info) {
+int                                                                       //
+resample_field_mesh_tet10(const int                            mpi_size,  // MPI size
+                          const int                            mpi_rank,  // MPI rank
+                          const mesh_t* const SFEM_RESTRICT    mesh,      // Mesh
+                          const ptrdiff_t* const SFEM_RESTRICT n,         // // SDF
+                          const ptrdiff_t* const SFEM_RESTRICT stride,    //
+                          const geom_t* const SFEM_RESTRICT    origin,    //
+                          const geom_t* const SFEM_RESTRICT    delta,     //
+                          const real_t* const SFEM_RESTRICT    data,      //
+                          const real_t* const SFEM_RESTRICT    field,     // // Output
+                          real_t* const SFEM_RESTRICT          g,         //
+                          sfem_resample_field_info*            info) {
     //
     PRINT_CURRENT_FUNCTION;
 
