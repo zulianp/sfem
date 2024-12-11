@@ -39,8 +39,8 @@ int main(int argc, char* argv[]) {
 
     MPI_Comm comm = MPI_COMM_WORLD;
 
-    int rank, mpi_size;
-    MPI_Comm_rank(comm, &rank);
+    int mpi_rank, mpi_size;
+    MPI_Comm_rank(comm, &mpi_rank);
     MPI_Comm_size(comm, &mpi_size);
 
     // print argv
@@ -187,8 +187,8 @@ int main(int argc, char* argv[]) {
 
         double ndarray_read_tock = MPI_Wtime();
 
-        if (!rank) {
-            printf("[%d] ndarray_create_from_file %g (seconds)\n", rank, ndarray_read_tock - ndarray_read_tick);
+        if (!mpi_rank) {
+            printf("[%d] ndarray_create_from_file %g (seconds)\n", mpi_rank, ndarray_read_tock - ndarray_read_tick);
         }
     }
 
@@ -276,7 +276,7 @@ int main(int argc, char* argv[]) {
                     const int ret =                                           //
                             hex8_to_tet10_resample_field_local_CUDA_wrapper(  //
                                     mpi_size,                                 // MPI size
-                                    rank,                                     // MPI rank
+                                    mpi_rank,                                 // MPI rank
                                     &mesh,                                    // Mesh
                                     assemble_dual_mass_vector_cuda,           // assemble dual mass vector in the kernel
                                     nlocal,                                   // number of nodes in each direction
@@ -378,7 +378,7 @@ int main(int argc, char* argv[]) {
         MPI_Gather(&mesh.nelements, 1, MPI_INT, elements_v, 1, MPI_INT, 0, comm);
 
         int tot_nelements = 0;
-        if (!rank) {
+        if (!mpi_rank) {
             for (int i = 0; i < mpi_size; i++) {
                 tot_nelements += elements_v[i];
             }
@@ -396,7 +396,7 @@ int main(int argc, char* argv[]) {
         MPI_Gather(&flops, 1, MPI_DOUBLE, flops_v, 1, MPI_DOUBLE, 0, comm);
 
         double tot_flops = 0.0;
-        if (!rank) {
+        if (!mpi_rank) {
             for (int i = 0; i < mpi_size; i++) {
                 tot_flops += flops_v[i];
             }
@@ -407,25 +407,25 @@ int main(int argc, char* argv[]) {
         fflush(stdout);
         MPI_Barrier(MPI_COMM_WORLD);
 
-        if (!rank) {
+        if (!mpi_rank) {
             const int    nelements       = mesh.nelements;
             const double elements_second = (double)tot_nelements / (double)(resample_tock - resample_tick);
 
             printf("\n");
             printf("===========================================\n");
-            printf("Rank: [%d]  file: %s:%d\n", rank, __FILE__, __LINE__);
+            printf("Rank: [%d]  file: %s:%d\n", mpi_rank, __FILE__, __LINE__);
 
             printf("Rank: [%d]  Nr of elements  %d\n",                    //
-                   rank,                                                  //
+                   mpi_rank,                                              //
                    nelements * mpi_size);                                 //
             printf("Rank: [%d]  Resample        %g (seconds)\n",          //
-                   rank,                                                  //
+                   mpi_rank,                                              //
                    resample_tock - resample_tick);                        //
             printf("Rank: [%d]  Throughput      %e (elements/second)\n",  //
-                   rank,                                                  //
+                   mpi_rank,                                              //
                    elements_second);                                      //
             printf("Rank: [%d]  FLOPS           %e (FLOP/S)\n",           //
-                   rank,                                                  //
+                   mpi_rank,                                              //
                    tot_flops);                                            //
             printf("===========================================\n");
 
@@ -435,7 +435,7 @@ int main(int argc, char* argv[]) {
 
     // Write result to disk
     {
-        if (rank == 0) {
+        if (mpi_rank == 0) {
             printf("-------------------------------------------\n");
             printf("Writing result to disk\n");
             printf("Output path: %s\n", output_path);
@@ -470,8 +470,8 @@ int main(int argc, char* argv[]) {
 
         double io_tock = MPI_Wtime();
 
-        if (!rank) {
-            printf("[%d] write %g (seconds)\n", rank, io_tock - io_tick);
+        if (!mpi_rank) {
+            printf("[%d] write %g (seconds)\n", mpi_rank, io_tock - io_tick);
         }
     }
 
@@ -487,7 +487,7 @@ int main(int argc, char* argv[]) {
 
     double tock = MPI_Wtime();
 
-    if (!rank) {
+    if (!mpi_rank) {
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld #grid (%ld x %ld x %ld)\n",
                (long)nelements,
