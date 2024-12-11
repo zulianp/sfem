@@ -245,38 +245,32 @@ namespace sfem {
                         blas.zeros(n_dofs, c->data());
                         apply_op->apply(r_pen->data(), c->data());
 
-                        const T alpha = blas.dot(n_dofs, r_pen->data(), r_pen->data()) /
-                                        blas.dot(n_dofs, r_pen->data(), c->data());
+                        const T alpha =
+                                blas.dot(n_dofs, r_pen->data(), r_pen->data()) / blas.dot(n_dofs, r_pen->data(), c->data());
 
                         blas.axpby(n_dofs, alpha, r_pen->data(), 1, x);
                     } else {
                         if (constraints_op_) {
                             // Use J_pen as temp buffer
-                            blas.zeros(n_constrained_dofs, J_pen->data());
+                            blas.zeros(n_constrained_dofs, c->data());
 
                             if (debug) printf("Jacobian\n");
                             // TODO: check if it is worth storing this as we are computing it twice?
-                            constraints_op_->apply(x, J_pen->data());
+                            constraints_op_->apply(x, c->data());
 
                             // Use c as temp buffer
                             blas.zeros(n_constrained_dofs, c->data());
                             impl.calc_J_pen(n_constrained_dofs,
-                                            J_pen->data(),
+                                            c->data(),
                                             penalty_param_,
                                             lb,
                                             ub,
                                             lagr_lb ? lagr_lb->data() : nullptr,
                                             lagr_ub ? lagr_ub->data() : nullptr,
-                                            c->data());
+                                            J_pen->data());
 
                             blas.zeros(n_dofs, J_pen->data());
-                            constraints_op_transpose_->apply(c->data(), J_pen->data());
-
-// FIXME (for non axis aligned contact we need a block diagonal matrix)
-#pragma omp parallel for
-                            for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                                J_pen->data()[i] = std::abs(J_pen->data()[i]);
-                            }
+                            linear_solver_->set_op_and_diag_shift(apply_op, constraints_op_x_op_, J_pen);
 
                         } else {
                             blas.zeros(n_dofs, J_pen->data());
