@@ -319,6 +319,7 @@ int main(int argc, char* argv[]) {
                                                     mesh.points,
                                                     mass_vector);
 
+                    // end if mesh.element_type == TET10
                 } else if (mesh.element_type == TET4) {  // mesh.element_type == TET4
                     enum ElemType st = shell_type(mesh.element_type);
 
@@ -329,9 +330,12 @@ int main(int argc, char* argv[]) {
                     } else {
                         assemble_lumped_mass(st, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mass_vector);
                     }
+
+                    // end if mesh.element_type == TET4
+
                 }  // end if mesh.element_type == TET10
 
-                if ((SFEM_TET10_CUDA == OFF) || SFEM_CUDA_MEMORY_MODEL == CUDA_HOST_MEMORY) {
+                if (assemble_dual_mass_vector_cuda == 0) {
                     //// TODO In CPU must be called.
                     //// TODO In GPU should be calculated in the kernel calls in case of unified and Managed memory
                     //// TODO In GPU is calculated here in case of host memory and more than one MPI rank (at the moment)
@@ -364,7 +368,7 @@ int main(int argc, char* argv[]) {
 
                 free(mass_vector);
             }  // end if mpi_size > 1
-        }
+        }      // end if SFEM_INTERPOLATE
 
         MPI_Barrier(MPI_COMM_WORLD);
         double resample_tock = MPI_Wtime();

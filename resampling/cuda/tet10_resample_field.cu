@@ -242,136 +242,6 @@ calculate_threads_and_blocks(ptrdiff_t  nelements,        //
 ////////////////////////////////////////////////////////////////////////
 // hex8_to_tet10_resample_field_local_CUDA_unified
 ////////////////////////////////////////////////////////////////////////
-extern "C" int                                                        //
-hex8_to_tet10_resample_field_local_CUDA_unified(                      //
-                                                                      // Mesh
-        const ptrdiff_t              nelements,                       // number of elements
-        const ptrdiff_t              nnodes,                          // number of nodes
-        const int                    bool_assemble_dual_mass_vector,  // assemble dual mass vector
-        idx_t** const SFEM_RESTRICT  elems,                           // connectivity
-        geom_t** const SFEM_RESTRICT xyz,                             // coordinates
-        // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
-        const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
-
-        const geom_t* const SFEM_RESTRICT origin,  // origin of the domain
-        const geom_t* const SFEM_RESTRICT delta,   // delta of the domain
-        const real_t* const SFEM_RESTRICT data,    // SDF
-        // Output //
-        real_t* const SFEM_RESTRICT g_host) {  //
-                                               //
-    PRINT_CURRENT_FUNCTION;
-
-    int size_data = n[0] * n[1] * n[2];
-
-    // Device memory
-    const real_t* data_device = data;
-    real_t*       mass_vector = NULL;
-    real_t*       g_device    = g_host;
-
-    memory_hint_write_mostly(nelements, sizeof(real_t), (void*)g_device);
-    memory_hint_read_mostly(size_data, sizeof(real_t), (void*)data_device);
-
-    mass_vector = (real_t*)malloc(nnodes * sizeof(real_t));
-
-    memory_hint_write_mostly(nnodes, sizeof(real_t), (void*)mass_vector);
-
-    //// Initialize the data on the device
-    elems_tet10_device elems_device =                    //
-            make_elems_tet10_device_unified(nelements);  //
-
-    copy_elems_tet10_device_unified(nelements, &elems_device, (const idx_t**)elems);
-    memory_hint_elems_tet10_device_unified(nelements, &elems_device);
-
-    xyz_tet10_device xyz_device =                   //
-            make_xyz_tet10_device_unified(nnodes);  //
-
-    copy_xyz_tet10_device_unified(nnodes, &xyz_device, (const float**)xyz);
-    memory_hint_xyz_tet10_device_unified(nnodes, &xyz_device);
-
-    const ptrdiff_t warp_per_block  = 8;  /// 8 warps per block /////
-    ptrdiff_t       threadsPerBlock = 0;
-    ptrdiff_t       numBlocks       = 0;
-
-    calculate_threads_and_blocks(nelements, warp_per_block, &threadsPerBlock, &numBlocks);
-
-#if CUBE1 == 0  // WENO ..
-    char kernel_name[] = "hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel";
-#else
-    char kernel_name[] = "hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel";
-#endif
-
-    printf("============================================================================\n");
-    printf("GPU:    Unified Memory Model\n");
-    printf("GPU:    Launching the kernel %s \n", kernel_name);
-    printf("GPU:    Number of blocks:            %ld\n", numBlocks);
-    printf("GPU:    Number of threads per block: %ld\n", threadsPerBlock);
-    printf("GPU:    Total number of threads:     %ld\n", (numBlocks * threadsPerBlock));
-    printf("GPU:    Number of elements:          %ld\n", nelements);
-    printf("GPU:    Use WENO:                    %s\n", (WENO_CUDA == 1 & CUBE1 == 1) ? "Yes" : "No");
-    printf("============================================================================\n");
-
-    cudaDeviceSynchronize();
-
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-
-    cudaEventRecord(start);
-
-    // Launch the kernels
-    launch_kernels_hex8_to_tet10_resample_field_local_CUDA(numBlocks,
-                                                           threadsPerBlock,
-                                                           bool_assemble_dual_mass_vector,
-                                                           nelements,
-                                                           nnodes,
-                                                           elems_device,
-                                                           xyz_device,
-                                                           n,
-                                                           stride,
-                                                           origin,
-                                                           delta,
-                                                           data_device,
-                                                           mass_vector,
-                                                           g_device);
-
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
-
-    float milliseconds = 0;
-    cudaEventElapsedTime(&milliseconds, start, stop);
-
-    const double seconds = milliseconds / 1000.0;
-
-    printf("============================================================================\n");
-    printf("GPU:    Time for the kernel (%s):\n"  //
-           "GPU:    %f seconds\n",                //
-           kernel_name,
-           seconds);
-    const double elements_per_second = (double)(nelements) / seconds;
-    printf("GPU:    Number of elements: %d.\n", nelements);
-    printf("GPU:    Throughput for the kernel: %e elements/second\n", elements_per_second);
-    printf("GPU:    %d, %f   (CSV friendly) \n", nelements, elements_per_second);
-    printf("============================================================================\n");
-
-    ////////////////////////////////////////
-    /// Finalize the memory allocation
-    free(mass_vector);
-    mass_vector = NULL;  // free the memory allocated for mass_vector
-
-    // The g device is already allocated in the unified memory
-    // and managed by the main program
-    g_device = NULL;
-
-    free_elems_tet10_device_unified(&elems_device);
-    free_xyz_tet10_device_unified(&xyz_device);
-
-    RETURN_FROM_FUNCTION(0);
-}
-
-////////////////////////////////////////////////////////////////////////
-// hex8_to_tet10_resample_field_local_CUDA_unified
-////////////////////////////////////////////////////////////////////////
 extern "C" int                                       //
 hex8_to_tet10_resample_field_local_CUDA_unified_v2(  //
         const int mpi_size,                          //
@@ -391,7 +261,7 @@ hex8_to_tet10_resample_field_local_CUDA_unified_v2(  //
                                                //
     PRINT_CURRENT_FUNCTION;
 
-    int size_data = n[0] * n[1] * n[2];
+    const int size_data = n[0] * n[1] * n[2];
 
     // Device memory
     const real_t* data_device = data;
@@ -503,6 +373,140 @@ hex8_to_tet10_resample_field_local_CUDA_unified_v2(  //
 }
 
 ////////////////////////////////////////////////////////////////////////
+// hex8_to_tet10_resample_field_local_CUDA_unified
+////////////////////////////////////////////////////////////////////////
+extern "C" int                                     //
+hex8_to_tet10_resample_field_local_CUDA_Managed(   //
+        const int mpi_size,                        //
+        const int mpi_rank,                        //
+        mesh_t*   mesh,                            // Mesh
+        const int bool_assemble_dual_mass_vector,  // assemble dual mass vector
+        // SDF
+        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
+        const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
+        // Geometry
+        const geom_t* const SFEM_RESTRICT origin,  // origin of the domain
+        const geom_t* const SFEM_RESTRICT delta,   // delta of the domain
+        // Data
+        const real_t* const SFEM_RESTRICT data,  // SDF
+        // Output //
+        real_t* const SFEM_RESTRICT g_host) {  //
+                                               //
+    PRINT_CURRENT_FUNCTION;
+
+    const int size_data = n[0] * n[1] * n[2];
+
+    // Managed memory
+    real_t* data_device = NULL;
+    real_t* mass_vector = NULL;
+    real_t* g_device    = NULL;
+
+    cudaMallocManaged(&data_device, size_data * sizeof(real_t));
+    cudaMemcpy(data_device, data, size_data * sizeof(real_t), cudaMemcpyHostToDevice);
+
+    cudaMallocManaged(&mass_vector, mesh->nnodes * sizeof(real_t));
+    cudaMallocManaged(&g_device, mesh->nnodes * sizeof(real_t));
+
+    memory_hint_write_mostly(mesh->nelements, sizeof(real_t), (void*)g_device);
+    memory_hint_read_mostly(size_data, sizeof(real_t), (void*)data_device);
+
+    elems_tet10_device elems_managed = make_elems_tet10_managed(mesh->nelements);
+    copy_elems_tet10_managed(mesh->nelements, &elems_managed, (const idx_t**)mesh->elements);
+
+    xyz_tet10_device xyz_managed = make_xyz_tet10_managed(mesh->nnodes);
+    copy_xyz_tet10_managed(mesh->nnodes, &xyz_managed, (const float**)mesh->points);
+
+    const ptrdiff_t warp_per_block  = 8;  /// 8 warps per block /////
+    ptrdiff_t       numBlocks       = 0;
+    ptrdiff_t       threadsPerBlock = 0;
+
+    calculate_threads_and_blocks(mesh->nelements, warp_per_block, &threadsPerBlock, &numBlocks);
+
+#if CUBE1 == 0  // WENO ..
+    char kernel_name[] = "hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel";
+#else
+    char kernel_name[] = "hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel";
+#endif
+
+    printf("============================================================================\n");
+    printf("GPU:    Managed Memory Model %s:%d \n", __FILE__, __LINE__);
+    printf("GPU:    MPI size:                    %d\n", mpi_size);
+    printf("GPU:    MPI rank:                    %d\n", mpi_rank);
+    printf("GPU:    Launching the kernel %s \n", kernel_name);
+    printf("GPU:    Number of blocks:            %ld\n", numBlocks);
+    printf("GPU:    Number of threads per block: %ld\n", threadsPerBlock);
+    printf("GPU:    Total number of threads:     %ld\n", (numBlocks * threadsPerBlock));
+    printf("GPU:    Number of elements:          %ld\n", mesh->nelements);
+    printf("GPU:    Use WENO:                    %s\n", (WENO_CUDA == 1 & CUBE1 == 1) ? "Yes" : "No");
+    printf("============================================================================\n");
+
+    cudaDeviceSynchronize();
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    cudaEventRecord(start);
+
+    ////  Launch the kernel
+    launch_kernels_hex8_to_tet10_resample_field_local_CUDA_unified(mpi_size,
+                                                                   mpi_rank,
+                                                                   numBlocks,
+                                                                   threadsPerBlock,
+                                                                   mesh,
+                                                                   bool_assemble_dual_mass_vector,
+                                                                   mesh->nelements,
+                                                                   mesh->nnodes,
+                                                                   elems_managed,
+                                                                   xyz_managed,
+                                                                   n,
+                                                                   stride,
+                                                                   origin,
+                                                                   delta,
+                                                                   data_device,
+                                                                   mass_vector,
+                                                                   g_device);
+
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+
+    const double seconds = milliseconds / 1000.0;
+
+    printf("============================================================================\n");
+    printf("GPU:    Time for the kernel (%s):\n"  //
+           "GPU:    %f seconds\n",                //
+           kernel_name,
+           seconds);
+    const double elements_per_second = (double)(mesh->nelements) / seconds;
+    printf("GPU:    Number of elements: %d.\n", mesh->nelements);
+    printf("GPU:    Throughput for the kernel: %e elements/second\n", elements_per_second);
+    printf("GPU:    %d, %f   (CSV friendly) \n", mesh->nelements, elements_per_second);
+    printf("============================================================================\n");
+
+    cudaMemcpy(g_host,                         //
+               g_device,                       //
+               mesh->nnodes * sizeof(real_t),  //
+               cudaMemcpyDeviceToHost);        //
+
+    cudaFree(data_device);
+    data_device = NULL;
+
+    cudaFree(mass_vector);
+    mass_vector = NULL;
+
+    cudaFree(g_device);
+    g_device = NULL;
+
+    free_elems_tet10_managed(&elems_managed);
+    free_xyz_tet10_managed(&xyz_managed);
+
+    RETURN_FROM_FUNCTION(0);
+}
+
+////////////////////////////////////////////////////////////////////////
 // hex8_to_tet10_resample_field_local_CUDA
 ////////////////////////////////////////////////////////////////////////
 extern "C" int                                                        //
@@ -524,32 +528,15 @@ hex8_to_tet10_resample_field_local_CUDA(                              //
         real_t* const SFEM_RESTRICT g_host) {  //
                                                // geom_t** const SFEM_RESTRICT xyz
 
-#if SFEM_CUDA_MEMORY_MODEL == CUDA_UNIFIED_MEMORY
-#pragma message "CUDA_UNIFIED_MEMORY is enabled"
-    return hex8_to_tet10_resample_field_local_CUDA_unified(nelements,  //
-                                                           nnodes,
-                                                           bool_assemble_dual_mass_vector,
-                                                           elems,
-                                                           xyz,
-                                                           n,
-                                                           stride,
-                                                           origin,
-                                                           delta,
-                                                           data,
-                                                           g_host);
-#elif SFEM_CUDA_MEMORY_MODEL == CUDA_MEMORY_MANAGED
-#pragma message "CUDA_MEMORY_MANAGED is enabled: Not implemented yet"
-    return -1;
-#endif
-
     PRINT_CURRENT_FUNCTION;
+
+    int size_data = n[0] * n[1] * n[2];
 
     // Device memory
     real_t* data_device = NULL;
     real_t* mass_vector = NULL;
     real_t* g_device    = NULL;
 
-    int size_data = n[0] * n[1] * n[2];
     cudaMalloc(&data_device, size_data * sizeof(real_t));
     cudaMemcpy(data_device, data, size_data * sizeof(real_t), cudaMemcpyHostToDevice);
 
@@ -693,13 +680,22 @@ hex8_to_tet10_resample_field_local_CUDA_wrapper(   //
                                                               g_host);
 #elif SFEM_CUDA_MEMORY_MODEL == CUDA_MANAGED_MEMORY
 
-#pragma message "CUDA_MEMORY_MANAGED is enabled: Not implemented yet"
-    return -1;
+#pragma message "CUDA_MEMORY_MANAGED is enabled:"
+    return hex8_to_tet10_resample_field_local_CUDA_Managed(mpi_size,                        //
+                                                           mpi_rank,                        //
+                                                           mesh,                            //
+                                                           bool_assemble_dual_mass_vector,  //
+                                                           n,
+                                                           stride,
+                                                           origin,
+                                                           delta,
+                                                           data,
+                                                           g_host);
 
 #elif SFEM_CUDA_MEMORY_MODEL == CUDA_HOST_MEMORY
 
     // Default memory model is CUDA_HOST_MEMORY.
-
+#pragma message "CUDA_HOST_MEMORY is enabled"
     return hex8_to_tet10_resample_field_local_CUDA(mesh->nelements,                 //
                                                    mesh->nnodes,                    //
                                                    bool_assemble_dual_mass_vector,  //

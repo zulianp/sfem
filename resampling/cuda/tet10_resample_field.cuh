@@ -45,6 +45,47 @@ copy_xyz_tet10_device(const ptrdiff_t nnodes, xyz_tet10_device* xyz, const float
 void                                           //
 free_xyz_tet10_device(xyz_tet10_device* xyz);  //
 
+/////////////////////////////////////////////////////////////////
+// xyz_tet10_device functions for managed memory
+/////////////////////////////////////////////////////////////////
+
+/**
+ * @brief
+ *
+ * @param nnodes
+ * @return xyz_tet10_device
+ */
+xyz_tet10_device                                        //
+make_xyz_tet10_managed(const ptrdiff_t nnodes);  //
+
+/**
+ * @brief
+ *
+ * @param nnodes
+ * @param xyz
+ * @param xyz_host
+ */
+void                                                                                                   //
+copy_xyz_tet10_managed(const ptrdiff_t nnodes, xyz_tet10_device* xyz, const float** xyz_host);  //
+
+/**
+ * @brief
+ *
+ * @param xyz
+ */
+void                                                   //
+free_xyz_tet10_managed(xyz_tet10_device* xyz);  //
+
+/**
+ * @brief
+ *
+ * @param nnodes
+ * @param xyz
+ */
+void                                                            //
+memory_hint_xyz_tet10_managed(const ptrdiff_t   nnodes,  //
+                                     xyz_tet10_device* xyz);    //
+
 // elems_tet10_device functions for unified memory
 
 /**
@@ -107,6 +148,10 @@ typedef struct {
 // end struct elems_tet10_device
 /////////////////////////////////////////////////////////////////
 
+/////////////////////////////////////////////////////////////////
+// Device memory
+/////////////////////////////////////////////////////////////////
+
 /**
  * @brief
  *
@@ -137,6 +182,44 @@ copy_elems_tet10_device(const ptrdiff_t     nelements,  //
 void                                                 //
 free_elems_tet10_device(elems_tet10_device* elems);  //
 
+/////////////////////////////////////////////////////////////////
+// Manged memory
+/////////////////////////////////////////////////////////////////
+
+/**
+ * @brief
+ *
+ * @param nelements
+ * @return elems_tet10_device
+ */
+elems_tet10_device                                    //
+make_elems_tet10_managed(const ptrdiff_t nelements);  //
+
+/**
+ * @brief
+ *
+ * @param nelements
+ * @param elems
+ * @param elems_host
+ * @return cudaError_t
+ */
+cudaError_t                                              //
+copy_elems_tet10_managed(const ptrdiff_t     nelements,  //
+                         elems_tet10_device* elems,      //
+                         const idx_t**       elems_host);      //
+
+/**
+ * @brief
+ *
+ * @param elems
+ */
+void                                                  //
+free_elems_tet10_managed(elems_tet10_device* elems);  //
+
+/////////////////////////////////////////////////////////////////
+// Unified memory
+/////////////////////////////////////////////////////////////////
+
 /**
  * @brief
  *
@@ -166,6 +249,10 @@ copy_elems_tet10_device_unified(const ptrdiff_t     nelements,  //
  */
 void                                                         //
 free_elems_tet10_device_unified(elems_tet10_device* elems);  //
+
+/////////////////////////////////////////////////////////////////
+// Memory hints
+/////////////////////////////////////////////////////////////////
 
 /**
  * @brief
