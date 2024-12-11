@@ -6,7 +6,6 @@
 #include <functional>
 #include <iostream>
 #include <memory>
-// #include <csignal>
 
 #include "sfem_Buffer.hpp"
 #include "sfem_base.h"
@@ -34,6 +33,21 @@ namespace sfem {
         const std::shared_ptr<Buffer<idx_t>>& idx() const { return idx_; }
         const std::shared_ptr<Buffer<T>>&     data() const { return data_; }
         ptrdiff_t                             n_blocks() const { return idx_->size(); }
+
+        void print(std::ostream& os) const {
+            for (ptrdiff_t i = 0; i < n_blocks(); i++) {
+                os << idx_->data()[i] << ") ";
+
+                for (int d = 0; d < block_size(); d++) {
+                    os << data_->data()[i * 6 + d];
+                    os << " ";
+                }
+
+                os << "\n";
+            }
+
+            os << "\n";
+        }
 
         // TODO maybe
         // int apply(const T* const x, T* const y) override {
@@ -81,15 +95,13 @@ namespace sfem {
 
                 int d_idx = 0;
                 for (int d1 = 0; d1 < block_size; d1++) {
-                    yi[d1] += xi[d1] * dd[d_idx++];
+                    yi[d1] += si * xi[d1] * dd[d_idx++];
                     for (int d2 = d1 + 1; d2 < block_size; d2++) {
-                        yi[d1] += xi[d2] * dd[d_idx];
-                        yi[d2] += xi[d1] * dd[d_idx];
-                        d_idx++;
+                        const auto m = si * dd[d_idx++];
+                        yi[d1] += m * xi[d2];
+                        yi[d2] += m * xi[d1];
                     }
                 }
-
-                // std::raise(SIGINT);
             }
 
             return SFEM_SUCCESS;
