@@ -6,6 +6,7 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+// #include <csignal>
 
 #include "sfem_Buffer.hpp"
 #include "sfem_base.h"
@@ -66,7 +67,8 @@ namespace sfem {
             const idx_t* const idx        = sbv->idx()->data();
             const T* const     dd         = sbv->data()->data();
             const T* const     s          = scaling->data();
-            const int          block_size = sbv->block_size();
+            const int          block_size = 3;
+            assert(sbv->block_size() == 6);
 
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n_blocks; i++) {
@@ -79,13 +81,15 @@ namespace sfem {
 
                 int d_idx = 0;
                 for (int d1 = 0; d1 < block_size; d1++) {
-                    yi[d1] += dd[d_idx++];
+                    yi[d1] += xi[d1] * dd[d_idx++];
                     for (int d2 = d1 + 1; d2 < block_size; d2++) {
                         yi[d1] += xi[d2] * dd[d_idx];
                         yi[d2] += xi[d1] * dd[d_idx];
                         d_idx++;
                     }
                 }
+
+                // std::raise(SIGINT);
             }
 
             return SFEM_SUCCESS;
@@ -93,12 +97,12 @@ namespace sfem {
 
         std::ptrdiff_t rows() const override { return sbv->data()->size(); }
         std::ptrdiff_t cols() const override { return sbv->data()->size(); }
-        ExecutionSpace execution_space() const override { return sbv->data()->mem_space(); }
+        ExecutionSpace execution_space() const override { return (enum ExecutionSpace)sbv->data()->mem_space(); }
     };
 
     template <typename T>
-    std::shared_ptr<SparseBlockVector<T>> create_sparse_block_vector_mult(const std::shared_ptr<SparseBlockVector<T>>& sbv,
-                                                                          const std::shared_ptr<Buffer<T>>&            scaling) {
+    std::shared_ptr<Operator<T>> create_sparse_block_vector_mult(const std::shared_ptr<SparseBlockVector<T>>& sbv,
+                                                                 const std::shared_ptr<Buffer<T>>&            scaling) {
         auto ret     = std::make_shared<ScaledBlockVectorMult<T>>();
         ret->sbv     = sbv;
         ret->scaling = scaling;
@@ -173,10 +177,18 @@ namespace sfem {
         virtual void set_initial_guess_zero(const bool /*val*/) {}
         virtual int  iterations() const = 0;
         virtual int  set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op, const std::shared_ptr<Buffer<T>>& diag) {
-            fprintf(stderr,
+            SFEM_ERROR(
                     "set_op_and_diag_shift: not implemented for subclass of "
                      "MatrixFreeLinearSolver!\n");
-            assert(false);
+            return SFEM_FAILURE;
+        }
+
+        virtual int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>&          op,
+                                          const std::shared_ptr<SparseBlockVector<T>>& sbv,
+                                          const std::shared_ptr<Buffer<T>>&            diag) {
+            SFEM_ERROR(
+                    "set_op_and_diag_shift: not implemented for subclass of "
+                    "MatrixFreeLinearSolver!\n");
             return SFEM_FAILURE;
         }
     };

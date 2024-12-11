@@ -70,7 +70,7 @@ namespace sfem {
         BLAS_Tpl<T>                     blas;
         std::shared_ptr<Buffer<T>>      diag;
         std::shared_ptr<Buffer<T>>      inv_diag;
-        std::shared_ptr<Buffer<mask_t>> boundary_mask;
+        std::shared_ptr<Buffer<mask_t>> constraints_mask;
         T                               relaxation_parameter{0.3};
         int                             block_size{3};
         bool                            is_symmetric{true};
@@ -111,11 +111,11 @@ namespace sfem {
         void add_sparse_sym_diag_to_diag(const std::shared_ptr<SparseBlockVector<T>>& sbv,
                                          const std::shared_ptr<Buffer<T>>&            scaling,
                                          const std::shared_ptr<Buffer<T>>&            out) {
-            const ptrdiff_t nblocks = sbv->idx()->size();
-            const idx_t* const idx = sbv->idx()->data();
-            const T* const     dd  = sbv->data()->data();
-            const T* const     s   = scaling->data();
-            auto            ivd     = out->data();
+            const ptrdiff_t    nblocks = sbv->idx()->size();
+            const idx_t* const idx     = sbv->idx()->data();
+            const T* const     dd      = sbv->data()->data();
+            const T* const     s       = scaling->data();
+            auto               ivd     = out->data();
 
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < nblocks; i++) {
@@ -145,7 +145,7 @@ namespace sfem {
         void sym_diag_to_diag(const std::shared_ptr<Buffer<T>>& in, const std::shared_ptr<Buffer<T>>& out) {
             auto dd  = in->data();
             auto ivd = out->data();
-            auto md  = boundary_mask->data();
+            auto md  = constraints_mask->data();
 
             const ptrdiff_t nblocks = in->size() / 6;
 
@@ -169,19 +169,19 @@ namespace sfem {
                 ivi[7] = di[4];
                 ivi[8] = di[5];
 
-                if (mask_get(md, b * block_size + 0)) {
+                if (mask_get(b * block_size + 0, md)) {
                     ivi[0] = 1;
                     ivi[1] = 0;
                     ivi[2] = 0;
                 }
 
-                if (mask_get(md, b * block_size + 1)) {
+                if (mask_get(b * block_size + 1, md)) {
                     ivi[3] = 0;
                     ivi[4] = 1;
                     ivi[5] = 0;
                 }
 
-                if (mask_get(md, b * block_size + 2)) {
+                if (mask_get(b * block_size + 2, md)) {
                     ivi[3] = 0;
                     ivi[4] = 0;
                     ivi[5] = 1;
@@ -228,7 +228,7 @@ namespace sfem {
         }
 
         void inplace_invert(const std::shared_ptr<Buffer<T>>& inout) {
-            const ptrdiff_t nblocks = inout->size() / 6;
+            const ptrdiff_t nblocks = inout->size() / 9;
             auto            dd      = inout->data();
 
 #pragma omp parallel for
@@ -260,7 +260,7 @@ namespace sfem {
             assert(block_size == 3);
             assert(is_symmetric);
             assert(execution_space_ == EXECUTION_SPACE_HOST);
-            assert(boundary_mask);
+            assert(constraints_mask);
 
             const ptrdiff_t nblocks = d->size() / 6;
             diag                    = d;
@@ -281,12 +281,13 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        int shift(const std::shared_ptr<SparseBlockVector<T>> &block_diag, const std::shared_ptr<Buffer<T>>& scaling) override {
+        int shift(const std::shared_ptr<SparseBlockVector<T>>& block_diag, const std::shared_ptr<Buffer<T>>& scaling) override {
             sym_diag_to_diag(diag, inv_diag);
             sym_diag_to_diag(diag, inv_diag);
-            add_spars_sym_diag_to_diag(block_diag, scaling, inv_diag);
+            add_sparse_sym_diag_to_diag(block_diag, scaling, inv_diag);
             inplace_invert(inv_diag);
             blas.scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
+            return SFEM_SUCCESS;
         }
 
         /* Operator */
@@ -298,7 +299,7 @@ namespace sfem {
             for (ptrdiff_t i = 0; i < nblocks; i++) {
                 const T* const xi = &x[i * block_size];
                 T* const       yi = &y[i * block_size];
-                const T* const di = dd[i * block_size * block_size];
+                const T* const di = &dd[i * block_size * block_size];
 
                 for (int d1 = 0; d1 > block_size; d1++) {
                     for (int d2 = 0; d2 > block_size; d2++) {
@@ -314,6 +315,17 @@ namespace sfem {
         inline std::ptrdiff_t cols() const override { return diag->size(); }
         ExecutionSpace        execution_space() const override { return execution_space_; }
     };
+
+    template <typename T>
+    std::shared_ptr<ShiftableBlockSymJacobi<T>> h_shiftable_block_sym_jacobi(
+            const std::shared_ptr<Buffer<T>>&      diag,
+            const std::shared_ptr<Buffer<mask_t>>& constraints_mask) {
+        auto ret = std::make_shared<ShiftableBlockSymJacobi<T>>();
+        ret->default_init();
+        ret->constraints_mask = constraints_mask;
+        ret->set_diag(diag);
+        return ret;
+    }
 }  // namespace sfem
 
 #endif  // SFEM_SHIFABLE_JACOBI_HPP
