@@ -6,9 +6,9 @@ search_name_number_in_args() {
     shift
     for arg in "$@"
     do
-        if [[ "$arg" =~ ^${name}[0-9]+$ ]]
+        if [[ "$arg" =~ ^${name}([0-9]+)$ ]]
         then
-            echo "${BASH_REMATCH[0]}"
+            echo "${BASH_REMATCH[1]}"
             return 0
         fi
     done
@@ -28,7 +28,13 @@ search_string_in_args() {
     return 1
 }
 
-n_procs=1
+if search_name_number_in_args "np" "$@"
+then
+	n_procs=${BASH_REMATCH[1]}
+else
+	n_procs=1
+fi
+
 echo "example_p2.sh: n_procs=$n_procs"
 
 export USE_MPI=0
