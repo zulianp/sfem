@@ -277,8 +277,10 @@ namespace sfem {
                                 J_pen->data()[i] = std::abs(J_pen->data()[i]);
                             }
 
-                            auto J = apply_op + sfem::diag_op(J_pen, execution_space());
-                            linear_solver_->set_op(J);
+                            // auto J = apply_op + sfem::diag_op(J_pen, execution_space());
+                            // linear_solver_->set_op(J);
+
+                            linear_solver_->set_op_and_diag_shift(apply_op, J_pen);
 
                         } else {
                             blas.zeros(n_dofs, J_pen->data());
@@ -292,8 +294,7 @@ namespace sfem {
                                             lagr_ub ? lagr_ub->data() : nullptr,
                                             J_pen->data());
 
-                            auto J = apply_op + sfem::diag_op(J_pen, execution_space());
-                            linear_solver_->set_op(J);
+                            linear_solver_->set_op_and_diag_shift(apply_op, J_pen);
                         }
 
                         blas.zeros(n_dofs, c->data());
