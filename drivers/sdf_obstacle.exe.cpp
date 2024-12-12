@@ -139,9 +139,6 @@ int main(int argc, char *argv[]) {
     auto      x     = sfem::create_buffer<real_t>(ndofs, es);
     auto      rhs   = sfem::create_buffer<real_t>(ndofs, es);
 
-    f->apply_constraints(x->data());
-    f->apply_constraints(rhs->data());
-
     std::shared_ptr<sfem::Operator<real_t>> linear_op;
 
     if (SFEM_MATRIX_FREE) {
@@ -165,6 +162,10 @@ int main(int argc, char *argv[]) {
     auto normal_prod = sfem::create_buffer<real_t>(sym_block_size * contact_conds->n_constrained_dofs(), es);
     contact_conds->hessian_block_diag_sym(x->data(), normal_prod->data());
     auto sbv         = sfem::create_sparse_block_vector(contact_conds->node_mapping(), normal_prod);
+
+    auto upper_bound_viz = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
+
+    contact_conds->signed_distance_for_mesh_viz(x->data(), upper_bound_viz->data()); 
 
     std::shared_ptr<sfem::Operator<real_t>> solver;
     if (SFEM_ELEMENT_REFINE_LEVEL > 0 && !SFEM_USE_SHIFTED_PENALTY) {
@@ -194,11 +195,12 @@ int main(int argc, char *argv[]) {
         auto cg     = sfem::create_cg(linear_op, es);
         cg->verbose = false;
         // cg->verbose = true;
-        // auto diag   = sfem::create_buffer<real_t>(fs->mesh_ptr()->n_nodes() * (block_size == 3 ? 6 : 3), es);
-        // auto mask   = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
-        // f->hessian_block_diag_sym(nullptr, diag->data());
-        // auto sj = sfem::h_shiftable_block_sym_jacobi(diag, mask);
-        // cg->set_preconditioner_op(sj);
+        auto diag   = sfem::create_buffer<real_t>(fs->mesh_ptr()->n_nodes() * (block_size == 3 ? 6 : 3), es);
+        auto mask   = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
+        f->hessian_block_diag_sym(nullptr, diag->data());
+
+        auto sj = sfem::h_shiftable_block_sym_jacobi(diag, mask);
+        cg->set_preconditioner_op(sj);
 
         cg->set_atol(1e-12);
         cg->set_rtol(1e-4);
@@ -213,6 +215,9 @@ int main(int argc, char *argv[]) {
         sp->set_constraints_op(cc_op, cc_op_t, sbv);
         solver = sp;
     }
+
+    f->apply_constraints(x->data());
+    f->apply_constraints(rhs->data());
 
     double solve_tick = MPI_Wtime();
     solver->apply(rhs->data(), x->data());
@@ -231,6 +236,7 @@ int main(int argc, char *argv[]) {
     output->enable_AoS_to_SoA(true);
     output->write("disp", h_x->data());
     output->write("rhs", h_rhs->data());
+    output->write("gap", upper_bound_viz->data());
 
     double tock = MPI_Wtime();
 
