@@ -648,22 +648,18 @@ hex8_to_tet10_resample_field_local_CUDA(                              //
 ////////////////////////////////////////////////////////////////////////
 // hex8_to_tet10_resample_field_local_CUDA_wrapper
 ////////////////////////////////////////////////////////////////////////
-extern "C" int                                     //
-hex8_to_tet10_resample_field_local_CUDA_wrapper(   //
-        const int mpi_size,                        // MPI size
-        const int mpi_rank,                        // MPI rank
-                                                   // Mesh
-        mesh_t*   mesh,                            // Mesh
-        const int bool_assemble_dual_mass_vector,  // assemble dual mass vector
-        // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
-        const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
-
-        const geom_t* const SFEM_RESTRICT origin,  // origin of the domain
-        const geom_t* const SFEM_RESTRICT delta,   // delta of the domain
-        const real_t* const SFEM_RESTRICT data,    // SDF
-        // Output //
-        real_t* const SFEM_RESTRICT g_host) {  //
+extern "C" int                                                                //
+hex8_to_tet10_resample_field_local_CUDA_wrapper(                              //
+        const int                            mpi_size,                        // MPI size
+        const int                            mpi_rank,                        // MPI rank
+        mesh_t*                              mesh,                            // Mesh
+        const int                            bool_assemble_dual_mass_vector,  // assemble dual mass vector
+        const ptrdiff_t* const SFEM_RESTRICT n,                               // number of nodes in each direction // SDF
+        const ptrdiff_t* const SFEM_RESTRICT stride,                          // stride of the data
+        const geom_t* const SFEM_RESTRICT    origin,                          // origin of the domain
+        const geom_t* const SFEM_RESTRICT    delta,                           // delta of the domain
+        const real_t* const SFEM_RESTRICT    data,                            // SDF
+        real_t* const SFEM_RESTRICT          g_host) {                                 // // Output //
 
 #if SFEM_CUDA_MEMORY_MODEL == CUDA_UNIFIED_MEMORY
 
@@ -696,8 +692,11 @@ hex8_to_tet10_resample_field_local_CUDA_wrapper(   //
 
     // Default memory model is CUDA_HOST_MEMORY.
 #pragma message "CUDA_HOST_MEMORY is enabled"
+
+    const int mesh_nnodes = mpi_size >= 1 ? mesh->nnodes : mesh->n_owned_nodes;
+
     return hex8_to_tet10_resample_field_local_CUDA(mesh->nelements,                 //
-                                                   mesh->nnodes,                    //
+                                                   mesh_nnodes,                     //
                                                    bool_assemble_dual_mass_vector,  //
                                                    mesh->elements,                  //
                                                    mesh->points,                    //

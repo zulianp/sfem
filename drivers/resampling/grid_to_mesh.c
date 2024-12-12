@@ -253,7 +253,7 @@ int main(int argc, char* argv[]) {
                         // Mesh
                         mesh.element_type,
                         mesh.nelements,
-                        mesh.n_owned_nodes,
+                        mesh.nnodes,
                         mesh.elements,
                         mesh.points,
                         // discrete field
