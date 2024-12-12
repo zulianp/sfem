@@ -648,19 +648,21 @@ int affine_hex8_linear_elasticity_block_diag_sym(const ptrdiff_t              ne
                 }
             }
 
+            const ptrdiff_t v = ev[edof_i];
+
             // local to global
 #pragma omp atomic update
-            out0[edof_i * out_stride] += element_matrix[0];
+            out0[v * out_stride] += element_matrix[0];
 #pragma omp atomic update
-            out1[edof_i * out_stride] += element_matrix[1];
+            out1[v * out_stride] += element_matrix[1];
 #pragma omp atomic update
-            out2[edof_i * out_stride] += element_matrix[2];
+            out2[v * out_stride] += element_matrix[2];
 #pragma omp atomic update
-            out3[edof_i * out_stride] += element_matrix[3];
+            out3[v * out_stride] += element_matrix[3];
 #pragma omp atomic update
-            out4[edof_i * out_stride] += element_matrix[4];
+            out4[v * out_stride] += element_matrix[4];
 #pragma omp atomic update
-            out5[edof_i * out_stride] += element_matrix[5];
+            out5[v * out_stride] += element_matrix[5];
         }
     }
 
