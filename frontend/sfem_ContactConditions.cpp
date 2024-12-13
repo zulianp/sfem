@@ -12,8 +12,8 @@
 #include "sfem_Grid.hpp"
 #include "sfem_Input.hpp"
 
-#include "sfem_resample_gap.h"
 #include "node_interpolate.h"
+#include "sfem_resample_gap.h"
 
 #include "sfem_API.hpp"
 
@@ -274,6 +274,7 @@ namespace sfem {
         std::shared_ptr<Buffer<real_t>> gap_znormal;
 
         std::shared_ptr<Buffer<real_t>> mass_vector;
+        bool                            variational{true};
         bool                            debug{false};
 
         ~Impl() {}
@@ -315,8 +316,9 @@ namespace sfem {
         void assemble_mass_vector() {
             collect_points();
 
+            auto st = shell_type(side_type(space->element_type()));
             auto surface_mesh = std::make_shared<Mesh>(space->mesh_ptr()->spatial_dimension(),
-                                                       shell_type(side_type(space->element_type())),
+                                                       st,
                                                        sides->extent(1),
                                                        sides->data(),
                                                        surface_points->extent(1),
@@ -326,10 +328,25 @@ namespace sfem {
             auto trace_space = std::make_shared<FunctionSpace>(surface_mesh, 1);
             auto bop         = sfem::Factory::create_op(trace_space, "Mass");
 
-            auto ones   = h_buffer<real_t>(trace_space->n_dofs());
             mass_vector = h_buffer<real_t>(trace_space->n_dofs());
-            sfem::blas<real_t>(EXECUTION_SPACE_HOST)->values(trace_space->n_dofs(), 1, ones->data());
-            bop->apply(nullptr, ones->data(), mass_vector->data());
+
+            if (variational) {
+                resample_weight_local(
+                    // Mesh
+                    st,
+                    sides->extent(1),
+                    node_mapping->size(),
+                    sides->data(),
+                    surface_points->data(),
+                    // Output
+                    mass_vector->data()
+                    );
+
+            } else {
+                auto ones = h_buffer<real_t>(trace_space->n_dofs());
+                sfem::blas<real_t>(EXECUTION_SPACE_HOST)->values(trace_space->n_dofs(), 1, ones->data());
+                bop->apply(nullptr, ones->data(), mass_vector->data());
+            }
 
             auto m = mass_vector->data();
 
@@ -339,15 +356,13 @@ namespace sfem {
             }
 
             printf("AREA: %g\n", (double)area);
+            assert(area > 0);
         }
     };
 
     ptrdiff_t ContactConditions::n_constrained_dofs() const { return impl_->node_mapping->size(); }
 
-    const std::shared_ptr<Buffer<idx_t>> &ContactConditions::node_mapping()
-    {
-        return impl_->node_mapping;
-    }
+    const std::shared_ptr<Buffer<idx_t>> &ContactConditions::node_mapping() { return impl_->node_mapping; }
 
     std::shared_ptr<FunctionSpace> ContactConditions::space() { return impl_->space; }
 
@@ -394,6 +409,8 @@ namespace sfem {
 
         std::string path_surface;
         in->require("surface", path_surface);
+
+        in->require("variational", cc->impl_->variational);
 
         if (rpath) {
             path_surface = path + "/" + path_surface;
@@ -514,21 +531,46 @@ namespace sfem {
 
         auto tt = temp->data();
 
-        interpolate_gap(
-                // Mesh
-                impl_->surface_points->extent(1),
-                impl_->surface_points->data(),
-                // SDF
-                sdf->nlocal(),
-                sdf->stride(),
-                sdf->origin(),
-                sdf->delta(),
-                sdf->data(),
-                // Output
-                tt,
-                impl_->gap_xnormal->data(),
-                impl_->gap_ynormal->data(),
-                impl_->gap_znormal->data());
+        int err = 0;
+        if (impl_->variational) {
+            auto st = shell_type(side_type(impl_->space->element_type()));
+            err     = resample_gap(
+                    // Mesh
+                    st,
+                    impl_->sides->extent(1),
+                    impl_->node_mapping->size(),
+                    impl_->sides->data(),
+                    impl_->surface_points->data(),
+                    // SDF
+                    sdf->nlocal(),
+                    sdf->stride(),
+                    sdf->origin(),
+                    sdf->delta(),
+                    sdf->data(),
+                    // Output
+                    tt,
+                    impl_->gap_xnormal->data(),
+                    impl_->gap_ynormal->data(),
+                    impl_->gap_znormal->data());
+        } else {
+            err = interpolate_gap(
+                    // Mesh
+                    impl_->surface_points->extent(1),
+                    impl_->surface_points->data(),
+                    // SDF
+                    sdf->nlocal(),
+                    sdf->stride(),
+                    sdf->origin(),
+                    sdf->delta(),
+                    sdf->data(),
+                    // Output
+                    tt,
+                    impl_->gap_xnormal->data(),
+                    impl_->gap_ynormal->data(),
+                    impl_->gap_znormal->data());
+        }
+
+        assert(err == SFEM_SUCCESS);
 
         const ptrdiff_t    n   = impl_->node_mapping->size();
         const idx_t *const idx = impl_->node_mapping->data();
@@ -606,20 +648,41 @@ namespace sfem {
         impl_->displace_points(x);
         auto sdf = impl_->sdf;
 
-        return interpolate_gap_normals(
-                // Mesh
-                impl_->surface_points->extent(1),
-                impl_->surface_points->data(),
-                // SDF
-                sdf->nlocal(),
-                sdf->stride(),
-                sdf->origin(),
-                sdf->delta(),
-                sdf->data(),
-                // Output
-                impl_->gap_xnormal->data(),
-                impl_->gap_ynormal->data(),
-                impl_->gap_znormal->data());
+        if (impl_->variational) {
+            auto st = shell_type(side_type(impl_->space->element_type()));
+            return resample_gap_normals(
+                    // Mesh
+                    st,
+                    impl_->sides->extent(1),
+                    impl_->node_mapping->size(),
+                    impl_->sides->data(),
+                    impl_->surface_points->data(),
+                    // SDF
+                    sdf->nlocal(),
+                    sdf->stride(),
+                    sdf->origin(),
+                    sdf->delta(),
+                    sdf->data(),
+                    // Output
+                    impl_->gap_xnormal->data(),
+                    impl_->gap_ynormal->data(),
+                    impl_->gap_znormal->data());
+        } else {
+            return interpolate_gap_normals(
+                    // Mesh
+                    impl_->surface_points->extent(1),
+                    impl_->surface_points->data(),
+                    // SDF
+                    sdf->nlocal(),
+                    sdf->stride(),
+                    sdf->origin(),
+                    sdf->delta(),
+                    sdf->data(),
+                    // Output
+                    impl_->gap_xnormal->data(),
+                    impl_->gap_ynormal->data(),
+                    impl_->gap_znormal->data());
+        }
     }
 
     std::shared_ptr<Operator<real_t>> ContactConditions::linear_constraints_op() {
@@ -645,33 +708,74 @@ namespace sfem {
 
         auto sdf = impl_->sdf;
 
-        interpolate_gap_value(
-                // Mesh
-                impl_->surface_points->extent(1),
-                impl_->surface_points->data(),
-                // SDF
-                sdf->nlocal(),
-                sdf->stride(),
-                sdf->origin(),
-                sdf->delta(),
-                sdf->data(),
-                // Output
-                g);
+        int err = 0;
+        if (impl_->variational) {
+            auto st = shell_type(side_type(impl_->space->element_type()));
+            err     = resample_gap_value(
+                    // Mesh
+                    st,
+                    impl_->sides->extent(1),
+                    impl_->node_mapping->size(),
+                    impl_->sides->data(),
+                    impl_->surface_points->data(),
+                    // SDF
+                    sdf->nlocal(),
+                    sdf->stride(),
+                    sdf->origin(),
+                    sdf->delta(),
+                    sdf->data(),
+                    g);
 
-        return SFEM_SUCCESS;
+        } else {
+            err = interpolate_gap_value(
+                    // Mesh
+                    impl_->surface_points->extent(1),
+                    impl_->surface_points->data(),
+                    // SDF
+                    sdf->nlocal(),
+                    sdf->stride(),
+                    sdf->origin(),
+                    sdf->delta(),
+                    sdf->data(),
+                    // Output
+                    g);
+        }
+
+        assert(err == SFEM_SUCCESS);
+        return err;
     }
 
     int ContactConditions::gradient(const real_t *const x, real_t *const g) {
-        int err = signed_distance(x, g);
-        assert(err == SFEM_SUCCESS);
+        int err = SFEM_SUCCESS;
+        if (impl_->variational) {
+            auto sdf = impl_->sdf;
+            auto st = shell_type(side_type(impl_->space->element_type()));
+            err     = resample_gap_value_local(
+                    // Mesh
+                    st,
+                    impl_->sides->extent(1),
+                    impl_->node_mapping->size(),
+                    impl_->sides->data(),
+                    impl_->surface_points->data(),
+                    // SDF
+                    sdf->nlocal(),
+                    sdf->stride(),
+                    sdf->origin(),
+                    sdf->delta(),
+                    sdf->data(),
+                    g);
+        } else {
+            err = signed_distance(x, g);
+            assert(err == SFEM_SUCCESS);
 
-        ptrdiff_t n = impl_->mass_vector->size();
-        auto      m = impl_->mass_vector->data();
-        for (ptrdiff_t i = 0; i < n; i++) {
-            g[i] *= m[i];
+            ptrdiff_t n = impl_->mass_vector->size();
+            auto      m = impl_->mass_vector->data();
+            for (ptrdiff_t i = 0; i < n; i++) {
+                g[i] *= m[i];
+            }
         }
 
-        return SFEM_SUCCESS;
+        return err;
     }
 
     int ContactConditions::apply_value(const real_t value, real_t *const x) {
@@ -740,13 +844,13 @@ namespace sfem {
             }
         }
 
-        if(false) {
+        if (false) {
             const idx_t *const idx = impl_->node_mapping->data();
 
             for (ptrdiff_t i = 0; i < n; ++i) {
                 printf("%d) ", idx[i]);
                 real_t *const v = &values[i * 6];
-                for(int d = 0; d < 6; d++) {
+                for (int d = 0; d < 6; d++) {
                     printf("%g\t", (double)v[d]);
                 }
                 printf("\n");
