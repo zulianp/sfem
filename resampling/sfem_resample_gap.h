@@ -35,38 +35,6 @@ int resample_gap(
         real_t* const SFEM_RESTRICT g, real_t* const SFEM_RESTRICT xnormal,
         real_t* const SFEM_RESTRICT ynormal, real_t* const SFEM_RESTRICT znormal);
 
-int interpolate_gap(const ptrdiff_t nnodes, geom_t** const SFEM_RESTRICT xyz,
-                    // SDF
-                    const ptrdiff_t* const SFEM_RESTRICT n,
-                    const ptrdiff_t* const SFEM_RESTRICT stride,
-                    const geom_t* const SFEM_RESTRICT origin,
-                    const geom_t* const SFEM_RESTRICT delta, const geom_t* const SFEM_RESTRICT data,
-                    // Output
-                    real_t* const SFEM_RESTRICT g, real_t* const SFEM_RESTRICT xnormal,
-                    real_t* const SFEM_RESTRICT ynormal, real_t* const SFEM_RESTRICT znormal);
-
-int interpolate_gap_value(const ptrdiff_t nnodes, geom_t** const SFEM_RESTRICT xyz,
-                          // SDF
-                          const ptrdiff_t* const SFEM_RESTRICT n,
-                          const ptrdiff_t* const SFEM_RESTRICT stride,
-                          const geom_t* const SFEM_RESTRICT origin,
-                          const geom_t* const SFEM_RESTRICT delta,
-                          const geom_t* const SFEM_RESTRICT data,
-                          // Output
-                          real_t* const SFEM_RESTRICT g);
-
-int interpolate_gap_normals(const ptrdiff_t nnodes, geom_t** const SFEM_RESTRICT xyz,
-                            // SDF
-                            const ptrdiff_t* const SFEM_RESTRICT n,
-                            const ptrdiff_t* const SFEM_RESTRICT stride,
-                            const geom_t* const SFEM_RESTRICT origin,
-                            const geom_t* const SFEM_RESTRICT delta,
-                            const geom_t* const SFEM_RESTRICT data,
-                            // Output
-                            real_t* const SFEM_RESTRICT xnormal,
-                            real_t* const SFEM_RESTRICT ynormal,
-                            real_t* const SFEM_RESTRICT znormal);
-
 int sdf_view(MPI_Comm comm, const ptrdiff_t nnodes, const geom_t* SFEM_RESTRICT z_coordinate,
              const ptrdiff_t* const nlocal, const ptrdiff_t* const SFEM_RESTRICT nglobal,
              const ptrdiff_t* const SFEM_RESTRICT stride, const geom_t* const origin,

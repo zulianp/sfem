@@ -71,6 +71,10 @@ if(SFEM_ENABLE_RESAMPLING)
     list(APPEND SFEM_MODULES
         resampling
         resampling/tet10
+        resampling/quadshell4
+        resampling/trishell3
+        resampling/beam2
+        resampling/interpolate
     )
 endif()
 
