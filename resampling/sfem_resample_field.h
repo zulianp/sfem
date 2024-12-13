@@ -92,42 +92,40 @@ int                                                                       //
 resample_field_mesh_tet10(const int                            mpi_size,  // MPI size
                           const int                            mpi_rank,  // MPI rank
                           const mesh_t* const SFEM_RESTRICT    mesh,      // Mesh
-                          const ptrdiff_t* const SFEM_RESTRICT n,         // // SDF
-                          const ptrdiff_t* const SFEM_RESTRICT stride,    //
-                          const geom_t* const SFEM_RESTRICT    origin,    //
-                          const geom_t* const SFEM_RESTRICT    delta,     //
-                          const real_t* const SFEM_RESTRICT    data,      //
-                          const real_t* const SFEM_RESTRICT    field,     // // Output
-                          real_t* const SFEM_RESTRICT          g,         //
-                          sfem_resample_field_info*            info);                //
+                          const ptrdiff_t* const SFEM_RESTRICT n,         // SDF: n[3]
+                          const ptrdiff_t* const SFEM_RESTRICT stride,    // SDF: stride[3]
+                          const geom_t* const SFEM_RESTRICT    origin,    // SDF: origin[3]
+                          const geom_t* const SFEM_RESTRICT    delta,     // SDF: delta[3]
+                          const real_t* const SFEM_RESTRICT    data,      // SDF: data
+                          real_t* const SFEM_RESTRICT          g,         // Output
+                          sfem_resample_field_info*            info);                // info
 
 /**
  * @brief
- * 
- * @param mpi_size 
- * @param mpi_rank 
- * @param mesh 
- * @param n 
- * @param stride 
- * @param origin 
- * @param delta 
- * @param data 
- * @param field 
- * @param g 
- * @param info 
- * @return int 
+ *
+ * @param mpi_size
+ * @param mpi_rank
+ * @param mesh
+ * @param n
+ * @param stride
+ * @param origin
+ * @param delta
+ * @param data
+ * @param field
+ * @param g
+ * @param info
+ * @return int
  */
 int                                                                      //
 resample_field_mesh_tet4(const int                            mpi_size,  // MPI size
                          const int                            mpi_rank,  // MPI rank
-                         const mesh_t* const SFEM_RESTRICT    mesh,      // Mesh
-                         const ptrdiff_t* const SFEM_RESTRICT n,         // // SDF
-                         const ptrdiff_t* const SFEM_RESTRICT stride,    //
-                         const geom_t* const SFEM_RESTRICT    origin,    //
-                         const geom_t* const SFEM_RESTRICT    delta,     //
-                         const real_t* const SFEM_RESTRICT    data,      //
-                         const real_t* const SFEM_RESTRICT    field,     // // Output
-                         real_t* const SFEM_RESTRICT          g,         //
+                         const mesh_t* const SFEM_RESTRICT    mesh,      // Mesh: mesh_t struct
+                         const ptrdiff_t* const SFEM_RESTRICT n,         // SDF: n[3]
+                         const ptrdiff_t* const SFEM_RESTRICT stride,    // SDF: stride[3]
+                         const geom_t* const SFEM_RESTRICT    origin,    // SDF: origin[3]
+                         const geom_t* const SFEM_RESTRICT    delta,     // SDF: delta[3]
+                         const real_t* const SFEM_RESTRICT    data,      // SDF: data
+                         real_t* const SFEM_RESTRICT          g,         // Output
                          sfem_resample_field_info*            info);                //
 
 int interpolate_field(const ptrdiff_t nnodes, geom_t** const SFEM_RESTRICT xyz,

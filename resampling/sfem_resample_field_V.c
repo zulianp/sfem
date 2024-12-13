@@ -43,16 +43,16 @@ SFEM_INLINE static vec_real tet4_measure_V(
     //
     // V = (1/6) * det(M)
 
-    const real_t ref_vol = 1. / 6;
-    const vec_real x0 = -pz0 + pz3;
-    const vec_real x1 = -py0 + py2;
-    const vec_real x2 = -ref_vol * px0 + ref_vol * px1;
-    const vec_real x3 = -py0 + py3;
-    const vec_real x4 = -pz0 + pz2;
-    const vec_real x5 = -py0 + py1;
-    const vec_real x6 = -ref_vol * px0 + ref_vol * px2;
-    const vec_real x7 = -pz0 + pz1;
-    const vec_real x8 = -ref_vol * px0 + ref_vol * px3;
+    const real_t   ref_vol = 1. / 6;
+    const vec_real x0      = -pz0 + pz3;
+    const vec_real x1      = -py0 + py2;
+    const vec_real x2      = -ref_vol * px0 + ref_vol * px1;
+    const vec_real x3      = -py0 + py3;
+    const vec_real x4      = -pz0 + pz2;
+    const vec_real x5      = -py0 + py1;
+    const vec_real x6      = -ref_vol * px0 + ref_vol * px2;
+    const vec_real x7      = -pz0 + pz1;
+    const vec_real x8      = -ref_vol * px0 + ref_vol * px3;
 
     return x0 * x1 * x2 - x0 * x5 * x6 - x1 * x7 * x8 - x2 * x3 * x4 + x3 * x6 * x7 + x4 * x5 * x8;
 }
@@ -100,8 +100,7 @@ SFEM_INLINE static void tet4_transform_V(
         // Quadrature point
         const vec_real qx, const vec_real qy, const vec_real qz,
         // Output
-        vec_real* const SFEM_RESTRICT out_x, vec_real* const SFEM_RESTRICT out_y,
-        vec_real* const SFEM_RESTRICT out_z) {
+        vec_real* const SFEM_RESTRICT out_x, vec_real* const SFEM_RESTRICT out_y, vec_real* const SFEM_RESTRICT out_z) {
     //
     //
     *out_x = px0 + qx * (-px0 + px1) + qy * (-px0 + px2) + qz * (-px0 + px3);
@@ -121,9 +120,8 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V(
         const vec_real x, const vec_real y, const vec_real z,
 
         // Output
-        vec_real* const SFEM_RESTRICT f0, vec_real* const SFEM_RESTRICT f1,
-        vec_real* const SFEM_RESTRICT f2, vec_real* const SFEM_RESTRICT f3,
-        vec_real* const SFEM_RESTRICT f4, vec_real* const SFEM_RESTRICT f5,
+        vec_real* const SFEM_RESTRICT f0, vec_real* const SFEM_RESTRICT f1, vec_real* const SFEM_RESTRICT f2,
+        vec_real* const SFEM_RESTRICT f3, vec_real* const SFEM_RESTRICT f4, vec_real* const SFEM_RESTRICT f5,
         vec_real* const SFEM_RESTRICT f6, vec_real* const SFEM_RESTRICT f7) {
     //
     *f0 = (1.0 - x) * (1.0 - y) * (1.0 - z);
@@ -149,19 +147,17 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V(
                           _data[_indx_V[7]]}; \
     }
 
-#define GET_INDICES(_elems_, _element_i_)                                                     \
-    {                                                                                         \
-        _elems_[_element_i_ + 0], _elems_[_element_i_ + 1], _elems_[_element_i_ + 2],         \
-                _elems_[_element_i_ + 3], _elems_[_element_i_ + 4], _elems_[_element_i_ + 5], \
-                _elems_[_element_i_ + 6], _elems_[_element_i_ + 7]                            \
+#define GET_INDICES(_elems_, _element_i_)                                                                              \
+    {                                                                                                                  \
+        _elems_[_element_i_ + 0], _elems_[_element_i_ + 1], _elems_[_element_i_ + 2], _elems_[_element_i_ + 3],        \
+                _elems_[_element_i_ + 4], _elems_[_element_i_ + 5], _elems_[_element_i_ + 6], _elems_[_element_i_ + 7] \
     }
 
-#define COPY_COORDINATES(__ev__, __xyz_ind__)                                             \
-    (vec_real) {                                                                          \
-        (real_t) xyz[__xyz_ind__][__ev__[0]], (real_t)xyz[__xyz_ind__][__ev__[1]],        \
-                (real_t)xyz[__xyz_ind__][__ev__[2]], (real_t)xyz[__xyz_ind__][__ev__[3]], \
-                (real_t)xyz[__xyz_ind__][__ev__[4]], (real_t)xyz[__xyz_ind__][__ev__[5]], \
-                (real_t)xyz[__xyz_ind__][__ev__[6]], (real_t)xyz[__xyz_ind__][__ev__[7]]  \
+#define COPY_COORDINATES(__ev__, __xyz_ind__)                                                                                  \
+    (vec_real) {                                                                                                               \
+        (real_t) xyz[__xyz_ind__][__ev__[0]], (real_t)xyz[__xyz_ind__][__ev__[1]], (real_t)xyz[__xyz_ind__][__ev__[2]],        \
+                (real_t)xyz[__xyz_ind__][__ev__[3]], (real_t)xyz[__xyz_ind__][__ev__[4]], (real_t)xyz[__xyz_ind__][__ev__[5]], \
+                (real_t)xyz[__xyz_ind__][__ev__[6]], (real_t)xyz[__xyz_ind__][__ev__[7]]                                       \
     }
 
 #define ACCUMULATE_WFIELD(_indx_, _element_fieldN_)                          \
@@ -177,22 +173,16 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V(
     }
 
 #elif _VL_ == 4
-#define GET_OUT_MACRO(_out, _data, _indx_V)                                                  \
-    {                                                                                        \
-        _out = (vec_real){                                                                   \
-                _data[_indx_V[0]], _data[_indx_V[1]], _data[_indx_V[2]], _data[_indx_V[3]]}; \
-    }
+#define GET_OUT_MACRO(_out, _data, _indx_V) \
+    { _out = (vec_real){_data[_indx_V[0]], _data[_indx_V[1]], _data[_indx_V[2]], _data[_indx_V[3]]}; }
 
-#define GET_INDICES(_elems_, _element_i_)                                             \
-    {                                                                                 \
-        _elems_[_element_i_ + 0], _elems_[_element_i_ + 1], _elems_[_element_i_ + 2], \
-                _elems_[_element_i_ + 3]                                              \
-    }
+#define GET_INDICES(_elems_, _element_i_) \
+    { _elems_[_element_i_ + 0], _elems_[_element_i_ + 1], _elems_[_element_i_ + 2], _elems_[_element_i_ + 3] }
 
-#define COPY_COORDINATES(__ev__, __xyz_ind__)                                            \
-    (vec_real) {                                                                         \
-        (real_t) xyz[__xyz_ind__][__ev__[0]], (real_t)xyz[__xyz_ind__][__ev__[1]],       \
-                (real_t)xyz[__xyz_ind__][__ev__[2]], (real_t)xyz[__xyz_ind__][__ev__[3]] \
+#define COPY_COORDINATES(__ev__, __xyz_ind__)                                                                           \
+    (vec_real) {                                                                                                        \
+        (real_t) xyz[__xyz_ind__][__ev__[0]], (real_t)xyz[__xyz_ind__][__ev__[1]], (real_t)xyz[__xyz_ind__][__ev__[2]], \
+                (real_t)xyz[__xyz_ind__][__ev__[3]]                                                                     \
     }
 
 #define ACCUMULATE_WFIELD(_indx_, _element_fieldN_)                          \
@@ -224,28 +214,26 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V(
                           _data[_indx_V[15]]}; \
     }
 
-#define GET_INDICES(_elems_, _element_i_)                                                        \
-    {                                                                                            \
-        _elems_[_element_i_ + 0], _elems_[_element_i_ + 1], _elems_[_element_i_ + 2],            \
-                _elems_[_element_i_ + 3], _elems_[_element_i_ + 4], _elems_[_element_i_ + 5],    \
-                _elems_[_element_i_ + 6], _elems_[_element_i_ + 7], _elems_[_element_i_ + 8],    \
-                _elems_[_element_i_ + 9], _elems_[_element_i_ + 10], _elems_[_element_i_ + 11],  \
-                _elems_[_element_i_ + 12], _elems_[_element_i_ + 13], _elems_[_element_i_ + 14], \
-                _elems_[_element_i_ + 15]                                                        \
+#define GET_INDICES(_elems_, _element_i_)                                                                                  \
+    {                                                                                                                      \
+        _elems_[_element_i_ + 0], _elems_[_element_i_ + 1], _elems_[_element_i_ + 2], _elems_[_element_i_ + 3],            \
+                _elems_[_element_i_ + 4], _elems_[_element_i_ + 5], _elems_[_element_i_ + 6], _elems_[_element_i_ + 7],    \
+                _elems_[_element_i_ + 8], _elems_[_element_i_ + 9], _elems_[_element_i_ + 10], _elems_[_element_i_ + 11],  \
+                _elems_[_element_i_ + 12], _elems_[_element_i_ + 13], _elems_[_element_i_ + 14], _elems_[_element_i_ + 15] \
     }
 
-#define COPY_COORDINATES(__ev__, __xyz_ind__)                                                   \
-    (vec_real) {                                                                                \
-        (real_t) {                                                                              \
-            xyz[__xyz_ind__][__ev__[0]], (real_t)xyz[__xyz_ind__][__ev__[1]],                   \
-                    (real_t)xyz[__xyz_ind__][__ev__[2]], (real_t)xyz[__xyz_ind__][__ev__[3]],   \
-                    (real_t)xyz[__xyz_ind__][__ev__[4]], (real_t)xyz[__xyz_ind__][__ev__[5]],   \
-                    (real_t)xyz[__xyz_ind__][__ev__[6]], (real_t)xyz[__xyz_ind__][__ev__[7]],   \
-                    (real_t)xyz[__xyz_ind__][__ev__[8]], (real_t)xyz[__xyz_ind__][__ev__[9]],   \
-                    (real_t)xyz[__xyz_ind__][__ev__[10]], (real_t)xyz[__xyz_ind__][__ev__[11]], \
-                    (real_t)xyz[__xyz_ind__][__ev__[12]], (real_t)xyz[__xyz_ind__][__ev__[13]], \
-                    (real_t)xyz[__xyz_ind__][__ev__[14]], (real_t)xyz[__xyz_ind__][__ev__[15]]  \
-        }                                                                                       \
+#define COPY_COORDINATES(__ev__, __xyz_ind__)                                                                      \
+    (vec_real) {                                                                                                   \
+        (real_t) {                                                                                                 \
+            xyz[__xyz_ind__][__ev__[0]], (real_t)xyz[__xyz_ind__][__ev__[1]], (real_t)xyz[__xyz_ind__][__ev__[2]], \
+                    (real_t)xyz[__xyz_ind__][__ev__[3]], (real_t)xyz[__xyz_ind__][__ev__[4]],                      \
+                    (real_t)xyz[__xyz_ind__][__ev__[5]], (real_t)xyz[__xyz_ind__][__ev__[6]],                      \
+                    (real_t)xyz[__xyz_ind__][__ev__[7]], (real_t)xyz[__xyz_ind__][__ev__[8]],                      \
+                    (real_t)xyz[__xyz_ind__][__ev__[9]], (real_t)xyz[__xyz_ind__][__ev__[10]],                     \
+                    (real_t)xyz[__xyz_ind__][__ev__[11]], (real_t)xyz[__xyz_ind__][__ev__[12]],                    \
+                    (real_t)xyz[__xyz_ind__][__ev__[13]], (real_t)xyz[__xyz_ind__][__ev__[14]],                    \
+                    (real_t)xyz[__xyz_ind__][__ev__[15]]                                                           \
+        }                                                                                                          \
     }
 
 #define ACCUMULATE_WFIELD(_indx_, _element_fieldN_)                            \
@@ -275,15 +263,15 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V(
 // hex_aa_8_collect_coeffs_V8 ////////////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-SFEM_INLINE static void hex_aa_8_collect_coeffs_V(
-        const vec_indices stride0, const vec_indices stride1, const vec_indices stride2,
-        const vec_indices i, const vec_indices j, const vec_indices k,
-        // Attention this is geometric data transformed to solver data!
-        const real_t* const SFEM_RESTRICT data,
-        //
-        vec_real* SFEM_RESTRICT out0, vec_real* SFEM_RESTRICT out1, vec_real* SFEM_RESTRICT out2,
-        vec_real* SFEM_RESTRICT out3, vec_real* SFEM_RESTRICT out4, vec_real* SFEM_RESTRICT out5,
-        vec_real* SFEM_RESTRICT out6, vec_real* SFEM_RESTRICT out7) {
+SFEM_INLINE static void hex_aa_8_collect_coeffs_V(const vec_indices stride0, const vec_indices stride1, const vec_indices stride2,
+                                                  const vec_indices i, const vec_indices j, const vec_indices k,
+                                                  // Attention this is geometric data transformed to solver data!
+                                                  const real_t* const SFEM_RESTRICT data,
+                                                  //
+                                                  vec_real* SFEM_RESTRICT out0, vec_real* SFEM_RESTRICT out1,
+                                                  vec_real* SFEM_RESTRICT out2, vec_real* SFEM_RESTRICT out3,
+                                                  vec_real* SFEM_RESTRICT out4, vec_real* SFEM_RESTRICT out5,
+                                                  vec_real* SFEM_RESTRICT out6, vec_real* SFEM_RESTRICT out7) {
     //
 
     const vec_indices i0 = i * stride0 + j * stride1 + k * stride2;
@@ -312,12 +300,11 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_V(
 //////////////////////////////////////////////////////////
 int tet4_resample_field_local_V_aligned(
         // Mesh
-        const ptrdiff_t start_nelement, const ptrdiff_t end_nelement, const ptrdiff_t nnodes,
-        idx_t** const SFEM_RESTRICT elems, geom_t** const SFEM_RESTRICT xyz,
+        const ptrdiff_t start_nelement, const ptrdiff_t end_nelement, const ptrdiff_t nnodes, idx_t** const SFEM_RESTRICT elems,
+        geom_t** const SFEM_RESTRICT xyz,
         // SDF
         const ptrdiff_t* const SFEM_RESTRICT n, const ptrdiff_t* const SFEM_RESTRICT stride,
-        const geom_t* const SFEM_RESTRICT origin, const geom_t* const SFEM_RESTRICT delta,
-        const real_t* const SFEM_RESTRICT data,
+        const geom_t* const SFEM_RESTRICT origin, const geom_t* const SFEM_RESTRICT delta, const real_t* const SFEM_RESTRICT data,
         // Output
         real_t* const SFEM_RESTRICT weighted_field) {
     //
@@ -358,19 +345,18 @@ int tet4_resample_field_local_V_aligned(
         vec_real z0 = zeros, z1 = zeros, z2 = zeros, z3 = zeros;
 
         // real_t hex8_f[8];
-        vec_real hex8_f0 = zeros, hex8_f1 = zeros, hex8_f2 = zeros, hex8_f3 = zeros,
-                 hex8_f4 = zeros, hex8_f5 = zeros, hex8_f6 = zeros, hex8_f7 = zeros;
+        vec_real hex8_f0 = zeros, hex8_f1 = zeros, hex8_f2 = zeros, hex8_f3 = zeros, hex8_f4 = zeros, hex8_f5 = zeros,
+                 hex8_f6 = zeros, hex8_f7 = zeros;
 
         // real_t coeffs[8];
-        vec_real coeffs0 = zeros, coeffs1 = zeros, coeffs2 = zeros, coeffs3 = zeros,
-                 coeffs4 = zeros, coeffs5 = zeros, coeffs6 = zeros, coeffs7 = zeros;
+        vec_real coeffs0 = zeros, coeffs1 = zeros, coeffs2 = zeros, coeffs3 = zeros, coeffs4 = zeros, coeffs5 = zeros,
+                 coeffs6 = zeros, coeffs7 = zeros;
 
         // real_t tet4_f[4];
         vec_real tet4_f0 = zeros, tet4_f1 = zeros, tet4_f2 = zeros, tet4_f3 = zeros;
 
         // real_t element_field[4];
-        vec_real element_field0 = zeros, element_field1 = zeros, element_field2 = zeros,
-                 element_field3 = zeros;
+        vec_real element_field0 = zeros, element_field1 = zeros, element_field2 = zeros, element_field3 = zeros;
 
         // copy the coordinates of the vertices
         {
@@ -477,17 +463,7 @@ int tet4_resample_field_local_V_aligned(
             vec_real l_z = (grid_z - __builtin_convertvector(k, vec_real));
 
             // Critical point
-            hex_aa_8_eval_fun_V(l_x,
-                                l_y,
-                                l_z,
-                                &hex8_f0,
-                                &hex8_f1,
-                                &hex8_f2,
-                                &hex8_f3,
-                                &hex8_f4,
-                                &hex8_f5,
-                                &hex8_f6,
-                                &hex8_f7);
+            hex_aa_8_eval_fun_V(l_x, l_y, l_z, &hex8_f0, &hex8_f1, &hex8_f2, &hex8_f3, &hex8_f4, &hex8_f5, &hex8_f6, &hex8_f7);
 
             hex_aa_8_collect_coeffs_V(stride0,
                                       stride1,
@@ -555,47 +531,26 @@ int tet4_resample_field_local_V_aligned(
 //////////////////////////////////////////////////////////
 int tet4_resample_field_local_V(
         // Mesh
-        const ptrdiff_t nelements, const ptrdiff_t nnodes, idx_t** const SFEM_RESTRICT elems,
-        geom_t** const SFEM_RESTRICT xyz,
+        const ptrdiff_t nelements, const ptrdiff_t nnodes, idx_t** const SFEM_RESTRICT elems, geom_t** const SFEM_RESTRICT xyz,
         // SDF
         const ptrdiff_t* const SFEM_RESTRICT n, const ptrdiff_t* const SFEM_RESTRICT stride,
-        const geom_t* const SFEM_RESTRICT origin, const geom_t* const SFEM_RESTRICT delta,
-        const real_t* const SFEM_RESTRICT data,
+        const geom_t* const SFEM_RESTRICT origin, const geom_t* const SFEM_RESTRICT delta, const real_t* const SFEM_RESTRICT data,
         // Output
         real_t* const SFEM_RESTRICT weighted_field) {
     //
     const ptrdiff_t nelements_aligned = nelements - (nelements % _VL_);
-    const ptrdiff_t nelements_tail = nelements % _VL_;
+    const ptrdiff_t nelements_tail    = nelements % _VL_;
 
     printf("=============================================\n");
     printf("nelements_aligned = %ld\n", nelements_aligned);
     printf("nelements_tail =    %ld\n", nelements_tail);
     printf("=============================================\n");
 
-    tet4_resample_field_local_V_aligned(0,
-                                        nelements_aligned,
-                                        nnodes,
-                                        elems,
-                                        xyz,
-                                        n,
-                                        stride,
-                                        origin,
-                                        delta,
-                                        data,
-                                        weighted_field);
+    tet4_resample_field_local_V_aligned(0, nelements_aligned, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
 
     if (nelements_tail > 0) {
-        tet4_resample_field_local_v2(nelements_aligned,
-                                     nelements,
-                                     nnodes,
-                                     elems,
-                                     xyz,
-                                     n,
-                                     stride,
-                                     origin,
-                                     delta,
-                                     data,
-                                     weighted_field);
+        tet4_resample_field_local_v2(
+                nelements_aligned, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
     }
 
     return 0;
