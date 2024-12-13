@@ -824,8 +824,17 @@ int resample_field_local(
 
             // tet4_resample_field_local_reduce_CUDA
 
-#if USE_TET4_MODEL == USE_TET4_V4 || USE_TET4_MODEL == USE_TET4_V8
-            return tet4_resample_field_local_V(nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+#if USE_TET4_MODEL == USE_TET4_V4 || USE_TET4_MODEL == USE_TET4_V8 || USE_TET4_MODEL == USE_TET4_V16
+            return tet4_resample_field_local_V(nelements,        //
+                                               nnodes,           //
+                                               elems,            //
+                                               xyz,              //
+                                               n,                //
+                                               stride,           //
+                                               origin,           //
+                                               delta,            //
+                                               data,             //
+                                               weighted_field);  //
 // #elif USE_TET4_MODEL == USE_TET4_V8
 //             return tet4_resample_field_local_V(
 //                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data,
@@ -835,6 +844,8 @@ int resample_field_local(
                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
 #endif
         }
+
+        break;
 
         case TET10: {
 // #define TET10_V2
@@ -850,6 +861,8 @@ int resample_field_local(
             RETURN_FROM_FUNCTION(ret);
 #endif
         }
+
+        break;
 
         default:
             break;
@@ -946,51 +959,53 @@ int resample_field(
 int                                                                      //
 resample_field_mesh_tet4(const int                            mpi_size,  // MPI size
                          const int                            mpi_rank,  // MPI rank
-                         const mesh_t* const SFEM_RESTRICT    mesh,      // Mesh
-                         const ptrdiff_t* const SFEM_RESTRICT nlocal,    // // SDF
-                         const ptrdiff_t* const SFEM_RESTRICT stride,    //
-                         const geom_t* const SFEM_RESTRICT    origin,    //
-                         const geom_t* const SFEM_RESTRICT    delta,     //
-                         const real_t* const SFEM_RESTRICT    data,      //
-                         const real_t* const SFEM_RESTRICT    field,     // // Output
-                         real_t* const SFEM_RESTRICT          g,         //
+                         const mesh_t* const SFEM_RESTRICT    mesh,      // Mesh: mesh_t struct
+                         const ptrdiff_t* const SFEM_RESTRICT nlocal,    // SDF: nlocal[3]
+                         const ptrdiff_t* const SFEM_RESTRICT stride,    // SDF: stride[3]
+                         const geom_t* const SFEM_RESTRICT    origin,    // SDF: origin[3]
+                         const geom_t* const SFEM_RESTRICT    delta,     // SDF: delta[3]
+                         const real_t* const SFEM_RESTRICT    data,      // SDF: data
+                         real_t* const SFEM_RESTRICT          g,         // Output
                          sfem_resample_field_info*            info) {               //
     //
     PRINT_CURRENT_FUNCTION;
 
-    if (mpi_size == 1) {
-        resample_field(
-                // Mesh
-                mesh->element_type,
-                mesh->nelements,
-                mesh->n_owned_nodes,
-                mesh->elements,
-                mesh->points,
-                // discrete field
-                nlocal,
-                stride,
-                origin,
-                delta,
-                field,
-                // Output
-                g,
-                info);
+    int ret = 1;
 
-        RETURN_FROM_FUNCTION(0);
-    }  // end if mpi_size == 1
+    // if (mpi_size == 1) {
+    //     ret = resample_field_local(
+    //             // Mesh
+    //             mesh->element_type,
+    //             mesh->nelements,
+    //             mesh->nnodes,
+    //             mesh->elements,
+    //             mesh->points,
+    //             // discrete field
+    //             nlocal,
+    //             stride,
+    //             origin,
+    //             delta,
+    //             data,
+    //             // Output
+    //             g,
+    //             info);
 
-    resample_field_local(mesh->element_type,  // // Mesh
-                         mesh->nelements,     //
-                         mesh->nnodes,        //
-                         mesh->elements,      //
-                         mesh->points,        //
-                         nlocal,              // // discrete field//
-                         stride,              //
-                         origin,              //
-                         delta,               //
-                         field,               //
-                         g,                   // // Output//
-                         info);               //
+    //     // RETURN_FROM_FUNCTION(ret);
+    // } else
+    {
+        ret = resample_field_local(mesh->element_type,  // Mesh is TET4
+                                   mesh->nelements,     // Mesh: nelements
+                                   mesh->nnodes,        // Mesh: nnodes
+                                   mesh->elements,      // Mesh: elements
+                                   mesh->points,        // Mesh: points (xyz)
+                                   nlocal,              // SDF: nlocal[3]
+                                   stride,              // SDF: stride[3]
+                                   origin,              // SDF: origin[3]
+                                   delta,               // SDF: delta[3]
+                                   data,                // SDF: data
+                                   g,                   // // Output//
+                                   info);               //
+    }
 
     real_t* mass_vector = calloc(mesh->nnodes, sizeof(real_t));
 
@@ -1011,7 +1026,7 @@ resample_field_mesh_tet4(const int                            mpi_size,  // MPI 
         //// TODO In GPU is calculated here in case of host memory and more than one MPI rank (at the moment)
 
         // exchange ghost nodes and add contribution
-        {  // For MPI size > 1
+        if (mpi_size > 1) {
             send_recv_t slave_to_master;
             mesh_create_nodal_send_recv(mesh, &slave_to_master);
 
@@ -1029,9 +1044,8 @@ resample_field_mesh_tet4(const int                            mpi_size,  // MPI 
 
         // divide by the mass vector
         for (ptrdiff_t i = 0; i < mesh->n_owned_nodes; i++) {
-            if (mass_vector[i] == 0) {
+            if (mass_vector[i] == 0)
                 fprintf(stderr, "Found 0 mass at %ld, info (%ld, %ld)\n", i, mesh->n_owned_nodes, mesh->nnodes);
-            }
 
             assert(mass_vector[i] != 0);
             g[i] /= mass_vector[i];
@@ -1041,26 +1055,25 @@ resample_field_mesh_tet4(const int                            mpi_size,  // MPI 
     free(mass_vector);
     mass_vector = NULL;
 
-    RETURN_FROM_FUNCTION(0);
+    RETURN_FROM_FUNCTION(ret);
 }
 
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
-// resample_field_mesh ////////////////////////////////////////////////////
+// resample_field_mesh_tet10 ///////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 int                                                                       //
 resample_field_mesh_tet10(const int                            mpi_size,  // MPI size
                           const int                            mpi_rank,  // MPI rank
-                          const mesh_t* const SFEM_RESTRICT    mesh,      // Mesh
-                          const ptrdiff_t* const SFEM_RESTRICT n,         // // SDF
-                          const ptrdiff_t* const SFEM_RESTRICT stride,    //
-                          const geom_t* const SFEM_RESTRICT    origin,    //
-                          const geom_t* const SFEM_RESTRICT    delta,     //
-                          const real_t* const SFEM_RESTRICT    data,      //
-                          const real_t* const SFEM_RESTRICT    field,     // // Output
-                          real_t* const SFEM_RESTRICT          g,         //
-                          sfem_resample_field_info*            info) {
+                          const mesh_t* const SFEM_RESTRICT    mesh,      // Mesh: mesh_t struct
+                          const ptrdiff_t* const SFEM_RESTRICT n,         // SDF: n[3]
+                          const ptrdiff_t* const SFEM_RESTRICT stride,    // SDF: stride[3]
+                          const geom_t* const SFEM_RESTRICT    origin,    // SDF: origin[3]
+                          const geom_t* const SFEM_RESTRICT    delta,     // SDF: delta[3]
+                          const real_t* const SFEM_RESTRICT    data,      // SDF: data
+                          real_t* const SFEM_RESTRICT          g,         // Output: g
+                          sfem_resample_field_info*            info) {               //
     //
     PRINT_CURRENT_FUNCTION;
 
@@ -1149,17 +1162,19 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
 
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
-// resample_field /////////////////////////////////////////////////////////
+// interpolate_field //////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
-int interpolate_field(const ptrdiff_t nnodes, geom_t** const SFEM_RESTRICT xyz,
-                      // SDF
-                      const ptrdiff_t* const SFEM_RESTRICT n, const ptrdiff_t* const SFEM_RESTRICT stride,
-                      const geom_t* const SFEM_RESTRICT origin, const geom_t* const SFEM_RESTRICT delta,
-                      const real_t* const SFEM_RESTRICT data,
-                      // Output
-                      real_t* const SFEM_RESTRICT g) {
-    //
+int                                                             //
+interpolate_field(const ptrdiff_t                      nnodes,  // Mesh: nnodes
+                  geom_t** const SFEM_RESTRICT         xyz,     // Mesh: xyz[3][nnodes]
+                  const ptrdiff_t* const SFEM_RESTRICT n,       // SDF: n[3]
+                  const ptrdiff_t* const SFEM_RESTRICT stride,  // SDF: stride[3]
+                  const geom_t* const SFEM_RESTRICT    origin,  // SDF: origin[3]
+                  const geom_t* const SFEM_RESTRICT    delta,   // SDF: delta[3]
+                  const real_t* const SFEM_RESTRICT    data,    // SDF: data
+                  real_t* const SFEM_RESTRICT          g) {              // Output: g
+
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];
     const real_t oz = (real_t)origin[2];
@@ -1243,28 +1258,79 @@ int interpolate_field(const ptrdiff_t nnodes, geom_t** const SFEM_RESTRICT xyz,
     return 0;
 }
 
-SFEM_INLINE static void minmax(const ptrdiff_t n, const geom_t* const SFEM_RESTRICT x, geom_t* xmin, geom_t* xmax) {
-    *xmin = x[0];
-    *xmax = x[0];
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+// minmax /////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+SFEM_INLINE static void                         //
+minmax(const ptrdiff_t                   n,     //
+       const geom_t* const SFEM_RESTRICT x,     //
+       geom_t*                           xmin,  //
+       geom_t*                           xmax) {                          //
+
+    *xmin = x[0];  //
+    *xmax = x[0];  //
+
     for (ptrdiff_t i = 1; i < n; i++) {
         *xmin = MIN(*xmin, x[i]);
         *xmax = MAX(*xmax, x[i]);
     }
 }
 
-int field_view(MPI_Comm comm, const ptrdiff_t nnodes, const geom_t* SFEM_RESTRICT z_coordinate, const ptrdiff_t* const nlocal,
-               const ptrdiff_t* const SFEM_RESTRICT nglobal, const ptrdiff_t* const SFEM_RESTRICT stride,
-               const geom_t* const origin, const geom_t* const SFEM_RESTRICT delta, const real_t* const field, real_t** field_out,
-               ptrdiff_t* z_nlocal_out, geom_t* const SFEM_RESTRICT z_origin_out) {
-    return field_view_ensure_margin(
-            comm, nnodes, z_coordinate, nlocal, nglobal, stride, origin, delta, field, 2, field_out, z_nlocal_out, z_origin_out);
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+// resample_wiew ///////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+int field_view(MPI_Comm                             comm,          //
+               const ptrdiff_t                      nnodes,        //
+               const geom_t* SFEM_RESTRICT          z_coordinate,  //
+               const ptrdiff_t* const               nlocal,        //
+               const ptrdiff_t* const SFEM_RESTRICT nglobal,       //
+               const ptrdiff_t* const SFEM_RESTRICT stride,        //
+               const geom_t* const                  origin,        //
+               const geom_t* const SFEM_RESTRICT    delta,         //
+               const real_t* const                  field,         //
+               real_t**                             field_out,     //
+               ptrdiff_t*                           z_nlocal_out,  //
+               geom_t* const SFEM_RESTRICT          z_origin_out) {         //
+
+    return field_view_ensure_margin(comm,           //
+                                    nnodes,         //
+                                    z_coordinate,   //
+                                    nlocal,         //
+                                    nglobal,        //
+                                    stride,         //
+                                    origin,         //
+                                    delta,          //
+                                    field,          //
+                                    2,              //
+                                    field_out,      //
+                                    z_nlocal_out,   //
+                                    z_origin_out);  //
 }
 
-int field_view_ensure_margin(MPI_Comm comm, const ptrdiff_t nnodes, const geom_t* SFEM_RESTRICT z_coordinate,
-                             const ptrdiff_t* const nlocal, const ptrdiff_t* const SFEM_RESTRICT nglobal,
-                             const ptrdiff_t* const SFEM_RESTRICT stride, const geom_t* const origin,
-                             const geom_t* const SFEM_RESTRICT delta, const real_t* const field, const ptrdiff_t z_margin,
-                             real_t** field_out, ptrdiff_t* z_nlocal_out, geom_t* const SFEM_RESTRICT z_origin_out) {
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+// resample_wiew_ensure_margin /////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+int                                                                          //
+field_view_ensure_margin(MPI_Comm                             comm,          //
+                         const ptrdiff_t                      nnodes,        //
+                         const geom_t* SFEM_RESTRICT          z_coordinate,  //
+                         const ptrdiff_t* const               nlocal,        //
+                         const ptrdiff_t* const SFEM_RESTRICT nglobal,       //
+                         const ptrdiff_t* const SFEM_RESTRICT stride,        //
+                         const geom_t* const                  origin,        //
+                         const geom_t* const SFEM_RESTRICT    delta,         //
+                         const real_t* const                  field,         //
+                         const ptrdiff_t                      z_margin,      //
+                         real_t**                             field_out,     //
+                         ptrdiff_t*                           z_nlocal_out,  //
+                         geom_t* const SFEM_RESTRICT          z_origin_out) {         //
+
     int rank, size;
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
