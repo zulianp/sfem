@@ -14,7 +14,7 @@
 #define POW2(a) ((a) * (a))
 #endif
 
-#define SFEM_RESAMPLE_GAP_DUAL
+// #define SFEM_RESAMPLE_GAP_DUAL
 
 static SFEM_INLINE real_t put_inside(const real_t v) { return MIN(MAX(1e-7, v), 1 - 1e-7); }
 
@@ -437,11 +437,6 @@ int quadshell4_resample_weight_local(
         geom_t x[4], y[4], z[4];
 
         real_t hex8_f[8];
-        real_t hex8_grad_x[8];
-        real_t hex8_grad_y[8];
-        real_t hex8_grad_z[8];
-        real_t coeffs[8];
-
         real_t quad4_f[4];
         real_t element_weight[4];
 
@@ -505,6 +500,391 @@ int quadshell4_resample_weight_local(
         for (int v = 0; v < 4; ++v) {
 #pragma omp atomic update
             w[ev[v]] += element_weight[v];
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+
+
+int quadshell4_resample_gap_value_local(
+        // Mesh
+        const ptrdiff_t              nelements,
+        const ptrdiff_t              nnodes,
+        idx_t** const SFEM_RESTRICT  elems,
+        geom_t** const SFEM_RESTRICT xyz,
+        // SDF
+        const ptrdiff_t* const SFEM_RESTRICT n,
+        const ptrdiff_t* const SFEM_RESTRICT stride,
+        const geom_t* const SFEM_RESTRICT    origin,
+        const geom_t* const SFEM_RESTRICT    delta,
+        const geom_t* const SFEM_RESTRICT    data,
+        // Output
+        real_t* const SFEM_RESTRICT wg) {
+    if (!nelements) return 0;
+
+    const real_t ox = (real_t)origin[0];
+    const real_t oy = (real_t)origin[1];
+    const real_t oz = (real_t)origin[2];
+
+    const real_t dx = (real_t)delta[0];
+    const real_t dy = (real_t)delta[1];
+    const real_t dz = (real_t)delta[2];
+
+    static const int             n_qp = line_q6_n;
+    static const scalar_t* const qx   = line_q6_x;
+    static const scalar_t* const qw   = line_q6_w;
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t  ev[4];
+        geom_t x[4], y[4], z[4];
+
+        real_t hex8_f[8];
+        real_t coeffs[8];
+
+        real_t quad4_f[4];
+        real_t element_gap[4];
+
+
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        for (int v = 0; v < 4; ++v) {
+            x[v] = xyz[0][ev[v]];
+            y[v] = xyz[1][ev[v]];
+            z[v] = xyz[2][ev[v]];
+        }
+
+        memset(element_gap, 0, 4 * sizeof(real_t));
+        
+        for (int q_ix = 0; q_ix < n_qp; q_ix++) {
+            for (int q_iy = 0; q_iy < n_qp; q_iy++) {
+                const real_t measure = quadshell4_measure(
+                        x[0], x[1], x[2], x[3], y[0], y[1], y[2], y[3], z[0], z[1], z[2], z[3], qx[q_ix], qx[q_iy]);
+
+                assert(measure > 0);
+
+                real_t g_qx, g_qy, g_qz;
+                quadshell4_transform(x[0],
+                                     x[1],
+                                     x[2],
+                                     x[3],
+                                     y[0],
+                                     y[1],
+                                     y[2],
+                                     y[3],
+                                     z[0],
+                                     z[1],
+                                     z[2],
+                                     z[3],
+                                     qx[q_ix],
+                                     qx[q_iy],
+                                     &g_qx,
+                                     &g_qy,
+                                     &g_qz);
+
+#ifndef SFEM_RESAMPLE_GAP_DUAL
+                // Standard basis function
+                {
+                    const scalar_t x0 = 1 - qx[q_ix];
+                    const scalar_t x1 = 1 - qx[q_iy];
+                    quad4_f[0]        = x0 * x1;
+                    quad4_f[1]        = qx[q_ix] * x1;
+                    quad4_f[2]        = qx[q_ix] * qx[q_iy];
+                    quad4_f[3]        = qx[q_iy] * x0;
+                }
+#else
+                // DUAL basis function
+                {
+                    const scalar_t x0 = 1 - qx[q_ix];
+                    const scalar_t x1 = 1 - qx[q_iy];
+                    const scalar_t f0 = x0 * x1;
+                    const scalar_t f1 = qx[q_ix] * x1;
+                    const scalar_t f2 = qx[q_ix] * qx[q_iy];
+                    const scalar_t f3 = qx[q_iy] * x0;
+
+                    quad4_f[0] = 4 * f0 - 2 * f1 - f2 - 2 * f3;
+                    quad4_f[1] = -2 * f0 + 4 * f1 - 2 * f2 - f3;
+                    quad4_f[2] = -f0 - 2 * f1 + 4 * f2 - 2 * f3;
+                    quad4_f[3] = -2 * f0 - f1 - 2 * f2 + 4 * f3;
+                }
+#endif
+                const real_t dV = measure * qw[q_ix] * qw[q_iy];
+
+                const real_t grid_x = (g_qx - ox) / dx;
+                const real_t grid_y = (g_qy - oy) / dy;
+                const real_t grid_z = (g_qz - oz) / dz;
+
+                const ptrdiff_t i = floor(grid_x);
+                const ptrdiff_t j = floor(grid_y);
+                const ptrdiff_t k = floor(grid_z);
+
+                // If outside
+                if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
+                    SFEM_ERROR(
+                            "(%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
+                            "%ld)!\n",
+                            g_qx,
+                            g_qy,
+                            g_qz,
+                            i,
+                            j,
+                            k,
+                            n[0],
+                            n[1],
+                            n[2]);
+                    continue;
+                }
+
+                // Get the reminder [0, 1]
+                real_t l_x = (grid_x - i);
+                real_t l_y = (grid_y - j);
+                real_t l_z = (grid_z - k);
+
+                assert(l_x >= -1e-8);
+                assert(l_y >= -1e-8);
+                assert(l_z >= -1e-8);
+
+                assert(l_x <= 1 + 1e-8);
+                assert(l_y <= 1 + 1e-8);
+                assert(l_z <= 1 + 1e-8);
+
+                hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
+                hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
+
+                // Integrate gap function
+                {
+                    real_t eval_gap = 0;
+
+#pragma unroll(8)
+                    for (int edof_j = 0; edof_j < 8; edof_j++) {
+                        eval_gap += hex8_f[edof_j] * coeffs[edof_j];
+                    }
+
+#pragma unroll(4)
+                    for (int edof_i = 0; edof_i < 4; edof_i++) {
+                        element_gap[edof_i] += eval_gap * quad4_f[edof_i] * dV;
+                    }
+                }
+            }
+        }
+
+#pragma unroll(4)
+        for (int v = 0; v < 4; ++v) {
+            // Invert sign since distance field is negative inside and positive outside
+#pragma omp atomic update
+            wg[ev[v]] -= element_gap[v];
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+
+
+int quadshell4_resample_gap_normals_local(
+        // Mesh
+        const ptrdiff_t              nelements,
+        const ptrdiff_t              nnodes,
+        idx_t** const SFEM_RESTRICT  elems,
+        geom_t** const SFEM_RESTRICT xyz,
+        // SDF
+        const ptrdiff_t* const SFEM_RESTRICT n,
+        const ptrdiff_t* const SFEM_RESTRICT stride,
+        const geom_t* const SFEM_RESTRICT    origin,
+        const geom_t* const SFEM_RESTRICT    delta,
+        const geom_t* const SFEM_RESTRICT    data,
+        // Output
+        real_t* const SFEM_RESTRICT xnormal,
+        real_t* const SFEM_RESTRICT ynormal,
+        real_t* const SFEM_RESTRICT znormal) {
+    if (!nelements) return 0;
+
+    const real_t ox = (real_t)origin[0];
+    const real_t oy = (real_t)origin[1];
+    const real_t oz = (real_t)origin[2];
+
+    const real_t dx = (real_t)delta[0];
+    const real_t dy = (real_t)delta[1];
+    const real_t dz = (real_t)delta[2];
+
+    static const int             n_qp = line_q6_n;
+    static const scalar_t* const qx   = line_q6_x;
+    static const scalar_t* const qw   = line_q6_w;
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t  ev[4];
+        geom_t x[4], y[4], z[4];
+
+        real_t hex8_grad_x[8];
+        real_t hex8_grad_y[8];
+        real_t hex8_grad_z[8];
+        real_t coeffs[8];
+
+        real_t quad4_f[4];
+        real_t element_xnormal[4];
+        real_t element_ynormal[4];
+        real_t element_znormal[4];
+
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elems[v][i];
+        }
+
+        for (int v = 0; v < 4; ++v) {
+            x[v] = xyz[0][ev[v]];
+            y[v] = xyz[1][ev[v]];
+            z[v] = xyz[2][ev[v]];
+        }
+
+        memset(element_xnormal, 0, 4 * sizeof(real_t));
+        memset(element_ynormal, 0, 4 * sizeof(real_t));
+        memset(element_znormal, 0, 4 * sizeof(real_t));
+
+        for (int q_ix = 0; q_ix < n_qp; q_ix++) {
+            for (int q_iy = 0; q_iy < n_qp; q_iy++) {
+                const real_t measure = quadshell4_measure(
+                        x[0], x[1], x[2], x[3], y[0], y[1], y[2], y[3], z[0], z[1], z[2], z[3], qx[q_ix], qx[q_iy]);
+
+                assert(measure > 0);
+
+                real_t g_qx, g_qy, g_qz;
+                quadshell4_transform(x[0],
+                                     x[1],
+                                     x[2],
+                                     x[3],
+                                     y[0],
+                                     y[1],
+                                     y[2],
+                                     y[3],
+                                     z[0],
+                                     z[1],
+                                     z[2],
+                                     z[3],
+                                     qx[q_ix],
+                                     qx[q_iy],
+                                     &g_qx,
+                                     &g_qy,
+                                     &g_qz);
+
+#ifndef SFEM_RESAMPLE_GAP_DUAL
+                // Standard basis function
+                {
+                    const scalar_t x0 = 1 - qx[q_ix];
+                    const scalar_t x1 = 1 - qx[q_iy];
+                    quad4_f[0]        = x0 * x1;
+                    quad4_f[1]        = qx[q_ix] * x1;
+                    quad4_f[2]        = qx[q_ix] * qx[q_iy];
+                    quad4_f[3]        = qx[q_iy] * x0;
+                }
+#else
+                // DUAL basis function
+                {
+                    const scalar_t x0 = 1 - qx[q_ix];
+                    const scalar_t x1 = 1 - qx[q_iy];
+                    const scalar_t f0 = x0 * x1;
+                    const scalar_t f1 = qx[q_ix] * x1;
+                    const scalar_t f2 = qx[q_ix] * qx[q_iy];
+                    const scalar_t f3 = qx[q_iy] * x0;
+
+                    quad4_f[0] = 4 * f0 - 2 * f1 - f2 - 2 * f3;
+                    quad4_f[1] = -2 * f0 + 4 * f1 - 2 * f2 - f3;
+                    quad4_f[2] = -f0 - 2 * f1 + 4 * f2 - 2 * f3;
+                    quad4_f[3] = -2 * f0 - f1 - 2 * f2 + 4 * f3;
+                }
+#endif
+                const real_t dV = measure * qw[q_ix] * qw[q_iy];
+                assert(dV > 0);
+
+                const real_t grid_x = (g_qx - ox) / dx;
+                const real_t grid_y = (g_qy - oy) / dy;
+                const real_t grid_z = (g_qz - oz) / dz;
+
+                const ptrdiff_t i = floor(grid_x);
+                const ptrdiff_t j = floor(grid_y);
+                const ptrdiff_t k = floor(grid_z);
+
+                // If outside
+                if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
+                    SFEM_ERROR(
+                            "(%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
+                            "%ld)!\n",
+                            g_qx,
+                            g_qy,
+                            g_qz,
+                            i,
+                            j,
+                            k,
+                            n[0],
+                            n[1],
+                            n[2]);
+                    continue;
+                }
+
+                // Get the reminder [0, 1]
+                real_t l_x = (grid_x - i);
+                real_t l_y = (grid_y - j);
+                real_t l_z = (grid_z - k);
+
+                assert(l_x >= -1e-8);
+                assert(l_y >= -1e-8);
+                assert(l_z >= -1e-8);
+
+                assert(l_x <= 1 + 1e-8);
+                assert(l_y <= 1 + 1e-8);
+                assert(l_z <= 1 + 1e-8);
+
+                hex_aa_8_eval_grad(put_inside(l_x), put_inside(l_y), put_inside(l_z), hex8_grad_x, hex8_grad_y, hex8_grad_z);
+                hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
+
+                {
+                    real_t eval_xnormal = 0;
+                    real_t eval_ynormal = 0;
+                    real_t eval_znormal = 0;
+
+#pragma unroll(8)
+                    for (int edof_j = 0; edof_j < 8; edof_j++) {
+                        eval_xnormal += hex8_grad_x[edof_j] * coeffs[edof_j];
+                        eval_ynormal += hex8_grad_y[edof_j] * coeffs[edof_j];
+                        eval_znormal += hex8_grad_z[edof_j] * coeffs[edof_j];
+                    }
+
+                    {
+                        // Normalize
+                        const real_t denom = MAX(
+                                1e-20,
+                                sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal + eval_znormal * eval_znormal));
+
+                        assert(denom != 0);
+
+                        eval_xnormal /= denom;
+                        eval_ynormal /= denom;
+                        eval_znormal /= denom;
+                    }
+
+#pragma unroll(4)
+                    for (int edof_i = 0; edof_i < 4; edof_i++) {
+                        element_xnormal[edof_i] += eval_xnormal * quad4_f[edof_i] * dV;
+                        element_ynormal[edof_i] += eval_ynormal * quad4_f[edof_i] * dV;
+                        element_znormal[edof_i] += eval_znormal * quad4_f[edof_i] * dV;
+                    }
+                }
+            }
+        }
+
+#pragma unroll(4)
+        for (int v = 0; v < 4; ++v) {
+#pragma omp atomic update
+            xnormal[ev[v]] += element_xnormal[v];
+
+#pragma omp atomic update
+            ynormal[ev[v]] += element_ynormal[v];
+
+#pragma omp atomic update
+            znormal[ev[v]] += element_znormal[v];
         }
     }
 
