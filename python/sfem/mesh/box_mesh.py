@@ -313,7 +313,7 @@ def create_boundary_nodes(nx, ny, nz):
             yb = 0 * ld[1]
             yt = (ny - 1) * ld[1]
 
-            xp = yi * ld[1]
+            xp = xi * ld[0]
             zp = zi * ld[2]
 
             p = xp + zp
@@ -327,10 +327,10 @@ def create_boundary_nodes(nx, ny, nz):
     for yi in range(0, ny):
         for xi in range(0, nx):
             
-            zf = 0 * ld[2]
-            zb = (nz - 1) * ld[2]
+            zf = (nz - 1) * ld[2]
+            zb = 0 * ld[2]
 
-            xp = yi * ld[1]
+            xp = xi * ld[0]
             yp = yi * ld[1]
 
             p = xp + yp
