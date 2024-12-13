@@ -13,6 +13,7 @@
 #include "sfem_Input.hpp"
 
 #include "sfem_resample_gap.h"
+#include "node_interpolate.h"
 
 #include "sfem_API.hpp"
 

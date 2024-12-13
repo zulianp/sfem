@@ -91,6 +91,21 @@ def inverse(mat):
     else:
         return inv3(mat)
 
+def pseudo_inverse(mat):
+    rows, cols = mat.shape
+    assert cols <= rows
+
+    AtA = mat.T * mat
+    AtA_inv = inverse(AtA)
+    return AtA_inv * mat.T
+
+def pseudo_determinant(mat):
+    rows, cols = mat.shape
+    assert cols <= rows
+
+    AtA = mat.T * mat
+    return sp.sqrt(determinant(AtA))
+
 def adjugate(mat):
     rows, cols = mat.shape
     if rows == 2:
