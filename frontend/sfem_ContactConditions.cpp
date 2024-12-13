@@ -277,7 +277,7 @@ namespace sfem {
 
         ~Impl() {}
 
-        void update_displaced_points(const real_t *disp) {
+        void displace_points(const real_t *disp) {
             auto               mesh = space->mesh_ptr();
             const ptrdiff_t    n    = node_mapping->size();
             const idx_t *const idx  = node_mapping->data();
@@ -505,7 +505,7 @@ namespace sfem {
     int ContactConditions::apply(real_t *const x) { return apply_value(0, x); }
 
     int ContactConditions::signed_distance_for_mesh_viz(const real_t *const x, real_t *const g) const {
-        impl_->update_displaced_points(x);
+        impl_->displace_points(x);
 
         auto sdf = impl_->sdf;
 
@@ -602,7 +602,7 @@ namespace sfem {
     }
 
     int ContactConditions::update(const real_t *const x) {
-        impl_->update_displaced_points(x);
+        impl_->displace_points(x);
         auto sdf = impl_->sdf;
 
         return interpolate_gap_normals(
@@ -640,7 +640,7 @@ namespace sfem {
     }
 
     int ContactConditions::signed_distance(const real_t *const x, real_t *const g) {
-        impl_->update_displaced_points(x);
+        impl_->displace_points(x);
 
         auto sdf = impl_->sdf;
 
@@ -716,7 +716,7 @@ namespace sfem {
     }
 
     int ContactConditions::hessian_block_diag_sym(const real_t *const x, real_t *const values) {
-        impl_->update_displaced_points(x);
+        impl_->displace_points(x);
 
         const ptrdiff_t    n   = impl_->node_mapping->size();
         const idx_t *const idx = impl_->node_mapping->data();
