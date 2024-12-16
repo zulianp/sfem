@@ -214,6 +214,14 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V(
                           _data[_indx_V[15]]}; \
     }
 
+// #define GET_INDICES(_elems_, _element_i_)                                                                                  \
+//     {                                                                                                                      \
+//         _elems_[_element_i_ + 0], _elems_[_element_i_ + 1], _elems_[_element_i_ + 2], _elems_[_element_i_ + 3],            \
+//                 _elems_[_element_i_ + 4], _elems_[_element_i_ + 5], _elems_[_element_i_ + 6], _elems_[_element_i_ + 7],    \
+//                 _elems_[_element_i_ + 8], _elems_[_element_i_ + 9], _elems_[_element_i_ + 10], _elems_[_element_i_ + 11],  \
+//                 _elems_[_element_i_ + 12], _elems_[_element_i_ + 13], _elems_[_element_i_ + 14], _elems_[_element_i_ + 15] \
+//     }
+
 #define GET_INDICES(_elems_, _element_i_)                                                                                  \
     {                                                                                                                      \
         _elems_[_element_i_ + 0], _elems_[_element_i_ + 1], _elems_[_element_i_ + 2], _elems_[_element_i_ + 3],            \
@@ -222,18 +230,13 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V(
                 _elems_[_element_i_ + 12], _elems_[_element_i_ + 13], _elems_[_element_i_ + 14], _elems_[_element_i_ + 15] \
     }
 
-#define COPY_COORDINATES(__ev__, __xyz_ind__)                                                                      \
-    (vec_real) {                                                                                                   \
-        (real_t) {                                                                                                 \
-            xyz[__xyz_ind__][__ev__[0]], (real_t)xyz[__xyz_ind__][__ev__[1]], (real_t)xyz[__xyz_ind__][__ev__[2]], \
-                    (real_t)xyz[__xyz_ind__][__ev__[3]], (real_t)xyz[__xyz_ind__][__ev__[4]],                      \
-                    (real_t)xyz[__xyz_ind__][__ev__[5]], (real_t)xyz[__xyz_ind__][__ev__[6]],                      \
-                    (real_t)xyz[__xyz_ind__][__ev__[7]], (real_t)xyz[__xyz_ind__][__ev__[8]],                      \
-                    (real_t)xyz[__xyz_ind__][__ev__[9]], (real_t)xyz[__xyz_ind__][__ev__[10]],                     \
-                    (real_t)xyz[__xyz_ind__][__ev__[11]], (real_t)xyz[__xyz_ind__][__ev__[12]],                    \
-                    (real_t)xyz[__xyz_ind__][__ev__[13]], (real_t)xyz[__xyz_ind__][__ev__[14]],                    \
-                    (real_t)xyz[__xyz_ind__][__ev__[15]]                                                           \
-        }                                                                                                          \
+#define COPY_COORDINATES(__ev__, __xyz_ind__)                                                                               \
+    (vec_real) {                                                                                                            \
+        xyz[__xyz_ind__][__ev__[0]], xyz[__xyz_ind__][__ev__[1]], xyz[__xyz_ind__][__ev__[2]], xyz[__xyz_ind__][__ev__[3]], \
+                xyz[__xyz_ind__][__ev__[4]], xyz[__xyz_ind__][__ev__[5]], xyz[__xyz_ind__][__ev__[6]],                      \
+                xyz[__xyz_ind__][__ev__[7]], xyz[__xyz_ind__][__ev__[8]], xyz[__xyz_ind__][__ev__[9]],                      \
+                xyz[__xyz_ind__][__ev__[10]], xyz[__xyz_ind__][__ev__[11]], xyz[__xyz_ind__][__ev__[12]],                   \
+                xyz[__xyz_ind__][__ev__[13]], xyz[__xyz_ind__][__ev__[14]], xyz[__xyz_ind__][__ev__[15]]                    \
     }
 
 #define ACCUMULATE_WFIELD(_indx_, _element_fieldN_)                            \
