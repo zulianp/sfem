@@ -311,7 +311,7 @@ int tet4_resample_field_local_V_aligned(
     PRINT_CURRENT_FUNCTION;
 
     printf("============================================================\n");
-    printf("Start: tet4_resample_field_local_V_aligned  V8 [%s] \n", __FILE__);
+    printf("Start: tet4_resample_field_local_V_aligned  V8 [%s:%d] \n", __FILE__, __LINE__);
     printf("============================================================\n");
     //
     const real_t ox = (real_t)origin[0];
@@ -497,6 +497,8 @@ int tet4_resample_field_local_V_aligned(
                 eval_field += hex8_f6 * coeffs6;
                 eval_field += hex8_f7 * coeffs7;
 
+                // eval_field = (vec_real)CONST_VEC(1.0f);
+
                 // UNROLL_ZERO
                 // for (int edof_i = 0; edof_i < 4; edof_i++) {
                 //     element_field[edof_i] += eval_field * tet4_f[edof_i] * dV;
@@ -509,6 +511,11 @@ int tet4_resample_field_local_V_aligned(
                 element_field1 += eval_field * tet4_f1 * dV;
                 element_field2 += eval_field * tet4_f2 * dV;
                 element_field3 += eval_field * tet4_f3 * dV;
+
+                // element_field0 = (vec_real) CONST_VEC(1.0f);
+                // element_field1 = (vec_real) CONST_VEC(1.0f);
+                // element_field2 = (vec_real) CONST_VEC(1.0f);
+                // element_field3 = (vec_real) CONST_VEC(1.0f);
 
             }  // end integrate gap function
 
@@ -529,15 +536,19 @@ int tet4_resample_field_local_V_aligned(
 // tet4_resample_field_local_v2 //////////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-int tet4_resample_field_local_V(
-        // Mesh
-        const ptrdiff_t nelements, const ptrdiff_t nnodes, idx_t** const SFEM_RESTRICT elems, geom_t** const SFEM_RESTRICT xyz,
-        // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n, const ptrdiff_t* const SFEM_RESTRICT stride,
-        const geom_t* const SFEM_RESTRICT origin, const geom_t* const SFEM_RESTRICT delta, const real_t* const SFEM_RESTRICT data,
-        // Output
-        real_t* const SFEM_RESTRICT weighted_field) {
+int tet4_resample_field_local_V(const ptrdiff_t                      nelements,  // Mesh: number of elements
+                                const ptrdiff_t                      nnodes,     // Mesh: number of nodes
+                                idx_t** const SFEM_RESTRICT          elems,      // Mesh: connectivity
+                                geom_t** const SFEM_RESTRICT         xyz,        // Mesh: coordinates
+                                const ptrdiff_t* const SFEM_RESTRICT n,          // SDF: number of nodes in each direction
+                                const ptrdiff_t* const SFEM_RESTRICT stride,     // SDF: stride
+                                const geom_t* const SFEM_RESTRICT    origin,     // SDF: origin
+                                const geom_t* const SFEM_RESTRICT    delta,      // SDF: delta
+                                const real_t* const SFEM_RESTRICT    data,       // SDF: data
+                                real_t* const SFEM_RESTRICT          weighted_field) {    // Output
     //
+    PRINT_CURRENT_FUNCTION;
+
     const ptrdiff_t nelements_aligned = nelements - (nelements % _VL_);
     const ptrdiff_t nelements_tail    = nelements % _VL_;
 
@@ -546,12 +557,33 @@ int tet4_resample_field_local_V(
     printf("nelements_tail =    %ld\n", nelements_tail);
     printf("=============================================\n");
 
-    tet4_resample_field_local_V_aligned(0, nelements_aligned, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+    int ret = 0;
+
+    ret = tet4_resample_field_local_V_aligned(0,                  // start_nelement
+                                              nelements_aligned,  // end_nelement
+                                              nnodes,             //
+                                              elems,              //
+                                              xyz,                //
+                                              n,                  //
+                                              stride,             //
+                                              origin,             //
+                                              delta,              //
+                                              data,               //
+                                              weighted_field);    //
 
     if (nelements_tail > 0) {
-        tet4_resample_field_local_v2(
-                nelements_aligned, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
+        ret = ret || tet4_resample_field_local_v2(nelements_aligned,  // start_nelement: for the tail
+                                                  nelements,          // end_nelement:   for the tail
+                                                  nnodes,             //
+                                                  elems,              //
+                                                  xyz,                //
+                                                  n,                  //
+                                                  stride,             //
+                                                  origin,             //
+                                                  delta,              //
+                                                  data,               //
+                                                  weighted_field);    //
     }
 
-    return 0;
+    RETURN_FROM_FUNCTION(ret);
 }

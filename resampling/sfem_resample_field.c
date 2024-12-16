@@ -992,19 +992,35 @@ resample_field_mesh_tet4(const int                            mpi_size,  // MPI 
 
     //     // RETURN_FROM_FUNCTION(ret);
     // } else
+
     {
-        ret = resample_field_local(mesh->element_type,  // Mesh is TET4
-                                   mesh->nelements,     // Mesh: nelements
-                                   mesh->nnodes,        // Mesh: nnodes
-                                   mesh->elements,      // Mesh: elements
-                                   mesh->points,        // Mesh: points (xyz)
-                                   nlocal,              // SDF: nlocal[3]
-                                   stride,              // SDF: stride[3]
-                                   origin,              // SDF: origin[3]
-                                   delta,               // SDF: delta[3]
-                                   data,                // SDF: data
-                                   g,                   // // Output//
-                                   info);               //
+#if USE_TET4_MODEL == USE_TET4_V4 || USE_TET4_MODEL == USE_TET4_V8 || USE_TET4_MODEL == USE_TET4_V16
+        ret = tet4_resample_field_local_V(mesh->nelements,  //
+                                          mesh->nnodes,     //
+                                          mesh->elements,   //
+                                          mesh->points,     //
+                                          nlocal,           //
+                                          stride,           //
+                                          origin,           //
+                                          delta,            //
+                                          data,             //
+                                          g);               //
+// #elif USE_TET4_MODEL == USE_TET4_V8
+//             return tet4_resample_field_local_V(
+//                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data,
+//                     weighted_field);
+#elif USE_TET4_MODEL == USE_TET4_CUDA
+        ret = tet4_resample_field_local_reduce_CUDA(nelements,        //
+                                                    nnodes,           //
+                                                    elems,            //
+                                                    xyz,              //
+                                                    n,                //
+                                                    stride,           //
+                                                    origin,           //
+                                                    delta,            //
+                                                    data,             //
+                                                    weighted_field);  //
+#endif
     }
 
     real_t* mass_vector = calloc(mesh->nnodes, sizeof(real_t));
