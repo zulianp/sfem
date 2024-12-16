@@ -7,7 +7,7 @@ elem_type=HEX8
 which box_mesh.py
 which highfreq_surface.py      
 
-N=40
+N=20
 box_mesh.py mesh -x $N -y $N -z $N --cell_type=$elem_type --tx=0.5 --ty=0.5 --tz=-1
 highfreq_surface.py obstacle_mesh -x 120 -y 120 --width=2 --height=2
 
@@ -34,7 +34,8 @@ echo "variational: true" >> obstacle/meta.yaml
 # exit 0
 
 margin=1
-hmax=0.01
+# hmax=0.01
+hmax=0.02
 mkdir -p obstacle/sdf
 mesh_to_sdf.py obstacle_mesh obstacle/sdf/sdf.float32.raw --hmax=$hmax --margin=$margin
 raw_to_xdmf.py obstacle/sdf/sdf.float32.raw
