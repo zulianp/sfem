@@ -51,7 +51,7 @@ zv[:] = np.linspace(pmin[2], pmax[2], dims[2])
 
 X, Y, Z = np.meshgrid(xv, yv, zv)
 
-ff = 0
+ff = 1
 
 if ff == 0:
     print("sdf_test.py: Using field: sin(4.0 * pi * X) + cos(4.0 * pi * Y + 4.0 * pi * Z)**2")
