@@ -281,6 +281,8 @@ int main(int argc, char* argv[]) {
 
                     break;
                 default:
+                    fprintf(stderr, "Error: Invalid element type\n");
+                    exit(EXIT_FAILURE);
                     break;
             }
 
