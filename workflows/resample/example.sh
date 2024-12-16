@@ -30,6 +30,7 @@ skinned=skinned
 sdf=sdf.float32.raw
 mesh_sorted=sorted
 resample_target=$mesh_sorted
+
 # resample_target=$skinned
 
 if [[ -d "refined" ]]
@@ -46,11 +47,12 @@ else
 	sfc $mesh $mesh_sorted
 	mkdir -p $skinned
 	skin $mesh $skinned
-	mesh_to_sdf.py $skinned $sdf --hmax=0.01 --margin=0.1
+	# mesh_to_sdf.py $skinned $sdf --hmax=0.01 --margin=0.1
+	mesh_to_sdf.py $skinned $sdf --hmax=0.1 --margin=1
 	# raw_to_xdmf.py $sdf
 fi
 
-# raw_to_xdmf.py $sdf
+## raw_to_xdmf.py $sdf
 sdf_test.py $sdf
 
 sizes=`head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' '`
@@ -61,7 +63,7 @@ echo $sizes
 echo $origins
 echo $scaling
 
-n_procs=18
+n_procs=1
 # n_procs=2
 # n_procs=8
 

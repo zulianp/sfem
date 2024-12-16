@@ -250,8 +250,8 @@ int main(int argc, char* argv[]) {
         } else {
             int ret_resample = 1;
 
-            switch (info.element_type) {
-                case TET10:
+            switch (info.element_type) {                         //
+                case TET10:                                      //
                     ret_resample =                               //
                             resample_field_mesh_tet10(mpi_size,  //
                                                       mpi_rank,  //
@@ -263,21 +263,21 @@ int main(int argc, char* argv[]) {
                                                       field,     //
                                                       g,         //
                                                       &info);    //
-                    break;
+                    break;                                       //
 
-                case TET4:
-                    printf("resample_field_mesh_tet4, %s:%d\n", __FILE__, __LINE__);
-                    ret_resample =                              //
-                            resample_field_mesh_tet4(mpi_size,  //
-                                                     mpi_rank,  //
-                                                     &mesh,     //
-                                                     nlocal,    //
-                                                     stride,    //
-                                                     origin,    //
-                                                     delta,     //
-                                                     field,     //
-                                                     g,         //
-                                                     &info);    //
+                case TET4:                                                            //
+                    printf("resample_field_mesh_tet4, %s:%d\n", __FILE__, __LINE__);  //
+                    ret_resample =                                                    //
+                            resample_field_mesh_tet4(mpi_size,                        //
+                                                     mpi_rank,                        //
+                                                     &mesh,                           //
+                                                     nlocal,                          //
+                                                     stride,                          //
+                                                     origin,                          //
+                                                     delta,                           //
+                                                     field,                           //
+                                                     g,                               //
+                                                     &info);                          //
 
                     break;
                 default:
@@ -290,8 +290,6 @@ int main(int argc, char* argv[]) {
                 fprintf(stderr, "Error: resample_field_mesh failed %s:%d\n", __FILE__, __LINE__);
                 return EXIT_FAILURE;
             }
-
-            
 
             //             if (mpi_size == 1) {
             //                 resample_field(
@@ -385,7 +383,8 @@ int main(int argc, char* argv[]) {
             //                 if (assemble_dual_mass_vector_cuda == 0) {
             //                     //// TODO In CPU must be called.
             //                     //// TODO In GPU should be calculated in the kernel calls in case of unified and Managed memory
-            //                     //// TODO In GPU is calculated here in case of host memory and more than one MPI rank (at the                                moment)
+            //                     //// TODO In GPU is calculated here in case of host memory and more than one MPI rank (at the
+            //                     moment)
 
             //                     // exchange ghost nodes and add contribution
             //                     if (mpi_size > 1) {

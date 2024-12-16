@@ -390,7 +390,8 @@ int tet4_resample_field_local(
                     tet4_f[3] = -f0 - f1 - f2 + 4 * f3;
                 }
 #endif
-                const real_t dV = measure * tet4_qw[q];
+                // const real_t dV = measure * tet4_qw[q];
+                const real_t dV = tet4_qw[q];
 
                 const real_t grid_x = (g_qx - ox) / dx;
                 const real_t grid_y = (g_qy - oy) / dy;
@@ -447,6 +448,10 @@ int tet4_resample_field_local(
                     }  // end edof_i loop
                 }
             }  // end quadrature loop
+
+            for (int edof_i = 0; edof_i < 4; edof_i++) {
+                element_field[edof_i] *= measure;
+            }
 
             UNROLL_ZERO
             for (int v = 0; v < 4; ++v) {
@@ -953,6 +958,31 @@ int resample_field(
 
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
+// perform_exchange_operations /////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+void                                              //
+perform_exchange_operations(mesh_t* mesh,         //
+                            real_t* mass_vector,  //
+                            real_t* g) {          //
+
+    send_recv_t slave_to_master;
+    mesh_create_nodal_send_recv(mesh, &slave_to_master);
+
+    ptrdiff_t count       = mesh_exchange_master_buffer_count(&slave_to_master);
+    real_t*   real_buffer = (real_t*)calloc(count, sizeof(real_t));
+
+    exchange_add(mesh, &slave_to_master, mass_vector, real_buffer);
+    exchange_add(mesh, &slave_to_master, g, real_buffer);
+
+    free(real_buffer);
+    real_buffer = NULL;
+
+    send_recv_destroy(&slave_to_master);
+}
+
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
 // resample_field_mesh ////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
@@ -972,68 +1002,44 @@ resample_field_mesh_tet4(const int                            mpi_size,  // MPI 
 
     int ret = 1;
 
-    // if (mpi_size == 1) {
-    //     ret = resample_field_local(
-    //             // Mesh
-    //             mesh->element_type,
-    //             mesh->nelements,
-    //             mesh->nnodes,
-    //             mesh->elements,
-    //             mesh->points,
-    //             // discrete field
-    //             nlocal,
-    //             stride,
-    //             origin,
-    //             delta,
-    //             data,
-    //             // Output
-    //             g,
-    //             info);
-
-    //     // RETURN_FROM_FUNCTION(ret);
-    // } else
-
-    {
+    {  // Begin of the calls to the resample_field_local
 #if USE_TET4_MODEL == USE_TET4_V4 || USE_TET4_MODEL == USE_TET4_V8 || USE_TET4_MODEL == USE_TET4_V16
-        ret = tet4_resample_field_local_V(mesh->nelements,  //
-                                          mesh->nnodes,     //
-                                          mesh->elements,   //
-                                          mesh->points,     //
-                                          nlocal,           //
-                                          stride,           //
-                                          origin,           //
-                                          delta,            //
-                                          data,             //
-                                          g);               //
-// #elif USE_TET4_MODEL == USE_TET4_V8
-//             return tet4_resample_field_local_V(
-//                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data,
-//                     weighted_field);
+        ret = tet4_resample_field_local(mesh->nelements,  //
+                                        mesh->nnodes,     //
+                                        mesh->elements,   //
+                                        mesh->points,     //
+                                        nlocal,           //
+                                        stride,           //
+                                        origin,           //
+                                        delta,            //
+                                        data,             //
+                                        g);               //
+
 #elif USE_TET4_MODEL == USE_TET4_CUDA
-        ret = tet4_resample_field_local_reduce_CUDA(nelements,        //
-                                                    nnodes,           //
-                                                    elems,            //
-                                                    xyz,              //
-                                                    n,                //
+        ret = tet4_resample_field_local_reduce_CUDA(mesh->nelements,  //
+                                                    mesh->nnodes,     //
+                                                    mesh->elements,   //
+                                                    mesh->points,     //
+                                                    nlocal,           //
                                                     stride,           //
                                                     origin,           //
                                                     delta,            //
                                                     data,             //
-                                                    weighted_field);  //
+                                                    g);               //
 #endif
     }
 
     real_t* mass_vector = calloc(mesh->nnodes, sizeof(real_t));
 
-    {  // mesh.element_type == TET4
+    {
         enum ElemType st = shell_type(mesh->element_type);
-
-        if (st == INVALID) {
-            assemble_lumped_mass(mesh->element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, mass_vector);
-
-        } else {
-            assemble_lumped_mass(st, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, mass_vector);
-        }
+        st               = (st == INVALID) ? mesh->element_type : st;
+        assemble_lumped_mass(st,               //
+                             mesh->nelements,  //
+                             mesh->nnodes,     //
+                             mesh->elements,   //
+                             mesh->points,     //
+                             mass_vector);     //
     }
 
     {
@@ -1043,19 +1049,7 @@ resample_field_mesh_tet4(const int                            mpi_size,  // MPI 
 
         // exchange ghost nodes and add contribution
         if (mpi_size > 1) {
-            send_recv_t slave_to_master;
-            mesh_create_nodal_send_recv(mesh, &slave_to_master);
-
-            ptrdiff_t count       = mesh_exchange_master_buffer_count(&slave_to_master);
-            real_t*   real_buffer = malloc(count * sizeof(real_t));
-
-            exchange_add(mesh, &slave_to_master, mass_vector, real_buffer);
-            exchange_add(mesh, &slave_to_master, g, real_buffer);
-
-            free(real_buffer);
-            real_buffer = NULL;
-
-            send_recv_destroy(&slave_to_master);
+            perform_exchange_operations(mesh, mass_vector, g);
         }  // end if mpi_size > 1
 
         // divide by the mass vector
@@ -1114,6 +1108,7 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
                                                                 g);                         //
 
         if (assemble_dual_mass_vector == 1) {
+            // the exchange was mede in the kernel
             RETURN_FROM_FUNCTION(ret);
         }
 #endif
@@ -1141,25 +1136,20 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
 
     real_t* mass_vector = calloc(mesh->nnodes, sizeof(real_t));
 
-    if (INVALID == st) {
+    if (st == INVALID) {
         // FIXME
 
-        tet10_assemble_dual_mass_vector(mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, mass_vector);
+        tet10_assemble_dual_mass_vector(mesh->nelements,  //
+                                        mesh->nnodes,     //
+                                        mesh->elements,
+                                        mesh->points,
+                                        mass_vector);
 
         // exchange ghost nodes and add contribution
-        if (mpi_size > 1) {  // exchange ghost nodes and add contribution
-            send_recv_t slave_to_master;
-            mesh_create_nodal_send_recv(mesh, &slave_to_master);
-
-            ptrdiff_t count       = mesh_exchange_master_buffer_count(&slave_to_master);
-            real_t*   real_buffer = malloc(count * sizeof(real_t));
-
-            exchange_add(mesh, &slave_to_master, mass_vector, real_buffer);
-            exchange_add(mesh, &slave_to_master, g, real_buffer);
-
-            free(real_buffer);
-            send_recv_destroy(&slave_to_master);
-        }  // end if mpi_size > 1
+        if (mpi_size > 1)
+            perform_exchange_operations(mesh,         //
+                                        mass_vector,  //
+                                        g);           //
 
         for (ptrdiff_t i = 0; i < mesh->nnodes; i++) {
             assert(mass_vector[i] != 0);
@@ -1167,7 +1157,13 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
         }  // end for (i) loop
 
     } else {
-        apply_inv_lumped_mass(st, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, weighted_field, g);
+        apply_inv_lumped_mass(st,  //
+                              mesh->nelements,
+                              mesh->nnodes,
+                              mesh->elements,
+                              mesh->points,
+                              weighted_field,
+                              g);
     }  // end if (INVALID == st)
 
     free(mass_vector);
