@@ -6,6 +6,7 @@
 // #define real_type real_t
 
 #include "mesh_aura.h"
+#include "sfem_defs.h"
 #include "sfem_mesh.h"
 
 #include "tet10_weno_cuda.cuh"
@@ -189,36 +190,55 @@ launch_kernels_hex8_to_tet10_resample_field_local_CUDA_unified(               //
     cudaDeviceSynchronize();
 
     if (bool_assemble_dual_mass_vector == 1) {
-        // Launch isoparametric_tet10_assemble_dual_mass_vector_kernel
-        isoparametric_tet10_assemble_dual_mass_vector_kernel<<<numBlocks, threadsPerBlock>>>(
-                0, nelements, nnodes, elems_device, xyz_device, mass_vector);
+        // enum ElemType st = shell_type(mesh->element_type);
 
-        // Synchronize device
-        cudaDeviceSynchronize();
+        // if (st == INVALID) 
+        {
+            // Launch isoparametric_tet10_assemble_dual_mass_vector_kernel
 
-        if (mpi_size > 1) {
-            printf("MPI:    Launching the exchange, %s:%d\n", __FILE__, __LINE__);
-            send_recv_t slave_to_master;
-            mesh_create_nodal_send_recv(mesh, &slave_to_master);
+            isoparametric_tet10_assemble_dual_mass_vector_kernel<<<numBlocks,                        //
+                                                                   threadsPerBlock>>>(0,             //
+                                                                                      nelements,     //
+                                                                                      nnodes,        //
+                                                                                      elems_device,  //
+                                                                                      xyz_device,    //
+                                                                                      mass_vector);  //
 
-            ptrdiff_t count       = mesh_exchange_master_buffer_count(&slave_to_master);
-            real_t*   real_buffer = (real_t*)malloc(count * sizeof(real_t));
+            // Synchronize device
+            cudaDeviceSynchronize();
 
-            exchange_add(mesh, &slave_to_master, mass_vector, real_buffer);
-            exchange_add(mesh, &slave_to_master, g_device, real_buffer);
+            if (mpi_size > 1) {
+                printf("MPI:    Launching the exchange, %s:%d\n", __FILE__, __LINE__);
+                send_recv_t slave_to_master;
+                mesh_create_nodal_send_recv(mesh, &slave_to_master);
 
-            free(real_buffer);
-            send_recv_destroy(&slave_to_master);
-        }
+                ptrdiff_t count       = mesh_exchange_master_buffer_count(&slave_to_master);
+                real_t*   real_buffer = (real_t*)malloc(count * sizeof(real_t));
 
-        // // Launch compute_g_kernel
-        // compute_g_kernel<<<(nnodes / threadsPerBlock) + 1, threadsPerBlock>>>(
-        //         nnodes, weighted_field_device, mass_vector, g_device);
+                exchange_add(mesh, &slave_to_master, mass_vector, real_buffer);
+                exchange_add(mesh, &slave_to_master, g_device, real_buffer);
 
-        compute_g_kernel_v2<<<(nnodes / threadsPerBlock) + 1, threadsPerBlock>>>(nnodes, mass_vector, g_device);
+                free(real_buffer);
+                send_recv_destroy(&slave_to_master);
+            }
 
-        // Synchronize device
-        cudaDeviceSynchronize();
+            compute_g_kernel_v2<<<(nnodes / threadsPerBlock) + 1,  //
+                                  threadsPerBlock>>>(nnodes,       //
+                                                     mass_vector,  //
+                                                     g_device);    //
+
+            // Synchronize device
+            cudaDeviceSynchronize();
+        } 
+        // else {
+            // apply_inv_lumped_mass(st,               //
+            //                       mesh->nelements,  //
+            //                       mesh->nnodes,     //
+            //                       mesh->elements,   //
+            //                       mesh->points,     //
+            //                       weighted_field,   //
+            //                       g_device);        //
+        // }
     }
 
     RETURN_FROM_FUNCTION(0);
@@ -242,23 +262,19 @@ calculate_threads_and_blocks(ptrdiff_t  nelements,        //
 ////////////////////////////////////////////////////////////////////////
 // hex8_to_tet10_resample_field_local_CUDA_unified
 ////////////////////////////////////////////////////////////////////////
-extern "C" int                                       //
-hex8_to_tet10_resample_field_local_CUDA_unified_v2(  //
-        const int mpi_size,                          //
-        const int mpi_rank,                          //
-        mesh_t*   mesh,                              // Mesh
-        const int bool_assemble_dual_mass_vector,    // assemble dual mass vector
-        // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
-        const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
-        // Geometry
-        const geom_t* const SFEM_RESTRICT origin,  // origin of the domain
-        const geom_t* const SFEM_RESTRICT delta,   // delta of the domain
-        // Data
-        const real_t* const SFEM_RESTRICT data,  // SDF
-        // Output //
-        real_t* const SFEM_RESTRICT g_host) {  //
-                                               //
+extern "C" int                                                                //
+hex8_to_tet10_resample_field_local_CUDA_unified_v2(                           //
+        const int                            mpi_size,                        // MPI size
+        const int                            mpi_rank,                        // MPI rank
+        mesh_t*                              mesh,                            // Mesh data
+        const int                            bool_assemble_dual_mass_vector,  // assemble dual mass vector: 0 or 1
+        const ptrdiff_t* const SFEM_RESTRICT n,                               // SDF: number of nodes in each direction
+        const ptrdiff_t* const SFEM_RESTRICT stride,                          // SDF: stride of the data
+        const geom_t* const SFEM_RESTRICT    origin,                          // Geometry: origin of the domain
+        const geom_t* const SFEM_RESTRICT    delta,                           // Geometry: delta of the domain
+        const real_t* const SFEM_RESTRICT    data,                            // Data: SDF
+        real_t* const SFEM_RESTRICT          g_host) {                                 // Output: g_host
+
     PRINT_CURRENT_FUNCTION;
 
     const int size_data = n[0] * n[1] * n[2];

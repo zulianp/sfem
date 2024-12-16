@@ -20,8 +20,10 @@ dims = (D, D, D)
 print(f'sdf_test.py: Generating field of size {dims[0]} x {dims[1]} x {dims[2]}')
 print(f'sdf_test.py: Size of field in memory: {np.prod(dims) * np.dtype(sdf_t).itemsize / 1024 / 1024 / 1024} GB')
 
-mn = -0.88
-mx = 0.88
+mult_f = 10.0
+mn = -0.88 * mult_f
+mx = 0.88 * mult_f
+
 pmin = np.array([mn, mn, mn])
 pmax = np.array([mx, mx, mx])
 
@@ -51,17 +53,22 @@ zv[:] = np.linspace(pmin[2], pmax[2], dims[2])
 
 X, Y, Z = np.meshgrid(xv, yv, zv)
 
-ff = 1
+X = X / mult_f
+Y = Y / mult_f
+Z = Z / mult_f
 
-if ff == 0:
+option = 0
+
+if option == 0:
     print("sdf_test.py: Using field: sin(4.0 * pi * X) + cos(4.0 * pi * Y + 4.0 * pi * Z)**2")
-    field  = np.sin(4.0 * np.pi * X) + np.cos(4.0 * np.pi * Y + 4.0 * np.pi * Z)**2
+    # field  = np.sin(4.0 * np.pi * X  ) + np.cos(4.0 * np.pi * Y + 4.0 * np.pi * Z)**2
+    field = np.sin(4.0 * np.pi * (X)) + np.cos(4.0 * np.pi * (Y + Z))**2
 
-elif ff == 1:
-    print("sdf_test.py: Using field: sin(4.0 * pi * X) + cos(4.0 * pi * Y) * tanh(4.0 * pi * (Z + X))")
-    field  = np.sin(4.0 * np.pi * X) + np.cos(4.0 * np.pi * Y) * np.tanh(4.0 * np.pi * (Z + X))
+elif option == 1:
+    print("sdf_test.py: Using field: sin(4.0 * pi * X/mult_f) + cos(4.0 * pi * Y/mult_f) * tanh(4.0 * pi * (Z/mult_f + X/mult_f))")
+    field  = np.sin(4.0 * np.pi * (X)) + np.cos(4.0 * np.pi * (Y)) * np.tanh(4.0 * np.pi * (Z + X))
 
-elif ff == 2:
+elif option == 2:
     print("sdf_test.py: Using field: chess_board(X, Y, Z, mc)")
     field = chess_board(X, Y, Z, mc)
 
