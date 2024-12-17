@@ -55,7 +55,7 @@ free_xyz_tet10_device(xyz_tet10_device* xyz);  //
  * @param nnodes
  * @return xyz_tet10_device
  */
-xyz_tet10_device                                        //
+xyz_tet10_device                                 //
 make_xyz_tet10_managed(const ptrdiff_t nnodes);  //
 
 /**
@@ -65,7 +65,7 @@ make_xyz_tet10_managed(const ptrdiff_t nnodes);  //
  * @param xyz
  * @param xyz_host
  */
-void                                                                                                   //
+void                                                                                            //
 copy_xyz_tet10_managed(const ptrdiff_t nnodes, xyz_tet10_device* xyz, const float** xyz_host);  //
 
 /**
@@ -73,7 +73,7 @@ copy_xyz_tet10_managed(const ptrdiff_t nnodes, xyz_tet10_device* xyz, const floa
  *
  * @param xyz
  */
-void                                                   //
+void                                            //
 free_xyz_tet10_managed(xyz_tet10_device* xyz);  //
 
 /**
@@ -82,9 +82,9 @@ free_xyz_tet10_managed(xyz_tet10_device* xyz);  //
  * @param nnodes
  * @param xyz
  */
-void                                                            //
+void                                                     //
 memory_hint_xyz_tet10_managed(const ptrdiff_t   nnodes,  //
-                                     xyz_tet10_device* xyz);    //
+                              xyz_tet10_device* xyz);    //
 
 // elems_tet10_device functions for unified memory
 
@@ -282,5 +282,18 @@ memory_hint_read_mostly(const ptrdiff_t array_size, const ptrdiff_t element_size
  */
 void                                                                                            //
 memory_hint_write_mostly(const ptrdiff_t array_size, const ptrdiff_t element_size, void* ptr);  //
+
+/**
+ * @brief Apply the inverse of the lumped mass matrix to a field.
+ * Referencing the function in the original code: mass.c
+ */
+extern "C" void                                                   //
+apply_inv_lumped_mass(const int                    element_type,  //
+                      const ptrdiff_t              nelements,     //
+                      const ptrdiff_t              nnodes,        //
+                      idx_t** const SFEM_RESTRICT  elems,         //
+                      geom_t** const SFEM_RESTRICT xyz,           //
+                      const real_t* const          x,             //
+                      real_t* const                values);                      //
 
 #endif  // __TET10_RESAMPLE_FIELD_CUH__

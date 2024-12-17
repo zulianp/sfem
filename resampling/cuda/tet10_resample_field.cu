@@ -190,10 +190,8 @@ launch_kernels_hex8_to_tet10_resample_field_local_CUDA_unified(               //
     cudaDeviceSynchronize();
 
     if (bool_assemble_dual_mass_vector == 1) {
-        // enum ElemType st = shell_type(mesh->element_type);
-
-        // if (st == INVALID) 
-        {
+        enum ElemType st = shell_type((ElemType)mesh->element_type);
+        if (st == INVALID) {
             // Launch isoparametric_tet10_assemble_dual_mass_vector_kernel
 
             isoparametric_tet10_assemble_dual_mass_vector_kernel<<<numBlocks,                        //
@@ -229,16 +227,15 @@ launch_kernels_hex8_to_tet10_resample_field_local_CUDA_unified(               //
 
             // Synchronize device
             cudaDeviceSynchronize();
-        } 
-        // else {
-            // apply_inv_lumped_mass(st,               //
-            //                       mesh->nelements,  //
-            //                       mesh->nnodes,     //
-            //                       mesh->elements,   //
-            //                       mesh->points,     //
-            //                       weighted_field,   //
-            //                       g_device);        //
-        // }
+        } else {
+            apply_inv_lumped_mass(st,               //
+                                  mesh->nelements,  //
+                                  mesh->nnodes,     //
+                                  mesh->elements,   //
+                                  mesh->points,     //
+                                  g_device,         //
+                                  g_device);        //
+        }
     }
 
     RETURN_FROM_FUNCTION(0);

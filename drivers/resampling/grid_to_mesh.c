@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <math.h>
 #include <mpi.h>
 #include <stddef.h>
@@ -23,6 +24,20 @@
 double calculate_flops(const ptrdiff_t nelements, const ptrdiff_t quad_nodes, double time_sec) {
     const double flops = (nelements * (35 + 166 * quad_nodes)) / time_sec;
     return flops;
+}
+
+// Function prototype
+// int check_string_in_args(int argc, char* argv[], const char* target);
+
+// Function definition
+int check_string_in_args(const int argc, const char* argv[], const char* target) {
+    for (int i = 0; i < argc; ++i) {
+        if (strcmp(argv[i], target) == 0) {
+            printf("Found %s in argv[%d]\n", target, i);
+            return 1;
+        }
+    }
+    return 0;
 }
 
 int main(int argc, char* argv[]) {
@@ -75,27 +90,39 @@ int main(int argc, char* argv[]) {
     const char* folder      = argv[11];
     const char* output_path = argv[12];
 
-    if (argc == 14) {
-        if (strcmp(argv[13], "TET4") == 0) {
-            info.element_type = TET4;
-        } else if (strcmp(argv[13], "TET10") == 0) {
-            info.element_type = TET10;
-        } else {
-            fprintf(stderr, "Error: Invalid element type\n\n");
-            fprintf(stderr,
-                    "usage: %s <nx> <ny> <nz> <ox> <oy> <oz> <dx> <dy> <dz> "
-                    "<data.float32.raw> <folder> <output_path> <element_type>\n",
-                    argv[0]);
-            return EXIT_FAILURE;
-        }
+    if (check_string_in_args(argc, (const char**)argv, "TET4")) {
+        info.element_type = TET4;
+    } else if (check_string_in_args(argc, (const char**)argv, "TET10")) {
+        info.element_type = TET10;
+    } else {
+        fprintf(stderr, "Error: Invalid element type\n\n");
+        fprintf(stderr,
+                "usage: %s <nx> <ny> <nz> <ox> <oy> <oz> <dx> <dy> <dz> "
+                "<data.float32.raw> <folder> <output_path> <element_type>\n",
+                argv[0]);
+        return EXIT_FAILURE;
     }
 
-    if (info.element_type == TET4) {
-        printf("info.element_type = TET4,  %s:%d\n", __FILE__, __LINE__);
-    } else if (info.element_type == TET10) {
-        printf("info.element_type = TET10, %s:%d\n", __FILE__, __LINE__);
+    info.use_accelerator = 0;
+
+#ifdef SFEM_ENABLE_CUDA
+
+    if (check_string_in_args(argc, (const char**)argv, "CUDA")) {
+        info.use_accelerator = 1;
+        if (mpi_rank == 0) printf("info.use_accelerator = 1\n");
     } else {
-        printf("info.element_type = UNKNOWN, %s:%d\n", __FILE__, __LINE__);
+        info.use_accelerator = 0;
+        if (mpi_rank == 0) printf("info.use_accelerator = 0\n");
+    }
+
+#endif
+
+    if (info.element_type == TET4) {
+        if (mpi_rank == 0) printf("info.element_type = TET4,    %s:%d\n", __FILE__, __LINE__);
+    } else if (info.element_type == TET10) {
+        if (mpi_rank == 0) printf("info.element_type = TET10,   %s:%d\n", __FILE__, __LINE__);
+    } else {
+        if (mpi_rank == 0) printf("info.element_type = UNKNOWN, %s:%d\n", __FILE__, __LINE__);
     }
 
     mesh_t mesh;
@@ -265,19 +292,19 @@ int main(int argc, char* argv[]) {
                                                       &info);    //
                     break;                                       //
 
-                case TET4:                                                            //
-                    printf("resample_field_mesh_tet4, %s:%d\n", __FILE__, __LINE__);  //
-                    ret_resample =                                                    //
-                            resample_field_mesh_tet4(mpi_size,                        //
-                                                     mpi_rank,                        //
-                                                     &mesh,                           //
-                                                     nlocal,                          //
-                                                     stride,                          //
-                                                     origin,                          //
-                                                     delta,                           //
-                                                     field,                           //
-                                                     g,                               //
-                                                     &info);                          //
+                case TET4:  //
+                    // printf("resample_field_mesh_tet4, %s:%d\n", __FILE__, __LINE__);  //
+                    ret_resample =                              //
+                            resample_field_mesh_tet4(mpi_size,  //
+                                                     mpi_rank,  //
+                                                     &mesh,     //
+                                                     nlocal,    //
+                                                     stride,    //
+                                                     origin,    //
+                                                     delta,     //
+                                                     field,     //
+                                                     g,         //
+                                                     &info);    //
 
                     break;
                 default:
@@ -321,10 +348,10 @@ int main(int argc, char* argv[]) {
             //                                     mpi_size,                                 // MPI size
             //                                     mpi_rank,                                 // MPI rank
             //                                     &mesh,                                    // Mesh
-            //                                     assemble_dual_mass_vector_cuda,           // assemble dual mass vector in the
-            //                                     kernel nlocal,                                   // number of nodes in each
-            //                                     direction stride,                                   // stride of the data
-            //                                     origin,                                   // origin of the domain
+            //                                     assemble_dual_mass_vector_cuda,           // assemble dual mass vector in
+            //                                     the kernel nlocal,                                   // number of nodes in
+            //                                     each direction stride,                                   // stride of the
+            //                                     data origin,                                   // origin of the domain
             //                                     delta,                                    // delta of the domain
             //                                     field,                                    // filed
             //                                     g);                                       // output
@@ -382,9 +409,10 @@ int main(int argc, char* argv[]) {
 
             //                 if (assemble_dual_mass_vector_cuda == 0) {
             //                     //// TODO In CPU must be called.
-            //                     //// TODO In GPU should be calculated in the kernel calls in case of unified and Managed memory
-            //                     //// TODO In GPU is calculated here in case of host memory and more than one MPI rank (at the
-            //                     moment)
+            //                     //// TODO In GPU should be calculated in the kernel calls in case of unified and Managed
+            //                     memory
+            //                     //// TODO In GPU is calculated here in case of host memory and more than one MPI rank (at
+            //                     the moment)
 
             //                     // exchange ghost nodes and add contribution
             //                     if (mpi_size > 1) {
