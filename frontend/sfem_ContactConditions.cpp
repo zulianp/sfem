@@ -316,7 +316,7 @@ namespace sfem {
         void assemble_mass_vector() {
             collect_points();
 
-            auto st = shell_type(side_type(space->element_type()));
+            auto st           = shell_type(side_type(space->element_type()));
             auto surface_mesh = std::make_shared<Mesh>(space->mesh_ptr()->spatial_dimension(),
                                                        st,
                                                        sides->extent(1),
@@ -332,15 +332,14 @@ namespace sfem {
 
             if (variational) {
                 resample_weight_local(
-                    // Mesh
-                    st,
-                    sides->extent(1),
-                    node_mapping->size(),
-                    sides->data(),
-                    surface_points->data(),
-                    // Output
-                    mass_vector->data()
-                    );
+                        // Mesh
+                        st,
+                        sides->extent(1),
+                        node_mapping->size(),
+                        sides->data(),
+                        surface_points->data(),
+                        // Output
+                        mass_vector->data());
 
             } else {
                 auto ones = h_buffer<real_t>(trace_space->n_dofs());
@@ -644,8 +643,7 @@ namespace sfem {
         return update(x) || normal_project(h, out);
     }
 
-    int ContactConditions::update(const real_t *const x) {
-        impl_->displace_points(x);
+    int ContactConditions::init() {
         auto sdf = impl_->sdf;
 
         if (impl_->variational) {
@@ -685,6 +683,11 @@ namespace sfem {
         }
     }
 
+    int ContactConditions::update(const real_t *const x) {
+        impl_->displace_points(x);
+        return init();
+    }
+
     std::shared_ptr<Operator<real_t>> ContactConditions::linear_constraints_op() {
         auto space = impl_->space;
         return make_op<real_t>(
@@ -703,9 +706,7 @@ namespace sfem {
                 EXECUTION_SPACE_HOST);
     }
 
-    int ContactConditions::signed_distance(const real_t *const x, real_t *const g) {
-        impl_->displace_points(x);
-
+    int ContactConditions::signed_distance(real_t *const g) {
         auto sdf = impl_->sdf;
 
         int err = 0;
@@ -745,12 +746,17 @@ namespace sfem {
         return err;
     }
 
+    int ContactConditions::signed_distance(const real_t *const disp, real_t *const g) {
+        impl_->displace_points(disp);
+        return signed_distance(g);
+    }
+
     int ContactConditions::gradient(const real_t *const x, real_t *const g) {
         int err = SFEM_SUCCESS;
         if (impl_->variational) {
             auto sdf = impl_->sdf;
-            auto st = shell_type(side_type(impl_->space->element_type()));
-            err     = resample_gap_value_local(
+            auto st  = shell_type(side_type(impl_->space->element_type()));
+            err      = resample_gap_value_local(
                     // Mesh
                     st,
                     impl_->sides->extent(1),
@@ -821,7 +827,9 @@ namespace sfem {
     }
 
     int ContactConditions::hessian_block_diag_sym(const real_t *const x, real_t *const values) {
-        impl_->displace_points(x);
+
+        // if(x)
+            // impl_->displace_points(x);
 
         const ptrdiff_t    n   = impl_->node_mapping->size();
         const idx_t *const idx = impl_->node_mapping->data();

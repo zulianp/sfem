@@ -12,6 +12,8 @@
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_ShiftedPenalty_impl.hpp"
+#include "sfem_tpl_blas.hpp"
+#include "sfem_openmp_blas.hpp"
 
 #include "sfem_Buffer.hpp"
 
@@ -32,9 +34,11 @@ namespace sfem {
         void set_penalty_parameter(const T val) { penalty_param_ = val; }
 
         void set_constraints_op(const std::shared_ptr<Operator<T>>& op,
-                                const std::shared_ptr<Operator<T>>& op_t) {
+                                const std::shared_ptr<Operator<T>>& op_t,
+                                const std::shared_ptr<SparseBlockVector<T>>& op_x_op) {
             constraints_op_ = op;
             constraints_op_transpose_ = op_t;
+            constraints_op_x_op_      = op_x_op;
         }
 
         enum CycleType {
@@ -251,7 +255,7 @@ namespace sfem {
         void default_init() {
             OpenMP_BLAS<T>::build_blas(blas_);
             OpenMP_ShiftedPenalty<T>::build(impl_);
-            execution_space_ = EXECUTION_SPACE_HOST;
+            execution_space_ = EXECUTION_SPACE_HOST; 
         }
 
         void set_max_it(const int val) { max_it_ = val; }
@@ -280,6 +284,7 @@ namespace sfem {
 
         std::shared_ptr<Operator<T>> constraints_op_;
         std::shared_ptr<Operator<T>> constraints_op_transpose_;
+        std::shared_ptr<SparseBlockVector<T>> constraints_op_x_op_;
 
         // Internals
         std::vector<std::shared_ptr<Memory>> memory_;
@@ -364,6 +369,8 @@ namespace sfem {
             const T* const l_ub = lagr_ub ? lagr_ub->data() : nullptr;
 
             if (constraints_op_) {
+                // Jacobian
+                
                 blas_.zeros(n_constrained_dofs, correction->data());
 
                 // Solution space to constraints space
@@ -383,6 +390,9 @@ namespace sfem {
 
                 // Constraints space to solution space
                 constraints_op_transpose_->apply(mem->work->data(), mem->diag->data());
+
+
+                // Residual
 
                 blas_.zeros(n_constrained_dofs, mem->work->data());
                 impl_.calc_r_pen(n_constrained_dofs,
