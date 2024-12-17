@@ -8,6 +8,7 @@ from time import perf_counter
 import numpy as np
 import meshio
 import taichi as ti
+import inspect
 
 ti.init(arch=ti.gpu)
 # ti.init(arch=ti.cpu)
@@ -31,7 +32,7 @@ def cross(u, v):
 def read_mesh(input_path):
     fname, fextension = os.path.splitext(input_path)
 
-    print(f'file extension {fextension}')
+    print(f'mesh_to_sdf: file extension {fextension}')
     if fextension in ['.e', '.exo', '.vtk']:
         mesh = meshio.read(input_path)
     else:
@@ -53,7 +54,7 @@ def select_submesh(mesh, pmin, pmax):
     selected_cells = None
     for b in mesh.cells:
         ncells, nnodesxelem = b.data.shape
-        print(f'{ncells} x {nnodesxelem}')
+        print(f'mesh_to_sdf: ncells x nnodesxelem = {ncells} x {nnodesxelem}, line: {inspect.currentframe().f_lineno}')
 
         i0 = b.data[:, 0].astype(np.int32)
         i1 = b.data[:, 1].astype(np.int32)
@@ -108,19 +109,19 @@ def mesh_to_sdf(mesh, pmin, pmax, hmax, export_normals=False):
     ny = np.int64(np.ceil((y_range)/hmax)) + 1
     nz = np.int64(np.ceil((z_range)/hmax)) + 1
 
-    print(f'hmax={hmax} margin={margin}')
-    print(f'hmax={x_range} y_range={y_range} z_range={z_range}')
+    print(f'mesh_to_sdf.py: hmax={hmax} margin={margin}')
+    print(f'mesh_to_sdf.py: hmax={x_range} y_range={y_range} z_range={z_range}')
 
     num_points = len(x)
 
-    print(f'grid    {nx} x {ny} x {nz}')
-    print(f'grid    [{xmin}, {xmax}] x [{ymin}, {ymax}] x [{zmin}, {zmax}] ')
-    print(f'points  {num_points}')
+    print(f'mesh_to_sdf.py: grid    {nx} x {ny} x {nz}')
+    print(f'mesh_to_sdf.py: grid    [{xmin}, {xmax}] x [{ymin}, {ymax}] x [{zmin}, {zmax}] ')
+    print(f'mesh_to_sdf.py: points  {num_points}')
 
     infty = sdf_t(np.max([x_range, y_range, z_range]) * 1000)
     edt = np.zeros((nz, ny, nx)).astype(sdf_t)
 
-    print(f'shape {edt.shape}')
+    print(f'mesh_to_sdf.py: shape {edt.shape}')
 
     edt = ti.field(ti.f32, shape=edt.shape)
     tix = ti.field(ti.f32, shape=x.shape)
@@ -139,9 +140,10 @@ def mesh_to_sdf(mesh, pmin, pmax, hmax, export_normals=False):
     tiny = ti.field(ti.f32, shape=y.shape)
     tinz = ti.field(ti.f32, shape=z.shape)
     
+    print(f'mesh_to_sdf.py: mesh.cells shape {len(mesh.cells)}')
     for b in mesh.cells:
         ncells, nnodesxelem = b.data.shape
-        print(f'{ncells} x {nnodesxelem}')
+        print(f'mesh_to_sdf.py: ncells x nnodesxelem = {ncells} x {nnodesxelem}')
 
         ii0 = b.data[:, 0]
         ii1 = b.data[:, 1]
@@ -216,7 +218,7 @@ def mesh_to_sdf(mesh, pmin, pmax, hmax, export_normals=False):
 
     for b in mesh.cells:
         ncells, nnodesxelem = b.data.shape
-        print(f'{ncells} x {nnodesxelem}')
+        print(f'mesh_to_sdf.py: ncells x nnodesxelem = {ncells} x {nnodesxelem}')
 
         ii0 = b.data[:, 0]
         ii1 = b.data[:, 1]
@@ -285,7 +287,7 @@ def mesh_to_sdf(mesh, pmin, pmax, hmax, export_normals=False):
     ti.sync()
 
     t1_stop = perf_counter()
-    print("TTS:", t1_stop - t1_start)
+    print("mesh_to_sdf: TTS:", t1_stop - t1_start)
 
     if export_normals:
         tinx.to_numpy().astype(geom_t).tofile('nx.float32.raw')
@@ -293,7 +295,7 @@ def mesh_to_sdf(mesh, pmin, pmax, hmax, export_normals=False):
         tinz.to_numpy().astype(geom_t).tofile('nz.float32.raw')
 
     nedt = edt.to_numpy().astype(sdf_t)
-    print(f'd in [{np.min(nedt[:])}, {np.max(nedt[:])}]')
+    print(f'mesh_to_sdf: d in [{np.min(nedt[:])}, {np.max(nedt[:])}]')
     return nedt, [nx, ny, nz]
 
 if __name__ == '__main__':

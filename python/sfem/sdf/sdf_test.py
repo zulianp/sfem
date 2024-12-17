@@ -63,6 +63,20 @@ if option == 0:
     print("sdf_test.py: Using field: sin(4.0 * pi * X) + cos(4.0 * pi * Y + 4.0 * pi * Z)**2")
     # field  = np.sin(4.0 * np.pi * X  ) + np.cos(4.0 * np.pi * Y + 4.0 * np.pi * Z)**2
     field = np.sin(4.0 * np.pi * (X)) + np.cos(4.0 * np.pi * (Y + Z))**2
+    
+    field_max = np.max(field)
+    field_min = np.min(field)
+    
+    mean_max_min = (field_max + field_min) / 2.0  
+    field = field - mean_max_min
+    
+    field_max = np.max(field)
+    field = field / field_max
+
+    field_max = np.max(field)
+    field_min = np.min(field)
+    
+    print(f'sdf_test.py: field_max = {field_max:.7e} field_min = {field_min:.7e}')
 
 elif option == 1:
     print("sdf_test.py: Using field: sin(4.0 * pi * X/mult_f) + cos(4.0 * pi * Y/mult_f) * tanh(4.0 * pi * (Z/mult_f + X/mult_f))")
