@@ -43,7 +43,7 @@ if [[ -d "$skinned" ]]
 then
 	echo "Reusing existing mesh $skinned and SDF!"
 else
-	create_sphere.sh 5
+	create_sphere.sh 4
 	sfc $mesh $mesh_sorted
 	mkdir -p $skinned
 	skin $mesh $skinned
@@ -82,5 +82,5 @@ GRID_TO_MESH="grid_to_mesh"
 set -x
 time SFEM_INTERPOLATE= SFEM_READ_FP32=1 $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4
 
-raw_to_db.py $resample_target out.vtk --point_data=$field  --point_data_type=float32
+raw_to_db.py $resample_target out.vtk --point_data=$field  --point_data_type=float64
 

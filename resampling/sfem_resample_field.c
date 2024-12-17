@@ -1004,16 +1004,16 @@ resample_field_mesh_tet4(const int                            mpi_size,  // MPI 
 
     {  // Begin of the calls to the resample_field_local
 #if USE_TET4_MODEL == USE_TET4_V4 || USE_TET4_MODEL == USE_TET4_V8 || USE_TET4_MODEL == USE_TET4_V16
-        ret = tet4_resample_field_local(mesh->nelements,  //
-                                        mesh->nnodes,     //
-                                        mesh->elements,   //
-                                        mesh->points,     //
-                                        nlocal,           //
-                                        stride,           //
-                                        origin,           //
-                                        delta,            //
-                                        data,             //
-                                        g);               //
+        ret = tet4_resample_field_local_V(mesh->nelements,  //
+                                          mesh->nnodes,     //
+                                          mesh->elements,   //
+                                          mesh->points,     //
+                                          nlocal,           //
+                                          stride,           //
+                                          origin,           //
+                                          delta,            //
+                                          data,             //
+                                          g);               //
 
 #elif USE_TET4_MODEL == USE_TET4_CUDA
         ret = tet4_resample_field_local_reduce_CUDA(mesh->nelements,  //
