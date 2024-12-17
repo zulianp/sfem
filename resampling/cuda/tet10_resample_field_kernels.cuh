@@ -1166,13 +1166,13 @@ hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  //
         const ptrdiff_t stride1,  // stride of the data
         const ptrdiff_t stride2,  // stride of the data
 
-        const geom_t originx,  // origin of the domain
-        const geom_t originy,  // origin of the domain
-        const geom_t originz,  // origin of the domain
+        const geom_t originx,  // origin x of the domain
+        const geom_t originy,  // origin y of the domain
+        const geom_t originz,  // origin z of the domain
 
-        const geom_t deltax,  // delta of the domain
-        const geom_t deltay,  // delta of the domain
-        const geom_t deltaz,  // delta of the domain
+        const geom_t deltax,  // delta x of the domain
+        const geom_t deltay,  // delta y of the domain
+        const geom_t deltaz,  // delta z of the domain
 
         const real_t* const MY_RESTRICT data,  // SDF
         // Output
@@ -1382,19 +1382,19 @@ hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  //
         //
         // printf("nSizes_global = %ld\n", nSizes_global);
         // printf("origin = (%f, %f, %f)\n", ox, oy, oz);
-        real_t eval_field = hex_aa_8_eval_weno4_3D_Unit_cuda(g_qx_unit,
-                                                             g_qy_unit,
-                                                             g_qz_unit,  //
-                                                             x_cube_origin,
-                                                             y_cube_origin,
+        real_t eval_field = hex_aa_8_eval_weno4_3D_Unit_cuda(g_qx_unit,      //
+                                                             g_qy_unit,      //
+                                                             g_qz_unit,      //
+                                                             x_cube_origin,  //
+                                                             y_cube_origin,  //
                                                              z_cube_origin,  //
-                                                             i_glob,
-                                                             j_glob,
-                                                             k_glob,
-                                                             stride0,
-                                                             stride1,
-                                                             stride2,
-                                                             data);  //
+                                                             i_glob,         //
+                                                             j_glob,         //
+                                                             k_glob,         //
+                                                             stride0,        //
+                                                             stride1,        //
+                                                             stride2,        //
+                                                             data);          //
 
         // eval_field = 1.0;  ///////////////////// DEBUG
 #else  // WENO_CUBE == 0

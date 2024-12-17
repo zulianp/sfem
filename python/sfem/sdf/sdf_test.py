@@ -20,7 +20,7 @@ dims = (D, D, D)
 print(f'sdf_test.py: Generating field of size {dims[0]} x {dims[1]} x {dims[2]}')
 print(f'sdf_test.py: Size of field in memory: {np.prod(dims) * np.dtype(sdf_t).itemsize / 1024 / 1024 / 1024} GB')
 
-mult_f = 10.0
+mult_f = 1.0
 mn = -0.88 * mult_f
 mx = 0.88 * mult_f
 

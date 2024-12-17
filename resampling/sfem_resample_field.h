@@ -18,28 +18,42 @@ extern "C" {
 // } element_type;
 
 typedef struct {
-    ptrdiff_t quad_nodes_cnt;
-    ptrdiff_t nelements;
-    //     element_type element_type;
-    enum ElemType element_type;
+    ptrdiff_t     quad_nodes_cnt;   // Number of quadrature points
+    ptrdiff_t     nelements;        // Number of elements
+    enum ElemType element_type;     // Element type
+    int           use_accelerator;  // Use accelerator such as CUDA
 } sfem_resample_field_info;
 
-int resample_field_local(
-        // Mesh
-        const enum ElemType          element_type,  //
-        const ptrdiff_t              nelements,     //
-        const ptrdiff_t              nnodes,        //
-        idx_t** const SFEM_RESTRICT  elems,         //
-        geom_t** const SFEM_RESTRICT xyz,           //
-        // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,       //
-        const ptrdiff_t* const SFEM_RESTRICT stride,  //
-        const geom_t* const SFEM_RESTRICT    origin,  //
-        const geom_t* const SFEM_RESTRICT    delta,   //
-        const real_t* const SFEM_RESTRICT    data,    //
-        // Output
-        real_t* const SFEM_RESTRICT wg,   //
-        sfem_resample_field_info*   info);  //
+/**
+ * @brief
+ *
+ * @param element_type
+ * @param nelements
+ * @param nnodes
+ * @param elems
+ * @param xyz
+ * @param n
+ * @param stride
+ * @param origin
+ * @param delta
+ * @param data
+ * @param wg
+ * @param info
+ * @return int
+ */
+int                                                                      //
+resample_field_local(const enum ElemType                  element_type,  // Mesh
+                     const ptrdiff_t                      nelements,     // Mesh
+                     const ptrdiff_t                      nnodes,        // Mesh
+                     idx_t** const SFEM_RESTRICT          elems,         // Mesh
+                     geom_t** const SFEM_RESTRICT         xyz,           // Mesh
+                     const ptrdiff_t* const SFEM_RESTRICT n,             // SDF
+                     const ptrdiff_t* const SFEM_RESTRICT stride,        // SDF
+                     const geom_t* const SFEM_RESTRICT    origin,        // SDF
+                     const geom_t* const SFEM_RESTRICT    delta,         // SDF
+                     const real_t* const SFEM_RESTRICT    data,          // SDF
+                     real_t* const SFEM_RESTRICT          wg,            //  Output
+                     sfem_resample_field_info*            info);                    // Info
 
 /**
  * @brief

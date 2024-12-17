@@ -1088,49 +1088,64 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
     PRINT_CURRENT_FUNCTION;
 
     int assemble_dual_mass_vector = 1;
+    int ret                       = 0;
 
     const int mesh_nnodes = mpi_size >= 1 ? mesh->nnodes : mesh->n_owned_nodes;
 
-    if (SFEM_TET10_CUDA == ON) {
+    if (info->use_accelerator == 1 && (SFEM_TET10_CUDA == ON)) {
 #if SFEM_TET10_CUDA == ON
         if (SFEM_CUDA_MEMORY_MODEL == CUDA_HOST_MEMORY) assemble_dual_mass_vector = 0;
 
-        const int ret =                                                                     //
-                hex8_to_tet10_resample_field_local_CUDA_wrapper(mpi_size,                   //
-                                                                mpi_rank,                   //
-                                                                mesh,                       //
-                                                                assemble_dual_mass_vector,  //
-                                                                n,                          //
-                                                                stride,                     //
-                                                                origin,                     //
-                                                                delta,                      //
-                                                                data,                       //
-                                                                g);                         //
+        ret = hex8_to_tet10_resample_field_local_CUDA_wrapper(mpi_size,                   //
+                                                              mpi_rank,                   //
+                                                              mesh,                       //
+                                                              assemble_dual_mass_vector,  //
+                                                              n,                          //
+                                                              stride,                     //
+                                                              origin,                     //
+                                                              delta,                      //
+                                                              data,                       //
+                                                              g);                         //
 
         if (assemble_dual_mass_vector == 1) {
             // the exchange was mede in the kernel
             RETURN_FROM_FUNCTION(ret);
         }
+#else
+        fprintf(stderr, "SFEM_TET10_CUDA is OFF\n");
+        return EXIT_FAILURE;
 #endif
     }
 
     real_t* weighted_field = calloc(mesh->nnodes, sizeof(real_t));
 
-    if (SFEM_TET10_CUDA == OFF) {                 //
-                                                  //
-        resample_field_local(mesh->element_type,  //
-                             mesh->nelements,     //
-                             mesh_nnodes,         //
-                             mesh->elements,      //
-                             mesh->points,        //
-                             n,                   //
-                             stride,              //
-                             origin,              //
-                             delta,               //
-                             data,                //
-                             weighted_field,      //
-                             info);               //
-    }                                             // end if SFEM_TET10_CUDA == OFF
+    if (SFEM_TET10_CUDA == OFF) {  //
+
+        ret = hex8_to_tet10_resample_field_local(mesh->nelements,  //
+                                                 mesh_nnodes,      //
+                                                 mesh->elements,   //
+                                                 mesh->points,     //
+                                                 n,                //
+                                                 stride,           //
+                                                 origin,           //
+                                                 delta,            //
+                                                 data,             //
+                                                 weighted_field);  //
+
+        // resample_field_local(mesh->element_type,  //
+        //                      mesh->nelements,     //
+        //                      mesh_nnodes,         //
+        //                      mesh->elements,      //
+        //                      mesh->points,        //
+        //                      n,                   //
+        //                      stride,              //
+        //                      origin,              //
+        //                      delta,               //
+        //                      data,                //
+        //                      weighted_field,      //
+        //                      info);               //
+
+    }  // end if SFEM_TET10_CUDA == OFF
 
     enum ElemType st = shell_type(mesh->element_type);
 
@@ -1141,9 +1156,9 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
 
         tet10_assemble_dual_mass_vector(mesh->nelements,  //
                                         mesh->nnodes,     //
-                                        mesh->elements,
-                                        mesh->points,
-                                        mass_vector);
+                                        mesh->elements,   //
+                                        mesh->points,     //
+                                        mass_vector);     //
 
         // exchange ghost nodes and add contribution
         if (mpi_size > 1)
@@ -1157,19 +1172,19 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
         }  // end for (i) loop
 
     } else {
-        apply_inv_lumped_mass(st,  //
-                              mesh->nelements,
-                              mesh->nnodes,
-                              mesh->elements,
-                              mesh->points,
-                              weighted_field,
-                              g);
-    }  // end if (INVALID == st)
+        apply_inv_lumped_mass(st,               //
+                              mesh->nelements,  //
+                              mesh->nnodes,     //
+                              mesh->elements,   //
+                              mesh->points,     //
+                              weighted_field,   //
+                              g);               //
+    }                                           // end if (INVALID == st)
 
     free(mass_vector);
     free(weighted_field);
 
-    RETURN_FROM_FUNCTION(0);
+    RETURN_FROM_FUNCTION(ret);
 }  // end resample_field_mesh
 
 ////////////////////////////////////////////////////////////////////////////

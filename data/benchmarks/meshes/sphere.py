@@ -13,7 +13,7 @@ def main(argv):
 		exit(1)
 
 	output = argv[1]
-	radius=0.5 * 10.0
+	radius=0.5 * 1.0
 
 	if(len(argv) > 2):
 		nrefs = int(sys.argv[2])
