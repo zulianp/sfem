@@ -206,6 +206,20 @@ struct viz {
         }
     }
 
+    void center_mesh()
+    {
+        compute_barycenter();
+
+        for (int d = 0; d < 3; d++) {
+
+            for (ptrdiff_t i = 0; i < n_nodes; i++) {
+                 points[d][i] -= barycenter[d];
+            }
+
+            barycenter[d] = 0;
+        }
+    }
+
     void compute_barycenter() {
         for (int d = 0; d < 3; d++) {
             barycenter[d] = 0;
@@ -309,7 +323,7 @@ struct viz {
 
         printf("#elements %ld #nodes %ld #disp %ld\n", n_elements, n_nodes, n_disp);
 
-        compute_barycenter();
+        center_mesh();
         compute_pseudo_normals();
         compute_bounding_box();
     }
@@ -347,11 +361,11 @@ int main(int argc, char **argv) {
     glEnable(GL_CULL_FACE);
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
-    glEnable(GL_LIGHT1);
-    glEnable(GL_LIGHT2);
+    // glEnable(GL_LIGHT1);
+    // glEnable(GL_LIGHT2);
 
-    glLightf(GL_LIGHT1, GL_CONSTANT_ATTENUATION, 0.2);
-    glLightf(GL_LIGHT2, GL_CONSTANT_ATTENUATION, 0.2);
+    glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, 0.2);
+    // glLightf(GL_LIGHT2, GL_CONSTANT_ATTENUATION, 0.2);
     // glEnable(GL_LIGHT3);
     // glEnable(GL_LIGHT4);
 

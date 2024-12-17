@@ -50,6 +50,7 @@ namespace sfem {
         ShiftedPenalty_Tpl<T> impl;
 
         std::shared_ptr<MatrixFreeLinearSolver<T>> linear_solver_;
+        std::shared_ptr<Buffer<T>> lagr_lb, lagr_ub;
 
         ExecutionSpace        execution_space() const override { return execution_space_; }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
@@ -165,9 +166,8 @@ namespace sfem {
             auto r_pen = make_buffer(n_dofs);
             auto J_pen = make_buffer(n_dofs);
 
-            std::shared_ptr<Buffer<T>> lagr_lb, lagr_ub;
-            if (lb) lagr_lb = make_buffer(n_constrained_dofs);
-            if (ub) lagr_ub = make_buffer(n_constrained_dofs);
+            if (lb && !lagr_lb) lagr_lb = make_buffer(n_constrained_dofs);
+            if (ub && !lagr_ub) lagr_ub = make_buffer(n_constrained_dofs);
 
             T penetration_norm = 0;
             T penetration_tol  = 1 / (penalty_param_ * 0.1);
