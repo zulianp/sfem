@@ -11,10 +11,10 @@ extern "C" {
 
 int sshex8_skin(const int       L,
                 const ptrdiff_t nelements,
-                idx_t         **elements,
-                ptrdiff_t      *n_surf_elements,
-                idx_t **const   surf_elements,
-                element_idx_t **parent_element);
+                idx_t         **SFEM_RESTRICT elements,
+                ptrdiff_t      *SFEM_RESTRICT n_surf_elements,
+                idx_t **const   SFEM_RESTRICT surf_elements,
+                element_idx_t **SFEM_RESTRICT parent_element);
 
 int sshex8_surface_from_sideset(const int                                L,
                                 const ptrdiff_t                          nelements,
