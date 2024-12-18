@@ -7,6 +7,15 @@ import sys
 import numpy as np
 
 def mkdir(output_folder):
+    """
+    Create a directory if it does not already exist.
+
+    Args:
+        output_folder (str): The path of the directory to create.
+
+    Returns:
+        None
+    """
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
