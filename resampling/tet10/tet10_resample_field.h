@@ -88,8 +88,8 @@ int hex8_to_tet10_resample_field_local_CUDA_wrapper(  //
         const int mpi_size,                           // MPI size
         const int mpi_rank,                           // MPI rank
                                                       // Mesh
-        mesh_t*   mesh,                               // Mesh
-        const int bool_assemble_dual_mass_vector,     // assemble dual mass vector
+        mesh_t* mesh,                                 // Mesh
+        int*    bool_assemble_dual_mass_vector,       // assemble dual mass vector
         // SDF
         const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
         const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
