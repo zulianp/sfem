@@ -183,15 +183,6 @@ int main(int argc, char *argv[]) {
 
             sshex8_skin(SFEM_ELEMENT_REFINE_LEVEL, mesh.nelements, elements, &n_surf_elements, surf_elems, &parent);
 
-            // for (ptrdiff_t i = 0; i < n_surf_elements; i++) {
-            //     printf("%d) ", i);
-            //     for (int d = 0; d < nnxs; d++) {
-            //         printf("%d ", surf_elems[d][i]);
-            //     }
-
-            //     printf("\n");
-            // }
-
             char path[2048];
             for (int d = 0; d < nnxs; d++) {
                 sprintf(path, "%s/i%d.raw", output_folder, d);

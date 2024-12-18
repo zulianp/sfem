@@ -106,10 +106,10 @@ int sshex8_surface_from_sideset(const int                                L,
 
 int sshex8_skin(const int       L,
                 const ptrdiff_t nelements,
-                idx_t         **elements,
-                ptrdiff_t      *n_surf_elements,
-                idx_t **const   surf_elements,
-                element_idx_t **parent_element) {
+                idx_t         **SFEM_RESTRICT elements,
+                ptrdiff_t      *SFEM_RESTRICT n_surf_elements,
+                idx_t **const   SFEM_RESTRICT surf_elements,
+                element_idx_t **SFEM_RESTRICT parent_element) {
     const int proteus_to_std[8] = {// Bottom
                                    proteus_hex8_lidx(L, 0, 0, 0),
                                    proteus_hex8_lidx(L, L, 0, 0),
@@ -165,8 +165,6 @@ int sshex8_skin(const int       L,
                 int end[3]       = {L + 1, L + 1, L + 1};
                 int increment[3] = {1, 1, 1};
 
-                // printf("side %d: ", s);
-
                 switch (s) {
                     case HEX8_LEFT: {
                         A3SET(start, 0, L, 0);
@@ -216,7 +214,6 @@ int sshex8_skin(const int       L,
                             const int   lidx                = proteus_hex8_lidx(L, xi, yi, zi);
                             const idx_t node                = elements[lidx][e];
                             surf_elements[n++][side_offset] = node;
-                            // printf("(%d, %d, %d), l: %d => g:\t%d\n", xi, yi, zi, lidx, node);
                         }
                     }
                 }
