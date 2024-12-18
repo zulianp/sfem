@@ -39,33 +39,45 @@
 #endif
 
 // Convert HSV values (in range [0.0, 1.0]) to RGB
-void hsv_to_rgb(float hue, float saturation, float value, float& r, float& g, float& b) {
-    int hi = static_cast<int>(floor(hue * 6)) % 6; // sector 0 to 5
-    float f = (hue * 6) - floor(hue * 6);
-    float p = value * (1 - saturation);
-    float q = value * (1 - f * saturation);
-    float t = value * (1 - (1 - f) * saturation);
+void hsv_to_rgb(float hue, float saturation, float value, float &r, float &g, float &b) {
+    int   hi = static_cast<int>(floor(hue * 6)) % 6;  // sector 0 to 5
+    float f  = (hue * 6) - floor(hue * 6);
+    float p  = value * (1 - saturation);
+    float q  = value * (1 - f * saturation);
+    float t  = value * (1 - (1 - f) * saturation);
 
     switch (hi) {
-        case 0: r = value, g = t, b = p; break;
-        case 1: r = q, g = value, b = p; break;
-        case 2: r = p, g = value, b = t; break;
-        case 3: r = p, g = q, b = value; break;
-        case 4: r = t, g = p, b = value; break;
-        case 5: r = value, g = p, b = q; break;
+        case 0:
+            r = value, g = t, b = p;
+            break;
+        case 1:
+            r = q, g = value, b = p;
+            break;
+        case 2:
+            r = p, g = value, b = t;
+            break;
+        case 3:
+            r = p, g = q, b = value;
+            break;
+        case 4:
+            r = t, g = p, b = value;
+            break;
+        case 5:
+            r = value, g = p, b = q;
+            break;
     }
 }
 
 // Generate RGB color from intensity
 void color_from_intensity(float intensity) {
-    float hue = fmod(intensity * 3.0f, 1.0f); // Cycle through hues (R -> G -> B)
-    float saturation = 1.0f;                 // Full saturation for vivid colors
-    float value = intensity;                 // Intensity directly affects brightness
+    float hue        = fmod(intensity * 3.0f, 1.0f);  // Cycle through hues (R -> G -> B)
+    float saturation = 1.0f;                          // Full saturation for vivid colors
+    float value      = intensity;                     // Intensity directly affects brightness
 
     float r, g, b;
     hsv_to_rgb(hue, saturation, value, r, g, b);
 
-    glColor3f(r, g, b); // Set OpenGL color to the calculated RGB values
+    glColor3f(r, g, b);  // Set OpenGL color to the calculated RGB values
 }
 
 static const char *helpprompt[] = {"Press F1 for help", 0};
@@ -234,10 +246,10 @@ struct viz {
         glLightModelfv(GL_LIGHT_MODEL_AMBIENT, globalAmbientLight);
 
         // Configure and enable light 0 (e.g., a directional light)
-        GLfloat light0Position[] = {1.0f, 1.0f, 1.0f, 0.0f};  // Directional light
-        GLfloat light0Ambient[]  = {0.01f, 0.01f, 0.01f, 1.0f};
-        GLfloat light0Diffuse[]  = {0.6f, 0.6f, 0.6f, 1.0f};
-        GLfloat light0Specular[] = {1.f, 1.f, 1.f, 1.0f};
+        GLfloat light0Position[]  = {1.0f, 1.0f, 1.0f, 0.0f};  // Directional light
+        GLfloat light0Ambient[]   = {0.01f, 0.01f, 0.01f, 1.0f};
+        GLfloat light0Diffuse[]   = {0.6f, 0.6f, 0.6f, 1.0f};
+        GLfloat light0Specular[]  = {1.f, 1.f, 1.f, 1.0f};
         GLfloat light0Direction[] = {0.0f, 0.0f, -1.0f, 0.0f};  // Direction of the light
 
         glLightfv(GL_LIGHT0, GL_POSITION, light0Position);
@@ -454,8 +466,6 @@ void draw_node(const float  x,
     float f[4];
     evalf(x, y, f);
 
-    
-
     float p[3] = {f[0] * p0[0] + f[1] * p1[0] + f[2] * p2[0] + f[3] * p3[0],
                   f[0] * p0[1] + f[1] * p1[1] + f[2] * p2[1] + f[3] * p3[1],
                   f[0] * p0[2] + f[1] * p1[2] + f[2] * p2[2] + f[3] * p3[2]};
@@ -464,10 +474,9 @@ void draw_node(const float  x,
                   f[0] * n0[1] + f[1] * n1[1] + f[2] * n2[1] + f[3] * n3[1],
                   f[0] * n0[2] + f[1] * n1[2] + f[2] * n2[2] + f[3] * n3[2]};
 
-
     // color_from_intensity(n[0]);
 
-     glColor3f((1+n[0])/2, (1+n[1])/2, (1+n[2])/2);
+    glColor3f((1 + n[0]) / 2, (1 + n[1]) / 2, (1 + n[2]) / 2);
 
     normalize(n);
 
@@ -490,7 +499,6 @@ void display(void) {
     // float l2pos[] = {v.bbmin[0] - ldist, v.bbmin[1] - ldist, v.bbmin[2] - ldist, 0};
     // float l1pos[] = {v.bbmax[0] + ldist, v.bbmax[1] + ldist, v.bbmax[2] + ldist, 0};
     // float l0pos[] = {v.barycenter[0], v.barycenter[0], v.barycenter[0] + v.bbmax[2] + ldist, 0};
-    
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
