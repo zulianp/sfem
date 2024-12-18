@@ -330,4 +330,45 @@ tet4_resample_field_local_reduce_CUDA_wrapper(const int mpi_size,               
                                               const geom_t* const SFEM_RESTRICT    delta,   // delta of the domain
                                               const real_t* const SFEM_RESTRICT    data,    // SDF
                                               real_t* const SFEM_RESTRICT          g_host) {         // Output
+
+#if SFEM_CUDA_MEMORY_MODEL == CUDA_UNIFIED_MEMORY
+
+#pragma message "CUDA_UNIFIED_MEMORY is enabled"
+
+    *bool_assemble_dual_mass_vector = 1;
+
+    printf("TODO: Implement the CUDA_UNIFIED_MEMORY: %s:%d\n", __FILE__, __LINE__);
+
+    exit(EXIT_FAILURE);
+
+#elif SFEM_CUDA_MEMORY_MODEL == CUDA_MANAGED_MEMORY
+
+#pragma message "CUDA_MEMORY_MANAGED is enabled:"
+
+    *bool_assemble_dual_mass_vector = 1;
+
+    printf("TODO: Implement the CUDA_MANAGED_MEMORY: %s:%d\n", __FILE__, __LINE__);
+
+    exit(EXIT_FAILURE);
+
+#elif SFEM_CUDA_MEMORY_MODEL == CUDA_HOST_MEMORY
+
+    // Default memory model is CUDA_HOST_MEMORY.
+#pragma message "CUDA_HOST_MEMORY is enabled"
+
+    const int mesh_nnodes           = mpi_size > 1 ? mesh->nnodes : mesh->n_owned_nodes;
+    *bool_assemble_dual_mass_vector = 0;
+
+    tet4_resample_field_local_reduce_CUDA(mesh->n_owned_elements,  //
+                                          mesh_nnodes,             //
+                                          mesh->elements,          //
+                                          mesh->points,            //
+                                          n,                       //
+                                          stride,                  //
+                                          origin,                  //
+                                          delta,                   //
+                                          data,                    //
+                                          g_host);
+
+#endif
 }

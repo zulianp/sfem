@@ -1023,6 +1023,8 @@ resample_field_mesh_tet4(const int                            mpi_size,  // MPI 
     //
     PRINT_CURRENT_FUNCTION;
 
+    int assemble_dual_mass_vector = 0;
+
     int ret = 1;
 
     {  // Begin of the calls to the resample_field_local
@@ -1039,16 +1041,33 @@ resample_field_mesh_tet4(const int                            mpi_size,  // MPI 
                                           g);               //
 
 #elif USE_TET4_MODEL == USE_TET4_CUDA
-        ret = tet4_resample_field_local_reduce_CUDA(mesh->nelements,  //
-                                                    mesh->nnodes,     //
-                                                    mesh->elements,   //
-                                                    mesh->points,     //
-                                                    nlocal,           //
-                                                    stride,           //
-                                                    origin,           //
-                                                    delta,            //
-                                                    data,             //
-                                                    g);               //
+
+        ret = tet4_resample_field_local_reduce_CUDA_wrapper(mpi_size,                    //
+                                                            mpi_rank,                    //
+                                                            mesh,                        //
+                                                            &assemble_dual_mass_vector,  //
+                                                            nlocal,                      //
+                                                            stride,                      //
+                                                            origin,                      //
+                                                            delta,                       //
+                                                            data,                        //
+                                                            g);                          //
+
+        if (assemble_dual_mass_vector == 1) {
+            // the exchange was mede in the kernel
+            RETURN_FROM_FUNCTION(ret);
+        }
+
+        // ret = tet4_resample_field_local_reduce_CUDA(mesh->nelements,  //
+        //                                             mesh->nnodes,     //
+        //                                             mesh->elements,   //
+        //                                             mesh->points,     //
+        //                                             nlocal,           //
+        //                                             stride,           //
+        //                                             origin,           //
+        //                                             delta,            //
+        //                                             data,             //
+        //                                             g);               //
 #endif
     }
 

@@ -579,21 +579,24 @@ __device__ void quadrature_node(const Real_Type tet4_qx_v, const Real_Type tet4_
 // tet4_resample_field_reduce_local_kernel ///////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-__global__ void tet4_resample_field_reduce_local_kernel(
-        // Mesh
-        const ptrdiff_t start_element, const ptrdiff_t end_element, const ptrdiff_t nnodes,
-        const elems_tet4_device MY_RESTRICT elems, const xyz_tet4_device MY_RESTRICT xyz,
-        // SDF
-        // const ptrdiff_t* const MY_RESTRICT n,
-        const ptrdiff_t MY_RESTRICT stride0, const ptrdiff_t MY_RESTRICT stride1, const ptrdiff_t MY_RESTRICT stride2,
-
-        const float origin_x, const float origin_y, const float origin_z,
-
-        const float delta_x, const float delta_y, const float delta_z,
-
-        const real_type* const MY_RESTRICT data,
-        // Output
-        real_type* const MY_RESTRICT weighted_field) {  //
+__global__ void                                             //
+tet4_resample_field_reduce_local_kernel(                    //
+        const ptrdiff_t                     start_element,  //
+        const ptrdiff_t                     end_element,    //
+        const ptrdiff_t                     nnodes,         //
+        const elems_tet4_device MY_RESTRICT elems,          //
+        const xyz_tet4_device MY_RESTRICT   xyz,            //
+        const ptrdiff_t MY_RESTRICT         stride0,        //
+        const ptrdiff_t MY_RESTRICT         stride1,        //
+        const ptrdiff_t MY_RESTRICT         stride2,        //
+        const float                         origin_x,       //
+        const float                         origin_y,       //
+        const float                         origin_z,       //
+        const float                         delta_x,        //
+        const float                         delta_y,        //
+        const float                         delta_z,        //
+        const real_type* const MY_RESTRICT  data,           //
+        real_type* const MY_RESTRICT        weighted_field) {      //// Output
 
     real_type x0 = 0.0, x1 = 0.0, x2 = 0.0, x3 = 0.0;
     real_type y0 = 0.0, y1 = 0.0, y2 = 0.0, y3 = 0.0;
