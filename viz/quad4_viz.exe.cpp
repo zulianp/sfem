@@ -38,6 +38,36 @@
 #pragma warning(disable : 4305 4244)
 #endif
 
+// Convert HSV values (in range [0.0, 1.0]) to RGB
+void hsv_to_rgb(float hue, float saturation, float value, float& r, float& g, float& b) {
+    int hi = static_cast<int>(floor(hue * 6)) % 6; // sector 0 to 5
+    float f = (hue * 6) - floor(hue * 6);
+    float p = value * (1 - saturation);
+    float q = value * (1 - f * saturation);
+    float t = value * (1 - (1 - f) * saturation);
+
+    switch (hi) {
+        case 0: r = value, g = t, b = p; break;
+        case 1: r = q, g = value, b = p; break;
+        case 2: r = p, g = value, b = t; break;
+        case 3: r = p, g = q, b = value; break;
+        case 4: r = t, g = p, b = value; break;
+        case 5: r = value, g = p, b = q; break;
+    }
+}
+
+// Generate RGB color from intensity
+void color_from_intensity(float intensity) {
+    float hue = fmod(intensity * 3.0f, 1.0f); // Cycle through hues (R -> G -> B)
+    float saturation = 1.0f;                 // Full saturation for vivid colors
+    float value = intensity;                 // Intensity directly affects brightness
+
+    float r, g, b;
+    hsv_to_rgb(hue, saturation, value, r, g, b);
+
+    glColor3f(r, g, b); // Set OpenGL color to the calculated RGB values
+}
+
 static const char *helpprompt[] = {"Press F1 for help", 0};
 static const char *helptext[]   = {"Rotate: left mouse drag",
                                    " Scale: right mouse drag up/down",
@@ -58,7 +88,7 @@ void mouse(int bn, int st, int x, int y);
 void motion(int x, int y);
 
 int   win_width, win_height;
-float cam_theta, cam_phi = 25, cam_dist = 3;
+float cam_theta, cam_phi = 25, cam_dist = 15;
 float cam_pan[3];
 int   mouse_x, mouse_y;
 int   bnstate[8];
@@ -172,6 +202,7 @@ struct viz {
 
     bool enable_displacement{true};
     bool enable_pseudo_normals{false};
+    bool enable_wireframe{false};
     int  levels{1};
 
     ~viz() {
@@ -194,6 +225,42 @@ struct viz {
         free(node_mapping);
     }
 
+    void setup_lights() {
+        // Enable lighting in general
+        glEnable(GL_LIGHTING);
+
+        // Set global ambient light (affects all objects equally)
+        GLfloat globalAmbientLight[] = {0.2f, 0.2f, 0.2f, 1.0f};  // Low-intensity ambient light
+        glLightModelfv(GL_LIGHT_MODEL_AMBIENT, globalAmbientLight);
+
+        // Configure and enable light 0 (e.g., a directional light)
+        GLfloat light0Position[] = {1.0f, 1.0f, 1.0f, 0.0f};  // Directional light
+        GLfloat light0Ambient[]  = {0.01f, 0.01f, 0.01f, 1.0f};
+        GLfloat light0Diffuse[]  = {0.6f, 0.6f, 0.6f, 1.0f};
+        GLfloat light0Specular[] = {1.f, 1.f, 1.f, 1.0f};
+        GLfloat light0Direction[] = {0.0f, 0.0f, -1.0f, 0.0f};  // Direction of the light
+
+        glLightfv(GL_LIGHT0, GL_POSITION, light0Position);
+        glLightfv(GL_LIGHT0, GL_AMBIENT, light0Ambient);
+        glLightfv(GL_LIGHT0, GL_DIFFUSE, light0Diffuse);
+        glLightfv(GL_LIGHT0, GL_SPECULAR, light0Specular);
+
+        glEnable(GL_LIGHT0);  // Enable the first light
+
+        // Configure and enable light 1 (e.g., another directional light)
+        GLfloat light1Position[] = {-1.0f, -1.0f, 1.0f, 0.0f};  // Another directional light
+        GLfloat light1Ambient[]  = {0.01f, 0.01f, 0.01f, 1.0f};
+        GLfloat light1Diffuse[]  = {0.5f, 0.5f, 0.5f, 1.0f};
+        GLfloat light1Specular[] = {1.0f, 1.0f, 1.0f, 1.0f};
+
+        glLightfv(GL_LIGHT1, GL_POSITION, light1Position);
+        glLightfv(GL_LIGHT1, GL_AMBIENT, light1Ambient);
+        glLightfv(GL_LIGHT1, GL_DIFFUSE, light1Diffuse);
+        glLightfv(GL_LIGHT1, GL_SPECULAR, light1Specular);
+
+        glEnable(GL_LIGHT1);  // Enable the second light
+    }
+
     void compute_bounding_box() {
         for (int d = 0; d < 3; d++) {
             bbmin[d] = points[d][0];
@@ -206,14 +273,12 @@ struct viz {
         }
     }
 
-    void center_mesh()
-    {
+    void center_mesh() {
         compute_barycenter();
 
         for (int d = 0; d < 3; d++) {
-
             for (ptrdiff_t i = 0; i < n_nodes; i++) {
-                 points[d][i] -= barycenter[d];
+                points[d][i] -= barycenter[d];
             }
 
             barycenter[d] = 0;
@@ -357,6 +422,7 @@ int main(int argc, char **argv) {
     glutMouseFunc(mouse);
     glutMotionFunc(motion);
 
+    glEnable(GL_COLOR_MATERIAL);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glEnable(GL_LIGHTING);
@@ -388,6 +454,8 @@ void draw_node(const float  x,
     float f[4];
     evalf(x, y, f);
 
+    
+
     float p[3] = {f[0] * p0[0] + f[1] * p1[0] + f[2] * p2[0] + f[3] * p3[0],
                   f[0] * p0[1] + f[1] * p1[1] + f[2] * p2[1] + f[3] * p3[1],
                   f[0] * p0[2] + f[1] * p1[2] + f[2] * p2[2] + f[3] * p3[2]};
@@ -395,6 +463,11 @@ void draw_node(const float  x,
     float n[3] = {f[0] * n0[0] + f[1] * n1[0] + f[2] * n2[0] + f[3] * n3[0],
                   f[0] * n0[1] + f[1] * n1[1] + f[2] * n2[1] + f[3] * n3[1],
                   f[0] * n0[2] + f[1] * n1[2] + f[2] * n2[2] + f[3] * n3[2]};
+
+
+    // color_from_intensity(n[0]);
+
+     glColor3f((1+n[0])/2, (1+n[1])/2, (1+n[2])/2);
 
     normalize(n);
 
@@ -414,11 +487,10 @@ void display(void) {
 
     float ldist = 8;
 
-    float l2pos[] = {v.bbmin[0] - ldist, v.bbmin[1] - ldist, v.bbmin[2] - ldist, 0};
-    float l1pos[] = {v.bbmax[0] + ldist, v.bbmax[1] + ldist, v.bbmax[2] + ldist, 0};
-    float l0pos[] = {v.barycenter[0], v.barycenter[0], v.barycenter[0] + v.bbmax[2] + ldist, 0};
-    // float l3pos[] = {-10, -10, -10, 0};
-    // float l4pos[] = {-10, 10, -10, 0};
+    // float l2pos[] = {v.bbmin[0] - ldist, v.bbmin[1] - ldist, v.bbmin[2] - ldist, 0};
+    // float l1pos[] = {v.bbmax[0] + ldist, v.bbmax[1] + ldist, v.bbmax[2] + ldist, 0};
+    // float l0pos[] = {v.barycenter[0], v.barycenter[0], v.barycenter[0] + v.bbmax[2] + ldist, 0};
+    
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -429,11 +501,13 @@ void display(void) {
     glRotatef(cam_theta, 0, 1, 0);
     glTranslatef(cam_pan[0], cam_pan[1], cam_pan[2]);
 
-    glLightfv(GL_LIGHT0, GL_POSITION, l0pos);
-    glLightfv(GL_LIGHT1, GL_POSITION, l1pos);
-    glLightfv(GL_LIGHT2, GL_POSITION, l2pos);
+    // glLightfv(GL_LIGHT0, GL_POSITION, l0pos);
+    // glLightfv(GL_LIGHT1, GL_POSITION, l1pos);
+    // glLightfv(GL_LIGHT2, GL_POSITION, l2pos);
     // glLightfv(GL_LIGHT3, GL_POSITION, l3pos);
     // glLightfv(GL_LIGHT4, GL_POSITION, l4pos);
+
+    v.setup_lights();
 
     glPushMatrix();
     if (anim) {
@@ -442,7 +516,80 @@ void display(void) {
         glRotatef(tm / 10.0f, 0, 1, 0);
     }
 
-    // glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+    if (v.enable_wireframe) {
+        glColor3f(0.3, 0.3, 0.3);
+        glLineWidth(1.5);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        glBegin(GL_LINES);
+        for (ptrdiff_t i = 0; i < v.n_elements; i++) {
+            int i0 = v.elements[0][i];
+            int i1 = v.elements[1][i];
+            int i2 = v.elements[2][i];
+            int i3 = v.elements[3][i];
+
+            float p0[3] = {v.points[0][i0], v.points[1][i0], v.points[2][i0]};
+            float p1[3] = {v.points[0][i1], v.points[1][i1], v.points[2][i1]};
+            float p2[3] = {v.points[0][i2], v.points[1][i2], v.points[2][i2]};
+            float p3[3] = {v.points[0][i3], v.points[1][i3], v.points[2][i3]};
+
+            if (v.node_mapping && v.enable_displacement) {
+                int g0 = v.node_mapping[i0];
+                int g1 = v.node_mapping[i1];
+                int g2 = v.node_mapping[i2];
+                int g3 = v.node_mapping[i3];
+
+                for (int d = 0; d < 3; d++) {
+                    p0[d] += v.disp[d][g0];
+                    p1[d] += v.disp[d][g1];
+                    p2[d] += v.disp[d][g2];
+                    p3[d] += v.disp[d][g3];
+                }
+            }
+
+            float n0[3];
+            float n1[3];
+            float n2[3];
+            float n3[3];
+
+            if (v.enable_pseudo_normals) {
+                for (int d = 0; d < 3; d++) {
+                    n0[d] = v.normals[d][i0];
+                    n1[d] = v.normals[d][i1];
+                    n2[d] = v.normals[d][i2];
+                    n3[d] = v.normals[d][i3];
+                }
+            } else {
+                eval_normal(0, 0, p0, p1, p2, p3, n0);
+                eval_normal(1, 0, p0, p1, p2, p3, n1);
+                eval_normal(1, 1, p0, p1, p2, p3, n2);
+                eval_normal(0, 1, p0, p1, p2, p3, n3);
+            }
+
+            for (int xi = 0; xi < v.levels; xi++) {
+                const float l = float(xi) / (v.levels);
+                const float r = float(xi + 1) / (v.levels);
+                draw_node(l, 0, p0, p1, p2, p3, n0, n1, n2, n3);
+                draw_node(r, 0, p0, p1, p2, p3, n0, n1, n2, n3);
+                draw_node(l, 1, p0, p1, p2, p3, n0, n1, n2, n3);
+                draw_node(r, 1, p0, p1, p2, p3, n0, n1, n2, n3);
+            }
+
+            for (int yi = 0; yi < v.levels; yi++) {
+                const float l = float(yi) / (v.levels);
+                const float r = float(yi + 1) / (v.levels);
+                draw_node(0, l, p0, p1, p2, p3, n0, n1, n2, n3);
+                draw_node(0, r, p0, p1, p2, p3, n0, n1, n2, n3);
+
+                draw_node(1, l, p0, p1, p2, p3, n0, n1, n2, n3);
+                draw_node(1, r, p0, p1, p2, p3, n0, n1, n2, n3);
+            }
+        }
+
+        glEnd();
+    }
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+    glColor3f(0.9, 0.9, 0.9);
     glBegin(GL_QUADS);
 
     for (ptrdiff_t i = 0; i < v.n_elements; i++) {
@@ -502,7 +649,6 @@ void display(void) {
     }
 
     glEnd();
-
     glPopMatrix();
 
     print_help();
@@ -549,7 +695,7 @@ void print_help(void) {
     glPopAttrib();
 }
 
-#define ZNEAR 0.5f
+#define ZNEAR 0.1f
 void reshape(int x, int y) {
     float vsz, aspect = (float)x / (float)y;
     win_width  = x;
@@ -569,6 +715,10 @@ void keypress(unsigned char key, int x, int y) {
 
     switch (key) {
         case 27:
+        case 'w':
+            v.enable_wireframe = !v.enable_wireframe;
+            glutPostRedisplay();
+            break;
         case 'q':
             exit(0);
             break;
