@@ -757,21 +757,43 @@ int beam2_resample_field_local(const ptrdiff_t nelements, const ptrdiff_t nnodes
 #define MY_RESTRICT __restrict__
 #define real_type real_t
 
-int tet4_resample_field_local_CUDA(  // Mesh
-        const ptrdiff_t nelements, const ptrdiff_t nnodes, int** const MY_RESTRICT elems, float** const MY_RESTRICT xyz,
-        // SDF
-        const ptrdiff_t* const MY_RESTRICT n, const ptrdiff_t* const MY_RESTRICT stride, const float* const MY_RESTRICT origin,
-        const float* const MY_RESTRICT delta, const real_type* const MY_RESTRICT data,
-        // Output
-        real_type* const MY_RESTRICT weighted_field);
+int                                                    //
+tet4_resample_field_local_CUDA(                        //
+        const ptrdiff_t                    nelements,  // Mesh
+        const ptrdiff_t                    nnodes,     // Mesh
+        int** const MY_RESTRICT            elems,      // Mesh
+        float** const MY_RESTRICT          xyz,        // Mesh
+        const ptrdiff_t* const MY_RESTRICT n,          // SDF
+        const ptrdiff_t* const MY_RESTRICT stride,     // SDF
+        const float* const MY_RESTRICT     origin,     // SDF
+        const float* const MY_RESTRICT     delta,      // SDF
+        const real_type* const MY_RESTRICT data,       // SDF
+        real_type* const MY_RESTRICT       weighted_field);  // Output
 
-int tet4_resample_field_local_reduce_CUDA(  // Mesh
-        const ptrdiff_t nelements, const ptrdiff_t nnodes, int** const MY_RESTRICT elems, float** const MY_RESTRICT xyz,
-        // SDF
-        const ptrdiff_t* const MY_RESTRICT n, const ptrdiff_t* const MY_RESTRICT stride, const float* const MY_RESTRICT origin,
-        const float* const MY_RESTRICT delta, const real_type* const MY_RESTRICT data,
-        // Output
-        real_type* const MY_RESTRICT weighted_field);
+int                                                    //
+tet4_resample_field_local_reduce_CUDA(                 //
+        const ptrdiff_t                    nelements,  // Mesh
+        const ptrdiff_t                    nnodes,     // Mesh
+        int** const MY_RESTRICT            elems,      // Mesh
+        float** const MY_RESTRICT          xyz,        // Mesh
+        const ptrdiff_t* const MY_RESTRICT n,          // SDF
+        const ptrdiff_t* const MY_RESTRICT stride,     // SDF
+        const float* const MY_RESTRICT     origin,     // SDF
+        const float* const MY_RESTRICT     delta,      // SDF
+        const real_type* const MY_RESTRICT data,       // SDF
+        real_type* const MY_RESTRICT       weighted_field);  // Output
+
+int                                                                                         //
+tet4_resample_field_local_reduce_CUDA_wrapper(const int mpi_size,                           // MPI size
+                                              const int mpi_rank,                           // MPI rank
+                                              mesh_t*   mesh,                               // Mesh
+                                              int*      bool_assemble_dual_mass_vector,     // assemble dual mass vector
+                                              const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
+                                              const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
+                                              const geom_t* const SFEM_RESTRICT    origin,  // origin of the domain
+                                              const geom_t* const SFEM_RESTRICT    delta,   // delta of the domain
+                                              const real_t* const SFEM_RESTRICT    data,    // SDF
+                                              real_t* const SFEM_RESTRICT          g_host);          // Output
 
 int tet4_resample_field_local_V8(
         // Mesh
@@ -1089,7 +1111,11 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
     PRINT_CURRENT_FUNCTION;
 
     int assemble_dual_mass_vector = 1;
-    int ret                       = 0;
+    // This indicates if the exchange was made in the kernel
+    // The default is 1, which means that the exchange was not made in the kernel
+    // If the exchange was made in the kernel, this variable will be set to 0 in the CUDA wrapper.
+
+    int ret = 0;
 
     const int mesh_nnodes = mpi_size > 1 ? mesh->nnodes : mesh->n_owned_nodes;
     // const int mesh_nnodes    = mesh->nnodes;
@@ -1100,16 +1126,16 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
 #if SFEM_TET10_CUDA == ON
         if (SFEM_CUDA_MEMORY_MODEL == CUDA_HOST_MEMORY) assemble_dual_mass_vector = 0;
 
-        ret = hex8_to_tet10_resample_field_local_CUDA_wrapper(mpi_size,                   //
-                                                              mpi_rank,                   //
-                                                              mesh,                       //
-                                                              assemble_dual_mass_vector,  //
-                                                              n,                          //
-                                                              stride,                     //
-                                                              origin,                     //
-                                                              delta,                      //
-                                                              data,                       //
-                                                              g);                         //
+        ret = hex8_to_tet10_resample_field_local_CUDA_wrapper(mpi_size,                    //
+                                                              mpi_rank,                    //
+                                                              mesh,                        //
+                                                              &assemble_dual_mass_vector,  //
+                                                              n,                           //
+                                                              stride,                      //
+                                                              origin,                      //
+                                                              delta,                       //
+                                                              data,                        //
+                                                              g);                          //
 
         if (assemble_dual_mass_vector == 1) {
             // the exchange was mede in the kernel
@@ -1118,8 +1144,8 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
 
         weighted_field = g;  // for the cases where the exchange was not made in the kernel
 #else
-        fprintf(stderr, "SFEM_TET10_CUDA is OFF\n");
-        return EXIT_FAILURE;
+        fprintf(stderr, "SFEM_TET10_CUDA is OFF,  %s:%d\n", __FILE__, __LINE__);
+        exit(EXIT_FAILURE);
 #endif
     }  // end if info->use_accelerator == SFEM_ACCELERATOR_TYPE_CUDA && (SFEM_TET10_CUDA == ON)
 
@@ -1137,19 +1163,6 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
                                                  delta,            //
                                                  data,             //
                                                  weighted_field);  //
-
-        // resample_field_local(mesh->element_type,  //
-        //                      mesh->nelements,     //
-        //                      mesh_nnodes,         //
-        //                      mesh->elements,      //
-        //                      mesh->points,        //
-        //                      n,                   //
-        //                      stride,              //
-        //                      origin,              //
-        //                      delta,               //
-        //                      data,                //
-        //                      weighted_field,      //
-        //                      info);               //
 
     }  // end if SFEM_TET10_CUDA == OFF
 
