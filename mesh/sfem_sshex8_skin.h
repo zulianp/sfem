@@ -1,9 +1,9 @@
 #ifndef SFEM_SSHEX8_SKIN_H
 #define SFEM_SSHEX8_SKIN_H
 
-#include "sfem_base.h"
 #include <stddef.h>
 #include <stdint.h>
+#include "sfem_base.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,15 +16,13 @@ int sshex8_skin(const int       L,
                 idx_t **const   surf_elements,
                 element_idx_t **parent_element);
 
-// Sideset is (sshex8 element id, macro_face local index)
-int sshex8_sideset_to_ssquad4_surface(
-    const int       L,
-    const ptrdiff_t nelements,
-    idx_t         **elements,
-    const element_idx_t *parent_element,
-    const int8_t *face_idx,
-    ptrdiff_t      *n_surf_elements,
-    idx_t **const   surf_elements);
+int sshex8_surface_from_sideset(const int                                L,
+                                const ptrdiff_t                          nelements,
+                                idx_t **const SFEM_RESTRICT              elements,
+                                const ptrdiff_t                          n_surf_elements,
+                                const element_idx_t *const SFEM_RESTRICT parents,
+                                const int16_t *const SFEM_RESTRICT       side_idx,
+                                idx_t **SFEM_RESTRICT                    sides);
 
 #ifdef __cplusplus
 }

@@ -12,7 +12,7 @@ def mkdir(output_folder):
 
 try: geom_t
 except NameError: 
-    print('raw_to_db: self contained mode')
+    print('submesh.py: self contained mode')
     geom_t = np.float32
     idx_t = np.int32
     element_idx_t = np.int32
@@ -49,8 +49,8 @@ if __name__ == '__main__':
         print(f'Element_indices: {element_indices}')
         print(f'Output mesh: {output_folder}')
 
-    selection = np.fromfile(element_indices, dtype=element_idx_t)
-    print(selection)
+    # Avoid ensure increasing order and avoid duplicates
+    selection = np.unique(np.sort(np.fromfile(element_indices, dtype=element_idx_t)))
 
     mkdir(output_folder)
     
@@ -58,6 +58,9 @@ if __name__ == '__main__':
     for path in ifiles:
         if verbose:
             print(f'Reading {path}...')
+            
         ii = np.fromfile(path, dtype=idx_t)
         iis = ii[selection]
         iis.tofile(f'{output_folder}/{os.path.basename(path)}')
+
+    selection.tofile(f'{output_folder}/element_mapping.{str(element_idx_t.__name__)}.raw')
