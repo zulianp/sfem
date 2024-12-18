@@ -22,14 +22,7 @@
     } while (0)
 
 // According to exodus doc
-enum HEX8_Sides {
-    HEX8_LEFT = 3,
-    HEX8_RIGHT = 1,
-    HEX8_BOTTOM = 4,
-    HEX8_TOP = 5,
-    HEX8_FRONT = 0,
-    HEX8_BACK = 2
-};
+
 
 // PROTEUS
 // static idx_t hex8_edge_connectivity[8][3] =
@@ -176,7 +169,7 @@ int hex8_build_edge_graph(const ptrdiff_t nelements,
     return err;
 }
 
-#define SFEM_INVALID_IDX (-1)
+
 
 ptrdiff_t nxe_max_node_id(const ptrdiff_t nelements,
                           const int nxe,
@@ -705,7 +698,7 @@ int proteus_hex8_create_full_idx(const int L,
     return SFEM_SUCCESS;
 }
 
-int proteus_hex8_mesh_skin(const int L,
+int proteus_hex8_mesh_to_quad4_skin(const int L,
                            const ptrdiff_t nelements,
                            idx_t **elements,
                            ptrdiff_t *n_surf_elements,

@@ -126,6 +126,7 @@ typedef @SFEM_LOCAL_IDX_C_TYPE@ local_idx_t;
 
 typedef char mask_t;
 #define SFEM_MPI_MASK_T MPI_CHAR
+#define SFEM_INVALID_IDX (-1)
 
 // typedef long mask_t;
 // #define SFEM_MPI_MASK_T MPI_LONG
