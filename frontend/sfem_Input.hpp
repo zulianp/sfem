@@ -26,6 +26,8 @@ namespace sfem {
 
         virtual int array_require_keys(const std::string &key, std::vector<std::string> &ret) = 0;
         virtual int array_require_values(const std::string &key, std::vector<std::string> &ret) = 0;
+
+        virtual bool key_exists(const std::string &key) const = 0;
     };
     /**
      * @brief A class that reads YAML input without indentation.
@@ -106,6 +108,8 @@ namespace sfem {
 
         int array_require_keys(const std::string &key, std::vector<std::string> &ret) override;
         int array_require_values(const std::string &key, std::vector<std::string> &ret) override;
+
+        bool key_exists(const std::string &key) const override;
 
         /// Add a new key-value setting
         /// @tparam T Type of the value to add

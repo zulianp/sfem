@@ -381,7 +381,6 @@ int extract_skin_sideset(const ptrdiff_t               n_elements,
     *n_surf_elements = 0;
     for (ptrdiff_t e = 0; e < n_elements; e++) {
         for (int s = 0; s < ns; s++) {
-            // Array of structures
             const element_idx_t e_adj = table[e * ns + s];
             if (e_adj == SFEM_INVALID_IDX) {
                 (*n_surf_elements)++;
@@ -395,7 +394,6 @@ int extract_skin_sideset(const ptrdiff_t               n_elements,
     ptrdiff_t side_offset = 0;
     for (ptrdiff_t e = 0; e < n_elements; e++) {
         for (int s = 0; s < ns; s++) {
-            // Array of structures
             const element_idx_t e_adj = table[e * ns + s];
             if (e_adj == SFEM_INVALID_IDX) {
                 (*parent_element)[side_offset] = e;

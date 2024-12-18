@@ -44,9 +44,23 @@ namespace sfem {
 #include "sfem_prolongation_restriction.h"
 
 #include <sys/stat.h>
+#include <glob.h>
 #include "matrixio_crs.h"
 
 namespace sfem {
+
+    static void find_files(const char *pattern, std::vector<std::string> &paths) {
+        paths.clear();
+
+        glob_t gl;
+        glob(pattern, GLOB_MARK, NULL, &gl);
+
+        int n_files = gl.gl_pathc;
+
+        for (int np = 0; np < n_files; np++) {
+            paths.push_back(gl.gl_pathv[np]);
+        }
+    }
 
     template <typename T>
     auto blas(const ExecutionSpace es) {
