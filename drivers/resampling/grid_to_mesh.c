@@ -103,16 +103,25 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    info.use_accelerator = 0;
+    info.use_accelerator = SFEM_ACCELERATOR_TYPE_CPU;
 
 #ifdef SFEM_ENABLE_CUDA
 
     if (check_string_in_args(argc, (const char**)argv, "CUDA")) {
-        info.use_accelerator = 1;
+        info.use_accelerator = SFEM_ACCELERATOR_TYPE_CUDA;
         if (mpi_rank == 0) printf("info.use_accelerator = 1\n");
-    } else {
-        info.use_accelerator = 0;
+
+    } else if (check_string_in_args(argc, (const char**)argv, "CPU")) {
+        info.use_accelerator = SFEM_ACCELERATOR_TYPE_CPU;
         if (mpi_rank == 0) printf("info.use_accelerator = 0\n");
+
+    } else {
+        fprintf(stderr, "Error: Invalid accelerator type\n\n");
+        fprintf(stderr,
+                "usage: %s <nx> <ny> <nz> <ox> <oy> <oz> <dx> <dy> <dz> "
+                "<data.float32.raw> <folder> <output_path> <element_type> <accelerator_type>\n",
+                argv[0]);
+        return EXIT_FAILURE;
     }
 
 #endif
@@ -262,18 +271,14 @@ int main(int argc, char* argv[]) {
         double resample_tick = MPI_Wtime();
 
         if (SFEM_INTERPOLATE) {
-            interpolate_field(
-                    // Mesh
-                    mesh.n_owned_nodes,
-                    mesh.points,
-                    // discrete field
-                    nlocal,
-                    stride,
-                    origin,
-                    delta,
-                    field,
-                    // Output
-                    g);
+            interpolate_field(mesh.n_owned_nodes,  // Mesh:
+                              mesh.points,         // Mesh:
+                              nlocal,              // discrete field
+                              stride,              //
+                              origin,              //
+                              delta,               //
+                              field,               //
+                              g);                  // Output
         } else {
             int ret_resample = 1;
 

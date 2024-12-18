@@ -18,10 +18,10 @@ extern "C" {
 // } element_type;
 
 typedef struct {
-    ptrdiff_t     quad_nodes_cnt;   // Number of quadrature points
-    ptrdiff_t     nelements;        // Number of elements
-    enum ElemType element_type;     // Element type
-    int           use_accelerator;  // Use accelerator such as CUDA
+    ptrdiff_t        quad_nodes_cnt;   // Number of quadrature points
+    ptrdiff_t        nelements;        // Number of elements
+    enum ElemType    element_type;     // Element type
+    AcceleratorsType use_accelerator;  // Use accelerator such as CUDA
 } sfem_resample_field_info;
 
 /**

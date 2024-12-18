@@ -1375,6 +1375,8 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
     const ptrdiff_t stride1 = stride[1];
     const ptrdiff_t stride2 = stride[2];
 
+    double quad_sum = 0.0;
+
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         // printf("element = %d\n", i);
 
@@ -1703,7 +1705,7 @@ int hex8_to_tet10_resample_field_local_V2(
                                                                      data,
                                                                      weighted_field);
 #endif
-        return a;
+        RETURN_FROM_FUNCTION(a);
     } else {
         // return hex8_to_subparametric_tet10_resample_field_local(nelements,  //
         //                                                         nnodes,
