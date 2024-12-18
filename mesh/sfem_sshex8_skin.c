@@ -31,6 +31,79 @@ static SFEM_INLINE int ssquad4_nxe(int level) {
         a[2] = z;         \
     } while (0)
 
+int sshex8_surface_from_sideset(const int                                L,
+                                const ptrdiff_t                          nelements,
+                                idx_t **const SFEM_RESTRICT              elements,
+                                const ptrdiff_t                          n_surf_elements,
+                                const element_idx_t *const SFEM_RESTRICT parents,
+                                const int16_t *const SFEM_RESTRICT       side_idx,
+                                idx_t **SFEM_RESTRICT                    sides) {
+    const int ns = elem_num_sides(HEX8);
+    for (ptrdiff_t i = 0; i < n_surf_elements; i++) {
+        int start[3]     = {0, 0, 0};
+        int end[3]       = {L + 1, L + 1, L + 1};
+        int increment[3] = {1, 1, 1};
+
+        const ptrdiff_t e = parents[i];
+        const int       s = side_idx[e];
+
+        switch (s) {
+            case HEX8_LEFT: {
+                A3SET(start, 0, L, 0);
+                A3SET(end, 1, -1, L + 1);
+                A3SET(increment, 1, -1, 1);
+                break;
+            }
+            case HEX8_RIGHT: {
+                start[0] = L;
+                end[0]   = L + 1;
+                break;
+            }
+            case HEX8_BOTTOM: {
+                start[2] = 0;
+                end[2]   = 1;
+                A3SET(start, 0, L, 0);
+                A3SET(end, L + 1, -1, 1);
+                A3SET(increment, 1, -1, 1);
+                break;
+            }
+            case HEX8_TOP: {
+                start[2] = L;
+                end[2]   = L + 1;
+                break;
+            }
+            case HEX8_FRONT: {
+                start[1] = 0;
+                end[1]   = 1;
+                break;
+            }
+            case HEX8_BACK: {
+                A3SET(start, L, L, 0);
+                A3SET(end, -1, L + 1, L + 1);
+                A3SET(increment, -1, 1, 1);
+                break;
+            }
+            default: {
+                assert(0);
+                break;
+            }
+        }
+
+        int n = 0;
+        for (int zi = start[2]; zi != end[2]; zi += increment[2]) {
+            for (int yi = start[1]; yi != end[1]; yi += increment[1]) {
+                for (int xi = start[0]; xi != end[0]; xi += increment[0]) {
+                    const int   lidx = proteus_hex8_lidx(L, xi, yi, zi);
+                    const idx_t node = elements[lidx][e];
+                    sides[n++][i]    = node;
+                }
+            }
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
 int sshex8_skin(const int       L,
                 const ptrdiff_t nelements,
                 idx_t         **elements,
@@ -99,13 +172,11 @@ int sshex8_skin(const int       L,
                         A3SET(start, 0, L, 0);
                         A3SET(end, 1, -1, L + 1);
                         A3SET(increment, 1, -1, 1);
-                        // printf("HEX8_LEFT\n");
                         break;
                     }
                     case HEX8_RIGHT: {
                         start[0] = L;
                         end[0]   = L + 1;
-                        // printf("HEX8_RIGHT\n");
                         break;
                     }
                     case HEX8_BOTTOM: {
@@ -114,26 +185,22 @@ int sshex8_skin(const int       L,
                         A3SET(start, 0, L, 0);
                         A3SET(end, L + 1, -1, 1);
                         A3SET(increment, 1, -1, 1);
-                        // printf("HEX8_BOTTOM\n");
                         break;
                     }
                     case HEX8_TOP: {
                         start[2] = L;
                         end[2]   = L + 1;
-                        // printf("HEX8_TOP\n");
                         break;
                     }
                     case HEX8_FRONT: {
                         start[1] = 0;
                         end[1]   = 1;
-                        // printf("HEX8_FRONT\n");
                         break;
                     }
                     case HEX8_BACK: {
                         A3SET(start, L, L, 0);
                         A3SET(end, -1, L + 1, L + 1);
                         A3SET(increment, -1, 1, 1);
-                        // printf("HEX8_BACK\n");
                         break;
                     }
                     default: {

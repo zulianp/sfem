@@ -213,9 +213,22 @@ int main(int argc, char *argv[]) {
     ptrdiff_t      n_surf_elements = 0;
     idx_t        **surf_elems      = (idx_t **)malloc(nnxs * sizeof(idx_t *));
     element_idx_t *parent          = 0;
+    int16_t       *side_idx        = 0;
 
-    extract_surface_connectivity_with_adj_table(
-            mesh.nelements, mesh.nnodes, mesh.element_type, mesh.elements, &n_surf_elements, surf_elems, &parent);
+    if (extract_skin_sideset(
+                mesh.nelements, mesh.nnodes, mesh.element_type, mesh.elements, &n_surf_elements, &parent, &side_idx) !=
+        SFEM_SUCCESS) {
+        SFEM_ERROR("Failed to extract skin!\n");
+    }
+
+    for (int s = 0; s < nnxs; s++) {
+        surf_elems[s] = malloc(n_surf_elements * sizeof(idx_t));
+    }
+
+    if (extract_surface_from_sideset(mesh.element_type, mesh.elements, n_surf_elements, parent, side_idx, surf_elems) !=
+        SFEM_SUCCESS) {
+        SFEM_ERROR("Unable to extract surface from sideset!\n");
+    }
 
     idx_t *vol2surf = (idx_t *)malloc(mesh.nnodes * sizeof(idx_t));
     for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {
@@ -292,6 +305,9 @@ int main(int argc, char *argv[]) {
     sprintf(path, "%s/parent.raw", output_folder);
     array_write(comm, path, SFEM_MPI_ELEMENT_IDX_T, parent, n_surf_elements, n_surf_elements);
 
+    sprintf(path, "%s/lfi.int16.raw", output_folder);
+    array_write(comm, path, MPI_SHORT, side_idx, n_surf_elements, n_surf_elements);
+
     // Clean-up
 
     if (!rank) {
@@ -303,6 +319,7 @@ int main(int argc, char *argv[]) {
     mesh_destroy(&mesh);
     mesh_destroy(&surf);
     free(parent);
+    free(side_idx);
 
     double tock = MPI_Wtime();
 
