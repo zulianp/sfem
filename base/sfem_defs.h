@@ -414,6 +414,15 @@ SFEM_INLINE static int is_second_order_lagrange(const enum ElemType type) {
     }
 }
 
+enum HEX8_Sides {
+    HEX8_LEFT = 3,
+    HEX8_RIGHT = 1,
+    HEX8_BOTTOM = 4,
+    HEX8_TOP = 5,
+    HEX8_FRONT = 0,
+    HEX8_BACK = 2
+};
+
 #ifdef __cplusplus
 }
 #endif

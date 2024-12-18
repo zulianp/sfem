@@ -24,6 +24,7 @@
 
 #include "proteus_hex8.h"  // FIXME
 #include "sfem_hex8_mesh_graph.h"
+#include "sfem_sshex8_skin.h"
 
 static SFEM_INLINE void normalize(real_t *const vec3) {
     const real_t len = sqrt(vec3[0] * vec3[0] + vec3[1] * vec3[1] + vec3[2] * vec3[2]);
@@ -32,11 +33,11 @@ static SFEM_INLINE void normalize(real_t *const vec3) {
     vec3[2] /= len;
 }
 
-void correct_side_orientation(const ptrdiff_t nsides,
-                              idx_t **const SFEM_RESTRICT sides,
+void correct_side_orientation(const ptrdiff_t                          nsides,
+                              idx_t **const SFEM_RESTRICT              sides,
                               const element_idx_t *const SFEM_RESTRICT parent,
-                              idx_t **const SFEM_RESTRICT elements,
-                              geom_t **const SFEM_RESTRICT xyz) {
+                              idx_t **const SFEM_RESTRICT              elements,
+                              geom_t **const SFEM_RESTRICT             xyz) {
     double tick = MPI_Wtime();
 
     for (ptrdiff_t i = 0; i < nsides; ++i) {
@@ -57,8 +58,8 @@ void correct_side_orientation(const ptrdiff_t nsides,
         normalize(n);
 
         // Compute element barycenter
-        real_t b[3] = {0, 0, 0};
-        const element_idx_t p = parent[i];
+        real_t              b[3] = {0, 0, 0};
+        const element_idx_t p    = parent[i];
 
         for (int d = 0; d < 4; ++d) {
             b[0] += xyz[0][elements[d][p]];
@@ -156,9 +157,9 @@ int main(int argc, char *argv[]) {
         if (mesh.element_type == HEX8) {
             // Generate proteus mesh on the fly!
 
-            const int nxe = proteus_hex8_nxe(SFEM_ELEMENT_REFINE_LEVEL);
-            const int txe = proteus_hex8_txe(SFEM_ELEMENT_REFINE_LEVEL);
-            idx_t **elements = 0;
+            const int nxe      = proteus_hex8_nxe(SFEM_ELEMENT_REFINE_LEVEL);
+            const int txe      = proteus_hex8_txe(SFEM_ELEMENT_REFINE_LEVEL);
+            idx_t   **elements = 0;
 
             elements = malloc(nxe * sizeof(idx_t *));
             for (int d = 0; d < nxe; d++) {
@@ -172,21 +173,15 @@ int main(int argc, char *argv[]) {
             }
 
             ptrdiff_t n_unique_nodes, interior_start;
-            proteus_hex8_create_full_idx(
-                    SFEM_ELEMENT_REFINE_LEVEL, &mesh, elements, &n_unique_nodes, &interior_start);
+            proteus_hex8_create_full_idx(SFEM_ELEMENT_REFINE_LEVEL, &mesh, elements, &n_unique_nodes, &interior_start);
 
             const int nnxs = (SFEM_ELEMENT_REFINE_LEVEL + 1) * (SFEM_ELEMENT_REFINE_LEVEL + 1);
 
-            ptrdiff_t n_surf_elements = 0;
-            idx_t **surf_elems = (idx_t **)calloc(nnxs, sizeof(idx_t *));
-            element_idx_t *parent = 0;
+            ptrdiff_t      n_surf_elements = 0;
+            idx_t        **surf_elems      = (idx_t **)calloc(nnxs, sizeof(idx_t *));
+            element_idx_t *parent          = 0;
 
-            proteus_hex8_mesh_skin(SFEM_ELEMENT_REFINE_LEVEL,
-                                   mesh.nelements,
-                                   elements,
-                                   &n_surf_elements,
-                                   surf_elems,
-                                   &parent);
+            sshex8_skin(SFEM_ELEMENT_REFINE_LEVEL, mesh.nelements, elements, &n_surf_elements, surf_elems, &parent);
 
             // for (ptrdiff_t i = 0; i < n_surf_elements; i++) {
             //     printf("%d) ", i);
@@ -198,7 +193,7 @@ int main(int argc, char *argv[]) {
             // }
 
             char path[2048];
-            for(int d = 0; d < nnxs; d++) {
+            for (int d = 0; d < nnxs; d++) {
                 sprintf(path, "%s/i%d.raw", output_folder, d);
                 array_write(comm, path, SFEM_MPI_IDX_T, surf_elems[d], n_surf_elements, n_surf_elements);
             }
@@ -212,20 +207,15 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    enum ElemType st = side_type(mesh.element_type);
-    const int nnxs = elem_num_nodes(st);
+    enum ElemType st   = side_type(mesh.element_type);
+    const int     nnxs = elem_num_nodes(st);
 
-    ptrdiff_t n_surf_elements = 0;
-    idx_t **surf_elems = (idx_t **)malloc(nnxs * sizeof(idx_t *));
-    element_idx_t *parent = 0;
+    ptrdiff_t      n_surf_elements = 0;
+    idx_t        **surf_elems      = (idx_t **)malloc(nnxs * sizeof(idx_t *));
+    element_idx_t *parent          = 0;
 
-    extract_surface_connectivity_with_adj_table(mesh.nelements,
-                                                mesh.nnodes,
-                                                mesh.element_type,
-                                                mesh.elements,
-                                                &n_surf_elements,
-                                                surf_elems,
-                                                &parent);
+    extract_surface_connectivity_with_adj_table(
+            mesh.nelements, mesh.nnodes, mesh.element_type, mesh.elements, &n_surf_elements, surf_elems, &parent);
 
     idx_t *vol2surf = (idx_t *)malloc(mesh.nnodes * sizeof(idx_t));
     for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {
@@ -243,7 +233,7 @@ int main(int argc, char *argv[]) {
     }
 
     ptrdiff_t n_surf_nodes = next_id;
-    geom_t **points = (geom_t **)malloc(mesh.spatial_dim * sizeof(geom_t *));
+    geom_t  **points       = (geom_t **)malloc(mesh.spatial_dim * sizeof(geom_t *));
     for (int d = 0; d < mesh.spatial_dim; d++) {
         points[d] = 0;
     }
@@ -280,21 +270,21 @@ int main(int argc, char *argv[]) {
     mesh_t surf;
     mesh_init(&surf);
 
-    surf.comm = mesh.comm;
+    surf.comm      = mesh.comm;
     surf.mem_space = mesh.mem_space;
 
-    surf.spatial_dim = mesh.spatial_dim;
+    surf.spatial_dim  = mesh.spatial_dim;
     surf.element_type = shell_type(side_type(mesh.element_type));
 
     surf.nelements = n_surf_elements;
-    surf.nnodes = n_surf_nodes;
+    surf.nnodes    = n_surf_nodes;
 
     surf.elements = surf_elems;
-    surf.points = points;
+    surf.points   = points;
 
-    surf.node_mapping = mapping;
+    surf.node_mapping    = mapping;
     surf.element_mapping = 0;
-    surf.node_owner = 0;
+    surf.node_owner      = 0;
 
     mesh_write(output_folder, &surf);
 
