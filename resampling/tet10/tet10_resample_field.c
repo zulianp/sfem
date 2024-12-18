@@ -1626,20 +1626,16 @@ int tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, const ptrdiff_t n
 ///////////////////////////////////////////////////////////////////////
 // hex8_to_subparametric_tet10_resample_field_local
 ///////////////////////////////////////////////////////////////////////
-int hex8_to_tet10_resample_field_local(
-        // Mesh
-        const ptrdiff_t              nelements,  // number of elements
-        const ptrdiff_t              nnodes,     // number of nodes
-        idx_t** const SFEM_RESTRICT  elems,      // connectivity
-        geom_t** const SFEM_RESTRICT xyz,        // coordinates
-        // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
-        const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
-        const geom_t* const SFEM_RESTRICT    origin,  // origin of the domain
-        const geom_t* const SFEM_RESTRICT    delta,   // delta of the domain
-        const real_t* const SFEM_RESTRICT    data,    // SDF
-        // Output
-        real_t* const SFEM_RESTRICT weighted_field) {
+int hex8_to_tet10_resample_field_local(const ptrdiff_t                      nelements,  // Mesh: number of elements
+                                       const ptrdiff_t                      nnodes,     // Mesh: number of nodes
+                                       idx_t** const SFEM_RESTRICT          elems,      // Mesh: connectivity
+                                       geom_t** const SFEM_RESTRICT         xyz,        // Mesh: coordinates
+                                       const ptrdiff_t* const SFEM_RESTRICT n,          // SDF: number of nodes in each direction
+                                       const ptrdiff_t* const SFEM_RESTRICT stride,     // SDF: stride of the data
+                                       const geom_t* const SFEM_RESTRICT    origin,     // SDF: origin of the domain
+                                       const geom_t* const SFEM_RESTRICT    delta,      // SDF: delta of the domain
+                                       const real_t* const SFEM_RESTRICT    data,       // SDF: SDF
+                                       real_t* const SFEM_RESTRICT          weighted_field) {    // Output
     //
     PRINT_CURRENT_FUNCTION;
     //
@@ -1653,6 +1649,7 @@ int hex8_to_tet10_resample_field_local(
 #endif
 
     if (1 | SFEM_ENABLE_ISOPARAMETRIC) {
+        // This is the scalar version of the code for the WENO version.
 #if CUBE1 == 1 && SFEM_VEC_SIZE == 1                                                    // CUBE1
         return hex8_to_isoparametric_tet10_resample_field_local_cube1(nelements,        //
                                                                       nnodes,           //
@@ -1666,7 +1663,9 @@ int hex8_to_tet10_resample_field_local(
                                                                       weighted_field);  //
 #else
 
-#if SFEM_VEC_SIZE == 8 || SFEM_VEC_SIZE == 4
+#if (SFEM_VEC_SIZE == 8 || SFEM_VEC_SIZE == 4)
+        // Vectorized version for CPU
+        // It is a wrapper between the classical algo and the WENO version
         hex8_to_tet10_resample_field_local_V2(nelements,        //
                                               nnodes,           //
                                               elems,            //
@@ -1678,6 +1677,7 @@ int hex8_to_tet10_resample_field_local(
                                               data,             //
                                               weighted_field);  //
 #else
+        // Original code for the scalar version
         hex8_to_isoparametric_tet10_resample_field_local(nelements,        //
                                                          nnodes,           //
                                                          elems,            //

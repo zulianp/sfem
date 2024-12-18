@@ -1091,9 +1091,10 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
     int assemble_dual_mass_vector = 1;
     int ret                       = 0;
 
-    // const int mesh_nnodes = mpi_size >= 1 ? mesh->nnodes : mesh->n_owned_nodes;
-    const int mesh_nnodes    = mesh->nnodes;
-    real_t*   weighted_field = NULL;
+    const int mesh_nnodes = mpi_size > 1 ? mesh->nnodes : mesh->n_owned_nodes;
+    // const int mesh_nnodes    = mesh->nnodes;
+
+    real_t* weighted_field = NULL;
 
     if (info->use_accelerator == SFEM_ACCELERATOR_TYPE_CUDA && (SFEM_TET10_CUDA == ON)) {
 #if SFEM_TET10_CUDA == ON
@@ -1115,40 +1116,40 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
             RETURN_FROM_FUNCTION(ret);
         }
 
-        weighted_field = g; // for the cases where the exchange was not made in the kernel
+        weighted_field = g;  // for the cases where the exchange was not made in the kernel
 #else
         fprintf(stderr, "SFEM_TET10_CUDA is OFF\n");
         return EXIT_FAILURE;
 #endif
-    }
+    }  // end if info->use_accelerator == SFEM_ACCELERATOR_TYPE_CUDA && (SFEM_TET10_CUDA == ON)
 
     if (info->use_accelerator == SFEM_ACCELERATOR_TYPE_CPU) {  // CPU
 
         weighted_field = calloc(mesh->nnodes, sizeof(real_t));
 
-        // ret = hex8_to_tet10_resample_field_local(mesh->nelements,  //
-        //                                          mesh_nnodes,      //
-        //                                          mesh->elements,   //
-        //                                          mesh->points,     //
-        //                                          n,                //
-        //                                          stride,           //
-        //                                          origin,           //
-        //                                          delta,            //
-        //                                          data,             //
-        //                                          weighted_field);  //
+        ret = hex8_to_tet10_resample_field_local(mesh->nelements,  //
+                                                 mesh_nnodes,      //
+                                                 mesh->elements,   //
+                                                 mesh->points,     //
+                                                 n,                //
+                                                 stride,           //
+                                                 origin,           //
+                                                 delta,            //
+                                                 data,             //
+                                                 weighted_field);  //
 
-        resample_field_local(mesh->element_type,  //
-                             mesh->nelements,     //
-                             mesh_nnodes,         //
-                             mesh->elements,      //
-                             mesh->points,        //
-                             n,                   //
-                             stride,              //
-                             origin,              //
-                             delta,               //
-                             data,                //
-                             weighted_field,      //
-                             info);               //
+        // resample_field_local(mesh->element_type,  //
+        //                      mesh->nelements,     //
+        //                      mesh_nnodes,         //
+        //                      mesh->elements,      //
+        //                      mesh->points,        //
+        //                      n,                   //
+        //                      stride,              //
+        //                      origin,              //
+        //                      delta,               //
+        //                      data,                //
+        //                      weighted_field,      //
+        //                      info);               //
 
     }  // end if SFEM_TET10_CUDA == OFF
 
@@ -1168,7 +1169,7 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
             printf("perform_exchange_operations %s:%d\n", __FILE__, __LINE__);  //
             perform_exchange_operations(mesh,                                   //
                                         mass_vector,                            //
-                                        g);                                     //
+                                        weighted_field);                        //
         }
 
         for (ptrdiff_t i = 0; i < mesh->nnodes; i++) {  //
