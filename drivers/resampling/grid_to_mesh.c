@@ -283,7 +283,7 @@ int main(int argc, char* argv[]) {
             int ret_resample = 1;
 
             switch (info.element_type) {                         //
-                case TET10:                                      //
+                case TET10:                                      // TET10 case
                     ret_resample =                               //
                             resample_field_mesh_tet10(mpi_size,  //
                                                       mpi_rank,  //
@@ -297,8 +297,7 @@ int main(int argc, char* argv[]) {
                                                       &info);    //
                     break;                                       //
 
-                case TET4:  //
-                    // printf("resample_field_mesh_tet4, %s:%d\n", __FILE__, __LINE__);  //
+                case TET4:                                      // TET4 case
                     ret_resample =                              //
                             resample_field_mesh_tet4(mpi_size,  //
                                                      mpi_rank,  //
@@ -466,7 +465,7 @@ int main(int argc, char* argv[]) {
         MPI_Gather(&mesh.nelements, 1, MPI_INT, elements_v, 1, MPI_INT, 0, comm);
 
         int tot_nelements = 0;
-        if (!mpi_rank) {
+        if (mpi_rank == 0) {
             for (int i = 0; i < mpi_size; i++) {
                 tot_nelements += elements_v[i];
             }
@@ -484,7 +483,7 @@ int main(int argc, char* argv[]) {
         MPI_Gather(&flops, 1, MPI_DOUBLE, flops_v, 1, MPI_DOUBLE, 0, comm);
 
         double tot_flops = 0.0;
-        if (!mpi_rank) {
+        if (mpi_rank == 0) {
             for (int i = 0; i < mpi_size; i++) {
                 tot_flops += flops_v[i];
             }
