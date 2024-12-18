@@ -63,7 +63,7 @@ echo $sizes
 echo $origins
 echo $scaling
 
-n_procs=1
+n_procs=18
 # n_procs=2
 # n_procs=8
 
@@ -80,7 +80,7 @@ GRID_TO_MESH="grid_to_mesh"
 # export OMP_PROC_BIND=true
 
 set -x
-time SFEM_INTERPOLATE= SFEM_READ_FP32=1 $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4
+time SFEM_INTERPOLATE= SFEM_READ_FP32=1 $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CPU
 
 raw_to_db.py $resample_target out.vtk --point_data=$field  --point_data_type=float64
 

@@ -13,6 +13,14 @@ extern "C" {
 enum RealType { SFEM_FLOAT16 = 2, SFEM_FLOAT32 = 4, SFEM_FLOAT64 = 8, SFEM_REAL_DEFAULT = 0 };
 enum IntegerType { SFEM_INT16 = 20, SFEM_INT32 = 40, SFEM_INT64 = 80, SFEM_INT_DEFAULT = 0 };
 
+typedef enum {
+    SFEM_ACCELERATOR_TYPE_CPU     = 0,  // CPU
+    SFEM_ACCELERATOR_TYPE_CUDA    = 1,  // CUDA
+    SFEM_ACCELERATOR_TYPE_OPENCL  = 2,  // OpenCL Not supported
+    SFEM_ACCELERATOR_TYPE_OPENACC = 3,  // OpenACC Not supported
+    SFEM_ACCELERATOR_TYPE_HIP     = 4   // HIP Not supported
+} AcceleratorsType;
+
 static void* SFEM_DEFAULT_STREAM = 0;
 
 SFEM_INLINE static int real_type_size(enum RealType type) {
