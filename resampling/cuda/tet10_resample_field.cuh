@@ -34,8 +34,10 @@ make_xyz_tet10_device(const ptrdiff_t nnodes);  //
  * @param xyz
  * @param xyz_host
  */
-void                                                                                           //
-copy_xyz_tet10_device(const ptrdiff_t nnodes, xyz_tet10_device* xyz, const float** xyz_host);  //
+void                                             //
+copy_xyz_tet10_device(const ptrdiff_t   nnodes,  //
+                      xyz_tet10_device* xyz,     //
+                      const float**     xyz_host);   //
 
 /**
  * @brief
@@ -65,8 +67,10 @@ make_xyz_tet10_managed(const ptrdiff_t nnodes);  //
  * @param xyz
  * @param xyz_host
  */
-void                                                                                            //
-copy_xyz_tet10_managed(const ptrdiff_t nnodes, xyz_tet10_device* xyz, const float** xyz_host);  //
+void                                              //
+copy_xyz_tet10_managed(const ptrdiff_t   nnodes,  //
+                       xyz_tet10_device* xyz,     //
+                       const float**     xyz_host);   //
 
 /**
  * @brief

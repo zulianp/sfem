@@ -216,11 +216,11 @@ xyz_tet10_device make_xyz_tet10_managed(const ptrdiff_t nnodes) {
 //////////////////////////////////////////////////////////
 // copy_xyz_tet10_managed
 //////////////////////////////////////////////////////////
-void                                                     //
+void                                              //
 copy_xyz_tet10_managed(const ptrdiff_t   nnodes,  //
-                              xyz_tet10_device* xyz,     //
-                              const float**     xyz_host) {  //
-                                                         //
+                       xyz_tet10_device* xyz,     //
+                       const float**     xyz_host) {  //
+
     cudaError_t err0 = cudaMemcpy(xyz->x, xyz_host[0], nnodes * sizeof(float), cudaMemcpyHostToDevice);
     cudaError_t err1 = cudaMemcpy(xyz->y, xyz_host[1], nnodes * sizeof(float), cudaMemcpyHostToDevice);
     cudaError_t err2 = cudaMemcpy(xyz->z, xyz_host[2], nnodes * sizeof(float), cudaMemcpyHostToDevice);
@@ -234,9 +234,9 @@ copy_xyz_tet10_managed(const ptrdiff_t   nnodes,  //
 //////////////////////////////////////////////////////////
 // free_xyz_tet10_managed
 //////////////////////////////////////////////////////////
-void                                                    //
+void                                             //
 free_xyz_tet10_managed(xyz_tet10_device* xyz) {  //
-                                                        //
+                                                 //
     cudaError_t err0 = cudaFree(xyz->x);
     cudaError_t err1 = cudaFree(xyz->y);
     cudaError_t err2 = cudaFree(xyz->z);
@@ -253,10 +253,10 @@ free_xyz_tet10_managed(xyz_tet10_device* xyz) {  //
 //////////////////////////////////////////////////////////
 // memory_hint_xyz_tet10_managed
 //////////////////////////////////////////////////////////
-void                                                            //
+void                                                     //
 memory_hint_xyz_tet10_managed(const ptrdiff_t   nnodes,  //
-                                     xyz_tet10_device* xyz) {   //
-                                                                //
+                              xyz_tet10_device* xyz) {   //
+                                                         //
     cudaMemAdvise(xyz->x, nnodes * sizeof(float), cudaMemAdviseSetPreferredLocation, cudaCpuDeviceId);
     cudaMemAdvise(xyz->y, nnodes * sizeof(float), cudaMemAdviseSetPreferredLocation, cudaCpuDeviceId);
     cudaMemAdvise(xyz->z, nnodes * sizeof(float), cudaMemAdviseSetPreferredLocation, cudaCpuDeviceId);
@@ -296,6 +296,7 @@ make_elems_tet10_device(const ptrdiff_t nelements) {  //
 cudaError_t copy_elems_tet10_device(const ptrdiff_t     nelements,  //
                                     elems_tet10_device* elems,      //
                                     const idx_t**       elems_host) {     //
+
     cudaError_t err0 = cudaMemcpy(elems->elems_v0, elems_host[0], nelements * sizeof(int), cudaMemcpyHostToDevice);
     cudaError_t err1 = cudaMemcpy(elems->elems_v1, elems_host[1], nelements * sizeof(int), cudaMemcpyHostToDevice);
     cudaError_t err2 = cudaMemcpy(elems->elems_v2, elems_host[2], nelements * sizeof(int), cudaMemcpyHostToDevice);
@@ -319,7 +320,8 @@ cudaError_t copy_elems_tet10_device(const ptrdiff_t     nelements,  //
 //////////////////////////////////////////////////////////
 // free_elems_tet10_device
 //////////////////////////////////////////////////////////
-void free_elems_tet10_device(elems_tet10_device* elems) {
+void free_elems_tet10_device(elems_tet10_device* elems) {  //
+                                                           //
     cudaError_t err0 = cudaFree(elems->elems_v0);
     cudaError_t err1 = cudaFree(elems->elems_v1);
     cudaError_t err2 = cudaFree(elems->elems_v2);
@@ -358,8 +360,9 @@ void free_elems_tet10_device(elems_tet10_device* elems) {
  * @param nelements
  * @return elems_tet10_device
  */
-elems_tet10_device  //
-make_elems_tet10_device_unified(const ptrdiff_t nelements) {
+elems_tet10_device                                            //
+make_elems_tet10_device_unified(const ptrdiff_t nelements) {  //
+                                                              //
     elems_tet10_device elems;
     elems.elems_v0 = NULL;
     elems.elems_v1 = NULL;
