@@ -12,6 +12,7 @@
 #define MY_RESTRICT __restrict__
 
 #include "quadratures_rule_cuda.h"
+#include "sfem_resample_field_cuda_fun.cuh"
 
 ////////////////////////////////////////////////////////
 // tet4_transform_v2
@@ -157,49 +158,6 @@ __device__ void hex_aa_8_collect_coeffs_cu(
     *out5 = data[i5];
     *out6 = data[i6];
     *out7 = data[i7];
-}
-
-// Struct for the elements
-typedef struct {
-    int* elems_v0;
-    int* elems_v1;
-    int* elems_v2;
-    int* elems_v3;
-} elems_tet4_device;
-
-void                                                              //
-cuda_allocate_elems_tet4_device(elems_tet4_device* elems_device,  //
-                                const ptrdiff_t    nelements) {      //
-    cudaMalloc((void**)&elems_device->elems_v0, nelements * sizeof(int));
-    cudaMalloc((void**)&elems_device->elems_v1, nelements * sizeof(int));
-    cudaMalloc((void**)&elems_device->elems_v2, nelements * sizeof(int));
-    cudaMalloc((void**)&elems_device->elems_v3, nelements * sizeof(int));
-}
-
-void free_elems_tet4_device(elems_tet4_device* elems_device) {
-    cudaFree(elems_device->elems_v0);
-    cudaFree(elems_device->elems_v1);
-    cudaFree(elems_device->elems_v2);
-    cudaFree(elems_device->elems_v3);
-}
-
-// Struct for xyz
-typedef struct {
-    float* x;
-    float* y;
-    float* z;
-} xyz_tet4_device;
-
-void cuda_allocate_xyz_tet4_device(xyz_tet4_device* xyz_device, const ptrdiff_t nnodes) {
-    cudaMalloc((void**)&xyz_device->x, nnodes * sizeof(float));
-    cudaMalloc((void**)&xyz_device->y, nnodes * sizeof(float));
-    cudaMalloc((void**)&xyz_device->z, nnodes * sizeof(float));
-}
-
-void free_xyz_tet4_device(xyz_tet4_device* xyz_device) {
-    cudaFree(xyz_device->x);
-    cudaFree(xyz_device->y);
-    cudaFree(xyz_device->z);
 }
 
 //////////////////////////////////////////////////////////
