@@ -230,6 +230,5 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_level2_to_level4);
     SFEM_RUN_TEST(test_level1_to_level2);
     SFEM_RUN_TEST(test_incidence_count);
-
     return SFEM_UNIT_TEST_FINALIZE();
 }
