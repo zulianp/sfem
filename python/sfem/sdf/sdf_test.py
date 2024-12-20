@@ -89,7 +89,7 @@ def normalize_field(field):
 # 3: np.ones_like(X)
 
 
-option = 0
+option = 1
 
 ########## Normalize field in an interval [-1, 1] ##########
 

@@ -1,6 +1,7 @@
 #ifndef SFEM_RESAMPLE_FIELD_CUDA_FUN_CUH
 #define SFEM_RESAMPLE_FIELD_CUDA_FUN_CUH
 
+#include <cuda_runtime.h>
 #include <stdio.h>
 #include "sfem_base.h"
 
@@ -137,9 +138,18 @@ void                                                                //
 cuda_allocate_xyz_tet4_device_managed(xyz_tet4_device* xyz_device,  //
                                       const ptrdiff_t  nnodes) {     //
 
-    cudaMallocManaged((void**)&xyz_device->x, nnodes * sizeof(float));
-    cudaMallocManaged((void**)&xyz_device->y, nnodes * sizeof(float));
-    cudaMallocManaged((void**)&xyz_device->z, nnodes * sizeof(float));
+    cudaError_t err0 = cudaMallocManaged((void**)&xyz_device->x, nnodes * sizeof(float));
+    cudaError_t err1 = cudaMallocManaged((void**)&xyz_device->y, nnodes * sizeof(float));
+    cudaError_t err2 = cudaMallocManaged((void**)&xyz_device->z, nnodes * sizeof(float));
+
+    if (err0 != cudaSuccess || err1 != cudaSuccess || err2 != cudaSuccess) {
+        fprintf(stderr,
+                "Failed to allocate managed memory (error codes: %s, %s, %s)!\n",
+                cudaGetErrorString(err0),
+                cudaGetErrorString(err1),
+                cudaGetErrorString(err2));
+        exit(EXIT_FAILURE);
+    }
 }
 
 /**

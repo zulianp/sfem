@@ -63,9 +63,11 @@ static SFEM_INLINE void tet4_mass_kernel(const real_t x0, const real_t x1, const
     element_matrix[15] = x15;
 }
 
-static SFEM_INLINE void lumped_mass(const real_t px0, const real_t px1, const real_t px2, const real_t px3, const real_t py0,
-                                    const real_t py1, const real_t py2, const real_t py3, const real_t pz0, const real_t pz1,
-                                    const real_t pz2, const real_t pz3, real_t *element_vector) {
+static SFEM_INLINE void  //
+lumped_mass(const real_t px0, const real_t px1, const real_t px2, const real_t px3, const real_t py0, const real_t py1,
+            const real_t py2, const real_t py3, const real_t pz0, const real_t pz1, const real_t pz2, const real_t pz3,
+            real_t *element_vector) {
+    //
     // FLOATING POINT OPS!
     //       - Result: 4*ASSIGNMENT
     //       - Subexpressions: 11*ADD + 16*DIV + 48*MUL + 12*SUB
@@ -135,9 +137,24 @@ static SFEM_INLINE void find_cols4(const idx_t *targets, const idx_t *const row,
     }
 }
 
-void tet4_assemble_mass(const ptrdiff_t nelements, const ptrdiff_t nnodes, idx_t **const SFEM_RESTRICT elems,
-                        geom_t **const SFEM_RESTRICT xyz, const count_t *const SFEM_RESTRICT rowptr,
-                        const idx_t *const SFEM_RESTRICT colidx, real_t *const values) {
+/**
+ * @brief Assemble the mass matrix for TET4 elements
+ *
+ * @param nelements
+ * @param nnodes
+ * @param elems
+ * @param xyz
+ * @param rowptr
+ * @param colidx
+ * @param values
+ */
+void tet4_assemble_mass(const ptrdiff_t                    nelements,  //
+                        const ptrdiff_t                    nnodes,     //
+                        idx_t **const SFEM_RESTRICT        elems,      //
+                        geom_t **const SFEM_RESTRICT       xyz,        //
+                        const count_t *const SFEM_RESTRICT rowptr,     //
+                        const idx_t *const SFEM_RESTRICT   colidx,     //
+                        real_t *const                      values) {                        //
     SFEM_UNUSED(nnodes);
 
     double tick = MPI_Wtime();
@@ -199,6 +216,15 @@ void tet4_assemble_mass(const ptrdiff_t nelements, const ptrdiff_t nnodes, idx_t
     printf("tet4_mass.c: assemble_mass\t%g seconds\n", tock - tick);
 }
 
+/**
+ * @brief Assemble the lumped mass matrix for TET4 elements
+ *
+ * @param nelements
+ * @param nnodes
+ * @param elems
+ * @param xyz
+ * @param values
+ */
 void                                                               //
 tet4_assemble_lumped_mass(const ptrdiff_t              nelements,  //
                           const ptrdiff_t              nnodes,     //
