@@ -44,12 +44,14 @@ int ssquad4_element_node_incidence_count(const int                     level,
     return SFEM_SUCCESS;
 }
 
-int ssquad4_restrict(const int                           level,
+int ssquad4_restrict(const ptrdiff_t                     nelements,
                      const int                           from_level,
-                     const int                           to_level,
-                     const ptrdiff_t                     nelements,
-                     idx_t **const SFEM_RESTRICT         elements,
+                     const int                           from_level_stride,
+                     idx_t **const SFEM_RESTRICT         from_elements,
                      const uint16_t *const SFEM_RESTRICT from_element_to_node_incidence_count,
+                     const int                           to_level,
+                     const int                           to_level_stride,
+                     idx_t **const SFEM_RESTRICT         to_elements,
                      const int                           vec_size,
                      const real_t *const SFEM_RESTRICT   from,
                      real_t *const SFEM_RESTRICT         to) {
@@ -201,21 +203,20 @@ int ssquad4_prolongate(const ptrdiff_t                   nelements,
                 // Interpolate the coefficients along the y-axis (edges)
                 for (int yi = 0; yi < from_level; yi++) {
                     for (int xi = 0; xi < from_level; xi++) {
-
                         for (int between_yi = 1; between_yi < from_to_step; between_yi++) {
-                            const int yy = yi * from_to_step + between_yi;
-                            const int left   = ssquad4_lidx(to_level, xi * from_to_step, yy);
-                            const int right  = ssquad4_lidx(to_level, (xi + 1) * from_to_step, yy);
-                            const scalar_t cl = c[left];
-                            const scalar_t cr = c[right];
+                            const int      yy    = yi * from_to_step + between_yi;
+                            const int      left  = ssquad4_lidx(to_level, xi * from_to_step, yy);
+                            const int      right = ssquad4_lidx(to_level, (xi + 1) * from_to_step, yy);
+                            const scalar_t cl    = c[left];
+                            const scalar_t cr    = c[right];
 
                             for (int between_xi = 1; between_xi < from_to_step; between_xi++) {
                                 const scalar_t fl = (1 - between_xi * to_h);
                                 const scalar_t fr = (between_xi * to_h);
 
-                                const int xx = xi * from_to_step + between_xi;
+                                const int xx     = xi * from_to_step + between_xi;
                                 const int center = ssquad4_lidx(to_level, xx, yy);
-                                c[center] = fl * cl + fr * cr;
+                                c[center]        = fl * cl + fr * cr;
                             }
                         }
                     }
