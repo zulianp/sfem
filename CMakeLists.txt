@@ -261,7 +261,8 @@ foreach(DRIVER ${DRIVERS})
 endforeach()
 
 if(SFEM_ENABLE_TESTING)
-#     include(tests/tests.cmake)
+    enable_testing()
+    
     list(APPEND SFEM_UNIT_TESTS
         operators/ssquad4/tests
     )
@@ -274,16 +275,6 @@ if(SFEM_ENABLE_TESTING)
     list(APPEND TEST_DRIVERS "${C_UNIT_TESTS}")
     list(APPEND TEST_DRIVERS "${CXX_UNIT_TESTS}")
 
-
-
-    # if(SFEM_ENABLE_CUDA)
-    #     file(GLOB SFEM_UNIT_TEST_KERNEL_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/${UNIT_TEST}/*.cu")
-    #     # message(STATUS "${UNIT_TEST} : ${SFEM_UNIT_TEST_KERNEL_SOURCES}")
-    # endif()
-
-    # if(SFEM_UNIT_TEST_KERNEL_SOURCES)
-    #     list(APPEND SFEM_KERNEL_SOURCES "${SFEM_UNIT_TEST_KERNEL_SOURCES}")
-    # endif()
     endforeach(UNIT_TEST)
 
     message(STATUS "TEST_DRIVERS=${TEST_DRIVERS}")
@@ -292,7 +283,7 @@ if(SFEM_ENABLE_TESTING)
         get_filename_component(TEST_DRIVER_NAME ${TEST_DRIVER} NAME_WE)
         add_executable(${TEST_DRIVER_NAME} ${TEST_DRIVER})
         target_link_libraries(${TEST_DRIVER_NAME} PRIVATE sfem)
-        # list(APPEND SFEM_TARGETS ${TEST_DRIVER_NAME})
+        add_test(NAME ${TEST_DRIVER_NAME} COMMAND ${TEST_DRIVER_NAME})
     endforeach(TEST_DRIVER ${TEST_DRIVERS})
     
 
