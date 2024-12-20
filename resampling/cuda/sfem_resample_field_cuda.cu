@@ -46,7 +46,7 @@ perform_exchange_operations(mesh_t* mesh,         //
  * @param element_vector
  * @return __device__
  */
-__device__ void                                                                         //
+__device__ inline void                                                                  //
 lumped_mass_cu(const real_t px0, const real_t px1, const real_t px2, const real_t px3,  //
                const real_t py0, const real_t py1, const real_t py2, const real_t py3,  //
                const real_t pz0, const real_t pz1, const real_t pz2, const real_t pz3,  //
@@ -81,7 +81,7 @@ lumped_mass_cu(const real_t px0, const real_t px1, const real_t px2, const real_
  * @param values
  * @return __global__
  */
-__global__ void                                                             //
+__global__ inline void                                                      //
 tet4_assemble_lumped_mass_kernel(const ptrdiff_t             nelements,     //
                                  const ptrdiff_t             nnodes,        //
                                  elems_tet4_device           elems_device,  //
@@ -92,26 +92,24 @@ tet4_assemble_lumped_mass_kernel(const ptrdiff_t             nelements,     //
 
     // double tick = MPI_Wtime();
 
-    idx_t ev[4];
-    idx_t ks[4];
+    // idx_t ev[4];
+    // idx_t ks[4];
 
     real_t element_vector[4];
 
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i >= nelements) {
-        return;
-    }
+    if (i >= nelements) return;
 
-    ev[0] = elems_device.elems_v0[i];
-    ev[1] = elems_device.elems_v1[i];
-    ev[2] = elems_device.elems_v2[i];
-    ev[3] = elems_device.elems_v3[i];
+    // ev[0] = elems_device.elems_v0[i];
+    // ev[1] = elems_device.elems_v1[i];
+    // ev[2] = elems_device.elems_v2[i];
+    // ev[3] = elems_device.elems_v3[i];
 
     // Element indices
-    const idx_t i0 = ev[0];
-    const idx_t i1 = ev[1];
-    const idx_t i2 = ev[2];
-    const idx_t i3 = ev[3];
+    const idx_t i0 = elems_device.elems_v0[i];
+    const idx_t i1 = elems_device.elems_v1[i];
+    const idx_t i2 = elems_device.elems_v2[i];
+    const idx_t i3 = elems_device.elems_v3[i];
 
     lumped_mass_cu(
             // X-coordinates
@@ -131,9 +129,14 @@ tet4_assemble_lumped_mass_kernel(const ptrdiff_t             nelements,     //
             xyz.z[i3],
             element_vector);
 
-    for (int edof_i = 0; edof_i < 4; ++edof_i) {
-        values[ev[edof_i]] += element_vector[edof_i];
-    }
+    // for (int edof_i = 0; edof_i < 4; ++edof_i) {
+    //     values[ev[edof_i]] += element_vector[edof_i];
+    // }
+
+    atomicAdd(&values[i0], element_vector[0]);
+    atomicAdd(&values[i1], element_vector[1]);
+    atomicAdd(&values[i2], element_vector[2]);
+    atomicAdd(&values[i3], element_vector[3]);
 
     // double tock = MPI_Wtime();
     // printf("tet4_mass.c: tet4_assemble_lumped_mass\t%g seconds\n", tock - tick);
@@ -151,13 +154,18 @@ divide_by_mass_vector_kernel(ptrdiff_t     n_owned_nodes,            //
         return;
     }
 
-    if (mass_vector[i] == 0) {
-        assert(mass_vector[i] != 0 && "Found 0 mass");
-    }
+    assert(mass_vector[i] != 0 && "Found 0 mass");
 
-    assert(mass_vector[i] != 0);
     weighted_field_device_g[i] /= mass_vector[i];
 }
+
+extern "C" void                                                    //
+                                                                   //
+tet4_assemble_lumped_mass(const ptrdiff_t              nelements,  //
+                          const ptrdiff_t              nnodes,     //
+                          idx_t** const SFEM_RESTRICT  elems,      //
+                          geom_t** const SFEM_RESTRICT xyz,        //
+                          real_t* const SFEM_RESTRICT  values);
 
 /**
  * @brief kernel for unified and managed memory
@@ -186,7 +194,7 @@ launch_kernels_tet4_resample_field_CUDA_unified(const int         mpi_size,     
                                                 const int         mpi_rank,                        //
                                                 const int         numBlocks,                       //
                                                 const int         threadsPerBlock,                 //
-                                                mesh_t*           mesh,                            // Mesh
+                                                const mesh_t*     mesh,                            // Mesh
                                                 const int         bool_assemble_dual_mass_vector,  // assemble dual mass vector
                                                 int               nelements,                       //
                                                 ptrdiff_t         nnodes,                          //
@@ -234,28 +242,36 @@ launch_kernels_tet4_resample_field_CUDA_unified(const int         mpi_size,     
 
     if (bool_assemble_dual_mass_vector == 1) {
         // real_t* mass_vector = (real_t*)malloc(mesh->nnodes * sizeof(real_t));
-        real_t* mass_vector = NULL;
+        // real_t* mass_vector = NULL;
 
-        cudaError_t err = cudaMalloc((void**)&mass_vector,            //
-                                     mesh->nnodes * sizeof(real_t));  //
-        HANDLE_CUDA_ERROR(err);
+        // cudaError_t err = cudaMalloc((void**)&mass_vector,            //
+        //                              mesh->nnodes * sizeof(real_t));  //
+        // HANDLE_CUDA_ERROR(err);
 
         const int threadPerBlock = 256;
 
         {
-            const int numBlocks = (nelements + threadPerBlock - 1) / threadPerBlock;  //
-            tet4_assemble_lumped_mass_kernel<<<numBlocks,                             //
-                                               threadPerBlock>>>(mesh->nelements,     //
-                                                                 mesh->nnodes,        //
-                                                                 elems_device,        //
-                                                                 xyz_device,          //
-                                                                 mass_vector);        //
+            const int numBlocks = (mesh->nelements + threadPerBlock - 1) / threadPerBlock;  //
+            tet4_assemble_lumped_mass_kernel<<<numBlocks,                                   //
+                                               threadPerBlock>>>(mesh->nelements,           //
+                                                                 mesh->nnodes,              //
+                                                                 elems_device,              //
+                                                                 xyz_device,                //
+                                                                 mass_vector);              //
+
+            // tet4_assemble_lumped_mass(mesh->nelements,  //
+            //                           mesh->nnodes,     //
+            //                           mesh->elements,   //
+            //                           mesh->points,     //
+            //                           mass_vector);     //
         }
 
-        {  // exchange ghost nodes and add contribution
-
+        {
             if (mpi_size > 1) {
-                perform_exchange_operations(mesh, mass_vector, weighted_field_device_g);
+                // exchange ghost nodes and add contribution
+                // perform_exchange_operations((mesh_t*)mesh,             //
+                //                             mass_vector,               //
+                //                             weighted_field_device_g);  //
             }  // end if mpi_size > 1
 
             const int numBlocks = (mesh->nnodes + threadPerBlock - 1) / threadPerBlock;  //
@@ -265,10 +281,7 @@ launch_kernels_tet4_resample_field_CUDA_unified(const int         mpi_size,     
                                                              mass_vector);               //
         }
 
-        cudaError_t error = cudaFree(mass_vector);
-        mass_vector       = NULL;
-        HANDLE_CUDA_ERROR(error);
-    }
+    }  // end if bool_assemble_dual_mass_vector == 1
 
     RETURN_FROM_FUNCTION(ret);
 }
@@ -600,10 +613,10 @@ tet4_resample_field_local_reduce_CUDA(const ptrdiff_t                    nelemen
  * @param g_host
  */
 int                                                                                          //
-tet4_resample_field_local_reduce_CUDA_managed(const int     mpi_size,                        // MPI size
+tet4_resample_field_local_reduce_CUDA_Managed(const int     mpi_size,                        // MPI size
                                               const int     mpi_rank,                        // MPI rank
                                               const mesh_t* mesh,                            // Mesh
-                                              int*          bool_assemble_dual_mass_vector,  // assemble dual mass vector (Output)
+                                              int           bool_assemble_dual_mass_vector,  // assemble dual mass vector (Output)
                                               const ptrdiff_t* const SFEM_RESTRICT n,        // number of nodes in each direction
                                               const ptrdiff_t* const SFEM_RESTRICT stride,   // stride of the data
                                               const geom_t* const SFEM_RESTRICT    origin,   // origin of the domain
@@ -617,8 +630,18 @@ tet4_resample_field_local_reduce_CUDA_managed(const int     mpi_size,           
 
     int ret = 0;
 
+    real_type* mass_vector = NULL;
+    {
+        cudaError_t err = cudaMallocManaged((void**)&mass_vector, mesh->nnodes * sizeof(real_type));
+        HANDLE_CUDA_ERROR(err);
+    }
+
+    // init mass vector
+    cudaMemset(mass_vector, 0, mesh->nnodes * sizeof(real_type));
+
     // Allocate weighted_field on the device
-    real_type* weighted_field_device;
+    real_type* weighted_field_device = NULL;
+
     cudaMallocManaged((void**)&weighted_field_device, mesh->nnodes * sizeof(real_type));
     cudaMemset(weighted_field_device, 0, sizeof(real_type) * mesh->nnodes);
 
@@ -635,37 +658,65 @@ tet4_resample_field_local_reduce_CUDA_managed(const int     mpi_size,           
     // make and allocate xyz on the device
     xyz_tet4_device xyz_device = make_xyz_tet4_device();
 
-    cuda_allocate_xyz_tet4_device(&xyz_device,    //
-                                  mesh->nnodes);  //
+    cuda_allocate_xyz_tet4_device_managed(&xyz_device,    //
+                                          mesh->nnodes);  //
 
     copy_xyz_tet4_device((const float**)mesh->points,  //
                          mesh->nnodes,                 //
                          &xyz_device);                 //
 
-    real_type*      data_device;
-    const ptrdiff_t size_data = n[0] * n[1] * n[2];
+    real_type*      data_device = NULL;
+    const ptrdiff_t size_data   = n[0] * n[1] * n[2];
+
     cudaMallocManaged((void**)&data_device, size_data * sizeof(real_type));
     cudaMemcpy(data_device, data, size_data * sizeof(real_type), cudaMemcpyHostToDevice);
 
     ///////////////////////////////////////////////////////////////////////////////
     // Call the kernel
+
+    // Number of threads
+    const ptrdiff_t warp_per_block  = 8;
+    const ptrdiff_t threadsPerBlock = warp_per_block * __WARP_SIZE__;
+
+    // Number of blocks
+    const ptrdiff_t numBlocks = (mesh->nelements / warp_per_block) + (mesh->nelements % warp_per_block) + 1;
+
     cudaEvent_t start, stop;
 
-    // // TODO Launch the kernel
-    // launch_kernels_tet4_resample_field_CUDA_unified(mpi_size,                //
-    //                                                 mpi_rank,                //
-    //                                                 mesh->nelements,         //
-    //                                                 mesh_nnodes,             //
-    //                                                 elems_device,            //
-    //                                                 xyz_device,              //
-    //                                                 n,                       //
-    //                                                 stride,                  //
-    //                                                 origin,                  //
-    //                                                 delta,                   //
-    //                                                 data_device,             //
-    //                                                 weighted_field_device);  //
+    cudaDeviceSynchronize();
+
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    cudaEventRecord(start);
+
+    // TODO Launch the kernel
+    launch_kernels_tet4_resample_field_CUDA_unified(mpi_size,                        //
+                                                    mpi_rank,                        //
+                                                    numBlocks,                       //
+                                                    threadsPerBlock,                 //
+                                                    mesh,                            //
+                                                    bool_assemble_dual_mass_vector,  //
+                                                    mesh->nelements,                 //
+                                                    mesh_nnodes,                     //
+                                                    elems_device,                    //
+                                                    xyz_device,                      //
+                                                    n,                               //
+                                                    stride,                          //
+                                                    origin,                          //
+                                                    delta,                           //
+                                                    data_device,                     //
+                                                    mass_vector,                     //
+                                                    weighted_field_device);          //
 
     cudaDeviceSynchronize();
+    cudaEventRecord(stop);
+
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
 
     // Free memory on the device
     free_elems_tet4_device(&elems_device);
@@ -678,8 +729,13 @@ tet4_resample_field_local_reduce_CUDA_managed(const int     mpi_size,           
                cudaMemcpyDeviceToHost);           //
 
     cudaFree(weighted_field_device);
+    weighted_field_device = NULL;
 
     cudaFree(data_device);
+    data_device = NULL;
+
+    cudaFree(mass_vector);
+    mass_vector = NULL;
 
     RETURN_FROM_FUNCTION(ret);
 }
@@ -723,9 +779,16 @@ tet4_resample_field_local_reduce_CUDA_wrapper(const int     mpi_size,           
 
     *bool_assemble_dual_mass_vector = 1;
 
-    printf("TODO: Implement the CUDA_MANAGED_MEMORY: %s:%d\n", __FILE__, __LINE__);
-
-    exit(EXIT_FAILURE);
+    ret = tet4_resample_field_local_reduce_CUDA_Managed(mpi_size,                         //
+                                                        mpi_rank,                         //
+                                                        mesh,                             //
+                                                        *bool_assemble_dual_mass_vector,  //
+                                                        n,                                //
+                                                        stride,                           //
+                                                        origin,                           //
+                                                        delta,                            //
+                                                        data,                             //
+                                                        g_host);                          //
 
 #elif SFEM_CUDA_MEMORY_MODEL == CUDA_HOST_MEMORY
 

@@ -1091,7 +1091,7 @@ resample_field_mesh_tet4(const int                            mpi_size,  // MPI 
 
         // exchange ghost nodes and add contribution
         if (mpi_size > 1) {
-            perform_exchange_operations(mesh, mass_vector, g);
+            // perform_exchange_operations(mesh, mass_vector, g);
         }  // end if mpi_size > 1
 
         // divide by the mass vector
