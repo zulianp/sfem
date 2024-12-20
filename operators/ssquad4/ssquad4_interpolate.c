@@ -53,7 +53,36 @@ int ssquad4_restrict(const int                           level,
                      const int                           vec_size,
                      const real_t *const SFEM_RESTRICT   from,
                      real_t *const SFEM_RESTRICT         to) {
-    //
+    assert(from_level % to_level == 0);
+
+    if (from_level % to_level != 0) {
+        SFEM_ERROR("Nested meshes requirement: from_level must be divisible by to_level!");
+        return SFEM_FAILURE;
+    }
+
+#pragma omp parallel
+    {
+        const int from_nxe     = ssquad4_nxe(from_level);
+        const int to_nxe       = ssquad4_nxe(to_level);
+        const int to_from_step = from_level / to_level;
+
+        scalar_t **from_coeffs = malloc(vec_size * sizeof(scalar_t *));
+        for (int d = 0; d < vec_size; d++) {
+            from_coeffs[d] = malloc(from_nxe * sizeof(scalar_t));
+        }
+
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; e++) {
+            //
+        }
+
+        for (int d = 0; d < vec_size; d++) {
+            free(from_coeffs[d]);
+        }
+
+        free(from_coeffs);
+    }
+
     return SFEM_SUCCESS;
 }
 
@@ -70,7 +99,7 @@ int ssquad4_prolongate(const ptrdiff_t                   nelements,
     assert(to_level % from_level == 0);
 
     if (to_level % from_level != 0) {
-        SFEM_ERROR("to_level must be divisible by from_level!");
+        SFEM_ERROR("Nested meshes requirement: to_level must be divisible by from_level!");
         return SFEM_FAILURE;
     }
 
@@ -85,25 +114,16 @@ int ssquad4_prolongate(const ptrdiff_t                   nelements,
             to_coeffs[d] = malloc(to_nxe * sizeof(scalar_t));
         }
 
-        idx_t *to_gidx = malloc(to_nxe * sizeof(idx_t));
-
 #pragma omp for
         for (ptrdiff_t e = 0; e < nelements; e++) {
-            {  // Gather elemental data
-                for (int yi = 0; yi <= to_level; yi += to_level_stride) {
-                    for (int xi = 0; xi <= to_level; xi += to_level_stride) {
-                        const int v = ssquad4_lidx(to_level * to_level_stride, xi * to_level_stride, yi * to_level_stride);
-                        to_gidx[v]  = to_elements[v][e];
-                    }
-                }
-
-#ifndef NDEBUG 
+            {
+#ifndef NDEBUG
                 // Only for debugging
                 for (int d = 0; d < vec_size; d++) {
                     memset(to_coeffs[d], 0, to_nxe * sizeof(scalar_t));
                 }
 #endif
-
+                // Gather elemental data
                 // Fill matching nodes with from data while gathering
                 for (int d = 0; d < vec_size; d++) {
                     for (int yi = 0; yi <= from_level; yi++) {
@@ -144,13 +164,15 @@ int ssquad4_prolongate(const ptrdiff_t                   nelements,
                     }
                 }
 
-                // printf("x-axis interpolation\n");
-                // for (int yi = 0; yi <= to_level; yi ++) {
-                //     for (int xi = 0; xi <= to_level; xi ++) {
-                //         printf("%g ", c[ssquad4_lidx(to_level, xi, yi)]);
-                //     }
-                //     printf("\n");
-                // }
+#if 0
+                printf("x-axis interpolation\n");
+                for (int yi = 0; yi <= to_level; yi++) {
+                    for (int xi = 0; xi <= to_level; xi++) {
+                        printf("%g ", c[ssquad4_lidx(to_level, xi, yi)]);
+                    }
+                    printf("\n");
+                }
+#endif
 
                 // Interpolate the coefficients along the y-axis (edges)
                 for (int yi = 0; yi < from_level; yi++) {
@@ -166,52 +188,59 @@ int ssquad4_prolongate(const ptrdiff_t                   nelements,
                         }
                     }
                 }
-
-                // printf("y-axis interpolation\n");
-                // for (int yi = 0; yi <= to_level; yi ++) {
-                //     for (int xi = 0; xi <= to_level; xi ++) {
-                //         printf("%g ", c[ssquad4_lidx(to_level, xi, yi)]);
-                //     }
-                //     printf("\n");
-                // }
+#if 0
+                printf("y-axis interpolation\n");
+                for (int yi = 0; yi <= to_level; yi++) {
+                    for (int xi = 0; xi <= to_level; xi++) {
+                        printf("%g ", c[ssquad4_lidx(to_level, xi, yi)]);
+                    }
+                    printf("\n");
+                }
+#endif
 
                 // Interpolate the coefficients along the y-axis (edges)
                 for (int yi = 0; yi < from_level; yi++) {
                     for (int xi = 0; xi < from_level; xi++) {
+
                         for (int between_yi = 1; between_yi < from_to_step; between_yi++) {
-                            const scalar_t fb = (1 - between_yi * to_h);
-                            const scalar_t ft = (between_yi * to_h);
+                            const int yy = yi * from_to_step + between_yi;
+                            const int left   = ssquad4_lidx(to_level, xi * from_to_step, yy);
+                            const int right  = ssquad4_lidx(to_level, (xi + 1) * from_to_step, yy);
+                            const scalar_t cl = c[left];
+                            const scalar_t cr = c[right];
 
                             for (int between_xi = 1; between_xi < from_to_step; between_xi++) {
                                 const scalar_t fl = (1 - between_xi * to_h);
                                 const scalar_t fr = (between_xi * to_h);
 
                                 const int xx = xi * from_to_step + between_xi;
-                                const int yy = yi * from_to_step + between_yi;
-
                                 const int center = ssquad4_lidx(to_level, xx, yy);
-                                const int left   = ssquad4_lidx(to_level, xx - 1, yy);
-                                const int right  = ssquad4_lidx(to_level, xx + 1, yy);
-
-                                c[center] = fl * c[left] + fr * c[right];
+                                c[center] = fl * cl + fr * cr;
                             }
                         }
                     }
                 }
-
-                // printf("Interior interpolation\n");
-                // for (int yi = 0; yi <= to_level; yi ++) {
-                //     for (int xi = 0; xi <= to_level; xi ++) {
-                //         printf("%g ", c[ssquad4_lidx(to_level, xi, yi)]);
-                //     }
-                //     printf("\n");
-                // }
+#if 0
+                printf("Interior interpolation\n");
+                for (int yi = 0; yi <= to_level; yi++) {
+                    for (int xi = 0; xi <= to_level; xi++) {
+                        printf("%g ", c[ssquad4_lidx(to_level, xi, yi)]);
+                    }
+                    printf("\n");
+                }
+#endif
             }
-        }
 
-        for (int i = 0; i < to_nxe; i++) {
-            for (int d = 0; d < vec_size; d++) {
-                to[to_gidx[i] * vec_size + d] = to_coeffs[d][i];
+            for (int yi = 0; yi <= to_level; yi++) {
+                for (int xi = 0; xi <= to_level; xi++) {
+                    const int v         = ssquad4_lidx(to_level, xi, yi);
+                    const int strided_v = ssquad4_lidx(to_level * to_level_stride, xi * to_level_stride, yi * to_level_stride);
+                    const ptrdiff_t gid = to_elements[strided_v][e];
+
+                    for (int d = 0; d < vec_size; d++) {
+                        to[gid * vec_size + d] = to_coeffs[d][v];
+                    }
+                }
             }
         }
 
@@ -220,7 +249,6 @@ int ssquad4_prolongate(const ptrdiff_t                   nelements,
         }
 
         free(to_coeffs);
-        free(to_gidx);
     }
 
     return SFEM_SUCCESS;

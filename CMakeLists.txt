@@ -262,7 +262,7 @@ endforeach()
 
 if(SFEM_ENABLE_TESTING)
     enable_testing()
-    
+
     list(APPEND SFEM_UNIT_TESTS
         operators/ssquad4/tests
     )
@@ -285,8 +285,6 @@ if(SFEM_ENABLE_TESTING)
         target_link_libraries(${TEST_DRIVER_NAME} PRIVATE sfem)
         add_test(NAME ${TEST_DRIVER_NAME} COMMAND ${TEST_DRIVER_NAME})
     endforeach(TEST_DRIVER ${TEST_DRIVERS})
-    
-
 endif()
 
 # if(SFEM_ENABLE_BENCHMARK)
