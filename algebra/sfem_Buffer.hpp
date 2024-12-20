@@ -99,7 +99,7 @@ namespace sfem {
                                                  const ptrdiff_t  n1,
                                                  T              **x,
                                                  enum MemorySpace mem_space = MEMORY_SPACE_INVALID) {
-            return std::make_shared<Buffer<T>>(n0, n1, x, nullptr, mem_space);
+            return std::make_shared<Buffer<T *>>(n0, n1, x, nullptr, mem_space);
         }
 
         static std::shared_ptr<Buffer<T *>> own(const ptrdiff_t                     n0,
