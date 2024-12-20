@@ -93,6 +93,15 @@ namespace sfem {
                 os << "On the device!\n";
                 return;
             }
+
+            os << "Buffer size " << extent_[0] << ", " << extent_[1] << "\n";
+            for (ptrdiff_t i = 0; i < extent_[0]; i++) {
+                for (ptrdiff_t j = 0; j < extent_[1]; j++) {
+                    os << ptr_[i][j] << " ";
+                }
+                os << "\n";
+            }
+            os << "\n";
         }
 
         static std::shared_ptr<Buffer<T *>> wrap(const ptrdiff_t  n0,
