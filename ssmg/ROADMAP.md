@@ -116,6 +116,7 @@ MS := Milestone
 
 **MS 2: ()**
    - [ ] Drafting/Finalizing P1
+   - [ ] Nonlinear obstacle contact loop (if not done in MS 1)
 
 **MS 3: ()**
 
