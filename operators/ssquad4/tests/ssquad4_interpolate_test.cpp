@@ -5,7 +5,7 @@
 
 #include "sfem_test.h"
 
-int test_restrict_level2_to_level1() {
+static int test_restrict_level2_to_level1() {
     real_t from[9] = {1, 1, 1, 1, 1, 1, 1, 1, 1};
     auto   to      = sfem::h_buffer<real_t>(4);
 
@@ -49,7 +49,7 @@ int test_restrict_level2_to_level1() {
     return SFEM_TEST_SUCCESS;
 }
 
-int test_restrict_level4_to_level2() {
+static int test_restrict_level4_to_level2() {
     auto from = sfem::h_buffer<real_t>(25);
     auto to   = sfem::h_buffer<real_t>(9);
 
@@ -95,7 +95,7 @@ int test_restrict_level4_to_level2() {
     return SFEM_TEST_SUCCESS;
 }
 
-int test_incidence_count() {
+static int test_incidence_count() {
     auto elements = sfem::h_buffer<idx_t>(9, 2);
 
     for (ptrdiff_t i = 0; i < 9; i++) {
@@ -118,7 +118,7 @@ int test_incidence_count() {
     return SFEM_TEST_SUCCESS;
 }
 
-int test_level1_to_level2() {
+static int test_level1_to_level2() {
     real_t from[4] = {0, 2, 2, 0};
     real_t to[9];
 
@@ -174,7 +174,7 @@ int test_level1_to_level2() {
     return SFEM_TEST_SUCCESS;
 }
 
-int test_level2_to_level4() {
+static int test_level2_to_level4() {
     real_t from[9] = {0, 2, 4, 0, 2, 4, 0, 2, 4};
     real_t to[25];
 
@@ -229,7 +229,7 @@ int test_level2_to_level4() {
     return SFEM_TEST_SUCCESS;
 }
 
-int test_level1_to_level4() {
+static int test_level1_to_level4() {
     // 3 	14 	6 	13 	2
     // 15 	23	18	22	12
     // 7  	24	8   21	5
@@ -316,11 +316,11 @@ int test_level1_to_level4() {
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT();
+    SFEM_RUN_TEST(test_incidence_count);
     SFEM_RUN_TEST(test_restrict_level4_to_level2);
     SFEM_RUN_TEST(test_restrict_level2_to_level1);
     SFEM_RUN_TEST(test_level1_to_level4);
     SFEM_RUN_TEST(test_level2_to_level4);
     SFEM_RUN_TEST(test_level1_to_level2);
-    SFEM_RUN_TEST(test_incidence_count);
     return SFEM_UNIT_TEST_FINALIZE();
 }
