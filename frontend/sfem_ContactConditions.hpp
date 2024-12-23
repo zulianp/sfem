@@ -82,6 +82,7 @@ namespace sfem {
         /// $x \in R^{n}, g \in R^{m}$
         int gradient(const real_t *const x, real_t *const g) override;
         int signed_distance(const real_t *const x, real_t *const g);
+        int signed_distance(real_t *const g);
 
         int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
@@ -89,6 +90,8 @@ namespace sfem {
                         real_t *const        values) override;
 
         int hessian_block_diag_sym(const real_t *const x, real_t *const values);
+
+        int init();
 
         int                               update(const real_t *const x);
         std::shared_ptr<Operator<real_t>> linear_constraints_op();

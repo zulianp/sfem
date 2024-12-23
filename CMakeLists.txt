@@ -60,6 +60,7 @@ set(SFEM_MODULES
     operators/proteus_hex8
     operators/hierarchical
     operators/hex8
+    operators/ssquad4
     ssmg
 )
 
@@ -71,6 +72,10 @@ if(SFEM_ENABLE_RESAMPLING)
     list(APPEND SFEM_MODULES
         resampling
         resampling/tet10
+        resampling/quadshell4
+        resampling/trishell3
+        resampling/beam2
+        resampling/interpolate
     )
 endif()
 
@@ -255,9 +260,33 @@ foreach(DRIVER ${DRIVERS})
     endif()
 endforeach()
 
-# if(SFEM_ENABLE_TESTING)
-#     include(tests/tests.cmake)
-# endif()
+if(SFEM_ENABLE_TESTING)
+    enable_testing()
+
+    list(APPEND SFEM_UNIT_TESTS
+        operators/ssquad4/tests
+        operators/proteus_hex8/tests
+    )
+
+    foreach(UNIT_TEST ${SFEM_UNIT_TESTS})
+    
+    file(GLOB C_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.c")
+    file(GLOB CXX_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.cpp")
+
+    list(APPEND TEST_DRIVERS "${C_UNIT_TESTS}")
+    list(APPEND TEST_DRIVERS "${CXX_UNIT_TESTS}")
+
+    endforeach(UNIT_TEST)
+
+    message(STATUS "TEST_DRIVERS=${TEST_DRIVERS}")
+
+    foreach(TEST_DRIVER ${TEST_DRIVERS})
+        get_filename_component(TEST_DRIVER_NAME ${TEST_DRIVER} NAME_WE)
+        add_executable(${TEST_DRIVER_NAME} ${TEST_DRIVER})
+        target_link_libraries(${TEST_DRIVER_NAME} PRIVATE sfem)
+        add_test(NAME ${TEST_DRIVER_NAME} COMMAND ${TEST_DRIVER_NAME})
+    endforeach(TEST_DRIVER ${TEST_DRIVERS})
+endif()
 
 # if(SFEM_ENABLE_BENCHMARK)
 #     include(benchmarks/benchmarks.cmake)

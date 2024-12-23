@@ -46,8 +46,6 @@
         }                                                                                 \
     } while (0)
 
-void sfem_abort();
-
 #define SFEM_ERROR(...)                                             \
     do {                                                            \
         fprintf(stderr, __VA_ARGS__);                               \
@@ -126,5 +124,16 @@ typedef real_t accumulator_t;
 #define SFEM_VEC_SIZE 4
 typedef scalar_t vec_t __attribute__((vector_size(SFEM_VEC_SIZE * sizeof(scalar_t)), aligned(SFEM_VEC_SIZE * sizeof(scalar_t))));
 
+#endif
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void sfem_abort();
+
+#ifdef __cplusplus
+}
 #endif
 #endif  // SFEM_BASE_H

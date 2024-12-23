@@ -26,13 +26,6 @@ int proteus_hex8_create_full_idx(const int L,
                                  ptrdiff_t *n_unique_nodes_out,
                                  ptrdiff_t *interior_start_out);
 
-int proteus_hex8_mesh_skin(const int L,
-                           const ptrdiff_t nelements,
-                           idx_t **elements,
-                           ptrdiff_t *n_surf_elements,
-                           idx_t **const surf_elements,
-                           element_idx_t **parent_element);
-
 int proteus_hex8_crs_graph(const int L,
                            const ptrdiff_t nelements,
                            const ptrdiff_t nnodes,

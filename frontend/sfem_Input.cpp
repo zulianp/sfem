@@ -2,13 +2,13 @@
 
 #include "sfem_base.h"
 
+#include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <map>
 #include <sstream>
-#include <cassert>
 
 #include <mpi.h>
 
@@ -27,23 +27,21 @@ inline static std::string &ltrim(std::string &s, const char *t = ws) {
 }
 
 // trim from both ends of string (right then left)
-inline static std::string &trim(std::string &s, const char *t = ws) {
-    return ltrim(rtrim(s, t), t);
-}
+inline static std::string &trim(std::string &s, const char *t = ws) { return ltrim(rtrim(s, t), t); }
 
 namespace sfem {
     class YAMLNoIndent::Impl {
     public:
         class Node {
         public:
-            virtual ~Node() = default;
+            virtual ~Node()                      = default;
             virtual void print(std::ostream &os) = 0;
         };
 
         class StringNode : public Node {
         public:
             std::string value;
-            void print(std::ostream &os) override { os << value; }
+            void        print(std::ostream &os) override { os << value; }
         };
 
         class MapNode : public Node {
@@ -88,16 +86,12 @@ namespace sfem {
         }
 
         static void error_not_found(const std::string &str) {
-            fprintf(stderr,
-                    "[Error] YAMLNoIndent: Unable to find required key \"%s\"!\n",
-                    str.c_str());
+            fprintf(stderr, "[Error] YAMLNoIndent: Unable to find required key \"%s\"!\n", str.c_str());
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
 
         static void error_invalid_format(const std::string &str) {
-            fprintf(stderr,
-                    "[Error] YAMLNoIndent: Unable to convert required key \"%s\"!\n",
-                    str.c_str());
+            fprintf(stderr, "[Error] YAMLNoIndent: Unable to convert required key \"%s\"!\n", str.c_str());
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
 
@@ -151,8 +145,10 @@ namespace sfem {
             // return convert(iter->second, value);
         }
 
+        bool key_exists(const std::string &key) const { return kv.find(key) != kv.end(); }
+
         std::map<std::string, std::shared_ptr<Node>> kv;
-        bool debug{false};
+        bool                                         debug{false};
     };
 
     int YAMLNoIndent::array_require_keys(const std::string &key, std::vector<std::string> &ret) {
@@ -174,7 +170,7 @@ namespace sfem {
     }
 
     int YAMLNoIndent::add_setting_aux(const std::string &key, const std::string &value) {
-        auto node = std::make_shared<Impl::StringNode>();
+        auto node   = std::make_shared<Impl::StringNode>();
         node->value = value;
 
         impl_->kv[key] = node;
@@ -204,8 +200,8 @@ namespace sfem {
 
         token = strsep(&string, ":");
         assert(token);
-        key = token;
-        key = trim(key);
+        key   = token;
+        key   = trim(key);
         token = strsep(&string, ":");
 
         int comp = 1;
@@ -236,59 +232,60 @@ namespace sfem {
             if (ncomp == 1) {
                 // Assuming relational array of - key: val
 
-                if(impl_->debug) printf("Reading list %s\n", key.c_str());
+                if (impl_->debug) printf("Reading list %s\n", key.c_str());
 
-                auto map_node = std::make_shared<Impl::MapNode>();
+                auto map_node  = std::make_shared<Impl::MapNode>();
                 impl_->kv[key] = map_node;
 
                 bool in_list = false;
                 do {
                     std::getline(input, line, '\n');
                     line = trim(line);
-                    if(line.empty() || line[0] == '#') continue;
+                    if (line.empty() || line[0] == '#') continue;
 
                     // Check for malformed input
                     if (!in_list) {
                         assert(line[0] == '-');
                         if (line[0] != '-') {
                             SFEM_ERROR("Malfofmed YAML file at key %s (expected value or list)\nline: %s",
-                                       key.c_str(), line.c_str());
+                                       key.c_str(),
+                                       line.c_str());
                         }
 
                         in_list = true;
                     }
 
-
                     if (line[0] == '-') {
                         int ncomp = parse_key_and_value(line.substr(1, line.size() - 1), key, value);
                         assert(ncomp == 2);
-                        if(ncomp < 2) {
-                            SFEM_ERROR("Malfofmed YAML file at key (expected value)%s\n",
-                                   key.c_str());
+                        if (ncomp < 2) {
+                            SFEM_ERROR("Malfofmed YAML file at key (expected value)%s\n", key.c_str());
                         }
 
                         map_node->values[key] = value;
                     } else {
                         in_list = false;
 
-                        if(impl_->debug) printf("Exited list and encouted %s: %s\n", key.c_str(), value.c_str());
-                        auto node = std::make_shared<Impl::StringNode>();
-                        node->value = value;
+                        if (impl_->debug) printf("Exited list and encouted %s: %s\n", key.c_str(), value.c_str());
+                        auto node      = std::make_shared<Impl::StringNode>();
+                        node->value    = value;
                         impl_->kv[key] = node;
                     }
 
                 } while (in_list);
 
             } else {
-                if(impl_->debug) printf("%s: %s\n", key.c_str(), value.c_str());
-                auto node = std::make_shared<Impl::StringNode>();
-                node->value = value;
+                if (impl_->debug) printf("%s: %s\n", key.c_str(), value.c_str());
+                auto node      = std::make_shared<Impl::StringNode>();
+                node->value    = value;
                 impl_->kv[key] = node;
             }
         }
 
         return SFEM_FAILURE;
     }
+
+    bool YAMLNoIndent::key_exists(const std::string &key) const { return impl_->key_exists(key); }
 
     int YAMLNoIndent::get(const std::string &key, ptrdiff_t &val) { return impl_->get(key, val); }
     int YAMLNoIndent::get(const std::string &key, int &val) { return impl_->get(key, val); }
@@ -297,22 +294,12 @@ namespace sfem {
     int YAMLNoIndent::get(const std::string &key, std::string &val) { return impl_->get(key, val); }
     int YAMLNoIndent::get(const std::string &key, bool &val) { return impl_->get(key, val); }
 
-    int YAMLNoIndent::require(const std::string &key, ptrdiff_t &val) {
-        return impl_->require(key, val);
-    }
+    int YAMLNoIndent::require(const std::string &key, ptrdiff_t &val) { return impl_->require(key, val); }
     int YAMLNoIndent::require(const std::string &key, int &val) { return impl_->require(key, val); }
-    int YAMLNoIndent::require(const std::string &key, float &val) {
-        return impl_->require(key, val);
-    }
-    int YAMLNoIndent::require(const std::string &key, double &val) {
-        return impl_->require(key, val);
-    }
-    int YAMLNoIndent::require(const std::string &key, std::string &val) {
-        return impl_->require(key, val);
-    }
+    int YAMLNoIndent::require(const std::string &key, float &val) { return impl_->require(key, val); }
+    int YAMLNoIndent::require(const std::string &key, double &val) { return impl_->require(key, val); }
+    int YAMLNoIndent::require(const std::string &key, std::string &val) { return impl_->require(key, val); }
 
-    int YAMLNoIndent::require(const std::string &key, bool &val) {
-        return impl_->require(key, val);
-    }
+    int YAMLNoIndent::require(const std::string &key, bool &val) { return impl_->require(key, val); }
 
 }  // namespace sfem
