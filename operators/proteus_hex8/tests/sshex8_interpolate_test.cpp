@@ -107,8 +107,6 @@ static int test_restrict_level2_to_level1() {
          SFEM_TEST_ASSERT(fabs(to->data()[i] - 3.375) < 1e-14);
      }
 
-    // count->print(std::cout);
-    // to->print(std::cout);
     return SFEM_TEST_SUCCESS;
 }
 
