@@ -286,8 +286,8 @@ int ssquad4_prolongate(const ptrdiff_t                   nelements,
 
                 // Interpolate the coefficients along the x-axis (center)
                 for (int yi = 0; yi < from_level; yi++) {
-                    for (int xi = 0; xi < from_level; xi++) {
-                        for (int between_yi = 1; between_yi < from_to_step; between_yi++) {
+                    for (int between_yi = 1; between_yi < from_to_step; between_yi++) {
+                        for (int xi = 0; xi < from_level; xi++) {
                             const int      yy    = yi * from_to_step + between_yi;
                             const int      left  = ssquad4_lidx(to_level, xi * from_to_step, yy);
                             const int      right = ssquad4_lidx(to_level, (xi + 1) * from_to_step, yy);

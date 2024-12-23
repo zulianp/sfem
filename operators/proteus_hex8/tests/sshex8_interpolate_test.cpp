@@ -29,6 +29,70 @@ static int test_incidence_count() {
     return SFEM_TEST_SUCCESS;
 }
 
+static int test_level1_to_level4() {
+    auto from = sfem::h_buffer<real_t>(8);
+    auto to   = sfem::h_buffer<real_t>(125);
+
+    for (ptrdiff_t i = 0; i < from->size(); i++) {
+        from->data()[i] = 1;
+    }
+
+    auto from_elements = sfem::h_buffer<idx_t>(8, 1);
+    auto to_elements   = sfem::h_buffer<idx_t>(125, 1);
+
+    for (ptrdiff_t i = 0; i < from_elements->extent(0); i++) {
+        from_elements->data()[i][0] = i;
+    }
+
+    for (ptrdiff_t i = 0; i < to_elements->extent(0); i++) {
+        to_elements->data()[i][0] = i;
+    }
+
+    SFEM_TEST_ASSERT(sshex8_prolongate(1,                      // nelements,
+                                       1,                      // from_level
+                                       1,                      // from_level_stride
+                                       from_elements->data(),  // from_elements
+                                       4,                      // to_level
+                                       1,                      // to_level_stride
+                                       to_elements->data(),    // to_elements
+                                       1,                      // vec_size
+                                       from->data(),
+                                       to->data()) == SFEM_SUCCESS);
+
+    for (ptrdiff_t i = 0; i < to->size(); i++) {
+        SFEM_TEST_ASSERT(fabs(to->data()[i] - 1) < 1e-12);
+    }
+
+    for (int zi = 0; zi < 2; zi++) {
+        for (int yi = 0; yi < 2; yi++) {
+            for (int xi = 0; xi < 2; xi++) {
+                from->data()[zi * 4 + yi * 2 + xi] = xi * 4;
+            }
+        }
+    }
+
+    SFEM_TEST_ASSERT(sshex8_prolongate(1,                      // nelements,
+                                       1,                      // from_level
+                                       1,                      // from_level_stride
+                                       from_elements->data(),  // from_elements
+                                       4,                      // to_level
+                                       1,                      // to_level_stride
+                                       to_elements->data(),    // to_elements
+                                       1,                      // vec_size
+                                       from->data(),
+                                       to->data()) == SFEM_SUCCESS);
+
+    for (int zi = 0; zi < 5; zi++) {
+        for (int yi = 0; yi < 5; yi++) {
+            for (int xi = 0; xi < 5; xi++) {
+                    SFEM_TEST_ASSERT(fabs(to->data()[zi * 25 + yi * 5 + xi] - xi) < 1e-12);
+            }
+        }
+    }
+
+    return SFEM_TEST_SUCCESS;
+}
+
 static int test_level1_to_level2() {
     auto from = sfem::h_buffer<real_t>(8);
     auto to   = sfem::h_buffer<real_t>(27);
@@ -45,7 +109,7 @@ static int test_level1_to_level2() {
     e[2][0] = 1;
 
     // (0,0.5,0)-(1,0.5,0)
-    e[3][0] = 19;
+    e[3][0] = 9;
     e[4][0] = 10;
     e[5][0] = 11;
 
@@ -87,15 +151,15 @@ static int test_level1_to_level2() {
     for (int zi = 0; zi < 2; zi++) {
         for (int yi = 0; yi < 2; yi++) {
             for (int xi = 0; xi < 2; xi++) {
-                const idx_t idx = e[2 * zi * 9 + 2 * yi * 3 + 2 * xi][0];
-                SFEM_TEST_ASSERT(idx < 8);
-                from->data()[idx] = xi * 2;
+                    const idx_t idx = e[2 * zi * 9 + 2 * yi * 3 + 2 * xi][0];
+                    SFEM_TEST_ASSERT(idx < 8);
+                    from->data()[idx] = xi * 2;
             }
         }
     }
-    
+
     SFEM_TEST_ASSERT(sshex8_prolongate(1,  // nelements,
-                                       1,  // rom_level
+                                       1,  // from_level
                                        2,  // from_level_stride
                                        e,  // from_elements
                                        2,  // to_level
@@ -108,23 +172,23 @@ static int test_level1_to_level2() {
     for (int zi = 0; zi < 3; zi++) {
         for (int yi = 0; yi < 3; yi++) {
             for (int xi = 0; xi < 3; xi++) {
-                const idx_t idx = e[zi * 9 + yi * 3 + xi][0];
-                SFEM_TEST_ASSERT(fabs(to->data()[idx] - xi) < 1e-12);
+                    const idx_t idx = e[zi * 9 + yi * 3 + xi][0];
+                    SFEM_TEST_ASSERT(fabs(to->data()[idx] - xi) < 1e-12);
             }
         }
     }
 
-    auto count_to = sfem::h_buffer<uint16_t>(9);
+    auto count_to = sfem::h_buffer<uint16_t>(27);
     sshex8_element_node_incidence_count(2, 1, 1, elements->data(), count_to->data());
 
-    for (ptrdiff_t i = 0; i < 9; i++) {
+    for (ptrdiff_t i = 0; i < 27; i++) {
         SFEM_TEST_ASSERT(count_to->data()[i] == 1);
     }
 
-    auto count_from = sfem::h_buffer<uint16_t>(4);
+    auto count_from = sfem::h_buffer<uint16_t>(8);
     sshex8_element_node_incidence_count(1, 2, 1, elements->data(), count_from->data());
 
-    for (ptrdiff_t i = 0; i < 4; i++) {
+    for (ptrdiff_t i = 0; i < 8; i++) {
         SFEM_TEST_ASSERT(count_from->data()[i] == 1);
     }
 
@@ -135,5 +199,6 @@ int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT();
     SFEM_RUN_TEST(test_incidence_count);
     SFEM_RUN_TEST(test_level1_to_level2);
+    SFEM_RUN_TEST(test_level1_to_level4);
     return SFEM_UNIT_TEST_FINALIZE();
 }
