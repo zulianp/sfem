@@ -102,15 +102,21 @@ MS := Milestone
 **MS 1: ()**
 
    - [x] Two-level method matrix-free SPGMG on GPU (basic)
+   - [x] Baseline obstacle problem with SDF using Shifted-Penalty (recuced size of constrained dofs and quantities, normal field)
+   - [x] GMG: prolongation/restriction on CPU for SSHEX8, and SSQUAD4 (for contact boundary)
+   - [ ] SSHEX-Mesh online generation from HEX8
+   - [ ] Multilevel GMG on CPU
+   - [ ] Contact stresses post-processor for SSHEX8
    - [ ] Provide boundary surface mask for adaptive coarsening
    - [ ] Boundary mass-matrix
-   - [ ] Support non-axis aligned normal fields for contact
-   - [ ] Actual obstacle problem with SDF (recuced size of constrained dofs and quanties, normal field, nonlinear obstacle)
+   - [ ] MG with Support non-axis aligned normal fields for contact
    - [ ] Chebyshev smoother
    - [ ] Export facilities for Paper 1
+   - [ ] Nonlinear obstacle contact loop (Optional)
 
 **MS 2: ()**
    - [ ] Drafting/Finalizing P1
+   - [ ] Nonlinear obstacle contact loop (if not done in MS 1)
 
 **MS 3: ()**
 

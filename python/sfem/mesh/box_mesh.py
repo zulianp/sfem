@@ -81,8 +81,8 @@ def create_boundary_faces(cell_type, nx, ny, nz):
     top = create_face_idx(fact*(nx-1)*(nz-1), nxf)
     bottom = create_face_idx(fact*(nx-1)*(nz-1), nxf)
 
-    front = create_face_idx(nx*ny, nxf)
-    back = create_face_idx(nx*ny, nxf)
+    front = create_face_idx(fact*(nx-1)*(ny-1), nxf)
+    back = create_face_idx(fact*(nx-1)*(ny-1), nxf)
 
     idx = 0
     for zi in range(0, nz-1):
@@ -143,51 +143,139 @@ def create_boundary_faces(cell_type, nx, ny, nz):
                 right[idx, 2]  = quad_right[3]
 
                 idx += 1
-        
 
-    # idx = 0 
-    # for zi in range(0, nz):
-    #     for xi in range(0, nx):
-            
-    #         yb = 0 * ld[1]
-    #         yt = (ny - 1) * ld[1]
+    idx = 0
+    for zi in range(0, nz-1):
+        for xi in range(0, nx-1):
 
-    #         xp = yi * ld[1]
-    #         zp = zi * ld[2]
+            yb = 0 * ld[1]
+            yt = (ny - 1) * ld[1]
 
-    #         p = xp + zp
+            x0 = xi * ld[0]
+            z0 = zi * ld[2]
+            p0 = x0 + z0
 
-    #         bottom[idx]  = yb + p
-    #         top[idx]     = yt + p
+            x1 = (xi + 1) * ld[0]
+            z1 = zi * ld[2]
+            p1 = x1 + z1
 
-    #         idx += 1
+            x2 = (xi + 1) * ld[0]
+            z2 = (zi + 1) * ld[2]
+            p2 = x2 + z2
 
-    # idx = 0 
-    # for yi in range(0, ny):
-    #     for xi in range(0, nx):
-            
-    #         zf = 0 * ld[2]
-    #         zb = (nz - 1) * ld[2]
+            x3 = xi * ld[0]
+            z3 = (zi+1) * ld[2]
+            p3 = x3 + z3
 
-    #         xp = yi * ld[1]
-    #         yp = yi * ld[1]
+            quad_bottom  = [ yb + p0, yb + p1, yb + p2, yb + p3 ]
+            quad_top = [ yt + p0, yt + p1, yt + p2, yt + p3 ]
 
-    #         p = xp + yp
+            quad_bottom.reverse() 
+            quad_top.reverse() 
 
-    #         front[idx] = zf + p
-    #         back[idx]  = zb + p
+            if ih:
+                bottom[idx, 0]  = quad_bottom[3]
+                bottom[idx, 1]  = quad_bottom[2]
+                bottom[idx, 2]  = quad_bottom[1]
+                bottom[idx, 3]  = quad_bottom[0]
 
-    #         idx += 1
+                top[idx, 0]  = quad_top[0]
+                top[idx, 1]  = quad_top[1]
+                top[idx, 2]  = quad_top[2]
+                top[idx, 3]  = quad_top[3]
 
-    # print(left)
+                idx += 1
+
+            else:
+                bottom[idx, 0]  = quad_bottom[0]
+                bottom[idx, 1]  = quad_bottom[2]
+                bottom[idx, 2]  = quad_bottom[1]
+
+                top[idx, 0]  = quad_top[0]
+                top[idx, 1]  = quad_top[1]
+                top[idx, 2]  = quad_top[2]
+
+                idx += 1
+
+                bottom[idx, 0]  = quad_bottom[0]
+                bottom[idx, 1]  = quad_bottom[3]
+                bottom[idx, 2]  = quad_bottom[2]
+
+                top[idx, 0]  = quad_top[0]
+                top[idx, 1]  = quad_top[2]
+                top[idx, 2]  = quad_top[3]
+
+                idx += 1
+
+    idx = 0
+    for yi in range(0, ny-1):
+        for xi in range(0, nx-1):
+            zb = 0 * ld[2]
+            zf = (nz - 1) * ld[2]
+
+            y0 = yi * ld[1]
+            x0 = xi * ld[0]
+            p0 = y0 + x0
+
+            y1 = (yi + 1) * ld[1]
+            x1 = xi * ld[0]
+            p1 = y1 + x1
+
+            y2 = (yi + 1) * ld[1]
+            x2 = (xi + 1) * ld[0]
+            p2 = y2 + x2
+
+            y3 = yi * ld[1]
+            x3 = (xi+1) * ld[0]
+            p3 = y3 + x3
+
+            quad_back  = [ zb + p0, zb + p1, zb + p2, zb + p3 ]
+            quad_front = [ zf + p0, zf + p1, zf + p2, zf + p3 ]
+
+            quad_back.reverse()
+            quad_front.reverse()
+
+            if ih:
+                back[idx, 0]  = quad_back[3]
+                back[idx, 1]  = quad_back[2]
+                back[idx, 2]  = quad_back[1]
+                back[idx, 3]  = quad_back[0]
+
+                front[idx, 0]  = quad_front[0]
+                front[idx, 1]  = quad_front[1]
+                front[idx, 2]  = quad_front[2]
+                front[idx, 3]  = quad_front[3]
+
+                idx += 1
+
+            else:
+                back[idx, 0]  = quad_back[0]
+                back[idx, 1]  = quad_back[2]
+                back[idx, 2]  = quad_back[1]
+
+                front[idx, 0]  = quad_front[0]
+                front[idx, 1]  = quad_front[1]
+                front[idx, 2]  = quad_front[2]
+
+                idx += 1
+
+                back[idx, 0]  = quad_back[0]
+                back[idx, 1]  = quad_back[3]
+                back[idx, 2]  = quad_back[2]
+
+                front[idx, 0]  = quad_front[0]
+                front[idx, 1]  = quad_front[2]
+                front[idx, 2]  = quad_front[3]
+
+                idx += 1
+
     return {
         "left"      : left,
-        "right"     : right
-        # ,
-        # "top"       : top,
-        # "bottom"    : bottom,
-        # "front"     : front,
-        # "back"      : back
+        "right"     : right,
+        "top"       : top,
+        "bottom"    : bottom,
+        "front"     : front,
+        "back"      : back
     }
 
 def create_boundary_nodes(nx, ny, nz):
@@ -225,7 +313,7 @@ def create_boundary_nodes(nx, ny, nz):
             yb = 0 * ld[1]
             yt = (ny - 1) * ld[1]
 
-            xp = yi * ld[1]
+            xp = xi * ld[0]
             zp = zi * ld[2]
 
             p = xp + zp
@@ -239,10 +327,10 @@ def create_boundary_nodes(nx, ny, nz):
     for yi in range(0, ny):
         for xi in range(0, nx):
             
-            zf = 0 * ld[2]
-            zb = (nz - 1) * ld[2]
+            zf = (nz - 1) * ld[2]
+            zb = 0 * ld[2]
 
-            xp = yi * ld[1]
+            xp = xi * ld[0]
             yp = yi * ld[1]
 
             p = xp + yp

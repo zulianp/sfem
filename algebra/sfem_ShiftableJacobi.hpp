@@ -84,10 +84,10 @@ namespace sfem {
             auto dd  = in->data();
             auto ivd = out->data();
 
-            const ptrdiff_t nblocks = in->size() / 6;
+            const ptrdiff_t n_blocks = in->size() / 6;
 
 #pragma omp parallel for
-            for (ptrdiff_t b = 0; b < nblocks; b++) {
+            for (ptrdiff_t b = 0; b < n_blocks; b++) {
                 auto ivi = &ivd[b * 9];
                 auto di  = &dd[b * 6];
 
@@ -111,19 +111,19 @@ namespace sfem {
         void add_sparse_sym_diag_to_diag(const std::shared_ptr<SparseBlockVector<T>>& sbv,
                                          const std::shared_ptr<Buffer<T>>&            scaling,
                                          const std::shared_ptr<Buffer<T>>&            out) {
-            const ptrdiff_t    nblocks = sbv->idx()->size();
-            const idx_t* const idx     = sbv->idx()->data();
-            const T* const     dd      = sbv->data()->data();
-            const T* const     s       = scaling->data();
-            auto               ivd     = out->data();
+            const ptrdiff_t    n_blocks = sbv->idx()->size();
+            const idx_t* const idx      = sbv->idx()->data();
+            const T* const     dd       = sbv->data()->data();
+            const T* const     s        = scaling->data();
+            auto               ivd      = out->data();
 
 #pragma omp parallel for
-            for (ptrdiff_t i = 0; i < nblocks; i++) {
-                const idx_t b = idx[i];
+            for (ptrdiff_t i = 0; i < n_blocks; i++) {
+                auto di = &dd[i * 6];
+                auto si = s[i];
 
-                auto ivi = &ivd[b * 9];
-                auto di  = &dd[i * 6];
-                auto si  = s[i];
+                const idx_t b   = idx[i];
+                auto        ivi = &ivd[b * 9];
 
                 // row 0
                 ivi[0] += si * di[0];
@@ -142,15 +142,44 @@ namespace sfem {
             }
         }
 
+        void apply_mask(const std::shared_ptr<Buffer<T>>& inout) {
+            const ptrdiff_t n_blocks = inout->size() / 9;
+            auto ivd = inout->data();
+            auto md  = constraints_mask->data();
+
+#pragma omp parallel for
+            for (ptrdiff_t b = 0; b < n_blocks; b++) {
+                auto ivi = &ivd[b * 9];
+
+                if (mask_get(b * block_size + 0, md)) {
+                    ivi[0] = 1;
+                    ivi[1] = 0;
+                    ivi[2] = 0;
+                }
+
+                if (mask_get(b * block_size + 1, md)) {
+                    ivi[3] = 0;
+                    ivi[4] = 1;
+                    ivi[5] = 0;
+                }
+
+                if (mask_get(b * block_size + 2, md)) {
+                    ivi[6] = 0;
+                    ivi[7] = 0;
+                    ivi[8] = 1;
+                }
+            }
+        }
+
         void sym_diag_to_diag(const std::shared_ptr<Buffer<T>>& in, const std::shared_ptr<Buffer<T>>& out) {
             auto dd  = in->data();
             auto ivd = out->data();
             auto md  = constraints_mask->data();
 
-            const ptrdiff_t nblocks = in->size() / 6;
+            const ptrdiff_t n_blocks = in->size() / 6;
 
 #pragma omp parallel for
-            for (ptrdiff_t b = 0; b < nblocks; b++) {
+            for (ptrdiff_t b = 0; b < n_blocks; b++) {
                 auto ivi = &ivd[b * 9];
                 auto di  = &dd[b * 6];
 
@@ -169,23 +198,23 @@ namespace sfem {
                 ivi[7] = di[4];
                 ivi[8] = di[5];
 
-                if (mask_get(b * block_size + 0, md)) {
-                    ivi[0] = 1;
-                    ivi[1] = 0;
-                    ivi[2] = 0;
-                }
+                // if (mask_get(b * block_size + 0, md)) {
+                //     ivi[0] = 1;
+                //     ivi[1] = 0;
+                //     ivi[2] = 0;
+                // }
 
-                if (mask_get(b * block_size + 1, md)) {
-                    ivi[3] = 0;
-                    ivi[4] = 1;
-                    ivi[5] = 0;
-                }
+                // if (mask_get(b * block_size + 1, md)) {
+                //     ivi[3] = 0;
+                //     ivi[4] = 1;
+                //     ivi[5] = 0;
+                // }
 
-                if (mask_get(b * block_size + 2, md)) {
-                    ivi[3] = 0;
-                    ivi[4] = 0;
-                    ivi[5] = 1;
-                }
+                // if (mask_get(b * block_size + 2, md)) {
+                //     ivi[6] = 0;
+                //     ivi[7] = 0;
+                //     ivi[8] = 1;
+                // }
             }
         }
 
@@ -201,21 +230,22 @@ namespace sfem {
                 const T mat_7,
                 const T mat_8,
                 // Output
-                T* const SFEM_RESTRICT mat_inv_0,
-                T* const SFEM_RESTRICT mat_inv_1,
-                T* const SFEM_RESTRICT mat_inv_2,
-                T* const SFEM_RESTRICT mat_inv_3,
-                T* const SFEM_RESTRICT mat_inv_4,
-                T* const SFEM_RESTRICT mat_inv_5,
-                T* const SFEM_RESTRICT mat_inv_6,
-                T* const SFEM_RESTRICT mat_inv_7,
-                T* const SFEM_RESTRICT mat_inv_8) {
+                T* const mat_inv_0,
+                T* const mat_inv_1,
+                T* const mat_inv_2,
+                T* const mat_inv_3,
+                T* const mat_inv_4,
+                T* const mat_inv_5,
+                T* const mat_inv_6,
+                T* const mat_inv_7,
+                T* const mat_inv_8) {
             const T x0 = mat_4 * mat_8;
             const T x1 = mat_5 * mat_7;
             const T x2 = mat_1 * mat_5;
             const T x3 = mat_1 * mat_8;
             const T x4 = mat_2 * mat_4;
             const T x5 = 1.0 / (mat_0 * x0 - mat_0 * x1 + mat_2 * mat_3 * mat_7 - mat_3 * x3 + mat_6 * x2 - mat_6 * x4);
+            assert(x5 == x5);
             *mat_inv_0 = x5 * (x0 - x1);
             *mat_inv_1 = x5 * (mat_2 * mat_7 - x3);
             *mat_inv_2 = x5 * (x2 - x4);
@@ -228,11 +258,11 @@ namespace sfem {
         }
 
         void inplace_invert(const std::shared_ptr<Buffer<T>>& inout) {
-            const ptrdiff_t nblocks = inout->size() / 9;
-            auto            dd      = inout->data();
+            const ptrdiff_t n_blocks = inout->size() / 9;
+            auto            dd       = inout->data();
 
 #pragma omp parallel for
-            for (ptrdiff_t b = 0; b < nblocks; b++) {
+            for (ptrdiff_t b = 0; b < n_blocks; b++) {
                 auto ddi = &dd[b * 9];
 
                 inverse3(ddi[0],
@@ -262,9 +292,9 @@ namespace sfem {
             assert(execution_space_ == EXECUTION_SPACE_HOST);
             assert(constraints_mask);
 
-            const ptrdiff_t nblocks = d->size() / 6;
-            diag                    = d;
-            inv_diag                = create_buffer<T>(nblocks * block_size * block_size, execution_space());
+            const ptrdiff_t n_blocks = d->size() / 6;
+            diag                     = d;
+            inv_diag                 = create_buffer<T>(n_blocks * block_size * block_size, execution_space());
             sym_diag_to_diag(diag, inv_diag);
             inplace_invert(inv_diag);
             blas.scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
@@ -276,6 +306,7 @@ namespace sfem {
 
             sym_diag_to_diag(diag, inv_diag);
             add_sym_diag_to_diag(d, inv_diag);
+            apply_mask(inv_diag);
             inplace_invert(inv_diag);
             blas.scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
             return SFEM_SUCCESS;
@@ -283,8 +314,8 @@ namespace sfem {
 
         int shift(const std::shared_ptr<SparseBlockVector<T>>& block_diag, const std::shared_ptr<Buffer<T>>& scaling) override {
             sym_diag_to_diag(diag, inv_diag);
-            sym_diag_to_diag(diag, inv_diag);
             add_sparse_sym_diag_to_diag(block_diag, scaling, inv_diag);
+            apply_mask(inv_diag);
             inplace_invert(inv_diag);
             blas.scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
             return SFEM_SUCCESS;
@@ -292,17 +323,17 @@ namespace sfem {
 
         /* Operator */
         int apply(const T* const x, T* const y) override {
-            const ptrdiff_t nblocks = inv_diag->size() / (block_size * block_size);
+            const ptrdiff_t n_blocks = inv_diag->size() / (block_size * block_size);
 
             const T* const dd = inv_diag->data();
 #pragma omp parallel for
-            for (ptrdiff_t i = 0; i < nblocks; i++) {
+            for (ptrdiff_t i = 0; i < n_blocks; i++) {
                 const T* const xi = &x[i * block_size];
                 T* const       yi = &y[i * block_size];
                 const T* const di = &dd[i * block_size * block_size];
 
-                for (int d1 = 0; d1 > block_size; d1++) {
-                    for (int d2 = 0; d2 > block_size; d2++) {
+                for (int d1 = 0; d1 < block_size; d1++) {
+                    for (int d2 = 0; d2 < block_size; d2++) {
                         yi[d1] += di[d1 * block_size + d2] * xi[d2];
                     }
                 }

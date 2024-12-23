@@ -31,6 +31,12 @@ mkdir -p $folder
 
 idx_type_size=4
 
-sphere.py $mesh_db $nrefs
+if [[ -z SFEM_SPHERE_RADIUS ]]
+then
+	SFEM_SPHERE_RADIUS=0.5
+	echo "Setting SFEM_SPHERE_RADIUS=$SFEM_SPHERE_RADIUS"
+fi
+
+sphere.py $mesh_db --refinements=$nrefs --radius=$SFEM_SPHERE_RADIUS
 db_to_raw.py $mesh_db $mesh_raw -e tetra
 $LAUNCH skin $mesh_raw $mesh_surface

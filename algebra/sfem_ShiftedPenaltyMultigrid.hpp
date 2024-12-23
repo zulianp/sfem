@@ -12,6 +12,8 @@
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_ShiftedPenalty_impl.hpp"
+#include "sfem_tpl_blas.hpp"
+#include "sfem_openmp_blas.hpp"
 
 #include "sfem_Buffer.hpp"
 
@@ -32,9 +34,11 @@ namespace sfem {
         void set_penalty_parameter(const T val) { penalty_param_ = val; }
 
         void set_constraints_op(const std::shared_ptr<Operator<T>>& op,
-                                const std::shared_ptr<Operator<T>>& op_t) {
+                                const std::shared_ptr<Operator<T>>& op_t,
+                                const std::shared_ptr<SparseBlockVector<T>>& op_x_op) {
             constraints_op_ = op;
             constraints_op_transpose_ = op_t;
+            constraints_op_x_op_      = op_x_op;
         }
 
         enum CycleType {
@@ -251,7 +255,7 @@ namespace sfem {
         void default_init() {
             OpenMP_BLAS<T>::build_blas(blas_);
             OpenMP_ShiftedPenalty<T>::build(impl_);
-            execution_space_ = EXECUTION_SPACE_HOST;
+            execution_space_ = EXECUTION_SPACE_HOST; 
         }
 
         void set_max_it(const int val) { max_it_ = val; }
@@ -280,6 +284,7 @@ namespace sfem {
 
         std::shared_ptr<Operator<T>> constraints_op_;
         std::shared_ptr<Operator<T>> constraints_op_transpose_;
+        std::shared_ptr<SparseBlockVector<T>> constraints_op_x_op_;
 
         // Internals
         std::vector<std::shared_ptr<Memory>> memory_;
@@ -348,6 +353,12 @@ namespace sfem {
             return 0;
         }
 
+        std::shared_ptr<Operator<T>> shifted_op(const int level)
+        {
+            auto J = operator_[level] + sfem::diag_op(memory_[level]->diag, execution_space());
+            return J;
+        }
+
         void eval_residual_and_jacobian() {
             const int level = finest_level();
             auto mem = memory_[level];
@@ -364,26 +375,25 @@ namespace sfem {
             const T* const l_ub = lagr_ub ? lagr_ub->data() : nullptr;
 
             if (constraints_op_) {
-                blas_.zeros(n_constrained_dofs, correction->data());
-
-                // Solution space to constraints space
-                constraints_op_->apply(mem->solution->data(), correction->data());
+                // Jacobian
 
                 blas_.zeros(n_constrained_dofs, mem->work->data());
+
+                // Solution space to constraints space
+                constraints_op_->apply(mem->solution->data(), mem->work->data());
+                blas_.zeros(n_dofs, mem->diag->data());
+
+                blas_.zeros(n_constrained_dofs, mem->diag->data());
                 impl_.calc_J_pen(n_constrained_dofs,
-                                correction->data(),
+                                mem->work->data(),
                                 penalty_param_,
                                 lb,
                                 ub,
                                 l_lb,
                                 l_ub,
-                                mem->work->data());
+                                mem->diag->data());
 
-                blas_.zeros(n_dofs, mem->diag->data());
-
-                // Constraints space to solution space
-                constraints_op_transpose_->apply(mem->work->data(), mem->diag->data());
-
+                // Residual
                 blas_.zeros(n_constrained_dofs, mem->work->data());
                 impl_.calc_r_pen(n_constrained_dofs,
                                 correction->data(),
@@ -456,7 +466,11 @@ namespace sfem {
             for (int ns = 0; ns < nlsmooth_steps; ns++) {
                 eval_residual_and_jacobian();
 
-                smoother->set_op_and_diag_shift(op, mem->diag);
+                if(constraints_op_) {
+                    smoother->set_op_and_diag_shift(op, constraints_op_x_op_, mem->diag);
+                } else {
+                    smoother->set_op_and_diag_shift(op, mem->diag);
+                }
 
                 blas_.zeros(n_dofs, correction->data());
                 smoother->apply(mem->work->data(), correction->data());
@@ -470,7 +484,7 @@ namespace sfem {
             const int level = finest_level();
             auto mem = memory_[level];
             auto smoother = smoother_[level];
-            auto op = operator_[level];
+            auto sop = shifted_op(level);
             auto restriction = restriction_[level];
             auto prolongation = prolongation_[coarser_level(level)];
             auto mem_coarse = memory_[coarser_level(level)];
@@ -498,11 +512,11 @@ namespace sfem {
                 prolongation->apply(mem_coarse->solution->data(), correction->data());
 
                 if (line_search_enabled_) {
+                    assert(!constraints_op_); // IMPLEMENT ME?
                     T alpha = blas_.dot(correction->size(), correction->data(), mem->work->data());
                     blas_.zeros(mem->work->size(), mem->work->data());
 
-                    auto J = op + sfem::diag_op(mem->diag, execution_space());
-                    J->apply(correction->data(), mem->work->data());
+                    sop->apply(correction->data(), mem->work->data());
 
                     alpha /= std::max(
                             T(1e-16),
@@ -539,6 +553,7 @@ namespace sfem {
             auto mem = memory_[level];
             auto smoother = smoother_[level];
             auto op = operator_[level];
+            auto sop = shifted_op(level);
 
             ptrdiff_t n_dofs = op->rows();
             if (coarsest_level() == level) {
@@ -565,9 +580,8 @@ namespace sfem {
 
                 {
                     // Compute residual
-                    auto J = op + sfem::diag_op(mem->diag, execution_space());
                     blas_.zeros(mem->size(), mem->work->data());
-                    J->apply(mem->solution->data(), mem->work->data());
+                    sop->apply(mem->solution->data(), mem->work->data());
                     blas_.axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
                 }
 

@@ -66,6 +66,9 @@ int main(int argc, char *argv[]) {
     int SFEM_MAX_IT = 20;
     SFEM_READ_ENV(SFEM_MAX_IT, atoi);
 
+    int SFEM_CONTACT_LINEARIZATIONS = 20;
+    SFEM_READ_ENV(SFEM_CONTACT_LINEARIZATIONS, atoi);
+
     bool SFEM_USE_GPU = true;
     SFEM_READ_ENV(SFEM_USE_GPU, atoi);
 
@@ -139,9 +142,6 @@ int main(int argc, char *argv[]) {
     auto      x     = sfem::create_buffer<real_t>(ndofs, es);
     auto      rhs   = sfem::create_buffer<real_t>(ndofs, es);
 
-    f->apply_constraints(x->data());
-    f->apply_constraints(rhs->data());
-
     std::shared_ptr<sfem::Operator<real_t>> linear_op;
 
     if (SFEM_MATRIX_FREE) {
@@ -158,64 +158,98 @@ int main(int argc, char *argv[]) {
     auto cc_op       = contact_conds->linear_constraints_op();
     auto cc_op_t     = contact_conds->linear_constraints_op_transpose();
     auto upper_bound = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);
-    
     contact_conds->signed_distance(x->data(), upper_bound->data());
 
-    int sym_block_size = (block_size == 3 ? 6 : 3);
-    auto normal_prod = sfem::create_buffer<real_t>(sym_block_size * contact_conds->n_constrained_dofs(), es);
-    auto sbv         = sfem::create_sparse_block_vector(contact_conds->node_mapping(), normal_prod);
-
+    int  sym_block_size = (block_size == 3 ? 6 : 3);
+    auto normal_prod    = sfem::create_buffer<real_t>(sym_block_size * contact_conds->n_constrained_dofs(), es);
     contact_conds->hessian_block_diag_sym(x->data(), normal_prod->data());
+    auto sbv = sfem::create_sparse_block_vector(contact_conds->node_mapping(), normal_prod);
 
-    std::shared_ptr<sfem::Operator<real_t>> solver;
-    if (SFEM_ELEMENT_REFINE_LEVEL > 0 && !SFEM_USE_SHIFTED_PENALTY) {
-        printf("Using Shifted-Penalty Multigrid\n");
-        auto spmg = sfem::create_ssmg<sfem::ShiftedPenaltyMultigrid<real_t>>(f, es);
-        spmg->set_max_it(30);
-        spmg->set_atol(1e-8);
-        spmg->set_upper_bound(upper_bound);
-        spmg->set_constraints_op(cc_op, cc_op_t);
-        //        spmg->debug = true;
-        solver = spmg;
-    } else {
-        printf("Using Shifted-Penalty\n");
-        int SFEM_USE_STEEPEST_DESCENT = 0;
-        SFEM_READ_ENV(SFEM_USE_STEEPEST_DESCENT, atoi);
+    // std::shared_ptr<sfem::Operator<real_t>> solver;
+    // if (SFEM_ELEMENT_REFINE_LEVEL > 0 && !SFEM_USE_SHIFTED_PENALTY) {
+    //     printf("Using Shifted-Penalty Multigrid\n");
+    //     auto spmg = sfem::create_ssmg<sfem::ShiftedPenaltyMultigrid<real_t>>(f, es);
+    //     spmg->set_max_it(30);
+    //     spmg->set_atol(1e-8);
+    //     spmg->set_upper_bound(upper_bound);
+    //     spmg->set_constraints_op(cc_op, cc_op_t);
+    //     //        spmg->debug = true;
+    //     solver = spmg;
+    // } else {
+    printf("Using Shifted-Penalty\n");
+    int SFEM_USE_STEEPEST_DESCENT = 0;
+    SFEM_READ_ENV(SFEM_USE_STEEPEST_DESCENT, atoi);
 
-        auto sp = std::make_shared<sfem::ShiftedPenalty<real_t>>();
-        sp->set_op(linear_op);
-        sp->default_init();
+    auto sp = std::make_shared<sfem::ShiftedPenalty<real_t>>();
+    sp->set_op(linear_op);
+    sp->default_init();
 
-        sp->set_atol(1e-12);
-        sp->set_max_it(SFEM_MAX_IT);
-        sp->set_max_inner_it(30);
-        sp->set_damping(SFEM_DAMPING);
-        sp->set_penalty_param(10);
+    sp->set_atol(1e-12);
+    sp->set_max_it(SFEM_MAX_IT);
+    sp->set_max_inner_it(30);
+    sp->set_damping(SFEM_DAMPING);
+    sp->set_penalty_param(10);
 
-        auto cg     = sfem::create_cg(linear_op, es);
-        cg->verbose = true;
-        auto diag   = sfem::create_buffer<real_t>(fs->mesh_ptr()->n_nodes() * (block_size == 3 ? 6 : 3), es);
-        auto mask   = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
-        f->hessian_block_diag_sym(nullptr, diag->data());
-        auto sj = sfem::h_shiftable_block_sym_jacobi(diag, mask);
-        // cg->set_preconditioner_op(sj);
+    auto cg     = sfem::create_cg(linear_op, es);
+    cg->verbose = false;
+    auto diag   = sfem::create_buffer<real_t>(fs->mesh_ptr()->n_nodes() * (block_size == 3 ? 6 : 3), es);
+    auto mask   = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
+    f->hessian_block_diag_sym(nullptr, diag->data());
 
-        cg->set_atol(1e-12);
-        cg->set_rtol(1e-3);
-        cg->set_max_it(20000);
+    auto sj = sfem::h_shiftable_block_sym_jacobi(diag, mask);
+    cg->set_preconditioner_op(sj);
 
-        sp->linear_solver_ = cg;
-        sp->enable_steepest_descent(SFEM_USE_STEEPEST_DESCENT);
+    cg->set_atol(1e-12);
+    cg->set_rtol(1e-4);
+    cg->set_max_it(20000);
 
-        sp->verbose = true;
+    sp->linear_solver_ = cg;
+    sp->enable_steepest_descent(SFEM_USE_STEEPEST_DESCENT);
 
-        sp->set_upper_bound(upper_bound);
-        sp->set_constraints_op(cc_op, cc_op_t, sbv);
-        solver = sp;
-    }
+    sp->verbose = true;
+
+    auto solver = sp;
+    // }
+
+    solver->set_upper_bound(upper_bound);
+    solver->set_constraints_op(cc_op, cc_op_t, sbv);
+
+    auto upper_bound_increment = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);
 
     double solve_tick = MPI_Wtime();
-    solver->apply(rhs->data(), x->data());
+
+    auto blas = sfem::blas<real_t>(es);
+
+    f->apply_constraints(x->data());
+    f->apply_constraints(rhs->data());
+
+    for (int k = 0; k < SFEM_CONTACT_LINEARIZATIONS; k++) {
+        printf("---------------------------\n");
+        printf("Contact linerization %d\n", k);
+        printf("---------------------------\n");
+
+        solver->apply(rhs->data(), x->data());
+
+        if (k + 1 < SFEM_CONTACT_LINEARIZATIONS) {
+            // 1) Project x onto the current constraints space and store it as a translation
+            blas->zeros(contact_conds->n_constrained_dofs(), upper_bound->data());
+            cc_op->apply(x->data(), upper_bound->data());
+
+            // 2) Update the normal fields with respect to x
+            contact_conds->update(x->data());
+            blas->zeros(normal_prod->size(), normal_prod->data());
+            contact_conds->hessian_block_diag_sym(x->data(), normal_prod->data());
+
+            // 3) Compute the distance increment
+            blas->zeros(upper_bound_increment->size(), upper_bound_increment->data());
+            contact_conds->signed_distance(x->data(), upper_bound_increment->data());
+
+            // 4) Add increment to the upper-bound
+            blas->axpy(upper_bound_increment->size(), 1, upper_bound_increment->data(), upper_bound->data());
+            solver->set_upper_bound(upper_bound);
+        }
+    }
+
     double solve_tock = MPI_Wtime();
 
 #ifdef SFEM_ENABLE_CUDA
@@ -226,11 +260,15 @@ int main(int argc, char *argv[]) {
     auto h_rhs = rhs;
 #endif
 
+    auto upper_bound_viz = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
+    contact_conds->signed_distance_for_mesh_viz(x->data(), upper_bound_viz->data());
+
     auto output = f->output();
     output->set_output_dir(output_path);
     output->enable_AoS_to_SoA(true);
     output->write("disp", h_x->data());
     output->write("rhs", h_rhs->data());
+    output->write("gap", upper_bound_viz->data());
 
     double tock = MPI_Wtime();
 

@@ -1,22 +1,19 @@
 #!/usr/bin/env python3
 
+import sys
+from aahex8 import *
+from hex8 import *
+from quad4 import *
 from sfem_codegen import *
-from tri3 import *
-from tri6 import *
-from tet4 import *
 from tet10 import *
 from tet20 import *
-from quad4 import *
-from hex8 import *
-from aahex8 import *
-
-
-import sys
+from tet4 import *
+from tri3 import *
+from tri6 import *
 
 class LaplaceOp:
-	def __init__(self, fe, symbolic_integration = False):
+	def __init__(self, fe, symbolic_integration=False):
 		self.symbolic_integration = symbolic_integration
-
 		# Ref element dims
 		dims = fe.manifold_dim()
 
@@ -56,7 +53,7 @@ class LaplaceOp:
 
 				if FFF[i, j] != 0:
 					FFF_symbolic[i, j] = var
-					FFF_symbolic[j, i] = var;
+					FFF_symbolic[j, i] = var
 
 		###################################################################
 

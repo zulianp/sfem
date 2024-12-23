@@ -371,13 +371,13 @@ int linear_elasticity_bcrs_sym(const enum ElemType                element_type,
 }
 
 int linear_elasticity_block_diag_sym_aos(const enum ElemType          element_type,
-                                     const ptrdiff_t              nelements,
-                                     const ptrdiff_t              nnodes,
-                                     idx_t **const SFEM_RESTRICT  elements,
-                                     geom_t **const SFEM_RESTRICT points,
-                                     const real_t                 mu,
-                                     const real_t                 lambda,
-                                     real_t *const                out) {
+                                         const ptrdiff_t              nelements,
+                                         const ptrdiff_t              nnodes,
+                                         idx_t **const SFEM_RESTRICT  elements,
+                                         geom_t **const SFEM_RESTRICT points,
+                                         const real_t                 mu,
+                                         const real_t                 lambda,
+                                         real_t *const                out) {
     switch (element_type) {
         case HEX8: {
             return affine_hex8_linear_elasticity_block_diag_sym(
