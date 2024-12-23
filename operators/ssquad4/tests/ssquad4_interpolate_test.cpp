@@ -5,6 +5,96 @@
 
 #include "sfem_test.h"
 
+int test_restrict_level2_to_level1() {
+    real_t from[9] = {1, 1, 1, 1, 1, 1, 1, 1, 1};
+    auto   to      = sfem::h_buffer<real_t>(4);
+
+    // In this example we use the same element indices array for both discretization
+    // the correct acceess is handled through strides. Specific ordering is expected!
+    auto elements = sfem::h_buffer<idx_t>(9, 1);
+
+    auto e  = elements->data();
+    e[0][0] = 0;
+    e[1][0] = 4;
+    e[2][0] = 1;
+
+    e[3][0] = 7;
+    e[4][0] = 8;
+    e[5][0] = 5;
+
+    e[6][0] = 3;
+    e[7][0] = 6;
+    e[8][0] = 2;
+
+    auto count = sfem::h_buffer<uint16_t>(9);
+
+    SFEM_TEST_ASSERT(ssquad4_element_node_incidence_count(2, 1, 1, e, count->data()) == SFEM_SUCCESS);
+
+    SFEM_TEST_ASSERT(ssquad4_restrict(1,              // nelements
+                                      2,              // from_level
+                                      1,              // from_level_stride
+                                      e,              // from_elements
+                                      count->data(),  // from_element_to_node_incidence_count
+                                      1,              // to_level
+                                      2,              // to_level_stride
+                                      e,              // to_elements
+                                      1,              // vec_size
+                                      from,
+                                      to->data()) == SFEM_SUCCESS);
+
+    for (int i = 0; i < 4; i++) {
+        SFEM_TEST_ASSERT(fabs(to->data()[i] - 2.25) < 1e-12);
+    }
+
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_restrict_level4_to_level2() {
+    auto from = sfem::h_buffer<real_t>(25);
+    auto to   = sfem::h_buffer<real_t>(9);
+
+    for (ptrdiff_t i = 0; i < 25; i++) {
+        from->data()[i] = 1;
+    }
+
+    auto to_elements = sfem::h_buffer<idx_t>(9, 1);
+    for (ptrdiff_t i = 0; i < 9; i++) {
+        to_elements->data()[i][0] = i;
+    }
+
+    auto from_elements = sfem::h_buffer<idx_t>(25, 1);
+    for (ptrdiff_t i = 0; i < 25; i++) {
+        from_elements->data()[i][0] = i;
+    }
+
+    auto count = sfem::h_buffer<uint16_t>(25);
+    SFEM_TEST_ASSERT(ssquad4_element_node_incidence_count(4, 1, 1, from_elements->data(), count->data()) == SFEM_SUCCESS);
+
+    SFEM_TEST_ASSERT(ssquad4_restrict(1,                      // nelements
+                                      4,                      // from_level
+                                      1,                      // from_level_stride
+                                      from_elements->data(),  // from_elements
+                                      count->data(),          // from_element_to_node_incidence_count
+                                      2,                      // to_level
+                                      1,                      // to_level_stride
+                                      to_elements->data(),    // to_elements
+                                      1,                      // vec_size
+                                      from->data(),
+                                      to->data()) == SFEM_SUCCESS);
+
+    SFEM_TEST_ASSERT(fabs(to->data()[0] - 2.25) < 1e-12);
+    SFEM_TEST_ASSERT(fabs(to->data()[1] - 3) < 1e-12);
+    SFEM_TEST_ASSERT(fabs(to->data()[2] - 2.25) < 1e-12);
+    SFEM_TEST_ASSERT(fabs(to->data()[3] - 3) < 1e-12);
+    SFEM_TEST_ASSERT(fabs(to->data()[4] - 4) < 1e-12);
+    SFEM_TEST_ASSERT(fabs(to->data()[5] - 3) < 1e-12);
+    SFEM_TEST_ASSERT(fabs(to->data()[6] - 2.25) < 1e-12);
+    SFEM_TEST_ASSERT(fabs(to->data()[7] - 3) < 1e-12);
+    SFEM_TEST_ASSERT(fabs(to->data()[8] - 2.25) < 1e-12);
+
+    return SFEM_TEST_SUCCESS;
+}
+
 int test_incidence_count() {
     auto elements = sfem::h_buffer<idx_t>(9, 2);
 
@@ -226,6 +316,8 @@ int test_level1_to_level4() {
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT();
+    SFEM_RUN_TEST(test_restrict_level4_to_level2);
+    SFEM_RUN_TEST(test_restrict_level2_to_level1);
     SFEM_RUN_TEST(test_level1_to_level4);
     SFEM_RUN_TEST(test_level2_to_level4);
     SFEM_RUN_TEST(test_level1_to_level2);
