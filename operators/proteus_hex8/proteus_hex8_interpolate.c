@@ -4,24 +4,23 @@
 
 #include <stdio.h>
 
-int proteus_hex8_hierarchical_restriction(int level,
-                                          const ptrdiff_t nelements,
-                                          idx_t **const SFEM_RESTRICT elements,
-                                          const uint16_t *const SFEM_RESTRICT
-                                                  element_to_node_incidence_count,
-                                          const int vec_size,
-                                          const real_t *const SFEM_RESTRICT from,
-                                          real_t *const SFEM_RESTRICT to) {
+int         proteus_hex8_hierarchical_restriction(int                                 level,
+                                                  const ptrdiff_t                     nelements,
+                                                  idx_t **const SFEM_RESTRICT         elements,
+                                                  const uint16_t *const SFEM_RESTRICT element_to_node_incidence_count,
+                                                  const int                           vec_size,
+                                                  const real_t *const SFEM_RESTRICT   from,
+                                                  real_t *const SFEM_RESTRICT         to) {
 #pragma omp parallel
     {
-        const int nxe = proteus_hex8_nxe(level);
+        const int  nxe    = proteus_hex8_nxe(level);
         scalar_t **e_from = malloc(vec_size * sizeof(scalar_t *));
-        scalar_t **e_to = malloc(vec_size * sizeof(scalar_t *));
-        uint16_t *weight = malloc(nxe * sizeof(uint16_t));
+        scalar_t **e_to   = malloc(vec_size * sizeof(scalar_t *));
+        uint16_t  *weight = malloc(nxe * sizeof(uint16_t));
 
         for (int d = 0; d < vec_size; d++) {
             e_from[d] = malloc(nxe * sizeof(scalar_t));
-            e_to[d] = malloc(8 * sizeof(scalar_t));
+            e_to[d]   = malloc(8 * sizeof(scalar_t));
         }
 
         idx_t *ev = malloc(nxe * sizeof(idx_t));
@@ -108,7 +107,6 @@ int proteus_hex8_hierarchical_restriction(int level,
             }
         }
 
-
         for (int d = 0; d < vec_size; d++) {
             free(e_to[d]);
             free(e_from[d]);
@@ -123,21 +121,21 @@ int proteus_hex8_hierarchical_restriction(int level,
     return SFEM_SUCCESS;
 }
 
-int proteus_hex8_hierarchical_prolongation(int level,
-                                           const ptrdiff_t nelements,
-                                           idx_t **const SFEM_RESTRICT elements,
-                                           const int vec_size,
-                                           const real_t *const SFEM_RESTRICT from,
-                                           real_t *const SFEM_RESTRICT to) {
+int         proteus_hex8_hierarchical_prolongation(int                               level,
+                                                   const ptrdiff_t                   nelements,
+                                                   idx_t **const SFEM_RESTRICT       elements,
+                                                   const int                         vec_size,
+                                                   const real_t *const SFEM_RESTRICT from,
+                                                   real_t *const SFEM_RESTRICT       to) {
 #pragma omp parallel
     {
-        const int nxe = proteus_hex8_nxe(level);
+        const int  nxe    = proteus_hex8_nxe(level);
         scalar_t **e_from = malloc(vec_size * sizeof(scalar_t *));
-        scalar_t **e_to = malloc(vec_size * sizeof(scalar_t *));
+        scalar_t **e_to   = malloc(vec_size * sizeof(scalar_t *));
 
         for (int d = 0; d < vec_size; d++) {
             e_from[d] = malloc(8 * sizeof(scalar_t));
-            e_to[d] = malloc(nxe * sizeof(scalar_t));
+            e_to[d]   = malloc(nxe * sizeof(scalar_t));
         }
 
         idx_t *ev = malloc(nxe * sizeof(idx_t));
@@ -228,4 +226,108 @@ int proteus_hex8_hierarchical_prolongation(int level,
     }
 
     return SFEM_SUCCESS;
+}
+
+// OpenMP nested parallelization? https://docs.oracle.com/cd/E19205-01/819-5270/aewbc/index.html
+// https://ppc.cs.aalto.fi/ch3/nested/
+
+int sshex8_element_node_incidence_count(const int                     level,
+                                        const int                     stride,
+                                        const ptrdiff_t               nelements,
+                                        idx_t **const SFEM_RESTRICT   elements,
+                                        uint16_t *const SFEM_RESTRICT count) {
+    for (int zi = 0; zi <= level; zi++) {
+        for (int yi = 0; yi <= level; yi++) {
+            for (int xi = 0; xi <= level; xi++) {
+                const int v = proteus_hex8_lidx(level * stride, xi * stride, yi * stride, zi * stride);
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < nelements; ++i) {
+#pragma omp atomic update
+                    count[elements[v][i]]++;
+                }
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+int sshex8_restrict(const ptrdiff_t                     nelements,
+                    const int                           from_level,
+                    const int                           from_level_stride,
+                    idx_t **const SFEM_RESTRICT         from_elements,
+                    const uint16_t *const SFEM_RESTRICT from_element_to_node_incidence_count,
+                    const int                           to_level,
+                    const int                           to_level_stride,
+                    idx_t **const SFEM_RESTRICT         to_elements,
+                    const int                           vec_size,
+                    const real_t *const SFEM_RESTRICT   from,
+                    real_t *const SFEM_RESTRICT         to) {
+    return SFEM_FAILURE;
+}
+
+int sshex8_prolongate(const ptrdiff_t                   nelements,
+                      const int                         from_level,
+                      const int                         from_level_stride,
+                      idx_t **const SFEM_RESTRICT       from_elements,
+                      const int                         to_level,
+                      const int                         to_level_stride,
+                      idx_t **const SFEM_RESTRICT       to_elements,
+                      const int                         vec_size,
+                      const real_t *const SFEM_RESTRICT from,
+                      real_t *const SFEM_RESTRICT       to) {
+    //     assert(to_level % from_level == 0);
+
+    //     if (to_level % from_level != 0) {
+    //         SFEM_ERROR("Nested meshes requirement: to_level must be divisible by from_level!");
+    //         return SFEM_FAILURE;
+    //     }
+
+    // #pragma omp parallel
+    //     {
+    //         const int from_nxe     = proteus_hex8_nxe(from_level);
+    //         const int to_nxe       = proteus_hex8_nxe(to_level);
+    //         const int from_to_step = to_level / from_level;
+
+    //         scalar_t **to_coeffs = malloc(vec_size * sizeof(scalar_t *));
+    //         for (int d = 0; d < vec_size; d++) {
+    //             to_coeffs[d] = malloc(to_nxe * sizeof(scalar_t));
+    //         }
+
+    // #pragma omp for
+    //         for (ptrdiff_t e = 0; e < nelements; e++) {
+    //             {
+    // #ifndef NDEBUG
+    //                 // Only for debugging
+    //                 for (int d = 0; d < vec_size; d++) {
+    //                     memset(to_coeffs[d], 0, to_nxe * sizeof(scalar_t));
+    //                 }
+    // #endif
+    //                 // Gather elemental data
+    //                 // Fill matching nodes with from data while gathering
+    //                 for (int d = 0; d < vec_size; d++) {
+    //                     for (int zi = 0; yi <= from_level; yi++) {
+    //                         for (int yi = 0; yi <= from_level; yi++) {
+    //                             for (int xi = 0; xi <= from_level; xi++) {
+    //                                 // Use top level stride
+    //                                 const int from_lidx = proteus_hex8_lidx(
+    //                                         from_level * from_level_stride, xi * from_level_stride, yi *
+    //                                         from_level_stride);
+
+    //                                 // Use stride to convert from "from" to "to" local indexing
+    //                                 const int to_lidx = proteus_hex8_lidx(to_level, xi * from_to_step, yi * from_to_step);
+
+    //                                 const idx_t    idx = from_elements[from_lidx][e];
+    //                                 const scalar_t val = from[idx * vec_size + d];
+
+    //                                 to_coeffs[d][to_lidx] = val;
+    //                                 assert(to_coeffs[d][to_lidx] == to_coeffs[d][to_lidx]);
+    //                             }
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         }
+    // }
+
+    return SFEM_FAILURE;
 }
