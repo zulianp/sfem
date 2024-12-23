@@ -3,6 +3,7 @@
 #include "proteus_hex8.h"
 
 #include <stdio.h>
+#include <string.h>
 
 int         proteus_hex8_hierarchical_restriction(int                                 level,
                                                   const ptrdiff_t                     nelements,
@@ -275,59 +276,348 @@ int sshex8_prolongate(const ptrdiff_t                   nelements,
                       const int                         vec_size,
                       const real_t *const SFEM_RESTRICT from,
                       real_t *const SFEM_RESTRICT       to) {
-    //     assert(to_level % from_level == 0);
+    assert(to_level % from_level == 0);
 
-    //     if (to_level % from_level != 0) {
-    //         SFEM_ERROR("Nested meshes requirement: to_level must be divisible by from_level!");
-    //         return SFEM_FAILURE;
-    //     }
+    if (to_level % from_level != 0) {
+        SFEM_ERROR("Nested meshes requirement: to_level must be divisible by from_level!");
+        return SFEM_FAILURE;
+    }
 
-    // #pragma omp parallel
-    //     {
-    //         const int from_nxe     = proteus_hex8_nxe(from_level);
-    //         const int to_nxe       = proteus_hex8_nxe(to_level);
-    //         const int from_to_step = to_level / from_level;
+#pragma omp parallel
+    {
+        const int from_nxe     = proteus_hex8_nxe(from_level);
+        const int to_nxe       = proteus_hex8_nxe(to_level);
+        const int from_to_step = to_level / from_level;
 
-    //         scalar_t **to_coeffs = malloc(vec_size * sizeof(scalar_t *));
-    //         for (int d = 0; d < vec_size; d++) {
-    //             to_coeffs[d] = malloc(to_nxe * sizeof(scalar_t));
-    //         }
+        scalar_t **to_coeffs = malloc(vec_size * sizeof(scalar_t *));
+        for (int d = 0; d < vec_size; d++) {
+            to_coeffs[d] = malloc(to_nxe * sizeof(scalar_t));
+        }
 
-    // #pragma omp for
-    //         for (ptrdiff_t e = 0; e < nelements; e++) {
-    //             {
-    // #ifndef NDEBUG
-    //                 // Only for debugging
-    //                 for (int d = 0; d < vec_size; d++) {
-    //                     memset(to_coeffs[d], 0, to_nxe * sizeof(scalar_t));
-    //                 }
-    // #endif
-    //                 // Gather elemental data
-    //                 // Fill matching nodes with from data while gathering
-    //                 for (int d = 0; d < vec_size; d++) {
-    //                     for (int zi = 0; yi <= from_level; yi++) {
-    //                         for (int yi = 0; yi <= from_level; yi++) {
-    //                             for (int xi = 0; xi <= from_level; xi++) {
-    //                                 // Use top level stride
-    //                                 const int from_lidx = proteus_hex8_lidx(
-    //                                         from_level * from_level_stride, xi * from_level_stride, yi *
-    //                                         from_level_stride);
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; e++) {
+            {
+#ifndef NDEBUG
+                // Only for debugging
+                for (int d = 0; d < vec_size; d++) {
+                    memset(to_coeffs[d], 0, to_nxe * sizeof(scalar_t));
+                }
+#endif
+                // Gather elemental data
+                // Fill matching nodes with from data while gathering
+                for (int d = 0; d < vec_size; d++) {
+                    for (int zi = 0; zi <= from_level; zi++) {
+                        for (int yi = 0; yi <= from_level; yi++) {
+                            for (int xi = 0; xi <= from_level; xi++) {
+                                // Use top level stride
+                                const int from_lidx = proteus_hex8_lidx(from_level * from_level_stride,
+                                                                        xi * from_level_stride,
+                                                                        yi * from_level_stride,
+                                                                        zi * from_level_stride);
 
-    //                                 // Use stride to convert from "from" to "to" local indexing
-    //                                 const int to_lidx = proteus_hex8_lidx(to_level, xi * from_to_step, yi * from_to_step);
+                                // Use stride to convert from "from" to "to" local indexing
+                                const int to_lidx =
+                                        proteus_hex8_lidx(to_level, xi * from_to_step, yi * from_to_step, zi * from_to_step);
 
-    //                                 const idx_t    idx = from_elements[from_lidx][e];
-    //                                 const scalar_t val = from[idx * vec_size + d];
+                                const idx_t    idx = from_elements[from_lidx][e];
+                                const scalar_t val = from[idx * vec_size + d];
 
-    //                                 to_coeffs[d][to_lidx] = val;
-    //                                 assert(to_coeffs[d][to_lidx] == to_coeffs[d][to_lidx]);
-    //                             }
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    // }
+                                to_coeffs[d][to_lidx] = val;
+                                assert(to_coeffs[d][to_lidx] == to_coeffs[d][to_lidx]);
+                            }
+                        }
+                    }
 
-    return SFEM_FAILURE;
+#if 0
+printf("nodal interpolation\n");
+for (int zi = 0; zi <= to_level; zi++) {
+for (int yi = 0; yi <= to_level; yi++) {
+for (int xi = 0; xi <= to_level; xi++) {
+printf("%g ", to_coeffs[d][proteus_hex8_lidx(to_level, xi, yi, zi)]);
+}
+printf("\n");
+}
+printf("\n");
+}
+#endif
+                }
+            }
+
+            const scalar_t to_h = from_level * 1. / to_level;
+            for (int d = 0; d < vec_size; d++) {
+                scalar_t *c = to_coeffs[d];
+
+                // Interpolate the coefficients along the x-axis (edges)
+                for (int zi = 0; zi <= from_level; zi++) {
+                    for (int yi = 0; yi <= from_level; yi++) {
+                        for (int xi = 0; xi < from_level; xi++) {
+                            const scalar_t c0 =
+                                    c[proteus_hex8_lidx(to_level, xi * from_to_step, yi * from_to_step, zi * from_to_step)];
+                            const scalar_t c1 =
+                                    c[proteus_hex8_lidx(to_level, (xi + 1) * from_to_step, yi * from_to_step, zi * from_to_step)];
+
+                            for (int between_xi = 1; between_xi < from_to_step; between_xi++) {
+                                const scalar_t fl      = (1 - between_xi * to_h);
+                                const scalar_t fr      = (between_xi * to_h);
+                                const int      to_lidx = proteus_hex8_lidx(
+                                        to_level, xi * from_to_step + between_xi, yi * from_to_step, zi * from_to_step);
+                                c[to_lidx] = fl * c0 + fr * c1;
+                            }
+                        }
+                    }
+                }
+
+#if 0
+printf("x-axis interpolation (edge)\n");
+for (int zi = 0; zi <= to_level; zi++) {
+for (int yi = 0; yi <= to_level; yi++) {
+for (int xi = 0; xi <= to_level; xi++) {
+printf("%g ", c[proteus_hex8_lidx(to_level, xi, yi, zi)]);
+}
+printf("\n");
+}
+printf("\n");
+}
+#endif
+
+                // Interpolate the coefficients along the y-axis (edges)
+                for (int zi = 0; zi <= from_level; zi++) {
+                    for (int yi = 0; yi < from_level; yi++) {
+                        for (int xi = 0; xi <= from_level; xi++) {
+                            const scalar_t c0 =
+                                    c[proteus_hex8_lidx(to_level, xi * from_to_step, yi * from_to_step, zi * from_to_step)];
+                            const scalar_t c1 =
+                                    c[proteus_hex8_lidx(to_level, xi * from_to_step, (yi + 1) * from_to_step, zi * from_to_step)];
+
+                            for (int between_yi = 1; between_yi < from_to_step; between_yi++) {
+                                const scalar_t fb      = (1 - between_yi * to_h);
+                                const scalar_t ft      = (between_yi * to_h);
+                                const int      to_lidx = proteus_hex8_lidx(
+                                        to_level, xi * from_to_step, yi * from_to_step + between_yi, zi * from_to_step);
+                                c[to_lidx] = fb * c0 + ft * c1;
+                            }
+                        }
+                    }
+                }
+
+#if 0
+printf("y-axis interpolation (edge)\n");
+for (int zi = 0; zi <= to_level; zi++) {
+for (int yi = 0; yi <= to_level; yi++) {
+for (int xi = 0; xi <= to_level; xi++) {
+printf("%g ", c[proteus_hex8_lidx(to_level, xi, yi, zi)]);
+}
+printf("\n");
+}
+printf("\n");
+}
+#endif
+
+                // Interpolate the coefficients along the y-axis (edges)
+                for (int zi = 0; zi < from_level; zi++) {
+                    for (int yi = 0; yi <= from_level; yi++) {
+                        for (int xi = 0; xi <= from_level; xi++) {
+                            const scalar_t c0 =
+                                    c[proteus_hex8_lidx(to_level, xi * from_to_step, yi * from_to_step, zi * from_to_step)];
+                            const scalar_t c1 =
+                                    c[proteus_hex8_lidx(to_level, xi * from_to_step, yi * from_to_step, (zi + 1) * from_to_step)];
+
+                            for (int between_zi = 1; between_zi < from_to_step; between_zi++) {
+                                const scalar_t fb      = (1 - between_zi * to_h);
+                                const scalar_t ft      = (between_zi * to_h);
+                                const int      to_lidx = proteus_hex8_lidx(
+                                        to_level, xi * from_to_step, yi * from_to_step, zi * from_to_step + between_zi);
+                                c[to_lidx] = fb * c0 + ft * c1;
+                            }
+                        }
+                    }
+                }
+
+#if 0
+printf("z-axis interpolation (edge)\n");
+for (int zi = 0; zi <= to_level; zi++) {
+for (int yi = 0; yi <= to_level; yi++) {
+for (int xi = 0; xi <= to_level; xi++) {
+printf("%g ", c[proteus_hex8_lidx(to_level, xi, yi, zi)]);
+}
+printf("\n");
+}
+printf("\n");
+}
+#endif
+
+                // Interpolate the coefficients along the x-axis (center) in the x-y-planes
+                for (int zi = 0; zi <= from_level; zi++) {
+                    for (int yi = 0; yi < from_level; yi++) {
+                        for (int between_yi = 1; between_yi < from_to_step; between_yi++) {
+                            for (int xi = 0; xi < from_level; xi++) {
+                                const int      zz    = zi * from_to_step;
+                                const int      yy    = yi * from_to_step + between_yi;
+                                const int      left  = proteus_hex8_lidx(to_level, xi * from_to_step, yy, zz);
+                                const int      right = proteus_hex8_lidx(to_level, (xi + 1) * from_to_step, yy, zz);
+                                const scalar_t cl    = c[left];
+                                const scalar_t cr    = c[right];
+
+                                for (int between_xi = 1; between_xi < from_to_step; between_xi++) {
+                                    const scalar_t fl = (1 - between_xi * to_h);
+                                    const scalar_t fr = (between_xi * to_h);
+
+                                    const int xx     = xi * from_to_step + between_xi;
+                                    const int center = proteus_hex8_lidx(to_level, xx, yy, zz);
+                                    c[center]        = fl * cl + fr * cr;
+                                }
+                            }
+                        }
+                    }
+                }
+
+#if 0
+printf("xy-plane interpolation (face)\n");
+for (int zi = 0; zi <= to_level; zi++) {
+for (int yi = 0; yi <= to_level; yi++) {
+for (int xi = 0; xi <= to_level; xi++) {
+printf("%g ", c[proteus_hex8_lidx(to_level, xi, yi, zi)]);
+}
+printf("\n");
+}
+printf("\n");
+}
+#endif
+
+                // Interpolate the coefficients along the x-axis (center) in the x-z-planes
+                for (int zi = 0; zi < from_level; zi++) {
+                    for (int between_zi = 1; between_zi < from_to_step; between_zi++) {
+                        for (int yi = 0; yi <= from_level; yi++) {
+                            for (int xi = 0; xi < from_level; xi++) {
+                                const int      yy    = yi * from_to_step;
+                                const int      zz    = zi * from_to_step + between_zi;
+                                const int      left  = proteus_hex8_lidx(to_level, xi * from_to_step, yy, zz);
+                                const int      right = proteus_hex8_lidx(to_level, (xi + 1) * from_to_step, yy, zz);
+                                const scalar_t cl    = c[left];
+                                const scalar_t cr    = c[right];
+
+                                for (int between_xi = 1; between_xi < from_to_step; between_xi++) {
+                                    const scalar_t fl = (1 - between_xi * to_h);
+                                    const scalar_t fr = (between_xi * to_h);
+
+                                    const int xx     = xi * from_to_step + between_xi;
+                                    const int center = proteus_hex8_lidx(to_level, xx, yy, zz);
+                                    c[center]        = fl * cl + fr * cr;
+                                }
+                            }
+                        }
+                    }
+                }
+
+#if 0
+printf("xy-plane interpolation (face)\n");
+for (int zi = 0; zi <= to_level; zi++) {
+for (int yi = 0; yi <= to_level; yi++) {
+for (int xi = 0; xi <= to_level; xi++) {
+printf("%g ", c[proteus_hex8_lidx(to_level, xi, yi, zi)]);
+}
+printf("\n");
+}
+printf("\n");
+}
+#endif
+
+                // Interpolate the coefficients along the y-axis (center) in the y-z-planes
+                for (int zi = 0; zi < from_level; zi++) {
+                    for (int between_zi = 1; between_zi < from_to_step; between_zi++) {
+                        for (int yi = 0; yi < from_level; yi++) {
+                            for (int xi = 0; xi <= from_level; xi++) {
+                                const int      xx    = xi * from_to_step;
+                                const int      zz    = zi * from_to_step + between_zi;
+                                const int      left  = proteus_hex8_lidx(to_level, xx, yi * from_to_step, zz);
+                                const int      right = proteus_hex8_lidx(to_level, xx, (yi + 1) * from_to_step, zz);
+                                const scalar_t cl    = c[left];
+                                const scalar_t cr    = c[right];
+
+                                for (int between_yi = 1; between_yi < from_to_step; between_yi++) {
+                                    const scalar_t fl = (1 - between_yi * to_h);
+                                    const scalar_t fr = (between_yi * to_h);
+
+                                    const int yy     = yi * from_to_step + between_yi;
+                                    const int center = proteus_hex8_lidx(to_level, xx, yy, zz);
+                                    c[center]        = fl * cl + fr * cr;
+                                }
+                            }
+                        }
+                    }
+                }
+
+#if 0
+printf("yz-plane interpolation (face)\n");
+for (int zi = 0; zi <= to_level; zi++) {
+for (int yi = 0; yi <= to_level; yi++) {
+for (int xi = 0; xi <= to_level; xi++) {
+printf("%g ", c[proteus_hex8_lidx(to_level, xi, yi, zi)]);
+}
+printf("\n");
+}
+printf("\n");
+}
+#endif
+
+                // Interpolate the coefficients along the x-axis (center) in the x-y-planes
+                for (int zi = 0; zi < from_level; zi++) {
+                    for (int between_zi = 1; between_zi < from_to_step; between_zi++) {
+                        for (int yi = 0; yi < from_level; yi++) {
+                            for (int between_yi = 1; between_yi < from_to_step; between_yi++) {
+                                for (int xi = 0; xi < from_level; xi++) {
+                                    const int      zz    = zi * from_to_step + between_zi;
+                                    const int      yy    = yi * from_to_step + between_yi;
+                                    const int      left  = proteus_hex8_lidx(to_level, xi * from_to_step, yy, zz);
+                                    const int      right = proteus_hex8_lidx(to_level, (xi + 1) * from_to_step, yy, zz);
+                                    const scalar_t cl    = c[left];
+                                    const scalar_t cr    = c[right];
+
+                                    for (int between_xi = 1; between_xi < from_to_step; between_xi++) {
+                                        const scalar_t fl = (1 - between_xi * to_h);
+                                        const scalar_t fr = (between_xi * to_h);
+
+                                        const int xx     = xi * from_to_step + between_xi;
+                                        const int center = proteus_hex8_lidx(to_level, xx, yy, zz);
+                                        c[center]        = fl * cl + fr * cr;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+#if 0
+printf("interpolation (volume)\n");
+for (int zi = 0; zi <= to_level; zi++) {
+for (int yi = 0; yi <= to_level; yi++) {
+for (int xi = 0; xi <= to_level; xi++) {
+printf("%g ", c[proteus_hex8_lidx(to_level, xi, yi, zi)]);
+}
+printf("\n");
+}
+printf("\n");
+}
+#endif
+            }
+
+            // Scatter elemental data
+            for (int zi = 0; zi <= to_level; zi++) {
+                for (int yi = 0; yi <= to_level; yi++) {
+                    for (int xi = 0; xi <= to_level; xi++) {
+                        const int v         = proteus_hex8_lidx(to_level, xi, yi, zi);
+                        const int strided_v = proteus_hex8_lidx(
+                                to_level * to_level_stride, xi * to_level_stride, yi * to_level_stride, zi * to_level_stride);
+                        const ptrdiff_t gid = to_elements[strided_v][e];
+
+                        for (int d = 0; d < vec_size; d++) {
+                            to[gid * vec_size + d] = to_coeffs[d][v];
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return SFEM_SUCCESS;
 }
