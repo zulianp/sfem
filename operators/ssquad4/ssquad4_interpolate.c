@@ -98,11 +98,11 @@ int ssquad4_restrict(const ptrdiff_t                     nelements,
                 for (int yi = 0; yi <= to_level; yi++) {
                     for (int xi = 0; xi < to_level; xi++) {
                         for (int between_xi = 1; between_xi < step_factor; between_xi++) {
-                            const scalar_t fl      = (1 - between_xi * h);
-                            const scalar_t fr      = (between_xi * h);
-                            const int      to_lidx = ssquad4_lidx(from_level, xi * step_factor + between_xi, yi * step_factor);
-                            c[ssquad4_lidx(from_level, xi * step_factor, yi * step_factor)] += fl * c[to_lidx];
-                            c[ssquad4_lidx(from_level, (xi + 1) * step_factor, yi * step_factor)] += fr * c[to_lidx];
+                            const scalar_t fl     = (1 - between_xi * h);
+                            const scalar_t fr     = (between_xi * h);
+                            const int between_idx = ssquad4_lidx(from_level, xi * step_factor + between_xi, yi * step_factor);
+                            c[ssquad4_lidx(from_level, xi * step_factor, yi * step_factor)] += fl * c[between_idx];
+                            c[ssquad4_lidx(from_level, (xi + 1) * step_factor, yi * step_factor)] += fr * c[between_idx];
                         }
                     }
                 }
@@ -144,7 +144,7 @@ int ssquad4_restrict(const ptrdiff_t                     nelements,
             }
 
             // Scatter elemental data
-            // Fill matching nodes with from data while gathering
+            // Extract coarse coeffs and discard rest
             for (int d = 0; d < vec_size; d++) {
                 for (int yi = 0; yi <= to_level; yi++) {
                     for (int xi = 0; xi <= to_level; xi++) {
