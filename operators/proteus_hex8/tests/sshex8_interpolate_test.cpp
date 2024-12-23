@@ -280,9 +280,9 @@ static int test_level1_to_level2() {
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT();
-    // SFEM_RUN_TEST(test_incidence_count);
+    SFEM_RUN_TEST(test_incidence_count);
     SFEM_RUN_TEST(test_restrict_level2_to_level1);
-    // SFEM_RUN_TEST(test_level1_to_level2);
-    // SFEM_RUN_TEST(test_level1_to_level4);
+    SFEM_RUN_TEST(test_level1_to_level2);
+    SFEM_RUN_TEST(test_level1_to_level4);
     return SFEM_UNIT_TEST_FINALIZE();
 }
