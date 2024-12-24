@@ -16,6 +16,7 @@
 #include "sfem_openmp_blas.hpp"
 
 #include "sfem_Buffer.hpp"
+#include "sfem_Tracer.hpp"
 
 // MATLAB version
 // https://bitbucket.org/hkothari/matsci/src/ab637a0655512c4ddf299914dd45fdb563ac7b34/Solvers/%2BBoxConstraints/%40PenaltyMG/PenaltyMG.m?at=restructuring
@@ -63,6 +64,8 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return execution_space_; }
 
         int apply(const T* const rhs, T* const x) override {
+            SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::apply");
+
             ensure_init();
 
             count_smoothing_steps = 0;
@@ -360,6 +363,8 @@ namespace sfem {
         }
 
         void eval_residual_and_jacobian() {
+            SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::eval_residual_and_jacobian");
+
             const int level = finest_level();
             auto mem = memory_[level];
             auto smoother = smoother_[level];
@@ -449,6 +454,8 @@ namespace sfem {
         }
 
         void penalty_pseudo_galerkin_assembly() {
+            SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::penalty_pseudo_galerkin_assembly");
+
             for(int  l = finest_level(); l != coarsest_level(); l = coarser_level(l)) {
                 auto mem_coarse = memory_[coarser_level(l)];
                 blas_.zeros(mem_coarse->diag->size(), mem_coarse->diag->data());
@@ -457,6 +464,8 @@ namespace sfem {
         }
 
         void nonlinear_smooth() {
+            SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::nonlinear_smooth");
+
             const int level = finest_level();
             auto mem = memory_[level];
             auto smoother = smoother_[level];
@@ -481,6 +490,8 @@ namespace sfem {
         }
 
         CycleReturnCode nonlinear_cycle() {
+            SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::nonlinear_cycle");
+
             const int level = finest_level();
             auto mem = memory_[level];
             auto smoother = smoother_[level];
@@ -550,6 +561,8 @@ namespace sfem {
         }
 
         CycleReturnCode cycle(const int level) {
+            SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::cycle");
+            
             auto mem = memory_[level];
             auto smoother = smoother_[level];
             auto op = operator_[level];

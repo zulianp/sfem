@@ -26,6 +26,7 @@ option(SFEM_USE_OCCUPANCY_MAX_POTENTIAL "Enable usage of cudaOccupancyMaxPotenti
 # option(SFEM_ENABLE_AVX512 "Enable AVX2 intrinsics" OFF) # TODO
 
 option(SFEM_ENABLE_RESAMPLING "Enable resampling features" ON)
+option(SFEM_ENABLE_TRACE "Eneable trace facilities and output sfem.trace.csv (Override with SFEM_TRACE_FILE in the env)" ON)
 
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)
 
