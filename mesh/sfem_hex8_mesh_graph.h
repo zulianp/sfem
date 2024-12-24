@@ -33,6 +33,13 @@ int proteus_hex8_crs_graph(const int L,
                            count_t **out_rowptr,
                            idx_t **out_colidx);
 
+int sshex8_hierarchical_renumbering(const int       L,
+                                    const int       nlevels,
+                                    int *const      levels,
+                                    const ptrdiff_t nelements,
+                                    const ptrdiff_t nnodes,
+                                    idx_t **const   elements);
+
 #ifdef __cplusplus
 }
 #endif
