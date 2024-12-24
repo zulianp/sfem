@@ -108,8 +108,8 @@ namespace sfem {
 
             auto finest_A = operator_[0];
             int finest_dim = finest_A->rows();
-            auto finest_vec = h_buffer<T>(finest_dim);
-            auto finest_out = h_buffer<T>(finest_dim);
+            auto finest_vec = create_host_buffer<T>(finest_dim);
+            auto finest_out = create_host_buffer<T>(finest_dim);
             for (int i = 0; i < finest_dim; i++) {
                 finest_vec->data()[i] = 1;
             }
@@ -131,19 +131,19 @@ namespace sfem {
                 assert(pt->rows() == fine_dim);
                 assert(pt->cols() == coarse_dim);
 
-                auto coarse_vec = h_buffer<T>(coarse_dim);
+                auto coarse_vec = create_host_buffer<T>(coarse_dim);
                 for (int i = 0; i < coarse_dim; i++) {
                     coarse_vec->data()[i] = 1;
                 }
 
-                auto out1 = h_buffer<T>(coarse_dim);
+                auto out1 = create_host_buffer<T>(coarse_dim);
                 Ac->apply(coarse_vec->data(), out1->data());
                 T ac1 = this->blas.norm2(coarse_dim, out1->data());
                 printf("Level %d: ||Ac 1|| = %f\n", level, ac1);
 
-                auto temp = h_buffer<T>(fine_dim);
-                auto temp2 = h_buffer<T>(fine_dim);
-                auto out2 = h_buffer<T>(coarse_dim);
+                auto temp = create_host_buffer<T>(fine_dim);
+                auto temp2 = create_host_buffer<T>(fine_dim);
+                auto out2 = create_host_buffer<T>(coarse_dim);
                 p->apply(coarse_vec->data(), temp->data());
                 /* only nueman
                     for (int i = 0; i < fine_dim; i++) {

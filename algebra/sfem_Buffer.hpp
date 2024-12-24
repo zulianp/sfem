@@ -127,13 +127,13 @@ namespace sfem {
     };
 
     template <typename T>
-    std::shared_ptr<Buffer<T>> h_buffer(const ptrdiff_t n) {
+    std::shared_ptr<Buffer<T>> create_host_buffer(const ptrdiff_t n) {
         auto ret = std::make_shared<Buffer<T>>(n, (T *)calloc(n, sizeof(T)), &free, MEMORY_SPACE_HOST);
         return ret;
     }
 
     template <typename T>
-    std::shared_ptr<Buffer<T *>> h_buffer(const ptrdiff_t n0, const ptrdiff_t n1) {
+    std::shared_ptr<Buffer<T *>> create_host_buffer(const ptrdiff_t n0, const ptrdiff_t n1) {
         T **data = (T **)malloc(n0 * sizeof(T *));
         for (int i = 0; i < n0; ++i) {
             data[i] = (T *)calloc(n1, sizeof(T));
@@ -154,7 +154,7 @@ namespace sfem {
     }
 
     template <typename T>
-    std::shared_ptr<Buffer<T *>> h_buffer_fake_SoA(const ptrdiff_t n0, const ptrdiff_t n1) {
+    std::shared_ptr<Buffer<T *>> create_host_buffer_fake_SoA(const ptrdiff_t n0, const ptrdiff_t n1) {
         T *allocated = (T *)calloc(n0 * n1, sizeof(T));
 
         T **data = (T **)malloc(n0 * sizeof(T *));

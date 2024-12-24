@@ -89,8 +89,8 @@ namespace sfem {
     std::shared_ptr<Buffer<idx_t>>   CRSGraph::colidx() const { return impl_->colidx; }
 
     std::shared_ptr<CRSGraph> CRSGraph::block_to_scalar(const int block_size) {
-        auto rowptr = h_buffer<count_t>(this->n_nodes() * block_size + 1);
-        auto colidx = h_buffer<idx_t>(this->nnz() * block_size * block_size);
+        auto rowptr = create_host_buffer<count_t>(this->n_nodes() * block_size + 1);
+        auto colidx = create_host_buffer<idx_t>(this->nnz() * block_size * block_size);
 
         crs_graph_block_to_scalar(
                 this->n_nodes(), block_size, this->rowptr()->data(), this->colidx()->data(), rowptr->data(), colidx->data());
@@ -947,7 +947,7 @@ namespace sfem {
         if (impl_->AoS_to_SoA && block_size > 1) {
             ptrdiff_t n_blocks = impl_->space->n_dofs() / block_size;
 
-            auto buff = h_buffer<real_t>(n_blocks);
+            auto buff = create_host_buffer<real_t>(n_blocks);
             auto bb   = buff->data();
 
             char path[2048];

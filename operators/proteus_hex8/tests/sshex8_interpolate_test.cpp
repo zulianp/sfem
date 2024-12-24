@@ -7,14 +7,14 @@
 #include "sfem_test.h"
 
 static int test_incidence_count() {
-    auto elements = sfem::h_buffer<idx_t>(27, 2);
+    auto elements = sfem::create_host_buffer<idx_t>(27, 2);
 
     for (ptrdiff_t i = 0; i < 27; i++) {
         elements->data()[i][0] = i;
         elements->data()[i][1] = 18 + i;
     }
 
-    auto count = sfem::h_buffer<uint16_t>(27 + 18);
+    auto count = sfem::create_host_buffer<uint16_t>(27 + 18);
     sshex8_element_node_incidence_count(2, 1, 2, elements->data(), count->data());
 
     for (ptrdiff_t i = 0; i < 18; i++) {
@@ -30,8 +30,8 @@ static int test_incidence_count() {
 }
 
 static int test_restrict_level2_to_level1() {
-    auto to   = sfem::h_buffer<real_t>(8);
-    auto from = sfem::h_buffer<real_t>(27);
+    auto to   = sfem::create_host_buffer<real_t>(8);
+    auto from = sfem::create_host_buffer<real_t>(27);
 
     for (ptrdiff_t i = 0; i < from->size(); i++) {
         from->data()[i] = 1;
@@ -39,7 +39,7 @@ static int test_restrict_level2_to_level1() {
 
     // In this example we use the same element indices array for both discretization
     // the correct acceess is handled through strides. Specific ordering is expected!
-    auto elements = sfem::h_buffer<idx_t>(27, 1);
+    auto elements = sfem::create_host_buffer<idx_t>(27, 1);
 
     auto e = elements->data();
 
@@ -88,7 +88,7 @@ static int test_restrict_level2_to_level1() {
     e[25][0] = 26;
     e[26][0] = 7;
 
-    auto count = sfem::h_buffer<uint16_t>(27);
+    auto count = sfem::create_host_buffer<uint16_t>(27);
     sshex8_element_node_incidence_count(2, 1, 1, elements->data(), count->data());
 
     SFEM_TEST_ASSERT(sshex8_restrict(1,                 // nelements,
@@ -111,15 +111,15 @@ static int test_restrict_level2_to_level1() {
 }
 
 static int test_level1_to_level4() {
-    auto from = sfem::h_buffer<real_t>(8);
-    auto to   = sfem::h_buffer<real_t>(125);
+    auto from = sfem::create_host_buffer<real_t>(8);
+    auto to   = sfem::create_host_buffer<real_t>(125);
 
     for (ptrdiff_t i = 0; i < from->size(); i++) {
         from->data()[i] = 1;
     }
 
-    auto from_elements = sfem::h_buffer<idx_t>(8, 1);
-    auto to_elements   = sfem::h_buffer<idx_t>(125, 1);
+    auto from_elements = sfem::create_host_buffer<idx_t>(8, 1);
+    auto to_elements   = sfem::create_host_buffer<idx_t>(125, 1);
 
     for (ptrdiff_t i = 0; i < from_elements->extent(0); i++) {
         from_elements->data()[i][0] = i;
@@ -175,12 +175,12 @@ static int test_level1_to_level4() {
 }
 
 static int test_level1_to_level2() {
-    auto from = sfem::h_buffer<real_t>(8);
-    auto to   = sfem::h_buffer<real_t>(27);
+    auto from = sfem::create_host_buffer<real_t>(8);
+    auto to   = sfem::create_host_buffer<real_t>(27);
 
     // In this example we use the same element indices array for both discretization
     // the correct acceess is handled through strides. Specific ordering is expected!
-    auto elements = sfem::h_buffer<idx_t>(27, 1);
+    auto elements = sfem::create_host_buffer<idx_t>(27, 1);
 
     auto e = elements->data();
 
@@ -259,14 +259,14 @@ static int test_level1_to_level2() {
         }
     }
 
-    auto count_to = sfem::h_buffer<uint16_t>(27);
+    auto count_to = sfem::create_host_buffer<uint16_t>(27);
     sshex8_element_node_incidence_count(2, 1, 1, elements->data(), count_to->data());
 
     for (ptrdiff_t i = 0; i < 27; i++) {
         SFEM_TEST_ASSERT(count_to->data()[i] == 1);
     }
 
-    auto count_from = sfem::h_buffer<uint16_t>(8);
+    auto count_from = sfem::create_host_buffer<uint16_t>(8);
     sshex8_element_node_incidence_count(1, 2, 1, elements->data(), count_from->data());
 
     for (ptrdiff_t i = 0; i < 8; i++) {
