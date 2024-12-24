@@ -167,9 +167,9 @@ namespace sfem {
 
         PartitionerWorkspace *ws = create_partition_ws(fine_ndofs, offdiag_nnz);
         // Weighted connectivity graph in COO format
-        auto offdiag_row_indices = h_buffer<idx_t>(offdiag_nnz);
-        auto offdiag_col_indices = h_buffer<idx_t>(offdiag_nnz);
-        auto offdiag_values = h_buffer<real_t>(offdiag_nnz);
+        auto offdiag_row_indices = create_host_buffer<idx_t>(offdiag_nnz);
+        auto offdiag_col_indices = create_host_buffer<idx_t>(offdiag_nnz);
+        auto offdiag_values = create_host_buffer<real_t>(offdiag_nnz);
 
         idx_t amg_levels = 1;
 
@@ -263,8 +263,8 @@ namespace sfem {
             }
 
             ptrdiff_t coarser_dim = ndofs;
-            auto partition_buff = h_buffer<idx_t>(finer_dim);
-            auto weights_buff = h_buffer<real_t>(finer_dim);
+            auto partition_buff = create_host_buffer<idx_t>(finer_dim);
+            auto weights_buff = create_host_buffer<real_t>(finer_dim);
 
             for (idx_t k = 0; k < finer_dim; k++) {
                 partition_buff->data()[k] = ws->partition[k];

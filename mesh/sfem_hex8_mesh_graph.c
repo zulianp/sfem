@@ -977,7 +977,7 @@ int sshex8_hierarchical_renumbering(const int       L,
             }
         }
 
-        // stride++;
+        // stride *= 2;
     }
 
 
