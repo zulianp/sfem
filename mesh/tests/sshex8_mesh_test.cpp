@@ -19,7 +19,7 @@ int test_sshex8_hierarchical_renumbering() {
     }
 
     int       L               = 24;
-    const int nxe             = proteus_hex8_nxe(L);
+    const int nxe             = sshex8_nxe(L);
     auto      sshex8_elements = sfem::create_host_buffer<idx_t>(nxe, nelements);
 
     ptrdiff_t sshex_nnodes   = -1;
@@ -47,7 +47,7 @@ int test_sshex8_hierarchical_renumbering() {
     for (int zi = 0; zi <= 1; zi++) {
         for (int yi = 0; yi <= 1; yi++) {
             for (int xi = 0; xi <= 1; xi++) {
-                int v = proteus_hex8_lidx(L, xi * L, yi * L, zi * L);
+                int v = sshex8_lidx(L, xi * L, yi * L, zi * L);
 
                 for (ptrdiff_t e = 0; e < nelements; e++) {
                     SFEM_TEST_ASSERT(sshex8_elements->data()[v][e] < nnodes);

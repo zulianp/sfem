@@ -11,9 +11,9 @@
 #include <cstdio>
 #include <vector>
 
-#include "proteus_hex8.h"
-#include "proteus_hex8_laplacian.h"
-#include "proteus_hex8_linear_elasticity.h"
+#include "sshex8.h"
+#include "sshex8_laplacian.h"
+#include "sshex8_linear_elasticity.h"
 #include "sfem_API.hpp"
 #include "sfem_hex8_mesh_graph.h"
 

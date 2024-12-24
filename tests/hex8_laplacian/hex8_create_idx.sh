@@ -38,4 +38,4 @@ box_mesh.py hex8_mesh_for_macro -c hex8 -x $NX -y $NY -z $NZ --height=1 --width=
 
 export SFEM_REPEAT=10
 
-$LAUNCH proteus_hex8_laplacian_apply hex8_mesh_for_macro gen:ones null.raw
+$LAUNCH sshex8_laplacian_apply hex8_mesh_for_macro gen:ones null.raw

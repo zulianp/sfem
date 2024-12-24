@@ -86,10 +86,10 @@ enum ElemType {
     MACRO_TRI3 = (MACRO + TRI3),
     MACRO_TRISHELL3 = (MACRO + TRISHELL3),
     MACRO_TET4 = (MACRO + TET4),
-    PROTEUS_TET4 = 4000,
-    PROTEUS_QUAD4 = 40000,
-    PROTEUS_QUADSHELL4 = 140000,
-    PROTEUS_HEX8 = 8000,
+    SSTET4 = 4000,
+    SSQUAD4 = 40000,
+    SSQUADSHELL4 = 140000,
+    SSHEX8 = 8000,
     INVALID = -1
 };
 
@@ -104,15 +104,15 @@ SFEM_INLINE static enum ElemType type_from_string(const char* str) {
     if (!strcmp(str, "WEDGE6")) return WEDGE6;
     if (!strcmp(str, "QUAD4")) return QUAD4;
     if (!strcmp(str, "QUADSHELL4")) return QUADSHELL4;
-    if (!strcmp(str, "PROTEUS_QUAD4")) return PROTEUS_QUAD4;
-    if (!strcmp(str, "PROTEUS_QUADSHELL4")) return PROTEUS_QUADSHELL4;
+    if (!strcmp(str, "SSQUAD4")) return SSQUAD4;
+    if (!strcmp(str, "SSQUADSHELL4")) return SSQUADSHELL4;
     if (!strcmp(str, "TET4")) return TET4;
     if (!strcmp(str, "TET10")) return TET10;
     if (!strcmp(str, "TET20")) return TET20;
     if (!strcmp(str, "MACRO_TRI3")) return MACRO_TRI3;
     if (!strcmp(str, "MACRO_TET4")) return MACRO_TET4;
     if (!strcmp(str, "HEX8")) return HEX8;
-    if (!strcmp(str, "PROTEUS_HEX8")) return PROTEUS_HEX8;
+    if (!strcmp(str, "SSHEX8")) return SSHEX8;
 
     assert(0);
     return INVALID;
@@ -138,10 +138,10 @@ SFEM_INLINE static const char* type_to_string(enum ElemType type) {
             return "QUAD4";
         case QUADSHELL4:
             return "QUADSHELL4";
-        case PROTEUS_QUAD4:
-            return "PROTEUS_QUAD4";
-        case PROTEUS_QUADSHELL4:
-            return "PROTEUS_QUADSHELL4";
+        case SSQUAD4:
+            return "SSQUAD4";
+        case SSQUADSHELL4:
+            return "SSQUADSHELL4";
         case TET4:
             return "TET4";
         case TRI6:
@@ -158,8 +158,8 @@ SFEM_INLINE static const char* type_to_string(enum ElemType type) {
             return "MACRO_TET4";
         case HEX8:
             return "HEX8";
-        case PROTEUS_HEX8:
-            return "PROTEUS_HEX8";
+        case SSHEX8:
+            return "SSHEX8";
         case TET10:
             return "TET10";
         case TET20:
@@ -194,8 +194,8 @@ SFEM_INLINE static enum ElemType side_type(const enum ElemType type) {
             return MACRO_TRI3;
         case HEX8:
             return QUAD4;
-        case PROTEUS_HEX8:
-            return PROTEUS_QUAD4;
+        case SSHEX8:
+            return SSQUAD4;
         default: {
             assert(0);
             return INVALID;
@@ -227,10 +227,10 @@ SFEM_INLINE static enum ElemType shell_type(const enum ElemType type) {
             return QUADSHELL4;
         case QUADSHELL4:
             return QUADSHELL4;
-        case PROTEUS_QUAD4:
-            return PROTEUS_QUADSHELL4;
-        case PROTEUS_QUADSHELL4:
-            return PROTEUS_QUADSHELL4;
+        case SSQUAD4:
+            return SSQUADSHELL4;
+        case SSQUADSHELL4:
+            return SSQUADSHELL4;
         default: {
             // assert(0);
             return INVALID;
@@ -393,7 +393,7 @@ SFEM_INLINE static enum ElemType macro_base_elem(const enum ElemType macro_type)
             return TET4;
         case TRI6:
             return TRI3;
-        case PROTEUS_HEX8:
+        case SSHEX8:
             return HEX8;
         default: {
             assert(0);
