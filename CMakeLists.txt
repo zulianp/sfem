@@ -266,6 +266,7 @@ if(SFEM_ENABLE_TESTING)
     list(APPEND SFEM_UNIT_TESTS
         operators/ssquad4/tests
         operators/proteus_hex8/tests
+        mesh/tests
     )
 
     foreach(UNIT_TEST ${SFEM_UNIT_TESTS})

@@ -104,7 +104,9 @@ MS := Milestone
    - [x] Two-level method matrix-free SPGMG on GPU (basic)
    - [x] Baseline obstacle problem with SDF using Shifted-Penalty (recuced size of constrained dofs and quantities, normal field)
    - [x] GMG: prolongation/restriction on CPU for SSHEX8, and SSQUAD4 (for contact boundary)
-   - [ ] SSHEX-Mesh online generation from HEX8
+   - [x] Basic tracing facilities for timing different parts of the code (CPU only)
+   - [ ] GMG: Hierarchical indexing for no redundancy multilevel discretization
+   - [ ] SSHEX8-Mesh online generation from HEX8
    - [ ] Multilevel GMG on CPU
    - [ ] Contact stresses post-processor for SSHEX8
    - [ ] Provide boundary surface mask for adaptive coarsening

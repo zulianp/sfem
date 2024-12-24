@@ -20,6 +20,8 @@
 #include "sfem_sshex8_skin.h"
 #include "adj_table.h"
 
+#include "sfem_Tracer.hpp"
+
 #include <vector>
 
 namespace sfem {
@@ -282,6 +284,8 @@ namespace sfem {
         ~Impl() {}
 
         void displace_points(const real_t *disp) {
+            SFEM_TRACE_SCOPE("ContactConditions::displace_points");
+
             auto               mesh = space->mesh_ptr();
             const ptrdiff_t    n    = node_mapping->size();
             const idx_t *const idx  = node_mapping->data();
@@ -299,6 +303,8 @@ namespace sfem {
         }
 
         void collect_points() {
+            SFEM_TRACE_SCOPE("ContactConditions::collect_points");
+
             auto               mesh = space->mesh_ptr();
             const ptrdiff_t    n    = node_mapping->size();
             const idx_t *const idx  = node_mapping->data();
@@ -316,6 +322,8 @@ namespace sfem {
         }
 
         void assemble_mass_vector() {
+            SFEM_TRACE_SCOPE("ContactConditions::assemble_mass_vector");
+
             collect_points();
 
             auto st           = shell_type(side_type(space->element_type()));
@@ -361,6 +369,8 @@ namespace sfem {
         }
 
         void read_sideset(const std::string &path_surface, Input &in) {
+            SFEM_TRACE_SCOPE("ContactConditions::read_sideset");
+
             auto mesh = space->mesh_ptr();
 
             std::string path_parent;
@@ -414,6 +424,8 @@ namespace sfem {
         }
 
         void read_surface(const std::string &path_surface, Input &in) {
+            SFEM_TRACE_SCOPE("ContactConditions::read_surface");
+
             std::string points;
             std::string surface_elem_type;
 
@@ -507,6 +519,9 @@ namespace sfem {
 
     std::shared_ptr<ContactConditions> ContactConditions::create_from_file(const std::shared_ptr<FunctionSpace> &space,
                                                                            const std::string                    &path) {
+
+        SFEM_TRACE_SCOPE("ContactConditions::create_from_file");
+
         auto in = YAMLNoIndent::create_from_file(path + "/meta.yaml");
 
         auto cc     = std::make_unique<ContactConditions>(space);
@@ -626,6 +641,8 @@ namespace sfem {
     }
 
     int ContactConditions::normal_project(const real_t *const h, real_t *const out) {
+        SFEM_TRACE_SCOPE("ContactConditions::normal_project");
+
         const ptrdiff_t    n   = impl_->node_mapping->size();
         const idx_t *const idx = impl_->node_mapping->data();
 
@@ -651,6 +668,7 @@ namespace sfem {
     }
 
     int ContactConditions::distribute_contact_forces(const real_t *const f, real_t *const out) {
+        SFEM_TRACE_SCOPE("ContactConditions::distribute_contact_forces");
         const ptrdiff_t    n   = impl_->node_mapping->size();
         const idx_t *const idx = impl_->node_mapping->data();
 
@@ -682,6 +700,7 @@ namespace sfem {
     }
 
     int ContactConditions::init() {
+        SFEM_TRACE_SCOPE("ContactConditions::init");
         auto sdf = impl_->sdf;
 
         if (impl_->variational) {
@@ -745,6 +764,8 @@ namespace sfem {
     }
 
     int ContactConditions::signed_distance(real_t *const g) {
+        SFEM_TRACE_SCOPE("ContactConditions::signed_distance");
+
         auto sdf = impl_->sdf;
 
         int err = 0;
@@ -790,6 +811,8 @@ namespace sfem {
     }
 
     int ContactConditions::gradient(const real_t *const x, real_t *const g) {
+        SFEM_TRACE_SCOPE("ContactConditions::gradient");
+
         int err = SFEM_SUCCESS;
         if (impl_->variational) {
             auto sdf = impl_->sdf;
@@ -823,6 +846,8 @@ namespace sfem {
     }
 
     int ContactConditions::apply_value(const real_t value, real_t *const x) {
+        SFEM_TRACE_SCOPE("ContactConditions::apply_value");
+
         const ptrdiff_t    n   = impl_->node_mapping->size();
         const idx_t *const idx = impl_->node_mapping->data();
 #pragma omp parallel for
@@ -834,6 +859,8 @@ namespace sfem {
     }
 
     int ContactConditions::copy_constrained_dofs(const real_t *const src, real_t *const dest) {
+        SFEM_TRACE_SCOPE("ContactConditions::copy_constrained_dofs");
+
         const ptrdiff_t    n   = impl_->node_mapping->size();
         const idx_t *const idx = impl_->node_mapping->data();
 #pragma omp parallel for
@@ -848,6 +875,8 @@ namespace sfem {
                                        const count_t *const rowptr,
                                        const idx_t *const   colidx,
                                        real_t *const        values) {
+        SFEM_TRACE_SCOPE("ContactConditions::hessian_crs");
+
         // TODO Householder matrix?
         assert(false);
         return SFEM_FAILURE;
@@ -865,8 +894,7 @@ namespace sfem {
     }
 
     int ContactConditions::hessian_block_diag_sym(const real_t *const x, real_t *const values) {
-        // if(x)
-        // impl_->displace_points(x);
+        SFEM_TRACE_SCOPE("ContactConditions::hessian_block_diag_sym");
 
         const ptrdiff_t    n   = impl_->node_mapping->size();
         const idx_t *const idx = impl_->node_mapping->data();
