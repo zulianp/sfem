@@ -45,6 +45,8 @@
 // Multigrid
 #include "sfem_prolongation_restriction.h"
 
+#include "sfem_Tracer.hpp"
+
 namespace sfem {
 
     class CRSGraph::Impl {
@@ -148,6 +150,8 @@ namespace sfem {
     Mesh::~Mesh() = default;
 
     int Mesh::read(const char *path) {
+        SFEM_TRACE_SCOPE("Mesh::read");
+
         if (mesh_read(impl_->comm, path, &impl_->mesh)) {
             return SFEM_FAILURE;
         }
@@ -163,6 +167,8 @@ namespace sfem {
     }
 
     int Mesh::write(const char *path) const {
+        SFEM_TRACE_SCOPE("Mesh::write");
+
         if (mesh_write(path, &impl_->mesh)) {
             return SFEM_FAILURE;
         }
@@ -210,6 +216,8 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
+        SFEM_TRACE_SCOPE("Mesh::initialize_node_to_node_graph");
+
         impl_->crs_graph = std::make_shared<CRSGraph>();
 
         auto mesh = &impl_->mesh;
@@ -225,24 +233,25 @@ namespace sfem {
     }
 
     std::shared_ptr<CRSGraph> Mesh::node_to_node_graph_upper_triangular() {
-        if (!impl_->crs_graph_upper_triangular) {
-            auto mesh = &impl_->mesh;
+        if (impl_->crs_graph_upper_triangular) return impl_->crs_graph_upper_triangular;
+        SFEM_TRACE_SCOPE("Mesh::node_to_node_graph_upper_triangular");
 
-            count_t *rowptr{nullptr};
-            idx_t   *colidx{nullptr};
-            build_crs_graph_upper_triangular_from_element(mesh->nelements,
-                                                          mesh->nnodes,
-                                                          elem_num_nodes((enum ElemType)mesh->element_type),
-                                                          mesh->elements,
-                                                          &rowptr,
-                                                          &colidx);
+        auto mesh = &impl_->mesh;
 
-            impl_->crs_graph_upper_triangular =
-                    std::make_shared<CRSGraph>(Buffer<count_t>::own(mesh->nnodes + 1, rowptr, free, MEMORY_SPACE_HOST),
-                                               Buffer<idx_t>::own(rowptr[mesh->nnodes], colidx, free, MEMORY_SPACE_HOST));
+        count_t *rowptr{nullptr};
+        idx_t   *colidx{nullptr};
+        build_crs_graph_upper_triangular_from_element(mesh->nelements,
+                                                      mesh->nnodes,
+                                                      elem_num_nodes((enum ElemType)mesh->element_type),
+                                                      mesh->elements,
+                                                      &rowptr,
+                                                      &colidx);
 
-            // impl_->crs_graph_upper_triangular->print(std::cout);
-        }
+        impl_->crs_graph_upper_triangular =
+                std::make_shared<CRSGraph>(Buffer<count_t>::own(mesh->nnodes + 1, rowptr, free, MEMORY_SPACE_HOST),
+                                           Buffer<idx_t>::own(rowptr[mesh->nnodes], colidx, free, MEMORY_SPACE_HOST));
+
+        // impl_->crs_graph_upper_triangular->print(std::cout);
 
         return impl_->crs_graph_upper_triangular;
     }
@@ -267,6 +276,8 @@ namespace sfem {
         std::shared_ptr<CRSGraph>        node_to_node_graph;
 
         void init(const std::shared_ptr<Mesh> macro_mesh, const int level) {
+            SFEM_TRACE_SCOPE("SemiStructuredMesh::init");
+
             this->macro_mesh = macro_mesh;
             this->level      = level;
 
@@ -283,9 +294,14 @@ namespace sfem {
                 }
             }
 #endif
-
-            proteus_hex8_create_full_idx(
-                    level, (mesh_t *)macro_mesh->impl_mesh(), elements, &this->n_unique_nodes, &this->interior_start);
+            auto c_mesh = (mesh_t *)macro_mesh->impl_mesh();
+            sshex8_generate_elements(level,
+                                     c_mesh->nelements,
+                                     c_mesh->nnodes,
+                                     c_mesh->elements,
+                                     elements,
+                                     &this->n_unique_nodes,
+                                     &this->interior_start);
 
             this->elements = std::make_shared<Buffer<idx_t *>>(
                     nxe,
@@ -310,6 +326,8 @@ namespace sfem {
         if (impl_->node_to_node_graph) {
             return impl_->node_to_node_graph;
         }
+
+        SFEM_TRACE_SCOPE("SemiStructuredMesh::node_to_node_graph");
 
         count_t *rowptr{nullptr};
         idx_t   *colidx{nullptr};
@@ -504,7 +522,8 @@ namespace sfem {
     }
 
     std::shared_ptr<NeumannConditions> NeumannConditions::create_from_env(const std::shared_ptr<FunctionSpace> &space) {
-        //
+        SFEM_TRACE_SCOPE("NeumannConditions::create_from_env");
+
         auto nc = std::make_unique<NeumannConditions>(space);
 
         char *SFEM_NEUMANN_SIDESET   = 0;
@@ -535,6 +554,8 @@ namespace sfem {
     }
 
     int NeumannConditions::gradient(const real_t *const x, real_t *const out) {
+        SFEM_TRACE_SCOPE("NeumannConditions::gradient");
+
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
 
         for (int i = 0; i < impl_->n_neumann_conditions; i++) {
@@ -640,6 +661,9 @@ namespace sfem {
 
     std::shared_ptr<Constraint> DirichletConditions::derefine(const std::shared_ptr<FunctionSpace> &coarse_space,
                                                               const bool                            as_zero) const {
+        SFEM_TRACE_SCOPE("DirichletConditions::derefine");
+
+
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
         auto et   = (enum ElemType)impl_->space->element_type();
 
@@ -740,7 +764,8 @@ namespace sfem {
     }
 
     std::shared_ptr<DirichletConditions> DirichletConditions::create_from_env(const std::shared_ptr<FunctionSpace> &space) {
-        //
+        SFEM_TRACE_SCOPE("DirichletConditions::create_from_env");
+
         auto dc = std::make_unique<DirichletConditions>(space);
 
         char *SFEM_DIRICHLET_NODESET   = 0;
@@ -762,6 +787,8 @@ namespace sfem {
     }
 
     int DirichletConditions::apply(real_t *const x) {
+        SFEM_TRACE_SCOPE("DirichletConditions::apply");
+
         for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
             constraint_nodes_to_value_vec(impl_->dirichlet_conditions[i].local_size,
                                           impl_->dirichlet_conditions[i].idx,
@@ -775,6 +802,8 @@ namespace sfem {
     }
 
     int DirichletConditions::gradient(const real_t *const x, real_t *const g) {
+        SFEM_TRACE_SCOPE("DirichletConditions::gradient");
+
         for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
             constraint_gradient_nodes_to_value_vec(impl_->dirichlet_conditions[i].local_size,
                                                    impl_->dirichlet_conditions[i].idx,
@@ -789,6 +818,8 @@ namespace sfem {
     }
 
     int DirichletConditions::apply_value(const real_t value, real_t *const x) {
+        SFEM_TRACE_SCOPE("DirichletConditions::apply_value");
+
         for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
             constraint_nodes_to_value_vec(impl_->dirichlet_conditions[i].local_size,
                                           impl_->dirichlet_conditions[i].idx,
@@ -802,6 +833,8 @@ namespace sfem {
     }
 
     int DirichletConditions::copy_constrained_dofs(const real_t *const src, real_t *const dest) {
+        SFEM_TRACE_SCOPE("DirichletConditions::copy_constrained_dofs");
+
         for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
             constraint_nodes_copy_vec(impl_->dirichlet_conditions[i].local_size,
                                       impl_->dirichlet_conditions[i].idx,
@@ -818,6 +851,8 @@ namespace sfem {
                                          const count_t *const rowptr,
                                          const idx_t *const   colidx,
                                          real_t *const        values) {
+        SFEM_TRACE_SCOPE("DirichletConditions::hessian_crs");
+
         for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
             crs_constraint_nodes_to_identity_vec(impl_->dirichlet_conditions[i].local_size,
                                                  impl_->dirichlet_conditions[i].idx,
@@ -836,6 +871,8 @@ namespace sfem {
                                          const count_t *const rowptr,
                                          const idx_t *const   colidx,
                                          real_t *const        values) {
+        SFEM_TRACE_SCOPE("DirichletConditions::hessian_bsr");
+
         for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
             bsr_constraint_nodes_to_identity_vec(impl_->dirichlet_conditions[i].local_size,
                                                  impl_->dirichlet_conditions[i].idx,
@@ -851,6 +888,8 @@ namespace sfem {
     }
 
     int DirichletConditions::mask(mask_t *mask) {
+        SFEM_TRACE_SCOPE("DirichletConditions::mask");
+
         for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
             for (ptrdiff_t node = 0; node < impl_->dirichlet_conditions[i].local_size; node++) {
                 const ptrdiff_t idx = impl_->dirichlet_conditions[i].idx[node] * impl_->space->block_size() +
@@ -862,81 +901,6 @@ namespace sfem {
         }
         return SFEM_SUCCESS;
     }
-
-    class Timings {
-    public:
-        static double tick() { return MPI_Wtime(); }
-
-        class Scoped {
-        public:
-            double  tick_{0};
-            double *value_;
-            Scoped(double *value) : value_(value) { tick_ = tick(); }
-
-            ~Scoped() { *value_ += tick() - tick_; }
-        };
-
-        double create_crs_graph{0};
-        double destroy_crs_graph{0};
-        double hessian_crs{0};
-        double hessian_bsr{0};
-        double hessian_bcrs_sym{0};
-        double hessian_crs_sym{0};
-        double hessian_diag{0};
-        double hessian_block_diag_sym{0};
-        double gradient{0};
-        double apply{0};
-        double value{0};
-        double apply_constraints{0};
-        double constraints_gradient{0};
-        double apply_zero_constraints{0};
-        double copy_constrained_dofs{0};
-        double report_solution{0};
-        double initial_guess{0};
-
-        void clear() {
-            create_crs_graph       = 0;
-            destroy_crs_graph      = 0;
-            hessian_crs            = 0;
-            hessian_bsr            = 0;
-            hessian_bcrs_sym       = 0;
-            hessian_crs_sym        = 0;
-            hessian_diag           = 0;
-            hessian_block_diag_sym = 0;
-            gradient               = 0;
-            apply                  = 0;
-            value                  = 0;
-            apply_constraints      = 0;
-            constraints_gradient   = 0;
-            apply_zero_constraints = 0;
-            copy_constrained_dofs  = 0;
-            report_solution        = 0;
-            initial_guess          = 0;
-        }
-
-        void describe(std::ostream &os) const {
-            os << "function,seconds\n";
-            os << "create_crs_graph," << create_crs_graph << "\n";
-            os << "destroy_crs_graph," << destroy_crs_graph << "\n";
-            os << "hessian_crs," << hessian_crs << "\n";
-            os << "hessian_bsr," << hessian_bsr << "\n";
-            os << "hessian_bcrs_sym," << hessian_bcrs_sym << "\n";
-            os << "hessian_crs_sym," << hessian_crs_sym << "\n";
-            os << "hessian_diag," << hessian_diag << "\n";
-            os << "hessian_block_diag_sym," << hessian_block_diag_sym << "\n";
-            os << "gradient," << gradient << "\n";
-            os << "apply," << apply << "\n";
-            os << "value," << value << "\n";
-            os << "apply_constraints," << apply_constraints << "\n";
-            os << "constraints_gradient," << constraints_gradient << "\n";
-            os << "apply_zero_constraints," << apply_zero_constraints << "\n";
-            os << "copy_constrained_dofs," << copy_constrained_dofs << "\n";
-            os << "report_solution," << report_solution << "\n";
-            os << "initial_guess," << initial_guess << "\n";
-        }
-    };
-
-#define SFEM_FUNCTION_SCOPED_TIMING(acc) Timings::Scoped scoped_(&(acc))
 
     class Output::Impl {
     public:
@@ -968,6 +932,8 @@ namespace sfem {
     void Output::set_output_dir(const char *path) { impl_->output_dir = path; }
 
     int Output::write(const char *name, const real_t *const x) {
+        SFEM_TRACE_SCOPE("Output::write");
+
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
 
         {
@@ -1010,6 +976,8 @@ namespace sfem {
     }
 
     int Output::write_time_step(const char *name, const real_t t, const real_t *const x) {
+        SFEM_TRACE_SCOPE("Output::write_time_step");
+        
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
 
         {
@@ -1040,7 +1008,6 @@ namespace sfem {
         std::shared_ptr<FunctionSpace>           space;
         std::vector<std::shared_ptr<Op>>         ops;
         std::vector<std::shared_ptr<Constraint>> constraints;
-        Timings                                  timings;
 
         std::shared_ptr<Output> output;
         bool                    handle_constraints{true};
@@ -1064,14 +1031,7 @@ namespace sfem {
 
     std::shared_ptr<FunctionSpace> Function::space() { return impl_->space; }
 
-    Function::~Function() {
-        std::ofstream os;
-        os.open("perf_" + std::to_string(space()->n_dofs()) + ".csv");
-        if (!os.good()) return;
-
-        impl_->timings.describe(os);
-        os.close();
-    }
+    Function::~Function() {}
 
     void Function::add_operator(const std::shared_ptr<Op> &op) { impl_->ops.push_back(op); }
     void Function::add_constraint(const std::shared_ptr<Constraint> &c) { impl_->constraints.push_back(c); }
@@ -1079,6 +1039,8 @@ namespace sfem {
     void Function::add_dirichlet_conditions(const std::shared_ptr<DirichletConditions> &c) { add_constraint(c); }
 
     int Function::constaints_mask(mask_t *mask) {
+        SFEM_TRACE_SCOPE("Function::constaints_mask");
+
         for (auto &c : impl_->constraints) {
             c->mask(mask);
         }
@@ -1092,7 +1054,7 @@ namespace sfem {
                               const count_t *const rowptr,
                               const idx_t *const   colidx,
                               real_t *const        values) {
-        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.hessian_crs);
+        SFEM_TRACE_SCOPE("Function::hessian_crs");
 
         for (auto &op : impl_->ops) {
             if (op->hessian_crs(x, rowptr, colidx, values) != SFEM_SUCCESS) {
@@ -1114,7 +1076,7 @@ namespace sfem {
                               const count_t *const rowptr,
                               const idx_t *const   colidx,
                               real_t *const        values) {
-        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.hessian_bsr);
+        SFEM_TRACE_SCOPE("Function::hessian_bsr");
 
         for (auto &op : impl_->ops) {
             if (op->hessian_bsr(x, rowptr, colidx, values) != SFEM_SUCCESS) {
@@ -1138,8 +1100,7 @@ namespace sfem {
                                    const ptrdiff_t      block_stride,
                                    real_t **const       diag_values,
                                    real_t **const       off_diag_values) {
-        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.hessian_bcrs_sym);
-
+        SFEM_TRACE_SCOPE("Function::hessian_bcrs_sym");
         for (auto &op : impl_->ops) {
             if (op->hessian_bcrs_sym(x, rowptr, colidx, block_stride, diag_values, off_diag_values) != SFEM_SUCCESS) {
                 std::cerr << "Failed hessian_bcrs_sym in op: " << op->name() << "\n";
@@ -1154,8 +1115,7 @@ namespace sfem {
                                   const idx_t *const   colidx,
                                   real_t *const        diag_values,
                                   real_t *const        off_diag_values) {
-        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.hessian_crs_sym);
-
+        SFEM_TRACE_SCOPE("Function::hessian_crs_sym");
         for (auto &op : impl_->ops) {
             if (op->hessian_crs_sym(x, rowptr, colidx, diag_values, off_diag_values) != SFEM_SUCCESS) {
                 std::cerr << "Failed hessian_crs_sym in op: " << op->name() << "\n";
@@ -1166,8 +1126,7 @@ namespace sfem {
     }
 
     int Function::hessian_diag(const real_t *const x, real_t *const values) {
-        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.hessian_diag);
-
+        SFEM_TRACE_SCOPE("Function::hessian_diag");
         for (auto &op : impl_->ops) {
             if (op->hessian_diag(x, values) != SFEM_SUCCESS) {
                 std::cerr << "Failed hessian_diag in op: " << op->name() << "\n";
@@ -1185,7 +1144,7 @@ namespace sfem {
     }
 
     int Function::hessian_block_diag_sym(const real_t *const x, real_t *const values) {
-        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.hessian_block_diag_sym);
+        SFEM_TRACE_SCOPE("Function::hessian_block_diag_sym");
 
         for (auto &op : impl_->ops) {
             if (op->hessian_block_diag_sym(x, values) != SFEM_SUCCESS) {
@@ -1198,7 +1157,7 @@ namespace sfem {
     }
 
     int Function::gradient(const real_t *const x, real_t *const out) {
-        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.gradient);
+        SFEM_TRACE_SCOPE("Function::gradient");
 
         for (auto &op : impl_->ops) {
             if (op->gradient(x, out) != SFEM_SUCCESS) {
@@ -1215,7 +1174,7 @@ namespace sfem {
     }
 
     int Function::apply(const real_t *const x, const real_t *const h, real_t *const out) {
-        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.apply);
+        SFEM_TRACE_SCOPE("Function::apply");
 
         for (auto &op : impl_->ops) {
             if (op->apply(x, h, out) != SFEM_SUCCESS) {
@@ -1248,8 +1207,6 @@ namespace sfem {
                 this->space()->n_dofs(),
                 this->space()->n_dofs(),
                 [=](const real_t *const x, real_t *const y) {
-                    SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.apply);
-
                     for (auto op : cloned_ops) {
                         if (op->apply(nullptr, x, y) != SFEM_SUCCESS) {
                             std::cerr << "Failed apply in op: " << op->name() << "\n";
@@ -1265,7 +1222,7 @@ namespace sfem {
     }
 
     int Function::value(const real_t *x, real_t *const out) {
-        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.value);
+        SFEM_TRACE_SCOPE("Function::value");
 
         for (auto &op : impl_->ops) {
             if (op->value(x, out) != SFEM_SUCCESS) {
@@ -1278,7 +1235,7 @@ namespace sfem {
     }
 
     int Function::apply_constraints(real_t *const x) {
-        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.apply_constraints);
+        SFEM_TRACE_SCOPE("Function::apply_constraints");
 
         for (auto &c : impl_->constraints) {
             c->apply(x);
@@ -1287,7 +1244,7 @@ namespace sfem {
     }
 
     int Function::constraints_gradient(const real_t *const x, real_t *const g) {
-        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.constraints_gradient);
+        SFEM_TRACE_SCOPE("Function::constraints_gradient");
 
         for (auto &c : impl_->constraints) {
             c->gradient(x, g);
@@ -1296,7 +1253,7 @@ namespace sfem {
     }
 
     int Function::apply_zero_constraints(real_t *const x) {
-        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.apply_zero_constraints);
+        SFEM_TRACE_SCOPE("Function::apply_zero_constraints");
 
         for (auto &c : impl_->constraints) {
             c->apply_zero(x);
@@ -1305,7 +1262,7 @@ namespace sfem {
     }
 
     int Function::set_value_to_constrained_dofs(const real_t val, real_t *const x) {
-        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.apply_zero_constraints);
+        SFEM_TRACE_SCOPE("Function::set_value_to_constrained_dofs");
 
         for (auto &c : impl_->constraints) {
             c->apply_value(val, x);
@@ -1314,7 +1271,7 @@ namespace sfem {
     }
 
     int Function::copy_constrained_dofs(const real_t *const src, real_t *const dest) {
-        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.copy_constrained_dofs);
+        SFEM_TRACE_SCOPE("Function::copy_constrained_dofs");
 
         for (auto &c : impl_->constraints) {
             c->copy_constrained_dofs(src, dest);
@@ -1323,7 +1280,7 @@ namespace sfem {
     }
 
     int Function::report_solution(const real_t *const x) {
-        SFEM_FUNCTION_SCOPED_TIMING(impl_->timings.report_solution);
+        SFEM_TRACE_SCOPE("Function::report_solution");
 
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
         return impl_->output->write("out", x);
@@ -1343,6 +1300,7 @@ namespace sfem {
     }
 
     std::shared_ptr<Function> Function::derefine(const std::shared_ptr<FunctionSpace> &space, const bool dirichlet_as_zero) {
+        SFEM_TRACE_SCOPE("Function::derefine");
         auto ret = std::make_shared<Function>(space);
 
         for (auto &o : impl_->ops) {
@@ -1360,6 +1318,8 @@ namespace sfem {
 
     std::shared_ptr<Function> Function::lor() { return lor(impl_->space->lor()); }
     std::shared_ptr<Function> Function::lor(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("Function::lor");
+
         auto ret = std::make_shared<Function>(space);
 
         for (auto &o : impl_->ops) {
