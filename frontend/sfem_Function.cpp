@@ -39,8 +39,8 @@
 #include "sshex8_linear_elasticity.h"
 
 // Mesh
-#include "sshex8.h"
 #include "sfem_hex8_mesh_graph.h"
+#include "sshex8.h"
 
 // Multigrid
 #include "sfem_prolongation_restriction.h"
@@ -663,7 +663,6 @@ namespace sfem {
                                                               const bool                            as_zero) const {
         SFEM_TRACE_SCOPE("DirichletConditions::derefine");
 
-
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
         auto et   = (enum ElemType)impl_->space->element_type();
 
@@ -977,7 +976,7 @@ namespace sfem {
 
     int Output::write_time_step(const char *name, const real_t t, const real_t *const x) {
         SFEM_TRACE_SCOPE("Output::write_time_step");
-        
+
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
 
         {
@@ -1343,6 +1342,8 @@ namespace sfem {
         real_t mu{1}, lambda{1};
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            SFEM_TRACE_SCOPE("LinearElasticity::create");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             assert(mesh->spatial_dim == space->block_size());
@@ -1362,6 +1363,8 @@ namespace sfem {
         }
 
         std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
+            SFEM_TRACE_SCOPE("LinearElasticity::lor_op");
+
             auto ret          = std::make_shared<LinearElasticity>(space);
             ret->element_type = macro_type_variant(element_type);
             ret->mu           = mu;
@@ -1370,6 +1373,8 @@ namespace sfem {
         }
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
+            SFEM_TRACE_SCOPE("LinearElasticity::derefine_op");
+
             auto ret          = std::make_shared<LinearElasticity>(space);
             ret->element_type = macro_base_elem(element_type);
             ret->mu           = mu;
@@ -1388,6 +1393,8 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
                         real_t *const        values) override {
+            SFEM_TRACE_SCOPE("LinearElasticity::hessian_crs");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             auto graph = space->node_to_node_graph();
@@ -1410,6 +1417,8 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
                         real_t *const        values) override {
+            SFEM_TRACE_SCOPE("LinearElasticity::hessian_bsr");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             auto graph = space->node_to_node_graph();
@@ -1434,6 +1443,8 @@ namespace sfem {
                              const ptrdiff_t      block_stride,
                              real_t **const       diag_values,
                              real_t **const       off_diag_values) override {
+            SFEM_TRACE_SCOPE("LinearElasticity::hessian_bcrs_sym");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             linear_elasticity_bcrs_sym(element_type,
@@ -1452,12 +1463,16 @@ namespace sfem {
         }
 
         int hessian_block_diag_sym(const real_t *const x, real_t *const values) {
+            SFEM_TRACE_SCOPE("LinearElasticity::hessian_block_diag_sym");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
             return linear_elasticity_block_diag_sym_aos(
                     element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, this->mu, this->lambda, values);
         }
 
         int hessian_diag(const real_t *const, real_t *const out) override {
+            SFEM_TRACE_SCOPE("LinearElasticity::hessian_diag");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             linear_elasticity_assemble_diag_aos(
@@ -1466,6 +1481,8 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
+            SFEM_TRACE_SCOPE("LinearElasticity::gradient");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             linear_elasticity_assemble_gradient_aos(
@@ -1475,6 +1492,8 @@ namespace sfem {
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+            SFEM_TRACE_SCOPE("LinearElasticity::apply");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             linear_elasticity_apply_aos(
@@ -1484,6 +1503,8 @@ namespace sfem {
         }
 
         int value(const real_t *x, real_t *const out) override {
+            SFEM_TRACE_SCOPE("LinearElasticity::value");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             linear_elasticity_assemble_value_aos(
@@ -1518,6 +1539,8 @@ namespace sfem {
         }
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            SFEM_TRACE_SCOPE("SemiStructuredLinearElasticity::create");
+
             assert(space->has_semi_structured_mesh());
             if (!space->has_semi_structured_mesh()) {
                 fprintf(stderr,
@@ -1565,6 +1588,8 @@ namespace sfem {
         }
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
+            SFEM_TRACE_SCOPE("SemiStructuredLinearElasticity::derefine_op");
+
             assert(space->element_type() == macro_base_elem(element_type));
             auto ret          = std::make_shared<LinearElasticity>(space);
             ret->element_type = macro_base_elem(element_type);
@@ -1592,33 +1617,37 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
                         real_t *const        values) override {
+            SFEM_TRACE_SCOPE("SemiStructuredLinearElasticity::hessian_bsr");
+
             auto &ssm = space->semi_structured_mesh();
 
             return affine_sshex8_elasticity_bsr(ssm.level(),
-                                                      ssm.n_elements(),
-                                                      ssm.interior_start(),
-                                                      ssm.element_data(),
-                                                      ssm.point_data(),
-                                                      this->mu,
-                                                      this->lambda,
-                                                      rowptr,
-                                                      colidx,
-                                                      values);
+                                                ssm.n_elements(),
+                                                ssm.interior_start(),
+                                                ssm.element_data(),
+                                                ssm.point_data(),
+                                                this->mu,
+                                                this->lambda,
+                                                rowptr,
+                                                colidx,
+                                                values);
         }
 
         int hessian_diag(const real_t *const, real_t *const out) override {
+            SFEM_TRACE_SCOPE("SemiStructuredLinearElasticity::hessian_diag");
+
             auto &ssm = space->semi_structured_mesh();
             return affine_sshex8_linear_elasticity_diag(ssm.level(),
-                                                              ssm.n_elements(),
-                                                              ssm.interior_start(),
-                                                              ssm.element_data(),
-                                                              ssm.point_data(),
-                                                              mu,
-                                                              lambda,
-                                                              3,
-                                                              &out[0],
-                                                              &out[1],
-                                                              &out[2]);
+                                                        ssm.n_elements(),
+                                                        ssm.interior_start(),
+                                                        ssm.element_data(),
+                                                        ssm.point_data(),
+                                                        mu,
+                                                        lambda,
+                                                        3,
+                                                        &out[0],
+                                                        &out[1],
+                                                        &out[2]);
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
@@ -1627,6 +1656,8 @@ namespace sfem {
         }
 
         int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
+            SFEM_TRACE_SCOPE("SemiStructuredLinearElasticity::apply");
+
             assert(element_type == SSHEX8);  // REMOVEME once generalized approach
 
             auto &ssm = space->semi_structured_mesh();
@@ -1637,37 +1668,37 @@ namespace sfem {
             int    err;
             if (use_affine_approximation) {
                 err = affine_sshex8_linear_elasticity_apply(ssm.level(),
-                                                                  ssm.n_elements(),
-                                                                  ssm.interior_start(),
-                                                                  ssm.element_data(),
-                                                                  ssm.point_data(),
-                                                                  mu,
-                                                                  lambda,
-                                                                  3,
-                                                                  &h[0],
-                                                                  &h[1],
-                                                                  &h[2],
-                                                                  3,
-                                                                  &out[0],
-                                                                  &out[1],
-                                                                  &out[2]);
+                                                            ssm.n_elements(),
+                                                            ssm.interior_start(),
+                                                            ssm.element_data(),
+                                                            ssm.point_data(),
+                                                            mu,
+                                                            lambda,
+                                                            3,
+                                                            &h[0],
+                                                            &h[1],
+                                                            &h[2],
+                                                            3,
+                                                            &out[0],
+                                                            &out[1],
+                                                            &out[2]);
 
             } else {
                 err = sshex8_linear_elasticity_apply(ssm.level(),
-                                                           ssm.n_elements(),
-                                                           ssm.interior_start(),
-                                                           ssm.element_data(),
-                                                           ssm.point_data(),
-                                                           mu,
-                                                           lambda,
-                                                           3,
-                                                           &h[0],
-                                                           &h[1],
-                                                           &h[2],
-                                                           3,
-                                                           &out[0],
-                                                           &out[1],
-                                                           &out[2]);
+                                                     ssm.n_elements(),
+                                                     ssm.interior_start(),
+                                                     ssm.element_data(),
+                                                     ssm.point_data(),
+                                                     mu,
+                                                     lambda,
+                                                     3,
+                                                     &h[0],
+                                                     &h[1],
+                                                     &h[2],
+                                                     3,
+                                                     &out[0],
+                                                     &out[1],
+                                                     &out[2]);
             }
 
             double tock = MPI_Wtime();
@@ -1693,6 +1724,8 @@ namespace sfem {
         inline bool is_linear() const override { return true; }
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            SFEM_TRACE_SCOPE("Laplacian::create");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             assert(1 == space->block_size());
@@ -1722,6 +1755,8 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
                         real_t *const        values) override {
+            SFEM_TRACE_SCOPE("Laplacian::hessian_crs");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             auto graph = space->dof_to_dof_graph();
@@ -1741,6 +1776,8 @@ namespace sfem {
                             const idx_t *const   colidx,
                             real_t *const        diag_values,
                             real_t *const        off_diag_values) override {
+            SFEM_TRACE_SCOPE("Laplacian::hessian_crs_sym");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             // auto graph = space->node_to_node_graph_upper_triangular();
@@ -1757,24 +1794,32 @@ namespace sfem {
         }
 
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
+            SFEM_TRACE_SCOPE("Laplacian::hessian_diag");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             return laplacian_diag(element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, values);
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
+            SFEM_TRACE_SCOPE("Laplacian::gradient");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             return laplacian_assemble_gradient(element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+            SFEM_TRACE_SCOPE("Laplacian::apply");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             return laplacian_apply(element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, h, out);
         }
 
         int value(const real_t *x, real_t *const out) override {
+            SFEM_TRACE_SCOPE("Laplacian::value");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             return laplacian_assemble_value(element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, x, out);
@@ -1805,6 +1850,8 @@ namespace sfem {
         }
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            SFEM_TRACE_SCOPE("SemiStructuredLaplacian::create");
+
             assert(space->has_semi_structured_mesh());
             if (!space->has_semi_structured_mesh()) {
                 fprintf(stderr,
@@ -1832,6 +1879,8 @@ namespace sfem {
         }
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
+            SFEM_TRACE_SCOPE("SemiStructuredLaplacian::derefine_op");
+
             assert(space->element_type() == macro_base_elem(element_type));
             auto ret          = std::make_shared<Laplacian>(space);
             ret->element_type = macro_base_elem(element_type);
@@ -1855,6 +1904,8 @@ namespace sfem {
         }
 
         int hessian_diag(const real_t *const, real_t *const out) override {
+            SFEM_TRACE_SCOPE("SemiStructuredLaplacian::hessian_diag");
+
             auto &ssm = space->semi_structured_mesh();
             return affine_sshex8_laplacian_diag(
                     ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), out);
@@ -1867,6 +1918,8 @@ namespace sfem {
         }
 
         int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
+        SFEM_TRACE_SCOPE("SemiStructuredLaplacian::apply");
+
             assert(element_type == SSHEX8);  // REMOVEME once generalized approach
 
             auto &ssm = space->semi_structured_mesh();
@@ -1907,6 +1960,8 @@ namespace sfem {
         inline bool is_linear() const override { return true; }
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            SFEM_TRACE_SCOPE("Mass::create");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
             assert(1 == space->block_size());
 
@@ -1923,6 +1978,8 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
                         real_t *const        values) override {
+            SFEM_TRACE_SCOPE("Mass::hessian_crs");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             auto graph = space->dof_to_dof_graph();
@@ -1940,6 +1997,8 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
+            SFEM_TRACE_SCOPE("Mass::gradient");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             apply_mass(element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, 1, x, 1, out);
@@ -1948,6 +2007,8 @@ namespace sfem {
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+            SFEM_TRACE_SCOPE("Mass::apply");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             apply_mass(element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, 1, h, 1, out);
@@ -1984,6 +2045,8 @@ namespace sfem {
         inline bool is_linear() const override { return true; }
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            SFEM_TRACE_SCOPE("LumpedMass::create");
+
             auto mesh         = (mesh_t *)space->mesh().impl_mesh();
             auto ret          = std::make_unique<LumpedMass>(space);
             ret->element_type = (enum ElemType)space->element_type();
@@ -1995,6 +2058,8 @@ namespace sfem {
         LumpedMass(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
+        SFEM_TRACE_SCOPE("LumpedMass::hessian_diag");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             if (space->block_size() == 1) {
@@ -2234,6 +2299,8 @@ namespace sfem {
         real_t mu{1}, lambda{1};
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            SFEM_TRACE_SCOPE("NeoHookeanOgden::create");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             assert(mesh->spatial_dim == space->block_size());
@@ -2253,6 +2320,8 @@ namespace sfem {
         }
 
         std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
+            SFEM_TRACE_SCOPE("NeoHookeanOgden::lor_op");
+
             auto ret          = std::make_shared<NeoHookeanOgden>(space);
             ret->element_type = macro_type_variant(element_type);
             ret->mu           = mu;
@@ -2261,6 +2330,8 @@ namespace sfem {
         }
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
+            SFEM_TRACE_SCOPE("NeoHookeanOgden::derefine_op");
+
             auto ret          = std::make_shared<NeoHookeanOgden>(space);
             ret->element_type = macro_base_elem(element_type);
             ret->mu           = mu;
@@ -2279,6 +2350,8 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
                         real_t *const        values) override {
+            SFEM_TRACE_SCOPE("NeoHookeanOgden::hessian_crs");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             auto graph = space->node_to_node_graph();
@@ -2297,6 +2370,8 @@ namespace sfem {
         }
 
         int hessian_diag(const real_t *const x, real_t *const out) override {
+            SFEM_TRACE_SCOPE("NeoHookeanOgden::hessian_diag");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             return neohookean_ogden_diag_aos(
@@ -2304,6 +2379,8 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
+            SFEM_TRACE_SCOPE("NeoHookeanOgden::gradient");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             return neohookean_ogden_gradient_aos(
@@ -2311,6 +2388,8 @@ namespace sfem {
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+            SFEM_TRACE_SCOPE("NeoHookeanOgden::apply");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             return neohookean_ogden_apply_aos(
@@ -2318,6 +2397,8 @@ namespace sfem {
         }
 
         int value(const real_t *x, real_t *const out) override {
+            SFEM_TRACE_SCOPE("NeoHookeanOgden::value");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             return neohookean_ogden_value_aos(
@@ -2338,6 +2419,8 @@ namespace sfem {
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace>   &space,
                                           const std::shared_ptr<Buffer<idx_t *>> &boundary_elements) {
+            SFEM_TRACE_SCOPE("BoundaryMass::create");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             auto ret          = std::make_unique<BoundaryMass>(space);
@@ -2398,6 +2481,8 @@ namespace sfem {
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+            SFEM_TRACE_SCOPE("BoundaryMass::apply");
+
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
             int  block_size = space->block_size();
