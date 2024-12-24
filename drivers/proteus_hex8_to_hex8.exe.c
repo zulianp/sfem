@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
     }
 
     ptrdiff_t n_unique_nodes, interior_start;
-    proteus_hex8_create_full_idx(level, &mesh, elements, &n_unique_nodes, &interior_start);
+    sshex8_generate_elements(level, mesh.nelements, mesh.nnodes, mesh.elements, elements, &n_unique_nodes, &interior_start);
 
     // ///////////////////////////////////////////////////////////////////////////////
     // Generate explicit hex8 micro-mesh
