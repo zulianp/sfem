@@ -90,8 +90,8 @@ int main(int argc, char *argv[]) {
     }
 
     ptrdiff_t n_unique_nodes, interior_start;
-    proteus_hex8_create_full_idx(
-            SFEM_ELEMENT_REFINE_LEVEL, &mesh, elements, &n_unique_nodes, &interior_start);
+    sshex8_generate_elements(
+            SFEM_ELEMENT_REFINE_LEVEL, mesh.nelements, mesh.nnodes, mesh.elements, elements, &n_unique_nodes, &interior_start);
 
     if (0) {
         printf("//--------------- \n");

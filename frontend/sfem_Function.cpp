@@ -283,9 +283,9 @@ namespace sfem {
                 }
             }
 #endif
-
-            proteus_hex8_create_full_idx(
-                    level, (mesh_t *)macro_mesh->impl_mesh(), elements, &this->n_unique_nodes, &this->interior_start);
+            auto c_mesh =  (mesh_t *)macro_mesh->impl_mesh();
+            sshex8_generate_elements(
+                    level, c_mesh->nelements, c_mesh->nnodes, c_mesh->elements, elements, &this->n_unique_nodes, &this->interior_start);
 
             this->elements = std::make_shared<Buffer<idx_t *>>(
                     nxe,
