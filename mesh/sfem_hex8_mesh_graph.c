@@ -4,7 +4,7 @@
 #include "sortreduce.h"
 
 #include "adj_table.h"
-#include "proteus_hex8.h"  //FIXME
+#include "sshex8.h"  //FIXME
 
 #include <assert.h>
 #include <mpi.h>
@@ -339,7 +339,7 @@ static void index_face(const int        L,
                             //        uzi + vzi + o_start[2]);
 
                             int pidx =
-                                    proteus_hex8_lidx(L, uxi + vxi + o_start[0], uyi + vyi + o_start[1], uzi + vzi + o_start[2]);
+                                    sshex8_lidx(L, uxi + vxi + o_start[0], uyi + vyi + o_start[1], uzi + vzi + o_start[2]);
 
                             // idx_t u_offset = u_face_start + (uxi + uyi + uzi) * u_increment;
                             // idx_t v_offset = v_face_start + (vxi + vyi + vzi) * v_increment;
@@ -371,19 +371,19 @@ int sshex8_generate_elements(const int       L,
 
     double tick = MPI_Wtime();
 
-    const int nxe = proteus_hex8_nxe(L);
+    const int nxe = sshex8_nxe(L);
 
     // 1) Get the node indices from the HEX8 mesh
     int lagr_to_proteus_corners[8] = {// Bottom
-                                      proteus_hex8_lidx(L, 0, 0, 0),
-                                      proteus_hex8_lidx(L, L, 0, 0),
-                                      proteus_hex8_lidx(L, L, L, 0),
-                                      proteus_hex8_lidx(L, 0, L, 0),
+                                      sshex8_lidx(L, 0, 0, 0),
+                                      sshex8_lidx(L, L, 0, 0),
+                                      sshex8_lidx(L, L, L, 0),
+                                      sshex8_lidx(L, 0, L, 0),
                                       // Top
-                                      proteus_hex8_lidx(L, 0, 0, L),
-                                      proteus_hex8_lidx(L, L, 0, L),
-                                      proteus_hex8_lidx(L, L, L, L),
-                                      proteus_hex8_lidx(L, 0, L, L)};
+                                      sshex8_lidx(L, 0, 0, L),
+                                      sshex8_lidx(L, L, 0, L),
+                                      sshex8_lidx(L, L, L, L),
+                                      sshex8_lidx(L, 0, L, L)};
 
 #ifndef NDEBUG
     for (int i = 0; i < 8; i++) {
@@ -399,7 +399,7 @@ int sshex8_generate_elements(const int       L,
     for (int zi = 0; zi <= L; zi++) {
         for (int yi = 0; yi <= L; yi++) {
             for (int xi = 0; xi <= L; xi++) {
-                int lidx = proteus_hex8_lidx(L, xi, yi, zi);
+                int lidx = sshex8_lidx(L, xi, yi, zi);
                 assert(lidx < nxe);
                 coords[0][lidx] = xi;
                 coords[1][lidx] = yi;
@@ -553,7 +553,7 @@ int sshex8_generate_elements(const int       L,
                     for (int zi = 0; zi != len[2]; zi += dir[2]) {
                         for (int yi = 0; yi != len[1]; yi += dir[1]) {
                             for (int xi = 0; xi != len[0]; xi += dir[0]) {
-                                const int lidx_edge    = proteus_hex8_lidx(L, start[0] + xi, start[1] + yi, start[2] + zi);
+                                const int lidx_edge    = sshex8_lidx(L, start[0] + xi, start[1] + yi, start[2] + zi);
                                 elements[lidx_edge][e] = edge_start + en;
                                 en += 1;
 
@@ -646,7 +646,7 @@ int sshex8_generate_elements(const int       L,
         for (int zi = 1; zi < L; zi++) {
             for (int yi = 1; yi < L; yi++) {
                 for (int xi = 1; xi < L; xi++) {
-                    const int lidx_vol = proteus_hex8_lidx(L, xi, yi, zi);
+                    const int lidx_vol = sshex8_lidx(L, xi, yi, zi);
                     int       Lm1      = L - 1;
                     int       en       = (zi - 1) * Lm1 * Lm1 + (yi - 1) * Lm1 + xi - 1;
 
@@ -677,7 +677,7 @@ int sshex8_generate_elements(const int       L,
     return SFEM_SUCCESS;
 }
 
-int proteus_hex8_build_n2e(const int       L,
+int sshex8_build_n2e(const int       L,
                            const ptrdiff_t nelements,
                            const ptrdiff_t nnodes,
                            idx_t **const   elems,
@@ -700,14 +700,14 @@ int proteus_hex8_build_n2e(const int       L,
         for (int zi = 0; zi < L; zi++) {
             for (int yi = 0; yi < L; yi++) {
                 for (int xi = 0; xi < L; xi++) {
-                    const idx_t lev[8] = {proteus_hex8_lidx(L, xi, yi, zi),
-                                          proteus_hex8_lidx(L, xi + 1, yi, zi),
-                                          proteus_hex8_lidx(L, xi, yi + 1, zi),
-                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi),
-                                          proteus_hex8_lidx(L, xi, yi, zi + 1),
-                                          proteus_hex8_lidx(L, xi + 1, yi, zi + 1),
-                                          proteus_hex8_lidx(L, xi, yi + 1, zi + 1),
-                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi + 1)};
+                    const idx_t lev[8] = {sshex8_lidx(L, xi, yi, zi),
+                                          sshex8_lidx(L, xi + 1, yi, zi),
+                                          sshex8_lidx(L, xi, yi + 1, zi),
+                                          sshex8_lidx(L, xi + 1, yi + 1, zi),
+                                          sshex8_lidx(L, xi, yi, zi + 1),
+                                          sshex8_lidx(L, xi + 1, yi, zi + 1),
+                                          sshex8_lidx(L, xi, yi + 1, zi + 1),
+                                          sshex8_lidx(L, xi + 1, yi + 1, zi + 1)};
 
                     // const ptrdiff_t e_macro = i * txe + zi * L * L + yi * L + xi;
 
@@ -734,14 +734,14 @@ int proteus_hex8_build_n2e(const int       L,
         for (int zi = 0; zi < L; zi++) {
             for (int yi = 0; yi < L; yi++) {
                 for (int xi = 0; xi < L; xi++) {
-                    const idx_t lev[8] = {proteus_hex8_lidx(L, xi, yi, zi),
-                                          proteus_hex8_lidx(L, xi + 1, yi, zi),
-                                          proteus_hex8_lidx(L, xi, yi + 1, zi),
-                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi),
-                                          proteus_hex8_lidx(L, xi, yi, zi + 1),
-                                          proteus_hex8_lidx(L, xi + 1, yi, zi + 1),
-                                          proteus_hex8_lidx(L, xi, yi + 1, zi + 1),
-                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi + 1)};
+                    const idx_t lev[8] = {sshex8_lidx(L, xi, yi, zi),
+                                          sshex8_lidx(L, xi + 1, yi, zi),
+                                          sshex8_lidx(L, xi, yi + 1, zi),
+                                          sshex8_lidx(L, xi + 1, yi + 1, zi),
+                                          sshex8_lidx(L, xi, yi, zi + 1),
+                                          sshex8_lidx(L, xi + 1, yi, zi + 1),
+                                          sshex8_lidx(L, xi, yi + 1, zi + 1),
+                                          sshex8_lidx(L, xi + 1, yi + 1, zi + 1)};
 
                     const ptrdiff_t elidx = i * txe + zi * L * L + yi * L + xi;
 
@@ -765,7 +765,7 @@ int proteus_hex8_build_n2e(const int       L,
     return SFEM_SUCCESS;
 }
 
-static int proteus_hex8_build_crs_graph_from_n2e(const int                                L,
+static int sshex8_build_crs_graph_from_n2e(const int                                L,
                                                  const ptrdiff_t                          nelements,
                                                  const ptrdiff_t                          nnodes,
                                                  idx_t **const SFEM_RESTRICT              elems,
@@ -799,14 +799,14 @@ static int proteus_hex8_build_crs_graph_from_n2e(const int                      
                     const ptrdiff_t yi      = (eidx - e_macro * txe - zi * L * L) / L;
                     const ptrdiff_t xi      = eidx - e_macro * txe - zi * L * L - yi * L;
 
-                    const idx_t lev[8] = {proteus_hex8_lidx(L, xi, yi, zi),
-                                          proteus_hex8_lidx(L, xi + 1, yi, zi),
-                                          proteus_hex8_lidx(L, xi, yi + 1, zi),
-                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi),
-                                          proteus_hex8_lidx(L, xi, yi, zi + 1),
-                                          proteus_hex8_lidx(L, xi + 1, yi, zi + 1),
-                                          proteus_hex8_lidx(L, xi, yi + 1, zi + 1),
-                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi + 1)};
+                    const idx_t lev[8] = {sshex8_lidx(L, xi, yi, zi),
+                                          sshex8_lidx(L, xi + 1, yi, zi),
+                                          sshex8_lidx(L, xi, yi + 1, zi),
+                                          sshex8_lidx(L, xi + 1, yi + 1, zi),
+                                          sshex8_lidx(L, xi, yi, zi + 1),
+                                          sshex8_lidx(L, xi + 1, yi, zi + 1),
+                                          sshex8_lidx(L, xi, yi + 1, zi + 1),
+                                          sshex8_lidx(L, xi + 1, yi + 1, zi + 1)};
 
                     for (int edof_i = 0; edof_i < 8; ++edof_i) {
                         idx_t neighnode = elems[lev[edof_i]][e_macro];
@@ -847,14 +847,14 @@ static int proteus_hex8_build_crs_graph_from_n2e(const int                      
                     const ptrdiff_t yi      = (eidx - e_macro * txe - zi * L * L) / L;
                     const ptrdiff_t xi      = eidx - e_macro * txe - zi * L * L - yi * L;
 
-                    const idx_t lev[8] = {proteus_hex8_lidx(L, xi, yi, zi),
-                                          proteus_hex8_lidx(L, xi + 1, yi, zi),
-                                          proteus_hex8_lidx(L, xi, yi + 1, zi),
-                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi),
-                                          proteus_hex8_lidx(L, xi, yi, zi + 1),
-                                          proteus_hex8_lidx(L, xi + 1, yi, zi + 1),
-                                          proteus_hex8_lidx(L, xi, yi + 1, zi + 1),
-                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi + 1)};
+                    const idx_t lev[8] = {sshex8_lidx(L, xi, yi, zi),
+                                          sshex8_lidx(L, xi + 1, yi, zi),
+                                          sshex8_lidx(L, xi, yi + 1, zi),
+                                          sshex8_lidx(L, xi + 1, yi + 1, zi),
+                                          sshex8_lidx(L, xi, yi, zi + 1),
+                                          sshex8_lidx(L, xi + 1, yi, zi + 1),
+                                          sshex8_lidx(L, xi, yi + 1, zi + 1),
+                                          sshex8_lidx(L, xi + 1, yi + 1, zi + 1)};
 
                     for (int edof_i = 0; edof_i < 8; ++edof_i) {
                         idx_t neighnode = elems[lev[edof_i]][e_macro];
@@ -877,7 +877,7 @@ static int proteus_hex8_build_crs_graph_from_n2e(const int                      
     return SFEM_SUCCESS;
 }
 
-int proteus_hex8_crs_graph(const int       L,
+int sshex8_crs_graph(const int       L,
                            const ptrdiff_t nelements,
                            const ptrdiff_t nnodes,
                            idx_t **const   elements,
@@ -887,15 +887,15 @@ int proteus_hex8_crs_graph(const int       L,
 
     count_t       *n2eptr;
     element_idx_t *elindex;
-    proteus_hex8_build_n2e(L, nelements, nnodes, elements, &n2eptr, &elindex);
+    sshex8_build_n2e(L, nelements, nnodes, elements, &n2eptr, &elindex);
 
-    int err = proteus_hex8_build_crs_graph_from_n2e(L, nelements, nnodes, elements, n2eptr, elindex, out_rowptr, out_colidx);
+    int err = sshex8_build_crs_graph_from_n2e(L, nelements, nnodes, elements, n2eptr, elindex, out_rowptr, out_colidx);
 
     free(n2eptr);
     free(elindex);
 
     double tock = MPI_Wtime();
-    printf("proteus_hex8_crs_graph \t%g seconds\n", tock - tick);
+    printf("sshex8_crs_graph \t%g seconds\n", tock - tick);
     return err;
 }
 
@@ -948,7 +948,7 @@ int sshex8_hierarchical_renumbering(const int       L,
             for (int xi = 0; xi <= 1; xi++) {
                 
                 for (ptrdiff_t e = 0; e < nelements; e++) {
-                    const int v     = proteus_hex8_lidx(L, xi * L, yi * L, zi * L);
+                    const int v     = sshex8_lidx(L, xi * L, yi * L, zi * L);
                     node_mapping[elements[v][e]] = elements[v][e];
                     next_id         = MAX(next_id, node_mapping[v]);
                 }
@@ -967,7 +967,7 @@ int sshex8_hierarchical_renumbering(const int       L,
             for (int zi = 0; zi <= l; zi += stride) {
                 for (int yi = 0; yi <= l; yi += stride) {
                     for (int xi = 0; xi <= l; xi += stride) {
-                        const int   v   = proteus_hex8_lidx(L, xi * step_factor, yi * step_factor, zi * step_factor);
+                        const int   v   = sshex8_lidx(L, xi * step_factor, yi * step_factor, zi * step_factor);
                         const idx_t idx = elements[v][e];
                         if (node_mapping[idx] == -1) {
                             node_mapping[idx] = next_id++;
@@ -986,7 +986,7 @@ int sshex8_hierarchical_renumbering(const int       L,
     //         for (int xi = 0; xi <= L; xi++) {
     //             printf("(%d %d %d): ", xi, yi, zi);
     //             for (ptrdiff_t e = 0; e < nelements; e++) {
-    //                 const int   v   = proteus_hex8_lidx(L, xi, yi, zi);
+    //                 const int   v   = sshex8_lidx(L, xi, yi, zi);
     //                 printf("%d (%d) ", elements[v][e], node_mapping[elements[v][e]]);
     //             }
     //             printf("\n");
@@ -999,7 +999,7 @@ int sshex8_hierarchical_renumbering(const int       L,
         for (int yi = 0; yi <= L; yi++) {
             for (int xi = 0; xi <= L; xi++) {
                 for (ptrdiff_t e = 0; e < nelements; e++) {
-                    const int   v   = proteus_hex8_lidx(L, xi, yi, zi);
+                    const int   v   = sshex8_lidx(L, xi, yi, zi);
                     const idx_t idx = elements[v][e];
 
                     if (node_mapping[idx] == -1) {

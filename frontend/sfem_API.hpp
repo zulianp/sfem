@@ -21,7 +21,7 @@
 #include "sfem_mprgp.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "cu_proteus_hex8_interpolate.h"
+#include "cu_sshex8_interpolate.h"
 #include "cu_tet4_prolongation_restriction.h"
 #include "sfem_ContactConditions_cuda.hpp"
 #include "sfem_Function_incore_cuda.hpp"
@@ -37,8 +37,8 @@ namespace sfem {
 }  // namespace sfem
 #endif
 
-#include "proteus_hex8.h"
-#include "proteus_hex8_interpolate.h"
+#include "sshex8.h"
+#include "sshex8_interpolate.h"
 #include "sfem_ShiftableJacobi.hpp"
 #include "sfem_Stationary.hpp"
 #include "sfem_prolongation_restriction.h"
@@ -314,7 +314,7 @@ namespace sfem {
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
                             auto &ssm = to_space->semi_structured_mesh();
-                            cu_proteus_hex8_hierarchical_prolongation(ssm.level(),
+                            cu_sshex8_hierarchical_prolongation(ssm.level(),
                                                                       ssm.n_elements(),
                                                                       ssm.n_elements(),
                                                                       elements->data(),
@@ -359,7 +359,7 @@ namespace sfem {
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
                             auto &ssm = to_space->semi_structured_mesh();
-                            proteus_hex8_hierarchical_prolongation(ssm.level(),
+                            sshex8_hierarchical_prolongation(ssm.level(),
                                                                    ssm.n_elements(),
                                                                    ssm.element_data(),
                                                                    from_space->block_size(),
@@ -399,7 +399,7 @@ namespace sfem {
         int nxe;
         if (from_space->has_semi_structured_mesh()) {
             auto &mesh = from_space->semi_structured_mesh();
-            nxe = proteus_hex8_nxe(mesh.level());
+            nxe = sshex8_nxe(mesh.level());
             elements = mesh.element_data();
             nnodes = mesh.n_nodes();
         } else {
@@ -439,7 +439,7 @@ namespace sfem {
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
                             auto &ssm = from_space->semi_structured_mesh();
-                            cu_proteus_hex8_hierarchical_restriction(ssm.level(),
+                            cu_sshex8_hierarchical_restriction(ssm.level(),
                                                                      ssm.n_elements(),
                                                                      ssm.n_elements(),
                                                                      elements->data(),
@@ -485,7 +485,7 @@ namespace sfem {
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
                             auto &ssm = from_space->semi_structured_mesh();
-                            proteus_hex8_hierarchical_restriction(
+                            sshex8_hierarchical_restriction(
                                     ssm.level(),
                                     ssm.n_elements(),
                                     ssm.element_data(),

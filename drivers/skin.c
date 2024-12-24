@@ -22,7 +22,7 @@
 
 #include "adj_table.h"
 
-#include "proteus_hex8.h"  // FIXME
+#include "sshex8.h"  // FIXME
 #include "sfem_hex8_mesh_graph.h"
 #include "sfem_sshex8_skin.h"
 
@@ -143,13 +143,13 @@ int main(int argc, char *argv[]) {
         override_element_type = type_from_string(SFEM_ELEMENT_TYPE);
     }
 
-    if (override_element_type == PROTEUS_HEX8) {
+    if (override_element_type == SSHEX8) {
         int SFEM_ELEMENT_REFINE_LEVEL = 0;
         SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
         if (!SFEM_ELEMENT_REFINE_LEVEL) {
             fprintf(stderr,
-                    "ElemType PROTEUS_HEX8 requires SFEM_ELEMENT_REFINE_LEVEL to be defined and >= "
+                    "ElemType sshex8 requires SFEM_ELEMENT_REFINE_LEVEL to be defined and >= "
                     "2!\n");
             return EXIT_FAILURE;
         }
@@ -157,8 +157,8 @@ int main(int argc, char *argv[]) {
         if (mesh.element_type == HEX8) {
             // Generate proteus mesh on the fly!
 
-            const int nxe      = proteus_hex8_nxe(SFEM_ELEMENT_REFINE_LEVEL);
-            const int txe      = proteus_hex8_txe(SFEM_ELEMENT_REFINE_LEVEL);
+            const int nxe      = sshex8_nxe(SFEM_ELEMENT_REFINE_LEVEL);
+            const int txe      = sshex8_txe(SFEM_ELEMENT_REFINE_LEVEL);
             idx_t   **elements = 0;
 
             elements = malloc(nxe * sizeof(idx_t *));
