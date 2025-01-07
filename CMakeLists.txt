@@ -109,11 +109,11 @@ if(SFEM_ENABLE_CUDA)
 endif()
 
 foreach(MODULE ${SFEM_MODULES})
-    scan_directories(${CMAKE_SOURCE_DIR}/${MODULE} "." SFEM_BUILD_INCLUDES
+    scan_directories(${CMAKE_CURRENT_SOURCE_DIR}/${MODULE} "." SFEM_BUILD_INCLUDES
        SFEM_HEADERS SFEM_SOURCES)
 
     if(SFEM_ENABLE_CUDA)
-        file(GLOB SFEM_MODULE_KERNEL_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/${MODULE}/*.cu")
+        file(GLOB SFEM_MODULE_KERNEL_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}/*.cu")
         # message(STATUS "${MODULE} : ${SFEM_MODULE_KERNEL_SOURCES}")
     endif()
 
@@ -167,7 +167,7 @@ foreach(include ${SFEM_BUILD_INCLUDES})
 endforeach()
 
 target_include_directories(sfem BEFORE
-     PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/external>)
+     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external>)
 
 target_include_directories(
     sfem BEFORE
