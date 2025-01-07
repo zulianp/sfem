@@ -104,6 +104,20 @@ namespace sfem {
         std::unique_ptr<Impl> impl_;
     };
 
+    class Sideset final {
+    public:
+        int read(const char *path);
+        std::shared_ptr<Buffer<element_idx_t>> parent();
+        std::shared_ptr<Buffer<int16_t>> lfi();
+
+        Sideset();
+        ~Sideset();
+
+    private:
+        class Impl;
+        std::unique_ptr<Impl> impl_;
+    };
+
     class SemiStructuredMesh {
     public:
         idx_t   **element_data();

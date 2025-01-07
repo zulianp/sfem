@@ -266,6 +266,41 @@ namespace sfem {
     std::shared_ptr<Buffer<count_t>> Mesh::node_to_node_rowptr() const { return impl_->crs_graph->rowptr(); }
     std::shared_ptr<Buffer<idx_t>>   Mesh::node_to_node_colidx() const { return impl_->crs_graph->colidx(); }
 
+    class Sideset::Impl final {
+    public:
+        std::shared_ptr<Buffer<element_idx_t>> parent;
+        std::shared_ptr<Buffer<int16_t>>       lfi;
+    };
+
+    Sideset::Sideset() : impl_(std::make_unique<Impl>()) {}
+    Sideset::~Sideset() = default;
+
+    int Sideset::read(const char *folder) {
+        std::string    folder_ = folder;
+        ptrdiff_t      nlocal{0}, nglobal{0}, ncheck{0};
+        element_idx_t *parent{nullptr};
+        int16_t       *lfi{nullptr};
+
+        if (array_create_from_file(
+                    MPI_COMM_SELF, (folder_ + "/parent.raw").c_str(), SFEM_MPI_ELEMENT_IDX_T, (void**)&parent, &nlocal, &nglobal) ||
+            array_create_from_file(MPI_COMM_SELF, (folder_ + "/lfi.raw").c_str(), MPI_SHORT, (void**)&lfi, &ncheck, &nglobal)) {
+            return SFEM_FAILURE;
+        }
+
+        impl_->parent = sfem::manage_host_buffer(nlocal, parent);
+        impl_->lfi    = sfem::manage_host_buffer(nlocal, lfi);
+
+        if (ncheck != nlocal) {
+            SFEM_ERROR("Inconsistend array sizes in sideset at %s\n", folder);
+            return SFEM_FAILURE;
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    std::shared_ptr<Buffer<element_idx_t>> Sideset::parent() { return impl_->parent; }
+    std::shared_ptr<Buffer<int16_t>>       Sideset::lfi() { return impl_->lfi; }
+
     class SemiStructuredMesh::Impl {
     public:
         std::shared_ptr<Mesh> macro_mesh;
@@ -1918,7 +1953,7 @@ namespace sfem {
         }
 
         int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
-        SFEM_TRACE_SCOPE("SemiStructuredLaplacian::apply");
+            SFEM_TRACE_SCOPE("SemiStructuredLaplacian::apply");
 
             assert(element_type == SSHEX8);  // REMOVEME once generalized approach
 
@@ -2058,7 +2093,7 @@ namespace sfem {
         LumpedMass(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
-        SFEM_TRACE_SCOPE("LumpedMass::hessian_diag");
+            SFEM_TRACE_SCOPE("LumpedMass::hessian_diag");
 
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
