@@ -4,5 +4,5 @@
 @OLD_CMAKE_CONFIG_CONTENT@
 ########## end of old style variables ####################################################################################
 
-include("${CMAKE_CURRENT_LIST_DIR}/ParMoonolithTargets.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/SFEMTargets.cmake")
 
