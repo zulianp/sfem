@@ -11,7 +11,7 @@ int test_sshex8_hierarchical_renumbering() {
     const ptrdiff_t nelements = 2;
     const ptrdiff_t nnodes    = 27 + 18;
 
-    auto elements = sfem::h_buffer<idx_t>(27, nelements);
+    auto elements = sfem::create_host_buffer<idx_t>(27, nelements);
 
     for (ptrdiff_t i = 0; i < 27; i++) {
         elements->data()[i][0] = i;
@@ -19,8 +19,8 @@ int test_sshex8_hierarchical_renumbering() {
     }
 
     int       L               = 24;
-    const int nxe             = proteus_hex8_nxe(L);
-    auto      sshex8_elements = sfem::h_buffer<idx_t>(nxe, nelements);
+    const int nxe             = sshex8_nxe(L);
+    auto      sshex8_elements = sfem::create_host_buffer<idx_t>(nxe, nelements);
 
     ptrdiff_t sshex_nnodes   = -1;
     ptrdiff_t interior_start = -1;
@@ -31,7 +31,7 @@ int test_sshex8_hierarchical_renumbering() {
             SFEM_SUCCESS);
 
     int  nlevels = sshex8_hierarchical_n_levels(L);
-    auto levels  = sfem::h_buffer<int>(nlevels);
+    auto levels  = sfem::create_host_buffer<int>(nlevels);
     sshex8_hierarchical_mesh_levels(L, nlevels, levels->data());
 
     SFEM_TEST_ASSERT(nlevels == 4);
@@ -47,7 +47,7 @@ int test_sshex8_hierarchical_renumbering() {
     for (int zi = 0; zi <= 1; zi++) {
         for (int yi = 0; yi <= 1; yi++) {
             for (int xi = 0; xi <= 1; xi++) {
-                int v = proteus_hex8_lidx(L, xi * L, yi * L, zi * L);
+                int v = sshex8_lidx(L, xi * L, yi * L, zi * L);
 
                 for (ptrdiff_t e = 0; e < nelements; e++) {
                     SFEM_TEST_ASSERT(sshex8_elements->data()[v][e] < nnodes);

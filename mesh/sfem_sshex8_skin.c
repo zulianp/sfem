@@ -1,7 +1,7 @@
 #include "sfem_sshex8_skin.h"
 
 #include "adj_table.h"
-#include "proteus_hex8.h"
+#include "sshex8.h"
 #include "sfem_hex8_mesh_graph.h"
 
 #include <assert.h>
@@ -93,7 +93,7 @@ int sshex8_surface_from_sideset(const int                                L,
         for (int zi = start[2]; zi != end[2]; zi += increment[2]) {
             for (int yi = start[1]; yi != end[1]; yi += increment[1]) {
                 for (int xi = start[0]; xi != end[0]; xi += increment[0]) {
-                    const int   lidx = proteus_hex8_lidx(L, xi, yi, zi);
+                    const int   lidx = sshex8_lidx(L, xi, yi, zi);
                     const idx_t node = elements[lidx][e];
                     sides[n++][i]    = node;
                 }
@@ -111,15 +111,15 @@ int sshex8_skin(const int       L,
                 idx_t **const   SFEM_RESTRICT surf_elements,
                 element_idx_t **SFEM_RESTRICT parent_element) {
     const int proteus_to_std[8] = {// Bottom
-                                   proteus_hex8_lidx(L, 0, 0, 0),
-                                   proteus_hex8_lidx(L, L, 0, 0),
-                                   proteus_hex8_lidx(L, L, L, 0),
-                                   proteus_hex8_lidx(L, 0, L, 0),
+                                   sshex8_lidx(L, 0, 0, 0),
+                                   sshex8_lidx(L, L, 0, 0),
+                                   sshex8_lidx(L, L, L, 0),
+                                   sshex8_lidx(L, 0, L, 0),
                                    // Top
-                                   proteus_hex8_lidx(L, 0, 0, L),
-                                   proteus_hex8_lidx(L, L, 0, L),
-                                   proteus_hex8_lidx(L, L, L, L),
-                                   proteus_hex8_lidx(L, 0, L, L)};
+                                   sshex8_lidx(L, 0, 0, L),
+                                   sshex8_lidx(L, L, 0, L),
+                                   sshex8_lidx(L, L, L, L),
+                                   sshex8_lidx(L, 0, L, L)};
 
     idx_t *hex8_elements[8] = {elements[proteus_to_std[0]],
                                elements[proteus_to_std[1]],
@@ -211,7 +211,7 @@ int sshex8_skin(const int       L,
                 for (int zi = start[2]; zi != end[2]; zi += increment[2]) {
                     for (int yi = start[1]; yi != end[1]; yi += increment[1]) {
                         for (int xi = start[0]; xi != end[0]; xi += increment[0]) {
-                            const int   lidx                = proteus_hex8_lidx(L, xi, yi, zi);
+                            const int   lidx                = sshex8_lidx(L, xi, yi, zi);
                             const idx_t node                = elements[lidx][e];
                             surf_elements[n++][side_offset] = node;
                         }

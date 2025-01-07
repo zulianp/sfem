@@ -38,9 +38,9 @@ namespace sfem {
             SFEM_ERROR("Unable to write trace file!\n");
         }
 
-        os << "name,calls,total,avg;\n";
+        os << "name,calls,total,avg\n";
         for (auto &e : impl_->events) {
-            os << e.first << "," << e.second.first << "," << e.second.second << "," << e.second.second/e.second.first <<";\n";
+            os << e.first << "," << e.second.first << "," << e.second.second << "," << e.second.second/e.second.first <<"\n";
         }
 
         os.close();

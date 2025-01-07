@@ -56,8 +56,8 @@ set(SFEM_MODULES
     operators/cvfem_quad4
     operators/macro_tri3
     operators/macro_tet4
-    operators/proteus_tet4
-    operators/proteus_hex8
+    operators/sstet4
+    operators/sshex8
     operators/hierarchical
     operators/hex8
     operators/ssquad4
@@ -93,9 +93,9 @@ if(SFEM_ENABLE_CUDA)
         operators/tet4/cuda
         operators/macro_tet4/cuda
         operators/tet10/cuda
-        operators/proteus_tet4/cuda
+        operators/sstet4/cuda
         operators/hex8/cuda
-        operators/proteus_hex8/cuda
+        operators/sshex8/cuda
         operators/hierarchical/cuda
         resampling/cuda
         )
@@ -265,7 +265,7 @@ if(SFEM_ENABLE_TESTING)
 
     list(APPEND SFEM_UNIT_TESTS
         operators/ssquad4/tests
-        operators/proteus_hex8/tests
+        operators/sshex8/tests
         mesh/tests
     )
 

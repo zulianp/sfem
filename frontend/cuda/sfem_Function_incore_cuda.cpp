@@ -10,8 +10,8 @@
 #include "cu_hex8_fff.h"
 #include "cu_laplacian.h"
 #include "cu_linear_elasticity.h"
-#include "cu_proteus_hex8_laplacian.h"
-#include "cu_proteus_hex8_linear_elasticity.h"
+#include "cu_sshex8_laplacian.h"
+#include "cu_sshex8_linear_elasticity.h"
 #include "cu_tet4_adjugate.h"
 #include "cu_tet4_fff.h"
 
@@ -420,7 +420,7 @@ namespace sfem {
 
         int hessian_diag(const real_t *const /*x*/, real_t *const out) override {
             auto &ssm = space->semi_structured_mesh();
-            return cu_proteus_affine_hex8_laplacian_diag(ssm.level(),
+            return cu_affine_sshex8_laplacian_diag(ssm.level(),
                                                          fff->n_elements(),
                                                          fff->n_elements(),  // stride
                                                          ssm.interior_start(),
@@ -433,7 +433,7 @@ namespace sfem {
 
         int gradient(const real_t *const x, real_t *const out) override {
             auto &ssm = space->semi_structured_mesh();
-            return cu_proteus_affine_hex8_laplacian_apply(ssm.level(),
+            return cu_affine_sshex8_laplacian_apply(ssm.level(),
                                                           fff->n_elements(),
                                                           fff->n_elements(),  // stride
                                                           ssm.interior_start(),
@@ -447,7 +447,7 @@ namespace sfem {
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
             auto &ssm = space->semi_structured_mesh();
-            return cu_proteus_affine_hex8_laplacian_apply(ssm.level(),
+            return cu_affine_sshex8_laplacian_apply(ssm.level(),
                                                           fff->n_elements(),
                                                           fff->n_elements(),  // stride
                                                           ssm.interior_start(),
@@ -531,7 +531,7 @@ namespace sfem {
             return SFEM_FAILURE;
 
             // auto &ssm = space->semi_structured_mesh();
-            // return cu_proteus_affine_hex8_laplacian_apply(ssm.level(),
+            // return cu_affine_sshex8_laplacian_apply(ssm.level(),
             //                                               fff->n_elements(),
             //                                               fff->n_elements(),  // stride
             //                                               ssm.interior_start(),
@@ -549,7 +549,7 @@ namespace sfem {
             return SFEM_FAILURE;
 
             // auto &ssm = space->semi_structured_mesh();
-            // return cu_proteus_affine_hex8_laplacian_apply(ssm.level(),
+            // return cu_affine_sshex8_laplacian_apply(ssm.level(),
             //                                               fff->n_elements(),
             //                                               fff->n_elements(),  // stride
             //                                               ssm.interior_start(),
@@ -766,7 +766,7 @@ namespace sfem {
 
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
             auto &ssm = space->semi_structured_mesh();
-            return cu_proteus_affine_hex8_linear_elasticity_diag(ssm.level(),
+            return cu_affine_sshex8_linear_elasticity_diag(ssm.level(),
                                                                  adjugate->n_elements(),
                                                                  adjugate->n_elements(),
                                                                  ssm.interior_start(),
@@ -785,7 +785,7 @@ namespace sfem {
 
         int gradient(const real_t *const x, real_t *const out) override {
             auto &ssm = space->semi_structured_mesh();
-            return cu_proteus_affine_hex8_linear_elasticity_apply(ssm.level(),
+            return cu_affine_sshex8_linear_elasticity_apply(ssm.level(),
                                                                   adjugate->n_elements(),
                                                                   adjugate->n_elements(),
                                                                   ssm.interior_start(),
@@ -808,7 +808,7 @@ namespace sfem {
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
             auto &ssm = space->semi_structured_mesh();
-            return cu_proteus_affine_hex8_linear_elasticity_apply(ssm.level(),
+            return cu_affine_sshex8_linear_elasticity_apply(ssm.level(),
                                                                   adjugate->n_elements(),
                                                                   adjugate->n_elements(),
                                                                   ssm.interior_start(),
