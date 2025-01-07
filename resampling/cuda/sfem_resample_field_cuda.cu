@@ -598,6 +598,21 @@ tet4_resample_field_local_reduce_CUDA(const ptrdiff_t                    nelemen
     // return 0;
 }
 
+int                                                                                          //
+tet4_resample_field_local_reduce_CUDA_Unified(const int     mpi_size,                        // MPI size
+                                              const int     mpi_rank,                        // MPI rank
+                                              const mesh_t* mesh,                            // Mesh
+                                              int           bool_assemble_dual_mass_vector,  // assemble dual mass vector (Output)
+                                              const ptrdiff_t* const SFEM_RESTRICT n,        // number of nodes in each direction
+                                              const ptrdiff_t* const SFEM_RESTRICT stride,   // stride of the data
+                                              const geom_t* const SFEM_RESTRICT    origin,   // origin of the domain
+                                              const geom_t* const SFEM_RESTRICT    delta,    // delta of the domain
+                                              const real_t* const SFEM_RESTRICT    data,     // SDF
+                                              real_t* const SFEM_RESTRICT          g_host) {          // Output
+
+    PRINT_CURRENT_FUNCTION;
+}
+
 /**
  * @brief Construct a new tet4 resample field local reduce CUDA managed object
  *
@@ -632,7 +647,7 @@ tet4_resample_field_local_reduce_CUDA_Managed(const int     mpi_size,           
 
     real_type* mass_vector = NULL;
     {
-        cudaError_t err = cudaMallocManaged((void**)&mass_vector, mesh->nnodes * sizeof(real_type));
+        const cudaError_t err = cudaMallocManaged((void**)&mass_vector, mesh->nnodes * sizeof(real_type));
         HANDLE_CUDA_ERROR(err);
     }
 
