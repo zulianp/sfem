@@ -33,7 +33,10 @@ endif()
 ######################################################
 
 find_package(MatrixIO REQUIRED)
-find_package(ISolver REQUIRED)
+
+if(SFEM_ENABLE_ISOLVER)
+    find_package(ISolver REQUIRED)
+endif()
 
 set(SFEM_MODULES
     algebra base matrix mesh pizzastack solver
@@ -106,11 +109,11 @@ if(SFEM_ENABLE_CUDA)
 endif()
 
 foreach(MODULE ${SFEM_MODULES})
-    scan_directories(${CMAKE_SOURCE_DIR}/${MODULE} "." SFEM_BUILD_INCLUDES
+    scan_directories(${CMAKE_CURRENT_SOURCE_DIR}/${MODULE} "." SFEM_BUILD_INCLUDES
        SFEM_HEADERS SFEM_SOURCES)
 
     if(SFEM_ENABLE_CUDA)
-        file(GLOB SFEM_MODULE_KERNEL_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/${MODULE}/*.cu")
+        file(GLOB SFEM_MODULE_KERNEL_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}/*.cu")
         # message(STATUS "${MODULE} : ${SFEM_MODULE_KERNEL_SOURCES}")
     endif()
 
@@ -164,7 +167,7 @@ foreach(include ${SFEM_BUILD_INCLUDES})
 endforeach()
 
 target_include_directories(sfem BEFORE
-     PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/external>)
+     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external>)
 
 target_include_directories(
     sfem BEFORE
@@ -222,6 +225,11 @@ list(APPEND SFEM_EXCLUDED_EXEC "ssolve")
 if(${SFEM_SCALAR_TYPE} STREQUAL "float32")
     # FIXME these executables need to be fixed when compiling with real_t=float32
     list (APPEND SFEM_EXCLUDED_EXEC assemble;assemble3;assemble4;cvfem_assemble;heat_equation;heat_equation;linear_elasticity_assemble;neohookean_assemble;taylor_hood_navier_stokes)
+endif()
+
+if(NOT ${SFEM_ENABLE_ISOLVER})
+    message(WARNING "ISOLVER is disabled!")
+     list (APPEND SFEM_EXCLUDED_EXEC heat_equation;heat_equation;linear_elasticity_assemble;neohookean_assemble;taylor_hood_navier_stokes)
 endif()
 
 if(SFEM_ENABLE_RESAMPLING)
@@ -366,7 +374,10 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/SFEMConfig.cmake
   ${CMAKE_CURRENT_BINARY_DIR}/SFEMConfigVersion.cmake
   DESTINATION lib/cmake/)
 
-include(cmake/PostInstall.cmake)
+
+if(NOT SFEM_ENABLE_SUBMODULE)
+    include(cmake/PostInstall.cmake)
+endif()
 
 ######################################################
 ######################################################
