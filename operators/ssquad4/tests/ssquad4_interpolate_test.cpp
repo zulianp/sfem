@@ -7,11 +7,11 @@
 
 static int test_restrict_level2_to_level1() {
     real_t from[9] = {1, 1, 1, 1, 1, 1, 1, 1, 1};
-    auto   to      = sfem::h_buffer<real_t>(4);
+    auto   to      = sfem::create_host_buffer<real_t>(4);
 
     // In this example we use the same element indices array for both discretization
     // the correct acceess is handled through strides. Specific ordering is expected!
-    auto elements = sfem::h_buffer<idx_t>(9, 1);
+    auto elements = sfem::create_host_buffer<idx_t>(9, 1);
 
     auto e  = elements->data();
     e[0][0] = 0;
@@ -26,7 +26,7 @@ static int test_restrict_level2_to_level1() {
     e[7][0] = 6;
     e[8][0] = 2;
 
-    auto count = sfem::h_buffer<uint16_t>(9);
+    auto count = sfem::create_host_buffer<uint16_t>(9);
 
     SFEM_TEST_ASSERT(ssquad4_element_node_incidence_count(2, 1, 1, e, count->data()) == SFEM_SUCCESS);
 
@@ -50,24 +50,24 @@ static int test_restrict_level2_to_level1() {
 }
 
 static int test_restrict_level4_to_level2() {
-    auto from = sfem::h_buffer<real_t>(25);
-    auto to   = sfem::h_buffer<real_t>(9);
+    auto from = sfem::create_host_buffer<real_t>(25);
+    auto to   = sfem::create_host_buffer<real_t>(9);
 
     for (ptrdiff_t i = 0; i < 25; i++) {
         from->data()[i] = 1;
     }
 
-    auto to_elements = sfem::h_buffer<idx_t>(9, 1);
+    auto to_elements = sfem::create_host_buffer<idx_t>(9, 1);
     for (ptrdiff_t i = 0; i < 9; i++) {
         to_elements->data()[i][0] = i;
     }
 
-    auto from_elements = sfem::h_buffer<idx_t>(25, 1);
+    auto from_elements = sfem::create_host_buffer<idx_t>(25, 1);
     for (ptrdiff_t i = 0; i < 25; i++) {
         from_elements->data()[i][0] = i;
     }
 
-    auto count = sfem::h_buffer<uint16_t>(25);
+    auto count = sfem::create_host_buffer<uint16_t>(25);
     SFEM_TEST_ASSERT(ssquad4_element_node_incidence_count(4, 1, 1, from_elements->data(), count->data()) == SFEM_SUCCESS);
 
     SFEM_TEST_ASSERT(ssquad4_restrict(1,                      // nelements
@@ -96,14 +96,14 @@ static int test_restrict_level4_to_level2() {
 }
 
 static int test_incidence_count() {
-    auto elements = sfem::h_buffer<idx_t>(9, 2);
+    auto elements = sfem::create_host_buffer<idx_t>(9, 2);
 
     for (ptrdiff_t i = 0; i < 9; i++) {
         elements->data()[i][0] = i;
         elements->data()[i][1] = 6 + i;
     }
 
-    auto count = sfem::h_buffer<uint16_t>(9 + 6);
+    auto count = sfem::create_host_buffer<uint16_t>(9 + 6);
     ssquad4_element_node_incidence_count(2, 1, 2, elements->data(), count->data());
 
     for (ptrdiff_t i = 0; i < 6; i++) {
@@ -124,7 +124,7 @@ static int test_level1_to_level2() {
 
     // In this example we use the same element indices array for both discretization
     // the correct acceess is handled through strides. Specific ordering is expected!
-    auto elements = sfem::h_buffer<idx_t>(9, 1);
+    auto elements = sfem::create_host_buffer<idx_t>(9, 1);
 
     auto e  = elements->data();
     e[0][0] = 0;
@@ -157,14 +157,14 @@ static int test_level1_to_level2() {
         }
     }
 
-    auto count_to = sfem::h_buffer<uint16_t>(9);
+    auto count_to = sfem::create_host_buffer<uint16_t>(9);
     ssquad4_element_node_incidence_count(2, 1, 1, elements->data(), count_to->data());
 
     for (ptrdiff_t i = 0; i < 9; i++) {
         SFEM_TEST_ASSERT(count_to->data()[i] == 1);
     }
 
-    auto count_from = sfem::h_buffer<uint16_t>(4);
+    auto count_from = sfem::create_host_buffer<uint16_t>(4);
     ssquad4_element_node_incidence_count(1, 2, 1, elements->data(), count_from->data());
 
     for (ptrdiff_t i = 0; i < 4; i++) {
@@ -178,12 +178,12 @@ static int test_level2_to_level4() {
     real_t from[9] = {0, 2, 4, 0, 2, 4, 0, 2, 4};
     real_t to[25];
 
-    auto from_elements = sfem::h_buffer<idx_t>(9, 1);
+    auto from_elements = sfem::create_host_buffer<idx_t>(9, 1);
     for (ptrdiff_t i = 0; i < 9; i++) {
         from_elements->data()[i][0] = i;
     }
 
-    auto to_elements = sfem::h_buffer<idx_t>(25, 1);
+    auto to_elements = sfem::create_host_buffer<idx_t>(25, 1);
     for (ptrdiff_t i = 0; i < 25; i++) {
         to_elements->data()[i][0] = i;
     }
@@ -237,11 +237,11 @@ static int test_level1_to_level4() {
     // 0 	9 	4 	10 	1
 
     real_t from[4] = {0, 4, 4, 0};
-    auto   to      = sfem::h_buffer<real_t>(25);
+    auto   to      = sfem::create_host_buffer<real_t>(25);
 
     // In this example we use the same element indices array for both discretization
     // the correct acceess is handled through strides. Specific ordering is expected!
-    auto elements = sfem::h_buffer<idx_t>(25, 1);
+    auto elements = sfem::create_host_buffer<idx_t>(25, 1);
     auto e        = elements->data();
 
     e[0][0] = 0;

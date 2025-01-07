@@ -21,7 +21,7 @@
 #include "sfem_mprgp.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "cu_proteus_hex8_interpolate.h"
+#include "cu_sshex8_interpolate.h"
 #include "cu_tet4_prolongation_restriction.h"
 #include "sfem_ContactConditions_cuda.hpp"
 #include "sfem_Function_incore_cuda.hpp"
@@ -37,8 +37,8 @@ namespace sfem {
 }  // namespace sfem
 #endif
 
-#include "proteus_hex8.h"
-#include "proteus_hex8_interpolate.h"
+#include "sshex8.h"
+#include "sshex8_interpolate.h"
 #include "sfem_ShiftableJacobi.hpp"
 #include "sfem_Stationary.hpp"
 #include "sfem_prolongation_restriction.h"
@@ -100,7 +100,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         if (es == MEMORY_SPACE_DEVICE) return sfem::d_buffer<T>(n);
 #endif  // SFEM_ENABLE_CUDA
-        return sfem::h_buffer<T>(n);
+        return sfem::create_host_buffer<T>(n);
     }
 
     template <typename T>
@@ -109,7 +109,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) return sfem::d_buffer<T>(n);
 #endif  // SFEM_ENABLE_CUDA
-        return sfem::h_buffer<T>(n);
+        return sfem::create_host_buffer<T>(n);
     }
 
     static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,
@@ -282,7 +282,7 @@ namespace sfem {
 
     static std::shared_ptr<Buffer<idx_t>> create_edge_idx(CRSGraph &crs_graph) {
         const ptrdiff_t rows = crs_graph.n_nodes();
-        auto p2_vertices = h_buffer<idx_t>(crs_graph.nnz());
+        auto p2_vertices = create_host_buffer<idx_t>(crs_graph.nnz());
 
         build_p1_to_p2_edge_map(
                 rows, crs_graph.rowptr()->data(), crs_graph.colidx()->data(), p2_vertices->data());
@@ -314,7 +314,7 @@ namespace sfem {
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
                             auto &ssm = to_space->semi_structured_mesh();
-                            cu_proteus_hex8_hierarchical_prolongation(ssm.level(),
+                            cu_sshex8_hierarchical_prolongation(ssm.level(),
                                                                       ssm.n_elements(),
                                                                       ssm.n_elements(),
                                                                       elements->data(),
@@ -359,7 +359,7 @@ namespace sfem {
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
                             auto &ssm = to_space->semi_structured_mesh();
-                            proteus_hex8_hierarchical_prolongation(ssm.level(),
+                            sshex8_hierarchical_prolongation(ssm.level(),
                                                                    ssm.n_elements(),
                                                                    ssm.element_data(),
                                                                    from_space->block_size(),
@@ -399,7 +399,7 @@ namespace sfem {
         int nxe;
         if (from_space->has_semi_structured_mesh()) {
             auto &mesh = from_space->semi_structured_mesh();
-            nxe = proteus_hex8_nxe(mesh.level());
+            nxe = sshex8_nxe(mesh.level());
             elements = mesh.element_data();
             nnodes = mesh.n_nodes();
         } else {
@@ -439,7 +439,7 @@ namespace sfem {
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
                             auto &ssm = from_space->semi_structured_mesh();
-                            cu_proteus_hex8_hierarchical_restriction(ssm.level(),
+                            cu_sshex8_hierarchical_restriction(ssm.level(),
                                                                      ssm.n_elements(),
                                                                      ssm.n_elements(),
                                                                      elements->data(),
@@ -485,7 +485,7 @@ namespace sfem {
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
                             auto &ssm = from_space->semi_structured_mesh();
-                            proteus_hex8_hierarchical_restriction(
+                            sshex8_hierarchical_restriction(
                                     ssm.level(),
                                     ssm.n_elements(),
                                     ssm.element_data(),
@@ -691,7 +691,7 @@ namespace sfem {
                                     (real_t)1);
         }
 #endif
-        auto values = sfem::h_buffer<real_t>(crs_graph->nnz());
+        auto values = sfem::create_host_buffer<real_t>(crs_graph->nnz());
 
         f.hessian_crs(
                 nullptr, crs_graph->rowptr()->data(), crs_graph->colidx()->data(), values->data());
@@ -728,7 +728,7 @@ namespace sfem {
                                     (real_t)1);
         }
 #endif
-        auto values = sfem::h_buffer<real_t>(crs_graph->nnz());
+        auto values = sfem::create_host_buffer<real_t>(crs_graph->nnz());
 
         const real_t *const x_data = (x) ? x->data() : nullptr;
         f->hessian_crs(
@@ -770,7 +770,7 @@ namespace sfem {
                                     (real_t)1);
         }
 #endif
-        auto values = sfem::h_buffer<real_t>(crs_graph->nnz() * block_size * block_size);
+        auto values = sfem::create_host_buffer<real_t>(crs_graph->nnz() * block_size * block_size);
 
         real_t *x_data = (x) ? x->data() : nullptr;
 
@@ -807,12 +807,12 @@ namespace sfem {
 
         if (SFEM_BCRS_SYM_USE_AOS) {
             block_stride = nblock_entries;
-            off_diag_values = sfem::h_buffer_fake_SoA<real_t>(nblock_entries, crs_graph->nnz());
-            diag_values = sfem::h_buffer_fake_SoA<real_t>(nblock_entries,
+            off_diag_values = sfem::create_host_buffer_fake_SoA<real_t>(nblock_entries, crs_graph->nnz());
+            diag_values = sfem::create_host_buffer_fake_SoA<real_t>(nblock_entries,
                                                           f->space()->n_dofs() / block_size);
         } else {
-            off_diag_values = sfem::h_buffer<real_t>(nblock_entries, crs_graph->nnz());
-            diag_values = sfem::h_buffer<real_t>(nblock_entries, f->space()->n_dofs() / block_size);
+            off_diag_values = sfem::create_host_buffer<real_t>(nblock_entries, crs_graph->nnz());
+            diag_values = sfem::create_host_buffer<real_t>(nblock_entries, f->space()->n_dofs() / block_size);
         }
 
         real_t *x_data = (x) ? x->data() : nullptr;

@@ -35,7 +35,7 @@ fi
 resolution=$1
 N=$(( resolution * 2 ))
 
-export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
+export SFEM_ELEMENT_TYPE=SSHEX8 
 export SFEM_ELEMENT_REFINE_LEVEL=$2
 
 if [[ -z $SFEM_BOX_SIZE ]]
@@ -55,7 +55,7 @@ raw_to_db.py $mesh model.vtk
 skin $mesh $mesh/macro_quad_surface
 cp $mesh/{x,y,z}.raw $mesh/macro_quad_surface
 
-proteus_quad4_to_quad4.py $SFEM_ELEMENT_REFINE_LEVEL $mesh/macro_quad_surface $mesh/surface
+ssquad4_to_quad4.py $SFEM_ELEMENT_REFINE_LEVEL $mesh/macro_quad_surface $mesh/surface
 
 SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface 0 0.5 0.5 0.99 	$mesh/surface/sides_left.raw
 SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface 1 0.5 0.5 0.99 	$mesh/surface/sides_right.raw
@@ -127,7 +127,7 @@ boundary_nodes $mesh/surface back  	$mesh/surface/sidesets_aos/back.raw
 # smask $mesh/surface/sidesets_aos/back.raw $sides $sides 6
 
 box_mesh.py $mesh -c hex8 -x $N -y $N -z $N --height=$SFEM_BOX_SIZE --width=$SFEM_BOX_SIZE --depth=$SFEM_BOX_SIZE --skip_boundary=1 $BOX_MESH_EXTRA_OPTIONS 
-proteus_quad4_to_quad4.py $SFEM_ELEMENT_REFINE_LEVEL $mesh/macro_quad_surface $mesh/surface
+ssquad4_to_quad4.py $SFEM_ELEMENT_REFINE_LEVEL $mesh/macro_quad_surface $mesh/surface
 
 # raw_to_db.py $mesh/surface $mesh/dirichlet.vtk --point_data="$sides" --cell_type=quad
 

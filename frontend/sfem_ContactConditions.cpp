@@ -338,7 +338,7 @@ namespace sfem {
             auto trace_space = std::make_shared<FunctionSpace>(surface_mesh, 1);
             auto bop         = sfem::Factory::create_op(trace_space, "Mass");
 
-            mass_vector = h_buffer<real_t>(trace_space->n_dofs());
+            mass_vector = create_host_buffer<real_t>(trace_space->n_dofs());
 
             if (variational) {
                 resample_weight_local(
@@ -352,7 +352,7 @@ namespace sfem {
                         mass_vector->data());
 
             } else {
-                auto ones = h_buffer<real_t>(trace_space->n_dofs());
+                auto ones = create_host_buffer<real_t>(trace_space->n_dofs());
                 sfem::blas<real_t>(EXECUTION_SPACE_HOST)->values(trace_space->n_dofs(), 1, ones->data());
                 bop->apply(nullptr, ones->data(), mass_vector->data());
             }
@@ -406,7 +406,7 @@ namespace sfem {
 
             mesh_t *c_mesh = (mesh_t*)space->mesh_ptr()->impl_mesh();
 
-            this->sides = sfem::h_buffer<idx_t>(nnxs, size);
+            this->sides = sfem::create_host_buffer<idx_t>(nnxs, size);
             if (extract_surface_from_sideset(
                         space->element_type(), c_mesh->elements, size, parent, side_idx, this->sides->data()) !=
                 SFEM_SUCCESS) {
@@ -490,7 +490,7 @@ namespace sfem {
             }
 
             // Allocate buffer for point information
-            this->surface_points = h_buffer<geom_t>(mesh->spatial_dimension(), this->node_mapping->size());
+            this->surface_points = create_host_buffer<geom_t>(mesh->spatial_dimension(), this->node_mapping->size());
         }
     };
 
@@ -558,9 +558,9 @@ namespace sfem {
             cc->impl_->sdf = Grid<geom_t>::create_from_file(mesh->comm(), path_sdf.c_str());
         }
 
-        cc->impl_->gap_xnormal = h_buffer<real_t>(cc->n_constrained_dofs());
-        cc->impl_->gap_ynormal = h_buffer<real_t>(cc->n_constrained_dofs());
-        cc->impl_->gap_znormal = h_buffer<real_t>(cc->n_constrained_dofs());
+        cc->impl_->gap_xnormal = create_host_buffer<real_t>(cc->n_constrained_dofs());
+        cc->impl_->gap_ynormal = create_host_buffer<real_t>(cc->n_constrained_dofs());
+        cc->impl_->gap_znormal = create_host_buffer<real_t>(cc->n_constrained_dofs());
 
         cc->impl_->assemble_mass_vector();
         return cc;
@@ -579,7 +579,7 @@ namespace sfem {
 
         auto sdf = impl_->sdf;
 
-        auto temp = h_buffer<real_t>(n_constrained_dofs());
+        auto temp = create_host_buffer<real_t>(n_constrained_dofs());
 
         auto tt = temp->data();
 

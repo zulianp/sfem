@@ -26,7 +26,7 @@ int sshex8_generate_elements(const int       L,
                              ptrdiff_t      *n_unique_nodes_out,
                              ptrdiff_t      *interior_start_out);
 
-int proteus_hex8_crs_graph(const int       L,
+int sshex8_crs_graph(const int       L,
                            const ptrdiff_t nelements,
                            const ptrdiff_t nnodes,
                            idx_t **const   elements,

@@ -91,7 +91,7 @@ NB_MODULE(pysfem, m) {
           [](const std::shared_ptr<sfem::Buffer<double>> &b) -> size_t { return b->size(); });
 
     m.def("create_real_buffer", [](const ptrdiff_t n) -> std::shared_ptr<sfem::Buffer<real_t>> {
-        return sfem::h_buffer<real_t>(n);
+        return sfem::create_host_buffer<real_t>(n);
     });
 
     m.def("numpy_view",

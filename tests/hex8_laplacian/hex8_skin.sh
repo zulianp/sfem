@@ -43,13 +43,13 @@ db_to_raw.py model.vtk hex8_mesh_2 --select_elem_type=hexahedron
 export SFEM_ELEMENT_TYPE=HEX8
 skin hex8_mesh_2 hex8_mesh_surface_std
 
-export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
+export SFEM_ELEMENT_TYPE=SSHEX8 
 export SFEM_ELEMENT_REFINE_LEVEL=8
 
 skin hex8_mesh_2 hex8_mesh_surface
 cp hex8_mesh_2/{x,y,z}.raw ./hex8_mesh_surface
 
-proteus_quad4_to_quad4.py $SFEM_ELEMENT_REFINE_LEVEL hex8_mesh_surface hex8_mesh_surface/quad4
+ssquad4_to_quad4.py $SFEM_ELEMENT_REFINE_LEVEL hex8_mesh_surface hex8_mesh_surface/quad4
 raw_to_db.py hex8_mesh_surface/quad4 quad4_mesh.vtk --cell_type=quad
 raw_to_db.py hex8_mesh_surface_std quad4_mesh_std.vtk --cell_type=quad
 
