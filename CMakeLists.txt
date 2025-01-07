@@ -374,7 +374,10 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/SFEMConfig.cmake
   ${CMAKE_CURRENT_BINARY_DIR}/SFEMConfigVersion.cmake
   DESTINATION lib/cmake/)
 
-include(cmake/PostInstall.cmake)
+
+if(NOT SFEM_ENABLE_SUBMODULE)
+    include(cmake/PostInstall.cmake)
+endif()
 
 ######################################################
 ######################################################
