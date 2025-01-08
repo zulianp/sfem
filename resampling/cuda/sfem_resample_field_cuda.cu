@@ -632,7 +632,6 @@ tet4_resample_field_local_reduce_CUDA_Unified(const int     mpi_size,           
     copy_xyz_tet4_device_unified((const geom_t**)mesh->points, mesh->nnodes, &xyz_device);
 
     const real_type* data_device = data;
-    const ptrdiff_t  size_data   = n[0] * n[1] * n[2];
 
     ///////////////////////////////////////////////////////////////////////////////
     // Call the kernel
@@ -687,6 +686,8 @@ tet4_resample_field_local_reduce_CUDA_Unified(const int     mpi_size,           
 
     free(weighted_field_device);
     weighted_field_device = NULL;
+
+    RETURN_FROM_FUNCTION(ret);
 }
 
 /**
@@ -853,8 +854,6 @@ tet4_resample_field_local_reduce_CUDA_wrapper(const int     mpi_size,           
 
     PRINT_CURRENT_FUNCTION;
 
-    const int mesh_nnodes = mpi_size > 1 ? mesh->nnodes : mesh->n_owned_nodes;
-
     int ret = 0;
 
 #if SFEM_CUDA_MEMORY_MODEL == CUDA_UNIFIED_MEMORY
@@ -863,9 +862,16 @@ tet4_resample_field_local_reduce_CUDA_wrapper(const int     mpi_size,           
 
     *bool_assemble_dual_mass_vector = 1;
 
-    printf("TODO: Implement the CUDA_UNIFIED_MEMORY: %s:%d\n", __FILE__, __LINE__);
-
-    exit(EXIT_FAILURE);
+    ret = tet4_resample_field_local_reduce_CUDA_Unified(mpi_size,                         //
+                                                        mpi_rank,                         //
+                                                        mesh,                             //
+                                                        *bool_assemble_dual_mass_vector,  //
+                                                        n,                                //
+                                                        stride,                           //
+                                                        origin,                           //
+                                                        delta,                            //
+                                                        data,                             //
+                                                        g_host);                          //
 
 #elif SFEM_CUDA_MEMORY_MODEL == CUDA_MANAGED_MEMORY
 
@@ -890,6 +896,7 @@ tet4_resample_field_local_reduce_CUDA_wrapper(const int     mpi_size,           
 #pragma message "CUDA_HOST_MEMORY is enabled"
 
     *bool_assemble_dual_mass_vector = 0;
+    const int mesh_nnodes           = mpi_size > 1 ? mesh->nnodes : mesh->n_owned_nodes;
 
     ret = tet4_resample_field_local_reduce_CUDA(mesh->nelements,  //
                                                 mesh_nnodes,      //

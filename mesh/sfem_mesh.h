@@ -11,13 +11,15 @@
 extern "C" {
 #endif
 
-static const int SFEM_MEM_SPACE_HOST = 0;
-static const int SFEM_MEM_SPACE_CUDA = 1;
-static const int SFEM_MEM_SPACE_NONE = -1;
+static const int SFEM_MEM_SPACE_NONE    = -1;
+static const int SFEM_MEM_SPACE_HOST    = 0;
+static const int SFEM_MEM_SPACE_CUDA    = 1;
+static const int SFEM_MEM_SPACE_MANAGED = 2;
+static const int SFEM_MEM_SPACE_UNIFIED = 3;
 
 typedef struct {
     MPI_Comm comm;
-    int mem_space;
+    int      mem_space;
 
     int spatial_dim;
     int element_type;
@@ -25,7 +27,7 @@ typedef struct {
     ptrdiff_t nelements;
     ptrdiff_t nnodes;
 
-    idx_t **elements;
+    idx_t  **elements;
     geom_t **points;
 
     ptrdiff_t n_owned_nodes;
@@ -36,14 +38,13 @@ typedef struct {
     ptrdiff_t n_shared_elements;
 
     idx_t *node_mapping;
-    int *node_owner;
+    int   *node_owner;
 
     idx_t *element_mapping;
 
     idx_t *node_offsets;
     idx_t *ghosts;
 } mesh_t;
-
 
 /**
  * @brief Initialize mesh data structure to empty
@@ -63,7 +64,6 @@ void mesh_init(mesh_t *mesh);
  */
 void mesh_destroy(mesh_t *mesh);
 
-
 /**
  * @brief Create mesh in serial mode
  *
@@ -72,21 +72,14 @@ void mesh_destroy(mesh_t *mesh);
  * @param mesh Pointer to the mesh data structure
  * @param spatial_dim Spatial dimension
  */
-void mesh_create_serial(
-    mesh_t *mesh,
-    int spatial_dim,
-    enum ElemType element_type,
-    ptrdiff_t nelements,
-    idx_t **elements,
-    ptrdiff_t nnodes,
-    geom_t **points
-    );
+void mesh_create_serial(mesh_t *mesh, int spatial_dim, enum ElemType element_type, ptrdiff_t nelements, idx_t **elements,
+                        ptrdiff_t nnodes, geom_t **points);
 
 void mesh_minmax_edge_length(const mesh_t *const mesh, real_t *emin, real_t *emax);
 
 typedef struct {
     ptrdiff_t nelements;
-    idx_t **elements;
+    idx_t   **elements;
 } element_block_t;
 
 void mesh_create_shared_elements_block(mesh_t *mesh, element_block_t *block);
