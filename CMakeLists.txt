@@ -39,7 +39,10 @@ if(SFEM_ENABLE_ISOLVER)
 endif()
 
 set(SFEM_MODULES
-    algebra base matrix mesh pizzastack solver
+    algebra base matrix 
+    mesh 
+    mesh/sshex8
+    pizzastack solver
     algebra/openmp
     operators 
     operators/beam2 
