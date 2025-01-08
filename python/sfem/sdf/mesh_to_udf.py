@@ -94,7 +94,7 @@ def udf(mesh, hmax, margin):
 
 	for b in mesh.cells:
 		ncells, nnodesxelem = b.data.shape
-		print(f'{ncells} x {nnodesxelem}')
+		print(f'mesh_to_udf.py: nclells x nnodesxelem = {ncells} x {nnodesxelem}')
 
 		ii0 = b.data[:, 0]
 		ii1 = b.data[:, 1]

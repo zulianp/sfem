@@ -19,14 +19,8 @@
 // Casting from int64 to double SIMD vector
 vec_real vec_indices_to_real(const vec_indices a) {
 #if _VL_ == 8  //// 512 bits SIMD in double precision or 256 bits SIMD in single precision
-    return (vec_real){(real_t)a[0],
-                      (real_t)a[1],
-                      (real_t)a[2],
-                      (real_t)a[3],
-                      (real_t)a[4],
-                      (real_t)a[5],
-                      (real_t)a[6],
-                      (real_t)a[7]};
+    return (vec_real){
+            (real_t)a[0], (real_t)a[1], (real_t)a[2], (real_t)a[3], (real_t)a[4], (real_t)a[5], (real_t)a[6], (real_t)a[7]};
 
 #elif _VL_ == 4  //// 256 bits SIMD in double precision or 128 bits SIMD in single precision
 
@@ -327,9 +321,7 @@ vec_indices floor_V(vec_real a) {
     { _out = _in[0] + _in[1] + _in[2] + _in[3]; }
 
 //// SIMD floor for AVX2
-vec_indices floor_V(vec_real a) {
-    return (vec_indices){(ptrdiff_t)a[0], (ptrdiff_t)a[1], (ptrdiff_t)a[2], (ptrdiff_t)a[3]};
-}
+vec_indices floor_V(vec_real a) { return (vec_indices){(ptrdiff_t)a[0], (ptrdiff_t)a[1], (ptrdiff_t)a[2], (ptrdiff_t)a[3]}; }
 
 #elif _VL_ == 16
 
@@ -338,10 +330,10 @@ vec_indices floor_V(vec_real a) {
     (vec_real) { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
 
 //// SIMD_REDUCE_SUM for AVX512
-#define SIMD_REDUCE_SUM_MACRO(_out, _in)                                                        \
-    {                                                                                           \
-        _out = _in[0] + _in[1] + _in[2] + _in[3] + _in[4] + _in[5] + _in[6] + _in[7] + _in[8] + \
-               _in[9] + _in[10] + _in[11] + _in[12] + _in[13] + _in[14] + _in[15];              \
+#define SIMD_REDUCE_SUM_MACRO(_out, _in)                                                                                     \
+    {                                                                                                                        \
+        _out = _in[0] + _in[1] + _in[2] + _in[3] + _in[4] + _in[5] + _in[6] + _in[7] + _in[8] + _in[9] + _in[10] + _in[11] + \
+               _in[12] + _in[13] + _in[14] + _in[15];                                                                        \
     }
 
 vec_indices floor_V(vec_real a) {
@@ -368,22 +360,21 @@ vec_indices floor_V(vec_real a) {
 ///////////////////////////////////////////////////////////////////////
 // isoparametric_lumped_mass_kernel_hrt
 ///////////////////////////////////////////////////////////////////////
-SFEM_INLINE static void isoparametric_lumped_mass_kernel_hrt_V(
-        const vec_real dV,
-        // Quadrature
-        const vec_real qx, const vec_real qy, const vec_real qz,
-        vec_real* const SFEM_RESTRICT element_diag) {
+SFEM_INLINE static void isoparametric_lumped_mass_kernel_hrt_V(const vec_real dV,
+                                                               // Quadrature
+                                                               const vec_real qx, const vec_real qy, const vec_real qz,
+                                                               vec_real* const SFEM_RESTRICT element_diag) {
     //
-    const vec_real x0 = 4 * qx;
-    const vec_real x1 = qy * qz;
-    const vec_real x2 = 2 * qx - 1;
-    const vec_real x3 = qx * x2;
-    const vec_real x4 = 2 * qy;
-    const vec_real x5 = qy * (x4 - 1);
-    const vec_real x6 = 2 * qz;
-    const vec_real x7 = qz * (x6 - 1);
-    const vec_real x8 = qx + qy + qz - 1;
-    const vec_real x9 = qx * x8;
+    const vec_real x0  = 4 * qx;
+    const vec_real x1  = qy * qz;
+    const vec_real x2  = 2 * qx - 1;
+    const vec_real x3  = qx * x2;
+    const vec_real x4  = 2 * qy;
+    const vec_real x5  = qy * (x4 - 1);
+    const vec_real x6  = 2 * qz;
+    const vec_real x7  = qz * (x6 - 1);
+    const vec_real x8  = qx + qy + qz - 1;
+    const vec_real x9  = qx * x8;
     const vec_real x10 = qy * x8;
     const vec_real x11 = qz * x8;
     const vec_real x12 = x8 * (x2 + x4 + x6);
@@ -402,8 +393,7 @@ SFEM_INLINE static void isoparametric_lumped_mass_kernel_hrt_V(
     const vec_real x25 = -11 * x1 + 4 * x3 + 11 * x9;
     const vec_real x26 = -24 * qz + 21 * x16;
 
-    element_diag[0] +=
-            x12 * x13 * (qy * x0 + qz * x0 + 4 * x1 - x10 - x11 + 10 * x12 + x3 + x5 + x7 - x9);
+    element_diag[0] += x12 * x13 * (qy * x0 + qz * x0 + 4 * x1 - x10 - x11 + 10 * x12 + x3 + x5 + x7 - x9);
     element_diag[1] += qx * x13 * (42 * (POW3_VEC(qx)) + 14 * qx - 45 * x14 - 1);
     element_diag[2] += qy * x13 * (42 * (POW3_VEC(qy)) + 14 * qy - 45 * x15 - 1);
     element_diag[3] += qz * x13 * (42 * (POW3_VEC(qz)) + 14 * qz - 45 * x16 - 1);
@@ -426,73 +416,68 @@ SFEM_INLINE static void isoparametric_lumped_mass_kernel_hrt_V(
  * @param qz
  * @return SFEM_INLINE
  */
-SFEM_INLINE static vec_real tet10_measure_V(const real_t* const SFEM_RESTRICT x,
-                                            const real_t* const SFEM_RESTRICT y,
+SFEM_INLINE static vec_real tet10_measure_V(const real_t* const SFEM_RESTRICT x, const real_t* const SFEM_RESTRICT y,
                                             const real_t* const SFEM_RESTRICT z,
                                             // Quadrature point
-                                            const vec_real qx, const vec_real qy,
-                                            const vec_real qz) {
-    const vec_real x0 = 4 * qz;
-    const vec_real x1 = x0 - 1;
-    const vec_real x2 = 4 * qy;
-    const vec_real x3 = 4 * qx;
-    const vec_real x4 = x3 - 4;
-    const vec_real x5 = -8 * qz - x2 - x4;
-    const vec_real x6 = -x3 * y[4];
-    const vec_real x7 = x0 + x2;
-    const vec_real x8 = x3 + x7 - 3;
-    const vec_real x9 = x8 * y[0];
-    const vec_real x10 = -x2 * y[6] + x9;
-    const vec_real x11 = x1 * y[3] + x10 + x2 * y[9] + x3 * y[8] + x5 * y[7] + x6;
-    const vec_real x12 = -x2 * z[6];
-    const vec_real x13 = -x0 * z[7];
-    const vec_real x14 = x3 - 1;
-    const vec_real x15 = x8 * z[0];
-    const vec_real x16 = -8 * qx - x7 + 4;
-    const vec_real x17 = x0 * z[8] + x12 + x13 + x14 * z[1] + x15 + x16 * z[4] + x2 * z[5];
-    const vec_real x18 = x2 - 1;
-    const vec_real x19 = -8 * qy - x0 - x4;
-    const vec_real x20 = -x3 * x[4];
-    const vec_real x21 = x8 * x[0];
-    const vec_real x22 = -x0 * x[7] + x21;
-    const real_t sixth = 1.0 / 6.0;
-    const vec_real x23 = sixth * x0 * x[9] + sixth * x18 * x[2] + sixth * x19 * x[6] + sixth * x20 +
-                         sixth * x22 + sixth * x3 * x[5];
+                                            const vec_real qx, const vec_real qy, const vec_real qz) {
+    const vec_real x0    = 4 * qz;
+    const vec_real x1    = x0 - 1;
+    const vec_real x2    = 4 * qy;
+    const vec_real x3    = 4 * qx;
+    const vec_real x4    = x3 - 4;
+    const vec_real x5    = -8 * qz - x2 - x4;
+    const vec_real x6    = -x3 * y[4];
+    const vec_real x7    = x0 + x2;
+    const vec_real x8    = x3 + x7 - 3;
+    const vec_real x9    = x8 * y[0];
+    const vec_real x10   = -x2 * y[6] + x9;
+    const vec_real x11   = x1 * y[3] + x10 + x2 * y[9] + x3 * y[8] + x5 * y[7] + x6;
+    const vec_real x12   = -x2 * z[6];
+    const vec_real x13   = -x0 * z[7];
+    const vec_real x14   = x3 - 1;
+    const vec_real x15   = x8 * z[0];
+    const vec_real x16   = -8 * qx - x7 + 4;
+    const vec_real x17   = x0 * z[8] + x12 + x13 + x14 * z[1] + x15 + x16 * z[4] + x2 * z[5];
+    const vec_real x18   = x2 - 1;
+    const vec_real x19   = -8 * qy - x0 - x4;
+    const vec_real x20   = -x3 * x[4];
+    const vec_real x21   = x8 * x[0];
+    const vec_real x22   = -x0 * x[7] + x21;
+    const real_t   sixth = 1.0 / 6.0;
+    const vec_real x23 =
+            sixth * x0 * x[9] + sixth * x18 * x[2] + sixth * x19 * x[6] + sixth * x20 + sixth * x22 + sixth * x3 * x[5];
     const vec_real x24 = -x0 * y[7];
     const vec_real x25 = x0 * y[8] + x10 + x14 * y[1] + x16 * y[4] + x2 * y[5] + x24;
     const vec_real x26 = x15 - x3 * z[4];
     const vec_real x27 = x1 * z[3] + x12 + x2 * z[9] + x26 + x3 * z[8] + x5 * z[7];
     const vec_real x28 = x0 * y[9] + x18 * y[2] + x19 * y[6] + x24 + x3 * y[5] + x6 + x9;
     const vec_real x29 = -x2 * x[6];
-    const vec_real x30 = sixth * x1 * x[3] + sixth * x2 * x[9] + sixth * x20 + sixth * x21 +
-                         sixth * x29 + sixth * x3 * x[8] + sixth * x5 * x[7];
+    const vec_real x30 = sixth * x1 * x[3] + sixth * x2 * x[9] + sixth * x20 + sixth * x21 + sixth * x29 + sixth * x3 * x[8] +
+                         sixth * x5 * x[7];
     const vec_real x31 = x0 * z[9] + x13 + x18 * z[2] + x19 * z[6] + x26 + x3 * z[5];
-    const vec_real x32 = sixth * x0 * x[8] + sixth * x14 * x[1] + sixth * x16 * x[4] +
-                         sixth * x2 * x[5] + sixth * x22 + sixth * x29;
+    const vec_real x32 =
+            sixth * x0 * x[8] + sixth * x14 * x[1] + sixth * x16 * x[4] + sixth * x2 * x[5] + sixth * x22 + sixth * x29;
 
-    return x11 * x17 * x23 - x11 * x31 * x32 - x17 * x28 * x30 - x23 * x25 * x27 + x25 * x30 * x31 +
-           x27 * x28 * x32;
+    return x11 * x17 * x23 - x11 * x31 * x32 - x17 * x28 * x30 - x23 * x25 * x27 + x25 * x30 * x31 + x27 * x28 * x32;
 }
 
-SFEM_INLINE static void tet10_transform_V(const real_t* const SFEM_RESTRICT x,
-                                          const real_t* const SFEM_RESTRICT y,
+SFEM_INLINE static void tet10_transform_V(const real_t* const SFEM_RESTRICT x, const real_t* const SFEM_RESTRICT y,
                                           const real_t* const SFEM_RESTRICT z,
                                           // Quadrature point
                                           const vec_real qx, const vec_real qy, const vec_real qz,
                                           // Output
-                                          vec_real* const SFEM_RESTRICT out_x,
-                                          vec_real* const SFEM_RESTRICT out_y,
+                                          vec_real* const SFEM_RESTRICT out_x, vec_real* const SFEM_RESTRICT out_y,
                                           vec_real* const SFEM_RESTRICT out_z) {
-    const vec_real x0 = 4.0 * qx;
-    const vec_real x1 = qy * x0;
-    const vec_real x2 = qz * x0;
-    const vec_real x3 = 4.0 * qy;
-    const vec_real x4 = qz * x3;
-    const vec_real x5 = 2.0 * qx - 1.0;
-    const vec_real x6 = qx * x5;
-    const vec_real x7 = 2.0 * qy;
-    const vec_real x8 = qy * (x7 - 1.0);
-    const vec_real x9 = 2.0 * qz;
+    const vec_real x0  = 4.0 * qx;
+    const vec_real x1  = qy * x0;
+    const vec_real x2  = qz * x0;
+    const vec_real x3  = 4.0 * qy;
+    const vec_real x4  = qz * x3;
+    const vec_real x5  = 2.0 * qx - 1.0;
+    const vec_real x6  = qx * x5;
+    const vec_real x7  = 2.0 * qy;
+    const vec_real x8  = qy * (x7 - 1.0);
+    const vec_real x9  = 2.0 * qz;
     const vec_real x10 = qz * (x9 - 1.0);
     const vec_real x11 = -4 * qz - x0 - x3 + 4.0;
     const vec_real x12 = qx * x11;
@@ -500,38 +485,37 @@ SFEM_INLINE static void tet10_transform_V(const real_t* const SFEM_RESTRICT x,
     const vec_real x14 = qz * x11;
     const vec_real x15 = (-x5 - x7 - x9) * (-qx - qy - qz + 1.0);
 
-    *out_x = x[0] * x15 + x[1] * x6 + x[2] * x8 + x[3] * x10 + x[4] * x12 + x[5] * x1 + x[6] * x13 +
-             x[7] * x14 + x[8] * x2 + x[9] * x4;
-    *out_y = y[0] * x15 + y[1] * x6 + y[2] * x8 + y[3] * x10 + y[4] * x12 + y[5] * x1 + y[6] * x13 +
-             y[7] * x14 + y[8] * x2 + y[9] * x4;
-    *out_z = z[0] * x15 + z[1] * x6 + z[2] * x8 + z[3] * x10 + z[4] * x12 + z[5] * x1 + z[6] * x13 +
-             z[7] * x14 + z[8] * x2 + z[9] * x4;
+    *out_x = x[0] * x15 + x[1] * x6 + x[2] * x8 + x[3] * x10 + x[4] * x12 + x[5] * x1 + x[6] * x13 + x[7] * x14 + x[8] * x2 +
+             x[9] * x4;
+    *out_y = y[0] * x15 + y[1] * x6 + y[2] * x8 + y[3] * x10 + y[4] * x12 + y[5] * x1 + y[6] * x13 + y[7] * x14 + y[8] * x2 +
+             y[9] * x4;
+    *out_z = z[0] * x15 + z[1] * x6 + z[2] * x8 + z[3] * x10 + z[4] * x12 + z[5] * x1 + z[6] * x13 + z[7] * x14 + z[8] * x2 +
+             z[9] * x4;
 }
 
-SFEM_INLINE static void tet10_dual_basis_hrt_V(const vec_real qx, const vec_real qy,
-                                               const vec_real qz, vec_real* const f) {
-    static const real_t c5_18 = 5.0 / 18.0;
-    static const real_t c5_72 = 5.0 / 72.0;
-    static const real_t c10_9 = 10.0 / 9.0;
-    static const real_t c25_9 = 25.0 / 9.0;
-    static const real_t c40_27 = 40.0 / 27.0;
+SFEM_INLINE static void tet10_dual_basis_hrt_V(const vec_real qx, const vec_real qy, const vec_real qz, vec_real* const f) {
+    static const real_t c5_18   = 5.0 / 18.0;
+    static const real_t c5_72   = 5.0 / 72.0;
+    static const real_t c10_9   = 10.0 / 9.0;
+    static const real_t c25_9   = 25.0 / 9.0;
+    static const real_t c40_27  = 40.0 / 27.0;
     static const real_t c115_27 = 115.0 / 27.0;
     static const real_t c110_27 = 110.0 / 27.0;
-    static const real_t c55_54 = 55.0 / 54.0;
-    static const real_t c10_27 = 10.0 / 27.0;
+    static const real_t c55_54  = 55.0 / 54.0;
+    static const real_t c10_27  = 10.0 / 27.0;
     static const real_t c160_27 = 160.0 / 27.0;
     static const real_t c460_27 = 460.0 / 27.0;
 
-    const vec_real x0 = 2 * qy;
-    const vec_real x1 = 2 * qz;
-    const vec_real x2 = 2 * qx - 1;
-    const vec_real x3 = (-x0 - x1 - x2) * (-qx - qy - qz + 1);
-    const vec_real x4 = x0 - 1;
-    const vec_real x5 = c5_18 * qy;
-    const vec_real x6 = x4 * x5;
-    const vec_real x7 = x1 - 1;
-    const vec_real x8 = c5_18 * qz;
-    const vec_real x9 = x7 * x8;
+    const vec_real x0  = 2 * qy;
+    const vec_real x1  = 2 * qz;
+    const vec_real x2  = 2 * qx - 1;
+    const vec_real x3  = (-x0 - x1 - x2) * (-qx - qy - qz + 1);
+    const vec_real x4  = x0 - 1;
+    const vec_real x5  = c5_18 * qy;
+    const vec_real x6  = x4 * x5;
+    const vec_real x7  = x1 - 1;
+    const vec_real x8  = c5_18 * qz;
+    const vec_real x9  = x7 * x8;
     const vec_real x10 = -4 * qx - 4 * qy - 4 * qz + 4;
     const vec_real x11 = c5_72 * x10;
     const vec_real x12 = qy * qz;
@@ -632,11 +616,8 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V(
 
 #elif _VL_ == 4
 
-#define GET_DATA_MACRO(_out, _data, _indx_V)                                                 \
-    {                                                                                        \
-        _out = (vec_real){                                                                   \
-                _data[_indx_V[0]], _data[_indx_V[1]], _data[_indx_V[2]], _data[_indx_V[3]]}; \
-    }
+#define GET_DATA_MACRO(_out, _data, _indx_V) \
+    { _out = (vec_real){_data[_indx_V[0]], _data[_indx_V[1]], _data[_indx_V[2]], _data[_indx_V[3]]}; }
 
 #elif _VL_ == 16
 
@@ -674,13 +655,12 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V(
  * @param data
  * @param out
  */
-SFEM_INLINE static void hex_aa_8_collect_coeffs_V(
-        const ptrdiff_t stride0, const ptrdiff_t stride1, const ptrdiff_t stride2,
+SFEM_INLINE static void hex_aa_8_collect_coeffs_V(const ptrdiff_t stride0, const ptrdiff_t stride1, const ptrdiff_t stride2,
 
-        const vec_indices i, const vec_indices j, const vec_indices k,
+                                                  const vec_indices i, const vec_indices j, const vec_indices k,
 
-        // Attention this is geometric data transformed to solver data!
-        const real_t* const SFEM_RESTRICT data, vec_real* const SFEM_RESTRICT out) {
+                                                  // Attention this is geometric data transformed to solver data!
+                                                  const real_t* const SFEM_RESTRICT data, vec_real* const SFEM_RESTRICT out) {
     //
 
     ptrdiff_t_sfem stride0_sfem = (ptrdiff_t_sfem)stride0;
@@ -732,16 +712,16 @@ int vec_real_check_nan(const vec_real a) {
  */
 int hex8_to_isoparametric_tet10_resample_field_local_V(
         // Mesh
-        const ptrdiff_t nelements,          // number of elements
-        const ptrdiff_t nnodes,             // number of nodes
-        idx_t** const SFEM_RESTRICT elems,  // connectivity
-        geom_t** const SFEM_RESTRICT xyz,   // coordinates
+        const ptrdiff_t              nelements,  // number of elements
+        const ptrdiff_t              nnodes,     // number of nodes
+        idx_t** const SFEM_RESTRICT  elems,      // connectivity
+        geom_t** const SFEM_RESTRICT xyz,        // coordinates
         // SDF
         const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
         const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
-        const geom_t* const SFEM_RESTRICT origin,     // origin of the domain
-        const geom_t* const SFEM_RESTRICT delta,      // delta of the domain
-        const real_t* const SFEM_RESTRICT data,       // SDF
+        const geom_t* const SFEM_RESTRICT    origin,  // origin of the domain
+        const geom_t* const SFEM_RESTRICT    delta,   // delta of the domain
+        const real_t* const SFEM_RESTRICT    data,    // SDF
         // Output
         real_t* const SFEM_RESTRICT weighted_field) {
     //
@@ -1026,20 +1006,20 @@ SFEM_INLINE static void tet4_transform_VV(
  * @param f
  * @return SFEM_INLINE
  */
-SFEM_INLINE static void tet10_dual_basis_hrt_VV(const vec_real qx,    //
-                                                const vec_real qy,    //
-                                                const vec_real qz,    //
+SFEM_INLINE static void tet10_dual_basis_hrt_VV(const vec_real  qx,   //
+                                                const vec_real  qy,   //
+                                                const vec_real  qz,   //
                                                 vec_real* const f) {  //
-    const vec_real x0 = 2 * qy;
-    const vec_real x1 = 2 * qz;
-    const vec_real x2 = 2 * qx - 1;
-    const vec_real x3 = (-x0 - x1 - x2) * (-qx - qy - qz + 1);
-    const vec_real x4 = x0 - 1;
-    const vec_real x5 = (real_t)(5.0 / 18.0) * qy;
-    const vec_real x6 = x4 * x5;
-    const vec_real x7 = x1 - 1;
-    const vec_real x8 = (real_t)(5.0 / 18.0) * qz;
-    const vec_real x9 = x7 * x8;
+    const vec_real x0  = 2 * qy;
+    const vec_real x1  = 2 * qz;
+    const vec_real x2  = 2 * qx - 1;
+    const vec_real x3  = (-x0 - x1 - x2) * (-qx - qy - qz + 1);
+    const vec_real x4  = x0 - 1;
+    const vec_real x5  = (real_t)(5.0 / 18.0) * qy;
+    const vec_real x6  = x4 * x5;
+    const vec_real x7  = x1 - 1;
+    const vec_real x8  = (real_t)(5.0 / 18.0) * qz;
+    const vec_real x9  = x7 * x8;
     const vec_real x10 = -4 * qx - 4 * qy - 4 * qz + 4;
     const vec_real x11 = (real_t)(5.0 / 72.0) * x10;
     const vec_real x12 = qy * qz;
@@ -1100,16 +1080,16 @@ SFEM_INLINE static void tet10_dual_basis_hrt_VV(const vec_real qx,    //
 ////////////////////////////////////////////////////////////////////////
 int hex8_to_subparametric_tet10_resample_field_local_V(
         // Mesh
-        const ptrdiff_t nelements,          // number of elements
-        const ptrdiff_t nnodes,             // number of nodes
-        idx_t** const SFEM_RESTRICT elems,  // connectivity
-        geom_t** const SFEM_RESTRICT xyz,   // coordinates
+        const ptrdiff_t              nelements,  // number of elements
+        const ptrdiff_t              nnodes,     // number of nodes
+        idx_t** const SFEM_RESTRICT  elems,      // connectivity
+        geom_t** const SFEM_RESTRICT xyz,        // coordinates
         // SDF
         const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
         const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
-        const geom_t* const SFEM_RESTRICT origin,     // origin of the domain
-        const geom_t* const SFEM_RESTRICT delta,      // delta of the domain
-        const real_t* const SFEM_RESTRICT data,       // SDF
+        const geom_t* const SFEM_RESTRICT    origin,  // origin of the domain
+        const geom_t* const SFEM_RESTRICT    delta,   // delta of the domain
+        const real_t* const SFEM_RESTRICT    data,    // SDF
         // Output
         real_t* const SFEM_RESTRICT weighted_field) {
     //
@@ -1184,7 +1164,7 @@ int hex8_to_subparametric_tet10_resample_field_local_V(
         // SUBPARAMETRIC (for iso-parametric tassellation of tet10 might be necessary)
         for (int q = 0; q < TET4_NQP; q += _VL_) {  // loop over the quadrature points
 
-            vec_real qx_V, qy_V, qz_V, qw_V;
+            vec_real  qx_V, qy_V, qz_V, qw_V;
             const int q_next = q + _VL_;
             if (q_next < TET4_NQP) {
                 ASSIGN_QUADRATURE_POINT_MACRO(q, qx_V, qy_V, qz_V, qw_V);
@@ -1310,16 +1290,16 @@ int hex8_to_subparametric_tet10_resample_field_local_V(
 // hex_aa_8_eval_weno4_3D
 ////////////////////////////////////////////////////////////////////////
 SFEM_INLINE static vec_real hex_aa_8_eval_weno4_3D_Unit_V(  //
-        const vec_real x_unit,                              //
-        const vec_real y_unit,                              //
-        const vec_real z_unit,                              //
-        const vec_real ox_unit,                             //
-        const vec_real oy_unit,                             //
-        const vec_real oz_unit,                             //
-        const vec_indices i,                                // it must be the absolute index
-        const vec_indices j,                                // Used to get the data
-        const vec_indices k,                                // From the data array
-        const ptrdiff_t* stride,                            //
+        const vec_real                    x_unit,           //
+        const vec_real                    y_unit,           //
+        const vec_real                    z_unit,           //
+        const vec_real                    ox_unit,          //
+        const vec_real                    oy_unit,          //
+        const vec_real                    oz_unit,          //
+        const vec_indices                 i,                // it must be the absolute index
+        const vec_indices                 j,                // Used to get the data
+        const vec_indices                 k,                // From the data array
+        const ptrdiff_t*                  stride,           //
         const real_t* const SFEM_RESTRICT data) {           //
 
     // collect the data for the WENO interpolation
@@ -1342,13 +1322,13 @@ SFEM_INLINE static vec_real hex_aa_8_eval_weno4_3D_Unit_V(  //
     const vec_indices k_local = floor_V(z_unit - oz_unit);
 
     const vec_real i_local_vec = vec_indices_to_real(i_local);
-    const vec_real x = (x_unit - ox_unit) - i_local_vec + ones_vec;
+    const vec_real x           = (x_unit - ox_unit) - i_local_vec + ones_vec;
 
     const vec_real j_local_vec = vec_indices_to_real(j_local);
-    const vec_real y = (y_unit - oy_unit) - j_local_vec + ones_vec;
+    const vec_real y           = (y_unit - oy_unit) - j_local_vec + ones_vec;
 
     const vec_real k_local_vec = vec_indices_to_real(k_local);
-    const vec_real z = (z_unit - oz_unit) - k_local_vec + ones_vec;
+    const vec_real z           = (z_unit - oz_unit) - k_local_vec + ones_vec;
 
     // // printf("x = %f, x_ = %f, i = %d\n", x, x_, i);
     // // printf("y = %f, y_ = %f, j = %d\n", y, y_, j);
@@ -1366,16 +1346,16 @@ SFEM_INLINE static vec_real hex_aa_8_eval_weno4_3D_Unit_V(  //
 //////////////////////////////////////////////////////////
 int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
         /// Mesh
-        const ptrdiff_t nelements,          // number of elements
-        const ptrdiff_t nnodes,             // number of nodes
-        idx_t** const SFEM_RESTRICT elems,  // connectivity
-        geom_t** const SFEM_RESTRICT xyz,   // coordinates
+        const ptrdiff_t              nelements,  // number of elements
+        const ptrdiff_t              nnodes,     // number of nodes
+        idx_t** const SFEM_RESTRICT  elems,      // connectivity
+        geom_t** const SFEM_RESTRICT xyz,        // coordinates
         /// SDF
         const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
         const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
-        const geom_t* const SFEM_RESTRICT origin,     // origin of the domain
-        const geom_t* const SFEM_RESTRICT delta,      // delta of the domain
-        const real_t* const SFEM_RESTRICT data,       // SDF
+        const geom_t* const SFEM_RESTRICT    origin,  // origin of the domain
+        const geom_t* const SFEM_RESTRICT    delta,   // delta of the domain
+        const real_t* const SFEM_RESTRICT    data,    // SDF
         // Output                                     //
         real_t* const SFEM_RESTRICT weighted_field) {  //
     //
@@ -1394,6 +1374,8 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
     const ptrdiff_t stride0 = stride[0];
     const ptrdiff_t stride1 = stride[1];
     const ptrdiff_t stride2 = stride[2];
+
+    double quad_sum = 0.0;
 
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         // printf("element = %d\n", i);
@@ -1419,7 +1401,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
         // ISOPARAMETRIC
         // search for the vertex with the minimum distance to the origin
 
-        int v_orig = 0;
+        int    v_orig   = 0;
         real_t dist_min = 1e14;
 
         for (int v = 0; v < 10; ++v) {
@@ -1433,7 +1415,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
 
             if (dist < dist_min) {
                 dist_min = dist;
-                v_orig = v;
+                v_orig   = v;
             }
         }
 
@@ -1487,15 +1469,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
             const vec_real dV = measure_V * tet4_qw_V * cVolume;
 
             vec_real g_qx_glob_V, g_qy_glob_V, g_qz_glob_V;
-            tet10_transform_V(x,
-                              y,
-                              z,
-                              tet4_qx_V,
-                              tet4_qy_V,
-                              tet4_qz_V,
-                              &g_qx_glob_V,
-                              &g_qy_glob_V,
-                              &g_qz_glob_V);
+            tet10_transform_V(x, y, z, tet4_qx_V, tet4_qy_V, tet4_qz_V, &g_qx_glob_V, &g_qy_glob_V, &g_qz_glob_V);
 
             tet10_dual_basis_hrt_V(tet4_qx_V, tet4_qy_V, tet4_qz_V, tet10_f);
 
@@ -1503,15 +1477,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
             // g_qx_unit, g_qy_unit, g_qz_unit are the coordinates of the quadrature point in
             // the unitary space
             vec_real g_qx_unit_V, g_qy_unit_V, g_qz_unit_V;
-            tet10_transform_V(x_unit,
-                              y_unit,
-                              z_unit,
-                              tet4_qx_V,
-                              tet4_qy_V,
-                              tet4_qz_V,
-                              &g_qx_unit_V,
-                              &g_qy_unit_V,
-                              &g_qz_unit_V);
+            tet10_transform_V(x_unit, y_unit, z_unit, tet4_qx_V, tet4_qy_V, tet4_qz_V, &g_qx_unit_V, &g_qy_unit_V, &g_qz_unit_V);
 
             ///// ======================================================
 
@@ -1611,16 +1577,16 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
 ////////////////////////////////////////////////////////////////////////
 // hex8_to_tet10_resample_field_local_cube1_V
 ////////////////////////////////////////////////////////////////////////
-int isoparametric_tet10_assemble_dual_mass_vector_V(const ptrdiff_t nelements,
-                                                    const ptrdiff_t nnodes,
-                                                    idx_t** const SFEM_RESTRICT elems,
-                                                    geom_t** const SFEM_RESTRICT xyz,
-                                                    real_t* const diag) {
+int isoparametric_tet10_assemble_dual_mass_vector_V(const ptrdiff_t              nelements,  //
+                                                    const ptrdiff_t              nnodes,     //
+                                                    idx_t** const SFEM_RESTRICT  elems,      //
+                                                    geom_t** const SFEM_RESTRICT xyz,        //
+                                                    real_t* const                diag) {                    //
     PRINT_CURRENT_FUNCTION;
 
-    idx_t ev[10];  // Element indices
+    idx_t    ev[10];  // Element indices
     vec_real element_diag[10];
-    real_t x[10], y[10], z[10];
+    real_t   x[10], y[10], z[10];
 
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         //
@@ -1693,16 +1659,16 @@ int isoparametric_tet10_assemble_dual_mass_vector_V(const ptrdiff_t nelements,
  */
 int hex8_to_tet10_resample_field_local_V2(
         // Mesh
-        const ptrdiff_t nelements,          // number of elements
-        const ptrdiff_t nnodes,             // number of nodes
-        idx_t** const SFEM_RESTRICT elems,  // connectivity
-        geom_t** const SFEM_RESTRICT xyz,   // coordinates
+        const ptrdiff_t              nelements,  // number of elements
+        const ptrdiff_t              nnodes,     // number of nodes
+        idx_t** const SFEM_RESTRICT  elems,      // connectivity
+        geom_t** const SFEM_RESTRICT xyz,        // coordinates
         // SDF
         const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
         const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
-        const geom_t* const SFEM_RESTRICT origin,     // origin of the domain
-        const geom_t* const SFEM_RESTRICT delta,      // delta of the domain
-        const real_t* const SFEM_RESTRICT data,       // SDF
+        const geom_t* const SFEM_RESTRICT    origin,  // origin of the domain
+        const geom_t* const SFEM_RESTRICT    delta,   // delta of the domain
+        const real_t* const SFEM_RESTRICT    data,    // SDF
         // Output
         real_t* const SFEM_RESTRICT weighted_field) {
     //
@@ -1739,7 +1705,7 @@ int hex8_to_tet10_resample_field_local_V2(
                                                                      data,
                                                                      weighted_field);
 #endif
-        return a;
+        RETURN_FROM_FUNCTION(a);
     } else {
         // return hex8_to_subparametric_tet10_resample_field_local(nelements,  //
         //                                                         nnodes,

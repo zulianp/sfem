@@ -13,6 +13,14 @@ extern "C" {
 enum RealType { SFEM_FLOAT16 = 2, SFEM_FLOAT32 = 4, SFEM_FLOAT64 = 8, SFEM_REAL_DEFAULT = 0 };
 enum IntegerType { SFEM_INT16 = 20, SFEM_INT32 = 40, SFEM_INT64 = 80, SFEM_INT_DEFAULT = 0 };
 
+typedef enum {
+    SFEM_ACCELERATOR_TYPE_CPU     = 0,  // CPU
+    SFEM_ACCELERATOR_TYPE_CUDA    = 1,  // CUDA
+    SFEM_ACCELERATOR_TYPE_OPENCL  = 2,  // OpenCL Not supported
+    SFEM_ACCELERATOR_TYPE_OPENACC = 3,  // OpenACC Not supported
+    SFEM_ACCELERATOR_TYPE_HIP     = 4   // HIP Not supported
+} AcceleratorsType;
+
 static void* SFEM_DEFAULT_STREAM = 0;
 
 SFEM_INLINE static int real_type_size(enum RealType type) {
@@ -63,33 +71,33 @@ SFEM_INLINE static const char* integer_type_to_string(enum IntegerType type) {
 }
 
 enum ElemType {
-    NIL = 0,
-    NODE1 = 1,
-    EDGE2 = 2,
-    EDGE3 = 11,
-    EDGESHELL2 = 101,
-    BEAM2 = 100002,
-    TRI3 = 3,
-    TRI6 = 6,
-    TRI10 = 1010,
-    TRISHELL3 = 103,
-    TRISHELL6 = 106,
-    TRISHELL10 = 110,
-    QUAD4 = 40,
-    QUADSHELL4 = 140,
-    TET4 = 4,
-    TET10 = 10,
-    TET20 = 20,
-    HEX8 = 8,
-    WEDGE6 = 1006,
-    MACRO = 200,
-    MACRO_TRI3 = (MACRO + TRI3),
+    NIL             = 0,
+    NODE1           = 1,
+    EDGE2           = 2,
+    EDGE3           = 11,
+    EDGESHELL2      = 101,
+    BEAM2           = 100002,
+    TRI3            = 3,
+    TRI6            = 6,
+    TRI10           = 1010,
+    TRISHELL3       = 103,
+    TRISHELL6       = 106,
+    TRISHELL10      = 110,
+    QUAD4           = 40,
+    QUADSHELL4      = 140,
+    TET4            = 4,
+    TET10           = 10,
+    TET20           = 20,
+    HEX8            = 8,
+    WEDGE6          = 1006,
+    MACRO           = 200,
+    MACRO_TRI3      = (MACRO + TRI3),
     MACRO_TRISHELL3 = (MACRO + TRISHELL3),
-    MACRO_TET4 = (MACRO + TET4),
-    PROTEUS_TET4 = 4000,
-    PROTEUS_QUAD4 = 40000,
-    PROTEUS_HEX8 = 8000,
-    INVALID = -1
+    MACRO_TET4      = (MACRO + TET4),
+    PROTEUS_TET4    = 4000,
+    PROTEUS_QUAD4   = 40000,
+    PROTEUS_HEX8    = 8000,
+    INVALID         = -1
 };
 
 SFEM_INLINE static enum ElemType type_from_string(const char* str) {
