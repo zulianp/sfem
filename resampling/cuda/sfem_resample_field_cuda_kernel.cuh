@@ -11,7 +11,7 @@
 
 #define MY_RESTRICT __restrict__
 
-#include "quadratures_rule_cuda.h"
+#include "quadratures_rule_cuda.cuh"
 #include "sfem_resample_field_cuda_fun.cuh"
 
 ////////////////////////////////////////////////////////
