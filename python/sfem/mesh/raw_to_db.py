@@ -12,6 +12,12 @@ import inspect
 # Get the current frame
 frame = inspect.currentframe()
 
+tet4_names = ("tetra", "tetrahedron", "tetra4", "tet4", "TET4")
+hex8_names = ("hexahedron", "hex", "hex8", "HEX8")
+
+quad4_names = ("quad", "quad4", "QUAD4")
+tri3_names = ("tri", "tri3", "TRI3")
+
 try: geom_t
 except NameError: 
     print('raw_to_db: self contained mode')
@@ -19,6 +25,11 @@ except NameError:
     idx_t = np.int32
 
 max_nodes_x_element = 10
+
+
+# def ssquad4_to_standard(ssref, idx, points):
+#     if ssref == 2:
+
 
 def write_transient_data(
     output_path,
@@ -175,11 +186,12 @@ def raw_to_db(argv):
 
     cell_type = None
     verbose = False
+    ssref = 0
 
     try:
         opts, args = getopt.getopt(
             argv[3:], "p:d:c:t:hv",
-            ["coords=", "point_data=", "point_data_type=", "cell_type=", "cell_data=", "cell_data_type=", "transient", "time_step_format", "n_time_steps=", "time_whole=", "time_whole_txt=", "help", "verbose"])
+            ["coords=", "point_data=", "point_data_type=", "cell_type=", "cell_data=", "cell_data_type=", "transient", "time_step_format", "n_time_steps=", "time_whole=", "time_whole_txt=", "help", "verbose", "ssref"])
 
     except getopt.GetoptError as err:
         print(err)
@@ -190,7 +202,7 @@ def raw_to_db(argv):
         if opt in ('-h', '--help'):
             print(usage)
             sys.exit()
-        if opt in ('-v', '--verbose'):
+        elif opt in ('-v', '--verbose'):
             verbose = True
         elif opt in ("-p", "--point_data"):
             point_data = arg
@@ -216,6 +228,8 @@ def raw_to_db(argv):
             raw_xyz_folder = arg
             if verbose:
                 print(f"Using coords={arg}")
+        elif opt in ("--ssref"):
+            ssref = int(arg)
 
     if transient:
         if len(time_whole) == 0:
@@ -251,6 +265,29 @@ def raw_to_db(argv):
             else:    
                 # No more indices to read!
                 break
+
+    if cell_type in quad4_names:
+        cell_type = "quad"
+
+    if cell_type in hex8_names:
+        cell_type = "hexahedron"
+
+    if cell_type in tet4_names:
+        cell_type = "tetra"
+
+    if cell_type in tri3_names:
+        cell_type = "triangle"
+
+    # Do I need to do that?
+    # if ssref > 1:
+    #     # Convert ssmesh to standard mesh or to high-order rep
+    #     assert cell_type != None
+
+    #     if cell_type == "quad":
+    #         idx, points = ssquad4_to_standard(ssref, idx, points)
+    #     elif cell_type == "hexahedron"
+    #         # Implement me!
+    #         assert False
     
     if cell_type == None:
         if len(idx) == 3:
