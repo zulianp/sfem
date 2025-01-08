@@ -11,7 +11,7 @@
 
 #include "tet10_weno_cuda.cuh"
 
-#include "quadratures_rule_cuda.h"
+#include "quadratures_rule_cuda.cuh"
 #include "tet10_resample_field.cuh"
 
 #include "tet10_resample_field_kernels.cuh"

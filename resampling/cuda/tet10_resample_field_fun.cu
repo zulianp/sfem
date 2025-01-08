@@ -3,7 +3,7 @@
 
 // #define real_type real_t
 
-#include "quadratures_rule_cuda.h"
+#include "quadratures_rule_cuda.cuh"
 #include "tet10_resample_field.cuh"
 
 //////////////////////////////////////////////////////////
