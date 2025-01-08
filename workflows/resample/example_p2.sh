@@ -6,9 +6,9 @@ search_name_number_in_args() {
     shift
     for arg in "$@"
     do
-        if [[ "$arg" =~ ^${name}[0-9]+$ ]]
+        if [[ "$arg" =~ ^${name}([0-9]+)$ ]]
         then
-            echo "${BASH_REMATCH[0]}"
+            echo "${BASH_REMATCH[1]}"
             return 0
         fi
     done
@@ -28,7 +28,14 @@ search_string_in_args() {
     return 1
 }
 
-n_procs=4
+
+if search_name_number_in_args "np" "$@"
+then
+	n_procs=${BASH_REMATCH[1]}
+else
+	n_procs=1
+fi
+
 echo "example_p2.sh: n_procs=$n_procs"
 
 export USE_MPI=0
@@ -171,7 +178,7 @@ fi
 export SFEM_ENABLE_ISOPARAMETRIC=1
 
 set -x
-time SFEM_INTERPOLATE=0 SFEM_READ_FP32=1 $LAUNCH  $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET10
+time SFEM_INTERPOLATE=0 SFEM_READ_FP32=1 $LAUNCH  $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET10 CUDA
 
 if [[ "$FLOAT_64" == "1" ]]
 then
