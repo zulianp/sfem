@@ -63,11 +63,14 @@ echo $sizes
 echo $origins
 echo $scaling
 
-n_procs=18
+n_procs=1
 # n_procs=2
 # n_procs=8
 
+Nsight_PATH="/home/sriva/spz/NVIDIA-Nsight-Compute-2024.3"
+
 LAUNCH="mpiexec -np $n_procs"
+LAUNCH="${Nsight_PATH}/ncu -f --section ComputeWorkloadAnalysis -o /home/sriva/spz/NVidia_prof_out/ncu_grid_to_mesh"
 # LAUNCH="srun -p debug -n $n_procs -N 1 "
 # LAUNCH=""
 
@@ -80,7 +83,7 @@ GRID_TO_MESH="grid_to_mesh"
 # export OMP_PROC_BIND=true
 
 set -x
-time SFEM_INTERPOLATE= SFEM_READ_FP32=1 $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CPU
+time SFEM_INTERPOLATE=0 SFEM_READ_FP32=1 $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA
 
 raw_to_db.py $resample_target out.vtk --point_data=$field  --point_data_type=float64
 
