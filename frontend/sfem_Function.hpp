@@ -139,6 +139,8 @@ namespace sfem {
         int       level() const;
         ptrdiff_t n_elements() const;
 
+        std::shared_ptr<Buffer<geom_t*>> points();
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;

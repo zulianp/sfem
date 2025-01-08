@@ -18,8 +18,8 @@
 #include "sfem_API.hpp"
 
 #include "adj_table.h"
-#include "sfem_sshex8_skin.h"
 #include "sfem_hex8_mesh_graph.h"
+#include "sfem_sshex8_skin.h"
 
 #include "sfem_Tracer.hpp"
 
@@ -303,6 +303,30 @@ namespace sfem {
             }
         }
 
+        void displace_points_semistructured(const real_t *disp) {
+            SFEM_TRACE_SCOPE("ContactConditions::displace_points_semistructured");
+
+            assert(space->has_semi_structured_mesh());
+
+            auto &ssmesh   = space->semi_structured_mesh();
+            auto  sspoints = ssmesh.points();
+
+            auto               mesh = space->mesh_ptr();
+            const ptrdiff_t    n    = node_mapping->size();
+            const idx_t *const idx  = node_mapping->data();
+            const int          dim  = mesh->spatial_dimension();
+
+            for (int d = 0; d < dim; d++) {
+                const geom_t *const x   = sspoints->data()[d];
+                geom_t *const       x_s = surface_points->data()[d];
+
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    x_s[i] = x[idx[i]] + disp[idx[i] * dim + d];
+                }
+            }
+        }
+
         void collect_points() {
             SFEM_TRACE_SCOPE("ContactConditions::collect_points");
 
@@ -313,6 +337,30 @@ namespace sfem {
 
             for (int d = 0; d < dim; d++) {
                 const geom_t *const x   = mesh->points(d);
+                geom_t *const       x_s = surface_points->data()[d];
+
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    x_s[i] = x[idx[i]];
+                }
+            }
+        }
+
+        void collect_points_semistructured() {
+            SFEM_TRACE_SCOPE("ContactConditions::collect_points_semistructured");
+
+            assert(space->has_semi_structured_mesh());
+
+            auto &ssmesh   = space->semi_structured_mesh();
+            auto  sspoints = ssmesh.points();
+
+            auto               mesh = space->mesh_ptr();
+            const ptrdiff_t    n    = node_mapping->size();
+            const idx_t *const idx  = node_mapping->data();
+            const int          dim  = mesh->spatial_dimension();
+
+            for (int d = 0; d < dim; d++) {
+                const geom_t *const x   = sspoints->data()[d];
                 geom_t *const       x_s = surface_points->data()[d];
 
 #pragma omp parallel for
@@ -367,6 +415,15 @@ namespace sfem {
 
             printf("AREA: %g\n", (double)area);
             assert(area > 0);
+        }
+
+        void assemble_mass_vector_semistructured() {
+            SFEM_TRACE_SCOPE("ContactConditions::assemble_mass_vector_semistructured");
+
+            assert(space->has_semi_structured_mesh());
+            collect_points_semistructured();
+
+            assert(false);  // IMPLEMENT ME!
         }
 
         void read_sideset(const std::string &path_surface, Input &in) {

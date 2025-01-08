@@ -41,6 +41,7 @@
 // Mesh
 #include "sfem_hex8_mesh_graph.h"
 #include "sshex8.h"
+#include "sshex8_mesh.h"
 
 // Multigrid
 #include "sfem_prolongation_restriction.h"
@@ -325,6 +326,8 @@ namespace sfem {
         ptrdiff_t                        n_unique_nodes{-1}, interior_start{-1};
         std::shared_ptr<CRSGraph>        node_to_node_graph;
 
+        std::shared_ptr<Buffer<geom_t*>> points;
+
         void init(const std::shared_ptr<Mesh> macro_mesh, const int level) {
             SFEM_TRACE_SCOPE("SemiStructuredMesh::init");
 
@@ -370,6 +373,18 @@ namespace sfem {
         Impl() {}
         ~Impl() {}
     };
+
+    std::shared_ptr<Buffer<geom_t*>> SemiStructuredMesh::points()
+    {
+        if(!impl_->points) {
+            auto p = sfem::create_host_buffer<geom_t>(impl_->macro_mesh->spatial_dimension(), impl_->n_unique_nodes);
+            auto macro_p = ((mesh_t *)(impl_->macro_mesh->impl_mesh()))->points;
+            sshex8_fill_points(level(), n_elements(), element_data(), macro_p, p->data());
+            impl_->points = p;
+        }
+
+        return impl_->points;
+    }
 
     std::shared_ptr<CRSGraph> SemiStructuredMesh::node_to_node_graph() {
         // printf("SemiStructuredMesh::node_to_node_graph\n");
