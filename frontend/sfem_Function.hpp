@@ -106,9 +106,10 @@ namespace sfem {
 
     class Sideset final {
     public:
-        int read(const char *path);
+        int read(MPI_Comm comm, const char *path);
         std::shared_ptr<Buffer<element_idx_t>> parent();
         std::shared_ptr<Buffer<int16_t>> lfi();
+        static std::shared_ptr<Sideset> create_from_file(MPI_Comm comm, const char *path);
 
         Sideset();
         ~Sideset();

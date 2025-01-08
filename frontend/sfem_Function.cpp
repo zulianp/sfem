@@ -268,6 +268,7 @@ namespace sfem {
 
     class Sideset::Impl final {
     public:
+        MPI_Comm comm;
         std::shared_ptr<Buffer<element_idx_t>> parent;
         std::shared_ptr<Buffer<int16_t>>       lfi;
     };
@@ -275,15 +276,29 @@ namespace sfem {
     Sideset::Sideset() : impl_(std::make_unique<Impl>()) {}
     Sideset::~Sideset() = default;
 
-    int Sideset::read(const char *folder) {
+    std::shared_ptr<Sideset> Sideset::create_from_file(MPI_Comm comm, const char *path)
+    {
+        auto ret = std::make_shared<Sideset>();
+        if(ret->read(comm, path) != SFEM_SUCCESS) return nullptr;
+        return ret;
+    }
+
+    int Sideset::read(MPI_Comm comm,  const char *folder) {
+        impl_->comm = comm;
+
         std::string    folder_ = folder;
         ptrdiff_t      nlocal{0}, nglobal{0}, ncheck{0};
         element_idx_t *parent{nullptr};
         int16_t       *lfi{nullptr};
 
-        if (array_create_from_file(
-                    MPI_COMM_SELF, (folder_ + "/parent.raw").c_str(), SFEM_MPI_ELEMENT_IDX_T, (void**)&parent, &nlocal, &nglobal) ||
-            array_create_from_file(MPI_COMM_SELF, (folder_ + "/lfi.raw").c_str(), MPI_SHORT, (void**)&lfi, &ncheck, &nglobal)) {
+        if (array_create_from_file(comm,
+                                   (folder_ + "/parent.raw").c_str(),
+                                   SFEM_MPI_ELEMENT_IDX_T,
+                                   (void **)&parent,
+                                   &nlocal,
+                                   &nglobal) ||
+            array_create_from_file(
+                    comm, (folder_ + "/lfi.int16.raw").c_str(), MPI_SHORT, (void **)&lfi, &ncheck, &nglobal)) {
             return SFEM_FAILURE;
         }
 
@@ -291,7 +306,7 @@ namespace sfem {
         impl_->lfi    = sfem::manage_host_buffer(nlocal, lfi);
 
         if (ncheck != nlocal) {
-            SFEM_ERROR("Inconsistend array sizes in sideset at %s\n", folder);
+            SFEM_ERROR("Inconsistent array sizes in sideset at %s\n", folder);
             return SFEM_FAILURE;
         }
 

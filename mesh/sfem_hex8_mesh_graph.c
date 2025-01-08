@@ -338,8 +338,7 @@ static void index_face(const int        L,
                             //        uyi + vyi + o_start[1],
                             //        uzi + vzi + o_start[2]);
 
-                            int pidx =
-                                    sshex8_lidx(L, uxi + vxi + o_start[0], uyi + vyi + o_start[1], uzi + vzi + o_start[2]);
+                            int pidx = sshex8_lidx(L, uxi + vxi + o_start[0], uyi + vyi + o_start[1], uzi + vzi + o_start[2]);
 
                             // idx_t u_offset = u_face_start + (uxi + uyi + uzi) * u_increment;
                             // idx_t v_offset = v_face_start + (vxi + vyi + vzi) * v_increment;
@@ -678,11 +677,11 @@ int sshex8_generate_elements(const int       L,
 }
 
 int sshex8_build_n2e(const int       L,
-                           const ptrdiff_t nelements,
-                           const ptrdiff_t nnodes,
-                           idx_t **const   elems,
-                           count_t       **out_n2eptr,
-                           element_idx_t **out_elindex) {
+                     const ptrdiff_t nelements,
+                     const ptrdiff_t nnodes,
+                     idx_t **const   elems,
+                     count_t       **out_n2eptr,
+                     element_idx_t **out_elindex) {
     double tick = MPI_Wtime();
 
 #ifdef SFEM_ENABLE_MEM_DIAGNOSTICS
@@ -766,13 +765,13 @@ int sshex8_build_n2e(const int       L,
 }
 
 static int sshex8_build_crs_graph_from_n2e(const int                                L,
-                                                 const ptrdiff_t                          nelements,
-                                                 const ptrdiff_t                          nnodes,
-                                                 idx_t **const SFEM_RESTRICT              elems,
-                                                 const count_t *const SFEM_RESTRICT       n2eptr,
-                                                 const element_idx_t *const SFEM_RESTRICT elindex,
-                                                 count_t                                **out_rowptr,
-                                                 idx_t                                  **out_colidx) {
+                                           const ptrdiff_t                          nelements,
+                                           const ptrdiff_t                          nnodes,
+                                           idx_t **const SFEM_RESTRICT              elems,
+                                           const count_t *const SFEM_RESTRICT       n2eptr,
+                                           const element_idx_t *const SFEM_RESTRICT elindex,
+                                           count_t                                **out_rowptr,
+                                           idx_t                                  **out_colidx) {
     count_t *rowptr = (count_t *)malloc((nnodes + 1) * sizeof(count_t));
     idx_t   *colidx = 0;
 
@@ -878,11 +877,11 @@ static int sshex8_build_crs_graph_from_n2e(const int                            
 }
 
 int sshex8_crs_graph(const int       L,
-                           const ptrdiff_t nelements,
-                           const ptrdiff_t nnodes,
-                           idx_t **const   elements,
-                           count_t       **out_rowptr,
-                           idx_t         **out_colidx) {
+                     const ptrdiff_t nelements,
+                     const ptrdiff_t nnodes,
+                     idx_t **const   elements,
+                     count_t       **out_rowptr,
+                     idx_t         **out_colidx) {
     double tick = MPI_Wtime();
 
     count_t       *n2eptr;
@@ -946,11 +945,10 @@ int sshex8_hierarchical_renumbering(const int       L,
     for (int zi = 0; zi <= 1; zi++) {
         for (int yi = 0; yi <= 1; yi++) {
             for (int xi = 0; xi <= 1; xi++) {
-                
                 for (ptrdiff_t e = 0; e < nelements; e++) {
-                    const int v     = sshex8_lidx(L, xi * L, yi * L, zi * L);
+                    const int v                  = sshex8_lidx(L, xi * L, yi * L, zi * L);
                     node_mapping[elements[v][e]] = elements[v][e];
-                    next_id         = MAX(next_id, node_mapping[v]);
+                    next_id                      = MAX(next_id, node_mapping[v]);
                 }
             }
         }
@@ -980,7 +978,6 @@ int sshex8_hierarchical_renumbering(const int       L,
         // stride *= 2;
     }
 
-
     // for (int zi = 0; zi <= L; zi++) {
     //     for (int yi = 0; yi <= L; yi++) {
     //         for (int xi = 0; xi <= L; xi++) {
@@ -993,7 +990,6 @@ int sshex8_hierarchical_renumbering(const int       L,
     //         }
     //     }
     // }
-
 
     for (int zi = 0; zi <= L; zi++) {
         for (int yi = 0; yi <= L; yi++) {
@@ -1013,7 +1009,135 @@ int sshex8_hierarchical_renumbering(const int       L,
         }
     }
 
-
     free(node_mapping);
+    return SFEM_SUCCESS;
+}
+
+static void sshex8_x_lside(const int                   L,
+                           const ptrdiff_t             e,
+                           idx_t **const SFEM_RESTRICT elems,
+                           const ptrdiff_t             i,
+                           idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int zi = 0; zi <= L; zi++) {
+        for (int yi = L; yi >= 0; yi--) {
+            sides[lidx++][i] = elems[sshex8_lidx(L, 0, yi, zi)][e];
+        }
+    }
+}
+
+static void sshex8_x_rside(const int                   L,
+                           const ptrdiff_t             e,
+                           idx_t **const SFEM_RESTRICT elems,
+                           const ptrdiff_t             i,
+                           idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int zi = 0; zi <= L; zi++) {
+        for (int yi = 0; yi <= L; yi++) {
+            sides[lidx++][i] = elems[sshex8_lidx(L, L, yi, zi)][e];
+        }
+    }
+}
+
+//////////////
+
+static void sshex8_y_lside(const int                   L,
+                           const ptrdiff_t             e,
+                           idx_t **const SFEM_RESTRICT elems,
+                           const ptrdiff_t             i,
+                           idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int zi = 0; zi <= L; zi++) {
+        for (int xi = L; xi >= 0; xi--) {
+            sides[lidx++][i] = elems[sshex8_lidx(L, xi, 0, zi)][e];
+        }
+    }
+}
+
+static void sshex8_y_rside(const int                   L,
+                           const ptrdiff_t             e,
+                           idx_t **const SFEM_RESTRICT elems,
+                           const ptrdiff_t             i,
+                           idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int zi = 0; zi <= L; zi++) {
+        for (int xi = 0; xi <= L; xi++) {
+            sides[lidx++][i] = elems[sshex8_lidx(L, xi, L, zi)][e];
+        }
+    }
+}
+
+//////////////
+
+static void sshex8_z_lside(const int                   L,
+                           const ptrdiff_t             e,
+                           idx_t **const SFEM_RESTRICT elems,
+                           const ptrdiff_t             i,
+                           idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int yi = L; yi >= 0; yi--) {
+        for (int xi = 0; xi <= L; xi++) {
+            sides[lidx++][i] = elems[sshex8_lidx(L, xi, yi, 0)][e];
+        }
+    }
+}
+
+static void sshex8_z_rside(const int                   L,
+                           const ptrdiff_t             e,
+                           idx_t **const SFEM_RESTRICT elems,
+                           const ptrdiff_t             i,
+                           idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int yi = 0; yi <= L; yi++) {
+        for (int xi = 0; xi <= L; xi++) {
+            sides[lidx++][i] = elems[sshex8_lidx(L, xi, yi, L)][e];
+        }
+    }
+}
+
+//////////////
+
+int sshex8_extract_surface_from_sideset(const int                                L,
+                                        idx_t **const SFEM_RESTRICT              elems,
+                                        const ptrdiff_t                          n_surf_elements,
+                                        const element_idx_t *const SFEM_RESTRICT parent_element,
+                                        const int16_t *const SFEM_RESTRICT       side_idx,
+                                        idx_t **const SFEM_RESTRICT              sides) {
+    for (ptrdiff_t i = 0; i < n_surf_elements; i++) {
+        const ptrdiff_t e = parent_element[i];
+        const int       s = side_idx[i];
+
+        switch (s) {
+            case 0: {
+                sshex8_y_lside(L, e, elems, i, sides);
+                break;
+            }
+            case 1: {
+                sshex8_x_rside(L, e, elems, i, sides);
+                break;
+            }
+            case 2: {
+                sshex8_y_rside(L, e, elems, i, sides);
+                break;
+            }
+            case 3: {
+                sshex8_x_lside(L, e, elems, i, sides);
+                break;
+            }
+            case 4: {
+                sshex8_z_lside(L, e, elems, i, sides);
+                break;
+            }
+            case 5: {
+                sshex8_z_rside(L, e, elems, i, sides);
+                break;
+            }
+            default: {
+                assert(0);
+                break;
+            }
+        }
+    }
+
     return SFEM_SUCCESS;
 }

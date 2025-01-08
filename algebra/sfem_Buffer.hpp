@@ -4,6 +4,10 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <cstdio>
+#include <cassert>
+
+#include "sfem_base.h"
 
 namespace sfem {
 
@@ -59,6 +63,17 @@ namespace sfem {
         }
 
         static std::shared_ptr<Buffer<T>> make_empty() { return std::make_shared<Buffer<T>>(); }
+
+        int to_file(const char *path) {
+            FILE *file = fopen(path, "wb");
+            if (!file) return SFEM_FAILURE;
+
+            const size_t written = fwrite(ptr_, sizeof(T), n_, file);
+            assert(written == n_);
+
+            fclose(file);
+            return written == n_ ? SFEM_SUCCESS : SFEM_FAILURE;
+        }
 
     private:
         size_t                      n_{0};
@@ -117,6 +132,29 @@ namespace sfem {
                                                 std::function<void(int n, void **)> destroy,
                                                 enum MemorySpace                    mem_space = MEMORY_SPACE_INVALID) {
             return std::make_shared<Buffer<T *>>(n0, n1, x, destroy, mem_space);
+        }
+
+        int to_files(const char *format) {
+            char path[2048];
+            for(int i = 0; i < extent_[0]; i++) {
+
+                int nchars = snprintf(path, sizeof(path), format, i);
+                assert(nchars < sizeof(path));
+
+                if(nchars >= sizeof(path)) {
+                    SFEM_ERROR("Path is too long!\n");
+                }
+
+                FILE *file = fopen(path, "wb");
+                if (!file) return SFEM_FAILURE;
+
+                const size_t written = fwrite(ptr_[i], sizeof(T), extent_[1], file);
+                assert(written == extent_[1]);
+
+                fclose(file);
+            }
+
+            return SFEM_SUCCESS;
         }
 
     private:
