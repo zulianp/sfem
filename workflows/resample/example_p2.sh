@@ -28,7 +28,7 @@ search_string_in_args() {
     return 1
 }
 
-n_procs=1
+n_procs=4
 echo "example_p2.sh: n_procs=$n_procs"
 
 export USE_MPI=0
