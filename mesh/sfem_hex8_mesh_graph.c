@@ -1097,12 +1097,13 @@ static void sshex8_z_rside(const int                   L,
 
 //////////////
 
-int sshex8_extract_surface_from_sideset(const int                                L,
-                                        idx_t **const SFEM_RESTRICT              elems,
-                                        const ptrdiff_t                          n_surf_elements,
-                                        const element_idx_t *const SFEM_RESTRICT parent_element,
-                                        const int16_t *const SFEM_RESTRICT       side_idx,
-                                        idx_t **const SFEM_RESTRICT              sides) {
+int         sshex8_extract_surface_from_sideset(const int                                L,
+                                                idx_t **const SFEM_RESTRICT              elems,
+                                                const ptrdiff_t                          n_surf_elements,
+                                                const element_idx_t *const SFEM_RESTRICT parent_element,
+                                                const int16_t *const SFEM_RESTRICT       side_idx,
+                                                idx_t **const SFEM_RESTRICT              sides) {
+#pragma omp parallel for
     for (ptrdiff_t i = 0; i < n_surf_elements; i++) {
         const ptrdiff_t e = parent_element[i];
         const int       s = side_idx[i];
@@ -1139,5 +1140,136 @@ int sshex8_extract_surface_from_sideset(const int                               
         }
     }
 
+    return SFEM_SUCCESS;
+}
+
+static void sshex8_x_lside_nodes(const int                   L,
+                                 const ptrdiff_t             e,
+                                 idx_t **const SFEM_RESTRICT elems,
+                                 idx_t *const SFEM_RESTRICT  nodes) {
+    int lidx = 0;
+    for (int zi = 0; zi <= L; zi++) {
+        for (int yi = L; yi >= 0; yi--) {
+            nodes[lidx++] = elems[sshex8_lidx(L, 0, yi, zi)][e];
+        }
+    }
+}
+
+static void sshex8_x_rside_nodes(const int                   L,
+                                 const ptrdiff_t             e,
+                                 idx_t **const SFEM_RESTRICT elems,
+                                 idx_t *const SFEM_RESTRICT  nodes) {
+    int lidx = 0;
+    for (int zi = 0; zi <= L; zi++) {
+        for (int yi = 0; yi <= L; yi++) {
+            nodes[lidx++] = elems[sshex8_lidx(L, L, yi, zi)][e];
+        }
+    }
+}
+
+//////////////
+
+static void sshex8_y_lside_nodes(const int                   L,
+                                 const ptrdiff_t             e,
+                                 idx_t **const SFEM_RESTRICT elems,
+                                 idx_t *const SFEM_RESTRICT  nodes) {
+    int lidx = 0;
+    for (int zi = 0; zi <= L; zi++) {
+        for (int xi = L; xi >= 0; xi--) {
+            nodes[lidx++] = elems[sshex8_lidx(L, xi, 0, zi)][e];
+        }
+    }
+}
+
+static void sshex8_y_rside_nodes(const int                   L,
+                                 const ptrdiff_t             e,
+                                 idx_t **const SFEM_RESTRICT elems,
+                                 idx_t *const SFEM_RESTRICT  nodes) {
+    int lidx = 0;
+    for (int zi = 0; zi <= L; zi++) {
+        for (int xi = 0; xi <= L; xi++) {
+            nodes[lidx++] = elems[sshex8_lidx(L, xi, L, zi)][e];
+        }
+    }
+}
+
+//////////////
+
+static void sshex8_z_lside_nodes(const int                   L,
+                                 const ptrdiff_t             e,
+                                 idx_t **const SFEM_RESTRICT elems,
+                                 idx_t *const SFEM_RESTRICT  nodes) {
+    int lidx = 0;
+    for (int yi = L; yi >= 0; yi--) {
+        for (int xi = 0; xi <= L; xi++) {
+            nodes[lidx++] = elems[sshex8_lidx(L, xi, yi, 0)][e];
+        }
+    }
+}
+
+static void sshex8_z_rside_nodes(const int                   L,
+                                 const ptrdiff_t             e,
+                                 idx_t **const SFEM_RESTRICT elems,
+                                 idx_t *const SFEM_RESTRICT  nodes) {
+    int lidx = 0;
+    for (int yi = 0; yi <= L; yi++) {
+        for (int xi = 0; xi <= L; xi++) {
+            nodes[lidx++] = elems[sshex8_lidx(L, xi, yi, L)][e];
+        }
+    }
+}
+
+int sshex8_extract_nodeset_from_sideset(const int                                L,
+                                        idx_t **const SFEM_RESTRICT              elems,
+                                        const ptrdiff_t                          n_surf_elements,
+                                        const element_idx_t *const SFEM_RESTRICT parent_element,
+                                        const int16_t *const SFEM_RESTRICT       side_idx,
+                                        ptrdiff_t                               *n_nodes_out,
+                                        idx_t **SFEM_RESTRICT                    nodes_out)
+
+{
+    const int       nnxs  = (L + 1) * (L + 1);
+    const ptrdiff_t n     = nnxs * n_surf_elements;
+    idx_t          *nodes = malloc(n * sizeof(idx_t));
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n_surf_elements; i++) {
+        const ptrdiff_t e = parent_element[i];
+        const int       s = side_idx[i];
+
+        switch (s) {
+            case 0: {
+                sshex8_y_lside_nodes(L, e, elems, &nodes[i * nnxs]);
+                break;
+            }
+            case 1: {
+                sshex8_x_rside_nodes(L, e, elems, &nodes[i * nnxs]);
+                break;
+            }
+            case 2: {
+                sshex8_y_rside_nodes(L, e, elems, &nodes[i * nnxs]);
+                break;
+            }
+            case 3: {
+                sshex8_x_lside_nodes(L, e, elems, &nodes[i * nnxs]);
+                break;
+            }
+            case 4: {
+                sshex8_z_lside_nodes(L, e, elems, &nodes[i * nnxs]);
+                break;
+            }
+            case 5: {
+                sshex8_z_rside_nodes(L, e, elems, &nodes[i * nnxs]);
+                break;
+            }
+            default: {
+                assert(0);
+                break;
+            }
+        }
+    }
+
+    *n_nodes_out = sortreduce(nodes, n);
+    *nodes_out   = realloc(nodes, *n_nodes_out * sizeof(idx_t));
     return SFEM_SUCCESS;
 }
