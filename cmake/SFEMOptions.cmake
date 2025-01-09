@@ -22,6 +22,7 @@ option(SFEM_ENABLE_AVX512 "Enable AVX512 intrinsics" OFF)
 option(SFEM_ENABLE_METIS "Enable METIS graph-partitioning" OFF)
 option(SFEM_ENABLE_AMG "Enable AMG solver" ON)
 option(SFEM_ENABLE_ISOLVER "Enable Isolver interface" OFF)
+option(SFEM_ENABLE_RYAML "Enable YAML input files with RapidYAML" OFF)
 
 option(SFEM_USE_OCCUPANCY_MAX_POTENTIAL "Enable usage of cudaOccupancyMaxPotentialBlockSize" OFF)
 # option(SFEM_ENABLE_AVX512 "Enable AVX2 intrinsics" OFF) # TODO

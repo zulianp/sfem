@@ -48,6 +48,25 @@
 
 #include "sfem_Tracer.hpp"
 
+#ifdef SFEM_ENABLE_RYAML
+
+#if defined(RYML_SINGLE_HEADER)  // using the single header directly in the executable
+#define RYML_SINGLE_HDR_DEFINE_NOW
+#include <ryml_all.hpp>
+#elif defined(RYML_SINGLE_HEADER_LIB)  // using the single header from a library
+#include <ryml_all.hpp>
+#else
+#include <ryml.hpp>
+// <ryml_std.hpp> is needed if interop with std containers is
+// desired; ryml itself does not use any STL container.
+// For this sample, we will be using std interop, so...
+#include <c4/format.hpp>  // needed for the examples below
+#include <ryml_std.hpp>   // optional header, provided for std:: interop
+#endif
+
+#include <sstream>
+#endif
+
 namespace sfem {
 
     class CRSGraph::Impl {
@@ -269,7 +288,7 @@ namespace sfem {
 
     class Sideset::Impl final {
     public:
-        MPI_Comm comm;
+        MPI_Comm                               comm;
         std::shared_ptr<Buffer<element_idx_t>> parent;
         std::shared_ptr<Buffer<int16_t>>       lfi;
     };
@@ -277,14 +296,13 @@ namespace sfem {
     Sideset::Sideset() : impl_(std::make_unique<Impl>()) {}
     Sideset::~Sideset() = default;
 
-    std::shared_ptr<Sideset> Sideset::create_from_file(MPI_Comm comm, const char *path)
-    {
+    std::shared_ptr<Sideset> Sideset::create_from_file(MPI_Comm comm, const char *path) {
         auto ret = std::make_shared<Sideset>();
-        if(ret->read(comm, path) != SFEM_SUCCESS) return nullptr;
+        if (ret->read(comm, path) != SFEM_SUCCESS) return nullptr;
         return ret;
     }
 
-    int Sideset::read(MPI_Comm comm,  const char *folder) {
+    int Sideset::read(MPI_Comm comm, const char *folder) {
         impl_->comm = comm;
 
         std::string    folder_ = folder;
@@ -292,14 +310,9 @@ namespace sfem {
         element_idx_t *parent{nullptr};
         int16_t       *lfi{nullptr};
 
-        if (array_create_from_file(comm,
-                                   (folder_ + "/parent.raw").c_str(),
-                                   SFEM_MPI_ELEMENT_IDX_T,
-                                   (void **)&parent,
-                                   &nlocal,
-                                   &nglobal) ||
-            array_create_from_file(
-                    comm, (folder_ + "/lfi.int16.raw").c_str(), MPI_SHORT, (void **)&lfi, &ncheck, &nglobal)) {
+        if (array_create_from_file(
+                    comm, (folder_ + "/parent.raw").c_str(), SFEM_MPI_ELEMENT_IDX_T, (void **)&parent, &nlocal, &nglobal) ||
+            array_create_from_file(comm, (folder_ + "/lfi.int16.raw").c_str(), MPI_SHORT, (void **)&lfi, &ncheck, &nglobal)) {
             return SFEM_FAILURE;
         }
 
@@ -326,7 +339,7 @@ namespace sfem {
         ptrdiff_t                        n_unique_nodes{-1}, interior_start{-1};
         std::shared_ptr<CRSGraph>        node_to_node_graph;
 
-        std::shared_ptr<Buffer<geom_t*>> points;
+        std::shared_ptr<Buffer<geom_t *>> points;
 
         void init(const std::shared_ptr<Mesh> macro_mesh, const int level) {
             SFEM_TRACE_SCOPE("SemiStructuredMesh::init");
@@ -374,10 +387,9 @@ namespace sfem {
         ~Impl() {}
     };
 
-    std::shared_ptr<Buffer<geom_t*>> SemiStructuredMesh::points()
-    {
-        if(!impl_->points) {
-            auto p = sfem::create_host_buffer<geom_t>(impl_->macro_mesh->spatial_dimension(), impl_->n_unique_nodes);
+    std::shared_ptr<Buffer<geom_t *>> SemiStructuredMesh::points() {
+        if (!impl_->points) {
+            auto p       = sfem::create_host_buffer<geom_t>(impl_->macro_mesh->spatial_dimension(), impl_->n_unique_nodes);
             auto macro_p = ((mesh_t *)(impl_->macro_mesh->impl_mesh()))->points;
             sshex8_fill_points(level(), n_elements(), element_data(), macro_p, p->data());
             impl_->points = p;
@@ -832,22 +844,119 @@ namespace sfem {
 
         auto dc = std::make_unique<DirichletConditions>(space);
 
+        // char *SFEM_DIRICHLET_SIDESET   = 0;
         char *SFEM_DIRICHLET_NODESET   = 0;
         char *SFEM_DIRICHLET_VALUE     = 0;
         char *SFEM_DIRICHLET_COMPONENT = 0;
+
+        // SFEM_READ_ENV(SFEM_DIRICHLET_SIDESET, );
         SFEM_READ_ENV(SFEM_DIRICHLET_NODESET, );
         SFEM_READ_ENV(SFEM_DIRICHLET_VALUE, );
         SFEM_READ_ENV(SFEM_DIRICHLET_COMPONENT, );
 
+        // assert(!SFEM_DIRICHLET_SIDESET || !SFEM_DIRICHLET_NODESET);
+
         auto mesh = (mesh_t *)space->mesh().impl_mesh();
-        read_dirichlet_conditions(mesh,
-                                  SFEM_DIRICHLET_NODESET,
-                                  SFEM_DIRICHLET_VALUE,
-                                  SFEM_DIRICHLET_COMPONENT,
-                                  &dc->impl_->dirichlet_conditions,
-                                  &dc->impl_->n_dirichlet_conditions);
+
+        // if (SFEM_DIRICHLET_SIDESET) {
+        //     auto ss = Sideset::create_from_file(space->mesh_ptr()->comm(), SFEM_DIRICHLET_SIDESET);
+        //     if (!ss) {
+        //         SFEM_ERROR("Unable to read sideset at: %s\n", SFEM_DIRICHLET_SIDESET);
+        //     }
+
+        //     if (space->has_semi_structured_mesh()) {
+        //         //
+        //     } else {
+        //         // SFEM_TRACE_SCOPE("extract_nodeset_from_sideset");
+
+        //         // ptrdiff_t n_nodes{0};
+        //         // idx_t *nodes{nullptr};
+        //         // if (extract_nodeset_from_sideset(mesh->element_type,
+        //         //                                  mesh->elements,
+        //         //                                  ss->parent()->size(),
+        //         //                                  ss->parent()->data(),
+        //         //                                  ss->lfi()->data(),
+        //         //                                  &n_nodes,
+        //         //                                  &nodes) != SFEM_SUCCESS) {
+        //         //     SFEM_ERROR("Unable to extract nodeset from sideset!\n");
+        //         // }
+        //     }
+
+        // } else
+        {
+            read_dirichlet_conditions(mesh,
+                                      SFEM_DIRICHLET_NODESET,
+                                      SFEM_DIRICHLET_VALUE,
+                                      SFEM_DIRICHLET_COMPONENT,
+                                      &dc->impl_->dirichlet_conditions,
+                                      &dc->impl_->n_dirichlet_conditions);
+        }
 
         return dc;
+    }
+
+    std::shared_ptr<DirichletConditions> DirichletConditions::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                                               std::string                           yaml) {
+#ifdef SFEM_ENABLE_RYAML
+        ryml::Tree tree  = ryml::parse_in_place(ryml::to_substr(yaml));
+        auto       conds = tree["dirichlet_conditions"];
+
+        std::map<std::string, std::shared_ptr<Sideset>> sidesets;
+
+        for (auto c : conds.children()) {
+            std::cout << c.key() << "\n";
+            std::cout << "name: " << c["name"].val() << "\n";
+
+            auto value     = c["value"];
+            auto component = c["component"];
+
+            auto ss = c["sideset"];
+            if (ss.readable()) {
+                std::cout << "sideset: " << ss.val() << "\n";
+            }
+
+            auto ns = c["nodeset"];
+            if (ns.readable()) {
+                std::cout << "nodeset: " << ns.val() << "\n";
+            }
+
+            if (value.is_seq()) {
+                for (auto v : value) {
+                    std::cout << v << "\n";
+                }
+            } else {
+                std::cout << "value: " << value.val() << "\n";
+            }
+
+            if (component.is_seq()) {
+                for (auto v : component) {
+                    std::cout << v << "\n";
+                }
+            } else {
+                std::cout << "component: " << component.val() << "\n";
+            }
+        }
+
+        return nullptr;
+#else
+        SFEM_ERROR("This functionaly requires -DSFEM_ENABLE_RYAML=ON\n");
+        return nullptr;
+#endif
+    }
+
+    std::shared_ptr<DirichletConditions> DirichletConditions::create_from_file(const std::shared_ptr<FunctionSpace> &space,
+                                                                               const std::string                    &path) {
+        std::ifstream is(path);
+        if (!is.good()) {
+            SFEM_ERROR("Unable to read file %s\n", path.c_str());
+        }
+
+        std::ostringstream contents;
+        contents << is.rdbuf();
+        auto yaml = contents.str();
+        is.close();
+
+        return create_from_yaml(space, std::move(yaml));
     }
 
     int DirichletConditions::apply(real_t *const x) {
