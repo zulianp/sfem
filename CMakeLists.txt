@@ -278,6 +278,7 @@ if(SFEM_ENABLE_TESTING)
         operators/ssquad4/tests
         operators/sshex8/tests
         mesh/tests
+        frontend/tests
     )
 
     foreach(UNIT_TEST ${SFEM_UNIT_TESTS})
@@ -310,6 +311,10 @@ if(SFEM_ENABLE_PYTHON)
 endif()
 
 # message(STATUS "SFEM_TARGETS: ${SFEM_TARGETS}")
+
+if(SFEM_SUBMODULES)
+    target_link_libraries(sfem PUBLIC ${SFEM_SUBMODULES})
+endif()
 
 ######################################################
 ######################################################
