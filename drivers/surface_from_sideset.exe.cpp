@@ -31,6 +31,9 @@ int main(int argc, char *argv[]) {
     int SFEM_EXTRACT_NODESET = 0;
     SFEM_READ_ENV(SFEM_EXTRACT_NODESET, atoi);
 
+    int SFEM_CONVERT_TO_STD_MESH = 0;
+    SFEM_READ_ENV(SFEM_CONVERT_TO_STD_MESH, atoi);
+
     const char *path_mesh    = argv[1];
     auto        m            = sfem::Mesh::create_from_file(comm, path_mesh);
     const char *path_sideset = argv[2];
@@ -95,11 +98,29 @@ int main(int argc, char *argv[]) {
             SFEM_ERROR("Element %s not supported for semi-structured discretization\n", type_to_string(element_type));
         }
 
-        auto ss         = sfem::SemiStructuredMesh::create(m, SFEM_ELEMENT_REFINE_LEVEL);
-        int  nnxs       = (ss->level() + 1) * (ss->level() + 1);
-        auto surf_elems = sfem::create_host_buffer<idx_t>(nnxs, s->parent()->size());
+        auto ss = sfem::SemiStructuredMesh::create(m, SFEM_ELEMENT_REFINE_LEVEL);
 
-        {
+        std::shared_ptr<sfem::Buffer<idx_t *>> surf_elems;
+
+        if (SFEM_CONVERT_TO_STD_MESH) {
+            const int nnxs = 4;
+            const int nexs = ss->level() * ss->level();
+            surf_elems     = sfem::create_host_buffer<idx_t>(nnxs, s->parent()->size() * nexs);
+
+            SFEM_TRACE_SCOPE("sshex8_extract_quadshell4_surface_from_sideset");
+            if (sshex8_extract_quadshell4_surface_from_sideset(ss->level(),
+                                                               ss->element_data(),
+                                                               s->parent()->size(),
+                                                               s->parent()->data(),
+                                                               s->lfi()->data(),
+                                                               surf_elems->data()) != SFEM_SUCCESS) {
+                SFEM_ERROR("Unable to extract surface from sideset!\n");
+            }
+
+        } else {
+            int nnxs   = (ss->level() + 1) * (ss->level() + 1);
+            surf_elems = sfem::create_host_buffer<idx_t>(nnxs, s->parent()->size());
+
             SFEM_TRACE_SCOPE("sshex8_extract_surface_from_sideset");
             if (sshex8_extract_surface_from_sideset(ss->level(),
                                                     ss->element_data(),
