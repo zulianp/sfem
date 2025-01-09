@@ -79,7 +79,8 @@ __device__ real_type Power_m1p5(const real_type x) {
 #if SFEM_REAL_T_IS_FLOAT64
     return 1.0 / (x * sqrt(x));
 #else
-    return 1.0 / (x * sqrtf(x));
+    const real_type r1 = 1.0;
+    return r1 / (x * sqrtf(x));
 #endif
 }
 
@@ -103,10 +104,11 @@ __device__ real_type Power_m1p5_cuda(const real_type x) {
  * @param x
  * @return real_type
  */
-__device__ void LagrangePolyArrayConstH_cuda(const real_type x,                //
-                                             const real_type h,                //
-                                             real_type      *lagrange_poly_0,  //
-                                             real_type      *lagrange_poly_1) {     //
+__device__ void                                                //
+LagrangePolyArrayConstH_cuda(const real_type x,                //
+                             const real_type h,                //
+                             real_type      *lagrange_poly_0,  //
+                             real_type      *lagrange_poly_1) {     //
 
     List3_cu(lagrange_poly_0,                                    //
              ((-2 * h + x) * (-h + x)) / (2. * Power2_cuda(h)),  //
@@ -127,10 +129,14 @@ __device__ void LagrangePolyArrayConstH_cuda(const real_type x,                /
  * @param h : grid spacing
  * @param linear_weights : array to store the linear weights of size 2
  */
-__device__ void getLinearWeightsConstH_cuda(const real_type x, const real_type h, real_type *linear_weights) {
+__device__ void  //
+getLinearWeightsConstH_cuda(const real_type x, const real_type h, real_type *linear_weights) {
     //
-    linear_weights[0] = (3 * h - x) / (3. * h);
-    linear_weights[1] = x / (3. * h);
+
+    const real_type r3 = 3.0;
+
+    linear_weights[0] = (r3 * h - x) / (r3 * h);
+    linear_weights[1] = x / (r3 * h);
 }
 
 /**
@@ -206,10 +212,14 @@ getNonLinearWeightsConstH_cuda(const real_type x,                   //
  * @param y3
  * @return __device__
  */
-__device__ real_type weno4ConstH_cuda(const real_type x, const real_type h,  //
-                                      const real_type y0, const real_type y1,
-                                      const real_type y2,    //
-                                      const real_type y3) {  //
+__device__ real_type                    //
+weno4ConstH_cuda(const real_type x,     //
+                 const real_type h,     //
+                 const real_type y0,    //
+                 const real_type y1,    //
+                 const real_type y2,    //
+                 const real_type y3) {  //
+
     const real_type eps = 1e-6;
 
     real_type lagrange_poly_0[3];
