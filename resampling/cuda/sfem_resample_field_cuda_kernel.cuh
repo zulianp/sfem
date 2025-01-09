@@ -66,7 +66,8 @@ __device__ void tet4_transform_cu(
 ////////////////////////////////////////////////////////
 // tet4_measure_v2
 ////////////////////////////////////////////////////////
-__device__ real_type tet4_measure_cu(
+__device__ real_type  //
+tet4_measure_cu(
         // X-coordinates
         const real_type px0, const real_type px1, const real_type px2, const real_type px3,
         // Y-coordinates
@@ -82,15 +83,17 @@ __device__ real_type tet4_measure_cu(
     //
     // V = (1/6) * det(M)
 
+    const real_type r1_6 = 1.0 / 6.0;
+
     const real_type x0 = -pz0 + pz3;
     const real_type x1 = -py0 + py2;
-    const real_type x2 = -(1.0 / 6.0) * px0 + (1.0 / 6.0) * px1;
+    const real_type x2 = -r1_6 * px0 + r1_6 * px1;
     const real_type x3 = -py0 + py3;
     const real_type x4 = -pz0 + pz2;
     const real_type x5 = -py0 + py1;
-    const real_type x6 = -(1.0 / 6.0) * px0 + (1.0 / 6.0) * px2;
+    const real_type x6 = -r1_6 * px0 + r1_6 * px2;
     const real_type x7 = -pz0 + pz1;
-    const real_type x8 = -(1.0 / 6.0) * px0 + (1.0 / 6.0) * px3;
+    const real_type x8 = -r1_6 * px0 + r1_6 * px3;
 
     return x0 * x1 * x2 - x0 * x5 * x6 - x1 * x7 * x8 - x2 * x3 * x4 + x3 * x6 * x7 + x4 * x5 * x8;
 }
@@ -167,7 +170,8 @@ __device__ void hex_aa_8_collect_coeffs_cu(
 // tet4_resample_field_local_kernel //////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-__global__ void tet4_resample_field_local_kernel(
+__global__ void  //
+tet4_resample_field_local_kernel(
         // Mesh
         const ptrdiff_t start_element, const ptrdiff_t end_element, const ptrdiff_t nnodes,
         const elems_tet4_device MY_RESTRICT elems, const xyz_tet4_device MY_RESTRICT xyz,
@@ -310,10 +314,12 @@ __global__ void tet4_resample_field_local_kernel(
             const real_type f2 = tet4_qy[quad_i];
             const real_type f3 = tet4_qz[quad_i];
 
-            tet4_f0 = 4.0 * f0 - f1 - f2 - f3;
-            tet4_f1 = -f0 + 4.0 * f1 - f2 - f3;
-            tet4_f2 = -f0 - f1 + 4.0 * f2 - f3;
-            tet4_f3 = -f0 - f1 - f2 + 4.0 * f3;
+            const real_type r4 = 4.0;
+
+            tet4_f0 = r4 * f0 - f1 - f2 - f3;
+            tet4_f1 = -f0 + r4 * f1 - f2 - f3;
+            tet4_f2 = -f0 - f1 + r4 * f2 - f3;
+            tet4_f3 = -f0 - f1 - f2 + r4 * f3;
         }
 #endif
 
@@ -626,10 +632,10 @@ tet4_resample_field_reduce_local_kernel(                    //
     const size_t nr_warp_loop = (TET4_NQP / __WARP_SIZE__) +                //
                                 ((TET4_NQP % __WARP_SIZE__) == 0 ? 0 : 1);  //
 
-    real_type element_field0_reduce = 0.0;
-    real_type element_field1_reduce = 0.0;
-    real_type element_field2_reduce = 0.0;
-    real_type element_field3_reduce = 0.0;
+    real_type element_field0_reduce = real_t(0.0);
+    real_type element_field1_reduce = real_t(0.0);
+    real_type element_field2_reduce = real_t(0.0);
+    real_type element_field3_reduce = real_t(0.0);
 
     for (size_t i = 0; i < nr_warp_loop; i++) {
         const size_t q_i = i * size_t(__WARP_SIZE__) + tile_rank;
