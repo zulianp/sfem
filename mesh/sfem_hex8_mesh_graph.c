@@ -1273,3 +1273,219 @@ int sshex8_extract_nodeset_from_sideset(const int                               
     *nodes_out   = realloc(nodes, *n_nodes_out * sizeof(idx_t));
     return SFEM_SUCCESS;
 }
+
+// 1) 1, 2, 6, 5, ---  9, 14, 17, 13, 26 (Y left)
+// 2) 2, 3, 7, 6, --- 10, 15, 18, 14, 25 (X right)
+// 3) 3, 4, 8, 7, --- 11, 16, 19, 15, 27 (Y right)
+// 4) 1, 5, 8, 4, --- 13, 20, 16, 12, 24 (X left)
+// 5) 1, 4, 3, 2, --- 12, 11, 10, 9,  22 (Z left)
+// 6) 5, 6, 7, 8, --- 17, 18, 19, 20, 23 (Z right)
+
+// Front face
+// 5 ---------- 6
+// |            |
+// |            |
+// |            |
+// |            |
+// 1/___________2/  x -->
+
+// Back face
+
+// /8 ----------/7
+// |            |
+// |            |
+// |            |
+// |            |
+// /4___________/3
+
+static void sshex8_x_lside_quadshell4(const int                   L,
+                                      const ptrdiff_t             e,
+                                      idx_t **const SFEM_RESTRICT elems,
+                                      const ptrdiff_t             offset,
+                                      idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int zi = 0; zi < L; zi++) {
+        for (int yi = 0; yi < L; yi++) {
+            // 1, 5, 8, 4,
+            const idx_t i0 = sshex8_lidx(L, 0, yi, zi);
+            const idx_t i1 = sshex8_lidx(L, 0, yi, zi + 1);
+            const idx_t i2 = sshex8_lidx(L, 0, yi + 1, zi + 1);
+            const idx_t i3 = sshex8_lidx(L, 0, yi + 1, zi);
+
+            sides[0][offset + lidx] = elems[i0][e];
+            sides[1][offset + lidx] = elems[i1][e];
+            sides[2][offset + lidx] = elems[i2][e];
+            sides[3][offset + lidx] = elems[i3][e];
+            lidx++;
+        }
+    }
+}
+
+static void sshex8_x_rside_quadshell4(const int                   L,
+                                      const ptrdiff_t             e,
+                                      idx_t **const SFEM_RESTRICT elems,
+                                      const ptrdiff_t             offset,
+                                      idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int zi = 0; zi < L; zi++) {
+        for (int yi = 0; yi < L; yi++) {
+            // 2, 3, 7, 6
+            const idx_t i0 = sshex8_lidx(L, L, yi, zi);
+            const idx_t i1 = sshex8_lidx(L, L, yi + 1, zi);
+            const idx_t i2 = sshex8_lidx(L, L, yi + 1, zi + 1);
+            const idx_t i3 = sshex8_lidx(L, L, yi, zi + 1);
+
+            sides[0][offset + lidx] = elems[i0][e];
+            sides[1][offset + lidx] = elems[i1][e];
+            sides[2][offset + lidx] = elems[i2][e];
+            sides[3][offset + lidx] = elems[i3][e];
+            lidx++;
+        }
+    }
+}
+
+//////////////
+
+static void sshex8_y_lside_quadshell4(const int                   L,
+                                      const ptrdiff_t             e,
+                                      idx_t **const SFEM_RESTRICT elems,
+                                      const ptrdiff_t             offset,
+                                      idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int zi = 0; zi < L; zi++) {
+        for (int xi = 0; xi < L; xi++) {
+            // 1, 2, 6, 5
+            const idx_t i0 = sshex8_lidx(L, xi, 0, zi);
+            const idx_t i1 = sshex8_lidx(L, xi + 1, 0, zi);
+            const idx_t i2 = sshex8_lidx(L, xi + 1, 0, zi + 1);
+            const idx_t i3 = sshex8_lidx(L, xi, 0, zi + 1);
+
+            sides[0][offset + lidx] = elems[i0][e];
+            sides[1][offset + lidx] = elems[i1][e];
+            sides[2][offset + lidx] = elems[i2][e];
+            sides[3][offset + lidx] = elems[i3][e];
+            lidx++;
+        }
+    }
+}
+
+static void sshex8_y_rside_quadshell4(const int                   L,
+                                      const ptrdiff_t             e,
+                                      idx_t **const SFEM_RESTRICT elems,
+                                      const ptrdiff_t             offset,
+                                      idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int zi = 0; zi < L; zi++) {
+        for (int xi = 0; xi < L; xi++) {
+            // 3, 4, 8, 7
+            const idx_t i0 = sshex8_lidx(L, xi + 1, L, zi);
+            const idx_t i1 = sshex8_lidx(L, xi, L, zi);
+            const idx_t i2 = sshex8_lidx(L, xi, L, zi + 1);
+            const idx_t i3 = sshex8_lidx(L, xi + 1, L, zi + 1);
+
+            sides[0][offset + lidx] = elems[i0][e];
+            sides[1][offset + lidx] = elems[i1][e];
+            sides[2][offset + lidx] = elems[i2][e];
+            sides[3][offset + lidx] = elems[i3][e];
+            lidx++;
+        }
+    }
+}
+
+//////////////
+
+static void sshex8_z_lside_quadshell4(const int                   L,
+                                      const ptrdiff_t             e,
+                                      idx_t **const SFEM_RESTRICT elems,
+                                      const ptrdiff_t             offset,
+                                      idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int yi = 0; yi < L; yi++) {
+        for (int xi = 0; xi < L; xi++) {
+            // 1, 4, 3, 2
+            const idx_t i0 = sshex8_lidx(L, xi, yi, 0);
+            const idx_t i1 = sshex8_lidx(L, xi, yi + 1, 0);
+            const idx_t i2 = sshex8_lidx(L, xi + 1, yi + 1, 0);
+            const idx_t i3 = sshex8_lidx(L, xi + 1, yi, 0);
+
+            sides[0][offset + lidx] = elems[i0][e];
+            sides[1][offset + lidx] = elems[i1][e];
+            sides[2][offset + lidx] = elems[i2][e];
+            sides[3][offset + lidx] = elems[i3][e];
+            lidx++;
+        }
+    }
+}
+
+static void sshex8_z_rside_quadshell4(const int                   L,
+                                      const ptrdiff_t             e,
+                                      idx_t **const SFEM_RESTRICT elems,
+                                      const ptrdiff_t             offset,
+                                      idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int yi = 0; yi < L; yi++) {
+        for (int xi = 0; xi < L; xi++) {
+            // 5, 6, 7, 8
+            const idx_t i0 = sshex8_lidx(L, xi, yi, L);
+            const idx_t i1 = sshex8_lidx(L, xi + 1, yi, L);
+            const idx_t i2 = sshex8_lidx(L, xi + 1, yi + 1, L);
+            const idx_t i3 = sshex8_lidx(L, xi, yi + 1, L);
+
+            sides[0][offset + lidx] = elems[i0][e];
+            sides[1][offset + lidx] = elems[i1][e];
+            sides[2][offset + lidx] = elems[i2][e];
+            sides[3][offset + lidx] = elems[i3][e];
+            lidx++;
+        }
+    }
+}
+
+//////////////
+
+int sshex8_extract_quadshell4_surface_from_sideset(const int                                L,
+                                                   idx_t **const SFEM_RESTRICT              elems,
+                                                   const ptrdiff_t                          n_surf_elements,
+                                                   const element_idx_t *const SFEM_RESTRICT parent_element,
+                                                   const int16_t *const SFEM_RESTRICT       side_idx,
+                                                   idx_t **const SFEM_RESTRICT              sides) {
+    const int nquadsxside = L * L;
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n_surf_elements; i++) {
+        const ptrdiff_t e = parent_element[i];
+        const int       s = side_idx[i];
+
+        switch (s) {
+            case 0: {
+                sshex8_y_lside_quadshell4(L, e, elems, i * nquadsxside, sides);
+                break;
+            }
+            case 1: {
+                sshex8_x_rside_quadshell4(L, e, elems, i * nquadsxside, sides);
+                break;
+            }
+            case 2: {
+                sshex8_y_rside_quadshell4(L, e, elems, i * nquadsxside, sides);
+                break;
+            }
+            case 3: {
+                sshex8_x_lside_quadshell4(L, e, elems, i * nquadsxside, sides);
+                break;
+            }
+            case 4: {
+                sshex8_z_lside_quadshell4(L, e, elems, i * nquadsxside, sides);
+                break;
+            }
+            case 5: {
+                sshex8_z_rside_quadshell4(L, e, elems, i * nquadsxside, sides);
+                break;
+            }
+            default: {
+                assert(0);
+                break;
+            }
+        }
+    }
+
+    return SFEM_SUCCESS;
+}

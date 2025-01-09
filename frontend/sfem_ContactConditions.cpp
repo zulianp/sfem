@@ -439,14 +439,26 @@ namespace sfem {
             if (space->has_semi_structured_mesh()) {
                 auto &&ssmesh = space->semi_structured_mesh();
 
-                int nnxs    = (ssmesh.level() + 1) * (ssmesh.level() + 1);
-                this->sides = sfem::create_host_buffer<idx_t>(nnxs, ss->parent()->size());
-                if (sshex8_extract_surface_from_sideset(ssmesh.level(),
-                                                        ssmesh.element_data(),
-                                                        ss->parent()->size(),
-                                                        ss->parent()->data(),
-                                                        ss->lfi()->data(),
-                                                        this->sides->data()) != SFEM_SUCCESS) {
+                // int nnxs    = (ssmesh.level() + 1) * (ssmesh.level() + 1);
+                // this->sides = sfem::create_host_buffer<idx_t>(nnxs, ss->parent()->size());
+                // if (sshex8_extract_surface_from_sideset(ssmesh.level(),
+                //                                         ssmesh.element_data(),
+                //                                         ss->parent()->size(),
+                //                                         ss->parent()->data(),
+                //                                         ss->lfi()->data(),
+                //                                         this->sides->data()) != SFEM_SUCCESS) {
+                //     SFEM_ERROR("Unable to extract surface from sideset!\n");
+                // }
+
+                const int nnxs = 4;
+                const int nexs = ssmesh.level() * ssmesh.level();
+                this->sides    = sfem::create_host_buffer<idx_t>(nnxs, ss->parent()->size() * nexs);
+                if (sshex8_extract_quadshell4_surface_from_sideset(ssmesh.level(),
+                                                                   ssmesh.element_data(),
+                                                                   ss->parent()->size(),
+                                                                   ss->parent()->data(),
+                                                                   ss->lfi()->data(),
+                                                                   this->sides->data()) != SFEM_SUCCESS) {
                     SFEM_ERROR("Unable to extract surface from sideset!\n");
                 }
 
