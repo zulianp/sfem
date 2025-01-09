@@ -14,6 +14,16 @@
 #define __WARP_SIZE__ 32
 #define WENO_CUDA 1
 
+__device__ real_t         //
+floor_real_t(real_t x) {  //
+
+#if SFEM_REAL_T_IS_FLOAT64
+    return floor(x);
+#else
+    return floorf(x);
+#endif
+}
+
 //-------------------------------------------
 /// iso-parametric version
 //-------------------------------------------
@@ -28,52 +38,54 @@
  * @param qz
  * @return __device__
  */
-__device__ real_t                                    //
-tet10_measure_cu(const real_t* const MY_RESTRICT x,  //
-                 const real_t* const MY_RESTRICT y,  //
-                 const real_t* const MY_RESTRICT z,  //
-
-                 // Quadrature point //
-                 const real_t qx,    //
-                 const real_t qy,    //
-                 const real_t qz) {  //
+__device__ real_t                                     //
+tet10_measure_cu(const real_t* const MY_RESTRICT x,   //
+                 const real_t* const MY_RESTRICT y,   //
+                 const real_t* const MY_RESTRICT z,   //
+                 const real_t                    qx,  // // Quadrature point x
+                 const real_t                    qy,  // // Quadrature point y
+                 const real_t                    qz) {                   // // Quadrature point z
     //
-    const real_t x0  = 4 * qz;
-    const real_t x1  = x0 - 1;
-    const real_t x2  = 4 * qy;
-    const real_t x3  = 4 * qx;
-    const real_t x4  = x3 - 4;
-    const real_t x5  = -8 * qz - x2 - x4;
+    const real_t r1   = 1.0;
+    const real_t r3   = 3.0;
+    const real_t r4   = 4.0;
+    const real_t r8   = 8.0;
+    const real_t r1_6 = 1.0 / 6.0;
+
+    const real_t x0  = r4 * qz;
+    const real_t x1  = x0 - r1;
+    const real_t x2  = r4 * qy;
+    const real_t x3  = r4 * qx;
+    const real_t x4  = x3 - r4;
+    const real_t x5  = -r8 * qz - x2 - x4;
     const real_t x6  = -x3 * y[4];
     const real_t x7  = x0 + x2;
-    const real_t x8  = x3 + x7 - 3;
+    const real_t x8  = x3 + x7 - r3;
     const real_t x9  = x8 * y[0];
     const real_t x10 = -x2 * y[6] + x9;
     const real_t x11 = x1 * y[3] + x10 + x2 * y[9] + x3 * y[8] + x5 * y[7] + x6;
     const real_t x12 = -x2 * z[6];
     const real_t x13 = -x0 * z[7];
-    const real_t x14 = x3 - 1;
+    const real_t x14 = x3 - r1;
     const real_t x15 = x8 * z[0];
-    const real_t x16 = -8 * qx - x7 + 4;
+    const real_t x16 = -r8 * qx - x7 + r4;
     const real_t x17 = x0 * z[8] + x12 + x13 + x14 * z[1] + x15 + x16 * z[4] + x2 * z[5];
-    const real_t x18 = x2 - 1;
-    const real_t x19 = -8 * qy - x0 - x4;
+    const real_t x18 = x2 - r1;
+    const real_t x19 = -r8 * qy - x0 - x4;
     const real_t x20 = -x3 * x[4];
     const real_t x21 = x8 * x[0];
     const real_t x22 = -x0 * x[7] + x21;
-    const real_t x23 = (1.0 / 6.0) * x0 * x[9] + (1.0 / 6.0) * x18 * x[2] + (1.0 / 6.0) * x19 * x[6] + (1.0 / 6.0) * x20 +
-                       (1.0 / 6.0) * x22 + (1.0 / 6.0) * x3 * x[5];
+    const real_t x23 = r1_6 * x0 * x[9] + r1_6 * x18 * x[2] + r1_6 * x19 * x[6] + r1_6 * x20 + r1_6 * x22 + r1_6 * x3 * x[5];
     const real_t x24 = -x0 * y[7];
     const real_t x25 = x0 * y[8] + x10 + x14 * y[1] + x16 * y[4] + x2 * y[5] + x24;
     const real_t x26 = x15 - x3 * z[4];
     const real_t x27 = x1 * z[3] + x12 + x2 * z[9] + x26 + x3 * z[8] + x5 * z[7];
     const real_t x28 = x0 * y[9] + x18 * y[2] + x19 * y[6] + x24 + x3 * y[5] + x6 + x9;
     const real_t x29 = -x2 * x[6];
-    const real_t x30 = (1.0 / 6.0) * x1 * x[3] + (1.0 / 6.0) * x2 * x[9] + (1.0 / 6.0) * x20 + (1.0 / 6.0) * x21 +
-                       (1.0 / 6.0) * x29 + (1.0 / 6.0) * x3 * x[8] + (1.0 / 6.0) * x5 * x[7];
+    const real_t x30 =
+            r1_6 * x1 * x[3] + r1_6 * x2 * x[9] + r1_6 * x20 + r1_6 * x21 + r1_6 * x29 + r1_6 * x3 * x[8] + r1_6 * x5 * x[7];
     const real_t x31 = x0 * z[9] + x13 + x18 * z[2] + x19 * z[6] + x26 + x3 * z[5];
-    const real_t x32 = (1.0 / 6.0) * x0 * x[8] + (1.0 / 6.0) * x14 * x[1] + (1.0 / 6.0) * x16 * x[4] + (1.0 / 6.0) * x2 * x[5] +
-                       (1.0 / 6.0) * x22 + (1.0 / 6.0) * x29;
+    const real_t x32 = r1_6 * x0 * x[8] + r1_6 * x14 * x[1] + r1_6 * x16 * x[4] + r1_6 * x2 * x[5] + r1_6 * x22 + r1_6 * x29;
     //
     return x11 * x17 * x23 - x11 * x31 * x32 - x17 * x28 * x30 - x23 * x25 * x27 + x25 * x30 * x31 + x27 * x28 * x32;
 }  // end tet10_measure_cu
@@ -107,7 +119,7 @@ isoparametric_lumped_mass_kernel_hrt_cu(const real_t dV,
                                         real_t*      element_diag_6,  //
                                         real_t*      element_diag_7,  //
                                         real_t*      element_diag_8,  //
-                                        real_t*      element_diag_9) {
+                                        real_t*      element_diag_9) {     //
     //
     const real_t x0  = 4 * qx;
     const real_t x1  = qy * qz;
@@ -164,29 +176,39 @@ isoparametric_lumped_mass_kernel_hrt_cu(const real_t dV,
  * @param out_z
  * @return __device__
  */
-__device__ void tet10_transform_cu(const real_t* const MY_RESTRICT x, const real_t* const MY_RESTRICT y,
-                                   const real_t* const MY_RESTRICT z,
-                                   // Quadrature point
-                                   const real_t qx, const real_t qy, const real_t qz,
-                                   // Output
-                                   real_t* const MY_RESTRICT out_x, real_t* const MY_RESTRICT out_y,
-                                   real_t* const MY_RESTRICT out_z) {
-    const real_t x0  = 4 * qx;
+__device__ void                                        //
+tet10_transform_cu(const real_t* const MY_RESTRICT x,  //
+                   const real_t* const MY_RESTRICT y,  //
+                   const real_t* const MY_RESTRICT z,  //
+                   // Quadrature point
+                   const real_t qx,  //
+                   const real_t qy,  //
+                   const real_t qz,  //
+                   // Output
+                   real_t* const MY_RESTRICT out_x,    //
+                   real_t* const MY_RESTRICT out_y,    //
+                   real_t* const MY_RESTRICT out_z) {  //
+
+    const real_t r4 = 4.0;
+    const real_t r2 = 2.0;
+    const real_t r1 = 1.0;
+
+    const real_t x0  = r4 * qx;
     const real_t x1  = qy * x0;
     const real_t x2  = qz * x0;
-    const real_t x3  = 4 * qy;
+    const real_t x3  = r4 * qy;
     const real_t x4  = qz * x3;
-    const real_t x5  = 2 * qx - 1;
+    const real_t x5  = r2 * qx - r1;
     const real_t x6  = qx * x5;
-    const real_t x7  = 2 * qy;
-    const real_t x8  = qy * (x7 - 1);
-    const real_t x9  = 2 * qz;
-    const real_t x10 = qz * (x9 - 1);
-    const real_t x11 = -4 * qz - x0 - x3 + 4;
+    const real_t x7  = r2 * qy;
+    const real_t x8  = qy * (x7 - r1);
+    const real_t x9  = r2 * qz;
+    const real_t x10 = qz * (x9 - r1);
+    const real_t x11 = -r4 * qz - x0 - x3 + r4;
     const real_t x12 = qx * x11;
     const real_t x13 = qy * x11;
     const real_t x14 = qz * x11;
-    const real_t x15 = (-x5 - x7 - x9) * (-qx - qy - qz + 1);
+    const real_t x15 = (-x5 - x7 - x9) * (-qx - qy - qz + r1);
 
     *out_x = x[0] * x15 + x[1] * x6 + x[2] * x8 + x[3] * x10 + x[4] * x12 + x[5] * x1 + x[6] * x13 + x[7] * x14 + x[8] * x2 +
              x[9] * x4;
@@ -194,6 +216,7 @@ __device__ void tet10_transform_cu(const real_t* const MY_RESTRICT x, const real
              y[9] * x4;
     *out_z = z[0] * x15 + z[1] * x6 + z[2] * x8 + z[3] * x10 + z[4] * x12 + z[5] * x1 + z[6] * x13 + z[7] * x14 + z[8] * x2 +
              z[9] * x4;
+
 }  // end tet10_transform_cu
 
 /**
@@ -205,101 +228,130 @@ __device__ void tet10_transform_cu(const real_t* const MY_RESTRICT x, const real
  * @param f
  * @return __device__
  */
-__device__ void tet10_dual_basis_hrt_cu(const real_t qx, const real_t qy, const real_t qz, real_t* const f) {
-    const real_t x0  = 2 * qy;
-    const real_t x1  = 2 * qz;
-    const real_t x2  = 2 * qx - 1;
-    const real_t x3  = (-x0 - x1 - x2) * (-qx - qy - qz + 1);
-    const real_t x4  = x0 - 1;
-    const real_t x5  = (5.0 / 18.0) * qy;
+__device__ void                             //
+tet10_dual_basis_hrt_cu(const real_t  qx,   //
+                        const real_t  qy,   //
+                        const real_t  qz,   //
+                        real_t* const f) {  //
+
+    const real_t r2      = 2.0;
+    const real_t r1      = 1.0;
+    const real_t r4      = 4.0;
+    const real_t r5_18   = 5.0 / 18.0;
+    const real_t r10_9   = 10.0 / 9.0;
+    const real_t r5_72   = 5.0 / 72.0;
+    const real_t r40_27  = 40.0 / 27.0;
+    const real_t r115_27 = 115.0 / 27.0;
+    const real_t r110_27 = 110.0 / 27.0;
+    const real_t r55_54  = 55.0 / 54.0;
+    const real_t r10_27  = 10.0 / 27.0;
+    const real_t r25_9   = 25.0 / 9.0;
+    const real_t r160_27 = 160.0 / 27.0;
+    const real_t r460_27 = 460.0 / 27.0;
+
+    const real_t x0  = r2 * qy;
+    const real_t x1  = r2 * qz;
+    const real_t x2  = r2 * qx - r1;
+    const real_t x3  = (-x0 - x1 - x2) * (-qx - qy - qz + r1);
+    const real_t x4  = x0 - r1;
+    const real_t x5  = r5_18 * qy;
     const real_t x6  = x4 * x5;
-    const real_t x7  = x1 - 1;
-    const real_t x8  = (5.0 / 18.0) * qz;
+    const real_t x7  = x1 - r1;
+    const real_t x8  = r5_18 * qz;
     const real_t x9  = x7 * x8;
-    const real_t x10 = -4 * qx - 4 * qy - 4 * qz + 4;
-    const real_t x11 = (5.0 / 72.0) * x10;
+    const real_t x10 = -r4 * qx - r4 * qy - r4 * qz + r4;
+    const real_t x11 = r5_72 * x10;
     const real_t x12 = qy * qz;
-    const real_t x13 = qx * x11 + (10.0 / 9.0) * x12 + x6 + x9;
-    const real_t x14 = (5.0 / 18.0) * qx;
+    const real_t x13 = qx * x11 + r10_9 * x12 + x6 + x9;
+    const real_t x14 = r5_18 * qx;
     const real_t x15 = x14 * x2;
-    const real_t x16 = (10.0 / 9.0) * qx;
+    const real_t x16 = r10_9 * qx;
     const real_t x17 = qy * x11 + qz * x16 + x15;
     const real_t x18 = qy * x16 + qz * x11;
     const real_t x19 = qx * x2;
-    const real_t x20 = (5.0 / 18.0) * x3;
+    const real_t x20 = r5_18 * x3;
     const real_t x21 = qy * x14 + x10 * x8 + x20;
     const real_t x22 = qz * x14 + x10 * x5;
     const real_t x23 = qy * x4;
     const real_t x24 = qz * x5 + x10 * x14;
     const real_t x25 = qz * x7;
-    const real_t x26 = (40.0 / 27.0) * x23;
-    const real_t x27 = (115.0 / 27.0) * x10;
-    const real_t x28 = (110.0 / 27.0) * qx;
+    const real_t x26 = r40_27 * x23;
+    const real_t x27 = r115_27 * x10;
+    const real_t x28 = r110_27 * qx;
     const real_t x29 = -qz * x28;
-    const real_t x30 = (55.0 / 54.0) * x10;
+    const real_t x30 = r55_54 * x10;
     const real_t x31 = -qy * x30;
-    const real_t x32 = (10.0 / 27.0) * x19;
-    const real_t x33 = (40.0 / 27.0) * x25;
+    const real_t x32 = r10_27 * x19;
+    const real_t x33 = r40_27 * x25;
     const real_t x34 = x29 + x31 + x32 + x33;
     const real_t x35 = -qy * x28;
     const real_t x36 = -qz * x30;
-    const real_t x37 = (10.0 / 27.0) * x3;
+    const real_t x37 = r10_27 * x3;
     const real_t x38 = x35 + x36 + x37;
-    const real_t x39 = (40.0 / 27.0) * x10;
+    const real_t x39 = r40_27 * x10;
     const real_t x40 = qx * qy;
-    const real_t x41 = -qx * x30 - 110.0 / 27.0 * x12;
-    const real_t x42 = (10.0 / 27.0) * x23;
-    const real_t x43 = (40.0 / 27.0) * x3;
+    const real_t x41 = -qx * x30 - r110_27 * x12;
+    const real_t x42 = r10_27 * x23;
+    const real_t x43 = r40_27 * x3;
     const real_t x44 = x42 + x43;
     const real_t x45 = qx * qz;
-    const real_t x46 = (40.0 / 27.0) * x19;
+    const real_t x46 = r40_27 * x19;
     const real_t x47 = x41 + x46;
-    const real_t x48 = (10.0 / 27.0) * x25;
+    const real_t x48 = r10_27 * x25;
     const real_t x49 = x26 + x48;
     const real_t x50 = x29 + x31;
     const real_t x51 = x35 + x36;
 
-    f[0] = x13 + x17 + x18 + (25.0 / 9.0) * x3;
-    f[1] = x13 + (25.0 / 9.0) * x19 + x21 + x22;
-    f[2] = x17 + x21 + (25.0 / 9.0) * x23 + x24 + x9;
-    f[3] = x15 + x18 + x20 + x22 + x24 + (25.0 / 9.0) * x25 + x6;
-    f[4] = qx * x27 + (160.0 / 27.0) * x12 + x26 + x34 + x38;
-    f[5] = qz * x39 + x34 + (460.0 / 27.0) * x40 + x41 + x44;
-    f[6] = qy * x27 + x33 + x38 + x42 + (160.0 / 27.0) * x45 + x47;
-    f[7] = qz * x27 + x37 + (160.0 / 27.0) * x40 + x47 + x49 + x50;
-    f[8] = qy * x39 + x32 + x41 + x43 + (460.0 / 27.0) * x45 + x49 + x51;
-    f[9] = qx * x39 + (460.0 / 27.0) * x12 + x44 + x46 + x48 + x50 + x51;
+    f[0] = x13 + x17 + x18 + r25_9 * x3;
+    f[1] = x13 + r25_9 * x19 + x21 + x22;
+    f[2] = x17 + x21 + r25_9 * x23 + x24 + x9;
+    f[3] = x15 + x18 + x20 + x22 + x24 + r25_9 * x25 + x6;
+    f[4] = qx * x27 + r160_27 * x12 + x26 + x34 + x38;
+    f[5] = qz * x39 + x34 + r460_27 * x40 + x41 + x44;
+    f[6] = qy * x27 + x33 + x38 + x42 + r160_27 * x45 + x47;
+    f[7] = qz * x27 + x37 + r160_27 * x40 + x47 + x49 + x50;
+    f[8] = qy * x39 + x32 + x41 + x43 + r460_27 * x45 + x49 + x51;
+    f[9] = qx * x39 + r460_27 * x12 + x44 + x46 + x48 + x50 + x51;
 }  //    end tet10_dual_basis_hrt_cu
 
 /////////////////////////////////////////////////////////////////
 // hex_aa_8_eval_fun_cu
 /////////////////////////////////////////////////////////////////
-__device__ void hex_aa_8_eval_fun_cu(
-        // Quadrature point (local coordinates)
-        // With respect to the hat functions of a cube element
-        // In a local coordinate system
-        const real_t x, const real_t y, const real_t z,
-        // Output
-        real_t* const MY_RESTRICT f) {
+__device__ void hex_aa_8_eval_fun_cu(const real_t x,  //
+                                     const real_t y,  //
+                                     const real_t z,  //
+                                     // Output
+                                     real_t* const MY_RESTRICT f) {
     //
-    f[0] = (1.0 - x) * (1.0 - y) * (1.0 - z);
-    f[1] = x * (1.0 - y) * (1.0 - z);
-    f[2] = x * y * (1.0 - z);
-    f[3] = (1.0 - x) * y * (1.0 - z);
-    f[4] = (1.0 - x) * (1.0 - y) * z;
-    f[5] = x * (1.0 - y) * z;
+    // Quadrature point (local coordinates)
+    // With respect to the hat functions of a cube element
+    // In a local coordinate system
+
+    const real_t r1 = 1.0;
+
+    f[0] = (r1 - x) * (r1 - y) * (r1 - z);
+    f[1] = x * (r1 - y) * (r1 - z);
+    f[2] = x * y * (r1 - z);
+    f[3] = (r1 - x) * y * (r1 - z);
+    f[4] = (r1 - x) * (r1 - y) * z;
+    f[5] = x * (r1 - y) * z;
     f[6] = x * y * z;
-    f[7] = (1.0 - x) * y * z;
+    f[7] = (r1 - x) * y * z;
 }  // end hex_aa_8_eval_fun_cu
 
 /////////////////////////////////////////////////////////////////
 // hex_aa_8_eval_grad_cu
 /////////////////////////////////////////////////////////////////
-__device__ void hex_aa_8_collect_coeffs_cu(const ptrdiff_t stride0, const ptrdiff_t stride1, const ptrdiff_t stride2,
-
-                                           const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k,
-                                           // Attention this is geometric data transformed to solver data!
-                                           const real_t* MY_RESTRICT data, real_t* MY_RESTRICT out) {
+// Attention this is geometric data transformed to solver data!
+__device__ void                                                //
+hex_aa_8_collect_coeffs_cu(const ptrdiff_t           stride0,  //
+                           const ptrdiff_t           stride1,  //
+                           const ptrdiff_t           stride2,  //
+                           const ptrdiff_t           i,        //
+                           const ptrdiff_t           j,        //
+                           const ptrdiff_t           k,        //
+                           const real_t* MY_RESTRICT data,     //
+                           real_t* MY_RESTRICT       out) {          //
     //
     const ptrdiff_t i0 = i * stride0 + j * stride1 + k * stride2;
     const ptrdiff_t i1 = (i + 1) * stride0 + j * stride1 + k * stride2;
@@ -703,7 +755,7 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(
         const real_t tet4_qx_v = (q_i < TET4_NQP) ? tet4_qx[q_i] : tet4_qx[0];
         const real_t tet4_qy_v = (q_i < TET4_NQP) ? tet4_qy[q_i] : tet4_qy[0];
         const real_t tet4_qz_v = (q_i < TET4_NQP) ? tet4_qz[q_i] : tet4_qz[0];
-        const real_t tet4_qw_v = (q_i < TET4_NQP) ? tet4_qw[q_i] : 0.0;
+        const real_t tet4_qw_v = (q_i < TET4_NQP) ? tet4_qw[q_i] : real_t(0.0);
 
         const real_t measure = tet10_measure_cu(x, y, z, tet4_qx_v, tet4_qy_v, tet4_qz_v);
 
@@ -733,9 +785,9 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(
         const real_t grid_y = (g_qy - oy) / dy;
         const real_t grid_z = (g_qz - oz) / dz;
 
-        const ptrdiff_t i = floor(grid_x);
-        const ptrdiff_t j = floor(grid_y);
-        const ptrdiff_t k = floor(grid_z);
+        const ptrdiff_t i = floor_real_t(grid_x);
+        const ptrdiff_t j = floor_real_t(grid_y);
+        const ptrdiff_t k = floor_real_t(grid_z);
 
         // If outside
         // if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
@@ -788,7 +840,7 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(
             //                                                             data);
             // #else
 
-            real_t eval_field = 0.0;
+            real_t eval_field = real_t(0.0);
 
             for (int edof_j = 0; edof_j < 8; edof_j++) {
                 eval_field += hex8_f[edof_j] * coeffs[edof_j];
@@ -1042,11 +1094,12 @@ __global__ void zeros_kernel(ptrdiff_t n, real_t* a) {
  * @param k
  * @return __device__
  */
-__device__ ptrdiff_t hex_aa_8_indices_O3_first_index_cuda(const ptrdiff_t stride0,               //
-                                                          const ptrdiff_t stride1,               //
-                                                          const ptrdiff_t stride2,               //
-                                                          const ptrdiff_t i, const ptrdiff_t j,  //
-                                                          const ptrdiff_t k) {                   //
+__device__ ptrdiff_t                                                        //
+hex_aa_8_indices_O3_first_index_cuda(const ptrdiff_t stride0,               //
+                                     const ptrdiff_t stride1,               //
+                                     const ptrdiff_t stride2,               //
+                                     const ptrdiff_t i, const ptrdiff_t j,  //
+                                     const ptrdiff_t k) {                   //
     //
     return (i - 1) * stride0 + (j - 1) * stride1 + (k - 1) * stride2;
 }
@@ -1120,13 +1173,15 @@ hex_aa_8_eval_weno4_3D_Unit_cuda(                   //
     ////// Compute the local indices
     // ptrdiff_t i_local, j_local, k_local;
 
-    const ptrdiff_t i_local = floor(x_unit - ox_unit);
-    const ptrdiff_t j_local = floor(y_unit - oy_unit);
-    const ptrdiff_t k_local = floor(z_unit - oz_unit);
+    const real_t r1 = 1.0;
 
-    const double x = (x_unit - ox_unit) - (real_t)i_local + 1.0;
-    const double y = (y_unit - oy_unit) - (real_t)j_local + 1.0;
-    const double z = (z_unit - oz_unit) - (real_t)k_local + 1.0;
+    const ptrdiff_t i_local = floor_real_t(x_unit - ox_unit);
+    const ptrdiff_t j_local = floor_real_t(y_unit - oy_unit);
+    const ptrdiff_t k_local = floor_real_t(z_unit - oz_unit);
+
+    const real_t x = (x_unit - ox_unit) - (real_t)i_local + r1;
+    const real_t y = (y_unit - oy_unit) - (real_t)j_local + r1;
+    const real_t z = (z_unit - oz_unit) - (real_t)k_local + r1;
 
     // printf("x = %f, x_ = %f, i = %d\n", x, x_, i);
     // printf("y = %f, y_ = %f, j = %d\n", y, y_, j);
@@ -1278,9 +1333,9 @@ hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  //
     const real_t grid_y_orig = (y[v_orig] - oy) / dy;
     const real_t grid_z_orig = (z[v_orig] - oz) / dz;
 
-    const ptrdiff_t i_orig = floor(grid_x_orig);
-    const ptrdiff_t j_orig = floor(grid_y_orig);
-    const ptrdiff_t k_orig = floor(grid_z_orig);
+    const ptrdiff_t i_orig = floor_real_t(grid_x_orig);
+    const ptrdiff_t j_orig = floor_real_t(grid_y_orig);
+    const ptrdiff_t k_orig = floor_real_t(grid_z_orig);
 
     const real_t x_orig = ox + ((real_t)i_orig) * dx;
     const real_t y_orig = oy + ((real_t)j_orig) * dy;
@@ -1338,9 +1393,9 @@ hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  //
         const real_t grid_y = (g_qy_glob - oy) / dy;
         const real_t grid_z = (g_qz_glob - oz) / dz;
 
-        const ptrdiff_t i_glob = floor(grid_x);
-        const ptrdiff_t j_glob = floor(grid_y);
-        const ptrdiff_t k_glob = floor(grid_z);
+        const ptrdiff_t i_glob = floor_real_t(grid_x);
+        const ptrdiff_t j_glob = floor_real_t(grid_y);
+        const ptrdiff_t k_glob = floor_real_t(grid_z);
 
         // /* If outside */
         // if (i_glob < 0 || j_glob < 0 || k_glob < 0 || (i_glob + 1 >= n[0]) ||
@@ -1370,9 +1425,9 @@ hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  //
 #if WENO_DIRECT_CUDA == 1
         // Calculate the origin of the 4x4x4 cube in the global space
         // And transform the coordinates to the the unitary space
-        const real_t x_cube_origin = (ox + ((real_t)i_glob - 1.0) * dx) / dx;
-        const real_t y_cube_origin = (oy + ((real_t)j_glob - 1.0) * dy) / dy;
-        const real_t z_cube_origin = (oz + ((real_t)k_glob - 1.0) * dz) / dz;
+        const real_t x_cube_origin = (ox + ((real_t)i_glob - (real_t)(1.0)) * dx) / dx;
+        const real_t y_cube_origin = (oy + ((real_t)j_glob - (real_t)(1.0)) * dy) / dy;
+        const real_t z_cube_origin = (oz + ((real_t)k_glob - (real_t)(1.0)) * dz) / dz;
 #else
         const real_t x_cube_origin = 0.0;
         const real_t y_cube_origin = 0.0;

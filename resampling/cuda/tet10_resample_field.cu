@@ -480,6 +480,8 @@ hex8_to_tet10_resample_field_local_CUDA_Managed(   //
                                                                    mass_vector,
                                                                    g_device);
 
+    PRINT_CURRENT_FUNCTION;
+
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
 

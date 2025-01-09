@@ -67,10 +67,11 @@ n_procs=1
 # n_procs=2
 # n_procs=8
 
-Nsight_PATH="/home/sriva/spz/NVIDIA-Nsight-Compute-2024.3"
+Nsight_PATH="/home/sriva/App/NVIDIA-Nsight-Compute-2024.3/"
+Nsight_OUTPUT="/home/sriva/App/NVidia_prof_out/ncu_grid_to_mesh"
 
 LAUNCH="mpiexec -np $n_procs"
-LAUNCH="${Nsight_PATH}/ncu -f --section ComputeWorkloadAnalysis -o /home/sriva/spz/NVidia_prof_out/ncu_grid_to_mesh"
+LAUNCH="${Nsight_PATH}/ncu  --set roofline --print-details body -c 1  -f --section ComputeWorkloadAnalysis -o ${Nsight_OUTPUT} "
 # LAUNCH="srun -p debug -n $n_procs -N 1 "
 # LAUNCH=""
 
