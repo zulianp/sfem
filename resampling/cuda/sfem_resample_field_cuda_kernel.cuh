@@ -117,14 +117,16 @@ __device__ void hex_aa_8_eval_fun_cu(
         real_t* const MY_RESTRICT f6,    //
         real_t* const MY_RESTRICT f7) {  //
     //
-    *f0 = (1.0 - x) * (1.0 - y) * (1.0 - z);
-    *f1 = x * (1.0 - y) * (1.0 - z);
-    *f2 = x * y * (1.0 - z);
-    *f3 = (1.0 - x) * y * (1.0 - z);
-    *f4 = (1.0 - x) * (1.0 - y) * z;
-    *f5 = x * (1.0 - y) * z;
+    const real_t r1 = 1.0;
+
+    *f0 = (r1 - x) * (r1 - y) * (r1 - z);
+    *f1 = x * (r1 - y) * (r1 - z);
+    *f2 = x * y * (r1 - z);
+    *f3 = (r1 - x) * y * (r1 - z);
+    *f4 = (r1 - x) * (r1 - y) * z;
+    *f5 = x * (r1 - y) * z;
     *f6 = x * y * z;
-    *f7 = (1.0 - x) * y * z;
+    *f7 = (r1 - x) * y * z;
 }
 
 ////////////////////////////////////////////////////////

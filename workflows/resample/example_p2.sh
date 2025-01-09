@@ -40,6 +40,8 @@ echo "example_p2.sh: n_procs=$n_procs"
 export USE_MPI=0
 export USE_MPI_GH200=0
 export USE_MPI_NORMAL=0
+export USE_NSIGNT=0
+
 export FLOAT_64=0
 
 export PERF="no"
@@ -62,6 +64,11 @@ fi
 if search_string_in_args "perf" "$@"
 then
 	export PERF="yes"
+fi
+
+if search_string_in_args "nsight" "$@"
+then
+	export USE_NSIGNT=1
 fi
 
 if search_string_in_args "f64" "$@"
@@ -146,6 +153,9 @@ echo $scaling
 # export OMP_PROC_BIND=true
 # export OMP_NUM_THREADS=8
 
+Nsight_PATH="/home/sriva/App/NVIDIA-Nsight-Compute-2024.3/"
+Nsight_OUTPUT="/home/sriva/App/NVidia_prof_out/ncu_grid_to_mesh"
+
 if [[ "$USE_MPI" == "1" ]]
 then
 	LAUNCH="mpiexec -np $n_procs"
@@ -155,6 +165,9 @@ then
 elif [[ "$USE_MPI_GH200" == "1" ]]
 then
 	LAUNCH="srun -n $n_procs -p gh200 "
+elif [[ "$USE_NSIGNT" == "1" ]]
+then
+	LAUNCH="${Nsight_PATH}/ncu --set roofline --print-details body  -f --section ComputeWorkloadAnalysis -o ${Nsight_OUTPUT} "
 else
 	LAUNCH=""
 fi
