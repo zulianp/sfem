@@ -165,7 +165,7 @@ namespace sfem {
     std::shared_ptr<Buffer<geom_t *>> Mesh::points() {
         return Buffer<geom_t *>::wrap(spatial_dimension(), n_nodes(), impl_->mesh.points);
     }
-    
+
     std::shared_ptr<Buffer<idx_t *>> Mesh::elements() {
         return Buffer<idx_t *>::wrap(n_nodes_per_elem(), n_elements(), impl_->mesh.elements);
     }
@@ -675,6 +675,7 @@ namespace sfem {
 
         return SFEM_SUCCESS;
     }
+    
     int NeumannConditions::apply(const real_t *const /*x*/, const real_t *const /*h*/, real_t *const /*out*/) {
         return SFEM_SUCCESS;
     }
