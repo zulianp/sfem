@@ -108,6 +108,6 @@ set(CMAKE_CXX_FLAGS_PROF
 
 
 # set(CMAKE_CUDA_FLAGS "--compiler-options \"-fPIC\" -arch=sm_90 -Xptxas=-O3,-v -use_fast_math")
-set(CMAKE_CUDA_FLAGS " -O3 --generate-line-info  -use_fast_math -Xcompiler=-O3,-march=native,-mtune=native,-fPIC -arch=sm_${SFEM_CUDA_ARCH} -Xptxas=-O3,-v ")
+set(CMAKE_CUDA_FLAGS " -O3 -use_fast_math  --generate-line-info  -Xcompiler=-O3,-march=native,-mtune=native,-fPIC -arch=sm_${SFEM_CUDA_ARCH} -Xptxas=-O3,-v ")
 
 message(STATUS "CMAKE_CUDA_FLAGS: ${CMAKE_CUDA_FLAGS}")

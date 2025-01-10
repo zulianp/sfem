@@ -2,6 +2,7 @@
 #define __TET10_RESAMPLE_FIELD_KERNELS_CUH__
 
 #include "mesh_aura.h"
+#include "sfem_cuda_math.cuh"
 #include "sfem_mesh.h"
 
 #include "tet10_weno_cuda.cuh"
@@ -13,16 +14,6 @@
 
 #define __WARP_SIZE__ 32
 #define WENO_CUDA 1
-
-__device__ real_t         //
-floor_real_t(real_t x) {  //
-
-#if SFEM_REAL_T_IS_FLOAT64
-    return floor(x);
-#else
-    return floorf(x);
-#endif
-}
 
 //-------------------------------------------
 /// iso-parametric version
@@ -104,12 +95,11 @@ tet10_measure_cu(const real_t* const MY_RESTRICT x,   //
  * @param qz
  * @return __device__
  */
-__device__ void  //
-isoparametric_lumped_mass_kernel_hrt_cu(const real_t dV,
-                                        // Quadrature
-                                        const real_t qx,              //
-                                        const real_t qy,              //
-                                        const real_t qz,              //
+__device__ void                                                       //
+isoparametric_lumped_mass_kernel_hrt_cu(const real_t dV,              // Volume of the element
+                                        const real_t qx,              // Quadrature point x
+                                        const real_t qy,              // Quadrature point y
+                                        const real_t qz,              // Quadrature point z
                                         real_t*      element_diag_0,  //
                                         real_t*      element_diag_1,  //
                                         real_t*      element_diag_2,  //
@@ -121,6 +111,10 @@ isoparametric_lumped_mass_kernel_hrt_cu(const real_t dV,
                                         real_t*      element_diag_8,  //
                                         real_t*      element_diag_9) {     //
     //
+
+    const real_t r5_18  = 5.0 / 18.0;
+    const real_t r40_27 = 40.0 / 27.0;
+
     const real_t x0  = 4 * qx;
     const real_t x1  = qy * qz;
     const real_t x2  = 2 * qx - 1;
@@ -134,14 +128,14 @@ isoparametric_lumped_mass_kernel_hrt_cu(const real_t dV,
     const real_t x10 = qy * x8;
     const real_t x11 = qz * x8;
     const real_t x12 = x8 * (x2 + x4 + x6);
-    const real_t x13 = (5.0 / 18.0) * dV;
+    const real_t x13 = r5_18 * dV;
     const real_t x14 = POW2_D(qx);
     const real_t x15 = POW2_D(qy);
     const real_t x16 = POW2_D(qz);
     const real_t x17 = 11 * qx;
     const real_t x18 = -qy * x17 + 11 * x11 + x12 + 4 * x7;
     const real_t x19 = -qz * x17 + 11 * x10 + 4 * x5;
-    const real_t x20 = (40.0 / 27.0) * dV;
+    const real_t x20 = r40_27 * dV;
     const real_t x21 = qx * qy;
     const real_t x22 = -24 * qx + 21 * x14 + 4;
     const real_t x23 = -24 * qy + 21 * x15;
@@ -626,9 +620,9 @@ __device__ real_t hex_aa_8_eval_weno4_3D_cuda(const real_t                      
     real_t out[64];
     hex_aa_8_collect_coeffs_O3_cuda(stride0, stride1, stride2, i, j, k, data, out);
 
-    double x = (x_ - ox) - (real_t)i * h + h;
-    double y = (y_ - oy) - (real_t)j * h + h;
-    double z = (z_ - oz) - (real_t)k * h + h;
+    real_t x = (x_ - ox) - (real_t)i * h + h;
+    real_t y = (y_ - oy) - (real_t)j * h + h;
+    real_t z = (z_ - oz) - (real_t)k * h + h;
 
     const real_t w4 = weno4_3D_ConstH_cuda(x,  //
                                            y,
@@ -898,15 +892,13 @@ __global__ void hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(
 ///////////////////////////////////////////////////////////////////////
 // subparametric_tet10_assemble_dual_mass_vector
 ///////////////////////////////////////////////////////////////////////
-__global__ void                                        //
-isoparametric_tet10_assemble_dual_mass_vector_kernel(  /// TODO TODO TODO
-        const ptrdiff_t start_element,                 // start element
-        const ptrdiff_t end_element,                   // end element
-        const ptrdiff_t nnodes,                        // number of nodes
-        //
-        elems_tet10_device elems,  // connectivity
-        xyz_tet10_device   xyz,    // coordinates
-        real_t*            diag) {
+__global__ void                                                                         //
+isoparametric_tet10_assemble_dual_mass_vector_kernel(const ptrdiff_t    start_element,  // start element
+                                                     const ptrdiff_t    end_element,    // end element
+                                                     const ptrdiff_t    nnodes,         // number of nodes
+                                                     elems_tet10_device elems,          // connectivity
+                                                     xyz_tet10_device   xyz,            // coordinates
+                                                     real_t*            diag) {
     //
 
     // for (ptrdiff_t i = 0; i < nelements; ++i)
@@ -985,7 +977,7 @@ isoparametric_tet10_assemble_dual_mass_vector_kernel(  /// TODO TODO TODO
             const real_t tet4_qx_v = (q_i < TET4_NQP) ? tet4_qx[q_i] : tet4_qx[0];
             const real_t tet4_qy_v = (q_i < TET4_NQP) ? tet4_qy[q_i] : tet4_qy[0];
             const real_t tet4_qz_v = (q_i < TET4_NQP) ? tet4_qz[q_i] : tet4_qz[0];
-            const real_t tet4_qw_v = (q_i < TET4_NQP) ? tet4_qw[q_i] : 0.0;
+            const real_t tet4_qw_v = (q_i < TET4_NQP) ? tet4_qw[q_i] : real_t(0.0);
 
             const real_t dV = tet10_measure_cu(x, y, z, tet4_qx_v, tet4_qy_v, tet4_qz_v) * tet4_qw_v;
 
@@ -1312,16 +1304,16 @@ hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  //
     // ISOPARAMETRIC
     // and search the node closest to the origin
     int    v_orig   = 0;
-    double dist_min = 1e14;
+    real_t dist_min = 1e14;
 
     for (int v = 0; v < 10; ++v) {
         x[v] = xyz.x[ev[v]];  // x-coordinates
         y[v] = xyz.y[ev[v]];  // y-coordinates
         z[v] = xyz.z[ev[v]];  // z-coordinates
 
-        const double dist = sqrt((x[v] - ox) * (x[v] - ox) +  //
-                                 (y[v] - oy) * (y[v] - oy) +  //
-                                 (z[v] - oz) * (z[v] - oz));  //
+        const real_t dist = sqrt_real_t((x[v] - ox) * (x[v] - ox) +  //
+                                        (y[v] - oy) * (y[v] - oy) +  //
+                                        (z[v] - oz) * (z[v] - oz));  //
 
         if (dist < dist_min) {
             dist_min = dist;
@@ -1359,7 +1351,7 @@ hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  //
         const real_t tet4_qx_v = (q_i < TET4_NQP) ? tet4_qx[q_i] : tet4_qx[0];
         const real_t tet4_qy_v = (q_i < TET4_NQP) ? tet4_qy[q_i] : tet4_qy[0];
         const real_t tet4_qz_v = (q_i < TET4_NQP) ? tet4_qz[q_i] : tet4_qz[0];
-        const real_t tet4_qw_v = (q_i < TET4_NQP) ? tet4_qw[q_i] : 0.0;
+        const real_t tet4_qw_v = (q_i < TET4_NQP) ? tet4_qw[q_i] : real_t(0.0);
 
         const real_t measure = tet10_measure_cu(x_unit,
                                                 y_unit,

@@ -462,23 +462,23 @@ hex8_to_tet10_resample_field_local_CUDA_Managed(   //
     cudaEventRecord(start);
 
     ////  Launch the kernel
-    launch_kernels_hex8_to_tet10_resample_field_local_CUDA_unified(mpi_size,
-                                                                   mpi_rank,
-                                                                   numBlocks,
-                                                                   threadsPerBlock,
-                                                                   mesh,
-                                                                   bool_assemble_dual_mass_vector,
-                                                                   mesh->nelements,
-                                                                   mesh->nnodes,
-                                                                   elems_managed,
-                                                                   xyz_managed,
-                                                                   n,
-                                                                   stride,
-                                                                   origin,
-                                                                   delta,
-                                                                   data_device,
-                                                                   mass_vector,
-                                                                   g_device);
+    launch_kernels_hex8_to_tet10_resample_field_local_CUDA_unified(mpi_size,                        //
+                                                                   mpi_rank,                        //
+                                                                   numBlocks,                       //
+                                                                   threadsPerBlock,                 //
+                                                                   mesh,                            //
+                                                                   bool_assemble_dual_mass_vector,  //
+                                                                   mesh->nelements,                 //
+                                                                   mesh->nnodes,                    //
+                                                                   elems_managed,                   //
+                                                                   xyz_managed,                     //
+                                                                   n,                               //
+                                                                   stride,                          //
+                                                                   origin,                          //
+                                                                   delta,                           //
+                                                                   data_device,                     //
+                                                                   mass_vector,                     //
+                                                                   g_device);                       //
 
     PRINT_CURRENT_FUNCTION;
 
