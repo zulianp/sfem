@@ -47,9 +47,7 @@ set(SFEM_MODULES
     operators 
     operators/beam2 
     operators/cvfem 
-    # operators/kernels 
     operators/navier_stokes
-    # operators/phase_field_for_fracture
     operators/tet10
     operators/tet4
     operators/tet4/vectorized
