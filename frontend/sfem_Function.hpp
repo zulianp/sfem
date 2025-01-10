@@ -89,8 +89,8 @@ namespace sfem {
         const geom_t *const points(const int coord) const;
         const idx_t *const  idx(const int node_num) const;
 
-        std::shared_ptr<Buffer<geom_t*>> points();
-        std::shared_ptr<Buffer<idx_t*>> elements();
+        std::shared_ptr<Buffer<geom_t *>> points();
+        std::shared_ptr<Buffer<idx_t *>>  elements();
 
         void *impl_mesh();
 
@@ -344,6 +344,14 @@ namespace sfem {
 
     class DirichletConditions final : public Constraint {
     public:
+        struct Condition {
+            std::shared_ptr<Sideset>        sideset;  /// Maybe undefined in certain cases
+            std::shared_ptr<Buffer<idx_t>>  nodeset;
+            std::shared_ptr<Buffer<real_t>> values;
+            real_t                          value{0};
+            int component{0};
+        };
+
         DirichletConditions(const std::shared_ptr<FunctionSpace> &space);
         ~DirichletConditions();
 

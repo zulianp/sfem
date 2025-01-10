@@ -17,14 +17,18 @@ int test_dirichlet_conditions_read_yaml() {
       lfi: [2]
       value: [-0.6, 0, 0]
       component: [0, 1, 2]
+    - name: left
+      type: nodeset
+      format: expr
+      nodes: [0, 1, 2]
+      value: 1
+      component: 0
     )";
 
-    MPI_Comm comm = MPI_COMM_WORLD;
-    auto     m    = sfem::Mesh::create_hex8_cube(comm);
-    auto     fs   = sfem::FunctionSpace::create(m, 3);
-    // fs->promote_to_semi_structured(32);
-    // auto points = fs->semi_structured_mesh().points();
-    auto conds  = sfem::DirichletConditions::create_from_yaml(fs, yaml);
+    MPI_Comm comm  = MPI_COMM_WORLD;
+    auto     m     = sfem::Mesh::create_hex8_cube(comm);
+    auto     fs    = sfem::FunctionSpace::create(m, 3);
+    auto     conds = sfem::DirichletConditions::create_from_yaml(fs, yaml);
     return SFEM_TEST_SUCCESS;
 }
 

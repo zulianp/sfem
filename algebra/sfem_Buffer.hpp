@@ -232,7 +232,6 @@ namespace sfem {
                 MEMORY_SPACE_HOST);
         return ret;
     }
-
 }  // namespace sfem
 
 #endif  // SFEM_BUFFER_HPP
