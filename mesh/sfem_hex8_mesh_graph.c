@@ -642,14 +642,13 @@ int sshex8_generate_elements(const int       L,
     if (nxelement) {
         double temp_tick = MPI_Wtime();
 
+#pragma omp parallel for collapse(3)
         for (int zi = 1; zi < L; zi++) {
             for (int yi = 1; yi < L; yi++) {
                 for (int xi = 1; xi < L; xi++) {
                     const int lidx_vol = sshex8_lidx(L, xi, yi, zi);
                     int       Lm1      = L - 1;
                     int       en       = (zi - 1) * Lm1 * Lm1 + (yi - 1) * Lm1 + xi - 1;
-
-#pragma omp parallel for
                     for (ptrdiff_t e = 0; e < m_nelements; e++) {
                         elements[lidx_vol][e] = index_base + e * nxelement + en;
                         // printf("elements[%d][%ld] = %d + %ld * %d + %d\n", lidx_vol, e,
@@ -672,6 +671,7 @@ int sshex8_generate_elements(const int       L,
 
     double tock = MPI_Wtime();
     printf("Create idx (%s) took\t%g [s]\n", type_to_string(m_element_type), tock - tick);
+    printf("#microelements %ld, #micronodes %ld\n", m_nelements * (L * L * L), *n_unique_nodes_out);
 
     return SFEM_SUCCESS;
 }

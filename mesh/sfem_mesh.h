@@ -64,6 +64,8 @@ void mesh_init(mesh_t *mesh);
 void mesh_destroy(mesh_t *mesh);
 
 
+void mesh_create_hex8_cube(mesh_t *mesh);
+
 /**
  * @brief Create mesh in serial mode
  *

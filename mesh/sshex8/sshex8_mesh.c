@@ -36,6 +36,8 @@ int sshex8_fill_points(const int       level,
     // Nodes
     const scalar_t h = 1. / level;
     scalar_t       f[8];
+
+#pragma omp parallel for collapse(4)
     for (int zi = 0; zi < level + 1; zi++) {
         for (int yi = 0; yi < level + 1; yi++) {
             for (int xi = 0; xi < level + 1; xi++) {
@@ -43,7 +45,7 @@ int sshex8_fill_points(const int       level,
                 int lidx = sshex8_lidx(level, xi, yi, zi);
 
                 for (int d = 0; d < 3; d++) {
-#pragma omp parallel for
+
                     for (ptrdiff_t e = 0; e < nelements; e++) {
                         scalar_t acc = 0;
 

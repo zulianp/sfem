@@ -60,7 +60,8 @@ int test_sshex8_hierarchical_renumbering() {
 }
 
 int main(int argc, char *argv[]) {
-    SFEM_UNIT_TEST_INIT();
+    SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_sshex8_hierarchical_renumbering);
-    return SFEM_UNIT_TEST_FINALIZE();
+    SFEM_UNIT_TEST_FINALIZE();
+    return SFEM_UNIT_TEST_ERR();
 }
