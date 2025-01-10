@@ -421,13 +421,15 @@ __device__ void hex_aa_8_indices_O3_cuda(const ptrdiff_t SFEM_RESTRICT stride0, 
  * @param out
  * @return SFEM_INLINE
  */
-__device__ void hex_aa_8_collect_coeffs_O3_cuda(  //
-        const ptrdiff_t SFEM_RESTRICT stride0,    //
-        const ptrdiff_t SFEM_RESTRICT stride1,    //
-        const ptrdiff_t SFEM_RESTRICT stride2,    //
-        const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k,
-        // Attention this is geometric data transformed to solver data!
-        const real_t* const SFEM_RESTRICT data, real_t* const SFEM_RESTRICT out) {
+__device__ void                                                             //
+hex_aa_8_collect_coeffs_O3_cuda(const ptrdiff_t SFEM_RESTRICT     stride0,  //
+                                const ptrdiff_t SFEM_RESTRICT     stride1,  //
+                                const ptrdiff_t SFEM_RESTRICT     stride2,  //
+                                const ptrdiff_t                   i,        //
+                                const ptrdiff_t                   j,        //
+                                const ptrdiff_t                   k,        //
+                                const real_t* const SFEM_RESTRICT data,     //
+                                real_t* const SFEM_RESTRICT       out) {          //
     //
     ptrdiff_t i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15;
 
@@ -602,20 +604,21 @@ __device__ void hex_aa_8_collect_coeffs_O3_cuda(  //
 ////////////////////////////////////////////////////////////////////////
 // hex_aa_8_eval_weno4_3D
 ////////////////////////////////////////////////////////////////////////
-__device__ real_t hex_aa_8_eval_weno4_3D_cuda(const real_t                      x_,       //
-                                              const real_t                      y_,       //
-                                              const real_t                      z_,       //
-                                              const real_t                      ox,       //
-                                              const real_t                      oy,       //
-                                              const real_t                      oz,       //
-                                              const real_t                      h,        //
-                                              const ptrdiff_t                   i,        //
-                                              const ptrdiff_t                   j,        //
-                                              const ptrdiff_t                   k,        //
-                                              const ptrdiff_t                   stride0,  //
-                                              const ptrdiff_t                   stride1,  //
-                                              const ptrdiff_t                   stride2,  //
-                                              const real_t* const SFEM_RESTRICT data) {   //
+__device__ real_t                                                       //
+hex_aa_8_eval_weno4_3D_cuda(const real_t                      x_,       //
+                            const real_t                      y_,       //
+                            const real_t                      z_,       //
+                            const real_t                      ox,       //
+                            const real_t                      oy,       //
+                            const real_t                      oz,       //
+                            const real_t                      h,        //
+                            const ptrdiff_t                   i,        //
+                            const ptrdiff_t                   j,        //
+                            const ptrdiff_t                   k,        //
+                            const ptrdiff_t                   stride0,  //
+                            const ptrdiff_t                   stride1,  //
+                            const ptrdiff_t                   stride2,  //
+                            const real_t* const SFEM_RESTRICT data) {   //
 
     real_t out[64];
     hex_aa_8_collect_coeffs_O3_cuda(stride0, stride1, stride2, i, j, k, data, out);
@@ -640,34 +643,26 @@ __device__ real_t hex_aa_8_eval_weno4_3D_cuda(const real_t                      
  * @brief Resample a field from a hex8 mesh to a tet10 mesh
  *
  */
-__global__ void hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(
-        // Mesh
-        const ptrdiff_t start_element,  // start element
-        const ptrdiff_t end_element,    // end element
-        const ptrdiff_t nnodes,         // number of nodes
-
-        elems_tet10_device elems,  // connectivity
-        xyz_tet10_device   xyz,    // coordinates
-        // SDF
-        const ptrdiff_t nx,  // number of nodes in each direction x
-        const ptrdiff_t ny,  // number of nodes in each direction y
-        const ptrdiff_t nz,  // number of nodes in each direction z
-
-        const ptrdiff_t stride0,  // stride of the data
-        const ptrdiff_t stride1,  // stride of the data
-        const ptrdiff_t stride2,  // stride of the data
-
-        const geom_t originx,  // origin of the domain
-        const geom_t originy,  // origin of the domain
-        const geom_t originz,  // origin of the domain
-
-        const geom_t deltax,  // delta of the domain
-        const geom_t deltay,  // delta of the domain
-        const geom_t deltaz,  // delta of the domain
-
-        const real_t* const MY_RESTRICT data,  // SDF
-        // Output
-        real_t* const MY_RESTRICT weighted_field) {
+__global__ void                                                                                    //
+hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(const ptrdiff_t     start_element,  // start element Mesh
+                                                               const ptrdiff_t     end_element,    // end element Mesh
+                                                               const ptrdiff_t     nnodes,         // number of nodes in the mesh
+                                                               elems_tet10_device  elems,          // connectivity of the mesh
+                                                               xyz_tet10_device    xyz,            // coordinates of the mesh
+                                                               const ptrdiff_t     nx,  // number of nodes in each direction x SDF
+                                                               const ptrdiff_t     ny,  // number of nodes in each direction y SDF
+                                                               const ptrdiff_t     nz,  // number of nodes in each direction z SDF
+                                                               const ptrdiff_t     stride0,     // stride of the data SDF
+                                                               const ptrdiff_t     stride1,     // stride of the data SDF
+                                                               const ptrdiff_t     stride2,     // stride of the data SDF
+                                                               const geom_t        originx,     // origin of the domain SDF
+                                                               const geom_t        originy,     // origin of the domain SDF
+                                                               const geom_t        originz,     // origin of the domain SDF
+                                                               const geom_t        deltax,      // delta of the domain SDF
+                                                               const geom_t        deltay,      // delta of the domain SDF
+                                                               const geom_t        deltaz,      // delta of the domain SDF
+                                                               const real_t* const data,        // SDF data
+                                                               real_t* const       weighted_field) {  // Output field
     //
     // printf("============================================================\n");
     // printf("Start: hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel\n");
@@ -898,7 +893,7 @@ isoparametric_tet10_assemble_dual_mass_vector_kernel(const ptrdiff_t    start_el
                                                      const ptrdiff_t    nnodes,         // number of nodes
                                                      elems_tet10_device elems,          // connectivity
                                                      xyz_tet10_device   xyz,            // coordinates
-                                                     real_t*            diag) {
+                                                     real_t*            diag) {                    // Output diagonal
     //
 
     // for (ptrdiff_t i = 0; i < nelements; ++i)
@@ -1058,6 +1053,7 @@ compute_g_kernel(ptrdiff_t nnodes, const real_t* weighted_field,  //
  */
 __global__ void                                                                   //
 compute_g_kernel_v2(ptrdiff_t nnodes, const real_t* mass_vector, real_t* g_wf) {  //
+                                                                                  //
     ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < nnodes) {
         assert(mass_vector[i] != 0);
