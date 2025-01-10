@@ -39,6 +39,7 @@
 #include "sshex8_linear_elasticity.h"
 
 // Mesh
+#include "adj_table.h"
 #include "sfem_hex8_mesh_graph.h"
 #include "sshex8.h"
 #include "sshex8_mesh.h"
@@ -149,11 +150,25 @@ namespace sfem {
         mesh_create_serial(&impl_->mesh, spatial_dim, element_type, nelements, elements, nnodes, points);
     }
 
+    std::shared_ptr<Mesh> Mesh::create_hex8_cube(MPI_Comm comm) {
+        auto ret = std::make_shared<Mesh>(comm);
+        mesh_create_hex8_cube(&ret->impl_->mesh);
+        return ret;
+    }
+
     int Mesh::spatial_dimension() const { return impl_->mesh.spatial_dim; }
     int Mesh::n_nodes_per_elem() const { return elem_num_nodes((enum ElemType)impl_->mesh.element_type); }
 
     ptrdiff_t Mesh::n_nodes() const { return impl_->mesh.nnodes; }
     ptrdiff_t Mesh::n_elements() const { return impl_->mesh.nelements; }
+
+    std::shared_ptr<Buffer<geom_t *>> Mesh::points() {
+        return Buffer<geom_t *>::wrap(spatial_dimension(), n_nodes(), impl_->mesh.points);
+    }
+    
+    std::shared_ptr<Buffer<idx_t *>> Mesh::elements() {
+        return Buffer<idx_t *>::wrap(n_nodes_per_elem(), n_elements(), impl_->mesh.elements);
+    }
 
     Mesh::Mesh() : impl_(std::make_unique<Impl>()) {
         impl_->comm = MPI_COMM_WORLD;
@@ -293,6 +308,15 @@ namespace sfem {
         std::shared_ptr<Buffer<int16_t>>       lfi;
     };
 
+    Sideset::Sideset(MPI_Comm                                      comm,
+                     const std::shared_ptr<Buffer<element_idx_t>> &parent,
+                     const std::shared_ptr<Buffer<int16_t>>       &lfi)
+        : impl_(std::make_unique<Impl>()) {
+        impl_->comm   = comm;
+        impl_->parent = parent;
+        impl_->lfi    = lfi;
+    }
+
     Sideset::Sideset() : impl_(std::make_unique<Impl>()) {}
     Sideset::~Sideset() = default;
 
@@ -391,6 +415,8 @@ namespace sfem {
         if (!impl_->points) {
             auto p       = sfem::create_host_buffer<geom_t>(impl_->macro_mesh->spatial_dimension(), impl_->n_unique_nodes);
             auto macro_p = ((mesh_t *)(impl_->macro_mesh->impl_mesh()))->points;
+
+            SFEM_TRACE_SCOPE("sshex8_fill_points");
             sshex8_fill_points(level(), n_elements(), element_data(), macro_p, p->data());
             impl_->points = p;
         }
@@ -904,36 +930,77 @@ namespace sfem {
         std::map<std::string, std::shared_ptr<Sideset>> sidesets;
 
         for (auto c : conds.children()) {
-            std::cout << c.key() << "\n";
-            std::cout << "name: " << c["name"].val() << "\n";
+            std::vector<int>    component;
+            std::vector<real_t> value;
 
-            auto value     = c["value"];
-            auto component = c["component"];
+            auto node_value     = c["value"];
+            auto node_component = c["component"];
 
-            auto ss = c["sideset"];
-            if (ss.readable()) {
-                std::cout << "sideset: " << ss.val() << "\n";
-            }
-
-            auto ns = c["nodeset"];
-            if (ns.readable()) {
-                std::cout << "nodeset: " << ns.val() << "\n";
-            }
-
-            if (value.is_seq()) {
-                for (auto v : value) {
-                    std::cout << v << "\n";
-                }
+            if (node_value.is_seq()) {
+                node_value >> value;
             } else {
-                std::cout << "value: " << value.val() << "\n";
+                value.resize(0);
+                node_value >> value[0];
             }
 
-            if (component.is_seq()) {
-                for (auto v : component) {
-                    std::cout << v << "\n";
-                }
+            if (node_component.is_seq()) {
+                node_component >> component;
             } else {
-                std::cout << "component: " << component.val() << "\n";
+                component.resize(0);
+                node_component >> component[0];
+            }
+
+            const bool is_sideset = c["type"].readable() && c["type"].val() == "sideset";
+            const bool is_file    = c["format"].readable() && c["format"].val() == "file";
+            const bool is_expr    = c["format"].readable() && c["format"].val() == "expr";
+
+            assert(is_file || is_expr);
+
+            if (is_sideset) {
+                std::shared_ptr<Sideset> sideset;
+                if (is_file) {
+                    std::string path;
+                    c["path"] >> path;
+                    sideset = Sideset::create_from_file(space->mesh_ptr()->comm(), path.c_str());
+                } else if (is_expr) {
+                    assert(c["parent"].is_seq());
+                    assert(c["lfi"].is_seq());
+
+                    ptrdiff_t size   = c["parent"].num_children();
+                    auto      parent = create_host_buffer<element_idx_t>(size);
+                    auto      lfi    = create_host_buffer<int16_t>(size);
+
+                    ptrdiff_t parent_count = 0;
+                    for (auto p : c["parent"]) {
+                        p >> parent->data()[parent_count++];
+                    }
+
+                    ptrdiff_t lfi_count = 0;
+                    for (auto p : c["lfi"]) {
+                        p >> lfi->data()[lfi_count++];
+                    }
+
+                    assert(lfi_count == parent_count);
+                    sideset = std::make_shared<Sideset>(space->mesh_ptr()->comm(), parent, lfi);
+                }
+
+                if (space->has_semi_structured_mesh()) {
+                } else {
+                    ptrdiff_t n_nodes{0};
+                    idx_t    *nodes{nullptr};
+                    if (extract_nodeset_from_sideset(space->element_type(),
+                                                     space->mesh_ptr()->elements()->data(),
+                                                     sideset->parent()->size(),
+                                                     sideset->parent()->data(),
+                                                     sideset->lfi()->data(),
+                                                     &n_nodes,
+                                                     &nodes) != SFEM_SUCCESS) {
+                        SFEM_ERROR("Unable to extract nodeset from sideset!\n");
+                    }
+
+                    auto nodeset = sfem::manage_host_buffer(n_nodes, nodes);
+                    nodeset->print(std::cout);
+                }
             }
         }
 

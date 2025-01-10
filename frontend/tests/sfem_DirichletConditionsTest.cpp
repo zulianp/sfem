@@ -7,29 +7,34 @@
 #ifdef SFEM_ENABLE_RYAML
 
 int test_dirichlet_conditions_read_yaml() {
-    std::string yaml = 
-    R"(
+    std::string yaml =
+            R"(
     dirichlet_conditions:
     - name: right
-      sideset: mesh/sidesets/right
+      type: sideset
+      format: expr
+      parent: [0]
+      lfi: [2]
       value: [-0.6, 0, 0]
-      component: [0, 1, 2]
-    - name: left
-      nodeset: mesh/boundary_nodes/left.int32.raw
-      value: [0.6, 0, 0]
       component: [0, 1, 2]
     )";
 
-    auto conds = sfem::DirichletConditions::create_from_yaml(nullptr, yaml);
+    MPI_Comm comm = MPI_COMM_WORLD;
+    auto     m    = sfem::Mesh::create_hex8_cube(comm);
+    auto     fs   = sfem::FunctionSpace::create(m, 3);
+    // fs->promote_to_semi_structured(32);
+    // auto points = fs->semi_structured_mesh().points();
+    auto conds  = sfem::DirichletConditions::create_from_yaml(fs, yaml);
     return SFEM_TEST_SUCCESS;
 }
 
 #endif
 
 int main(int argc, char *argv[]) {
-    SFEM_UNIT_TEST_INIT();
+    SFEM_UNIT_TEST_INIT(argc, argv);
 #ifdef SFEM_ENABLE_RYAML
     SFEM_RUN_TEST(test_dirichlet_conditions_read_yaml);
 #endif
-    return SFEM_UNIT_TEST_FINALIZE();
+    SFEM_UNIT_TEST_FINALIZE();
+    return SFEM_UNIT_TEST_ERR();
 }
