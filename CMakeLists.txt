@@ -67,6 +67,7 @@ set(SFEM_MODULES
     operators/hierarchical
     operators/hex8
     operators/ssquad4
+    operators/boundary_conditions
     ssmg
 )
 
@@ -104,6 +105,7 @@ if(SFEM_ENABLE_CUDA)
         operators/sshex8/cuda
         operators/hierarchical/cuda
         resampling/cuda
+        operators/boundary_conditions/cuda
         )
 
     if(SFEM_ENABLE_AMG)
