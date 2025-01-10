@@ -8,9 +8,9 @@
 // Struct for xyz
 /////////////////////////////////////////////////////////////////
 typedef struct {
-    float* x = NULL;
-    float* y = NULL;
-    float* z = NULL;
+    geom_t* x = NULL;
+    geom_t* y = NULL;
+    geom_t* z = NULL;
 } xyz_tet10_device;
 // end struct xyz_tet10_device //////////////////////////////////
 /////////////////////////////////////////////////////////////////
@@ -138,16 +138,16 @@ memory_hint_xyz_tet10_device_unified(const ptrdiff_t   nnodes,  //
 // Struct for elems
 /////////////////////////////////////////////////////////////////
 typedef struct {
-    int* elems_v0 = NULL;
-    int* elems_v1 = NULL;
-    int* elems_v2 = NULL;
-    int* elems_v3 = NULL;
-    int* elems_v4 = NULL;
-    int* elems_v5 = NULL;
-    int* elems_v6 = NULL;
-    int* elems_v7 = NULL;
-    int* elems_v8 = NULL;
-    int* elems_v9 = NULL;
+    idx_t* elems_v0 = NULL;
+    idx_t* elems_v1 = NULL;
+    idx_t* elems_v2 = NULL;
+    idx_t* elems_v3 = NULL;
+    idx_t* elems_v4 = NULL;
+    idx_t* elems_v5 = NULL;
+    idx_t* elems_v6 = NULL;
+    idx_t* elems_v7 = NULL;
+    idx_t* elems_v8 = NULL;
+    idx_t* elems_v9 = NULL;
 } elems_tet10_device;
 // end struct elems_tet10_device
 /////////////////////////////////////////////////////////////////

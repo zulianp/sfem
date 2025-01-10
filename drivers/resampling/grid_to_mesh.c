@@ -59,14 +59,14 @@ int main(int argc, char* argv[]) {
     MPI_Comm_size(comm, &mpi_size);
 
     // print argv
-    // if (!rank) {
-    //     printf("argc: %d\n", argc);
-    //     printf("argv: \n");
-    //     for (int i = 0; i < argc; i++) {
-    //         printf(" %s", argv[i]);
-    //     }
-    //     printf("\n");
-    // }
+    if (mpi_rank == 0) {
+        printf("argc: %d\n", argc);
+        printf("argv: \n");
+        for (int i = 0; i < argc; i++) {
+            printf(" %s", argv[i]);
+        }
+        printf("\n");
+    }
 
     if (argc < 13 && argc > 14) {
         fprintf(stderr, "Error: Invalid number of arguments\n\n");
@@ -223,7 +223,7 @@ int main(int argc, char* argv[]) {
 
         double ndarray_read_tock = MPI_Wtime();
 
-        if (!mpi_rank) {
+        if (mpi_rank == 0) {
             printf("[%d] ndarray_create_from_file %g (seconds)\n", mpi_rank, ndarray_read_tock - ndarray_read_tick);
         }
     }
@@ -271,6 +271,7 @@ int main(int argc, char* argv[]) {
         double resample_tick = MPI_Wtime();
 
         if (SFEM_INTERPOLATE) {
+            printf("SFEM_INTERPOLATE = 1, %s:%d\n", __FILE__, __LINE__);
             interpolate_field(mesh.n_owned_nodes,  // Mesh:
                               mesh.points,         // Mesh:
                               nlocal,              // discrete field
@@ -297,7 +298,7 @@ int main(int argc, char* argv[]) {
                                                       &info);    //
                     break;                                       //
 
-                case TET4:                                      // TET4 case
+                case TET4:  // TET4 case
                     ret_resample =                              //
                             resample_field_mesh_tet4(mpi_size,  //
                                                      mpi_rank,  //
