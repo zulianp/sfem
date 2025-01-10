@@ -3,7 +3,9 @@
 #include <cooperative_groups.h>
 #include <cuda_profiler_api.h>
 #include <stdio.h>
+
 #include "sfem_base.h"
+#include "sfem_cuda_math.cuh"
 
 // #define real_t double
 #define real_type real_t

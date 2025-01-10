@@ -135,16 +135,22 @@ __device__ void hex_aa_8_eval_fun_cu(
 ////////////////////////////////////////////////////////
 // hex_aa_8_collect_coeffs_cu
 ////////////////////////////////////////////////////////
-__device__ void hex_aa_8_collect_coeffs_cu(
-        //
-        const ptrdiff_t MY_RESTRICT stride0, const ptrdiff_t MY_RESTRICT stride1, const ptrdiff_t MY_RESTRICT stride2,
-        //
-        const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k,
-        // Attention this is geometric data transformed to solver data!
-        const real_t* const MY_RESTRICT data,  //
-        //
-        real_t* MY_RESTRICT out0, real_t* MY_RESTRICT out1, real_t* MY_RESTRICT out2, real_t* MY_RESTRICT out3,
-        real_t* MY_RESTRICT out4, real_t* MY_RESTRICT out5, real_t* MY_RESTRICT out6, real_t* MY_RESTRICT out7) {
+__device__ void                                                      //
+hex_aa_8_collect_coeffs_cu(const ptrdiff_t MY_RESTRICT     stride0,  // stride0
+                           const ptrdiff_t MY_RESTRICT     stride1,  // stride1
+                           const ptrdiff_t MY_RESTRICT     stride2,  // stride2
+                           const ptrdiff_t                 i,        //
+                           const ptrdiff_t                 j,        //
+                           const ptrdiff_t                 k,        //
+                           const real_t* const MY_RESTRICT data,  // Attention this is geometric data transformed to solver data!
+                           real_t* MY_RESTRICT             out0,  // output
+                           real_t* MY_RESTRICT             out1,  //
+                           real_t* MY_RESTRICT             out2,  //
+                           real_t* MY_RESTRICT             out3,  //
+                           real_t* MY_RESTRICT             out4,  //
+                           real_t* MY_RESTRICT             out5,  //
+                           real_t* MY_RESTRICT             out6,  //
+                           real_t* MY_RESTRICT             out7) {            //
     //
     const ptrdiff_t i0 = i * stride0 + j * stride1 + k * stride2;
     const ptrdiff_t i1 = (i + 1) * stride0 + j * stride1 + k * stride2;
@@ -170,22 +176,23 @@ __device__ void hex_aa_8_collect_coeffs_cu(
 // tet4_resample_field_local_kernel //////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-__global__ void  //
-tet4_resample_field_local_kernel(
-        // Mesh
-        const ptrdiff_t start_element, const ptrdiff_t end_element, const ptrdiff_t nnodes,
-        const elems_tet4_device MY_RESTRICT elems, const xyz_tet4_device MY_RESTRICT xyz,
-        // SDF
-        // const ptrdiff_t* const MY_RESTRICT n,
-        const ptrdiff_t MY_RESTRICT stride0, const ptrdiff_t MY_RESTRICT stride1, const ptrdiff_t MY_RESTRICT stride2,
-
-        const float origin_x, const float origin_y, const float origin_z,
-
-        const float delta_x, const float delta_y, const float delta_z,
-
-        const real_type* const MY_RESTRICT data,
-        // Output
-        real_type* const MY_RESTRICT weighted_field) {
+__global__ void                                                                      //
+tet4_resample_field_local_kernel(const ptrdiff_t                     start_element,  // Mesh
+                                 const ptrdiff_t                     end_element,    // Mesh
+                                 const ptrdiff_t                     nnodes,         // Mesh
+                                 const elems_tet4_device MY_RESTRICT elems,          // Mesh
+                                 const xyz_tet4_device MY_RESTRICT   xyz,            // Mesh
+                                 const ptrdiff_t MY_RESTRICT         stride0,        // SDF stride0
+                                 const ptrdiff_t MY_RESTRICT         stride1,        // SDF stride1
+                                 const ptrdiff_t MY_RESTRICT         stride2,        // SDF stride2
+                                 const float                         origin_x,       // Origin x
+                                 const float                         origin_y,       // Origin y
+                                 const float                         origin_z,       // Origin z
+                                 const float                         delta_x,        // Delta x
+                                 const float                         delta_y,        // Delta y
+                                 const float                         delta_z,        // Delta z
+                                 const real_type* const MY_RESTRICT  data,           // Data
+                                 real_type* const MY_RESTRICT        weighted_field) {      // Output field
     //
     // Thread index
     const ptrdiff_t element_i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -462,24 +469,27 @@ __device__ void quadrature_node(const Real_Type tet4_qx_v, const Real_Type tet4_
 
     // DUAL basis function
     {
-        const Real_Type f0 = 1.0 - tet4_qx_v - tet4_qy_v - tet4_qz_v;
+        const Real_Type r4 = 4.0;
+        const Real_Type r1 = 1.0;
+
+        const Real_Type f0 = r1 - tet4_qx_v - tet4_qy_v - tet4_qz_v;
         const Real_Type f1 = tet4_qx_v;
         const Real_Type f2 = tet4_qy_v;
         const Real_Type f3 = tet4_qz_v;
 
-        tet4_f0 = 4.0 * f0 - f1 - f2 - f3;
-        tet4_f1 = -f0 + 4.0 * f1 - f2 - f3;
-        tet4_f2 = -f0 - f1 + 4.0 * f2 - f3;
-        tet4_f3 = -f0 - f1 - f2 + 4.0 * f3;
+        tet4_f0 = r4 * f0 - f1 - f2 - f3;
+        tet4_f1 = -f0 + r4 * f1 - f2 - f3;
+        tet4_f2 = -f0 - f1 + r4 * f2 - f3;
+        tet4_f3 = -f0 - f1 - f2 + r4 * f3;
     }
 
     const Real_Type grid_x = (g_qx - ox) / dx;
     const Real_Type grid_y = (g_qy - oy) / dy;
     const Real_Type grid_z = (g_qz - oz) / dz;
 
-    const ptrdiff_t i = floor(grid_x);
-    const ptrdiff_t j = floor(grid_y);
-    const ptrdiff_t k = floor(grid_z);
+    const ptrdiff_t i = floor_real_t(grid_x);
+    const ptrdiff_t j = floor_real_t(grid_y);
+    const ptrdiff_t k = floor_real_t(grid_z);
 
     // Get the reminder [0, 1]
     Real_Type l_x = (grid_x - (Real_Type)i);
