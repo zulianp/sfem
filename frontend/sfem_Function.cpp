@@ -68,6 +68,8 @@
 #include <sstream>
 #endif
 
+#include <map>
+
 namespace sfem {
 
     class CRSGraph::Impl {
@@ -757,29 +759,76 @@ namespace sfem {
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
         auto et   = (enum ElemType)impl_->space->element_type();
 
-        const ptrdiff_t max_coarse_idx = max_node_id(coarse_space->element_type(), mesh->nelements, mesh->elements);
-        auto            coarse         = std::make_shared<DirichletConditions>(coarse_space);
-        auto           &conds          = impl_->conditions;
+        ptrdiff_t max_coarse_idx = -1;
+        auto      coarse         = std::make_shared<DirichletConditions>(coarse_space);
+        auto     &conds          = impl_->conditions;
 
+        std::map<std::shared_ptr<Sideset>, std::shared_ptr<Buffer<idx_t>>> sideset_to_nodeset;
         for (size_t i = 0; i < conds.size(); i++) {
             ptrdiff_t coarse_num_nodes = 0;
             idx_t    *coarse_nodeset   = nullptr;
-            hierarchical_create_coarse_indices(
-                    max_coarse_idx, conds[i].nodeset->size(), conds[i].nodeset->data(), &coarse_num_nodes, &coarse_nodeset);
 
             struct Condition cdc;
             cdc.sideset   = conds[i].sideset;
             cdc.component = conds[i].component;
             cdc.value     = as_zero ? 0 : conds[i].value;
-            cdc.nodeset   = sfem::manage_host_buffer<idx_t>(coarse_num_nodes, coarse_nodeset);
 
-            if (!as_zero && conds[i].values) {
-                cdc.values = create_host_buffer<real_t>(coarse_num_nodes);
-                hierarchical_collect_coarse_values(max_coarse_idx,
-                                                   conds[i].nodeset->size(),
-                                                   conds[i].nodeset->data(),
-                                                   conds[i].values->data(),
-                                                   cdc.values->data());
+            if (!cdc.sideset) {
+                if (max_coarse_idx == -1)
+                    max_coarse_idx = max_node_id(coarse_space->element_type(), mesh->nelements, mesh->elements);
+
+                hierarchical_create_coarse_indices(
+                        max_coarse_idx, conds[i].nodeset->size(), conds[i].nodeset->data(), &coarse_num_nodes, &coarse_nodeset);
+                cdc.nodeset = sfem::manage_host_buffer<idx_t>(coarse_num_nodes, coarse_nodeset);
+
+                if (!as_zero && conds[i].values) {
+                    cdc.values = create_host_buffer<real_t>(coarse_num_nodes);
+                    hierarchical_collect_coarse_values(max_coarse_idx,
+                                                       conds[i].nodeset->size(),
+                                                       conds[i].nodeset->data(),
+                                                       conds[i].values->data(),
+                                                       cdc.values->data());
+                }
+
+            } else {
+                assert(as_zero);
+
+                auto it = sideset_to_nodeset.find(conds[i].sideset);
+                if (it == sideset_to_nodeset.end()) {
+                    ptrdiff_t n_nodes{0};
+                    idx_t    *nodes{nullptr};
+
+                    if (coarse_space->has_semi_structured_mesh()) {
+                        auto &&ss = coarse_space->semi_structured_mesh();
+                        SFEM_TRACE_SCOPE("sshex8_extract_nodeset_from_sideset");
+                        if (sshex8_extract_nodeset_from_sideset(ss.level(),
+                                                                ss.element_data(),
+                                                                cdc.sideset->parent()->size(),
+                                                                cdc.sideset->parent()->data(),
+                                                                cdc.sideset->lfi()->data(),
+                                                                &n_nodes,
+                                                                &nodes) != SFEM_SUCCESS) {
+                            SFEM_ERROR("Unable to extract nodeset from sideset!\n");
+                        }
+                    } else {
+                        if (extract_nodeset_from_sideset(coarse_space->element_type(),
+                                                         coarse_space->mesh_ptr()->elements()->data(),
+                                                         cdc.sideset->parent()->size(),
+                                                         cdc.sideset->parent()->data(),
+                                                         cdc.sideset->lfi()->data(),
+                                                         &n_nodes,
+                                                         &nodes) != SFEM_SUCCESS) {
+                            SFEM_ERROR("Unable to extract nodeset from sideset!\n");
+                        }
+                    }
+
+                    auto nodeset                         = sfem::manage_host_buffer(n_nodes, nodes);
+                    cdc.nodeset                          = nodeset;
+                    sideset_to_nodeset[conds[i].sideset] = nodeset;
+
+                } else {
+                    cdc.nodeset = it->second;
+                }
             }
 
             coarse->impl_->conditions.push_back(cdc);
