@@ -42,7 +42,7 @@ int test_poisson() {
     op->initialize();
     f->add_operator(op);
 
-    auto linear_op = sfem::make_linear_op(f);
+    auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
     auto cg        = sfem::create_cg<real_t>(linear_op, es);
     cg->verbose    = true;
     cg->set_max_it(1000);

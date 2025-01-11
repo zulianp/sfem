@@ -2327,8 +2327,7 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
                         real_t *const        values) override {
-            fprintf(stderr, "[Error] ss:Laplacian::hessian_crs NOT IMPLEMENTED!\n");
-            assert(false);
+            SFEM_ERROR("[Error] ss:Laplacian::hessian_crs NOT IMPLEMENTED!\n");
             return SFEM_FAILURE;
         }
 
@@ -2341,8 +2340,7 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
-            fprintf(stderr, "[Error] ss:Laplacian::gradient NOT IMPLEMENTED!\n");
-            assert(false);
+            SFEM_ERROR("[Error] ss:Laplacian::gradient NOT IMPLEMENTED!\n");
             return SFEM_FAILURE;
         }
 
@@ -2372,8 +2370,7 @@ namespace sfem {
         }
 
         int value(const real_t *x, real_t *const out) override {
-            fprintf(stderr, "[Error] ss:Laplacian::value NOT IMPLEMENTED!\n");
-            assert(false);
+            SFEM_ERROR("[Error] ss:Laplacian::value NOT IMPLEMENTED!\n");
             return SFEM_FAILURE;
         }
 
