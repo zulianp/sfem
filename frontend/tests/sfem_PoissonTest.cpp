@@ -32,7 +32,7 @@ int test_poisson() {
 
     auto m  = sfem::Mesh::create_hex8_cube(comm);
     auto fs = sfem::FunctionSpace::create(m, 1);
-    fs->promote_to_semi_structured(128);
+    fs->promote_to_semi_structured(16);
     auto f = sfem::Function::create(fs);
 
     auto conds = sfem::DirichletConditions::create_from_yaml(fs, yaml);
