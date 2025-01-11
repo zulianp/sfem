@@ -25,10 +25,17 @@ int test_dirichlet_conditions_read_yaml() {
       component: 0
     )";
 
-    MPI_Comm comm  = MPI_COMM_WORLD;
-    auto     m     = sfem::Mesh::create_hex8_cube(comm);
-    auto     fs    = sfem::FunctionSpace::create(m, 3);
-    auto     conds = sfem::DirichletConditions::create_from_yaml(fs, yaml);
+    MPI_Comm comm = MPI_COMM_WORLD;
+    auto     m    = sfem::Mesh::create_hex8_cube(comm);
+    auto     fs   = sfem::FunctionSpace::create(m, 3);
+
+    // Conditions for standard mesh
+    auto conds = sfem::DirichletConditions::create_from_yaml(fs, yaml);
+
+    // Conditions for semi-structured mesh
+    fs->promote_to_semi_structured(32);
+    conds = sfem::DirichletConditions::create_from_yaml(fs, yaml);
+
     return SFEM_TEST_SUCCESS;
 }
 

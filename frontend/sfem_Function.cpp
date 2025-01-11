@@ -988,11 +988,21 @@ namespace sfem {
                     sideset = std::make_shared<Sideset>(space->mesh_ptr()->comm(), parent, lfi);
                 }
 
+                ptrdiff_t n_nodes{0};
+                idx_t    *nodes{nullptr};
                 if (space->has_semi_structured_mesh()) {
-                    SFEM_ERROR("IMPLEMENTE ME!\n");
+                    auto &&ss = space->semi_structured_mesh();
+                    SFEM_TRACE_SCOPE("sshex8_extract_nodeset_from_sideset");
+                    if (sshex8_extract_nodeset_from_sideset(ss.level(),
+                                                            ss.element_data(),
+                                                            sideset->parent()->size(),
+                                                            sideset->parent()->data(),
+                                                            sideset->lfi()->data(),
+                                                            &n_nodes,
+                                                            &nodes) != SFEM_SUCCESS) {
+                        SFEM_ERROR("Unable to extract nodeset from sideset!\n");
+                    }
                 } else {
-                    ptrdiff_t n_nodes{0};
-                    idx_t    *nodes{nullptr};
                     if (extract_nodeset_from_sideset(space->element_type(),
                                                      space->mesh_ptr()->elements()->data(),
                                                      sideset->parent()->size(),
@@ -1002,10 +1012,9 @@ namespace sfem {
                                                      &nodes) != SFEM_SUCCESS) {
                         SFEM_ERROR("Unable to extract nodeset from sideset!\n");
                     }
-
-                    auto nodeset = sfem::manage_host_buffer(n_nodes, nodes);
-                    nodeset->print(std::cout);
                 }
+
+                nodeset = sfem::manage_host_buffer(n_nodes, nodes);
             } else {
                 if (is_file) {
                     std::string path;
