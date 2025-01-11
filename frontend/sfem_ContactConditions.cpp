@@ -17,8 +17,9 @@
 
 #include "sfem_API.hpp"
 
-#include "sfem_sshex8_skin.h"
 #include "adj_table.h"
+#include "sfem_hex8_mesh_graph.h"
+#include "sfem_sshex8_skin.h"
 
 #include "sfem_Tracer.hpp"
 
@@ -284,6 +285,11 @@ namespace sfem {
         ~Impl() {}
 
         void displace_points(const real_t *disp) {
+            if (space->has_semi_structured_mesh()) {
+                displace_points_semistructured(disp);
+                return;
+            }
+
             SFEM_TRACE_SCOPE("ContactConditions::displace_points");
 
             auto               mesh = space->mesh_ptr();
@@ -302,7 +308,36 @@ namespace sfem {
             }
         }
 
+        void displace_points_semistructured(const real_t *disp) {
+            SFEM_TRACE_SCOPE("ContactConditions::displace_points_semistructured");
+
+            assert(space->has_semi_structured_mesh());
+
+            auto &ssmesh   = space->semi_structured_mesh();
+            auto  sspoints = ssmesh.points();
+
+            auto               mesh = space->mesh_ptr();
+            const ptrdiff_t    n    = node_mapping->size();
+            const idx_t *const idx  = node_mapping->data();
+            const int          dim  = mesh->spatial_dimension();
+
+            for (int d = 0; d < dim; d++) {
+                const geom_t *const x   = sspoints->data()[d];
+                geom_t *const       x_s = surface_points->data()[d];
+
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    x_s[i] = x[idx[i]] + disp[idx[i] * dim + d];
+                }
+            }
+        }
+
         void collect_points() {
+            if (space->has_semi_structured_mesh()) {
+                collect_points_semistructured();
+                return;
+            }
+
             SFEM_TRACE_SCOPE("ContactConditions::collect_points");
 
             auto               mesh = space->mesh_ptr();
@@ -312,6 +347,30 @@ namespace sfem {
 
             for (int d = 0; d < dim; d++) {
                 const geom_t *const x   = mesh->points(d);
+                geom_t *const       x_s = surface_points->data()[d];
+
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    x_s[i] = x[idx[i]];
+                }
+            }
+        }
+
+        void collect_points_semistructured() {
+            SFEM_TRACE_SCOPE("ContactConditions::collect_points_semistructured");
+
+            assert(space->has_semi_structured_mesh());
+
+            auto &ssmesh   = space->semi_structured_mesh();
+            auto  sspoints = ssmesh.points();
+
+            auto               mesh = space->mesh_ptr();
+            const ptrdiff_t    n    = node_mapping->size();
+            const idx_t *const idx  = node_mapping->data();
+            const int          dim  = mesh->spatial_dimension();
+
+            for (int d = 0; d < dim; d++) {
+                const geom_t *const x   = sspoints->data()[d];
                 geom_t *const       x_s = surface_points->data()[d];
 
 #pragma omp parallel for
@@ -368,49 +427,55 @@ namespace sfem {
             assert(area > 0);
         }
 
+        void assemble_mass_vector_semistructured() {
+            SFEM_TRACE_SCOPE("ContactConditions::assemble_mass_vector_semistructured");
+
+            assert(space->has_semi_structured_mesh());
+            collect_points_semistructured();
+
+            assert(false);  // IMPLEMENT ME!
+        }
+
         void read_sideset(const std::string &path_surface, Input &in) {
             SFEM_TRACE_SCOPE("ContactConditions::read_sideset");
 
             auto mesh = space->mesh_ptr();
 
-            std::string path_parent;
-            std::string path_side_idx;
-            in.require("parent", path_parent);
-            in.require("side_idx", path_side_idx);
-
-            bool rpath = false;
-            in.get("rpath", rpath);
-
-            if (rpath) {
-                path_parent   = path_surface + "/" + path_parent;
-                path_side_idx = path_surface + "/" + path_side_idx;
+            auto ss = Sideset::create_from_file(space->mesh_ptr()->comm(), path_surface.c_str());
+            if (!ss) {
+                SFEM_ERROR("Unable to read sideset at: %s\n", path_surface.c_str());
             }
 
-            ptrdiff_t      _nope_, size = -1;
-            element_idx_t *parent = nullptr;
-            int16_t       *side_idx;
+            if (space->has_semi_structured_mesh()) {
+                auto &&ssmesh = space->semi_structured_mesh();
 
-            if (array_create_from_file(
-                        mesh->comm(), path_parent.c_str(), SFEM_MPI_ELEMENT_IDX_T, (void **)&parent, &_nope_, &size) !=
-                SFEM_SUCCESS) {
-                SFEM_ERROR("Unable to read path %s\n", path_parent.c_str());
-            }
+                const int nnxs = 4;
+                const int nexs = ssmesh.level() * ssmesh.level();
+                this->sides    = sfem::create_host_buffer<idx_t>(nnxs, ss->parent()->size() * nexs);
+                if (sshex8_extract_quadshell4_surface_from_sideset(ssmesh.level(),
+                                                                   ssmesh.element_data(),
+                                                                   ss->parent()->size(),
+                                                                   ss->parent()->data(),
+                                                                   ss->lfi()->data(),
+                                                                   this->sides->data()) != SFEM_SUCCESS) {
+                    SFEM_ERROR("Unable to extract surface from sideset!\n");
+                }
 
-            if (array_create_from_file(mesh->comm(), path_side_idx.c_str(), MPI_SHORT, (void **)&side_idx, &_nope_, &size) !=
-                SFEM_SUCCESS) {
-                SFEM_ERROR("Unable to read path %s\n", path_side_idx.c_str());
-            }
+            } else {
+                enum ElemType st   = side_type(space->element_type());
+                const int     nnxs = elem_num_nodes(st);
 
-            enum ElemType st   = side_type(space->element_type());
-            const int     nnxs = elem_num_nodes(st);
+                mesh_t *c_mesh = (mesh_t *)space->mesh_ptr()->impl_mesh();
 
-            mesh_t *c_mesh = (mesh_t*)space->mesh_ptr()->impl_mesh();
-
-            this->sides = sfem::create_host_buffer<idx_t>(nnxs, size);
-            if (extract_surface_from_sideset(
-                        space->element_type(), c_mesh->elements, size, parent, side_idx, this->sides->data()) !=
-                SFEM_SUCCESS) {
-                SFEM_ERROR("Unable to extract surface from sideset!\n");
+                this->sides = sfem::create_host_buffer<idx_t>(nnxs, ss->parent()->size());
+                if (extract_surface_from_sideset(space->element_type(),
+                                                 c_mesh->elements,
+                                                 ss->parent()->size(),
+                                                 ss->parent()->data(),
+                                                 ss->lfi()->data(),
+                                                 this->sides->data()) != SFEM_SUCCESS) {
+                    SFEM_ERROR("Unable to extract surface from sideset!\n");
+                }
             }
 
             idx_t    *idx          = nullptr;
@@ -418,9 +483,6 @@ namespace sfem {
             remap_elements_to_contiguous_index(
                     this->sides->extent(1), this->sides->extent(0), this->sides->data(), &n_contiguous, &idx);
             this->node_mapping = sfem::manage_host_buffer(n_contiguous, idx);
-
-            free(parent);
-            free(side_idx);
         }
 
         void read_surface(const std::string &path_surface, Input &in) {
@@ -519,7 +581,6 @@ namespace sfem {
 
     std::shared_ptr<ContactConditions> ContactConditions::create_from_file(const std::shared_ptr<FunctionSpace> &space,
                                                                            const std::string                    &path) {
-
         SFEM_TRACE_SCOPE("ContactConditions::create_from_file");
 
         auto in = YAMLNoIndent::create_from_file(path + "/meta.yaml");
@@ -541,7 +602,7 @@ namespace sfem {
 
         auto in_surface = YAMLNoIndent::create_from_file(path_surface + "/meta.yaml");
 
-        if (in_surface->key_exists("side_idx")) { // Detect sideset file!
+        if (in_surface->key_exists("side_idx")) {  // Detect sideset file!
             cc->impl_->read_sideset(path_surface, *in_surface);
         } else {
             cc->impl_->read_surface(path_surface, *in_surface);

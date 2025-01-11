@@ -28,12 +28,12 @@ export SFEM_MG_ENABLE_COARSE_SPACE_PRECONDITIONER=1
 # export SFEM_DIRICHLET_COMPONENT="0,1,2"
 # export SFEM_CONTACT_CONDITIONS=obstacle
 
-# side_set=mesh/boundary_nodes/right.int32.raw
-# side_set=BC.int32.raw
-# side_set=mesh/boundary_nodes/left.int32.raw
-side_set=mesh/boundary_nodes/back.int32.raw
+# node_set=mesh/boundary_nodes/right.int32.raw
+# node_set=BC.int32.raw
+# node_set=mesh/boundary_nodes/left.int32.raw
+node_set=mesh/boundary_nodes/back.int32.raw
 
-export SFEM_DIRICHLET_NODESET="$side_set,$side_set,$side_set" 
+export SFEM_DIRICHLET_NODESET="$node_set,$node_set,$node_set" 
 export SFEM_DIRICHLET_VALUE="0,0,0.6" # LEFT
 # export SFEM_DIRICHLET_VALUE="-0.7,0,0.7"  # RIGHT
 export SFEM_DIRICHLET_COMPONENT="0,1,2"

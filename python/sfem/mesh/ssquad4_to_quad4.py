@@ -35,12 +35,30 @@ if __name__ == '__main__':
 	L = int(argv[1])
 	input_folder = argv[2]
 	output_folder = argv[3]
+	coords_folder = input_folder
+
+	try:
+	    opts, args = getopt.getopt(
+	        argv[4:], "c:hv",
+	        ["coords=", "help", "verbose"])
+	except getopt.GetoptError as err:
+	    print(err)
+	    print(usage)
+	    sys.exit(1)
+	for opt, arg in opts:
+	    if opt in ('-h', '--help'):
+	        print(usage)
+	        sys.exit()
+	    elif opt in ('-v', '--verbose'):
+	        verbose = True
+	    elif opt in ('-c', '--coords'):
+	     	coords_folder = arg
 
 	nnodesxelem = (L+1) * (L+1)
 
-	x = np.fromfile(f'{input_folder}/x.raw', dtype=geom_t)
-	y = np.fromfile(f'{input_folder}/y.raw', dtype=geom_t)
-	z = np.fromfile(f'{input_folder}/z.raw', dtype=geom_t)
+	x = np.fromfile(f'{coords_folder}/x.raw', dtype=geom_t)
+	y = np.fromfile(f'{coords_folder}/y.raw', dtype=geom_t)
+	z = np.fromfile(f'{coords_folder}/z.raw', dtype=geom_t)
 
 	elements = [0]*nnodesxelem
 	for d in range(0, nnodesxelem):

@@ -349,6 +349,113 @@ def create_boundary_nodes(nx, ny, nz):
         "back"      : back
     }
 
+def elem_leading_dim(nx, ny, nz):
+    return [1,  nx-1, (nx-1)*(ny-1)]
+
+def create_sidesets(cell_type, nx, ny, nz):
+    ld = elem_leading_dim(nx, ny, nz)
+    ih = is_hex(cell_type)
+
+    # Implement for tet later
+    assert ih 
+
+    parent_left = np.zeros((ny-1)*(nz-1), dtype=idx_t)
+    parent_right= np.zeros((ny-1)*(nz-1), dtype=idx_t)
+    
+    parent_bottom= np.zeros((ny-1)*(nx-1), dtype=idx_t)
+    parent_top= np.zeros((ny-1)*(nx-1), dtype=idx_t)
+    
+    parent_front = np.zeros((nx-1)*(nz-1), dtype=idx_t)
+    parent_back  = np.zeros((nx-1)*(nz-1), dtype=idx_t)
+
+    lfi_left = np.zeros((ny-1)*(nz-1), dtype=np.int16)
+    lfi_right= np.zeros((ny-1)*(nz-1), dtype=np.int16)
+    
+    lfi_bottom= np.zeros((ny-1)*(nx-1), dtype=np.int16)
+    lfi_top= np.zeros((ny-1)*(nx-1), dtype=np.int16)
+    
+    lfi_front= np.zeros((nx-1)*(nz-1), dtype=np.int16)
+    lfi_back= np.zeros((nx-1)*(nz-1), dtype=np.int16)
+
+    idx = 0
+    for zi in range(0, nz-1):
+        for yi in range(0, ny-1):
+            pleft  = ld[0] * 0 + ld[1] * yi + ld[2] * zi
+            pright = ld[0] * (nx-2) + ld[1] * yi + ld[2] * zi
+
+            lleft = 3
+            lright = 1
+
+            parent_left[idx] = pleft
+            lfi_left[idx] = lleft
+
+            parent_right[idx] = pright
+            lfi_right[idx] = lright
+
+            idx += 1
+
+    idx = 0
+    for yi in range(0, ny-1):
+        for xi in range(0, nx-1):
+            pbottom  = ld[0] * xi + ld[1] * yi + ld[2] * 0
+            ptop = ld[0] * xi + ld[1] * yi + ld[2] * (nz - 2)
+
+            lbottom = 4
+            ltop = 5
+
+            parent_bottom[idx] = pbottom
+            lfi_bottom[idx] = lbottom
+
+            parent_top[idx] = ptop
+            lfi_top[idx] = ltop
+
+            idx += 1
+
+
+    idx = 0
+    for zi in range(0, nz-1):
+        for xi in range(0, nx-1):
+            pfront  = ld[0] * xi + ld[1] * (ny - 2) + ld[2] * zi
+            pback = ld[0] * xi + ld[1] * 0 + ld[2] * zi
+
+            lfront = 2
+            lback = 0
+
+            parent_front[idx] = pfront
+            lfi_front[idx] = lfront
+
+            parent_back[idx] = pback
+            lfi_back[idx] = lback
+
+            idx += 1
+
+
+    return {
+        "left" : {
+            "parent" : parent_left,
+            "lfi" : lfi_left
+        },
+        "right" : {
+            "parent" : parent_right,
+            "lfi" : lfi_right
+        },
+         "bottom" : {
+            "parent" : parent_bottom,
+            "lfi" : lfi_bottom
+        },
+         "top" : {
+            "parent" : parent_top,
+            "lfi" : lfi_top
+        },
+         "front" : {
+            "parent" : parent_front,
+            "lfi" : lfi_front
+        },
+         "back" : {
+            "parent" : parent_back,
+            "lfi" : lfi_back
+        }
+        }
 
 def create(w, h, t, nx, ny, nz, cell_type):
     cell_type = cell_type.lower()
@@ -690,7 +797,7 @@ if __name__ == '__main__':
                 os.mkdir(f'{path}')
 
             n, nxf = v.shape
-            print(f'{k}: {path} {n} {nxf}')
+            # print(f'{k}: {path} {n} {nxf}')
 
             surf_meta = {}
             surf_meta['element_type'] = side_type(to_sfem_element_type(cell_type))
@@ -707,5 +814,33 @@ if __name__ == '__main__':
                 surf_meta['elements'].append({f'i{d}' : f'i{d}.{str(idx_t.__name__)}.raw'})
 
             write_meta(path, surf_meta)
+
+        sideset_dir = f'{output_folder}/surface/sidesets'
+        if not os.path.exists(sideset_dir):
+            os.mkdir(f'{sideset_dir}')
+
+        meta['sidesets'] = []
+        sidesets = create_sidesets(cell_type, nx, ny, nz)
+        for k, v in sidesets.items():
+            path = f'{sideset_dir}/{k}'
+
+            if not os.path.exists(path):
+                os.mkdir(f'{path}')
+
+            meta['sidesets'].append({k:f'surface/sidesets/{k}'}) 
+
+            sideset_meta = {}
+            sideset_meta['element_type'] = side_type(to_sfem_element_type(cell_type))
+            sideset_meta['parent'] = 'parent.raw'
+            sideset_meta['lfi'] = 'lfi.int16.raw'
+
+            v['parent'].tofile(f'{path}/parent.raw')
+            v['lfi'].tofile(f'{path}/lfi.int16.raw')
+
+            write_meta(path, sideset_meta)
+  
+
+
+
 
     write_meta(output_folder, meta);
