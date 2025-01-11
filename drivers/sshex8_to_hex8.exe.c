@@ -88,33 +88,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Elements
-
-    int lnode[8];
-    for (int zi = 0; zi < level; zi++) {
-        for (int yi = 0; yi < level; yi++) {
-            for (int xi = 0; xi < level; xi++) {
-                lnode[0] = sshex8_lidx(level, xi, yi, zi);
-                lnode[1] = sshex8_lidx(level, xi + 1, yi, zi);
-                lnode[2] = sshex8_lidx(level, xi + 1, yi + 1, zi);
-                lnode[3] = sshex8_lidx(level, xi, yi + 1, zi);
-
-                lnode[4] = sshex8_lidx(level, xi, yi, zi + 1);
-                lnode[5] = sshex8_lidx(level, xi + 1, yi, zi + 1);
-                lnode[6] = sshex8_lidx(level, xi + 1, yi + 1, zi + 1);
-                lnode[7] = sshex8_lidx(level, xi, yi + 1, zi + 1);
-
-                int le = zi * level * level + yi * level + xi;
-                assert(le < txe);
-
-                for (int l = 0; l < 8; l++) {
-                    for (ptrdiff_t e = 0; e < mesh.nelements; e++) {
-                        idx_t node                     = elements[lnode[l]][e];
-                        hex8_elements[l][e * txe + le] = node;
-                    }
-                }
-            }
-        }
-    }
+    sshex8_to_standard_hex8_mesh(level, mesh.nelements, elements, hex8_elements);
 
     geom_t **hex8_points = malloc(3 * sizeof(geom_t *));
     for (int d = 0; d < 3; d++) {

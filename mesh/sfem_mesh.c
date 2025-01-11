@@ -73,7 +73,7 @@ void mesh_create_hex8_cube(mesh_t *mesh)
 
     mesh->points[0][4] = 0;
     mesh->points[1][4] = 0;
-    mesh->points[2][4] = 0;
+    mesh->points[2][4] = 1;
 
     mesh->points[0][5] = 1;
     mesh->points[1][5] = 0;

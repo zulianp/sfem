@@ -246,6 +246,17 @@ def raw_to_db(argv):
                 print(f'Reading {path}...')
             x = np.fromfile(path, dtype=geom_t)
             points.append(x)
+
+    # Attempt format x0, x1, x2
+    if len(points) == 0:
+        for d in range(0, 3):
+            path = f'{raw_xyz_folder}/x{d}.raw'
+            if os.path.exists(path):
+                if verbose:
+                    print(f'Reading {path}...')
+                x = np.fromfile(path, dtype=geom_t)
+                points.append(x)
+
             
     idx = []
     for i in range(0, max_nodes_x_element):
