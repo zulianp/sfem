@@ -147,6 +147,9 @@ namespace sfem {
 
         std::shared_ptr<Buffer<geom_t *>> points();
 
+        int export_as_standard(const char *path);
+        int write(const char *path);
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;

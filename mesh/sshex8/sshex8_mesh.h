@@ -15,6 +15,11 @@ int sshex8_fill_points(const int       level,
                        geom_t **const  macro_mesh_points,
                        geom_t **const  points);
 
+int sshex8_to_standard_hex8_mesh(const int                   level,
+                                 const ptrdiff_t             nelements,
+                                 idx_t **const SFEM_RESTRICT elements,
+                                 idx_t **const SFEM_RESTRICT hex8_elements);
+
 #ifdef __cplusplus
 }
 #endif
