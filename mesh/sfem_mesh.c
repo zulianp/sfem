@@ -35,6 +35,59 @@ void mesh_init(mesh_t *mesh) {
     mesh->ghosts = 0;
 }
 
+void mesh_create_hex8_cube(mesh_t *mesh)
+{
+    mesh_init(mesh);
+    mesh->comm = MPI_COMM_SELF;
+    mesh->spatial_dim = 3;
+    mesh->element_type = HEX8;
+    mesh->nelements = 1;
+    mesh->elements = malloc(8 * sizeof(idx_t*));
+    mesh->nnodes = 8;
+    mesh->points =  malloc(3 * sizeof(geom_t*));
+
+    for(int i = 0; i < 8; i++) {
+        mesh->elements[i] =  malloc(sizeof(idx_t));
+        mesh->elements[i][0] = i;
+    }
+
+    for(int d = 0; d < 3; d++) {
+        mesh->points[d] =  malloc(8*sizeof(geom_t));
+    }
+
+    mesh->points[0][0] = 0;
+    mesh->points[1][0] = 0;
+    mesh->points[2][0] = 0;
+
+    mesh->points[0][1] = 1;
+    mesh->points[1][1] = 0;
+    mesh->points[2][1] = 0;
+
+    mesh->points[0][2] = 1;
+    mesh->points[1][2] = 1;
+    mesh->points[2][2] = 0;
+
+    mesh->points[0][3] = 0;
+    mesh->points[1][3] = 1;
+    mesh->points[2][3] = 0;
+
+    mesh->points[0][4] = 0;
+    mesh->points[1][4] = 0;
+    mesh->points[2][4] = 1;
+
+    mesh->points[0][5] = 1;
+    mesh->points[1][5] = 0;
+    mesh->points[2][5] = 1;
+
+    mesh->points[0][6] = 1;
+    mesh->points[1][6] = 1;
+    mesh->points[2][6] = 1;
+
+    mesh->points[0][7] = 0;
+    mesh->points[1][7] = 1;
+    mesh->points[2][7] = 1;
+}
+
 void mesh_create_serial(mesh_t *mesh, int spatial_dim, enum ElemType element_type,
                         ptrdiff_t nelements, idx_t **elements, ptrdiff_t nnodes, geom_t **points) {
     mesh_init(mesh);

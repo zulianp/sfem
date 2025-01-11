@@ -39,14 +39,15 @@ if(SFEM_ENABLE_ISOLVER)
 endif()
 
 set(SFEM_MODULES
-    algebra base matrix mesh pizzastack solver
+    algebra base matrix 
+    mesh 
+    mesh/sshex8
+    pizzastack solver
     algebra/openmp
     operators 
     operators/beam2 
     operators/cvfem 
-    # operators/kernels 
     operators/navier_stokes
-    # operators/phase_field_for_fracture
     operators/tet10
     operators/tet4
     operators/tet4/vectorized
@@ -64,6 +65,7 @@ set(SFEM_MODULES
     operators/hierarchical
     operators/hex8
     operators/ssquad4
+    operators/boundary_conditions
     ssmg
 )
 
@@ -101,6 +103,7 @@ if(SFEM_ENABLE_CUDA)
         operators/sshex8/cuda
         operators/hierarchical/cuda
         resampling/cuda
+        operators/boundary_conditions/cuda
         )
 
     if(SFEM_ENABLE_AMG)
@@ -275,6 +278,7 @@ if(SFEM_ENABLE_TESTING)
         operators/ssquad4/tests
         operators/sshex8/tests
         mesh/tests
+        frontend/tests
     )
 
     foreach(UNIT_TEST ${SFEM_UNIT_TESTS})
@@ -307,6 +311,10 @@ if(SFEM_ENABLE_PYTHON)
 endif()
 
 # message(STATUS "SFEM_TARGETS: ${SFEM_TARGETS}")
+
+if(SFEM_SUBMODULES)
+    target_link_libraries(sfem PUBLIC ${SFEM_SUBMODULES})
+endif()
 
 ######################################################
 ######################################################

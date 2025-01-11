@@ -39,13 +39,36 @@
 #include "sshex8_linear_elasticity.h"
 
 // Mesh
+#include "adj_table.h"
 #include "sfem_hex8_mesh_graph.h"
 #include "sshex8.h"
+#include "sshex8_mesh.h"
 
 // Multigrid
 #include "sfem_prolongation_restriction.h"
 
 #include "sfem_Tracer.hpp"
+
+#ifdef SFEM_ENABLE_RYAML
+
+#if defined(RYML_SINGLE_HEADER)  // using the single header directly in the executable
+#define RYML_SINGLE_HDR_DEFINE_NOW
+#include <ryml_all.hpp>
+#elif defined(RYML_SINGLE_HEADER_LIB)  // using the single header from a library
+#include <ryml_all.hpp>
+#else
+#include <ryml.hpp>
+// <ryml_std.hpp> is needed if interop with std containers is
+// desired; ryml itself does not use any STL container.
+// For this sample, we will be using std interop, so...
+#include <c4/format.hpp>  // needed for the examples below
+#include <ryml_std.hpp>   // optional header, provided for std:: interop
+#endif
+
+#include <sstream>
+#endif
+
+#include <map>
 
 namespace sfem {
 
@@ -129,11 +152,25 @@ namespace sfem {
         mesh_create_serial(&impl_->mesh, spatial_dim, element_type, nelements, elements, nnodes, points);
     }
 
+    std::shared_ptr<Mesh> Mesh::create_hex8_cube(MPI_Comm comm) {
+        auto ret = std::make_shared<Mesh>(comm);
+        mesh_create_hex8_cube(&ret->impl_->mesh);
+        return ret;
+    }
+
     int Mesh::spatial_dimension() const { return impl_->mesh.spatial_dim; }
     int Mesh::n_nodes_per_elem() const { return elem_num_nodes((enum ElemType)impl_->mesh.element_type); }
 
     ptrdiff_t Mesh::n_nodes() const { return impl_->mesh.nnodes; }
     ptrdiff_t Mesh::n_elements() const { return impl_->mesh.nelements; }
+
+    std::shared_ptr<Buffer<geom_t *>> Mesh::points() {
+        return Buffer<geom_t *>::wrap(spatial_dimension(), n_nodes(), impl_->mesh.points);
+    }
+
+    std::shared_ptr<Buffer<idx_t *>> Mesh::elements() {
+        return Buffer<idx_t *>::wrap(n_nodes_per_elem(), n_elements(), impl_->mesh.elements);
+    }
 
     Mesh::Mesh() : impl_(std::make_unique<Impl>()) {
         impl_->comm = MPI_COMM_WORLD;
@@ -169,7 +206,7 @@ namespace sfem {
     int Mesh::write(const char *path) const {
         SFEM_TRACE_SCOPE("Mesh::write");
 
-        if (mesh_write(path, &impl_->mesh)) {
+        if (mesh_write(path, &impl_->mesh) != SFEM_SUCCESS) {
             return SFEM_FAILURE;
         }
 
@@ -266,6 +303,59 @@ namespace sfem {
     std::shared_ptr<Buffer<count_t>> Mesh::node_to_node_rowptr() const { return impl_->crs_graph->rowptr(); }
     std::shared_ptr<Buffer<idx_t>>   Mesh::node_to_node_colidx() const { return impl_->crs_graph->colidx(); }
 
+    class Sideset::Impl final {
+    public:
+        MPI_Comm                               comm;
+        std::shared_ptr<Buffer<element_idx_t>> parent;
+        std::shared_ptr<Buffer<int16_t>>       lfi;
+    };
+
+    Sideset::Sideset(MPI_Comm                                      comm,
+                     const std::shared_ptr<Buffer<element_idx_t>> &parent,
+                     const std::shared_ptr<Buffer<int16_t>>       &lfi)
+        : impl_(std::make_unique<Impl>()) {
+        impl_->comm   = comm;
+        impl_->parent = parent;
+        impl_->lfi    = lfi;
+    }
+
+    Sideset::Sideset() : impl_(std::make_unique<Impl>()) {}
+    Sideset::~Sideset() = default;
+
+    std::shared_ptr<Sideset> Sideset::create_from_file(MPI_Comm comm, const char *path) {
+        auto ret = std::make_shared<Sideset>();
+        if (ret->read(comm, path) != SFEM_SUCCESS) return nullptr;
+        return ret;
+    }
+
+    int Sideset::read(MPI_Comm comm, const char *folder) {
+        impl_->comm = comm;
+
+        std::string    folder_ = folder;
+        ptrdiff_t      nlocal{0}, nglobal{0}, ncheck{0};
+        element_idx_t *parent{nullptr};
+        int16_t       *lfi{nullptr};
+
+        if (array_create_from_file(
+                    comm, (folder_ + "/parent.raw").c_str(), SFEM_MPI_ELEMENT_IDX_T, (void **)&parent, &nlocal, &nglobal) ||
+            array_create_from_file(comm, (folder_ + "/lfi.int16.raw").c_str(), MPI_SHORT, (void **)&lfi, &ncheck, &nglobal)) {
+            return SFEM_FAILURE;
+        }
+
+        impl_->parent = sfem::manage_host_buffer(nlocal, parent);
+        impl_->lfi    = sfem::manage_host_buffer(nlocal, lfi);
+
+        if (ncheck != nlocal) {
+            SFEM_ERROR("Inconsistent array sizes in sideset at %s\n", folder);
+            return SFEM_FAILURE;
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    std::shared_ptr<Buffer<element_idx_t>> Sideset::parent() { return impl_->parent; }
+    std::shared_ptr<Buffer<int16_t>>       Sideset::lfi() { return impl_->lfi; }
+
     class SemiStructuredMesh::Impl {
     public:
         std::shared_ptr<Mesh> macro_mesh;
@@ -274,6 +364,8 @@ namespace sfem {
         std::shared_ptr<Buffer<idx_t *>> elements;
         ptrdiff_t                        n_unique_nodes{-1}, interior_start{-1};
         std::shared_ptr<CRSGraph>        node_to_node_graph;
+
+        std::shared_ptr<Buffer<geom_t *>> points;
 
         void init(const std::shared_ptr<Mesh> macro_mesh, const int level) {
             SFEM_TRACE_SCOPE("SemiStructuredMesh::init");
@@ -321,6 +413,19 @@ namespace sfem {
         ~Impl() {}
     };
 
+    std::shared_ptr<Buffer<geom_t *>> SemiStructuredMesh::points() {
+        if (!impl_->points) {
+            auto p       = sfem::create_host_buffer<geom_t>(impl_->macro_mesh->spatial_dimension(), impl_->n_unique_nodes);
+            auto macro_p = ((mesh_t *)(impl_->macro_mesh->impl_mesh()))->points;
+
+            SFEM_TRACE_SCOPE("sshex8_fill_points");
+            sshex8_fill_points(level(), n_elements(), element_data(), macro_p, p->data());
+            impl_->points = p;
+        }
+
+        return impl_->points;
+    }
+
     std::shared_ptr<CRSGraph> SemiStructuredMesh::node_to_node_graph() {
         // printf("SemiStructuredMesh::node_to_node_graph\n");
         if (impl_->node_to_node_graph) {
@@ -357,6 +462,107 @@ namespace sfem {
     ptrdiff_t SemiStructuredMesh::n_nodes() const { return impl_->n_unique_nodes; }
     int       SemiStructuredMesh::level() const { return impl_->level; }
     ptrdiff_t SemiStructuredMesh::n_elements() const { return impl_->macro_mesh->n_elements(); }
+
+    int SemiStructuredMesh::export_as_standard(const char *path) {
+        SFEM_TRACE_SCOPE("SemiStructuredMesh::export_as_standard");
+
+        {
+            struct stat st = {0};
+            if (stat(path, &st) == -1) {
+                mkdir(path, 0700);
+            }
+        }
+
+        std::string folder   = path;
+        auto        elements = impl_->elements;
+        auto        points   = this->points();
+
+        const int txe = sshex8_txe(this->level());
+        ptrdiff_t n_micro_elements = this->n_elements() * txe;
+        auto hex8_elements = create_host_buffer<idx_t>(8, n_micro_elements);
+
+        sshex8_to_standard_hex8_mesh(level(), n_elements(), elements->data(), hex8_elements->data());
+
+        // hex8_elements->print(std::cout);
+        // points->print(std::cout);
+
+        std::string points_path = folder + "/x%d.raw";
+        points->to_files(points_path.c_str());
+
+        std::string elements_path = folder + "/i%d.raw";
+        hex8_elements->to_files(elements_path.c_str());
+
+        std::stringstream ss;
+        ss << "# SFEM mesh meta file (generated by SemiStructuredMesh::export_as_standard)\n";
+        ss << "n_elements: " << hex8_elements->extent(1) << "\n";
+        ss << "n_nodes: " << points->extent(1) << "\n";
+        ss << "spatial_dimension: 3\n";
+        ss << "elem_num_nodes: 8\n";
+        ss << "element_type: HEX8\n";
+        ss << "points:\n";
+        ss << "- x: x0.raw\n";
+        ss << "- y: x1.raw\n";
+        ss << "- z: x2.raw\n";
+        ss << "rpath: true\n";
+
+        std::string   meta_path = folder + "/meta.yaml";
+        std::ofstream os(meta_path.c_str());
+
+        if (!os.good()) {
+            return SFEM_FAILURE;
+        }
+
+        os << ss.str();
+        os.close();
+
+        return SFEM_SUCCESS;
+    }
+
+    int SemiStructuredMesh::write(const char *path) {
+        SFEM_TRACE_SCOPE("SemiStructuredMesh::write");
+
+        {
+            struct stat st = {0};
+            if (stat(path, &st) == -1) {
+                mkdir(path, 0700);
+            }
+        }
+
+        std::string folder   = path;
+        auto        elements = impl_->elements;
+        auto        points   = this->points();
+
+        std::string points_path = folder + "/x%d.raw";
+        points->to_files(points_path.c_str());
+
+        std::string elements_path = folder + "/i%d.raw";
+        elements->to_files(elements_path.c_str());
+
+        std::stringstream ss;
+        ss << "# SFEM mesh meta file (generated by SemiStructuredMesh::write)\n";
+        ss << "level: " << this->level() << "\n";
+        ss << "n_elements: " << elements->extent(1) << "\n";
+        ss << "n_nodes: " << points->extent(1) << "\n";
+        ss << "spatial_dimension: 3\n";
+        ss << "elem_num_nodes: " << ((level() - 1) * (level() - 1) * (level() - 1)) << "\n";
+        ss << "element_type: SSHEX8\n";
+        ss << "points:\n";
+        ss << "- x: x0.raw\n";
+        ss << "- y: x1.raw\n";
+        ss << "- z: x2.raw\n";
+        ss << "rpath: true\n";
+
+        std::string   meta_path = folder + "/meta.yaml";
+        std::ofstream os(meta_path.c_str());
+
+        if (!os.good()) {
+            return SFEM_FAILURE;
+        }
+
+        os << ss.str();
+        os.close();
+        return SFEM_SUCCESS;
+    }
 
     class FunctionSpace::Impl {
     public:
@@ -572,6 +778,7 @@ namespace sfem {
 
         return SFEM_SUCCESS;
     }
+
     int NeumannConditions::apply(const real_t *const /*x*/, const real_t *const /*h*/, real_t *const /*out*/) {
         return SFEM_SUCCESS;
     }
@@ -635,25 +842,12 @@ namespace sfem {
     class DirichletConditions::Impl {
     public:
         std::shared_ptr<FunctionSpace> space;
-
-        ~Impl() {
-            if (dirichlet_conditions) {
-                for (int i = 0; i < n_dirichlet_conditions; i++) {
-                    free(dirichlet_conditions[i].idx);
-                }
-
-                free(dirichlet_conditions);
-            }
-        }
-
-        int                   n_dirichlet_conditions{0};
-        boundary_condition_t *dirichlet_conditions{nullptr};
+        std::vector<struct Condition>  conditions;
     };
 
     std::shared_ptr<FunctionSpace> DirichletConditions::space() { return impl_->space; }
 
-    int   DirichletConditions::n_conditions() const { return impl_->n_dirichlet_conditions; }
-    void *DirichletConditions::impl_conditions() { return (void *)impl_->dirichlet_conditions; }
+    int DirichletConditions::n_conditions() const { return impl_->conditions.size(); }
 
     DirichletConditions::DirichletConditions(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>()) {
         impl_->space = space;
@@ -666,57 +860,79 @@ namespace sfem {
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
         auto et   = (enum ElemType)impl_->space->element_type();
 
-        const ptrdiff_t max_coarse_idx = max_node_id(coarse_space->element_type(), mesh->nelements, mesh->elements);
+        ptrdiff_t max_coarse_idx = -1;
+        auto      coarse         = std::make_shared<DirichletConditions>(coarse_space);
+        auto     &conds          = impl_->conditions;
 
-        auto coarse = std::make_shared<DirichletConditions>(coarse_space);
+        std::map<std::shared_ptr<Sideset>, std::shared_ptr<Buffer<idx_t>>> sideset_to_nodeset;
+        for (size_t i = 0; i < conds.size(); i++) {
+            ptrdiff_t coarse_num_nodes = 0;
+            idx_t    *coarse_nodeset   = nullptr;
 
-        coarse->impl_->dirichlet_conditions =
-                (boundary_condition_t *)malloc(impl_->n_dirichlet_conditions * sizeof(boundary_condition_t));
-        coarse->impl_->n_dirichlet_conditions = 0;
+            struct Condition cdc;
+            cdc.sideset   = conds[i].sideset;
+            cdc.component = conds[i].component;
+            cdc.value     = as_zero ? 0 : conds[i].value;
 
-        for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
-            ptrdiff_t coarse_local_size = 0;
-            idx_t    *coarse_indices    = nullptr;
-            real_t   *coarse_values     = nullptr;
-            hierarchical_create_coarse_indices(max_coarse_idx,
-                                               impl_->dirichlet_conditions[i].local_size,
-                                               impl_->dirichlet_conditions[i].idx,
-                                               &coarse_local_size,
-                                               &coarse_indices);
+            if (!cdc.sideset) {
+                if (max_coarse_idx == -1)
+                    max_coarse_idx = max_node_id(coarse_space->element_type(), mesh->nelements, mesh->elements);
 
-            if (!as_zero && impl_->dirichlet_conditions[i].values) {
-                coarse_values = (real_t *)malloc(coarse_local_size * sizeof(real_t));
+                hierarchical_create_coarse_indices(
+                        max_coarse_idx, conds[i].nodeset->size(), conds[i].nodeset->data(), &coarse_num_nodes, &coarse_nodeset);
+                cdc.nodeset = sfem::manage_host_buffer<idx_t>(coarse_num_nodes, coarse_nodeset);
 
-                hierarchical_collect_coarse_values(max_coarse_idx,
-                                                   impl_->dirichlet_conditions[i].local_size,
-                                                   impl_->dirichlet_conditions[i].idx,
-                                                   impl_->dirichlet_conditions[i].values,
-                                                   coarse_values);
-            }
-
-            long coarse_global_size = coarse_local_size;
-
-            // MPI_CATCH_ERROR(
-            // MPI_Allreduce(MPI_IN_PLACE, &coarse_global_size, 1, MPI_LONG, MPI_SUM, mesh->comm));
-
-            if (as_zero) {
-                boundary_condition_create(&coarse->impl_->dirichlet_conditions[coarse->impl_->n_dirichlet_conditions++],
-                                          coarse_local_size,
-                                          coarse_global_size,
-                                          coarse_indices,
-                                          impl_->dirichlet_conditions[i].component,
-                                          0,
-                                          nullptr);
+                if (!as_zero && conds[i].values) {
+                    cdc.values = create_host_buffer<real_t>(coarse_num_nodes);
+                    hierarchical_collect_coarse_values(max_coarse_idx,
+                                                       conds[i].nodeset->size(),
+                                                       conds[i].nodeset->data(),
+                                                       conds[i].values->data(),
+                                                       cdc.values->data());
+                }
 
             } else {
-                boundary_condition_create(&coarse->impl_->dirichlet_conditions[coarse->impl_->n_dirichlet_conditions++],
-                                          coarse_local_size,
-                                          coarse_global_size,
-                                          coarse_indices,
-                                          impl_->dirichlet_conditions[i].component,
-                                          impl_->dirichlet_conditions[i].value,
-                                          coarse_values);
+                assert(as_zero);
+
+                auto it = sideset_to_nodeset.find(conds[i].sideset);
+                if (it == sideset_to_nodeset.end()) {
+                    ptrdiff_t n_nodes{0};
+                    idx_t    *nodes{nullptr};
+
+                    if (coarse_space->has_semi_structured_mesh()) {
+                        auto &&ss = coarse_space->semi_structured_mesh();
+                        SFEM_TRACE_SCOPE("sshex8_extract_nodeset_from_sideset");
+                        if (sshex8_extract_nodeset_from_sideset(ss.level(),
+                                                                ss.element_data(),
+                                                                cdc.sideset->parent()->size(),
+                                                                cdc.sideset->parent()->data(),
+                                                                cdc.sideset->lfi()->data(),
+                                                                &n_nodes,
+                                                                &nodes) != SFEM_SUCCESS) {
+                            SFEM_ERROR("Unable to extract nodeset from sideset!\n");
+                        }
+                    } else {
+                        if (extract_nodeset_from_sideset(coarse_space->element_type(),
+                                                         coarse_space->mesh_ptr()->elements()->data(),
+                                                         cdc.sideset->parent()->size(),
+                                                         cdc.sideset->parent()->data(),
+                                                         cdc.sideset->lfi()->data(),
+                                                         &n_nodes,
+                                                         &nodes) != SFEM_SUCCESS) {
+                            SFEM_ERROR("Unable to extract nodeset from sideset!\n");
+                        }
+                    }
+
+                    auto nodeset                         = sfem::manage_host_buffer(n_nodes, nodes);
+                    cdc.nodeset                          = nodeset;
+                    sideset_to_nodeset[conds[i].sideset] = nodeset;
+
+                } else {
+                    cdc.nodeset = it->second;
+                }
             }
+
+            coarse->impl_->conditions.push_back(cdc);
         }
 
         return coarse;
@@ -734,18 +950,11 @@ namespace sfem {
                                             idx_t *const    idx,
                                             const int       component,
                                             const real_t    value) {
-        impl_->dirichlet_conditions = (boundary_condition_t *)realloc(
-                impl_->dirichlet_conditions, (impl_->n_dirichlet_conditions + 1) * sizeof(boundary_condition_t));
-
-        boundary_condition_create(&impl_->dirichlet_conditions[impl_->n_dirichlet_conditions],
-                                  local_size,
-                                  global_size,
-                                  idx,
-                                  component,
-                                  value,
-                                  nullptr);
-
-        impl_->n_dirichlet_conditions++;
+        struct Condition cdc;
+        cdc.component = component;
+        cdc.value     = value;
+        cdc.nodeset   = manage_host_buffer<idx_t>(local_size, idx);
+        impl_->conditions.push_back(cdc);
     }
 
     void DirichletConditions::add_condition(const ptrdiff_t local_size,
@@ -753,48 +962,294 @@ namespace sfem {
                                             idx_t *const    idx,
                                             const int       component,
                                             real_t *const   values) {
-        impl_->dirichlet_conditions = (boundary_condition_t *)realloc(
-                impl_->dirichlet_conditions, (impl_->n_dirichlet_conditions + 1) * sizeof(boundary_condition_t));
-
-        boundary_condition_create(
-                &impl_->dirichlet_conditions[impl_->n_dirichlet_conditions], local_size, global_size, idx, component, 0, values);
-
-        impl_->n_dirichlet_conditions++;
+        struct Condition cdc;
+        cdc.component = component;
+        cdc.value     = 0;
+        cdc.nodeset   = manage_host_buffer<idx_t>(local_size, idx);
+        cdc.values    = manage_host_buffer<real_t>(local_size, values);
+        impl_->conditions.push_back(cdc);
     }
 
     std::shared_ptr<DirichletConditions> DirichletConditions::create_from_env(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("DirichletConditions::create_from_env");
 
-        auto dc = std::make_unique<DirichletConditions>(space);
-
+        auto  dc                       = std::make_unique<DirichletConditions>(space);
         char *SFEM_DIRICHLET_NODESET   = 0;
+        char *SFEM_DIRICHLET_SIDESET   = 0;
         char *SFEM_DIRICHLET_VALUE     = 0;
         char *SFEM_DIRICHLET_COMPONENT = 0;
+
         SFEM_READ_ENV(SFEM_DIRICHLET_NODESET, );
         SFEM_READ_ENV(SFEM_DIRICHLET_VALUE, );
         SFEM_READ_ENV(SFEM_DIRICHLET_COMPONENT, );
 
-        auto mesh = (mesh_t *)space->mesh().impl_mesh();
-        read_dirichlet_conditions(mesh,
-                                  SFEM_DIRICHLET_NODESET,
-                                  SFEM_DIRICHLET_VALUE,
-                                  SFEM_DIRICHLET_COMPONENT,
-                                  &dc->impl_->dirichlet_conditions,
-                                  &dc->impl_->n_dirichlet_conditions);
+        assert(!SFEM_DIRICHLET_NODESET || !SFEM_DIRICHLET_SIDESET);
+
+        if (!SFEM_DIRICHLET_NODESET && !SFEM_DIRICHLET_SIDESET) return dc;
+
+        MPI_Comm comm = space->mesh_ptr()->comm();
+        int      rank;
+        MPI_Comm_rank(comm, &rank);
+
+        auto &conds = dc->impl_->conditions;
+
+        char       *sets     = SFEM_DIRICHLET_SIDESET ? SFEM_DIRICHLET_SIDESET : SFEM_DIRICHLET_NODESET;
+        const char *splitter = ",";
+        int         count    = 1;
+        {
+            int i = 0;
+            while (sets[i]) {
+                count += (sets[i++] == splitter[0]);
+                assert(i <= strlen(sets));
+            }
+        }
+
+        printf("conds = %d, splitter=%c\n", count, splitter[0]);
+
+        // NODESET/SIDESET
+        {
+            const char *pch = strtok(sets, splitter);
+            int         i   = 0;
+            while (pch != NULL) {
+                printf("Reading file (%d/%d): %s\n", ++i, count, pch);
+                struct Condition cdc;
+                cdc.value     = 0;
+                cdc.component = 0;
+
+                if (SFEM_DIRICHLET_NODESET) {
+                    idx_t    *this_set{nullptr};
+                    ptrdiff_t lsize{0}, gsize{0};
+                    if (array_create_from_file(comm, pch, SFEM_MPI_IDX_T, (void **)&this_set, &lsize, &gsize)) {
+                        SFEM_ERROR("Failed to read file %s\n", pch);
+                        break;
+                    }
+
+                    cdc.nodeset = manage_host_buffer<idx_t>(lsize, this_set);
+                } else {
+                    cdc.sideset = Sideset::create_from_file(comm, pch);
+                }
+
+                conds.push_back(cdc);
+
+                pch = strtok(NULL, splitter);
+            }
+        }
+
+        if (SFEM_DIRICHLET_COMPONENT) {
+            const char *pch = strtok(SFEM_DIRICHLET_COMPONENT, splitter);
+            int         i   = 0;
+            while (pch != NULL) {
+                printf("Parsing comps (%d/%d): %s\n", i + 1, count, pch);
+                conds[i].component = atoi(pch);
+                i++;
+
+                pch = strtok(NULL, splitter);
+            }
+        }
+
+        if (SFEM_DIRICHLET_VALUE) {
+            static const char *path_key     = "path:";
+            const int          path_key_len = strlen(path_key);
+
+            const char *pch = strtok(SFEM_DIRICHLET_VALUE, splitter);
+            int         i   = 0;
+            while (pch != NULL) {
+                printf("Parsing  values (%d/%d): %s\n", i + 1, count, pch);
+                assert(i < count);
+
+                if (strncmp(pch, path_key, path_key_len) == 0) {
+                    conds[i].value = 0;
+
+                    real_t   *values{nullptr};
+                    ptrdiff_t lsize, gsize;
+                    if (array_create_from_file(comm, pch + path_key_len, SFEM_MPI_REAL_T, (void **)&values, &lsize, &gsize)) {
+                        SFEM_ERROR("Failed to read file %s\n", pch + path_key_len);
+                    }
+
+                    if (conds[i].nodeset->size() != lsize) {
+                        if (!rank) {
+                            SFEM_ERROR(
+                                    "read_boundary_conditions: len(idx) != len(values) (%ld != "
+                                    "%ld)\nfile:%s\n",
+                                    (long)conds[i].nodeset->size(),
+                                    (long)lsize,
+                                    pch + path_key_len);
+                        }
+                    }
+
+                } else {
+                    conds[i].value = atof(pch);
+                }
+                i++;
+
+                pch = strtok(NULL, splitter);
+            }
+        }
 
         return dc;
+    }
+
+    std::shared_ptr<DirichletConditions> DirichletConditions::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                                               std::string                           yaml) {
+        SFEM_TRACE_SCOPE("DirichletConditions::create_from_yaml");
+
+#ifdef SFEM_ENABLE_RYAML
+        auto dc = std::make_unique<DirichletConditions>(space);
+
+        ryml::Tree tree  = ryml::parse_in_place(ryml::to_substr(yaml));
+        auto       conds = tree["dirichlet_conditions"];
+
+        MPI_Comm comm = space->mesh_ptr()->comm();
+
+        for (auto c : conds.children()) {
+            std::shared_ptr<Sideset>       sideset;
+            std::shared_ptr<Buffer<idx_t>> nodeset;
+
+            const bool is_sideset = c["type"].readable() && c["type"].val() == "sideset";
+            const bool is_file    = c["format"].readable() && c["format"].val() == "file";
+            const bool is_expr    = c["format"].readable() && c["format"].val() == "expr";
+
+            assert(is_file || is_expr);
+
+            if (is_sideset) {
+                if (is_file) {
+                    std::string path;
+                    c["path"] >> path;
+                    sideset = Sideset::create_from_file(space->mesh_ptr()->comm(), path.c_str());
+                } else if (is_expr) {
+                    assert(c["parent"].is_seq());
+                    assert(c["lfi"].is_seq());
+
+                    ptrdiff_t size   = c["parent"].num_children();
+                    auto      parent = create_host_buffer<element_idx_t>(size);
+                    auto      lfi    = create_host_buffer<int16_t>(size);
+
+                    ptrdiff_t parent_count = 0;
+                    for (auto p : c["parent"]) {
+                        p >> parent->data()[parent_count++];
+                    }
+
+                    ptrdiff_t lfi_count = 0;
+                    for (auto p : c["lfi"]) {
+                        p >> lfi->data()[lfi_count++];
+                    }
+
+                    assert(lfi_count == parent_count);
+                    sideset = std::make_shared<Sideset>(space->mesh_ptr()->comm(), parent, lfi);
+                }
+
+                ptrdiff_t n_nodes{0};
+                idx_t    *nodes{nullptr};
+                if (space->has_semi_structured_mesh()) {
+                    auto &&ss = space->semi_structured_mesh();
+                    SFEM_TRACE_SCOPE("sshex8_extract_nodeset_from_sideset");
+                    if (sshex8_extract_nodeset_from_sideset(ss.level(),
+                                                            ss.element_data(),
+                                                            sideset->parent()->size(),
+                                                            sideset->parent()->data(),
+                                                            sideset->lfi()->data(),
+                                                            &n_nodes,
+                                                            &nodes) != SFEM_SUCCESS) {
+                        SFEM_ERROR("Unable to extract nodeset from sideset!\n");
+                    }
+                } else {
+                    if (extract_nodeset_from_sideset(space->element_type(),
+                                                     space->mesh_ptr()->elements()->data(),
+                                                     sideset->parent()->size(),
+                                                     sideset->parent()->data(),
+                                                     sideset->lfi()->data(),
+                                                     &n_nodes,
+                                                     &nodes) != SFEM_SUCCESS) {
+                        SFEM_ERROR("Unable to extract nodeset from sideset!\n");
+                    }
+                }
+
+                nodeset = sfem::manage_host_buffer(n_nodes, nodes);
+            } else {
+                if (is_file) {
+                    std::string path;
+                    c["path"] >> path;
+                    idx_t    *arr{nullptr};
+                    ptrdiff_t lsize, gsize;
+                    if (!array_create_from_file(comm, path.c_str(), SFEM_MPI_IDX_T, (void **)&arr, &lsize, &gsize)) {
+                        SFEM_ERROR("Unable to read file %s!\n", path.c_str());
+                    }
+
+                    nodeset = manage_host_buffer<idx_t>(lsize, arr);
+                } else {
+                    ptrdiff_t size  = c["nodes"].num_children();
+                    nodeset         = create_host_buffer<idx_t>(size);
+                    ptrdiff_t count = 0;
+                    for (auto p : c["nodes"]) {
+                        p >> nodeset->data()[count++];
+                    }
+                }
+            }
+
+            std::vector<int>    component;
+            std::vector<real_t> value;
+            auto                node_value     = c["value"];
+            auto                node_component = c["component"];
+
+            assert(node_value.readable());
+            assert(node_component.readable());
+
+            if (node_value.is_seq()) {
+                node_value >> value;
+            } else {
+                value.resize(1);
+                node_value >> value[0];
+            }
+
+            if (node_component.is_seq()) {
+                node_component >> component;
+            } else {
+                component.resize(1);
+                node_component >> component[0];
+            }
+
+            if (component.size() != value.size()) {
+                SFEM_ERROR("Inconsistent sizes for component (%d) and value (%d)\n", (int)component.size(), (int)value.size());
+            }
+
+            for (size_t i = 0; i < component.size(); i++) {
+                struct Condition cdc;
+                cdc.component = component[i];
+                cdc.value     = value[i];
+                cdc.sideset   = sideset;
+                cdc.nodeset   = nodeset;
+                dc->impl_->conditions.push_back(cdc);
+            }
+        }
+
+        return dc;
+#else
+        SFEM_ERROR("This functionaly requires -DSFEM_ENABLE_RYAML=ON\n");
+        return nullptr;
+#endif
+    }
+
+    std::shared_ptr<DirichletConditions> DirichletConditions::create_from_file(const std::shared_ptr<FunctionSpace> &space,
+                                                                               const std::string                    &path) {
+        std::ifstream is(path);
+        if (!is.good()) {
+            SFEM_ERROR("Unable to read file %s\n", path.c_str());
+        }
+
+        std::ostringstream contents;
+        contents << is.rdbuf();
+        auto yaml = contents.str();
+        is.close();
+
+        return create_from_yaml(space, std::move(yaml));
     }
 
     int DirichletConditions::apply(real_t *const x) {
         SFEM_TRACE_SCOPE("DirichletConditions::apply");
 
-        for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
-            constraint_nodes_to_value_vec(impl_->dirichlet_conditions[i].local_size,
-                                          impl_->dirichlet_conditions[i].idx,
-                                          impl_->space->block_size(),
-                                          impl_->dirichlet_conditions[i].component,
-                                          impl_->dirichlet_conditions[i].value,
-                                          x);
+        for (auto &c : impl_->conditions) {
+            constraint_nodes_to_value_vec(
+                    c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, c.value, x);
         }
 
         return SFEM_SUCCESS;
@@ -803,14 +1258,9 @@ namespace sfem {
     int DirichletConditions::gradient(const real_t *const x, real_t *const g) {
         SFEM_TRACE_SCOPE("DirichletConditions::gradient");
 
-        for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
-            constraint_gradient_nodes_to_value_vec(impl_->dirichlet_conditions[i].local_size,
-                                                   impl_->dirichlet_conditions[i].idx,
-                                                   impl_->space->block_size(),
-                                                   impl_->dirichlet_conditions[i].component,
-                                                   impl_->dirichlet_conditions[i].value,
-                                                   x,
-                                                   g);
+        for (auto &c : impl_->conditions) {
+            constraint_gradient_nodes_to_value_vec(
+                    c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, c.value, x, g);
         }
 
         return SFEM_SUCCESS;
@@ -819,13 +1269,9 @@ namespace sfem {
     int DirichletConditions::apply_value(const real_t value, real_t *const x) {
         SFEM_TRACE_SCOPE("DirichletConditions::apply_value");
 
-        for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
-            constraint_nodes_to_value_vec(impl_->dirichlet_conditions[i].local_size,
-                                          impl_->dirichlet_conditions[i].idx,
-                                          impl_->space->block_size(),
-                                          impl_->dirichlet_conditions[i].component,
-                                          value,
-                                          x);
+        for (auto &c : impl_->conditions) {
+            constraint_nodes_to_value_vec(
+                    c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, value, x);
         }
 
         return SFEM_SUCCESS;
@@ -834,13 +1280,8 @@ namespace sfem {
     int DirichletConditions::copy_constrained_dofs(const real_t *const src, real_t *const dest) {
         SFEM_TRACE_SCOPE("DirichletConditions::copy_constrained_dofs");
 
-        for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
-            constraint_nodes_copy_vec(impl_->dirichlet_conditions[i].local_size,
-                                      impl_->dirichlet_conditions[i].idx,
-                                      impl_->space->block_size(),
-                                      impl_->dirichlet_conditions[i].component,
-                                      src,
-                                      dest);
+        for (auto &c : impl_->conditions) {
+            constraint_nodes_copy_vec(c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, src, dest);
         }
 
         return SFEM_SUCCESS;
@@ -852,15 +1293,9 @@ namespace sfem {
                                          real_t *const        values) {
         SFEM_TRACE_SCOPE("DirichletConditions::hessian_crs");
 
-        for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
-            crs_constraint_nodes_to_identity_vec(impl_->dirichlet_conditions[i].local_size,
-                                                 impl_->dirichlet_conditions[i].idx,
-                                                 impl_->space->block_size(),
-                                                 impl_->dirichlet_conditions[i].component,
-                                                 1,
-                                                 rowptr,
-                                                 colidx,
-                                                 values);
+        for (auto &c : impl_->conditions) {
+            crs_constraint_nodes_to_identity_vec(
+                    c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, 1, rowptr, colidx, values);
         }
 
         return SFEM_SUCCESS;
@@ -872,15 +1307,9 @@ namespace sfem {
                                          real_t *const        values) {
         SFEM_TRACE_SCOPE("DirichletConditions::hessian_bsr");
 
-        for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
-            bsr_constraint_nodes_to_identity_vec(impl_->dirichlet_conditions[i].local_size,
-                                                 impl_->dirichlet_conditions[i].idx,
-                                                 impl_->space->block_size(),
-                                                 impl_->dirichlet_conditions[i].component,
-                                                 1,
-                                                 rowptr,
-                                                 colidx,
-                                                 values);
+        for (auto &c : impl_->conditions) {
+            bsr_constraint_nodes_to_identity_vec(
+                    c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, 1, rowptr, colidx, values);
         }
 
         return SFEM_SUCCESS;
@@ -889,15 +1318,15 @@ namespace sfem {
     int DirichletConditions::mask(mask_t *mask) {
         SFEM_TRACE_SCOPE("DirichletConditions::mask");
 
-        for (int i = 0; i < impl_->n_dirichlet_conditions; i++) {
-            for (ptrdiff_t node = 0; node < impl_->dirichlet_conditions[i].local_size; node++) {
-                const ptrdiff_t idx = impl_->dirichlet_conditions[i].idx[node] * impl_->space->block_size() +
-                                      impl_->dirichlet_conditions[i].component;
+        const int block_size = impl_->space->block_size();
+        for (auto &c : impl_->conditions) {
+            auto nodeset = c.nodeset->data();
+            for (ptrdiff_t node = 0; node < c.nodeset->size(); node++) {
+                const ptrdiff_t idx = nodeset[node] * block_size + c.component;
                 mask_set(idx, mask);
-                // printf("%ld ", idx);
             }
-            // printf("\n");
         }
+
         return SFEM_SUCCESS;
     }
 
@@ -1462,7 +1891,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        int hessian_block_diag_sym(const real_t *const x, real_t *const values) {
+        int hessian_block_diag_sym(const real_t *const x, real_t *const values) override {
             SFEM_TRACE_SCOPE("LinearElasticity::hessian_block_diag_sym");
 
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
@@ -1898,8 +2327,7 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
                         real_t *const        values) override {
-            fprintf(stderr, "[Error] ss:Laplacian::hessian_crs NOT IMPLEMENTED!\n");
-            assert(false);
+            SFEM_ERROR("[Error] ss:Laplacian::hessian_crs NOT IMPLEMENTED!\n");
             return SFEM_FAILURE;
         }
 
@@ -1912,13 +2340,12 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
-            fprintf(stderr, "[Error] ss:Laplacian::gradient NOT IMPLEMENTED!\n");
-            assert(false);
+            SFEM_ERROR("[Error] ss:Laplacian::gradient NOT IMPLEMENTED!\n");
             return SFEM_FAILURE;
         }
 
         int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
-        SFEM_TRACE_SCOPE("SemiStructuredLaplacian::apply");
+            SFEM_TRACE_SCOPE("SemiStructuredLaplacian::apply");
 
             assert(element_type == SSHEX8);  // REMOVEME once generalized approach
 
@@ -1943,8 +2370,7 @@ namespace sfem {
         }
 
         int value(const real_t *x, real_t *const out) override {
-            fprintf(stderr, "[Error] ss:Laplacian::value NOT IMPLEMENTED!\n");
-            assert(false);
+            SFEM_ERROR("[Error] ss:Laplacian::value NOT IMPLEMENTED!\n");
             return SFEM_FAILURE;
         }
 
@@ -2058,7 +2484,7 @@ namespace sfem {
         LumpedMass(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
-        SFEM_TRACE_SCOPE("LumpedMass::hessian_diag");
+            SFEM_TRACE_SCOPE("LumpedMass::hessian_diag");
 
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 

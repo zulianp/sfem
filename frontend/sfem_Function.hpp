@@ -89,6 +89,9 @@ namespace sfem {
         const geom_t *const points(const int coord) const;
         const idx_t *const  idx(const int node_num) const;
 
+        std::shared_ptr<Buffer<geom_t *>> points();
+        std::shared_ptr<Buffer<idx_t *>>  elements();
+
         void *impl_mesh();
 
         MPI_Comm comm() const;
@@ -98,6 +101,24 @@ namespace sfem {
             ret->read(path);
             return ret;
         }
+
+        static std::shared_ptr<Mesh> create_hex8_cube(MPI_Comm comm);
+
+    private:
+        class Impl;
+        std::unique_ptr<Impl> impl_;
+    };
+
+    class Sideset final {
+    public:
+        int                                    read(MPI_Comm comm, const char *path);
+        std::shared_ptr<Buffer<element_idx_t>> parent();
+        std::shared_ptr<Buffer<int16_t>>       lfi();
+        static std::shared_ptr<Sideset>        create_from_file(MPI_Comm comm, const char *path);
+
+        Sideset(MPI_Comm comm, const std::shared_ptr<Buffer<element_idx_t>> &parent, const std::shared_ptr<Buffer<int16_t>> &lfi);
+        Sideset();
+        ~Sideset();
 
     private:
         class Impl;
@@ -123,6 +144,11 @@ namespace sfem {
         ptrdiff_t n_nodes() const;
         int       level() const;
         ptrdiff_t n_elements() const;
+
+        std::shared_ptr<Buffer<geom_t *>> points();
+
+        int export_as_standard(const char *path);
+        int write(const char *path);
 
     private:
         class Impl;
@@ -189,7 +215,7 @@ namespace sfem {
                                 const count_t *const /*rowptr*/,
                                 const idx_t *const /*colidx*/,
                                 real_t *const /*values*/) {
-            assert(false);
+            SFEM_ERROR("Called unimplemented methdo!\n");
             return SFEM_FAILURE;
         }
 
@@ -199,7 +225,7 @@ namespace sfem {
                                      const ptrdiff_t /*block_stride*/,
                                      real_t **const /*diag_values*/,
                                      real_t **const /*off_diag_values*/) {
-            assert(false);
+            SFEM_ERROR("Called unimplemented methdo!\n");
             return SFEM_FAILURE;
         }
 
@@ -208,17 +234,17 @@ namespace sfem {
                                     const idx_t *const   colidx,
                                     real_t *const        diag_values,
                                     real_t *const        off_diag_values) {
-            assert(false);
+            SFEM_ERROR("Called unimplemented methdo!\n");
             return SFEM_FAILURE;
         }
 
         virtual int hessian_diag(const real_t *const /*x*/, real_t *const /*values*/) {
-            assert(false);
+            SFEM_ERROR("Called unimplemented methdo!\n");
             return SFEM_FAILURE;
         }
 
         virtual int hessian_block_diag_sym(const real_t *const x, real_t *const values) {
-            assert(false);
+            SFEM_ERROR("Called unimplemented methdo!\n");
             return SFEM_FAILURE;
         }
 
@@ -321,16 +347,30 @@ namespace sfem {
 
     class DirichletConditions final : public Constraint {
     public:
+        struct Condition {
+            std::shared_ptr<Sideset>        sideset;  /// Maybe undefined in certain cases
+            std::shared_ptr<Buffer<idx_t>>  nodeset;
+            std::shared_ptr<Buffer<real_t>> values;
+            real_t                          value{0};
+            int component{0};
+        };
+
         DirichletConditions(const std::shared_ptr<FunctionSpace> &space);
         ~DirichletConditions();
 
         std::shared_ptr<FunctionSpace> space();
 
         static std::shared_ptr<DirichletConditions> create_from_env(const std::shared_ptr<FunctionSpace> &space);
-        int                                         apply(real_t *const x) override;
-        int                                         apply_value(const real_t value, real_t *const x) override;
-        int                                         copy_constrained_dofs(const real_t *const src, real_t *const dest) override;
-        int                                         mask(mask_t *mask) override;
+        static std::shared_ptr<DirichletConditions> create_from_file(const std::shared_ptr<FunctionSpace> &space,
+                                                                     const std::string                    &path);
+
+        static std::shared_ptr<DirichletConditions> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                                     std::string                           yaml);
+
+        int apply(real_t *const x) override;
+        int apply_value(const real_t value, real_t *const x) override;
+        int copy_constrained_dofs(const real_t *const src, real_t *const dest) override;
+        int mask(mask_t *mask) override;
 
         int gradient(const real_t *const x, real_t *const g) override;
 

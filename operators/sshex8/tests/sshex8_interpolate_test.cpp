@@ -103,9 +103,9 @@ static int test_restrict_level2_to_level1() {
                                      from->data(),
                                      to->data()) == SFEM_SUCCESS);
 
-     for (ptrdiff_t i = 0; i < 8; i++) {
-         SFEM_TEST_ASSERT(fabs(to->data()[i] - 3.375) < 1e-14);
-     }
+    for (ptrdiff_t i = 0; i < 8; i++) {
+        SFEM_TEST_ASSERT(fabs(to->data()[i] - 3.375) < 1e-14);
+    }
 
     return SFEM_TEST_SUCCESS;
 }
@@ -277,10 +277,11 @@ static int test_level1_to_level2() {
 }
 
 int main(int argc, char *argv[]) {
-    SFEM_UNIT_TEST_INIT();
+    SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_incidence_count);
     SFEM_RUN_TEST(test_restrict_level2_to_level1);
     SFEM_RUN_TEST(test_level1_to_level2);
     SFEM_RUN_TEST(test_level1_to_level4);
-    return SFEM_UNIT_TEST_FINALIZE();
+    SFEM_UNIT_TEST_FINALIZE();
+    return SFEM_UNIT_TEST_ERR();
 }
