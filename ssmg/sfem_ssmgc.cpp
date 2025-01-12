@@ -2,6 +2,10 @@
 
 #include "sfem_API.hpp"
 
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_cuda_ShiftedPenalty_impl.hpp"
+#endif
+
 namespace sfem {
     // TODO improve contact integration in SSMG
     // auto coarse_contact_conditions = contact_conds->derefine(fs_coarse, true);

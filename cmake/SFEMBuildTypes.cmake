@@ -80,19 +80,19 @@ endif()
 message(STATUS "SFEM_CPU_ARCH: ${SFEM_CPU_ARCH}, CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}") 
 
 set(CMAKE_CXX_FLAGS_AVX2
-    "-Ofast ${SFEM_MARCH_SWITCH}${SFEM_CPU_ARCH} ${VECTOR_OPT} -fno-trapping-math   -DNDEBUG  -DSFEM_ENABLE_EXPLICIT_VECTORIZATION -Iexternal"
+    "-Ofast ${SFEM_MARCH_SWITCH}${SFEM_CPU_ARCH} ${VECTOR_OPT} -fno-trapping-math   -DNDEBUG -Iexternal"
     CACHE STRING "Flags for using fast operations and avx2" FORCE)
 
 set(CMAKE_C_FLAGS_AVX2
-    "-Ofast ${SFEM_MARCH_SWITCH}${SFEM_CPU_ARCH} ${VECTOR_OPT} -fno-trapping-math   -DNDEBUG  -DSFEM_ENABLE_EXPLICIT_VECTORIZATION -Iexternal"
+    "-Ofast ${SFEM_MARCH_SWITCH}${SFEM_CPU_ARCH} ${VECTOR_OPT} -fno-trapping-math   -DNDEBUG -Iexternal"
     CACHE STRING "Flags for using fast operations and avx2" FORCE)
 
 set(CMAKE_CXX_FLAGS_AVX512
-    "-Ofast ${SFEM_MARCH_SWITCH}${SFEM_CPU_ARCH} ${VECTOR_OPT_v8} -fno-trapping-math   -DNDEBUG  -DSFEM_ENABLE_EXPLICIT_VECTORIZATION -Iexternal"
+    "-Ofast ${SFEM_MARCH_SWITCH}${SFEM_CPU_ARCH} ${VECTOR_OPT_v8} -fno-trapping-math   -DNDEBUG -Iexternal"
     CACHE STRING "Flags for using fast operations and avx512" FORCE)
 
 set(CMAKE_C_FLAGS_AVX512
-    "-Ofast ${SFEM_MARCH_SWITCH}${SFEM_CPU_ARCH} ${VECTOR_OPT_v8} -fno-trapping-math   -DNDEBUG  -DSFEM_ENABLE_EXPLICIT_VECTORIZATION -Iexternal"
+    "-Ofast ${SFEM_MARCH_SWITCH}${SFEM_CPU_ARCH} ${VECTOR_OPT_v8} -fno-trapping-math   -DNDEBUG -Iexternal"
     CACHE STRING "Flags for using fast operations and avx512" FORCE)
 
 

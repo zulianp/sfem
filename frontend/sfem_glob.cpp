@@ -4,9 +4,9 @@
 #include <glob.h>
 #include <sys/stat.h>
 #else
+#include <cassert>
 #include <filesystem>
 #include <iostream>
-#include <cassert>
 #include "glob/glob.h"
 #endif
 
@@ -26,7 +26,7 @@ namespace sfem {
         return ret;
 #else
         std::vector<std::string> ret;
-        for(auto path : glob::glob(pattern)) {
+        for (auto path : glob::glob(pattern)) {
             ret.push_back(path.generic_string());
         }
         return ret;
@@ -51,7 +51,7 @@ namespace sfem {
 #else
         struct stat st = {0};
         if (stat(path, &st) == -1) {
-            mkdir(path, 0700);
+            return mkdir(path, 0700) == 0 ? SFEM_SUCCESS : SFEM_FAILURE;
         }
 
         return SFEM_SUCCESS;

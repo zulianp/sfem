@@ -43,7 +43,7 @@ namespace sfem {
     template <typename T>
     std::shared_ptr<Multigrid<T>> d_mg() {
         auto mg = std::make_shared<Multigrid<T>>();
-        CUDA_BLAS<T>::build_blas(mg->blas);
+        CUDA_BLAS<T>::build_blas(mg->blas());
         mg->execution_space_ = EXECUTION_SPACE_DEVICE;
         return mg;
     }
