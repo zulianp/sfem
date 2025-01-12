@@ -837,6 +837,7 @@ namespace sfem {
     };
 
     std::shared_ptr<FunctionSpace> DirichletConditions::space() { return impl_->space; }
+    std::vector<struct DirichletConditions::Condition>  &DirichletConditions::conditions() { return impl_->conditions; }
 
     int DirichletConditions::n_conditions() const { return impl_->conditions.size(); }
 

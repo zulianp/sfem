@@ -23,6 +23,7 @@
 #include "sfem_ShiftedPenaltyMultigrid.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
+#include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
 #else
 #include "sfem_ShiftedPenalty_impl.hpp"
