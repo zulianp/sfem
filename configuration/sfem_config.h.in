@@ -1,4 +1,5 @@
 #ifndef SFEM_CONFIG_HPP
+#define SFEM_CONFIG_HPP
 
 #cmakedefine SFEM_ENABLE_AMG
 #cmakedefine SFEM_ENABLE_AVX2
@@ -12,6 +13,7 @@
 #cmakedefine SFEM_ENABLE_RYAML
 #cmakedefine SFEM_ENABLE_TRACE
 #cmakedefine SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+#cmakedefine SFEM_ENABLE_EXPLICIT_VECTORIZATION
 
 #ifdef SFEM_ENABLE_CUDA
 #define SFEM_CUDA_ARCH @SFEM_CUDA_ARCH@
@@ -58,10 +60,14 @@ typedef @SFEM_SCALAR_C_TYPE@ scalar_t;
 #define d_SCALAR_T "@SFEM_SCALAR_PRINT_TYPE@"
 #define dtype_SCALAR_T "@SFEM_SCALAR_TYPE@"
 
+#ifndef _WIN32
 #define SFEM_VEC_SIZE @SFEM_VEC_SIZE@
 typedef scalar_t vec_t __attribute__((vector_size(SFEM_VEC_SIZE * sizeof(scalar_t)),
                                       aligned(SFEM_VEC_SIZE * sizeof(scalar_t))));
-
+#else
+#define SFEM_VEC_SIZE 1
+typedef scalar_t vec_t;
+#endif
 // Jacobian
 typedef @SFEM_JACOBIAN_CPU_C_TYPE@ jacobian_t;
 #define SFEM_MPI_JACOBIAN_CPU_T @SFEM_JACOBIAN_CPU_MPI_TYPE@

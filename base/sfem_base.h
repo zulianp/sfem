@@ -62,7 +62,12 @@
 #endif
 
 #define SFEM_UNUSED(var) (void)var
+#ifndef _WIN32
 #define SFEM_RESTRICT __restrict__
+#else
+#define SFEM_RESTRICT __restrict 
+#endif
+
 #define SFEM_MAX_PATH_LENGTH 2056
 #define SFEM_OK 0
 #define SFEM_SUCCESS 0

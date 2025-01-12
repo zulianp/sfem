@@ -77,10 +77,10 @@ int sshex8_fill_points(const int       level,
     for (int zi = 0; zi < level + 1; zi++) {
         for (int yi = 0; yi < level + 1; yi++) {
             for (int xi = 0; xi < level + 1; xi++) {
-                hex8_eval_f(xi * h, yi * h, zi * h, f);
-                int lidx = sshex8_lidx(level, xi, yi, zi);
-
                 for (int d = 0; d < 3; d++) {
+                    hex8_eval_f(xi * h, yi * h, zi * h, f);
+                    int lidx = sshex8_lidx(level, xi, yi, zi);
+                    
                     for (ptrdiff_t e = 0; e < nelements; e++) {
                         scalar_t acc = 0;
 

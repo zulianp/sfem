@@ -44,23 +44,11 @@ namespace sfem {
 #include "sfem_prolongation_restriction.h"
 
 #include <sys/stat.h>
-#include <glob.h>
 #include "matrixio_crs.h"
 
+#include "sfem_glob.hpp"
+
 namespace sfem {
-
-    static void find_files(const char *pattern, std::vector<std::string> &paths) {
-        paths.clear();
-
-        glob_t gl;
-        glob(pattern, GLOB_MARK, NULL, &gl);
-
-        int n_files = gl.gl_pathc;
-
-        for (int np = 0; np < n_files; np++) {
-            paths.push_back(gl.gl_pathv[np]);
-        }
-    }
 
     template <typename T>
     auto blas(const ExecutionSpace es) {
@@ -98,7 +86,7 @@ namespace sfem {
     template <typename T>
     static std::shared_ptr<Buffer<T>> create_buffer(const std::ptrdiff_t n, const MemorySpace es) {
 #ifdef SFEM_ENABLE_CUDA
-        if (es == MEMORY_SPACE_DEVICE) return sfem::d_buffer<T>(n);
+        if (es == MEMORY_SPACE_DEVICE) return sfem::create_device_buffer<T>(n);
 #endif  // SFEM_ENABLE_CUDA
         return sfem::create_host_buffer<T>(n);
     }
@@ -107,7 +95,7 @@ namespace sfem {
     static std::shared_ptr<Buffer<T>> create_buffer(const std::ptrdiff_t n,
                                                     const ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) return sfem::d_buffer<T>(n);
+        if (es == EXECUTION_SPACE_DEVICE) return sfem::create_device_buffer<T>(n);
 #endif  // SFEM_ENABLE_CUDA
         return sfem::create_host_buffer<T>(n);
     }
@@ -984,11 +972,7 @@ namespace sfem {
     }
 
     static int write_crs(const std::string &path, CRSGraph &graph, sfem::Buffer<real_t> &values) {
-        struct stat st = {0};
-        if (stat(path.c_str(), &st) == -1) {
-            mkdir(path.c_str(), 0700);
-        }
-
+        sfem::create_directory(path.c_str());
         crs_t crs_out;
         crs_out.rowptr = (char *)graph.rowptr()->data();
         crs_out.colidx = (char *)graph.colidx()->data();

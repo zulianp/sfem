@@ -257,6 +257,25 @@ SFEM_INLINE static enum ElemType elem_lower_order(const enum ElemType type) {
     }
 }
 
+SFEM_INLINE static enum ElemType elem_higher_order(const enum ElemType type) {
+    switch (type) {
+        case NIL:
+            return NIL;
+        case TRI3:
+            return TRI6;
+        case TET4:
+            return TET10;
+        case TET10:
+            return TET20;
+        case EDGE2:
+            return EDGE3;
+        default: {
+            assert(0);
+            return INVALID;
+        }
+    }
+}
+
 SFEM_INLINE static int elem_num_nodes(const enum ElemType type) {
     switch (type) {
         case NIL:

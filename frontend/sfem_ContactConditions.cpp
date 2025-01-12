@@ -22,6 +22,7 @@
 #include "sfem_sshex8_skin.h"
 
 #include "sfem_Tracer.hpp"
+#include "sfem_glob.hpp"
 
 #include <vector>
 
@@ -508,8 +509,7 @@ namespace sfem {
             char pattern[SFEM_MAX_PATH_LENGTH];
             sprintf(pattern, "%s/i*.*raw", path_surface.c_str());
 
-            std::vector<std::string> paths;
-            find_files(pattern, paths);
+            auto paths = sfem::find_files(pattern);
 
             assert((int)paths.size() == nxe);
 

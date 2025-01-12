@@ -1,5 +1,5 @@
 #include "sfem_Function.hpp"
-#include <glob.h>
+
 #include <stddef.h>
 
 #include "matrixio_array.h"
@@ -27,6 +27,7 @@
 #include <map>
 #include <memory>
 #include <vector>
+#include <sstream>
 
 // Ops
 
@@ -48,6 +49,7 @@
 #include "sfem_prolongation_restriction.h"
 
 #include "sfem_Tracer.hpp"
+#include "sfem_glob.hpp"
 
 #ifdef SFEM_ENABLE_RYAML
 
@@ -466,12 +468,7 @@ namespace sfem {
     int SemiStructuredMesh::export_as_standard(const char *path) {
         SFEM_TRACE_SCOPE("SemiStructuredMesh::export_as_standard");
 
-        {
-            struct stat st = {0};
-            if (stat(path, &st) == -1) {
-                mkdir(path, 0700);
-            }
-        }
+        sfem::create_directory(path);
 
         std::string folder   = path;
         auto        elements = impl_->elements;
@@ -520,13 +517,7 @@ namespace sfem {
 
     int SemiStructuredMesh::write(const char *path) {
         SFEM_TRACE_SCOPE("SemiStructuredMesh::write");
-
-        {
-            struct stat st = {0};
-            if (stat(path, &st) == -1) {
-                mkdir(path, 0700);
-            }
-        }
+        sfem::create_directory(path);
 
         std::string folder   = path;
         auto        elements = impl_->elements;
@@ -846,6 +837,7 @@ namespace sfem {
     };
 
     std::shared_ptr<FunctionSpace> DirichletConditions::space() { return impl_->space; }
+    std::vector<struct DirichletConditions::Condition>  &DirichletConditions::conditions() { return impl_->conditions; }
 
     int DirichletConditions::n_conditions() const { return impl_->conditions.size(); }
 
@@ -1363,13 +1355,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("Output::write");
 
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
-
-        {
-            struct stat st = {0};
-            if (stat(impl_->output_dir.c_str(), &st) == -1) {
-                mkdir(impl_->output_dir.c_str(), 0700);
-            }
-        }
+        sfem::create_directory(impl_->output_dir.c_str());
 
         const int block_size = impl_->space->block_size();
         if (impl_->AoS_to_SoA && block_size > 1) {
@@ -1407,13 +1393,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("Output::write_time_step");
 
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
-
-        {
-            struct stat st = {0};
-            if (stat(impl_->output_dir.c_str(), &st) == -1) {
-                mkdir(impl_->output_dir.c_str(), 0700);
-            }
-        }
+        sfem::create_directory(impl_->output_dir.c_str());
 
         char path[2048];
         sprintf(path, impl_->time_dependent_file_format.c_str(), impl_->output_dir.c_str(), name, impl_->export_counter++);
@@ -3035,10 +3015,8 @@ namespace sfem {
 
         std::shared_ptr<Buffer<idx_t *>> ret;
 
-        glob_t gl;
-        glob(pattern, GLOB_MARK, NULL, &gl);
-
-        int n_files = gl.gl_pathc;
+        auto files = sfem::find_files(pattern);
+        int n_files = files.size();
 
         idx_t **data = (idx_t **)malloc(n_files * sizeof(idx_t *));
 
@@ -3048,15 +3026,13 @@ namespace sfem {
         printf("n_files (%d):\n", n_files);
         int err = 0;
         for (int np = 0; np < n_files; np++) {
-            printf("%s\n", gl.gl_pathv[np]);
+            printf("%s\n", files[np].c_str());
 
             idx_t *idx = 0;
-            err |= array_create_from_file(comm, gl.gl_pathv[np], SFEM_MPI_IDX_T, (void **)&idx, &local_size, &size);
+            err |= array_create_from_file(comm, files[np].c_str(), SFEM_MPI_IDX_T, (void **)&idx, &local_size, &size);
 
             data[np] = idx;
         }
-
-        globfree(&gl);
 
         ret = std::make_shared<Buffer<idx_t *>>(
                 n_files,
