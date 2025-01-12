@@ -50,7 +50,6 @@ set(SFEM_MODULES
     operators/navier_stokes
     operators/tet10
     operators/tet4
-    operators/tet4/vectorized
     operators/tri3
     operators/tri6
     operators/trishell3
@@ -69,6 +68,10 @@ set(SFEM_MODULES
     ssmg
 )
 
+if(SFEM_ENABLE_EXPLICIT_VECTORIZATION)
+    list(APPEND SFEM_MODULES operators/tet4/vectorized)
+endif()
+
 if(SFEM_ENABLE_AMG)
     list(APPEND SFEM_MODULES amg)
 endif()
@@ -81,12 +84,16 @@ if(SFEM_ENABLE_RESAMPLING)
     list(APPEND SFEM_MODULES
         resampling
         resampling/tet10
-        resampling/quadshell4
-        resampling/trishell3
-        resampling/beam2
-        resampling/interpolate
     )
 endif()
+
+list(APPEND SFEM_MODULES 
+    resampling/interpolate
+    resampling/quadshell4
+    resampling/trishell3
+    resampling/beam2
+    resampling/surface
+    )
 
 list(APPEND SFEM_MODULES frontend)
 
