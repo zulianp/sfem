@@ -86,7 +86,7 @@ namespace sfem {
     template <typename T>
     static std::shared_ptr<Buffer<T>> create_buffer(const std::ptrdiff_t n, const MemorySpace es) {
 #ifdef SFEM_ENABLE_CUDA
-        if (es == MEMORY_SPACE_DEVICE) return sfem::d_buffer<T>(n);
+        if (es == MEMORY_SPACE_DEVICE) return sfem::create_device_buffer<T>(n);
 #endif  // SFEM_ENABLE_CUDA
         return sfem::create_host_buffer<T>(n);
     }
@@ -95,7 +95,7 @@ namespace sfem {
     static std::shared_ptr<Buffer<T>> create_buffer(const std::ptrdiff_t n,
                                                     const ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) return sfem::d_buffer<T>(n);
+        if (es == EXECUTION_SPACE_DEVICE) return sfem::create_device_buffer<T>(n);
 #endif  // SFEM_ENABLE_CUDA
         return sfem::create_host_buffer<T>(n);
     }
